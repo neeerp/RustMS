@@ -213,6 +213,8 @@ pub struct Player {
     pub teleport_rocks: TeleportRocks,
     /// The tamed monster's level, EXP and tiredness.
     pub mount: Mount,
+    /// The town the player entered the Free Market from, to go back to.
+    pub free_market_return: Option<i32>,
     dirty: bool,
 }
 
@@ -249,6 +251,7 @@ impl Player {
             charmed: false,
             teleport_rocks: TeleportRocks::default(),
             mount: Mount::default(),
+            free_market_return: None,
             dirty: false,
         }
     }

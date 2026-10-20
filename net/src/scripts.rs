@@ -6,6 +6,10 @@
 use crate::content;
 use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
+use game_data::PortalTemplate;
+
+const FREE_MARKET: i32 = 910000000;
+const HENESYS: i32 = 100000000;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -59,6 +63,11 @@ pub enum Effect {
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything
     /// else), judged as the client judges a style's kind.
     SetStyle(i32),
+    /// Set or clear the town to go back to from the Free Market.
+    SetFreeMarketReturn(Option<i32>),
+    /// Play the portal sound, which the client leaves to the server for a
+    /// scripted portal.
+    PortalSound,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -107,6 +116,30 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             effects: vec![Effect::OfferTutorialSkip],
             block: true,
         },
+        // The Free Market's exit, back to the town the player came from.
+        "market00" => {
+            let town = player.free_market_return.unwrap_or(HENESYS);
+            ScriptOutcome {
+                effects: vec![
+                    Effect::SetFreeMarketReturn(None),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(town, portal_id(town, is_market_portal)),
+                ],
+                block: false,
+            }
+        }
+        // A town's Free Market entrance (market01 to market22).
+        script if script.starts_with("market") => ScriptOutcome {
+            effects: vec![
+                Effect::SetFreeMarketReturn(Some(player.stats.map_id)),
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    FREE_MARKET,
+                    portal_id(FREE_MARKET, |portal| portal.name == "out00"),
+                ),
+            ],
+            block: false,
+        },
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -118,6 +151,22 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         _ => return None,
     };
     Some(outcome)
+}
+
+fn is_market_portal(portal: &PortalTemplate) -> bool {
+    portal
+        .script
+        .as_deref()
+        .is_some_and(|script| script.contains("market"))
+}
+
+/// The id of `map_id`'s first portal that `pick` accepts, else 0.
+fn portal_id(map_id: i32, pick: impl Fn(&PortalTemplate) -> bool) -> u8 {
+    crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(map_id))
+        .and_then(|field| field.portals().find(|portal| pick(portal)))
+        .map_or(0, |portal| u8::try_from(portal.id).unwrap_or(0))
 }
 
 #[cfg(test)]
@@ -145,6 +194,34 @@ mod tests {
             effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
         }
+    }
+
+    #[test]
+    fn the_free_market_sends_players_back_where_they_came_from() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 100000100;
+        assert_eq!(
+            portal("market01", &player).unwrap().effects,
+            vec![
+                Effect::SetFreeMarketReturn(Some(100000100)),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FREE_MARKET, 34),
+            ]
+        );
+        player.free_market_return = Some(220000000);
+        assert_eq!(
+            portal("market00", &player).unwrap().effects,
+            vec![
+                Effect::SetFreeMarketReturn(None),
+                Effect::PortalSound,
+                Effect::WarpToPortal(220000000, 31),
+            ]
+        );
+        player.free_market_return = None;
+        assert_eq!(
+            portal("market00", &player).unwrap().effects[2],
+            Effect::WarpToPortal(HENESYS, 0)
+        );
     }
 
     #[test]

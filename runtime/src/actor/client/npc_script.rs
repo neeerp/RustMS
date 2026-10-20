@@ -5,6 +5,7 @@ use crate::error::RuntimeError;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
+use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, stat};
 use net::quests::{self, QuestTemplate};
@@ -98,6 +99,13 @@ impl ClientActor {
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
+                Effect::PortalSound => {
+                    afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
+                }
+                Effect::SetFreeMarketReturn(town) => {
+                    next.free_market_return = *town;
+                    changed = true;
+                }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Hint {
                     text,

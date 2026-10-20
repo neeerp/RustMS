@@ -105,6 +105,8 @@ pub fn build_wheel_used(left: u8) -> Result<Packet, NetworkError> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharEffect {
     LevelUp = 0,
+    /// The portal sound, for a scripted warp (FUN_009377d9 mode 7).
+    PortalSound = 7,
     JobChange = 8,
     QuestClear = 9,
     MonsterCard = 13,

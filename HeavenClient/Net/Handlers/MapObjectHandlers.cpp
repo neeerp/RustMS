@@ -365,6 +365,10 @@ namespace ms
 		{
 			show_effect_with_sound(cid, CharEffect::LEVELUP, Sound::Name::LEVELUP);
 		}
+		else if (effect == 7) // a scripted portal's sound
+		{
+			Sound(Sound::Name::PORTAL).play();
+		}
 		else if (effect == 8 && !recv.available())
 		{
 			show_effect_with_sound(cid, CharEffect::JOBCHANGE, Sound::Name::JOBCHANGED);

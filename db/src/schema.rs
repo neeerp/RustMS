@@ -242,6 +242,14 @@ diesel::table! {
 }
 diesel::joinable!(teleport_rocks -> characters (character_id));
 diesel::table! {
+    saved_locations (character_id, kind) {
+        character_id -> Int4,
+        kind -> Int2,
+        map_id -> Int4,
+    }
+}
+diesel::joinable!(saved_locations -> characters (character_id));
+diesel::table! {
     gacha_exp (character_id) {
         character_id -> Int4,
         exp -> Int4,
@@ -370,6 +378,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     wish_lists,
     monster_book_cards,
     teleport_rocks,
+    saved_locations,
     gacha_exp,
     character_mounts,
     fame_log,

@@ -730,6 +730,10 @@ namespace ms
 						messenger->show_status(Color::Name::PICTONBLUE, message);
 			}
 		}
+		else if (mode1 == 7) // a scripted portal's sound (FUN_009377d9)
+		{
+			Sound(Sound::Name::PORTAL).play();
+		}
 		else if (mode1 == 8) // job change
 		{
 			Stage::get().get_player().show_effect_id(CharEffect::Id::JOBCHANGE);
