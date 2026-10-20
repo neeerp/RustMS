@@ -53,7 +53,8 @@ fn moves(stat: BuffStat) -> bool {
 /// GIVE_BUFF: the stats a skill gives, lasting `duration_ms`
 /// (FUN_00a202be). Each stat's value, skill, and duration come in the
 /// order of their bits. A disease's skill is its mob skill and level,
-/// `skill | level << 16`.
+/// `skill | level << 16`. Speed Infusion's two-state data follows the
+/// defense attack and state.
 pub fn build_give_buff(
     skill_id: i32,
     duration_ms: i32,
@@ -64,13 +65,23 @@ pub fn build_give_buff(
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::GiveBuff as i16)?;
     write_mask(&mut p, stats.iter().map(|&(stat, _)| stat.bit()))?;
-    for &(_, value) in &stats {
+    let infusion = stats
+        .iter()
+        .find(|&&(stat, _)| stat == BuffStat::SpeedInfusion);
+    for &(stat, value) in &stats {
+        if stat == BuffStat::SpeedInfusion {
+            continue;
+        }
         p.write_short(value)?;
         p.write_int(skill_id)?;
         p.write_int(duration_ms)?;
     }
     p.write_byte(0)?; // defense attack
     p.write_byte(0)?; // defense state
+    if let Some(&(_, value)) = infusion {
+        let seconds = (duration_ms / 1000).clamp(0, i32::from(u16::MAX)) as u16;
+        write_infusion(&mut p, value, skill_id, seconds)?;
+    }
     p.write_short(0)?; // delay
     if stats.iter().any(|&(stat, _)| moves(stat)) {
         p.write_byte(0)?;
@@ -171,6 +182,24 @@ pub(crate) fn write_two_state(
     p.write_int(i32::from(value))?;
     p.write_int(skill_id)?;
     p.write_byte(0)?; // start before (1) or after now
+    p.write_int(0)?; // how long
+    p.write_short(seconds as i16)?;
+    Ok(())
+}
+
+/// Speed Infusion's two-state data (PartyBooster, bit 86; v83 0x793e28):
+/// as the others', with a second sign and delta for when it was given.
+fn write_infusion(
+    p: &mut Packet,
+    value: i16,
+    skill_id: i32,
+    seconds: u16,
+) -> Result<(), NetworkError> {
+    p.write_int(i32::from(value))?;
+    p.write_int(skill_id)?;
+    p.write_byte(0)?; // start before (1) or after now
+    p.write_int(0)?; // how long
+    p.write_byte(0)?; // given before (1) or after now
     p.write_int(0)?; // how long
     p.write_short(seconds as i16)?;
     Ok(())
@@ -434,6 +463,26 @@ mod tests {
         expect.short(50).int(1301007).int(300_000);
         expect.short(60).int(1301007).int(300_000);
         expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn speed_infusion_gives_its_two_state_block_after_the_defense() {
+        let packet = build_give_buff(5121009, 300_000, &[(BuffStat::SpeedInfusion, -2)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(1 << 54).long(0);
+        expect.byte(0).byte(0);
+        // Its value and skill, two signs and deltas, then its seconds.
+        expect
+            .int(-2)
+            .int(5121009)
+            .byte(0)
+            .int(0)
+            .byte(0)
+            .int(0)
+            .short(300);
+        expect.short(0);
         expect.end();
     }
 

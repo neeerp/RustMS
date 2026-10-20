@@ -757,7 +757,8 @@ namespace ms
 		int8_t base_speed = stats.get_attackspeed();
 		int8_t weapon_speed = weapon.get_speed();
 
-		return base_speed + weapon_speed;
+		// The buffs speed it up as far as 2 (FUN_00765066).
+		return static_cast<int8_t>(std::clamp(base_speed + weapon_speed, 2, 10));
 	}
 
 	void Player::set_direction(bool flipped)

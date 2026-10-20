@@ -85,8 +85,8 @@ namespace ms
 			case 83: return DASH_SPEED;
 			case 84: return DASH_JUMP;
 			case 85: return MONSTER_RIDING;
+			case 86: return SPEED_INFUSION;
 			case 87: return HOMING_BEACON;
-			case 88: return SPEED_INFUSION;
 			default: return NONE;
 			}
 		}

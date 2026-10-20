@@ -54,6 +54,9 @@ namespace ms
 		constexpr uint8_t DASH_JUMP = 84;
 		// Riding, a two-state stat: its data is the mount and the skill riding it (0x793ef2).
 		constexpr uint8_t RIDING = 85;
+		// Speed Infusion, a two-state stat: its data is the attack speed it adds, the skill and its seconds, with a
+		// second time between (0x793e28).
+		constexpr uint8_t INFUSION = 86;
 
 		struct Ride
 		{
@@ -70,12 +73,20 @@ namespace ms
 			int16_t seconds;
 		};
 
+		struct Infusion
+		{
+			int32_t speed;
+			int32_t skill;
+			int16_t seconds;
+		};
+
 		struct TwoState
 		{
 			int32_t energy;
 			int32_t energy_skill;
 			Dash dash;
 			Ride ride;
+			Infusion infusion;
 		};
 
 		// The two-state stats' data, which follows the defense attack and state: the energy's, Dash's and

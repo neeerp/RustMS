@@ -949,6 +949,7 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
             vec![(BuffStat::Booster, effect.x)]
         }
         1101007 | 1201007 => vec![(BuffStat::PowerGuard, effect.x)],
+        5121009 | 15111005 => vec![(BuffStat::SpeedInfusion, effect.x)],
         // The orbs start at none, which the client counts from 1.
         1111002 => vec![(BuffStat::Combo, 1)],
         1211003..=1211008 | 1221003 | 1221004 => {
