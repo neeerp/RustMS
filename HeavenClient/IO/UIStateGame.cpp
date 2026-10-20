@@ -66,6 +66,8 @@ namespace ms
 					return Tooltip::Parent::ITEMINVENTORY;
 				case UIElement::Type::SKILLBOOK:
 					return Tooltip::Parent::SKILLBOOK;
+				case UIElement::Type::SKILLMACRO:
+					return Tooltip::Parent::SKILLMACRO;
 				case UIElement::Type::SHOP:
 					return Tooltip::Parent::SHOP;
 				case UIElement::Type::STORAGE:

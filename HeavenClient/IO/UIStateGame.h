@@ -138,6 +138,8 @@ namespace ms
 				{Icon::IconType::EQUIP,     UIElement::Type::EQUIPINVENTORY},
 				{Icon::IconType::ITEM,      UIElement::Type::ITEMINVENTORY},
 				{Icon::IconType::KEY,       UIElement::Type::KEYCONFIG},
+				{Icon::IconType::MACRO_SKILL, UIElement::Type::SKILLMACRO},
+				{Icon::IconType::MACRO,     UIElement::Type::SKILLMACRO},
 				{Icon::IconType::NUM_TYPES, UIElement::Type::NUM_TYPES}
 		};
 

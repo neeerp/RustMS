@@ -46,6 +46,8 @@ namespace ms
 
 		void toggle_active() override;
 
+		void update() override;
+
 		void doubleclick(Point<int16_t> cursorpos) override;
 
 		void remove_cursor() override;
@@ -137,6 +139,9 @@ namespace ms
 
 		void close();
 
+		// Closes the macro window, which belongs to this one.
+		void close_macros();
+
 		bool check_required(int32_t id) const;
 
 		enum Buttons : uint16_t
@@ -150,7 +155,8 @@ namespace ms
 			BT_SPUP0,
 			BT_SPUP1,
 			BT_SPUP2,
-			BT_SPUP3
+			BT_SPUP3,
+			BT_MACRO
 		};
 
 		static constexpr uint16_t TABS = 5;

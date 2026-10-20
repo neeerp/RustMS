@@ -38,6 +38,10 @@ namespace ms
 			EQUIP,
 			ITEM,
 			KEY,
+			// A skill taken out of a macro's slot.
+			MACRO_SKILL,
+			// A macro, to bind to a key.
+			MACRO,
 			NUM_TYPES
 		};
 
@@ -113,7 +117,7 @@ namespace ms
 
 		void set_count(int16_t count);
 
-		IconType get_type();
+		IconType get_type() const;
 
 		void draw(Point<int16_t> position) const;
 

@@ -26,6 +26,34 @@ namespace ms
 			return skill == 0 || digit == 0 || digit == 9;
 		}
 
+		// The skills held down to charge (v83 FUN_004fb08f).
+		constexpr int32_t KEYDOWN[] = {
+			5101004, 2221001, 1121001, 1221001, 1321001, 2121001, 2321001, 3121004, 3221001, 5201002,
+			5221004, 13111002, 14111006, 15101003, 22121000, 22151001
+		};
+
+		// Teleport, Flash Jump, Meso Explosion and 11101005.
+		constexpr int32_t MOVES[] = { 2101002, 2201002, 2301001, 12101003, 22101001, 4111006, 14101004, 4211006, 11101005 };
+
+		// Whether a skill may go in a macro's slot (v83 FUN_004fb292): one a
+		// macro runs, not held down to charge, not a movement skill, and with
+		// no cooldown at any level.
+		inline bool may_hold(int32_t skill, bool has_cooltime)
+		{
+			if (skipped(skill) || has_cooltime)
+				return false;
+
+			for (int32_t id : KEYDOWN)
+				if (id == skill)
+					return false;
+
+			for (int32_t id : MOVES)
+				if (id == skill)
+					return false;
+
+			return true;
+		}
+
 		struct Step
 		{
 			int32_t skill;

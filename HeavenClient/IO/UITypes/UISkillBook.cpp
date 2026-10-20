@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UISkillBook.h"
+#include "UISkillMacro.h"
 
 #include "../UI.h"
 
@@ -57,6 +58,8 @@ namespace ms
 		constexpr Point<int16_t> ROW_RECOMMEND = Point<int16_t>(36, 0);
 		constexpr int16_t SLIDER_X = 153;
 		constexpr Point<int16_t> SP_LABEL = Point<int16_t>(110, 259);
+		// v83 FUN_008aaa88.
+		constexpr Point<int16_t> MACRO = Point<int16_t>(120, 265);
 		constexpr int16_t ICON_SIZE = 32;
 	}
 
@@ -166,6 +169,8 @@ namespace ms
 			buttons[Buttons::BT_SPUP0 + i] = std::make_unique<MapleButton>(Skill["BtSpUp"], spup_pos);
 		}
 
+		buttons[Buttons::BT_MACRO] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtMacro"], MACRO);
+
 		booktext = Text(Text::Font::A10M, Text::Alignment::CENTER, Color::Name::WHITE);
 		splabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
@@ -259,6 +264,13 @@ namespace ms
 					spend_sp(skills[index].get_id());
 			}
 				break;
+			case Buttons::BT_MACRO:
+				clear_tooltip();
+
+				if (auto macros = UI::get().emplace<UISkillMacro>(position))
+					macros->dock(position);
+
+				break;
 			default:
 				break;
 		}
@@ -268,9 +280,21 @@ namespace ms
 
 	void UISkillBook::toggle_active()
 	{
+		if (active)
+			close_macros();
+
 		UIElement::toggle_active();
 
 		clear_tooltip();
+	}
+
+	void UISkillBook::update()
+	{
+		UIElement::update();
+
+		// The macro window keeps to the skill window's right.
+		if (auto macros = UI::get().get_element<UISkillMacro>())
+			macros->dock(position);
 	}
 
 	void UISkillBook::doubleclick(Point<int16_t> cursorpos)
@@ -599,8 +623,17 @@ namespace ms
 
 	void UISkillBook::close()
 	{
+		close_macros();
 		clear_tooltip();
 		deactivate();
+	}
+
+	void UISkillBook::close_macros()
+	{
+		// v83 destroys the macro window with the skill window.
+		if (auto macros = UI::get().get_element<UISkillMacro>())
+			if (macros->is_active())
+				macros->close();
 	}
 
 	bool UISkillBook::check_required(int32_t id) const

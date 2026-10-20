@@ -183,8 +183,19 @@ from `UI.nx`. Moved so far:
   (`Text::Font::A10M`). Rows are grey when a required skill is missing. SP-up
   spends a point at once; v83 had no allocation popup. A `recommend/0` frame
   marks the skill `Etc/RecommendSkill.img` names for the SP spent in the tab
-  (`recommended_skill`). The MACRO button and the `SkillMacro` window are not
-  drawn yet.
+  (`recommended_skill`). Its MACRO button (`Basic.img/BtMacro`) shows or hides
+  the skill macro window.
+- **Skill macro window** (`UISkillMacro`, `UIWindow.img/SkillMacro`): docked
+  at the skill window's right, which closes it and forgets its selection. It
+  lists the five macros three at a time with a scroll bar. Skills are dragged
+  into a macro's slots from the skill window or from another slot, and taken
+  out by dropping them on the field. v83 refuses passive, charged and movement
+  skills and ones with a cooldown (`skill_macro::may_hold`). Every change
+  sends the whole list (`SkillMacroPacket`). Clicking a row selects it, and
+  any other click in the window selects the first macro, as v83 does. The
+  selected macro's name (12 bytes) and shout box are saved with OK, which
+  refuses curse words. The macro icons can be dragged, but no key takes them
+  yet. The buttons have no tooltips.
 - **Item window** (`UIItemInventory`, `UIWindow.img/Item`): five tabs
   (`Item/Tab`, drawn by `ClassicTabs`), six rows of four slots with a `VScr4`
   scroll bar, and the mesos, laid out from period footage. BtFull widens it to

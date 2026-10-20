@@ -65,6 +65,12 @@ int main()
 		runner.clear();
 		require(!runner.running(), "cleared");
 
+		require(may_hold(1001004, false), "Power Strike");
+		require(!may_hold(1000000, false) && !may_hold(1009000, false), "passive and digit 9");
+		require(!may_hold(2121001, false) && !may_hold(5101004, false), "charged");
+		require(!may_hold(2101002, false) && !may_hold(4111006, false) && !may_hold(4211006, false), "moves");
+		require(!may_hold(1121006, true), "a cooldown");
+
 		std::cout << "skill macro rules passed\n";
 		return 0;
 	}

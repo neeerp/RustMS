@@ -33,6 +33,25 @@ int main()
 		macros.replace({});
 		require(macros.size() == 0, "replaced by none");
 
+		macros.set_skill(2, 1, 1001004);
+		require(macros.size() == 3 && macros.skill(2, 1) == 1001004, "a skill grows the list");
+		require(macros.name(0).empty() && macros.shouts(0) && macros.skill(0, 0) == 0, "grown empty and shouting");
+
+		macros.set_skill(5, 0, 1001004);
+		macros.set_skill(0, 3, 1001004);
+		require(macros.size() == 3 && macros.skill(0, 0) == 0, "no sixth macro or fourth slot");
+
+		macros.clear_skill(2, 1);
+		macros.clear_skill(4, 0);
+		require(macros.size() == 3 && macros.skill(2, 1) == 0, "cleared in range only");
+
+		require(!macros.set_name(0, "", true), "unchanged");
+		require(macros.set_name(0, "", false) && !macros.shouts(0), "silenced");
+		require(macros.set_name(0, "twelve bytes", false) && macros.name(0) == "twelve bytes", "renamed");
+		require(!macros.set_name(0, "thirteen byte", false) && macros.name(0) == "twelve bytes", "too long");
+		require(!macros.set_name(5, "a", true), "no sixth");
+		require(!macros.set_name(4, "", true) && macros.size() == 5, "grows even when unchanged");
+
 		std::cout << "skill macros passed\n";
 		return 0;
 	}

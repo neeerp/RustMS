@@ -234,6 +234,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME skill_macros COMMAND skill_macros_tests)
     add_executable(skill_macro_rules_tests tests/skill_macro_rules.cpp)
     add_test(NAME skill_macro_rules COMMAND skill_macro_rules_tests)
+    add_executable(skill_macro_layout_tests tests/skill_macro_layout.cpp)
+    add_test(NAME skill_macro_layout COMMAND skill_macro_layout_tests)
     add_executable(mount_rules_tests tests/mount_rules.cpp)
     add_test(NAME mount_rules COMMAND mount_rules_tests)
     add_executable(catch_items_tests tests/catch_items.cpp)
@@ -735,6 +737,9 @@ add_executable(HeavenClient
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
+    IO/UITypes/SkillMacroLayout.h
+    IO/UITypes/UISkillMacro.cpp
+    IO/UITypes/UISkillMacro.h
     IO/UITypes/UISystemOption.cpp
     IO/UITypes/UISystemOption.h
     IO/UITypes/UISoftKey.cpp
