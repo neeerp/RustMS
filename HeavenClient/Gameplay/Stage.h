@@ -357,6 +357,8 @@ namespace ms
 		MapMists mists;
 		// The ms since a mob's mist last hurt the player.
 		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
+		// When a mob touching the barrel last tried to see through it.
+		int64_t barrel_checked = INT32_MIN;
 		MapDoors doors;
 		MapSummons summons;
 		MapShip ship;

@@ -32,6 +32,9 @@ namespace ms
 		// An item's morph: neither a superman's (Transformation) nor hidden (Oak Barrel) (FUN_008c46de).
 		bool is_item() const;
 
+		// Oak Barrel's, which hides the player from mobs (FUN_004520d5).
+		bool is_hide() const;
+
 		int32_t get_speed() const;
 
 		int32_t get_jump() const;

@@ -428,7 +428,7 @@ namespace ms
 				grip = ride_ability->fs;
 				swim = ride_ability->swim;
 			}
-			else if (const MorphTemplate *morph = get_item_morph())
+			else if (const MorphTemplate *morph = get_template_morph())
 			{
 				grip = morph->get_fs();
 				swim = morph->get_swim();
@@ -1659,7 +1659,7 @@ namespace ms
 
 	bool Player::morph_refuses() const
 	{
-		if (!get_item_morph())
+		if (!get_template_morph())
 			return false;
 
 		InChatMessage(no_cancel_morph() ? Messages::Type::MORPHED_FIXED : Messages::Type::MORPHED).drop();
@@ -1727,13 +1727,14 @@ namespace ms
 
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
 	// them into shoe multipliers (FUN_007a4dec). A rider moves as the mount
-	// does instead, and an item's morph as its template (FUN_0094d3d9).
+	// does instead, and an item's morph or the barrel as its template
+	// (FUN_0094d3d9).
 	double Player::get_walkspeed() const
 	{
 		if (ride_ability)
 			return ride_ability->speed / 100.0;
 
-		if (const MorphTemplate *morph = get_item_morph())
+		if (const MorphTemplate *morph = get_template_morph())
 			return morph::speed(morph->get_speed()) / 100.0;
 
 		std::optional<int32_t> slow;
@@ -1751,7 +1752,7 @@ namespace ms
 		if (ride_ability)
 			return Physics::jump_speed(ride_ability->jump / 100.0);
 
-		if (const MorphTemplate *morph = get_item_morph())
+		if (const MorphTemplate *morph = get_template_morph())
 			return Physics::jump_speed(morph::jump(morph->get_jump()) / 100.0);
 
 		return Physics::jump_speed(std::clamp<int32_t>(stats.get_total(EquipStat::Id::JUMP), 80, 123) / 100.0);

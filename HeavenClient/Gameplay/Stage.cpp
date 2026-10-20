@@ -33,6 +33,7 @@
 #include "../IO/UI.h"
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
+#include "../Util/Randomizer.h"
 
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIMobGage.h"
@@ -49,6 +50,7 @@
 
 #include <nlnx/nx.hpp>
 
+#include <cmath>
 #include <cstdlib>
 #include <unordered_map>
 
@@ -377,7 +379,8 @@ namespace ms
 														   !player.getflip());
 
 		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
-							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.get_beacon() });
+							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.is_barrelled(),
+							   player.get_beacon() });
 		chars.update(physics);
 		drops.update(physics);
 
@@ -451,9 +454,25 @@ namespace ms
 				player.has_buff(Buffstat::Id::DARKSIGHT));
 
 		if (touching)
-		{
 			combat.body_attack(touching);
 
+		if (touching && player.is_barrelled())
+		{
+			// A mob touching the barrel does no harm, but every 2 seconds may see through it
+			// (0x94b3ef, 0x94b65d).
+			int64_t now = get_uptime() / 1000;
+
+			if (now - barrel_checked >= 2000)
+			{
+				barrel_checked = now;
+				int32_t level = player.get_skills().get_level(morph::OAK_BARREL);
+				float chance = SkillData::get(morph::OAK_BARREL).get_stats(level).chance;
+
+				if (morph::spotted(static_cast<int32_t>(std::lround(chance * 100)), Randomizer().next_int<uint32_t>(100)))
+					CancelBuffPacket(morph::OAK_BARREL).dispatch();
+			}
+		} else if (touching)
+		{
 			if (MobAttack attack = mobs.create_attack(touching))
 			{
 				MobAttackResult result = player.damage(attack);
@@ -819,7 +838,7 @@ namespace ms
 
 	void Stage::check_seats()
 	{
-		// Not on a mount or as an item's morph, wherever the player is (FUN_0094e45f).
+		// Not on a mount or morphed, wherever the player is (FUN_0094e45f).
 		if (player.is_sitting() || player.is_attacking() || player.ride_refuses() || player.morph_refuses())
 			return;
 
@@ -1018,7 +1037,7 @@ namespace ms
 
 				break;
 			case KeyType::Id::FACE:
-				// Not as an item's morph (FUN_00a24470).
+				// Not morphed (FUN_00a24470).
 				if (down && !player.morph_refuses() && emote_cooldown.try_start(get_uptime() / 1000))
 				{
 					player.set_expression(action);
@@ -1457,7 +1476,7 @@ namespace ms
 
 	void Stage::use_item_effect(int32_t item_id)
 	{
-		// Not as an item's morph (FUN_00a24530).
+		// Not morphed (FUN_00a24530).
 		if (player.morph_refuses())
 			return;
 

@@ -111,6 +111,8 @@ namespace ms
 			bool dead;
 			// Dark Sight keeps physical attacks off.
 			bool darksight;
+			// Oak Barrel keeps every attack off.
+			bool hidden;
 			// The mob the player's Homing Beacon marked.
 			beacon::Mark guided;
 		};
@@ -513,6 +515,7 @@ namespace ms
 		mob_attack::Box targetbody{};
 		bool targetonground = false;
 		bool targetdarksight = false;
+		bool targethidden = false;
 		// Its own look, while Doom shows another.
 		std::optional<std::map<Stance, Animation>> ownlook;
 		std::string name;
