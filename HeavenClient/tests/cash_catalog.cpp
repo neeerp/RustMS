@@ -43,6 +43,15 @@ int main()
 		std::vector<Commodity> wished = find(all, { 50100001, 0, 99999999, 50200003 });
 		require(wished.size() == 2 && wished[0].sn == 50100001 && wished[1].sn == 50200003, "the wish list keeps its order and skips empty slots");
 
+		std::vector<Commodity> hats = {
+			{ 10100133, 1062050, 800, 1, 2, NONE, 1, 90 },
+			{ 20500059, 1062050, 3000, 1, 2, NONE, 1, 90 },
+			{ 91000010, 1062050, 2400, 1, 2, NONE, 1, 90 },
+			{ 20500060, 1062050, 5000, 1, 2, NONE, 1, 0 }
+		};
+		require(regular_price(hats, hats[2]) == 3000, "a content costs what the dearest of its kind does");
+		require(regular_price(hats, hats[3]) == 5000, "a different period is another kind");
+
 		std::vector<int32_t> wishes = wish({ 7, 0, 0 }, 9);
 		require(wishes == std::vector<int32_t>({ 7, 9 }), "a wish joins the end, dropping empty slots");
 		require(wish(wishes, 7) == wishes, "a wish is listed once");
