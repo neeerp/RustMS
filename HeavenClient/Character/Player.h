@@ -223,6 +223,9 @@ namespace ms
 		// Return the charge skill on the character's weapon, or 0.
 		int32_t get_charge() const override;
 
+		// Return the skill whose clone Shadow Partner draws, or 0 without the buff.
+		int32_t get_shadow_partner() const override;
+
 		// Return the character's attacking speed.
 		int8_t get_integer_attackspeed() const override;
 
