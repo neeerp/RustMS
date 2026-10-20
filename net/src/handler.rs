@@ -437,7 +437,7 @@ pub enum WorldAction {
 /// A skill a player used that reached their party: the members in the
 /// slots set in `slots` (a bit each, the first slot highest, as USE_SKILL
 /// has them) get its buffs, or `heal` HP from Heal, if they are alive and
-/// in its area.
+/// in its area. Echo of Hero reaches everyone on the map instead.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PartySkill {
     pub skill_id: i32,

@@ -74,6 +74,13 @@ namespace ms
 			return defence * percent / 100;
 		}
 
+		// What Echo of Hero adds to a whole attack or magic: its percent,
+		// rounded down (0x77e01c, 0x79167b).
+		inline int32_t echo_bonus(int32_t total, int32_t percent)
+		{
+			return percent > 0 ? total * percent / 100 : 0;
+		}
+
 		// The Thrusts, which add their speed (FUN_00765c5e): the Ranger's,
 		// the Sniper's and the Wind Archer's.
 		constexpr int32_t THRUSTS[] = { 3110000, 3210000, 13100004 };

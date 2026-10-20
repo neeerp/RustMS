@@ -654,16 +654,26 @@ impl WorldDirectory {
     }
 
     /// Pass a party skill on to the members in its slots, the party's
-    /// joining order, who are on the user's map.
+    /// joining order, who are on the user's map; Echo of Hero, to everyone
+    /// else on the map.
     fn party_skill(&self, from: ClientId, used: PartySkill, origin: (i16, i16)) {
-        let (Some(entry), Some(party)) = (self.clients.get(&from), self.parties.of(from)) else {
+        let Some(entry) = self.clients.get(&from) else {
             return;
         };
-        for (slot, member) in party.members.iter().enumerate() {
-            if member.id == from || used.slots & net::skills::party_bit(slot) == 0 {
-                continue;
-            }
-            let Some(other) = self.clients.get(&member.id) else {
+        let reached: Vec<ClientId> = if net::skills::ECHOES.contains(&used.skill_id) {
+            self.clients.keys().copied().collect()
+        } else if let Some(party) = self.parties.of(from) {
+            let in_slots = party
+                .members
+                .iter()
+                .enumerate()
+                .filter(|(slot, _)| used.slots & net::skills::party_bit(*slot) != 0);
+            in_slots.map(|(_, member)| member.id).collect()
+        } else {
+            return;
+        };
+        for id in reached.into_iter().filter(|&id| id != from) {
+            let Some(other) = self.clients.get(&id) else {
                 continue;
             };
             if other.shares_map_with(entry) {
@@ -913,6 +923,30 @@ mod tests {
         assert!(reached(&mut bobby).is_empty());
         assert!(reached(&mut carol).is_empty());
         assert!(reached(&mut dave).is_empty());
+    }
+
+    #[test]
+    fn echo_of_hero_reaches_everyone_on_the_map() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut bobby = online(&mut directory, 2, "Bobby", 10000);
+        let mut carol = online(&mut directory, 3, "Carol", 20000);
+        let used = PartySkill {
+            skill_id: 1005,
+            level: 1,
+            slots: 0x3F,
+            heal: 0,
+        };
+        directory.party_skill(1, used.clone(), (5, 6));
+        let reached = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            std::iter::from_fn(|| rx.try_recv().ok())
+                .filter(|message| matches!(message, ServerMessage::PartySkill { .. }))
+                .count()
+        };
+        assert_eq!(reached(&mut alice), 0);
+        assert_eq!(reached(&mut bobby), 1);
+        assert_eq!(reached(&mut carol), 0);
     }
 
     #[test]

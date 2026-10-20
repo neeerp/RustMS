@@ -288,6 +288,13 @@ namespace ms
 			stats.add_value(EquipStat::Id::WATK,
 							secondary_stat::bare_hands_attack(job, stats.get_stat(MapleStat::Id::LEVEL)));
 
+		// Echo of Hero adds its percent of the whole attack and of the
+		// whole magic, which counts INT (FUN_00791617).
+		int32_t echo = get_buff_value(Buffstat::Id::ECHO_OF_HERO);
+		int32_t magic = stats.get_total(EquipStat::Id::INT) + stats.get_total(EquipStat::Id::MAGIC);
+		stats.add_value(EquipStat::Id::WATK, secondary_stat::echo_bonus(stats.get_total(EquipStat::Id::WATK), echo));
+		stats.add_value(EquipStat::Id::MAGIC, secondary_stat::echo_bonus(magic, echo));
+
 		stats.close_totalstats();
 
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
