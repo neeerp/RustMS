@@ -7,6 +7,7 @@
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
+use crate::events::{self, Entry, EventKind};
 use crate::scripts::Effect;
 use game::guild::{self, Guild};
 use game::{InventoryType, Player, QuestState};
@@ -29,6 +30,11 @@ pub const HERACLE: i32 = 2010007;
 /// Lea, beside him, who makes guild emblems; her script needs the guild
 /// too (`NpcScript::lea`).
 pub const LEA: i32 = 2010008;
+/// Lakelis, who sends parties into Kerning City's party quest; her script
+/// needs to know whether the party may go (`NpcScript::lakelis`).
+pub const LAKELIS: i32 = 9020000;
+/// Nella, who lets players out of the party quest and back to town.
+const NELLA: i32 = 9020002;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -605,8 +611,14 @@ impl NpcScript {
         lea(player, guild)
     }
 
+    /// Lakelis's script, for a player whose party may or may not go into
+    /// the party quest.
+    pub fn lakelis(entry: Entry) -> Self {
+        lakelis(entry)
+    }
+
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
-    /// plays for `player`. Heracle and Lea are not among them.
+    /// plays for `player`. Heracle, Lea and Lakelis are not among them.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -673,6 +685,7 @@ impl NpcScript {
             NLC_TAXI => Some(nlc_taxi(player)),
             DOLPHIN => Some(dolphin(player)),
             NATALIE => Some(natalie(player)),
+            NELLA => nella(player),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -1284,6 +1297,59 @@ fn nlc_taxi(player: &Player) -> NpcScript {
     );
     script.refused = Some(text(keys::NLC_TAXI_SHORT));
     script
+}
+
+/// Lakelis (Cosmic `9020000`): the party's leader may take the party in.
+fn lakelis(entry: Entry) -> NpcScript {
+    let page = match entry {
+        Entry::NoParty => Page::Say(text(keys::KPQ_LAKELIS_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::KPQ_LAKELIS_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(kpq_terms()),
+        Entry::Busy => Page::Say(text(keys::KPQ_LAKELIS_BUSY)),
+        Entry::Ready => Page::Ask {
+            text: text(keys::KPQ_LAKELIS_ASK),
+            on_yes: vec![Effect::StartEvent(EventKind::Kpq)],
+            on_no: Some(text(keys::KPQ_LAKELIS_DECLINE)),
+        },
+    };
+    let mut script = NpcScript::new(LAKELIS, vec![page]);
+    // Someone left or moved since she checked, or another party went in.
+    script.refused = Some(kpq_terms());
+    script
+}
+
+/// Who may play Kerning City's party quest.
+fn kpq_terms() -> String {
+    let (team, levels) = (&events::KPQ.team, &events::KPQ.levels);
+    content::text().get(
+        keys::KPQ_LAKELIS_NOT_ELIGIBLE,
+        &[
+            ("least", &team.start().to_string()),
+            ("most", &team.end().to_string()),
+            ("low", &levels.start().to_string()),
+            ("high", &levels.end().to_string()),
+        ],
+    )
+}
+
+/// Nella (Cosmic `9020002`): out of the party quest, then back to town.
+fn nella(player: &Player) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let (key, to) = if map_id == events::KPQ.exit {
+        (keys::KPQ_NELLA_HOME, events::KPQ.lobby)
+    } else if events::KPQ.holds(map_id) {
+        (keys::KPQ_NELLA_LEAVE, events::KPQ.exit)
+    } else {
+        return None;
+    };
+    Some(NpcScript::new(
+        NELLA,
+        vec![Page::Ask {
+            text: text(key),
+            on_yes: vec![Effect::Warp(to)],
+            on_no: None,
+        }],
+    ))
 }
 
 /// `station_in`: Isa shows the way to Orbis Station's platforms.
@@ -2731,6 +2797,46 @@ mod tests {
         let mut taxi = NpcScript::for_npc(NLC_TAXI, &rider(100, 14999, 600000000)).unwrap();
         taxi.begin();
         assert!(taxi.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+    }
+
+    #[test]
+    fn lakelis_takes_a_ready_party_in_and_tells_the_rest_why_not() {
+        let mut ready = NpcScript::lakelis(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(1));
+        assert_eq!(
+            ready.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::StartEvent(EventKind::Kpq)]
+        );
+        // Refused on the way in: she gives the terms.
+        let refused = ready.refused().unwrap();
+        assert_eq!(kind(&refused), Some(0));
+        for entry in [
+            Entry::NoParty,
+            Entry::NotLeader,
+            Entry::NotEligible,
+            Entry::Busy,
+        ] {
+            let mut lakelis = NpcScript::lakelis(entry);
+            assert_eq!(kind(&lakelis.begin()), Some(0));
+            assert!(lakelis
+                .respond(ScriptInput::Next)
+                .unwrap()
+                .effects
+                .is_empty());
+        }
+    }
+
+    #[test]
+    fn nella_lets_players_out_of_the_party_quest_then_home() {
+        for (from, to) in [(103000801, 103000890), (103000890, 103000000)] {
+            let mut nella = NpcScript::for_npc(NELLA, &rider(100, 0, from)).unwrap();
+            assert_eq!(kind(&nella.begin()), Some(1));
+            assert_eq!(
+                nella.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(to)]
+            );
+        }
+        assert_eq!(NpcScript::for_npc(NELLA, &rider(100, 0, 103000000)), None);
     }
 
     fn rider(job: i16, meso: i32, map_id: i32) -> Player {

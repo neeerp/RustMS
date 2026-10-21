@@ -1,5 +1,6 @@
 pub mod client;
 pub mod directory;
+pub mod event;
 pub mod field;
 pub mod field_drops;
 pub mod field_mists;

@@ -304,6 +304,26 @@ impl ClientActor {
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
+                Effect::StartEvent(kind) => {
+                    // Scripts end on this effect: once the directory reserves
+                    // the event, the party goes in.
+                    let (reply, start) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::StartEvent {
+                        from: self.client_id,
+                        kind: *kind,
+                        reply,
+                    })
+                    .await?;
+                    let Some(start) = start.await.ok().flatten() else {
+                        debug!(?kind, "Party may not go in; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    crate::actor::event::spawn(
+                        start,
+                        self.services.fields.clone(),
+                        self.services.directory.clone(),
+                    );
+                }
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);

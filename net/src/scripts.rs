@@ -105,6 +105,10 @@ pub enum Effect {
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
+    /// Take the player's party into its own copy of an event's maps
+    /// (`events::Event::team`). Nothing is applied unless the party still
+    /// may go; the script says its `refused` text instead.
+    StartEvent(crate::events::EventKind),
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

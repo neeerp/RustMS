@@ -2,12 +2,13 @@ use crate::actor::field::{FieldActor, FieldMapEntityNpc};
 use crate::actor::field_drops::DropSet;
 use crate::actor::field_mobs::{full_spawn, mob_capacity, MobSet};
 use crate::actor::field_reactors::ReactorSet;
-use crate::message::{FieldHandle, FieldKey};
+use crate::message::{FieldHandle, FieldKey, FieldMessage};
 use crate::supervisor::spawn_supervised;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio::sync::mpsc::error::TrySendError;
 use tracing::warn;
 
 const FIELD_QUEUE_CAPACITY: usize = 1024;
@@ -17,6 +18,8 @@ const MAP_NPC_OBJECT_ID_BASE: i32 = 1_000_000_000;
 /// up their field here and then talk to it directly.
 pub struct FieldRegistry {
     fields: Mutex<HashMap<FieldKey, FieldHandle>>,
+    /// Events' copies of their maps (channel, instance id) still running.
+    instances: Mutex<HashSet<(u8, u32)>>,
     tick: Duration,
 }
 
@@ -24,13 +27,19 @@ impl FieldRegistry {
     pub fn new(tick: Duration) -> Arc<Self> {
         Arc::new(Self {
             fields: Mutex::new(HashMap::new()),
+            instances: Mutex::new(HashSet::new()),
             tick,
         })
     }
 
-    /// The handle for `key`, starting its actor if needed.
+    /// The handle for `key`, starting its actor if needed. A field of an
+    /// event's copy that has closed is started for the caller alone, and
+    /// stops when they leave it.
     pub fn field(self: &Arc<Self>, key: FieldKey) -> FieldHandle {
+        // Locked before `instances`, as in `close_instance`, so a copy can't
+        // close between the check and the insert.
         let mut fields = self.fields.lock().unwrap_or_else(|e| e.into_inner());
+        let closed = !self.is_open(key);
         if let Some(handle) = fields.get(&key) {
             if !handle.tx.is_closed() {
                 return handle.clone();
@@ -48,6 +57,11 @@ impl FieldRegistry {
             load_field_reactors(key),
             self.tick,
         );
+        if closed {
+            // Nothing else may hold a sender, or it would never stop.
+            spawn_supervised(format!("field {key:?}"), actor.run(), || {});
+            return handle;
+        }
         let registry: Weak<Self> = Arc::downgrade(self);
         let exited = handle.clone();
         spawn_supervised(format!("field {key:?}"), actor.run(), move || {
@@ -57,6 +71,48 @@ impl FieldRegistry {
         });
         fields.insert(key, handle.clone());
         handle
+    }
+
+    /// Whether `key` is the channel's own field or one of a copy still
+    /// running.
+    pub fn is_open(&self, key: FieldKey) -> bool {
+        key.instance_id == 0
+            || self
+                .instances
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(&(key.channel_id, key.instance_id))
+    }
+
+    /// An event's copy of its maps opens: its fields start as members
+    /// arrive.
+    pub fn open_instance(&self, channel_id: u8, instance_id: u32) {
+        self.instances
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert((channel_id, instance_id));
+    }
+
+    /// The event is over: its copy's fields stop, and anyone still on one
+    /// finds it gone.
+    pub fn close_instance(&self, channel_id: u8, instance_id: u32) {
+        let mut fields = self.fields.lock().unwrap_or_else(|e| e.into_inner());
+        self.instances
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&(channel_id, instance_id));
+        fields.retain(|key, handle| {
+            let closing = (key.channel_id, key.instance_id) == (channel_id, instance_id);
+            if closing {
+                if let Err(TrySendError::Full(close)) = handle.tx.try_send(FieldMessage::Close) {
+                    let tx = handle.tx.clone();
+                    tokio::spawn(async move {
+                        let _ = tx.send(close).await;
+                    });
+                }
+            }
+            !closing
+        });
     }
 
     /// Drop a handle whose actor has exited, unless it was already replaced.

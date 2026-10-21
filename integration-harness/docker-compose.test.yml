@@ -51,6 +51,9 @@ services:
       # Ships sail 60 times as fast: a trip takes 15 seconds (see
       # tests/ships.rs).
       RUSTMS_CONTI_SCALE: "60"
+      # Party events run 60 times as fast: Kerning City's party quest lasts
+      # 30 seconds (see tests/kpq.rs).
+      RUSTMS_EVENT_SCALE: "60"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

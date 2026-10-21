@@ -3,6 +3,7 @@ mod buff;
 mod combat;
 mod dialogue;
 mod door;
+mod events;
 mod expiry;
 mod fame;
 mod guild_bbs;
@@ -134,6 +135,8 @@ pub struct ClientActor {
     personal_shop: Option<personal_shop::PersonalShop>,
     /// Heracle asked for a new guild's name; only then is one founded.
     naming_guild: bool,
+    /// The player's ticket into the party event they are in.
+    event: Option<crate::actor::event::EventTicket>,
 }
 
 impl ClientActor {
@@ -190,6 +193,7 @@ impl ClientActor {
             trade: None,
             personal_shop: None,
             naming_guild: false,
+            event: None,
         })
     }
 
@@ -646,7 +650,8 @@ impl ClientActor {
             client_id: self.client_id,
         })
         .await?;
-        let key = FieldKey::new(self.channel_id, map_id);
+        self.leaving_for(map_id).await?;
+        let key = self.field_key(map_id);
         let field = self.services.fields.field(key);
         let game = self.in_game_mut()?;
         game.field = field;
@@ -674,6 +679,7 @@ impl ClientActor {
         .await?;
         self.set_wall_clock().await?;
         self.start_map_timer().await?;
+        self.show_event_clock().await?;
         self.start_hazard()?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;
@@ -1128,8 +1134,11 @@ impl ClientActor {
                     client_id: self.client_id,
                     party: party_id,
                 })
-                .await?
+                .await?;
+                self.left_party_in_event().await?
             }
+            ServerMessage::EventStarted(ticket) => self.event_started(ticket).await?,
+            ServerMessage::EventEnded { id } => self.event_ended(id).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::PartySkill {
@@ -1237,6 +1246,8 @@ impl ClientActor {
         };
         match game.field.tx.send(message).await {
             Ok(()) => Ok(()),
+            // An event's copy closed; the event already sent its members out.
+            Err(_) if !self.services.fields.is_open(game.field.key) => Ok(()),
             Err(mpsc::error::SendError(message)) => {
                 warn!(self.client_id, field = ?game.field.key, "Field actor gone; rejoining");
                 let key = game.field.key;
@@ -1374,6 +1385,7 @@ impl ClientActor {
             if let Err(error) = self.close_door().await {
                 warn!(self.client_id, %error, "Failed to close Mystic Door");
             }
+            self.forget_event();
             if !self.changing_channel {
                 if let Err(error) = self.announce_offline().await {
                     warn!(self.client_id, %error, "Failed to tell buddies of logout");

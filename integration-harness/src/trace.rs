@@ -198,6 +198,8 @@ pub struct Trace {
     pub clocks: Vec<(u8, u8, u8)>,
     /// CLOCK kind 2, the field's countdown: its seconds.
     pub countdowns: Vec<i32>,
+    /// STOP_CLOCK: the countdown taken down.
+    pub clocks_stopped: usize,
     /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
     pub ship_moves: Vec<(u8, u8)>,
     /// CONTI_STATE: the ship's state, as answered...
@@ -603,6 +605,8 @@ impl Trace {
                 2 => self.countdowns.push(r.read_int().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::StopClock as i16 {
+            self.clocks_stopped += 1;
         } else if op == SendOpcode::ContiMove as i16 {
             self.ship_moves
                 .push((r.read_byte().unwrap(), r.read_byte().unwrap()));
