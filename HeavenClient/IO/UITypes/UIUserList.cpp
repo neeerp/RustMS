@@ -1175,7 +1175,7 @@ namespace ms
 					member->id == shown_leader,
 					y,
 					Text(Text::Font::A12M, Text::Alignment::LEFT, color, member->name),
-					Text(Text::Font::A12M, Text::Alignment::LEFT, color, Job(member->job).get_name()),
+					Text(Text::Font::A12M, Text::Alignment::LEFT, color, party_job_text(Job::get_name(member->job))),
 					Text(Text::Font::A12M, Text::Alignment::LEFT, color, std::to_string(member->level))
 			});
 

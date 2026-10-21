@@ -102,14 +102,16 @@ namespace ms
 		return level;
 	}
 
-	std::string Job::get_name(uint16_t jid) const
+	// v83 FUN_004a77ef's table (report 243), spelling and spacing included: 82 of its 83 entries, all but 800's,
+	// which is Korean text. The Cygnus Knights' tiers share the first's name. Any other job has none.
+	std::string Job::get_name(uint16_t jid)
 	{
 		switch (jid)
 		{
 			case 0:
 				return "Beginner";
 			case 100:
-				return "Swordsman";
+				return "Swordman";
 			case 110:
 				return "Fighter";
 			case 111:
@@ -131,17 +133,17 @@ namespace ms
 			case 200:
 				return "Magician";
 			case 210:
-				return "Wizard (F/P)";
+				return "Wizard (Fire,Poison)";
 			case 211:
-				return "Mage (F/P)";
+				return "Mage(Fire, Poison)";
 			case 212:
-				return "Archmage (F/P)";
+				return "Arch Mage(Fire,Poison)";
 			case 220:
-				return "Wizard (I/L)";
+				return "Wizard(Ice,Lightning)";
 			case 221:
-				return "Mage (I/L)";
+				return "Mage(Ice,Lightning)";
 			case 222:
-				return "Archmage (I/L)";
+				return "Arch Mage(Ice,Lightning)";
 			case 230:
 				return "Cleric";
 			case 231:
@@ -157,7 +159,7 @@ namespace ms
 			case 312:
 				return "Bowmaster";
 			case 320:
-				return "Crossbowman";
+				return "Crossbow man";
 			case 321:
 				return "Sniper";
 			case 322:
@@ -169,7 +171,7 @@ namespace ms
 			case 411:
 				return "Hermit";
 			case 412:
-				return "Nightlord";
+				return "Night Lord";
 			case 420:
 				return "Bandit";
 			case 421:
@@ -190,18 +192,68 @@ namespace ms
 				return "Outlaw";
 			case 522:
 				return "Corsair";
+			case 900:
+				return "GM";
+			case 910:
+				return "SuperGM";
+			case 920:
+				return "MWLB";
 			case 1000:
 				return "Noblesse";
+			case 1100:
+			case 1110:
+			case 1111:
+			case 1112:
+				return "Dawn Warrior";
+			case 1200:
+			case 1210:
+			case 1211:
+			case 1212:
+				return "Blaze Wizard";
+			case 1300:
+			case 1310:
+			case 1311:
+			case 1312:
+				return "Wind Archer";
+			case 1400:
+			case 1410:
+			case 1411:
+			case 1412:
+				return "Night Walker";
+			case 1500:
+			case 1510:
+			case 1511:
+			case 1512:
+				return "Thunder Breaker";
 			case 2000:
+				return "Legend";
 			case 2100:
 			case 2110:
 			case 2111:
 			case 2112:
 				return "Aran";
-			case 900:
-				return "GM";
-			case 910:
-				return "SuperGM";
+			case 2001:
+				return "Evan0";
+			case 2200:
+				return "Evan1";
+			case 2210:
+				return "Evan2";
+			case 2211:
+				return "Evan3";
+			case 2212:
+				return "Evan4";
+			case 2213:
+				return "Evan5";
+			case 2214:
+				return "Evan6";
+			case 2215:
+				return "Evan7";
+			case 2216:
+				return "Evan8";
+			case 2217:
+				return "Evan9";
+			case 2218:
+				return "Evan10";
 			default:
 				return "";
 		}

@@ -183,7 +183,9 @@ namespace ms
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
-		job = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
+		// v83 draws the job in Tahoma 9 (font 0x2c), smaller than the other rows, so that its long names, such as
+		// "Arch Mage(Ice,Lightning)", fit; 10 px Arimo is the nearest we have.
+		job = Text(Text::Font::A10M, Text::Alignment::LEFT, Color::Name::BLACK);
 		fame = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 		guild = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 		alliance = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);

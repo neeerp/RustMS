@@ -70,9 +70,10 @@ namespace ms
 
 		const std::string& get_name() const;
 
-	private:
-		std::string get_name(uint16_t id) const;
+		// A job's name as v83 shows it, or "" for a job it has no name for (or 800, whose name is Korean).
+		static std::string get_name(uint16_t id);
 
+	private:
 		std::string name;
 		uint16_t id;
 		Level level;

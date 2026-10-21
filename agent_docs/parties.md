@@ -69,6 +69,8 @@ reconstruction of v83:
   (`UIWindow.img/UserList`). Only the Party tab works so far.
   - Members are listed under online and offline. The leader has a star.
     Members off the player's map are greyed.
+  - A job name longer than 10 characters is cut to its first 9 and "..",
+    as v83 cuts it (`FUN_0090bddb`): "Dark Knight" shows as "Dark Knig..".
   - Clicking a row selects that member, for Party Leader, Whisper, and Expel.
     Party Leader asks "Do you wish to pass the leader position to NAME?"
     first, as v83 does (`FUN_0090e41a`). It is greyed out on a map whose

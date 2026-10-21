@@ -66,4 +66,8 @@ namespace ms
 		std::vector<PartyMember> members;
 		bool hp_marks = true;
 	};
+
+	// A job name as the party list shows it: v83 (FUN_0090bddb) cuts one longer than 10 characters to its first 9
+	// and "..".
+	std::string party_job_text(const std::string& job);
 }
