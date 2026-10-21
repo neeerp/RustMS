@@ -131,7 +131,8 @@ to each (Cosmic `9020001`'s rope, platform and barrel stages):
 - A puzzle is three of them (`combos(n)`: the masks below `2^n` with three
   bits, in order). It is drawn at the leader's first talk on the stage and
   kept (`net::events::Puzzles`). `RUSTMS_KPQ_COMBO` pins the index into
-  `combos(n)`; the harness world pins 1, areas 0, 1 and 3.
+  `combos(n)`, from 0, on every stage; an index past a stage's last is
+  ignored there. The harness world pins 1, areas 0, 1 and 3.
 - A member who isn't the leader is told to follow the leader
   (`Cloto::Follow`). The leader's first talk sets out the puzzle
   (`Cloto::Intro`). Each later talk by the leader is an answer.
@@ -145,6 +146,7 @@ to each (Cosmic `9020001`'s rope, platform and barrel stages):
   Right, her page (`NpcScript::cloto_answer`) runs
   `EventCommand::ClearStage(stage)`, which the event takes only from the
   leader, for a stage whose puzzle has been set.
+- Once the stage is cleared, Cloto tells everyone so.
 
 Where a player stands is only what their client last sent in MOVE_PLAYER.
 A client may hold back moves in the air or on a rope until it lands, so a

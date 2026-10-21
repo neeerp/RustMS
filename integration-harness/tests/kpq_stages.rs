@@ -122,8 +122,13 @@ async fn the_team_takes_cloto_s_areas_to_clear_stages_two_to_four() {
             assert_eq!(trace.field_effects, wrong_effects());
         }
 
-        // Areas 0, 1 and 3 clear the stage, and everyone gets its EXP.
+        // Areas 0, 1 and 3 are right, but only the leader may answer.
         stand_on(&mut team[2..], &[centres[3]]).await;
+        let (told, trace) = ask_cloto(&mut team[1], map).await;
+        assert_eq!(told, follow);
+        assert!(trace.field_effects.is_empty(), "{trace:?}");
+
+        // The leader's answer clears the stage, and everyone gets its EXP.
         let (right, mut trace) = ask_cloto(&mut team[0], map).await;
         assert!(right != wrong && right != intro, "{right}");
         until(&mut team[0].connection, &mut trace, |t| !t.gains.is_empty()).await;

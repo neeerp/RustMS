@@ -109,13 +109,16 @@ pub async fn party(players: &mut [WorldSession]) {
 /// on its first stage.
 pub async fn enter_kpq(team: &mut [WorldSession]) {
     let name = team[0].character_name.clone();
+    let mut asked = false;
     for _ in 0..5 {
         let trace = step(&mut team[0].connection, &name, talk(KPQ.lobby, LAKELIS)).await;
         if trace.prompts == [(LAKELIS, 1)] {
+            asked = true;
             break;
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+    assert!(asked, "Lakelis never let the party in");
     let mut seen = Some(step(&mut team[0].connection, &name, answer(1, 1, None)).await);
     for player in team.iter_mut() {
         let mut trace = seen.take().unwrap_or_default();

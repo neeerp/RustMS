@@ -67,7 +67,10 @@ impl ClientActor {
         let script = match ticket.cloto(stage).await {
             None => return Ok(false),
             Some(Cloto::Puzzle { stage, combo }) => {
-                let right = self.standing_on(map_id, combo).await?;
+                // Unchecked, she has nothing to say rather than a wrong.
+                let Some(right) = self.standing_on(map_id, combo).await? else {
+                    return Ok(false);
+                };
                 if !right {
                     self.show_wrong_answer().await?;
                 }
@@ -80,25 +83,26 @@ impl ClientActor {
     }
 
     /// Whether everyone on `map_id`, the player's map, stands on its areas
-    /// as `combo` asks. Only the event's members can be on its copy.
-    async fn standing_on(&mut self, map_id: i32, combo: u32) -> Result<bool, RuntimeError> {
+    /// as `combo` asks; `None` if it can't be told. Only the event's members
+    /// can be on its copy.
+    async fn standing_on(&mut self, map_id: i32, combo: u32) -> Result<Option<bool>, RuntimeError> {
         let Some(field) = net::get_game_data()
             .ok()
             .and_then(|data| data.field(map_id))
         else {
-            return Ok(false);
+            return Ok(None);
         };
         let (reply, positions) = oneshot::channel();
         self.send_to_field(FieldMessage::Positions { reply })
             .await?;
         let Ok(positions) = positions.await else {
-            return Ok(false);
+            return Ok(None);
         };
         let positions: Vec<(i32, i32)> = positions
             .into_iter()
             .map(|(x, y)| (i32::from(x), i32::from(y)))
             .collect();
-        Ok(on_areas(combo, &field.areas, &positions))
+        Ok(Some(on_areas(combo, &field.areas, &positions)))
     }
 
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.

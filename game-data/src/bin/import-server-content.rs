@@ -39,6 +39,17 @@ struct DirectorySource {
     source: String,
 }
 
+/// The mapping, once every text key has a source or is listed unsourced.
+fn mapping() -> Result<Mapping, String> {
+    let mapping: Mapping = toml::from_str(MAPPING).map_err(|e| e.to_string())?;
+    for key in keys::all() {
+        if !mapping.text.contains_key(&key) && !mapping.unsourced.contains(&key) {
+            return Err(format!("server_content.toml has no source for {key}"));
+        }
+    }
+    Ok(mapping)
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some(sources) = args.first().map(PathBuf::from) else {
@@ -59,12 +70,7 @@ fn main() -> ExitCode {
 }
 
 fn run(sources: &Path, pack: &Path) -> Result<(), String> {
-    let mapping: Mapping = toml::from_str(MAPPING).map_err(|e| e.to_string())?;
-    for key in keys::all() {
-        if !mapping.text.contains_key(&key) && !mapping.unsourced.contains(&key) {
-            return Err(format!("server_content.toml has no source for {key}"));
-        }
-    }
+    let mapping = mapping()?;
 
     let mut text = BTreeMap::new();
     for (key, source) in &mapping.text {
@@ -145,4 +151,16 @@ fn fill(template: &str, literals: &[String]) -> Result<String, String> {
     }
     out.push_str(rest);
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_text_key_has_a_source_or_is_unsourced() {
+        if let Err(error) = mapping() {
+            panic!("{error}");
+        }
+    }
 }
