@@ -3221,6 +3221,11 @@ mod tests {
                 Effect::EventCommand(EventCommand::ClearStage(5))
             ]
         );
+        // Both say how many it takes.
+        assert!(
+            short.contains("10") && clear.contains("10"),
+            "{short} {clear}"
+        );
         // Not stage 1's lines.
         let first = Cloto::Leader {
             stage: 1,

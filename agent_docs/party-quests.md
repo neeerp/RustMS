@@ -4,8 +4,9 @@ A party event is played in a copy of its maps of its own: an instance.
 Kerning City's party quest (KPQ) is the first. So far it has its entry,
 exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles of
 areas to stand on), with their clears and the gates on, and stage 5 (ten
-passes), which wins it. The rewards and the bonus stage come next (see `v83ref/reports/a005-instancing-kpq.md`,
-section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
+passes), which wins it. The rewards and the bonus stage come next (see
+`v83ref/reports/a005-instancing-kpq.md`, section 3, `a011-kpq-stage1.md`
+and `a016-kpq-stages-2-5.md`).
 
 ## Rules
 
@@ -72,13 +73,13 @@ section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
    coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
    `Event::take_items`, shown to the client unless they are logging out.
 6. **Ending.** The event ends when its time is up, when its leader leaves,
-   or when too few remain; once won, only when its last member leaves. It sends `EventEnded{id}`, and members still on
-   its maps go to the exit. Two seconds later the actor exits. Its
+   or when too few remain; once won, only when its last member leaves. It
+   sends `EventEnded{id}`, and members still on its maps go to the exit. Two seconds later the actor exits. Its
    `on_exit`, which runs even after a panic, sends every member
    `EventEnded` again, closes the instance (`FieldRegistry::close_instance`
    sends each field `FieldMessage::Close`) and tells the directory
    (`EventClosed`), which frees the lobby, about two seconds after the
-   event ended.
+   event ended. A won event frees it at the win (below).
 
 A player saved on an event map logs back in at its `forcedReturn`
 (103000890), outside the copy. A player without a ticket who warps onto an
@@ -176,6 +177,10 @@ The clear is a stage clear like the others, and then wins the event
   that shows no clock (`EventTicket::won`).
 - `Team::win`: the event no longer ends when the leader leaves or too few
   remain, only when the last member leaves its maps or the game.
+- The lobby is freed at once (`EventClosed`, said again when the event
+  ends, which changes nothing): the next party may go in while the won
+  one is still inside, in a copy of its own. Cosmic's `setEventCleared`
+  frees it too, after `EVENT_LOBBY_DELAY` (10 seconds); we don't wait.
 - Leaving the party, or the leader breaking it up, no longer sends anyone
   out (Cosmic `playerLeft` and `disbandParty` once cleared).
 
@@ -224,6 +229,6 @@ These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
 - A new leader chosen inside the copy: the event still counts the first
-  leader, so the leader leaving ends it.
+  leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
   where they are; they drop their ticket, which can end the event at once.

@@ -1,8 +1,9 @@
 //! Kerning City's party quest, stage 5: the monsters drop the passes, and
 //! the leader hands Cloto ten of them to clear the stage, which wins the
-//! party quest. Its clock stops, and it no longer ends at its time, when
-//! the party breaks up, or when the leader leaves: only when the last of
-//! the team has left. The harness world's event lasts 30 seconds.
+//! party quest. Its clock stops, the next party may go in, and it no
+//! longer ends at its time, when the party breaks up, or when the leader
+//! leaves: only when the last of the team has left. The harness world's
+//! event lasts 30 seconds.
 
 use integration_harness::events::{
     enter_kpq, in_lobby, leave_party, party, talk, throw_down, CLOTO,
@@ -66,6 +67,7 @@ async fn ten_passes_win_kpq_which_then_lasts_until_its_team_has_left() {
     for player in team.iter_mut() {
         let trace = go_to(player, KPQ.stage_map(5)).await;
         let &left = trace.countdowns.last().expect("a countdown");
+        assert!(left <= 30, "{trace:?}");
         deadline.get_or_insert(Instant::now() + Duration::from_secs(left as u64 + 1));
     }
     let [leader, giver, other] = &mut team[..] else {
@@ -80,7 +82,8 @@ async fn ten_passes_win_kpq_which_then_lasts_until_its_team_has_left() {
     nothing_changed_hands(&trace);
     assert_ne!(short, gather);
 
-    // A member's pass makes ten.
+    // A member's pass makes ten, while another member waits on stage 4.
+    go_to(other, KPQ.stage_map(4)).await;
     send(&mut giver.connection, throw_down(1, 1)).await;
     let mut trace = Trace::default();
     until(&mut leader.connection, &mut trace, |t| {
@@ -99,26 +102,29 @@ async fn ten_passes_win_kpq_which_then_lasts_until_its_team_has_left() {
     .await;
 
     // Cloto takes the ten: the stage is cleared, everyone gets its EXP,
-    // and everyone's clock stops.
-    let (won, mut trace) = ask_cloto(leader).await;
-    assert!(won != short && won != gather, "{won}");
+    // and everyone's clock stops. Only those on stage 5 see it cleared.
+    let (handed, mut trace) = ask_cloto(leader).await;
+    assert!(handed != short && handed != gather, "{handed}");
     assert_eq!(trace.removed, [(ETC, 1)]);
-    until(&mut leader.connection, &mut trace, |t| !t.gains.is_empty()).await;
+    until(&mut leader.connection, &mut trace, |t| t.clocks_stopped > 0).await;
     assert_eq!(trace.field_effects, clear_effects());
     assert_eq!(trace.gains, [KPQ.stage_exp(5)]);
     assert_eq!(trace.clocks_stopped, 1);
-    for member in [&mut *giver, &mut *other] {
+    for (member, effects) in [(&mut *giver, clear_effects()), (&mut *other, vec![])] {
         let mut trace = Trace::default();
-        until(&mut member.connection, &mut trace, |t| !t.gains.is_empty()).await;
-        assert_eq!(trace.field_effects, clear_effects());
+        until(&mut member.connection, &mut trace, |t| t.clocks_stopped > 0).await;
+        assert_eq!(trace.field_effects, effects);
         assert_eq!(trace.gains, [KPQ.stage_exp(5)]);
         assert_eq!(trace.clocks_stopped, 1);
     }
 
-    // Cloto says so to everyone, and takes nothing more.
+    // Back on stage 5 there is no clock, and Cloto says it is won to
+    // everyone, taking nothing more.
+    let trace = go_to(other, KPQ.stage_map(5)).await;
+    assert!(trace.countdowns.is_empty(), "{trace:?}");
     let (told, trace) = ask_cloto(other).await;
     nothing_changed_hands(&trace);
-    assert!(told != gather && told != short && told != won, "{told}");
+    assert!(told != gather && told != short && told != handed, "{told}");
     assert_eq!(ask_cloto(leader).await.0, told);
 
     // Past the event's time nobody is sent out.
@@ -153,4 +159,17 @@ async fn ten_passes_win_kpq_which_then_lasts_until_its_team_has_left() {
     assert_eq!(ask_cloto(giver).await.0, told);
     let trace = go_to(other, KPQ.stage_map(4)).await;
     assert!(trace.countdowns.is_empty(), "{trace:?}");
+    let name = other.character_name.clone();
+    let trace = step(&mut other.connection, &name, talk(KPQ.stage_map(4), CLOTO)).await;
+    assert_eq!(trace.prompts, [(CLOTO, 0)], "{trace:?}");
+
+    // Meanwhile the next party goes in.
+    let mut next = vec![
+        in_lobby(25, &[]).await,
+        in_lobby(25, &[]).await,
+        in_lobby(25, &[]).await,
+    ];
+    party(&mut next).await;
+    enter_kpq(&mut next).await;
+    assert_eq!(ask_cloto(giver).await.0, told);
 }

@@ -259,11 +259,12 @@ impl ClientActor {
             packets.push(build_field_sound("Party1/Clear")?);
             packets.push(build_field_object("gate")?);
         }
+        gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
+        self.commit_player(next, None, &mut packets).await?;
+        // The EXP comes before the clock stops, as in Cosmic's `clearPQ`.
         if stage == event.last_stage() {
             packets.push(build_stop_clock()?);
         }
-        gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
-        self.commit_player(next, None, &mut packets).await?;
         self.send_all(&mut packets).await
     }
 

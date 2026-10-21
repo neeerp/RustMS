@@ -12,8 +12,8 @@
 //!
 //! The stages cleared are shared with the tickets, so a member's client
 //! actor can tell at once whether a stage's way on is open. Clearing the
-//! last stage wins the event: its clock stops, and it goes on until the
-//! last member leaves its maps.
+//! last stage wins the event: its clock stops, the next party may start
+//! their own, and it goes on until the last member leaves its maps.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -171,6 +171,7 @@ pub fn spawn(
     let actor = EventActor {
         id,
         kind,
+        channel_id,
         ends: Some(Instant::now() + kind.event().duration()),
         event: Some(EventHandle { tx }),
         rx,
@@ -187,6 +188,7 @@ pub fn spawn(
         stage1: Stage1::default(),
         puzzles: Puzzles::default(),
         cleared: Arc::default(),
+        directory: directory.clone(),
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -195,21 +197,34 @@ pub fn spawn(
             member.send(ServerMessage::EventEnded { id });
         }
         fields.close_instance(channel_id, id);
-        tokio::spawn(async move {
-            let _ = directory
-                .send(DirectoryMessage::EventClosed {
-                    channel_id,
-                    kind,
-                    id,
-                })
-                .await;
-        });
+        free_lobby(&directory, channel_id, kind, id);
+    });
+}
+
+/// Tell the directory event `id` no longer holds its lobby, so the next
+/// party may go. Said again later, it changes nothing.
+fn free_lobby(
+    directory: &mpsc::Sender<DirectoryMessage>,
+    channel_id: u8,
+    kind: EventKind,
+    id: u32,
+) {
+    let directory = directory.clone();
+    tokio::spawn(async move {
+        let _ = directory
+            .send(DirectoryMessage::EventClosed {
+                channel_id,
+                kind,
+                id,
+            })
+            .await;
     });
 }
 
 struct EventActor {
     id: u32,
     kind: EventKind,
+    channel_id: u8,
     /// None once the event is won.
     ends: Option<Instant>,
     /// Ours until the tickets are out; then only they keep the queue open.
@@ -220,6 +235,7 @@ struct EventActor {
     stage1: Stage1,
     puzzles: Puzzles,
     cleared: Arc<Cleared>,
+    directory: mpsc::Sender<DirectoryMessage>,
 }
 
 impl EventActor {
@@ -322,14 +338,17 @@ impl EventActor {
         }
     }
 
-    /// The leader handed in the last stage's passes: the event is won, and
-    /// its time no longer runs (Cosmic `clearPQ`).
+    /// The leader handed in the last stage's passes: the event is won, its
+    /// time no longer runs, and the next party may start theirs in a copy
+    /// of their own (Cosmic `clearPQ`, whose `setEventCleared` frees the
+    /// lobby).
     fn win(&mut self) {
         if !self.clear(self.kind.event().last_stage()) {
             return;
         }
         self.team.win();
         self.ends = None;
+        free_lobby(&self.directory, self.channel_id, self.kind, self.id);
         info!(kind = ?self.kind, id = self.id, "Event won");
     }
 
