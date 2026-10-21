@@ -55,9 +55,10 @@ pub struct LiveMob {
     pub foothold: i16,
     pub home_foothold: i16,
     pub hp: i64,
-    /// Its MP, which its attacks cost. It doesn't come back: a v83 client
-    /// never regains it either, and when the server should is unknown.
+    /// Its MP, which its attacks and skills cost.
     pub mp: i32,
+    /// When it next regains its `hpRecovery` and `mpRecovery`.
+    pub next_recovery: Instant,
     pub controller: Option<ClientId>,
     /// Until when the controller's client is chasing its player with it.
     pub aggro_until: Option<Instant>,
@@ -84,6 +85,11 @@ pub struct Grant {
     pub level: u8,
     pub at: Instant,
 }
+
+/// How often a mob regains its `hpRecovery` and `mpRecovery`, as the
+/// Nexon server OrionAlpha decompiles does it (`Mob.update`): every 8 s from
+/// its spawn, whether or not it is being hit, with no packet.
+pub const RECOVERY: Duration = Duration::from_secs(8);
 
 /// How long a grant waits for its cast before the server may grant another
 /// in its place: the client may never cast it, being stunned, say.
@@ -206,6 +212,7 @@ impl LiveMob {
             home_foothold: foothold,
             hp: i64::from(info.max_hp),
             mp: info.max_mp,
+            next_recovery: now + RECOVERY,
             info,
             controller: None,
             aggro_until: None,
@@ -1054,6 +1061,29 @@ impl MobSet {
             .collect()
     }
 
+    /// Every live mob whose time has come regains its `hpRecovery` and
+    /// `mpRecovery`, up to its maxima. Nothing is sent: the next HP the
+    /// clients see has it.
+    pub fn recover(&mut self, now: Instant) {
+        for mob in self.live.values_mut() {
+            if mob.hp <= 0 || mob.next_recovery > now {
+                continue;
+            }
+            mob.next_recovery = now + RECOVERY;
+            let info = &mob.info;
+            let max_hp = i64::from(info.max_hp);
+            if mob.hp < max_hp {
+                mob.hp = (mob.hp + i64::from(info.hp_recovery.max(0))).min(max_hp);
+            }
+            if mob.mp < info.max_mp {
+                mob.mp = mob
+                    .mp
+                    .saturating_add(info.mp_recovery.max(0))
+                    .min(info.max_mp);
+            }
+        }
+    }
+
     /// Take off every status that has worn off by `now`: each mob's lost
     /// statuses.
     pub fn expire_statuses(&mut self, now: Instant) -> Vec<(i32, Vec<MobStat>)> {
@@ -1721,6 +1751,40 @@ mod tests {
         assert_eq!(mobs.eat_mp(stumpy, 40), 0);
         assert_eq!(mobs.eat_mp(boss, 40), 0);
         assert_eq!(mobs.get(boss).unwrap().mp, 12);
+    }
+
+    #[test]
+    fn mobs_regain_hp_and_mp_every_8_seconds() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(100);
+        (info.max_hp, info.hp_recovery) = (100, 30);
+        (info.max_mp, info.mp_recovery) = (10, 4);
+        let mut mobs = MobSet::new([(template.clone(), info.clone()), (template, info)]);
+        let spawned = mobs.spawn_all(now);
+        let (hurt, dead) = (spawned[0], spawned[1]);
+        assert_eq!(mobs.damage(1, hurt, 90, now), Some(Ok(10)));
+        mobs.live.get_mut(&hurt).unwrap().mp = 0;
+        let state = |mobs: &MobSet| {
+            let mob = mobs.get(hurt).unwrap();
+            (mob.hp, mob.mp)
+        };
+        mobs.recover(now + RECOVERY - Duration::from_millis(1));
+        assert_eq!(state(&mobs), (10, 0));
+        mobs.recover(now + RECOVERY);
+        assert_eq!(state(&mobs), (40, 4));
+        // Not again until another 8 s have passed, and never past the
+        // maxima.
+        mobs.recover(now + RECOVERY * 2 - Duration::from_millis(1));
+        assert_eq!(state(&mobs), (40, 4));
+        for n in 2..=5 {
+            mobs.recover(now + RECOVERY * n);
+        }
+        assert_eq!(state(&mobs), (100, 10));
+
+        // A dying mob stays dead.
+        mobs.live.get_mut(&dead).unwrap().hp = 0;
+        mobs.recover(now + RECOVERY * 9);
+        assert_eq!(mobs.get(dead).unwrap().hp, 0);
     }
 
     #[test]

@@ -37,6 +37,11 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
     spawn point a mob of its own instead: no capacity, no room check and no
     first wait, and an emptied point fills again after its `mobTime`, at
     least 7 s.
+- **Recovery:** every 8 s from its spawn a live mob regains its
+  `hpRecovery` HP and `mpRecovery` MP, up to its maxima, as OrionAlpha's
+  `Mob.update` does, hit or not (`MobSet::recover`, from the field tick).
+  Nothing is sent; the next HP percent or boss bar shows it. MP is what its
+  attacks and skills spend, so a mob that ran dry casts again.
 - **Revive:** a mob with `info/revive` (the Blue Perfume bottle, Yeti and
   Pepe, ...) lets those mobs out where it died once its `die1` animation is
   over (`MobInfo::dying_ms`, 500 ms without one), as Cosmic does. They fade
@@ -810,7 +815,8 @@ When a mob dies, its drops roll once (`net::loot::roll`), for whoever dealt
 it the most damage of the players still on the field, as Cosmic does. They
 come from the content pack's table plus the committed v83 overrides
 (`game-data/reward_overrides.toml`): each entry rolls its `prob`, mesos
-vary by ±25%, items take `min`..`max` (see "Rates and rate cards" for
+take 4/5 of the table amount plus up to 2/5 more (OrionAlpha's
+`Reward.create`, about ±20%), items take `min`..`max` (see "Rates and rate cards" for
 what scales them). A mob worth no EXP still drops and
 counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one

@@ -224,6 +224,7 @@ impl FieldActor {
             }
             self.show_boss_bar(self.mobs.get(hurt.object_id).and_then(LiveMob::boss_bar));
         }
+        self.mobs.recover(now);
         for (object_id, lost) in self.mobs.expire_statuses(now) {
             if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
                 self.broadcast(None, packet);
