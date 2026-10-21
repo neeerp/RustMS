@@ -792,7 +792,7 @@ the screen size.
 | System | Client status | Effort |
 | --- | --- | --- |
 | Buddy groups | Default group only | S |
-| Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading and deleting; writing missing) | M |
+| Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting) | M |
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |

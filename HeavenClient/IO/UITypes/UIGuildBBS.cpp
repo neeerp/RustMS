@@ -7,6 +7,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Data/CurseData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Util/Misc.h"
@@ -57,9 +58,41 @@ namespace ms
 		const Point<int16_t> NOTICE_AT(404, 275), WRITE_AT(540, 275), RETOUCH_AT(602, 275), DELETE_AT(664, 275),
 							 REPLY_AT(704, 457), REPLY_DELETE_AT(690, 331), QUIT_AT(680, 501);
 
-		// 0xe8a, 0xe9f
+		// The reply input (0x7e2): white on the dark bar.
+		const Rectangle<int16_t> REPLY_BOX(424, 680, 459 - TEXT_RAISE, 475 - TEXT_RAISE);
+
+		// The write panel (0x8145a9): the title, the body (wrapping at
+		// 240 px, 15 lines of 12 px), and the body's scroll bar.
+		const Rectangle<int16_t> TITLE_BOX(449, 705, 30 - TEXT_RAISE, 46 - TEXT_RAISE);
+		const Rectangle<int16_t> DRAFT_BOX(449, 699, 56 - TEXT_RAISE, 236 - TEXT_RAISE);
+		constexpr int16_t DRAFT_SLIDER_X = 706, DRAFT_SLIDER_TOP = 53, DRAFT_SLIDER_BOTTOM = 240;
+		const Point<int16_t> REGISTER_AT(602, 275), CANCEL_AT(664, 275), LEFT_AT(404, 243), RIGHT_AT(704, 243);
+		// The palette's icons and the highlight's frame, by top-left (0x814c2c).
+		const Point<int16_t> PALETTE_ICON_AT(427, 247), PALETTE_FRAME_AT(425, 245);
+
+		// 0xe8a, 0xe9f, 0x15b9, 0xe89, 0x110, 0xe8b
 		constexpr const char* DELETE_QUESTION = "Are you sure you want to delete the post?";
 		constexpr const char* THREAD_GONE = "This message had been deleted by another user.\\nPlease check again.";
+		constexpr const char* NO_TITLE = "Please enter the title.";
+		constexpr const char* NO_TEXT = "Please enter the text.";
+		constexpr const char* NO_CURSING = "Cursing is not allowed.";
+		constexpr const char* NOTICE_TAKEN = "Please delete the current notice\\nand then try again.";
+
+		// The text for a refusal, or nothing.
+		const char* refusal_text(GuildBbs::Refusal refusal)
+		{
+			switch (refusal)
+			{
+			case GuildBbs::Refusal::NO_TITLE:
+				return NO_TITLE;
+			case GuildBbs::Refusal::NO_TEXT:
+				return NO_TEXT;
+			case GuildBbs::Refusal::CURSING:
+				return NO_CURSING;
+			default:
+				return nullptr;
+			}
+		}
 
 		Text plain_text(Text::Font font, Color::Name color, const std::string& str)
 		{
@@ -107,12 +140,14 @@ namespace ms
 	}
 
 	UIGuildBBS::UIGuildBBS() : UIElement(Point<int16_t>(), Point<int16_t>()), emblem_shown(false), page(0),
-		body_scroll(0), reply_scroll(0), mouse_down(false), wheel_on_body(false)
+		selected(0), body_scroll(0), reply_scroll(0), highlight(0), icon(0), mouse_down(false), wheel_on_body(false)
 	{
 		nl::node src = NxFiles::ui_classic["GuildBBS.img"]["GuildBBS"];
 
 		background = src["backgrnd"];
 		view_panel = src["backgrnd2"];
+		write_panel = src["backgrnd3"];
+		select_frame = src["Emoticon"]["Select"];
 		guild_frame = NxFiles::ui_classic["UIWindow.img"]["UserList"]["Guild"]["GuildInfo"]["guildmark"];
 
 		for (size_t i = 0; i < basic_icons.size(); i++)
@@ -137,17 +172,40 @@ namespace ms
 			button(BT_REPLY_DELETE0 + k, "BtReplyDelete", REPLY_DELETE_AT + Point<int16_t>(0, REPLY_HEIGHT * k));
 
 		button(BT_QUIT, "BtQuit", QUIT_AT);
+		button(BT_REGISTER, "BtRegister", REGISTER_AT);
+		button(BT_CANCEL, "BtCancel", CANCEL_AT);
+
+		buttons[BT_LEFT] = std::make_unique<MapleButton>(src["MoveEmoticon"]["BtLeft"], LEFT_AT);
+		buttons[BT_RIGHT] = std::make_unique<MapleButton>(src["MoveEmoticon"]["BtRight"], RIGHT_AT);
 
 		body_slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(BODY_SLIDER_TOP, BODY_SLIDER_BOTTOM), BODY_SLIDER_X,
 				BODY_LINES, 0, [&](bool up) { scroll_body(body_scroll + (up ? -1 : 1)); });
 		reply_slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(REPLY_SLIDER_TOP, REPLY_SLIDER_BOTTOM),
 				REPLY_SLIDER_X, GuildBbs::REPLY_ROWS, 0, [&](bool up) { scroll_replies(reply_scroll + (up ? -1 : 1)); });
+		draft_slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(DRAFT_SLIDER_TOP, DRAFT_SLIDER_BOTTOM),
+				DRAFT_SLIDER_X, GuildBbs::BODY_ROWS, 0, [&](bool up)
+				{
+					size_t first = body_field.first_line();
+					body_field.scroll_lines(up ? (first > 0 ? first - 1 : 0) : first + 1);
+				});
+
+		reply_field = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, REPLY_BOX,
+				GuildBbs::REPLY_LIMIT);
+
+		title_field = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, TITLE_BOX,
+				GuildBbs::TITLE_LIMIT);
+		body_field = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, DRAFT_BOX,
+				GuildBbs::BODY_LIMIT);
+		// Enter sends neither the reply nor the title, and Tab moves no focus
+		// (0x816994, 0x8145a9).
+		body_field.set_lines(BODY_WRAP, GuildBbs::BODY_ROWS, BODY_LINE);
 
 		dimension = background.get_dimensions();
 		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 
 		build_header();
 		build_pages();
+		end_draft();
 		build_view();
 
 		// The window opens empty and asks for the first page (0x816b69).
@@ -164,7 +222,23 @@ namespace ms
 		Point<int16_t> raise(0, TEXT_RAISE);
 
 		background.draw(position + background.get_origin());
-		view_panel.draw(position + VIEW_PANEL_AT + view_panel.get_origin());
+
+		const Texture& panel = draft ? write_panel : view_panel;
+		panel.draw(position + VIEW_PANEL_AT + panel.get_origin());
+
+		if (draft)
+		{
+			for (int32_t slot = 0; slot < GuildBbs::BASIC_ICONS + static_cast<int32_t>(owned_icons.size()); slot++)
+			{
+				Texture icon = icon_texture(GuildBbs::slot_icon(slot, owned_icons));
+				Point<int16_t> at = PALETTE_ICON_AT + Point<int16_t>(GuildBbs::PALETTE_PITCH * slot, 0);
+
+				icon.draw(position + at + icon.get_origin());
+			}
+
+			Point<int16_t> frame = PALETTE_FRAME_AT + Point<int16_t>(GuildBbs::PALETTE_PITCH * highlight, 0);
+			select_frame.draw(position + frame + select_frame.get_origin());
+		}
 
 		if (emblem_shown)
 			emblem.draw(position + EMBLEM_AT);
@@ -182,7 +256,7 @@ namespace ms
 		for (const PageLink& link : page_links)
 			link.label.draw(position + Point<int16_t>(link.text_x, PAGES_Y) - raise);
 
-		if (thread)
+		if (thread && !draft)
 		{
 			title.draw(position + Point<int16_t>(TITLE_X + (TITLE_WIDTH - title.width()) / 2, TITLE_Y) - raise);
 			poster.draw(position + POSTER_AT - raise);
@@ -209,10 +283,48 @@ namespace ms
 			}
 		}
 
-		body_slider.draw(position);
+		// The replies' scrollbar stays with the write panel.
 		reply_slider.draw(position);
 
+		if (draft)
+		{
+			title_field.draw(position);
+			body_field.draw(position);
+			draft_slider.draw(position);
+		}
+		else
+		{
+			body_slider.draw(position);
+			reply_field.draw(position);
+		}
+
 		UIElement::draw(inter);
+	}
+
+	void UIGuildBBS::update()
+	{
+		UIElement::update();
+
+		reply_field.update(position);
+		title_field.update(position);
+		body_field.update(position);
+
+		if (draft)
+		{
+			draft_slider.setrows(static_cast<int16_t>(body_field.first_line()), GuildBbs::BODY_ROWS,
+					static_cast<int16_t>(body_field.line_count()));
+		}
+	}
+
+	Texture UIGuildBBS::icon_texture(int32_t id) const
+	{
+		if (id >= 0 && id < static_cast<int32_t>(basic_icons.size()))
+			return basic_icons[id];
+
+		if (id >= GuildBbs::FIRST_CASH_ICON && id < GuildBbs::FIRST_CASH_ICON + static_cast<int32_t>(cash_icons.size()))
+			return cash_icons[id - GuildBbs::FIRST_CASH_ICON];
+
+		return Texture();
 	}
 
 	UIGuildBBS::Row UIGuildBBS::make_row(const GuildBbs::Entry& entry) const
@@ -221,11 +333,7 @@ namespace ms
 		row.text = plain_text(Text::Font::A12M, Color::Name::BLACK, GuildBbs::row_text(entry.id, entry.title));
 		row.count = plain_text(Text::Font::A12M, Color::Name::PICTONBLUE, GuildBbs::count_text(entry.replies));
 
-		if (entry.icon >= 0 && entry.icon < static_cast<int32_t>(basic_icons.size()))
-			row.icon = basic_icons[entry.icon];
-		else if (entry.icon >= 100 && entry.icon < 100 + static_cast<int32_t>(cash_icons.size()))
-			row.icon = cash_icons[entry.icon - 100];
-
+		row.icon = icon_texture(entry.icon);
 		row.writer = plain_text(Text::Font::A12M, Color::Name::BLACK, member_name(entry.poster));
 		string_format::format_with_ellipsis(row.writer, WRITER_MAX);
 		row.date = plain_text(Text::Font::A12M, Color::Name::DARKGREY, GuildBbs::short_date(entry.time, today()));
@@ -294,12 +402,19 @@ namespace ms
 		int32_t rank = own_rank();
 		bool editable = thread && GuildBbs::may_edit(rank, thread->poster, own_id());
 
-		// Not built yet: writing, the notice, editing, and replying.
-		buttons[BT_NOTICE]->set_state(Button::State::DISABLED);
-		buttons[BT_WRITE]->set_state(Button::State::DISABLED);
-		buttons[BT_RETOUCH]->set_state(Button::State::DISABLED);
-		buttons[BT_REPLY]->set_state(Button::State::DISABLED);
-		buttons[BT_DELETE]->set_state(editable ? Button::State::NORMAL : Button::State::DISABLED);
+		auto enable = [&](uint16_t id, bool enabled)
+		{
+			buttons[id]->set_state(enabled ? Button::State::NORMAL : Button::State::DISABLED);
+		};
+
+		enable(BT_NOTICE, GuildBbs::may_moderate(rank));
+		enable(BT_WRITE, true);
+		enable(BT_RETOUCH, editable);
+		enable(BT_DELETE, editable);
+		enable(BT_REPLY, thread.has_value());
+
+		// The reply box is made again, empty.
+		reply_field.change_text("");
 
 		title = Text();
 		poster = Text();
@@ -349,7 +464,7 @@ namespace ms
 		for (size_t k = 0; k < GuildBbs::REPLY_ROWS; k++)
 		{
 			size_t index = reply_scroll + k;
-			bool shown = thread && index < thread->replies.size()
+			bool shown = !draft && thread && index < thread->replies.size()
 				&& GuildBbs::may_edit(rank, thread->replies[index].poster, self);
 
 			buttons[BT_REPLY_DELETE0 + k]->set_active(shown);
@@ -391,6 +506,8 @@ namespace ms
 	void UIGuildBBS::show_thread(GuildBbs::Thread received)
 	{
 		thread = std::move(received);
+		selected = thread->id;
+		end_draft();
 		build_view();
 	}
 
@@ -399,6 +516,7 @@ namespace ms
 		UI::get().emplace<UIOk>(THREAD_GONE, [](bool) {});
 
 		thread.reset();
+		end_draft();
 		build_view();
 	}
 
@@ -408,6 +526,7 @@ namespace ms
 
 		body_slider.remove_cursor();
 		reply_slider.remove_cursor();
+		draft_slider.remove_cursor();
 		mouse_down = false;
 	}
 
@@ -421,11 +540,41 @@ namespace ms
 		// anywhere else.
 		wheel_on_body = local.x() >= VIEW_PANEL_AT.x() && local.y() < NOTICE_AT.y();
 
-		if (Cursor::State state = body_slider.send_cursor(local, clicked))
-			return state;
+		// Every field hears the click, so the others lose the focus.
+		Cursor::State field_state = Cursor::State::IDLE;
 
-		if (Cursor::State state = reply_slider.send_cursor(local, clicked))
-			return state;
+		for (Textfield* field : { &reply_field, &title_field, &body_field })
+		{
+			Cursor::State state = field->send_cursor(cursorpos, clicked);
+
+			if (state != Cursor::State::IDLE)
+				field_state = state;
+		}
+
+		if (field_state != Cursor::State::IDLE)
+			return field_state;
+
+		for (Slider* slider : { &body_slider, &reply_slider, &draft_slider })
+		{
+			if (draft && slider == &body_slider || !draft && slider == &draft_slider)
+				continue;
+
+			if (Cursor::State state = slider->send_cursor(local, clicked))
+				return state;
+		}
+
+		if (pressed && draft)
+		{
+			int32_t slot = GuildBbs::slot_at(local.x(), local.y(), owned_icons.size());
+
+			if (slot != GuildBbs::NO_ROW)
+			{
+				highlight = slot;
+				icon = GuildBbs::slot_icon(slot, owned_icons);
+
+				return Cursor::State::IDLE;
+			}
+		}
 
 		if (pressed)
 		{
@@ -436,6 +585,7 @@ namespace ms
 				// The notice is thread 0 (0x81621c).
 				int32_t id = row == GuildBbs::NOTICE_ROW ? 0 : list.entries[row].id;
 
+				selected = id;
 				BbsShowPacket(id).dispatch();
 				BbsListPacket(page).dispatch();
 
@@ -461,7 +611,11 @@ namespace ms
 
 	void UIGuildBBS::send_scroll(double yoffset)
 	{
-		if (wheel_on_body)
+		if (draft && wheel_on_body)
+			draft_slider.send_scroll(yoffset);
+		else if (draft)
+			reply_slider.send_scroll(yoffset);
+		else if (wheel_on_body)
 			body_slider.send_scroll(yoffset);
 		else
 			reply_slider.send_scroll(yoffset);
@@ -471,11 +625,34 @@ namespace ms
 	{
 		switch (buttonid)
 		{
+		case BT_NOTICE:
+			start_draft(Draft::NOTICE);
+			break;
+		case BT_WRITE:
+			start_draft(Draft::NEW);
+			break;
+		case BT_RETOUCH:
+			start_draft(Draft::EDIT);
+			break;
 		case BT_DELETE:
 			ask_delete_thread();
 			break;
+		case BT_REPLY:
+			send_reply();
+			break;
+		case BT_REGISTER:
+			submit();
+			break;
+		case BT_CANCEL:
+			cancel_draft();
+			break;
+		case BT_LEFT:
+		case BT_RIGHT:
+			highlight = std::clamp(highlight + (buttonid == BT_LEFT ? -1 : 1), 0,
+					GuildBbs::BASIC_ICONS + static_cast<int32_t>(owned_icons.size()) - 1);
+			break;
 		case BT_QUIT:
-			deactivate();
+			close();
 			break;
 		default:
 			if (buttonid >= BT_REPLY_DELETE0 && buttonid <= BT_REPLY_DELETE3)
@@ -533,6 +710,133 @@ namespace ms
 			BbsDeleteReplyPacket(thread_id, reply_id).dispatch();
 			BbsListPacket(board->page).dispatch();
 		});
+	}
+
+	void UIGuildBBS::start_draft(Draft kind)
+	{
+		if (kind == Draft::NOTICE && list.has_notice)
+		{
+			UI::get().emplace<UIOk>(NOTICE_TAKEN, [](bool) {});
+
+			return;
+		}
+
+		if (kind == Draft::EDIT && !thread)
+			return;
+
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		owned_icons.clear();
+
+		for (int32_t i = 0; i < GuildBbs::CASH_ICONS; i++)
+		{
+			if (inventory.find_item(InventoryType::Id::CASH, GuildBbs::FIRST_ICON_ITEM + i) > 0)
+				owned_icons.push_back(GuildBbs::FIRST_CASH_ICON + i);
+		}
+
+		bool editing = kind == Draft::EDIT;
+		int32_t slot = editing ? GuildBbs::slot_of(thread->icon, owned_icons) : GuildBbs::NO_ROW;
+
+		// An edit keeps the thread's icon if the palette has it.
+		highlight = slot != GuildBbs::NO_ROW ? slot : 0;
+		icon = slot != GuildBbs::NO_ROW ? thread->icon : 0;
+		draft = kind;
+
+		for (uint16_t id : { BT_NOTICE, BT_WRITE, BT_RETOUCH, BT_DELETE, BT_REPLY })
+			buttons[id]->set_active(false);
+
+		for (uint16_t k = 0; k < GuildBbs::REPLY_ROWS; k++)
+			buttons[BT_REPLY_DELETE0 + k]->set_active(false);
+
+		for (uint16_t id : { BT_REGISTER, BT_CANCEL, BT_LEFT, BT_RIGHT })
+			buttons[id]->set_active(true);
+
+		reply_field.set_state(Textfield::State::DISABLED);
+
+		// Nothing takes the focus until a click (0x8145a9).
+		title_field.change_text(editing ? thread->title : "");
+		body_field.change_text(editing ? thread->body : "");
+		title_field.set_state(Textfield::State::NORMAL);
+		body_field.set_state(Textfield::State::NORMAL);
+		body_field.scroll_lines(0);
+	}
+
+	void UIGuildBBS::end_draft()
+	{
+		draft.reset();
+
+		title_field.set_state(Textfield::State::DISABLED);
+		body_field.set_state(Textfield::State::DISABLED);
+
+		for (uint16_t id : { BT_REGISTER, BT_CANCEL, BT_LEFT, BT_RIGHT })
+			buttons[id]->set_active(false);
+
+		for (uint16_t id : { BT_NOTICE, BT_WRITE, BT_RETOUCH, BT_DELETE, BT_REPLY })
+			buttons[id]->set_active(true);
+
+		// A focused reply box keeps its focus.
+		if (reply_field.get_state() == Textfield::State::DISABLED)
+			reply_field.set_state(Textfield::State::NORMAL);
+	}
+
+	void UIGuildBBS::submit()
+	{
+		if (!draft || *draft == Draft::EDIT && !thread)
+			return;
+
+		const std::string& subject = title_field.get_text();
+		const std::string& text = body_field.get_text();
+
+		if (const char* refusal = refusal_text(GuildBbs::check_thread(subject, text, CurseData::filter)))
+		{
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
+
+			return;
+		}
+
+		std::optional<int32_t> edited = *draft == Draft::EDIT ? std::optional<int32_t>(thread->id) : std::nullopt;
+		BbsWritePacket(edited, *draft == Draft::NOTICE, subject, text, icon).dispatch();
+
+		// The panel stays until the thread comes back (mode 7); the list
+		// goes back to its first page.
+		page = 0;
+		BbsListPacket(page).dispatch();
+	}
+
+	void UIGuildBBS::cancel_draft()
+	{
+		end_draft();
+		build_view();
+
+		// 0x8168ca
+		BbsShowPacket(selected).dispatch();
+		BbsListPacket(page).dispatch();
+	}
+
+	void UIGuildBBS::send_reply()
+	{
+		if (!thread || draft)
+			return;
+
+		const std::string& text = reply_field.get_text();
+
+		if (const char* refusal = refusal_text(GuildBbs::check_reply(text, CurseData::filter)))
+		{
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
+
+			return;
+		}
+
+		// The thread comes back with the reply (0x816994).
+		BbsReplyPacket(thread->id, text).dispatch();
+		BbsListPacket(page).dispatch();
+	}
+
+	void UIGuildBBS::close()
+	{
+		for (Textfield* field : { &reply_field, &title_field, &body_field })
+			field->set_state(Textfield::State::DISABLED);
+
+		deactivate();
 	}
 
 	UIElement::Type UIGuildBBS::get_type() const

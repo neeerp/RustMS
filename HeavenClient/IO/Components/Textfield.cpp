@@ -57,12 +57,17 @@ namespace ms
 			GraphicsGL::get().drawrectangle(absp.x(), top, textlabel.width(), 12, 0.0f, 0.0f, 0x7F / 255.0f, 1.0f);
 			selectedlabel.draw(absp);
 		}
+		else if (rows > 0)
+		{
+			for (size_t i = top; i < linelabels.size() && i < top + rows; i++)
+				linelabels[i].draw(absp + Point<int16_t>(0, linespace * static_cast<int16_t>(i - top)));
+		}
 		else if (text.size() > 0)
 		{
 			textlabel.draw(absp);
 		}
 
-		if (state == State::FOCUSED && showmarker)
+		if (state == State::FOCUSED && showmarker && marker_shown())
 		{
 			Point<int16_t> mpos = absp + marker_offset() + Point<int16_t>(0, -1);
 
@@ -98,7 +103,9 @@ namespace ms
 			}
 			else
 			{
+				// Losing the focus sets a focused field back to NORMAL.
 				UI::get().remove_textfield();
+				state = State::DISABLED;
 			}
 
 			if (state == State::FOCUSED)
@@ -126,16 +133,14 @@ namespace ms
 				{
 				case KeyAction::Id::LEFT:
 					selected = false;
-
-					if (markerpos > 0)
-						markerpos--;
+					markerpos = text_lines::step_left(text, markerpos);
+					follow_marker();
 
 					break;
 				case KeyAction::Id::RIGHT:
 					selected = false;
-
-					if (markerpos < text.size())
-						markerpos++;
+					markerpos = text_lines::step_right(text, markerpos);
+					follow_marker();
 
 					break;
 				case KeyAction::Id::BACK:
@@ -143,17 +148,27 @@ namespace ms
 						erase_selection();
 					else if (text.size() > 0 && markerpos > 0)
 					{
-						text.erase(markerpos - 1, 1);
+						size_t from = text_lines::step_left(text, markerpos);
+						text.erase(from, markerpos - from);
 
-						markerpos--;
+						markerpos = from;
 
 						modifytext(text);
 					}
 
 					break;
 				case KeyAction::Id::RETURN:
-					if (onreturn)
+					if (rows > 0)
+					{
+						if (selected)
+							erase_selection();
+
+						insert("\r");
+					}
+					else if (onreturn)
+					{
 						onreturn(text);
+					}
 
 					break;
 				case KeyAction::Id::SPACE:
@@ -162,17 +177,19 @@ namespace ms
 				case KeyAction::Id::HOME:
 					selected = false;
 					markerpos = 0;
+					follow_marker();
 					break;
 				case KeyAction::Id::END:
 					selected = false;
 					markerpos = text.size();
+					follow_marker();
 					break;
 				case KeyAction::Id::DELETE:
 					if (selected)
 						erase_selection();
 					else if (text.size() > 0 && markerpos < text.size())
 					{
-						text.erase(markerpos, 1);
+						text.erase(markerpos, text_lines::step_right(text, markerpos) - markerpos);
 
 						modifytext(text);
 					}
@@ -202,17 +219,47 @@ namespace ms
 		if (selected && !str.empty())
 			erase_selection();
 
+		char last = 0;
+
 		for (char c : str)
 		{
-			if (belowlimit())
+			if (rows == 0)
 			{
-				text.insert(markerpos, 1, c);
+				if (belowlimit())
+				{
+					text.insert(markerpos, 1, c);
 
-				markerpos++;
+					markerpos++;
 
-				modifytext(text);
+					modifytext(text);
+				}
 			}
+			else if (c == '\r' || c == '\n')
+			{
+				// A pasted "\r\n" or "\n" breaks the line once, as Enter does.
+				if (c == '\r' || last != '\r')
+					insert("\r");
+			}
+			else
+			{
+				insert(std::string(1, c));
+			}
+
+			last = c;
 		}
+	}
+
+	bool Textfield::insert(const std::string& unit)
+	{
+		if (limit > 0 ? text.size() + unit.size() > limit : !belowlimit())
+			return false;
+
+		text.insert(markerpos, unit);
+		markerpos += unit.size();
+
+		modifytext(text);
+
+		return true;
 	}
 
 	void Textfield::modifytext(const std::string& t)
@@ -230,6 +277,58 @@ namespace ms
 		}
 
 		text = t;
+
+		if (rows > 0)
+			layout_lines();
+	}
+
+	void Textfield::layout_lines()
+	{
+		auto width = [&](const std::string& line)
+		{
+			return Text(font, alignment, color, line, 0, false).width();
+		};
+
+		lines = text_lines::layout(text, wrapwidth, width);
+		linelabels.clear();
+
+		for (const text_lines::Line& line : lines)
+			linelabels.emplace_back(font, alignment, color, text.substr(line.start, line.length), 0, false);
+
+		follow_marker();
+	}
+
+	void Textfield::follow_marker()
+	{
+		if (rows == 0)
+			return;
+
+		top = text_lines::scroll_to(top, rows, lines.size(), text_lines::line_of(lines, std::min(markerpos, text.size())));
+	}
+
+	size_t Textfield::line_count() const
+	{
+		return lines.size();
+	}
+
+	size_t Textfield::first_line() const
+	{
+		return top;
+	}
+
+	void Textfield::scroll_lines(size_t first)
+	{
+		top = first + rows < lines.size() ? first : (lines.size() > rows ? lines.size() - rows : 0);
+	}
+
+	bool Textfield::marker_shown() const
+	{
+		if (rows == 0)
+			return true;
+
+		size_t line = text_lines::line_of(lines, markerpos);
+
+		return line >= top && line < top + rows;
 	}
 
 	Cursor::State Textfield::send_cursor(Point<int16_t> cursorpos, bool clicked)
@@ -269,6 +368,7 @@ namespace ms
 
 		markerpos = text.size();
 		selected = false;
+		follow_marker();
 	}
 
 	void Textfield::select_all()
@@ -296,8 +396,25 @@ namespace ms
 		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false);
 	}
 
+	void Textfield::set_lines(uint16_t width, size_t shown, int16_t space)
+	{
+		wrapwidth = width;
+		rows = shown;
+		linespace = space;
+
+		layout_lines();
+	}
+
 	Point<int16_t> Textfield::marker_offset() const
 	{
+		if (rows > 0)
+		{
+			size_t line = text_lines::line_of(lines, markerpos);
+
+			return Point<int16_t>(linelabels[line].advance(markerpos - lines[line].start),
+								  linespace * static_cast<int16_t>(line - top));
+		}
+
 		if (wrapwidth == 0)
 			return Point<int16_t>(textlabel.advance(markerpos), 0);
 

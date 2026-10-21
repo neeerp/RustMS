@@ -2,7 +2,7 @@
 
 #include "Inventory/ItemExpiry.h"
 
-#include "../Util/Memos.h"
+#include "../Util/TextLines.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -159,27 +159,106 @@ namespace ms::GuildBbs
 		return text;
 	}
 
+	// What stops a thread or a reply from being sent (0x8166f6, 0x816994).
+	enum class Refusal
+	{
+		NONE,
+		// 0x15b9
+		NO_TITLE,
+		// 0xe89
+		NO_TEXT,
+		// 0x110
+		CURSING
+	};
+
+	// Why a thread can't be sent: no title, no body, or a curse word in
+	// either, as `filter` stars them out.
+	template <typename Filter>
+	Refusal check_thread(const std::string& title, const std::string& body, Filter filter)
+	{
+		if (title.empty())
+			return Refusal::NO_TITLE;
+
+		if (body.empty())
+			return Refusal::NO_TEXT;
+
+		if (filter(title) != title || filter(body) != body)
+			return Refusal::CURSING;
+
+		return Refusal::NONE;
+	}
+
+	template <typename Filter>
+	Refusal check_reply(const std::string& text, Filter filter)
+	{
+		if (text.empty())
+			return Refusal::NO_TEXT;
+
+		if (filter(text) != text)
+			return Refusal::CURSING;
+
+		return Refusal::NONE;
+	}
+
+	// The write panel's limits (0x8145a9) and the reply's (0x813a8c): the
+	// body takes 600 bytes and shows 15 lines, scrolling past them.
+	constexpr size_t TITLE_LIMIT = 25, BODY_LIMIT = 600, BODY_ROWS = 15, REPLY_LIMIT = 25;
+
+	// The free icons are 0 to 2; the cash ones, 100 to 106, come with the
+	// items 5290000 to 5290006 (0x8165e2).
+	constexpr int32_t BASIC_ICONS = 3, CASH_ICONS = 7, FIRST_CASH_ICON = 100, FIRST_ICON_ITEM = 5290000;
+
+	inline int32_t icon_of_item(int32_t itemid)
+	{
+		return itemid - FIRST_ICON_ITEM + FIRST_CASH_ICON;
+	}
+
+	// The palette's slots (0x81621c): the free icons, then the cash icons
+	// owned, 23 px apart from x 426, each 20 px square from y 246.
+	constexpr int16_t PALETTE_X = 426, PALETTE_Y = 246, PALETTE_PITCH = 23, PALETTE_SLOT = 20;
+
+	// The slot under a point, or NO_ROW.
+	inline int32_t slot_at(int16_t x, int16_t y, size_t owned)
+	{
+		if (y < PALETTE_Y || y >= PALETTE_Y + PALETTE_SLOT || x < PALETTE_X)
+			return NO_ROW;
+
+		int32_t slot = (x - PALETTE_X) / PALETTE_PITCH;
+
+		if ((x - PALETTE_X) % PALETTE_PITCH >= PALETTE_SLOT || slot >= BASIC_ICONS + static_cast<int32_t>(owned))
+			return NO_ROW;
+
+		return slot;
+	}
+
+	// A slot's icon: the free icon, or the owned cash icon.
+	inline int32_t slot_icon(int32_t slot, const std::vector<int32_t>& owned)
+	{
+		return slot < BASIC_ICONS ? slot : owned[slot - BASIC_ICONS];
+	}
+
+	// The slot showing an icon, or NO_ROW when the palette lacks it: an
+	// edit starts on the thread's icon only if it is free or owned
+	// (0x8165e2).
+	inline int32_t slot_of(int32_t icon, const std::vector<int32_t>& owned)
+	{
+		if (icon >= 0 && icon < BASIC_ICONS)
+			return icon;
+
+		auto found = std::find(owned.begin(), owned.end(), icon);
+
+		return found != owned.end() ? BASIC_ICONS + static_cast<int32_t>(found - owned.begin()) : NO_ROW;
+	}
+
 	// A body's lines of at most `max` px by `width`: its own line breaks,
 	// then wrapped.
 	template <typename Width>
 	std::vector<std::string> body_lines(const std::string& body, int16_t max, Width width)
 	{
 		std::vector<std::string> lines;
-		size_t start = 0;
 
-		while (true)
-		{
-			size_t end = body.find_first_of("\r\n", start);
-			std::string paragraph = body.substr(start, end == std::string::npos ? std::string::npos : end - start);
-
-			for (std::string& line : Memos::wrap(paragraph, max, width))
-				lines.push_back(std::move(line));
-
-			if (end == std::string::npos)
-				break;
-
-			start = end + (body.compare(end, 2, "\r\n") == 0 ? 2 : 1);
-		}
+		for (const text_lines::Line& line : text_lines::layout(body, max, width))
+			lines.push_back(body.substr(line.start, line.length));
 
 		return lines;
 	}

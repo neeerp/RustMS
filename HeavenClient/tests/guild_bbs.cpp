@@ -102,6 +102,75 @@ int main()
 				"a closing line break leaves a blank line");
 
 		{
+			using text_lines::Line;
+
+			auto width = [](const std::string& text) { return static_cast<int16_t>(text.size() * 6); };
+			std::string text = "ab\r\ncccc dddd\n";
+			std::vector<Line> lines = text_lines::layout(text, 30, width);
+
+			require(lines.size() == 4, "a break, a wrap and a closing break make four lines");
+			require(lines[0].start == 0 && lines[0].length == 2, "a line stops before its break");
+			require(lines[1].start == 4 && lines[1].length == 5 && lines[2].start == 9 && lines[2].length == 4,
+					"a wrapped line ends where the next starts");
+			require(lines[3].start == 14 && lines[3].length == 0, "after a closing break, an empty line");
+			require(text_lines::layout("", 30, width).size() == 1, "no text is one line");
+
+			require(text_lines::line_of(lines, 0) == 0 && text_lines::line_of(lines, 2) == 0, "the first line");
+			require(text_lines::line_of(lines, 9) == 2, "a wrap's end is the next line's start");
+			require(text_lines::line_of(lines, 14) == 3, "the end of the text");
+
+			require(text_lines::step_left(text, 4) == 2 && text_lines::step_right(text, 2) == 4,
+					"\\r\\n is one step");
+			require(text_lines::step_left(text, 3) == 2 && text_lines::step_right(text, 13) == 14, "a lone character");
+			require(text_lines::step_left(text, 0) == 0 && text_lines::step_right(text, 14) == 14, "the ends stay");
+
+			std::vector<Line> lone = text_lines::layout("a\rb\r", 30, width);
+			require(lone.size() == 3 && lone[1].start == 2 && lone[2].start == 4, "a lone \\r breaks the line");
+			require(text_lines::step_left("a\rb", 2) == 1, "a lone \\r is one step");
+
+			require(text_lines::scroll_to(0, 15, 16, 15) == 1, "a 16th line scrolls one down");
+			require(text_lines::scroll_to(5, 15, 30, 2) == 2, "a line above scrolls up to it");
+			require(text_lines::scroll_to(5, 15, 30, 10) == 5, "a line shown scrolls nothing");
+			require(text_lines::scroll_to(5, 15, 17, 16) == 2, "no empty rows after deleting lines");
+			require(text_lines::scroll_to(3, 15, 4, 0) == 0, "fewer lines than rows show from the first");
+		}
+
+		{
+			auto stars = [](const std::string& text) { return text == "darn" ? std::string("****") : text; };
+
+			require(GuildBbs::check_thread("", "", stars) == GuildBbs::Refusal::NO_TITLE, "the title first");
+			require(GuildBbs::check_thread("Hi", "", stars) == GuildBbs::Refusal::NO_TEXT, "then the text");
+			require(GuildBbs::check_thread("darn", "x", stars) == GuildBbs::Refusal::CURSING
+					&& GuildBbs::check_thread("x", "darn", stars) == GuildBbs::Refusal::CURSING, "no curse in either");
+			require(GuildBbs::check_thread("Hi", "there", stars) == GuildBbs::Refusal::NONE, "a thread to send");
+			require(GuildBbs::check_reply("", stars) == GuildBbs::Refusal::NO_TEXT
+					&& GuildBbs::check_reply("darn", stars) == GuildBbs::Refusal::CURSING
+					&& GuildBbs::check_reply("ok", stars) == GuildBbs::Refusal::NONE, "a reply's checks");
+		}
+
+		{
+			require(GuildBbs::icon_of_item(5290000) == 100 && GuildBbs::icon_of_item(5290006) == 106,
+					"the cash icons' items");
+
+			require(GuildBbs::slot_at(426, 246, 0) == 0 && GuildBbs::slot_at(445, 265, 0) == 0, "the first slot");
+			require(GuildBbs::slot_at(446, 250, 0) == GuildBbs::NO_ROW, "a gap between slots");
+			require(GuildBbs::slot_at(449, 250, 0) == 1 && GuildBbs::slot_at(472, 250, 0) == 2, "23 px a slot");
+			require(GuildBbs::slot_at(495, 250, 0) == GuildBbs::NO_ROW && GuildBbs::slot_at(495, 250, 1) == 3,
+					"a cash slot only for an icon owned");
+			require(GuildBbs::slot_at(430, 245, 2) == GuildBbs::NO_ROW
+					&& GuildBbs::slot_at(430, 266, 2) == GuildBbs::NO_ROW
+					&& GuildBbs::slot_at(425, 250, 2) == GuildBbs::NO_ROW, "slots run from y 246 to 265");
+
+			std::vector<int32_t> owned = { 102, 105 };
+			require(GuildBbs::slot_icon(1, owned) == 1 && GuildBbs::slot_icon(4, owned) == 105,
+					"a slot's icon: free, then owned");
+			require(GuildBbs::slot_of(2, owned) == 2 && GuildBbs::slot_of(105, owned) == 4,
+					"an edit starts on a free or owned icon");
+			require(GuildBbs::slot_of(103, owned) == GuildBbs::NO_ROW && GuildBbs::slot_of(-1, owned) == GuildBbs::NO_ROW,
+					"but not on one the palette lacks");
+		}
+
+		{
 			Writer w;
 			w.put<uint8_t>(0).put<int32_t>(12).put<int32_t>(2);
 			w.entry(12, 7, "Hello", OCT_21, 1, 0).entry(11, 8, "Older", JAN_2, 101, 3);

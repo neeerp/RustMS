@@ -29,6 +29,8 @@ int main()
 		require(filter("ba r", words) == "** *", "a word may span a space");
 		require(filter("seafood", words) == "sea***d", "a word inside a longer one is starred out");
 		require(filter("foo\x01", words) == "foo\x01", "a message with control characters stays");
+		require(filter("hi\r\nthere", words) == "hi\r\nthere", "line breaks stay where they were");
+		require(filter("fo\r\no\nbar", words) == "**\r\n*\n***", "a word may span a line break");
 		require(filter(std::string(0x3ff, 'a') + "foo", words) == std::string(0x3ff, 'a') + "foo",
 				"a long message stays");
 

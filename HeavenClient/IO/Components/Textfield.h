@@ -27,8 +27,10 @@
 #include "../Keyboard.h"
 
 #include "../../Graphics/Text.h"
+#include "../../Util/TextLines.h"
 
 #include <functional>
+#include <vector>
 
 namespace ms
 {
@@ -67,6 +69,17 @@ namespace ms
 		// Wrap the text at width pixels instead of keeping it on one line.
 		void set_wrap(uint16_t width);
 
+		// Take several lines wrapped at `width`, showing `rows` of them
+		// `linespace` px apart and scrolling to the caret: Enter breaks the
+		// line with a lone "\r", as the original's multi-line edit does.
+		void set_lines(uint16_t width, size_t rows, int16_t linespace);
+
+		// The lines there are, and the first shown.
+		size_t line_count() const;
+		size_t first_line() const;
+		// Show the lines from `first`, as a scrollbar asks.
+		void scroll_lines(size_t first);
+
 		void set_enter_callback(std::function<void(std::string)> onreturn);
 
 		void set_key_callback(KeyAction::Id key, std::function<void(void)> action);
@@ -86,6 +99,18 @@ namespace ms
 
 		bool belowlimit() const;
 
+		// Insert a character, or a line break, if the limits allow.
+		bool insert(const std::string& unit);
+
+		// The label's lines, when there are several.
+		void layout_lines();
+
+		// Scroll the lines shown so the caret's is among them.
+		void follow_marker();
+
+		// Whether the caret's line is shown.
+		bool marker_shown() const;
+
 		// Drop the selected text.
 		void erase_selection();
 
@@ -96,6 +121,11 @@ namespace ms
 		Text::Alignment alignment;
 		Color::Name color;
 		uint16_t wrapwidth = 0;
+		size_t rows = 0;
+		size_t top = 0;
+		int16_t linespace = 0;
+		std::vector<text_lines::Line> lines;
+		std::vector<Text> linelabels;
 		std::string text;
 		Text marker;
 		bool showmarker;
