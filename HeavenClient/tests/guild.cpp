@@ -399,6 +399,26 @@ int main()
 			w.put<uint8_t>(Mode::GUILDS).put<int32_t>(2).guild(20, "Twenty", 9, theirs).guild(10, "Tens", 9, ours);
 			news(w, alliance, own);
 			require(alliance.get_guilds().size() == 1 && own.get_data().alliance_id == 9, "mode 0xd stores each guild");
+
+			// The guild's packets bring the alliance along (Alliance::follow).
+			// Guilds that came before the player's own guild was known keep
+			// it among the others until then.
+			Guild early;
+			Alliance first;
+			AllianceData nine;
+			nine.id = 9;
+			nine.guild_ids = { 10, 20 };
+			first.set(nine);
+			first.store(early, GuildData{ 10, "Tens" });
+			first.store(early, GuildData{ 20, "Twenty" });
+			first.follow(early);
+			require(!first.exists() && first.get_guilds().empty(), "no guild, no alliance");
+			first.set(nine);
+			first.store(early, GuildData{ 10, "Tens" });
+			first.store(early, GuildData{ 20, "Twenty" });
+			early.update(own.get_data());
+			first.follow(early);
+			require(first.exists() && first.get_guilds().size() == 1 && !first.find_guild(10), "the player's guild leaves the others");
 		}
 
 		std::cout << "Guild passed\n";

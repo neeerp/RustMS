@@ -56,6 +56,9 @@ namespace ms
 		// Guild, any other replaces the guild of its id or joins the end.
 		void store(Guild& own, GuildData guild);
 		void erase(int32_t guild_id);
+		// After the player's guild changes: forgets everything if it is in no
+		// alliance, else keeps it out of the other guilds.
+		void follow(const Guild& own);
 
 		// A member of another guild; nullptr if the guild or the member is
 		// not there.

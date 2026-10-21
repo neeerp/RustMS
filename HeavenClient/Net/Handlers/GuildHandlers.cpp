@@ -149,13 +149,21 @@ namespace ms
 			);
 		}
 
-		// After the guild changes: the player's tag and the stat window.
-		void refresh()
+		// The player's tag and the stat window.
+		void show_guild()
 		{
 			Stage::get().get_player().show_guild();
 
 			if (auto stats = UI::get().get_element<UIStatsInfo>())
 				stats->update_all_stats();
+		}
+
+		// After the guild changes: the alliance too.
+		void refresh()
+		{
+			Player& player = Stage::get().get_player();
+			player.get_alliance().follow(player.get_guild());
+			show_guild();
 		}
 
 		// An invitation (FUN_00a37490): a card, unless one is up already, the
@@ -547,7 +555,7 @@ namespace ms
 		if (outcome.ask_info)
 			AllianceInfoPacket().dispatch();
 
-		refresh();
+		show_guild();
 	}
 
 	void NotifyLevelUpHandler::handle(InPacket& recv) const

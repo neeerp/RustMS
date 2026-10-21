@@ -130,6 +130,19 @@ namespace ms
 		}), guilds.end());
 	}
 
+	void Alliance::follow(const Guild& own)
+	{
+		if (own.get_data().alliance_id == 0)
+		{
+			clear();
+			clear_guilds();
+		}
+		else
+		{
+			erase(own.get_data().id);
+		}
+	}
+
 	const GuildMember* Alliance::set_online(int32_t guild_id, int32_t cid, bool online)
 	{
 		GuildMember* found = member(guild_id, cid);
