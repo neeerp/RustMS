@@ -73,14 +73,17 @@ way back outlasts a relogin; going back clears it. The fares are Cosmic's.
 | Pason (`1002002`), Shuri (`2010005`), Nara (`2040048`), `florina2` | Lith Harbor, Orbis, Ludibrium | Menu: to Florina Beach (`110000000`, `st00`, id 4) for 1500, 2000 or 1800, or by showing the VIP Ticket to Florina Beach (`4031134`), which is kept; or two pages about the ticket. Saved as kind 2 (`FLORINA_RETURN`) |
 | Pison (`1081001`, `florina1`) | Florina Beach | Back to the saved map, else Lith Harbor |
 | Thomas Swift (`9201022`) | Henesys, Amoria | Free, to Amoria's portal 0 or back to Henesys's portal 5. Saves nothing |
+| Audrey (`9201135`, `Malay_Warp2`) | The CBD (`540000000`, where the plane lands), Trend Zone Metropolis, Kampung Village (`551000000`) | Menu, then a Yes or No on the fare: from the CBD to Trend Zone, portal 0, for 42000, saved as kind 1; from Trend Zone to Kampung Village, portal 2, for 10000; from Kampung Village to Trend Zone, portal 4, for 10000. From Trend Zone also free back to the saved map, else Boat Quay Town, at portal 4 |
 
 Spinel's tour has no Yes or No: the fare is paid as the last page turns,
 and a player short of it is told so after the first page about the trip.
-Spinel doesn't stand in Malaysia; Audrey (`9201135`), who does, isn't
-scripted yet, so the way back from Malaysia is on foot. All of this text is
-`unsourced` placeholder text (`world_trip.*`, `florina.*`, `amoria.*`).
-`world_tour.rs` checks the tour over a relogin, Florina Beach both ways
-and Thomas Swift.
+Spinel doesn't stand in Malaysia; Audrey does, and shares Spinel's kind,
+so a tour of Malaysia begun with either ends with her. Only the CBD and
+Boat Quay Town are saved on the way there; any other saved map is warped
+to without a portal. All of this text is `unsourced` placeholder text
+(`world_trip.*`, `florina.*`, `amoria.*`, `malaysia.*`). `world_tour.rs`
+checks the tour over a relogin, Florina Beach both ways, Thomas Swift and
+Audrey's rides.
 
 ## Guards
 
