@@ -671,10 +671,25 @@ impl NpcScript {
         lakelis(entry)
     }
 
-    /// Cloto's script on the party quest's first stage, for `player`,
-    /// who stands with her as `view`.
+    /// Cloto's script on the party quest's stages, for `player`, who
+    /// stands with her as `view`. A leader answering a puzzle gets
+    /// `cloto_answer` instead.
     pub fn cloto(view: Cloto, player: &Player) -> Self {
         cloto(view, player)
+    }
+
+    /// Cloto to the leader answering puzzle stage `stage`: whether the team
+    /// stands on the `right` areas, which clears the stage.
+    pub fn cloto_answer(stage: u8, right: bool) -> Self {
+        let page = if right {
+            Page::Act {
+                text: text(keys::KPQ_CLOTO_AREAS_RIGHT),
+                effects: vec![Effect::EventCommand(EventCommand::ClearStage(stage))],
+            }
+        } else {
+            Page::Say(text(keys::KPQ_CLOTO_AREAS_WRONG))
+        };
+        NpcScript::new(CLOTO, vec![page])
     }
 
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
@@ -1434,14 +1449,20 @@ fn kpq_terms() -> String {
     )
 }
 
-/// Cloto on stage 1 (Cosmic `9020001`): each member but the leader is
+/// Cloto (Cosmic `9020001`). On stage 1 each member but the leader is
 /// asked to hold a number of coupons, and holding exactly that many earns
 /// a pass; the leader clears the stage by handing in a pass from each of
-/// them. A wrong number costs nothing.
+/// them. A wrong number costs nothing. On stages 2 to 4 she sets the
+/// leader a puzzle (`events::Puzzles`).
 fn cloto(view: Cloto, player: &Player) -> NpcScript {
     let held = |item_id| player.inventory.count(item_id);
     let page = match view {
         Cloto::Cleared => Page::Say(text(keys::KPQ_CLOTO_CLEARED)),
+        Cloto::Follow => Page::Say(text(keys::KPQ_CLOTO_FOLLOW)),
+        // A puzzle unanswered (`cloto_answer`) is set out again.
+        Cloto::Intro { stage } | Cloto::Puzzle { stage, .. } => {
+            Page::Say(text(PUZZLES[usize::from(stage.clamp(2, 4) - 2)]))
+        }
         Cloto::Member { passed: true, .. } => Page::Say(text(keys::KPQ_CLOTO_THANKS)),
         Cloto::Member { question, new, .. } => {
             let asked = text(QUESTIONS[question]);
@@ -1490,6 +1511,13 @@ fn cloto(view: Cloto, player: &Player) -> NpcScript {
     script.refused = Some(text(keys::KPQ_CLOTO_REFUSED));
     script
 }
+
+/// Cloto's puzzles on stages 2 to 4: the ropes, platforms and barrels.
+const PUZZLES: [&str; 3] = [
+    keys::KPQ_CLOTO_S2_INTRO,
+    keys::KPQ_CLOTO_S3_INTRO,
+    keys::KPQ_CLOTO_S4_INTRO,
+];
 
 /// Cloto's questions, in the order of `events::ANSWERS`.
 const QUESTIONS: [&str; 7] = [
@@ -2500,6 +2528,13 @@ mod tests {
         })
     }
 
+    fn page_text(step: &Step) -> String {
+        match &step.prompt {
+            Some(Prompt::Text(page)) => page.text.clone(),
+            other => panic!("text page expected, got {other:?}"),
+        }
+    }
+
     fn buttons(step: &Step) -> (bool, bool) {
         match &step.prompt {
             Some(Prompt::Text(page)) => (page.has_previous, page.has_next),
@@ -3128,6 +3163,29 @@ mod tests {
         );
         let cleared = NpcScript::cloto(Cloto::Cleared, &holding(events::PASS, 4)).begin();
         assert!(cleared.effects.is_empty());
+    }
+
+    #[test]
+    fn cloto_sets_the_leader_a_puzzle_and_clears_it_when_answered() {
+        let player = hunter(&[], &[]);
+        let says = |view| {
+            let page = NpcScript::cloto(view, &player).begin();
+            assert!(page.effects.is_empty());
+            page_text(&page)
+        };
+        let intros: Vec<String> = (2..=4).map(|stage| says(Cloto::Intro { stage })).collect();
+        assert!(intros[0] != intros[1] && intros[1] != intros[2]);
+        assert_eq!(says(Cloto::Puzzle { stage: 3, combo: 7 }), intros[1]);
+        assert!(!intros.contains(&says(Cloto::Follow)));
+
+        let wrong = NpcScript::cloto_answer(3, false).begin();
+        assert!(wrong.effects.is_empty());
+        let right = NpcScript::cloto_answer(3, true).begin();
+        assert_eq!(
+            right.effects,
+            [Effect::EventCommand(EventCommand::ClearStage(3))]
+        );
+        assert_ne!(page_text(&wrong), page_text(&right));
     }
 
     #[test]

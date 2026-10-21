@@ -371,6 +371,10 @@ pub enum FieldMessage {
         from: ClientId,
         request: crate::actor::field_shops::ShopRoomRequest,
     },
+    /// Where everyone on the map stands, as of their last move.
+    Positions {
+        reply: tokio::sync::oneshot::Sender<Vec<(i16, i16)>>,
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

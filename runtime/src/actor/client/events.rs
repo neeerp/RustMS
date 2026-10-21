@@ -6,8 +6,9 @@ use super::quest::gain_exp;
 use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
-use crate::message::{DirectoryMessage, FieldKey};
-use net::events::{EventCommand, EventKind, KPQ};
+use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
+use net::events::{on_areas, Cloto, EventCommand, EventKind};
+use net::handler::FieldRequest;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::build::world::effect::{
@@ -52,19 +53,68 @@ impl ClientActor {
         self.start_script(script).await
     }
 
-    /// Cloto sets the party quest's first stage for a player in it there.
-    /// Returns whether she did; elsewhere she has nothing to say.
+    /// Cloto sets the party quest's stage for a player in it there, and
+    /// hears the leader's answer to a puzzle. Returns whether she did;
+    /// elsewhere she has nothing to say.
     pub(super) async fn talk_to_cloto(&mut self) -> Result<bool, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let Some(ticket) = self.event.as_ref().filter(|_| map_id == KPQ.entry) else {
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
             return Ok(false);
         };
-        let Some(view) = ticket.cloto().await else {
+        let Some(stage) = ticket.kind.event().stage_on(map_id) else {
             return Ok(false);
         };
-        let script = NpcScript::cloto(view, &self.in_game()?.player);
+        let script = match ticket.cloto(stage).await {
+            None => return Ok(false),
+            Some(Cloto::Puzzle { stage, combo }) => {
+                let right = self.standing_on(map_id, combo).await?;
+                if !right {
+                    self.show_wrong_answer().await?;
+                }
+                NpcScript::cloto_answer(stage, right)
+            }
+            Some(view) => NpcScript::cloto(view, &self.in_game()?.player),
+        };
         self.start_script(script).await?;
         Ok(true)
+    }
+
+    /// Whether everyone on `map_id`, the player's map, stands on its areas
+    /// as `combo` asks. Only the event's members can be on its copy.
+    async fn standing_on(&mut self, map_id: i32, combo: u32) -> Result<bool, RuntimeError> {
+        let Some(field) = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(map_id))
+        else {
+            return Ok(false);
+        };
+        let (reply, positions) = oneshot::channel();
+        self.send_to_field(FieldMessage::Positions { reply })
+            .await?;
+        let Ok(positions) = positions.await else {
+            return Ok(false);
+        };
+        let positions: Vec<(i32, i32)> = positions
+            .into_iter()
+            .map(|(x, y)| (i32::from(x), i32::from(y)))
+            .collect();
+        Ok(on_areas(combo, &field.areas, &positions))
+    }
+
+    /// A wrong answer to a puzzle: everyone on the map sees and hears it.
+    async fn show_wrong_answer(&mut self) -> Result<(), RuntimeError> {
+        let mut packets = vec![
+            build_field_effect("quest/party/wrong_kor")?,
+            build_field_sound("Party1/Failed")?,
+        ];
+        for packet in &packets {
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Broadcast(packet.clone()),
+            })
+            .await?;
+        }
+        self.send_all(&mut packets).await
     }
 
     /// The player's script did something their event keeps track of.

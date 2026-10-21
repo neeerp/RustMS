@@ -57,6 +57,9 @@ services:
       # Cloto asks every member of Kerning City's party quest her last
       # question, whose answer is 8 coupons (see tests/kpq_stage1.rs).
       RUSTMS_KPQ_QUESTION: "7"
+      # Cloto's puzzles on stages 2-4 are all the second set of three areas,
+      # 0, 1 and 3 (see tests/kpq_stages.rs).
+      RUSTMS_KPQ_COMBO: "1"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

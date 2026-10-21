@@ -374,6 +374,14 @@ impl FieldActor {
                 }
             }
             FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
+            FieldMessage::Positions { reply } => {
+                let positions = self
+                    .occupants
+                    .values()
+                    .map(|occupant| (occupant.avatar.x, occupant.avatar.y))
+                    .collect();
+                let _ = reply.send(positions);
+            }
             FieldMessage::Move {
                 from,
                 packet,
