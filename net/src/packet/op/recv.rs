@@ -50,6 +50,10 @@ pub enum RecvOpcode {
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,
+    /// Alliance requests, by op (0x6ec9ce).
+    AllianceOperation = 0x8F,
+    /// An alliance invitation declined, by the card or the client itself.
+    DenyAllianceRequest = 0x90,
     /// The guild bulletin board (FUN_008166f6 and its siblings).
     GuildBbs = 0x9B,
     FaceExpression = 0x33,

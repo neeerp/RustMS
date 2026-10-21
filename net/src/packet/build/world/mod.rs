@@ -1,3 +1,4 @@
+pub mod alliance;
 pub mod buddy;
 pub mod buff;
 pub mod cash_shop;

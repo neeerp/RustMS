@@ -19,6 +19,7 @@ mod settings;
 mod sql_types;
 
 pub mod account;
+pub mod alliance;
 pub mod buddy;
 pub mod cash_shop;
 pub mod character;

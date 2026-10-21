@@ -1,7 +1,8 @@
 use crate::handler::{
-    BuddyRequest, GuildRequest, HandlerResult, PartyRequest, WorldAction, WorldContext,
-    WorldHandler, WorldResult,
+    AllianceRequest, BuddyRequest, GuildRequest, HandlerResult, PartyRequest, WorldAction,
+    WorldContext, WorldHandler, WorldResult,
 };
+use crate::packet::build::world::alliance::MULTICHAT_ALLIANCE;
 use crate::packet::build::world::buddy::MULTICHAT_BUDDY;
 use crate::packet::build::world::guild::MULTICHAT_GUILD;
 use crate::packet::build::world::party::{PartyStatus, MULTICHAT_PARTY};
@@ -69,9 +70,10 @@ impl WorldHandler for DenyPartyRequestHandler {
     }
 }
 
-/// `MULTI_CHAT`: a line for the party, buddies, or the guild. The client
-/// lists recipients; the party decides who hears party chat, the guild who
-/// hears guild chat, and only listed mutual buddies hear buddy chat.
+/// `MULTI_CHAT`: a line for the party, buddies, the guild, or the
+/// alliance. The client lists recipients; the party decides who hears
+/// party chat, the guild and alliance who hear theirs, and only listed
+/// mutual buddies hear buddy chat.
 pub struct MultiChatHandler;
 
 impl WorldHandler for MultiChatHandler {
@@ -89,6 +91,7 @@ impl WorldHandler for MultiChatHandler {
             MULTICHAT_PARTY => WorldAction::Party(PartyRequest::Chat { text }),
             MULTICHAT_BUDDY => WorldAction::Buddy(BuddyRequest::Chat { recipients, text }),
             MULTICHAT_GUILD => WorldAction::Guild(GuildRequest::Chat { text }),
+            MULTICHAT_ALLIANCE => WorldAction::Alliance(AllianceRequest::Chat { text }),
             _ => return Ok(HandlerResult::empty()),
         };
         Ok(HandlerResult::empty().with(action))
@@ -182,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn party_buddy_and_guild_chat_are_forwarded() {
+    fn party_buddy_guild_and_alliance_chat_are_forwarded() {
         let chat = |mode: u8| {
             let mut packet = Packet::new_empty();
             packet.write_short(RecvOpcode::MultiChat as i16).unwrap();
@@ -206,6 +209,10 @@ mod tests {
             chat(2),
             Some(WorldAction::Guild(GuildRequest::Chat { text })) if text == "hello"
         ));
-        assert!(chat(3).is_none());
+        assert!(matches!(
+            chat(3),
+            Some(WorldAction::Alliance(AllianceRequest::Chat { text })) if text == "hello"
+        ));
+        assert!(chat(4).is_none());
     }
 }

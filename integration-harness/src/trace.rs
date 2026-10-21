@@ -154,6 +154,10 @@ pub struct Trace {
     pub guild_chat: Vec<(String, String)>,
     /// Every GUILD_OPERATION body (mode first), in order.
     pub guild_ops: Vec<Vec<u8>>,
+    /// Alliance chat lines: (sender, text).
+    pub alliance_chat: Vec<(String, String)>,
+    /// Every ALLIANCE_OPERATION body (mode first), in order.
+    pub alliance_ops: Vec<Vec<u8>>,
     /// Each GUILD_BBS packet's body, from its mode on.
     pub bbs: Vec<Vec<u8>>,
     /// GUILD_NAME_CHANGED: (character, guild name).
@@ -472,6 +476,7 @@ impl Trace {
                 0 => self.buddy_chat.push(line),
                 1 => self.party_chat.push(line),
                 2 => self.guild_chat.push(line),
+                3 => self.alliance_chat.push(line),
                 _ => {}
             }
         } else if op == SendOpcode::BuddyList as i16 {
@@ -536,6 +541,8 @@ impl Trace {
             self.char_boxes.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildOperation as i16 {
             self.guild_ops.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::AllianceOperation as i16 {
+            self.alliance_ops.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildBbs as i16 {
             self.bbs.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::NotifyLevelUp as i16 || op == SendOpcode::NotifyJobChange as i16

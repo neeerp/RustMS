@@ -12,6 +12,7 @@
 //! backpressure), but fields and the directory never await a client: a client
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
+use game::alliance::Alliance;
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
 use net::packet::build::world::door::DoorView;
@@ -90,6 +91,11 @@ pub enum ServerMessage {
     /// Someone else changed the player's guild (expelled them); read it
     /// again.
     GuildChanged,
+    /// The invitation the player's guild had to `alliance_id` stands; join
+    /// it.
+    JoinAlliance {
+        alliance_id: i32,
+    },
     /// A party member on `map_id` used a skill that reached this player,
     /// standing at `origin`.
     PartySkill {
@@ -397,6 +403,8 @@ pub struct Presence {
     pub hp: i16,
     pub max_hp: i16,
     pub guild_id: Option<i32>,
+    /// The guild's alliance, for its members' logins, levels and jobs.
+    pub alliance_id: Option<i32>,
 }
 
 impl Presence {
@@ -410,6 +418,11 @@ impl Presence {
             hp: stats.hp,
             max_hp: player.effective_max_hp() as i16,
             guild_id: player.guild.as_ref().map(|guild| guild.id),
+            alliance_id: player
+                .guild
+                .as_ref()
+                .map(|guild| guild.alliance_id)
+                .filter(|&id| id != 0),
         }
     }
 }
@@ -554,6 +567,42 @@ pub enum DirectoryMessage {
     GuildDisbanded {
         guild_id: i32,
     },
+    /// Tell these alliance members the news, with who is online.
+    AllianceNews {
+        to: Vec<ClientId>,
+        news: AllianceNews,
+    },
+    /// `from`, the master of `alliance_id`, invites the guild `guild_name`
+    /// whose master is `master`.
+    AllianceInvite {
+        from: ClientId,
+        alliance_id: i32,
+        master: ClientId,
+        guild_name: String,
+    },
+    /// `from` accepts the invitation to `alliance_id`; if it stands, they
+    /// are told to join (`ServerMessage::JoinAlliance`).
+    AllianceAccept {
+        from: ClientId,
+        alliance_id: i32,
+    },
+    /// `from`, the master of `guild_name`, turns down `inviter`'s
+    /// invitation.
+    AllianceDeny {
+        from: ClientId,
+        inviter: String,
+        guild_name: String,
+    },
+    /// The alliance is gone; its invitations no longer stand.
+    AllianceDisbanded {
+        alliance_id: i32,
+    },
+    /// If `from` leads a party, its members on their map and channel,
+    /// `from` first.
+    PartyHere {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<Option<Vec<ClientId>>>,
+    },
     Messenger {
         from: ClientId,
         request: MessengerRequest,
@@ -578,4 +627,22 @@ pub enum DirectoryMessage {
         owner: ClientId,
         from_town: bool,
     },
+}
+
+/// What an alliance's members hear; the guilds it carries list who is
+/// online.
+#[derive(Clone, Debug)]
+pub enum AllianceNews {
+    /// The whole alliance.
+    Info(Alliance),
+    /// Guild `guild_id` joined it.
+    GuildJoined { alliance: Alliance, guild_id: i32 },
+    /// The guild left or was expelled; the alliance as it is without it.
+    GuildLeft {
+        alliance: Alliance,
+        guild: Guild,
+        expelled: bool,
+    },
+    /// Guild `guild_id`'s members changed.
+    GuildChanged { alliance: Alliance, guild_id: i32 },
 }

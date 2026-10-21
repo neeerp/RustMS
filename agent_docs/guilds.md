@@ -247,6 +247,70 @@ data lists the member ids, then a 37-byte record per member: the name padded
 to 13 bytes, then job, level, rank, online, contribution and alliance rank as
 ints. The client takes the first member for the master.
 
+### Alliances
+
+An alliance joins two to five guilds under the master of one of them. The
+client's protocol is in `v83ref/reports/b023-alliance-protocol-re.md` and
+the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
+(both outside this repository).
+
+- The `alliances` table (`db/src/alliance.rs`) holds the name (unique
+  within a world, ignoring case), the five rank titles, the capacity and
+  the notice. `guilds.alliance_id` says which alliance a guild is in (0 for
+  none), and `guild_members.alliance_rank` each member's rank in it: 1 for
+  the alliance's master, 2 for the other guilds' masters, 3 to 5 for the
+  rest (a joining guild's members start at 5). `game::alliance` has the
+  model and its rules (who may invite, expel, leave, hand over, rename
+  ranks, move members, post the notice), each as the client's buttons
+  allow it.
+- `GuildTag::alliance_id` comes with the player, and the directory's
+  `Presence::alliance_id` with it. Two packets go by presence: a member
+  entering or leaving the game (0x0E) and a new level or job (0x18) reach
+  the alliance's other guilds online; their own guild hears through the
+  guild packets. A channel change says nothing, as for the guild.
+  Everything else goes to the members the database lists
+  (`db::alliance::member_ids`), through `DirectoryMessage::AllianceNews`
+  (which marks members online as guild info does) or `Deliver`.
+- Lenario (2010009, `NpcScript::lenario`, beside Heracle) talks only to
+  guild masters. Founding one needs the player to lead a party whose
+  members on the map include exactly one other guild's master
+  (`DirectoryMessage::PartyHere`), neither guild in an alliance, and
+  2,000,000 mesos. The name comes from an NPC text prompt (`Page::AskText`,
+  message type 2); a bad or taken one is asked for again. The founder pays
+  only once `db::alliance::create` succeeds, and both guilds get 0x0F. The
+  master grows it by one guild, up to five, for 1,000,000 (0x17 with the
+  new capacity), or disbands it (0x1D to everyone). These run as
+  `Effect::CreateAlliance`, `GrowAlliance { from }` and `DisbandAlliance`
+  after the conversation's changes are saved; growing checks the quoted
+  capacity again, as Heracle does.
+- `ALLIANCE_OPERATION` (recv 0x8F, `AllianceRequest`):
+  - op 1 sends the alliance (0x0F). The client asks for it itself when its
+    guild info names an alliance, so login sends nothing more.
+  - op 3 invites a guild by name. Only the master, with room, may; a guild
+    that doesn't exist, is in an alliance, or whose master is offline or
+    considering another invitation, is a pink line for the inviter. The
+    card (0x03) reaches the master on any channel, and one invitation per
+    master waits at a time (`alliance_invites` in the directory, for 180
+    seconds; asking again while the card shows sends nothing). op 4
+    accepts it: everyone gets 0x12 (the client prints its
+    own line, so the server adds none), and the guild's members are
+    tagged again. `DENY_ALLIANCE_REQUEST` (recv 0x90) tells the inviter in
+    pink.
+  - op 2 takes a guild master's own guild out, and op 6 has the master
+    expel another guild. The remaining members and the guild get 0x10, and
+    the remaining members a pink line.
+  - op 7 hands the alliance to another guild's master (0x19, and a pink
+    line), op 8 renames the ranks (0x1A), op 9 moves a member a rank up or
+    down (0x1B, and a pink line), op 0x0A posts the notice (0x1C).
+- A guild that joins, moves a member to another guild rank, or changes its
+  emblem sends the alliance 0x1E (the guild). A member who leaves or is
+  expelled from an allied guild gets 0x1D, which clears the alliance on
+  their client. When an allied guild disbands, the alliance goes with it if
+  that guild was the master's, and otherwise the rest get 0x0F and a pink
+  line.
+- Alliance chat is `MULTICHAT` mode 3, sent to every other member online,
+  like guild chat. `CHAR_INFO` shows the alliance's name.
+
 ## Client
 
 - `Character/Guild` holds the guild as the server last described it; the
@@ -388,7 +452,16 @@ ints. The client takes the first member for the master.
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- Guild points, alliances, and the guild quest.
+- Guild points and the guild quest.
+- Alliances in the client: HeavenClient ignores `ALLIANCE_OPERATION`
+  (send 0x42) and alliance chat, and has no Alliance tab.
+- A joining guild's members, and new members of an allied guild, always
+  start at alliance rank 5, even while rank 5 has no title.
+- The deny's reason (invitations switched off, another card showing,
+  declined) is not told apart: the inviter hears the same line.
+- An allied guild's disband and the alliance's cleanup are two
+  transactions; a server stopping between them leaves an alliance with no
+  master.
 - The board's page selector art: the labels are drawn as text, 32 px apart,
   with "<" and ">" for other groups of ten. The original's pitch and arrows
   are unknown.

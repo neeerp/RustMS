@@ -278,7 +278,7 @@ pub fn load(guild_id: i32) -> crate::Result<Option<Guild>> {
     Ok(load_in(&mut conn, guild_id)?)
 }
 
-fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Option<Guild>> {
+pub(crate) fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Option<Guild>> {
     let Some(row) = guilds::table
         .find(guild_id)
         .first::<GuildRow>(conn)
@@ -296,15 +296,17 @@ fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Option<Guild>>
             characters::job,
             characters::level,
             guild_members::rank,
+            guild_members::alliance_rank,
         ))
-        .load::<(i32, String, i16, i16, i16)>(conn)?
+        .load::<(i32, String, i16, i16, i16, i16)>(conn)?
         .into_iter()
-        .map(|(id, name, job, level, rank)| GuildMember {
+        .map(|(id, name, job, level, rank, alliance_rank)| GuildMember {
             id,
             name,
             job,
             level: level as u8,
             rank: rank as u8,
+            alliance_rank: alliance_rank as u8,
             online: false,
         })
         .collect();
@@ -333,14 +335,18 @@ pub fn tag_of(conn: &mut PgConnection, cid: i32) -> QueryResult<Option<GuildTag>
             guilds::mark_bg_color,
             guilds::mark,
             guilds::mark_color,
+            guilds::alliance_id,
         ))
-        .first::<(i32, String, i16, i16, i16, i16)>(conn)
+        .first::<(i32, String, i16, i16, i16, i16, i32)>(conn)
         .optional()?
-        .map(|(id, name, bg, bg_color, mark, mark_color)| GuildTag {
-            id,
-            name,
-            emblem: emblem(bg, bg_color, mark, mark_color),
-        }))
+        .map(
+            |(id, name, bg, bg_color, mark, mark_color, alliance_id)| GuildTag {
+                id,
+                name,
+                emblem: emblem(bg, bg_color, mark, mark_color),
+                alliance_id,
+            },
+        ))
 }
 
 /// What others see of `cid`'s guild, read again after someone else changed

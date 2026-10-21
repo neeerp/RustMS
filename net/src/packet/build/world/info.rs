@@ -3,9 +3,10 @@ use game::inventory::equip_slot;
 use game::{InventoryType, Player};
 use packet::{io::write::PktWrite, Packet};
 
-/// CHAR_INFO: what the character info window shows about `player`. There are
-/// no alliances, wish lists, or monster books yet, so those are empty.
-pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
+/// CHAR_INFO: what the character info window shows about `player`, whose
+/// guild is in the alliance `alliance` (empty for none). There are no wish
+/// lists or monster books yet, so those are empty.
+pub fn build_character_info(player: &Player, alliance: &str) -> Result<Packet, NetworkError> {
     let stats = &player.stats;
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CharInfo as i16)?;
@@ -16,7 +17,7 @@ pub fn build_character_info(player: &Player) -> Result<Packet, NetworkError> {
     packet.write_byte(0)?; // married
     let guild = player.guild.as_ref();
     packet.write_str_with_length(guild.map_or("", |guild| &guild.name))?;
-    packet.write_str_with_length("")?; // alliance
+    packet.write_str_with_length(alliance)?;
     packet.write_byte(0)?; // medal info
     for (index, item) in
         (0..player.pets.len()).filter_map(|index| Some((index, player.summoned_pet(index)?)))
@@ -80,7 +81,7 @@ mod tests {
             equip_slot::MEDAL,
             Item::equipment(1142000, EquipStats::default()),
         );
-        let packet = build_character_info(&player).unwrap();
+        let packet = build_character_info(&player, "").unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CharInfo as i16)
@@ -126,7 +127,7 @@ mod tests {
             equip_slot::PET_CLOTHES[0],
             Item::equipment(1802000, EquipStats::default()),
         );
-        let packet = build_character_info(&player).unwrap();
+        let packet = build_character_info(&player, "").unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
         expect.byte(10).short(100).short(7).byte(0);
@@ -156,7 +157,7 @@ mod tests {
             exp: 200,
             tiredness: 40,
         };
-        let packet = build_character_info(&player).unwrap();
+        let packet = build_character_info(&player, "").unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::CharInfo as i16).int(0x0102_0304);
         expect.byte(10).short(100).short(7).byte(0);
@@ -167,14 +168,15 @@ mod tests {
     }
 
     #[test]
-    fn shows_the_guild_name() {
+    fn shows_the_guild_and_alliance_names() {
         let mut player = crate::codec::stats::sample_player();
         player.guild = Some(GuildTag {
             id: 4,
             name: "Testers".into(),
             emblem: Emblem::default(),
+            alliance_id: 0,
         });
-        let packet = build_character_info(&player).unwrap();
+        let packet = build_character_info(&player, "Union").unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::CharInfo as i16)
@@ -184,6 +186,6 @@ mod tests {
             .short(7)
             .byte(0)
             .string("Testers")
-            .string("");
+            .string("Union");
     }
 }

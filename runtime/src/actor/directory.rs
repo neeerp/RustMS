@@ -3,9 +3,14 @@ use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
-use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
+use crate::message::{
+    AllianceNews, ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage,
+};
+use game::alliance::Alliance;
 use game::Guild;
+use game_data::server_content::keys;
 use net::events::{self, Candidate, EventKind};
+use net::packet::build::world::alliance;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
@@ -14,7 +19,9 @@ use net::packet::build::world::guild::{
     GuildError, InviteRefusal,
 };
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
-use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
+use net::packet::build::world::messaging::{
+    build_broadcast, build_find_result, build_whisper_result, Broadcast, FindLocation,
+};
 use net::packet::build::world::party::{
     build_party_chat, build_party_created, build_party_disbanded, build_party_door,
     build_party_invite, build_party_joined, build_party_leader_changed, build_party_left,
@@ -62,6 +69,14 @@ impl Entry {
     }
 }
 
+/// A guild member changing channel, and when they left.
+#[derive(Clone, Copy)]
+struct Away {
+    guild_id: i32,
+    alliance_id: Option<i32>,
+    left: Instant,
+}
+
 /// A Mystic Door, open on `channel_id`.
 struct Door {
     channel_id: u8,
@@ -78,12 +93,14 @@ pub struct WorldDirectory {
     names: HashMap<String, ClientId>,
     parties: Parties,
     guild_invites: GuildInvites,
+    /// Invitations to alliances, to guild masters, by alliance id.
+    alliance_invites: GuildInvites,
     messengers: Messengers,
     /// Each player's Mystic Door, which their party may use too.
     doors: HashMap<ClientId, Door>,
-    /// Guild members changing channel, with their guild and when they left:
-    /// the guild hears they logged out only if they don't arrive in time.
-    guild_away: HashMap<ClientId, (i32, Instant)>,
+    /// Guild members changing channel: their guild and alliance hear they
+    /// logged out only if they don't arrive in time.
+    guild_away: HashMap<ClientId, Away>,
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
@@ -98,6 +115,7 @@ impl WorldDirectory {
             names: HashMap::new(),
             parties: Parties::default(),
             guild_invites: GuildInvites::default(),
+            alliance_invites: GuildInvites::default(),
             messengers: Messengers::default(),
             doors: HashMap::new(),
             guild_away: HashMap::new(),
@@ -235,6 +253,42 @@ impl WorldDirectory {
             DirectoryMessage::GuildDisbanded { guild_id } => {
                 self.guild_invites.forget_guild(guild_id)
             }
+            DirectoryMessage::AllianceNews { to, news } => self.alliance_news(&to, news),
+            DirectoryMessage::AllianceInvite {
+                from,
+                alliance_id,
+                master,
+                guild_name,
+            } => self.alliance_invite(from, alliance_id, master, &guild_name, Instant::now()),
+            DirectoryMessage::AllianceAccept { from, alliance_id } => {
+                if self
+                    .alliance_invites
+                    .accept(from, alliance_id, Instant::now())
+                {
+                    self.tell(from, ServerMessage::JoinAlliance { alliance_id });
+                }
+            }
+            DirectoryMessage::AllianceDeny {
+                from,
+                inviter,
+                guild_name,
+            } => {
+                let Some(&inviter) = self.names.get(&inviter) else {
+                    // Gone offline: no one to tell, but the card is answered.
+                    return self.alliance_invites.forget(from);
+                };
+                if self.alliance_invites.decline(from, inviter) {
+                    let text = net::content::text()
+                        .get(keys::ALLIANCE_DENIED, &[("guild", guild_name.as_str())]);
+                    self.send_packet(inviter, build_broadcast(Broadcast::Pink, &text));
+                }
+            }
+            DirectoryMessage::AllianceDisbanded { alliance_id } => {
+                self.alliance_invites.forget_guild(alliance_id)
+            }
+            DirectoryMessage::PartyHere { from, reply } => {
+                let _ = reply.send(self.party_here(from));
+            }
             DirectoryMessage::Messenger { from, request } => self.messenger(from, request),
             DirectoryMessage::LookChanged { client_id, look } => {
                 let out = self.messengers.look_changed(client_id, look);
@@ -319,7 +373,7 @@ impl WorldDirectory {
 
     fn register(&mut self, handle: ClientHandle, presence: Presence, channel_id: u8) {
         let client_id = handle.client_id;
-        let guild_id = presence.guild_id;
+        let (guild_id, alliance_id) = (presence.guild_id, presence.alliance_id);
         let previous = self.clients.remove(&client_id);
         if let Some(previous) = &previous {
             // The same character connected again: only one session may live.
@@ -357,13 +411,15 @@ impl WorldDirectory {
 
         // The guild already knows of a second login, or one from another
         // channel.
-        let away = self
-            .guild_away
-            .remove(&client_id)
-            .map(|(guild_id, _)| guild_id);
+        let away = self.guild_away.remove(&client_id);
         if let (None, Some(guild_id)) = (&previous, guild_id) {
-            if away != Some(guild_id) {
+            if away.map(|away| away.guild_id) != Some(guild_id) {
                 self.tell_guild_online(guild_id, client_id, true);
+            }
+            if let Some(alliance_id) = alliance_id {
+                if away.and_then(|away| away.alliance_id) != Some(alliance_id) {
+                    self.tell_alliance_online(alliance_id, guild_id, client_id, true);
+                }
             }
         }
     }
@@ -380,11 +436,15 @@ impl WorldDirectory {
                 self.names.remove(&entry.presence.name);
                 info!(client_id, "Character offline");
                 if let Some(guild_id) = entry.presence.guild_id {
+                    let away = Away {
+                        guild_id,
+                        alliance_id: entry.presence.alliance_id,
+                        left: Instant::now(),
+                    };
                     if changing_channel {
-                        self.guild_away
-                            .insert(client_id, (guild_id, Instant::now()));
+                        self.guild_away.insert(client_id, away);
                     } else {
-                        self.tell_guild_online(guild_id, client_id, false);
+                        self.tell_offline(client_id, away);
                     }
                 }
                 let out = self
@@ -394,6 +454,7 @@ impl WorldDirectory {
             }
             self.parties.forget_invites(client_id);
             self.guild_invites.forget(client_id);
+            self.alliance_invites.forget(client_id);
             if let Some(party) = self.parties.of(client_id) {
                 self.send_party_update(party);
             }
@@ -575,9 +636,15 @@ impl WorldDirectory {
         self.send_packet(owner, build_buddy_list(&views));
     }
 
+    /// Send `owner` their guild with who is online.
+    fn send_guild_info(&self, owner: ClientId, mut guild: Guild) {
+        self.mark_online(&mut guild);
+        self.send_packet(owner, build_guild_info(Some(&guild)));
+    }
+
     /// Members online on any channel, or changing channel, show online,
     /// at the level and job they have now.
-    fn send_guild_info(&self, owner: ClientId, mut guild: Guild) {
+    fn mark_online(&self, guild: &mut Guild) {
         for member in &mut guild.members {
             match self.clients.get(&member.id) {
                 Some(entry) => {
@@ -588,7 +655,151 @@ impl WorldDirectory {
                 None => member.online = self.guild_away.contains_key(&member.id),
             }
         }
-        self.send_packet(owner, build_guild_info(Some(&guild)));
+    }
+
+    /// Send the news to whichever of `to` are online, with the alliance's
+    /// members marked as `mark_online` does.
+    fn alliance_news(&self, to: &[ClientId], news: AllianceNews) {
+        let mark = |alliance: &mut Alliance| {
+            for guild in &mut alliance.guilds {
+                self.mark_online(guild);
+            }
+        };
+        let packet = match news {
+            AllianceNews::Info(mut alliance) => {
+                mark(&mut alliance);
+                alliance::build_alliance_info(&alliance)
+            }
+            AllianceNews::GuildJoined {
+                mut alliance,
+                guild_id,
+            } => {
+                mark(&mut alliance);
+                match alliance.guild(guild_id) {
+                    Some(guild) => alliance::build_guild_joined(&alliance, guild),
+                    None => return,
+                }
+            }
+            AllianceNews::GuildLeft {
+                mut alliance,
+                mut guild,
+                expelled,
+            } => {
+                mark(&mut alliance);
+                self.mark_online(&mut guild);
+                alliance::build_guild_left(&alliance, &guild, expelled)
+            }
+            AllianceNews::GuildChanged {
+                mut alliance,
+                guild_id,
+            } => {
+                mark(&mut alliance);
+                match alliance.guild(guild_id) {
+                    Some(guild) => alliance::build_guild_changed(alliance.id, guild),
+                    None => return,
+                }
+            }
+        };
+        match packet {
+            Ok(packet) => {
+                for client in to {
+                    if let Some(entry) = self.clients.get(client) {
+                        entry.handle.send_packet(packet.clone());
+                    }
+                }
+            }
+            Err(error) => warn!(%error, "Failed to build alliance packet"),
+        }
+    }
+
+    /// The members of alliance `alliance_id` online, on any channel, but
+    /// for those of guild `guild_id`, who hear of each other as guild
+    /// members.
+    fn alliance_online(&self, alliance_id: i32, guild_id: i32) -> impl Iterator<Item = &Entry> {
+        self.clients.values().filter(move |entry| {
+            entry.presence.alliance_id == Some(alliance_id)
+                && entry.presence.guild_id != Some(guild_id)
+        })
+    }
+
+    /// Tell the alliance's other guilds that `member` entered or left the
+    /// game; the client shows a card for it.
+    fn tell_alliance_online(
+        &self,
+        alliance_id: i32,
+        guild_id: i32,
+        member: ClientId,
+        online: bool,
+    ) {
+        let packet = match alliance::build_member_online(alliance_id, guild_id, member, online) {
+            Ok(packet) => packet,
+            Err(error) => return warn!(member, %error, "Failed to build packet"),
+        };
+        for entry in self.alliance_online(alliance_id, guild_id) {
+            entry.handle.send_packet(packet.clone());
+        }
+    }
+
+    /// `member` left the game: their guild and alliance hear so.
+    fn tell_offline(&self, member: ClientId, away: Away) {
+        self.tell_guild_online(away.guild_id, member, false);
+        if let Some(alliance_id) = away.alliance_id {
+            self.tell_alliance_online(alliance_id, away.guild_id, member, false);
+        }
+    }
+
+    /// Pass on an alliance's invitation to the master of another guild,
+    /// online anywhere in the world, unless they are considering another.
+    fn alliance_invite(
+        &mut self,
+        from: ClientId,
+        alliance_id: i32,
+        master: ClientId,
+        guild_name: &str,
+        now: Instant,
+    ) {
+        let Some(inviter) = self.clients.get(&from) else {
+            return;
+        };
+        let pink = |key| {
+            let text = net::content::text().get(key, &[("guild", guild_name)]);
+            build_broadcast(Broadcast::Pink, &text)
+        };
+        if !self.clients.contains_key(&master) {
+            return self.send_packet(from, pink(keys::ALLIANCE_OFFLINE));
+        }
+        // A second card would be refused as another one showing, which
+        // would take back the first.
+        if self
+            .alliance_invites
+            .is_showing(master, from, alliance_id, now)
+        {
+            return;
+        }
+        let packet = alliance::build_alliance_invite(alliance_id, &inviter.presence.name);
+        if self.alliance_invites.invite(alliance_id, from, master, now) {
+            self.send_packet(master, packet);
+        } else {
+            self.send_packet(from, pink(keys::ALLIANCE_BUSY));
+        }
+    }
+
+    /// The party `from` leads: its members on their map and channel, `from`
+    /// first. None if they lead none.
+    fn party_here(&self, from: ClientId) -> Option<Vec<ClientId>> {
+        let leader = self.clients.get(&from)?;
+        let party = self.parties.of(from).filter(|party| party.leader == from)?;
+        let mut here = vec![from];
+        here.extend(
+            party
+                .members
+                .iter()
+                .filter(|member| member.id != from)
+                .filter_map(|member| self.clients.get(&member.id))
+                .filter(|entry| entry.shares_map_with(leader))
+                .map(|entry| entry.handle.client_id),
+        );
+        Some(here)
     }
 
     /// The members of guild `guild_id` online, on any channel.
@@ -618,12 +829,12 @@ impl WorldDirectory {
         let gone: Vec<_> = self
             .guild_away
             .iter()
-            .filter(|(_, (_, left))| now.duration_since(*left) >= CHANNEL_CHANGE_GRACE)
-            .map(|(&id, &(guild_id, _))| (id, guild_id))
+            .filter(|(_, away)| now.duration_since(away.left) >= CHANNEL_CHANGE_GRACE)
+            .map(|(&id, &away)| (id, away))
             .collect();
-        for (id, guild_id) in gone {
+        for (id, away) in gone {
             self.guild_away.remove(&id);
-            self.tell_guild_online(guild_id, id, false);
+            self.tell_offline(id, away);
         }
     }
 
@@ -656,6 +867,23 @@ impl WorldDirectory {
             news.push(build_guild_job_change(now.job, &now.name));
         }
         let others = built(news);
+        if let Some(alliance_id) = now
+            .alliance_id
+            .filter(|&id| previous.alliance_id == Some(id))
+        {
+            let packet = built(vec![alliance::build_member_level_job(
+                alliance_id,
+                guild_id,
+                client_id,
+                now.level,
+                now.job,
+            )]);
+            for entry in self.alliance_online(alliance_id, guild_id) {
+                for packet in &packet {
+                    entry.handle.send_packet(packet.clone());
+                }
+            }
+        }
         for (id, entry) in self.guild_online(guild_id) {
             let extra = if id == client_id {
                 &[][..]
@@ -1084,6 +1312,7 @@ mod tests {
             hp: 50,
             max_hp: 50,
             guild_id: None,
+            alliance_id: None,
         }
     }
 
@@ -1147,6 +1376,7 @@ mod tests {
                     job: 0,
                     level: 10,
                     rank: 3,
+                    alliance_rank: 5,
                     online,
                 })
                 .collect(),
@@ -1586,6 +1816,147 @@ mod tests {
 
         directory.handle(DirectoryMessage::GuildChanged { client_id: 2 });
         assert!(matches!(bobby.try_recv(), Ok(ServerMessage::GuildChanged)));
+    }
+
+    /// A registered member of guild `guild_id` in alliance `alliance_id`.
+    fn allied_online(
+        directory: &mut WorldDirectory,
+        id: ClientId,
+        name: &str,
+        guild_id: i32,
+        alliance_id: Option<i32>,
+        connection: u64,
+    ) -> mpsc::Receiver<ServerMessage> {
+        let (tx, rx) = mpsc::channel(64);
+        let handle = ClientHandle::new(id, connection, tx, CancellationToken::new());
+        let mut presence = presence(name, 10000);
+        presence.guild_id = Some(guild_id);
+        presence.alliance_id = alliance_id;
+        directory.register(handle, presence, 0);
+        rx
+    }
+
+    #[test]
+    fn the_alliances_other_guilds_hear_of_logins_levels_and_logouts() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = allied_online(&mut directory, 1, "Alice", 4, Some(7), 1);
+        let mut carol = allied_online(&mut directory, 3, "Carol", 5, Some(7), 3);
+        let mut erin = allied_online(&mut directory, 5, "Erin", 6, None, 5);
+        packets(&mut alice);
+        let mut bobby = allied_online(&mut directory, 2, "Bobby", 4, Some(7), 2);
+        let guild_card = |online| build_member_online(4, 2, online).unwrap().bytes;
+        let card = |online| {
+            alliance::build_member_online(7, 4, 2, online)
+                .unwrap()
+                .bytes
+        };
+        assert_eq!(packets(&mut alice), [guild_card(true)], "as guild only");
+        assert_eq!(packets(&mut carol), [card(true)]);
+        assert!(packets(&mut erin).is_empty() && packets(&mut bobby).is_empty());
+
+        let mut grown = presence("Bobby", 10000);
+        grown.guild_id = Some(4);
+        grown.alliance_id = Some(7);
+        grown.level = 11;
+        directory.update_presence(2, grown);
+        let level_job = alliance::build_member_level_job(7, 4, 2, 11, 0)
+            .unwrap()
+            .bytes;
+        assert_eq!(packets(&mut carol), [level_job]);
+        assert!(packets(&mut erin).is_empty());
+
+        // A channel change says nothing; leaving the game does.
+        directory.unregister(2, 2, true);
+        let _bobby = allied_online(&mut directory, 2, "Bobby", 4, Some(7), 12);
+        assert!(packets(&mut carol).is_empty());
+        directory.unregister(2, 12, false);
+        assert_eq!(packets(&mut carol), [card(false)]);
+        assert!(packets(&mut erin).is_empty());
+    }
+
+    #[test]
+    fn alliance_invitations_reach_a_master_anywhere_and_answers_the_inviter() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut dave = online(&mut directory, 4, "Dave", 10000);
+        let (bobby, mut bobby_rx, _) = handle(2, 2);
+        directory.register(bobby, presence("Bobby", 20000), 2);
+        let pink = |key, guild: &str| {
+            let text = net::content::text().get(key, &[("guild", guild)]);
+            build_broadcast(Broadcast::Pink, &text).unwrap().bytes
+        };
+        let invite = |directory: &mut WorldDirectory, from, alliance_id, master| {
+            directory.handle(DirectoryMessage::AllianceInvite {
+                from,
+                alliance_id,
+                master,
+                guild_name: "Rivals".into(),
+            })
+        };
+
+        // Carol, the master, is offline.
+        invite(&mut directory, 1, 7, 3);
+        assert_eq!(
+            packets(&mut alice),
+            [pink(keys::ALLIANCE_OFFLINE, "Rivals")]
+        );
+
+        // Bobby is on another channel; another alliance must wait.
+        invite(&mut directory, 1, 7, 2);
+        assert_eq!(
+            packets(&mut bobby_rx),
+            [alliance::build_alliance_invite(7, "Alice").unwrap().bytes]
+        );
+        invite(&mut directory, 4, 8, 2);
+        assert_eq!(packets(&mut dave), [pink(keys::ALLIANCE_BUSY, "Rivals")]);
+        invite(&mut directory, 1, 7, 2);
+        assert!(packets(&mut bobby_rx).is_empty(), "the card still shows");
+        assert!(packets(&mut alice).is_empty());
+
+        directory.handle(DirectoryMessage::AllianceDeny {
+            from: 2,
+            inviter: "Alice".into(),
+            guild_name: "Rivals".into(),
+        });
+        assert_eq!(packets(&mut alice), [pink(keys::ALLIANCE_DENIED, "Rivals")]);
+        directory.handle(DirectoryMessage::AllianceAccept {
+            from: 2,
+            alliance_id: 7,
+        });
+        assert!(bobby_rx.try_recv().is_err(), "declined already");
+
+        invite(&mut directory, 1, 7, 2);
+        packets(&mut bobby_rx);
+        directory.handle(DirectoryMessage::AllianceAccept {
+            from: 2,
+            alliance_id: 7,
+        });
+        assert!(matches!(
+            bobby_rx.try_recv(),
+            Ok(ServerMessage::JoinAlliance { alliance_id: 7 })
+        ));
+    }
+
+    #[test]
+    fn party_here_lists_the_leader_then_members_on_their_map() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let _alice = online(&mut directory, 1, "Alice", 10000);
+        let _bobby = online(&mut directory, 2, "Bobby", 10000);
+        let _carol = online(&mut directory, 3, "Carol", 20000);
+        let now = Instant::now();
+        assert_eq!(directory.party_here(1), None, "in no party");
+        for name in ["Bobby", "Carol"] {
+            let name = name.into();
+            directory.party_request(1, PartyRequest::Invite { name }, now);
+        }
+        for id in [2, 3] {
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        assert_eq!(directory.party_here(1), Some(vec![1, 2]));
+        assert_eq!(directory.party_here(2), None, "not the leader");
     }
 
     #[test]

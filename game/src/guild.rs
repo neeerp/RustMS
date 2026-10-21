@@ -81,6 +81,9 @@ pub struct GuildTag {
     pub id: i32,
     pub name: String,
     pub emblem: Emblem,
+    /// The guild's alliance, or 0. Others don't see it; the world
+    /// directory routes alliance packets by it.
+    pub alliance_id: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -90,6 +93,9 @@ pub struct GuildMember {
     pub job: i16,
     pub level: u8,
     pub rank: u8,
+    /// Their rank in the guild's alliance (see `crate::alliance`); 5 in
+    /// none.
+    pub alliance_rank: u8,
     /// Logged in on any channel; filled in by the world directory.
     pub online: bool,
 }
@@ -115,6 +121,7 @@ impl Guild {
             id: self.id,
             name: self.name.clone(),
             emblem: self.emblem,
+            alliance_id: self.alliance_id,
         }
     }
 
@@ -221,7 +228,7 @@ impl Guild {
     }
 }
 
-fn lowest_rank(titles: &[String; 5]) -> u8 {
+pub(crate) fn lowest_rank(titles: &[String; 5]) -> u8 {
     if titles[3].is_empty() {
         3
     } else if titles[4].is_empty() {
@@ -234,7 +241,7 @@ fn lowest_rank(titles: &[String; 5]) -> u8 {
 /// Ranks 1 to 3 need a title and ranks 4 and 5 may have none. A title
 /// is checked as a guild name (FUN_00916e8d calls FUN_0079fc74) in a box
 /// that takes 10.
-fn title_is_valid(index: usize, title: &str) -> bool {
+pub(crate) fn title_is_valid(index: usize, title: &str) -> bool {
     (title.is_empty() && index >= 3) || (title.len() <= 10 && name_is_valid(title))
 }
 
@@ -270,6 +277,7 @@ mod tests {
                     job: 0,
                     level: 10,
                     rank,
+                    alliance_rank: 5,
                     online: true,
                 })
                 .collect(),
