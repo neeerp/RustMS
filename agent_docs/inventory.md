@@ -208,7 +208,9 @@ stat update.
 
 Event invitations (2031000-2031008) also have `spec/returnMapQR`, which v83
 never reads. The server saves the map the invitation was used in under that
-number (`saved_locations`), and the event map's exit script takes the player
+number (`saved_locations`; the scripts' own kinds, such as the Free Market's
+0, are below 1000, and the smallest `returnMapQR` is 1056), and the event
+map's exit script takes the player
 back there (`photoOut`, `StudioZone_Out`, `outBabyBird`; see
 `map-travel.md`). The event maps' field limits refuse every scroll, so the
 exit is the only way out. Two are refused: 2031002, whose moon map is left

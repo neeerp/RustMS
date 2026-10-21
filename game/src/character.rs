@@ -879,6 +879,15 @@ mod tests {
     use crate::inventory::equip_slot;
 
     #[test]
+    fn the_scripts_saved_location_kinds_are_apart_and_below_the_invitations() {
+        let kinds = [FREE_MARKET_RETURN, WORLD_TOUR_RETURN, FLORINA_RETURN];
+        for (i, kind) in kinds.iter().enumerate() {
+            assert!(!kinds[..i].contains(kind));
+            assert!((0..1000).contains(kind));
+        }
+    }
+
+    #[test]
     fn cash_items_cover_regular_items_in_the_same_slot() {
         let look = AvatarLook::from_equipped(
             &test_stats(),

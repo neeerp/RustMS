@@ -65,7 +65,7 @@ does the plane between Kerning City and Singapore (`plane.rs`).
 
 Some trips end at an NPC who takes the player back where they came from.
 The map they left is saved with the character (`saved_locations`), so the
-way back outlasts a relogin, and taken once. The fares are Cosmic's.
+way back outlasts a relogin; going back clears it. The fares are Cosmic's.
 
 | NPC | Where | Trip |
 | --- | --- | --- |
