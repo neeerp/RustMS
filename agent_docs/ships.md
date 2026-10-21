@@ -147,7 +147,8 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
   closed is refused by the `RequireBoarding` effect.
 - The waiting-room guides take people back to the platform of the room they
   are in (`conti::waiting_in`). The ticket is not returned.
-- Isa points the way to Orbis Station's four platforms.
+- Isa points the way to Orbis Station's six platforms, the crane's and
+  Ereve's ferry's among them.
 - Leafre Station's `dracoout` portal leads back into Leafre.
 - The subway's ticket gates (`SUBWAY_GATES`: 1052007 in Kerning City,
   9201068 in New Leaf City) ask first, as `NLC_Move` does, and only then
@@ -157,6 +158,37 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
   platform from a one-choice menu, and in a waiting room lets the rider back
   out to its platform. The text is under the `subway.*` keys, from
   Server.Scripts.
+
+## Rides on a countdown
+
+The ferries to Ereve and Rien and the crane between Orbis and Mu Lung keep
+no timetable: a player boards when they like and rides alone
+(`net/src/rides.rs`). The pilot or the crane sells the ride from a
+one-choice menu and a Yes or No on the fare, and the yes warps the player
+onto the ride map. Joining a ride map starts the client actor's map timer
+(`time_limit.rs`) with the ride's length and its arrival, overriding the
+map's `forcedReturn`, which is the dock the ride began at. The countdown is
+CLOCK kind 2, scaled like the route clock (`RUSTMS_CONTI_SCALE`).
+
+| Ride map | Sold by | Fare | Ride | Arrives |
+| --- | --- | --- | --- | --- |
+| `200090020` | Kiru `1100008`, Orbis Station `200000161` | 1000 | 8 min | Ereve's dock `130000210`, id 0 |
+| `200090021` | Kiru `1100004`, Ereve | 1000 | 8 min | `200000161`, id 0 |
+| `200090030` | Kiriru `1100007`, Ellinia's dock `101000400` | 1000 | 2 min | `130000210`, id 0 |
+| `200090031` | Kiriru `1100003`, Ereve | 1000 | 2 min | `101000400`, id 0 |
+| `200090060` | Puro `1200004`, Lith Harbor | 800 | 1 min | Rien's dock `140020300`, id 0 |
+| `200090070` | Puro `1200003`, Rien | 800 | 1 min | Lith Harbor, id 3 |
+| `200090300` | The crane `2090005`, Orbis Station `200000141` | 1500 | 1 min | Mu Lung Temple `250000100`, id 0 |
+| `200090310` | The crane, Mu Lung Temple | 1500 | 1 min | `200000141`, id 0 |
+
+The crane also goes straight between Mu Lung Temple and Herb Town
+(`251000000`) for 500; from Herb Town it is a bare Yes or No. Falling off a
+ride map (its `hd*` portals) lands back on the dock it left. Logging out
+lands on its `forcedReturn`, which is that dock too, except on the two Rien
+ferries, whose `forcedReturn` (Map.nx) is where they arrive. The fares and lengths are Cosmic's. The
+text is under the unsourced `ferry.*` keys. Ellinia's `inERShip` and Rien's
+`enterPort` lead down to the docks (`map-travel.md`). `ferries.rs` checks
+Rien both ways, the crane and Herb Town, and a logout mid-ride.
 
 ## Packets
 
@@ -168,8 +200,8 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 | 149 CONTI_STATE | server to client | `u8` state, `u8` flag | The trip's state, on entry |
 
 The client only checks that its map's ship is of the right kind; the target
-is not compared with the map. Other CLOCK kinds (countdowns) are not sent
-or drawn yet.
+is not compared with the map. Ride maps and timed fields send CLOCK kind 2,
+a countdown (see "Rides on a countdown").
 
 ## Client
 
@@ -211,6 +243,6 @@ again before it has finished docking.
   Construction Site choices.
 
 - 8150000's drops, which belong in the content pack.
-- Mu Lung and Ereve in Isa's list; Corba's dragon flight to Leafre.
+- Corba's dragon flight to Leafre.
 - Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
-- CLOCK countdowns (kinds 0, 2 and 3).
+- CLOCK countdown kinds 0 and 3.

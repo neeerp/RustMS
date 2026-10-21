@@ -422,7 +422,8 @@ pub fn now() -> i64 {
     millis * scale()
 }
 
-fn scale() -> i64 {
+/// How many times as fast as the wall clock route time runs.
+pub(crate) fn scale() -> i64 {
     static SCALE: OnceLock<i64> = OnceLock::new();
     *SCALE.get_or_init(|| {
         std::env::var("RUSTMS_CONTI_SCALE")

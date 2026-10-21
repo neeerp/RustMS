@@ -271,6 +271,14 @@ pub mod keys {
     pub const MALAYSIA_HOME: &str = "malaysia.home";
     pub const MALAYSIA_HOME_GO: &str = "malaysia.home_go";
 
+    /// The Ereve and Rien ferries' pilots and the crane between Orbis, Mu
+    /// Lung and Herb Town: a choice and its ask with `{map}` and `{price}`.
+    pub const FERRY_INTRO: &str = "ferry.intro";
+    pub const FERRY_CHOICE: &str = "ferry.choice";
+    pub const FERRY_ASK: &str = "ferry.ask";
+    pub const FERRY_DECLINE: &str = "ferry.decline";
+    pub const FERRY_SHORT: &str = "ferry.short";
+
     /// The NLC Taxi between New Leaf City and the Haunted House's mansion
     /// grounds.
     pub const NLC_TAXI_ASK: &str = "nlc_taxi.ask";
@@ -932,6 +940,11 @@ mod tests {
             keys::MALAYSIA_SHORT,
             keys::MALAYSIA_HOME,
             keys::MALAYSIA_HOME_GO,
+            keys::FERRY_INTRO,
+            keys::FERRY_CHOICE,
+            keys::FERRY_ASK,
+            keys::FERRY_DECLINE,
+            keys::FERRY_SHORT,
             keys::NLC_TAXI_ASK,
             keys::NLC_TAXI_DECLINE,
             keys::NLC_TAXI_SHORT,
