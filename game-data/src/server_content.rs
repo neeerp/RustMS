@@ -83,6 +83,44 @@ pub mod keys {
     pub const ISA_ASK: &str = "isa.ask";
     pub const ISA_DECLINE: &str = "isa.decline";
 
+    /// The Regular Cabs (`taxi1`-`taxi6`): a greeting, a menu of the other
+    /// towns with their fares (opened, for a beginner, by the beginners'
+    /// discount), a yes or no, and the lines for no and for too few mesos.
+    pub const TAXI_INTRO: &str = "taxi.intro";
+    pub const TAXI_DISCOUNT: &str = "taxi.discount";
+    pub const TAXI_MENU: &str = "taxi.menu";
+    pub const TAXI_CHOICE: &str = "taxi.choice";
+    pub const TAXI_ASK: &str = "taxi.ask";
+    pub const TAXI_DECLINE: &str = "taxi.decline";
+    pub const TAXI_SHORT: &str = "taxi.short";
+
+    /// The VIP Cabs (`mTaxi`) to Ant Tunnel Park; a beginner's yes or no
+    /// opens with the Regular Cabs' discount line.
+    pub const VIP_CAB_INTRO: &str = "vip_cab.intro";
+    pub const VIP_CAB_ASK: &str = "vip_cab.ask";
+    pub const VIP_CAB_DECLINE: &str = "vip_cab.decline";
+    pub const VIP_CAB_SHORT: &str = "vip_cab.short";
+
+    /// Ossyria's Danger Zone Taxi (`ossyria_taxi`).
+    pub const DANGER_ZONE_TAXI_INTRO: &str = "danger_zone_taxi.intro";
+    pub const DANGER_ZONE_TAXI_ASK: &str = "danger_zone_taxi.ask";
+    pub const DANGER_ZONE_TAXI_DECLINE: &str = "danger_zone_taxi.decline";
+    pub const DANGER_ZONE_TAXI_SHORT: &str = "danger_zone_taxi.short";
+
+    /// The Camel Cab between Ariant and Magatia (`nihal_taxi`).
+    pub const CAMEL_CAB_ASK: &str = "camel_cab.ask";
+    pub const CAMEL_CAB_DECLINE: &str = "camel_cab.decline";
+    pub const CAMEL_CAB_SHORT: &str = "camel_cab.short";
+
+    /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
+    /// or with a coupon) and a ride across, each with its yes or no.
+    pub const DOLPHIN_MENU: &str = "dolphin.menu";
+    pub const DOLPHIN_CHOICE: &str = "dolphin.choice";
+    pub const DOLPHIN_COUPON: &str = "dolphin.coupon";
+    pub const DOLPHIN_ASK: &str = "dolphin.ask";
+    pub const DOLPHIN_COUPON_ASK: &str = "dolphin.coupon_ask";
+    pub const DOLPHIN_SHORT: &str = "dolphin.short";
+
     /// Natalie, Henesys's hair salon: a menu of a cut or a dye, then for
     /// each the choice of styles, the line after, and the line to a player
     /// without the coupon.
@@ -512,6 +550,30 @@ mod tests {
             keys::ISA_PLATFORM,
             keys::ISA_ASK,
             keys::ISA_DECLINE,
+            keys::TAXI_INTRO,
+            keys::TAXI_DISCOUNT,
+            keys::TAXI_MENU,
+            keys::TAXI_CHOICE,
+            keys::TAXI_ASK,
+            keys::TAXI_DECLINE,
+            keys::TAXI_SHORT,
+            keys::VIP_CAB_INTRO,
+            keys::VIP_CAB_ASK,
+            keys::VIP_CAB_DECLINE,
+            keys::VIP_CAB_SHORT,
+            keys::DANGER_ZONE_TAXI_INTRO,
+            keys::DANGER_ZONE_TAXI_ASK,
+            keys::DANGER_ZONE_TAXI_DECLINE,
+            keys::DANGER_ZONE_TAXI_SHORT,
+            keys::CAMEL_CAB_ASK,
+            keys::CAMEL_CAB_DECLINE,
+            keys::CAMEL_CAB_SHORT,
+            keys::DOLPHIN_MENU,
+            keys::DOLPHIN_CHOICE,
+            keys::DOLPHIN_COUPON,
+            keys::DOLPHIN_ASK,
+            keys::DOLPHIN_COUPON_ASK,
+            keys::DOLPHIN_SHORT,
             keys::NATALIE_MENU,
             keys::NATALIE_CUT,
             keys::NATALIE_DYE,

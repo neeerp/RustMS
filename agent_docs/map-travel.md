@@ -33,6 +33,30 @@ revamp's Sen house (`30001`), and the Adventurer Training Centers
 (`1010100`-`1010400`) are in the assets but not linked from the route. Do not
 insert them or invent reverse connections.
 
+## Taxis
+
+Taxi NPCs are scripted in `net::npc_scripts` (fares from v83 server
+scripts). Every ride asks Yes or No first. Yes with too few mesos takes
+nothing and shows the cab's "not enough mesos" line.
+
+| NPC | Where | Ride |
+| --- | --- | --- |
+| Regular Cab (`1002007`, `1012000`, `1022001`, `1032000`, `1052016`, `1092014`) | Lith Harbor, Henesys, Perion, Ellinia, Kerning City, Nautilus | Menu of the other five towns: 1000 mesos, 800 to Ellinia and Nautilus. Arrives at the town's first spawn point |
+| VIP Cab (`1002004`, `1032005`) | Lith Harbor, Ellinia | Ant Tunnel Park (`105070001`) for 10000 |
+| Danger Zone Taxi (`2023000`) | El Nath, Ludibrium, Omega Sector, Leafre | El Nath to `211040200` (10000), Ludibrium to `220050300` portal 1 (25000), Omega Sector to Ludibrium (25000), Leafre to `240030000` (65000) |
+| Camel Cab (`2110005`) | Outside Ariant and Magatia | The other end for 1500 |
+| Dolphin (`2060009`) | Aquarium, Herb Town pier | Menu: down to Sharp Unknown (`230030200` portal 2) for 1000 or one Dolphin Taxi Coupon (`4031242`), or across between the two for 10000 |
+
+Beginners (job 0) pay a tenth on the Regular and VIP cabs, and the Regular
+Cab's menu opens with the discount line. In the original, choosing a
+Dolphin ride warps at once; here each choice asks Yes or No, since a menu
+choice opens pages and cannot take mesos itself.
+
+Only the Regular Cab's text is in the content pack (`taxi.*`). The VIP Cab,
+Danger Zone Taxi, Camel Cab and Dolphin keys are `unsourced` and show
+placeholder text. `taxis.rs` checks a beginner's Regular Cab ride and the
+VIP Cab's fare through the network harness.
+
 ## Map and portal scripts
 
 Map entry (`info/onUserEnter`) and touch portals (`pt` 9) run native scripts

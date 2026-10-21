@@ -75,6 +75,100 @@ const ISA_PLATFORMS: [(&str, &str, i32); 4] = [
     ("Ship", "Leafre", 200000130),
     ("Genie", "Ariant", 200000150),
 ];
+/// Victoria Island's Regular Cabs (`taxi1`-`taxi6`), each with its fares
+/// to the other towns (Cosmic's v83 fares). Beginners pay a tenth.
+const REGULAR_CABS: [(i32, [(i32, i32); 5]); 6] = [
+    (
+        1002007,
+        [
+            (100000000, 1000),
+            (102000000, 1000),
+            (101000000, 800),
+            (103000000, 1000),
+            (120000000, 800),
+        ],
+    ),
+    (
+        1012000,
+        [
+            (104000000, 1000),
+            (102000000, 1000),
+            (101000000, 800),
+            (103000000, 1000),
+            (120000000, 800),
+        ],
+    ),
+    (
+        1022001,
+        [
+            (104000000, 1000),
+            (100000000, 1000),
+            (101000000, 800),
+            (103000000, 1000),
+            (120000000, 800),
+        ],
+    ),
+    (
+        1032000,
+        [
+            (104000000, 1000),
+            (102000000, 1000),
+            (100000000, 1000),
+            (103000000, 1000),
+            (120000000, 800),
+        ],
+    ),
+    (
+        1052016,
+        [
+            (104000000, 1000),
+            (102000000, 1000),
+            (100000000, 1000),
+            (101000000, 800),
+            (120000000, 800),
+        ],
+    ),
+    (
+        1092014,
+        [
+            (104000000, 1000),
+            (102000000, 1000),
+            (100000000, 1000),
+            (101000000, 800),
+            (103000000, 1000),
+        ],
+    ),
+];
+/// The VIP Cabs at Lith Harbor and Ellinia (`mTaxi`), to Ant Tunnel Park.
+const VIP_CABS: [i32; 2] = [1002004, 1032005];
+const ANT_TUNNEL_PARK: i32 = 105070001;
+const VIP_FARE: i32 = 10000;
+/// Ossyria's Danger Zone Taxi (`ossyria_taxi`): from each town it stands
+/// in, (town, destination, its portal, fare).
+const DANGER_ZONE_TAXI: i32 = 2023000;
+const DANGER_ZONE_ROUTES: [(i32, i32, u8, i32); 4] = [
+    (211000000, 211040200, 0, 10000),
+    (220000000, 220050300, 1, 25000),
+    (221000000, 220000000, 0, 25000),
+    (240000000, 240030000, 0, 65000),
+];
+/// The Camel Cab (`nihal_taxi`) between Ariant's north gate and Magatia's
+/// Sahel 1, each way to the town at the other end.
+const CAMEL_CAB: i32 = 2110005;
+const CAMEL_CAB_FARE: i32 = 1500;
+const OUTSIDE_ARIANT: i32 = 260020000;
+const MAGATIA: i32 = 261000000;
+const ARIANT: i32 = 260000000;
+/// The Dolphin Taxi (`aqua_taxi`) at the Aquarium and Herb Town's pier:
+/// down to the Sharp Unknown for a fare or a coupon, or across to the
+/// other end.
+const DOLPHIN: i32 = 2060009;
+const DOLPHIN_TAXI_COUPON: i32 = 4031242;
+const AQUARIUM: i32 = 230000000;
+const HERB_TOWN_PIER: i32 = 251000100;
+const SHARP_UNKNOWN: i32 = 230030200;
+const SHARP_UNKNOWN_FARE: i32 = 1000;
+const DOLPHIN_FARE: i32 = 10000;
 /// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
 /// choosing, for a coupon each.
 const NATALIE: i32 = 1012103;
@@ -495,6 +589,12 @@ impl NpcScript {
         if WAITING_ROOM_GUIDES.contains(&npc_id) {
             return conti::waiting_in(player.stats.map_id).map(|route| leave_ship(npc_id, route));
         }
+        if let Some((_, fares)) = REGULAR_CABS.iter().find(|(cab, _)| *cab == npc_id) {
+            return Some(regular_cab(npc_id, fares, player));
+        }
+        if VIP_CABS.contains(&npc_id) {
+            return Some(vip_cab(npc_id, player));
+        }
         match npc_id {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
             SPARKLING_CRYSTAL => sparkling_crystal(player),
@@ -506,6 +606,9 @@ impl NpcScript {
             HERACLE => Some(heracle(player)),
             AGATHA => Some(agatha(player)),
             ISA => Some(isa()),
+            DANGER_ZONE_TAXI => danger_zone_taxi(player),
+            CAMEL_CAB => Some(camel_cab(player)),
+            DOLPHIN => Some(dolphin(player)),
             NATALIE => Some(natalie(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
@@ -927,6 +1030,207 @@ fn isa() -> NpcScript {
             choices,
         }],
     )
+}
+
+/// `taxi1`-`taxi6`: a Regular Cab to another of Victoria's towns.
+fn regular_cab(npc_id: i32, fares: &[(i32, i32)], player: &Player) -> NpcScript {
+    let beginner = player.stats.job == 0;
+    let mut menu = if beginner {
+        text(keys::TAXI_DISCOUNT)
+    } else {
+        String::new()
+    };
+    menu.push_str(&text(keys::TAXI_MENU));
+    let choices = fares
+        .iter()
+        .map(|&(town, fare)| {
+            let fare = if beginner { fare / 10 } else { fare };
+            let (map, price) = (town.to_string(), fare.to_string());
+            let vars = [("map", map.as_str()), ("price", price.as_str())];
+            let ride = ride(
+                content::text().get(keys::TAXI_ASK, &vars),
+                Some(keys::TAXI_DECLINE),
+                keys::TAXI_SHORT,
+                fare,
+                Effect::Warp(town),
+                player,
+            );
+            (content::text().get(keys::TAXI_CHOICE, &vars), ride)
+        })
+        .collect();
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![
+            Page::Say(text(keys::TAXI_INTRO)),
+            Page::Menu {
+                text: menu,
+                choices,
+            },
+        ],
+    );
+    script.refused = Some(text(keys::TAXI_SHORT));
+    script
+}
+
+/// `mTaxi`: the VIP Cab to Ant Tunnel Park, a tenth of the fare for a
+/// beginner.
+fn vip_cab(npc_id: i32, player: &Player) -> NpcScript {
+    let beginner = player.stats.job == 0;
+    let fare = if beginner { VIP_FARE / 10 } else { VIP_FARE };
+    let mut ask = if beginner {
+        text(keys::TAXI_DISCOUNT)
+    } else {
+        String::new()
+    };
+    ask.push_str(&content::text().get(keys::VIP_CAB_ASK, &[("price", &fare.to_string())]));
+    let mut pages = vec![Page::Say(text(keys::VIP_CAB_INTRO))];
+    pages.extend(ride(
+        ask,
+        Some(keys::VIP_CAB_DECLINE),
+        keys::VIP_CAB_SHORT,
+        fare,
+        Effect::Warp(ANT_TUNNEL_PARK),
+        player,
+    ));
+    let mut script = NpcScript::new(npc_id, pages);
+    script.refused = Some(text(keys::VIP_CAB_SHORT));
+    script
+}
+
+/// `ossyria_taxi`: the Danger Zone Taxi from the town it stands in, past
+/// the dangerous part of the way. `None` in a town it doesn't serve.
+fn danger_zone_taxi(player: &Player) -> Option<NpcScript> {
+    let &(town, to, portal, fare) = DANGER_ZONE_ROUTES
+        .iter()
+        .find(|(town, ..)| *town == player.stats.map_id)?;
+    let (town, map, price) = (town.to_string(), to.to_string(), fare.to_string());
+    let vars = [("town", town.as_str()), ("map", &map), ("price", &price)];
+    let mut pages = vec![Page::Say(
+        content::text().get(keys::DANGER_ZONE_TAXI_INTRO, &vars),
+    )];
+    pages.extend(ride(
+        content::text().get(keys::DANGER_ZONE_TAXI_ASK, &vars),
+        Some(keys::DANGER_ZONE_TAXI_DECLINE),
+        keys::DANGER_ZONE_TAXI_SHORT,
+        fare,
+        Effect::WarpToPortal(to, portal),
+        player,
+    ));
+    let mut script = NpcScript::new(DANGER_ZONE_TAXI, pages);
+    script.refused = Some(text(keys::DANGER_ZONE_TAXI_SHORT));
+    Some(script)
+}
+
+/// `nihal_taxi`: the Camel Cab to Magatia from outside Ariant's north
+/// gate, and back to Ariant from Sahel 1.
+fn camel_cab(player: &Player) -> NpcScript {
+    let to = if player.stats.map_id == OUTSIDE_ARIANT {
+        MAGATIA
+    } else {
+        ARIANT
+    };
+    let (map, price) = (to.to_string(), CAMEL_CAB_FARE.to_string());
+    let ask = content::text().get(keys::CAMEL_CAB_ASK, &[("map", &map), ("price", &price)]);
+    let mut script = NpcScript::new(
+        CAMEL_CAB,
+        ride(
+            ask,
+            Some(keys::CAMEL_CAB_DECLINE),
+            keys::CAMEL_CAB_SHORT,
+            CAMEL_CAB_FARE,
+            Effect::WarpToPortal(to, 0),
+            player,
+        ),
+    );
+    script.refused = Some(text(keys::CAMEL_CAB_SHORT));
+    script
+}
+
+/// `aqua_taxi`: the Dolphin Taxi down to the Sharp Unknown, for a coupon
+/// if the player has one and a fare if not, or across to the other end
+/// of the route.
+fn dolphin(player: &Player) -> NpcScript {
+    let across = if player.stats.map_id == HERB_TOWN_PIER {
+        AQUARIUM
+    } else {
+        HERB_TOWN_PIER
+    };
+    let down = SHARP_UNKNOWN.to_string();
+    let down = if player.inventory.count(DOLPHIN_TAXI_COUPON) > 0 {
+        let vars = [("map", down.as_str())];
+        let ask = Page::Ask {
+            text: content::text().get(keys::DOLPHIN_COUPON_ASK, &vars),
+            on_yes: vec![
+                Effect::TakeItem {
+                    item_id: DOLPHIN_TAXI_COUPON,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(SHARP_UNKNOWN, 2),
+            ],
+            on_no: None,
+        };
+        (content::text().get(keys::DOLPHIN_COUPON, &vars), vec![ask])
+    } else {
+        dolphin_ride(
+            SHARP_UNKNOWN,
+            SHARP_UNKNOWN_FARE,
+            Effect::WarpToPortal(SHARP_UNKNOWN, 2),
+            player,
+        )
+    };
+    let across = dolphin_ride(across, DOLPHIN_FARE, Effect::Warp(across), player);
+    let mut script = NpcScript::new(
+        DOLPHIN,
+        vec![Page::Menu {
+            text: text(keys::DOLPHIN_MENU),
+            choices: vec![down, across],
+        }],
+    );
+    script.refused = Some(text(keys::DOLPHIN_SHORT));
+    script
+}
+
+/// A choice of the Dolphin Taxi's menu: to `to` for `fare`.
+fn dolphin_ride(to: i32, fare: i32, warp: Effect, player: &Player) -> (String, Vec<Page>) {
+    let (map, price) = (to.to_string(), fare.to_string());
+    let vars = [("map", map.as_str()), ("price", price.as_str())];
+    let ride = ride(
+        content::text().get(keys::DOLPHIN_ASK, &vars),
+        None,
+        keys::DOLPHIN_SHORT,
+        fare,
+        warp,
+        player,
+    );
+    (content::text().get(keys::DOLPHIN_CHOICE, &vars), ride)
+}
+
+/// A ride asked about with `ask`: yes pays `fare` and applies `warp`, no
+/// says `decline` (if any), and a player short of the fare hears `short`
+/// after yes instead.
+fn ride(
+    ask: String,
+    decline: Option<&str>,
+    short: &str,
+    fare: i32,
+    warp: Effect,
+    player: &Player,
+) -> Vec<Page> {
+    let can_pay = player.meso >= fare;
+    let on_yes = if can_pay {
+        vec![Effect::SpendMeso(fare), warp]
+    } else {
+        Vec::new()
+    };
+    let mut pages = vec![Page::Ask {
+        text: ask,
+        on_yes,
+        on_no: decline.map(text),
+    }];
+    if !can_pay {
+        pages.push(Page::Say(text(short)));
+    }
+    pages
 }
 
 /// A first-job instructor. A beginner who qualifies may take the job, its
@@ -1929,6 +2233,152 @@ mod tests {
                 [Effect::Warp(passage)]
             );
         }
+    }
+
+    fn rider(job: i16, meso: i32, map_id: i32) -> Player {
+        let mut player = traveller(10, meso, false);
+        player.stats.job = job;
+        player.stats.map_id = map_id;
+        player
+    }
+
+    fn menu_text(step: &Step) -> &str {
+        match &step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_cabs_charge_beginners_a_tenth_of_the_fare() {
+        // Henesys's Regular Cab: past the greeting, the other five towns.
+        let mut cab = NpcScript::for_npc(1012000, &rider(100, 1000, 100000000)).unwrap();
+        assert_eq!(buttons(&cab.begin()), (false, true));
+        let menu = cab.respond(ScriptInput::Next).unwrap();
+        assert_eq!(menu_text(&menu).matches("#L").count(), 5);
+        assert!(!menu_text(&menu).contains("#m100000000#"));
+        assert!(!menu_text(&menu).contains(&text(keys::TAXI_DISCOUNT)));
+        assert_eq!(kind(&cab.respond(ScriptInput::Select(2)).unwrap()), Some(1));
+        assert_eq!(
+            cab.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::SpendMeso(800), Effect::Warp(101000000)]
+        );
+
+        // A beginner is told of the discount and pays a tenth.
+        let mut cab = NpcScript::for_npc(1012000, &rider(0, 100, 100000000)).unwrap();
+        cab.begin();
+        let menu = cab.respond(ScriptInput::Next).unwrap();
+        assert!(menu_text(&menu).starts_with(&text(keys::TAXI_DISCOUNT)));
+        cab.respond(ScriptInput::Select(0));
+        assert_eq!(
+            cab.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::SpendMeso(100), Effect::Warp(104000000)]
+        );
+
+        // Short of the fare, yes is answered with why not; no is declined.
+        let mut cab = NpcScript::for_npc(1022001, &rider(0, 79, 102000000)).unwrap();
+        cab.begin();
+        cab.respond(ScriptInput::Next);
+        cab.respond(ScriptInput::Select(2));
+        let short = cab.respond(ScriptInput::Yes).unwrap();
+        assert!(short.effects.is_empty());
+        assert_eq!(buttons(&short), (false, false));
+        let mut cab = NpcScript::for_npc(1022001, &rider(0, 80, 102000000)).unwrap();
+        cab.begin();
+        cab.respond(ScriptInput::Next);
+        cab.respond(ScriptInput::Select(2));
+        let no = cab.respond(ScriptInput::No).unwrap();
+        assert!(no.effects.is_empty());
+        assert_eq!(buttons(&no), (false, false));
+        assert!(cab.refused().is_some(), "a fare spent meanwhile is told");
+
+        // The VIP Cab goes to Ant Tunnel Park.
+        for (job, fare) in [(100, 10000), (0, 1000)] {
+            let mut vip = NpcScript::for_npc(1032005, &rider(job, 10000, 101000000)).unwrap();
+            assert_eq!(buttons(&vip.begin()), (false, true));
+            assert_eq!(kind(&vip.respond(ScriptInput::Next).unwrap()), Some(1));
+            assert_eq!(
+                vip.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::SpendMeso(fare), Effect::Warp(ANT_TUNNEL_PARK)]
+            );
+        }
+    }
+
+    #[test]
+    fn ossyrias_taxis_take_the_fare_to_the_far_end() {
+        // The Danger Zone Taxi from Ludibrium stops at the Path of Time's
+        // second spawn point; it doesn't run from towns it doesn't serve.
+        let mut taxi = NpcScript::for_npc(DANGER_ZONE_TAXI, &rider(200, 25000, 220000000)).unwrap();
+        assert_eq!(buttons(&taxi.begin()), (false, true));
+        assert_eq!(kind(&taxi.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            taxi.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::SpendMeso(25000), Effect::WarpToPortal(220050300, 1)]
+        );
+        assert!(NpcScript::for_npc(DANGER_ZONE_TAXI, &rider(200, 25000, 104000000)).is_none());
+        let mut taxi = NpcScript::for_npc(DANGER_ZONE_TAXI, &rider(200, 64999, 240000000)).unwrap();
+        taxi.begin();
+        taxi.respond(ScriptInput::Next);
+        assert!(taxi.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+
+        // The Camel Cab goes to the town at the other end.
+        for (from, to) in [(OUTSIDE_ARIANT, MAGATIA), (260020700, ARIANT)] {
+            let mut cab = NpcScript::for_npc(CAMEL_CAB, &rider(200, 1500, from)).unwrap();
+            assert_eq!(kind(&cab.begin()), Some(1));
+            assert_eq!(
+                cab.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::SpendMeso(1500), Effect::WarpToPortal(to, 0)]
+            );
+        }
+
+        // The Dolphin Taxi takes a coupon instead of the fare down, and
+        // the fare across.
+        let mut holder = rider(200, 0, AQUARIUM);
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(DOLPHIN_TAXI_COUPON, 1),
+        );
+        let mut dolphin = NpcScript::for_npc(DOLPHIN, &holder).unwrap();
+        assert_eq!(kind(&dolphin.begin()), Some(4));
+        dolphin.respond(ScriptInput::Select(0));
+        assert_eq!(
+            dolphin.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: DOLPHIN_TAXI_COUPON,
+                    quantity: 1
+                },
+                Effect::WarpToPortal(SHARP_UNKNOWN, 2)
+            ]
+        );
+        let pier = rider(200, 11000, HERB_TOWN_PIER);
+        for (choice, effects) in [
+            (
+                0,
+                [
+                    Effect::SpendMeso(1000),
+                    Effect::WarpToPortal(SHARP_UNKNOWN, 2),
+                ],
+            ),
+            (1, [Effect::SpendMeso(10000), Effect::Warp(AQUARIUM)]),
+        ] {
+            let mut dolphin = NpcScript::for_npc(DOLPHIN, &pier).unwrap();
+            dolphin.begin();
+            dolphin.respond(ScriptInput::Select(choice));
+            assert_eq!(dolphin.respond(ScriptInput::Yes).unwrap().effects, effects);
+        }
+        let mut dolphin = NpcScript::for_npc(DOLPHIN, &rider(200, 9999, AQUARIUM)).unwrap();
+        dolphin.begin();
+        assert_eq!(
+            kind(&dolphin.respond(ScriptInput::Select(1)).unwrap()),
+            Some(1)
+        );
+        assert!(dolphin
+            .respond(ScriptInput::Yes)
+            .unwrap()
+            .effects
+            .is_empty());
     }
 
     #[test]
