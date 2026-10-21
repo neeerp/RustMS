@@ -29,9 +29,11 @@ tests.
   (`server_content::keys`), never literal dialogue; a unit test fails if a key
   has no placeholder. `{name}` placeholders are filled at runtime.
 - **Drops** (`RewardTable`): without `rewards.json` mobs drop nothing, except
-  the committed overrides. Overrides replace a mob's drops; they are facts
-  from our own assets, e.g. Tutorial Jr. Sentinel → 4031802 for quest 1035
-  (`Check.img/1035/1/item`), since the imported v95 data names another item.
+  the committed overrides. `replace = [...]` replaces a mob's drops and
+  `add = [...]` appends to them; both are facts from our own assets, e.g.
+  Tutorial Jr. Sentinel → 4031802 for quest 1035 (`Check.img/1035/1/item`),
+  since the imported v95 data names another item, and Manon/Griffey add the
+  pirates' 4031860/4031861 for 6944, which the pack lacks.
   `quest = <id>` limits a drop to players with that quest started. Premium
   (cash) drops are filtered out.
 - **Reactor drops** (`RewardTable::reactor_drops`): `rewards.json` mixes
