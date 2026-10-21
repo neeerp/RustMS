@@ -57,8 +57,11 @@ and the new look for the map. Sealed items (mode 11) and expiring skills
 Items with `info/expireOnLogout` (127 of them, mostly event and PQ items)
 go when their owner logs out: the client actor's cleanup takes them
 (`net::items::drop_logout_items`) before the final save, but not on a channel
-change. The client shows nothing. A crash before the save leaves them, since
-the server can't yet tell a fresh login from a channel change.
+change. The client shows nothing. A world stopped without that cleanup
+leaves in-game sessions behind; the restarted world clears them and deletes
+those characters' expireOnLogout items (`drop_stale_logout_items` in
+`runtime/src/world.rs`). Loading a character brings HP and MP down within
+the maximum, since no buff survives a logout or channel change.
 
 ## One-of-a-kind items
 

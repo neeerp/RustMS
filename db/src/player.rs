@@ -256,6 +256,28 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
     Ok(player)
 }
 
+/// The distinct items the characters hold, worn or in their bags.
+pub fn held_item_ids(character_ids: &[i32]) -> crate::Result<Vec<i32>> {
+    let mut connection = crate::connection()?;
+    Ok(inventory_items::table
+        .filter(inventory_items::character_id.eq_any(character_ids))
+        .select(inventory_items::item_id)
+        .distinct()
+        .load(&mut connection)?)
+}
+
+/// Delete every stack of `item_ids` the characters hold. Returns how many
+/// went.
+pub fn delete_held_items(character_ids: &[i32], item_ids: &[i32]) -> crate::Result<usize> {
+    let mut connection = crate::connection()?;
+    Ok(diesel::delete(
+        inventory_items::table
+            .filter(inventory_items::character_id.eq_any(character_ids))
+            .filter(inventory_items::item_id.eq_any(item_ids)),
+    )
+    .execute(&mut connection)?)
+}
+
 /// Persist a player snapshot. Character columns, keymap, inventory, skills,
 /// and Monster Book cards are replaced atomically. Quest progress is written by its own
 /// transactions and is not touched here.
