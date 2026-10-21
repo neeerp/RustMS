@@ -17,8 +17,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <cstdint>
 
+#include "../Login.h"
 #include "../OutPacket.h"
 
 #include "../../Character/Inventory/Inventory.h"
@@ -232,6 +234,61 @@ namespace ms
 				write_int(tab);
 				write_int(item_slot);
 			}
+
+			write_time();
+		}
+	};
+
+	// Uses an avatar megaphone (FUN_00a0a63f's 539 branch): four lines, the
+	// ear, and my look in its megaphone form (FUN_004e73b4), the reverse of
+	// LoginParser::parse_look.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseAvatarMegaphonePacket : public OutPacket
+	{
+	public:
+		UseAvatarMegaphonePacket(int16_t slot, int32_t itemid, const std::array<std::string, 4> &lines, bool ear,
+								 const LookEntry &look) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+
+			for (const std::string &line : lines)
+				write_string(line);
+
+			write_byte(ear);
+			write_byte(look.female);
+			write_byte(look.skin);
+			write_int(look.faceid);
+			write_byte(0);
+			write_int(look.hairid);
+
+			for (auto [part, id] : look.equips)
+			{
+				write_byte(part);
+				write_int(id);
+			}
+
+			write_byte(-1);
+
+			int32_t cash_weapon = 0;
+
+			for (auto [part, id] : look.maskedequips)
+			{
+				if (part == -111)
+				{
+					cash_weapon = id;
+				} else
+				{
+					write_byte(part);
+					write_int(id);
+				}
+			}
+
+			write_byte(-1);
+			write_int(cash_weapon);
+
+			for (size_t i = 0; i < 3; i++)
+				write_int(i < look.petids.size() ? look.petids[i] : 0);
 
 			write_time();
 		}

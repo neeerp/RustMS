@@ -54,6 +54,25 @@ int main()
 
 		require(sample_line("[***]  M A P") == "[***]  M A P", "a sample line stays as it is");
 		require(sample_line("\xe3\x80\x80[^^^]") == "?[^^^]", "but for what the code page lacks");
+
+		require(kind(5390000) == Kind::AVATAR && kind(5390006) == Kind::AVATAR, "539 is the avatar megaphone");
+
+		using Rows = AvatarLines;
+		require(avatar_lines("", {}) == Rows{}, "an empty box sends four empty lines");
+		require(avatar_lines("hello", { 0 }) == Rows{ "hello", "", "", "" }, "one row is the first line");
+		require(avatar_lines("hello world", { 0, 5 }) == Rows{ "hello ", "world", "", "" },
+				"the space a row wraps at stays on the row before");
+		require(avatar_lines("abcdefgh", { 0, 3, 6 }) == Rows{ "abc", "def", "gh", "" },
+				"a word too long is cut where it wraps");
+		require(avatar_lines("a b c d e", { 0, 1, 3, 5, 7 }) == Rows{ "a ", "b ", "c ", "d " },
+				"a fifth row is left out");
+
+		require(check_avatar_lines(Rows{}, keep) == Refusal::EMPTY, "an avatar megaphone needs text");
+		require(check_avatar_lines(Rows{ "", "", "", "hi" }, star) == Refusal::CURSING, "without cursing");
+		require(check_avatar_lines(Rows{ long_line, long_line, "", "" }, keep) == Refusal::NONE,
+				"but any length and level will do");
+
+		require(!avatar_long_name(69) && avatar_long_name(70), "a name of 70 or wider takes the long plate");
 	}
 	catch (const std::exception& e)
 	{

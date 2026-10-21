@@ -57,6 +57,28 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// An avatar megaphone was refused: 'S' while the line waits too long, 'T' below level 11 (v83's CWvsContext
+	// handler for 110). The megaphone is kept.
+	// Opcode: AVATAR_MEGAPHONE_RESULT(110)
+	class AvatarMegaphoneResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// An avatar megaphone's banner, and its line in the chat log (FUN_0045a4cd, FUN_0045b2b9)
+	// Opcode: AVATAR_MEGAPHONE(111)
+	class AvatarMegaphoneHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Takes the avatar megaphone's banner down (FUN_0045b818)
+	// Opcode: CLEAR_AVATAR_MEGAPHONE(112)
+	class ClearAvatarMegaphoneHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Show another type of server message
 	// Opcode: WEEK_EVENT_MESSAGE(77)
 	class WeekEventMessageHandler : public PacketHandler

@@ -108,6 +108,8 @@ namespace ms
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
 		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
+		// StringPool 0xe89.
+		constexpr const char *ENTER_TEXT = "Please enter the text.";
 		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 		// StringPool 0x17a and 0x17b.
@@ -445,6 +447,9 @@ namespace ms
 				case Megaphones::Refusal::LONG:
 					reason = MEGAPHONE_LONG;
 					break;
+				case Megaphones::Refusal::EMPTY:
+					reason = ENTER_TEXT;
+					break;
 				case Megaphones::Refusal::QUIET:
 					break;
 			}
@@ -470,9 +475,10 @@ namespace ms
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
 		}
 
-		// v83 FUN_00a0a63f, types 0xc to 0xf and 0x3c: a megaphone asks for
-		// its line, and checks it once the prompt has closed. The item
-		// megaphone's window stays open beside the game and sends by itself.
+		// v83 FUN_00a0a63f, types 0xc to 0xf and 0x3c, and the avatar
+		// megaphones' branch: a megaphone asks for its line, and checks it
+		// once the prompt has closed. The item megaphone's window stays open
+		// beside the game and sends by itself.
 		void use_megaphone(int16_t slot, int32_t item_id)
 		{
 			if (!may_use_cash_item())
@@ -499,6 +505,17 @@ namespace ms
 					{
 						if (!megaphone_refused(Megaphones::check_lines(lines)))
 							send_megaphone(UseTripleMegaphonePacket(slot, item_id, Megaphones::lines_sent(lines), ear));
+					});
+					break;
+				case Megaphones::Kind::AVATAR:
+					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &typed, bool ear)
+					{
+						Megaphones::AvatarLines lines;
+						std::copy_n(typed.begin(), std::min(typed.size(), lines.size()), lines.begin());
+
+						if (!megaphone_refused(Megaphones::check_avatar_lines(lines, CurseData::filter)))
+							send_megaphone(UseAvatarMegaphonePacket(slot, item_id, lines, ear,
+																	Stage::get().get_player().look_entry()));
 					});
 					break;
 				case Megaphones::Kind::ITEM:
@@ -1090,7 +1107,7 @@ namespace ms
 							use_meso_bag(slot, item_id);
 						else if (item_id / 10000 == 504)
 							use_teleport_rock(slot, item_id);
-						else if (item_id / 10000 == 507)
+						else if (item_id / 10000 == 507 || item_id / 10000 == 539)
 							use_megaphone(slot, item_id);
 						else if (item_id / 10000 == 509)
 						{

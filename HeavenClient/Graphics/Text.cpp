@@ -139,6 +139,17 @@ namespace ms
 		return layout.get_endoffset();
 	}
 
+	std::vector<size_t> Text::line_starts() const
+	{
+		std::vector<size_t> starts;
+
+		for (const Layout::Line &line : layout)
+			if (!line.words.empty())
+				starts.push_back(line.words.front().first);
+
+		return starts;
+	}
+
 	const std::string &Text::get_text() const
 	{
 		return text;

@@ -94,6 +94,9 @@ namespace ms
 
 		const std::string &get_text() const;
 
+		// Where each row of a wrapped field's text begins.
+		std::vector<size_t> line_starts() const;
+
 	private:
 		void modifytext(const std::string &);
 

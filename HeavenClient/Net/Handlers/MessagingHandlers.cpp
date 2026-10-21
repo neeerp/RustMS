@@ -33,6 +33,7 @@
 #include "../Packets/MessagingPackets.h"
 #include "StatusMessages.h"
 
+#include "../../IO/UITypes/UIAvatarMegaphone.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIMessenger.h"
@@ -336,6 +337,62 @@ namespace ms
 	{
 		if (auto messenger = UI::get().get_element<UIStatusMessenger>())
 			messenger->show_status(color, message);
+	}
+
+	void AvatarMegaphoneResultHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().request_answered();
+
+		// StringPool 0xf84 and 0xea1.
+		switch (recv.read_byte())
+		{
+			case 'S':
+				UI::get().emplace<UIOk>(
+						"The waiting line is longer than 15 seconds.\\nPlease try using it at a later time.",
+						[](bool) {});
+				break;
+			case 'T':
+				UI::get().emplace<UIOk>(
+						"This megaphone is only available for \\ncharacters that are over Level 10.",
+						[](bool) {});
+				break;
+			default:
+				if (recv.available())
+					UI::get().emplace<UIOk>(recv.read_string(), [](bool) {});
+
+				break;
+		}
+	}
+
+	void AvatarMegaphoneHandler::handle(InPacket& recv) const
+	{
+		int32_t item_id = recv.read_int();
+		std::string name = recv.read_string();
+		Megaphones::AvatarLines lines;
+
+		for (std::string& line : lines)
+			line = recv.read_string();
+
+		int32_t channel = recv.read_int();
+		bool ear = recv.read_bool();
+		LookEntry look = LoginParser::parse_look(recv);
+
+		UI::get().emplace<UIAvatarMegaphone>(item_id, name, lines, look);
+
+		// The chat log gets "name : " and the four lines run together.
+		std::string line = name + Megaphones::SEPARATOR;
+
+		for (const std::string& said : lines)
+			line += said;
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_megaphone(line, UIChatBar::LineType::AVATAR_MEGAPHONE, static_cast<int8_t>(channel), ear);
+	}
+
+	void ClearAvatarMegaphoneHandler::handle(InPacket&) const
+	{
+		if (auto banner = UI::get().get_element<UIAvatarMegaphone>())
+			banner->hide();
 	}
 
 	void ServerMessageHandler::handle(InPacket& recv) const

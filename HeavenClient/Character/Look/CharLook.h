@@ -138,6 +138,11 @@ namespace ms
 
 		const Face *get_face() const;
 
+		// The skin, hair and face set, by id.
+		int32_t get_skin_id() const;
+		int32_t get_hair_id() const;
+		int32_t get_face_id() const;
+
 		const CharEquips &get_equips() const;
 
 		// Ride a mount (190xxxx or 193xxxx), or get off with 0 (report 201).
@@ -225,6 +230,9 @@ namespace ms
 		const Body *body;
 		const Hair *hair;
 		const Face *face;
+		int32_t skin_id = 0;
+		int32_t hair_id = 0;
+		int32_t face_id = 0;
 		CharEquips equips;
 		std::array<int32_t, 3> pet_wear = {};
 		std::map<int16_t, int32_t> pet_parts;

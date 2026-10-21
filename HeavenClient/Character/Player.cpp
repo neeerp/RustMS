@@ -1919,6 +1919,41 @@ namespace ms
 		return inventory;
 	}
 
+	LookEntry Player::look_entry() const
+	{
+		LookEntry entry;
+		entry.female = stats.get_female();
+		entry.skin = static_cast<uint8_t>(look.get_skin_id());
+		entry.faceid = look.get_face_id();
+		entry.hairid = look.get_hair_id();
+
+		for (int16_t part = 1; part < Inventory::CASH_EQUIP; part++)
+		{
+			int32_t worn = inventory.get_item_id(InventoryType::Id::EQUIPPED, part);
+			int32_t cash = inventory.get_item_id(InventoryType::Id::EQUIPPED, part + Inventory::CASH_EQUIP);
+			auto slot = static_cast<int8_t>(part);
+
+			if (part == EquipSlot::Id::WEAPON)
+			{
+				if (worn)
+					entry.equips[slot] = worn;
+
+				entry.maskedequips[-111] = cash;
+			} else if (cash)
+			{
+				entry.equips[slot] = cash;
+
+				if (worn)
+					entry.maskedequips[slot] = worn;
+			} else if (worn)
+			{
+				entry.equips[slot] = worn;
+			}
+		}
+
+		return entry;
+	}
+
 	bool Player::pet_wears(uint8_t index, int32_t itemid) const
 	{
 		auto part = static_cast<EquipSlot::Id>((*pets::equip_parts(itemid))[index]);

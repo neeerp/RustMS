@@ -774,6 +774,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuiz.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
+    IO/UITypes/UIAvatarMegaphone.cpp
+    IO/UITypes/UIAvatarMegaphone.h
     IO/UITypes/UIQuickSlotConfig.cpp
     IO/UITypes/UIQuickSlotConfig.h
     IO/UITypes/UIQuit.cpp
