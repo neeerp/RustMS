@@ -180,6 +180,9 @@ impl WorldDirectory {
             DirectoryMessage::GuildChanged { client_id } => {
                 self.tell(client_id, ServerMessage::GuildChanged)
             }
+            DirectoryMessage::GuildDisbanded { guild_id } => {
+                self.guild_invites.forget_guild(guild_id)
+            }
             DirectoryMessage::Messenger { from, request } => self.messenger(from, request),
             DirectoryMessage::LookChanged { client_id, look } => {
                 let out = self.messengers.look_changed(client_id, look);

@@ -15,6 +15,8 @@ const OP_CREATED: u8 = 0x20;
 const OP_JOINED: u8 = 0x27;
 const OP_LEFT: u8 = 0x2C;
 const OP_EXPELLED: u8 = 0x2F;
+const OP_DISBANDED: u8 = 0x32;
+const OP_CAPACITY_CHANGED: u8 = 0x3A;
 const OP_MEMBER_LEVEL_JOB: u8 = 0x3C;
 const OP_MEMBER_ONLINE: u8 = 0x3D;
 const OP_TITLES_CHANGED: u8 = 0x3E;
@@ -33,7 +35,8 @@ const JOB_CHANGE_GUILD: u8 = 0;
 /// reads it only in an alliance.
 const ALLIANCE_RANK: i32 = 5;
 
-/// Why founding or joining a guild failed; the client shows each by code.
+/// Why founding, joining, disbanding, or growing a guild failed; the client
+/// shows each by code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GuildError {
     /// Heracle says "The name is already in use..." and asks again.
@@ -52,6 +55,12 @@ pub enum GuildError {
     Full = 0x29,
     /// "The character cannot be found in the current channel."
     NotInChannel = 0x2A,
+    /// Heracle says "The problem has happened during the process of
+    /// disbanding the guild...".
+    DisbandFailed = 0x34,
+    /// Heracle says "The problem has happened during the process of
+    /// increasing the guild...".
+    GrowFailed = 0x3B,
 }
 
 /// Why an invitation was turned down. The invitee's client sends the code
@@ -206,6 +215,23 @@ fn departure(op: u8, guild_id: i32, member_id: i32, name: &str) -> Result<Packet
     packet.write_int(guild_id)?;
     packet.write_int(member_id)?;
     packet.write_str_with_length(name)?;
+    Ok(packet)
+}
+
+/// The guild is gone. The master's client has Heracle say so; the others
+/// write "The guild has been disbanded." to the chat log.
+pub fn build_guild_disbanded(guild_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_DISBANDED)?;
+    packet.write_int(guild_id)?;
+    Ok(packet)
+}
+
+/// The guild now takes `capacity` members. Only the master's client says
+/// so, in Heracle's box.
+pub fn build_capacity_changed(guild_id: i32, capacity: u8) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_CAPACITY_CHANGED)?;
+    packet.write_int(guild_id)?;
+    packet.write_byte(capacity)?;
     Ok(packet)
 }
 
@@ -563,6 +589,38 @@ mod tests {
         let packet = build_guild_job_change(110, "Bobby").unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(0x6B).byte(0).int(110).string("> Bobby").end();
+    }
+
+    #[test]
+    fn disbanded_and_capacity() {
+        let packet = build_guild_disbanded(4).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x32)
+            .int(4)
+            .end();
+
+        let packet = build_capacity_changed(4, 15).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x3A)
+            .int(4)
+            .byte(15)
+            .end();
+
+        for (error, mode) in [
+            (GuildError::DisbandFailed, 0x34),
+            (GuildError::GrowFailed, 0x3B),
+        ] {
+            let packet = build_guild_error(error).unwrap();
+            let mut expect = Expect::new(&packet.bytes);
+            expect
+                .short(SendOpcode::GuildOperation as i16)
+                .byte(mode)
+                .end();
+        }
     }
 
     #[test]

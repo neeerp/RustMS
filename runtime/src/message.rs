@@ -506,6 +506,10 @@ pub enum DirectoryMessage {
     GuildChanged {
         client_id: ClientId,
     },
+    /// The guild is gone; its invitations no longer stand.
+    GuildDisbanded {
+        guild_id: i32,
+    },
     Messenger {
         from: ClientId,
         request: MessengerRequest,

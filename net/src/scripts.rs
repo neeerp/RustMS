@@ -60,6 +60,15 @@ pub enum Effect {
     /// Ask for a new guild's name (Heracle); the guild is founded, and paid
     /// for, when the client answers.
     OpenGuildNamePrompt,
+    /// Grow the player's guild a step from `from` members, the capacity
+    /// Heracle quoted the price for, and charge it. The client hears how it
+    /// went from the guild, so nothing may follow it in the script.
+    GrowGuild {
+        from: u8,
+    },
+    /// Disband the player's guild, if they are its master. As with
+    /// `GrowGuild`, nothing may follow it.
+    DisbandGuild,
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

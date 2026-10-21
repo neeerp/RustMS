@@ -83,6 +83,12 @@ impl GuildInvites {
     pub fn forget(&mut self, invitee: ClientId) {
         self.invites.remove(&invitee);
     }
+
+    /// Forget invitations to a guild that was disbanded, which would keep
+    /// its invitees from other guilds' invitations.
+    pub fn forget_guild(&mut self, guild_id: i32) {
+        self.invites.retain(|_, invite| invite.guild_id != guild_id);
+    }
 }
 
 #[cfg(test)]
@@ -121,5 +127,17 @@ mod tests {
         invites.invite(4, 1, 2, now);
         invites.forget(2);
         assert!(!invites.accept(2, 4, now));
+    }
+
+    #[test]
+    fn a_disbanded_guild_invites_nobody() {
+        let mut invites = GuildInvites::default();
+        let now = Instant::now();
+        invites.invite(4, 1, 2, now);
+        invites.invite(5, 6, 7, now);
+        invites.forget_guild(4);
+        assert!(!invites.accept(2, 4, now));
+        assert!(invites.invite(8, 9, 2, now));
+        assert!(invites.is_invited(7, 6));
     }
 }

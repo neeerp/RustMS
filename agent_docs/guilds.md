@@ -5,7 +5,8 @@ Heracle in the Orbis guild headquarters. Members see the guild's name and
 emblem under each other's names, the stat window and character info show it,
 and guild chat reaches the members online. The master and the Jr. Masters
 invite players on their channel, move members a rank up or down, and post
-the notice; the master names the ranks. Members leave, and are expelled.
+the notice; the master names the ranks, and at Heracle grows the guild or
+disbands it. Members leave, and are expelled.
 
 ## Server
 
@@ -24,12 +25,22 @@ case (a unique index on `lower(name)`).
 - `Player::guild` is the guild's tag (id, name, emblem), loaded with the
   player. `FieldAvatar` carries it, so `SPAWN_PLAYER` shows it to others;
   `CHAR_INFO` shows the name.
-- Heracle (2010007, `net/src/npc_scripts.rs`) says why not if the player is
-  already in a guild, under level 10, or short of the fee. Otherwise he asks,
-  and yes sends the name prompt (`GUILD_OPERATION` mode 0x01) and sets the
-  actor's `naming_guild` flag. His lines are `heracle.*` content keys; no
-  licensed script has his text, so they stay placeholders (`unsourced` in
-  `game-data/server_content.toml`).
+- Heracle (2010007, `NpcScript::heracle` in `net/src/npc_scripts.rs`)
+  offers a menu: make a guild, disband it, or make it bigger. His script
+  needs the player's guild, so `dialogue.rs` sends him to the client actor's
+  `talk_to_heracle`, which loads it, rather than through `for_npc`. His lines
+  are `heracle.*` content keys; no licensed script has his text, so they
+  stay placeholders (`unsourced` in `game-data/server_content.toml`).
+  - Making one: he says why not if the player is already in a guild, under
+    level 10, or short of the fee. Otherwise he asks, and yes sends the name
+    prompt (`GUILD_OPERATION` mode 0x01) and sets the actor's
+    `naming_guild` flag.
+  - Disbanding and growing are for the master only; anyone else is told so.
+    Disbanding asks first. Growing adds 5 members up to 100
+    (`guild::MAX_CAPACITY`) and costs `guild::capacity_cost`: 500,000 mesos
+    up to 15, then 1,000,000 more for each 5 beyond 15, and 5,000,000 past
+    30 (HeavenMS's prices). He quotes the price and the new size; a player
+    short of it hears so after saying yes.
 - `GUILD_OPERATION` (`net/src/packet/handle/world/guild.rs`) becomes a
   `GuildRequest`: reload (mode 0), create with a name (2), invite by name
   (5), accept an invitation (6), leave (7), expel (8), set the five titles
@@ -100,6 +111,23 @@ case (a unique index on `lower(name)`).
   0, the job, the name) for a new job. The client's job line has no `>`
   after "<Guild", so the name goes as "> " and the name. Nothing is sent
   when the guild itself changes in the same update.
+- Saying yes to Heracle ends the conversation with an effect
+  (`Effect::GrowGuild { from }`, `Effect::DisbandGuild`) that runs after
+  the conversation's changes are saved:
+  - Growing checks the mesos again, then `db::guild::grow` grows the guild
+    under its lock only if the player is still the master and the capacity
+    is still the `from` Heracle quoted, so a stale yes can't pay twice.
+    Every member online gets 0x3A (the guild, the new capacity), and the
+    master pays and gets the meso update and loss line. Any refusal is
+    0x3B.
+  - `db::guild::disband` deletes the guild, if the player is still its
+    master, and returns who was in it; the member rows go with it. The
+    directory drops invitations to it (`DirectoryMessage::GuildDisbanded`),
+    every member online gets 0x32 (the guild), and each member's actor reads
+    their guild again, so the map sees the name and emblem go. A refusal is
+    0x34.
+  - A guild that is gone is no error. Loading it gives nothing, and an actor
+    that finds its player's guild gone sets it to none.
 - Guild chat is the guild mode (2) of `MULTICHAT`. The server ignores the
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
@@ -139,6 +167,11 @@ ints. The client takes the first member for the master.
     the notice, an empty one clearing it, and prints "* Guild Notice :
     <notice>" unless it is empty. v83 prints every guild line in its type
     0xc colour, which is `LineType::SKILL`.
+  - 0x32 clears the guild; Heracle tells the master "The guild has been
+    disbanded..", and the others get the chat line "The guild has been
+    disbanded.". 0x3A sets the capacity, and Heracle tells the master the
+    new size. Both only count for the player's guild. 0x34 and 0x3B have
+    Heracle say the disbanding or growing went wrong.
   - 0x3D marks a member online or offline. Coming online shows the buddy
     list's card, "<name> is" over "logged in." with the invite sound; v83
     checks neither the old flag nor who it is, and going offline shows
@@ -214,10 +247,9 @@ ints. The client takes the first member for the master.
 
 ## Not implemented
 
-- Disbanding.
 - The card's option to refuse all invitations, and the blacklist, which
   v83 also checks before showing one.
-- Making the emblem; raising the capacity.
+- Making the emblem.
 - The rank panel's slide in and out. v83 keeps the panel's edits if it is
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt

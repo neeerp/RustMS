@@ -8,7 +8,8 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::scripts::Effect;
-use game::{guild, InventoryType, Player, QuestState};
+use game::guild::{self, Guild};
+use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -22,7 +23,9 @@ const ROGER: i32 = 2000;
 const ROBIN: i32 = 2003;
 const MAPLE_ADMINISTRATOR: i32 = 2007;
 const SHANKS: i32 = 22000;
-const HERACLE: i32 = 2010007;
+/// Heracle, at the guild headquarters. The runtime loads the player's
+/// guild for his script (`NpcScript::heracle`).
+pub const HERACLE: i32 = 2010007;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -546,8 +549,14 @@ impl NpcScript {
         }
     }
 
+    /// Heracle's script as it plays for `player`, who is in `guild`, if it
+    /// still exists.
+    pub fn heracle(player: &Player, guild: Option<&Guild>) -> Self {
+        heracle(player, guild)
+    }
+
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
-    /// plays for `player`.
+    /// plays for `player`. Heracle is not among them.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -603,7 +612,6 @@ impl NpcScript {
             PIRATE_PROCTOR => Some(pirate_proctor(player)),
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
-            HERACLE => Some(heracle(player)),
             AGATHA => Some(agatha(player)),
             ISA => Some(isa()),
             DANGER_ZONE_TAXI => danger_zone_taxi(player),
@@ -897,10 +905,28 @@ fn shanks(player: &Player) -> NpcScript {
     script
 }
 
-/// Heracle founds guilds; the client then asks for the name. Founding is
-/// all he offers so far.
-fn heracle(player: &Player) -> NpcScript {
-    let page = if player.guild.is_some() {
+/// Heracle founds guilds, disbands them, and grows them, as the player
+/// chooses (the HeavenMS script's menu). Only a guild's master may do the
+/// last two.
+fn heracle(player: &Player, guild: Option<&Guild>) -> NpcScript {
+    let master = guild.filter(|guild| guild.is_master(player.stats.id));
+    let choices = vec![
+        (text(keys::HERACLE_CREATE), vec![found_guild(player)]),
+        (text(keys::HERACLE_DISBAND), vec![disband_guild(master)]),
+        (text(keys::HERACLE_GROW), grow_guild(player, master)),
+    ];
+    NpcScript::new(
+        HERACLE,
+        vec![Page::Menu {
+            text: text(keys::HERACLE_MENU),
+            choices,
+        }],
+    )
+}
+
+/// The client asks for the new guild's name.
+fn found_guild(player: &Player) -> Page {
+    if player.guild.is_some() {
         Page::Say(text(keys::HERACLE_IN_GUILD))
     } else if player.stats.level < guild::MIN_LEVEL {
         Page::Say(text(keys::HERACLE_TOO_WEAK))
@@ -912,8 +938,57 @@ fn heracle(player: &Player) -> NpcScript {
             on_yes: vec![Effect::OpenGuildNamePrompt],
             on_no: Some(text(keys::HERACLE_DECLINE)),
         }
+    }
+}
+
+/// The client has Heracle say how it went.
+fn disband_guild(master: Option<&Guild>) -> Page {
+    match master {
+        Some(_) => Page::Ask {
+            text: text(keys::HERACLE_DISBAND_ASK),
+            on_yes: vec![Effect::DisbandGuild],
+            on_no: Some(text(keys::HERACLE_DECLINE)),
+        },
+        None => Page::Say(text(keys::HERACLE_DISBAND_NOT_MASTER)),
+    }
+}
+
+/// A step of `guild::CAPACITY_STEP` members. Like the HeavenMS script it
+/// asks first and only then says the player can't pay; the client has
+/// Heracle say how a paid step went.
+fn grow_guild(player: &Player, master: Option<&Guild>) -> Vec<Page> {
+    let Some(master) = master else {
+        return vec![Page::Say(text(keys::HERACLE_GROW_NOT_MASTER))];
     };
-    NpcScript::new(HERACLE, vec![page])
+    if master.capacity >= guild::MAX_CAPACITY {
+        return vec![Page::Say(text(keys::HERACLE_GROW_FULL))];
+    }
+    let price = guild::capacity_cost(master.capacity);
+    let price_text = price.to_string();
+    let capacity = (master.capacity + guild::CAPACITY_STEP).to_string();
+    let vars = [
+        ("price", price_text.as_str()),
+        ("capacity", capacity.as_str()),
+    ];
+    let can_pay = player.meso >= price;
+    let on_yes = if can_pay {
+        vec![Effect::GrowGuild {
+            from: master.capacity,
+        }]
+    } else {
+        Vec::new()
+    };
+    let mut pages = vec![Page::Ask {
+        text: content::text().get(keys::HERACLE_GROW_ASK, &vars),
+        on_yes,
+        on_no: Some(text(keys::HERACLE_DECLINE)),
+    }];
+    if !can_pay {
+        pages.push(Page::Say(
+            content::text().get(keys::HERACLE_GROW_NO_MESOS, &vars),
+        ));
+    }
+    pages
 }
 
 /// A station's ticket booth: one ticket for the route's price. Like the
@@ -2072,35 +2147,129 @@ mod tests {
         assert_eq!(shanks.respond(ScriptInput::Next), Some(Step::default()));
     }
 
+    fn guilder(level: u8, meso: i32, guilded: bool) -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.level = level;
+        player.meso = meso;
+        if guilded {
+            player.guild = Some(guild::GuildTag {
+                id: 1,
+                name: "Testers".into(),
+                emblem: guild::Emblem::default(),
+            });
+        }
+        player
+    }
+
+    /// A guild of two whose master is `master`.
+    fn testers(master: i32, capacity: u8) -> Guild {
+        let member = |id, rank| guild::GuildMember {
+            id,
+            name: format!("Member{id}"),
+            job: 0,
+            level: 10,
+            rank,
+            online: true,
+        };
+        Guild {
+            id: 1,
+            name: "Testers".into(),
+            titles: guild::DEFAULT_TITLES.map(String::from),
+            capacity,
+            emblem: guild::Emblem::default(),
+            notice: String::new(),
+            points: 0,
+            alliance_id: 0,
+            members: vec![member(master, guild::MASTER_RANK), member(master + 1, 3)],
+        }
+    }
+
+    /// Heracle, with the menu entry `choice` picked.
+    fn heracle_picks(player: &Player, guild: Option<&Guild>, choice: i32) -> (NpcScript, Step) {
+        let mut heracle = NpcScript::heracle(player, guild);
+        assert_eq!(kind(&heracle.begin()), Some(4));
+        let step = heracle.respond(ScriptInput::Select(choice)).unwrap();
+        (heracle, step)
+    }
+
+    fn says_one_page(mut heracle: NpcScript, step: &Step) {
+        assert_eq!(buttons(step), (false, false));
+        assert_eq!(heracle.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
     #[test]
     fn heracle_asks_for_a_guild_name_from_level_10_with_the_fee() {
-        let founder = |level, meso, guilded| {
-            let mut player = crate::codec::stats::sample_player();
-            player.stats.level = level;
-            player.meso = meso;
-            if guilded {
-                player.guild = Some(guild::GuildTag {
-                    id: 1,
-                    name: "Testers".into(),
-                    emblem: guild::Emblem::default(),
-                });
-            }
-            NpcScript::for_npc(HERACLE, &player).unwrap()
-        };
-        let mut heracle = founder(10, guild::CREATE_COST, false);
-        assert_eq!(kind(&heracle.begin()), Some(1));
+        assert_eq!(NpcScript::for_npc(HERACLE, &guilder(10, 0, false)), None);
+        let founder = guilder(10, guild::CREATE_COST, false);
+        let (mut heracle, step) = heracle_picks(&founder, None, 0);
+        assert_eq!(kind(&step), Some(1));
         let yes = heracle.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.prompt, None);
         assert_eq!(yes.effects, [Effect::OpenGuildNamePrompt]);
 
         // Too weak, too poor, or already in a guild: he says so.
-        for mut heracle in [
-            founder(9, guild::CREATE_COST, false),
-            founder(10, guild::CREATE_COST - 1, false),
-            founder(10, guild::CREATE_COST, true),
+        for player in [
+            guilder(9, guild::CREATE_COST, false),
+            guilder(10, guild::CREATE_COST - 1, false),
+            guilder(10, guild::CREATE_COST, true),
         ] {
-            assert_eq!(buttons(&heracle.begin()), (false, false));
-            assert_eq!(heracle.respond(ScriptInput::Next), Some(Step::default()));
+            let (heracle, step) = heracle_picks(&player, None, 0);
+            says_one_page(heracle, &step);
+        }
+    }
+
+    #[test]
+    fn heracle_disbands_only_a_masters_guild() {
+        let master = guilder(10, 0, true);
+        let id = master.stats.id;
+        let guild = testers(id, 10);
+        let (mut heracle, step) = heracle_picks(&master, Some(&guild), 1);
+        assert_eq!(kind(&step), Some(1));
+        let yes = heracle.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.prompt, None);
+        assert_eq!(yes.effects, [Effect::DisbandGuild]);
+
+        let (mut heracle, _) = heracle_picks(&master, Some(&guild), 1);
+        let no = heracle.respond(ScriptInput::No).unwrap();
+        assert!(no.effects.is_empty());
+        says_one_page(heracle, &no);
+
+        // A member who isn't the master, or someone without a guild.
+        for guild in [Some(testers(id - 1, 10)), None] {
+            let (heracle, step) = heracle_picks(&master, guild.as_ref(), 1);
+            says_one_page(heracle, &step);
+        }
+    }
+
+    #[test]
+    fn heracle_grows_a_masters_guild_by_5_for_the_steps_price() {
+        let master = guilder(10, 500_000, true);
+        let id = master.stats.id;
+        let guild = testers(id, 10);
+        let (mut heracle, step) = heracle_picks(&master, Some(&guild), 2);
+        let Some(Prompt::YesNo { text, .. }) = &step.prompt else {
+            panic!("a question expected, got {:?}", step.prompt);
+        };
+        assert!(text.contains("500000") && text.contains("15"), "{text}");
+        let yes = heracle.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.prompt, None);
+        assert_eq!(yes.effects, [Effect::GrowGuild { from: 10 }]);
+
+        // Short of the price: asked all the same, then told.
+        let poor = guilder(10, 499_999, true);
+        let (mut heracle, _) = heracle_picks(&poor, Some(&guild), 2);
+        let yes = heracle.respond(ScriptInput::Yes).unwrap();
+        assert!(yes.effects.is_empty());
+        says_one_page(heracle, &yes);
+
+        // At 100 members, not the master, or without a guild.
+        for guild in [
+            Some(testers(id, guild::MAX_CAPACITY)),
+            Some(testers(id - 1, 10)),
+            None,
+        ] {
+            let (heracle, step) = heracle_picks(&master, guild.as_ref(), 2);
+            says_one_page(heracle, &step);
         }
     }
 

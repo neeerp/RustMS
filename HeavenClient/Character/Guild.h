@@ -148,6 +148,7 @@ namespace ms
 		bool set_level_job(int32_t cid, int32_t level, int32_t job);
 		void set_titles(std::array<std::string, 5> titles);
 		void set_notice(std::string notice);
+		void set_capacity(int32_t capacity);
 
 	private:
 		GuildMember* member(int32_t cid);
