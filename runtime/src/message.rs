@@ -510,7 +510,8 @@ pub enum DirectoryMessage {
         kind: EventKind,
         reply: tokio::sync::oneshot::Sender<Option<crate::actor::event::EventStart>>,
     },
-    /// Event `id` of `kind` on `channel_id` is over; the next party may go.
+    /// Event `id` of `kind` on `channel_id` is over or won; the next party
+    /// may go.
     EventClosed {
         channel_id: u8,
         kind: EventKind,

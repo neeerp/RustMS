@@ -1458,7 +1458,9 @@ fn cloto(view: Cloto, player: &Player) -> NpcScript {
     let held = |item_id| player.inventory.count(item_id);
     let page = match view {
         Cloto::Cleared => Page::Say(text(keys::KPQ_CLOTO_CLEARED)),
+        Cloto::Won => Page::Say(text(keys::KPQ_CLOTO_S5_WON)),
         Cloto::Follow => Page::Say(text(keys::KPQ_CLOTO_FOLLOW)),
+        Cloto::Gather => Page::Say(text(keys::KPQ_CLOTO_S5_GATHER)),
         // A puzzle unanswered (`cloto_answer`) is set out again.
         Cloto::Intro { stage } | Cloto::Puzzle { stage, .. } => {
             Page::Say(text(PUZZLES[usize::from(stage.clamp(2, 4) - 2)]))
@@ -1488,21 +1490,25 @@ fn cloto(view: Cloto, player: &Player) -> NpcScript {
                 Page::Say(content::text().get(keys::KPQ_CLOTO_WRONG, &[("question", &asked)]))
             }
         }
-        Cloto::Leader { needed } => {
+        Cloto::Leader { stage, needed } => {
             let says = |key| content::text().get(key, &[("n", &needed.to_string())]);
-            if held(events::PASS) >= needed {
-                Page::Act {
-                    text: says(keys::KPQ_CLOTO_LEADER_CLEAR),
+            let (clear, short) = if stage == 1 {
+                (keys::KPQ_CLOTO_LEADER_CLEAR, keys::KPQ_CLOTO_LEADER_SHORT)
+            } else {
+                (keys::KPQ_CLOTO_S5_CLEAR, keys::KPQ_CLOTO_S5_SHORT)
+            };
+            match i16::try_from(needed) {
+                Ok(quantity) if held(events::PASS) >= needed => Page::Act {
+                    text: says(clear),
                     effects: vec![
                         Effect::TakeItem {
                             item_id: events::PASS,
-                            quantity: needed as i16,
+                            quantity,
                         },
-                        Effect::EventCommand(EventCommand::ClearStage(1)),
+                        Effect::EventCommand(EventCommand::ClearStage(stage)),
                     ],
-                }
-            } else {
-                Page::Say(says(keys::KPQ_CLOTO_LEADER_SHORT))
+                },
+                _ => Page::Say(says(short)),
             }
         }
     };
@@ -3150,7 +3156,10 @@ mod tests {
         assert!(thanks.effects.is_empty());
 
         // The leader hands in a pass from each of the others.
-        let leader = Cloto::Leader { needed: 3 };
+        let leader = Cloto::Leader {
+            stage: 1,
+            needed: 3,
+        };
         let short = NpcScript::cloto(leader, &holding(events::PASS, 2)).begin();
         assert!(short.effects.is_empty());
         let clear = NpcScript::cloto(leader, &holding(events::PASS, 4)).begin();
@@ -3186,6 +3195,51 @@ mod tests {
             [Effect::EventCommand(EventCommand::ClearStage(3))]
         );
         assert_ne!(page_text(&wrong), page_text(&right));
+    }
+
+    #[test]
+    fn the_leader_hands_cloto_the_last_stage_s_ten_passes() {
+        let holding = |quantity| hunter(&[(events::PASS, quantity)], &[]);
+        let says = |view, passes| {
+            let page = NpcScript::cloto(view, &holding(passes)).begin();
+            (page_text(&page), page.effects)
+        };
+        let leader = Cloto::Leader {
+            stage: 5,
+            needed: 10,
+        };
+        let (short, effects) = says(leader, 9);
+        assert!(effects.is_empty());
+        let (clear, effects) = says(leader, 11);
+        assert_eq!(
+            effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::PASS,
+                    quantity: 10
+                },
+                Effect::EventCommand(EventCommand::ClearStage(5))
+            ]
+        );
+        // Both say how many it takes.
+        assert!(
+            short.contains("10") && clear.contains("10"),
+            "{short} {clear}"
+        );
+        // Not stage 1's lines.
+        let first = Cloto::Leader {
+            stage: 1,
+            needed: 10,
+        };
+        assert_ne!(short, says(first, 9).0);
+        assert_ne!(clear, says(first, 11).0);
+
+        let (gather, effects) = says(Cloto::Gather, 10);
+        assert!(effects.is_empty());
+        let (won, effects) = says(Cloto::Won, 10);
+        assert!(effects.is_empty());
+        let (cleared, _) = says(Cloto::Cleared, 10);
+        assert!(gather != won && won != cleared && gather != short);
     }
 
     #[test]

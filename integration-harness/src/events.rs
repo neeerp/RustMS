@@ -46,6 +46,18 @@ pub fn talk(map: i32, npc: i32) -> Packet {
     p
 }
 
+/// Throw `quantity` of the Etc stack in `slot` on the ground.
+pub fn throw_down(slot: i16, quantity: i16) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ItemMove as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(4).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_short(0).unwrap();
+    p.write_short(quantity).unwrap();
+    p
+}
+
 fn party_operation(op: u8) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::PartyOperation as i16).unwrap();
@@ -57,6 +69,11 @@ fn invite(name: &str) -> Packet {
     let mut p = party_operation(4);
     p.write_str_with_length(name).unwrap();
     p
+}
+
+/// Leave the party, which its leader's leaving disbands.
+pub fn leave_party() -> Packet {
+    party_operation(2)
 }
 
 fn accept(party_id: i32) -> Packet {
