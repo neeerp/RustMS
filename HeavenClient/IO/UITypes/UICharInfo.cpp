@@ -24,6 +24,7 @@
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/PartyCommands.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UITradingRoom.h"
@@ -167,10 +168,9 @@ namespace ms
 		});
 		taming_slider = Slider(Slider::Type::CLASSIC, TAMING_SLIDER, ITEM_SLIDER_X, ITEM_ROWS, 0, [](bool) {});
 
-		// There are no families or parties yet. The pet and taming boxes
-		// open once CHAR_INFO says there are pets or a mount.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_PARTY, Buttons::BT_EXCEPTION, Buttons::BT_PET_SHOW,
-							 Buttons::BT_TAMING_SHOW })
+		// There are no families yet. The pet and taming boxes open once
+		// CHAR_INFO says there are pets or a mount.
+		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_EXCEPTION, Buttons::BT_PET_SHOW, Buttons::BT_TAMING_SHOW })
 			buttons[button]->set_state(Button::State::DISABLED);
 
 		// v83 offers fame only from level 15 (FUN_009007a0), and never for
@@ -180,6 +180,10 @@ namespace ms
 		if (cid == player.get_oid() || player.get_stats().get_stat(MapleStat::Id::LEVEL) < 15)
 			for (auto button : { Buttons::BT_FAME_UP, Buttons::BT_FAME_DOWN })
 				buttons[button]->set_state(Button::State::DISABLED);
+
+		// Nor does it invite oneself (FUN_00903b86).
+		if (cid == player.get_oid())
+			buttons[Buttons::BT_PARTY]->set_state(Button::State::DISABLED);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
@@ -340,6 +344,9 @@ namespace ms
 			break;
 		case Buttons::BT_TRADE:
 			UITradingRoom::request(cid);
+			break;
+		case Buttons::BT_PARTY:
+			invite();
 			break;
 		case Buttons::BT_PET_SHOW:
 			set_mode(Mode::PET);
@@ -642,6 +649,17 @@ namespace ms
 	{
 		close_exceptions();
 		deactivate();
+	}
+
+	void UICharInfo::invite() const
+	{
+		// Only a party's leader invites from here; anyone else's click does
+		// nothing (FUN_008ff5b0).
+		const Player &player = Stage::get().get_player();
+		const Party &party = player.get_party();
+
+		if (party.exists() && party.is_leader(player.get_oid()) && !name.get_text().empty())
+			PartyCommands::invite(name.get_text());
 	}
 
 	void UICharInfo::give_fame(bool up) const
