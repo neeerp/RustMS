@@ -651,6 +651,14 @@ v83's order with its notices, raises the fee, and comes out on a click or
 once none are left, staying in for the next make otherwise. For a
 disassembly an equipment from a recipe is dropped on the first slot ("This
 item cannot be disassembled." otherwise), and the fee follows its grade.
+The random make ("???") takes up to six different items, asking "How many
+would you like to apply?" (1 to what the player has) for each and showing
+"chosen/???", plus any stimulator and up to four gems of any kind; a
+seventh item or a second of the same is refused with v83's notices, and a
+click takes any of them back out. Create is enabled once one item is in.
+After the gauge it always ends in "Production failed." and sends nothing,
+as v83 does: its matcher (FUN_00822ce1) only looks at recipes with `hide`,
+and there are none.
 Create is enabled each frame while every ingredient is there; the
 stimulator and gems are optional. It asks first, checks for room
 (FUN_0082744f: a free slot in the tab the item goes to, or for a
@@ -664,8 +672,7 @@ next make. Cancel closes the window at any time, as v83's Cancel does; so does
 Esc, though the first Esc only closes an open list. The skill book keeps SP
 off the Maker skills, which have `disable` set.
 
-Not done in the window: random making (selectable but Create stays off;
-v83's always ends in "Production failed."). The drop lists can't be opened while
+Not done in the window: the drop lists can't be opened while
 the gauge fills, which v83 allows, and they don't take the arrow keys and
 Enter, which HC sends to the player. The window opens centred, where v83 remembers its
 place, and is dragged by its top 20 px, a height not checked against v83.

@@ -136,6 +136,14 @@ int main()
 		require(stimulator_refusal(true, 4130002, 4130002) == "You can only apply 1 Stimulator.", "one only");
 		require(stimulator_refusal(false, 4011000, 4130002) == "You can only apply the Stimulator.", "not one");
 		require(stimulator_refusal(false, 4130001, 4130002) == "You cannot apply this Stimulator.", "another");
+		require(random_ingredient_refusal({}, 4011000).empty(), "the first ingredient");
+		require(random_ingredient_refusal({ 4011000 }, 4011000) == "This item has already been applied.",
+				"one of each");
+		require(random_ingredient_refusal({ 1, 2, 3, 4, 5, 6 }, 4011000) == "You cannot apply any more ingredients.",
+				"six at most");
+		require(random_ingredient_refusal({ 1, 2, 3, 4, 5, 4011000 }, 4011000) ==
+					"You cannot apply any more ingredients.",
+				"full before the same item");
 		Recipe made = recipe(1302010);
 		made.meso = 60000;
 		made.ingredients = { { 4011000, 1 }, { 4260000, 20 }, { 4260001, 1 } };
