@@ -60,6 +60,7 @@ namespace ms
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
 			info.rewards.meso = static_cast<int32_t>(act["money"].get_integer());
 			info.rewards.exp = static_cast<int32_t>(act["exp"].get_integer());
+			info.rewards.fame = static_cast<int32_t>(act["pop"].get_integer());
 			info.next_quest = static_cast<int16_t>(act["nextQuest"].get_integer());
 			info.start_script = start["startscript"].data_type() == nl::node::type::string;
 			info.end_script = end["endscript"].data_type() == nl::node::type::string;

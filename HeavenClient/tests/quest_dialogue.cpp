@@ -156,6 +156,13 @@ void rewards_are_listed_under_the_last_page()
 	require(rewards.summary(900, false, false).find("1002053") != std::string::npos, "GMs pass every job filter");
 	require(rewards.summary(0, false, true).empty(), "nothing is listed when another quest follows");
 	require(ms::QuestRewards{}.summary(0, false, false).empty(), "or when there is nothing to list");
+
+	ms::QuestRewards fame;
+	fame.fame = 2;
+	require(fame.summary(0, false, false) == HEADER + "\r\n#fUI/UIWindow.img/QuestIcon/6/0# 2\r\n\r\n#w",
+		"fame is listed after EXP");
+	fame.fame = -2;
+	require(fame.summary(0, false, false).empty(), "a loss of fame is not");
 }
 
 void pages_are_read_to_the_end()
