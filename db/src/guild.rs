@@ -4,7 +4,7 @@
 use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use game::guild::{Emblem, Guild, GuildMember, GuildTag, MASTER_RANK};
+use game::guild::{Emblem, Guild, GuildMember, GuildTag, CAPACITY_STEP, MASTER_RANK};
 
 /// Why founding a guild failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,6 +20,8 @@ pub enum JoinError {
     /// The guild has as many members as it may.
     Full,
     AlreadyInGuild,
+    /// The guild was disbanded since the invitation.
+    NoGuild,
 }
 
 #[derive(Queryable)]
@@ -95,7 +97,9 @@ pub fn add_member(guild_id: i32, cid: i32) -> crate::Result<Result<u8, JoinError
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
         // Lock the guild so members joining at once can't pass its capacity.
-        let guild = locked(conn, guild_id)?;
+        let Some(guild) = locked(conn, guild_id)? else {
+            return Ok(Err(JoinError::NoGuild));
+        };
         let member = guild_members::table
             .find(cid)
             .select(guild_members::guild_id)
@@ -192,8 +196,33 @@ pub fn set_notice(guild_id: i32, by: i32, notice: &str) -> crate::Result<Option<
     )
 }
 
+/// Grow the guild a step from `from` members, if member `by` may. Returns
+/// every member's id, or `None` if `by` may not.
+pub fn grow(guild_id: i32, by: i32, from: u8) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.may_grow(by, from),
+        |conn| {
+            diesel::update(guilds::table.find(guild_id))
+                .set(guilds::capacity.eq(i16::from(from + CAPACITY_STEP)))
+                .execute(conn)
+        },
+    )
+}
+
+/// Disband the guild, if member `by` is its master; its members go with it.
+/// Returns every member's id as it was, or `None` if `by` may not.
+pub fn disband(guild_id: i32, by: i32) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.is_master(by),
+        |conn| diesel::delete(guilds::table.find(guild_id)).execute(conn),
+    )
+}
+
 /// Check a change against the guild and make it, with the guild locked so
-/// another change can't slip in between.
+/// another change can't slip in between. A guild disbanded meanwhile
+/// allows nothing.
 fn change(
     guild_id: i32,
     allowed: impl FnOnce(&Guild) -> bool,
@@ -201,34 +230,43 @@ fn change(
 ) -> crate::Result<Option<Vec<i32>>> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
-        let guild = locked(conn, guild_id)?;
-        if !allowed(&guild) {
+        let Some(guild) = locked(conn, guild_id)?.filter(|guild| allowed(guild)) else {
             return Ok(None);
-        }
+        };
         update(conn)?;
         Ok(Some(guild.members.iter().map(|member| member.id).collect()))
     })?)
 }
 
-/// The guild, locked until the transaction ends.
-fn locked(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
-    guilds::table
+/// The guild, locked until the transaction ends, unless it was disbanded.
+fn locked(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Option<Guild>> {
+    let found = guilds::table
         .find(guild_id)
         .select(guilds::id)
         .for_update()
-        .first::<i32>(conn)?;
-    load_in(conn, guild_id)
+        .first::<i32>(conn)
+        .optional()?;
+    match found {
+        Some(_) => load_in(conn, guild_id),
+        None => Ok(None),
+    }
 }
 
-/// The guild with its members, the master first. Members are not marked
-/// online; the world directory knows who is.
-pub fn load(guild_id: i32) -> crate::Result<Guild> {
+/// The guild with its members, the master first, unless it was disbanded.
+/// Members are not marked online; the world directory knows who is.
+pub fn load(guild_id: i32) -> crate::Result<Option<Guild>> {
     let mut conn = crate::connection()?;
     Ok(load_in(&mut conn, guild_id)?)
 }
 
-fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
-    let row: GuildRow = guilds::table.find(guild_id).first(conn)?;
+fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Option<Guild>> {
+    let Some(row) = guilds::table
+        .find(guild_id)
+        .first::<GuildRow>(conn)
+        .optional()?
+    else {
+        return Ok(None);
+    };
     let members = guild_members::table
         .inner_join(characters::table)
         .filter(guild_members::guild_id.eq(guild_id))
@@ -251,7 +289,7 @@ fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
             online: false,
         })
         .collect();
-    Ok(Guild {
+    Ok(Some(Guild {
         id: row.id,
         name: row.name,
         titles: [row.title1, row.title2, row.title3, row.title4, row.title5],
@@ -261,7 +299,7 @@ fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
         points: row.points,
         alliance_id: row.alliance_id,
         members,
-    })
+    }))
 }
 
 /// What others see of `cid`'s guild, if they are in one.

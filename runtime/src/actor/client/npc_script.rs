@@ -101,6 +101,8 @@ impl ClientActor {
         let mut offer_skip = false;
         let mut warp = None;
         let mut name_guild = false;
+        let mut grow_guild = None;
+        let mut disband_guild = false;
         let mut restyled = false;
         for effect in effects {
             match effect {
@@ -126,6 +128,8 @@ impl ClientActor {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);
                 }
+                Effect::GrowGuild { from } => grow_guild = Some(*from),
+                Effect::DisbandGuild => disband_guild = true,
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -324,6 +328,13 @@ impl ClientActor {
             {
                 Box::pin(self.start_script(script)).await?;
             }
+        }
+        // These change the player themselves, so they wait for the commit.
+        if let Some(from) = grow_guild {
+            self.grow_guild(from).await?;
+        }
+        if disband_guild {
+            self.disband_guild().await?;
         }
         if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;

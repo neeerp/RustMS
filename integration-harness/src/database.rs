@@ -439,6 +439,80 @@ pub async fn join_guild(character_id: i32, guild: &str) -> Result<(), HarnessErr
     .await
 }
 
+/// Set the capacity of the guild named `guild`.
+pub async fn set_guild_capacity(guild: &str, capacity: i16) -> Result<(), HarnessError> {
+    let guild = guild.to_owned();
+    change_one_row("set guild capacity", move |conn| {
+        diesel::sql_query("UPDATE guilds SET capacity = $2 WHERE name = $1")
+            .bind::<Text, _>(guild)
+            .bind::<SmallInt, _>(capacity)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Give guild member `character_id` `rank`.
+pub async fn set_guild_rank(character_id: i32, rank: i16) -> Result<(), HarnessError> {
+    change_one_row("set guild rank", move |conn| {
+        diesel::sql_query("UPDATE guild_members SET rank = $2 WHERE character_id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(rank)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Delete the guild named `guild`, and its members' rows with it, behind
+/// the server's back.
+pub async fn delete_guild(guild: &str) -> Result<(), HarnessError> {
+    let guild = guild.to_owned();
+    change_one_row("delete guild", move |conn| {
+        diesel::sql_query("DELETE FROM guilds WHERE name = $1")
+            .bind::<Text, _>(guild)
+            .execute(conn)
+    })
+    .await
+}
+
+/// The capacity of the guild named `guild`, and the characters in it; None
+/// if there is no such guild.
+pub async fn guild_capacity_and_members(
+    guild: &str,
+) -> Result<Option<(i16, Vec<i32>)>, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = SmallInt)]
+        capacity: i16,
+        #[diesel(sql_type = Nullable<Integer>)]
+        character_id: Option<i32>,
+    }
+    let guild = guild.to_owned();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read a guild",
+        message,
+    };
+    let rows = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT g.capacity, m.character_id FROM guilds g \
+             LEFT JOIN guild_members m ON m.guild_id = g.id \
+             WHERE g.name = $1 ORDER BY m.character_id",
+        )
+        .bind::<Text, _>(guild)
+        .load::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(rows.first().map(|first| {
+        (
+            first.capacity,
+            rows.iter().filter_map(|row| row.character_id).collect(),
+        )
+    }))
+}
+
 /// Make the fame `giver_id` gave look `days` days older, as though that
 /// many days had passed since.
 pub async fn backdate_fame(giver_id: i32, days: i32) -> Result<(), HarnessError> {

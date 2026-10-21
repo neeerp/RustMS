@@ -6,11 +6,16 @@
 //! join; members leave, and are expelled. The master and jr. masters move
 //! members between ranks and post the notice, and the master renames the
 //! ranks. Members hear who logs in or out (but not a channel change), levels
-//! up, or advances a job.
+//! up, or advances a job. At Heracle the master grows the guild five
+//! members at a time, for a price, or disbands it. Members of a guild gone
+//! meanwhile stay connected.
 
 use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{grant_stack, join_guild, set_job, set_meso, set_str};
+use integration_harness::database::{
+    delete_guild, grant_stack, guild_capacity_and_members, join_guild, set_guild_capacity,
+    set_guild_rank, set_job, set_meso, set_str,
+};
 use integration_harness::packets::{
     build_change_channel, build_player_logged_in, decode_channel_change,
 };
@@ -32,6 +37,10 @@ const GUILD_HQ: i32 = 200_000_301;
 const PARK: i32 = 200_000_200;
 const HERACLE: i32 = 2010007;
 const FEE: i32 = 1_500_000;
+// Heracle's menu.
+const CREATE: i32 = 0;
+const DISBAND: i32 = 1;
+const GROW: i32 = 2;
 
 const NAME_PROMPT: u8 = 0x01;
 const INFO: u8 = 0x1a;
@@ -42,7 +51,11 @@ const JOINED: u8 = 0x27;
 const NOT_IN_CHANNEL: u8 = 0x2a;
 const LEFT: u8 = 0x2c;
 const EXPELLED: u8 = 0x2f;
+const DISBANDED: u8 = 0x32;
+const DISBAND_FAILED: u8 = 0x34;
 const DECLINED: u8 = 0x37;
+const CAPACITY_CHANGED: u8 = 0x3a;
+const GROW_FAILED: u8 = 0x3b;
 const MEMBER_LEVEL_JOB: u8 = 0x3c;
 const MEMBER_ONLINE: u8 = 0x3d;
 const TITLES_CHANGED: u8 = 0x3e;
@@ -206,14 +219,32 @@ async fn founder(config: &HarnessConfig, meso: i32) -> WorldSession {
     session
 }
 
-/// Heracle asks for a name. Barrier lines carry the speaker's name, since
-/// everyone on the map hears them.
-async fn ask_heracle(session: &mut WorldSession) {
+/// Pick `choice` from Heracle's menu; what follows. Barrier lines carry
+/// the speaker's name, since everyone on the map hears them.
+async fn heracle_menu(session: &mut WorldSession, choice: i32) -> Trace {
     let m = session.character_name.clone();
     let c = &mut session.connection;
     let t = step(c, &format!("{m} talk"), talk(GUILD_HQ, HERACLE)).await;
+    assert_eq!(t.prompts, [(HERACLE, 4)]);
+    step(
+        c,
+        &format!("{m} picks {choice}"),
+        answer(4, 1, Some(choice)),
+    )
+    .await
+}
+
+/// Heracle asks for a name.
+async fn ask_heracle(session: &mut WorldSession) {
+    let t = heracle_menu(session, CREATE).await;
     assert_eq!(t.prompts, [(HERACLE, 1)]);
-    let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+    let m = session.character_name.clone();
+    let t = step(
+        &mut session.connection,
+        &format!("{m} yes"),
+        answer(1, 1, None),
+    )
+    .await;
     assert_eq!(t.guild_ops, [vec![NAME_PROMPT]]);
 }
 
@@ -237,7 +268,7 @@ async fn heracle_founds_a_guild_that_members_see_and_chat_in() {
     let a_id = a.character_id;
 
     // A level 1 can't found one, and naming one unasked does nothing.
-    let t = step(&mut b.connection, "b weak", talk(GUILD_HQ, HERACLE)).await;
+    let t = heracle_menu(&mut b, CREATE).await;
     assert_eq!(t.prompts, [(HERACLE, 0)]);
     let t = step(&mut b.connection, "b unasked", create("Sneaky")).await;
     assert!(t.guild_ops.is_empty());
@@ -738,4 +769,202 @@ async fn members_hear_who_logs_in_or_out_levels_up_and_advances() {
         level_job(&t.guild_ops).as_ref() == Some(&changed)
     })
     .await;
+}
+
+#[tokio::test]
+async fn the_master_grows_and_disbands_the_guild_at_heracle() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let b_id = new_character(&b_config).await;
+    let mut a = founder(&a_config, FEE + 900_000).await;
+    let a_id = a.character_id;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let guild_id = Cursor::new(&created[1..]).read_int().unwrap();
+    join_guild(b_id, &name).await.expect("B joins");
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    assert_eq!(
+        warp(&mut b.connection, GUILD_HQ, "", &mut bt).await,
+        GUILD_HQ
+    );
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.players.iter().any(|p| p.character_id == b_id)
+    })
+    .await;
+    let mut members = vec![a_id, b_id];
+    members.sort();
+
+    // Only the master may grow or disband it.
+    for choice in [GROW, DISBAND] {
+        let t = heracle_menu(&mut b, choice).await;
+        assert_eq!(t.prompts, [(HERACLE, 0)]);
+        step(&mut b.connection, "b close", answer(0, -1, None)).await;
+    }
+
+    // Heracle quotes 500,000 mesos to grow it from 10 to 15, but won't once
+    // the guild has changed since.
+    let t = heracle_menu(&mut a, GROW).await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    assert!(t.prompt_texts[0].contains("500000") && t.prompt_texts[0].contains("15"));
+    set_guild_capacity(&name, 15)
+        .await
+        .expect("grown meanwhile");
+    let t = step(&mut a.connection, "a stale grow", answer(1, 1, None)).await;
+    assert_eq!(t.guild_ops, [vec![GROW_FAILED]]);
+    assert_eq!(t.stat(stat::MESO), None);
+    set_guild_capacity(&name, 10).await.expect("back to 10");
+
+    // It grows, the whole guild hears so, and A pays.
+    let grown = [
+        vec![CAPACITY_CHANGED],
+        guild_id.to_le_bytes().to_vec(),
+        vec![15],
+    ]
+    .concat();
+    heracle_menu(&mut a, GROW).await;
+    send(&mut a.connection, answer(1, 1, None)).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_ops.contains(&grown) && t.stat(stat::MESO).is_some()
+    })
+    .await;
+    assert_eq!(at.stat(stat::MESO), Some(400_000));
+    assert_eq!(next_op(&mut b, CAPACITY_CHANGED).await, grown);
+    assert_eq!(
+        guild_capacity_and_members(&name).await.unwrap(),
+        Some((15, members.clone()))
+    );
+
+    // Short of the next step's price, A is told so.
+    let t = heracle_menu(&mut a, GROW).await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    let t = step(&mut a.connection, "a poor grow", answer(1, 1, None)).await;
+    assert_eq!(t.prompts, [(HERACLE, 0)]);
+    assert!(t.guild_ops.is_empty());
+    step(&mut a.connection, "a close", answer(0, -1, None)).await;
+
+    // A, no longer master by the time they say yes, can't disband it.
+    let t = heracle_menu(&mut a, DISBAND).await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    set_guild_rank(a_id, 2).await.expect("demoted");
+    let t = step(&mut a.connection, "a stale disband", answer(1, 1, None)).await;
+    assert_eq!(t.guild_ops, [vec![DISBAND_FAILED]]);
+    set_guild_rank(a_id, 1).await.expect("master again");
+
+    // A disbands it. Both hear so and see the name go from under the
+    // other's.
+    let disbanded = [vec![DISBANDED], guild_id.to_le_bytes().to_vec()].concat();
+    heracle_menu(&mut a, DISBAND).await;
+    send(&mut a.connection, answer(1, 1, None)).await;
+    for (session, other) in [(&mut a, b_id), (&mut b, a_id)] {
+        let mut t = Trace::default();
+        until(&mut session.connection, &mut t, |t| {
+            t.guild_ops.contains(&disbanded) && t.guild_names.contains(&(other, String::new()))
+        })
+        .await;
+    }
+    assert_eq!(guild_capacity_and_members(&name).await.unwrap(), None);
+    drop((a, b));
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // A enters the game again without a guild, and with the mesos left.
+    let mut a = relogin(&a_config).await;
+    assert_eq!(a.meso, 400_000);
+    let mut at = Trace::default();
+    read_for(&mut a.connection, &mut at, 1000).await;
+    assert!(at.guild_ops.is_empty());
+}
+
+/// A guild can be gone by the time a member acts on it (disbanded on
+/// another channel): the client hears of a failure, or nothing, and stays
+/// connected.
+#[tokio::test]
+async fn members_of_a_guild_gone_meanwhile_stay_connected() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let b_name = b_config.character_name.clone();
+    let b_id = new_character(&b_config).await;
+    let mut a = founder(&a_config, 2 * FEE + 500_000).await;
+    let a_id = a.character_id;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    next_op(&mut a, CREATED).await;
+    join_guild(b_id, &name).await.expect("B joins");
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    assert_eq!(
+        warp(&mut b.connection, GUILD_HQ, "", &mut bt).await,
+        GUILD_HQ
+    );
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.players.iter().any(|p| p.character_id == b_id)
+    })
+    .await;
+
+    // A's yes to growing it finds it gone.
+    let t = heracle_menu(&mut a, GROW).await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    delete_guild(&name).await.expect("gone");
+    let t = step(&mut a.connection, "a grows it", answer(1, 1, None)).await;
+    assert_eq!(t.guild_ops, [vec![GROW_FAILED]]);
+    assert_eq!(t.stat(stat::MESO), None);
+
+    // B asks for the guild window and gets none, and the name goes from
+    // under B's.
+    let t = step(&mut b.connection, "b reload", operation(0x00, &[], None)).await;
+    assert_eq!(t.guild_ops, [vec![INFO, 0]]);
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_names.contains(&(b_id, String::new()))
+    })
+    .await;
+
+    // A's invitation and expulsion go nowhere.
+    for (what, op) in [
+        ("a invites", operation(INVITE, &[], Some(&b_name))),
+        ("a expels", operation(0x08, &[b_id], Some(&b_name))),
+    ] {
+        let t = step(&mut a.connection, what, op).await;
+        assert!(t.guild_ops.is_empty(), "{what}");
+    }
+    let mut bt = Trace::default();
+    read_for(&mut b.connection, &mut bt, 300).await;
+    assert!(bt.guild_ops.is_empty());
+
+    // Heracle finds A guildless, so A founds another.
+    ask_heracle(&mut a).await;
+    let mut bt = Trace::default();
+    until(&mut b.connection, &mut bt, |t| {
+        t.guild_names.contains(&(a_id, String::new()))
+    })
+    .await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let guild_id = Cursor::new(&created[1..]).read_int().unwrap();
+
+    // It goes too, after A invites B and is asked to disband it: A's yes
+    // fails, and B's acceptance does nothing.
+    send(&mut a.connection, operation(INVITE, &[], Some(&b_name))).await;
+    next_op(&mut b, INVITE).await;
+    let t = heracle_menu(&mut a, DISBAND).await;
+    assert_eq!(t.prompts, [(HERACLE, 1)]);
+    delete_guild(&name).await.expect("gone again");
+    let t = step(&mut a.connection, "a disbands it", answer(1, 1, None)).await;
+    assert_eq!(t.guild_ops, [vec![DISBAND_FAILED]]);
+    send(&mut b.connection, operation(0x06, &[guild_id, b_id], None)).await;
+    let mut bt = Trace::default();
+    read_for(&mut b.connection, &mut bt, 500).await;
+    assert!(bt.guild_ops.is_empty());
+    barrier(&mut b.connection, "b still here", &mut bt).await;
+    assert_eq!(guild_capacity_and_members(&name).await.unwrap(), None);
 }

@@ -15,6 +15,22 @@ pub const MASTER_RANK: u8 = 1;
 pub const JR_MASTER_RANK: u8 = 2;
 /// The longest notice the client's prompt takes (FUN_009114f1).
 pub const NOTICE_MAX_LEN: usize = 100;
+/// The most members Heracle lets a guild grow to; the HeavenMS default.
+pub const MAX_CAPACITY: u8 = 100;
+/// Members each of Heracle's steps adds; the HeavenMS default.
+pub const CAPACITY_STEP: u8 = 5;
+
+/// Mesos Heracle asks to grow a guild of `capacity` by a step, at the
+/// HeavenMS default prices: 500,000 up to 15 members, a million more for
+/// each step past that, and 5 million past 30.
+pub fn capacity_cost(capacity: u8) -> i32 {
+    let capacity = i32::from(capacity);
+    if capacity > 30 {
+        5_000_000
+    } else {
+        500_000 + (capacity - 15).max(0) / i32::from(CAPACITY_STEP) * 1_000_000
+    }
+}
 
 /// The emblem shown beside the guild name. All zeros means none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -71,6 +87,17 @@ impl Guild {
 
     pub fn member(&self, id: i32) -> Option<&GuildMember> {
         self.members.iter().find(|member| member.id == id)
+    }
+
+    pub fn is_master(&self, id: i32) -> bool {
+        self.member(id)
+            .is_some_and(|member| member.rank == MASTER_RANK)
+    }
+
+    /// Whether member `by` may grow the guild a step from `from` members,
+    /// the capacity they were quoted: only the master, below the most.
+    pub fn may_grow(&self, by: i32, from: u8) -> bool {
+        self.is_master(by) && self.capacity == from && from < MAX_CAPACITY
     }
 
     /// The lowest rank with a title, which the client lets nobody pass
@@ -219,6 +246,29 @@ mod tests {
         assert!(!testers.may_invite(3));
         assert!(!testers.may_invite(9));
         assert!(!guild(&[1, 2, 5, 5]).may_invite(1));
+    }
+
+    #[test]
+    fn the_master_grows_the_guild_by_steps_to_100() {
+        let mut testers = guild(&[1, 2]);
+        testers.capacity = 10;
+        assert!(testers.is_master(1) && !testers.is_master(2) && !testers.is_master(9));
+        assert!(testers.may_grow(1, 10));
+        assert!(!testers.may_grow(2, 10));
+        assert!(!testers.may_grow(1, 15), "quoted for another capacity");
+        testers.capacity = 95;
+        assert!(testers.may_grow(1, 95));
+        testers.capacity = MAX_CAPACITY;
+        assert!(!testers.may_grow(1, MAX_CAPACITY));
+    }
+
+    #[test]
+    fn growing_costs_more_up_to_30_members() {
+        let costs = [10, 15, 20, 25, 30, 35, 95].map(capacity_cost);
+        assert_eq!(
+            costs,
+            [500_000, 500_000, 1_500_000, 2_500_000, 3_500_000, 5_000_000, 5_000_000]
+        );
     }
 
     #[test]

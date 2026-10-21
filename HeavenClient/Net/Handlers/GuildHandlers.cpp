@@ -50,6 +50,10 @@ namespace ms
 			EXPELLED = 0x2F,
 			// 0x15e
 			EXPEL_NOT_IN_GUILD = 0x30,
+			// 0xcd0 for the master, 0x159 for the others
+			DISBANDED = 0x32,
+			// 0xcd4
+			DISBAND_FAILED = 0x34,
 			// 0x14e
 			NOT_ACCEPTING = 0x35,
 			// 0xaa3
@@ -58,6 +62,10 @@ namespace ms
 			DECLINED = 0x37,
 			// 0x167
 			ADMIN = 0x38,
+			// 0xcd1 for the master
+			CAPACITY_CHANGED = 0x3A,
+			// 0xcd5
+			GROW_FAILED = 0x3B,
 			// Silent
 			MEMBER_LEVEL_JOB = 0x3C,
 			// 0x2ca and 0x2cb on the card when they log in
@@ -285,6 +293,30 @@ namespace ms
 		case Operation::EXPEL_NOT_IN_GUILD:
 			chat_line("You are not in the guild.");
 			break;
+		case Operation::DISBANDED:
+		{
+			int32_t guild_id = recv.read_int();
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			// Asked before the guild, and with it its master, is gone.
+			bool master = guild.is_master(player.get_oid());
+			guild.clear();
+
+			if (master)
+				heracle_says("The guild has been disbanded..  Please come back to me when you want to make a guild, again..",
+							 nullptr);
+			else
+				chat_line("The guild has been disbanded.");
+
+			refresh();
+			break;
+		}
+		case Operation::DISBAND_FAILED:
+			heracle_says("The problem has happened during the process of disbanding the guild... Plese try again later...",
+						 nullptr);
+			break;
 		case Operation::NOT_ACCEPTING:
 			chat_line(recv.read_string() + " is currently not accepting guild invite message.");
 			break;
@@ -296,6 +328,30 @@ namespace ms
 			break;
 		case Operation::ADMIN:
 			chat_line("Admin cannot make a guild.");
+			break;
+		case Operation::CAPACITY_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t capacity = static_cast<uint8_t>(recv.read_byte());
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			// Everyone's client keeps it, for the invite check; only the
+			// master, who paid, hears it.
+			guild.set_capacity(capacity);
+
+			if (guild.is_master(player.get_oid()))
+				heracle_says("Congratulation~  The number of guld members has now increased to " +
+							 std::to_string(capacity) + " ...  Please come back to me whenever you need to..",
+							 nullptr);
+
+			refresh();
+			break;
+		}
+		case Operation::GROW_FAILED:
+			heracle_says("The problem has happened during the process of increasing the guild... Plese try again later...",
+						 nullptr);
 			break;
 		case Operation::MEMBER_LEVEL_JOB:
 		{

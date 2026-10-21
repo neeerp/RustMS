@@ -8,10 +8,12 @@ use db::guild::{CreateError, JoinError};
 use game::guild::{self, Emblem, GuildMember, GuildTag};
 use game_data::forbidden_names::ForbiddenNames;
 use net::error::NetworkError;
+use net::npc_scripts::NpcScript;
 use net::packet::build::world::guild::{
-    build_guild_chat, build_guild_created, build_guild_error, build_guild_info,
-    build_guild_mark_changed, build_guild_name_changed, build_member_expelled, build_member_joined,
-    build_member_left, build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
+    build_capacity_changed, build_guild_chat, build_guild_created, build_guild_disbanded,
+    build_guild_error, build_guild_info, build_guild_mark_changed, build_guild_name_changed,
+    build_member_expelled, build_member_joined, build_member_left, build_notice_changed,
+    build_rank_changed, build_titles_changed, GuildError,
 };
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, stat};
@@ -142,7 +144,7 @@ impl ClientActor {
     /// The client checks the inviter's rank and the guild's room first.
     async fn invite_to_guild(&mut self, guild_id: i32, name: String) -> Result<(), RuntimeError> {
         let guild = spawn_db(move || db::guild::load(guild_id)).await?;
-        if !guild.may_invite(self.client_id) {
+        if !guild.is_some_and(|guild| guild.may_invite(self.client_id)) {
             warn!(
                 self.client_id,
                 "Guild invitation the client should not send; ignored"
@@ -172,8 +174,16 @@ impl ClientActor {
                     .send(&mut build_guild_error(GuildError::InviteeInGuild)?)
                     .await
             }
+            Err(JoinError::NoGuild) => {
+                warn!(cid, guild_id, "Invited to a guild since disbanded; ignored");
+                return Ok(());
+            }
         };
-        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        // Disbanded since the player joined: everyone it had hears of it,
+        // the player too.
+        let Some(guild) = spawn_db(move || db::guild::load(guild_id)).await? else {
+            return Ok(());
+        };
         let stats = &self.in_game()?.player.stats;
         let member = GuildMember {
             id: cid,
@@ -215,7 +225,9 @@ impl ClientActor {
         guild_id: i32,
         member_id: i32,
     ) -> Result<(), RuntimeError> {
-        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        let Some(guild) = spawn_db(move || db::guild::load(guild_id)).await? else {
+            return Ok(());
+        };
         let name = match guild.member(member_id) {
             Some(member) if guild.may_expel(self.client_id, member_id) => member.name.clone(),
             _ => {
@@ -272,7 +284,12 @@ impl ClientActor {
 
     /// The directory, which knows who is online, sends the guild.
     async fn show_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
-        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        let Some(guild) = spawn_db(move || db::guild::load(guild_id)).await? else {
+            // Disbanded while the player was entering the game, too soon
+            // for them to hear: they have no guild.
+            self.guild_changed().await?;
+            return self.send(&mut build_guild_info(None)?).await;
+        };
         self.send_to_directory(DirectoryMessage::GuildInfo {
             owner: self.client_id,
             guild,
@@ -331,7 +348,9 @@ impl ClientActor {
         };
         self.naming_guild = false;
 
-        let mut guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        let mut guild = spawn_db(move || db::guild::load(guild_id))
+            .await?
+            .ok_or(db::Error::NotFound)?;
         for member in &mut guild.members {
             member.online = member.id == cid;
         }
@@ -347,6 +366,90 @@ impl ClientActor {
         ];
         self.send_all(&mut packets).await?;
         self.set_guild(Some(guild.tag())).await
+    }
+
+    /// Heracle's script needs the player's guild as it is now.
+    pub(super) async fn talk_to_heracle(&mut self) -> Result<(), RuntimeError> {
+        let guild = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
+            Some(guild_id) => {
+                let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+                if guild.is_none() {
+                    // Disbanded too soon for the player to hear.
+                    self.guild_changed().await?;
+                }
+                guild
+            }
+            None => None,
+        };
+        let script = NpcScript::heracle(&self.in_game()?.player, guild.as_ref());
+        self.start_script(script).await
+    }
+
+    /// Grow the guild a step from `from` members, the capacity Heracle
+    /// quoted, and charge the master. The guild hears first, so that a
+    /// connection lost while paying can't keep it from the others.
+    pub(super) async fn grow_guild(&mut self, from: u8) -> Result<(), RuntimeError> {
+        let cost = guild::capacity_cost(from);
+        let player = &self.in_game()?.player;
+        let guild_id = player.guild.as_ref().map(|tag| tag.id);
+        let can_pay = player.meso >= cost;
+        let cid = self.client_id;
+        let grown = match guild_id {
+            Some(guild_id) if can_pay => spawn_db(move || db::guild::grow(guild_id, cid, from))
+                .await?
+                .map(|to| (guild_id, to)),
+            _ => None,
+        };
+        let Some((guild_id, to)) = grown else {
+            return self
+                .send(&mut build_guild_error(GuildError::GrowFailed)?)
+                .await;
+        };
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to,
+            packet: build_capacity_changed(guild_id, from + guild::CAPACITY_STEP)?,
+        })
+        .await?;
+        let player = &mut self.in_game_mut()?.player;
+        player.meso -= cost;
+        player.mark_dirty();
+        let meso = player.meso;
+        self.flush().await?;
+        let mut packets = vec![
+            stat::build_stat_update(false, &[StatUpdate::Meso(meso)])?,
+            drop::build_meso_gain_in_chat(-cost)?,
+        ];
+        self.send_all(&mut packets).await
+    }
+
+    /// Disband the guild, if the player is its master. Everyone in it hears
+    /// so, and each member's name tag goes.
+    pub(super) async fn disband_guild(&mut self) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let disbanded = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
+            Some(guild_id) => spawn_db(move || db::guild::disband(guild_id, cid))
+                .await?
+                .map(|to| (guild_id, to)),
+            None => None,
+        };
+        let Some((guild_id, to)) = disbanded else {
+            return self
+                .send(&mut build_guild_error(GuildError::DisbandFailed)?)
+                .await;
+        };
+        self.send_to_directory(DirectoryMessage::GuildDisbanded { guild_id })
+            .await?;
+        let others: Vec<ClientId> = to.iter().copied().filter(|&id| id != cid).collect();
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to,
+            packet: build_guild_disbanded(guild_id)?,
+        })
+        .await?;
+        for client_id in others {
+            self.send_to_directory(DirectoryMessage::GuildChanged { client_id })
+                .await?;
+        }
+        self.set_guild(None).await
     }
 }
 

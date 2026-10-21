@@ -153,9 +153,14 @@ int main()
 		require(guild.set_online(3, true) && guild.online_count() == 2 && !guild.set_online(9, true), "a member logs in");
 		require(guild.set_level_job(3, 31, 110) && guild.find(3)->level == 31 && guild.find(3)->job == 110, "a member's level and job");
 		require(!guild.set_level_job(9, 31, 110), "no one else's");
+		guild.set_capacity(2);
+		require(guild.full() && guild.get_data().capacity == 2, "two members fill a guild of two");
+		guild.set_capacity(15);
+		require(!guild.full() && guild.get_data().capacity == 15, "a grown guild has room");
 
 		guild.clear();
 		require(!guild.exists() && guild.get_data().members.empty(), "clearing forgets the guild");
+		require(!guild.is_master(1), "no one is master without a guild");
 		require(guild.lowest_rank() == 0 && guild.rank_held(3), "no guild, no ranks");
 
 		require(Guild::check_name("Testers") == Guild::Name::OK, "letters are fine");

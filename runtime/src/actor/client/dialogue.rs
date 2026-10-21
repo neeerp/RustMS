@@ -19,6 +19,9 @@ impl ClientActor {
             return Ok(());
         }
         self.conversation = None;
+        if npc_id == net::npc_scripts::HERACLE {
+            return self.talk_to_heracle().await;
+        }
         if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, &game.player) {
             return self.start_script(script).await;
         }

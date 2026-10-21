@@ -308,6 +308,11 @@ namespace ms
 		data.notice = std::move(notice);
 	}
 
+	void Guild::set_capacity(int32_t capacity)
+	{
+		data.capacity = capacity;
+	}
+
 	GuildMember* Guild::member(int32_t cid)
 	{
 		for (auto& member : data.members)

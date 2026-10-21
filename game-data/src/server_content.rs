@@ -57,6 +57,18 @@ pub mod keys {
     pub const HERACLE_IN_GUILD: &str = "heracle.in_guild";
     pub const HERACLE_TOO_WEAK: &str = "heracle.too_weak";
     pub const HERACLE_NO_MESOS: &str = "heracle.no_mesos";
+    pub const HERACLE_MENU: &str = "heracle.menu";
+    pub const HERACLE_CREATE: &str = "heracle.choice.create";
+    pub const HERACLE_DISBAND: &str = "heracle.choice.disband";
+    pub const HERACLE_GROW: &str = "heracle.choice.grow";
+    pub const HERACLE_DISBAND_NOT_MASTER: &str = "heracle.disband.not_master";
+    pub const HERACLE_DISBAND_ASK: &str = "heracle.disband.ask";
+    pub const HERACLE_GROW_NOT_MASTER: &str = "heracle.grow.not_master";
+    pub const HERACLE_GROW_FULL: &str = "heracle.grow.full";
+    /// `{price}` and the `{capacity}` it grows to.
+    pub const HERACLE_GROW_ASK: &str = "heracle.grow.ask";
+    /// `{price}` and `{capacity}`, as for the question.
+    pub const HERACLE_GROW_NO_MESOS: &str = "heracle.grow.no_mesos";
 
     /// The continent ships' station staff: the booths that sell tickets
     /// (Joel, Agatha), the ushers that take them aboard (Cherry, Rini), and
@@ -533,6 +545,16 @@ mod tests {
             keys::HERACLE_IN_GUILD,
             keys::HERACLE_TOO_WEAK,
             keys::HERACLE_NO_MESOS,
+            keys::HERACLE_MENU,
+            keys::HERACLE_CREATE,
+            keys::HERACLE_DISBAND,
+            keys::HERACLE_GROW,
+            keys::HERACLE_DISBAND_NOT_MASTER,
+            keys::HERACLE_DISBAND_ASK,
+            keys::HERACLE_GROW_NOT_MASTER,
+            keys::HERACLE_GROW_FULL,
+            keys::HERACLE_GROW_ASK,
+            keys::HERACLE_GROW_NO_MESOS,
             keys::SHIPS_SELL_ASK,
             keys::SHIPS_SELL_DECLINE,
             keys::SHIPS_SELL_SHORT,
