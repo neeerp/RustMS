@@ -460,8 +460,9 @@ namespace ms
 		jobs = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
 			fit(Text::Font::A12M, QuestRequirements::jobs(ids), HEADER_WIDTH, ".."), 0, false);
 
+		// An empty start check still counts (2049, 3240); only a missing one is "No limit".
 		levels = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
-			QuestRequirements::levels(start.size() > 0, static_cast<int32_t>(start["lvmin"].get_integer()),
+			QuestRequirements::levels(static_cast<bool>(start), static_cast<int32_t>(start["lvmin"].get_integer()),
 				static_cast<int32_t>(start["lvmax"].get_integer())), 0, false);
 
 		write_details();
