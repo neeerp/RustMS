@@ -3,6 +3,7 @@
 //! the runtime's event actor keeps the time and moves the players.
 
 use crate::ClientId;
+use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -125,6 +126,10 @@ impl Team {
         }
     }
 
+    pub fn leader(&self) -> ClientId {
+        self.leader
+    }
+
     pub fn members(&self) -> &[ClientId] {
         &self.members
     }
@@ -142,6 +147,102 @@ impl Team {
         self.members.remove(index);
         member == self.leader || self.members.len() < self.least
     }
+}
+
+/// What a member's script tells their event, once its items have changed
+/// hands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EventCommand {
+    /// Cloto gave the member a pass.
+    PassGiven,
+    /// The leader handed Cloto the passes for stage `n`.
+    ClearStage(u8),
+}
+
+/// The coupons Kerning City's party quest's first stage has its members
+/// collect, and the pass Cloto gives for the right number.
+pub const COUPON: i32 = 4001007;
+pub const PASS: i32 = 4001008;
+
+/// The answers to Cloto's stage 1 questions, in order (Cosmic `9020001`):
+/// each is a job advancement's requirement, the level a warrior needs, the
+/// STR a warrior needs, the INT a magician needs, the DEX a bowman needs,
+/// the DEX a thief needs, the level of the second advancement, and the
+/// level a magician needs.
+pub const ANSWERS: [i32; 7] = [10, 35, 20, 25, 25, 30, 8];
+
+/// Where a player stands with Cloto on stage 1.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cloto {
+    /// The leader handed in the passes; the way on is open.
+    Cleared,
+    /// The leader, who needs a pass from each of the others.
+    Leader { needed: i32 },
+    /// Another member, asked `question` (an index into `ANSWERS`), told it
+    /// for the first time if `new`.
+    Member {
+        question: usize,
+        new: bool,
+        passed: bool,
+    },
+}
+
+/// Stage 1 of Kerning City's party quest: each member other than the
+/// leader is asked a question, and earns a pass by holding the answer's
+/// number of coupons; the leader clears the stage with everyone's pass.
+#[derive(Debug, Default)]
+pub struct Stage1 {
+    questions: HashMap<ClientId, usize>,
+    passed: HashSet<ClientId>,
+    cleared: bool,
+}
+
+impl Stage1 {
+    /// `who` talks to Cloto. A member is asked a question the first time,
+    /// `draw`n then, and the same one after that.
+    pub fn talk(&mut self, who: ClientId, team: &Team, draw: impl FnOnce() -> usize) -> Cloto {
+        if self.cleared {
+            return Cloto::Cleared;
+        }
+        if who == team.leader() {
+            let needed = team.members().len().saturating_sub(1);
+            return Cloto::Leader {
+                needed: i32::try_from(needed).unwrap_or(i32::MAX),
+            };
+        }
+        let new = !self.questions.contains_key(&who);
+        let question = *self.questions.entry(who).or_insert_with(draw);
+        Cloto::Member {
+            question,
+            new,
+            passed: self.passed.contains(&who),
+        }
+    }
+
+    /// Cloto gave `who` their pass.
+    pub fn pass_given(&mut self, who: ClientId) {
+        self.passed.insert(who);
+    }
+
+    /// The leader handed in the passes. Returns whether that cleared the
+    /// stage, which it does once.
+    pub fn clear(&mut self) -> bool {
+        !std::mem::replace(&mut self.cleared, true)
+    }
+}
+
+/// A question for a member who hasn't been asked one: random, or the one
+/// `RUSTMS_KPQ_QUESTION` (1 to 7) names for testing.
+pub fn draw_question() -> usize {
+    static PINNED: OnceLock<Option<usize>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        std::env::var("RUSTMS_KPQ_QUESTION")
+            .ok()
+            .and_then(|question| question.parse::<usize>().ok())
+            .filter(|question| (1..=ANSWERS.len()).contains(question))
+            .map(|question| question - 1)
+    });
+    pinned.unwrap_or_else(|| rand::random::<usize>() % ANSWERS.len())
 }
 
 #[cfg(test)]
@@ -196,5 +297,39 @@ mod tests {
         assert_eq!(KPQ.duration(), Duration::from_secs(30 * 60));
         assert!(KPQ.holds(103_000_800) && KPQ.holds(103_000_805));
         assert!(!KPQ.holds(KPQ.exit) && !KPQ.holds(KPQ.lobby));
+    }
+
+    #[test]
+    fn cloto_asks_each_member_one_question_and_the_leader_for_passes() {
+        let team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
+        let mut stage = Stage1::default();
+        assert_eq!(stage.talk(1, &team, || 0), Cloto::Leader { needed: 3 });
+        let asked = Cloto::Member {
+            question: 4,
+            new: true,
+            passed: false,
+        };
+        assert_eq!(stage.talk(2, &team, || 4), asked);
+        assert_eq!(
+            stage.talk(2, &team, || 6),
+            Cloto::Member {
+                question: 4,
+                new: false,
+                passed: false
+            }
+        );
+        stage.pass_given(2);
+        assert_eq!(
+            stage.talk(2, &team, || 6),
+            Cloto::Member {
+                question: 4,
+                new: false,
+                passed: true
+            }
+        );
+        assert!(stage.clear());
+        assert!(!stage.clear());
+        assert_eq!(stage.talk(3, &team, || 0), Cloto::Cleared);
+        assert_eq!(stage.talk(1, &team, || 0), Cloto::Cleared);
     }
 }

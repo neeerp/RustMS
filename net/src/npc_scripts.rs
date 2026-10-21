@@ -7,7 +7,7 @@
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
-use crate::events::{self, Entry, EventKind};
+use crate::events::{self, Cloto, Entry, EventCommand, EventKind};
 use crate::scripts::Effect;
 use game::guild::{self, Guild};
 use game::{InventoryType, Player, QuestState};
@@ -35,6 +35,8 @@ pub const LEA: i32 = 2010008;
 pub const LAKELIS: i32 = 9020000;
 /// Nella, who lets players out of the party quest and back to town.
 const NELLA: i32 = 9020002;
+/// Cloto, who sets each stage of Kerning City's party quest.
+pub const CLOTO: i32 = 9020001;
 /// Jeff, at the way down from Ice Valley II.
 const JEFF: i32 = 2030000;
 /// Sharp Cliff I and its `under00` portal, the top of the dungeon below.
@@ -608,6 +610,14 @@ pub enum Page {
     /// The conversation ends here without another page, as when a menu
     /// choice warps at once: `effects`, then the script's end effects.
     Done(Vec<Effect>),
+    /// Said as `effects` apply, as an NPC who hands something over while
+    /// speaking. If they are refused, the script's `refused` text is said
+    /// instead. Previous never goes back to it (`has_previous`), so they
+    /// apply once.
+    Act {
+        text: String,
+        effects: Vec<Effect>,
+    },
 }
 
 /// What to do after an answer: apply `effects`, then show `prompt` (or end
@@ -659,6 +669,12 @@ impl NpcScript {
     /// the party quest.
     pub fn lakelis(entry: Entry) -> Self {
         lakelis(entry)
+    }
+
+    /// Cloto's script on the party quest's first stage, for `player`,
+    /// who stands with her as `view`.
+    pub fn cloto(view: Cloto, player: &Player) -> Self {
+        cloto(view, player)
     }
 
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
@@ -832,7 +848,9 @@ impl NpcScript {
     /// the prompt (the runtime ends the conversation).
     pub fn respond(&mut self, input: ScriptInput) -> Option<Step> {
         match (&self.pages[self.page], input) {
-            (Page::Say(_) | Page::End(_), ScriptInput::Next) => Some(self.advance(Vec::new())),
+            (Page::Say(_) | Page::Act { .. } | Page::End(_), ScriptInput::Next) => {
+                Some(self.advance(Vec::new()))
+            }
             (Page::Say(_), ScriptInput::Previous) if self.has_previous() => {
                 self.page -= 1;
                 Some(self.begin())
@@ -918,6 +936,15 @@ impl NpcScript {
                 has_previous: self.has_previous(),
                 has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
             }),
+            Page::Act { text, effects: own } => {
+                effects.extend(own.iter().cloned());
+                Prompt::Text(DialoguePage {
+                    npc_id,
+                    text: text.clone(),
+                    has_previous: false,
+                    has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
+                })
+            }
             Page::End(text) => Prompt::Text(DialoguePage {
                 npc_id,
                 text: text.clone(),
@@ -1406,6 +1433,74 @@ fn kpq_terms() -> String {
         ],
     )
 }
+
+/// Cloto on stage 1 (Cosmic `9020001`): each member but the leader is
+/// asked to hold a number of coupons, and holding exactly that many earns
+/// a pass; the leader clears the stage by handing in a pass from each of
+/// them. A wrong number costs nothing.
+fn cloto(view: Cloto, player: &Player) -> NpcScript {
+    let held = |item_id| player.inventory.count(item_id);
+    let page = match view {
+        Cloto::Cleared => Page::Say(text(keys::KPQ_CLOTO_CLEARED)),
+        Cloto::Member { passed: true, .. } => Page::Say(text(keys::KPQ_CLOTO_THANKS)),
+        Cloto::Member { question, new, .. } => {
+            let asked = text(QUESTIONS[question]);
+            let answer = events::ANSWERS[question];
+            if new {
+                Page::Say(asked)
+            } else if held(events::COUPON) == answer {
+                Page::Act {
+                    text: text(keys::KPQ_CLOTO_RIGHT),
+                    effects: vec![
+                        Effect::TakeItem {
+                            item_id: events::COUPON,
+                            quantity: answer as i16,
+                        },
+                        Effect::GiveItem {
+                            item_id: events::PASS,
+                            quantity: 1,
+                        },
+                        Effect::EventCommand(EventCommand::PassGiven),
+                    ],
+                }
+            } else {
+                Page::Say(content::text().get(keys::KPQ_CLOTO_WRONG, &[("question", &asked)]))
+            }
+        }
+        Cloto::Leader { needed } => {
+            let says = |key| content::text().get(key, &[("n", &needed.to_string())]);
+            if held(events::PASS) >= needed {
+                Page::Act {
+                    text: says(keys::KPQ_CLOTO_LEADER_CLEAR),
+                    effects: vec![
+                        Effect::TakeItem {
+                            item_id: events::PASS,
+                            quantity: needed as i16,
+                        },
+                        Effect::EventCommand(EventCommand::ClearStage(1)),
+                    ],
+                }
+            } else {
+                Page::Say(says(keys::KPQ_CLOTO_LEADER_SHORT))
+            }
+        }
+    };
+    let mut script = NpcScript::new(CLOTO, vec![page]);
+    script.inventory_full = Some(text(keys::KPQ_CLOTO_FULL));
+    script.refused = Some(text(keys::KPQ_CLOTO_REFUSED));
+    script
+}
+
+/// Cloto's questions, in the order of `events::ANSWERS`.
+const QUESTIONS: [&str; 7] = [
+    keys::KPQ_CLOTO_Q1,
+    keys::KPQ_CLOTO_Q2,
+    keys::KPQ_CLOTO_Q3,
+    keys::KPQ_CLOTO_Q4,
+    keys::KPQ_CLOTO_Q5,
+    keys::KPQ_CLOTO_Q6,
+    keys::KPQ_CLOTO_Q7,
+];
 
 /// Nella (Cosmic `9020002`): out of the party quest, then back to town.
 fn nella(player: &Player) -> Option<NpcScript> {
@@ -2983,6 +3078,56 @@ mod tests {
         let mut taxi = NpcScript::for_npc(NLC_TAXI, &rider(100, 14999, 600000000)).unwrap();
         taxi.begin();
         assert!(taxi.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+    }
+
+    #[test]
+    fn cloto_gives_a_pass_for_the_right_number_of_coupons() {
+        let member = |new, passed| Cloto::Member {
+            question: 6,
+            new,
+            passed,
+        };
+        let holding = |item_id, quantity| hunter(&[(item_id, quantity)], &[]);
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+
+        // Asked first; then 8 coupons, no more and no fewer, earn a pass.
+        let asked = NpcScript::cloto(member(true, false), &holding(events::COUPON, 8)).begin();
+        assert_eq!(kind(&asked), Some(0));
+        assert!(asked.effects.is_empty());
+        for wrong in [7, 9] {
+            let step = NpcScript::cloto(member(false, false), &holding(events::COUPON, wrong));
+            assert!(step.begin().effects.is_empty());
+        }
+        let mut right = NpcScript::cloto(member(false, false), &holding(events::COUPON, 8));
+        assert_eq!(
+            right.begin().effects,
+            [
+                take(events::COUPON, 8),
+                Effect::GiveItem {
+                    item_id: events::PASS,
+                    quantity: 1
+                },
+                Effect::EventCommand(EventCommand::PassGiven),
+            ]
+        );
+        assert!(right.respond(ScriptInput::Next).unwrap().effects.is_empty());
+        let thanks = NpcScript::cloto(member(false, true), &holding(events::COUPON, 8)).begin();
+        assert!(thanks.effects.is_empty());
+
+        // The leader hands in a pass from each of the others.
+        let leader = Cloto::Leader { needed: 3 };
+        let short = NpcScript::cloto(leader, &holding(events::PASS, 2)).begin();
+        assert!(short.effects.is_empty());
+        let clear = NpcScript::cloto(leader, &holding(events::PASS, 4)).begin();
+        assert_eq!(
+            clear.effects,
+            [
+                take(events::PASS, 3),
+                Effect::EventCommand(EventCommand::ClearStage(1))
+            ]
+        );
+        let cleared = NpcScript::cloto(Cloto::Cleared, &holding(events::PASS, 4)).begin();
+        assert!(cleared.effects.is_empty());
     }
 
     #[test]

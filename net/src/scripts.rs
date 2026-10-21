@@ -134,6 +134,9 @@ pub enum Effect {
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
     StartEvent(crate::events::EventKind),
+    /// Tell the player's event something happened, once the effects before
+    /// it have applied. Scripts end on it.
+    EventCommand(crate::events::EventCommand),
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

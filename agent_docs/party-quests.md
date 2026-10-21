@@ -2,8 +2,9 @@
 
 A party event is played in a copy of its maps of its own: an instance.
 Kerning City's party quest (KPQ) is the first. So far it has its entry,
-exit and timer; its stages, gates and rewards come next (see
-`v83ref/reports/a005-instancing-kpq.md`, section 3).
+exit and timer, and Cloto's quiz on stage 1; its gates, the other stages
+and rewards come next (see `v83ref/reports/a005-instancing-kpq.md`,
+section 3, and `a011-kpq-stage1.md`).
 
 ## Rules
 
@@ -26,7 +27,7 @@ exit and timer; its stages, gates and rewards come next (see
 | Owner | Holds |
 | --- | --- |
 | Directory | Which event each channel is playing, as `(channel, kind)` → id. There is one at a time per kind, like a GMS lobby. |
-| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, and the members' handles. |
+| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, the members' handles, and the stages' progress (`Stage1`). |
 | Field registry | The open instance ids. The fields of a copy are keyed by `FieldKey{channel, map, instance_id}`. |
 | Client actor (`client/events.rs`) | The member's `EventTicket`: the id, the kind, the end time, and the event's handle. |
 
@@ -88,23 +89,51 @@ A closed copy never comes back:
 - `field` and `close_instance` both lock the fields before the open
   instances, so no field of a copy is registered after it closes.
 
+## Stage 1
+
+On 103000800 Cloto (9020001) sets a quiz (`net::events::Stage1`, Cosmic
+`9020001`):
+
+- Each member but the leader is asked, on their first talk, for as many
+  coupons (4001007) as one of seven job-advancement requirements
+  (`ANSWERS`). The question is drawn then and stays theirs.
+  `RUSTMS_KPQ_QUESTION` (1 to 7) pins it; the harness world pins 7, whose
+  answer is 8.
+- Holding exactly that many earns a pass (4001008) for the coupons. A
+  wrong number costs nothing, and she asks again. A member who has a pass
+  is told to give it to the leader.
+- The leader clears the stage by handing in a pass from each of the other
+  members (`members - 1`). Passes reach the leader by trade or by being
+  dropped and picked up.
+- After the clear, Cloto tells everyone to hurry on.
+
+The client actor asks its ticket where the player stands
+(`EventTicket::cloto`, a reply from the event actor), and builds
+`NpcScript::cloto` from that and the player's bag. The items change hands
+as her page is shown (`Page::Act`, as in Cosmic, where the page and the
+items go in one call). The script's last effect, `Effect::EventCommand`,
+tells the event (`PassGiven`, `ClearStage(1)`) once the items have changed
+hands. Elsewhere, and outside an event, Cloto has nothing to say yet.
+
 ## NPCs
 
 | NPC | Where | Script |
 | --- | --- | --- |
 | Lakelis 9020000 | 103000000 | Runtime (`talk_about_event`), like Heracle |
+| Cloto 9020001 | 103000800 | Runtime (`talk_to_cloto`): stage 1's quiz |
 | Nella 9020002 | 103000800-805 | Out to 103000890 |
 | Nella 9020002 | 103000890 | Home to 103000000 |
 
-Their lines are unsourced placeholder keys `kpq.lakelis.*` and
-`kpq.nella.*`.
+Their lines are unsourced placeholder keys `kpq.lakelis.*`,
+`kpq.cloto.*` and `kpq.nella.*`.
 
 ## Not yet
 
 These are not done yet:
 
-- Cloto's stages, coupons and passes.
-- The `next00` gates, which stay open until the stage logic lands.
+- Cloto's stages after the first.
+- The `next00` gates, which stay open until the stage logic lands; the
+  clear's effects, sound and stage EXP.
 - Rewards and the bonus stage.
 - Removing the quest's items on exit.
 - A new leader chosen inside the copy: the event still counts the first

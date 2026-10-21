@@ -13,14 +13,14 @@
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
-use net::events::{EventKind, Team};
+use net::events::{draw_question, Cloto, EventCommand, EventKind, Stage1, Team};
 use net::ClientId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::{sleep, sleep_until, Instant};
-use tracing::info;
+use tracing::{debug, info};
 
 /// How long members have to get out after the event ends before its fields
 /// close.
@@ -31,6 +31,16 @@ const EVENT_QUEUE_CAPACITY: usize = 64;
 pub enum EventMessage {
     /// `client_id` left the event's maps, the party, or the game.
     Left { client_id: ClientId },
+    /// `client_id` talks to Cloto on the first stage.
+    Cloto {
+        client_id: ClientId,
+        reply: oneshot::Sender<Cloto>,
+    },
+    /// `client_id`'s script did something the event keeps track of.
+    Command {
+        client_id: ClientId,
+        command: EventCommand,
+    },
 }
 
 /// A way to reach one running event.
@@ -63,6 +73,33 @@ impl EventTicket {
     /// Whether `map_id` is one of the event's maps, played in its copy.
     pub fn holds(&self, map_id: i32) -> bool {
         self.kind.event().holds(map_id)
+    }
+
+    /// Where the member stands with Cloto, or `None` once the event is
+    /// over.
+    pub async fn cloto(&self) -> Option<Cloto> {
+        let (reply, view) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Cloto {
+                client_id: self.member,
+                reply,
+            })
+            .await
+            .ok()?;
+        view.await.ok()
+    }
+
+    /// Tell the event what the member's script did.
+    pub async fn command(&self, command: EventCommand) {
+        let _ = self
+            .event
+            .tx
+            .send(EventMessage::Command {
+                client_id: self.member,
+                command,
+            })
+            .await;
     }
 }
 
@@ -103,6 +140,7 @@ pub fn spawn(
             .into_iter()
             .map(|member| (member.client_id, member))
             .collect(),
+        stage1: Stage1::default(),
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -132,6 +170,7 @@ struct EventActor {
     rx: mpsc::Receiver<EventMessage>,
     team: Team,
     members: HashMap<ClientId, ClientHandle>,
+    stage1: Stage1,
 }
 
 impl EventActor {
@@ -155,12 +194,21 @@ impl EventActor {
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
+                    Some(EventMessage::Cloto { client_id, reply }) => {
+                        let _ = reply.send(self.stage1.talk(client_id, &self.team, draw_question));
+                    }
+                    Some(EventMessage::Command { client_id, command }) => {
+                        self.command(client_id, command);
+                    }
                     None => over = true,
                 },
                 _ = sleep_until(ends) => over = true,
             }
         }
         info!(?kind, id, "Event ended");
+        // Nothing is answered from here on: a member asking Cloto hears
+        // nothing at once rather than after the grace.
+        drop(self.rx);
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::EventEnded { id });
@@ -168,5 +216,20 @@ impl EventActor {
         }
         // Give them time to get out before the copy closes.
         sleep(GRACE).await;
+    }
+
+    fn command(&mut self, client_id: ClientId, command: EventCommand) {
+        if !self.team.has(client_id) {
+            return;
+        }
+        match command {
+            EventCommand::PassGiven => self.stage1.pass_given(client_id),
+            EventCommand::ClearStage(1) if client_id == self.team.leader() => {
+                if self.stage1.clear() {
+                    info!(kind = ?self.kind, id = self.id, "Stage 1 cleared");
+                }
+            }
+            EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
+        }
     }
 }

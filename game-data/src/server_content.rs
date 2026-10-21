@@ -174,6 +174,21 @@ pub mod keys {
     pub const KPQ_LAKELIS_DECLINE: &str = "kpq.lakelis.decline";
     pub const KPQ_NELLA_LEAVE: &str = "kpq.nella.leave";
     pub const KPQ_NELLA_HOME: &str = "kpq.nella.home";
+    pub const KPQ_CLOTO_Q1: &str = "kpq.cloto.q1";
+    pub const KPQ_CLOTO_Q2: &str = "kpq.cloto.q2";
+    pub const KPQ_CLOTO_Q3: &str = "kpq.cloto.q3";
+    pub const KPQ_CLOTO_Q4: &str = "kpq.cloto.q4";
+    pub const KPQ_CLOTO_Q5: &str = "kpq.cloto.q5";
+    pub const KPQ_CLOTO_Q6: &str = "kpq.cloto.q6";
+    pub const KPQ_CLOTO_Q7: &str = "kpq.cloto.q7";
+    pub const KPQ_CLOTO_RIGHT: &str = "kpq.cloto.right";
+    pub const KPQ_CLOTO_WRONG: &str = "kpq.cloto.wrong";
+    pub const KPQ_CLOTO_THANKS: &str = "kpq.cloto.thanks";
+    pub const KPQ_CLOTO_CLEARED: &str = "kpq.cloto.cleared";
+    pub const KPQ_CLOTO_LEADER_CLEAR: &str = "kpq.cloto.leader_clear";
+    pub const KPQ_CLOTO_LEADER_SHORT: &str = "kpq.cloto.leader_short";
+    pub const KPQ_CLOTO_FULL: &str = "kpq.cloto.full";
+    pub const KPQ_CLOTO_REFUSED: &str = "kpq.cloto.refused";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -704,6 +719,21 @@ mod tests {
             keys::KPQ_LAKELIS_DECLINE,
             keys::KPQ_NELLA_LEAVE,
             keys::KPQ_NELLA_HOME,
+            keys::KPQ_CLOTO_Q1,
+            keys::KPQ_CLOTO_Q2,
+            keys::KPQ_CLOTO_Q3,
+            keys::KPQ_CLOTO_Q4,
+            keys::KPQ_CLOTO_Q5,
+            keys::KPQ_CLOTO_Q6,
+            keys::KPQ_CLOTO_Q7,
+            keys::KPQ_CLOTO_RIGHT,
+            keys::KPQ_CLOTO_WRONG,
+            keys::KPQ_CLOTO_THANKS,
+            keys::KPQ_CLOTO_CLEARED,
+            keys::KPQ_CLOTO_LEADER_CLEAR,
+            keys::KPQ_CLOTO_LEADER_SHORT,
+            keys::KPQ_CLOTO_FULL,
+            keys::KPQ_CLOTO_REFUSED,
             keys::JEFF_INTRO,
             keys::JEFF_ASK,
             keys::JEFF_DECLINE,

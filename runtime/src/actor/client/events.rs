@@ -6,7 +6,7 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey};
-use net::events::EventKind;
+use net::events::{EventCommand, EventKind, KPQ};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::handle::world::warp_to_spawn_point;
@@ -44,6 +44,28 @@ impl ClientActor {
             EventKind::Kpq => NpcScript::lakelis(entry),
         };
         self.start_script(script).await
+    }
+
+    /// Cloto sets the party quest's first stage for a player in it there.
+    /// Returns whether she did; elsewhere she has nothing to say.
+    pub(super) async fn talk_to_cloto(&mut self) -> Result<bool, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|_| map_id == KPQ.entry) else {
+            return Ok(false);
+        };
+        let Some(view) = ticket.cloto().await else {
+            return Ok(false);
+        };
+        let script = NpcScript::cloto(view, &self.in_game()?.player);
+        self.start_script(script).await?;
+        Ok(true)
+    }
+
+    /// The player's script did something their event keeps track of.
+    pub(super) async fn tell_event(&self, command: EventCommand) {
+        if let Some(ticket) = &self.event {
+            ticket.command(command).await;
+        }
     }
 
     /// The party went in: the player takes their ticket to the event's
