@@ -5,72 +5,20 @@
 //! harness world pins her question (`RUSTMS_KPQ_QUESTION`), so the
 //! members' coupons can be granted before they log in.
 
-use game_data::GameData;
-use integration_harness::database::{grant_stack, set_job};
+use integration_harness::events::{enter_kpq, in_lobby, party, talk, CLOTO, NELLA};
 use integration_harness::hunting::pickup;
 use integration_harness::packets::build_change_map;
-use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, step, until, warp, Trace};
-use integration_harness::{login_to_world_session, relogin, WorldSession};
+use integration_harness::WorldSession;
 use net::events::{ANSWERS, COUPON, KPQ, PASS};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
-use std::path::Path;
-use std::sync::OnceLock;
-use tokio::time::Duration;
 
-const LAKELIS: i32 = 9020000;
-const CLOTO: i32 = 9020001;
-const NELLA: i32 = 9020002;
-const OP_JOIN: u8 = 0x0F;
 const ETC: u8 = 4;
 /// The question the harness world pins, 1 to 7.
 const QUESTION: usize = 7;
-
-fn maps() -> &'static GameData {
-    static MAPS: OnceLock<GameData> = OnceLock::new();
-    MAPS.get_or_init(|| {
-        GameData::load_from_nx_map(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
-        )
-        .unwrap()
-    })
-}
-
-fn talk(map: i32, npc: i32) -> Packet {
-    let index = maps()
-        .field(map)
-        .unwrap()
-        .map_npcs
-        .iter()
-        .position(|n| n.npc_id == npc)
-        .unwrap();
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
-    p.write_int(1_000_000_000 + index as i32).unwrap();
-    p
-}
-
-fn party_operation(op: u8) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::PartyOperation as i16).unwrap();
-    p.write_byte(op).unwrap();
-    p
-}
-
-fn invite(name: &str) -> Packet {
-    let mut p = party_operation(4);
-    p.write_str_with_length(name).unwrap();
-    p
-}
-
-fn accept(party_id: i32) -> Packet {
-    let mut p = party_operation(3);
-    p.write_int(party_id).unwrap();
-    p
-}
 
 /// Throw `quantity` of the Etc stack in `slot` on the ground.
 fn throw_down(slot: i16, quantity: i16) -> Packet {
@@ -87,40 +35,7 @@ fn throw_down(slot: i16, quantity: i16) -> Packet {
 /// A new level-25 character holding `quantity` of `item_id` in Etc slot 1,
 /// logged in and waiting in Kerning City.
 async fn player(item_id: i32, quantity: i16) -> WorldSession {
-    let config = load_harness_config_or_fail().await;
-    let id = login_to_world_session(&config).await.unwrap().character_id;
-    drop(relogin(&config).await);
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    set_job(id, 0, 25, 50).await.unwrap();
-    grant_stack(id, ETC as i16, 1, item_id, quantity)
-        .await
-        .unwrap();
-    let mut session = relogin(&config).await;
-    let mut trace = Trace::default();
-    assert_eq!(
-        warp(&mut session.connection, KPQ.lobby, "", &mut trace).await,
-        KPQ.lobby
-    );
-    session
-}
-
-/// The first player invites the rest into a party.
-async fn party(players: &mut [WorldSession]) {
-    let (leader, members) = players.split_first_mut().unwrap();
-    for member in members {
-        send(&mut leader.connection, invite(&member.character_name)).await;
-        let mut trace = Trace::default();
-        until(&mut member.connection, &mut trace, |t| {
-            !t.party_invites.is_empty()
-        })
-        .await;
-        let party_id = trace.party_invites[0].0;
-        send(&mut member.connection, accept(party_id)).await;
-        until(&mut member.connection, &mut trace, |t| {
-            t.party_ops.contains(&OP_JOIN)
-        })
-        .await;
-    }
+    in_lobby(25, &[(item_id, quantity)]).await
 }
 
 /// What `player` is shown on talking to Cloto: one text page, and the
@@ -159,23 +74,7 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
     ];
     party(&mut team).await;
 
-    // In they go, once the party before them is out (tests/kpq.rs).
-    let name = team[0].character_name.clone();
-    for _ in 0..5 {
-        let trace = step(&mut team[0].connection, &name, talk(KPQ.lobby, LAKELIS)).await;
-        if trace.prompts == [(LAKELIS, 1)] {
-            break;
-        }
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
-    let mut seen = Some(step(&mut team[0].connection, &name, answer(1, 1, None)).await);
-    for player in team.iter_mut() {
-        let mut trace = seen.take().unwrap_or_default();
-        until(&mut player.connection, &mut trace, |t| {
-            t.warps.contains(&KPQ.entry)
-        })
-        .await;
-    }
+    enter_kpq(&mut team).await;
     let [leader, right, wrong] = &mut team[..] else {
         unreachable!()
     };

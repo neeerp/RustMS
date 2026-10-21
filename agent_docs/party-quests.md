@@ -2,10 +2,10 @@
 
 A party event is played in a copy of its maps of its own: an instance.
 Kerning City's party quest (KPQ) is the first. So far it has its entry,
-exit and timer, and stage 1: Cloto's quiz, its clear and the way on to
-stage 2. The other stages and rewards come next (see
-`v83ref/reports/a005-instancing-kpq.md`, section 3, and
-`a011-kpq-stage1.md`).
+exit and timer, stage 1 (Cloto's quiz), and stages 2 to 4 (her puzzles
+of areas to stand on), with their clears and the gates on. Stage 5 and
+the rewards come next (see `v83ref/reports/a005-instancing-kpq.md`,
+section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
 
 ## Rules
 
@@ -28,7 +28,7 @@ stage 2. The other stages and rewards come next (see
 | Owner | Holds |
 | --- | --- |
 | Directory | Which event each channel is playing, as `(channel, kind)` → id. There is one at a time per kind, like a GMS lobby. |
-| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, the members' handles, and the stages' progress (`Stage1`). It alone writes the stages cleared (`Cleared`, one bit per stage), shared with the tickets. |
+| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, the members' handles, and the stages' progress (`Stage1`, and `Puzzles` for stages 2-4). It alone writes the stages cleared (`Cleared`, one bit per stage), shared with the tickets. |
 | Field registry | The open instance ids. The fields of a copy are keyed by `FieldKey{channel, map, instance_id}`. |
 | Client actor (`client/events.rs`) | The member's `EventTicket`: the id, the kind, the end time, the event's handle, and the stages cleared. |
 
@@ -118,7 +118,40 @@ The client actor asks its ticket where the player stands
 as her page is shown (`Page::Act`, as in Cosmic, where the page and the
 items go in one call). The script's last effect, `Effect::EventCommand`,
 tells the event (`PassGiven`, `ClearStage(1)`) once the items have changed
-hands. Elsewhere, and outside an event, Cloto has nothing to say yet.
+hands. On stage 5, and outside an event, Cloto has nothing to say yet.
+
+## Stages 2 to 4
+
+On 103000801-803 the team must take three of the map's areas, one member
+to each (Cosmic `9020001`'s rope, platform and barrel stages):
+
+- The areas are the map's own (`Map.nx` `area`, `FieldTemplate::areas`,
+  in node order; `Area::contains` is half-open): 4 ropes, 5 platforms and
+  6 barrels.
+- A puzzle is three of them (`combos(n)`: the masks below `2^n` with three
+  bits, in order). It is drawn at the leader's first talk on the stage and
+  kept (`net::events::Puzzles`). `RUSTMS_KPQ_COMBO` pins the index into
+  `combos(n)`, from 0, on every stage; an index past a stage's last is
+  ignored there. The harness world pins 1, areas 0, 1 and 3.
+- A member who isn't the leader is told to follow the leader
+  (`Cloto::Follow`). The leader's first talk sets out the puzzle
+  (`Cloto::Intro`). Each later talk by the leader is an answer.
+- At the leader's later talks (`Cloto::Puzzle`) the client actor asks the
+  field where everyone in it stands (`FieldMessage::Positions`) and checks
+  them (`on_areas`): one occupant in each of the puzzle's areas and nobody
+  in another, each counted in the first area holding them. Only the
+  event's members can be in its copy.
+- Wrong, everyone on the map is shown FIELD_EFFECT 3
+  `quest/party/wrong_kor` and hears 4 `Party1/Failed`, and Cloto says so.
+  Right, her page (`NpcScript::cloto_answer`) runs
+  `EventCommand::ClearStage(stage)`, which the event takes only from the
+  leader, for a stage whose puzzle has been set.
+- Once the stage is cleared, Cloto tells everyone so.
+
+Where a player stands is only what their client last sent in MOVE_PLAYER.
+A client may hold back moves in the air or on a rope until it lands, so a
+member hanging still on a rope may still count where they last stood
+(`v83ref/reports/a018-kpq-stage-facts.md`).
 
 ## Clearing a stage
 
@@ -149,7 +182,7 @@ portal is closed for now." line, which also unlocks it
 | NPC | Where | Script |
 | --- | --- | --- |
 | Lakelis 9020000 | 103000000 | Runtime (`talk_about_event`), like Heracle |
-| Cloto 9020001 | 103000800 | Runtime (`talk_to_cloto`): stage 1's quiz |
+| Cloto 9020001 | 103000800-803 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles |
 | Nella 9020002 | 103000800-805 | Out to 103000890 |
 | Nella 9020002 | 103000890 | Home to 103000000 |
 
@@ -160,7 +193,7 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 
 These are not done yet:
 
-- Cloto's stages after the first.
+- Stage 5, Cloto's last stage.
 - Rewards and the bonus stage.
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it.

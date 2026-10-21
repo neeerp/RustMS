@@ -3,6 +3,7 @@ pub mod config;
 pub mod connection;
 pub mod database;
 pub mod error;
+pub mod events;
 pub mod handshake;
 pub mod hunting;
 pub mod packets;

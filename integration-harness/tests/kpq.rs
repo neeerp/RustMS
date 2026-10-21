@@ -5,100 +5,16 @@
 //! up. The harness world runs events 60 times as fast
 //! (`RUSTMS_EVENT_SCALE`), so the quest lasts 30 seconds.
 
-use game_data::GameData;
-use integration_harness::database::set_job;
-use integration_harness::preconditions::load_harness_config_or_fail;
+use integration_harness::events::{in_lobby, party, talk, LAKELIS, NELLA};
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, send, step, until, warp, Trace};
-use integration_harness::{login_to_world_session, relogin, WorldSession};
+use integration_harness::trace::{read_for, step, until, warp, Trace};
+use integration_harness::WorldSession;
 use net::events::KPQ;
-use net::packet::op::RecvOpcode;
-use packet::io::write::PktWrite;
-use packet::Packet;
-use std::path::Path;
-use std::sync::OnceLock;
 use tokio::time::Duration;
-
-const LAKELIS: i32 = 9020000;
-const NELLA: i32 = 9020002;
-const OP_JOIN: u8 = 0x0F;
-
-fn maps() -> &'static GameData {
-    static MAPS: OnceLock<GameData> = OnceLock::new();
-    MAPS.get_or_init(|| {
-        GameData::load_from_nx_map(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
-        )
-        .unwrap()
-    })
-}
-
-fn talk(map: i32, npc: i32) -> Packet {
-    let index = maps()
-        .field(map)
-        .unwrap()
-        .map_npcs
-        .iter()
-        .position(|n| n.npc_id == npc)
-        .unwrap();
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
-    p.write_int(1_000_000_000 + index as i32).unwrap();
-    p
-}
-
-fn party_operation(op: u8) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::PartyOperation as i16).unwrap();
-    p.write_byte(op).unwrap();
-    p
-}
-
-fn invite(name: &str) -> Packet {
-    let mut p = party_operation(4);
-    p.write_str_with_length(name).unwrap();
-    p
-}
-
-fn accept(party_id: i32) -> Packet {
-    let mut p = party_operation(3);
-    p.write_int(party_id).unwrap();
-    p
-}
 
 /// A new character at `level`, logged in and waiting in Kerning City.
 async fn player(level: i16) -> WorldSession {
-    let config = load_harness_config_or_fail().await;
-    let id = login_to_world_session(&config).await.unwrap().character_id;
-    drop(relogin(&config).await);
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    set_job(id, 0, level, 50).await.unwrap();
-    let mut session = relogin(&config).await;
-    let mut trace = Trace::default();
-    assert_eq!(
-        warp(&mut session.connection, KPQ.lobby, "", &mut trace).await,
-        KPQ.lobby
-    );
-    session
-}
-
-/// The first player invites the rest into a party.
-async fn party(players: &mut [WorldSession]) {
-    let (leader, members) = players.split_first_mut().unwrap();
-    for member in members {
-        send(&mut leader.connection, invite(&member.character_name)).await;
-        let mut trace = Trace::default();
-        until(&mut member.connection, &mut trace, |t| {
-            !t.party_invites.is_empty()
-        })
-        .await;
-        let party_id = trace.party_invites[0].0;
-        send(&mut member.connection, accept(party_id)).await;
-        until(&mut member.connection, &mut trace, |t| {
-            t.party_ops.contains(&OP_JOIN)
-        })
-        .await;
-    }
+    in_lobby(level, &[]).await
 }
 
 /// What `player` is told on talking to `npc` on `map`: the NPC and the

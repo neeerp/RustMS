@@ -16,7 +16,9 @@
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
-use net::events::{draw_question, Cloto, EventCommand, EventKind, Stage1, Team};
+use net::events::{
+    draw_combo, draw_question, Cloto, EventCommand, EventKind, Puzzles, Stage1, Team,
+};
 use net::ClientId;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -35,10 +37,12 @@ const EVENT_QUEUE_CAPACITY: usize = 64;
 pub enum EventMessage {
     /// `client_id` left the event's maps, the party, or the game.
     Left { client_id: ClientId },
-    /// `client_id` talks to Cloto on the first stage.
+    /// `client_id` talks to Cloto on `stage`; she has nothing to say on a
+    /// stage without a part for her.
     Cloto {
         client_id: ClientId,
-        reply: oneshot::Sender<Cloto>,
+        stage: u8,
+        reply: oneshot::Sender<Option<Cloto>>,
     },
     /// `client_id`'s script did something the event keeps track of.
     Command {
@@ -57,10 +61,9 @@ impl Cleared {
         bit(stage).is_some_and(|bit| self.0.load(Ordering::Acquire) & bit != 0)
     }
 
-    fn set(&self, stage: u8) {
-        if let Some(bit) = bit(stage) {
-            self.0.fetch_or(bit, Ordering::Release);
-        }
+    /// Returns whether `stage` was not cleared before.
+    fn set(&self, stage: u8) -> bool {
+        bit(stage).is_some_and(|bit| self.0.fetch_or(bit, Ordering::Release) & bit == 0)
     }
 }
 
@@ -108,19 +111,20 @@ impl EventTicket {
         self.cleared.has(stage)
     }
 
-    /// Where the member stands with Cloto, or `None` once the event is
-    /// over.
-    pub async fn cloto(&self) -> Option<Cloto> {
+    /// Where the member stands with Cloto on `stage`, or `None` if she has
+    /// nothing to say there or the event is over.
+    pub async fn cloto(&self, stage: u8) -> Option<Cloto> {
         let (reply, view) = oneshot::channel();
         self.event
             .tx
             .send(EventMessage::Cloto {
                 client_id: self.member,
+                stage,
                 reply,
             })
             .await
             .ok()?;
-        view.await.ok()
+        view.await.ok().flatten()
     }
 
     /// Tell the event what the member's script did.
@@ -174,6 +178,7 @@ pub fn spawn(
             .map(|member| (member.client_id, member))
             .collect(),
         stage1: Stage1::default(),
+        puzzles: Puzzles::default(),
         cleared: Arc::default(),
     };
     // However it ends, even by a panic, its members are sent out, the copy
@@ -205,6 +210,7 @@ struct EventActor {
     team: Team,
     members: HashMap<ClientId, ClientHandle>,
     stage1: Stage1,
+    puzzles: Puzzles,
     cleared: Arc<Cleared>,
 }
 
@@ -230,8 +236,8 @@ impl EventActor {
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
-                    Some(EventMessage::Cloto { client_id, reply }) => {
-                        let _ = reply.send(self.stage1.talk(client_id, &self.team, draw_question));
+                    Some(EventMessage::Cloto { client_id, stage, reply }) => {
+                        let _ = reply.send(self.cloto(client_id, stage));
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
@@ -254,26 +260,58 @@ impl EventActor {
         sleep(GRACE).await;
     }
 
+    fn cloto(&mut self, client_id: ClientId, stage: u8) -> Option<Cloto> {
+        if !self.team.has(client_id) {
+            return None;
+        }
+        let event = self.kind.event();
+        if stage == 1 {
+            return Some(self.stage1.talk(client_id, &self.team, draw_question));
+        }
+        if !event.puzzles.contains(&stage) {
+            return None;
+        }
+        let cleared = self.cleared.has(stage);
+        let draw = || {
+            let map_id = event.stage_map(stage);
+            let field = net::get_game_data().ok()?.field(map_id)?;
+            draw_combo(field.areas.len())
+        };
+        Some(
+            self.puzzles
+                .talk(stage, client_id, &self.team, cleared, draw),
+        )
+    }
+
     fn command(&mut self, client_id: ClientId, command: EventCommand) {
         if !self.team.has(client_id) {
             return;
         }
+        let leader = client_id == self.team.leader();
+        let puzzles = &self.kind.event().puzzles;
         match command {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
-            EventCommand::ClearStage(1) if client_id == self.team.leader() => {
+            EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {
                     self.clear(1);
                 }
+            }
+            EventCommand::ClearStage(stage)
+                if leader && puzzles.contains(&stage) && self.puzzles.set(stage) =>
+            {
+                self.clear(stage);
             }
             EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
         }
     }
 
     /// The way on from `stage` opens before anyone hears of the clear, so a
-    /// member who sees it can go through.
+    /// member who sees it can go through. A stage clears once.
     fn clear(&self, stage: u8) {
+        if !self.cleared.set(stage) {
+            return;
+        }
         info!(kind = ?self.kind, id = self.id, stage, "Stage cleared");
-        self.cleared.set(stage);
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::StageCleared { id: self.id, stage });
@@ -289,14 +327,12 @@ mod tests {
     #[test]
     fn cleared_keeps_one_bit_per_stage() {
         let cleared = Cleared::default();
-        cleared.set(1);
-        cleared.set(3);
+        assert!(cleared.set(1) && cleared.set(3) && !cleared.set(1));
         assert!(cleared.has(1) && !cleared.has(2) && cleared.has(3));
         // Stages are counted from 1, and eight fit.
-        cleared.set(0);
-        cleared.set(9);
+        assert!(!cleared.set(0) && !cleared.set(9));
         assert!(!cleared.has(0) && !cleared.has(9) && !cleared.has(8));
-        cleared.set(8);
+        assert!(cleared.set(8));
         assert!(cleared.has(8));
     }
 }

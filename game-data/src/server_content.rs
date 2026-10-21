@@ -189,6 +189,12 @@ pub mod keys {
     pub const KPQ_CLOTO_LEADER_SHORT: &str = "kpq.cloto.leader_short";
     pub const KPQ_CLOTO_FULL: &str = "kpq.cloto.full";
     pub const KPQ_CLOTO_REFUSED: &str = "kpq.cloto.refused";
+    pub const KPQ_CLOTO_FOLLOW: &str = "kpq.cloto.follow";
+    pub const KPQ_CLOTO_S2_INTRO: &str = "kpq.cloto.s2.intro";
+    pub const KPQ_CLOTO_S3_INTRO: &str = "kpq.cloto.s3.intro";
+    pub const KPQ_CLOTO_S4_INTRO: &str = "kpq.cloto.s4.intro";
+    pub const KPQ_CLOTO_AREAS_WRONG: &str = "kpq.cloto.areas_wrong";
+    pub const KPQ_CLOTO_AREAS_RIGHT: &str = "kpq.cloto.areas_right";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -734,6 +740,12 @@ mod tests {
             keys::KPQ_CLOTO_LEADER_SHORT,
             keys::KPQ_CLOTO_FULL,
             keys::KPQ_CLOTO_REFUSED,
+            keys::KPQ_CLOTO_FOLLOW,
+            keys::KPQ_CLOTO_S2_INTRO,
+            keys::KPQ_CLOTO_S3_INTRO,
+            keys::KPQ_CLOTO_S4_INTRO,
+            keys::KPQ_CLOTO_AREAS_WRONG,
+            keys::KPQ_CLOTO_AREAS_RIGHT,
             keys::JEFF_INTRO,
             keys::JEFF_ASK,
             keys::JEFF_DECLINE,

@@ -38,6 +38,8 @@ pub struct Event {
     /// cleared. Every stage map has a `gate` object, shown once its stage is
     /// cleared.
     pub gated: RangeInclusive<i32>,
+    /// The stages cleared by standing on their maps' areas (`on_areas`).
+    pub puzzles: RangeInclusive<u8>,
     /// Items of use only in the event, taken from whoever leaves it.
     pub items: &'static [i32],
 }
@@ -45,7 +47,8 @@ pub struct Event {
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
 /// `FieldSet.img/Party1`: maps 103000800-805, 30 minutes). Stage EXP is
 /// Cosmic's; `next00` leads on from 103000800-803, and 800-804 each have a
-/// `gate` object (Map.nx).
+/// `gate` object (Map.nx). Stages 2 to 4 are Cloto's ropes, platforms and
+/// barrels.
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
@@ -56,6 +59,7 @@ pub const KPQ: Event = Event {
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
     gated: 103_000_800..=103_000_803,
+    puzzles: 2..=4,
     items: &[COUPON, PASS],
 };
 
@@ -236,11 +240,20 @@ pub const PASS: i32 = 4001008;
 /// level a magician needs.
 pub const ANSWERS: [i32; 7] = [10, 35, 20, 25, 25, 30, 8];
 
-/// Where a player stands with Cloto on stage 1.
+/// Where a player stands with Cloto on a stage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cloto {
-    /// The leader handed in the passes; the way on is open.
+    /// The stage is cleared; the way on is open.
     Cleared,
+    /// A member other than the leader on a puzzle stage, which is the
+    /// leader's to answer.
+    Follow,
+    /// The leader, on first talking to her on puzzle stage `stage`: she sets
+    /// the puzzle.
+    Intro { stage: u8 },
+    /// The leader, answering puzzle stage `stage`: the team must stand as
+    /// `combo` asks (`on_areas`).
+    Puzzle { stage: u8, combo: u32 },
     /// The leader, who needs a pass from each of the others.
     Leader { needed: i32 },
     /// Another member, asked `question` (an index into `ANSWERS`), told it
@@ -308,6 +321,67 @@ pub fn draw_question() -> usize {
             .map(|question| question - 1)
     });
     pinned.unwrap_or_else(|| rand::random::<usize>() % ANSWERS.len())
+}
+
+/// Stages 2 to 4 of Kerning City's party quest: the leader's team stands
+/// on three of the map's areas, the right three, which are drawn when the
+/// leader first talks to Cloto there (Cosmic `9020001`). Only the leader
+/// may answer, as often as they like.
+#[derive(Debug, Default)]
+pub struct Puzzles {
+    combos: HashMap<u8, u32>,
+}
+
+impl Puzzles {
+    /// `who` talks to Cloto on puzzle stage `stage`, cleared or not. The
+    /// leader's first talk `draw`s the stage's combo, if it can be drawn.
+    pub fn talk(
+        &mut self,
+        stage: u8,
+        who: ClientId,
+        team: &Team,
+        cleared: bool,
+        draw: impl FnOnce() -> Option<u32>,
+    ) -> Cloto {
+        if cleared {
+            return Cloto::Cleared;
+        }
+        if who != team.leader() {
+            return Cloto::Follow;
+        }
+        if let Some(&combo) = self.combos.get(&stage) {
+            return Cloto::Puzzle { stage, combo };
+        }
+        if let Some(combo) = draw() {
+            self.combos.insert(stage, combo);
+        }
+        Cloto::Intro { stage }
+    }
+
+    /// Whether the puzzle of `stage` has been set, so may be answered.
+    pub fn set(&self, stage: u8) -> bool {
+        self.combos.contains_key(&stage)
+    }
+}
+
+/// A combo for a puzzle stage with `areas` areas: random, or the one
+/// `RUSTMS_KPQ_COMBO` (from 0, in `combos`' order) names for testing.
+/// `None` for a map without enough areas.
+pub fn draw_combo(areas: usize) -> Option<u32> {
+    static PINNED: OnceLock<Option<usize>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        std::env::var("RUSTMS_KPQ_COMBO")
+            .ok()
+            .and_then(|combo| combo.parse::<usize>().ok())
+    });
+    let count = combos(areas).count();
+    if count == 0 {
+        return None;
+    }
+    let index = pinned
+        .filter(|index| *index < count)
+        .unwrap_or_else(|| rand::random::<usize>() % count);
+    combos(areas).nth(index)
 }
 
 /// How many of a stage's areas the team must stand on, on Kerning City's
@@ -427,6 +501,54 @@ mod tests {
         assert_eq!(KPQ.duration(), Duration::from_secs(30 * 60));
         assert!(KPQ.holds(103_000_800) && KPQ.holds(103_000_805));
         assert!(!KPQ.holds(KPQ.exit) && !KPQ.holds(KPQ.lobby));
+    }
+
+    #[test]
+    fn the_leader_answers_cloto_s_puzzles_drawn_at_their_first_talk() {
+        let team = Team::new(&KPQ, 1, vec![1, 2, 3]);
+        let mut puzzles = Puzzles::default();
+        let mut draws = 0;
+        let mut draw = |combo| {
+            draws += 1;
+            Some(combo)
+        };
+
+        assert_eq!(puzzles.talk(2, 2, &team, false, || draw(7)), Cloto::Follow);
+        assert!(!puzzles.set(2));
+        assert_eq!(
+            puzzles.talk(2, 1, &team, false, || draw(7)),
+            Cloto::Intro { stage: 2 }
+        );
+        assert!(puzzles.set(2) && !puzzles.set(3));
+        for _ in 0..2 {
+            assert_eq!(
+                puzzles.talk(2, 1, &team, false, || draw(11)),
+                Cloto::Puzzle { stage: 2, combo: 7 }
+            );
+        }
+        // Each stage has its own.
+        assert_eq!(
+            puzzles.talk(3, 1, &team, false, || draw(11)),
+            Cloto::Intro { stage: 3 }
+        );
+        assert_eq!(
+            puzzles.talk(3, 1, &team, false, || draw(7)),
+            Cloto::Puzzle {
+                stage: 3,
+                combo: 11
+            }
+        );
+        assert_eq!(draws, 2);
+        assert_eq!(puzzles.talk(2, 1, &team, true, || None), Cloto::Cleared);
+        assert_eq!(puzzles.talk(2, 3, &team, true, || None), Cloto::Cleared);
+        // A map without areas sets no puzzle.
+        assert_eq!(
+            puzzles.talk(4, 1, &team, false, || None),
+            Cloto::Intro { stage: 4 }
+        );
+        assert!(!puzzles.set(4));
+        assert_eq!(draw_combo(2), None);
+        assert!(draw_combo(4).is_some_and(|combo| combos(4).any(|c| c == combo)));
     }
 
     #[test]
