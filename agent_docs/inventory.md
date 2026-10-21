@@ -803,6 +803,80 @@ items on the right; one tab picks the bag for both. Clicking a selected row
 again takes it out or stores it, like the shop. The v83 prompts are reproduced
 except karma. Stored equips show their name and icon but not their stats.
 
+## Duey
+
+Duey (9010009, in each town's post office) carries mesos and one stack of
+an item to another character, online or not (`v83ref` report b028). A
+parcel is a `parcels` row with the receiver's id, the sender's name, the
+mesos, the item columns as storage keeps them, and for a quick delivery its
+message. Equipment stats go in `parcel_equipment_stats`. Both go with the
+receiving character. `db::parcel` loads, sends, claims, deletes and announces
+parcels. `net::duey` holds the rules and `ClientActor` (`client/duey.rs`)
+holds which window is open.
+
+PARCEL (`0x142`) starts with a mode byte:
+
+- **Open** (`0x08`): a receive-only flag, then a count byte and the parcels
+  waiting, then a count byte and those that expired. A parcel is a fixed
+  record (id, a 13-byte sender, mesos, a FILETIME, a has-message int, a
+  200-byte message, quick, has-item) and then the item without a position.
+- **Removed** (`0x17`): id and why, 3 deleted or 4 claimed.
+- **Arrived** (`0x19`): the sender's name and quick, for an online receiver.
+- **Quick send** (`0x1a`): opens the window from a coupon.
+- **Waiting** (`0x1b`): quick, on entering the game.
+- **Results** (`0x0a`..`0x16`): `net::duey::result`. Each one also lets
+  the window take requests again.
+
+The client throws if an open (`0x08` or `0x1a`) arrives while its window is
+up, so the server keeps `duey: Option<DueyWindow>`. It is set on open and
+cleared only by DUEY_ACTION op 7, so a second open sends nothing. The
+client's FILETIME is when the parcel expires, which is 30 days after it was
+sent: the window counts the days left and calls a parcel still "on its way"
+if it is 30 or more days off. A new parcel can be claimed at once.
+
+DUEY_ACTION (`0x41`) starts with an op byte:
+
+- **Open** (0): from the notifier of a quick delivery. Talking to Duey
+  opens the window too.
+- **Send** (2: bag, slot, quantity, mesos, receiver, quick; if quick, a
+  message and the coupon's slot): needs the window the send came from. A
+  normal send costs 5000 plus a tax on the mesos (`net::duey::tax`: nothing
+  below 100,000, then 0.8% rising to 6%). A quick send uses up a Quick
+  Delivery Coupon (5330000) found in the Cash bag instead of the 5000. Its
+  message is at most 100 characters. Refusals:
+  - an unknown receiver or the sender themself gets `0x0c`, and another
+    character of the same account `0x0d`;
+  - a receiver with 10 parcels waiting gets `0x0e`, and one with the same
+    one-of-a-kind item waiting `0x10`;
+  - at level 15 or below, more than 1,000,000 mesos in one send gets
+    `0x11`;
+  - too few mesos gets `0x0a`;
+  - anything else wrong (bad slot or quantity, an item that can't go,
+    nothing chosen, no coupon) gets `0x0b`.
+  What may go is what storage takes (no cash items), but not items that
+  expire or are bound to an account, a party quest or a session. Stars,
+  bullets and equipment go whole. Karma is used up on sending.
+- **Claim** (4: id) and **delete** (5: id): an id that isn't waiting gets
+  `0x13`. A claim may also get a full bag `0x15`, or `0x16` for a
+  one-of-a-kind item the player has.
+- **Close** (7).
+
+The cost leaves the player, and the claimed parcel comes to them, in one
+transaction with saving the player (`db::parcel::send`, `claim`). The send
+locks the receiver's row, so two senders can't both fill the last place. If
+saving fails or is refused, the player is put back as they were. Using a
+coupon opens a quick send (`0x1a`); with a window already open it gets an
+empty stat update.
+
+Parcels expire lazily. Opening the window deletes any older than 30 days
+and lists them as expired. On entering the game the player gets `0x1b` if
+any parcel hasn't been announced, and they are then all marked announced.
+An online receiver is told at once (`0x19`), through the directory, and the
+parcel is marked announced. Not done: mode `0x18`, which adds a parcel to an
+open window (the receiver sees it on the next open), the GM refusal, a
+per-day limit for low levels, and the client's Duey window (HeavenClient has
+none yet).
+
 ## Trading
 
 Two players on one map trade in a trading room (mini room type 3). The
@@ -1004,6 +1078,17 @@ opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items
 out, and after a relogin finds both sides saved. The client's
 `storage_contents` test reads the contents of each kind of result.
+`net::duey` covers the tax, what may be sent, each send and claim refusal,
+and what a send and a claim take and give; `parcel` covers the record
+layout and the other modes, and the Duey handler parses every op. `duey`
+(integration) has two tests:
+
+- The first is refused a missing receiver and the sender themself. It
+  sends potions and mesos less the fee to an offline character, then is
+  refused too few mesos. The receiver hears of the parcel on entering the
+  game, claims it, and is refused a second claim.
+- The second sends a quick delivery with a coupon to an online character,
+  who hears of it at once, finds its message, and deletes it.
 
 Trading is tested at three levels:
 
