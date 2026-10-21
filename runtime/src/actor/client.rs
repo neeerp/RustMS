@@ -5,6 +5,7 @@ mod dialogue;
 mod door;
 mod expiry;
 mod fame;
+mod guild_bbs;
 mod guilds;
 mod hazard;
 mod loot;

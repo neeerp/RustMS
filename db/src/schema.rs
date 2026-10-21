@@ -422,6 +422,33 @@ diesel::table! {
     }
 }
 diesel::joinable!(gift_replies -> cash_items (cash_item_id));
+diesel::table! {
+    guild_bbs_threads (id) {
+        id -> Int4,
+        guild_id -> Int4,
+        local_id -> Int4,
+        poster_id -> Int4,
+        #[max_length = 25]
+        title -> Varchar,
+        body -> Text,
+        icon -> Int2,
+        posted_at -> Timestamp,
+    }
+}
+diesel::joinable!(guild_bbs_threads -> guilds (guild_id));
+diesel::joinable!(guild_bbs_threads -> characters (poster_id));
+diesel::table! {
+    guild_bbs_replies (id) {
+        id -> Int4,
+        thread_id -> Int4,
+        poster_id -> Int4,
+        #[max_length = 25]
+        text -> Varchar,
+        posted_at -> Timestamp,
+    }
+}
+diesel::joinable!(guild_bbs_replies -> guild_bbs_threads (thread_id));
+diesel::joinable!(guild_bbs_replies -> characters (poster_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -452,4 +479,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     pets,
     notes,
     gift_replies,
+    guild_bbs_threads,
+    guild_bbs_replies,
 );

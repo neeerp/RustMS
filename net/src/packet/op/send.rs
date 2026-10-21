@@ -38,6 +38,8 @@ pub enum SendOpcode {
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     GuildOperation = 0x41,
+    /// The guild bulletin board's list and threads (0x816c32).
+    GuildBbs = 0x3B,
     NotifyLevelUp = 0x69,
     NotifyJobChange = 0x6B,
     MonsterBookSetCard = 0x53,

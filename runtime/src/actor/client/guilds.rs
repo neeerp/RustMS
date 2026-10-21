@@ -123,6 +123,7 @@ impl ClientActor {
                 let to = spawn_db(move || db::guild::set_notice(guild_id, cid, &notice)).await?;
                 self.tell_guild(to, packet, "Guild notice").await
             }
+            GuildRequest::Bbs(request) => self.bbs_request(request).await,
         }
     }
 

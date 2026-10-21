@@ -148,6 +148,8 @@ pub struct Trace {
     pub guild_chat: Vec<(String, String)>,
     /// Every GUILD_OPERATION body (mode first), in order.
     pub guild_ops: Vec<Vec<u8>>,
+    /// Each GUILD_BBS packet's body, from its mode on.
+    pub bbs: Vec<Vec<u8>>,
     /// GUILD_NAME_CHANGED: (character, guild name).
     pub guild_names: Vec<(i32, String)>,
     /// GUILD_MARK_CHANGED: (character, [background, its colour, mark, its
@@ -510,6 +512,8 @@ impl Trace {
             self.char_boxes.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildOperation as i16 {
             self.guild_ops.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::GuildBbs as i16 {
+            self.bbs.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::NotifyLevelUp as i16 || op == SendOpcode::NotifyJobChange as i16
         {
             let (kind, value) = (r.read_byte().unwrap(), r.read_int().unwrap());

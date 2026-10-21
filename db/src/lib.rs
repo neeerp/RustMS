@@ -24,6 +24,7 @@ pub mod cash_shop;
 pub mod character;
 pub mod fame;
 pub mod guild;
+pub mod guild_bbs;
 pub mod keybinding;
 pub mod note;
 pub mod pet;

@@ -50,6 +50,8 @@ pub enum RecvOpcode {
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,
+    /// The guild bulletin board (FUN_008166f6 and its siblings).
+    GuildBbs = 0x9B,
     FaceExpression = 0x33,
     UseItemEffect = 0x34,
     Whisper = 0x78,
