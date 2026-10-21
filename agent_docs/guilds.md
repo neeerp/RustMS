@@ -4,8 +4,8 @@ A guild is a named group of up to its capacity of characters, founded at
 Heracle in the Orbis guild headquarters. Members see the guild's name and
 emblem under each other's names, the stat window and character info show it,
 and guild chat reaches the members online. The master and the Jr. Masters
-invite players on their channel; members leave, and are expelled. Nothing
-else about a guild changes in game yet.
+invite players on their channel, move members a rank up or down, and post
+the notice; the master names the ranks. Members leave, and are expelled.
 
 ## Server
 
@@ -17,8 +17,10 @@ case (a unique index on `lower(name)`).
 - `game::guild` has the model (`Guild`, `GuildMember`, `GuildTag`,
   `Emblem`) and the server-only rules: founding needs level 10 and costs
   1,500,000 mesos (HeavenMS defaults; the client checks neither), and names
-  follow the character name rules (4 to 12 ASCII letters or digits). A new
-  guild has capacity 10 and the titles Master, Jr. Master and Member.
+  follow the character name rules (4 to 12 ASCII letters or digits, with
+  fewer than four of 'I' and 'l', and none of the forbidden words in
+  `Etc.nx`, `net::names::forbidden_names`). A new guild has capacity 10 and the
+  titles Master, Jr. Master, Member, Member and Member.
 - `Player::guild` is the guild's tag (id, name, emblem), loaded with the
   player. `FieldAvatar` carries it, so `SPAWN_PLAYER` shows it to others;
   `CHAR_INFO` shows the name.
@@ -30,8 +32,9 @@ case (a unique index on `lower(name)`).
   `game-data/server_content.toml`).
 - `GUILD_OPERATION` (`net/src/packet/handle/world/guild.rs`) becomes a
   `GuildRequest`: reload (mode 0), create with a name (2), invite by name
-  (5), accept an invitation (6), leave (7), or expel (8). Other modes are
-  ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
+  (5), accept an invitation (6), leave (7), expel (8), set the five titles
+  (0x0D), move a member to a rank (0x0E, the id and a byte), or post the
+  notice (0x10). Other modes are ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
   the client was busy, 0x36 when it already shows one, 0x37 when declined.
 - The client actor (`runtime/src/actor/client/guilds.rs`) founds the guild
   only while `naming_guild` is set, so a forged create does nothing. It
@@ -54,8 +57,9 @@ case (a unique index on `lower(name)`).
   refused with 0x36 while one is waiting. A refusal reaches the inviter
   once, as 0x35, 0x36 or 0x37 with the invitee's name.
 - Accepting an invitation that is still waiting tells the invitee's actor
-  to join. `db::guild::add_member` adds them at rank 5, locking the guild so
-  it can't pass its capacity (0x29 when full). Every member online gets
+  to join. `db::guild::add_member` adds them at the lowest rank with a title
+  (`Guild::lowest_rank`, the client's FUN_00a3930b; rank 5 with the default
+  titles), locking the guild so it can't pass its capacity (0x29 when full). Every member online gets
   0x27 with the newcomer's record, the newcomer included; their client asks
   for the whole guild again (mode 0).
 - Leaving (anyone but the master) sends 0x2C to the members and the leaver.
@@ -64,6 +68,23 @@ case (a unique index on `lower(name)`).
   Master. 0x2F goes to every member, the expelled one included, and their
   actor, if online, reads their guild again (`DirectoryMessage::GuildChanged`).
   Either way the map sees the name and emblem go.
+- Ranks, titles and the notice change under the guild's lock
+  (`db::guild::set_rank`, `set_titles`, `set_notice`) if the client's own
+  rules allow it, which it checks before sending:
+  - `Guild::may_change_rank`: the master moves members ranked 2 and lower,
+    a Jr. Master those ranked 3 and lower, one step at a time, and nobody
+    goes down past the lowest rank with a title.
+  - `Guild::may_set_titles`: only the master; ranks 1 to 3 keep a title,
+    titles are guild names of at most 10 letters (forbidden words
+    included), title 5 needs title 4, and no member is left below the
+    lowest titled rank. Titles sent back unchanged aren't checked again;
+    the default "Master" holds the forbidden word "master".
+  - `Guild::may_set_notice`: the master or a Jr. Master, 1 to 100 bytes,
+    with no control characters but CR and LF, as the client's prompt
+    allows. The client censors bad words with `*`; the server doesn't.
+  - Every member online then gets 0x40 (id, rank), 0x3E (the titles) or
+    0x44 (the notice). A change the client wouldn't send is logged and
+    dropped.
 - Guild chat is the guild mode (2) of `MULTICHAT`. The server ignores the
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
@@ -80,8 +101,9 @@ ints. The client takes the first member for the master.
   with the mark centred on it).
 - `Net/Handlers/GuildHandlers` applies `GUILD_OPERATION` (65):
   - 0x01 asks for the name with `UIEnterText` (v83 uses a UtilDlgEx input).
-    Too short or not allowed says so and asks again; cancel sends nothing.
-    The client's forbidden word list isn't in HeavenClient.
+    Too short or not allowed (`Util/CharacterName.h` and the forbidden
+    words, `CurseData::in_name`) says so and asks again; cancel sends
+    nothing.
   - 0x1A replaces the guild; 0x20 does too, and Heracle congratulates the
     master while other members get a chat line.
   - 0x1C has Heracle say the name is taken, then asks again. 0x21, 0x23,
@@ -96,6 +118,12 @@ ints. The client takes the first member for the master.
     clear the guild if it is the player. These three only count for the
     player's guild. 0x28, 0x29, 0x2A, 0x2D, 0x30 and the refusals 0x35 to
     0x37 are chat lines.
+  - For the player's guild only: 0x3E stores the titles, and the master
+    gets "It is saved."; 0x40 moves a member and says "[name]'s position
+    has been changed to [title]." with the new rank's title; 0x44 stores
+    the notice, an empty one clearing it, and prints "* Guild Notice :
+    <notice>" unless it is empty. v83 prints every guild line in its type
+    0xc colour, which is `LineType::SKILL`.
 - `IO/GuildCommands` has v83's checks before asking the server:
   - `/guildinfo` lists every member, online or not, and says if the player
     is the master.
@@ -127,18 +155,44 @@ ints. The client takes the first member for the master.
     to lead a party.
   - INVITE (the master and Jr. Masters) asks for a name, LEAVE (anyone but
     the master) and EXPEL run the commands. EXPEL needs a picked member
-    the player may expel (`Guild::may_kick`), online or not. The other six
-    buttons are always disabled for now.
+    the player may expel (`Guild::may_kick`), online or not.
+  - UP and DOWN move the picked member a rank without asking
+    (`Guild::may_raise`, `may_lower`): the master raises members ranked 3
+    and lower and lowers anyone else, a Jr. Master raises those ranked 4
+    and lower and lowers those ranked 3 and lower, and nobody is lowered
+    from the lowest rank with a title.
+  - NOTICE (the master and Jr. Masters) asks for up to 100 letters; OK
+    trims them, censors bad words with `*` (`CurseData::filter`) and sends
+    them unless nothing is left.
+  - INFO, with a guild, opens or closes the rank panel (`GuildGrade` art)
+    beside the window, at (311, 86): the guild's GP, then a row per rank
+    with its number, its title and its fixed name (Master, Jr.Master,
+    Member), the name grey while the rank has no title. Anyone may pick a
+    row. The master's MODIFY asks for the picked rank's title: ranks 1 to
+    3 need 4 letters, 4 and 5 may be emptied unless a member holds the
+    rank (or, for 4, rank 5 has a title); a title follows the guild name
+    rules, with 10 letters at most. Giving rank 5 a title names an empty
+    rank 4 "Member". SAVE asks first, then sends the titles if any differ,
+    ignoring case, or says "It is saved.". The panel edits a copy of the
+    titles taken when it opens; it closes with the window, on Esc, or on
+    another tab. Leaving the guild leaves it open with only its
+    background.
+  - Clicking a tab, even the one shown, drops the guild pick.
+  - WHERE and BBS stay disabled: there is no member search or guild board.
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),
     so the tab adds the origin back.
 
 ## Not implemented
 
-- Rank changes and disbanding.
+- Disbanding.
 - The card's option to refuse all invitations, and the blacklist, which
   v83 also checks before showing one.
-- Editing the notice, titles, or emblem; raising the capacity.
+- Making the emblem; raising the capacity.
+- The rank panel's slide in and out. v83 keeps the panel's edits if it is
+  opened again while sliding back; this one always starts over. A title
+  too short closes the prompt, says so and asks again, where v83's prompt
+  stays open.
 - Telling members when someone logs in or out, levels up, or changes job:
   the window shows who was online when the player entered the game.
 - Guild points, the guild BBS, alliances, and the guild quest.

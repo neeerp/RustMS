@@ -1,5 +1,6 @@
 #include "../Character/Guild.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -106,14 +107,59 @@ int main()
 		require(!Guild::may_kick(2, 2) && Guild::may_kick(2, 3), "a Jr. Master expels the ranks below");
 		require(!Guild::may_kick(3, 4) && !Guild::may_kick(1, 0), "members don't, and not without a pick");
 
+		// Alice (1) is the master and Carol (3) holds rank 5, which has no
+		// title; ranks 4 and 5 have none.
+		require(guild.lowest_rank() == 3, "rank 3 is the lowest with a title");
+		require(guild.rank_held(1) && guild.rank_held(5) && !guild.rank_held(2), "ranks held");
+
+		require(Guild::may_raise(1, 3) && Guild::may_raise(1, 5) && !Guild::may_raise(1, 2), "the master raises up to Jr. Master");
+		require(Guild::may_raise(2, 4) && !Guild::may_raise(2, 3), "a Jr. Master raises up to Member");
+		require(!Guild::may_raise(3, 5) && !Guild::may_raise(1, 0), "members don't, and not without a pick");
+		require(guild.may_lower(1, 2) && !guild.may_lower(1, 3), "no one is lowered from the lowest rank");
+		require(!guild.may_lower(2, 2) && !guild.may_lower(1, 1) && !guild.may_lower(3, 4), "nor the master, nor by members");
+
+		std::array<std::string, 5> working = guild.get_data().titles;
+		require(Guild::min_title(3) == 4 && Guild::min_title(4) == 0, "ranks 1 to 3 need a title");
+		require(guild.check_title(working, 1, "ab") == Guild::Title::TOO_SHORT, "a short title");
+		require(guild.check_title(working, 3, "") == Guild::Title::TOO_SHORT, "rank 3 keeps a title");
+		require(guild.check_title(working, 2, "Captain") == Guild::Title::OK, "a fine title");
+		require(guild.check_title(working, 2, "IllIX") == Guild::Title::NOT_ALLOWED, "four of I and l");
+		require(guild.check_title(working, 2, "Big Boss") == Guild::Title::NOT_ALLOWED, "no spaces");
+		require(guild.check_title(working, 5, "abc") == Guild::Title::NOT_ALLOWED, "a title takes four letters");
+		require(guild.check_title(working, 4, "") == Guild::Title::OK, "an empty rank 4 stays empty");
+		require(guild.check_title(working, 5, "") == Guild::Title::HELD, "Carol holds rank 5");
+
+		Guild::set_title(working, 5, "Recruit");
+		require(working[3] == "Member" && working[4] == "Recruit", "rank 4 is named when rank 5 is");
+		require(guild.check_title(working, 4, "") == Guild::Title::LOWER_RANK, "rank 4 keeps a title under rank 5");
+		Guild::set_title(working, 4, "Squire");
+		require(working[3] == "Squire", "rank 4 renamed");
+		require(guild.titles_differ(working), "the titles changed");
+
+		std::array<std::string, 5> shouted = guild.get_data().titles;
+		shouted[0] = "MASTER";
+		require(!guild.titles_differ(shouted), "case alone is no change");
+
+		require(guild.set_rank(3, 4) && guild.rank(3) == 4 && !guild.set_rank(9, 2), "a member's rank changes");
+		guild.set_titles({ "Master", "Jr. Master", "Member", "Squire", "" });
+		require(guild.lowest_rank() == 4, "rank 4 is the lowest while rank 5 has no title");
+		require(guild.may_lower(2, 3) && !guild.may_lower(2, 4) && !guild.may_lower(2, 2), "a Jr. Master lowers rank 3, not the lowest");
+		require(guild.may_lower(1, 3) && !guild.may_lower(1, 4), "the master lowers rank 3, not the lowest");
+		guild.set_titles(working);
+		require(guild.title(5) == "Recruit" && guild.lowest_rank() == 5, "new titles");
+		guild.set_notice("Hello");
+		require(guild.get_data().notice == "Hello", "a new notice");
+
 		guild.clear();
 		require(!guild.exists() && guild.get_data().members.empty(), "clearing forgets the guild");
+		require(guild.lowest_rank() == 0 && guild.rank_held(3), "no guild, no ranks");
 
 		require(Guild::check_name("Testers") == Guild::Name::OK, "letters are fine");
 		require(Guild::check_name("Guild123") == Guild::Name::OK, "digits are fine");
 		require(Guild::check_name("abc") == Guild::Name::TOO_SHORT, "three letters are too few");
 		require(Guild::check_name("abcdefghijklm") == Guild::Name::NOT_ALLOWED, "thirteen are too many");
 		require(Guild::check_name("Bad Name") == Guild::Name::NOT_ALLOWED, "no spaces");
+		require(Guild::check_name("IllIX") == Guild::Name::NOT_ALLOWED, "fewer than four of I and l");
 
 		require(!GuildEmblem().shown(), "no emblem without a background or a mark");
 		GuildEmblem background_only;

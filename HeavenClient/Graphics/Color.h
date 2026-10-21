@@ -134,6 +134,7 @@ namespace ms
 			DISCOUNTRED,
 			MEMOBLUE,
 			MEMOCYAN,
+			GRADEGREY,
 			NUM_COLORS
 		};
 
@@ -217,7 +218,8 @@ namespace ms
 						{0.99f, 0.96f, 0.08f}, // Package yellow (#FDF514, v83 tooltip font 1: a Cash Shop package's name)
 						{0.97f, 0.06f, 0.20f}, // Discount red (#F71034, v83's Cash Shop package tooltip: the regular total)
 						{0.14f, 0.28f, 0.42f}, // Memo blue (#24476B, who sent a note in v83's inbox)
-						{0.80f, 1.00f, 1.00f}  // Memo cyan (#CCFFFF, the v83 inbox's heading)
+						{0.80f, 1.00f, 1.00f}, // Memo cyan (#CCFFFF, the v83 inbox's heading)
+						{0.56f, 0.56f, 0.56f}  // Grade grey (#909090, ranks without a title in v83's guild rank panel)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

@@ -6,14 +6,17 @@ use crate::{
 };
 use db::guild::{CreateError, JoinError};
 use game::guild::{self, Emblem, GuildMember, GuildTag};
+use game_data::forbidden_names::ForbiddenNames;
+use net::error::NetworkError;
 use net::packet::build::world::guild::{
     build_guild_chat, build_guild_created, build_guild_error, build_guild_info,
     build_guild_mark_changed, build_guild_name_changed, build_member_expelled, build_member_joined,
-    build_member_left, GuildError,
+    build_member_left, build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
 };
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, stat};
 use net::{ClientId, GuildRequest};
+use packet::Packet;
 use tracing::warn;
 
 impl ClientActor {
@@ -80,6 +83,59 @@ impl ClientActor {
                 Some(guild_id) => self.expel_from_guild(guild_id, member_id).await,
                 None => Ok(()),
             },
+            GuildRequest::SetTitles { titles } => {
+                let Some(guild_id) = guild_id else {
+                    return Ok(());
+                };
+                let packet = build_titles_changed(guild_id, &titles)?;
+                let forbidden = forbidden_names()?;
+                let cid = self.client_id;
+                let to = spawn_db(move || {
+                    db::guild::set_titles(guild_id, cid, &titles, |title| forbidden.forbids(title))
+                })
+                .await?;
+                self.tell_guild(to, packet, "Guild titles").await
+            }
+            GuildRequest::SetRank { member_id, rank } => {
+                let Some(guild_id) = guild_id else {
+                    return Ok(());
+                };
+                let cid = self.client_id;
+                let to =
+                    spawn_db(move || db::guild::set_rank(guild_id, cid, member_id, rank)).await?;
+                let packet = build_rank_changed(guild_id, member_id, rank)?;
+                self.tell_guild(to, packet, "Guild rank change").await
+            }
+            GuildRequest::SetNotice { notice } => {
+                let Some(guild_id) = guild_id else {
+                    return Ok(());
+                };
+                let packet = build_notice_changed(guild_id, &notice)?;
+                let cid = self.client_id;
+                let to = spawn_db(move || db::guild::set_notice(guild_id, cid, &notice)).await?;
+                self.tell_guild(to, packet, "Guild notice").await
+            }
+        }
+    }
+
+    /// A change the player made to the guild went through when `to` lists
+    /// the members, who all hear of it. The client checks the player's rank
+    /// and what the change may be first.
+    async fn tell_guild(
+        &mut self,
+        to: Option<Vec<i32>>,
+        packet: Packet,
+        what: &str,
+    ) -> Result<(), RuntimeError> {
+        match to {
+            Some(to) => {
+                self.send_to_directory(DirectoryMessage::Deliver { to, packet })
+                    .await
+            }
+            None => {
+                warn!(self.client_id, "{what} the client should not send; ignored");
+                Ok(())
+            }
         }
     }
 
@@ -106,14 +162,17 @@ impl ClientActor {
     /// whole guild.
     pub(super) async fn join_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
         let cid = self.client_id;
-        let refusal = match spawn_db(move || db::guild::add_member(guild_id, cid)).await? {
-            Ok(()) => None,
-            Err(JoinError::Full) => Some(GuildError::Full),
-            Err(JoinError::AlreadyInGuild) => Some(GuildError::InviteeInGuild),
+        let rank = match spawn_db(move || db::guild::add_member(guild_id, cid)).await? {
+            Ok(rank) => rank,
+            Err(JoinError::Full) => {
+                return self.send(&mut build_guild_error(GuildError::Full)?).await
+            }
+            Err(JoinError::AlreadyInGuild) => {
+                return self
+                    .send(&mut build_guild_error(GuildError::InviteeInGuild)?)
+                    .await
+            }
         };
-        if let Some(error) = refusal {
-            return self.send(&mut build_guild_error(error)?).await;
-        }
         let guild = spawn_db(move || db::guild::load(guild_id)).await?;
         let stats = &self.in_game()?.player.stats;
         let member = GuildMember {
@@ -121,7 +180,7 @@ impl ClientActor {
             name: stats.name.clone(),
             job: stats.job,
             level: stats.level,
-            rank: guild::MEMBER_RANK,
+            rank,
             online: true,
         };
         self.send_to_directory(DirectoryMessage::Deliver {
@@ -238,7 +297,7 @@ impl ClientActor {
             Some(GuildError::AlreadyInGuild)
         } else if player.stats.level < guild::MIN_LEVEL {
             Some(GuildError::LevelTooLow)
-        } else if !guild::name_is_valid(&name) {
+        } else if !guild::name_is_valid(&name) || forbidden_names()?.forbids(&name) {
             // The client checks names too; ask again as for a taken one.
             Some(GuildError::NameTaken)
         } else {
@@ -289,4 +348,9 @@ impl ClientActor {
         self.send_all(&mut packets).await?;
         self.set_guild(Some(guild.tag())).await
     }
+}
+
+/// The words guild names and titles may not hold, as for character names.
+fn forbidden_names() -> Result<&'static ForbiddenNames, RuntimeError> {
+    net::names::forbidden_names().map_err(|error| NetworkError::PacketHandlerError(error).into())
 }

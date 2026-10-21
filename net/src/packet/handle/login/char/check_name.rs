@@ -1,12 +1,11 @@
 use crate::error::NetworkError;
 use crate::handler::{HandlerResult, LoginContext, LoginHandler, LoginResult};
-use crate::load::{self, asset_path};
+use crate::names::forbidden_names;
 use crate::packet::build::login;
 use crate::packet::build::login::char::NameCheck;
 use game_data::forbidden_names::ForbiddenNames;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
-use std::sync::OnceLock;
 
 pub struct CheckCharNameHandler;
 
@@ -32,13 +31,6 @@ fn name_is_allowed(name: &str, gm: bool, forbidden: &ForbiddenNames) -> bool {
         && name.bytes().all(|b| b.is_ascii_alphanumeric())
         && name.bytes().filter(|&b| b == b'I' || b == b'l').count() < 4
         && (gm || !forbidden.forbids(name))
-}
-
-fn forbidden_names() -> Result<&'static ForbiddenNames, &'static str> {
-    static NAMES: OnceLock<Result<ForbiddenNames, String>> = OnceLock::new();
-    load::once(&NAMES, || {
-        ForbiddenNames::load(asset_path("RUSTMS_ETC_NX_PATH", "assets/game-data/Etc.nx"))
-    })
 }
 
 impl LoginHandler for CheckCharNameHandler {

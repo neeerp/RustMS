@@ -6,8 +6,8 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
 /// `GUILD_OPERATION`: ask for the guild again, name a new guild in answer
-/// to the name prompt, invite, join, leave, or expel. Other modes aren't
-/// supported yet.
+/// to the name prompt, invite, join, leave, expel, or change the rank
+/// titles, a member's rank or the notice. Other modes aren't supported yet.
 pub struct GuildOperationHandler;
 
 impl WorldHandler for GuildOperationHandler {
@@ -31,6 +31,22 @@ impl WorldHandler for GuildOperationHandler {
             // The member's name follows.
             0x08 => GuildRequest::Expel {
                 member_id: reader.read_int()?,
+            },
+            0x0D => GuildRequest::SetTitles {
+                titles: [
+                    reader.read_str_with_length()?,
+                    reader.read_str_with_length()?,
+                    reader.read_str_with_length()?,
+                    reader.read_str_with_length()?,
+                    reader.read_str_with_length()?,
+                ],
+            },
+            0x0E => GuildRequest::SetRank {
+                member_id: reader.read_int()?,
+                rank: reader.read_byte()?,
+            },
+            0x10 => GuildRequest::SetNotice {
+                notice: reader.read_str_with_length()?,
             },
             _ => return Ok(HandlerResult::empty()),
         };
@@ -106,11 +122,47 @@ mod tests {
             })
         );
 
-        // Rank changes and the rest come later.
+        // Emblems and the rest come later.
+        let mut packet = operation(0x0F);
+        packet.write_short(1001).unwrap();
+        packet.write_byte(2).unwrap();
+        packet.write_short(2003).unwrap();
+        packet.write_byte(4).unwrap();
+        assert_eq!(guild_request(&packet), None);
+    }
+
+    #[test]
+    fn reads_titles_rank_and_notice() {
+        let mut packet = operation(0x0D);
+        for title in ["Boss", "Deputy", "Grunt", "Newbie", ""] {
+            packet.write_str_with_length(title).unwrap();
+        }
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::SetTitles {
+                titles: ["Boss", "Deputy", "Grunt", "Newbie", ""].map(String::from)
+            })
+        );
+
         let mut packet = operation(0x0E);
         packet.write_int(7).unwrap();
         packet.write_byte(3).unwrap();
-        assert_eq!(guild_request(&packet), None);
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::SetRank {
+                member_id: 7,
+                rank: 3
+            })
+        );
+
+        let mut packet = operation(0x10);
+        packet.write_str_with_length("hi").unwrap();
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::SetNotice {
+                notice: "hi".into()
+            })
+        );
     }
 
     #[test]

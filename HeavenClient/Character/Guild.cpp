@@ -1,5 +1,7 @@
 #include "Guild.h"
 
+#include "../Util/CharacterName.h"
+
 #include <algorithm>
 #include <cctype>
 #include <utility>
@@ -52,12 +54,53 @@ namespace ms
 		if (name.size() < MIN_NAME)
 			return Name::TOO_SHORT;
 
-		bool letters = std::all_of(name.begin(), name.end(), [](char c)
-		{
-			return std::isalnum(static_cast<unsigned char>(c)) != 0;
-		});
+		return character_name_valid(name) ? Name::OK : Name::NOT_ALLOWED;
+	}
 
-		return name.size() <= MAX_NAME && letters ? Name::OK : Name::NOT_ALLOWED;
+	size_t Guild::min_title(int32_t rank)
+	{
+		return rank <= 3 ? MIN_NAME : 0;
+	}
+
+	Guild::Title Guild::check_title(const std::array<std::string, 5>& working, int32_t rank,
+									const std::string& title) const
+	{
+		if (title.size() < min_title(rank))
+			return Title::TOO_SHORT;
+
+		if (!title.empty())
+			return character_name_valid(title) ? Title::OK : Title::NOT_ALLOWED;
+
+		if (rank == 4 && !working[4].empty())
+			return Title::LOWER_RANK;
+
+		return rank_held(rank) ? Title::HELD : Title::OK;
+	}
+
+	void Guild::set_title(std::array<std::string, 5>& working, int32_t rank, std::string title)
+	{
+		working[rank - 1] = std::move(title);
+
+		if (rank == 5 && working[3].empty() && !working[4].empty())
+			working[3] = "Member";
+	}
+
+	bool Guild::titles_differ(const std::array<std::string, 5>& working) const
+	{
+		for (size_t i = 0; i < working.size(); i++)
+		{
+			const std::string& stored = data.titles[i];
+			bool same = std::equal(stored.begin(), stored.end(), working[i].begin(), working[i].end(),
+								   [](char a, char b)
+			{
+				return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+			});
+
+			if (!same)
+				return true;
+		}
+
+		return false;
 	}
 
 	bool Guild::exists() const
@@ -123,6 +166,32 @@ namespace ms
 		}
 	}
 
+	bool Guild::may_raise(int32_t self, int32_t picked)
+	{
+		switch (self)
+		{
+		case 1:
+			return picked >= 3;
+		case 2:
+			return picked >= 4;
+		default:
+			return false;
+		}
+	}
+
+	bool Guild::may_lower(int32_t self, int32_t picked) const
+	{
+		switch (self)
+		{
+		case 1:
+			return picked >= 2 && picked != lowest_rank();
+		case 2:
+			return picked >= 3 && picked != lowest_rank();
+		default:
+			return false;
+		}
+	}
+
 	const std::string& Guild::title(int32_t rank) const
 	{
 		static const std::string none;
@@ -131,6 +200,25 @@ namespace ms
 			return none;
 
 		return data.titles[rank - 1];
+	}
+
+	int32_t Guild::lowest_rank() const
+	{
+		if (!exists())
+			return 0;
+
+		if (data.titles[3].empty())
+			return 3;
+
+		return data.titles[4].empty() ? 4 : 5;
+	}
+
+	bool Guild::rank_held(int32_t rank) const
+	{
+		return !exists() || std::any_of(data.members.begin(), data.members.end(), [rank](const GuildMember& member)
+		{
+			return member.rank == rank;
+		});
 	}
 
 	size_t Guild::online_count() const
@@ -175,5 +263,29 @@ namespace ms
 		{
 			return member.id == cid;
 		}), members.end());
+	}
+
+	bool Guild::set_rank(int32_t cid, int32_t rank)
+	{
+		for (auto& member : data.members)
+		{
+			if (member.id == cid)
+			{
+				member.rank = rank;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	void Guild::set_titles(std::array<std::string, 5> titles)
+	{
+		data.titles = std::move(titles);
+	}
+
+	void Guild::set_notice(std::string notice)
+	{
+		data.notice = std::move(notice);
 	}
 }

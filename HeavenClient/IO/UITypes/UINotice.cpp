@@ -312,8 +312,9 @@ namespace ms
 		deactivate();
 	}
 
-	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string &)> th, size_t limit)
-			: UINotice(message, NoticeType::ENTERNUMBER), texthandler(th)
+	UIEnterText::UIEnterText(std::string message, std::function<void(const std::string &)> th, size_t limit,
+							 bool allow_empty)
+			: UINotice(message, NoticeType::ENTERNUMBER), texthandler(th), allow_empty(allow_empty)
 	{
 		nl::node src = NxFiles::ui_classic["Basic.img"];
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOK"], LEFT_BUTTON_X, buttons_y());
@@ -397,7 +398,7 @@ namespace ms
 	{
 		std::string text = textfield.get_text();
 
-		if (text.empty())
+		if (text.empty() && !allow_empty)
 			return;
 
 		close();

@@ -281,6 +281,19 @@ pub enum GuildRequest {
     Expel {
         member_id: i32,
     },
+    /// Give the ranks these titles.
+    SetTitles {
+        titles: [String; 5],
+    },
+    /// Move a member one rank up or down.
+    SetRank {
+        member_id: i32,
+        rank: u8,
+    },
+    /// Post the guild notice.
+    SetNotice {
+        notice: String,
+    },
 }
 
 /// Something a player asks of their Maple Messenger, which the world

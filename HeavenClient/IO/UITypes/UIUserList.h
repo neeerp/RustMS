@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -58,6 +59,11 @@ namespace ms
 		void draw(float inter) const override;
 
 		void update() override;
+
+		// Closing the window closes the rank panel with it.
+		void toggle_active() override;
+
+		bool is_in_range(Point<int16_t> cursorpos) const override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
@@ -110,6 +116,9 @@ namespace ms
 			BT_GUILD_NOTICE,
 			BT_GUILD_PARTY_INVITE,
 			BT_GUILD_BBS,
+			// The rank panel's.
+			BT_GRADE_MODIFY,
+			BT_GRADE_SAVE,
 			// Each guild section's fold, unfold, previous and next page
 			// buttons: the online section's, then the offline one's.
 			BT_GUILD_SECTION,
@@ -216,6 +225,17 @@ namespace ms
 		// The same, if online.
 		const GuildMember* picked_online_member() const;
 
+		// The rank panel (UserList/Guild/GuildGrade), which the Info button
+		// slides out to the window's right.
+		void open_grade();
+		void close_grade();
+		void rebuild_grade();
+		void draw_grade() const;
+		// Asks the master for rank `rank`'s new title, then checks it.
+		void prompt_title(int32_t rank);
+		void edit_title(int32_t rank, const std::string& text);
+		void save_titles();
+
 		uint16_t tab;
 		Party& party;
 		BuddyList& buddies;
@@ -251,5 +271,15 @@ namespace ms
 		Slider guild_slider;
 		int16_t guild_scroll = 0;
 		int16_t guild_height = 0;
+
+		Texture grade_background;
+		std::array<Texture, 5> grade_art;
+		bool grade_shown = false;
+		// The titles as the master edits them, until saved, and the rank
+		// picked, 0 for none.
+		std::array<std::string, 5> grade_titles;
+		int32_t grade_picked = 0;
+		Text grade_points;
+		std::array<Text, 5> grade_ranks, grade_title_texts, grade_labels;
 	};
 }

@@ -3,7 +3,9 @@
 //! get their guild on entering the game, others see the guild name under
 //! a member's, and guild chat reaches the members online. The master
 //! invites players on the channel, who may decline (DENY_GUILD_REQUEST) or
-//! join; members leave, and are expelled.
+//! join; members leave, and are expelled. The master and jr. masters move
+//! members between ranks and post the notice, and the master renames the
+//! ranks.
 
 use game_data::GameData;
 use integration_harness::database::{join_guild, set_job, set_meso};
@@ -36,6 +38,9 @@ const NOT_IN_CHANNEL: u8 = 0x2a;
 const LEFT: u8 = 0x2c;
 const EXPELLED: u8 = 0x2f;
 const DECLINED: u8 = 0x37;
+const TITLES_CHANGED: u8 = 0x3e;
+const RANK_CHANGED: u8 = 0x40;
+const NOTICE_CHANGED: u8 = 0x44;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -140,6 +145,33 @@ fn guild_data(body: &[u8]) -> (String, Vec<(i32, bool)>) {
         })
         .collect();
     (name, members)
+}
+
+/// A GUILDDATA block's rank titles and notice.
+fn titles_and_notice(body: &[u8]) -> ([String; 5], String) {
+    let mut r = Cursor::new(body);
+    r.read_int().unwrap();
+    r.read_str_with_length().unwrap();
+    let titles = [(); 5].map(|_| r.read_str_with_length().unwrap());
+    let count = r.read_byte().unwrap() as usize;
+    r.read_bytes(count * (4 + 37) + 4 + 6).unwrap();
+    (titles, r.read_str_with_length().unwrap())
+}
+
+fn set_titles(titles: [&str; 5]) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::GuildOperation as i16).unwrap();
+    p.write_byte(0x0d).unwrap();
+    for title in titles {
+        p.write_str_with_length(title).unwrap();
+    }
+    p
+}
+
+fn set_rank(member_id: i32, rank: u8) -> Packet {
+    let mut p = operation(0x0e, &[member_id], None);
+    p.write_byte(rank).unwrap();
+    p
 }
 
 /// Make the character behind `config` and log it out again; its id.
@@ -426,4 +458,134 @@ async fn members_are_invited_and_leave_or_are_expelled() {
     let mut bt = Trace::default();
     read_for(&mut b.connection, &mut bt, 1000).await;
     assert!(bt.guild_ops.is_empty());
+}
+
+#[tokio::test]
+async fn ranks_titles_and_the_notice_change() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let mut a = founder(&a_config, FEE).await;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let guild_id = Cursor::new(&created[1..]).read_int().unwrap();
+    // Every rank has a title, so members join at rank 5.
+    assert_eq!(
+        titles_and_notice(&created[1..]).0,
+        ["Master", "Jr. Master", "Member", "Member", "Member"]
+    );
+    let mut t = Trace::default();
+    assert_eq!(warp(&mut a.connection, PARK, "", &mut t).await, PARK);
+    let mut b = visitor(&b_config, &mut a).await;
+    let (a_id, b_id) = (a.character_id, b.character_id);
+    send(
+        &mut a.connection,
+        operation(INVITE, &[], Some(&b.character_name)),
+    )
+    .await;
+    next_op(&mut b, INVITE).await;
+    send(&mut b.connection, operation(0x06, &[guild_id, b_id], None)).await;
+    let joined = next_op(&mut b, JOINED).await;
+    let mut r = Cursor::new(&joined[1 + 8 + 13 + 8..]);
+    assert_eq!(r.read_int().unwrap(), 5);
+    next_op(&mut a, JOINED).await;
+
+    // A plain member changes nothing.
+    let bm = b.character_name.clone();
+    for (what, packet) in [
+        ("rank", set_rank(b_id, 4)),
+        ("notice", operation(0x10, &[], Some("mine"))),
+        ("titles", set_titles(["Boss", "Deputy", "Grunt", "", ""])),
+    ] {
+        step(&mut b.connection, &format!("{bm} {what}"), packet).await;
+    }
+    let mut at = Trace::default();
+    read_for(&mut a.connection, &mut at, 500).await;
+    assert!(at
+        .guild_ops
+        .iter()
+        .all(|op| op[0] != RANK_CHANGED && op[0] != NOTICE_CHANGED && op[0] != TITLES_CHANGED));
+
+    // The master moves B up a rank, and both hear it; not two ranks.
+    send(&mut a.connection, set_rank(b_id, 4)).await;
+    for session in [&mut a, &mut b] {
+        let changed = next_op(session, RANK_CHANGED).await;
+        assert_eq!(
+            changed[1..],
+            [&guild_id.to_le_bytes()[..], &b_id.to_le_bytes(), &[4]].concat()
+        );
+    }
+    let am = a.character_name.clone();
+    for (what, packet) in [
+        ("skip", set_rank(b_id, 2)),
+        ("master", set_rank(b_id, 1)),
+        ("self", set_rank(a_id, 2)),
+    ] {
+        let t = step(&mut a.connection, &format!("{am} {what}"), packet).await;
+        assert!(t.guild_ops.is_empty(), "{what}");
+    }
+
+    // The notice.
+    send(&mut a.connection, operation(0x10, &[], Some("hi all"))).await;
+    for session in [&mut a, &mut b] {
+        let changed = next_op(session, NOTICE_CHANGED).await;
+        let mut r = Cursor::new(&changed[1..]);
+        assert_eq!(r.read_int().unwrap(), guild_id);
+        assert_eq!(r.read_str_with_length().unwrap(), "hi all");
+    }
+    // A control character, which the client refuses and Postgres can't
+    // store, changes nothing and keeps A connected.
+    let t = step(
+        &mut a.connection,
+        &format!("{am} control"),
+        operation(0x10, &[], Some("hi\0all")),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty());
+
+    // Titles: rank 5 may lose its title, but not rank 4 while B holds it.
+    // The untouched title goes back as it was, with its space and dot.
+    let titles = ["Boss", "Jr. Master", "Grunt", "Newbie", ""];
+    send(&mut a.connection, set_titles(titles)).await;
+    for session in [&mut a, &mut b] {
+        let changed = next_op(session, TITLES_CHANGED).await;
+        let mut r = Cursor::new(&changed[1..]);
+        assert_eq!(r.read_int().unwrap(), guild_id);
+        assert_eq!([(); 5].map(|_| r.read_str_with_length().unwrap()), titles);
+    }
+    for (what, packet) in [
+        ("held", set_titles(["Boss", "Jr. Master", "Grunt", "", ""])),
+        (
+            "gap",
+            set_titles(["Boss", "Jr. Master", "Grunt", "", "Newbie"]),
+        ),
+        (
+            "short",
+            set_titles(["Bos", "Deputy", "Grunt", "Newbie", ""]),
+        ),
+        // "test" is a forbidden word.
+        (
+            "forbidden",
+            set_titles(["Boss", "Jr. Master", "Testy", "Newbie", ""]),
+        ),
+    ] {
+        let t = step(&mut a.connection, &format!("{am} {what}"), packet).await;
+        assert!(t.guild_ops.is_empty(), "{what}");
+    }
+    // B can't go below the last rank with a title.
+    let t = step(&mut a.connection, &format!("{am} low"), set_rank(b_id, 5)).await;
+    assert!(t.guild_ops.is_empty());
+    drop((a, b));
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // It all lasts.
+    let mut a = relogin(&a_config).await;
+    let info = next_op(&mut a, INFO).await;
+    assert_eq!(
+        titles_and_notice(&info[2..]),
+        (titles.map(String::from), "hi all".to_string())
+    );
 }

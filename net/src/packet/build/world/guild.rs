@@ -13,6 +13,9 @@ const OP_CREATED: u8 = 0x20;
 const OP_JOINED: u8 = 0x27;
 const OP_LEFT: u8 = 0x2C;
 const OP_EXPELLED: u8 = 0x2F;
+const OP_TITLES_CHANGED: u8 = 0x3E;
+const OP_RANK_CHANGED: u8 = 0x40;
+const OP_NOTICE_CHANGED: u8 = 0x44;
 
 /// `MULTICHAT` mode for guild chat.
 pub const MULTICHAT_GUILD: u8 = 2;
@@ -194,6 +197,34 @@ fn departure(op: u8, guild_id: i32, member_id: i32, name: &str) -> Result<Packet
     packet.write_int(guild_id)?;
     packet.write_int(member_id)?;
     packet.write_str_with_length(name)?;
+    Ok(packet)
+}
+
+/// Member `member_id` now holds `rank`. The client writes "[name]'s
+/// position has been changed to [title]." to the chat log.
+pub fn build_rank_changed(guild_id: i32, member_id: i32, rank: u8) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_RANK_CHANGED)?;
+    packet.write_int(guild_id)?;
+    packet.write_int(member_id)?;
+    packet.write_byte(rank)?;
+    Ok(packet)
+}
+
+/// The ranks' new titles. The master's client says "It is saved.".
+pub fn build_titles_changed(guild_id: i32, titles: &[String; 5]) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_TITLES_CHANGED)?;
+    packet.write_int(guild_id)?;
+    for title in titles {
+        packet.write_str_with_length(title)?;
+    }
+    Ok(packet)
+}
+
+/// The guild's new notice, which the client also writes to the chat log.
+pub fn build_notice_changed(guild_id: i32, notice: &str) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_NOTICE_CHANGED)?;
+    packet.write_int(guild_id)?;
+    packet.write_str_with_length(notice)?;
     Ok(packet)
 }
 
@@ -405,6 +436,41 @@ mod tests {
                 .string("Bobby")
                 .end();
         }
+    }
+
+    #[test]
+    fn rank_titles_and_notice_changes() {
+        let packet = build_rank_changed(4, 2, 3).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x40)
+            .int(4)
+            .int(2)
+            .byte(3)
+            .end();
+
+        let packet = build_titles_changed(4, &guild().titles).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x3E)
+            .int(4)
+            .string("Master")
+            .string("Jr. Master")
+            .string("Member")
+            .string("")
+            .string("")
+            .end();
+
+        let packet = build_notice_changed(4, "hi").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x44)
+            .int(4)
+            .string("hi")
+            .end();
     }
 
     #[test]
