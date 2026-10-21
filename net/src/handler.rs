@@ -369,6 +369,12 @@ pub struct SpawnPosition {
 #[derive(Debug)]
 pub enum WorldAction {
     Reply(Packet),
+    /// Send `packet` `after` this long, as when the client animates a
+    /// result before it may see it.
+    ReplyLater {
+        after: std::time::Duration,
+        packet: Packet,
+    },
     /// Enter the game with the character named in PLAYER_LOGGEDIN.
     EnterGame {
         character_id: i32,
@@ -837,6 +843,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetAutoPot, InGame(&world::PetAutoPotHandler)),
             (Op::PetExcludeItems, InGame(&world::PetExcludeItemsHandler)),
             (Op::UseCashItem, InGame(&world::UseCashItemHandler)),
+            (Op::UseHammer, InGame(&world::UseHammerHandler)),
             (Op::CloseChalkboard, InGame(&world::CloseChalkboardHandler)),
             (Op::CalcDamageStat, InGame(&world::CalcDamageStatHandler)),
             (

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "EquipTooltip.h"
 
+#include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/Equip.h"
 #include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Character/Inventory/ItemProperties.h"
@@ -24,12 +25,15 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
 	{
-		// Measured from period footage.
+		// Measured from period footage. A stat line wider than the box widens it to 20 past the line (0x8f3b4f).
 		constexpr int16_t WIDTH = 236;
+		constexpr int16_t LINE_MARGIN = 20;
 		// The required stats, right of the icon, with their values after them.
 		const Point<int16_t> REQ_POS = { 94, 31 };
 		constexpr int16_t REQ_STEP = 12;
@@ -123,7 +127,7 @@ namespace ms
 	}
 
 	EquipTooltip::EquipTooltip() :
-		line(WIDTH - 2 * LINE_POS.x(), 1, Color::Name::WHITE, 0.9f)
+		width(WIDTH), line(WIDTH - 2 * LINE_POS.x(), 1, Color::Name::WHITE, 0.9f)
 	{
 		nl::node Equip = NxFiles::ui_classic["UIWindow.img"]["ToolTip"]["Equip"];
 		nl::node Can = Equip["Can"];
@@ -181,6 +185,9 @@ namespace ms
 			case Tooltip::Parent::SHOP:
 			case Tooltip::Parent::STORAGE:
 			case Tooltip::Parent::ITEMMEGAPHONE:
+			case Tooltip::Parent::VICIOUSHAMMER:
+			case Tooltip::Parent::VEGASPELL:
+			case Tooltip::Parent::VEGARESULT:
 				invtype = InventoryType::Id::EQUIP;
 				break;
 			case Tooltip::Parent::EQUIPINVENTORY:
@@ -285,10 +292,10 @@ namespace ms
 				continue;
 
 			properties[i] = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::TIPORANGE, line);
-			int16_t width = properties[i].width();
-			properties_height += PROPERTY_STEP * (width / WIDTH + 1);
+			int16_t line_width = properties[i].width();
+			properties_height += PROPERTY_STEP * (line_width / WIDTH + 1);
 
-			if (i == 0 && width > WIDTH)
+			if (i == 0 && line_width > WIDTH)
 			{
 				properties[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::TIPORANGE, line,
 									 PROPERTY_WRAP_WIDTH, true, tooltip::LINE_ADJ);
@@ -364,6 +371,17 @@ namespace ms
 		if (equipdata.get_slots() > 0)
 			add_line("NUMBER OF UPGRADES AVAILABLE", std::to_string(equip.get_slots()), false);
 
+		// And the Vicious' Hammers it has had, if it could take one (0x8e9355), in one string without a bold value.
+		if (vicious_hammer::takes(item_id, equipdata.get_slots()))
+			add_line("", "NUMBER OF VICIOUS' HAMMER APPLIED : " + vicious_hammer::tooltip_line(equip.get_vicious()), true);
+
+		width = WIDTH;
+
+		for (const StatLine &statline : stats)
+			width = std::max<int16_t>(width, statline.label.width() + statline.gap + statline.value.width() + LINE_MARGIN);
+
+		line.setwidth(width - 2 * LINE_POS.x());
+
 		int16_t height = properties_height + STATS_TOP + STAT_STEP * static_cast<int16_t>(stats.size());
 
 		if (!expiry.empty())
@@ -387,7 +405,7 @@ namespace ms
 			height += desc.height();
 		}
 
-		size = Point<int16_t>(WIDTH, height + tooltip::BOTTOM);
+		size = Point<int16_t>(width, height + tooltip::BOTTOM);
 	}
 
 	void EquipTooltip::draw(Point<int16_t> pos) const
@@ -404,10 +422,10 @@ namespace ms
 		if (wrapped)
 			properties[0].draw(pos + PROPERTY_WRAP_POS);
 		else if (!properties[0].empty())
-			properties[0].draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y));
+			properties[0].draw(pos + Point<int16_t>(width / 2, PROPERTY_Y));
 
 		if (!properties[1].empty())
-			properties[1].draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y + PROPERTY_STEP));
+			properties[1].draw(pos + Point<int16_t>(width / 2, PROPERTY_Y + PROPERTY_STEP));
 
 		pos.shift_y(properties_height);
 

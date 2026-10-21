@@ -4,6 +4,7 @@
 use crate::load::{self, asset_path};
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item, Player};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
+use game_data::vega_spell::VegaSpells;
 use rand::Rng;
 use std::sync::OnceLock;
 use std::time::SystemTime;
@@ -50,6 +51,17 @@ pub fn cash_message(item_id: i32) -> Option<String> {
 /// The template for `item_id`, if the data has it.
 pub fn info(item_id: i32) -> Option<ItemInfo> {
     data().ok()?.info(item_id).ok().flatten()
+}
+
+/// The success rate in percent of `scroll_id`, if Vega's Spell takes it
+/// (`Etc.nx`).
+pub fn vega_rate(scroll_id: i32) -> Option<i32> {
+    static SPELLS: OnceLock<Result<VegaSpells, String>> = OnceLock::new();
+    load::once(&SPELLS, || {
+        VegaSpells::load(asset_path("RUSTMS_ETC_NX_PATH", "assets/game-data/Etc.nx"))
+    })
+    .ok()?
+    .rate(scroll_id)
 }
 
 /// Whether the hair or face `style` exists. Without the data, every one

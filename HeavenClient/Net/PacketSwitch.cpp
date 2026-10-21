@@ -208,6 +208,8 @@ namespace ms
 		KEYMAP = 335,
 		AUTO_HP_POT = 336,
 		AUTO_MP_POT = 337,
+		VICIOUS_HAMMER = 354,
+		VEGA_SPELL = 358,
 
 		/// Player Interaction
 		CHAR_INFO = 61,
@@ -338,6 +340,8 @@ namespace ms
 		emplace<KEYMAP, KeymapHandler>();
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
+		emplace<VICIOUS_HAMMER, ViciousHammerHandler>();
+		emplace<VEGA_SPELL, VegaSpellHandler>();
 		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();
 		emplace<SKILL_MACROS, SkillMacrosHandler>();
 		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();

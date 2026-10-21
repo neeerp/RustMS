@@ -146,4 +146,6 @@ pub enum SendOpcode {
     KeyMap = 0x14F,
     AutoHpPot = 0x150,
     AutoMpPot = 0x151,
+    ViciousHammer = 0x162,
+    VegaScroll = 0x166,
 }

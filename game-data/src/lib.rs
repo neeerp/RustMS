@@ -17,6 +17,7 @@ pub mod quests;
 pub mod reactors;
 pub mod server_content;
 pub mod skills;
+pub mod vega_spell;
 
 const NODE_SIZE_BYTES: u64 = 20;
 pub const NO_DESTINATION_MAP: i32 = 999_999_999;

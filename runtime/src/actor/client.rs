@@ -9,6 +9,7 @@ mod fame;
 mod guild_bbs;
 mod guilds;
 mod hazard;
+mod later;
 mod loot;
 mod notes;
 mod npc_script;
@@ -129,6 +130,8 @@ pub struct ClientActor {
     map_timer: Option<time_limit::MapTimer>,
     /// The map that hurts the player now and then.
     hazard: Option<hazard::HazardTimer>,
+    /// Packets to send later, soonest first.
+    later: Vec<(Instant, Packet)>,
     /// The player's side of a trade they are in.
     trade: Option<trade::Trade>,
     /// The player's own shop, or the one they visit.
@@ -190,6 +193,7 @@ impl ClientActor {
             door: None,
             map_timer: None,
             hazard: None,
+            later: Vec::new(),
             trade: None,
             personal_shop: None,
             naming_guild: false,
@@ -213,6 +217,7 @@ impl ClientActor {
             let hazard_due = self.hazard_due();
             let pets_due = self.pets_due();
             let items_due = self.items_due();
+            let later_due = self.later_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -241,6 +246,9 @@ impl ClientActor {
                 _ = sleep_until(hazard_due.unwrap_or_else(Instant::now)), if hazard_due.is_some() => {
                     self.hurt_by_map().await
                 }
+                _ = sleep_until(later_due.unwrap_or_else(Instant::now)), if later_due.is_some() => {
+                    self.send_later().await
+                }
             };
             if let Err(error) = step {
                 break error;
@@ -261,6 +269,11 @@ impl ClientActor {
     /// blocked on a peer that stopped reading, and `PacketWriter` bounds it
     /// with a timeout either way, so the actor always reaches cleanup.
     async fn send(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
+        self.send_later_before(packet).await?;
+        self.write(packet).await
+    }
+
+    async fn write(&mut self, packet: &mut Packet) -> Result<(), RuntimeError> {
         let kill = self.kill.clone();
         tokio::select! {
             biased;
@@ -325,6 +338,7 @@ impl ClientActor {
     async fn apply(&mut self, action: WorldAction) -> Result<(), RuntimeError> {
         match action {
             WorldAction::Reply(mut packet) => self.send(&mut packet).await?,
+            WorldAction::ReplyLater { after, packet } => self.reply_later(after, packet),
             WorldAction::EnterGame { character_id } => self.enter_game(character_id).await?,
             WorldAction::ChangeField { map_id, spawn } => self.change_field(map_id, spawn).await?,
             WorldAction::FieldChat(packet) => {
@@ -746,6 +760,9 @@ impl ClientActor {
         })
         .await?;
         self.in_cash_shop = true;
+        // The shop sends the whole inventory, and the packets were for windows
+        // the shop closes.
+        self.later.clear();
         self.flush().await?;
 
         let player = &self.in_game()?.player;

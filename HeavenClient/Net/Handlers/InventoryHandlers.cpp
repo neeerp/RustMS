@@ -31,6 +31,8 @@
 #include "../IO/UITypes/UIStatusMessenger.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../IO/UITypes/UITeleportRock.h"
+#include "../IO/UITypes/UIVegaSpell.h"
+#include "../IO/UITypes/UIViciousHammer.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../Character/Pets.h"
 
@@ -86,6 +88,44 @@ namespace ms
 		}
 
 		rock.set_target("");
+	}
+
+	void ViciousHammerHandler::handle(InPacket& recv) const
+	{
+		// Any answer lets the next request go (0x82b2d7).
+		Stage::get().get_player().request_answered();
+
+		int8_t code = recv.read_byte();
+		auto window = UI::get().get_element<UIViciousHammer>();
+
+		if (!window || !window->is_active())
+			return;
+
+		switch (code)
+		{
+			case 0x3d:
+				window->finish(recv.read_int());
+				break;
+			case 0x3e:
+				window->refuse(recv.read_int());
+				break;
+			default:
+			{
+				int32_t flag = recv.read_int();
+				int32_t applied = recv.read_int();
+
+				window->answer(code, flag, applied);
+				break;
+			}
+		}
+	}
+
+	void VegaSpellHandler::handle(InPacket& recv) const
+	{
+		int8_t code = recv.read_byte();
+
+		if (auto window = UI::get().get_element<UIVegaSpell>(); window && window->is_active())
+			window->receive(code);
 	}
 
 	void ModifyInventoryHandler::handle(InPacket& recv) const

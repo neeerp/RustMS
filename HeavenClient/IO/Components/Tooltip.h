@@ -48,6 +48,9 @@ namespace ms
 			TRADINGROOM,
 			PERSONALSHOP,
 			ITEMMEGAPHONE,
+			VICIOUSHAMMER,
+			VEGASPELL,
+			VEGARESULT,
 			STATUSBAR,
 			// The status bar's quick slots, whose tooltips go above the cursor.
 			QUICKSLOT,

@@ -67,6 +67,8 @@ namespace ms
 		Tooltip::Parent parent;
 		int16_t invpos;
 		Point<int16_t> size;
+		// The box's, at least WIDTH.
+		int16_t width;
 
 		TooltipBox box;
 		TooltipIcon icon;

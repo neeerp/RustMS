@@ -102,6 +102,11 @@ namespace ms
 		type->drop_on_potion(mp);
 	}
 
+	std::pair<InventoryType::Id, int16_t> Icon::get_source() const
+	{
+		return type->get_source();
+	}
+
 	InventoryType::Id Icon::get_return_tab() const
 	{
 		return type->get_return_tab();
