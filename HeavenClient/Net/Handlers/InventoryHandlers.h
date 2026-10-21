@@ -48,6 +48,23 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// What came of Vicious' Hammer (v83 FUN_0082b2c3): 0x39 with a flag and
+	// the hammers the equip has had, then 0x3d once the window has shown it,
+	// or 0x3e with why not.
+	// Opcode: VICIOUS_HAMMER(354)
+	class ViciousHammerHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Vega's Spell's roll (FUN_0082d8d5): one code, first the one that
+	// starts it and says how it went, then the one that lets it end.
+	// Opcode: VEGA_SPELL(358)
+	class VegaSpellHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

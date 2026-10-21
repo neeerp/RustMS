@@ -25,6 +25,7 @@
 #include "../Keyboard.h"
 
 #include <memory>
+#include <utility>
 
 namespace ms
 {
@@ -71,6 +72,14 @@ namespace ms
 			// Puts the icon's item beside the first pet's HP or MP pouch.
 			virtual void drop_on_potion(bool mp) const {}
 
+			// The inventory tab and slot of the icon's item, for a window
+			// that checks what is dropped on it; NONE if it isn't from the
+			// inventory.
+			virtual std::pair<InventoryType::Id, int16_t> get_source() const
+			{
+				return { InventoryType::Id::NONE, 0 };
+			}
+
 			// The inventory tab an icon from another window goes back to,
 			// or NONE if the inventory doesn't take it.
 			virtual InventoryType::Id get_return_tab() const
@@ -115,6 +124,7 @@ namespace ms
 		void drop_on_shop() const;
 		void drop_on_megaphone() const;
 		void drop_on_potion(bool mp) const;
+		std::pair<InventoryType::Id, int16_t> get_source() const;
 		InventoryType::Id get_return_tab() const;
 		void drop_on_inventory() const;
 		Keyboard::Mapping get_mapping() const;

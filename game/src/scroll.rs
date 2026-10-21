@@ -83,7 +83,7 @@ pub fn fits(scroll_id: i32, equip_id: i32) -> bool {
 /// Whether `scroll` may be used on `equip` (`equip_id`), whose template has
 /// `base_slots` upgrade slots: it fits, the equip is in its `req` list if it
 /// has one, and a slot is left (for Clean Slate: one was used up by a
-/// failure).
+/// failure, counting the slots Vicious' Hammers added).
 pub fn can_apply(
     scroll_id: i32,
     scroll: &ScrollInfo,
@@ -96,7 +96,8 @@ pub fn can_apply(
     }
     match scroll.kind {
         ScrollKind::CleanSlate => {
-            u16::from(equip.upgrade_slots) + u16::from(equip.level) < u16::from(base_slots)
+            i32::from(equip.upgrade_slots) + i32::from(equip.level)
+                < i32::from(base_slots) + equip.vicious
         }
         _ => equip.upgrade_slots >= 1,
     }
@@ -380,6 +381,9 @@ mod tests {
         let scroll = scroll_of(ScrollKind::CleanSlate, 20, 50);
         assert!(can_apply(2049003, &scroll, 1302000, &sword(5, 1), 7));
         assert!(!can_apply(2049003, &scroll, 1302000, &sword(6, 1), 7));
+        let mut hammered = sword(7, 0);
+        hammered.vicious = 1;
+        assert!(can_apply(2049003, &scroll, 1302000, &hammered, 7));
         let mut equip = sword(5, 1);
         assert_eq!(
             run(&mut equip, &scroll, true, &[19]).0,

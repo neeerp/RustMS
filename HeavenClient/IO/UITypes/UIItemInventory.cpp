@@ -28,6 +28,8 @@
 #include "UIPetChooser.h"
 #include "UITeleportRock.h"
 #include "UITradingRoom.h"
+#include "UIVegaSpell.h"
+#include "UIViciousHammer.h"
 
 #include "../Messages.h"
 #include "../UI.h"
@@ -38,6 +40,7 @@
 
 #include "../../Character/GachaExp.h"
 #include "../../Character/Pets.h"
+#include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
@@ -530,6 +533,20 @@ namespace ms
 				case Megaphones::Kind::NONE:
 					break;
 			}
+		}
+
+		// Vicious' Hammer and Vega's Spell open their windows, which take
+		// the equip (and the scroll) dragged in.
+		void use_hammer(int16_t slot)
+		{
+			if (may_use_cash_item())
+				UI::get().emplace<UIViciousHammer>(slot);
+		}
+
+		void use_vega_spell(int16_t slot, int32_t item_id)
+		{
+			if (may_use_cash_item())
+				UI::get().emplace<UIVegaSpell>(slot, item_id);
 		}
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
@@ -1135,6 +1152,10 @@ namespace ms
 							use_sp_reset(slot, item_id);
 						else if (item_id / 10000 == 501)
 							Stage::get().use_item_effect(item_id);
+						else if (item_id == vicious_hammer::ITEM)
+							use_hammer(slot);
+						else if (vega_spell::is_vega(item_id))
+							use_vega_spell(slot, item_id);
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
 						else if (item_id / 10000 == 518)
@@ -1735,6 +1756,11 @@ namespace ms
 
 		if (player.can_request(ExclRequest::WAIT))
 			player.change_auto_potion(mp, item_id);
+	}
+
+	std::pair<InventoryType::Id, int16_t> UIItemInventory::ItemIcon::get_source() const
+	{
+		return { sourcetab, source };
 	}
 
 	void UIItemInventory::ItemIcon::set_count(int16_t c)

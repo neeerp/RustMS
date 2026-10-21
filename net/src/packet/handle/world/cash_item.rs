@@ -3,9 +3,11 @@
 //! item's own fields and the tick. The client then waits for an answer that
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
 //! teleport rocks, notes, weather items, the jukebox, meso sacks, avatar
-//! megaphones, AP Reset and SP Reset are used so far.
+//! megaphones, AP Reset, SP Reset, the Vicious' Hammer and Vega's Spell are
+//! used so far.
 
 use super::chalkboard::chalkboard;
+use super::hammer::vicious_hammer;
 use super::jukebox::jukebox;
 use super::megaphone::{avatar_megaphone, megaphone};
 use super::meso_sack::meso_sack;
@@ -13,6 +15,7 @@ use super::note::note;
 use super::pet::{cash_pet_food, pet_name_tag};
 use super::stat_reset::{ap_reset, sp_reset};
 use super::teleport_rock::teleport_rock;
+use super::vega::vega_spell;
 use super::weather::weather;
 use crate::handler::{HandlerResult, WorldContext, WorldHandler, WorldResult};
 use crate::packet::build::world::stat::build_stat_update;
@@ -48,6 +51,9 @@ impl WorldHandler for UseCashItemHandler {
             524 if held => cash_pet_food(ctx, slot, item_id),
             537 if held => chalkboard(ctx, &mut r),
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
+            // The window waits for 354, so even a hammer not held gets one.
+            557 => vicious_hammer(ctx, &mut r, slot, item_id),
+            561 if held => vega_spell(ctx, &mut r, slot, item_id),
             _ => Ok(HandlerResult::reply(build_stat_update(true, &[])?)),
         }
     }

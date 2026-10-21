@@ -80,6 +80,12 @@ namespace ms
 					return Tooltip::Parent::PERSONALSHOP;
 				case UIElement::Type::ITEMMEGAPHONE:
 					return Tooltip::Parent::ITEMMEGAPHONE;
+				case UIElement::Type::VICIOUSHAMMER:
+					return Tooltip::Parent::VICIOUSHAMMER;
+				case UIElement::Type::VEGASPELL:
+					return Tooltip::Parent::VEGASPELL;
+				case UIElement::Type::VEGARESULT:
+					return Tooltip::Parent::VEGARESULT;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:

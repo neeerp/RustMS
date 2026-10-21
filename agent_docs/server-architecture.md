@@ -129,6 +129,8 @@ session.
   database or network IO, so they run inline. Side effects are returned as
   `WorldAction`s (`Reply`, `EnterGame`, `ChangeField`, `FieldChat`,
   `FieldMove`, `NpcInteraction`, `Whisper`, `ChangeChannel`, `Disconnect`).
+  `ReplyLater { after, packet }` sends a packet after a delay; the client
+  actor keeps it in a queue ordered by due time.
 - **Registry**: `login_route(opcode)` and `world_route(opcode)` look up the
   handler and the session stage it requires (`LoginStage::Any`/`Session`/
   `LoggedIn`; `WorldRoute::PreGame`/`InGame`). Opcodes used in the wrong stage

@@ -491,6 +491,75 @@ others) and sends nothing. It shows CATCH_MONSTER_WITH_ITEM as the item's
 `Game.img/CatchSuccess` or `CatchFaild` for the Element Rock. The rules are
 `Character/CatchItemRules.h`; every line is in the skill chat colour.
 
+### Vicious' Hammer and Vega's Spell
+
+Both come through USE_CASH_ITEM. Vicious' Hammer (5570000) sends the equip's
+tab and slot after the item id (`world/hammer.rs`). The server refuses with
+VICIOUS_HAMMER (`354`: `0x3e`, reason) when the equip is not upgradable
+(1: it has no upgrade slots in its template, is pet equipment, or came from
+the Cash Shop), when it has had two hammers already (2), or when it is the
+Horntail Necklace (3). A hammer that isn't in the slot, a tab other than
+Equip, or a dead player gets reason 1 too, since the window waits for an
+answer. Otherwise the hammer adds one upgrade slot and one to
+the equip's `vicious` count (saved in `equipment_stats.vicious`, sent in the
+equip's stats). The server answers with INVENTORY_OPERATION and then
+`354: 0x39, 0, applied`. When the client's gauge is full, it sends
+USE_HAMMER (`0x104`: code, flag), and the server's `354: 0x3d, 0` closes the
+window.
+
+Vega's Spell (5610000 for 10% scrolls, 5610001 for 60% ones) sends the
+equip's tab and slot, then the scroll's tab and slot (`world/vega.rs`). The
+scroll must be on `Etc.nx`'s `VegaSpell.img` list (`game-data`'s
+`VegaSpells`; `prob` is a real or the text `[R8]0.1`) at the spell's rate,
+must fit the equip, and the equip may not be a cash item. The spell raises
+10% to 30% and 60% to 90%, and the scroll is applied like any other. The
+roll is decided at once. VEGA_SCROLL (`358`) sends `0x40` (success) or
+`0x45` (failure), which starts the window's roll. The inventory change and
+`0x41` or `0x43` follow 2.6 s later, through `WorldAction::ReplyLater`, so
+the equip's new stats don't show before the roll ends. The client actor
+keeps those packets in `ClientActor::later` and sends them when due, or at
+once before any other inventory change, since they carry the slots' states
+from when they were queued. Entering the Cash Shop drops them. A refused
+spell gets only an empty stat change, which unlocks the client; as in v83,
+the window then stays until it is closed, since any code but the four would
+close it without unlocking (report c004c).
+Whether the map should see the scroll's effect (`0xA7`) is unknown.
+
+HeavenClient opens `UIViciousHammer` on double-clicking a hammer and
+`UIVegaSpell` on a Vega's Spell (both use UIWindow.img in UIClassic.nx).
+Only dragging puts an item in: the drop reads the icon's source tab and
+slot (`Icon::get_source`).
+
+The hammer window runs the client's own checks (`vicious_hammer::check` in
+`Character/Inventory/CashUpgrades.h`) and says why it refuses. Start sends
+the hammer and plays `EffectP`. The gauge fills 160 columns at 59 a second.
+Once the gauge is full and the answer is in, the window sends USE_HAMMER,
+waiting a second after a success while `EffectE` plays. The last answer
+closes the window with "Increased available upgrade by 1. N upgrades are
+left.", the reason, or "Unknown Error (n).". Esc closes it only before
+Start, and it is dragged by its top.
+
+The Vega window takes an equip from the Equip tab and a scroll on the list
+from the Use tab ("This scroll cannot be used.", or "This item cannot be
+used." for anything else). It shows the scroll's rate and the raised one in
+its `Count` digits. Start checks the scroll fits, then sends and plays
+`EffectArrow`. The start code plays `EffectSpelling`, loops
+`EffectTwinkling` and the `VegaTwinkling` sound, and fills the gauge at 63
+px/s. When the gauge passes 159 px and the result code is in, `UIVegaResult`
+opens `SuccessWnd` or `FailWnd` with the equip, its effect and its sound,
+and OK, Esc or Return closes it. Hovering over an equip in either window
+shows its tooltip.
+
+The equip tooltip has a "NUMBER OF VICIOUS' HAMMER APPLIED : n" line
+("2(MAX)" at two) for any equip that could take a hammer. Like v83's, the
+tooltip widens to 20 px past its widest stat line.
+
+Inferred, not taken from the client: what the two rate boxes mean, that the
+Vega windows close on Esc (the Vega window only before Start, since the
+spell is spent once sent), that Start refuses a scroll whose rate the spell
+doesn't raise and treats an unlock with no start code as a refusal, and the
+result window's hover area.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's

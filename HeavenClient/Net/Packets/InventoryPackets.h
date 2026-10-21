@@ -465,4 +465,53 @@ namespace ms
 			write_byte(0); // Legendary Spirit
 		}
 	};
+
+	// Uses Vicious' Hammer on the equip in `equip_slot` of the Equip tab
+	// (v83 FUN_0082aed3, BtStart).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseHammerPacket : public OutPacket
+	{
+	public:
+		UseHammerPacket(int16_t slot, int32_t itemid, int16_t equip_slot) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(InventoryType::Id::EQUIP);
+			write_int(equip_slot);
+			write_time();
+		}
+	};
+
+	// Tells the server the hammer's window has shown what came of it, with
+	// the code and flag the server sent (FUN_0082ae28).
+	// Opcode: USE_HAMMER(260)
+	class HammerShownPacket : public OutPacket
+	{
+	public:
+		HammerShownPacket(int32_t code, int32_t flag) : OutPacket(OutPacket::Opcode::USE_HAMMER)
+		{
+			write_int(code);
+			write_int(flag);
+		}
+	};
+
+	// Casts Vega's Spell: the scroll in `scroll_slot` of the Use tab on the
+	// equip in `equip_slot` of the Equip tab (FUN_0082cbe2).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseVegaSpellPacket : public OutPacket
+	{
+	public:
+		UseVegaSpellPacket(int16_t slot, int32_t itemid, int16_t equip_slot, int16_t scroll_slot)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(InventoryType::Id::EQUIP);
+			write_int(equip_slot);
+			write_int(InventoryType::Id::USE);
+			write_int(scroll_slot);
+			write_int(1);
+			write_time();
+		}
+	};
 }

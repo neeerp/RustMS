@@ -137,6 +137,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME field_limit COMMAND field_limit_tests)
     add_executable(scroll_rules_tests tests/scroll_rules.cpp)
     add_test(NAME scroll_rules COMMAND scroll_rules_tests)
+    add_executable(cash_upgrades_tests tests/cash_upgrades.cpp)
+    add_test(NAME cash_upgrades COMMAND cash_upgrades_tests)
     add_executable(pickup_tests tests/pickup.cpp)
     target_include_directories(pickup_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME pickup COMMAND pickup_tests)
@@ -802,6 +804,10 @@ add_executable(HeavenClient
     IO/UITypes/UISpReset.h
     IO/UITypes/UIItemMegaphone.cpp
     IO/UITypes/UIItemMegaphone.h
+    IO/UITypes/UIViciousHammer.cpp
+    IO/UITypes/UIViciousHammer.h
+    IO/UITypes/UIVegaSpell.cpp
+    IO/UITypes/UIVegaSpell.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
     IO/UITypes/UIGuildBBS.cpp

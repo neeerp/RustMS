@@ -181,6 +181,68 @@ pub async fn wear_equip(
     .await
 }
 
+/// Put the equip `item_id` with `upgrade_slots` slots in slot `slot` of the
+/// logged-out character `character_id`'s Equip tab.
+pub async fn stow_equip(
+    character_id: i32,
+    slot: i16,
+    item_id: i32,
+    upgrade_slots: i16,
+) -> Result<(), HarnessError> {
+    change_one_row("stow equip", move |conn| {
+        diesel::sql_query(
+            "WITH item AS (INSERT INTO inventory_items (character_id, inventory_type, slot, item_id, quantity, owner, flags) \
+             VALUES ($1, 1, $2, $3, 1, '', 0) RETURNING id) \
+             INSERT INTO equipment_stats (item_row_id, upgrade_slots) SELECT id, $4 FROM item",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(slot)
+        .bind::<Integer, _>(item_id)
+        .bind::<SmallInt, _>(upgrade_slots)
+        .execute(conn)
+    })
+    .await
+}
+
+/// The upgrade slots left, scrolls passed (level) and hammers of the equip in
+/// slot `slot` of character `character_id`'s Equip tab.
+pub async fn equip_upgrades(
+    character_id: i32,
+    slot: i16,
+) -> Result<Option<(i16, i16, i32)>, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = SmallInt)]
+        upgrade_slots: i16,
+        #[diesel(sql_type = SmallInt)]
+        level: i16,
+        #[diesel(sql_type = Integer)]
+        vicious: i32,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read an equip",
+        message,
+    };
+    let rows = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT e.upgrade_slots, e.level, e.vicious FROM inventory_items i \
+             JOIN equipment_stats e ON e.item_row_id = i.id \
+             WHERE i.character_id = $1 AND i.inventory_type = 1 AND i.slot = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(slot)
+        .load::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(rows
+        .first()
+        .map(|row| (row.upgrade_slots, row.level, row.vicious)))
+}
+
 /// Dress the logged-out character `character_id` in the cash equip
 /// `item_id`, with cash serial `serial`, at `position` (negative), such as
 /// a pet's equipment.
