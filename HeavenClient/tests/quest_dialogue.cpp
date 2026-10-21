@@ -129,6 +129,24 @@ void completions_page_to_the_rewards()
 	QuestDialogue rewards_only(Mode::COMPLETION, ms::QuestScript{}, "#w+exp#w");
 	require(rewards_only.take_initial_effect() == Effect::NONE, "rewards alone are still shown");
 	require(rewards_only.page()->text == "#w+exp#w", "on a page of their own");
+	require(rewards_only.choice() == -1, "with nothing picked");
+}
+
+void a_reward_is_picked_on_the_last_page()
+{
+	ms::QuestScript shoes;
+	shoes.pages = {"pick a pair"};
+	const std::string REWARDS = "#w\r\n\r\n#fUI/UIWindow.img/QuestIcon/3/0#\r\n#L0#a#l\r\n#L1#b#l\r\n#w";
+
+	QuestDialogue pick(Mode::COMPLETION, shoes, REWARDS);
+	require(pick.page()->kind == QuestPage::SELECTION && pick.page()->text == "pick a pair" + REWARDS,
+		"choices make the last page a menu");
+	require(pick.respond(1, 1) == Effect::COMPLETE && pick.finished() && pick.read(), "picking one completes the quest");
+	require(pick.choice() == 1, "with that pick");
+
+	QuestDialogue closed(Mode::COMPLETION, shoes, REWARDS);
+	require(closed.respond(-1) == Effect::NONE && closed.finished() && closed.choice() == -1,
+		"closing the menu completes nothing");
 }
 
 void rewards_are_listed_under_the_last_page()
@@ -156,6 +174,23 @@ void rewards_are_listed_under_the_last_page()
 	require(rewards.summary(900, false, false).find("1002053") != std::string::npos, "GMs pass every job filter");
 	require(rewards.summary(0, false, true).empty(), "nothing is listed when another quest follows");
 	require(ms::QuestRewards{}.summary(0, false, false).empty(), "or when there is nothing to list");
+
+	ms::QuestRewards shoes;
+	shoes.items = {
+		{ 1072141, 1, -1, 2, -1 },
+		{ 1072122, 0, -1, 2, -1 },
+		{ 1072303, 1, 1 << 1, 2, -1 },
+		{ 1072133, 1, -1, 2, -1 }
+	};
+	const std::string CHOOSE = "#w\r\n\r\n#fUI/UIWindow.img/QuestIcon/3/0#\r\n";
+	require(shoes.summary(0, false, true) ==
+			CHOOSE + "#L0##v1072141:# #t1072141:# 1#l\r\n#L1##v1072133:# #t1072133:# 1#l\r\n#w",
+		"choices are numbered among those shown, even when another quest follows");
+	shoes.exp = 30;
+	require(shoes.summary(100, false, false) == CHOOSE +
+			"#L0##v1072141:# #t1072141:# 1#l\r\n#L1##v1072303:# #t1072303:# 1#l\r\n#L2##v1072133:# #t1072133:# 1#l\r\n" +
+			"\r\n\r\n#fUI/UIWindow.img/QuestIcon/4/0#\r\n\r\n" + EXP + "#w",
+		"other rewards follow under their own header");
 
 	ms::QuestRewards fame;
 	fame.fame = 2;
@@ -196,6 +231,7 @@ int main()
 		wrong_answers_end_the_conversation();
 		flipped_questions_say_their_lead_first();
 		completions_page_to_the_rewards();
+		a_reward_is_picked_on_the_last_page();
 		rewards_are_listed_under_the_last_page();
 		pages_are_read_to_the_end();
 		std::cout << "Quest dialogue passed\n";

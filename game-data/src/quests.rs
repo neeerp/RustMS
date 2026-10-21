@@ -120,8 +120,8 @@ pub struct QuestItem {
     /// 0 male, 1 female, 2 (or absent) either.
     pub gender: u8,
     /// Weight among the entries that have one; one of them is picked at
-    /// random. `None` always applies. -1 (a reward the player picks) is
-    /// not supported.
+    /// random. `None` always applies. -1 marks a reward the player picks
+    /// one of.
     pub prop: Option<i32>,
 }
 
@@ -176,8 +176,6 @@ pub struct QuestKeys {
     pub end_act: Vec<String>,
     /// Keys used by any `Act/<n>/item` entry.
     pub item_keys: Vec<String>,
-    /// Whether an item action has `prop` -1: a reward the player picks.
-    pub item_choice: bool,
     /// Keys used by any `Act/1/skill` entry.
     pub skill_keys: Vec<String>,
 }
@@ -209,9 +207,6 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;
     unsupported(&keys.item_keys, ITEM_ACTION_KEYS, "Act/item")?;
     unsupported(&keys.skill_keys, SKILL_ACTION_KEYS, "Act/skill")?;
-    if keys.item_choice {
-        return Err("Act/item/prop=-1".into());
-    }
     Ok(())
 }
 
@@ -259,7 +254,6 @@ impl QuestCatalog {
                 };
                 for item in nx.child_indices(items)? {
                     keys.item_keys.extend(child_names(&nx, item)?);
-                    keys.item_choice |= nx.int_child(item, "prop")? == Some(-1);
                 }
             }
             if let Some(skills) = path_index(&nx, &format!("Act.img/{id}/1/skill"))? {
@@ -423,8 +417,16 @@ fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataErr
     let Some(items) = path_index(nx, &format!("{act}/item"))? else {
         return Ok(Vec::new());
     };
-    let mut result = Vec::new();
+    // The files list entries by name as text ("10" before "2"); v83 goes by
+    // the number, which numbers the rewards a player picks from.
+    let mut entries = Vec::new();
     for item in nx.child_indices(items)? {
+        let name = nx.node_name(item)?;
+        entries.push((name.parse::<u32>().unwrap_or(u32::MAX), item));
+    }
+    entries.sort_by_key(|&(order, _)| order);
+    let mut result = Vec::new();
+    for (_, item) in entries {
         result.push(QuestItem {
             item_id: nx
                 .int_child(item, "id")?
@@ -567,9 +569,6 @@ mod tests {
         let mut expiring = hunting.clone();
         expiring.item_keys = vec!["id".into(), "count".into(), "period".into()];
         assert_eq!(classify(&expiring), Err("Act/item/period".into()));
-        let mut chosen = hunting.clone();
-        chosen.item_choice = true;
-        assert_eq!(classify(&chosen), Err("Act/item/prop=-1".into()));
         let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
         assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
@@ -630,6 +629,14 @@ mod tests {
             Some(1440)
         );
         assert_eq!(mirror.start.repeat_interval, None);
+        // The token taken, then scrolls to pick from, listed "1" to "16" in
+        // numeric order.
+        let rewards = &catalog.quest(3379).unwrap().end_rewards;
+        assert_eq!(rewards.len(), 17);
+        assert_eq!(rewards[0].prop, None);
+        assert_eq!(rewards[2].item_id, 2043201);
+        assert_eq!(rewards[10].item_id, 2044301);
+        assert!(rewards[1..].iter().all(|item| item.prop == Some(-1)));
     }
 
     #[test]

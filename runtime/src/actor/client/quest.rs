@@ -111,7 +111,9 @@ impl ClientActor {
         };
         match request.kind {
             QuestActionKind::Start { npc_id } => self.start_quest(template, npc_id).await,
-            QuestActionKind::Complete { npc_id, .. } => self.complete_quest(template, npc_id).await,
+            QuestActionKind::Complete { npc_id, choice } => {
+                self.complete_quest(template, npc_id, choice).await
+            }
             QuestActionKind::ScriptStart { .. } => {
                 self.run_quest_script(template.start_script.as_deref())
                     .await
@@ -142,7 +144,13 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if !self.quest_items(template.id, &template.start_items, &mut next, &mut packets)? {
+        if !self.quest_items(
+            template.id,
+            &template.start_items,
+            -1,
+            &mut next,
+            &mut packets,
+        )? {
             return self.send_all(&mut packets).await;
         }
         if self
@@ -158,13 +166,20 @@ impl ClientActor {
         &mut self,
         template: &'static QuestTemplate,
         npc_id: i32,
+        choice: i32,
     ) -> Result<(), RuntimeError> {
         if quests::check_complete(template, npc_id, &self.in_game()?.player).is_err() {
             return Ok(());
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if !self.quest_items(template.id, &template.end_rewards, &mut next, &mut packets)? {
+        if !self.quest_items(
+            template.id,
+            &template.end_rewards,
+            choice,
+            &mut next,
+            &mut packets,
+        )? {
             return self.send_all(&mut packets).await;
         }
         if template.money != 0 {
@@ -217,16 +232,24 @@ impl ClientActor {
         .await
     }
 
-    /// Apply a quest step's item actions to `next`. `false`, with the
+    /// Apply a quest step's item actions, with the reward picked as
+    /// `choice`, to `next`. `false` if the pick isn't offered or, with the
     /// "inventory full" notice queued, if the gifts don't fit.
     fn quest_items(
         &self,
         quest_id: i16,
         items: &[QuestItem],
+        choice: i32,
         next: &mut Player,
         packets: &mut Vec<Packet>,
     ) -> Result<bool, RuntimeError> {
-        let picked = quests::pick_items(items, next, &mut rand::thread_rng());
+        let picked = match quests::pick_items(items, next, choice, &mut rand::thread_rng()) {
+            Ok(picked) => picked,
+            Err(rejection) => {
+                debug!(?rejection, "Quest reward refused");
+                return Ok(false);
+            }
+        };
         let changes = match quests::apply_items(next, &picked) {
             Ok(changes) => changes,
             Err(rejection) => {

@@ -156,7 +156,7 @@ namespace ms
 					position = player().get_position();
 
 				if (effect != QuestDialogue::Effect::NONE)
-					QuestActionPacket(action, quest_id, npc_id, position).dispatch();
+					QuestActionPacket(action, quest_id, npc_id, position, active->dialogue.choice()).dispatch();
 			}
 
 			void show();

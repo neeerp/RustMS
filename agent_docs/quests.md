@@ -25,7 +25,9 @@ Quests run the way the original client ran them:
 2. When the player accepts or finishes, the client sends `QUEST_ACTION`
    (`0x6B`): action byte (1 start, 2 complete, 3 forfeit, 4/5 scripted),
    quest id, and the NPC, then its position (left out for the quest
-   alert's autoStart and autoComplete quests, below).
+   alert's autoStart and autoComplete quests, below). A completion ends
+   with the picked reward's index, -1 without one (`FUN_00716fe1`); the
+   server reads it from the last four bytes.
 3. **The server** checks the request against the quest's `Check.img`
    requirements and the player (`net::quests::check_start`/`check_complete`),
    asks the field whether that NPC is on the map within reach (1200×800
@@ -75,7 +77,7 @@ Only requirements and actions the server implements are allowed
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill` |
-| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` (not -1) |
+| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` |
 | `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job` |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
@@ -118,11 +120,13 @@ only to its `job` families (v83 bits: 0x1 beginner, 0x2 warrior, 0x4
 magician, 0x8 bowman, 0x10 thief, 0x20 pirate, 0x400+ Cygnus) and `gender`
 (2 or absent: either). Entries without `prop` always apply; among those with
 a positive `prop`, one is picked at random by weight (Todd's beginner hats).
-`prop` -1 is a reward the player chooses, which needs UI and stays
-unsupported, as do `period`, `dateExpire`, `var`, and `name`. If the gifts
-don't fit, nothing changes and the client gets UPDATE_QUEST_INFO mode 10
-with the quest id; it names the full inventories itself ("Etc item
-inventory is full."). `startscript`/
+With `prop` -1 the player picks one: the choices are those for the job and
+gender, counted in numeric entry order (the file keeps "10" before "2", so
+both sides sort), and a completion naming none of them is refused, as in
+Hongbu's shoes (3608). `period`, `dateExpire`, `var`, and `name` stay
+unsupported. If the gifts don't fit, nothing changes and the client gets
+UPDATE_QUEST_INFO mode 10 with the quest id; it names the full inventories
+itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
@@ -146,7 +150,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1289 quests qualify
+changing the server's allowlist and regenerating the list. 1309 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -205,7 +209,10 @@ the v83ref notes):
   `Character/QuestRewards.h`): "REWARD!!" with the fixed items for the
   player's job and gender, meso, EXP, and the "?" box when one random item
   is given, unless another quest follows. It sits between `#w` marks, which
-  `UINpcTalk` shows at once while the page above types out.
+  `UINpcTalk` shows at once while the page above types out. Rewards to
+  choose from come first, as `#L<n>#` links under their own icon
+  (`FUN_0071808a`), and make the page a menu: picking one completes the
+  quest with its index.
 - **Yes pages** come only with the server's mode 8, as above.
 
 Markers use the same catalog (`QuestLog::supported_rules`) and v83's rules
@@ -285,4 +292,5 @@ copied into the source.
   `beginner_contact_quests` (the route through Sen's house and `nextQuest`
   results), and `quest_objectives` (1034's candy errand, Todd's hunt and
   random hat, Sam's snails persisting across relog and capped at ten, Maria's
-  letter to Lucas, refusals before requirements are met).
+  letter to Lucas, refusals before requirements are met), and
+  `quest_reward_choice` (Hongbu's shoes, refusing a choice not offered).

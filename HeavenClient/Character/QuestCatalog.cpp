@@ -1,6 +1,7 @@
 #include "QuestCatalog.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 
@@ -99,7 +100,18 @@ namespace ms
 					info.start_items.emplace_back(static_cast<int32_t>(item["id"].get_integer()),
 						static_cast<int32_t>(item["count"].get_integer()));
 
+			// The file keeps "10" before "2"; the reward list numbers them in
+			// numeric order.
+			std::vector<nl::node> items;
+
 			for (auto item : act["item"])
+				items.push_back(item);
+
+			std::stable_sort(items.begin(), items.end(), [](const nl::node& a, const nl::node& b) {
+				return std::strtol(a.name().c_str(), nullptr, 10) < std::strtol(b.name().c_str(), nullptr, 10);
+			});
+
+			for (auto item : items)
 				info.rewards.items.push_back({ static_cast<int32_t>(item["id"].get_integer()),
 					static_cast<int32_t>(item["count"].get_integer()), static_cast<int32_t>(item["job"].get_integer(-1)),
 					static_cast<int32_t>(item["gender"].get_integer(2)), static_cast<int32_t>(item["prop"].get_integer()) });
