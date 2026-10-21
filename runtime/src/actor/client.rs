@@ -600,9 +600,9 @@ impl ClientActor {
         // Items that expired meanwhile are gone before the client sees them;
         // it says which once in the game.
         let expired = net::items::expire_items(&mut player, SystemTime::now());
-        if expired.worn {
-            player.fit_hp_mp();
-        }
+        // No buff lasts past a logout or a channel change, and gear may have
+        // gone: HP and MP come back within the maximum without them.
+        player.fit_hp_mp();
         self.client_id = character_id;
 
         let mut char_info = build::world::char::build_char_info(&player, self.channel_id)

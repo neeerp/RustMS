@@ -127,12 +127,16 @@ pub fn clear_login_sessions() -> crate::Result<usize> {
 }
 
 /// Remove in-game sessions for channels a restarted world server hosts.
-pub fn clear_world_sessions(channel_ids: &[i16]) -> crate::Result<usize> {
+/// Returns the characters they were for, whose last session ended without
+/// the world's cleanup.
+pub fn clear_world_sessions(channel_ids: &[i16]) -> crate::Result<Vec<i32>> {
     let mut connection = crate::connection()?;
-    Ok(diesel::delete(
+    let cleared: Vec<Option<i32>> = diesel::delete(
         sessions
             .filter(state.eq(SessionState::InGame))
             .filter(selected_channel_id.eq_any(channel_ids.iter().map(|&c| Some(c)))),
     )
-    .execute(&mut connection)?)
+    .returning(character_id)
+    .get_results(&mut connection)?;
+    Ok(cleared.into_iter().flatten().collect())
 }

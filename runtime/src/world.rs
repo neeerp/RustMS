@@ -18,6 +18,31 @@ const DIRECTORY_QUEUE_CAPACITY: usize = 1024;
 /// How often fields advance time-driven state.
 const FIELD_TICK: Duration = Duration::from_millis(100);
 
+/// The characters whose sessions a stopped world left behind never had their
+/// logout cleanup, so the items that last only until logout
+/// (`info/expireOnLogout`) go now.
+async fn drop_stale_logout_items(character_ids: Vec<i32>) -> Result<(), RuntimeError> {
+    if character_ids.is_empty() {
+        return Ok(());
+    }
+    let dropped = spawn_db(move || {
+        let due: Vec<i32> = db::player::held_item_ids(&character_ids)?
+            .into_iter()
+            .filter(|&item_id| net::items::info(item_id).is_some_and(|info| info.expire_on_logout))
+            .collect();
+        if due.is_empty() {
+            return Ok(0);
+        }
+        db::player::delete_held_items(&character_ids, &due)
+    })
+    .await?;
+    info!(
+        dropped,
+        "Dropped items left from before the restart that last until logout"
+    );
+    Ok(())
+}
+
 /// Run every channel of the configured world in this process. Channel `n`
 /// listens on its own advertised port, so a connection's channel is known
 /// from the socket it arrived on (v83 clients do not send it).
@@ -27,7 +52,8 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
 
     let channel_ids: Vec<i16> = channels.iter().map(|c| i16::from(c.channel_id)).collect();
     let cleared = spawn_db(move || db::session::clear_world_sessions(&channel_ids)).await?;
-    info!(cleared, "Cleared stale in-game sessions");
+    info!(cleared = cleared.len(), "Cleared stale in-game sessions");
+    drop_stale_logout_items(cleared).await?;
 
     let (directory_tx, directory_rx) = mpsc::channel(DIRECTORY_QUEUE_CAPACITY);
     spawn_supervised(
