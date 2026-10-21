@@ -399,6 +399,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::VICIOUSHAMMER);
+					types.emplace_back(UIElement::Type::MAKER);
 					types.emplace_back(UIElement::Type::VEGASPELL);
 					types.emplace_back(UIElement::Type::VEGARESULT);
 					types.emplace_back(UIElement::Type::PETCHOOSER);

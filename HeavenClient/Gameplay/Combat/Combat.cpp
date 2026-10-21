@@ -50,6 +50,8 @@
 #include "../../Data/SkillData.h"
 #include "../../Data/WeaponData.h"
 #include "../../IO/Messages.h"
+#include "../../IO/UI.h"
+#include "../../IO/UITypes/UIMaker.h"
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
 
@@ -236,6 +238,18 @@ namespace ms
 		// server refuses.
 		if (player.morph_refuses())
 			return false;
+
+		// The Maker opens its window, with the skill learnt, and sends nothing (FUN_00966f7a).
+		if (maker::is_maker(move_id))
+		{
+			auto window = UI::get().get_element<UIMaker>();
+			bool open = window && window->is_active();
+
+			if (!open && player.get_skills().get_level(move_id) > 0 && player.can_request(200))
+				UI::get().emplace<UIMaker>();
+
+			return false;
+		}
 
 		if (player.is_barrel_busy())
 		{

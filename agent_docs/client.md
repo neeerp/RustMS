@@ -586,6 +586,7 @@ side yet.
 | Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
+| Item Maker (`UIMaker`) | Recipes without gems or a stimulator, and monster crystals: the drop lists, ingredient counts, fee, gauge, result dialog and chat lines; see `inventory.md` |
 | Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |
 | Continent ships, station wall clocks | Docking ships and the Balrog's ship, CONTI_MOVE/CONTI_STATE, CLOCK kind 1; see `ships.md` |
 | Map clouds (`info/cloud`, 223 maps such as Perion) | Implemented (`MapClouds`): as v83 does, 10 to 59 of `MapHelper.img/weather/cloud`'s canvases scattered over the field's footholds plus 200 px, at 140 to 219 of 255 opacity, drifting right at 17 to 50 px/s for good and wrapping, above the front backgrounds |

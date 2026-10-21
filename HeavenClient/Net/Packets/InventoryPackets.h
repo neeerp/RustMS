@@ -495,6 +495,37 @@ namespace ms
 		}
 	};
 
+	// Asks the Item Maker to make `itemid` from its recipe, with a stimulator
+	// or not and the gems put in (FUN_00827096, mode 1).
+	// Opcode: ITEM_MAKE(113)
+	class ItemMakePacket : public OutPacket
+	{
+	public:
+		ItemMakePacket(int32_t itemid, bool stimulator, const std::vector<int32_t>& gems) : OutPacket(OutPacket::Opcode::ITEM_MAKE)
+		{
+			write_int(1);
+			write_int(itemid);
+			write_byte(stimulator);
+			write_int(static_cast<int32_t>(gems.size()));
+
+			for (int32_t gem : gems)
+				write_int(gem);
+		}
+	};
+
+	// Asks the Item Maker for a monster crystal from 100 of the drop
+	// `itemid` (FUN_00827096, mode 3).
+	// Opcode: ITEM_MAKE(113)
+	class ItemMakeCrystalPacket : public OutPacket
+	{
+	public:
+		ItemMakeCrystalPacket(int32_t itemid) : OutPacket(OutPacket::Opcode::ITEM_MAKE)
+		{
+			write_int(3);
+			write_int(itemid);
+		}
+	};
+
 	// Casts Vega's Spell: the scroll in `scroll_slot` of the Use tab on the
 	// equip in `equip_slot` of the Equip tab (FUN_0082cbe2).
 	// Opcode: USE_CASH_ITEM(79)

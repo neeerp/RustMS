@@ -209,6 +209,7 @@ namespace ms
 		AUTO_HP_POT = 336,
 		AUTO_MP_POT = 337,
 		VICIOUS_HAMMER = 354,
+		MAKER_RESULT = 217,
 		VEGA_SPELL = 358,
 
 		/// Player Interaction
@@ -341,6 +342,7 @@ namespace ms
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<VICIOUS_HAMMER, ViciousHammerHandler>();
+		emplace<MAKER_RESULT, MakerResultHandler>();
 		emplace<VEGA_SPELL, VegaSpellHandler>();
 		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();
 		emplace<SKILL_MACROS, SkillMacrosHandler>();

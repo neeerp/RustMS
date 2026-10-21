@@ -18,6 +18,8 @@
 #include "InventoryHandlers.h"
 
 #include "Helpers/ItemParser.h"
+#include "StatusMessages.h"
+#include "../Data/ItemData.h"
 
 #include "../Gameplay/Stage.h"
 #include "../IO/UI.h"
@@ -26,7 +28,9 @@
 #include "../Character/Inventory/Inventory.h"
 #include "../IO/UITypes/UIEquipInventory.h"
 #include "../IO/UITypes/UIItemInventory.h"
+#include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIKeyConfig.h"
+#include "../IO/UITypes/UIMaker.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStatusMessenger.h"
 #include "../IO/UITypes/UIStorage.h"
@@ -118,6 +122,77 @@ namespace ms
 				break;
 			}
 		}
+	}
+
+	void MakerResultHandler::handle(InPacket& recv) const
+	{
+		int32_t result = recv.read_int();
+		int32_t made = 0;
+		int32_t count = 0;
+
+		auto line = [](const std::string& text)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(text, UIChatBar::LineType::GREY);
+		};
+
+		auto gained = [&line](int32_t id, int32_t qty)
+		{
+			line(maker::gained_line(status_messages::tab_name(id), ItemData::get(id).get_name(), qty));
+		};
+
+		auto lost = [&line](int32_t id, int32_t qty)
+		{
+			line(maker::lost_line(ItemData::get(id).get_name(), qty));
+		};
+
+		if (result == 0 || result == 1)
+		{
+			switch (recv.read_int())
+			{
+				case 1:
+				case 2:
+				{
+					if (!recv.read_bool())
+					{
+						made = recv.read_int();
+						count = recv.read_int();
+						gained(made, count);
+					}
+
+					for (int32_t n = recv.read_int(); n > 0; n--)
+					{
+						int32_t id = recv.read_int();
+						lost(id, recv.read_int());
+					}
+
+					for (int32_t n = recv.read_int(); n > 0; n--)
+						lost(recv.read_int(), 1);
+
+					if (recv.read_bool())
+						lost(recv.read_int(), 1);
+
+					if (int32_t meso = recv.read_int(); meso > 0)
+						line(maker::meso_line(meso));
+
+					break;
+				}
+				case 3:
+				{
+					// The crystal shows as one, from a hundred of the drop.
+					made = recv.read_int();
+					count = 1;
+					gained(made, 1);
+					lost(recv.read_int(), maker::CRYSTAL_DROPS);
+					break;
+				}
+				default:
+					break;
+			}
+		}
+
+		if (auto window = UI::get().get_element<UIMaker>(); window && window->is_active())
+			window->answer(result, count, made ? ItemData::get(made).get_name() : "");
 	}
 
 	void VegaSpellHandler::handle(InPacket& recv) const
