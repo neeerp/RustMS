@@ -40,7 +40,8 @@ impl ClientActor {
     /// shows it, with no message.
     pub(super) async fn gained_exp(&mut self, amount: i32) -> Result<(), RuntimeError> {
         let mut next = self.in_game()?.player.clone();
-        let levelled = next.gain_exp(amount, net::skills::growth_bonus(&next, true)) > 0;
+        let bonus = net::skills::growth_bonus(&next, true);
+        let levelled = next.gain_exp(amount, bonus, net::skills::growth_roll) > 0;
         let mut packets = vec![stat::build_exp_stats(&next.stats, levelled)?];
         self.commit_player(next, None, &mut packets).await?;
         self.send_all(&mut packets).await

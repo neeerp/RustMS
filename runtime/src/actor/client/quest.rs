@@ -462,7 +462,8 @@ pub(super) fn gain_exp(
     amount: i32,
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
-    let levelled = next.gain_exp(amount, skills::growth_bonus(next, true)) > 0;
+    let bonus = skills::growth_bonus(next, true);
+    let levelled = next.gain_exp(amount, bonus, skills::growth_roll) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
     packets.push(quest::build_gain_exp_in_chat(amount)?);
     Ok(())
@@ -477,7 +478,11 @@ pub(super) fn gain_exp_with_bonus(
     packets: &mut Vec<Packet>,
 ) -> Result<(), RuntimeError> {
     let bonus = skills::growth_bonus(next, true);
-    let levelled = next.gain_exp(amount.saturating_add(party_bonus), bonus) > 0;
+    let levelled = next.gain_exp(
+        amount.saturating_add(party_bonus),
+        bonus,
+        skills::growth_roll,
+    ) > 0;
     packets.push(stat::build_exp_stats(&next.stats, levelled)?);
     packets.push(quest::build_gain_exp(amount, party_bonus)?);
     Ok(())

@@ -439,13 +439,22 @@ The client actor applies what came back as one STAT_CHANGED
 A dead mob's EXP is shared by damage dealt (the top damager gets any
 rounding remainder) and each share goes to that player's client actor
 (`ServerMessage::MobKilled`), which adds it with `Player::gain_exp`. A level
-gained sends the new level, AP, SP, max HP/MP (+14/+11 per beginner level,
-the middle of v83's ranges) and shows SHOW_FOREIGN_EFFECT 0 to the others. As
-in v83, current HP and MP are not refilled. Each level grants 5 AP, and 3 SP
-once past beginner. A warrior's Improving MaxHP Increase (1000001), a
-Brawler's Improve MaxHP (5100000) and a magician's Improving MaxMP Increase
-(2000001) add their `x` to each level's growth and their `y` to an AP's
-(`net::skills::growth_bonus`).
+gained sends the new level, AP, SP, max HP/MP and shows SHOW_FOREIGN_EFFECT
+0 to the others. As in v83, current HP and MP are not refilled. Each level
+grants 5 AP, and 3 SP once past beginner.
+
+Max HP/MP growth (`game::character::growth`) starts from the v83 client's
+own per-job floors, the slopes of its minimum max HP/MP tables: per level
+beginner 12/10, warrior 24/4, magician 10/22, bowman and thief 20/14,
+pirate 22/18; per AP the AP Reset dialog's 8/6, 20/2, 6/18, 16/10 and
+18/14. A roll (`net::skills::growth_roll`) adds 0-4 HP and 0-2 MP on top.
+The client keys these by `job % 1000`, so Cygnus Knights and Aran use the
+Explorer rows; GMs use the beginners'. Max MP also gains a tenth of total
+INT per level and 3/40 of it per AP (the share the client's AP Reset takes
+back), and a warrior's Improving MaxHP Increase (1000001), a Brawler's
+Improve MaxHP (5100000) and a magician's Improving MaxMP Increase (2000001)
+add their `x` to each level's growth and their `y` to an AP's
+(`net::skills::growth_bonus`). Level ups stop at 30,000 like AP.
 
 ### Rates and rate cards
 
@@ -783,8 +792,8 @@ so every request is answered, refusals with an empty STAT_CHANGED.
 
 - **AP** (`Player::spend_ap`): SPEND_AP names the stat by its STAT_CHANGED
   bit: STR, DEX, INT, LUK, MaxHP (0x800), or MaxMP (0x2000). Base stats stop
-  at 999 and max HP/MP at 30,000. One AP adds the middle of v83's per-job
-  HP/MP range (`ap_growth`; a beginner gets +10/+7). As in v83, the client
+  at 999 and max HP/MP at 30,000. One AP adds the job's growth (see EXP
+  above; a beginner gets +8-12 HP or +6-8 MP). As in v83, the client
   only asks for MaxHP or MaxMP from level 20, and then only after the player
   confirms a warning that it may leave the character weaker.
 - **SP** (`Player::raise_skill`): the skill must belong to the character's

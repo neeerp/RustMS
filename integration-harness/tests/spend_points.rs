@@ -42,9 +42,10 @@ async fn ap_and_sp_raise_stats_and_skills_and_persist() {
     let t = step(c, "str", spend_ap(stat::STR)).await;
     assert_eq!(t.stat(stat::STR), Some(i64::from(session.str) + 1));
     assert_eq!(t.stat(stat::AP), Some(4));
-    // A beginner's AP adds 10 max HP.
+    // A beginner's AP adds 8 to 12 max HP.
     let t = step(c, "max hp", spend_ap(stat::MAX_HP)).await;
-    assert_eq!(t.stat(stat::MAX_HP), Some(max_hp + 10));
+    let gain = t.stat(stat::MAX_HP).unwrap() - max_hp;
+    assert!((8..=12).contains(&gain), "{gain}");
     assert_eq!(t.stat(stat::AP), Some(3));
     // Current HP is not something AP buys.
     let t = step(c, "hp", spend_ap(stat::HP)).await;
