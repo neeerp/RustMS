@@ -178,6 +178,11 @@ pub mod keys {
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
     pub const JEFF_TOO_WEAK: &str = "jeff.too_weak";
+    /// Mushroom Castle's portals: `TD_MC_first`, `obstacle`, `gotocastle`.
+    pub const MC_FIRST_BLOCKED: &str = "portal.mc_first.blocked";
+    pub const MC_OBSTACLE_BLOCKED: &str = "portal.mc_obstacle.blocked";
+    pub const MC_OBSTACLE_USED: &str = "portal.mc_obstacle.used";
+    pub const MC_CASTLE_BLOCKED: &str = "portal.mc_castle.blocked";
 
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
@@ -689,6 +694,10 @@ mod tests {
             keys::JEFF_ASK,
             keys::JEFF_DECLINE,
             keys::JEFF_TOO_WEAK,
+            keys::MC_FIRST_BLOCKED,
+            keys::MC_OBSTACLE_BLOCKED,
+            keys::MC_OBSTACLE_USED,
+            keys::MC_CASTLE_BLOCKED,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,

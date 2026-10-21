@@ -90,6 +90,11 @@ nothing. A script returns effects that the client actor sends:
 | `market00` | The Free Market's exit: portal sound, back to the saved town's entrance (else Henesys), forget the town |
 | `halloween_enter` | The Haunted House's gate: portal sound, warp to `682000100` portal `st00` |
 | `photoOut`, `StudioZone_Out`, `outBabyBird` | An event map's exit: portal sound, back to where its invitation was used (else Henesys), forget it |
+| `TD_MC_first` | The Empty House's (`100000002`) way to the Mushroom Kingdom: portal sound, warp to `106020000`, once 2260 is completed or any of 2300-2310 is taken; else a pink line |
+| `obstacle` | The poisonous mushrooms on `106020300`: with a Poison Spore (`4000507`), a pink line, portal sound, take one, warp to `106020400` portal `left00`; else a pink line |
+| `gotocastle` | Split Road of Destiny's way over the castle wall: portal sound, warp to `106020501`, once 2324 is completed; else a pink line |
+| `TD_MC_jump` | Portal sound, warp to `106020501` |
+| `TD_MC_Egate` | Portal sound, warp to `106021300` portal `right00` |
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,

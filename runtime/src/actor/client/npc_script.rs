@@ -7,6 +7,7 @@ use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, skill, stat};
 use net::quests::{self, QuestTemplate};
@@ -118,6 +119,7 @@ impl ClientActor {
                     changed = true;
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
+                Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
                 Effect::Hint {
                     text,
                     width,
