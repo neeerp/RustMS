@@ -5,6 +5,8 @@
 #include "UITypes/UIInviteCard.h"
 #include "UITypes/UINotice.h"
 
+#include "../Configuration.h"
+
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Util/CharacterName.h"
@@ -91,6 +93,12 @@ namespace ms
 			for (const Buddy& buddy : Stage::get().get_player().get_buddies().get_buddies())
 				if (buddy.pending())
 					ask(buddy.name, buddy.id);
+		}
+
+		FriendGroups::Blocks blocks()
+		{
+			return FriendGroups::Blocks(FriendGroups::parse_blocks(Setting<FriendBlocked>::get().load(),
+					Stage::get().get_player().get_oid()));
 		}
 	}
 }

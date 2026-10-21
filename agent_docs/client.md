@@ -576,7 +576,7 @@ side yet.
 | Character info, minimap, world map | Implemented |
 | UI and game sounds | v83's: GameIn as the server lets a character in, not on map loads; RollDown/RollUp for the channel panel; SelectMap alone on world map links and right-click; BuyShopItem on Cash Shop purchase notices; other players' level-up, job, quest and card sounds. QuestAlert and a few rarer sounds are missing |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
-| Buddy list (`UIUserList` Friend tab, buddy chat) | Implemented without groups; see `buddies.md` |
+| Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
 | Alliance / blacklist tabs (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
@@ -805,7 +805,6 @@ the screen size.
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| Buddy groups | Default group only | S |
 | Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting) | M |
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |

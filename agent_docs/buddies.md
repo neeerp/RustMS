@@ -73,39 +73,66 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
   or yourself; accepting someone who didn't ask; removing someone not on
   the list. After each map loads it shows the unanswered requests again,
   unless a request card is still up.
-- `MultiChatHandler` prints buddy chat in orange.
-- The Friend tab of `UIUserList` is built from `UserList/Friend` art:
-  - **ONLINE** (`friend0`), over a `SAME CH.` / `OTHER CH.` legend
-    (`friend1`). Each `friend2` row holds a same-channel buddy on the left
-    and an other-channel buddy on the right. Buddies on other channels show
-    their channel number on the right.
-  - **OFFLINE** (`friend4`), two greyed names per `friend5` row. This also
-    covers buddies who haven't added the player back.
-  - Clicking a name selects that buddy.
-  - The buttons are ADD BUDDY (asks for a name with `UIEnterText`), DELETE
-    (asks for confirmation), WHISPER, TALK (sets the chat target to "To a
-    buddy", as does the buddy chat key, 3 by default), and INVITE TO PARTY.
-    MAP is always disabled.
-  - SHOW ONLINE / SHOW ALL hides or shows the offline section. The two
-    buttons share a spot, so `filter_clicked` makes sure one press toggles
-    only once.
+- `MultiChatHandler` prints buddy chat in orange, and drops lines from
+  buddies the player has blocked.
+- The Friend tab of `UIUserList` follows v83's groups (reports b015, b018
+  and b019). `Character/FriendGroups` holds the logic the tests cover:
+  - The list is grouped by each buddy's group name: groups by name, the
+    Default Group last and always shown, requests left out. Each header
+    reads `name(online/total)` in blue, behind an arrow. Clicking a header
+    picks the group and folds or unfolds it; the folded groups are kept in
+    the `FriendFolded` setting.
+  - Members sit two to a row, each with v83's icon: `icon01` if blocked,
+    otherwise `icon00` if on the player's channel. Names are black if
+    online, grey if away (offline, on no channel, or blocked), red if
+    blocked, and white when picked. An empty group shows "none".
+  - The tab header counts buddies against the capacity.
+  - SHOW ONLINE / SHOW ALL hides or shows those away (kept in
+    `FriendShowOnline`). The two buttons share a spot, so `filter_clicked`
+    makes sure one press toggles only once.
+  - Clicking a name picks that buddy; the buttons act on the pick.
+    Double-clicking a buddy whispers one online or writes a note to one
+    away, and asks to unblock one blocked first. Double-clicking a picked
+    header edits the group.
+  - ADD BUDDY opens v83's Add Buddy dialog (`UIGroupPicker` with a name
+    field, report b021): a name, and a combo of the existing groups that
+    starts blank. A blank group is sent blank, and the server reads it as
+    the Default Group. EDIT on a buddy opens the same dialog with the name
+    filled in, which moves them to the group chosen.
+  - ADD GROUP, or EDIT on a group, opens the Edit Group dialog
+    (`UIFriendGroup`, art `GroupMod`): the group's name over every buddy,
+    each with a checkbox, those already in the group checked. OK refuses a
+    blank name, nothing checked among the 7 rows in view, or a name taken,
+    as v83 does. Otherwise it moves each buddy checked into the group and
+    each unchecked one out to the Default Group, one add each.
+  - DELETE removes a buddy after asking. On a group it asks, then moves
+    every member to the Default Group. The Default Group can be neither
+    edited nor deleted.
+  - GROUP WHISPER sets the chat target to a group. CHAT opens a messenger
+    and invites the buddy; WHISPER, MESSAGE (a note) and PARTY do what they
+    say.
+  - BLOCK / UNBLOCK toggles a buddy, or a whole group (blocking unless
+    every member already is), and prints "Buddy chat with "<name>" has been
+    disabled." or "enabled.". As in v83 the server is told nothing: blocks
+    are kept per character in the client's `FriendBlocked` setting. A
+    blocked buddy counts as away, gets no buddy or group chat from the
+    player, and their buddy chat is not shown (report b020).
 
 ## Not implemented
 
-- Groups in HeavenClient: its Friend tab shows online and offline sections,
-  not v83's groups, and has no ADD GROUP or EDIT. The server already moves
-  buddies between groups.
 - Raising the capacity (packet 0x15 is parsed but never sent), and the
   Cash Shop flags.
-- The MAP button, notes, and the blacklist.
+- The MAP button, and the blacklist.
+- Deleting a group's buddies along with it (v83's "DELETE BUDDIES AS WELL"
+  checkbox).
 
 ## Unverified against period footage
 
-No 2008–2010 footage of the Friend tab was found, so the layout is inferred
-from the art:
+The tab's group layout, the Edit Group dialog and the delete-group prompt
+match 2010 GMS footage (report b019). Still inferred from the client's
+code alone:
 
-- the two columns;
-- where names and channels sit in a row;
-- the button order;
-- the delete wording;
+- the Add Buddy dialog, whose group combo covers the prompt's second line
+  (the coordinates are v83's own);
+- where names and icons sit in a row;
 - the buddy chat colour (orange).

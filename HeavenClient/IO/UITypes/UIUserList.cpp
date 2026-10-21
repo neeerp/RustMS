@@ -344,8 +344,7 @@ namespace ms
 		location = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::LOCATIONGREY);
 
 		show_online = Setting<FriendShowOnline>::get().load();
-		blocks = FriendGroups::Blocks(FriendGroups::parse_blocks(Setting<FriendBlocked>::get().load(),
-				Stage::get().get_player().get_oid()));
+		blocks = BuddyCommands::blocks();
 		folded = FriendGroups::parse_names(Setting<FriendFolded>::get().load());
 
 		friend_slider = Slider(Slider::Type::CLASSIC, FRIEND_SLIDER, FRIEND_SLIDER_X, 1, 0,

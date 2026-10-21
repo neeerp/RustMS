@@ -80,23 +80,23 @@ namespace ms
 		return capacity;
 	}
 
-	std::vector<int32_t> BuddyList::online_ids() const
+	std::vector<int32_t> BuddyList::online_ids(const std::set<int32_t>& blocked) const
 	{
 		std::vector<int32_t> result;
 
 		for (auto& buddy : buddies)
-			if (buddy.hears_chat())
+			if (buddy.hears_chat() && !blocked.count(buddy.id))
 				result.push_back(buddy.id);
 
 		return result;
 	}
 
-	std::vector<int32_t> BuddyList::online_ids(const std::string& group) const
+	std::vector<int32_t> BuddyList::online_ids(const std::string& group, const std::set<int32_t>& blocked) const
 	{
 		std::vector<int32_t> result;
 
 		for (auto& buddy : buddies)
-			if (buddy.group == group && buddy.hears_chat())
+			if (buddy.group == group && buddy.hears_chat() && !blocked.count(buddy.id))
 				result.push_back(buddy.id);
 
 		return result;

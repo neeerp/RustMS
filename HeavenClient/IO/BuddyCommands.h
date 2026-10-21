@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Character/FriendGroups.h"
+
 #include <cstdint>
 #include <string>
 
@@ -20,5 +22,7 @@ namespace ms
 		// Asks again about each request still unanswered, unless one is
 		// showing, as v83 does once a map has loaded (FUN_00a3fecf).
 		void show_requests();
+		// The buddies this character has blocked, from the settings.
+		FriendGroups::Blocks blocks();
 	}
 }
