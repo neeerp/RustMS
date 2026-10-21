@@ -42,9 +42,10 @@ async fn ap_and_sp_raise_stats_and_skills_and_persist() {
     let t = step(c, "str", spend_ap(stat::STR)).await;
     assert_eq!(t.stat(stat::STR), Some(i64::from(session.str) + 1));
     assert_eq!(t.stat(stat::AP), Some(4));
-    // A beginner's AP adds 10 max HP.
+    // A beginner's AP adds 8 to 12 max HP.
     let t = step(c, "max hp", spend_ap(stat::MAX_HP)).await;
-    assert_eq!(t.stat(stat::MAX_HP), Some(max_hp + 10));
+    let raised = t.stat(stat::MAX_HP).unwrap();
+    assert!((8..=12).contains(&(raised - max_hp)), "{raised}");
     assert_eq!(t.stat(stat::AP), Some(3));
     // Current HP is not something AP buys.
     let t = step(c, "hp", spend_ap(stat::HP)).await;
@@ -63,10 +64,7 @@ async fn ap_and_sp_raise_stats_and_skills_and_persist() {
     drop(session);
     let session = relogin(&config).await;
     assert_eq!(session.level, 2);
-    assert_eq!(
-        (session.str, i64::from(session.max_hp)),
-        (str + 1, max_hp + 10)
-    );
+    assert_eq!((session.str, i64::from(session.max_hp)), (str + 1, raised));
     assert_eq!((session.ap, session.sp), (3, 0));
     assert_eq!(session.skills, BTreeMap::from([(THREE_SNAILS, 1)]));
 }

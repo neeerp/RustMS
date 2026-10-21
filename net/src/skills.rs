@@ -5,6 +5,7 @@ use crate::packet::build::world::mist::MistKind;
 use game::{BuffStat, Disease, InventoryType, MobStat, Player, SkillRecord};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
+use rand::Rng;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -130,9 +131,11 @@ pub const IMPROVING_MAX_HP: i32 = 1000001;
 pub const IMPROVING_MAX_MP: i32 = 2000001;
 pub const BRAWLER_IMPROVE_MAX_HP: i32 = 5100000;
 
-/// What a warrior's Improving MaxHP Increase, a Brawler's Improve MaxHP and
-/// a magician's Improving MaxMP Increase add to max HP and MP growth: `x`
-/// on a level up, or `y` for an AP, as their descriptions say.
+/// What the player adds to max HP and MP growth: a warrior's Improving
+/// MaxHP Increase, a Brawler's Improve MaxHP and a magician's Improving
+/// MaxMP Increase (`x` on a level up, or `y` for an AP, as their
+/// descriptions say), and for MP a share of total INT: a tenth on a level
+/// up, 3/40 for an AP, the share the client's AP Reset takes back.
 pub fn growth_bonus(player: &Player, level_up: bool) -> (i16, i16) {
     let job = i32::from(player.stats.job);
     let bonus = |line, skill_id| {
@@ -146,10 +149,17 @@ pub fn growth_bonus(player: &Player, level_up: bool) -> (i16, i16) {
         });
         i16::try_from(value).unwrap_or(0)
     };
+    let int = total_int(player);
+    let int = if level_up { int / 10 } else { int * 3 / 40 };
     (
         bonus(100, IMPROVING_MAX_HP) + bonus(510, BRAWLER_IMPROVE_MAX_HP),
-        bonus(200, IMPROVING_MAX_MP),
+        bonus(200, IMPROVING_MAX_MP) + i16::try_from(int).unwrap_or(i16::MAX),
     )
+}
+
+/// The random part of max HP/MP growth: 0 to `spread`.
+pub fn growth_roll(spread: i16) -> i16 {
+    rand::thread_rng().gen_range(0, spread + 1)
 }
 
 /// The percent Element Amplification scales the player's spells by (its
@@ -1262,6 +1272,7 @@ mod tests {
             (BRAWLER_IMPROVE_MAX_HP, 2),
         ]);
         player.stats.job = 110;
+        player.stats.int = 9;
         assert_eq!(growth_bonus(&player, true), (40, 0));
         assert_eq!(growth_bonus(&player, false), (30, 0));
         player.stats.job = 230;
@@ -1272,6 +1283,21 @@ mod tests {
         // A Gunslinger has no Improve MaxHP.
         player.stats.job = 520;
         assert_eq!(growth_bonus(&player, false), (0, 0));
+    }
+
+    #[test]
+    fn int_adds_to_max_mp_growth() {
+        // A tenth of total INT on a level up, 3/40 for an AP, whatever the
+        // job.
+        let mut player = knowing(&[]);
+        player.stats.job = 230;
+        player.stats.int = 400;
+        assert_eq!(growth_bonus(&player, true), (0, 40));
+        assert_eq!(growth_bonus(&player, false), (0, 30));
+        player.stats.job = 100;
+        player.stats.int = 4;
+        assert_eq!(growth_bonus(&player, true), (0, 0));
+        assert!((0..=4).contains(&growth_roll(4)));
     }
 
     #[test]

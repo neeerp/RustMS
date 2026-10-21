@@ -473,9 +473,15 @@ impl Player {
 
     /// Add EXP, levelling up as many times as it covers. Each level grants
     /// 5 AP, 3 SP past beginner, and the job family's max HP/MP growth plus
-    /// `skill_bonus`, what the player's skills add to it; current HP and MP
+    /// `bonus`, what the player's skills and INT add to it, up to 30000;
+    /// `roll(spread)` picks the random part, 0 to `spread`. Current HP and MP
     /// stay as they were, as in v83. Returns the number of levels gained.
-    pub fn gain_exp(&mut self, amount: i32, skill_bonus: (i16, i16)) -> u8 {
+    pub fn gain_exp(
+        &mut self,
+        amount: i32,
+        bonus: (i16, i16),
+        mut roll: impl FnMut(i16) -> i16,
+    ) -> u8 {
         if amount <= 0 {
             return 0;
         }
@@ -491,9 +497,10 @@ impl Player {
             if self.stats.job % 1000 != 0 {
                 self.stats.sp = self.stats.sp.saturating_add(3);
             }
-            let (hp, mp) = level_up_growth(self.stats.job);
-            self.stats.max_hp = self.stats.max_hp.saturating_add(hp + skill_bonus.0);
-            self.stats.max_mp = self.stats.max_mp.saturating_add(mp + skill_bonus.1);
+            let (hp, mp) = growth(self.stats.job).level_up(&mut roll);
+            let stats = &mut self.stats;
+            stats.max_hp = stats.max_hp.saturating_add(hp + bonus.0).min(MAX_HP_MP);
+            stats.max_mp = stats.max_mp.saturating_add(mp + bonus.1).min(MAX_HP_MP);
             gained += 1;
         }
         if crate::exp::to_next_level(self.stats.level).is_none() {
@@ -610,14 +617,20 @@ impl Player {
     }
 
     /// Spend one AP on `stat`, which for max HP or MP adds the job's growth
-    /// plus `skill_bonus`, what the player's skills add to it. Returns false,
-    /// changing nothing, without AP or once the stat is at its cap.
-    pub fn spend_ap(&mut self, stat: ApStat, skill_bonus: (i16, i16)) -> bool {
+    /// plus `bonus`, what the player's skills and INT add to it, with
+    /// `roll` as in `gain_exp`. Returns false, changing nothing, without AP
+    /// or once the stat is at its cap.
+    pub fn spend_ap(
+        &mut self,
+        stat: ApStat,
+        bonus: (i16, i16),
+        mut roll: impl FnMut(i16) -> i16,
+    ) -> bool {
         if self.stats.ap <= 0 {
             return false;
         }
-        let (hp, mp) = ap_growth(self.stats.job);
-        let (hp, mp) = (hp + skill_bonus.0, mp + skill_bonus.1);
+        let (hp, mp) = growth(self.stats.job).ap(&mut roll);
+        let (hp, mp) = (hp + bonus.0, mp + bonus.1);
         let stats = &mut self.stats;
         let (value, gain, cap) = match stat {
             ApStat::Str => (&mut stats.str, 1, MAX_BASE_STAT),
@@ -761,17 +774,45 @@ impl Player {
     }
 }
 
-/// Max HP/MP gained per level: the middle of v83's random ranges
-/// (`MapleCharacter.levelUp`), so levels are reproducible.
-fn level_up_growth(job: i16) -> (i16, i16) {
-    match job / 100 {
-        0 | 10 | 20 => (14, 11),
-        1 | 11 | 21 => (26, 5),
-        2 | 12 => (12, 23),
-        3 | 4 | 13 | 14 => (22, 15),
-        5 | 15 => (25, 20),
-        _ => (14, 11),
+/// A job family's max HP/MP growth in v83: the least a level up and an AP
+/// add, the slopes of the client's minimum max HP/MP tables (`FUN_008cd10a`,
+/// `FUN_008cd369`) and its AP Reset dialog's gains (`0x8cc216`), plus a roll of up to
+/// `HP_SPREAD` HP and `MP_SPREAD` MP on top, as servers of the time rolled.
+struct Growth {
+    level_up: (i16, i16),
+    ap: (i16, i16),
+}
+
+const HP_SPREAD: i16 = 4;
+const MP_SPREAD: i16 = 2;
+
+impl Growth {
+    fn level_up(&self, roll: &mut impl FnMut(i16) -> i16) -> (i16, i16) {
+        Self::rolled(self.level_up, roll)
     }
+
+    fn ap(&self, roll: &mut impl FnMut(i16) -> i16) -> (i16, i16) {
+        Self::rolled(self.ap, roll)
+    }
+
+    fn rolled((hp, mp): (i16, i16), roll: &mut impl FnMut(i16) -> i16) -> (i16, i16) {
+        let hp = hp + roll(HP_SPREAD).clamp(0, HP_SPREAD);
+        (hp, mp + roll(MP_SPREAD).clamp(0, MP_SPREAD))
+    }
+}
+
+/// `job`'s growth row. The client keys its tables by `job % 1000`, so
+/// Cygnus Knights and Aran share the Explorers' rows; GMs take the
+/// beginners'.
+fn growth(job: i16) -> Growth {
+    let (level_up, ap) = match job % 1000 / 100 {
+        1 => ((24, 4), (20, 2)),
+        2 => ((10, 22), (6, 18)),
+        3 | 4 => ((20, 14), (16, 10)),
+        5 => ((22, 18), (18, 14)),
+        _ => ((12, 10), (8, 6)),
+    };
+    Growth { level_up, ap }
 }
 
 /// A first job's minimum level and the max HP/MP it adds: the middle of
@@ -794,18 +835,6 @@ fn second_job_rules(job: i16) -> Option<(i16, i16)> {
         210 | 220 | 230 => Some((0, 475)),
         310 | 320 | 410 | 420 | 510 | 520 => Some((325, 175)),
         _ => None,
-    }
-}
-
-/// Max HP/MP one AP adds: the middle of v83's random ranges, as with
-/// `level_up_growth`.
-fn ap_growth(job: i16) -> (i16, i16) {
-    match job / 100 {
-        1 | 11 | 21 => (22, 3),
-        2 | 12 => (8, 19),
-        3 | 4 | 13 | 14 => (18, 11),
-        5 | 15 => (20, 15),
-        _ => (10, 7),
     }
 }
 
@@ -884,6 +913,11 @@ mod tests {
         assert!(player.is_dirty());
     }
 
+    /// Growth's least roll.
+    fn floor(_spread: i16) -> i16 {
+        0
+    }
+
     fn player() -> Player {
         Player::new(
             1,
@@ -943,25 +977,26 @@ mod tests {
         player.stats.max_hp = 50;
         player.stats.hp = 40;
         // Rain's seven quizzes pay 62 EXP: level 1 -> 3 with 13 left over.
-        assert_eq!(player.gain_exp(62, (0, 0)), 2);
+        assert_eq!(player.gain_exp(62, (0, 0), floor), 2);
         assert_eq!(
             (player.stats.level, player.stats.exp, player.stats.ap),
             (3, 13, 10)
         );
-        // Two beginner levels: +28 max HP, +22 max MP, no refill.
-        assert_eq!((player.stats.max_hp, player.stats.hp), (78, 40));
-        assert_eq!((player.stats.max_mp, player.stats.mp), (27, 5));
-        assert_eq!(player.gain_exp(0, (0, 0)), 0);
+        // Two beginner levels at the least: +24 max HP, +20 max MP, no
+        // refill.
+        assert_eq!((player.stats.max_hp, player.stats.hp), (74, 40));
+        assert_eq!((player.stats.max_mp, player.stats.mp), (25, 5));
+        assert_eq!(player.gain_exp(0, (0, 0), floor), 0);
         assert!(player.is_dirty());
     }
 
     #[test]
     fn levels_past_beginner_grant_sp() {
         let mut player = player();
-        player.gain_exp(62, (0, 0));
+        player.gain_exp(62, (0, 0), floor);
         assert_eq!(player.stats.sp, 0);
         player.stats.job = 200;
-        player.gain_exp(57 + 92 - 13, (0, 0));
+        player.gain_exp(57 + 92 - 13, (0, 0), floor);
         assert_eq!((player.stats.level, player.stats.sp), (5, 6));
     }
 
@@ -969,38 +1004,96 @@ mod tests {
     fn ap_raises_one_stat_until_it_runs_out_or_caps() {
         let mut player = player();
         player.stats.ap = 3;
-        assert!(player.spend_ap(ApStat::Str, (0, 0)));
+        assert!(player.spend_ap(ApStat::Str, (0, 0), floor));
         assert_eq!((player.stats.str, player.stats.ap), (13, 2));
         assert!(player.is_dirty());
         player.stats.job = 200;
-        assert!(player.spend_ap(ApStat::MaxMp, (0, 0)));
-        assert_eq!((player.stats.max_mp, player.stats.ap), (24, 1));
+        assert!(player.spend_ap(ApStat::MaxMp, (0, 0), floor));
+        assert_eq!((player.stats.max_mp, player.stats.ap), (23, 1));
         player.stats.luk = MAX_BASE_STAT;
-        assert!(!player.spend_ap(ApStat::Luk, (0, 0)));
+        assert!(!player.spend_ap(ApStat::Luk, (0, 0), floor));
         player.stats.max_hp = MAX_HP_MP - 1;
-        assert!(player.spend_ap(ApStat::MaxHp, (0, 0)));
+        assert!(player.spend_ap(ApStat::MaxHp, (0, 0), floor));
         assert_eq!((player.stats.max_hp, player.stats.ap), (MAX_HP_MP, 0));
-        assert!(!player.spend_ap(ApStat::Dex, (0, 0)));
+        assert!(!player.spend_ap(ApStat::Dex, (0, 0), floor));
         assert_eq!(player.stats.dex, 5);
     }
 
     #[test]
     fn skills_add_to_max_hp_and_mp_growth() {
-        // A warrior with Improving MaxHP Increase at 10: 26 + 40 HP a level,
-        // 22 + 30 for an AP.
+        // A warrior with Improving MaxHP Increase at 10: 24 + 40 HP a level
+        // at the least, 20 + 30 for an AP.
         let mut player = player();
         player.stats.job = 100;
         player.stats.level = 10;
         player.stats.ap = 1;
         player.stats.max_hp = 500;
         player.stats.max_mp = 100;
-        player.gain_exp(crate::exp::to_next_level(10).unwrap() as i32, (40, 0));
-        assert_eq!((player.stats.max_hp, player.stats.max_mp), (566, 105));
-        assert!(player.spend_ap(ApStat::MaxHp, (30, 0)));
-        assert_eq!(player.stats.max_hp, 618);
+        player.gain_exp(
+            crate::exp::to_next_level(10).unwrap() as i32,
+            (40, 0),
+            floor,
+        );
+        assert_eq!((player.stats.max_hp, player.stats.max_mp), (564, 104));
+        assert!(player.spend_ap(ApStat::MaxHp, (30, 0), floor));
+        assert_eq!(player.stats.max_hp, 614);
         // Strength takes no bonus.
-        assert!(player.spend_ap(ApStat::Str, (30, 0)));
+        assert!(player.spend_ap(ApStat::Str, (30, 0), floor));
         assert_eq!(player.stats.str, 13);
+    }
+
+    #[test]
+    fn growth_rolls_up_to_4_hp_and_2_mp_over_the_clients_floor() {
+        // (job, level-up floor, AP floor) for each family.
+        let rows = [
+            (0, (12, 10), (8, 6)),
+            (100, (24, 4), (20, 2)),
+            (232, (10, 22), (6, 18)),
+            (312, (20, 14), (16, 10)),
+            (422, (20, 14), (16, 10)),
+            (520, (22, 18), (18, 14)),
+            // Cygnus Knights and Aran use the Explorers' rows, GMs the
+            // beginners'.
+            (1210, (10, 22), (6, 18)),
+            (2100, (24, 4), (20, 2)),
+            (2000, (12, 10), (8, 6)),
+            (910, (12, 10), (8, 6)),
+        ];
+        let top = |spread| spread;
+        for (job, level_up, ap) in rows {
+            let gains = |roll: fn(i16) -> i16| {
+                let mut player = player();
+                player.stats.job = job;
+                player.stats.ap = 2;
+                let start = (player.stats.max_hp, player.stats.max_mp);
+                player.gain_exp(15, (0, 0), roll);
+                let levelled = (player.stats.max_hp, player.stats.max_mp);
+                player.spend_ap(ApStat::MaxHp, (0, 0), roll);
+                player.spend_ap(ApStat::MaxMp, (0, 0), roll);
+                (
+                    (levelled.0 - start.0, levelled.1 - start.1),
+                    (
+                        player.stats.max_hp - levelled.0,
+                        player.stats.max_mp - levelled.1,
+                    ),
+                )
+            };
+            assert_eq!(gains(floor), (level_up, ap), "job {job}");
+            let spread = |(hp, mp): (i16, i16)| (hp + 4, mp + 2);
+            assert_eq!(gains(top), (spread(level_up), spread(ap)), "job {job}");
+        }
+    }
+
+    #[test]
+    fn level_ups_stop_at_30000_max_hp_and_mp() {
+        let mut player = player();
+        player.stats.max_hp = MAX_HP_MP - 10;
+        player.stats.max_mp = MAX_HP_MP;
+        player.gain_exp(15, (40, 50), floor);
+        assert_eq!(
+            (player.stats.max_hp, player.stats.max_mp),
+            (MAX_HP_MP, MAX_HP_MP)
+        );
     }
 
     #[test]

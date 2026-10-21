@@ -30,7 +30,8 @@ async fn improving_max_hp_adds_to_level_ups_and_ap() {
     let c = &mut session.connection;
     let max_hp = i64::from(session.max_hp);
 
-    // Five snails (15 EXP) reach level 2: 26 max HP, and 40 from the skill.
+    // Five snails (15 EXP) reach level 2: 24 to 28 max HP, and 40 from the
+    // skill.
     let mut h = Trace::default();
     assert_eq!(warp(c, FOREST, "", &mut h).await, FOREST);
     until(c, &mut h, |t| t.field.alive(SNAIL).len() >= 5).await;
@@ -38,9 +39,14 @@ async fn improving_max_hp_adds_to_level_ups_and_ap() {
         send(c, attack(snail, 8)).await;
     }
     until(c, &mut h, |t| t.stat(stat::LEVEL).is_some()).await;
-    assert_eq!(h.stat(stat::MAX_HP), Some(max_hp + 26 + 40));
+    let levelled = h.stat(stat::MAX_HP).unwrap();
+    assert!(
+        (max_hp + 24 + 40..=max_hp + 28 + 40).contains(&levelled),
+        "{levelled}"
+    );
 
-    // An AP adds 22, and 30 from the skill.
+    // An AP adds 20 to 24, and 30 from the skill.
     let t = step(c, "max hp", spend_ap(stat::MAX_HP)).await;
-    assert_eq!(t.stat(stat::MAX_HP), Some(max_hp + 66 + 52));
+    let gain = t.stat(stat::MAX_HP).unwrap() - levelled;
+    assert!((20 + 30..=24 + 30).contains(&gain), "{gain}");
 }
