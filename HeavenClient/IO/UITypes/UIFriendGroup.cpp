@@ -5,6 +5,7 @@
 #include "../BuddyCommands.h"
 #include "../KeyAction.h"
 #include "../UI.h"
+#include "../../Gameplay/Stage.h"
 
 #include "../Components/MapleButton.h"
 
@@ -151,7 +152,8 @@ namespace ms
 				{
 					picks[top + i].checked = !picks[top + i].checked;
 
-					return Cursor::State::CLICKING;
+					// IDLE, so holding the button doesn't toggle it back.
+					return Cursor::State::IDLE;
 				}
 
 				return Cursor::State::CANCLICK;
@@ -228,7 +230,9 @@ namespace ms
 
 		if (refusal)
 		{
-			UI::get().emplace<UIOk>(refusal, [](bool) {});
+			// The notice takes the keys until it is closed.
+			name.set_state(Textfield::State::DISABLED);
+			UI::get().emplace<UIOk>(refusal, [this](bool) { name.set_state(Textfield::State::FOCUSED); });
 			return;
 		}
 
@@ -236,8 +240,12 @@ namespace ms
 
 		close();
 
+		// Skip anyone deleted while the dialog was open.
+		const BuddyList& buddies = Stage::get().get_player().get_buddies();
+
 		for (const auto& [buddy, to] : moves)
-			BuddyCommands::add(buddy, to, false);
+			if (buddies.find_listed(buddy))
+				BuddyCommands::add(buddy, to, false);
 	}
 
 	void UIFriendGroup::close()

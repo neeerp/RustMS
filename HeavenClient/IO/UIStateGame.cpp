@@ -846,6 +846,7 @@ namespace ms
 				case UIElement::Type::QUESTCOMPLETE:
 				case UIElement::Type::NOTICE:
 				case UIElement::Type::ENTERNUMBER:
+				case UIElement::Type::FRIENDGROUP:
 				case UIElement::Type::NPCTALK:
 				case UIElement::Type::AVATARSELECT:
 				case UIElement::Type::PETCHOOSER:

@@ -112,10 +112,10 @@ from `UI.nx`. Moved so far:
   name prompt, `/w NAME`, and incoming whispers feed the history `/w` alone
   uses. To Alliance and To Spouse give v83's notices, since HC has no
   alliances or marriage. Picking To Group opens v83's group dialog
-  (`UIGroupPicker`, FUN_008d500b): a combo box of a blank entry and the
-  buddies' groups, which can also be typed in. OK sends lines to that
-  group's online buddies. It does so even with the box blank, and then
-  finds no one. The name prompt has no history list.
+  (`UIGroupPicker`, FUN_008d500b): a combo box of the Default Group,
+  which it starts on, and the buddies' other groups, which can also be
+  typed in. OK sends lines to that group's online buddies. It does so
+  even with the box cleared, and then finds no one. The name prompt has no history list.
 - **NPC dialog** (`UINpcTalk`, `UIWindow.img/UtilDlgEx`): the frame,
   buttons, menu dots, quest list headers, and the `Basic.img/VScr4` scroll
   bar (`Slider::Type::CLASSIC`). See [npc-dialogue.md](npc-dialogue.md).

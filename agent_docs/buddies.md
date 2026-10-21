@@ -85,20 +85,23 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
   - Members sit two to a row, each with v83's icon: `icon01` if blocked,
     otherwise `icon00` if on the player's channel. Names are black if
     online, grey if away (offline, on no channel, or blocked), red if
-    blocked, and white when picked. An empty group shows "none".
+    blocked, and white when picked. An empty group shows "none". A
+    header's online count leaves out those away.
   - The tab header counts buddies against the capacity.
   - SHOW ONLINE / SHOW ALL hides or shows those away (kept in
     `FriendShowOnline`). The two buttons share a spot, so `filter_clicked`
     makes sure one press toggles only once.
   - Clicking a name picks that buddy; the buttons act on the pick.
     Double-clicking a buddy whispers one online or writes a note to one
-    away, and asks to unblock one blocked first. Double-clicking a picked
-    header edits the group.
+    away; one blocked is offered unblocking first, and then the same.
+    Double-clicking a picked header edits the group.
   - ADD BUDDY opens v83's Add Buddy dialog (`UIGroupPicker` with a name
-    field, report b021): a name, and a combo of the existing groups that
-    starts blank. A blank group is sent blank, and the server reads it as
-    the Default Group. EDIT on a buddy opens the same dialog with the name
-    filled in, which moves them to the group chosen.
+    field, report b021): a name, and a combo that starts on the Default
+    Group and lists the other groups after it (FUN_00a3fc85). A group typed
+    blank is sent blank, and the server reads it as the Default Group.
+    EDIT on a buddy opens the same dialog with the name filled in, which
+    moves them to the group chosen; as in v83, it doesn't start on their
+    own group.
   - ADD GROUP, or EDIT on a group, opens the Edit Group dialog
     (`UIFriendGroup`, art `GroupMod`): the group's name over every buddy,
     each with a checkbox, those already in the group checked. OK refuses a
@@ -125,6 +128,9 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 - The MAP button, and the blacklist.
 - Deleting a group's buddies along with it (v83's "DELETE BUDDIES AS WELL"
   checkbox).
+- The hover tip on a buddy ("Double-click to send a note." or to whisper).
+- Keeping folded groups per character (they are kept per client), and
+  scrolling back to a header after it is clicked shut.
 
 ## Unverified against period footage
 
@@ -135,4 +141,7 @@ code alone:
 - the Add Buddy dialog, whose group combo covers the prompt's second line
   (the coordinates are v83's own);
 - where names and icons sit in a row;
-- the buddy chat colour (orange).
+- the buddy chat colour (orange);
+- the height of the "none" line in an empty group;
+- whether v83's header counts include a request still waiting, which the
+  tab leaves out.

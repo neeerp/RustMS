@@ -921,28 +921,43 @@ namespace ms
 		if (!buddy || buddy->id != line->ids[half])
 			return;
 
-		std::string name = buddy->name;
+		int32_t id = buddy->id;
 
-		if (blocks.blocked(buddy->id))
+		// Write a note to one away; whisper one online.
+		auto reach = [this, id]()
+		{
+			const Buddy* buddy = buddies.find(id);
+
+			if (!buddy)
+				return;
+
+			if (FriendGroups::away(*buddy, blocks))
+				UIMemoSend::write_to(buddy->name);
+			else if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->whisper_to(buddy->name);
+		};
+
+		if (blocks.blocked(id))
 		{
 			// Unblock first, and only then go on.
 			UI::get().emplace<UIYesNo>(
 					"You can use it after unblocking.\\nWould you like to unblock?",
-					[this](bool yes)
+					[this, id, reach](bool yes)
 					{
-						if (yes)
-							toggle_block();
+						if (!yes)
+							return;
+
+						toggle_block();
+
+						if (!blocks.blocked(id))
+							reach();
 					}
 			);
 
 			return;
 		}
 
-		// Write a note to one away; whisper one online.
-		if (FriendGroups::away(*buddy, blocks))
-			UIMemoSend::write_to(name);
-		else if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->whisper_to(name);
+		reach();
 	}
 
 	void UIUserList::send_key(int32_t keycode, bool pressed, bool escape)
@@ -1391,6 +1406,11 @@ namespace ms
 		shown_buddies = buddies.get_buddies();
 		friend_groups = FriendGroups::arrange(shown_buddies);
 
+		// The headers count a blocked buddy as offline, as v83 does.
+		for (FriendGroups::Group& group : friend_groups)
+			group.online = static_cast<size_t>(std::count_if(group.members.begin(), group.members.end(),
+				[&](const Buddy* member) { return !FriendGroups::away(*member, blocks); }));
+
 		if (!buddies.find(picked_buddy))
 			picked_buddy = 0;
 
@@ -1486,7 +1506,8 @@ namespace ms
 		int16_t y = in_list.y() + friend_scroll * FRIEND_STEP;
 		size_t index = static_cast<size_t>(y / ROW);
 
-		if (index >= friend_lines.size())
+		// Two halves of 128; the strip right of them, before the scroll bar, hits nothing.
+		if (index >= friend_lines.size() || in_list.x() >= 2 * HALF)
 			return nullptr;
 
 		const FriendLine& line = friend_lines[index];

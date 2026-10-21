@@ -387,6 +387,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MONSTERBOOK);
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
+					types.emplace_back(UIElement::Type::FRIENDGROUP);
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::PETITEMSEARCH);
 					types.emplace_back(UIElement::Type::CHARINFO);
@@ -415,6 +416,7 @@ namespace ms
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
 					types.emplace_back(UIElement::Type::ENTERNUMBER);
+					types.emplace_back(UIElement::Type::FRIENDGROUP);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
