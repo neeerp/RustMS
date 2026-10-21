@@ -14,6 +14,12 @@ const HENESYS: i32 = 100000000;
 const LEAFRE_STATION_ENTRANCE: i32 = 240000100;
 /// The Haunted House's first hall, past the grounds' gate.
 const HAUNTED_HOUSE: i32 = 682000100;
+/// The Mushroom Castle's way in and through (Cosmic's `td_mushcastle`).
+const MUSHROOM_FOREST_FIELD: i32 = 106020000;
+const SPLIT_ROAD: i32 = 106020400;
+const CASTLE_WALL_EDGE: i32 = 106020501;
+const CASTLE_EAST_GATE: i32 = 106021300;
+const POISON_SPORE: i32 = 4000507;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -105,6 +111,9 @@ pub enum Effect {
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
+    /// A line in pink chat, as a portal that won't let the player through
+    /// says why.
+    Pink(String),
     /// Take the player's party into its own copy of an event's maps
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
@@ -208,6 +217,39 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ],
             block: false,
         },
+        // An Empty House's way to the Mushroom Kingdom, open once the
+        // quest that leads there is done or its first quests are taken.
+        "TD_MC_first"
+            if quest(2260) == QuestState::Completed
+                || (2300..=2310).any(|id| quest(id) != QuestState::NotStarted) =>
+        {
+            through(Effect::Warp(MUSHROOM_FOREST_FIELD))
+        }
+        "TD_MC_first" => refused(keys::MC_FIRST_BLOCKED),
+        // A Poison Spore clears the poisonous mushrooms in the way.
+        "obstacle" if player.inventory.count(POISON_SPORE) > 0 => ScriptOutcome {
+            effects: vec![
+                Effect::Pink(content::text().get(keys::MC_OBSTACLE_USED, &[])),
+                Effect::PortalSound,
+                Effect::TakeItem {
+                    item_id: POISON_SPORE,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(SPLIT_ROAD, named(SPLIT_ROAD, "left00")),
+            ],
+            block: false,
+        },
+        "obstacle" => refused(keys::MC_OBSTACLE_BLOCKED),
+        // Over the castle wall, once the Thorn Remover quest is done.
+        "gotocastle" if quest(2324) == QuestState::Completed => {
+            through(Effect::Warp(CASTLE_WALL_EDGE))
+        }
+        "gotocastle" => refused(keys::MC_CASTLE_BLOCKED),
+        "TD_MC_jump" => through(Effect::Warp(CASTLE_WALL_EDGE)),
+        "TD_MC_Egate" => through(Effect::WarpToPortal(
+            CASTLE_EAST_GATE,
+            named(CASTLE_EAST_GATE, "right00"),
+        )),
         // Event maps' exits, back to where the invitation (2031001, 2031006,
         // 2031003) was used, kept under its `returnMapQR`.
         "photoOut" => go_back(7686, Effect::Warp(saved(7686))),
@@ -226,6 +268,22 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
     Some(outcome)
 }
 
+/// A portal that lets the player through with its sound.
+fn through(warp: Effect) -> ScriptOutcome {
+    ScriptOutcome {
+        effects: vec![Effect::PortalSound, warp],
+        block: false,
+    }
+}
+
+/// A portal that keeps the player back, saying why in pink chat.
+fn refused(key: &str) -> ScriptOutcome {
+    ScriptOutcome {
+        effects: vec![Effect::Pink(content::text().get(key, &[]))],
+        block: false,
+    }
+}
+
 /// End a trip: forget the saved location `kind` and take the player back
 /// with `warp`.
 fn go_back(kind: i16, warp: Effect) -> ScriptOutcome {
@@ -240,6 +298,11 @@ fn is_market_portal(portal: &PortalTemplate) -> bool {
         .script
         .as_deref()
         .is_some_and(|script| script.contains("market"))
+}
+
+/// The id of `map_id`'s portal called `name`, else 0.
+fn named(map_id: i32, name: &str) -> u8 {
+    portal_id(map_id, |portal| portal.name == name)
 }
 
 /// The id of `map_id`'s first portal that `pick` accepts, else 0.
@@ -276,6 +339,55 @@ mod tests {
             effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
         }
+    }
+
+    fn pink(outcome: &ScriptOutcome) -> bool {
+        matches!(outcome.effects.as_slice(), [Effect::Pink(_)])
+    }
+
+    #[test]
+    fn the_mushroom_castle_lets_players_in_once_their_quests_allow() {
+        let through = |warp| vec![Effect::PortalSound, warp];
+        let first = |quests| portal("TD_MC_first", &player_with(quests)).unwrap();
+        assert!(pink(&first(&[])));
+        assert!(pink(&first(&[(2299, QuestState::Started)])));
+        for quests in [
+            &[(2260, QuestState::Completed)][..],
+            &[(2300, QuestState::Started)],
+            &[(2310, QuestState::Completed)],
+        ] {
+            assert_eq!(first(quests).effects, through(Effect::Warp(106020000)));
+        }
+
+        let castle = |quests| portal("gotocastle", &player_with(quests)).unwrap();
+        assert!(pink(&castle(&[(2324, QuestState::Started)])));
+        assert_eq!(
+            castle(&[(2324, QuestState::Completed)]).effects,
+            through(Effect::Warp(106020501))
+        );
+        assert_eq!(
+            portal("TD_MC_jump", &player_with(&[])).unwrap().effects,
+            through(Effect::Warp(106020501))
+        );
+    }
+
+    #[test]
+    fn a_poison_spore_clears_the_way_through_the_mushroom_forest() {
+        let mut player = player_with(&[]);
+        assert!(pink(&portal("obstacle", &player).unwrap()));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(POISON_SPORE, 2));
+        let effects = portal("obstacle", &player).unwrap().effects;
+        assert!(matches!(effects[0], Effect::Pink(_)));
+        assert!(effects.contains(&Effect::TakeItem {
+            item_id: POISON_SPORE,
+            quantity: 1,
+        }));
+        assert!(matches!(
+            effects.last(),
+            Some(Effect::WarpToPortal(106020400, _))
+        ));
     }
 
     #[test]
