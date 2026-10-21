@@ -181,9 +181,10 @@ namespace ms
 			for (auto button : { Buttons::BT_FAME_UP, Buttons::BT_FAME_DOWN })
 				buttons[button]->set_state(Button::State::DISABLED);
 
-		// Nor does it invite oneself (FUN_00903b86).
+		// Nor does it invite or trade with oneself (FUN_00903b86).
 		if (cid == player.get_oid())
-			buttons[Buttons::BT_PARTY]->set_state(Button::State::DISABLED);
+			for (auto button : { Buttons::BT_PARTY, Buttons::BT_TRADE })
+				buttons[button]->set_state(Button::State::DISABLED);
 
 		name = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::WHITE);
 		level = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
