@@ -34,6 +34,8 @@ namespace ms
 			Point<int16_t> text;
 			// The guild's has "from '<name>'" first.
 			bool from_first = false;
+			// The alliance's has "'<name>'s" first instead.
+			bool possessive = false;
 		};
 
 		// The invitations'.
@@ -42,7 +44,8 @@ namespace ms
 			{ "icon1", "Buddy request", Point<int16_t>(24, 2) },
 			{ "icon2", "Trade request", Point<int16_t>(24, 2) },
 			{ "icon5", "Party invite", Point<int16_t>(26, 4) },
-			{ "icon5", "Guild invite", Point<int16_t>(26, 4), true }
+			{ "icon5", "Guild invite", Point<int16_t>(26, 4), true },
+			{ "icon5", "Guild Alliance Invitation.", Point<int16_t>(26, 4), true, true }
 		};
 
 		// v83 writes the arrivals at (25, 7), in Arial 11.
@@ -115,7 +118,7 @@ namespace ms
 	{
 		const Look& look = LOOKS[kind];
 		nl::node fade = NxFiles::ui_classic["UIWindow.img"]["FadeYesNo"];
-		std::string from = "from '" + inviter + "'";
+		std::string from = look.possessive ? "'" + inviter + "'s" : "from '" + inviter + "'";
 
 		push({
 			kind,

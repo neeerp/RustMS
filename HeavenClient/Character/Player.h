@@ -23,6 +23,7 @@
 #include "Beacon.h"
 #include "Diseases.h"
 #include "BuddyList.h"
+#include "Alliance.h"
 #include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
@@ -411,6 +412,9 @@ namespace ms
 		// The player's guild, as the server last described it.
 		Guild &get_guild();
 		const Guild &get_guild() const;
+		// The guild's alliance, and the other guilds in it.
+		Alliance &get_alliance();
+		const Alliance &get_alliance() const;
 		// Show the guild's name and emblem under the player's name.
 		void show_guild();
 
@@ -501,6 +505,7 @@ namespace ms
 		MysticDoor door;
 		BuddyList buddies;
 		Guild guild;
+		Alliance alliance;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

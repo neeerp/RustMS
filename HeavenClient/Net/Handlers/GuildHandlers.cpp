@@ -1,5 +1,6 @@
 #include "GuildHandlers.h"
 
+#include "Helpers/AllianceNews.h"
 #include "Helpers/GuildBbsParser.h"
 #include "Helpers/GuildParser.h"
 
@@ -181,6 +182,30 @@ namespace ms
 			});
 		}
 
+		// An alliance's invitation (FUN_00a39f4e): a card, unless the Game
+		// Option blocks it or one is up already, when the client turns it
+		// down itself. Its O sends the player's guild's name; letting it fade
+		// says nothing.
+		void invited_to_alliance(int32_t alliance_id, const std::string& inviter)
+		{
+			std::string guild = Stage::get().get_player().get_guild().get_data().name;
+			auto cards = UI::get().get_element<UIInviteCard>();
+
+			if (!Setting<AllowAllianceInvite>::get().load())
+				return DenyAllianceRequestPacket(DenyAllianceRequestPacket::BLOCKING, inviter, guild).dispatch();
+
+			if (!cards || cards->showing(UIInviteCard::ALLIANCE))
+				return DenyAllianceRequestPacket(DenyAllianceRequestPacket::ANOTHER, inviter, guild).dispatch();
+
+			cards->add(UIInviteCard::ALLIANCE, inviter, [alliance_id, inviter, guild](bool yes)
+			{
+				if (yes)
+					JoinAlliancePacket(alliance_id, guild).dispatch();
+				else
+					DenyAllianceRequestPacket(DenyAllianceRequestPacket::DECLINED, inviter, guild).dispatch();
+			});
+		}
+
 		// A member left (LEFT) or was expelled; the player, if it was them.
 		void departed(Guild& guild, int32_t cid, const std::string& name, bool expelled)
 		{
@@ -254,6 +279,10 @@ namespace ms
 
 			if (recv.read_bool())
 				guild.update(GuildParser::parse_guild(recv));
+
+			// The alliance comes when asked (FUN_00a37490).
+			if (guild.get_data().alliance_id != 0)
+				AllianceInfoPacket().dispatch();
 
 			refresh();
 			break;
@@ -491,6 +520,34 @@ namespace ms
 			chat_line("The guild request has not been accepted, due to unknown reason.");
 			break;
 		}
+	}
+
+	void AllianceOperationHandler::handle(InPacket& recv) const
+	{
+		Player& player = Stage::get().get_player();
+		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
+
+		if (mode == AllianceNews::Mode::INVITE)
+		{
+			int32_t alliance_id = recv.read_int();
+			invited_to_alliance(alliance_id, recv.read_string());
+			return;
+		}
+
+		AllianceNews::Outcome outcome = AllianceNews::apply(mode, recv, player.get_alliance(), player.get_guild(), player.get_oid());
+
+		if (!outcome.chat.empty())
+			chat_line(outcome.chat);
+
+		// The buddy list's card, whatever the Game Option says.
+		if (!outcome.logged_in.empty())
+			if (auto cards = UI::get().get_element<UIInviteCard>())
+				cards->notify(outcome.logged_in, false);
+
+		if (outcome.ask_info)
+			AllianceInfoPacket().dispatch();
+
+		refresh();
 	}
 
 	void NotifyLevelUpHandler::handle(InPacket& recv) const

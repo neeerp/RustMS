@@ -21,6 +21,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The guild's alliance, an invitation to one, and its members logging in
+	// Opcode: ALLIANCE_OPERATION(66)
+	class AllianceOperationHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// "<Guild> Name has reached Lv. 30.", or a family's
 	// Opcode: NOTIFY_LEVELUP(105)
 	class NotifyLevelUpHandler : public PacketHandler

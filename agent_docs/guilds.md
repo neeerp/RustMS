@@ -401,6 +401,34 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 - Guild chat: the GUILDCHAT key and `/guild` set the chat target to "To the
   Guild". A line goes to the members the client knows are online; with
   nobody online it says so and sends nothing. Guild lines are mauve.
+- `Character/Alliance` holds the alliance and the other guilds in it; the
+  player's own guild stays in `Guild`, whose members carry their alliance
+  rank. `Net/Handlers/Helpers/AllianceNews` applies `ALLIANCE_OPERATION`
+  (66) as v83 does (FUN_00a39f4e):
+  - 0x0F replaces the alliance and stores each guild; a guild arriving
+    with the player's guild's id replaces the player's guild, so the list
+    never holds it. 0x0C sets or clears the alliance, 0x0D stores guilds.
+  - 0x12 adds a guild, or, for the player's guild, takes its GUILDDATA and
+    asks for the alliance (op 1); each says so in a chat line. 0x10 drops
+    a guild, or for the player's own clears the alliance and says "You
+    leaved the guild alliance." or "You are dismissed from the guild
+    alliance.". 0x1D clears it all and puts the guild back at rank 3.
+  - 0x0E marks another guild's member online or off, with the buddy list's
+    "is / logged in." card for a login; the player's guildmates come
+    through the guild's packets. 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x17 and
+    0x1E change a member, the master, the titles, a rank, the notice, the
+    alliance or a guild, each only for the player's alliance but 0x1B.
+  - The guild info (65/0x1A) asks for the alliance when it names one.
+  - 0x03 shows a card (`UIInviteCard::ALLIANCE`), "'<name>'s" over
+    "Guild Alliance Invitation."; O sends op 4 with the alliance's id and
+    the player's guild's name, X sends `DENY_ALLIANCE_REQUEST` 0x16. With
+    the AllowAllianceInvite option off the client denies with 0x14, and
+    with a card already up with 0x15.
+- Alliance chat: the ALLIANCECHAT key and `/alliance` pick "To Alliance".
+  A line goes to the members online in the other guilds, then in the
+  player's own, and is echoed locally in v83's alliance green (#A6FF7F);
+  with no one it says v83's notice. AllowAllianceChat off drops what
+  arrives.
 - The Guild tab of `UIUserList` (`UserList/Guild` art on `backgrnd2`):
   - The header shows the emblem, or the empty frame, before the guild name,
     centred; or "You are not in the guild." The notice scrolls through a
@@ -453,8 +481,8 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
 - Guild points and the guild quest.
-- Alliances in the client: HeavenClient ignores `ALLIANCE_OPERATION`
-  (send 0x42) and alliance chat, and has no Alliance tab.
+- The Alliance tab: the client keeps the alliance but shows only the tab
+  strip, so nothing sends ops 2, 3 or 6 to 0x0A yet.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,

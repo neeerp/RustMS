@@ -1,5 +1,6 @@
 #include "../Character/Guild.h"
 #include "../Character/GuildEmblemRules.h"
+#include "../Net/Handlers/Helpers/AllianceNews.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
 #include <array>
 #include <cstring>
@@ -34,14 +35,71 @@ struct Writer
 	}
 
 	// A GUILDMEMBER record: the name NUL-padded to 13 bytes, then six ints.
-	Writer& member(const std::string& name, int32_t rank, int32_t online)
+	Writer& member(const std::string& name, int32_t rank, int32_t online, int32_t alliance_rank = 5)
 	{
 		std::string padded = name;
 		padded.resize(13, '\0');
 		bytes.insert(bytes.end(), padded.begin(), padded.end());
-		return put<int32_t>(100).put<int32_t>(30).put(rank).put(online).put<int32_t>(0).put<int32_t>(5);
+		return put<int32_t>(100).put<int32_t>(30).put(rank).put(online).put<int32_t>(0).put(alliance_rank);
+	}
+
+	struct Member
+	{
+		int32_t id;
+		const char* name;
+		int32_t online;
+		int32_t alliance_rank;
+	};
+
+	// A GUILDDATA with no emblem; the first member is the master.
+	Writer& guild(int32_t id, const std::string& name, int32_t alliance_id, std::vector<Member> members)
+	{
+		put(id).string(name);
+
+		for (const char* title : { "Master", "Jr. Master", "Member", "", "" })
+			string(title);
+
+		put<uint8_t>(static_cast<uint8_t>(members.size()));
+
+		for (auto& m : members)
+			put(m.id);
+
+		for (size_t i = 0; i < members.size(); i++)
+			member(members[i].name, i == 0 ? 1 : 3, members[i].online, members[i].alliance_rank);
+
+		return put<int32_t>(10).put<int16_t>(0).put<uint8_t>(0).put<int16_t>(0).put<uint8_t>(0)
+			.string("").put<int32_t>(0).put(alliance_id);
+	}
+
+	// The ALLIANCE struct: the guild ids, then the capacity.
+	Writer& alliance(int32_t id, const std::vector<int32_t>& guilds, int32_t capacity, const std::string& notice)
+	{
+		put(id).string("Union");
+
+		for (const char* title : { "Chief", "Lords", "Elder", "", "" })
+			string(title);
+
+		put<uint8_t>(static_cast<uint8_t>(guilds.size()));
+
+		for (int32_t guild : guilds)
+			put(guild);
+
+		return put(capacity).string(notice);
 	}
 };
+
+// Applies one ALLIANCE_OPERATION packet for the player, character 1.
+ms::AllianceNews::Outcome news(Writer& w, ms::Alliance& alliance, ms::Guild& own, bool whole = true)
+{
+	ms::InPacket recv(w.bytes.data(), w.bytes.size());
+	uint8_t mode = static_cast<uint8_t>(recv.read_byte());
+	ms::AllianceNews::Outcome outcome = ms::AllianceNews::apply(mode, recv, alliance, own, 1);
+
+	if (whole)
+		require(!recv.available(), "the packet is read to its end");
+
+	return outcome;
+}
 
 int main()
 {
@@ -207,6 +265,141 @@ int main()
 		require(emblem::category_index(7000) == 0 && emblem::category_index(0) == 0, "an unknown category is the first");
 		require(emblem::category_mark(0) == 2000 && emblem::category_mark(1) == 3000 && emblem::category_mark(2) == 4000, "a category's first mark");
 		require(emblem::category_mark(3) == 5000 && emblem::category_mark(4) == 9000, "letters, then ETC");
+
+		// The alliance, as recv 66 tells it (FUN_00a39f4e).
+		{
+			using Mode = AllianceNews::Mode;
+			Guild own;
+			Alliance alliance;
+			std::vector<Writer::Member> ours = { { 1, "Alice", 1, 3 }, { 2, "Bobby", 1, 3 } };
+			std::vector<Writer::Member> theirs = { { 3, "Carol", 0, 2 }, { 4, "Dan", 0, 5 } };
+			Writer w;
+			w.guild(10, "Tens", 0, ours);
+			InPacket recv(w.bytes.data(), w.bytes.size());
+			own.update(GuildParser::parse_guild(recv));
+			require(own.find(1)->alliance_rank == 3, "GUILDDATA carries the alliance rank");
+			require(alliance.online_ids(own, 1).empty(), "no alliance chat outside an alliance");
+
+			ours[0].alliance_rank = 1;
+			ours[1].alliance_rank = 5;
+			w = Writer();
+			w.put<uint8_t>(Mode::INFO).alliance(7, { 10, 20 }, 3, "Hi").guild(10, "Tens", 7, ours).guild(20, "Twenty", 7, theirs);
+			news(w, alliance, own);
+			require(alliance.exists() && alliance.get_data().name == "Union" && alliance.get_data().capacity == 3, "the alliance");
+			require(alliance.get_data().guild_ids == (std::vector<int32_t>{ 10, 20 }) && alliance.get_data().notice == "Hi", "its guilds and notice");
+			require(own.get_data().alliance_id == 7 && own.find(1)->alliance_rank == 1, "the player's guild goes to the guild");
+			require(alliance.get_guilds().size() == 1 && alliance.find_guild(20) && !alliance.find_guild(10), "the list holds the others");
+			require(alliance.title(1) == "Chief" && alliance.title(4).empty() && alliance.title(6).empty(), "titles by rank");
+			require(alliance.lowest_rank() == 3, "rank 4 has no title");
+			require(alliance.rank_held(own, 2) && !alliance.rank_held(own, 4), "ranks held anywhere in it");
+			require(alliance.online_ids(own, 1) == std::vector<int32_t>{ 2 }, "chat goes to those online but the player");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::MEMBER_ONLINE).put<int32_t>(7).put<int32_t>(20).put<int32_t>(3).put<uint8_t>(1);
+			require(news(w, alliance, own).logged_in == "Carol", "a login elsewhere shows the card");
+			require(alliance.online_ids(own, 1) == (std::vector<int32_t>{ 3, 2 }), "the other guilds come first");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::MEMBER_ONLINE).put<int32_t>(7).put<int32_t>(10).put<int32_t>(2).put<uint8_t>(1);
+			require(news(w, alliance, own).logged_in.empty(), "guildmates aren't looked up");
+			w = Writer();
+			w.put<uint8_t>(Mode::MEMBER_ONLINE).put<int32_t>(7).put<int32_t>(20).put<int32_t>(1).put<uint8_t>(1);
+			require(news(w, alliance, own).logged_in.empty(), "nor the player");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_JOINED).alliance(7, { 10, 20, 30 }, 3, "Hi").put<int32_t>(30)
+				.guild(30, "Thirty", 7, { { 5, "Eve", 1, 2 } });
+			AllianceNews::Outcome joined = news(w, alliance, own);
+			require(joined.chat == "[Thirty] guild joined in your guild alliance." && !joined.ask_info, "another guild joins");
+			require(alliance.get_guilds().size() == 2 && alliance.get_data().guild_ids.size() == 3, "and is listed");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::MEMBER_LEVEL_JOB).put<int32_t>(7).put<int32_t>(20).put<int32_t>(4).put<int32_t>(70).put<int32_t>(110);
+			news(w, alliance, own);
+			require(alliance.find_guild(20)->members[1].level == 70 && alliance.find_guild(20)->members[1].job == 110, "level and job");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::MASTER).put<int32_t>(7).put<int32_t>(1).put<int32_t>(3);
+			news(w, alliance, own);
+			require(own.find(1)->alliance_rank == 2 && alliance.find_guild(20)->members[0].alliance_rank == 1, "a new master");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::RANK).put<int32_t>(2).put<uint8_t>(4);
+			news(w, alliance, own);
+			w = Writer();
+			w.put<uint8_t>(Mode::RANK).put<int32_t>(4).put<uint8_t>(3);
+			news(w, alliance, own);
+			require(own.find(2)->alliance_rank == 4 && alliance.find_guild(20)->members[1].alliance_rank == 3, "ranks, here or there");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::TITLES).put<int32_t>(7);
+			for (const char* title : { "A1", "B2", "C3", "D4", "E5" })
+				w.string(title);
+			news(w, alliance, own);
+			require(alliance.title(5) == "E5" && alliance.lowest_rank() == 5, "titles");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::NOTICE).put<int32_t>(8).string("Other");
+			news(w, alliance, own);
+			require(alliance.get_data().notice == "Hi", "another alliance's notice is ignored");
+			w = Writer();
+			w.put<uint8_t>(Mode::NOTICE).put<int32_t>(7).string("Meet");
+			news(w, alliance, own);
+			require(alliance.get_data().notice == "Meet", "the notice");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::CHANGED).alliance(7, { 10, 20, 30 }, 4, "Meet");
+			news(w, alliance, own);
+			require(alliance.get_data().capacity == 4 && alliance.get_data().titles[4].empty(), "the whole alliance anew");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_LEFT).alliance(7, { 10, 20 }, 4, "Meet").put<int32_t>(30)
+				.guild(30, "Thirty", 0, { { 5, "Eve", 1, 3 } }).put<uint8_t>(0);
+			require(news(w, alliance, own, false).chat.empty(), "another guild leaving says nothing");
+			require(!alliance.find_guild(30) && alliance.get_guilds().size() == 1, "and leaves the list");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_CHANGED).put<int32_t>(7).put<int32_t>(20)
+				.guild(20, "Twenty", 7, { { 3, "Carol", 1, 1 } });
+			news(w, alliance, own);
+			require(alliance.find_guild(20)->members.size() == 1, "a guild anew");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::DISBANDED).put<int32_t>(7);
+			news(w, alliance, own);
+			require(!alliance.exists() && alliance.get_guilds().empty(), "disbanded");
+			require(own.get_data().alliance_id == 0 && own.find(1)->alliance_rank == 3 && own.find(2)->alliance_rank == 3, "everyone back at rank 3");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_JOINED).alliance(9, { 20, 10 }, 2, "").put<int32_t>(10).guild(10, "Tens", 9, ours);
+			joined = news(w, alliance, own);
+			require(joined.chat == "You joined [Union] guild alliance." && joined.ask_info, "the player's guild joins");
+			require(own.get_data().alliance_id == 9 && alliance.get_guilds().empty(), "the others come with the info");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_LEFT).alliance(8, { 20 }, 2, "").put<int32_t>(10).guild(10, "Tens", 0, ours).put<uint8_t>(1);
+			news(w, alliance, own, false);
+			require(alliance.exists() && own.get_data().alliance_id == 9, "another alliance's guild left");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILD_LEFT).alliance(9, { 20 }, 2, "").put<int32_t>(10).guild(10, "Tens", 0, ours).put<uint8_t>(1);
+			require(news(w, alliance, own).chat == "You are dismissed from the guild alliance.", "expelled");
+			require(!alliance.exists() && own.get_data().alliance_id == 0, "and out");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::ALLIANCE).put<uint8_t>(1).alliance(9, { 10 }, 2, "");
+			news(w, alliance, own);
+			require(alliance.exists(), "mode 0xc sets the alliance");
+			w = Writer();
+			w.put<uint8_t>(Mode::ALLIANCE).put<uint8_t>(0);
+			news(w, alliance, own);
+			require(!alliance.exists(), "or clears it");
+
+			w = Writer();
+			w.put<uint8_t>(Mode::GUILDS).put<int32_t>(2).guild(20, "Twenty", 9, theirs).guild(10, "Tens", 9, ours);
+			news(w, alliance, own);
+			require(alliance.get_guilds().size() == 1 && own.get_data().alliance_id == 9, "mode 0xd stores each guild");
+		}
 
 		std::cout << "Guild passed\n";
 		return 0;

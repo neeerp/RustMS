@@ -29,7 +29,7 @@ namespace ms
 			member.rank = recv.read_int();
 			member.online = recv.read_int() != 0;
 			recv.skip_int(); // contribution
-			recv.skip_int(); // alliance rank
+			member.alliance_rank = recv.read_int();
 
 			return member;
 		}
@@ -63,6 +63,27 @@ namespace ms
 			guild.alliance_id = recv.read_int();
 
 			return guild;
+		}
+
+		AllianceData parse_alliance(InPacket& recv)
+		{
+			AllianceData alliance;
+			alliance.id = recv.read_int();
+			alliance.name = recv.read_string();
+
+			for (auto& title : alliance.titles)
+				title = recv.read_string();
+
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			alliance.guild_ids.resize(count);
+
+			for (auto& id : alliance.guild_ids)
+				id = recv.read_int();
+
+			alliance.capacity = recv.read_int();
+			alliance.notice = recv.read_string();
+
+			return alliance;
 		}
 	}
 }

@@ -2231,6 +2231,16 @@ namespace ms
 		return guild;
 	}
 
+	Alliance &Player::get_alliance()
+	{
+		return alliance;
+	}
+
+	const Alliance &Player::get_alliance() const
+	{
+		return alliance;
+	}
+
 	void Player::show_guild()
 	{
 		const GuildData &data = guild.get_data();

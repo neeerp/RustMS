@@ -39,7 +39,7 @@ namespace ms
 	bool GuildMember::operator==(const GuildMember& other) const
 	{
 		return id == other.id && name == other.name && job == other.job && level == other.level &&
-			   rank == other.rank && online == other.online;
+			   rank == other.rank && online == other.online && alliance_rank == other.alliance_rank;
 	}
 
 	bool GuildData::operator==(const GuildData& other) const
@@ -296,6 +296,24 @@ namespace ms
 		}
 
 		return found;
+	}
+
+	bool Guild::set_alliance_rank(int32_t cid, int32_t rank)
+	{
+		GuildMember* found = member(cid);
+
+		if (found)
+			found->alliance_rank = rank;
+
+		return found;
+	}
+
+	void Guild::leave_alliance()
+	{
+		data.alliance_id = 0;
+
+		for (auto& member : data.members)
+			member.alliance_rank = 3;
 	}
 
 	void Guild::set_titles(std::array<std::string, 5> titles)

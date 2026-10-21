@@ -110,8 +110,8 @@ from `UI.nx`. Moved so far:
   v83's order (FUN_008d536c). Picking Whisper asks for a name, and every
   typed line then goes to that name until another target is picked; the
   name prompt, `/w NAME`, and incoming whispers feed the history `/w` alone
-  uses. To Alliance and To Spouse give v83's notices, since HC has no
-  alliances or marriage. Picking To Group opens v83's group dialog
+  uses. To Alliance goes to the alliance's members online (`guilds.md`);
+  To Spouse gives v83's notice, since HC has no marriage. Picking To Group opens v83's group dialog
   (`UIGroupPicker`, FUN_008d500b): a combo box of the Default Group,
   which it starts on, and the buddies' other groups, which can also be
   typed in. OK sends lines to that group's online buddies. It does so
@@ -578,7 +578,8 @@ side yet.
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
-| Alliance / blacklist tabs (`UIUserList`) | Tab strip only |
+| Alliance (`Character/Alliance`, invitation and login cards, alliance chat) | State, cards and chat implemented; the Alliance tab shows only its strip; see `guilds.md` |
+| Blacklist tab (`UIUserList`) | Tab strip only |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |
