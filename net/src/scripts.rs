@@ -12,6 +12,8 @@ use game_data::PortalTemplate;
 const FREE_MARKET: i32 = 910000000;
 const HENESYS: i32 = 100000000;
 const LEAFRE_STATION_ENTRANCE: i32 = 240000100;
+/// The Haunted House's first hall, past the grounds' gate.
+const HAUNTED_HOUSE: i32 = 682000100;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -186,6 +188,18 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 Effect::WarpToPortal(
                     LEAFRE_STATION_ENTRANCE,
                     portal_id(LEAFRE_STATION_ENTRANCE, |portal| portal.name == "east00"),
+                ),
+            ],
+            block: false,
+        },
+        // The Haunted House's gate, from its grounds (Cosmic's
+        // `halloween_enter`).
+        "halloween_enter" => ScriptOutcome {
+            effects: vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    HAUNTED_HOUSE,
+                    portal_id(HAUNTED_HOUSE, |portal| portal.name == "st00"),
                 ),
             ],
             block: false,

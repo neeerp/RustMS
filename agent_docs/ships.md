@@ -44,6 +44,24 @@ other end, its ticket and its fare:
 The fares and the 10-minute timetable come from Cosmic and have not been
 checked against v83.
 
+### The subway
+
+The subway between Kerning City and New Leaf City runs on the same clock
+as a `Route` with `ship: false`. A train leaves each way every 5 minutes:
+boarding opens 4 minutes before, closes 1 minute before, and the ride takes
+1 minute (`SUBWAY`, Edelstein's Continent 8 and 9). Its stations have no
+`shipObj`, so they get no CONTI_MOVE and `ship_state` answers nothing for
+them; the waiting room is still moved onto the train at departure and the
+riders set down at the far station's first `sp`.
+
+| Route | Boards at | Waiting room | Train | Arrives at | Ticket | Fare |
+| --- | --- | --- | --- | --- | --- | --- |
+| `TO_NLC` | 103000100 | 600010004 | 600010005 | 600010001 | 4031711 | 5,000 |
+| `TO_KERNING_CITY` | 600010001 | 600010002 | 600010003 | 103000100 | 4031713 | 5,000 |
+
+The fare is Cosmic's. The Basic tickets (4031710, 4031712) that Edelstein
+sells to level 10 and under are not sold or accepted.
+
 `conti::now()` is route time in milliseconds: the wall clock times
 `RUSTMS_CONTI_SCALE` (a whole number, default 1). The harness world sets it
 to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
@@ -104,6 +122,14 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
   are in (`conti::waiting_in`). The ticket is not returned.
 - Isa points the way to Orbis Station's four platforms.
 - Leafre Station's `dracoout` portal leads back into Leafre.
+- The subway's ticket gates (`SUBWAY_GATES`: 1052007 in Kerning City,
+  9201068 in New Leaf City) ask first, as `NLC_Move` does, and only then
+  look for the ticket. Kerning City's gate only serves the subway; its
+  original menu also offered Kerning Square and the Construction Site.
+- Bell (9201057, `NLC_ticketing`) sells the ticket for the line leaving her
+  platform from a one-choice menu, and in a waiting room lets the rider back
+  out to its platform. The text is under the `subway.*` keys, from
+  Server.Scripts.
 
 ## Packets
 
@@ -153,6 +179,9 @@ runs 60 times as fast. A ship seen against the harness therefore leaves
 again before it has finished docking.
 
 ## Not yet
+
+- The subway's Basic tickets, and Kerning City gate's Kerning Square and
+  Construction Site choices.
 
 - 8150000's drops, which belong in the content pack.
 - Mu Lung and Ereve in Isa's list; Corba's dragon flight to Leafre.

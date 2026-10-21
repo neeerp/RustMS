@@ -78,6 +78,9 @@ pub struct Route {
     pub ticket: i32,
     pub price: i32,
     pub timetable: Timetable,
+    /// Whether the platforms show a ship docking and leaving. The subway's
+    /// maps have none (no `shipObj`), so they get no CONTI packets.
+    pub ship: bool,
 }
 
 /// Ellinia and Orbis: one leaves each way every 15 minutes and sails for
@@ -101,6 +104,7 @@ pub const TO_ORBIS: Route = Route {
     ticket: 4031045,
     price: 5000,
     timetable: ELLINIA_ORBIS,
+    ship: true,
 };
 
 pub const TO_ELLINIA: Route = Route {
@@ -114,6 +118,7 @@ pub const TO_ELLINIA: Route = Route {
     ticket: 4031047,
     price: 5000,
     timetable: ELLINIA_ORBIS,
+    ship: true,
 };
 
 /// Orbis and Ludibrium, Leafre and Ariant: one leaves each way every 10
@@ -137,6 +142,7 @@ pub const TO_LUDIBRIUM: Route = Route {
     ticket: 4031074,
     price: 6000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
 /// Riders land on Orbis's `ludi00`, the spawn point named for this train (an
@@ -153,6 +159,7 @@ pub const LUDIBRIUM_TO_ORBIS: Route = Route {
     ticket: 4031045,
     price: 6000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
 pub const TO_LEAFRE: Route = Route {
@@ -166,6 +173,7 @@ pub const TO_LEAFRE: Route = Route {
     ticket: 4031331,
     price: 30000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
 pub const LEAFRE_TO_ORBIS: Route = Route {
@@ -179,6 +187,7 @@ pub const LEAFRE_TO_ORBIS: Route = Route {
     ticket: 4031045,
     price: 30000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
 /// Ariant's platform is also the town's entrance. Both its spawn points are
@@ -195,6 +204,7 @@ pub const TO_ARIANT: Route = Route {
     ticket: 4031576,
     price: 6000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
 pub const ARIANT_TO_ORBIS: Route = Route {
@@ -208,9 +218,49 @@ pub const ARIANT_TO_ORBIS: Route = Route {
     ticket: 4031045,
     price: 6000,
     timetable: ORBIS_BOATS,
+    ship: true,
 };
 
-const ROUTES: [&Route; 8] = [
+/// The subway between Kerning City and New Leaf City: one leaves each way
+/// every 5 minutes and rides for 1, boarding the 4 before (Edelstein's
+/// Continent 8 and 9). Riders land on the first spawn point.
+const SUBWAY: Timetable = Timetable {
+    term: 5,
+    wait: 4,
+    closed: 1,
+    ride: 1,
+};
+
+/// The fare is Cosmic's.
+pub const TO_NLC: Route = Route {
+    platform: 103000100,
+    waiting_room: 600010004,
+    deck: 600010005,
+    cabin: None,
+    balrogs: None,
+    arrival: (600010001, "sp"),
+    arrival_platform: 600010001,
+    ticket: 4031711,
+    price: 5000,
+    timetable: SUBWAY,
+    ship: false,
+};
+
+pub const TO_KERNING_CITY: Route = Route {
+    platform: 600010001,
+    waiting_room: 600010002,
+    deck: 600010003,
+    cabin: None,
+    balrogs: None,
+    arrival: (103000100, "sp"),
+    arrival_platform: 103000100,
+    ticket: 4031713,
+    price: 5000,
+    timetable: SUBWAY,
+    ship: false,
+};
+
+const ROUTES: [&Route; 10] = [
     &TO_ORBIS,
     &TO_ELLINIA,
     &TO_LUDIBRIUM,
@@ -219,6 +269,8 @@ const ROUTES: [&Route; 8] = [
     &LEAFRE_TO_ORBIS,
     &TO_ARIANT,
     &ARIANT_TO_ORBIS,
+    &TO_NLC,
+    &TO_KERNING_CITY,
 ];
 
 const MINUTE: i64 = 60_000;
@@ -357,9 +409,9 @@ pub fn waiting_in(map_id: i32) -> Option<&'static Route> {
 /// the route whose ship it shows, if any, and on a deck whether the Crimson
 /// Balrog's ship is alongside.
 pub fn ship_state(map_id: i32, t: i64) -> Option<(State, bool)> {
-    let route = ROUTES
-        .into_iter()
-        .find(|route| [route.platform, route.arrival_platform, route.deck].contains(&map_id))?;
+    let route = ROUTES.into_iter().find(|route| {
+        route.ship && [route.platform, route.arrival_platform, route.deck].contains(&map_id)
+    })?;
     let state = route.timetable.state(t);
     let departure = t - t.rem_euclid(route.timetable.term * MINUTE);
     let alongside = map_id == route.deck
@@ -410,7 +462,7 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
         }
         for change in route.timetable.changes(from, to) {
             let happening = match change {
-                State::Start if map_id == route.platform => {
+                State::Start if map_id == route.platform && route.ship => {
                     Happening::Show(Target::Platform, State::Start)
                 }
                 State::Move if map_id == route.waiting_room => Happening::MoveAll {
@@ -421,7 +473,7 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
                     let (map_id, portal) = route.arrival;
                     Happening::MoveAll { map_id, portal }
                 }
-                State::End if map_id == route.arrival_platform => {
+                State::End if map_id == route.arrival_platform && route.ship => {
                     Happening::Show(Target::ArrivalPlatform, State::End)
                 }
                 _ => continue,
@@ -655,5 +707,37 @@ mod tests {
                 Happening::Retreat
             ]
         );
+    }
+
+    #[test]
+    fn the_subway_runs_every_five_minutes_without_a_ship() {
+        let departure = 7 * HOUR + 5 * MINUTE;
+        let happens = |map_id, at: i64| happenings(map_id, at - 50, at + 50);
+        assert_eq!(SUBWAY.state(departure - 4 * MINUTE), State::Wait);
+        assert_eq!(SUBWAY.state(departure - MINUTE), State::Start);
+        assert_eq!(SUBWAY.state(departure + 30_000), State::Move);
+        assert_eq!(departing_from(103000100), Some(&TO_NLC));
+        assert_eq!(waiting_in(600010002), Some(&TO_KERNING_CITY));
+        // The waiting room boards the train and the train arrives...
+        assert_eq!(
+            happens(600010004, departure),
+            [Happening::MoveAll {
+                map_id: 600010005,
+                portal: ""
+            }]
+        );
+        assert_eq!(
+            happens(600010003, departure + MINUTE),
+            [Happening::MoveAll {
+                map_id: 103000100,
+                portal: "sp"
+            }]
+        );
+        // ...but the stations show no ship, and don't answer for one.
+        for station in [103000100, 600010001] {
+            assert_eq!(happens(station, departure - MINUTE), []);
+            assert_eq!(happens(station, departure + MINUTE), []);
+            assert_eq!(ship_state(station, departure), None);
+        }
     }
 }
