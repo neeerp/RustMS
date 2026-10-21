@@ -20,6 +20,22 @@ const SPLIT_ROAD: i32 = 106020400;
 const CASTLE_WALL_EDGE: i32 = 106020501;
 const CASTLE_EAST_GATE: i32 = 106021300;
 const POISON_SPORE: i32 = 4000507;
+/// Kerning City's subway: Line 1's first area, and its second, where the
+/// construction site's tunnel comes out.
+const LINE_1_AREA_1: i32 = 103000101;
+const LINE_1_AREA_2: i32 = 103000103;
+/// `rankRoom`: each job's hall (and Ereve's and the Dangerous Forest's),
+/// the room it leads into, and the room's portal back.
+const RANK_ROOMS: [(i32, i32, &str); 8] = [
+    (100000201, 100000204, "out00"),
+    (101000003, 101000004, "out00"),
+    (102000003, 102000004, "out00"),
+    (103000003, 103000008, "out00"),
+    (120000101, 120000105, "out00"),
+    (130000000, 130000100, "east00"),
+    (130000200, 130000100, "west00"),
+    (140010100, 140010110, "out00"),
+];
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -250,6 +266,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             CASTLE_EAST_GATE,
             named(CASTLE_EAST_GATE, "right00"),
         )),
+        // Into the subway's tunnels, from its ticketing booth and from the
+        // construction site north of town.
+        "subway_in2" => through(Effect::WarpToPortal(
+            LINE_1_AREA_1,
+            named(LINE_1_AREA_1, "out00"),
+        )),
+        // The second of the area's spawn points, as in Cosmic.
+        "met_in" => through(Effect::WarpToPortal(LINE_1_AREA_2, 1)),
+        "rankRoom" => {
+            let &(_, room, back) = RANK_ROOMS
+                .iter()
+                .find(|&&(hall, _, _)| hall == player.stats.map_id)?;
+            through(Effect::WarpToPortal(room, named(room, back)))
+        }
         // Event maps' exits, back to where the invitation (2031001, 2031006,
         // 2031003) was used, kept under its `returnMapQR`.
         "photoOut" => go_back(7686, Effect::Warp(saved(7686))),
@@ -388,6 +418,32 @@ mod tests {
             effects.last(),
             Some(Effect::WarpToPortal(106020400, _))
         ));
+    }
+
+    #[test]
+    fn the_subways_tunnels_and_the_halls_rooms_open_with_the_portal_sound() {
+        let mut player = player_with(&[]);
+        let warp = |script, player: &Player| match portal(script, player).unwrap().effects[..] {
+            [Effect::PortalSound, Effect::WarpToPortal(map, id)] => (map, id),
+            ref effects => panic!("{effects:?}"),
+        };
+        assert_eq!(warp("subway_in2", &player), (103000101, 3));
+        assert_eq!(warp("met_in", &player), (103000103, 1));
+        for (hall, room, id) in [
+            (100000201, 100000204, 2),
+            (101000003, 101000004, 2),
+            (102000003, 102000004, 1),
+            (103000003, 103000008, 1),
+            (120000101, 120000105, 1),
+            (130000000, 130000100, 5),
+            (130000200, 130000100, 4),
+            (140010100, 140010110, 1),
+        ] {
+            player.stats.map_id = hall;
+            assert_eq!(warp("rankRoom", &player), (room, id));
+        }
+        player.stats.map_id = HENESYS;
+        assert_eq!(portal("rankRoom", &player), None);
     }
 
     #[test]
