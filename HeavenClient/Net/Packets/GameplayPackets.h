@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 
 #include "MovementPacket.h"
 
@@ -714,9 +715,11 @@ namespace ms
 	public:
 		enum Mode : int8_t
 		{
+			WRITE = 0,
 			DELETE_THREAD = 1,
 			LIST = 2,
 			SHOW = 3,
+			REPLY = 4,
 			DELETE_REPLY = 5
 		};
 
@@ -744,6 +747,37 @@ namespace ms
 		BbsShowPacket(int32_t thread) : GuildBbsPacket(GuildBbsPacket::Mode::SHOW)
 		{
 			write_int(thread);
+		}
+	};
+
+	// Writes a thread, the notice, or a thread's new version (0x8166f6)
+	class BbsWritePacket : public GuildBbsPacket
+	{
+	public:
+		// Pass the thread when editing one.
+		BbsWritePacket(std::optional<int32_t> thread, bool notice, const std::string& title, const std::string& body,
+					   int32_t icon) : GuildBbsPacket(GuildBbsPacket::Mode::WRITE)
+		{
+			write_byte(thread.has_value());
+
+			if (thread)
+				write_int(*thread);
+
+			write_byte(notice);
+			write_string(title);
+			write_string(body);
+			write_int(icon);
+		}
+	};
+
+	// Replies to a thread
+	class BbsReplyPacket : public GuildBbsPacket
+	{
+	public:
+		BbsReplyPacket(int32_t thread, const std::string& text) : GuildBbsPacket(GuildBbsPacket::Mode::REPLY)
+		{
+			write_int(thread);
+			write_string(text);
 		}
 	};
 

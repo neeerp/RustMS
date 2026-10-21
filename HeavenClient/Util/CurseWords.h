@@ -55,10 +55,12 @@ namespace ms
 				if (static_cast<unsigned char>(c) < 0x20 && c != '\r' && c != '\n')
 					return message;
 
+			// Line breaks are skipped like the ignored characters.
+			auto kept = [](char c) { return static_cast<unsigned char>(c) >= 0x20 && !ignored(c); };
 			std::string squeezed;
 
 			for (char c : message)
-				if (static_cast<unsigned char>(c) >= 0x20 && !ignored(c))
+				if (kept(c))
 					squeezed += c;
 
 			for (const auto& word : words)
@@ -75,7 +77,7 @@ namespace ms
 			size_t next = 0;
 
 			for (char& c : filtered)
-				if (next < squeezed.size() && !ignored(c))
+				if (next < squeezed.size() && kept(c))
 					c = squeezed[next++];
 
 			return filtered;

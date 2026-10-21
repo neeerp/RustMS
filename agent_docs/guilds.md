@@ -218,6 +218,29 @@ parser in `Net/Handlers/Helpers/GuildBbsParser.cpp` (both covered by
   again." and drops the thread. QUIT closes the board; Esc does not.
 - DELETE follows rank changes when the next thread arrives; the reply
   rows' delete buttons also on every reply scroll, as in v83.
+- WRITE, NOTICE (masters and Jr. Masters) and EDIT (the thread's poster or
+  a moderator) swap the thread view for the write panel (`backgrnd3`; RE
+  notes `v83ref/reports/b009-bbs-write-re.md`). NOTICE while a notice
+  exists says "Please delete the current notice and then try again."
+  instead. The panel has a 25-byte title, a 600-byte body that shows 15
+  lines and scrolls past them (its scroll bar and the wheel move it, and it
+  follows the caret), the icon palette, SUBMIT and CANCEL. The list, the
+  page selector, the reply scroll bar and QUIT stay. Nothing takes the
+  focus until a click, Tab does nothing, and Enter in the body breaks the
+  line with a lone "\r" (a pasted "\r\n" also gives one).
+- The palette offers icons 0 to 2, then the cash icons 100 to 106 whose
+  items (5290000 to 5290006) the player has. A click picks one; the arrows
+  move only the highlight, so the icon sent stays the last one clicked, as
+  in v83. An edit starts on the thread's icon if the palette has it, else
+  on icon 0.
+- SUBMIT refuses an empty title ("Please enter the title."), an empty body
+  ("Please enter the text.") and a curse word in either ("Cursing is not
+  allowed."); otherwise it sends the thread, asks for page 0, and keeps the
+  panel until the server's thread (mode 7) replaces it. CANCEL asks for the
+  last thread clicked or shown and the page again.
+- The reply box (25 bytes) sends with the pencil button only; Enter does
+  nothing. It refuses empty text and cursing as SUBMIT does, sends the
+  reply, asks for the page, and empties only when the view is rebuilt.
 
 The packets are built in `net/src/packet/build/world/guild.rs`. The guild
 data lists the member ids, then a 37-byte record per member: the name padded
@@ -366,8 +389,6 @@ ints. The client takes the first member for the master.
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
 - Guild points, alliances, and the guild quest.
-- The board window's write and edit panel, the notice, replying, and the
-  emoticon palette: BtWrite, BtNotice, BtRetouch and BtReply stay disabled.
 - The board's page selector art: the labels are drawn as text, 32 px apart,
   with "<" and ">" for other groups of ten. The original's pitch and arrows
   are unknown.
@@ -391,7 +412,8 @@ ints. The client takes the first member for the master.
   as modal there hasn't been checked.
 - The board's notice is thread 0 on the wire, inferred from the client
   sending 0 when it is clicked.
-- How v83 encodes Enter in a board body is untraced; the board splits on
-  "\r\n", "\n" and "\r", so a closing break shows a blank last line.
+- The board shows bodies split on "\r\n", "\n" and "\r" (v83 writes a
+  lone "\r"; how its view splits the others is untraced), so a closing
+  break shows a blank last line.
 - The board's 12 px body line and 32 px page-number pitch are guesses.
 - Whether Esc closes v83's board; the spec names only QUIT.
