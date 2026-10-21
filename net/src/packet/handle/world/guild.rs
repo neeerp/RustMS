@@ -2,12 +2,14 @@ use crate::handler::{
     GuildRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build::world::guild::InviteRefusal;
+use game::guild::Emblem;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
 /// `GUILD_OPERATION`: ask for the guild again, name a new guild in answer
 /// to the name prompt, invite, join, leave, expel, or change the rank
-/// titles, a member's rank or the notice. Other modes aren't supported yet.
+/// titles, a member's rank, the emblem or the notice. Other modes aren't
+/// supported yet.
 pub struct GuildOperationHandler;
 
 impl WorldHandler for GuildOperationHandler {
@@ -44,6 +46,14 @@ impl WorldHandler for GuildOperationHandler {
             0x0E => GuildRequest::SetRank {
                 member_id: reader.read_int()?,
                 rank: reader.read_byte()?,
+            },
+            0x0F => GuildRequest::SetEmblem {
+                emblem: Emblem {
+                    background: reader.read_short()? as u16,
+                    background_color: reader.read_byte()?,
+                    mark: reader.read_short()? as u16,
+                    mark_color: reader.read_byte()?,
+                },
             },
             0x10 => GuildRequest::SetNotice {
                 notice: reader.read_str_with_length()?,
@@ -122,13 +132,28 @@ mod tests {
             })
         );
 
-        // Emblems and the rest come later.
+        // Alliances and the rest come later.
+        assert_eq!(guild_request(&operation(0x30)), None);
+    }
+
+    #[test]
+    fn reads_the_emblem() {
         let mut packet = operation(0x0F);
         packet.write_short(1001).unwrap();
         packet.write_byte(2).unwrap();
-        packet.write_short(2003).unwrap();
-        packet.write_byte(4).unwrap();
-        assert_eq!(guild_request(&packet), None);
+        packet.write_short(9026).unwrap();
+        packet.write_byte(16).unwrap();
+        assert_eq!(
+            guild_request(&packet),
+            Some(GuildRequest::SetEmblem {
+                emblem: Emblem {
+                    background: 1001,
+                    background_color: 2,
+                    mark: 9026,
+                    mark_color: 16,
+                }
+            })
+        );
     }
 
     #[test]

@@ -294,6 +294,10 @@ pub enum GuildRequest {
     SetNotice {
         notice: String,
     },
+    /// Give the guild the emblem made in Lea's emblem maker.
+    SetEmblem {
+        emblem: game::guild::Emblem,
+    },
 }
 
 /// Something a player asks of their Maple Messenger, which the world

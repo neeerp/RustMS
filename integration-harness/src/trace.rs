@@ -150,6 +150,9 @@ pub struct Trace {
     pub guild_ops: Vec<Vec<u8>>,
     /// GUILD_NAME_CHANGED: (character, guild name).
     pub guild_names: Vec<(i32, String)>,
+    /// GUILD_MARK_CHANGED: (character, [background, its colour, mark, its
+    /// colour]).
+    pub guild_marks: Vec<(i32, [u16; 4])>,
     /// NOTIFY_LEVELUP and NOTIFY_JOB_CHANGE: (opcode, type, level or job,
     /// name).
     pub notices: Vec<(i16, u8, i32, String)>,
@@ -515,6 +518,15 @@ impl Trace {
         } else if op == SendOpcode::GuildNameChanged as i16 {
             self.guild_names
                 .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::GuildMarkChanged as i16 {
+            let cid = r.read_int().unwrap();
+            let emblem = [
+                r.read_short().unwrap() as u16,
+                u16::from(r.read_byte().unwrap()),
+                r.read_short().unwrap() as u16,
+                u16::from(r.read_byte().unwrap()),
+            ];
+            self.guild_marks.push((cid, emblem));
         } else if op == SendOpcode::SpawnPet as i16 {
             let (owner, index) = (r.read_int().unwrap(), r.read_byte().unwrap());
             if r.read_byte().unwrap() == 0 {

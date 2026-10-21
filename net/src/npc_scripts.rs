@@ -26,6 +26,9 @@ const SHANKS: i32 = 22000;
 /// Heracle, at the guild headquarters. The runtime loads the player's
 /// guild for his script (`NpcScript::heracle`).
 pub const HERACLE: i32 = 2010007;
+/// Lea, beside him, who makes guild emblems; her script needs the guild
+/// too (`NpcScript::lea`).
+pub const LEA: i32 = 2010008;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -555,8 +558,14 @@ impl NpcScript {
         heracle(player, guild)
     }
 
+    /// Lea's script as it plays for `player`, who is in `guild`, if it
+    /// still exists.
+    pub fn lea(player: &Player, guild: Option<&Guild>) -> Self {
+        lea(player, guild)
+    }
+
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
-    /// plays for `player`. Heracle is not among them.
+    /// plays for `player`. Heracle and Lea are not among them.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -989,6 +998,29 @@ fn grow_guild(player: &Player, master: Option<&Guild>) -> Vec<Page> {
         ));
     }
     pages
+}
+
+/// Lea opens the client's emblem maker for a guild's master (the HeavenMS
+/// script's menu). Like that script she doesn't check the price, which is
+/// charged when the client sends the emblem.
+fn lea(player: &Player, guild: Option<&Guild>) -> NpcScript {
+    let emblem = if guild.is_some_and(|guild| guild.may_set_emblem(player.stats.id)) {
+        let price = guild::EMBLEM_COST.to_string();
+        Page::Ask {
+            text: content::text().get(keys::LEA_ASK, &[("price", price.as_str())]),
+            on_yes: vec![Effect::OpenEmblemMaker],
+            on_no: Some(text(keys::LEA_DECLINE)),
+        }
+    } else {
+        Page::Say(text(keys::LEA_NOT_MASTER))
+    };
+    NpcScript::new(
+        LEA,
+        vec![Page::Menu {
+            text: text(keys::LEA_MENU),
+            choices: vec![(text(keys::LEA_EMBLEM), vec![emblem])],
+        }],
+    )
 }
 
 /// A station's ticket booth: one ticket for the route's price. Like the
@@ -2270,6 +2302,41 @@ mod tests {
         ] {
             let (heracle, step) = heracle_picks(&master, guild.as_ref(), 2);
             says_one_page(heracle, &step);
+        }
+    }
+
+    #[test]
+    fn lea_opens_the_emblem_maker_for_the_master() {
+        assert_eq!(NpcScript::for_npc(LEA, &guilder(10, 0, true)), None);
+        let master = guilder(10, 0, true);
+        let id = master.stats.id;
+        let guild = testers(id, 10);
+        let lea_picks = |guild: Option<&Guild>| {
+            let mut lea = NpcScript::lea(&master, guild);
+            assert_eq!(kind(&lea.begin()), Some(4));
+            let step = lea.respond(ScriptInput::Select(0)).unwrap();
+            (lea, step)
+        };
+        // Asked without a word of the master's mesos, which are checked
+        // when the emblem comes back.
+        let (mut lea, step) = lea_picks(Some(&guild));
+        let Some(Prompt::YesNo { text, .. }) = &step.prompt else {
+            panic!("a question expected, got {:?}", step.prompt);
+        };
+        assert!(text.contains("5000000"), "{text}");
+        let yes = lea.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.prompt, None);
+        assert_eq!(yes.effects, [Effect::OpenEmblemMaker]);
+
+        let (mut lea, _) = lea_picks(Some(&guild));
+        let no = lea.respond(ScriptInput::No).unwrap();
+        assert!(no.effects.is_empty());
+        says_one_page(lea, &no);
+
+        // A member who isn't the master, or someone without a guild.
+        for guild in [Some(testers(id - 1, 10)), None] {
+            let (lea, step) = lea_picks(guild.as_ref());
+            says_one_page(lea, &step);
         }
     }
 

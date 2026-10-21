@@ -433,6 +433,7 @@ add_executable(HeavenClient
     Character/ExpTable.h
     Character/Guild.cpp
     Character/Guild.h
+    Character/GuildEmblemRules.h
     Character/GuildMark.cpp
     Character/GuildMark.h
     Character/Job.cpp
@@ -790,6 +791,8 @@ add_executable(HeavenClient
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
+    IO/UITypes/UIGuildMarkMaker.cpp
+    IO/UITypes/UIGuildMarkMaker.h
     IO/UITypes/UIMemo.cpp
     IO/UITypes/UIMemo.h
     IO/UITypes/UIMemoNotice.cpp

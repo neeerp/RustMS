@@ -5,8 +5,9 @@ Heracle in the Orbis guild headquarters. Members see the guild's name and
 emblem under each other's names, the stat window and character info show it,
 and guild chat reaches the members online. The master and the Jr. Masters
 invite players on their channel, move members a rank up or down, and post
-the notice; the master names the ranks, and at Heracle grows the guild or
-disbands it. Members leave, and are expelled.
+the notice; the master names the ranks, at Heracle grows the guild or
+disbands it, and at Lea makes or changes its emblem. Members leave, and are
+expelled.
 
 ## Server
 
@@ -28,7 +29,7 @@ case (a unique index on `lower(name)`).
 - Heracle (2010007, `NpcScript::heracle` in `net/src/npc_scripts.rs`)
   offers a menu: make a guild, disband it, or make it bigger. His script
   needs the player's guild, so `dialogue.rs` sends him to the client actor's
-  `talk_to_heracle`, which loads it, rather than through `for_npc`. His lines
+  `talk_about_guild`, which loads it, rather than through `for_npc`. His lines
   are `heracle.*` content keys; no licensed script has his text, so they
   stay placeholders (`unsourced` in `game-data/server_content.toml`).
   - Making one: he says why not if the player is already in a guild, under
@@ -41,11 +42,19 @@ case (a unique index on `lower(name)`).
     up to 15, then 1,000,000 more for each 5 beyond 15, and 5,000,000 past
     30 (HeavenMS's prices). He quotes the price and the new size; a player
     short of it hears so after saying yes.
+- Lea (2010008, `NpcScript::lea`) offers a menu with one choice, the
+  emblem; `dialogue.rs` sends her to `talk_about_guild` too. Only the master
+  is asked: she quotes 5,000,000 mesos (`guild::EMBLEM_COST`, the price in
+  2008 footage and HeavenMS), and yes ends the conversation with
+  `Effect::OpenEmblemMaker`, which sends 0x11. Anyone else is told only the
+  master may. She doesn't check the mesos, as in HeavenMS; the save does.
+  Her lines are `lea.*` content keys, placeholders like Heracle's.
 - `GUILD_OPERATION` (`net/src/packet/handle/world/guild.rs`) becomes a
   `GuildRequest`: reload (mode 0), create with a name (2), invite by name
   (5), accept an invitation (6), leave (7), expel (8), set the five titles
-  (0x0D), move a member to a rank (0x0E, the id and a byte), or post the
-  notice (0x10). Other modes are ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
+  (0x0D), move a member to a rank (0x0E, the id and a byte), set the emblem
+  (0x0F: background as a short, its colour as a byte, mark as a short, its
+  colour as a byte), or post the notice (0x10). Other modes are ignored. `DENY_GUILD_REQUEST` (127) turns an invitation down: 0x35 when
   the client was busy, 0x36 when it already shows one, 0x37 when declined.
 - The client actor (`runtime/src/actor/client/guilds.rs`) founds the guild
   only while `naming_guild` is set, so a forged create does nothing. It
@@ -128,6 +137,17 @@ case (a unique index on `lower(name)`).
     0x34.
   - A guild that is gone is no error. Loading it gives nothing, and an actor
     that finds its player's guild gone sets it to none.
+- Setting the emblem (`set_emblem` in `runtime/src/actor/client/guilds.rs`)
+  checks, in this order, that the player is in the headquarters
+  (200000301, `guild::HEADQUARTERS`), that the emblem is one the maker can
+  make (`Emblem::is_valid`: backgrounds 1000 to 1030, marks 2000 to 2020,
+  3000 to 3006, 4000 to 4021, 5000 to 5035 or 9000 to 9026, colours 1 to
+  16), and that the player is the master. Any of these failing is logged
+  and ignored, as no client sends it. Then a master short of the price gets
+  a popup (`lea.no_mesos`); otherwise `db::guild::set_emblem` saves it under
+  the guild's lock if they are still the master, every member online gets
+  0x42 (the guild, the emblem), each member's actor reads their guild
+  again so their map sees the new emblem (203), and the master pays.
 - Guild chat is the guild mode (2) of `MULTICHAT`. The server ignores the
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
@@ -172,6 +192,10 @@ ints. The client takes the first member for the master.
     disbanded.". 0x3A sets the capacity, and Heracle tells the master the
     new size. Both only count for the player's guild. 0x34 and 0x3B have
     Heracle say the disbanding or growing went wrong.
+  - 0x11 opens the emblem maker, for the master only; v83 ignores it
+    otherwise. 0x42 stores the emblem, for the player's guild only, and
+    redraws the player's tag; the master gets "It is completed." v83's box
+    is modal, so there the tag changes only once it is dismissed.
   - 0x3D marks a member online or offline. Coming online shows the buddy
     list's card, "<name> is" over "logged in." with the invite sound; v83
     checks neither the old flag nor who it is, and going offline shows
@@ -198,6 +222,25 @@ ints. The client takes the first member for the master.
     context menu's GUILD INVITE uses `invite` too.
   - `GUILD_NAME_CHANGED` (202) and `GUILD_MARK_CHANGED` (203) change what
     another character shows.
+- `IO/UITypes/UIGuildMarkMaker` is Lea's emblem maker (`MakeMark` art,
+  250x343 at (275, 100) on an 800x600 screen), with its rules in
+  `Character/GuildEmblemRules.h`:
+  - It starts from the guild's emblem, or from background 1000, mark 2000
+    and colour 1 for both if the guild has none.
+  - The scroll unrolls under the emblem preview (a white 17x17 square with
+    the emblem on it). A second after the animation ends the title, the four
+    labelled boxes, the arrows, the category combo, OK and CANCEL appear;
+    until then nothing responds, Esc and Enter included.
+  - The arrows step the background, the mark within its category, and the
+    two colours (1 to 16), wrapping at either end. The last id of each
+    category is the largest child name in `GuildMark.img`.
+  - The combo lists Animal, Plant, Pattern, Character and ETC (marks 2000,
+    3000, 4000, 5000 and 9000 on); picking one starts at its first mark.
+    v83 indents the names, so they carry six spaces.
+  - OK or Enter asks "Would you like to save it as a guild emblem?"; yes
+    sends mode 0x0F and closes the maker, no leaves it as it was. CANCEL or
+    Esc closes it and sends nothing. v83's box has OK and CANCEL; this one
+    is the client's usual YES and NO.
 - `Char` draws the guild name under the character's name, with the emblem
   to its left when it has one. The stat window shows the name, or "-".
 - Guild chat: the GUILDCHAT key and `/guild` set the chat target to "To the
@@ -249,7 +292,6 @@ ints. The client takes the first member for the master.
 
 - The card's option to refuse all invitations, and the blacklist, which
   v83 also checks before showing one.
-- Making the emblem.
 - The rank panel's slide in and out. v83 keeps the panel's edits if it is
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt

@@ -7,14 +7,16 @@ use crate::{
 use db::guild::{CreateError, JoinError};
 use game::guild::{self, Emblem, GuildMember, GuildTag};
 use game_data::forbidden_names::ForbiddenNames;
+use game_data::server_content::keys;
 use net::error::NetworkError;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::guild::{
-    build_capacity_changed, build_guild_chat, build_guild_created, build_guild_disbanded,
-    build_guild_error, build_guild_info, build_guild_mark_changed, build_guild_name_changed,
-    build_member_expelled, build_member_joined, build_member_left, build_notice_changed,
-    build_rank_changed, build_titles_changed, GuildError,
+    build_capacity_changed, build_emblem_changed, build_guild_chat, build_guild_created,
+    build_guild_disbanded, build_guild_error, build_guild_info, build_guild_mark_changed,
+    build_guild_name_changed, build_member_expelled, build_member_joined, build_member_left,
+    build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
 };
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, stat};
 use net::{ClientId, GuildRequest};
@@ -108,6 +110,10 @@ impl ClientActor {
                 let packet = build_rank_changed(guild_id, member_id, rank)?;
                 self.tell_guild(to, packet, "Guild rank change").await
             }
+            GuildRequest::SetEmblem { emblem } => match guild_id {
+                Some(guild_id) => self.set_emblem(guild_id, emblem).await,
+                None => Ok(()),
+            },
             GuildRequest::SetNotice { notice } => {
                 let Some(guild_id) = guild_id else {
                     return Ok(());
@@ -368,8 +374,8 @@ impl ClientActor {
         self.set_guild(Some(guild.tag())).await
     }
 
-    /// Heracle's script needs the player's guild as it is now.
-    pub(super) async fn talk_to_heracle(&mut self) -> Result<(), RuntimeError> {
+    /// Heracle's and Lea's scripts need the player's guild as it is now.
+    pub(super) async fn talk_about_guild(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
         let guild = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
             Some(guild_id) => {
                 let guild = spawn_db(move || db::guild::load(guild_id)).await?;
@@ -381,8 +387,71 @@ impl ClientActor {
             }
             None => None,
         };
-        let script = NpcScript::heracle(&self.in_game()?.player, guild.as_ref());
+        let player = &self.in_game()?.player;
+        let script = if npc_id == net::npc_scripts::LEA {
+            NpcScript::lea(player, guild.as_ref())
+        } else {
+            NpcScript::heracle(player, guild.as_ref())
+        };
         self.start_script(script).await
+    }
+
+    /// Give the guild the emblem the master made in Lea's emblem maker, and
+    /// charge them. The client checks nothing before sending it, so the
+    /// headquarters, the emblem, the mastery, and the price are checked
+    /// here, in that order, so that only the master hears they can't pay;
+    /// the mastery again with the guild locked. The members hear first, as
+    /// when the guild grows; each one's tag is read again so that their map
+    /// sees the new emblem.
+    async fn set_emblem(&mut self, guild_id: i32, emblem: Emblem) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let cid = self.client_id;
+        if player.stats.map_id != guild::HEADQUARTERS {
+            warn!(cid, "Guild emblem away from Lea; ignored");
+            return Ok(());
+        }
+        if !emblem.is_valid() {
+            warn!(cid, ?emblem, "Guild emblem the maker can't make; ignored");
+            return Ok(());
+        }
+        let can_pay = player.meso >= guild::EMBLEM_COST;
+        let guild = spawn_db(move || db::guild::load(guild_id)).await?;
+        if !guild.is_some_and(|guild| guild.may_set_emblem(cid)) {
+            warn!(cid, "Guild emblem by a member who may not; ignored");
+            return Ok(());
+        }
+        if !can_pay {
+            let price = guild::EMBLEM_COST.to_string();
+            let text = net::content::text().get(keys::LEA_NO_MESOS, &[("price", price.as_str())]);
+            return self
+                .send(&mut build_broadcast(Broadcast::Popup, &text)?)
+                .await;
+        }
+        let Some(to) = spawn_db(move || db::guild::set_emblem(guild_id, cid, emblem)).await? else {
+            warn!(cid, "Guild emblem for a guild changed meanwhile; ignored");
+            return Ok(());
+        };
+        let others: Vec<ClientId> = to.iter().copied().filter(|&id| id != cid).collect();
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to,
+            packet: build_emblem_changed(guild_id, &emblem)?,
+        })
+        .await?;
+        for client_id in others {
+            self.send_to_directory(DirectoryMessage::GuildChanged { client_id })
+                .await?;
+        }
+        self.guild_changed().await?;
+        let player = &mut self.in_game_mut()?.player;
+        player.meso -= guild::EMBLEM_COST;
+        player.mark_dirty();
+        let meso = player.meso;
+        self.flush().await?;
+        let mut packets = vec![
+            stat::build_stat_update(false, &[StatUpdate::Meso(meso)])?,
+            drop::build_meso_gain_in_chat(-guild::EMBLEM_COST)?,
+        ];
+        self.send_all(&mut packets).await
     }
 
     /// Grow the guild a step from `from` members, the capacity Heracle

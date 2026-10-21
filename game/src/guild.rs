@@ -1,6 +1,8 @@
 //! Guilds: a named group of characters with a master, shown under each
 //! member's name and in the client's Guild window.
 
+use std::ops::RangeInclusive;
+
 /// Lowest level that may found a guild. The client doesn't check; this is
 /// the HeavenMS default.
 pub const MIN_LEVEL: u8 = 10;
@@ -32,6 +34,26 @@ pub fn capacity_cost(capacity: u8) -> i32 {
     }
 }
 
+/// The guild headquarters in Orbis, where Heracle and Lea are.
+pub const HEADQUARTERS: i32 = 200_000_301;
+/// Mesos Lea asks to make or change the guild's emblem; the HeavenMS
+/// default, not from the client.
+pub const EMBLEM_COST: i32 = 5_000_000;
+/// The emblem frames in the client's `UI/GuildMark.img/BackGround`.
+const EMBLEM_BACKGROUNDS: RangeInclusive<u16> = 1000..=1030;
+/// The marks in each of `UI/GuildMark.img/Mark`'s folders: Animal, Plant,
+/// Pattern, Letter and Etc. The client's emblem maker steps through each
+/// folder's ids up to the last.
+const EMBLEM_MARKS: [RangeInclusive<u16>; 5] = [
+    2000..=2020,
+    3000..=3006,
+    4000..=4021,
+    5000..=5035,
+    9000..=9026,
+];
+/// The colours of each frame and mark.
+const EMBLEM_COLORS: RangeInclusive<u8> = 1..=16;
+
 /// The emblem shown beside the guild name. All zeros means none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Emblem {
@@ -39,6 +61,17 @@ pub struct Emblem {
     pub background_color: u8,
     pub mark: u16,
     pub mark_color: u8,
+}
+
+impl Emblem {
+    /// Whether the client's emblem maker could have made this emblem: a
+    /// frame and mark it has, each in one of its colours.
+    pub fn is_valid(&self) -> bool {
+        EMBLEM_BACKGROUNDS.contains(&self.background)
+            && EMBLEM_MARKS.iter().any(|marks| marks.contains(&self.mark))
+            && EMBLEM_COLORS.contains(&self.background_color)
+            && EMBLEM_COLORS.contains(&self.mark_color)
+    }
 }
 
 /// What others see of a member's guild: the name under theirs and the
@@ -92,6 +125,11 @@ impl Guild {
     pub fn is_master(&self, id: i32) -> bool {
         self.member(id)
             .is_some_and(|member| member.rank == MASTER_RANK)
+    }
+
+    /// Whether member `by` may change the emblem: only the master.
+    pub fn may_set_emblem(&self, by: i32) -> bool {
+        self.is_master(by)
     }
 
     /// Whether member `by` may grow the guild a step from `from` members,
@@ -422,6 +460,40 @@ mod tests {
         assert!(!testers.may_set_notice(1, "hi\0x"));
         assert!(!testers.may_set_notice(1, "a\tb"));
         assert!(testers.may_set_notice(1, "a\r\nb"));
+    }
+
+    #[test]
+    fn only_the_master_changes_the_emblem() {
+        let testers = guild(&[1, 2, 3]);
+        assert!(testers.may_set_emblem(1));
+        assert!(!testers.may_set_emblem(2));
+        assert!(!testers.may_set_emblem(3));
+        assert!(!testers.may_set_emblem(9));
+    }
+
+    #[test]
+    fn emblems_are_those_the_maker_makes() {
+        let emblem = |background, background_color, mark, mark_color| Emblem {
+            background,
+            background_color,
+            mark,
+            mark_color,
+        };
+        assert!(emblem(1000, 1, 2000, 1).is_valid());
+        assert!(emblem(1030, 16, 9026, 16).is_valid());
+        for mark in [2020, 3000, 3006, 4021, 5000, 5035, 9000] {
+            assert!(emblem(1005, 3, mark, 7).is_valid(), "{mark}");
+        }
+        assert!(!Emblem::default().is_valid());
+        assert!(!emblem(999, 1, 2000, 1).is_valid());
+        assert!(!emblem(1031, 1, 2000, 1).is_valid());
+        for mark in [1999, 2021, 3007, 4022, 5036, 6000, 8999, 9027] {
+            assert!(!emblem(1000, 1, mark, 1).is_valid(), "{mark}");
+        }
+        assert!(!emblem(1000, 0, 2000, 1).is_valid());
+        assert!(!emblem(1000, 17, 2000, 1).is_valid());
+        assert!(!emblem(1000, 1, 2000, 0).is_valid());
+        assert!(!emblem(1000, 1, 2000, 17).is_valid());
     }
 
     #[test]

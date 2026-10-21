@@ -11,6 +11,7 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIEnterText.h"
+#include "../../IO/UITypes/UIGuildMarkMaker.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
@@ -25,6 +26,8 @@ namespace ms
 		{
 			NAME_PROMPT = 0x01,
 			INVITE = 0x05,
+			// Lea's emblem maker, which only the master's client opens
+			EMBLEM_MAKER = 0x11,
 			INFO = 0x1A,
 			// 0xcce
 			NAME_TAKEN = 0x1C,
@@ -74,6 +77,8 @@ namespace ms
 			TITLES_CHANGED = 0x3E,
 			// 0xcdf
 			RANK_CHANGED = 0x40,
+			// 0xd0c for the master
+			EMBLEM_CHANGED = 0x42,
 			// 0xd15
 			NOTICE_CHANGED = 0x44
 		};
@@ -206,6 +211,12 @@ namespace ms
 		{
 		case Operation::NAME_PROMPT:
 			prompt_name();
+			break;
+		case Operation::EMBLEM_MAKER:
+			// The others' clients ignore it (FUN_00a37490).
+			if (guild.is_master(player.get_oid()))
+				UI::get().emplace<UIGuildMarkMaker>(guild.get_data().emblem);
+
 			break;
 		case Operation::INVITE:
 		{
@@ -413,6 +424,24 @@ namespace ms
 
 			if (guild.set_rank(cid, rank))
 				chat_line("[" + guild.find(cid)->name + "]'s position has been changed to [" + guild.title(rank) + "].");
+
+			refresh();
+			break;
+		}
+		case Operation::EMBLEM_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			GuildEmblem emblem = GuildParser::parse_emblem(recv);
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			guild.set_emblem(emblem);
+
+			// Only the master hears it, who made it. The player's own tag
+			// changes here, from the guild; 203 is for the others.
+			if (guild.is_master(player.get_oid()))
+				UI::get().emplace<UIOk>("It is completed.", [](bool) {});
 
 			refresh();
 			break;

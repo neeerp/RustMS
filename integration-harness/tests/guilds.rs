@@ -7,8 +7,8 @@
 //! members between ranks and post the notice, and the master renames the
 //! ranks. Members hear who logs in or out (but not a channel change), levels
 //! up, or advances a job. At Heracle the master grows the guild five
-//! members at a time, for a price, or disbands it. Members of a guild gone
-//! meanwhile stay connected.
+//! members at a time, for a price, or disbands it; at Lea they make it an
+//! emblem, for a price. Members of a guild gone meanwhile stay connected.
 
 use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
@@ -36,13 +36,16 @@ const GUILD_HQ: i32 = 200_000_301;
 /// Orbis Park, away from the other test's founding.
 const PARK: i32 = 200_000_200;
 const HERACLE: i32 = 2010007;
+const LEA: i32 = 2010008;
 const FEE: i32 = 1_500_000;
+const EMBLEM_COST: i32 = 5_000_000;
 // Heracle's menu.
 const CREATE: i32 = 0;
 const DISBAND: i32 = 1;
 const GROW: i32 = 2;
 
 const NAME_PROMPT: u8 = 0x01;
+const EMBLEM_MAKER: u8 = 0x11;
 const INFO: u8 = 0x1a;
 const NAME_TAKEN: u8 = 0x1c;
 const CREATED: u8 = 0x20;
@@ -60,6 +63,7 @@ const MEMBER_LEVEL_JOB: u8 = 0x3c;
 const MEMBER_ONLINE: u8 = 0x3d;
 const TITLES_CHANGED: u8 = 0x3e;
 const RANK_CHANGED: u8 = 0x40;
+const EMBLEM_CHANGED: u8 = 0x42;
 const NOTICE_CHANGED: u8 = 0x44;
 
 fn maps() -> &'static GameData {
@@ -185,6 +189,33 @@ fn set_titles(titles: [&str; 5]) -> Packet {
     for title in titles {
         p.write_str_with_length(title).unwrap();
     }
+    p
+}
+
+/// A GUILDDATA block's emblem.
+fn emblem(body: &[u8]) -> [u16; 4] {
+    let mut r = Cursor::new(body);
+    r.read_int().unwrap();
+    for _ in 0..6 {
+        r.read_str_with_length().unwrap();
+    }
+    let count = r.read_byte().unwrap() as usize;
+    r.read_bytes(count * (4 + 37) + 4).unwrap();
+    [
+        r.read_short().unwrap() as u16,
+        u16::from(r.read_byte().unwrap()),
+        r.read_short().unwrap() as u16,
+        u16::from(r.read_byte().unwrap()),
+    ]
+}
+
+/// The emblem maker's answer.
+fn set_emblem([background, background_color, mark, mark_color]: [u16; 4]) -> Packet {
+    let mut p = operation(0x0f, &[], None);
+    p.write_short(background as i16).unwrap();
+    p.write_byte(background_color as u8).unwrap();
+    p.write_short(mark as i16).unwrap();
+    p.write_byte(mark_color as u8).unwrap();
     p
 }
 
@@ -881,6 +912,141 @@ async fn the_master_grows_and_disbands_the_guild_at_heracle() {
     assert!(at.guild_ops.is_empty());
 }
 
+/// Ask Lea about the emblem; what follows.
+async fn ask_lea(session: &mut WorldSession) -> Trace {
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let t = step(c, &format!("{m} talks to Lea"), talk(GUILD_HQ, LEA)).await;
+    assert_eq!(t.prompts, [(LEA, 4)]);
+    step(c, &format!("{m} asks Lea"), answer(4, 1, Some(0))).await
+}
+
+#[tokio::test]
+async fn the_master_changes_the_emblem_at_lea() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let b_id = new_character(&b_config).await;
+    let mut a = founder(&a_config, FEE + EMBLEM_COST + 100_000).await;
+    let a_id = a.character_id;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let guild_id = Cursor::new(&created[1..]).read_int().unwrap();
+    join_guild(b_id, &name).await.expect("B joins");
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    assert_eq!(
+        warp(&mut b.connection, GUILD_HQ, "", &mut bt).await,
+        GUILD_HQ
+    );
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.players.iter().any(|p| p.character_id == b_id)
+    })
+    .await;
+
+    // Lea only offers the master the emblem maker, and for a price.
+    let t = ask_lea(&mut b).await;
+    assert_eq!(t.prompts, [(LEA, 0)]);
+    step(&mut b.connection, "b closes", answer(0, -1, None)).await;
+    let t = ask_lea(&mut a).await;
+    assert_eq!(t.prompts, [(LEA, 1)]);
+    assert!(t.prompt_texts[0].contains("5000000"));
+    let t = step(&mut a.connection, "a says no", answer(1, 0, None)).await;
+    assert_eq!(t.prompts, [(LEA, 0)]);
+    assert!(t.guild_ops.is_empty());
+    step(&mut a.connection, "a closes", answer(0, -1, None)).await;
+    ask_lea(&mut a).await;
+    let t = step(&mut a.connection, "a says yes", answer(1, 1, None)).await;
+    assert_eq!(t.guild_ops, [vec![EMBLEM_MAKER]]);
+
+    // No emblem the maker can't make, none from another member, and none
+    // away from Lea.
+    let t = step(
+        &mut a.connection,
+        "a makes none",
+        set_emblem([999, 1, 2000, 1]),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty() && t.stat(stat::MESO).is_none());
+    let t = step(
+        &mut b.connection,
+        "b makes one",
+        set_emblem([1001, 1, 2001, 1]),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty() && t.broadcasts.is_empty());
+    let mut at = Trace::default();
+    assert_eq!(warp(&mut a.connection, PARK, "", &mut at).await, PARK);
+    let t = step(
+        &mut a.connection,
+        "a makes one away",
+        set_emblem([1002, 2, 2002, 2]),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty() && t.stat(stat::MESO).is_none());
+    let mut at = Trace::default();
+    assert_eq!(
+        warp(&mut a.connection, GUILD_HQ, "", &mut at).await,
+        GUILD_HQ
+    );
+    until(&mut a.connection, &mut at, |t| {
+        t.players.iter().any(|p| p.character_id == b_id)
+    })
+    .await;
+
+    // A makes one: the whole guild hears so, each sees the other's emblem
+    // change, and A pays.
+    let made = [1005, 3, 2004, 7];
+    let changed = [
+        vec![EMBLEM_CHANGED],
+        guild_id.to_le_bytes().to_vec(),
+        vec![0xed, 0x03, 3, 0xd4, 0x07, 7],
+    ]
+    .concat();
+    send(&mut a.connection, set_emblem(made)).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.guild_ops.contains(&changed)
+            && t.stat(stat::MESO).is_some()
+            && t.guild_marks.contains(&(b_id, made))
+    })
+    .await;
+    assert_eq!(at.stat(stat::MESO), Some(100_000));
+    let mut bt = Trace::default();
+    until(&mut b.connection, &mut bt, |t| {
+        t.guild_ops.iter().any(|op| op[0] == EMBLEM_CHANGED)
+            && t.guild_marks.contains(&(a_id, made))
+    })
+    .await;
+    assert_eq!(bt.guild_ops, [changed]);
+
+    // Short of the price, A is told so.
+    let t = step(
+        &mut a.connection,
+        "a can't pay",
+        set_emblem([1006, 4, 3000, 8]),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty() && t.stat(stat::MESO).is_none());
+    assert_eq!(t.broadcasts.len(), 1);
+    assert_eq!(t.broadcasts[0].0, 1);
+    assert!(t.broadcasts[0].1.contains(&EMBLEM_COST.to_string()));
+    drop((a, b));
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // The guild keeps it, and A the mesos left.
+    let mut b = relogin(&b_config).await;
+    let mut bt = Trace::default();
+    until(&mut b.connection, &mut bt, |t| !t.guild_ops.is_empty()).await;
+    assert_eq!(bt.guild_ops[0][..2], [INFO, 1]);
+    assert_eq!(emblem(&bt.guild_ops[0][2..]), made);
+    assert_eq!(relogin(&a_config).await.meso, 100_000);
+}
+
 /// A guild can be gone by the time a member acts on it (disbanded on
 /// another channel): the client hears of a failure, or nothing, and stays
 /// connected.
@@ -917,6 +1083,17 @@ async fn members_of_a_guild_gone_meanwhile_stay_connected() {
     delete_guild(&name).await.expect("gone");
     let t = step(&mut a.connection, "a grows it", answer(1, 1, None)).await;
     assert_eq!(t.guild_ops, [vec![GROW_FAILED]]);
+    assert_eq!(t.stat(stat::MESO), None);
+
+    // So does an emblem from a maker opened before: not even the price,
+    // which A lacks, is mentioned.
+    let t = step(
+        &mut a.connection,
+        "a sets the emblem",
+        set_emblem([1001, 1, 2001, 1]),
+    )
+    .await;
+    assert!(t.guild_ops.is_empty() && t.broadcasts.is_empty());
     assert_eq!(t.stat(stat::MESO), None);
 
     // B asks for the guild window and gets none, and the name goes from
