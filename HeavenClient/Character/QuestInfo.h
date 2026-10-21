@@ -33,6 +33,9 @@ namespace ms
 		std::vector<int32_t> worn_any;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
+		// Not offered before this FILETIME (Check/0/start, quest_date); 0
+		// means any time.
+		int64_t start_time = 0;
 		// Minutes after completing before the quest can be started again
 		// (Check/0/interval); -1 means it can't be repeated.
 		int32_t repeat_interval = -1;

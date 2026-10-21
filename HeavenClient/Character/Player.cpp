@@ -1934,7 +1934,12 @@ namespace ms
 	{
 		auto done = questlog.completed_quests().find(quest.id);
 
-		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, item_expiry::now()))
+		int64_t now = item_expiry::now();
+
+		if (now < quest.start_time)
+			return false;
+
+		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, now))
 			return false;
 
 		auto worn = [&](int32_t id) { return inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0; };

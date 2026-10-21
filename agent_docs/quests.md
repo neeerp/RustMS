@@ -73,11 +73,11 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, and the alert trigger `normalAutoStart` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level` |
-| `Act/<id>/0` | `item` |
-| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct` |
-| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` |
+| `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
+| `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
 | `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job`, `onlyMasterLevel` |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
@@ -102,7 +102,10 @@ book quests, 6110–6325, ask for the book's skill to be unlearned). `pop` is th
 compared unsigned as v83 does, so negative fame passes. Every item listed
 under `equipAllNeed` must be worn (the Magatia cape, 1102135, for 3307–3315),
 and at least one under `equipSelectNeed`; a copy in the bag doesn't count.
-With `fieldEnter`, the player must be on one of the listed maps.
+With `fieldEnter`, the player must be on one of the listed maps. `start`
+(yyyymmddhh) is the hour before which the quest can't be started; v83
+compares it with its clock set to the server's, which for RustMS is UTC
+(the four quests with one, such as 3600, date from 2005–2007).
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
@@ -136,7 +139,9 @@ Hongbu's shoes (3608). `period` lends the item for that many minutes: it
 comes dated (v83's client ignores the key and shows the date the item
 carries) and on its own, as dated items never stack, and goes when the time
 is up (see [Inventory](./inventory.md#expiry)); Rupi's Lost Paper (3085) is
-one. `dateExpire`, `var`, and `name` stay unsupported. If the gifts don't fit, nothing changes and the client gets
+one. `var` is allowed and ignored: neither v83's client nor Cosmic reads
+it, and the item comes with its base stats. `dateExpire` and `name` stay
+unsupported. If the gifts don't fit, nothing changes and the client gets
 UPDATE_QUEST_INFO mode 10 with the quest id; it names the full inventories
 itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
@@ -144,7 +149,12 @@ itself ("Etc item inventory is full."). `startscript`/
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
-client gets mode 11 ("You do not have enough mesos."). `pop` gives (or
+client gets mode 11 ("You do not have enough mesos."). On the start step,
+`money` and `exp` do the same when the quest starts: v83's client doesn't
+check the fee or show either, so only the server refuses (Nella's 2029
+takes 1,000 mesos, where Cosmic takes what the player has). `buffItemID`
+gives the named item's effect, as if the player used it (the dragon
+potion's transformation for 7301), when its step is done. `pop` gives (or
 takes) fame on completion, with a fame stat update and SHOW_STATUS_INFO
 mode 4 in the chat log ("You have gained fame. (+n)"). Skill actions
 (`net::quests::apply_skills`) teach a skill to a player whose job is exactly
@@ -164,7 +174,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1356 quests qualify
+changing the server's allowlist and regenerating the list. 1371 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

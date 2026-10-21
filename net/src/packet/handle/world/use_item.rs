@@ -1,5 +1,6 @@
 use super::change_map::warp;
 use super::use_skill::show_given;
+use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
@@ -41,26 +42,14 @@ impl WorldHandler for UseItemHandler {
             debug!(slot, item_id, "Item use refused");
             return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
         };
-        let stats = &ctx.player.stats;
         let mut result =
-            HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?)
-                .with_reply(stat::build_stat_update(
-                    true,
-                    &[StatUpdate::Hp(stats.hp), StatUpdate::Mp(stats.mp)],
-                )?);
-        if !used.cured.is_empty() {
-            result = result.with_reply(buff::build_cancel_buff(&used.cured)?);
-            let unseen: Vec<_> = used.cured.into_iter().filter(|s| s.shown()).collect();
-            if !unseen.is_empty() {
-                let foreign = buff::build_cancel_foreign_buff(ctx.player.id(), &unseen)?;
-                result = result.with(WorldAction::BuffsChanged(foreign));
-            }
+            HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?);
+        let (own, seen) = item_effect_packets(ctx.player, item_id, used.effect, true)?;
+        for packet in own {
+            result = result.with_reply(packet);
         }
-        if !used.given.is_empty() {
-            result = result.with_reply(buff::build_give_buff(-item_id, used.time, &used.given)?);
-            if let Some(foreign) = show_given(ctx.player, &used.given)? {
-                result = result.with(WorldAction::BuffsChanged(foreign));
-            }
+        for packet in seen {
+            result = result.with(WorldAction::BuffsChanged(packet));
         }
         Ok(result)
     }
@@ -69,11 +58,52 @@ impl WorldHandler for UseItemHandler {
 /// What using an item did.
 struct Used {
     changes: Vec<InventoryChange>,
+    effect: ItemEffect,
+}
+
+/// What an item's effect did to the player.
+pub struct ItemEffect {
     /// The diseases it cured.
     cured: Vec<BuffStat>,
     /// The stats it raised, for `time` ms.
     given: Vec<(BuffStat, i16)>,
     time: i32,
+}
+
+/// Give `player` the effect of using `item_id` (its `spec`), without using
+/// one up, as a quest's `buffItemID` does; `None` if it has none supported.
+pub fn apply_item_effect(player: &mut Player, item_id: i32, now: Instant) -> Option<ItemEffect> {
+    let spec = items::info(item_id)?.spec.filter(ConsumeSpec::has_effect)?;
+    Some(apply_spec(player, item_id, &spec, now))
+}
+
+/// The packets telling the player what `effect` did, from their HP and MP
+/// on, and those telling the others on the map what they now see.
+/// `exclusive` unlocks the client's item use.
+pub fn item_effect_packets(
+    player: &Player,
+    item_id: i32,
+    effect: ItemEffect,
+    exclusive: bool,
+) -> Result<(Vec<Packet>, Vec<Packet>), NetworkError> {
+    let stats = &player.stats;
+    let mut own = vec![stat::build_stat_update(
+        exclusive,
+        &[StatUpdate::Hp(stats.hp), StatUpdate::Mp(stats.mp)],
+    )?];
+    let mut seen = Vec::new();
+    if !effect.cured.is_empty() {
+        own.push(buff::build_cancel_buff(&effect.cured)?);
+        let unseen: Vec<_> = effect.cured.into_iter().filter(|s| s.shown()).collect();
+        if !unseen.is_empty() {
+            seen.push(buff::build_cancel_foreign_buff(player.id(), &unseen)?);
+        }
+    }
+    if !effect.given.is_empty() {
+        own.push(buff::build_give_buff(-item_id, effect.time, &effect.given)?);
+        seen.extend(show_given(player, &effect.given)?);
+    }
+    Ok((own, seen))
 }
 
 fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Option<Used> {
@@ -94,6 +124,15 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         .inventory_mut()
         .take(InventoryType::Use, slot, 1)
         .ok()?;
+    Some(Used {
+        changes,
+        effect: apply_spec(player, item_id, &spec, now),
+    })
+}
+
+/// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it
+/// cures, then the stats it raises for its time as a buff of id `-item_id`.
+fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instant) -> ItemEffect {
     let max_hp = player.effective_max_hp();
     let max_mp = player.effective_max_mp();
     let (more, longer) = alchemist(player);
@@ -101,19 +140,18 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
     player.add_mp(spec.mp * more / 100 + max_mp * spec.mp_r / 100);
     let cured = player.buffs.cure(&spec.cures);
     let time = spec.time * longer / 100;
-    let given = if time > 0 { spec.stats } else { Vec::new() };
+    let given = if time > 0 {
+        spec.stats.clone()
+    } else {
+        Vec::new()
+    };
     let lasts = Duration::from_millis(time.max(0) as u64);
     for &(stat, value) in &given {
         player
             .buffs
             .give(Buff::new(-item_id, stat, value, now, lasts));
     }
-    Some(Used {
-        changes,
-        cured,
-        given,
-        time,
-    })
+    ItemEffect { cured, given, time }
 }
 
 /// Alchemist (4110000): the percent of an item's flat HP and MP, `x`, and of
@@ -535,7 +573,7 @@ mod tests {
         assert_eq!(player.stats.hp, 165);
         let time = items::info(2002004).unwrap().spec.unwrap().time;
         let used = use_item(&mut player, 4, 2002004, now).unwrap();
-        assert_eq!(used.time, time * 130 / 100);
+        assert_eq!(used.effect.time, time * 130 / 100);
     }
 
     #[test]
@@ -577,7 +615,10 @@ mod tests {
         let now = std::time::Instant::now();
         // Warrior Pill: +5 weapon attack for three minutes.
         let used = use_item(&mut player, 1, 2002004, now).unwrap();
-        assert_eq!((used.given, used.time), (vec![(BuffStat::Pad, 5)], 180_000));
+        assert_eq!(
+            (used.effect.given, used.effect.time),
+            (vec![(BuffStat::Pad, 5)], 180_000)
+        );
         let buff = &player.buffs.active()[0];
         assert_eq!(
             (buff.skill_id, buff.stat, buff.value),

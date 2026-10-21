@@ -4,11 +4,12 @@ use game::{Player, QuestRecord, QuestState, QuestStatus};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::{drop, inventory, quest, skill, stat};
+use net::packet::handle::world::{apply_item_effect, item_effect_packets, ItemEffect};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::skills;
 use net::FieldRequest;
 use packet::Packet;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 use tracing::{debug, warn};
 
 /// A quest change to commit together with the player.
@@ -154,13 +155,21 @@ impl ClientActor {
         )? {
             return self.send_all(&mut packets).await;
         }
-        if self
+        pay_mesos(&mut next, template.start_money, &mut packets)?;
+        if template.start_exp > 0 {
+            gain_exp(&mut next, template.start_exp, &mut packets)?;
+        }
+        let buff = buff_item(&mut next, template.start_buff_item);
+        if !self
             .commit_player(next, Some(QuestChange::Start(template)), &mut packets)
             .await?
         {
-            packets.push(quest::build_quest_action_result(template.id, npc_id, 0)?);
+            return Ok(());
         }
-        self.send_all(&mut packets).await
+        let seen = self.show_buff_item(buff, &mut packets)?;
+        packets.push(quest::build_quest_action_result(template.id, npc_id, 0)?);
+        self.send_all(&mut packets).await?;
+        self.show_seen(seen).await
     }
 
     async fn complete_quest(
@@ -183,14 +192,7 @@ impl ClientActor {
         )? {
             return self.send_all(&mut packets).await;
         }
-        if template.money != 0 {
-            next.meso = next.meso.saturating_add(template.money).max(0);
-            packets.push(stat::build_stat_update(
-                false,
-                &[stat::StatUpdate::Meso(next.meso)],
-            )?);
-            packets.push(drop::build_meso_gain_in_chat(template.money)?);
-        }
+        pay_mesos(&mut next, template.money, &mut packets)?;
         if template.fame != 0 {
             next.stats.fame = next.stats.fame.saturating_add(template.fame);
             packets.push(stat::build_stat_update(
@@ -203,12 +205,14 @@ impl ClientActor {
             gain_exp(&mut next, template.exp, &mut packets)?;
         }
         let taught = quests::apply_skills(&template.end_skills, &mut next);
+        let buff = buff_item(&mut next, template.end_buff_item);
         if !self
             .commit_player(next, Some(QuestChange::Complete(template)), &mut packets)
             .await?
         {
             return Ok(());
         }
+        let seen = self.show_buff_item(buff, &mut packets)?;
         // Only continue into a quest the client can actually be offered.
         let follow_up = template
             .next_quest
@@ -224,6 +228,7 @@ impl ClientActor {
             packets.push(skill::build_update_skills(&taught)?);
         }
         self.send_all(&mut packets).await?;
+        self.show_seen(seen).await?;
         let character_id = self.in_game()?.player.id();
         let shown = effect::build_foreign_effect(character_id, CharEffect::QuestClear)?;
         self.send_to_field(FieldMessage::FromClient {
@@ -231,6 +236,28 @@ impl ClientActor {
             request: FieldRequest::Broadcast(shown),
         })
         .await
+    }
+
+    /// Queue what a quest's `buffItemID` did for the player; return what the
+    /// others on the map see.
+    fn show_buff_item(
+        &self,
+        buff: Option<(i32, ItemEffect)>,
+        packets: &mut Vec<Packet>,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        let Some((item_id, effect)) = buff else {
+            return Ok(Vec::new());
+        };
+        let (own, seen) = item_effect_packets(&self.in_game()?.player, item_id, effect, false)?;
+        packets.extend(own);
+        Ok(seen)
+    }
+
+    async fn show_seen(&mut self, seen: Vec<Packet>) -> Result<(), RuntimeError> {
+        for packet in seen {
+            self.show_buffs(packet).await?;
+        }
+        Ok(())
     }
 
     /// Apply a quest step's item actions, with the reward picked as
@@ -401,6 +428,31 @@ impl ClientActor {
         }
         Ok(())
     }
+}
+
+/// Give `next` the effect of a quest step's `buffItemID`, if any.
+fn buff_item(next: &mut Player, item_id: Option<i32>) -> Option<(i32, ItemEffect)> {
+    let item_id = item_id?;
+    let effect = apply_item_effect(next, item_id, Instant::now());
+    if effect.is_none() {
+        warn!(item_id, "Quest buff item has no supported effect");
+    }
+    Some((item_id, effect?))
+}
+
+/// Pay a quest step's `money` to `next`, or take it if negative, with the
+/// stat update and the message in the chat log.
+fn pay_mesos(next: &mut Player, money: i32, packets: &mut Vec<Packet>) -> Result<(), RuntimeError> {
+    if money == 0 {
+        return Ok(());
+    }
+    next.meso = next.meso.saturating_add(money).max(0);
+    packets.push(stat::build_stat_update(
+        false,
+        &[stat::StatUpdate::Meso(next.meso)],
+    )?);
+    packets.push(drop::build_meso_gain_in_chat(money)?);
+    Ok(())
 }
 
 /// Add quest or script EXP to `next`, with the stat update and the EXP

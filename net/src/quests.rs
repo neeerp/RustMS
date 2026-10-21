@@ -67,6 +67,8 @@ pub enum QuestRejection {
     Worn(i32),
     /// Not on one of the quest's maps.
     Map,
+    /// Before the quest's start date.
+    Date,
     /// Fewer mesos than the quest takes.
     Mesos,
     /// The item rewards don't fit.
@@ -142,6 +144,13 @@ pub fn check_start(
     }
     if !start.maps.is_empty() && !start.maps.contains(&player.stats.map_id) {
         return Err(QuestRejection::Map);
+    }
+    if start.not_before.is_some_and(|at| SystemTime::now() < at) {
+        return Err(QuestRejection::Date);
+    }
+    // v83's client doesn't check; it has the server's refusal text.
+    if quest.start_money < 0 && player.meso < quest.start_money.saturating_neg() {
+        return Err(QuestRejection::Mesos);
     }
     Ok(())
 }
@@ -391,6 +400,10 @@ mod tests {
             end_min_level: None,
             start_items: vec![],
             end_rewards: vec![],
+            start_exp: 0,
+            start_money: 0,
+            start_buff_item: None,
+            end_buff_item: None,
             end_skills: vec![],
             start_script: None,
             end_script: None,
@@ -623,6 +636,29 @@ mod tests {
         p.stats.fame = 1;
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
         p.stats.fame = -3;
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+    }
+
+    #[test]
+    fn start_waits_for_the_start_date() {
+        let mut q = quest();
+        q.start.quests.clear();
+        let p = player(1, 0);
+        q.start.not_before = Some(SystemTime::now() + Duration::from_secs(3600));
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
+        q.start.not_before = Some(SystemTime::now() - Duration::from_secs(3600));
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+    }
+
+    #[test]
+    fn a_quest_that_takes_mesos_to_start_needs_them_held() {
+        let mut q = quest();
+        q.start.quests.clear();
+        q.start_money = -1000;
+        let mut p = player(1, 0);
+        p.meso = 999;
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Mesos));
+        p.meso = 1000;
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
     }
 

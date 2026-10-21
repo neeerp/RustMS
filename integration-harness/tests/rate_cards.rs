@@ -65,9 +65,11 @@ async fn hunters_luck_doubles_kill_exp() {
         t.buffs.contains(&(-HUNTERS_LUCK, 200, 1_800_000))
     })
     .await;
-    until(c, &mut t, |t| !t.field.alive(SNAIL).is_empty()).await;
+    until(c, &mut t, |t| t.field.alive(SNAIL).len() > 1).await;
 
-    let snail = t.field.alive(SNAIL)[0];
+    // The other test hunts the same map at the same time and takes the first
+    // snail, so this one takes the last.
+    let snail = *t.field.alive(SNAIL).last().unwrap();
     send(c, attack(snail, 4)).await;
     send(c, attack(snail, 4)).await;
     until(c, &mut t, |t| !t.gains.is_empty()).await;

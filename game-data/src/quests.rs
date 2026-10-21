@@ -13,6 +13,7 @@ use crate::{GameDataError, NxDataFile};
 use game::QuestState;
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
 pub const START_REQUIREMENTS: &[&str] = &[
@@ -29,6 +30,7 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "equipAllNeed",
     "equipSelectNeed",
     "fieldEnter",
+    "start",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -49,7 +51,7 @@ pub const END_REQUIREMENTS: &[&str] = &[
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
-pub const START_ACTIONS: &[&str] = &["item"];
+pub const START_ACTIONS: &[&str] = &["item", "exp", "money", "buffItemID"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
 /// `npcAct` (always "quest") names an NPC animation; neither the client nor
 /// the server does anything with it.
@@ -61,9 +63,12 @@ pub const END_ACTIONS: &[&str] = &[
     "item",
     "skill",
     "npcAct",
+    "buffItemID",
 ];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
-pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop", "period"];
+/// `var` (1 or 2, on equipment only) is read by neither v83's client nor
+/// Cosmic, which give the base stats; so do we.
+pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop", "period", "var"];
 /// Keys of an `Act/1/skill/<k>` entry the server applies.
 /// `onlyMasterLevel` marks entries without a `skillLevel`, which already
 /// raise only the master level.
@@ -100,6 +105,9 @@ pub struct StartRequirements {
     pub worn_any: Vec<i32>,
     /// Maps the player must be on (`fieldEnter`); empty means any.
     pub maps: Vec<i32>,
+    /// The hour (UTC) before which the quest can't be started (`start`,
+    /// "yyyymmddhh").
+    pub not_before: Option<SystemTime>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -122,6 +130,14 @@ pub struct QuestTemplate {
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
+    /// EXP given and mesos given (or, if negative, taken, which needs them
+    /// held) on starting.
+    pub start_exp: i32,
+    pub start_money: i32,
+    /// Items whose effect, as if used, the player gets on starting and on
+    /// completing (`buffItemID`).
+    pub start_buff_item: Option<i32>,
+    pub end_buff_item: Option<i32>,
     /// Skills taught on completion.
     pub end_skills: Vec<QuestSkill>,
     /// Scripts that run the start or completion instead of the quest data.
@@ -359,6 +375,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.worn_all = int_list(nx, start, "equipAllNeed")?;
     requirements.worn_any = int_list(nx, start, "equipSelectNeed")?;
     requirements.maps = int_list(nx, start, "fieldEnter")?;
+    requirements.not_before = nx.int_child(start, "start")?.map(date_hour).transpose()?;
     requirements.items = item_counts(nx, start)?;
     if let Some(skills) = nx.child_by_name(start, "skill")? {
         for skill in nx.child_indices(skills)? {
@@ -389,7 +406,13 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         None => Ok(None),
     };
     let exp = action_int("exp")?.unwrap_or(0);
-    if exp < 0 {
+    let start_actions = path_index(nx, &format!("Act.img/{id}/0"))?;
+    let start_action_int = |key: &str| match start_actions {
+        Some(index) => nx.int_child(index, key),
+        None => Ok(None),
+    };
+    let start_exp = start_action_int("exp")?.unwrap_or(0);
+    if exp < 0 || start_exp < 0 {
         return Err(invalid("negative EXP reward"));
     }
     let info = path_index(nx, &format!("QuestInfo.img/{id}"))?;
@@ -420,6 +443,10 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .transpose()?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
+        start_exp,
+        start_money: start_action_int("money")?.unwrap_or(0),
+        start_buff_item: start_action_int("buffItemID")?,
+        end_buff_item: action_int("buffItemID")?,
         end_skills: quest_skills(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
@@ -531,6 +558,40 @@ fn quest_skills(nx: &NxDataFile, act: &str) -> Result<Vec<QuestSkill>, GameDataE
 }
 
 /// A supported script name, if the node names one.
+/// The hour a quest date names, read as v83 does (FUN_00720d26): the
+/// digits "yyyymmddhh" as year, month, day and hour, in UTC.
+fn date_hour(date: i32) -> Result<SystemTime, GameDataError> {
+    let (year, month, day, hour) = (
+        date / 1_000_000,
+        date / 10_000 % 100,
+        date / 100 % 100,
+        date % 100,
+    );
+    if !(1601..=9999).contains(&year)
+        || !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+    {
+        return Err(invalid("bad quest date"));
+    }
+    // Howard Hinnant's days_from_civil.
+    let (y, m) = if month <= 2 {
+        (i64::from(year) - 1, i64::from(month) + 9)
+    } else {
+        (i64::from(year), i64::from(month) - 3)
+    };
+    let era = y.div_euclid(400);
+    let year_of_era = y - era * 400;
+    let day_of_year = (153 * m + 2) / 5 + i64::from(day) - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    let seconds = days * 86_400 + i64::from(hour) * 3_600;
+    Ok(match u64::try_from(seconds) {
+        Ok(after) => SystemTime::UNIX_EPOCH + Duration::from_secs(after),
+        Err(_) => SystemTime::UNIX_EPOCH - Duration::from_secs(seconds.unsigned_abs()),
+    })
+}
+
 fn script(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>, GameDataError> {
     match nx.string_child(parent, key)? {
         None => Ok(None),
@@ -635,8 +696,10 @@ mod tests {
         assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
         assert_eq!(classify(&money), Ok(()));
-        let start_money = keys(&["npc"], &["npc"], &["money"], &[]);
-        assert_eq!(classify(&start_money), Err("Act/0/money".into()));
+        let start_money = keys(&["npc"], &["npc"], &["money", "exp"], &[]);
+        assert_eq!(classify(&start_money), Ok(()));
+        let start_fame = keys(&["npc"], &["npc"], &["pop"], &[]);
+        assert_eq!(classify(&start_fame), Err("Act/0/pop".into()));
         let mut skill = keys(&["npc"], &["npc"], &[], &["skill"]);
         skill.skill_keys = vec!["id".into(), "masterLevel".into(), "job".into()];
         assert_eq!(classify(&skill), Ok(()));
@@ -702,6 +765,15 @@ mod tests {
         assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
         // Rupi's paper lasts an hour.
         assert_eq!(catalog.quest(3085).unwrap().start_items[0].period, Some(60));
+        // Not before Christmas Eve 2005; a fee, and EXP, to start; a
+        // transformation for finishing.
+        assert_eq!(
+            catalog.quest(3600).unwrap().start.not_before,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_135_382_400))
+        );
+        assert_eq!(catalog.quest(2029).unwrap().start_money, -1000);
+        assert_eq!(catalog.quest(3406).unwrap().start_exp, 1600);
+        assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
         // numeric order.
         let rewards = &catalog.quest(3379).unwrap().end_rewards;

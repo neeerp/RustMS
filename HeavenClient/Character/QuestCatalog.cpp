@@ -1,5 +1,7 @@
 #include "QuestCatalog.h"
 
+#include "QuestMarker.h"
+
 #include <algorithm>
 #include <cstdlib>
 #include <fstream>
@@ -61,6 +63,10 @@ namespace ms
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
 			info.min_fame = static_cast<int16_t>(start["pop"].get_integer());
 			info.repeat_interval = static_cast<int32_t>(start["interval"].get_integer(-1));
+
+			if (start["start"].data_type() != nl::node::type::none)
+				info.start_time = quest_date(start["start"].get_integer());
+
 			info.rewards.meso = static_cast<int32_t>(act["money"].get_integer());
 			info.rewards.exp = static_cast<int32_t>(act["exp"].get_integer());
 			info.rewards.fame = static_cast<int32_t>(act["pop"].get_integer());
