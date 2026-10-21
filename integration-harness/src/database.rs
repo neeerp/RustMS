@@ -439,6 +439,21 @@ pub async fn join_guild(character_id: i32, guild: &str) -> Result<(), HarnessErr
     .await
 }
 
+/// Found the guild `guild` in world 0 with `master` as its only member.
+pub async fn found_guild(master: i32, guild: &str) -> Result<(), HarnessError> {
+    let guild = guild.to_owned();
+    change_one_row("found guild", move |conn| {
+        diesel::sql_query(
+            "WITH g AS (INSERT INTO guilds (world_id, name) VALUES (0, $2) RETURNING id) \
+             INSERT INTO guild_members (character_id, guild_id, rank) SELECT $1, id, 1 FROM g",
+        )
+        .bind::<Integer, _>(master)
+        .bind::<Text, _>(guild)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the capacity of the guild named `guild`.
 pub async fn set_guild_capacity(guild: &str, capacity: i16) -> Result<(), HarnessError> {
     let guild = guild.to_owned();

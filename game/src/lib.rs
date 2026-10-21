@@ -9,6 +9,7 @@ pub mod buff;
 pub mod character;
 pub mod exp;
 pub mod guild;
+pub mod guild_bbs;
 pub mod inventory;
 pub mod keymap;
 pub mod mob_damage;

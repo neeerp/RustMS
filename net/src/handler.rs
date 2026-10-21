@@ -298,6 +298,39 @@ pub enum GuildRequest {
     SetEmblem {
         emblem: game::guild::Emblem,
     },
+    Bbs(BbsRequest),
+}
+
+/// Something asked of the guild bulletin board. Threads are named by the
+/// guild's number for them, and the notice is thread 0.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BbsRequest {
+    /// Post a thread or the notice, or rewrite thread `edit`.
+    Write {
+        edit: Option<i32>,
+        notice: bool,
+        title: String,
+        body: String,
+        icon: i32,
+    },
+    Delete {
+        thread: i32,
+    },
+    /// List a page of threads, counting from 0.
+    List {
+        page: i32,
+    },
+    Show {
+        thread: i32,
+    },
+    Reply {
+        thread: i32,
+        text: String,
+    },
+    /// Delete a reply, named by the board's number for it.
+    DeleteReply {
+        reply: i32,
+    },
 }
 
 /// Something a player asks of their Maple Messenger, which the world
@@ -720,6 +753,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::DenyGuildRequest,
                 InGame(&world::DenyGuildRequestHandler),
             ),
+            (Op::GuildBbs, InGame(&world::GuildBbsHandler)),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (
                 Op::PlayerInteraction,
@@ -839,7 +873,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 89);
+        assert_eq!(world_routes().len(), 90);
     }
 
     #[test]

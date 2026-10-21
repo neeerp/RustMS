@@ -152,6 +152,43 @@ case (a unique index on `lower(name)`).
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
 
+### Bulletin board
+
+The guild board (`GUILD_BBS`, recv 0x9B, send 0x3B; the RE notes are
+`v83ref/scratch/251/bbs.md`, outside this repository) lives in `guild_bbs_threads` and `guild_bbs_replies`
+(`db/src/guild_bbs.rs`). Each guild numbers its threads from 1 (the largest
+number plus one, so the newest thread's number comes back after it is
+deleted). The notice is thread 0, so a guild has at most one. Replies are
+numbered across every guild. Deleting a guild, a thread or a poster deletes
+their threads and replies; a member who leaves or is expelled keeps theirs,
+which the client shows with no writer name.
+
+- The client sends a mode byte: 0 write or edit, 1 delete a thread, 2 list
+  a page, 3 show a thread, 4 reply, 5 delete a reply. After every change it
+  asks for the list again, so the server answers only the asker, and only
+  this: mode 7 (the thread with its replies, oldest first) after a post,
+  edit, reply or deleted reply; mode 6 (the notice, the number of other
+  threads, then up to ten of them, newest first) for a list; mode 8 ("This
+  message had been deleted by another user.") when the thread to show or
+  reply to isn't there. A deleted thread and a refused request get nothing. A
+  successful write needs mode 7, or the client stays in the write panel.
+- `runtime/src/actor/client/guild_bbs.rs` ignores a player with no guild,
+  an empty title, body or reply, text with a NUL character, and icons other than 0 to 2, or 100 to 106
+  without the emoticon item 5290000 + (icon - 100). It cuts titles to 25
+  characters, bodies to 600 and replies to 25, as the reference server does.
+- The DB functions read the member's guild and rank in their transaction.
+  Only the master and jr. masters (rank 2 or better) post the notice, and
+  only when there is none; the poster or those ranks edit or delete a
+  thread or reply (so a demoted member still edits the notice they posted).
+  An edit dates the thread now. A page past the end is
+  the first page. A reply is found only on the asker's own guild's board
+  (Cosmic doesn't check this).
+- Dates are UTC FILETIMEs. The client prints them unconverted, so players
+  see UTC.
+- The harness test `guild_bbs` covers posting, pages, icons, the notice,
+  replies, cuts and every permission; `found_guild` makes a guild in the
+  database and `Trace::bbs` collects the board's packets.
+
 The packets are built in `net/src/packet/build/world/guild.rs`. The guild
 data lists the member ids, then a 37-byte record per member: the name padded
 to 13 bytes, then job, level, rank, online, contribution and alliance rank as
@@ -284,7 +321,8 @@ ints. The client takes the first member for the master.
     another tab. Leaving the guild leaves it open with only its
     background.
   - Clicking a tab, even the one shown, drops the guild pick.
-  - WHERE and BBS stay disabled: there is no member search or guild board.
+  - WHERE and BBS stay disabled: there is no member search, and no guild
+    board window yet (the server side is in "Bulletin board" above).
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),
     so the tab adds the origin back.
@@ -297,7 +335,8 @@ ints. The client takes the first member for the master.
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- Guild points, the guild BBS, alliances, and the guild quest.
+- Guild points, alliances, and the guild quest.
+- The guild board's window: the client keeps BtGuildBBS disabled.
 - Sorting by column.
 
 ## Inferred or unverified

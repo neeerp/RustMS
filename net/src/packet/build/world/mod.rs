@@ -10,6 +10,7 @@ pub mod effect;
 pub mod fame;
 pub mod field;
 pub mod guild;
+pub mod guild_bbs;
 pub mod info;
 pub mod inventory;
 pub mod keymap;
