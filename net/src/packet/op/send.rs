@@ -89,6 +89,8 @@ pub enum SendOpcode {
     ShowItemGainInChat = 0xCE,
     UpdateQuestInfo = 0xD3,
     HpTaken = 0xD4,
+    /// What the Item Maker made (FUN_0095dad3).
+    MakerResult = 0xD9,
     Cooldown = 0xEA,
     SpawnMonster = 0xEC,
     KillMonster = 0xED,

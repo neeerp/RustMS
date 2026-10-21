@@ -579,6 +579,39 @@ spell is spent once sent), that Start refuses a scroll whose rate the spell
 doesn't raise and treats an unlock with no start code as a refusal, and the
 result window's hover area.
 
+### Item Maker
+
+The Maker skill (`base*10000+1007`, base being `job/1000*1000`, or 2001 for
+Evan) opens the client's Maker window, which sends ITEM_MAKE (`0x71`,
+`world/maker.rs`; reports c006 and c006b). `game-data`'s `MakerData` reads
+the recipes from `Etc.nx`'s `ItemMake.img` (each named for what it makes,
+in a group for the jobs that see it) and, from `Item.nx`, each etc item's
+`info/lv` and the levels each monster crystal (4260000 to 4260008) is made
+from.
+
+Mode 1 (`1, itemId, stimulator flag, gem count, gems`) makes a recipe. The
+server checks what the window checks: the player is alive, has the level,
+the Maker level, the held item, the worn item and the quest states the
+recipe asks, every ingredient, and the fee. The fee is the client's: the
+recipe's `meso` plus a tenth of it for each part (one for the recipe, five
+for a stimulator, three for each gem plus three times its grade), floored to
+a thousand. A recipe with a `randomReward` list (the gems) makes one of its
+outcomes by weight. Mode 3 (`3, itemId`) takes 100 of an etc item with a
+level and gives the crystal for that level. Equipment, which takes a
+stimulator and gems, random making (mode 2) and disassembly (mode 4) are
+refused for now.
+
+The window waits for MAKER_RESULT (`217`) after every ITEM_MAKE, a
+request cut short included. Success sends a meso stat change (for a recipe
+with a fee; a crystal costs none), INVENTORY_OPERATION, then `217: 0, 1, 0, item,
+count, n, (id, count)*, 0, 0, meso` for a recipe or `217: 0, 3, crystal,
+item` for a crystal, then SHOW_ITEM_GAIN_INCHAT `0x10, 0`, which plays the
+Maker's success effect and sound. A refusal is `217: 2` ("Production failed
+due to an unknown error."), or 4 to 7 when the Equip, Use, Setup or Etc tab
+has no room for what was made. A one-of-a-kind item already held is
+refused like an unknown error. Whether the map should see the effect is
+unknown, so it isn't sent.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's

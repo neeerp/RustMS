@@ -4,6 +4,7 @@
 use crate::load::{self, asset_path};
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item, Player};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
+use game_data::maker::MakerData;
 use game_data::vega_spell::VegaSpells;
 use rand::Rng;
 use std::sync::OnceLock;
@@ -62,6 +63,19 @@ pub fn vega_rate(scroll_id: i32) -> Option<i32> {
     })
     .ok()?
     .rate(scroll_id)
+}
+
+/// The Item Maker's recipes and what makes each monster crystal (`Etc.nx`,
+/// `Item.nx`).
+pub fn maker() -> Option<&'static MakerData> {
+    static MAKER: OnceLock<Result<MakerData, String>> = OnceLock::new();
+    load::once(&MAKER, || {
+        MakerData::load(
+            asset_path("RUSTMS_ETC_NX_PATH", "assets/game-data/Etc.nx"),
+            asset_path("RUSTMS_ITEM_NX_PATH", "assets/game-data/Item.nx"),
+        )
+    })
+    .ok()
 }
 
 /// Whether the hair or face `style` exists. Without the data, every one
