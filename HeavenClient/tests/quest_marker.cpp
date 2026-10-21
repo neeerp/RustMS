@@ -234,6 +234,9 @@ int main()
 		huckle = ms::select_quest_menu(2030012, { errand }, done,
 			[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 30, done, early); }, early);
 		require(huckle.available.empty() && huckle.finished == 1, "and counts it done until then");
+		// 3600's Christmas Eve 2005, in FILETIME ticks.
+		require(ms::quest_date(2005122400) == 116444736000000000 + 1135382400LL * 10000000, "a start date is UTC");
+		require(ms::quest_date(2005122413) - ms::quest_date(2005122400) == 13 * 36000000000LL, "to the hour");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

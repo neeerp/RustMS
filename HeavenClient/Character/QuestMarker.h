@@ -139,6 +139,27 @@ namespace ms
 		return quest.repeat_interval >= 0 && completed_at + quest.repeat_interval * TICKS_PER_MINUTE <= now;
 	}
 
+	// A Check.nx date, yyyymmddhh, as a FILETIME. v83 parses it to the hour
+	// (FUN_00720d26) and compares it with its clock moved to the server's,
+	// which for RustMS is UTC.
+	inline int64_t quest_date(int64_t date)
+	{
+		int64_t year = date / 1000000;
+		int64_t month = date / 10000 % 100;
+		int64_t day = date / 100 % 100;
+		int64_t hour = date % 100;
+
+		// Howard Hinnant's days_from_civil.
+		year -= month <= 2 ? 1 : 0;
+		int64_t era = (year >= 0 ? year : year - 399) / 400;
+		int64_t yoe = year - era * 400;
+		int64_t doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+		int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+		int64_t days = era * 146097 + doe - 719468;
+
+		return 116444736000000000 + (days * 86400 + hour * 3600) * 10000000;
+	}
+
 	// `holds` checks start_holdings_met for the player and, for a completed
 	// quest, repeat_due.
 	template<class Status, class Holds>
