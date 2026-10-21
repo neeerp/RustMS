@@ -149,6 +149,7 @@ namespace ms
 		void set_titles(std::array<std::string, 5> titles);
 		void set_notice(std::string notice);
 		void set_capacity(int32_t capacity);
+		void set_emblem(const GuildEmblem& emblem);
 
 	private:
 		GuildMember* member(int32_t cid);

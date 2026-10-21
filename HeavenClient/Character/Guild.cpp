@@ -313,6 +313,11 @@ namespace ms
 		data.capacity = capacity;
 	}
 
+	void Guild::set_emblem(const GuildEmblem& emblem)
+	{
+		data.emblem = emblem;
+	}
+
 	GuildMember* Guild::member(int32_t cid)
 	{
 		for (auto& member : data.members)

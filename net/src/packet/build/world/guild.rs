@@ -10,6 +10,7 @@ use packet::{io::write::PktWrite, Packet};
 
 const OP_NAME_PROMPT: u8 = 0x01;
 const OP_INVITE: u8 = 0x05;
+const OP_EMBLEM_MAKER: u8 = 0x11;
 const OP_INFO: u8 = 0x1A;
 const OP_CREATED: u8 = 0x20;
 const OP_JOINED: u8 = 0x27;
@@ -21,6 +22,7 @@ const OP_MEMBER_LEVEL_JOB: u8 = 0x3C;
 const OP_MEMBER_ONLINE: u8 = 0x3D;
 const OP_TITLES_CHANGED: u8 = 0x3E;
 const OP_RANK_CHANGED: u8 = 0x40;
+const OP_EMBLEM_CHANGED: u8 = 0x42;
 const OP_NOTICE_CHANGED: u8 = 0x44;
 
 /// `MULTICHAT` mode for guild chat.
@@ -145,6 +147,12 @@ pub fn build_name_prompt() -> Result<Packet, NetworkError> {
     guild_operation(OP_NAME_PROMPT)
 }
 
+/// Open the emblem maker (Lea), which only the master's client does; it
+/// answers with `GUILD_OPERATION` mode 0x0F.
+pub fn build_emblem_maker() -> Result<Packet, NetworkError> {
+    guild_operation(OP_EMBLEM_MAKER)
+}
+
 /// The player's guild, or none, replacing what the client knows.
 pub fn build_guild_info(guild: Option<&Guild>) -> Result<Packet, NetworkError> {
     let mut packet = guild_operation(OP_INFO)?;
@@ -252,6 +260,15 @@ pub fn build_titles_changed(guild_id: i32, titles: &[String; 5]) -> Result<Packe
     for title in titles {
         packet.write_str_with_length(title)?;
     }
+    Ok(packet)
+}
+
+/// The guild's new emblem. Each member's client puts it beside their own
+/// name; the master's says "It is completed.".
+pub fn build_emblem_changed(guild_id: i32, emblem: &Emblem) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_EMBLEM_CHANGED)?;
+    packet.write_int(guild_id)?;
+    write_emblem(&mut packet, emblem)?;
     Ok(packet)
 }
 
@@ -621,6 +638,28 @@ mod tests {
                 .byte(mode)
                 .end();
         }
+    }
+
+    #[test]
+    fn emblem_maker_and_changed() {
+        let packet = build_emblem_maker().unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x11)
+            .end();
+
+        let packet = build_emblem_changed(4, &guild().emblem).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x42)
+            .int(4)
+            .short(1001)
+            .byte(2)
+            .short(2003)
+            .byte(4)
+            .end();
     }
 
     #[test]

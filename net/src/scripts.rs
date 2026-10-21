@@ -60,6 +60,9 @@ pub enum Effect {
     /// Ask for a new guild's name (Heracle); the guild is founded, and paid
     /// for, when the client answers.
     OpenGuildNamePrompt,
+    /// Open the client's emblem maker (Lea); the emblem is checked, and
+    /// paid for, when the client sends it.
+    OpenEmblemMaker,
     /// Grow the player's guild a step from `from` members, the capacity
     /// Heracle quoted the price for, and charge it. The client hears how it
     /// went from the guild, so nothing may follow it in the script.

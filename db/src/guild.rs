@@ -196,6 +196,25 @@ pub fn set_notice(guild_id: i32, by: i32, notice: &str) -> crate::Result<Option<
     )
 }
 
+/// Give the guild this emblem, if member `by` may. Returns every member's
+/// id, or `None` if `by` may not.
+pub fn set_emblem(guild_id: i32, by: i32, emblem: Emblem) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.may_set_emblem(by),
+        |conn| {
+            diesel::update(guilds::table.find(guild_id))
+                .set((
+                    guilds::mark_bg.eq(emblem.background as i16),
+                    guilds::mark_bg_color.eq(i16::from(emblem.background_color)),
+                    guilds::mark.eq(emblem.mark as i16),
+                    guilds::mark_color.eq(i16::from(emblem.mark_color)),
+                ))
+                .execute(conn)
+        },
+    )
+}
+
 /// Grow the guild a step from `from` members, if member `by` may. Returns
 /// every member's id, or `None` if `by` may not.
 pub fn grow(guild_id: i32, by: i32, from: u8) -> crate::Result<Option<Vec<i32>>> {

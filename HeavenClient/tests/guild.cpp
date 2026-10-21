@@ -1,4 +1,5 @@
 #include "../Character/Guild.h"
+#include "../Character/GuildEmblemRules.h"
 #include "../Net/Handlers/Helpers/GuildParser.h"
 #include <array>
 #include <cstring>
@@ -157,6 +158,8 @@ int main()
 		require(guild.full() && guild.get_data().capacity == 2, "two members fill a guild of two");
 		guild.set_capacity(15);
 		require(!guild.full() && guild.get_data().capacity == 15, "a grown guild has room");
+		guild.set_emblem(GuildEmblem{ 1005, 3, 2004, 7 });
+		require(guild.get_data().emblem == (GuildEmblem{ 1005, 3, 2004, 7 }), "a new emblem");
 
 		guild.clear();
 		require(!guild.exists() && guild.get_data().members.empty(), "clearing forgets the guild");
@@ -180,6 +183,30 @@ int main()
 		require(std::string(guild_mark_category(4021)) == "Pattern", "4xxx marks are patterns");
 		require(std::string(guild_mark_category(5035)) == "Letter", "5xxx marks are letters");
 		require(std::string(guild_mark_category(9026)) == "Etc", "the rest are Etc");
+
+		// Lea's emblem maker starts from the guild's emblem if it has a mark, else from the first of all.
+		require(emblem::initial(GuildEmblem{ 1005, 3, 3002, 9 }) == (GuildEmblem{ 1005, 3, 3002, 9 }), "the guild's emblem");
+		require(emblem::initial(GuildEmblem()) == (GuildEmblem{ 1000, 1, 2000, 1 }), "no emblem, the first");
+		require(emblem::initial(background_only) == (GuildEmblem{ 1000, 1, 2000, 1 }), "no mark, the first of all");
+
+		require(emblem::last_id({ "00001003", "00001030", "00001000" }) == 1030, "the last id, in any order");
+		require(emblem::last_id({ "00002000", "name", "00002020" }) == 2020, "names that aren't ids don't count");
+		require(emblem::last_id({}) == 0, "no ids");
+
+		emblem::LastIds last = { 0, 1030, 2020, 3006, 4021, 5035, 0, 0, 0, 9026 };
+		require(emblem::step_background(1000, false, last) == 1030 && emblem::step_background(1030, true, last) == 1000, "backgrounds wrap");
+		require(emblem::step_background(1004, true, last) == 1005 && emblem::step_background(1004, false, last) == 1003, "backgrounds step");
+		require(emblem::step_mark(2000, false, last) == 2020 && emblem::step_mark(2020, true, last) == 2000, "animals wrap");
+		require(emblem::step_mark(9000, false, last) == 9026 && emblem::step_mark(9026, true, last) == 9000, "ETC wraps");
+		require(emblem::step_mark(5035, true, last) == 5000 && emblem::step_mark(3003, true, last) == 3004, "marks stay in their category");
+		require(emblem::step_color(1, false) == 16 && emblem::step_color(16, true) == 1, "colours wrap");
+		require(emblem::step_color(7, true) == 8 && emblem::step_color(7, false) == 6, "colours step");
+
+		require(emblem::category_index(2000) == 0 && emblem::category_index(5035) == 3, "the combo's categories");
+		require(emblem::category_index(9026) == 4, "ETC is the last");
+		require(emblem::category_index(7000) == 0 && emblem::category_index(0) == 0, "an unknown category is the first");
+		require(emblem::category_mark(0) == 2000 && emblem::category_mark(1) == 3000 && emblem::category_mark(2) == 4000, "a category's first mark");
+		require(emblem::category_mark(3) == 5000 && emblem::category_mark(4) == 9000, "letters, then ETC");
 
 		std::cout << "Guild passed\n";
 		return 0;

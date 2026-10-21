@@ -107,6 +107,7 @@ namespace ms
 			MEMO,
 			MEMOSEND,
 			QUICKSLOTCONFIG,
+			GUILDMARKMAKER,
 			NUM_TYPES
 		};
 

@@ -70,6 +70,17 @@ pub mod keys {
     /// `{price}` and `{capacity}`, as for the question.
     pub const HERACLE_GROW_NO_MESOS: &str = "heracle.grow.no_mesos";
 
+    /// Lea, who makes guild emblems beside Heracle; no licensed script has
+    /// her text either.
+    pub const LEA_MENU: &str = "lea.menu";
+    pub const LEA_EMBLEM: &str = "lea.choice.emblem";
+    pub const LEA_NOT_MASTER: &str = "lea.not_master";
+    /// `{price}`.
+    pub const LEA_ASK: &str = "lea.ask";
+    pub const LEA_DECLINE: &str = "lea.decline";
+    /// The popup for an emblem sent without its `{price}`.
+    pub const LEA_NO_MESOS: &str = "lea.no_mesos";
+
     /// The continent ships' station staff: the booths that sell tickets
     /// (Joel, Agatha), the ushers that take them aboard (Cherry, Rini), and
     /// the crew that lets passengers off before take-off (Purin, Erin). No
@@ -555,6 +566,12 @@ mod tests {
             keys::HERACLE_GROW_FULL,
             keys::HERACLE_GROW_ASK,
             keys::HERACLE_GROW_NO_MESOS,
+            keys::LEA_MENU,
+            keys::LEA_EMBLEM,
+            keys::LEA_NOT_MASTER,
+            keys::LEA_ASK,
+            keys::LEA_DECLINE,
+            keys::LEA_NO_MESOS,
             keys::SHIPS_SELL_ASK,
             keys::SHIPS_SELL_DECLINE,
             keys::SHIPS_SELL_SHORT,

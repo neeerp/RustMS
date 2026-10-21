@@ -29,6 +29,7 @@
 
 #include "../../Gameplay/MovePath.h"
 
+#include "../../Character/Guild.h"
 #include "../../Character/Inventory/InventoryType.h"
 #include "../../Util/Memos.h"
 
@@ -568,6 +569,7 @@ namespace ms
 			EXPEL = 8,
 			SET_TITLES = 13,
 			CHANGE_RANK = 14,
+			SET_EMBLEM = 15,
 			SET_NOTICE = 16
 		};
 
@@ -660,6 +662,20 @@ namespace ms
 		{
 			write_int(cid);
 			write_byte(rank);
+		}
+	};
+
+	// Saves the emblem made in Lea's emblem maker, with the full ids
+	class SetGuildEmblemPacket : public GuildOperationPacket
+	{
+	public:
+		SetGuildEmblemPacket(const GuildEmblem& emblem) :
+			GuildOperationPacket(GuildOperationPacket::Operation::SET_EMBLEM)
+		{
+			write_short(emblem.background);
+			write_byte(emblem.background_color);
+			write_short(emblem.mark);
+			write_byte(emblem.mark_color);
 		}
 	};
 

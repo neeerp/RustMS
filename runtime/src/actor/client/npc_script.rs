@@ -128,6 +128,7 @@ impl ClientActor {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);
                 }
+                Effect::OpenEmblemMaker => afterwards.push(guild::build_emblem_maker()?),
                 Effect::GrowGuild { from } => grow_guild = Some(*from),
                 Effect::DisbandGuild => disband_guild = true,
                 Effect::SetHp(hp) => {
