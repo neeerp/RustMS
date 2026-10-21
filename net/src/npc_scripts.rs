@@ -230,6 +230,15 @@ const SUBWAY_GATES: [(i32, &Route); 2] = [
     (1052007, &conti::TO_NLC),
     (9201068, &conti::TO_KERNING_CITY),
 ];
+/// The airports' booths, Irene (`sellticket_sg`) in Kerning City and
+/// Shalon (`sellticket_cbd`) at Changi, with where each one's plane goes.
+const PLANE_BOOTHS: [(i32, &Route, &str); 2] = [
+    (9270041, &conti::TO_CHANGI, "Singapore"),
+    (9270038, &conti::AIR_TO_KERNING_CITY, "Kerning City"),
+];
+/// The pilots: Xinga (`goback_kerning`) in Kerning City's departure room,
+/// and Kerny (`goback_cbd`) in Changi's and on both planes.
+const PILOTS: [i32; 2] = [9270017, 9270018];
 /// Bell (`NLC_ticketing`) stands on both platforms and in both waiting
 /// rooms.
 const BELL: i32 = 9201057;
@@ -781,6 +790,12 @@ impl NpcScript {
         }
         if let Some((_, route)) = SUBWAY_GATES.iter().find(|(gate, _)| *gate == npc_id) {
             return Some(subway_gate(npc_id, route, player, conti::now()));
+        }
+        if let Some(&(_, route, place)) = PLANE_BOOTHS.iter().find(|(booth, ..)| *booth == npc_id) {
+            return Some(plane_booth(npc_id, route, place, player, conti::now()));
+        }
+        if PILOTS.contains(&npc_id) {
+            return pilot(npc_id, player);
         }
         if let Some((_, route)) = USHERS.iter().find(|(usher, _)| *usher == npc_id) {
             return Some(usher(npc_id, route, player, conti::now()));
@@ -1476,7 +1491,7 @@ fn sell_ticket(route: &Route, player: &Player) -> Vec<Page> {
     let ask = ticket_text(keys::SHIPS_SELL_ASK, route);
     sell(
         route,
-        player,
+        player.meso >= route.price,
         ask,
         keys::SHIPS_SELL_DECLINE,
         keys::SHIPS_SELL_SHORT,
@@ -1484,9 +1499,8 @@ fn sell_ticket(route: &Route, player: &Player) -> Vec<Page> {
 }
 
 /// One of `route`'s tickets, asked about with `ask`: no says `decline`,
-/// and a player short of the price hears `short` after yes.
-fn sell(route: &Route, player: &Player, ask: String, decline: &str, short: &str) -> Vec<Page> {
-    let can_pay = player.meso >= route.price;
+/// and a player who can't buy it hears `short` after yes.
+fn sell(route: &Route, can_pay: bool, ask: String, decline: &str, short: &str) -> Vec<Page> {
     let on_yes = if can_pay {
         vec![
             Effect::SpendMeso(route.price),
@@ -1546,11 +1560,33 @@ fn leave_ship(npc_id: i32, route: &Route) -> NpcScript {
     )
 }
 
-/// `NLC_Move`: a subway gate asks first and only then looks for the
-/// ticket, then shows the player to the waiting room while the train
-/// boards, as of route time `t`.
+/// `NLC_Move`: a subway gate, as of route time `t`.
 fn subway_gate(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript {
-    let pages = match route.timetable.state(t) {
+    let says = GateText {
+        ask: keys::SUBWAY_BOARD_ASK,
+        decline: keys::SUBWAY_BOARD_DECLINE,
+        no_ticket: keys::SUBWAY_BOARD_NO_TICKET,
+        closing: keys::SUBWAY_BOARD_CLOSING,
+        full: keys::SUBWAY_BOARD_FULL,
+    };
+    NpcScript::new(npc_id, gate(route, player, t, &says))
+}
+
+/// What a gate says: before boarding, after a no, without a ticket, once
+/// boarding has closed, and between trips.
+struct GateText {
+    ask: &'static str,
+    decline: &'static str,
+    no_ticket: &'static str,
+    closing: &'static str,
+    full: &'static str,
+}
+
+/// A gate that asks first and only then looks for the ticket, then shows
+/// the player to the waiting room while `route` boards, as of route time
+/// `t`.
+fn gate(route: &Route, player: &Player, t: i64, says: &GateText) -> Vec<Page> {
+    match route.timetable.state(t) {
         State::Wait => {
             let has_ticket = player.inventory.count(route.ticket) > 0;
             let on_yes = if has_ticket {
@@ -1566,19 +1602,74 @@ fn subway_gate(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript
                 Vec::new()
             };
             let mut pages = vec![Page::Ask {
-                text: text(keys::SUBWAY_BOARD_ASK),
+                text: text(says.ask),
                 on_yes,
-                on_no: Some(text(keys::SUBWAY_BOARD_DECLINE)),
+                on_no: Some(text(says.decline)),
             }];
             if !has_ticket {
-                pages.push(Page::Say(text(keys::SUBWAY_BOARD_NO_TICKET)));
+                pages.push(Page::Say(text(says.no_ticket)));
             }
             pages
         }
-        State::Start => vec![Page::Say(text(keys::SUBWAY_BOARD_CLOSING))],
-        _ => vec![Page::Say(text(keys::SUBWAY_BOARD_FULL))],
+        State::Start => vec![Page::Say(text(says.closing))],
+        _ => vec![Page::Say(text(says.full))],
+    }
+}
+
+/// An airport's booth: one menu to buy the ticket for its plane, which
+/// flies to `place`, or to go in and board it, as of route time `t`. A
+/// player who already holds a ticket can't buy another (Cosmic).
+fn plane_booth(npc_id: i32, route: &Route, place: &str, player: &Player, t: i64) -> NpcScript {
+    let choice = |key| content::text().get(key, &[("place", place)]);
+    let can_pay = player.meso >= route.price && player.inventory.count(route.ticket) == 0;
+    let buy = sell(
+        route,
+        can_pay,
+        ticket_text(keys::PLANE_SELL_ASK, route),
+        keys::PLANE_SELL_DECLINE,
+        keys::PLANE_SELL_SHORT,
+    );
+    let says = GateText {
+        ask: keys::PLANE_BOARD_ASK,
+        decline: keys::PLANE_BOARD_DECLINE,
+        no_ticket: keys::PLANE_BOARD_NO_TICKET,
+        closing: keys::PLANE_BOARD_CLOSED,
+        full: keys::PLANE_BOARD_CLOSED,
     };
-    NpcScript::new(npc_id, pages)
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![Page::Menu {
+            text: choice(keys::PLANE_BOOTH_MENU),
+            choices: vec![
+                (choice(keys::PLANE_BOOTH_BUY), buy),
+                (text(keys::PLANE_BOOTH_BOARD), gate(route, player, t, &says)),
+            ],
+        }],
+    );
+    script.inventory_full = Some(text(keys::PLANE_SELL_FULL));
+    script
+}
+
+/// A pilot: in a departure room, lets the player back out to the airport
+/// without the ticket; on a plane, says it lands soon.
+fn pilot(npc_id: i32, player: &Player) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    if let Some(route) = conti::riding_on(map_id) {
+        let (_, _, place) = PLANE_BOOTHS
+            .iter()
+            .find(|(_, plane, _)| plane.deck == route.deck)?;
+        let says = content::text().get(keys::PLANE_RIDE, &[("place", place)]);
+        return Some(NpcScript::new(npc_id, vec![Page::Say(says)]));
+    }
+    let route = conti::waiting_in(map_id)?;
+    Some(NpcScript::new(
+        npc_id,
+        vec![Page::Ask {
+            text: text(keys::PLANE_LEAVE_ASK),
+            on_yes: vec![Effect::Warp(route.platform)],
+            on_no: Some(text(keys::PLANE_LEAVE_DECLINE)),
+        }],
+    ))
 }
 
 /// `NLC_ticketing`: on a platform Bell sells the ticket for the line that
@@ -1604,7 +1695,7 @@ fn bell(player: &Player) -> Option<NpcScript> {
         let ask = content::text().get(line.ask, &vars);
         let pages = sell(
             route,
-            player,
+            player.meso >= route.price,
             ask,
             keys::SUBWAY_SELL_DECLINE,
             keys::SUBWAY_SELL_SHORT,
@@ -3430,6 +3521,97 @@ mod tests {
             );
         }
         assert!(NpcScript::for_npc(BELL, &traveller(10, 0, false)).is_none());
+    }
+
+    #[test]
+    fn the_airport_booths_sell_one_ticket_and_board_its_holders() {
+        const HOUR: i64 = 3_600_000;
+        // A plane leaves on the hour and every 6 minutes; boarding is open
+        // from 5 to 1 minutes before.
+        let minute = |m: i64| 7 * HOUR + m * 60_000;
+        let (irene, route) = (9270041, &conti::TO_CHANGI);
+        let booth = |player: &Player, t| plane_booth(irene, route, "Singapore", player, t);
+        let buyer = rider(0, 5000, 103000000);
+        let mut sold = booth(&buyer, minute(2));
+        assert_eq!(kind(&sold.begin()), Some(4));
+        assert_eq!(
+            kind(&sold.respond(ScriptInput::Select(0)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            sold.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SpendMeso(5000),
+                Effect::GiveItem {
+                    item_id: 4031731,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(sold.inventory_full().is_some());
+        // Not to one short of the fare, nor to one who holds a ticket.
+        let mut holder = buyer.clone();
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(route.ticket, 1),
+        );
+        for player in [&rider(0, 4999, 103000000), &holder] {
+            let mut refused = booth(player, minute(2));
+            refused.begin();
+            refused.respond(ScriptInput::Select(0)).unwrap();
+            let step = refused.respond(ScriptInput::Yes).unwrap();
+            assert!(step.effects.is_empty());
+            assert_eq!(buttons(&step), (false, false));
+        }
+        // A holder boards while the plane boards.
+        let mut board = booth(&holder, minute(2));
+        board.begin();
+        assert_eq!(
+            kind(&board.respond(ScriptInput::Select(1)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            board.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireBoarding(103000000),
+                Effect::TakeItem {
+                    item_id: 4031731,
+                    quantity: 1
+                },
+                Effect::Warp(540010100),
+            ]
+        );
+        for t in [minute(5), minute(6)] {
+            let mut late = booth(&holder, t);
+            late.begin();
+            let step = late.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(buttons(&step), (false, false));
+        }
+    }
+
+    #[test]
+    fn the_pilots_let_passengers_out_and_say_the_plane_lands_soon() {
+        for (pilot, room, airport) in [
+            (9270017, 540010100, 103000000),
+            (9270018, 540010001, 540010000),
+        ] {
+            let mut out = NpcScript::for_npc(pilot, &rider(0, 0, room)).unwrap();
+            assert_eq!(kind(&out.begin()), Some(1));
+            assert_eq!(
+                out.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(airport)]
+            );
+        }
+        let mut says = Vec::new();
+        for plane in [540010101, 540010002] {
+            let mut aboard = NpcScript::for_npc(9270018, &rider(0, 0, plane)).unwrap();
+            let step = aboard.begin();
+            assert_eq!(buttons(&step), (false, false));
+            says.push(page_text(&step));
+        }
+        assert_ne!(says[0], says[1]);
+        assert!(NpcScript::for_npc(9270018, &rider(0, 0, 540010000)).is_none());
     }
 
     #[test]

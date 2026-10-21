@@ -58,6 +58,15 @@ pub struct Timetable {
     pub ride: i64,
 }
 
+/// A portal riders are put at: by name, the first of that name (none
+/// is the map's first spawn point), or by id where a map's spawn points
+/// share their name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Portal {
+    Named(&'static str),
+    Id(u8),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Route {
     /// Where the ship docks and passengers board.
@@ -71,7 +80,7 @@ pub struct Route {
     /// attack (Cosmic's Boats.js).
     pub balrogs: Option<(i16, i16)>,
     /// Where riders step off, and by which portal.
-    pub arrival: (i32, &'static str),
+    pub arrival: (i32, Portal),
     /// Where the ship docks at the other end.
     pub arrival_platform: i32,
     /// The ticket the platform takes.
@@ -99,7 +108,7 @@ pub const TO_ORBIS: Route = Route {
     deck: 200090010,
     cabin: Some(200090011),
     balrogs: Some((339, 148)),
-    arrival: (200000100, "come00"),
+    arrival: (200000100, Portal::Named("come00")),
     arrival_platform: 200000111,
     ticket: 4031045,
     price: 5000,
@@ -113,7 +122,7 @@ pub const TO_ELLINIA: Route = Route {
     deck: 200090000,
     cabin: Some(200090001),
     balrogs: Some((-538, 143)),
-    arrival: (101000300, "come00"),
+    arrival: (101000300, Portal::Named("come00")),
     arrival_platform: 101000300,
     ticket: 4031047,
     price: 5000,
@@ -137,7 +146,7 @@ pub const TO_LUDIBRIUM: Route = Route {
     deck: 200090100,
     cabin: None,
     balrogs: None,
-    arrival: (220000100, "sp"),
+    arrival: (220000100, Portal::Named("sp")),
     arrival_platform: 220000110,
     ticket: 4031074,
     price: 6000,
@@ -154,7 +163,7 @@ pub const LUDIBRIUM_TO_ORBIS: Route = Route {
     deck: 200090110,
     cabin: None,
     balrogs: None,
-    arrival: (200000100, "ludi00"),
+    arrival: (200000100, Portal::Named("ludi00")),
     arrival_platform: 200000121,
     ticket: 4031045,
     price: 6000,
@@ -168,7 +177,7 @@ pub const TO_LEAFRE: Route = Route {
     deck: 200090200,
     cabin: None,
     balrogs: None,
-    arrival: (240000100, "sp"),
+    arrival: (240000100, Portal::Named("sp")),
     arrival_platform: 240000110,
     ticket: 4031331,
     price: 30000,
@@ -182,7 +191,7 @@ pub const LEAFRE_TO_ORBIS: Route = Route {
     deck: 200090210,
     cabin: None,
     balrogs: None,
-    arrival: (200000100, "sp"),
+    arrival: (200000100, Portal::Named("sp")),
     arrival_platform: 200000131,
     ticket: 4031045,
     price: 30000,
@@ -199,7 +208,7 @@ pub const TO_ARIANT: Route = Route {
     deck: 200090400,
     cabin: None,
     balrogs: None,
-    arrival: (260000100, "sp"),
+    arrival: (260000100, Portal::Named("sp")),
     arrival_platform: 260000100,
     ticket: 4031576,
     price: 6000,
@@ -213,7 +222,7 @@ pub const ARIANT_TO_ORBIS: Route = Route {
     deck: 200090410,
     cabin: None,
     balrogs: None,
-    arrival: (200000100, "sp"),
+    arrival: (200000100, Portal::Named("sp")),
     arrival_platform: 200000151,
     ticket: 4031045,
     price: 6000,
@@ -238,7 +247,7 @@ pub const TO_NLC: Route = Route {
     deck: 600010005,
     cabin: None,
     balrogs: None,
-    arrival: (600010001, "sp"),
+    arrival: (600010001, Portal::Named("sp")),
     arrival_platform: 600010001,
     ticket: 4031711,
     price: 5000,
@@ -252,7 +261,7 @@ pub const TO_KERNING_CITY: Route = Route {
     deck: 600010003,
     cabin: None,
     balrogs: None,
-    arrival: (103000100, "sp"),
+    arrival: (103000100, Portal::Named("sp")),
     arrival_platform: 103000100,
     ticket: 4031713,
     price: 5000,
@@ -260,7 +269,47 @@ pub const TO_KERNING_CITY: Route = Route {
     ship: false,
 };
 
-const ROUTES: [&Route; 10] = [
+/// Kerning City and Changi: one plane leaves each way every 6 minutes and
+/// flies for 1, boarding the 4 after it lands (Cosmic's AirPlane event).
+const PLANE: Timetable = Timetable {
+    term: 6,
+    wait: 5,
+    closed: 1,
+    ride: 1,
+};
+
+/// The fare is Cosmic's.
+pub const TO_CHANGI: Route = Route {
+    platform: 103000000,
+    waiting_room: 540010100,
+    deck: 540010101,
+    cabin: None,
+    balrogs: None,
+    arrival: (540010000, Portal::Named("sp")),
+    arrival_platform: 540010000,
+    ticket: 4031731,
+    price: 5000,
+    timetable: PLANE,
+    ship: false,
+};
+
+/// Kerning City's spawn points are all `sp`; riders land on the one by
+/// Irene's booth (Cosmic).
+pub const AIR_TO_KERNING_CITY: Route = Route {
+    platform: 540010000,
+    waiting_room: 540010001,
+    deck: 540010002,
+    cabin: None,
+    balrogs: None,
+    arrival: (103000000, Portal::Id(7)),
+    arrival_platform: 103000000,
+    ticket: 4031732,
+    price: 5000,
+    timetable: PLANE,
+    ship: false,
+};
+
+const ROUTES: [&Route; 12] = [
     &TO_ORBIS,
     &TO_ELLINIA,
     &TO_LUDIBRIUM,
@@ -271,6 +320,8 @@ const ROUTES: [&Route; 10] = [
     &ARIANT_TO_ORBIS,
     &TO_NLC,
     &TO_KERNING_CITY,
+    &TO_CHANGI,
+    &AIR_TO_KERNING_CITY,
 ];
 
 const MINUTE: i64 = 60_000;
@@ -405,6 +456,11 @@ pub fn waiting_in(map_id: i32) -> Option<&'static Route> {
         .find(|route| route.waiting_room == map_id)
 }
 
+/// The route whose riders are on `map_id`, its deck, if any.
+pub fn riding_on(map_id: i32) -> Option<&'static Route> {
+    ROUTES.into_iter().find(|route| route.deck == map_id)
+}
+
 /// The state a client on `map_id` is told when it asks (send 0xDC): that of
 /// the route whose ship it shows, if any, and on a deck whether the Crimson
 /// Balrog's ship is alongside.
@@ -427,7 +483,7 @@ pub enum Happening {
     /// Show the ship leaving or docking (CONTI_MOVE).
     Show(Target, State),
     /// Move everyone on the map there.
-    MoveAll { map_id: i32, portal: &'static str },
+    MoveAll { map_id: i32, portal: Portal },
     /// Bring `count` of `mob_id` aboard on the ground below `at`.
     Board {
         mob_id: i32,
@@ -438,17 +494,13 @@ pub enum Happening {
     Retreat,
 }
 
-/// Whether trips ever change anything on `map_id`.
+/// Whether trips ever change anything on `map_id`. Without a ship, the
+/// platforms see nothing.
 pub fn has_trips(map_id: i32) -> bool {
     ROUTES.into_iter().any(|route| {
-        [
-            route.platform,
-            route.waiting_room,
-            route.deck,
-            route.arrival_platform,
-        ]
-        .contains(&map_id)
+        [route.waiting_room, route.deck].contains(&map_id)
             || route.cabin == Some(map_id)
+            || route.ship && [route.platform, route.arrival_platform].contains(&map_id)
     })
 }
 
@@ -467,7 +519,7 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
                 }
                 State::Move if map_id == route.waiting_room => Happening::MoveAll {
                     map_id: route.deck,
-                    portal: "",
+                    portal: Portal::Named(""),
                 },
                 State::End if map_id == route.deck || route.cabin == Some(map_id) => {
                     let (map_id, portal) = route.arrival;
@@ -563,7 +615,7 @@ mod tests {
             happens(101000301, departure),
             [Happening::MoveAll {
                 map_id: 200090010,
-                portal: ""
+                portal: Portal::Named("")
             }]
         );
         let arrival = departure + 10 * MINUTE;
@@ -572,7 +624,7 @@ mod tests {
                 happens(ship, arrival),
                 [Happening::MoveAll {
                     map_id: 200000100,
-                    portal: "come00"
+                    portal: Portal::Named("come00")
                 }]
             );
         }
@@ -599,7 +651,7 @@ mod tests {
             happens(200000132, departure),
             [Happening::MoveAll {
                 map_id: 200090200,
-                portal: ""
+                portal: Portal::Named("")
             }]
         );
         let arrival = departure + 5 * MINUTE;
@@ -607,7 +659,7 @@ mod tests {
             happens(200090200, arrival),
             [Happening::MoveAll {
                 map_id: 240000100,
-                portal: "sp"
+                portal: Portal::Named("sp")
             }]
         );
         // Ariant's platform sees its own ship leave and the other dock.
@@ -723,14 +775,14 @@ mod tests {
             happens(600010004, departure),
             [Happening::MoveAll {
                 map_id: 600010005,
-                portal: ""
+                portal: Portal::Named("")
             }]
         );
         assert_eq!(
             happens(600010003, departure + MINUTE),
             [Happening::MoveAll {
                 map_id: 103000100,
-                portal: "sp"
+                portal: Portal::Named("sp")
             }]
         );
         // ...but the stations show no ship, and don't answer for one.
@@ -738,6 +790,39 @@ mod tests {
             assert_eq!(happens(station, departure - MINUTE), []);
             assert_eq!(happens(station, departure + MINUTE), []);
             assert_eq!(ship_state(station, departure), None);
+        }
+    }
+
+    #[test]
+    fn the_plane_flies_every_six_minutes_and_lands_by_irene() {
+        let departure = 7 * HOUR + 6 * MINUTE;
+        let happens = |map_id, at: i64| happenings(map_id, at - 50, at + 50);
+        assert_eq!(PLANE.state(departure - 5 * MINUTE), State::Wait);
+        assert_eq!(PLANE.state(departure - MINUTE), State::Start);
+        assert_eq!(PLANE.state(departure + 30_000), State::Move);
+        assert_eq!(departing_from(103000000), Some(&TO_CHANGI));
+        assert_eq!(waiting_in(540010001), Some(&AIR_TO_KERNING_CITY));
+        assert_eq!(riding_on(540010101), Some(&TO_CHANGI));
+        assert_eq!(riding_on(540010100), None);
+        assert_eq!(
+            happens(540010100, departure),
+            [Happening::MoveAll {
+                map_id: 540010101,
+                portal: Portal::Named("")
+            }]
+        );
+        assert_eq!(
+            happens(540010002, departure + MINUTE),
+            [Happening::MoveAll {
+                map_id: 103000000,
+                portal: Portal::Id(7)
+            }]
+        );
+        for airport in [103000000, 540010000] {
+            assert!(!has_trips(airport));
+            assert_eq!(happens(airport, departure - MINUTE), []);
+            assert_eq!(happens(airport, departure + MINUTE), []);
+            assert_eq!(ship_state(airport, departure), None);
         }
     }
 }

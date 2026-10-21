@@ -58,7 +58,8 @@ Danger Zone Taxi, Camel Cab, Dolphin and NLC Taxi keys are `unsourced` and show
 placeholder text. `taxis.rs` checks a beginner's Regular Cab ride and the
 VIP Cab's fare through the network harness.
 `subway.rs` rides the NLC Taxi and walks through `halloween_enter`. The
-Kerning City-New Leaf City subway runs on the ship clock (`ships.md`).
+Kerning City-New Leaf City subway runs on the ship clock (`ships.md`), as
+does the plane between Kerning City and Singapore (`plane.rs`).
 
 ## Guards
 

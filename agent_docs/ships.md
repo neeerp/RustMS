@@ -62,6 +62,33 @@ riders set down at the far station's first `sp`.
 The fare is Cosmic's. The Basic tickets (4031710, 4031712) that Edelstein
 sells to level 10 and under are not sold or accepted.
 
+### The plane
+
+The plane between Kerning City and Singapore's Changi Airport is another
+`Route` without a ship. One leaves each way every 6 minutes: boarding
+opens 5 minutes before, closes 1 minute before, and the flight takes 1
+minute (`PLANE`, Cosmic's `AirPlane`). Kerning City has no station of its
+own: the plane boards from the town itself (103000000).
+
+| Route | Boards at | Waiting room | Plane | Arrives at | Ticket | Fare |
+| --- | --- | --- | --- | --- | --- | --- |
+| `TO_CHANGI` | 103000000 | 540010100 | 540010101 | 540010000 `sp` | 4031731 | 5,000 |
+| `AIR_TO_KERNING_CITY` | 540010000 | 540010001 | 540010002 | 103000000 portal 7 | 4031732 | 5,000 |
+
+The plane home sets its passengers down by Irene, at Kerning City's portal
+7, which has no name of its own. So an arrival is a `conti::Portal`: a name,
+or an id (`warp_to_spawn_point`). The fare and the timetable are Cosmic's.
+
+Its NPCs, with placeholder lines under the `plane.*` keys:
+
+- Irene (9270041, Kerning City) and Shalon (9270038, Changi) each have a
+  menu (`PLANE_BOOTHS`): buy the ticket, or board. They sell one ticket at
+  a time, to a player who has none, and board its holder while the plane
+  boards.
+- Xinga (9270017) in Kerning City's waiting room and Kerny (9270018) in
+  Changi's let passengers back out to the airport; the ticket is gone. On
+  either plane, Kerny only says it lands soon (`conti::riding_on`).
+
 `conti::now()` is route time in milliseconds: the wall clock times
 `RUSTMS_CONTI_SCALE` (a whole number, default 1). The harness world sets it
 to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
