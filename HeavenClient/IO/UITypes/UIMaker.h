@@ -168,6 +168,11 @@ namespace ms
 
 		void drop_equip(int32_t id, int16_t slot);
 
+		// Puts an item in the random make, as many as the player says (FUN_00825dd2, mode 2).
+		void drop_random(int32_t id);
+		// Fills the first empty slot once the player has said how many.
+		void apply_random(int32_t id, int32_t quantity);
+
 		// What the fee is now, for a recipe with what has been put in or a disassembly.
 		int32_t current_fee() const;
 
@@ -208,9 +213,11 @@ namespace ms
 		int32_t mode;
 		const maker::Recipe *recipe;
 		std::vector<Slot> slots;
-		// The gems put in, in their slots' order, and whether the stimulator is.
+		// The gems put in, in their slots' order, and whether the stimulator is, and which: the recipe's, or for the
+		// random make any.
 		std::vector<int32_t> gems;
 		bool stimulated;
+		int32_t stimulator;
 		// The Equip tab's slot of the equipment to take apart.
 		int16_t equip_slot;
 		State state;

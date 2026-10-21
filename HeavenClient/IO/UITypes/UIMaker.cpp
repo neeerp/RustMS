@@ -404,7 +404,7 @@ namespace ms
 	}
 
 	UIMaker::UIMaker() : UIElement(Point<int16_t>(), Point<int16_t>()), mode(0), recipe(nullptr), stimulated(false),
-						 equip_slot(0), state(State::IDLE),
+						 stimulator(0), equip_slot(0), state(State::IDLE),
 						 elapsed(0), was_clicked(false), dragged(false)
 	{
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["Maker"];
@@ -568,6 +568,8 @@ namespace ms
 		if (mode == 1 && recipe && recipe->catalyst)
 			draw_centred(ItemData::get(recipe->catalyst).get_icon(false), position + STIMULATOR, SLOT_SIZE,
 						 stimulated ? 1.0f : 100.0f / 255.0f);
+		else if (mode == 2 && stimulated)
+			draw_centred(ItemData::get(stimulator).get_icon(false), position + STIMULATOR, SLOT_SIZE, 1.0f);
 		else if (mode != 2)
 			not_use.draw(position + STIMULATOR);
 
@@ -702,7 +704,7 @@ namespace ms
 		}
 
 		// A press on a gem or the stimulator takes it back out (FUN_008269e9, FUN_00826a5c).
-		if (click && idle && mode == 1)
+		if (click && idle && (mode == 1 || mode == 2))
 		{
 			for (size_t k = 0; k < gems.size(); k++)
 			{
@@ -719,6 +721,7 @@ namespace ms
 			if (stimulated && square(STIMULATOR).contains(cursor))
 			{
 				stimulated = false;
+				stimulator = 0;
 				clear_tooltip();
 				Sound(Sound::Name::DRAGEND).play();
 
@@ -727,7 +730,7 @@ namespace ms
 		}
 
 		// A press on a dropped-in ingredient takes it back out (FUN_008266f1, FUN_00826838).
-		if (click && idle && (mode == 3 || mode == 4))
+		if (click && idle && mode > 1)
 		{
 			int32_t i = slot_at(cursor);
 
@@ -813,6 +816,8 @@ namespace ms
 			drop_equip(id, tab == InventoryType::Id::EQUIP ? s : 0);
 		else if (INGREDIENTS.contains(cursor) && mode == 3)
 			drop_crystal(id);
+		else if (INGREDIENTS.contains(cursor) && mode == 2)
+			drop_random(id);
 
 		return true;
 	}
@@ -863,9 +868,69 @@ namespace ms
 		recount();
 	}
 
+	void UIMaker::drop_random(int32_t id)
+	{
+		std::vector<int32_t> applied;
+
+		for (const Slot &slot : slots)
+			if (slot.item_id)
+				applied.push_back(slot.item_id);
+
+		std::string refusal = maker::random_ingredient_refusal(applied, id);
+
+		if (!refusal.empty())
+		{
+			notice(refusal);
+
+			return;
+		}
+
+		int32_t owned = Stage::get().get_player().get_inventory().get_total_item_count(id);
+
+		// 0x2f3: 1 to what the player has.
+		UI::get().emplace<UIEnterNumber>("How many would you like to apply?", [id](int32_t quantity)
+		{
+			auto window = UI::get().get_element<UIMaker>();
+
+			if (window && window->is_active())
+				window->apply_random(id, quantity);
+		}, owned, 1);
+	}
+
+	void UIMaker::apply_random(int32_t id, int32_t quantity)
+	{
+		// The window may have changed while it asked.
+		if (mode != 2 || (state != State::IDLE && state != State::READY))
+			return;
+
+		std::vector<int32_t> applied;
+
+		for (const Slot &slot : slots)
+			if (slot.item_id)
+				applied.push_back(slot.item_id);
+
+		if (!maker::random_ingredient_refusal(applied, id).empty())
+			return;
+
+		for (Slot &slot : slots)
+		{
+			if (slot.item_id)
+				continue;
+
+			slot.item_id = id;
+			slot.owned = quantity;
+			Sound(Sound::Name::DRAGEND).play();
+			recount();
+
+			return;
+		}
+	}
+
 	void UIMaker::drop_gem(int32_t id)
 	{
-		std::string refusal = maker::gem_refusal(gems, gem_slots(), id, recipe && maker::is_weapon(recipe->item_id));
+		// The random make takes any gems (FUN_0082637e skips the weapon check in mode 2).
+		bool weapon = mode == 2 || (recipe && maker::is_weapon(recipe->item_id));
+		std::string refusal = maker::gem_refusal(gems, gem_slots(), id, weapon);
 
 		if (!refusal.empty())
 		{
@@ -880,10 +945,11 @@ namespace ms
 
 	void UIMaker::drop_stimulator(int32_t id)
 	{
-		if (mode != 1 || !recipe)
+		if (mode != 2 && (mode != 1 || !recipe))
 			return;
 
-		std::string refusal = maker::stimulator_refusal(stimulated, id, recipe->catalyst);
+		// The random make takes any stimulator (FUN_008265a1 skips the check in mode 2).
+		std::string refusal = maker::stimulator_refusal(stimulated, id, mode == 2 ? id : recipe->catalyst);
 
 		if (!refusal.empty())
 		{
@@ -893,6 +959,7 @@ namespace ms
 		}
 
 		stimulated = true;
+		stimulator = id;
 		Sound(Sound::Name::DRAGEND).play();
 	}
 
@@ -935,6 +1002,10 @@ namespace ms
 
 	bool UIMaker::has_room(bool tell) const
 	{
+		// The random make checks neither room nor mesos (FUN_00826fb3).
+		if (mode == 2)
+			return true;
+
 		const Inventory &inventory = Stage::get().get_player().get_inventory();
 		auto free = [&inventory](InventoryType::Id tab)
 		{
@@ -968,6 +1039,9 @@ namespace ms
 
 	int32_t UIMaker::gem_slots() const
 	{
+		if (mode == 2)
+			return 4;
+
 		return mode == 1 && recipe ? std::min(recipe->gem_slots, 4) : 0;
 	}
 
@@ -1026,6 +1100,7 @@ namespace ms
 		slots.clear();
 		gems.clear();
 		stimulated = false;
+		stimulator = 0;
 
 		// FUN_0082384f.
 		if (category.selected() != 0)
@@ -1062,6 +1137,7 @@ namespace ms
 		slots.clear();
 		gems.clear();
 		stimulated = false;
+		stimulator = 0;
 
 		// FUN_00823a13.
 		if (item.selected() != 0)
@@ -1134,11 +1210,18 @@ namespace ms
 			return inventory.get_total_item_count(gem) == 0;
 		}), gems.end());
 
-		if (stimulated && (!recipe || inventory.get_total_item_count(recipe->catalyst) == 0))
+		if (stimulated && inventory.get_total_item_count(stimulator) == 0)
+		{
 			stimulated = false;
+			stimulator = 0;
+		}
 
+		// The random make keeps what the player said, but no more than they have.
 		for (Slot &slot : slots)
-			slot.owned = slot.item_id ? inventory.get_total_item_count(slot.item_id) : 0;
+			if (mode == 2)
+				slot.owned = slot.item_id ? std::min<int32_t>(slot.owned, inventory.get_total_item_count(slot.item_id)) : 0;
+			else
+				slot.owned = slot.item_id ? inventory.get_total_item_count(slot.item_id) : 0;
 
 		if (state == State::IDLE || state == State::READY)
 		{
@@ -1172,8 +1255,9 @@ namespace ms
 			case 3:
 			case 4:
 				return !slots.empty() && slots[0].item_id && slots[0].owned >= slots[0].needed;
+			case 2:
+				return std::any_of(slots.begin(), slots.end(), [](const Slot &slot) { return slot.item_id != 0; });
 			default:
-				// The random make comes later.
 				return false;
 		}
 	}
@@ -1227,7 +1311,8 @@ namespace ms
 		state = State::READY;
 		recount();
 
-		if (!can_start() || !has_room(false) ||
+		// No recipe is hidden, so the random make never finds what was put in (FUN_00822ce1).
+		if (mode == 2 || !can_start() || !has_room(false) ||
 			Stage::get().get_player().get_inventory().get_meso() < current_fee())
 		{
 			notice("Production failed.");
@@ -1290,6 +1375,13 @@ namespace ms
 
 				return;
 			}
+		}
+
+		if (stimulated && mode == 2 && square(STIMULATOR).contains(cursor))
+		{
+			UI::get().show_item(Tooltip::Parent::MAKER, stimulator);
+
+			return;
 		}
 
 		if (mode == 1 && recipe && recipe->catalyst && square(STIMULATOR).contains(cursor))

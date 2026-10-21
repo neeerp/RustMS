@@ -294,6 +294,23 @@ namespace ms
 			return {};
 		}
 
+		// The random make's ingredient slots (FUN_00824395).
+		constexpr int32_t RANDOM_SLOTS = 6;
+
+		// Why an item can't go in beside the random make's `applied`
+		// ingredients (FUN_00825dd2, StringPool 0x2e5, 0x2e4), or nothing
+		// when it can; the player then says how many (0x2f3).
+		inline std::string random_ingredient_refusal(const std::vector<int32_t>& applied, int32_t item_id)
+		{
+			if (static_cast<int32_t>(applied.size()) >= RANDOM_SLOTS)
+				return "You cannot apply any more ingredients.";
+
+			if (std::find(applied.begin(), applied.end(), item_id) != applied.end())
+				return "This item has already been applied.";
+
+			return {};
+		}
+
 		// Why a stimulator can't go in for a recipe of `catalyst`, or
 		// nothing when it can (FUN_008265a1, StringPool 0x2ea-0x2ec).
 		inline std::string stimulator_refusal(bool applied, int32_t item_id, int32_t catalyst)
