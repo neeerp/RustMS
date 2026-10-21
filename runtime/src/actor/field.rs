@@ -357,6 +357,7 @@ impl FieldActor {
                             None => (pet.x, pet.y) = (live.x, live.y),
                         }
                     }
+                    let hid = avatar.hidden != live.hidden;
                     occupant.avatar = FieldAvatar {
                         x: live.x,
                         y: live.y,
@@ -365,6 +366,9 @@ impl FieldActor {
                         mini_room: live.mini_room.take(),
                         ..avatar
                     };
+                    if hid {
+                        self.show_hidden(client_id);
+                    }
                 }
             }
             FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
@@ -1962,6 +1966,9 @@ impl FieldActor {
         }
 
         for occupant in self.occupants.values() {
+            if !sees(&avatar, &occupant.avatar) {
+                continue;
+            }
             match build_player_enter_field(&occupant.avatar) {
                 Ok(packet) => {
                     handle.send_packet(packet);
@@ -1971,7 +1978,7 @@ impl FieldActor {
         }
 
         match build_player_enter_field(&avatar) {
-            Ok(packet) => self.broadcast(None, packet),
+            Ok(packet) => self.broadcast_seen(&avatar, packet),
             Err(error) => warn!(client_id, %error, "Failed to build join spawn"),
         }
 
@@ -2046,9 +2053,9 @@ impl FieldActor {
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
-        if self.occupants.remove(&client_id).is_none() {
+        let Some(left) = self.occupants.remove(&client_id) else {
             return;
-        }
+        };
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
         let out = self.shops.leave(client_id);
@@ -2058,7 +2065,7 @@ impl FieldActor {
         self.summons.remove_owned(client_id, None);
         // Everyone sees the player go before control passes on.
         match build_player_leave_field(client_id) {
-            Ok(packet) => self.broadcast(None, packet),
+            Ok(packet) => self.broadcast_seen(&left.avatar, packet),
             Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
         }
         let next = self.occupants.keys().next().copied();
@@ -2117,6 +2124,41 @@ impl FieldActor {
             }
         }
     }
+
+    /// Send a player's coming or going to those here who see the player.
+    fn broadcast_seen(&self, avatar: &FieldAvatar, packet: Packet) {
+        for occupant in self.occupants.values() {
+            if sees(&occupant.avatar, avatar) {
+                occupant.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
+    /// A GM hid or came out of hiding: those not GMs lose or see the GM.
+    fn show_hidden(&self, client_id: ClientId) {
+        let Some(gm) = self.occupants.get(&client_id) else {
+            return;
+        };
+        let packet = if gm.avatar.hidden {
+            build_player_leave_field(client_id)
+        } else {
+            build_player_enter_field(&gm.avatar)
+        };
+        let packet = match packet {
+            Ok(packet) => packet,
+            Err(error) => return warn!(client_id, %error, "Failed to build hide packet"),
+        };
+        for (&other, occupant) in &self.occupants {
+            if other != client_id && !occupant.avatar.gm {
+                occupant.handle.send_packet(packet.clone());
+            }
+        }
+    }
+}
+
+/// Whether `viewer` sees `avatar`: a hidden GM shows only to GMs.
+fn sees(viewer: &FieldAvatar, avatar: &FieldAvatar) -> bool {
+    !avatar.hidden || viewer.gm
 }
 
 fn to_foreign_npc(npc: &FieldMapEntityNpc) -> ForeignNpc {
@@ -2172,6 +2214,8 @@ mod tests {
             dash: [None; 2],
             ride: None,
             mount: game::Mount::default(),
+            gm: false,
+            hidden: false,
         }
     }
 
@@ -2620,6 +2664,92 @@ mod tests {
             next_opcode(&mut first_rx).await,
             SendOpcode::RemovePlayerFromMap as i16
         );
+    }
+
+    #[tokio::test]
+    async fn a_hidden_gm_shows_only_to_gms() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let players = |packets: Vec<Packet>| -> Vec<i16> {
+            packets
+                .iter()
+                .map(Packet::opcode)
+                .filter(|&op| {
+                    op == SendOpcode::SpawnPlayer as i16
+                        || op == SendOpcode::RemovePlayerFromMap as i16
+                })
+                .collect()
+        };
+        let gm = |id, hidden| FieldAvatar {
+            gm: true,
+            hidden,
+            ..avatar(id, 0, 0)
+        };
+        let (hider, mut hider_rx) = client(1);
+        let (other_gm, mut other_gm_rx) = client(2);
+        let (player, mut player_rx) = client(3);
+        let joining = [
+            (hider, gm(1, false)),
+            (other_gm, gm(2, false)),
+            (player, avatar(3, 0, 0)),
+        ];
+        for (handle, avatar) in joining {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar,
+                party: None,
+            });
+        }
+        let (spawn, remove) = (
+            SendOpcode::SpawnPlayer as i16,
+            SendOpcode::RemovePlayerFromMap as i16,
+        );
+        sent(&mut hider_rx);
+        sent(&mut other_gm_rx);
+        sent(&mut player_rx);
+
+        let hide = |hidden| FieldMessage::UpdateAvatar {
+            client_id: 1,
+            avatar: gm(1, hidden),
+            announce: Vec::new(),
+        };
+        actor.handle_message(hide(true));
+        assert_eq!(players(sent(&mut player_rx)), [remove]);
+        assert!(
+            players(sent(&mut other_gm_rx)).is_empty(),
+            "a GM still sees"
+        );
+        assert!(players(sent(&mut hider_rx)).is_empty());
+
+        // Someone coming in does not see the hidden GM, and the GM's going
+        // is no news to them.
+        let (late, mut late_rx) = client(4);
+        actor.handle_message(FieldMessage::Join {
+            handle: late,
+            avatar: avatar(4, 0, 0),
+            party: None,
+        });
+        assert_eq!(players(sent(&mut late_rx)), [spawn, spawn]);
+        sent(&mut player_rx);
+        sent(&mut other_gm_rx);
+        actor.handle_message(hide(false));
+        assert_eq!(players(sent(&mut late_rx)), [spawn]);
+        assert_eq!(players(sent(&mut player_rx)), [spawn]);
+        assert!(players(sent(&mut other_gm_rx)).is_empty());
+
+        actor.handle_message(hide(true));
+        sent(&mut late_rx);
+        actor.handle_message(FieldMessage::Leave { client_id: 1 });
+        assert!(players(sent(&mut late_rx)).is_empty());
+        assert_eq!(players(sent(&mut other_gm_rx)), [remove]);
     }
 
     #[tokio::test]

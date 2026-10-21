@@ -428,6 +428,15 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::HiddenChanged => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce: Vec::new(),
+                })
+                .await?
+            }
             WorldAction::PetsChanged(changes) => {
                 self.pets_changed(changes, PetGone::Dismissed).await?
             }

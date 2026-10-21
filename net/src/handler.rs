@@ -372,6 +372,9 @@ pub enum WorldAction {
     /// already changed); refresh their field avatar and show the others
     /// this SHOW_ITEM_EFFECT.
     ItemEffectChanged(Packet),
+    /// The GM hid or came out of hiding (`player.hidden` already changed);
+    /// the field takes the GM from, or shows the GM to, those not GMs.
+    HiddenChanged,
     /// Look on the channel for the character named `name`, to take the
     /// player to them with `rock`.
     RockToCharacter {

@@ -297,6 +297,8 @@ mod tests {
             dash: [None; 2],
             ride: None,
             mount: game::Mount::default(),
+            gm: false,
+            hidden: false,
         }
     }
 

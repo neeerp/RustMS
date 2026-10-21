@@ -145,6 +145,10 @@ pub struct Trace {
     pub guild_names: Vec<(i32, String)>,
     /// Other players appearing on the field.
     pub players: Vec<SpawnPlayerPacket>,
+    /// REMOVE_PLAYER_FROM_MAP: the players gone from the field.
+    pub gone: Vec<i32>,
+    /// ADMIN_RESULT 0x10: whether the GM is now hidden.
+    pub hidden: Vec<bool>,
     /// NPC shops opened: the NPC and (item id, price) per row.
     pub shops: Vec<(i32, Vec<(i32, i32)>)>,
     /// CONFIRM_SHOP_TRANSACTION codes.
@@ -509,6 +513,10 @@ impl Trace {
             ));
         } else if op == SendOpcode::SpawnPlayer as i16 {
             self.players.extend(decode_spawn_player(p));
+        } else if op == SendOpcode::RemovePlayerFromMap as i16 {
+            self.gone.push(r.read_int().unwrap());
+        } else if op == SendOpcode::AdminResult as i16 && r.read_byte().unwrap() == 0x10 {
+            self.hidden.push(r.read_byte().unwrap() != 0);
         } else if op == SendOpcode::ConfirmShopTransaction as i16 {
             self.shop_results.push(r.read_byte().unwrap());
         } else if op == SendOpcode::GiveBuff as i16 && p.bytes.get(2..18) == Some(&INFUSION) {
