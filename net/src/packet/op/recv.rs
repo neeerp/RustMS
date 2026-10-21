@@ -44,6 +44,7 @@ pub enum RecvOpcode {
     WaterOfLife = 0x75,
     MultiChat = 0x77,
     PartyOperation = 0x7C,
+    AdminCommand = 0x80,
     BuddyListModify = 0x82,
     NoteAction = 0x83,
     UseDoor = 0x85,
