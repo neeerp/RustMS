@@ -8,6 +8,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
@@ -30,6 +31,9 @@ namespace ms
 		constexpr Rectangle<int16_t> INGREDIENTS = Rectangle<int16_t>(11, 300, 124, 220);
 		constexpr Point<int16_t> FEE = Point<int16_t>(277, 226);
 		constexpr Point<int16_t> STIMULATOR = Point<int16_t>(19, 269);
+		// Where a stimulator and gems are dropped (FUN_00822350's +0xce8 and +0xcf8).
+		constexpr Rectangle<int16_t> STIMULATOR_DROP = Rectangle<int16_t>(11, 80, 250, 313);
+		constexpr Rectangle<int16_t> GEM_DROP = Rectangle<int16_t>(80, 304, 250, 313);
 		constexpr Point<int16_t> BAR = Point<int16_t>(6, 320);
 		constexpr int16_t DRAG_HEIGHT = 20;
 
@@ -66,10 +70,27 @@ namespace ms
 
 		// StringPool 0x2e1, 0x2e4, 0x2e5, 0x2ed, 0x2f8.
 		constexpr const char *SELECT_FIRST = "Please select the item you wish to make first!";
-		constexpr const char *ALREADY_APPLIED = "This item has already been applied.";
 		constexpr const char *NO_MORE = "You cannot apply any more ingredients.";
 		constexpr const char *NOT_CRYSTAL = "You cannot use this item as an ingredient to make the Monster Crystal.";
 		constexpr const char *CRYSTAL_HINT = "Apply the drop items here\\n to make the Monster Crystal.";
+		// StringPool 0x2f9, 0x11cf.
+		constexpr const char *DISASSEMBLY_HINT = "Apply the equipment to be disassembled here\\n to acquire the Monster Crystal.";
+		constexpr const char *NOT_DISASSEMBLABLE = "This item cannot be disassembled.";
+
+		// The recipe for `item_id`, whoever may make it, or none.
+		const maker::Recipe *recipe_of(int32_t item_id, const std::vector<maker::Recipe> &all)
+		{
+			for (const maker::Recipe &r : all)
+				if (r.item_id == item_id)
+					return &r;
+
+			return nullptr;
+		}
+
+		Rectangle<int16_t> square(Point<int16_t> at)
+		{
+			return Rectangle<int16_t>(at, at + Point<int16_t>(SLOT_SIZE, SLOT_SIZE));
+		}
 
 		// The drop lists' boxes are 18 high, their rows 16, and ten show (FUN_00822350, FUN_004c7068).
 		constexpr int16_t BOX_HEIGHT = 18;
@@ -382,7 +403,8 @@ namespace ms
 		return maker::crystal_for(level, crystals);
 	}
 
-	UIMaker::UIMaker() : UIElement(Point<int16_t>(), Point<int16_t>()), mode(0), recipe(nullptr), state(State::IDLE),
+	UIMaker::UIMaker() : UIElement(Point<int16_t>(), Point<int16_t>()), mode(0), recipe(nullptr), stimulated(false),
+						 equip_slot(0), state(State::IDLE),
 						 elapsed(0), was_clicked(false), dragged(false)
 	{
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["Maker"];
@@ -533,23 +555,27 @@ namespace ms
 
 		// The gems and the stimulator (FUN_008257b9, FUN_008259a2): unused past the recipe's slots, and the
 		// stimulator's icon faded until one is applied.
-		int32_t gem_slots = mode == 1 && recipe ? recipe->gem_slots : 0;
+		int32_t open = gem_slots();
 
 		for (int32_t k = 0; k < 4; k++)
-			if (k >= gem_slots)
+		{
+			if (k < static_cast<int32_t>(gems.size()))
+				draw_centred(ItemData::get(gems[k]).get_icon(false), position + gem_position(k), SLOT_SIZE, 1.0f);
+			else if (k >= open)
 				not_use.draw(position + gem_position(k));
+		}
 
 		if (mode == 1 && recipe && recipe->catalyst)
 			draw_centred(ItemData::get(recipe->catalyst).get_icon(false), position + STIMULATOR, SLOT_SIZE,
-						 100.0f / 255.0f);
+						 stimulated ? 1.0f : 100.0f / 255.0f);
 		else if (mode != 2)
 			not_use.draw(position + STIMULATOR);
 
-		// The fee (FUN_0082507e), for a recipe or a crystal.
-		if ((mode == 1 && recipe) || mode == 3)
+		// The fee (FUN_0082507e), for a recipe, a crystal or a disassembly.
+		if ((mode == 1 && recipe) || mode == 3 || (mode == 4 && !slots.empty() && slots[0].item_id))
 		{
 			Text line = fee;
-			std::string text = std::to_string(mode == 1 ? maker::fee(recipe->meso, false, {}) : 0);
+			std::string text = std::to_string(current_fee());
 			string_format::split_number(text);
 			line.change_text(text);
 			line.draw(position + FEE);
@@ -675,6 +701,31 @@ namespace ms
 			}
 		}
 
+		// A press on a gem or the stimulator takes it back out (FUN_008269e9, FUN_00826a5c).
+		if (click && idle && mode == 1)
+		{
+			for (size_t k = 0; k < gems.size(); k++)
+			{
+				if (square(gem_position(static_cast<int32_t>(k))).contains(cursor))
+				{
+					gems.erase(gems.begin() + static_cast<std::ptrdiff_t>(k));
+					clear_tooltip();
+					Sound(Sound::Name::DRAGEND).play();
+
+					return Cursor::State::CLICKING;
+				}
+			}
+
+			if (stimulated && square(STIMULATOR).contains(cursor))
+			{
+				stimulated = false;
+				clear_tooltip();
+				Sound(Sound::Name::DRAGEND).play();
+
+				return Cursor::State::CLICKING;
+			}
+		}
+
 		// A press on a dropped-in ingredient takes it back out (FUN_008266f1, FUN_00826838).
 		if (click && idle && (mode == 3 || mode == 4))
 		{
@@ -742,10 +793,6 @@ namespace ms
 
 		Point<int16_t> cursor = cursorpos - position;
 
-		// Only the crystal takes dropped ingredients yet; a recipe's are its own (FUN_00825dd2).
-		if (mode != 3 || !INGREDIENTS.contains(cursor))
-			return true;
-
 		auto [tab, s] = icon.get_source();
 
 		if (tab == InventoryType::Id::NONE || tab == InventoryType::Id::EQUIPPED)
@@ -756,32 +803,172 @@ namespace ms
 		if (id == 0)
 			return true;
 
-		if (!slots.empty() && slots[0].item_id == id)
-		{
-			notice(ALREADY_APPLIED);
+		// A recipe's ingredients are its own; dropped ones are the crystal's drops or the equipment to take
+		// apart (FUN_00825dd2).
+		if (STIMULATOR_DROP.contains(cursor))
+			drop_stimulator(id);
+		else if (GEM_DROP.contains(cursor))
+			drop_gem(id);
+		else if (INGREDIENTS.contains(cursor) && mode == 4)
+			drop_equip(id, tab == InventoryType::Id::EQUIP ? s : 0);
+		else if (INGREDIENTS.contains(cursor) && mode == 3)
+			drop_crystal(id);
 
-			return true;
-		}
+		return true;
+	}
 
+	void UIMaker::drop_crystal(int32_t id)
+	{
+		// One slot, so a filled one refuses before the same item would (FUN_00825dd2).
 		if (!slots.empty() && slots[0].item_id)
 		{
 			notice(NO_MORE);
 
-			return true;
+			return;
 		}
 
 		if (!crystal_of(id))
 		{
 			notice(NOT_CRYSTAL);
 
-			return true;
+			return;
 		}
 
 		slots[0].item_id = id;
 		Sound(Sound::Name::DRAGEND).play();
 		recount();
+	}
 
-		return true;
+	void UIMaker::drop_equip(int32_t id, int16_t slot)
+	{
+		if (!slots.empty() && slots[0].item_id)
+		{
+			notice(NO_MORE);
+
+			return;
+		}
+
+		const maker::Recipe *made = recipe_of(id, recipes());
+
+		if (slot == 0 || !made || !maker::disassemblable(*made))
+		{
+			notice(NOT_DISASSEMBLABLE);
+
+			return;
+		}
+
+		slots[0].item_id = id;
+		equip_slot = slot;
+		Sound(Sound::Name::DRAGEND).play();
+		recount();
+	}
+
+	void UIMaker::drop_gem(int32_t id)
+	{
+		std::string refusal = maker::gem_refusal(gems, gem_slots(), id, recipe && maker::is_weapon(recipe->item_id));
+
+		if (!refusal.empty())
+		{
+			notice(refusal);
+
+			return;
+		}
+
+		gems.push_back(id);
+		Sound(Sound::Name::DRAGEND).play();
+	}
+
+	void UIMaker::drop_stimulator(int32_t id)
+	{
+		if (mode != 1 || !recipe)
+			return;
+
+		std::string refusal = maker::stimulator_refusal(stimulated, id, recipe->catalyst);
+
+		if (!refusal.empty())
+		{
+			notice(refusal);
+
+			return;
+		}
+
+		stimulated = true;
+		Sound(Sound::Name::DRAGEND).play();
+	}
+
+	int32_t UIMaker::current_fee() const
+	{
+		if (mode == 1 && recipe)
+			return maker::fee(recipe->meso, stimulated, gems);
+
+		if (mode == 4 && !slots.empty() && slots[0].item_id)
+		{
+			const maker::Recipe *made = recipe_of(slots[0].item_id, recipes());
+			auto equip = Stage::get().get_player().get_inventory().get_equip(InventoryType::Id::EQUIP, equip_slot);
+
+			if (made && equip)
+			{
+				// The equip's stats against its own, in FUN_005ca1b8's order.
+				static const EquipStat::Id GRADED[] = {
+					EquipStat::Id::STR, EquipStat::Id::DEX, EquipStat::Id::INT, EquipStat::Id::LUK,
+					EquipStat::Id::HP, EquipStat::Id::MP, EquipStat::Id::WATK, EquipStat::Id::MAGIC,
+					EquipStat::Id::WDEF, EquipStat::Id::MDEF, EquipStat::Id::ACC, EquipStat::Id::AVOID,
+					EquipStat::Id::SPEED, EquipStat::Id::JUMP
+				};
+
+				const EquipData &data = EquipData::get(slots[0].item_id);
+				std::vector<int32_t> stats;
+				std::vector<int32_t> own;
+
+				for (EquipStat::Id stat : GRADED)
+				{
+					stats.push_back(static_cast<int16_t>(equip->get_stat(stat)));
+					own.push_back(data.get_defstat(stat));
+				}
+
+				return maker::disassembly_fee(made->meso, maker::stat_grade(stats, own));
+			}
+		}
+
+		return 0;
+	}
+
+	bool UIMaker::has_room(bool tell) const
+	{
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		auto free = [&inventory](InventoryType::Id tab)
+		{
+			int32_t count = 0;
+
+			for (int16_t s = 1; s <= inventory.get_slotmax(tab); s++)
+				if (inventory.get_item_id(tab, s) == 0)
+					count++;
+
+			return count;
+		};
+
+		InventoryType::Id tab = InventoryType::Id::ETC;
+		int32_t needed = 1;
+
+		if (mode == 1 && recipe)
+			tab = InventoryType::by_item_id(recipe->item_id);
+
+		if (mode == 4 && !slots.empty())
+			if (const maker::Recipe *made = recipe_of(slots[0].item_id, recipes()))
+				needed = static_cast<int32_t>(made->ingredients.size());
+
+		if (free(tab) >= needed)
+			return true;
+
+		if (tell)
+			notice(maker::no_room_text(tab));
+
+		return false;
+	}
+
+	int32_t UIMaker::gem_slots() const
+	{
+		return mode == 1 && recipe ? std::min(recipe->gem_slots, 4) : 0;
 	}
 
 	UIElement::Type UIMaker::get_type() const
@@ -789,7 +976,7 @@ namespace ms
 		return TYPE;
 	}
 
-	void UIMaker::answer(int32_t result, int32_t made, const std::string &name)
+	void UIMaker::answer(int32_t result, int32_t made, const std::string &name, bool disassembled)
 	{
 		if (state != State::WAITING)
 			return;
@@ -799,10 +986,14 @@ namespace ms
 		category.enable(true);
 		item.enable(category.selected() != 0);
 
-		std::string text = maker::result_text(result, made, name);
+		std::string text = disassembled ? maker::disassembled_text(name) : maker::result_text(result, made, name);
 
 		if (!text.empty())
 			notice(text);
+
+		// A disassembly empties its slot (FUN_008248dd); gems and a stimulator stay in until they run out.
+		if (disassembled && mode == 4 && !slots.empty())
+			slots[0].item_id = 0;
 
 		// The selection stays; what was used up is counted again.
 		recount();
@@ -833,6 +1024,8 @@ namespace ms
 		mode = 0;
 		recipe = nullptr;
 		slots.clear();
+		gems.clear();
+		stimulated = false;
 
 		// FUN_0082384f.
 		if (category.selected() != 0)
@@ -867,6 +1060,8 @@ namespace ms
 		mode = 0;
 		recipe = nullptr;
 		slots.clear();
+		gems.clear();
+		stimulated = false;
 
 		// FUN_00823a13.
 		if (item.selected() != 0)
@@ -928,6 +1123,20 @@ namespace ms
 	{
 		const Inventory &inventory = Stage::get().get_player().get_inventory();
 
+		// The equipment to take apart must stay where it was.
+		if (mode == 4 && !slots.empty() && slots[0].item_id &&
+			inventory.get_item_id(InventoryType::Id::EQUIP, equip_slot) != slots[0].item_id)
+			slots[0].item_id = 0;
+
+		// Gems and the stimulator come out once none are left (FUN_00824a90).
+		gems.erase(std::remove_if(gems.begin(), gems.end(), [&inventory](int32_t gem)
+		{
+			return inventory.get_total_item_count(gem) == 0;
+		}), gems.end());
+
+		if (stimulated && (!recipe || inventory.get_total_item_count(recipe->catalyst) == 0))
+			stimulated = false;
+
 		for (Slot &slot : slots)
 			slot.owned = slot.item_id ? inventory.get_total_item_count(slot.item_id) : 0;
 
@@ -961,9 +1170,10 @@ namespace ms
 				return true;
 			}
 			case 3:
+			case 4:
 				return !slots.empty() && slots[0].item_id && slots[0].owned >= slots[0].needed;
 			default:
-				// The random make and disassembly come later.
+				// The random make comes later.
 				return false;
 		}
 	}
@@ -989,12 +1199,14 @@ namespace ms
 		// Things may have moved while it asked (FUN_00826f25), and the fee is checked now (FUN_00826fb3).
 		recount();
 
-		if (state != State::READY || !can_start())
+		if (state != State::READY || !can_start() || !has_room(true))
 			return;
 
-		if (mode == 1 && Stage::get().get_player().get_inventory().get_meso() < maker::fee(recipe->meso, false, {}))
+		// A disassembly short of mesos does nothing.
+		if (Stage::get().get_player().get_inventory().get_meso() < current_fee())
 		{
-			notice("You do not have enough mesos.");
+			if (mode != 4)
+				notice("You do not have enough mesos.");
 
 			return;
 		}
@@ -1009,13 +1221,34 @@ namespace ms
 
 	void UIMaker::send()
 	{
-		state = State::WAITING;
 		working.stop();
 
+		// What was checked at Start is checked again (FUN_00827096).
+		state = State::READY;
+		recount();
+
+		if (!can_start() || !has_room(false) ||
+			Stage::get().get_player().get_inventory().get_meso() < current_fee())
+		{
+			notice("Production failed.");
+			state = State::IDLE;
+			buttons[Buttons::CANCEL]->set_state(Button::State::NORMAL);
+			category.enable(true);
+			item.enable(category.selected() != 0);
+			recount();
+
+			return;
+		}
+
+		state = State::WAITING;
+		buttons[Buttons::START]->set_state(Button::State::DISABLED);
+
 		if (mode == 1)
-			ItemMakePacket(recipe->item_id, false, {}).dispatch();
+			ItemMakePacket(recipe->item_id, stimulated, gems).dispatch();
 		else if (mode == 3)
 			ItemMakeCrystalPacket(slots[0].item_id).dispatch();
+		else if (mode == 4)
+			ItemDisassemblePacket(slots[0].item_id, equip_slot).dispatch();
 	}
 
 	void UIMaker::close()
@@ -1049,17 +1282,26 @@ namespace ms
 			return;
 		}
 
-		if (mode == 1 && recipe && recipe->catalyst &&
-			Rectangle<int16_t>(STIMULATOR, STIMULATOR + Point<int16_t>(SLOT_SIZE, SLOT_SIZE)).contains(cursor))
+		for (size_t k = 0; k < gems.size(); k++)
+		{
+			if (square(gem_position(static_cast<int32_t>(k))).contains(cursor))
+			{
+				UI::get().show_item(Tooltip::Parent::MAKER, gems[k]);
+
+				return;
+			}
+		}
+
+		if (mode == 1 && recipe && recipe->catalyst && square(STIMULATOR).contains(cursor))
 		{
 			UI::get().show_item(Tooltip::Parent::MAKER, recipe->catalyst);
 
 			return;
 		}
 
-		if (mode == 3 && INGREDIENTS.contains(cursor))
+		if ((mode == 3 || mode == 4) && INGREDIENTS.contains(cursor))
 		{
-			UI::get().show_text(Tooltip::Parent::MAKER, CRYSTAL_HINT);
+			UI::get().show_text(Tooltip::Parent::MAKER, mode == 3 ? CRYSTAL_HINT : DISASSEMBLY_HINT);
 
 			return;
 		}
@@ -1073,7 +1315,7 @@ namespace ms
 		{
 			Point<int16_t> at = slot_position(i);
 
-			if (Rectangle<int16_t>(at, at + Point<int16_t>(SLOT_SIZE, SLOT_SIZE)).contains(cursor))
+			if (square(at).contains(cursor))
 				return static_cast<int32_t>(i);
 		}
 

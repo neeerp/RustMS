@@ -40,6 +40,26 @@ pub struct Recipe {
     pub gem_slots: i32,
 }
 
+/// What a gem (`Etc/0425.img`) does to the equipment it goes into, by its
+/// one `info` key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Gem {
+    /// `inc*`: a stat, by its key less `inc` (`PAD`, `MaxHP`, `STR`, ...),
+    /// and how much it adds.
+    Stat(&'static str, i16),
+    /// `incReqLevel`: how much it lowers the level to wear it.
+    ReqLevel(i16),
+    /// `randOption`.
+    RandOption(i16),
+    /// `randStat`.
+    RandStat(i16),
+}
+
+/// The stats a gem can add, by their `inc` keys.
+const GEM_STATS: [&str; 12] = [
+    "PAD", "MAD", "ACC", "EVA", "Speed", "Jump", "MaxHP", "MaxMP", "STR", "INT", "LUK", "DEX",
+];
+
 /// One of a gem recipe's outcomes, with its weight.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Reward {
@@ -55,6 +75,7 @@ pub struct MakerData {
     levels: HashMap<i32, i32>,
     /// Each crystal and the levels it is made from (`lvMin`, `lvMax`).
     crystals: Vec<(i32, i32, i32)>,
+    gems: HashMap<i32, Gem>,
 }
 
 impl MakerData {
@@ -89,6 +110,16 @@ impl MakerData {
                 }
             }
         }
+        if let Some(gems) = path_index(&nx, "Etc/0425.img")? {
+            for node in nx.child_indices(gems)? {
+                let Ok(item_id) = nx.node_name(node)?.parse() else {
+                    continue;
+                };
+                if let Some(gem) = gem(&nx, node)? {
+                    data.gems.insert(item_id, gem);
+                }
+            }
+        }
         for crystal in CRYSTALS {
             let Some(info) = path_index(&nx, &format!("Etc/0426.img/{crystal:08}/info"))? else {
                 continue;
@@ -106,6 +137,11 @@ impl MakerData {
         self.recipes.get(&item_id)
     }
 
+    /// What the gem `item_id` does, if it is one.
+    pub fn gem(&self, item_id: i32) -> Option<Gem> {
+        self.gems.get(&item_id).copied()
+    }
+
     /// The crystal 100 of `item_id` make, if it makes one.
     pub fn crystal(&self, item_id: i32) -> Option<i32> {
         let lv = *self.levels.get(&item_id)?;
@@ -114,6 +150,29 @@ impl MakerData {
             .find(|(_, low, high)| (*low..=*high).contains(&lv))
             .map(|(crystal, _, _)| *crystal)
     }
+}
+
+fn gem(nx: &NxDataFile, node: u32) -> Result<Option<Gem>, GameDataError> {
+    let Some(info) = nx.child_by_name(node, "info")? else {
+        return Ok(None);
+    };
+    let small = |key: &str| -> Result<Option<i16>, GameDataError> {
+        Ok(nx
+            .int_child(info, key)?
+            .and_then(|value| i16::try_from(value).ok()))
+    };
+    for stat in GEM_STATS {
+        if let Some(amount) = small(&format!("inc{stat}"))? {
+            return Ok(Some(Gem::Stat(stat, amount)));
+        }
+    }
+    Ok(if let Some(by) = small("incReqLevel")? {
+        Some(Gem::ReqLevel(-by))
+    } else if let Some(n) = small("randOption")? {
+        Some(Gem::RandOption(n))
+    } else {
+        small("randStat")?.map(Gem::RandStat)
+    })
 }
 
 fn recipe(nx: &NxDataFile, group: i32, node: u32) -> Result<Option<Recipe>, GameDataError> {
@@ -226,6 +285,21 @@ mod tests {
         assert_eq!(data.recipe(2_040_727).unwrap().req_equip, 1_122_013);
         assert_eq!(data.recipe(4_032_312).unwrap().req_quests, [(21_303, 2)]);
         assert_eq!(data.recipe(4_001_174).unwrap().req_item, 4_031_966);
+    }
+
+    #[test]
+    fn each_gem_does_one_thing() {
+        let Some(data) = data() else {
+            return;
+        };
+        assert_eq!(data.gems.len(), 45);
+        assert_eq!(data.gem(4_250_000), Some(Gem::Stat("PAD", 1)));
+        assert_eq!(data.gem(4_250_602), Some(Gem::Stat("MaxHP", 30)));
+        assert_eq!(data.gem(4_251_102), Some(Gem::Stat("DEX", 5)));
+        assert_eq!(data.gem(4_251_201), Some(Gem::ReqLevel(2)));
+        assert_eq!(data.gem(4_251_300), Some(Gem::RandOption(1)));
+        assert_eq!(data.gem(4_251_402), Some(Gem::RandStat(5)));
+        assert_eq!(data.gem(4_021_007), None);
     }
 
     #[test]

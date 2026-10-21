@@ -129,6 +129,7 @@ namespace ms
 		int32_t result = recv.read_int();
 		int32_t made = 0;
 		int32_t count = 0;
+		int32_t taken = 0;
 
 		auto line = [](const std::string& text)
 		{
@@ -186,13 +187,35 @@ namespace ms
 					lost(recv.read_int(), maker::CRYSTAL_DROPS);
 					break;
 				}
+				case 4:
+				{
+					// The equipment taken apart, then the crystals it gave and the fee.
+					taken = recv.read_int();
+					line(maker::lost_item_line(ItemData::get(taken).get_name()));
+
+					for (int32_t n = recv.read_int(); n > 0; n--)
+					{
+						int32_t id = recv.read_int();
+						gained(id, recv.read_int());
+					}
+
+					if (int32_t meso = recv.read_int(); meso > 0)
+						line(maker::meso_line(meso));
+
+					break;
+				}
 				default:
 					break;
 			}
 		}
 
 		if (auto window = UI::get().get_element<UIMaker>(); window && window->is_active())
-			window->answer(result, count, made ? ItemData::get(made).get_name() : "");
+		{
+			if (taken)
+				window->answer(result, 0, ItemData::get(taken).get_name(), true);
+			else
+				window->answer(result, count, made ? ItemData::get(made).get_name() : "", false);
+		}
 	}
 
 	void VegaSpellHandler::handle(InPacket& recv) const

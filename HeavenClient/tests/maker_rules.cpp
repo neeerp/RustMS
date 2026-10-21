@@ -118,6 +118,51 @@ int main()
 		require(equip_category(1492000) == "GUN" && equip_category(1342000).empty() && equip_category(2000000).empty(),
 			"no name");
 		require(crystal_for(0, crystals) == 0, "no level");
+
+		require(is_weapon(1302010) && is_weapon(1492000) && !is_weapon(1002000) && !is_weapon(1342000), "weapons");
+		require(gem_kind(4250001) == 0 && gem_kind(4250502) == 5 && gem_kind(4251402) == 14, "gem kinds");
+		require(gem_refusal({}, 1, 4250001, true).empty(), "an attack gem on a sword");
+		require(gem_refusal({}, 1, 4250001, false) == "You can only use this Strengthening Gem on weapon items.",
+				"not on a hat");
+		require(gem_refusal({ 4250502 }, 1, 4250001, true) == "You cannot apply the Strengthening Gem anymore.",
+				"the slots are full");
+		require(gem_refusal({ 4250502 }, 1, 4011000, true) == "You cannot apply the Strengthening Gem anymore.",
+				"full, and not a gem");
+		require(gem_refusal({}, 2, 4011000, true) == "You can only apply the Strengthening Gem.", "not a gem");
+		require(gem_refusal({ 4250500 }, 2, 4250502, false) ==
+					"You cannot apply more than 1 of the same Strengthening Gems.",
+				"one of a kind");
+		require(stimulator_refusal(false, 4130002, 4130002).empty(), "its stimulator");
+		require(stimulator_refusal(true, 4130002, 4130002) == "You can only apply 1 Stimulator.", "one only");
+		require(stimulator_refusal(false, 4011000, 4130002) == "You can only apply the Stimulator.", "not one");
+		require(stimulator_refusal(false, 4130001, 4130002) == "You cannot apply this Stimulator.", "another");
+		Recipe made = recipe(1302010);
+		made.meso = 60000;
+		made.ingredients = { { 4011000, 1 }, { 4260000, 20 }, { 4260001, 1 } };
+		require(disassemblable(made), "a sword comes apart");
+		made.item_id = 4250000;
+		require(!disassemblable(made), "a gem doesn't");
+		std::vector<int32_t> own = { 0, 0, 0, 0, 0, 0, 67, 0, 0, 0, 0, 0, 0, 0 };
+		std::vector<int32_t> stats = own;
+		require(stat_grade(stats, own) == 0, "its own stats");
+		stats[6] = 66;
+		require(stat_grade(stats, own) == -1, "below them");
+		stats[6] = 73;
+		stats[4] = 19;
+		require(stat_grade(stats, own) == 1, "a tenth of HP counts");
+		stats[0] = 17;
+		require(stat_grade(stats, own) == 2, "23 above");
+		stats[1] = 17;
+		require(stat_grade(stats, own) == 3, "40 above");
+		require(disassembly_fee(60000, -1) == 6000 && disassembly_fee(60000, 0) == 9000 &&
+					disassembly_fee(60000, 3) == 18000 && disassembly_fee(0, 0) == 0,
+				"the disassembly fee by grade");
+		require(disassembly_fee(66500, 1) == 13000, "rounded down to 1000");
+		require(no_room_text(4) == "Etc You don't have enough room in your Inventory." &&
+					result_text(4, 0, "") == "Eqp You don't have enough room in your Inventory.",
+				"no room");
+		require(disassembled_text("Sword") == "You have successfully disassembled the Sword.", "disassembled");
+		require(lost_item_line("Sword") == "You have lost an item (Sword)", "lost an item");
 	}
 	catch (const std::exception& error)
 	{
