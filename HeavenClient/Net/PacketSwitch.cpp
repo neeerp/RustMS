@@ -79,6 +79,7 @@ namespace ms
 		SHOW_STATUS_INFO = 39,
 		UPDATE_QUEST_INFO = 211,
 		CHECK_AUTO_HP = 212,
+		ITEM_EMOTION = 226,
 		PLAYER_HINT = 214,
 
 		/// Inventory 2
@@ -346,6 +347,7 @@ namespace ms
 		emplace<MAKER_RESULT, MakerResultHandler>();
 		emplace<VEGA_SPELL, VegaSpellHandler>();
 		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();
+		emplace<ITEM_EMOTION, ItemEmotionHandler>();
 		emplace<SKILL_MACROS, SkillMacrosHandler>();
 		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();
 		emplace<CHANGE_STATS, ChangeStatsHandler>();

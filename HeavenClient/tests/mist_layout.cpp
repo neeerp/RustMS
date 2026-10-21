@@ -74,6 +74,17 @@ int main()
 		require(!mist::shelters(smokes, 0, 0, stranger), "a stranger's doesn't");
 		require(!mist::shelters(smokes, 200, 0, ally), "nor outside it");
 		require(!mist::shelters(areas, 0, 0, ally), "a poison mist doesn't");
+
+		// A cash mist waits for the user's own from the item, or while
+		// they stand in any.
+		std::vector<mist::Area> gas{ { mist::ITEM, 7, 5281000, 1, -110, -82, 110, 83, 0, 0, true } };
+		require(mist::item_busy(gas, 7, 5281000, 500, 0), "one's own gas lasts");
+		require(!mist::item_busy(gas, 7, 5281001, 500, 0), "another item's free");
+		require(mist::item_busy(gas, 8, 5281001, 0, 0), "standing in anyone's waits");
+		require(!mist::item_busy(gas, 8, 5281000, 110, 0), "the right edge is out");
+		require(!mist::item_busy(smokes, 7, 4221006, 0, 0), "a smoke screen is no cash mist");
+		gas[0].started = false;
+		require(!mist::item_busy(gas, 7, 5281000, 0, 0), "nor is one not started yet");
 	}
 	catch (const std::exception& e)
 	{

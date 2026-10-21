@@ -162,6 +162,19 @@ namespace ms
 			return false;
 		}
 
+		// A cash mist (528xxxx) waits while the user's own started one from
+		// that item lasts, or while they stand in anyone's (FUN_00431866).
+		template<class Areas>
+		bool item_busy(const Areas &areas, int32_t owner, int32_t itemid, int32_t x, int32_t y)
+		{
+			for (const Area &area : areas)
+				if (area.type == ITEM && area.started
+					&& ((area.owner == owner && area.skillid == itemid) || area.contains(x, y)))
+					return true;
+
+			return false;
+		}
+
 		// The element a mob mist's hurt is resisted as: 125 poison, 130
 		// fire; Poison Mist (131) none, so it takes its full x
 		// (FUN_00765c0f).

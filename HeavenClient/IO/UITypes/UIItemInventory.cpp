@@ -112,6 +112,8 @@ namespace ms
 		// StringPool 0x112 and 0x318.
 		constexpr const char *EFFECT_BUSY = "The effect is taking place right now.\\nPlease try it later.";
 		constexpr const char *WEATHER_PROMPT = "Please enter the attached message";
+		// StringPool 0x12ee.
+		constexpr const char *MIST_BUSY = "An Effect Item is currently in use. \\nplease try again later.";
 		// StringPool 0x10f, 0xea1 and 0x111.
 		constexpr const char *MEGAPHONE_PROMPT = "Enter your comments through the megaphone.";
 		constexpr const char *MEGAPHONE_LEVEL = "This megaphone is only available for \\ncharacters that are over Level 10.";
@@ -415,6 +417,27 @@ namespace ms
 				if (may_use_cash_item())
 					Stage::get().get_player().request(UseResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
 			});
+		}
+
+		// v83 FUN_00a0a63f type 0x22: a cash mist (528xxxx) is sent at once,
+		// unless the user's own cloud of it lasts or they stand in anyone's
+		// (FUN_00431866).
+		void use_cash_mist(int16_t slot, int32_t item_id)
+		{
+			if (!nl::nx::item["Cash"]["0528.img"][string_format::extend_id(item_id, 8)])
+				return;
+
+			Player &player = Stage::get().get_player();
+
+			if (Stage::get().get_mists().item_busy(player.get_oid(), item_id, player.get_position()))
+			{
+				UI::get().emplace<UIOk>(MIST_BUSY, [](bool)
+				{});
+				return;
+			}
+
+			if (may_use_cash_item() && player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
 		}
 
 		// v83 FUN_00a0a63f, type 0x13: a meso sack asks before it opens. The
@@ -1140,6 +1163,8 @@ namespace ms
 							use_chalkboard(slot, item_id);
 						else if (item_id / 10000 == 520)
 							use_meso_bag(slot, item_id);
+						else if (item_id / 10000 == 528)
+							use_cash_mist(slot, item_id);
 						else if (item_id / 10000 == 504)
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 507 || item_id / 10000 == 539)

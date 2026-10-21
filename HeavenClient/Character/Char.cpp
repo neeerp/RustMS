@@ -669,6 +669,14 @@ namespace ms
 		effects.add(effect);
 	}
 
+	void Char::show_mist_puff(int32_t itemid)
+	{
+		nl::node effect = nl::nx::item["Cash"]["0528.img"][string_format::extend_id(itemid, 8)]["effect"];
+
+		effects.add(effect, DrawArgument(facing_right), static_cast<int8_t>(effect["z"].get_integer()));
+		Sound(nl::nx::sound["ConsumeEffect.img"][std::to_string(itemid)]["Use"]).play();
+	}
+
 	void Char::ride(int32_t v, bool at_once)
 	{
 		// The Battleship's effect plays longer.

@@ -600,6 +600,14 @@ pub enum FieldRequest {
         left: bool,
         inflict: crate::skills::Inflict,
     },
+    /// The player used the cash mist item `item_id`: its cloud covers
+    /// `area` around them for `lasts`, unless one of theirs from that item
+    /// is still there or they stand in another's.
+    ItemMist {
+        item_id: i32,
+        area: (i32, i32, i32, i32),
+        lasts: std::time::Duration,
+    },
     /// Show everyone else on the map this packet.
     Broadcast(Packet),
     /// The player used Monster Magnet: show the others `effect`, and each

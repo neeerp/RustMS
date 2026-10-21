@@ -964,6 +964,9 @@ a type 2 (smoke) mist around the caster that puts nothing on mobs. The
 v83 client shelters itself from mob attacks while it stands in its own or
 a party member's smoke, so the server has nothing more to do.
 
+Cash mists (Passed Gas 5281000, Floral Scent 5281001) are type 3 mists
+that do nothing to anyone; see `inventory.md`.
+
 HeavenClient's `MapMists` lays the skill's `tile` clouds over the area as
 v83 does (`MistLayout.h`, a diamond of random tiles), draws them above the
 map's objects, and fades them out over a second when the mist lifts.

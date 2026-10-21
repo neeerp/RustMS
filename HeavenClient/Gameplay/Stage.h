@@ -239,6 +239,10 @@ namespace ms
 		// so, the wait starts.
 		bool try_give_fame();
 
+		// Pull one of the cash mist `item_id`'s `emotion` faces, picked by
+		// their weights (ITEM_EMOTION, FUN_00938b3e), as an emote key would.
+		void use_item_emotion(int32_t item_id);
+
 		// Show the player's 501xxxx or 429xxxx effect item, or stop it if it is the one shown (FUN_00a24530).
 		void use_item_effect(int32_t item_id);
 		// Get the total up time of the client

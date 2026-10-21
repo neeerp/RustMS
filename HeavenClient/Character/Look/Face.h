@@ -63,6 +63,9 @@ namespace ms
 
 		static Id byaction(size_t action);
 
+		// The v83 emotion number of a face by its name (FUN_00416563), or -1.
+		static int32_t emotion(const std::string &name);
+
 		static const EnumMap<Id, std::string> names;
 	};
 

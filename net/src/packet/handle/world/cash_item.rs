@@ -3,9 +3,10 @@
 //! item's own fields and the tick. The client then waits for an answer that
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
 //! teleport rocks, notes, weather items, the jukebox, meso sacks, avatar
-//! megaphones, AP Reset, SP Reset, the Vicious' Hammer and Vega's Spell are
-//! used so far.
+//! megaphones, AP Reset, SP Reset, the Vicious' Hammer, Vega's Spell and the
+//! cash mists are used so far.
 
+use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
 use super::hammer::vicious_hammer;
 use super::jukebox::jukebox;
@@ -49,6 +50,7 @@ impl WorldHandler for UseCashItemHandler {
             517 if held && item_id % 10_000 == 0 => pet_name_tag(ctx, &mut r, slot),
             520 if held => meso_sack(ctx, slot, item_id),
             524 if held => cash_pet_food(ctx, slot, item_id),
+            528 if held => cash_mist(ctx, slot, item_id),
             537 if held => chalkboard(ctx, &mut r),
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
             // The window waits for 354, so even a hammer not held gets one.

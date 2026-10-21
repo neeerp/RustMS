@@ -72,6 +72,10 @@ impl MistSet {
         view
     }
 
+    pub fn all(&self) -> impl Iterator<Item = &Mist> {
+        self.mists.values()
+    }
+
     pub fn views(&self) -> impl Iterator<Item = &MistView> {
         self.mists.values().map(|mist| &mist.view)
     }

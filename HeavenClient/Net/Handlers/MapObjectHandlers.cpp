@@ -470,6 +470,13 @@ namespace ms
 		{
 			show_effect_with_sound(cid, CharEffect::MONSTER_CARD, Sound::Name::MCARDGET);
 		}
+		else if (effect == 20) // a cash mist's puff
+		{
+			int32_t itemid = recv.read_int();
+
+			if (Optional<Char> character = Stage::get().get_character(cid))
+				character->show_mist_puff(itemid);
+		}
 		else if (effect == 4) // a pet effect
 		{
 			uint8_t kind = recv.read_byte();

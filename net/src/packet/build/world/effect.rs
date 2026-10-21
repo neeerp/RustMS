@@ -159,6 +159,34 @@ pub fn build_foreign_effect(character_id: i32, effect: CharEffect) -> Result<Pac
     Ok(p)
 }
 
+/// A cash mist's puff (FUN_009377d9 mode 20) on its user: SHOW_ITEM_GAIN_INCHAT
+/// for them, SHOW_FOREIGN_EFFECT naming `character_id` for the others.
+pub fn build_mist_item_effect(
+    character_id: Option<i32>,
+    item_id: i32,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    match character_id {
+        Some(id) => {
+            p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+            p.write_int(id)?;
+        }
+        None => p.write_short(SendOpcode::ShowItemGainInChat as i16)?,
+    }
+    p.write_byte(20)?;
+    p.write_int(item_id)?;
+    Ok(p)
+}
+
+/// ITEM_EMOTION (0xE2, FUN_00938b3e): the user of the cash mist `item_id`
+/// pulls one of its `emotion` faces, which their client picks and shows.
+pub fn build_item_emotion(item_id: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ItemEmotion as i16)?;
+    p.write_int(item_id)?;
+    Ok(p)
+}
+
 /// SHOW_SCROLL_EFFECT (0xA7, v83 FUN_0093354d): the glow, sound and (for
 /// the scroller) chat line of a scroll on `character_id`. `success` is 1 or
 /// 0, or -1 to refuse a Legendary Spirit request; `cursed` means the item was
@@ -196,6 +224,29 @@ pub fn build_hint(text: &str, width: i16, height: i16) -> Result<Packet, Network
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn a_cash_mist_puffs_on_its_user() {
+        let own = build_mist_item_effect(None, 5281000).unwrap();
+        let mut expect = Expect::new(&own.bytes);
+        expect
+            .short(SendOpcode::ShowItemGainInChat as i16)
+            .byte(20)
+            .int(5281000);
+        expect.end();
+        let foreign = build_mist_item_effect(Some(7), 5281001).unwrap();
+        let mut expect = Expect::new(&foreign.bytes);
+        expect
+            .short(SendOpcode::ShowForeignEffect as i16)
+            .int(7)
+            .byte(20)
+            .int(5281001);
+        expect.end();
+        let face = build_item_emotion(5281000).unwrap();
+        let mut expect = Expect::new(&face.bytes);
+        expect.short(0xE2).int(5281000);
+        expect.end();
+    }
 
     #[test]
     fn field_effect_is_mode_three_with_a_path() {

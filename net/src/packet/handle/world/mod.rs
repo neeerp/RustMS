@@ -3,6 +3,7 @@ mod alliance;
 mod berserk;
 mod buddy;
 mod cash_item;
+mod cash_mist;
 mod cash_shop;
 mod catch_item;
 mod chair;

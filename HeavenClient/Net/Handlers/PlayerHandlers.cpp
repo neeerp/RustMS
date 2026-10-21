@@ -572,6 +572,11 @@ namespace ms
 		Stage::get().get_player().check_auto_hp(recv.read_int());
 	}
 
+	void ItemEmotionHandler::handle(InPacket& recv) const
+	{
+		Stage::get().use_item_emotion(recv.read_int());
+	}
+
 	void MonsterBookSetCardHandler::handle(InPacket& recv) const
 	{
 		// v83 writes both lines in chat type 0xc and reads nothing more for a full card (FUN_00a081b8).

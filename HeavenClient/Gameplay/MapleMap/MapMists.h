@@ -52,6 +52,9 @@ namespace ms
 		// Whether an ally's smoke screen shelters the player at `position`.
 		bool shelters(Point<int16_t> position, const std::function<bool(int32_t)> &ally) const;
 
+		// Whether `owner` at `position` must wait to use the cash mist `itemid`.
+		bool item_busy(int32_t owner, int32_t itemid, Point<int16_t> position) const;
+
 	private:
 		struct Cloud
 		{

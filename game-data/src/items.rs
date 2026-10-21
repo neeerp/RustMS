@@ -74,7 +74,54 @@ pub struct ItemInfo {
     pub pet_chat_balloon: bool,
     /// What a 2x EXP (521xxxx) or drop (536xxxx) card multiplies, and when.
     pub rate_card: Option<RateCard>,
+    /// The cloud a cash mist item (528xxxx) leaves.
+    pub mist: Option<ItemMist>,
 }
+
+/// A cash mist item's cloud: its box around the user (`info/lt`, `info/rb`)
+/// and how long it lasts (`info/time`, in seconds).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ItemMist {
+    /// Left, top, right, bottom, from where the user stands.
+    pub area: (i32, i32, i32, i32),
+    pub seconds: i32,
+    /// The emotes its user may pull (its `emotion` keys), one bit each by
+    /// v83's emote numbers.
+    pub faces: u32,
+}
+
+impl ItemMist {
+    pub fn has_face(&self, emote: i32) -> bool {
+        (0..32).contains(&emote) && self.faces & 1 << emote != 0
+    }
+}
+
+/// v83's emote numbers by name, F1's "hit" being 1 (FUN_00416563).
+const EMOTES: [&str; 23] = [
+    "blink",
+    "hit",
+    "smile",
+    "troubled",
+    "cry",
+    "angry",
+    "bewildered",
+    "stunned",
+    "vomit",
+    "oops",
+    "cheers",
+    "chu",
+    "wink",
+    "pain",
+    "glitter",
+    "blaze",
+    "shine",
+    "love",
+    "despair",
+    "hum",
+    "bowing",
+    "hot",
+    "dam",
+];
 
 /// A rate card's multiplier (`info/rate`) and the hours it works in
 /// (`info/time`).
@@ -415,6 +462,26 @@ impl ItemData {
                     windows,
                 });
             }
+            if item_id / 10_000 == 528 {
+                if let (Some((left, top)), Some((right, bottom))) =
+                    (nx.vector_child(meta, "lt")?, nx.vector_child(meta, "rb")?)
+                {
+                    let mut faces = 0;
+                    if let Some(emotion) = nx.child_by_name(node, "emotion")? {
+                        for face in nx.child_indices(emotion)? {
+                            let name = nx.node_name(face)?;
+                            if let Some(emote) = EMOTES.iter().position(|e| *e == name) {
+                                faces |= 1 << emote;
+                            }
+                        }
+                    }
+                    info.mist = Some(ItemMist {
+                        area: (left, top, right, bottom),
+                        seconds: nx.int_child(meta, "time")?.unwrap_or(0),
+                        faces,
+                    });
+                }
+            }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
             let mut pets = Vec::new();
@@ -589,6 +656,7 @@ impl ItemData {
             pet_name_tag: false,
             pet_chat_balloon: false,
             rate_card: None,
+            mist: None,
         }))
     }
 }
@@ -722,6 +790,26 @@ mod tests {
         assert_eq!((triple.rate, triple.windows.len()), (3.0, 7));
         assert!(triple.active(3, 0) && triple.active(3, 23));
         assert!(data.info(5040000).unwrap().unwrap().rate_card.is_none());
+    }
+
+    #[test]
+    fn reads_the_cash_mists_clouds() {
+        let Some(data) = data() else {
+            return;
+        };
+        for item_id in [5281000, 5281001] {
+            let mist = data.info(item_id).unwrap().unwrap().mist.unwrap();
+            assert_eq!(mist.area, (-110, -82, 110, 83));
+            assert_eq!(mist.seconds, 60);
+        }
+        let gas = data.info(5281000).unwrap().unwrap().mist.unwrap();
+        // vomit, angry, cry, oops
+        assert!([8, 5, 4, 9].iter().all(|&emote| gas.has_face(emote)));
+        assert!(!gas.has_face(17) && !gas.has_face(1));
+        let scent = data.info(5281001).unwrap().unwrap().mist.unwrap();
+        // love, cheers, glitter, chu
+        assert_eq!(scent.faces, 1 << 17 | 1 << 10 | 1 << 14 | 1 << 11);
+        assert!(data.info(5120000).unwrap().unwrap().mist.is_none());
     }
 
     #[test]
