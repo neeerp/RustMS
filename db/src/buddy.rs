@@ -40,6 +40,8 @@ pub struct Added {
     pub name: String,
     /// They already had this character, so both now see each other.
     pub mutual: bool,
+    /// They were already on the list, in another group, and moved to this one.
+    pub regrouped: bool,
 }
 
 /// Every row of `cid`'s list, pending requests included.
@@ -91,7 +93,8 @@ fn listed_by(conn: &mut PgConnection, cid: i32) -> QueryResult<HashSet<i32>> {
 
 /// Add the character called `name` to `cid`'s list, asking them to add
 /// `cid` back unless they already have. Accepting their request has the same
-/// effect. `capacity` bounds both lists.
+/// effect. Adding a buddy already listed under another group moves them to
+/// `group`, which is how v83 changes groups. `capacity` bounds both lists.
 pub fn add(
     cid: i32,
     name: &str,
@@ -118,17 +121,30 @@ pub fn add(
 
         let existing = buddies::table
             .find((cid, target))
-            .select(buddies::pending)
-            .first::<bool>(conn)
+            .select((buddies::pending, buddies::group_name))
+            .first::<(bool, String)>(conn)
             .optional()?;
         match existing {
-            Some(false) => return Ok(Err(AddError::AlreadyAdded)),
-            Some(true) => {
+            Some((false, current)) if current == group => return Ok(Err(AddError::AlreadyAdded)),
+            Some((false, _)) => {
+                diesel::update(buddies::table.find((cid, target)))
+                    .set(buddies::group_name.eq(group))
+                    .execute(conn)?;
+                let mutual = listed_by(conn, cid)?.contains(&target);
+                return Ok(Ok(Added {
+                    id: target,
+                    name: target_name,
+                    mutual,
+                    regrouped: true,
+                }));
+            }
+            Some((true, _)) => {
                 accept_row(conn, cid, target, group)?;
                 return Ok(Ok(Added {
                     id: target,
                     name: target_name,
                     mutual: true,
+                    regrouped: false,
                 }));
             }
             None => {}
@@ -165,6 +181,7 @@ pub fn add(
             id: target,
             name: target_name,
             mutual: theirs == Some(false),
+            regrouped: false,
         }))
     })?)
 }

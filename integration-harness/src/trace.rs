@@ -138,6 +138,8 @@ pub struct Trace {
     pub party_chat: Vec<(String, String)>,
     /// Every full BUDDYLIST: (id, name, channel) per buddy.
     pub buddy_lists: Vec<Vec<(i32, String, i32)>>,
+    /// The same lists' groups: (id, group) per buddy.
+    pub buddy_groups: Vec<Vec<(i32, String)>>,
     /// The unanswered requests each full BUDDYLIST carries, by requester.
     pub buddy_list_requests: Vec<Vec<i32>>,
     /// Buddy requests: (requester id, name).
@@ -467,20 +469,22 @@ impl Trace {
             match r.read_byte().unwrap() {
                 7 => {
                     let count = r.read_byte().unwrap();
-                    let (mut list, mut requests) = (Vec::new(), Vec::new());
+                    let (mut list, mut requests, mut groups) = (Vec::new(), Vec::new(), Vec::new());
                     for _ in 0..count {
                         let id = r.read_int().unwrap();
                         let name = read_padded(&mut r, 13);
                         let requesting = r.read_byte().unwrap() == 1;
                         let channel = r.read_int().unwrap();
-                        read_padded(&mut r, 17);
+                        let group = read_padded(&mut r, 17);
                         if requesting {
                             requests.push(id);
                         } else {
                             list.push((id, name, channel));
+                            groups.push((id, group));
                         }
                     }
                     self.buddy_lists.push(list);
+                    self.buddy_groups.push(groups);
                     self.buddy_list_requests.push(requests);
                 }
                 9 => {
