@@ -83,6 +83,10 @@ namespace ms
 		constexpr Range<int16_t> SLIDER_RANGE = Range<int16_t>(51, 237);
 		constexpr Point<int16_t> COIN = Point<int16_t>(8, 267);
 		constexpr Point<int16_t> FULL_COIN = Point<int16_t>(7, 267);
+		// Only the full window has the Cash Shop button (0x81cef7).
+		constexpr Point<int16_t> FULL_CASHSHOP = Point<int16_t>(495, 266);
+		// No cash item expands a tab past 96 slots.
+		constexpr int16_t CASHSHOP_SLOTMAX = 96;
 		// The right end of the meso amount, which sits in a field ending at 137.
 		constexpr Point<int16_t> MESO = Point<int16_t>(131, 260);
 		constexpr Point<int16_t> FULL_MESO = Point<int16_t>(135, 260);
@@ -770,6 +774,7 @@ namespace ms
 		buttons[Buttons::BT_SORT] = std::make_unique<MapleButton>(Item["BtSort"]);
 		buttons[Buttons::BT_FULL] = std::make_unique<MapleButton>(Item["BtFull"]);
 		buttons[Buttons::BT_SMALL] = std::make_unique<MapleButton>(Item["BtSmall"]);
+		buttons[Buttons::BT_CASHSHOP] = std::make_unique<MapleButton>(Item["BtCashshop"], FULL_CASHSHOP);
 
 		mesolabel = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
@@ -957,6 +962,7 @@ namespace ms
 					update_slider();
 					load_icons();
 					set_sort(false);
+					update_cashshop();
 				}
 
 				// The strip is drawn from tab, not the button states. A tab
@@ -974,6 +980,11 @@ namespace ms
 				break;
 			case Buttons::BT_SMALL:
 				set_full(false);
+				break;
+			case Buttons::BT_CASHSHOP:
+				// v83 also asks the shop to show the tab's expansion item
+				// (0x81d3ca), which our Cash Shop doesn't take.
+				Stage::get().enter_cash_shop();
 				break;
 			case Buttons::BT_COIN:
 			{
@@ -1627,9 +1638,19 @@ namespace ms
 
 		buttons[Buttons::BT_FULL]->set_active(!full_enabled);
 		buttons[Buttons::BT_SMALL]->set_active(full_enabled);
+		buttons[Buttons::BT_CASHSHOP]->set_active(full_enabled);
 
 		set_sort(sort_enabled);
+		update_cashshop();
 		load_icons();
+	}
+
+	void UIItemInventory::update_cashshop()
+	{
+		bool expandable = (tab == InventoryType::Id::EQUIP || tab == InventoryType::Id::USE || tab == InventoryType::Id::ETC)
+						  && inventory.get_slotmax(tab) < CASHSHOP_SLOTMAX;
+
+		buttons[Buttons::BT_CASHSHOP]->set_state(expandable ? Button::State::NORMAL : Button::State::DISABLED);
 	}
 
 	void UIItemInventory::ItemIcon::drop_on_trade(int8_t slot) const

@@ -66,7 +66,9 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
+  Esc opens the Game Menu; the MENU key action opens ShortCut, whose buttons
+  run in v83's order: Item, Equip, Stat, Skill, Community, Quest, Monster
+  Book, Messenger. Dropping a
   skill, a USE or SETUP item, or a skill macro on a quick slot binds that
   slot's key and saves the keymap right away; an open Key Config shows the
   new binding. Which key each slot stands for comes from QUICKSLOT_INIT (159)
@@ -228,7 +230,10 @@ from `UI.nx`. Moved so far:
   Slots past the tab's limit show `disabled`. A gained item pulses its tab
   (`New/Tab0`, or `Tab1` when selected) and its slot (`New/inventory`) until
   the window closes. BtGather and BtSort rearrange the bag, and BtCoin asks
-  how many mesos to drop.
+  how many mesos to drop. The full window's BtCashshop enters the Cash Shop,
+  as the status bar's button does. It is greyed on the Set-up and Cash tabs
+  and on a tab of 96 slots. v83 also has the shop show the tab's slot
+  expansion, which our Cash Shop can't take yet.
 - **Equipment window** (`UIEquipInventory`, `UIWindow.img/Equip`): the labelled
   `backgrnd` grid (33 px cells from (5,35)) with an icon per worn slot, and the
   `pet` panel that PET EQUIP opens beside it, laid out from period footage.

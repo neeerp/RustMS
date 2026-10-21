@@ -377,6 +377,11 @@ namespace ms
 										Stage::get().get_player().get_quests()
 								);
 								break;
+							case KeyAction::Id::NOTIFIER:
+								if (auto helper = UI::get().get_element<UIQuestHelper>())
+									helper->toggle_minimized();
+
+								break;
 							case KeyAction::Id::MENU:
 								// Esc is bound to MENU by default, but it opens the
 								// Game Menu rather than the ShortCut menu.
