@@ -57,6 +57,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// What the Item Maker made (v83 FUN_0095dad3): a code, and for 0 or 1
+	// what was made, gained and used up, as grey chat lines; then the
+	// window's dialog.
+	// Opcode: MAKER_RESULT(217)
+	class MakerResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Vega's Spell's roll (FUN_0082d8d5): one code, first the one that
 	// starts it and says how it went, then the one that lets it end.
 	// Opcode: VEGA_SPELL(358)

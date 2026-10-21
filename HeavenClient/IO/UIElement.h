@@ -114,6 +114,7 @@ namespace ms
 			GUILDBBS,
 			AVATARMEGAPHONE,
 			FRIENDGROUP,
+			MAKER,
 			NUM_TYPES
 		};
 

@@ -914,6 +914,20 @@ namespace ms
 			if (file)
 				Stage::get().get_player().show_effect(Animation(file.resolve(path.substr(slash + 1))));
 		}
+		else if (mode1 == 0x10)
+		{
+			// The Item Maker's glow and sound on the maker: 0 made it, 1 failed, anything else nothing (FUN_009377d9).
+			int32_t result = recv.read_int();
+
+			if (result != 0 && result != 1)
+				return;
+
+			bool made = result == 0;
+			nl::node effect = nl::nx::effect["BasicEff.img"]["ItemMake"][made ? "Success" : "Failure"];
+
+			Stage::get().get_player().show_effect(Animation(effect));
+			Sound(made ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+		}
 		else // Buff effect
 		{
 			int32_t skillid = recv.read_int();

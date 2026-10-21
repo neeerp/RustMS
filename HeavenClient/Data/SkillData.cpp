@@ -106,6 +106,7 @@ namespace ms
 		passive = (id % 10000) / 1000 == 0;
 		flags = flags_of(id);
 		invisible = src["invisible"].get_bool();
+		disabled = src["disable"].get_bool();
 
 		/// Load required skills
 		nl::node reqsrc = src["req"];
@@ -290,6 +291,11 @@ namespace ms
 	bool SkillData::is_invisible() const
 	{
 		return invisible;
+	}
+
+	bool SkillData::is_disabled() const
+	{
+		return disabled;
 	}
 
 	int32_t SkillData::get_masterlevel() const

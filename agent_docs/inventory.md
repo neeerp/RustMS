@@ -612,6 +612,37 @@ has no room for what was made. A one-of-a-kind item already held is
 refused like an unknown error. Whether the map should see the effect is
 unknown, so it isn't sent.
 
+The client's window is `UIMaker` (`UIWindow.img/Maker`, rules in
+`Character/Inventory/MakerRules.h`; reports c006b and c006d). Casting a
+Maker skill, from a key or the skill book, opens it and sends nothing. Two
+v83 drop lists (`Basic.img/ComboBox4`, ten 16 px rows and a scroll bar past
+that) pick a category, then an item: the categories are the fixed ones, the
+gems, each kind of equipment the listed recipes make (named from the string
+pool, " ONE_HANDED MACE" and all), Use, Setup and Etc, then "???". A recipe
+is listed when the player has its level, Maker level, held and worn items
+and quest states. A recipe shows its ingredients with "owned/needed" counts
+(faded when short) and the fee; for a monster crystal the window shows
+`randomRecipe` and "0/100" until an etc drop with a level is dropped on its
+slot (in HC a dragged icon lands on the next click), and a click on the drop
+takes it back out. Create is enabled each frame while
+everything is there. It asks first, checks the fee ("You do not have enough
+mesos."), fills the gauge for 5.1 s with `Sound/UI.img/ItemMake` looping,
+sends, and waits for MAKER_RESULT. That writes v83's grey chat lines (what
+was gained, each ingredient lost, the mesos) and the result dialog, and
+SHOW_ITEM_GAIN_INCHAT `0x10` plays `BasicEff.img/ItemMake/Success` or
+`Failure`; any other code there does nothing. The selection stays for the
+next make. Cancel closes the window at any time, as v83's Cancel does; so does
+Esc, though the first Esc only closes an open list. The skill book keeps SP
+off the Maker skills, which have `disable` set.
+
+Not done in the window: the equipment's stimulator and gem slots, random
+making and disassembly (selectable but Create stays off), and the
+inventory-space check before sending. The drop lists can't be opened while
+the gauge fills, which v83 allows, and they don't take the arrow keys and
+Enter, which HC sends to the player. Drops on the stimulator and gem slots
+show none of v83's notices. The window opens centred, where v83 remembers its
+place, and is dragged by its top 20 px, a height not checked against v83.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's

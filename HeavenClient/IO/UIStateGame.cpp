@@ -82,6 +82,8 @@ namespace ms
 					return Tooltip::Parent::ITEMMEGAPHONE;
 				case UIElement::Type::VICIOUSHAMMER:
 					return Tooltip::Parent::VICIOUSHAMMER;
+				case UIElement::Type::MAKER:
+					return Tooltip::Parent::MAKER;
 				case UIElement::Type::VEGASPELL:
 					return Tooltip::Parent::VEGASPELL;
 				case UIElement::Type::VEGARESULT:

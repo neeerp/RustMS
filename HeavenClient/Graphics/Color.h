@@ -139,6 +139,10 @@ namespace ms
 			FRIENDBLUE,
 			BLOCKRED,
 			LOCATIONGREY,
+			MAKERCOUNT,
+			MAKERFEE,
+			COMBOLIST,
+			COMBOHOVER,
 			NUM_COLORS
 		};
 
@@ -227,7 +231,11 @@ namespace ms
 						{0.99f, 0.55f, 0.90f}, // Avatar megaphone (#FC8BE5, v83 chat font 0x11: avatar megaphones)
 						{0.10f, 0.44f, 0.69f}, // Friend blue (#1A6FB1, group headers in v83's Friend tab)
 						{0.82f, 0.00f, 0.00f}, // Block red (#D10000, blocked buddies in v83's Friend tab)
-						{0.40f, 0.40f, 0.40f}  // Location grey (#666666, "My Location" under v83's Friend tab)
+						{0.40f, 0.40f, 0.40f}, // Location grey (#666666, "My Location" under v83's Friend tab)
+						{0.56f, 0.66f, 0.76f}, // Maker count (#90A8C3, the Item Maker's ingredient counts)
+						{0.16f, 0.32f, 0.48f}, // Maker fee (#29517A, the Item Maker's fee)
+						{0.93f, 0.93f, 0.93f}, // Combo list (#EEEEEE, an open v83 drop list)
+						{0.65f, 0.63f, 0.60f}  // Combo hover (#A5A198, the row under the cursor in one)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

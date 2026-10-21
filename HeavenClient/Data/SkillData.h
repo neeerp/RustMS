@@ -136,6 +136,9 @@ namespace ms
 		// Return whether this skill is invisible in the skill book ui.
 		bool is_invisible() const;
 
+		// Return whether SP can't be spent on this skill (v83 reads `disable`, report c006c).
+		bool is_disabled() const;
+
 		// Return the default masterlevel.
 		int32_t get_masterlevel() const;
 
@@ -184,6 +187,7 @@ namespace ms
 		int32_t flags;
 		bool passive;
 		bool invisible;
+		bool disabled;
 		bool cooltime = false;
 
 		std::string name;

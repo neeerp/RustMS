@@ -496,11 +496,11 @@ namespace ms
 		for (int32_t skill_id : data.get_skills())
 		{
 			int32_t level = skillbook.get_level(skill_id);
-			int32_t masterlevel = skillbook.get_masterlevel(skill_id);
 
 			bool invisible = SkillData::get(skill_id).is_invisible();
 
-			if (invisible && masterlevel == 0)
+			// An invisible skill shows once the character has it, whatever its master level (FUN_008abf71).
+			if (invisible && !skillbook.has_skill(skill_id))
 				continue;
 
 			skills.emplace_back(skill_id, level);
@@ -570,7 +570,7 @@ namespace ms
 		if (masterlevel == 0 && !sp_reset::has_master_level(skill_id))
 			masterlevel = SkillData::get(skill_id).get_masterlevel();
 
-		if (level >= masterlevel)
+		if (level >= masterlevel || SkillData::get(skill_id).is_disabled())
 			return false;
 
 		switch (skill_id)
