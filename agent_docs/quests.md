@@ -71,7 +71,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill` |
@@ -88,6 +88,16 @@ A quest without a `Check/1` `npc` is completed at
 its start NPC if `Check/1` asks for items or kills (Pio's 1008); one with
 neither is unsupported, which keeps out the event records that only a
 server script completes.
+
+Start requirements follow v83's own check (FUN_00721163). `item` counts what
+the bag holds plus one if a copy is worn: a positive count is a minimum, 0
+means none, and a negative count is a maximum. A
+`skill` entry with `acquire` 1 needs the skill, one without needs its
+absence. "Having" a skill is v83's loose test: any skill not marked
+`invisible` counts, for every job and at every level, and a hidden one
+counts once it has a record, even at level 0 (that is how the 4th-job skill
+book quests, 6110–6325, ask for the book's skill to be unlearned). `pop` is the least fame,
+compared unsigned as v83 does, so negative fame passes.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
 and take negative ones (capped at what the player holds). An entry without a
@@ -127,7 +137,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1081 quests qualify
+changing the server's allowlist and regenerating the list. 1186 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

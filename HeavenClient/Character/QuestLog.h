@@ -60,12 +60,15 @@ namespace ms
 		bool is_completed(int16_t id) const;
 		const std::map<int16_t, std::string>& started_quests() const;
 		const std::map<int16_t, int64_t>& completed_quests() const;
-		// `count` gives how many of an item the player holds.
+		// `count` gives how many of an item the player holds, and `holds`
+		// whether they meet a quest's start_holdings_met.
 		QuestMarker npc_marker(int32_t npc_id, int16_t job, int16_t level,
-			const std::function<int32_t(int32_t)>& count) const;
+			const std::function<int32_t(int32_t)>& count,
+			const std::function<bool(const QuestInfo&)>& holds) const;
 		uint64_t revision() const;
 		int16_t state(int16_t id) const;
-		std::vector<int16_t> available_quests(int16_t job, int16_t level, bool all_levels = false) const;
+		std::vector<int16_t> available_quests(int16_t job, int16_t level,
+			const std::function<bool(const QuestInfo&)>& holds, bool all_levels = false) const;
 
 	private:
 		std::map<int16_t, std::string> started;

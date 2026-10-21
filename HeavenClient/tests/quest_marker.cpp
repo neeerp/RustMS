@@ -1,6 +1,7 @@
 #include "../Character/QuestMarker.h"
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <stdexcept>
 
@@ -24,6 +25,7 @@ int main()
 {
 	try
 	{
+		auto anyone = [](const ms::QuestInfo&) { return true; };
 		std::vector<ms::QuestInfo> chain;
 		for (int16_t id = 1009; id <= 1015; ++id)
 			chain.push_back(id > 1009 ? quest(id, 12101, 12101, {{id - 1, 2}}) : quest(id, 12101, 12101));
@@ -34,7 +36,7 @@ int main()
 			{
 				auto found = states.find(id);
 				return found == states.end() ? 0 : found->second;
-			}, 1, [](int32_t) { return 0; }, [](int16_t) { return std::string(); });
+			}, 1, [](int32_t) { return 0; }, [](int16_t) { return std::string(); }, anyone);
 		};
 		require(marker(10000) == QuestMarker::NONE, "Pio must not advertise Rain's quests");
 		require(marker(12101, 100) == QuestMarker::NONE, "non-beginners must not see the bulb");
@@ -62,23 +64,23 @@ int main()
 		auto lone = [&](const ms::QuestInfo& info, int16_t state)
 		{
 			return ms::select_quest_marker(12101, 0, {info}, [&](int16_t) { return state; }, 1,
-				[](int32_t) { return 0; }, [](int16_t) { return std::string(); });
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); }, anyone);
 		};
 		require(lone(quest(1250, 12101, 12101), 0) == QuestMarker::NONE, "party quests get no icon");
 		require(lone(quest(2002, 12101, 0), 1) == QuestMarker::READY, "a quest without a finishing NPC is ready anywhere");
 		std::vector<ms::QuestInfo> contact { quest(1032, 2102, 2001, {}, 10), quest(1033, 2001, 2102, {{1032, 2}}, 10) };
 		auto contact_marker = [&](int32_t npc, int16_t level = 1) {
 			return ms::select_quest_marker(npc, 0, contact, [&](int16_t id) { return states[id]; }, level,
-				[](int32_t) { return 0; }, [](int16_t) { return std::string(); });
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); }, anyone);
 		};
 		require(contact_marker(2102) == QuestMarker::AVAILABLE, "Nina must offer the existing quest");
 		require(contact_marker(2102, 11) == QuestMarker::NONE, "offer must honor maximum start level");
 		auto status = [&](int16_t id) { return states[id]; };
-		require(ms::quest_available(contact[0], 0, 1, status), "quest list must show eligible visits");
-		require(!ms::quest_available(contact[0], 0, 11, status), "level filter must hide unavailable visits");
-		require(ms::quest_available(contact[0], 0, 11, status, true), "all-levels view may show out-of-range visits");
-		require(!ms::quest_available(contact[0], 100, 1, status, true), "all-levels view must still honor job requirements");
-		require(!ms::quest_available(contact[1], 0, 1, status, true), "quest list must not bypass prerequisites");
+		require(ms::quest_available(contact[0], 0, 1, status, anyone), "quest list must show eligible visits");
+		require(!ms::quest_available(contact[0], 0, 11, status, anyone), "level filter must hide unavailable visits");
+		require(ms::quest_available(contact[0], 0, 11, status, anyone, true), "all-levels view may show out-of-range visits");
+		require(!ms::quest_available(contact[0], 100, 1, status, anyone, true), "all-levels view must still honor job requirements");
+		require(!ms::quest_available(contact[1], 0, 1, status, anyone, true), "quest list must not bypass prerequisites");
 		require(contact_marker(2001) == QuestMarker::NONE, "Sen must wait for acceptance");
 		states[1032] = 1;
 		require(contact_marker(2102) == QuestMarker::IN_PROGRESS, "source NPC must show an open book while waiting");
@@ -97,7 +99,7 @@ int main()
 		int32_t shells = 0;
 		auto hunt_marker = [&]() {
 			return ms::select_quest_marker(2002, 0, {hunt}, [](int16_t) { return 1; }, 1,
-				[&](int32_t) { return shells; }, [&](int16_t) { return progress; });
+				[&](int32_t) { return shells; }, [&](int16_t) { return progress; }, anyone);
 		};
 		require(hunt_marker() == QuestMarker::IN_PROGRESS, "no kills yet");
 		shells = 1;
@@ -122,6 +124,41 @@ int main()
 		require(stop(2002) == ms::QuestStop::MOB, "then kills");
 		progress = "001";
 		require(stop(2002) == ms::QuestStop::NONE, "and then it can be completed");
+		// Start requirements on what the player holds (FUN_00721163): worn
+		// copies count once, 0 means none, and a negative count is a maximum.
+		ms::QuestInfo mirror = quest(1000, 2101, 2101);
+		mirror.held_items = {{1042003, 1}, {2010007, 0}, {4000381, -1}};
+		std::map<int32_t, int32_t> held { {1042003, 1} };
+		std::set<int32_t> skills;
+		int16_t fame = 0;
+		auto holds = [&](const ms::QuestInfo& info) {
+			return ms::start_holdings_met(info, fame, [&](int32_t id) { return held[id]; },
+				[&](int32_t id) { return skills.count(id) > 0; });
+		};
+		auto mirror_marker = [&]() {
+			return ms::select_quest_marker(2101, 0, {mirror}, [](int16_t) { return 0; }, 1,
+				[](int32_t) { return 0; }, [](int16_t) { return std::string(); }, holds);
+		};
+		require(mirror_marker() == QuestMarker::AVAILABLE, "held items allow the start");
+		held[4000381] = 2;
+		require(mirror_marker() == QuestMarker::NONE, "more than a negative count's bound blocks it");
+		held[4000381] = 1;
+		held[2010007] = 1;
+		require(!holds(mirror), "an item that must not be held blocks it");
+		held[2010007] = 0;
+		held[1042003] = 0;
+		require(!holds(mirror), "a missing item blocks it");
+		ms::QuestInfo book = quest(6110, 1022002, 1022002);
+		book.skills = {{1001004, true}, {1121006, false}};
+		book.min_fame = 1;
+		skills = {1001004};
+		require(!holds(book), "fame below the minimum blocks it");
+		fame = -1;
+		require(holds(book), "fame compares unsigned, so negative fame passes");
+		skills.insert(1121006);
+		require(!holds(book), "a skill that must be lacked blocks it");
+		skills = {};
+		require(!holds(book), "a skill that must be had blocks it");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };
@@ -129,7 +166,7 @@ int main()
 		bool items = false;
 		auto menu = [&]() {
 			return ms::select_quest_menu(10000, pio, [&](int16_t id) { return pio_states[id]; },
-				[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 1, [&](int16_t id) { return pio_states[id]; }); },
+				[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 1, [&](int16_t id) { return pio_states[id]; }, anyone); },
 				[&](const ms::QuestInfo& info) { return info.end_npc == 10000 && (info.id != 1008 || items); });
 		};
 		ms::QuestMenu listed = menu();

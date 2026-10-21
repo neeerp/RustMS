@@ -362,10 +362,12 @@ namespace ms
 	void UIQuestLog::refresh_list()
 	{
 		std::vector<int16_t> ids;
-		auto& stats = Stage::get().get_player().get_stats();
+		auto& player = Stage::get().get_player();
+		auto& stats = player.get_stats();
 
 		if (tab == TAB0)
-			ids = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL));
+			ids = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL),
+				[&](const QuestInfo& quest) { return player.quest_holdings_met(quest); });
 		else if (tab == TAB1)
 			for (const auto& quest : questlog.started_quests())
 				ids.push_back(quest.first);

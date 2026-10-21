@@ -58,6 +58,7 @@ namespace ms
 			info.end_npc = static_cast<int32_t>(end["npc"].get_integer(info.start_npc));
 			info.min_level = static_cast<int16_t>(start["lvmin"].get_integer(0));
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
+			info.min_fame = static_cast<int16_t>(start["pop"].get_integer());
 			info.rewards.meso = static_cast<int32_t>(act["money"].get_integer());
 			info.rewards.exp = static_cast<int32_t>(act["exp"].get_integer());
 			info.rewards.fame = static_cast<int32_t>(act["pop"].get_integer());
@@ -75,6 +76,14 @@ namespace ms
 			for (auto prerequisite : start["quest"])
 				info.prerequisites.emplace_back(static_cast<int16_t>(prerequisite["id"].get_integer()),
 					static_cast<int16_t>(prerequisite["state"].get_integer()));
+
+			for (auto item : start["item"])
+				info.held_items.emplace_back(static_cast<int32_t>(item["id"].get_integer()),
+					static_cast<int32_t>(item["count"].get_integer()));
+
+			for (auto skill : start["skill"])
+				info.skills.emplace_back(static_cast<int32_t>(skill["id"].get_integer()),
+					skill["acquire"].get_integer() != 0);
 
 			for (auto item : end["item"])
 				info.end_items.emplace_back(static_cast<int32_t>(item["id"].get_integer()),

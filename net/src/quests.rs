@@ -47,6 +47,10 @@ pub enum QuestRejection {
     Items(i32),
     /// Fewer kills of this mob than required.
     Mobs(i32),
+    /// Lacking, or for a "must not have" entry having, this skill.
+    Skill(i32),
+    /// Less fame than the quest asks.
+    Fame,
     /// Fewer mesos than the quest takes.
     Mesos,
     /// The item rewards don't fit.
@@ -82,7 +86,44 @@ pub fn check_start(
     {
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
     }
+    // v83 compares fame unsigned, so negative fame passes.
+    if start.min_fame != 0 && (player.stats.fame as u16) < (start.min_fame as u16) {
+        return Err(QuestRejection::Fame);
+    }
+    for &(item_id, count) in &start.items {
+        let held = held_for_start(player, item_id);
+        let met = match count {
+            1.. => held >= count,
+            0 => held == 0,
+            _ => held <= count.saturating_neg(),
+        };
+        if !met {
+            return Err(QuestRejection::Items(item_id));
+        }
+    }
+    if let Some(&(skill_id, _)) = start
+        .skills
+        .iter()
+        .find(|&&(id, acquire)| has_skill(player, id) != acquire)
+    {
+        return Err(QuestRejection::Skill(skill_id));
+    }
     Ok(())
+}
+
+/// How many of `item_id` v83's start check sees `player` hold: those in the
+/// bag, plus one if a copy is worn.
+fn held_for_start(player: &Player, item_id: i32) -> i32 {
+    let worn = player.inventory.equipped_ids().any(|(_, id)| id == item_id);
+    player.inventory.count(item_id) + i32::from(worn)
+}
+
+/// Whether v83's start check counts `player` as having `skill_id`: a skill
+/// they've learned, or any skill that isn't hidden from the skill window.
+/// It looks at neither the level nor the job.
+fn has_skill(player: &Player, skill_id: i32) -> bool {
+    crate::skills::info(skill_id)
+        .is_some_and(|info| !info.invisible || player.skills.get(skill_id).is_some())
 }
 
 /// Whether `player` may complete `quest` with `npc_id`. The start
@@ -276,6 +317,7 @@ mod tests {
                     quest_id: 1032,
                     state: QuestState::Completed,
                 }],
+                ..StartRequirements::default()
             },
             end_npc: 2102,
             end_items: vec![],
@@ -425,6 +467,79 @@ mod tests {
         assert_eq!(
             check_start(&q, 2001, &p),
             Err(QuestRejection::Prerequisite(2078))
+        );
+    }
+
+    #[test]
+    fn start_items_count_worn_copies_and_bound_by_sign() {
+        let mut q = quest();
+        q.start.quests.clear();
+        q.start.items = vec![(1002067, 2), (2010007, 0), (4000381, -1)];
+        let mut p = player(1, 0);
+        p.inventory.insert(
+            game::InventoryType::Equipped,
+            game::inventory::equip_slot::CAP,
+            game::Item::equipment(1002067, game::EquipStats::default()),
+        );
+        assert_eq!(
+            check_start(&q, 2001, &p),
+            Err(QuestRejection::Items(1002067))
+        );
+        p.inventory.insert(
+            game::InventoryType::Equip,
+            1,
+            game::Item::equipment(1002067, game::EquipStats::default()),
+        );
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        p.inventory.add(game::Item::stack(4000381, 1), 100).unwrap();
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        p.inventory.add(game::Item::stack(4000381, 1), 100).unwrap();
+        assert_eq!(
+            check_start(&q, 2001, &p),
+            Err(QuestRejection::Items(4000381))
+        );
+        q.start.items.truncate(2);
+        p.inventory.add(game::Item::stack(2010007, 1), 100).unwrap();
+        assert_eq!(
+            check_start(&q, 2001, &p),
+            Err(QuestRejection::Items(2010007))
+        );
+    }
+
+    #[test]
+    fn start_fame_is_compared_unsigned() {
+        let mut q = quest();
+        q.start.quests.clear();
+        q.start.min_fame = 1;
+        let mut p = player(1, 0);
+        p.stats.fame = 0;
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Fame));
+        p.stats.fame = 1;
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        p.stats.fame = -3;
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+    }
+
+    #[test]
+    fn start_skills_count_any_visible_skill_and_learned_hidden_ones() {
+        if crate::skills::data().is_err() {
+            return;
+        }
+        let mut q = quest();
+        q.start.quests.clear();
+        // Power Strike (visible) needed; Maple Warrior (hidden) must be lacked.
+        q.start.skills = vec![(1001004, true), (1121000, false)];
+        let mut p = player(1, 0);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        p.skills.set(SkillRecord {
+            skill_id: 1121000,
+            level: 0,
+            master_level: 10,
+            expiration: None,
+        });
+        assert_eq!(
+            check_start(&q, 2001, &p),
+            Err(QuestRejection::Skill(1121000))
         );
     }
 

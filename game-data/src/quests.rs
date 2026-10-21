@@ -15,7 +15,17 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 /// Requirements to start a quest (`Check.img/<id>/0`) that the server checks.
-pub const START_REQUIREMENTS: &[&str] = &["npc", "job", "lvmin", "lvmax", "quest", "startscript"];
+pub const START_REQUIREMENTS: &[&str] = &[
+    "npc",
+    "job",
+    "lvmin",
+    "lvmax",
+    "quest",
+    "item",
+    "skill",
+    "pop",
+    "startscript",
+];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: on stat changes, or on entering
 /// one of the listed maps. They aren't requirements, as v83's own start check
@@ -49,6 +59,13 @@ pub struct StartRequirements {
     pub min_level: Option<i16>,
     pub max_level: Option<i16>,
     pub quests: Vec<QuestPrerequisite>,
+    /// Items to hold, as `(item id, count)`: at least `count` if positive,
+    /// none if 0, and at most `-count` if negative.
+    pub items: Vec<(i32, i32)>,
+    /// Skills to have (`true`, from `acquire`) or not have (`false`).
+    pub skills: Vec<(i32, bool)>,
+    /// Least fame (`pop`); 0 means no requirement.
+    pub min_fame: i16,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -287,6 +304,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .int_child(start, "lvmax")?
             .map(|v| small(v, "level"))
             .transpose()?,
+        min_fame: small(nx.int_child(start, "pop")?.unwrap_or(0), "fame")?,
         ..StartRequirements::default()
     };
     if let Some(jobs) = nx.child_by_name(start, "job")? {
@@ -299,15 +317,17 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         }
     }
     requirements.quests = prerequisites(nx, start)?;
-    let mut end_items = Vec::new();
-    if let Some(items) = nx.child_by_name(end, "item")? {
-        for item in nx.child_indices(items)? {
-            let item_id = nx
-                .int_child(item, "id")?
-                .ok_or_else(|| invalid("item requirement without id"))?;
-            end_items.push((item_id, nx.int_child(item, "count")?.unwrap_or(0)));
+    requirements.items = item_counts(nx, start)?;
+    if let Some(skills) = nx.child_by_name(start, "skill")? {
+        for skill in nx.child_indices(skills)? {
+            let skill_id = nx
+                .int_child(skill, "id")?
+                .ok_or_else(|| invalid("skill requirement without id"))?;
+            let acquire = nx.int_child(skill, "acquire")?.unwrap_or(0) != 0;
+            requirements.skills.push((skill_id, acquire));
         }
     }
+    let end_items = item_counts(nx, end)?;
     let mut end_mobs = Vec::new();
     if let Some(mobs) = nx.child_by_name(end, "mob")? {
         for mob in nx.child_indices(mobs)? {
@@ -476,6 +496,20 @@ fn node(nx: &NxDataFile, path: &str) -> Result<u32, GameDataError> {
     path_index(nx, path)?.ok_or_else(|| invalid(&format!("missing quest node {path}")))
 }
 
+/// The `item` list of a `Check.img` stage, as `(item id, count)`.
+fn item_counts(nx: &NxDataFile, stage: u32) -> Result<Vec<(i32, i32)>, GameDataError> {
+    let mut counts = Vec::new();
+    if let Some(items) = nx.child_by_name(stage, "item")? {
+        for item in nx.child_indices(items)? {
+            let item_id = nx
+                .int_child(item, "id")?
+                .ok_or_else(|| invalid("item requirement without id"))?;
+            counts.push((item_id, nx.int_child(item, "count")?.unwrap_or(0)));
+        }
+    }
+    Ok(counts)
+}
+
 fn small(value: i32, what: &str) -> Result<i16, GameDataError> {
     i16::try_from(value).map_err(|_| invalid(&format!("{what} out of range")))
 }
@@ -569,6 +603,19 @@ mod tests {
             .map(|l| l.trim().parse().unwrap())
             .collect();
         assert_eq!(actual, golden, "update game-data/supported_quests.txt");
+    }
+
+    #[test]
+    fn loads_held_item_and_skill_start_requirements() {
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let catalog = QuestCatalog::load_from_nx(path).unwrap();
+        // Borrowing Sera's Mirror asks for the GM shirt, held or worn.
+        let mirror = catalog.quest(1000).unwrap();
+        assert_eq!(mirror.start.items, [(1042003, 1)]);
+        let mastery = catalog.quest(2415).unwrap();
+        assert_eq!(mastery.start.skills, [(1001004, true)]);
     }
 
     #[test]

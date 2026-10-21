@@ -21,6 +21,14 @@ namespace ms
 		int16_t max_level = 32767;
 		// (quest id, required state) pairs.
 		std::vector<std::pair<int16_t, int16_t>> prerequisites;
+		// Items to hold to start (Check/0/item): (item id, count), where a
+		// positive count is a minimum, 0 means none, and a negative count a
+		// maximum.
+		std::vector<std::pair<int32_t, int32_t>> held_items;
+		// Skills to have (true, from `acquire`) or lack (false) to start.
+		std::vector<std::pair<int32_t, bool>> skills;
+		// Least fame to start (Check/0/pop); 0 means any.
+		int16_t min_fame = 0;
 		// Items needed to complete: (item id, count); a count of 0 means none
 		// may be left.
 		std::vector<std::pair<int32_t, int32_t>> end_items;
