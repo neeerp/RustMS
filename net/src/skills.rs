@@ -31,6 +31,9 @@ pub struct Learned {
 }
 
 pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
+    if is_gm(skill_id) && player.gm_level == 0 {
+        return None;
+    }
     let level = player.skills.level(skill_id);
     let mut effect = info(skill_id)?.level(level)?.clone();
     effect.morph = crate::morph::template(effect.morph, player.stats.gender);
@@ -219,6 +222,30 @@ pub const TIME_LEAP: i32 = 5121010;
 /// Echo of Hero, the Beginner's, the Noblesse's, and the Legend's: it
 /// reaches everyone around, in the player's party or not (0x96a33a).
 pub const ECHOES: [i32; 3] = [1005, 10001005, 20001005];
+
+/// The GM skills (900.img, 910.img), which only a GM may use (Cosmic's
+/// SpecialMoveHandler).
+pub fn is_gm(skill_id: i32) -> bool {
+    matches!(skill_id / 10000, 900 | 910)
+}
+
+pub const GM_HEAL: i32 = 9101000;
+pub const GM_RESURRECTION: i32 = 9101005;
+/// Heal + Dispel, Haste (Super), Holy Symbol, Bless, Resurrection and Hyper
+/// Body, which the client casts on everyone in their area as it does Echo
+/// of Hero (0x96a33a).
+pub const GM_AREA: [i32; 6] = [GM_HEAL, 9101001, 9101002, 9101003, GM_RESURRECTION, 9101008];
+
+/// Whether a skill reaches everyone on the map around the player, in their
+/// party or not.
+pub fn reaches_everyone(skill_id: i32) -> bool {
+    ECHOES.contains(&skill_id) || GM_AREA.contains(&skill_id)
+}
+
+/// Whether a skill reaches only the dead, and raises them.
+pub fn raises_dead(skill_id: i32) -> bool {
+    skill_id == RESURRECTION || skill_id == GM_RESURRECTION
+}
 pub const MP_RECOVERY: i32 = 5101005;
 
 pub const SACRIFICE: i32 = 1311005;
@@ -284,9 +311,9 @@ pub fn self_stun(skill: &Learned) -> Option<Disease> {
 
 pub const MYSTIC_DOOR: i32 = 2311002;
 
-/// The Teleport skills (v83 FUN_00957b74): the client moves the player and
-/// asks only for the MP.
-pub const TELEPORTS: [i32; 5] = [2101002, 2201002, 2301001, 12101003, 22101001];
+/// The Teleport skills, the GM's among them (v83 FUN_00957b74): the client
+/// moves the player and asks only for the MP.
+pub const TELEPORTS: [i32; 6] = [2101002, 2201002, 2301001, 12101003, 22101001, 9001002];
 
 /// The Flash Jump skills (v83 FUN_0096be38): the client throws the player on
 /// through the air and asks only for the MP.
@@ -303,12 +330,22 @@ pub const WINGS: i32 = 5201005;
 /// Skills that neither buff nor debuff: the handler does their work.
 /// Chakra heals the user, MP Recovery turns HP into MP, Resurrection raises
 /// dead party members, Time Leap ends cooldowns, Mystic Door opens a door,
-/// and Smokescreen leaves its smoke. Teleport, Flash Jump and Wings have no
-/// work, and Dash gives its own buffs.
+/// and Smokescreen leaves its smoke. The GM's Heal + Dispel heals and cures
+/// everyone around, and their Resurrection raises the dead around them.
+/// Teleport, Flash Jump and Wings have no work, and Dash gives its own
+/// buffs.
 pub fn acts_alone(skill_id: i32) -> bool {
     matches!(
         skill_id,
-        MYSTIC_DOOR | CHAKRA | MP_RECOVERY | RESURRECTION | TIME_LEAP | WINGS | SMOKESCREEN
+        MYSTIC_DOOR
+            | CHAKRA
+            | MP_RECOVERY
+            | RESURRECTION
+            | TIME_LEAP
+            | WINGS
+            | SMOKESCREEN
+            | GM_HEAL
+            | GM_RESURRECTION
     ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)
         || DASHES.contains(&skill_id)
@@ -1055,7 +1092,10 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1211003..=1211008 | 1221003 | 1221004 => {
             return Some(vec![(BuffStat::WeaponCharge, effect.x)]);
         }
-        1301007 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
+        1301007 | 9101008 => vec![(BuffStat::MaxHp, effect.x), (BuffStat::MaxMp, effect.y)],
+        // The GM's Haste (Normal) and (Super), and Bless.
+        9001000 | 9101001 | 9101003 => vec![],
+        9101002 => vec![(BuffStat::HolySymbol, effect.x)],
         DRAGON_BLOOD => vec![(BuffStat::DragonBlood, effect.x)],
         1121000 | 1221000 | 1321000 | 2121000 | 2221000 | 2321000 | 3121000 | 3221000 | 4121000
         | 4221000 | 5121000 | 5221000 => vec![(BuffStat::MapleWarrior, effect.x)],
@@ -1153,6 +1193,37 @@ mod tests {
             });
         }
         player
+    }
+
+    #[test]
+    fn the_gm_skills_are_a_gms_alone() {
+        if data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.skills.set(game::SkillRecord {
+            skill_id: 9101003,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        assert_eq!(learned(&player, 9101003), None);
+        player.gm_level = 1;
+        assert_eq!(learned(&player, 9101003).map(|skill| skill.level), Some(1));
+    }
+
+    #[test]
+    fn the_gm_buffs_give_their_stats() {
+        if data().is_err() {
+            return;
+        }
+        let stats = |skill_id| buffs(&at_level(skill_id, 1).unwrap()).unwrap();
+        assert!(stats(9101002).contains(&(BuffStat::HolySymbol, 50)));
+        assert!(stats(9101003).contains(&(BuffStat::Pad, 20)));
+        assert!(stats(9101008).contains(&(BuffStat::MaxHp, 60)));
+        assert!(stats(9001000).contains(&(BuffStat::Speed, 40)));
+        assert!(reaches_everyone(9101000) && !reaches_everyone(9001000));
+        assert!(raises_dead(9101005) && acts_alone(9101005) && acts_alone(9001002));
     }
 
     #[test]

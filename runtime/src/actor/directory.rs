@@ -654,13 +654,13 @@ impl WorldDirectory {
     }
 
     /// Pass a party skill on to the members in its slots, the party's
-    /// joining order, who are on the user's map; Echo of Hero, to everyone
-    /// else on the map.
+    /// joining order, who are on the user's map; Echo of Hero and the GM's
+    /// area skills, to everyone else on the map.
     fn party_skill(&self, from: ClientId, used: PartySkill, origin: (i16, i16)) {
         let Some(entry) = self.clients.get(&from) else {
             return;
         };
-        let reached: Vec<ClientId> = if net::skills::ECHOES.contains(&used.skill_id) {
+        let reached: Vec<ClientId> = if net::skills::reaches_everyone(used.skill_id) {
             self.clients.keys().copied().collect()
         } else if let Some(party) = self.parties.of(from) {
             let in_slots = party
