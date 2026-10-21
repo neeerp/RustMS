@@ -10,6 +10,8 @@ use packet::io::write::PktWrite;
 use packet::Packet;
 
 const FOREST: i32 = 50_000;
+/// OPQ's Jail Storage, an everlast map.
+const JAIL_STORAGE: i32 = 920_010_911;
 const SNAIL: i32 = 100100;
 const WEAPON: i16 = -11;
 const EQUIP: i8 = 1;
@@ -94,6 +96,27 @@ async fn a_dropped_weapon_is_anyones_and_gone_from_the_dropper() {
     assert!(!dropper.items.contains_key(&weapon));
     let finder = relogin(&finder_config).await;
     assert_eq!(finder.items.get(&weapon), Some(&1));
+}
+
+#[tokio::test]
+async fn nothing_may_be_thrown_down_in_an_everlast_map() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config).await.unwrap();
+    let weapon = session.equipped[&WEAPON.abs()];
+    let c = &mut session.connection;
+    let mut t = Trace::default();
+    assert_eq!(warp(c, JAIL_STORAGE, "", &mut t).await, JAIL_STORAGE);
+    read_for(c, &mut t, 300).await;
+
+    send(c, item_move(EQUIPPED, WEAPON, 1, 1)).await;
+    read_for(c, &mut t, 300).await;
+    send(c, item_move(EQUIP, 1, 0, 1)).await;
+    read_for(c, &mut t, 500).await;
+    assert!(t.field.item_drop(weapon).is_none());
+    drop(session);
+
+    let session = relogin(&config).await;
+    assert_eq!(session.items.get(&weapon), Some(&1));
 }
 
 #[tokio::test]

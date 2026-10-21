@@ -1723,6 +1723,10 @@ namespace ms
 		if (item_drop::kept(item_id))
 			return;
 
+		// v83 FUN_004f31a5 drops nothing on an everlast map, silently.
+		if (Stage::get().get_mapinfo().is_everlast())
+			return;
+
 		if (item_drop::refused(item_id, traits.cash))
 		{
 			UI::get().emplace<UIOk>(cashmessage, [](bool)

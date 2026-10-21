@@ -842,7 +842,9 @@ mobs with `publicReward` are anyone's at once, as are those of mobs with
 ownership type tells the client which (v83 FUN_0050483a, whose pets follow
 it): 0 with the owner's character id, 1 with the party id, 2 for anyone (and
 for any drop once the 15 s are over), 3 for an explosive drop. Drops vanish
-after 180 s (REMOVE_ITEM_FROM_MAP 0). Drops players throw down are anyone's
+after 180 s (REMOVE_ITEM_FROM_MAP 0), except on the 24 maps with
+`info/everlast` (the OPQ and GPQ storage rooms, the Hill of Christmas), where
+they stay until picked up, as in Cosmic. Drops players throw down are anyone's
 at once; see "Client moves" in `inventory.md`.
 
 HeavenClient's `Drop` gives a falling drop its own, lighter gravity instead

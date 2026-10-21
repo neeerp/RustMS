@@ -119,6 +119,9 @@ pub struct DropSet {
     drops: BTreeMap<i32, Drop>,
     object_ids: ObjectIds,
     footholds: Footholds,
+    /// How long a drop lies here; `None` on everlast maps, where drops
+    /// stay until picked up.
+    lifetime: Option<Duration>,
 }
 
 impl Default for DropSet {
@@ -134,6 +137,15 @@ impl DropSet {
             drops: BTreeMap::new(),
             object_ids: ObjectIds::new(object_ids::DROPS),
             footholds,
+            lifetime: Some(LIFETIME),
+        }
+    }
+
+    /// Drops that never vanish (`info/everlast`).
+    pub fn everlast(self) -> Self {
+        Self {
+            lifetime: None,
+            ..self
         }
     }
 
@@ -314,10 +326,13 @@ impl DropSet {
 
     /// Remove expired drops and return their object ids.
     pub fn expire(&mut self, now: Instant) -> Vec<i32> {
+        let Some(lifetime) = self.lifetime else {
+            return Vec::new();
+        };
         let expired: Vec<i32> = self
             .drops
             .values()
-            .filter(|drop| now >= drop.dropped_at + LIFETIME)
+            .filter(|drop| now >= drop.dropped_at + lifetime)
             .map(|drop| drop.object_id)
             .collect();
         for id in &expired {
@@ -526,6 +541,16 @@ mod tests {
         );
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
+    }
+
+    #[test]
+    fn drops_on_everlast_maps_never_expire() {
+        let now = Instant::now();
+        let mut drops = DropSet::default().everlast();
+        let item = game::Item::stack(2010000, 3);
+        drops.throw(Loot::Dropped(item), 1, 0, 0, now);
+        assert!(drops.expire(now + LIFETIME * 100).is_empty());
+        assert_eq!(drops.all().count(), 1);
     }
 
     #[test]

@@ -114,12 +114,18 @@ fn load_field_reactors(field_key: FieldKey) -> ReactorSet {
 }
 
 fn load_field_drops(field_key: FieldKey) -> DropSet {
-    let footholds = net::get_game_data()
+    let field = net::get_game_data()
         .ok()
-        .and_then(|data| data.field(field_key.map_id))
-        .map(|field| field.footholds.clone())
-        .unwrap_or_default();
-    DropSet::new(footholds)
+        .and_then(|data| data.field(field_key.map_id));
+    let drops = DropSet::new(
+        field
+            .map(|field| field.footholds.clone())
+            .unwrap_or_default(),
+    );
+    match field {
+        Some(field) if field.everlast => drops.everlast(),
+        _ => drops,
+    }
 }
 
 fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {
