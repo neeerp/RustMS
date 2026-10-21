@@ -3,6 +3,7 @@ mod buff;
 mod combat;
 mod dialogue;
 mod door;
+mod expiry;
 mod fame;
 mod guilds;
 mod hazard;
@@ -206,6 +207,7 @@ impl ClientActor {
             let map_timer_due = self.map_timer_due();
             let hazard_due = self.hazard_due();
             let pets_due = self.pets_due();
+            let items_due = self.items_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -218,6 +220,9 @@ impl ClientActor {
                 _ = hunger.tick() => self.pets_grow_hungry().await,
                 _ = sleep_until(pets_due.unwrap_or_else(Instant::now)), if pets_due.is_some() => {
                     self.pets_dry_up().await
+                }
+                _ = sleep_until(items_due.unwrap_or_else(Instant::now)), if items_due.is_some() => {
+                    self.expire_items().await
                 }
                 _ = sleep_until(buffs_due.unwrap_or_else(Instant::now)), if buffs_due.is_some() => {
                     self.update_buffs().await
@@ -550,6 +555,12 @@ impl ClientActor {
         ships::leave_forced_return_map(&mut player);
         // The client learns of pets that dried up meanwhile with the rest.
         net::packet::handle::world::pets_dry_up(&mut player, SystemTime::now());
+        // Items that expired meanwhile are gone before the client sees them;
+        // it says which once in the game.
+        let expired = net::items::expire_items(&mut player, SystemTime::now());
+        if expired.worn {
+            player.fit_hp_mp();
+        }
         self.client_id = character_id;
 
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
@@ -562,6 +573,11 @@ impl ClientActor {
         self.send(&mut keymap).await?;
         self.send(&mut macros).await?;
         self.send(&mut char_info).await?;
+        if !expired.item_ids.is_empty() {
+            let mut lines = build::world::inventory::build_items_expired(&expired.item_ids)
+                .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+            self.send(&mut lines).await?;
+        }
 
         let presence = Presence::of(&player);
         self.presence = Some(presence.clone());

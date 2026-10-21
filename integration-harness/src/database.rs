@@ -3,7 +3,7 @@
 
 use crate::HarnessError;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Integer, SmallInt, Text};
+use diesel::sql_types::{BigInt, Integer, Nullable, SmallInt, Text};
 
 const DEFAULT_DATABASE_URL: &str = "postgres://maplestory:pass@127.0.0.1:15432/maplestory_test";
 
@@ -229,6 +229,44 @@ pub async fn date_pet(serial: i64, seconds: i32) -> Result<(), HarnessError> {
         .execute(conn)
     })
     .await
+}
+
+/// Date the logged-out character `character_id`'s `item_id` to expire
+/// `seconds` from now; in the past if negative. The whole minutes it had
+/// left, if it was dated.
+pub async fn date_item(
+    character_id: i32,
+    item_id: i32,
+    seconds: i32,
+) -> Result<Option<i64>, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Left {
+        #[diesel(sql_type = Nullable<BigInt>)]
+        minutes: Option<i64>,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "date an item",
+        message,
+    };
+    let left = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "WITH old AS (SELECT id, expires_at FROM inventory_items \
+             WHERE character_id = $1 AND item_id = $2) \
+             UPDATE inventory_items i SET expires_at = now() + make_interval(secs => $3) \
+             FROM old WHERE i.id = old.id \
+             RETURNING floor(extract(epoch FROM old.expires_at - now()::timestamp) / 60)::bigint AS minutes",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .bind::<Integer, _>(seconds)
+        .get_result::<Left>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(left.minutes)
 }
 
 /// Set the logged-out character `character_id`'s HP and max HP; 0 HP

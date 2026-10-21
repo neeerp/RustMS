@@ -2,10 +2,11 @@
 //! turn them into inventory items.
 
 use crate::load::{self, asset_path};
-use game::{EquipStats, Inventory, InventoryChange, InventoryError, Item};
+use game::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item, Player};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
 use rand::Rng;
 use std::sync::OnceLock;
+use std::time::SystemTime;
 
 pub fn data() -> Result<&'static ItemData, &'static str> {
     static ITEMS: OnceLock<Result<ItemData, String>> = OnceLock::new();
@@ -78,7 +79,18 @@ pub fn give(
     item_id: i32,
     quantity: i16,
 ) -> Result<Vec<InventoryChange>, InventoryError> {
-    let item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
+    give_until(inventory, item_id, quantity, None)
+}
+
+/// [`give`] items that expire at `until`; `None` never does.
+pub fn give_until(
+    inventory: &mut Inventory,
+    item_id: i32,
+    quantity: i16,
+    until: Option<SystemTime>,
+) -> Result<Vec<InventoryChange>, InventoryError> {
+    let mut item = create(item_id, quantity).ok_or(InventoryError::UnknownItem)?;
+    item.expiration = until;
     if item.equip.is_none() {
         return inventory.add(item, slot_max(item_id));
     }
@@ -189,6 +201,52 @@ pub fn can_wear(equip: &EquipInfo, player: &game::Player) -> bool {
         && (equip.req_fame == 0 || stats.fame >= equip.req_fame)
 }
 
+/// What a sweep of expired items took from a player.
+#[derive(Debug, Default)]
+pub struct Expired {
+    /// The items gone, for the "has been expired" lines.
+    pub item_ids: Vec<i32>,
+    pub changes: Vec<InventoryChange>,
+    /// Whether one was worn, which changes the player's look.
+    pub worn: bool,
+}
+
+/// When `item` expires: pets age instead (they turn into dolls), and v83
+/// takes 2079 or later for never.
+fn expires(item: &Item) -> Option<SystemTime> {
+    item.expiration
+        .filter(|&at| item.pet.is_none() && at < game::pet::doll_date())
+}
+
+/// Take every item, worn or in the bags, whose date passed by `now`
+/// (Cosmic's expirationTask). v83's client removes none itself.
+pub fn expire_items(player: &mut Player, now: SystemTime) -> Expired {
+    let due: Vec<(InventoryType, i16, i32, i16)> = player
+        .inventory
+        .all()
+        .filter(|(_, _, item)| expires(item).is_some_and(|at| at <= now))
+        .map(|(kind, slot, item)| (kind, slot, item.item_id, item.quantity))
+        .collect();
+    let mut expired = Expired::default();
+    for (kind, slot, item_id, quantity) in due {
+        if let Ok(changes) = player.inventory_mut().take(kind, slot, quantity) {
+            expired.changes.extend(changes);
+            expired.item_ids.push(item_id);
+            expired.worn |= kind == InventoryType::Equipped;
+        }
+    }
+    expired
+}
+
+/// When the next of the player's items expires, if one ever does.
+pub fn next_expiry(player: &Player) -> Option<SystemTime> {
+    player
+        .inventory
+        .all()
+        .filter_map(|(_, _, item)| expires(item))
+        .min()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,6 +290,56 @@ mod tests {
         player.stats.fame = -3;
         assert!(can_wear(&EquipInfo::default(), &player));
         assert!(!can_wear(&famous, &player));
+    }
+
+    #[test]
+    fn items_whose_date_passed_go_but_pets_and_2079_stay() {
+        use std::time::Duration;
+        let mut player = crate::codec::stats::sample_player();
+        let now = SystemTime::now();
+        let dated = |item_id, at| Item {
+            expiration: Some(at),
+            ..Item::stack(item_id, 3)
+        };
+        let past = now - Duration::from_secs(1);
+        let soon = now + Duration::from_secs(60);
+        let bag = player.inventory_mut();
+        bag.insert(InventoryType::Etc, 1, dated(4031281, past));
+        bag.insert(InventoryType::Etc, 2, dated(4031126, soon));
+        bag.insert(
+            InventoryType::Etc,
+            3,
+            dated(4031017, game::pet::doll_date()),
+        );
+        let cape = Item {
+            expiration: Some(past),
+            ..Item::equipment(1102135, EquipStats::default())
+        };
+        bag.insert(InventoryType::Equipped, -9, cape);
+        let kitty = Item {
+            pet: Some(game::pet::PetData::new("Kitty")),
+            ..dated(5000000, past)
+        };
+        bag.insert(InventoryType::Cash, 1, kitty);
+
+        let expired = expire_items(&mut player, now);
+        assert_eq!(expired.item_ids, [1102135, 4031281]);
+        assert!(expired.worn);
+        assert_eq!(
+            expired.changes,
+            [
+                InventoryChange::Remove {
+                    kind: InventoryType::Equipped,
+                    slot: -9
+                },
+                InventoryChange::Remove {
+                    kind: InventoryType::Etc,
+                    slot: 1
+                },
+            ]
+        );
+        assert_eq!(next_expiry(&player), Some(soon));
+        assert!(expire_items(&mut player, now).item_ids.is_empty());
     }
 
     #[test]
