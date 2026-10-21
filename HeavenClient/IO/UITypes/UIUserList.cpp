@@ -33,6 +33,7 @@
 #include "../../Constants.h"
 
 #include "../../Character/Job.h"
+#include "../../Data/CurseData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
 #include "../../Graphics/GraphicsGL.h"
@@ -151,6 +152,32 @@ namespace ms
 				{ "BtPartyInvite", Point<int16_t>(159, 363) },
 				{ "BtGuildBBS", Point<int16_t>(80, 363) }
 		};
+		// The notice prompt takes 100 letters.
+		constexpr size_t NOTICE_LIMIT = 100;
+		// The rank panel sits at the window's right (FUN_0091e2e0) and is
+		// laid out as the client draws it (FUN_009165dd): the guild's GP,
+		// then a row per rank with its number, its title as edited and its
+		// fixed name, greyed while the rank has no title.
+		constexpr Point<int16_t> GRADE = Point<int16_t>(311, 86);
+		const std::pair<const char*, Point<int16_t>> GRADE_ART[] = {
+				{ "guildgrade3", Point<int16_t>(6, 8) },
+				{ "guildgrade4", Point<int16_t>(6, 45) },
+				{ "guildgrade0", Point<int16_t>(6, 91) },
+				{ "guildgrade1", Point<int16_t>(6, 128) },
+				{ "guildgrade2", Point<int16_t>(6, 146) }
+		};
+		constexpr Point<int16_t> GRADE_POINTS = Point<int16_t>(221, 67);
+		constexpr int16_t GRADE_ROWS = 146;
+		constexpr int16_t GRADE_ROW_LEFT = 6;
+		constexpr int16_t GRADE_ROW_WIDTH = 221;
+		constexpr int16_t GRADE_TEXT_Y = 4;
+		constexpr int16_t GRADE_RANK_X = 26;
+		constexpr int16_t GRADE_TITLE_X = 66;
+		constexpr int16_t GRADE_LABEL_X = 146;
+		constexpr int16_t GRADE_LABEL_WIDTH = 86;
+		const char* GRADE_LABELS[] = { "Master", "Jr.Master", "Member", "Member", "Member" };
+		constexpr Point<int16_t> GRADE_MODIFY = Point<int16_t>(25, 268);
+		constexpr Point<int16_t> GRADE_SAVE = Point<int16_t>(125, 268);
 		// A guild section's buttons, from BT_GUILD_SECTION.
 		enum SectionButton : uint16_t
 		{
@@ -186,6 +213,18 @@ namespace ms
 		std::string fraction(size_t part, size_t whole)
 		{
 			return "[" + std::to_string(part) + "/" + std::to_string(whole) + "]";
+		}
+
+		// The client trims what is typed in its prompts.
+		std::string trim(const std::string& text)
+		{
+			const char* blanks = " \t\r\n";
+			size_t first = text.find_first_not_of(blanks);
+
+			if (first == std::string::npos)
+				return "";
+
+			return text.substr(first, text.find_last_not_of(blanks) - first + 1);
 		}
 	}
 
@@ -325,6 +364,22 @@ namespace ms
 		guild_slider = Slider(Slider::Type::CLASSIC, GUILD_SLIDER, GUILD_SLIDER_X, 1, 0,
 							  [&](bool up) { scroll_guild(guild_scroll + (up ? -1 : 1)); });
 
+		nl::node GuildGrade = UserList["Guild"]["GuildGrade"];
+		grade_background = UserList["Guild"]["backgrnd"];
+
+		for (size_t i = 0; i < grade_art.size(); i++)
+			grade_art[i] = GuildGrade[GRADE_ART[i].first];
+
+		for (auto [id, name, pos] : { std::tuple(Buttons::BT_GRADE_MODIFY, "BtModf", GRADE_MODIFY),
+									  std::tuple(Buttons::BT_GRADE_SAVE, "BtSave", GRADE_SAVE) })
+		{
+			nl::node button = GuildGrade[name];
+			buttons[id] = std::make_unique<MapleButton>(button, GRADE + pos + Texture(button["normal"]["0"]).get_origin());
+			buttons[id]->set_active(false);
+		}
+
+		grade_points = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
+
 		dimension = Texture(backgrnd).get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
@@ -356,9 +411,44 @@ namespace ms
 		else if (tab == Tab::GUILD)
 		{
 			draw_guild();
+
+			if (grade_shown)
+				draw_grade();
 		}
 
 		UIElement::draw_buttons(alpha);
+	}
+
+	void UIUserList::draw_grade() const
+	{
+		Point<int16_t> panel = position + GRADE;
+
+		grade_background.draw(panel);
+
+		// Without a guild, only the background.
+		if (!guild.exists())
+			return;
+
+		for (size_t i = 0; i < grade_art.size(); i++)
+			grade_art[i].draw(panel + GRADE_ART[i].second);
+
+		grade_points.draw(panel + GRADE_POINTS + Point<int16_t>(0, CLIENT_TEXT));
+
+		for (int16_t i = 0; i < static_cast<int16_t>(grade_titles.size()); i++)
+		{
+			int16_t top = GRADE_ROWS + ROW * i;
+			int16_t y = top + GRADE_TEXT_Y + CLIENT_TEXT;
+
+			if (grade_picked == i + 1)
+				GraphicsGL::get().drawrectangle(panel.x() + GRADE_ROW_LEFT, panel.y() + top, GRADE_ROW_WIDTH, ROW,
+												PICKED_RED, PICKED_GREEN, PICKED_BLUE, 1.0f);
+
+			const Text& label = grade_labels[i];
+
+			grade_ranks[i].draw(panel + Point<int16_t>(GRADE_RANK_X, y));
+			grade_title_texts[i].draw(panel + Point<int16_t>(GRADE_TITLE_X, y));
+			label.draw(panel + Point<int16_t>(GRADE_LABEL_X + (GRADE_LABEL_WIDTH - label.width()) / 2, y));
+		}
 	}
 
 	void UIUserList::draw_guild() const
@@ -563,6 +653,22 @@ namespace ms
 		update_buttons();
 	}
 
+	void UIUserList::toggle_active()
+	{
+		if (active)
+			close_grade();
+
+		UIElement::toggle_active();
+	}
+
+	bool UIUserList::is_in_range(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> panel = position + GRADE;
+
+		return UIElement::is_in_range(cursorpos) ||
+			   (grade_shown && Rectangle<int16_t>(panel, panel + grade_background.get_dimensions()).contains(cursorpos));
+	}
+
 	Cursor::State UIUserList::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Cursor::State dstate = UIDragElement::send_cursor(clicked, cursorpos);
@@ -574,6 +680,28 @@ namespace ms
 			filter_clicked = false;
 
 		Point<int16_t> cursor_relative = cursorpos - position;
+
+		if (tab == Tab::GUILD && grade_shown && clicked)
+		{
+			// Anyone may pick a rank (FUN_009172aa); a miss keeps the pick.
+			Point<int16_t> in_panel = cursor_relative - GRADE;
+			int16_t x = in_panel.x() - GRADE_ROW_LEFT;
+			int16_t y = in_panel.y() - GRADE_ROWS;
+			int16_t rows = static_cast<int16_t>(grade_titles.size());
+
+			if (x >= 0 && x < GRADE_ROW_WIDTH && y >= 0 && y < ROW * rows)
+			{
+				int32_t rank = y / ROW + 1;
+
+				if (rank != grade_picked)
+				{
+					grade_picked = rank;
+					rebuild_grade();
+				}
+
+				return Cursor::State::IDLE;
+			}
+		}
 
 		if (tab == Tab::GUILD)
 		{
@@ -684,7 +812,10 @@ namespace ms
 		if (pressed)
 		{
 			if (escape)
+			{
+				close_grade();
 				deactivate();
+			}
 			else if (keycode == KeyAction::Id::TAB)
 				change_tab((tab + 1) % Tab::NUM_TABS);
 		}
@@ -708,6 +839,9 @@ namespace ms
 
 		if (tabid != tab)
 			guild_picked = 0;
+
+		if (tabid != Tab::GUILD)
+			close_grade();
 
 		tab = tabid;
 
@@ -742,6 +876,7 @@ namespace ms
 		switch (buttonid)
 		{
 			case Buttons::BT_CLOSE:
+				close_grade();
 				deactivate();
 				break;
 			case Buttons::BT_HP:
@@ -871,6 +1006,58 @@ namespace ms
 					GuildCommands::expel(picked->name);
 
 				break;
+			// One rank up or down, without asking (FUN_00911341).
+			case Buttons::BT_GUILD_UP:
+			case Buttons::BT_GUILD_DOWN:
+				if (const GuildMember* picked = picked_member())
+				{
+					int32_t step = buttonid == Buttons::BT_GUILD_UP ? -1 : 1;
+					ChangeGuildRankPacket(picked->id, static_cast<uint8_t>(picked->rank + step)).dispatch();
+				}
+
+				break;
+			case Buttons::BT_GUILD_INFO:
+				if (grade_shown)
+					close_grade();
+				else
+					open_grade();
+
+				break;
+			// Cancel or a blank notice sends nothing (FUN_009114f1).
+			case Buttons::BT_GUILD_NOTICE:
+				UI::get().emplace<UIEnterText>(
+						"Please enter the Guild Notice.",
+						[](const std::string& text)
+						{
+							std::string notice = trim(text);
+
+							if (!notice.empty())
+								SetGuildNoticePacket(CurseData::filter(notice)).dispatch();
+						},
+						NOTICE_LIMIT,
+						true
+				);
+				break;
+			case Buttons::BT_GRADE_MODIFY:
+				if (grade_picked > 0 && guild.is_master(Stage::get().get_player().get_oid()))
+					prompt_title(grade_picked);
+
+				break;
+			case Buttons::BT_GRADE_SAVE:
+				if (guild.is_master(Stage::get().get_player().get_oid()))
+				{
+					UI::get().emplace<UIYesNo>(
+							"Would like to save the change?",
+							[](bool yes)
+							{
+								if (yes)
+									if (auto userlist = UI::get().get_element<UIUserList>())
+										userlist->save_titles();
+							}
+					);
+				}
+
+				break;
 			case Buttons::BT_GUILD_WHISPER:
 				if (const GuildMember* picked = picked_online_member())
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -915,6 +1102,9 @@ namespace ms
 				}
 				else if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
 				{
+					// Clicking a tab drops the guild pick, even the tab
+					// already shown (FUN_0091d99d).
+					guild_picked = 0;
 					change_tab(buttonid - Buttons::BT_TAB0);
 
 					return Button::State::PRESSED;
@@ -1115,23 +1305,31 @@ namespace ms
 		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);
 
 		// The client's rules (FUN_0090f17c). Without a guild the player's
-		// rank is 0, which greys out all of them. The rest need guild
-		// operations the server doesn't have yet.
-		int32_t rank = guild.rank(Stage::get().get_player().get_oid());
+		// rank is 0, which greys out all of them. HeavenClient has no
+		// member search or guild board yet.
+		int32_t rank = guild.rank(self);
 		const GuildMember* picked = picked_member();
 		const GuildMember* guild_member = picked_online_member();
+		int32_t picked_rank = picked ? picked->rank : 0;
 
 		enable(Buttons::BT_GUILD_INVITE, rank == 1 || rank == 2);
 		enable(Buttons::BT_GUILD_WITHDRAW, rank > 1);
-		enable(Buttons::BT_GUILD_KICK, Guild::may_kick(rank, picked ? picked->rank : 0));
-
-		for (uint16_t id : { Buttons::BT_GUILD_UP, Buttons::BT_GUILD_DOWN, Buttons::BT_GUILD_WHERE,
-							 Buttons::BT_GUILD_INFO, Buttons::BT_GUILD_NOTICE, Buttons::BT_GUILD_BBS })
-			enable(id, false);
+		enable(Buttons::BT_GUILD_KICK, Guild::may_kick(rank, picked_rank));
+		enable(Buttons::BT_GUILD_UP, Guild::may_raise(rank, picked_rank));
+		enable(Buttons::BT_GUILD_DOWN, guild.may_lower(rank, picked_rank));
+		enable(Buttons::BT_GUILD_WHERE, false);
+		enable(Buttons::BT_GUILD_INFO, guild.exists());
+		enable(Buttons::BT_GUILD_NOTICE, rank == 1 || rank == 2);
+		enable(Buttons::BT_GUILD_BBS, false);
 
 		enable(Buttons::BT_GUILD_CHAT, guild_member);
 		enable(Buttons::BT_GUILD_WHISPER, guild_member);
 		enable(Buttons::BT_GUILD_PARTY_INVITE, guild_member && leader);
+
+		// Only the master edits titles (FUN_009165dd).
+		bool master = guild.is_master(self);
+		enable(Buttons::BT_GRADE_MODIFY, master);
+		enable(Buttons::BT_GRADE_SAVE, master);
 	}
 
 	const PartyMember* UIUserList::selected_member() const
@@ -1177,6 +1375,9 @@ namespace ms
 		guild_height = lay_out(guild_offline, offline_members, next + GUILD_SECTION_GAP);
 
 		scroll_guild(guild_scroll);
+
+		if (grade_shown)
+			rebuild_grade();
 	}
 
 	int16_t UIUserList::lay_out(GuildSection& section, const std::vector<const GuildMember*>& members, int16_t y)
@@ -1293,5 +1494,110 @@ namespace ms
 		const GuildMember* member = picked_member();
 
 		return member && member->online ? member : nullptr;
+	}
+
+	// Each opening starts over from the guild's titles (FUN_00916569).
+	void UIUserList::open_grade()
+	{
+		grade_shown = true;
+		grade_titles = guild.get_data().titles;
+		grade_picked = 0;
+
+		buttons[Buttons::BT_GRADE_MODIFY]->set_active(true);
+		buttons[Buttons::BT_GRADE_SAVE]->set_active(true);
+
+		rebuild_grade();
+		update_buttons();
+	}
+
+	void UIUserList::close_grade()
+	{
+		grade_shown = false;
+
+		buttons[Buttons::BT_GRADE_MODIFY]->set_active(false);
+		buttons[Buttons::BT_GRADE_SAVE]->set_active(false);
+	}
+
+	void UIUserList::rebuild_grade()
+	{
+		grade_points.change_text(std::to_string(guild.get_data().points));
+
+		for (size_t i = 0; i < grade_titles.size(); i++)
+		{
+			Color::Name color = grade_picked == static_cast<int32_t>(i) + 1 ? Color::Name::WHITE : Color::Name::BLACK;
+			Color::Name label = grade_titles[i].empty() ? Color::Name::GRADEGREY : color;
+
+			grade_ranks[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, color, std::to_string(i + 1));
+			grade_title_texts[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, color, grade_titles[i]);
+			grade_labels[i] = Text(Text::Font::A12M, Text::Alignment::LEFT, label, GRADE_LABELS[i]);
+		}
+	}
+
+	// Too few letters for the rank ask again (FUN_00916e8d), so the prompt
+	// itself takes any.
+	void UIUserList::prompt_title(int32_t rank)
+	{
+		UI::get().emplace<UIEnterText>(
+				"Please put a position,\\n which you want to change to.",
+				[rank](const std::string& text)
+				{
+					if (auto userlist = UI::get().get_element<UIUserList>())
+						userlist->edit_title(rank, text);
+				},
+				Guild::MAX_TITLE,
+				true
+		);
+	}
+
+	void UIUserList::edit_title(int32_t rank, const std::string& text)
+	{
+		std::string title = trim(text);
+		Guild::Title check = guild.check_title(grade_titles, rank, title);
+
+		if (check == Guild::Title::OK && !title.empty() && CurseData::in_name(title))
+			check = Guild::Title::NOT_ALLOWED;
+
+		switch (check)
+		{
+			case Guild::Title::OK:
+				Guild::set_title(grade_titles, rank, title);
+				rebuild_grade();
+				break;
+			case Guild::Title::TOO_SHORT:
+				UI::get().emplace<UIOk>(
+						"Please enter at least " + std::to_string(Guild::min_title(rank)) + " characters.",
+						[rank](bool)
+						{
+							if (auto userlist = UI::get().get_element<UIUserList>())
+								userlist->prompt_title(rank);
+						}
+				);
+				break;
+			case Guild::Title::NOT_ALLOWED:
+				UI::get().emplace<UIOk>("It cannot be used. Please check it again.", [](bool) {});
+				break;
+			case Guild::Title::LOWER_RANK:
+				UI::get().emplace<UIOk>(
+						"You cannot delete this position, because there is a lower rank than this position.",
+						[](bool) {}
+				);
+				break;
+			case Guild::Title::HELD:
+				UI::get().emplace<UIOk>(
+						"You cannot delete this position, because there are still members who are in this position.",
+						[](bool) {}
+				);
+				break;
+		}
+	}
+
+	// Unchanged titles, ignoring case, only say so (FUN_00917127); the
+	// server's answer says the rest.
+	void UIUserList::save_titles()
+	{
+		if (guild.titles_differ(grade_titles))
+			SetGuildTitlesPacket(grade_titles).dispatch();
+		else
+			UI::get().emplace<UIOk>("It is saved.", [](bool) {});
 	}
 }

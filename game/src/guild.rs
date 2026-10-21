@@ -8,13 +8,13 @@ pub const MIN_LEVEL: u8 = 10;
 /// client.
 pub const CREATE_COST: i32 = 1_500_000;
 /// The rank titles a new guild starts with (OdinMS and HeavenMS).
-pub const DEFAULT_TITLES: [&str; 5] = ["Master", "Jr. Master", "Member", "", ""];
+pub const DEFAULT_TITLES: [&str; 5] = ["Master", "Jr. Master", "Member", "Member", "Member"];
 /// The master's rank; members range from 1 to 5.
 pub const MASTER_RANK: u8 = 1;
 /// A jr. master, who may invite and expel too.
 pub const JR_MASTER_RANK: u8 = 2;
-/// The rank new members join at.
-pub const MEMBER_RANK: u8 = 5;
+/// The longest notice the client's prompt takes (FUN_009114f1).
+pub const NOTICE_MAX_LEN: usize = 100;
 
 /// The emblem shown beside the guild name. All zeros means none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -73,6 +73,12 @@ impl Guild {
         self.members.iter().find(|member| member.id == id)
     }
 
+    /// The lowest rank with a title, which the client lets nobody pass
+    /// (FUN_00a3930b): 3 while title 4 is empty, 4 while title 5 is.
+    pub fn lowest_rank(&self) -> u8 {
+        lowest_rank(&self.titles)
+    }
+
     /// Whether member `by` may invite someone: a master or jr. master, while
     /// there is room.
     pub fn may_invite(&self, by: i32) -> bool {
@@ -95,10 +101,85 @@ impl Guild {
     }
 }
 
-/// Guild names follow the character name rules: 4 to 12 ASCII letters or
-/// digits.
+impl Guild {
+    /// Whether member `by` may move `member_id` to `rank`, one step up or
+    /// down, as the client's Up and Down buttons allow (FUN_0090f17c): the
+    /// master moves anyone between rank 2 and the lowest, a jr. master
+    /// anyone between rank 3 and the lowest. Down stops at the lowest rank
+    /// with a title; anyone below it may still go up.
+    pub fn may_change_rank(&self, by: i32, member_id: i32, rank: u8) -> bool {
+        let (Some(by), Some(member)) = (self.member(by), self.member(member_id)) else {
+            return false;
+        };
+        by.rank <= JR_MASTER_RANK
+            && member.rank > by.rank
+            && rank > by.rank
+            && rank.abs_diff(member.rank) == 1
+            && (rank < member.rank || rank <= self.lowest_rank())
+    }
+
+    /// Whether member `by` may give the ranks these titles. Only the master
+    /// edits them, and only as the client's rank window does
+    /// (FUN_00916e8d): no rank loses its title while members hold it, and
+    /// title 5 needs title 4. `forbids` is the forbidden-word check guild
+    /// names get. The client sends the titles it didn't edit as they were,
+    /// so those aren't checked again; the default "Master" holds a
+    /// forbidden word.
+    pub fn may_set_titles(
+        &self,
+        by: i32,
+        titles: &[String; 5],
+        forbids: impl Fn(&str) -> bool,
+    ) -> bool {
+        let lowest = lowest_rank(titles);
+        self.member(by).is_some_and(|by| by.rank == MASTER_RANK)
+            && titles
+                .iter()
+                .zip(&self.titles)
+                .enumerate()
+                .all(|(i, (title, old))| {
+                    title == old || (title_is_valid(i, title) && !forbids(title))
+                })
+            && !(titles[3].is_empty() && !titles[4].is_empty())
+            && self.members.iter().all(|member| member.rank <= lowest)
+    }
+
+    /// Whether member `by` may post this notice: a master or jr. master,
+    /// with text the client's prompt can send, which refuses control
+    /// characters other than CR and LF (FUN_007a06f3).
+    pub fn may_set_notice(&self, by: i32, notice: &str) -> bool {
+        self.member(by)
+            .is_some_and(|member| member.rank <= JR_MASTER_RANK)
+            && !notice.is_empty()
+            && notice.len() <= NOTICE_MAX_LEN
+            && !notice.chars().any(|c| c < ' ' && c != '\r' && c != '\n')
+    }
+}
+
+fn lowest_rank(titles: &[String; 5]) -> u8 {
+    if titles[3].is_empty() {
+        3
+    } else if titles[4].is_empty() {
+        4
+    } else {
+        5
+    }
+}
+
+/// Ranks 1 to 3 need a title and ranks 4 and 5 may have none. A title
+/// is checked as a guild name (FUN_00916e8d calls FUN_0079fc74) in a box
+/// that takes 10.
+fn title_is_valid(index: usize, title: &str) -> bool {
+    (title.is_empty() && index >= 3) || (title.len() <= 10 && name_is_valid(title))
+}
+
+/// Guild names follow the character name rules (FUN_0079fc74): 4 to 12
+/// ASCII letters or digits, with fewer than four of 'I' and 'l' between
+/// them.
 pub fn name_is_valid(name: &str) -> bool {
-    (4..=12).contains(&name.len()) && name.bytes().all(|b| b.is_ascii_alphanumeric())
+    (4..=12).contains(&name.len())
+        && name.bytes().all(|b| b.is_ascii_alphanumeric())
+        && name.bytes().filter(|&b| b == b'I' || b == b'l').count() < 4
 }
 
 #[cfg(test)]
@@ -153,6 +234,146 @@ mod tests {
         assert!(!testers.may_expel(1, 9));
     }
 
+    fn titles(titles: [&str; 5]) -> [String; 5] {
+        titles.map(String::from)
+    }
+
+    fn forbids_nothing(_: &str) -> bool {
+        false
+    }
+
+    #[test]
+    fn the_lowest_rank_is_the_last_with_a_title() {
+        let mut testers = guild(&[1]);
+        assert_eq!(testers.lowest_rank(), 5);
+        testers.titles = titles(["Master", "Jr. Master", "Member", "Rookie", ""]);
+        assert_eq!(testers.lowest_rank(), 4);
+        testers.titles = titles(["Master", "Jr. Master", "Member", "", ""]);
+        assert_eq!(testers.lowest_rank(), 3);
+    }
+
+    #[test]
+    fn ranks_move_one_step_below_the_mover() {
+        let testers = guild(&[1, 2, 3, 5, 2]);
+        assert!(testers.may_change_rank(1, 2, 3));
+        assert!(testers.may_change_rank(1, 3, 2));
+        assert!(testers.may_change_rank(1, 4, 4));
+        assert!(testers.may_change_rank(2, 3, 4));
+        assert!(testers.may_change_rank(2, 4, 4));
+        // Nobody becomes master, skips a rank, passes the lowest or moves
+        // themselves, and a jr. master moves nobody to or from rank 2.
+        assert!(!testers.may_change_rank(1, 2, 1));
+        assert!(!testers.may_change_rank(1, 3, 5));
+        assert!(!testers.may_change_rank(1, 4, 6));
+        assert!(!testers.may_change_rank(1, 1, 2));
+        assert!(!testers.may_change_rank(2, 3, 2));
+        assert!(!testers.may_change_rank(2, 5, 3));
+        assert!(!testers.may_change_rank(3, 4, 4));
+        assert!(!testers.may_change_rank(1, 9, 3));
+
+        // Below the lowest rank with a title, up but not down.
+        let mut short = guild(&[1, 3, 4]);
+        short.titles = titles(["Master", "Jr. Master", "Member", "", ""]);
+        assert!(!short.may_change_rank(1, 2, 4));
+        assert!(short.may_change_rank(1, 3, 3));
+        assert!(!short.may_change_rank(1, 3, 5));
+    }
+
+    #[test]
+    fn the_master_sets_titles_the_client_could_show() {
+        let testers = guild(&[1, 2, 3]);
+        assert!(testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "Newbie", ""]),
+            forbids_nothing
+        ));
+        assert!(testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "Newbie", "Rookie"]),
+            forbids_nothing
+        ));
+        // Untouched titles go back as they were, which the client's own
+        // check would refuse.
+        assert!(testers.may_set_titles(
+            1,
+            &titles(["Boss", "Jr. Master", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            2,
+            &titles(["Boss", "Deputy", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Boss", "", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Bos", "Deputy", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Boss", "Jr Master", "Grunt", "", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "New", ""]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "", "Newbie"]),
+            forbids_nothing
+        ));
+        assert!(!testers.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Elevenchars", "", ""]),
+            forbids_nothing
+        ));
+
+        // Words a guild name can't hold, but untouched titles keep theirs.
+        let test = |title: &str| title.to_ascii_lowercase().contains("test");
+        assert!(!testers.may_set_titles(1, &titles(["Boss", "Deputy", "Tester", "", ""]), test));
+        assert!(testers.may_set_titles(1, &titles(["Boss", "Deputy", "Grunt", "", ""]), test));
+        let mut tested = guild(&[1, 2, 3]);
+        tested.titles = titles(["Master", "Jr. Master", "Testers", "", ""]);
+        assert!(tested.may_set_titles(1, &titles(["Boss", "Deputy", "Testers", "", ""]), test));
+
+        let full = guild(&[1, 4, 5]);
+        assert!(!full.may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "Newbie", ""]),
+            forbids_nothing
+        ));
+        assert!(guild(&[1, 4]).may_set_titles(
+            1,
+            &titles(["Boss", "Deputy", "Grunt", "Newbie", ""]),
+            forbids_nothing
+        ));
+    }
+
+    #[test]
+    fn masters_and_jr_masters_post_notices() {
+        let testers = guild(&[1, 2, 3]);
+        assert!(testers.may_set_notice(1, "Hello"));
+        assert!(testers.may_set_notice(2, &"x".repeat(NOTICE_MAX_LEN)));
+        assert!(!testers.may_set_notice(3, "Hello"));
+        assert!(!testers.may_set_notice(1, ""));
+        assert!(!testers.may_set_notice(1, &"x".repeat(NOTICE_MAX_LEN + 1)));
+        assert!(!testers.may_set_notice(1, "hi\0x"));
+        assert!(!testers.may_set_notice(1, "a\tb"));
+        assert!(testers.may_set_notice(1, "a\r\nb"));
+    }
+
     #[test]
     fn names_are_four_to_twelve_letters_or_digits() {
         assert!(name_is_valid("Testers"));
@@ -160,5 +381,7 @@ mod tests {
         assert!(!name_is_valid("abc"));
         assert!(!name_is_valid("thirteenchars"));
         assert!(!name_is_valid("two words"));
+        assert!(!name_is_valid("IllIX"));
+        assert!(name_is_valid("IllX"));
     }
 }

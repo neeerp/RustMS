@@ -4,7 +4,7 @@
 use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use game::guild::{Emblem, Guild, GuildMember, GuildTag, MASTER_RANK, MEMBER_RANK};
+use game::guild::{Emblem, Guild, GuildMember, GuildTag, MASTER_RANK};
 
 /// Why founding a guild failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -89,16 +89,13 @@ pub fn create(world_id: u8, name: &str, master: i32) -> crate::Result<Result<i32
     }
 }
 
-/// Add `cid` to the guild at the lowest rank, if there is room.
-pub fn add_member(guild_id: i32, cid: i32) -> crate::Result<Result<(), JoinError>> {
+/// Add `cid` to the guild at its lowest rank with a title, if there is
+/// room. Returns that rank.
+pub fn add_member(guild_id: i32, cid: i32) -> crate::Result<Result<u8, JoinError>> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
         // Lock the guild so members joining at once can't pass its capacity.
-        let capacity = guilds::table
-            .find(guild_id)
-            .select(guilds::capacity)
-            .for_update()
-            .first::<i16>(conn)?;
+        let guild = locked(conn, guild_id)?;
         let member = guild_members::table
             .find(cid)
             .select(guild_members::guild_id)
@@ -107,21 +104,18 @@ pub fn add_member(guild_id: i32, cid: i32) -> crate::Result<Result<(), JoinError
         if member.is_some() {
             return Ok(Err(JoinError::AlreadyInGuild));
         }
-        let count: i64 = guild_members::table
-            .filter(guild_members::guild_id.eq(guild_id))
-            .count()
-            .get_result(conn)?;
-        if count >= i64::from(capacity) {
+        if guild.members.len() >= usize::from(guild.capacity) {
             return Ok(Err(JoinError::Full));
         }
+        let rank = guild.lowest_rank();
         diesel::insert_into(guild_members::table)
             .values((
                 guild_members::character_id.eq(cid),
                 guild_members::guild_id.eq(guild_id),
-                guild_members::rank.eq(i16::from(MEMBER_RANK)),
+                guild_members::rank.eq(i16::from(rank)),
             ))
             .execute(conn)?;
-        Ok(Ok(()))
+        Ok(Ok(rank))
     })?)
 }
 
@@ -139,11 +133,102 @@ pub fn remove_member(guild_id: i32, cid: i32) -> crate::Result<bool> {
     Ok(removed == 1)
 }
 
+/// Move `member_id` to `rank`, if member `by` may. Returns every member's
+/// id, or `None` if `by` may not.
+pub fn set_rank(
+    guild_id: i32,
+    by: i32,
+    member_id: i32,
+    rank: u8,
+) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.may_change_rank(by, member_id, rank),
+        |conn| {
+            diesel::update(guild_members::table.find(member_id))
+                .set(guild_members::rank.eq(i16::from(rank)))
+                .execute(conn)
+        },
+    )
+}
+
+/// Give the ranks these titles, if member `by` may; `forbids` is the
+/// forbidden-word check. Returns every member's id, or `None` if `by` may
+/// not.
+pub fn set_titles(
+    guild_id: i32,
+    by: i32,
+    titles: &[String; 5],
+    forbids: impl Fn(&str) -> bool,
+) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.may_set_titles(by, titles, forbids),
+        |conn| {
+            diesel::update(guilds::table.find(guild_id))
+                .set((
+                    guilds::title1.eq(&titles[0]),
+                    guilds::title2.eq(&titles[1]),
+                    guilds::title3.eq(&titles[2]),
+                    guilds::title4.eq(&titles[3]),
+                    guilds::title5.eq(&titles[4]),
+                ))
+                .execute(conn)
+        },
+    )
+}
+
+/// Post the guild's notice, if member `by` may. Returns every member's id,
+/// or `None` if `by` may not.
+pub fn set_notice(guild_id: i32, by: i32, notice: &str) -> crate::Result<Option<Vec<i32>>> {
+    change(
+        guild_id,
+        |guild| guild.may_set_notice(by, notice),
+        |conn| {
+            diesel::update(guilds::table.find(guild_id))
+                .set(guilds::notice.eq(notice))
+                .execute(conn)
+        },
+    )
+}
+
+/// Check a change against the guild and make it, with the guild locked so
+/// another change can't slip in between.
+fn change(
+    guild_id: i32,
+    allowed: impl FnOnce(&Guild) -> bool,
+    update: impl FnOnce(&mut PgConnection) -> QueryResult<usize>,
+) -> crate::Result<Option<Vec<i32>>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        let guild = locked(conn, guild_id)?;
+        if !allowed(&guild) {
+            return Ok(None);
+        }
+        update(conn)?;
+        Ok(Some(guild.members.iter().map(|member| member.id).collect()))
+    })?)
+}
+
+/// The guild, locked until the transaction ends.
+fn locked(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
+    guilds::table
+        .find(guild_id)
+        .select(guilds::id)
+        .for_update()
+        .first::<i32>(conn)?;
+    load_in(conn, guild_id)
+}
+
 /// The guild with its members, the master first. Members are not marked
 /// online; the world directory knows who is.
 pub fn load(guild_id: i32) -> crate::Result<Guild> {
     let mut conn = crate::connection()?;
-    let row: GuildRow = guilds::table.find(guild_id).first(&mut conn)?;
+    Ok(load_in(&mut conn, guild_id)?)
+}
+
+fn load_in(conn: &mut PgConnection, guild_id: i32) -> QueryResult<Guild> {
+    let row: GuildRow = guilds::table.find(guild_id).first(conn)?;
     let members = guild_members::table
         .inner_join(characters::table)
         .filter(guild_members::guild_id.eq(guild_id))
@@ -155,7 +240,7 @@ pub fn load(guild_id: i32) -> crate::Result<Guild> {
             characters::level,
             guild_members::rank,
         ))
-        .load::<(i32, String, i16, i16, i16)>(&mut conn)?
+        .load::<(i32, String, i16, i16, i16)>(conn)?
         .into_iter()
         .map(|(id, name, job, level, rank)| GuildMember {
             id,

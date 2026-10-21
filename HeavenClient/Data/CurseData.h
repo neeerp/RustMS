@@ -26,5 +26,8 @@ namespace ms
 	{
 		// The message with each curse word starred out.
 		std::string filter(const std::string& message);
+		// Whether a word of ForbiddenName.img or, up to a comma, of
+		// Curse.img is anywhere in a name, ignoring case (FUN_0079fc74).
+		bool in_name(const std::string& name);
 	}
 }

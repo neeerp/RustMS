@@ -5,6 +5,7 @@
 #include "../Packets/GameplayPackets.h"
 
 #include "../../Configuration.h"
+#include "../../Data/CurseData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -55,7 +56,13 @@ namespace ms
 			// 0x14f
 			DECLINED = 0x37,
 			// 0x167
-			ADMIN = 0x38
+			ADMIN = 0x38,
+			// 0xce0 for the master
+			TITLES_CHANGED = 0x3E,
+			// 0xcdf
+			RANK_CHANGED = 0x40,
+			// 0xd15
+			NOTICE_CHANGED = 0x44
 		};
 
 		// Heracle, at the guild headquarters, says the client's own guild
@@ -86,15 +93,19 @@ namespace ms
 		}
 
 		// The new guild's name (FUN_005305ae). Cancel sends nothing; a name
-		// the client refuses asks again. The client also runs its forbidden
-		// word list here, which HeavenClient doesn't have.
+		// the client refuses asks again.
 		void prompt_name()
 		{
 			UI::get().emplace<UIEnterText>(
 				"Please type the name of the guild.",
 				[](const std::string& name)
 				{
-					switch (Guild::check_name(name))
+					Guild::Name check = Guild::check_name(name);
+
+					if (check == Guild::Name::OK && CurseData::in_name(name))
+						check = Guild::Name::NOT_ALLOWED;
+
+					switch (check)
 					{
 					case Guild::Name::OK:
 						CreateGuildPacket(name).dispatch();
@@ -281,6 +292,57 @@ namespace ms
 		case Operation::ADMIN:
 			chat_line("Admin cannot make a guild.");
 			break;
+		case Operation::TITLES_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			std::array<std::string, 5> titles;
+
+			for (auto& title : titles)
+				title = recv.read_string();
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			guild.set_titles(std::move(titles));
+
+			// Only the master hears it, who asked.
+			if (guild.is_master(player.get_oid()))
+				UI::get().emplace<UIOk>("It is saved.", [](bool) {});
+
+			refresh();
+			break;
+		}
+		case Operation::RANK_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			int32_t rank = static_cast<uint8_t>(recv.read_byte());
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			if (guild.set_rank(cid, rank))
+				chat_line("[" + guild.find(cid)->name + "]'s position has been changed to [" + guild.title(rank) + "].");
+
+			refresh();
+			break;
+		}
+		case Operation::NOTICE_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			std::string notice = recv.read_string();
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			// An empty one clears the notice quietly.
+			if (!notice.empty())
+				chat_line("* Guild Notice : " + notice);
+
+			guild.set_notice(std::move(notice));
+			refresh();
+			break;
+		}
 		default:
 			chat_line("The guild request has not been accepted, due to unknown reason.");
 			break;

@@ -30,6 +30,7 @@
 #include "../../Constants.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Util/CharacterName.h"
 #include "../../Util/NxFiles.h"
@@ -107,13 +108,6 @@ namespace ms
 		const int16_t VALUE_WIDTH = 112;
 
 		const char *GENDER_NAME[2] = { "Male", "Female" };
-
-		std::string to_lower(std::string value)
-		{
-			std::transform(value.begin(), value.end(), value.begin(), ::tolower);
-
-			return value;
-		}
 	}
 
 	UICharCreation::UICharCreation(uint8_t r) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(800, 600)), race(r), settings(false), female(false)
@@ -530,26 +524,6 @@ namespace ms
 		if (!character_name_valid(text))
 			return false;
 
-		if (Configuration::get().get_admin())
-			return true;
-
-		std::string lower = to_lower(text);
-
-		for (auto forbidden : nl::nx::etc["ForbiddenName.img"])
-			if (lower.find(to_lower(forbidden)) != std::string::npos)
-				return false;
-
-		for (auto curse : nl::nx::etc["Curse.img"])
-		{
-			std::string word = curse;
-			word = word.substr(0, word.find(','));
-			word.erase(0, word.find_first_not_of(' '));
-			word.erase(word.find_last_not_of(' ') + 1);
-
-			if (!word.empty() && lower.find(to_lower(word)) != std::string::npos)
-				return false;
-		}
-
-		return true;
+		return Configuration::get().get_admin() || !CurseData::in_name(text);
 	}
 }

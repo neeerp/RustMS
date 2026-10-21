@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -564,7 +565,10 @@ namespace ms
 			INVITE = 5,
 			JOIN = 6,
 			LEAVE = 7,
-			EXPEL = 8
+			EXPEL = 8,
+			SET_TITLES = 13,
+			CHANGE_RANK = 14,
+			SET_NOTICE = 16
 		};
 
 		GuildOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::GUILD_OPERATION)
@@ -632,6 +636,41 @@ namespace ms
 		{
 			write_int(cid);
 			write_string(name);
+		}
+	};
+
+	// Saves the five rank titles, changed or not, from the rank panel
+	class SetGuildTitlesPacket : public GuildOperationPacket
+	{
+	public:
+		SetGuildTitlesPacket(const std::array<std::string, 5>& titles) :
+			GuildOperationPacket(GuildOperationPacket::Operation::SET_TITLES)
+		{
+			for (auto& title : titles)
+				write_string(title);
+		}
+	};
+
+	// Moves a member one rank up or down
+	class ChangeGuildRankPacket : public GuildOperationPacket
+	{
+	public:
+		ChangeGuildRankPacket(int32_t cid, uint8_t rank) :
+			GuildOperationPacket(GuildOperationPacket::Operation::CHANGE_RANK)
+		{
+			write_int(cid);
+			write_byte(rank);
+		}
+	};
+
+	// Sets the guild notice
+	class SetGuildNoticePacket : public GuildOperationPacket
+	{
+	public:
+		SetGuildNoticePacket(const std::string& notice) :
+			GuildOperationPacket(GuildOperationPacket::Operation::SET_NOTICE)
+		{
+			write_string(notice);
 		}
 	};
 

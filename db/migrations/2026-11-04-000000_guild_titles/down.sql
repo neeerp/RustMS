@@ -1,0 +1,3 @@
+ALTER TABLE guilds
+    ALTER COLUMN title4 SET DEFAULT '',
+    ALTER COLUMN title5 SET DEFAULT '';

@@ -20,6 +20,7 @@
 #include "../Util/CurseWords.h"
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 #include <nlnx/nx.hpp>
@@ -51,10 +52,42 @@ namespace ms
 
 			return loaded;
 		}
+
+		std::string to_lower(std::string value)
+		{
+			std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
+			{
+				return static_cast<char>(std::tolower(c));
+			});
+
+			return value;
+		}
 	}
 
 	std::string CurseData::filter(const std::string& message)
 	{
 		return CurseWords::filter(message, words());
+	}
+
+	bool CurseData::in_name(const std::string& name)
+	{
+		std::string lower = to_lower(name);
+
+		for (auto forbidden : nl::nx::etc["ForbiddenName.img"])
+			if (lower.find(to_lower(forbidden)) != std::string::npos)
+				return true;
+
+		for (auto curse : nl::nx::etc["Curse.img"])
+		{
+			std::string word = curse;
+			word = word.substr(0, word.find(','));
+			word.erase(0, word.find_first_not_of(' '));
+			word.erase(word.find_last_not_of(' ') + 1);
+
+			if (!word.empty() && lower.find(to_lower(word)) != std::string::npos)
+				return true;
+		}
+
+		return false;
 	}
 }

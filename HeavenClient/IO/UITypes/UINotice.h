@@ -139,11 +139,13 @@ namespace ms
 		int32_t min;
 	};
 
-	// Asks for a line of text, such as a character name.
+	// Asks for a line of text, such as a character name. OK does nothing
+	// while the box is empty unless empty answers are allowed.
 	class UIEnterText : public UINotice
 	{
 	public:
-		UIEnterText(std::string message, std::function<void(const std::string &text)> texthandler, size_t limit);
+		UIEnterText(std::string message, std::function<void(const std::string &text)> texthandler, size_t limit,
+					bool allow_empty = false);
 
 		void draw(float alpha) const override;
 
@@ -170,6 +172,7 @@ namespace ms
 
 		std::function<void(const std::string &text)> texthandler;
 		Textfield textfield;
+		bool allow_empty;
 	};
 
 	class UIOk : public UINotice

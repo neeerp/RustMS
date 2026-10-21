@@ -628,7 +628,7 @@ namespace ms
 				} else
 				{
 					if (userlist->is_active() && userlist->get_tab() == tab)
-						userlist->deactivate();
+						userlist->toggle_active();
 					else
 						userlist->makeactive();
 
