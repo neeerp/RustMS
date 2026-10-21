@@ -716,8 +716,10 @@ pub fn hurt_by_hazard(player: &mut Player, hazard: &game_data::Hazard) -> WorldR
     if player.stats.hp <= 0 || protected || hazard.hp <= kept {
         return Ok(HandlerResult::empty());
     }
+    let before = player.stats.hp;
     let hp = player.add_hp(kept - hazard.hp);
-    let actions = HandlerResult::reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
+    let actions = HandlerResult::reply(stat::build_hp_taken(i32::from(before - hp))?)
+        .with_reply(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
     Ok(if hp == 0 {
         actions.with(WorldAction::Died)
     } else {
@@ -1143,7 +1145,14 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         player.stats.hp = 100;
         let actions = hurt_by_hazard(&mut player, &cold).unwrap().actions;
-        assert!(matches!(actions.as_slice(), [WorldAction::Reply(_)]));
+        // The HP taken goes first, so the pet checks its HP potion.
+        let [WorldAction::Reply(taken), WorldAction::Reply(_)] = actions.as_slice() else {
+            panic!("not hurt: {actions:?}");
+        };
+        crate::codec::testing::Expect::new(&taken.bytes)
+            .short(crate::packet::op::SendOpcode::HpTaken as i16)
+            .int(10)
+            .end();
         assert_eq!(player.stats.hp, 90);
 
         player.inventory.insert(

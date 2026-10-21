@@ -269,6 +269,14 @@ diesel::table! {
 }
 diesel::joinable!(gacha_exp -> characters (character_id));
 diesel::table! {
+    auto_potions (character_id) {
+        character_id -> Int4,
+        hp_item -> Int4,
+        mp_item -> Int4,
+    }
+}
+diesel::joinable!(auto_potions -> characters (character_id));
+diesel::table! {
     character_mounts (character_id) {
         character_id -> Int4,
         level -> Int4,
@@ -418,6 +426,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     skill_macros,
     saved_locations,
     gacha_exp,
+    auto_potions,
     character_mounts,
     fame_log,
     storage_items,

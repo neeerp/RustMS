@@ -1286,7 +1286,8 @@ and Confuse (132) 51 (`game::mob_skill::inflicted`).
   sends its `x` then the reason). The server ends it on time or on death,
   and the player can't cancel it.
 - **Effects on the server:** Poison takes `x` HP each second, never the
-  last one. Curse halves the EXP from kills (as Cosmic does). Darkness's
+  last one, with HP_TAKEN before each stat update (v83 checks the pet's HP
+  potion after each tick, 0x94b1b4). Curse halves the EXP from kills (as Cosmic does). Darkness's
   lower accuracy isn't applied.
 - **Dispel (2311001):** for each party member reached it rolls its `prop`,
   then cures Poison, Seal, Darkness, Weakness, Curse and Slow (not Stun,
@@ -1407,7 +1408,9 @@ Aquarium's seabed, Sharenian, and others, 123 maps in all. v83 reads none of
 `decHP`, `decInterval` or `protectItem`, so the server does it
 (`runtime/src/actor/client/hazard.rs`, `net::hurt_by_hazard`). From a field
 join, every `decInterval` ms (only the Balrog's maps have one, 15 s), or
-otherwise every 10 s, the player loses `decHP` HP in a plain stat update.
+otherwise every 10 s, the player loses `decHP` HP. HP_TAKEN (`0xD4`) with
+the amount goes before the stat update, since a v83 client checks the pet's
+HP potion on that packet but never on a stat change.
 Nothing happens while they're dead, in the Cash Shop, or wearing the map's
 `protectItem` (1102109 in the cold, 1102061 under water). The 10 s comes from
 Cassandra's Magic (2022187), which protects "every 10 seconds underwater".
@@ -1554,7 +1557,7 @@ it dies.
 which another player sees as DAMAGE_PLAYER -3, and has a hit of 2 refused.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
 cold out, then takes it off and drinks an Air Bubble, which doesn't help: it
-loses 10 HP at the next tick. After a Red Bean Porridge it loses nothing.
+loses 10 HP at the next tick, after an HP_TAKEN of 10. After a Red Bean Porridge it loses nothing.
 HeavenClient's `diseases_tests` cover the input, jump, attack and skill
 gates and the notices; `combo_tests` cover the orbs' damage table and
 `combo_orbs_tests` what they show; `flash_jump_tests` cover Flash Jump's

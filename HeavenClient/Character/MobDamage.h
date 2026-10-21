@@ -281,6 +281,19 @@ namespace ms
 			return damage - kept_off - saved;
 		}
 
+		// The MP Magic Guard takes of a hit of `damage` at its `percent`
+		// (0 without it), no more than the `mp` left unless under Infinity
+		// (0x959595). The client only foresees it, for the pet's potions.
+		inline int32_t magic_guarded(int32_t damage, int32_t percent, int32_t mp, bool infinity)
+		{
+			if (damage <= 0 || percent <= 0)
+				return 0;
+
+			int32_t share = percent * damage / 100;
+
+			return infinity ? share : std::min(share, mp);
+		}
+
 		// The Night Lord's or Shadower's Shadow Shifter, which may dodge any
 		// hit, a miss too, at its chance (0x9584f6); 0 for other jobs.
 		inline int32_t shadow_shifter(int32_t job)

@@ -175,6 +175,11 @@ namespace ms
 		// dodged the hit (damage -1), Guardian or Shadow Shifter, or 0.
 		uint8_t guard = 0;
 		int32_t dodged = 0;
+		// The HP the player stands to lose, which the server decides, and
+		// whether Power Guard, Meso Guard or Magic Guard took a share
+		// (0x959595), for the pet's potions.
+		int32_t hp_loss = 0;
+		bool guarded = false;
 		// Where the mob and the player were.
 		Point<int16_t> mobposition;
 		Point<int16_t> position;

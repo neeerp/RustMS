@@ -132,11 +132,31 @@ pub fn build_exp_stats(stats: &CharacterStats, levelled: bool) -> Result<Packet,
     build_stat_update(false, &updates)
 }
 
+/// `HpTaken` (0xD4): HP the server is about to take without a hit, as the
+/// map's `decHP` or Poison does. A v83 client checks no pet HP potion on a
+/// stat change, so this has it check as if its HP were already that much
+/// lower (FUN_0095b985); it goes before the stat change.
+pub fn build_hp_taken(hp: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::HpTaken as i16)?;
+    packet.write_int(hp)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::codec::stats::sample_stats;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn hp_taken_is_the_hp_alone() {
+        let packet = build_hp_taken(25).unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::HpTaken as i16)
+            .int(25)
+            .end();
+    }
 
     #[test]
     fn values_follow_mask_order_with_their_wire_widths() {

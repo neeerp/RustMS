@@ -1,8 +1,10 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::keymap::KEY_COUNT;
-use game::Keymap;
+use game::{AutoPotions, Keymap};
 use packet::{io::write::PktWrite, Packet};
 
+/// `KEYMAP` (0x14F). A v83 client drops it before the first SET_FIELD,
+/// while its stage is still the login one (CLogin::OnPacket FUN_005f80ff).
 pub fn build_keymap(keymap: &Keymap) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::KeyMap as i16)?;
@@ -15,6 +17,23 @@ pub fn build_keymap(keymap: &Keymap) -> Result<Packet, NetworkError> {
     }
 
     Ok(packet)
+}
+
+/// The potions the first pet gives from the HP and MP pouches' slots,
+/// `AUTO_HP_POT` (0x150) and `AUTO_MP_POT` (0x151): the item id, or 0 for
+/// none (v83 FUN_0058de2d, FUN_0058de53). Like the key map, they reach
+/// only a field's stage, so they follow SET_FIELD.
+pub fn build_auto_potions(potions: AutoPotions) -> Result<[Packet; 2], NetworkError> {
+    let build = |op: SendOpcode, item_id: i32| -> Result<Packet, NetworkError> {
+        let mut packet = Packet::new_empty();
+        packet.write_short(op as i16)?;
+        packet.write_int(item_id)?;
+        Ok(packet)
+    };
+    Ok([
+        build(SendOpcode::AutoHpPot, potions.hp)?,
+        build(SendOpcode::AutoMpPot, potions.mp)?,
+    ])
 }
 
 #[cfg(test)]
@@ -39,6 +58,19 @@ mod tests {
             expect.byte(kind).int(action);
         }
         expect.end();
+    }
+
+    #[test]
+    fn auto_potions_are_the_hp_then_the_mp_item() {
+        let [hp, mp] = build_auto_potions(AutoPotions { hp: 2000000, mp: 0 }).unwrap();
+        Expect::new(&hp.bytes)
+            .short(SendOpcode::AutoHpPot as i16)
+            .int(2000000)
+            .end();
+        Expect::new(&mp.bytes)
+            .short(SendOpcode::AutoMpPot as i16)
+            .int(0)
+            .end();
     }
 
     #[test]

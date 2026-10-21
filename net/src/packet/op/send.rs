@@ -77,6 +77,7 @@ pub enum SendOpcode {
     DamageSummon = 0xB4,
     ShowItemGainInChat = 0xCE,
     UpdateQuestInfo = 0xD3,
+    HpTaken = 0xD4,
     Cooldown = 0xEA,
     SpawnMonster = 0xEC,
     KillMonster = 0xED,
@@ -132,4 +133,6 @@ pub enum SendOpcode {
     TrunkResult = 0x135,
 
     KeyMap = 0x14F,
+    AutoHpPot = 0x150,
+    AutoMpPot = 0x151,
 }

@@ -111,14 +111,12 @@ namespace ms
 		};
 
 		// The first pet's clothes, label and quote ring cells, and the auto
-		// potions' slots beside the HP and MP pouches.
+		// potions' slots, HP then MP, with the pouches they go beside.
 		constexpr Point<int16_t> PET_WEAR = Point<int16_t>(112, 77);
 		constexpr Point<int16_t> PET_LABEL = Point<int16_t>(79, 110);
 		constexpr Point<int16_t> PET_QUOTE = Point<int16_t>(112, 110);
-		constexpr Point<int16_t> HP_POTION = Point<int16_t>(46, 11);
-		constexpr Point<int16_t> MP_POTION = Point<int16_t>(112, 11);
-		constexpr int16_t HP_POUCH = 24;
-		constexpr int16_t MP_POUCH = 25;
+		constexpr Point<int16_t> POTIONS[] = { Point<int16_t>(46, 11), Point<int16_t>(112, 11) };
+		constexpr int16_t POUCHES[] = { 24, 25 };
 
 		EquipSlot::Id part_slot(int16_t part)
 		{
@@ -194,12 +192,16 @@ namespace ms
 				unavailable.draw(panel + PET_QUOTE);
 			}
 
-			// No pouch, no auto potion.
-			if (!has_pet(0) || !is_worn(HP_POUCH))
-				unavailable.draw(panel + HP_POTION);
+			// The potions and how many are left, even none (0x80190c). No
+			// pouch, no auto potion.
+			for (uint8_t mp = 0; mp < 2; mp++)
+			{
+				if (potions[mp])
+					potions[mp]->draw(panel + POTIONS[mp] + ICON);
 
-			if (!has_pet(0) || !is_worn(MP_POUCH))
-				unavailable.draw(panel + MP_POTION);
+				if (!has_pet(0) || !is_worn(POUCHES[mp]))
+					unavailable.draw(panel + POTIONS[mp]);
+			}
 
 			for (const PetCell &cell : PET_CELLS)
 				if (auto &icon = icons[part_slot(cell.parts[pet_tab])])
@@ -261,6 +263,44 @@ namespace ms
 				tab.set_state(Button::State::DISABLED);
 			else if (tab.get_state() == Button::State::DISABLED)
 				tab.set_state(Button::State::NORMAL);
+		}
+
+		update_potions();
+	}
+
+	void UIEquipInventory::update_potions()
+	{
+		Player &player = Stage::get().get_player();
+
+		for (uint8_t mp = 0; mp < 2; mp++)
+		{
+			// v83 clears a potion each time the panel is drawn without the
+			// first pet or its pouch (FUN_00801474); this tells the server once.
+			// The pets are only away while the field changes.
+			if (pet_enabled && Stage::get().is_active() && player.get_auto_potion(mp) && !player.wears_pouch(mp))
+				player.change_auto_potion(mp, 0);
+
+			int32_t item_id = player.get_auto_potion(mp);
+			int16_t count = item_id ? inventory.get_total_item_count(item_id) : 0;
+
+			if (item_id != potion_ids[mp])
+			{
+				potion_ids[mp] = item_id;
+
+				// A potion held on the cursor goes with its icon.
+				if (potions[mp] && potions[mp]->get_drag())
+					UI::get().cancel_drag();
+
+				if (item_id)
+					potions[mp] = std::make_unique<Icon>(std::make_unique<PotionIcon>(mp),
+														 ItemData::get(item_id).get_icon(false), count);
+				else
+					potions[mp].reset();
+			}
+			else if (potions[mp])
+			{
+				potions[mp]->set_count(count);
+			}
 		}
 	}
 
@@ -359,6 +399,22 @@ namespace ms
 			return dstate;
 		}
 
+		int8_t potion = potion_by_position(cursorpos);
+
+		if (potion >= 0 && potions[potion])
+		{
+			clear_tooltip();
+
+			if (!pressed)
+				return Cursor::State::CANGRAB;
+
+			potions[potion]->start_drag(cursorpos - position - PET_PANEL - POTIONS[potion] - ICON);
+
+			UI::get().drag_icon(potions[potion].get());
+
+			return Cursor::State::GRABBING;
+		}
+
 		EquipSlot::Id slot = slot_by_position(cursorpos);
 
 		if (auto icon = icons[slot].get())
@@ -430,7 +486,9 @@ namespace ms
 
 	bool UIEquipInventory::send_icon(const Icon& icon, Point<int16_t> cursorpos)
 	{
-		if (EquipSlot::Id slot = slot_by_position(cursorpos))
+		if (int8_t potion = potion_by_position(cursorpos); potion >= 0)
+			icon.drop_on_potion(potion);
+		else if (EquipSlot::Id slot = slot_by_position(cursorpos))
 			icon.drop_on_equips(slot);
 
 		return true;
@@ -495,6 +553,22 @@ namespace ms
 		}
 
 		return EquipSlot::Id::NONE;
+	}
+
+	int8_t UIEquipInventory::potion_by_position(Point<int16_t> cursorpos) const
+	{
+		if (!pet_enabled)
+			return -1;
+
+		for (int8_t mp = 0; mp < 2; mp++)
+		{
+			Point<int16_t> cellpos = position + PET_PANEL + POTIONS[mp];
+
+			if (Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(SLOT_SIZE, SLOT_SIZE)).contains(cursorpos))
+				return mp;
+		}
+
+		return -1;
 	}
 
 	UIEquipInventory::EquipIcon::EquipIcon(int16_t s)
@@ -573,6 +647,18 @@ namespace ms
 	}
 
 	Icon::IconType UIEquipInventory::EquipIcon::get_type()
+	{
+		return Icon::IconType::EQUIP;
+	}
+
+	UIEquipInventory::PotionIcon::PotionIcon(bool m) : mp(m) {}
+
+	void UIEquipInventory::PotionIcon::drop_on_stage() const
+	{
+		Stage::get().get_player().change_auto_potion(mp, 0);
+	}
+
+	Icon::IconType UIEquipInventory::PotionIcon::get_type()
 	{
 		return Icon::IconType::EQUIP;
 	}

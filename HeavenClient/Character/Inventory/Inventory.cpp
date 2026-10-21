@@ -117,12 +117,12 @@ namespace ms
 
 	void Inventory::add_pet(InventoryType::Id invtype, int16_t slot, int32_t item_id, int64_t cash_id, int64_t expire,
 							const std::string &name, int8_t level, int16_t closeness, int8_t fullness, int64_t date_dead,
-							int32_t remain_life)
+							int32_t remain_life, uint16_t skill)
 	{
 		pets.emplace(
 				std::piecewise_construct,
 				std::forward_as_tuple(add_slot(invtype, slot, item_id, 1, cash_id)),
-				std::forward_as_tuple(item_id, expire, name, level, closeness, fullness, date_dead, remain_life)
+				std::forward_as_tuple(item_id, expire, name, level, closeness, fullness, date_dead, remain_life, skill)
 		);
 	}
 

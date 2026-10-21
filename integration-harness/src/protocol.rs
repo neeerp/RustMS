@@ -8,11 +8,11 @@ use crate::error::HarnessError;
 use crate::packets::{
     build_accept_tos, build_char_list_request, build_char_select, build_check_char_name,
     build_create_char, build_login_credentials, build_login_started, build_player_logged_in,
-    build_server_list_request, build_set_gender, decode_char_list, decode_char_name_response,
-    decode_keymap, decode_last_connected_world, decode_login_status, decode_new_character,
-    decode_recommended_worlds, decode_server_redirect, decode_set_field, decode_skill_macros,
-    opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket, ServerListPacket,
-    SkillMacroEntry,
+    build_server_list_request, build_set_gender, decode_auto_potion, decode_char_list,
+    decode_char_name_response, decode_keymap, decode_last_connected_world, decode_login_status,
+    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
+    decode_skill_macros, opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket,
+    ServerListPacket, SkillMacroEntry,
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
@@ -66,6 +66,9 @@ pub struct WorldSession {
     pub keymap: Vec<(u8, i32)>,
     /// The world-entry MACRO_SYS_DATA_INIT.
     pub skill_macros: Vec<SkillMacroEntry>,
+    /// The potions set beside the HP and MP pouches, from the world-entry
+    /// AUTO_HP_POT and AUTO_MP_POT.
+    pub auto_potions: (i32, i32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +117,8 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
 
     let mut keymap = None;
     let mut skill_macros = None;
+    let mut auto_hp = None;
+    let mut auto_mp = None;
     let mut world_entry = None;
 
     for _ in 0..8 {
@@ -128,6 +133,16 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
                 skill_macros = Some(decode_skill_macros(&envelope.packet).map_err(|message| {
                     HarnessError::protocol("world entry", world_conn.endpoint(), message)
                 })?);
+            }
+            x if x == SendOpcode::AutoHpPot as i16 || x == SendOpcode::AutoMpPot as i16 => {
+                let item_id = decode_auto_potion(&envelope.packet).map_err(|message| {
+                    HarnessError::protocol("world entry", world_conn.endpoint(), message)
+                })?;
+                if x == SendOpcode::AutoHpPot as i16 {
+                    auto_hp = Some(item_id);
+                } else {
+                    auto_mp = Some(item_id);
+                }
             }
             x if x == SendOpcode::SetField as i16 => {
                 let set_field = decode_set_field(&envelope.packet).map_err(|message| {
@@ -168,7 +183,12 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             }
         }
 
-        if keymap.is_some() && skill_macros.is_some() && world_entry.is_some() {
+        if keymap.is_some()
+            && skill_macros.is_some()
+            && auto_hp.is_some()
+            && auto_mp.is_some()
+            && world_entry.is_some()
+        {
             break;
         }
     }
@@ -197,6 +217,14 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     };
 
+    let (Some(auto_hp), Some(auto_mp)) = (auto_hp, auto_mp) else {
+        return Err(HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive AutoHpPot and AutoMpPot during world entry".to_string(),
+        ));
+    };
+
     drain_spawn_npcs(&mut world_conn).await;
 
     Ok(WorldSession {
@@ -222,6 +250,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         monster_book: world_entry.monster_book,
         keymap,
         skill_macros,
+        auto_potions: (auto_hp, auto_mp),
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         spawn_point: world_entry.spawn_point,

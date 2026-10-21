@@ -116,6 +116,9 @@ namespace ms
 		if (updatemask & MapleStat::codes[MapleStat::Id::HP])
 			player.update_berserk(false);
 
+		// Then on any change the pet's MP potion, if readied (0xa202a8).
+		player.check_auto_mp();
+
 		// After a level-up, v83 tells anyone but a GM to spend AP once more than 199 pile up (FUN_00a1fb52).
 		const CharStats& stats = player.get_stats();
 
@@ -537,6 +540,21 @@ namespace ms
 
 			UI::get().add_keymapping(i, type, action);
 		}
+	}
+
+	void AutoHpPotHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().set_auto_potion(false, recv.read_int());
+	}
+
+	void AutoMpPotHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().set_auto_potion(true, recv.read_int());
+	}
+
+	void CheckAutoHpHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().check_auto_hp(recv.read_int());
 	}
 
 	void MonsterBookSetCardHandler::handle(InPacket& recv) const

@@ -774,7 +774,7 @@ the screen size.
 | Player shops | Nothing | L |
 | Cash shop | No coupons, charging, or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
-| Pets | Summon, follow, chat commands, food and cash food only: no name tags, equipment or looting | M |
+| Pets | Summon, follow, chat commands, food, cash food, name tags, equipment, looting, the exception list and auto potions | M |
 | Mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |
 | Buddy whisper/find modes | Ignored | S |

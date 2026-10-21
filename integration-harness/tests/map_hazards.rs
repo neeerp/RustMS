@@ -63,6 +63,7 @@ async fn the_cold_hurts_unless_the_cape_is_worn() {
     // The cape keeps the cold out.
     read_for(c, &mut h, 11_000).await;
     assert_eq!(h.stat(stat::HP), None);
+    assert!(h.hp_taken.is_empty());
 
     // Without it, the next tick takes 10: an Air Bubble is no use in the
     // cold.
@@ -73,6 +74,8 @@ async fn the_cold_hurts_unless_the_cape_is_worn() {
     let mut h = Trace::default();
     until(c, &mut h, |t| t.stat(stat::HP).is_some()).await;
     assert_eq!(h.stat(stat::HP), Some(40));
+    // The pet's HP potion is checked first.
+    assert_eq!(h.hp_taken, [10]);
 
     // Red Bean Porridge keeps the next 10 off.
     send(c, use_item(2, RED_BEAN_PORRIDGE)).await;
@@ -84,4 +87,5 @@ async fn the_cold_hurts_unless_the_cape_is_worn() {
     let mut h = Trace::default();
     read_for(c, &mut h, 11_000).await;
     assert_eq!(h.stat(stat::HP), None);
+    assert!(h.hp_taken.is_empty());
 }

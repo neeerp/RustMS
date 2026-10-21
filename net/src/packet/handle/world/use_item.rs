@@ -38,21 +38,98 @@ impl WorldHandler for UseItemHandler {
         reader.read_int()?; // client tick
         let slot = reader.read_short()?;
         let item_id = reader.read_int()?;
-        let Some(used) = use_item(ctx.player, slot, item_id, Instant::now()) else {
+        let used = use_item(ctx.player, slot, item_id, Instant::now());
+        if used.is_none() {
             debug!(slot, item_id, "Item use refused");
-            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
-        };
-        let mut result =
-            HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?);
-        let (own, seen) = item_effect_packets(ctx.player, item_id, used.effect, true)?;
-        for packet in own {
-            result = result.with_reply(packet);
         }
-        for packet in seen {
-            result = result.with(WorldAction::BuffsChanged(packet));
-        }
-        Ok(result)
+        answer_use(ctx.player, item_id, used)
     }
+}
+
+/// `PET_AUTO_POT` (0xAB, v83 FUN_00a0955c): the pet's cash serial, a flag,
+/// the tick, the slot in the USE bag and the item id. The first pet out
+/// gives the potion set beside a pouch it wears once the player's HP or MP
+/// falls under its alert level; the client judges when, and the field
+/// limit. The server checks that the pet is the first one out, that the
+/// item is the one set beside a worn pouch whose kind it restores, and then
+/// whatever USE_ITEM checks. The client waits for the answer either way.
+pub struct PetAutoPotHandler;
+
+impl WorldHandler for PetAutoPotHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let serial = reader.read_long()?;
+        reader.read_byte()?;
+        reader.read_int()?; // client tick
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let used = pet_gives(ctx.player, serial, item_id)
+            .then(|| use_item(ctx.player, slot, item_id, Instant::now()))
+            .flatten();
+        if used.is_none() {
+            debug!(serial, slot, item_id, "Pet potion refused");
+        }
+        answer_use(ctx.player, item_id, used)
+    }
+}
+
+/// The answer to an item use: the bag change and what the item did, or an
+/// empty stat update for a refusal. Either unlocks the client's item use.
+fn answer_use(player: &Player, item_id: i32, used: Option<Used>) -> WorldResult {
+    let Some(used) = used else {
+        return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+    };
+    let mut result =
+        HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?);
+    let (own, seen) = item_effect_packets(player, item_id, used.effect, true)?;
+    for packet in own {
+        result = result.with_reply(packet);
+    }
+    for packet in seen {
+        result = result.with(WorldAction::BuffsChanged(packet));
+    }
+    Ok(result)
+}
+
+/// The HP and MP pouches (PetEquip `consumeHP`, `consumeMP`).
+const HP_POUCH: i32 = 1_812_002;
+const MP_POUCH: i32 = 1_812_003;
+
+/// Whether the pet with `serial` may give `item_id`: it is the first pet
+/// out (v83 uses only list entry 0), and the item is the potion set beside
+/// the HP pouch, or the MP pouch, which that pet wears.
+fn pet_gives(player: &Player, serial: i64, item_id: i32) -> bool {
+    if player.pets.first() != Some(&serial) {
+        return false;
+    }
+    let worn = |pouch| {
+        equip_slot::pet_slots(pouch).is_some_and(|slots| {
+            player
+                .inventory
+                .get(InventoryType::Equipped, slots[0] - 100)
+                .is_some()
+        })
+    };
+    let potions = player.auto_potions;
+    (item_id == potions.hp && restores(item_id, false) && worn(HP_POUCH))
+        || (item_id == potions.mp && restores(item_id, true) && worn(MP_POUCH))
+}
+
+/// Whether `item_id` is a USE item whose `spec` restores HP, or MP if `mp`
+/// (`hp` or `hpR`, `mp` or `mpR`): what the potion slot beside that pouch
+/// takes (v83 FUN_007ff0d6, FUN_007ff5fe).
+pub fn restores(item_id: i32, mp: bool) -> bool {
+    is_use_item(item_id)
+        && items::info(item_id)
+            .and_then(|info| info.spec)
+            .is_some_and(|spec| {
+                if mp {
+                    spec.mp != 0 || spec.mp_r != 0
+                } else {
+                    spec.hp != 0 || spec.hp_r != 0
+                }
+            })
 }
 
 /// What using an item did.
@@ -489,6 +566,113 @@ mod tests {
             .handle(&mut packet, &mut ctx)
             .unwrap()
             .actions
+    }
+
+    fn pet_request(serial: i64, slot: i16, item_id: i32) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::PetAutoPot as i16).unwrap();
+        p.write_long(serial).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_int(0).unwrap();
+        p.write_short(slot).unwrap();
+        p.write_int(item_id).unwrap();
+        p
+    }
+
+    fn pet_handle(player: &mut Player, packet: Packet) -> Vec<WorldAction> {
+        let mut packet = packet;
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        PetAutoPotHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    /// A player at 10 of 500 HP with pets 77 and 78 out, the first wearing
+    /// the HP pouch, five Red Potions in USE slot 1, and the Red Potion set
+    /// beside the HP pouch.
+    fn pouch_owner() -> Player {
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.max_hp = 500;
+        player.stats.hp = 10;
+        player.pets = vec![77, 78];
+        player
+            .inventory
+            .insert(InventoryType::Equipped, -124, Item::stack(HP_POUCH, 1));
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2000000, 5));
+        player.auto_potions.hp = 2000000;
+        player
+    }
+
+    fn refused(actions: &[WorldAction]) -> bool {
+        matches!(actions, [WorldAction::Reply(p)]
+            if p.opcode() == SendOpcode::StatChange as i16 && p.bytes[2..] == [1, 0, 0, 0, 0])
+    }
+
+    #[test]
+    fn the_first_pet_gives_the_potion_set_beside_its_pouch() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = pouch_owner();
+        let actions = pet_handle(&mut player, pet_request(77, 1, 2000000));
+        assert!(
+            matches!(actions.as_slice(), [WorldAction::Reply(a), WorldAction::Reply(b)]
+            if a.opcode() == SendOpcode::InventoryOperation as i16 && b.opcode() == SendOpcode::StatChange as i16)
+        );
+        assert_eq!(player.stats.hp, 60);
+        let left = player.inventory.get(InventoryType::Use, 1).unwrap();
+        assert_eq!(left.quantity, 4);
+    }
+
+    #[test]
+    fn a_pet_potion_is_refused_unless_the_first_pet_may_give_it() {
+        if items::data().is_err() {
+            return;
+        }
+        // Not the first pet, nor one out.
+        let mut player = pouch_owner();
+        assert!(refused(&pet_handle(
+            &mut player,
+            pet_request(78, 1, 2000000)
+        )));
+        assert!(refused(&pet_handle(
+            &mut player,
+            pet_request(79, 1, 2000000)
+        )));
+        // A potion not set beside the pouch, or set beside the MP pouch.
+        player.auto_potions.hp = 2000001;
+        assert!(refused(&pet_handle(
+            &mut player,
+            pet_request(77, 1, 2000000)
+        )));
+        player.auto_potions = game::AutoPotions { hp: 0, mp: 2000000 };
+        assert!(refused(&pet_handle(
+            &mut player,
+            pet_request(77, 1, 2000000)
+        )));
+        // The pouch taken off.
+        player.auto_potions.hp = 2000000;
+        player.inventory.unequip(-124, 1).unwrap();
+        assert!(refused(&pet_handle(
+            &mut player,
+            pet_request(77, 1, 2000000)
+        )));
+        assert_eq!(player.stats.hp, 10);
+        assert_eq!(
+            player
+                .inventory
+                .get(InventoryType::Use, 1)
+                .unwrap()
+                .quantity,
+            5
+        );
     }
 
     #[test]

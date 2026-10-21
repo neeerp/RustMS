@@ -250,6 +250,8 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",
         x if x == SendOpcode::KeyMap as i16 => "KeyMap",
         x if x == SendOpcode::MacroSysDataInit as i16 => "MacroSysDataInit",
+        x if x == SendOpcode::AutoHpPot as i16 => "AutoHpPot",
+        x if x == SendOpcode::AutoMpPot as i16 => "AutoMpPot",
         x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
         x if x == SendOpcode::StatChange as i16 => "StatChange",
         x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
@@ -922,6 +924,15 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         monster_book_cover,
         monster_book,
     })
+}
+
+/// AUTO_HP_POT or AUTO_MP_POT: the potion's item id, or 0.
+pub fn decode_auto_potion(packet: &Packet) -> Result<i32, String> {
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    skip(&mut cursor, 2)?;
+    cursor
+        .read_int()
+        .map_err(|error| format!("auto potion: {error}"))
 }
 
 /// KEYMAP: `(kind, action)` for each of the 90 keys.

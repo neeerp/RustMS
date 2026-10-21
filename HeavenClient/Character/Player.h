@@ -161,8 +161,9 @@ namespace ms
 		int32_t resists(int32_t element) const;
 
 		// Hurts the player by a trap's `damage` and knocks them at (vx, vy) pixels per second (FUN_009581a9 with
-		// no mob): no miss, guard or Power Stance.
-		void damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy);
+		// no mob): no miss, guard or Power Stance. Return the HP the player stands to lose and whether Magic Guard
+		// took a share, for the pet's potions.
+		std::pair<int32_t, bool> damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy);
 
 		// Apply a buff to the player
 		void give_buff(Buff buff);
@@ -339,6 +340,37 @@ namespace ms
 		// Give the pet food in USE slot `slot` to the pets (FUN_00a09905).
 		void feed_pets(int16_t slot, int32_t itemid);
 
+		// The potion the first pet out gives from beside its HP pouch, or its
+		// MP pouch if `mp`, 0 for none.
+		int32_t get_auto_potion(bool mp) const;
+
+		// Note the potion as the server sends it (AUTO_HP_POT, AUTO_MP_POT).
+		void set_auto_potion(bool mp, int32_t itemid);
+
+		// Put `itemid` beside the pouch, or 0 to take it away, and tell the
+		// server (v83 FUN_007ff0d6, FUN_007ff5fe). The first pet out must
+		// wear the pouch, and the item restore what it is for.
+		void change_auto_potion(bool mp, int32_t itemid);
+
+		// Whether the first pet out wears the HP pouch, or the MP pouch.
+		bool wears_pouch(bool mp) const;
+
+		// Have the first pet give its HP potion if HP, `hp_loss` lower, is
+		// under the alert (FUN_0095b9a4). A hit a guard took a share of
+		// readies the MP potion too.
+		void check_auto_hp(int32_t hp_loss, bool guarded = false);
+
+		// Ready the MP potion, as a skill cast does (+0x2ae4). It is checked
+		// on each update until given.
+		void arm_auto_mp();
+
+		// Have the first pet give its MP potion if it is ready and MP is
+		// under the alert (FUN_0095bbe0).
+		void check_auto_mp();
+
+		// Forget the potions the pets lacked, as entering a field does.
+		void forget_potion_misses();
+
 		// The closeness of each pet out, -1 where there is none.
 		std::array<int32_t, 3> get_pet_closeness() const;
 
@@ -435,6 +467,20 @@ namespace ms
 
 		// Die when HP runs out, and get back up when it returns.
 		void update_death();
+
+		// Send the first pet's potion request (FUN_00a0955c).
+		void give_potion(bool mp, int16_t slot, int32_t itemid);
+
+		// The potion is not in USE: the pets out that speak up say so for the
+		// first three times in a row, the chat every time.
+		void lack_potion(bool mp);
+
+		// The potions beside the HP and MP pouches (+0x3c0, +0x3c4).
+		std::array<int32_t, 2> auto_potions = { 0, 0 };
+		// The checks in a row that found no potion (+0x3258, +0x325c).
+		std::array<int32_t, 2> potion_misses = { 0, 0 };
+		// Whether a skill or a guarded hit readied the MP potion (+0x2ae4).
+		bool auto_mp_armed = false;
 
 		// Steps since the player died; the revive window opens after 2.2 seconds.
 		static constexpr uint16_t REVIVE_DELAY = 2200 / Constants::TIMESTEP;

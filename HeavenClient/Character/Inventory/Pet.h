@@ -26,7 +26,7 @@ namespace ms
 	{
 	public:
 		Pet(int32_t item_id, int64_t expiration, const std::string &name, uint8_t level, uint16_t closeness,
-			uint8_t fullness, int64_t date_dead, int32_t remain_life);
+			uint8_t fullness, int64_t date_dead, int32_t remain_life, uint16_t skill);
 
 		int32_t get_item_id() const;
 		const std::string &get_name() const;
@@ -37,6 +37,8 @@ namespace ms
 		int64_t get_date_dead() const;
 		// The seconds a pet with limitedLife has left.
 		int32_t get_remain_life() const;
+		// The pet's skill bits: 0x100 lets it speak up on its own.
+		uint16_t get_skill() const;
 
 	private:
 		int32_t item_id;
@@ -47,5 +49,6 @@ namespace ms
 		uint8_t fullness;
 		int64_t date_dead;
 		int32_t remain_life;
+		uint16_t skill;
 	};
 }

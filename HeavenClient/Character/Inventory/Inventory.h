@@ -85,7 +85,7 @@ namespace ms
 		// Add a pet item.
 		void add_pet(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire,
 					 const std::string &name, int8_t level, int16_t closeness, int8_t fullness, int64_t date_dead,
-					 int32_t remain_life);
+					 int32_t remain_life, uint16_t skill);
 
 		// Add an equip item.
 		void add_equip(InventoryType::Id type, int16_t slot, int32_t itemid, int64_t cash_id, int64_t expire, uint8_t slots,

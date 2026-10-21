@@ -31,6 +31,19 @@ namespace ms
 			last = now;
 		}
 
+		// A pet's auto potion keeps its own times, one for HP and one for
+		// MP, but always waits on the HP one (FUN_00a09662).
+		bool can_send_potion(int64_t now) const
+		{
+			return !pending && now - potion_last[0] >= USE_WAIT;
+		}
+
+		void sent_potion(int64_t now, bool mp)
+		{
+			pending = true;
+			potion_last[mp] = now;
+		}
+
 		void answered(int64_t now)
 		{
 			pending = false;
@@ -46,5 +59,6 @@ namespace ms
 	private:
 		bool pending = false;
 		int64_t last = INT32_MIN;
+		int64_t potion_last[2] = { INT32_MIN, INT32_MIN };
 	};
 }

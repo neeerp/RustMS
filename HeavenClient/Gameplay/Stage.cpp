@@ -434,6 +434,7 @@ namespace ms
 
 			MobAttackResult result = player.damage(landed.attack);
 			TakeDamagePacket(result).dispatch();
+			player.check_auto_hp(result.hp_loss, result.guarded);
 			combat.interrupt_prepare(result.damage);
 
 			if (result.damage > 0)
@@ -477,6 +478,7 @@ namespace ms
 			{
 				MobAttackResult result = player.damage(attack);
 				TakeDamagePacket(result).dispatch();
+				player.check_auto_hp(result.hp_loss, result.guarded);
 				combat.interrupt_prepare(result.damage);
 
 				if (result.dodged)
@@ -504,6 +506,7 @@ namespace ms
 			{
 				player.show_damage(hurt.damage);
 				TakeDamagePacket(hurt.element, hurt.damage, hurt.code).dispatch();
+				player.check_auto_hp(hurt.damage);
 				since_mist_hurt = 0;
 			}
 		}
@@ -517,6 +520,7 @@ namespace ms
 				chatbar->send_chatline(disease::STOP_MOTION_HURT, UIChatBar::LineType::GREY);
 
 			TakeDamagePacket(4, damage, 0, 3).dispatch();
+			player.check_auto_hp(damage);
 		}
 	}
 
@@ -545,8 +549,9 @@ namespace ms
 			if (push == obstacle::Vec{ 0, 0 })
 				push = obstacle::fallback(phobj.get_last_x(), phobj.get_last_y(), phobj.get_x(), phobj.get_y());
 
-			player.damage_by_obstacle(damage, push.x, push.y);
+			auto [hp_loss, guarded] = player.damage_by_obstacle(damage, push.x, push.y);
 			TakeDamagePacket(TakeDamagePacket::Obstacle{ damage, code }).dispatch();
+			player.check_auto_hp(hp_loss, guarded);
 		}
 
 		// Witch Tower's snacks send the player back to its entrance, hurting or not (0x94b767).
@@ -772,6 +777,11 @@ namespace ms
 	bool Stage::may_dash() const
 	{
 		return !pending_teleport;
+	}
+
+	bool Stage::is_active() const
+	{
+		return state == State::ACTIVE;
 	}
 
 	void Stage::dash(teleport::Spot spot)

@@ -819,6 +819,22 @@ namespace ms
 		}
 	};
 
+	// The first pet out, `serial`, gives the potion in USE slot `slot` from
+	// beside its pouch (v83 FUN_00a0955c).
+	// Opcode: PET_AUTO_POT(171)
+	class PetAutoPotPacket : public OutPacket
+	{
+	public:
+		PetAutoPotPacket(int64_t serial, int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::PET_AUTO_POT)
+		{
+			write_long(serial);
+			write_byte(0);
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// The player closed a pet's exception list (FUN_00706393): the ids it
 	// is to leave, pets::IGNORED_MESOS for mesos.
 	// Opcode: PET_EXCLUDE_ITEMS(172)

@@ -163,6 +163,10 @@ impl ClientActor {
         let stats = &player.stats;
         let below_max = i32::from(stats.hp) < player.effective_max_hp();
         if stats.hp > 0 && (change < 0 || (change > 0 && below_max)) {
+            // The pet's HP potion is checked after each Poison tick (0x94b1b4).
+            if poison > 0 {
+                packets.push(stat::build_hp_taken(poison)?);
+            }
             let hp = player.add_hp(change);
             packets.push(stat::build_stat_update(false, &[StatUpdate::Hp(hp)])?);
         }

@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Player.h"
 
+#include "AutoPotions.h"
 #include "Berserk.h"
 #include "CatchItemRules.h"
 #include "MorphRules.h"
@@ -28,8 +29,10 @@
 #include "Inventory/ItemProperties.h"
 
 #include "../Audio/Audio.h"
+#include "../Configuration.h"
 #include "../Data/BulletData.h"
 #include "../Data/EquipData.h"
+#include "../Data/PetData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
 #include "../Gameplay/Combat/Combo.h"
@@ -45,10 +48,12 @@
 #include "../IO/UI.h"
 
 #include "../IO/UITypes/UIChatBar.h"
+#include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UIRevive.h"
 #include "../IO/UITypes/UISkillBook.h"
 #include "../IO/UITypes/UIStatsInfo.h"
 #include "../IO/UITypes/UIStatusBar.h"
+#include "../IO/UITypes/UISystemOption.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/PlayerPackets.h"
@@ -74,7 +79,7 @@ namespace ms
 			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 		}
 
-		// A catch item's notice, in the chat line v83 uses for them (type 0xc).
+		// A notice, as for a catch item or a pet's potion, in the chat line v83 uses for them (type 0xc).
 		void catch_notice(const std::string &line)
 		{
 			if (line.empty())
@@ -125,6 +130,13 @@ namespace ms
 		int32_t in_percent(float value)
 		{
 			return static_cast<int32_t>(std::lround(value * 100));
+		}
+
+		// A USE item's node in Item.nx.
+		nl::node consume_node(int32_t itemid)
+		{
+			return nl::nx::item["Consume"][string_format::extend_id(itemid / 10000, 4) + ".img"]
+				[string_format::extend_id(itemid, 8)];
 		}
 	}
 
@@ -472,6 +484,10 @@ namespace ms
 		}
 
 		update_recovery();
+
+		// A readied MP potion is checked each update, dead or alive (0x94b9b6).
+		if (auto_mp_armed)
+			check_auto_mp();
 
 		// Landing or grabbing a rope readies Flash Jump again (0x9506f6).
 		if (phobj.onground || is_climbing())
@@ -1170,16 +1186,31 @@ namespace ms
 		}
 
 		// A dodge shows no number; Shadow Shifter smiles (0x9593b9).
+		int32_t hp_loss = 0;
+		bool guarded = false;
+
 		if (dodged)
 		{
 			if (!blocked)
 				set_expression(Expression::Id::SMILE, 1500);
+
+			// Power Guard's reflect counts before a Guardian block takes it
+			// back (0x959657, 0x959686).
+			guarded = reflected.damage > 0;
 		}
 		else
 		{
 			int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
-			show_damage(mob_damage::shown(damage, achilles, get_buff_value(Buffstat::Id::MESOGUARD),
-										  inventory.get_meso()) - reflected.damage);
+			int32_t mesoguard = get_buff_value(Buffstat::Id::MESOGUARD);
+			int32_t shown = mob_damage::shown(damage, achilles, mesoguard, inventory.get_meso()) - reflected.damage;
+			show_damage(shown);
+
+			// Magic Guard's share shows, but comes out of MP (0x959595).
+			int32_t magic_guard = mob_damage::magic_guarded(damage, get_buff_value(Buffstat::Id::MAGIC_GUARD),
+					stats.get_stat(MapleStat::Id::MP), has_buff(Buffstat::Id::INFINITY_));
+			hp_loss = std::max(shown - magic_guard, 0);
+			guarded = reflected.damage > 0 || magic_guard > 0 ||
+					  shown + reflected.damage < mob_damage::shown(damage, achilles, 0, 0);
 		}
 
 		become_invincible(damage > 0);
@@ -1221,16 +1252,21 @@ namespace ms
 		result.reflected = reflected.shown;
 		result.guard = mob_damage::guard(blocked, attack.index < 0);
 		result.dodged = dodged;
+		result.hp_loss = hp_loss;
+		result.guarded = guarded;
 		result.position = get_position();
 
 		return result;
 	}
 
-	void Player::damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy)
+	std::pair<int32_t, bool> Player::damage_by_obstacle(int32_t damage, int32_t vx, int32_t vy)
 	{
 		// Achilles leaves the number as for a mob; Meso Guard has no part.
 		int32_t achilles = 1000 - static_cast<int32_t>(std::lround(stats.get_reducedamage() * 1000.0f));
-		show_damage(mob_damage::shown(damage, achilles, 0, 0));
+		int32_t shown = mob_damage::shown(damage, achilles, 0, 0);
+		show_damage(shown);
+		int32_t magic_guard = mob_damage::magic_guarded(damage, get_buff_value(Buffstat::Id::MAGIC_GUARD),
+				stats.get_stat(MapleStat::Id::MP), has_buff(Buffstat::Id::INFINITY_));
 		become_invincible(true);
 		leave_chair();
 
@@ -1244,6 +1280,8 @@ namespace ms
 
 			Physics::knockback(phobj, vx, vy);
 		}
+
+		return { std::max(shown - magic_guard, 0), magic_guard > 0 };
 	}
 
 	void Player::give_buff(Buff buff)
@@ -1905,6 +1943,150 @@ namespace ms
 
 		if (index >= 0)
 			pets[index].play_eat_sound();
+	}
+
+	int32_t Player::get_auto_potion(bool mp) const
+	{
+		return auto_potions[mp];
+	}
+
+	void Player::set_auto_potion(bool mp, int32_t itemid)
+	{
+		auto_potions[mp] = itemid;
+	}
+
+	void Player::change_auto_potion(bool mp, int32_t itemid)
+	{
+		bool restores = false;
+
+		if (itemid != 0)
+		{
+			nl::node spec = consume_node(itemid)["spec"];
+			restores = mp ? spec["mp"] || spec["mpR"] : spec["hp"] || spec["hpR"];
+		}
+
+		switch (auto_potion::change(itemid, wears_pouch(mp), restores, auto_potions[mp]))
+		{
+			case auto_potion::Change::CLEAR:
+				auto_potions[mp] = 0;
+				ChangeAutoPotPacket(mp, 0).dispatch();
+				break;
+			case auto_potion::Change::REFUSED:
+				UI::get().emplace<UIOk>(mp ? auto_potion::ONLY_MP : auto_potion::ONLY_HP, [](bool) {});
+				break;
+			case auto_potion::Change::SET:
+				// Then the alerts the potion waits on may be set.
+				auto_potions[mp] = itemid;
+				ChangeAutoPotPacket(mp, itemid).dispatch();
+				catch_notice(mp ? auto_potion::SET_MP : auto_potion::SET_HP);
+				UI::get().emplace<UISystemOption>();
+				break;
+			default:
+				break;
+		}
+	}
+
+	bool Player::wears_pouch(bool mp) const
+	{
+		return pets[0].get_itemid() && pet_wears(0, mp ? auto_potion::MP_POUCH : auto_potion::HP_POUCH);
+	}
+
+	void Player::check_auto_hp(int32_t hp_loss, bool guarded)
+	{
+		int32_t itemid = auto_potions[0];
+
+		if (itemid && wears_pouch(false) && !get_diseases().seduced &&
+			auto_potion::below(stats.get_stat(MapleStat::Id::HP), hp_loss, stats.get_total(EquipStat::Id::HP),
+							   Setting<HPAlert>::get().load()))
+		{
+			// The misses start over even if the request can't go yet.
+			if (int16_t slot = inventory.find_item(InventoryType::Id::USE, itemid))
+			{
+				give_potion(false, slot, itemid);
+				potion_misses[0] = 0;
+			}
+			else
+			{
+				lack_potion(false);
+			}
+		}
+
+		if (guarded)
+		{
+			arm_auto_mp();
+			check_auto_mp();
+		}
+	}
+
+	void Player::arm_auto_mp()
+	{
+		auto_mp_armed = true;
+	}
+
+	void Player::check_auto_mp()
+	{
+		int32_t itemid = auto_potions[1];
+
+		if (!auto_mp_armed || !itemid || !wears_pouch(true) || get_diseases().seduced ||
+			!auto_potion::below(stats.get_stat(MapleStat::Id::MP), 0, stats.get_total(EquipStat::Id::MP),
+								Setting<MPAlert>::get().load()))
+			return;
+
+		if (int16_t slot = inventory.find_item(InventoryType::Id::USE, itemid))
+			give_potion(true, slot, itemid);
+		else
+			lack_potion(true);
+	}
+
+	void Player::forget_potion_misses()
+	{
+		potion_misses = { 0, 0 };
+		auto_mp_armed = false;
+	}
+
+	void Player::give_potion(bool mp, int16_t slot, int32_t itemid)
+	{
+		// Unlike using the potion, Stop Potion doesn't stop the pet.
+		if (Stage::get().get_mapinfo().get_fieldlimit() & field_limit::CONSUMABLES)
+			return;
+
+		if (stats.get_stat(MapleStat::Id::LEVEL) < consume_node(itemid)["info"]["reqLevel"].get_integer())
+		{
+			catch_notice(auto_potion::LEVEL_TOO_LOW);
+			return;
+		}
+
+		int64_t now = now_ms();
+
+		// An MP potion may go to a player who is down.
+		if (!excl.can_send_potion(now) || (!mp && stats.get_stat(MapleStat::Id::HP) <= 0))
+			return;
+
+		PetAutoPotPacket(pets[0].get_serial(), slot, itemid).dispatch();
+		excl.sent_potion(now, mp);
+		Sound(itemid).play();
+
+		if (mp)
+			auto_mp_armed = false;
+	}
+
+	void Player::lack_potion(bool mp)
+	{
+		if (auto_potion::pets_complain(++potion_misses[mp]))
+		{
+			for (PetLook &pet : pets)
+			{
+				if (!pet.get_itemid())
+					continue;
+
+				Optional<const Pet> item = inventory.get_pet(pet.get_serial());
+
+				if (item && item->get_skill() & auto_potion::SPEAKS_UP)
+					pet.act({ 3, 0, PetData::get(pet.get_itemid()).get_no_potion(mp) }, true);
+			}
+		}
+
+		catch_notice(mp ? auto_potion::LACKING_MP : auto_potion::LACKING_HP);
 	}
 
 	std::array<int32_t, 3> Player::get_pet_closeness() const

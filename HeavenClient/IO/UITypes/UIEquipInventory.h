@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <memory>
 
 #include "../UIDragElement.h"
 
@@ -68,6 +70,9 @@ namespace ms
 		// Whether the pet at `index` in the list is out.
 		bool has_pet(uint8_t index) const;
 		bool is_worn(int16_t part) const;
+		// The auto potion slot under the cursor: 0 for HP, 1 for MP, -1 for neither.
+		int8_t potion_by_position(Point<int16_t> position) const;
+		void update_potions();
 
 		class EquipIcon : public Icon::Type
 		{
@@ -89,6 +94,24 @@ namespace ms
 			int16_t source;
 		};
 
+		// The potion beside the first pet's HP or MP pouch. Dragged onto the
+		// stage, it goes (FUN_004ef140).
+		class PotionIcon : public Icon::Type
+		{
+		public:
+			PotionIcon(bool mp);
+
+			void drop_on_stage() const override;
+			void drop_on_equips(EquipSlot::Id) const override {}
+			bool drop_on_items(InventoryType::Id, EquipSlot::Id, int16_t, bool) const override { return true; }
+			void drop_on_bindings(Point<int16_t>, bool) const override {}
+			void set_count(int16_t) override {}
+			Icon::IconType get_type() override;
+
+		private:
+			bool mp;
+		};
+
 		enum Buttons : uint16_t
 		{
 			BT_CLOSE,
@@ -103,6 +126,9 @@ namespace ms
 
 		EnumMap<EquipSlot::Id, Point<int16_t>> iconpositions;
 		EnumMap<EquipSlot::Id, std::unique_ptr<Icon>> icons;
+		// The auto potions' icons, HP then MP, and the items they show.
+		std::array<std::unique_ptr<Icon>, 2> potions;
+		std::array<int32_t, 2> potion_ids = { 0, 0 };
 
 		Texture backgrnd;
 		Texture pet;

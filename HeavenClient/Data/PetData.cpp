@@ -80,6 +80,8 @@ namespace ms
 		}
 
 		idle = reactions(src["randAction"], dialog);
+		no_potion[0] = dialog["e_NOHPPotion"].get_string();
+		no_potion[1] = dialog["e_NOMPPotion"].get_string();
 
 		for (nl::node child : src)
 			if (!pets::reserved(child.name()))
@@ -119,5 +121,10 @@ namespace ms
 	const std::vector<std::string> &PetData::get_customs() const
 	{
 		return customs;
+	}
+
+	const std::string &PetData::get_no_potion(bool mp) const
+	{
+		return no_potion[mp];
 	}
 }

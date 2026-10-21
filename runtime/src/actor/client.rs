@@ -563,16 +563,23 @@ impl ClientActor {
         }
         self.client_id = character_id;
 
+        let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         let mut keymap = build::world::keymap::build_keymap(&player.keymap)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
         // Sent even with no macros: the client keeps the last list it had.
         let mut macros = build::world::skill_macro::build_skill_macros(&player.skill_macros)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
-            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        let [mut auto_hp, mut auto_mp] =
+            build::world::keymap::build_auto_potions(player.auto_potions)
+                .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        // The key map and the pet's potions reach only a field's stage, so a
+        // v83 client drops them before SET_FIELD.
+        self.send(&mut char_info).await?;
         self.send(&mut keymap).await?;
         self.send(&mut macros).await?;
-        self.send(&mut char_info).await?;
+        self.send(&mut auto_hp).await?;
+        self.send(&mut auto_mp).await?;
         if !expired.item_ids.is_empty() {
             let mut lines = build::world::inventory::build_items_expired(&expired.item_ids)
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;

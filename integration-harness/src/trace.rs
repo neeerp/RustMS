@@ -80,6 +80,8 @@ pub struct Trace {
     pub fame_gains: Vec<i32>,
     /// Every STAT_CHANGED, as values by mask bit.
     pub stat_updates: Vec<BTreeMap<i32, i64>>,
+    /// HP_TAKEN (0xD4): HP about to go without a hit, in order.
+    pub hp_taken: Vec<i32>,
     /// UPDATE_SKILLS: (skill id, level).
     pub skills: Vec<(i32, i32)>,
     /// Item gains and losses shown in chat (SHOW_ITEM_GAIN_INCHAT 3).
@@ -318,6 +320,8 @@ impl Trace {
                 }
             }
             self.stat_updates.push(values);
+        } else if op == SendOpcode::HpTaken as i16 {
+            self.hp_taken.push(r.read_int().unwrap());
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
         } else if op == SendOpcode::BroadcastMsg as i16 {
