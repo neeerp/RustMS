@@ -35,6 +35,11 @@ pub const LEA: i32 = 2010008;
 pub const LAKELIS: i32 = 9020000;
 /// Nella, who lets players out of the party quest and back to town.
 const NELLA: i32 = 9020002;
+/// Jeff, at the way down from Ice Valley II.
+const JEFF: i32 = 2030000;
+/// Sharp Cliff I and its `under00` portal, the top of the dungeon below.
+const SHARP_CLIFF: (i32, u8) = (211040300, 5);
+const JEFF_LEVEL: u8 = 50;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -686,6 +691,7 @@ impl NpcScript {
             DOLPHIN => Some(dolphin(player)),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
+            JEFF => Some(jeff(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -1350,6 +1356,23 @@ fn nella(player: &Player) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// Jeff (`goDungeon`): players from level 50 may go down to Sharp Cliff.
+/// The Orihalcon Hammer's way to Ice Valley (921100100) comes with its
+/// quest line.
+fn jeff(player: &Player) -> NpcScript {
+    let (map, portal) = SHARP_CLIFF;
+    let next = if player.stats.level >= JEFF_LEVEL {
+        Page::Ask {
+            text: text(keys::JEFF_ASK),
+            on_yes: vec![Effect::WarpToPortal(map, portal)],
+            on_no: Some(text(keys::JEFF_DECLINE)),
+        }
+    } else {
+        Page::Say(text(keys::JEFF_TOO_WEAK))
+    };
+    NpcScript::new(JEFF, vec![Page::Say(text(keys::JEFF_INTRO)), next])
 }
 
 /// `station_in`: Isa shows the way to Orbis Station's platforms.
@@ -2837,6 +2860,23 @@ mod tests {
             );
         }
         assert_eq!(NpcScript::for_npc(NELLA, &rider(100, 0, 103000000)), None);
+    }
+
+    #[test]
+    fn jeff_lets_level_50_players_down_to_sharp_cliff() {
+        let mut jeff = NpcScript::for_npc(JEFF, &traveller(50, 0, false)).unwrap();
+        assert_eq!(kind(&jeff.begin()), Some(0));
+        assert_eq!(kind(&jeff.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            jeff.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(211040300, 5)]
+        );
+
+        let mut jeff = NpcScript::for_npc(JEFF, &traveller(49, 0, false)).unwrap();
+        jeff.begin();
+        let refusal = jeff.respond(ScriptInput::Next).unwrap();
+        assert_eq!(kind(&refusal), Some(0));
+        assert!(jeff.respond(ScriptInput::Next).unwrap().effects.is_empty());
     }
 
     fn rider(job: i16, meso: i32, map_id: i32) -> Player {

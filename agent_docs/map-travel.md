@@ -60,6 +60,17 @@ VIP Cab's fare through the network harness.
 `subway.rs` rides the NLC Taxi and walks through `halloween_enter`. The
 Kerning City-New Leaf City subway runs on the ship clock (`ships.md`).
 
+## Guards
+
+Jeff (`2030000`, `goDungeon`) stands in Ice Valley II (`211040200`), where
+the El Nath Danger Zone Taxi stops. After a first page he asks a player of
+level 50 or more whether to go down, and Yes warps to Sharp Cliff I
+(`211040300`) portal 5 (`under00`); below level 50 he refuses. In the
+original, a holder of the Orihalcon Hammer (`4031450`) goes straight to Ice
+Valley (`921100100`) instead; that comes with its quest line. His keys
+(`jeff.*`) are `unsourced`. `el_nath_dungeon.rs` checks both answers through
+the network harness.
+
 ## Map and portal scripts
 
 Map entry (`info/onUserEnter`) and touch portals (`pt` 9) run native scripts
