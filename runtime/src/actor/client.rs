@@ -4,6 +4,7 @@ mod buff;
 mod combat;
 mod dialogue;
 mod door;
+mod duey;
 mod events;
 mod expiry;
 mod fame;
@@ -109,6 +110,8 @@ pub struct ClientActor {
     shop: Option<net::shop::Shop>,
     /// The account's storage, while the player has it open.
     storage: Option<net::storage::OpenStorage>,
+    /// The Duey window, while the player has it open.
+    duey: Option<duey::DueyWindow>,
     /// When natural recovery of HP and of MP was last accepted; the client
     /// times them separately.
     last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
@@ -183,6 +186,7 @@ impl ClientActor {
             script: None,
             shop: None,
             storage: None,
+            duey: None,
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
@@ -422,6 +426,7 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
+            WorldAction::Duey(request) => self.duey_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
                 self.shop_room_request(request).await?
@@ -656,6 +661,7 @@ impl ClientActor {
         self.load_buddies().await?;
         self.load_guild().await?;
         self.load_notes().await?;
+        self.announce_parcels().await?;
         info!(
             character_id,
             channel_id = self.channel_id,

@@ -14,6 +14,7 @@ pub mod combo;
 pub mod content;
 pub mod conti;
 pub mod dialogue;
+pub mod duey;
 pub mod energy;
 pub mod events;
 mod game_data;

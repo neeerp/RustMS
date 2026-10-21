@@ -35,7 +35,10 @@ impl ClientActor {
         if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, player) {
             return self.start_script(script).await;
         }
-        if self.open_shop(npc_id).await? || self.open_storage(npc_id).await? {
+        if self.open_shop(npc_id).await?
+            || self.open_storage(npc_id).await?
+            || self.open_duey(npc_id).await?
+        {
             return Ok(());
         }
         let data =

@@ -427,6 +427,8 @@ pub enum WorldAction {
     Shop(crate::shop::ShopRequest),
     /// Take out of, store in, sort, or close the storage the player has open.
     Storage(crate::storage::StorageRequest),
+    /// Open Duey's window, send, claim, or delete a parcel, or close it.
+    Duey(crate::duey::DueyRequest),
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
     /// Open, stock, visit, or buy from a personal shop.
@@ -824,6 +826,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
             (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
             (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
+            (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -935,7 +938,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 95);
+        assert_eq!(world_routes().len(), 96);
     }
 
     #[test]
