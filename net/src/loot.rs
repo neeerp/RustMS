@@ -122,10 +122,12 @@ fn loot_of(
     rng: &mut impl Rng,
 ) -> Option<Loot> {
     if let Some(amount) = entry.money {
-        // v83 varies meso drops by about ±25%.
-        let spread = (amount / 4).max(0);
-        let amount = rng.gen_range(amount - spread, amount + spread + 1).max(1);
-        let amount = (f64::from(amount) * mesos).round().min(f64::from(i32::MAX)) as i32;
+        // 4/5 of the amount plus up to 2/5 more, as the Nexon server
+        // OrionAlpha decompiles has it (`Reward.create`): about ±20%.
+        let money = i64::from(amount.max(0));
+        let (base, width) = (4 * money / 5, 2 * money / 5);
+        let amount = (base + rng.gen_range(0, width + 1)).max(1);
+        let amount = (amount as f64 * mesos).round().min(f64::from(i32::MAX)) as i32;
         return Some(Loot::Mesos(amount.max(1)));
     }
     let item_id = entry.item?;
@@ -346,7 +348,7 @@ mod tests {
             else {
                 panic!("one meso drop");
             };
-            assert!((6..=10).contains(&amount));
+            assert!((6..=9).contains(&amount), "{amount}");
         }
         assert!(
             roll_entries(&[entry(Some(4000019), None, 0.0, None)], &player, &mut rng).is_empty()
@@ -373,7 +375,7 @@ mod tests {
             let [Loot::Mesos(amount)] = roll_at(&mesos, (1.0, 2.0), &player, &mut rng)[..] else {
                 panic!("one meso drop");
             };
-            assert!((150..=250).contains(&amount) && amount % 2 == 0);
+            assert!((160..=240).contains(&amount) && amount % 2 == 0);
         }
     }
 

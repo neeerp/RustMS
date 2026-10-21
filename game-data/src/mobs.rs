@@ -57,6 +57,10 @@ pub struct MobInfo {
     /// How long it takes to die, in ms: its `die1` frames' delays (100 for
     /// one without), or 500 without any, as Cosmic has it.
     pub dying_ms: i32,
+    /// The HP and MP it regains every few seconds (`hpRecovery`,
+    /// `mpRecovery`).
+    pub hp_recovery: i32,
+    pub mp_recovery: i32,
     /// How long it stays before it leaves on its own, in seconds
     /// (`removeAfter`), or 0 for as long as it lives.
     pub remove_after: i32,
@@ -233,6 +237,8 @@ impl MobData {
             banish: self.banish(info)?,
             revive: self.revive(info)?,
             dying_ms: self.dying_ms(image)?,
+            hp_recovery: int("hpRecovery")?,
+            mp_recovery: int("mpRecovery")?,
             remove_after: int("removeAfter")?,
             self_destruct: self.self_destruct(info)?,
             hp_tag_color: u8::try_from(int("hpTagColor")?).unwrap_or(0),
@@ -488,6 +494,21 @@ mod tests {
         assert_eq!(mob(9300117).remove_after, 10);
         assert_eq!(mob(4300017).remove_after, 15);
         assert_eq!(mob(100100).remove_after, 0);
+    }
+
+    #[test]
+    fn reads_what_mobs_regain() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        let mob = |id| data.info(id).unwrap().unwrap();
+        // Mano, and a snail with none.
+        assert_eq!(
+            (mob(2220000).hp_recovery, mob(2220000).mp_recovery),
+            (10, 1)
+        );
+        assert_eq!((mob(100100).hp_recovery, mob(100100).mp_recovery), (0, 0));
     }
 
     #[test]
