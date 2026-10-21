@@ -37,6 +37,7 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIMessenger.h"
+#include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../Util/CurseWords.h"
@@ -457,8 +458,20 @@ namespace ms
 					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
 				break;
 			case 7:
-				recv.read_int(); // npcid
+			{
+				// The NPC says it in a dialog with OK, which answers
+				// nothing (0xa235fa).
+				int32_t npcid = recv.read_int();
+
+				UI::get().emplace<UINpcTalk>();
+
+				if (auto talk = UI::get().get_element<UINpcTalk>())
+				{
+					talk->change_text(npcid, 0, 0, 0, message);
+					talk->set_local_responder([](int8_t, int32_t) {});
+				}
 				break;
+			}
 			case 8:
 			case 9:
 			{

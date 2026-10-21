@@ -276,6 +276,12 @@ megaphone's later lines take the first line's name. Lines are dropped on
 event maps (`Util/Megaphones.h`); v83 shows them there to GMs, but
 HeavenClient doesn't know who is a GM.
 
+Two other server message types aren't megaphones. Type 6 (a line with an
+item ID) is shown as a blue chat line; v83 also links the item, which
+HeavenClient leaves out. Type 7 (an NPC ID and the text) opens that NPC's
+say dialog with OK and no NEXT or BACK; closing it sends nothing back
+(0xa235fa).
+
 Double-clicking a megaphone in the Cash tab opens its dialog
 (`UIItemInventory::use_megaphone`), as v83 does:
 
