@@ -309,6 +309,21 @@ const PISON: i32 = 1081001;
 const THOMAS_SWIFT: i32 = 9201022;
 const HENESYS: (i32, u8) = (100000000, 5);
 const AMORIA: (i32, u8) = (680000000, 0);
+/// Audrey (`Malay_Warp2`), Malaysia's tour guide (Cosmic's fares): from the
+/// Central Business District, where the plane lands, to Trend Zone
+/// Metropolis; between Trend Zone and Kampung Village; and from Trend Zone
+/// free back where the tour began, else Boat Quay Town. The destinations
+/// are `(map, portal)`.
+const AUDREY: i32 = 9201135;
+const MALAYSIA_CBD: i32 = 540000000;
+const KAMPUNG_VILLAGE: i32 = 551000000;
+const CBD_FARE: i32 = 42000;
+const CBD_TO_TREND_ZONE: (i32, u8) = (TREND_ZONE_METROPOLIS, 0);
+const TO_KAMPUNG_VILLAGE: (i32, u8) = (KAMPUNG_VILLAGE, 2);
+const BACK_TO_TREND_ZONE: (i32, u8) = (TREND_ZONE_METROPOLIS, 4);
+/// The portal the way back arrives at, on either town a tour of Malaysia
+/// begins in.
+const MALAYSIA_HOME_PORTAL: u8 = 4;
 /// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
 /// choosing, for a coupon each.
 const NATALIE: i32 = 1012103;
@@ -856,6 +871,7 @@ impl NpcScript {
             SPINEL => Some(spinel(player)),
             PISON => Some(pison(player)),
             THOMAS_SWIFT => thomas_swift(player),
+            AUDREY => audrey(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
             JEFF => Some(jeff(player)),
@@ -2424,6 +2440,70 @@ fn thomas_swift(player: &Player) -> Option<NpcScript> {
     ))
 }
 
+/// Audrey's rides around Malaysia from where the player stands. `None`
+/// elsewhere.
+fn audrey(player: &Player) -> Option<NpcScript> {
+    let here = player.stats.map_id;
+    let ride = |(to, portal): (i32, u8), fare: i32| {
+        let (map, price) = (to.to_string(), fare.to_string());
+        let args = [("map", map.as_str()), ("price", price.as_str())];
+        let mut go = vec![Effect::SpendMeso(fare)];
+        if here == MALAYSIA_CBD {
+            go.push(Effect::SaveLocation(WORLD_TOUR_RETURN, Some(here)));
+        }
+        go.push(Effect::WarpToPortal(to, portal));
+        let ask = content::text().get(keys::MALAYSIA_ASK, &args);
+        let pages = gated(
+            ask,
+            Some(keys::MALAYSIA_DECLINE),
+            keys::MALAYSIA_SHORT,
+            player.meso >= fare,
+            go,
+        );
+        (content::text().get(keys::MALAYSIA_CHOICE, &args), pages)
+    };
+    let (intro, choices) = match here {
+        MALAYSIA_CBD => (
+            keys::MALAYSIA_INTRO_CBD,
+            vec![ride(CBD_TO_TREND_ZONE, CBD_FARE)],
+        ),
+        TREND_ZONE_METROPOLIS => {
+            let back = saved_location(player, WORLD_TOUR_RETURN, BOAT_QUAY_TOWN);
+            // Only the Malaysian towns are saved on the way here; anywhere
+            // else arrives at its first spawn point.
+            let warp = if back == MALAYSIA_CBD || back == BOAT_QUAY_TOWN {
+                Effect::WarpToPortal(back, MALAYSIA_HOME_PORTAL)
+            } else {
+                Effect::Warp(back)
+            };
+            let home = vec![
+                Page::Say(text(keys::MALAYSIA_HOME_GO)),
+                Page::Done(vec![Effect::SaveLocation(WORLD_TOUR_RETURN, None), warp]),
+            ];
+            let map = back.to_string();
+            let label = content::text().get(keys::MALAYSIA_HOME, &[("map", map.as_str())]);
+            (
+                keys::MALAYSIA_INTRO,
+                vec![ride(TO_KAMPUNG_VILLAGE, MALAYSIA_FARE), (label, home)],
+            )
+        }
+        KAMPUNG_VILLAGE => (
+            keys::MALAYSIA_INTRO,
+            vec![ride(BACK_TO_TREND_ZONE, MALAYSIA_FARE)],
+        ),
+        _ => return None,
+    };
+    let mut script = NpcScript::new(
+        AUDREY,
+        vec![Page::Menu {
+            text: text(intro),
+            choices,
+        }],
+    );
+    script.refused = Some(text(keys::MALAYSIA_SHORT));
+    Some(script)
+}
+
 /// A first-job instructor. A beginner who qualifies may take the job, its
 /// weapons and its bag rows; one who doesn't is told to train; everyone
 /// else hears what the job is like.
@@ -3806,7 +3886,7 @@ mod tests {
         }
         let mut says = Vec::new();
         for plane in [540010101, 540010002] {
-            let mut aboard = NpcScript::for_npc(9270018, &rider(0, 0, plane)).unwrap();
+            let aboard = NpcScript::for_npc(9270018, &rider(0, 0, plane)).unwrap();
             let step = aboard.begin();
             assert_eq!(buttons(&step), (false, false));
             says.push(page_text(&step));
@@ -3960,6 +4040,60 @@ mod tests {
             );
         }
         assert!(NpcScript::for_npc(THOMAS_SWIFT, &rider(0, 0, 101000000)).is_none());
+    }
+
+    #[test]
+    fn audrey_rides_around_malaysia_and_sees_the_tour_home() {
+        // A paid ride asks first; from the CBD it saves where the tour began.
+        for (from, to, fare) in [
+            (540000000, (550000000, 0), 42000),
+            (550000000, (551000000, 2), 10000),
+            (551000000, (550000000, 4), 10000),
+        ] {
+            let start = |meso| {
+                let mut ride = NpcScript::for_npc(AUDREY, &rider(0, meso, from)).unwrap();
+                assert_eq!(kind(&ride.begin()), Some(4));
+                assert_eq!(
+                    kind(&ride.respond(ScriptInput::Select(0)).unwrap()),
+                    Some(1)
+                );
+                ride
+            };
+            let mut paid = vec![Effect::SpendMeso(fare)];
+            if from == 540000000 {
+                paid.push(Effect::SaveLocation(WORLD_TOUR_RETURN, Some(from)));
+            }
+            paid.push(Effect::WarpToPortal(to.0, to.1));
+            let mut ride = start(fare);
+            assert_eq!(ride.respond(ScriptInput::Yes).unwrap().effects, paid);
+            assert!(ride.refused.is_some());
+            // One meso short, or saying no, goes nowhere.
+            let mut short = start(fare - 1);
+            assert!(short.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+            let mut no = start(fare);
+            assert!(no.respond(ScriptInput::No).unwrap().effects.is_empty());
+        }
+        // From Trend Zone, free back where the tour began, else Boat Quay.
+        let mut toured = rider(0, 0, 550000000);
+        toured.saved_locations.insert(WORLD_TOUR_RETURN, 540000000);
+        let mut astray = rider(0, 0, 550000000);
+        astray.saved_locations.insert(WORLD_TOUR_RETURN, 100000000);
+        for (player, warp) in [
+            (&toured, Effect::WarpToPortal(540000000, 4)),
+            (&rider(0, 0, 550000000), Effect::WarpToPortal(541000000, 4)),
+            (&astray, Effect::Warp(100000000)),
+        ] {
+            let mut home = NpcScript::for_npc(AUDREY, player).unwrap();
+            home.begin();
+            let step = home.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(kind(&step), Some(0));
+            assert!(step.effects.is_empty());
+            assert_eq!(
+                home.respond(ScriptInput::Next).unwrap().effects,
+                [Effect::SaveLocation(WORLD_TOUR_RETURN, None), warp]
+            );
+        }
+        assert!(NpcScript::for_npc(AUDREY, &rider(0, 0, 541000000)).is_none());
     }
 
     #[test]

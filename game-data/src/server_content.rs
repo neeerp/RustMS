@@ -260,6 +260,17 @@ pub mod keys {
     pub const AMORIA_DECLINE: &str = "amoria.decline";
     pub const AMORIA_BYE: &str = "amoria.bye";
 
+    /// Audrey's rides around Malaysia: a choice and its ask with `{map}`
+    /// and `{price}`, and the way home with `{map}`.
+    pub const MALAYSIA_INTRO_CBD: &str = "malaysia.intro_cbd";
+    pub const MALAYSIA_INTRO: &str = "malaysia.intro";
+    pub const MALAYSIA_CHOICE: &str = "malaysia.choice";
+    pub const MALAYSIA_ASK: &str = "malaysia.ask";
+    pub const MALAYSIA_DECLINE: &str = "malaysia.decline";
+    pub const MALAYSIA_SHORT: &str = "malaysia.short";
+    pub const MALAYSIA_HOME: &str = "malaysia.home";
+    pub const MALAYSIA_HOME_GO: &str = "malaysia.home_go";
+
     /// The NLC Taxi between New Leaf City and the Haunted House's mansion
     /// grounds.
     pub const NLC_TAXI_ASK: &str = "nlc_taxi.ask";
@@ -913,6 +924,14 @@ mod tests {
             keys::AMORIA_TO_HENESYS,
             keys::AMORIA_DECLINE,
             keys::AMORIA_BYE,
+            keys::MALAYSIA_INTRO_CBD,
+            keys::MALAYSIA_INTRO,
+            keys::MALAYSIA_CHOICE,
+            keys::MALAYSIA_ASK,
+            keys::MALAYSIA_DECLINE,
+            keys::MALAYSIA_SHORT,
+            keys::MALAYSIA_HOME,
+            keys::MALAYSIA_HOME_GO,
             keys::NLC_TAXI_ASK,
             keys::NLC_TAXI_DECLINE,
             keys::NLC_TAXI_SHORT,

@@ -1,6 +1,7 @@
 //! Trips that end at an NPC rather than a portal: Spinel's world tour to
 //! the Mushroom Shrine and back, which outlives a relogin, the Florina
-//! Beach guides and Pison, and Thomas Swift between Henesys and Amoria.
+//! Beach guides and Pison, Thomas Swift between Henesys and Amoria, and
+//! Audrey's rides around Malaysia.
 
 use game_data::GameData;
 use integration_harness::database::{grant_item, set_job, set_meso};
@@ -20,10 +21,14 @@ const LITH_HARBOR: i32 = 104_000_000;
 const MUSHROOM_SHRINE: i32 = 800_000_000;
 const FLORINA_BEACH: i32 = 110_000_000;
 const AMORIA: i32 = 680_000_000;
+const MALAYSIA_CBD: i32 = 540_000_000;
+const TREND_ZONE: i32 = 550_000_000;
+const KAMPUNG_VILLAGE: i32 = 551_000_000;
 const SPINEL: i32 = 9000020;
 const PASON: i32 = 1002002;
 const PISON: i32 = 1081001;
 const THOMAS_SWIFT: i32 = 9201022;
+const AUDREY: i32 = 9201135;
 const VIP_TICKET_TO_FLORINA: i32 = 4031134;
 const ETC: i16 = 4;
 
@@ -162,4 +167,36 @@ async fn thomas_swift_walks_between_henesys_and_amoria() {
         let t = step(c, &format!("{m} go"), answer(0, 1, None)).await;
         assert_eq!(t.warps, [to]);
     }
+}
+
+#[tokio::test]
+async fn audrey_rides_around_malaysia_and_back_where_the_tour_began() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = traveller(&config, 62000, None, MALAYSIA_CBD).await;
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+
+    // The CBD to Trend Zone, Kampung Village and back, each paid on a yes.
+    for (from, to, meso) in [
+        (MALAYSIA_CBD, TREND_ZONE, 20000),
+        (TREND_ZONE, KAMPUNG_VILLAGE, 10000),
+        (KAMPUNG_VILLAGE, TREND_ZONE, 0),
+    ] {
+        let t = step(c, &format!("{m} talk"), talk(from, AUDREY)).await;
+        assert_eq!(t.prompts, [(AUDREY, 4)]);
+        assert!(t.prompt_texts[0].contains(&format!("#m{to}#")));
+        let t = step(c, &format!("{m} pick"), answer(4, 1, Some(0))).await;
+        assert_eq!(t.prompts, [(AUDREY, 1)]);
+        let t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+        assert_eq!(t.stat(stat::MESO), Some(meso));
+        assert_eq!(t.warps, [to]);
+    }
+
+    // Free from Trend Zone back to the CBD, where the tour began.
+    let t = step(c, &format!("{m} talk"), talk(TREND_ZONE, AUDREY)).await;
+    assert!(t.prompt_texts[0].contains(&format!("#m{MALAYSIA_CBD}#")));
+    let t = step(c, &format!("{m} home"), answer(4, 1, Some(1))).await;
+    assert_eq!(t.prompts, [(AUDREY, 0)]);
+    let t = step(c, &format!("{m} go"), answer(0, 1, None)).await;
+    assert_eq!(t.warps, [MALAYSIA_CBD]);
 }
