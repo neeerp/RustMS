@@ -174,6 +174,10 @@ pub mod keys {
     pub const KPQ_LAKELIS_DECLINE: &str = "kpq.lakelis.decline";
     pub const KPQ_NELLA_LEAVE: &str = "kpq.nella.leave";
     pub const KPQ_NELLA_HOME: &str = "kpq.nella.home";
+    pub const JEFF_INTRO: &str = "jeff.intro";
+    pub const JEFF_ASK: &str = "jeff.ask";
+    pub const JEFF_DECLINE: &str = "jeff.decline";
+    pub const JEFF_TOO_WEAK: &str = "jeff.too_weak";
 
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
@@ -681,6 +685,10 @@ mod tests {
             keys::KPQ_LAKELIS_DECLINE,
             keys::KPQ_NELLA_LEAVE,
             keys::KPQ_NELLA_HOME,
+            keys::JEFF_INTRO,
+            keys::JEFF_ASK,
+            keys::JEFF_DECLINE,
+            keys::JEFF_TOO_WEAK,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,

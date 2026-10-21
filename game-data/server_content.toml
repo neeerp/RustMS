@@ -342,6 +342,10 @@ unsourced = [
     "kpq.lakelis.decline",
     "kpq.nella.leave",
     "kpq.nella.home",
+    "jeff.intro",
+    "jeff.ask",
+    "jeff.decline",
+    "jeff.too_weak",
 ]
 
 [text."glTutoMsg0.message"]
