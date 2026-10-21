@@ -29,6 +29,8 @@ namespace ms
 	Textfield::Textfield()
 	{
 		text = "";
+		markerpos = 0;
+		alignment = Text::Alignment::LEFT;
 	}
 
 	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name color, Rectangle<int16_t> bounds, size_t limit) : font(font), alignment(alignment), color(color), bounds(bounds), limit(limit)
@@ -393,11 +395,10 @@ namespace ms
 
 	void Textfield::change_text(const std::string& t)
 	{
-		modifytext(t);
-
-		markerpos = text.size();
+		// The caret goes to the end before the text is measured, once.
+		markerpos = t.size();
 		selected = false;
-		follow_marker();
+		modifytext(t);
 	}
 
 	void Textfield::select_all()
@@ -423,6 +424,7 @@ namespace ms
 	void Textfield::set_wrap(uint16_t width)
 	{
 		wrapwidth = width;
+		scroll = 0;
 		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false);
 	}
 
@@ -431,6 +433,7 @@ namespace ms
 		wrapwidth = width;
 		rows = shown;
 		linespace = space;
+		scroll = 0;
 
 		layout_lines();
 	}
