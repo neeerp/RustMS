@@ -29,6 +29,7 @@
 #include "MesoExplosion.h"
 #include "PhysicalDamage.h"
 #include "PointBlank.h"
+#include "PqSkills.h"
 #include "Prepare.h"
 #include "RecoilShot.h"
 #include "RemoteShot.h"
@@ -447,6 +448,25 @@ namespace ms
 			return false;
 
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
+			return false;
+
+		// The secret skills go only on their own maps, which v83 checks
+		// first (FUN_00587f5f); the attacks need ground under the player,
+		// and no ride or transformation (0x9673cf, 0x951447).
+		pq_skills::Kind pq = pq_skills::kind(move.get_id());
+
+		if (!pq_skills::allowed(pq, mapinfo.get_fieldtype()))
+		{
+			InChatMessage(Messages::SKILL_FIELD).drop();
+			return false;
+		}
+
+		bool riding = player.has_buff(Buffstat::Id::MONSTER_RIDING);
+
+		if (pq_skills::refused(pq, riding, player.has_buff(Buffstat::Id::MORPH)))
+			return false;
+
+		if (pq_skills::strike(pq, 0, false) >= 0 && !player.get_phobj().onground)
 			return false;
 
 		if (assassinate::refused(move.get_id(), player.has_buff(Buffstat::Id::DARKSIGHT)))

@@ -98,6 +98,9 @@ pub enum BuffStat {
     EchoOfHero = 47,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
+    /// No mob can hurt the player: the client dodges every hit
+    /// (Invincibility, 1010).
+    DivineBody = 60,
     /// Kills give `value` percent of their EXP: Hunter's Luck (2450000).
     /// The client only shows its icon.
     ExpBuff = 74,
@@ -141,7 +144,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 20] = [
+    pub const SHOWN: [BuffStat; 21] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -162,6 +165,7 @@ impl BuffStat {
         BuffStat::StopPotion,
         BuffStat::StopMotion,
         BuffStat::Fear,
+        BuffStat::DivineBody,
     ];
 
     pub const DISEASES: [BuffStat; 13] = [

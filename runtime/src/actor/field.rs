@@ -973,6 +973,11 @@ impl FieldActor {
             let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
             let mut damage = if hurts { damage } else { 0 };
             let max_hp = i64::from(mob.info.max_hp);
+            if let Some(cap) =
+                skill.and_then(|skill| net::skills::pq_strike_cap(skill, max_hp, mob.info.boss))
+            {
+                damage = damage.min(cap);
+            }
             // Mortal Blow's kill takes what the mob has left.
             if takes.life > 0
                 && damage > 0

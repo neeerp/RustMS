@@ -395,6 +395,12 @@ impl WorldHandler for TakeDamageHandler {
                 return Ok(HandlerResult::empty());
             }
         };
+        // Invincibility dodges every hit from a mob (FUN_00959708).
+        let damage = if player.buffs.has(BuffStat::DivineBody) {
+            damage.min(0)
+        } else {
+            damage
+        };
         // The client works out the damage; it can be at most the attack's
         // own, or all but 1 HP for a deadly attack. -1 is a dodge.
         let deadly = attack.is_some_and(|a| a.deadly);

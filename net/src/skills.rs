@@ -4,7 +4,10 @@ use crate::load::{self, asset_path};
 use crate::packet::build::world::mist::MistKind;
 use game::{BuffStat, Disease, InventoryType, MobStat, Player, SkillRecord};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
-use game_data::{FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, PORTAL_TYPE_START_POINT};
+use game_data::{
+    FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, FIELD_TYPE_DOJO, FIELD_TYPE_DOJO_2, FIELD_TYPE_PYRAMID,
+    PORTAL_TYPE_START_POINT,
+};
 use rand::Rng;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -35,7 +38,11 @@ pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
     if is_gm(skill_id) && player.gm_level == 0 {
         return None;
     }
-    let level = player.skills.level(skill_id);
+    let level = match pq_skill(skill_id) {
+        Some(kind) if pq_skill_allowed(kind, player) => 1,
+        Some(_) => return None,
+        None => player.skills.level(skill_id),
+    };
     let mut effect = info(skill_id)?.level(level)?.clone();
     effect.morph = crate::morph::template(effect.morph, player.stats.gender);
     Some(Learned {
@@ -43,6 +50,61 @@ pub fn learned(player: &Player, skill_id: i32) -> Option<Learned> {
         level,
         effect,
     })
+}
+
+/// The Beginner's secret skills of the Mu Lung Dojo and Nett's Pyramid, which
+/// v83 casts at level 1 with no skill record (FUN_007616f6) and only on
+/// their own maps (FUN_00587f5f).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PqSkill {
+    /// Bamboo Rain (1009): every mob in reach loses its max HP, a boss 30%.
+    BambooRain,
+    /// Invincibility (1010) and Power Explosion (1011).
+    DojoBuff,
+    /// Rage of Pharaoh (1020): every mob in reach loses its max HP.
+    RageOfPharaoh,
+}
+
+/// Which secret skill `skill_id` is, in the Beginner's, Noblesse's, Legend's,
+/// or Evan's copy.
+pub fn pq_skill(skill_id: i32) -> Option<PqSkill> {
+    if !matches!(skill_id / 10000, 0 | 1000 | 2000 | 2001) {
+        return None;
+    }
+    match skill_id % 10000 {
+        1009 => Some(PqSkill::BambooRain),
+        1010 | 1011 => Some(PqSkill::DojoBuff),
+        1020 => Some(PqSkill::RageOfPharaoh),
+        _ => None,
+    }
+}
+
+/// Whether the player may use a secret skill where they are: the Dojo's
+/// on its stages and Rage of Pharaoh in the Pyramid, and the two attacks
+/// neither riding nor transformed (FUN_00966f7a).
+fn pq_skill_allowed(kind: PqSkill, player: &Player) -> bool {
+    let field_type = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id))
+        .map_or(0, |field| field.field_type);
+    let on_its_map = match kind {
+        PqSkill::BambooRain | PqSkill::DojoBuff => {
+            matches!(field_type, FIELD_TYPE_DOJO | FIELD_TYPE_DOJO_2)
+        }
+        PqSkill::RageOfPharaoh => field_type == FIELD_TYPE_PYRAMID,
+    };
+    let attack = kind != PqSkill::DojoBuff;
+    on_its_map && !(attack && (player.ride_skill().is_some() || player.buffs.has(BuffStat::Morph)))
+}
+
+/// The most a secret attack may take from a mob: all its max HP, but only
+/// 30% of a boss's to Bamboo Rain (FUN_0078df87).
+pub fn pq_strike_cap(skill_id: i32, max_hp: i64, boss: bool) -> Option<i64> {
+    match pq_skill(skill_id)? {
+        PqSkill::BambooRain if boss => Some(max_hp * 3 / 10),
+        PqSkill::BambooRain | PqSkill::RageOfPharaoh => Some(max_hp),
+        PqSkill::DojoBuff => None,
+    }
 }
 
 /// What a new fourth job is taught at the advancement: each of `job`'s
@@ -1088,6 +1150,8 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
     let effect = &skill.effect;
     let own = match skill.skill_id {
         1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],
+        // Invincibility: no mob can hurt the player (FUN_00959708).
+        1010 | 10001010 | 20001010 | 20011010 => vec![(BuffStat::DivineBody, effect.x)],
         1002 | 10001002 | 20001002 => vec![],
         // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
         // Focus, Haste, Enrage.
@@ -1205,6 +1269,47 @@ mod tests {
             });
         }
         player
+    }
+
+    #[test]
+    fn the_secret_skills_need_no_record_but_their_own_maps() {
+        if data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = knowing(&[]);
+        let level = |player: &Player, skill_id| learned(player, skill_id).map(|s| s.level);
+        player.stats.map_id = 100_000_000;
+        assert_eq!(level(&player, 1010), None);
+        assert_eq!(level(&player, 1020), None);
+        // A Dojo stage (fieldType 14).
+        player.stats.map_id = 925_020_100;
+        assert_eq!(level(&player, 1010), Some(1));
+        assert_eq!(level(&player, 1009), Some(1));
+        assert_eq!(level(&player, 1020), None);
+        let invincibility = learned(&player, 1010).unwrap();
+        assert_eq!(buffs(&invincibility), Some(vec![(BuffStat::DivineBody, 1)]));
+        assert_eq!(invincibility.effect.duration, 30);
+        // Transformed, the attack is refused but the buff isn't.
+        let now = std::time::Instant::now();
+        let morph = game::Buff::new(-2210000, BuffStat::Morph, 1, now, Duration::from_secs(60));
+        player.buffs.give(morph);
+        assert_eq!(level(&player, 1009), None);
+        assert_eq!(level(&player, 1010), Some(1));
+        // Nett's Pyramid (fieldType 23).
+        let mut player = knowing(&[]);
+        player.stats.map_id = 926_010_100;
+        assert_eq!(level(&player, 1020), Some(1));
+        assert_eq!(level(&player, 1009), None);
+    }
+
+    #[test]
+    fn the_secret_attacks_take_a_mobs_max_hp_and_bamboo_a_bosss_30_percent() {
+        assert_eq!(pq_strike_cap(1009, 1000, false), Some(1000));
+        assert_eq!(pq_strike_cap(1009, 1000, true), Some(300));
+        assert_eq!(pq_strike_cap(10001020, 1000, true), Some(1000));
+        assert_eq!(pq_strike_cap(1010, 1000, false), None);
+        assert_eq!(pq_strike_cap(1001009, 1000, false), None);
+        assert_eq!(pq_skill(20011011), Some(PqSkill::DojoBuff));
     }
 
     #[test]

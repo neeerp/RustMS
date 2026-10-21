@@ -23,6 +23,7 @@
 #include "../Constants.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
+#include "../Gameplay/Combat/PqSkills.h"
 #include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Stage.h"
@@ -136,6 +137,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::DASH_SPEED)
 				show_dash(dash::skill(job));
+
+			if (stat == Buffstat::Id::DIVINE_BODY)
+				show_divine_body(pq_skills::family(job, pq_skills::INVINCIBILITY));
 		}
 
 		show_diseases();
@@ -161,6 +165,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::DASH_SPEED)
 				show_dash(0);
+
+			if (stat == Buffstat::Id::DIVINE_BODY)
+				show_divine_body(0);
 		}
 
 		show_diseases();

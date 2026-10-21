@@ -42,6 +42,7 @@
 #include "../Gameplay/Combat/RecoilShot.h"
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Combat/MagicDamage.h"
+#include "../Gameplay/Combat/PqSkills.h"
 #include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/Messages.h"
@@ -1119,6 +1120,13 @@ namespace ms
 		int32_t damage = stats.calculate_damage(attack, randomizer.next_real(1.0), randomizer.next_real(1.0),
 												 get_buff_value(Buffstat::Id::INVINCIBLE), resist);
 
+		// Invincibility makes every mob's hit miss, even one Shadow Shifter
+		// would dodge (FUN_00959708).
+		bool divine = has_buff(Buffstat::Id::DIVINE_BODY);
+
+		if (divine)
+			damage = 0;
+
 		if (mob_damage::blinded(attack.blind, randomizer.next_real(1.0)))
 			damage = 0;
 
@@ -1139,7 +1147,7 @@ namespace ms
 		int32_t dodged = 0;
 		int32_t shifter = procs ? mob_damage::shadow_shifter(job) : 0;
 
-		if (shifter && skillbook.get_level(shifter) > 0 && randomizer.below(skill_stats(skillbook, shifter).chance))
+		if (shifter && !divine && skillbook.get_level(shifter) > 0 && randomizer.below(skill_stats(skillbook, shifter).chance))
 		{
 			damage = -1;
 			dodged = shifter;
@@ -1297,6 +1305,9 @@ namespace ms
 		if (buff.stat == Buffstat::Id::MORPH)
 			transform(buff.value, false, underwater);
 
+		if (buff.stat == Buffstat::Id::DIVINE_BODY)
+			show_divine_body(pq_skills::family(stats.get_stat(MapleStat::Id::JOB), pq_skills::INVINCIBILITY));
+
 		show_diseases();
 	}
 
@@ -1314,6 +1325,9 @@ namespace ms
 
 		if (stat == Buffstat::Id::MORPH)
 			transform(0, false);
+
+		if (stat == Buffstat::Id::DIVINE_BODY)
+			show_divine_body(0);
 
 		show_diseases();
 	}

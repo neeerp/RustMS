@@ -620,6 +620,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             effect.money_cost * 3 / 2 * 10 * (100 + effect.x) / 100
         } else if skill.skill_id == SNIPE && attack.kind == AttackKind::Ranged {
             SNIPE_MOST
+        } else if skills::pq_strike_cap(skill.skill_id, 1, false).is_some() {
+            // Bamboo Rain and Rage of Pharaoh take the mob's max HP, which
+            // the field caps them at.
+            i32::MAX
         } else if skill.skill_id == MESO_EXPLOSION {
             // Each line is worth less than 50·x (FUN_00791fbc).
             if attack.explosion.is_none() {

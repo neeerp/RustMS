@@ -18,6 +18,7 @@
 #include "SkillBook.h"
 
 #include "../Data/SkillData.h"
+#include "../Gameplay/Combat/PqSkills.h"
 
 namespace ms
 {
@@ -33,6 +34,10 @@ namespace ms
 
 	int32_t SkillBook::get_level(int32_t id) const
 	{
+		// The secret skills are always at level 1 (FUN_007616f6).
+		if (pq_skills::kind(id) != pq_skills::Kind::NONE)
+			return 1;
+
 		auto iter = skillentries.find(id);
 
 		if (iter == skillentries.end())

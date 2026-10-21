@@ -24,6 +24,7 @@
 #include "../Combat/HitPoint.h"
 #include "../Combat/MesoExplosion.h"
 #include "../Combat/MonsterMagnet.h"
+#include "../Combat/PqSkills.h"
 #include "../Combat/Prepare.h"
 #include "../Combat/ShotPath.h"
 #include "../../Character/SkillId.h"
@@ -2160,6 +2161,18 @@ namespace ms
 		// attacks hurt.
 		if (!MobHurts::hurt_by(damagedby, attack.skill, onlynormal))
 			return result;
+
+		// Bamboo Rain and Rage of Pharaoh take the mob's max HP, with no
+		// roll (0x78e3dd, 0x7905a5).
+		int32_t strike = pq_skills::strike(pq_skills::kind(attack.skill), maxhp, boss);
+
+		if (strike >= 0)
+		{
+			for (auto &line : result)
+				line = { strike, false };
+
+			return result;
+		}
 
 		for (size_t i = 0; i < result.size(); i++)
 		{
