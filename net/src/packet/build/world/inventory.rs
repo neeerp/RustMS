@@ -101,6 +101,21 @@ pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkErr
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO mode 8: "The item [name] has been expired, and
+/// therefore, deleted from your inventory." for each of up to 255
+/// `item_ids` (v83 FUN_00a209d4).
+pub fn build_items_expired(item_ids: &[i32]) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(8)?;
+    let item_ids = &item_ids[..item_ids.len().min(255)];
+    p.write_byte(item_ids.len() as u8)?;
+    for &item_id in item_ids {
+        p.write_int(item_id)?;
+    }
+    Ok(p)
+}
+
 /// INVENTORY_GROW: the bag of `kind` now has `slots` slots.
 pub fn build_inventory_grow(kind: InventoryType, slots: u8) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -256,6 +271,14 @@ mod tests {
             .byte(3)
             .byte(1);
         expect.int(4031792).int(-10);
+        expect.end();
+        let expired = build_items_expired(&[4031281, 1102135]).unwrap();
+        let mut expect = Expect::new(&expired.bytes);
+        expect
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(8)
+            .byte(2);
+        expect.int(4031281).int(1102135);
         expect.end();
     }
 }

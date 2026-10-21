@@ -63,7 +63,7 @@ pub const END_ACTIONS: &[&str] = &[
     "npcAct",
 ];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
-pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
+pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop", "period"];
 /// Keys of an `Act/1/skill/<k>` entry the server applies.
 /// `onlyMasterLevel` marks entries without a `skillLevel`, which already
 /// raise only the master level.
@@ -157,6 +157,9 @@ pub struct QuestItem {
     /// random. `None` always applies. -1 marks a reward the player picks
     /// one of.
     pub prop: Option<i32>,
+    /// Minutes a gift lasts. v83's client doesn't read it: the item comes
+    /// dated.
+    pub period: Option<i32>,
 }
 
 impl QuestItem {
@@ -493,6 +496,7 @@ fn quest_items(nx: &NxDataFile, act: &str) -> Result<Vec<QuestItem>, GameDataErr
             job: nx.int_child(item, "job")?.unwrap_or(0),
             gender: u8::try_from(nx.int_child(item, "gender")?.unwrap_or(2)).unwrap_or(2),
             prop: nx.int_child(item, "prop")?,
+            period: nx.int_child(item, "period")?,
         });
     }
     Ok(result)
@@ -625,8 +629,8 @@ mod tests {
         let hunting = keys(&["npc"], &["npc", "mob"], &[], &["exp", "item"]);
         assert_eq!(classify(&hunting), Ok(()));
         let mut expiring = hunting.clone();
-        expiring.item_keys = vec!["id".into(), "count".into(), "period".into()];
-        assert_eq!(classify(&expiring), Err("Act/item/period".into()));
+        expiring.item_keys = vec!["id".into(), "count".into(), "dateExpire".into()];
+        assert_eq!(classify(&expiring), Err("Act/item/dateExpire".into()));
         let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
         assert_eq!(classify(&pet), Err("Check/0/pet".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
@@ -696,6 +700,8 @@ mod tests {
         );
         assert_eq!(catalog.quest(3300).unwrap().end_meso, 10000);
         assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
+        // Rupi's paper lasts an hour.
+        assert_eq!(catalog.quest(3085).unwrap().start_items[0].period, Some(60));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
         // numeric order.
         let rewards = &catalog.quest(3379).unwrap().end_rewards;
@@ -753,7 +759,8 @@ mod tests {
                 count: -1,
                 job: 0,
                 gender: 2,
-                prop: None
+                prop: None,
+                period: None
             }
         );
         // Kyrin's Brawler test takes every crystal: an item without a count.

@@ -90,6 +90,8 @@ pub struct Trace {
     pub quantities: Vec<(u8, i16, i16)>,
     /// Slots emptied: (inventory type, slot).
     pub removed: Vec<(u8, i16)>,
+    /// Items said to have expired (SHOW_STATUS_INFO 8).
+    pub expired: Vec<i32>,
     /// INVENTORY_GROW: (inventory type, new slot count).
     pub bag_slots: Vec<(u8, u8)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
@@ -267,6 +269,11 @@ impl Trace {
                     self.gains.push(r.read_int().unwrap());
                 }
                 4 => self.fame_gains.push(r.read_int().unwrap()),
+                8 => {
+                    for _ in 0..r.read_byte().unwrap() {
+                        self.expired.push(r.read_int().unwrap());
+                    }
+                }
                 _ => {}
             }
         } else if op == SendOpcode::ShowItemGainInChat as i16 {

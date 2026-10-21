@@ -8,6 +8,7 @@ use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest
 use net::skills;
 use net::FieldRequest;
 use packet::Packet;
+use std::time::SystemTime;
 use tracing::{debug, warn};
 
 /// A quest change to commit together with the player.
@@ -250,7 +251,7 @@ impl ClientActor {
                 return Ok(false);
             }
         };
-        let changes = match quests::apply_items(next, &picked) {
+        let changes = match quests::apply_items(next, &picked, SystemTime::now()) {
             Ok(changes) => changes,
             Err(rejection) => {
                 debug!(?rejection, "Quest items refused");
@@ -263,7 +264,7 @@ impl ClientActor {
         if !changes.is_empty() {
             packets.push(inventory::build_inventory_operation(true, &changes)?);
         }
-        for (item_id, count) in picked {
+        for (item_id, count, _) in picked {
             packets.push(inventory::build_item_gain_in_chat(item_id, count)?);
         }
         Ok(true)

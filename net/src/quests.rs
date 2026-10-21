@@ -247,7 +247,8 @@ pub fn count_kill<'a>(
     changed
 }
 
-/// The item changes a quest step makes for `player`, as `(item id, count)`:
+/// The item changes a quest step makes for `player`, as `(item id, count,
+/// minutes a gift lasts)`:
 /// every entry for their job and gender without a `prop`, plus one pick
 /// among those with a positive one, weighted by it, plus the `choice`th of
 /// those with -1 that give something, if there are any (v83 numbers the
@@ -258,7 +259,7 @@ pub fn pick_items(
     player: &Player,
     choice: i32,
     rng: &mut impl Rng,
-) -> Result<Vec<(i32, i32)>, QuestRejection> {
+) -> Result<Vec<(i32, i32, Option<i32>)>, QuestRejection> {
     let eligible: Vec<&QuestItem> = items
         .iter()
         .filter(|item| item.applies_to(player.stats.job, player.stats.gender))
@@ -267,14 +268,14 @@ pub fn pick_items(
         .iter()
         .filter(|item| item.prop.is_some_and(|p| p < 0) && item.count > 0)
         .collect();
-    let mut picked: Vec<(i32, i32)> = eligible
+    let mut picked: Vec<(i32, i32, Option<i32>)> = eligible
         .iter()
         .filter(|item| item.prop.is_none())
         .map(|item| match item.count {
-            0 => (item.item_id, -player.inventory.count(item.item_id)),
-            count => (item.item_id, count),
+            0 => (item.item_id, -player.inventory.count(item.item_id), None),
+            count => (item.item_id, count, item.period),
         })
-        .filter(|&(_, count)| count != 0)
+        .filter(|&(_, count, _)| count != 0)
         .collect();
     let weighted: Vec<&&QuestItem> = eligible
         .iter()
@@ -286,7 +287,7 @@ pub fn pick_items(
         for item in weighted {
             let weight = item.prop.unwrap_or(0);
             if roll < weight {
-                picked.push((item.item_id, item.count));
+                picked.push((item.item_id, item.count, item.period));
                 break;
             }
             roll -= weight;
@@ -297,20 +298,22 @@ pub fn pick_items(
             .ok()
             .and_then(|index| choices.get(index))
             .ok_or(QuestRejection::Choice)?;
-        picked.push((chosen.item_id, chosen.count));
+        picked.push((chosen.item_id, chosen.count, chosen.period));
     }
     Ok(picked)
 }
 
-/// Take, then give, `items` (negative counts take). Takes are capped at
-/// what the player holds. Fails without a partial result if a gift doesn't
-/// fit; the caller applies this to a copy of the player.
+/// Take, then give, `items` (negative counts take), a gift with minutes
+/// lasting that long from `now`. Takes are capped at what the player holds.
+/// Fails without a partial result if a gift doesn't fit; the caller applies
+/// this to a copy of the player.
 pub fn apply_items(
     player: &mut Player,
-    items: &[(i32, i32)],
+    items: &[(i32, i32, Option<i32>)],
+    now: SystemTime,
 ) -> Result<Vec<InventoryChange>, QuestRejection> {
     let mut changes = Vec::new();
-    for &(item_id, count) in items.iter().filter(|(_, count)| *count < 0) {
+    for &(item_id, count, _) in items.iter().filter(|(_, count, _)| *count < 0) {
         let held = player.inventory.count(item_id);
         let taken = i16::try_from(held.min(-count)).unwrap_or(i16::MAX);
         if taken > 0 {
@@ -322,9 +325,10 @@ pub fn apply_items(
             );
         }
     }
-    for &(item_id, count) in items.iter().filter(|(_, count)| *count > 0) {
+    for &(item_id, count, minutes) in items.iter().filter(|(_, count, _)| *count > 0) {
         let quantity = i16::try_from(count).unwrap_or(i16::MAX);
-        let given = crate::items::give(&mut player.inventory, item_id, quantity);
+        let until = minutes.map(|m| now + Duration::from_secs(60 * u64::try_from(m).unwrap_or(0)));
+        let given = crate::items::give_until(&mut player.inventory, item_id, quantity, until);
         changes.extend(given.map_err(|error| match error {
             InventoryError::UnknownItem => QuestRejection::Items(item_id),
             _ => QuestRejection::InventoryFull,
@@ -713,6 +717,7 @@ mod tests {
             job,
             gender,
             prop,
+            period: None,
         };
         let items = [
             item(1002053, 1, 2, Some(1)),
@@ -747,9 +752,9 @@ mod tests {
             // exactly one hat; no sword (warriors only) and no skirt
             // (female only).
             assert_eq!(picked.len(), 3);
-            assert!(picked.contains(&(4031802, -1)));
-            assert!(picked.contains(&(4031792, -17)));
-            hats.insert(picked.iter().find(|(_, c)| *c > 0).unwrap().0);
+            assert!(picked.contains(&(4031802, -1, None)));
+            assert!(picked.contains(&(4031792, -17, None)));
+            hats.insert(picked.iter().find(|(_, c, _)| *c > 0).unwrap().0);
         }
         assert_eq!(hats.len(), 2);
     }
@@ -762,6 +767,7 @@ mod tests {
             job,
             gender: 2,
             prop: Some(-1),
+            period: None,
         };
         let items = [
             QuestItem {
@@ -777,15 +783,32 @@ mod tests {
         let beginner = player(37, 0);
         let mut rng = rand::thread_rng();
         let mut pick = |choice| pick_items(&items, &beginner, choice, &mut rng);
-        assert_eq!(pick(1), Ok(vec![(4031223, -1), (1072129, 1)]));
-        assert_eq!(pick(0), Ok(vec![(4031223, -1), (1072133, 1)]));
+        assert_eq!(pick(1), Ok(vec![(4031223, -1, None), (1072129, 1, None)]));
+        assert_eq!(pick(0), Ok(vec![(4031223, -1, None), (1072133, 1, None)]));
         assert_eq!(pick(2), Err(QuestRejection::Choice));
         assert_eq!(pick(-1), Err(QuestRejection::Choice));
         let warrior = player(37, 100);
         assert_eq!(
             pick_items(&items, &warrior, 1, &mut rand::thread_rng()),
-            Ok(vec![(4031223, -1), (1072303, 1)])
+            Ok(vec![(4031223, -1, None), (1072303, 1, None)])
         );
+    }
+
+    #[test]
+    fn a_gift_with_minutes_comes_dated_and_on_its_own() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        let mut p = player(70, 0);
+        let now = SystemTime::now();
+        let gifts = [(4031281, 1, Some(60)), (4031281, 1, None)];
+        assert!(apply_items(&mut p, &gifts, now).is_ok());
+        let dated: Vec<_> = p
+            .inventory
+            .items(game::InventoryType::Etc)
+            .map(|(_, item)| item.expiration)
+            .collect();
+        assert_eq!(dated, [Some(now + Duration::from_secs(3600)), None]);
     }
 
     #[test]

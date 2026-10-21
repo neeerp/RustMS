@@ -132,8 +132,11 @@ a positive `prop`, one is picked at random by weight (Todd's beginner hats).
 With `prop` -1 the player picks one: the choices are those for the job and
 gender, counted in numeric entry order (the file keeps "10" before "2", so
 both sides sort), and a completion naming none of them is refused, as in
-Hongbu's shoes (3608). `period`, `dateExpire`, `var`, and `name` stay
-unsupported. If the gifts don't fit, nothing changes and the client gets
+Hongbu's shoes (3608). `period` lends the item for that many minutes: it
+comes dated (v83's client ignores the key and shows the date the item
+carries) and on its own, as dated items never stack, and goes when the time
+is up (see [Inventory](./inventory.md#expiry)); Rupi's Lost Paper (3085) is
+one. `dateExpire`, `var`, and `name` stay unsupported. If the gifts don't fit, nothing changes and the client gets
 UPDATE_QUEST_INFO mode 10 with the quest id; it names the full inventories
 itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
@@ -161,7 +164,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1342 quests qualify
+changing the server's allowlist and regenerating the list. 1356 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

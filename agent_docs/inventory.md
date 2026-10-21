@@ -36,6 +36,24 @@ stats, and the `reqJob` branch bits; 0 means anyone). New characters' starting
 equipment gets its base stats at creation (the login server reads the same
 assets).
 
+## Expiry
+
+Items may carry an expiry date (`Item::expiration`, saved as
+`inventory_items.expires_at`): cash items bought for a period, and quest
+gifts with a `period` in minutes (`net::items::give_until`). v83's client
+shows the date but removes nothing, so the server takes the items when it
+passes, as Cosmic's expiration task does: `net::items::expire_items` takes
+every item, worn or in a bag, whose date has passed, except pets (their
+lives run out separately) and items dated 2079 or later (the client's "no
+expiry"). It runs as the player enters the game, before CHAR_INFO is built,
+and again whenever the next date comes while they play (the client actor
+waits for `next_expiry`; not in the Cash Shop). Either way the client gets
+SHOW_STATUS_INFO mode 8 with the item ids ("... has been expired, and
+therefore, deleted from your inventory."); in play it also gets the
+INVENTORY_OPERATION removals and, if a worn item went, the refitted HP and MP
+and the new look for the map. Sealed items (mode 11) and expiring skills
+(mode 13) aren't implemented.
+
 ## Client moves
 
 ITEM_MOVE (`0x47`: tick, type, from, to, quantity) is handled by
@@ -651,6 +669,9 @@ swapping, overall/pants, and gather/sort (replaying the swaps); `net` covers the
 observes UPDATE_CHAR_LOOK from a second player, gathers and sorts the equip
 bag, and checks persistence; `player_drops` drops a weapon for a second player
 to pick up and drops mesos earned from snails, checking both losses are saved;
+`net::items` covers which items expire and the next date, and
+`item_expiry` (integration) starts Rupi's Lost Paper, has the paper run out
+while playing, and finds a worn cape that expired offline gone at login.
 `net::shop` covers buying, selling, recharging, and their refusals, and
 `npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
