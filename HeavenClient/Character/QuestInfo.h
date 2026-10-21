@@ -27,6 +27,10 @@ namespace ms
 		std::vector<std::pair<int32_t, int32_t>> held_items;
 		// Skills to have (true, from `acquire`) or lack (false) to start.
 		std::vector<std::pair<int32_t, bool>> skills;
+		// Items that must all be worn (equipAllNeed), and of which one must
+		// be worn (equipSelectNeed), to start.
+		std::vector<int32_t> worn_all;
+		std::vector<int32_t> worn_any;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
 		// Minutes after completing before the quest can be started again
@@ -37,6 +41,8 @@ namespace ms
 		std::vector<std::pair<int32_t, int32_t>> end_items;
 		// Quests in a state needed to complete this one, as above.
 		std::vector<std::pair<int16_t, int16_t>> end_prerequisites;
+		// Mesos to hold to complete (Check/1/endmeso).
+		int32_t end_meso = 0;
 		// Items given when the quest starts: (item id, count).
 		std::vector<std::pair<int32_t, int32_t>> start_items;
 		// Mobs to kill before completing: (mob id, count).
@@ -57,6 +63,7 @@ namespace ms
 		bool auto_pre_complete = false;
 		bool auto_complete = false;
 		// When the alert checks an autoStart quest (Check/0): on every stat change, or on entering one of these maps.
+		// The maps are also a start requirement: the player must be on one.
 		bool normal_auto_start = false;
 		std::vector<int32_t> field_enter;
 	};

@@ -68,8 +68,16 @@ namespace ms
 			info.start_script = start["startscript"].data_type() == nl::node::type::string;
 			info.end_script = end["endscript"].data_type() == nl::node::type::string;
 
+			info.end_meso = static_cast<int32_t>(end["endmeso"].get_integer());
+
 			for (auto map : start["fieldEnter"])
 				info.field_enter.push_back(static_cast<int32_t>(map.get_integer()));
+
+			for (auto item : start["equipAllNeed"])
+				info.worn_all.push_back(static_cast<int32_t>(item.get_integer()));
+
+			for (auto item : start["equipSelectNeed"])
+				info.worn_any.push_back(static_cast<int32_t>(item.get_integer()));
 
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));

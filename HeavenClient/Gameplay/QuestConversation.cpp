@@ -73,7 +73,7 @@ namespace ms
 
 				return ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
 					[&](int32_t id) { return inventory.get_total_item_count(id); },
-					progress == started.end() ? std::string() : progress->second);
+					progress == started.end() ? std::string() : progress->second, inventory.get_meso());
 			}
 
 			// Whether a quest item given at the start is no longer held, worn

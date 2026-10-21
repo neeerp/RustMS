@@ -53,7 +53,8 @@ namespace ms
 	// Why a started quest can't be completed with an NPC, by v83's first
 	// failed check (FUN_00721d2c), or NONE. The names are the stop/<reason>
 	// pages they show.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB };
+	// MESO has no stop key of its own, so it shows stop/default.
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB, MESO };
 
 	inline const char* stop_reason(QuestStop stop)
 	{
@@ -70,7 +71,7 @@ namespace ms
 	// `progress` is the quest's progress string (its kill counts).
 	template<class Status, class Count>
 	QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id, Status status, Count count,
-		const std::string& progress)
+		const std::string& progress, int64_t meso)
 	{
 		if (quest.end_npc != npc_id)
 			return QuestStop::NPC;
@@ -85,17 +86,32 @@ namespace ms
 		if (!end_mobs_met(quest, progress))
 			return QuestStop::MOB;
 
+		if (meso < quest.end_meso)
+			return QuestStop::MESO;
+
 		return QuestStop::NONE;
 	}
 
-	// Whether the player's fame, items and skills meet a quest's start
-	// requirements, as v83 checks them (FUN_00721163). `held` gives how many
-	// of an item the player holds, plus one if a copy is worn. `has_skill`
-	// is v83's loose test: any skill not hidden from the skill book counts,
-	// and a hidden one once it has a record (FUN_007619b0).
-	template<class Held, class HasSkill>
-	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill)
+	// Whether the player's fame, items, skills, worn items and map meet a
+	// quest's start requirements, as v83 checks them (FUN_00721163). `held`
+	// gives how many of an item the player holds, plus one if a copy is worn,
+	// and `worn` whether a copy is worn. `has_skill` is v83's loose test: any
+	// skill not hidden from the skill book counts, and a hidden one once it
+	// has a record (FUN_007619b0).
+	template<class Held, class HasSkill, class Worn>
+	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,
+		int32_t mapid)
 	{
+		if (!std::all_of(quest.worn_all.begin(), quest.worn_all.end(), worn))
+			return false;
+
+		if (!quest.worn_any.empty() && std::none_of(quest.worn_any.begin(), quest.worn_any.end(), worn))
+			return false;
+
+		if (!quest.field_enter.empty() &&
+			std::find(quest.field_enter.begin(), quest.field_enter.end(), mapid) == quest.field_enter.end())
+			return false;
+
 		// v83 compares fame unsigned, so negative fame passes.
 		if (quest.min_fame != 0 && static_cast<uint16_t>(fame) < static_cast<uint16_t>(quest.min_fame))
 			return false;

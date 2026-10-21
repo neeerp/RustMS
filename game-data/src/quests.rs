@@ -26,25 +26,49 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "pop",
     "interval",
     "startscript",
+    "equipAllNeed",
+    "equipSelectNeed",
+    "fieldEnter",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
-/// autoStart quest through its quest alert: on stat changes, or on entering
-/// one of the listed maps. They aren't requirements, as v83's own start check
-/// (FUN_00721163) ignores them.
-pub const START_TRIGGERS: &[&str] = &["normalAutoStart", "fieldEnter"];
+/// autoStart quest through its quest alert: `normalAutoStart` on stat
+/// changes. v83's own start check (FUN_00721163) ignores it. (`fieldEnter`
+/// also triggers the alert, on entering a listed map, but is a requirement.)
+pub const START_TRIGGERS: &[&str] = &["normalAutoStart"];
 /// Requirements to complete a quest (`Check.img/<id>/1`) that the server checks.
-pub const END_REQUIREMENTS: &[&str] = &["npc", "item", "mob", "quest", "endscript"];
+pub const END_REQUIREMENTS: &[&str] = &[
+    "npc",
+    "item",
+    "mob",
+    "quest",
+    "endscript",
+    "endmeso",
+    "level",
+];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "money", "pop", "nextQuest", "item", "skill"];
+/// `npcAct` (always "quest") names an NPC animation; neither the client nor
+/// the server does anything with it.
+pub const END_ACTIONS: &[&str] = &[
+    "exp",
+    "money",
+    "pop",
+    "nextQuest",
+    "item",
+    "skill",
+    "npcAct",
+];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
 /// Keys of an `Act/1/skill/<k>` entry the server applies.
-pub const SKILL_ACTION_KEYS: &[&str] = &["id", "skillLevel", "masterLevel", "job"];
+/// `onlyMasterLevel` marks entries without a `skillLevel`, which already
+/// raise only the master level.
+pub const SKILL_ACTION_KEYS: &[&str] =
+    &["id", "skillLevel", "masterLevel", "job", "onlyMasterLevel"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QuestPrerequisite {
@@ -70,6 +94,12 @@ pub struct StartRequirements {
     /// Minutes after completing before the quest can be started again
     /// (`interval`); `None` means it can't be repeated.
     pub repeat_interval: Option<u32>,
+    /// Items that must all be worn (`equipAllNeed`).
+    pub worn_all: Vec<i32>,
+    /// Items of which one must be worn (`equipSelectNeed`), if any.
+    pub worn_any: Vec<i32>,
+    /// Maps the player must be on (`fieldEnter`); empty means any.
+    pub maps: Vec<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -85,6 +115,10 @@ pub struct QuestTemplate {
     pub end_mobs: Vec<(i32, u16)>,
     /// Quests that must be in a given state before completing.
     pub end_quests: Vec<QuestPrerequisite>,
+    /// Mesos to hold before completing (`endmeso`); 0 means none.
+    pub end_meso: i32,
+    /// Least level to complete (`Check/1/level`).
+    pub end_min_level: Option<i16>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -319,6 +353,9 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         }
     }
     requirements.quests = prerequisites(nx, start)?;
+    requirements.worn_all = int_list(nx, start, "equipAllNeed")?;
+    requirements.worn_any = int_list(nx, start, "equipSelectNeed")?;
+    requirements.maps = int_list(nx, start, "fieldEnter")?;
     requirements.items = item_counts(nx, start)?;
     if let Some(skills) = nx.child_by_name(start, "skill")? {
         for skill in nx.child_indices(skills)? {
@@ -373,6 +410,11 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_items,
         end_mobs,
         end_quests: prerequisites(nx, end)?,
+        end_meso: nx.int_child(end, "endmeso")?.unwrap_or(0),
+        end_min_level: nx
+            .int_child(end, "level")?
+            .map(|v| small(v, "level"))
+            .transpose()?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         end_skills: quest_skills(nx, &format!("Act.img/{id}/1"))?,
@@ -387,6 +429,22 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         auto_start: flag("autoStart")?,
         auto_complete: flag("autoComplete")?,
     })
+}
+
+/// The integers listed under `key` of a `Check` node.
+fn int_list(nx: &NxDataFile, check: u32, key: &str) -> Result<Vec<i32>, GameDataError> {
+    let Some(list) = nx.child_by_name(check, key)? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for entry in nx.child_indices(list)? {
+        let name = nx.node_name(entry)?;
+        result.push(
+            nx.int_child(list, &name)?
+                .ok_or_else(|| invalid("non-integer list entry"))?,
+        );
+    }
+    Ok(result)
 }
 
 /// The `quest` requirements of a `Check` node: other quests' states.
@@ -579,7 +637,7 @@ mod tests {
         skill.skill_keys = vec!["id".into(), "masterLevel".into(), "job".into()];
         assert_eq!(classify(&skill), Ok(()));
         skill.skill_keys.push("onlyMasterLevel".into());
-        assert_eq!(classify(&skill), Err("Act/skill/onlyMasterLevel".into()));
+        assert_eq!(classify(&skill), Ok(()));
     }
 
     #[test]
@@ -629,6 +687,15 @@ mod tests {
             Some(1440)
         );
         assert_eq!(mirror.start.repeat_interval, None);
+        // The Magatia cape worn; Maple Administrator's hat, in his map.
+        assert_eq!(catalog.quest(3307).unwrap().start.worn_all, [1102135]);
+        let gm = &catalog.quest(9999).unwrap().start;
+        assert_eq!(
+            (&gm.worn_any[..], &gm.maps[..]),
+            (&[1002140][..], &[180000000][..])
+        );
+        assert_eq!(catalog.quest(3300).unwrap().end_meso, 10000);
+        assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
         // numeric order.
         let rewards = &catalog.quest(3379).unwrap().end_rewards;
@@ -714,6 +781,11 @@ mod tests {
             ]
         );
         assert_eq!(catalog.quest(6800).unwrap().end_skills[0].level, 1);
-        assert!(catalog.quest(6121).is_none());
+        // Bahamut's master level only (`onlyMasterLevel`).
+        let bahamut = &catalog.quest(6121).unwrap().end_skills[0];
+        assert_eq!(
+            (bahamut.skill_id, bahamut.level, bahamut.master_level),
+            (2321003, 0, 15)
+        );
     }
 }
