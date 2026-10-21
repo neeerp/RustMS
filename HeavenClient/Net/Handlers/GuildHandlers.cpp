@@ -1,5 +1,6 @@
 #include "GuildHandlers.h"
 
+#include "Helpers/GuildBbsParser.h"
 #include "Helpers/GuildParser.h"
 
 #include "../Packets/GameplayPackets.h"
@@ -11,6 +12,7 @@
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIEnterText.h"
+#include "../../IO/UITypes/UIGuildBBS.h"
 #include "../../IO/UITypes/UIGuildMarkMaker.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINpcTalk.h"
@@ -198,6 +200,29 @@ namespace ms
 			}
 
 			refresh();
+		}
+	}
+
+	void GuildBbsHandler::handle(InPacket& recv) const
+	{
+		auto board = UI::get().get_element<UIGuildBBS>();
+
+		if (!board || !board->is_active())
+			return;
+
+		switch (recv.read_byte())
+		{
+		case 6:
+			board->show_list(GuildBbsParser::parse_list(recv));
+			break;
+		case 7:
+			board->show_thread(GuildBbsParser::parse_thread(recv));
+			break;
+		case 8:
+			board->thread_missing();
+			break;
+		default:
+			break;
 		}
 	}
 

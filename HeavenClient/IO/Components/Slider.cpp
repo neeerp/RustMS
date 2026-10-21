@@ -227,7 +227,7 @@ namespace ms
 			hold.slider = nullptr;
 		}
 
-		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.second())
+		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.length() + buttonheight)
 		{
 			thumb.set_state(Button::State::NORMAL);
 			next.set_state(Button::State::NORMAL);
@@ -312,7 +312,7 @@ namespace ms
 	{
 		Point<int16_t> relative = cursor - start;
 
-		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.second())
+		if (relative.x() < 0 || relative.y() < 0 || relative.x() > 8 || relative.y() > vertical.length() + buttonheight)
 			return Part::NONE;
 
 		Point<int16_t> thumbpos = getthumbpos();
