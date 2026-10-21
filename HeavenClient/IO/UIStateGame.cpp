@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIStateGame.h"
+#include "WindowLayer.h"
 
 #include "UI.h"
 #include "InputFocus.h"
@@ -548,10 +549,7 @@ namespace ms
 						}
 
 						if (drag_element_type != UIElement::Type::NONE)
-						{
-							elementorder.remove(drag_element_type);
-							elementorder.push_back(drag_element_type);
-						}
+							raise(drag_element_type);
 					}
 
 					if (dragged)
@@ -774,8 +772,7 @@ namespace ms
 
 		if (element && is_toggled)
 		{
-			elementorder.remove(type);
-			elementorder.push_back(type);
+			raise(type);
 
 			bool active = element->is_active();
 
@@ -812,7 +809,7 @@ namespace ms
 		} else
 		{
 			remove(type);
-			elementorder.push_back(type);
+			raise(type);
 
 			if (is_focused)
 			{
@@ -824,6 +821,34 @@ namespace ms
 
 			return elements.find(type);
 		}
+	}
+
+	void UIStateGame::raise(UIElement::Type type)
+	{
+		auto is_top = [](UIElement::Type t)
+		{
+			switch (t)
+			{
+				case UIElement::Type::INVITECARD:
+				case UIElement::Type::MEMONOTICE:
+				case UIElement::Type::QUESTCOMPLETE:
+				case UIElement::Type::NOTICE:
+				case UIElement::Type::ENTERNUMBER:
+				case UIElement::Type::NPCTALK:
+				case UIElement::Type::AVATARSELECT:
+				case UIElement::Type::PETCHOOSER:
+				case UIElement::Type::SLIDEMENU:
+				case UIElement::Type::SHOP:
+				case UIElement::Type::STORAGE:
+				case UIElement::Type::TRADINGROOM:
+				case UIElement::Type::PERSONALSHOP:
+					return true;
+				default:
+					return false;
+			}
+		};
+
+		window_layer::raise(elementorder, type, is_top);
 	}
 
 	void UIStateGame::remove(UIElement::Type type)
