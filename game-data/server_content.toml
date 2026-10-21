@@ -298,6 +298,23 @@ unsourced = [
     "water_of_life.ask",
     "water_of_life.done",
     "water_of_life.no_doll",
+    "vip_cab.intro",
+    "vip_cab.ask",
+    "vip_cab.decline",
+    "vip_cab.short",
+    "danger_zone_taxi.intro",
+    "danger_zone_taxi.ask",
+    "danger_zone_taxi.decline",
+    "danger_zone_taxi.short",
+    "camel_cab.ask",
+    "camel_cab.decline",
+    "camel_cab.short",
+    "dolphin.menu",
+    "dolphin.choice",
+    "dolphin.coupon",
+    "dolphin.ask",
+    "dolphin.coupon_ask",
+    "dolphin.short",
 ]
 
 [text."glTutoMsg0.message"]
@@ -469,6 +486,41 @@ sha256 = "58c668fc5220d17be317ef871077dd054596ddd8a08bd762b8a3322dfceb6a11"
 source = "Server.Scripts/src/station_in.lua"
 template = "{s30}"
 sha256 = "1470b56e281510c8150ee643d84313e54d0c2a510cf13e9d382a200313d13d13"
+
+[text."taxi.intro"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s0}"
+sha256 = "1f51aeb00d3a742ff84b0ed15e7e1a9c219ba1a0d2917c3a41e3f337f3c579b4"
+
+[text."taxi.discount"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s2}"
+sha256 = "6181d5205dfb887cbf64a39866c579d9a67cefe423f7c80c21fb8f063e3ef21a"
+
+[text."taxi.menu"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s3}"
+sha256 = "4051f6793c2dea251ec1b0f32f654dea578a785d9b2c4d3a173ed0224224a90b"
+
+[text."taxi.choice"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s4}{map}{s5}{price}{s6}"
+sha256 = "49a154b630ab9375775357f12fb8adc3105049847a391747014b6bf28b9e893e"
+
+[text."taxi.ask"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s7}{map}{s8}{price}{s9}"
+sha256 = "e02ff3792a5007339388f93d755efa8d74a6448759d28191291178548860b8c3"
+
+[text."taxi.decline"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s10}"
+sha256 = "aea0fc0b60c60b1d9030a85cede4e515270c94ef10edf82cd21ab7edb02ee1b2"
+
+[text."taxi.short"]
+source = "Edelstein.lua/src/victoria/victoria_taxi.lua"
+template = "{s11}"
+sha256 = "ab048d7f8ac35f486016c4e24782e6e244de9dbb1ae283cf04148f18467948a7"
 
 [text."robin.menu"]
 source = "Server.Scripts/src/begin5.lua"
