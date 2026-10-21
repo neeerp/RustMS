@@ -783,8 +783,8 @@ namespace ms
 		if (!draft || *draft == Draft::EDIT && !thread)
 			return;
 
-		const std::string& subject = title_field.get_text();
-		const std::string& text = body_field.get_text();
+		std::string subject = title_field.get_text();
+		std::string text = body_field.get_text();
 
 		if (const char* refusal = refusal_text(GuildBbs::check_thread(subject, text, CurseData::filter)))
 		{
@@ -817,7 +817,7 @@ namespace ms
 		if (!thread || draft)
 			return;
 
-		const std::string& text = reply_field.get_text();
+		std::string text = reply_field.get_text();
 
 		if (const char* refusal = refusal_text(GuildBbs::check_reply(text, CurseData::filter)))
 		{

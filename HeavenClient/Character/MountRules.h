@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 // Riding a tamed monster (Monster Rider) as v83 does it (report 201).
 namespace ms::mount
@@ -65,6 +66,20 @@ namespace ms::mount
 	inline bool is_vehicle(int32_t item)
 	{
 		return item / 10000 == 193;
+	}
+
+	// Whether a saddle (191xxxx) fits a tamed monster, given the monsters its TamingMob.nx img lists
+	// (FUN_004b1113). v83 keeps the list as a 64-bit mask of each id's last two digits, so a monster
+	// fits any saddle listing one with the same, and one ending 64 or above fits none.
+	inline bool saddle_fits(int32_t saddle, int32_t monster, const std::vector<int32_t> &listed)
+	{
+		if (saddle / 10000 != 191 || !is_tamed_monster(monster) || monster % 100 >= 64)
+			return false;
+
+		return std::any_of(listed.begin(), listed.end(), [&](int32_t id)
+		{
+			return is_tamed_monster(id) && id % 100 == monster % 100;
+		});
 	}
 
 	// The Corsair's Battleship, and the vehicle it rides (decomp.c:1178699).

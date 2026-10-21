@@ -39,6 +39,7 @@
 #include "../UITypes/UIKeyConfig.h"
 
 #include "../../Character/GachaExp.h"
+#include "../../Character/MountRules.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/ItemDrop.h"
@@ -338,7 +339,7 @@ namespace ms
 				if (text.empty())
 					return;
 
-				if (CurseData::filter(text) != text)
+				if (!CurseData::valid(text))
 				{
 					UI::get().emplace<UIOk>(NO_CURSING, [](bool)
 					{});
@@ -346,7 +347,8 @@ namespace ms
 				}
 
 				if (may_use_cash_item())
-					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, text), ExclRequest::WAIT);
+					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, CurseData::filter(text)),
+													  ExclRequest::WAIT);
 			}, weather::MAX_MESSAGE);
 		}
 
@@ -468,8 +470,9 @@ namespace ms
 			return true;
 		}
 
-		// Checks a plain or super megaphone's line with the level I have now.
-		bool line_refused(const std::string &text)
+		// Checks a plain or super megaphone's line with the level I have now,
+		// starring out its curse words.
+		bool line_refused(std::string &text)
 		{
 			uint16_t level = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL);
 
@@ -494,8 +497,10 @@ namespace ms
 			switch (Megaphones::kind(item_id))
 			{
 				case Megaphones::Kind::PLAIN:
-					UI::get().emplace<UIEnterText>(MEGAPHONE_PROMPT, [=](const std::string &text)
+					UI::get().emplace<UIEnterText>(MEGAPHONE_PROMPT, [=](const std::string &typed)
 					{
+						std::string text = typed;
+
 						if (!line_refused(text))
 							send_megaphone(UseCashItemPacket(slot, item_id, text));
 					}, Megaphones::MAX_LINE);
@@ -503,8 +508,10 @@ namespace ms
 				case Megaphones::Kind::SUPER:
 					UI::get().emplace<UIMegaphone>(item_id, [=](const std::vector<std::string> &lines, bool ear)
 					{
-						if (!line_refused(lines[0]))
-							send_megaphone(UseSuperMegaphonePacket(slot, item_id, lines[0], ear));
+						std::string line = lines[0];
+
+						if (!line_refused(line))
+							send_megaphone(UseSuperMegaphonePacket(slot, item_id, line, ear));
 					});
 					break;
 				case Megaphones::Kind::TRIPLE:
@@ -1508,13 +1515,54 @@ namespace ms
 			return false;
 		}
 
-		if (meets_equip_reqs(stats, equipdata))
-			return true;
+		// A tamed monster and a saddle worn together must fit, each layer
+		// on its own; one that doesn't goes on with nothing said (FUN_004f2c5e).
+		EquipSlot::Id part = inventory.find_equipslot(item_id);
+		bool cash = inventory.get_cash_id(InventoryType::Id::EQUIP, slot) != 0;
+		int16_t layer = cash ? Inventory::CASH_EQUIP : 0;
 
-		// v83 (FUN_004f1c2d) has one text for every unmet requirement.
-		UI::get().emplace<UIOk>("Your stats are too low to equip this item.", [](bool)
-		{});
-		return false;
+		if (part == EquipSlot::Id::TAMEDMOB || part == EquipSlot::Id::SADDLE)
+		{
+			bool saddle = part == EquipSlot::Id::SADDLE;
+			int16_t other = (saddle ? EquipSlot::Id::TAMEDMOB : EquipSlot::Id::SADDLE) + layer;
+			int32_t other_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, other);
+
+			if (other_id != 0 && !saddle_fits(saddle ? item_id : other_id, saddle ? other_id : item_id))
+				return false;
+		}
+
+		if (!meets_equip_reqs(stats, equipdata))
+		{
+			// v83 (FUN_004f1c2d) has one text for every unmet requirement.
+			UI::get().emplace<UIOk>("Your stats are too low to equip this item.", [](bool)
+			{});
+			return false;
+		}
+
+		// A cash tamed monster or saddle covers a real one.
+		if (cash && (part == EquipSlot::Id::TAMEDMOB || part == EquipSlot::Id::SADDLE)
+			&& inventory.get_item_id(InventoryType::Id::EQUIPPED, part) == 0)
+		{
+			UI::get().emplace<UIOk>(part == EquipSlot::Id::TAMEDMOB
+									? "You must have a tamed monster\\nin order to equip this."
+									: "You must be equipped with a saddle\\nto equip this.", [](bool)
+			{});
+			return false;
+		}
+
+		return true;
+	}
+
+	bool UIItemInventory::saddle_fits(int32_t saddle, int32_t monster)
+	{
+		// The saddle's img lists the monsters it fits, beside its info.
+		std::vector<int32_t> listed;
+
+		for (const nl::node &child : nl::nx::character["TamingMob"][string_format::extend_id(saddle, 8) + ".img"])
+			if (child.name() != "info")
+				listed.push_back(std::atoi(child.name().c_str()));
+
+		return mount::saddle_fits(saddle, monster, listed);
 	}
 
 	bool UIItemInventory::can_wear_pet_equip(int16_t slot, int16_t part) const

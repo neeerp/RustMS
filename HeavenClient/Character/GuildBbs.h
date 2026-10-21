@@ -2,6 +2,7 @@
 
 #include "Inventory/ItemExpiry.h"
 
+#include "../Data/CurseData.h"
 #include "../Util/TextLines.h"
 
 #include <algorithm>
@@ -171,10 +172,11 @@ namespace ms::GuildBbs
 		CURSING
 	};
 
-	// Why a thread can't be sent: no title, no body, or a curse word in
-	// either, as `filter` stars them out.
+	// Why a thread can't be sent: no title, no body, or text the filter
+	// won't take. Both become what is sent, curse words starred out by
+	// `filter`.
 	template <typename Filter>
-	Refusal check_thread(const std::string& title, const std::string& body, Filter filter)
+	Refusal check_thread(std::string& title, std::string& body, Filter filter)
 	{
 		if (title.empty())
 			return Refusal::NO_TITLE;
@@ -182,20 +184,25 @@ namespace ms::GuildBbs
 		if (body.empty())
 			return Refusal::NO_TEXT;
 
-		if (filter(title) != title || filter(body) != body)
+		if (!CurseData::valid(title) || !CurseData::valid(body))
 			return Refusal::CURSING;
+
+		title = filter(title);
+		body = filter(body);
 
 		return Refusal::NONE;
 	}
 
 	template <typename Filter>
-	Refusal check_reply(const std::string& text, Filter filter)
+	Refusal check_reply(std::string& text, Filter filter)
 	{
 		if (text.empty())
 			return Refusal::NO_TEXT;
 
-		if (filter(text) != text)
+		if (!CurseData::valid(text))
 			return Refusal::CURSING;
+
+		text = filter(text);
 
 		return Refusal::NONE;
 	}

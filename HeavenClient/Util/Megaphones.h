@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Data/CurseData.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -97,16 +99,18 @@ namespace ms
 		};
 
 		// Checks a plain or super megaphone's line in v83's order, once its
-		// prompt has closed (FUN_00a0a63f types 0xc, 0xd and 0xf). `censor`
-		// stars out curse words.
+		// prompt has closed (FUN_00a0a63f types 0xc, 0xd and 0xf). `text`
+		// becomes what is sent, its curse words starred out by `censor`.
 		template <typename Censor>
-		Refusal check_line(const std::string& text, uint16_t level, Censor censor)
+		Refusal check_line(std::string& text, uint16_t level, Censor censor)
 		{
 			if (text.empty())
 				return Refusal::QUIET;
 
-			if (censor(text) != text)
+			if (!CurseData::valid(text))
 				return Refusal::CURSING;
+
+			text = censor(text);
 
 			if (level <= MIN_LEVEL)
 				return Refusal::LEVEL;
@@ -211,11 +215,11 @@ namespace ms
 		}
 
 		// Checks an avatar megaphone's lines once its box has closed: v83
-		// asks for some text, and refuses cursing, but has no level or length
-		// rule of its own (FUN_00a0a63f's 539 branch). `censor` stars out
-		// curse words.
+		// asks for some text, but has no level or length rule of its own
+		// (FUN_00a0a63f's 539 branch). Each line's curse words are starred
+		// out by `censor`.
 		template <typename Censor>
-		Refusal check_avatar_lines(const AvatarLines& lines, Censor censor)
+		Refusal check_avatar_lines(AvatarLines& lines, Censor censor)
 		{
 			std::string joined;
 
@@ -225,8 +229,11 @@ namespace ms
 			if (joined.empty())
 				return Refusal::EMPTY;
 
-			if (censor(joined) != joined)
+			if (!CurseData::valid(joined))
 				return Refusal::CURSING;
+
+			for (std::string& line : lines)
+				line = censor(line);
 
 			return Refusal::NONE;
 		}

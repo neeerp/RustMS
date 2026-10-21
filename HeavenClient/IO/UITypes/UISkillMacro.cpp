@@ -444,13 +444,15 @@ namespace ms
 
 		std::string name = field.get_text();
 
-		// FUN_008aa134
-		if (CurseData::filter(name) != name)
+		// FUN_008aa134 saves the name with its curse words starred out.
+		if (!CurseData::valid(name))
 		{
 			notice(NO_CURSING);
 
 			return;
 		}
+
+		name = CurseData::filter(name);
 
 		if (UI::get().get_skill_macros().set_name(selected, name, shout))
 			send_macros();

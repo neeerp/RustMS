@@ -219,7 +219,7 @@ from `UI.nx`. Moved so far:
   sends the whole list (`SkillMacroPacket`). Clicking a row selects it, and
   any other click in the window selects the first macro, as v83 does. The
   selected macro's name (12 bytes) and shout box are saved with OK, which
-  refuses curse words. A macro's icon is dragged onto a key in Key Config or
+  stars out curse words in the name. A macro's icon is dragged onto a key in Key Config or
   a quick slot, which then shows it (`Macroicon/<n>/icon`). Hovering the icon,
   or such a key in Key Config, shows the macro's tooltip (`MacroTooltip`). The
   buttons have no tooltips.
@@ -600,6 +600,9 @@ side yet.
 | Named map objects (`ObjStateRules`) | Implemented, as v83 does: an obj with a `name` (party quest gates, OPQ spears, coconuts, the CWKPQ portals and menhirs) has its own node as state 0 and `s1`, `s2`... as further states, each with its own animation, sound and trap. They start hidden, except state 0 of an `autoActive` obj. FIELD_EFFECT mode 2 shows one's current state; FIELD_OBSTACLE_ONOFF (139) and SET_OBJECT_STATE (153) switch one, FIELD_OBSTACLE_ONOFF_LIST (140) several, and FIELD_OBSTACLE_ALL_RESET (141) puts every named trap in state 0. Every obj plays as its `repeat` says: from 0 up it loops back to that frame, -1 plays once and stays, -2 plays once and returns to the first frame. The server sends none of these packets yet |
 | Tagged map objects | Implemented, as v83 does: an obj with `hide` starts hidden, and one with `tags` (split on ",") is shown or hidden by tag. A tag that is some quest's `showLayerTag` in Quest.nx QuestInfo.img shows its objs only while that quest is in progress, checked on entering the map, every 5 s and when the quest log changes. These are the arrows to the job instructors' training centers (quests 2400 to 2404) and the Aran arrows in Lith Harbor (21705). SET_MAP_OBJECT_VISIBLE (129) shows or hides a tag too; the server doesn't send it |
 | Back fades | Implemented, as v83 does: SET_BACK_EFFECT (128) fades one of the map's backs, by its number under `back`, from its alpha now to full (mode 0) or to nothing (mode 1), linearly over the packet's duration. CLEAR_BACK_EFFECT (130) loads the backs again as the map has them. Backs with `a` 0, such as the Temple of Time's and Ereb's, stay hidden until faded in. The server doesn't send either |
+| Curse filter (`CurseData`) | As v83 does (FUN_007a06f3): only text of 0x3ff bytes or more, or with a control character other than a line break, is refused ("Cursing is not allowed."); curse words are starred out and the text goes on. Notes, the plain, super and avatar megaphones, guild BBS threads and replies, macro names, pet names and the weather item's line work so. The triple megaphone's lines go as typed, as nothing shows v83 censoring them |
+| General chat while a shop or trade is open | Refused in the chat log with "You can't chat right now." (FUN_0052c315); the room has its own chat |
+| Admin accounts' item rules | Not done: v83 refuses an admin dropping items ("The admin can't drop items.") and some items ("Not available with an Admin account.") by grade bits HeavenClient doesn't tell apart |
 | Player shops, mini-games, memo/mail | No UI, no handlers |
 | Reactors | Spawning, swings, hits and breaking; no skill hits, touch or quest gates; see `combat.md` |
 | Pets | Summoning, following, others' pets, map changes, chat commands, idle actions, level-up effect, food, cash food and hunger; see `pets.md` |

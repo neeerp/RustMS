@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Character/Inventory/ItemExpiry.h"
+#include "../Data/CurseData.h"
 
 #include <algorithm>
 #include <cctype>
@@ -64,10 +65,10 @@ namespace ms::Memos
 		});
 	}
 
-	// Whether a note with the trimmed `to` and `text` may go, from `own`;
-	// `filter` masks curses.
+	// Whether a note with the trimmed `to` and `text` may go, from `own`.
+	// `text` becomes what is sent, its curse words starred out by `filter`.
 	template <typename Filter>
-	Refusal check(const std::string& to, const std::string& text, const std::string& own, Filter filter)
+	Refusal check(const std::string& to, std::string& text, const std::string& own, Filter filter)
 	{
 		if (to.size() < SHORTEST_NAME || to.size() > LONGEST_NAME)
 			return Refusal::NAME;
@@ -75,8 +76,10 @@ namespace ms::Memos
 		if (same_name(to, own))
 			return Refusal::SELF;
 
-		if (filter(text) != text)
+		if (!CurseData::valid(text))
 			return Refusal::CURSE;
+
+		text = filter(text);
 
 		if (text.empty())
 			return Refusal::EMPTY;

@@ -24,15 +24,23 @@ int main()
 
 			return masked;
 		};
+		auto sent = [](const std::string& to, std::string text, const std::string& own, auto filter)
+		{
+			return check(to, text, own, filter);
+		};
 
-		require(check("Bob", "hi", "Me", clean) == Refusal::NAME, "a name under 4 is refused");
-		require(check("Abcdefghijklm", "hi", "Me", clean) == Refusal::NAME, "a name over 12 is refused");
-		require(check("mYsElF", "hi", "Myself", clean) == Refusal::SELF, "not to oneself, ignoring case");
-		require(check("Alice", "a bad word", "Me", mask) == Refusal::CURSE, "curses are refused");
-		require(check("Alice", "", "Me", clean) == Refusal::EMPTY, "an empty note is refused");
-		require(check("Alice", std::string(201, 'a'), "Me", clean) == Refusal::LONG, "200 bytes at most");
-		require(check("Alice", std::string(200, 'a'), "Me", clean) == Refusal::NONE, "200 bytes go");
-		require(check("Alice", "", "Alice", clean) == Refusal::SELF, "the name is checked before the text");
+		require(sent("Bob", "hi", "Me", clean) == Refusal::NAME, "a name under 4 is refused");
+		require(sent("Abcdefghijklm", "hi", "Me", clean) == Refusal::NAME, "a name over 12 is refused");
+		require(sent("mYsElF", "hi", "Myself", clean) == Refusal::SELF, "not to oneself, ignoring case");
+		std::string text = "a bad word";
+		require(check("Alice", text, "Me", mask) == Refusal::NONE && text == "a *** word",
+				"curse words are starred out, not refused (FUN_007a06f3)");
+		require(sent("Alice", "a\tb", "Me", clean) == Refusal::CURSE, "a control character is refused");
+		require(sent("Alice", "a\r\nb", "Me", clean) == Refusal::NONE, "but not a line break");
+		require(sent("Alice", "", "Me", clean) == Refusal::EMPTY, "an empty note is refused");
+		require(sent("Alice", std::string(201, 'a'), "Me", clean) == Refusal::LONG, "200 bytes at most");
+		require(sent("Alice", std::string(200, 'a'), "Me", clean) == Refusal::NONE, "200 bytes go");
+		require(sent("Alice", "", "Alice", clean) == Refusal::SELF, "the name is checked before the text");
 
 		// 2026-10-20 14:05:09 UTC.
 		int64_t when = ms::item_expiry::UNIX_EPOCH + 1792505109LL * ms::item_expiry::TICKS_PER_SECOND;

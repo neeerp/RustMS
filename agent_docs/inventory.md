@@ -82,6 +82,19 @@ INVENTORY_OPERATION; a worn-equipment change also refreshes the field avatar
 and sends UPDATE_CHAR_LOOK (`0xC5`) to the other players on the map. Refused
 moves only get an enable-actions stat update.
 
+HeavenClient checks a wear before asking (`UIItemInventory::can_wear_equip`),
+in v83's order (FUN_004f2c5e): a second Unique Equipped Item is refused; a
+tamed monster or saddle that doesn't fit the saddle or monster worn on the same
+layer (both normal or both cash) is refused without a word; then stats too low;
+then a cash tamed monster or saddle with no normal one under it is refused
+("You must have a tamed monster in order to equip this." / "You must be
+equipped with a saddle to equip this."). A saddle fits the monsters its
+`Character/TamingMob/0191xxxx.img` lists beside `info`, compared by their last
+two digits as v83's 64-bit mask does, so one ending 64 or above fits nothing
+(`mount::saddle_fits`). v83's "You can ride the tamed cash monster when it is
+equipped with a Cash Saddle." follows a check the silent one already made, so
+it never shows and isn't done.
+
 Dropping is a move to destination 0 from a bag slot (`drop_item`; worn items
 can't be dropped, and the client never asks). Stars and bullets go as the
 whole stack; anything else drops the asked quantity, keeping equipment's
@@ -286,8 +299,8 @@ Double-clicking a megaphone in the Cash tab opens its dialog
 (`UIItemInventory::use_megaphone`), as v83 does:
 
 - Plain: a text prompt ("Enter your comments through the megaphone.", 60
-  characters). After OK, an empty line is dropped, then cursing, a level of
-  10 or below, and a line over 60 bytes are refused with v83's notices.
+  characters). After OK, an empty line is dropped, then text the curse filter
+  won't take (`CurseData::valid`), a level of 10 or below, and a line over 60 bytes are refused with v83's notices.
 - Super and triple: `UIMegaphone`, a modal window on
   `UIWindow.img/Megaphone` (one line) or `ArtMegaphone` (three), with the
   "Display whisper icon" checkbox (on at first). It closes before the lines
@@ -329,7 +342,7 @@ line. The server never sends CLEAR_AVATAR_MEGAPHONE (`0x70`).
 In HeavenClient the dialog is `UIMegaphone` on `UIWindow.img/AvatarMegaphone`:
 one box of up to 97 characters that wraps into four lines, which are sent as
 the client wraps them, and the whisper-icon checkbox. Nothing typed is
-refused with "Please enter the text."; cursing as for the other megaphones.
+refused with "Please enter the text."; curse words as for the other megaphones.
 The packet carries the look `Player::look_entry` builds from the equipped
 items. The banner is `UIAvatarMegaphone`: the item's `info/path` art from
 `Map.nx` `MapHelper.img/AvatarMegaphone` in the top right corner, the speaker

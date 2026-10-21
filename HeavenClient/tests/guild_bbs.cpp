@@ -148,14 +148,23 @@ int main()
 		{
 			auto stars = [](const std::string& text) { return text == "darn" ? std::string("****") : text; };
 
-			require(GuildBbs::check_thread("", "", stars) == GuildBbs::Refusal::NO_TITLE, "the title first");
-			require(GuildBbs::check_thread("Hi", "", stars) == GuildBbs::Refusal::NO_TEXT, "then the text");
-			require(GuildBbs::check_thread("darn", "x", stars) == GuildBbs::Refusal::CURSING
-					&& GuildBbs::check_thread("x", "darn", stars) == GuildBbs::Refusal::CURSING, "no curse in either");
-			require(GuildBbs::check_thread("Hi", "there", stars) == GuildBbs::Refusal::NONE, "a thread to send");
-			require(GuildBbs::check_reply("", stars) == GuildBbs::Refusal::NO_TEXT
-					&& GuildBbs::check_reply("darn", stars) == GuildBbs::Refusal::CURSING
-					&& GuildBbs::check_reply("ok", stars) == GuildBbs::Refusal::NONE, "a reply's checks");
+			auto thread = [&](std::string title, std::string body) { return GuildBbs::check_thread(title, body, stars); };
+			auto reply = [&](std::string text) { return GuildBbs::check_reply(text, stars); };
+
+			require(thread("", "") == GuildBbs::Refusal::NO_TITLE, "the title first");
+			require(thread("Hi", "") == GuildBbs::Refusal::NO_TEXT, "then the text");
+			require(thread("a\tb", "x") == GuildBbs::Refusal::CURSING
+					&& thread("x", "a\x01") == GuildBbs::Refusal::CURSING, "text the filter won't take, in either");
+			require(thread("Hi", "line\rnext") == GuildBbs::Refusal::NONE, "a thread to send, line breaks and all");
+			require(reply("") == GuildBbs::Refusal::NO_TEXT && reply("a\tb") == GuildBbs::Refusal::CURSING
+					&& reply("ok") == GuildBbs::Refusal::NONE, "a reply's checks");
+
+			std::string title = "darn", body = "darn";
+			require(GuildBbs::check_thread(title, body, stars) == GuildBbs::Refusal::NONE && title == "****"
+					&& body == "****", "curse words are starred out in both, not refused (0x8166f6)");
+			std::string text = "darn";
+			require(GuildBbs::check_reply(text, stars) == GuildBbs::Refusal::NONE && text == "****",
+					"and in a reply (0x816994)");
 		}
 
 		{

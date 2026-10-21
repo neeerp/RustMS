@@ -92,6 +92,8 @@ namespace ms
 		bool can_change_equips() const;
 
 		bool can_wear_equip(int16_t slot) const;
+		// Whether the saddle fits the tamed monster, as its TamingMob.nx img lists.
+		static bool saddle_fits(int32_t saddle, int32_t monster);
 
 		// Whether the pet equipment in `slot` may go on `part`, with a
 		// notice if not (FUN_004f1c2d).
