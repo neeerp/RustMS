@@ -39,6 +39,18 @@ replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 [mobs.9001004]
 replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 
+[mobs.8180000]
+# Manon (Leafre): the pack has the Explorer lines' Pentagon-style items
+# (4031343, 4031511, 4031514, 4031517; Hero's Quality 6904 and its siblings
+# check for them) but not the pirates' 4031860, which Attributes of a Hero
+# (6944) checks for (Quest.nx Check.img/6944/1/item). Same chance as the
+# others.
+add = [{ item = 4031860, prob = 0.4, quest = 6944 }]
+
+[mobs.8180001]
+# Griffey (Leafre): likewise the pirates' 4031861 for 6944.
+add = [{ item = 4031861, prob = 0.4, quest = 6944 }]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).

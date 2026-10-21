@@ -375,7 +375,11 @@ struct Overrides {
 #[derive(Debug, Deserialize)]
 struct MobOverride {
     /// Drops that replace whatever the pack says for this mob.
-    replace: Vec<RewardEntry>,
+    #[serde(default)]
+    replace: Option<Vec<RewardEntry>>,
+    /// Drops added to the pack's (or `replace`'s) list.
+    #[serde(default)]
+    add: Vec<RewardEntry>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -418,9 +422,12 @@ impl RewardTable {
         let overrides: Overrides = toml::from_str(REWARD_OVERRIDES)
             .map_err(|e| GameDataError::InvalidData(format!("reward_overrides.toml: {e}")))?;
         for (mob, entry) in overrides.mobs {
-            table
-                .mobs
-                .insert(parse_id(&mob, "override mob id")?, entry.replace);
+            let id = parse_id(&mob, "override mob id")?;
+            let mut drops = entry
+                .replace
+                .unwrap_or_else(|| table.pack.get(&id).cloned().unwrap_or_default());
+            drops.extend(entry.add);
+            table.mobs.insert(id, drops);
         }
         for (reactor, entry) in overrides.reactors {
             let id = parse_id(&reactor, "override reactor id")?;
@@ -714,6 +721,30 @@ mod tests {
         };
         assert_eq!(table.drops(9001006), [crystal(4031856, 2191)]);
         assert_eq!(table.drops(9001005), [crystal(4031857, 2192)]);
+    }
+
+    #[test]
+    fn manon_and_griffey_add_the_pirates_pentagon_and_star() {
+        let pirate = |item| RewardEntry {
+            prob: 0.4,
+            ..quest_item(item, 6944)
+        };
+        let table = RewardTable::load(None).unwrap();
+        assert_eq!(table.drops(8180000), [pirate(4031860)]);
+        assert_eq!(table.drops(8180001), [pirate(4031861)]);
+
+        let dir = std::env::temp_dir().join(format!("rustms-manon-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("rewards.json"),
+            r#"{"8180000": [{"item": 4031343, "prob": 0.4}]}"#,
+        )
+        .unwrap();
+        let table = RewardTable::load(Some(&dir)).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+        let drops = table.drops(8180000);
+        assert_eq!(drops[0].item, Some(4031343));
+        assert_eq!(drops[1..], [pirate(4031860)]);
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
