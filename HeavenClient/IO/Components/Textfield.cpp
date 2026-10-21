@@ -21,6 +21,7 @@
 
 #include "../../Graphics/GraphicsGL.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace ms
@@ -28,6 +29,8 @@ namespace ms
 	Textfield::Textfield()
 	{
 		text = "";
+		markerpos = 0;
+		alignment = Text::Alignment::LEFT;
 	}
 
 	Textfield::Textfield(Text::Font font, Text::Alignment alignment, Color::Name color, Rectangle<int16_t> bounds, size_t limit) : font(font), alignment(alignment), color(color), bounds(bounds), limit(limit)
@@ -48,14 +51,30 @@ namespace ms
 
 		Point<int16_t> absp = bounds.get_left_top() + posiiton;
 
+		// A one-line field shows what fits of its text, scrolled to the
+		// caret.
+		Point<int16_t> textpos = absp - Point<int16_t>(scroll, 0);
+		Range<int16_t> shown = scrolls() ? Range<int16_t>(absp.x(), absp.x() + bounds.get_horizontal().length())
+										 : Range<int16_t>(0, 0);
+
 		if (selected && state == State::FOCUSED)
 		{
 			// A focused edit's selection is white on navy, as tall as the
 			// font, from the top of the text (FUN_004cb1ea).
 			int16_t top = absp.y() + marker.height() - 11;
+			int16_t left = textpos.x();
+			int16_t right = textpos.x() + textlabel.width();
 
-			GraphicsGL::get().drawrectangle(absp.x(), top, textlabel.width(), 12, 0.0f, 0.0f, 0x7F / 255.0f, 1.0f);
-			selectedlabel.draw(absp);
+			if (shown.second() > shown.first())
+			{
+				left = std::max(left, shown.first());
+				right = std::min(right, shown.second());
+			}
+
+			if (right > left)
+				GraphicsGL::get().drawrectangle(left, top, right - left, 12, 0.0f, 0.0f, 0x7F / 255.0f, 1.0f);
+
+			selectedlabel.draw_between(textpos, shown);
 		}
 		else if (rows > 0)
 		{
@@ -64,7 +83,7 @@ namespace ms
 		}
 		else if (text.size() > 0)
 		{
-			textlabel.draw(absp);
+			textlabel.draw_between(textpos, shown);
 		}
 
 		if (state == State::FOCUSED && showmarker && marker_shown())
@@ -280,6 +299,8 @@ namespace ms
 
 		if (rows > 0)
 			layout_lines();
+		else
+			follow_marker();
 	}
 
 	void Textfield::layout_lines()
@@ -300,6 +321,16 @@ namespace ms
 
 	void Textfield::follow_marker()
 	{
+		if (scrolls())
+		{
+			int16_t caret = textlabel.advance(std::min(markerpos, text.size()));
+			int16_t width = bounds.get_horizontal().length();
+
+			scroll = width > 0 ? text_lines::scroll_x(scroll, width, caret, textlabel.width(), MARGIN) : 0;
+
+			return;
+		}
+
 		if (rows == 0)
 			return;
 
@@ -364,11 +395,10 @@ namespace ms
 
 	void Textfield::change_text(const std::string& t)
 	{
-		modifytext(t);
-
-		markerpos = text.size();
+		// The caret goes to the end before the text is measured, once.
+		markerpos = t.size();
 		selected = false;
-		follow_marker();
+		modifytext(t);
 	}
 
 	void Textfield::select_all()
@@ -376,6 +406,7 @@ namespace ms
 		markerpos = text.size();
 		selected = !text.empty();
 		selectedlabel = Text(font, alignment, Color::Name::WHITE, textlabel.get_text(), 0, false);
+		follow_marker();
 	}
 
 	void Textfield::erase_selection()
@@ -393,6 +424,7 @@ namespace ms
 	void Textfield::set_wrap(uint16_t width)
 	{
 		wrapwidth = width;
+		scroll = 0;
 		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false);
 	}
 
@@ -401,6 +433,7 @@ namespace ms
 		wrapwidth = width;
 		rows = shown;
 		linespace = space;
+		scroll = 0;
 
 		layout_lines();
 	}
@@ -416,12 +449,17 @@ namespace ms
 		}
 
 		if (wrapwidth == 0)
-			return Point<int16_t>(textlabel.advance(markerpos), 0);
+			return Point<int16_t>(textlabel.advance(markerpos) - scroll, 0);
 
 		// Where the text before the marker ends once wrapped.
 		Text before(font, alignment, color, textlabel.get_text().substr(0, markerpos), wrapwidth, false);
 
 		return before.endoffset();
+	}
+
+	bool Textfield::scrolls() const
+	{
+		return rows == 0 && wrapwidth == 0 && alignment == Text::Alignment::LEFT;
 	}
 
 	bool Textfield::belowlimit() const

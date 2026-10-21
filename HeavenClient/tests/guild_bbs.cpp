@@ -133,6 +133,16 @@ int main()
 			require(text_lines::scroll_to(5, 15, 30, 10) == 5, "a line shown scrolls nothing");
 			require(text_lines::scroll_to(5, 15, 17, 16) == 2, "no empty rows after deleting lines");
 			require(text_lines::scroll_to(3, 15, 4, 0) == 0, "fewer lines than rows show from the first");
+
+			require(text_lines::scroll_x(0, 100, 80, 120, 12) == 0, "a caret shown scrolls nothing");
+			require(text_lines::scroll_x(0, 100, 99, 120, 12) == 0, "a caret on the right edge is shown");
+			require(text_lines::scroll_x(0, 100, 110, 110, 12) == 11, "typing at the end puts the caret on the edge");
+			require(text_lines::scroll_x(0, 100, 110, 150, 12) == 23, "text after the caret shows a margin");
+			require(text_lines::scroll_x(40, 100, 30, 150, 12) == 18, "going left scrolls the margin back in");
+			require(text_lines::scroll_x(40, 100, 5, 150, 12) == 0, "but not before the start");
+			require(text_lines::scroll_x(40, 100, 40, 150, 12) == 40, "a caret on the left edge is shown");
+			require(text_lines::scroll_x(60, 100, 120, 120, 12) == 60, "deleting at the end leaves the scroll");
+			require(text_lines::scroll_x(0, 10, 30, 100, 48) == 21, "a narrow view keeps the caret on its edge");
 		}
 
 		{

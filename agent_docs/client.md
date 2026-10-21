@@ -486,7 +486,15 @@ from `UI.nx`. Moved so far:
 - **Sliders** (`Slider`): the numbered `Basic.img/VScr` types read
   `UIClassic.nx`, which has up to `VScr8`. Later types, such as
   `DEFAULT_SILVER`, read `UI.nx`.
-
+- **Edits** (`Textfield`): a one-line, left-aligned field shows what fits
+  of its text and scrolls sideways to keep the caret shown, as v83's edit
+  does (0x4cbc03): past the right edge the caret goes to the edge, 48 px
+  further in when text follows it; past the left edge it goes 48 px in.
+  Deleting never scrolls back, so a shortened text can leave blank space
+  on the right. The text and the selection are clipped to the field's
+  bounds, and the scroll keeps the caret inside them; v83 clips only at
+  the control's outer edge, a few px wider. Fields with no byte limit (the chat bar) still
+  stop 50 px short of the edge, so they never scroll.
 - **Combo boxes** (`MapleComboBox`): the typed boxes read `Basic.img/ComboBox`
   to `ComboBox5` from `UIClassic.nx`; later types keep the modern art. No
   window uses one yet.

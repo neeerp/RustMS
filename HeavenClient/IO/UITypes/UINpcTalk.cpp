@@ -1055,6 +1055,12 @@ namespace ms
 			});
 
 			field.change_text(prompt.text);
+
+			// A one-line edit's default comes selected, so the first key
+			// typed replaces it.
+			if (!box_text)
+				field.select_all();
+
 			field.set_state(Textfield::State::FOCUSED);
 		}
 

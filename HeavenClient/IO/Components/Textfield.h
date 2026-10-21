@@ -119,6 +119,10 @@ namespace ms
 
 		Point<int16_t> marker_offset() const;
 
+		// Whether the field is one left-aligned line, scrolling sideways to
+		// keep the caret shown.
+		bool scrolls() const;
+
 		Text textlabel;
 		Text::Font font;
 		Text::Alignment alignment;
@@ -127,6 +131,11 @@ namespace ms
 		size_t rows = 0;
 		size_t top = 0;
 		int16_t linespace = 0;
+		// How far a one-line field's text is scrolled left, in px.
+		int16_t scroll = 0;
+		// What a scroll leaves beside the caret: four times the font's
+		// height, 12 px (the edit's +0x7c).
+		static constexpr int16_t MARGIN = 48;
 		std::vector<text_lines::Line> lines;
 		std::vector<Text> linelabels;
 		std::string text;

@@ -74,6 +74,31 @@ namespace ms::text_lines
 		return top < last ? top : last;
 	}
 
+	// A one-line edit's scroll, in px, so the 1 px caret at `caret` px
+	// shows in `width` px of a text `total` px wide (0x4cbc03): past the
+	// right edge the caret goes to the edge, `margin` px further in when
+	// text follows it; past the left edge it goes `margin` px in, but no
+	// further back than the start. A view narrower than the margin then
+	// puts the caret back on its edge. Deleting never scrolls back.
+	inline int16_t scroll_x(int16_t scroll, int16_t width, int16_t caret, int16_t total, int16_t margin)
+	{
+		int16_t right = caret + 1;
+
+		if (right > scroll + width)
+			scroll = right - width + (right < total ? margin : 0);
+
+		if (caret < scroll)
+			scroll = caret > margin ? caret - margin : 0;
+
+		if (right > scroll + width)
+			scroll = right - width;
+
+		if (caret < scroll)
+			scroll = caret;
+
+		return scroll;
+	}
+
 	// One character left or right, taking "\r\n" as one.
 	inline size_t step_left(const std::string& text, size_t pos)
 	{
