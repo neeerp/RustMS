@@ -114,6 +114,15 @@ namespace ms
 					requirement.need.draw(at);
 					y += ROW;
 				}
+
+				if (entry.meso)
+				{
+					Point<int16_t> at = position + Point<int16_t>(TEXT_X, y - 6);
+					entry.meso_label.draw(at);
+					at.shift_x(entry.meso_label.width() + COUNT_GAP);
+					entry.meso_need.draw(at);
+					y += ROW;
+				}
 			}
 		}
 
@@ -127,7 +136,7 @@ namespace ms
 		if (!moved)
 			position = default_position();
 
-		std::vector<std::pair<int16_t, std::vector<QuestObjective>>> current;
+		std::vector<Shown> current;
 		const auto& started = quests.started_quests();
 
 		for (int16_t id : quests.tracked())
@@ -138,8 +147,13 @@ namespace ms
 			if (!quest || progress == started.end())
 				continue;
 
-			current.emplace_back(id, quest_objectives(quest->end_mobs, quest->end_items, progress->second,
-				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); }));
+			current.push_back({
+				id,
+				quest_objectives(quest->end_mobs, quest->end_items, progress->second,
+					[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); }),
+				quest->end_meso,
+				quest->end_meso != 0 ? inventory.get_meso() : 0
+			});
 		}
 
 		if (current != shown)
@@ -162,7 +176,7 @@ namespace ms
 
 		int16_t y = TOP;
 
-		for (const auto& [id, objectives] : shown)
+		for (const auto& [id, objectives, meso_need, meso_have] : shown)
 		{
 			// As in the original (FUN_007052e6), a blank row separates quests.
 			if (!entries.empty())
@@ -196,6 +210,18 @@ namespace ms
 				y += ROW;
 			}
 
+			// As in the original (FUN_00885eb8), the end meso comes after the
+			// mobs and items, even once you have it. It shows only what it
+			// takes, red until you have that much (FUN_00887b21).
+			if (meso_need != 0)
+			{
+				entry.meso = true;
+				entry.meso_label = Text(Text::A12M, Text::LEFT, Color::Name::BLACK, "Meso");
+				entry.meso_need = Text(Text::A12M, Text::LEFT,
+					meso_have >= meso_need ? Color::Name::DEEPGREEN : Color::Name::BRIGHTRED, std::to_string(meso_need));
+				y += ROW;
+			}
+
 			entries.push_back(std::move(entry));
 		}
 
@@ -214,6 +240,9 @@ namespace ms
 		{
 			rows += entry.name.height() > ROW ? (entry.name.height() + ROW - 1) / ROW * ROW : ROW;
 			rows += static_cast<int16_t>(entry.requirements.size()) * ROW;
+
+			if (entry.meso)
+				rows += ROW;
 		}
 
 		return TOP + rows + BOTTOM;

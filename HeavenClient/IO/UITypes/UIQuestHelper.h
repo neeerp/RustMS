@@ -51,6 +51,25 @@ namespace ms
 			int16_t id;
 			Text name;
 			std::vector<Requirement> requirements;
+			// The quest's end meso, last, when it asks for any.
+			bool meso = false;
+			Text meso_label, meso_need;
+		};
+
+		// What an entry is built from, to rebuild only on changes.
+		struct Shown
+		{
+			int16_t id;
+			std::vector<QuestObjective> objectives;
+			// The meso held counts only when the quest asks for meso.
+			int32_t meso_need;
+			int64_t meso_have;
+
+			bool operator==(const Shown& other) const
+			{
+				return id == other.id && objectives == other.objectives && meso_need == other.meso_need &&
+					meso_have == other.meso_have;
+			}
 		};
 
 		// As in the original, it drags by its top, not by its buttons.
@@ -65,8 +84,7 @@ namespace ms
 		Texture top, top_minimized, center, bottom, icon;
 		Text title;
 		std::vector<Entry> entries;
-		// What the entries were built from, to rebuild only on changes.
-		std::vector<std::pair<int16_t, std::vector<QuestObjective>>> shown;
+		std::vector<Shown> shown;
 		bool minimized = false;
 		bool moved;
 
