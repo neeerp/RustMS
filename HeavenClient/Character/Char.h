@@ -201,6 +201,9 @@ namespace ms
 		void show_energy(int32_t skill, bool full, bool init);
 		// Loop Berserk's aura, or take it away (SHOW_ITEM_GAIN_INCHAT 1).
 		void show_berserk(bool on);
+		// Loop Invincibility's `repeat` at the feet while its Divine Body lasts (FUN_0093e344), or take it away
+		// with a skill of 0.
+		void show_divine_body(int32_t skill);
 
 		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
 		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
@@ -427,6 +430,8 @@ namespace ms
 		EffectLayer held_effects;
 		EffectLayer energy_glow;
 		EffectLayer berserk_aura;
+		EffectLayer divine_body;
+		int32_t divine_body_skill = 0;
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;
 		int16_t energy_wait = -1;

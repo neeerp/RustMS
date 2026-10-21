@@ -64,6 +64,7 @@ namespace ms
 		held_effects.drawbelow(absp, alpha);
 		energy_glow.drawbelow(absp, alpha);
 		berserk_aura.drawbelow(absp, alpha);
+		divine_body.drawbelow(absp, alpha);
 
 		if (dashing && phobj.onground)
 			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
@@ -171,6 +172,7 @@ namespace ms
 		held_effects.drawabove(absp, alpha);
 		energy_glow.drawabove(absp, alpha);
 		berserk_aura.drawabove(absp, alpha);
+		divine_body.drawabove(absp, alpha);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
@@ -241,6 +243,7 @@ namespace ms
 		held_effects.update();
 		energy_glow.update();
 		berserk_aura.update();
+		divine_body.update();
 
 		if (dashing)
 			dash_dust.update();
@@ -603,6 +606,20 @@ namespace ms
 		if (on)
 			berserk_aura.add_looping(nl::nx::skill["132.img"]["skill"]["1320006"]["effect"], DrawArgument(facing_right),
 									 0, 1.0f);
+	}
+
+	void Char::show_divine_body(int32_t skill)
+	{
+		// Once on, it keeps looping (FUN_0094314d).
+		if (skill != 0 && divine_body_skill == skill)
+			return;
+
+		divine_body.clear();
+		divine_body_skill = skill;
+
+		if (skill != 0)
+			divine_body.add_looping(nl::nx::skill[string_format::skill_img(skill)]["skill"][string_format::extend_id(skill, 7)]
+									["repeat"], DrawArgument(facing_right), 0, 1.0f);
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)

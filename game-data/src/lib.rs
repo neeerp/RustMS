@@ -23,6 +23,12 @@ pub const NO_DESTINATION_MAP: i32 = 999_999_999;
 pub const PORTAL_TYPE_START_POINT: i32 = 0;
 /// `pt` of a town's door portals (`tp`), where Mystic Doors stand.
 pub const PORTAL_TYPE_TOWN_DOOR: i32 = 6;
+/// `info/fieldType` of the Mu Lung Dojo's stages, where the Beginner's
+/// secret skills work (v83 FUN_00587f5f); `FIELD_TYPE_DOJO_2` too.
+pub const FIELD_TYPE_DOJO: i32 = 14;
+pub const FIELD_TYPE_DOJO_2: i32 = 18;
+/// `info/fieldType` of Nett's Pyramid, where Rage of Pharaoh works.
+pub const FIELD_TYPE_PYRAMID: i32 = 23;
 /// `info/fieldLimit` bit forbidding movement skills; teleport rocks can't
 /// be used there either (v83 FUN_00a0a4aa).
 pub const FIELD_LIMIT_MOVEMENT_SKILLS: i32 = 0x2;
@@ -239,6 +245,9 @@ pub struct FieldTemplate {
     pub town: bool,
     /// `info/fieldLimit`: what the map forbids (see `FIELD_LIMIT_*`).
     pub field_limit: i32,
+    /// `info/fieldType`: the kind of event map it is, e.g.
+    /// `FIELD_TYPE_DOJO` (0 for an ordinary map).
+    pub field_type: i32,
     /// `info/allowedItem`: the items `FIELD_LIMIT_CONSUMABLES` still allows.
     pub allowed_items: Vec<i32>,
     /// `info/personalShop`: players may open personal shops here (the Free
@@ -525,16 +534,17 @@ fn build_field_template(
         .flatten()
         .and_then(|seconds| u32::try_from(seconds).ok())
         .filter(|&seconds| seconds > 0);
-    let (town, field_limit, allowed_items, personal_shop, hazard) =
+    let (town, field_limit, field_type, allowed_items, personal_shop, hazard) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
                 nx.int_child(info, "town")?.unwrap_or(0) != 0,
                 nx.int_child(info, "fieldLimit")?.unwrap_or(0),
+                nx.int_child(info, "fieldType")?.unwrap_or(0),
                 allowed_items(nx, info)?,
                 nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
                 hazard(nx, info, return_map)?,
             ),
-            None => (false, 0, Vec::new(), false, None),
+            None => (false, 0, 0, Vec::new(), false, None),
         };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
@@ -607,6 +617,7 @@ fn build_field_template(
         recovery,
         town,
         field_limit,
+        field_type,
         allowed_items,
         personal_shop,
         clock,
@@ -1218,6 +1229,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            field_type: 0,
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
@@ -1290,6 +1302,7 @@ mod tests {
             recovery: 1.0,
             town: false,
             field_limit: 0,
+            field_type: 0,
             allowed_items: Vec::new(),
             personal_shop: false,
             clock: false,
