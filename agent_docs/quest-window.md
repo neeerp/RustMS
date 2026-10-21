@@ -34,8 +34,16 @@ The detail panel shows:
 
 - the NPC's portrait (the giver on Available, the taker otherwise)
 - the bold quest name
-- "Available to all" or the allowed jobs
-- "Over Level N" or "Under Level N"
+- who may start it, worded as v83 does (`QuestRequirements::jobs`,
+  FUN_0087fdc9, report b004): "Available to all", whole classes by name
+  ("Available to Warrior", "Cygnus Knights"), ranges of advancements
+  ("At least at 2nd job advancement Available to Warrior"), the
+  "all except" lists v83 tells apart by their length alone (with its
+  "Avaliable" typo), and otherwise each job's name. The job ids are taken
+  in the data's order, by number.
+- the level bounds (`QuestRequirements::levels`): "Over Level 10",
+  " Under Level 30" (with v83's leading space), both joined by two spaces,
+  or "No limit" for a quest with no start check
 - the original `QuestInfo.img/<id>/<tab>` text
 
 The text keeps its `#b`/`#k` colours and `#p`/`#m`/`#t`/`#o` names. `#c` and
