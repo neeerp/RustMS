@@ -4,6 +4,7 @@
 
 use crate::ClientId;
 use game::{InventoryChange, Player};
+use game_data::Area;
 use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 use std::sync::OnceLock;
@@ -309,6 +310,34 @@ pub fn draw_question() -> usize {
     pinned.unwrap_or_else(|| rand::random::<usize>() % ANSWERS.len())
 }
 
+/// How many of a stage's areas the team must stand on, on Kerning City's
+/// party quest's stages 2 to 4 (Cosmic `9020001`): one member on each.
+pub const AREAS_TAKEN: u32 = 3;
+
+/// Each way of choosing `AREAS_TAKEN` of `areas` areas, as a bit per area
+/// (bit 0 for the first), in a fixed order: 4 for stage 2's ropes, 10 for
+/// stage 3's platforms and 20 for stage 4's barrels.
+pub fn combos(areas: usize) -> impl Iterator<Item = u32> {
+    let all = 1u32.checked_shl(areas as u32).unwrap_or(0);
+    (0..all).filter(|combo| combo.count_ones() == AREAS_TAKEN)
+}
+
+/// Whether the team stands as `combo` asks: one of `positions` on each of
+/// its areas, and none on the others. A position counts for the first of
+/// `areas` that holds it; one on none of them doesn't count.
+pub fn on_areas(combo: u32, areas: &[Area], positions: &[(i32, i32)]) -> bool {
+    let mut standing = vec![0; areas.len()];
+    for &(x, y) in positions {
+        if let Some(area) = areas.iter().position(|area| area.contains(x, y)) {
+            standing[area] += 1;
+        }
+    }
+    standing
+        .iter()
+        .enumerate()
+        .all(|(area, &count)| count == combo.checked_shr(area as u32).unwrap_or(0) & 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,6 +427,54 @@ mod tests {
         assert_eq!(KPQ.duration(), Duration::from_secs(30 * 60));
         assert!(KPQ.holds(103_000_800) && KPQ.holds(103_000_805));
         assert!(!KPQ.holds(KPQ.exit) && !KPQ.holds(KPQ.lobby));
+    }
+
+    #[test]
+    fn each_puzzle_stage_has_a_combo_for_every_three_of_its_areas() {
+        for (areas, count) in [(4, 4), (5, 10), (6, 20)] {
+            let all: Vec<u32> = combos(areas).collect();
+            assert_eq!(all.len(), count);
+            assert!(all.iter().all(|c| c.count_ones() == 3 && *c < 1 << areas));
+            assert_eq!(all.iter().collect::<HashSet<_>>().len(), count);
+        }
+    }
+
+    #[test]
+    fn the_team_must_stand_one_on_each_of_the_combos_areas() {
+        let area = |x1| Area {
+            x1,
+            x2: x1 + 10,
+            y1: 0,
+            y2: 10,
+        };
+        let areas = [area(0), area(20), area(40), area(60)];
+        let combo = 0b1011;
+        let on = |area: i32| (area * 20 + 5, 5);
+
+        assert!(on_areas(combo, &areas, &[on(0), on(1), on(3)]));
+        // A fourth member off every area doesn't count.
+        assert!(on_areas(combo, &areas, &[on(3), (100, 5), on(0), on(1)]));
+        // Two on one area, one off them, or one on the wrong area.
+        assert!(!on_areas(combo, &areas, &[on(0), on(0), on(3)]));
+        assert!(!on_areas(combo, &areas, &[on(0), on(1), (15, 5)]));
+        assert!(!on_areas(combo, &areas, &[on(0), on(1), on(2)]));
+        // A box holds its first edges but not its second.
+        assert!(on_areas(combo, &areas, &[(0, 0), (20, 9), (60, 0)]));
+        assert!(!on_areas(combo, &areas, &[(10, 5), on(1), on(3)]));
+        assert!(!on_areas(combo, &areas, &[on(0), (25, 10), on(3)]));
+    }
+
+    #[test]
+    fn a_position_counts_for_the_first_area_holding_it() {
+        let wide = Area {
+            x1: 0,
+            x2: 100,
+            y1: 0,
+            y2: 10,
+        };
+        let narrow = Area { x2: 10, ..wide };
+        assert!(on_areas(0b01, &[wide, narrow], &[(5, 5)]));
+        assert!(!on_areas(0b10, &[wide, narrow], &[(5, 5)]));
     }
 
     #[test]

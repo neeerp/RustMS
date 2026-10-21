@@ -270,8 +270,28 @@ pub struct FieldTemplate {
     /// What the map's traps may do to a player who touches one.
     pub traps: Traps,
     pub footholds: footholds::Footholds,
+    /// The `area` boxes, in their order in the map. The client ignores them;
+    /// the server checks where players stand in them, as on Kerning City's
+    /// party quest's ropes, platforms and barrels.
+    pub areas: Vec<Area>,
     portals_by_id: BTreeMap<u32, PortalTemplate>,
     portal_ids_by_name: HashMap<String, Vec<u32>>,
+}
+
+/// One of a map's `area` boxes: from `x1` to `x2` and `y1` to `y2`, the
+/// second edge left out of each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Area {
+    pub x1: i32,
+    pub x2: i32,
+    pub y1: i32,
+    pub y2: i32,
+}
+
+impl Area {
+    pub fn contains(&self, x: i32, y: i32) -> bool {
+        (self.x1..self.x2).contains(&x) && (self.y1..self.y2).contains(&y)
+    }
 }
 
 /// How often a map's hazard hurts when it has no `info/decInterval`. A
@@ -609,6 +629,20 @@ fn build_field_template(
         }
     }
 
+    let mut areas = Vec::new();
+    if let Some(area_root) = nx.child_by_name(map_node_idx, "area")? {
+        for area in nx.child_indices(area_root)? {
+            let edge =
+                |key| -> Result<i32, GameDataError> { Ok(nx.int_child(area, key)?.unwrap_or(0)) };
+            areas.push(Area {
+                x1: edge("x1")?,
+                x2: edge("x2")?,
+                y1: edge("y1")?,
+                y2: edge("y2")?,
+            });
+        }
+    }
+
     let mut portal_ids_by_name: HashMap<String, Vec<u32>> = HashMap::new();
     for (id, portal) in &portals_by_id {
         portal_ids_by_name
@@ -638,6 +672,7 @@ fn build_field_template(
         hazard,
         traps,
         footholds,
+        areas,
         portals_by_id,
         portal_ids_by_name,
     })
@@ -1251,6 +1286,7 @@ mod tests {
             hazard: None,
             traps: Traps::default(),
             footholds: footholds::Footholds::default(),
+            areas: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (
                     0,
@@ -1326,6 +1362,7 @@ mod tests {
             traps: Traps::default(),
             reactors: Vec::new(),
             footholds: footholds::Footholds::default(),
+            areas: Vec::new(),
             portals_by_id: BTreeMap::from([
                 (0, portal(0, PORTAL_TYPE_START_POINT, -500, None)),
                 (1, portal(1, 0, 300, None)),
@@ -1375,6 +1412,34 @@ mod tests {
                 && npc.rx0 <= npc.x
                 && npc.rx1 >= npc.x
         }));
+    }
+
+    #[test]
+    fn loads_kerning_party_quest_areas_from_assets_map_nx() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let areas = |map_id| game_data.field(map_id).expect("field").areas.len();
+
+        // Its ropes, platforms and barrels.
+        assert_eq!(
+            [areas(103000801), areas(103000802), areas(103000803)],
+            [4, 5, 6]
+        );
+        assert_eq!(areas(103000800), 0);
+        let rope = game_data.field(103000801).unwrap().areas[0];
+        assert_eq!(
+            rope,
+            Area {
+                x1: -770,
+                x2: -742,
+                y1: -132,
+                y2: 46
+            }
+        );
+        assert!(rope.contains(-770, -132) && rope.contains(-743, 45));
+        assert!(!rope.contains(-742, 0) && !rope.contains(-750, 46));
     }
 
     #[test]
