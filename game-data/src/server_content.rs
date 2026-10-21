@@ -191,6 +191,12 @@ pub mod keys {
     pub const STATUE_INTRO: &str = "statue.intro";
     pub const STATUE_MENU: &str = "statue.menu";
     pub const CRUMBLING_ASK: &str = "crumbling.ask";
+    /// Shane (`herb_in`) and Louis (`herb_out`) of the Forest of Patience.
+    pub const SHANE_TOO_LOW: &str = "shane.too_low";
+    pub const SHANE_ASK: &str = "shane.ask";
+    pub const SHANE_DECLINE: &str = "shane.decline";
+    pub const SHANE_SHORT: &str = "shane.short";
+    pub const LOUIS_ASK: &str = "louis.ask";
 
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
@@ -711,6 +717,11 @@ mod tests {
             keys::STATUE_INTRO,
             keys::STATUE_MENU,
             keys::CRUMBLING_ASK,
+            keys::SHANE_TOO_LOW,
+            keys::SHANE_ASK,
+            keys::SHANE_DECLINE,
+            keys::SHANE_SHORT,
+            keys::LOUIS_ASK,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,

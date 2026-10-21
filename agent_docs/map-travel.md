@@ -71,6 +71,15 @@ portal 1 (`west00`) without a word, though nothing hands the hammer out yet.
 His keys (`jeff.*`) are `unsourced`. `el_nath_dungeon.rs` checks all three
 through the network harness.
 
+Shane (`1032003`, `herb_in`) in Ellinia lets players from level 25 into the
+Forest of Patience for 5000 mesos (Yes/No, then a refusal if short). They
+start at Step 1 (`101000100`) while on Sabitrama's first herb quest (2050),
+else at Step 3 (`101000102`) while on the second (2051), else at Step 1 below
+level 50 and Step 3 from it, arriving at portal 0. Louis (`1032004`,
+`herb_out`) on each step asks, and Yes goes back to Ellinia portal 0. Their
+keys (`shane.*`, `louis.ask`) are `unsourced`. `forest_of_patience.rs` checks
+them through the network harness.
+
 ## Menu warps
 
 These NPCs warp straight off a menu choice, with no question after it

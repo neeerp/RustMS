@@ -65,6 +65,17 @@ const STATUE_FOREST: i32 = 105040300;
 /// The Deep Forest's steps a John quest opens: each quest, taken or done,
 /// opens one more.
 const DEEP_FOREST: [(i32, i16); 3] = [(105040310, 2052), (105040312, 2053), (105040314, 2054)];
+/// Shane in Ellinia, who lets players into the Forest of Patience, and
+/// Louis inside, who sees them back.
+const SHANE: i32 = 1032003;
+const LOUIS: i32 = 1032004;
+const SHANE_LEVEL: u8 = 25;
+const SHANE_FARE: i32 = 5000;
+const ELLINIA: i32 = 101000000;
+/// The Forest of Patience's first and third steps, each the start of one
+/// of Sabitrama's herb quests (2050, 2051).
+const PATIENCE_STEP_1: i32 = 101000100;
+const PATIENCE_STEP_3: i32 = 101000102;
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -721,6 +732,15 @@ impl NpcScript {
             NELLA => nella(player),
             JEFF => Some(jeff(player)),
             TIME_GATE => Some(time_gate(player)),
+            SHANE => Some(shane(player)),
+            LOUIS => Some(Self::new(
+                LOUIS,
+                vec![Page::Ask {
+                    text: text(keys::LOUIS_ASK),
+                    on_yes: vec![Effect::WarpToPortal(ELLINIA, 0)],
+                    on_no: None,
+                }],
+            )),
             MYSTERIOUS_STATUE => Some(mysterious_statue(player)),
             CRUMBLING_STATUE => Some(Self::new(
                 CRUMBLING_STATUE,
@@ -1457,6 +1477,38 @@ fn time_gate(player: &Player) -> NpcScript {
             choices,
         }],
     )
+}
+
+/// Shane (`herb_in`): from level 25, the Forest of Patience for a fare,
+/// starting at the step of the herb quest the player is on, else the one
+/// for their level.
+fn shane(player: &Player) -> NpcScript {
+    if player.stats.level < SHANE_LEVEL {
+        return NpcScript::new(SHANE, vec![Page::Say(text(keys::SHANE_TOO_LOW))]);
+    }
+    let started = |id| player.quests.state(id) == QuestState::Started;
+    let step = if started(2050) {
+        PATIENCE_STEP_1
+    } else if started(2051) || player.stats.level >= 50 {
+        PATIENCE_STEP_3
+    } else {
+        PATIENCE_STEP_1
+    };
+    let price = SHANE_FARE.to_string();
+    let ask = content::text().get(keys::SHANE_ASK, &[("price", &price)]);
+    let mut script = NpcScript::new(
+        SHANE,
+        ride(
+            ask,
+            Some(keys::SHANE_DECLINE),
+            keys::SHANE_SHORT,
+            SHANE_FARE,
+            Effect::WarpToPortal(step, 0),
+            player,
+        ),
+    );
+    script.refused = Some(text(keys::SHANE_SHORT));
+    script
 }
 
 /// The Mysterious Statue (`flower_in`): past it, the Deep Forest's steps
@@ -3051,6 +3103,48 @@ mod tests {
         let mut gate = NpcScript::for_npc(TIME_GATE, &player).unwrap();
         gate.begin();
         assert_eq!(gate.respond(ScriptInput::Select(2)), None);
+    }
+
+    #[test]
+    fn shane_lets_players_into_the_forest_of_patience_for_a_fare() {
+        let ask = |player: &Player| {
+            let mut shane = NpcScript::for_npc(SHANE, player).unwrap();
+            assert_eq!(kind(&shane.begin()), Some(1));
+            shane.respond(ScriptInput::Yes).unwrap()
+        };
+        let mut player = with_quests(&[]);
+        player.meso = SHANE_FARE;
+        for (level, step) in [(25, 101000100), (49, 101000100), (50, 101000102)] {
+            player.stats.level = level;
+            assert_eq!(
+                ask(&player).effects,
+                [Effect::SpendMeso(SHANE_FARE), Effect::WarpToPortal(step, 0)]
+            );
+        }
+        // The herb quest the player is on decides the step.
+        let mut player = with_quests(&[(2050, false)]);
+        player.meso = SHANE_FARE;
+        assert_eq!(ask(&player).effects[1], Effect::WarpToPortal(101000100, 0));
+        let mut player = with_quests(&[(2051, false)]);
+        (player.meso, player.stats.level) = (SHANE_FARE, 30);
+        assert_eq!(ask(&player).effects[1], Effect::WarpToPortal(101000102, 0));
+
+        // Short of the fare: a refusal and no ride.
+        player.meso = SHANE_FARE - 1;
+        let short = ask(&player);
+        assert!(short.effects.is_empty());
+        assert_eq!(kind(&short), Some(0));
+
+        player.stats.level = 24;
+        let shane = NpcScript::for_npc(SHANE, &player).unwrap();
+        assert_eq!(kind(&shane.begin()), Some(0));
+
+        let mut louis = NpcScript::for_npc(LOUIS, &player).unwrap();
+        assert_eq!(kind(&louis.begin()), Some(1));
+        assert_eq!(
+            louis.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(101000000, 0)]
+        );
     }
 
     #[test]
