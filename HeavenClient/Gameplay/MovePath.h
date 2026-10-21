@@ -17,8 +17,10 @@ namespace ms
 	// (FUN_0068b371, FUN_0068adcc).
 	namespace move_path
 	{
-		// A path goes out once it holds this much movement (FUN_0068a828).
+		// A path goes out once it holds this much movement (FUN_0068a828),
+		// or, for a recorder that sends whole paths, half as much.
 		constexpr int32_t SEND_MS = 1000;
+		constexpr int32_t WHOLE_SEND_MS = 500;
 
 		// Elements on a foothold. The rest are in the air (0) or on a ladder
 		// or rope (minus its number).
@@ -40,6 +42,12 @@ namespace ms
 		class Recorder
 		{
 		public:
+			// `whole`: send every path whole and twice as often, as the user's
+			// recorder does (path +0x40, set from its owner's kind at
+			// FUN_009b12a8, always on for characters; reports/a019), so a
+			// climb or a jump goes out without waiting for a foothold.
+			explicit Recorder(bool whole = false) : whole(whole) {}
+
 			// Start over where the user stands, as on entering a map
 			// (FUN_0068aab2).
 			void reset(const Movement &now)
@@ -78,21 +86,21 @@ namespace ms
 
 			// Whether a path should go out: a second of movement with
 			// something on a foothold in it, or with anything for a flier
-			// (FUN_0068a828).
+			// (FUN_0068a828); half a second of anything when sent whole.
 			bool ready(bool flying = false) const
 			{
-				return !elements.empty() && recorded >= SEND_MS &&
-					   (flying || std::any_of(elements.begin(), elements.end(), grounded));
+				return !elements.empty() && recorded >= (whole ? WHOLE_SEND_MS : SEND_MS) &&
+					   (whole || flying || std::any_of(elements.begin(), elements.end(), grounded));
 			}
 
 			// The path to send. What comes after the last element on a
-			// foothold waits for the next path, except for a flier, or when
-			// nothing is on one.
+			// foothold waits for the next path, except when sent whole, for
+			// a flier, or when nothing is on one.
 			Path flush(bool flying = false)
 			{
 				auto held = elements.end();
 
-				if (!flying)
+				if (!flying && !whole)
 				{
 					held = std::find_if(elements.rbegin(), elements.rend(), grounded).base();
 
@@ -144,6 +152,7 @@ namespace ms
 					elements.push_back(element);
 			}
 
+			bool whole;
 			std::vector<Movement> elements;
 			int32_t recorded = 0;
 			Point<int16_t> start;

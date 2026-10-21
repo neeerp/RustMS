@@ -529,7 +529,7 @@ namespace ms
 		// Homing Beacon's mark (+0xcc8 of the temporary stats).
 		beacon::Mark guided;
 
-		move_path::Recorder path;
+		move_path::Recorder path{ true };
 
 		uint8_t get_stancebyte() const;
 
