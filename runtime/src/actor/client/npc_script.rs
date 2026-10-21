@@ -105,6 +105,7 @@ impl ClientActor {
         let mut grow_guild = None;
         let mut disband_guild = false;
         let mut restyled = false;
+        let mut command = None;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -326,6 +327,7 @@ impl ClientActor {
                         self.services.directory.clone(),
                     );
                 }
+                Effect::EventCommand(told) => command = Some(*told),
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);
@@ -340,6 +342,10 @@ impl ClientActor {
             return Ok(Applied::Refused);
         }
         packets.append(&mut afterwards);
+        if let Some(command) = command {
+            // Only once the items it follows have changed hands.
+            self.tell_event(command).await;
+        }
         self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
         if restyled {

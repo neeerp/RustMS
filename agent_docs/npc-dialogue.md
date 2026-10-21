@@ -44,9 +44,10 @@ each client chooses locally and players see different actions.
 `net::npc_scripts::NpcScript` holds native scripts (Lua is deferred) as a
 list of pages: `Say`, `Ask` (effects on yes), `Menu` (each choice its
 own pages), `Style` (each style its own effects), `End` (a failing
-choice's last page) and `Done` (no page: the conversation ends there with
-its effects, as when a menu choice warps at once), plus effects applied
-after the last page. The effects are
+choice's last page), `Done` (no page: the conversation ends there with
+its effects, as when a menu choice warps at once) and `Act` (a page whose
+effects apply as it is shown, as when Cloto hands over a pass while
+speaking), plus effects applied after the last page. The effects are
 `net::scripts::Effect`, shared with map and portal scripts. The client actor
 (`ClientActor::apply_effects` in `client/npc_script.rs`) applies them to a
 copy of the player and commits any quest change together with it, or

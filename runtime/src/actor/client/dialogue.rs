@@ -25,7 +25,11 @@ impl ClientActor {
         if npc_id == net::npc_scripts::LAKELIS {
             return self.talk_about_event(net::events::EventKind::Kpq).await;
         }
-        if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, &game.player) {
+        if npc_id == net::npc_scripts::CLOTO && self.talk_to_cloto().await? {
+            return Ok(());
+        }
+        let player = &self.in_game()?.player;
+        if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, player) {
             return self.start_script(script).await;
         }
         if self.open_shop(npc_id).await? || self.open_storage(npc_id).await? {
