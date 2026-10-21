@@ -195,6 +195,10 @@ pub mod keys {
     pub const KPQ_CLOTO_S4_INTRO: &str = "kpq.cloto.s4.intro";
     pub const KPQ_CLOTO_AREAS_WRONG: &str = "kpq.cloto.areas_wrong";
     pub const KPQ_CLOTO_AREAS_RIGHT: &str = "kpq.cloto.areas_right";
+    pub const KPQ_CLOTO_S5_SHORT: &str = "kpq.cloto.s5.short";
+    pub const KPQ_CLOTO_S5_CLEAR: &str = "kpq.cloto.s5.clear";
+    pub const KPQ_CLOTO_S5_GATHER: &str = "kpq.cloto.s5.gather";
+    pub const KPQ_CLOTO_S5_WON: &str = "kpq.cloto.s5.won";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -746,6 +750,10 @@ mod tests {
             keys::KPQ_CLOTO_S4_INTRO,
             keys::KPQ_CLOTO_AREAS_WRONG,
             keys::KPQ_CLOTO_AREAS_RIGHT,
+            keys::KPQ_CLOTO_S5_SHORT,
+            keys::KPQ_CLOTO_S5_CLEAR,
+            keys::KPQ_CLOTO_S5_GATHER,
+            keys::KPQ_CLOTO_S5_WON,
             keys::JEFF_INTRO,
             keys::JEFF_ASK,
             keys::JEFF_DECLINE,

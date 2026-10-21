@@ -5,32 +5,18 @@
 //! harness world pins her question (`RUSTMS_KPQ_QUESTION`), so the
 //! members' coupons can be granted before they log in.
 
-use integration_harness::events::{enter_kpq, in_lobby, party, talk, CLOTO, NELLA};
+use integration_harness::events::{enter_kpq, in_lobby, party, talk, throw_down, CLOTO, NELLA};
 use integration_harness::hunting::pickup;
 use integration_harness::packets::build_change_map;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, step, until, warp, Trace};
 use integration_harness::WorldSession;
 use net::events::{ANSWERS, COUPON, KPQ, PASS};
-use net::packet::op::{RecvOpcode, SendOpcode};
-use packet::io::write::PktWrite;
-use packet::Packet;
+use net::packet::op::SendOpcode;
 
 const ETC: u8 = 4;
 /// The question the harness world pins, 1 to 7.
 const QUESTION: usize = 7;
-
-/// Throw `quantity` of the Etc stack in `slot` on the ground.
-fn throw_down(slot: i16, quantity: i16) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::ItemMove as i16).unwrap();
-    p.write_int(0).unwrap();
-    p.write_byte(ETC).unwrap();
-    p.write_short(slot).unwrap();
-    p.write_short(0).unwrap();
-    p.write_short(quantity).unwrap();
-    p
-}
 
 /// A new level-25 character holding `quantity` of `item_id` in Etc slot 1,
 /// logged in and waiting in Kerning City.

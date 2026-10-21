@@ -42,13 +42,17 @@ pub struct Event {
     pub puzzles: RangeInclusive<u8>,
     /// Items of use only in the event, taken from whoever leaves it.
     pub items: &'static [i32],
+    /// The passes the leader hands Cloto to clear the last stage, which
+    /// wins the event.
+    pub passes: i32,
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
 /// `FieldSet.img/Party1`: maps 103000800-805, 30 minutes). Stage EXP is
 /// Cosmic's; `next00` leads on from 103000800-803, and 800-804 each have a
 /// `gate` object (Map.nx). Stages 2 to 4 are Cloto's ropes, platforms and
-/// barrels.
+/// barrels; stage 5's monsters drop the 10 passes that clear it (Cosmic
+/// `9020001`, `clearPQ`).
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
@@ -61,6 +65,7 @@ pub const KPQ: Event = Event {
     gated: 103_000_800..=103_000_803,
     puzzles: 2..=4,
     items: &[COUPON, PASS],
+    passes: 10,
 };
 
 impl EventKind {
@@ -143,6 +148,26 @@ impl Event {
         changes
     }
 
+    /// The stage whose clear wins the event.
+    pub fn last_stage(&self) -> u8 {
+        u8::try_from(self.exp_per_stage.len()).unwrap_or(u8::MAX)
+    }
+
+    /// `who` talks to Cloto on the last stage, `cleared` or not: the leader
+    /// hands her the passes, which only the leader may do.
+    pub fn last_stage_talk(&self, who: ClientId, team: &Team, cleared: bool) -> Cloto {
+        if cleared {
+            Cloto::Won
+        } else if who == team.leader() {
+            Cloto::Leader {
+                stage: self.last_stage(),
+                needed: self.passes,
+            }
+        } else {
+            Cloto::Gather
+        }
+    }
+
     /// The EXP for clearing `stage`.
     pub fn stage_exp(&self, stage: u8) -> i32 {
         usize::from(stage)
@@ -178,12 +203,14 @@ fn scale() -> u32 {
 }
 
 /// Who is still playing. The event ends when its leader leaves or too few
-/// remain (Cosmic `isEventTeamLackingNow`, before the event is cleared).
+/// remain, and once won, when the last of them leaves (Cosmic
+/// `isEventTeamLackingNow`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Team {
     leader: ClientId,
     members: Vec<ClientId>,
     least: usize,
+    won: bool,
 }
 
 impl Team {
@@ -192,7 +219,14 @@ impl Team {
             leader,
             members,
             least: *event.team.start(),
+            won: false,
         }
+    }
+
+    /// The team won the event: from now on only the last member's leaving
+    /// ends it.
+    pub fn win(&mut self) {
+        self.won = true;
     }
 
     pub fn leader(&self) -> ClientId {
@@ -214,6 +248,9 @@ impl Team {
             return false;
         };
         self.members.remove(index);
+        if self.won {
+            return self.members.is_empty();
+        }
         member == self.leader || self.members.len() < self.least
     }
 }
@@ -245,17 +282,24 @@ pub const ANSWERS: [i32; 7] = [10, 35, 20, 25, 25, 30, 8];
 pub enum Cloto {
     /// The stage is cleared; the way on is open.
     Cleared,
+    /// The last stage is cleared: the event is won.
+    Won,
     /// A member other than the leader on a puzzle stage, which is the
     /// leader's to answer.
     Follow,
+    /// A member other than the leader on the last stage, who gathers its
+    /// passes for the leader to hand in.
+    Gather,
     /// The leader, on first talking to her on puzzle stage `stage`: she sets
     /// the puzzle.
     Intro { stage: u8 },
     /// The leader, answering puzzle stage `stage`: the team must stand as
     /// `combo` asks (`on_areas`).
     Puzzle { stage: u8, combo: u32 },
-    /// The leader, who needs a pass from each of the others.
-    Leader { needed: i32 },
+    /// The leader, who clears `stage` by handing in `needed` passes: on
+    /// stage 1 one from each of the others, on the last stage the event's
+    /// `passes`.
+    Leader { stage: u8, needed: i32 },
     /// Another member, asked `question` (an index into `ANSWERS`), told it
     /// for the first time if `new`.
     Member {
@@ -285,6 +329,7 @@ impl Stage1 {
         if who == team.leader() {
             let needed = team.members().len().saturating_sub(1);
             return Cloto::Leader {
+                stage: 1,
                 needed: i32::try_from(needed).unwrap_or(i32::MAX),
             };
         }
@@ -497,6 +542,34 @@ mod tests {
     }
 
     #[test]
+    fn a_won_event_ends_when_its_last_member_leaves() {
+        let mut team = Team::new(&KPQ, 1, vec![1, 2, 3]);
+        team.win();
+        assert!(!team.leave(1));
+        assert!(!team.leave(2));
+        assert!(!team.leave(2));
+        assert!(team.leave(3));
+    }
+
+    #[test]
+    fn the_leader_wins_kpq_with_ten_passes_on_its_fifth_stage() {
+        let team = Team::new(&KPQ, 1, vec![1, 2, 3]);
+        assert_eq!(KPQ.last_stage(), 5);
+        assert_eq!(KPQ.stage_on(KPQ.stage_map(5)), Some(5));
+        assert_eq!(KPQ.gate_stage(KPQ.stage_map(5), "next00"), None);
+        assert_eq!(
+            KPQ.last_stage_talk(1, &team, false),
+            Cloto::Leader {
+                stage: 5,
+                needed: 10
+            }
+        );
+        assert_eq!(KPQ.last_stage_talk(2, &team, false), Cloto::Gather);
+        assert_eq!(KPQ.last_stage_talk(1, &team, true), Cloto::Won);
+        assert_eq!(KPQ.last_stage_talk(2, &team, true), Cloto::Won);
+    }
+
+    #[test]
     fn kpq_lasts_half_an_hour_on_its_own_maps() {
         assert_eq!(KPQ.duration(), Duration::from_secs(30 * 60));
         assert!(KPQ.holds(103_000_800) && KPQ.holds(103_000_805));
@@ -603,7 +676,13 @@ mod tests {
     fn cloto_asks_each_member_one_question_and_the_leader_for_passes() {
         let team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
         let mut stage = Stage1::default();
-        assert_eq!(stage.talk(1, &team, || 0), Cloto::Leader { needed: 3 });
+        assert_eq!(
+            stage.talk(1, &team, || 0),
+            Cloto::Leader {
+                stage: 1,
+                needed: 3
+            }
+        );
         let asked = Cloto::Member {
             question: 4,
             new: true,

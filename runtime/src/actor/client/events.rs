@@ -158,9 +158,11 @@ impl ClientActor {
         self.leave_event().await
     }
 
-    /// Without a party there is no event: the player leaves it.
+    /// Without a party there is no event: the player leaves it, unless it
+    /// is already won (Cosmic `playerLeft`).
     pub(super) async fn left_party_in_event(&mut self) -> Result<(), RuntimeError> {
-        if self.party_id.is_none() && self.event.is_some() {
+        let playing = self.event.as_ref().is_some_and(|ticket| !ticket.won());
+        if self.party_id.is_none() && playing {
             self.leave_event().await?;
         }
         Ok(())
@@ -239,7 +241,8 @@ impl ClientActor {
     }
 
     /// The party cleared `stage` of event `id`: those on its map see and
-    /// hear it and its gate opens, and everyone gets the stage's EXP.
+    /// hear it and its gate opens, and everyone gets the stage's EXP. The
+    /// last stage wins the event, and everyone's clock stops.
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -255,6 +258,9 @@ impl ClientActor {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             packets.push(build_field_object("gate")?);
+        }
+        if stage == event.last_stage() {
+            packets.push(build_stop_clock()?);
         }
         gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
@@ -277,10 +283,12 @@ impl ClientActor {
         self.send(&mut build_field_object("gate")?).await
     }
 
-    /// On one of the event's maps the client shows the time left.
+    /// On one of the event's maps the client shows the time left, until the
+    /// event is won.
     pub(super) async fn show_event_clock(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+        let shown = |ticket: &&EventTicket| ticket.holds(map_id) && !ticket.won();
+        let Some(ticket) = self.event.as_ref().filter(shown) else {
             return Ok(());
         };
         let left = ticket.ends.saturating_duration_since(Instant::now());

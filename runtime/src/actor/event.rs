@@ -11,7 +11,9 @@
 //! it, hands itself back.
 //!
 //! The stages cleared are shared with the tickets, so a member's client
-//! actor can tell at once whether a stage's way on is open.
+//! actor can tell at once whether a stage's way on is open. Clearing the
+//! last stage wins the event: its clock stops, and it goes on until the
+//! last member leaves its maps.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -111,6 +113,11 @@ impl EventTicket {
         self.cleared.has(stage)
     }
 
+    /// Whether the party has cleared the last stage, so has no time limit.
+    pub fn won(&self) -> bool {
+        self.cleared(self.kind.event().last_stage())
+    }
+
     /// Where the member stands with Cloto on `stage`, or `None` if she has
     /// nothing to say there or the event is over.
     pub async fn cloto(&self, stage: u8) -> Option<Cloto> {
@@ -164,7 +171,7 @@ pub fn spawn(
     let actor = EventActor {
         id,
         kind,
-        ends: Instant::now() + kind.event().duration(),
+        ends: Some(Instant::now() + kind.event().duration()),
         event: Some(EventHandle { tx }),
         rx,
         team: Team::new(
@@ -203,7 +210,8 @@ pub fn spawn(
 struct EventActor {
     id: u32,
     kind: EventKind,
-    ends: Instant,
+    /// None once the event is won.
+    ends: Option<Instant>,
     /// Ours until the tickets are out; then only they keep the queue open.
     event: Option<EventHandle>,
     rx: mpsc::Receiver<EventMessage>,
@@ -216,9 +224,9 @@ struct EventActor {
 
 impl EventActor {
     async fn run(mut self) {
-        let (id, kind, ends) = (self.id, self.kind, self.ends);
+        let (id, kind) = (self.id, self.kind);
         info!(?kind, id, members = ?self.team.members(), "Event started");
-        if let Some(event) = self.event.take() {
+        if let (Some(event), Some(ends)) = (self.event.take(), self.ends) {
             for member in self.members.values() {
                 // A ticket that doesn't arrive hands itself back.
                 member.send(ServerMessage::EventStarted(EventTicket {
@@ -233,6 +241,7 @@ impl EventActor {
         }
         let mut over = false;
         while !over {
+            let ends = self.ends;
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
@@ -244,7 +253,7 @@ impl EventActor {
                     }
                     None => over = true,
                 },
-                _ = sleep_until(ends) => over = true,
+                _ = until(ends) => over = true,
             }
         }
         info!(?kind, id, "Event ended");
@@ -268,6 +277,10 @@ impl EventActor {
         if stage == 1 {
             return Some(self.stage1.talk(client_id, &self.team, draw_question));
         }
+        if stage == event.last_stage() {
+            let cleared = self.cleared.has(stage);
+            return Some(event.last_stage_talk(client_id, &self.team, cleared));
+        }
         if !event.puzzles.contains(&stage) {
             return None;
         }
@@ -288,7 +301,8 @@ impl EventActor {
             return;
         }
         let leader = client_id == self.team.leader();
-        let puzzles = &self.kind.event().puzzles;
+        let event = self.kind.event();
+        let puzzles = &event.puzzles;
         match command {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
             EventCommand::ClearStage(1) if leader => {
@@ -301,15 +315,30 @@ impl EventActor {
             {
                 self.clear(stage);
             }
+            EventCommand::ClearStage(stage) if leader && stage == event.last_stage() => {
+                self.win();
+            }
             EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
         }
     }
 
-    /// The way on from `stage` opens before anyone hears of the clear, so a
-    /// member who sees it can go through. A stage clears once.
-    fn clear(&self, stage: u8) {
-        if !self.cleared.set(stage) {
+    /// The leader handed in the last stage's passes: the event is won, and
+    /// its time no longer runs (Cosmic `clearPQ`).
+    fn win(&mut self) {
+        if !self.clear(self.kind.event().last_stage()) {
             return;
+        }
+        self.team.win();
+        self.ends = None;
+        info!(kind = ?self.kind, id = self.id, "Event won");
+    }
+
+    /// The way on from `stage` opens before anyone hears of the clear, so a
+    /// member who sees it can go through. A stage clears once; returns
+    /// whether this cleared it.
+    fn clear(&self, stage: u8) -> bool {
+        if !self.cleared.set(stage) {
+            return false;
         }
         info!(kind = ?self.kind, id = self.id, stage, "Stage cleared");
         for member in self.team.members() {
@@ -317,6 +346,15 @@ impl EventActor {
                 handle.send(ServerMessage::StageCleared { id: self.id, stage });
             }
         }
+        true
+    }
+}
+
+/// Wait until `ends`, or forever without it.
+async fn until(ends: Option<Instant>) {
+    match ends {
+        Some(ends) => sleep_until(ends).await,
+        None => std::future::pending().await,
     }
 }
 

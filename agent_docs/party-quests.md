@@ -2,9 +2,9 @@
 
 A party event is played in a copy of its maps of its own: an instance.
 Kerning City's party quest (KPQ) is the first. So far it has its entry,
-exit and timer, stage 1 (Cloto's quiz), and stages 2 to 4 (her puzzles
-of areas to stand on), with their clears and the gates on. Stage 5 and
-the rewards come next (see `v83ref/reports/a005-instancing-kpq.md`,
+exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles of
+areas to stand on), with their clears and the gates on, and stage 5 (ten
+passes), which wins it. The rewards and the bonus stage come next (see `v83ref/reports/a005-instancing-kpq.md`,
 section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
 
 ## Rules
@@ -20,6 +20,8 @@ section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
   leader's channel, standing in the lobby, at the right levels. The leader
   must be one of them, and there must be enough of them and not too many.
 - `Team::leave` ends the event when the leader leaves or too few remain.
+  Once the event is won (`Team::win`), only the last member's leaving
+  ends it.
 - `RUSTMS_EVENT_SCALE` (a whole number, default 1) shortens every event.
   The harness world sets it to 60, so KPQ lasts 30 seconds.
 
@@ -53,14 +55,15 @@ section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
    otherwise they drop it. While a
    member holds a ticket, `change_field` uses `field_key`, so the event's
    maps resolve to its copy. On arrival the client is sent the countdown
-   (`show_event_clock`).
+   (`show_event_clock`), unless the event is won.
 5. **Leaving.** A ticket hands itself back when dropped
    (`EventMessage::Left`), including one that never reached its member.
    Each of these ways out drops it and stops the clock:
    - going to a map outside the event, whether by Nella, by dying, or by a
      debug warp;
    - leaving or losing the party (`PartyChanged{None}`), which also warps
-     the member to the exit;
+     the member to the exit, unless the event is won (Cosmic
+     `playerLeft`);
    - logging out or changing channel, which come through `cleanup`. A
      member in the Cash Shop keeps the ticket until they come back out,
      which is a channel change.
@@ -69,7 +72,7 @@ section 3, `a011-kpq-stage1.md` and `a016-kpq-stages-2-5.md`).
    coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
    `Event::take_items`, shown to the client unless they are logging out.
 6. **Ending.** The event ends when its time is up, when its leader leaves,
-   or when too few remain. It sends `EventEnded{id}`, and members still on
+   or when too few remain; once won, only when its last member leaves. It sends `EventEnded{id}`, and members still on
    its maps go to the exit. Two seconds later the actor exits. Its
    `on_exit`, which runs even after a panic, sends every member
    `EventEnded` again, closes the instance (`FieldRegistry::close_instance`
@@ -118,7 +121,7 @@ The client actor asks its ticket where the player stands
 as her page is shown (`Page::Act`, as in Cosmic, where the page and the
 items go in one call). The script's last effect, `Effect::EventCommand`,
 tells the event (`PassGiven`, `ClearStage(1)`) once the items have changed
-hands. On stage 5, and outside an event, Cloto has nothing to say yet.
+hands. Outside an event Cloto has nothing to say.
 
 ## Stages 2 to 4
 
@@ -153,6 +156,32 @@ A client may hold back moves in the air or on a rope until it lands, so a
 member hanging still on a rope may still count where they last stood
 (`v83ref/reports/a018-kpq-stage-facts.md`).
 
+## Stage 5
+
+On 103000804 the monsters drop the passes, and the leader hands Cloto ten
+of them (`Event::passes`, Cosmic `9020001`) to clear the stage
+(`Event::last_stage_talk`):
+
+- The leader holding fewer is told to bring ten; with ten or more, Cloto
+  takes ten (`Cloto::Leader{stage: 5}`, `ClearStage(5)`).
+- The other members are told to gather passes for the leader
+  (`Cloto::Gather`). Only the leader may hand them in.
+- Once cleared, everyone is told the party quest is won (`Cloto::Won`).
+
+The clear is a stage clear like the others, and then wins the event
+(`EventActor::win`, Cosmic `clearPQ`):
+
+- The deadline goes (`ends` is `None`), and every member is sent
+  STOP_CLOCK with the clear. Coming onto one of the event's maps after
+  that shows no clock (`EventTicket::won`).
+- `Team::win`: the event no longer ends when the leader leaves or too few
+  remain, only when the last member leaves its maps or the game.
+- Leaving the party, or the leader breaking it up, no longer sends anyone
+  out (Cosmic `playerLeft` and `disbandParty` once cleared).
+
+So far the won party leaves by Nella; Cloto's reward and the warp to the
+bonus stage (103000805) are not done yet.
+
 ## Clearing a stage
 
 Stage n is played on `entry + n - 1`. A clear, taken once and only from the
@@ -182,7 +211,7 @@ portal is closed for now." line, which also unlocks it
 | NPC | Where | Script |
 | --- | --- | --- |
 | Lakelis 9020000 | 103000000 | Runtime (`talk_about_event`), like Heracle |
-| Cloto 9020001 | 103000800-803 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles |
+| Cloto 9020001 | 103000800-804 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles, stage 5's passes |
 | Nella 9020002 | 103000800-805 | Out to 103000890 |
 | Nella 9020002 | 103000890 | Home to 103000000 |
 
@@ -193,8 +222,7 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 
 These are not done yet:
 
-- Stage 5, Cloto's last stage.
-- Rewards and the bonus stage.
+- Cloto's reward after the win, and the bonus stage (103000805).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it.
 - Members in the Cash Shop still pass the entry check, which doesn't know
