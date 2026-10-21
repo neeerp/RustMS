@@ -281,3 +281,22 @@ impl EventActor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cleared_keeps_one_bit_per_stage() {
+        let cleared = Cleared::default();
+        cleared.set(1);
+        cleared.set(3);
+        assert!(cleared.has(1) && !cleared.has(2) && cleared.has(3));
+        // Stages are counted from 1, and eight fit.
+        cleared.set(0);
+        cleared.set(9);
+        assert!(!cleared.has(0) && !cleared.has(9) && !cleared.has(8));
+        cleared.set(8);
+        assert!(cleared.has(8));
+    }
+}

@@ -188,9 +188,7 @@ impl ClientActor {
         if next.stats.map_id == map_id {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
-            if event.has_gate(map_id) {
-                packets.push(build_field_object("gate")?);
-            }
+            packets.push(build_field_object("gate")?);
         }
         gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
@@ -204,11 +202,10 @@ impl ClientActor {
             return Ok(());
         };
         let event = ticket.kind.event();
-        let open = event.has_gate(map_id)
-            && event
-                .stage_on(map_id)
-                .is_some_and(|stage| ticket.cleared(stage));
-        if !open {
+        let cleared = event
+            .stage_on(map_id)
+            .is_some_and(|stage| ticket.cleared(stage));
+        if !cleared {
             return Ok(());
         }
         self.send(&mut build_field_object("gate")?).await

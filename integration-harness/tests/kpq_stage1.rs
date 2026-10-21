@@ -179,19 +179,21 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
         unreachable!()
     };
 
-    // The way on is shut until the stage is cleared.
-    send(
-        &mut leader.connection,
-        build_change_map(-1, "next00").unwrap(),
-    )
-    .await;
-    let mut trace = Trace::default();
-    until(&mut leader.connection, &mut trace, |t| {
-        !t.blocked.is_empty()
-    })
-    .await;
-    assert_eq!(trace.blocked, [(SendOpcode::BlockedMap as i16, 1)]);
-    assert!(trace.warps.is_empty(), "{trace:?}");
+    // The way on is shut until the stage is cleared, for everyone.
+    for player in [&mut *leader, &mut *wrong] {
+        send(
+            &mut player.connection,
+            build_change_map(-1, "next00").unwrap(),
+        )
+        .await;
+        let mut trace = Trace::default();
+        until(&mut player.connection, &mut trace, |t| {
+            !t.blocked.is_empty()
+        })
+        .await;
+        assert_eq!(trace.blocked, [(SendOpcode::BlockedMap as i16, 1)]);
+        assert!(trace.warps.is_empty(), "{trace:?}");
+    }
 
     // Each member is asked first, whatever they hold.
     let (question, trace) = ask_cloto(right).await;

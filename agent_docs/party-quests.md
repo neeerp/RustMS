@@ -125,10 +125,11 @@ leader, goes like this (`EventActor::clear`):
    member who sees the clear can go on.
 2. Every member gets `ServerMessage::StageCleared{id, stage}`. Those on
    the stage's map are shown FIELD_EFFECT 3 `quest/party/clear`, 4
-   `Party1/Clear` (the sound), and 2 `gate` where the map has one (800,
-   802, 804). Everyone in the event, wherever they are in it, gets the
-   stage's EXP (`Event::stage_exp`: 100, 200, 400, 800, 1500, Cosmic's) as
-   quest EXP.
+   `Party1/Clear` (the sound), and 2 `gate` (every stage map has one).
+   Everyone in the event, wherever they are in it, gets the stage's EXP
+   as quest EXP (`Event::exp_per_stage`: 100, 200, 400, 800, 1500,
+   Cosmic's, though not scaled by an EXP rate as Cosmic's is). A member in
+   the Cash Shop gets none; leaving it takes them out of the event anyway.
 3. A member who comes onto a cleared stage's map later is shown its gate
    again (`show_event_gate`, from `join_current_field`).
 
@@ -156,8 +157,6 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's stages after the first.
-- HeavenClient ignores FIELD_EFFECT 2 and 4, so it shows no gate opening
-  and plays no clear sound, and it draws the `gate` from the start.
 - Rewards and the bonus stage.
 - Removing the quest's items on exit.
 - A new leader chosen inside the copy: the event still counts the first

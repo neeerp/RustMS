@@ -31,19 +31,17 @@ pub struct Event {
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
     /// is played on `entry + n - 1`.
-    pub stage_exp: &'static [i32],
+    pub exp_per_stage: &'static [i32],
     /// The stage maps whose `next00` portal stays shut until their stage is
+    /// cleared. Every stage map has a `gate` object, shown once its stage is
     /// cleared.
     pub gated: RangeInclusive<i32>,
-    /// The stage maps with a `gate` object, shown once their stage is
-    /// cleared.
-    pub gates: &'static [i32],
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
 /// `FieldSet.img/Party1`: maps 103000800-805, 30 minutes). Stage EXP is
-/// Cosmic's; `next00` leads on from 103000800-803, and 800, 802 and 804
-/// have a `gate` object (Map.nx).
+/// Cosmic's; `next00` leads on from 103000800-803, and 800-804 each have a
+/// `gate` object (Map.nx).
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
@@ -52,9 +50,8 @@ pub const KPQ: Event = Event {
     levels: 21..=30,
     team: 3..=4,
     minutes: 30,
-    stage_exp: &[100, 200, 400, 800, 1500],
+    exp_per_stage: &[100, 200, 400, 800, 1500],
     gated: 103_000_800..=103_000_803,
-    gates: &[103_000_800, 103_000_802, 103_000_804],
 };
 
 impl EventKind {
@@ -105,7 +102,7 @@ impl Event {
     /// The stage played on `map_id`, if any.
     pub fn stage_on(&self, map_id: i32) -> Option<u8> {
         let stage = u8::try_from(map_id.checked_sub(self.entry)? + 1).ok()?;
-        (1..=self.stage_exp.len())
+        (1..=self.exp_per_stage.len())
             .contains(&usize::from(stage))
             .then_some(stage)
     }
@@ -119,16 +116,11 @@ impl Event {
         self.stage_on(map_id)
     }
 
-    /// Whether `map_id` shows a `gate` once its stage is cleared.
-    pub fn has_gate(&self, map_id: i32) -> bool {
-        self.gates.contains(&map_id)
-    }
-
     /// The EXP for clearing `stage`.
     pub fn stage_exp(&self, stage: u8) -> i32 {
         usize::from(stage)
             .checked_sub(1)
-            .and_then(|index| self.stage_exp.get(index))
+            .and_then(|index| self.exp_per_stage.get(index))
             .copied()
             .unwrap_or(0)
     }
@@ -314,7 +306,6 @@ mod tests {
         assert_eq!(KPQ.gate_stage(103_000_803, "next00"), Some(4));
         assert_eq!(KPQ.gate_stage(103_000_804, "next00"), None);
         assert_eq!(KPQ.gate_stage(103_000_800, "st00"), None);
-        assert!(KPQ.has_gate(103_000_800) && !KPQ.has_gate(103_000_801));
         assert_eq!((KPQ.stage_exp(1), KPQ.stage_exp(5)), (100, 1500));
         assert_eq!((KPQ.stage_exp(0), KPQ.stage_exp(6)), (0, 0));
     }
