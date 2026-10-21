@@ -146,6 +146,16 @@ namespace ms
 			write_string(text);
 			write_time();
 		}
+
+		// The Item Tag (5060000) and Magical Sandglasses (550xxxx) send the worn equip's slot, negative as
+		// in moves.
+		UseCashItemPacket(int16_t slot, int32_t itemid, int16_t equipped) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_short(-equipped);
+			write_time();
+		}
 	};
 
 	// Sends a note with the note item (509xxxx, v83 a0b6e4).

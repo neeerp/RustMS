@@ -75,6 +75,9 @@ namespace ms
 		ColorBox line;
 		Texture stat_dot;
 
+		// Whose name an Item Tag printed on it, orange with a white "'s" after, over the name.
+		Text owner;
+		Text owner_s;
 		Text name;
 		// The orange lines under the name; the first wraps where it is wider than the box.
 		std::array<Text, 2> properties;

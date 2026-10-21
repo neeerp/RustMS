@@ -22,6 +22,7 @@ mod guild_bbs;
 mod hammer;
 mod item_effect;
 mod item_move;
+mod item_tag;
 mod jukebox;
 mod keybinds;
 mod logged_in;

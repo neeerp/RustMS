@@ -216,6 +216,10 @@ pub const FLAG_UNTRADEABLE: i16 = 0x08;
 pub const FLAG_EQUIP_KARMA: i16 = 0x10;
 pub const FLAG_BUNDLE_KARMA: i16 = 0x02;
 
+/// `Item.flags` bit of a sealed item (v83 GW_ItemSlotBase::IsProtectedItem,
+/// report c009): it can't be sold, traded or dropped.
+pub const FLAG_LOCK: i16 = 0x01;
+
 /// One stack (or one equipment instance) occupying an inventory slot.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item {

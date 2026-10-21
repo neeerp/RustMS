@@ -34,6 +34,8 @@ pub struct ItemInfo {
     pub pquest: bool,
     /// Items gone once their owner logs out (`info/expireOnLogout`).
     pub expire_on_logout: bool,
+    /// Time-limited items no sandglass extends (`info/notExtend`).
+    pub not_extend: bool,
     /// What a meso sack holds (`info/meso`).
     pub meso: i32,
     pub price: i32,
@@ -76,6 +78,17 @@ pub struct ItemInfo {
     pub rate_card: Option<RateCard>,
     /// The cloud a cash mist item (528xxxx) leaves.
     pub mist: Option<ItemMist>,
+    /// What a Magical Sandglass (550xxxx) adds.
+    pub sandglass: Option<Sandglass>,
+}
+
+/// A Magical Sandglass's `info`: the seconds it adds to a time-limited
+/// equip (`addTime`), and how many days from now that may reach
+/// (`maxDays`, 0 for any).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Sandglass {
+    pub add_seconds: i32,
+    pub max_days: i32,
 }
 
 /// A cash mist item's cloud: its box around the user (`info/lt`, `info/rb`)
@@ -410,6 +423,7 @@ impl ItemData {
             info.account_sharable = nx.int_child(meta, "accountSharable")? == Some(1);
             info.pquest = nx.int_child(meta, "pquest")? == Some(1);
             info.expire_on_logout = nx.int_child(meta, "expireOnLogout")? == Some(1);
+            info.not_extend = nx.int_child(meta, "notExtend")? == Some(1);
             info.meso = nx.int_child(meta, "meso")?.unwrap_or(0);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
@@ -481,6 +495,12 @@ impl ItemData {
                         faces,
                     });
                 }
+            }
+            if item_id / 10_000 == 550 {
+                info.sandglass = Some(Sandglass {
+                    add_seconds: nx.int_child(meta, "addTime")?.unwrap_or(0),
+                    max_days: nx.int_child(meta, "maxDays")?.unwrap_or(0),
+                });
             }
         }
         if let Some(spec) = nx.child_by_name(node, "spec")? {
@@ -637,6 +657,7 @@ impl ItemData {
             account_sharable: nx.int_child(meta, "accountSharable")? == Some(1),
             pquest: nx.int_child(meta, "pquest")? == Some(1),
             expire_on_logout: nx.int_child(meta, "expireOnLogout")? == Some(1),
+            not_extend: nx.int_child(meta, "notExtend")? == Some(1),
             meso: 0,
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
@@ -657,6 +678,7 @@ impl ItemData {
             pet_chat_balloon: false,
             rate_card: None,
             mist: None,
+            sandglass: None,
         }))
     }
 }

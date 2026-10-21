@@ -64,6 +64,8 @@ namespace ms
 		constexpr int16_t PROPERTY_STEP = 19;
 		const Point<int16_t> PROPERTY_WRAP_POS = { 25, 27 };
 		constexpr int16_t PROPERTY_WRAP_WIDTH = 178;
+		// An owner's line takes the top, centred, and moves everything else down (FUN_008f49bc, report c011).
+		constexpr int16_t OWNER_HEIGHT = 19;
 
 		constexpr const char *JOB_NAMES[] = { "beginner", "warrior", "magician", "bowman", "thief", "pirate" };
 
@@ -275,6 +277,10 @@ namespace ms
 		name = Text(Text::Font::A12B, Text::Alignment::LEFT, equip.get_level() > 0 ? Color::Name::CORNFLOWERBLUE : Color::Name::WHITE, namestr);
 		itemicon = itemdata.get_icon(false);
 
+		const std::string &ownerstr = equip.get_owner();
+		owner = ownerstr.empty() ? Text() : Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::TIPORANGE, ownerstr);
+		owner_s = ownerstr.empty() ? Text() : Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "'s");
+
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
 		gift = giftstr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, giftstr);
 
@@ -390,6 +396,9 @@ namespace ms
 		if (!gift.empty())
 			height += EXPIRY_HEIGHT;
 
+		if (!owner.empty())
+			height += OWNER_HEIGHT;
+
 		// One that could trade with Scissors of Karma says so.
 		std::string descstr = itemdata.get_desc();
 
@@ -415,6 +424,14 @@ namespace ms
 
 		pos = tooltip::place(pos, size);
 		box.draw(pos, size);
+
+		if (!owner.empty())
+		{
+			int16_t left = width / 2 - (owner.width() + owner_s.width()) / 2;
+			owner.draw(pos + Point<int16_t>(left, tooltip::NAME_POS.y()));
+			owner_s.draw(pos + Point<int16_t>(left + owner.width(), tooltip::NAME_POS.y()));
+			pos.shift_y(OWNER_HEIGHT);
+		}
 
 		icon.draw_dot(pos + tooltip::DOT_POS);
 		name.draw(pos + tooltip::NAME_POS);
