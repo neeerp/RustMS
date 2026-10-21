@@ -6,7 +6,9 @@
 //!
 //! Members' client actors do the moving: a ticket makes `change_field` use
 //! the copy's fields for the event's maps, and leaving those maps, the
-//! party or the game hands the ticket back (`EventMessage::Left`).
+//! party or the game hands the ticket back (`EventMessage::Left`). A ticket
+//! dropped any other way, say with a client that went away before reading
+//! it, hands itself back.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -37,21 +39,24 @@ pub struct EventHandle {
     tx: mpsc::Sender<EventMessage>,
 }
 
-impl EventHandle {
-    pub fn left(&self, client_id: ClientId) {
-        // Only members send, once each, so the queue can't fill.
-        let _ = self.tx.try_send(EventMessage::Left { client_id });
-    }
-}
-
 /// What a member holds while in the event: the event's own fields for its
-/// maps, and when it ends.
-#[derive(Clone, Debug)]
+/// maps, and when it ends. Dropping it leaves the event.
+#[derive(Debug)]
 pub struct EventTicket {
     pub id: u32,
     pub kind: EventKind,
     pub ends: Instant,
-    pub event: EventHandle,
+    member: ClientId,
+    event: EventHandle,
+}
+
+impl Drop for EventTicket {
+    fn drop(&mut self) {
+        // Each member has one ticket, so the queue can't fill.
+        let _ = self.event.tx.try_send(EventMessage::Left {
+            client_id: self.member,
+        });
+    }
 }
 
 impl EventTicket {
@@ -81,13 +86,12 @@ pub fn spawn(
     let (id, kind, channel_id) = (start.id, start.kind, start.channel_id);
     fields.open_instance(channel_id, id);
     let (tx, rx) = mpsc::channel(EVENT_QUEUE_CAPACITY);
+    let everyone = start.team.clone();
     let actor = EventActor {
-        ticket: EventTicket {
-            id,
-            kind,
-            ends: Instant::now() + kind.event().duration(),
-            event: EventHandle { tx },
-        },
+        id,
+        kind,
+        ends: Instant::now() + kind.event().duration(),
+        event: Some(EventHandle { tx }),
         rx,
         team: Team::new(
             kind.event(),
@@ -100,8 +104,12 @@ pub fn spawn(
             .map(|member| (member.client_id, member))
             .collect(),
     };
-    // However it ends, the copy closes and the next party may go.
+    // However it ends, even by a panic, its members are sent out, the copy
+    // closes and the next party may go.
     spawn_supervised(format!("event {kind:?} {id}"), actor.run(), move || {
+        for member in &everyone {
+            member.send(ServerMessage::EventEnded { id });
+        }
         fields.close_instance(channel_id, id);
         tokio::spawn(async move {
             let _ = directory
@@ -116,7 +124,11 @@ pub fn spawn(
 }
 
 struct EventActor {
-    ticket: EventTicket,
+    id: u32,
+    kind: EventKind,
+    ends: Instant,
+    /// Ours until the tickets are out; then only they keep the queue open.
+    event: Option<EventHandle>,
     rx: mpsc::Receiver<EventMessage>,
     team: Team,
     members: HashMap<ClientId, ClientHandle>,
@@ -124,20 +136,21 @@ struct EventActor {
 
 impl EventActor {
     async fn run(mut self) {
-        let EventTicket { id, kind, ends, .. } = self.ticket;
+        let (id, kind, ends) = (self.id, self.kind, self.ends);
         info!(?kind, id, members = ?self.team.members(), "Event started");
-        let gone: Vec<_> = self
-            .members
-            .values()
-            .filter(|member| !member.send(ServerMessage::EventStarted(self.ticket.clone())))
-            .map(|member| member.client_id)
-            .collect();
-        let mut over = false;
-        for client_id in gone {
-            over |= self.team.leave(client_id);
+        if let Some(event) = self.event.take() {
+            for member in self.members.values() {
+                // A ticket that doesn't arrive hands itself back.
+                member.send(ServerMessage::EventStarted(EventTicket {
+                    id,
+                    kind,
+                    ends,
+                    member: member.client_id,
+                    event: event.clone(),
+                }));
+            }
         }
-        // The members' tickets hold the only senders besides ours.
-        drop(self.ticket);
+        let mut over = false;
         while !over {
             tokio::select! {
                 message = self.rx.recv() => match message {
@@ -153,6 +166,7 @@ impl EventActor {
                 handle.send(ServerMessage::EventEnded { id });
             }
         }
+        // Give them time to get out before the copy closes.
         sleep(GRACE).await;
     }
 }

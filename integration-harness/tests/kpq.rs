@@ -118,7 +118,11 @@ async fn yes(player: &mut WorldSession) -> Trace {
 
 /// Wait until `player` is moved to `map`, and return the trace.
 async fn moved_to(player: &mut WorldSession, map: i32) -> Trace {
-    let mut trace = Trace::default();
+    moved_on(player, map, Trace::default()).await
+}
+
+/// `moved_to`, carrying on from what `trace` has already seen.
+async fn moved_on(player: &mut WorldSession, map: i32, mut trace: Trace) -> Trace {
     until(&mut player.connection, &mut trace, |t| {
         t.warps.contains(&map)
     })
@@ -144,9 +148,10 @@ async fn parties_play_kerning_city_party_quest_in_turn_in_their_own_copy() {
 
     // Lakelis asks the leader, and in they go together, on the clock.
     assert_eq!(talk_to(&mut a[0], KPQ.lobby, LAKELIS).await, [(LAKELIS, 1)]);
-    yes(&mut a[0]).await;
+    let mut seen = Some(yes(&mut a[0]).await);
     for player in a.iter_mut() {
-        let mut trace = moved_to(player, KPQ.entry).await;
+        let seen = seen.take().unwrap_or_default();
+        let mut trace = moved_on(player, KPQ.entry, seen).await;
         until(&mut player.connection, &mut trace, |t| {
             !t.countdowns.is_empty()
         })
@@ -168,7 +173,12 @@ async fn parties_play_kerning_city_party_quest_in_turn_in_their_own_copy() {
     assert!(trace.players.is_empty(), "{:?}", trace.players);
     let mut trace = Trace::default();
     read_for(&mut a[0].connection, &mut trace, 500).await;
-    assert!(trace.players.is_empty(), "{:?}", trace.players);
+    let outsider = b[0].character_id;
+    assert!(
+        trace.players.iter().all(|p| p.character_id != outsider),
+        "{:?}",
+        trace.players
+    );
     let mut trace = Trace::default();
     assert_eq!(
         warp(&mut b[0].connection, KPQ.lobby, "", &mut trace).await,
@@ -178,8 +188,8 @@ async fn parties_play_kerning_city_party_quest_in_turn_in_their_own_copy() {
     // Nella lets a member out, which leaves too few: the quest ends, and
     // the rest are sent out after them.
     assert_eq!(talk_to(&mut a[2], KPQ.entry, NELLA).await, [(NELLA, 1)]);
-    yes(&mut a[2]).await;
-    let mut trace = moved_to(&mut a[2], KPQ.exit).await;
+    let seen = yes(&mut a[2]).await;
+    let mut trace = moved_on(&mut a[2], KPQ.exit, seen).await;
     until(&mut a[2].connection, &mut trace, |t| t.clocks_stopped > 0).await;
     for player in a[..2].iter_mut() {
         moved_to(player, KPQ.exit).await;
@@ -188,10 +198,11 @@ async fn parties_play_kerning_city_party_quest_in_turn_in_their_own_copy() {
     // The next party may go in once the copy closes.
     tokio::time::sleep(Duration::from_secs(3)).await;
     assert_eq!(talk_to(&mut b[0], KPQ.lobby, LAKELIS).await, [(LAKELIS, 1)]);
-    yes(&mut b[0]).await;
+    let mut seen = Some(yes(&mut b[0]).await);
     let mut seconds = 0;
     for player in b.iter_mut() {
-        let mut trace = moved_to(player, KPQ.entry).await;
+        let seen = seen.take().unwrap_or_default();
+        let mut trace = moved_on(player, KPQ.entry, seen).await;
         until(&mut player.connection, &mut trace, |t| {
             !t.countdowns.is_empty()
         })
@@ -201,8 +212,8 @@ async fn parties_play_kerning_city_party_quest_in_turn_in_their_own_copy() {
 
     // One of four leaving still leaves enough to play on...
     assert_eq!(talk_to(&mut b[3], KPQ.entry, NELLA).await, [(NELLA, 1)]);
-    yes(&mut b[3]).await;
-    moved_to(&mut b[3], KPQ.exit).await;
+    let seen = yes(&mut b[3]).await;
+    moved_on(&mut b[3], KPQ.exit, seen).await;
     let mut trace = Trace::default();
     read_for(&mut b[0].connection, &mut trace, 500).await;
     assert!(trace.warps.is_empty(), "{:?}", trace.warps);

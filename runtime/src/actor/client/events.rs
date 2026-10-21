@@ -47,10 +47,19 @@ impl ClientActor {
     }
 
     /// The party went in: the player takes their ticket to the event's
-    /// first map, unless they are in the Cash Shop or already in one.
+    /// first map, unless they have since left the party or the lobby, or
+    /// are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
-        if self.in_cash_shop || self.game.is_none() || self.event.is_some() {
-            ticket.event.left(self.client_id);
+        let lobby = ticket.kind.event().lobby;
+        let waiting = self.party_id.is_some()
+            && !self.in_cash_shop
+            && self.event.is_none()
+            && self
+                .game
+                .as_ref()
+                .is_some_and(|game| game.player.stats.map_id == lobby);
+        if !waiting {
+            // Dropping the ticket hands it back.
             return Ok(());
         }
         let entry = ticket.kind.event().entry;
@@ -112,8 +121,8 @@ impl ClientActor {
     }
 
     async fn drop_event_ticket(&mut self) -> Result<(), RuntimeError> {
-        if let Some(ticket) = self.event.take() {
-            ticket.event.left(self.client_id);
+        // Dropping the ticket hands it back.
+        if self.event.take().is_some() {
             if self.game.is_some() && !self.in_cash_shop {
                 self.send(&mut build_stop_clock()?).await?;
             }
@@ -134,8 +143,6 @@ impl ClientActor {
 
     /// A player who leaves the game leaves the event.
     pub(super) fn forget_event(&mut self) {
-        if let Some(ticket) = self.event.take() {
-            ticket.event.left(self.client_id);
-        }
+        self.event = None;
     }
 }

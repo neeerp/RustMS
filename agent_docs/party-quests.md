@@ -41,31 +41,40 @@ exit and timer; its stages, gates and rewards come next (see
    script's last effect. The leader's client asks the directory to reserve
    the event (`StartEvent`). The directory checks again and returns an
    `EventStart` with the team's handles, or `None`; then the script's
-   `refused` text, the terms, is shown.
+   `refused` text, the terms, is shown whatever the reason. A reservation
+   whose reply the leader can't take is dropped at once.
 3. **Starting.** The leader's client spawns the event actor
    (`event::spawn`). That opens the instance in the registry and sends each
    member `ServerMessage::EventStarted(ticket)`.
-4. **Entering.** A member who gets a ticket warps to the entry map. While a
+4. **Entering.** A member who gets a ticket warps to the entry map if they
+   are still in the party and the lobby, and not in the Cash Shop;
+   otherwise they drop it. While a
    member holds a ticket, `change_field` uses `field_key`, so the event's
    maps resolve to its copy. On arrival the client is sent the countdown
    (`show_event_clock`).
-5. **Leaving.** Each of these ways out hands the ticket back
-   (`EventMessage::Left`) and stops the clock:
+5. **Leaving.** A ticket hands itself back when dropped
+   (`EventMessage::Left`), including one that never reached its member.
+   Each of these ways out drops it and stops the clock:
    - going to a map outside the event, whether by Nella, by dying, or by a
      debug warp;
    - leaving or losing the party (`PartyChanged{None}`), which also warps
      the member to the exit;
-   - logging out, changing channel, or entering the Cash Shop and leaving
-     it again, all of which come through `cleanup`.
+   - logging out or changing channel, which come through `cleanup`. A
+     member in the Cash Shop keeps the ticket until they come back out,
+     which is a channel change.
 6. **Ending.** The event ends when its time is up, when its leader leaves,
    or when too few remain. It sends `EventEnded{id}`, and members still on
    its maps go to the exit. Two seconds later the actor exits. Its
-   `on_exit` closes the instance (`FieldRegistry::close_instance` sends each
-   field `FieldMessage::Close`) and tells the directory (`EventClosed`),
-   which frees the lobby.
+   `on_exit`, which runs even after a panic, sends every member
+   `EventEnded` again, closes the instance (`FieldRegistry::close_instance`
+   sends each field `FieldMessage::Close`) and tells the directory
+   (`EventClosed`), which frees the lobby, about two seconds after the
+   event ended.
 
 A player saved on an event map logs back in at its `forcedReturn`
-(103000890), outside the copy.
+(103000890), outside the copy. A player without a ticket who warps onto an
+event map by a debug warp lands on the channel's own copy of it, which the
+harness uses to check that copies are apart.
 
 ## Closed copies
 
@@ -74,8 +83,10 @@ A closed copy never comes back:
 - `FieldRegistry::field` starts a field of a closed instance for its caller
   alone, without registering it. It stops when the caller leaves, so a
   stale ticket can't make a copy outlive its event.
-- `send_to_field` doesn't rejoin a gone instanced field. The event has
-  already sent its members out.
+- `send_to_field` doesn't rejoin a gone field of a closed instance
+  (`FieldRegistry::is_open`). The event has already sent its members out.
+- `field` and `close_instance` both lock the fields before the open
+  instances, so no field of a copy is registered after it closes.
 
 ## NPCs
 
@@ -96,3 +107,7 @@ These are not done yet:
 - The `next00` gates, which stay open until the stage logic lands.
 - Rewards and the bonus stage.
 - Removing the quest's items on exit.
+- A new leader chosen inside the copy: the event still counts the first
+  leader, so the leader leaving ends it.
+- Members in the Cash Shop still pass the entry check, which doesn't know
+  where they are; they drop their ticket, which can end the event at once.

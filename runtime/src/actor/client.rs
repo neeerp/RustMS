@@ -1247,7 +1247,7 @@ impl ClientActor {
         match game.field.tx.send(message).await {
             Ok(()) => Ok(()),
             // An event's copy closed; the event already sent its members out.
-            Err(_) if game.field.key.instance_id != 0 => Ok(()),
+            Err(_) if !self.services.fields.is_open(game.field.key) => Ok(()),
             Err(mpsc::error::SendError(message)) => {
                 warn!(self.client_id, field = ?game.field.key, "Field actor gone; rejoining");
                 let key = game.field.key;

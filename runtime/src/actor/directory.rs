@@ -166,7 +166,10 @@ impl WorldDirectory {
                 let _ = reply.send(self.event_entry(from, kind).0);
             }
             DirectoryMessage::StartEvent { from, kind, reply } => {
-                let _ = reply.send(self.start_event(from, kind));
+                // A leader who can't take the reply can't start it.
+                if let Err(Some(start)) = reply.send(self.start_event(from, kind)) {
+                    self.events.remove(&(start.channel_id, kind));
+                }
             }
             DirectoryMessage::EventClosed {
                 channel_id,
