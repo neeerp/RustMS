@@ -68,6 +68,9 @@ namespace ms
 			// Shows the icon's item in the item megaphone's window.
 			virtual void drop_on_megaphone() const {}
 
+			// Puts the icon's item beside the first pet's HP or MP pouch.
+			virtual void drop_on_potion(bool mp) const {}
+
 			// The inventory tab an icon from another window goes back to,
 			// or NONE if the inventory doesn't take it.
 			virtual InventoryType::Id get_return_tab() const
@@ -111,6 +114,7 @@ namespace ms
 		void drop_on_trade(int8_t slot) const;
 		void drop_on_shop() const;
 		void drop_on_megaphone() const;
+		void drop_on_potion(bool mp) const;
 		InventoryType::Id get_return_tab() const;
 		void drop_on_inventory() const;
 		Keyboard::Mapping get_mapping() const;

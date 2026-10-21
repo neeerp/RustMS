@@ -242,7 +242,18 @@ pub struct Player {
     /// (`FREE_MARKET_RETURN`), or the map they used an event invitation in,
     /// under its `returnMapQR`.
     pub saved_locations: BTreeMap<i16, i32>,
+    /// The potions the first pet gives from the HP and MP pouches' slots,
+    /// or 0.
+    pub auto_potions: AutoPotions,
     dirty: bool,
+}
+
+/// The potions set in the pet panel's slots beside the HP and MP pouches
+/// (v83 keeps them with the key map, at `+0x3c0` and `+0x3c4`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AutoPotions {
+    pub hp: i32,
+    pub mp: i32,
 }
 
 impl Player {
@@ -283,6 +294,7 @@ impl Player {
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
             saved_locations: BTreeMap::new(),
+            auto_potions: AutoPotions::default(),
             dirty: false,
         }
     }

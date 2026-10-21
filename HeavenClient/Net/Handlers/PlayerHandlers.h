@@ -133,6 +133,29 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The potion the first pet gives from beside its HP pouch, 0 for none
+	// (v83 FUN_0058de2d)
+	// Opcode: AUTO_HP_POT(336)
+	class AutoHpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// The same for the MP pouch (FUN_0058de53)
+	// Opcode: AUTO_MP_POT(337)
+	class AutoMpPotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Checks the HP potion as if HP were lower by the amount sent, for HP
+	// the server takes without a hit (FUN_0095b985)
+	// Opcode: CHECK_AUTO_HP(212)
+	class CheckAutoHpHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Puts a picked-up card in the Monster Book, or says its page is full
 	// Opcode: MONSTER_BOOK_SET_CARD(83)
 	class MonsterBookSetCardHandler : public PacketHandler

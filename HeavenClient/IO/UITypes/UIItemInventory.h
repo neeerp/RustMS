@@ -137,6 +137,8 @@ namespace ms
 
 			void drop_on_megaphone() const override;
 
+			void drop_on_potion(bool mp) const override;
+
 			void set_count(int16_t count) override;
 
 			Icon::IconType get_type() override;

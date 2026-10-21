@@ -44,7 +44,10 @@ window between servers:
    redirect.
 3. **World entry** (`PLAYER_LOGGEDIN`) atomically claims a fresh ticket
    (younger than 60 seconds) for that character, channel, and IP, moving it to
-   `in_game`. Without a valid ticket the connection is closed.
+   `in_game`. Without a valid ticket the connection is closed. The client
+   actor then sends SET_FIELD (the character block) before the key map,
+   macros and auto potions: a v83 client handles only the login stage's
+   packets until its first SET_FIELD and drops the rest.
 4. **Channel change** saves the player, reissues the ticket for the target
    channel, and redirects; the new channel claims it as in step 3.
 5. **Disconnect** deletes the session (except during a channel change).

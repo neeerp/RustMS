@@ -23,11 +23,15 @@ async fn read_world_entry(
 
     let mut saw_keymap = false;
     let mut saw_set_field = false;
+    let mut saw_auto_mp = false;
     for _ in 0..8 {
         let envelope = connection.read_packet("world entry").await?;
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => saw_keymap = true,
             x if x == SendOpcode::MacroSysDataInit as i16 => {}
+            x if x == SendOpcode::AutoHpPot as i16 => {}
+            // The last of world entry.
+            x if x == SendOpcode::AutoMpPot as i16 => saw_auto_mp = true,
             x if x == SendOpcode::SetField as i16 => saw_set_field = true,
             x if x == SendOpcode::SpawnNpc as i16 => {}
             x if x == SendOpcode::SpawnNpcRequestController as i16 => {}
@@ -45,7 +49,7 @@ async fn read_world_entry(
             }
         }
 
-        if saw_keymap && saw_set_field {
+        if saw_keymap && saw_set_field && saw_auto_mp {
             return Ok(());
         }
     }

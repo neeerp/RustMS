@@ -241,13 +241,14 @@ namespace ms
 		// Use the move. A held skill hits with its `charge`, and its shots
 		// while held keep the body's action (`held`). A Final Attack
 		// (`follow`) cuts short the action under way with its own.
-		// Assassinate's second strike (`again`) hits only that mob.
-		void apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
+		// Assassinate's second strike (`again`) hits only that mob. Whether
+		// it went out.
+		bool apply_move(const SpecialMove &move, int32_t charge = 0, bool held = false,
 						const Follow *follow = nullptr, std::optional<int32_t> again = std::nullopt);
 
 		// Meso Explosion: set off the mesos in front of the player, each
-		// hurting the mobs around it (FUN_0096b3fb).
-		void set_off_mesos(const SpecialMove &move);
+		// hurting the mobs around it (FUN_0096b3fb). Whether it went off.
+		bool set_off_mesos(const SpecialMove &move);
 
 		// After a skill attack, see whether one of the Final Attacks it may
 		// set off comes up, and when it follows (0x957830).
@@ -276,8 +277,8 @@ namespace ms
 		// (0x950921), anyone else's only shows its effect (0x936528).
 		void explode(int32_t owner, int32_t skill, Point<int16_t> position);
 
-		// Start holding a skill down (FUN_0096a86e).
-		void start_prepare(const Skill &skill);
+		// Start holding a skill down (FUN_0096a86e). Whether it started.
+		bool start_prepare(const Skill &skill);
 
 		// Hold the skill another step: its effects, and its next shot.
 		void update_prepare();

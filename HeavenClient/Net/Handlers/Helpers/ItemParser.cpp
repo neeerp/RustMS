@@ -54,8 +54,9 @@ namespace ms
 			int8_t fullness = recv.read_byte();
 			int64_t date_dead = recv.read_long();
 
-			// Its attribute and skills
-			recv.skip(4);
+			// Its attribute, then its skills
+			recv.skip(2);
+			uint16_t skill = recv.read_short();
 
 			int32_t remain_life = recv.read_int();
 
@@ -63,7 +64,7 @@ namespace ms
 			recv.skip(2);
 
 			inventory.add_pet(invtype, slot, id, cash_id, expire, petname, petlevel, closeness, fullness, date_dead,
-				remain_life);
+				remain_life, skill);
 		}
 
 		// Parse an equip from a packet

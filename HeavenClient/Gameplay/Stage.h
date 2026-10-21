@@ -150,6 +150,8 @@ namespace ms
 
 		// Whether no in-map move is waiting, so a dash may go.
 		bool may_dash() const;
+		// Whether a field is up, rather than being left or still fading in.
+		bool is_active() const;
 		// Move the player onto `spot` on the next update, as Assassinate's
 		// second strike does (0x952d7b).
 		void dash(teleport::Spot spot);

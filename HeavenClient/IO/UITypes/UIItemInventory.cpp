@@ -1664,6 +1664,18 @@ namespace ms
 			megaphone->set_item(sourcetab, source);
 	}
 
+	void UIItemInventory::ItemIcon::drop_on_potion(bool mp) const
+	{
+		// Only a potion's kind of item from USE (FUN_007ff0d6, FUN_007ff5fe).
+		if (sourcetab != InventoryType::Id::USE || !field_limit::is_use_item(item_id))
+			return;
+
+		Player &player = Stage::get().get_player();
+
+		if (player.can_request(ExclRequest::WAIT))
+			player.change_auto_potion(mp, item_id);
+	}
+
 	void UIItemInventory::ItemIcon::set_count(int16_t c)
 	{
 		count = c;

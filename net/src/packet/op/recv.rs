@@ -101,6 +101,7 @@ pub enum RecvOpcode {
     PetChat = 0xA8,
     PetCommand = 0xA9,
     PetLoot = 0xAA,
+    PetAutoPot = 0xAB,
     PetExcludeItems = 0xAC,
     MoveSummon = 0xAF,
     SummonAttack = 0xB0,

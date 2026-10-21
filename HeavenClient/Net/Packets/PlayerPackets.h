@@ -156,4 +156,17 @@ namespace ms
 			}
 		}
 	};
+
+	// Sets the potion the first pet gives from beside its HP pouch, or its
+	// MP pouch if `mp`, 0 for none (v83 FUN_007ff0d6, FUN_007ff5fe).
+	// Opcode: CHANGE_KEYMAP(135)
+	class ChangeAutoPotPacket : public OutPacket
+	{
+	public:
+		ChangeAutoPotPacket(bool mp, int32_t itemid) : OutPacket(OutPacket::Opcode::CHANGE_KEYMAP)
+		{
+			write_int(mp ? 2 : 1); // mode
+			write_int(itemid);
+		}
+	};
 }

@@ -291,7 +291,11 @@ namespace ms
 				return false;
 
 			end_dash();
-			start_prepare(skill);
+
+			// Held skills ready the pet's MP potion too (0x9692d1).
+			if (start_prepare(skill))
+				player.arm_auto_mp();
+
 			return true;
 		}
 
@@ -307,24 +311,27 @@ namespace ms
 		if (!dash::is_dash(move_id))
 			end_dash();
 
-		if (move_id == meso_explosion::ID)
-		{
-			set_off_mesos(move);
-			return true;
-		}
-
 		// v83's spell handler swings a regular attack instead when the player
 		// is prone (0x969b10), and most shots whack a mob right in front of
 		// the player instead (0x9698ca).
 		int16_t reach = 0;
+		bool used;
 
-		if (move.is_skill() && player.is_prone() && SkillData::get(move_id).is_spell())
-			apply_move(regularattack);
+		if (move_id == meso_explosion::ID)
+			used = set_off_mesos(move);
+		else if (move.is_skill() && player.is_prone() && SkillData::get(move_id).is_spell())
+			used = apply_move(regularattack);
 		else if (move.is_skill() && SkillData::get(move_id).is_shot() && !point_blank::always_shoots(move_id)
 				 && find_whack(player.prepare_attack(0), reach) != Stance::Id::NONE)
-			apply_move(regularattack);
+			used = apply_move(regularattack);
 		else
-			apply_move(move);
+			used = apply_move(move);
+
+		// A skill used readies the pet's MP potion and a refused one doesn't
+		// (0x967b85, 0x9693a8). Teleport and Flash Jump take their own way
+		// and never ready it, as in v83.
+		if (used && move_id != 0)
+			player.arm_auto_mp();
 
 		return true;
 	}
@@ -1058,7 +1065,7 @@ namespace ms
 		return targets;
 	}
 
-	void Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow,
+	bool Combat::apply_move(const SpecialMove &move, int32_t charge, bool held, const Follow *follow,
 							std::optional<int32_t> again)
 	{
 		if (move.is_attack() || follow)
@@ -1069,13 +1076,13 @@ namespace ms
 			if (move.get_id() == heal::ID)
 			{
 				if (!player.can_request(ExclRequest::SKILL_WAIT))
-					return;
+					return false;
 
 				healed = request_heal();
 			}
 
 			if (!move.is_skill() && swing_at_reactor())
-				return;
+				return true;
 
 			// A Final Attack swings or shoots as the weapon does.
 			Attack attack = player.prepare_attack(move.is_skill() && !follow ? move.get_id() : 0);
@@ -1098,10 +1105,7 @@ namespace ms
 				if (level > 0)
 				{
 					if (Randomizer().below(SkillData::get(blow).get_stats(level).chance))
-					{
-						apply_move(get_skill(blow));
-						return;
-					}
+						return apply_move(get_skill(blow));
 
 					flags = point_blank::MISSED_BLOW_FLAG;
 				}
@@ -1426,19 +1430,20 @@ namespace ms
 
 			if (attack.skill && attack.type != Attack::Type::MAGIC && !held && !follow && !again)
 				roll_final_attack(attack.skill);
-		} else
-		{
-			request_skill(move);
+
+			return true;
 		}
+
+		return request_skill(move);
 	}
 
-	void Combat::set_off_mesos(const SpecialMove &move)
+	bool Combat::set_off_mesos(const SpecialMove &move)
 	{
 		using namespace meso_explosion;
 
 		// Not from a rope or a ladder, nor in the air (0x96b4c7, 0x96b4d9).
 		if (!player.get_phobj().onground || player.get_ladder())
-			return;
+			return false;
 
 		Attack attack = player.prepare_attack(ID);
 		move.apply_stats(player, attack);
@@ -1496,6 +1501,8 @@ namespace ms
 
 		auto delay = static_cast<int16_t>(player.get_attackdelay(0));
 		MesoExplosionPacket(result, lines, player.get_position(), sent, delay).dispatch();
+
+		return true;
 	}
 
 	void Combat::roll_final_attack(int32_t trigger)
@@ -2923,7 +2930,7 @@ namespace ms
 		remote_prepares.erase(iter);
 	}
 
-	void Combat::start_prepare(const Skill &skill)
+	bool Combat::start_prepare(const Skill &skill)
 	{
 		int32_t id = skill.get_id();
 
@@ -2935,7 +2942,7 @@ namespace ms
 
 		if (!player.can_request(ExclRequest::SKILL_WAIT) || (!thrown && !player.get_phobj().onground)
 			|| player.get_ladder())
-			return;
+			return false;
 
 		// Monster Magnet and the throws wait a while to be held again
 		// (0x96a9ab).
@@ -2946,7 +2953,7 @@ namespace ms
 			auto iter = reuse_times.find(id);
 
 			if (iter != reuse_times.end() && now < iter->second)
-				return;
+				return false;
 		}
 
 		// Chakra says nothing when the player has too much HP.
@@ -2954,7 +2961,7 @@ namespace ms
 
 		if (id == prepare::CHAKRA
 			&& !prepare::chakra_allowed(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP)))
-			return;
+			return false;
 
 		const SkillPrepare &data = skill.get_prepare();
 		int16_t action = prepare::action_id(data.action);
@@ -2991,6 +2998,8 @@ namespace ms
 
 		if (reuse > 0)
 			reuse_times[id] = now + reuse;
+
+		return true;
 	}
 
 	void Combat::update_prepare()

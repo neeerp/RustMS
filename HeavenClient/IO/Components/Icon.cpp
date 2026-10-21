@@ -97,6 +97,11 @@ namespace ms
 		type->drop_on_megaphone();
 	}
 
+	void Icon::drop_on_potion(bool mp) const
+	{
+		type->drop_on_potion(mp);
+	}
+
 	InventoryType::Id Icon::get_return_tab() const
 	{
 		return type->get_return_tab();

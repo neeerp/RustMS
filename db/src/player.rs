@@ -8,9 +8,9 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, character_mounts, character_quests, characters, equipment_stats, gacha_exp,
-    inventory_items, keybindings, monster_book_cards, saved_locations, skill_macros, skills,
-    teleport_rocks,
+    accounts, auto_potions, character_mounts, character_quests, characters, equipment_stats,
+    gacha_exp, inventory_items, keybindings, monster_book_cards, saved_locations, skill_macros,
+    skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -18,9 +18,9 @@ use diesel::upsert::excluded;
 use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills, SCRIPT_MARKERS};
 use game::{
-    AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item, KeyBinding, Keymap,
-    MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook, SkillMacro,
-    SkillMacros, SkillRecord, TeleportRocks,
+    AutoPotions, AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item,
+    KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook,
+    SkillMacro, SkillMacros, SkillRecord, TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -222,6 +222,14 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         .load::<(i16, i32)>(&mut conn)?
         .into_iter()
         .collect();
+    if let Some((hp, mp)) = auto_potions::table
+        .find(character_id)
+        .select((auto_potions::hp_item, auto_potions::mp_item))
+        .first(&mut conn)
+        .optional()?
+    {
+        player.auto_potions = AutoPotions { hp, mp };
+    }
     player.stats.gacha_exp = gacha_exp::table
         .find(character_id)
         .select(gacha_exp::exp)
@@ -367,6 +375,21 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
                 .execute(conn)?;
         } else {
             diesel::delete(gacha_exp::table.find(id)).execute(conn)?;
+        }
+        let AutoPotions { hp, mp } = player.auto_potions;
+        if hp != 0 || mp != 0 {
+            diesel::insert_into(auto_potions::table)
+                .values((
+                    auto_potions::character_id.eq(id),
+                    auto_potions::hp_item.eq(hp),
+                    auto_potions::mp_item.eq(mp),
+                ))
+                .on_conflict(auto_potions::character_id)
+                .do_update()
+                .set((auto_potions::hp_item.eq(hp), auto_potions::mp_item.eq(mp)))
+                .execute(conn)?;
+        } else {
+            diesel::delete(auto_potions::table.find(id)).execute(conn)?;
         }
         save_mount(conn, id, &player.mount)?;
         save_inventory(conn, id, &player.inventory)?;

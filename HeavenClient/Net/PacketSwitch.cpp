@@ -78,6 +78,7 @@ namespace ms
 		/// Messaging 1
 		SHOW_STATUS_INFO = 39,
 		UPDATE_QUEST_INFO = 211,
+		CHECK_AUTO_HP = 212,
 		PLAYER_HINT = 214,
 
 		/// Inventory 2
@@ -201,6 +202,8 @@ namespace ms
 		CONFIRM_SHOP_TRANSACTION = 306,
 		TRUNK_RESULT = 309,
 		KEYMAP = 335,
+		AUTO_HP_POT = 336,
+		AUTO_MP_POT = 337,
 
 		/// Player Interaction
 		CHAR_INFO = 61,
@@ -326,6 +329,9 @@ namespace ms
 		// Player handlers
 		emplace<CHANGE_CHANNEL, ChangeChannelHandler>();
 		emplace<KEYMAP, KeymapHandler>();
+		emplace<AUTO_HP_POT, AutoHpPotHandler>();
+		emplace<AUTO_MP_POT, AutoMpPotHandler>();
+		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();
 		emplace<SKILL_MACROS, SkillMacrosHandler>();
 		emplace<CHANGE_STATS, ChangeStatsHandler>();
 		emplace<GIVE_BUFF, ApplyBuffHandler>();

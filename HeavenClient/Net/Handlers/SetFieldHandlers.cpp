@@ -130,8 +130,10 @@ namespace ms
 		if (auto statsinfo = UI::get().get_element<UIStatsInfo>())
 			statsinfo->update_stat(MapleStat::Id::HP);
 
-		// A request still waiting is forgotten in the new field.
+		// A request still waiting is forgotten in the new field, and so are
+		// the potions the pets lacked (FUN_00948b7b).
 		Stage::get().get_player().clear_request();
+		Stage::get().get_player().forget_potion_misses();
 
 		// The server ends a trade when we leave the field.
 		if (auto room = UI::get().get_element<UITradingRoom>())

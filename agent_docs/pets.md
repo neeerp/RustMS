@@ -5,8 +5,10 @@ Cash tab, it can be summoned to follow its owner, and everyone on the map
 sees it. Up to three can be out with Follow the Lead, one without. It answers
 commands said in chat and grows closer when it obeys. It grows hungry, eats pet
 food and cash food, goes home when it starves, and can be renamed with a name
-tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
-159 has the v83 client's side of each.
+tag. It wears pet equipment and loots with a Meso Magnet or Item Pouch,
+which this file doesn't cover yet (`v83ref` report 159 has the v83 client's
+side). With an HP or MP pouch on, the first pet out gives the potion set
+beside it.
 
 ## Server
 
@@ -96,6 +98,22 @@ tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
   server remembers which pets the last command called by name
   (`Player.pets_named`, not saved) and styles their answers. Echoing the
   name flag is an inference; Cosmic always writes 0.
+- **Auto potions.** The potions the first pet gives are kept with the
+  character in `auto_potions` (`Player.auto_potions`, 0 for none).
+  CHANGE_KEYMAP (`0x87` in) mode 1 (HP) or 2 (MP) is followed by the item
+  id; any USE item whose spec restores that kind is taken (the Elixir fits
+  both), 0 clears, and nothing answers. A v83 client sends zeros each time
+  its equipment window redraws without a pet or the pouch. AUTO_HP_POT and
+  AUTO_MP_POT (`0x150`, `0x151`) carry the ids on world entry. PET_AUTO_POT
+  (`0xAB` in) is the pet's serial, a byte, the tick, the USE slot and the
+  item id. The server uses the item as USE_ITEM would only when the pet is
+  the first out, the id is the one set for a pouch, it restores that
+  pouch's kind, and the pouch (HP 1812002, MP 1812003) is worn in the first
+  pet's slot (`-124`, `-125`). It always answers with the exclusive flag,
+  an empty stat change when refused, since the client keeps a request
+  pending until then. HP the server takes without a hit (a map's `decHP`,
+  a Poison tick) is announced first as HP_TAKEN (`0xD4`, the amount), which
+  is what makes a v83 client check its HP potion.
 - **Not allowed.** Dropping a pet that is out. Trading or storing one isn't
   checked yet.
 
@@ -167,8 +185,36 @@ tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
 - **Level up.** Effect 4 (`0xCE` for the player, `0xC6` for others) plays
   `Effect/PetEff.img/Basic/LevelUp` on the pet, with the level-up sound
   for kind 0; kinds 1 to 3 are Teleport, the pet's warp and Evolution.
+- **Auto potions.** With the pet panel open, a USE item dropped beside
+  the first pet's HP pouch (46, 11) or MP pouch (112, 11) is set when its
+  spec restores that kind ("Only usable on Auto HP Potion Pouch." if not):
+  CHANGE_KEYMAP mode 1 or 2, a yellow line, and the System Options so the
+  alerts can be set. Without the pet or the pouch nothing happens. The slot
+  shows the item and how many are left, even none; dragged onto the stage
+  it clears, and so does opening the panel without the pet or the pouch
+  (not while a field change has the pets away). A potion held on the cursor
+  is dropped when its slot empties.
+  150 and 151 set the ids on field entry. `Character/AutoPotions.h` holds
+  the rules.
+- **Giving.** After each TAKE_DAMAGE, and on 212 (HP_TAKEN), the HP check
+  runs when the first pet wears the HP pouch, the player isn't seduced, and
+  HP less the hit is under the HP alert (a percent in HeavenClient's
+  settings). The hit is what HP loses: Achilles, Meso Guard, Power Guard's
+  reflection and Magic Guard's share come off. A skill that goes off (one
+  refused doesn't; Teleport and Flash Jump never do), Magic Guard taking
+  part of a hit, or Power Guard or Meso Guard working arms the MP check
+  (Power Guard counts even when the Guardian then blocks the hit), which then
+  runs every frame and on each stat change until an MP potion goes. The
+  item comes from the first USE slot holding it, as PET_AUTO_POT, when the
+  field allows consumables, the player's level meets the item's, nothing is
+  pending, 200 ms have passed since the last potion, and (for HP) the
+  player is alive; it plays the item's sound. A missing potion prints "You
+  are lacking the HP Potion that your pet is supposed to use." each time,
+  and pets that speak up on their own (skill bit `0x100`, read from the
+  item) say `e_NOHPPotion` for the first three in a row. HP misses reset on
+  a give, MP misses on field entry.
 - `PetData` reads the pet's commands, food answers, idle actions, own
-  animations and balloon from Item.nx and String.nx.
+  animations, balloon and no-potion lines from Item.nx and String.nx.
 
 ## Tests
 
@@ -184,6 +230,13 @@ tag. Pet equipment, looting and auto potions are not done yet; `v83ref` report
   closeness, then gives it a cash food that suits it and one that doesn't.
   It renames the pet with a name tag, checks the 172 for the owner and the
   watcher, and that the watcher sees the new name after the relog.
+- `integration-harness/tests/pet_auto_potion.rs` sets a Red Potion beside a
+  worn HP pouch, has the pet give one, checks that a pet not out is refused
+  with an empty stat change, and that the potion is kept and cleared across
+  relogs. `map_hazards` checks the HP_TAKEN before the cold's stat update.
+- `HeavenClient/tests/auto_potions.cpp` covers the alert threshold, the
+  three complaints and what setting an item does; `excl_request.cpp` covers
+  the potion timer and `mob_damage.cpp` Magic Guard's share.
 - `HeavenClient/tests/pets.cpp` covers the closing-up list, the summon
   rules, Follow the Lead's skill ids, the stance mapping, the SPAWN_PLAYER
   list, splitting command words, hearing a command, the action mapping, the

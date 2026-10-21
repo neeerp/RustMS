@@ -45,6 +45,11 @@ int main()
 		require(shown(1000, 850, 0, 0) == 850, "the number leaves out Achilles' share");
 		require(shown(101, 1000, 78, 1000) == 51, "and the half Meso Guard saves");
 		require(shown(100, 1000, 78, 20) == 75, "or what the mesos buy");
+		require(magic_guarded(1000, 80, 5000, false) == 800, "Magic Guard takes its share from MP");
+		require(magic_guarded(1000, 80, 300, false) == 300, "while there is any");
+		require(magic_guarded(1000, 80, 300, true) == 800, "or all of it under Infinity");
+		require(magic_guarded(-1, 80, 300, false) == 0 && magic_guarded(1000, 0, 300, false) == 0,
+				"a miss or no Magic Guard takes nothing");
 		require(shown(-1, 850, 78, 1000) == -1 && shown(0, 850, 0, 0) == 0, "a dodge or miss stays");
 		require(physical(warrior, stumpy, 125, 1.0, 50, 200) == 82, "then a Power Up scales what is left");
 

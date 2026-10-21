@@ -33,6 +33,25 @@ int main()
 		require(!excl.can_send(6100, ExclRequest::USE_WAIT), "a new field keeps the request's time");
 		require(excl.can_send(6200, ExclRequest::USE_WAIT), "a new field forgets the waiting request");
 
+		ExclRequest potions;
+		potions.sent(0);
+		potions.answered(0);
+		require(potions.can_send_potion(0), "an auto potion keeps its own time");
+		potions.sent_potion(0, false);
+		require(!potions.can_send_potion(1000), "an auto potion waits on its answer too");
+		potions.answered(1000);
+		require(potions.can_send_potion(1000), "an answer doesn't hold the next potion");
+		require(!potions.can_send(1499, ExclRequest::WAIT), "an answer to a potion holds other requests");
+		potions.sent_potion(1000, true);
+		potions.answered(1000);
+		require(potions.can_send_potion(1000), "an MP potion leaves the HP time alone");
+		potions.sent_potion(1000, false);
+		potions.answered(1000);
+		require(!potions.can_send_potion(1199), "an HP potion waits 200 ms");
+		require(potions.can_send_potion(1200), "and then may go");
+		potions.sent(1300);
+		require(!potions.can_send_potion(5000), "any waiting request holds the potion");
+
 		std::cout << "Exclusive request passed\n";
 		return 0;
 	}

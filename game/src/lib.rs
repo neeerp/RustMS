@@ -26,7 +26,9 @@ pub mod storage;
 pub mod teleport_rock;
 
 pub use buff::{Beacon, Buff, BuffStat, Buffs, Disease, ShownBuff};
-pub use character::{ApStat, AvatarLook, CharacterStats, FieldAvatar, MiniRoomBox, Player, Ride};
+pub use character::{
+    ApStat, AutoPotions, AvatarLook, CharacterStats, FieldAvatar, MiniRoomBox, Player, Ride,
+};
 pub use guild::{Guild, GuildMember, GuildTag};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};

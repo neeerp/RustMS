@@ -53,6 +53,10 @@ namespace ms
 		// Its own animations, actions 9 on.
 		const std::vector<std::string> &get_customs() const;
 
+		// What it says when out of the HP or MP potion its pouch gives
+		// (e_NOHPPotion, e_NOMPPotion), empty for most kinds.
+		const std::string &get_no_potion(bool mp) const;
+
 	private:
 		// Allow the cache to use the constructor
 		friend Cache<PetData>;
@@ -66,5 +70,6 @@ namespace ms
 		std::vector<pets::Command> food;
 		std::vector<pets::Reaction> idle;
 		std::vector<std::string> customs;
+		std::string no_potion[2];
 	};
 }
