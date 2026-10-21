@@ -377,6 +377,12 @@ namespace ms
 		bool ear = recv.read_bool();
 		LookEntry look = LoginParser::parse_look(recv);
 
+		// Only in the game: the cash shop, which has no chat bar, would put the banner in front of every click.
+		auto chatbar = UI::get().get_element<UIChatBar>();
+
+		if (!chatbar)
+			return;
+
 		UI::get().emplace<UIAvatarMegaphone>(item_id, name, lines, look);
 
 		// The chat log gets "name : " and the four lines run together.
@@ -385,8 +391,7 @@ namespace ms
 		for (const std::string& said : lines)
 			line += said;
 
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->send_megaphone(line, UIChatBar::LineType::AVATAR_MEGAPHONE, static_cast<int8_t>(channel), ear);
+		chatbar->send_megaphone(line, UIChatBar::LineType::AVATAR_MEGAPHONE, static_cast<int8_t>(channel), ear);
 	}
 
 	void ClearAvatarMegaphoneHandler::handle(InPacket&) const

@@ -57,7 +57,7 @@ namespace ms
 	UIAvatarMegaphone::UIAvatarMegaphone(int32_t item_id, const std::string &speaker,
 										 const Megaphones::AvatarLines &said, const LookEntry &entry)
 			: UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, HEIGHT)), art(art_of(item_id)), look(entry),
-			  shown(0), leaving(-1)
+			  shown(0), leaving(-1), left_at(0)
 	{
 		int32_t emotion = nl::nx::item["Cash"]["0539.img"][string_format::extend_id(item_id, 8)]["info"]["emotion"];
 		expression = Expression::byaction(emotion + 99);
@@ -124,13 +124,17 @@ namespace ms
 	void UIAvatarMegaphone::hide()
 	{
 		if (leaving < 0)
+		{
+			left_at = offset();
 			leaving = 0;
+		}
 	}
 
 	int16_t UIAvatarMegaphone::offset() const
 	{
+		// Out from wherever it was when told to leave, so a clear during the slide in doesn't jump.
 		if (leaving >= 0)
-			return static_cast<int16_t>(WIDTH * std::min(leaving, SLIDE) / SLIDE);
+			return static_cast<int16_t>(left_at + (WIDTH - left_at) * std::min(leaving, SLIDE) / SLIDE);
 
 		if (shown < SLIDE)
 			return static_cast<int16_t>(WIDTH * (SLIDE - shown) / SLIDE);

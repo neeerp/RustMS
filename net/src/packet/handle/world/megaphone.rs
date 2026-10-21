@@ -408,12 +408,18 @@ mod tests {
     }
 
     #[test]
-    fn an_avatar_megaphone_with_nothing_to_say_is_refused() {
+    fn an_avatar_megaphone_with_nothing_to_say_or_too_much_is_refused() {
         let mut player = speaker(30, AVATAR);
         refused(&use_item(
             &mut player,
             AVATAR,
             avatar_body(["", "", "", ""]),
+        ));
+        let long = "x".repeat(MAX_LINE + 1).leak();
+        refused(&use_item(
+            &mut player,
+            AVATAR,
+            avatar_body(["hi", long, "", ""]),
         ));
     }
 

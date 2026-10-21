@@ -53,5 +53,7 @@ namespace ms
 		// Since it came in, and since it began to leave, in ms.
 		int32_t shown;
 		int32_t leaving;
+		// How far right it was when it began to leave.
+		int16_t left_at;
 	};
 }
