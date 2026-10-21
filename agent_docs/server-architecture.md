@@ -46,7 +46,7 @@ window between servers:
    (younger than 60 seconds) for that character, channel, and IP, moving it to
    `in_game`. Without a valid ticket the connection is closed. The client
    actor then sends SET_FIELD (the character block) before the key map,
-   macros and auto potions: a v83 client handles only the login stage's
+   macros, auto potions and quick slots: a v83 client handles only the login stage's
    packets until its first SET_FIELD and drops the rest.
 4. **Channel change** saves the player, reissues the ticket for the target
    channel, and redirects; the new channel claims it as in step 3.
@@ -104,7 +104,8 @@ session.
   equipment stats, skills, quests, account GM level) on world entry.
 - Handlers mutate the in-memory `Player`; mutators mark it dirty.
 - `ClientActor` writes it back with `db::player::save_player` (one
-  transaction replacing character columns, keymap, inventory, and skills):
+  transaction replacing character columns, keymap, quick slots, inventory,
+  and skills):
   every 60 seconds if dirty, before a channel change, before a quest
   transition, and on disconnect.
 - Quest transitions (`db::quest::transition`) lock the character row and

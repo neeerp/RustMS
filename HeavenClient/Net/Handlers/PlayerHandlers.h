@@ -119,6 +119,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Sets the quick slot keys, or the defaults (FUN_0072b82a)
+	// Opcode: QUICKSLOT_INIT(159)
+	class QuickSlotInitHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Notifies the client that a skill is on cool-down
 	// Opcode: ADD_COOLDOWN(234)
 	class AddCooldownHandler : public PacketHandler

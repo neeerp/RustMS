@@ -34,6 +34,7 @@
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIGameOption.h"
 #include "UITypes/UINpcTalk.h"
+#include "UITypes/UIQuickSlotConfig.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
@@ -253,7 +254,15 @@ namespace ms
 		if (is_key_down[keyboard.capslockcode()])
 			caps_lock_enabled = !caps_lock_enabled;
 
-		if (focusedtextfield)
+		auto quickslots = get_element<UIQuickSlotConfig>();
+		UIElement *quickslot_notice = state->get(UIElement::Type::NOTICE);
+
+		if (quickslots && quickslots->is_active() && !(quickslot_notice && quickslot_notice->is_active()))
+		{
+			// The quick slot editor reads every key itself while none of its
+			// notices is up (OnKey 72ce91).
+			quickslots->send_raw_key(keycode, pressed);
+		} else if (focusedtextfield)
 		{
 			bool ctrl = is_key_down[keyboard.leftctrlcode()] || is_key_down[keyboard.rightctrlcode()];
 
@@ -564,6 +573,11 @@ namespace ms
 	SkillMacros &UI::get_skill_macros()
 	{
 		return skill_macros;
+	}
+
+	QuickSlots &UI::get_quick_slots()
+	{
+		return quick_slots;
 	}
 
 	Keyboard &UI::get_keyboard()

@@ -10,9 +10,9 @@ use crate::packets::{
     build_create_char, build_login_credentials, build_login_started, build_player_logged_in,
     build_server_list_request, build_set_gender, decode_auto_potion, decode_char_list,
     decode_char_name_response, decode_keymap, decode_last_connected_world, decode_login_status,
-    decode_new_character, decode_recommended_worlds, decode_server_redirect, decode_set_field,
-    decode_skill_macros, opcode_name, CharacterSummary, CharacterTemplate, LoginStatusPacket,
-    ServerListPacket, SkillMacroEntry,
+    decode_new_character, decode_quick_slot_init, decode_recommended_worlds,
+    decode_server_redirect, decode_set_field, decode_skill_macros, opcode_name, CharacterSummary,
+    CharacterTemplate, LoginStatusPacket, ServerListPacket, SkillMacroEntry,
 };
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
@@ -69,6 +69,8 @@ pub struct WorldSession {
     /// The potions set beside the HP and MP pouches, from the world-entry
     /// AUTO_HP_POT and AUTO_MP_POT.
     pub auto_potions: (i32, i32),
+    /// The world-entry QUICKSLOT_INIT's keys, or None for the defaults.
+    pub quick_slots: Option<[i32; 8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,10 +121,24 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
     let mut skill_macros = None;
     let mut auto_hp = None;
     let mut auto_mp = None;
+    let mut quick_slots = None;
     let mut world_entry = None;
 
-    for _ in 0..8 {
+    for _ in 0..10 {
         let envelope = read_packet(&mut world_conn, "world entry").await?;
+        // Only a field's stage handles the rest, so a v83 client drops
+        // anything that comes before SET_FIELD.
+        if world_entry.is_none() && envelope.opcode() != SendOpcode::SetField as i16 {
+            return Err(HarnessError::protocol(
+                "world entry",
+                world_conn.endpoint(),
+                format!(
+                    "opcode {} ({}) arrived before SetField",
+                    envelope.opcode(),
+                    opcode_name(envelope.opcode())
+                ),
+            ));
+        }
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => {
                 keymap = Some(decode_keymap(&envelope.packet).map_err(|message| {
@@ -143,6 +159,12 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
                 } else {
                     auto_mp = Some(item_id);
                 }
+            }
+            x if x == SendOpcode::QuickSlotInit as i16 => {
+                quick_slots =
+                    Some(decode_quick_slot_init(&envelope.packet).map_err(|message| {
+                        HarnessError::protocol("world entry", world_conn.endpoint(), message)
+                    })?);
             }
             x if x == SendOpcode::SetField as i16 => {
                 let set_field = decode_set_field(&envelope.packet).map_err(|message| {
@@ -187,6 +209,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             && skill_macros.is_some()
             && auto_hp.is_some()
             && auto_mp.is_some()
+            && quick_slots.is_some()
             && world_entry.is_some()
         {
             break;
@@ -225,6 +248,14 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     };
 
+    let Some(quick_slots) = quick_slots else {
+        return Err(HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive QuickSlotInit during world entry".to_string(),
+        ));
+    };
+
     drain_spawn_npcs(&mut world_conn).await;
 
     Ok(WorldSession {
@@ -251,6 +282,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         keymap,
         skill_macros,
         auto_potions: (auto_hp, auto_mp),
+        quick_slots,
         character_name: world_entry.character_name,
         map_id: world_entry.map_id,
         spawn_point: world_entry.spawn_point,

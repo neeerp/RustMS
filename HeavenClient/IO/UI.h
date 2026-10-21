@@ -28,6 +28,7 @@
 #include "Components/Textfield.h"
 
 #include "../Character/SkillMacros.h"
+#include "QuickSlots.h"
 
 namespace ms
 {
@@ -129,6 +130,9 @@ namespace ms
 		// The skill macros, kept across characters as v83 does (report 206).
 		SkillMacros &get_skill_macros();
 
+		// The quick slot keys, kept across characters as v83 does (report 240).
+		QuickSlots &get_quick_slots();
+
 		int64_t get_uptime();
 
 		uint16_t get_uplevel();
@@ -147,6 +151,7 @@ namespace ms
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;
 		SkillMacros skill_macros;
+		QuickSlots quick_slots;
 		Cursor cursor;
 		ScrollingNotice scrollingnotice;
 

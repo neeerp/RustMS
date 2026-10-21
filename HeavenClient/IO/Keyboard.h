@@ -77,6 +77,11 @@ namespace ms
 
 		Mapping get_text_mapping(int32_t keycode, bool shift) const;
 
+		// The key map index (scan code) the quick slot editor reads for a
+		// key, 0 for one it has none for (FUN_0072df55). The numpad's digits
+		// are the top row's.
+		static int32_t quickslot_key(int32_t keycode);
+
 	private:
 		std::map<int32_t, Mapping> keymap;
 		std::map<int32_t, Mapping> maplekeys;

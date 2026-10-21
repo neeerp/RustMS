@@ -25,6 +25,7 @@ pub mod npc;
 pub mod party;
 pub mod pet;
 pub mod quest;
+pub mod quick_slots;
 pub mod reactor;
 pub mod shop;
 pub mod skill;

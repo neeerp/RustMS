@@ -172,6 +172,37 @@ namespace ms
 		maplekeys[key] = mapping;
 	}
 
+	int32_t Keyboard::quickslot_key(int32_t keycode)
+	{
+		if (keycode >= GLFW_KEY_KP_1 && keycode <= GLFW_KEY_KP_9)
+			return keycode - GLFW_KEY_KP_1 + 2;
+
+		switch (keycode)
+		{
+			case GLFW_KEY_KP_0:
+				return 11;
+			case GLFW_KEY_KP_DECIMAL:
+				return 83;
+			case GLFW_KEY_ESCAPE:
+				return 1;
+			case GLFW_KEY_RIGHT_CONTROL:
+				return 29;
+			case GLFW_KEY_RIGHT_ALT:
+				return 56;
+			case GLFW_KEY_RIGHT_SHIFT:
+				return 54;
+			default:
+				break;
+		}
+
+		// The table numbers Esc 84, where v83 has 1.
+		for (int32_t key = 0; key < 90; key++)
+			if (key != 84 && Keytable[key] != 0 && Keytable[key] == keycode)
+				return key;
+
+		return 0;
+	}
+
 	Keyboard::Mapping Keyboard::get_text_mapping(int32_t keycode, bool shift) const
 	{
 		if (textactions.count(keycode))

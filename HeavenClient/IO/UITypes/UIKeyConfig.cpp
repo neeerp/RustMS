@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIKeyConfig.h"
+#include "UIQuickSlotConfig.h"
 
 #include "../UI.h"
 
@@ -258,8 +259,6 @@ namespace ms
 		buttons[Buttons::NOTICE_OK] = std::make_unique<MapleButton>(KeyConfig["BtOK"], NOTICE_POS + NOTICE_OK_POS);
 		buttons[Buttons::NOTICE_CANCEL] = std::make_unique<MapleButton>(KeyConfig["BtCancel"], NOTICE_POS + NOTICE_CANCEL_POS);
 
-		// The quick slot is not configurable yet.
-		buttons[Buttons::QUICKSLOT]->set_state(Button::State::DISABLED);
 		buttons[Buttons::NOTICE_OK]->set_active(false);
 		buttons[Buttons::NOTICE_CANCEL]->set_active(false);
 
@@ -290,6 +289,9 @@ namespace ms
 		load_item_icons();
 		load_skill_icons();
 		refresh_bound_actions();
+
+		// v83 sends the quick slots each time the window opens (0x83278b).
+		send_quick_slots();
 	}
 
 	/// Load
@@ -352,12 +354,14 @@ namespace ms
 		UIElement::draw_buttons(inter);
 	}
 
+	// Unsaved quick slots go back as the window goes (FUN_00832834).
 	void UIKeyConfig::close()
 	{
 		clear_tooltip();
 		hide_notice();
 		deactivate();
 		reset();
+		UI::get().get_quick_slots().revert();
 	}
 
 	Button::State UIKeyConfig::button_pressed(uint16_t buttonid)
@@ -366,7 +370,7 @@ namespace ms
 		{
 		case Buttons::CLOSE:
 		case Buttons::CANCEL:
-			close();
+			safe_close();
 			break;
 		case Buttons::DEFAULT:
 			show_notice(Notice::RESET);
@@ -374,8 +378,14 @@ namespace ms
 		case Buttons::DELETE:
 			show_notice(Notice::CLEAR);
 			break;
+		case Buttons::QUICKSLOT:
+			clear_tooltip();
+			UI::get().emplace<UIQuickSlotConfig>();
+			break;
 		case Buttons::OK:
+			// The quick slots go whether or not they changed (0x83370b).
 			save_staged_mappings();
+			send_quick_slots();
 			close();
 			break;
 		case Buttons::NOTICE_OK:
@@ -479,13 +489,28 @@ namespace ms
 	}
 
 	// v83 builds the window anew each time it opens, so it shows the keys as
-	// they are, including any bound from a quick slot while it was shut.
+	// they are, including any bound from a quick slot while it was shut. Its
+	// hotkey and the status bar's button close it as Cancel does, asking
+	// first about unsaved changes (FUN_00a04f7a case 5, FUN_00a0631b).
 	void UIKeyConfig::toggle_active()
 	{
+		if (active && (dirty || UI::get().get_quick_slots().changed()))
+		{
+			show_notice(Notice::SAVE);
+			return;
+		}
+
 		UIElement::toggle_active();
 
 		if (active)
+		{
 			reset();
+			send_quick_slots();
+		}
+		else
+		{
+			UI::get().get_quick_slots().revert();
+		}
 	}
 
 	UIElement::Type UIKeyConfig::get_type() const
@@ -495,7 +520,7 @@ namespace ms
 
 	void UIKeyConfig::safe_close()
 	{
-		if (dirty)
+		if (dirty || UI::get().get_quick_slots().changed())
 			show_notice(Notice::SAVE);
 		else
 			close();
@@ -513,7 +538,7 @@ namespace ms
 
 			if (id == Buttons::NOTICE_OK || id == Buttons::NOTICE_CANCEL)
 				it.second->set_active(true);
-			else if (id != Buttons::QUICKSLOT)
+			else
 				it.second->set_state(Button::State::DISABLED);
 		}
 	}
@@ -531,7 +556,7 @@ namespace ms
 				it.second->set_active(false);
 				it.second->set_state(Button::State::NORMAL);
 			}
-			else if (id != Buttons::QUICKSLOT)
+			else
 			{
 				it.second->set_state(Button::State::NORMAL);
 			}
@@ -554,6 +579,7 @@ namespace ms
 					staged_mappings[it.first] = it.second;
 
 				refresh_bound_actions();
+				UI::get().get_quick_slots().reset();
 			}
 
 			break;
@@ -563,8 +589,14 @@ namespace ms
 
 			break;
 		case Notice::SAVE:
+			// Only what changed goes (FUN_00833749).
 			if (ok)
+			{
 				save_staged_mappings();
+
+				if (UI::get().get_quick_slots().changed())
+					send_quick_slots();
+			}
 
 			close();
 			break;
@@ -713,6 +745,15 @@ namespace ms
 		dirty = false;
 	}
 
+	// Sending makes the layout the saved one (FUN_0072b87e).
+	void UIKeyConfig::send_quick_slots()
+	{
+		QuickSlots& quick_slots = UI::get().get_quick_slots();
+
+		QuickSlotPacket(quick_slots.keys()).dispatch();
+		quick_slots.save();
+	}
+
 	void UIKeyConfig::refresh_bound_actions()
 	{
 		bound_actions.clear();
@@ -777,6 +818,13 @@ namespace ms
 			return action_icons.at(KeyAction::actionbyid(mapping.action)).get();
 
 		return nullptr;
+	}
+
+	Texture UIKeyConfig::key_icon(int32_t key) const
+	{
+		Icon* icon = mapping_icon(get_staged_mapping(key));
+
+		return icon ? icon->get_texture() : Texture();
 	}
 
 	Texture UIKeyConfig::get_item_texture(int32_t item_id) const

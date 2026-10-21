@@ -573,13 +573,18 @@ impl ClientActor {
         let [mut auto_hp, mut auto_mp] =
             build::world::keymap::build_auto_potions(player.auto_potions)
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;
-        // The key map and the pet's potions reach only a field's stage, so a
-        // v83 client drops them before SET_FIELD.
+        let mut quick_slots = build::world::quick_slots::build_quick_slot_init(player.quick_slots)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        // The key map, the pet's potions and the quick slots reach only a
+        // field's stage, so a v83 client drops them before SET_FIELD.
         self.send(&mut char_info).await?;
         self.send(&mut keymap).await?;
         self.send(&mut macros).await?;
         self.send(&mut auto_hp).await?;
         self.send(&mut auto_mp).await?;
+        // Sent even with none set, as flag 0 puts back the defaults; the
+        // client otherwise keeps the last character's layout.
+        self.send(&mut quick_slots).await?;
         if !expired.item_ids.is_empty() {
             let mut lines = build::world::inventory::build_items_expired(&expired.item_ids)
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;

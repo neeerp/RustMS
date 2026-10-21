@@ -69,7 +69,8 @@ from `UI.nx`. Moved so far:
   Esc opens the Game Menu; the MENU key action opens ShortCut. Dropping a
   skill, a USE or SETUP item, or a skill macro on a quick slot binds that
   slot's key and saves the keymap right away; an open Key Config shows the
-  new binding. Hovering a quick slot shows its skill with levels, its item
+  new binding. Which key each slot stands for comes from QUICKSLOT_INIT (159)
+  after SET_FIELD, which the client echoes back as QUICK_SLOT. Hovering a quick slot shows its skill with levels, its item
   as Item.nx has it, or its macro, with the box 128 px above the cursor;
   cash and other slots leave the last tooltip up, as v83 does. The mouse
   wheel goes only to the window under the cursor (or a modal window), never
@@ -247,9 +248,30 @@ from `UI.nx`. Moved so far:
   period footage. Drag an icon between keys or onto the palette to unbind it.
   It shows the keys as they are each time it opens, as v83 builds it anew.
   Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
-  restores the server's defaults; DEFAULT, CLEAR ALL, and Esc with unsaved
-  changes ask through the in-window `notice` bitmaps. CHANGE QUICK SLOTS is
-  disabled until the quick slot is configurable.
+  restores the server's defaults; DEFAULT and CLEAR ALL ask through the
+  in-window `notice` bitmaps. Cancel, X, Esc, the hotkey, and the status bar's
+  KeySet button all close it as v83's Cancel does, asking "Save changes?"
+  first when keys or quick slots are unsaved. A skill, item or macro dropped
+  on a status bar quick slot while it is open is one of its edits, sent with
+  OK and taken back on Cancel, and the status bar shows it meanwhile.
+  CHANGE QUICK SLOTS opens the quick slot editor (below). Opening Key Config
+  and its OK each send QUICK_SLOT (183, eight i32s), and so does a saved close
+  if the quick slots changed. DEFAULT also resets the quick slots, and closing
+  without saving takes back any change made in the editor.
+- **Quick slot editor** (`UIQuickSlotConfig`, `KeyConfig/quickslotConfig`):
+  eight cells laid out as the status bar's quick slots, each with its key's
+  label over what Key Config has on that key. Click a cell, or Tab to the
+  first one, then press a key. A key without a label is refused ("The key you
+  just pressed is a key that has been disabled."), and so is one a cell
+  already has, the selected cell's own key too ("This key is already being
+  used."). Right Shift counts as Shift. Left and Right move inside a row and
+  stop at its ends, Up and Down switch rows, and on OK and Cancel Left and
+  Right step between them. Tab goes on to OK, Esc lets go of the cells and
+  then cancels, and
+  Enter is OK. The editor reads every key itself while it is up. OK shows
+  the new keys on the status bar at once; Key Config sends them.
+  `IO/QuickSlots.h` holds the rules and the keys, which last as long as the
+  client runs.
 - **Maple Messenger** (`UIMessenger`, `UIWindow.img/Messenger`): three seats
   with the members standing in them, the chat log, and the input line, laid
   out from period footage. The MAPLECHAT key or ShortCut's MESSENGER button

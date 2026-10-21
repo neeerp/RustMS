@@ -106,6 +106,7 @@ namespace ms
 			MEMONOTICE,
 			MEMO,
 			MEMOSEND,
+			QUICKSLOTCONFIG,
 			NUM_TYPES
 		};
 

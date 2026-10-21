@@ -446,8 +446,8 @@ namespace ms
 											Stage::get().get_player().get_inventory(),
 											Stage::get().get_player().get_skills()
 									);
-								else if (keyconfig && keyconfig->is_active())
-									keyconfig->close();
+								else
+									keyconfig->safe_close();
 
 								break;
 							}
