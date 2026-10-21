@@ -29,5 +29,21 @@ namespace ms
 		// Whether a word of ForbiddenName.img or, up to a comma, of
 		// Curse.img is anywhere in a name, ignoring case (FUN_0079fc74).
 		bool in_name(const std::string& name);
+
+		// Whether the filter takes the text at all: under 0x3ff bytes, with
+		// no control character but a line break (FUN_007a0540). Only such
+		// text is refused with "Cursing is not allowed."; a curse word is
+		// starred out and the text goes on.
+		inline bool valid(const std::string& text)
+		{
+			if (text.size() >= 0x3ff)
+				return false;
+
+			for (char c : text)
+				if (static_cast<unsigned char>(c) < 0x20 && c != '\r' && c != '\n')
+					return false;
+
+			return true;
+		}
 	}
 }

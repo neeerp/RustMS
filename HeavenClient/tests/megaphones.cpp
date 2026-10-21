@@ -34,13 +34,17 @@ int main()
 		auto keep = [](const std::string& text) { return text; };
 		auto star = [](const std::string& text) { return std::string(text.size(), '*'); };
 		const std::string long_line(61, 'a');
+		auto line_check = [](std::string text, uint16_t level, auto censor) { return check_line(text, level, censor); };
+		auto avatar_check = [](AvatarLines lines, auto censor) { return check_avatar_lines(lines, censor); };
 
-		require(check_line("", 5, star) == Refusal::QUIET, "an empty line goes before anything else");
-		require(check_line("hi", 5, star) == Refusal::CURSING, "then cursing");
-		require(check_line("hi", 10, keep) == Refusal::LEVEL, "then level 10 and below");
-		require(check_line(long_line, 11, keep) == Refusal::LONG, "then over 60");
-		require(check_line(std::string(81, 'a'), 11, keep) == Refusal::QUIET, "and over 80 says nothing");
-		require(check_line(std::string(60, 'a'), 11, keep) == Refusal::NONE, "60 at level 11 goes");
+		require(line_check("", 5, star) == Refusal::QUIET, "an empty line goes before anything else");
+		require(line_check("h\ti", 5, keep) == Refusal::CURSING, "then text the filter won't take");
+		std::string starred = "hi";
+		require(check_line(starred, 11, star) == Refusal::NONE && starred == "**", "curse words are starred out");
+		require(line_check("hi", 10, keep) == Refusal::LEVEL, "then level 10 and below");
+		require(line_check(long_line, 11, keep) == Refusal::LONG, "then over 60");
+		require(line_check(std::string(81, 'a'), 11, keep) == Refusal::QUIET, "and over 80 says nothing");
+		require(line_check(std::string(60, 'a'), 11, keep) == Refusal::NONE, "60 at level 11 goes");
 
 		require(check_lines({ "", "", "" }) == Refusal::QUIET, "a triple needs a line");
 		require(check_lines({ "", long_line, "" }) == Refusal::LONG, "of 60 at most");
@@ -67,9 +71,22 @@ int main()
 		require(avatar_lines("a b c d e", { 0, 1, 3, 5, 7 }) == Rows{ "a ", "b ", "c ", "d " },
 				"a fifth row is left out");
 
-		require(check_avatar_lines(Rows{}, keep) == Refusal::EMPTY, "an avatar megaphone needs text");
-		require(check_avatar_lines(Rows{ "", "", "", "hi" }, star) == Refusal::CURSING, "without cursing");
-		require(check_avatar_lines(Rows{ long_line, long_line, "", "" }, keep) == Refusal::NONE,
+		require(avatar_check(Rows{}, keep) == Refusal::EMPTY, "an avatar megaphone needs text");
+		require(avatar_check(Rows{ "", "", "", "h\ti" }, keep) == Refusal::CURSING, "text the filter takes");
+		Rows censored{ "hi", "", "", "yo" };
+		require(check_avatar_lines(censored, star) == Refusal::NONE && censored == Rows{ "**", "", "", "**" },
+				"each line's curse words starred out");
+		auto bad = [](std::string text)
+		{
+			for (size_t at = text.find("bad"); at != std::string::npos; at = text.find("bad", at))
+				text.replace(at, 3, "***");
+
+			return text;
+		};
+		Rows split{ "a ba", "d day", "", "" };
+		require(check_avatar_lines(split, bad) == Refusal::NONE && split == Rows{ "a **", "* day", "", "" },
+				"as one text, so a word cut by the wrap is starred too");
+		require(avatar_check(Rows{ long_line, long_line, "", "" }, keep) == Refusal::NONE,
 				"but any length and level will do");
 
 		require(!avatar_long_name(69) && avatar_long_name(70), "a name of 70 or wider takes the long plate");

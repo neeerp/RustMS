@@ -234,12 +234,12 @@ parser in `Net/Handlers/Helpers/GuildBbsParser.cpp` (both covered by
   in v83. An edit starts on the thread's icon if the palette has it, else
   on icon 0.
 - SUBMIT refuses an empty title ("Please enter the title."), an empty body
-  ("Please enter the text.") and a curse word in either ("Cursing is not
-  allowed."); otherwise it sends the thread, asks for page 0, and keeps the
+  ("Please enter the text.") and text the curse filter won't take in either
+  ("Cursing is not allowed."), and stars out curse words in both; otherwise it sends the thread, asks for page 0, and keeps the
   panel until the server's thread (mode 7) replaces it. CANCEL asks for the
   last thread clicked or shown and the page again.
 - The reply box (25 bytes) sends with the pencil button only; Enter does
-  nothing. It refuses empty text and cursing as SUBMIT does, sends the
+  nothing. It refuses empty text and censors as SUBMIT does, sends the
   reply, asks for the page, and empties only when the view is rebuilt.
 
 The packets are built in `net/src/packet/build/world/guild.rs`. The guild

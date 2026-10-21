@@ -41,6 +41,14 @@ int main()
 			"the ship shoots");
 		require(action("cannon", false, 1902000) == "stand1", "a tamed monster doesn't");
 
+		require(saddle_fits(1912000, 1902000, { 1902000, 1902001 }), "a saddle fits what it lists");
+		require(!saddle_fits(1912000, 1902002, { 1902000, 1902001 }), "and nothing else");
+		require(saddle_fits(1912005, 1902105, { 1902005 }), "by the last two digits");
+		require(!saddle_fits(1912000, 1902064, { 1902064 }) && saddle_fits(1912000, 1902063, { 1902063 }),
+			"of which 64 and up fit nothing");
+		require(!saddle_fits(1932000, 1902000, { 1902000 }) && !saddle_fits(1912000, 1932000, { 1932000 }),
+			"only saddles and tamed monsters");
+
 		require(is_ship(1932000) && is_ship(1932006) && !is_ship(1932001) && !is_ship(1932011) &&
 			!is_ship(1902000), "the ship and not the event vehicles");
 		require(ship_allows(5221007) && ship_allows(5201003) && ship_allows(21121008), "guns from the ship");
