@@ -206,10 +206,11 @@ ints. The client takes the first member for the master.
   family line about Reps, which needs families. `NOTIFY_JOB_CHANGE` (107)
   prints "<Guild[name] has advanced to a(an) [job]." for type 0 and
   "<Family..." for 1, and nothing for any other type. Both are
-  `LineType::SKILL` lines. The job is named by HeavenClient's
-  `Job::get_name`, whose names differ from v83's for some jobs (v83 calls
-  100 "Swordman" and 320 "Crossbow man"); every job name in the client
-  shares that table.
+  `LineType::SKILL` lines. The job is named by `Job::get_name`, v83's
+  table (`FUN_004a77ef`), spelling included (100 "Swordman", 320 "Crossbow
+  man"), but for 800's Korean name; a job it doesn't name has an empty
+  name. Every window that names a job from its id uses it; the skill
+  window's caption is the book's name from `Skill.img`.
 - `IO/GuildCommands` has v83's checks before asking the server:
   - `/guildinfo` lists every member, online or not, and says if the player
     is the master.

@@ -119,4 +119,12 @@ namespace ms
 	{
 		hp_marks = !hp_marks;
 	}
+
+	std::string party_job_text(const std::string& job)
+	{
+		if (job.size() <= 10)
+			return job;
+
+		return job.substr(0, 9) + "..";
+	}
 }

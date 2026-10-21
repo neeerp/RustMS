@@ -50,6 +50,10 @@ int main()
 		party.clear();
 		require(!party.exists() && party.get_members().empty(), "leaving forgets the party");
 
+		require(party_job_text("Dark Knight") == "Dark Knig..", "a job over 10 characters is cut to 9");
+		require(party_job_text("Gunslinger") == "Gunslinger", "10 characters fit");
+		require(party_job_text("") == "", "no job, no text");
+
 		std::cout << "Party passed\n";
 		return 0;
 	}
