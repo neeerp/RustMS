@@ -354,6 +354,11 @@ unsourced = [
     "statue.intro",
     "statue.menu",
     "crumbling.ask",
+    "shane.too_low",
+    "shane.ask",
+    "shane.decline",
+    "shane.short",
+    "louis.ask",
 ]
 
 [text."glTutoMsg0.message"]
