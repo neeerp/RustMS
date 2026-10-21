@@ -76,6 +76,16 @@ int main()
 		Rows censored{ "hi", "", "", "yo" };
 		require(check_avatar_lines(censored, star) == Refusal::NONE && censored == Rows{ "**", "", "", "**" },
 				"each line's curse words starred out");
+		auto bad = [](std::string text)
+		{
+			for (size_t at = text.find("bad"); at != std::string::npos; at = text.find("bad", at))
+				text.replace(at, 3, "***");
+
+			return text;
+		};
+		Rows split{ "a ba", "d day", "", "" };
+		require(check_avatar_lines(split, bad) == Refusal::NONE && split == Rows{ "a **", "* day", "", "" },
+				"as one text, so a word cut by the wrap is starred too");
 		require(avatar_check(Rows{ long_line, long_line, "", "" }, keep) == Refusal::NONE,
 				"but any length and level will do");
 

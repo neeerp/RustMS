@@ -232,8 +232,16 @@ namespace ms
 			if (!CurseData::valid(joined))
 				return Refusal::CURSING;
 
+			// Censored as one text, so a word cut by a wrap is caught, then
+			// cut back into the lines; stars keep the length.
+			std::string censored = censor(joined);
+			size_t start = 0;
+
 			for (std::string& line : lines)
-				line = censor(line);
+			{
+				line = censored.substr(start, line.size());
+				start += line.size();
+			}
 
 			return Refusal::NONE;
 		}

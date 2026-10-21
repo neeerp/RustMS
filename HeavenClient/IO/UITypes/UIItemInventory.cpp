@@ -1516,7 +1516,7 @@ namespace ms
 		}
 
 		// A tamed monster and a saddle worn together must fit, each layer
-		// on its own; one that doesn't goes on with nothing said (FUN_004f2c5e).
+		// on its own; one that doesn't goes on with nothing said (FUN_004f1c2d).
 		EquipSlot::Id part = inventory.find_equipslot(item_id);
 		bool cash = inventory.get_cash_id(InventoryType::Id::EQUIP, slot) != 0;
 		int16_t layer = cash ? Inventory::CASH_EQUIP : 0;

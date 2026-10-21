@@ -83,7 +83,7 @@ and sends UPDATE_CHAR_LOOK (`0xC5`) to the other players on the map. Refused
 moves only get an enable-actions stat update.
 
 HeavenClient checks a wear before asking (`UIItemInventory::can_wear_equip`),
-in v83's order (FUN_004f2c5e): a second Unique Equipped Item is refused; a
+in v83's order (FUN_004f1c2d): a second Unique Equipped Item is refused; a
 tamed monster or saddle that doesn't fit the saddle or monster worn on the same
 layer (both normal or both cash) is refused without a word; then stats too low;
 then a cash tamed monster or saddle with no normal one under it is refused

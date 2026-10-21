@@ -31,7 +31,7 @@ namespace ms
 		bool in_name(const std::string& name);
 
 		// Whether the filter takes the text at all: under 0x3ff bytes, with
-		// no control character but a line break (FUN_007a04c0). Only such
+		// no control character but a line break (FUN_007a0540). Only such
 		// text is refused with "Cursing is not allowed."; a curse word is
 		// starred out and the text goes on.
 		inline bool valid(const std::string& text)
