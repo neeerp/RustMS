@@ -681,7 +681,7 @@ fn scroll_info(nx: &NxDataFile, node: u32, meta: u32) -> Result<Option<ScrollInf
     }))
 }
 
-fn path_index(nx: &NxDataFile, path: &str) -> Result<Option<u32>, GameDataError> {
+pub(crate) fn path_index(nx: &NxDataFile, path: &str) -> Result<Option<u32>, GameDataError> {
     let mut index = 0;
     for key in path.split('/') {
         match nx.child_by_name(index, key)? {

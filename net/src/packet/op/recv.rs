@@ -95,6 +95,8 @@ pub enum RecvOpcode {
     CalcDamageStat = 0x6C,
     ThrowGrenade = 0x6D,
     SkillMacro = 0x6E,
+    /// The Item Maker's Start, once its gauge is full (FUN_00827096).
+    ItemMake = 0x71,
 
     ChangeKeybinds = 0x87,
     UseSolomonItem = 0x9D,

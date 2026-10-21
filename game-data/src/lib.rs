@@ -12,6 +12,7 @@ pub mod forbidden_names;
 pub mod items;
 pub mod lua_strings;
 pub mod make_char_info;
+pub mod maker;
 pub mod mobs;
 pub mod quests;
 pub mod reactors;
