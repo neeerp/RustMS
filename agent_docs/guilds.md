@@ -471,6 +471,34 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),
     so the tab adds the origin back.
+- The Alliance tab of `UIUserList` (`UIUserListAlliance.cpp`, `UserList/
+  GuildUnion` art on `backgrnd2`; RE in `v83ref/reports/b025`):
+  - The header shows the alliance's name, or "This guild is not
+    affiliated with any Guild Union." while nobody in it is online. The
+    notice starts 20 px further right than the guild's, or reads "Guild
+    Union notice." if empty.
+  - A section per guild, the player's own first: its mark or the empty
+    frame, its name, "[online/total]", and its members online only, five
+    a page, with the guild tab's fold and page buttons. Titles are the
+    alliance's ranks. The list scrolls 33 px a step over 18 px a shown
+    row plus 572, as v83 counts it, so it runs on past the last section.
+  - Any click on the window that misses the buttons picks the row under
+    it, or no one. The rules (`Alliance::tab_buttons`): INVITE for the
+    alliance's master while there is room; LEAVE for the other guild
+    masters (rank 2); EXPEL and the master hand-over (op 7) for the master
+    on another guild's master; UP and DOWN for ranks 1 and 2 on ranks 3
+    to 5 (UP from 4 or 5, DOWN from 3 or 4 unless already the lowest
+    titled rank, and always from 5, as v83 reads; the server refuses
+    that); TALK, WHISPER and PARTY INVITE (party leaders) on someone else
+    online; NOTICE for ranks 1 and 2.
+  - INVITE asks for a guild's name (4 to 14 letters) and sends op 3; LEAVE
+    and EXPEL ask first and send ops 2 and 6 (guild id, then alliance
+    id); UP and DOWN send op 9 without asking; NOTICE sends op 10 as the
+    guild's does.
+  - INFO opens the rank panel at (311, 85) on `GuildUnion/backgrnd` with
+    the guild panel's art and no GP. Only the alliance's master may
+    MODIFY and SAVE (op 8); a rank anyone in any of the guilds holds
+    keeps its title, and SAVE compares the titles matching case.
 
 ## Not implemented
 
@@ -481,8 +509,12 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
 - Guild points and the guild quest.
-- The Alliance tab: the client keeps the alliance but shows only the tab
-  strip, so nothing sends ops 2, 3 or 6 to 0x0A yet.
+- The alliance's rank panel slides no more than the guild's.
+- The Alliance tab's tooltips: the whole notice over its box, the online
+  and total counts, "Sort thru" over the column heads, and "Unknown" over a
+  level v83 does not know.
+- An alliance invitation to a name under 4 characters is dropped; v83's
+  prompt keeps OK until the name is long enough.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,

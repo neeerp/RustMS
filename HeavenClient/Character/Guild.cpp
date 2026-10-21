@@ -65,6 +65,12 @@ namespace ms
 	Guild::Title Guild::check_title(const std::array<std::string, 5>& working, int32_t rank,
 									const std::string& title) const
 	{
+		return check_title(working, rank, title, rank_held(rank));
+	}
+
+	Guild::Title Guild::check_title(const std::array<std::string, 5>& working, int32_t rank, const std::string& title,
+									bool held)
+	{
 		if (title.size() < min_title(rank))
 			return Title::TOO_SHORT;
 
@@ -74,7 +80,7 @@ namespace ms
 		if (rank == 4 && !working[4].empty())
 			return Title::LOWER_RANK;
 
-		return rank_held(rank) ? Title::HELD : Title::OK;
+		return held ? Title::HELD : Title::OK;
 	}
 
 	void Guild::set_title(std::array<std::string, 5>& working, int32_t rank, std::string title)

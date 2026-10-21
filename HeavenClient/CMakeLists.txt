@@ -861,7 +861,9 @@ add_executable(HeavenClient
     IO/UITypes/UITermsOfService.cpp
     IO/UITypes/UITermsOfService.h
     IO/UITypes/UIUserList.cpp
+    IO/UITypes/UIUserListAlliance.cpp
     IO/UITypes/UIUserList.h
+    IO/UITypes/UserListLayout.h
     IO/UITypes/UIWorldMap.cpp
     IO/UITypes/UIWorldMap.h
     IO/UITypes/UIWorldSelect.cpp

@@ -421,6 +421,105 @@ int main()
 			require(first.exists() && first.get_guilds().size() == 1 && !first.find_guild(10), "the player's guild leaves the others");
 		}
 
+		{
+			// The Alliance tab's rules (FUN_00912b49, FUN_00918204).
+			auto guild_data = [](int32_t id, std::string name, std::vector<GuildMember> members)
+			{
+				GuildData data;
+				data.id = id;
+				data.name = std::move(name);
+				data.members = std::move(members);
+				data.alliance_id = 9;
+
+				return data;
+			};
+
+			// id, name, job, level, rank, online, alliance rank.
+			Guild mine;
+			mine.update(guild_data(10, "Tens", {
+					{ 1, "Me", 0, 10, 1, true, 1 },
+					{ 2, "Bob", 0, 10, 2, true, 3 },
+					{ 5, "Eve", 0, 10, 3, false, 4 }
+			}));
+			Guild outside;
+			GuildData lone = guild_data(30, "Lone", { { 7, "Gus", 0, 10, 1, true, 3 } });
+			lone.alliance_id = 0;
+			outside.update(lone);
+
+			AllianceData nine;
+			nine.id = 9;
+			nine.guild_ids = { 10, 20 };
+			nine.capacity = 3;
+			nine.titles = { "Master", "Jr.Master", "Member", "", "" };
+
+			Alliance union_;
+			union_.set(nine);
+			union_.store(mine, guild_data(20, "Twenty", {
+					{ 3, "Carol", 0, 10, 1, true, 2 },
+					{ 4, "Dan", 0, 10, 2, true, 3 },
+					{ 6, "Fay", 0, 10, 3, false, 5 }
+			}));
+
+			require(union_.joined(mine) && !union_.joined(outside), "joined only by a guild in it");
+			require(union_.find_member(mine, 1)->name == "Me" && union_.find_member(mine, 3)->name == "Carol" &&
+					!union_.find_member(mine, 99), "members of every guild");
+			require(union_.guild_of(mine, 2)->id == 10 && union_.guild_of(mine, 4)->id == 20 &&
+					!union_.guild_of(mine, 99), "and their guilds");
+			require(union_.may_edit_titles(mine, 1) && !union_.may_edit_titles(mine, 2) &&
+					!union_.may_edit_titles(outside, 7), "only the alliance's master edits titles");
+
+			Alliance::TabButtons none = union_.tab_buttons(mine, 1, 0, true);
+			require(none.invite && !none.withdraw && none.notice && none.info, "the master's own buttons");
+			require(!none.kick && !none.change && !none.chat && !none.whisper && !none.party_invite && !none.up &&
+					!none.down, "nothing for no one picked");
+
+			Alliance::TabButtons self = union_.tab_buttons(mine, 1, 1, true);
+			require(!self.chat && !self.whisper && !self.party_invite, "nor for the player");
+
+			Alliance::TabButtons carol = union_.tab_buttons(mine, 1, 3, true);
+			require(carol.kick && carol.change && carol.chat && carol.whisper && carol.party_invite,
+					"another guild's master");
+			require(!carol.up && !carol.down, "at rank 2, moved by neither button");
+			require(!union_.tab_buttons(mine, 1, 3, false).party_invite, "a party invite needs a party leader");
+
+			Alliance::TabButtons dan = union_.tab_buttons(mine, 1, 4, false);
+			require(!dan.kick && !dan.change && dan.chat, "not a guild master");
+			require(!dan.up && !dan.down, "rank 3 is already the lowest");
+			require(!union_.tab_buttons(mine, 1, 5, false).chat, "nor anyone offline");
+
+			Alliance::TabButtons bob = union_.tab_buttons(mine, 2, 4, false);
+			require(!bob.invite && !bob.withdraw && !bob.notice && !bob.up && !bob.down && bob.chat,
+					"rank 3 moves no one");
+			require(!union_.tab_buttons(outside, 7, 0, false).info, "no buttons outside an alliance");
+
+			Guild twenty;
+			twenty.update(*union_.find_guild(20));
+			Alliance::TabButtons master = union_.tab_buttons(twenty, 3, 0, false);
+			require(master.withdraw && master.notice && !master.invite, "a guild master may leave");
+
+			AllianceData full = nine;
+			full.capacity = 2;
+			full.titles = { "Master", "Jr.Master", "Member", "Four", "" };
+			union_.set(full);
+			require(!union_.tab_buttons(mine, 1, 0, false).invite, "a full alliance invites no one");
+			dan = union_.tab_buttons(mine, 1, 4, false);
+			require(!dan.up && dan.down, "down to rank 4 once it has a title");
+
+			std::array<std::string, 5> working = full.titles;
+			require(!union_.titles_differ(working), "unchanged titles");
+			working[3] = "four";
+			require(union_.titles_differ(working), "case counts");
+
+			working = { "Master", "Jr.Master", "Member", "Four", "Five" };
+			require(union_.check_title(mine, working, 4, "") == Guild::Title::LOWER_RANK, "rank 4 under rank 5");
+			working[4] = "";
+			require(union_.check_title(mine, working, 4, "") == Guild::Title::HELD, "Eve holds rank 4");
+			require(union_.check_title(mine, working, 5, "") == Guild::Title::HELD, "Fay holds rank 5 in another guild");
+			union_.store(mine, guild_data(20, "Twenty", { { 3, "Carol", 0, 10, 1, true, 2 } }));
+			require(union_.check_title(mine, working, 5, "") == Guild::Title::OK, "an empty rank may lose its title");
+			require(union_.check_title(mine, working, 5, "Fifth") == Guild::Title::OK, "a title");
+		}
+
 		std::cout << "Guild passed\n";
 		return 0;
 	}

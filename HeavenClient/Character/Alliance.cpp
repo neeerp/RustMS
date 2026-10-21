@@ -5,6 +5,12 @@
 
 namespace ms
 {
+	bool AllianceData::operator==(const AllianceData& other) const
+	{
+		return id == other.id && name == other.name && titles == other.titles && guild_ids == other.guild_ids &&
+			   capacity == other.capacity && notice == other.notice;
+	}
+
 	bool Alliance::exists() const
 	{
 		return data.id != 0;
@@ -65,6 +71,98 @@ namespace ms
 		{
 			return std::any_of(guild.members.begin(), guild.members.end(), holds);
 		});
+	}
+
+	bool Alliance::joined(const Guild& own) const
+	{
+		return exists() && own.exists() && own.get_data().alliance_id != 0;
+	}
+
+	const GuildMember* Alliance::find_member(const Guild& own, int32_t cid) const
+	{
+		if (const GuildMember* member = own.find(cid))
+			return member;
+
+		for (auto& guild : guilds)
+			for (auto& member : guild.members)
+				if (member.id == cid)
+					return &member;
+
+		return nullptr;
+	}
+
+	const GuildData* Alliance::guild_of(const Guild& own, int32_t cid) const
+	{
+		if (own.find(cid))
+			return &own.get_data();
+
+		for (auto& guild : guilds)
+			for (auto& member : guild.members)
+				if (member.id == cid)
+					return &guild;
+
+		return nullptr;
+	}
+
+	bool Alliance::may_edit_titles(const Guild& own, int32_t self) const
+	{
+		const GuildMember* member = own.find(self);
+
+		return joined(own) && member && member->alliance_rank == 1;
+	}
+
+	Guild::Title Alliance::check_title(const Guild& own, const std::array<std::string, 5>& working, int32_t rank,
+									   const std::string& title) const
+	{
+		return Guild::check_title(working, rank, title, rank_held(own, rank));
+	}
+
+	bool Alliance::titles_differ(const std::array<std::string, 5>& working) const
+	{
+		return working != data.titles;
+	}
+
+	Alliance::TabButtons Alliance::tab_buttons(const Guild& own, int32_t self, int32_t picked, bool party_leader) const
+	{
+		TabButtons result;
+
+		// Without an alliance, none.
+		if (!joined(own))
+			return result;
+
+		const GuildMember* me = own.find(self);
+		int32_t rank = me ? me->alliance_rank : -1;
+		bool master = rank == 1;
+		// Those needing someone else picked, whom the list shows online.
+		const GuildMember* other = picked != self ? find_member(own, picked) : nullptr;
+
+		if (other && !other->online)
+			other = nullptr;
+
+		int32_t lowest = lowest_rank();
+
+		result.invite = master && data.guild_ids.size() < static_cast<size_t>(std::max(data.capacity, 0));
+		result.withdraw = rank == 2;
+		// Only another guild's master: their guild goes, or takes over.
+		result.kick = master && other && other->rank == 1;
+		result.change = result.kick;
+
+		// The master or a guild master moves those of rank 3 and below. As
+		// the client reads, rank 5 may always go down; the server refuses.
+		if (other && (rank == 1 || rank == 2))
+		{
+			int32_t theirs = other->alliance_rank;
+			result.up = theirs == 4 || theirs == 5;
+			result.down = (theirs == 3 || theirs == 4) ? lowest != theirs : theirs == 5;
+		}
+
+		result.chat = other;
+		result.whisper = other;
+		result.info = true;
+		result.notice = rank == 1 || rank == 2;
+		result.party_invite = other && party_leader;
+
+		return result;
 	}
 
 	std::vector<int32_t> Alliance::online_ids(const Guild& own, int32_t self) const
