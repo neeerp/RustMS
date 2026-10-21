@@ -63,8 +63,8 @@ Clicking the bulb opens Maple Administrator (9010000) listing them under the
 NPC menu's headers. Picking one opens its conversation as its start NPC
 would, wherever the player is, so the server starts `autoStart` quests and
 completes `autoComplete` ones without the reach check. An `autoAccept` quest opens by itself and
-starts without its offer pages. `normalAutoStart` and `fieldEnter` only say
-when to check; they are not requirements.
+starts without its offer pages. `normalAutoStart` only says when to check;
+`fieldEnter` is also a start requirement (below).
 
 ## Supported quests
 
@@ -73,12 +73,12 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level` |
 | `Act/<id>/0` | `item` |
-| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop` |
-| `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job` |
+| `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job`, `onlyMasterLevel` |
 
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`; that is not
 an action. `item` requirements are counts the player must hold; a count of 0
@@ -99,7 +99,16 @@ absence. "Having" a skill is v83's loose test: any skill not marked
 `invisible` counts, for every job and at every level, and a hidden one
 counts once it has a record, even at level 0 (that is how the 4th-job skill
 book quests, 6110–6325, ask for the book's skill to be unlearned). `pop` is the least fame,
-compared unsigned as v83 does, so negative fame passes.
+compared unsigned as v83 does, so negative fame passes. Every item listed
+under `equipAllNeed` must be worn (the Magatia cape, 1102135, for 3307–3315),
+and at least one under `equipSelectNeed`; a copy in the bag doesn't count.
+With `fieldEnter`, the player must be on one of the listed maps.
+
+To complete, `endmeso` is the mesos to hold (it always matches the `money`
+taken). v83 checks it after kills and shows `stop/default` (or the NPC's
+line) when it fails, since the stop page has no key for it. `level` is the
+least level to complete (200 for 29300–29304); the client doesn't check it,
+so only the server refuses.
 
 `interval` makes a quest repeatable: once completed, it can be started again
 that many minutes after its completion time (0 means at once); without it a
@@ -139,8 +148,10 @@ mode 4 in the chat log ("You have gained fame. (+n)"). Skill actions
 one in the entry's `job` list, as v83's reward list shows them (a 0 there is
 the beginner job, not "any"). The level and master level become the entry's
 where the player's are lower, as Cosmic does, and the changed skills follow
-the completion in one UPDATE_SKILLS. `onlyMasterLevel` and `acquire` stay
-unsupported. A quest with
+the completion in one UPDATE_SKILLS. `onlyMasterLevel` marks entries
+without a `skillLevel`, which already raise only the master level (Bahamut,
+6121–6124); `acquire` stays unsupported there. `npcAct` (always "quest") names an NPC animation that neither
+side plays; it is ignored. A quest with
 any other key (`infoex`,
 `pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
@@ -150,7 +161,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1309 quests qualify
+changing the server's allowlist and regenerating the list. 1342 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -236,8 +247,8 @@ As in the original's font choice (`FUN_00704c2c`), the count you have is red
 under a third of the way, pink under two thirds, orange until done, then
 green; the rest of the line is black. As in the original's layout
 (`FUN_007052e6`), a blank 18-pixel row separates one quest from the next.
-The original also lists a quest's `endmeso` as a "Meso" row, but no
-supported quest has one. Starting a quest with kills or items to bring
+The original also lists a quest's `endmeso` as a "Meso" row, which
+HeavenClient doesn't show yet. Starting a quest with kills or items to bring
 tracks it unless AUTO was switched off; the quest window's helper button
 tracks and untracks open quests. Each quest's ⓧ untracks it, the minimize
 button folds the helper to its title bar, and close hides it until the

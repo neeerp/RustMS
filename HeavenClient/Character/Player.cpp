@@ -1937,14 +1937,12 @@ namespace ms
 		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, item_expiry::now()))
 			return false;
 
-		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
-			[&](int32_t id)
-			{
-				bool worn = inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0;
+		auto worn = [&](int32_t id) { return inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0; };
 
-				return inventory.get_total_item_count(id) + (worn ? 1 : 0);
-			},
-			[&](int32_t id) { return skillbook.has_skill(id) || !SkillData::get(id).is_invisible(); });
+		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
+			[&](int32_t id) { return inventory.get_total_item_count(id) + (worn(id) ? 1 : 0); },
+			[&](int32_t id) { return skillbook.has_skill(id) || !SkillData::get(id).is_invisible(); }, worn,
+			Stage::get().get_mapid());
 	}
 
 	TeleportRock &Player::get_teleport_rock()

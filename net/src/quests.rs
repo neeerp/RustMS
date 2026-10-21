@@ -62,6 +62,11 @@ pub enum QuestRejection {
     Skill(i32),
     /// Less fame than the quest asks.
     Fame,
+    /// Not wearing this required item, or (for `equipSelectNeed`, with 0)
+    /// none of the listed ones.
+    Worn(i32),
+    /// Not on one of the quest's maps.
+    Map,
     /// Fewer mesos than the quest takes.
     Mesos,
     /// The item rewards don't fit.
@@ -128,6 +133,16 @@ pub fn check_start(
     {
         return Err(QuestRejection::Skill(skill_id));
     }
+    let worn = |item_id: i32| player.inventory.equipped_ids().any(|(_, id)| id == item_id);
+    if let Some(&item_id) = start.worn_all.iter().find(|&&id| !worn(id)) {
+        return Err(QuestRejection::Worn(item_id));
+    }
+    if !start.worn_any.is_empty() && !start.worn_any.iter().any(|&id| worn(id)) {
+        return Err(QuestRejection::Worn(0));
+    }
+    if !start.maps.is_empty() && !start.maps.contains(&player.stats.map_id) {
+        return Err(QuestRejection::Map);
+    }
     Ok(())
 }
 
@@ -179,8 +194,16 @@ pub fn check_complete(
     {
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
     }
-    if quest.money < 0 && player.meso < quest.money.saturating_neg() {
+    if player.meso < quest.end_meso
+        || (quest.money < 0 && player.meso < quest.money.saturating_neg())
+    {
         return Err(QuestRejection::Mesos);
+    }
+    if quest
+        .end_min_level
+        .is_some_and(|min| i16::from(player.stats.level) < min)
+    {
+        return Err(QuestRejection::Level);
     }
     Ok(())
 }
@@ -360,6 +383,8 @@ mod tests {
             end_items: vec![],
             end_mobs: vec![],
             end_quests: vec![],
+            end_meso: 0,
+            end_min_level: None,
             start_items: vec![],
             end_rewards: vec![],
             end_skills: vec![],
@@ -444,6 +469,19 @@ mod tests {
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
         q.money = 200;
         p.meso = 0;
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        q.end_meso = 1;
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Mesos));
+    }
+
+    #[test]
+    fn complete_checks_the_end_level() {
+        let mut q = quest();
+        q.end_min_level = Some(200);
+        let mut p = player(199, 0);
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Level));
+        p.stats.level = 200;
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
@@ -582,6 +620,41 @@ mod tests {
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
         p.stats.fame = -3;
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
+    }
+
+    #[test]
+    fn start_checks_worn_items_and_the_map() {
+        let mut q = quest();
+        q.start.quests.clear();
+        q.start.worn_all = vec![1002067];
+        q.start.worn_any = vec![1102000, 1102135];
+        q.start.maps = vec![261000000];
+        let mut p = player(1, 0);
+        p.stats.map_id = 261000000;
+        // Holding a copy in the bag isn't wearing it.
+        p.inventory.insert(
+            game::InventoryType::Equip,
+            1,
+            game::Item::equipment(1002067, game::EquipStats::default()),
+        );
+        assert_eq!(
+            check_start(&q, 2001, &p),
+            Err(QuestRejection::Worn(1002067))
+        );
+        p.inventory.insert(
+            game::InventoryType::Equipped,
+            game::inventory::equip_slot::CAP,
+            game::Item::equipment(1002067, game::EquipStats::default()),
+        );
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Worn(0)));
+        p.inventory.insert(
+            game::InventoryType::Equipped,
+            game::inventory::equip_slot::CAPE,
+            game::Item::equipment(1102135, game::EquipStats::default()),
+        );
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        p.stats.map_id = 261000001;
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Map));
     }
 
     #[test]

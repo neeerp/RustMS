@@ -110,9 +110,10 @@ int main()
 		// v83 checks the NPC, items, quests, then kills (FUN_00721d2c).
 		hunt.end_prerequisites = {{1034, 2}};
 		int16_t before = 1;
+		int64_t meso = 0;
 		auto stop = [&](int32_t npc) {
 			return ms::completion_stop(hunt, npc, [&](int16_t id) { return id == 1034 ? before : 1; },
-				[&](int32_t) { return shells; }, progress);
+				[&](int32_t) { return shells; }, progress, meso);
 		};
 		shells = 0;
 		progress = "000";
@@ -124,6 +125,11 @@ int main()
 		require(stop(2002) == ms::QuestStop::MOB, "then kills");
 		progress = "001";
 		require(stop(2002) == ms::QuestStop::NONE, "and then it can be completed");
+		hunt.end_meso = 10000;
+		require(stop(2002) == ms::QuestStop::MESO, "endmeso is checked last");
+		require(std::string(ms::stop_reason(ms::QuestStop::MESO)) == "default", "and shows stop/default");
+		meso = 10000;
+		require(stop(2002) == ms::QuestStop::NONE, "enough mesos complete it");
 		// Start requirements on what the player holds (FUN_00721163): worn
 		// copies count once, 0 means none, and a negative count is a maximum.
 		ms::QuestInfo mirror = quest(1000, 2101, 2101);
@@ -131,9 +137,12 @@ int main()
 		std::map<int32_t, int32_t> held { {1042003, 1} };
 		std::set<int32_t> skills;
 		int16_t fame = 0;
+		std::set<int32_t> worn;
+		int32_t mapid = 0;
 		auto holds = [&](const ms::QuestInfo& info) {
 			return ms::start_holdings_met(info, fame, [&](int32_t id) { return held[id]; },
-				[&](int32_t id) { return skills.count(id) > 0; });
+				[&](int32_t id) { return skills.count(id) > 0; }, [&](int32_t id) { return worn.count(id) > 0; },
+				mapid);
 		};
 		auto mirror_marker = [&]() {
 			return ms::select_quest_marker(2101, 0, {mirror}, [](int16_t) { return 0; }, 1,
@@ -159,6 +168,20 @@ int main()
 		require(!holds(book), "a skill that must be lacked blocks it");
 		skills = {};
 		require(!holds(book), "a skill that must be had blocks it");
+		// equipAllNeed, equipSelectNeed and fieldEnter.
+		ms::QuestInfo cape = quest(3307, 2111008, 2111008);
+		cape.worn_all = {1102135};
+		cape.worn_any = {1002140, 1002141};
+		cape.field_enter = {261000000};
+		mapid = 261000000;
+		worn = {1002141};
+		require(!holds(cape), "every equipAllNeed item must be worn");
+		worn = {1102135};
+		require(!holds(cape), "one equipSelectNeed item must be worn");
+		worn.insert(1002141);
+		require(holds(cape), "both lists worn allow the start");
+		mapid = 261000001;
+		require(!holds(cape), "a fieldEnter quest starts only on its maps");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };
