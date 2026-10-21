@@ -183,6 +183,14 @@ pub mod keys {
     pub const MC_OBSTACLE_BLOCKED: &str = "portal.mc_obstacle.blocked";
     pub const MC_OBSTACLE_USED: &str = "portal.mc_obstacle.used";
     pub const MC_CASTLE_BLOCKED: &str = "portal.mc_castle.blocked";
+    /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
+    pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
+    pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
+    /// The Mysterious Statue (`flower_in`) and Crumbling Statue
+    /// (`flower_out`) of the Deep Forest's jump quest.
+    pub const STATUE_INTRO: &str = "statue.intro";
+    pub const STATUE_MENU: &str = "statue.menu";
+    pub const CRUMBLING_ASK: &str = "crumbling.ask";
 
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
@@ -698,6 +706,11 @@ mod tests {
             keys::MC_OBSTACLE_BLOCKED,
             keys::MC_OBSTACLE_USED,
             keys::MC_CASTLE_BLOCKED,
+            keys::TIME_GATE_INACTIVE,
+            keys::TIME_GATE_NO_ERA,
+            keys::STATUE_INTRO,
+            keys::STATUE_MENU,
+            keys::CRUMBLING_ASK,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,

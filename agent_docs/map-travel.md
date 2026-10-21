@@ -65,11 +65,34 @@ Kerning City-New Leaf City subway runs on the ship clock (`ships.md`).
 Jeff (`2030000`, `goDungeon`) stands in Ice Valley II (`211040200`), where
 the El Nath Danger Zone Taxi stops. After a first page he asks a player of
 level 50 or more whether to go down, and Yes warps to Sharp Cliff I
-(`211040300`) portal 5 (`under00`); below level 50 he refuses. In the
-original, a holder of the Orihalcon Hammer (`4031450`) goes straight to Ice
-Valley (`921100100`) instead; that comes with its quest line. His keys
-(`jeff.*`) are `unsourced`. `el_nath_dungeon.rs` checks both answers through
-the network harness.
+(`211040300`) portal 5 (`under00`); below level 50 he refuses. A holder of
+the Orihalcon Hammer (`4031450`) goes straight to Ice Valley (`921100100`)
+portal 1 (`west00`) without a word, though nothing hands the hammer out yet.
+His keys (`jeff.*`) are `unsourced`. `el_nath_dungeon.rs` checks all three
+through the network harness.
+
+## Menu warps
+
+These NPCs warp straight off a menu choice, with no question after it
+(`Page::Done`):
+
+- The Mysterious Statue (`1061006`, `flower_in`) in the Sleepywood forest
+  (`105040300`) speaks a first page, then offers the Deep Forest's steps that
+  John's quests have opened, each taken or done: 2052 opens Step 1
+  (`105040310`), 2053 Step 3 (`105040312`) and 2054 Step 5 (`105040314`),
+  arriving at portal 0. With none, it only speaks. The Crumbling Statue
+  (`1061007`, `flower_out`) on each step asks, and Yes goes back to
+  `105040300` portal 0.
+- The Time Gate (`2083006`, `TD_neoCity_enter`) in the Tera Forest
+  (`240070000`) sleeps until Andy the Time Traveler (3718) is completed. It
+  then offers each era in turn whose Guardian Nex quest (3719, 3724, 3730,
+  3736, 3742, 3748 for Years 2021 to 2503) is completed, stopping at the
+  first that isn't, and arrives at the era's portal 1 (`left00`). With none,
+  it says to beat Guardian Nex first.
+
+Their keys (`statue.*`, `crumbling.ask`, `time_gate.*`) are `unsourced`;
+menu labels are map names (`#m<map id>#`). `statues_and_time_gate.rs` checks
+them through the network harness.
 
 ## Map and portal scripts
 
