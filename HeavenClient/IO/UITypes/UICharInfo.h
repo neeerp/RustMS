@@ -96,6 +96,7 @@ namespace ms
 
 	private:
 		void give_fame(bool up) const;
+		void invite() const;
 
 		// The main window alone, or lengthened to show pets, the mount, or
 		// the monster book collection.

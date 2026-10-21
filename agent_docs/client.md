@@ -329,9 +329,10 @@ from `UI.nx`. Moved so far:
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
   RustMS has no mounts or monster book, and the pet and wish list pages are
-  not read. Family,
-  party, and excluded items are disabled; TRADE invites the character to a
-  trade. The fame buttons send
+  not read. Family and excluded items are disabled. REQ PARTY, greyed in the
+  player's own window, invites the character when the player leads a party,
+  and otherwise does nothing (v83 FUN_008ff5b0). TRADE invites the character
+  to a trade. The fame buttons send
   GIVE_FAME (`GiveFamePacket`) unless the window is the player's own or the
   player is below level 15. As in v83 (FUN_00a23eb5), the client refuses a
   character who isn't on the map ("Unable to find the character.") and a
