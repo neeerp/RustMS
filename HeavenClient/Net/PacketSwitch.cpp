@@ -118,6 +118,7 @@ namespace ms
 		CONTI_STATE = 149,
 		SET_OBJECT_STATE = 153,
 		STOP_CLOCK = 154,
+		QUICKSLOT_INIT = 159,
 
 		/// MapObject
 		SPAWN_CHAR = 160,
@@ -333,6 +334,7 @@ namespace ms
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();
 		emplace<SKILL_MACROS, SkillMacrosHandler>();
+		emplace<QUICKSLOT_INIT, QuickSlotInitHandler>();
 		emplace<CHANGE_STATS, ChangeStatsHandler>();
 		emplace<GIVE_BUFF, ApplyBuffHandler>();
 		emplace<CANCEL_BUFF, CancelBuffHandler>();

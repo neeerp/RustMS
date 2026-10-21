@@ -9,8 +9,8 @@ use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, auto_potions, character_mounts, character_quests, characters, equipment_stats,
-    gacha_exp, inventory_items, keybindings, monster_book_cards, saved_locations, skill_macros,
-    skills, teleport_rocks,
+    gacha_exp, inventory_items, keybindings, monster_book_cards, quick_slots, saved_locations,
+    skill_macros, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -19,8 +19,8 @@ use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, encode_kills, SCRIPT_MARKERS};
 use game::{
     AutoPotions, AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item,
-    KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, SkillBook,
-    SkillMacro, SkillMacros, SkillRecord, TeleportRocks,
+    KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, QuickSlots,
+    SkillBook, SkillMacro, SkillMacros, SkillRecord, TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -230,6 +230,7 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
     {
         player.auto_potions = AutoPotions { hp, mp };
     }
+    player.quick_slots = load_quick_slots(&mut conn, character_id)?;
     player.stats.gacha_exp = gacha_exp::table
         .find(character_id)
         .select(gacha_exp::exp)
@@ -390,6 +391,9 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
                 .execute(conn)?;
         } else {
             diesel::delete(auto_potions::table.find(id)).execute(conn)?;
+        }
+        if let Some(slots) = player.quick_slots {
+            save_quick_slots(conn, id, slots)?;
         }
         save_mount(conn, id, &player.mount)?;
         save_inventory(conn, id, &player.inventory)?;
@@ -622,6 +626,52 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
             },
         },
     }
+}
+
+/// The quick slot keys, or None if the client never sent a layout.
+fn load_quick_slots(conn: &mut PgConnection, character_id: i32) -> QueryResult<Option<QuickSlots>> {
+    let row = quick_slots::table
+        .find(character_id)
+        .select((
+            quick_slots::key0,
+            quick_slots::key1,
+            quick_slots::key2,
+            quick_slots::key3,
+            quick_slots::key4,
+            quick_slots::key5,
+            quick_slots::key6,
+            quick_slots::key7,
+        ))
+        .first::<(i16, i16, i16, i16, i16, i16, i16, i16)>(conn)
+        .optional()?;
+    Ok(row.and_then(|(k0, k1, k2, k3, k4, k5, k6, k7)| {
+        QuickSlots::from_client([k0, k1, k2, k3, k4, k5, k6, k7].map(i32::from))
+    }))
+}
+
+fn save_quick_slots(
+    conn: &mut PgConnection,
+    character_id: i32,
+    slots: QuickSlots,
+) -> QueryResult<()> {
+    let [k0, k1, k2, k3, k4, k5, k6, k7] = slots.0.map(i16::from);
+    let keys = (
+        quick_slots::key0.eq(k0),
+        quick_slots::key1.eq(k1),
+        quick_slots::key2.eq(k2),
+        quick_slots::key3.eq(k3),
+        quick_slots::key4.eq(k4),
+        quick_slots::key5.eq(k5),
+        quick_slots::key6.eq(k6),
+        quick_slots::key7.eq(k7),
+    );
+    diesel::insert_into(quick_slots::table)
+        .values((quick_slots::character_id.eq(character_id), keys))
+        .on_conflict(quick_slots::character_id)
+        .do_update()
+        .set(keys)
+        .execute(conn)?;
+    Ok(())
 }
 
 fn load_keymap(conn: &mut PgConnection, character_id: i32) -> QueryResult<Keymap> {

@@ -57,12 +57,6 @@ namespace ms
 {
 	namespace
 	{
-		// The quick slot keys, left to right and top to bottom.
-		constexpr KeyConfig::Key QUICKSLOT_KEYS[8] = {
-			KeyConfig::Key::LEFT_SHIFT, KeyConfig::Key::INSERT, KeyConfig::Key::HOME, KeyConfig::Key::PAGE_UP,
-			KeyConfig::Key::LEFT_CONTROL, KeyConfig::Key::DELETE, KeyConfig::Key::END, KeyConfig::Key::PAGE_DOWN
-		};
-
 		// The icon in UIWindow.img/KeyConfig/icon for each action the client
 		// knows. v83 numbers its functions differently from the client.
 		const std::map<int32_t, int32_t> ACTION_ICONS = {
@@ -143,10 +137,35 @@ namespace ms
 		const Point<int16_t> CELL_PITCH = Point<int16_t>(35, 33);
 		constexpr int16_t CELL_SIZE = 32;
 
+		// An open Key Config's edits are on the key map v83 draws the panel
+		// from, so the panel shows them.
+		UIKeyConfig *open_keyconfig()
+		{
+			auto keyconfig = UI::get().get_element<UIKeyConfig>();
+
+			return keyconfig && keyconfig->is_active() ? keyconfig.get() : nullptr;
+		}
+
+		Keyboard::Mapping quickslot_mapping(int32_t key)
+		{
+			if (UIKeyConfig *keyconfig = open_keyconfig())
+				return keyconfig->get_staged_mapping(key);
+
+			return UI::get().get_keyboard().get_maple_mapping(key);
+		}
+
 		// Bind a key to a mapping and tell the server. As in Key Config, the
-		// mapping leaves any other key it was on.
+		// mapping leaves any other key it was on. With Key Config open it is
+		// one of the window's edits, sent on its OK or taken back on Cancel
+		// (0x87 goes only when Key Config is shut, DAT_00bed650).
 		void bind_key(int32_t key, Keyboard::Mapping mapping)
 		{
+			if (UIKeyConfig *keyconfig = open_keyconfig())
+			{
+				keyconfig->stage_key(key, mapping);
+				return;
+			}
+
 			Keyboard &keyboard = UI::get().get_keyboard();
 			std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> changes;
 
@@ -169,11 +188,6 @@ namespace ms
 				else
 					keyboard.assign(changed, type, action);
 			}
-
-			// An open Key Config shows the same binding.
-			if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
-				if (keyconfig->is_active())
-					keyconfig->stage_key(key, mapping);
 		}
 	}
 
@@ -203,8 +217,9 @@ namespace ms
 		mpflash.pos = MPFLASH_POS;
 		quickslot = base["quickSlot"];
 
-		for (size_t i = 0; i < 8; i++)
-			keylabels[i] = src["key"][std::to_string(i)];
+		// A cell's label follows its key (FUN_008ddb30).
+		for (nl::node label : window["KeyConfig"]["quickslotConfig"]["key"])
+			keylabels[std::stoi(label.name())] = label;
 
 		for (auto &iter : ACTION_ICONS)
 			action_icons[iter.first] = window["KeyConfig"]["icon"][std::to_string(iter.second)];
@@ -445,7 +460,7 @@ namespace ms
 
 		quickslot.draw(panel);
 
-		const Keyboard &keyboard = UI::get().get_keyboard();
+		const QuickSlots &quick_slots = UI::get().get_quick_slots();
 		const Inventory &inventory = Stage::get().get_player().get_inventory();
 
 		for (int16_t i = 0; i < 8; i++)
@@ -454,7 +469,7 @@ namespace ms
 			int16_t row = i / 4;
 			Point<int16_t> cellpos = panel + Point<int16_t>(7 + col * CELL_PITCH.x(), 8 + row * CELL_PITCH.y());
 
-			Keyboard::Mapping mapping = keyboard.get_maple_mapping(QUICKSLOT_KEYS[i]);
+			Keyboard::Mapping mapping = quickslot_mapping(quick_slots.key(i));
 
 			// Icons hang from their bottom-left corner.
 			Point<int16_t> iconpos = cellpos + Point<int16_t>(0, 32);
@@ -495,7 +510,11 @@ namespace ms
 					break;
 			}
 
-			keylabels[i].draw(panel + Point<int16_t>(9 + col * CELL_PITCH.x(), 10 + row * CELL_PITCH.y()));
+			// Right Shift keeps its own label.
+			auto label = keylabels.find(quick_slots.keys()[i]);
+
+			if (label != keylabels.end())
+				label->second.draw(panel + Point<int16_t>(9 + col * CELL_PITCH.x(), 10 + row * CELL_PITCH.y()));
 		}
 	}
 
@@ -690,7 +709,7 @@ namespace ms
 
 		if (slot >= 0 && mapping.type != KeyType::Id::NONE)
 		{
-			bind_key(QUICKSLOT_KEYS[slot], mapping);
+			bind_key(UI::get().get_quick_slots().key(slot), mapping);
 			Sound(Sound::Name::DRAGEND).play();
 		}
 
@@ -774,7 +793,7 @@ namespace ms
 	// leave the last tooltip up, as v83 does.
 	void UIStatusBar::show_quickslot(int16_t slot) const
 	{
-		Keyboard::Mapping mapping = UI::get().get_keyboard().get_maple_mapping(QUICKSLOT_KEYS[slot]);
+		Keyboard::Mapping mapping = quickslot_mapping(UI::get().get_quick_slots().key(slot));
 
 		switch (mapping.type)
 		{

@@ -174,7 +174,8 @@ namespace ms
 		GaugeFlash hpflash;
 		GaugeFlash mpflash;
 		Texture quickslot;
-		Texture keylabels[8];
+		// UIWindow.img/KeyConfig/quickslotConfig/key, by key map index.
+		std::map<int32_t, Texture> keylabels;
 		Texture gamemenu;
 		Texture shortcutmenu;
 		std::map<int32_t, Texture> action_icons;

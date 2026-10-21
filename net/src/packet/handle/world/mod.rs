@@ -36,6 +36,7 @@ mod pet;
 mod pickup;
 mod player_interaction;
 mod quest_action;
+mod quick_slots;
 mod reactor;
 mod rearrange;
 mod script_portal;
@@ -95,6 +96,7 @@ pub use self::pet::{
 pub use self::pickup::ItemPickupHandler;
 pub use self::player_interaction::PlayerInteractionHandler;
 pub use self::quest_action::QuestActionHandler;
+pub use self::quick_slots::QuickSlotHandler;
 pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
 pub use self::script_portal::ChangeMapSpecialHandler;

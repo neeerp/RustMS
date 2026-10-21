@@ -6,6 +6,7 @@ use crate::monster_book::MonsterBook;
 use crate::mount::Mount;
 use crate::pet::{FieldPet, FOLLOW_THE_LEAD};
 use crate::quest::QuestLog;
+use crate::quick_slots::QuickSlots;
 use crate::skill::{self, SkillBook, SkillRecord};
 use crate::skill_macro::SkillMacros;
 use crate::teleport_rock::TeleportRocks;
@@ -245,6 +246,9 @@ pub struct Player {
     /// The potions the first pet gives from the HP and MP pouches' slots,
     /// or 0.
     pub auto_potions: AutoPotions,
+    /// The quick slot panel's keys, or None if never set, when the client
+    /// is told to use its defaults.
+    pub quick_slots: Option<QuickSlots>,
     dirty: bool,
 }
 
@@ -295,6 +299,7 @@ impl Player {
             mount: Mount::default(),
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
+            quick_slots: None,
             dirty: false,
         }
     }

@@ -108,6 +108,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME enter_number COMMAND enter_number_tests)
     add_executable(keyboard_tests tests/keyboard.cpp IO/Keyboard.cpp)
     add_test(NAME keyboard COMMAND keyboard_tests)
+    add_executable(quick_slots_tests tests/quick_slots.cpp IO/Keyboard.cpp)
+    add_test(NAME quick_slots COMMAND quick_slots_tests)
     add_executable(mob_damage_tests tests/mob_damage.cpp)
     add_test(NAME mob_damage COMMAND mob_damage_tests)
     add_executable(mob_attack_tests tests/mob_attack.cpp)
@@ -760,6 +762,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuiz.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
+    IO/UITypes/UIQuickSlotConfig.cpp
+    IO/UITypes/UIQuickSlotConfig.h
     IO/UITypes/UIQuit.cpp
     IO/UITypes/UIQuit.h
     IO/UITypes/UIRaceSelect.cpp
@@ -827,6 +831,7 @@ add_executable(HeavenClient
     IO/Keyboard.cpp
     IO/Keyboard.h
     IO/KeyConfig.h
+    IO/QuickSlots.h
     IO/KeyType.h
     IO/Messages.cpp
     IO/Messages.h

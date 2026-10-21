@@ -252,6 +252,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::MacroSysDataInit as i16 => "MacroSysDataInit",
         x if x == SendOpcode::AutoHpPot as i16 => "AutoHpPot",
         x if x == SendOpcode::AutoMpPot as i16 => "AutoMpPot",
+        x if x == SendOpcode::QuickSlotInit as i16 => "QuickSlotInit",
         x if x == SendOpcode::FieldEffect as i16 => "FieldEffect",
         x if x == SendOpcode::StatChange as i16 => "StatChange",
         x if x == SendOpcode::ShowStatusInfo as i16 => "ShowStatusInfo",
@@ -935,6 +936,26 @@ pub fn decode_auto_potion(packet: &Packet) -> Result<i32, String> {
         .map_err(|error| format!("auto potion: {error}"))
 }
 
+/// QUICKSLOT_INIT: the eight keys, or None for the client's defaults.
+pub fn decode_quick_slot_init(packet: &Packet) -> Result<Option<[i32; 8]>, String> {
+    expect_opcode(packet, SendOpcode::QuickSlotInit as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[..]);
+    skip(&mut cursor, 2)?;
+    let set = cursor
+        .read_byte()
+        .map_err(|error| format!("quick slots: {error}"))?;
+    if set == 0 {
+        return Ok(None);
+    }
+    let mut keys = [0; 8];
+    for key in &mut keys {
+        *key = cursor
+            .read_int()
+            .map_err(|error| format!("quick slots: {error}"))?;
+    }
+    Ok(Some(keys))
+}
+
 /// KEYMAP: `(kind, action)` for each of the 90 keys.
 pub fn decode_keymap(packet: &Packet) -> Result<Vec<(u8, i32)>, String> {
     expect_opcode(packet, SendOpcode::KeyMap as i16)?;
@@ -1004,6 +1025,15 @@ pub fn build_change_keymap(bindings: &[(i32, u8, i32)]) -> Result<Packet, String
         packet.write_int(key).map_err(|e| e.to_string())?;
         packet.write_byte(kind).map_err(|e| e.to_string())?;
         packet.write_int(action).map_err(|e| e.to_string())?;
+    }
+    Ok(packet)
+}
+
+/// QUICK_SLOT: the client's eight quick slot keys.
+pub fn build_quick_slot(keys: &[i32]) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::QuickSlot as i16);
+    for key in keys {
+        packet.write_int(*key).map_err(|e| e.to_string())?;
     }
     Ok(packet)
 }

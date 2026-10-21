@@ -23,15 +23,28 @@ async fn read_world_entry(
 
     let mut saw_keymap = false;
     let mut saw_set_field = false;
-    let mut saw_auto_mp = false;
-    for _ in 0..8 {
+    let mut saw_quick_slots = false;
+    for _ in 0..10 {
         let envelope = connection.read_packet("world entry").await?;
+        // A v83 client drops anything that comes before SET_FIELD.
+        if !saw_set_field && envelope.opcode() != SendOpcode::SetField as i16 {
+            return Err(HarnessError::protocol(
+                "world entry",
+                connection.endpoint(),
+                format!(
+                    "opcode {} ({}) arrived before SetField",
+                    envelope.opcode(),
+                    opcode_name(envelope.opcode())
+                ),
+            ));
+        }
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => saw_keymap = true,
             x if x == SendOpcode::MacroSysDataInit as i16 => {}
             x if x == SendOpcode::AutoHpPot as i16 => {}
+            x if x == SendOpcode::AutoMpPot as i16 => {}
             // The last of world entry.
-            x if x == SendOpcode::AutoMpPot as i16 => saw_auto_mp = true,
+            x if x == SendOpcode::QuickSlotInit as i16 => saw_quick_slots = true,
             x if x == SendOpcode::SetField as i16 => saw_set_field = true,
             x if x == SendOpcode::SpawnNpc as i16 => {}
             x if x == SendOpcode::SpawnNpcRequestController as i16 => {}
@@ -49,7 +62,7 @@ async fn read_world_entry(
             }
         }
 
-        if saw_keymap && saw_set_field && saw_auto_mp {
+        if saw_keymap && saw_set_field && saw_quick_slots {
             return Ok(());
         }
     }

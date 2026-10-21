@@ -277,6 +277,20 @@ diesel::table! {
 }
 diesel::joinable!(auto_potions -> characters (character_id));
 diesel::table! {
+    quick_slots (character_id) {
+        character_id -> Int4,
+        key0 -> Int2,
+        key1 -> Int2,
+        key2 -> Int2,
+        key3 -> Int2,
+        key4 -> Int2,
+        key5 -> Int2,
+        key6 -> Int2,
+        key7 -> Int2,
+    }
+}
+diesel::joinable!(quick_slots -> characters (character_id));
+diesel::table! {
     character_mounts (character_id) {
         character_id -> Int4,
         level -> Int4,
@@ -427,6 +441,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     saved_locations,
     gacha_exp,
     auto_potions,
+    quick_slots,
     character_mounts,
     fame_log,
     storage_items,

@@ -25,6 +25,7 @@
 
 #include "../../Character/MapleStat.h"
 #include "../../Character/SkillMacros.h"
+#include "../../IO/QuickSlots.h"
 
 #include "../IO/UITypes/UIKeyConfig.h"
 
@@ -154,6 +155,18 @@ namespace ms
 				write_byte(std::get<1>(keymap));	// type
 				write_int(std::get<2>(keymap));		// action
 			}
+		}
+	};
+
+	// The quick slot keys, left to right and top to bottom (FUN_0072b87e)
+	// Opcode: QUICK_SLOT(183)
+	class QuickSlotPacket : public OutPacket
+	{
+	public:
+		QuickSlotPacket(const QuickSlots::Keys& keys) : OutPacket(OutPacket::Opcode::QUICK_SLOT)
+		{
+			for (int32_t key : keys)
+				write_int(key);
 		}
 	};
 

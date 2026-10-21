@@ -24,6 +24,7 @@
 #include "../../Character/MountRules.h"
 
 #include "../Packets/LoginPackets.h"
+#include "../Packets/PlayerPackets.h"
 
 #include "../../Configuration.h"
 #include "../../Data/ItemData.h"
@@ -506,6 +507,20 @@ namespace ms
 
 		UI::get().get_skill_macros().replace(std::move(macros));
 		Stage::get().stop_macro();
+	}
+
+	void QuickSlotInitHandler::handle(InPacket& recv) const
+	{
+		QuickSlots::Keys keys = QuickSlots::DEFAULTS;
+
+		if (recv.read_byte() != 0)
+			for (int32_t& key : keys)
+				key = recv.read_int();
+
+		UI::get().get_quick_slots().init(keys);
+
+		// v83 sends every layout it is given straight back.
+		QuickSlotPacket(keys).dispatch();
 	}
 
 	void AddCooldownHandler::handle(InPacket& recv) const

@@ -107,6 +107,7 @@ pub enum RecvOpcode {
     SummonAttack = 0xB0,
     DamageSummon = 0xB1,
     Beholder = 0xB2,
+    QuickSlot = 0xB7,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
     MobBomb = 0xC1,

@@ -1493,6 +1493,14 @@ HeavenClient numbers them: Ctrl → attack (53), Z → pick up (51), X → sit (
 and B → Monster Book (59), among others. The client's DEFAULT button in Keyboard
 Setting restores the same table.
 
+Which keys the status bar's eight quick slots stand for is stored per character
+(`game/src/quick_slots.rs`, table `quick_slots`). QUICKSLOT_INIT (`0x9F` out)
+follows SET_FIELD on world entry: a flag byte, then eight i32 scan codes when
+the character has a layout, or just 0 for v83's defaults (Shift, Insert, Home,
+Page Up over Ctrl, Delete, End, Page Down). QUICK_SLOT (`0xB7` in) carries
+eight i32s; the server keeps them only if all eight are keys with a quick slot
+label and none repeats.
+
 ## Tests
 
 `field_mobs` unit tests cover spawning, control hand-off (including by

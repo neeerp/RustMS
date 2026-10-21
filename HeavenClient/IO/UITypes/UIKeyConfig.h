@@ -47,12 +47,22 @@ namespace ms
 		UIElement::Type get_type() const override;
 
 		void close();
+		// A close that asks first when keys or quick slots are unsaved
+		// (FUN_00833749).
+		void safe_close();
 
 		void stage_mapping(Point<int16_t> cursorposition, Keyboard::Mapping mapping);
 		void stage_key(int32_t key, Keyboard::Mapping mapping);
 		void unstage_mapping(Keyboard::Mapping mapping);
 
 		void update_item_count(InventoryType::Id type, int16_t slot, int16_t change);
+
+		// The icon of what a key is bound to, as the quick slot editor draws
+		// it (FUN_0072d162).
+		Texture key_icon(int32_t key) const;
+		// What a key is bound to with the window's unsaved edits, which v83 makes
+		// on the live key map the status bar draws.
+		Keyboard::Mapping get_staged_mapping(int32_t keycode) const;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -71,7 +81,6 @@ namespace ms
 		void load_item_icons();
 		void load_skill_icons();
 
-		void safe_close();
 		void show_notice(Notice notice);
 		void hide_notice();
 		void answer_notice(bool ok);
@@ -81,6 +90,7 @@ namespace ms
 		void clear_tooltip();
 
 		void save_staged_mappings();
+		void send_quick_slots();
 		void refresh_bound_actions();
 		void clear();
 		void reset();
@@ -90,7 +100,6 @@ namespace ms
 		Texture get_skill_texture(int32_t skill_id) const;
 		int32_t key_by_position(Point<int16_t> position) const;
 		KeyAction::Id unbound_action_by_position(Point<int16_t> position) const;
-		Keyboard::Mapping get_staged_mapping(int32_t keycode) const;
 		bool is_action_mapping(Keyboard::Mapping mapping) const;
 		bool is_bound(KeyAction::Id action) const;
 		static KeyType::Id get_keytype(KeyAction::Id action);
