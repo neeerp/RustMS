@@ -7,9 +7,11 @@ use crate::codec::time::filetime;
 use crate::{duey::INBOX_LIMIT, error::NetworkError, packet::op::SendOpcode};
 use db::parcel::Parcel;
 use packet::{io::write::PktWrite, Packet};
+use std::time::Duration;
 
 const OPEN: u8 = 0x08;
 const REMOVED: u8 = 0x17;
+const ADDED: u8 = 0x18;
 const ARRIVED: u8 = 0x19;
 const QUICK_SEND: u8 = 0x1a;
 const WAITING: u8 = 0x1b;
@@ -46,14 +48,17 @@ fn write_fixed(packet: &mut Packet, text: &str, len: usize) -> Result<(), Networ
     Ok(())
 }
 
-/// One parcel as the window lists it. Its time is when it expires: the
-/// window counts the days left, and calls a parcel 30 or more days from
-/// expiring still on its way.
+/// A day short of a parcel's expiry, which the window shows: it counts the
+/// days left, and calls a parcel 30 or more days off still on its way. The
+/// day spare keeps a new parcel claimable on a client whose clock is behind.
+const MARGIN: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// One parcel as the window lists it.
 fn write_parcel(packet: &mut Packet, parcel: &Parcel) -> Result<(), NetworkError> {
     packet.write_int(i32::try_from(parcel.id).unwrap_or(-1))?;
     write_fixed(packet, &parcel.sender, SENDER_LEN)?;
     packet.write_int(parcel.mesos)?;
-    packet.write_long(filetime(parcel.expires_at()))?;
+    packet.write_long(filetime(parcel.expires_at() - MARGIN))?;
     let message = parcel.message.as_deref().unwrap_or("");
     packet.write_int(i32::from(!message.is_empty()))?;
     write_fixed(packet, message, MESSAGE_LEN)?;
@@ -90,6 +95,14 @@ pub fn build_parcel_removed(id: i32, kind: u8) -> Result<Packet, NetworkError> {
     let mut packet = parcel_packet(REMOVED)?;
     packet.write_int(id)?;
     packet.write_byte(kind)?;
+    Ok(packet)
+}
+
+/// Mode 0x18: `parcel` arrived while the window is open; it joins the
+/// list. A client without the window ignores it.
+pub fn build_parcel_added(parcel: &Parcel) -> Result<Packet, NetworkError> {
+    let mut packet = parcel_packet(ADDED)?;
+    write_parcel(&mut packet, parcel)?;
     Ok(packet)
 }
 
@@ -147,7 +160,8 @@ mod tests {
         assert_eq!(&record[..4], &9i32.to_le_bytes());
         assert_eq!(&record[4..17], b"Duey\0\0\0\0\0\0\0\0\0");
         assert_eq!(&record[17..21], &1000i32.to_le_bytes());
-        let expires = UNIX_EPOCH + Duration::from_secs(1_700_000_000) + db::parcel::LIFETIME;
+        let expires =
+            UNIX_EPOCH + Duration::from_secs(1_700_000_000) + db::parcel::LIFETIME - MARGIN;
         assert_eq!(&record[21..29], &filetime(expires).to_le_bytes());
         assert_eq!(&record[29..33], &1i32.to_le_bytes());
         assert_eq!(&record[33..35], b"hi");
@@ -182,6 +196,15 @@ mod tests {
         assert_eq!(&record[4..17], b"abcdefghijkl\0");
         assert_eq!(record[33 + 199], 0);
         assert_eq!(record[33 + 198], b'x');
+    }
+
+    #[test]
+    fn an_added_parcel_is_one_record() {
+        let packet = build_parcel_added(&parcel(None, None)).unwrap();
+        let body = &packet.bytes[2..];
+        assert_eq!(body[0], ADDED);
+        assert_eq!(&body[1..5], &9i32.to_le_bytes());
+        assert_eq!(body.len(), 1 + 0xeb);
     }
 
     #[test]

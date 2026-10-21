@@ -13,6 +13,10 @@ diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql
 /// How long a parcel waits before it expires.
 pub const LIFETIME: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
+/// The first key of the advisory lock that serializes sends to one
+/// receiver (the second is the receiver's id).
+const SEND_LOCK: i32 = 0x5072_636c;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Parcel {
     pub id: i64,
@@ -165,7 +169,8 @@ pub fn recipient(name: &str) -> crate::Result<Option<Recipient>> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Sent {
-    Sent,
+    /// Saved, as parcel `id`.
+    Sent(i64),
     /// The receiver has `limit` parcels waiting.
     InboxFull,
     /// A parcel waiting for the receiver has this one-of-a-kind item.
@@ -179,12 +184,13 @@ pub enum Sent {
 pub fn send(new: &NewParcel, only: bool, limit: i64, sender: &Player) -> crate::Result<Sent> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
-        // Two parcels sent at once can't both take the last place.
-        characters::table
-            .find(new.receiver_id)
-            .select(characters::id)
-            .for_update()
-            .first::<i32>(conn)?;
+        // Two parcels sent at once can't both take the last place. A lock
+        // on the receiver's row would deadlock with the receiver sending
+        // back at once, as each then saves the row the other holds.
+        diesel::sql_query("SELECT pg_advisory_xact_lock($1, $2)")
+            .bind::<diesel::sql_types::Integer, _>(SEND_LOCK)
+            .bind::<diesel::sql_types::Integer, _>(new.receiver_id)
+            .execute(conn)?;
         let waiting = parcels::table
             .filter(parcels::receiver_id.eq(new.receiver_id))
             .filter(parcels::sent_at.ge(cutoff(new.sent_at)));
@@ -225,7 +231,7 @@ pub fn send(new: &NewParcel, only: bool, limit: i64, sender: &Player) -> crate::
                 .execute(conn)?;
         }
         write_player(conn, sender)?;
-        Ok(Sent::Sent)
+        Ok(Sent::Sent(id))
     })?)
 }
 

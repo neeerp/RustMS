@@ -426,6 +426,7 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
+            WorldAction::Duey(_) if self.in_cash_shop => {}
             WorldAction::Duey(request) => self.duey_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
@@ -769,6 +770,8 @@ impl ClientActor {
         self.script = None;
         self.pending_quest = None;
         self.naming_guild = false;
+        // The shop is a stage of its own, and takes the Duey window with it.
+        self.duey = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;

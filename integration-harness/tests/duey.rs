@@ -22,9 +22,12 @@ const CASH: i16 = 5;
 const OPEN: u8 = 0x08;
 const NO_MESOS: u8 = 0x0a;
 const NO_RECEIVER: u8 = 0x0c;
+const SAME_ACCOUNT: u8 = 0x0d;
+const INBOX_FULL: u8 = 0x0e;
 const SENT: u8 = 0x12;
 const UNKNOWN: u8 = 0x13;
 const REMOVED: u8 = 0x17;
+const ADDED: u8 = 0x18;
 const ARRIVED: u8 = 0x19;
 const QUICK_SEND: u8 = 0x1a;
 const WAITING: u8 = 0x1b;
@@ -95,18 +98,16 @@ struct Listed {
     item: Option<i32>,
 }
 
-/// Read a window's parcels and the number that expired.
-fn window(body: &[u8]) -> (Vec<Listed>, u8) {
-    assert_eq!(body[..2], [OPEN, 0], "a full window");
+/// Read `n` parcels from `body` at `at`, and where they end.
+fn records(body: &[u8], mut at: usize, n: u8) -> (Vec<Listed>, usize) {
     let int = |at: usize| i32::from_le_bytes(body[at..at + 4].try_into().unwrap());
     let text = |at: usize, len: usize| {
         let bytes = &body[at..at + len];
         let end = bytes.iter().position(|&b| b == 0).unwrap_or(len);
         String::from_utf8_lossy(&bytes[..end]).into_owned()
     };
-    let mut at = 3;
     let mut listed = Vec::new();
-    for _ in 0..body[2] {
+    for _ in 0..n {
         let has_item = body[at + 234] == 1;
         listed.push(Listed {
             id: int(at),
@@ -125,16 +126,27 @@ fn window(body: &[u8]) -> (Vec<Listed>, u8) {
                 0
             };
     }
-    (listed, body[at])
+    (listed, at)
 }
 
+/// Read a window: whether it only receives, its parcels, and the number
+/// that expired.
+fn window(body: &[u8]) -> (bool, Vec<Listed>, u8) {
+    assert_eq!(body[0], OPEN, "a window");
+    let (listed, at) = records(body, 3, body[2]);
+    (body[1] == 1, listed, body[at])
+}
+
+/// Open Duey's own window, by talking to him.
 async fn open(c: &mut MapleTestConnection, seen: &mut Trace) -> (Vec<Listed>, u8) {
     until(c, seen, |t| t.field.npc(DUEY).is_some()).await;
     let duey = seen.field.npc(DUEY).unwrap();
     let before = seen.parcels.len();
     send(c, talk(duey)).await;
     until(c, seen, |t| t.parcels.len() > before).await;
-    window(&seen.parcels[before])
+    let (receive_only, listed, expired) = window(&seen.parcels[before]);
+    assert!(!receive_only, "Duey's window sends too");
+    (listed, expired)
 }
 
 #[tokio::test]
@@ -171,7 +183,7 @@ async fn duey_carries_mesos_and_items_to_an_offline_character() {
         normal(0, 0, 0, 1000, &sender.character_name),
     )
     .await;
-    assert_eq!(t.parcels, [[NO_RECEIVER]]);
+    assert_eq!(t.parcels, [[SAME_ACCOUNT]]);
 
     // Four potions and 1000 mesos, for the fee of 5000.
     let t = step(s, "duey-send", normal(USE, 1, 4, 1000, &receiver_name)).await;
@@ -231,6 +243,14 @@ async fn a_quick_delivery_reaches_an_online_character_who_may_delete_it() {
         .await
         .expect("give a coupon");
 
+    // The receiver opens the window from a notifier: it only receives.
+    let r = &mut receiver.connection;
+    let t = step(r, "duey-notifier", action(0)).await;
+    let [body] = &t.parcels[..] else {
+        panic!("one window: {:?}", t.parcels);
+    };
+    assert_eq!(window(body), (true, Vec::new(), 0));
+
     // The coupon opens the window for a quick send, and goes with it: no
     // base fee, only the tax on 200,000.
     let mut sender = relogin(&sender_config).await;
@@ -247,29 +267,40 @@ async fn a_quick_delivery_reaches_an_online_character_who_may_delete_it() {
     assert_eq!(t.stat(stat::MESO), Some(300_000 - 200_000 - 1_600));
     send(s, action(7)).await;
 
+    // The parcel joins the receiver's open window, and they hear of it.
     let r = &mut receiver.connection;
     let mut seen = Trace::default();
-    until(r, &mut seen, |t| !t.parcels.is_empty()).await;
-    let name = sender.character_name.as_bytes();
-    let mut arrived = vec![ARRIVED, name.len() as u8, 0];
-    arrived.extend_from_slice(name);
-    arrived.push(1);
-    assert_eq!(seen.parcels, [arrived]);
-
-    assert_eq!(warp(r, HENESYS, "", &mut seen).await, HENESYS);
-    let (listed, _) = open(r, &mut seen).await;
+    until(r, &mut seen, |t| t.parcels.len() >= 2).await;
+    let [added, arrived] = &seen.parcels[..] else {
+        panic!("added and arrived: {:?}", seen.parcels);
+    };
+    assert_eq!(added[0], ADDED);
+    let (listed, _) = records(added, 1, 1);
     let [parcel] = &listed[..] else {
         panic!("one parcel: {listed:?}");
     };
     assert_eq!(
         (
+            parcel.sender.as_str(),
             parcel.mesos,
             parcel.message.as_str(),
             parcel.quick,
             parcel.item
         ),
-        (200_000, "for you", true, None)
+        (
+            sender.character_name.as_str(),
+            200_000,
+            "for you",
+            true,
+            None
+        )
     );
+    let name = sender.character_name.as_bytes();
+    let mut expected = vec![ARRIVED, name.len() as u8, 0];
+    expected.extend_from_slice(name);
+    expected.push(1);
+    assert_eq!(arrived, &expected);
+
     let t = step(r, "duey-delete", with_id(5, parcel.id)).await;
     let id = parcel.id.to_le_bytes();
     assert_eq!(
@@ -277,7 +308,46 @@ async fn a_quick_delivery_reaches_an_online_character_who_may_delete_it() {
         [vec![REMOVED, id[0], id[1], id[2], id[3], DELETED]]
     );
 
-    // Closed and opened again, the window is empty.
+    // Closed, and opened at Duey's, the window is empty.
     send(r, action(7)).await;
+    assert_eq!(warp(r, HENESYS, "", &mut seen).await, HENESYS);
     assert_eq!(open(r, &mut seen).await, (Vec::new(), 0));
+}
+
+#[tokio::test]
+async fn ten_parcels_fill_a_characters_inbox() {
+    let receiver_config = load_harness_config_or_fail().await;
+    let receiver = login_to_world_session(&receiver_config)
+        .await
+        .expect("receiver login failed");
+    let receiver_name = receiver.character_name.clone();
+    drop(receiver);
+    let sender_config = load_harness_config_or_fail().await;
+    let sender_id = login_to_world_session(&sender_config)
+        .await
+        .expect("sender login failed")
+        .character_id;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_meso(sender_id, 100_000).await.expect("give mesos");
+
+    let mut sender = relogin(&sender_config).await;
+    let s = &mut sender.connection;
+    let mut seen = Trace::default();
+    assert_eq!(warp(s, HENESYS, "", &mut seen).await, HENESYS);
+    open(s, &mut seen).await;
+    for n in 0..10 {
+        let t = step(s, "duey-send", normal(0, 0, 0, 1, &receiver_name)).await;
+        assert_eq!(t.parcels, [[SENT]], "parcel {n}");
+    }
+    let t = step(s, "duey-full", normal(0, 0, 0, 1, &receiver_name)).await;
+    assert_eq!(t.parcels, [[INBOX_FULL]]);
+    assert!(t.stat(stat::MESO).is_none());
+
+    // The receiver's window lists all ten.
+    let mut receiver = relogin(&receiver_config).await;
+    let r = &mut receiver.connection;
+    let mut seen = Trace::default();
+    assert_eq!(warp(r, HENESYS, "", &mut seen).await, HENESYS);
+    let (listed, _) = open(r, &mut seen).await;
+    assert_eq!(listed.len(), 10);
 }
