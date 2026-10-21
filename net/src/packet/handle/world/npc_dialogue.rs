@@ -32,11 +32,17 @@ impl WorldHandler for NpcTalkMoreHandler {
             (7, 1) => Some(i32::from(reader.read_byte()?)),
             _ => None,
         };
+        // A text prompt answers with what was typed.
+        let text = match (message_type, response) {
+            (2, 1) => Some(reader.read_str_with_length()?),
+            _ => None,
+        };
         Ok(
             HandlerResult::empty().with(WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,
                 selection,
+                text,
             })),
         )
     }

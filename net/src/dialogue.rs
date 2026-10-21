@@ -6,7 +6,7 @@
 
 use game_data::NpcDialogueTemplate;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum NpcInteraction {
     Start {
         object_id: i32,
@@ -16,6 +16,8 @@ pub enum NpcInteraction {
         message_type: u8,
         response: i8,
         selection: Option<i32>,
+        /// What the player typed into a text prompt.
+        text: Option<String>,
     },
     /// A Water of Life was used: Mar the Fairy offers to revive a doll.
     WaterOfLife,
@@ -40,6 +42,13 @@ pub enum Prompt {
         npc_id: i32,
         text: String,
         styles: Vec<i32>,
+    },
+    /// A line of text, `min` to `max` bytes long.
+    AskText {
+        npc_id: i32,
+        text: String,
+        min: i16,
+        max: i16,
     },
 }
 

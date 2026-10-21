@@ -70,6 +70,22 @@ impl GuildInvites {
             .is_some_and(|invite| invite.inviter == inviter)
     }
 
+    /// Whether `invitee` is still shown `inviter`'s invitation to
+    /// `guild_id`.
+    pub fn is_showing(
+        &self,
+        invitee: ClientId,
+        inviter: ClientId,
+        guild_id: i32,
+        now: Instant,
+    ) -> bool {
+        self.invites.get(&invitee).is_some_and(|invite| {
+            invite.inviter == inviter
+                && invite.guild_id == guild_id
+                && now < invite.sent + INVITE_TIMEOUT
+        })
+    }
+
     /// Turn down `inviter`'s invitation. Returns whether there was one.
     pub fn decline(&mut self, invitee: ClientId, inviter: ClientId) -> bool {
         let pending = self.is_invited(invitee, inviter);

@@ -51,15 +51,17 @@ impl ClientActor {
         message_type: u8,
         response: i8,
         selection: Option<i32>,
+        text: Option<String>,
     ) -> Result<bool, RuntimeError> {
         let Some(ActiveScript { mut script, prompt }) = self.script.take() else {
             return Ok(false);
         };
-        let Some(input) = npc_scripts::input(&prompt, message_type, response, selection) else {
+        let Some(input) = npc_scripts::input(&prompt, message_type, response, selection, text)
+        else {
             // Closed, or an answer that doesn't fit the prompt: end it.
             return Ok(true);
         };
-        let Some(step) = script.respond(input) else {
+        let Some(step) = script.respond(input.clone()) else {
             debug!(?input, "Script refused the answer");
             return Ok(true);
         };
@@ -104,6 +106,7 @@ impl ClientActor {
         let mut name_guild = false;
         let mut grow_guild = None;
         let mut disband_guild = false;
+        let mut alliance = None;
         let mut restyled = false;
         let mut command = None;
         for effect in effects {
@@ -134,6 +137,9 @@ impl ClientActor {
                 Effect::OpenEmblemMaker => afterwards.push(guild::build_emblem_maker()?),
                 Effect::GrowGuild { from } => grow_guild = Some(*from),
                 Effect::DisbandGuild => disband_guild = true,
+                Effect::CreateAlliance { .. }
+                | Effect::GrowAlliance { .. }
+                | Effect::DisbandAlliance => alliance = Some(effect.clone()),
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -371,6 +377,13 @@ impl ClientActor {
         }
         if disband_guild {
             self.disband_guild().await?;
+        }
+        // These say how it went in a script of their own.
+        match alliance {
+            Some(Effect::CreateAlliance { name }) => Box::pin(self.create_alliance(name)).await?,
+            Some(Effect::GrowAlliance { from }) => Box::pin(self.grow_alliance(from)).await?,
+            Some(Effect::DisbandAlliance) => Box::pin(self.disband_alliance()).await?,
+            _ => {}
         }
         if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;

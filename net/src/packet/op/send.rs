@@ -38,6 +38,8 @@ pub enum SendOpcode {
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     GuildOperation = 0x41,
+    /// Guild alliances ("Guild Union"), by mode (0xa39f4e).
+    AllianceOperation = 0x42,
     /// The guild bulletin board's list and threads (0x816c32).
     GuildBbs = 0x3B,
     NotifyLevelUp = 0x69,

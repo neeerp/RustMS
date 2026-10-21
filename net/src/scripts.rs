@@ -96,6 +96,21 @@ pub enum Effect {
     /// Disband the player's guild, if they are its master. As with
     /// `GrowGuild`, nothing may follow it.
     DisbandGuild,
+    /// Found an alliance of the player's guild and their party's other
+    /// guild master's, and charge for it (Lenario). Lenario then says how
+    /// it went, so nothing may follow it.
+    CreateAlliance {
+        name: String,
+    },
+    /// Grow the player's alliance a guild from `from`, the capacity
+    /// Lenario quoted the price for, and charge it. As with `GrowGuild`,
+    /// nothing may follow it.
+    GrowAlliance {
+        from: u8,
+    },
+    /// Disband the player's alliance, if they are its master. Nothing may
+    /// follow it.
+    DisbandAlliance,
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

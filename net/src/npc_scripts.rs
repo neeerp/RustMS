@@ -9,6 +9,7 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{self, Cloto, Entry, EventCommand, EventKind};
 use crate::scripts::Effect;
+use game::alliance::{self, Alliance};
 use game::guild::{self, Guild};
 use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
@@ -30,6 +31,9 @@ pub const HERACLE: i32 = 2010007;
 /// Lea, beside him, who makes guild emblems; her script needs the guild
 /// too (`NpcScript::lea`).
 pub const LEA: i32 = 2010008;
+/// Lenario, beside Heracle, who founds alliances; his script needs the
+/// guild, its alliance, and the party (`NpcScript::lenario`).
+pub const LENARIO: i32 = 2010009;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -574,13 +578,30 @@ const QUIZ_LENGTH: usize = 5;
 const CLONE_TIME_LIMIT: u32 = 20 * 60;
 
 /// The player's answer to the current prompt.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScriptInput {
     Next,
     Previous,
     Yes,
     No,
     Select(i32),
+    Text(String),
+}
+
+/// What a script does with a line of text the player typed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnText {
+    /// Lenario confirms the name for the new alliance.
+    NameAlliance,
+}
+
+impl OnText {
+    /// The pages that follow the text.
+    fn pages(self, text: &str) -> Vec<Page> {
+        match self {
+            OnText::NameAlliance => confirm_alliance_name(text),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -597,6 +618,14 @@ pub enum Page {
     Menu {
         text: String,
         choices: Vec<(String, Vec<Page>)>,
+    },
+    /// A line of text from `min` to `max` bytes long (`Prompt::AskText`);
+    /// what `on_text` makes of it replaces the rest of the script.
+    AskText {
+        text: String,
+        min: i16,
+        max: i16,
+        on_text: OnText,
     },
     /// A choice of styles (`Prompt::Style`), each with the effects picking
     /// it applies before moving on.
@@ -663,6 +692,22 @@ impl NpcScript {
     /// still exists.
     pub fn lea(player: &Player, guild: Option<&Guild>) -> Self {
         lea(player, guild)
+    }
+
+    /// Lenario's script as it plays for `player`.
+    pub fn lenario(player: &Player, view: AllianceView) -> Self {
+        lenario(player, view)
+    }
+
+    /// Lenario asks for another name for the alliance: the last one was
+    /// taken.
+    pub fn lenario_name_again() -> Self {
+        Self::new(LENARIO, vec![name_alliance(true)])
+    }
+
+    /// Lenario says how founding, growing, or disbanding went.
+    pub fn lenario_says(text: String) -> Self {
+        Self::new(LENARIO, vec![Page::Say(text)])
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -887,6 +932,11 @@ impl NpcScript {
                 }
                 Some(self.begin())
             }
+            (Page::AskText { on_text, .. }, ScriptInput::Text(text)) => {
+                self.pages = on_text.pages(&text);
+                self.page = 0;
+                Some(self.begin())
+            }
             (Page::Style { choices, .. }, ScriptInput::Select(choice)) => {
                 let (_, effects) = choices.get(usize::try_from(choice).ok()?)?;
                 let effects = effects.clone();
@@ -980,6 +1030,12 @@ impl NpcScript {
                 }
                 Prompt::Selection { npc_id, text: menu }
             }
+            Page::AskText { text, min, max, .. } => Prompt::AskText {
+                npc_id,
+                text: text.clone(),
+                min: *min,
+                max: *max,
+            },
             Page::Style { text, choices } => Prompt::Style {
                 npc_id,
                 text: text.clone(),
@@ -1197,6 +1253,145 @@ fn lea(player: &Player, guild: Option<&Guild>) -> NpcScript {
             choices: vec![(text(keys::LEA_EMBLEM), vec![emblem])],
         }],
     )
+}
+
+/// What Lenario's script needs to know of the player: their guild, its
+/// alliance, and whether they lead their party.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AllianceView<'a> {
+    pub guild: Option<&'a Guild>,
+    pub alliance: Option<&'a Alliance>,
+    pub party_leader: bool,
+}
+
+/// Lenario, beside Heracle, founds, grows, and disbands alliances for
+/// guild masters (the HeavenMS script's menu).
+fn lenario(player: &Player, view: AllianceView) -> NpcScript {
+    let cid = player.stats.id;
+    if !view.guild.is_some_and(|guild| guild.is_master(cid)) {
+        return NpcScript::new(LENARIO, vec![Page::Say(text(keys::LENARIO_NOT_MASTER))]);
+    }
+    let master = view.alliance.filter(|alliance| alliance.is_master(cid));
+    let choices = vec![
+        (
+            text(keys::LENARIO_INFO),
+            vec![Page::Say(text(keys::LENARIO_INFO_SAY))],
+        ),
+        (
+            text(keys::LENARIO_HOW),
+            vec![Page::Say(text(keys::LENARIO_HOW_SAY))],
+        ),
+        (text(keys::LENARIO_CREATE), create_alliance(player, &view)),
+        (text(keys::LENARIO_GROW), grow_alliance(player, master)),
+        (text(keys::LENARIO_DISBAND), vec![disband_alliance(master)]),
+    ];
+    NpcScript::new(
+        LENARIO,
+        vec![Page::Menu {
+            text: text(keys::LENARIO_MENU),
+            choices,
+        }],
+    )
+}
+
+/// The party's leader, a guild master in no alliance, pays, then names it.
+/// Like the HeavenMS script it asks first and only then says the player
+/// can't pay.
+fn create_alliance(player: &Player, view: &AllianceView) -> Vec<Page> {
+    if view.guild.is_some_and(|guild| guild.alliance_id != 0) {
+        return vec![Page::Say(text(keys::LENARIO_IN_ALLIANCE))];
+    }
+    if !view.party_leader {
+        return vec![Page::Say(text(keys::LENARIO_NOT_LEADER))];
+    }
+    let price = alliance::CREATE_COST.to_string();
+    let vars = [("price", price.as_str())];
+    let next = if player.meso < alliance::CREATE_COST {
+        Page::Say(content::text().get(keys::LENARIO_CREATE_NO_MESOS, &vars))
+    } else {
+        name_alliance(false)
+    };
+    vec![
+        Page::Ask {
+            text: content::text().get(keys::LENARIO_CREATE_ASK, &vars),
+            on_yes: Vec::new(),
+            on_no: Some(text(keys::LENARIO_DECLINE)),
+        },
+        next,
+    ]
+}
+
+/// The prompt for the alliance's name; `again` after one that can't be
+/// used.
+fn name_alliance(again: bool) -> Page {
+    Page::AskText {
+        text: text(if again {
+            keys::LENARIO_NAME_AGAIN
+        } else {
+            keys::LENARIO_NAME
+        }),
+        min: *alliance::NAME_LEN.start(),
+        max: *alliance::NAME_LEN.end(),
+        on_text: OnText::NameAlliance,
+    }
+}
+
+/// Lenario asks whether the name is right, and asks for another if it
+/// can't be one.
+fn confirm_alliance_name(name: &str) -> Vec<Page> {
+    if !alliance::name_is_valid(name) {
+        return vec![name_alliance(true)];
+    }
+    vec![Page::Ask {
+        text: content::text().get(keys::LENARIO_NAME_CONFIRM, &[("name", name)]),
+        on_yes: vec![Effect::CreateAlliance {
+            name: name.to_string(),
+        }],
+        on_no: Some(text(keys::LENARIO_DECLINE)),
+    }]
+}
+
+/// Room for one more guild, for the alliance's master.
+fn grow_alliance(player: &Player, master: Option<&Alliance>) -> Vec<Page> {
+    let Some(master) = master else {
+        return vec![Page::Say(text(keys::LENARIO_GROW_NOT_MASTER))];
+    };
+    if master.capacity >= alliance::MAX_CAPACITY {
+        return vec![Page::Say(text(keys::LENARIO_GROW_FULL))];
+    }
+    let price = alliance::GROW_COST.to_string();
+    let capacity = (master.capacity + 1).to_string();
+    let vars = [("price", price.as_str()), ("capacity", capacity.as_str())];
+    let can_pay = player.meso >= alliance::GROW_COST;
+    let on_yes = if can_pay {
+        vec![Effect::GrowAlliance {
+            from: master.capacity,
+        }]
+    } else {
+        Vec::new()
+    };
+    let mut pages = vec![Page::Ask {
+        text: content::text().get(keys::LENARIO_GROW_ASK, &vars),
+        on_yes,
+        on_no: Some(text(keys::LENARIO_DECLINE)),
+    }];
+    if !can_pay {
+        pages.push(Page::Say(
+            content::text().get(keys::LENARIO_GROW_NO_MESOS, &vars),
+        ));
+    }
+    pages
+}
+
+fn disband_alliance(master: Option<&Alliance>) -> Page {
+    match master {
+        Some(_) => Page::Ask {
+            text: text(keys::LENARIO_DISBAND_ASK),
+            on_yes: vec![Effect::DisbandAlliance],
+            on_no: Some(text(keys::LENARIO_DECLINE)),
+        },
+        None => Page::Say(text(keys::LENARIO_DISBAND_NOT_MASTER)),
+    }
 }
 
 /// A station's ticket booth: one ticket for the route's price. Like the
@@ -2501,6 +2696,7 @@ pub fn input(
     message_type: u8,
     response: i8,
     selection: Option<i32>,
+    text: Option<String>,
 ) -> Option<ScriptInput> {
     match (prompt, message_type, response) {
         (Prompt::Text(_), 0, 1) => Some(ScriptInput::Next),
@@ -2509,6 +2705,7 @@ pub fn input(
         (Prompt::YesNo { .. }, 1, 0) => Some(ScriptInput::No),
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
         (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
+        (Prompt::AskText { .. }, 2, 1) => text.map(ScriptInput::Text),
         _ => None,
     }
 }
@@ -2531,6 +2728,7 @@ mod tests {
             Prompt::YesNo { .. } => 1,
             Prompt::Selection { .. } => 4,
             Prompt::Style { .. } => 7,
+            Prompt::AskText { .. } => 2,
         })
     }
 
@@ -2746,6 +2944,7 @@ mod tests {
                 id: 1,
                 name: "Testers".into(),
                 emblem: guild::Emblem::default(),
+                alliance_id: 0,
             });
         }
         player
@@ -2759,6 +2958,7 @@ mod tests {
             job: 0,
             level: 10,
             rank,
+            alliance_rank: 5,
             online: true,
         };
         Guild {
@@ -3784,6 +3984,143 @@ mod tests {
         );
     }
 
+    /// Lenario for a guild master, with the menu entry `choice` picked.
+    fn lenario_picks(player: &Player, view: AllianceView, choice: i32) -> (NpcScript, Step) {
+        let mut lenario = NpcScript::lenario(player, view);
+        assert_eq!(kind(&lenario.begin()), Some(4));
+        let step = lenario.respond(ScriptInput::Select(choice)).unwrap();
+        (lenario, step)
+    }
+
+    /// An alliance of the `testers` guild and another, with `master` its
+    /// master and room for `capacity` guilds.
+    fn union(master: i32, capacity: u8) -> Alliance {
+        let mut own = testers(master, 10);
+        own.alliance_id = 7;
+        own.members[0].alliance_rank = alliance::MASTER_RANK;
+        let mut other = testers(master + 10, 10);
+        other.id = 2;
+        other.alliance_id = 7;
+        other.members[0].alliance_rank = alliance::GUILD_MASTER_RANK;
+        Alliance {
+            id: 7,
+            name: "Union".into(),
+            titles: alliance::DEFAULT_TITLES.map(String::from),
+            capacity,
+            notice: String::new(),
+            guilds: vec![own, other],
+        }
+    }
+
+    #[test]
+    fn lenario_speaks_only_to_guild_masters() {
+        let player = guilder(10, 0, true);
+        let id = player.stats.id;
+        for guild in [Some(testers(id - 1, 10)), None] {
+            let view = AllianceView {
+                guild: guild.as_ref(),
+                ..Default::default()
+            };
+            let lenario = NpcScript::lenario(&player, view);
+            assert_eq!(kind(&lenario.begin()), Some(0));
+        }
+    }
+
+    #[test]
+    fn lenario_founds_an_alliance_for_a_party_leader_who_pays_and_names_it() {
+        let player = guilder(10, alliance::CREATE_COST, true);
+        let guild = testers(player.stats.id, 10);
+        let view = AllianceView {
+            guild: Some(&guild),
+            alliance: None,
+            party_leader: true,
+        };
+        let (mut lenario, step) = lenario_picks(&player, view, 2);
+        assert_eq!(kind(&step), Some(1));
+        let name = lenario.respond(ScriptInput::Yes).unwrap();
+        assert!(name.effects.is_empty());
+        let Some(Prompt::AskText { min, max, .. }) = name.prompt else {
+            panic!("a text prompt expected, got {:?}", name.prompt);
+        };
+        assert_eq!((min, max), (4, 12));
+        // A name that can't be one asks again.
+        let again = lenario.respond(ScriptInput::Text("a b".into())).unwrap();
+        assert_eq!(kind(&again), Some(2));
+        let confirm = lenario.respond(ScriptInput::Text("Union".into())).unwrap();
+        assert_eq!(kind(&confirm), Some(1));
+        let yes = lenario.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.prompt, None);
+        assert_eq!(
+            yes.effects,
+            [Effect::CreateAlliance {
+                name: "Union".into()
+            }]
+        );
+
+        // Short of the price: asked, then told.
+        let poor = guilder(10, alliance::CREATE_COST - 1, true);
+        let (mut lenario, _) = lenario_picks(&poor, view, 2);
+        let yes = lenario.respond(ScriptInput::Yes).unwrap();
+        says_one_page(lenario, &yes);
+
+        // Not the party's leader, or already in an alliance.
+        let mut allied = testers(player.stats.id, 10);
+        allied.alliance_id = 7;
+        for view in [
+            AllianceView {
+                party_leader: false,
+                ..view
+            },
+            AllianceView {
+                guild: Some(&allied),
+                ..view
+            },
+        ] {
+            let (lenario, step) = lenario_picks(&player, view, 2);
+            says_one_page(lenario, &step);
+        }
+    }
+
+    #[test]
+    fn lenario_grows_and_disbands_only_the_masters_alliance() {
+        let player = guilder(10, alliance::GROW_COST, true);
+        let id = player.stats.id;
+        let own = union(id, 2);
+        let view = AllianceView {
+            guild: Some(&own.guilds[0]),
+            alliance: Some(&own),
+            party_leader: false,
+        };
+        let (mut lenario, _) = lenario_picks(&player, view, 3);
+        let yes = lenario.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::GrowAlliance { from: 2 }]);
+        let (mut lenario, _) = lenario_picks(&player, view, 4);
+        let yes = lenario.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::DisbandAlliance]);
+
+        // Full, or the other guild's master.
+        let full = union(id, alliance::MAX_CAPACITY);
+        let (lenario, step) = lenario_picks(
+            &player,
+            AllianceView {
+                alliance: Some(&full),
+                ..view
+            },
+            3,
+        );
+        says_one_page(lenario, &step);
+        let other = union(id - 10, 2);
+        let view = AllianceView {
+            guild: Some(&other.guilds[1]),
+            alliance: Some(&other),
+            party_leader: false,
+        };
+        for choice in [3, 4] {
+            let (lenario, step) = lenario_picks(&player, view, choice);
+            says_one_page(lenario, &step);
+        }
+    }
+
     #[test]
     fn answers_must_fit_the_prompt() {
         let page = Prompt::Text(DialoguePage {
@@ -3792,23 +4129,40 @@ mod tests {
             has_previous: false,
             has_next: true,
         });
-        assert_eq!(input(&page, 0, 1, None), Some(ScriptInput::Next));
-        assert_eq!(input(&page, 0, 0, None), None, "no previous page");
-        assert_eq!(input(&page, 1, 1, None), None);
+        assert_eq!(input(&page, 0, 1, None, None), Some(ScriptInput::Next));
+        assert_eq!(input(&page, 0, 0, None, None), None, "no previous page");
+        assert_eq!(input(&page, 1, 1, None, None), None);
         let menu = Prompt::Selection {
             npc_id: 1,
             text: String::new(),
         };
-        assert_eq!(input(&menu, 4, 1, Some(3)), Some(ScriptInput::Select(3)));
-        assert_eq!(input(&menu, 4, -1, None), None);
+        assert_eq!(
+            input(&menu, 4, 1, Some(3), None),
+            Some(ScriptInput::Select(3))
+        );
+        assert_eq!(input(&menu, 4, -1, None, None), None);
         let styles = Prompt::Style {
             npc_id: 1,
             text: String::new(),
             styles: vec![30000],
         };
-        assert_eq!(input(&styles, 7, 1, Some(0)), Some(ScriptInput::Select(0)));
-        assert_eq!(input(&styles, 7, 0, None), None, "cancelled");
-        assert_eq!(input(&styles, 4, 1, Some(0)), None);
+        assert_eq!(
+            input(&styles, 7, 1, Some(0), None),
+            Some(ScriptInput::Select(0))
+        );
+        assert_eq!(input(&styles, 7, 0, None, None), None, "cancelled");
+        assert_eq!(input(&styles, 4, 1, Some(0), None), None);
+        let ask = Prompt::AskText {
+            npc_id: 1,
+            text: String::new(),
+            min: 4,
+            max: 12,
+        };
+        assert_eq!(
+            input(&ask, 2, 1, None, Some("Union".into())),
+            Some(ScriptInput::Text("Union".into()))
+        );
+        assert_eq!(input(&ask, 2, 0, None, None), None, "cancelled");
     }
 
     fn styles(step: &Step) -> Vec<i32> {

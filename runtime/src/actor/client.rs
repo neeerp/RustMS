@@ -1,3 +1,4 @@
+mod alliances;
 mod buddies;
 mod buff;
 mod combat;
@@ -399,9 +400,10 @@ impl ClientActor {
                 message_type,
                 response,
                 selection,
+                text,
             }) => {
                 if !self
-                    .respond_to_script(message_type, response, selection)
+                    .respond_to_script(message_type, response, selection, text)
                     .await?
                 {
                     self.respond_to_npc(message_type, response).await?
@@ -497,6 +499,7 @@ impl ClientActor {
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::Note(request) => self.note_request(request).await?,
             WorldAction::Guild(request) => self.guild_request(request).await?,
+            WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
             WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
@@ -1180,6 +1183,7 @@ impl ClientActor {
             ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
+            ServerMessage::JoinAlliance { alliance_id } => self.join_alliance(alliance_id).await?,
             ServerMessage::PartySkill {
                 used,
                 origin,
@@ -1213,8 +1217,15 @@ impl ClientActor {
             }
             ServerMessage::RockLocated { rock, found } => self.rock_located(rock, found).await?,
             ServerMessage::CharInfoRequested { requester } => {
-                let packet = build::world::info::build_character_info(&self.in_game()?.player)
-                    .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+                let alliance = match self.alliance_id()? {
+                    Some(alliance_id) => spawn_db(move || db::alliance::name(alliance_id))
+                        .await?
+                        .unwrap_or_default(),
+                    None => String::new(),
+                };
+                let packet =
+                    build::world::info::build_character_info(&self.in_game()?.player, &alliance)
+                        .map_err(|e| RuntimeError::Handler(e.to_string()))?;
                 requester.send_packet(packet);
             }
             ServerMessage::Famed {

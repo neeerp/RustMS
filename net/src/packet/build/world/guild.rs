@@ -33,10 +33,6 @@ const LEVEL_UP_GUILD: u8 = 2;
 /// `NOTIFY_JOB_CHANGE`'s type for a guild member (1 is family).
 const JOB_CHANGE_GUILD: u8 = 0;
 
-/// The lowest alliance rank, which OdinMS gives every member; the client
-/// reads it only in an alliance.
-const ALLIANCE_RANK: i32 = 5;
-
 /// Why founding, joining, disbanding, or growing a guild failed; the client
 /// shows each by code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,13 +110,13 @@ fn write_member(packet: &mut Packet, member: &GuildMember) -> Result<(), Network
     packet.write_int(i32::from(member.rank))?;
     packet.write_int(i32::from(member.online))?;
     packet.write_int(0)?; // contribution
-    packet.write_int(ALLIANCE_RANK)?;
+    packet.write_int(i32::from(member.alliance_rank))?;
     Ok(())
 }
 
 /// `GUILDDATA`: the guild, its titles, and its members, each as a 37-byte
 /// record. The client takes the first member for the master.
-fn write_guild(packet: &mut Packet, guild: &Guild) -> Result<(), NetworkError> {
+pub(crate) fn write_guild(packet: &mut Packet, guild: &Guild) -> Result<(), NetworkError> {
     packet.write_int(guild.id)?;
     packet.write_str_with_length(&guild.name)?;
     for title in &guild.titles {
@@ -377,6 +373,7 @@ mod tests {
             job: 100,
             level: 30,
             rank,
+            alliance_rank: 5,
             online,
         };
         Guild {

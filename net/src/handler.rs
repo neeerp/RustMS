@@ -250,6 +250,34 @@ pub enum NoteRequest {
     ThankForGift { to: String, text: String, gift: i64 },
 }
 
+/// An alliance operation (`ALLIANCE_OPERATION`), carried out by the
+/// client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AllianceRequest {
+    /// Send the alliance, with its guilds (op 1).
+    Info,
+    /// Take the player's guild out of the alliance (op 2).
+    Leave,
+    /// Invite the guild with this name (op 3).
+    Invite { guild_name: String },
+    /// Bring the player's guild into the alliance that invited it (op 4).
+    Accept { alliance_id: i32 },
+    /// Put a guild out of the alliance (op 6).
+    Expel { guild_id: i32 },
+    /// Hand the alliance to another guild's master (op 7).
+    ChangeMaster { member_id: i32 },
+    /// Give the ranks these titles (op 8).
+    SetTitles { titles: [String; 5] },
+    /// Move a member one rank up or down (op 9).
+    SetRank { member_id: i32, up: bool },
+    /// Post the alliance notice (op 10).
+    SetNotice { notice: String },
+    /// Say something to the alliance's members online.
+    Chat { text: String },
+    /// Turn down the invitation `inviter` sent (`DENY_ALLIANCE_REQUEST`).
+    Deny { inviter: String },
+}
+
 /// A guild operation, carried out by the client's actor.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuildRequest {
@@ -453,6 +481,7 @@ pub enum WorldAction {
     Buddy(BuddyRequest),
     Note(NoteRequest),
     Guild(GuildRequest),
+    Alliance(AllianceRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -768,6 +797,14 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::DenyGuildRequestHandler),
             ),
             (Op::GuildBbs, InGame(&world::GuildBbsHandler)),
+            (
+                Op::AllianceOperation,
+                InGame(&world::AllianceOperationHandler),
+            ),
+            (
+                Op::DenyAllianceRequest,
+                InGame(&world::DenyAllianceRequestHandler),
+            ),
             (Op::Messenger, InGame(&world::MessengerHandler)),
             (
                 Op::PlayerInteraction,
@@ -889,7 +926,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 90);
+        assert_eq!(world_routes().len(), 94);
     }
 
     #[test]

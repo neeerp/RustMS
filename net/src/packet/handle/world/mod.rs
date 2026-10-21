@@ -1,3 +1,4 @@
+mod alliance;
 mod berserk;
 mod buddy;
 mod cash_item;
@@ -58,6 +59,7 @@ mod vega;
 mod weather;
 mod whisper;
 
+pub use self::alliance::{AllianceOperationHandler, DenyAllianceRequestHandler};
 pub use self::berserk::CalcDamageStatHandler;
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;

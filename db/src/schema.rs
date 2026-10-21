@@ -380,6 +380,28 @@ diesel::table! {
         guild_id -> Int4,
         rank -> Int2,
         joined_at -> Timestamp,
+        alliance_rank -> Int2,
+    }
+}
+diesel::table! {
+    alliances (id) {
+        id -> Int4,
+        world_id -> Int2,
+        #[max_length = 12]
+        name -> Varchar,
+        #[max_length = 12]
+        title1 -> Varchar,
+        #[max_length = 12]
+        title2 -> Varchar,
+        #[max_length = 12]
+        title3 -> Varchar,
+        #[max_length = 12]
+        title4 -> Varchar,
+        #[max_length = 12]
+        title5 -> Varchar,
+        capacity -> Int2,
+        #[max_length = 100]
+        notice -> Varchar,
     }
 }
 diesel::joinable!(guild_members -> characters (character_id));
@@ -481,4 +503,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     gift_replies,
     guild_bbs_threads,
     guild_bbs_replies,
+    alliances,
 );

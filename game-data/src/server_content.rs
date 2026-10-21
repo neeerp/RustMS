@@ -81,6 +81,63 @@ pub mod keys {
     /// The popup for an emblem sent without its `{price}`.
     pub const LEA_NO_MESOS: &str = "lea.no_mesos";
 
+    /// Lenario, who founds alliances beside Heracle, and the pink lines
+    /// alliance members read; no licensed script has their text.
+    pub const LENARIO_NOT_MASTER: &str = "lenario.not_master";
+    pub const LENARIO_MENU: &str = "lenario.menu";
+    pub const LENARIO_INFO: &str = "lenario.choice.info";
+    pub const LENARIO_HOW: &str = "lenario.choice.how";
+    pub const LENARIO_CREATE: &str = "lenario.choice.create";
+    pub const LENARIO_GROW: &str = "lenario.choice.grow";
+    pub const LENARIO_DISBAND: &str = "lenario.choice.disband";
+    pub const LENARIO_INFO_SAY: &str = "lenario.info";
+    pub const LENARIO_HOW_SAY: &str = "lenario.how";
+    pub const LENARIO_IN_ALLIANCE: &str = "lenario.in_alliance";
+    pub const LENARIO_NOT_LEADER: &str = "lenario.not_leader";
+    /// `{price}`.
+    pub const LENARIO_CREATE_ASK: &str = "lenario.create.ask";
+    /// `{price}`.
+    pub const LENARIO_CREATE_NO_MESOS: &str = "lenario.create.no_mesos";
+    pub const LENARIO_NAME: &str = "lenario.name";
+    pub const LENARIO_NAME_AGAIN: &str = "lenario.name.again";
+    /// The `{name}` typed.
+    pub const LENARIO_NAME_CONFIRM: &str = "lenario.name.confirm";
+    pub const LENARIO_CREATE_PARTY: &str = "lenario.create.party";
+    /// The new alliance's `{name}`.
+    pub const LENARIO_CREATED: &str = "lenario.created";
+    pub const LENARIO_GROW_NOT_MASTER: &str = "lenario.grow.not_master";
+    pub const LENARIO_GROW_FULL: &str = "lenario.grow.full";
+    /// `{price}` and the `{capacity}` it grows to.
+    pub const LENARIO_GROW_ASK: &str = "lenario.grow.ask";
+    /// `{price}` and `{capacity}`, as for the question.
+    pub const LENARIO_GROW_NO_MESOS: &str = "lenario.grow.no_mesos";
+    /// `{capacity}`.
+    pub const LENARIO_GROWN: &str = "lenario.grown";
+    pub const LENARIO_DISBAND_NOT_MASTER: &str = "lenario.disband.not_master";
+    pub const LENARIO_DISBAND_ASK: &str = "lenario.disband.ask";
+    pub const LENARIO_DISBANDED: &str = "lenario.disbanded";
+    pub const LENARIO_DECLINE: &str = "lenario.decline";
+    pub const LENARIO_FAILED: &str = "lenario.failed";
+    /// `{guild}`, as typed.
+    pub const ALLIANCE_NO_GUILD: &str = "alliance.invite.no_guild";
+    /// `{guild}`.
+    pub const ALLIANCE_IN_ALLIANCE: &str = "alliance.invite.in_alliance";
+    /// `{guild}`.
+    pub const ALLIANCE_OFFLINE: &str = "alliance.invite.offline";
+    /// `{guild}`.
+    pub const ALLIANCE_BUSY: &str = "alliance.invite.busy";
+    pub const ALLIANCE_FULL: &str = "alliance.invite.full";
+    /// `{guild}`.
+    pub const ALLIANCE_DENIED: &str = "alliance.invite.denied";
+    /// `{guild}`.
+    pub const ALLIANCE_LEFT: &str = "alliance.left";
+    /// `{guild}`.
+    pub const ALLIANCE_EXPELLED: &str = "alliance.expelled";
+    /// The new master's `{name}`.
+    pub const ALLIANCE_MASTER: &str = "alliance.master";
+    /// `{name}` and their new `{title}`.
+    pub const ALLIANCE_RANK: &str = "alliance.rank";
+
     /// The continent ships' station staff: the booths that sell tickets
     /// (Joel, Agatha), the ushers that take them aboard (Cherry, Rini), and
     /// the crew that lets passengers off before take-off (Purin, Erin). No
@@ -667,6 +724,44 @@ mod tests {
             keys::LEA_ASK,
             keys::LEA_DECLINE,
             keys::LEA_NO_MESOS,
+            keys::LENARIO_NOT_MASTER,
+            keys::LENARIO_MENU,
+            keys::LENARIO_INFO,
+            keys::LENARIO_HOW,
+            keys::LENARIO_CREATE,
+            keys::LENARIO_GROW,
+            keys::LENARIO_DISBAND,
+            keys::LENARIO_INFO_SAY,
+            keys::LENARIO_HOW_SAY,
+            keys::LENARIO_IN_ALLIANCE,
+            keys::LENARIO_NOT_LEADER,
+            keys::LENARIO_CREATE_ASK,
+            keys::LENARIO_CREATE_NO_MESOS,
+            keys::LENARIO_NAME,
+            keys::LENARIO_NAME_AGAIN,
+            keys::LENARIO_NAME_CONFIRM,
+            keys::LENARIO_CREATE_PARTY,
+            keys::LENARIO_CREATED,
+            keys::LENARIO_GROW_NOT_MASTER,
+            keys::LENARIO_GROW_FULL,
+            keys::LENARIO_GROW_ASK,
+            keys::LENARIO_GROW_NO_MESOS,
+            keys::LENARIO_GROWN,
+            keys::LENARIO_DISBAND_NOT_MASTER,
+            keys::LENARIO_DISBAND_ASK,
+            keys::LENARIO_DISBANDED,
+            keys::LENARIO_DECLINE,
+            keys::LENARIO_FAILED,
+            keys::ALLIANCE_NO_GUILD,
+            keys::ALLIANCE_IN_ALLIANCE,
+            keys::ALLIANCE_OFFLINE,
+            keys::ALLIANCE_BUSY,
+            keys::ALLIANCE_FULL,
+            keys::ALLIANCE_DENIED,
+            keys::ALLIANCE_LEFT,
+            keys::ALLIANCE_EXPELLED,
+            keys::ALLIANCE_MASTER,
+            keys::ALLIANCE_RANK,
             keys::SHIPS_SELL_ASK,
             keys::SHIPS_SELL_DECLINE,
             keys::SHIPS_SELL_SHORT,

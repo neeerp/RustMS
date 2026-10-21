@@ -1,8 +1,8 @@
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
-/// Any server-driven NPC prompt: a text page, a yes/no question, a menu, or
-/// a choice of styles.
+/// Any server-driven NPC prompt: a text page, a yes/no question, a menu, a
+/// choice of styles, or a line of text to type.
 pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkError> {
     use crate::dialogue::Prompt;
     let (npc_id, message_type, text) = match prompt {
@@ -10,6 +10,7 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         Prompt::YesNo { npc_id, text } => (*npc_id, 1, text),
         Prompt::Selection { npc_id, text } => (*npc_id, 4, text),
         Prompt::Style { npc_id, text, .. } => (*npc_id, 7, text),
+        Prompt::AskText { npc_id, text, .. } => (*npc_id, 2, text),
     };
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::NpcDialogue as i16)?;
@@ -24,6 +25,12 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         for &style in styles {
             p.write_int(style)?;
         }
+    }
+    if let Prompt::AskText { min, max, .. } = prompt {
+        // The box starts empty.
+        p.write_str_with_length("")?;
+        p.write_short(*min)?;
+        p.write_short(*max)?;
     }
     Ok(p)
 }

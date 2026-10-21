@@ -107,8 +107,15 @@ impl ClientActor {
                 let cid = self.client_id;
                 let to =
                     spawn_db(move || db::guild::set_rank(guild_id, cid, member_id, rank)).await?;
+                let changed = to.is_some();
                 let packet = build_rank_changed(guild_id, member_id, rank)?;
-                self.tell_guild(to, packet, "Guild rank change").await
+                self.tell_guild(to, packet, "Guild rank change").await?;
+                match self.alliance_id()? {
+                    Some(alliance_id) if changed => {
+                        self.tell_alliance_of_guild(alliance_id, guild_id).await
+                    }
+                    _ => Ok(()),
+                }
             }
             GuildRequest::SetEmblem { emblem } => match guild_id {
                 Some(guild_id) => self.set_emblem(guild_id, emblem).await,
@@ -198,6 +205,7 @@ impl ClientActor {
             job: stats.job,
             level: stats.level,
             rank,
+            alliance_rank: game::alliance::LOWEST_RANK,
             online: true,
         };
         self.send_to_directory(DirectoryMessage::Deliver {
@@ -205,12 +213,18 @@ impl ClientActor {
             packet: build_member_joined(guild_id, &member)?,
         })
         .await?;
-        self.set_guild(Some(guild.tag())).await
+        self.set_guild(Some(guild.tag())).await?;
+        if guild.alliance_id != 0 {
+            self.tell_alliance_of_guild(guild.alliance_id, guild_id)
+                .await?;
+        }
+        Ok(())
     }
 
     /// The master can't leave; the client doesn't offer it.
     async fn leave_guild(&mut self, guild_id: i32) -> Result<(), RuntimeError> {
         let cid = self.client_id;
+        let alliance_id = self.alliance_id()?;
         if !spawn_db(move || db::guild::remove_member(guild_id, cid)).await? {
             warn!(cid, "The guild master can't leave the guild; ignored");
             return Ok(());
@@ -223,7 +237,11 @@ impl ClientActor {
             packet: build_member_left(guild_id, cid, &name)?,
         })
         .await?;
-        self.set_guild(None).await
+        self.set_guild(None).await?;
+        match alliance_id {
+            Some(alliance_id) => self.left_allied_guild(cid, alliance_id, guild_id).await,
+            None => Ok(()),
+        }
     }
 
     /// Put a member out, if the player's rank allows it (`Guild::may_expel`).
@@ -256,7 +274,12 @@ impl ClientActor {
         self.send_to_directory(DirectoryMessage::GuildChanged {
             client_id: member_id,
         })
-        .await
+        .await?;
+        if guild.alliance_id != 0 {
+            self.left_allied_guild(member_id, guild.alliance_id, guild_id)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Someone else changed the player's guild: read it again.
@@ -267,9 +290,18 @@ impl ClientActor {
     }
 
     /// Others on the map see the guild's name and emblem under the player's,
-    /// or none.
+    /// or none; they needn't hear of a change to the alliance alone.
     async fn set_guild(&mut self, tag: Option<GuildTag>) -> Result<(), RuntimeError> {
         let cid = self.client_id;
+        let shown = |tag: &Option<GuildTag>| {
+            tag.as_ref()
+                .map(|tag| (tag.id, tag.name.clone(), tag.emblem))
+        };
+        let player = &mut self.in_game_mut()?.player;
+        if shown(&player.guild) == shown(&tag) {
+            player.guild = tag;
+            return Ok(());
+        }
         let (name, emblem) = tag
             .as_ref()
             .map_or((String::new(), Emblem::default()), |tag| {
@@ -443,6 +475,9 @@ impl ClientActor {
                 .await?;
         }
         self.guild_changed().await?;
+        if let Some(alliance_id) = self.alliance_id()? {
+            self.tell_alliance_of_guild(alliance_id, guild_id).await?;
+        }
         let player = &mut self.in_game_mut()?.player;
         player.meso -= guild::EMBLEM_COST;
         player.mark_dirty();
@@ -496,6 +531,13 @@ impl ClientActor {
     /// so, and each member's name tag goes.
     pub(super) async fn disband_guild(&mut self) -> Result<(), RuntimeError> {
         let cid = self.client_id;
+        let alliance_id = self.alliance_id()?;
+        let guild_name = self
+            .in_game()?
+            .player
+            .guild
+            .as_ref()
+            .map(|tag| tag.name.clone());
         let disbanded = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
             Some(guild_id) => spawn_db(move || db::guild::disband(guild_id, cid))
                 .await?
@@ -511,7 +553,7 @@ impl ClientActor {
             .await?;
         let others: Vec<ClientId> = to.iter().copied().filter(|&id| id != cid).collect();
         self.send_to_directory(DirectoryMessage::Deliver {
-            to,
+            to: to.clone(),
             packet: build_guild_disbanded(guild_id)?,
         })
         .await?;
@@ -519,7 +561,15 @@ impl ClientActor {
             self.send_to_directory(DirectoryMessage::GuildChanged { client_id })
                 .await?;
         }
-        self.set_guild(None).await
+        self.set_guild(None).await?;
+        match alliance_id {
+            Some(alliance_id) => {
+                let guild_name = guild_name.unwrap_or_default();
+                self.allied_guild_disbanded(alliance_id, guild_id, &guild_name, &to)
+                    .await
+            }
+            None => Ok(()),
+        }
     }
 }
 

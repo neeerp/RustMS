@@ -22,6 +22,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::HERACLE || npc_id == net::npc_scripts::LEA {
             return self.talk_about_guild(npc_id).await;
         }
+        if npc_id == net::npc_scripts::LENARIO {
+            return self.talk_to_lenario().await;
+        }
         if npc_id == net::npc_scripts::LAKELIS {
             return self.talk_about_event(net::events::EventKind::Kpq).await;
         }

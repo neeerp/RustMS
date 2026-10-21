@@ -551,6 +551,7 @@ mod tests {
                 mark: 2003,
                 mark_color: 4,
             },
+            alliance_id: 0,
         });
         let packet = build_player_enter_field(&avatar).unwrap();
 
