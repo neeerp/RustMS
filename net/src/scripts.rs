@@ -124,6 +124,13 @@ pub enum Effect {
     /// on the same terms, and teach the job's first skills
     /// (`skills::fourth_job_skills`).
     TakeFourthJob(i16),
+    /// Teach a skill up to `level` and `master_level`, never lowering
+    /// either (as a quest's `Act/1/skill` reward).
+    TeachSkill {
+        skill_id: i32,
+        level: i32,
+        master_level: i32,
+    },
     /// Set or clear a script marker (`game::quest::SCRIPT_MARKERS`), which
     /// the client is not told about.
     Mark(i16),

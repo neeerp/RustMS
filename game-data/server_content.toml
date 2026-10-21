@@ -422,6 +422,16 @@ unsourced = [
     "shane.decline",
     "shane.short",
     "louis.ask",
+    "maker.alchemy.0",
+    "maker.alchemy.1",
+    "maker.science.0",
+    "maker.science.1",
+    "maker.practice.0",
+    "maker.practice.1",
+    "maker.crystal_test.0",
+    "maker.crystal_test.1",
+    "maker.gold_anvil.0",
+    "maker.gold_anvil.1",
 ]
 
 [text."glTutoMsg0.message"]

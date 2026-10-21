@@ -145,7 +145,8 @@ unsupported. If the gifts don't fit, nothing changes and the client gets
 UPDATE_QUEST_INFO mode 10 with the quest id; it names the full inventories
 itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
-(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`); those steps go through
+(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, and Meren's Maker
+lessons below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -170,11 +171,32 @@ any other key (`infoex`,
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
 
+Meren's Maker lessons in Magatia are the one exception to the info keys
+(`game_data::quests::MEREN_INFO_QUESTS`). "Meren's Lessons" (6029, level
+45) and its three classes (6030 Carson's alchemy, 6031 Hughes's science,
+6032 Meren's practice, each 10,000 mesos to start) share 6029's quest-info
+string, one digit per class (`info`, `infoNumber`, `infoex`). Each class
+needs 6029 started and 6029 needs all three completed, so the server keeps
+no string and reads past those keys; the classes, which `interval 0` would
+make repeatable, stay done once completed, as their digit keeps them in
+v83. Only a forfeited and restarted 6029 differs: its classes stay done.
+6029's completion teaches the Maker at level 1 (master level 3) through its
+skill action. Its Evan entry (20011007) has no `job` list, so it teaches
+no one; v83 has no Evan skills, and the crystal test teaches level 2 anyway.
+The class end scripts (`q6030e`-`q6032e`) complete the class.
+Meren's crystal test (6033, level 75, a level 75 crystal shown) and the
+Gold Anvil (6036, level 105, after the paper 6035; the anvil is taken)
+carry no rewards in the data; their scripts (`q6033e`, `q6036e`) teach
+levels 2 and 3 and give Cosmic's 230,000 and 300,000 EXP. 6034's `Act/0`
+repeats its start requirements with a `skill` entry that teaches nothing,
+so the server ignores it. The scripts' text is unsourced and stays
+placeholder.
+
 The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1371 quests qualify
+changing the server's allowlist and regenerating the list. 1378 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -311,7 +333,8 @@ copied into the source.
   NPC reach). Set `RUSTMS_REQUIRE_ASSETS=1` so asset tests cannot skip.
 - Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
   (`quest_dialogue`, `quest_catalog`, `quest_markers`).
-- Integration: `scripted_npcs` (Roger's Apple end to end, Robin, the
+- Integration: `maker_quests` (Meren's lessons to the Maker's level 2),
+  `scripted_npcs` (Roger's Apple end to end, Robin, the
   Shanks refusing a new beginner, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
   wrong NPC, NPC not on the map, forfeit, relogin, channel change, isolation)
   `beginner_contact_quests` (the route through Sen's house and `nextQuest`

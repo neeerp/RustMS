@@ -49,7 +49,25 @@ pub const END_REQUIREMENTS: &[&str] = &[
 ];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
-pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
+pub const SCRIPTS: &[&str] = &[
+    "q1021s", "q1021e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
+];
+/// Meren's Maker classes (quests 6030-6032) and the quest they make up
+/// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
+/// starts it at "000", a class starts only while its own digit is 0
+/// (`Check/0 infoNumber`/`infoex`), its end script sets the digit, and 6029
+/// completes at "111" (`Check/1 infoex`). 6029 also needs the three classes
+/// completed, and each class needs 6029 started, so the server keeps no
+/// string: it reads past these keys and makes the classes, which
+/// `interval 0` would let be taken again, one-time quests, as their digit
+/// does. Only a forfeited and restarted 6029, which resets the string,
+/// differs: its classes stay done.
+pub const MEREN_INFO_QUESTS: &[i16] = &[6029, 6030, 6031, 6032];
+const INFO_KEYS: &[&str] = &["info", "infoNumber", "infoex"];
+/// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
+/// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
+/// has the same data); none of it is an action.
+const REQUIREMENTS_IN_START_ACTIONS: i16 = 6034;
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item", "exp", "money", "buffItemID"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
@@ -314,8 +332,23 @@ impl QuestCatalog {
                     keys.skill_keys.extend(child_names(&nx, skill)?);
                 }
             }
+            if MEREN_INFO_QUESTS.contains(&id) {
+                for keys in [&mut keys.start_check, &mut keys.end_check]
+                    .into_iter()
+                    .flatten()
+                    .chain([&mut keys.start_act])
+                {
+                    keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
+                }
+            }
+            if id == REQUIREMENTS_IN_START_ACTIONS {
+                keys.start_act.clear();
+            }
             match classify(&keys).and_then(|()| template(&nx, id).map_err(|e| e.to_string())) {
-                Ok(template) => {
+                Ok(mut template) => {
+                    if MEREN_INFO_QUESTS.contains(&id) {
+                        template.start.repeat_interval = None;
+                    }
                     catalog.supported.insert(id, template);
                 }
                 Err(reason) => {

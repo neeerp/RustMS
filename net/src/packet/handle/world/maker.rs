@@ -460,16 +460,11 @@ fn may_make(player: &Player, recipe: &Recipe) -> bool {
         && quests
 }
 
-/// The level of the player's Maker skill: 1007 for explorers, 10001007
-/// for Cygnus Knights, 20001007 for Aran and 20011007 for Evan.
+/// The level of the player's Maker skill (`skills::maker_skill`).
 fn maker_level(player: &Player) -> i32 {
-    let job = i32::from(player.stats.job);
-    let base = if job / 100 == 22 || job == 2001 {
-        2001
-    } else {
-        job / 1000 * 1000
-    };
-    player.skills.level(base * 10_000 + 1007)
+    player
+        .skills
+        .level(crate::skills::maker_skill(player.stats.job))
 }
 
 /// The fee the window shows for a recipe of `base` mesos (FUN_00824e8d):

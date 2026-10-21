@@ -107,6 +107,18 @@ pub fn pq_strike_cap(skill_id: i32, max_hp: i64, boss: bool) -> Option<i64> {
     }
 }
 
+/// The Maker skill of a player of `job`: 1007 for explorers, 10001007 for
+/// Cygnus Knights, 20001007 for Aran and 20011007 for Evan.
+pub fn maker_skill(job: i16) -> i32 {
+    let job = i32::from(job);
+    let base = if job / 100 == 22 || job == 2001 {
+        2001
+    } else {
+        job / 1000 * 1000
+    };
+    base * 10_000 + 1007
+}
+
 /// What a new fourth job is taught at the advancement: each of `job`'s
 /// skills with a `masterLevel`, at level 0 and that master level. The rest
 /// are hidden until a quest or a book teaches them.
