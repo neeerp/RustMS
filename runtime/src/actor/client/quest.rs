@@ -175,6 +175,14 @@ impl ClientActor {
             )?);
             packets.push(drop::build_meso_gain_in_chat(template.money)?);
         }
+        if template.fame != 0 {
+            next.stats.fame = next.stats.fame.saturating_add(template.fame);
+            packets.push(stat::build_stat_update(
+                false,
+                &[stat::StatUpdate::Fame(next.stats.fame)],
+            )?);
+            packets.push(quest::build_fame_gain_in_chat(template.fame)?);
+        }
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
         }

@@ -25,6 +25,7 @@ pub mod stat {
     pub const AP: i32 = 0x4000;
     pub const SP: i32 = 0x8000;
     pub const EXP: i32 = 0x10000;
+    pub const FAME: i32 = 0x20000;
     pub const MESO: i32 = 0x40000;
     /// The summoned pets' serials, which come right after HAIR (0x8).
     pub const PET_2: i32 = 0x80000;
@@ -75,6 +76,8 @@ pub struct Trace {
     pub kills: BTreeMap<i16, String>,
     /// EXP gains from SHOW_STATUS_INFO mode 3.
     pub gains: Vec<i32>,
+    /// Fame gains (or losses) from SHOW_STATUS_INFO mode 4.
+    pub fame_gains: Vec<i32>,
     /// Every STAT_CHANGED, as values by mask bit.
     pub stat_updates: Vec<BTreeMap<i32, i64>>,
     /// UPDATE_SKILLS: (skill id, level).
@@ -263,6 +266,7 @@ impl Trace {
                     r.read_byte().unwrap();
                     self.gains.push(r.read_int().unwrap());
                 }
+                4 => self.fame_gains.push(r.read_int().unwrap()),
                 _ => {}
             }
         } else if op == SendOpcode::ShowItemGainInChat as i16 {

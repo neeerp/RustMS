@@ -288,6 +288,7 @@ mod tests {
             end_script: None,
             exp: 7,
             money: 0,
+            fame: 0,
             next_quest: None,
             auto_start: false,
             auto_complete: false,

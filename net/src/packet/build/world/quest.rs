@@ -79,6 +79,16 @@ pub fn build_gain_exp_in_chat(gain: i32) -> Result<Packet, NetworkError> {
     write_gain_exp(gain, 0, true)
 }
 
+/// SHOW_STATUS_INFO 4: "You have gained fame. (+n)" (or lost it) in the
+/// chat log, for a quest's fame reward.
+pub fn build_fame_gain_in_chat(gain: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(4)?;
+    p.write_int(i32::from(gain))?;
+    Ok(p)
+}
+
 fn write_gain_exp(gain: i32, party_bonus: i32, in_chat: bool) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
@@ -173,6 +183,18 @@ mod tests {
         let packet = build_quest_short_of_mesos().unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::UpdateQuestInfo as i16).byte(11);
+        expect.end();
+    }
+
+    #[test]
+    fn fame_rewards_show_in_chat_as_mode_4() {
+        let packet = build_fame_gain_in_chat(-2).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(4)
+            .int(-2);
         expect.end();
     }
 
