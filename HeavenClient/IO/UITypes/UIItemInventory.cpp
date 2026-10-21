@@ -2020,6 +2020,10 @@ namespace ms
 
 				nl::node info = nl::nx::item["Cash"]["0550.img"][string_format::extend_id(item_id, 8)]["info"];
 				equip_cash::Sandglass sandglass { info["addTime"], info["maxDays"] };
+
+				if (sandglass.add_seconds <= 0)
+					break;
+
 				equip_cash::Target state {
 					equip->get_expiration(),
 					inventory.get_cash_id(InventoryType::Id::EQUIPPED, target) != 0,

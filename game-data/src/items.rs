@@ -496,9 +496,12 @@ impl ItemData {
                     });
                 }
             }
-            if item_id / 10_000 == 550 {
+            // One that adds nothing is no sandglass.
+            if let (550, Some(add_seconds @ 1..)) =
+                (item_id / 10_000, nx.int_child(meta, "addTime")?)
+            {
                 info.sandglass = Some(Sandglass {
-                    add_seconds: nx.int_child(meta, "addTime")?.unwrap_or(0),
+                    add_seconds,
                     max_days: nx.int_child(meta, "maxDays")?.unwrap_or(0),
                 });
             }
