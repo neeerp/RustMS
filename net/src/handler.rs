@@ -476,6 +476,14 @@ pub enum WorldAction {
         packet: Packet,
     },
     Messenger(MessengerRequest),
+    /// Queue the banner of the avatar megaphone `item_id` in Cash `slot`
+    /// for the whole world; the item is used up only if it's queued
+    /// (`megaphone::spend_avatar_megaphone`).
+    AvatarMegaphone {
+        slot: i16,
+        item_id: i32,
+        banner: Packet,
+    },
     ChangeChannel {
         channel_id: u8,
     },

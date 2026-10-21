@@ -466,6 +466,12 @@ pub enum DirectoryMessage {
         scope: BroadcastScope,
         packet: Packet,
     },
+    /// Show the world an avatar megaphone's banner in its turn; `reply`
+    /// says whether it got in line.
+    AvatarBanner {
+        banner: Packet,
+        reply: tokio::sync::oneshot::Sender<bool>,
+    },
     /// Send `owner` their buddy list with the channels of those online.
     BuddyList {
         owner: ClientId,

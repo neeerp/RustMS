@@ -40,7 +40,7 @@ use net::packet::build;
 use net::packet::build::world::field::{build_chalkboard, parse_movement_state};
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
-use net::packet::handle::world::{to_character, Rock, Whereabouts};
+use net::packet::handle::world::{spend_avatar_megaphone, to_character, Rock, Whereabouts};
 use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -501,6 +501,19 @@ impl ClientActor {
                     packet,
                 })
                 .await?
+            }
+            WorldAction::AvatarMegaphone {
+                slot,
+                item_id,
+                banner,
+            } => {
+                let (reply, queued) = tokio::sync::oneshot::channel();
+                self.send_to_directory(DirectoryMessage::AvatarBanner { banner, reply })
+                    .await?;
+                let queued = queued.await.unwrap_or(false);
+                let player = &mut self.in_game_mut()?.player;
+                let mut packet = spend_avatar_megaphone(player, slot, item_id, queued)?;
+                self.send(&mut packet).await?
             }
             WorldAction::Messenger(request) => {
                 self.send_to_directory(DirectoryMessage::Messenger {

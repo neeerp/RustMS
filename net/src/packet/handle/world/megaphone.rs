@@ -1,11 +1,14 @@
 //! Megaphones (507xxxx), used through USE_CASH_ITEM (report 179, 1.1-1.4).
 //! Each line goes out as `<name> : <text>`, as the v83 client expects
 //! (FUN_00a22785 looks for the " : "), and the megaphone is used up.
+//! Avatar megaphones (539xxxx, report c003) show a banner to the world
+//! instead, one at a time, so the world queues them.
 
 use crate::handler::{BroadcastScope, HandlerResult, WorldAction, WorldContext, WorldResult};
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::messaging::{
-    build_broadcast, build_item_megaphone, build_super_megaphone, build_triple_megaphone, Broadcast,
+    build_avatar_megaphone, build_avatar_megaphone_refusal, build_broadcast, build_item_megaphone,
+    build_super_megaphone, build_triple_megaphone, AvatarRefusal, Broadcast,
 };
 use crate::packet::build::world::stat::build_stat_update;
 use game::InventoryType;
@@ -38,6 +41,74 @@ pub fn megaphone(
         HandlerResult::reply(build_inventory_operation(true, &changes)?)
             .with(WorldAction::Broadcast { scope, packet }),
     )
+}
+
+/// Use the avatar megaphone `item_id` in Cash `slot`; `r` is past the item
+/// id. Its four lines and ear come before the sender's look, which the
+/// banner takes from the player instead. The item goes once the world has
+/// room for the banner (`WorldAction::AvatarMegaphone`).
+pub fn avatar_megaphone(
+    ctx: &mut WorldContext,
+    r: &mut Cursor<&Vec<u8>>,
+    slot: i16,
+    item_id: i32,
+) -> WorldResult {
+    let mut lines: [String; 4] = Default::default();
+    for line in &mut lines {
+        *line = r.read_str_with_length()?;
+    }
+    let ear = r.read_byte()? != 0;
+    if ctx.player.stats.level <= MIN_LEVEL {
+        return Ok(HandlerResult::reply(build_avatar_megaphone_refusal(
+            AvatarRefusal::TooLow,
+        )?));
+    }
+    // The client's box wraps at most 97 characters into the four lines.
+    if lines.iter().all(String::is_empty) || lines.iter().any(|line| line.len() > MAX_LINE) {
+        return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
+    }
+    let banner = build_avatar_megaphone(
+        item_id,
+        ctx.player.name(),
+        &lines,
+        ctx.channel_id,
+        ear,
+        &ctx.player.look(),
+    )?;
+    Ok(HandlerResult::empty().with(WorldAction::AvatarMegaphone {
+        slot,
+        item_id,
+        banner,
+    }))
+}
+
+/// Use up the avatar megaphone the world has queued the banner of, or
+/// refuse it with `Busy` when the wait is too long.
+pub fn spend_avatar_megaphone(
+    player: &mut game::Player,
+    slot: i16,
+    item_id: i32,
+    queued: bool,
+) -> Result<Packet, crate::error::NetworkError> {
+    if !queued {
+        return build_avatar_megaphone_refusal(AvatarRefusal::Busy);
+    }
+    let held = player
+        .inventory
+        .get(InventoryType::Cash, slot)
+        .is_some_and(|item| item.item_id == item_id);
+    let taken = held
+        .then(|| {
+            player
+                .inventory_mut()
+                .take(InventoryType::Cash, slot, 1)
+                .ok()
+        })
+        .flatten();
+    match taken {
+        Some(changes) => build_inventory_operation(true, &changes),
+        None => build_stat_update(true, &[]),
+    }
 }
 
 /// What the megaphone says and to whom, or `None` when it can't be used
@@ -291,5 +362,71 @@ mod tests {
     fn maple_tv_is_not_a_megaphone() {
         let mut player = speaker(30, 5075000);
         refused(&use_item(&mut player, 5075000, |_| {}));
+    }
+
+    const AVATAR: i32 = 5_390_000;
+
+    /// An avatar megaphone's four lines and ear, then a look the server
+    /// ignores (just a few bytes here).
+    fn avatar_body(lines: [&'static str; 4]) -> impl Fn(&mut Packet) {
+        move |p| {
+            for line in lines {
+                p.write_str_with_length(line).unwrap();
+            }
+            p.write_byte(1).unwrap();
+            p.write_bytes(&[0, 0, 0, 0, 0]).unwrap();
+        }
+    }
+
+    #[test]
+    fn an_avatar_megaphone_asks_the_world_to_show_its_banner() {
+        let mut player = speaker(11, AVATAR);
+        let actions = use_item(&mut player, AVATAR, avatar_body(["hi", "", "all", ""]));
+        let [WorldAction::AvatarMegaphone {
+            slot: 2,
+            item_id: AVATAR,
+            banner,
+        }] = &actions[..]
+        else {
+            panic!("expected the banner: {actions:?}");
+        };
+        let mut expect = Expect::new(&banner.bytes);
+        expect.short(0x6F).int(AVATAR).string("Tester");
+        expect.string("hi").string("").string("all").string("");
+        expect.int(2).byte(1).look(&player.look(), true).end();
+        assert_eq!(left(&player), 3, "kept until the world has it in line");
+    }
+
+    #[test]
+    fn an_avatar_megaphone_is_for_those_over_level_10() {
+        let mut player = speaker(10, AVATAR);
+        let actions = use_item(&mut player, AVATAR, avatar_body(["hi", "", "", ""]));
+        let [WorldAction::Reply(packet)] = &actions[..] else {
+            panic!("expected a lone reply: {actions:?}");
+        };
+        Expect::new(&packet.bytes).short(0x6E).byte(b'T').end();
+    }
+
+    #[test]
+    fn an_avatar_megaphone_with_nothing_to_say_is_refused() {
+        let mut player = speaker(30, AVATAR);
+        refused(&use_item(
+            &mut player,
+            AVATAR,
+            avatar_body(["", "", "", ""]),
+        ));
+    }
+
+    #[test]
+    fn a_queued_banner_uses_the_megaphone_up_and_a_refused_one_keeps_it() {
+        let mut player = speaker(30, AVATAR);
+        let busy = spend_avatar_megaphone(&mut player, 2, AVATAR, false).unwrap();
+        Expect::new(&busy.bytes).short(0x6E).byte(b'S').end();
+        assert_eq!(left(&player), 3);
+        let used = spend_avatar_megaphone(&mut player, 2, AVATAR, true).unwrap();
+        assert_eq!(used.bytes[..2], [0x1D, 0], "an inventory operation");
+        assert_eq!(left(&player), 2);
+        let gone = spend_avatar_megaphone(&mut player, 4, AVATAR, true).unwrap();
+        assert_eq!(gone.bytes[..2], [0x1F, 0], "only the unlock");
     }
 }

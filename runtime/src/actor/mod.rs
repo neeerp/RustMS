@@ -1,3 +1,4 @@
+pub mod avatar_banners;
 pub mod client;
 pub mod directory;
 pub mod event;

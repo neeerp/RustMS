@@ -42,6 +42,12 @@ pub enum SendOpcode {
     GuildBbs = 0x3B,
     NotifyLevelUp = 0x69,
     NotifyJobChange = 0x6B,
+    /// An avatar megaphone was refused (`u8` reason) (0xa2a3bc).
+    AvatarMegaphoneResult = 0x6E,
+    /// An avatar megaphone's banner (0xa2a486).
+    AvatarMegaphone = 0x6F,
+    /// Hide the avatar megaphone's banner (0xa2a65b).
+    ClearAvatarMegaphone = 0x70,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
     FamilyInfo = 0x5F,
