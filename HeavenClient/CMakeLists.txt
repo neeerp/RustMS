@@ -107,6 +107,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME guild_bbs COMMAND guild_bbs_tests)
     add_executable(job_names_tests tests/job_names.cpp Character/Job.cpp)
     add_test(NAME job_names COMMAND job_names_tests)
+    add_executable(quest_requirements_tests tests/quest_requirements.cpp Character/QuestRequirements.cpp Character/Job.cpp)
+    add_test(NAME quest_requirements COMMAND quest_requirements_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
     target_include_directories(npc_reach_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME npc_reach COMMAND npc_reach_tests)
@@ -457,6 +459,8 @@ add_executable(HeavenClient
     Character/GuildMark.h
     Character/Job.cpp
     Character/Job.h
+    Character/QuestRequirements.cpp
+    Character/QuestRequirements.h
     Character/MapleStat.cpp
     Character/MapleStat.h
     Character/MonsterBook.cpp

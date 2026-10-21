@@ -26,7 +26,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
-#include "../../Character/Job.h"
+#include "../../Character/QuestRequirements.h"
 #include "../../Character/QuestCatalog.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -444,22 +444,26 @@ namespace ms
 		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE,
 			fit(Text::Font::A12B, info["name"], TITLE_WIDTH, ".."), 0, false);
 
-		std::string allowed;
+		// The job ids in the data's order: by number, where the NX file sorts their names as text.
+		std::vector<std::pair<int32_t, int32_t>> allowed;
 
 		for (auto job : start["job"])
-			allowed += (allowed.empty() ? "" : ", ") + Job(static_cast<uint16_t>(job.get_integer())).get_name();
+			allowed.emplace_back(string_conversion::or_zero<int32_t>(job.name()), static_cast<int32_t>(job.get_integer()));
+
+		std::sort(allowed.begin(), allowed.end());
+
+		std::vector<int32_t> ids;
+
+		for (const auto& [order, job] : allowed)
+			ids.push_back(job);
 
 		jobs = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
-			fit(Text::Font::A12M, "Available to " + (allowed.empty() ? "all" : allowed), HEADER_WIDTH, ".."), 0, false);
+			fit(Text::Font::A12M, QuestRequirements::jobs(ids), HEADER_WIDTH, ".."), 0, false);
 
-		std::string level;
-
-		if (start["lvmin"].get_integer() > 0)
-			level = "Over Level " + std::to_string(start["lvmin"].get_integer());
-		else if (start["lvmax"].get_integer() > 0)
-			level = "Under Level " + std::to_string(start["lvmax"].get_integer());
-
-		levels = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, level, 0, false);
+		// An empty start check still counts (2049, 3240); only a missing one is "No limit".
+		levels = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE,
+			QuestRequirements::levels(static_cast<bool>(start), static_cast<int32_t>(start["lvmin"].get_integer()),
+				static_cast<int32_t>(start["lvmax"].get_integer())), 0, false);
 
 		write_details();
 		show_details(true);
