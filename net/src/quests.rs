@@ -30,11 +30,21 @@ pub struct QuestRequest {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestActionKind {
-    Start { npc_id: i32 },
-    Complete { npc_id: i32 },
+    Start {
+        npc_id: i32,
+    },
+    /// `choice` is the picked reward's place among those offered, or -1.
+    Complete {
+        npc_id: i32,
+        choice: i32,
+    },
     Forfeit,
-    ScriptStart { npc_id: i32 },
-    ScriptEnd { npc_id: i32 },
+    ScriptStart {
+        npc_id: i32,
+    },
+    ScriptEnd {
+        npc_id: i32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +66,8 @@ pub enum QuestRejection {
     Mesos,
     /// The item rewards don't fit.
     InventoryFull,
+    /// The picked reward isn't one of those offered.
+    Choice,
 }
 
 /// Whether `player` may start `quest` with `npc_id`.
@@ -214,12 +226,23 @@ pub fn count_kill<'a>(
 
 /// The item changes a quest step makes for `player`, as `(item id, count)`:
 /// every entry for their job and gender without a `prop`, plus one pick
-/// among those with one, weighted by it. An entry without a count takes
-/// all the player holds, and is left out if that's none.
-pub fn pick_items(items: &[QuestItem], player: &Player, rng: &mut impl Rng) -> Vec<(i32, i32)> {
+/// among those with a positive one, weighted by it, plus the `choice`th of
+/// those with -1 that give something, if there are any (v83 numbers the
+/// choices it shows the same way, FUN_0071808a). An entry without a count
+/// takes all the player holds, and is left out if that's none.
+pub fn pick_items(
+    items: &[QuestItem],
+    player: &Player,
+    choice: i32,
+    rng: &mut impl Rng,
+) -> Result<Vec<(i32, i32)>, QuestRejection> {
     let eligible: Vec<&QuestItem> = items
         .iter()
         .filter(|item| item.applies_to(player.stats.job, player.stats.gender))
+        .collect();
+    let choices: Vec<&&QuestItem> = eligible
+        .iter()
+        .filter(|item| item.prop.is_some_and(|p| p < 0) && item.count > 0)
         .collect();
     let mut picked: Vec<(i32, i32)> = eligible
         .iter()
@@ -246,7 +269,14 @@ pub fn pick_items(items: &[QuestItem], player: &Player, rng: &mut impl Rng) -> V
             roll -= weight;
         }
     }
-    picked
+    if !choices.is_empty() {
+        let chosen = usize::try_from(choice)
+            .ok()
+            .and_then(|index| choices.get(index))
+            .ok_or(QuestRejection::Choice)?;
+        picked.push((chosen.item_id, chosen.count));
+    }
+    Ok(picked)
 }
 
 /// Take, then give, `items` (negative counts take). Takes are capped at
@@ -639,7 +669,7 @@ mod tests {
         let mut rng = rand::rngs::StdRng::seed_from_u64(7);
         let mut hats = std::collections::BTreeSet::new();
         for _ in 0..50 {
-            let picked = pick_items(&items, &beginner, &mut rng);
+            let picked = pick_items(&items, &beginner, -1, &mut rng).unwrap();
             // The shellpiece and every held 4031792 are always taken;
             // exactly one hat; no sword (warriors only) and no skirt
             // (female only).
@@ -649,6 +679,40 @@ mod tests {
             hats.insert(picked.iter().find(|(_, c)| *c > 0).unwrap().0);
         }
         assert_eq!(hats.len(), 2);
+    }
+
+    #[test]
+    fn the_picked_reward_counts_only_choices_offered() {
+        let choice = |item_id, count, job| QuestItem {
+            item_id,
+            count,
+            job,
+            gender: 2,
+            prop: Some(-1),
+        };
+        let items = [
+            QuestItem {
+                prop: None,
+                ..choice(4031223, -1, 0)
+            },
+            choice(1072133, 1, 0),
+            // Not offered: nothing given, or for warriors only.
+            choice(1072122, 0, 0),
+            choice(1072303, 1, 2),
+            choice(1072129, 1, 0),
+        ];
+        let beginner = player(37, 0);
+        let mut rng = rand::thread_rng();
+        let mut pick = |choice| pick_items(&items, &beginner, choice, &mut rng);
+        assert_eq!(pick(1), Ok(vec![(4031223, -1), (1072129, 1)]));
+        assert_eq!(pick(0), Ok(vec![(4031223, -1), (1072133, 1)]));
+        assert_eq!(pick(2), Err(QuestRejection::Choice));
+        assert_eq!(pick(-1), Err(QuestRejection::Choice));
+        let warrior = player(37, 100);
+        assert_eq!(
+            pick_items(&items, &warrior, 1, &mut rand::thread_rng()),
+            Ok(vec![(4031223, -1), (1072303, 1)])
+        );
     }
 
     #[test]

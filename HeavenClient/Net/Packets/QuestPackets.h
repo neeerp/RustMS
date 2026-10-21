@@ -11,7 +11,9 @@ namespace ms
 	// Asks the server to start, complete, or forfeit a quest. The client shows
 	// the quest's conversation itself (Quest.nx Say.img) and sends this when the
 	// player accepts or finishes it. v83 leaves out the player's position for a
-	// quest the quest alert offers or completes (FUN_00721008).
+	// quest the quest alert offers or completes (FUN_00721008). A completion
+	// ends with the picked reward's place among the choices, or -1
+	// (FUN_00716fe1).
 	// Opcode: QUEST_ACTION(107)
 	class QuestActionPacket : public OutPacket
 	{
@@ -26,7 +28,8 @@ namespace ms
 			SCRIPT_END = 5
 		};
 
-		QuestActionPacket(Action action, int16_t quest_id, int32_t npc_id, std::optional<Point<int16_t>> position) :
+		QuestActionPacket(Action action, int16_t quest_id, int32_t npc_id, std::optional<Point<int16_t>> position,
+			int32_t choice = -1) :
 			OutPacket(OutPacket::Opcode::QUEST_ACTION)
 		{
 			write_byte(action);
@@ -41,6 +44,9 @@ namespace ms
 					write_short(position->x());
 					write_short(position->y());
 				}
+
+				if (action == COMPLETE)
+					write_int(choice);
 			}
 		}
 	};

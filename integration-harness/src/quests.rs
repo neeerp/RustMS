@@ -30,6 +30,14 @@ pub fn build_quest_action(action: u8, quest_id: i16, npc_id: i32) -> Packet {
     p
 }
 
+/// A completion as v83 sends it: the NPC, the player's position, then the
+/// picked reward (-1 for none).
+pub fn build_quest_completion(quest_id: i16, npc_id: i32, choice: i32) -> Packet {
+    let mut p = build_quest_action(COMPLETE, quest_id, npc_id);
+    p.write_int(choice).unwrap();
+    p
+}
+
 /// `NPC_TALK_MORE`: the answer to an NPC prompt of `kind`.
 pub fn answer(kind: u8, response: i8, selection: Option<i32>) -> Packet {
     let mut p = Packet::new_empty();

@@ -5,9 +5,8 @@ use std::io::Cursor;
 use tracing::debug;
 
 /// `QUEST_ACTION`: action byte, quest id, then the NPC for every action but
-/// forfeit. The client may append its position, and a completion may append
-/// a chosen reward; no supported quest has choosable rewards, so both are
-/// ignored.
+/// forfeit. The client may append its position, which is ignored. A
+/// completion ends with the picked reward, -1 for none (v83 FUN_00716fe1).
 pub struct QuestActionHandler;
 
 impl WorldHandler for QuestActionHandler {
@@ -20,9 +19,18 @@ impl WorldHandler for QuestActionHandler {
             1 => QuestActionKind::Start {
                 npc_id: reader.read_int()?,
             },
-            2 => QuestActionKind::Complete {
-                npc_id: reader.read_int()?,
-            },
+            2 => {
+                let npc_id = reader.read_int()?;
+                // The choice comes last, after the position if there is one.
+                let rest = packet.bytes.len() as u64 - reader.position();
+                let choice = if rest >= 4 {
+                    reader.set_position(packet.bytes.len() as u64 - 4);
+                    reader.read_int()?
+                } else {
+                    -1
+                };
+                QuestActionKind::Complete { npc_id, choice }
+            }
             3 => QuestActionKind::Forfeit,
             4 => QuestActionKind::ScriptStart {
                 npc_id: reader.read_int()?,
@@ -86,19 +94,32 @@ mod tests {
     }
 
     #[test]
-    fn parses_completion_and_ignores_position_and_selection() {
-        let request = parse(|p| {
-            p.write_byte(2).unwrap();
-            p.write_short(1031).unwrap();
-            p.write_int(2100).unwrap();
-            p.write_short(0).unwrap();
-            p.write_short(0).unwrap();
-            p.write_short(3).unwrap();
-        });
-        assert_eq!(
-            request.unwrap().kind,
-            QuestActionKind::Complete { npc_id: 2100 }
-        );
+    fn parses_the_completion_choice_with_or_without_position() {
+        let complete = |position: bool, choice: Option<i32>| {
+            parse(|p| {
+                p.write_byte(2).unwrap();
+                p.write_short(3608).unwrap();
+                p.write_int(2071001).unwrap();
+                if position {
+                    p.write_short(-20).unwrap();
+                    p.write_short(150).unwrap();
+                }
+                if let Some(choice) = choice {
+                    p.write_int(choice).unwrap();
+                }
+            })
+            .unwrap()
+            .kind
+        };
+        let picked = |choice| QuestActionKind::Complete {
+            npc_id: 2071001,
+            choice,
+        };
+        assert_eq!(complete(true, Some(1)), picked(1));
+        assert_eq!(complete(false, Some(1)), picked(1));
+        assert_eq!(complete(true, Some(-1)), picked(-1));
+        // An older client sends no choice.
+        assert_eq!(complete(false, None), picked(-1));
     }
 
     #[test]

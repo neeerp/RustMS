@@ -152,7 +152,10 @@ namespace ms
 			if (mode == Mode::OFFER)
 				return QuestPage { QuestPage::YESNO, pages[index], false, false };
 
-			return QuestPage { QuestPage::TEXT, last_page(), false, false };
+			// Items to choose from make the last page a menu (FUN_0071808a).
+			auto kind = rewards.find(CHOICES) == std::string::npos ? QuestPage::TEXT : QuestPage::SELECTION;
+
+			return QuestPage { kind, last_page(), false, false };
 		}
 
 		// response: 1 next/yes/select, 0 previous/no, -1 close. `selection` is
@@ -220,6 +223,20 @@ namespace ms
 				return Effect::NONE;
 			}
 
+			if (shown->kind == QuestPage::SELECTION)
+			{
+				// The reward picked on the last completion page.
+				step = Step::DONE;
+
+				if (response != 1 || selection < 0)
+					return Effect::NONE;
+
+				read_to_end = true;
+				picked = selection;
+
+				return Effect::COMPLETE;
+			}
+
 			if (shown->kind == QuestPage::YESNO)
 			{
 				if (response == 1)
@@ -271,6 +288,12 @@ namespace ms
 			return read_to_end;
 		}
 
+		// The reward the player picked, by its #L number, or -1.
+		int32_t choice() const
+		{
+			return picked;
+		}
+
 	private:
 		enum class Step { PAGE, FLIP, QUESTION, WRONG, DECLINED, DONE };
 
@@ -315,6 +338,7 @@ namespace ms
 		Step step = Step::PAGE;
 		size_t index = 0;
 		bool read_to_end = false;
+		int32_t picked = -1;
 		Effect initial = Effect::NONE;
 		std::string wrong_text;
 	};
