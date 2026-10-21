@@ -739,6 +739,82 @@ namespace ms
 		AllianceInfoPacket() : AllianceOperationPacket(AllianceOperationPacket::Operation::INFO) {}
 	};
 
+	// The Alliance tab's requests (FUN_00912b49's buttons, b025): a guild
+	// master leaves with their guild
+	class LeaveAlliancePacket : public AllianceOperationPacket
+	{
+	public:
+		LeaveAlliancePacket() : AllianceOperationPacket(AllianceOperationPacket::Operation::LEAVE) {}
+	};
+
+	// The master invites a guild by name
+	class InviteToAlliancePacket : public AllianceOperationPacket
+	{
+	public:
+		InviteToAlliancePacket(const std::string& guild) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::INVITE)
+		{
+			write_string(guild);
+		}
+	};
+
+	// The master expels a guild: its id, then the alliance's
+	class ExpelFromAlliancePacket : public AllianceOperationPacket
+	{
+	public:
+		ExpelFromAlliancePacket(int32_t guild_id, int32_t alliance_id) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::EXPEL)
+		{
+			write_int(guild_id);
+			write_int(alliance_id);
+		}
+	};
+
+	// The master hands the alliance to another guild's master
+	class ChangeAllianceMasterPacket : public AllianceOperationPacket
+	{
+	public:
+		ChangeAllianceMasterPacket(int32_t cid) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::CHANGE_MASTER)
+		{
+			write_int(cid);
+		}
+	};
+
+	// The master's new titles for ranks 1 to 5
+	class SetAllianceTitlesPacket : public AllianceOperationPacket
+	{
+	public:
+		SetAllianceTitlesPacket(const std::array<std::string, 5>& titles) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::SET_TITLES)
+		{
+			for (const std::string& title : titles)
+				write_string(title);
+		}
+	};
+
+	// A member one rank up (true) or down
+	class ChangeAllianceRankPacket : public AllianceOperationPacket
+	{
+	public:
+		ChangeAllianceRankPacket(int32_t cid, bool up) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::CHANGE_RANK)
+		{
+			write_int(cid);
+			write_byte(up ? 1 : 0);
+		}
+	};
+
+	class SetAllianceNoticePacket : public AllianceOperationPacket
+	{
+	public:
+		SetAllianceNoticePacket(const std::string& notice) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::SET_NOTICE)
+		{
+			write_string(notice);
+		}
+	};
+
 	// Takes up an invitation to an alliance (FUN_00522585): its id and the
 	// player's own guild's name
 	class JoinAlliancePacket : public AllianceOperationPacket

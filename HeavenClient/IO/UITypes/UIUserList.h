@@ -28,6 +28,7 @@
 #include "../Components/ClassicTabs.h"
 #include "../Components/Slider.h"
 
+#include "../../Character/Alliance.h"
 #include "../../Character/BuddyList.h"
 #include "../../Character/FriendGroups.h"
 #include "../../Character/Guild.h"
@@ -37,8 +38,9 @@
 namespace ms
 {
 	// The v83 Maple User List & Guild window (UIWindow.img/UserList). The
-	// Friend, Party and Guild tabs work so far; the others show an empty
-	// window.
+	// Friend, Party, Guild and Alliance tabs work so far; the Blacklist tab
+	// shows an empty window. The Alliance tab's code is in
+	// UIUserListAlliance.cpp.
 	class UIUserList : public UIDragElement<PosUSERLIST>
 	{
 	public:
@@ -129,7 +131,24 @@ namespace ms
 			// Each guild section's fold, unfold, previous and next page
 			// buttons: the online section's, then the offline one's.
 			BT_GUILD_SECTION,
-			BT_TAB0 = BT_GUILD_SECTION + 8
+			// The Alliance tab's, in the order of FUN_0091afa5's slots.
+			BT_ALLIANCE_INVITE = BT_GUILD_SECTION + 8,
+			BT_ALLIANCE_WITHDRAW,
+			BT_ALLIANCE_KICK,
+			BT_ALLIANCE_UP,
+			BT_ALLIANCE_DOWN,
+			BT_ALLIANCE_CHANGE,
+			BT_ALLIANCE_CHAT,
+			BT_ALLIANCE_INFO,
+			BT_ALLIANCE_WHISPER,
+			BT_ALLIANCE_NOTICE,
+			BT_ALLIANCE_PARTY_INVITE,
+			// Its rank panel's.
+			BT_UNION_MODIFY,
+			BT_UNION_SAVE,
+			// The same four buttons for each of its five guild sections.
+			BT_ALLIANCE_SECTION,
+			BT_TAB0 = BT_ALLIANCE_SECTION + 20
 		};
 
 		// One member's row; y is relative to the window.
@@ -198,6 +217,24 @@ namespace ms
 			int16_t end = 0;
 		};
 
+		// One guild of the alliance, its online members a page at a time;
+		// y is in the member list's own space.
+		struct AllianceSection
+		{
+			bool shown = false;
+			int32_t guild_id = 0;
+			GuildMark mark;
+			bool marked = false;
+			Text name, count, page_text;
+			bool expanded = true;
+			int16_t page = 1;
+			int16_t pages = 1;
+			int16_t top = 0;
+			std::vector<GuildRow> rows;
+			int16_t first = 0;
+			int16_t end = 0;
+		};
+
 		std::vector<Shown> currently_shown() const;
 		void rebuild();
 		// Lays out one section from y and returns where the next may start.
@@ -249,10 +286,38 @@ namespace ms
 		void edit_title(int32_t rank, const std::string& text);
 		void save_titles();
 
+		// Loads the tab's art and makes its buttons, for the constructor.
+		void init_alliance();
+		void rebuild_alliance();
+		// Lays out one guild of the alliance from y and returns where the
+		// next may start.
+		int16_t lay_out(AllianceSection& section, const GuildData& members, int16_t y);
+		void draw_alliance() const;
+		void place_alliance_buttons();
+		void scroll_alliance(int16_t steps);
+		// The member picked in the list, if the list shows them; never the
+		// player.
+		const GuildMember* picked_ally() const;
+		// A click on the tab or its rank panel; IDLE once handled.
+		Cursor::State alliance_cursor(bool clicked, Point<int16_t> cursorpos);
+		Button::State alliance_button(uint16_t buttonid);
+		void update_alliance_buttons(bool party_leader);
+
+		// The rank panel (FUN_00917388), which the Alliance tab's Info button
+		// opens at the window's right, with the guild panel's art.
+		void open_union();
+		void close_union();
+		void rebuild_union();
+		void draw_union() const;
+		void prompt_union_title(int32_t rank);
+		void edit_union_title(int32_t rank, const std::string& text);
+		void save_union_titles();
+
 		uint16_t tab;
 		Party& party;
 		BuddyList& buddies;
 		Guild& guild;
+		Alliance& alliance;
 		ClassicTabs tabs;
 		Texture background, guild_background;
 
@@ -304,5 +369,28 @@ namespace ms
 		int32_t grade_picked = 0;
 		Text grade_points;
 		std::array<Text, 5> grade_ranks, grade_title_texts, grade_labels;
+
+		Texture union_header, union_columns, union_row, union_end, union_notice_box;
+		Text alliance_name, no_alliance, union_notice_label, union_notice;
+		std::array<AllianceSection, 5> alliance_sections;
+		AllianceData shown_alliance;
+		std::vector<GuildData> shown_allies;
+		GuildData shown_own;
+		// Online members in all its guilds; 0 hides the alliance's name.
+		size_t alliance_online = 0;
+		// The member picked, by id, which survives refreshes (0x915534).
+		int32_t alliance_picked = 0;
+		int16_t union_ticker_x = 0;
+		uint16_t union_ticker_time = 0;
+		Slider alliance_slider;
+		int16_t alliance_scroll = 0;
+		int16_t alliance_height = 0;
+
+		Texture union_background;
+		std::array<Texture, 3> union_art;
+		bool union_shown = false;
+		std::array<std::string, 5> union_titles;
+		int32_t union_picked = 0;
+		std::array<Text, 5> union_ranks, union_title_texts, union_labels;
 	};
 }

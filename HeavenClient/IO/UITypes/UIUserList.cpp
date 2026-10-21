@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UIUserList.h"
+#include "UserListLayout.h"
 
 #include "UIChatBar.h"
 #include "UIEnterText.h"
@@ -56,6 +57,8 @@ namespace ms
 {
 	namespace
 	{
+		using namespace UserListLayout;
+
 		// The window, measured from period footage.
 		constexpr Point<int16_t> CLOSE = Point<int16_t>(291, 7);
 		constexpr Point<int16_t> TAB_STRIP = Point<int16_t>(11, 23);
@@ -64,8 +67,6 @@ namespace ms
 		// headings, one row per member (or "none"), and a bottom edge.
 		constexpr Point<int16_t> LIST = Point<int16_t>(15, 51);
 		constexpr int16_t HEADER = 27;
-		constexpr int16_t COLUMNS = 18;
-		constexpr int16_t ROW = 18;
 		constexpr int16_t FOOTER = 4;
 		constexpr int16_t SECTION_GAP = 10;
 		constexpr Point<int16_t> HIGHLIGHT_SIZE = Point<int16_t>(278, ROW);
@@ -137,145 +138,6 @@ namespace ms
 		{
 			return buddy.online() && buddy.channel == Configuration::get().get_channelid();
 		}
-
-		// The guild tab, as the client lays it out (FUN_0090f17c). The
-		// client places text by its top; HeavenClient's 5 pixels lower.
-		constexpr int16_t CLIENT_TEXT = -5;
-		// The header: the guild's emblem and name, centred, then the notice.
-		constexpr Point<int16_t> GUILD_HEADER = Point<int16_t>(5, 55);
-		constexpr int16_t GUILD_HEADER_WIDTH = 306;
-		constexpr int16_t EMBLEM_SPACE = 26;
-		constexpr int16_t GUILD_NAME_Y = 3;
-		constexpr Point<int16_t> NOTICE_BOX = Point<int16_t>(5, 80);
-		constexpr Point<int16_t> NOTICE_LABEL = Point<int16_t>(13, 85);
-		// A notice scrolls left through its strip a pixel each 30 ms update,
-		// and starts over once it has left (FUN_00910dde).
-		constexpr Point<int16_t> TICKER = Point<int16_t>(10, 85);
-		constexpr int16_t TICKER_WIDTH = 270;
-		constexpr int16_t TICKER_START = 250;
-		constexpr uint16_t TICKER_STEP = 30;
-		// The member list scrolls through its view 33 pixels a step.
-		constexpr Point<int16_t> GUILD_LIST = Point<int16_t>(6, 113);
-		constexpr int16_t GUILD_VIEW = 192;
-		constexpr int16_t GUILD_STEP = 33;
-		constexpr Range<int16_t> GUILD_SLIDER = Range<int16_t>(113, 292);
-		constexpr int16_t GUILD_SLIDER_X = 290;
-		// Each section: a header, then, unless folded, column headings, a
-		// page of rows (or "none") and an end line.
-		constexpr int16_t GUILD_SECTION_HEADER = 27;
-		constexpr int16_t GUILD_COLUMNS_GAP = 4;
-		constexpr int16_t GUILD_END = 1;
-		constexpr int16_t GUILD_SECTION_GAP = 10;
-		constexpr int16_t MEMBERS_PER_PAGE = 20;
-		// In a section's header.
-		constexpr Point<int16_t> GUILD_COUNT = Point<int16_t>(185, 6);
-		constexpr Point<int16_t> GUILD_PAGE = Point<int16_t>(261, 6);
-		constexpr Point<int16_t> GUILD_FOLD = Point<int16_t>(172, 8);
-		constexpr int16_t PAGE_BUTTON = 13;
-		// In a member's row.
-		constexpr int16_t MEMBER_NAME_X = 10;
-		constexpr int16_t MEMBER_JOB_X = 100;
-		constexpr int16_t MEMBER_LEVEL_X = 170;
-		constexpr int16_t MEMBER_TITLE_X = 210;
-		constexpr int16_t MEMBER_TEXT_Y = 4;
-		constexpr int16_t MEMBER_JOB_WIDTH = 67;
-		constexpr int16_t GUILD_ROW_WIDTH = 281;
-		// A picked row is filled from its second column (0xFF244768).
-		constexpr int16_t PICKED_LEFT = 1;
-		constexpr int16_t PICKED_WIDTH = GUILD_ROW_WIDTH - PICKED_LEFT;
-		constexpr float PICKED_RED = 0x24 / 255.0f;
-		constexpr float PICKED_GREEN = 0x47 / 255.0f;
-		constexpr float PICKED_BLUE = 0x68 / 255.0f;
-		// Every guild button shows on the tab; ranks only grey them out.
-		// In the order of the guild buttons in Buttons.
-		const std::pair<const char*, Point<int16_t>> GUILD_BUTTONS[] = {
-				{ "BtInvite", Point<int16_t>(9, 316) },
-				{ "BtWithdraw", Point<int16_t>(80, 316) },
-				{ "BtKick", Point<int16_t>(159, 336) },
-				{ "BtUp", Point<int16_t>(9, 336) },
-				{ "BtDown", Point<int16_t>(80, 336) },
-				{ "BtWhere", Point<int16_t>(159, 316) },
-				{ "BtChat", Point<int16_t>(238, 336) },
-				{ "BtInfo", Point<int16_t>(238, 363) },
-				{ "BtWhisper", Point<int16_t>(238, 316) },
-				{ "Btnotice", Point<int16_t>(287, 80) },
-				{ "BtPartyInvite", Point<int16_t>(159, 363) },
-				{ "BtGuildBBS", Point<int16_t>(80, 363) }
-		};
-		// The notice prompt takes 100 letters.
-		constexpr size_t NOTICE_LIMIT = 100;
-		// The rank panel sits at the window's right (FUN_0091e2e0) and is
-		// laid out as the client draws it (FUN_009165dd): the guild's GP,
-		// then a row per rank with its number, its title as edited and its
-		// fixed name, greyed while the rank has no title.
-		constexpr Point<int16_t> GRADE = Point<int16_t>(311, 86);
-		const std::pair<const char*, Point<int16_t>> GRADE_ART[] = {
-				{ "guildgrade3", Point<int16_t>(6, 8) },
-				{ "guildgrade4", Point<int16_t>(6, 45) },
-				{ "guildgrade0", Point<int16_t>(6, 91) },
-				{ "guildgrade1", Point<int16_t>(6, 128) },
-				{ "guildgrade2", Point<int16_t>(6, 146) }
-		};
-		constexpr Point<int16_t> GRADE_POINTS = Point<int16_t>(221, 67);
-		constexpr int16_t GRADE_ROWS = 146;
-		constexpr int16_t GRADE_ROW_LEFT = 6;
-		constexpr int16_t GRADE_ROW_WIDTH = 221;
-		constexpr int16_t GRADE_TEXT_Y = 4;
-		constexpr int16_t GRADE_RANK_X = 26;
-		constexpr int16_t GRADE_TITLE_X = 66;
-		constexpr int16_t GRADE_LABEL_X = 146;
-		constexpr int16_t GRADE_LABEL_WIDTH = 86;
-		const char* GRADE_LABELS[] = { "Master", "Jr.Master", "Member", "Member", "Member" };
-		constexpr Point<int16_t> GRADE_MODIFY = Point<int16_t>(25, 268);
-		constexpr Point<int16_t> GRADE_SAVE = Point<int16_t>(125, 268);
-		// A guild section's buttons, from BT_GUILD_SECTION.
-		enum SectionButton : uint16_t
-		{
-			FOLD,
-			UNFOLD,
-			PREVIOUS_PAGE,
-			NEXT_PAGE,
-			SECTION_BUTTONS
-		};
-
-		// `text` cut to `width`, with `tail` after it if cut.
-		std::string fit(Text::Font font, const std::string& text, int16_t width, const std::string& tail)
-		{
-			Text measure(font, Text::Alignment::LEFT, Color::Name::BLACK, text, 0, false);
-
-			if (measure.width() <= width)
-				return text;
-
-			std::string cut = text;
-
-			while (!cut.empty())
-			{
-				cut.pop_back();
-				measure.change_text(cut + tail);
-
-				if (measure.width() <= width)
-					break;
-			}
-
-			return cut + tail;
-		}
-
-		std::string fraction(size_t part, size_t whole)
-		{
-			return "[" + std::to_string(part) + "/" + std::to_string(whole) + "]";
-		}
-
-		// The client trims what is typed in its prompts.
-		std::string trim(const std::string& text)
-		{
-			const char* blanks = " \t\r\n";
-			size_t first = text.find_first_not_of(blanks);
-
-			if (first == std::string::npos)
-				return "";
-
-			return text.substr(first, text.find_last_not_of(blanks) - first + 1);
-		}
 	}
 
 	bool UIUserList::Shown::operator==(const Shown& other) const
@@ -286,7 +148,8 @@ namespace ms
 
 	UIUserList::UIUserList(uint16_t t)
 			: UIDragElement<PosUSERLIST>(), tab(t), party(Stage::get().get_player().get_party()),
-			  buddies(Stage::get().get_player().get_buddies()), guild(Stage::get().get_player().get_guild())
+			  buddies(Stage::get().get_player().get_buddies()), guild(Stage::get().get_player().get_guild()),
+			  alliance(Stage::get().get_player().get_alliance())
 	{
 		nl::node UserList = NxFiles::ui_classic["UIWindow.img"]["UserList"];
 		nl::node Party = UserList["Party"];
@@ -423,12 +286,15 @@ namespace ms
 
 		grade_points = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
+		init_alliance();
+
 		dimension = Texture(backgrnd).get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
 
 		rebuild();
 		rebuild_buddies();
 		rebuild_guild();
+		rebuild_alliance();
 		change_tab(tab);
 	}
 
@@ -458,6 +324,13 @@ namespace ms
 
 			if (grade_shown)
 				draw_grade();
+		}
+		else if (tab == Tab::ALLIANCE)
+		{
+			draw_alliance();
+
+			if (union_shown)
+				draw_union();
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -755,13 +628,29 @@ namespace ms
 					ticker_x = TICKER_START;
 		}
 
+		if (!(alliance.get_data() == shown_alliance) || alliance.get_guilds() != shown_allies ||
+			!(guild.get_data() == shown_own))
+			rebuild_alliance();
+
+		if (alliance_online > 0 && !shown_alliance.notice.empty())
+		{
+			union_ticker_time += Constants::TIMESTEP;
+
+			for (; union_ticker_time >= TICKER_STEP; union_ticker_time -= TICKER_STEP)
+				if (--union_ticker_x + union_notice.width() < 0)
+					union_ticker_x = UNION_TICKER_START;
+		}
+
 		update_buttons();
 	}
 
 	void UIUserList::toggle_active()
 	{
 		if (active)
+		{
 			close_grade();
+			close_union();
+		}
 
 		UIElement::toggle_active();
 	}
@@ -769,9 +658,12 @@ namespace ms
 	bool UIUserList::is_in_range(Point<int16_t> cursorpos) const
 	{
 		Point<int16_t> panel = position + GRADE;
+		Point<int16_t> union_panel = position + UNION;
 
 		return UIElement::is_in_range(cursorpos) ||
-			   (grade_shown && Rectangle<int16_t>(panel, panel + grade_background.get_dimensions()).contains(cursorpos));
+			   (grade_shown && Rectangle<int16_t>(panel, panel + grade_background.get_dimensions()).contains(cursorpos)) ||
+			   (union_shown &&
+				Rectangle<int16_t>(union_panel, union_panel + union_background.get_dimensions()).contains(cursorpos));
 	}
 
 	Cursor::State UIUserList::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -783,6 +675,9 @@ namespace ms
 
 		if (!clicked)
 			filter_clicked = false;
+
+		if (tab == Tab::ALLIANCE)
+			return alliance_cursor(clicked, cursorpos);
 
 		Point<int16_t> cursor_relative = cursorpos - position;
 
@@ -967,6 +862,7 @@ namespace ms
 			if (escape)
 			{
 				close_grade();
+				close_union();
 				deactivate();
 			}
 			else if (keycode == KeyAction::Id::TAB)
@@ -978,6 +874,8 @@ namespace ms
 	{
 		if (tab == Tab::GUILD)
 			guild_slider.send_scroll(yoffset);
+		else if (tab == Tab::ALLIANCE)
+			alliance_slider.send_scroll(yoffset);
 		else if (tab == Tab::FRIEND)
 			friend_slider.send_scroll(yoffset);
 	}
@@ -993,10 +891,16 @@ namespace ms
 		buttons[Buttons::BT_TAB0 + tabid]->set_state(Button::State::PRESSED);
 
 		if (tabid != tab)
+		{
 			guild_picked = 0;
+			alliance_picked = 0;
+		}
 
 		if (tabid != Tab::GUILD)
 			close_grade();
+
+		if (tabid != Tab::ALLIANCE)
+			close_union();
 
 		tab = tabid;
 
@@ -1014,8 +918,12 @@ namespace ms
 		for (uint16_t i = Buttons::BT_GUILD_INVITE; i <= Buttons::BT_GUILD_BBS; i++)
 			buttons[i]->set_active(tab == Tab::GUILD);
 
+		for (uint16_t i = Buttons::BT_ALLIANCE_INVITE; i <= Buttons::BT_ALLIANCE_PARTY_INVITE; i++)
+			buttons[i]->set_active(tab == Tab::ALLIANCE);
+
 		// Also shows or hides the section buttons.
 		rebuild_guild();
+		rebuild_alliance();
 		update_buttons();
 	}
 
@@ -1026,6 +934,9 @@ namespace ms
 
 	Button::State UIUserList::button_pressed(uint16_t buttonid)
 	{
+		if (buttonid >= Buttons::BT_ALLIANCE_INVITE && buttonid < Buttons::BT_TAB0)
+			return alliance_button(buttonid);
+
 		const PartyMember* member = selected_member();
 		const Buddy* buddy = selected_buddy();
 
@@ -1033,6 +944,7 @@ namespace ms
 		{
 			case Buttons::BT_CLOSE:
 				close_grade();
+				close_union();
 				deactivate();
 				break;
 			case Buttons::BT_HP:
@@ -1285,7 +1197,8 @@ namespace ms
 
 				break;
 			default:
-				if (buttonid >= Buttons::BT_GUILD_SECTION && buttonid < Buttons::BT_TAB0)
+				if (buttonid >= Buttons::BT_GUILD_SECTION &&
+					buttonid < Buttons::BT_GUILD_SECTION + 2 * SectionButton::SECTION_BUTTONS)
 				{
 					uint16_t index = buttonid - Buttons::BT_GUILD_SECTION;
 					GuildSection& section = index < SectionButton::SECTION_BUTTONS ? guild_online : guild_offline;
@@ -1313,8 +1226,9 @@ namespace ms
 				else if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
 				{
 					// Clicking a tab drops the guild pick, even the tab
-					// already shown (FUN_0091d99d).
+					// already shown (FUN_0091d99d), and the alliance's.
 					guild_picked = 0;
+					alliance_picked = 0;
 					change_tab(buttonid - Buttons::BT_TAB0);
 
 					return Button::State::PRESSED;
@@ -1692,6 +1606,8 @@ namespace ms
 		bool master = guild.is_master(self);
 		enable(Buttons::BT_GRADE_MODIFY, master);
 		enable(Buttons::BT_GRADE_SAVE, master);
+
+		update_alliance_buttons(leader);
 	}
 
 	const PartyMember* UIUserList::selected_member() const

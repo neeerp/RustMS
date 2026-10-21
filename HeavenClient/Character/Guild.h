@@ -98,6 +98,10 @@ namespace ms
 		// titles as the panel's Modify button does (FUN_00916e8d), but for
 		// the forbidden words: a title is checked as a guild name.
 		Title check_title(const std::array<std::string, 5>& working, int32_t rank, const std::string& title) const;
+		// The same, given whether anyone holds the rank: the alliance's panel
+		// checks titles alike (FUN_00918204).
+		static Title check_title(const std::array<std::string, 5>& working, int32_t rank, const std::string& title,
+								 bool held);
 		// Stores a checked title in the working titles. Rank 4 becomes
 		// "Member" if rank 5 gets a title and 4 has none.
 		static void set_title(std::array<std::string, 5>& working, int32_t rank, std::string title);

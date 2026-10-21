@@ -21,6 +21,8 @@ namespace ms
 		// How many guilds it may hold.
 		int32_t capacity = 0;
 		std::string notice;
+
+		bool operator==(const AllianceData& other) const;
 	};
 
 	// The player's guild alliance ("Guild Union"), as the server last
@@ -42,6 +44,43 @@ namespace ms
 		// Whether anyone in the alliance holds a rank; true for no guild or
 		// no alliance (FUN_00a3ad86).
 		bool rank_held(const Guild& own, int32_t rank) const;
+		// Whether the player's guild is in this alliance (ctx+0x306e).
+		bool joined(const Guild& own) const;
+		// A member of the player's guild, or failing that of another.
+		const GuildMember* find_member(const Guild& own, int32_t cid) const;
+		// The guild a member is in, the player's own included.
+		const GuildData* guild_of(const Guild& own, int32_t cid) const;
+		// Whether the player may edit the rank titles (FUN_00a3ac6f): the
+		// player's guild is in the alliance and they are its master.
+		bool may_edit_titles(const Guild& own, int32_t self) const;
+		// Checks a title typed in the rank panel (FUN_00918204), as the
+		// guild's panel does but for who holds a rank.
+		Guild::Title check_title(const Guild& own, const std::array<std::string, 5>& working, int32_t rank,
+								 const std::string& title) const;
+		// Whether saving the working titles would change any, matching case
+		// (FUN_0091848d compares with strcmp).
+		bool titles_differ(const std::array<std::string, 5>& working) const;
+
+		// Which of the Alliance tab's buttons may be used (the end of
+		// FUN_00912b49). `picked` is the member picked in the list, 0 for
+		// none; `party_leader` whether the player leads a party.
+		struct TabButtons
+		{
+			bool invite = false;
+			bool withdraw = false;
+			bool kick = false;
+			bool up = false;
+			bool down = false;
+			bool change = false;
+			bool chat = false;
+			bool info = false;
+			bool whisper = false;
+			bool notice = false;
+			bool party_invite = false;
+		};
+
+		TabButtons tab_buttons(const Guild& own, int32_t self, int32_t picked, bool party_leader) const;
+
 		// Members who would hear alliance chat (FUN_00a3ab7e): those online
 		// in the other guilds, then in the player's own, but the player.
 		// None if the player's guild is in no alliance.
