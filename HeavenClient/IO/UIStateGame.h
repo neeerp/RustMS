@@ -117,6 +117,9 @@ namespace ms
 		// Whether the tooltip up belongs to the window.
 		bool owns_tooltip(UIElement::Type type) const;
 
+		// Brings type to the front of its window layer (WindowLayer.h).
+		void raise(UIElement::Type type);
+
 		// The window holding the focus. Once it closes, the focus goes back
 		// to the one it opened over, such as a dialog under its notice.
 		UIElement *get_focused();
