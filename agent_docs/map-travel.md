@@ -61,6 +61,27 @@ VIP Cab's fare through the network harness.
 Kerning City-New Leaf City subway runs on the ship clock (`ships.md`), as
 does the plane between Kerning City and Singapore (`plane.rs`).
 
+## Trips with a way back
+
+Some trips end at an NPC who takes the player back where they came from.
+The map they left is saved with the character (`saved_locations`), so the
+way back outlasts a relogin, and taken once. The fares are Cosmic's.
+
+| NPC | Where | Trip |
+| --- | --- | --- |
+| Spinel (`9000020`, `world_trip`) | Victoria Island's five towns, Orbis, Ludibrium, Leafre, Mu Lung, Ariant, Boat Quay Town, Amoria and the Mushroom Shrine (`800000000`) | From a town to the Mushroom Shrine, portal 0, for 3000; from Boat Quay Town (`541000000`) to Trend Zone Metropolis (`550000000`), portal 0, for 10000. Saved as kind 1 (`WORLD_TOUR_RETURN`). At the shrine, a menu: back to the saved map, else Lith Harbor, or stay |
+| Pason (`1002002`), Shuri (`2010005`), Nara (`2040048`), `florina2` | Lith Harbor, Orbis, Ludibrium | Menu: to Florina Beach (`110000000`, `st00`, id 4) for 1500, 2000 or 1800, or by showing the VIP Ticket to Florina Beach (`4031134`), which is kept; or two pages about the ticket. Saved as kind 2 (`FLORINA_RETURN`) |
+| Pison (`1081001`, `florina1`) | Florina Beach | Back to the saved map, else Lith Harbor |
+| Thomas Swift (`9201022`) | Henesys, Amoria | Free, to Amoria's portal 0 or back to Henesys's portal 5. Saves nothing |
+
+Spinel's tour has no Yes or No: the fare is paid as the last page turns,
+and a player short of it is told so after the first page about the trip.
+Spinel doesn't stand in Malaysia; Audrey (`9201135`), who does, isn't
+scripted yet, so the way back from Malaysia is on foot. All of this text is
+`unsourced` placeholder text (`world_trip.*`, `florina.*`, `amoria.*`).
+`world_tour.rs` checks the tour over a relogin, Florina Beach both ways
+and Thomas Swift.
+
 ## Guards
 
 Jeff (`2030000`, `goDungeon`) stands in Ice Valley II (`211040200`), where
@@ -150,7 +171,8 @@ same packet, at most once per 500 ms. The client plays no portal sound for
 these; a script that warps sends it, SHOW_ITEM_GAIN_INCHAT mode 7.
 
 The town a player entered the Free Market from is saved with the character
-(`saved_locations`, kind 0), so the exit still leads back after a relogin.
+(`saved_locations`, kind 0; NPC trips use kinds 1 and 2, above), so the
+exit still leads back after a relogin.
 `free_market.rs` checks the round trip through the network harness. An event
 invitation saves the map it was used in the same way, under its
 `returnMapQR` (see "Return scrolls" in `inventory.md`).

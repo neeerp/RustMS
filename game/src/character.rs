@@ -19,8 +19,13 @@ pub const MAX_HP_MP: i16 = 30_000;
 /// The most SP the three beginner skills can share (one per level from 2).
 pub const MAX_BEGINNER_SP: i32 = 6;
 /// The `saved_locations` key of the town the player entered the Free Market
-/// from. Event invitations use their `returnMapQR`, which is never 0.
+/// from. Script keys are below 1000; event invitations use their
+/// `returnMapQR`, which starts at 1056.
 pub const FREE_MARKET_RETURN: i16 = 0;
+/// The `saved_locations` key of the map a world tour with Spinel left from.
+pub const WORLD_TOUR_RETURN: i16 = 1;
+/// The `saved_locations` key of the town a trip to Florina Beach left from.
+pub const FLORINA_RETURN: i16 = 2;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,8 +245,9 @@ pub struct Player {
     pub mount: Mount,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
-    /// (`FREE_MARKET_RETURN`), or the map they used an event invitation in,
-    /// under its `returnMapQR`.
+    /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
+    /// Beach left from (`WORLD_TOUR_RETURN`, `FLORINA_RETURN`), or the map
+    /// they used an event invitation in, under its `returnMapQR`.
     pub saved_locations: BTreeMap<i16, i32>,
     /// The potions the first pet gives from the HP and MP pouches' slots,
     /// or 0.

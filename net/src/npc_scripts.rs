@@ -10,6 +10,7 @@ use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{self, Cloto, Entry, EventCommand, EventKind};
 use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
+use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
 use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
@@ -283,6 +284,31 @@ const HERB_TOWN_PIER: i32 = 251000100;
 const SHARP_UNKNOWN: i32 = 230030200;
 const SHARP_UNKNOWN_FARE: i32 = 1000;
 const DOLPHIN_FARE: i32 = 10000;
+/// Spinel of the Maple Travel Agency (`world_trip`): from a town to the
+/// Mushroom Shrine in Japan, or from Boat Quay Town to Malaysia's Trend
+/// Zone Metropolis, and from the shrine back where the tour began, else
+/// to Lith Harbor (Cosmic's fares). Audrey, not Spinel, stands in Malaysia.
+const SPINEL: i32 = 9000020;
+const MUSHROOM_SHRINE: i32 = 800000000;
+const WORLD_TOUR_FARE: i32 = 3000;
+const BOAT_QUAY_TOWN: i32 = 541000000;
+const TREND_ZONE_METROPOLIS: i32 = 550000000;
+const MALAYSIA_FARE: i32 = 10000;
+/// The guides to Florina Beach (`florina2`) and their fares: Pason in Lith
+/// Harbor, Shuri in Orbis and Nara in Ludibrium (Cosmic's). The VIP ticket
+/// takes its holder for free and is kept.
+const FLORINA_GUIDES: [(i32, i32); 3] = [(1002002, 1500), (2010005, 2000), (2040048, 1800)];
+const VIP_TICKET_TO_FLORINA: i32 = 4031134;
+/// Florina Beach and its `st00` portal.
+const FLORINA_BEACH: (i32, u8) = (110000000, 4);
+/// Pison on Florina Beach (`florina1`), who takes players back where they
+/// came from, else to Lith Harbor.
+const PISON: i32 = 1081001;
+/// Thomas Swift, free between Henesys and Amoria: to Amoria's portal 0, and
+/// back to Henesys's portal 5, at the town's east end.
+const THOMAS_SWIFT: i32 = 9201022;
+const HENESYS: (i32, u8) = (100000000, 5);
+const AMORIA: (i32, u8) = (680000000, 0);
 /// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
 /// choosing, for a coupon each.
 const NATALIE: i32 = 1012103;
@@ -809,6 +835,9 @@ impl NpcScript {
         if VIP_CABS.contains(&npc_id) {
             return Some(vip_cab(npc_id, player));
         }
+        if let Some(&(_, fare)) = FLORINA_GUIDES.iter().find(|(guide, _)| *guide == npc_id) {
+            return Some(florina_guide(npc_id, fare, player));
+        }
         match npc_id {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
             SPARKLING_CRYSTAL => sparkling_crystal(player),
@@ -824,6 +853,9 @@ impl NpcScript {
             BELL => bell(player),
             NLC_TAXI => Some(nlc_taxi(player)),
             DOLPHIN => Some(dolphin(player)),
+            SPINEL => Some(spinel(player)),
+            PISON => Some(pison(player)),
+            THOMAS_SWIFT => thomas_swift(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
             JEFF => Some(jeff(player)),
@@ -2206,21 +2238,190 @@ fn ride(
     warp: Effect,
     player: &Player,
 ) -> Vec<Page> {
-    let can_pay = player.meso >= fare;
-    let on_yes = if can_pay {
-        vec![Effect::SpendMeso(fare), warp]
-    } else {
-        Vec::new()
-    };
+    let on_yes = vec![Effect::SpendMeso(fare), warp];
+    gated(ask, decline, short, player.meso >= fare, on_yes)
+}
+
+/// A question asked with `ask`: yes applies `on_yes` if `allowed`, and
+/// otherwise says `refusal` after yes instead; no says `decline` (if any).
+fn gated(
+    ask: String,
+    decline: Option<&str>,
+    refusal: &str,
+    allowed: bool,
+    on_yes: Vec<Effect>,
+) -> Vec<Page> {
     let mut pages = vec![Page::Ask {
         text: ask,
-        on_yes,
+        on_yes: if allowed { on_yes } else { Vec::new() },
         on_no: decline.map(text),
     }];
-    if !can_pay {
-        pages.push(Page::Say(text(short)));
+    if !allowed {
+        pages.push(Page::Say(text(refusal)));
     }
     pages
+}
+
+/// `world_trip`: Spinel's tour from where the player stands, or at the
+/// Mushroom Shrine the way back.
+fn spinel(player: &Player) -> NpcScript {
+    let here = player.stats.map_id;
+    if here == MUSHROOM_SHRINE {
+        return spinel_back(player);
+    }
+    let (to, fare) = if here == BOAT_QUAY_TOWN {
+        (TREND_ZONE_METROPOLIS, MALAYSIA_FARE)
+    } else {
+        (MUSHROOM_SHRINE, WORLD_TOUR_FARE)
+    };
+    let (map, price) = (to.to_string(), fare.to_string());
+    let map = [("map", map.as_str())];
+    let mut trip = vec![Page::Say(
+        content::text().get(keys::WORLD_TRIP_DESCRIBE, &map),
+    )];
+    if player.meso >= fare {
+        trip.push(Page::Say(text(keys::WORLD_TRIP_MORE)));
+        trip.push(Page::Done(vec![
+            Effect::SpendMeso(fare),
+            Effect::SaveLocation(WORLD_TOUR_RETURN, Some(here)),
+            Effect::WarpToPortal(to, 0),
+        ]));
+    } else {
+        trip.push(Page::End(text(keys::WORLD_TRIP_SHORT)));
+    }
+    let pages = vec![
+        Page::Say(content::text().get(keys::WORLD_TRIP_INTRO, &[("price", &price)])),
+        Page::Menu {
+            text: content::text().get(keys::WORLD_TRIP_OFFER, &map),
+            choices: vec![(content::text().get(keys::WORLD_TRIP_CHOICE, &map), trip)],
+        },
+    ];
+    let mut script = NpcScript::new(SPINEL, pages);
+    script.refused = Some(text(keys::WORLD_TRIP_SHORT));
+    script
+}
+
+/// Spinel at the Mushroom Shrine: back to where the tour began, else to
+/// Lith Harbor, or stay.
+fn spinel_back(player: &Player) -> NpcScript {
+    let back = saved_location(player, WORLD_TOUR_RETURN, LITH_HARBOR);
+    let map = back.to_string();
+    let map = [("map", map.as_str())];
+    let home = vec![
+        Page::Say(text(keys::WORLD_TRIP_BACK_GO)),
+        Page::Done(vec![
+            Effect::SaveLocation(WORLD_TOUR_RETURN, None),
+            Effect::Warp(back),
+        ]),
+    ];
+    let stay = vec![Page::Say(text(keys::WORLD_TRIP_BACK_STAY))];
+    NpcScript::new(
+        SPINEL,
+        vec![Page::Menu {
+            text: content::text().get(keys::WORLD_TRIP_BACK_MENU, &map),
+            choices: vec![
+                (content::text().get(keys::WORLD_TRIP_BACK_YES, &map), home),
+                (text(keys::WORLD_TRIP_BACK_NO), stay),
+            ],
+        }],
+    )
+}
+
+/// The map saved under `kind`, else `fallback`.
+fn saved_location(player: &Player, kind: i16, fallback: i32) -> i32 {
+    player
+        .saved_locations
+        .get(&kind)
+        .copied()
+        .unwrap_or(fallback)
+}
+
+/// `florina2`: to Florina Beach for `fare` or the VIP ticket, saving where
+/// the trip began.
+fn florina_guide(npc_id: i32, fare: i32, player: &Player) -> NpcScript {
+    let price = fare.to_string();
+    let price = [("price", price.as_str())];
+    let (beach, portal) = FLORINA_BEACH;
+    let go = [
+        Effect::SaveLocation(FLORINA_RETURN, Some(player.stats.map_id)),
+        Effect::WarpToPortal(beach, portal),
+    ];
+    let mut paid = vec![Effect::SpendMeso(fare)];
+    paid.extend(go.clone());
+    let pay = gated(
+        content::text().get(keys::FLORINA_PAY_ASK, &price),
+        Some(keys::FLORINA_DECLINE),
+        keys::FLORINA_SHORT,
+        player.meso >= fare,
+        paid,
+    );
+    let ticket = gated(
+        text(keys::FLORINA_TICKET_ASK),
+        Some(keys::FLORINA_DECLINE),
+        keys::FLORINA_NO_TICKET,
+        holds(player, VIP_TICKET_TO_FLORINA),
+        go.to_vec(),
+    );
+    let what = vec![
+        Page::Say(text(keys::FLORINA_WHAT_1)),
+        Page::Say(text(keys::FLORINA_WHAT_2)),
+    ];
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![Page::Menu {
+            text: content::text().get(keys::FLORINA_MENU, &price),
+            choices: vec![
+                (content::text().get(keys::FLORINA_PAY, &price), pay),
+                (text(keys::FLORINA_TICKET), ticket),
+                (text(keys::FLORINA_WHAT), what),
+            ],
+        }],
+    );
+    script.refused = Some(text(keys::FLORINA_SHORT));
+    script
+}
+
+/// `florina1`: Pison takes the player back where their trip to Florina
+/// Beach began, else to Lith Harbor.
+fn pison(player: &Player) -> NpcScript {
+    let back = saved_location(player, FLORINA_RETURN, LITH_HARBOR);
+    let map = back.to_string();
+    let map = [("map", map.as_str())];
+    NpcScript::new(
+        PISON,
+        vec![
+            Page::Say(content::text().get(keys::FLORINA_LEAVE, &map)),
+            Page::Ask {
+                text: content::text().get(keys::FLORINA_LEAVE_ASK, &map),
+                on_yes: vec![
+                    Effect::SaveLocation(FLORINA_RETURN, None),
+                    Effect::Warp(back),
+                ],
+                on_no: Some(content::text().get(keys::FLORINA_LEAVE_DECLINE, &map)),
+            },
+        ],
+    )
+}
+
+/// Thomas Swift, free from Henesys to Amoria and back. `None` elsewhere.
+fn thomas_swift(player: &Player) -> Option<NpcScript> {
+    let (ask, (to, portal)) = match player.stats.map_id {
+        id if id == HENESYS.0 => (keys::AMORIA_TO_AMORIA, AMORIA),
+        id if id == AMORIA.0 => (keys::AMORIA_TO_HENESYS, HENESYS),
+        _ => return None,
+    };
+    Some(NpcScript::new(
+        THOMAS_SWIFT,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: Vec::new(),
+                on_no: Some(text(keys::AMORIA_DECLINE)),
+            },
+            Page::Say(text(keys::AMORIA_BYE)),
+            Page::Done(vec![Effect::WarpToPortal(to, portal)]),
+        ],
+    ))
 }
 
 /// A first-job instructor. A beginner who qualifies may take the job, its
@@ -3612,6 +3813,153 @@ mod tests {
         }
         assert_ne!(says[0], says[1]);
         assert!(NpcScript::for_npc(9270018, &rider(0, 0, 540010000)).is_none());
+    }
+
+    #[test]
+    fn spinel_tours_japan_and_malaysia_and_brings_the_traveller_back() {
+        // From a town to the Mushroom Shrine, or from Boat Quay to Malaysia:
+        // the fare is paid and the town saved as the last page turns.
+        for (from, to, fare) in [
+            (100000000, 800000000, 3000),
+            (240000000, 800000000, 3000),
+            (541000000, 550000000, 10000),
+        ] {
+            let mut tour = NpcScript::for_npc(SPINEL, &rider(100, fare, from)).unwrap();
+            assert_eq!(kind(&tour.begin()), Some(0));
+            assert_eq!(kind(&tour.respond(ScriptInput::Next).unwrap()), Some(4));
+            assert_eq!(
+                kind(&tour.respond(ScriptInput::Select(0)).unwrap()),
+                Some(0)
+            );
+            let last = tour.respond(ScriptInput::Next).unwrap();
+            assert!(last.effects.is_empty());
+            assert_eq!(
+                tour.respond(ScriptInput::Next).unwrap().effects,
+                [
+                    Effect::SpendMeso(fare),
+                    Effect::SaveLocation(WORLD_TOUR_RETURN, Some(from)),
+                    Effect::WarpToPortal(to, 0),
+                ]
+            );
+            assert!(tour.refused.is_some());
+            // One meso short, the tour ends after the description.
+            let mut short = NpcScript::for_npc(SPINEL, &rider(100, fare - 1, from)).unwrap();
+            short.begin();
+            short.respond(ScriptInput::Next).unwrap();
+            short.respond(ScriptInput::Select(0)).unwrap();
+            let step = short.respond(ScriptInput::Next).unwrap();
+            assert!(step.effects.is_empty());
+            assert_eq!(buttons(&step), (false, false));
+        }
+        // At the shrine, back where the tour began, else to Lith Harbor.
+        let mut toured = rider(100, 0, 800000000);
+        toured.saved_locations.insert(WORLD_TOUR_RETURN, 220000000);
+        for (player, back) in [(&toured, 220000000), (&rider(100, 0, 800000000), 104000000)] {
+            let mut home = NpcScript::for_npc(SPINEL, player).unwrap();
+            assert_eq!(kind(&home.begin()), Some(4));
+            assert!(home
+                .respond(ScriptInput::Select(0))
+                .unwrap()
+                .effects
+                .is_empty());
+            assert_eq!(
+                home.respond(ScriptInput::Next).unwrap().effects,
+                [
+                    Effect::SaveLocation(WORLD_TOUR_RETURN, None),
+                    Effect::Warp(back),
+                ]
+            );
+            let mut stay = NpcScript::for_npc(SPINEL, player).unwrap();
+            stay.begin();
+            let step = stay.respond(ScriptInput::Select(1)).unwrap();
+            assert!(step.effects.is_empty());
+            assert!(stay.respond(ScriptInput::Next).unwrap().effects.is_empty());
+        }
+    }
+
+    #[test]
+    fn the_florina_guides_take_a_fare_or_show_the_ticket_and_pison_sees_players_home() {
+        let take = |guide, player: &Player| {
+            let mut trip = NpcScript::for_npc(guide, player).unwrap();
+            assert_eq!(kind(&trip.begin()), Some(4));
+            assert_eq!(
+                kind(&trip.respond(ScriptInput::Select(0)).unwrap()),
+                Some(1)
+            );
+            trip.respond(ScriptInput::Yes).unwrap().effects
+        };
+        let go = |from| {
+            [
+                Effect::SaveLocation(FLORINA_RETURN, Some(from)),
+                Effect::WarpToPortal(110000000, 4),
+            ]
+        };
+        for (guide, fare, from) in [
+            (1002002, 1500, 104000000),
+            (2010005, 2000, 200000000),
+            (2040048, 1800, 220000000),
+        ] {
+            let mut paid = vec![Effect::SpendMeso(fare)];
+            paid.extend(go(from));
+            assert_eq!(take(guide, &rider(100, fare, from)), paid);
+            assert!(take(guide, &rider(100, fare - 1, from)).is_empty());
+        }
+        // The VIP ticket is shown, not taken; without it nothing happens.
+        let mut holder = rider(100, 0, 104000000);
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(VIP_TICKET_TO_FLORINA, 1),
+        );
+        for (player, effects) in [
+            (&holder, go(104000000).to_vec()),
+            (&rider(100, 0, 104000000), Vec::new()),
+        ] {
+            let mut trip = NpcScript::for_npc(1002002, player).unwrap();
+            trip.begin();
+            assert_eq!(
+                kind(&trip.respond(ScriptInput::Select(1)).unwrap()),
+                Some(1)
+            );
+            assert_eq!(trip.respond(ScriptInput::Yes).unwrap().effects, effects);
+        }
+        let mut what = NpcScript::for_npc(1002002, &holder).unwrap();
+        what.begin();
+        assert_eq!(
+            kind(&what.respond(ScriptInput::Select(2)).unwrap()),
+            Some(0)
+        );
+        assert!(what.respond(ScriptInput::Next).unwrap().effects.is_empty());
+
+        // Pison: back where the trip began, else to Lith Harbor.
+        let mut came = rider(100, 0, 110000000);
+        came.saved_locations.insert(FLORINA_RETURN, 200000000);
+        for (player, back) in [(&came, 200000000), (&rider(100, 0, 110000000), 104000000)] {
+            let mut home = NpcScript::for_npc(PISON, player).unwrap();
+            assert_eq!(kind(&home.begin()), Some(0));
+            assert_eq!(kind(&home.respond(ScriptInput::Next).unwrap()), Some(1));
+            assert_eq!(
+                home.respond(ScriptInput::Yes).unwrap().effects,
+                [
+                    Effect::SaveLocation(FLORINA_RETURN, None),
+                    Effect::Warp(back)
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn thomas_swift_walks_between_henesys_and_amoria_for_free() {
+        for (from, to) in [(100000000, (680000000, 0)), (680000000, (100000000, 5))] {
+            let mut walk = NpcScript::for_npc(THOMAS_SWIFT, &rider(0, 0, from)).unwrap();
+            assert_eq!(kind(&walk.begin()), Some(1));
+            assert!(walk.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+            assert_eq!(
+                walk.respond(ScriptInput::Next).unwrap().effects,
+                [Effect::WarpToPortal(to.0, to.1)]
+            );
+        }
+        assert!(NpcScript::for_npc(THOMAS_SWIFT, &rider(0, 0, 101000000)).is_none());
     }
 
     #[test]
