@@ -94,6 +94,35 @@ void recorder()
 	require(!send(path), "a climb waits for a foothold");
 }
 
+// The user's recorder sends half a second at a time, whole: a climb or a
+// jump goes out where it is, and hanging still sends nothing more.
+void whole()
+{
+	using namespace ms::move_path;
+
+	Recorder path{ true };
+	path.reset(at(0, 0, 0, 0, 7));
+
+	int16_t x = walk(path, 0, 125, 7, 62);
+	require(!send(path), "nothing goes out before half a second");
+	x = walk(path, x, 125, 7, 1);
+	auto sent = send(path);
+	require(sent && sent->elements.size() == 1 && sent->elements[0].duration == 504,
+			"half a second of walking goes out");
+
+	walk(path, x, 0, -3, 63);
+	sent = send(path);
+	require(sent && sent->elements.size() == 1 && sent->elements[0].fh == -3 && sent->elements[0].xpos == x,
+			"a climb goes out where the rope is");
+	walk(path, x, 0, -3, 200);
+	require(!send(path), "hanging still sends nothing more");
+
+	x = walk(path, x, 125, 0, 63, -500);
+	sent = send(path);
+	require(sent && sent->elements.back().fh == 0 && sent->elements.back().xpos == x,
+			"a jump goes out in the air");
+}
+
 void mob()
 {
 	using namespace ms::move_path;
@@ -254,6 +283,7 @@ int main()
 		require(Movement::velocity(1.0) == 125 && Movement::velocity(-4.44) == -555, "speeds are per second");
 
 		recorder();
+		whole();
 		player();
 		mob();
 
