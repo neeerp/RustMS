@@ -222,7 +222,9 @@ i16 max` (bytes, 0 for no most), a number prompt (3) `i32 default, i32 min,
 i32 max`, and a box text (13) `str default, i16 cols, i16 rows`. The
 client checks a text's trimmed length and a number's range, shows v83's
 notice and stays open when they are wrong, and answers `02 01 str`,
-`03 01 i32` or `0D 01 str`. The server sends none of them yet.
+`03 01 i32` or `0D 01 str`. A text or number prompt's default comes
+selected, so the first key typed replaces it. The server sends none of
+them yet.
 
 Types 7 and 8 are a choice of styles: after the text come `u8 count` and
 that many `i32` style ids. The client shows the v83 `UtilDlgEx_Avatar`
