@@ -842,6 +842,8 @@ namespace ms
 				case UIElement::Type::STORAGE:
 				case UIElement::Type::TRADINGROOM:
 				case UIElement::Type::PERSONALSHOP:
+				case UIElement::Type::SHOPSELL:
+				case UIElement::Type::SHOPSALES:
 					return true;
 				default:
 					return false;
