@@ -331,7 +331,8 @@ standing in it with the item's `info/emotion` face, the name on the short or
 long plate, and the four lines. It slides in from the right edge over 225 ms
 with a small wobble, and out again after 10 s, when the next replaces it at
 once, or on 0x70. The line also goes to the chat log in its own colours, with the
-channel tag, as `<name> : <lines>`.
+channel tag, as `<name> : <lines>`. A banner that arrives in the cash shop
+is dropped.
 
 ### Chalkboard
 
