@@ -217,15 +217,19 @@ impl WorldHandler for UseSkillHandler {
                 if skill_id == skills::DISPEL {
                     result = dispel(ctx.player, &used.skill, result, rand::random())?;
                 }
+                if skill_id == skills::GM_HEAL {
+                    result = gm_heal(ctx.player, result)?;
+                }
                 if skills::HEROS_WILL.contains(&skill_id) {
                     result = cure(ctx.player, &skills::PURGED, result)?;
                 }
                 if skill_id == combo::ENRAGE {
                     result = set_combo(ctx.player, 1, now, result)?;
                 }
-                // Echo of Hero sends the players it reached rather than the
-                // party's bits; the server finds them itself.
-                let party = if skills::ECHOES.contains(&skill_id) {
+                // Echo of Hero and the GM's skills send the players they
+                // reached rather than the party's bits; the server finds
+                // them itself.
+                let party = if skills::reaches_everyone(skill_id) {
                     Some(EVERYONE)
                 } else {
                     extras.party
@@ -498,6 +502,19 @@ fn dispel(
     if roll * 100.0 >= f64::from(skill.effect.prop) {
         return Ok(result);
     }
+    cure(player, &skills::DISPELLED, result)
+}
+
+/// The GM's Heal + Dispel reached the player: full HP and MP, and Dispel's
+/// diseases cured (Cosmic's StatEffect, `prop 100`).
+fn gm_heal(
+    player: &mut Player,
+    result: HandlerResult<WorldAction>,
+) -> Result<HandlerResult<WorldAction>, NetworkError> {
+    let hp = player.add_hp(player.effective_max_hp());
+    let mp = player.add_mp(player.effective_max_mp());
+    let updates = [StatUpdate::Hp(hp), StatUpdate::Mp(mp)];
+    let result = result.with_reply(stat::build_stat_update(false, &updates)?);
     cure(player, &skills::DISPELLED, result)
 }
 
@@ -904,12 +921,10 @@ pub fn party_skill_reached(
     };
     // Resurrection reaches only the dead, the rest only the living.
     let dead = player.stats.hp <= 0;
-    if dead != (used.skill_id == skills::RESURRECTION)
-        || !skills::in_area(&skill.effect, origin, at)
-    {
+    if dead != skills::raises_dead(used.skill_id) || !skills::in_area(&skill.effect, origin, at) {
         return Ok(HandlerResult::empty());
     }
-    let mut result = if used.skill_id == skills::HEAL || used.skill_id == skills::RESURRECTION {
+    let mut result = if used.skill_id == skills::HEAL || skills::raises_dead(used.skill_id) {
         // Resurrection raises them with full HP (OdinMS-family servers).
         let hp = if dead {
             player.add_hp(player.effective_max_hp())
@@ -921,6 +936,8 @@ pub fn party_skill_reached(
         leap(player, HandlerResult::empty())?
     } else if used.skill_id == skills::DISPEL {
         dispel(player, &skill, HandlerResult::empty(), rand::random())?
+    } else if used.skill_id == skills::GM_HEAL {
+        gm_heal(player, HandlerResult::empty())?
     } else {
         let Some(stats) = skills::buffs(&skill) else {
             return Ok(HandlerResult::empty());
@@ -1583,6 +1600,56 @@ mod tests {
         let extras = read(2111004, &[2, 0, 0, 0, 0, 5, 0, 0, 0]);
         assert_eq!(extras.mobs, [5]);
         assert_eq!(extras.position, None);
+    }
+
+    #[test]
+    fn the_gms_heal_and_resurrection_reach_those_around() {
+        if skills::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let used = |skill_id| PartySkill {
+            skill_id,
+            level: 1,
+            slots: EVERYONE,
+            heal: 0,
+        };
+        let mut player = beginner_with(1000, 1);
+        player.stats.max_hp = 1000;
+        player.stats.hp = 10;
+        player.stats.mp = 0;
+        player.buffs.give(game::Buff::new(
+            0,
+            BuffStat::Poison,
+            1,
+            now,
+            Duration::from_secs(30),
+        ));
+        let sent = opcodes(party_skill_reached(
+            &mut player,
+            &used(skills::GM_HEAL),
+            (0, 0),
+            (0, 0),
+            now,
+        ));
+        assert_eq!(player.stats.hp, 1000);
+        assert_eq!(player.stats.mp, player.stats.max_mp);
+        assert!(!player.buffs.has(BuffStat::Poison));
+        assert!(sent.contains(&(SendOpcode::CancelBuff as i16)));
+
+        // Resurrection passes the living by and raises the dead.
+        let resurrection = used(skills::GM_RESURRECTION);
+        assert!(opcodes(party_skill_reached(
+            &mut player,
+            &resurrection,
+            (0, 0),
+            (0, 0),
+            now
+        ))
+        .is_empty());
+        player.stats.hp = 0;
+        party_skill_reached(&mut player, &resurrection, (0, 0), (0, 0), now).unwrap();
+        assert_eq!(player.stats.hp, 1000);
     }
 
     #[test]
