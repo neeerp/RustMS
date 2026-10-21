@@ -33,12 +33,14 @@ fn rejected() -> diesel::result::Error {
 /// Start a quest and save `player` (already updated with whatever starting
 /// it changed, e.g. a given item, and holding the started quest) in one
 /// transaction. `prerequisites` are
-/// `(quest id, required state)` pairs, rechecked under the character lock; a
-/// quest can only be started once.
+/// `(quest id, required state)` pairs, rechecked under the character lock. A
+/// quest can only be started once, unless it is `repeatable` and was
+/// completed, when its record starts over.
 pub fn start(
     player: &Player,
     qid: i16,
     prerequisites: &[(i16, QuestState)],
+    repeatable: bool,
 ) -> crate::Result<QuestProgress> {
     let cid = player.id();
     let mut conn = crate::connection()?;
@@ -59,20 +61,30 @@ pub fn start(
                 return Err(rejected());
             }
         }
-        if character_quests::table
+        let current = character_quests::table
             .find((cid, qid))
-            .first::<QuestProgress>(conn)
-            .optional()?
-            .is_some()
-        {
-            return Err(rejected());
+            .select(character_quests::status)
+            .first::<i16>(conn)
+            .optional()?;
+        match current {
+            None => {}
+            Some(2) if repeatable => {}
+            Some(_) => return Err(rejected()),
         }
+        let progress = encode_kills(player.quests.kills(qid));
         let progress = diesel::insert_into(character_quests::table)
             .values((
                 character_quests::character_id.eq(cid),
                 character_quests::quest_id.eq(qid),
                 character_quests::status.eq(1),
-                character_quests::progress.eq(encode_kills(player.quests.kills(qid))),
+                character_quests::progress.eq(&progress),
+            ))
+            .on_conflict((character_quests::character_id, character_quests::quest_id))
+            .do_update()
+            .set((
+                character_quests::status.eq(1),
+                character_quests::completed_at.eq(None::<SystemTime>),
+                character_quests::progress.eq(&progress),
             ))
             .get_result(conn)?;
         write_player(conn, player)?;

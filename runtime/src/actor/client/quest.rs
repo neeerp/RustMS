@@ -296,7 +296,11 @@ impl ClientActor {
                         .iter()
                         .map(|p| (p.quest_id, p.state))
                         .collect();
-                    spawn_db(move || db::quest::start(&snapshot, template.id, &prerequisites)).await
+                    let repeatable = template.start.repeat_interval.is_some();
+                    spawn_db(move || {
+                        db::quest::start(&snapshot, template.id, &prerequisites, repeatable)
+                    })
+                    .await
                 }
                 QuestChange::Complete(template) => {
                     spawn_db(move || db::quest::complete(&snapshot, template.id)).await

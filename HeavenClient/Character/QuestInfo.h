@@ -29,6 +29,9 @@ namespace ms
 		std::vector<std::pair<int32_t, bool>> skills;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
+		// Minutes after completing before the quest can be started again
+		// (Check/0/interval); -1 means it can't be repeated.
+		int32_t repeat_interval = -1;
 		// Items needed to complete: (item id, count); a count of 0 means none
 		// may be left.
 		std::vector<std::pair<int32_t, int32_t>> end_items;

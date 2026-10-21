@@ -106,14 +106,18 @@ namespace ms
 	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
 	uint64_t QuestLog::revision() const { return marker_revision; }
 
-	int16_t QuestLog::state(int16_t id) const { return completed.count(id) ? 2 : started.count(id) ? 1 : 0; }
+	// A repeatable quest started again keeps its completion, as in v83, but
+	// counts as started.
+	int16_t QuestLog::state(int16_t id) const { return started.count(id) ? 1 : completed.count(id) ? 2 : 0; }
 
 	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level,
 		const std::function<bool(const QuestInfo&)>& holds, bool all_levels) const
 	{
 		std::vector<int16_t> result;
 		for (const auto& quest : QuestCatalog::get().quests())
-			if (quest_available(quest, job, level, [&](int16_t id) { return state(id); }, holds, all_levels))
+			// v83 lists only quests never done (FUN_00a1f8e3), so no repeats.
+			if (state(quest.id) == 0 &&
+				quest_available(quest, job, level, [&](int16_t id) { return state(id); }, holds, all_levels))
 				result.push_back(quest.id);
 		return result;
 	}

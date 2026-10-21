@@ -24,6 +24,7 @@
 #include "PlayerStates.h"
 #include "SecondaryStat.h"
 #include "SkillId.h"
+#include "Inventory/ItemExpiry.h"
 #include "Inventory/ItemProperties.h"
 
 #include "../Audio/Audio.h"
@@ -1929,8 +1930,13 @@ namespace ms
 		return questlog;
 	}
 
-	bool Player::quest_holdings_met(const QuestInfo &quest) const
+	bool Player::quest_start_met(const QuestInfo &quest) const
 	{
+		auto done = questlog.completed_quests().find(quest.id);
+
+		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, item_expiry::now()))
+			return false;
+
 		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
 			[&](int32_t id)
 			{

@@ -188,6 +188,29 @@ int main()
 			"#d#L3# #r#e[Job Adv.]#d#nThe Path of a Bowman (In Progress)#l#k\r\n", "after its type, in red");
 		require(ms::quest_menu_line(3, job, true, true).find(" (Pre-completion enabled)#l") != std::string::npos,
 			"and says when it can be completed");
+		// Huckle's ingredients (3038) can be taken again a day after they
+		// were handed in.
+		constexpr int64_t DAY = 864000000000;
+		ms::QuestInfo errand = quest(3038, 2030012, 2030012);
+		errand.repeat_interval = 1440;
+		require(!ms::repeat_due(errand, 0, DAY - 1) && ms::repeat_due(errand, 0, DAY), "a repeat waits out its interval");
+		errand.repeat_interval = 0;
+		require(ms::repeat_due(errand, 5, 5), "an interval of 0 repeats at once");
+		errand.repeat_interval = -1;
+		require(!ms::repeat_due(errand, 0, 365 * DAY), "a quest without an interval never repeats");
+		auto done = [](int16_t) { return 2; };
+		auto early = [](const ms::QuestInfo&) { return false; };
+		require(!ms::quest_available(errand, 0, 30, done, anyone), "a done quest isn't offered again");
+		errand.repeat_interval = 1440;
+		require(ms::quest_available(errand, 0, 30, done, anyone), "a repeatable one is, once due");
+		require(!ms::quest_available(errand, 0, 30, done, early), "but not before");
+		require(!ms::quest_available(errand, 0, 30, [](int16_t) { return 1; }, anyone), "nor while started");
+		ms::QuestMenu huckle = ms::select_quest_menu(2030012, { errand }, done,
+			[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 30, done, anyone); }, early);
+		require(huckle.available == std::vector<int16_t>({3038}) && huckle.finished == 0, "Huckle offers it again");
+		huckle = ms::select_quest_menu(2030012, { errand }, done,
+			[&](const ms::QuestInfo& info) { return ms::quest_available(info, 0, 30, done, early); }, early);
+		require(huckle.available.empty() && huckle.finished == 1, "and counts it done until then");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}

@@ -24,6 +24,7 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "item",
     "skill",
     "pop",
+    "interval",
     "startscript",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
@@ -66,6 +67,9 @@ pub struct StartRequirements {
     pub skills: Vec<(i32, bool)>,
     /// Least fame (`pop`); 0 means no requirement.
     pub min_fame: i16,
+    /// Minutes after completing before the quest can be started again
+    /// (`interval`); `None` means it can't be repeated.
+    pub repeat_interval: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -305,6 +309,10 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .map(|v| small(v, "level"))
             .transpose()?,
         min_fame: small(nx.int_child(start, "pop")?.unwrap_or(0), "fame")?,
+        // v83 treats a negative interval, like none, as not repeatable.
+        repeat_interval: nx
+            .int_child(start, "interval")?
+            .and_then(|v| u32::try_from(v).ok()),
         ..StartRequirements::default()
     };
     if let Some(jobs) = nx.child_by_name(start, "job")? {
@@ -616,6 +624,12 @@ mod tests {
         assert_eq!(mirror.start.items, [(1042003, 1)]);
         let mastery = catalog.quest(2415).unwrap();
         assert_eq!(mastery.start.skills, [(1001004, true)]);
+        // Huckle's daily ingredients, and a quest done once.
+        assert_eq!(
+            catalog.quest(3038).unwrap().start.repeat_interval,
+            Some(1440)
+        );
+        assert_eq!(mirror.start.repeat_interval, None);
     }
 
     #[test]
