@@ -123,6 +123,13 @@ async fn the_crane_flies_to_mu_lung_and_walks_on_to_herb_town_and_back() {
     assert_eq!(t.warps, [MU_LUNG_TEMPLE]);
 }
 
+/// Log the character out mid-ride, and back in.
+async fn relogin_aboard(config: &HarnessConfig, session: WorldSession) -> WorldSession {
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    relogin(config).await
+}
+
 #[tokio::test]
 async fn a_rider_who_logs_out_mid_ride_is_back_on_the_dock() {
     let config = load_harness_config_or_fail().await;
@@ -141,8 +148,6 @@ async fn a_rider_who_logs_out_mid_ride_is_back_on_the_dock() {
     assert_eq!(t.warps, [ORBIS_TO_EREVE]);
     // Eight minutes take eight seconds; the relogin comes well before.
     assert_eq!(t.countdowns, [8]);
-    drop(session);
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let session = relogin(&config).await;
+    let session = relogin_aboard(&config, session).await;
     assert_eq!(session.map_id, ORBIS_FERRY_PLATFORM);
 }

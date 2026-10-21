@@ -182,9 +182,10 @@ CLOCK kind 2, scaled like the route clock (`RUSTMS_CONTI_SCALE`).
 | `200090310` | The crane, Mu Lung Temple | 1500 | 1 min | `200000141`, id 0 |
 
 The crane also goes straight between Mu Lung Temple and Herb Town
-(`251000000`) for 500; from Herb Town it is a bare Yes or No. Leaving a ride
-map early, by falling off or logging out, lands on its `forcedReturn`, so
-the player is back on the dock. The fares and lengths are Cosmic's. The
+(`251000000`) for 500; from Herb Town it is a bare Yes or No. Falling off a
+ride map (its `hd*` portals) lands back on the dock it left. Logging out
+lands on its `forcedReturn`, which is that dock too, except on the two Rien
+ferries, whose `forcedReturn` (Map.nx) is where they arrive. The fares and lengths are Cosmic's. The
 text is under the unsourced `ferry.*` keys. Ellinia's `inERShip` and Rien's
 `enterPort` lead down to the docks (`map-travel.md`). `ferries.rs` checks
 Rien both ways, the crane and Herb Town, and a logout mid-ride.

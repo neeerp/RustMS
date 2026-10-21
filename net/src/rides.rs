@@ -1,9 +1,10 @@
 //! Rides with no timetable: the Ereve and Rien ferries and the crane
 //! between Orbis and Mu Lung. A player boards when they like and rides
 //! alone: the ride map shows a countdown, and when it runs out the player
-//! arrives (Cosmic's `MapleMap` rides and `Hak` event). Leaving the map
-//! early, by falling off or logging out, ends where its `forcedReturn`
-//! says, the dock the ride began at.
+//! arrives (Cosmic's `MapleMap` rides and `Hak` event). Falling off lands
+//! on the dock the ride began at. Logging out lands on the map's
+//! `forcedReturn`: that dock too, except on the Rien ferries, whose
+//! `forcedReturn` is where they arrive.
 
 use crate::conti;
 
@@ -22,7 +23,7 @@ impl Ride {
     /// The ride's length on the route clock, which `RUSTMS_CONTI_SCALE`
     /// speeds up for testing; never under a second.
     pub fn countdown(&self) -> u32 {
-        let scale = u32::try_from(conti::scale()).unwrap_or(1);
+        let scale = u32::try_from(conti::scale()).unwrap_or(u32::MAX);
         (self.seconds / scale).max(1)
     }
 }
@@ -74,6 +75,11 @@ mod tests {
             assert!(ride.countdown() >= 1 && ride.countdown() <= ride.seconds);
         }
         assert_eq!(ride_on(RIEN_TO_LITH.map).unwrap().to, (104000000, 3));
+        // The map timer starts only if both ends are maps.
+        let data = crate::game_data::get().unwrap();
+        for ride in RIDES {
+            assert!(data.field_exists(ride.map) && data.field_exists(ride.to.0));
+        }
         assert_eq!(ride_on(104000000), None);
     }
 }
