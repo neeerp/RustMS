@@ -866,6 +866,10 @@ namespace ms
 		{
 			Stage::get().get_combat().show_player_special(recv.read_int());
 		}
+		else if (mode1 == 20) // a cash mist's puff
+		{
+			Stage::get().get_player().show_mist_puff(recv.read_int());
+		}
 		else if (mode1 == 18) // intro effect
 		{
 			recv.read_string(); // path

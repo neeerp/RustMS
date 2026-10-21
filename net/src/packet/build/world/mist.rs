@@ -10,6 +10,9 @@ pub enum MistKind {
     Mob = 0,
     Poison = 1,
     Smoke = 2,
+    /// A cash mist item's cloud (5281000 Passed Gas, 5281001 Floral Scent):
+    /// the client draws the item's `tile` and nothing else happens.
+    Item = 3,
 }
 
 /// A mist (an affected area) as players see it.

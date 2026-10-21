@@ -96,6 +96,10 @@ pub struct Trace {
     pub removed: Vec<(u8, i16)>,
     /// Items said to have expired (SHOW_STATUS_INFO 8).
     pub expired: Vec<i32>,
+    /// Cash mists puffed on this player (SHOW_ITEM_GAIN_INCHAT 20).
+    pub mist_puffs: Vec<i32>,
+    /// Cash mists whose face this player pulls (ITEM_EMOTION).
+    pub item_emotions: Vec<i32>,
     /// INVENTORY_GROW: (inventory type, new slot count).
     pub bag_slots: Vec<(u8, u8)>,
     /// "Quest Clear" effects (SHOW_ITEM_GAIN_INCHAT 9).
@@ -317,9 +321,12 @@ impl Trace {
                 7 => self.portal_sounds += 1,
                 9 => self.cleared += 1,
                 0x0D => self.card_effects += 1,
+                0x14 => self.mist_puffs.push(r.read_int().unwrap()),
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::ItemEmotion as i16 {
+            self.item_emotions.push(r.read_int().unwrap());
         } else if op == SendOpcode::MonsterBookSetCard as i16 {
             let added = r.read_byte().unwrap() == 1;
             self.cards

@@ -446,6 +446,26 @@ STAT_CHANGED with the mesos, INVENTORY_OPERATION, and SHOW_STATUS_INFO
 mode 5 ("You have gained mesos"). A sack that would pass 2^31 - 1 mesos
 stays shut with only the unlock.
 
+### Cash mists
+
+Passed Gas (5281000) and Floral Scent (5281001) leave a cloud around their
+user for 60 seconds (`Item.nx Cash/0528.img`: `info/lt`, `info/rb`,
+`info/time`, read into `ItemInfo.mist`). The client sends USE_CASH_ITEM with
+nothing after the item, at once, unless the user's own cloud of that item
+still lasts or they stand in anyone's; then it says "An Effect Item is
+currently in use." (`MapMists::item_busy`, v83 FUN_00431866). The server
+(`world/cash_mist.rs`) takes one and asks the field (`FieldRequest::ItemMist`),
+which checks the same and, if it is free, adds a type 3 mist owned by the user
+with the item as its skill (AFFECTED_AREA_CREATED to the map), and shows
+the item's `effect` puff on the user: SHOW_ITEM_GAIN_INCHAT mode 20 to them,
+SHOW_FOREIGN_EFFECT mode 20 to the others. The cloud does nothing to anyone.
+ITEM_EMOTION (`0xE2`, the item id) makes the user's client pick one of the
+item's `emotion` faces by weight and send it as FACE_EXPRESSION, which the
+server allows from the last cash mist used, for the next face only
+(`Player::mist_face`).
+Report c008 has the client's detail. The puff's ConsumeEffect sound isn't in
+this Sound.nx.
+
 ### Writs of Solomon
 
 A Writ of Solomon (237xxxx) gives its `spec/exp` not as EXP but as gacha

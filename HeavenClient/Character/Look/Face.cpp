@@ -24,15 +24,30 @@
 
 namespace ms
 {
-	Expression::Id Expression::byaction(size_t action)
+	namespace
 	{
 		// The v83 client's faces by emotion number, F1's action (100)
 		// being 1. The face items start at 8.
-		static constexpr Id BY_EMOTION[] = {
-			BLINK, HIT, SMILE, TROUBLED, CRY, ANGRY, BEWILDERED, STUNNED,
-			VOMIT, OOPS, CHEERS, CHU, WINK, PAIN, GLITTER, BLAZE,
-			SHINE, LOVE, DESPAIR, HUM, BOWING, HOT, DAM
+		constexpr Expression::Id BY_EMOTION[] = {
+			Expression::BLINK, Expression::HIT, Expression::SMILE, Expression::TROUBLED, Expression::CRY,
+			Expression::ANGRY, Expression::BEWILDERED, Expression::STUNNED, Expression::VOMIT, Expression::OOPS,
+			Expression::CHEERS, Expression::CHU, Expression::WINK, Expression::PAIN, Expression::GLITTER,
+			Expression::BLAZE, Expression::SHINE, Expression::LOVE, Expression::DESPAIR, Expression::HUM,
+			Expression::BOWING, Expression::HOT, Expression::DAM
 		};
+	}
+
+	int32_t Expression::emotion(const std::string &name)
+	{
+		for (size_t i = 0; i < std::size(BY_EMOTION); i++)
+			if (names[BY_EMOTION[i]] == name)
+				return static_cast<int32_t>(i);
+
+		return -1;
+	}
+
+	Expression::Id Expression::byaction(size_t action)
+	{
 
 		size_t emotion = action - 99;
 

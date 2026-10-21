@@ -1486,6 +1486,39 @@ namespace ms
 		return fame_cooldown.try_give(get_uptime() / 1000);
 	}
 
+	void Stage::use_item_emotion(int32_t item_id)
+	{
+		nl::node faces = nl::nx::item["Cash"]["0528.img"][string_format::extend_id(item_id, 8)]["emotion"];
+		int32_t total = 0;
+
+		for (nl::node face : faces)
+			total += face.get_integer();
+
+		if (total <= 0)
+			return;
+
+		int32_t roll = Randomizer().next_int(total);
+		int32_t emotion = -1;
+
+		for (nl::node face : faces)
+		{
+			roll -= static_cast<int32_t>(face.get_integer());
+
+			if (roll < 0)
+			{
+				emotion = Expression::emotion(face.name());
+				break;
+			}
+		}
+
+		// Not morphed, and no faster than the emote keys (FUN_00a24470).
+		if (emotion < 0 || player.shape_refuses() || !emote_cooldown.try_start(get_uptime() / 1000))
+			return;
+
+		player.set_expression(99 + emotion);
+		FaceExpressionPacket(emotion).dispatch();
+	}
+
 	void Stage::use_item_effect(int32_t item_id)
 	{
 		// Not morphed (FUN_00a24530).

@@ -216,6 +216,10 @@ namespace ms
 		// Play an animation anchored to the character (e.g. a tutorial image).
 		void show_effect(const Animation &effect);
 
+		// A cash mist's puff: its item's `effect` once at the node's z, with
+		// its ConsumeEffect sound (FUN_009377d9 mode 20).
+		void show_mist_puff(int32_t itemid);
+
 		// Display the iron body skill animation.
 		void show_iron_body();
 

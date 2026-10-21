@@ -160,6 +160,11 @@ namespace ms
 		return mist::shelters(areas(), position.x(), position.y(), ally);
 	}
 
+	bool MapMists::item_busy(int32_t owner, int32_t itemid, Point<int16_t> position) const
+	{
+		return mist::item_busy(areas(), owner, itemid, position.x(), position.y());
+	}
+
 	// A fading mist is gone to the client, which removes its area at once.
 	std::vector<mist::Area> MapMists::areas() const
 	{

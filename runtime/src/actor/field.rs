@@ -19,7 +19,9 @@ use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
-use net::packet::build::world::effect::{build_blow_weather, build_boss_hp_bar};
+use net::packet::build::world::effect::{
+    build_blow_weather, build_boss_hp_bar, build_item_emotion, build_mist_item_effect,
+};
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
     parse_movement_state,
@@ -471,6 +473,11 @@ impl FieldActor {
                     left,
                     inflict,
                 } => self.handle_mist(from, skill_id, level, left, inflict),
+                FieldRequest::ItemMist {
+                    item_id,
+                    area,
+                    lasts,
+                } => self.handle_item_mist(from, item_id, area, lasts),
                 FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
                 FieldRequest::MobDebuff {
@@ -1224,6 +1231,71 @@ impl FieldActor {
         let view = self.mists.add(view, from, inflict, lasts, Instant::now());
         if let Ok(packet) = build_spawn_mist(&view) {
             self.broadcast(None, packet);
+        }
+    }
+
+    /// `from` used a cash mist item: its cloud covers `area` around them.
+    /// Like the v83 client's own check (FUN_00431866), none is left while
+    /// one of theirs from that item is there or they stand in any item's
+    /// cloud; the item is spent either way.
+    fn handle_item_mist(
+        &mut self,
+        from: ClientId,
+        item_id: i32,
+        area: (i32, i32, i32, i32),
+        lasts: Duration,
+    ) {
+        let Some(user) = self.occupants.get(&from) else {
+            return;
+        };
+        let (owner_id, x, y) = (user.avatar.id, user.avatar.x, user.avatar.y);
+        // The client asks PtInRect, so the right and bottom edges are out.
+        let (px, py) = (i32::from(x), i32::from(y));
+        let busy = self.mists.all().any(|mist| {
+            let (left, top, right, bottom) = mist.view.area;
+            mist.view.kind == MistKind::Item
+                && ((mist.view.owner_id == owner_id && mist.view.skill_id == item_id)
+                    || (left <= px && px < right && top <= py && py < bottom))
+        });
+        if busy {
+            return;
+        }
+        let (left, top, right, bottom) = area;
+        let (x, y) = (i32::from(x), i32::from(y));
+        let view = MistView {
+            object_id: 0,
+            kind: MistKind::Item,
+            owner_id,
+            skill_id: item_id,
+            level: 1,
+            delay: 0,
+            area: (x + left, y + top, x + right, y + bottom),
+            element: 0,
+        };
+        let inflict = Inflict {
+            skill_id: item_id,
+            prop: 0,
+            duration: lasts,
+            statuses: Vec::new(),
+        };
+        let view = self.mists.add(view, from, inflict, lasts, Instant::now());
+        if let Ok(packet) = build_spawn_mist(&view) {
+            self.broadcast(None, packet);
+        }
+        // The puff on its user, for everyone, and the user's face.
+        if let Some(user) = self.occupants.get(&from) {
+            for packet in [
+                build_mist_item_effect(None, item_id),
+                build_item_emotion(item_id),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                user.handle.send_packet(packet);
+            }
+        }
+        if let Ok(packet) = build_mist_item_effect(Some(owner_id), item_id) {
+            self.broadcast(Some(from), packet);
         }
     }
 

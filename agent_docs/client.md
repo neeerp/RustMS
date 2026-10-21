@@ -585,6 +585,7 @@ side yet.
 | Maple Messenger (`UIMessenger`) | Implemented |
 | Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
 | Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
+| Cash mists (528xxxx) | Implemented: the use gate (`MapMists::item_busy`), the cloud (`MapMists`, type 3), the puff on the user (`Char::show_mist_puff`, user effect mode 20) and the face (ITEM_EMOTION, `Stage::use_item_emotion`); see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
 | Item Maker (`UIMaker`) | Recipes with their stimulator and gems, monster crystals, disassembly and the random make: the drop lists, ingredient counts, fee, gauge, result dialog and chat lines; see `inventory.md` |

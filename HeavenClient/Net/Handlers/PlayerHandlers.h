@@ -163,6 +163,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The player pulls one of a cash mist's faces (FUN_00938b3e)
+	// Opcode: ITEM_EMOTION(226)
+	class ItemEmotionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Puts a picked-up card in the Monster Book, or says its page is full
 	// Opcode: MONSTER_BOOK_SET_CARD(83)
 	class MonsterBookSetCardHandler : public PacketHandler

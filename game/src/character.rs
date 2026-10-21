@@ -237,6 +237,9 @@ pub struct Player {
     /// The catch item (227xxxx) last thrown and when, for its `useDelay`;
     /// not saved.
     pub last_catch: Option<(i32, std::time::Instant)>,
+    /// The cash mist (528xxxx) last used, whose face the player may pull
+    /// once; not saved.
+    pub mist_face: Option<i32>,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     /// The skill macros, by place in the list.
@@ -300,6 +303,7 @@ impl Player {
             berserk: false,
             hidden: false,
             last_catch: None,
+            mist_face: None,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
