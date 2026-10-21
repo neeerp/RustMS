@@ -135,6 +135,34 @@ pub mod keys {
     pub const CAMEL_CAB_DECLINE: &str = "camel_cab.decline";
     pub const CAMEL_CAB_SHORT: &str = "camel_cab.short";
 
+    /// The subway between Kerning City and New Leaf City: the ticket gates
+    /// (`NLC_Move`), and Bell (`NLC_ticketing`), who sells tickets at each
+    /// station (`to_nlc`, `to_kerning_city`: the menu, its one choice, and
+    /// the ask with `{term}`, `{price}` and `{ticket}`) and lets riders back
+    /// out of the waiting rooms.
+    pub const SUBWAY_BOARD_ASK: &str = "subway.board.ask";
+    pub const SUBWAY_BOARD_DECLINE: &str = "subway.board.decline";
+    pub const SUBWAY_BOARD_NO_TICKET: &str = "subway.board.no_ticket";
+    pub const SUBWAY_BOARD_CLOSING: &str = "subway.board.closing";
+    pub const SUBWAY_BOARD_FULL: &str = "subway.board.full";
+    pub const SUBWAY_TO_NLC_MENU: &str = "subway.to_nlc.menu";
+    pub const SUBWAY_TO_NLC_CHOICE: &str = "subway.to_nlc.choice";
+    pub const SUBWAY_TO_NLC_ASK: &str = "subway.to_nlc.ask";
+    pub const SUBWAY_TO_NLC_LEAVE: &str = "subway.to_nlc.leave";
+    pub const SUBWAY_TO_KERNING_CITY_MENU: &str = "subway.to_kerning_city.menu";
+    pub const SUBWAY_TO_KERNING_CITY_CHOICE: &str = "subway.to_kerning_city.choice";
+    pub const SUBWAY_TO_KERNING_CITY_ASK: &str = "subway.to_kerning_city.ask";
+    pub const SUBWAY_TO_KERNING_CITY_LEAVE: &str = "subway.to_kerning_city.leave";
+    pub const SUBWAY_SELL_DECLINE: &str = "subway.sell.decline";
+    pub const SUBWAY_SELL_SHORT: &str = "subway.sell.short";
+    pub const SUBWAY_LEAVE_DECLINE: &str = "subway.leave.decline";
+
+    /// The NLC Taxi between New Leaf City and the Haunted House's mansion
+    /// grounds.
+    pub const NLC_TAXI_ASK: &str = "nlc_taxi.ask";
+    pub const NLC_TAXI_DECLINE: &str = "nlc_taxi.decline";
+    pub const NLC_TAXI_SHORT: &str = "nlc_taxi.short";
+
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
     pub const DOLPHIN_MENU: &str = "dolphin.menu";
@@ -614,6 +642,25 @@ mod tests {
             keys::CAMEL_CAB_ASK,
             keys::CAMEL_CAB_DECLINE,
             keys::CAMEL_CAB_SHORT,
+            keys::SUBWAY_BOARD_ASK,
+            keys::SUBWAY_BOARD_DECLINE,
+            keys::SUBWAY_BOARD_NO_TICKET,
+            keys::SUBWAY_BOARD_CLOSING,
+            keys::SUBWAY_BOARD_FULL,
+            keys::SUBWAY_TO_NLC_MENU,
+            keys::SUBWAY_TO_NLC_CHOICE,
+            keys::SUBWAY_TO_NLC_ASK,
+            keys::SUBWAY_TO_NLC_LEAVE,
+            keys::SUBWAY_TO_KERNING_CITY_MENU,
+            keys::SUBWAY_TO_KERNING_CITY_CHOICE,
+            keys::SUBWAY_TO_KERNING_CITY_ASK,
+            keys::SUBWAY_TO_KERNING_CITY_LEAVE,
+            keys::SUBWAY_SELL_DECLINE,
+            keys::SUBWAY_SELL_SHORT,
+            keys::SUBWAY_LEAVE_DECLINE,
+            keys::NLC_TAXI_ASK,
+            keys::NLC_TAXI_DECLINE,
+            keys::NLC_TAXI_SHORT,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,

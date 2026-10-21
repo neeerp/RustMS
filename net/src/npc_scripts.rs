@@ -165,6 +165,47 @@ const CAMEL_CAB_FARE: i32 = 1500;
 const OUTSIDE_ARIANT: i32 = 260020000;
 const MAGATIA: i32 = 261000000;
 const ARIANT: i32 = 260000000;
+/// The subway's ticket gates: Kerning City's (`subway_in`, whose menu also
+/// offers Kerning Square and the Construction Site, left out until those
+/// run) and New Leaf City's (`NLC_Move`).
+const SUBWAY_GATES: [(i32, &Route); 2] = [
+    (1052007, &conti::TO_NLC),
+    (9201068, &conti::TO_KERNING_CITY),
+];
+/// Bell (`NLC_ticketing`) stands on both platforms and in both waiting
+/// rooms.
+const BELL: i32 = 9201057;
+/// What Bell says about each line: her menu, its one choice, the ask, and
+/// the way back out of the line's waiting room.
+struct SubwayLine {
+    route: &'static Route,
+    menu: &'static str,
+    choice: &'static str,
+    ask: &'static str,
+    leave: &'static str,
+}
+const SUBWAY_LINES: [SubwayLine; 2] = [
+    SubwayLine {
+        route: &conti::TO_NLC,
+        menu: keys::SUBWAY_TO_NLC_MENU,
+        choice: keys::SUBWAY_TO_NLC_CHOICE,
+        ask: keys::SUBWAY_TO_NLC_ASK,
+        leave: keys::SUBWAY_TO_NLC_LEAVE,
+    },
+    SubwayLine {
+        route: &conti::TO_KERNING_CITY,
+        menu: keys::SUBWAY_TO_KERNING_CITY_MENU,
+        choice: keys::SUBWAY_TO_KERNING_CITY_CHOICE,
+        ask: keys::SUBWAY_TO_KERNING_CITY_ASK,
+        leave: keys::SUBWAY_TO_KERNING_CITY_LEAVE,
+    },
+];
+/// The NLC Taxi between New Leaf City and the Haunted House's grounds,
+/// either way (Cosmic's fare).
+const NLC_TAXI: i32 = 9201056;
+const NLC_TAXI_FARE: i32 = 15000;
+const NEW_LEAF_CITY: i32 = 600000000;
+const HAUNTED_HOUSE_GROUNDS: i32 = 682000000;
 /// The Dolphin Taxi (`aqua_taxi`) at the Aquarium and Herb Town's pier:
 /// down to the Sharp Unknown for a fare or a coupon, or across to the
 /// other end.
@@ -601,6 +642,9 @@ impl NpcScript {
         if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
             return Some(ticket_seller(npc_id, route, player));
         }
+        if let Some((_, route)) = SUBWAY_GATES.iter().find(|(gate, _)| *gate == npc_id) {
+            return Some(subway_gate(npc_id, route, player, conti::now()));
+        }
         if let Some((_, route)) = USHERS.iter().find(|(usher, _)| *usher == npc_id) {
             return Some(usher(npc_id, route, player, conti::now()));
         }
@@ -625,6 +669,8 @@ impl NpcScript {
             ISA => Some(isa()),
             DANGER_ZONE_TAXI => danger_zone_taxi(player),
             CAMEL_CAB => Some(camel_cab(player)),
+            BELL => bell(player),
+            NLC_TAXI => Some(nlc_taxi(player)),
             DOLPHIN => Some(dolphin(player)),
             NATALIE => Some(natalie(player)),
             MAPLE_ADMINISTRATOR => Some(Self::new(
@@ -1056,6 +1102,19 @@ fn ticket_text(key: &str, route: &Route) -> String {
 }
 
 fn sell_ticket(route: &Route, player: &Player) -> Vec<Page> {
+    let ask = ticket_text(keys::SHIPS_SELL_ASK, route);
+    sell(
+        route,
+        player,
+        ask,
+        keys::SHIPS_SELL_DECLINE,
+        keys::SHIPS_SELL_SHORT,
+    )
+}
+
+/// One of `route`'s tickets, asked about with `ask`: no says `decline`,
+/// and a player short of the price hears `short` after yes.
+fn sell(route: &Route, player: &Player, ask: String, decline: &str, short: &str) -> Vec<Page> {
     let can_pay = player.meso >= route.price;
     let on_yes = if can_pay {
         vec![
@@ -1069,12 +1128,12 @@ fn sell_ticket(route: &Route, player: &Player) -> Vec<Page> {
         Vec::new()
     };
     let mut pages = vec![Page::Ask {
-        text: ticket_text(keys::SHIPS_SELL_ASK, route),
+        text: ask,
         on_yes,
-        on_no: Some(text(keys::SHIPS_SELL_DECLINE)),
+        on_no: Some(text(decline)),
     }];
     if !can_pay {
-        pages.push(Page::Say(ticket_text(keys::SHIPS_SELL_SHORT, route)));
+        pages.push(Page::Say(ticket_text(short, route)));
     }
     pages
 }
@@ -1114,6 +1173,117 @@ fn leave_ship(npc_id: i32, route: &Route) -> NpcScript {
             on_no: Some(text(keys::SHIPS_LEAVE_DECLINE)),
         }],
     )
+}
+
+/// `NLC_Move`: a subway gate asks first and only then looks for the
+/// ticket, then shows the player to the waiting room while the train
+/// boards, as of route time `t`.
+fn subway_gate(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript {
+    let pages = match route.timetable.state(t) {
+        State::Wait => {
+            let has_ticket = player.inventory.count(route.ticket) > 0;
+            let on_yes = if has_ticket {
+                vec![
+                    Effect::RequireBoarding(route.platform),
+                    Effect::TakeItem {
+                        item_id: route.ticket,
+                        quantity: 1,
+                    },
+                    Effect::Warp(route.waiting_room),
+                ]
+            } else {
+                Vec::new()
+            };
+            let mut pages = vec![Page::Ask {
+                text: text(keys::SUBWAY_BOARD_ASK),
+                on_yes,
+                on_no: Some(text(keys::SUBWAY_BOARD_DECLINE)),
+            }];
+            if !has_ticket {
+                pages.push(Page::Say(text(keys::SUBWAY_BOARD_NO_TICKET)));
+            }
+            pages
+        }
+        State::Start => vec![Page::Say(text(keys::SUBWAY_BOARD_CLOSING))],
+        _ => vec![Page::Say(text(keys::SUBWAY_BOARD_FULL))],
+    };
+    NpcScript::new(npc_id, pages)
+}
+
+/// `NLC_ticketing`: on a platform Bell sells the ticket for the line that
+/// leaves it; in a waiting room she lets the player back out to the
+/// platform.
+fn bell(player: &Player) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    if let Some(line) = SUBWAY_LINES
+        .iter()
+        .find(|line| line.route.platform == map_id)
+    {
+        let route = line.route;
+        let (term, price, ticket) = (
+            route.timetable.term.to_string(),
+            route.price.to_string(),
+            route.ticket.to_string(),
+        );
+        let vars = [
+            ("term", term.as_str()),
+            ("price", &price),
+            ("ticket", &ticket),
+        ];
+        let ask = content::text().get(line.ask, &vars);
+        let pages = sell(
+            route,
+            player,
+            ask,
+            keys::SUBWAY_SELL_DECLINE,
+            keys::SUBWAY_SELL_SHORT,
+        );
+        let mut script = NpcScript::new(
+            BELL,
+            vec![Page::Menu {
+                text: text(line.menu),
+                choices: vec![(text(line.choice), pages)],
+            }],
+        );
+        script.inventory_full = Some(ticket_text(keys::SUBWAY_SELL_SHORT, route));
+        return Some(script);
+    }
+    let line = SUBWAY_LINES
+        .iter()
+        .find(|line| line.route.waiting_room == map_id)?;
+    Some(NpcScript::new(
+        BELL,
+        vec![Page::Ask {
+            text: text(line.leave),
+            on_yes: vec![Effect::Warp(line.route.platform)],
+            on_no: Some(text(keys::SUBWAY_LEAVE_DECLINE)),
+        }],
+    ))
+}
+
+/// The NLC Taxi, to the Haunted House's grounds from New Leaf City and
+/// back.
+fn nlc_taxi(player: &Player) -> NpcScript {
+    let to = if player.stats.map_id == HAUNTED_HOUSE_GROUNDS {
+        NEW_LEAF_CITY
+    } else {
+        HAUNTED_HOUSE_GROUNDS
+    };
+    let (map, price) = (to.to_string(), NLC_TAXI_FARE.to_string());
+    let ask = content::text().get(keys::NLC_TAXI_ASK, &[("map", &map), ("price", &price)]);
+    let mut script = NpcScript::new(
+        NLC_TAXI,
+        ride(
+            ask,
+            Some(keys::NLC_TAXI_DECLINE),
+            keys::NLC_TAXI_SHORT,
+            NLC_TAXI_FARE,
+            Effect::WarpToPortal(to, 0),
+            player,
+        ),
+    );
+    script.refused = Some(text(keys::NLC_TAXI_SHORT));
+    script
 }
 
 /// `station_in`: Isa shows the way to Orbis Station's platforms.
@@ -2469,6 +2639,98 @@ mod tests {
                 [Effect::Warp(passage)]
             );
         }
+    }
+
+    #[test]
+    fn the_subway_gates_ask_first_and_bell_sells_tickets_and_lets_riders_out() {
+        const HOUR: i64 = 3_600_000;
+        // A train leaves on the hour and every 5 minutes; boarding is open
+        // from 4 to 1 minutes before.
+        let minute = |m: i64| 7 * HOUR + m * 60_000;
+        let mut holder = traveller(10, 0, false);
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(conti::TO_NLC.ticket, 1),
+        );
+        let mut gate = subway_gate(1052007, &conti::TO_NLC, &holder, minute(2));
+        assert_eq!(kind(&gate.begin()), Some(1));
+        assert_eq!(
+            gate.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireBoarding(103000100),
+                Effect::TakeItem {
+                    item_id: 4031711,
+                    quantity: 1
+                },
+                Effect::Warp(600010004),
+            ]
+        );
+        // Without a ticket the gate still asks, then says why not.
+        let mut gate = subway_gate(
+            9201068,
+            &conti::TO_KERNING_CITY,
+            &traveller(10, 0, false),
+            minute(2),
+        );
+        assert_eq!(kind(&gate.begin()), Some(1));
+        let refused = gate.respond(ScriptInput::Yes).unwrap();
+        assert!(refused.effects.is_empty());
+        assert_eq!(buttons(&refused), (false, false));
+        // Boarding closed, or the train gone.
+        for t in [minute(4), minute(5)] {
+            let gate = subway_gate(1052007, &conti::TO_NLC, &holder, t);
+            assert_eq!(buttons(&gate.begin()), (false, false));
+        }
+
+        // Bell sells the ticket for the line leaving her platform.
+        for (platform, ticket) in [(103000100, 4031711), (600010001, 4031713)] {
+            let mut buyer = traveller(10, 5000, false);
+            buyer.stats.map_id = platform;
+            let mut bell = NpcScript::for_npc(BELL, &buyer).unwrap();
+            assert_eq!(kind(&bell.begin()), Some(4));
+            assert_eq!(
+                kind(&bell.respond(ScriptInput::Select(0)).unwrap()),
+                Some(1)
+            );
+            assert_eq!(
+                bell.respond(ScriptInput::Yes).unwrap().effects,
+                [
+                    Effect::SpendMeso(5000),
+                    Effect::GiveItem {
+                        item_id: ticket,
+                        quantity: 1
+                    }
+                ]
+            );
+            assert!(bell.inventory_full().is_some());
+        }
+        // ...and lets riders back out of a waiting room to its platform.
+        for (room, platform) in [(600010004, 103000100), (600010002, 600010001)] {
+            let mut rider = traveller(10, 0, false);
+            rider.stats.map_id = room;
+            let mut bell = NpcScript::for_npc(BELL, &rider).unwrap();
+            assert_eq!(
+                bell.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(platform)]
+            );
+        }
+        assert!(NpcScript::for_npc(BELL, &traveller(10, 0, false)).is_none());
+    }
+
+    #[test]
+    fn the_nlc_taxi_runs_between_new_leaf_city_and_the_haunted_house() {
+        for (from, to) in [(600000000, 682000000), (682000000, 600000000)] {
+            let mut taxi = NpcScript::for_npc(NLC_TAXI, &rider(100, 15000, from)).unwrap();
+            assert_eq!(kind(&taxi.begin()), Some(1));
+            assert_eq!(
+                taxi.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::SpendMeso(15000), Effect::WarpToPortal(to, 0)]
+            );
+        }
+        let mut taxi = NpcScript::for_npc(NLC_TAXI, &rider(100, 14999, 600000000)).unwrap();
+        taxi.begin();
+        assert!(taxi.respond(ScriptInput::Yes).unwrap().effects.is_empty());
     }
 
     fn rider(job: i16, meso: i32, map_id: i32) -> Player {

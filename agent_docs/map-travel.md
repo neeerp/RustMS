@@ -45,6 +45,7 @@ nothing and shows the cab's "not enough mesos" line.
 | VIP Cab (`1002004`, `1032005`) | Lith Harbor, Ellinia | Ant Tunnel Park (`105070001`) for 10000 |
 | Danger Zone Taxi (`2023000`) | El Nath, Ludibrium, Omega Sector, Leafre | El Nath to `211040200` (10000), Ludibrium to `220050300` portal 1 (25000), Omega Sector to Ludibrium (25000), Leafre to `240030000` (65000) |
 | Camel Cab (`2110005`) | Outside Ariant and Magatia | The other end for 1500 |
+| NLC Taxi (`9201056`) | New Leaf City, the Haunted House's grounds (`682000000`) | The other end, portal 0, for 15000 |
 | Dolphin (`2060009`) | Aquarium, Herb Town pier | Menu: down to Sharp Unknown (`230030200` portal 2) for 1000 or one Dolphin Taxi Coupon (`4031242`), or across between the two for 10000 |
 
 Beginners (job 0) pay a tenth on the Regular and VIP cabs, and the Regular
@@ -53,9 +54,11 @@ Dolphin ride warps at once; here each choice asks Yes or No, since a menu
 choice opens pages and cannot take mesos itself.
 
 Only the Regular Cab's text is in the content pack (`taxi.*`). The VIP Cab,
-Danger Zone Taxi, Camel Cab and Dolphin keys are `unsourced` and show
+Danger Zone Taxi, Camel Cab, Dolphin and NLC Taxi keys are `unsourced` and show
 placeholder text. `taxis.rs` checks a beginner's Regular Cab ride and the
 VIP Cab's fare through the network harness.
+`subway.rs` rides the NLC Taxi and walks through `halloween_enter`. The
+Kerning City-New Leaf City subway runs on the ship clock (`ships.md`).
 
 ## Map and portal scripts
 
@@ -74,6 +77,7 @@ nothing. A script returns effects that the client actor sends:
 | `glTutoMsg0` | PLAYER_HINT balloon, text key `glTutoMsg0.message` |
 | `market01`-`market22` | A town's Free Market entrance: save the town, portal sound, warp to `910000000` portal `out00` |
 | `market00` | The Free Market's exit: portal sound, back to the saved town's entrance (else Henesys), forget the town |
+| `halloween_enter` | The Haunted House's gate: portal sound, warp to `682000100` portal `st00` |
 | `photoOut`, `StudioZone_Out`, `outBabyBird` | An event map's exit: portal sound, back to where its invitation was used (else Henesys), forget it |
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer

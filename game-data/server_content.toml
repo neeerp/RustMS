@@ -331,6 +331,9 @@ unsourced = [
     "dolphin.ask",
     "dolphin.coupon_ask",
     "dolphin.short",
+    "nlc_taxi.ask",
+    "nlc_taxi.decline",
+    "nlc_taxi.short",
 ]
 
 [text."glTutoMsg0.message"]
@@ -1002,6 +1005,86 @@ sha256 = "478fc63289da4844b0784da8a164ba11ead3207fb9377acfb4786962e6bf8e14"
 source = "Server.Scripts/src/kairinT.lua"
 template = "{s17}"
 sha256 = "5b56550d1ea4930c9b153b4d8f9b77ac22e1a9bd8639737dadaec6b0cfeb4cf3"
+
+[text."subway.board.ask"]
+source = "Server.Scripts/src/NLC_Move.lua"
+template = "{s3}"
+sha256 = "7db8b609465f293cd4c886128e0bdb3b212a3024123280ec9ff11e188cdf09dc"
+
+[text."subway.board.decline"]
+source = "Server.Scripts/src/NLC_Move.lua"
+template = "{s5}"
+sha256 = "23ceada93ec5a8404f40eb8af7495aa84d997f68ff521f4c858b8d3b55482276"
+
+[text."subway.board.no_ticket"]
+source = "Server.Scripts/src/NLC_Move.lua"
+template = "{s4}"
+sha256 = "ff34c272316a01584460aca0df7073b42afb158a780754d1588eb6956730240a"
+
+[text."subway.board.closing"]
+source = "Server.Scripts/src/NLC_Move.lua"
+template = "{s7}"
+sha256 = "bcd11d10fbb2b2d61c4a8db867b551156c41239b4b605f5aadf88c772c4d8fd3"
+
+[text."subway.board.full"]
+source = "Server.Scripts/src/NLC_Move.lua"
+template = "{s9}"
+sha256 = "27ac562682cddb4d1ea80f652f3193753dab751072dc87c1c9fadcfc988a3e08"
+
+[text."subway.to_nlc.menu"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s10}"
+sha256 = "f94e1cc345f83070662519d9d8ec1dd704e5cda7f7a895ce104ebf449e0c9fa4"
+
+[text."subway.to_nlc.choice"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s11}"
+sha256 = "ba1f4451b51c91536ed514a09f548033f4f87a70ae461ac2e105495f55ccce2b"
+
+[text."subway.to_nlc.ask"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s12}{term}{s13}{price}{s14}{ticket}{s15}"
+sha256 = "ae49f157360834c0c8293d0311d63cdf274ef13dcb57e936e7e27e2abf8c502c"
+
+[text."subway.to_nlc.leave"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s20}{s19}{s21}"
+sha256 = "daee07b89d9ac06a0abcdbd7b2f5a3d208cb3ebb384f10e2add3e50e0fe4f1aa"
+
+[text."subway.to_kerning_city.menu"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s2}"
+sha256 = "8172149324fe9a293360a183f5d0c268111db880c96582e2f7a5db56df136e34"
+
+[text."subway.to_kerning_city.choice"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s3}"
+sha256 = "c3a7ff0448e4524504cb56d6b15683dffc833a2a0d8a097e2fd6c1125208289b"
+
+[text."subway.to_kerning_city.ask"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s4}{term}{s5}{price}{s6}{ticket}{s7}"
+sha256 = "4a078d08cfb67ac43992e10702d4d9bac7b480dbab0091fdb584bc379c615af3"
+
+[text."subway.to_kerning_city.leave"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s20}{s18}{s21}"
+sha256 = "0c0522f2f513ff1868e7db73db763f8cd7d7115bc64defa3ef329ef45dc6dc1e"
+
+[text."subway.sell.decline"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s8}"
+sha256 = "23ceada93ec5a8404f40eb8af7495aa84d997f68ff521f4c858b8d3b55482276"
+
+[text."subway.sell.short"]
+source = "Server.Scripts/src/lib/charInventory.lua"
+template = "{s0}{price}{s1}"
+sha256 = "e1aa71b245c22aabf86919c563f8c6c57c921946e3aca6f8902bcb0995a3f0b7"
+
+[text."subway.leave.decline"]
+source = "Server.Scripts/src/NLC_ticketing.lua"
+template = "{s22}"
+sha256 = "ad7c30b55f98b22a8ed2fa15f8c495b924580a8f5179af2dd2feea3512cd9dea"
 
 [rewards]
 source = "Server.NX/src/Reward.img"
