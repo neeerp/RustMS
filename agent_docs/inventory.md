@@ -831,9 +831,11 @@ PARCEL (`0x142`) starts with a mode byte:
 
 The client throws if an open (`0x08` or `0x1a`) arrives while its window is
 up, so the server keeps `duey: Option<DueyWindow>` (Duey's own window, a
-receive-only one, or a quick send). It is set on open and cleared by
-DUEY_ACTION op 7 and on entering the Cash Shop, so a second open sends
-nothing. The client uses a coupon only with no window up, so using one
+receive-only one, or a quick send). It is set on open, so a second open
+sends nothing. DUEY_ACTION op 7 clears it, and so do a map change and
+entering the Cash Shop: the client destroys the window on any new field or
+stage without sending op 7 (`v83ref` report b029). The window isn't modal,
+so the player may walk and talk to NPCs while it is up. The client uses a coupon only with no window up, so using one
 always opens a quick send. Duey requests in the Cash Shop are ignored. A
 send, claim or delete that doesn't fit the open window gets `0x13`, since
 the window waits for an answer. With no window open such a request gets

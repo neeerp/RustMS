@@ -186,7 +186,12 @@ async fn duey_carries_mesos_and_items_to_an_offline_character() {
     assert_eq!(t.parcels, [[SAME_ACCOUNT]]);
 
     // Four potions and 1000 mesos, for the fee of 5000.
-    let t = step(s, "duey-send", normal(USE, 1, 4, 1000, &receiver_name)).await;
+    let t = step(
+        s,
+        "duey-send-potions",
+        normal(USE, 1, 4, 1000, &receiver_name),
+    )
+    .await;
     assert_eq!(t.parcels, [[SENT]]);
     assert_eq!(t.stat(stat::MESO), Some(94_000));
     assert_eq!(t.quantities, [(USE, 1, 6)]);
@@ -224,6 +229,10 @@ async fn duey_carries_mesos_and_items_to_an_offline_character() {
     // It's gone.
     let t = step(r, "duey-claim-again", with_id(4, parcel.id)).await;
     assert_eq!(t.parcels, [[UNKNOWN]]);
+
+    // A new map takes the window, unclosed, and Duey opens it again.
+    assert_eq!(warp(r, HENESYS, "", &mut seen).await, HENESYS);
+    assert_eq!(open(r, &mut seen).await, (Vec::new(), 0));
 }
 
 #[tokio::test]
@@ -336,7 +345,8 @@ async fn ten_parcels_fill_a_characters_inbox() {
     assert_eq!(warp(s, HENESYS, "", &mut seen).await, HENESYS);
     open(s, &mut seen).await;
     for n in 0..10 {
-        let t = step(s, "duey-send", normal(0, 0, 0, 1, &receiver_name)).await;
+        let marker = format!("duey-fill-{n}");
+        let t = step(s, &marker, normal(0, 0, 0, 1, &receiver_name)).await;
         assert_eq!(t.parcels, [[SENT]], "parcel {n}");
     }
     let t = step(s, "duey-full", normal(0, 0, 0, 1, &receiver_name)).await;

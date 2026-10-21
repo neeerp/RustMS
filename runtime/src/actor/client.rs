@@ -681,6 +681,9 @@ impl ClientActor {
         self.script = None;
         self.shop = None;
         self.storage = None;
+        // A new field takes the Duey window with it, and the client doesn't
+        // say so (report b029).
+        self.duey = None;
         self.pending_quest = None;
         self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
@@ -770,7 +773,8 @@ impl ClientActor {
         self.script = None;
         self.pending_quest = None;
         self.naming_guild = false;
-        // The shop is a stage of its own, and takes the Duey window with it.
+        // The shop is a stage of its own, and takes the Duey window with it
+        // (report b029).
         self.duey = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
