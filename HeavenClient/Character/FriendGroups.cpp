@@ -202,6 +202,40 @@ namespace ms::FriendGroups
 		return result;
 	}
 
+	Refusal check_group(const std::string& name, const std::string& original, bool renaming, bool any_checked,
+						const std::vector<std::string>& groups)
+	{
+		if (name.empty())
+			return Refusal::NO_NAME;
+
+		if (!any_checked)
+			return Refusal::NO_FRIENDS;
+
+		if (renaming && name == original)
+			return Refusal::NONE;
+
+		if (std::find(groups.begin(), groups.end(), name) != groups.end())
+			return Refusal::EXISTS;
+
+		return Refusal::NONE;
+	}
+
+	std::vector<std::pair<std::string, std::string>> group_moves(const std::vector<Pick>& picks,
+																 const std::string& name)
+	{
+		std::vector<std::pair<std::string, std::string>> moves;
+
+		for (const Pick& pick : picks)
+		{
+			if (pick.checked)
+				moves.emplace_back(pick.name, name);
+			else if (pick.group == name)
+				moves.emplace_back(pick.name, DEFAULT);
+		}
+
+		return moves;
+	}
+
 	Buttons buttons(const Buddy& picked, const Blocks& blocks)
 	{
 		bool blocked = blocks.blocked(picked.id);

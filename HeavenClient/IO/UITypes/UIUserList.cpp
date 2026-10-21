@@ -19,6 +19,8 @@
 
 #include "UIChatBar.h"
 #include "UIEnterText.h"
+#include "UIFriendGroup.h"
+#include "UIGroupPicker.h"
 #include "UIGuildBBS.h"
 #include "UIMemoSend.h"
 #include "UIMessenger.h"
@@ -30,6 +32,7 @@
 #include "../UI.h"
 
 #include "../Components/AreaButton.h"
+#include "../Components/ChatTarget.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
@@ -1070,7 +1073,7 @@ namespace ms
 				);
 				break;
 			case Buttons::BT_ADD_FRIEND:
-				add_friend("", "");
+				add_friend("");
 				break;
 			case Buttons::BT_ADD_GROUP:
 				open_group("");
@@ -1097,7 +1100,7 @@ namespace ms
 			case Buttons::BT_FRIEND_MOD:
 				// A buddy's group is changed in the Add Friend dialog (b015).
 				if (buddy)
-					add_friend(buddy->name, buddy->group);
+					add_friend(buddy->name);
 				else if (const FriendGroups::Group* group = selected_group())
 					open_group(group->name);
 
@@ -1567,19 +1570,25 @@ namespace ms
 			return;
 		}
 
-		// TODO: the GroupMod dialog.
+		UI::get().emplace<UIFriendGroup>(group, buddies.get_buddies());
 	}
 
-	void UIUserList::add_friend(const std::string& name, const std::string& group)
+	void UIUserList::add_friend(const std::string& name)
 	{
-		// TODO: the Add Friend dialog with its group box.
-		UI::get().emplace<UIEnterText>(
-				"Please enter the name of the character\\nyou'll add as a buddy.",
-				[](const std::string& name)
+		std::vector<std::string> groups;
+
+		for (const Buddy& buddy : buddies.get_buddies())
+			groups.push_back(buddy.group);
+
+		// The group starts blank even for a buddy's (FUN_00909fca), and goes
+		// as typed: the server reads blank as Default Group.
+		UI::get().emplace<UIGroupPicker>(
+				name,
+				chat_target::group_choices(groups),
+				[](const std::string& name, const std::string& group)
 				{
-					BuddyCommands::add(name, FriendGroups::DEFAULT);
-				},
-				NAME_LIMIT
+					BuddyCommands::add(name, group);
+				}
 		);
 	}
 

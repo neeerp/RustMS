@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 // The Friend tab's groups, as v83 arranges and acts on them (report b015). A group is only the
@@ -60,6 +61,32 @@ namespace ms::FriendGroups
 	// The settings' list of groups folded, split by tabs, which no name holds.
 	std::set<std::string> parse_names(const std::string& text);
 	std::string format_names(const std::set<std::string>& names);
+
+	// One buddy in the Edit Group dialog (FUN_0080ee78).
+	struct Pick
+	{
+		std::string name;
+		std::string group;
+		bool checked;
+	};
+
+	// The Edit Group dialog's checks on OK (FUN_0080f93e), in v83's order. any_checked is only over the
+	// rows in view, as v83 tests its 7 checkboxes and not the list behind them.
+	enum class Refusal
+	{
+		NONE,
+		NO_NAME,
+		NO_FRIENDS,
+		EXISTS
+	};
+
+	Refusal check_group(const std::string& name, const std::string& original, bool renaming, bool any_checked,
+						const std::vector<std::string>& groups);
+
+	// The adds that carry out the dialog (0x90af2a): each buddy checked goes to the group named, and
+	// each unchecked one already in a group of that name goes to the Default Group.
+	std::vector<std::pair<std::string, std::string>> group_moves(const std::vector<Pick>& picks,
+																 const std::string& name);
 
 	// v83's offline class (FUN_00908fc4): offline, or blocked.
 	bool away(const Buddy& buddy, const Blocks& blocks);

@@ -741,6 +741,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGender.h
     IO/UITypes/UIGroupPicker.cpp
     IO/UITypes/UIGroupPicker.h
+    IO/UITypes/UIFriendGroup.cpp
+    IO/UITypes/UIFriendGroup.h
     IO/UITypes/UIWhisperPrompt.cpp
     IO/UITypes/UIWhisperPrompt.h
     IO/UITypes/UIItemInventory.cpp

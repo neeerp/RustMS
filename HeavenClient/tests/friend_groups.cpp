@@ -109,6 +109,22 @@ int main()
 		require(parse_names("Mates\tWork group") == std::set<std::string>{ "Mates", "Work group" },
 				"names may hold spaces");
 		require(format_names({ "Work group", "Mates" }) == "Mates\tWork group", "and are written in order");
+
+		std::vector<std::string> taken = { "Mates", "Work", DEFAULT };
+		require(check_group("", "Mates", true, false, taken) == Refusal::NO_NAME, "a group needs a name first");
+		require(check_group("Pals", "", false, false, taken) == Refusal::NO_FRIENDS, "then a buddy checked");
+		require(check_group("Mates", "Mates", true, true, taken) == Refusal::NONE, "keeping a group's name is fine");
+		require(check_group("Work", "Mates", true, true, taken) == Refusal::EXISTS, "taking another's is not");
+		require(check_group("Mates", "", false, true, taken) == Refusal::EXISTS, "nor is a new one taking it");
+		require(check_group("Pals", "Mates", true, true, taken) == Refusal::NONE, "a fresh name is");
+
+		using Moves = std::vector<std::pair<std::string, std::string>>;
+		std::vector<Pick> picks = { { "Amy", "Mates", true }, { "Bob", "Mates", false }, { "Cat", "Pals", false },
+									{ "Dan", "Work", true } };
+		require(group_moves(picks, "Pals") == Moves{ { "Amy", "Pals" }, { "Cat", DEFAULT }, { "Dan", "Pals" } },
+				"checked buddies join; unchecked ones of that name leave for the Default Group");
+		require(group_moves(picks, "Mates") == Moves{ { "Amy", "Mates" }, { "Bob", DEFAULT }, { "Dan", "Mates" } },
+				"which is how unchecking a member removes them");
 	}
 	catch (const std::exception& e)
 	{

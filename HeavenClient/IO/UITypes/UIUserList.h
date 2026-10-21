@@ -220,8 +220,9 @@ namespace ms
 		void toggle_block();
 		// The GroupMod dialog, for a new group if group is blank.
 		void open_group(const std::string& group);
-		// The Add Friend dialog, or for moving name if given.
-		void add_friend(const std::string& name, const std::string& group);
+		// The Add Buddy dialog, its name starting as name: a buddy's, to move
+		// them to another group, or blank.
+		void add_friend(const std::string& name);
 
 		void rebuild_guild();
 		// Lays out one guild section from y and returns where the next may
