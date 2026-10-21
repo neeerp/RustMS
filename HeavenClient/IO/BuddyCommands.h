@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Character/FriendGroups.h"
+
 #include <cstdint>
 #include <string>
 
@@ -9,8 +11,8 @@ namespace ms
 	// asking the server. Each refusal is an OK notice.
 	namespace BuddyCommands
 	{
-		// FUN_00531021
-		void add(const std::string& name, const std::string& group);
+		// FUN_00531021. The Edit Group dialog's adds refuse without a word.
+		void add(const std::string& name, const std::string& group, bool notify = true);
 		// Only someone who asked, or isn't listed (FUN_00531270).
 		void accept(int32_t cid);
 		// Removes a buddy or turns down a request (FUN_005311c1).
@@ -20,5 +22,7 @@ namespace ms
 		// Asks again about each request still unanswered, unless one is
 		// showing, as v83 does once a map has loaded (FUN_00a3fecf).
 		void show_requests();
+		// The buddies this character has blocked, from the settings.
+		FriendGroups::Blocks blocks();
 	}
 }

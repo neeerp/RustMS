@@ -136,6 +136,9 @@ namespace ms
 			MEMOCYAN,
 			GRADEGREY,
 			AVATARMEGAPHONE,
+			FRIENDBLUE,
+			BLOCKRED,
+			LOCATIONGREY,
 			NUM_COLORS
 		};
 
@@ -221,7 +224,10 @@ namespace ms
 						{0.14f, 0.28f, 0.42f}, // Memo blue (#24476B, who sent a note in v83's inbox)
 						{0.80f, 1.00f, 1.00f}, // Memo cyan (#CCFFFF, the v83 inbox's heading)
 						{0.56f, 0.56f, 0.56f}, // Grade grey (#909090, ranks without a title in v83's guild rank panel)
-						{0.99f, 0.55f, 0.90f}  // Avatar megaphone (#FC8BE5, v83 chat font 0x11: avatar megaphones)
+						{0.99f, 0.55f, 0.90f}, // Avatar megaphone (#FC8BE5, v83 chat font 0x11: avatar megaphones)
+						{0.10f, 0.44f, 0.69f}, // Friend blue (#1A6FB1, group headers in v83's Friend tab)
+						{0.82f, 0.00f, 0.00f}, // Block red (#D10000, blocked buddies in v83's Friend tab)
+						{0.40f, 0.40f, 0.40f}  // Location grey (#666666, "My Location" under v83's Friend tab)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

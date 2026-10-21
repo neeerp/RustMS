@@ -19,8 +19,12 @@
 
 #include "UIChatBar.h"
 #include "UIEnterText.h"
+#include "UIFriendGroup.h"
+#include "UIGroupPicker.h"
 #include "UIGuildBBS.h"
 #include "UIMemoSend.h"
+#include "UIMessenger.h"
+#include "UINotice.h"
 
 #include "../BuddyCommands.h"
 #include "../GuildCommands.h"
@@ -28,6 +32,7 @@
 #include "../UI.h"
 
 #include "../Components/AreaButton.h"
+#include "../Components/ChatTarget.h"
 #include "../Components/MapleButton.h"
 
 #include "../../Configuration.h"
@@ -41,6 +46,7 @@
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
+#include "../../Net/Packets/MessagingPackets.h"
 
 #include <nlnx/nx.hpp>
 
@@ -75,19 +81,62 @@ namespace ms
 		constexpr Point<int16_t> BUTTON_PITCH = Point<int16_t>(60, 22);
 		constexpr size_t PARTY_CAPACITY = 6;
 		constexpr size_t NAME_LIMIT = 12;
-		// The buddy list shares the party list's corner, header, and rows,
-		// but splits each row in two: same-channel buddies on the left and
-		// the rest on the right, under a legend saying so.
-		constexpr int16_t LEGEND = 19;
-		constexpr int16_t BUDDY_FOOTER = 6;
-		constexpr int16_t CELL_WIDTH = 140;
-		constexpr int16_t CELL_NAME_X = 18;
-		constexpr int16_t CELL_CHANNEL_X = 134;
-		constexpr Point<int16_t> CELL_HIGHLIGHT = Point<int16_t>(CELL_WIDTH - 1, ROW);
-		// The buddy buttons: one row, then INVITE TO PARTY and the filter.
-		constexpr int16_t BUDDY_BUTTON_GAP = 7;
-		constexpr int16_t BUTTONS_RIGHT = 299;
-		const char* DEFAULT_GROUP = "Default Group";
+		// The Friend tab (FUN_0091a065), whose buttons sit by their top left.
+		struct FriendButton
+		{
+			uint16_t id;
+			const char* name;
+			Point<int16_t> pos;
+		};
+
+		constexpr FriendButton FRIEND_BUTTONS[] = {
+				{ 0, "BtAddFriend", Point<int16_t>(5, 81) },
+				{ 1, "BtAddGroup", Point<int16_t>(72, 81) },
+				{ 2, "BtGroupWhisper", Point<int16_t>(8, 341) },
+				{ 3, "BtShowOnline", Point<int16_t>(232, 81) },
+				{ 4, "BtShowAll", Point<int16_t>(232, 81) },
+				{ 5, "BtMod", Point<int16_t>(8, 362) },
+				{ 6, "BtDelete", Point<int16_t>(49, 362) },
+				{ 7, "BtChat", Point<int16_t>(99, 341) },
+				{ 8, "BtWhisper", Point<int16_t>(254, 341) },
+				{ 9, "BtMessage", Point<int16_t>(254, 362) },
+				{ 10, "BtParty", Point<int16_t>(99, 362) },
+				{ 11, "BtBlock", Point<int16_t>(182, 362) },
+				{ 12, "BtUnBlock", Point<int16_t>(182, 362) }
+		};
+
+		// How many buddies are listed, of how many may be, right-aligned
+		// in the header bar (0x909685), by the top of its text.
+		constexpr Point<int16_t> FRIEND_COUNT = Point<int16_t>(295, 62);
+		// The list (FUN_0090952e) is laid out from 0 down, a line of 18
+		// pixels for each group's header and each two of its members, and
+		// shows through a view of 188 that scrolls 33 at a time (0x91cdbc).
+		constexpr Point<int16_t> FRIEND_LIST = Point<int16_t>(8, 113);
+		constexpr int16_t FRIEND_WIDTH = 281;
+		constexpr int16_t FRIEND_VIEW = 188;
+		constexpr int16_t FRIEND_STEP = 33;
+		constexpr Range<int16_t> FRIEND_SLIDER = Range<int16_t>(113, 288);
+		constexpr int16_t FRIEND_SLIDER_X = 290;
+		// A header: its arrow, its title, and dots from past the title to
+		// 258, every 4 pixels.
+		constexpr int16_t FOLD_X = 5;
+		constexpr int16_t TITLE_X = 14;
+		constexpr int16_t DOTS_GAP = 2;
+		constexpr int16_t DOTS_END = 258;
+		constexpr int16_t DOTS_STEP = 4;
+		// A member's half of a line: its status icon, then its name.
+		constexpr int16_t HALF = 128;
+		constexpr int16_t ICON_X = 5;
+		constexpr int16_t FRIEND_NAME_X = 14;
+		constexpr int16_t FRIEND_TEXT_Y = 4;
+		// Under the list, in grey (0x91c7e1).
+		constexpr Point<int16_t> LOCATION = Point<int16_t>(10, 315);
+
+		// Whether the status icon shows (0x909df0).
+		bool same_channel(const Buddy& buddy)
+		{
+			return buddy.online() && buddy.channel == Configuration::get().get_channelid();
+		}
 
 		// The guild tab, as the client lays it out (FUN_0090f17c). The
 		// client places text by its top; HeavenClient's 5 pixels lower.
@@ -274,39 +323,32 @@ namespace ms
 			buttons[Buttons::BT_HP + i] = std::make_unique<MapleButton>(Party[party_buttons[i]], button_pos);
 		}
 
-		const char* buddy_buttons[] = { "BtAddFriend", "BtDelete", "BtWhisper", "BtChat", "BtWhere" };
-		int16_t buddy_x = BUTTONS.x();
-
-		for (uint16_t i = 0; i < std::size(buddy_buttons); i++)
+		for (const FriendButton& button : FRIEND_BUTTONS)
 		{
-			nl::node button = Friend[buddy_buttons[i]];
-			buttons[Buttons::BT_ADD_BUDDY + i] = std::make_unique<MapleButton>(button, Point<int16_t>(buddy_x, BUTTONS.y()));
-			buddy_x += Texture(button["normal"]["0"]).get_dimensions().x() + BUDDY_BUTTON_GAP;
+			// Placed by the top left, whatever the art's origin, which only
+			// BtMessage sets.
+			nl::node art = Friend[button.name];
+			buttons[Buttons::BT_ADD_FRIEND + button.id] = std::make_unique<MapleButton>(art,
+					button.pos + Texture(art["normal"]["0"]).get_origin());
 		}
 
-		Point<int16_t> second_row = BUTTONS + Point<int16_t>(0, BUTTON_PITCH.y());
-		buttons[Buttons::BT_INVITE_BUDDY] = std::make_unique<MapleButton>(Friend["BtParty"], second_row);
-		// v83 has it at (254, 362); our Friend tab is laid out differently.
-		// Unlike the others, its art is drawn about its centre.
-		int16_t after_party = buttons[Buttons::BT_INVITE_BUDDY]->bounds(Point<int16_t>()).right() + BUDDY_BUTTON_GAP;
-		Point<int16_t> message_origin = Texture(Friend["BtMessage"]["normal"]["0"]).get_origin();
-		buttons[Buttons::BT_MESSAGE_BUDDY] = std::make_unique<MapleButton>(Friend["BtMessage"],
-				Point<int16_t>(after_party, second_row.y()) + message_origin);
+		// Its own background, and none of friend0 to friend6, which v83
+		// loads and never draws (0x91d99d).
+		friend_background = UserList["backgrnd3"];
+		unfolded_icon = Friend["icon03"];
+		folded_icon = Friend["icon04"];
+		same_channel_icon = Friend["icon00"];
+		blocked_icon = Friend["icon01"];
+		dot = Friend["icon02"];
+		friend_count = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		location = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::LOCATIONGREY);
 
-		for (auto [id, name] : { std::pair(Buttons::BT_SHOW_ONLINE, "BtShowOnline"), std::pair(Buttons::BT_SHOW_ALL, "BtShowAll") })
-		{
-			int16_t width = Texture(Friend[name]["normal"]["0"]).get_dimensions().x();
-			buttons[id] = std::make_unique<MapleButton>(Friend[name], Point<int16_t>(BUTTONS_RIGHT - width, second_row.y()));
-		}
+		show_online = Setting<FriendShowOnline>::get().load();
+		blocks = BuddyCommands::blocks();
+		folded = FriendGroups::parse_names(Setting<FriendFolded>::get().load());
 
-		buddies_online.header = Friend["friend0"];
-		buddies_offline.header = Friend["friend4"];
-		legend = Friend["friend1"];
-		buddy_row = Friend["friend2"];
-		offline_row = Friend["friend5"];
-		buddy_bottom = Friend["friend3"];
-		buddies_online.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
-		buddies_offline.count = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::WHITE);
+		friend_slider = Slider(Slider::Type::CLASSIC, FRIEND_SLIDER, FRIEND_SLIDER_X, 1, 0,
+							   [&](bool up) { scroll_buddies(friend_scroll + (up ? -1 : 1)); });
 
 		online.header = Party["party0"];
 		offline.header = Party["party4"];
@@ -392,8 +434,12 @@ namespace ms
 
 	void UIUserList::draw(float alpha) const
 	{
-		bool guild_art = tab == Tab::GUILD || tab == Tab::ALLIANCE;
-		(guild_art ? guild_background : background).draw(position);
+		if (tab == Tab::FRIEND)
+			friend_background.draw(position);
+		else if (tab == Tab::GUILD || tab == Tab::ALLIANCE)
+			guild_background.draw(position);
+		else
+			background.draw(position);
 
 		tabs.draw(position + TAB_STRIP, Tab::NUM_TABS, tab);
 
@@ -404,10 +450,7 @@ namespace ms
 		}
 		else if (tab == Tab::FRIEND)
 		{
-			draw_buddies(buddies_online, buddy_row, true);
-
-			if (show_all)
-				draw_buddies(buddies_offline, offline_row, false);
+			draw_buddies();
 		}
 		else if (tab == Tab::GUILD)
 		{
@@ -595,35 +638,88 @@ namespace ms
 		bottom.draw(position + Point<int16_t>(LIST.x() + 1, section.bottom - FOOTER));
 	}
 
-	void UIUserList::draw_buddies(const BuddySection& section, const Texture& section_row, bool with_legend) const
+	void UIUserList::draw_buddies() const
 	{
-		Point<int16_t> top = position + Point<int16_t>(LIST.x(), section.top);
+		friend_count.draw(position + FRIEND_COUNT + Point<int16_t>(0, CLIENT_TEXT));
+		location.draw(position + LOCATION + Point<int16_t>(0, CLIENT_TEXT));
 
-		section.header.draw(top);
-		section.count.draw(top + COUNT);
+		// As the guild list: laid out from 0 down, seen through the view.
+		int16_t view_top = friend_scroll * FRIEND_STEP;
+		int16_t view_bottom = view_top + FRIEND_VIEW;
+		Point<int16_t> list = position + FRIEND_LIST - Point<int16_t>(0, view_top);
+		Range<int16_t> screen_rows = Range<int16_t>(position.y() + FRIEND_LIST.y(),
+													position.y() + FRIEND_LIST.y() + FRIEND_VIEW);
 
-		int16_t first = HEADER;
-
-		if (with_legend)
+		auto art = [&](const Texture& texture, int16_t x, int16_t y)
 		{
-			legend.draw(top + Point<int16_t>(0, HEADER));
-			first += LEGEND;
+			int16_t from = std::max<int16_t>(0, view_top - y);
+			int16_t to = std::min<int16_t>(texture.height(), view_bottom - y);
+
+			if (from < to)
+				texture.draw(list + Point<int16_t>(x, y), Rectangle<int16_t>(0, texture.width(), from, to));
+		};
+
+		auto words = [&](const Text& text, int16_t x, int16_t y)
+		{
+			if (y + text.height() > view_top && y < view_bottom)
+				text.draw(list + Point<int16_t>(x, y + CLIENT_TEXT), screen_rows);
+		};
+
+		// Icons sit in the middle of their line.
+		auto centred = [&](const Texture& texture, int16_t x, int16_t y)
+		{
+			art(texture, x, y + (ROW - texture.height()) / 2);
+		};
+
+		int16_t y = 0;
+
+		for (const FriendLine& line : friend_lines)
+		{
+			if (y + ROW > view_top && y < view_bottom)
+			{
+				if (line.header)
+				{
+					// No highlight for a group picked (0x909926).
+					bool is_folded = folded.count(line.group) > 0;
+					centred(is_folded ? folded_icon : unfolded_icon, FOLD_X, y);
+					words(line.texts[0], TITLE_X, y + FRIEND_TEXT_Y);
+
+					for (int16_t x = TITLE_X + line.texts[0].width() + DOTS_GAP; x < DOTS_END; x += DOTS_STEP)
+						centred(dot, x, y);
+				}
+				else
+				{
+					for (size_t half = 0; half < line.ids.size(); half++)
+					{
+						int16_t x = static_cast<int16_t>(HALF * half);
+						int32_t id = line.ids[half];
+
+						if (id != 0 && id == picked_buddy)
+						{
+							int16_t top = std::max(y, view_top);
+							int16_t bottom = std::min<int16_t>(y + ROW, view_bottom);
+
+							GraphicsGL::get().drawrectangle(list.x() + x + PICKED_LEFT, list.y() + top, HALF,
+															bottom - top, PICKED_RED, PICKED_GREEN, PICKED_BLUE, 1.0f);
+						}
+
+						if (id != 0)
+						{
+							if (blocks.blocked(id))
+								centred(blocked_icon, x + ICON_X, y);
+							else if (const Buddy* buddy = buddies.find(id); buddy && same_channel(*buddy))
+								centred(same_channel_icon, x + ICON_X, y);
+						}
+
+						words(line.texts[half], x + FRIEND_NAME_X, y + FRIEND_TEXT_Y);
+					}
+				}
+			}
+
+			y += ROW;
 		}
 
-		for (const Cell& cell : section.cells)
-			if (cell.id == picked_buddy)
-				highlight.draw(DrawArgument(position + cell.pos + Point<int16_t>(1, 0), CELL_HIGHLIGHT));
-
-		for (int16_t i = 0; i < section.rows; i++)
-			section_row.draw(top + Point<int16_t>(0, first + ROW * i));
-
-		for (const Cell& cell : section.cells)
-		{
-			cell.name.draw(position + cell.pos + Point<int16_t>(CELL_NAME_X, TEXT_Y));
-			cell.channel.draw(position + cell.pos + Point<int16_t>(CELL_CHANNEL_X, TEXT_Y));
-		}
-
-		buddy_bottom.draw(position + Point<int16_t>(LIST.x(), section.bottom - BUDDY_FOOTER));
+		friend_slider.draw(position);
 	}
 
 	void UIUserList::update()
@@ -638,6 +734,14 @@ namespace ms
 
 		if (buddies.get_buddies() != shown_buddies)
 			rebuild_buddies();
+
+		if (mapid != shown_location)
+		{
+			// v83 names the map, or failing that its street (0x91c62d).
+			shown_location = mapid;
+			NxHelper::Map::MapInfo info = NxHelper::Map::get_map_info_by_id(mapid);
+			location.change_text("My Location - " + (info.name.empty() ? info.street_name : info.name));
+		}
 
 		if (!(guild.get_data() == shown_guild))
 			rebuild_guild();
@@ -753,25 +857,39 @@ namespace ms
 			}
 		}
 
-		if (clicked && tab == Tab::FRIEND)
+		if (tab == Tab::FRIEND)
 		{
-			for (const BuddySection* section : {&buddies_online, &buddies_offline})
+			if (Cursor::State state = friend_slider.send_cursor(cursor_relative, clicked))
+				return state;
+
+			Point<int16_t> in_view = cursor_relative - FRIEND_LIST;
+
+			if (clicked && in_view.x() >= 0 && in_view.x() < FRIEND_WIDTH && in_view.y() >= 0 &&
+				in_view.y() < FRIEND_VIEW)
 			{
-				if (section == &buddies_offline && !show_all)
-					continue;
+				// A click picks afresh, so one on nothing picks nothing; one
+				// on a header also folds or unfolds it (0x91d669).
+				picked_buddy = 0;
+				picked_group.clear();
+				size_t half = 0;
 
-				for (const Cell& cell : section->cells)
+				if (const FriendLine* line = buddy_line_at(cursor_relative, half))
 				{
-					Point<int16_t> corner = cell.pos + Point<int16_t>(1, 0);
-
-					if (Rectangle<int16_t>(corner, corner + CELL_HIGHLIGHT).contains(cursor_relative))
+					if (line->header)
 					{
-						picked_buddy = cell.id;
-						update_buttons();
-
-						return Cursor::State::IDLE;
+						picked_group = line->group;
+						fold(line->group);
+					}
+					else
+					{
+						picked_buddy = line->ids[half];
 					}
 				}
+
+				rebuild_buddies();
+				update_buttons();
+
+				return Cursor::State::IDLE;
 			}
 		}
 
@@ -780,32 +898,66 @@ namespace ms
 
 	void UIUserList::doubleclick(Point<int16_t> cursorpos)
 	{
-		// The first click picked the buddy. v83 (0x91de7b) writes a note to
-		// one away and whispers one online.
+		if (tab != Tab::FRIEND)
+			return;
+
+		// The first click picked the line (FUN_0091de7b).
+		size_t half = 0;
+		const FriendLine* line = buddy_line_at(cursorpos - position, half);
+
+		if (!line)
+			return;
+
+		if (line->header)
+		{
+			if (line->group == picked_group)
+				button_pressed(Buttons::BT_FRIEND_MOD);
+
+			return;
+		}
+
 		const Buddy* buddy = selected_buddy();
 
-		if (tab != Tab::FRIEND || !buddy)
+		if (!buddy || buddy->id != line->ids[half])
 			return;
 
-		Point<int16_t> cursor_relative = cursorpos - position;
-		bool on_cell = false;
+		int32_t id = buddy->id;
 
-		for (const BuddySection* section : {&buddies_online, &buddies_offline})
-			for (const Cell& cell : section->cells)
-			{
-				Point<int16_t> corner = cell.pos + Point<int16_t>(1, 0);
+		// Write a note to one away; whisper one online.
+		auto reach = [this, id]()
+		{
+			const Buddy* buddy = buddies.find(id);
 
-				if (cell.id == buddy->id && Rectangle<int16_t>(corner, corner + CELL_HIGHLIGHT).contains(cursor_relative))
-					on_cell = true;
-			}
+			if (!buddy)
+				return;
 
-		if (!on_cell)
+			if (FriendGroups::away(*buddy, blocks))
+				UIMemoSend::write_to(buddy->name);
+			else if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->whisper_to(buddy->name);
+		};
+
+		if (blocks.blocked(id))
+		{
+			// Unblock first, and only then go on.
+			UI::get().emplace<UIYesNo>(
+					"You can use it after unblocking.\\nWould you like to unblock?",
+					[this, id, reach](bool yes)
+					{
+						if (!yes)
+							return;
+
+						toggle_block();
+
+						if (!blocks.blocked(id))
+							reach();
+					}
+			);
+
 			return;
+		}
 
-		if (!buddy->online())
-			UIMemoSend::write_to(buddy->name);
-		else if (auto chatbar = UI::get().get_element<UIChatBar>())
-			chatbar->whisper_to(buddy->name);
+		reach();
 	}
 
 	void UIUserList::send_key(int32_t keycode, bool pressed, bool escape)
@@ -826,6 +978,8 @@ namespace ms
 	{
 		if (tab == Tab::GUILD)
 			guild_slider.send_scroll(yoffset);
+		else if (tab == Tab::FRIEND)
+			friend_slider.send_scroll(yoffset);
 	}
 
 	UIElement::Type UIUserList::get_type() const
@@ -849,12 +1003,13 @@ namespace ms
 		for (uint16_t i = Buttons::BT_HP; i <= Buttons::BT_INVITE; i++)
 			buttons[i]->set_active(tab == Tab::PARTY);
 
-		for (uint16_t i = Buttons::BT_ADD_BUDDY; i <= Buttons::BT_MESSAGE_BUDDY; i++)
+		for (uint16_t i = Buttons::BT_ADD_FRIEND; i <= Buttons::BT_FRIEND_UNBLOCK; i++)
 			buttons[i]->set_active(tab == Tab::FRIEND);
 
-		// The filter button offers whichever view isn't showing.
-		buttons[Buttons::BT_SHOW_ONLINE]->set_active(tab == Tab::FRIEND && show_all);
-		buttons[Buttons::BT_SHOW_ALL]->set_active(tab == Tab::FRIEND && !show_all);
+		// Shared spots: the filter offers whichever view isn't showing, and
+		// update_buttons picks BLOCK or UNBLOCK.
+		buttons[Buttons::BT_SHOW_ONLINE]->set_active(tab == Tab::FRIEND && !show_online);
+		buttons[Buttons::BT_SHOW_ALL]->set_active(tab == Tab::FRIEND && show_online);
 
 		for (uint16_t i = Buttons::BT_GUILD_INVITE; i <= Buttons::BT_GUILD_BBS; i++)
 			buttons[i]->set_active(tab == Tab::GUILD);
@@ -931,17 +1086,40 @@ namespace ms
 						NAME_LIMIT
 				);
 				break;
-			case Buttons::BT_ADD_BUDDY:
-				UI::get().emplace<UIEnterText>(
-						"Please enter the name of the character\\nyou'll add as a buddy.",
-						[](const std::string& name)
-						{
-							BuddyCommands::add(name, DEFAULT_GROUP);
-						},
-						NAME_LIMIT
-				);
+			case Buttons::BT_ADD_FRIEND:
+				add_friend("");
 				break;
-			case Buttons::BT_DELETE_BUDDY:
+			case Buttons::BT_ADD_GROUP:
+				open_group("");
+				break;
+			case Buttons::BT_GROUP_WHISPER:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->set_target(UIChatBar::Target::GROUP);
+
+				break;
+			case Buttons::BT_SHOW_ONLINE:
+			case Buttons::BT_SHOW_ALL:
+				// The two share a spot, and one click can reach both: the
+				// cursor keeps clicking until the button is released.
+				if (!filter_clicked)
+				{
+					filter_clicked = true;
+					show_online = buttonid == Buttons::BT_SHOW_ONLINE;
+					Setting<FriendShowOnline>::get().save(show_online);
+					rebuild_buddies();
+					change_tab(tab);
+				}
+
+				break;
+			case Buttons::BT_FRIEND_MOD:
+				// A buddy's group is changed in the Add Friend dialog (b015).
+				if (buddy)
+					add_friend(buddy->name);
+				else if (const FriendGroups::Group* group = selected_group())
+					open_group(group->name);
+
+				break;
+			case Buttons::BT_FRIEND_DELETE:
 				if (buddy)
 				{
 					int32_t id = buddy->id;
@@ -955,39 +1133,67 @@ namespace ms
 							}
 					);
 				}
+				else if (const FriendGroups::Group* group = selected_group())
+				{
+					if (group->name == FriendGroups::DEFAULT)
+					{
+						UI::get().emplace<UIOk>(group->name + " cannot be changed or deleted.", [](bool) {});
+						break;
+					}
+
+					// A group is only its members' names: v83 deletes one by
+					// moving each into the Default Group.
+					std::vector<std::string> names;
+
+					for (const Buddy* member : group->members)
+						names.push_back(member->name);
+
+					UI::get().emplace<UIYesNo>(
+							"'" + group->name + "' group will be deleted. Your friends in the group will be moved to Default Group.",
+							[names](bool yes)
+							{
+								if (yes)
+									for (const std::string& name : names)
+										BuddyCommands::add(name, FriendGroups::DEFAULT);
+							}
+					);
+				}
 
 				break;
-			case Buttons::BT_WHISPER_BUDDY:
+			case Buttons::BT_FRIEND_CHAT:
+				// Opens a messenger and asks the buddy in, unless one is open
+				// already (0x90a8dc).
+				if (buddy)
+				{
+					auto messenger = UI::get().get_element<UIMessenger>();
+
+					if (!messenger || !messenger->is_active())
+					{
+						MessengerOpenPacket(0).dispatch();
+						MessengerInvitePacket(buddy->name).dispatch();
+					}
+				}
+
+				break;
+			case Buttons::BT_FRIEND_WHISPER:
 				if (buddy)
 					if (auto chatbar = UI::get().get_element<UIChatBar>())
 						chatbar->whisper_to(buddy->name);
 
 				break;
-			case Buttons::BT_BUDDY_CHAT:
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->set_target(UIChatBar::Target::BUDDY);
+			case Buttons::BT_FRIEND_MESSAGE:
+				if (buddy)
+					UIMemoSend::write_to(buddy->name);
 
 				break;
-			case Buttons::BT_INVITE_BUDDY:
+			case Buttons::BT_FRIEND_PARTY:
 				if (buddy)
 					PartyCommands::invite(buddy->name);
 
 				break;
-			// Whoever is picked, or no one (0x90aa2c).
-			case Buttons::BT_MESSAGE_BUDDY:
-				UIMemoSend::write_to(buddy ? buddy->name : "");
-				break;
-			case Buttons::BT_SHOW_ONLINE:
-			case Buttons::BT_SHOW_ALL:
-				// The two share a spot, and one click can reach both: the
-				// cursor keeps clicking until the button is released.
-				if (!filter_clicked)
-				{
-					filter_clicked = true;
-					show_all = buttonid == Buttons::BT_SHOW_ALL;
-					change_tab(tab);
-				}
-
+			case Buttons::BT_FRIEND_BLOCK:
+			case Buttons::BT_FRIEND_UNBLOCK:
+				toggle_block();
 				break;
 			case Buttons::BT_GUILD_INVITE:
 				UI::get().emplace<UIEnterText>(
@@ -1198,70 +1404,212 @@ namespace ms
 	void UIUserList::rebuild_buddies()
 	{
 		shown_buddies = buddies.get_buddies();
+		friend_groups = FriendGroups::arrange(shown_buddies);
+
+		// The headers count a blocked buddy as offline, as v83 does.
+		for (FriendGroups::Group& group : friend_groups)
+			group.online = static_cast<size_t>(std::count_if(group.members.begin(), group.members.end(),
+				[&](const Buddy* member) { return !FriendGroups::away(*member, blocks); }));
 
 		if (!buddies.find(picked_buddy))
 			picked_buddy = 0;
 
-		int32_t channel = Configuration::get().get_channelid();
-		std::vector<const Buddy*> same, other, away;
+		if (!selected_group())
+			picked_group.clear();
 
-		for (const Buddy& buddy : shown_buddies)
+		size_t total = 0;
+
+		for (const FriendGroups::Group& group : friend_groups)
+			total += group.members.size();
+
+		friend_count.change_text(std::to_string(total) + "/" + std::to_string(buddies.get_capacity()));
+
+		auto name_text = [&](const Buddy& buddy)
 		{
-			// Requests wait on their cards instead.
-			if (buddy.pending())
-				continue;
+			// Picking whitens only black names (0x909b9a).
+			Color::Name color = Color::Name::BLACK;
 
-			if (!buddy.online())
-				away.push_back(&buddy);
-			else if (buddy.channel == channel)
-				same.push_back(&buddy);
-			else
-				other.push_back(&buddy);
-		}
+			if (blocks.blocked(buddy.id))
+				color = Color::Name::BLOCKRED;
+			else if (FriendGroups::away(buddy, blocks))
+				color = Color::Name::DUSTYGRAY;
+			else if (buddy.id == picked_buddy)
+				color = Color::Name::WHITE;
 
-		std::string total = "/" + std::to_string(buddies.listed());
-		buddies_online.count.change_text(std::to_string(same.size() + other.size()) + total);
-		buddies_offline.count.change_text(std::to_string(away.size()) + total);
-
-		auto cell = [](const Buddy& buddy, Point<int16_t> pos, bool online)
-		{
-			Color::Name color = online ? Color::Name::BLACK : Color::Name::SILVERCHALICE;
-
-			return Cell{ buddy.id, pos, Text(Text::Font::A12M, Text::Alignment::LEFT, color, buddy.name), Text() };
+			return Text(Text::Font::A12M, Text::Alignment::LEFT, color, buddy.name);
 		};
 
-		// Online: a column per kind, as long as the longer one.
-		buddies_online.top = LIST.y();
-		buddies_online.cells.clear();
-		int16_t first = buddies_online.top + HEADER + LEGEND;
+		friend_lines.clear();
 
-		for (size_t i = 0; i < same.size(); i++)
-			buddies_online.cells.push_back(cell(*same[i], Point<int16_t>(LIST.x(), first + ROW * i), true));
-
-		for (size_t i = 0; i < other.size(); i++)
+		for (const FriendGroups::Group& group : friend_groups)
 		{
-			Cell c = cell(*other[i], Point<int16_t>(LIST.x() + CELL_WIDTH, first + ROW * i), true);
-			c.channel = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::SILVERCHALICE,
-							 "Ch. " + std::to_string(other[i]->channel + 1));
-			buddies_online.cells.push_back(std::move(c));
+			FriendLine header{ group.name, true, { 0, 0 }, {} };
+			header.texts[0] = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::FRIENDBLUE,
+								   group.name + "(" + std::to_string(group.online) + "/"
+								   + std::to_string(group.members.size()) + ")");
+			friend_lines.push_back(std::move(header));
+
+			if (folded.count(group.name))
+				continue;
+
+			// Two to a line; showing only who is online hides the rest.
+			std::vector<const Buddy*> shown;
+
+			for (const Buddy* member : group.members)
+				if (!show_online || !FriendGroups::away(*member, blocks))
+					shown.push_back(member);
+
+			if (shown.empty())
+			{
+				FriendLine none{ group.name, false, { 0, 0 }, {} };
+				none.texts[0] = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, "none");
+				friend_lines.push_back(std::move(none));
+				continue;
+			}
+
+			for (size_t i = 0; i < shown.size(); i += 2)
+			{
+				FriendLine line{ group.name, false, { shown[i]->id, 0 }, {} };
+				line.texts[0] = name_text(*shown[i]);
+
+				if (i + 1 < shown.size())
+				{
+					line.ids[1] = shown[i + 1]->id;
+					line.texts[1] = name_text(*shown[i + 1]);
+				}
+
+				friend_lines.push_back(std::move(line));
+			}
 		}
 
-		buddies_online.rows = static_cast<int16_t>(std::max<size_t>({ 1, same.size(), other.size() }));
-		buddies_online.bottom = first + ROW * buddies_online.rows + BUDDY_FOOTER;
+		scroll_buddies(friend_scroll);
+	}
 
-		// Offline: left to right, then down.
-		buddies_offline.top = buddies_online.bottom + SECTION_GAP;
-		buddies_offline.cells.clear();
-		first = buddies_offline.top + HEADER;
+	void UIUserList::scroll_buddies(int16_t scroll)
+	{
+		// As the guild list (FUN_004d7dac): a step for each 33 pixels beyond the
+		// view, and one more.
+		int16_t overflow = static_cast<int16_t>(friend_lines.size()) * ROW - FRIEND_VIEW;
+		int16_t last = overflow > 0 ? overflow / FRIEND_STEP + 1 : 0;
 
-		for (size_t i = 0; i < away.size(); i++)
+		friend_scroll = std::clamp<int16_t>(scroll, 0, last);
+		friend_slider.setrows(friend_scroll, 1, last + 1);
+	}
+
+	const UIUserList::FriendLine* UIUserList::buddy_line_at(Point<int16_t> cursor_relative, size_t& half) const
+	{
+		Point<int16_t> in_list = cursor_relative - FRIEND_LIST;
+
+		if (in_list.x() < 0 || in_list.x() >= FRIEND_WIDTH || in_list.y() < 0 || in_list.y() >= FRIEND_VIEW)
+			return nullptr;
+
+		int16_t y = in_list.y() + friend_scroll * FRIEND_STEP;
+		size_t index = static_cast<size_t>(y / ROW);
+
+		// Two halves of 128; the strip right of them, before the scroll bar, hits nothing.
+		if (index >= friend_lines.size() || in_list.x() >= 2 * HALF)
+			return nullptr;
+
+		const FriendLine& line = friend_lines[index];
+		half = in_list.x() < HALF ? 0 : 1;
+
+		if (!line.header && line.ids[half] == 0)
+			return nullptr;
+
+		return &line;
+	}
+
+	const FriendGroups::Group* UIUserList::selected_group() const
+	{
+		if (picked_group.empty())
+			return nullptr;
+
+		for (const FriendGroups::Group& group : friend_groups)
+			if (group.name == picked_group)
+				return &group;
+
+		return nullptr;
+	}
+
+	void UIUserList::fold(const std::string& group)
+	{
+		if (!folded.erase(group))
+			folded.insert(group);
+
+		Setting<FriendFolded>::get().save(FriendGroups::format_names(folded));
+	}
+
+	void UIUserList::toggle_block()
+	{
+		std::vector<const Buddy*> targets;
+		bool block = true;
+
+		if (const Buddy* buddy = selected_buddy())
 		{
-			Point<int16_t> pos = Point<int16_t>(LIST.x() + CELL_WIDTH * (i % 2), first + ROW * (i / 2));
-			buddies_offline.cells.push_back(cell(*away[i], pos, false));
+			targets.push_back(buddy);
+			block = !blocks.blocked(buddy->id);
+		}
+		else if (const FriendGroups::Group* group = selected_group())
+		{
+			// A group blocks unless every member already is (report b020).
+			targets = group->members;
+			block = !blocks.all_blocked(*group);
 		}
 
-		buddies_offline.rows = static_cast<int16_t>(std::max<size_t>(1, (away.size() + 1) / 2));
-		buddies_offline.bottom = first + ROW * buddies_offline.rows + BUDDY_FOOTER;
+		auto chatbar = UI::get().get_element<UIChatBar>();
+		bool changed = false;
+
+		for (const Buddy* target : targets)
+		{
+			if (blocks.blocked(target->id) == block)
+				continue;
+
+			blocks.set(target->id, block);
+			changed = true;
+
+			if (chatbar)
+				chatbar->send_chatline("Buddy chat with \"" + target->name + "\" has been "
+									   + (block ? "disabled." : "enabled."), UIChatBar::LineType::SKILL);
+		}
+
+		if (!changed)
+			return;
+
+		Setting<FriendBlocked>::get().save(FriendGroups::format_blocks(Setting<FriendBlocked>::get().load(),
+				Stage::get().get_player().get_oid(), blocks.ids()));
+
+		rebuild_buddies();
+		update_buttons();
+	}
+
+	void UIUserList::open_group(const std::string& group)
+	{
+		if (group == FriendGroups::DEFAULT)
+		{
+			UI::get().emplace<UIOk>(group + " cannot be changed or deleted.", [](bool) {});
+			return;
+		}
+
+		UI::get().emplace<UIFriendGroup>(group, buddies.get_buddies());
+	}
+
+	void UIUserList::add_friend(const std::string& name)
+	{
+		std::vector<std::string> groups;
+
+		for (const Buddy& buddy : buddies.get_buddies())
+			groups.push_back(buddy.group);
+
+		// The group starts blank even for a buddy's (FUN_00909fca), and goes
+		// as typed: the server reads blank as Default Group.
+		UI::get().emplace<UIGroupPicker>(
+				name,
+				chat_target::group_choices(groups),
+				[](const std::string& name, const std::string& group)
+				{
+					BuddyCommands::add(name, group);
+				}
+		);
 	}
 
 	const Buddy* UIUserList::selected_buddy() const
@@ -1297,16 +1645,25 @@ namespace ms
 		enable(Buttons::BT_EXPEL, leader && member);
 		enable(Buttons::BT_INVITE, leader && party.get_members().size() < PARTY_CAPACITY);
 
-		const Buddy* buddy = selected_buddy();
-		bool party_has_room = !in_party || (leader && party.get_members().size() < PARTY_CAPACITY);
+		// v83's rules (FUN_0091dba9); with nothing picked, only those that
+		// need no one.
+		FriendGroups::Buttons friend_buttons;
 
-		enable(Buttons::BT_ADD_BUDDY, !buddies.is_full());
-		enable(Buttons::BT_DELETE_BUDDY, buddy);
-		enable(Buttons::BT_WHISPER_BUDDY, buddy && buddy->online());
-		enable(Buttons::BT_BUDDY_CHAT, buddies.listed() > 0);
-		enable(Buttons::BT_BUDDY_MAP, false);
-		// Inviting someone makes a party first if the player has none.
-		enable(Buttons::BT_INVITE_BUDDY, buddy && buddy->online() && party_has_room);
+		if (const Buddy* buddy = selected_buddy())
+			friend_buttons = FriendGroups::buttons(*buddy, blocks);
+		else if (const FriendGroups::Group* group = selected_group())
+			friend_buttons = FriendGroups::buttons(*group, blocks);
+
+		enable(Buttons::BT_FRIEND_MOD, friend_buttons.mod);
+		enable(Buttons::BT_FRIEND_DELETE, friend_buttons.remove);
+		enable(Buttons::BT_FRIEND_CHAT, friend_buttons.chat);
+		enable(Buttons::BT_FRIEND_WHISPER, friend_buttons.whisper);
+		enable(Buttons::BT_FRIEND_MESSAGE, friend_buttons.message);
+		enable(Buttons::BT_FRIEND_PARTY, friend_buttons.party);
+		enable(Buttons::BT_FRIEND_BLOCK, friend_buttons.block);
+		enable(Buttons::BT_FRIEND_UNBLOCK, friend_buttons.block);
+		buttons[Buttons::BT_FRIEND_BLOCK]->set_active(tab == Tab::FRIEND && !friend_buttons.unblock);
+		buttons[Buttons::BT_FRIEND_UNBLOCK]->set_active(tab == Tab::FRIEND && friend_buttons.unblock);
 
 		// The client's rules (FUN_0090f17c). Without a guild the player's
 		// rank is 0, which greys out all of them. HeavenClient has no

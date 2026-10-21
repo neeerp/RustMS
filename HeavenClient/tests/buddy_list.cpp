@@ -52,6 +52,8 @@ int main()
 		require(list.get_buddies().size() == 3 && list.listed() == 1, "requests aren't counted");
 		require(list.find(5) && list.find(5)->pending(), "a request is kept");
 		require(list.online_ids() == std::vector<int32_t>{ 2 }, "requests don't hear buddy chat");
+		require(list.online_ids(std::set<int32_t>{ 2 }).empty() && list.online_ids("Default Group") == std::vector<int32_t>{ 2 }
+			&& list.online_ids("Default Group", std::set<int32_t>{ 2 }).empty(), "nor do blocked buddies");
 		require(!list.find_listed("dave") && list.find_listed("bOBBY") == list.find(2),
 			"names are found regardless of case, requests left out");
 

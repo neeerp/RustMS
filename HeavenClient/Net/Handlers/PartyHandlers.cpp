@@ -9,6 +9,7 @@
 #include "../../Data/SwindleData.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../IO/BuddyCommands.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
@@ -352,6 +353,14 @@ namespace ms
 			return;
 
 		std::string name = recv.read_string();
+
+		// Nothing is heard from a buddy blocked in the Friend tab, whatever
+		// the mode; others aren't looked at (FUN_00531e00, report b020).
+		const Buddy* buddy = Stage::get().get_player().get_buddies().find_listed(name);
+
+		if (buddy && BuddyCommands::blocks().blocked(buddy->id))
+			return;
+
 		// As with nearby chat, v83 stars out curse words and shows what it
 		// can't print as spaces (FUN_00531e00).
 		std::string text = CurseWords::printable(CurseData::filter(recv.read_string()));

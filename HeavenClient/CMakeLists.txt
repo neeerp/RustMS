@@ -96,6 +96,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME door_rules COMMAND door_rules_tests)
     add_executable(buddy_list_tests tests/buddy_list.cpp Character/BuddyList.cpp)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
+    add_executable(friend_groups_tests tests/friend_groups.cpp Character/FriendGroups.cpp Character/BuddyList.cpp)
+    add_test(NAME friend_groups COMMAND friend_groups_tests)
     add_executable(guild_tests tests/guild.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
     target_include_directories(guild_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME guild COMMAND guild_tests)
@@ -420,6 +422,8 @@ add_executable(HeavenClient
     Character/ActiveBuffs.h
     Character/BuddyList.cpp
     Character/BuddyList.h
+    Character/FriendGroups.cpp
+    Character/FriendGroups.h
     Character/Berserk.h
     Character/Buff.cpp
     Character/Buff.h
@@ -737,6 +741,8 @@ add_executable(HeavenClient
     IO/UITypes/UIGender.h
     IO/UITypes/UIGroupPicker.cpp
     IO/UITypes/UIGroupPicker.h
+    IO/UITypes/UIFriendGroup.cpp
+    IO/UITypes/UIFriendGroup.h
     IO/UITypes/UIWhisperPrompt.cpp
     IO/UITypes/UIWhisperPrompt.h
     IO/UITypes/UIItemInventory.cpp

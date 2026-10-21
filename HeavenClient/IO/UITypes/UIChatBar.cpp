@@ -32,6 +32,7 @@
 
 #include "../Components/MapleButton.h"
 
+#include "../BuddyCommands.h"
 #include "../GuildCommands.h"
 #include "../PartyCommands.h"
 
@@ -1233,7 +1234,9 @@ namespace ms
 	{
 		Player& player = Stage::get().get_player();
 		const BuddyList& buddies = player.get_buddies();
-		std::vector<int32_t> recipients = group ? buddies.online_ids(*group) : buddies.online_ids();
+		// Blocked buddies are left out (FUN_00a3fb25).
+		FriendGroups::Blocks blocks = BuddyCommands::blocks();
+		std::vector<int32_t> recipients = group ? buddies.online_ids(*group, blocks.ids()) : buddies.online_ids(blocks.ids());
 
 		if (recipients.empty())
 		{

@@ -45,10 +45,10 @@ int main()
 
 		using ms::chat_target::group_choices;
 		using Groups = std::vector<std::string>;
-		require(group_choices({}) == Groups({ "" }), "a blank entry with no buddies");
-		require(group_choices({ "Default Group", "", "Default Group" }) == Groups({ "", "Default Group" }),
-				"each group once, and no second blank");
-		require(group_choices({ "b", "A", "a", "B" }) == Groups({ "", "A", "B", "a", "b" }), "bytewise order");
+		require(group_choices({}) == Groups({ "Default Group" }), "the Default Group with no buddies");
+		require(group_choices({ "Default Group", "Mates", "Default Group", "Mates" }) == Groups({ "Default Group", "Mates" }),
+				"each group once, the Default Group first");
+		require(group_choices({ "b", "A", "a", "B" }) == Groups({ "Default Group", "A", "B", "a", "b" }), "bytewise order");
 
 		ms::chat_target::WhisperHistory history;
 		require(history.latest().empty(), "an empty history has no latest name");

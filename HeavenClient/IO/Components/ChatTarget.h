@@ -90,18 +90,28 @@ namespace ms
 			}
 		}
 
-		// What the "To Group" dialog offers (FUN_00a3fc85): a blank entry,
-		// then each buddy's group once, in bytewise order. Pending buddies'
-		// groups count too.
+		// What the "To Group" and Add Buddy dialogs offer (FUN_00a3fc85): the
+		// Default Group first, which the combo starts on, then each buddy's
+		// other group once, in bytewise order. Pending buddies' groups count
+		// too.
 		inline std::vector<std::string> group_choices(std::vector<std::string> groups)
 		{
+			const std::string first = "Default Group";
+
 			std::sort(groups.begin(), groups.end());
 
-			std::vector<std::string> choices = { "" };
+			std::vector<std::string> choices = { first };
+			std::string last;
 
-			for (const std::string& group : groups)
-				if (!group.empty() && group != choices.back())
-					choices.push_back(group);
+			for (size_t i = 0; i < groups.size(); i++)
+			{
+				// Each is compared with the last one kept, from the second on.
+				if (groups[i] == first || (i > 0 && groups[i] == last))
+					continue;
+
+				choices.push_back(groups[i]);
+				last = groups[i];
+			}
 
 			return choices;
 		}

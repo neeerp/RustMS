@@ -3,6 +3,7 @@
 #include "../UIElement.h"
 
 #include "../Components/ComboEdit.h"
+#include "../Components/Textfield.h"
 
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
@@ -15,7 +16,8 @@ namespace ms
 {
 	// v83's "To Group" dialog (FUN_008d500b): a CUtilDlg asking for a buddy
 	// group in a combo box whose text is typed or picked from the groups.
-	// OK hands over the text, blank or not.
+	// OK hands over the text, blank or not. The Add Buddy dialog (kind 0x3ea,
+	// FUN_00909fca) is the same with a name edit under the combo.
 	class UIGroupPicker : public UIElement
 	{
 	public:
@@ -24,6 +26,10 @@ namespace ms
 		static constexpr bool TOGGLED = false;
 
 		UIGroupPicker(std::vector<std::string> choices, std::function<void(const std::string &group)> okhandler);
+		// Add Buddy, its name starting as name; OK hands over the name
+		// trimmed and the group as typed.
+		UIGroupPicker(const std::string &name, std::vector<std::string> choices,
+					  std::function<void(const std::string &name, const std::string &group)> okhandler);
 
 		void draw(float alpha) const override;
 
@@ -48,11 +54,16 @@ namespace ms
 			CANCEL
 		};
 
+		UIGroupPicker(bool asks_name, std::vector<std::string> choices);
+
+		bool asks_name;
 		std::function<void(const std::string &)> okhandler;
+		std::function<void(const std::string &, const std::string &)> name_okhandler;
 		Texture top;
 		Texture middle;
 		Texture bottom;
-		Text prompt;
+		std::vector<Text> prompt;
 		ComboEdit combo;
+		Textfield name;
 	};
 }

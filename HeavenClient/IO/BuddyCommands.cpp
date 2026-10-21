@@ -5,6 +5,8 @@
 #include "UITypes/UIInviteCard.h"
 #include "UITypes/UINotice.h"
 
+#include "../Configuration.h"
+
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Util/CharacterName.h"
@@ -30,17 +32,23 @@ namespace ms
 			}
 		}
 
-		void add(const std::string& name, const std::string& group)
+		void add(const std::string& name, const std::string& group, bool notify)
 		{
 			const Player& player = Stage::get().get_player();
 			const Buddy* listed = player.get_buddies().find_listed(name);
 
+			auto refuse = [notify](const std::string& text)
+			{
+				if (notify)
+					notice(text);
+			};
+
 			if (!character_name_valid(name))
-				notice("You have entered an invalid character name.");
+				refuse("You have entered an invalid character name.");
 			else if (listed && listed->group == group)
-				notice("The buddy is already registered.");
+				refuse("The buddy is already registered.");
 			else if (same_name(name, player.get_stats().get_name()))
-				notice("You can't enter yourself as your buddy.");
+				refuse("You can't enter yourself as your buddy.");
 			else
 				AddBuddyPacket(name, group).dispatch();
 		}
@@ -85,6 +93,12 @@ namespace ms
 			for (const Buddy& buddy : Stage::get().get_player().get_buddies().get_buddies())
 				if (buddy.pending())
 					ask(buddy.name, buddy.id);
+		}
+
+		FriendGroups::Blocks blocks()
+		{
+			return FriendGroups::Blocks(FriendGroups::parse_blocks(Setting<FriendBlocked>::get().load(),
+					Stage::get().get_player().get_oid()));
 		}
 	}
 }

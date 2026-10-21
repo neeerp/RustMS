@@ -19,6 +19,7 @@
 
 #include <array>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,7 @@
 #include "../Components/Slider.h"
 
 #include "../../Character/BuddyList.h"
+#include "../../Character/FriendGroups.h"
 #include "../../Character/Guild.h"
 #include "../../Character/GuildMark.h"
 #include "../../Character/Party.h"
@@ -95,15 +97,20 @@ namespace ms
 			BT_LEAVE,
 			BT_EXPEL,
 			BT_INVITE,
-			BT_ADD_BUDDY,
-			BT_DELETE_BUDDY,
-			BT_WHISPER_BUDDY,
-			BT_BUDDY_CHAT,
-			BT_BUDDY_MAP,
-			BT_INVITE_BUDDY,
-			BT_MESSAGE_BUDDY,
+			// The Friend tab's, in v83's order (FUN_0091a065).
+			BT_ADD_FRIEND,
+			BT_ADD_GROUP,
+			BT_GROUP_WHISPER,
 			BT_SHOW_ONLINE,
 			BT_SHOW_ALL,
+			BT_FRIEND_MOD,
+			BT_FRIEND_DELETE,
+			BT_FRIEND_CHAT,
+			BT_FRIEND_WHISPER,
+			BT_FRIEND_MESSAGE,
+			BT_FRIEND_PARTY,
+			BT_FRIEND_BLOCK,
+			BT_FRIEND_UNBLOCK,
 			BT_GUILD_INVITE,
 			BT_GUILD_WITHDRAW,
 			BT_GUILD_KICK,
@@ -155,23 +162,16 @@ namespace ms
 			bool operator==(const Shown& other) const;
 		};
 
-		// One buddy's half of a row; pos is relative to the window.
-		struct Cell
+		// One line of the friend list: a group's header, two of its members,
+		// or "none" for a group shown empty.
+		struct FriendLine
 		{
-			int32_t id;
-			Point<int16_t> pos;
-			Text name, channel;
-		};
-
-		// The online or offline part of the buddy list, two buddies a row.
-		struct BuddySection
-		{
-			Texture header;
-			Text count;
-			int16_t top = 0;
-			int16_t bottom = 0;
-			int16_t rows = 0;
-			std::vector<Cell> cells;
+			std::string group;
+			bool header;
+			// The members, 0 where there is none.
+			std::array<int32_t, 2> ids;
+			// A header's title, the members' names, or "none".
+			std::array<Text, 2> texts;
 		};
 
 		// One guild member's row; y is in the member list's own space.
@@ -208,8 +208,21 @@ namespace ms
 		const PartyMember* selected_member() const;
 
 		void rebuild_buddies();
-		void draw_buddies(const BuddySection& section, const Texture& section_row, bool legend) const;
+		void draw_buddies() const;
+		void scroll_buddies(int16_t row);
+		// The line under the cursor, and which half of it.
+		const FriendLine* buddy_line_at(Point<int16_t> cursor_relative, size_t& half) const;
 		const Buddy* selected_buddy() const;
+		const FriendGroups::Group* selected_group() const;
+		void fold(const std::string& group);
+		// Blocks or unblocks the buddy picked, or every member of the group
+		// picked (FUN_0090aba4).
+		void toggle_block();
+		// The GroupMod dialog, for a new group if group is blank.
+		void open_group(const std::string& group);
+		// The Add Buddy dialog, its name starting as name: a buddy's, to move
+		// them to another group, or blank.
+		void add_friend(const std::string& name);
 
 		void rebuild_guild();
 		// Lays out one guild section from y and returns where the next may
@@ -251,12 +264,22 @@ namespace ms
 		int32_t shown_mapid = 0;
 		int32_t selected = 0;
 
-		Texture legend, buddy_row, offline_row, buddy_bottom;
-		BuddySection buddies_online, buddies_offline;
+		Texture friend_background, unfolded_icon, folded_icon, same_channel_icon, blocked_icon, dot;
+		Text friend_count, location;
 		std::vector<Buddy> shown_buddies;
+		// Point into shown_buddies.
+		std::vector<FriendGroups::Group> friend_groups;
+		std::vector<FriendLine> friend_lines;
+		FriendGroups::Blocks blocks;
+		std::set<std::string> folded;
+		// v83 picks a buddy by id or a group by name, never both.
 		int32_t picked_buddy = 0;
-		bool show_all = true;
+		std::string picked_group;
+		bool show_online = false;
 		bool filter_clicked = false;
+		Slider friend_slider;
+		int16_t friend_scroll = 0;
+		int32_t shown_location = -1;
 
 		Texture guild_frame, notice_box, guild_columns, guild_row, guild_end;
 		Text guild_name, no_guild, notice_label, notice;
