@@ -758,6 +758,28 @@ namespace ms
 		{}
 	};
 
+	// The Friend tab's own settings, which v83 keeps in the client and never
+	// tells the server: whether it shows only who is online, the groups folded,
+	// by name and split by tabs, and the buddies each character has blocked,
+	// as "character:buddy" ids split by commas.
+	struct FriendShowOnline : public Configuration::BoolEntry
+	{
+		FriendShowOnline() : BoolEntry("FriendShowOnline", "false")
+		{}
+	};
+
+	struct FriendFolded : public Configuration::StringEntry
+	{
+		FriendFolded() : StringEntry("FriendFolded", "")
+		{}
+	};
+
+	struct FriendBlocked : public Configuration::StringEntry
+	{
+		FriendBlocked() : StringEntry("FriendBlocked", "")
+		{}
+	};
+
 	template<typename T>
 	// Can be used to access settings.
 	struct Setting

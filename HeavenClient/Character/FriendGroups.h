@@ -52,6 +52,15 @@ namespace ms::FriendGroups
 		std::set<int32_t> ids_;
 	};
 
+	// The settings' list of blocks, "owner:id" pairs split by commas. v83 keeps them per character
+	// (report b020), so each owner's are read and written apart from the others'.
+	std::set<int32_t> parse_blocks(const std::string& text, int32_t owner);
+	std::string format_blocks(const std::string& text, int32_t owner, const std::set<int32_t>& ids);
+
+	// The settings' list of groups folded, split by tabs, which no name holds.
+	std::set<std::string> parse_names(const std::string& text);
+	std::string format_names(const std::set<std::string>& names);
+
 	// v83's offline class (FUN_00908fc4): offline, or blocked.
 	bool away(const Buddy& buddy, const Blocks& blocks);
 

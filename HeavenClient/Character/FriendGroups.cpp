@@ -1,6 +1,7 @@
 #include "FriendGroups.h"
 
 #include <algorithm>
+#include <stdexcept>
 #include <utility>
 
 namespace ms::FriendGroups
@@ -89,6 +90,116 @@ namespace ms::FriendGroups
 	bool away(const Buddy& buddy, const Blocks& blocks)
 	{
 		return blocks.blocked(buddy.id) || !buddy.online();
+	}
+
+	namespace
+	{
+		std::vector<std::string> split(const std::string& text, char separator)
+		{
+			std::vector<std::string> parts;
+			size_t start = 0;
+
+			while (start <= text.size())
+			{
+				size_t end = text.find(separator, start);
+
+				if (end == std::string::npos)
+					end = text.size();
+
+				if (end > start)
+					parts.push_back(text.substr(start, end - start));
+
+				start = end + 1;
+			}
+
+			return parts;
+		}
+
+		// An "owner:id" pair, or false if the text is not one.
+		bool parse_pair(const std::string& text, int32_t& owner, int32_t& id)
+		{
+			size_t colon = text.find(':');
+
+			if (colon == std::string::npos)
+				return false;
+
+			try
+			{
+				owner = std::stoi(text.substr(0, colon));
+				id = std::stoi(text.substr(colon + 1));
+			}
+			catch (const std::exception&)
+			{
+				return false;
+			}
+
+			return true;
+		}
+	}
+
+	std::set<int32_t> parse_blocks(const std::string& text, int32_t owner)
+	{
+		std::set<int32_t> ids;
+
+		for (const std::string& part : split(text, ','))
+		{
+			int32_t pair_owner = 0;
+			int32_t id = 0;
+
+			if (parse_pair(part, pair_owner, id) && pair_owner == owner)
+				ids.insert(id);
+		}
+
+		return ids;
+	}
+
+	std::string format_blocks(const std::string& text, int32_t owner, const std::set<int32_t>& ids)
+	{
+		std::string result;
+
+		auto add = [&](const std::string& part)
+		{
+			if (!result.empty())
+				result += ',';
+
+			result += part;
+		};
+
+		for (const std::string& part : split(text, ','))
+		{
+			int32_t pair_owner = 0;
+			int32_t id = 0;
+
+			if (parse_pair(part, pair_owner, id) && pair_owner != owner)
+				add(part);
+		}
+
+		for (int32_t id : ids)
+			add(std::to_string(owner) + ':' + std::to_string(id));
+
+		return result;
+	}
+
+	std::set<std::string> parse_names(const std::string& text)
+	{
+		std::vector<std::string> parts = split(text, '\t');
+
+		return std::set<std::string>(parts.begin(), parts.end());
+	}
+
+	std::string format_names(const std::set<std::string>& names)
+	{
+		std::string result;
+
+		for (const std::string& name : names)
+		{
+			if (!result.empty())
+				result += '\t';
+
+			result += name;
+		}
+
+		return result;
 	}
 
 	Buttons buttons(const Buddy& picked, const Blocks& blocks)

@@ -422,6 +422,8 @@ add_executable(HeavenClient
     Character/ActiveBuffs.h
     Character/BuddyList.cpp
     Character/BuddyList.h
+    Character/FriendGroups.cpp
+    Character/FriendGroups.h
     Character/Berserk.h
     Character/Buff.cpp
     Character/Buff.h

@@ -98,6 +98,17 @@ int main()
 
 		auto work = buttons(groups[1], blocks);
 		require(work.unblock, "a group all blocked reads UNBLOCK");
+
+		require(parse_blocks("", 1).empty(), "no blocks at first");
+		require(parse_blocks("1:5,2:6,1:7,junk,3:", 1) == std::set<int32_t>{ 5, 7 },
+				"each character's own blocks, and nothing malformed");
+		require(format_blocks("1:5,2:6", 1, { 7, 8 }) == "2:6,1:7,1:8", "writing one's blocks keeps the others'");
+		require(format_blocks("1:5", 1, {}) == "", "and an empty set clears them");
+
+		require(parse_names("").empty(), "nothing folded at first");
+		require(parse_names("Mates\tWork group") == std::set<std::string>{ "Mates", "Work group" },
+				"names may hold spaces");
+		require(format_names({ "Work group", "Mates" }) == "Mates\tWork group", "and are written in order");
 	}
 	catch (const std::exception& e)
 	{

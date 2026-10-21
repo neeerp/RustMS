@@ -87,6 +87,9 @@ namespace ms
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();
+		settings.emplace<FriendShowOnline>();
+		settings.emplace<FriendFolded>();
+		settings.emplace<FriendBlocked>();
 
 		load();
 	}
