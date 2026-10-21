@@ -39,6 +39,7 @@ use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
 use net::packet::build::world::field::{build_chalkboard, parse_movement_state};
+use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
 use net::packet::handle::world::{spend_avatar_megaphone, to_character, Rock, Whereabouts};
@@ -307,6 +308,12 @@ impl ClientActor {
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
+        }
+        // Checked before the handler moves the player.
+        if opcode == RecvOpcode::ChangeMap as i16 && self.gate_closed(&packet) {
+            return self
+                .send(&mut build_blocked_map(BlockedMap::PortalClosed)?)
+                .await;
         }
 
         let result = match (route, self.game.as_mut()) {
@@ -707,6 +714,7 @@ impl ClientActor {
         self.set_wall_clock().await?;
         self.start_map_timer().await?;
         self.show_event_clock().await?;
+        self.show_event_gate().await?;
         self.start_hazard()?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;
@@ -1169,6 +1177,7 @@ impl ClientActor {
             }
             ServerMessage::EventStarted(ticket) => self.event_started(ticket).await?,
             ServerMessage::EventEnded { id } => self.event_ended(id).await?,
+            ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::PartySkill {

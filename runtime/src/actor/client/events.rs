@@ -1,7 +1,8 @@
 //! The player's side of a party event (`crate::actor::event`): the ticket
 //! that puts them in the event's own copy of its maps, the event's clock,
-//! and getting out when it ends or they leave.
+//! its stages' gates, and getting out when it ends or they leave.
 
+use super::quest::gain_exp;
 use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
@@ -9,7 +10,11 @@ use crate::message::{DirectoryMessage, FieldKey};
 use net::events::{EventCommand, EventKind, KPQ};
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
-use net::packet::handle::world::warp_to_spawn_point;
+use net::packet::build::world::effect::{
+    build_field_effect, build_field_object, build_field_sound,
+};
+use net::packet::handle::world::{portal_name, warp_to_spawn_point};
+use packet::Packet;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
 
@@ -150,6 +155,60 @@ impl ClientActor {
             }
         }
         Ok(())
+    }
+
+    /// Whether `packet`, a walk through a portal, would leave a stage before
+    /// the party has cleared it. The client doesn't stop the player itself.
+    pub(super) fn gate_closed(&self, packet: &Packet) -> bool {
+        let (Some(ticket), Some(game)) = (&self.event, &self.game) else {
+            return false;
+        };
+        let map_id = game.player.stats.map_id;
+        if self.in_cash_shop || !ticket.holds(map_id) {
+            return false;
+        }
+        portal_name(packet)
+            .and_then(|portal| ticket.kind.event().gate_stage(map_id, &portal))
+            .is_some_and(|stage| !ticket.cleared(stage))
+    }
+
+    /// The party cleared `stage` of event `id`: those on its map see and
+    /// hear it and its gate opens, and everyone gets the stage's EXP.
+    pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
+            return Ok(());
+        };
+        if self.in_cash_shop || self.game.is_none() {
+            return Ok(());
+        }
+        let event = ticket.kind.event();
+        let map_id = event.stage_map(stage);
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        if next.stats.map_id == map_id {
+            packets.push(build_field_effect("quest/party/clear")?);
+            packets.push(build_field_sound("Party1/Clear")?);
+            packets.push(build_field_object("gate")?);
+        }
+        gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
+        self.commit_player(next, None, &mut packets).await?;
+        self.send_all(&mut packets).await
+    }
+
+    /// A cleared stage's gate stays open for whoever comes onto its map.
+    pub(super) async fn show_event_gate(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+            return Ok(());
+        };
+        let event = ticket.kind.event();
+        let cleared = event
+            .stage_on(map_id)
+            .is_some_and(|stage| ticket.cleared(stage));
+        if !cleared {
+            return Ok(());
+        }
+        self.send(&mut build_field_object("gate")?).await
     }
 
     /// On one of the event's maps the client shows the time left.

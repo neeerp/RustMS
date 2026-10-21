@@ -1,18 +1,20 @@
 //! Kerning City's party quest, stage 1: Cloto asks each member but the
 //! leader for a number of coupons, gives a pass for exactly that many, and
-//! the leader clears the stage by handing in a pass from each of them. The
+//! the leader clears the stage by handing in a pass from each of them,
+//! which opens the way on to stage 2 and gives everyone its EXP. The
 //! harness world pins her question (`RUSTMS_KPQ_QUESTION`), so the
 //! members' coupons can be granted before they log in.
 
 use game_data::GameData;
 use integration_harness::database::{grant_stack, set_job};
 use integration_harness::hunting::pickup;
+use integration_harness::packets::build_change_map;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{ANSWERS, COUPON, KPQ, PASS};
-use net::packet::op::RecvOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
 use std::path::Path;
@@ -129,6 +131,16 @@ async fn ask_cloto(player: &mut WorldSession) -> (String, Trace) {
     (trace.prompt_texts[0].clone(), trace)
 }
 
+/// What a member on the stage's map is shown on its clear: the clear on
+/// screen, its sound, and the gate opening.
+fn clear_effects() -> Vec<(u8, String)> {
+    vec![
+        (3, "quest/party/clear".into()),
+        (4, "Party1/Clear".into()),
+        (2, "gate".into()),
+    ]
+}
+
 fn nothing_changed_hands(trace: &Trace) {
     assert!(
         trace.added.is_empty() && trace.removed.is_empty() && trace.quantities.is_empty(),
@@ -166,6 +178,22 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
     let [leader, right, wrong] = &mut team[..] else {
         unreachable!()
     };
+
+    // The way on is shut until the stage is cleared, for everyone.
+    for player in [&mut *leader, &mut *wrong] {
+        send(
+            &mut player.connection,
+            build_change_map(-1, "next00").unwrap(),
+        )
+        .await;
+        let mut trace = Trace::default();
+        until(&mut player.connection, &mut trace, |t| {
+            !t.blocked.is_empty()
+        })
+        .await;
+        assert_eq!(trace.blocked, [(SendOpcode::BlockedMap as i16, 1)]);
+        assert!(trace.warps.is_empty(), "{trace:?}");
+    }
 
     // Each member is asked first, whatever they hold.
     let (question, trace) = ask_cloto(right).await;
@@ -207,11 +235,41 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
     })
     .await;
 
-    // Both passes clear the stage, and Cloto says so to everyone.
-    let (cleared, trace) = ask_cloto(leader).await;
+    // Both passes clear the stage: everyone on it sees and hears it, the
+    // gate opens, and each gets the stage's EXP.
+    let (cleared, mut trace) = ask_cloto(leader).await;
     assert_eq!(trace.removed, [(ETC, 1)]);
+    until(&mut leader.connection, &mut trace, |t| !t.gains.is_empty()).await;
+    assert_eq!(trace.field_effects, clear_effects());
+    assert_eq!(trace.gains, [KPQ.stage_exp(1)]);
+    for member in [&mut *right, &mut *wrong] {
+        let mut trace = Trace::default();
+        until(&mut member.connection, &mut trace, |t| !t.gains.is_empty()).await;
+        assert_eq!(trace.field_effects, clear_effects());
+        assert_eq!(trace.gains, [KPQ.stage_exp(1)]);
+    }
+
+    // Cloto says so to everyone.
     let (told, trace) = ask_cloto(wrong).await;
     nothing_changed_hands(&trace);
     assert!(!told.contains(&question), "{told}");
     assert_ne!(told, cleared);
+
+    // Through it the leader goes on to stage 2, and back on stage 1 the
+    // gate is still open.
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(&mut leader.connection, -1, "next00", &mut trace).await,
+        KPQ.stage_map(2)
+    );
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(&mut leader.connection, KPQ.entry, "", &mut trace).await,
+        KPQ.entry
+    );
+    until(&mut leader.connection, &mut trace, |t| {
+        !t.field_effects.is_empty()
+    })
+    .await;
+    assert_eq!(trace.field_effects, [(2, "gate".to_string())]);
 }

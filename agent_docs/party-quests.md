@@ -2,9 +2,10 @@
 
 A party event is played in a copy of its maps of its own: an instance.
 Kerning City's party quest (KPQ) is the first. So far it has its entry,
-exit and timer, and Cloto's quiz on stage 1; its gates, the other stages
-and rewards come next (see `v83ref/reports/a005-instancing-kpq.md`,
-section 3, and `a011-kpq-stage1.md`).
+exit and timer, and stage 1: Cloto's quiz, its clear and the way on to
+stage 2. The other stages and rewards come next (see
+`v83ref/reports/a005-instancing-kpq.md`, section 3, and
+`a011-kpq-stage1.md`).
 
 ## Rules
 
@@ -27,9 +28,9 @@ section 3, and `a011-kpq-stage1.md`).
 | Owner | Holds |
 | --- | --- |
 | Directory | Which event each channel is playing, as `(channel, kind)` → id. There is one at a time per kind, like a GMS lobby. |
-| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, the members' handles, and the stages' progress (`Stage1`). |
+| Event actor (`runtime/src/actor/event.rs`) | The team, the deadline, the members' handles, and the stages' progress (`Stage1`). It alone writes the stages cleared (`Cleared`, one bit per stage), shared with the tickets. |
 | Field registry | The open instance ids. The fields of a copy are keyed by `FieldKey{channel, map, instance_id}`. |
-| Client actor (`client/events.rs`) | The member's `EventTicket`: the id, the kind, the end time, and the event's handle. |
+| Client actor (`client/events.rs`) | The member's `EventTicket`: the id, the kind, the end time, the event's handle, and the stages cleared. |
 
 ## Flow
 
@@ -115,6 +116,30 @@ items go in one call). The script's last effect, `Effect::EventCommand`,
 tells the event (`PassGiven`, `ClearStage(1)`) once the items have changed
 hands. Elsewhere, and outside an event, Cloto has nothing to say yet.
 
+## Clearing a stage
+
+Stage n is played on `entry + n - 1`. A clear, taken once and only from the
+leader, goes like this (`EventActor::clear`):
+
+1. The event sets the stage's bit in `Cleared` before telling anyone, so a
+   member who sees the clear can go on.
+2. Every member gets `ServerMessage::StageCleared{id, stage}`. Those on
+   the stage's map are shown FIELD_EFFECT 3 `quest/party/clear`, 4
+   `Party1/Clear` (the sound), and 2 `gate` (every stage map has one).
+   Everyone in the event, wherever they are in it, gets the stage's EXP
+   as quest EXP (`Event::exp_per_stage`: 100, 200, 400, 800, 1500,
+   Cosmic's, though not scaled by an EXP rate as Cosmic's is). A member in
+   the Cash Shop gets none; leaving it takes them out of the event anyway.
+3. A member who comes onto a cleared stage's map later is shown its gate
+   again (`show_event_gate`, from `join_current_field`).
+
+The client doesn't stop anyone at a closed gate: it sends CHANGE_MAP with
+the portal's name either way. So `handle_packet` checks CHANGE_MAP before
+the handler moves the player (`gate_closed`). For `next00` on 103000800-803
+before that stage's clear, it answers BLOCKED_MAP 1, the client's own "The
+portal is closed for now." line, which also unlocks it
+(`v83ref/reports/a012-kpq-gate.md`). Map-id warps aren't checked.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -132,8 +157,6 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's stages after the first.
-- The `next00` gates, which stay open until the stage logic lands; the
-  clear's effects, sound and stage EXP.
 - Rewards and the bonus stage.
 - Removing the quest's items on exit.
 - A new leader chosen inside the copy: the event still counts the first
