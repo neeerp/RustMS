@@ -188,6 +188,9 @@ pub struct Trace {
     pub cooldowns: Vec<(i32, i16)>,
     /// BLOCKED_MAP and BLOCKED_SERVER: (opcode, reason).
     pub blocked: Vec<(i16, u8)>,
+    /// FIELD_EFFECT modes naming something: (mode, name), for 2 a map
+    /// object, 3 a screen effect and 4 a sound.
+    pub field_effects: Vec<(u8, String)>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,
     /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
@@ -345,6 +348,12 @@ impl Trace {
             self.hp_taken.push(r.read_int().unwrap());
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
+        } else if op == SendOpcode::FieldEffect as i16 {
+            let mode = r.read_byte().unwrap();
+            if matches!(mode, 2..=4) {
+                self.field_effects
+                    .push((mode, r.read_str_with_length().unwrap()));
+            }
         } else if op == SendOpcode::BroadcastMsg as i16 {
             let kind = r.read_byte().unwrap();
             if matches!(kind, 0 | 1 | 5) {

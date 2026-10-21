@@ -29,10 +29,21 @@ pub struct Event {
     /// How many may play, the leader included.
     pub team: RangeInclusive<usize>,
     pub minutes: u64,
+    /// The EXP every member gets for clearing each stage, in order. Stage n
+    /// is played on `entry + n - 1`.
+    pub stage_exp: &'static [i32],
+    /// The stage maps whose `next00` portal stays shut until their stage is
+    /// cleared.
+    pub gated: RangeInclusive<i32>,
+    /// The stage maps with a `gate` object, shown once their stage is
+    /// cleared.
+    pub gates: &'static [i32],
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
-/// `FieldSet.img/Party1`: maps 103000800-805, 30 minutes).
+/// `FieldSet.img/Party1`: maps 103000800-805, 30 minutes). Stage EXP is
+/// Cosmic's; `next00` leads on from 103000800-803, and 800, 802 and 804
+/// have a `gate` object (Map.nx).
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
@@ -41,6 +52,9 @@ pub const KPQ: Event = Event {
     levels: 21..=30,
     team: 3..=4,
     minutes: 30,
+    stage_exp: &[100, 200, 400, 800, 1500],
+    gated: 103_000_800..=103_000_803,
+    gates: &[103_000_800, 103_000_802, 103_000_804],
 };
 
 impl EventKind {
@@ -81,6 +95,42 @@ impl Event {
 
     pub fn holds(&self, map_id: i32) -> bool {
         self.maps.contains(&map_id)
+    }
+
+    /// The map stage `stage` (from 1) is played on.
+    pub fn stage_map(&self, stage: u8) -> i32 {
+        self.entry + i32::from(stage) - 1
+    }
+
+    /// The stage played on `map_id`, if any.
+    pub fn stage_on(&self, map_id: i32) -> Option<u8> {
+        let stage = u8::try_from(map_id.checked_sub(self.entry)? + 1).ok()?;
+        (1..=self.stage_exp.len())
+            .contains(&usize::from(stage))
+            .then_some(stage)
+    }
+
+    /// The stage that must be cleared before `portal` on `map_id` lets
+    /// anyone through.
+    pub fn gate_stage(&self, map_id: i32, portal: &str) -> Option<u8> {
+        if portal != "next00" || !self.gated.contains(&map_id) {
+            return None;
+        }
+        self.stage_on(map_id)
+    }
+
+    /// Whether `map_id` shows a `gate` once its stage is cleared.
+    pub fn has_gate(&self, map_id: i32) -> bool {
+        self.gates.contains(&map_id)
+    }
+
+    /// The EXP for clearing `stage`.
+    pub fn stage_exp(&self, stage: u8) -> i32 {
+        usize::from(stage)
+            .checked_sub(1)
+            .and_then(|index| self.stage_exp.get(index))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Those of the leader's party online on the channel who come along:
@@ -251,6 +301,22 @@ mod tests {
 
     fn at(id: ClientId, level: u8, map_id: i32) -> Candidate {
         Candidate { id, level, map_id }
+    }
+
+    #[test]
+    fn kpq_stages_open_their_next_portal_once_cleared() {
+        assert_eq!(KPQ.stage_on(103_000_800), Some(1));
+        assert_eq!(KPQ.stage_on(103_000_804), Some(5));
+        assert_eq!(KPQ.stage_on(103_000_805), None);
+        assert_eq!(KPQ.stage_on(103_000_000), None);
+        assert_eq!(KPQ.stage_map(1), KPQ.entry);
+        assert_eq!(KPQ.gate_stage(103_000_800, "next00"), Some(1));
+        assert_eq!(KPQ.gate_stage(103_000_803, "next00"), Some(4));
+        assert_eq!(KPQ.gate_stage(103_000_804, "next00"), None);
+        assert_eq!(KPQ.gate_stage(103_000_800, "st00"), None);
+        assert!(KPQ.has_gate(103_000_800) && !KPQ.has_gate(103_000_801));
+        assert_eq!((KPQ.stage_exp(1), KPQ.stage_exp(5)), (100, 1500));
+        assert_eq!((KPQ.stage_exp(0), KPQ.stage_exp(6)), (0, 0));
     }
 
     #[test]

@@ -219,6 +219,11 @@ pub enum ServerMessage {
     EventEnded {
         id: u32,
     },
+    /// The party in event `id` cleared `stage`.
+    StageCleared {
+        id: u32,
+        stage: u8,
+    },
     SendPacket(Packet),
 }
 

@@ -9,6 +9,9 @@
 //! party or the game hands the ticket back (`EventMessage::Left`). A ticket
 //! dropped any other way, say with a client that went away before reading
 //! it, hands itself back.
+//!
+//! The stages cleared are shared with the tickets, so a member's client
+//! actor can tell at once whether a stage's way on is open.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -16,6 +19,7 @@ use crate::supervisor::spawn_supervised;
 use net::events::{draw_question, Cloto, EventCommand, EventKind, Stage1, Team};
 use net::ClientId;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -43,6 +47,29 @@ pub enum EventMessage {
     },
 }
 
+/// The stages an event's party has cleared, one bit each. Only the event
+/// writes it.
+#[derive(Debug, Default)]
+pub struct Cleared(AtomicU8);
+
+impl Cleared {
+    pub fn has(&self, stage: u8) -> bool {
+        bit(stage).is_some_and(|bit| self.0.load(Ordering::Acquire) & bit != 0)
+    }
+
+    fn set(&self, stage: u8) {
+        if let Some(bit) = bit(stage) {
+            self.0.fetch_or(bit, Ordering::Release);
+        }
+    }
+}
+
+fn bit(stage: u8) -> Option<u8> {
+    stage
+        .checked_sub(1)
+        .and_then(|shift| 1u8.checked_shl(shift.into()))
+}
+
 /// A way to reach one running event.
 #[derive(Clone, Debug)]
 pub struct EventHandle {
@@ -58,6 +85,7 @@ pub struct EventTicket {
     pub ends: Instant,
     member: ClientId,
     event: EventHandle,
+    cleared: Arc<Cleared>,
 }
 
 impl Drop for EventTicket {
@@ -73,6 +101,11 @@ impl EventTicket {
     /// Whether `map_id` is one of the event's maps, played in its copy.
     pub fn holds(&self, map_id: i32) -> bool {
         self.kind.event().holds(map_id)
+    }
+
+    /// Whether the party has cleared `stage`.
+    pub fn cleared(&self, stage: u8) -> bool {
+        self.cleared.has(stage)
     }
 
     /// Where the member stands with Cloto, or `None` once the event is
@@ -141,6 +174,7 @@ pub fn spawn(
             .map(|member| (member.client_id, member))
             .collect(),
         stage1: Stage1::default(),
+        cleared: Arc::default(),
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -171,6 +205,7 @@ struct EventActor {
     team: Team,
     members: HashMap<ClientId, ClientHandle>,
     stage1: Stage1,
+    cleared: Arc<Cleared>,
 }
 
 impl EventActor {
@@ -186,6 +221,7 @@ impl EventActor {
                     ends,
                     member: member.client_id,
                     event: event.clone(),
+                    cleared: self.cleared.clone(),
                 }));
             }
         }
@@ -226,10 +262,22 @@ impl EventActor {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
             EventCommand::ClearStage(1) if client_id == self.team.leader() => {
                 if self.stage1.clear() {
-                    info!(kind = ?self.kind, id = self.id, "Stage 1 cleared");
+                    self.clear(1);
                 }
             }
             EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
+        }
+    }
+
+    /// The way on from `stage` opens before anyone hears of the clear, so a
+    /// member who sees it can go through.
+    fn clear(&self, stage: u8) {
+        info!(kind = ?self.kind, id = self.id, stage, "Stage cleared");
+        self.cleared.set(stage);
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::StageCleared { id: self.id, stage });
+            }
         }
     }
 }
