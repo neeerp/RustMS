@@ -583,11 +583,11 @@ result window's hover area.
 
 The Maker skill (`base*10000+1007`, base being `job/1000*1000`, or 2001 for
 Evan) opens the client's Maker window, which sends ITEM_MAKE (`0x71`,
-`world/maker.rs`; reports c006 and c006b). `game-data`'s `MakerData` reads
-the recipes from `Etc.nx`'s `ItemMake.img` (each named for what it makes,
-in a group for the jobs that see it) and, from `Item.nx`, each etc item's
-`info/lv` and the levels each monster crystal (4260000 to 4260008) is made
-from.
+`world/maker.rs`; reports c006, c006b and c006e). `game-data`'s
+`MakerData` reads the recipes from `Etc.nx`'s `ItemMake.img` (each named for
+what it makes, in a group for the jobs that see it) and, from `Item.nx`,
+each etc item's `info/lv`, the levels each monster crystal (4260000 to
+4260008) is made from, and what each gem (`Etc/0425.img`) does.
 
 Mode 1 (`1, itemId, stimulator flag, gem count, gems`) makes a recipe. The
 server checks what the window checks: the player is alive, has the level,
@@ -597,15 +597,34 @@ recipe's `meso` plus a tenth of it for each part (one for the recipe, five
 for a stimulator, three for each gem plus three times its grade), floored to
 a thousand. A recipe with a `randomReward` list (the gems) makes one of its
 outcomes by weight. Mode 3 (`3, itemId`) takes 100 of an etc item with a
-level and gives the crystal for that level. Equipment, which takes a
-stimulator and gems, random making (mode 2) and disassembly (mode 4) are
-refused for now.
+level and gives the crystal for that level. Random making (mode 2) is
+refused: no recipe has the `hide` node that would make one reachable.
+
+Equipment may take its recipe's stimulator (`catalyst`; the packet sends
+only the flag) and up to `tuc` gems, one of each kind (`id%10000/100`), the
+attack kinds 0 and 1 on weapons only. A stat gem adds its `inc*` value; a
+level gem does nothing, v83 equipment having no such stat; `randStat` and
+`randOption` move each nonzero stat of their set by up to their amount
+either way. Without a stimulator the item has its own stats; with one, each
+nonzero stat but speed gains up to 2 (5 for defense, HP and MP), and one
+time in ten the item is destroyed with everything it took (`217: 1`, the
+"destroyed" dialog). The success roll and the stimulator's effect are not
+in the client; these are Cosmic's.
+
+Mode 4 (`4, itemId, 1, slot`) takes apart the Equip tab's item in `slot`
+when a recipe makes it, for half of each crystal the recipe takes (Cosmic;
+what v83 gave is unknown). Its fee is the client's: a tenth of the recipe's
+`meso`, and half that again for each grade above -1, floored to a thousand.
+The grade (FUN_005ca1b8) sums the item's stats above its own (HP and MP a
+tenth): below 0 is -1, to 5 is 0, to 22 is 1, to 39 is 2, then 3. It answers
+`217: 0, 4, itemId, n, (crystal, count)*, meso`.
 
 The window waits for MAKER_RESULT (`217`) after every ITEM_MAKE, a
 request cut short included. Success sends a meso stat change (for a recipe
 with a fee; a crystal costs none), INVENTORY_OPERATION, then `217: 0, 1, 0, item,
-count, n, (id, count)*, 0, 0, meso` for a recipe or `217: 0, 3, crystal,
-item` for a crystal, then SHOW_ITEM_GAIN_INCHAT `0x10, 0`, which plays the
+count, n, (id, count)*, gems, stimulator, meso` for a recipe (`217: 1, 1, 1`
+and no item when destroyed) or `217: 0, 3, crystal, item` for a crystal,
+then SHOW_ITEM_GAIN_INCHAT `0x10, 0`, which plays the
 Maker's success effect and sound. A refusal is `217: 2` ("Production failed
 due to an unknown error."), or 4 to 7 when the Equip, Use, Setup or Etc tab
 has no room for what was made. A one-of-a-kind item already held is
@@ -624,9 +643,17 @@ and quest states. A recipe shows its ingredients with "owned/needed" counts
 (faded when short) and the fee; for a monster crystal the window shows
 `randomRecipe` and "0/100" until an etc drop with a level is dropped on its
 slot (in HC a dragged icon lands on the next click), and a click on the drop
-takes it back out. Create is enabled each frame while
-everything is there. It asks first, checks the fee ("You do not have enough
-mesos."), fills the gauge for 5.1 s with `Sound/UI.img/ItemMake` looping,
+takes it back out. Equipment shows its stimulator and `tuc` gem slots
+(`notUse` past them); a stimulator or gem dropped on them is checked in
+v83's order with its notices, raises the fee, and comes out on a click or
+once none are left, staying in for the next make otherwise. For a
+disassembly an equipment from a recipe is dropped on the first slot ("This
+item cannot be disassembled." otherwise), and the fee follows its grade.
+Create is enabled each frame while every ingredient is there; the
+stimulator and gems are optional. It asks first, checks for room
+(FUN_0082744f: a free slot in the tab the item goes to, or for a
+disassembly one free Etc slot per ingredient of the recipe), then the fee
+("You do not have enough mesos.", nothing for a disassembly), fills the gauge for 5.1 s with `Sound/UI.img/ItemMake` looping,
 sends, and waits for MAKER_RESULT. That writes v83's grey chat lines (what
 was gained, each ingredient lost, the mesos) and the result dialog, and
 SHOW_ITEM_GAIN_INCHAT `0x10` plays `BasicEff.img/ItemMake/Success` or
@@ -635,12 +662,10 @@ next make. Cancel closes the window at any time, as v83's Cancel does; so does
 Esc, though the first Esc only closes an open list. The skill book keeps SP
 off the Maker skills, which have `disable` set.
 
-Not done in the window: the equipment's stimulator and gem slots, random
-making and disassembly (selectable but Create stays off), and the
-inventory-space check before sending. The drop lists can't be opened while
+Not done in the window: random making (selectable but Create stays off;
+v83's always ends in "Production failed."). The drop lists can't be opened while
 the gauge fills, which v83 allows, and they don't take the arrow keys and
-Enter, which HC sends to the player. Drops on the stimulator and gem slots
-show none of v83's notices. The window opens centred, where v83 remembers its
+Enter, which HC sends to the player. The window opens centred, where v83 remembers its
 place, and is dragged by its top 20 px, a height not checked against v83.
 
 ## NPC shops

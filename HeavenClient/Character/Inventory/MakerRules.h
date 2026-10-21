@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -259,6 +260,102 @@ namespace ms
 			return static_cast<int32_t>(total / 1000 * 1000);
 		}
 
+		// Whether a recipe's product is a weapon, which FUN_005c99fc names.
+		inline bool is_weapon(int32_t item_id)
+		{
+			return item_id / 10000 >= 130 && !equip_category(item_id).empty();
+		}
+
+		// A gem's kind (FUN_0082637e): its id's hundreds, 0 for weapon
+		// attack and 1 for magic attack.
+		inline int32_t gem_kind(int32_t gem)
+		{
+			return gem % 10000 / 100;
+		}
+
+		// Why a gem can't go in beside `gems` in `slots` slots, in the
+		// order the window asks (FUN_0082637e, StringPool 0x2e6-0x2e9), or
+		// nothing when it can. `weapon` is whether the product is one.
+		inline std::string gem_refusal(const std::vector<int32_t>& gems, int32_t slots, int32_t gem, bool weapon)
+		{
+			if (static_cast<int32_t>(gems.size()) >= slots)
+				return "You cannot apply the Strengthening Gem anymore.";
+
+			if (gem / 10000 != GEMS)
+				return "You can only apply the Strengthening Gem.";
+
+			for (int32_t other : gems)
+				if (gem_kind(other) == gem_kind(gem))
+					return "You cannot apply more than 1 of the same Strengthening Gems.";
+
+			if (gem_kind(gem) <= 1 && !weapon)
+				return "You can only use this Strengthening Gem on weapon items.";
+
+			return {};
+		}
+
+		// Why a stimulator can't go in for a recipe of `catalyst`, or
+		// nothing when it can (FUN_008265a1, StringPool 0x2ea-0x2ec).
+		inline std::string stimulator_refusal(bool applied, int32_t item_id, int32_t catalyst)
+		{
+			if (applied)
+				return "You can only apply 1 Stimulator.";
+
+			if (item_id / 1000 != 4130)
+				return "You can only apply the Stimulator.";
+
+			if (item_id != catalyst)
+				return "You cannot apply this Stimulator.";
+
+			return {};
+		}
+
+		// How far an equip's stats are above its own (FUN_005ca1b8): -1 when
+		// below them, else 0 to 3. Both lists hold STR, DEX, INT, LUK, HP, MP,
+		// attack, magic attack, defense, magic defense, accuracy, avoid,
+		// speed and jump; HP and MP count a tenth.
+		inline int32_t stat_grade(const std::vector<int32_t>& stats, const std::vector<int32_t>& own)
+		{
+			int32_t score = 0;
+
+			for (size_t i = 0; i < stats.size() && i < own.size(); i++)
+			{
+				int32_t above = stats[i] - own[i];
+				score += i == 4 || i == 5 ? above / 10 : above;
+			}
+
+			if (score < 0)
+				return -1;
+
+			if (score <= 5)
+				return 0;
+
+			if (score <= 22)
+				return 1;
+
+			return score <= 39 ? 2 : 3;
+		}
+
+		// The fee to take apart what a recipe of `meso` makes, of `grade`
+		// (FUN_00824f9d, FUN_005ca659): a tenth of it, and half that again
+		// for each grade above -1, rounded down to 1000.
+		inline int32_t disassembly_fee(int32_t meso, int32_t grade)
+		{
+			int64_t fee = static_cast<int64_t>(meso / 10) * (150 + 50 * grade) / 100;
+
+			return fee <= 0 ? 0 : static_cast<int32_t>(fee / 1000 * 1000);
+		}
+
+		// Whether what a recipe makes may be taken apart (FUN_0082317f): it is
+		// equipment.
+		inline bool disassemblable(const Recipe& recipe)
+		{
+			static const int32_t GROUPS[] = { 0, 1, 2, 4, 8, 16 };
+
+			return recipe.item_id / 1000000 == 1 &&
+				   std::find(std::begin(GROUPS), std::end(GROUPS), recipe.group) != std::end(GROUPS);
+		}
+
 		// The count under an ingredient's icon (formats at 0xb38d00 and 0xb39390).
 		inline std::string count_text(int32_t owned, int32_t needed)
 		{
@@ -281,13 +378,19 @@ namespace ms
 			}
 		}
 
+		// No room in the tab `type`, 1 Equip to 4 Etc (FUN_00827559).
+		inline std::string no_room_text(int32_t type)
+		{
+			static const char* const TABS[] = { "Eqp", "Use", "Setup", "Etc" };
+
+			return std::string(TABS[std::clamp(type, 1, 4) - 1]) + " You don't have enough room in your Inventory.";
+		}
+
 		// The dialog MAKER_RESULT ends with (FUN_00827264, FUN_00827559): for
 		// a made item its count and name, else nothing but the code. Empty
 		// for none.
 		inline std::string result_text(int32_t result, int32_t count, const std::string& name)
 		{
-			static const char* const TABS[] = { "Eqp", "Use", "Setup", "Etc" };
-
 			switch (result)
 			{
 				case 0:
@@ -303,7 +406,7 @@ namespace ms
 				case 5:
 				case 6:
 				case 7:
-					return std::string(TABS[result - 4]) + " You don't have enough room in your Inventory.";
+					return no_room_text(result - 3);
 				default:
 					return {};
 			}
@@ -319,6 +422,17 @@ namespace ms
 		inline std::string lost_line(const std::string& name, int32_t count)
 		{
 			return "You have lost items (" + name + " " + std::to_string(count) + ")";
+		}
+
+		inline std::string lost_item_line(const std::string& name)
+		{
+			return "You have lost an item (" + name + ")";
+		}
+
+		// The dialog after a disassembly (StringPool 0x2f0).
+		inline std::string disassembled_text(const std::string& name)
+		{
+			return "You have successfully disassembled the " + name + ".";
 		}
 
 		inline std::string meso_line(int32_t meso)

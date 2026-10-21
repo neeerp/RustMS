@@ -526,6 +526,21 @@ namespace ms
 		}
 	};
 
+	// Asks the Item Maker to take apart the equipment `itemid` in `slot` of
+	// the Equip tab (FUN_00827096, mode 4).
+	// Opcode: ITEM_MAKE(113)
+	class ItemDisassemblePacket : public OutPacket
+	{
+	public:
+		ItemDisassemblePacket(int32_t itemid, int16_t slot) : OutPacket(OutPacket::Opcode::ITEM_MAKE)
+		{
+			write_int(4);
+			write_int(itemid);
+			write_int(1);
+			write_int(slot);
+		}
+	};
+
 	// Casts Vega's Spell: the scroll in `scroll_slot` of the Use tab on the
 	// equip in `equip_slot` of the Equip tab (FUN_0082cbe2).
 	// Opcode: USE_CASH_ITEM(79)

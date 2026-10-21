@@ -43,8 +43,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
-		// MAKER_RESULT's code, and for one that made something its count and name (FUN_00827264).
-		void answer(int32_t result, int32_t count, const std::string &name);
+		// MAKER_RESULT's code, and for one that made something its count and name, or what it took apart
+		// (FUN_00827264).
+		void answer(int32_t result, int32_t count, const std::string &name, bool disassembled);
 
 		// The recipes in ItemMake.img, by group.
 		static const std::vector<maker::Recipe> &recipes();
@@ -157,6 +158,26 @@ namespace ms
 		// Puts the monster crystal in, mode 3 (FUN_0082411b).
 		void show_crystal();
 
+		// Takes a gem, a stimulator or an equipment to take apart dropped from the inventory (FUN_0082637e,
+		// FUN_008265a1, FUN_00825dd2).
+		void drop_crystal(int32_t id);
+
+		void drop_gem(int32_t id);
+
+		void drop_stimulator(int32_t id);
+
+		void drop_equip(int32_t id, int16_t slot);
+
+		// What the fee is now, for a recipe with what has been put in or a disassembly.
+		int32_t current_fee() const;
+
+		// Whether the tab what it makes goes to has room (FUN_0082744f): one free slot, or for a disassembly one for
+		// each ingredient of the equip's recipe. With `tell` the player is told when not.
+		bool has_room(bool tell) const;
+
+		// The gem slots there are now.
+		int32_t gem_slots() const;
+
 		// Counts the ingredients again and enables Start when they are all there.
 		void recount();
 
@@ -187,6 +208,11 @@ namespace ms
 		int32_t mode;
 		const maker::Recipe *recipe;
 		std::vector<Slot> slots;
+		// The gems put in, in their slots' order, and whether the stimulator is.
+		std::vector<int32_t> gems;
+		bool stimulated;
+		// The Equip tab's slot of the equipment to take apart.
+		int16_t equip_slot;
 		State state;
 		int32_t elapsed;
 		Texture not_use;
