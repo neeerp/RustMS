@@ -158,6 +158,10 @@ pub struct FieldAvatar {
     /// The player's mount's level, EXP and tiredness, which every player
     /// shows whether they ride or not.
     pub mount: Mount,
+    /// Whether the player's account is a GM's: only GMs see a hidden GM.
+    pub gm: bool,
+    /// Whether the player is a GM hidden by Hide.
+    pub hidden: bool,
 }
 
 /// What a player rides (the client's RideVehicle data): the mount item and
@@ -222,6 +226,8 @@ pub struct Player {
     /// Whether Berserk is on, as the client last told the server
     /// (`net::berserk`); not saved.
     pub berserk: bool,
+    /// Whether the GM hid with Hide (9101004); not saved.
+    pub hidden: bool,
     /// The catch item (227xxxx) last thrown and when, for its `useDelay`;
     /// not saved.
     pub last_catch: Option<(i32, std::time::Instant)>,
@@ -271,6 +277,7 @@ impl Player {
             item_effect: 0,
             charmed: false,
             berserk: false,
+            hidden: false,
             last_catch: None,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
@@ -407,6 +414,8 @@ impl Player {
             dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),
             ride: self.ride(),
             mount: self.mount,
+            gm: self.gm_level > 0,
+            hidden: self.hidden,
         }
     }
 

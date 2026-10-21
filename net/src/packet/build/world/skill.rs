@@ -103,6 +103,16 @@ pub fn build_throw_grenade(
     Ok(packet)
 }
 
+/// ADMIN_RESULT 0x10: whether the GM is now hidden. The client keeps the
+/// byte (FUN_005352e9); others stop seeing the GM through the field.
+pub fn build_hidden(hidden: bool) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::AdminResult as i16)?;
+    packet.write_byte(0x10)?;
+    packet.write_byte(u8::from(hidden))?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,6 +134,17 @@ mod tests {
             .byte(1)
             .short(1);
         expect.int(2001002).int(3).int(0).long(DEFAULT_TIME).byte(4);
+        expect.end();
+    }
+
+    #[test]
+    fn hiding_tells_the_gm_with_admin_result_0x10() {
+        let packet = build_hidden(true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::AdminResult as i16)
+            .byte(0x10)
+            .byte(1);
         expect.end();
     }
 

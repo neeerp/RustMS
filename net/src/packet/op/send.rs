@@ -50,6 +50,7 @@ pub enum SendOpcode {
     FieldEffect = 0x8A,
     BlowWeather = 0x8E,
     PlayJukebox = 0x8F,
+    AdminResult = 0x90,
     Clock = 0x93,
     ContiMove = 0x94,
     ContiState = 0x95,

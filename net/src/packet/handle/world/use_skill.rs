@@ -107,6 +107,23 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
+        if skill_id == skills::GM_HIDE {
+            // Others see no effect (Cosmic's StatEffect returns first).
+            return match use_skill(ctx.player, skill_id, level, Instant::now()) {
+                Ok(_) => {
+                    ctx.player.hidden = !ctx.player.hidden;
+                    Ok(
+                        HandlerResult::reply(skill::build_hidden(ctx.player.hidden)?)
+                            .with_reply(stat::build_stat_update(true, &[])?)
+                            .with(WorldAction::HiddenChanged),
+                    )
+                }
+                Err(refusal) => {
+                    debug!(skill_id, level, ?refusal, "Hide refused");
+                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))
+                }
+            };
+        }
         if skill_id == skills::HEAL {
             let party = r.read_byte()?;
             return match heal(ctx.player, level, party, rand::random()) {
@@ -1600,6 +1617,34 @@ mod tests {
         let extras = read(2111004, &[2, 0, 0, 0, 0, 5, 0, 0, 0]);
         assert_eq!(extras.mobs, [5]);
         assert_eq!(extras.position, None);
+    }
+
+    #[test]
+    fn hide_toggles_a_gm_out_of_sight_and_back() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(1000, 1);
+        player.skills.set(SkillRecord {
+            skill_id: skills::GM_HIDE,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        let actions = handle(&mut player, skills::GM_HIDE, 1);
+        assert!(!player.hidden, "a GM's alone");
+        assert!(actions.iter().all(unlocks));
+
+        player.gm_level = 1;
+        for hidden in [true, false] {
+            let actions = handle(&mut player, skills::GM_HIDE, 1);
+            assert_eq!(player.hidden, hidden);
+            assert!(matches!(&actions[0], WorldAction::Reply(p)
+                if p.opcode() == SendOpcode::AdminResult as i16
+                    && p.bytes[2..] == [0x10, u8::from(hidden)]));
+            assert!(unlocks(&actions[1]));
+            assert!(matches!(actions[2], WorldAction::HiddenChanged));
+        }
     }
 
     #[test]

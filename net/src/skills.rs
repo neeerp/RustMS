@@ -230,6 +230,7 @@ pub fn is_gm(skill_id: i32) -> bool {
 }
 
 pub const GM_HEAL: i32 = 9101000;
+pub const GM_HIDE: i32 = 9101004;
 pub const GM_RESURRECTION: i32 = 9101005;
 /// Heal + Dispel, Haste (Super), Holy Symbol, Bless, Resurrection and Hyper
 /// Body, which the client casts on everyone in their area as it does Echo
@@ -345,6 +346,7 @@ pub fn acts_alone(skill_id: i32) -> bool {
             | WINGS
             | SMOKESCREEN
             | GM_HEAL
+            | GM_HIDE
             | GM_RESURRECTION
     ) || TELEPORTS.contains(&skill_id)
         || FLASH_JUMPS.contains(&skill_id)

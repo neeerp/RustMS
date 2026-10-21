@@ -1,6 +1,6 @@
 //! The GM skills: a GM's Holy Symbol reaches everyone around them, in their
 //! party or not, as Echo of Hero does; a player who is not a GM can't use
-//! it even with the skill.
+//! it even with the skill. A GM's Hide takes the GM from others' sight.
 
 use integration_harness::database::{grant_skill, set_gm_level};
 use integration_harness::hunting::use_skill;
@@ -11,6 +11,7 @@ use tokio::time::Duration;
 
 const FIELD: i32 = 101_020_001;
 const HOLY_SYMBOL: i32 = 9_101_002;
+const HIDE: i32 = 9_101_004;
 /// Its `x` percent for its `time` of 900 seconds.
 const SYMBOL: (i32, i16, i32) = (HOLY_SYMBOL, 50, 900_000);
 
@@ -35,6 +36,7 @@ async fn a_gms_holy_symbol_reaches_strangers_and_no_one_else_casts_it() {
             .await
             .expect("teach Holy Symbol");
     }
+    grant_skill(gm_id, HIDE, 1).await.expect("teach Hide");
     for config in [&config, &other_config] {
         let mut session = relogin(config).await;
         let mut trace = Trace::default();
@@ -61,4 +63,28 @@ async fn a_gms_holy_symbol_reaches_strangers_and_no_one_else_casts_it() {
     assert_eq!(gt.buffs, [SYMBOL]);
     until(s, &mut st, |t| !t.buffs.is_empty()).await;
     assert_eq!(st.buffs, [SYMBOL]);
+
+    // Hiding takes the GM from the stranger's sight, and from the sight of
+    // one who comes in; coming out shows the GM again.
+    send(g, use_skill(HIDE, 1)).await;
+    until(g, &mut gt, |t| !t.hidden.is_empty()).await;
+    assert_eq!(gt.hidden, [true]);
+    until(s, &mut st, |t| t.gone.contains(&gm_id)).await;
+    drop(stranger);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let mut stranger = relogin(&other_config).await;
+    let s = &mut stranger.connection;
+    let mut st = Trace::default();
+    read_for(s, &mut st, 500).await;
+    assert!(
+        st.players.iter().all(|p| p.character_id != gm_id),
+        "a newcomer saw the hidden GM"
+    );
+    send(g, use_skill(HIDE, 1)).await;
+    until(g, &mut gt, |t| t.hidden.len() == 2).await;
+    assert_eq!(gt.hidden, [true, false]);
+    until(s, &mut st, |t| {
+        t.players.iter().any(|p| p.character_id == gm_id)
+    })
+    .await;
 }
