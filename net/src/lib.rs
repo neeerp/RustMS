@@ -15,6 +15,7 @@ pub mod content;
 pub mod conti;
 pub mod dialogue;
 pub mod energy;
+pub mod events;
 mod game_data;
 pub mod handler;
 mod helpers;

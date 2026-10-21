@@ -162,8 +162,8 @@ impl FieldActor {
         loop {
             tokio::select! {
                 message = self.rx.recv() => match message {
+                    Some(FieldMessage::Close) | None => break,
                     Some(message) => self.handle_message(message),
-                    None => break,
                 },
                 now = ticker.tick() => self.on_tick(now),
             }
@@ -333,6 +333,7 @@ impl FieldActor {
                 party,
             } => self.handle_join(handle, avatar, party),
             FieldMessage::Leave { client_id } => self.handle_leave(client_id),
+            FieldMessage::Close => {}
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;

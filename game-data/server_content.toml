@@ -334,6 +334,14 @@ unsourced = [
     "nlc_taxi.ask",
     "nlc_taxi.decline",
     "nlc_taxi.short",
+    "kpq.lakelis.no_party",
+    "kpq.lakelis.not_leader",
+    "kpq.lakelis.not_eligible",
+    "kpq.lakelis.busy",
+    "kpq.lakelis.ask",
+    "kpq.lakelis.decline",
+    "kpq.nella.leave",
+    "kpq.nella.home",
 ]
 
 [text."glTutoMsg0.message"]

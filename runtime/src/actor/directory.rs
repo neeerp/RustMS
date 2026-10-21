@@ -1,8 +1,10 @@
+use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
 use game::Guild;
+use net::events::{self, Candidate, EventKind};
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
@@ -73,6 +75,9 @@ pub struct WorldDirectory {
     /// Guild members changing channel, with their guild and when they left:
     /// the guild hears they logged out only if they don't arrive in time.
     guild_away: HashMap<ClientId, (i32, Instant)>,
+    /// The event each channel is playing of each kind, by id.
+    events: HashMap<(u8, EventKind), u32>,
+    next_event: u32,
 }
 
 impl WorldDirectory {
@@ -86,6 +91,8 @@ impl WorldDirectory {
             messengers: Messengers::default(),
             doors: HashMap::new(),
             guild_away: HashMap::new(),
+            events: HashMap::new(),
+            next_event: 1,
         }
     }
 
@@ -155,6 +162,21 @@ impl WorldDirectory {
                     .any(|entry| entry.channel_id == channel_id && entry.presence.map_id == map_id);
                 let _ = reply.send(occupied);
             }
+            DirectoryMessage::EventEntry { from, kind, reply } => {
+                let _ = reply.send(self.event_entry(from, kind).0);
+            }
+            DirectoryMessage::StartEvent { from, kind, reply } => {
+                let _ = reply.send(self.start_event(from, kind));
+            }
+            DirectoryMessage::EventClosed {
+                channel_id,
+                kind,
+                id,
+            } => {
+                if self.events.get(&(channel_id, kind)) == Some(&id) {
+                    self.events.remove(&(channel_id, kind));
+                }
+            }
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
                     if let Some(entry) = self.clients.get(&client) {
@@ -200,6 +222,69 @@ impl WorldDirectory {
                 from_town,
             } => self.use_door(from, owner, from_town),
         }
+    }
+
+    /// Whether `from`'s party may go into an event of `kind` on their
+    /// channel, and who would go.
+    fn event_entry(&self, from: ClientId, kind: EventKind) -> (events::Entry, Vec<ClientId>) {
+        let Some(asker) = self.clients.get(&from) else {
+            return (events::Entry::NoParty, Vec::new());
+        };
+        let Some(party) = self.parties.of(from) else {
+            return (events::Entry::NoParty, Vec::new());
+        };
+        if party.leader != from {
+            return (events::Entry::NotLeader, Vec::new());
+        }
+        let candidates: Vec<_> = party
+            .members
+            .iter()
+            .filter_map(|member| self.clients.get(&member.id))
+            .filter(|entry| entry.channel_id == asker.channel_id)
+            .map(|entry| Candidate {
+                id: entry.handle.client_id,
+                level: entry.presence.level,
+                map_id: entry.presence.map_id,
+            })
+            .collect();
+        let Some(team) = kind.event().team(from, &candidates) else {
+            return (events::Entry::NotEligible, Vec::new());
+        };
+        if self.events.contains_key(&(asker.channel_id, kind)) {
+            return (events::Entry::Busy, Vec::new());
+        }
+        (events::Entry::Ready, team)
+    }
+
+    /// Reserve an event of `kind` on `from`'s channel for their party, if
+    /// it may still go.
+    fn start_event(&mut self, from: ClientId, kind: EventKind) -> Option<EventStart> {
+        let (events::Entry::Ready, team) = self.event_entry(from, kind) else {
+            return None;
+        };
+        let channel_id = self.clients.get(&from)?.channel_id;
+        let id = self.next_event;
+        self.next_event = self.next_event.wrapping_add(1).max(1);
+        self.events.insert((channel_id, kind), id);
+        info!(
+            ?kind,
+            id,
+            channel_id,
+            leader = from,
+            ?team,
+            "Event reserved"
+        );
+        Some(EventStart {
+            id,
+            kind,
+            channel_id,
+            leader: from,
+            team: team
+                .iter()
+                .filter_map(|member| self.clients.get(member))
+                .map(|entry| entry.handle.clone())
+                .collect(),
+        })
     }
 
     fn register(&mut self, handle: ClientHandle, presence: Presence, channel_id: u8) {

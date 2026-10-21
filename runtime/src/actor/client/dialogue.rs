@@ -15,12 +15,15 @@ impl ClientActor {
         let Some(game) = self.game.as_ref() else {
             return Ok(());
         };
-        if field.map_id != game.player.stats.map_id || field.channel_id != self.channel_id {
+        if field != game.field.key {
             return Ok(());
         }
         self.conversation = None;
         if npc_id == net::npc_scripts::HERACLE || npc_id == net::npc_scripts::LEA {
             return self.talk_about_guild(npc_id).await;
+        }
+        if npc_id == net::npc_scripts::LAKELIS {
+            return self.talk_about_event(net::events::EventKind::Kpq).await;
         }
         if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, &game.player) {
             return self.start_script(script).await;

@@ -13,6 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::{AvatarLook, FieldAvatar, Guild, Player};
+use net::events::{Entry, EventKind};
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
 use net::packet::handle::world::{Rock, Whereabouts};
@@ -212,6 +213,12 @@ pub enum ServerMessage {
         room: i32,
         event: crate::actor::field_shops::ShopEvent,
     },
+    /// The player's party went into an event; this is their ticket.
+    EventStarted(crate::actor::event::EventTicket),
+    /// Event `id` ended; out of its maps.
+    EventEnded {
+        id: u32,
+    },
     SendPacket(Packet),
 }
 
@@ -359,6 +366,8 @@ pub enum FieldMessage {
         from: ClientId,
         request: crate::actor::field_shops::ShopRoomRequest,
     },
+    /// The event whose copy of the map this is ended: stop.
+    Close,
 }
 
 /// A way to reach one field actor.
@@ -471,6 +480,26 @@ pub enum DirectoryMessage {
     Online {
         client_id: ClientId,
         reply: tokio::sync::oneshot::Sender<bool>,
+    },
+    /// Whether `from`'s party may go into an event of `kind` now.
+    EventEntry {
+        from: ClientId,
+        kind: EventKind,
+        reply: tokio::sync::oneshot::Sender<Entry>,
+    },
+    /// `from`, a party leader, takes the party into an event of `kind`:
+    /// reserve it on their channel for the members who go, if they still
+    /// may.
+    StartEvent {
+        from: ClientId,
+        kind: EventKind,
+        reply: tokio::sync::oneshot::Sender<Option<crate::actor::event::EventStart>>,
+    },
+    /// Event `id` of `kind` on `channel_id` is over; the next party may go.
+    EventClosed {
+        channel_id: u8,
+        kind: EventKind,
+        id: u32,
     },
     /// Whether anyone is on `map_id` in `channel_id`.
     MapOccupied {

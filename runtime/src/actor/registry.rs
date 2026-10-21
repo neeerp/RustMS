@@ -2,9 +2,9 @@ use crate::actor::field::{FieldActor, FieldMapEntityNpc};
 use crate::actor::field_drops::DropSet;
 use crate::actor::field_mobs::{full_spawn, mob_capacity, MobSet};
 use crate::actor::field_reactors::ReactorSet;
-use crate::message::{FieldHandle, FieldKey};
+use crate::message::{FieldHandle, FieldKey, FieldMessage};
 use crate::supervisor::spawn_supervised;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -17,6 +17,8 @@ const MAP_NPC_OBJECT_ID_BASE: i32 = 1_000_000_000;
 /// up their field here and then talk to it directly.
 pub struct FieldRegistry {
     fields: Mutex<HashMap<FieldKey, FieldHandle>>,
+    /// Events' copies of their maps (channel, instance id) still running.
+    instances: Mutex<HashSet<(u8, u32)>>,
     tick: Duration,
 }
 
@@ -24,12 +26,21 @@ impl FieldRegistry {
     pub fn new(tick: Duration) -> Arc<Self> {
         Arc::new(Self {
             fields: Mutex::new(HashMap::new()),
+            instances: Mutex::new(HashSet::new()),
             tick,
         })
     }
 
-    /// The handle for `key`, starting its actor if needed.
+    /// The handle for `key`, starting its actor if needed. A field of an
+    /// event's copy that has closed is started for the caller alone, and
+    /// stops when they leave it.
     pub fn field(self: &Arc<Self>, key: FieldKey) -> FieldHandle {
+        let closed = key.instance_id != 0
+            && !self
+                .instances
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .contains(&(key.channel_id, key.instance_id));
         let mut fields = self.fields.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(handle) = fields.get(&key) {
             if !handle.tx.is_closed() {
@@ -55,8 +66,36 @@ impl FieldRegistry {
                 registry.forget(&exited);
             }
         });
-        fields.insert(key, handle.clone());
+        if !closed {
+            fields.insert(key, handle.clone());
+        }
         handle
+    }
+
+    /// An event's copy of its maps opens: its fields start as members
+    /// arrive.
+    pub fn open_instance(&self, channel_id: u8, instance_id: u32) {
+        self.instances
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert((channel_id, instance_id));
+    }
+
+    /// The event is over: its copy's fields stop, and anyone still on one
+    /// finds it gone.
+    pub fn close_instance(&self, channel_id: u8, instance_id: u32) {
+        self.instances
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&(channel_id, instance_id));
+        let mut fields = self.fields.lock().unwrap_or_else(|e| e.into_inner());
+        fields.retain(|key, handle| {
+            let closing = (key.channel_id, key.instance_id) == (channel_id, instance_id);
+            if closing {
+                let _ = handle.tx.try_send(FieldMessage::Close);
+            }
+            !closing
+        });
     }
 
     /// Drop a handle whose actor has exited, unless it was already replaced.

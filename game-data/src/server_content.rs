@@ -163,6 +163,18 @@ pub mod keys {
     pub const NLC_TAXI_DECLINE: &str = "nlc_taxi.decline";
     pub const NLC_TAXI_SHORT: &str = "nlc_taxi.short";
 
+    /// Kerning City's party quest: Lakelis, who takes a party in (the
+    /// terms with `{least}`, `{most}`, `{low}` and `{high}`), and Nella,
+    /// who lets players out and back to town.
+    pub const KPQ_LAKELIS_NO_PARTY: &str = "kpq.lakelis.no_party";
+    pub const KPQ_LAKELIS_NOT_LEADER: &str = "kpq.lakelis.not_leader";
+    pub const KPQ_LAKELIS_NOT_ELIGIBLE: &str = "kpq.lakelis.not_eligible";
+    pub const KPQ_LAKELIS_BUSY: &str = "kpq.lakelis.busy";
+    pub const KPQ_LAKELIS_ASK: &str = "kpq.lakelis.ask";
+    pub const KPQ_LAKELIS_DECLINE: &str = "kpq.lakelis.decline";
+    pub const KPQ_NELLA_LEAVE: &str = "kpq.nella.leave";
+    pub const KPQ_NELLA_HOME: &str = "kpq.nella.home";
+
     /// The Dolphin Taxi (`aqua_taxi`): a menu of a ride down (for a fare,
     /// or with a coupon) and a ride across, each with its yes or no.
     pub const DOLPHIN_MENU: &str = "dolphin.menu";
@@ -661,6 +673,14 @@ mod tests {
             keys::NLC_TAXI_ASK,
             keys::NLC_TAXI_DECLINE,
             keys::NLC_TAXI_SHORT,
+            keys::KPQ_LAKELIS_NO_PARTY,
+            keys::KPQ_LAKELIS_NOT_LEADER,
+            keys::KPQ_LAKELIS_NOT_ELIGIBLE,
+            keys::KPQ_LAKELIS_BUSY,
+            keys::KPQ_LAKELIS_ASK,
+            keys::KPQ_LAKELIS_DECLINE,
+            keys::KPQ_NELLA_LEAVE,
+            keys::KPQ_NELLA_HOME,
             keys::DOLPHIN_MENU,
             keys::DOLPHIN_CHOICE,
             keys::DOLPHIN_COUPON,
