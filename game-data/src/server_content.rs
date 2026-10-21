@@ -228,6 +228,38 @@ pub mod keys {
     pub const PLANE_LEAVE_DECLINE: &str = "plane.leave.decline";
     pub const PLANE_RIDE: &str = "plane.ride";
 
+    /// Spinel's world tour, the Florina Beach guides and Pison, and Thomas
+    /// Swift between Henesys and Amoria.
+    pub const WORLD_TRIP_INTRO: &str = "world_trip.intro";
+    pub const WORLD_TRIP_OFFER: &str = "world_trip.offer";
+    pub const WORLD_TRIP_CHOICE: &str = "world_trip.choice";
+    pub const WORLD_TRIP_DESCRIBE: &str = "world_trip.describe";
+    pub const WORLD_TRIP_MORE: &str = "world_trip.more";
+    pub const WORLD_TRIP_SHORT: &str = "world_trip.short";
+    pub const WORLD_TRIP_BACK_MENU: &str = "world_trip.back.menu";
+    pub const WORLD_TRIP_BACK_YES: &str = "world_trip.back.yes";
+    pub const WORLD_TRIP_BACK_NO: &str = "world_trip.back.no";
+    pub const WORLD_TRIP_BACK_GO: &str = "world_trip.back.go";
+    pub const WORLD_TRIP_BACK_STAY: &str = "world_trip.back.stay";
+    pub const FLORINA_MENU: &str = "florina.menu";
+    pub const FLORINA_PAY: &str = "florina.pay";
+    pub const FLORINA_TICKET: &str = "florina.ticket";
+    pub const FLORINA_WHAT: &str = "florina.what";
+    pub const FLORINA_PAY_ASK: &str = "florina.pay_ask";
+    pub const FLORINA_TICKET_ASK: &str = "florina.ticket_ask";
+    pub const FLORINA_DECLINE: &str = "florina.decline";
+    pub const FLORINA_SHORT: &str = "florina.short";
+    pub const FLORINA_NO_TICKET: &str = "florina.no_ticket";
+    pub const FLORINA_WHAT_1: &str = "florina.what_1";
+    pub const FLORINA_WHAT_2: &str = "florina.what_2";
+    pub const FLORINA_LEAVE: &str = "florina.leave";
+    pub const FLORINA_LEAVE_ASK: &str = "florina.leave_ask";
+    pub const FLORINA_LEAVE_DECLINE: &str = "florina.leave_decline";
+    pub const AMORIA_TO_AMORIA: &str = "amoria.to_amoria";
+    pub const AMORIA_TO_HENESYS: &str = "amoria.to_henesys";
+    pub const AMORIA_DECLINE: &str = "amoria.decline";
+    pub const AMORIA_BYE: &str = "amoria.bye";
+
     /// The NLC Taxi between New Leaf City and the Haunted House's mansion
     /// grounds.
     pub const NLC_TAXI_ASK: &str = "nlc_taxi.ask";
@@ -852,6 +884,35 @@ mod tests {
             keys::PLANE_LEAVE_ASK,
             keys::PLANE_LEAVE_DECLINE,
             keys::PLANE_RIDE,
+            keys::WORLD_TRIP_INTRO,
+            keys::WORLD_TRIP_OFFER,
+            keys::WORLD_TRIP_CHOICE,
+            keys::WORLD_TRIP_DESCRIBE,
+            keys::WORLD_TRIP_MORE,
+            keys::WORLD_TRIP_SHORT,
+            keys::WORLD_TRIP_BACK_MENU,
+            keys::WORLD_TRIP_BACK_YES,
+            keys::WORLD_TRIP_BACK_NO,
+            keys::WORLD_TRIP_BACK_GO,
+            keys::WORLD_TRIP_BACK_STAY,
+            keys::FLORINA_MENU,
+            keys::FLORINA_PAY,
+            keys::FLORINA_TICKET,
+            keys::FLORINA_WHAT,
+            keys::FLORINA_PAY_ASK,
+            keys::FLORINA_TICKET_ASK,
+            keys::FLORINA_DECLINE,
+            keys::FLORINA_SHORT,
+            keys::FLORINA_NO_TICKET,
+            keys::FLORINA_WHAT_1,
+            keys::FLORINA_WHAT_2,
+            keys::FLORINA_LEAVE,
+            keys::FLORINA_LEAVE_ASK,
+            keys::FLORINA_LEAVE_DECLINE,
+            keys::AMORIA_TO_AMORIA,
+            keys::AMORIA_TO_HENESYS,
+            keys::AMORIA_DECLINE,
+            keys::AMORIA_BYE,
             keys::NLC_TAXI_ASK,
             keys::NLC_TAXI_DECLINE,
             keys::NLC_TAXI_SHORT,
