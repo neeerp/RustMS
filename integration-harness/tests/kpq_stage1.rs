@@ -146,9 +146,15 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
     ];
     party(&mut team).await;
 
-    // In they go.
+    // In they go, once the party before them is out (tests/kpq.rs).
     let name = team[0].character_name.clone();
-    step(&mut team[0].connection, &name, talk(KPQ.lobby, LAKELIS)).await;
+    for _ in 0..5 {
+        let trace = step(&mut team[0].connection, &name, talk(KPQ.lobby, LAKELIS)).await;
+        if trace.prompts == [(LAKELIS, 1)] {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
     let mut seen = Some(step(&mut team[0].connection, &name, answer(1, 1, None)).await);
     for player in team.iter_mut() {
         let mut trace = seen.take().unwrap_or_default();

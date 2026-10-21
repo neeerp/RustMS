@@ -206,6 +206,9 @@ impl EventActor {
             }
         }
         info!(?kind, id, "Event ended");
+        // Nothing is answered from here on: a member asking Cloto hears
+        // nothing at once rather than after the grace.
+        drop(self.rx);
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::EventEnded { id });

@@ -612,7 +612,8 @@ pub enum Page {
     Done(Vec<Effect>),
     /// Said as `effects` apply, as an NPC who hands something over while
     /// speaking. If they are refused, the script's `refused` text is said
-    /// instead.
+    /// instead. Previous never goes back to it (`has_previous`), so they
+    /// apply once.
     Act {
         text: String,
         effects: Vec<Effect>,
