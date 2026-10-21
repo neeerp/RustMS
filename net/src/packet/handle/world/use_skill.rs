@@ -110,14 +110,7 @@ impl WorldHandler for UseSkillHandler {
         if skill_id == skills::GM_HIDE {
             // Others see no effect (Cosmic's StatEffect returns first).
             return match use_skill(ctx.player, skill_id, level, Instant::now()) {
-                Ok(_) => {
-                    ctx.player.hidden = !ctx.player.hidden;
-                    Ok(
-                        HandlerResult::reply(skill::build_hidden(ctx.player.hidden)?)
-                            .with_reply(stat::build_stat_update(true, &[])?)
-                            .with(WorldAction::HiddenChanged),
-                    )
-                }
+                Ok(_) => super::admin_command::set_hidden(ctx.player, !ctx.player.hidden),
                 Err(refusal) => {
                     debug!(skill_id, level, ?refusal, "Hide refused");
                     Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?))

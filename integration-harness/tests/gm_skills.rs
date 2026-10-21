@@ -1,12 +1,16 @@
 //! The GM skills: a GM's Holy Symbol reaches everyone around them, in their
 //! party or not, as Echo of Hero does; a player who is not a GM can't use
-//! it even with the skill. A GM's Hide takes the GM from others' sight.
+//! it even with the skill. A GM's Hide takes the GM from others' sight,
+//! and so does the GM's `/h` (ADMIN_COMMAND 0x80), which only a GM may use.
 
 use integration_harness::database::{grant_skill, set_gm_level};
 use integration_harness::hunting::use_skill;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
+use net::packet::op::RecvOpcode;
+use packet::io::write::PktWrite;
+use packet::Packet;
 use tokio::time::Duration;
 
 const FIELD: i32 = 101_020_001;
@@ -14,6 +18,15 @@ const HOLY_SYMBOL: i32 = 9_101_002;
 const HIDE: i32 = 9_101_004;
 /// Its `x` percent for its `time` of 900 seconds.
 const SYMBOL: (i32, i16, i32) = (HOLY_SYMBOL, 50, 900_000);
+
+/// `/h` on or off: ADMIN_COMMAND mode 0x10.
+fn slash_h(on: bool) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::AdminCommand as i16).unwrap();
+    p.write_byte(0x10).unwrap();
+    p.write_byte(u8::from(on)).unwrap();
+    p
+}
 
 #[tokio::test]
 async fn a_gms_holy_symbol_reaches_strangers_and_no_one_else_casts_it() {
@@ -87,4 +100,19 @@ async fn a_gms_holy_symbol_reaches_strangers_and_no_one_else_casts_it() {
         t.players.iter().any(|p| p.character_id == gm_id)
     })
     .await;
+
+    // `/h` does the same for the GM, and nothing for the stranger.
+    send(s, slash_h(true)).await;
+    read_for(s, &mut st, 500).await;
+    assert!(st.hidden.is_empty(), "{st:?}");
+    send(g, slash_h(true)).await;
+    until(g, &mut gt, |t| t.hidden.len() == 3).await;
+    assert_eq!(gt.hidden[2..], [true]);
+    until(s, &mut st, |t| t.gone.contains(&gm_id)).await;
+    let shown = st.players.len();
+    send(g, slash_h(false)).await;
+    until(g, &mut gt, |t| t.hidden.len() == 4).await;
+    assert_eq!(gt.hidden[3..], [false]);
+    until(s, &mut st, |t| t.players.len() > shown).await;
+    assert_eq!(st.players[shown].character_id, gm_id);
 }
