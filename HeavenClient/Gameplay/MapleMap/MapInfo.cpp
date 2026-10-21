@@ -61,6 +61,7 @@ namespace ms
 		swim = info["swim"].get_bool();
 		town = info["town"].get_bool();
 		personal_shop = info["personalShop"].get_bool();
+		everlast = info["everlast"].get_bool();
 		recovery = info["recovery"].get_real(1.0);
 
 		for (auto seat : src["seat"])
@@ -101,6 +102,11 @@ namespace ms
 	bool MapInfo::allows_personal_shop() const
 	{
 		return personal_shop;
+	}
+
+	bool MapInfo::is_everlast() const
+	{
+		return everlast;
 	}
 
 	int32_t MapInfo::get_fieldlimit() const

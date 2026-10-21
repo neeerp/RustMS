@@ -253,6 +253,9 @@ pub struct FieldTemplate {
     /// `info/personalShop`: players may open personal shops here (the Free
     /// Market rooms).
     pub personal_shop: bool,
+    /// `info/everlast`: drops never vanish here, and players may not throw
+    /// items down (the PQ storage rooms).
+    pub everlast: bool,
     /// Whether the map has a wall clock (a `clock` node with a position and
     /// size, as stations do), which the server sets to the time of day.
     pub clock: bool,
@@ -361,6 +364,12 @@ impl FieldTemplate {
     /// Whether players may drop items and mesos here.
     pub fn may_drop(&self) -> bool {
         self.field_limit & FIELD_LIMIT_DROPS == 0
+    }
+
+    /// Whether players may throw items down here. v83 refuses to drag an
+    /// item onto an everlast map (FUN_004f31a5 reads `CField+0x164`).
+    pub fn may_drop_items(&self) -> bool {
+        self.may_drop() && !self.everlast
     }
 
     pub fn portals(&self) -> impl Iterator<Item = &PortalTemplate> {
@@ -534,7 +543,7 @@ fn build_field_template(
         .flatten()
         .and_then(|seconds| u32::try_from(seconds).ok())
         .filter(|&seconds| seconds > 0);
-    let (town, field_limit, field_type, allowed_items, personal_shop, hazard) =
+    let (town, field_limit, field_type, allowed_items, personal_shop, everlast, hazard) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
                 nx.int_child(info, "town")?.unwrap_or(0) != 0,
@@ -542,9 +551,10 @@ fn build_field_template(
                 nx.int_child(info, "fieldType")?.unwrap_or(0),
                 allowed_items(nx, info)?,
                 nx.int_child(info, "personalShop")?.unwrap_or(0) != 0,
+                nx.int_child(info, "everlast")?.unwrap_or(0) != 0,
                 hazard(nx, info, return_map)?,
             ),
-            None => (false, 0, 0, Vec::new(), false, None),
+            None => (false, 0, 0, Vec::new(), false, false, None),
         };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
     let clock = match nx.child_by_name(map_node_idx, "clock")? {
@@ -620,6 +630,7 @@ fn build_field_template(
         field_type,
         allowed_items,
         personal_shop,
+        everlast,
         clock,
         time_limit,
         hazard,
@@ -1232,6 +1243,7 @@ mod tests {
             field_type: 0,
             allowed_items: Vec::new(),
             personal_shop: false,
+            everlast: false,
             clock: false,
             time_limit: None,
             hazard: None,
@@ -1305,6 +1317,7 @@ mod tests {
             field_type: 0,
             allowed_items: Vec::new(),
             personal_shop: false,
+            everlast: false,
             clock: false,
             time_limit: None,
             hazard: None,
@@ -1444,6 +1457,19 @@ mod tests {
             game_data.field(100_000_000).expect("Henesys").time_limit,
             None
         );
+    }
+
+    #[test]
+    fn pq_storage_rooms_are_everlast() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = |map_id| game_data.field(map_id).expect("map");
+        // OPQ's Jail Storage and GPQ's Center Banquet.
+        assert!(field(920_010_911).everlast && !field(920_010_911).may_drop_items());
+        assert!(field(990_000_501).everlast);
+        assert!(!field(100_000_000).everlast && field(100_000_000).may_drop_items());
     }
 
     #[test]
