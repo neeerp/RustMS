@@ -48,7 +48,8 @@ namespace ms
 		{
 			BUDDY = 0,
 			PARTY = 1,
-			GUILD = 2
+			GUILD = 2,
+			ALLIANCE = 3
 		};
 
 		MultiChatPacket(Mode mode, const std::vector<int32_t>& recipients, const std::string& message) : OutPacket(OutPacket::Opcode::MULTICHAT)

@@ -15,7 +15,8 @@ namespace ms
 {
 	// v83's fading invitations above the status bar (UIWindow.img/FadeYesNo,
 	// FUN_0052065d): an invitation to Maple Messenger, a buddy request, a
-	// trade request, a party invite or a guild invite, each "from '<name>'". O accepts and X
+	// trade request, a party invite or a guild invite, each "from '<name>'",
+	// or an alliance's, "'<name>'s Guild Alliance Invitation.". O accepts and X
 	// turns it down; one left alone fades out after three minutes and sends
 	// nothing. Smaller pink ones say a buddy logged in or came to the
 	// player's channel, for six seconds, with only an X. A new one replaces
@@ -29,8 +30,8 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		// v83's notice types 0, 1, 2, 5, 8 and 9.
-		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, GUILD, ARRIVAL, NUM_KINDS };
+		// v83's notice types 0, 1, 2, 5, 8, 6 and 9.
+		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, GUILD, ALLIANCE, ARRIVAL, NUM_KINDS };
 
 		UIInviteCard();
 

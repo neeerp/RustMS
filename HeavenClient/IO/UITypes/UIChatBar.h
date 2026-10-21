@@ -71,6 +71,8 @@ namespace ms
 			GM,
 			// Guild chat
 			GUILD,
+			// Alliance chat
+			ALLIANCE,
 			// A jukebox's song (v83 chat type 9)
 			LIGHT_YELLOW,
 			// Megaphones (v83 chat types 0xd to 0xf)
@@ -204,6 +206,7 @@ namespace ms
 		// The online buddies, or those in group if one is given.
 		void send_buddy_chat(const std::string& message, const std::string* group = nullptr);
 		void send_guild_chat(const std::string& message);
+		void send_alliance_chat(const std::string& message);
 		// What a line goes to by the target, once a whisper has been ruled
 		// out (FUN_008d536c).
 		void send_to_target(const std::string& message);

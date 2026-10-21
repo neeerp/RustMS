@@ -345,11 +345,15 @@ namespace ms
 	{
 		int8_t mode = recv.read_byte();
 
-		// The Game Option drops buddy and guild chat unread (FUN_00531e00).
+		// The Game Option drops buddy, guild and alliance chat unread
+		// (FUN_00531e00).
 		if (mode == MultiChatPacket::Mode::BUDDY && !Setting<AllowFriends>::get().load())
 			return;
 
 		if (mode == MultiChatPacket::Mode::GUILD && !Setting<AllowGuildChat>::get().load())
+			return;
+
+		if (mode == MultiChatPacket::Mode::ALLIANCE && !Setting<AllowAllianceChat>::get().load())
 			return;
 
 		std::string name = recv.read_string();
@@ -371,6 +375,8 @@ namespace ms
 			party_line(name + " : " + text, UIChatBar::LineType::BUDDY);
 		else if (mode == MultiChatPacket::Mode::GUILD)
 			party_line(name + " : " + text, UIChatBar::LineType::GUILD);
+		else if (mode == MultiChatPacket::Mode::ALLIANCE)
+			party_line(name + " : " + text, UIChatBar::LineType::ALLIANCE);
 		else
 			return;
 

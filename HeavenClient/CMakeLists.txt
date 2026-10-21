@@ -98,7 +98,7 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME buddy_list COMMAND buddy_list_tests)
     add_executable(friend_groups_tests tests/friend_groups.cpp Character/FriendGroups.cpp Character/BuddyList.cpp)
     add_test(NAME friend_groups COMMAND friend_groups_tests)
-    add_executable(guild_tests tests/guild.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
+    add_executable(guild_tests tests/guild.cpp Character/Alliance.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/AllianceNews.cpp Net/Handlers/Helpers/GuildParser.cpp)
     target_include_directories(guild_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME guild COMMAND guild_tests)
 
@@ -444,6 +444,8 @@ add_executable(HeavenClient
     Character/ItemEffect.h
     Character/ItemEffectRules.h
     Character/ApResetRules.h
+    Character/Alliance.cpp
+    Character/Alliance.h
     Character/SpResetRules.h
     Character/CharStats.cpp
     Character/CharStats.h
@@ -915,6 +917,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/MobStatParser.h
     Net/Handlers/Helpers/GuildBbsParser.cpp
     Net/Handlers/Helpers/GuildBbsParser.h
+    Net/Handlers/Helpers/AllianceNews.cpp
+    Net/Handlers/Helpers/AllianceNews.h
     Net/Handlers/Helpers/GuildParser.cpp
     Net/Handlers/Helpers/GuildParser.h
     Net/Handlers/AttackHandlers.cpp

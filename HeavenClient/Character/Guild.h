@@ -33,6 +33,9 @@ namespace ms
 		// 1 for the master, down to 5.
 		int32_t rank = 0;
 		bool online = false;
+		// 1 for the alliance's master, 2 for the other guilds' masters,
+		// down to 5; 3 outside an alliance.
+		int32_t alliance_rank = 0;
 
 		bool operator==(const GuildMember& other) const;
 	};
@@ -146,6 +149,10 @@ namespace ms
 		bool set_rank(int32_t cid, int32_t rank);
 		bool set_online(int32_t cid, bool online);
 		bool set_level_job(int32_t cid, int32_t level, int32_t job);
+		bool set_alliance_rank(int32_t cid, int32_t rank);
+		// The alliance disbanded (FUN_00a39f4e mode 0x1d): no alliance, and
+		// everyone back at rank 3.
+		void leave_alliance();
 		void set_titles(std::array<std::string, 5> titles);
 		void set_notice(std::string notice);
 		void set_capacity(int32_t capacity);

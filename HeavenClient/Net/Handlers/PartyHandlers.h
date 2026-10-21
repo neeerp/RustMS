@@ -20,7 +20,7 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
-	// Buddy, party, or guild chat; guild chat is unused
+	// Buddy, party, guild, or alliance chat
 	// Opcode: MULTICHAT(134)
 	class MultiChatHandler : public PacketHandler
 	{

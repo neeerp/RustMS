@@ -840,6 +840,9 @@ namespace ms
 			case LineType::GUILD:
 				color = Color::Name::MAUVE;
 				break;
+			case LineType::ALLIANCE:
+				color = Color::Name::ALLIANCEGREEN;
+				break;
 			case LineType::LIGHT_YELLOW:
 				color = Color::Name::LIGHTYELLOW;
 				break;
@@ -871,7 +874,7 @@ namespace ms
 		// notice and error colours.
 		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
 					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM ||
-					  type == LineType::GUILD || type >= LineType::MEGAPHONE;
+					  type == LineType::GUILD || type == LineType::ALLIANCE || type >= LineType::MEGAPHONE;
 		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
 		// The first row makes room for a channel tag.
 		int16_t room = channel >= 0 ? width - TAG_WIDTH : width;
@@ -1266,6 +1269,23 @@ namespace ms
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::GUILD);
 	}
 
+	void UIChatBar::send_alliance_chat(const std::string& message)
+	{
+		Player& player = Stage::get().get_player();
+		std::vector<int32_t> recipients = player.get_alliance().online_ids(player.get_guild(), player.get_oid());
+
+		// FUN_008df155
+		if (recipients.empty())
+		{
+			send_chatline("There are no guild alliance you joined OR no one online in your guild alliance.",
+						  LineType::SKILL);
+			return;
+		}
+
+		MultiChatPacket(MultiChatPacket::Mode::ALLIANCE, recipients, message).dispatch();
+		send_chatline(player.get_stats().get_name() + " : " + message, LineType::ALLIANCE);
+	}
+
 	void UIChatBar::send_to_target(const std::string& message)
 	{
 		switch (chat_target)
@@ -1283,10 +1303,7 @@ namespace ms
 				send_guild_chat(message);
 				break;
 			case Target::ALLIANCE:
-				// HC knows of no guild alliance, so v83 would find no one in
-				// one (FUN_008df155).
-				send_chatline("There are no guild alliance you joined OR no one online in your guild alliance.",
-							  LineType::SKILL);
+				send_alliance_chat(message);
 				break;
 			case Target::SPOUSE:
 				// Nor of marriages: v83 says this without a wedding ring

@@ -708,6 +708,68 @@ namespace ms
 		}
 	};
 
+	// Opcode: ALLIANCE_OPERATION(143)
+	class AllianceOperationPacket : public OutPacket
+	{
+	public:
+		enum Operation : int8_t
+		{
+			INFO = 1,
+			LEAVE = 2,
+			INVITE = 3,
+			ACCEPT = 4,
+			EXPEL = 6,
+			CHANGE_MASTER = 7,
+			SET_TITLES = 8,
+			CHANGE_RANK = 9,
+			SET_NOTICE = 10
+		};
+
+		AllianceOperationPacket(Operation op) : OutPacket(OutPacket::Opcode::ALLIANCE_OPERATION)
+		{
+			write_byte(op);
+		}
+	};
+
+	// Asks for the alliance and its guilds, after the guild's info or
+	// joining one
+	class AllianceInfoPacket : public AllianceOperationPacket
+	{
+	public:
+		AllianceInfoPacket() : AllianceOperationPacket(AllianceOperationPacket::Operation::INFO) {}
+	};
+
+	// Takes up an invitation to an alliance (FUN_00522585): its id and the
+	// player's own guild's name
+	class JoinAlliancePacket : public AllianceOperationPacket
+	{
+	public:
+		JoinAlliancePacket(int32_t alliance_id, const std::string& guild) :
+			AllianceOperationPacket(AllianceOperationPacket::Operation::ACCEPT)
+		{
+			write_int(alliance_id);
+			write_string(guild);
+		}
+	};
+
+	// Turns down an invitation to an alliance: the Game Option blocks it
+	// (BLOCKING), another is still showing (ANOTHER) or X (DECLINED)
+	// (FUN_00a39f4e, FUN_0051fff5).
+	// Opcode: DENY_ALLIANCE_REQUEST(144)
+	class DenyAllianceRequestPacket : public OutPacket
+	{
+	public:
+		static constexpr int8_t BLOCKING = 0x14, ANOTHER = 0x15, DECLINED = 0x16;
+
+		DenyAllianceRequestPacket(int8_t reason, const std::string& inviter, const std::string& guild) :
+			OutPacket(OutPacket::Opcode::DENY_ALLIANCE_REQUEST)
+		{
+			write_byte(reason);
+			write_string(inviter);
+			write_string(guild);
+		}
+	};
+
 	// A request to the guild bulletin board (0x9B)
 	// Opcode: GUILD_BBS(155)
 	class GuildBbsPacket : public OutPacket

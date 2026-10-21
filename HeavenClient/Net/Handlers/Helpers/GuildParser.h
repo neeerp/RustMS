@@ -2,6 +2,7 @@
 
 #include "../../InPacket.h"
 
+#include "../../../Character/Alliance.h"
 #include "../../../Character/Guild.h"
 
 namespace ms
@@ -18,5 +19,9 @@ namespace ms
 		// The emblem as GUILDDATA, SPAWN_PLAYER, and GUILD_MARK_CHANGED
 		// carry it.
 		GuildEmblem parse_emblem(InPacket& recv);
+
+		// The ALLIANCE struct (FUN_004e475a), the guild ids before the
+		// capacity.
+		AllianceData parse_alliance(InPacket& recv);
 	}
 }

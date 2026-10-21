@@ -143,6 +143,7 @@ namespace ms
 			MAKERFEE,
 			COMBOLIST,
 			COMBOHOVER,
+			ALLIANCEGREEN,
 			NUM_COLORS
 		};
 
@@ -235,7 +236,8 @@ namespace ms
 						{0.56f, 0.66f, 0.76f}, // Maker count (#90A8C3, the Item Maker's ingredient counts)
 						{0.16f, 0.32f, 0.48f}, // Maker fee (#29517A, the Item Maker's fee)
 						{0.93f, 0.93f, 0.93f}, // Combo list (#EEEEEE, an open v83 drop list)
-						{0.65f, 0.63f, 0.60f}  // Combo hover (#A5A198, the row under the cursor in one)
+						{0.65f, 0.63f, 0.60f}, // Combo hover (#A5A198, the row under the cursor in one)
+						{0.65f, 1.00f, 0.50f}  // Alliance green (#A6FF7F, v83 chat font 5: alliance chat)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
