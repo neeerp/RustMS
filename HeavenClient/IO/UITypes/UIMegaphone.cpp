@@ -26,9 +26,12 @@ namespace ms
 		constexpr Rectangle<int16_t> SUPER_FIELD = Rectangle<int16_t>(19, 245, 58, 73);
 		constexpr Rectangle<int16_t> TRIPLE_FIELD = Rectangle<int16_t>(19, 414, 63, 79);
 		constexpr int16_t TRIPLE_LINES[] = { 0, 21, 43 };
+		// The avatar megaphone's box (FUN_007f1196): 107 by 60 at (48, 81).
+		constexpr Rectangle<int16_t> AVATAR_FIELD = Rectangle<int16_t>(48, 155, 81, 141);
 		// The checkbox control; its box is drawn 2 right and 1 down in it.
 		constexpr Rectangle<int16_t> SUPER_CHECK = Rectangle<int16_t>(14, 174, 95, 109);
 		constexpr Rectangle<int16_t> TRIPLE_CHECK = Rectangle<int16_t>(18, 178, 153, 167);
+		constexpr Rectangle<int16_t> AVATAR_CHECK = Rectangle<int16_t>(10, 170, 147, 161);
 		constexpr Point<int16_t> CHECK_BOX = Point<int16_t>(2, 1);
 		// The samples' popup (FUN_00999320 and FUN_009995ae): where it opens from the window's top left, its width,
 		// its rows, the first sample button in it, and the "CREATE NEW" bar that empties the lines.
@@ -47,11 +50,14 @@ namespace ms
 	UIMegaphone::UIMegaphone(int32_t item_id, std::function<void(const std::vector<std::string> &, bool)> os)
 			: UIElement(Point<int16_t>(), Point<int16_t>()),
 			  triple(Megaphones::kind(item_id) == Megaphones::Kind::TRIPLE),
-			  item(nl::nx::item["Cash"]["0507.img"][string_format::extend_id(item_id, 8)]), onsend(std::move(os)),
+			  avatar(Megaphones::kind(item_id) == Megaphones::Kind::AVATAR),
+			  item(nl::nx::item["Cash"][string_format::extend_id(item_id / 10'000, 4) + ".img"]
+				   [string_format::extend_id(item_id, 8)]), onsend(std::move(os)),
 			  ear(true), held(false), checking(false), sampling(false), sample_count(0)
 	{
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
-		nl::node src = NxFiles::ui_classic["UIWindow.img"][triple ? "ArtMegaphone" : "Megaphone"];
+		nl::node src = NxFiles::ui_classic["UIWindow.img"][triple ? "ArtMegaphone" : avatar ? "AvatarMegaphone" :
+																					   "Megaphone"];
 
 		Texture background = src["backgrnd"];
 		sprites.emplace_back(src["backgrnd"]);
@@ -68,6 +74,13 @@ namespace ms
 
 			field_count = MAX_FIELDS;
 			check_area = TRIPLE_CHECK;
+		} else if (avatar)
+		{
+			buttons[Buttons::OK] = std::make_unique<MapleButton>(src["BtOk"], Point<int16_t>(52, 170));
+			buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(src["BtCancel"], Point<int16_t>(102, 170));
+
+			field_count = 1;
+			check_area = AVATAR_CHECK;
 		} else
 		{
 			buttons[Buttons::OK] = std::make_unique<MapleButton>(basic["BtOK2"], Point<int16_t>(146, 126));
@@ -79,12 +92,16 @@ namespace ms
 
 		for (size_t i = 0; i < field_count; i++)
 		{
-			Rectangle<int16_t> bounds = triple ? TRIPLE_FIELD : SUPER_FIELD;
+			Rectangle<int16_t> bounds = triple ? TRIPLE_FIELD : avatar ? AVATAR_FIELD : SUPER_FIELD;
 			bounds.shift(Point<int16_t>(0, triple ? TRIPLE_LINES[i] : 0));
 
 			Textfield &field = fields[i];
 			field = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, bounds,
-							  Megaphones::MAX_LINE);
+							  avatar ? Megaphones::AVATAR_TYPED : Megaphones::MAX_LINE);
+
+			if (avatar)
+				field.set_wrap(bounds.width());
+
 			field.set_enter_callback(
 					[&](std::string)
 					{
@@ -461,6 +478,13 @@ namespace ms
 
 	std::vector<std::string> UIMegaphone::lines() const
 	{
+		if (avatar)
+		{
+			Megaphones::AvatarLines rows = Megaphones::avatar_lines(fields[0].get_text(), fields[0].line_starts());
+
+			return std::vector<std::string>(rows.begin(), rows.end());
+		}
+
 		std::vector<std::string> typed;
 
 		for (size_t i = 0; i < field_count; i++)

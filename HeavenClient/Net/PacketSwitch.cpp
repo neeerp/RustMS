@@ -91,6 +91,9 @@ namespace ms
 		SPAWN_PORTAL = 67,
 		SERVER_MESSAGE = 68,
 		WEEK_EVENT_MESSAGE = 77,
+		AVATAR_MEGAPHONE_RESULT = 110,
+		AVATAR_MEGAPHONE = 111,
+		CLEAR_AVATAR_MEGAPHONE = 112,
 
 		/// Monster Book
 		MONSTER_BOOK_SET_CARD = 83,
@@ -360,6 +363,9 @@ namespace ms
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();
+		emplace<AVATAR_MEGAPHONE_RESULT, AvatarMegaphoneResultHandler>();
+		emplace<AVATAR_MEGAPHONE, AvatarMegaphoneHandler>();
+		emplace<CLEAR_AVATAR_MEGAPHONE, ClearAvatarMegaphoneHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
 
 		// Inventory Handlers

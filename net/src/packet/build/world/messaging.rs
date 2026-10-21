@@ -1,9 +1,10 @@
 use crate::{
     codec::item::{encode_item, SlotPrefix},
+    codec::look::encode_avatar_look,
     error::NetworkError,
     packet::op::SendOpcode,
 };
-use game::Item;
+use game::{AvatarLook, Item};
 use packet::{io::write::PktWrite, Packet};
 
 /// Client → server: send a whisper.
@@ -125,6 +126,48 @@ pub fn build_triple_megaphone(
     Ok(packet)
 }
 
+/// Why an avatar megaphone was refused (recv 110, FUN_00a2a3bc): the client
+/// unlocks and keeps the item.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AvatarRefusal {
+    /// "The waiting line is longer than 15 seconds." (StringPool 0xf84).
+    Busy = b'S' as isize,
+    /// Only for characters over level 10 (StringPool 0xea1).
+    TooLow = b'T' as isize,
+}
+
+/// An avatar megaphone is refused.
+pub fn build_avatar_megaphone_refusal(why: AvatarRefusal) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::AvatarMegaphoneResult as i16)?;
+    packet.write_byte(why as u8)?;
+    Ok(packet)
+}
+
+/// An avatar megaphone's banner (recv 111, FUN_00a2a486): the item, who
+/// sent it from which zero-based channel, their four lines and their look.
+/// The client shows it for 10 s, or until the next one replaces it.
+pub fn build_avatar_megaphone(
+    item_id: i32,
+    name: &str,
+    lines: &[String; 4],
+    channel: u8,
+    ear: bool,
+    look: &AvatarLook,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::AvatarMegaphone as i16)?;
+    packet.write_int(item_id)?;
+    packet.write_str_with_length(name)?;
+    for line in lines {
+        packet.write_str_with_length(line)?;
+    }
+    packet.write_int(channel.into())?;
+    packet.write_byte(ear as u8)?;
+    encode_avatar_look(&mut packet, look, true)?;
+    Ok(packet)
+}
+
 /// An incoming whisper. `channel` is the sender's zero-based channel.
 pub fn build_whisper_receive(
     sender_name: &str,
@@ -212,6 +255,25 @@ mod tests {
             .string("Tired")
             .int(0)
             .end();
+    }
+
+    #[test]
+    fn an_avatar_megaphone_refusal_is_its_letter() {
+        let packet = build_avatar_megaphone_refusal(AvatarRefusal::Busy).unwrap();
+        Expect::new(&packet.bytes).short(0x6E).byte(b'S').end();
+        let packet = build_avatar_megaphone_refusal(AvatarRefusal::TooLow).unwrap();
+        Expect::new(&packet.bytes).short(0x6E).byte(b'T').end();
+    }
+
+    #[test]
+    fn an_avatar_banner_has_the_lines_then_the_channel_and_the_look() {
+        let look = crate::codec::stats::sample_player().look();
+        let lines = ["one", "two", "", "four"].map(String::from);
+        let packet = build_avatar_megaphone(5_390_000, "Alice", &lines, 2, true, &look).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x6F).int(5_390_000).string("Alice");
+        expect.string("one").string("two").string("").string("four");
+        expect.int(2).byte(1).look(&look, true).end();
     }
 
     #[test]

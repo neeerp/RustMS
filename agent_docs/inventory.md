@@ -303,6 +303,37 @@ Double-clicking a megaphone in the Cash tab opens its dialog
 The item megaphone can't be opened in a shop or trade ("Not available").
 The gates are in `Util/Megaphones.h`.
 
+#### Avatar megaphones
+
+An avatar megaphone (539xxxx) comes through USE_CASH_ITEM too: four lines,
+the ear byte, and the speaker's look, which the server ignores and takes
+from the player (`avatar_megaphone` in `world/megaphone.rs`). A level of 10
+or below is refused with AVATAR_MEGAPHONE_RESULT (`0x6E`) 'T'; four empty
+lines, or one too long, get only the unlock. The banner, AVATAR_MEGAPHONE
+(`0x6F`: item id, name, the four lines, the zero-based channel, the ear and
+the look as character lists encode it), goes to the world directory
+(`WorldAction::AvatarMegaphone`), which shows it to every client at once.
+v83 shows one banner at a time and replaces it the moment another arrives,
+so the directory keeps the rest in line (`runtime/src/actor/avatar_banners.rs`)
+and shows each for the 10 s the client keeps it up. One that would wait past
+15 s is refused with 'S' ("The waiting line is longer than 15 seconds.") and
+the megaphone kept; otherwise the megaphone goes as soon as the banner is in
+line. The server never sends CLEAR_AVATAR_MEGAPHONE (`0x70`).
+
+In HeavenClient the dialog is `UIMegaphone` on `UIWindow.img/AvatarMegaphone`:
+one box of up to 97 characters that wraps into four lines, which are sent as
+the client wraps them, and the whisper-icon checkbox. Nothing typed is
+refused with "Please enter the text."; cursing as for the other megaphones.
+The packet carries the look `Player::look_entry` builds from the equipped
+items. The banner is `UIAvatarMegaphone`: the item's `info/path` art from
+`Map.nx` `MapHelper.img/AvatarMegaphone` in the top right corner, the speaker
+standing in it with the item's `info/emotion` face, the name on the short or
+long plate, and the four lines. It slides in from the right edge over 225 ms
+with a small wobble, and out again after 10 s, when the next replaces it at
+once, or on 0x70. The line also goes to the chat log in its own colours, with the
+channel tag, as `<name> : <lines>`. A banner that arrives in the cash shop
+is dropped.
+
 ### Chalkboard
 
 A chalkboard (537xxxx, `world/chalkboard.rs`) is used through USE_CASH_ITEM

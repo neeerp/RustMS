@@ -152,6 +152,7 @@ namespace ms
 		constexpr Color MEGAPHONE_STRIP = Color(0xCAE7FFB0);
 		constexpr Color SUPER_MEGAPHONE_STRIP = Color(0xFFBFDDCC);
 		constexpr Color ITEM_MEGAPHONE_STRIP = Color(0xFFC600DD);
+		constexpr Color AVATAR_MEGAPHONE_STRIP = Color(0x4D1AAD2C);
 
 		// A megaphone's channel tag is drawn this far into its first row,
 		// whose text starts after it (FUN_008dbb93).
@@ -844,6 +845,10 @@ namespace ms
 				break;
 			case LineType::MEGAPHONE_PREVIEW:
 				color = Color::Name::SILVER;
+				break;
+			case LineType::AVATAR_MEGAPHONE:
+				color = Color::Name::AVATARMEGAPHONE;
+				strip = AVATAR_MEGAPHONE_STRIP;
 				break;
 			default:
 				color = Color::Name::WHITE;

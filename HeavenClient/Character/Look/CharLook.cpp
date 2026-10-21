@@ -509,6 +509,7 @@ namespace ms
 		}
 
 		body = &iter->second;
+		this->skin_id = skin_id;
 	}
 
 	void CharLook::set_hair(int32_t hair_id)
@@ -525,6 +526,7 @@ namespace ms
 		}
 
 		hair = &iter->second;
+		this->hair_id = hair_id;
 	}
 
 	void CharLook::set_face(int32_t face_id)
@@ -535,6 +537,7 @@ namespace ms
 			iter = facetypes.emplace(face_id, face_id).first;
 
 		face = &iter->second;
+		this->face_id = face_id;
 	}
 
 	void CharLook::updatetwohanded()
@@ -864,6 +867,21 @@ namespace ms
 	const Face *CharLook::get_face() const
 	{
 		return face;
+	}
+
+	int32_t CharLook::get_skin_id() const
+	{
+		return skin_id;
+	}
+
+	int32_t CharLook::get_hair_id() const
+	{
+		return hair_id;
+	}
+
+	int32_t CharLook::get_face_id() const
+	{
+		return face_id;
 	}
 
 	int32_t CharLook::get_pet_wear(size_t index) const

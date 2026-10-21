@@ -330,6 +330,11 @@ namespace ms
 		// Obtain a reference to the player's inventory.
 		const Inventory &get_inventory() const;
 
+		// My look as an avatar megaphone sends it (v83 FUN_0045a68a): the
+		// equips worn, a cash one showing over the one it masks, and the cash
+		// weapon under -111 as LoginParser::parse_look keeps it. No pets.
+		LookEntry look_entry() const;
+
 		// Whether the pet `index` wears `itemid` (FUN_00705e2c).
 		bool pet_wears(uint8_t index, int32_t itemid) const;
 

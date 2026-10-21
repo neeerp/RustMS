@@ -443,6 +443,11 @@ namespace ms
 		return text;
 	}
 
+	std::vector<size_t> Textfield::line_starts() const
+	{
+		return textlabel.line_starts();
+	}
+
 	bool Textfield::empty() const
 	{
 		return text.empty();

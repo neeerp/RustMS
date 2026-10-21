@@ -751,7 +751,8 @@ namespace ms
 					UIElement::Type::FIELDCLOCK,
 					UIElement::Type::EVENTCLOCK,
 					UIElement::Type::MOBGAGE,
-					UIElement::Type::ENERGYBAR
+					UIElement::Type::ENERGYBAR,
+					UIElement::Type::AVATARMEGAPHONE
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())

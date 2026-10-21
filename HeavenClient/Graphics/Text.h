@@ -169,6 +169,9 @@ namespace ms
 
 		const std::string &get_text() const;
 
+		// Where each row of the text begins, once wrapped.
+		std::vector<size_t> line_starts() const;
+
 	private:
 		void reset_layout();
 

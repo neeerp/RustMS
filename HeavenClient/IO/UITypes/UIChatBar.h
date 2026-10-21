@@ -78,7 +78,10 @@ namespace ms
 			SUPER_MEGAPHONE,
 			ITEM_MEGAPHONE,
 			// A triple megaphone's preview (v83 chat type 0x15)
-			MEGAPHONE_PREVIEW
+			MEGAPHONE_PREVIEW,
+			// An avatar megaphone's banner, all its lines in one (v83 chat
+			// type 0x11)
+			AVATAR_MEGAPHONE
 		};
 
 		using Target = chat_target::Target;

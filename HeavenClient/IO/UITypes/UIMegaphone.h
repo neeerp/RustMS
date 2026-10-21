@@ -16,10 +16,11 @@
 
 namespace ms
 {
-	// The super megaphone's window (v83 FUN_00a0ece4 on UIWindow.img/Megaphone) and the triple megaphone's
-	// (FUN_00a0ee22 on ArtMegaphone): one line or three, and whether listeners get an ear to whisper back by. It is
-	// modal, and closes before the lines are checked. The triple megaphone's Special Character button opens the item's
-	// samples over it (FUN_00999320).
+	// The super megaphone's window (v83 FUN_00a0ece4 on UIWindow.img/Megaphone), the triple megaphone's
+	// (FUN_00a0ee22 on ArtMegaphone) and the avatar megaphone's (FUN_007f1196 on AvatarMegaphone): one line, three,
+	// or one box that wraps onto four, and whether listeners get an ear to whisper back by. It is modal, and closes
+	// before the lines are checked. The triple megaphone's Special Character button opens the item's samples over it
+	// (FUN_00999320).
 	class UIMegaphone : public UIElement
 	{
 	public:
@@ -90,7 +91,8 @@ namespace ms
 		static constexpr size_t MAX_FIELDS = 3;
 
 		bool triple;
-		// Item.nx's Cash/0507.img entry for the megaphone.
+		bool avatar;
+		// Item.nx's Cash entry for the megaphone.
 		nl::node item;
 		std::function<void(const std::vector<std::string> &lines, bool ear)> onsend;
 		// Fields don't move once made: the UI keeps a pointer to the one with the keys.

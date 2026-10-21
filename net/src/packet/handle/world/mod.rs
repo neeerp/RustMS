@@ -81,6 +81,7 @@ pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;
 pub use self::logged_in::PlayerLoggedInHandler;
 pub use self::map_transfer::PlayerMapTransferHandler;
+pub use self::megaphone::spend_avatar_megaphone;
 pub use self::meso_drop::MesoDropHandler;
 pub use self::messenger::MessengerHandler;
 pub use self::monster_book_cover::MonsterBookCoverHandler;

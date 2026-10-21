@@ -1,3 +1,4 @@
+use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
@@ -31,6 +32,14 @@ use tracing::{error, info, warn};
 /// How often messenger seats and guild members held through a channel
 /// change are checked.
 const PURGE_INTERVAL: Duration = Duration::from_secs(10);
+
+/// Wait until `instant`, or forever without one.
+async fn at(instant: Option<Instant>) {
+    match instant {
+        Some(instant) => tokio::time::sleep_until(instant.into()).await,
+        None => std::future::pending().await,
+    }
+}
 
 struct Entry {
     handle: ClientHandle,
@@ -78,6 +87,7 @@ pub struct WorldDirectory {
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
+    avatar_banners: AvatarBanners,
 }
 
 impl WorldDirectory {
@@ -93,6 +103,7 @@ impl WorldDirectory {
             guild_away: HashMap::new(),
             events: HashMap::new(),
             next_event: 1,
+            avatar_banners: AvatarBanners::default(),
         }
     }
 
@@ -109,6 +120,11 @@ impl WorldDirectory {
                     let out = self.messengers.purge(now);
                     self.deliver(out);
                     self.purge_guild_away(now);
+                }
+                _ = at(self.avatar_banners.until()) => {
+                    if let Some(banner) = self.avatar_banners.next(Instant::now()) {
+                        self.show_everyone(banner);
+                    }
                 }
             }
         }
@@ -140,6 +156,17 @@ impl WorldDirectory {
                 scope,
                 packet,
             } => self.broadcast(from, scope, packet),
+            DirectoryMessage::AvatarBanner { banner, reply } => {
+                let queued = match self.avatar_banners.queue(banner, Instant::now()) {
+                    Queued::Now(banner) => {
+                        self.show_everyone(banner);
+                        true
+                    }
+                    Queued::Later => true,
+                    Queued::Refused => false,
+                };
+                let _ = reply.send(queued);
+            }
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())
             }
@@ -520,6 +547,12 @@ impl WorldDirectory {
             if reached {
                 entry.handle.send_packet(packet.clone());
             }
+        }
+    }
+
+    fn show_everyone(&self, packet: Packet) {
+        for entry in self.clients.values() {
+            entry.handle.send_packet(packet.clone());
         }
     }
 

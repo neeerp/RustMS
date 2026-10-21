@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -55,14 +57,18 @@ namespace ms
 
 		// The megaphones the Cash tab uses, by what they ask for
 		// (FUN_0048645b's 507 kinds: 1 and 8 plain, 2 super, 5 from 6 and 6
-		// item, 7 triple; 5 below 6 is Maple TV).
+		// item, 7 triple; 5 below 6 is Maple TV), and the avatar megaphones
+		// (539).
 		enum class Kind : uint8_t
 		{
-			NONE, PLAIN, SUPER, ITEM, TRIPLE
+			NONE, PLAIN, SUPER, ITEM, TRIPLE, AVATAR
 		};
 
 		inline Kind kind(int32_t item_id)
 		{
+			if (item_id / 10'000 == 539)
+				return Kind::AVATAR;
+
 			if (item_id / 10'000 != 507)
 				return Kind::NONE;
 
@@ -87,7 +93,7 @@ namespace ms
 		// Why a line isn't sent. QUIET says nothing.
 		enum class Refusal : uint8_t
 		{
-			NONE, QUIET, CURSING, LEVEL, LONG
+			NONE, QUIET, CURSING, LEVEL, LONG, EMPTY
 		};
 
 		// Checks a plain or super megaphone's line in v83's order, once its
@@ -167,6 +173,72 @@ namespace ms
 			}
 
 			return line;
+		}
+
+		// The avatar megaphone's box (FUN_007f1196): one wrapped field of
+		// four lines and 97 characters.
+		constexpr size_t AVATAR_LINES = 4;
+		constexpr size_t AVATAR_TYPED = 97;
+
+		using AvatarLines = std::array<std::string, AVATAR_LINES>;
+
+		// The lines an avatar megaphone sends: the field's text cut where it
+		// wraps (FUN_007f1525), `starts` being where each row begins. A row
+		// past the fourth is left out. The space a row wraps at stays on the
+		// row before, so the lines run together as typed.
+		inline AvatarLines avatar_lines(const std::string& text, const std::vector<size_t>& starts)
+		{
+			AvatarLines lines;
+			std::vector<size_t> cuts;
+
+			for (size_t start : starts)
+			{
+				if (start > 0 && start < text.size() && text[start] == ' ')
+					start++;
+
+				cuts.push_back(std::min(start, text.size()));
+			}
+
+			for (size_t i = 0; i < AVATAR_LINES && i < cuts.size(); i++)
+			{
+				size_t end = i + 1 < cuts.size() ? cuts[i + 1] : text.size();
+
+				if (end > cuts[i])
+					lines[i] = text.substr(cuts[i], end - cuts[i]);
+			}
+
+			return lines;
+		}
+
+		// Checks an avatar megaphone's lines once its box has closed: v83
+		// asks for some text, and refuses cursing, but has no level or length
+		// rule of its own (FUN_00a0a63f's 539 branch). `censor` stars out
+		// curse words.
+		template <typename Censor>
+		Refusal check_avatar_lines(const AvatarLines& lines, Censor censor)
+		{
+			std::string joined;
+
+			for (const std::string& line : lines)
+				joined += line;
+
+			if (joined.empty())
+				return Refusal::EMPTY;
+
+			if (censor(joined) != joined)
+				return Refusal::CURSING;
+
+			return Refusal::NONE;
+		}
+
+		// Where an avatar megaphone's banner (FUN_0045a825) puts the name:
+		// the short plate (`name/0`) under a name narrower than 70, at x 48,
+		// and the long one (`name/1`) at x 3.
+		constexpr int16_t AVATAR_SHORT_NAME = 70;
+
+		inline bool avatar_long_name(int16_t name_width)
+		{
+			return name_width >= AVATAR_SHORT_NAME;
 		}
 	}
 }
