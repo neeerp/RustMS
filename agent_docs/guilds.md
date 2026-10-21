@@ -510,6 +510,11 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   stays open.
 - Guild points and the guild quest.
 - The alliance's rank panel slides no more than the guild's.
+- The Alliance tab's tooltips: the whole notice over its box, the online
+  and total counts, "Sort thru" over the column heads, and "Unknown" over a
+  level v83 does not know.
+- An alliance invitation to a name under 4 characters is dropped; v83's
+  prompt keeps OK until the name is long enough.
 - A joining guild's members, and new members of an allied guild, always
   start at alliance rank 5, even while rank 5 has no title.
 - The deny's reason (invitations switched off, another card showing,

@@ -195,9 +195,10 @@ namespace ms
 			}
 
 			// A page's rows and one more for each unfolded section, even
-			// one with no guild; none without an alliance.
+			// one with no guild; none without an alliance. An empty list
+			// still draws its "none" row but counts only the one (0x91eee7).
 			if (joined && section.expanded)
-				counted_rows += static_cast<int16_t>(std::max<size_t>(section.rows.size(), 1)) + 1;
+				counted_rows += static_cast<int16_t>(section.rows.size()) + 1;
 		}
 
 		alliance_height = ROW * counted_rows + UNION_CANVAS;
@@ -392,9 +393,11 @@ namespace ms
 		{
 			const AllianceSection& section = alliance_sections[s];
 			uint16_t first = Buttons::BT_ALLIANCE_SECTION + s * SectionButton::SECTION_BUTTONS;
-			// Made while the header is in view (FUN_0091ebd4).
-			bool shown = tab == Tab::ALLIANCE && section.shown && section.top >= view_top &&
-						 section.top + GUILD_SECTION_HEADER <= view_top + GUILD_VIEW;
+			// Made while the header's test point (77, y + 8) is in view
+			// (FUN_0091ebd4).
+			int16_t test_y = section.top + UNION_FOLD.y();
+			bool shown = tab == Tab::ALLIANCE && section.shown && test_y >= view_top &&
+						 test_y < view_top + GUILD_VIEW;
 			Point<int16_t> top = list + Point<int16_t>(0, section.top);
 			int16_t page_left = UNION_PAGE.x() - section.page_text.width() - PAGE_BUTTON;
 
@@ -429,12 +432,8 @@ namespace ms
 		if (alliance_picked == 0 || alliance_picked == Stage::get().get_player().get_oid())
 			return nullptr;
 
-		for (const AllianceSection& section : alliance_sections)
-			for (const GuildRow& row : section.rows)
-				if (row.id == alliance_picked)
-					return alliance.find_member(guild, row.id);
-
-		return nullptr;
+		// The pick outlives a page change; it is a character, not a row.
+		return alliance.find_member(guild, alliance_picked);
 	}
 
 	Cursor::State UIUserList::alliance_cursor(bool clicked, Point<int16_t> cursorpos)
