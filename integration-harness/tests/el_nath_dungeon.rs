@@ -1,8 +1,9 @@
 //! Jeff, in El Nath's Ice Valley II, lets players from level 50 down to
-//! Sharp Cliff I, the top of the dungeon below.
+//! Sharp Cliff I, the top of the dungeon below, and sends an Orihalcon
+//! Hammer's holder to Ice Valley without a word.
 
 use game_data::GameData;
-use integration_harness::database::set_job;
+use integration_harness::database::{grant_stack, set_job};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{barrier, step, warp, Trace};
@@ -17,6 +18,8 @@ use tokio::time::Duration;
 const ICE_VALLEY: i32 = 211040200;
 const SHARP_CLIFF: i32 = 211040300;
 const JEFF: i32 = 2030000;
+const HAMMERS_ICE_VALLEY: i32 = 921100100;
+const ORIHALCON_HAMMER: i32 = 4031450;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -75,4 +78,17 @@ async fn jeff_lets_players_from_level_50_down_to_sharp_cliff() {
     assert_eq!(t.prompts, [(JEFF, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.arrivals, [(SHARP_CLIFF, 5, None)]);
+
+    // With the hammer, straight to Ice Valley's `west00`.
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    grant_stack(id, 4, 1, ORIHALCON_HAMMER, 1).await.unwrap();
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, ICE_VALLEY, "", &mut trace).await, ICE_VALLEY);
+    barrier(c, &m, &mut trace).await;
+    let t = step(c, &m, talk(ICE_VALLEY, JEFF)).await;
+    assert!(t.prompts.is_empty(), "{:?}", t.prompts);
+    assert_eq!(t.arrivals, [(HAMMERS_ICE_VALLEY, 1, None)]);
 }

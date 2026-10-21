@@ -349,6 +349,11 @@ unsourced = [
     "portal.mc_obstacle.blocked",
     "portal.mc_obstacle.used",
     "portal.mc_castle.blocked",
+    "time_gate.inactive",
+    "time_gate.no_era",
+    "statue.intro",
+    "statue.menu",
+    "crumbling.ask",
 ]
 
 [text."glTutoMsg0.message"]

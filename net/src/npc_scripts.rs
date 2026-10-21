@@ -40,6 +40,31 @@ const JEFF: i32 = 2030000;
 /// Sharp Cliff I and its `under00` portal, the top of the dungeon below.
 const SHARP_CLIFF: (i32, u8) = (211040300, 5);
 const JEFF_LEVEL: u8 = 50;
+/// The Orihalcon Hammer, which takes Jeff's holder straight to Ice Valley.
+const ORIHALCON_HAMMER: i32 = 4031450;
+const ICE_VALLEY: (i32, u8) = (921100100, 1);
+/// The Time Gate at the edge of the Tera Forest.
+const TIME_GATE: i32 = 2083006;
+/// Andy the Time Traveler, which wakes the Time Gate.
+const TIME_GATE_QUEST: i16 = 3718;
+/// Each era's map (arriving at its `left00`, id 1) and the Guardian Nex
+/// quest that opens it, once those before it are done.
+const ERAS: [(i32, i16); 6] = [
+    (240070100, 3719),
+    (240070200, 3724),
+    (240070300, 3730),
+    (240070400, 3736),
+    (240070500, 3742),
+    (240070600, 3748),
+];
+/// The Mysterious Statue in the Sleepywood forest and the Crumbling Statue
+/// at each of the Deep Forest's steps.
+const MYSTERIOUS_STATUE: i32 = 1061006;
+const CRUMBLING_STATUE: i32 = 1061007;
+const STATUE_FOREST: i32 = 105040300;
+/// The Deep Forest's steps a John quest opens: each quest, taken or done,
+/// opens one more.
+const DEEP_FOREST: [(i32, i16); 3] = [(105040310, 2052), (105040312, 2053), (105040314, 2054)];
 const LITH_HARBOR: i32 = 104_000_000;
 /// Lucas's recommendation letter, which pays for Shanks's ship.
 const RECOMMENDATION_LETTER: i32 = 4031801;
@@ -569,6 +594,9 @@ pub enum Page {
     /// The last page of a menu choice that fails: said, and the script's
     /// end effects are dropped.
     End(String),
+    /// The conversation ends here without another page, as when a menu
+    /// choice warps at once: `effects`, then the script's end effects.
+    Done(Vec<Effect>),
 }
 
 /// What to do after an answer: apply `effects`, then show `prompt` (or end
@@ -692,6 +720,16 @@ impl NpcScript {
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
             JEFF => Some(jeff(player)),
+            TIME_GATE => Some(time_gate(player)),
+            MYSTERIOUS_STATUE => Some(mysterious_statue(player)),
+            CRUMBLING_STATUE => Some(Self::new(
+                CRUMBLING_STATUE,
+                vec![Page::Ask {
+                    text: text(keys::CRUMBLING_ASK),
+                    on_yes: vec![Effect::WarpToPortal(STATUE_FOREST, 0)],
+                    on_no: None,
+                }],
+            )),
             MAPLE_ADMINISTRATOR => Some(Self::new(
                 MAPLE_ADMINISTRATOR,
                 vec![Page::Ask {
@@ -843,9 +881,17 @@ impl NpcScript {
         self.page > 0 && matches!(self.pages[self.page - 1], Page::Say(_))
     }
 
-    fn step(&self, effects: Vec<Effect>) -> Step {
+    fn step(&self, mut effects: Vec<Effect>) -> Step {
         let npc_id = self.npc_id;
         let prompt = match &self.pages[self.page] {
+            Page::Done(done) => {
+                effects.extend(done.iter().cloned());
+                effects.extend(self.on_end.iter().cloned());
+                return Step {
+                    prompt: None,
+                    effects,
+                };
+            }
             Page::Say(text) => Prompt::Text(DialoguePage {
                 npc_id,
                 text: text.clone(),
@@ -865,7 +911,10 @@ impl NpcScript {
             Page::Menu { text, choices } => {
                 let mut menu = text.clone();
                 for (choice, (label, _)) in choices.iter().enumerate() {
-                    menu.push_str(&format!("\n#L{choice}##b{label}#k#l"));
+                    if !menu.is_empty() {
+                        menu.push('\n');
+                    }
+                    menu.push_str(&format!("#L{choice}##b{label}#k#l"));
                 }
                 Prompt::Selection { npc_id, text: menu }
             }
@@ -1358,10 +1407,16 @@ fn nella(player: &Player) -> Option<NpcScript> {
     ))
 }
 
-/// Jeff (`goDungeon`): players from level 50 may go down to Sharp Cliff.
-/// The Orihalcon Hammer's way to Ice Valley (921100100) comes with its
-/// quest line.
+/// Jeff (`goDungeon`): players from level 50 may go down to Sharp Cliff,
+/// and an Orihalcon Hammer's holder goes to Ice Valley without a word.
 fn jeff(player: &Player) -> NpcScript {
+    if player.inventory.count(ORIHALCON_HAMMER) > 0 {
+        let (map, portal) = ICE_VALLEY;
+        return NpcScript::new(
+            JEFF,
+            vec![Page::Done(vec![Effect::WarpToPortal(map, portal)])],
+        );
+    }
     let (map, portal) = SHARP_CLIFF;
     let next = if player.stats.level >= JEFF_LEVEL {
         Page::Ask {
@@ -1373,6 +1428,62 @@ fn jeff(player: &Player) -> NpcScript {
         Page::Say(text(keys::JEFF_TOO_WEAK))
     };
     NpcScript::new(JEFF, vec![Page::Say(text(keys::JEFF_INTRO)), next])
+}
+
+/// The Time Gate (`TD_neoCity_enter`): once Andy's quest wakes it, it
+/// takes the player to any era their Guardian Nex quests have opened.
+fn time_gate(player: &Player) -> NpcScript {
+    let done = |id| player.quests.state(id) == QuestState::Completed;
+    if !done(TIME_GATE_QUEST) {
+        return NpcScript::new(TIME_GATE, vec![Page::Say(text(keys::TIME_GATE_INACTIVE))]);
+    }
+    let open = ERAS.iter().take_while(|&&(_, quest)| done(quest)).count();
+    if open == 0 {
+        return NpcScript::new(TIME_GATE, vec![Page::Say(text(keys::TIME_GATE_NO_ERA))]);
+    }
+    let choices = ERAS[..open]
+        .iter()
+        .map(|&(map, _)| {
+            (
+                format!("#m{map}#"),
+                vec![Page::Done(vec![Effect::WarpToPortal(map, 1)])],
+            )
+        })
+        .collect();
+    NpcScript::new(
+        TIME_GATE,
+        vec![Page::Menu {
+            text: String::new(),
+            choices,
+        }],
+    )
+}
+
+/// The Mysterious Statue (`flower_in`): past it, the Deep Forest's steps
+/// that the player's John quests have opened.
+fn mysterious_statue(player: &Player) -> NpcScript {
+    let taken = |id| player.quests.state(id) != QuestState::NotStarted;
+    let open = DEEP_FOREST
+        .iter()
+        .rposition(|&(_, quest)| taken(quest))
+        .map_or(0, |last| last + 1);
+    let mut pages = vec![Page::Say(text(keys::STATUE_INTRO))];
+    if open > 0 {
+        let choices = DEEP_FOREST[..open]
+            .iter()
+            .map(|&(map, _)| {
+                (
+                    format!("#m{map}#"),
+                    vec![Page::Done(vec![Effect::WarpToPortal(map, 0)])],
+                )
+            })
+            .collect();
+        pages.push(Page::Menu {
+            text: text(keys::STATUE_MENU),
+            choices,
+        });
+    }
+    NpcScript::new(MYSTERIOUS_STATUE, pages)
 }
 
 /// `station_in`: Isa shows the way to Orbis Station's platforms.
@@ -2877,6 +2988,94 @@ mod tests {
         let refusal = jeff.respond(ScriptInput::Next).unwrap();
         assert_eq!(kind(&refusal), Some(0));
         assert!(jeff.respond(ScriptInput::Next).unwrap().effects.is_empty());
+    }
+
+    #[test]
+    fn jeff_sends_an_orihalcon_hammers_holder_to_ice_valley_at_once() {
+        let mut player = traveller(30, 0, false);
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(ORIHALCON_HAMMER, 1),
+        );
+        let jeff = NpcScript::for_npc(JEFF, &player).unwrap();
+        assert_eq!(
+            jeff.begin(),
+            Step {
+                prompt: None,
+                effects: vec![Effect::WarpToPortal(921100100, 1)],
+            }
+        );
+    }
+
+    fn with_quests(quests: &[(i16, bool)]) -> Player {
+        let mut player = traveller(70, 0, false);
+        for &(quest_id, completed) in quests {
+            let status = if completed {
+                QuestStatus::Completed {
+                    at: std::time::SystemTime::now(),
+                }
+            } else {
+                QuestStatus::Started { kills: Vec::new() }
+            };
+            player.quests.upsert(game::QuestRecord { quest_id, status });
+        }
+        player
+    }
+
+    #[test]
+    fn the_time_gate_opens_the_eras_guardian_nex_was_beaten_in() {
+        let says = |quests: &[(i16, bool)]| {
+            let gate = NpcScript::for_npc(TIME_GATE, &with_quests(quests)).unwrap();
+            kind(&gate.begin())
+        };
+        assert_eq!(says(&[]), Some(0));
+        assert_eq!(says(&[(3718, false), (3719, true)]), Some(0));
+        assert_eq!(says(&[(3718, true), (3719, false)]), Some(0));
+
+        // Only eras in an unbroken line from the first are offered.
+        let player = with_quests(&[(3718, true), (3719, true), (3724, true), (3736, true)]);
+        let mut gate = NpcScript::for_npc(TIME_GATE, &player).unwrap();
+        let menu = gate.begin();
+        assert_eq!(
+            menu_text(&menu),
+            "#L0##b#m240070100##k#l\n#L1##b#m240070200##k#l"
+        );
+        assert_eq!(
+            gate.respond(ScriptInput::Select(1)),
+            Some(Step {
+                prompt: None,
+                effects: vec![Effect::WarpToPortal(240070200, 1)],
+            })
+        );
+        let mut gate = NpcScript::for_npc(TIME_GATE, &player).unwrap();
+        gate.begin();
+        assert_eq!(gate.respond(ScriptInput::Select(2)), None);
+    }
+
+    #[test]
+    fn the_statues_lead_into_and_out_of_the_deep_forest() {
+        let mut statue = NpcScript::for_npc(MYSTERIOUS_STATUE, &with_quests(&[])).unwrap();
+        assert_eq!(kind(&statue.begin()), Some(0));
+        assert_eq!(statue.respond(ScriptInput::Next), Some(Step::default()));
+
+        let player = with_quests(&[(2052, true), (2053, false)]);
+        let mut statue = NpcScript::for_npc(MYSTERIOUS_STATUE, &player).unwrap();
+        statue.begin();
+        let menu = statue.respond(ScriptInput::Next).unwrap();
+        assert!(menu_text(&menu).ends_with("#L1##b#m105040312##k#l"));
+        assert!(!menu_text(&menu).contains("#L2#"));
+        assert_eq!(
+            statue.respond(ScriptInput::Select(1)).unwrap().effects,
+            [Effect::WarpToPortal(105040312, 0)]
+        );
+
+        let mut crumbling = NpcScript::for_npc(CRUMBLING_STATUE, &player).unwrap();
+        assert_eq!(kind(&crumbling.begin()), Some(1));
+        assert_eq!(
+            crumbling.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(105040300, 0)]
+        );
     }
 
     fn rider(job: i16, meso: i32, map_id: i32) -> Player {
