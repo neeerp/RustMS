@@ -11,6 +11,26 @@ pub fn build_field_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// FIELD_EFFECT mode 2: show the map object called `name` that the map
+/// keeps hidden until told, e.g. a party quest stage's `gate`.
+pub fn build_field_object(name: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldEffect as i16)?;
+    p.write_byte(2)?;
+    p.write_str_with_length(name)?;
+    Ok(p)
+}
+
+/// FIELD_EFFECT mode 4: play `Sound.nx/Field.img/<path>`, e.g. a party
+/// quest stage's clear jingle (`Party1/Clear`).
+pub fn build_field_sound(path: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldEffect as i16)?;
+    p.write_byte(4)?;
+    p.write_str_with_length(path)?;
+    Ok(p)
+}
+
 /// FIELD_EFFECT mode 5 (v83 0x5336ca): the boss HP bar across the top of
 /// the screen for the mob template `mob_id`, in the colours of its
 /// `hpTagColor` and `hpTagBgcolor`. An `hp` below 1 takes the bar down.
@@ -183,6 +203,24 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::FieldEffect as i16).byte(3);
         expect.string("maplemap/enter/10000");
+        expect.end();
+    }
+
+    #[test]
+    fn field_object_is_mode_two_with_a_name() {
+        let packet = build_field_object("gate").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::FieldEffect as i16).byte(2);
+        expect.string("gate");
+        expect.end();
+    }
+
+    #[test]
+    fn field_sound_is_mode_four_with_a_path() {
+        let packet = build_field_sound("Party1/Clear").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::FieldEffect as i16).byte(4);
+        expect.string("Party1/Clear");
         expect.end();
     }
 

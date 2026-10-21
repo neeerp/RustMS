@@ -103,6 +103,19 @@ impl WorldHandler for ChangeMapHandler {
     }
 }
 
+/// The portal a CHANGE_MAP packet walks through, or `None` for a map-id
+/// warp, a revival, or leaving the Cash Shop. Lets the client actor refuse
+/// a portal (a party quest stage's closed gate) before the handler runs.
+pub fn portal_name(packet: &Packet) -> Option<String> {
+    let mut reader = Cursor::new(&packet.bytes);
+    reader.read_short().ok()?;
+    reader.read_byte().ok()?;
+    if reader.read_int().ok()? != -1 {
+        return None;
+    }
+    reader.read_str_with_length().ok()
+}
+
 /// Send the player to `map_id`'s portal named `portal`, or its default
 /// spawn point without one (script warps, Banish).
 pub fn warp(
@@ -403,5 +416,28 @@ mod tests {
             [WorldAction::LeaveCashShop]
         ));
         assert_eq!(p.stats.map_id, 100000000);
+    }
+
+    fn change_map(target: i32, portal: &str) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(0x26).unwrap();
+        p.write_byte(1).unwrap();
+        p.write_int(target).unwrap();
+        p.write_str_with_length(portal).unwrap();
+        p.write_byte(0).unwrap();
+        p.write_byte(0).unwrap();
+        p
+    }
+
+    #[test]
+    fn portal_name_is_the_portal_walked_through() {
+        assert_eq!(
+            portal_name(&change_map(-1, "next00")).as_deref(),
+            Some("next00")
+        );
+        assert_eq!(portal_name(&change_map(103000801, "")), None);
+        let mut cash_shop_exit = Packet::new_empty();
+        cash_shop_exit.write_short(0x26).unwrap();
+        assert_eq!(portal_name(&cash_shop_exit), None);
     }
 }
