@@ -258,6 +258,23 @@ impl ClientActor {
                         packets.push(skill::build_update_skills(&taught)?);
                     }
                 }
+                Effect::TeachSkill {
+                    skill_id,
+                    level,
+                    master_level,
+                } => {
+                    let skill = quests::QuestSkill {
+                        skill_id: *skill_id,
+                        level: *level,
+                        master_level: *master_level,
+                        jobs: vec![next.stats.job],
+                    };
+                    let taught = quests::apply_skills(&[skill], &mut next);
+                    if !taught.is_empty() {
+                        changed = true;
+                        packets.push(skill::build_update_skills(&taught)?);
+                    }
+                }
                 Effect::Mark(marker) => {
                     next.quests.mark(*marker);
                     changed = true;

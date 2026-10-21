@@ -581,8 +581,10 @@ result window's hover area.
 
 ### Item Maker
 
-The Maker skill (`base*10000+1007`, base being `job/1000*1000`, or 2001 for
-Evan) opens the client's Maker window, which sends ITEM_MAKE (`0x71`,
+The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being
+`job/1000*1000`, or 2001 for Evan), which Meren's lessons in Magatia teach
+(quests 6029, 6033 and 6036; see [Quests](./quests.md)), opens the
+client's Maker window, which sends ITEM_MAKE (`0x71`,
 `world/maker.rs`; reports c006, c006b and c006e). `game-data`'s
 `MakerData` reads the recipes from `Etc.nx`'s `ItemMake.img` (each named for
 what it makes, in a group for the jobs that see it) and, from `Item.nx`,

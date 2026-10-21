@@ -410,6 +410,17 @@ pub mod keys {
     pub const WATER_OF_LIFE_DONE: &str = "water_of_life.done";
     pub const WATER_OF_LIFE_NO_DOLL: &str = "water_of_life.no_doll";
 
+    /// Meren's Maker lessons (quests 6029-6036, Magatia): the end scripts of
+    /// the three classes (`q6030e` Carson's alchemy, `q6031e` Hughes's
+    /// science, `q6032e` Meren's practice), then Meren's crystal test
+    /// (`q6033e`) and the Gold Anvil (`q6036e`), which teach the Maker's
+    /// levels 2 and 3.
+    pub const MAKER_ALCHEMY: [&str; 2] = ["maker.alchemy.0", "maker.alchemy.1"];
+    pub const MAKER_SCIENCE: [&str; 2] = ["maker.science.0", "maker.science.1"];
+    pub const MAKER_PRACTICE: [&str; 2] = ["maker.practice.0", "maker.practice.1"];
+    pub const MAKER_CRYSTAL_TEST: [&str; 2] = ["maker.crystal_test.0", "maker.crystal_test.1"];
+    pub const MAKER_GOLD_ANVIL: [&str; 2] = ["maker.gold_anvil.0", "maker.gold_anvil.1"];
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -903,6 +914,11 @@ mod tests {
             .chain(&keys::SHANKS_LETTER)
             .chain(&keys::NATALIE_CUT_PAGES)
             .chain(&keys::NATALIE_DYE_PAGES)
+            .chain(&keys::MAKER_ALCHEMY)
+            .chain(&keys::MAKER_SCIENCE)
+            .chain(&keys::MAKER_PRACTICE)
+            .chain(&keys::MAKER_CRYSTAL_TEST)
+            .chain(&keys::MAKER_GOLD_ANVIL)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

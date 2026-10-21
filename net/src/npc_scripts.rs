@@ -25,6 +25,11 @@ const ROGER: i32 = 2000;
 const ROBIN: i32 = 2003;
 const MAPLE_ADMINISTRATOR: i32 = 2007;
 const SHANKS: i32 = 22000;
+/// Meren's Maker lessons (quests 6029-6036): the three teachers.
+const CARSON: i32 = 2111000;
+const HUGHES: i32 = 2012017;
+const MEREN: i32 = 2110004;
+const GOLD_ANVIL: i32 = 4031980;
 /// Heracle, at the guild headquarters. The runtime loads the player's
 /// guild for his script (`NpcScript::heracle`).
 pub const HERACLE: i32 = 2010007;
@@ -891,6 +896,11 @@ impl NpcScript {
         match script {
             "q1021s" => Some(roger_start(player)),
             "q1021e" => Some(roger_end(player)),
+            "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
+            "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
+            "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
+            "q6033e" => Some(maker_lesson(player, keys::MAKER_CRYSTAL_TEST, 6033)),
+            "q6036e" => Some(maker_lesson(player, keys::MAKER_GOLD_ANVIL, 6036)),
             _ => None,
         }
     }
@@ -1110,6 +1120,42 @@ fn roger_end(player: &Player) -> NpcScript {
         Effect::CompleteQuest(ROGERS_APPLE_QUEST),
     ];
     script.inventory_full = Some(text(keys::ROGER_END_INVENTORY_FULL));
+    script
+}
+
+/// `q6030e`-`q6032e`: a Maker class ends. The fee was taken when it
+/// started (`Act/0 money`).
+fn maker_class(npc: i32, pages: [&str; 2], quest: i16) -> NpcScript {
+    let mut script = NpcScript::new(npc, pages.map(|key| Page::Say(text(key))).to_vec());
+    script.on_end = vec![Effect::CompleteQuest(quest)];
+    script
+}
+
+/// `q6033e` and `q6036e`: Meren teaches the Maker's level 2 for the
+/// crystal test and level 3 for the Gold Anvil, which he keeps. The data
+/// has no reward for either, so the EXP and levels are Cosmic's.
+fn maker_lesson(player: &Player, pages: [&str; 2], quest: i16) -> NpcScript {
+    let mut script = NpcScript::new(MEREN, pages.map(|key| Page::Say(text(key))).to_vec());
+    let (level, exp) = if quest == 6033 {
+        (2, 230_000)
+    } else {
+        (3, 300_000)
+    };
+    if quest == 6036 {
+        script.on_end.push(Effect::TakeItem {
+            item_id: GOLD_ANVIL,
+            quantity: 1,
+        });
+    }
+    script.on_end.extend([
+        Effect::CompleteQuest(quest),
+        Effect::TeachSkill {
+            skill_id: crate::skills::maker_skill(player.stats.job),
+            level,
+            master_level: 3,
+        },
+        Effect::GainExp(exp),
+    ]);
     script
 }
 
@@ -2823,6 +2869,86 @@ mod tests {
         assert!(paid
             .effects
             .contains(&Effect::CompleteQuest(ROGERS_APPLE_QUEST)));
+    }
+
+    #[test]
+    fn every_quest_script_the_catalog_supports_exists() {
+        for script in game_data::quests::SCRIPTS {
+            assert!(
+                NpcScript::for_quest(script, &player(50)).is_some(),
+                "{script} has no script"
+            );
+        }
+    }
+
+    /// The effects at the end of a two-page quest script.
+    fn ending(script: &str, player: &Player) -> (i32, Vec<Effect>) {
+        let mut script = NpcScript::for_quest(script, player).unwrap();
+        let npc = script.npc_id();
+        assert_eq!(buttons(&script.begin()), (false, true));
+        assert_eq!(
+            buttons(&script.respond(ScriptInput::Next).unwrap()),
+            (true, true)
+        );
+        let end = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(end.prompt, None);
+        (npc, end.effects)
+    }
+
+    #[test]
+    fn a_maker_class_ends_with_its_teacher() {
+        for (script, npc, quest) in [
+            ("q6030e", CARSON, 6030),
+            ("q6031e", HUGHES, 6031),
+            ("q6032e", MEREN, 6032),
+        ] {
+            assert_eq!(
+                ending(script, &player(50)),
+                (npc, vec![Effect::CompleteQuest(quest)])
+            );
+        }
+    }
+
+    #[test]
+    fn meren_teaches_the_makers_higher_levels_by_job() {
+        let mut aran = player(50);
+        aran.stats.job = 2110;
+        assert_eq!(
+            ending("q6033e", &aran),
+            (
+                MEREN,
+                vec![
+                    Effect::CompleteQuest(6033),
+                    Effect::TeachSkill {
+                        skill_id: 20001007,
+                        level: 2,
+                        master_level: 3,
+                    },
+                    Effect::GainExp(230_000),
+                ]
+            )
+        );
+        let mut warrior = player(50);
+        warrior.stats.job = 111;
+        assert_eq!(
+            ending("q6036e", &warrior),
+            (
+                MEREN,
+                vec![
+                    Effect::TakeItem {
+                        item_id: GOLD_ANVIL,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(6036),
+                    Effect::TeachSkill {
+                        skill_id: 1007,
+                        level: 3,
+                        master_level: 3,
+                    },
+                    Effect::GainExp(300_000),
+                ]
+            )
+        );
     }
 
     #[test]
