@@ -3,7 +3,7 @@
 //! keeps every mob's touch off the player, and nowhere else.
 
 use integration_harness::database::set_hp;
-use integration_harness::hunting::use_skill;
+use integration_harness::hunting::{cancel_buff, use_skill};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, stat, step, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -69,4 +69,10 @@ async fn invincibility_works_only_in_the_dojo_and_stops_every_touch() {
         t.stat_values(stat::HP).iter().all(|&hp| hp == 480),
         "a touch went through"
     );
+
+    // Without it the next touch hurts again, from the HP the blocked one
+    // left alone.
+    step(c, &m, cancel_buff(INVINCIBILITY)).await;
+    let t = step(c, &m, touched(20, STUMPY)).await;
+    assert_eq!(t.stat_values(stat::HP), [460]);
 }
