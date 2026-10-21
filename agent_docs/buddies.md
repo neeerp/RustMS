@@ -19,6 +19,13 @@ characters list each other without `pending`.
 - Adding someone who hasn't listed you gives them a pending row, and they
   are asked to accept. Adding someone who has already asked you accepts
   their request instead. Names match case-insensitively.
+- A group is only a name on each row (`group_name`, 16 characters, empty
+  meaning "Default Group"). v83 has no group packet: it moves a buddy by
+  adding them again under the new group, and adds, renames and deletes
+  groups by doing that for each buddy. So adding a buddy already listed
+  under another group moves them, sends the list again and asks them
+  nothing; adding them under the same group is refused as already
+  registered.
 - `db::buddy::add` locks both characters' rows, so two requests that cross
   can't both insert a pending row.
 - The capacity is the character's `buddy_capacity` (20; not persisted). It
@@ -85,7 +92,9 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 
 ## Not implemented
 
-- Groups: everyone is in "Default Group", and there is no ADD GROUP or EDIT.
+- Groups in HeavenClient: its Friend tab shows online and offline sections,
+  not v83's groups, and has no ADD GROUP or EDIT. The server already moves
+  buddies between groups.
 - Raising the capacity (packet 0x15 is parsed but never sent), and the
   Cash Shop flags.
 - The MAP button, notes, and the blacklist.

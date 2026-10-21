@@ -19,9 +19,13 @@ fn modify(mode: u8) -> Packet {
 }
 
 fn add(name: &str) -> Packet {
+    add_to(name, "Default Group")
+}
+
+fn add_to(name: &str, group: &str) -> Packet {
     let mut p = modify(1);
     p.write_str_with_length(name).unwrap();
-    p.write_str_with_length("Default Group").unwrap();
+    p.write_str_with_length(group).unwrap();
     p
 }
 
@@ -103,6 +107,24 @@ async fn buddies_see_each_others_channel_once_both_agree() {
         t.buddy_channels.contains(&(bobby_id, 0))
     })
     .await;
+
+    // Adding him again under another group moves him there, as v83 changes
+    // groups, without asking him anything; the same group again is refused.
+    let lists = a.buddy_lists.len();
+    send(&mut alice.connection, add_to(&bobby_name, "Mates")).await;
+    until(&mut alice.connection, &mut a, |t| {
+        t.buddy_lists.len() > lists
+    })
+    .await;
+    assert_eq!(
+        a.buddy_groups.last().unwrap(),
+        &[(bobby_id, "Mates".to_string())]
+    );
+    send(&mut alice.connection, add_to(&bobby_name, "Mates")).await;
+    until(&mut alice.connection, &mut a, |t| t.buddy_errors.len() == 3).await;
+    assert_eq!(a.buddy_errors[2], ALREADY_ADDED);
+    read_for(&mut bobby.connection, &mut b, 300).await;
+    assert!(b.buddy_requests.is_empty());
 
     // Buddy chat reaches listed buddies.
     send(&mut alice.connection, buddy_chat(bobby_id, "hey bobby")).await;

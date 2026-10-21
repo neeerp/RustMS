@@ -106,16 +106,19 @@ impl ClientActor {
                 return self.send(&mut built(build_buddy_error(error))?).await;
             }
         };
-        let packet = if added.mutual {
-            build_buddy_channel(cid, Some(self.channel_id))
-        } else {
-            build_buddy_request(cid, &my_name, Some(self.channel_id))
-        };
-        self.send_to_directory(DirectoryMessage::Deliver {
-            to: vec![added.id],
-            packet: built(packet)?,
-        })
-        .await?;
+        // A buddy moved to another group hears nothing.
+        if !added.regrouped {
+            let packet = if added.mutual {
+                build_buddy_channel(cid, Some(self.channel_id))
+            } else {
+                build_buddy_request(cid, &my_name, Some(self.channel_id))
+            };
+            self.send_to_directory(DirectoryMessage::Deliver {
+                to: vec![added.id],
+                packet: built(packet)?,
+            })
+            .await?;
+        }
         let rows = self.buddy_rows().await?;
         self.show_buddies(rows).await
     }
