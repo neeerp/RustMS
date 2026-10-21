@@ -1002,6 +1002,12 @@ impl ClientActor {
             }
         }
         let player = &mut self.in_game_mut()?.player;
+        // The client refuses a second one-of-a-kind item itself (0xb94).
+        if net::items::refuses_only(&player.inventory, item.item_id, item.quantity.into()) {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::InventoryFull,
+            )?]);
+        }
         let before = player.inventory.clone();
         let slot = match player.inventory_mut().place(item.clone(), slot) {
             Ok((_, slot)) => slot,
@@ -1381,6 +1387,13 @@ impl ClientActor {
                 })
                 .await;
             self.remember_spawn_point();
+            // A channel change keeps them: they go only when the player
+            // leaves the game.
+            if let (Some(game), false) = (self.game.as_mut(), self.changing_channel) {
+                if net::items::drop_logout_items(&mut game.player) {
+                    game.player.fit_hp_mp();
+                }
+            }
             if let Err(error) = self.flush().await {
                 error!(self.client_id, %error, "Failed to save player on disconnect");
             }

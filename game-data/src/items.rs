@@ -32,6 +32,10 @@ pub struct ItemInfo {
     pub account_sharable: bool,
     /// Party quest items (`info/pquest`).
     pub pquest: bool,
+    /// Items gone once their owner logs out (`info/expireOnLogout`).
+    pub expire_on_logout: bool,
+    /// What a meso sack holds (`info/meso`).
+    pub meso: i32,
     pub price: i32,
     /// What one throwing star or bullet costs to recharge (`unitPrice`).
     pub unit_price: f64,
@@ -358,6 +362,8 @@ impl ItemData {
             info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
             info.account_sharable = nx.int_child(meta, "accountSharable")? == Some(1);
             info.pquest = nx.int_child(meta, "pquest")? == Some(1);
+            info.expire_on_logout = nx.int_child(meta, "expireOnLogout")? == Some(1);
+            info.meso = nx.int_child(meta, "meso")?.unwrap_or(0);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
             info.pad = nx.int_child(meta, "incPAD")?.unwrap_or(0);
@@ -563,6 +569,8 @@ impl ItemData {
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
             account_sharable: nx.int_child(meta, "accountSharable")? == Some(1),
             pquest: nx.int_child(meta, "pquest")? == Some(1),
+            expire_on_logout: nx.int_child(meta, "expireOnLogout")? == Some(1),
+            meso: 0,
             price: nx.int_child(meta, "price")?.unwrap_or(0),
             unit_price: 0.0,
             pad: 0,

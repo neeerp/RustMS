@@ -282,8 +282,12 @@ impl ClientActor {
             Ok(changes) => changes,
             Err(rejection) => {
                 debug!(?rejection, "Quest items refused");
-                if rejection == QuestRejection::InventoryFull {
-                    packets.push(quest::build_quest_items_full(quest_id)?);
+                match rejection {
+                    QuestRejection::InventoryFull => {
+                        packets.push(quest::build_quest_items_full(quest_id)?)
+                    }
+                    QuestRejection::OnlyOne => packets.push(quest::build_quest_only_one()?),
+                    _ => {}
                 }
                 return Ok(false);
             }

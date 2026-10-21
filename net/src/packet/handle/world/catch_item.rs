@@ -85,7 +85,9 @@ pub fn trade_catch(
     item_id: i32,
     create: i32,
 ) -> Option<Vec<InventoryChange>> {
-    if inventory.get(InventoryType::Use, slot)?.item_id != item_id {
+    if inventory.get(InventoryType::Use, slot)?.item_id != item_id
+        || items::refuses_only(inventory, create, 1)
+    {
         return None;
     }
     let mut changes = inventory.take(InventoryType::Use, slot, 1).ok()?;

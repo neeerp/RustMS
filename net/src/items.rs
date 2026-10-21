@@ -72,6 +72,20 @@ pub fn create(item_id: i32, quantity: i16) -> Option<Item> {
     })
 }
 
+/// Whether `quantity` of `item_id` can't come into `inventory` because the
+/// item is one of a kind (`info/only`): it comes alone, and not to someone
+/// who holds one, worn or not.
+pub fn refuses_only(inventory: &Inventory, item_id: i32, quantity: i32) -> bool {
+    if !info(item_id).is_some_and(|info| info.only) {
+        return false;
+    }
+    quantity > 1
+        || inventory.count(item_id) > 0
+        || inventory
+            .items(InventoryType::Equipped)
+            .any(|(_, item)| item.item_id == item_id)
+}
+
 /// Put `quantity` of `item_id` into `inventory`, one slot per piece of
 /// equipment. Nothing changes unless all of it fits.
 pub fn give(
@@ -238,6 +252,23 @@ pub fn expire_items(player: &mut Player, now: SystemTime) -> Expired {
     expired
 }
 
+/// Take every item, worn or in the bags, that lasts only until its owner
+/// logs out (`info/expireOnLogout`): event weapons and a few set-up and
+/// etc items. v83's client says nothing of it (report c005). Whether any
+/// went.
+pub fn drop_logout_items(player: &mut Player) -> bool {
+    let due: Vec<(InventoryType, i16, i16)> = player
+        .inventory
+        .all()
+        .filter(|(_, _, item)| info(item.item_id).is_some_and(|info| info.expire_on_logout))
+        .map(|(kind, slot, item)| (kind, slot, item.quantity))
+        .collect();
+    for &(kind, slot, quantity) in &due {
+        let _ = player.inventory_mut().take(kind, slot, quantity);
+    }
+    !due.is_empty()
+}
+
 /// When the next of the player's items expires, if one ever does.
 pub fn next_expiry(player: &Player) -> Option<SystemTime> {
     player
@@ -340,6 +371,58 @@ mod tests {
         );
         assert_eq!(next_expiry(&player), Some(soon));
         assert!(expire_items(&mut player, now).item_ids.is_empty());
+    }
+
+    /// The first one-of-a-kind etc item, as the trade tests find one.
+    fn only_etc() -> i32 {
+        (4031000..4032000)
+            .find(|&id| info(id).is_some_and(|info| info.only))
+            .expect("an only item")
+    }
+
+    #[test]
+    fn a_one_of_a_kind_item_comes_alone_to_someone_without_one() {
+        let mut player = crate::codec::stats::sample_player();
+        let etc = only_etc();
+        assert!(!refuses_only(&player.inventory, etc, 1));
+        assert!(refuses_only(&player.inventory, etc, 2), "it comes alone");
+        give(player.inventory_mut(), etc, 1).unwrap();
+        assert!(refuses_only(&player.inventory, etc, 1));
+        give(player.inventory_mut(), 4000000, 1).unwrap();
+        assert!(
+            !refuses_only(&player.inventory, 4000000, 2),
+            "not one of a kind"
+        );
+
+        let medal = (1142000..1143000)
+            .find(|&id| info(id).is_some_and(|info| info.only))
+            .expect("an only medal");
+        player.inventory.insert(
+            InventoryType::Equipped,
+            -49,
+            Item::equipment(medal, EquipStats::default()),
+        );
+        assert!(refuses_only(&player.inventory, medal, 1));
+    }
+
+    #[test]
+    fn logout_items_go_and_the_rest_stay() {
+        assert!([1302050, 4001333, 3994085]
+            .iter()
+            .all(|&id| info(id).is_some_and(|info| info.expire_on_logout)));
+        let mut player = crate::codec::stats::sample_player();
+        player.inventory.insert(
+            InventoryType::Equipped,
+            -11,
+            Item::equipment(1302050, EquipStats::default()),
+        );
+        give(player.inventory_mut(), 4001333, 3).unwrap();
+        give(player.inventory_mut(), 4000000, 2).unwrap();
+        assert!(drop_logout_items(&mut player));
+        assert_eq!(player.inventory.count(4001333), 0);
+        assert!(player.inventory.get(InventoryType::Equipped, -11).is_none());
+        assert_eq!(player.inventory.count(4000000), 2);
+        assert!(!drop_logout_items(&mut player), "nothing left to drop");
     }
 
     #[test]

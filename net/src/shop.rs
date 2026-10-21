@@ -140,6 +140,11 @@ impl Shop {
         if cost > i64::from(player.meso) {
             return Err(ShopError::NotEnoughMesos);
         }
+        // A one-of-a-kind item comes alone, and not to someone who has it;
+        // v83's buy result has no code of its own for this (report c005).
+        if items::refuses_only(&player.inventory, item_id, quantity.into()) {
+            return Err(ShopError::InventoryFull);
+        }
         let changes = if rechargeable {
             let set =
                 items::create(item_id, set_size(player, item_id)).ok_or(ShopError::Invalid)?;
@@ -337,6 +342,36 @@ mod tests {
             Err(ShopError::InventoryFull)
         );
         assert_eq!((player.meso, &player.inventory), (10_000, &before));
+    }
+
+    #[test]
+    fn a_one_of_a_kind_item_is_sold_once() {
+        if items::data().is_err() {
+            return;
+        }
+        let only = (4031000..4032000)
+            .find(|&id| items::info(id).is_some_and(|info| info.only))
+            .unwrap();
+        let shop = Shop {
+            npc_id: 1011100,
+            items: vec![ShopItem {
+                item_id: only,
+                price: 10,
+                slot_max: 100,
+                unit_price: 0.0,
+            }],
+        };
+        let mut player = player(1000);
+        assert_eq!(
+            shop.buy(&mut player, 0, only, 2),
+            Err(ShopError::InventoryFull)
+        );
+        shop.buy(&mut player, 0, only, 1).unwrap();
+        assert_eq!(
+            shop.buy(&mut player, 0, only, 1),
+            Err(ShopError::InventoryFull)
+        );
+        assert_eq!((player.inventory.count(only), player.meso), (1, 990));
     }
 
     #[test]
