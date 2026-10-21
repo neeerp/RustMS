@@ -213,6 +213,20 @@ pub mod keys {
     pub const SUBWAY_SELL_DECLINE: &str = "subway.sell.decline";
     pub const SUBWAY_SELL_SHORT: &str = "subway.sell.short";
     pub const SUBWAY_LEAVE_DECLINE: &str = "subway.leave.decline";
+    pub const PLANE_BOOTH_MENU: &str = "plane.booth.menu";
+    pub const PLANE_BOOTH_BUY: &str = "plane.booth.buy";
+    pub const PLANE_BOOTH_BOARD: &str = "plane.booth.board";
+    pub const PLANE_SELL_ASK: &str = "plane.sell.ask";
+    pub const PLANE_SELL_DECLINE: &str = "plane.sell.decline";
+    pub const PLANE_SELL_SHORT: &str = "plane.sell.short";
+    pub const PLANE_SELL_FULL: &str = "plane.sell.full";
+    pub const PLANE_BOARD_ASK: &str = "plane.board.ask";
+    pub const PLANE_BOARD_DECLINE: &str = "plane.board.decline";
+    pub const PLANE_BOARD_NO_TICKET: &str = "plane.board.no_ticket";
+    pub const PLANE_BOARD_CLOSED: &str = "plane.board.closed";
+    pub const PLANE_LEAVE_ASK: &str = "plane.leave.ask";
+    pub const PLANE_LEAVE_DECLINE: &str = "plane.leave.decline";
+    pub const PLANE_RIDE: &str = "plane.ride";
 
     /// The NLC Taxi between New Leaf City and the Haunted House's mansion
     /// grounds.
@@ -824,6 +838,20 @@ mod tests {
             keys::SUBWAY_SELL_DECLINE,
             keys::SUBWAY_SELL_SHORT,
             keys::SUBWAY_LEAVE_DECLINE,
+            keys::PLANE_BOOTH_MENU,
+            keys::PLANE_BOOTH_BUY,
+            keys::PLANE_BOOTH_BOARD,
+            keys::PLANE_SELL_ASK,
+            keys::PLANE_SELL_DECLINE,
+            keys::PLANE_SELL_SHORT,
+            keys::PLANE_SELL_FULL,
+            keys::PLANE_BOARD_ASK,
+            keys::PLANE_BOARD_DECLINE,
+            keys::PLANE_BOARD_NO_TICKET,
+            keys::PLANE_BOARD_CLOSED,
+            keys::PLANE_LEAVE_ASK,
+            keys::PLANE_LEAVE_DECLINE,
+            keys::PLANE_RIDE,
             keys::NLC_TAXI_ASK,
             keys::NLC_TAXI_DECLINE,
             keys::NLC_TAXI_SHORT,

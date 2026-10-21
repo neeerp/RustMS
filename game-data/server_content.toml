@@ -11,6 +11,20 @@
 
 # Keys no licensed script has text for; they keep their placeholders.
 unsourced = [
+    "plane.booth.menu",
+    "plane.booth.buy",
+    "plane.booth.board",
+    "plane.sell.ask",
+    "plane.sell.decline",
+    "plane.sell.short",
+    "plane.sell.full",
+    "plane.board.ask",
+    "plane.board.decline",
+    "plane.board.no_ticket",
+    "plane.board.closed",
+    "plane.leave.ask",
+    "plane.leave.decline",
+    "plane.ride",
     "heracle.ask",
     "heracle.decline",
     "heracle.in_guild",

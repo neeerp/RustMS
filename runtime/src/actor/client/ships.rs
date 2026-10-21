@@ -1,9 +1,9 @@
 use super::ClientActor;
 use crate::error::RuntimeError;
 use game::Player;
-use net::conti;
+use net::conti::{self, Portal};
 use net::packet::build::world::conti::build_clock_time;
-use net::packet::handle::world::warp;
+use net::packet::handle::world::{warp, warp_to_spawn_point};
 
 /// A player who logs in on a map nobody stays on, such as a ship under way,
 /// starts on the map's `forcedReturn` instead (Cosmic applies it on save).
@@ -42,7 +42,7 @@ impl ClientActor {
         &mut self,
         from_map: i32,
         map_id: i32,
-        portal: &str,
+        portal: Portal,
     ) -> Result<(), RuntimeError> {
         if self.in_cash_shop {
             return Ok(());
@@ -54,7 +54,11 @@ impl ClientActor {
         if game.player.stats.map_id != from_map {
             return Ok(());
         }
-        for action in warp(&mut game.player, map_id, portal, channel_id)? {
+        let actions = match portal {
+            Portal::Named(name) => warp(&mut game.player, map_id, name, channel_id)?,
+            Portal::Id(id) => warp_to_spawn_point(&mut game.player, map_id, id, channel_id)?,
+        };
+        for action in actions {
             self.apply(action).await?;
         }
         Ok(())

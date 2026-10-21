@@ -207,7 +207,7 @@ pub enum ServerMessage {
     ShipWarp {
         from_map: i32,
         map_id: i32,
-        portal: &'static str,
+        portal: net::conti::Portal,
     },
     /// News from trading room `room` on this player's field.
     Trade {
