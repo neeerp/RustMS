@@ -1,5 +1,7 @@
-//! Guild packets: `GUILD_OPERATION`, the guild mode of `MULTICHAT`, and the
-//! name and emblem others see (`GUILD_NAME_CHANGED`, `GUILD_MARK_CHANGED`).
+//! Guild packets: `GUILD_OPERATION`, the guild mode of `MULTICHAT`, the
+//! name and emblem others see (`GUILD_NAME_CHANGED`, `GUILD_MARK_CHANGED`),
+//! and members' level-ups and new jobs (`NOTIFY_LEVELUP`,
+//! `NOTIFY_JOB_CHANGE`).
 
 use crate::codec::stats::write_padded_name;
 use crate::{error::NetworkError, packet::op::SendOpcode};
@@ -13,12 +15,19 @@ const OP_CREATED: u8 = 0x20;
 const OP_JOINED: u8 = 0x27;
 const OP_LEFT: u8 = 0x2C;
 const OP_EXPELLED: u8 = 0x2F;
+const OP_MEMBER_LEVEL_JOB: u8 = 0x3C;
+const OP_MEMBER_ONLINE: u8 = 0x3D;
 const OP_TITLES_CHANGED: u8 = 0x3E;
 const OP_RANK_CHANGED: u8 = 0x40;
 const OP_NOTICE_CHANGED: u8 = 0x44;
 
 /// `MULTICHAT` mode for guild chat.
 pub const MULTICHAT_GUILD: u8 = 2;
+
+/// `NOTIFY_LEVELUP`'s type for a guild member; any other says "Family".
+const LEVEL_UP_GUILD: u8 = 2;
+/// `NOTIFY_JOB_CHANGE`'s type for a guild member (1 is family).
+const JOB_CHANGE_GUILD: u8 = 0;
 
 /// The lowest alliance rank, which OdinMS gives every member; the client
 /// reads it only in an alliance.
@@ -225,6 +234,57 @@ pub fn build_notice_changed(guild_id: i32, notice: &str) -> Result<Packet, Netwo
     let mut packet = guild_operation(OP_NOTICE_CHANGED)?;
     packet.write_int(guild_id)?;
     packet.write_str_with_length(notice)?;
+    Ok(packet)
+}
+
+/// Member `member_id` is now at `level` with `job`. The client changes the
+/// guild list without a word.
+pub fn build_member_level_job(
+    guild_id: i32,
+    member_id: i32,
+    level: u8,
+    job: i16,
+) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_MEMBER_LEVEL_JOB)?;
+    packet.write_int(guild_id)?;
+    packet.write_int(member_id)?;
+    packet.write_int(i32::from(level))?;
+    packet.write_int(i32::from(job))?;
+    Ok(packet)
+}
+
+/// Member `member_id` entered or left the game. Entering shows the buddy
+/// list's "<name> is logged in." card, whoever it names.
+pub fn build_member_online(
+    guild_id: i32,
+    member_id: i32,
+    online: bool,
+) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_MEMBER_ONLINE)?;
+    packet.write_int(guild_id)?;
+    packet.write_int(member_id)?;
+    packet.write_byte(u8::from(online))?;
+    Ok(packet)
+}
+
+/// "<Guild> [name] has reached Lv. [level]." in the chat log.
+pub fn build_guild_level_up(level: u8, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NotifyLevelUp as i16)?;
+    packet.write_byte(LEVEL_UP_GUILD)?;
+    packet.write_int(i32::from(level))?;
+    packet.write_str_with_length(name)?;
+    Ok(packet)
+}
+
+/// "<Guild> [name] has advanced to a(an) [job]." in the chat log. The
+/// client's text has no '>' after the group, so it goes with the name.
+pub fn build_guild_job_change(job: i16, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NotifyJobChange as i16)?;
+    packet.write_byte(JOB_CHANGE_GUILD)?;
+    packet.write_int(i32::from(job))?;
+    packet.write_str_with_length(&format!("> {name}"))?;
     Ok(packet)
 }
 
@@ -471,6 +531,38 @@ mod tests {
             .int(4)
             .string("hi")
             .end();
+    }
+
+    #[test]
+    fn member_online_level_and_job() {
+        let packet = build_member_online(4, 2, true).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x3D)
+            .int(4)
+            .int(2)
+            .byte(1)
+            .end();
+
+        let packet = build_member_level_job(4, 2, 31, 110).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x3C)
+            .int(4)
+            .int(2)
+            .int(31)
+            .int(110)
+            .end();
+
+        let packet = build_guild_level_up(31, "Bobby").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x69).byte(2).int(31).string("Bobby").end();
+
+        let packet = build_guild_job_change(110, "Bobby").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x6B).byte(0).int(110).string("> Bobby").end();
     }
 
     #[test]

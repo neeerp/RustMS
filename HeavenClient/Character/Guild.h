@@ -142,12 +142,16 @@ namespace ms
 		// Someone joined, or left or was expelled.
 		void add(GuildMember member);
 		void remove(int32_t cid);
-		// Returns whether the member was found.
+		// These return whether the member was found.
 		bool set_rank(int32_t cid, int32_t rank);
+		bool set_online(int32_t cid, bool online);
+		bool set_level_job(int32_t cid, int32_t level, int32_t job);
 		void set_titles(std::array<std::string, 5> titles);
 		void set_notice(std::string notice);
 
 	private:
+		GuildMember* member(int32_t cid);
+
 		GuildData data;
 	};
 }

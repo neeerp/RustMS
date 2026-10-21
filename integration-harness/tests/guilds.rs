@@ -5,15 +5,20 @@
 //! invites players on the channel, who may decline (DENY_GUILD_REQUEST) or
 //! join; members leave, and are expelled. The master and jr. masters move
 //! members between ranks and post the notice, and the master renames the
-//! ranks.
+//! ranks. Members hear who logs in or out (but not a channel change), levels
+//! up, or advances a job.
 
 use game_data::GameData;
-use integration_harness::database::{join_guild, set_job, set_meso};
+use integration_harness::connection::MapleTestConnection;
+use integration_harness::database::{grant_stack, join_guild, set_job, set_meso, set_str};
+use integration_harness::packets::{
+    build_change_channel, build_player_logged_in, decode_channel_change,
+};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, send, stat, step, until, warp, Trace};
+use integration_harness::trace::{barrier, read, read_for, send, stat, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
-use net::packet::op::RecvOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::read::PktRead;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -38,6 +43,8 @@ const NOT_IN_CHANNEL: u8 = 0x2a;
 const LEFT: u8 = 0x2c;
 const EXPELLED: u8 = 0x2f;
 const DECLINED: u8 = 0x37;
+const MEMBER_LEVEL_JOB: u8 = 0x3c;
+const MEMBER_ONLINE: u8 = 0x3d;
 const TITLES_CHANGED: u8 = 0x3e;
 const RANK_CHANGED: u8 = 0x40;
 const NOTICE_CHANGED: u8 = 0x44;
@@ -588,4 +595,147 @@ async fn ranks_titles_and_the_notice_change() {
         titles_and_notice(&info[2..]),
         (titles.map(String::from), "hi all".to_string())
     );
+}
+
+/// A Writ of Solomon worth 100 EXP.
+const WRIT: i32 = 2_370_012;
+const WARRIORS_SANCTUARY: i32 = 102_000_003;
+const DANCES_WITH_BALROG: i32 = 1022000;
+
+/// USE_SOLOMON_ITEM of the writ in USE slot 1, then USE_GACHA_EXP to take it.
+fn use_writ() -> [Packet; 2] {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseSolomonItem as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_short(1).unwrap();
+    p.write_int(WRIT).unwrap();
+    let mut take = Packet::new_empty();
+    take.write_short(RecvOpcode::UseGachaExp as i16).unwrap();
+    take.write_int(0).unwrap();
+    [p, take]
+}
+
+/// Guild `guild_id`, member `member`, then the rest of a 0x3c or 0x3d.
+fn about(guild_id: i32, member: i32, rest: &[u8]) -> Vec<u8> {
+    [&guild_id.to_le_bytes()[..], &member.to_le_bytes(), rest].concat()
+}
+
+#[tokio::test]
+async fn members_hear_who_logs_in_or_out_levels_up_and_advances() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let name = a_config.character_name.clone();
+    let b_id = new_character(&b_config).await;
+    let mut a = founder(&a_config, FEE).await;
+    ask_heracle(&mut a).await;
+    send(&mut a.connection, create(&name)).await;
+    let created = next_op(&mut a, CREATED).await;
+    let guild_id = Cursor::new(&created[1..]).read_int().unwrap();
+    join_guild(b_id, &name).await.expect("B joins");
+    grant_stack(b_id, 2, 1, WRIT, 1).await.expect("a writ");
+
+    // B logs in: A hears it, B hears nothing of themself.
+    let mut b = relogin(&b_config).await;
+    let online = next_op(&mut a, MEMBER_ONLINE).await;
+    assert_eq!(online[1..], about(guild_id, b_id, &[1]));
+    let mut bt = Trace::default();
+    until(&mut b.connection, &mut bt, |t| !t.guild_ops.is_empty()).await;
+    read_for(&mut b.connection, &mut bt, 300).await;
+    assert!(bt.guild_ops.iter().all(|op| op[0] != MEMBER_ONLINE));
+
+    // B goes from level 1 to 3: the list changes for both, and A reads a
+    // line for each level.
+    let bm = b.character_name.clone();
+    for packet in use_writ() {
+        send(&mut b.connection, packet).await;
+    }
+    until(&mut b.connection, &mut bt, |t| {
+        t.stat(stat::LEVEL) == Some(3)
+    })
+    .await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| t.notices.len() == 2).await;
+    let level_up = |level| (SendOpcode::NotifyLevelUp as i16, 2, level, bm.clone());
+    assert_eq!(at.notices, [level_up(2), level_up(3)]);
+    let level_job = |ops: &[Vec<u8>]| {
+        ops.iter()
+            .rfind(|op| op[0] == MEMBER_LEVEL_JOB)
+            .map(|op| op[1..].to_vec())
+    };
+    let changed = about(guild_id, b_id, &[3, 0, 0, 0, 0, 0, 0, 0]);
+    until(&mut a.connection, &mut at, |t| {
+        level_job(&t.guild_ops).as_ref() == Some(&changed)
+    })
+    .await;
+    until(&mut b.connection, &mut bt, |t| {
+        level_job(&t.guild_ops).as_ref() == Some(&changed)
+    })
+    .await;
+    barrier(&mut b.connection, &bm, &mut bt).await;
+    assert!(bt.notices.is_empty());
+
+    // A channel change says nothing; leaving the game from there does.
+    send(&mut b.connection, build_change_channel(1).unwrap()).await;
+    let redirect = loop {
+        let packet = read(&mut b.connection, &mut bt).await;
+        if packet.opcode() == SendOpcode::ChangeChannel as i16 {
+            break decode_channel_change(&packet).unwrap();
+        }
+    };
+    assert_eq!(redirect.port, b_config.channel_addr(1).port());
+    drop(b);
+    let mut moved = MapleTestConnection::connect(b_config.channel_addr(1), "guild channel change")
+        .await
+        .unwrap();
+    send(&mut moved, build_player_logged_in(b_id).unwrap()).await;
+    loop {
+        let packet = read(&mut moved, &mut bt).await;
+        if packet.opcode() == SendOpcode::SetField as i16 {
+            break;
+        }
+    }
+    barrier(&mut moved, &bm, &mut bt).await;
+    let mut at = Trace::default();
+    read_for(&mut a.connection, &mut at, 1000).await;
+    assert!(at.guild_ops.iter().all(|op| op[0] != MEMBER_ONLINE));
+    drop(moved);
+    let offline = next_op(&mut a, MEMBER_ONLINE).await;
+    assert_eq!(offline[1..], about(guild_id, b_id, &[0]));
+
+    // A Warrior at last: A reads the job, with the "> " the client's text
+    // lacks.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_job(b_id, 0, 10, 50).await.expect("level 10");
+    set_str(b_id, 35).await.expect("strong");
+    let mut b = relogin(&b_config).await;
+    next_op(&mut a, MEMBER_ONLINE).await;
+    let c = &mut b.connection;
+    let mut bt = Trace::default();
+    assert_eq!(
+        warp(c, WARRIORS_SANCTUARY, "", &mut bt).await,
+        WARRIORS_SANCTUARY
+    );
+    barrier(c, &bm, &mut bt).await;
+    step(c, &bm, talk(WARRIORS_SANCTUARY, DANCES_WITH_BALROG)).await;
+    step(c, &bm, answer(0, 1, None)).await;
+    let t = step(c, &bm, answer(1, 1, None)).await;
+    assert_eq!(t.stat_values(0x20), [100]);
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| !t.notices.is_empty()).await;
+    assert_eq!(
+        at.notices,
+        [(
+            SendOpcode::NotifyJobChange as i16,
+            0,
+            100,
+            format!("> {bm}")
+        )]
+    );
+    let changed = about(guild_id, b_id, &[10, 0, 0, 0, 100, 0, 0, 0]);
+    until(&mut a.connection, &mut at, |t| {
+        level_job(&t.guild_ops).as_ref() == Some(&changed)
+    })
+    .await;
 }

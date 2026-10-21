@@ -150,6 +150,9 @@ pub struct Trace {
     pub guild_ops: Vec<Vec<u8>>,
     /// GUILD_NAME_CHANGED: (character, guild name).
     pub guild_names: Vec<(i32, String)>,
+    /// NOTIFY_LEVELUP and NOTIFY_JOB_CHANGE: (opcode, type, level or job,
+    /// name).
+    pub notices: Vec<(i16, u8, i32, String)>,
     /// Other players appearing on the field.
     pub players: Vec<SpawnPlayerPacket>,
     /// REMOVE_PLAYER_FROM_MAP: the players gone from the field.
@@ -504,6 +507,11 @@ impl Trace {
             self.char_boxes.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::GuildOperation as i16 {
             self.guild_ops.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::NotifyLevelUp as i16 || op == SendOpcode::NotifyJobChange as i16
+        {
+            let (kind, value) = (r.read_byte().unwrap(), r.read_int().unwrap());
+            self.notices
+                .push((op, kind, value, r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::GuildNameChanged as i16 {
             self.guild_names
                 .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
