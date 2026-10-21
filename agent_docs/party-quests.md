@@ -64,6 +64,10 @@ stage 2. The other stages and rewards come next (see
    - logging out or changing channel, which come through `cleanup`. A
      member in the Cash Shop keeps the ticket until they come back out,
      which is a channel change.
+
+   Whichever way they leave, the event's own items (`Event::items`, KPQ's
+   coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
+   `Event::take_items`, shown to the client unless they are logging out.
 6. **Ending.** The event ends when its time is up, when its leader leaves,
    or when too few remain. It sends `EventEnded{id}`, and members still on
    its maps go to the exit. Two seconds later the actor exits. Its
@@ -158,7 +162,6 @@ These are not done yet:
 
 - Cloto's stages after the first.
 - Rewards and the bonus stage.
-- Removing the quest's items on exit.
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it.
 - Members in the Cash Shop still pass the entry check, which doesn't know

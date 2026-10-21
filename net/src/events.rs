@@ -3,6 +3,7 @@
 //! the runtime's event actor keeps the time and moves the players.
 
 use crate::ClientId;
+use game::{InventoryChange, Player};
 use std::collections::{HashMap, HashSet};
 use std::ops::RangeInclusive;
 use std::sync::OnceLock;
@@ -36,6 +37,8 @@ pub struct Event {
     /// cleared. Every stage map has a `gate` object, shown once its stage is
     /// cleared.
     pub gated: RangeInclusive<i32>,
+    /// Items of use only in the event, taken from whoever leaves it.
+    pub items: &'static [i32],
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
@@ -52,6 +55,7 @@ pub const KPQ: Event = Event {
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
     gated: 103_000_800..=103_000_803,
+    items: &[COUPON, PASS],
 };
 
 impl EventKind {
@@ -114,6 +118,24 @@ impl Event {
             return None;
         }
         self.stage_on(map_id)
+    }
+
+    /// Take the event's own items from `player`, who is leaving it (Cosmic
+    /// `setExclusiveItems`).
+    pub fn take_items(&self, player: &mut Player) -> Vec<InventoryChange> {
+        let mut changes = Vec::new();
+        for &item_id in self.items {
+            let held = i16::try_from(player.inventory.count(item_id)).unwrap_or(i16::MAX);
+            if held > 0 {
+                changes.extend(
+                    player
+                        .inventory_mut()
+                        .remove(item_id, held)
+                        .unwrap_or_default(),
+                );
+            }
+        }
+        changes
     }
 
     /// The EXP for clearing `stage`.
@@ -308,6 +330,28 @@ mod tests {
         assert_eq!(KPQ.gate_stage(103_000_800, "st00"), None);
         assert_eq!((KPQ.stage_exp(1), KPQ.stage_exp(5)), (100, 1500));
         assert_eq!((KPQ.stage_exp(0), KPQ.stage_exp(6)), (0, 0));
+    }
+
+    #[test]
+    fn leaving_kpq_takes_its_coupons_and_passes() {
+        let mut player = crate::codec::stats::sample_player();
+        for (slot, (item_id, quantity)) in [(COUPON, 30), (PASS, 2), (COUPON, 5), (4000000, 3)]
+            .into_iter()
+            .enumerate()
+        {
+            let item = game::Item::stack(item_id, quantity);
+            player
+                .inventory
+                .insert(game::InventoryType::Etc, slot as i16 + 1, item);
+        }
+        assert_eq!(KPQ.take_items(&mut player).len(), 3);
+        assert!(player.is_dirty());
+        assert_eq!(
+            player.inventory.count(COUPON) + player.inventory.count(PASS),
+            0
+        );
+        assert_eq!(player.inventory.count(4000000), 3);
+        assert!(KPQ.take_items(&mut player).is_empty());
     }
 
     #[test]

@@ -13,6 +13,7 @@ use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::build::world::effect::{
     build_field_effect, build_field_object, build_field_sound,
 };
+use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use packet::Packet;
 use tokio::sync::oneshot;
@@ -147,12 +148,23 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Hand the ticket back, and with it the event's own items.
     async fn drop_event_ticket(&mut self) -> Result<(), RuntimeError> {
         // Dropping the ticket hands it back.
-        if self.event.take().is_some() {
-            if self.game.is_some() && !self.in_cash_shop {
-                self.send(&mut build_stop_clock()?).await?;
-            }
+        let Some(ticket) = self.event.take() else {
+            return Ok(());
+        };
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let changes = ticket.kind.event().take_items(&mut game.player);
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        self.send(&mut build_stop_clock()?).await?;
+        if !changes.is_empty() {
+            self.send(&mut build_inventory_operation(false, &changes)?)
+                .await?;
         }
         Ok(())
     }
@@ -222,8 +234,10 @@ impl ClientActor {
         self.send(&mut build_countdown(seconds)?).await
     }
 
-    /// A player who leaves the game leaves the event.
+    /// A player who leaves the game leaves the event, and its items.
     pub(super) fn forget_event(&mut self) {
-        self.event = None;
+        if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
+            ticket.kind.event().take_items(&mut game.player);
+        }
     }
 }
