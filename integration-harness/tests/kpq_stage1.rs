@@ -23,6 +23,7 @@ use tokio::time::Duration;
 
 const LAKELIS: i32 = 9020000;
 const CLOTO: i32 = 9020001;
+const NELLA: i32 = 9020002;
 const OP_JOIN: u8 = 0x0F;
 const ETC: u8 = 4;
 /// The question the harness world pins, 1 to 7.
@@ -272,4 +273,15 @@ async fn cloto_gives_passes_for_coupons_and_the_leader_clears_stage_one() {
     })
     .await;
     assert_eq!(trace.field_effects, [(2, "gate".to_string())]);
+
+    // Leaving takes the quest's own items: the coupons still held.
+    let name = wrong.character_name.clone();
+    let trace = step(&mut wrong.connection, &name, talk(KPQ.entry, NELLA)).await;
+    assert_eq!(trace.prompts, [(NELLA, 1)], "{trace:?}");
+    let mut trace = step(&mut wrong.connection, &name, answer(1, 1, None)).await;
+    until(&mut wrong.connection, &mut trace, |t| {
+        t.warps.contains(&KPQ.exit) && !t.removed.is_empty()
+    })
+    .await;
+    assert_eq!(trace.removed, [(ETC, 1)]);
 }
