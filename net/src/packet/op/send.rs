@@ -38,6 +38,8 @@ pub enum SendOpcode {
     CharInfo = 0x3D,
     BuddyList = 0x3F,
     GuildOperation = 0x41,
+    NotifyLevelUp = 0x69,
+    NotifyJobChange = 0x6B,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
     FamilyInfo = 0x5F,

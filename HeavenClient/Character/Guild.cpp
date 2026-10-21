@@ -267,16 +267,35 @@ namespace ms
 
 	bool Guild::set_rank(int32_t cid, int32_t rank)
 	{
-		for (auto& member : data.members)
+		GuildMember* found = member(cid);
+
+		if (found)
+			found->rank = rank;
+
+		return found;
+	}
+
+	bool Guild::set_online(int32_t cid, bool online)
+	{
+		GuildMember* found = member(cid);
+
+		if (found)
+			found->online = online;
+
+		return found;
+	}
+
+	bool Guild::set_level_job(int32_t cid, int32_t level, int32_t job)
+	{
+		GuildMember* found = member(cid);
+
+		if (found)
 		{
-			if (member.id == cid)
-			{
-				member.rank = rank;
-				return true;
-			}
+			found->level = level;
+			found->job = job;
 		}
 
-		return false;
+		return found;
 	}
 
 	void Guild::set_titles(std::array<std::string, 5> titles)
@@ -287,5 +306,14 @@ namespace ms
 	void Guild::set_notice(std::string notice)
 	{
 		data.notice = std::move(notice);
+	}
+
+	GuildMember* Guild::member(int32_t cid)
+	{
+		for (auto& member : data.members)
+			if (member.id == cid)
+				return &member;
+
+		return nullptr;
 	}
 }

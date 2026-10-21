@@ -4,6 +4,7 @@
 
 #include "../Packets/GameplayPackets.h"
 
+#include "../../Character/Job.h"
 #include "../../Configuration.h"
 #include "../../Data/CurseData.h"
 #include "../../Gameplay/Stage.h"
@@ -57,6 +58,10 @@ namespace ms
 			DECLINED = 0x37,
 			// 0x167
 			ADMIN = 0x38,
+			// Silent
+			MEMBER_LEVEL_JOB = 0x3C,
+			// 0x2ca and 0x2cb on the card when they log in
+			MEMBER_ONLINE = 0x3D,
 			// 0xce0 for the master
 			TITLES_CHANGED = 0x3E,
 			// 0xcdf
@@ -292,6 +297,35 @@ namespace ms
 		case Operation::ADMIN:
 			chat_line("Admin cannot make a guild.");
 			break;
+		case Operation::MEMBER_LEVEL_JOB:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			int32_t level = recv.read_int();
+			int32_t job = recv.read_int();
+
+			if (guild.exists() && guild_id == guild.get_data().id)
+				guild.set_level_job(cid, level, job);
+
+			break;
+		}
+		case Operation::MEMBER_ONLINE:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t cid = recv.read_int();
+			bool online = recv.read_bool();
+
+			if (!guild.exists() || guild_id != guild.get_data().id || !guild.set_online(cid, online))
+				break;
+
+			// The buddy list's card, for anyone in the guild; the client
+			// checks neither the old flag nor who it is.
+			if (online)
+				if (auto cards = UI::get().get_element<UIInviteCard>())
+					cards->notify(guild.find(cid)->name, false);
+
+			break;
+		}
 		case Operation::TITLES_CHANGED:
 		{
 			int32_t guild_id = recv.read_int();
@@ -347,6 +381,31 @@ namespace ms
 			chat_line("The guild request has not been accepted, due to unknown reason.");
 			break;
 		}
+	}
+
+	void NotifyLevelUpHandler::handle(InPacket& recv) const
+	{
+		uint8_t type = static_cast<uint8_t>(recv.read_byte());
+		int32_t level = recv.read_int();
+		std::string name = recv.read_string();
+
+		// 0x1245; type 0 also tells a family junior of a lower level that
+		// their reps are halved (0x1246), which needs families.
+		chat_line("<" + std::string(type == 2 ? "Guild" : "Family") + "> " + name + " has reached Lv. " + std::to_string(level) + ".");
+	}
+
+	void NotifyJobChangeHandler::handle(InPacket& recv) const
+	{
+		uint8_t type = static_cast<uint8_t>(recv.read_byte());
+		int32_t job = recv.read_int();
+		std::string name = recv.read_string();
+
+		if (type > 1)
+			return;
+
+		// 0x148c has no '>' after the group: the server sends it with the
+		// name.
+		chat_line("<" + std::string(type == 0 ? "Guild" : "Family") + name + " has advanced to a(an) " + Job(static_cast<uint16_t>(job)).get_name() + ".");
 	}
 
 	void GuildNameChangedHandler::handle(InPacket& recv) const

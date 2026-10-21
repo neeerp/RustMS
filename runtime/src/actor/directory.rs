@@ -1,13 +1,14 @@
 use crate::actor::guild_invites::GuildInvites;
-use crate::actor::messenger::{Messengers, Outbox};
+use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::message::{ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage};
 use game::Guild;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
 use net::packet::build::world::guild::{
-    build_guild_error, build_guild_info, build_guild_invite, build_invite_refused, GuildError,
-    InviteRefusal,
+    build_guild_error, build_guild_info, build_guild_invite, build_guild_job_change,
+    build_guild_level_up, build_invite_refused, build_member_level_job, build_member_online,
+    GuildError, InviteRefusal,
 };
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, build_whisper_result, FindLocation};
@@ -25,7 +26,8 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
-/// How often seats held through a channel change are checked.
+/// How often messenger seats and guild members held through a channel
+/// change are checked.
 const PURGE_INTERVAL: Duration = Duration::from_secs(10);
 
 struct Entry {
@@ -68,6 +70,9 @@ pub struct WorldDirectory {
     messengers: Messengers,
     /// Each player's Mystic Door, which their party may use too.
     doors: HashMap<ClientId, Door>,
+    /// Guild members changing channel, with their guild and when they left:
+    /// the guild hears they logged out only if they don't arrive in time.
+    guild_away: HashMap<ClientId, (i32, Instant)>,
 }
 
 impl WorldDirectory {
@@ -80,6 +85,7 @@ impl WorldDirectory {
             guild_invites: GuildInvites::default(),
             messengers: Messengers::default(),
             doors: HashMap::new(),
+            guild_away: HashMap::new(),
         }
     }
 
@@ -92,8 +98,10 @@ impl WorldDirectory {
                     None => break,
                 },
                 _ = purge.tick() => {
-                    let out = self.messengers.purge(Instant::now());
+                    let now = Instant::now();
+                    let out = self.messengers.purge(now);
                     self.deliver(out);
+                    self.purge_guild_away(now);
                 }
             }
         }
@@ -193,7 +201,9 @@ impl WorldDirectory {
 
     fn register(&mut self, handle: ClientHandle, presence: Presence, channel_id: u8) {
         let client_id = handle.client_id;
-        if let Some(previous) = self.clients.remove(&client_id) {
+        let guild_id = presence.guild_id;
+        let previous = self.clients.remove(&client_id);
+        if let Some(previous) = &previous {
             // The same character connected again: only one session may live.
             warn!(
                 client_id,
@@ -226,6 +236,18 @@ impl WorldDirectory {
         }
         let out = self.messengers.connected(client_id, channel_id);
         self.deliver(out);
+
+        // The guild already knows of a second login, or one from another
+        // channel.
+        let away = self
+            .guild_away
+            .remove(&client_id)
+            .map(|(guild_id, _)| guild_id);
+        if let (None, Some(guild_id)) = (&previous, guild_id) {
+            if away != Some(guild_id) {
+                self.tell_guild_online(guild_id, client_id, true);
+            }
+        }
     }
 
     fn unregister(&mut self, client_id: ClientId, connection_id: u64, changing_channel: bool) {
@@ -239,6 +261,14 @@ impl WorldDirectory {
             if let Some(entry) = self.clients.remove(&client_id) {
                 self.names.remove(&entry.presence.name);
                 info!(client_id, "Character offline");
+                if let Some(guild_id) = entry.presence.guild_id {
+                    if changing_channel {
+                        self.guild_away
+                            .insert(client_id, (guild_id, Instant::now()));
+                    } else {
+                        self.tell_guild_online(guild_id, client_id, false);
+                    }
+                }
                 let out = self
                     .messengers
                     .disconnected(client_id, changing_channel, Instant::now());
@@ -261,6 +291,9 @@ impl WorldDirectory {
         let moved = previous.map_id != entry.presence.map_id;
         let hp_changed =
             (previous.hp, previous.max_hp) != (entry.presence.hp, entry.presence.max_hp);
+
+        // Guild members needn't be in a party.
+        self.tell_guild_progress(client_id, &previous);
 
         let updated = self.parties.update(member).is_some();
         let Some(party) = self.parties.of(client_id) else {
@@ -418,11 +451,97 @@ impl WorldDirectory {
         self.send_packet(owner, build_buddy_list(&views));
     }
 
+    /// Members online on any channel, or changing channel, show online,
+    /// at the level and job they have now.
     fn send_guild_info(&self, owner: ClientId, mut guild: Guild) {
         for member in &mut guild.members {
-            member.online = self.clients.contains_key(&member.id);
+            match self.clients.get(&member.id) {
+                Some(entry) => {
+                    member.online = true;
+                    member.level = entry.presence.level;
+                    member.job = entry.presence.job;
+                }
+                None => member.online = self.guild_away.contains_key(&member.id),
+            }
         }
         self.send_packet(owner, build_guild_info(Some(&guild)));
+    }
+
+    /// The members of guild `guild_id` online, on any channel.
+    fn guild_online(&self, guild_id: i32) -> impl Iterator<Item = (ClientId, &Entry)> {
+        self.clients
+            .iter()
+            .filter(move |(_, entry)| entry.presence.guild_id == Some(guild_id))
+            .map(|(&id, entry)| (id, entry))
+    }
+
+    /// Tell the rest of `member`'s guild they entered or left the game. The
+    /// client would show the card about themself, so they aren't told.
+    fn tell_guild_online(&self, guild_id: i32, member: ClientId, online: bool) {
+        let packet = match build_member_online(guild_id, member, online) {
+            Ok(packet) => packet,
+            Err(error) => return warn!(member, %error, "Failed to build packet"),
+        };
+        for (id, entry) in self.guild_online(guild_id) {
+            if id != member {
+                entry.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
+    /// Members who changed channel and didn't arrive in time left the game.
+    fn purge_guild_away(&mut self, now: Instant) {
+        let gone: Vec<_> = self
+            .guild_away
+            .iter()
+            .filter(|(_, (_, left))| now.duration_since(*left) >= CHANNEL_CHANGE_GRACE)
+            .map(|(&id, &(guild_id, _))| (id, guild_id))
+            .collect();
+        for (id, guild_id) in gone {
+            self.guild_away.remove(&id);
+            self.tell_guild_online(guild_id, id, false);
+        }
+    }
+
+    /// A member's new level or job changes the guild list for everyone; the
+    /// others also read a line for each level gained and for a new job.
+    fn tell_guild_progress(&self, client_id: ClientId, previous: &Presence) {
+        let Some(now) = self.clients.get(&client_id).map(|entry| &entry.presence) else {
+            return;
+        };
+        let Some(guild_id) = now.guild_id.filter(|&id| previous.guild_id == Some(id)) else {
+            return;
+        };
+        if (previous.level, previous.job) == (now.level, now.job) {
+            return;
+        }
+        let built = |packets: Vec<Result<Packet, net::error::NetworkError>>| {
+            packets
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()
+                .inspect_err(|error| warn!(client_id, %error, "Failed to build packet"))
+                .unwrap_or_default()
+        };
+        let everyone = built(vec![build_member_level_job(
+            guild_id, client_id, now.level, now.job,
+        )]);
+        let mut news: Vec<_> = (previous.level..now.level)
+            .map(|level| build_guild_level_up(level + 1, &now.name))
+            .collect();
+        if previous.job != now.job {
+            news.push(build_guild_job_change(now.job, &now.name));
+        }
+        let others = built(news);
+        for (id, entry) in self.guild_online(guild_id) {
+            let extra = if id == client_id {
+                &[][..]
+            } else {
+                &others[..]
+            };
+            for packet in everyone.iter().chain(extra) {
+                entry.handle.send_packet(packet.clone());
+            }
+        }
     }
 
     /// Pass on an invitation to someone on the inviter's channel who is not
@@ -857,6 +976,59 @@ mod tests {
         rx
     }
 
+    /// A registered member of guild `guild_id`, or of none, on connection
+    /// `connection`.
+    fn member_online(
+        directory: &mut WorldDirectory,
+        id: ClientId,
+        name: &str,
+        guild_id: Option<i32>,
+        connection: u64,
+    ) -> mpsc::Receiver<ServerMessage> {
+        let (tx, rx) = mpsc::channel(64);
+        let handle = ClientHandle::new(id, connection, tx, CancellationToken::new());
+        let mut presence = presence(name, 10000);
+        presence.guild_id = guild_id;
+        directory.register(handle, presence, 0);
+        rx
+    }
+
+    /// The packets a client got.
+    fn packets(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<Vec<u8>> {
+        let mut seen = Vec::new();
+        while let Ok(message) = rx.try_recv() {
+            if let ServerMessage::SendPacket(packet) = message {
+                seen.push(packet.bytes);
+            }
+        }
+        seen
+    }
+
+    /// Guild 1, "Testers", with members (id, name, online) at level 10.
+    fn testers(members: &[(ClientId, &str, bool)]) -> Guild {
+        Guild {
+            id: 1,
+            name: "Testers".into(),
+            titles: game::guild::DEFAULT_TITLES.map(String::from),
+            capacity: 10,
+            emblem: Default::default(),
+            notice: String::new(),
+            points: 0,
+            alliance_id: 0,
+            members: members
+                .iter()
+                .map(|&(id, name, online)| game::GuildMember {
+                    id,
+                    name: name.into(),
+                    job: 0,
+                    level: 10,
+                    rank: 3,
+                    online,
+                })
+                .collect(),
+        }
+    }
+
     /// What a client got: party changes and packet opcodes, with the
     /// PARTY_OPERATION sub-op.
     fn received(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<String> {
@@ -1086,28 +1258,12 @@ mod tests {
         let mut alice = online(&mut directory, 1, "Alice", 10000);
         let (bobby, _bobby_rx, _) = handle(2, 2);
         directory.register(bobby, presence("Bobby", 20000), 2);
-        let member = |id, name: &str, online| game::GuildMember {
-            id,
-            name: name.into(),
-            job: 0,
-            level: 10,
-            rank: 3,
-            online,
-        };
-        let guild = |online: [bool; 3]| Guild {
-            id: 1,
-            name: "Testers".into(),
-            titles: game::guild::DEFAULT_TITLES.map(String::from),
-            capacity: 10,
-            emblem: Default::default(),
-            notice: String::new(),
-            points: 0,
-            alliance_id: 0,
-            members: vec![
-                member(1, "Alice", online[0]),
-                member(2, "Bobby", online[1]),
-                member(3, "Carol", online[2]),
-            ],
+        let guild = |online: [bool; 3]| {
+            testers(&[
+                (1, "Alice", online[0]),
+                (2, "Bobby", online[1]),
+                (3, "Carol", online[2]),
+            ])
         };
         directory.handle(DirectoryMessage::GuildInfo {
             owner: 1,
@@ -1118,6 +1274,99 @@ mod tests {
         };
         let expected = build_guild_info(Some(&guild([true, true, false]))).unwrap();
         assert_eq!(packet.bytes, expected.bytes);
+    }
+
+    #[test]
+    fn guild_members_hear_who_enters_and_leaves_the_game() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = member_online(&mut directory, 1, "Alice", Some(4), 1);
+        let mut carol = member_online(&mut directory, 3, "Carol", Some(5), 3);
+        let mut bobby = member_online(&mut directory, 2, "Bobby", Some(4), 2);
+        let online = |online| vec![build_member_online(4, 2, online).unwrap().bytes];
+        assert_eq!(packets(&mut alice), online(true));
+        assert!(packets(&mut bobby).is_empty(), "not about themself");
+        assert!(packets(&mut carol).is_empty(), "another guild");
+
+        // A second login says nothing, and neither does the first
+        // connection's late unregister.
+        let _again = member_online(&mut directory, 2, "Bobby", Some(4), 12);
+        directory.unregister(2, 2, false);
+        assert!(packets(&mut alice).is_empty());
+
+        directory.unregister(2, 12, false);
+        assert_eq!(packets(&mut alice), online(false));
+        assert!(packets(&mut carol).is_empty());
+    }
+
+    #[test]
+    fn a_channel_change_is_silent_unless_it_takes_too_long() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = member_online(&mut directory, 1, "Alice", Some(1), 1);
+        let _bobby = member_online(&mut directory, 2, "Bobby", Some(1), 2);
+        packets(&mut alice);
+
+        // On the way, the guild still shows them online.
+        directory.unregister(2, 2, true);
+        directory.purge_guild_away(Instant::now());
+        assert!(packets(&mut alice).is_empty());
+        directory.send_guild_info(1, testers(&[(1, "Alice", false), (2, "Bobby", false)]));
+        let info = build_guild_info(Some(&testers(&[(1, "Alice", true), (2, "Bobby", true)])));
+        assert_eq!(packets(&mut alice), [info.unwrap().bytes]);
+        let _bobby = member_online(&mut directory, 2, "Bobby", Some(1), 22);
+        assert!(packets(&mut alice).is_empty(), "back on another channel");
+
+        // Not back in time: they logged out, and in again later.
+        directory.unregister(2, 22, true);
+        directory.purge_guild_away(Instant::now() + CHANNEL_CHANGE_GRACE);
+        let online = |online| build_member_online(1, 2, online).unwrap().bytes;
+        assert_eq!(packets(&mut alice), [online(false)]);
+        let _bobby = member_online(&mut directory, 2, "Bobby", Some(1), 32);
+        assert_eq!(packets(&mut alice), [online(true)]);
+    }
+
+    #[test]
+    fn levels_and_jobs_reach_the_guild() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = member_online(&mut directory, 1, "Alice", Some(4), 1);
+        let mut carol = member_online(&mut directory, 3, "Carol", None, 3);
+        let mut bobby = member_online(&mut directory, 2, "Bobby", Some(4), 2);
+        packets(&mut alice);
+        let level_job = |level, job| build_member_level_job(4, 2, level, job).unwrap().bytes;
+        let level_up = |level| build_guild_level_up(level, "Bobby").unwrap().bytes;
+
+        // Bobby, in no party, gains two levels at once.
+        let mut grown = presence("Bobby", 10000);
+        grown.guild_id = Some(4);
+        grown.level = 12;
+        directory.update_presence(2, grown.clone());
+        assert_eq!(packets(&mut bobby), [level_job(12, 0)]);
+        assert_eq!(
+            packets(&mut alice),
+            [level_job(12, 0), level_up(11), level_up(12)]
+        );
+        assert!(packets(&mut carol).is_empty());
+
+        grown.job = 100;
+        directory.update_presence(2, grown.clone());
+        assert_eq!(packets(&mut bobby), [level_job(12, 100)]);
+        let job = build_guild_job_change(100, "Bobby").unwrap().bytes;
+        assert_eq!(packets(&mut alice), [level_job(12, 100), job]);
+
+        // HP and maps say nothing, nor does a level that comes with a change
+        // of guild: leaving, joining or moving to another.
+        grown.hp = 20;
+        grown.map_id = 20000;
+        directory.update_presence(2, grown.clone());
+        for (guild_id, level) in [(None, 13), (Some(4), 14), (Some(5), 15)] {
+            grown.guild_id = guild_id;
+            grown.level = level;
+            grown.job += 10;
+            directory.update_presence(2, grown.clone());
+        }
+        assert!(packets(&mut alice).is_empty() && packets(&mut bobby).is_empty());
     }
 
     #[test]

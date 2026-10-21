@@ -85,6 +85,21 @@ case (a unique index on `lower(name)`).
   - Every member online then gets 0x40 (id, rank), 0x3E (the titles) or
     0x44 (the notice). A change the client wouldn't send is logged and
     dropped.
+- The world directory tells the guild who comes and goes. A member entering
+  the game sends every other member online 0x3D (the guild, the member, 1),
+  and leaving it 0x3D with 0; the member themself gets neither, as the
+  client would show its own card. A second login of a character already
+  online says nothing. A channel change says nothing either: the directory
+  waits 30 seconds (the messenger's grace, `CHANNEL_CHANGE_GRACE`) for the
+  member to arrive, sweeping on its 10-second tick, and only then sends the
+  0x3D with 0. Meanwhile the guild data shows them online.
+- When a member's level or job changes (a `DirectoryMessage::Presence`
+  update, handled in `update_presence`), every member online gets 0x3C (the
+  guild, the member, level, job), the member included. The others also get `NOTIFY_LEVELUP` (105: type 2, the
+  level, the name) for each level gained, and `NOTIFY_JOB_CHANGE` (107: type
+  0, the job, the name) for a new job. The client's job line has no `>`
+  after "<Guild", so the name goes as "> " and the name. Nothing is sent
+  when the guild itself changes in the same update.
 - Guild chat is the guild mode (2) of `MULTICHAT`. The server ignores the
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
@@ -124,6 +139,20 @@ ints. The client takes the first member for the master.
     the notice, an empty one clearing it, and prints "* Guild Notice :
     <notice>" unless it is empty. v83 prints every guild line in its type
     0xc colour, which is `LineType::SKILL`.
+  - 0x3D marks a member online or offline. Coming online shows the buddy
+    list's card, "<name> is" over "logged in." with the invite sound; v83
+    checks neither the old flag nor who it is, and going offline shows
+    nothing. 0x3C sets a member's level and job without a word. Both only
+    count for the player's guild and a member it knows.
+- `NOTIFY_LEVELUP` (105) prints "<Guild> [name] has reached Lv. [level]."
+  for type 2 and "<Family> ..." for any other; v83's type 0 also adds a
+  family line about Reps, which needs families. `NOTIFY_JOB_CHANGE` (107)
+  prints "<Guild[name] has advanced to a(an) [job]." for type 0 and
+  "<Family..." for 1, and nothing for any other type. Both are
+  `LineType::SKILL` lines. The job is named by HeavenClient's
+  `Job::get_name`, whose names differ from v83's for some jobs (v83 calls
+  100 "Swordman" and 320 "Crossbow man"); every job name in the client
+  shares that table.
 - `IO/GuildCommands` has v83's checks before asking the server:
   - `/guildinfo` lists every member, online or not, and says if the player
     is the master.
@@ -193,8 +222,6 @@ ints. The client takes the first member for the master.
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- Telling members when someone logs in or out, levels up, or changes job:
-  the window shows who was online when the player entered the game.
 - Guild points, the guild BBS, alliances, and the guild quest.
 - Sorting by column.
 

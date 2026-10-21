@@ -218,6 +218,8 @@ namespace ms
 
 		/// Guild
 		GUILD_OPERATION = 65,
+		NOTIFY_LEVELUP = 105,
+		NOTIFY_JOB_CHANGE = 107,
 		GUILD_NAME_CHANGED = 202,
 		GUILD_MARK_CHANGED = 203,
 
@@ -388,6 +390,8 @@ namespace ms
 
 		// Guilds
 		emplace<GUILD_OPERATION, GuildOperationHandler>();
+		emplace<NOTIFY_LEVELUP, NotifyLevelUpHandler>();
+		emplace<NOTIFY_JOB_CHANGE, NotifyJobChangeHandler>();
 		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
 		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
 

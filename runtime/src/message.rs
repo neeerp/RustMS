@@ -369,7 +369,7 @@ pub struct FieldHandle {
 }
 
 /// What the world directory knows of an online character: enough for party
-/// windows, HP bars, and guild invitations.
+/// windows, HP bars, and guilds (invitations, and members' levels and jobs).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Presence {
     pub name: String,

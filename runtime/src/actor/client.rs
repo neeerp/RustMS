@@ -1269,7 +1269,7 @@ impl ClientActor {
     }
 
     /// Keep the directory's view of the player (map, level, job, HP)
-    /// current, for party windows and HP bars.
+    /// current, for party windows, HP bars, and the guild.
     async fn sync_presence(&mut self) -> Result<(), RuntimeError> {
         let Some(game) = self.game.as_ref() else {
             return Ok(());
