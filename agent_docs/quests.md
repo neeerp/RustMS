@@ -264,7 +264,8 @@ The original also lists a quest's `endmeso` as a "Meso" row, which
 HeavenClient doesn't show yet. Starting a quest with kills or items to bring
 tracks it unless AUTO was switched off; the quest window's helper button
 tracks and untracks open quests. Each quest's ⓧ untracks it, the minimize
-button folds the helper to its title bar, and close hides it until the
+button or the Quest Helper key (L) folds the helper to its title bar. The key
+unfolds it again, and so does a change to what it shows. Close hides it until the
 quest window tracks a quest again. Footage doesn't show what AUTO and close
 did, so those two are best guesses.
 

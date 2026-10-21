@@ -292,14 +292,15 @@ namespace ms
 					gamemenu_pos + Point<int16_t>(6, 25 + 25 * i)
 			);
 
+		// v83 puts the second button at (6, 50), 26 px below the first.
 		const char *shortcut_buttons[] = {
-			"BtEquip", "BtItem", "BtStat", "BtSkill", "BtQuest", "BtComm", "BtMessenger", "BtMobbook"
+			"BtItem", "BtEquip", "BtStat", "BtSkill", "BtComm", "BtQuest", "BtMobbook", "BtMessenger"
 		};
 
 		for (uint16_t i = 0; i < 8; i++)
-			buttons[Buttons::BT_SHORTCUT_EQUIP + i] = std::make_unique<MapleButton>(
+			buttons[Buttons::BT_SHORTCUT_ITEM + i] = std::make_unique<MapleButton>(
 					shortcut[shortcut_buttons[i]],
-					shortcutmenu_pos + Point<int16_t>(5, 23 + 26 * i)
+					shortcutmenu_pos + Point<int16_t>(6, 24 + 26 * i)
 			);
 
 		set_menu(Menu::NONE);
@@ -672,8 +673,8 @@ namespace ms
 				}
 		} else if (menu != Menu::NONE && (keycode == KeyAction::Id::UP || keycode == KeyAction::Id::DOWN))
 		{
-			uint16_t min_id = menu == Menu::GAME ? Buttons::BT_GAME_CHANNEL : Buttons::BT_SHORTCUT_EQUIP;
-			uint16_t max_id = menu == Menu::GAME ? Buttons::BT_GAME_QUIT : Buttons::BT_SHORTCUT_MONSTERBOOK;
+			uint16_t min_id = menu == Menu::GAME ? Buttons::BT_GAME_CHANNEL : Buttons::BT_SHORTCUT_ITEM;
+			uint16_t max_id = menu == Menu::GAME ? Buttons::BT_GAME_QUIT : Buttons::BT_SHORTCUT_MESSENGER;
 			uint16_t id = min_id;
 			bool found = false;
 
@@ -913,7 +914,7 @@ namespace ms
 			buttons[i]->set_state(Button::State::NORMAL);
 		}
 
-		for (uint16_t i = Buttons::BT_SHORTCUT_EQUIP; i <= Buttons::BT_SHORTCUT_MONSTERBOOK; i++)
+		for (uint16_t i = Buttons::BT_SHORTCUT_ITEM; i <= Buttons::BT_SHORTCUT_MESSENGER; i++)
 		{
 			buttons[i]->set_active(menu == Menu::SHORTCUT);
 			buttons[i]->set_state(Button::State::NORMAL);

@@ -116,6 +116,10 @@ namespace ms
 
 		void set_full(bool enabled);
 
+		// The full window's Cash Shop button works on the equip, use and etc
+		// tabs until they have 96 slots (0x81d230).
+		void update_cashshop();
+
 		class ItemIcon : public Icon::Type
 		{
 		public:
@@ -173,7 +177,8 @@ namespace ms
 			BT_GATHER,
 			BT_SORT,
 			BT_FULL,
-			BT_SMALL
+			BT_SMALL,
+			BT_CASHSHOP
 		};
 
 		const Inventory &inventory;

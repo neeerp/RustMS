@@ -160,9 +160,30 @@ namespace ms
 		{
 			shown = std::move(current);
 			rebuild();
+
+			// New quest data unfolds the window (FUN_00885d96).
+			if (minimized)
+				set_minimized(false);
 		}
 
 		UIElement::update();
+	}
+
+	void UIQuestHelper::toggle_minimized()
+	{
+		set_minimized(!minimized && !entries.empty());
+	}
+
+	void UIQuestHelper::set_minimized(bool folded)
+	{
+		minimized = folded;
+		buttons[MINIMIZE]->set_active(!minimized);
+		buttons[MAXIMIZE]->set_active(minimized);
+
+		for (auto it = buttons.lower_bound(UNTRACK); it != buttons.end(); ++it)
+			it->second->set_active(!minimized);
+
+		dimension = Point<int16_t>(WIDTH, height());
 	}
 
 	void UIQuestHelper::rebuild()
@@ -300,14 +321,7 @@ namespace ms
 				break;
 			case MINIMIZE:
 			case MAXIMIZE:
-				minimized = buttonid == MINIMIZE;
-				buttons[MINIMIZE]->set_active(!minimized);
-				buttons[MAXIMIZE]->set_active(minimized);
-
-				for (auto it = buttons.lower_bound(UNTRACK); it != buttons.end(); ++it)
-					it->second->set_active(!minimized);
-
-				dimension = Point<int16_t>(WIDTH, height());
+				set_minimized(buttonid == MINIMIZE);
 				break;
 			case CLOSE:
 				deactivate();

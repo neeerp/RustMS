@@ -33,6 +33,10 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// The Quest Helper key (L): folds the window, or unfolds it when it
+		// is folded or shows no quest (FUN_00888230).
+		void toggle_minimized();
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -77,6 +81,7 @@ namespace ms
 		// Where it sits until it is moved.
 		Point<int16_t> default_position() const;
 		void rebuild();
+		void set_minimized(bool minimized);
 		int16_t height() const;
 
 		QuestLog& quests;
