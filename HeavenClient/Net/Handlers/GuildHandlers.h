@@ -4,6 +4,15 @@
 
 namespace ms
 {
+	// The guild bulletin board's list, a thread, or a thread gone; dropped
+	// unless the board is open
+	// Opcode: GUILD_BBS(59)
+	class GuildBbsHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// The player's guild, founding one, and guild errors
 	// Opcode: GUILD_OPERATION(65)
 	class GuildOperationHandler : public PacketHandler

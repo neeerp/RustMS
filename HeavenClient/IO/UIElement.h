@@ -108,6 +108,7 @@ namespace ms
 			MEMOSEND,
 			QUICKSLOTCONFIG,
 			GUILDMARKMAKER,
+			GUILDBBS,
 			NUM_TYPES
 		};
 

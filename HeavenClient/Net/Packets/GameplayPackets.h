@@ -707,6 +707,67 @@ namespace ms
 		}
 	};
 
+	// A request to the guild bulletin board (0x9B)
+	// Opcode: GUILD_BBS(155)
+	class GuildBbsPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			DELETE_THREAD = 1,
+			LIST = 2,
+			SHOW = 3,
+			DELETE_REPLY = 5
+		};
+
+	protected:
+		GuildBbsPacket(Mode mode) : OutPacket(OutPacket::Opcode::GUILD_BBS)
+		{
+			write_byte(mode);
+		}
+	};
+
+	// Asks for a page of the board's threads, from 0
+	class BbsListPacket : public GuildBbsPacket
+	{
+	public:
+		BbsListPacket(int32_t page) : GuildBbsPacket(GuildBbsPacket::Mode::LIST)
+		{
+			write_int(page);
+		}
+	};
+
+	// Asks for a thread; the notice is thread 0
+	class BbsShowPacket : public GuildBbsPacket
+	{
+	public:
+		BbsShowPacket(int32_t thread) : GuildBbsPacket(GuildBbsPacket::Mode::SHOW)
+		{
+			write_int(thread);
+		}
+	};
+
+	// Deletes a thread
+	class BbsDeleteThreadPacket : public GuildBbsPacket
+	{
+	public:
+		BbsDeleteThreadPacket(int32_t thread) : GuildBbsPacket(GuildBbsPacket::Mode::DELETE_THREAD)
+		{
+			write_int(thread);
+		}
+	};
+
+	// Deletes a reply to a thread
+	class BbsDeleteReplyPacket : public GuildBbsPacket
+	{
+	public:
+		BbsDeleteReplyPacket(int32_t thread, int32_t reply) : GuildBbsPacket(GuildBbsPacket::Mode::DELETE_REPLY)
+		{
+			write_int(thread);
+			write_int(reply);
+		}
+	};
+
 	// Opcode: BUDDYLIST_MODIFY(130)
 	class BuddyListModifyPacket : public OutPacket
 	{

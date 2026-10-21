@@ -99,6 +99,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(guild_tests tests/guild.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
     target_include_directories(guild_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME guild COMMAND guild_tests)
+
+    add_executable(guild_bbs_tests tests/guild_bbs.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildBbsParser.cpp)
+    target_include_directories(guild_bbs_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guild_bbs COMMAND guild_bbs_tests)
     add_executable(job_names_tests tests/job_names.cpp Character/Job.cpp)
     add_test(NAME job_names COMMAND job_names_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
@@ -439,6 +443,7 @@ add_executable(HeavenClient
     Character/ExpTable.h
     Character/Guild.cpp
     Character/Guild.h
+    Character/GuildBbs.h
     Character/GuildEmblemRules.h
     Character/GuildMark.cpp
     Character/GuildMark.h
@@ -797,6 +802,8 @@ add_executable(HeavenClient
     IO/UITypes/UIItemMegaphone.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
+    IO/UITypes/UIGuildBBS.cpp
+    IO/UITypes/UIGuildBBS.h
     IO/UITypes/UIGuildMarkMaker.cpp
     IO/UITypes/UIGuildMarkMaker.h
     IO/UITypes/UIMemo.cpp
@@ -883,6 +890,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/BuffParser.h
     Net/Handlers/Helpers/MobStatParser.cpp
     Net/Handlers/Helpers/MobStatParser.h
+    Net/Handlers/Helpers/GuildBbsParser.cpp
+    Net/Handlers/Helpers/GuildBbsParser.h
     Net/Handlers/Helpers/GuildParser.cpp
     Net/Handlers/Helpers/GuildParser.h
     Net/Handlers/AttackHandlers.cpp

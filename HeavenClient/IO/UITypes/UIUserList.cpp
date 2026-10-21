@@ -19,6 +19,7 @@
 
 #include "UIChatBar.h"
 #include "UIEnterText.h"
+#include "UIGuildBBS.h"
 #include "UIMemoSend.h"
 
 #include "../BuddyCommands.h"
@@ -1016,6 +1017,9 @@ namespace ms
 				}
 
 				break;
+			case Buttons::BT_GUILD_BBS:
+				UIGuildBBS::open();
+				break;
 			case Buttons::BT_GUILD_INFO:
 				if (grade_shown)
 					close_grade();
@@ -1306,7 +1310,7 @@ namespace ms
 
 		// The client's rules (FUN_0090f17c). Without a guild the player's
 		// rank is 0, which greys out all of them. HeavenClient has no
-		// member search or guild board yet.
+		// member search yet.
 		int32_t rank = guild.rank(self);
 		const GuildMember* picked = picked_member();
 		const GuildMember* guild_member = picked_online_member();
@@ -1320,7 +1324,8 @@ namespace ms
 		enable(Buttons::BT_GUILD_WHERE, false);
 		enable(Buttons::BT_GUILD_INFO, guild.exists());
 		enable(Buttons::BT_GUILD_NOTICE, rank == 1 || rank == 2);
-		enable(Buttons::BT_GUILD_BBS, false);
+		// Any member may open the board (178-guild-ui).
+		enable(Buttons::BT_GUILD_BBS, guild.exists());
 
 		enable(Buttons::BT_GUILD_CHAT, guild_member);
 		enable(Buttons::BT_GUILD_WHISPER, guild_member);

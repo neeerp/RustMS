@@ -189,6 +189,36 @@ which the client shows with no writer name.
   replies, cuts and every permission; `found_guild` makes a guild in the
   database and `Trace::bbs` collects the board's packets.
 
+The client's board is `UIGuildBBS` (`GuildBBS.img/GuildBBS`, 734 x 526,
+centred). The rules it tests are in `Character/GuildBbs.h` and the packet
+parser in `Net/Handlers/Helpers/GuildBbsParser.cpp` (both covered by
+`tests/guild_bbs.cpp`); the handler drops recv 59 unless the board is open.
+
+- Opening asks for page 0. The left lists the notice (no number) and the
+  page's threads: number and title, the reply count in blue, the icon, the
+  writer cut to 70 px, and the date (the time if it is today, else
+  month/day). As in v83, the time is shown as sent (UTC) but "today" is the
+  player's local date, so near midnight a post away from UTC can show the
+  wrong form. Clicking a row asks for that thread
+  (the notice is 0) and the page again; clicking a page number asks for
+  that page and keeps the thread shown. A page past the last (after its
+  last thread is deleted) gets the first page from the server, and the
+  board then shows page 1 as current.
+- The header shows the guild's emblem when it has a mark, else the empty
+  frame, as the Guild tab does.
+- Mode 7 rebuilds the right panel: the title, writer and full date, the
+  body wrapped at 240 px (its own line breaks kept) in lines of 12 px
+  with a scroll bar, and the replies four at a time, starting at the last
+  four. The wheel scrolls the body above the buttons and the replies
+  anywhere else. DELETE (the poster, the master or a Jr. Master) and the reply rows'
+  delete buttons ask "Are you sure you want to delete the post?" first.
+  Deleting a thread drops it from the view and asks for the page; deleting
+  a reply asks for the page and waits for the server's thread.
+- Mode 8 says "This message had been deleted by another user. Please check
+  again." and drops the thread. QUIT closes the board; Esc does not.
+- DELETE follows rank changes when the next thread arrives; the reply
+  rows' delete buttons also on every reply scroll, as in v83.
+
 The packets are built in `net/src/packet/build/world/guild.rs`. The guild
 data lists the member ids, then a 37-byte record per member: the name padded
 to 13 bytes, then job, level, rank, online, contribution and alliance rank as
@@ -321,8 +351,8 @@ ints. The client takes the first member for the master.
     another tab. Leaving the guild leaves it open with only its
     background.
   - Clicking a tab, even the one shown, drops the guild pick.
-  - WHERE and BBS stay disabled: there is no member search, and no guild
-    board window yet (the server side is in "Bulletin board" above).
+  - WHERE stays disabled: there is no member search.
+  - BBS, for any member, opens the board window (below) unless it is open.
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),
     so the tab adds the origin back.
@@ -336,7 +366,18 @@ ints. The client takes the first member for the master.
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
 - Guild points, alliances, and the guild quest.
-- The guild board's window: the client keeps BtGuildBBS disabled.
+- The board window's write and edit panel, the notice, replying, and the
+  emoticon palette: BtWrite, BtNotice, BtRetouch and BtReply stay disabled.
+- The board's page selector art: the labels are drawn as text, 32 px apart,
+  with "<" and ">" for other groups of ten. The original's pitch and arrows
+  are unknown.
+- The board shows 14 body lines where v83's edit box shows 15: our font's
+  fifteenth line would cross the panel's edge.
+- The board looks writers' names up when a list or thread arrives, where
+  v83 looks them up on every draw, so a member who leaves keeps their name
+  until the next request.
+- Nothing closes the board on a map change or when the player leaves the
+  guild; the server then ignores its requests.
 - Sorting by column.
 
 ## Inferred or unverified
@@ -348,3 +389,9 @@ ints. The client takes the first member for the master.
 - The name tag's exact placement, which no footage has confirmed.
 - `UI::modal_open` stands in for v83's FUN_0049ed00; which windows count
   as modal there hasn't been checked.
+- The board's notice is thread 0 on the wire, inferred from the client
+  sending 0 when it is clicked.
+- How v83 encodes Enter in a board body is untraced; the board splits on
+  "\r\n", "\n" and "\r", so a closing break shows a blank last line.
+- The board's 12 px body line and 32 px page-number pitch are guesses.
+- Whether Esc closes v83's board; the spec names only QUIT.

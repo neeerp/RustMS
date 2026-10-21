@@ -217,6 +217,7 @@ namespace ms
 		UPDATE_PARTYMEMBER_HP = 201,
 
 		/// Guild
+		GUILD_BBS = 59,
 		GUILD_OPERATION = 65,
 		NOTIFY_LEVELUP = 105,
 		NOTIFY_JOB_CHANGE = 107,
@@ -389,6 +390,7 @@ namespace ms
 		emplace<MEMO_RESULT, MemoResultHandler>();
 
 		// Guilds
+		emplace<GUILD_BBS, GuildBbsHandler>();
 		emplace<GUILD_OPERATION, GuildOperationHandler>();
 		emplace<NOTIFY_LEVELUP, NotifyLevelUpHandler>();
 		emplace<NOTIFY_JOB_CHANGE, NotifyJobChangeHandler>();
