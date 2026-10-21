@@ -350,6 +350,26 @@ pub async fn set_quest(
     .await
 }
 
+/// Make the logged-out character `character_id`'s completion of quest
+/// `quest_id` look `minutes` minutes older.
+pub async fn backdate_quest(
+    character_id: i32,
+    quest_id: i16,
+    minutes: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("backdate quest", move |conn| {
+        diesel::sql_query(
+            "UPDATE character_quests SET completed_at = completed_at - make_interval(mins => $3) \
+             WHERE character_id = $1 AND quest_id = $2 AND status = 2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(quest_id)
+        .bind::<Integer, _>(minutes)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Teach the logged-out character `character_id` skill `skill_id` at
 /// `level`.
 pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {

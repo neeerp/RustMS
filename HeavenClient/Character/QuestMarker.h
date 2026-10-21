@@ -113,12 +113,23 @@ namespace ms
 			[&](const auto& requirement) { return has_skill(requirement.first) == requirement.second; });
 	}
 
-	// `holds` checks start_holdings_met for the player.
+	// Whether a completed quest can be started again: it is repeatable and
+	// its interval has passed since `completed_at`. Both times are FILETIMEs
+	// (FUN_00721163).
+	inline bool repeat_due(const QuestInfo& quest, int64_t completed_at, int64_t now)
+	{
+		constexpr int64_t TICKS_PER_MINUTE = 600000000;
+
+		return quest.repeat_interval >= 0 && completed_at + quest.repeat_interval * TICKS_PER_MINUTE <= now;
+	}
+
+	// `holds` checks start_holdings_met for the player and, for a completed
+	// quest, repeat_due.
 	template<class Status, class Holds>
 	bool quest_available(const QuestInfo& quest, int16_t job, int16_t level,
 		Status status, Holds holds, bool all_levels = false)
 	{
-		return status(quest.id) == 0 &&
+		return status(quest.id) != 1 && (status(quest.id) == 0 || quest.repeat_interval >= 0) &&
 			(quest.jobs.empty() || std::find(quest.jobs.begin(), quest.jobs.end(), job) != quest.jobs.end()) &&
 			(all_levels || (level >= quest.min_level && level <= quest.max_level)) &&
 			std::all_of(quest.prerequisites.begin(), quest.prerequisites.end(),
@@ -210,7 +221,7 @@ namespace ms
 
 			if (state == 1)
 				(can_complete(quest) ? menu.completable : menu.in_progress).push_back(quest.id);
-			else if (state == 0 && quest.start_npc == npc_id && can_start(quest))
+			else if (quest.start_npc == npc_id && can_start(quest))
 				menu.available.push_back(quest.id);
 			else if (state == 2)
 				menu.finished++;

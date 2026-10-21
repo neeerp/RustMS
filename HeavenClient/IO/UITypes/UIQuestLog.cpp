@@ -367,7 +367,7 @@ namespace ms
 
 		if (tab == TAB0)
 			ids = questlog.available_quests(stats.get_stat(MapleStat::JOB), stats.get_stat(MapleStat::LEVEL),
-				[&](const QuestInfo& quest) { return player.quest_holdings_met(quest); });
+				[&](const QuestInfo& quest) { return player.quest_start_met(quest); });
 		else if (tab == TAB1)
 			for (const auto& quest : questlog.started_quests())
 				ids.push_back(quest.first);

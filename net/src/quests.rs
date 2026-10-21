@@ -3,12 +3,13 @@
 //! catalog and the player's state before anything is persisted.
 
 use crate::load;
-use game::{InventoryChange, InventoryError, Player, QuestState, SkillRecord};
+use game::{InventoryChange, InventoryError, Player, QuestState, QuestStatus, SkillRecord};
 pub use game_data::quests::{
     QuestCatalog, QuestItem, QuestPrerequisite, QuestSkill, QuestTemplate, StartRequirements,
 };
 use rand::Rng;
 use std::sync::OnceLock;
+use std::time::{Duration, SystemTime};
 
 pub fn catalog() -> Result<&'static QuestCatalog, &'static str> {
     static CATALOG: OnceLock<Result<QuestCatalog, String>> = OnceLock::new();
@@ -67,8 +68,15 @@ pub fn check_start(
     if start.npc != npc_id {
         return Err(QuestRejection::WrongNpc);
     }
-    if player.quests.state(quest.id) != QuestState::NotStarted {
-        return Err(QuestRejection::WrongState);
+    match player.quests.status(quest.id) {
+        None => {}
+        // A repeatable quest starts again `interval` minutes after it was
+        // last completed (v83 FUN_00721163).
+        Some(QuestStatus::Completed { at })
+            if start.repeat_interval.is_some_and(|minutes| {
+                *at + Duration::from_secs(u64::from(minutes) * 60) <= SystemTime::now()
+            }) => {}
+        Some(_) => return Err(QuestRejection::WrongState),
     }
     if !start.jobs.is_empty() && !start.jobs.contains(&player.stats.job) {
         return Err(QuestRejection::Job);
@@ -301,8 +309,7 @@ pub fn apply_skills(skills: &[QuestSkill], player: &mut Player) -> Vec<SkillReco
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game::{QuestRecord, QuestStatus};
-    use std::time::SystemTime;
+    use game::QuestRecord;
 
     fn quest() -> QuestTemplate {
         QuestTemplate {
@@ -504,6 +511,33 @@ mod tests {
             check_start(&q, 2001, &p),
             Err(QuestRejection::Items(2010007))
         );
+    }
+
+    #[test]
+    fn repeatable_quests_restart_once_their_interval_has_passed() {
+        let mut q = quest();
+        q.start.quests.clear();
+        let mut p = player(1, 0);
+        let id = q.id;
+        let completed = move |p: &mut Player, ago: u64| {
+            p.quests.upsert(QuestRecord {
+                quest_id: id,
+                status: QuestStatus::Completed {
+                    at: SystemTime::now() - Duration::from_secs(ago),
+                },
+            })
+        };
+        completed(&mut p, 0);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::WrongState));
+        q.start.repeat_interval = Some(0);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        q.start.repeat_interval = Some(60);
+        completed(&mut p, 59 * 60);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::WrongState));
+        completed(&mut p, 61 * 60);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        set(&mut p, q.id, QuestState::Started);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::WrongState));
     }
 
     #[test]

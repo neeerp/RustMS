@@ -62,7 +62,7 @@ namespace ms
 
 				return quest_available(quest, stats.get_stat(MapleStat::Id::JOB), stats.get_stat(MapleStat::Id::LEVEL),
 					[](int16_t id) { return state(id); },
-					[](const QuestInfo& info) { return player().quest_holdings_met(info); });
+					[](const QuestInfo& info) { return player().quest_start_met(info); });
 			}
 
 			QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id)
@@ -241,7 +241,8 @@ namespace ms
 			if (!quest)
 				return;
 
-			if (state(quest_id) == 0)
+			// A completed quest may be due to repeat.
+			if (state(quest_id) != 1)
 			{
 				if (quest->start_npc != npc_id || !can_start(*quest))
 					return;
@@ -258,9 +259,6 @@ namespace ms
 				begin({ QuestDialogue(QuestDialogue::Mode::OFFER, std::move(script)), quest_id, npc_id });
 				return;
 			}
-
-			if (state(quest_id) != 1)
-				return;
 
 			// v83 checks Check.img/<id>/1 before saying anything (FUN_00716fe1).
 			QuestScript script = QuestCatalog::get().script(quest_id, true);

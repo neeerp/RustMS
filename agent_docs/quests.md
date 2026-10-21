@@ -71,7 +71,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, and the alert triggers `normalAutoStart` and `fieldEnter` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript` |
 | `Act/<id>/0` | `item` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill` |
@@ -98,6 +98,15 @@ absence. "Having" a skill is v83's loose test: any skill not marked
 counts once it has a record, even at level 0 (that is how the 4th-job skill
 book quests, 6110–6325, ask for the book's skill to be unlearned). `pop` is the least fame,
 compared unsigned as v83 does, so negative fame passes.
+
+`interval` makes a quest repeatable: once completed, it can be started again
+that many minutes after its completion time (0 means at once); without it a
+completed quest stays done. Starting it again replaces its completed record,
+as in Cosmic, and completing it again sets a new completion time. v83 keeps
+both records instead, so HeavenClient counts a quest it has both as started.
+The client shows a due repeatable with the NPC's bulb and in its menu, but,
+like v83, not in the quest log's Available tab. `dayByDay` (once per calendar
+day) is a separate key and stays unsupported.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
 and take negative ones (capped at what the player holds). An entry without a
@@ -137,7 +146,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1186 quests qualify
+changing the server's allowlist and regenerating the list. 1289 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
