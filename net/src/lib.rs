@@ -37,6 +37,7 @@ pub mod policy;
 pub mod quests;
 pub mod rates;
 pub mod reactors;
+pub mod rides;
 pub mod scripts;
 pub mod settings;
 pub mod shop;

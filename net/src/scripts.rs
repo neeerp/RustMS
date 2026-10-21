@@ -24,6 +24,10 @@ const POISON_SPORE: i32 = 4000507;
 /// construction site's tunnel comes out.
 const LINE_1_AREA_1: i32 = 103000101;
 const LINE_1_AREA_2: i32 = 103000103;
+/// The ferry docks a town's portal leads down to: Ellinia's (`inERShip`)
+/// and Rien's (`enterPort`).
+const ELLINIA_SKY_FERRY: i32 = 101000400;
+const RIEN_DOCK: i32 = 140020300;
 /// `rankRoom`: each job's hall (and Ereve's and the Dangerous Forest's),
 /// the room it leads into, and the room's portal back.
 const RANK_ROOMS: [(i32, i32, &str); 8] = [
@@ -299,6 +303,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         )),
         // The second of the area's spawn points, as in Cosmic.
         "met_in" => through(Effect::WarpToPortal(LINE_1_AREA_2, 1)),
+        "inERShip" => through(Effect::WarpToPortal(
+            ELLINIA_SKY_FERRY,
+            named(ELLINIA_SKY_FERRY, "out00"),
+        )),
+        // Cosmic also starts an Aran quest's fight here, which isn't in.
+        "enterPort" => through(Effect::WarpToPortal(RIEN_DOCK, named(RIEN_DOCK, "west00"))),
         "rankRoom" => {
             let &(_, room, back) = RANK_ROOMS
                 .iter()
@@ -454,6 +464,8 @@ mod tests {
         };
         assert_eq!(warp("subway_in2", &player), (103000101, 3));
         assert_eq!(warp("met_in", &player), (103000103, 1));
+        assert_eq!(warp("inERShip", &player), (101000400, 2));
+        assert_eq!(warp("enterPort", &player), (140020300, 1));
         for (hall, room, id) in [
             (100000201, 100000204, 2),
             (101000003, 101000004, 2),

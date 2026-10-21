@@ -154,6 +154,8 @@ nothing. A script returns effects that the client actor sends:
 | `TD_MC_Egate` | Portal sound, warp to `106021300` portal `right00` |
 | `subway_in2` | Kerning City's ticketing booth (`103000100` `in00`) into the tunnels: portal sound, warp to `103000101` portal `out00` |
 | `met_in` | The construction site's tunnel (`102040000` `subway00`): portal sound, warp to `103000103` portal 1, as in Cosmic (the original's Abandoned Subway Station needs Mr. Lim's instances) |
+| `inERShip` | Ellinia's (`101000000` `in04`) way down to its Sky Ferry dock: portal sound, warp to `101000400` portal `out00` |
+| `enterPort` | Rien's pier (`140020200` `east00`) onto the dock: portal sound, warp to `140020300` portal `west00`. Cosmic's Aran-quest fight here isn't in |
 | `rankRoom` | A job hall's (or Ereve's, or the Dangerous Forest's) way into its room: portal sound, warp to the room's portal back (`RANK_ROOMS`) |
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer

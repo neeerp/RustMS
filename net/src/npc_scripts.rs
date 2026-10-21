@@ -8,6 +8,7 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{self, Cloto, Entry, EventCommand, EventKind};
+use crate::rides;
 use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
@@ -130,16 +131,37 @@ const USHERS: [(i32, &Route); 8] = [
 /// train's, so the player's map picks the route.
 const WAITING_ROOM_GUIDES: [i32; 7] = [PURIN, ERIN, 2041001, 2012022, 2012024, 2082002, 2102001];
 /// Orbis Station's guide, and the passages to the platforms: (vehicle,
-/// destination, passage), as `station_in` names them. The passages to Mu
-/// Lung's crane and Ereve's ferry are left out until those run.
+/// destination, passage), as `station_in` names them.
 const ISA: i32 = 2012006;
 const ORBIS_TUNNEL: i32 = 200000110;
-const ISA_PLATFORMS: [(&str, &str, i32); 4] = [
+const ISA_PLATFORMS: [(&str, &str, i32); 6] = [
     ("Ship", "Victoria Island", ORBIS_TUNNEL),
     ("Ship", "Ludibrium", 200000120),
     ("Ship", "Leafre", 200000130),
+    ("Hak", "Mu Lung", 200000140),
     ("Genie", "Ariant", 200000150),
+    ("Ship", "Ereve", 200000160),
 ];
+/// The ferries' pilots, each with the one ride they sell and its fare
+/// (Cosmic's): Kiru between Orbis and Ereve, Kiriru between Ellinia and
+/// Ereve, and Puro between Lith Harbor and Rien.
+const FERRIES: [(i32, rides::Ride, i32); 6] = [
+    (1100008, rides::ORBIS_TO_EREVE, 1000),
+    (1100004, rides::EREVE_TO_ORBIS, 1000),
+    (1100007, rides::ELLINIA_TO_EREVE, 1000),
+    (1100003, rides::EREVE_TO_ELLINIA, 1000),
+    (1200004, rides::LITH_TO_RIEN, 800),
+    (1200003, rides::RIEN_TO_LITH, 800),
+];
+/// The crane (`crane`), on Orbis Station's platform, at Mu Lung Temple and
+/// in Herb Town: a ride between Orbis and Mu Lung, and straight between Mu
+/// Lung and Herb Town (Cosmic's fares).
+const CRANE: i32 = 2090005;
+const CRANE_PLATFORM: i32 = 200000141;
+const MU_LUNG_TEMPLE: i32 = 250000100;
+const HERB_TOWN: i32 = 251000000;
+const CRANE_FARE: i32 = 1500;
+const HERB_TOWN_FARE: i32 = 500;
 /// Victoria Island's Regular Cabs (`taxi1`-`taxi6`), each with its fares
 /// to the other towns (Cosmic's v83 fares). Beginners pay a tenth.
 const REGULAR_CABS: [(i32, [(i32, i32); 5]); 6] = [
@@ -853,6 +875,9 @@ impl NpcScript {
         if let Some(&(_, fare)) = FLORINA_GUIDES.iter().find(|(guide, _)| *guide == npc_id) {
             return Some(florina_guide(npc_id, fare, player));
         }
+        if let Some(&(_, ride, fare)) = FERRIES.iter().find(|(pilot, ..)| *pilot == npc_id) {
+            return Some(ferry(npc_id, ride, fare, player));
+        }
         match npc_id {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
             SPARKLING_CRYSTAL => sparkling_crystal(player),
@@ -872,6 +897,7 @@ impl NpcScript {
             PISON => Some(pison(player)),
             THOMAS_SWIFT => thomas_swift(player),
             AUDREY => audrey(player),
+            CRANE => crane(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
             JEFF => Some(jeff(player)),
@@ -2440,6 +2466,76 @@ fn thomas_swift(player: &Player) -> Option<NpcScript> {
     ))
 }
 
+/// A choice of a trip to `to` for `fare`, which on a yes pays and `warp`s.
+fn fare_choice(to: i32, fare: i32, warp: Effect, player: &Player) -> (String, Vec<Page>) {
+    let (map, price) = (to.to_string(), fare.to_string());
+    let args = [("map", map.as_str()), ("price", price.as_str())];
+    let ask = content::text().get(keys::FERRY_ASK, &args);
+    let pages = ride(
+        ask,
+        Some(keys::FERRY_DECLINE),
+        keys::FERRY_SHORT,
+        fare,
+        warp,
+        player,
+    );
+    (content::text().get(keys::FERRY_CHOICE, &args), pages)
+}
+
+/// A ferry's pilot: aboard for the fare, and the ride map's timer does the
+/// rest.
+fn ferry(npc_id: i32, ride: rides::Ride, fare: i32, player: &Player) -> NpcScript {
+    let warp = Effect::WarpToPortal(ride.map, 0);
+    let choices = vec![fare_choice(ride.to.0, fare, warp, player)];
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![Page::Menu {
+            text: text(keys::FERRY_INTRO),
+            choices,
+        }],
+    );
+    script.refused = Some(text(keys::FERRY_SHORT));
+    script
+}
+
+/// The crane from where the player stands. `None` elsewhere.
+fn crane(player: &Player) -> Option<NpcScript> {
+    let aboard = |ride: rides::Ride| Effect::WarpToPortal(ride.map, 0);
+    let to_herb_town = Effect::WarpToPortal(HERB_TOWN, 0);
+    let pages = match player.stats.map_id {
+        CRANE_PLATFORM => vec![Page::Menu {
+            text: text(keys::FERRY_INTRO),
+            choices: vec![fare_choice(
+                MU_LUNG_TEMPLE,
+                CRANE_FARE,
+                aboard(rides::ORBIS_TO_MU_LUNG),
+                player,
+            )],
+        }],
+        MU_LUNG_TEMPLE => vec![Page::Menu {
+            text: text(keys::FERRY_INTRO),
+            choices: vec![
+                fare_choice(
+                    CRANE_PLATFORM,
+                    CRANE_FARE,
+                    aboard(rides::MU_LUNG_TO_ORBIS),
+                    player,
+                ),
+                fare_choice(HERB_TOWN, HERB_TOWN_FARE, to_herb_town, player),
+            ],
+        }],
+        // Just the question, with no menu.
+        HERB_TOWN => {
+            let back = Effect::WarpToPortal(MU_LUNG_TEMPLE, 0);
+            fare_choice(MU_LUNG_TEMPLE, HERB_TOWN_FARE, back, player).1
+        }
+        _ => return None,
+    };
+    let mut script = NpcScript::new(CRANE, pages);
+    script.refused = Some(text(keys::FERRY_SHORT));
+    Some(script)
+}
+
 /// Audrey's rides around Malaysia from where the player stands. `None`
 /// elsewhere.
 fn audrey(player: &Player) -> Option<NpcScript> {
@@ -3713,7 +3809,13 @@ mod tests {
         }
         assert!(NpcScript::for_npc(2041001, &waiting(220000100)).is_none());
 
-        for (choice, passage) in [(0, ORBIS_TUNNEL), (2, 200000130), (3, 200000150)] {
+        for (choice, passage) in [
+            (0, ORBIS_TUNNEL),
+            (2, 200000130),
+            (3, 200000140),
+            (4, 200000150),
+            (5, 200000160),
+        ] {
             let mut isa = NpcScript::for_npc(ISA, &player(50)).unwrap();
             assert_eq!(kind(&isa.begin()), Some(4));
             assert_eq!(
@@ -4040,6 +4142,53 @@ mod tests {
             );
         }
         assert!(NpcScript::for_npc(THOMAS_SWIFT, &rider(0, 0, 101000000)).is_none());
+    }
+
+    #[test]
+    fn the_ferries_and_the_crane_take_a_fare_and_board_the_ride() {
+        // (npc, where it stands, choice, fare, where a yes warps, where the
+        // choice says it goes)
+        for (npc, from, choice, fare, warp, to) in [
+            (1100008, 200000161, Some(0), 1000, (200090020, 0), 130000210),
+            (1100004, 130000210, Some(0), 1000, (200090021, 0), 200000161),
+            (1100007, 101000400, Some(0), 1000, (200090030, 0), 130000210),
+            (1100003, 130000210, Some(0), 1000, (200090031, 0), 101000400),
+            (1200004, 104000000, Some(0), 800, (200090060, 0), 140020300),
+            (1200003, 140020300, Some(0), 800, (200090070, 0), 104000000),
+            (CRANE, 200000141, Some(0), 1500, (200090300, 0), 250000100),
+            (CRANE, 250000100, Some(0), 1500, (200090310, 0), 200000141),
+            (CRANE, 250000100, Some(1), 500, (251000000, 0), 251000000),
+            (CRANE, 251000000, None, 500, (250000100, 0), 250000100),
+        ] {
+            let start = |meso| {
+                let mut ride = NpcScript::for_npc(npc, &rider(0, meso, from)).unwrap();
+                let first = ride.begin();
+                let ask = match choice {
+                    Some(choice) => {
+                        assert_eq!(kind(&first), Some(4));
+                        assert!(menu_text(&first).contains(&format!("#m{to}#")));
+                        ride.respond(ScriptInput::Select(choice)).unwrap()
+                    }
+                    None => first,
+                };
+                assert_eq!(kind(&ask), Some(1));
+                ride
+            };
+            let mut ride = start(fare);
+            assert!(ride.refused.is_some());
+            assert_eq!(
+                ride.respond(ScriptInput::Yes).unwrap().effects,
+                [
+                    Effect::SpendMeso(fare),
+                    Effect::WarpToPortal(warp.0, warp.1)
+                ]
+            );
+            let mut short = start(fare - 1);
+            assert!(short.respond(ScriptInput::Yes).unwrap().effects.is_empty());
+            let mut no = start(fare);
+            assert!(no.respond(ScriptInput::No).unwrap().effects.is_empty());
+        }
+        assert!(NpcScript::for_npc(CRANE, &rider(0, 0, 100000000)).is_none());
     }
 
     #[test]
