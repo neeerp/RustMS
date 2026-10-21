@@ -406,6 +406,27 @@ namespace ms
 			});
 		}
 
+		// v83 FUN_00a0a63f, type 0x13: a meso sack asks before it opens. The
+		// last request is waited for only once the player says yes.
+		void use_meso_bag(int16_t slot, int32_t item_id)
+		{
+			if (in_mini_room())
+				return;
+
+			nl::node info = nl::nx::item["Cash"]["0520.img"]["0" + std::to_string(item_id)]["info"];
+
+			if (!info)
+				return;
+
+			int32_t meso = info["meso"];
+
+			UI::get().emplace<UIYesNo>("Will you use the meso bag\\nto receive " + std::to_string(meso) + " mesos?", [=](bool yes)
+			{
+				if (yes && may_use_cash_item() && Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
+					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+			});
+		}
+
 		// Whether a megaphone's line is refused, saying why if v83 does.
 		bool megaphone_refused(Megaphones::Refusal refusal)
 		{
@@ -1065,6 +1086,8 @@ namespace ms
 							name_pet(slot, item_id);
 						else if (item_id / 10000 == 537)
 							use_chalkboard(slot, item_id);
+						else if (item_id / 10000 == 520)
+							use_meso_bag(slot, item_id);
 						else if (item_id / 10000 == 504)
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 507)

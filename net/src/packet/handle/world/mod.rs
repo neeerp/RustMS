@@ -24,6 +24,7 @@ mod logged_in;
 mod map_transfer;
 mod megaphone;
 mod meso_drop;
+mod meso_sack;
 mod messenger;
 mod monster_book_cover;
 mod mount;

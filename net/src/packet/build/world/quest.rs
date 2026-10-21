@@ -59,6 +59,15 @@ pub fn build_quest_items_full(quest_id: i16) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// `UPDATE_QUEST_INFO` mode 14: "You may not possess more than one of this
+/// item." (FUN_00959a73).
+pub fn build_quest_only_one() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(14)?;
+    Ok(p)
+}
+
 /// `UPDATE_QUEST_INFO` mode 11: "You do not have enough mesos."
 pub fn build_quest_short_of_mesos() -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -120,6 +129,14 @@ mod tests {
 
     /// FILETIME of the unix epoch plus 1000 seconds.
     const FILETIME_1000S: i64 = 116_444_746_000_000_000;
+
+    #[test]
+    fn an_only_one_refusal_is_mode_14_alone() {
+        let packet = build_quest_only_one().unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(14);
+        expect.end();
+    }
 
     #[test]
     fn quest_time_is_a_filetime() {

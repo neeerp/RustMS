@@ -54,6 +54,25 @@ INVENTORY_OPERATION removals and, if a worn item went, the refitted HP and MP
 and the new look for the map. Sealed items (mode 11) and expiring skills
 (mode 13) aren't implemented.
 
+Items with `info/expireOnLogout` (127 of them, mostly event and PQ items)
+go when their owner logs out: the client actor's cleanup takes them
+(`net::items::drop_logout_items`) before the final save, but not on a channel
+change. The client shows nothing. A crash before the save leaves them, since
+the server can't yet tell a fresh login from a channel change.
+
+## One-of-a-kind items
+
+An item with `info/only` comes alone, and not to someone holding one, worn
+or not (`net::items::refuses_only`). Each way in refuses it differently, as
+v83 has no single code (report c005):
+- Pickup: SHOW_STATUS_INFO mode 0, -2 ("This item is unavailable for the
+  pick-up.") plus the unlock, and the drop goes back on the ground.
+- Quest reward: UPDATE_QUEST_INFO mode 14.
+- NPC shop: result 3 (inventory full).
+- Script `GiveItem`: the effect isn't applied.
+- Taking it out of the Cash Shop: inventory full. The client refuses this one
+  itself.
+
 ## Client moves
 
 ITEM_MOVE (`0x47`: tick, type, from, to, quantity) is handled by
@@ -365,6 +384,15 @@ asks before using the rock on the selected map, or uses it at once on the
 typed name once the name is valid and isn't the player's own. Enter is MOVE
 and Escape closes the window, which closes before the rock is used. A refused
 rock shows the result as a notice, naming the character for result 6.
+
+### Meso sacks
+
+A meso sack (5200000-5200002) holds `info/meso` mesos (1, 5 or 10 million).
+The client asks "Will you use the meso bag to receive N mesos?" and sends
+USE_CASH_ITEM with no body. The server takes one sack and adds the mesos:
+STAT_CHANGED with the mesos, INVENTORY_OPERATION, and SHOW_STATUS_INFO
+mode 5 ("You have gained mesos"). A sack that would pass 2^31 - 1 mesos
+stays shut with only the unlock.
 
 ### Writs of Solomon
 

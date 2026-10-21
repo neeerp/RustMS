@@ -73,6 +73,8 @@ pub enum QuestRejection {
     Mesos,
     /// The item rewards don't fit.
     InventoryFull,
+    /// A one-of-a-kind reward the player already has.
+    OnlyOne,
     /// The picked reward isn't one of those offered.
     Choice,
 }
@@ -336,6 +338,9 @@ pub fn apply_items(
     }
     for &(item_id, count, minutes) in items.iter().filter(|(_, count, _)| *count > 0) {
         let quantity = i16::try_from(count).unwrap_or(i16::MAX);
+        if crate::items::refuses_only(&player.inventory, item_id, count) {
+            return Err(QuestRejection::OnlyOne);
+        }
         let until = minutes.map(|m| now + Duration::from_secs(60 * u64::try_from(m).unwrap_or(0)));
         let given = crate::items::give_until(&mut player.inventory, item_id, quantity, until);
         changes.extend(given.map_err(|error| match error {

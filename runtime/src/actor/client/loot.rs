@@ -130,6 +130,23 @@ impl ClientActor {
         }
         let mut packets = Vec::new();
         let player = &mut self.in_game_mut()?.player;
+        let incoming = match &drop.loot {
+            Loot::Item {
+                item_id, quantity, ..
+            } => Some((*item_id, *quantity)),
+            Loot::Dropped(item) => Some((item.item_id, item.quantity)),
+            Loot::Mesos(_) => None,
+        };
+        if incoming.is_some_and(|(id, quantity)| {
+            net::items::refuses_only(&player.inventory, id, quantity.into())
+        }) {
+            // A second one-of-a-kind item: "This item is unavailable for
+            // the pick-up." and back on the ground (report c005).
+            packets.push(inventory::build_item_unavailable()?);
+            packets.push(stat::build_stat_update(true, &[])?);
+            self.send_all(&mut packets).await?;
+            return Ok(false);
+        }
         let (given, item_id, quantity) = match &drop.loot {
             Loot::Mesos(amount) => {
                 player.meso = player.meso.saturating_add(*amount);

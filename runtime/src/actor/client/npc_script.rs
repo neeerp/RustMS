@@ -140,6 +140,13 @@ impl ClientActor {
                     )?);
                 }
                 Effect::GiveItem { item_id, quantity } => {
+                    if net::items::refuses_only(&next.inventory, *item_id, (*quantity).into()) {
+                        warn!(
+                            item_id,
+                            "Script item is one of a kind and held; nothing applied"
+                        );
+                        return Ok(Applied::NoRoom);
+                    }
                     let changes = match net::items::give(&mut next.inventory, *item_id, *quantity) {
                         Ok(changes) => changes,
                         Err(error) => {

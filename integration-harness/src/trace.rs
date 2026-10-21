@@ -78,6 +78,8 @@ pub struct Trace {
     pub gains: Vec<i32>,
     /// Fame gains (or losses) from SHOW_STATUS_INFO mode 4.
     pub fame_gains: Vec<i32>,
+    /// Mesos gained without a pickup, shown in chat (SHOW_STATUS_INFO 5).
+    pub meso_gains: Vec<i32>,
     /// Every STAT_CHANGED, as values by mask bit.
     pub stat_updates: Vec<BTreeMap<i32, i64>>,
     /// HP_TAKEN (0xD4): HP about to go without a hit, in order.
@@ -110,6 +112,8 @@ pub struct Trace {
     pub images: Vec<String>,
     /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
     pub inventory_full: usize,
+    /// "This item is unavailable for the pick-up." (SHOW_STATUS_INFO 0, -2).
+    pub unavailable: usize,
     /// NPC dialogue prompts: (npc, message type).
     pub prompts: Vec<(i32, u8)>,
     /// Their text, in the same order.
@@ -263,7 +267,11 @@ impl Trace {
             match r.read_byte().unwrap() {
                 // Only the "inventory full" notice; item gains from
                 // pickups are not recorded.
-                0 if r.read_byte().unwrap() == 0xFF => self.inventory_full += 1,
+                0 => match r.read_byte().unwrap() {
+                    0xFF => self.inventory_full += 1,
+                    0xFE => self.unavailable += 1,
+                    _ => {}
+                },
                 1 => {
                     let (quest, state) = (r.read_short().unwrap(), r.read_byte().unwrap());
                     if state == 1 {
@@ -279,6 +287,7 @@ impl Trace {
                     self.gains.push(r.read_int().unwrap());
                 }
                 4 => self.fame_gains.push(r.read_int().unwrap()),
+                5 => self.meso_gains.push(r.read_int().unwrap()),
                 8 => {
                     for _ in 0..r.read_byte().unwrap() {
                         self.expired.push(r.read_int().unwrap());

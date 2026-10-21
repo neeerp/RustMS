@@ -134,6 +134,16 @@ pub fn build_inventory_full() -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO 0/-2: "This item is unavailable for the pick-up.", as
+/// for a one-of-a-kind item the player already has (FUN_00a20ad9).
+pub fn build_item_unavailable() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(0)?;
+    p.write_byte(0xFE)?;
+    Ok(p)
+}
+
 /// SHOW_ITEM_GAIN_INCHAT mode 3: an item gain line in the chat log (quest
 /// rewards and turn-ins).
 pub fn build_item_gain_in_chat(item_id: i32, quantity: i32) -> Result<Packet, NetworkError> {
@@ -190,6 +200,17 @@ mod tests {
             .byte(2);
         expect.byte(1).byte(2).short(2).short(7);
         expect.byte(3).byte(4).short(1);
+        expect.end();
+    }
+
+    #[test]
+    fn an_unavailable_pickup_is_status_0_minus_2() {
+        let packet = build_item_unavailable().unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(0)
+            .byte(0xFE);
         expect.end();
     }
 
