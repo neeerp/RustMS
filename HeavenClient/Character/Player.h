@@ -348,6 +348,10 @@ namespace ms
 		// Obtain a reference to the player's questlog.
 		QuestLog &get_quests();
 
+		// Whether the player's fame, items and skills meet a quest's start
+		// requirements (start_holdings_met).
+		bool quest_holdings_met(const QuestInfo &quest) const;
+
 		// Obtain a reference to the player's telerock locations.
 		TeleportRock &get_teleport_rock();
 

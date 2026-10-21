@@ -61,7 +61,8 @@ namespace ms
 				auto& stats = player().get_stats();
 
 				return quest_available(quest, stats.get_stat(MapleStat::Id::JOB), stats.get_stat(MapleStat::Id::LEVEL),
-					[](int16_t id) { return state(id); });
+					[](int16_t id) { return state(id); },
+					[](const QuestInfo& info) { return player().quest_holdings_met(info); });
 			}
 
 			QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id)

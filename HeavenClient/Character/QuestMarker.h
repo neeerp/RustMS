@@ -88,15 +88,42 @@ namespace ms
 		return QuestStop::NONE;
 	}
 
-	template<class Status>
+	// Whether the player's fame, items and skills meet a quest's start
+	// requirements, as v83 checks them (FUN_00721163). `held` gives how many
+	// of an item the player holds, plus one if a copy is worn. `has_skill`
+	// is v83's loose test: any skill not hidden from the skill book counts,
+	// and a hidden one once it has a record (FUN_007619b0).
+	template<class Held, class HasSkill>
+	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill)
+	{
+		// v83 compares fame unsigned, so negative fame passes.
+		if (quest.min_fame != 0 && static_cast<uint16_t>(fame) < static_cast<uint16_t>(quest.min_fame))
+			return false;
+
+		for (const auto& requirement : quest.held_items)
+		{
+			int32_t count = held(requirement.first);
+
+			if (requirement.second > 0 ? count < requirement.second :
+				requirement.second == 0 ? count != 0 : count > -requirement.second)
+				return false;
+		}
+
+		return std::all_of(quest.skills.begin(), quest.skills.end(),
+			[&](const auto& requirement) { return has_skill(requirement.first) == requirement.second; });
+	}
+
+	// `holds` checks start_holdings_met for the player.
+	template<class Status, class Holds>
 	bool quest_available(const QuestInfo& quest, int16_t job, int16_t level,
-		Status status, bool all_levels = false)
+		Status status, Holds holds, bool all_levels = false)
 	{
 		return status(quest.id) == 0 &&
 			(quest.jobs.empty() || std::find(quest.jobs.begin(), quest.jobs.end(), job) != quest.jobs.end()) &&
 			(all_levels || (level >= quest.min_level && level <= quest.max_level)) &&
 			std::all_of(quest.prerequisites.begin(), quest.prerequisites.end(),
-				[&](const auto& requirement) { return status(requirement.first) == requirement.second; });
+				[&](const auto& requirement) { return status(requirement.first) == requirement.second; }) &&
+			holds(quest);
 	}
 
 	// The icon over an NPC, as v83 chooses it (FUN_006d1779). The NPC's quests
@@ -104,11 +131,12 @@ namespace ms
 	// quest it can finish now (kills and items in) gives the closed book;
 	// otherwise a quest it can start gives the bulb, and a started quest the
 	// open book. Kept free of graphics so the choice can be tested.
-	// `progress` gives a started quest's progress string (its kill counts).
-	template<class Status, class Count, class Progress>
+	// `progress` gives a started quest's progress string (its kill counts),
+	// and `holds` checks start_holdings_met.
+	template<class Status, class Count, class Progress, class Holds>
 	QuestMarker select_quest_marker(int32_t npc_id, int16_t job,
 		const std::vector<QuestInfo>& quests, Status status, int16_t level, Count count,
-		Progress progress)
+		Progress progress, Holds holds)
 	{
 		bool available = false, in_progress = false;
 
@@ -129,7 +157,7 @@ namespace ms
 				in_progress = true;
 			}
 			else if ((quest.start_npc == 0 || quest.start_npc == npc_id) &&
-				quest_available(quest, job, level, status))
+				quest_available(quest, job, level, status, holds))
 			{
 				available = true;
 			}

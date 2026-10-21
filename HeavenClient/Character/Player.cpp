@@ -1929,6 +1929,18 @@ namespace ms
 		return questlog;
 	}
 
+	bool Player::quest_holdings_met(const QuestInfo &quest) const
+	{
+		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
+			[&](int32_t id)
+			{
+				bool worn = inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0;
+
+				return inventory.get_total_item_count(id) + (worn ? 1 : 0);
+			},
+			[&](int32_t id) { return skillbook.has_skill(id) || !SkillData::get(id).is_invisible(); });
+	}
+
 	TeleportRock &Player::get_teleport_rock()
 	{
 		return teleportrock;

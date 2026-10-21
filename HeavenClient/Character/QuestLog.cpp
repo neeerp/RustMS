@@ -108,24 +108,26 @@ namespace ms
 
 	int16_t QuestLog::state(int16_t id) const { return completed.count(id) ? 2 : started.count(id) ? 1 : 0; }
 
-	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level, bool all_levels) const
+	std::vector<int16_t> QuestLog::available_quests(int16_t job, int16_t level,
+		const std::function<bool(const QuestInfo&)>& holds, bool all_levels) const
 	{
 		std::vector<int16_t> result;
 		for (const auto& quest : QuestCatalog::get().quests())
-			if (quest_available(quest, job, level, [&](int16_t id) { return state(id); }, all_levels))
+			if (quest_available(quest, job, level, [&](int16_t id) { return state(id); }, holds, all_levels))
 				result.push_back(quest.id);
 		return result;
 	}
 
 	QuestMarker QuestLog::npc_marker(int32_t npc_id, int16_t job, int16_t level,
-		const std::function<int32_t(int32_t)>& count) const
+		const std::function<int32_t(int32_t)>& count,
+		const std::function<bool(const QuestInfo&)>& holds) const
 	{
 		return select_quest_marker(npc_id, job, QuestCatalog::get().quests(), [&](int16_t id) { return state(id); }, level, count,
 			[&](int16_t id)
 			{
 				auto iter = started.find(id);
 				return iter == started.end() ? std::string() : iter->second;
-			});
+			}, holds);
 	}
 
 	bool QuestLog::is_started(int16_t qid)

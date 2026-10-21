@@ -139,7 +139,8 @@ namespace ms
 		{
 			const Inventory& inventory = player.get_inventory();
 			QuestMarker next = quests.npc_marker(npcid, job, level,
-				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); });
+				[&](int32_t item_id) { return static_cast<int32_t>(inventory.get_total_item_count(item_id)); },
+				[&](const QuestInfo& quest) { return player.quest_holdings_met(quest); });
 			if (next != quest_marker)
 			{
 				quest_marker = next;
