@@ -76,6 +76,7 @@ pub struct SetFieldPacket {
     pub job: i16,
     pub str: i16,
     pub max_hp: i16,
+    pub fame: i16,
     pub hair: i32,
     pub ap: i16,
     pub sp: i16,
@@ -176,6 +177,7 @@ struct CharacterMeta {
     job: i16,
     str: i16,
     max_hp: i16,
+    fame: i16,
     hair: i32,
     ap: i16,
     sp: i16,
@@ -906,6 +908,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         job: meta.job,
         str: meta.str,
         max_hp: meta.max_hp,
+        fame: meta.fame,
         hair: meta.hair,
         ap: meta.ap,
         sp: meta.sp,
@@ -1342,7 +1345,8 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
     let ap = cursor.read_short().map_err(|e| e.to_string())?;
     let sp = cursor.read_short().map_err(|e| e.to_string())?;
     let exp = cursor.read_int().map_err(|e| e.to_string())?;
-    skip(cursor, 2 + 4)?;
+    let fame = cursor.read_short().map_err(|e| e.to_string())?;
+    skip(cursor, 4)?;
     let map_id = cursor
         .read_int()
         .map_err(|e| format!("failed to read character map id: {e}"))?;
@@ -1359,6 +1363,7 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
         job,
         str,
         max_hp,
+        fame,
         hair,
         ap,
         sp,

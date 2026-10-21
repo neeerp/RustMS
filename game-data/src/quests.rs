@@ -29,7 +29,7 @@ pub const SCRIPTS: &[&str] = &["q1021s", "q1021e"];
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-pub const END_ACTIONS: &[&str] = &["exp", "money", "nextQuest", "item", "skill"];
+pub const END_ACTIONS: &[&str] = &["exp", "money", "pop", "nextQuest", "item", "skill"];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 pub const ITEM_ACTION_KEYS: &[&str] = &["id", "count", "job", "gender", "prop"];
 /// Keys of an `Act/1/skill/<k>` entry the server applies.
@@ -75,6 +75,8 @@ pub struct QuestTemplate {
     pub exp: i32,
     /// Mesos given on completion; negative takes them (and needs them held).
     pub money: i32,
+    /// Fame given on completion (`pop`); negative takes it.
+    pub fame: i16,
     pub next_quest: Option<i16>,
     /// `QuestInfo` `autoStart` and `autoComplete`: the client's quest alert
     /// offers the quest wherever the player is.
@@ -356,6 +358,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_script: script(nx, end, "endscript")?,
         exp,
         money: action_int("money")?.unwrap_or(0),
+        fame: small(action_int("pop")?.unwrap_or(0), "fame")?,
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,

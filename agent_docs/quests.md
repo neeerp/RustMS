@@ -109,14 +109,16 @@ inventory is full."). `startscript`/
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
-client gets mode 11 ("You do not have enough mesos."). Skill actions
+client gets mode 11 ("You do not have enough mesos."). `pop` gives (or
+takes) fame on completion, with a fame stat update and SHOW_STATUS_INFO
+mode 4 in the chat log ("You have gained fame. (+n)"). Skill actions
 (`net::quests::apply_skills`) teach a skill to a player whose job is exactly
 one in the entry's `job` list, as v83's reward list shows them (a 0 there is
 the beginner job, not "any"). The level and master level become the entry's
 where the player's are lower, as Cosmic does, and the changed skills follow
 the completion in one UPDATE_SKILLS. `onlyMasterLevel` and `acquire` stay
 unsupported. A quest with
-any other key (`pop`, `infoex`,
+any other key (`infoex`,
 `pet`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
