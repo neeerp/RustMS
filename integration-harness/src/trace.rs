@@ -36,6 +36,8 @@ pub mod stat {
 /// Wire widths of the STAT_CHANGED values, in mask order.
 /// GIVE_BUFF's flags with only Speed Infusion's bit 86.
 const INFUSION: [u8; 16] = [0, 0, 0, 0, 0, 0, 0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+/// GIVE_BUFF's flags with only Energy Charge's bit 82.
+const ENERGY: [u8; 16] = [0, 0, 0, 0, 0, 0, 0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 const STAT_WIDTHS: [(i32, u8); 20] = [
     (0x1, 1),
@@ -678,6 +680,14 @@ impl Trace {
             let value = r.read_int().unwrap() as i16;
             let skill = r.read_int().unwrap();
             r.read_bytes(10).unwrap();
+            let seconds = i32::from(r.read_short().unwrap());
+            self.buffs.push((skill, value, seconds * 1000));
+        } else if op == SendOpcode::GiveBuff as i16 && p.bytes.get(2..18) == Some(&ENERGY) {
+            // Energy Charge's gauge: two-state data after the defense bytes.
+            r.read_bytes(16 + 2).unwrap();
+            let value = r.read_int().unwrap() as i16;
+            let skill = r.read_int().unwrap();
+            r.read_bytes(5).unwrap();
             let seconds = i32::from(r.read_short().unwrap());
             self.buffs.push((skill, value, seconds * 1000));
         } else if op == SendOpcode::GiveBuff as i16 {

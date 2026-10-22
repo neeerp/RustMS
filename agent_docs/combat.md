@@ -625,7 +625,9 @@ A few skills do more than buff:
   on a tamed monster (FUN_0095f135). Neither side plays an action or an
   effect of the attacker's, only the skill's `hit` on the mob. The server
   takes it through the attack handler (`AttackKind::Body`) and sends the
-  map ENERGY_ATTACK (0xBD); Energy Charge comes no other way.
+  map ENERGY_ATTACK (0xBD); Energy Charge comes no other way. Harness
+  `energy_charge` fills a Marauder's gauge 192 a swing to 10000 and checks
+  that Energy Blast waits for it.
 - **Weapon charges** (`net::charge`, 1211003 to 1211008 and the Paladin's
   1221003 and 1221004) raise every weapon hit by the charge's `damage`
   and its element; the client works the damage out and puts no status on
