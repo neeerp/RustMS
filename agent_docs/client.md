@@ -285,6 +285,14 @@ from `UI.nx`. Moved so far:
   or the close button leaves. A speaker shows the `chatBalloon` dots for a
   few seconds. Invitations arrive as an invitation notice, whose O does
   nothing while a room is open.
+  - The log says "- 'name' has entered." for our own join and for an
+    arrival the server announces, and "- 'name' have left the room." when
+    someone leaves. A negative seat from the server means we couldn't join:
+    we sit in seat 0 and are told so.
+  - As in v83 (report b037), every mode but the invitation is dropped while
+    no room is open, and a new look for an empty seat is dropped. Mode 8
+    resends all three seats silently (0 empty, 1 unchanged, else a member);
+    the server doesn't send it.
 - **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
   `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
   background. OK saves the boxes as the `Allow*` settings; the client doesn't

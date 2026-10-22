@@ -57,12 +57,22 @@ namespace ms
 		// Opens a new messenger, or leaves the one we are in.
 		static void toggle();
 
-		// The server seated us in a slot; shows the window.
-		static void seat(uint8_t slot);
+		// The server seated us in a slot; shows the window. A negative slot
+		// means we couldn't join, and v83 seats us first (0x84f281).
+		static void seat(int8_t slot);
 
-		void set_member(uint8_t slot, const CharLook &look, const std::string &name);
+		// Someone took a seat, announced in the log if `announce`.
+		void set_member(uint8_t slot, const CharLook &look, const std::string &name, bool announce = false);
 
+		// Someone left, said in the log (0x84f36c).
 		void remove_member(uint8_t slot);
+
+		// A new look for whoever sits in `slot`; an empty seat stays empty
+		// (0x85194f).
+		void update_look(uint8_t slot, const CharLook &look);
+
+		// Empties a seat without a word, as mode 8 does (0x8519f2).
+		void empty_seat(uint8_t slot);
 
 		// A line someone said, formatted as "name : text".
 		void add_chat(const std::string &line);

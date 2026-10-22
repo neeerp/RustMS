@@ -268,7 +268,7 @@ namespace ms
 			MessengerOpenPacket(0).dispatch();
 	}
 
-	void UIMessenger::seat(uint8_t slot)
+	void UIMessenger::seat(int8_t slot)
 	{
 		auto messenger = UI::get().get_element<UIMessenger>();
 
@@ -277,11 +277,24 @@ namespace ms
 		else if (!messenger->is_active())
 			messenger->makeactive();
 
-		if (messenger)
+		if (!messenger)
+			return;
+
+		if (slot < 0)
+		{
+			messenger->join(0);
+			messenger->add_note("- You have been unable to join the invited chat room.");
+		}
+		else
+		{
 			messenger->join(slot);
+
+			if (static_cast<size_t>(slot) < SLOTS)
+				messenger->add_note("- '" + Stage::get().get_player().get_name() + "' has entered.");
+		}
 	}
 
-	void UIMessenger::set_member(uint8_t slot, const CharLook &look, const std::string &name)
+	void UIMessenger::set_member(uint8_t slot, const CharLook &look, const std::string &name, bool announce)
 	{
 		if (slot >= SLOTS)
 			return;
@@ -291,6 +304,9 @@ namespace ms
 		member.look = look;
 		member.name.change_text(name);
 		buttons[Buttons::SLOT + slot]->set_active(false);
+
+		if (announce)
+			add_note("- '" + name + "' has entered.");
 	}
 
 	void UIMessenger::remove_member(uint8_t slot)
@@ -298,7 +314,21 @@ namespace ms
 		if (slot >= SLOTS || slot == own_slot)
 			return;
 
+		if (members[slot].present)
+			add_note("- '" + members[slot].name.get_text() + "' have left the room.");
 		clear_member(slot);
+	}
+
+	void UIMessenger::update_look(uint8_t slot, const CharLook &look)
+	{
+		if (slot < SLOTS && members[slot].present)
+			members[slot].look = look;
+	}
+
+	void UIMessenger::empty_seat(uint8_t slot)
+	{
+		if (slot < SLOTS)
+			clear_member(slot);
 	}
 
 	void UIMessenger::add_chat(const std::string &line)
