@@ -106,7 +106,8 @@ bonus and the storage come in a later slice
    Whichever way they leave, the event's own items (`Event::items`, KPQ's
    coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
    `Event::take_items`, shown to the client unless they are logging out.
-   A blessing given on arrival (Orbis's, below) ends too.
+   A blessing given on arrival (Orbis's, below) ends too, told only to
+   the player, and not at all on logging out, when buffs go anyway.
 6. **Ending.** The event ends when its time is up, when its leader leaves
    or passes the lead to someone not in it, or when too few remain; once
    won, only when its last member leaves. It sends `EventEnded{id}`, and

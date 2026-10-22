@@ -466,20 +466,22 @@ impl ClientActor {
         };
         let changes = ticket.kind.event().take_items(&mut game.player);
         // The blessing stays in the event (Cosmic `playerUnregistered`).
-        let blessing = ticket.blessing.map(|item_id| -item_id);
+        // Only the player hears of it: they are leaving the map, and arrive
+        // on the next without it.
+        let unblessed = ticket
+            .blessing
+            .map(|item_id| game.player.buffs.cancel(-item_id))
+            .unwrap_or_default();
         if self.in_cash_shop {
-            if let Some(buff) = blessing {
-                game.player.buffs.cancel(buff);
-            }
             return Ok(());
-        }
-        if let Some(buff) = blessing {
-            self.end_buff(buff).await?;
         }
         self.send(&mut build_stop_clock()?).await?;
         if !changes.is_empty() {
             self.send(&mut build_inventory_operation(false, &changes)?)
                 .await?;
+        }
+        if !unblessed.is_empty() {
+            self.send_cancelled(&unblessed).await?;
         }
         Ok(())
     }

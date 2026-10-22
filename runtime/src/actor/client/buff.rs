@@ -337,7 +337,7 @@ impl ClientActor {
 
     /// Tell the player their buffs among `ended` ended, and bring HP and MP
     /// down to the max they left.
-    async fn send_cancelled(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
+    pub(super) async fn send_cancelled(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
         let mut packets = vec![buff::build_cancel_buff(ended)?];
         let player = &mut self.in_game_mut()?.player;
         if player.fit_hp_mp() {
@@ -347,7 +347,7 @@ impl ClientActor {
     }
 
     /// End one buff, e.g. a Puppet's when a mob broke it.
-    pub(super) async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
+    async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
         let ended = self.in_game_mut()?.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(());
