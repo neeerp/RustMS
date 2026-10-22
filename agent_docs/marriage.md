@@ -17,7 +17,9 @@ The `marriages` table (`db/src/marriage.rs`) has one row per couple:
 `Player.marriage` holds the couple's `game::marriage::MarriageRecord`. It is
 loaded with the character, and the character data sends it as the third
 ring list, a 0x30-byte record (`write_marriage_record`). The same record
-follows `MARRIAGE_RESULT` 11.
+follows `MARRIAGE_RESULT` 11. Its two item ids are the couple's wedding
+ring (`MarriageRecord::ring_id`), the box's ring among 1112803, 1112806,
+1112807 and 1112809. v83 draws the ring look with the first of them.
 
 ## Proposing
 
@@ -116,6 +118,33 @@ Engaged couples are told as well as married ones. The client doesn't
 tell the two apart, and whether v83's server told engaged couples is
 inferred (report b057 §6).
 
+## The ring look
+
+A couple wearing their wedding rings show it to the map (report b059).
+`SPAWN_PLAYER` and `UPDATE_CHAR_LOOK` both end with three ring blocks:
+crush, friendship and marriage (`write_ring_looks`). RustMS sends the
+first two empty. The marriage block is a flag, then the wearer's id, the
+partner's id, and the ring's item id. It is set while the character has a
+couple and wears a wedding ring in a ring slot
+(`Player::marriage_ring`), whatever the couple's status.
+Every viewer gets the real ids. v83 pairs a user with any other whose
+partner id is its own id, so zeros would pair strangers.
+
+A look update replaces the character's block, so wearing or taking off
+the ring updates the look. An engagement does too when the player already
+wears a ring.
+
+Each frame the client pairs two users when one's partner id is the
+other's id. The player's own block comes from its record and its worn
+rings, not from a packet. Within 700 px across and 500 px up or down, each
+of the two shows `Effect/ItemEff.img/<ring>/0`, a small mark. Within
+250 px across and 100 px up or down, the lower id also shows
+`<ring>/1`, the big effect, centred between the two. v83's placement is
+COM layer code that wasn't decoded. The mark is drawn at each
+character's feet, and the big effect at the point midway between their
+feet, with the sprites' own origins. Footage of a 2012 couple's ring
+agrees with this (inferred).
+
 ## Client
 
 - `Character/Marriage.h` has the record, the tokens, and the result
@@ -131,6 +160,11 @@ inferred (report b057 §6).
   follow v83's order: others, the partner, NPCs, portals, then the player.
   The world map shows `worldMap/lovePos`, the heart, on the partner's spot
   unless it is the player's own.
+- `marriage::read_ring_looks` reads the three ring blocks for
+  `SpawnCharHandler` and `UpdateCharLookHandler`. `OtherChar` keeps the
+  marriage block. `Stage::show_rings` pairs the wearers with
+  `marriage::ring_effects` each frame, and `Char::show_ring` draws the
+  result.
 - `ItemTooltip` puts "YOU ARE ENGAGED WITH : <name>" under a token's
   orange lines, in the same orange. A token keeps 16 px for the line even
   without a couple, as v83 does. `EquipTooltip` gives a wedding ring
@@ -151,7 +185,8 @@ answers, and the proposer waits until they withdraw.
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- The ring's look.
+- Crush and friendship rings: their cash serial numbers and the
+  character data's lists.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.
 
 Report b052 §7 lists them.

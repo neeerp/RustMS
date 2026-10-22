@@ -2800,6 +2800,7 @@ mod tests {
             item_effect: 0,
             consume_effect: 0,
             berserk: false,
+            marriage_ring: None,
             energy: None,
             dash: [None; 2],
             ride: None,

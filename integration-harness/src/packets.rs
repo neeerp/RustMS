@@ -126,6 +126,8 @@ pub struct SpawnPlayerPacket {
     pub chalkboard: Option<String>,
     /// Whether their Berserk aura shows.
     pub berserk: bool,
+    /// Their marriage ring block: (self, partner, ring), if they show one.
+    pub marriage_ring: Option<(i32, i32, i32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1168,8 +1170,8 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         .map_err(|e| format!("failed to read spawn-player pets: {e}"))?;
     let chalkboard = decode_spawn_player_chalkboard(&mut cursor)
         .map_err(|e| format!("failed to read spawn-player chalkboard: {e}"))?;
-    // The three rings, and no new year cards.
-    skip(&mut cursor, 4)?;
+    let marriage_ring = decode_ring_looks(&mut cursor)?;
+    skip(&mut cursor, 1)?; // no new year cards
     let berserk = cursor
         .read_byte()
         .map_err(|e| format!("failed to read spawn-player berserk: {e}"))?
@@ -1188,7 +1190,34 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         pets,
         chalkboard,
         berserk,
+        marriage_ring,
     })
+}
+
+/// The crush, friendship and marriage ring blocks that end a look in
+/// SPAWN_PLAYER and UPDATE_CHAR_LOOK; the marriage ring's (self, partner,
+/// ring), if shown.
+pub fn decode_ring_looks(cursor: &mut Cursor<&[u8]>) -> Result<Option<(i32, i32, i32)>, String> {
+    for _ in 0..2 {
+        if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
+            skip(cursor, 8 + 8 + 4)?;
+        }
+    }
+    if cursor.read_byte().map_err(|e| e.to_string())? == 0 {
+        return Ok(None);
+    }
+    let mut int = || cursor.read_int().map_err(|e| e.to_string());
+    Ok(Some((int()?, int()?, int()?)))
+}
+
+/// UPDATE_CHAR_LOOK: the character and their marriage ring block.
+pub fn decode_char_look(packet: &Packet) -> Result<(i32, Option<(i32, i32, i32)>), String> {
+    expect_opcode(packet, SendOpcode::UpdateCharLook as i16)?;
+    let mut cursor = Cursor::new(&packet.bytes[2..]);
+    let id = cursor.read_int().map_err(|e| e.to_string())?;
+    skip(&mut cursor, 1)?; // flags: the look
+    decode_look(&mut cursor)?;
+    Ok((id, decode_ring_looks(&mut cursor)?))
 }
 
 /// After the foothold and a byte, each pet behind a 1, then a 0.

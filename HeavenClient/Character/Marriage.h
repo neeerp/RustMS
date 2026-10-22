@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Template/Point.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -18,7 +20,8 @@ namespace ms
 		int32_t bride_id = 0;
 		// 1 engaged, 3 married.
 		int16_t status = 0;
-		// The ring boxes the two were engaged with.
+		// The couple's wedding rings; the player's own ring effect is the
+		// groom's (0x95b5c8).
 		int32_t groom_item = 0;
 		int32_t bride_item = 0;
 		std::string groom_name;
@@ -47,6 +50,37 @@ namespace ms
 		bool marks(const std::vector<int32_t>& spot_maps, int32_t own_map) const;
 	};
 
+	// A player's marriage ring block, as SPAWN_PLAYER and UPDATE_CHAR_LOOK
+	// give it (user +0x1f34, +0x1f38 and +0x1f3c, report b059).
+	struct MarriageRing
+	{
+		int32_t self_id = 0;
+		int32_t partner_id = 0;
+		int32_t item_id = 0;
+	};
+
+	// Someone on the map with a marriage ring block, where they stand.
+	struct RingWearer
+	{
+		int32_t id = 0;
+		Point<int16_t> position;
+		MarriageRing ring;
+	};
+
+	// What a character shows of a couple's ring (CUserPool::Update
+	// 0x9717b5): the small mark while the partner is on the same screen,
+	// and on the lower id of the two, the big effect while they stand
+	// close, `offset` away midway between them.
+	struct RingEffect
+	{
+		int32_t item_id = 0;
+		bool mark = false;
+		bool pair = false;
+		Point<int16_t> offset;
+
+		bool operator==(const RingEffect& other) const;
+	};
+
 	namespace marriage
 	{
 		constexpr int16_t ENGAGED = 1;
@@ -68,6 +102,17 @@ namespace ms
 		bool is_token(int32_t item_id);
 		// The wedding rings 1112803, 1112806, 1112807 and 1112809.
 		bool is_wedding_ring(int32_t item_id);
+		// The crush, friendship and marriage ring blocks that end a look in
+		// SPAWN_PLAYER (0x97fb2d) and UPDATE_CHAR_LOOK (0x98367e); the
+		// marriage ring, if any.
+		std::optional<MarriageRing> read_ring_looks(InPacket& recv);
+		// The player's own block, from the record while a wedding ring is
+		// worn (0x95b5c8): the groom or the bride by the player's gender, and
+		// the groom's ring.
+		std::optional<MarriageRing> own_ring(const std::optional<MarriageRecord>& record, bool female, bool wearing);
+		// Each wearer's effect, by id: two wearers are a couple when one's
+		// partner is the other (0x972d54), and each is in one couple at most.
+		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers);
 		// The tooltip's line naming the partner: 0x1069 on a token, 0x1068 on
 		// a wedding ring, whatever the record's status (0x8ef061, 0x8e90a8).
 		// Empty without a record or for any other item.

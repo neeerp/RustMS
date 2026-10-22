@@ -4,7 +4,7 @@
 use crate::connection::MapleTestConnection;
 use crate::hunting::Field;
 use crate::packets::{
-    build_all_chat, build_change_map, decode_item_stack, decode_set_field_warp,
+    build_all_chat, build_change_map, decode_char_look, decode_item_stack, decode_set_field_warp,
     decode_spawn_player, SpawnPlayerPacket,
 };
 use net::packet::op::SendOpcode;
@@ -199,6 +199,8 @@ pub struct Trace {
     pub family: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST and MARRIAGE_RESULT: (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
+    /// UPDATE_CHAR_LOOK: (character, marriage ring block), in order.
+    pub looks: Vec<(i32, Option<(i32, i32, i32)>)>,
     /// NOTIFY_MARRIED_PARTNER_MAP_TRANSFER: (map, partner), in order.
     pub partner_maps: Vec<(i32, i32)>,
     /// SHOW_STATUS_INFO mode 9: the info lines, in order.
@@ -606,6 +608,9 @@ impl Trace {
             || op == SendOpcode::MarriageResult as i16
         {
             self.marriage.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::UpdateCharLook as i16 {
+            self.looks
+                .push(decode_char_look(p).expect("UPDATE_CHAR_LOOK"));
         } else if op == SendOpcode::NotifyMarriedPartnerMapTransfer as i16 {
             self.partner_maps
                 .push((r.read_int().unwrap(), r.read_int().unwrap()));

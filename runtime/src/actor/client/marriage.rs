@@ -12,7 +12,7 @@ use net::packet::build::world::marriage::{
     build_couple_ended, build_engaged, build_marriage_notice, build_marriage_refusal,
     build_partner_map, build_proposal,
 };
-use net::{ClientId, RingRequest};
+use net::{ClientId, RingRequest, WorldAction};
 use packet::Packet;
 use tracing::warn;
 
@@ -211,14 +211,22 @@ impl ClientActor {
 
     /// Keep `next`, and show it unless the player is in the Cash Shop, which
     /// shows the whole inventory again on the way out. The couple's row is
-    /// already written, so the tokens are saved now too.
+    /// already written, so the tokens are saved now too. A wedding ring
+    /// worn starts or stops showing the couple's effect to the map.
     async fn commit_engagement(
         &mut self,
         next: Player,
         mut packets: Vec<Packet>,
     ) -> Result<(), RuntimeError> {
+        let ring = self.in_game()?.player.marriage_ring();
+        let look = (next.marriage_ring() != ring)
+            .then(|| inventory::build_char_look(&next))
+            .transpose()?;
         if self.commit_player(next, None, &mut packets).await? && !self.in_cash_shop {
             self.send_all(&mut packets).await?;
+            if let Some(look) = look {
+                Box::pin(self.apply(WorldAction::LookChanged(look))).await?;
+            }
         }
         self.save_if_dirty().await
     }

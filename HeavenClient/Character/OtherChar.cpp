@@ -102,6 +102,16 @@ namespace ms
 		attackspeed = as;
 	}
 
+	const std::optional<MarriageRing> &OtherChar::get_marriage_ring() const
+	{
+		return marriage_ring;
+	}
+
+	void OtherChar::set_marriage_ring(std::optional<MarriageRing> ring)
+	{
+		marriage_ring = ring;
+	}
+
 	void OtherChar::update_look(const LookEntry &newlook)
 	{
 		// The new look rides, and is morphed, as the old was.

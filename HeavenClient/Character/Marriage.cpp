@@ -3,6 +3,7 @@
 #include "../Net/InPacket.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 namespace ms
 {
@@ -43,8 +44,83 @@ namespace ms
 		return mapid != 0 && has(mapid) && !has(own_map);
 	}
 
+	bool RingEffect::operator==(const RingEffect& other) const
+	{
+		return item_id == other.item_id && mark == other.mark && pair == other.pair && offset == other.offset;
+	}
+
 	namespace marriage
 	{
+		std::optional<MarriageRing> read_ring_looks(InPacket& recv)
+		{
+			// A crush or friendship block: the two ring serials and the item.
+			for (int i = 0; i < 2; i++)
+				if (recv.read_bool())
+					recv.skip(8 + 8 + 4);
+
+			if (!recv.read_bool())
+				return std::nullopt;
+
+			MarriageRing ring;
+			ring.self_id = recv.read_int();
+			ring.partner_id = recv.read_int();
+			ring.item_id = recv.read_int();
+
+			return ring;
+		}
+
+		std::optional<MarriageRing> own_ring(const std::optional<MarriageRecord>& record, bool female, bool wearing)
+		{
+			if (!record || !wearing)
+				return std::nullopt;
+
+			MarriageRing ring;
+			ring.self_id = female ? record->bride_id : record->groom_id;
+			ring.partner_id = female ? record->groom_id : record->bride_id;
+			ring.item_id = record->groom_item;
+
+			return ring;
+		}
+
+		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers)
+		{
+			std::vector<std::pair<int32_t, RingEffect>> effects;
+			std::vector<bool> paired(wearers.size(), false);
+
+			for (size_t i = 0; i < wearers.size(); i++)
+			{
+				for (size_t j = i + 1; j < wearers.size() && !paired[i]; j++)
+				{
+					const RingWearer& a = wearers[i];
+					const RingWearer& b = wearers[j];
+
+					if (paired[j] || (a.ring.partner_id != b.ring.self_id && b.ring.partner_id != a.ring.self_id))
+						continue;
+
+					paired[i] = paired[j] = true;
+
+					const RingWearer& low = a.id < b.id ? a : b;
+					const RingWearer& high = a.id < b.id ? b : a;
+					Point<int16_t> gap = high.position - low.position;
+					int16_t dx = static_cast<int16_t>(std::abs(gap.x()));
+					int16_t dy = static_cast<int16_t>(std::abs(gap.y()));
+
+					RingEffect effect;
+					effect.item_id = low.ring.item_id;
+					effect.mark = dx < 700 && dy < 500;
+
+					RingEffect low_effect = effect;
+					low_effect.pair = dx < 250 && dy < 100;
+					low_effect.offset = Point<int16_t>(gap.x() / 2, gap.y() / 2);
+
+					effects.emplace_back(low.id, low_effect);
+					effects.emplace_back(high.id, effect);
+				}
+			}
+
+			return effects;
+		}
+
 		bool is_ring_box(int32_t item_id)
 		{
 			return item_id / 10000 == 224;

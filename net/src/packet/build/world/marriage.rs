@@ -3,7 +3,7 @@
 //! proposer's "Waiting for her response..." box.
 
 use crate::{codec::stats::write_padded_name, error::NetworkError, packet::op::SendOpcode};
-use game::marriage::{MarriageRecord, Refusal};
+use game::marriage::{MarriageRecord, MarriageRing, Refusal};
 use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
@@ -22,8 +22,8 @@ fn result(mode: u8) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
-/// GW_MarriageRecord, 0x30 bytes. Both items are the ring box proposed
-/// with.
+/// GW_MarriageRecord, 0x30 bytes. Both items are the couple's wedding
+/// ring, which the client draws the player's own ring effect from.
 pub fn write_marriage_record(
     packet: &mut Packet,
     record: &MarriageRecord,
@@ -32,10 +32,29 @@ pub fn write_marriage_record(
     packet.write_int(record.groom_id)?;
     packet.write_int(record.bride_id)?;
     packet.write_short(record.status)?;
-    packet.write_int(record.item_id)?;
-    packet.write_int(record.item_id)?;
+    packet.write_int(record.ring_id())?;
+    packet.write_int(record.ring_id())?;
     write_padded_name(packet, &record.groom_name)?;
     write_padded_name(packet, &record.bride_name)?;
+    Ok(())
+}
+
+/// The ring blocks of a look, as SPAWN_PLAYER and UPDATE_CHAR_LOOK end
+/// it: crush and friendship rings (none), then the marriage ring
+/// (report b059). The client pairs the effect only with real ids on both
+/// sides.
+pub fn write_ring_looks(
+    packet: &mut Packet,
+    marriage: Option<&MarriageRing>,
+) -> Result<(), NetworkError> {
+    packet.write_byte(0)?; // crush ring
+    packet.write_byte(0)?; // friendship ring
+    packet.write_byte(u8::from(marriage.is_some()))?;
+    if let Some(ring) = marriage {
+        packet.write_int(ring.self_id)?;
+        packet.write_int(ring.partner_id)?;
+        packet.write_int(ring.item_id)?;
+    }
     Ok(())
 }
 
@@ -106,8 +125,31 @@ mod tests {
         let packet = build_engaged(&record).unwrap();
         assert_eq!(packet.bytes.len(), 3 + 0x30);
         assert_eq!(&packet.bytes[..3], &[0x49, 0x00, 11]);
+        // Both rings are the Moonstone box's wedding ring.
+        assert_eq!(
+            &packet.bytes[3 + 14..3 + 22],
+            &[0xe3, 0xfa, 0x10, 0, 0xe3, 0xfa, 0x10, 0]
+        );
         assert_eq!(&packet.bytes[3 + 22..3 + 27], b"Groom");
         assert_eq!(&packet.bytes[3 + 35..3 + 40], b"Bride");
+    }
+
+    #[test]
+    fn a_marriage_ring_follows_two_empty_ring_blocks() {
+        let mut packet = Packet::new_empty();
+        write_ring_looks(&mut packet, None).unwrap();
+        assert_eq!(packet.bytes, vec![0, 0, 0]);
+        let ring = MarriageRing {
+            self_id: 2,
+            partner_id: 1,
+            item_id: 1112803,
+        };
+        let mut packet = Packet::new_empty();
+        write_ring_looks(&mut packet, Some(&ring)).unwrap();
+        assert_eq!(
+            packet.bytes,
+            vec![0, 0, 1, 2, 0, 0, 0, 1, 0, 0, 0, 0xe3, 0xfa, 0x10, 0]
+        );
     }
 
     #[test]

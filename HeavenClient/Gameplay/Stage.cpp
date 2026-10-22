@@ -453,6 +453,7 @@ namespace ms
 		// The player's summons follow where the player now is.
 		summons.update(physics, player.get_position(), player.is_climbing());
 		check_pet_loot();
+		show_rings();
 
 		portals.update(player.get_position());
 		check_touch_portals(drawn);
@@ -965,6 +966,30 @@ namespace ms
 
 		if (loot.first)
 			player.request(PickupItemPacket(loot.first, loot.second), ExclRequest::PICKUP_WAIT);
+	}
+
+	void Stage::show_rings()
+	{
+		std::vector<RingWearer> wearers = chars.ring_wearers();
+
+		const Inventory &inventory = player.get_inventory();
+		bool wearing = false;
+
+		for (auto slot : { EquipSlot::Id::RING1, EquipSlot::Id::RING2, EquipSlot::Id::RING3, EquipSlot::Id::RING4 })
+			wearing |= marriage::is_wedding_ring(inventory.get_item_id(InventoryType::Id::EQUIPPED, slot));
+
+		if (auto ring = marriage::own_ring(player.get_marriage(), player.get_stats().get_female(), wearing))
+			wearers.push_back({ player.get_oid(), player.get_position(), *ring });
+
+		auto effects = marriage::ring_effects(wearers);
+		RingEffect own;
+
+		for (auto &[id, effect] : effects)
+			if (id == player.get_oid())
+				own = effect;
+
+		chars.show_rings(effects);
+		player.show_ring(own);
 	}
 
 	void Stage::check_pet_loot()

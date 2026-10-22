@@ -8,9 +8,13 @@
 //! Dropping either token (RING_ACTION 3, report b054) breaks it off: both
 //! get MARRIAGE_RESULT 13 and lose their tokens. While both are online each
 //! is told the other's map (NOTIFY_MARRIED_PARTNER_MAP_TRANSFER, report
-//! b057), and (0, 0) once the other logs off or the couple ends.
+//! b057), and (0, 0) once the other logs off or the couple ends. A wedding
+//! ring worn by either shows the couple's ring block to the map (report
+//! b059).
 
-use integration_harness::database::{grant_stack, set_gender, set_job};
+use integration_harness::database::{
+    grant_stack, marry, set_gender, set_job, stow_equip, wear_equip,
+};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
@@ -24,6 +28,8 @@ const PERION: i32 = 102_000_000;
 const MOONSTONE_BOX: i32 = 2240000;
 const EMPTY_BOX: i32 = 4031357;
 const RING: i32 = 4031358;
+const WEDDING_RING: i32 = 1112803;
+const RING_SLOT: i16 = -12;
 const USE: i16 = 2;
 const ETC: u8 = 4;
 
@@ -71,6 +77,17 @@ fn break_off(token: i32) -> Packet {
     p.write_short(RecvOpcode::RingAction as i16).unwrap();
     p.write_byte(3).unwrap();
     p.write_int(token).unwrap();
+    p
+}
+
+fn item_move(from: i16, to: i16) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ItemMove as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_short(from).unwrap();
+    p.write_short(to).unwrap();
+    p.write_short(1).unwrap();
     p
 }
 
@@ -156,6 +173,9 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     let [a_config, b_config, c_config, d_config] = &configs;
     let a_id = new_character(a_config, 0, 50, 2).await;
     let b_id = new_character(b_config, 1, 50, 0).await;
+    wear_equip(a_id, RING_SLOT, WEDDING_RING)
+        .await
+        .expect("a wedding ring worn before the engagement");
     new_character(c_config, 0, 50, 1).await;
     new_character(d_config, 1, 10, 0).await;
     let [an, bn, cn, dn] = configs.each_ref().map(|c| c.character_name.clone());
@@ -195,7 +215,10 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(marriage(&mut b, 1).await.marriage, [asked(&an, a_id)]);
     send(&mut b.connection, answer(true, &an, a_id)).await;
     let at = marriage_and_map(&mut a, 1).await;
-    let bt = marriage_and_map(&mut b, 1).await;
+    let mut bt = marriage_and_map(&mut b, 1).await;
+    // A already wears a wedding ring, so B sees A's look gain the couple.
+    until(&mut b.connection, &mut bt, |t| !t.looks.is_empty()).await;
+    assert_eq!(bt.looks, [(a_id, Some((a_id, b_id, WEDDING_RING)))]);
     let (op, record) = &at.marriage[0];
     assert_eq!(*op, SendOpcode::MarriageResult as i16);
     assert_eq!(record.len(), 1 + 0x30);
@@ -203,8 +226,8 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(record[5..9], a_id.to_le_bytes());
     assert_eq!(record[9..13], b_id.to_le_bytes());
     assert_eq!(record[13..15], 1i16.to_le_bytes());
-    assert_eq!(record[15..19], MOONSTONE_BOX.to_le_bytes());
-    assert_eq!(record[19..23], MOONSTONE_BOX.to_le_bytes());
+    assert_eq!(record[15..19], WEDDING_RING.to_le_bytes());
+    assert_eq!(record[19..23], WEDDING_RING.to_le_bytes());
     assert_eq!(record[23..36], padded(&an));
     assert_eq!(record[36..49], padded(&bn));
     assert_eq!(bt.marriage, at.marriage);
@@ -234,7 +257,9 @@ async fn a_proposal_said_yes_to_engages_the_two() {
 
     // B drops the ring: both are told, and both tokens go.
     send(&mut b.connection, break_off(RING)).await;
-    let bt = marriage_and_map(&mut b, 1).await;
+    let mut bt = marriage_and_map(&mut b, 1).await;
+    until(&mut b.connection, &mut bt, |t| !t.looks.is_empty()).await;
+    assert_eq!(bt.looks, [(a_id, None)]);
     let at = marriage_and_map(&mut a, 1).await;
     assert_eq!(bt.marriage, [result(BROKEN)]);
     assert_eq!(at.marriage, [result(BROKEN)]);
@@ -246,4 +271,51 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     // Free again: A may ask B once more.
     send(&mut a.connection, propose(&bn)).await;
     assert_eq!(marriage(&mut b, 1).await.marriage, [asked(&an, a_id)]);
+}
+
+#[tokio::test]
+async fn a_wedding_ring_worn_shows_the_couple_to_the_map() {
+    let configs = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    let [a_config, b_config] = &configs;
+    let a_id = new_character(a_config, 0, 50, 0).await;
+    let b_id = new_character(b_config, 1, 50, 0).await;
+    marry(a_id, b_id, MOONSTONE_BOX).await.expect("marry");
+    wear_equip(a_id, RING_SLOT, WEDDING_RING)
+        .await
+        .expect("A's ring");
+    stow_equip(b_id, 1, WEDDING_RING, 0)
+        .await
+        .expect("B's ring");
+
+    // B arrives and sees A wear the ring; A sees B without one.
+    let mut a = enter(a_config, HENESYS).await;
+    let mut b = enter(b_config, PERION).await;
+    let mut bt = Trace::default();
+    assert_eq!(warp(&mut b.connection, HENESYS, "", &mut bt).await, HENESYS);
+    until(&mut b.connection, &mut bt, |t| {
+        t.players.iter().any(|p| p.character_id == a_id)
+    })
+    .await;
+    let seen = bt.players.iter().find(|p| p.character_id == a_id).unwrap();
+    assert_eq!(seen.marriage_ring, Some((a_id, b_id, WEDDING_RING)));
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| {
+        t.players.iter().any(|p| p.character_id == b_id)
+    })
+    .await;
+    let seen = at.players.iter().find(|p| p.character_id == b_id).unwrap();
+    assert_eq!(seen.marriage_ring, None);
+
+    // B puts the ring on, then takes it off.
+    send(&mut b.connection, item_move(1, RING_SLOT)).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| !t.looks.is_empty()).await;
+    assert_eq!(at.looks, [(b_id, Some((b_id, a_id, WEDDING_RING)))]);
+    send(&mut b.connection, item_move(RING_SLOT, 1)).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| !t.looks.is_empty()).await;
+    assert_eq!(at.looks, [(b_id, None)]);
 }

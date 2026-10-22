@@ -26,6 +26,15 @@ pub fn tokens(ring_box: i32) -> (i32, i32) {
     (empty_box, empty_box + 1)
 }
 
+/// The wedding rings, one for each ring box in order. The client knows
+/// them by id alone, and draws a couple's pair effect from
+/// `Effect/ItemEff.img/<id>` (report b059).
+pub const WEDDING_RINGS: [i32; 4] = [1112803, 1112806, 1112807, 1112809];
+
+pub fn is_wedding_ring(item_id: i32) -> bool {
+    WEDDING_RINGS.contains(&item_id)
+}
+
 /// The empty boxes and rings a couple holds. The client lets a player drop
 /// one only to break off (report b054).
 pub fn is_token(item_id: i32) -> bool {
@@ -50,6 +59,13 @@ impl MarriageRecord {
         self.status == MARRIED
     }
 
+    /// The wedding ring that goes with the couple's ring box, which the
+    /// record names as both the groom's and the bride's ring.
+    pub fn ring_id(&self) -> i32 {
+        let index = usize::try_from(self.item_id - 2240000).unwrap_or(0);
+        WEDDING_RINGS[index.min(WEDDING_RINGS.len() - 1)]
+    }
+
     /// The other one of the couple, for one of them, `id`.
     pub fn partner_of(&self, id: i32) -> i32 {
         if self.groom_id == id {
@@ -58,6 +74,16 @@ impl MarriageRecord {
             self.groom_id
         }
     }
+}
+
+/// The marriage block of a player's look: the player, the partner and the
+/// ring whose effect the two show near each other (report b059). The
+/// client pairs two players when one's partner is the other's self.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MarriageRing {
+    pub self_id: i32,
+    pub partner_id: i32,
+    pub item_id: i32,
 }
 
 /// Why a proposal failed, or what became of it: MARRIAGE_RESULT's mode,
@@ -117,5 +143,21 @@ mod tests {
         assert!(!is_ring_box(2240004));
         assert!(is_token(4031357) && is_token(4031364));
         assert!(!is_token(4031365));
+    }
+
+    #[test]
+    fn each_box_gives_its_own_wedding_ring() {
+        let record = |item_id| MarriageRecord {
+            id: 1,
+            groom_id: 4,
+            bride_id: 5,
+            status: 1,
+            item_id,
+            groom_name: String::new(),
+            bride_name: String::new(),
+        };
+        let rings: Vec<i32> = (2240000..=2240003).map(|b| record(b).ring_id()).collect();
+        assert_eq!(rings, WEDDING_RINGS);
+        assert!(rings.iter().all(|&ring| is_wedding_ring(ring)));
     }
 }

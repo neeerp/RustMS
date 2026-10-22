@@ -48,9 +48,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_int(avatar.mount.tiredness)?;
     write_mini_room_box(&mut packet, avatar.mini_room.as_ref())?;
     write_chalkboard(&mut packet, avatar.chalkboard.as_deref())?;
-    packet.write_byte(0)?; // crush ring
-    packet.write_byte(0)?; // friendship ring
-    packet.write_byte(0)?; // marriage ring
+    super::marriage::write_ring_looks(&mut packet, avatar.marriage_ring.as_ref())?;
     packet.write_byte(0)?; // new year cards
     packet.write_byte(u8::from(avatar.berserk))?; // the aura (0x97fc24)
     packet.write_byte(0)?; // an Evan's Dragon Fury
@@ -305,6 +303,7 @@ mod tests {
             item_effect: 0,
             consume_effect: 0,
             berserk: false,
+            marriage_ring: None,
             energy: None,
             dash: [None; 2],
             ride: None,
@@ -353,6 +352,11 @@ mod tests {
     fn spawn_player_matches_reference() {
         let mut avatar = avatar();
         avatar.item_effect = 5010000;
+        avatar.marriage_ring = Some(game::marriage::MarriageRing {
+            self_id: 0x0102_0304,
+            partner_id: 9,
+            item_id: 1112803,
+        });
         let packet = build_player_enter_field(&avatar).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
@@ -368,7 +372,8 @@ mod tests {
         expect.int(1).int(0).int(0); // mount level, exp and tiredness
         expect.byte(0); // no shop or minigame box
         expect.byte(0); // no chalkboard
-        expect.byte(0).byte(0).byte(0); // crush, friendship, marriage rings
+        expect.byte(0).byte(0); // crush, friendship rings
+        expect.byte(1).int(0x0102_0304).int(9).int(1112803); // marriage ring
         expect.byte(0).byte(0).byte(0); // new year cards, berserk, dragon fury
         expect.byte(0); // team
         expect.end();

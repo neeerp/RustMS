@@ -74,10 +74,42 @@ namespace ms
 			otherchar->send_movement(movements);
 	}
 
-	void MapChars::update_look(int32_t cid, const LookEntry &look)
+	void MapChars::update_look(int32_t cid, const LookEntry &look, std::optional<MarriageRing> marriage_ring)
 	{
 		if (Optional<OtherChar> otherchar = get_char(cid))
+		{
 			otherchar->update_look(look);
+			otherchar->set_marriage_ring(marriage_ring);
+		}
+	}
+
+	std::vector<RingWearer> MapChars::ring_wearers() const
+	{
+		std::vector<RingWearer> wearers;
+
+		for (auto &[oid, object] : chars)
+		{
+			auto &otherchar = static_cast<const OtherChar &>(*object);
+
+			if (auto &ring = otherchar.get_marriage_ring())
+				wearers.push_back({ oid, otherchar.get_position(), *ring });
+		}
+
+		return wearers;
+	}
+
+	void MapChars::show_rings(const std::vector<std::pair<int32_t, RingEffect>> &effects)
+	{
+		for (auto &[oid, object] : chars)
+		{
+			RingEffect effect;
+
+			for (auto &[id, shown] : effects)
+				if (id == oid)
+					effect = shown;
+
+			static_cast<OtherChar &>(*object).show_ring(effect);
+		}
 	}
 
 	Optional<OtherChar> MapChars::get_char(int32_t cid)
