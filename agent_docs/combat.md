@@ -790,8 +790,11 @@ SPAWN_PLAYER (report c039). It is a movement stat, so GIVE_BUFF ends with
 the extra byte. v83 lets a ghost neither attack nor use any skill (it can
 still emote and sit), so the server refuses both as for a morph
 (`morph::ghosted`, which `morph::refused` and the party quest skill check
-use). Right-clicking the icon ends it. Whether death or a map change ends
-it isn't known.
+use). Right-clicking the icon ends it, and so does dying. A map change
+keeps it. v83 makes its user anew in each field and re-applies only a
+morph, not a ghost, from the stats it kept (report c044). So after each
+map join the server sends the owner the ghost's GIVE_BUFF again, with
+the time left (`show_ghost`). The map sees it in SPAWN_PLAYER.
 
 HeavenClient draws a ghost from the body's ghost actions in Character.nx
 (`ghoststand`, `ghostwalk`, `ghostjump`, `ghostproneStab`, `ghostladder`,

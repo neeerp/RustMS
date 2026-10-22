@@ -794,6 +794,7 @@ impl ClientActor {
             )?)
             .await?;
         }
+        self.show_ghost().await?;
         self.run_map_enter_script().await
     }
 

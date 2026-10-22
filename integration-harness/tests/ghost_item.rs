@@ -1,7 +1,8 @@
 //! A ghost item (report c039): 2360000 makes its user a ghost (Ghost,
 //! bit 49) for its `time`. The map sees it, another ghost or morph item
 //! waits until it ends, and right-clicking the icon ends it for everyone.
-//! Who comes to the map later sees the ghost, and dying ends it.
+//! Who comes to the map later sees the ghost, a map change keeps it, and
+//! dying ends it.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_stack, set_hp};
@@ -170,6 +171,26 @@ async fn a_ghost_item_shows_to_the_map_until_cancelled() {
     })
     .await;
     assert_eq!(spawned, (GHOST, 1));
+
+    // The ghost's own client makes them anew in each map, so after a map
+    // change it is told again what is left of the ghost (report c044).
+    for map in [HENESYS, LITH_HARBOR] {
+        assert_eq!(warp(&mut ghost.connection, map, "", &mut g).await, map);
+        let again = expect(&mut ghost.connection, |p| {
+            let mut r = body(p, SendOpcode::GiveBuff)?;
+            (r.read_long().unwrap() == 0 && r.read_long().unwrap() == GHOST).then(|| {
+                let value = r.read_short().unwrap();
+                (value, r.read_int().unwrap(), r.read_int().unwrap())
+            })
+        })
+        .await;
+        assert_eq!((again.0, again.1), (1, -GHOST_ITEM));
+        assert!(
+            (3_500_000..3_600_000).contains(&again.2),
+            "{} ms of an hour's ghost left",
+            again.2
+        );
+    }
 
     // Dying ends it, for the map too.
     send(&mut ghost.connection, touched(1)).await;
