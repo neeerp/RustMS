@@ -683,6 +683,18 @@ impl Inventory {
         if item.equip.is_none() || !equip_slot::fits(item.item_id, item.cash_serial.is_some(), to) {
             return Err(InventoryError::CannotEquip);
         }
+        // v83 wears one crush, one friendship and one wedding ring at a time;
+        // a ring may only replace one of its own kind (report b061).
+        if let Some(ring) = crate::ring::kind(item.item_id) {
+            let same = |id: i32| crate::ring::kind(id) == Some(ring);
+            let replaces_one = self
+                .equipped
+                .get(&to)
+                .is_some_and(|worn| same(worn.item_id));
+            if !replaces_one && self.equipped.values().any(|worn| same(worn.item_id)) {
+                return Err(InventoryError::CannotEquip);
+            }
+        }
         let worn = |position: i16| self.equipped.get(&position).map(|i| i.item_id);
         let conflict = match to {
             equip_slot::TOP if equip_slot::is_overall(item.item_id) => {
@@ -1156,6 +1168,25 @@ mod tests {
         inventory.equip(2, equip_slot::CAP).unwrap();
         assert_eq!(inventory.equipped_regular().count(), 1);
         assert_eq!(inventory.equipped_cash().count(), 1);
+    }
+
+    #[test]
+    fn one_ring_of_each_kind_is_worn_at_a_time() {
+        let mut inventory = Inventory::default();
+        for (slot, item_id) in [(1, 1112001), (2, 1112002), (3, 1112800), (4, 1112803)] {
+            let mut ring = equip(item_id);
+            ring.cash_serial = Some(slot.into());
+            inventory.insert(InventoryType::Equip, slot, ring);
+        }
+        let [first, second, third, fourth] = equip_slot::RINGS.map(|slot| slot - 100);
+        inventory.equip(1, first).unwrap();
+        assert_eq!(inventory.equip(2, second), Err(InventoryError::CannotEquip));
+        // A crush ring may still replace the worn one.
+        inventory.equip(2, first).unwrap();
+        inventory.equip(3, second).unwrap();
+        inventory.equip(4, third).unwrap();
+        assert_eq!(inventory.equip(2, fourth), Err(InventoryError::CannotEquip));
+        assert_eq!(inventory.equipped_cash().count(), 3);
     }
 
     #[test]

@@ -55,6 +55,15 @@ pub enum CashShopRequest {
         to: String,
         message: String,
     },
+    /// Pay for the crush or friendship ring `commodity`: one for the
+    /// Cash Inventory and its partner for the character named `to`, whose
+    /// gender the runtime still has to check.
+    BuyRing {
+        cash_type: CashType,
+        commodity: Commodity,
+        to: String,
+        message: String,
+    },
     /// Replace the wish list with these serial numbers.
     SetWishList(Vec<i32>),
     /// Move the Cash Inventory item with this cash serial to the character,
@@ -83,6 +92,15 @@ pub fn cash_type(value: i32) -> Option<CashType> {
         4 => Some(CashType::Prepaid),
         _ => None,
     }
+}
+
+/// Whether `item_id` is a crush or friendship ring, which is bought as a
+/// pair with its own request (report b061).
+pub fn pair_ring(item_id: i32) -> bool {
+    matches!(
+        game::ring::kind(item_id),
+        Some(game::ring::RingKind::Crush | game::ring::RingKind::Friendship)
+    )
 }
 
 /// Whether a character of `gender` can buy `commodity`.

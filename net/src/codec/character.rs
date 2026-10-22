@@ -76,8 +76,7 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     }
 
     packet.write_short(0)?; // minigame records
-    packet.write_short(0)?; // crush rings
-    packet.write_short(0)?; // friendship rings
+    crate::packet::build::world::marriage::write_couple_rings(packet, &player.rings)?;
     packet.write_short(i16::from(player.marriage.is_some()))?;
     if let Some(record) = &player.marriage {
         crate::packet::build::world::marriage::write_marriage_record(packet, record)?;

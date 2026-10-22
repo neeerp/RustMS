@@ -3,6 +3,8 @@ use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, Wor
 use crate::packet::build;
 use crate::packet::build::world::cash_shop::{CashShopFailure, GIFT_MESSAGE_LEN, WISH_LIST_SLOTS};
 use crate::packet::build::world::map::BlockedServer;
+use db::cash_shop::CashType;
+use game::ring::RingKind;
 use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -29,7 +31,9 @@ impl WorldHandler for EnterCashShopHandler {
 /// or 0x1E for a package) sends a byte, the balance to pay with, and the
 /// commodity's serial number;
 /// a gift (0x04) sends the birthday code, the serial number, and the
-/// receiver's name and message; the wish list (0x05) sends its ten serial
+/// receiver's name and message; a crush ring (0x1D) or a friendship ring
+/// (0x23) sends the birthday code, the balance, the serial number, and the
+/// partner's name and message; the wish list (0x05) sends its ten serial
 /// numbers, 0 for an empty slot.
 /// Taking an item out of the Cash Inventory (0x0D) sends its cash serial, its
 /// bag and the slot the client chose; putting one back (0x0E) sends its cash
@@ -46,6 +50,8 @@ const PUT_BACK: u8 = 0x0E;
 const EXPAND_BAG: u8 = 0x06;
 const EXPAND_STORAGE: u8 = 0x07;
 const BUY_PACKAGE: u8 = 0x1E;
+const BUY_CRUSH_RING: u8 = 0x1D;
+const BUY_FRIENDSHIP_RING: u8 = 0x23;
 /// Sent unasked by v83: a query for each commodity it has not cached, and
 /// 0x21, whose purpose is unknown. A failure would show a notice for each.
 const UNRESOLVED: u8 = 0x21;
@@ -74,6 +80,9 @@ impl WorldHandler for CashShopOperationHandler {
                     ctx.player.stats.gender.into(),
                 );
                 match (cash_type, commodity) {
+                    (_, Ok(commodity)) if cash_shop::pair_ring(commodity.item_id) => {
+                        return fail(CashShopFailure::Unknown)
+                    }
                     (Some(cash_type), Ok(commodity)) => CashShopRequest::Buy {
                         cash_type,
                         commodity: commodity.clone(),
@@ -88,6 +97,9 @@ impl WorldHandler for CashShopOperationHandler {
                 let to = reader.read_str_with_length()?;
                 let message = reader.read_str_with_length()?;
                 let commodity = match cash_shop::check_gift(cash_shop::commodity(sn)) {
+                    Ok(commodity) if cash_shop::pair_ring(commodity.item_id) => {
+                        return fail(CashShopFailure::Unknown)
+                    }
                     Ok(commodity) => commodity,
                     Err(failure) => return fail(failure),
                 };
@@ -98,6 +110,43 @@ impl WorldHandler for CashShopOperationHandler {
                     return fail(CashShopFailure::BirthdayCode);
                 }
                 CashShopRequest::Gift {
+                    commodity: commodity.clone(),
+                    to,
+                    message,
+                }
+            }
+            action @ (BUY_CRUSH_RING | BUY_FRIENDSHIP_RING) => {
+                let birthday = reader.read_int()?;
+                let cash_type = cash_shop::cash_type(reader.read_int()?);
+                let sn = reader.read_int()?;
+                let to = reader.read_str_with_length()?;
+                let message = reader.read_str_with_length()?;
+                let kind = if action == BUY_CRUSH_RING {
+                    RingKind::Crush
+                } else {
+                    RingKind::Friendship
+                };
+                let commodity = match cash_shop::check_purchase(
+                    cash_shop::commodity(sn),
+                    ctx.player.stats.gender.into(),
+                ) {
+                    Ok(commodity) if game::ring::kind(commodity.item_id) == Some(kind) => commodity,
+                    Ok(_) => return fail(CashShopFailure::Unknown),
+                    Err(failure) => return fail(failure),
+                };
+                // The ring dialog offers NX Credit and Prepaid NX (0x46e08e).
+                let Some(cash_type) = cash_type.filter(|kind| *kind != CashType::MaplePoints)
+                else {
+                    return fail(CashShopFailure::Unknown);
+                };
+                if message.is_empty() || message.len() > GIFT_MESSAGE_LEN {
+                    return fail(CashShopFailure::Unknown);
+                }
+                if !cash_shop::birthday_code(birthday) {
+                    return fail(CashShopFailure::BirthdayCode);
+                }
+                CashShopRequest::BuyRing {
+                    cash_type,
                     commodity: commodity.clone(),
                     to,
                     message,

@@ -64,6 +64,7 @@ pub struct NewGift {
 /// The character a gift is for.
 #[derive(Clone, Debug, PartialEq, Eq, Queryable)]
 pub struct GiftReceiver {
+    pub id: i32,
     pub account_id: i32,
     pub name: String,
     pub gender: i16,
@@ -101,7 +102,12 @@ diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql
 pub fn gift_receiver(name: &str) -> crate::Result<Option<GiftReceiver>> {
     Ok(characters::table
         .filter(lower(characters::name).eq(lower(name)))
-        .select((characters::accountid, characters::name, characters::gender))
+        .select((
+            characters::id,
+            characters::accountid,
+            characters::name,
+            characters::gender,
+        ))
         .first(&mut crate::connection()?)
         .optional()?)
 }
@@ -186,6 +192,39 @@ pub fn gift(sender: i32, price: i32, gift: &NewGift) -> crate::Result<Option<Bal
             .execute(conn)?;
         record_sale(conn, gift.sn)?;
         Ok(Some(balance_of(conn, sender)?))
+    })?)
+}
+
+/// Pay `price` from the buyer's `cash_type` balance for a crush or
+/// friendship ring: put `ring` in the buyer's Cash Inventory and `gift`, its
+/// partner, in the receiver's, and record the pair, in one transaction.
+/// `None` if the balance is short.
+pub fn buy_ring(
+    cash_type: CashType,
+    price: i32,
+    (ring, buyer_id): (&NewCashItem, i32),
+    (gift, receiver_id): (&NewGift, i32),
+) -> crate::Result<Option<(CashItem, Balance)>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        if !pay(conn, ring.account_id, cash_type, price)? {
+            return Ok(None);
+        }
+        let bought = diesel::insert_into(cash_items::table)
+            .values(ring)
+            .get_result::<CashItem>(conn)?;
+        let sent = diesel::insert_into(cash_items::table)
+            .values(gift)
+            .returning(cash_items::id)
+            .get_result::<i64>(conn)?;
+        crate::ring::insert_pair(
+            conn,
+            (bought.id, buyer_id),
+            (sent, receiver_id),
+            ring.item_id,
+        )?;
+        record_sale(conn, ring.sn)?;
+        Ok(Some((bought, balance_of(conn, ring.account_id)?)))
     })?)
 }
 

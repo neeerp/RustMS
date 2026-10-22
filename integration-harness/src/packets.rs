@@ -97,6 +97,19 @@ pub struct SetFieldPacket {
     pub monster_book: BTreeMap<i32, u8>,
     /// The name Blessing of the Fairy's tooltip shows, if any.
     pub linked_name: Option<String>,
+    /// The crush rings, then the friendship rings, the character carries.
+    pub couple_rings: Vec<CoupleRingRecord>,
+}
+
+/// A crush or friendship ring record of the character data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CoupleRingRecord {
+    pub partner_id: i32,
+    pub partner_name: String,
+    pub ring_id: i64,
+    pub partner_ring_id: i64,
+    /// A friendship ring's item; crush records carry none.
+    pub item_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,8 +139,18 @@ pub struct SpawnPlayerPacket {
     pub chalkboard: Option<String>,
     /// Whether their Berserk aura shows.
     pub berserk: bool,
-    /// Their marriage ring block: (self, partner, ring), if they show one.
-    pub marriage_ring: Option<(i32, i32, i32)>,
+    /// Their ring blocks.
+    pub rings: RingLooks,
+}
+
+/// The ring blocks that end a look: the crush and friendship rings'
+/// (serial, partner's serial, item) and the marriage ring's (self, partner,
+/// ring), each if shown.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RingLooks {
+    pub crush: Option<(i64, i64, i32)>,
+    pub friendship: Option<(i64, i64, i32)>,
+    pub marriage: Option<(i32, i32, i32)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -576,6 +599,30 @@ pub fn build_cash_shop_gift(
     Ok(packet)
 }
 
+/// CASHSHOP_OPERATION 0x1D (a crush ring) or 0x23 (a friendship ring):
+/// buy a pair with the balance `cash_type`, one for `to`.
+pub fn build_cash_shop_buy_ring(
+    friendship: bool,
+    birthday: i32,
+    cash_type: i32,
+    sn: i32,
+    to: &str,
+    message: &str,
+) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    let write = |packet: &mut Packet| -> std::io::Result<()> {
+        packet.write_byte(if friendship { 0x23 } else { 0x1D })?;
+        packet.write_int(birthday)?;
+        packet.write_int(cash_type)?;
+        packet.write_int(sn)?;
+        packet.write_str_with_length(to)?;
+        packet.write_str_with_length(message)?;
+        Ok(())
+    };
+    write(&mut packet).map_err(|e| format!("failed to write ring purchase: {e}"))?;
+    Ok(packet)
+}
+
 /// CASHSHOP_OPERATION wish list: ten serial numbers, 0 for an empty slot.
 pub fn build_cash_shop_wish_list(sns: &[i32; 10]) -> Result<Packet, String> {
     let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
@@ -896,11 +943,29 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         quests.insert(id, 2);
     }
 
-    // Minigame records and rings (the server sends none), the couple's
-    // 0x30-byte marriage records, then the teleport rocks.
-    for _ in 0..3 {
-        if cursor.read_short().map_err(|e| e.to_string())? != 0 {
-            return Err("unexpected minigame or ring records".into());
+    // Minigame records (the server sends none), the crush and friendship
+    // rings, the couple's 0x30-byte marriage records, then the teleport
+    // rocks.
+    if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+        return Err("unexpected minigame records".into());
+    }
+    let mut couple_rings = Vec::new();
+    for friendship in [false, true] {
+        for _ in 0..cursor.read_short().map_err(|e| e.to_string())? {
+            let partner_id = cursor.read_int().map_err(|e| e.to_string())?;
+            let name = cursor.read_bytes(13).map_err(|e| e.to_string())?;
+            let end = name.iter().position(|&b| b == 0).unwrap_or(name.len());
+            couple_rings.push(CoupleRingRecord {
+                partner_id,
+                partner_name: String::from_utf8_lossy(&name[..end]).into_owned(),
+                ring_id: cursor.read_long().map_err(|e| e.to_string())?,
+                partner_ring_id: cursor.read_long().map_err(|e| e.to_string())?,
+                item_id: if friendship {
+                    Some(cursor.read_int().map_err(|e| e.to_string())?)
+                } else {
+                    None
+                },
+            });
         }
     }
     let marriages = cursor.read_short().map_err(|e| e.to_string())?;
@@ -941,6 +1006,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         monster_book_cover,
         monster_book,
         linked_name,
+        couple_rings,
     })
 }
 
@@ -1170,7 +1236,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         .map_err(|e| format!("failed to read spawn-player pets: {e}"))?;
     let chalkboard = decode_spawn_player_chalkboard(&mut cursor)
         .map_err(|e| format!("failed to read spawn-player chalkboard: {e}"))?;
-    let marriage_ring = decode_ring_looks(&mut cursor)?;
+    let rings = decode_ring_looks(&mut cursor)?;
     skip(&mut cursor, 1)?; // no new year cards
     let berserk = cursor
         .read_byte()
@@ -1190,28 +1256,39 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         pets,
         chalkboard,
         berserk,
-        marriage_ring,
+        rings,
     })
 }
 
 /// The crush, friendship and marriage ring blocks that end a look in
-/// SPAWN_PLAYER and UPDATE_CHAR_LOOK; the marriage ring's (self, partner,
-/// ring), if shown.
-pub fn decode_ring_looks(cursor: &mut Cursor<&[u8]>) -> Result<Option<(i32, i32, i32)>, String> {
-    for _ in 0..2 {
-        if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
-            skip(cursor, 8 + 8 + 4)?;
+/// SPAWN_PLAYER and UPDATE_CHAR_LOOK.
+pub fn decode_ring_looks(cursor: &mut Cursor<&[u8]>) -> Result<RingLooks, String> {
+    let pair = |cursor: &mut Cursor<&[u8]>| -> Result<_, String> {
+        if cursor.read_byte().map_err(|e| e.to_string())? == 0 {
+            return Ok(None);
         }
-    }
-    if cursor.read_byte().map_err(|e| e.to_string())? == 0 {
-        return Ok(None);
-    }
-    let mut int = || cursor.read_int().map_err(|e| e.to_string());
-    Ok(Some((int()?, int()?, int()?)))
+        let ring = cursor.read_long().map_err(|e| e.to_string())?;
+        let partner = cursor.read_long().map_err(|e| e.to_string())?;
+        let item = cursor.read_int().map_err(|e| e.to_string())?;
+        Ok(Some((ring, partner, item)))
+    };
+    let crush = pair(cursor)?;
+    let friendship = pair(cursor)?;
+    let marriage = if cursor.read_byte().map_err(|e| e.to_string())? == 0 {
+        None
+    } else {
+        let mut int = || cursor.read_int().map_err(|e| e.to_string());
+        Some((int()?, int()?, int()?))
+    };
+    Ok(RingLooks {
+        crush,
+        friendship,
+        marriage,
+    })
 }
 
-/// UPDATE_CHAR_LOOK: the character and their marriage ring block.
-pub fn decode_char_look(packet: &Packet) -> Result<(i32, Option<(i32, i32, i32)>), String> {
+/// UPDATE_CHAR_LOOK: the character and their ring blocks.
+pub fn decode_char_look(packet: &Packet) -> Result<(i32, RingLooks), String> {
     expect_opcode(packet, SendOpcode::UpdateCharLook as i16)?;
     let mut cursor = Cursor::new(&packet.bytes[2..]);
     let id = cursor.read_int().map_err(|e| e.to_string())?;

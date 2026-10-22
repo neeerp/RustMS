@@ -214,6 +214,7 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
     player.family = crate::family::relatives(&mut conn, character_id)?;
     player.family_buff = crate::family::buff(&mut conn, character_id)?;
     player.marriage = crate::marriage::record(&mut conn, character_id)?;
+    player.rings = crate::ring::carried(&mut conn, &player.inventory)?;
     player.monster_book = MonsterBook::new(
         character.monster_book_cover,
         monster_book_cards::table

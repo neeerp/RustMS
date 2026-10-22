@@ -566,6 +566,15 @@ diesel::table! {
         item_id -> Int4,
     }
 }
+diesel::table! {
+    rings (id) {
+        id -> Int8,
+        partner_ring_id -> Int8,
+        partner_id -> Int4,
+        item_id -> Int4,
+    }
+}
+diesel::joinable!(rings -> characters (partner_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -606,4 +615,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     family_entitlement_uses,
     family_buffs,
     marriages,
+    rings,
 );
