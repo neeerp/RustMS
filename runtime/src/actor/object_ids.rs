@@ -3,6 +3,7 @@
 
 use std::ops::Range;
 
+pub const KITES: Range<i32> = 800_000_000..900_000_000;
 pub const SUMMONS: Range<i32> = 900_000_000..1_000_000_000;
 pub const MISTS: Range<i32> = 1_100_000_000..1_200_000_000;
 pub const REACTORS: Range<i32> = 1_200_000_000..1_500_000_000;

@@ -633,6 +633,9 @@ pub enum FieldRequest {
     /// Blow the weather of the 512xxxx item `item_id` over the map with
     /// its `message`, in place of any that blows, for 30 s.
     Weather { item_id: i32, message: String },
+    /// Fly the kite (508xxxx) `item_id` with the player's `message` above
+    /// where they stand, for an hour.
+    Kite { item_id: i32, message: String },
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
     Pickup { object_id: i32, x: i16, y: i16 },

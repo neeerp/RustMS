@@ -28,6 +28,7 @@ mod item_tag;
 mod jukebox;
 mod karma;
 mod keybinds;
+mod kite;
 mod logged_in;
 mod maker;
 mod map_transfer;
