@@ -650,23 +650,40 @@ namespace ms
 			INVITE_RESULT = 0x04,
 			DECLINED = 0x05,
 			CHAT = 0x06,
-			UPDATE = 0x07
+			UPDATE = 0x07,
+			REFRESH = 0x08
 		};
 
 		int8_t mode = recv.read_byte();
 		auto messenger = UI::get().get_element<UIMessenger>();
 
+		// v83 drops every mode but the invitation while no messenger is
+		// open (FUN_008511fc). Joining opens ours.
+		if (mode != Mode::INVITE && mode != Mode::JOIN && !(messenger && messenger->is_active()))
+			return;
+
 		switch (mode)
 		{
 			case Mode::ADD:
-			case Mode::UPDATE:
 			{
 				uint8_t slot = recv.read_byte();
 				LookEntry look = LoginParser::parse_look(recv);
 				std::string name = recv.read_string();
+				recv.skip_byte();
+				bool announce = recv.read_bool();
 
-				if (messenger)
-					messenger->set_member(slot, CharLook(look), name);
+				messenger->set_member(slot, CharLook(look), name, announce);
+
+				break;
+			}
+			// Only the look is read; the name and channel after it aren't
+			// (FUN_0085194f).
+			case Mode::UPDATE:
+			{
+				uint8_t slot = recv.read_byte();
+				LookEntry look = LoginParser::parse_look(recv);
+
+				messenger->update_look(slot, CharLook(look));
 
 				break;
 			}
@@ -674,8 +691,28 @@ namespace ms
 				UIMessenger::seat(recv.read_byte());
 				break;
 			case Mode::REMOVE:
-				if (messenger)
-					messenger->remove_member(recv.read_byte());
+				messenger->remove_member(recv.read_byte());
+				break;
+			// Every seat again, silently: 0 empties it, 1 leaves it as it
+			// is, anything else seats someone (FUN_008519f2).
+			case Mode::REFRESH:
+				for (uint8_t slot = 0; slot < 3; slot++)
+				{
+					uint8_t type = recv.read_byte();
+
+					if (type == 0)
+					{
+						messenger->empty_seat(slot);
+					}
+					else if (type != 1)
+					{
+						LookEntry look = LoginParser::parse_look(recv);
+						std::string name = recv.read_string();
+						recv.skip_byte();
+
+						messenger->set_member(slot, CharLook(look), name);
+					}
+				}
 
 				break;
 			case Mode::INVITE:
@@ -707,16 +744,15 @@ namespace ms
 
 				break;
 			}
-			// v83 writes both results into an open messenger's log and drops
-			// them otherwise (FUN_00851293, FUN_00851387).
+			// v83 writes both results into the messenger's log (FUN_00851293,
+			// FUN_00851387).
 			case Mode::INVITE_RESULT:
 			{
 				std::string target = recv.read_string();
 				bool sent = recv.read_bool();
 
-				if (messenger && messenger->is_active())
-					messenger->add_note(sent ? "- You have sent the invite to '" + target + "'."
-											 : "- '" + target + "' can't be found.");
+				messenger->add_note(sent ? "- You have sent the invite to '" + target + "'."
+									: "- '" + target + "' can't be found.");
 
 				break;
 			}
@@ -725,9 +761,8 @@ namespace ms
 				std::string target = recv.read_string();
 				bool blocking = recv.read_bool();
 
-				if (messenger && messenger->is_active())
-					messenger->add_note(blocking ? "'" + target + "' is currently not accepting chat."
-												 : "'" + target + "' denied the request.");
+				messenger->add_note(blocking ? "'" + target + "' is currently not accepting chat."
+									: "'" + target + "' denied the request.");
 
 				break;
 			}
@@ -741,8 +776,7 @@ namespace ms
 				if (at != std::string::npos)
 					line = line.substr(0, at + 3) + CurseData::filter(line.substr(at + 3));
 
-				if (messenger && messenger->is_active())
-					messenger->add_chat(line);
+				messenger->add_chat(line);
 
 				break;
 			}
