@@ -1,0 +1,97 @@
+//! Engagement (report b052): MARRIAGE_REQUEST asks the partner, and
+//! MARRIAGE_RESULT answers the proposer; any result first closes the
+//! proposer's "Waiting for her response..." box.
+
+use crate::{codec::stats::write_padded_name, error::NetworkError, packet::op::SendOpcode};
+use game::marriage::{MarriageRecord, Refusal};
+use packet::{io::write::PktWrite, Packet};
+
+/// The couple is engaged now; the client keeps the record.
+const ENGAGED: u8 = 11;
+/// A line of the server's own.
+const NOTICE: u8 = 36;
+
+fn result(mode: u8) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::MarriageResult as i16)?;
+    packet.write_byte(mode)?;
+    Ok(packet)
+}
+
+/// GW_MarriageRecord, 0x30 bytes. Both items are the ring box proposed
+/// with.
+pub fn write_marriage_record(
+    packet: &mut Packet,
+    record: &MarriageRecord,
+) -> Result<(), NetworkError> {
+    packet.write_int(record.id)?;
+    packet.write_int(record.groom_id)?;
+    packet.write_int(record.bride_id)?;
+    packet.write_short(record.status)?;
+    packet.write_int(record.item_id)?;
+    packet.write_int(record.item_id)?;
+    write_padded_name(packet, &record.groom_name)?;
+    write_padded_name(packet, &record.bride_name)?;
+    Ok(())
+}
+
+/// MARRIAGE_REQUEST mode 0: `name` (id `proposer_id`) proposes; the client
+/// asks Yes or No and answers with RING_ACTION mode 2.
+pub fn build_proposal(name: &str, proposer_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::MarriageRequest as i16)?;
+    packet.write_byte(0)?;
+    packet.write_str_with_length(name)?;
+    packet.write_int(proposer_id)?;
+    Ok(packet)
+}
+
+/// MARRIAGE_RESULT with the client's line for `refusal`.
+pub fn build_marriage_refusal(refusal: Refusal) -> Result<Packet, NetworkError> {
+    result(refusal as u8)
+}
+
+/// MARRIAGE_RESULT 11: "You are now engaged.", with the couple's record.
+pub fn build_engaged(record: &MarriageRecord) -> Result<Packet, NetworkError> {
+    let mut packet = result(ENGAGED)?;
+    write_marriage_record(&mut packet, record)?;
+    Ok(packet)
+}
+
+/// MARRIAGE_RESULT 36: `text` in the client's OK box.
+pub fn build_marriage_notice(text: &str) -> Result<Packet, NetworkError> {
+    let mut packet = result(NOTICE)?;
+    packet.write_byte(1)?;
+    packet.write_str_with_length(text)?;
+    Ok(packet)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use game::marriage::ENGAGED as STATUS;
+
+    #[test]
+    fn the_record_is_0x30_bytes() {
+        let record = MarriageRecord {
+            id: 7,
+            groom_id: 1,
+            bride_id: 2,
+            status: STATUS,
+            item_id: 2240000,
+            groom_name: "Groom".into(),
+            bride_name: "Bride".into(),
+        };
+        let packet = build_engaged(&record).unwrap();
+        assert_eq!(packet.bytes.len(), 3 + 0x30);
+        assert_eq!(&packet.bytes[..3], &[0x49, 0x00, 11]);
+        assert_eq!(&packet.bytes[3 + 22..3 + 27], b"Groom");
+        assert_eq!(&packet.bytes[3 + 35..3 + 40], b"Bride");
+    }
+
+    #[test]
+    fn a_refusal_is_its_mode_alone() {
+        let packet = build_marriage_refusal(Refusal::Declined).unwrap();
+        assert_eq!(packet.bytes, vec![0x49, 0x00, 30]);
+    }
+}

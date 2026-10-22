@@ -557,6 +557,15 @@ diesel::table! {
     }
 }
 diesel::joinable!(family_buffs -> characters (character_id));
+diesel::table! {
+    marriages (id) {
+        id -> Int4,
+        groom_id -> Int4,
+        bride_id -> Int4,
+        status -> Int2,
+        item_id -> Int4,
+    }
+}
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -596,4 +605,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     family_members,
     family_entitlement_uses,
     family_buffs,
+    marriages,
 );

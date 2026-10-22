@@ -95,6 +95,19 @@ pub enum ServerMessage {
     /// Someone else changed the player's guild (expelled them); read it
     /// again.
     GuildChanged,
+    /// `from` (named so) proposes; ask the player unless they can't be
+    /// asked.
+    Proposed {
+        from: ClientId,
+        name: String,
+    },
+    /// `partner` said yes to the player's proposal with `item_id`.
+    ProposalAccepted {
+        partner: ClientId,
+        item_id: i32,
+    },
+    /// The player's proposer recorded the engagement; take the ring.
+    Engaged(game::marriage::MarriageRecord),
     /// `junior` (named so) said yes to the player's request; add them.
     AddJunior {
         junior: ClientId,
@@ -686,6 +699,34 @@ pub enum DirectoryMessage {
     /// `client_id` was put in or out of a guild by someone else.
     GuildChanged {
         client_id: ClientId,
+    },
+    /// `from` proposes to `partner` with the ring box `item_id`: ask them
+    /// if they are on `from`'s map and of the level.
+    Propose {
+        from: ClientId,
+        partner: ClientId,
+        item_id: i32,
+    },
+    /// `from` withdrew their proposal.
+    ProposalCancel {
+        from: ClientId,
+    },
+    /// `from` answered `proposer`'s proposal.
+    ProposalAnswer {
+        from: ClientId,
+        proposer: ClientId,
+        accept: bool,
+    },
+    /// `from` can't be asked or can't take the ring after all; tell their
+    /// proposer why.
+    ProposalRefused {
+        from: ClientId,
+        refusal: game::marriage::Refusal,
+    },
+    /// `from` is engaged to `partner` now; tell `partner`.
+    Engaged {
+        partner: ClientId,
+        record: game::marriage::MarriageRecord,
     },
     /// Ask `junior`, if they are on `from`'s map and of the levels, to be
     /// `from`'s junior.

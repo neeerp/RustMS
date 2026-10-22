@@ -14,6 +14,7 @@ pub mod guild;
 pub mod guild_bbs;
 pub mod inventory;
 pub mod keymap;
+pub mod marriage;
 pub mod mob_damage;
 pub mod mob_skill;
 pub mod mob_stat;

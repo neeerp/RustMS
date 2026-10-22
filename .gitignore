@@ -37,3 +37,6 @@ assets/game-data/*
 assets/server-content/*
 !assets/server-content/.gitignore
 !assets/server-content/README.md
+
+# Lane test logs (lanes/bin/some.sh).
+/some-*.txt

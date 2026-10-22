@@ -1,4 +1,5 @@
 mod family;
+mod marriage;
 
 use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
@@ -130,6 +131,8 @@ pub struct WorldDirectory {
     family_away: HashMap<ClientId, family::Away>,
     /// Summonses waiting for their answer, by the member summoned.
     family_summons: HashMap<ClientId, family::Summons>,
+    /// Proposals waiting for their answer, by the partner asked.
+    proposals: HashMap<ClientId, marriage::Proposal>,
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
@@ -156,6 +159,7 @@ impl WorldDirectory {
             family_invites: GuildInvites::default(),
             family_away: HashMap::new(),
             family_summons: HashMap::new(),
+            proposals: HashMap::new(),
             events: HashMap::new(),
             next_event: 1,
             avatar_banners: AvatarBanners::default(),
@@ -316,6 +320,21 @@ impl WorldDirectory {
             DirectoryMessage::GuildChanged { client_id } => {
                 self.tell(client_id, ServerMessage::GuildChanged)
             }
+            DirectoryMessage::Propose {
+                from,
+                partner,
+                item_id,
+            } => self.propose(from, partner, item_id),
+            DirectoryMessage::ProposalCancel { from } => self.cancel_proposal(from),
+            DirectoryMessage::ProposalAnswer {
+                from,
+                proposer,
+                accept,
+            } => self.answer_proposal(from, proposer, accept),
+            DirectoryMessage::ProposalRefused { from, refusal } => {
+                self.refuse_proposal(from, refusal)
+            }
+            DirectoryMessage::Engaged { partner, record } => self.engaged(partner, record),
             DirectoryMessage::FamilyInvite { from, junior } => {
                 self.family_invite(from, junior, Instant::now())
             }
@@ -739,6 +758,7 @@ impl WorldDirectory {
             self.family_invites.forget(client_id);
             // Requests the player made go with them (keyed by the senior).
             self.family_invites.forget_guild(client_id);
+            self.forget_proposals(client_id);
             if let Some(party) = self.parties.of(client_id) {
                 self.send_party_update(party);
             }

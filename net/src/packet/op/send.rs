@@ -36,6 +36,10 @@ pub enum SendOpcode {
     OwlResult = 0x46,
     /// Whether GO on a row of the Owl's results may go (FUN_00a29013).
     OwlGoResult = 0x47,
+    /// A proposal to the partner, by mode (report b052).
+    MarriageRequest = 0x48,
+    /// The answer to a proposal, by mode; closes the proposer's waiting box.
+    MarriageResult = 0x49,
     CashPetFoodResult = 0x4C,
     BridleMobCatchFail = 0x4F,
 
