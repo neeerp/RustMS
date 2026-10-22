@@ -543,6 +543,7 @@ impl ClientActor {
             WorldAction::Guild(request) => self.guild_request(request).await?,
             WorldAction::Family(request) => self.family_request(request).await?,
             WorldAction::Ring(request) => self.ring_request(request).await?,
+            WorldAction::WeddingTalk { step } => self.wedding_talk(step),
             WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
@@ -1402,6 +1403,7 @@ impl ClientActor {
             }
             ServerMessage::WeddingEnded { id, failed } => self.wedding_ended(id, failed).await?,
             ServerMessage::Married { id, record, clock } => self.married(id, record, clock).await?,
+            ServerMessage::WeddingPriest { id, line } => self.wedding_priest(id, line).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,

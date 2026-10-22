@@ -369,6 +369,11 @@ pub enum ServerMessage {
         id: u32,
         failed: bool,
     },
+    /// The priest of wedding `id` shows `line` at its altar.
+    WeddingPriest {
+        id: u32,
+        line: crate::actor::wedding::PriestLine,
+    },
     /// Wedding `id` married the couple `record`; their time there now runs
     /// out at `clock`.
     Married {

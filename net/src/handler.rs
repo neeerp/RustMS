@@ -552,6 +552,11 @@ pub enum WorldAction {
     Alliance(AllianceRequest),
     Family(FamilyRequest),
     Ring(RingRequest),
+    /// One of the couple closed the priest's line `step` at the altar
+    /// (report b075).
+    WeddingTalk {
+        step: u8,
+    },
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -953,6 +958,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
+            (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),

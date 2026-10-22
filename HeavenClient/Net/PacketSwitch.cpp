@@ -222,6 +222,8 @@ namespace ms
 		CONFIRM_SHOP_TRANSACTION = 306,
 		TRUNK_RESULT = 309,
 		RPS_GAME = 312,
+		WEDDING_PROGRESS = 320,
+		WEDDING_CEREMONY_END = 321,
 		PARCEL = 322,
 		KEYMAP = 335,
 		AUTO_HP_POT = 336,
@@ -331,6 +333,8 @@ namespace ms
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
 		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
 		emplace<MARRIAGE_RESULT, MarriageResultHandler>();
+		emplace<WEDDING_PROGRESS, WeddingProgressHandler>();
+		emplace<WEDDING_CEREMONY_END, WeddingCeremonyEndHandler>();
 		emplace<NOTIFY_MARRIED_PARTNER_MAP_TRANSFER, PartnerMapHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
 		emplace<REMOVE_NPC, RemoveNpcHandler>();

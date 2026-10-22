@@ -162,6 +162,15 @@ namespace ms
 
 				pending_clock.reset();
 
+				// The priest welcomes the couple as they come to the altar.
+				for (const WeddingNews &news : pending_wedding)
+					if (news.hearts)
+						wedding.show_hearts();
+					else
+						wedding.progress(news.step, news.groom, news.bride, player.get_oid());
+
+				pending_wedding.clear();
+
 				// The player's effect item goes along, starting over where they arrive.
 				player.restart_item_effect();
 
@@ -223,6 +232,7 @@ namespace ms
 		// And the aura of an item buff, as v83 makes the user anew (user+0x1f64).
 		player.show_consume_effect(0);
 		pending_clock.reset();
+		pending_wedding.clear();
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -246,6 +256,7 @@ namespace ms
 		tooltips = mapid == -1 ? MapTooltips() : MapTooltips(mapid, src);
 		UI::get().clear_tooltip(Tooltip::Parent::FIELD);
 		ship = MapShip(src);
+		wedding = mapid == -1 ? MapWedding() : MapWedding(mapid);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
 		field_effects = EffectLayer();
@@ -342,6 +353,9 @@ namespace ms
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
+		// So are a wedding's hearts.
+		wedding.draw(Point<int16_t>(static_cast<int16_t>(std::round(viewx)), static_cast<int16_t>(std::round(viewy))),
+					 alpha);
 		// A weather's bursts and fireworks share the mists' layer (z 0xc00614a4).
 		weather.draw_shows(alpha);
 		drops.draw_explosions(viewpos, alpha);
@@ -410,6 +424,7 @@ namespace ms
 		clouds.update();
 		weather.update();
 		ship.update();
+		wedding.update(position_of(wedding.get_groom()), position_of(wedding.get_bride()));
 		clock.update();
 		ground_effects.update();
 		field_effects.update();
@@ -1665,6 +1680,38 @@ namespace ms
 	{
 		if (Stage::state == State::ACTIVE)
 			ship.show_state(state, flag);
+	}
+
+	std::optional<Point<int16_t>> Stage::position_of(int32_t cid)
+	{
+		if (cid == player.get_oid())
+			return player.get_position();
+
+		if (auto other = chars.get_char(cid))
+			return other->get_position();
+
+		return std::nullopt;
+	}
+
+	void Stage::wedding_progress(uint8_t step, int32_t groom, int32_t bride)
+	{
+		if (state == State::ACTIVE)
+			wedding.progress(step, groom, bride, player.get_oid());
+		else
+			pending_wedding.push_back({ false, step, groom, bride });
+	}
+
+	void Stage::wedding_hearts()
+	{
+		if (state == State::ACTIVE)
+			wedding.show_hearts();
+		else
+			pending_wedding.push_back({ true, 0, 0, 0 });
+	}
+
+	void Stage::answer_priest(uint32_t page, int8_t response)
+	{
+		wedding.answered(page, response);
 	}
 
 	void Stage::blow_weather(int32_t item_id, const std::string &msg, bool from_map)

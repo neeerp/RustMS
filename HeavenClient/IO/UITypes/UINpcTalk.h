@@ -106,8 +106,11 @@ namespace ms
 
 		// Answer this dialogue in the client instead of sending NPC_TALK_MORE.
 		// The responder gets 1/0/-1 (next or yes / previous or no / close) and,
-		// for menus, the chosen #L id. change_text clears it.
-		void set_local_responder(std::function<void(int8_t, int32_t)> responder);
+		// for menus, the chosen #L id. change_text clears it, and its `tag`,
+		// which tells its owner whether the page shown is still theirs.
+		void set_local_responder(std::function<void(int8_t, int32_t)> responder, uint32_t tag = 0);
+
+		uint32_t get_local_tag() const;
 
 		// What the text markup names: the player, NPCs, items, mobs and maps.
 		static NpcTextMarkup::Lookups markup_lookups();
@@ -243,6 +246,7 @@ namespace ms
 		answer_focus::Focus focus;
 		std::vector<InlineImage> images;
 		std::function<void(int8_t, int32_t)> local_responder;
+		uint32_t local_tag = 0;
 		// A prompt's field, its box relative to the window, and its limits.
 		Textfield field;
 		ColorBox field_border;

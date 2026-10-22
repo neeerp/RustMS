@@ -14,6 +14,11 @@
 //! gather, up to `MAX_GUESTS`, and go on to the altar with them; a guest
 //! may leave at any time without ending anything.
 //!
+//! The priest speaks to everyone at the altar (report b075): his welcome as
+//! the ceremony begins, the pronouncement once the couple are married, and
+//! when one of them closes it, or after `HEARTS_AFTER`, the hearts between
+//! them and his farewell.
+//!
 //! As with a party event (`crate::actor::event`), the client actors do the
 //! moving, and a ticket hands itself back when dropped.
 
@@ -23,11 +28,12 @@ use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use game::wedding::{
     GuestRefusal, Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING, MAX_GUESTS,
+    PRIEST_WELCOME,
 };
 use net::events::scaled;
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -37,6 +43,9 @@ use tracing::{info, warn};
 /// How long the couple have to get out after the wedding ends before its
 /// fields close.
 const GRACE: Duration = Duration::from_secs(2);
+/// How long the priest's pronouncement waits for the couple to close it
+/// before the hearts show anyway.
+const HEARTS_AFTER: Duration = Duration::from_secs(10);
 /// Room for each of the couple and the guests to leave while another
 /// message of theirs waits, so a dropped ticket is never turned away.
 pub const WEDDING_QUEUE_CAPACITY: usize = 2 * (MAX_GUESTS as usize + 2) + 16;
@@ -59,6 +68,17 @@ pub enum WeddingMessage {
         guest: ClientHandle,
         reply: oneshot::Sender<Result<WeddingTicket, GuestRefusal>>,
     },
+    /// `client_id` closed the priest's line `step`.
+    Talk { client_id: ClientId, step: u8 },
+}
+
+/// What the priest shows everyone at the altar.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PriestLine {
+    /// His line `step`, for the couple `groom` and `bride`.
+    Says { step: u8, groom: i32, bride: i32 },
+    /// The hearts between the married couple.
+    Hearts,
 }
 
 /// What one of the couple or a guest holds while in the wedding: the
@@ -76,6 +96,8 @@ pub struct WeddingTicket {
     tx: mpsc::Sender<WeddingMessage>,
     /// The wedding's stage, shared with it; only it writes.
     stage: Arc<AtomicU8>,
+    /// Whether the pronouncement's close was passed on already.
+    talked: AtomicBool,
 }
 
 impl Drop for WeddingTicket {
@@ -118,6 +140,19 @@ impl WeddingTicket {
         vows.await.unwrap_or(Vows::Refused)
     }
 
+    /// Say one of the couple closed the priest's pronouncement. Only the
+    /// first close counts, so the queue keeps its room for leaving.
+    pub fn talk(&self, step: u8) {
+        let pronounced = self.stage() == WeddingStage::Married && step == self.venue.pronouncing();
+        if self.guest || !pronounced || self.talked.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let _ = self.tx.try_send(WeddingMessage::Talk {
+            client_id: self.member,
+            step,
+        });
+    }
+
     /// Ask for the wedding to end.
     pub async fn end(&self) {
         let _ = self
@@ -143,9 +178,11 @@ pub struct WeddingStart {
     pub rx: mpsc::Receiver<WeddingMessage>,
 }
 
-/// Start the wedding's actor, which hands out the tickets.
+/// Start the wedding's actor, which hands out the tickets, for the couple
+/// `groom` and `bride`.
 pub fn spawn(
     start: WeddingStart,
+    (groom, bride): (i32, i32),
     fields: Arc<FieldRegistry>,
     directory: mpsc::Sender<DirectoryMessage>,
 ) {
@@ -158,7 +195,10 @@ pub fn spawn(
         id,
         venue,
         marriage_id: start.marriage_id,
+        groom,
+        bride,
         ends: Instant::now() + scaled(GATHERING),
+        hearts: None,
         tx: start.tx,
         rx: start.rx,
         guests,
@@ -198,8 +238,13 @@ struct WeddingActor {
     id: u32,
     venue: Venue,
     marriage_id: i32,
+    groom: i32,
+    bride: i32,
     /// When the current stage's time runs out.
     ends: Instant,
+    /// When the hearts show, if the priest has pronounced the couple
+    /// married and neither has closed it yet.
+    hearts: Option<Instant>,
     /// For the tickets; the directory keeps another for the guests.
     tx: mpsc::Sender<WeddingMessage>,
     rx: mpsc::Receiver<WeddingMessage>,
@@ -232,6 +277,7 @@ impl WeddingActor {
         let mut over = false;
         while !over {
             let ends = self.ends;
+            let hearts = self.hearts;
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(WeddingMessage::Left { client_id }) => over = self.left(client_id),
@@ -252,9 +298,18 @@ impl WeddingActor {
                         // A ticket the guest can't take hands itself back.
                         let _ = reply.send(self.join(guest));
                     }
+                    Some(WeddingMessage::Talk { client_id, step }) => {
+                        if self.members.contains_key(&client_id)
+                            && step == venue.pronouncing()
+                            && self.hearts.is_some()
+                        {
+                            self.show_hearts();
+                        }
+                    }
                     None => over = true,
                 },
                 _ = sleep_until(ends) => over = self.time_up(),
+                _ = sleep_until(hearts.unwrap_or(ends)), if hearts.is_some() => self.show_hearts(),
             }
         }
         if self.failed {
@@ -303,6 +358,7 @@ impl WeddingActor {
             guest,
             tx: self.tx.clone(),
             stage: self.stage.clone(),
+            talked: AtomicBool::new(false),
         }
     }
 
@@ -320,6 +376,29 @@ impl WeddingActor {
         drop(guests);
         info!(venue = ?self.venue, id = self.id, client_id, "Wedding guest came in");
         Ok(self.ticket(client_id, true))
+    }
+
+    /// Show `line` to everyone in the wedding; the client actors keep it
+    /// to those at the altar.
+    fn priest(&self, line: PriestLine) {
+        for member in self.members.values().chain(self.guests().values()) {
+            member.send(ServerMessage::WeddingPriest { id: self.id, line });
+        }
+    }
+
+    fn says(&self, step: u8) -> PriestLine {
+        PriestLine::Says {
+            step,
+            groom: self.groom,
+            bride: self.bride,
+        }
+    }
+
+    /// The hearts between the married couple, and the priest's farewell.
+    fn show_hearts(&mut self) {
+        self.hearts = None;
+        self.priest(PriestLine::Hearts);
+        self.priest(self.says(self.venue.farewell()));
     }
 
     fn set_stage(&self, stage: WeddingStage) {
@@ -357,6 +436,7 @@ impl WeddingActor {
                         clock: Some(self.ends),
                     });
                 }
+                self.priest(self.says(PRIEST_WELCOME));
                 info!(venue = ?self.venue, id = self.id, "Ceremony started");
                 false
             }
@@ -409,6 +489,8 @@ impl WeddingActor {
                 clock: self.ends,
             });
         }
+        self.priest(self.says(self.venue.pronouncing()));
+        self.hearts = Some(Instant::now() + HEARTS_AFTER);
         Vows::Married
     }
 }

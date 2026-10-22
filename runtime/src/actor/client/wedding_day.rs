@@ -6,18 +6,21 @@
 
 use super::marriage::take_tokens;
 use super::ClientActor;
-use crate::actor::wedding::WeddingTicket;
+use crate::actor::wedding::{PriestLine, WeddingTicket};
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::message::DirectoryMessage;
 use db::parcel::NewParcel;
 use game::marriage::{self, MarriageRecord, ENGAGED};
-use game::wedding::{self, StartRefusal, Venue, AMORIA, WEDDING_EXIT};
+use game::wedding::{self, StartRefusal, Venue, Vows, AMORIA, WEDDING_EXIT};
 use game_data::server_content::keys;
 use net::npc_scripts::{self, NpcScript};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::build::world::inventory;
-use net::packet::build::world::marriage::{build_married, build_wedding_notice, WeddingNotice};
+use net::packet::build::world::marriage::{
+    build_married, build_wedding_hearts, build_wedding_notice, build_wedding_progress,
+    WeddingNotice,
+};
 use std::time::SystemTime;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
@@ -91,11 +94,14 @@ impl ClientActor {
     /// still theirs to start and the partner stands beside them.
     pub(super) async fn start_wedding(&mut self, venue: Venue) -> Result<(), RuntimeError> {
         let player = &self.in_game()?.player;
-        let Some((marriage_id, partner)) = player
+        let Some((marriage_id, partner, couple)) = player
             .marriage
             .as_ref()
             .filter(|record| record.status == ENGAGED)
-            .map(|record| (record.id, record.partner_of(player.stats.id)))
+            .map(|record| {
+                let couple = (record.groom_id, record.bride_id);
+                (record.id, record.partner_of(player.stats.id), couple)
+            })
         else {
             return Ok(());
         };
@@ -122,6 +128,7 @@ impl ClientActor {
             Ok(Ok(start)) => {
                 crate::actor::wedding::spawn(
                     start,
+                    couple,
                     self.services.fields.clone(),
                     self.services.directory.clone(),
                 );
@@ -159,9 +166,44 @@ impl ClientActor {
             let script = NpcScript::wedding_priest(venue, player, stage);
             return self.start_script(script).await;
         }
-        let vows = ticket.vow().await;
-        self.start_script(NpcScript::wedding_priest_says(venue, vows))
-            .await
+        match ticket.vow().await {
+            // The priest pronounces them married at the altar instead.
+            Vows::Married => Ok(()),
+            vows => {
+                self.start_script(NpcScript::wedding_priest_says(venue, vows))
+                    .await
+            }
+        }
+    }
+
+    /// The priest of wedding `id` shows `line`, which those at its altar
+    /// see.
+    pub(super) async fn wedding_priest(
+        &mut self,
+        id: u32,
+        line: PriestLine,
+    ) -> Result<(), RuntimeError> {
+        let map_id = self.game.as_ref().map(|game| game.player.stats.map_id);
+        let at_altar = self
+            .wedding
+            .as_ref()
+            .is_some_and(|ticket| ticket.id == id && map_id == Some(ticket.venue.altar()));
+        if !at_altar || self.in_cash_shop {
+            return Ok(());
+        }
+        let mut packet = match line {
+            PriestLine::Says { step, groom, bride } => build_wedding_progress(step, groom, bride)?,
+            PriestLine::Hearts => build_wedding_hearts()?,
+        };
+        self.send(&mut packet).await
+    }
+
+    /// The player closed the priest's line `step`, which matters only from
+    /// one of the couple at the altar.
+    pub(super) fn wedding_talk(&self, step: u8) {
+        if let Some(ticket) = self.wedding_here() {
+            ticket.talk(step);
+        }
     }
 
     /// The married player asked the staff to end their wedding.

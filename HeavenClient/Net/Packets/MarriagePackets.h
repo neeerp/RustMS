@@ -76,4 +76,22 @@ namespace ms
 			write_int(item_id);
 		}
 	};
+
+	// The couple's client is done with the priest's page; `step` is the
+	// latest one it heard (0x8B, report b075).
+	class WeddingTalkPacket : public OutPacket
+	{
+	public:
+		WeddingTalkPacket(uint8_t step) : OutPacket(OutPacket::Opcode::WEDDING_TALK)
+		{
+			write_byte(step);
+		}
+	};
+
+	// A Cathedral guest blesses the couple (0x8C, no body).
+	class BlessCouplePacket : public OutPacket
+	{
+	public:
+		BlessCouplePacket() : OutPacket(OutPacket::Opcode::WEDDING_BLESS) {}
+	};
 }

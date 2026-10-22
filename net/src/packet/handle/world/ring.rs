@@ -59,6 +59,19 @@ impl WorldHandler for RingActionHandler {
     }
 }
 
+/// `WEDDING_TALK` (report b075): the groom or bride closed the priest's
+/// line, naming the last step the client was shown.
+pub struct WeddingTalkHandler;
+
+impl WorldHandler for WeddingTalkHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let step = reader.read_byte()?;
+        Ok(HandlerResult::empty().with(WorldAction::WeddingTalk { step }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

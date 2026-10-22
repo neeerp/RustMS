@@ -165,6 +165,26 @@ pub fn build_couple_ended(record: &MarriageRecord) -> Result<Packet, NetworkErro
     result(if record.married() { DIVORCED } else { BROKEN })
 }
 
+/// WEDDING_PROGRESS: the priest's line `step` to everyone at the altar,
+/// for the couple `groom` and `bride`, who answer it with WEDDING_TALK
+/// (report b075). Step 0 also starts the venue's music.
+pub fn build_wedding_progress(step: u8, groom: i32, bride: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::WeddingProgress as i16)?;
+    packet.write_byte(step)?;
+    packet.write_int(groom)?;
+    packet.write_int(bride)?;
+    Ok(packet)
+}
+
+/// WEDDING_CEREMONY_END: the client closes the priest's line and shows the
+/// hearts between the couple until the next ceremony. It reads nothing.
+pub fn build_wedding_hearts() -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::WeddingCeremonyEnd as i16)?;
+    Ok(packet)
+}
+
 /// MARRIAGE_RESULT 36: `text` in the client's OK box.
 pub fn build_marriage_notice(text: &str) -> Result<Packet, NetworkError> {
     let mut packet = result(NOTICE)?;
@@ -199,6 +219,13 @@ mod tests {
         );
         assert_eq!(&packet.bytes[3 + 22..3 + 27], b"Groom");
         assert_eq!(&packet.bytes[3 + 35..3 + 40], b"Bride");
+    }
+
+    #[test]
+    fn the_priest_names_his_line_and_the_couple() {
+        let packet = build_wedding_progress(1, 7, 8).unwrap();
+        assert_eq!(packet.bytes, [0x40, 0x01, 1, 7, 0, 0, 0, 8, 0, 0, 0]);
+        assert_eq!(build_wedding_hearts().unwrap().bytes, [0x41, 0x01]);
     }
 
     #[test]

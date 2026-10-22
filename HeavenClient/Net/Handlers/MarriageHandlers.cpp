@@ -72,4 +72,18 @@ namespace ms
 
 		Stage::get().get_player().set_partner(spot);
 	}
+
+	void WeddingProgressHandler::handle(InPacket& recv) const
+	{
+		uint8_t step = static_cast<uint8_t>(recv.read_byte());
+		int32_t groom = recv.read_int();
+		int32_t bride = recv.read_int();
+
+		Stage::get().wedding_progress(step, groom, bride);
+	}
+
+	void WeddingCeremonyEndHandler::handle(InPacket&) const
+	{
+		Stage::get().wedding_hearts();
+	}
 }
