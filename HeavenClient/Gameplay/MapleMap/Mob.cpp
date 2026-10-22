@@ -470,10 +470,10 @@ namespace ms
 				reporttime = 1000;
 
 				Point<int16_t> position = get_position();
-				int32_t dx = std::abs(targetpos.x() - position.x());
-				int32_t dy = std::abs(targetpos.y() - position.y());
+				int32_t distance = mob_attack::first_attack_distance(targetpos.x() - position.x(),
+																	 targetpos.y() - position.y());
 
-				MobDistancePacket(oid, dx / 10 + dy / 3 + (targetdead ? 100 : 0)).dispatch();
+				MobDistancePacket(oid, distance + (targetdead ? 100 : 0)).dispatch();
 			}
 		}
 
@@ -507,16 +507,16 @@ namespace ms
 
 			if (control)
 			{
-				// A firstAttack mob that can attack (FUN_005ce8c6) starts
-				// chasing the local player once they come within
-				// |dx| / 10 + |dy| / 3 <= 40 of it.
+				// A firstAttack mob that can attack starts chasing the local
+				// player once they come close or into reach of one of its
+				// attacks (FUN_0066e32d), in time to attack in this update.
 				if (firstattack && !notattack && !hastarget)
 				{
 					Point<int16_t> position = get_position();
-					int32_t dx = std::abs(targetpos.x() - position.x());
-					int32_t dy = std::abs(targetpos.y() - position.y());
+					int32_t distance = mob_attack::first_attack_distance(targetpos.x() - position.x(),
+																		 targetpos.y() - position.y());
 
-					if (dx / 10 + dy / 3 <= 40)
+					if (distance <= 40 || attack_reaches(physics))
 						chase();
 				}
 
@@ -681,6 +681,27 @@ namespace ms
 		if (!phobj.onground && !canfly)
 			return std::nullopt;
 
+		std::vector<Pick> candidates = attack_candidates(physics);
+
+		if (candidates.empty())
+			return std::nullopt;
+
+		return candidates[randomizer.next_int(candidates.size())];
+	}
+
+	bool Mob::attack_reaches(const Physics &physics)
+	{
+		// Only the pick's own checks: it needn't chase anyone yet nor stand
+		// on the ground. v83 doesn't skip a dead player here; HC does, as
+		// its distance reports count them 100 farther.
+		if (attacks.empty() || acting || attacking || casting || targetdead || targethidden || held())
+			return false;
+
+		return !attack_candidates(physics).empty();
+	}
+
+	std::vector<Mob::Pick> Mob::attack_candidates(const Physics &physics)
+	{
 		Point<int16_t> position = get_position();
 		int32_t x = position.x();
 		int32_t y = position.y();
@@ -783,10 +804,7 @@ namespace ms
 				candidates.push_back({ static_cast<uint8_t>(i), *left, skilldata });
 		}
 
-		if (candidates.empty())
-			return std::nullopt;
-
-		return candidates[randomizer.next_int(candidates.size())];
+		return candidates;
 	}
 
 	void Mob::attack(const Physics &physics, const Pick &pick)

@@ -101,10 +101,13 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   draw stance 32 with that animation.
 - **First-attack mobs:** a mob with `info/firstAttack` and without
   `notAttack` starts the same chase without being hit once the local player
-  comes within |dx| / 10 + |dy| / 3 <= 40 of it (v83's FUN_005ce8c6). Only
-  its controller's client checks this, and the server is not told. v83 also
-  starts the chase when one of the mob's attacks could reach the player;
-  HeavenClient does not yet.
+  comes within |dx| / 10 + |dy| / 3 <= 40 of it, or once one of its attacks
+  could reach them: the attack pick, run without needing a chase or the
+  ground under the mob (v83 FUN_0066e32d and FUN_0066a517, report c057;
+  `Mob::attack_reaches`). Only its controller's client checks this, every
+  update, and the server is not told. HeavenClient leaves out v83's Monster
+  Carnival exception (same-team mobs) and, unlike v83, never finds a dead
+  player in reach (the distance alone still starts a chase).
 - **Distance reports:** so that the player a firstAttack mob goes for is the
   one whose client checks, every client, controller or not, sends MOB_DISTANCE
   (`0xBD`: object id, distance) once a second for each such mob, as v83's
