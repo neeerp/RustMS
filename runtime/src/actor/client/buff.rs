@@ -347,7 +347,7 @@ impl ClientActor {
     }
 
     /// End one buff, e.g. a Puppet's when a mob broke it.
-    async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
+    pub(super) async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
         let ended = self.in_game_mut()?.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(());

@@ -570,16 +570,18 @@ impl WorldDirectory {
             ?team,
             "Event reserved"
         );
+        let team: Vec<_> = team
+            .iter()
+            .filter_map(|member| self.clients.get(member))
+            .collect();
+        let jobs: Vec<_> = team.iter().map(|entry| entry.presence.job).collect();
         Some(EventStart {
             id,
             kind,
             channel_id,
             leader: from,
-            team: team
-                .iter()
-                .filter_map(|member| self.clients.get(member))
-                .map(|entry| entry.handle.clone())
-                .collect(),
+            team: team.iter().map(|entry| entry.handle.clone()).collect(),
+            blessing: kind.event().blessing(&jobs, &mut rand::thread_rng()),
         })
     }
 
