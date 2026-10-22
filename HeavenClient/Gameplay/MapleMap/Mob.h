@@ -344,6 +344,8 @@ namespace ms
 
 		// Whether a status holds the mob where it stands.
 		bool held() const;
+		// Whether Hypnotize keeps the mob from hurting players.
+		bool dazzled() const;
 
 		// Show a status's skill on the mob: its `mob` effect once, or for
 		// as long as the status lasts if it repeats, and its `mob0` for as

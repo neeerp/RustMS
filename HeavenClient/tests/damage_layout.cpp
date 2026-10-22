@@ -29,6 +29,10 @@ int main()
 		require(width == 96 && placed[0].left == 30, "a critical number starts right of its banner");
 		require(placed[0].top == 15 && placed[1].top == 22, "drops apply to odd digits too");
 
+		require(damage_layout::shows_number(5221004), "a hit shows its number");
+		require(!damage_layout::shows_number(5221009) && !damage_layout::shows_number(1221011),
+				"Hypnotize's and Heaven's Hammer's don't");
+
 		require(damage_layout::left(66) == -33 && damage_layout::left(67) == -33, "the canvas is centred, rounding left");
 
 		require(damage_layout::opacity(0) == 1.0f && damage_layout::opacity(400) == 1.0f, "opaque for 400 ms");

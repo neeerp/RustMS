@@ -1933,9 +1933,11 @@ namespace ms
 
 	void Combat::apply_damage_effect(const DamageEffect &effect)
 	{
-		Point<int16_t> head_position = mobs.get_mob_head_position(effect.target_oid);
-		damagenumbers.push_back(effect.number);
-		damagenumbers.back().set_anchor(head_position);
+		if (damage_layout::shows_number(effect.move_id))
+		{
+			damagenumbers.push_back(effect.number);
+			damagenumbers.back().set_anchor(mobs.get_mob_head_position(effect.target_oid));
+		}
 
 		const SpecialMove &move = get_move(effect.move_id);
 		mobs.apply_damage(effect.target_oid, effect.damage, effect.toleft, effect.user, move);
