@@ -1188,7 +1188,7 @@ HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
 - Only the Octopus and Wrath of the Octopi fire a ball
   (`summon/attack1/info/ball`). It leaves the summon's `range/sp`, mirrored
   when the summon faces right, at `attackAfter`. It flies straight to where
-  the summon's row meets the mob, taking 600 ms per `bulletSpeed` px
+  the muzzle's row meets the mob, taking 600 ms per `bulletSpeed` px
   (300 px in 600 ms), turned to point along its path. The hit lands as it
   arrives (`summon_rules::muzzle`, `ball_time`, `ball_angle`).
 - Another player's summon fires no ball. All of its hits land at
