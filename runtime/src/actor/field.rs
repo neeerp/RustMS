@@ -997,6 +997,9 @@ impl FieldActor {
         let Some((item_id, quantity)) = reactor_item(&drop.loot) else {
             return;
         };
+        if !self.reactors.any_takes_items() {
+            return;
+        }
         if self
             .items_on_reactors
             .iter()

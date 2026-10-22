@@ -464,8 +464,8 @@ break brings out another Cellion at the spot `reactors::salion_next` names,
 breaks (4 to 13, `reactors::salion_limit`, as Cosmic draws it), have gone.
 The field keeps that count (`FieldActor::salion`; each team has its own
 copy of the map). The spot that breaks after the last drops its loot, a
-piece of the statue, 4001045, for whoever broke it (or anyone still on the
-map), whose client actor then tells the event the stage is cleared
+piece of the statue, 4001045, for the owner of the drop that broke it (or
+anyone still on the map), whose client actor then tells the event the stage is cleared
 (`Event::reactor_clears`; any member may). The piece goes in 2008005 on
 the hub. Eak's backup path on this map, which Cosmic has for a team whose
 Cellions got stuck, isn't here yet.

@@ -9,7 +9,7 @@ use integration_harness::hunting::{attack, walk_to};
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
 use net::events::OPQ;
-use net::reactors::{salion_next, CELLION, SALION_SPOTS};
+use net::reactors::{CELLION, SALION_SPOTS};
 
 const SALION: i32 = 920010300;
 
@@ -54,7 +54,7 @@ async fn each_cellions_drop_breaks_its_spot_and_the_next_comes_out_further_on() 
 
     // The map's Cellion stands at the first spot; its drop breaks that
     // spot, and the next comes out at 2001013's.
-    for reactor_id in [SALION_SPOTS, salion_next(1)] {
+    for (n, reactor_id) in [(1, SALION_SPOTS), (2, 2001013)] {
         let at = spot(&seen, reactor_id);
         let cellion = seen.field.alive(CELLION)[0];
         kill(&mut a[0], &mut seen, cellion, (at.x, at.y)).await;
@@ -66,8 +66,17 @@ async fn each_cellions_drop_breaks_its_spot_and_the_next_comes_out_further_on() 
                 && t.field.alive(CELLION).len() == 1
         })
         .await;
-        assert!(seen.field.item_drop(4001074).is_some(), "{seen:?}");
-        // No piece of the statue yet: four Cellions go first at least.
-        assert!(seen.field.item_drop(4001045).is_none(), "{seen:?}");
+        // The spot took this Cellion's drop: it went, picked up by no one.
+        let drops: Vec<_> = seen
+            .field
+            .drops
+            .iter()
+            .filter(|d| !d.meso && d.value == 4001074)
+            .map(|d| d.object_id)
+            .collect();
+        assert_eq!(drops.len(), n, "{seen:?}");
+        for drop in drops {
+            assert_eq!(seen.field.removals(drop), [None], "{seen:?}");
+        }
     }
 }

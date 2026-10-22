@@ -228,6 +228,13 @@ impl ReactorSet {
     }
 
     /// Whether `object_id`, in its state, waits for an item.
+    /// Whether any reactor here waits for an item now.
+    pub fn any_takes_items(&self) -> bool {
+        self.live
+            .values()
+            .any(|reactor| self.spots[reactor.spot].data.takes_items(reactor.state))
+    }
+
     pub fn takes_items(&self, object_id: i32) -> bool {
         self.live
             .get(&object_id)

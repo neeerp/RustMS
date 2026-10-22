@@ -64,6 +64,12 @@ add = [{ item = 4001156, prob = 1.0 }]
 [mobs.9300171]
 add = [{ item = 4001156, prob = 1.0 }]
 
+[mobs.9300040]
+# The Cellion on the Tower of Goddess's Salion stage (Map.nx 920010300)
+# drops the 4001074 its spot takes (Reactor.nx 2001002-15, item event):
+# one every time, so the stage works without the pack too.
+replace = [{ item = 4001074, prob = 1.0 }]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).
