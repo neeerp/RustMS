@@ -215,8 +215,9 @@ namespace ms
 
 		const Equip &equip = *oequip;
 		// Equips bought in the Cash Shop keep its serial.
-		bool cash = inventory.get_cash_id(invtype, invpos) != 0;
-		build(equip, item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED), "");
+		int64_t cash_id = inventory.get_cash_id(invtype, invpos);
+		build(equip, item_expiry::line(equip.get_expiration(), cash_id != 0, equip.get_flags() & item_expiry::SEALED), "",
+			  cash_id);
 	}
 
 	namespace
@@ -249,7 +250,8 @@ namespace ms
 			gift_from.empty() ? "" : "IT'S A GIFT FROM '" + gift_from + "'");
 	}
 
-	void EquipTooltip::build(const Equip &equip, const std::string &expirystr, const std::string &giftstr)
+	void EquipTooltip::build(const Equip &equip, const std::string &expirystr, const std::string &giftstr,
+							 int64_t cash_id)
 	{
 		const CharStats &charstats = Stage::get().get_player().get_stats();
 		int32_t item_id = equip.get_item_id();
@@ -404,9 +406,13 @@ namespace ms
 		if (!owner.empty())
 			height += OWNER_HEIGHT;
 
-		// A wedding ring names the partner in place of its description (0x8e9109).
+		// A wedding ring names the partner in place of its description (0x8e9109), and so, we take it, does
+		// a crush or friendship ring of the player's pairs (0x8e7975).
 		const Player &player = Stage::get().get_player();
 		std::string descstr = marriage::tooltip_line(item_id, player.get_marriage(), charstats.get_female());
+
+		if (descstr.empty())
+			descstr = marriage::pair_tooltip_line(item_id, cash_id, player.get_couple_rings());
 
 		if (descstr.empty())
 			descstr = itemdata.get_desc();

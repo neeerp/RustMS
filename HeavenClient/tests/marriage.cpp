@@ -120,15 +120,20 @@ void ring_looks()
 	Writer none;
 	none.put<int8_t>(0).put<int8_t>(0).put<int8_t>(0);
 	InPacket recv = none.packet();
-	require(!marriage::read_ring_looks(recv) && !recv.available(), "three empty blocks");
+	RingLooks empty = marriage::read_ring_looks(recv);
+	require(!empty.crush && !empty.friendship && !empty.marriage && !recv.available(), "three empty blocks");
 
 	Writer worn;
 	worn.put<int8_t>(1).put<int64_t>(11).put<int64_t>(12).put<int32_t>(1112001);
 	worn.put<int8_t>(0);
 	worn.put<int8_t>(1).put<int32_t>(5).put<int32_t>(4).put<int32_t>(1112806);
 	recv = worn.packet();
-	std::optional<MarriageRing> ring = marriage::read_ring_looks(recv);
-	require(!recv.available(), "a crush block is skipped");
+	RingLooks looks = marriage::read_ring_looks(recv);
+	require(!recv.available(), "all read");
+	require(looks.crush && looks.crush->ring_id == 11 && looks.crush->partner_ring_id == 12
+		&& looks.crush->item_id == 1112001, "the crush block");
+	require(!looks.friendship, "no friendship block");
+	std::optional<MarriageRing> ring = looks.marriage;
 	require(ring && ring->self_id == 5 && ring->partner_id == 4 && ring->item_id == 1112806, "the marriage block");
 
 	MarriageRecord record;
@@ -143,14 +148,59 @@ void ring_looks()
 	require(bride && bride->self_id == 5 && bride->partner_id == 4, "the bride's");
 }
 
+void couple_rings()
+{
+	require(marriage::ring_kind(1112001) == RingKind::CRUSH && marriage::ring_kind(1112099) == RingKind::CRUSH,
+		"crush rings");
+	require(!marriage::ring_kind(1112000) && !marriage::ring_kind(1112100), "a plain ring");
+	require(marriage::ring_kind(1112800) == RingKind::FRIENDSHIP && marriage::ring_kind(1112812) == RingKind::FRIENDSHIP,
+		"friendship rings");
+	require(marriage::ring_kind(1112803) == RingKind::WEDDING && !marriage::ring_kind(1112804), "the 1128xx between");
+
+	Writer lists;
+	lists.put<int32_t>(9).padded("Crush").put<int64_t>(21).put<int64_t>(22);
+	lists.put<int32_t>(8).padded("Friend").put<int64_t>(31).put<int64_t>(32).put<int32_t>(1112800);
+	InPacket recv = lists.packet();
+	std::vector<CoupleRingRecord> records = { marriage::read_couple_ring(recv, false),
+		marriage::read_couple_ring(recv, true) };
+	require(!recv.available(), "0x21 and 0x25 bytes");
+	require(records[0].partner_id == 9 && records[0].partner_name == "Crush" && records[0].ring_id == 21
+		&& records[0].partner_ring_id == 22, "a crush record");
+	require(records[1].partner_name == "Friend" && records[1].item_id == 1112800, "a friendship record");
+
+	std::optional<PairRing> crush = marriage::own_pair_ring(RingKind::CRUSH, { { 1112800, 31 }, { 1112001, 21 } }, records);
+	require(crush && crush->ring_id == 21 && crush->partner_ring_id == 22 && crush->item_id == 1112001, "the worn crush ring");
+	std::optional<PairRing> friendship = marriage::own_pair_ring(RingKind::FRIENDSHIP, { { 1112800, 31 } }, records);
+	require(friendship && friendship->partner_ring_id == 32, "the worn friendship ring");
+	require(!marriage::own_pair_ring(RingKind::CRUSH, { { 1112002, 99 }, { 1112001, 21 } }, records),
+		"only the first crush ring counts");
+	require(!marriage::own_pair_ring(RingKind::CRUSH, {}, records), "none worn");
+
+	require(marriage::pair_tooltip_line(1112001, 21, records) == "A COUPLE-RING WITH : Crush", "a crush ring's line");
+	require(marriage::pair_tooltip_line(1112800, 31, records) == "This is your Friendship Ring with 'Friend'.",
+		"a friendship ring's line");
+	require(marriage::pair_tooltip_line(1112001, 99, records).empty(), "not of a pair");
+	require(marriage::pair_tooltip_line(1112001, 0, records).empty(), "no serial");
+
+	require(!marriage::equip_gate(1112001, 0, { 1112800, 1112803 }), "one of each kind");
+	const char* second = marriage::equip_gate(1112001, 0, { 0, 1112002 });
+	require(second && second == std::string("Only one couple-ring can be equipped."),
+		"a second crush ring");
+	require(!marriage::equip_gate(1112001, 1112002, { 1112002 }), "in place of one");
+	require(marriage::equip_gate(1112801, 1112001, { 1112001, 1112800 }) != nullptr, "a second friendship ring");
+	require(marriage::equip_gate(1112806, 0, { 1112803 }) != nullptr, "a second wedding ring");
+	require(!marriage::equip_gate(1112000, 0, { 1112000 }), "plain rings");
+}
+
 void ring_effects()
 {
+	auto wear = [](int32_t id, Point<int16_t> position, MarriageRing ring) { return RingWearer::of(id, position, ring); };
 	MarriageRing groom{ 4, 5, 1112803 };
 	MarriageRing bride{ 5, 4, 1112803 };
 	MarriageRing other{ 7, 8, 1112806 };
 
-	auto effects = marriage::ring_effects({ { 5, Point<int16_t>(300, 0), bride }, { 7, Point<int16_t>(0, 0), other },
-		{ 4, Point<int16_t>(100, 0), groom } });
+	auto effects = marriage::ring_effects({ wear(5, Point<int16_t>(300, 0), bride), wear(7, Point<int16_t>(0, 0), other),
+		wear(4, Point<int16_t>(100, 0), groom) });
 	require(effects.size() == 2, "only the couple");
 	auto [low, low_effect] = effects[0];
 	auto [high, high_effect] = effects[1];
@@ -159,19 +209,34 @@ void ring_effects()
 	require(low_effect.pair && low_effect.offset == Point<int16_t>(100, 0), "close: the big effect midway");
 	require(!high_effect.pair && low_effect.item_id == 1112803, "on the lower id only");
 
-	auto apart = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(250, 0), bride } });
-	require(apart[0].second.mark && !apart[0].second.pair, "250 apart is not close");
-	auto far = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(0, 500), bride } });
+	auto couple = [&](Point<int16_t> gap) {
+		return marriage::ring_effects({ wear(4, Point<int16_t>(0, 0), groom), wear(5, gap, bride) });
+	};
+	require(couple(Point<int16_t>(250, 0))[0].second.mark && !couple(Point<int16_t>(250, 0))[0].second.pair,
+		"250 apart is not close");
+	auto far = couple(Point<int16_t>(0, 500));
 	require(!far[0].second.mark && !far[1].second.mark, "500 below is off the screen");
-
-	auto edge = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(249, 99), bride } });
-	require(edge[0].second.pair, "249 across and 99 down is close");
-	auto low_edge = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(0, 100), bride } });
-	require(!low_edge[0].second.pair, "100 down is not close");
-	auto screen = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(-699, 499), bride } });
+	require(couple(Point<int16_t>(249, 99))[0].second.pair, "249 across and 99 down is close");
+	require(!couple(Point<int16_t>(0, 100))[0].second.pair, "100 down is not close");
+	auto screen = couple(Point<int16_t>(-699, 499));
 	require(screen[0].second.mark && screen[1].second.mark, "699 across and 499 down share a screen");
-	auto off = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(700, 0), bride } });
-	require(!off[0].second.mark, "700 across is off the screen");
+	require(!couple(Point<int16_t>(700, 0))[0].second.mark, "700 across is off the screen");
+
+	// A crush pair goes by the ring serials, and is close within 100 px.
+	PairRing mine{ 21, 22, 1112001 };
+	PairRing theirs{ 22, 21, 1112001 };
+	auto crush = [&](Point<int16_t> gap) {
+		return marriage::ring_effects({ RingWearer::of(9, Point<int16_t>(0, 0), mine), RingWearer::of(3, gap, theirs) },
+			RingKind::CRUSH);
+	};
+	auto near = crush(Point<int16_t>(99, 99));
+	require(near.size() == 2 && near[0].first == 3 && near[0].second.pair, "99 across and down is close");
+	require(near[0].second.offset == Point<int16_t>(-49, -49), "midway from the lower id");
+	require(!crush(Point<int16_t>(100, 0))[0].second.pair && crush(Point<int16_t>(100, 0))[0].second.mark,
+		"100 across is not");
+	PairRing stranger{ 23, 24, 1112001 };
+	require(marriage::ring_effects({ RingWearer::of(9, Point<int16_t>(0, 0), mine),
+		RingWearer::of(3, Point<int16_t>(0, 0), stranger) }, RingKind::CRUSH).empty(), "another pair's ring");
 }
 
 int main()
@@ -183,6 +248,7 @@ int main()
 		tooltip_lines();
 		partner_spots();
 		ring_looks();
+		couple_rings();
 		ring_effects();
 	}
 	catch (const std::exception& error)

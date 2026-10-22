@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashBuy.h"
+#include "UICashGift.h"
 #include "UICashShop.h"
 #include "UINotice.h"
 
@@ -25,6 +26,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -120,6 +122,14 @@ namespace ms
 	{
 		auto buy = [=]() { UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid); };
 
+		// v83 4731a9: a crush or friendship ring is bought for two.
+		if (marriage::is_pair_ring(commodity.item_id))
+		{
+			UI::get().emplace<UICashGift>(commodity, credit, points, prepaid);
+
+			return;
+		}
+
 		if (!is_expansion(commodity.item_id))
 		{
 			// v83 46d211: a mount or saddle, for a job without Monster Rider.
@@ -159,7 +169,9 @@ namespace ms
 			buy();
 	}
 
-	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), payment(default_payment(commodity.price, credit, points, prepaid))
+	// v83's ring dialogs offer NX Credit and NX Prepaid (46e08e with flags
+	// 1 and 4), so the Maple Points' option is never checked.
+	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), payment(default_payment(commodity.price, credit, ring ? 0 : points, prepaid)), ring(std::move(ring))
 	{
 		nl::node Basic = NxFiles::ui_classic["Basic.img"];
 
@@ -220,8 +232,13 @@ namespace ms
 
 		if (cursor.x() >= 0 && cursor.x() < OPTION_WIDTH && cursor.y() >= 0 && cursor.y() < CHECKBOX_STEP * static_cast<int16_t>(NUM_PAYMENTS) && cursor.y() % CHECKBOX_STEP < CHECKBOX_SIZE)
 		{
+			size_t option = cursor.y() / CHECKBOX_STEP;
+
+			if (ring && PAYMENTS[option] == MAPLE_POINTS)
+				return UIElement::send_cursor(clicked, cursorpos);
+
 			if (clicked)
-				payment = cursor.y() / CHECKBOX_STEP;
+				payment = option;
 
 			return clicked ? Cursor::State::CLICKING : Cursor::State::CANCLICK;
 		}
@@ -270,7 +287,9 @@ namespace ms
 
 		if (cashshop && cashshop->request())
 		{
-			if (is_package(item_id))
+			if (ring)
+				BuyCoupleRingPacket(ring->friendship, ring->birthday, cash_type, sn, ring->to, ring->message).dispatch();
+			else if (is_package(item_id))
 				BuyCashPackagePacket(cash_type, sn).dispatch();
 			else if (is_expansion(item_id) && sn == 0)
 				ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();

@@ -216,6 +216,24 @@ namespace ms
 		}
 	};
 
+	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyCoupleRingPacket : public OutPacket
+	{
+	public:
+		// Buy the ring commodity sn for the buyer and the character named
+		// to: mode 0x1D for a crush ring, 0x23 for a friendship ring
+		// (v83 47021f and 470c7e).
+		BuyCoupleRingPacket(bool friendship, int32_t birthday, int32_t cash_type, int32_t sn, const std::string& to, const std::string& message) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(friendship ? 0x23 : 0x1D);
+			write_int(birthday);
+			write_int(cash_type);
+			write_int(sn);
+			write_string(to);
+			write_string(message);
+		}
+	};
+
 	// Opcode: NOTE_ACTION(131)
 	class GiftNotePacket : public OutPacket
 	{

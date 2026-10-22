@@ -29,8 +29,9 @@ namespace ms
 		void parse_skillbook(InPacket& recv, SkillBook& skills);
 		void parse_cooldowns(InPacket& recv, Player& player);
 		void parse_questlog(InPacket& recv, QuestLog& quests);
-		void parse_ring1(InPacket& recv);
-		void parse_ring2(InPacket& recv);
+		// The rings of the crush pairs, then of the friendship pairs.
+		void parse_ring1(InPacket& recv, Player& player);
+		void parse_ring2(InPacket& recv, Player& player);
 		// The couple the character is in, if any.
 		void parse_ring3(InPacket& recv, Player& player);
 		void parse_minigame(InPacket& recv);

@@ -976,26 +976,23 @@ namespace ms
 
 	void Stage::show_rings()
 	{
-		std::vector<RingWearer> wearers = chars.ring_wearers();
+		for (RingKind kind : { RingKind::CRUSH, RingKind::FRIENDSHIP, RingKind::WEDDING })
+		{
+			std::vector<RingWearer> wearers = chars.ring_wearers(kind);
 
-		const Inventory &inventory = player.get_inventory();
-		bool wearing = false;
+			if (auto own = player.ring_wearer(kind))
+				wearers.push_back(*own);
 
-		for (auto slot : { EquipSlot::Id::RING1, EquipSlot::Id::RING2, EquipSlot::Id::RING3, EquipSlot::Id::RING4 })
-			wearing |= marriage::is_wedding_ring(inventory.get_item_id(InventoryType::Id::EQUIPPED, slot));
+			auto effects = marriage::ring_effects(wearers, kind);
+			RingEffect own;
 
-		if (auto ring = marriage::own_ring(player.get_marriage(), player.get_stats().get_female(), wearing))
-			wearers.push_back({ player.get_oid(), player.get_position(), *ring });
+			for (auto &[id, effect] : effects)
+				if (id == player.get_oid())
+					own = effect;
 
-		auto effects = marriage::ring_effects(wearers);
-		RingEffect own;
-
-		for (auto &[id, effect] : effects)
-			if (id == player.get_oid())
-				own = effect;
-
-		chars.show_rings(effects);
-		player.show_ring(own);
+			chars.show_rings(kind, effects);
+			player.show_ring(kind, own);
+		}
 	}
 
 	void Stage::check_pet_loot()

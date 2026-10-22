@@ -44,6 +44,16 @@ namespace ms
 		return mapid != 0 && has(mapid) && !has(own_map);
 	}
 
+	RingWearer RingWearer::of(int32_t id, Point<int16_t> position, const MarriageRing& ring)
+	{
+		return { id, position, ring.self_id, ring.partner_id, ring.item_id };
+	}
+
+	RingWearer RingWearer::of(int32_t id, Point<int16_t> position, const PairRing& ring)
+	{
+		return { id, position, ring.ring_id, ring.partner_ring_id, ring.item_id };
+	}
+
 	bool RingEffect::operator==(const RingEffect& other) const
 	{
 		return item_id == other.item_id && mark == other.mark && pair == other.pair && offset == other.offset;
@@ -51,22 +61,85 @@ namespace ms
 
 	namespace marriage
 	{
-		std::optional<MarriageRing> read_ring_looks(InPacket& recv)
+		std::optional<RingKind> ring_kind(int32_t item_id)
 		{
-			// A crush or friendship block: the two ring serials and the item.
-			for (int i = 0; i < 2; i++)
-				if (recv.read_bool())
-					recv.skip(8 + 8 + 4);
+			if (is_wedding_ring(item_id))
+				return RingKind::WEDDING;
 
-			if (!recv.read_bool())
+			if (item_id / 100 == 11120 && item_id != 1112000)
+				return RingKind::CRUSH;
+
+			if (item_id / 100 == 11128 && item_id % 10 <= 2)
+				return RingKind::FRIENDSHIP;
+
+			return std::nullopt;
+		}
+
+		bool is_pair_ring(int32_t item_id)
+		{
+			std::optional<RingKind> kind = ring_kind(item_id);
+
+			return kind == RingKind::CRUSH || kind == RingKind::FRIENDSHIP;
+		}
+
+		RingLooks read_ring_looks(InPacket& recv)
+		{
+			auto pair_ring = [&recv]() -> std::optional<PairRing>
+			{
+				if (!recv.read_bool())
+					return std::nullopt;
+
+				PairRing ring;
+				ring.ring_id = recv.read_long();
+				ring.partner_ring_id = recv.read_long();
+				ring.item_id = recv.read_int();
+
+				return ring;
+			};
+
+			RingLooks looks;
+			looks.crush = pair_ring();
+			looks.friendship = pair_ring();
+
+			if (recv.read_bool())
+			{
+				MarriageRing ring;
+				ring.self_id = recv.read_int();
+				ring.partner_id = recv.read_int();
+				ring.item_id = recv.read_int();
+				looks.marriage = ring;
+			}
+
+			return looks;
+		}
+
+		CoupleRingRecord read_couple_ring(InPacket& recv, bool friendship)
+		{
+			CoupleRingRecord record;
+			record.partner_id = recv.read_int();
+			record.partner_name = recv.read_padded_string(13);
+			record.ring_id = recv.read_long();
+			record.partner_ring_id = recv.read_long();
+
+			if (friendship)
+				record.item_id = recv.read_int();
+
+			return record;
+		}
+
+		std::optional<PairRing> own_pair_ring(RingKind kind, const std::vector<std::pair<int32_t, int64_t>>& worn,
+											  const std::vector<CoupleRingRecord>& records)
+		{
+			auto ring = std::find_if(worn.begin(), worn.end(), [kind](auto& item) { return ring_kind(item.first) == kind; });
+
+			if (ring == worn.end())
 				return std::nullopt;
 
-			MarriageRing ring;
-			ring.self_id = recv.read_int();
-			ring.partner_id = recv.read_int();
-			ring.item_id = recv.read_int();
+			for (const CoupleRingRecord& record : records)
+				if (record.ring_id == ring->second)
+					return PairRing{ record.ring_id, record.partner_ring_id, ring->first };
 
-			return ring;
+			return std::nullopt;
 		}
 
 		std::optional<MarriageRing> own_ring(const std::optional<MarriageRecord>& record, bool female, bool wearing)
@@ -82,8 +155,10 @@ namespace ms
 			return ring;
 		}
 
-		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers)
+		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers, RingKind kind)
 		{
+			int16_t close = kind == RingKind::WEDDING ? 250 : 100;
+
 			std::vector<std::pair<int32_t, RingEffect>> effects;
 			std::vector<bool> paired(wearers.size(), false);
 
@@ -94,7 +169,7 @@ namespace ms
 					const RingWearer& a = wearers[i];
 					const RingWearer& b = wearers[j];
 
-					if (paired[j] || (a.ring.partner_id != b.ring.self_id && b.ring.partner_id != a.ring.self_id))
+					if (paired[j] || (a.partner != b.self && b.partner != a.self))
 						continue;
 
 					paired[i] = paired[j] = true;
@@ -106,11 +181,11 @@ namespace ms
 					int16_t dy = static_cast<int16_t>(std::abs(gap.y()));
 
 					RingEffect effect;
-					effect.item_id = low.ring.item_id;
+					effect.item_id = low.item_id;
 					effect.mark = dx < 700 && dy < 500;
 
 					RingEffect low_effect = effect;
-					low_effect.pair = dx < 250 && dy < 100;
+					low_effect.pair = dx < close && dy < 100;
 					low_effect.offset = Point<int16_t>(gap.x() / 2, gap.y() / 2);
 
 					effects.emplace_back(low.id, low_effect);
@@ -148,6 +223,40 @@ namespace ms
 				return "YOU ARE MARRIED WITH : " + record->partner(female);
 
 			return "";
+		}
+
+		std::string pair_tooltip_line(int32_t item_id, int64_t cash_id, const std::vector<CoupleRingRecord>& records)
+		{
+			std::optional<RingKind> kind = ring_kind(item_id);
+
+			if (cash_id == 0 || (kind != RingKind::CRUSH && kind != RingKind::FRIENDSHIP))
+				return "";
+
+			for (const CoupleRingRecord& record : records)
+				if (record.ring_id == cash_id)
+					return kind == RingKind::CRUSH ? "A COUPLE-RING WITH : " + record.partner_name
+												   : "This is your Friendship Ring with '" + record.partner_name + "'.";
+
+			return "";
+		}
+
+		const char* equip_gate(int32_t item_id, int32_t replaced, const std::vector<int32_t>& worn)
+		{
+			std::optional<RingKind> kind = ring_kind(item_id);
+
+			if (!kind || ring_kind(replaced) == kind
+				|| std::none_of(worn.begin(), worn.end(), [&](int32_t id) { return ring_kind(id) == kind; }))
+				return nullptr;
+
+			switch (*kind)
+			{
+			case RingKind::CRUSH:
+				return "Only one couple-ring can be equipped.";
+			case RingKind::FRIENDSHIP:
+				return "You may only equip\\none Friendship Ring at a time.";
+			default:
+				return "You may only equip ONE wedding ring.";
+			}
 		}
 
 		const char* break_question(bool married)

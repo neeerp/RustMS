@@ -20,6 +20,7 @@
 
 #include "../../Data/BulletData.h"
 #include "../../Data/EquipData.h"
+#include "../../Data/ItemData.h"
 
 #include <algorithm>
 #include <iostream>
@@ -314,14 +315,12 @@ namespace ms
 
 		if (eqslot == EquipSlot::Id::RING1)
 		{
-			if (!has_equipped(EquipSlot::Id::RING2))
-				return EquipSlot::Id::RING2;
+			// A cash ring looks for a free slot among the cash rings.
+			int16_t layer = ItemData::get(itemid).is_cashitem() ? CASH_EQUIP : 0;
 
-			if (!has_equipped(EquipSlot::Id::RING3))
-				return EquipSlot::Id::RING3;
-
-			if (!has_equipped(EquipSlot::Id::RING4))
-				return EquipSlot::Id::RING4;
+			for (EquipSlot::Id ring : { EquipSlot::Id::RING2, EquipSlot::Id::RING3, EquipSlot::Id::RING4 })
+				if (!inventories[InventoryType::Id::EQUIPPED].count(ring + layer))
+					return ring;
 
 			return EquipSlot::Id::RING1;
 		} else

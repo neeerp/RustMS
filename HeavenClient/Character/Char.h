@@ -211,9 +211,10 @@ namespace ms
 		// Loop an item buff's aura, `Effect/ItemEff.img/<item>` above or behind the body by its `z`, until the
 		// item is 0 (FUN_0093abe2). It isn't drawn while the character is morphed.
 		void show_consume_effect(int32_t item);
-		// A couple's ring (report b059): `Effect/ItemEff.img/<ring>/0` at the feet while the partner is on the
-		// same screen, and `/1` midway between them while they stand close. The same effect again goes on.
-		void show_ring(const RingEffect &effect);
+		// A pair's ring of a kind (reports b059, b061): `Effect/ItemEff.img/<ring>/0` at the feet while the
+		// partner is on the same screen, and `/1` midway between them while they stand close. Each kind has
+		// its own effect; the same effect again goes on.
+		void show_ring(RingKind kind, const RingEffect &effect);
 
 		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
 		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
@@ -446,9 +447,15 @@ namespace ms
 		EffectLayer berserk_aura;
 		EffectLayer divine_body;
 		EffectLayer consume_aura;
-		RingEffect ring;
-		Animation ring_mark;
-		Animation ring_pair;
+		struct RingDisplay
+		{
+			RingEffect effect;
+			Animation mark;
+			Animation pair;
+		};
+
+		// By RingKind.
+		std::array<RingDisplay, 3> rings;
 		int32_t divine_body_skill = 0;
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;

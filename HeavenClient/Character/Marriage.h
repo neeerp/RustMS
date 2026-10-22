@@ -59,12 +59,56 @@ namespace ms
 		int32_t item_id = 0;
 	};
 
-	// Someone on the map with a marriage ring block, where they stand.
+	// A crush or friendship ring block (user +0x1f10 and +0x1f18, +0x1f88
+	// and +0x1f90, report b059): the worn ring's cash serial, its partner
+	// ring's, and the item.
+	struct PairRing
+	{
+		int64_t ring_id = 0;
+		int64_t partner_ring_id = 0;
+		int32_t item_id = 0;
+	};
+
+	// The three ring blocks that end a look.
+	struct RingLooks
+	{
+		std::optional<PairRing> crush;
+		std::optional<PairRing> friendship;
+		std::optional<MarriageRing> marriage;
+	};
+
+	// One ring of a pair the character data lists (0x21 bytes for a crush
+	// ring, 0x25 with the item for a friendship ring, report b061).
+	struct CoupleRingRecord
+	{
+		int32_t partner_id = 0;
+		std::string partner_name;
+		int64_t ring_id = 0;
+		int64_t partner_ring_id = 0;
+		int32_t item_id = 0;
+	};
+
+	// The rings with a pair effect, by the item ids alone (0x4f1387).
+	enum class RingKind : uint8_t
+	{
+		CRUSH,
+		FRIENDSHIP,
+		WEDDING
+	};
+
+	// Someone on the map with a ring block of one kind, where they stand:
+	// for a wedding ring their own and their partner's character ids, else
+	// the two ring serials.
 	struct RingWearer
 	{
 		int32_t id = 0;
 		Point<int16_t> position;
-		MarriageRing ring;
+		int64_t self = 0;
+		int64_t partner = 0;
+		int32_t item_id = 0;
+
+		static RingWearer of(int32_t id, Point<int16_t> position, const MarriageRing& ring);
+		static RingWearer of(int32_t id, Point<int16_t> position, const PairRing& ring);
 	};
 
 	// What a character shows of a couple's ring (CUserPool::Update
@@ -102,21 +146,43 @@ namespace ms
 		bool is_token(int32_t item_id);
 		// The wedding rings 1112803, 1112806, 1112807 and 1112809.
 		bool is_wedding_ring(int32_t item_id);
+		// The kind of ring an item is: 1112001 to 1112099 a crush ring,
+		// 1112800 to 1112802, 1112810 to 1112812 and so on a friendship ring.
+		std::optional<RingKind> ring_kind(int32_t item_id);
+		// A crush or friendship ring, which the Cash Shop sells in pairs.
+		bool is_pair_ring(int32_t item_id);
 		// The crush, friendship and marriage ring blocks that end a look in
-		// SPAWN_PLAYER (0x97fb2d) and UPDATE_CHAR_LOOK (0x98367e); the
-		// marriage ring, if any.
-		std::optional<MarriageRing> read_ring_looks(InPacket& recv);
+		// SPAWN_PLAYER (0x97fb2d) and UPDATE_CHAR_LOOK (0x98367e).
+		RingLooks read_ring_looks(InPacket& recv);
+		// A crush or friendship record of the character data.
+		CoupleRingRecord read_couple_ring(InPacket& recv, bool friendship);
+		// The player's own crush or friendship block (0x95b335, 0x95b47c):
+		// the first ring of the kind among the worn cash rings, `worn` as
+		// (item, serial), if a record has its serial.
+		std::optional<PairRing> own_pair_ring(RingKind kind, const std::vector<std::pair<int32_t, int64_t>>& worn,
+											  const std::vector<CoupleRingRecord>& records);
 		// The player's own block, from the record while a wedding ring is
 		// worn (0x95b5c8): the groom or the bride by the player's gender, and
 		// the groom's ring.
 		std::optional<MarriageRing> own_ring(const std::optional<MarriageRecord>& record, bool female, bool wearing);
-		// Each wearer's effect, by id: two wearers are a couple when one's
-		// partner is the other (0x972d54), and each is in one couple at most.
-		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers);
+		// Each wearer's effect, by id: two wearers of a kind are a pair when
+		// one's partner is the other (0x972a5e, 0x972bd9, 0x972d54), and each
+		// is in one pair at most. The big effect wants a couple within
+		// 250×100 px, other pairs within 100×100.
+		std::vector<std::pair<int32_t, RingEffect>> ring_effects(const std::vector<RingWearer>& wearers,
+																 RingKind kind = RingKind::WEDDING);
 		// The tooltip's line naming the partner: 0x1069 on a token, 0x1068 on
 		// a wedding ring, whatever the record's status (0x8ef061, 0x8e90a8).
 		// Empty without a record or for any other item.
 		std::string tooltip_line(int32_t item_id, const std::optional<MarriageRecord>& record, bool female);
+		// The tooltip's line naming a crush or friendship ring's partner,
+		// from the record with the ring's serial: 0x2a0 or 0x2a1 (0x8e7975).
+		// Empty without one.
+		std::string pair_tooltip_line(int32_t item_id, int64_t cash_id, const std::vector<CoupleRingRecord>& records);
+		// The notice that keeps a ring from going on where the worn rings,
+		// as items, hold one of its kind and `replaced` isn't (0x365, 0x366
+		// and 0x10aa, 0x4f1397), or nullptr.
+		const char* equip_gate(int32_t item_id, int32_t replaced, const std::vector<int32_t>& worn);
 		// The question before a token goes: 0x10a3, or 0x10a4 for a couple
 		// whose record says married (0x4f3475).
 		const char* break_question(bool married);

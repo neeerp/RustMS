@@ -47,8 +47,8 @@ namespace ms
 			CharacterParser::parse_cooldowns(recv, player);
 			CharacterParser::parse_questlog(recv, player.get_quests());
 			CharacterParser::parse_minigame(recv);
-			CharacterParser::parse_ring1(recv);
-			CharacterParser::parse_ring2(recv);
+			CharacterParser::parse_ring1(recv, player);
+			CharacterParser::parse_ring2(recv, player);
 			CharacterParser::parse_ring3(recv, player);
 			CharacterParser::parse_teleportrock(recv, player.get_teleport_rock());
 			CharacterParser::parse_monsterbook(recv, player.get_monsterbook());

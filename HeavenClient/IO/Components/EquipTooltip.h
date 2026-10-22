@@ -55,7 +55,8 @@ namespace ms
 		// In the order of the job row.
 		static constexpr size_t NUM_JOBS = 6;
 
-		void build(const Equip &equip, const std::string &expiry, const std::string &gift);
+		// `cash_id` is the serial of the player's own equip, which a crush or friendship ring's line needs.
+		void build(const Equip &equip, const std::string &expiry, const std::string &gift, int64_t cash_id = 0);
 
 		struct StatLine
 		{

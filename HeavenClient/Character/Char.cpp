@@ -180,11 +180,14 @@ namespace ms
 		if (!look.get_morph())
 			consume_aura.drawabove(absp, alpha);
 
-		if (ring.mark)
-			ring_mark.draw(DrawArgument(absp), alpha);
+		for (const RingDisplay &ring : rings)
+		{
+			if (ring.effect.mark)
+				ring.mark.draw(DrawArgument(absp), alpha);
 
-		if (ring.pair)
-			ring_pair.draw(DrawArgument(absp + ring.offset), alpha);
+			if (ring.effect.pair)
+				ring.pair.draw(DrawArgument(absp + ring.effect.offset), alpha);
+		}
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
@@ -258,11 +261,14 @@ namespace ms
 		divine_body.update();
 		consume_aura.update();
 
-		if (ring.mark)
-			ring_mark.update();
+		for (RingDisplay &ring : rings)
+		{
+			if (ring.effect.mark)
+				ring.mark.update();
 
-		if (ring.pair)
-			ring_pair.update();
+			if (ring.effect.pair)
+				ring.pair.update();
+		}
 
 		if (dashing)
 			dash_dust.update();
@@ -662,20 +668,22 @@ namespace ms
 		consume_aura.add_looping(src, DrawArgument(), layer, 1.0f);
 	}
 
-	void Char::show_ring(const RingEffect &effect)
+	void Char::show_ring(RingKind kind, const RingEffect &effect)
 	{
-		if (effect == ring)
+		RingDisplay &ring = rings[static_cast<size_t>(kind)];
+
+		if (effect == ring.effect)
 			return;
 
 		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(effect.item_id)];
 
-		if (effect.mark && (!ring.mark || effect.item_id != ring.item_id))
-			ring_mark = Animation(src["0"]);
+		if (effect.mark && (!ring.effect.mark || effect.item_id != ring.effect.item_id))
+			ring.mark = Animation(src["0"]);
 
-		if (effect.pair && (!ring.pair || effect.item_id != ring.item_id))
-			ring_pair = Animation(src["1"]);
+		if (effect.pair && (!ring.effect.pair || effect.item_id != ring.effect.item_id))
+			ring.pair = Animation(src["1"]);
 
-		ring = effect;
+		ring.effect = effect;
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)

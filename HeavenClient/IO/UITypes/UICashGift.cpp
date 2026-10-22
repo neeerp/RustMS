@@ -16,7 +16,9 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashGift.h"
+#include "UICashBuy.h"
 #include "UICashShop.h"
+#include "UINotice.h"
 
 #include "../KeyAction.h"
 #include "../UI.h"
@@ -24,7 +26,9 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Character/Marriage.h"
 #include "../../Data/CurseData.h"
+#include "../../Data/ItemData.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -45,6 +49,8 @@ namespace ms
 		constexpr size_t NAME_LIMIT = 12;
 		constexpr size_t MESSAGE_LIMIT = 73;
 		constexpr size_t BIRTHDAY_LIMIT = 8;
+		// StringPool 0x217.
+		constexpr const char* NOT_ENOUGH_CASH = "You don't have enough cash.";
 		// OK and Cancel, from the right edge and the bottom of the art.
 		const Point<int16_t> OK_FROM_CORNER = Point<int16_t>(123, 31);
 		const Point<int16_t> CANCEL_FROM_CORNER = Point<int16_t>(73, 31);
@@ -63,7 +69,7 @@ namespace ms
 		}
 	}
 
-	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn)
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), credit(0), points(0), prepaid(0)
 	{
 		background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
 
@@ -84,6 +90,22 @@ namespace ms
 		place();
 
 		to.set_state(Textfield::State::FOCUSED);
+	}
+
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid) : UICashGift(commodity)
+	{
+		ring = commodity;
+		this->credit = credit;
+		this->points = points;
+		this->prepaid = prepaid;
+
+		to.set_state(Textfield::State::DISABLED);
+
+		asking_birthday = true;
+		background = NxFiles::ui_classic["CashShop.img"]["CSNotice"]["1"]["backgrnd"];
+		place();
+
+		birthday.set_state(Textfield::State::FOCUSED);
 	}
 
 	void UICashGift::place()
@@ -180,6 +202,9 @@ namespace ms
 
 	void UICashGift::confirm()
 	{
+		if (ring)
+			return confirm_ring();
+
 		if (asking_birthday)
 		{
 			// The server answers a wrong code with its own notice. v83
@@ -216,6 +241,63 @@ namespace ms
 		place();
 
 		birthday.set_state(Textfield::State::FOCUSED);
+	}
+
+	void UICashGift::confirm_ring()
+	{
+		if (asking_birthday)
+		{
+			// v83 (0x470078) checks the price next: NX Credit or NX Prepaid
+			// must cover it.
+			if (credit < ring->price && prepaid < ring->price)
+			{
+				close();
+				UI::get().emplace<UIOk>(NOT_ENOUGH_CASH, [](bool) {});
+
+				return;
+			}
+
+			birthday.set_state(Textfield::State::DISABLED);
+
+			asking_birthday = false;
+			background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
+			place();
+
+			to.set_state(Textfield::State::FOCUSED);
+
+			return;
+		}
+
+		if (to.empty())
+		{
+			to.set_state(Textfield::State::FOCUSED);
+
+			return;
+		}
+
+		if (message.empty())
+		{
+			message.set_state(Textfield::State::FOCUSED);
+
+			return;
+		}
+
+		// StringPool 0x200, then the BUY dialog. Opening the question
+		// replaces this dialog, so everything is copied first.
+		cash_catalog::Commodity commodity = *ring;
+		RingOrder order = { marriage::ring_kind(commodity.item_id) == RingKind::FRIENDSHIP, birthday_code(birthday.get_text()),
+							CurseData::filter(to.get_text()), CurseData::filter(message.get_text()) };
+		int32_t balances[3] = { credit, points, prepaid };
+		std::string question = ItemData::get(commodity.item_id).get_name() + " (" + std::to_string(commodity.price) +
+							   " NX)\\nWill you buy this item as a gift for\\n'" + order.to + "'?";
+
+		close();
+
+		UI::get().emplace<UIYesNo>(question, [commodity, order, balances](bool yes)
+		{
+			if (yes)
+				UI::get().emplace<UICashBuy>(commodity, balances[0], balances[1], balances[2], order);
+		});
 	}
 
 	void UICashGift::close()
