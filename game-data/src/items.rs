@@ -52,6 +52,9 @@ pub struct ItemInfo {
     pub recovery_mp: i32,
     /// The highest level that may use it (`info/maxLevel`), 0 for any.
     pub max_level: i32,
+    /// The lowest level that may use it (`info/reqLevel`): among items
+    /// that aren't equipment only ammo has one.
+    pub req_level: i32,
     /// `spec` of consumable items.
     pub spec: Option<ConsumeSpec>,
     /// What a skill or mastery book teaches (`info/skill`).
@@ -471,6 +474,7 @@ impl ItemData {
             info.recovery_hp = nx.int_child(meta, "recoveryHP")?.unwrap_or(0);
             info.recovery_mp = nx.int_child(meta, "recoveryMP")?.unwrap_or(0);
             info.max_level = nx.int_child(meta, "maxLevel")?.unwrap_or(0);
+            info.req_level = nx.int_child(meta, "reqLevel")?.unwrap_or(0);
             if pet {
                 info.pet_hunger = nx.int_child(meta, "hungry")?.unwrap_or(1);
                 if nx.int_child(meta, "permanent")? != Some(1) {
@@ -739,6 +743,7 @@ impl ItemData {
             recovery_hp: 0,
             recovery_mp: 0,
             max_level: 0,
+            req_level: i32::from(equip.req_level),
             spec: None,
             book: None,
             scroll: None,
@@ -1038,6 +1043,24 @@ mod tests {
         assert_eq!(writ(2370000), (50, 100000));
         assert_eq!(writ(2370012), (50, 100));
         assert_eq!(data.info(2000000).unwrap().unwrap().max_level, 0);
+    }
+
+    #[test]
+    fn reads_the_level_ammo_needs() {
+        let Some(data) = data() else {
+            return;
+        };
+        let level = |id| data.info(id).unwrap().unwrap().req_level;
+        assert_eq!(
+            (level(2060000), level(2070000), level(2070006)),
+            (0, 10, 10)
+        );
+        // Bullets need 10, and Fire and Ice Capsules 70.
+        assert_eq!(
+            (level(2330000), level(2331000), level(2332000)),
+            (10, 70, 70)
+        );
+        assert_eq!(level(2000000), 0);
     }
 
     #[test]
