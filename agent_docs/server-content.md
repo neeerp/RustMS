@@ -42,7 +42,8 @@ tests.
   reactor's drops (Amherst's box 2001 has none of its own, so it borrows
   2000's), and `quest_items` makes items quest drops that always drop during
   that quest (for a player who still needs them, or anyone in a party),
-  adding them if the pack lacks them. So Pio's materials for quest 1008 drop from the boxes even without a pack.
+  adding them if the pack lacks them. So Pio's materials for quest 1008 drop
+  from the boxes even without a pack.
 - **Shops** (`ShopTable`): without `shops.json` no NPC keeps a shop, and
   shopkeepers fall back to their normal speech.
 
