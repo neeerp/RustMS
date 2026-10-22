@@ -85,6 +85,19 @@ pub struct ItemInfo {
     pub sandglass: Option<Sandglass>,
     /// The days a timed Item Guard (5061xxx) seals for (`info/protectTime`).
     pub protect_time: i32,
+    /// What a box (2022xxx, 553xxxx) gives when opened (`reward`, beside
+    /// `info`): one entry, picked by weight.
+    pub reward: Vec<Reward>,
+}
+
+/// One of a box's prizes (`reward/N`): `count` of `item_id`, weighted by
+/// `prob` among the box's entries, lasting `period` minutes (0 for good).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Reward {
+    pub item_id: i32,
+    pub count: i16,
+    pub prob: u32,
+    pub period: i32,
 }
 
 /// A Magical Sandglass's `info`: the seconds it adds to a time-limited
@@ -568,6 +581,21 @@ impl ItemData {
                 }
             }
         }
+        if let Some(rewards) = nx.child_by_name(node, "reward")? {
+            // Nine cash bags store `item` as a string.
+            while let Some(entry) = nx.child_by_name(rewards, &info.reward.len().to_string())? {
+                info.reward.push(Reward {
+                    item_id: nx.int_child(entry, "item")?.unwrap_or(0),
+                    count: nx
+                        .int_child(entry, "count")?
+                        .map_or(1, |count| i16::try_from(count).unwrap_or(i16::MAX)),
+                    prob: nx
+                        .int_child(entry, "prob")?
+                        .map_or(0, |prob| u32::try_from(prob).unwrap_or(0)),
+                    period: nx.int_child(entry, "period")?.unwrap_or(0),
+                });
+            }
+        }
         if item_id / 10_000 == 227 {
             if let Some(meta) = nx.child_by_name(node, "info")? {
                 let side = |key: &str| -> Result<i16, GameDataError> {
@@ -701,6 +729,7 @@ impl ItemData {
             mist: None,
             sandglass: None,
             protect_time: 0,
+            reward: Vec::new(),
         }))
     }
 }
@@ -946,6 +975,33 @@ mod tests {
             (16, (100100, 100), (1210102, 50))
         );
         assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
+    }
+
+    #[test]
+    fn reads_what_a_box_gives() {
+        let Some(data) = data() else {
+            return;
+        };
+        let note = data.info(2022309).unwrap().unwrap().reward;
+        assert_eq!(note.len(), 8);
+        assert_eq!(note.iter().map(|r| r.prob).sum::<u32>(), 100);
+        // The DS Egg Basket's one entry is a string, and lasts.
+        assert_eq!(
+            data.info(5530000).unwrap().unwrap().reward,
+            [Reward {
+                item_id: 4_170_012,
+                count: 12,
+                prob: 50,
+                period: 21_600
+            }]
+        );
+        let pig = data.info(2022503).unwrap().unwrap().reward;
+        assert_eq!(pig.len(), 43);
+        assert_eq!(pig.iter().map(|r| r.prob).sum::<u32>(), 19864);
+        assert!(pig
+            .iter()
+            .any(|r| r.item_id == 1_132_010 && r.period == 7_200));
+        assert!(data.info(2000000).unwrap().unwrap().reward.is_empty());
     }
 
     #[test]

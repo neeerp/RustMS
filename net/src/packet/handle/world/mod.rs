@@ -66,6 +66,7 @@ mod storage;
 mod summon;
 mod teleport_rock;
 mod use_item;
+mod use_item_reward;
 mod use_skill;
 mod vega;
 mod weather;
@@ -152,6 +153,7 @@ pub use self::use_item::{
     apply_item_effect, item_effect_packets, HealOverTimeHandler, ItemEffect, PetAutoPotHandler,
     ReturnScrollHandler, UseItemHandler, UseSkillBookHandler, UseSummonSackHandler,
 };
+pub use self::use_item_reward::UseItemRewardHandler;
 pub use self::use_skill::{
     party_skill_reached, CancelBuffHandler, SkillEffectHandler, ThrowGrenadeHandler,
     UseSkillHandler,

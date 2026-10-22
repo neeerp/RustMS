@@ -756,6 +756,23 @@ there. OK asks the Yes/No from `Character/Inventory/Incubator.h`, then sends
 `UseOnItemPacket` and closes. `IncubatorResultHandler` (opcode 69) prints the
 gain line and opens a `UINpcTalk` with what was found.
 
+### Reward boxes
+
+Use items with a `reward` node beside `info` (2022309-2022618: the Golden
+Pig's eggs, the King Pepe boxes and the like; report c037) hold a list of
+entries `{item, count, prob, period}`, which game-data reads into
+`ItemInfo::reward`. The v83 client sends them as USE_ITEM_REWARD (`0x70`,
+USE slot and item id) instead of USE_ITEM and never reads the entries. The
+server (`world/use_item_reward.rs`) picks one entry with a single roll
+against the sum of the `prob` weights, takes the box and gives the entry,
+expiring after `period` minutes when it has one (a recommended default,
+`v83ref/lanes/QUESTIONS.md`), then answers the inventory changes and the
+chat gain line. If the entry doesn't fit, or is one of a kind and already
+held, it sends "Your inventory is full." and keeps the box. Anything else
+(no box in that slot, no reward node, dead, a map that bars the item) only
+unlocks the client. The entries' `Effect` and `worldMsg` aren't sent yet,
+and the nine cash bags (5530000-5530008) aren't handled.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being
