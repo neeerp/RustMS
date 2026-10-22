@@ -228,7 +228,7 @@ impl ClientActor {
     /// shows the whole inventory again on the way out. The couple's row is
     /// already written, so the tokens are saved now too. A wedding ring
     /// worn starts or stops showing the couple's effect to the map.
-    async fn commit_engagement(
+    pub(super) async fn commit_engagement(
         &mut self,
         next: Player,
         mut packets: Vec<Packet>,
@@ -316,7 +316,10 @@ impl ClientActor {
 }
 
 /// Take every token the player holds, which mean nothing without a couple.
-fn take_tokens(player: &mut Player, packets: &mut Vec<Packet>) -> Result<(), RuntimeError> {
+pub(super) fn take_tokens(
+    player: &mut Player,
+    packets: &mut Vec<Packet>,
+) -> Result<(), RuntimeError> {
     let mut changes = Vec::new();
     for token in 4031357..=4031364 {
         let count = player.inventory.count(token);

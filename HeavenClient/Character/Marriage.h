@@ -132,6 +132,8 @@ namespace ms
 
 		// MARRIAGE_RESULT's mode with the couple's record.
 		constexpr int8_t RESULT_ENGAGED = 11;
+		// The mode with the married couple's record, after the vows.
+		constexpr int8_t RESULT_MARRIED = 12;
 		// The modes that end the couple, engaged or married; the client
 		// forgets the record.
 		constexpr int8_t RESULT_BROKEN = 13;

@@ -921,6 +921,86 @@ pub mod keys {
     /// The note and parcel message to a guest who got an invitation by Duey: `{groom}`, `{bride}` and `{channel}`.
     pub const WEDDING_INVITED_NOTE: &str = "wedding.guest.note";
 
+    /// Wayne's line to anyone without a Chapel wedding booked.
+    pub const WEDDING_STARTER_INTRO: &str = "wedding.start.intro";
+
+    /// Wayne's line to an engaged player without a Chapel wedding booked.
+    pub const WEDDING_STARTER_NOT_BOOKED: &str = "wedding.start.not_booked";
+
+    /// Wayne's line to one of a couple whose wedding is on another channel: `{channel}`.
+    pub const WEDDING_STARTER_CHANNEL: &str = "wedding.start.channel";
+
+    /// Wayne's line to one of a couple whose wedding is not due yet: `{minutes}` and `{channel}`.
+    pub const WEDDING_STARTER_EARLY: &str = "wedding.start.early";
+
+    /// Wayne's line to one of a couple without wedding clothes.
+    pub const WEDDING_STARTER_CLOTHES: &str = "wedding.start.clothes";
+
+    /// Wayne asks one of a couple whether to begin their wedding.
+    pub const WEDDING_STARTER_ASK: &str = "wedding.start.ask";
+
+    /// Wayne's line when the partner is not beside the one who asked.
+    pub const WEDDING_STARTER_PARTNER: &str = "wedding.start.partner";
+
+    /// Wayne's line when another wedding is still under way at the Chapel.
+    pub const WEDDING_STARTER_BUSY: &str = "wedding.start.busy";
+
+    /// Wayne's line when the wedding could not begin.
+    pub const WEDDING_STARTER_ERROR: &str = "wedding.start.error";
+
+    /// The priest's line to anyone but the couple.
+    pub const WEDDING_PRIEST_INTRO: &str = "wedding.priest.intro";
+
+    /// The priest asks one of the couple for their vows: `{partner}`.
+    pub const WEDDING_PRIEST_ASK: &str = "wedding.priest.ask";
+
+    /// The priest's line to one of the couple not wearing wedding clothes.
+    pub const WEDDING_PRIEST_CLOTHES: &str = "wedding.priest.clothes";
+
+    /// The priest's line to one of the couple without their engagement ring or box.
+    pub const WEDDING_PRIEST_TOKEN: &str = "wedding.priest.token";
+
+    /// The priest's line to one of the couple without room in the Equip tab.
+    pub const WEDDING_PRIEST_ROOM: &str = "wedding.priest.room";
+
+    /// The priest's line once one of the couple took their vows.
+    pub const WEDDING_PRIEST_WAITING: &str = "wedding.priest.waiting";
+
+    /// The priest's line to the married couple.
+    pub const WEDDING_PRIEST_MARRIED: &str = "wedding.priest.married";
+
+    /// The priest's line when the vows could not be taken.
+    pub const WEDDING_PRIEST_FAILED: &str = "wedding.priest.failed";
+
+    /// The altar staff's line to the couple before they are married.
+    pub const WEDDING_STAFF_WAIT: &str = "wedding.staff.wait";
+
+    /// The altar staff asks the married couple whether to end the wedding.
+    pub const WEDDING_STAFF_ASK: &str = "wedding.staff.ask";
+
+    /// The wedding itself: Wayne, the priest and Jackie (report b071).
+    pub const CEREMONY: [&str; 19] = [
+        WEDDING_STARTER_INTRO,
+        WEDDING_STARTER_NOT_BOOKED,
+        WEDDING_STARTER_CHANNEL,
+        WEDDING_STARTER_EARLY,
+        WEDDING_STARTER_CLOTHES,
+        WEDDING_STARTER_ASK,
+        WEDDING_STARTER_PARTNER,
+        WEDDING_STARTER_BUSY,
+        WEDDING_STARTER_ERROR,
+        WEDDING_PRIEST_INTRO,
+        WEDDING_PRIEST_ASK,
+        WEDDING_PRIEST_CLOTHES,
+        WEDDING_PRIEST_TOKEN,
+        WEDDING_PRIEST_ROOM,
+        WEDDING_PRIEST_WAITING,
+        WEDDING_PRIEST_MARRIED,
+        WEDDING_PRIEST_FAILED,
+        WEDDING_STAFF_WAIT,
+        WEDDING_STAFF_ASK,
+    ];
+
     /// Wedding invitations: sending, opening, and more of them.
     pub const INVITATIONS: [&str; 19] = [
         WEDDING_CHOICE_GUEST,
@@ -1636,6 +1716,7 @@ mod tests {
             .chain(&keys::ENGAGEMENT)
             .chain(&keys::RESERVATIONS)
             .chain(&keys::INVITATIONS)
+            .chain(&keys::CEREMONY)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

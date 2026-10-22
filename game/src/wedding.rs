@@ -72,6 +72,105 @@ impl Venue {
             Self::Cathedral => 2,
         }
     }
+
+    /// The hall where the wedding gathers (report b071).
+    pub fn hall(self) -> i32 {
+        match self {
+            Self::Chapel => 680000100,
+            Self::Cathedral => 680000200,
+        }
+    }
+
+    /// The altar where the couple take their vows.
+    pub fn altar(self) -> i32 {
+        match self {
+            Self::Chapel => 680000110,
+            Self::Cathedral => 680000210,
+        }
+    }
+
+    /// Whether `map_id` is one of the maps the wedding has its own copy of.
+    pub fn holds(self, map_id: i32) -> bool {
+        map_id == self.hall() || map_id == self.altar()
+    }
+}
+
+/// Amoria, where Wayne starts the weddings.
+pub const AMORIA: i32 = 680000000;
+
+/// Where everyone goes when a wedding ends: Ames's room, which both venues'
+/// maps return to.
+pub const WEDDING_EXIT: i32 = 680000500;
+/// How long the couple wait in the hall before going to the altar.
+pub const GATHERING: Duration = Duration::from_secs(10 * 60);
+/// How long the couple have at the altar to take their vows.
+pub const CEREMONY: Duration = Duration::from_secs(20 * 60);
+/// How long the wedding lasts once they are married.
+pub const AFTER_VOWS: Duration = Duration::from_secs(45 * 60);
+
+/// The clothes a partner may marry in (report b071 Q1): the couple's own
+/// tuxedo and gowns, or the groomsman's and bridesmaid's.
+pub const WEDDING_CLOTHES: [i32; 13] = [
+    1050113, 1050135, 1051114, 1051154, 1051155, 1050131, 1050132, 1050133, 1050134, 1051150,
+    1051151, 1051152, 1051153,
+];
+
+/// Whether the player wears wedding clothes.
+pub fn dressed(player: &Player) -> bool {
+    player
+        .inventory
+        .equipped_regular()
+        .any(|(_, item)| WEDDING_CLOTHES.contains(&item.item_id))
+}
+
+/// Whether the player wears or carries wedding clothes.
+pub fn has_clothes(player: &Player) -> bool {
+    dressed(player)
+        || player
+            .inventory
+            .items(InventoryType::Equip)
+            .any(|(_, item)| WEDDING_CLOTHES.contains(&item.item_id))
+}
+
+/// How far a wedding has come.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum WeddingStage {
+    /// The couple wait in the hall.
+    Gathering = 0,
+    /// The couple stand at the altar, and may take their vows.
+    Ceremony = 1,
+    Married = 2,
+}
+
+impl WeddingStage {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => Self::Gathering,
+            1 => Self::Ceremony,
+            _ => Self::Married,
+        }
+    }
+}
+
+/// Why a booked wedding could not start.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartRefusal {
+    /// The partner is not beside the one starting it.
+    PartnerAway,
+    /// Another wedding is under way at the venue on the channel.
+    Busy,
+}
+
+/// What came of a partner's vows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Vows {
+    /// The partner has yet to take theirs.
+    Waiting,
+    /// Both took theirs: the couple is married.
+    Married,
+    /// The wedding is not at its vows, or the marriage failed.
+    Refused,
 }
 
 /// Invitations each partner gets with a booking.
@@ -234,6 +333,18 @@ mod tests {
         assert_eq!(Venue::of_invitation(4031406), None);
         assert_eq!(Venue::of_received_invitation(4031377), None);
         assert_eq!(Venue::Cathedral.window(), 2);
+    }
+
+    #[test]
+    fn each_venue_has_a_hall_and_an_altar() {
+        assert!(Venue::Chapel.holds(680000100) && Venue::Chapel.holds(680000110));
+        assert!(Venue::Cathedral.holds(680000200) && Venue::Cathedral.holds(680000210));
+        assert!(!Venue::Chapel.holds(680000210) && !Venue::Chapel.holds(WEDDING_EXIT));
+        assert_eq!(
+            WeddingStage::from_u8(WeddingStage::Ceremony as u8),
+            WeddingStage::Ceremony
+        );
+        assert_eq!(WeddingStage::from_u8(9), WeddingStage::Married);
     }
 
     #[test]

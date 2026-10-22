@@ -35,7 +35,7 @@ namespace ms
 
 		MarriageActions::answered();
 
-		if (mode == marriage::RESULT_ENGAGED)
+		if (mode == marriage::RESULT_ENGAGED || mode == marriage::RESULT_MARRIED)
 			Stage::get().get_player().set_marriage(MarriageRecord::read(recv));
 
 		if (mode == marriage::RESULT_BROKEN || mode == marriage::RESULT_DIVORCED)

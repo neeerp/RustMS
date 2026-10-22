@@ -15,7 +15,7 @@ use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
 use game::marriage;
-use game::wedding::{self, PartnerRefusal, Reservation, Venue};
+use game::wedding::{self, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
 use game::{Inventory, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use rand::seq::SliceRandom;
@@ -53,6 +53,16 @@ pub const BONNIE: i32 = 9201008;
 /// Victoria, the Cathedral's wedding coordinator in Amoria, who explains
 /// how a wedding is booked (report b066).
 const VICTORIA: i32 = 9201013;
+/// Wayne, the Chapel's wedding coordinator in Amoria, who begins a booked
+/// wedding there (report b071); his script needs the couple's booking
+/// (`NpcScript::wedding_starter`).
+pub const WAYNE: i32 = 9201012;
+/// Pelvis Bebop, who marries the couple at the Chapel's altar; his script
+/// needs the wedding (`NpcScript::wedding_priest`).
+pub const CHAPEL_PRIEST: i32 = 9201011;
+/// Jackie, at the Chapel's altar, who sees the wedding out
+/// (`NpcScript::wedding_staff`).
+pub const JACKIE: i32 = 9201009;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -881,6 +891,56 @@ impl NpcScript {
     /// The assistant of `venue` says how a booking went.
     pub fn wedding_assistant_says(venue: Venue, text: String) -> Self {
         Self::new(wedding_assistant_of(venue), vec![Page::Say(text)])
+    }
+
+    /// `npc_id`'s script, if it begins weddings in Amoria: for the couple
+    /// whose booked wedding is due on `channel`, the question whether to
+    /// begin it.
+    pub fn wedding_starter(
+        npc_id: i32,
+        player: &Player,
+        reservation: Option<&Reservation>,
+        channel: u8,
+        now: SystemTime,
+    ) -> Option<Self> {
+        let venue = wedding_starter_venue(npc_id)?;
+        (player.stats.map_id == AMORIA.0)
+            .then(|| wedding_starter(venue, player, reservation, channel, now))
+    }
+
+    /// The wedding starter of `venue` says why the wedding didn't begin.
+    pub fn wedding_starter_says(venue: Venue, text: String) -> Self {
+        Self::new(wedding_starter_of(venue), vec![Page::Say(text)])
+    }
+
+    /// The priest at `venue`'s altar, to one of the couple (`stage` their
+    /// wedding's) or, without one, to anyone else.
+    pub fn wedding_priest(venue: Venue, player: &Player, stage: Option<WeddingStage>) -> Self {
+        wedding_priest(venue, player, stage)
+    }
+
+    /// The priest at `venue`'s altar says how the vows went.
+    pub fn wedding_priest_says(venue: Venue, vows: Vows) -> Self {
+        let key = match vows {
+            Vows::Waiting => keys::WEDDING_PRIEST_WAITING,
+            Vows::Married => keys::WEDDING_PRIEST_MARRIED,
+            Vows::Refused => keys::WEDDING_PRIEST_FAILED,
+        };
+        Self::new(wedding_priest_of(venue), vec![Page::Say(text(key))])
+    }
+
+    /// The staff at `venue`'s altar, to one of the couple whose wedding is
+    /// at `stage`: once married, the way out.
+    pub fn wedding_staff(venue: Venue, stage: WeddingStage) -> Self {
+        let page = match stage {
+            WeddingStage::Married => Page::Ask {
+                text: text(keys::WEDDING_STAFF_ASK),
+                on_yes: vec![Effect::EndWedding],
+                on_no: None,
+            },
+            _ => Page::Say(text(keys::WEDDING_STAFF_WAIT)),
+        };
+        Self::new(wedding_staff_of(venue), vec![page])
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -3314,6 +3374,113 @@ fn wedding_assistant_of(venue: Venue) -> i32 {
         Venue::Cathedral => NICOLE,
         Venue::Chapel => BONNIE,
     }
+}
+
+/// The venue whose weddings `npc_id` begins, if it is one who does.
+pub fn wedding_starter_venue(npc_id: i32) -> Option<Venue> {
+    (npc_id == WAYNE).then_some(Venue::Chapel)
+}
+
+fn wedding_starter_of(_venue: Venue) -> i32 {
+    WAYNE
+}
+
+/// The venue whose altar `npc_id` marries couples at, if a priest.
+pub fn wedding_priest_venue(npc_id: i32) -> Option<Venue> {
+    (npc_id == CHAPEL_PRIEST).then_some(Venue::Chapel)
+}
+
+fn wedding_priest_of(_venue: Venue) -> i32 {
+    CHAPEL_PRIEST
+}
+
+/// The venue whose altar `npc_id` sees weddings out of, if one who does.
+pub fn wedding_staff_venue(npc_id: i32) -> Option<Venue> {
+    (npc_id == JACKIE).then_some(Venue::Chapel)
+}
+
+fn wedding_staff_of(_venue: Venue) -> i32 {
+    JACKIE
+}
+
+/// The wedding starter of `venue` (Wayne for the Chapel) begins the
+/// couple's wedding booked there on this channel once its hour has come,
+/// with wedding clothes at hand; their partner must be beside them, which
+/// the directory checks (report b071).
+fn wedding_starter(
+    venue: Venue,
+    player: &Player,
+    reservation: Option<&Reservation>,
+    channel: u8,
+    now: SystemTime,
+) -> NpcScript {
+    let engaged = player
+        .marriage
+        .as_ref()
+        .is_some_and(|record| record.status == marriage::ENGAGED);
+    let booked = reservation.filter(|reservation| engaged && reservation.venue == venue);
+    let page = match booked {
+        None if engaged => Page::Say(text(keys::WEDDING_STARTER_NOT_BOOKED)),
+        None => Page::Say(text(keys::WEDDING_STARTER_INTRO)),
+        Some(reservation) if reservation.channel != channel => Page::Say(wedding_text(
+            keys::WEDDING_STARTER_CHANNEL,
+            reservation,
+            now,
+        )),
+        Some(reservation) if reservation.inviting(now) => {
+            Page::Say(wedding_text(keys::WEDDING_STARTER_EARLY, reservation, now))
+        }
+        Some(_) if !wedding::has_clothes(player) => Page::Say(text(keys::WEDDING_STARTER_CLOTHES)),
+        Some(_) => Page::Ask {
+            text: text(keys::WEDDING_STARTER_ASK),
+            on_yes: vec![Effect::StartWedding { venue }],
+            on_no: None,
+        },
+    };
+    NpcScript::new(wedding_starter_of(venue), vec![page])
+}
+
+/// The priest at the altar asks each of the couple for their vows, once
+/// they wear wedding clothes, hold their half of the engagement and have
+/// room for the ring (report b071). The marriage comes with the second.
+fn wedding_priest(venue: Venue, player: &Player, stage: Option<WeddingStage>) -> NpcScript {
+    let say = |key| Page::Say(text(key));
+    let record = player.marriage.as_ref();
+    let token = record.is_some_and(|record| {
+        let (empty_box, ring) = marriage::tokens(record.item_id);
+        holds(player, empty_box) || holds(player, ring)
+    });
+    let page = match stage {
+        None => say(keys::WEDDING_PRIEST_INTRO),
+        Some(WeddingStage::Gathering) => say(keys::WEDDING_STAFF_WAIT),
+        Some(WeddingStage::Married) => say(keys::WEDDING_PRIEST_MARRIED),
+        Some(WeddingStage::Ceremony) if !wedding::dressed(player) => {
+            say(keys::WEDDING_PRIEST_CLOTHES)
+        }
+        Some(WeddingStage::Ceremony) if !token => say(keys::WEDDING_PRIEST_TOKEN),
+        Some(WeddingStage::Ceremony) => {
+            let ring = record.map_or(0, |record| record.ring_id());
+            if items::fits_until(&player.inventory, ring, 1, None) {
+                let partner = record
+                    .map(|record| {
+                        if record.groom_id == player.stats.id {
+                            record.bride_name.as_str()
+                        } else {
+                            record.groom_name.as_str()
+                        }
+                    })
+                    .unwrap_or_default();
+                Page::Ask {
+                    text: content::text().get(keys::WEDDING_PRIEST_ASK, &[("partner", partner)]),
+                    on_yes: vec![Effect::Vows],
+                    on_no: None,
+                }
+            } else {
+                say(keys::WEDDING_PRIEST_ROOM)
+            }
+        }
+    };
+    NpcScript::new(wedding_priest_of(venue), vec![page])
 }
 
 /// `key`'s text about the booked wedding: its ticket, the minutes left at

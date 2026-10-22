@@ -339,6 +339,28 @@ pub enum ServerMessage {
         to: i32,
         clock: Option<tokio::time::Instant>,
     },
+    /// The couple started their wedding; this is the player's ticket.
+    WeddingStarted(crate::actor::wedding::WeddingTicket),
+    /// Wedding `id` takes the couple to `to`, where the time left is
+    /// `clock`.
+    WeddingMoved {
+        id: u32,
+        to: i32,
+        clock: Option<tokio::time::Instant>,
+    },
+    /// Wedding `id` ended, before the couple married if `failed`; out of
+    /// its maps.
+    WeddingEnded {
+        id: u32,
+        failed: bool,
+    },
+    /// Wedding `id` married the couple `record`; their time there now runs
+    /// out at `clock`.
+    Married {
+        id: u32,
+        record: game::marriage::MarriageRecord,
+        clock: tokio::time::Instant,
+    },
     SendPacket(Packet),
     /// A quest drop's packet, which the player sees only if they still need
     /// `item_id` for `quest` (`net::loot::wants`).
@@ -714,6 +736,24 @@ pub enum DirectoryMessage {
     EventClosed {
         channel_id: u8,
         kind: EventKind,
+        id: u32,
+    },
+    /// `from` starts their booked wedding with `partner` at `venue`: if the
+    /// partner stands beside them and the venue is free on their channel,
+    /// reserve it for the couple.
+    StartWedding {
+        from: ClientId,
+        partner: ClientId,
+        venue: game::wedding::Venue,
+        marriage_id: i32,
+        reply: tokio::sync::oneshot::Sender<
+            Result<crate::actor::wedding::WeddingStart, game::wedding::StartRefusal>,
+        >,
+    },
+    /// Wedding `id` at `venue` on `channel_id` is over; the venue is free.
+    WeddingClosed {
+        channel_id: u8,
+        venue: game::wedding::Venue,
         id: u32,
     },
     /// `from` takes a mini-dungeon's way in: the first free of the `count`

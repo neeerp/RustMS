@@ -49,7 +49,10 @@ impl ClientActor {
         if npc_id == net::npc_scripts::CLOTO && self.talk_to_cloto().await? {
             return Ok(());
         }
-        if self.talk_to_balloon(npc_id).await? || self.talk_to_wedding_assistant(npc_id).await? {
+        if self.talk_to_balloon(npc_id).await?
+            || self.talk_to_wedding_assistant(npc_id).await?
+            || self.talk_to_wedding_staff(npc_id).await?
+        {
             return Ok(());
         }
         let player = &self.in_game()?.player;

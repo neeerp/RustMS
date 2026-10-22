@@ -1,9 +1,9 @@
 //! Engaged and married couples (report b052): one row per couple, while it
 //! lasts.
 
-use crate::schema::{characters, marriages};
+use crate::schema::{characters, marriages, wedding_reservations};
 use diesel::prelude::*;
-use game::marriage::{MarriageRecord, Refusal, ENGAGED};
+use game::marriage::{MarriageRecord, Refusal, ENGAGED, MARRIED};
 use std::time::SystemTime;
 
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
@@ -126,6 +126,23 @@ pub fn end_unless_booked(id: i32, now: SystemTime) -> crate::Result<Option<bool>
         }
         diesel::delete(marriages::table.find(id)).execute(conn)?;
         Ok(Some(true))
+    })?)
+}
+
+/// Marry the engaged couple `id` at their wedding (report b071): their
+/// booking goes with it. `None` if they are no longer engaged.
+pub fn marry(id: i32) -> crate::Result<Option<MarriageRecord>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        if crate::wedding::lock_couple(conn, id)? != Some(ENGAGED) {
+            return Ok(None);
+        }
+        let row = diesel::update(marriages::table.find(id))
+            .set(marriages::status.eq(MARRIED))
+            .returning(columns())
+            .get_result(conn)?;
+        diesel::delete(wedding_reservations::table.find(id)).execute(conn)?;
+        Ok(Some(with_names(conn, row)?))
     })?)
 }
 

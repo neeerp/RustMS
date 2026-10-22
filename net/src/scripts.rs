@@ -341,6 +341,18 @@ pub enum Effect {
     ExtraInvitations {
         venue: game::wedding::Venue,
     },
+    /// Begin the player's booked wedding at `venue` with their partner
+    /// beside them (report b071). The starter says why it didn't begin, so
+    /// nothing may follow it.
+    StartWedding {
+        venue: game::wedding::Venue,
+    },
+    /// The player takes their vows at their wedding's altar; the second of
+    /// the couple to do so marries them. The priest then says how it went,
+    /// so nothing may follow it.
+    Vows,
+    /// End the player's wedding, once married: everyone goes out.
+    EndWedding,
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

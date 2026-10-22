@@ -139,6 +139,8 @@ pub struct WorldDirectory {
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
+    /// The wedding under way at each channel's venues, by id.
+    weddings: HashMap<(u8, game::wedding::Venue), u32>,
     avatar_banners: AvatarBanners,
     /// Mini-dungeon copies taken, by channel and copy.
     dungeons: HashMap<(u8, i32), Run>,
@@ -165,6 +167,7 @@ impl WorldDirectory {
             proposals: HashMap::new(),
             events: HashMap::new(),
             next_event: 1,
+            weddings: HashMap::new(),
             avatar_banners: AvatarBanners::default(),
             dungeons: HashMap::new(),
             owl_searches: Searches::default(),
@@ -352,6 +355,28 @@ impl WorldDirectory {
                 venue,
                 premium,
             } => self.reserve_wedding(from, partner, venue, premium),
+            DirectoryMessage::StartWedding {
+                from,
+                partner,
+                venue,
+                marriage_id,
+                reply,
+            } => {
+                let start = self.start_wedding(from, partner, venue, marriage_id);
+                // A partner who can't take the reply can't start it.
+                if let Err(Ok(start)) = reply.send(start) {
+                    self.weddings.remove(&(start.channel_id, venue));
+                }
+            }
+            DirectoryMessage::WeddingClosed {
+                channel_id,
+                venue,
+                id,
+            } => {
+                if self.weddings.get(&(channel_id, venue)) == Some(&id) {
+                    self.weddings.remove(&(channel_id, venue));
+                }
+            }
             DirectoryMessage::Wedding { to, news } => self.tell(to, ServerMessage::Wedding(news)),
             DirectoryMessage::DeliverInvitation { invitation } => {
                 self.deliver_invitation(invitation)

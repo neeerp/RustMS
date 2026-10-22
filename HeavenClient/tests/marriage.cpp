@@ -66,6 +66,7 @@ void ring_boxes_and_result_texts()
 	require(!marriage::is_ring_box(2230000) && !marriage::is_ring_box(4031357), "not the boxes");
 
 	require(std::string(marriage::result_text(marriage::RESULT_ENGAGED)) == "You are now engaged.", "engaged");
+	require(std::string(marriage::result_text(marriage::RESULT_MARRIED)) == "You are now married!", "married");
 	require(std::string(marriage::result_text(18)) == "You have entered the wrong character name.", "wrong name");
 	require(std::string(marriage::result_text(30)) == "She has politely declined your engagement request.", "declined");
 

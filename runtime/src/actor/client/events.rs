@@ -26,13 +26,18 @@ impl ClientActor {
     /// The field `map_id` is played in: the event's copy of it for a member
     /// holding a ticket to its maps, otherwise the channel's own.
     pub(super) fn field_key(&self, map_id: i32) -> FieldKey {
-        match &self.event {
-            Some(ticket) if ticket.holds(map_id) => FieldKey {
+        let event = self.event.as_ref().filter(|ticket| ticket.holds(map_id));
+        let wedding = self.wedding.as_ref().filter(|ticket| ticket.holds(map_id));
+        match event
+            .map(|ticket| ticket.id)
+            .or(wedding.map(|ticket| ticket.id))
+        {
+            Some(instance_id) => FieldKey {
                 channel_id: self.channel_id,
                 map_id,
-                instance_id: ticket.id,
+                instance_id,
             },
-            _ => FieldKey::new(self.channel_id, map_id),
+            None => FieldKey::new(self.channel_id, map_id),
         }
     }
 
@@ -260,7 +265,7 @@ impl ClientActor {
         self.drop_event_ticket().await
     }
 
-    async fn warp_within_event(&mut self, map_id: i32) -> Result<(), RuntimeError> {
+    pub(super) async fn warp_within_event(&mut self, map_id: i32) -> Result<(), RuntimeError> {
         let channel_id = self.channel_id;
         let player = &mut self.in_game_mut()?.player;
         for action in warp_to_spawn_point(player, map_id, 0, channel_id)? {
@@ -278,6 +283,13 @@ impl ClientActor {
             .is_some_and(|ticket| !ticket.holds(map_id))
         {
             self.drop_event_ticket().await?;
+        }
+        if self
+            .wedding
+            .as_ref()
+            .is_some_and(|ticket| !ticket.holds(map_id))
+        {
+            self.drop_wedding_ticket().await?;
         }
         Ok(())
     }
@@ -400,10 +412,14 @@ impl ClientActor {
     /// event is won, and again during its bonus.
     pub(super) async fn show_event_clock(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
-            return Ok(());
+        let event = self.event.as_ref().filter(|ticket| ticket.holds(map_id));
+        let wedding = self.wedding.as_ref().filter(|ticket| ticket.holds(map_id));
+        let clock = match (event, wedding) {
+            (Some(ticket), _) => ticket.clock,
+            (None, Some(ticket)) => ticket.clock,
+            (None, None) => None,
         };
-        let Some(ends) = ticket.clock else {
+        let Some(ends) = clock else {
             return Ok(());
         };
         let left = ends.saturating_duration_since(Instant::now());
@@ -413,6 +429,8 @@ impl ClientActor {
 
     /// A player who leaves the game leaves the event, and its items.
     pub(super) fn forget_event(&mut self) {
+        // Dropping the wedding's ticket hands it back.
+        self.wedding = None;
         if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
             ticket.kind.event().take_items(&mut game.player);
         }

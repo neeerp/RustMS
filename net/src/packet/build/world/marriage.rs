@@ -10,6 +10,8 @@ use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
 const ENGAGED: u8 = 11;
+/// The couple is married now; the client keeps the record.
+const MARRIED: u8 = 12;
 /// The engagement is broken; the client drops the record.
 const BROKEN: u8 = 13;
 /// The marriage is over; the client drops the record.
@@ -119,6 +121,8 @@ pub fn build_marriage_refusal(refusal: Refusal) -> Result<Packet, NetworkError> 
 pub enum WeddingNotice {
     /// 0x109e: the reservation was made.
     Reserved = 16,
+    /// The reservation has been cancelled: the wedding fell through.
+    Cancelled = 31,
     /// 0x109b: no breaking off once a wedding is booked.
     NoBreakingOff = 32,
     /// 0x109d: the invitation opened is not valid.
@@ -143,6 +147,14 @@ pub fn build_invitation(groom: &str, bride: &str, venue: Venue) -> Result<Packet
 /// MARRIAGE_RESULT 11: "You are now engaged.", with the couple's record.
 pub fn build_engaged(record: &MarriageRecord) -> Result<Packet, NetworkError> {
     let mut packet = result(ENGAGED)?;
+    write_marriage_record(&mut packet, record)?;
+    Ok(packet)
+}
+
+/// MARRIAGE_RESULT 12: "You are now married!" (0x108c), with the
+/// couple's record (report b071).
+pub fn build_married(record: &MarriageRecord) -> Result<Packet, NetworkError> {
+    let mut packet = result(MARRIED)?;
     write_marriage_record(&mut packet, record)?;
     Ok(packet)
 }
@@ -197,6 +209,26 @@ mod tests {
         assert_eq!(packet.bytes, [0x49, 0x00, 32]);
         let packet = build_wedding_notice(WeddingNotice::InvalidInvitation).unwrap();
         assert_eq!(packet.bytes, [0x49, 0x00, 34]);
+        let packet = build_wedding_notice(WeddingNotice::Cancelled).unwrap();
+        assert_eq!(packet.bytes, [0x49, 0x00, 31]);
+    }
+
+    #[test]
+    fn the_married_result_carries_the_record_with_its_status() {
+        let record = MarriageRecord {
+            id: 7,
+            groom_id: 1,
+            bride_id: 2,
+            status: game::marriage::MARRIED,
+            item_id: 2240001,
+            groom_name: "Groom".into(),
+            bride_name: "Bride".into(),
+        };
+        let packet = build_married(&record).unwrap();
+        assert_eq!(packet.bytes.len(), 3 + 0x30);
+        assert_eq!(&packet.bytes[..3], &[0x49, 0x00, 12]);
+        assert_eq!(&packet.bytes[3 + 12..3 + 14], &[3, 0]);
+        assert_eq!(&packet.bytes[3 + 14..3 + 18], &1112806i32.to_le_bytes());
     }
 
     #[test]
