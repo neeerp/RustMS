@@ -13,6 +13,7 @@ use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
 use net::conti::{self, Happening, State, Target};
+use net::loot::Loot;
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::conti::build_conti_move;
@@ -47,6 +48,7 @@ use net::packet::build::world::summon::{
     build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
     build_summon_attack, build_summon_skill, Gone, SummonView,
 };
+use net::reactors;
 use net::skills::{self, Inflict, Takes};
 use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
@@ -97,6 +99,18 @@ const SUMMON_REACH_Y: i32 = 150;
 /// waits for the server to stop it).
 const WEATHER_TIME: Duration = Duration::from_secs(30);
 
+/// How long an item lies on a reactor before the reactor takes it
+/// (Cosmic's `ActivateItemReactor`).
+const ITEM_TAKEN_AFTER: Duration = Duration::from_secs(5);
+
+/// An item a player put on a reactor that takes it, once it has lain there
+/// long enough.
+struct ItemOnReactor {
+    at: Instant,
+    drop: i32,
+    reactor: i32,
+}
+
 /// One live copy of a map. It owns everything local to that map: who is on
 /// it and where, its NPCs, mobs, drops, and reactors, which advance on
 /// `tick`, and its players' mists and summons.
@@ -112,6 +126,7 @@ pub struct FieldActor {
     casts: Vec<Cast>,
     drops: DropSet,
     reactors: ReactorSet,
+    items_on_reactors: Vec<ItemOnReactor>,
     mists: MistSet,
     summons: SummonSet,
     /// Players' Mystic Doors here, by owner.
@@ -154,6 +169,7 @@ impl FieldActor {
             casts: Vec::new(),
             drops,
             reactors,
+            items_on_reactors: Vec::new(),
             mists: MistSet::default(),
             summons: SummonSet::default(),
             doors: HashMap::new(),
@@ -200,6 +216,13 @@ impl FieldActor {
             if let Ok(packet) = build_remove_drop(object_id, None) {
                 self.broadcast(None, packet);
             }
+        }
+        let (due, waiting) = std::mem::take(&mut self.items_on_reactors)
+            .into_iter()
+            .partition(|item: &ItemOnReactor| item.at <= now);
+        self.items_on_reactors = waiting;
+        for item in due {
+            self.take_item_on_reactor(item, now);
         }
         for object_id in self.reactors.respawn(now) {
             if let Some(reactor) = self.reactors.get(object_id) {
@@ -349,7 +372,7 @@ impl FieldActor {
                 avatar,
                 party,
             } => self.handle_join(handle, avatar, party),
-            FieldMessage::Leave { client_id } => self.handle_leave(client_id),
+            FieldMessage::Leave { client_id, staying } => self.handle_leave(client_id, staying),
             FieldMessage::Close => {}
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
@@ -863,6 +886,7 @@ impl FieldActor {
             (drop, DropAppearance::Vanishing { from: (x, y) })
         } else {
             let drop = self.drops.throw(loot, from, x, y, now).clone();
+            self.put_on_reactor(&drop, now);
             let falling = DropAppearance::Falling {
                 from: (x, y),
                 delay: 0,
@@ -871,6 +895,66 @@ impl FieldActor {
         };
         if let Ok(packet) = build_drop(&drop.view(now), appearance) {
             self.send_drop_packet(&drop, packet);
+        }
+    }
+
+    /// Where a drop lying at its spot comes to rest: on the ground below.
+    fn landing(&self, drop: &Drop) -> (i16, i16) {
+        let ground = self.drops.ground_below(drop.x, drop.y.saturating_sub(1));
+        (drop.x, ground.unwrap_or(drop.y))
+    }
+
+    /// If a player's drop lands on a reactor that takes it, the reactor
+    /// takes it a little later.
+    fn put_on_reactor(&mut self, drop: &Drop, now: Instant) {
+        let Loot::Dropped(item) = &drop.loot else {
+            return;
+        };
+        if self
+            .items_on_reactors
+            .iter()
+            .any(|on| on.drop == drop.object_id)
+        {
+            return;
+        }
+        let at = self.landing(drop);
+        if let Some(reactor) = self.reactors.taking(item.item_id, item.quantity, at) {
+            self.items_on_reactors.push(ItemOnReactor {
+                at: now + ITEM_TAKEN_AFTER,
+                drop: drop.object_id,
+                reactor,
+            });
+        }
+    }
+
+    /// The reactor takes the item put on it, if both are still there and
+    /// it still wants it, and moves on. A reactor that waits for another
+    /// item then looks at what already lies on it.
+    fn take_item_on_reactor(&mut self, on: ItemOnReactor, now: Instant) {
+        let Some(drop) = self.drops.get(on.drop) else {
+            return;
+        };
+        let Loot::Dropped(item) = &drop.loot else {
+            return;
+        };
+        let (owner, at) = (drop.owner, self.landing(drop));
+        let Some(hit) = self
+            .reactors
+            .take_item(on.reactor, item.item_id, item.quantity, at, now)
+        else {
+            return;
+        };
+        if let Some(drop) = self.drops.remove(on.drop) {
+            if let Ok(packet) = build_remove_drop(drop.object_id, None) {
+                self.send_drop_packet(&drop, packet);
+            }
+        }
+        self.show_reactor_hit(owner, hit, 0);
+        if self.reactors.takes_items(on.reactor) {
+            let lying: Vec<Drop> = self.drops.all().cloned().collect();
+            for drop in lying {
+                self.put_on_reactor(&drop, now);
+            }
         }
     }
 
@@ -2048,31 +2132,47 @@ impl FieldActor {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
-        let handle = occupant.handle.clone();
         let position = (occupant.avatar.x, occupant.avatar.y);
-        match self
+        if let Some(hit) = self
             .reactors
             .hit(object_id, flags, position, Instant::now())
         {
-            Some(Hit::Moved { view, event }) => {
+            self.show_reactor_hit(from, hit, delay);
+        }
+    }
+
+    /// Show a reactor's new state, or break it and do what it does: bring
+    /// out its mob, or have the client actor of `by`, who broke it, roll
+    /// its drops.
+    fn show_reactor_hit(&mut self, by: ClientId, hit: Hit, delay: u16) {
+        let view = match hit {
+            Hit::Moved { view, event } => {
                 if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }
+                return;
             }
-            Some(Hit::Broke(view)) => {
-                // The client plays the hit animation of the state it
-                // broke from as it removes the reactor.
-                if let Ok(packet) = build_remove_reactor(&view) {
-                    self.broadcast(None, packet);
+            Hit::Broke(view) => view,
+        };
+        // The client plays the hit animation of the state it broke from as
+        // it removes the reactor.
+        if let Ok(packet) = build_remove_reactor(&view) {
+            self.broadcast(None, packet);
+        }
+        match reactors::action(view.reactor_id) {
+            reactors::Action::BringOut(mob_id) => {
+                self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)))
+            }
+            reactors::Action::Drops => {
+                if let Some(occupant) = self.occupants.get(&by) {
+                    occupant.handle.send(ServerMessage::ReactorBroken {
+                        reactor_id: view.reactor_id,
+                        object_id: view.object_id,
+                        x: view.x,
+                        y: view.y,
+                    });
                 }
-                handle.send(ServerMessage::ReactorBroken {
-                    reactor_id: view.reactor_id,
-                    object_id: view.object_id,
-                    x: view.x,
-                    y: view.y,
-                });
             }
-            None => {}
         }
     }
 
@@ -2216,7 +2316,7 @@ impl FieldActor {
         }
     }
 
-    fn handle_leave(&mut self, client_id: ClientId) {
+    fn handle_leave(&mut self, client_id: ClientId, staying: bool) {
         let Some(left) = self.occupants.remove(&client_id) else {
             return;
         };
@@ -2243,8 +2343,9 @@ impl FieldActor {
                 self.send_npc_control(next);
             }
         }
-        // A boss or solo room is fresh for its next challenger.
-        if next.is_none() && net::npc_scripts::resets_when_empty(self.key.map_id) {
+        // A boss or solo room is fresh for its next challenger, but not
+        // for one warping within it.
+        if next.is_none() && !staying && net::npc_scripts::resets_when_empty(self.key.map_id) {
             let now = Instant::now();
             self.mobs.renew(now);
             self.reactors.renew(now);
@@ -2899,7 +3000,10 @@ mod tests {
         );
 
         field
-            .send(FieldMessage::Leave { client_id: 2 })
+            .send(FieldMessage::Leave {
+                client_id: 2,
+                staying: false,
+            })
             .await
             .unwrap();
         assert_eq!(
@@ -2989,7 +3093,10 @@ mod tests {
 
         actor.handle_message(hide(true));
         sent(&mut late_rx);
-        actor.handle_message(FieldMessage::Leave { client_id: 1 });
+        actor.handle_message(FieldMessage::Leave {
+            client_id: 1,
+            staying: false,
+        });
         assert!(players(sent(&mut late_rx)).is_empty());
         assert_eq!(players(sent(&mut other_gm_rx)), [remove]);
     }
@@ -3176,7 +3283,12 @@ mod tests {
             assert_eq!(&packet.bytes[2..], &[0x00, 0xca, 0x9a, 0x3b, 2, 0xff]);
         }
 
-        tx.send(FieldMessage::Leave { client_id: 1 }).await.unwrap();
+        tx.send(FieldMessage::Leave {
+            client_id: 1,
+            staying: false,
+        })
+        .await
+        .unwrap();
         assert!(opcodes(&mut second_rx).await.contains(&control));
     }
 
@@ -3328,6 +3440,92 @@ mod tests {
         let spawned = SendOpcode::SpawnMonster as i16;
         let controlled = SendOpcode::SpawnMonsterControl as i16;
         assert_eq!(seen, [spawned, spawned, controlled, controlled]);
+    }
+
+    #[tokio::test]
+    async fn a_mound_takes_what_lies_on_it_in_turn_and_keeps_it_through_a_warp_within() {
+        let Some(data) = net::reactors::template(2302003) else {
+            return;
+        };
+        let spot = game_data::MapReactorTemplate {
+            reactor_id: 2302003,
+            x: 105,
+            y: 164,
+            flip: false,
+            reactor_time: -1,
+            name: String::new(),
+        };
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 923000100),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::new([(spot, data)]),
+            Duration::from_millis(50),
+        );
+        let (handle, mut rx) = client(1);
+        let join = |handle: &ClientHandle| FieldMessage::Join {
+            handle: handle.clone(),
+            avatar: avatar(1, 105, 78),
+            party: None,
+        };
+        actor.handle_message(join(&handle));
+        opcodes(&mut rx).await;
+        let throw = |item_id| FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Throw {
+                loot: Loot::Dropped(game::Item::stack(item_id, 1)),
+                vanish: false,
+            },
+        };
+        let state = |actor: &FieldActor| actor.reactors.live().next().map(|r| r.state);
+
+        // The book before the flame, which it wants first.
+        actor.handle_message(throw(4001107));
+        actor.handle_message(throw(4001108));
+        let start = Instant::now();
+        actor.on_tick(start + Duration::from_secs(4));
+        assert_eq!(state(&actor), Some(0));
+        actor.on_tick(start + Duration::from_secs(6));
+        assert_eq!(state(&actor), Some(1));
+        assert_eq!(actor.drops.all().count(), 1);
+
+        // A warp within the room doesn't start it afresh.
+        actor.handle_message(FieldMessage::Leave {
+            client_id: 1,
+            staying: true,
+        });
+        actor.handle_message(join(&handle));
+        assert_eq!(state(&actor), Some(1));
+
+        // Then it takes the book lying there already, and breaks.
+        actor.on_tick(start + Duration::from_secs(12));
+        assert_eq!(state(&actor), None);
+        assert_eq!(actor.drops.all().count(), 0);
+        let mut seen = Vec::new();
+        let mut broken = false;
+        while let Ok(Some(message)) = timeout(Duration::from_millis(100), rx.recv()).await {
+            match message {
+                ServerMessage::SendPacket(packet) => seen.push(packet.opcode()),
+                ServerMessage::ReactorBroken { reactor_id, .. } => broken = reactor_id == 2302003,
+                _ => {}
+            }
+        }
+        assert!(broken);
+        for opcode in [SendOpcode::HitReactor, SendOpcode::RemoveReactor] {
+            assert!(seen.contains(&(opcode as i16)), "{seen:?}");
+        }
+        let removed = SendOpcode::RemoveItemFromMap as i16;
+        assert_eq!(seen.iter().filter(|&&op| op == removed).count(), 2);
+
+        // Left for good, the room is fresh for the next.
+        actor.handle_message(FieldMessage::Leave {
+            client_id: 1,
+            staying: false,
+        });
+        assert_eq!(state(&actor), Some(0));
     }
 
     fn summon(skill_id: i32, at: (i16, i16), lasts: Duration) -> FieldMessage {

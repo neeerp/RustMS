@@ -1152,7 +1152,7 @@ A map's `reactor` nodes (`game_data::MapReactorTemplate`) place reactors such
 as Amherst's scrap boxes; their states come from `Reactor.nx`
 (`game_data::reactors`, following `info/link`). Each state lists events
 (`<state>/event/<n>`), each with a `type` and the `state` it moves to. A
-state without events is the end.
+state without events is the end. A linked reactor keeps its own `action`.
 
 A basic attack can swing at a reactor instead of attacking mobs. Event
 types 0 to 4 take a swing: 0 any, 1 and 2 only facing right or left, and 3
@@ -1184,13 +1184,33 @@ the next player.
 The server ignores skill swings (kind 1); only guild quest reactors take
 them.
 
+An event of type 100 takes an item instead: exactly `1` of item `0`
+landing within `lt`-`rb` of the reactor (`ReactorTemplate::item_dropped`).
+When a player drops such an item (not one that vanishes) and it lands, on
+the ground below where they stand, in such an area, the field waits 5
+seconds, as Cosmic's `ActivateItemReactor` does (`ITEM_TAKEN_AFTER`). If the
+item still lies there and the reactor still wants it, the item goes
+(REMOVE_ITEM_FROM_MAP, no one picking it up) and the reactor moves on as if
+hit, shown with HIT_REACTOR event 0, or breaks. A reactor that then waits
+for another item looks at what already lies on it. The resurrection mound
+(`2302003`, `923000100`) takes a Cold Flame, then the Black Book; the
+fourth job's eggs (`2401001`, `2401002`, `924000100`) take their egg, then
+three hits.
+
+What a broken reactor does is `net::reactors::action`, keyed by reactor id
+as Cosmic's scripts are: by default the breaker rolls its drops; the eggs
+bring out the Fire Hawk or Ice Eagle (`9300089`, `9300090`), and the
+Hitman's hideout boxes (`1021000`, `1021001`) its `9300091`, on the ground
+just below the reactor, without drops. Warps and chances (the Hitman's
+other boxes, the Berserk room's decoys) aren't in yet.
+
 Server logic can also set a reactor's state by its map name
 (`ReactorSet::set_state`, shown with HIT_REACTOR): the Helios Tower
 elevator's car docking and leaving (`ships.md`).
 
 Reactor drops come from the content pack's table, keyed by reactor id, plus
-`[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
-`action` scripts (`mBoxItem0` and others) are not run.
+`[reactors]` in `reward_overrides.toml`; see `server-content.md`. The
+`action` script names (`mBoxItem0` and others) aren't used.
 
 ### Client
 
