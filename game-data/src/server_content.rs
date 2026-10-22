@@ -1070,6 +1070,24 @@ pub mod keys {
     /// Robin, in the party room, asks whether to leave the wedding by its exit.
     pub const WEDDING_PARTY_EXIT_ASK: &str = "wedding.party.exit_ask";
 
+    /// Robin's menu after a premium wedding, in the party room and the hunting ground.
+    pub const WEDDING_ROBIN_MENU: &str = "wedding.robin.menu";
+
+    /// Robin's choice, in the party room, of the hunting ground.
+    pub const WEDDING_ROBIN_HUNT: &str = "wedding.robin.hunt";
+
+    /// Robin's choice, in the hunting ground, of the box room for seven Heart Keys.
+    pub const WEDDING_ROBIN_BOXES: &str = "wedding.robin.boxes";
+
+    /// Robin's choice of leaving the wedding.
+    pub const WEDDING_ROBIN_OUT: &str = "wedding.robin.out";
+
+    /// Robin tells a player without seven Heart Keys how to get them.
+    pub const WEDDING_ROBIN_NO_KEYS: &str = "wedding.robin.no_keys";
+
+    /// Robin, in the box room, asks whether to go back to the hunting ground.
+    pub const WEDDING_ROBIN_BACK_ASK: &str = "wedding.robin.back_ask";
+
     /// The wedding's staff ask a guest whether to leave it.
     pub const WEDDING_STAFF_GUEST_LEAVE: &str = "wedding.staff.guest_leave";
 
@@ -1092,7 +1110,7 @@ pub mod keys {
     pub const WEDDING_GUEST_ERROR: &str = "wedding.guest.enter_error";
 
     /// The wedding itself: the starters, the priests and the altar staff (report b071).
-    pub const CEREMONY: [&str; 34] = [
+    pub const CEREMONY: [&str; 40] = [
         WEDDING_STARTER_INTRO,
         WEDDING_STARTER_NOT_BOOKED,
         WEDDING_STARTER_CHANNEL,
@@ -1120,6 +1138,12 @@ pub mod keys {
         WEDDING_STAFF_PARTY_ASK,
         WEDDING_PARTY_QUIT_ASK,
         WEDDING_PARTY_EXIT_ASK,
+        WEDDING_ROBIN_MENU,
+        WEDDING_ROBIN_HUNT,
+        WEDDING_ROBIN_BOXES,
+        WEDDING_ROBIN_OUT,
+        WEDDING_ROBIN_NO_KEYS,
+        WEDDING_ROBIN_BACK_ASK,
         WEDDING_STAFF_GUEST_LEAVE,
         WEDDING_GUEST_ASK,
         WEDDING_GUEST_ASK_CLOTHES,

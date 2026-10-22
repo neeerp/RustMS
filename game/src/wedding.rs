@@ -3,7 +3,7 @@
 //! and each partner gets invitations for their guests.
 
 use crate::marriage::is_wedding_ring;
-use crate::{InventoryType, Player};
+use crate::{InventoryChange, InventoryType, Player};
 use std::time::{Duration, SystemTime};
 
 /// Where the wedding is held.
@@ -90,10 +90,12 @@ impl Venue {
     }
 
     /// Whether `map_id` is one of the maps the wedding has its own copy of:
-    /// the venue's hall and altar, and the party room both venues' premium
-    /// weddings go on to.
+    /// the venue's hall and altar, and the party room and hunting grounds
+    /// both venues' premium weddings go on to.
     pub fn holds(self, map_id: i32) -> bool {
-        map_id == self.hall() || map_id == self.altar() || map_id == PARTY_ROOM
+        map_id == self.hall()
+            || map_id == self.altar()
+            || [PARTY_ROOM, HUNTING_GROUND, BOX_ROOM].contains(&map_id)
     }
 
     /// The priest's line that pronounces the couple married: the step of
@@ -145,6 +147,22 @@ pub const AMORIA: i32 = 680000000;
 /// Where a premium wedding goes on once the couple are married, when they
 /// ask the altar staff (report b080).
 pub const PARTY_ROOM: i32 = 680000300;
+
+/// Robin's hunting ground off the party room, where the cakes and candles
+/// drop the Heart Keys (report b082).
+pub const HUNTING_GROUND: i32 = 680000400;
+
+/// The room of boxes that `BOX_KEYS` Heart Keys open, off the hunting
+/// ground.
+pub const BOX_ROOM: i32 = 680000401;
+
+/// The Amoria Heart Key, which `String.nx` says opens the hunting ground's
+/// treasure chest; the cakes drop it (content pack). It is the wedding's
+/// own and goes when its holder leaves.
+pub const HEART_KEY: i32 = 4031409;
+
+/// How many Heart Keys Robin takes for the box room.
+pub const BOX_KEYS: i16 = 7;
 
 /// Where everyone goes when a wedding ends: Ames's room, which both venues'
 /// maps return to.
@@ -327,6 +345,18 @@ pub fn has_wedding_ring(player: &Player) -> bool {
         .any(|(_, item)| is_wedding_ring(item.item_id))
 }
 
+/// Take the wedding's Heart Keys from a player leaving it.
+pub fn take_keys(player: &mut Player) -> Vec<InventoryChange> {
+    let held = i16::try_from(player.inventory.count(HEART_KEY)).unwrap_or(i16::MAX);
+    if held == 0 {
+        return Vec::new();
+    }
+    player
+        .inventory_mut()
+        .remove(HEART_KEY, held)
+        .unwrap_or_default()
+}
+
 /// The start of the slot a booking made at `now` gets on a venue whose
 /// latest booking starts at `last`: the first top of a `slot` at least
 /// `lead` away, and after the latest booking.
@@ -354,6 +384,31 @@ mod tests {
 
     fn at(minutes: u64) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(minutes * 60)
+    }
+
+    #[test]
+    fn leaving_takes_every_heart_key() {
+        use crate::{Inventory, Item, Keymap, QuestLog, SkillBook};
+        let mut player = Player::new(
+            1,
+            0,
+            crate::character::test_stats(),
+            0,
+            Inventory::default(),
+            SkillBook::default(),
+            Keymap::default(),
+            QuestLog::default(),
+        );
+        assert!(take_keys(&mut player).is_empty());
+        // The keys don't stack, so each has its own slot.
+        for _ in 0..9 {
+            player
+                .inventory_mut()
+                .add(Item::stack(HEART_KEY, 1), 1)
+                .unwrap();
+        }
+        assert_eq!(take_keys(&mut player).len(), 9);
+        assert_eq!(player.inventory.count(HEART_KEY), 0);
     }
 
     #[test]
@@ -407,6 +462,7 @@ mod tests {
         assert!(Venue::Cathedral.holds(680000200) && Venue::Cathedral.holds(680000210));
         assert!(!Venue::Chapel.holds(680000210) && !Venue::Chapel.holds(WEDDING_EXIT));
         assert!(Venue::Chapel.holds(PARTY_ROOM) && Venue::Cathedral.holds(PARTY_ROOM));
+        assert!(Venue::Chapel.holds(HUNTING_GROUND) && Venue::Cathedral.holds(BOX_ROOM));
         assert_eq!(
             WeddingStage::from_u8(WeddingStage::Ceremony as u8),
             WeddingStage::Ceremony

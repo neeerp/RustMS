@@ -980,21 +980,52 @@ impl NpcScript {
         Self::new(npc_id, vec![page])
     }
 
-    /// `npc_id`'s script in a wedding's party room, if one of its own, to
-    /// anyone in the wedding: Travis's way back to Amoria, Robin's to the
-    /// exit (report b080).
-    pub fn wedding_party(npc_id: i32) -> Option<Self> {
-        let (key, to) = match npc_id {
-            TRAVIS => (keys::WEDDING_PARTY_QUIT_ASK, AMORIA.0),
-            WEDDING_ROBIN => (keys::WEDDING_PARTY_EXIT_ASK, wedding::WEDDING_EXIT),
-            _ => return None,
-        };
-        let page = Page::Ask {
+    /// `npc_id`'s script on `map_id` after a premium wedding, if one of its
+    /// own there, to anyone in the wedding holding `keys` Heart Keys:
+    /// Travis's way back to Amoria (report b080), and Robin's menu of the
+    /// hunting ground, the box room and the exit (report b082).
+    pub fn wedding_party(npc_id: i32, map_id: i32, held: i32) -> Option<Self> {
+        let leave = |key, to| Page::Ask {
             text: text(key),
             on_yes: vec![Effect::Warp(to)],
             on_no: None,
         };
-        Some(Self::new(npc_id, vec![page]))
+        let page = match (npc_id, map_id) {
+            (TRAVIS, wedding::PARTY_ROOM) => leave(keys::WEDDING_PARTY_QUIT_ASK, AMORIA.0),
+            (WEDDING_ROBIN, wedding::BOX_ROOM) => {
+                leave(keys::WEDDING_ROBIN_BACK_ASK, wedding::HUNTING_GROUND)
+            }
+            (WEDDING_ROBIN, wedding::PARTY_ROOM | wedding::HUNTING_GROUND) => {
+                let onward = if map_id == wedding::PARTY_ROOM {
+                    let hunt = Page::Done(vec![Effect::Warp(wedding::HUNTING_GROUND)]);
+                    (text(keys::WEDDING_ROBIN_HUNT), vec![hunt])
+                } else if held >= i32::from(wedding::BOX_KEYS) {
+                    let boxes = Page::Done(vec![
+                        Effect::TakeItem {
+                            item_id: wedding::HEART_KEY,
+                            quantity: wedding::BOX_KEYS,
+                        },
+                        Effect::Warp(wedding::BOX_ROOM),
+                    ]);
+                    (text(keys::WEDDING_ROBIN_BOXES), vec![boxes])
+                } else {
+                    let short = Page::End(text(keys::WEDDING_ROBIN_NO_KEYS));
+                    (text(keys::WEDDING_ROBIN_BOXES), vec![short])
+                };
+                let out = leave(keys::WEDDING_PARTY_EXIT_ASK, wedding::WEDDING_EXIT);
+                Page::Menu {
+                    text: text(keys::WEDDING_ROBIN_MENU),
+                    choices: vec![onward, (text(keys::WEDDING_ROBIN_OUT), vec![out])],
+                }
+            }
+            _ => return None,
+        };
+        let mut script = Self::new(npc_id, vec![page]);
+        if map_id == wedding::HUNTING_GROUND {
+            // The keys may have gone since the menu was drawn.
+            script.refused = Some(text(keys::WEDDING_ROBIN_NO_KEYS));
+        }
+        Some(script)
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -7928,15 +7959,53 @@ mod tests {
 
     #[test]
     fn the_party_room_has_two_ways_out() {
-        let mut quit = NpcScript::wedding_party(TRAVIS).unwrap();
+        let party = |npc_id, map_id, keys| NpcScript::wedding_party(npc_id, map_id, keys);
+        let mut quit = party(TRAVIS, wedding::PARTY_ROOM, 0).unwrap();
         assert_eq!(question(&quit.begin()), text(keys::WEDDING_PARTY_QUIT_ASK));
         let yes = quit.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::Warp(680000000)]);
-        let mut out = NpcScript::wedding_party(WEDDING_ROBIN).unwrap();
+        let mut out = party(WEDDING_ROBIN, wedding::PARTY_ROOM, 0).unwrap();
         out.begin();
+        let ask = out.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(question(&ask), text(keys::WEDDING_PARTY_EXIT_ASK));
         let yes = out.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::Warp(wedding::WEDDING_EXIT)]);
-        assert!(NpcScript::wedding_party(JACKIE).is_none());
+        assert!(party(JACKIE, wedding::PARTY_ROOM, 0).is_none());
+        assert!(party(TRAVIS, wedding::HUNTING_GROUND, 0).is_none());
+        assert!(party(WEDDING_ROBIN, wedding::WEDDING_EXIT, 0).is_none());
+    }
+
+    #[test]
+    fn robin_leads_to_the_hunting_ground_and_seven_keys_to_the_boxes() {
+        let party = |map_id, keys| NpcScript::wedding_party(WEDDING_ROBIN, map_id, keys).unwrap();
+        let mut hunt = party(wedding::PARTY_ROOM, 0);
+        hunt.begin();
+        let step = hunt.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::Warp(wedding::HUNTING_GROUND)]);
+        assert!(step.prompt.is_none());
+
+        let mut short = party(wedding::HUNTING_GROUND, 6);
+        short.begin();
+        let step = short.respond(ScriptInput::Select(0)).unwrap();
+        assert!(step.effects.is_empty());
+        assert_eq!(page_text(&step), text(keys::WEDDING_ROBIN_NO_KEYS));
+
+        let mut boxes = party(wedding::HUNTING_GROUND, 7);
+        boxes.begin();
+        let step = boxes.respond(ScriptInput::Select(0)).unwrap();
+        let take = Effect::TakeItem {
+            item_id: wedding::HEART_KEY,
+            quantity: 7,
+        };
+        assert_eq!(step.effects, [take, Effect::Warp(wedding::BOX_ROOM)]);
+        // Keys gone by the answer: the take fails and Robin says why.
+        let refused = boxes.refused().unwrap();
+        assert_eq!(page_text(&refused), text(keys::WEDDING_ROBIN_NO_KEYS));
+
+        let mut back = party(wedding::BOX_ROOM, 0);
+        assert_eq!(question(&back.begin()), text(keys::WEDDING_ROBIN_BACK_ASK));
+        let yes = back.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::Warp(wedding::HUNTING_GROUND)]);
     }
 
     #[test]

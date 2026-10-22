@@ -10,7 +10,8 @@
 //! The vows bring the couple 30000 EXP for each guest who blessed them and
 //! stayed (slice 7e), and their guild reads that they married. A premium
 //! wedding's couple go on with everyone to the party room, where Travis
-//! and Robin show the way out.
+//! and Robin show the way out, and Robin the way to the hunting ground and,
+//! for seven Heart Keys, the box room (slice 7f). Leaving takes the keys.
 
 use game_data::server_content::keys;
 use integration_harness::database::{
@@ -33,6 +34,8 @@ const HALL: i32 = 680_000_200;
 const ALTAR: i32 = 680_000_210;
 const EXIT: i32 = 680_000_500;
 const PARTY_ROOM: i32 = 680_000_300;
+const HUNTING_GROUND: i32 = 680_000_400;
+const BOX_ROOM: i32 = 680_000_401;
 const HIGH_PRIEST: i32 = 9201002;
 const NANCY: i32 = 9201007;
 const TRAVIS: i32 = 9201010;
@@ -44,6 +47,12 @@ static CATHEDRAL_IN_USE: Mutex<()> = Mutex::const_new(());
 
 /// The invitation a Cathedral guest receives.
 const INVITATION: i32 = 4031407;
+/// The Amoria Heart Key, seven of which Robin takes for the box room.
+const HEART_KEY: i32 = 4031409;
+/// The hunting ground's Cake Monster.
+const CAKE: i32 = 9400507;
+/// A box of the box room.
+const BOX: i32 = 6802000;
 /// The assistants' menu choice for guests.
 const AS_GUEST: i32 = 2;
 const UNDERSHIRT: i32 = 1040002;
@@ -152,6 +161,20 @@ async fn say_yes(session: &mut WorldSession, map: i32, npc: i32) -> Trace {
     let t = step(c, &format!("{m} talks to {npc}"), talk(map, npc)).await;
     assert_eq!(t.prompts, [(npc, 1)], "{:?}", t.prompt_texts);
     step(c, &format!("{m} yes"), answer(1, 1, None)).await
+}
+
+/// Pick `choice` from Robin's menu on `map`; what followed.
+async fn robin(session: &mut WorldSession, map: i32, choice: i32) -> Trace {
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let t = step(c, &format!("{m} talks to Robin"), talk(map, ROBIN)).await;
+    assert_eq!(t.prompts, [(ROBIN, 4)], "{:?}", t.prompt_texts);
+    step(
+        c,
+        &format!("{m} picks {choice}"),
+        answer(4, 1, Some(choice)),
+    )
+    .await
 }
 
 /// Read on from `t` until `session` arrives on `map`.
@@ -349,7 +372,10 @@ async fn a_premium_wedding_goes_on_to_the_party_room() {
     for _ in 0..3 {
         configs.push(load_harness_config_or_fail().await);
     }
-    book(&configs, true).await;
+    let (.., guests) = book(&configs, true).await;
+    grant_stack(guests[0], ETC, 2, HEART_KEY, 9)
+        .await
+        .expect("keys");
     let mut guest = enter(&configs[2]).await;
     let mut a = enter(&configs[0]).await;
     let mut b = enter(&configs[1]).await;
@@ -371,16 +397,47 @@ async fn a_premium_wedding_goes_on_to_the_party_room() {
     arrive(&mut b, PARTY_ROOM, Trace::default()).await;
     arrive(&mut guest, PARTY_ROOM, Trace::default()).await;
 
-    // Robin shows the guest to the exit and Travis the groom back to
-    // Amoria; the bride stays until she too goes.
-    let t = say_yes(&mut guest, PARTY_ROOM, ROBIN).await;
-    arrive(&mut guest, EXIT, t).await;
+    // Robin takes the guest hunting among the cakes, and for seven keys on
+    // to the boxes.
+    let t = robin(&mut guest, PARTY_ROOM, 0).await;
+    let t = arrive(&mut guest, HUNTING_GROUND, t).await;
+    let cakes = t.field.mobs.iter().filter(|&&(_, mob)| mob == CAKE);
+    assert!(cakes.count() > 0, "{:?}", t.field.mobs);
+    let t = robin(&mut guest, HUNTING_GROUND, 0).await;
+    let t = arrive(&mut guest, BOX_ROOM, t).await;
+    assert_eq!(t.items, [(HEART_KEY, -7)]);
+    let boxes = t.field.reactors.iter().filter(|r| r.reactor_id == BOX);
+    assert!(boxes.count() > 0, "{:?}", t.field.reactors);
+    let t = say_yes(&mut guest, BOX_ROOM, ROBIN).await;
+    arrive(&mut guest, HUNTING_GROUND, t).await;
+    // Two keys open nothing; leaving takes them.
+    let t = robin(&mut guest, HUNTING_GROUND, 0).await;
+    assert_eq!(t.prompts, [(ROBIN, 0)], "{:?}", t.prompt_texts);
+    assert!(t.warps.is_empty() && t.items.is_empty());
+    let t = robin(&mut guest, HUNTING_GROUND, 1).await;
+    assert_eq!(t.prompts, [(ROBIN, 1)], "{:?}", t.prompt_texts);
+    let m = guest.character_name.clone();
+    let t = step(
+        &mut guest.connection,
+        &format!("{m} yes"),
+        answer(1, 1, None),
+    )
+    .await;
+    let t = arrive(&mut guest, EXIT, t).await;
+    assert_eq!(t.removed, [(ETC as u8, 2)]);
+
+    // Travis shows the groom back to Amoria; the bride stays until she too
+    // goes.
+
     let at = say_yes(&mut a, PARTY_ROOM, TRAVIS).await;
     arrive(&mut a, AMORIA, at).await;
     let mut t = Trace::default();
     read_for(&mut b.connection, &mut t, 500).await;
     assert!(t.warps.is_empty(), "{:?}", t.warps);
-    let bt = say_yes(&mut b, PARTY_ROOM, ROBIN).await;
+    let bt = robin(&mut b, PARTY_ROOM, 1).await;
+    assert_eq!(bt.prompts, [(ROBIN, 1)], "{:?}", bt.prompt_texts);
+    let m = b.character_name.clone();
+    let bt = step(&mut b.connection, &format!("{m} yes"), answer(1, 1, None)).await;
     arrive(&mut b, EXIT, bt).await;
     tokio::time::sleep(Duration::from_secs(3)).await;
 }

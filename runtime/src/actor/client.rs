@@ -676,6 +676,9 @@ impl ClientActor {
             return Err(RuntimeError::NotLoggedIn);
         }
         ships::leave_forced_return_map(&mut player);
+        // Heart Keys are a wedding's own, and nobody logs in to one (a
+        // crash may have saved them).
+        game::wedding::take_keys(&mut player);
         // The client learns of pets that dried up meanwhile with the rest.
         net::packet::handle::world::pets_dry_up(&mut player, SystemTime::now());
         // Items that expired meanwhile are gone before the client sees them;
