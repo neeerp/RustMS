@@ -20,6 +20,7 @@ pub mod keymap;
 pub mod kite;
 pub mod maker;
 pub mod map;
+pub mod maple_tv;
 pub mod marriage;
 pub mod messaging;
 pub mod messenger;

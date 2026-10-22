@@ -283,7 +283,7 @@ A megaphone (507xxxx) is used through USE_CASH_ITEM (`0x4F`: Cash slot, item
 id, the megaphone's fields, tick), in `world/megaphone.rs`. The kind is the
 item id's thousands digit, as the v83 client reads it: 1 and 8 are plain
 megaphones, 2 super, 6 (and 5 with a last digit of 6 or more) item
-megaphones, 7 triple; 5 up to 5 is Maple TV, which isn't done. The fields
+megaphones, 7 triple; 5 up to 5 is Maple TV (below). The fields
 are the text and, but for the plain megaphone, the ear byte; the item
 megaphone adds whether an item is shown and then its inventory kind and
 slot, and the triple megaphone starts with its line count (1 to 3). Every
@@ -298,7 +298,7 @@ the rest, channel, ear) to the whole world, the speaker included. The client
 actor hands the line to the world directory (`WorldAction::Broadcast`), which
 knows every client's channel. One exclusive INVENTORY_OPERATION takes the
 megaphone first. Anything refused (too long, too low, an item that isn't
-there, Maple TV) gets only an empty stat change to unlock the client.
+there) gets only an empty stat change to unlock the client.
 
 HeavenClient shows each line in the chat log (`ServerMessageHandler`,
 `UIChatBar::send_megaphone`) as v83 draws it: plain megaphones in blue on a
@@ -373,6 +373,37 @@ with a small wobble, and out again after 10 s, when the next replaces it at
 once, or on 0x70. The line also goes to the chat log in its own colours, with the
 channel tag, as `<name> : <lines>`. A banner that arrives in the cash shop
 is dropped.
+
+#### Maple TV
+
+The Maple TV items (5075000 to 5075005: Messenger, Star Messenger, Heart
+Messenger, then the Megassenger of each) also come through USE_CASH_ITEM
+(`world/maple_tv.rs`). The last digit is the kind: the Messengers (0 and 3)
+start with a mode byte (3 with a receiver, 1 without), the Megassengers (3 to
+5) with the ear byte, all but the Stars name a receiver (the Hearts must),
+and five lines follow, the rows of the dialog's one wrapped box, at most 60
+bytes each here. A heart without a receiver or a line too long gets only the
+unlock; empty text is taken, as the v83 client sends it.
+
+The world directory shows one message at a time to the sender's channel, or
+to the world for a Megassenger with the ear ticked
+(`runtime/src/actor/maple_tv.rs`). A message naming a receiver goes first to
+the receiver's client actor (`ServerMessage::MapleTvPartner`), which adds the
+receiver's look; a receiver who isn't online is refused with TV_RESULT
+(`0x157`) 1, 2 ("You've entered the wrong user name."), the item kept. A
+message that would wait over an hour is refused with 1, 3. Otherwise the item
+goes at once and TV_RESULT 0 answers, and the message waits its turn.
+SEND_TV (`0x155`: flag 3 with the receiver's look, else 1; the screen, 0
+plain, 1 star, 2 heart; the sender's look; sender and receiver names; the five
+lines; the seconds the line takes to clear; the receiver's look) puts it up,
+and REMOVE_TV (`0x156`, empty) takes it down when its time is up: 30 s for
+the Star Megassenger, 60 s for the Heart Megassenger and 15 s for the rest.
+The client has no timer of its own, so these are Cosmic's. A player coming
+online sees the message up if it reaches them. The client shows those seconds
+only in its "This message will be sent to Maple TV in %d seconds." question.
+
+v83 draws the TV only in maps whose `info` sets `MapleTV` and its anchors,
+and no map in the v83 data does (report c056).
 
 ### Chalkboard
 

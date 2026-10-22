@@ -199,6 +199,12 @@ pub enum SendOpcode {
     KeyMap = 0x14F,
     AutoHpPot = 0x150,
     AutoMpPot = 0x151,
+    /// A Maple TV message (0x6371c1).
+    SendTv = 0x155,
+    /// Clear the Maple TV (0x6371ad).
+    RemoveTv = 0x156,
+    /// How sending a Maple TV message went (0x6373a0).
+    TvResult = 0x157,
     ViciousHammer = 0x162,
     VegaScroll = 0x166,
 }

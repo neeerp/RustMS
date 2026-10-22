@@ -29,6 +29,7 @@ mod load;
 pub mod login_world;
 pub mod loot;
 pub mod map_rules;
+pub mod maple_tv;
 pub mod medals;
 pub mod meso_explosion;
 pub mod mobs;

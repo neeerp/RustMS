@@ -16,8 +16,10 @@ use game::alliance::Alliance;
 use game::family::{FamilyBuff, Relatives};
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
+use net::maple_tv::MapleTv;
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
+use net::packet::build::world::maple_tv::TvRefusal;
 use net::packet::handle::world::{PartyPotion, Rock, Whereabouts};
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
@@ -239,6 +241,19 @@ pub enum ServerMessage {
     MorphedAnother {
         potion: PartyPotion,
         morphed: bool,
+    },
+    /// Someone's Maple TV message names this player: hand it back to the
+    /// world's line with this player's look.
+    MapleTvPartner {
+        tv: MapleTv,
+        reply: tokio::sync::oneshot::Sender<Result<(), TvRefusal>>,
+    },
+    /// The world put this player's Maple TV message in line, or didn't: use
+    /// up the item in Cash `slot`, or say why not.
+    MapleTvQueued {
+        slot: i16,
+        item_id: i32,
+        queued: Result<(), TvRefusal>,
     },
     /// `requester` (maybe this player) double-clicked this player; send them
     /// CHAR_INFO.
@@ -693,6 +708,14 @@ pub enum DirectoryMessage {
     AvatarBanner {
         banner: Packet,
         reply: tokio::sync::oneshot::Sender<bool>,
+    },
+    /// Put a Maple TV message in the TV's line. One naming a receiver goes
+    /// to them for their look (`partner`) first. `reply` says whether it
+    /// got in; dropped, the receiver wasn't found.
+    MapleTv {
+        tv: MapleTv,
+        partner: Option<AvatarLook>,
+        reply: tokio::sync::oneshot::Sender<Result<(), TvRefusal>>,
     },
     /// Someone searched for `item_id` with the Owl of Minerva.
     OwlSearched {

@@ -4,6 +4,7 @@ mod marriage;
 use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
+use crate::actor::maple_tv::{MapleTvLine, OnAir};
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
 use crate::actor::party_search::{PartySearches, Wanted};
@@ -11,11 +12,12 @@ use crate::message::{
     AllianceNews, ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage,
 };
 use game::alliance::Alliance;
-use game::Guild;
+use game::{AvatarLook, Guild};
 use game_data::server_content::keys;
 use net::conti::Portal;
 use net::dungeons::Refusal;
 use net::events::{self, Candidate, EventKind};
+use net::maple_tv::MapleTv;
 use net::owl::Searches;
 use net::packet::build::world::alliance;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
@@ -26,6 +28,7 @@ use net::packet::build::world::guild::{
     GuildError, InviteRefusal,
 };
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
+use net::packet::build::world::maple_tv::{build_remove_tv, build_send_tv, TvRefusal};
 use net::packet::build::world::messaging::{
     build_broadcast, build_find_result, build_whisper_result, Broadcast, FindLocation,
 };
@@ -41,7 +44,7 @@ use packet::Packet;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info, warn};
 
 /// How often messenger seats and guild members held through a channel
@@ -142,6 +145,7 @@ pub struct WorldDirectory {
     /// The wedding under way at each channel's venues.
     weddings: HashMap<(u8, game::wedding::Venue), marriage::Wedding>,
     avatar_banners: AvatarBanners,
+    maple_tv: MapleTvLine,
     /// Mini-dungeon copies taken, by channel and copy.
     dungeons: HashMap<(u8, i32), Run>,
     /// What the Owl of Minerva was asked to find.
@@ -169,6 +173,7 @@ impl WorldDirectory {
             next_event: 1,
             weddings: HashMap::new(),
             avatar_banners: AvatarBanners::default(),
+            maple_tv: MapleTvLine::default(),
             dungeons: HashMap::new(),
             owl_searches: Searches::default(),
         }
@@ -196,6 +201,7 @@ impl WorldDirectory {
                         self.show_everyone(banner);
                     }
                 }
+                _ = at(self.maple_tv.until()) => self.next_tv(Instant::now()),
             }
         }
     }
@@ -237,6 +243,9 @@ impl WorldDirectory {
                     Queued::Refused => false,
                 };
                 let _ = reply.send(queued);
+            }
+            DirectoryMessage::MapleTv { tv, partner, reply } => {
+                self.maple_tv(tv, partner, reply, Instant::now())
             }
             DirectoryMessage::OwlSearched { item_id } => self.owl_searches.record(item_id),
             DirectoryMessage::OwlPopular { reply } => {
@@ -763,6 +772,7 @@ impl WorldDirectory {
         }
         let out = self.messengers.connected(client_id, channel_id);
         self.deliver(out);
+        self.show_tv_to(client_id, Instant::now());
 
         // The guild already knows of a second login, or one from another
         // channel.
@@ -1019,6 +1029,82 @@ impl WorldDirectory {
             };
             if reached {
                 entry.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
+    /// Put a Maple TV message in line, once it has its receiver's look.
+    fn maple_tv(
+        &mut self,
+        tv: MapleTv,
+        partner: Option<AvatarLook>,
+        reply: oneshot::Sender<Result<(), TvRefusal>>,
+        now: Instant,
+    ) {
+        if let (Some(name), None) = (&tv.receiver, &partner) {
+            // The receiver's client adds the look and sends it back; if it
+            // has gone, the dropped reply says so.
+            match self.names.get(name).and_then(|id| self.clients.get(id)) {
+                Some(receiver) => {
+                    receiver
+                        .handle
+                        .send(ServerMessage::MapleTvPartner { tv, reply });
+                }
+                None => {
+                    let _ = reply.send(Err(TvRefusal::WrongName));
+                }
+            }
+            return;
+        }
+        let queued = self.maple_tv.queue(OnAir { tv, partner }, now);
+        let _ = reply.send(queued.map(|_| ()).map_err(|()| TvRefusal::LineTooLong));
+        if queued == Ok(true) {
+            self.show_tv(now);
+        }
+    }
+
+    /// The message up has had its time: clear it and show the next.
+    fn next_tv(&mut self, now: Instant) {
+        if let (Some(scope), _) = self.maple_tv.next(now) {
+            match build_remove_tv() {
+                Ok(packet) => self.broadcast(0, scope, packet),
+                Err(e) => warn!(error = %e, "Failed to build REMOVE_TV"),
+            }
+        }
+        self.show_tv(now);
+    }
+
+    /// The Maple TV packet of the message up, with the wait left in line.
+    fn tv_packet(&self, now: Instant) -> Option<(BroadcastScope, Packet)> {
+        let up = self.maple_tv.up()?;
+        let wait = self.maple_tv.wait(now).as_secs() as i32;
+        match build_send_tv(&up.tv, up.partner.as_ref(), wait) {
+            Ok(packet) => Some((up.tv.scope, packet)),
+            Err(e) => {
+                warn!(error = %e, "Failed to build SEND_TV");
+                None
+            }
+        }
+    }
+
+    fn show_tv(&self, now: Instant) {
+        if let Some((scope, packet)) = self.tv_packet(now) {
+            self.broadcast(0, scope, packet);
+        }
+    }
+
+    /// One who comes online sees the message up, if it reaches them.
+    fn show_tv_to(&self, client_id: ClientId, now: Instant) {
+        let Some(entry) = self.clients.get(&client_id) else {
+            return;
+        };
+        if let Some((scope, packet)) = self.tv_packet(now) {
+            let reached = match scope {
+                BroadcastScope::Channel(channel_id) => entry.channel_id == channel_id,
+                _ => true,
+            };
+            if reached {
+                entry.handle.send_packet(packet);
             }
         }
     }

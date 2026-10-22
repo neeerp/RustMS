@@ -54,9 +54,12 @@ use net::packet::build::world::field::{
     build_chalkboard, build_show_consume_effect, parse_movement_state,
 };
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
+use net::packet::build::world::maple_tv::TvRefusal;
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
-use net::packet::handle::world::{spend_avatar_megaphone, to_character, Rock, Whereabouts};
+use net::packet::handle::world::{
+    spend_avatar_megaphone, spend_maple_tv, to_character, Rock, Whereabouts,
+};
 use net::packet::op::RecvOpcode;
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
@@ -141,6 +144,9 @@ pub struct ClientActor {
     in_cash_shop: bool,
     /// Wrong coupon codes in a row on this connection.
     coupon_strikes: u8,
+    /// A Maple TV message is waiting to hear from the world's line; the
+    /// item goes only then, so another is refused meanwhile.
+    maple_tv_waiting: bool,
     /// The party the directory says the player is in; fields need it to
     /// share EXP.
     party_id: Option<i32>,
@@ -214,6 +220,7 @@ impl ClientActor {
             changing_channel: false,
             in_cash_shop: false,
             coupon_strikes: 0,
+            maple_tv_waiting: false,
             party_id: None,
             presence: None,
             door: None,
@@ -582,6 +589,34 @@ impl ClientActor {
                 let player = &mut self.in_game_mut()?.player;
                 let mut packet = spend_avatar_megaphone(player, slot, item_id, queued)?;
                 self.send(&mut packet).await?
+            }
+            WorldAction::MapleTv { slot, tv } => {
+                if self.maple_tv_waiting {
+                    let mut unlock = net::packet::build::world::stat::build_stat_update(true, &[])?;
+                    return self.send(&mut unlock).await;
+                }
+                self.maple_tv_waiting = true;
+                let item_id = tv.item_id;
+                let (reply, queued) = tokio::sync::oneshot::channel();
+                self.send_to_directory(DirectoryMessage::MapleTv {
+                    tv,
+                    partner: None,
+                    reply,
+                })
+                .await?;
+                // Waited for apart: the line may wait on the receiver's
+                // actor, which may be this one or be waiting on this one.
+                let me = self.handle();
+                tokio::spawn(async move {
+                    // A dropped reply: the receiver went before adding
+                    // their look.
+                    let queued = queued.await.unwrap_or(Err(TvRefusal::WrongName));
+                    me.send(ServerMessage::MapleTvQueued {
+                        slot,
+                        item_id,
+                        queued,
+                    });
+                });
             }
             WorldAction::Messenger(request) => {
                 self.send_to_directory(DirectoryMessage::Messenger {
@@ -1431,6 +1466,25 @@ impl ClientActor {
                     morphed: matches!(morphed, Ok(true)),
                 });
                 morphed?;
+            }
+            ServerMessage::MapleTvPartner { tv, reply } => {
+                // Not in game (yet): the dropped reply refuses it.
+                if let Ok(in_game) = self.in_game() {
+                    let partner = Some(in_game.player.look());
+                    self.send_to_directory(DirectoryMessage::MapleTv { tv, partner, reply })
+                        .await?;
+                }
+            }
+            ServerMessage::MapleTvQueued {
+                slot,
+                item_id,
+                queued,
+            } => {
+                self.maple_tv_waiting = false;
+                let player = &mut self.in_game_mut()?.player;
+                for mut packet in spend_maple_tv(player, slot, item_id, queued)? {
+                    self.send(&mut packet).await?;
+                }
             }
             ServerMessage::MorphedAnother { potion, morphed } => {
                 self.morphed_another(potion, morphed).await?

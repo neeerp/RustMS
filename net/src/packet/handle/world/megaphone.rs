@@ -358,12 +358,6 @@ mod tests {
             .end();
     }
 
-    #[test]
-    fn maple_tv_is_not_a_megaphone() {
-        let mut player = speaker(30, 5075000);
-        refused(&use_item(&mut player, 5075000, |_| {}));
-    }
-
     const AVATAR: i32 = 5_390_000;
 
     /// An avatar megaphone's four lines and ear, then a look the server

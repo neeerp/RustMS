@@ -1543,7 +1543,7 @@ fn decode_character_meta(cursor: &mut Cursor<&[u8]>) -> Result<CharacterMeta, St
 }
 
 /// Decode an avatar look, returning visible equipment by body slot.
-fn decode_look(cursor: &mut Cursor<&[u8]>) -> Result<BTreeMap<u8, i32>, String> {
+pub fn decode_look(cursor: &mut Cursor<&[u8]>) -> Result<BTreeMap<u8, i32>, String> {
     skip(cursor, 1 + 1 + 4 + 1 + 4)?; // gender, skin, face, megaphone flag, hair
     let mut visible = BTreeMap::new();
     for list in 0..2 {

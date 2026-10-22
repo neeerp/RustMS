@@ -13,6 +13,7 @@ pub mod field_summons;
 pub mod field_trades;
 pub mod guild_invites;
 pub mod login;
+pub mod maple_tv;
 pub mod messenger;
 pub mod object_ids;
 pub mod parties;
