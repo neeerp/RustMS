@@ -573,13 +573,10 @@ pub enum Happening {
     },
     /// The Balrog's ship sails off with every mob aboard.
     Retreat,
-    /// Put the reactor named `name` in `state`: the elevator's car leaving
-    /// or docking.
-    Reactor { name: &'static str, state: u8 },
 }
 
-/// Whether trips ever change anything on `map_id`. Without a ship, the
-/// platforms see nothing.
+/// Whether trips ever change anything on `map_id`. Without a ship or the
+/// elevator's car, the platforms see nothing.
 pub fn has_trips(map_id: i32) -> bool {
     ROUTES.into_iter().any(|route| {
         [route.waiting_room, route.deck].contains(&map_id)
@@ -591,6 +588,9 @@ pub fn has_trips(map_id: i32) -> bool {
 
 /// The state of the car's reactor on `map_id`, if it is a floor the
 /// elevator docks at: there while boarding for the way from it is open.
+/// The floor's field sets it from the clock on every reading rather than
+/// on each change, so a reading that spans both the car's arrival and its
+/// departure still leaves the right door.
 pub fn car_state(map_id: i32, t: i64) -> Option<(&'static str, u8)> {
     let route = ROUTES
         .into_iter()
@@ -626,20 +626,6 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
                 State::End if map_id == route.arrival_platform && route.ship => {
                     Happening::Show(Target::ArrivalPlatform, State::End)
                 }
-                State::Move if map_id == route.platform => match route.car {
-                    Some(name) => Happening::Reactor {
-                        name,
-                        state: CAR_AWAY,
-                    },
-                    None => continue,
-                },
-                State::End if map_id == route.arrival_platform => match route.car {
-                    Some(name) => Happening::Reactor {
-                        name,
-                        state: CAR_HERE,
-                    },
-                    None => continue,
-                },
                 _ => continue,
             };
             happenings.push(happening);
@@ -649,7 +635,8 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
 }
 
 /// What the Crimson Balrog's attacks do on `route`'s deck after route time
-/// `from` up to `to`, oldest first; at most the last trip's.
+/// `from` up to `to`, oldest first; at most the last trip's. Its routes
+/// leave on multiples of their term (`offset` 0).
 fn attacks(route: &Route, from: i64, to: i64) -> Vec<Happening> {
     let Some(at) = route.balrogs else {
         return Vec::new();
@@ -933,11 +920,12 @@ mod tests {
         assert_eq!(car(222020100, up + 30_000), Some(CAR_AWAY));
         assert_eq!(car(222020110, up), None);
 
-        let door = |state| Happening::Reactor {
-            name: "elevator",
-            state,
-        };
-        assert_eq!(happens(222020100, up), [door(CAR_AWAY)]);
+        // The floors see no change of their own (the field reads the car
+        // from the clock); the waiting rooms and cars move.
+        for at in [up, up + MINUTE, down, down + MINUTE] {
+            assert_eq!(happens(222020100, at), []);
+            assert_eq!(happens(222020200, at), []);
+        }
         assert_eq!(
             happens(222020110, up),
             [Happening::MoveAll {
@@ -952,9 +940,6 @@ mod tests {
                 portal: Portal::Id(0)
             }]
         );
-        assert_eq!(happens(222020200, up + MINUTE), [door(CAR_HERE)]);
-        assert_eq!(happens(222020200, down), [door(CAR_AWAY)]);
-        assert_eq!(happens(222020100, down + MINUTE), [door(CAR_HERE)]);
         assert_eq!(
             happens(222020211, down + MINUTE),
             [Happening::MoveAll {

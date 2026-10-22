@@ -1770,12 +1770,14 @@ impl FieldActor {
                     let left = self.mobs.leave_all(Instant::now());
                     self.show_left(left);
                 }
-                Happening::Reactor { name, state } => {
-                    for view in self.reactors.set_state(name, state) {
-                        if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
-                            self.broadcast(None, packet);
-                        }
-                    }
+            }
+        }
+        // The elevator's door, from the clock: shut as the car leaves,
+        // open as it docks.
+        if let Some((name, state)) = conti::car_state(self.key.map_id, now) {
+            for view in self.reactors.set_state(name, state) {
+                if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                    self.broadcast(None, packet);
                 }
             }
         }

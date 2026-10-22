@@ -109,11 +109,12 @@ down (`Timetable::offset`; Edelstein's Continent 4 and 5, Cosmic's
   (`portal.elevator.away`, sourced from Server.Scripts' `elevator.lua`).
 - Each floor has the reactor `elevator` (2208004): state 0 the car with its
   door open (`conti::CAR_HERE`), 1 the door shut (`CAR_AWAY`). `Route::car`
-  names it. At `Move` the departure floor's reactor goes to 1, at `End` the
-  arrival floor's to 0 (`Happening::Reactor`, HIT_REACTOR with delay 0 and
-  event 0, `ReactorSet::set_state`). A field that starts on a floor places
-  the car from the clock (`conti::car_state`). Its events are item events
-  (type 100), so nobody can hit it.
+  names it. A floor's field sets it from the clock (`conti::car_state`) when
+  it starts and on every trips reading, so it goes to 1 as the car leaves
+  (`Move`) and to 0 as it docks (the other way's `End`); a change is shown
+  with HIT_REACTOR, delay 0 and event 0 (`ReactorSet::set_state`). Reading
+  the state rather than the changes keeps the door right across a stalled
+  tick. Its events are item events (type 100), so nobody can hit it.
 - The waiting rooms and cars have no time limit and no NPC; their
   `forcedReturn` is the floor. Players walk out by `out00` or fall out.
 
@@ -132,8 +133,8 @@ to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
   - in the waiting room at `Move`, and on the deck and in the cabin at
     `End`, everyone is moved on (`ServerMessage::ShipWarp`);
   - on an Ellinia-Orbis deck, the Crimson Balrog's attack (below);
-  - on the Helios Tower's floors, the elevator's door shutting at `Move`
-    and opening at `End`.
+  - on the Helios Tower's floors, the elevator's door, set from the clock
+    on each reading (`conti::car_state`).
 - The client actor (`runtime/src/actor/client/ships.rs`) warps on
   `ShipWarp` only if the player is still on that map. A player in the Cash
   Shop stays where they are.
