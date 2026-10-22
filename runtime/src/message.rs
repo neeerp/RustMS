@@ -110,6 +110,9 @@ pub enum ServerMessage {
     /// The player's partner recorded the engagement; trade the ring box for
     /// its empty box.
     Engaged(game::marriage::MarriageRecord),
+    /// The player's partner broke off the couple `record`; forget it and
+    /// take back the token.
+    CoupleEnded(game::marriage::MarriageRecord),
     /// `junior` (named so) said yes to the player's request; add them.
     AddJunior {
         junior: ClientId,
@@ -728,6 +731,11 @@ pub enum DirectoryMessage {
     /// `from` is engaged to `proposer` now; tell `proposer`.
     Engaged {
         proposer: ClientId,
+        record: game::marriage::MarriageRecord,
+    },
+    /// The couple `record` is over; tell `partner`, who didn't break it off.
+    CoupleEnded {
+        partner: ClientId,
         record: game::marriage::MarriageRecord,
     },
     /// `from` went where they can't answer or be answered (the Cash Shop):

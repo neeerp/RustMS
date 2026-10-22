@@ -36,11 +36,21 @@ namespace ms
 
 		// MARRIAGE_RESULT's mode with the couple's record.
 		constexpr int8_t RESULT_ENGAGED = 11;
+		// The modes that end the couple, engaged or married; the client
+		// forgets the record.
+		constexpr int8_t RESULT_BROKEN = 13;
+		constexpr int8_t RESULT_DIVORCED = 14;
 		// The mode whose text the server sends.
 		constexpr int8_t RESULT_NOTICE = 36;
 
 		// The engagement ring boxes (224xxxx) a proposal is made with.
 		bool is_ring_box(int32_t item_id);
+		// The empty boxes and rings a couple holds (4031357 to 4031364), which
+		// the player drops to break off (0x4f33ee).
+		bool is_token(int32_t item_id);
+		// The question before a token goes: 0x10a3, or 0x10a4 for a couple
+		// whose record says married (0x4f3475).
+		const char* break_question(bool married);
 		// MARRIAGE_RESULT's text for a mode (0x75d9a1), or nullptr.
 		const char* result_text(int8_t mode);
 	}

@@ -37,6 +37,9 @@ namespace ms
 		if (mode == marriage::RESULT_ENGAGED)
 			Stage::get().get_player().set_marriage(MarriageRecord::read(recv));
 
+		if (mode == marriage::RESULT_BROKEN || mode == marriage::RESULT_DIVORCED)
+			Stage::get().get_player().set_marriage(std::nullopt);
+
 		if (mode == marriage::RESULT_NOTICE)
 		{
 			if (recv.read_bool())

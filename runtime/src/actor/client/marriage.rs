@@ -9,7 +9,8 @@ use game::{InventoryType, Player};
 use game_data::server_content::keys;
 use net::packet::build::world::inventory;
 use net::packet::build::world::marriage::{
-    build_engaged, build_marriage_notice, build_marriage_refusal, build_proposal,
+    build_couple_ended, build_engaged, build_marriage_notice, build_marriage_refusal,
+    build_proposal,
 };
 use net::{ClientId, RingRequest};
 use packet::Packet;
@@ -39,6 +40,7 @@ impl ClientActor {
                 })
                 .await
             }
+            RingRequest::Break { item_id } => self.break_off(item_id).await,
         }
     }
 
@@ -208,7 +210,8 @@ impl ClientActor {
     }
 
     /// Keep `next`, and show it unless the player is in the Cash Shop, which
-    /// shows the whole inventory again on the way out.
+    /// shows the whole inventory again on the way out. The couple's row is
+    /// already written, so the tokens are saved now too.
     async fn commit_engagement(
         &mut self,
         next: Player,
@@ -217,6 +220,76 @@ impl ClientActor {
         if self.commit_player(next, None, &mut packets).await? && !self.in_cash_shop {
             self.send_all(&mut packets).await?;
         }
-        Ok(())
+        self.save_if_dirty().await
     }
+
+    /// The player dropped the token `item_id` and said yes to breaking off
+    /// (report b054). The client keeps the token until told otherwise. A
+    /// token left from a couple already over just goes.
+    async fn break_off(&mut self, item_id: i32) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let player = &self.in_game()?.player;
+        if !marriage::is_token(item_id) || player.inventory.count(item_id) < 1 {
+            warn!(cid, item_id, "Breaking off without a token");
+            return Ok(());
+        }
+        let mut next = player.clone();
+        let mut packets = Vec::new();
+        if let Some(record) = player.marriage.clone() {
+            let id = record.id;
+            if !spawn_db(move || db::marriage::end(id)).await? {
+                warn!(cid, id, "The couple was over already");
+            }
+            next.marriage = None;
+            packets.push(build_couple_ended(&record)?);
+            let partner = if record.groom_id == cid {
+                record.bride_id
+            } else {
+                record.groom_id
+            };
+            self.send_to_directory(DirectoryMessage::CoupleEnded { partner, record })
+                .await?;
+        }
+        take_tokens(&mut next, &mut packets)?;
+        self.commit_engagement(next, packets).await
+    }
+
+    /// The partner broke off the couple `record`. A partner offline then
+    /// finds no record on their next login, and the token stays until they
+    /// drop it.
+    pub(super) async fn couple_ended(
+        &mut self,
+        record: MarriageRecord,
+    ) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        if player.marriage.as_ref().map(|own| own.id) != Some(record.id) {
+            return Ok(());
+        }
+        let mut next = player.clone();
+        next.marriage = None;
+        let mut packets = vec![build_couple_ended(&record)?];
+        take_tokens(&mut next, &mut packets)?;
+        self.commit_engagement(next, packets).await
+    }
+}
+
+/// Take every token the player holds, which mean nothing without a couple.
+fn take_tokens(player: &mut Player, packets: &mut Vec<Packet>) -> Result<(), RuntimeError> {
+    let mut changes = Vec::new();
+    for token in 4031357..=4031364 {
+        let count = player.inventory.count(token);
+        if count > 0 {
+            match player
+                .inventory
+                .remove(token, i16::try_from(count).unwrap_or(i16::MAX))
+            {
+                Ok(removed) => changes.extend(removed),
+                Err(error) => warn!(token, %error, "Failed to take a token"),
+            }
+        }
+    }
+    if !changes.is_empty() {
+        packets.push(inventory::build_inventory_operation(false, &changes)?);
+    }
+    Ok(())
 }

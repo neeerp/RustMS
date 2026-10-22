@@ -323,6 +323,8 @@ pub enum RingRequest {
     Cancel,
     /// Answer the proposal of the character with id `proposer`.
     Answer { proposer: ClientId, accept: bool },
+    /// Break off by dropping the token `item_id`.
+    Break { item_id: i32 },
 }
 
 /// A guild operation, carried out by the client's actor.

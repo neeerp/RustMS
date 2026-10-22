@@ -59,7 +59,7 @@ namespace ms
 				case 1112806:
 				case 1112807:
 				case 1112809:
-				case 3994597:
+				case 3994085:
 				case 4031373:
 				case 4031374:
 				case 4031375:

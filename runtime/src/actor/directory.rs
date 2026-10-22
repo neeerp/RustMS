@@ -336,6 +336,9 @@ impl WorldDirectory {
             }
             DirectoryMessage::Engaged { proposer, record } => self.engaged(proposer, record),
             DirectoryMessage::ForgetProposals { from } => self.forget_proposals(from),
+            DirectoryMessage::CoupleEnded { partner, record } => {
+                self.tell(partner, ServerMessage::CoupleEnded(record))
+            }
             DirectoryMessage::FamilyInvite { from, junior } => {
                 self.family_invite(from, junior, Instant::now())
             }

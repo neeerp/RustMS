@@ -73,6 +73,14 @@ void ring_boxes_and_result_texts()
 		require(marriage::result_text(mode) != nullptr, "every refusal has its text");
 
 	require(!marriage::result_text(17) && !marriage::result_text(31), "no text around them");
+	require(std::string(marriage::result_text(marriage::RESULT_BROKEN)) == "Your engagement has been broken.", "broken");
+	require(std::string(marriage::result_text(marriage::RESULT_DIVORCED)) == "You are no longer married.", "divorced");
+	require(marriage::result_text(32) != nullptr, "reserved");
+
+	require(marriage::is_token(4031357) && marriage::is_token(4031364), "the tokens");
+	require(!marriage::is_token(4031356) && !marriage::is_token(4031365), "not the tokens");
+	require(std::string(marriage::break_question(false)).rfind("Dropping this item", 0) == 0, "engaged question");
+	require(std::string(marriage::break_question(true)).rfind("You will not", 0) == 0, "married question");
 	require(!marriage::result_text(marriage::RESULT_NOTICE), "the server's own text");
 }
 

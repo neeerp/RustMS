@@ -98,6 +98,14 @@ pub fn engage(
     })?)
 }
 
+/// End the couple `id`; whether it was still there.
+pub fn end(id: i32) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    let deleted =
+        diesel::delete(marriages::table.filter(marriages::id.eq(id))).execute(&mut conn)?;
+    Ok(deleted > 0)
+}
+
 /// The one a proposal names: their id, gender, and any couple they are in.
 pub struct Partner {
     pub id: i32,
