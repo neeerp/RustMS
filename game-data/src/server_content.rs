@@ -332,15 +332,13 @@ pub mod keys {
     pub const MC_CASTLE_BLOCKED: &str = "portal.mc_castle.blocked";
     /// Gated portals of a004's section 3: the Temple of Time's lanes
     /// (`timeQuest`), Ereve's Training Forest (`enterDisguise0`), Magatia's
-    /// secret doors (`secretDoor`), Ariant's palace (`ariant_castle`), the
-    /// black witches' cave (`enterWitch`) and the Wedding Hall
-    /// (`TD_MC_enterboss1`).
+    /// secret doors (`secretDoor`), Ariant's palace (`ariant_castle`)
+    /// and the black witches' cave (`enterWitch`).
     pub const TIME_LANE_LOST: &str = "portal.time_lane.lost";
     pub const DISGUISE_NO_PERMIT: &str = "portal.disguise.no_permit";
     pub const SECRET_DOOR_LOCKED: &str = "portal.secret_door.locked";
     pub const ARIANT_PALACE_NO_PASS: &str = "portal.ariant_palace.no_pass";
     pub const WITCH_CAVE_CREEPY: &str = "portal.witch_cave.creepy";
-    pub const WEDDING_HALL_GUARDED: &str = "portal.wedding_hall.guarded";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1005,7 +1003,6 @@ mod tests {
             keys::SECRET_DOOR_LOCKED,
             keys::ARIANT_PALACE_NO_PASS,
             keys::WITCH_CAVE_CREEPY,
-            keys::WEDDING_HALL_GUARDED,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

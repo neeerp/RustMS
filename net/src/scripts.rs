@@ -73,10 +73,8 @@ const INVESTIGATION_PERMIT: i32 = 4032179;
 const STOLEN_EGG: i16 = 20404;
 const WITCH_CAVES: [(i16, i32); 2] = [(20407, 924010200), (20406, 924010100)];
 const WITCH_CAVE: i32 = 924010000;
-/// The Mushroom Castle's Wedding Hall entrance (`TD_MC_enterboss1`), past
-/// the Yeti brothers Stop the Wedding (2330) sends the player against.
+/// The Mushroom Castle's Wedding Hall entrance (`TD_MC_enterboss1`).
 const WEDDING_HALL_ENTRANCE: i32 = 106021401;
-const STOP_THE_WEDDING: i16 = 2330;
 /// Magatia's secret basement (`secretDoor`), from Zenumist's hallway or
 /// Alcadno's lab, once Verifying the Password (3360) is taken.
 const SECRET_BASEMENT_PATH: i32 = 261030000;
@@ -395,8 +393,8 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                     };
                     ScriptOutcome {
                         effects: vec![
-                            Effect::Pink(content::text().get(keys::TIME_LANE_LOST, &[])),
                             Effect::PortalSound,
+                            Effect::Pink(content::text().get(keys::TIME_LANE_LOST, &[])),
                             Effect::WarpToPortal(start, named(start, "in00")),
                         ],
                         block: false,
@@ -446,20 +444,9 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(cave, named(cave, "out00")))
         }
         "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
-        // Cosmic starts the fight with the Yeti brothers here while their
-        // quest is unfinished; that isn't in, so the way stays shut.
-        "TD_MC_enterboss1"
-            if quest(STOP_THE_WEDDING) == QuestState::Started
-                && player
-                    .quests
-                    .kills(STOP_THE_WEDDING)
-                    .iter()
-                    .filter(|&&n| n > 0)
-                    .count()
-                    < 3 =>
-        {
-            refused(keys::WEDDING_HALL_GUARDED)
-        }
+        // Cosmic starts the fight with the Yeti brothers here while Stop the
+        // Wedding (2330) is taken and they aren't all beaten; that isn't in,
+        // so the way is open to everyone rather than shut for good.
         "TD_MC_enterboss1" => through(Effect::WarpToPortal(
             WEDDING_HALL_ENTRANCE,
             named(WEDDING_HALL_ENTRANCE, "out00"),
@@ -786,7 +773,7 @@ mod tests {
                 Some((to, named(to, "out00")))
             );
             let lost = at(lane, &[(gate, QuestState::Started)]);
-            assert!(matches!(lost.effects[0], Effect::Pink(_)));
+            assert!(matches!(lost.effects[1], Effect::Pink(_)));
             let start = lane / 10000 * 10000;
             assert_eq!(
                 lost.effects.last(),
@@ -886,15 +873,13 @@ mod tests {
             assert_eq!(go("enterWitch", &with(quests, None)), Some((cave, 1)));
         }
 
-        // The Wedding Hall stays shut until the Yeti brothers are beaten.
-        let wedding = Some((WEDDING_HALL_ENTRANCE, 1));
-        assert_eq!(go("TD_MC_enterboss1", &fresh), wedding);
-        let mut hunting = player_with(&[(STOP_THE_WEDDING, QuestState::Started)]);
-        assert!(pink(&portal("TD_MC_enterboss1", &hunting).unwrap()));
-        *hunting.quests.kills_mut(STOP_THE_WEDDING).unwrap() = vec![1, 1, 0];
-        assert!(pink(&portal("TD_MC_enterboss1", &hunting).unwrap()));
-        *hunting.quests.kills_mut(STOP_THE_WEDDING).unwrap() = vec![1, 1, 1];
-        assert_eq!(go("TD_MC_enterboss1", &hunting), wedding);
+        assert_eq!(
+            go(
+                "TD_MC_enterboss1",
+                &player_with(&[(2330, QuestState::Started)])
+            ),
+            Some((WEDDING_HALL_ENTRANCE, 1))
+        );
 
         // Magatia's secret doors open to each lab's side of the basement.
         assert!(pink(&portal("secretDoor", &fresh).unwrap()));
