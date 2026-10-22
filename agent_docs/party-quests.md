@@ -232,6 +232,35 @@ weather item `5120016` with `hpq.moon.weather` (BLOW_WEATHER), which a
 player arriving meanwhile sees too. Each copy starts with its flowers and
 moon at state 0.
 
+## Henesys's Moon Bunny
+
+The Moon Bunny is a friendly mob (Mob.nx `damagedByMob`): players' attacks
+pass through it (`handle_attack` drops their hits), and only other mobs
+hurt it. Its client sends MOB_DAMAGE_MOB_FRIENDLY (recv 0xC0: attacker,
+character, victim) when a mob's body touches it, with no damage, so the
+server (`MobSet::friendly_hit`) rolls a tenth of a number under (maxHP / 13
++ PADamage * 10) * 2 + 500 (Cosmic's rule), for a mob that isn't friendly
+within 600 x 300 px, at most once a second per victim (the v83 client sends
+it once in 1.5 s; this only stops several clients doubling it). Everyone
+gets DAMAGE_MONSTER (0xF6) with the number, HP and max HP, which the client
+shows as the friendly's gauge. Every sixth hit tells the map
+`hpq.bunny.sick` (BROADCAST_MSG 6).
+
+Its `dropItemPeriod` (6, in tens of seconds) is a third as long for the
+bunny, so every 20 seconds it drops what the content pack's drops give mob
+`9300061` (a rice cake, `4001101`), without the quest items or the
+drops every mob shares (`loot::roll_friendly`), owned by the party of a player there, and the map
+hears `hpq.bunny.cake` with the count. 20 s is a recommended default in
+`v83ref/lanes/QUESTIONS.md` (row 180).
+
+When its HP runs out it goes home rather than dying (KILL_MONSTER 0, no
+drops, no EXP) and the map hears `hpq.bunny.gone`. In an event's copy, 5
+seconds later (shortened like events' time) everyone there gets a pink
+`hpq.bunny.lost` (BROADCAST_MSG 5) and their clients tell the event it
+failed (`ServerMessage::EventFailed`, `EventCommand::Fail`), which ends it
+and sends everyone to the way out, unless it is already won. Players'
+mists don't reach a friendly mob either.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -253,10 +282,9 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- HPQ's play: the Moon Bunny is still an ordinary mob, which players can
-  kill and other mobs can't hurt; mobs hurting the bunny (`damagedByMob`, recv 0xC0), its rice cakes,
-  Growlie's hand-in, Tory's reward, and Tommy's Pig Town bonus
-  (a058, slices 2-4).
+- HPQ's play: Growlie's hand-in of the rice cakes, Tory's reward, and
+  Tommy's Pig Town bonus (a058, slice 4). HeavenClient doesn't send 0xC0
+  or show a friendly's gauge yet (a061).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

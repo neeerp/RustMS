@@ -609,6 +609,9 @@ pub enum FieldRequest {
     MobDistance { object_id: i32, distance: i32 },
     /// A mob that bombs has a player in reach.
     MobBomb { object_id: i32 },
+    /// A mob touched a friendly mob (`damagedByMob`), which the server
+    /// hurts.
+    MobDamageMobFriendly { attacker: i32, victim: i32 },
     /// A mob's attack hurt another, a Dazzled one, for `damage`.
     MobDamageMob {
         attacker: i32,
@@ -941,6 +944,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (Op::MobBomb, InGame(&world::MobBombHandler)),
+            (
+                Op::MobDamageMobFriendly,
+                InGame(&world::MobDamageMobFriendlyHandler),
+            ),
             (Op::MobDamageMob, InGame(&world::MobDamageMobHandler)),
             (Op::NpcAction, InGame(&world::NpcActionHandler)),
             (

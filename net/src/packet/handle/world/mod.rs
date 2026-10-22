@@ -86,8 +86,8 @@ pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
 pub use self::combat::{
     absorbed, catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler,
-    MobBombHandler, MobDamageMobHandler, MobDistanceHandler, MoveLifeHandler, NpcActionHandler,
-    TakeDamageHandler,
+    MobBombHandler, MobDamageMobFriendlyHandler, MobDamageMobHandler, MobDistanceHandler,
+    MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;

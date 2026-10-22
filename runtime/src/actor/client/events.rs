@@ -159,6 +159,14 @@ impl ClientActor {
         self.leave_event().await
     }
 
+    /// The party lost what it protected in event `id`: the event ends,
+    /// which sends everyone out.
+    pub(super) async fn event_failed(&mut self, id: u32) {
+        if let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) {
+            ticket.command(EventCommand::Fail).await;
+        }
+    }
+
     /// Without a party there is no event: the player leaves it, unless it
     /// is already won (Cosmic `playerLeft`).
     pub(super) async fn left_party_in_event(&mut self) -> Result<(), RuntimeError> {

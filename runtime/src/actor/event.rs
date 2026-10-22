@@ -189,6 +189,7 @@ pub fn spawn(
         puzzles: Puzzles::default(),
         cleared: Arc::default(),
         directory: directory.clone(),
+        failed: false,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -236,6 +237,8 @@ struct EventActor {
     puzzles: Puzzles,
     cleared: Arc<Cleared>,
     directory: mpsc::Sender<DirectoryMessage>,
+    /// The party lost what it protected, which ends the event.
+    failed: bool,
 }
 
 impl EventActor {
@@ -266,6 +269,7 @@ impl EventActor {
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
+                        over = self.failed;
                     }
                     None => over = true,
                 },
@@ -335,6 +339,11 @@ impl EventActor {
                 self.win();
             }
             EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
+            EventCommand::Fail if self.ends.is_some() => {
+                info!(kind = ?self.kind, id = self.id, "Event failed");
+                self.failed = true;
+            }
+            EventCommand::Fail => {}
         }
     }
 

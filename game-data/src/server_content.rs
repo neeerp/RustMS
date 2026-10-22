@@ -348,6 +348,14 @@ pub mod keys {
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
     pub const HPQ_MOON_WEATHER: &str = "hpq.moon.weather";
+    /// Told as the Moon Bunny drops a rice cake, with the `count` so far.
+    pub const HPQ_BUNNY_CAKE: &str = "hpq.bunny.cake";
+    /// Told on every sixth hit mobs land on the Moon Bunny.
+    pub const HPQ_BUNNY_SICK: &str = "hpq.bunny.sick";
+    /// Told as the Moon Bunny, out of HP, goes home.
+    pub const HPQ_BUNNY_GONE: &str = "hpq.bunny.gone";
+    /// Told (in pink) as the party is sent off for losing the Moon Bunny.
+    pub const HPQ_BUNNY_LOST: &str = "hpq.bunny.lost";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -1100,6 +1108,10 @@ mod tests {
             keys::HPQ_TOMMY_HOME,
             keys::HPQ_MOON_BUNNY_OUT,
             keys::HPQ_MOON_WEATHER,
+            keys::HPQ_BUNNY_CAKE,
+            keys::HPQ_BUNNY_SICK,
+            keys::HPQ_BUNNY_GONE,
+            keys::HPQ_BUNNY_LOST,
             keys::KPQ_CLOTO_Q1,
             keys::KPQ_CLOTO_Q2,
             keys::KPQ_CLOTO_Q3,
