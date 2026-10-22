@@ -124,6 +124,21 @@ impl ReactorSet {
         spawned
     }
 
+    /// Put every reactor named `name` in `state`, as a script does (the
+    /// elevator's car leaving or docking); returns the views of those that
+    /// changed. It goes through no event, so nothing breaks.
+    pub fn set_state(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
+        let spots = &self.spots;
+        self.live
+            .values_mut()
+            .filter(|reactor| spots[reactor.spot].template.name == name && reactor.state != state)
+            .map(|reactor| {
+                reactor.state = state;
+                reactor.view()
+            })
+            .collect()
+    }
+
     /// A player at `from` swung at `object_id`; `flags` are the client's
     /// (bit 0 facing left, bit 1 on a foothold). `None` if it is gone, out
     /// of reach, or no event fits.
@@ -216,6 +231,28 @@ mod tests {
         assert_eq!(respawned.len(), 1);
         assert_ne!(respawned[0], id);
         assert_eq!(reactors.get(respawned[0]).unwrap().state, 0);
+    }
+
+    #[test]
+    fn a_script_sets_the_state_of_the_reactors_it_names() {
+        let (mut template, data) = scrap_box(-156, 0);
+        template.name = "elevator".into();
+        let mut reactors = ReactorSet::new(
+            [template.clone(), scrap_box(610, 90).0]
+                .into_iter()
+                .map(|template| (template, data.clone())),
+        );
+        let now = Instant::now();
+        let [car, other] = reactors.respawn(now)[..] else {
+            panic!("two reactors");
+        };
+        let changed = reactors.set_state("elevator", 1);
+        assert_eq!(changed.len(), 1);
+        assert_eq!((changed[0].object_id, changed[0].state), (car, 1));
+        assert_eq!(reactors.get(other).unwrap().state, 0);
+        assert!(reactors.set_state("elevator", 1).is_empty());
+        assert!(reactors.set_state("nothing", 3).is_empty());
+        assert_eq!(reactors.set_state("elevator", 0)[0].state, 0);
     }
 
     #[test]

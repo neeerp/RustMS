@@ -1162,6 +1162,10 @@ broken.
 The server ignores skill swings (kind 1); only guild quest reactors take
 them.
 
+Server logic can also set a reactor's state by its map name
+(`ReactorSet::set_state`, shown with HIT_REACTOR): the Helios Tower
+elevator's car docking and leaving (`ships.md`).
+
 Reactor drops come from the content pack's table, keyed by reactor id, plus
 `[reactors]` in `reward_overrides.toml`; see `server-content.md`. Reactor
 `action` scripts (`mBoxItem0` and others) are not run.

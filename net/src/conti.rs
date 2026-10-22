@@ -48,7 +48,7 @@ pub enum Target {
 /// When a route's ships sail, in minutes.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Timetable {
-    /// Between departures; one leaves on the hour.
+    /// Between departures; one leaves `offset` after the hour.
     pub term: i64,
     /// Boarding opens this long before a departure...
     pub wait: i64,
@@ -56,6 +56,9 @@ pub struct Timetable {
     pub closed: i64,
     /// From departure to arrival.
     pub ride: i64,
+    /// How long after the hour a departure is: 0 but for the Helios
+    /// Tower elevator's way up.
+    pub offset: i64,
 }
 
 /// A portal riders are put at: by name, the first of that name (none
@@ -83,13 +86,16 @@ pub struct Route {
     pub arrival: (i32, Portal),
     /// Where the ship docks at the other end.
     pub arrival_platform: i32,
-    /// The ticket the platform takes.
+    /// The ticket the platform takes; 0 for the elevator, which is free.
     pub ticket: i32,
     pub price: i32,
     pub timetable: Timetable,
     /// Whether the platforms show a ship docking and leaving. The subway's
     /// maps have none (no `shipObj`), so they get no CONTI packets.
     pub ship: bool,
+    /// The name of the platforms' reactor that shows the car docked or
+    /// gone, for the Helios Tower elevator.
+    pub car: Option<&'static str>,
 }
 
 /// Ellinia and Orbis: one leaves each way every 15 minutes and sails for
@@ -100,6 +106,7 @@ const ELLINIA_ORBIS: Timetable = Timetable {
     wait: 5,
     closed: 1,
     ride: 10,
+    offset: 0,
 };
 
 pub const TO_ORBIS: Route = Route {
@@ -114,6 +121,7 @@ pub const TO_ORBIS: Route = Route {
     price: 5000,
     timetable: ELLINIA_ORBIS,
     ship: true,
+    car: None,
 };
 
 pub const TO_ELLINIA: Route = Route {
@@ -128,6 +136,7 @@ pub const TO_ELLINIA: Route = Route {
     price: 5000,
     timetable: ELLINIA_ORBIS,
     ship: true,
+    car: None,
 };
 
 /// Orbis and Ludibrium, Leafre and Ariant: one leaves each way every 10
@@ -138,6 +147,7 @@ const ORBIS_BOATS: Timetable = Timetable {
     wait: 5,
     closed: 1,
     ride: 5,
+    offset: 0,
 };
 
 pub const TO_LUDIBRIUM: Route = Route {
@@ -152,6 +162,7 @@ pub const TO_LUDIBRIUM: Route = Route {
     price: 6000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 /// Riders land on Orbis's `ludi00`, the spawn point named for this train (an
@@ -169,6 +180,7 @@ pub const LUDIBRIUM_TO_ORBIS: Route = Route {
     price: 6000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 pub const TO_LEAFRE: Route = Route {
@@ -183,6 +195,7 @@ pub const TO_LEAFRE: Route = Route {
     price: 30000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 pub const LEAFRE_TO_ORBIS: Route = Route {
@@ -197,6 +210,7 @@ pub const LEAFRE_TO_ORBIS: Route = Route {
     price: 30000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 /// Ariant's platform is also the town's entrance. Both its spawn points are
@@ -214,6 +228,7 @@ pub const TO_ARIANT: Route = Route {
     price: 6000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 pub const ARIANT_TO_ORBIS: Route = Route {
@@ -228,6 +243,7 @@ pub const ARIANT_TO_ORBIS: Route = Route {
     price: 6000,
     timetable: ORBIS_BOATS,
     ship: true,
+    car: None,
 };
 
 /// The subway between Kerning City and New Leaf City: one leaves each way
@@ -238,6 +254,7 @@ const SUBWAY: Timetable = Timetable {
     wait: 4,
     closed: 1,
     ride: 1,
+    offset: 0,
 };
 
 /// The fare is Cosmic's.
@@ -253,6 +270,7 @@ pub const TO_NLC: Route = Route {
     price: 5000,
     timetable: SUBWAY,
     ship: false,
+    car: None,
 };
 
 pub const TO_KERNING_CITY: Route = Route {
@@ -267,6 +285,7 @@ pub const TO_KERNING_CITY: Route = Route {
     price: 5000,
     timetable: SUBWAY,
     ship: false,
+    car: None,
 };
 
 /// Kerning City and Changi: one plane leaves each way every 6 minutes and
@@ -276,6 +295,7 @@ const PLANE: Timetable = Timetable {
     wait: 5,
     closed: 1,
     ride: 1,
+    offset: 0,
 };
 
 /// The fare is Cosmic's.
@@ -291,6 +311,7 @@ pub const TO_CHANGI: Route = Route {
     price: 5000,
     timetable: PLANE,
     ship: false,
+    car: None,
 };
 
 /// Kerning City's spawn points are all `sp`; riders land on the one by
@@ -307,9 +328,64 @@ pub const AIR_TO_KERNING_CITY: Route = Route {
     price: 5000,
     timetable: PLANE,
     ship: false,
+    car: None,
 };
 
-const ROUTES: [&Route; 12] = [
+/// The Helios Tower elevator in Ludibrium, between the 2nd floor and the
+/// 99th: the car docks on a floor for a minute, rides for one, and docks
+/// on the other floor two minutes after it left (Edelstein's Continent 4
+/// and 5: term 4, wait 1, ride 1, the way up 2 behind; Cosmic's
+/// Elevator.js). It is free; riders board through the floor's `in00`.
+const ELEVATOR_DOWN_TIMES: Timetable = Timetable {
+    term: 4,
+    wait: 1,
+    closed: 0,
+    ride: 1,
+    offset: 0,
+};
+
+const ELEVATOR_UP_TIMES: Timetable = Timetable {
+    offset: 2,
+    ..ELEVATOR_DOWN_TIMES
+};
+
+/// The elevator's reactor (2208004) on both floors: state 0 is the car
+/// with its door open, 1 the door shut (Reactor.nx).
+pub const CAR_HERE: u8 = 0;
+pub const CAR_AWAY: u8 = 1;
+
+/// Riders land on the 99th floor's first spawn point (Cosmic).
+pub const ELEVATOR_UP: Route = Route {
+    platform: 222020100,
+    waiting_room: 222020110,
+    deck: 222020111,
+    cabin: None,
+    balrogs: None,
+    arrival: (222020200, Portal::Id(0)),
+    arrival_platform: 222020200,
+    ticket: 0,
+    price: 0,
+    timetable: ELEVATOR_UP_TIMES,
+    ship: false,
+    car: Some("elevator"),
+};
+
+pub const ELEVATOR_DOWN: Route = Route {
+    platform: 222020200,
+    waiting_room: 222020210,
+    deck: 222020211,
+    cabin: None,
+    balrogs: None,
+    arrival: (222020100, Portal::Named("st00")),
+    arrival_platform: 222020100,
+    ticket: 0,
+    price: 0,
+    timetable: ELEVATOR_DOWN_TIMES,
+    ship: false,
+    car: Some("elevator"),
+};
+
+const ROUTES: [&Route; 14] = [
     &TO_ORBIS,
     &TO_ELLINIA,
     &TO_LUDIBRIUM,
@@ -322,6 +398,8 @@ const ROUTES: [&Route; 12] = [
     &TO_KERNING_CITY,
     &TO_CHANGI,
     &AIR_TO_KERNING_CITY,
+    &ELEVATOR_UP,
+    &ELEVATOR_DOWN,
 ];
 
 const MINUTE: i64 = 60_000;
@@ -329,7 +407,7 @@ const MINUTE: i64 = 60_000;
 impl Timetable {
     /// The state at route time `t`.
     pub fn state(&self, t: i64) -> State {
-        let since_departure = t.rem_euclid(self.term * MINUTE);
+        let since_departure = (t - self.offset * MINUTE).rem_euclid(self.term * MINUTE);
         if since_departure < self.ride * MINUTE {
             State::Move
         } else if since_departure < (self.term - self.wait) * MINUTE {
@@ -345,6 +423,7 @@ impl Timetable {
     /// many trips passed, oldest first.
     pub fn changes(&self, from: i64, to: i64) -> Vec<State> {
         let term = self.term * MINUTE;
+        let (from, to) = (from - self.offset * MINUTE, to - self.offset * MINUTE);
         // Each change happens at its offset from a departure.
         let at = [
             (State::Start, -self.closed * MINUTE),
@@ -470,7 +549,8 @@ pub fn ship_state(map_id: i32, t: i64) -> Option<(State, bool)> {
         route.ship && [route.platform, route.arrival_platform, route.deck].contains(&map_id)
     })?;
     let state = route.timetable.state(t);
-    let departure = t - t.rem_euclid(route.timetable.term * MINUTE);
+    let timetable = &route.timetable;
+    let departure = t - (t - timetable.offset * MINUTE).rem_euclid(timetable.term * MINUTE);
     let alongside = map_id == route.deck
         && route.balrogs.is_some()
         && state == State::Move
@@ -493,6 +573,9 @@ pub enum Happening {
     },
     /// The Balrog's ship sails off with every mob aboard.
     Retreat,
+    /// Put the reactor named `name` in `state`: the elevator's car leaving
+    /// or docking.
+    Reactor { name: &'static str, state: u8 },
 }
 
 /// Whether trips ever change anything on `map_id`. Without a ship, the
@@ -501,8 +584,22 @@ pub fn has_trips(map_id: i32) -> bool {
     ROUTES.into_iter().any(|route| {
         [route.waiting_room, route.deck].contains(&map_id)
             || route.cabin == Some(map_id)
-            || route.ship && [route.platform, route.arrival_platform].contains(&map_id)
+            || (route.ship || route.car.is_some())
+                && [route.platform, route.arrival_platform].contains(&map_id)
     })
+}
+
+/// The state of the car's reactor on `map_id`, if it is a floor the
+/// elevator docks at: there while boarding for the way from it is open.
+pub fn car_state(map_id: i32, t: i64) -> Option<(&'static str, u8)> {
+    let route = ROUTES
+        .into_iter()
+        .find(|route| route.platform == map_id && route.car.is_some())?;
+    let state = match route.timetable.state(t) {
+        State::Wait => CAR_HERE,
+        _ => CAR_AWAY,
+    };
+    Some((route.car?, state))
 }
 
 /// What `map_id` does for the trips that changed after route time `from`
@@ -529,6 +626,20 @@ pub fn happenings(map_id: i32, from: i64, to: i64) -> Vec<Happening> {
                 State::End if map_id == route.arrival_platform && route.ship => {
                     Happening::Show(Target::ArrivalPlatform, State::End)
                 }
+                State::Move if map_id == route.platform => match route.car {
+                    Some(name) => Happening::Reactor {
+                        name,
+                        state: CAR_AWAY,
+                    },
+                    None => continue,
+                },
+                State::End if map_id == route.arrival_platform => match route.car {
+                    Some(name) => Happening::Reactor {
+                        name,
+                        state: CAR_HERE,
+                    },
+                    None => continue,
+                },
                 _ => continue,
             };
             happenings.push(happening);
@@ -792,6 +903,67 @@ mod tests {
             assert_eq!(happens(station, departure + MINUTE), []);
             assert_eq!(ship_state(station, departure), None);
         }
+    }
+
+    #[test]
+    fn the_helios_elevator_docks_a_minute_on_each_floor_in_turn() {
+        // The car leaves the 99th floor on the hour and the 2nd floor two
+        // minutes later.
+        let down = 9 * HOUR + 8 * MINUTE;
+        let up = down + 2 * MINUTE;
+        let happens = |map_id, at: i64| happenings(map_id, at - 50, at + 50);
+        let car = |map_id, at| car_state(map_id, at).map(|(_, state)| state);
+        for minute in 0..4 {
+            let at = down + minute * MINUTE + 30_000;
+            // On one floor or the other, never both, boarding only there.
+            let floors = [car(222020100, at), car(222020200, at)];
+            assert!(
+                floors == [Some(CAR_HERE), Some(CAR_AWAY)]
+                    || floors == [Some(CAR_AWAY), Some(CAR_HERE)]
+                    || floors == [Some(CAR_AWAY), Some(CAR_AWAY)],
+                "minute {minute}: {floors:?}"
+            );
+            assert_eq!(
+                ELEVATOR_UP.timetable.state(at) == State::Wait,
+                floors[0] == Some(CAR_HERE)
+            );
+        }
+        assert_eq!(car(222020100, up - 30_000), Some(CAR_HERE));
+        assert_eq!(car(222020200, down - 30_000), Some(CAR_HERE));
+        assert_eq!(car(222020100, up + 30_000), Some(CAR_AWAY));
+        assert_eq!(car(222020110, up), None);
+
+        let door = |state| Happening::Reactor {
+            name: "elevator",
+            state,
+        };
+        assert_eq!(happens(222020100, up), [door(CAR_AWAY)]);
+        assert_eq!(
+            happens(222020110, up),
+            [Happening::MoveAll {
+                map_id: 222020111,
+                portal: Portal::Named("")
+            }]
+        );
+        assert_eq!(
+            happens(222020111, up + MINUTE),
+            [Happening::MoveAll {
+                map_id: 222020200,
+                portal: Portal::Id(0)
+            }]
+        );
+        assert_eq!(happens(222020200, up + MINUTE), [door(CAR_HERE)]);
+        assert_eq!(happens(222020200, down), [door(CAR_AWAY)]);
+        assert_eq!(happens(222020100, down + MINUTE), [door(CAR_HERE)]);
+        assert_eq!(
+            happens(222020211, down + MINUTE),
+            [Happening::MoveAll {
+                map_id: 222020100,
+                portal: Portal::Named("st00")
+            }]
+        );
+        assert!(has_trips(222020100) && has_trips(222020211));
+        assert_eq!(ship_state(222020100, up), None);
     }
 
     #[test]

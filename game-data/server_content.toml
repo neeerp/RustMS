@@ -1260,3 +1260,8 @@ source = "Server.NX/src/NpcShop.img"
 source = "Edelstein.lua/src/td_mushcastle/TD_MC_first.lua"
 template = "{s0}"
 sha256 = "6a0b4a048c118e1c2fb6afb5fc4f0d52349ba38a2bd5e007586cec02df40cbab"
+
+[text."portal.elevator.away"]
+source = "Server.Scripts/src/elevator.lua"
+template = "{s2}"
+sha256 = "003d13235046bf505da5f866a9de7e83fd15cede3d64b433ae4732e921025ea5"
