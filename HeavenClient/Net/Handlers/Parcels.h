@@ -118,6 +118,75 @@ namespace ms::parcels
 		return "Will expire soon";
 	}
 
+	// Equipment, throwing stars and bullets go whole: v83 asks no count for
+	// them, and shows none (FUN_004284be).
+	inline bool single(int32_t item_id)
+	{
+		int32_t kind = item_id / 10000;
+
+		return item_id / 1000000 == 1 || kind == 207 || kind == 233;
+	}
+
+	// A normal send's fee on top of its tax.
+	constexpr int32_t SEND_FEE = 5000;
+	// No send takes more mesos.
+	constexpr int32_t MOST_MESOS = 100000000;
+	// Players of this level or under may send at most a million.
+	constexpr int16_t LOW_LEVEL = 15;
+	constexpr int32_t LOW_LEVEL_MESOS = 1000000;
+
+	// The tax on the mesos sent (FUN_006eedfe), in v83's doubles, which put
+	// some 1.8% amounts one below the server's.
+	inline int32_t tax(int32_t meso)
+	{
+		double rate = meso >= 100000000 ? 0.06
+			: meso >= 25000000 ? 0.05
+			: meso >= 10000000 ? 0.04
+			: meso >= 5000000 ? 0.03
+			: meso >= 1000000 ? 0.018
+			: meso >= 100000 ? 0.008
+			: 0.0;
+
+		return static_cast<int32_t>(meso * rate);
+	}
+
+	// The most the mesos prompt offers out of `left`, the purse less a
+	// normal send's fee (FUN_006f3875, FUN_006f20a5). v83 takes off its
+	// tax roughly: the first of these rates whose result lands in its
+	// range, or nothing.
+	inline int32_t most_mesos(int32_t left)
+	{
+		struct Tier
+		{
+			double rate;
+			double low;
+			double high;
+		};
+
+		constexpr Tier tiers[] = {
+			{ 0.9615384615384615, 1e7, 1e300 },
+			{ 0.970873786407767, 5e6, 1e7 },
+			{ 0.9803921568627451, 1e6, 5e6 },
+			{ 0.9900990099009901, 1e5, 1e6 },
+			{ 0.9950248756218907, 5e4, 1e5 }
+		};
+
+		int32_t most = left;
+
+		for (const Tier& tier : tiers)
+		{
+			double kept = left * tier.rate;
+
+			if (kept >= tier.low && kept < tier.high)
+			{
+				most = static_cast<int32_t>(kept);
+				break;
+			}
+		}
+
+		return most < MOST_MESOS ? most : MOST_MESOS;
+	}
+
 	// What a result code says (FUN_006f5be2), with UIOk's line breaks; some
 	// say nothing.
 	inline std::optional<std::string> result_text(uint8_t mode)

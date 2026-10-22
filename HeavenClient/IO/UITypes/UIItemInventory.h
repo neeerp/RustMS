@@ -143,6 +143,8 @@ namespace ms
 
 			void drop_on_megaphone() const override;
 
+			void drop_on_duey() const override;
+
 			void drop_on_potion(bool mp) const override;
 
 			std::pair<InventoryType::Id, int16_t> get_source() const override;

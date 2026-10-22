@@ -146,6 +146,15 @@ namespace ms
 			return nullptr;
 		}
 
+		// Whether Duey takes an item to send (FUN_004f483e), once it isn't
+		// sealed: Karma lets a quest or untradeable item go, but nothing with
+		// an expiry.
+		inline bool sendable(const Traits &item)
+		{
+			return !item.cash && !item.expires && !item.pquest && !item.account && (!item.quest || item.karma)
+				&& (!item.untradeable || item.karma);
+		}
+
 		// Whether the storage keeper lists an item to store (FUN_007c6e3a).
 		// Account items are what storage is for, and Karma lets the rest in.
 		inline bool storable(const Traits &item)

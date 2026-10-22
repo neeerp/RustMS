@@ -83,6 +83,7 @@ impl ClientActor {
                 self.duey = None;
                 Ok(())
             }
+            // Duey's own window has a quick tab too; a coupon's only that.
             DueyRequest::Send {
                 kind,
                 slot,
@@ -90,11 +91,10 @@ impl ClientActor {
                 mesos,
                 to,
                 quick,
-            } if window
-                == Some(match quick {
-                    Some(_) => DueyWindow::QuickSend,
-                    None => DueyWindow::Parcels,
-                }) =>
+            } if matches!(
+                (window, &quick),
+                (Some(DueyWindow::Parcels), _) | (Some(DueyWindow::QuickSend), Some(_))
+            ) =>
             {
                 self.send_parcel(kind, slot, quantity, mesos, to, quick)
                     .await

@@ -915,7 +915,8 @@ DUEY_ACTION (`0x41`) starts with an op byte:
 - **Open** (0): from the notifier of a quick delivery. It opens a
   receive-only window. Talking to Duey opens his own, which sends too.
 - **Send** (2: bag, slot, quantity, mesos, receiver, quick; if quick, a
-  message and the coupon's slot): needs the window the send came from. A
+  message and the coupon's slot): needs Duey's own window, which has both
+  send tabs, or for a quick send the coupon's window. A
   normal send costs 5000 plus a tax on the mesos (`net::duey::tax`: nothing
   below 100,000, then 0.8% rising to 6%). A quick send uses up a Quick
   Delivery Coupon (5330000) found in the Cash bag instead of the 5000. Its
@@ -969,9 +970,27 @@ shows over v83's box, 16 above the icon. RECEIVE refuses a parcel still
 being delivered, and DELETE asks first; either waits for the answer before
 another request. Each expired parcel gets its own notice, one after
 another. The close button and Esc send op 7. A map change drops the window
-without telling the server, as v83 does. Not done yet: the tab strip
-(`Basic.img/Tab2` at (6,23)), the send panels, the notifier and the coupon's
-quick send.
+without telling the server, as v83 does.
+
+Duey's own window has three tabs (`Basic.img/Tab2` pieces at (6,23), as wide
+as their `Delivery/Tab` labels): PA STORAGE, SEND PA and QUICK DELIVERY
+(report b032). With nothing waiting it opens on SEND PA. A send panel takes
+an item dropped from the inventory (`Icon::drop_on_duey`): a sealed item or
+one that can't go (`item_drop::sendable`) gets a notice, stars, bullets and
+equipment go whole, and other stacks ask how many. Clicking the item asks
+before taking it back. Clicking the mesos asks how many, up to
+`parcels::most_mesos` (what the purse less 5000 covers with the tax, at most
+100,000,000); the normal panel refuses a purse of 5000 or less, and a
+character of level 15 or below gets the `0x11` notice over 1,000,000. The
+mesos show in the shop's price colours. The fee table below the panel folds
+with the arrow button (BtMax2 while it's open, BtMin2 while folded), and a
+folded panel lets clicks through below it. SEND asks to confirm the fee
+(5000 plus `parcels::tax`, by v83's doubles, so a mesos amount may show one
+less than the server takes). The quick panel needs a Quick Delivery Coupon
+and a message of up to 100 letters, filtered as chat is, and cuts the item's
+name to fit. Return sends from SEND PA. While a send waits for its answer,
+the buttons, fields and tabs are off; `0x12` empties both panels. Not done
+yet: the notifier and the coupon's window.
 
 ## Trading
 

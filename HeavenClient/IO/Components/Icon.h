@@ -69,6 +69,9 @@ namespace ms
 			// Shows the icon's item in the item megaphone's window.
 			virtual void drop_on_megaphone() const {}
 
+			// Puts the icon's item in the open panel of Duey's window.
+			virtual void drop_on_duey() const {}
+
 			// Puts the icon's item beside the first pet's HP or MP pouch.
 			virtual void drop_on_potion(bool mp) const {}
 
@@ -123,6 +126,7 @@ namespace ms
 		void drop_on_trade(int8_t slot) const;
 		void drop_on_shop() const;
 		void drop_on_megaphone() const;
+		void drop_on_duey() const;
 		void drop_on_potion(bool mp) const;
 		std::pair<InventoryType::Id, int16_t> get_source() const;
 		InventoryType::Id get_return_tab() const;

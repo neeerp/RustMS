@@ -102,6 +102,25 @@ int main()
 		Parcel ann = read(padded);
 		require(ann.sender == "Ann" && ann.message && *ann.message == "hi", "a fixed string ends at its NUL");
 
+		// Equips, stars and bullets go whole.
+		require(single(1302000) && single(2070000) && single(2330000), "equips and rechargeables go whole");
+		require(!single(2000000) && !single(4000000) && !single(2080000), "other stacks are counted");
+
+		// The tax, by v83's doubles.
+		require(tax(99999) == 0, "nothing under 100,000");
+		require(tax(100000) == 800 && tax(999999) == 7999, "0.8% under a million");
+		require(tax(1000000) == 18000, "1.8% from a million");
+		require(tax(1337500) == 24074, "where the double falls short, one below the exact 24075");
+		require(tax(5000000) == 150000 && tax(10000000) == 400000, "3% and 4%");
+		require(tax(25000000) == 1250000 && tax(100000000) == 6000000, "5% and 6%");
+
+		// The mesos prompt's ceiling.
+		require(most_mesos(40000) == 40000, "small purses keep everything");
+		require(most_mesos(100000) == 99502, "100,000 less half a percent");
+		require(most_mesos(1000000) == 990099, "a million less 1%");
+		require(most_mesos(110000000) == 100000000, "capped at 100 million");
+		require(most_mesos(100000000) == 96153846, "100 million less 4%, all v83 takes");
+
 		require(result_text(0x12) && *result_text(0x12) == "The package has been successfully sent.", "sent");
 		require(result_text(0x1c) == result_text(0x13), "0x1c is the unknown error too");
 		require(!result_text(0x09) && !result_text(0x14), "some codes say nothing");

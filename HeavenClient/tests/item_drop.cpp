@@ -80,6 +80,16 @@ int main()
 		cash.karma = true;
 		require(!storable(cash), "nor cash items");
 
+		require(sendable(plain) && sendable(karma), "Duey takes what may trade, Karma included");
+		require(!sendable(quest) && !sendable(bound) && !sendable(cash) && !sendable(pquest),
+			"but not quest, untradeable, cash or party quest items");
+		Traits shared;
+		shared.account = true;
+		Traits expiring;
+		expiring.expires = true;
+		expiring.karma = true;
+		require(!sendable(shared) && !sendable(expiring), "nor account items, nor anything that expires");
+
 		require(asks_count(4000000, 10), "a stack of Snail Shells asks how many");
 		require(asks_count(2000000, 20), "a stack of potions asks how many");
 		require(asks_count(3010000, 2), "a stack of chairs asks how many");
