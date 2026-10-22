@@ -150,9 +150,11 @@ impl ClientActor {
                 Effect::CreateAlliance { .. }
                 | Effect::GrowAlliance { .. }
                 | Effect::DisbandAlliance => alliance = Some(effect.clone()),
-                Effect::BookWedding { .. } | Effect::ExtraInvitations { .. } => {
-                    wedding = Some(effect.clone())
-                }
+                Effect::BookWedding { .. }
+                | Effect::ExtraInvitations { .. }
+                | Effect::StartWedding { .. }
+                | Effect::Vows
+                | Effect::EndWedding => wedding = Some(effect.clone()),
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -490,6 +492,9 @@ impl ClientActor {
             Some(Effect::ExtraInvitations { venue }) => {
                 Box::pin(self.extra_invitations(venue)).await?
             }
+            Some(Effect::StartWedding { venue }) => Box::pin(self.start_wedding(venue)).await?,
+            Some(Effect::Vows) => Box::pin(self.take_vows()).await?,
+            Some(Effect::EndWedding) => self.end_wedding().await,
             _ => {}
         }
         if let Some((map_id, portal)) = warp {

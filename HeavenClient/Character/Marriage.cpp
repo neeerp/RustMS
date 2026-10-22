@@ -298,6 +298,7 @@ namespace ms
 			switch (mode)
 			{
 			case RESULT_ENGAGED: return "You are now engaged.";
+			case RESULT_MARRIED: return "You are now married!";
 			case RESULT_BROKEN: return "Your engagement has been broken.";
 			case RESULT_DIVORCED: return "You are no longer married.";
 			case 18: return "You have entered the wrong character name.";

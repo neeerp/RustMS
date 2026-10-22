@@ -29,6 +29,7 @@ mod storage;
 mod time_limit;
 mod trade;
 mod wedding;
+mod wedding_day;
 
 pub(crate) use wedding::leave_at_duey;
 
@@ -157,6 +158,8 @@ pub struct ClientActor {
     naming_guild: bool,
     /// The player's ticket into the party event they are in.
     event: Option<crate::actor::event::EventTicket>,
+    /// The player's ticket into their own wedding.
+    wedding: Option<crate::actor::wedding::WeddingTicket>,
 }
 
 impl ClientActor {
@@ -217,6 +220,7 @@ impl ClientActor {
             personal_shop: None,
             naming_guild: false,
             event: None,
+            wedding: None,
         })
     }
 
@@ -1351,6 +1355,12 @@ impl ClientActor {
                 to,
                 clock,
             } => self.event_moved(id, from, to, clock).await?,
+            ServerMessage::WeddingStarted(ticket) => self.wedding_started(ticket).await?,
+            ServerMessage::WeddingMoved { id, to, clock } => {
+                self.wedding_moved(id, to, clock).await?
+            }
+            ServerMessage::WeddingEnded { id, failed } => self.wedding_ended(id, failed).await?,
+            ServerMessage::Married { id, record, clock } => self.married(id, record, clock).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,

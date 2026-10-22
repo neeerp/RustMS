@@ -250,6 +250,52 @@ Invitation Ticket (5251100) in the Cash tab, a booked couple may trade it
 for 3 more invitations to their wedding at that venue, before it starts
 and with a free Etc slot (`Effect::ExtraInvitations`).
 
+## The wedding
+
+Slice 7a of report b071 marries a couple at the Chapel; guests, the
+Cathedral, the priest's packets and the party afterwards are later slices.
+
+Wayne (9201012) in Amoria starts a booked Chapel wedding
+(`NpcScript::wedding_starter`). He answers a player who isn't engaged,
+has no Chapel booking, is on another channel than the booking's, or comes
+before its `starts_at`. A partner without wedding clothes worn or in the
+Equip tab (`game::wedding::has_clothes`) is told to bring them. The couple
+has `NO_SHOW` (10 minutes) after `starts_at` to start; then the booking
+goes when next read. Saying yes (`Effect::StartWedding`) re-reads the
+booking and asks the directory (`DirectoryMessage::StartWedding`): the
+partner must stand beside the player, and one wedding at a time may use
+a venue on a channel (`weddings` by channel and venue; ids come from the
+same counter as party events', so copies never meet).
+
+`runtime::actor::wedding` runs one wedding. Like a party event
+(`party-quests.md`) it opens its own copy of the venue's hall (680000100)
+and altar (680000110) and gives each partner a `WeddingTicket` (the
+client actor's `wedding`); `field_key`, `leaving_for` and the clock
+follow either ticket. The stages, scaled by `RUSTMS_EVENT_SCALE`:
+
+1. Gathering (`GATHERING`, 10 minutes) in the hall, with its countdown.
+2. Ceremony (`CEREMONY`, 20 minutes) at the altar. The priest (9201011)
+   asks each partner for their vows once they wear wedding clothes, hold
+   their token (the box or the ring of the couple's set) and have room for
+   the wedding ring. The checks are made again on yes. The first vows
+   wait; the second marry the couple in one transaction
+   (`db::marriage::marry`: status 3, booking deleted). Each partner then
+   loses their tokens, gets the wedding ring of the set (`ring_id`) and
+   `MARRIAGE_RESULT` 12 with the record (`build_married`), and their look
+   updates if the ring is worn. A partner whose equipment filled up while
+   the other vowed gets the ring as a Duey parcel from the other instead.
+3. Married (`AFTER_VOWS`, 45 minutes). Jackie (9201009) asks whether to
+   end it; yes sends the couple to Ames's room (680000500), as does the
+   time running out.
+
+A partner who leaves the wedding's maps, logs out or changes channel
+before the vows ends it: the booking is deleted, nothing is refunded
+(b071 Q9), and whoever is still in it goes to 680000500 with
+`MARRIAGE_RESULT` 31. A ceremony that runs out without vows ends the
+same way. The venue's maps return to 680000500, so a player logging in
+there after a restart lands outside; a booking still inside its window
+can be started again (b071 Q10).
+
 ## The partner's map
 
 While both of a couple are online, each client is told where the other is
@@ -378,6 +424,9 @@ not made.
   (`UIClassic.nx UIWindow.img/Wedding/Invitation`) for type 2, else the
   Vegas art, with the groom's and the bride's names. OK, Enter and Esc
   close it, and nothing is sent. Modes 16, 31 and 34 say v83's notices.
+- `MARRIAGE_RESULT` 12 sets the married couple's record, as 11 does
+  the engaged one's, and says "You are now married!" (StringPool
+  0x108C).
 
 Any result ends the client's wait, as does a new field (a channel change
 or the Cash Shop, where the server drops the proposal). The result's OK
@@ -419,15 +468,16 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The wedding field and the wishlist. Report b066
-  lists the slices.
+- The rest of the wedding (report b071 slices 7b-7g): guests, the
+  Cathedral, the priest's packets (0x140, 0x141), blessings, the party
+  and the hunting grounds. Also the wishlist.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
   guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's
   own are 1050113 and 1051114 (Wedding Tuxedo and Dress), 1050135 (Beau
-  Tuxedo) and 1051154-55 (Princess Isis, Queen Mary). The wedding field
-  (slice 7) decides which ones the priest asks for, and the hint follows it.
+  Tuxedo) and 1051154-55 (Princess Isis, Queen Mary); the priest takes
+  any of these or the guests' sets (`game::wedding::WEDDING_CLOTHES`).
 - Sending `MARRIAGE_RESULT` 31 ("The reservation has been canceled...")
-  when a no-show's booking goes. The client already has the text.
+  when a no-show's booking goes unstarted. A wedding that fails sends it.
 
 Report b052 §7 lists them.

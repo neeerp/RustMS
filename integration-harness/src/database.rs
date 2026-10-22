@@ -3,7 +3,7 @@
 
 use crate::HarnessError;
 use diesel::prelude::*;
-use diesel::sql_types::{BigInt, Integer, Nullable, SmallInt, Text};
+use diesel::sql_types::{BigInt, Bool, Integer, Nullable, SmallInt, Text};
 
 const DEFAULT_DATABASE_URL: &str = "postgres://maplestory:pass@127.0.0.1:15432/maplestory_test";
 
@@ -878,6 +878,51 @@ pub async fn book_wedding(groom_id: i32, venue: i16, hours: i32) -> Result<i32, 
     .map_err(|e| fixture(e.to_string()))?
     .map_err(fixture)?;
     Ok(row.marriage_id)
+}
+
+/// Move the couple `marriage_id`'s booked wedding to the zero-based
+/// `channel`, starting a minute ago, so it may begin now.
+pub async fn wedding_due(marriage_id: i32, channel: i16) -> Result<(), HarnessError> {
+    change_one_row("make a wedding due", move |conn| {
+        diesel::sql_query(
+            "UPDATE wedding_reservations SET channel = $2, \
+             starts_at = now()::timestamp - interval '1 minute' WHERE marriage_id = $1",
+        )
+        .bind::<Integer, _>(marriage_id)
+        .bind::<SmallInt, _>(channel)
+        .execute(conn)
+    })
+    .await
+}
+
+/// The couple `marriage_id`'s status, and whether a wedding is booked for
+/// them.
+pub async fn couple_status(marriage_id: i32) -> Result<(i16, bool), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = SmallInt)]
+        status: i16,
+        #[diesel(sql_type = Bool)]
+        booked: bool,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read a couple's status",
+        message,
+    };
+    let row = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT status, EXISTS (SELECT 1 FROM wedding_reservations WHERE marriage_id = $1) AS booked \
+             FROM marriages WHERE id = $1",
+        )
+        .bind::<Integer, _>(marriage_id)
+        .get_result::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok((row.status, row.booked))
 }
 
 /// What waits for `receiver_id`: the sender and item of each parcel, and

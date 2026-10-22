@@ -5,12 +5,14 @@
 
 use super::WorldDirectory;
 use crate::actor::client::leave_at_duey;
+use crate::actor::wedding::WeddingStart;
 use crate::message::{ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
-use game::wedding::{Invitation, PartnerRefusal, Venue};
+use game::wedding::{Invitation, PartnerRefusal, StartRefusal, Venue};
 use game_data::server_content::keys;
 use net::packet::build::world::marriage::{build_marriage_notice, build_marriage_refusal};
 use net::ClientId;
+use tracing::info;
 
 /// A proposal waiting for the partner's answer.
 pub(super) struct Proposal {
@@ -147,8 +149,40 @@ impl WorldDirectory {
         self.tell(from, ServerMessage::Wedding(news));
     }
 
-    /// Hand `invitation` to its guest, or back to `from` (who sent it) if
-    /// the guest is offline.
+    /// Reserve `venue` on `from`'s channel for the wedding of `from` and
+    /// `partner`, who must stand beside them.
+    pub(super) fn start_wedding(
+        &mut self,
+        from: ClientId,
+        partner: ClientId,
+        venue: Venue,
+        marriage_id: i32,
+    ) -> Result<WeddingStart, StartRefusal> {
+        let starter = self.clients.get(&from).ok_or(StartRefusal::PartnerAway)?;
+        let partner = self
+            .clients
+            .get(&partner)
+            .filter(|entry| entry.shares_map_with(starter))
+            .ok_or(StartRefusal::PartnerAway)?;
+        let channel_id = starter.channel_id;
+        if self.weddings.contains_key(&(channel_id, venue)) {
+            return Err(StartRefusal::Busy);
+        }
+        let couple = vec![starter.handle.clone(), partner.handle.clone()];
+        // Weddings and party events share ids, so their copies don't meet.
+        let id = self.next_event;
+        self.next_event = self.next_event.wrapping_add(1).max(1);
+        self.weddings.insert((channel_id, venue), id);
+        info!(?venue, id, channel_id, marriage_id, "Wedding reserved");
+        Ok(WeddingStart {
+            id,
+            venue,
+            channel_id,
+            marriage_id,
+            couple,
+        })
+    }
+
     /// Hand `invitation` to its guest if they are online. Otherwise leave
     /// it at Duey here, in the background, so that it gets there even if
     /// its sender leaves meanwhile.
