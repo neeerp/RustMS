@@ -134,8 +134,13 @@ from `UI.nx`. Moved so far:
   [npc-dialogue.md](npc-dialogue.md).
 - **Quest Helper** (`UIQuestHelper`, `UIWindow.img/QuestAlarm`). See
   [quests.md](quests.md).
-- **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`).
-  See [quests.md](quests.md).
+- **Quest Complete! notice** (`UIQuestComplete`, `UIWindow.img/FadeYesNo`),
+  for a quest whose objectives the client sees met or one the server names
+  in QUEST_CLEAR (0x31). See [quests.md](quests.md).
+- **Script lines** (`UIScriptMessage`, SCRIPT_PROGRESS_MESSAGE, 0x7A): up to
+  five gold lines at y = 150, 130, ... 70, centred, each shown for 3 s and
+  faded over 3 more; with all five busy a line is dropped (FUN_00a13f20,
+  FUN_006ce251).
 - **Quest alert** (`QuestAlert`, `Effect/BasicEff.img/QuestAlert`): the bulb
   over the player's face for autoStart and autoComplete quests. See
   [quests.md](quests.md).
