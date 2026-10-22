@@ -19,6 +19,8 @@ pub enum EventKind {
     /// Ludibrium's party quest, started at the Red Sign on Eos Tower's
     /// 101st floor.
     Lpq,
+    /// Orbis's party quest in the Tower of Goddess, started at Wonky.
+    Opq,
 }
 
 /// An event's maps and terms.
@@ -382,6 +384,47 @@ const fn lpq_hand_in(stage: u8, npc: i32, item: i32, count: i16) -> HandIn {
     }
 }
 
+/// Orbis's party quest in the Tower of Goddess (Cosmic `OrbisPQ`: 5 to 6
+/// players of levels 51 to 70; Server.NX `FieldSet.img/Party5`: maps
+/// 920010000-920011300, 3600 seconds, the default 1A of
+/// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, Orbis PQ). The team starts on
+/// the cloud stage, 920010000, and leaves by 920011200, from where Eak
+/// sends players back to Orbis; the win takes it to Minerva on 920011300.
+/// Its stages are not played yet, so it can't be won. Its items are the
+/// statue's pieces and everything its stages take (Cosmic
+/// `setExclusiveItems`).
+pub const OPQ: Event = Event {
+    lobby: 200_080_101,
+    maps: 920_010_000..=920_011_300,
+    entry: 920_010_000,
+    exit: 920_011_200,
+    levels: 51..=70,
+    team: 5..=6,
+    minutes: 60,
+    exp_per_stage: &[],
+    stride: 100,
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &OPQ_ITEMS,
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: Some(920_011_300),
+    bonus: None,
+};
+
+/// The Orbis party quest's own items, 4001044 to 4001063.
+const OPQ_ITEMS: [i32; 20] = {
+    let mut items = [0; 20];
+    let mut i = 0;
+    while i < items.len() {
+        items[i] = 4_001_044 + i as i32;
+        i += 1;
+    }
+    items
+};
+
 /// What the Moon Bunny makes on Primrose Hill, and Growlie wants.
 pub const RICE_CAKE: i32 = 4001101;
 
@@ -396,6 +439,7 @@ impl EventKind {
             EventKind::Kpq => &KPQ,
             EventKind::Hpq => &HPQ,
             EventKind::Lpq => &LPQ,
+            EventKind::Opq => &OPQ,
         }
     }
 }
@@ -908,6 +952,16 @@ mod tests {
         assert_eq!(LPQ.gate_stage(922_010_201, "next00"), None);
         assert!(LPQ.holds(922_011_100) && !LPQ.holds(LPQ.exit));
         assert_eq!(EventKind::Lpq.event(), &LPQ);
+    }
+
+    #[test]
+    fn opq_holds_the_tower_but_not_its_way_out_and_has_no_stages_yet() {
+        assert!(OPQ.holds(OPQ.entry) && OPQ.holds(920_011_300));
+        assert!(!OPQ.holds(OPQ.exit) && !OPQ.holds(OPQ.lobby));
+        assert_eq!((OPQ.items[0], OPQ.items[19]), (4_001_044, 4_001_063));
+        assert_eq!(OPQ.stage_on(OPQ.entry), None);
+        assert_eq!(OPQ.last_stage(), 0);
+        assert_eq!(EventKind::Opq.event(), &OPQ);
     }
 
     #[test]

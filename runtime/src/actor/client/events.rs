@@ -53,6 +53,7 @@ impl ClientActor {
             EventKind::Kpq => NpcScript::lakelis(entry),
             EventKind::Hpq => NpcScript::tory(entry),
             EventKind::Lpq => NpcScript::red_sign(entry),
+            EventKind::Opq => NpcScript::wonky(entry),
         };
         self.start_script(script).await
     }

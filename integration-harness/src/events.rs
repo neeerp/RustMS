@@ -1,5 +1,5 @@
 //! Helpers for party events (`tests/kpq*.rs`, `tests/hpq*.rs`,
-//! `tests/lpq*.rs`): a party
+//! `tests/lpq*.rs`, `tests/opq*.rs`): a party
 //! gathered in the event's lobby, NPC talk on the event's maps, and getting
 //! the party in.
 
@@ -9,7 +9,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{HPQ, KPQ, LPQ};
+use net::events::{Event, HPQ, KPQ, LPQ, OPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -25,6 +25,8 @@ pub const TOMMY: i32 = 1012113;
 pub const GROWLIE: i32 = 1012114;
 pub const RED_SIGN: i32 = 2040034;
 pub const ANDERSON: i32 = 2040047;
+pub const WONKY: i32 = 2013000;
+pub const EAK: i32 = 2013001;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -199,10 +201,22 @@ pub async fn enter_hpq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// Red Sign, once the party before them is out, and everyone arrives there;
 /// returns what each saw up to their arrival.
 pub async fn enter_lpq(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &LPQ, RED_SIGN).await
+}
+
+/// The party's leader, first, takes it into the Tower of Goddess from
+/// Wonky, as `enter_lpq` does.
+pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &OPQ, WONKY).await
+}
+
+/// The leader picks the first choice of `npc`'s menu in `event`'s lobby
+/// until it takes the party in, and everyone arrives at its entry.
+async fn enter_from_menu(team: &mut [WorldSession], event: &Event, npc: i32) -> Vec<Trace> {
     let name = team[0].character_name.clone();
     let mut seen = None;
     for _ in 0..5 {
-        step(&mut team[0].connection, &name, talk(LPQ.lobby, RED_SIGN)).await;
+        step(&mut team[0].connection, &name, talk(event.lobby, npc)).await;
         let trace = step(&mut team[0].connection, &name, answer(4, 1, Some(0))).await;
         if trace.prompts.is_empty() {
             seen = Some(trace);
@@ -210,12 +224,12 @@ pub async fn enter_lpq(team: &mut [WorldSession]) -> Vec<Trace> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-    assert!(seen.is_some(), "the Red Sign never let the party in");
+    assert!(seen.is_some(), "{npc} never let the party in");
     let mut traces = Vec::new();
     for player in team.iter_mut() {
         let mut trace = seen.take().unwrap_or_default();
         until(&mut player.connection, &mut trace, |t| {
-            t.warps.contains(&LPQ.entry)
+            t.warps.contains(&event.entry)
         })
         .await;
         traces.push(trace);
