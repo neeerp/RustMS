@@ -80,6 +80,8 @@ pub struct ItemInfo {
     pub mist: Option<ItemMist>,
     /// What a Magical Sandglass (550xxxx) adds.
     pub sandglass: Option<Sandglass>,
+    /// The days a timed Item Guard (5061xxx) seals for (`info/protectTime`).
+    pub protect_time: i32,
 }
 
 /// A Magical Sandglass's `info`: the seconds it adds to a time-limited
@@ -424,6 +426,7 @@ impl ItemData {
             info.pquest = nx.int_child(meta, "pquest")? == Some(1);
             info.expire_on_logout = nx.int_child(meta, "expireOnLogout")? == Some(1);
             info.not_extend = nx.int_child(meta, "notExtend")? == Some(1);
+            info.protect_time = nx.int_child(meta, "protectTime")?.unwrap_or(0);
             info.meso = nx.int_child(meta, "meso")?.unwrap_or(0);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
@@ -682,6 +685,7 @@ impl ItemData {
             rate_card: None,
             mist: None,
             sandglass: None,
+            protect_time: 0,
         }))
     }
 }
@@ -1079,5 +1083,18 @@ mod tests {
         assert!(hat.pets.contains(&5000000) && !hat.pets.contains(&5000066));
         let magnet = data.info(1812000).unwrap().unwrap().equip.unwrap();
         assert!(magnet.pets.is_empty());
+    }
+
+    #[test]
+    fn reads_how_long_a_timed_guard_seals() {
+        let Some(data) = data() else {
+            return;
+        };
+        let days = |id| data.info(id).unwrap().unwrap().protect_time;
+        assert_eq!(
+            [5061000, 5061001, 5061002, 5061003].map(days),
+            [7, 30, 90, 365]
+        );
+        assert_eq!(days(5060001), 0);
     }
 }

@@ -36,6 +36,8 @@ namespace ms::item_properties
 		bool account_sharable = false;
 		bool not_extend = false;
 		bool trade_available = false;
+		// Gone when its owner logs out.
+		bool expire_on_logout = false;
 	};
 
 	// Most pieces join the first line; a few take the second when the first is in use.

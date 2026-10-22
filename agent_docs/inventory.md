@@ -51,8 +51,10 @@ waits for `next_expiry`; not in the Cash Shop). Either way the client gets
 SHOW_STATUS_INFO mode 8 with the item ids ("... has been expired, and
 therefore, deleted from your inventory."); in play it also gets the
 INVENTORY_OPERATION removals and, if a worn item went, the refitted HP and MP
-and the new look for the map. Sealed items (mode 11) and expiring skills
-(mode 13) aren't implemented.
+and the new look for the map. A sealed item whose date passes stays: its
+seal is lifted instead (see Item Guards), and the client gets mode 11 ("%s's
+seal has expired.") with those ids. Expiring skills (mode 13) aren't
+implemented.
 
 Items with `info/expireOnLogout` (127 of them, mostly event and PQ items)
 go when their owner logs out: the client actor's cleanup takes them
@@ -258,8 +260,8 @@ Spirit, White Scroll) goes to the scroller and the map, then the look
 refresh unless it simply failed. Legendary Spirit requests are refused with
 SHOW_SCROLL_EFFECT -1 to the scroller alone; HeavenClient ignores that, as
 it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
-the scroll glow, and gives the scroller the v83 chat line. It has no sealed
-items, so the v83 sealed-item prompts are skipped.
+the scroll glow, and gives the scroller the v83 chat line. The v83 prompts
+for scrolling a sealed item are skipped.
 
 ### Megaphones
 
@@ -625,6 +627,42 @@ equip through INVENTORY_OPERATION, or only unlocks the client.
 The equip tooltip shows the owner over the name, in orange with a white
 "'s", like v83's (FUN_008f49bc); the client's checks are in
 `Character/Inventory/EquipCash.h`.
+
+### Item Guards
+
+The Item Guard (5060001) seals an item for good; the timed ones (5061000-3)
+seal it for their Item.nx `info/protectTime` days (7, 30, 90, 365; read into
+`ItemInfo.protect_time`). A seal is `FLAG_LOCK`, and a timed one also dates
+the item. Double-clicking a guard in the Cash tab opens its window
+(`UIItemProtector`, v83 CUIItemProtector, report c009). An item dragged in
+from the Item window stays there, its icon drawn and its tooltip shown on
+hover, and OK asks before anything goes: "%s Would you like to seal this
+item?", or for a timed guard the date the seal would end ("... will be
+sealed until" or, for a seal already timed, "... will extend the item seal
+until"). Yes sends USE_CASH_ITEM with the item's tab and slot as two ints
+after the item id. Only equipment, stars, bullets and 22500xx can be sealed,
+not a cash item, one gone at logout, or one with a date of its own; a
+lasting seal takes no more, and a timed one may be extended (from its end);
+the Item Guard makes it lasting, which report c009 doesn't settle. Quest
+items aren't kept out, though String.nx says they are. The client refuses those with "This item cannot be
+sealed." and takes potions a pet uses with a warning. The server checks the
+same (`world/item_guard.rs`), takes the guard and re-sends the item, or
+only unlocks the client. Yes checks the guard and the item asked about are
+still in place, the packet naming only slots. Worn equips are refused: v83
+only takes drops from the Item window.
+
+A sealed item can't be dropped, sold or traded, in a trade or a personal
+shop (`Item::sealed`), nor taken apart by the Maker; it can be stored
+(report c009 would refuse that too), and a timed seal in storage runs on
+until the item comes out. HeavenClient refuses the drop itself, not yet a
+sale (v83 says "Sealed items cannot be sold, traded, or dropped.") or a
+Maker drop, and shows "Seal Released on" with a timed seal's date in the
+tooltip. When a timed seal's date passes, the expiry sweep lifts the seal
+and the date and re-sends the item.
+
+While the guard's window is open, no cash item can be used from a
+double-click ("Not available" in the chat). v83 also refuses chat and some inventory actions
+then; HeavenClient doesn't.
 
 ### Item Maker
 
@@ -1054,6 +1092,11 @@ to pick up and drops mesos earned from snails, checking both losses are saved;
 `net::items` covers which items expire and the next date, and
 `item_expiry` (integration) starts Rupi's Lost Paper, has the paper run out
 while playing, and finds a worn cape that expired offline gone at login.
+`net`'s item guard handler covers what may be sealed, for how long, and a
+seal running out; `item_guard` (integration) seals an equip for a week,
+extends it, makes it lasting and is refused its drop, then has a timed seal
+run out at login, and the client's `item_guard` test covers the checks and
+the questions.
 `net::shop` covers buying, selling, recharging, and their refusals, and
 `npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,

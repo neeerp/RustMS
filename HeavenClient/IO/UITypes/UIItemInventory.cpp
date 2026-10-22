@@ -21,6 +21,7 @@
 #include "UISpReset.h"
 #include "UIChatBar.h"
 #include "UIItemMegaphone.h"
+#include "UIItemProtector.h"
 #include "UIMemoSend.h"
 #include "UIMegaphone.h"
 #include "UINotice.h"
@@ -578,6 +579,36 @@ namespace ms
 		{
 			if (may_use_cash_item())
 				UI::get().emplace<UIVegaSpell>(slot, item_id);
+		}
+
+		// v83 0xa0cb3c: an Item Guard opens its window with the days it
+		// seals for (`info/protectTime`), none for 5060001.
+		void use_item_guard(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item())
+				return;
+
+			int32_t days = nl::nx::item["Cash"]["0506.img"][string_format::extend_id(item_id, 8)]["info"]["protectTime"];
+
+			if (item_id != item_guard::ITEM_GUARD && days <= 0)
+				return;
+
+			UI::get().emplace<UIItemProtector>(slot, item_id, days);
+		}
+
+		// v83 0x4f00ab: no cash item is used while the guard's window is
+		// open.
+		bool guard_open()
+		{
+			auto protector = UI::get().get_element<UIItemProtector>();
+
+			if (!protector || !protector->is_active())
+				return false;
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+
+			return true;
 		}
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
@@ -1147,6 +1178,9 @@ namespace ms
 						Stage::get().get_player().use_item(item_id);
 						break;
 					case InventoryType::Id::CASH:
+						if (guard_open())
+							break;
+
 						// As in v83, a face item (516xxxx) makes its emote
 						// (id % 100 + 8) as a face key would, without being
 						// used up.
@@ -1189,6 +1223,8 @@ namespace ms
 							use_hammer(slot);
 						else if (vega_spell::is_vega(item_id))
 							use_vega_spell(slot, item_id);
+						else if (item_guard::is_guard(item_id))
+							use_item_guard(slot, item_id);
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
 						else if (item_id / 10000 == 518)

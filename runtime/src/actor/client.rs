@@ -638,6 +638,11 @@ impl ClientActor {
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;
             self.send(&mut lines).await?;
         }
+        if !expired.released.is_empty() {
+            let mut lines = build::world::inventory::build_seals_expired(&expired.released)
+                .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+            self.send(&mut lines).await?;
+        }
 
         let presence = Presence::of(&player);
         self.presence = Some(presence.clone());

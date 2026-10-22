@@ -8,7 +8,6 @@ use crate::handler::{HandlerResult, WorldContext, WorldResult};
 use crate::items;
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::stat::build_stat_update;
-use game::inventory::FLAG_LOCK;
 use game::{InventoryChange, InventoryType, Item, Player};
 use game_data::items::Sandglass;
 use packet::io::read::PktRead;
@@ -55,7 +54,7 @@ fn extend(item: &mut Item, sandglass: Sandglass, now: SystemTime) -> bool {
         return false;
     };
     let not_extend = items::info(item.item_id).is_some_and(|info| info.not_extend);
-    if item.is_cash() || item.flags & FLAG_LOCK != 0 || not_extend {
+    if item.is_cash() || item.sealed() || not_extend {
         return false;
     }
     let extended = expiration + Duration::from_secs(sandglass.add_seconds.max(0) as u64);

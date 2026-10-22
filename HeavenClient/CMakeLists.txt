@@ -143,6 +143,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME scroll_rules COMMAND scroll_rules_tests)
     add_executable(equip_cash_tests tests/equip_cash.cpp)
     add_test(NAME equip_cash COMMAND equip_cash_tests)
+    add_executable(item_guard_tests tests/item_guard.cpp)
+    add_test(NAME item_guard COMMAND item_guard_tests)
     add_executable(cash_upgrades_tests tests/cash_upgrades.cpp)
     add_test(NAME cash_upgrades COMMAND cash_upgrades_tests)
     add_executable(maker_rules_tests tests/maker_rules.cpp)
@@ -825,6 +827,8 @@ add_executable(HeavenClient
     IO/UITypes/UIMaker.cpp
     IO/UITypes/UIMaker.h
     Character/Inventory/MakerRules.h
+    IO/UITypes/UIItemProtector.cpp
+    IO/UITypes/UIItemProtector.h
     IO/UITypes/UIVegaSpell.cpp
     IO/UITypes/UIVegaSpell.h
     IO/UITypes/UIInviteCard.cpp

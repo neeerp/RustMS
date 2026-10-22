@@ -10,6 +10,7 @@
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
 use super::hammer::vicious_hammer;
+use super::item_guard::{item_guard, ITEM_GUARD};
 use super::item_tag::{item_tag, sandglass};
 use super::jukebox::jukebox;
 use super::megaphone::{avatar_megaphone, megaphone};
@@ -46,6 +47,9 @@ impl WorldHandler for UseCashItemHandler {
                 sp_reset(ctx, &mut r, slot, item_id)
             }
             506 if held && item_id == 5_060_000 => item_tag(ctx, &mut r, slot),
+            506 if held && item_id == ITEM_GUARD => item_guard(ctx, &mut r, slot, item_id),
+            // Not 5060002, the incubator.
+            506 if held && item_id / 1000 == 5061 => item_guard(ctx, &mut r, slot, item_id),
             507 if held => megaphone(ctx, &mut r, slot, item_id),
             509 if held => note(ctx, &mut r, slot, item_id),
             510 if held => jukebox(ctx, slot, item_id),

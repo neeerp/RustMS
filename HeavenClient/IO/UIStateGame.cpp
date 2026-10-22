@@ -86,6 +86,8 @@ namespace ms
 					return Tooltip::Parent::MAKER;
 				case UIElement::Type::VEGASPELL:
 					return Tooltip::Parent::VEGASPELL;
+				case UIElement::Type::ITEMPROTECTOR:
+					return Tooltip::Parent::ITEMPROTECTOR;
 				case UIElement::Type::VEGARESULT:
 					return Tooltip::Parent::VEGARESULT;
 				case UIElement::Type::EVENT:
