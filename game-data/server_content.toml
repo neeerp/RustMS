@@ -622,6 +622,7 @@ unsourced = [
     "wedding.invite.error",
     "wedding.invite.sent",
     "wedding.invite.returned",
+    "wedding.victoria.info",
     "wedding.guest.invited",
     "wedding.guest.note",
     "hpq.tory.menu",
