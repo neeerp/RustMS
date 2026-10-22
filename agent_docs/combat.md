@@ -174,7 +174,8 @@ A skill's HP cost (`skills::hp_cost`, as v83's `FUN_00764256`) is its
 have one. Dragon Roar instead takes its `x` percent of max HP and needs at
 least half of it, and then stuns its user for its `y` seconds
 (`skills::self_stun`): a Stun disease under Dragon Roar's own id, so the
-client shows the skill's icon and won't let it be cancelled. Sacrifice takes its `x` percent of its first blow, never
+client shows the skill's icon and won't let it be cancelled. The mobs it
+hits are stunned for the same `y` seconds (it has no `time`). Sacrifice takes its `x` percent of its first blow, never
 the last HP, which v83 leaves wholly to the server (Cosmic's rule).
 Final Attack (`skills::FINAL_ATTACKS`) is a swing or shot the client sends
 on its own after a skill attack whose skill lists it under `finalAttack`

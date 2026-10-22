@@ -742,6 +742,8 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
         // Dawn Warrior Coma, Rolling Spin.
         1111005 | 1111006 | 1111008 | 1211002 | 3101005 | 4211002 | 4221007 | 5101002 | 5101003
         | 5121004 | 5121005 | 5201004 | 11111003 | 21110006 => one(MobStat::Stun),
+        // Dragon Roar "stuns them" for its `y` seconds (it has no `time`).
+        DRAGON_ROAR => one(MobStat::Stun),
         // Cold Beam, Ice Strike, Element Composition (I/L), Blizzard,
         // Blizzard (crossbow), Ice Splitter, Paralyze.
         2201004 | 2211002 | 2211006 | 2221007 | 3211003 | 5211005 | 2121006 => one(MobStat::Freeze),
@@ -808,6 +810,9 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
     if let Some(skill) = skill {
         if let Some(statuses) = hit_statuses(skill) {
             let mut inflict = Inflict::new(skill, statuses);
+            if skill.skill_id == DRAGON_ROAR {
+                inflict.duration = Duration::from_secs(skill.effect.y.max(0) as u64);
+            }
             if skill.skill_id == ICE_SPLITTER {
                 if let Some(boost) = elemental_boost(player, ICE_SPLITTER) {
                     inflict.duration += Duration::from_secs(boost.effect.y.max(0) as u64);
@@ -1599,6 +1604,25 @@ mod tests {
             }]
         );
         assert!(inflicts[0].takes(0.94) && !inflicts[0].takes(0.95));
+        // Dragon Roar always stuns, for 4 seconds at 1 and 2 at 30.
+        let roar = |level| {
+            on_hit(
+                &player,
+                Some(&at_level(DRAGON_ROAR, level).unwrap()),
+                false,
+                0.5,
+            )
+        };
+        assert_eq!(
+            roar(1),
+            [Inflict {
+                skill_id: DRAGON_ROAR,
+                prop: 100,
+                duration: Duration::from_secs(4),
+                statuses: vec![(MobStat::Stun, Amount::Value(1))],
+            }]
+        );
+        assert_eq!(roar(30)[0].duration, Duration::from_secs(2));
         let breath = at_level(2101005, 30).unwrap();
         assert_eq!(
             on_hit(&player, Some(&breath), false, 0.5)[0].statuses,
