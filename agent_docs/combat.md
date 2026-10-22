@@ -981,7 +981,13 @@ carry the statuses a mob has. Entries come in the client's decode order
   against none (`mob_hit_cap`); a hit that comes to nothing is dropped.
   The sender is credited as if they dealt it (Cosmic's rule), and the
   others get DAMAGE_MONSTER (0xF6) with the number and HP; a kill goes the
-  usual way. The friendly-mob variant (0xC0) is not handled.
+  usual way. The friendly-mob variant (0xC0) is not handled. In
+  HeavenClient the client controlling an undazzled attacker collects its
+  landed box hits and its balls in flight (`Mob::take_sweeps`), checks them
+  against up to 15 other mobs' bodies (`MapMobs::update`), and the victim
+  (`Mob::hurt_by`) rolls the damage with v83's formula (`mob_attack::mob_hit`),
+  shows the hit and number and sends 0xC2. Unlike v83 it doesn't turn the
+  victim on its attacker, and direct shots (type 1) hurt no mob.
 - Bosses shrug off Stun, Freeze, Seal, Doom, Web and Dazzle. A mob immune to poison
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick

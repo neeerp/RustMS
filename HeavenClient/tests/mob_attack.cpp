@@ -84,6 +84,14 @@ int main()
 		require(granted_skill({ 100, 1 }, { 114, 12 }) == std::make_pair<uint8_t, uint8_t>(114, 12),
 				"a new grant replaces it");
 
+		require(mob_hit(100, 0, false, 0.0, 0.0) == 180, "a mob's hit on another starts at attack 0.8");
+		require(mob_hit(100, 0, false, 0.999, 0.0) == 184, "and stays under 0.85");
+		require(mob_hit(12, 0, false, 0.999, 0.0) <= 13, "under the server's cap");
+		require(mob_hit(100, 20, false, 0.0, 0.0) == 170, "defense takes half");
+		require(mob_hit(100, 20, false, 0.0, 0.999) == 168, "up to 0.6 of it");
+		require(mob_hit(100, 20, true, 0.0, 0.0) == 165, "magic starts at 0.75");
+		require(mob_hit(10, 1000, false, 0.0, 0.0) == -489, "it may come out below 0");
+
 		std::cout << "Mob attack passed\n";
 		return 0;
 	}
