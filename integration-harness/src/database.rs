@@ -846,3 +846,106 @@ pub async fn marry(groom_id: i32, bride_id: i32, ring_box: i32) -> Result<(), Ha
     })
     .await
 }
+
+/// Book the wedding of the couple whose groom is `groom_id` at `venue` (0
+/// Chapel, 1 Cathedral), starting `hours` from the last top of the hour;
+/// the couple's id. It goes on a channel of the couple's own past the
+/// harness's, so it never takes another booking's slot.
+pub async fn book_wedding(groom_id: i32, venue: i16, hours: i32) -> Result<i32, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = Integer)]
+        marriage_id: i32,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "book a wedding",
+        message,
+    };
+    let row = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO wedding_reservations (marriage_id, venue, premium, channel, starts_at) \
+             SELECT id, $2, false, 100 + id % 100, date_trunc('hour', now()::timestamp) + make_interval(hours => $3) \
+             FROM marriages WHERE groom_id = $1 RETURNING marriage_id",
+        )
+        .bind::<Integer, _>(groom_id)
+        .bind::<SmallInt, _>(venue)
+        .bind::<Integer, _>(hours)
+        .get_result::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(row.marriage_id)
+}
+
+/// What waits for `receiver_id`: the sender and item of each parcel, and
+/// the sender of each note, oldest first.
+pub async fn parcels_and_notes(
+    receiver_id: i32,
+) -> Result<(Vec<(String, Option<i32>)>, Vec<String>), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Parcel {
+        #[diesel(sql_type = Text)]
+        sender: String,
+        #[diesel(sql_type = Nullable<Integer>)]
+        item_id: Option<i32>,
+    }
+    #[derive(QueryableByName)]
+    struct Note {
+        #[diesel(sql_type = Text)]
+        sender: String,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read parcels and notes",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        let parcels = diesel::sql_query(
+            "SELECT sender, item_id FROM parcels WHERE receiver_id = $1 ORDER BY id",
+        )
+        .bind::<Integer, _>(receiver_id)
+        .load::<Parcel>(&mut conn)
+        .map_err(|e| e.to_string())?;
+        let notes =
+            diesel::sql_query("SELECT sender FROM notes WHERE receiver_id = $1 ORDER BY id")
+                .bind::<Integer, _>(receiver_id)
+                .load::<Note>(&mut conn)
+                .map_err(|e| e.to_string())?;
+        Ok::<_, String>((
+            parcels.into_iter().map(|p| (p.sender, p.item_id)).collect(),
+            notes.into_iter().map(|n| n.sender).collect(),
+        ))
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)
+}
+
+/// Fill the Duey inbox of `receiver_id` with `count` parcels of a meso
+/// each.
+pub async fn fill_parcels(receiver_id: i32, count: i32) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "fill a Duey inbox",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO parcels \
+             (receiver_id, sender, mesos, quick, sent_at, announced, quantity, owner, flags) \
+             SELECT $1, 'filler', 1, false, now()::timestamp, true, 0, '', 0 \
+             FROM generate_series(1, $2)",
+        )
+        .bind::<Integer, _>(receiver_id)
+        .bind::<Integer, _>(count)
+        .execute(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(())
+}

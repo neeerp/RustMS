@@ -7,7 +7,8 @@ use tracing::debug;
 
 /// `RING_ACTION` (reports b052 and b054): a proposal with an engagement ring
 /// box, its withdrawal, the partner's answer, and breaking off by dropping a
-/// token. Invitations and the wishlist come later.
+/// token; and (report b066) sending and opening wedding invitations. The
+/// wishlist comes later.
 pub struct RingActionHandler;
 
 impl WorldHandler for RingActionHandler {
@@ -30,6 +31,25 @@ impl WorldHandler for RingActionHandler {
             3 => RingRequest::Break {
                 item_id: reader.read_int()?,
             },
+            5 => {
+                let guest = reader.read_str_with_length()?;
+                let marriage_id = reader.read_int()?;
+                let Ok(slot) = i16::try_from(reader.read_int()?) else {
+                    return Ok(HandlerResult::empty());
+                };
+                RingRequest::Invite {
+                    guest,
+                    marriage_id,
+                    slot,
+                }
+            }
+            6 => {
+                let Ok(slot) = i16::try_from(reader.read_int()?) else {
+                    return Ok(HandlerResult::empty());
+                };
+                let item_id = reader.read_int()?;
+                RingRequest::OpenInvitation { slot, item_id }
+            }
             other => {
                 debug!(mode = other, "Ignoring RING_ACTION");
                 return Ok(HandlerResult::empty());
@@ -91,5 +111,28 @@ mod tests {
             Some(RingRequest::Break { item_id: 4031357 })
         );
         assert_eq!(read(&[9, 0, 0]), None);
+    }
+
+    #[test]
+    fn reads_an_invitation_sent_and_opened() {
+        let invite = [&[5, 3, 0][..], b"Cid", &[7, 0, 0, 0], &[4, 0, 0, 0]].concat();
+        assert_eq!(
+            read(&invite),
+            Some(RingRequest::Invite {
+                guest: "Cid".into(),
+                marriage_id: 7,
+                slot: 4
+            })
+        );
+        let open = [6, 2, 0, 0, 0, 0xaf, 0x83, 0x3d, 0];
+        assert_eq!(
+            read(&open),
+            Some(RingRequest::OpenInvitation {
+                slot: 2,
+                item_id: 4031407
+            })
+        );
+        // A slot no inventory has.
+        assert_eq!(read(&[6, 0, 0, 1, 0, 0xaf, 0x83, 0x3d, 0]), None);
     }
 }

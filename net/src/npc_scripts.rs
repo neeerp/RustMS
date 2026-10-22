@@ -1553,9 +1553,11 @@ pub struct AllianceView<'a> {
 }
 
 /// What a wedding assistant needs besides the player: the couple's booked
-/// wedding, if any, and the time.
+/// wedding, if any, the soonest wedding at the assistant's venue the
+/// player is a guest of, and the time.
 pub struct WeddingView<'a> {
     pub reservation: Option<&'a Reservation>,
+    pub guest_of: Option<&'a Reservation>,
     pub now: SystemTime,
 }
 
@@ -3265,22 +3267,16 @@ pub fn partner_refusal_text(refusal: PartnerRefusal) -> String {
     })
 }
 
+/// Whether the player has room for a booking's invitations, which expire
+/// and so take a slot of their own.
+pub fn invitations_fit(player: &Player, venue: Venue) -> bool {
+    invitations_fit_n(player, venue, wedding::INVITATIONS)
+}
+
 /// Nicole (`cathedral`) and Bonnie (`vegas`) in Amoria tell how a wedding
 /// is prepared, and book an engaged couple's for a ticket from the Cash
 /// tab, the premium one first (report b066). The partner's side is checked
 /// when the booking is made.
-/// Whether the player has room for a booking's invitations, which expire
-/// and so take a slot of their own.
-pub fn invitations_fit(player: &Player, venue: Venue) -> bool {
-    let until = Some(SystemTime::UNIX_EPOCH);
-    items::fits_until(
-        &player.inventory,
-        venue.invitation(),
-        wedding::INVITATIONS,
-        until,
-    )
-}
-
 fn wedding_assistant(venue: Venue, player: &Player, view: WeddingView) -> NpcScript {
     let (ticket, premium) = (venue.ticket(false), venue.ticket(true));
     let (ticket_id, premium_id) = (ticket.to_string(), premium.to_string());
@@ -3315,16 +3311,73 @@ fn wedding_assistant(venue: Venue, player: &Player, view: WeddingView) -> NpcScr
             premium: holds(player, premium),
         }])],
     };
+    let mut choices = vec![
+        (text(keys::WEDDING_CHOICE_PREPARE), prepare),
+        (text(keys::WEDDING_CHOICE_RESERVE), reserve),
+        (
+            text(keys::WEDDING_CHOICE_GUEST),
+            wedding_guest(venue, player, &view),
+        ),
+    ];
+    if holds(player, wedding::INVITATION_TICKET) {
+        let own = view.reservation.filter(|_| engaged);
+        choices.push((
+            text(keys::WEDDING_CHOICE_EXTRA),
+            extra_invitations(venue, player, own, view.now),
+        ));
+    }
     NpcScript::new(
         wedding_assistant_of(venue),
         vec![Page::Menu {
             text: text(keys::WEDDING_MENU),
-            choices: vec![
-                (text(keys::WEDDING_CHOICE_PREPARE), prepare),
-                (text(keys::WEDDING_CHOICE_RESERVE), reserve),
-            ],
+            choices,
         }],
     )
+}
+
+/// A guest asking to go in: invited, with the invitation, to a wedding at
+/// the venue that has begun. Going in comes with the ceremony itself.
+fn wedding_guest(venue: Venue, player: &Player, view: &WeddingView) -> Vec<Page> {
+    let say = match view.guest_of {
+        Some(wedding) if holds(player, venue.received_invitation()) => {
+            if wedding.inviting(view.now) {
+                wedding_text(keys::WEDDING_GUEST_EARLY, wedding, view.now)
+            } else {
+                text(keys::WEDDING_GUEST_WAIT)
+            }
+        }
+        _ => text(keys::WEDDING_GUEST_NOT_INVITED),
+    };
+    vec![Page::Say(say)]
+}
+
+/// Whether the player has room for `quantity` invitations to `venue`'s
+/// wedding, which expire and so take a slot of their own unless held.
+fn invitations_fit_n(player: &Player, venue: Venue, quantity: i16) -> bool {
+    let until = Some(SystemTime::UNIX_EPOCH);
+    items::fits_until(&player.inventory, venue.invitation(), quantity, until)
+}
+
+/// A Wedding Invitation Ticket traded for invitations to the couple's
+/// wedding at the venue, before it starts.
+fn extra_invitations(
+    venue: Venue,
+    player: &Player,
+    own: Option<&Reservation>,
+    now: SystemTime,
+) -> Vec<Page> {
+    let refusal = match own.filter(|reservation| reservation.venue == venue) {
+        None => Some(text(keys::WEDDING_EXTRA_NOT_BOOKED)),
+        Some(reservation) if !reservation.inviting(now) => Some(text(keys::WEDDING_EXTRA_STARTED)),
+        Some(_) if !invitations_fit_n(player, venue, wedding::EXTRA_INVITATIONS) => {
+            Some(text(keys::WEDDING_NO_ROOM))
+        }
+        Some(_) => None,
+    };
+    match refusal {
+        Some(refusal) => vec![Page::Say(refusal)],
+        None => vec![Page::Done(vec![Effect::ExtraInvitations { venue }])],
+    }
 }
 
 /// A choice of a trip to `to` for `fare`, which on a yes pays and `warp`s.
@@ -6749,7 +6802,11 @@ mod tests {
         }
         let now = SystemTime::UNIX_EPOCH;
         let ask = |npc_id, player: &Player, reservation: Option<&Reservation>, choice| {
-            let view = WeddingView { reservation, now };
+            let view = WeddingView {
+                reservation,
+                guest_of: None,
+                now,
+            };
             let mut script = NpcScript::wedding_assistant(npc_id, player, view).unwrap();
             assert_eq!(kind(&script.begin()), Some(4));
             script.respond(ScriptInput::Select(choice)).unwrap()
@@ -6761,6 +6818,7 @@ mod tests {
         lobby.stats.map_id = 680000100;
         let view = WeddingView {
             reservation: None,
+            guest_of: None,
             now,
         };
         assert!(NpcScript::wedding_assistant(BONNIE, &lobby, view).is_none());
@@ -6844,6 +6902,83 @@ mod tests {
             premium: true,
         };
         assert_eq!(reserve(BONNIE, &both).effects, [chapel]);
+    }
+
+    #[test]
+    fn the_wedding_assistants_answer_guests_and_make_more_invitations() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        let now = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(600 * 60);
+        let wedding = |venue, minutes: u64| Reservation {
+            marriage_id: 5,
+            venue,
+            premium: false,
+            channel: 0,
+            starts_at: SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(minutes * 60),
+        };
+        let choose = |npc_id, player: &Player, view: WeddingView, choice| {
+            let mut script = NpcScript::wedding_assistant(npc_id, player, view).unwrap();
+            script.begin();
+            script.respond(ScriptInput::Select(choice)).unwrap()
+        };
+        let as_guest = |player: &Player, guest_of: Option<&Reservation>| {
+            let view = WeddingView {
+                reservation: None,
+                guest_of,
+                now,
+            };
+            page_text(&choose(NICOLE, player, view, 2))
+        };
+
+        // A guest needs both the invitation and a place on the list.
+        let later = wedding(Venue::Cathedral, 630);
+        let invitation = [(InventoryType::Etc, 4031407)];
+        let not_invited = text(keys::WEDDING_GUEST_NOT_INVITED);
+        assert_eq!(as_guest(&bride(&[]), Some(&later)), not_invited);
+        assert_eq!(as_guest(&bride(&invitation), None), not_invited);
+        let early = as_guest(&bride(&invitation), Some(&later));
+        assert_eq!(early, wedding_text(keys::WEDDING_GUEST_EARLY, &later, now));
+        let due = wedding(Venue::Cathedral, 595);
+        let wait = as_guest(&bride(&invitation), Some(&due));
+        assert_eq!(wait, text(keys::WEDDING_GUEST_WAIT));
+
+        // More invitations only with the ticket.
+        fn own(reservation: Option<&Reservation>, now: SystemTime) -> WeddingView<'_> {
+            WeddingView {
+                reservation,
+                guest_of: None,
+                now,
+            }
+        }
+        let plain = NpcScript::wedding_assistant(NICOLE, &bride(&[]), own(None, now)).unwrap();
+        let menu = format!("{:?}", plain.begin());
+        assert!(!menu.contains(&text(keys::WEDDING_CHOICE_EXTRA)));
+        let ticket = [(InventoryType::Cash, 5251100)];
+        let extra = |player: &Player, reservation| {
+            page_text(&choose(NICOLE, player, own(reservation, now), 3))
+        };
+        assert_eq!(
+            extra(&bride(&ticket), None),
+            text(keys::WEDDING_EXTRA_NOT_BOOKED)
+        );
+        let chapel = wedding(Venue::Chapel, 630);
+        assert_eq!(
+            extra(&bride(&ticket), Some(&chapel)),
+            text(keys::WEDDING_EXTRA_NOT_BOOKED)
+        );
+        assert_eq!(
+            extra(&bride(&ticket), Some(&due)),
+            text(keys::WEDDING_EXTRA_STARTED)
+        );
+        let mut full = bride(&[(InventoryType::Etc, 4000000), ticket[0]]);
+        full.inventory_mut().set_slot_limit(InventoryType::Etc, 1);
+        assert_eq!(extra(&full, Some(&later)), text(keys::WEDDING_NO_ROOM));
+        let made = choose(NICOLE, &bride(&ticket), own(Some(&later), now), 3);
+        let effect = Effect::ExtraInvitations {
+            venue: Venue::Cathedral,
+        };
+        assert_eq!(made.effects, [effect]);
     }
 
     #[test]

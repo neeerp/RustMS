@@ -335,6 +335,12 @@ pub enum Effect {
         venue: game::wedding::Venue,
         premium: bool,
     },
+    /// Trade a Wedding Invitation Ticket for more invitations to the
+    /// couple's wedding booked at `venue`. The assistant then says how it
+    /// went, so nothing may follow it.
+    ExtraInvitations {
+        venue: game::wedding::Venue,
+    },
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

@@ -188,14 +188,65 @@ channel. A unique key on (channel, venue, starts_at) keeps two couples off
 the same hour. A booked couple asking again hears the minutes left. A
 couple who has not begun their wedding 10 minutes after its start loses
 it: the row goes the next time it is read, and at world start.
-`wedding_guests` is for slice 6b's invitations. The couple's
-`marriages.status` stays engaged.
+`wedding_guests` lists the guests (below). The couple's `marriages.status`
+stays engaged, as the client sends invitations only for status 1.
 
 While a booking stands, dropping a token is refused with `MARRIAGE_RESULT`
 32 ("You can't break the engagement after making reservations."). The
 check and the delete are one transaction, and booking and breaking off
 both lock the couple's row first, so one of the two always sees the
 other.
+
+## Inviting guests
+
+A partner double-clicks an invitation in the Etc tab and types a guest's
+name. The client sends `RING_ACTION` 5: the name, the couple's record id,
+and the invitation's Etc slot as an `i32`. The server needs the slot to
+hold the couple's invitation (Cathedral 4031395, Chapel 4031377) and the
+record id to be the sender's own engaged couple; otherwise it does
+nothing more. Every request ends with the client's actions re-enabled,
+since the client waits for that after sending one (report b069). Then
+it puts the guest on the list
+(`db::wedding::invite`, which locks the couple's row), and refuses in pink
+chat, as Cosmic does:
+
+- no character of that name, or one of the couple;
+- a guest already invited;
+- no wedding booked at the invitation's venue (a Chapel invitation for a
+  Cathedral wedding counts as none);
+- a wedding already under way (sending is only before `starts_at`);
+- a full list (`game::wedding::MAX_GUESTS`, 60).
+
+A guest on the list costs the sender one invitation (Cosmic takes it on
+"already invited" too) and gets a received invitation (Cathedral 4031407,
+Chapel 4031406) that expires a slot after the wedding starts. The
+directory hands it to the guest's actor if they are online
+(`WeddingNews::Invited`). Without room there, or offline, it goes to
+Duey as a parcel from the sender, with a note saying whose wedding it is
+(`client::wedding::leave_at_duey`). For a guest offline the directory
+does this itself, in the background, so the sender may leave meanwhile.
+A guest online is told in pink chat either way. With the guest's Duey
+inbox full too, the guest goes off the list again and the invitation
+goes back to its sender (`WeddingNews::Returned`, through
+`DirectoryMessage::ReturnInvitation` from a guest online), who is told
+in pink chat and may send another; a sender gone by then loses it. An
+invitation handed to a guest's actor that is just leaving the channel
+is lost the same way, the guest staying on the list.
+
+A guest double-clicks the received invitation and the client sends
+`RING_ACTION` 6 with its Etc slot and item id. With the item there, the
+server answers `MARRIAGE_RESULT` 15 for the soonest wedding at its venue
+the guest is invited to: the groom's and bride's names and the window
+(2 the Cathedral's, 1 the Chapel's). Without one it answers 34 ("This
+invitation is not valid."), where Cosmic answers nothing.
+
+The assistants' menu has two more choices. "I am a guest" answers from the
+list: not invited (no list entry at this venue, or no received
+invitation), the minutes left, or, once the wedding is due, a wait line
+that slice 7's ceremony replaces with the way in. With a Wedding
+Invitation Ticket (5251100) in the Cash tab, a booked couple may trade it
+for 3 more invitations to their wedding at that venue, before it starts
+and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The partner's map
 
@@ -353,10 +404,10 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- Sending invitations to guests, more invitations for a partner without
-  them, selling the tickets, the wedding field, and the wishlist. The
-  client does not yet open its invitation window or say mode 16's text.
-  Report b066 lists the slices.
+- Selling the tickets, the wedding field, and the wishlist. The client
+  does not yet send invitations (an Etc double-click), open its
+  invitation window, or say the texts of modes 16 and 34. Report b066
+  lists the slices.
 - `MARRIAGE_RESULT` 31 ("The reservation has been canceled...") when a
   no-show's booking goes.
 

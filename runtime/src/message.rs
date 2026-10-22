@@ -779,6 +779,16 @@ pub enum DirectoryMessage {
         to: ClientId,
         news: WeddingNews,
     },
+    /// Hand `invitation` to its guest if they are online, else leave it at
+    /// Duey.
+    DeliverInvitation {
+        invitation: game::wedding::Invitation,
+    },
+    /// `invitation` could be neither given nor left at Duey: its guest is
+    /// off the list again; hand it back to its sender.
+    ReturnInvitation {
+        invitation: game::wedding::Invitation,
+    },
     /// `from` went where they can't answer or be answered (the Cash Shop):
     /// their proposals end, and their party can't take them into an event.
     EnteredCashShop {
@@ -956,4 +966,10 @@ pub enum WeddingNews {
     },
     /// The partner booked the couple's wedding: take the invitations.
     Booked(game::wedding::Reservation),
+    /// The player is invited to a wedding: take the invitation, or have it
+    /// left at Duey without room for it.
+    Invited(game::wedding::Invitation),
+    /// The invitation the player sent could not reach its guest, who is
+    /// off the list again: take it back.
+    Returned(game::wedding::Invitation),
 }

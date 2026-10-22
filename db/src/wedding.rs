@@ -1,12 +1,12 @@
 //! Booked weddings (report b066): one per couple, until the wedding or a
 //! no-show ends it.
 
-use crate::schema::{marriages, wedding_reservations};
+use crate::schema::{marriages, wedding_guests, wedding_reservations};
 use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use game::marriage::ENGAGED;
-use game::wedding::{next_slot, Reservation, Venue, SLOT};
+use game::marriage::{MarriageRecord, ENGAGED};
+use game::wedding::{next_slot, Reservation, Venue, MAX_GUESTS, NO_SHOW, SLOT};
 use std::time::{Duration, SystemTime};
 
 type Row = (i32, i16, bool, i16, SystemTime);
@@ -157,4 +157,99 @@ pub fn drop_over(now: SystemTime) -> crate::Result<usize> {
         wedding_reservations::table.filter(wedding_reservations::starts_at.le(cutoff)),
     )
     .execute(&mut conn)?)
+}
+
+/// What came of inviting a guest.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Invite {
+    /// On the list now, for this wedding.
+    Added(Reservation),
+    AlreadyInvited,
+    /// The wedding has its most guests.
+    Full,
+    /// The couple has no wedding booked at the venue.
+    NotBooked,
+    /// The wedding has begun.
+    Started,
+}
+
+/// Put `guest_id` on the list of the couple `marriage_id`'s wedding at
+/// `venue`, before it starts. It locks the couple's row, so two guests
+/// invited at once can't both take the last place.
+pub fn invite(
+    marriage_id: i32,
+    venue: Venue,
+    guest_id: i32,
+    now: SystemTime,
+) -> crate::Result<Invite> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<Invite> {
+        if lock_couple(conn, marriage_id)?.is_none() {
+            return Ok(Invite::NotBooked);
+        }
+        let Some(reservation) =
+            current_in(conn, marriage_id, now)?.filter(|reservation| reservation.venue == venue)
+        else {
+            return Ok(Invite::NotBooked);
+        };
+        if !reservation.inviting(now) {
+            return Ok(Invite::Started);
+        }
+        let guests = wedding_guests::table.filter(wedding_guests::marriage_id.eq(marriage_id));
+        let already: i64 = guests
+            .filter(wedding_guests::guest_id.eq(guest_id))
+            .count()
+            .get_result(conn)?;
+        if already > 0 {
+            return Ok(Invite::AlreadyInvited);
+        }
+        let count: i64 = guests.count().get_result(conn)?;
+        if count >= MAX_GUESTS {
+            return Ok(Invite::Full);
+        }
+        diesel::insert_into(wedding_guests::table)
+            .values((
+                wedding_guests::marriage_id.eq(marriage_id),
+                wedding_guests::guest_id.eq(guest_id),
+            ))
+            .execute(conn)?;
+        Ok(Invite::Added(reservation))
+    })?)
+}
+
+/// Take `guest_id` off the guest list of the couple `marriage_id`, whose
+/// invitation reached them nowhere.
+pub fn uninvite(marriage_id: i32, guest_id: i32) -> crate::Result<()> {
+    let mut conn = crate::connection()?;
+    diesel::delete(
+        wedding_guests::table
+            .filter(wedding_guests::marriage_id.eq(marriage_id))
+            .filter(wedding_guests::guest_id.eq(guest_id)),
+    )
+    .execute(&mut conn)?;
+    Ok(())
+}
+
+/// The soonest wedding at `venue` that `guest_id` is invited to and that
+/// has not passed by `now`, with its couple.
+pub fn guest_of(
+    guest_id: i32,
+    venue: Venue,
+    now: SystemTime,
+) -> crate::Result<Option<(Reservation, MarriageRecord)>> {
+    let mut conn = crate::connection()?;
+    let row = wedding_guests::table
+        .inner_join(wedding_reservations::table)
+        .filter(wedding_guests::guest_id.eq(guest_id))
+        .filter(wedding_reservations::venue.eq(venue as i16))
+        .filter(wedding_reservations::starts_at.gt(now - NO_SHOW))
+        .order(wedding_reservations::starts_at.asc())
+        .select(columns())
+        .first::<Row>(&mut conn)
+        .optional()?;
+    let Some(reservation) = row.and_then(reservation_of) else {
+        return Ok(None);
+    };
+    let record = crate::marriage::by_id(&mut conn, reservation.marriage_id)?;
+    Ok(record.map(|record| (reservation, record)))
 }

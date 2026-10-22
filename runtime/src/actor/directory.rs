@@ -351,6 +351,10 @@ impl WorldDirectory {
                 premium,
             } => self.reserve_wedding(from, partner, venue, premium),
             DirectoryMessage::Wedding { to, news } => self.tell(to, ServerMessage::Wedding(news)),
+            DirectoryMessage::DeliverInvitation { invitation } => {
+                self.deliver_invitation(invitation)
+            }
+            DirectoryMessage::ReturnInvitation { invitation } => self.return_invitation(invitation),
             DirectoryMessage::CoupleEnded { partner, record } => {
                 self.tell(partner, ServerMessage::CoupleEnded(record))
             }

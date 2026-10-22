@@ -12,6 +12,7 @@ use net::packet::build::world::marriage::{
     build_couple_ended, build_engaged, build_marriage_notice, build_marriage_refusal,
     build_partner_map, build_proposal, build_wedding_notice, WeddingNotice,
 };
+use net::packet::build::world::stat::build_stat_update;
 use net::{ClientId, RingRequest, WorldAction};
 use packet::Packet;
 use std::time::SystemTime;
@@ -42,6 +43,19 @@ impl ClientActor {
                 .await
             }
             RingRequest::Break { item_id } => self.break_off(item_id).await,
+            RingRequest::Invite {
+                guest,
+                marriage_id,
+                slot,
+            } => {
+                // The client waits for an answer after sending one
+                // (report b069), whatever came of it.
+                self.invite(guest, marriage_id, slot).await?;
+                self.send(&mut build_stat_update(true, &[])?).await
+            }
+            RingRequest::OpenInvitation { slot, item_id } => {
+                self.open_invitation(slot, item_id).await
+            }
         }
     }
 

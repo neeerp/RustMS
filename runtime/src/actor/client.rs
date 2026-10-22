@@ -30,6 +30,8 @@ mod time_limit;
 mod trade;
 mod wedding;
 
+pub(crate) use wedding::leave_at_duey;
+
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;

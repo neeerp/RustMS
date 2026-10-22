@@ -184,55 +184,69 @@ pub enum Sent {
 pub fn send(new: &NewParcel, only: bool, limit: i64, sender: &Player) -> crate::Result<Sent> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
-        // Two parcels sent at once can't both take the last place. A lock
-        // on the receiver's row would deadlock with the receiver sending
-        // back at once, as each then saves the row the other holds.
-        diesel::sql_query("SELECT pg_advisory_xact_lock($1, $2)")
-            .bind::<diesel::sql_types::Integer, _>(SEND_LOCK)
-            .bind::<diesel::sql_types::Integer, _>(new.receiver_id)
-            .execute(conn)?;
-        let waiting = parcels::table
-            .filter(parcels::receiver_id.eq(new.receiver_id))
-            .filter(parcels::sent_at.ge(cutoff(new.sent_at)));
-        let count: i64 = waiting.clone().count().get_result(conn)?;
-        if count >= limit {
-            return Ok(Sent::InboxFull);
+        let sent = insert(conn, new, only, limit)?;
+        if let Sent::Sent(_) = sent {
+            write_player(conn, sender)?;
         }
-        if let Some(item) = new.item.filter(|_| only) {
-            let held: i64 = waiting
-                .filter(parcels::item_id.eq(item.item_id))
-                .count()
-                .get_result(conn)?;
-            if held > 0 {
-                return Ok(Sent::OnlyOneWaiting);
-            }
-        }
-        let item = new.item;
-        let id: i64 = diesel::insert_into(parcels::table)
-            .values(&ParcelInsert {
-                receiver_id: new.receiver_id,
-                sender: new.sender,
-                mesos: new.mesos,
-                message: new.message,
-                quick: new.quick,
-                sent_at: new.sent_at,
-                item_id: item.map(|item| item.item_id),
-                quantity: item.map_or(0, |item| item.quantity),
-                owner: item.map_or("", |item| item.owner.as_str()),
-                flags: item.map_or(0, |item| item.flags),
-                expires_at: item.and_then(|item| item.expiration),
-                cash_serial: item.and_then(|item| item.cash_serial),
-            })
-            .returning(parcels::id)
-            .get_result(conn)?;
-        if let Some(stats) = item.and_then(|item| item.equip.as_ref()) {
-            diesel::insert_into(parcel_equipment_stats::table)
-                .values(&ParcelEquipmentStatsRow::new(id, stats))
-                .execute(conn)?;
-        }
-        write_player(conn, sender)?;
-        Ok(Sent::Sent(id))
+        Ok(sent)
     })?)
+}
+
+/// Leave `new` for its receiver from no one's inventory, as a server's
+/// delivery, unless they already have `limit` parcels waiting.
+pub fn leave(new: &NewParcel, limit: i64) -> crate::Result<Sent> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| insert(conn, new, false, limit))?)
+}
+
+fn insert(conn: &mut PgConnection, new: &NewParcel, only: bool, limit: i64) -> QueryResult<Sent> {
+    // Two parcels sent at once can't both take the last place. A lock
+    // on the receiver's row would deadlock with the receiver sending
+    // back at once, as each then saves the row the other holds.
+    diesel::sql_query("SELECT pg_advisory_xact_lock($1, $2)")
+        .bind::<diesel::sql_types::Integer, _>(SEND_LOCK)
+        .bind::<diesel::sql_types::Integer, _>(new.receiver_id)
+        .execute(conn)?;
+    let waiting = parcels::table
+        .filter(parcels::receiver_id.eq(new.receiver_id))
+        .filter(parcels::sent_at.ge(cutoff(new.sent_at)));
+    let count: i64 = waiting.clone().count().get_result(conn)?;
+    if count >= limit {
+        return Ok(Sent::InboxFull);
+    }
+    if let Some(item) = new.item.filter(|_| only) {
+        let held: i64 = waiting
+            .filter(parcels::item_id.eq(item.item_id))
+            .count()
+            .get_result(conn)?;
+        if held > 0 {
+            return Ok(Sent::OnlyOneWaiting);
+        }
+    }
+    let item = new.item;
+    let id: i64 = diesel::insert_into(parcels::table)
+        .values(&ParcelInsert {
+            receiver_id: new.receiver_id,
+            sender: new.sender,
+            mesos: new.mesos,
+            message: new.message,
+            quick: new.quick,
+            sent_at: new.sent_at,
+            item_id: item.map(|item| item.item_id),
+            quantity: item.map_or(0, |item| item.quantity),
+            owner: item.map_or("", |item| item.owner.as_str()),
+            flags: item.map_or(0, |item| item.flags),
+            expires_at: item.and_then(|item| item.expiration),
+            cash_serial: item.and_then(|item| item.cash_serial),
+        })
+        .returning(parcels::id)
+        .get_result(conn)?;
+    if let Some(stats) = item.and_then(|item| item.equip.as_ref()) {
+        diesel::insert_into(parcel_equipment_stats::table)
+            .values(&ParcelEquipmentStatsRow::new(id, stats))
+            .execute(conn)?;
+    }
+    Ok(Sent::Sent(id))
 }
 
 /// Remove `receiver`'s parcel `id` and save `player`, who took what it

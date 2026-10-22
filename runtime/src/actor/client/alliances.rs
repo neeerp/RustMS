@@ -177,7 +177,11 @@ impl ClientActor {
     }
 
     /// Tell the player of a problem in pink, as Cosmic does.
-    async fn pink(&mut self, key: &str, vars: &[(&str, &str)]) -> Result<(), RuntimeError> {
+    pub(super) async fn pink(
+        &mut self,
+        key: &str,
+        vars: &[(&str, &str)],
+    ) -> Result<(), RuntimeError> {
         let text = net::content::text().get(key, vars);
         self.send(&mut build_broadcast(Broadcast::Pink, &text)?)
             .await

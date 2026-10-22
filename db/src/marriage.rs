@@ -63,6 +63,17 @@ fn row_of(conn: &mut PgConnection, character_id: i32) -> QueryResult<Option<Row>
         .optional()
 }
 
+/// The couple `id`'s record, if it is still there.
+pub(crate) fn by_id(conn: &mut PgConnection, id: i32) -> QueryResult<Option<MarriageRecord>> {
+    marriages::table
+        .find(id)
+        .select(columns())
+        .first::<Row>(conn)
+        .optional()?
+        .map(|row| with_names(conn, row))
+        .transpose()
+}
+
 /// The character's engagement or marriage, if any.
 pub fn record(conn: &mut PgConnection, character_id: i32) -> QueryResult<Option<MarriageRecord>> {
     row_of(conn, character_id)?

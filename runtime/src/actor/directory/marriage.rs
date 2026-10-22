@@ -1,11 +1,13 @@
 //! The directory's part in engagements (report b052): a proposal waits
 //! here for the partner's answer, and goes when either leaves. A wedding
-//! booking (report b066) passes through here to the partner and back.
+//! booking (report b066) passes through here to the partner and back, and
+//! an invitation to its guest.
 
 use super::WorldDirectory;
+use crate::actor::client::leave_at_duey;
 use crate::message::{ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
-use game::wedding::{PartnerRefusal, Venue};
+use game::wedding::{Invitation, PartnerRefusal, Venue};
 use game_data::server_content::keys;
 use net::packet::build::world::marriage::{build_marriage_notice, build_marriage_refusal};
 use net::ClientId;
@@ -143,6 +145,41 @@ impl WorldDirectory {
             refusal: Some(refusal),
         };
         self.tell(from, ServerMessage::Wedding(news));
+    }
+
+    /// Hand `invitation` to its guest, or back to `from` (who sent it) if
+    /// the guest is offline.
+    /// Hand `invitation` to its guest if they are online. Otherwise leave
+    /// it at Duey here, in the background, so that it gets there even if
+    /// its sender leaves meanwhile.
+    pub(super) fn deliver_invitation(&self, invitation: Invitation) {
+        let guest = invitation.guest;
+        if self.clients.contains_key(&guest) {
+            self.tell(
+                guest,
+                ServerMessage::Wedding(WeddingNews::Invited(invitation)),
+            );
+            return;
+        }
+        let sender = self
+            .clients
+            .get(&invitation.sender)
+            .map(|entry| entry.handle.clone());
+        tokio::spawn(async move {
+            if !leave_at_duey(&invitation).await {
+                if let Some(sender) = sender {
+                    sender.send(ServerMessage::Wedding(WeddingNews::Returned(invitation)));
+                }
+            }
+        });
+    }
+
+    /// Hand `invitation`, which reached nobody, back to its sender.
+    pub(super) fn return_invitation(&self, invitation: Invitation) {
+        self.tell(
+            invitation.sender,
+            ServerMessage::Wedding(WeddingNews::Returned(invitation)),
+        );
     }
 
     fn partner_of(&self, proposer: ClientId) -> Option<ClientId> {
