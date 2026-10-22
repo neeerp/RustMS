@@ -6,7 +6,7 @@ use crate::charge;
 use crate::combo;
 use crate::energy;
 use crate::meso_explosion::{self, Blast, Explosion, MESO_EXPLOSION};
-use crate::skills::{self, Learned};
+use crate::skills::{self, Learned, HYPNOTIZE};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use game::inventory::equip_slot;
 use game::{BuffStat, InventoryType, Player};
@@ -790,7 +790,9 @@ fn sacrifice_cost(attack: &Attack, x: i32, hp: i16) -> i32 {
 fn damage_percent(skill: &Learned) -> Option<i32> {
     match (skill.effect.damage, skill.skill_id) {
         (0, ARROW_BOMB) => Some(skill.effect.x),
-        (0, 4001002 | 14001002 | 4121003 | 4221003) => Some(100),
+        // Disorder, Taunt, and Hypnotize have no `damage`: the client hits
+        // for the plain blow.
+        (0, 4001002 | 14001002 | 4121003 | 4221003 | HYPNOTIZE) => Some(100),
         (0, _) => None,
         (damage, _) => Some(damage),
     }
@@ -1854,7 +1856,7 @@ mod tests {
     }
 
     #[test]
-    fn disorder_and_taunt_hit_for_the_base_cap() {
+    fn disorder_taunt_and_hypnotize_hit_for_the_base_cap() {
         if skills::data().is_err() {
             return;
         }
@@ -1865,8 +1867,13 @@ mod tests {
         player.stats.mp = 100;
         learn(&mut player, 4001002, 20);
         learn(&mut player, 4121003, 30);
+        learn(&mut player, HYPNOTIZE, 20);
         let cap = (max_base_damage(&player, &hit(AttackKind::Close, 4001002, 0)) * 2).max(10);
-        for (kind, skill) in [(AttackKind::Close, 4001002), (AttackKind::Ranged, 4121003)] {
+        for (kind, skill) in [
+            (AttackKind::Close, 4001002),
+            (AttackKind::Ranged, 4121003),
+            (AttackKind::Close, HYPNOTIZE),
+        ] {
             assert!(validate(&hit(kind, skill, cap), &player).is_ok());
             assert_eq!(
                 validate(&hit(kind, skill, cap + 1), &player).unwrap_err(),

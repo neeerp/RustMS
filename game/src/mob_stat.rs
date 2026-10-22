@@ -120,7 +120,12 @@ impl MobStat {
     pub fn spares_bosses(self) -> bool {
         matches!(
             self,
-            MobStat::Stun | MobStat::Freeze | MobStat::Seal | MobStat::Doom | MobStat::Web
+            MobStat::Stun
+                | MobStat::Freeze
+                | MobStat::Seal
+                | MobStat::Doom
+                | MobStat::Web
+                | MobStat::Dazzle
         )
     }
 }

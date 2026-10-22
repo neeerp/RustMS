@@ -943,7 +943,7 @@ carry the statuses a mob has. Entries come in the client's decode order
   Dispel take mob buffs off instead.
 - An attack's hits carry `skills::on_hit`: the attack skill's own status
   (stuns, freezes, poisons, Disorder's lower attack and defence, Taunt's
-  higher defence) and a learned Venom's poison. Each mob hit for more than
+  higher defence, Hypnotize's Dazzle) and a learned Venom's poison. Each mob hit for more than
   0 rolls each. Elemental Boost makes Ice Splitter's freeze last its `y`
   seconds longer; the extra poison its description promises for
   Flamethrower is not modelled.
@@ -951,7 +951,12 @@ carry the statuses a mob has. Entries come in the client's decode order
   that dies with it gives its value in percent more EXP and makes each of
   its drops that much likelier (`Kill::showdown`, `loot::roll`; the
   OdinMS-family rule).
-- Bosses shrug off Stun, Freeze, Seal, Doom and Web. A mob immune to poison
+- Hypnotize (5221009) has no `damage` and hits for the plain blow, like
+  Disorder and Taunt. Its Dazzle (bit 28) stops the mob attacking players
+  on the client. In v83 other mobs may then hit it, reported by their
+  controller as MOB_DAMAGE_MOB (0xC2); the server has no handler for that
+  yet.
+- Bosses shrug off Stun, Freeze, Seal, Doom, Web and Dazzle. A mob immune to poison
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick
   (`MobSet::hurt_by_statuses`), the mob's `fixedDamage` instead if it has
