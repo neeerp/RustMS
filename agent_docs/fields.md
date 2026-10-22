@@ -136,7 +136,10 @@ and enters the map it left.
 In the shop, `CASHSHOP_OPERATION` (0xE5) buys a commodity and sets the wish
 list (`net/src/packet/handle/world/cash_shop.rs`). A purchase is checked against
 `Etc.nx` `Commodity.img` (`net::cash_shop`): the item must be on sale and allowed
-for the character's gender. `db::cash_shop::buy` then takes the price from the
+for the character's gender. Cash items that don't work here yet count as sold
+out, alone or in a package: hired merchants and their remote controller, the
+Rock of Evolution, Name Change, Character Transfer, Maple Life, Miu Miu and
+Remote Gachapon (`INERT_CLASSES`). `db::cash_shop::buy` then takes the price from the
 chosen balance and adds the item to the Cash Inventory in one transaction. The
 client gets the item (0x57) and its new balance, or a failure code (0x5C): 0xA5
 not enough cash, 0xAA gender, 0xC0 sold out, 0x00 anything else. The wish list

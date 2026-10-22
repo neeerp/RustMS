@@ -127,11 +127,27 @@ pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopF
     Ok(commodity)
 }
 
+/// The classes (`item_id / 10_000`) of cash items on sale that do nothing
+/// here yet: hired merchants (503) and their Store Remote Controller (547),
+/// the Rock of Evolution (538), Name Change and Character Transfer (540),
+/// Maple Life (543), and Miu Miu and Remote Gachapon (545). The shop calls
+/// them sold out rather than take NX for nothing (report c046). Take a class
+/// out once its item works.
+const INERT_CLASSES: [i32; 6] = [503, 538, 540, 543, 545, 547];
+
+fn inert(item_id: i32) -> bool {
+    INERT_CLASSES.contains(&(item_id / 10_000))
+}
+
 /// Whether `commodity` is for sale as an item or a package. The other
 /// `9xxxxxx` items, the slot expansions, are bought with their own request.
 fn check_sale(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
     let commodity = commodity.ok_or(CashShopFailure::Unknown)?;
     if !commodity.on_sale || commodity.price <= 0 {
+        return Err(CashShopFailure::SoldOut);
+    }
+    let contents = package(commodity).unwrap_or_else(|| vec![commodity]);
+    if contents.iter().any(|item| inert(item.item_id)) {
         return Err(CashShopFailure::SoldOut);
     }
     if commodity.item_id / 1_000_000 == 9 && package(commodity).is_none() {
@@ -349,6 +365,50 @@ mod tests {
             check_purchase(commodity(10100885), 0),
             Err(CashShopFailure::SoldOut)
         );
+    }
+
+    #[test]
+    fn items_that_do_nothing_yet_are_sold_out() {
+        let name_change = Commodity {
+            item_id: 5400000,
+            ..ticket()
+        };
+        assert_eq!(
+            check_purchase(Some(&name_change), 0),
+            Err(CashShopFailure::SoldOut)
+        );
+        assert_eq!(
+            check_gift(Some(&name_change)),
+            Err(CashShopFailure::SoldOut)
+        );
+        if commodities().is_err() {
+            return;
+        }
+        let on_sale = |item_id| {
+            commodities()
+                .unwrap()
+                .iter()
+                .any(|c| c.item_id == item_id && c.on_sale)
+        };
+        // A hired merchant, the Rock of Evolution, Name Change, Character
+        // Transfer, Maple Life, Miu Miu, Remote Gachapon, the Store Remote
+        // Controller.
+        for item_id in [
+            5030000, 5380000, 5400000, 5401000, 5431000, 5450000, 5451000, 5470000,
+        ] {
+            assert!(on_sale(item_id), "{item_id}");
+            let sn = commodity_sn(item_id, 1);
+            assert_eq!(
+                check_purchase(commodity(sn), 0),
+                Err(CashShopFailure::SoldOut),
+                "{item_id}"
+            );
+        }
+        // Gachapon Tickets, Pet Snacks and guild emoticons still sell.
+        for item_id in [5220000, 5460000, 5290000] {
+            let sn = commodity_sn(item_id, 1);
+            assert!(check_purchase(commodity(sn), 0).is_ok(), "{item_id}");
+        }
     }
 
     #[test]
