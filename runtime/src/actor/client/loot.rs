@@ -7,9 +7,10 @@ use net::loot::{self, Loot};
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::{drop, inventory, monster_book as book};
-use net::packet::handle::world::trade_catch;
+use net::packet::handle::world::{apply_item_effect, item_effect_packets, trade_catch};
 use net::reactors::Action;
 use net::FieldRequest;
+use std::time::Instant;
 use tracing::debug;
 
 impl ClientActor {
@@ -159,6 +160,16 @@ impl ClientActor {
                 return Ok(true);
             }
         }
+        let picked = match &drop.loot {
+            Loot::Item { item_id, .. } => Some(*item_id),
+            Loot::Dropped(item) => Some(item.item_id),
+            Loot::Mesos(_) => None,
+        };
+        if let Some(item_id) = picked {
+            if self.consume_on_pickup(item_id).await? {
+                return Ok(true);
+            }
+        }
         let mut packets = Vec::new();
         let player = &mut self.in_game_mut()?.player;
         let incoming = match &drop.loot {
@@ -250,6 +261,29 @@ impl ClientActor {
 
     /// A picked-up card goes straight into the Monster Book; once its page
     /// holds five, more copies are wasted.
+    /// Apply an item that works the moment it is picked up, such as the
+    /// fruits 2022086-88, rather than bag it (report c036); `false` if
+    /// `item_id` isn't one or does nothing the server supports yet.
+    async fn consume_on_pickup(&mut self, item_id: i32) -> Result<bool, RuntimeError> {
+        if !net::items::info(item_id)
+            .and_then(|info| info.spec)
+            .is_some_and(|spec| spec.consume_on_pickup)
+        {
+            return Ok(false);
+        }
+        let player = &mut self.in_game_mut()?.player;
+        let Some(effect) = apply_item_effect(player, item_id, Instant::now()) else {
+            return Ok(false);
+        };
+        // Its HP and MP update unlocks the client's pickup.
+        let (mut own, seen) = item_effect_packets(player, item_id, effect, true)?;
+        self.send_all(&mut own).await?;
+        for packet in seen {
+            self.show_buffs(packet).await?;
+        }
+        Ok(true)
+    }
+
     async fn collect_card(&mut self, card: i32) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let character_id = player.id();

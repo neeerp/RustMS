@@ -254,6 +254,9 @@ pub struct ConsumeSpec {
     /// Whether it morphs the player into a random template (`morphRandom`,
     /// 2211000 and 2212000), which the server doesn't choose yet.
     pub morph_random: bool,
+    /// Whether picking it up applies it at once instead of bagging it
+    /// (`consumeOnPickup`): the fruits 2022086-88, Carnival and Dojo items.
+    pub consume_on_pickup: bool,
 }
 
 impl ConsumeSpec {
@@ -570,6 +573,7 @@ impl ItemData {
                 exp: nx.int_child(spec, "exp")?.unwrap_or(0),
                 inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
                 morph_random: nx.child_by_name(spec, "morphRandom")?.is_some(),
+                consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
             });
         }
         if item_id / 10_000 == 210 {
@@ -940,6 +944,13 @@ mod tests {
             assert_eq!((random.morph_random, random.hp), (true, 50));
             assert!(!random.has_effect());
         }
+        let red_fruit = data.info(2022086).unwrap().unwrap().spec.unwrap();
+        assert!(red_fruit.consume_on_pickup && red_fruit.has_effect());
+        assert!(red_fruit
+            .stats
+            .iter()
+            .any(|&(stat, _)| stat == BuffStat::Pad));
+        assert!(!warrior_pill.consume_on_pickup);
         let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
         assert_eq!(
             (air_bubble.stats, air_bubble.time),
