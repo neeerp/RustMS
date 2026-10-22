@@ -401,6 +401,8 @@ enum Refusal {
     NoMovementSkillsHere,
     /// A skill the player's morph can't use.
     Morphed,
+    /// Not from the Battleship, or only from it.
+    Ship,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -799,6 +801,10 @@ fn use_skill(
         .ok_or(Refusal::NotLearned)?;
     if morph::refused(player, skill_id) {
         return Err(Refusal::Morphed);
+    }
+    let on_ship = player.ride_skill() == Some(mount::BATTLESHIP);
+    if mount::ship_refuses(on_ship, skill_id) {
+        return Err(Refusal::Ship);
     }
     if combo::enrage_refused(player, skill_id) {
         return Err(Refusal::TooFewOrbs);
@@ -1818,6 +1824,35 @@ mod tests {
             board(&mut player, 10, mounts_off, now).unwrap_err(),
             Refusal::NoMountsHere
         );
+    }
+
+    #[test]
+    fn the_battleship_takes_only_the_skills_used_from_it() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with(mount::BATTLESHIP, 10);
+        for skill_id in [5221000, 4101003] {
+            player.skills.set(SkillRecord {
+                skill_id,
+                level: 1,
+                master_level: 0,
+                expiration: None,
+            });
+        }
+        player.stats.level = 150;
+        player.stats.mp = 1000;
+        player.stats.max_mp = 1000;
+        let now = Instant::now();
+        board(&mut player, 10, 0, now).unwrap();
+        // Maple Warrior is used from the ship, Haste isn't; off it, both are.
+        assert!(use_skill(&mut player, 5221000, 1, now).is_ok());
+        assert_eq!(
+            use_skill(&mut player, 4101003, 1, now).unwrap_err(),
+            Refusal::Ship
+        );
+        dismount(&mut player, HandlerResult::empty()).unwrap();
+        assert!(use_skill(&mut player, 4101003, 1, now).is_ok());
     }
 
     #[test]

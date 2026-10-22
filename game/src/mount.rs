@@ -47,6 +47,30 @@ pub fn battleship_max_hp(level: i32, slv: i32) -> i32 {
     (400 * slv + 200 * (level - 120).max(0)).min(i32::from(u16::MAX))
 }
 
+/// The skills used from the ship (v83 FUN_00966f7a): the Corsair's guns,
+/// summons and buffs, the ship's own attacks, and a few other jobs'.
+/// Anything else, the basic attack too, is "Not available during the
+/// ride." (0xee6).
+const SHIP_SKILLS: [i32; 14] = [
+    5201002, 5201003, 5211001, 5211002, 5211004, 5211005, 5220002, 5221000, 5221007, 5221008,
+    5221010, 14111006, 21121008, 22171004,
+];
+
+/// Battleship Cannon and Torpedo, used only from the ship (0xdd3,
+/// FUN_00969a57).
+const SHIP_ONLY: [i32; 2] = [5221007, 5221008];
+
+/// Whether the Battleship's rules keep a player from a skill (0 for the
+/// basic attack): on the ship, any not used from it; off it, the ship's
+/// own attacks. The client already holds back both.
+pub fn ship_refuses(on_ship: bool, skill: i32) -> bool {
+    if on_ship {
+        !SHIP_SKILLS.contains(&skill)
+    } else {
+        SHIP_ONLY.contains(&skill)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mount {
     pub level: i32,
@@ -105,6 +129,17 @@ mod tests {
         assert_eq!(battleship_max_hp(150, 10), 10_000);
         assert_eq!(battleship_max_hp(200, 10), 20_000);
         assert_eq!(battleship_max_hp(100, 1), 400);
+    }
+
+    #[test]
+    fn the_ship_takes_only_its_own_skills_and_keeps_its_guns() {
+        assert!(!ship_refuses(true, 5221007));
+        assert!(!ship_refuses(true, 5211004));
+        assert!(ship_refuses(true, 0));
+        assert!(ship_refuses(true, 5221003));
+        assert!(ship_refuses(false, 5221008));
+        assert!(!ship_refuses(false, 0));
+        assert!(!ship_refuses(false, 5221003));
     }
 
     #[test]
