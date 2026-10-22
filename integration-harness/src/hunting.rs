@@ -3,6 +3,7 @@
 //! field.
 
 use crate::packets::build_player_move;
+use net::meso_explosion::MESO_EXPLOSION;
 use net::packet::build::world::mob::{Hurt, FROM_TOUCH};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
@@ -30,6 +31,54 @@ pub fn skill_attack(skill_id: i32, object_id: i32, damage: i32) -> Packet {
 /// each of `lines`.
 pub fn skill_attack_lines(skill_id: i32, object_id: i32, lines: &[i32]) -> Packet {
     kind_attack(RecvOpcode::CloseRangeAttack, skill_id, 0, object_id, lines)
+}
+
+/// CLOSE_RANGE_ATTACK with Meso Explosion facing left: each target's
+/// lines, then the `drops` it sets off, each with the targets it hurts (bit
+/// j for the j-th), and when its hits land, in ms (v83 0x96bafe).
+pub fn meso_explosion(targets: &[(i32, &[i32])], drops: &[(i32, u8)], delay: i16) -> Packet {
+    let most = targets.iter().map(|(_, lines)| lines.len()).max();
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::CloseRangeAttack as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_byte((targets.len() as u8) << 4 | most.unwrap_or(0) as u8)
+        .unwrap();
+    p.write_int(MESO_EXPLOSION).unwrap();
+    p.write_bytes(&[0; 8]).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_short(0x8005u16 as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_byte(4).unwrap();
+    p.write_bytes(&[0; 4]).unwrap();
+    // Each target says how many lines it takes.
+    for &(object_id, lines) in targets {
+        p.write_int(object_id).unwrap();
+        p.write_bytes(&[0; 12]).unwrap();
+        p.write_byte(lines.len() as u8).unwrap();
+        for &line in lines {
+            p.write_int(line).unwrap();
+        }
+        p.write_bytes(&[0; 4]).unwrap();
+    }
+    // Where the player stands, which the server takes from the field.
+    p.write_short(0).unwrap();
+    p.write_short(0).unwrap();
+    p.write_byte(drops.len() as u8).unwrap();
+    for &(object_id, targets) in drops {
+        p.write_int(object_id).unwrap();
+        p.write_byte(targets).unwrap();
+    }
+    p.write_short(delay).unwrap();
+    p
+}
+
+/// MESO_DROP: throw `amount` mesos.
+pub fn meso_drop(amount: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MesoDrop as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_int(amount).unwrap();
+    p
 }
 
 /// RANGED_ATTACK with a skill (0 for none) firing the ammo in USE slot
@@ -360,6 +409,8 @@ pub struct Field {
     pub drops: Vec<MapDrop>,
     /// (object id, character who picked it up)
     pub removed: Vec<(i32, Option<i32>)>,
+    /// Drops a Meso Explosion set off: (object id, delay in ms).
+    pub exploded: Vec<(i32, i16)>,
     /// Effects on other characters: (character id, effect).
     pub effects: Vec<(i32, u8)>,
     /// DAMAGE_PLAYER: (character id, source, damage).
@@ -647,8 +698,12 @@ impl Field {
         } else if op == SendOpcode::RemoveItemFromMap as i16 {
             let mode = r.read_byte().unwrap();
             let oid = r.read_int().unwrap();
-            self.removed
-                .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
+            if mode == 4 {
+                self.exploded.push((oid, r.read_short().unwrap()));
+            } else {
+                self.removed
+                    .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
+            }
         } else if op == SendOpcode::SpawnNpc as i16 {
             self.npcs
                 .push((r.read_int().unwrap(), r.read_int().unwrap()));
