@@ -56,4 +56,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Opens Duey's window, or answers a request to it (report b028)
+	// Opcode: PARCEL(322)
+	class ParcelHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

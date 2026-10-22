@@ -116,6 +116,7 @@ namespace ms
 			AVATARMEGAPHONE,
 			FRIENDGROUP,
 			MAKER,
+			DUEY,
 			NUM_TYPES
 		};
 

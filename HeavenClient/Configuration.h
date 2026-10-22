@@ -661,6 +661,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIDuey, where v83 makes it (FUN_006f3e94)
+	struct PosDUEY : public Configuration::PointEntry
+	{
+		PosDUEY() : PointEntry("PosDUEY", "(255, 25)")
+		{}
+	};
+
 	// The default position of UITradingRoom: centred, like the v83 dialog
 	struct PosTRADE : public Configuration::PointEntry
 	{

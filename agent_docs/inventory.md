@@ -925,8 +925,25 @@ any parcel hasn't been announced, and they are then all marked announced.
 An online receiver is told at once through the directory, and the parcel is
 marked announced. They get `0x18`, then `0x19`, which shows the notifier or
 brings an open window to the front. Expired parcels are deleted, not
-returned to their sender. Not done: the GM refusal, a per-day limit for low
-levels, and the client's Duey window (HeavenClient has none yet).
+returned to their sender. Not done: the GM refusal and a per-day limit for
+low levels.
+
+The client's window is `UIDuey`, from v83's CParcelDlg (layout in `v83ref`
+reports b028 and b030). PARCEL is handled by `ParcelHandler`, and
+`Net/Handlers/Parcels.h` reads the records and holds the status and result
+texts. Mode `0x08` opens the window unless one is open. The list shows three
+of up to ten parcels with a scrollbar: the sender and "Delivering", "%d
+day(s)" or "Will expire soon" (red). v83 also writes a Korean word for a
+quick parcel, which HC leaves out. Choosing a row shows its sender, mesos,
+item with its level limit and count, and its message where Duey's words
+were; an empty message reads "No information entered.". The item's tooltip
+shows over v83's box, 16 above the icon. RECEIVE refuses a parcel still
+being delivered, and DELETE asks first; either waits for the answer before
+another request. Each expired parcel gets its own notice, one after
+another. The close button and Esc send op 7. A map change drops the window
+without telling the server, as v83 does. Not done yet: the tab strip
+(`Basic.img/Tab2` at (6,23)), the send panels, the notifier and the coupon's
+quick send.
 
 ## Trading
 

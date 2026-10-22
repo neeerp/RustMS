@@ -63,7 +63,8 @@ namespace ms
 			// Help from String's ToolTipHelp.img, which belongs to the window it was shown for.
 			HELP,
 			// The item search's results, whose tooltips go right of the cursor.
-			PETITEMSEARCH
+			PETITEMSEARCH,
+			DUEY
 		};
 
 		virtual ~Tooltip()

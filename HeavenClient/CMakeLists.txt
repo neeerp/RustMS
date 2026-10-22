@@ -247,6 +247,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(buff_parser_tests tests/buff_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
     target_include_directories(buff_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME buff_parser COMMAND buff_parser_tests)
+    add_executable(parcels_tests tests/parcels.cpp Net/InPacket.cpp)
+    target_include_directories(parcels_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME parcels COMMAND parcels_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -810,6 +813,8 @@ add_executable(HeavenClient
     IO/UITypes/UISlideMenu.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
+    IO/UITypes/UIDuey.cpp
+    IO/UITypes/UIDuey.h
     IO/UITypes/UITeleportRock.cpp
     IO/UITypes/UITeleportRock.h
     IO/UITypes/UIMegaphone.cpp
