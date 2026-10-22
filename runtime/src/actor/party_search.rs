@@ -29,8 +29,10 @@ impl Wanted {
     /// leader of `level` whose party has `size` members.
     pub fn is_valid(&self, level: u8, size: usize) -> bool {
         let level = i32::from(level);
+        // Any ints may come; the span is taken without overflowing.
+        let span = i64::from(self.max_level) - i64::from(self.min_level);
         self.max_level <= MAX_LEVEL
-            && self.max_level - self.min_level <= LEVEL_SPAN
+            && span <= i64::from(LEVEL_SPAN)
             && self.min_level <= self.max_level
             && (self.min_level..=self.max_level).contains(&level)
             && (2..=6).contains(&self.members)
@@ -40,7 +42,8 @@ impl Wanted {
     }
 
     pub fn fits(&self, level: u8, job: i16) -> bool {
-        (self.min_level..=self.max_level).contains(&i32::from(level)) && self.jobs & job_bit(job) != 0
+        (self.min_level..=self.max_level).contains(&i32::from(level))
+            && self.jobs & job_bit(job) != 0
     }
 }
 
@@ -171,6 +174,11 @@ mod tests {
             ..wanted(all)
         };
         assert!(!one.is_valid(30, 0));
+        let hostile = Wanted {
+            min_level: i32::MIN,
+            ..wanted(all)
+        };
+        assert!(!hostile.is_valid(30, 1));
     }
 
     #[test]

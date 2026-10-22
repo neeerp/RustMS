@@ -27,8 +27,7 @@ use net::packet::build::world::party::{
     build_party_chat, build_party_created, build_party_disbanded, build_party_door,
     build_party_invite, build_party_joined, build_party_leader_changed, build_party_left,
     build_party_member_hp, build_party_search_invite, build_party_status, build_party_update,
-    Departure, PartyMemberView,
-    PartyStatus, PartyView,
+    Departure, PartyMemberView, PartyStatus, PartyView,
 };
 use net::packet::handle::world::{DoorExit, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
@@ -389,6 +388,8 @@ impl WorldDirectory {
             );
             previous.handle.kick();
             self.names.remove(&previous.presence.name);
+            // Its unregister will be stale; the search ends here instead.
+            self.party_searches.stop(client_id);
         }
         info!(
             client_id,
@@ -1024,8 +1025,7 @@ impl WorldDirectory {
                     jobs,
                 };
                 // v83 refuses all of these itself, so nothing answers them.
-                let Some(party) = self.parties.of(from).filter(|party| party.leader == from)
-                else {
+                let Some(party) = self.parties.of(from).filter(|party| party.leader == from) else {
                     return;
                 };
                 if !wanted.is_valid(member.level, party.members.len()) {
@@ -1074,7 +1074,12 @@ impl WorldDirectory {
                     && !self.party_searches.has_invited(leader, id)
                     && wanted.fits(candidate.presence.level, candidate.presence.job)
             })
-            .max_by_key(|candidate| (candidate.presence.level, Reverse(candidate.handle.client_id)))
+            .max_by_key(|candidate| {
+                (
+                    candidate.presence.level,
+                    Reverse(candidate.handle.client_id),
+                )
+            })
             .map(|candidate| candidate.handle.client_id);
         let Some(found) = found else {
             return;

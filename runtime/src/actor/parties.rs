@@ -150,11 +150,12 @@ impl Parties {
 
     /// Join `party_id` if invited to it recently and there is room.
     pub fn accept(&mut self, member: Member, party_id: i32, now: Instant) -> Option<&Party> {
+        // Another party's answer leaves this invitation alone.
+        if self.invites.get(&member.id)?.party_id != party_id {
+            return None;
+        }
         let invite = self.invites.remove(&member.id)?;
-        if invite.party_id != party_id
-            || now >= invite.sent + INVITE_TIMEOUT
-            || self.party_of.contains_key(&member.id)
-        {
+        if now >= invite.sent + INVITE_TIMEOUT || self.party_of.contains_key(&member.id) {
             return None;
         }
         let party = self.parties.get_mut(&party_id)?;
@@ -276,7 +277,9 @@ mod tests {
         );
         assert!(!parties.is_asked(3, now + INVITE_TIMEOUT));
         parties.search_invite(1, 3, now + INVITE_TIMEOUT).unwrap();
-        assert!(parties.accept(member(3), first, now + INVITE_TIMEOUT).is_some());
+        assert!(parties
+            .accept(member(3), first, now + INVITE_TIMEOUT)
+            .is_some());
     }
 
     #[test]
