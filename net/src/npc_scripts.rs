@@ -79,6 +79,11 @@ pub const JACKIE: i32 = 9201009;
 pub const HIGH_PRIEST: i32 = 9201002;
 /// Nancy, the Cathedral's assistant at its altar, Jackie's counterpart.
 pub const NANCY: i32 = 9201007;
+/// Travis, who in a wedding's party room sends guests back to Amoria
+/// (`NpcScript::wedding_party`).
+pub const TRAVIS: i32 = 9201010;
+/// Robin, who in a wedding's party room shows guests to its exit.
+pub const WEDDING_ROBIN: i32 = 9201021;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -951,8 +956,9 @@ impl NpcScript {
 
     /// `npc_id`, staff in a wedding's hall or at its altar, to someone in
     /// the wedding at `stage`: to a guest, the way out; to one of the
-    /// couple, once married, the end of the wedding.
-    pub fn wedding_staff(npc_id: i32, stage: WeddingStage, guest: bool) -> Self {
+    /// couple, once married, the end of the wedding, or of a `premium` one
+    /// the party room.
+    pub fn wedding_staff(npc_id: i32, stage: WeddingStage, guest: bool, premium: bool) -> Self {
         let page = match stage {
             _ if guest => Page::Ask {
                 text: text(keys::WEDDING_STAFF_GUEST_LEAVE),
@@ -960,13 +966,34 @@ impl NpcScript {
                 on_no: None,
             },
             WeddingStage::Married => Page::Ask {
-                text: text(keys::WEDDING_STAFF_ASK),
+                text: text(if premium {
+                    keys::WEDDING_STAFF_PARTY_ASK
+                } else {
+                    keys::WEDDING_STAFF_ASK
+                }),
                 on_yes: vec![Effect::EndWedding],
                 on_no: None,
             },
             _ => Page::Say(text(keys::WEDDING_STAFF_WAIT)),
         };
         Self::new(npc_id, vec![page])
+    }
+
+    /// `npc_id`'s script in a wedding's party room, if one of its own, to
+    /// anyone in the wedding: Travis's way back to Amoria, Robin's to the
+    /// exit (report b080).
+    pub fn wedding_party(npc_id: i32) -> Option<Self> {
+        let (key, to) = match npc_id {
+            TRAVIS => (keys::WEDDING_PARTY_QUIT_ASK, AMORIA.0),
+            WEDDING_ROBIN => (keys::WEDDING_PARTY_EXIT_ASK, wedding::WEDDING_EXIT),
+            _ => return None,
+        };
+        let page = Page::Ask {
+            text: text(key),
+            on_yes: vec![Effect::Warp(to)],
+            on_no: None,
+        };
+        Some(Self::new(npc_id, vec![page]))
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -4736,6 +4763,13 @@ mod tests {
         }
     }
 
+    fn question(step: &Step) -> String {
+        match &step.prompt {
+            Some(Prompt::YesNo { text, .. }) => text.clone(),
+            other => panic!("yes/no expected, got {other:?}"),
+        }
+    }
+
     fn buttons(step: &Step) -> (bool, bool) {
         match &step.prompt {
             Some(Prompt::Text(page)) => (page.has_previous, page.has_next),
@@ -7722,16 +7756,36 @@ mod tests {
 
     #[test]
     fn the_wedding_staff_see_guests_out_and_the_married_couple_off() {
-        let mut leave = NpcScript::wedding_staff(BONNIE, WeddingStage::Gathering, true);
+        let mut leave = NpcScript::wedding_staff(BONNIE, WeddingStage::Gathering, true, true);
         assert_eq!(kind(&leave.begin()), Some(1));
         let yes = leave.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::LeaveWedding]);
-        let wait = NpcScript::wedding_staff(JACKIE, WeddingStage::Ceremony, false);
+        let wait = NpcScript::wedding_staff(JACKIE, WeddingStage::Ceremony, false, true);
         assert_eq!(page_text(&wait.begin()), text(keys::WEDDING_STAFF_WAIT));
-        let mut end = NpcScript::wedding_staff(JACKIE, WeddingStage::Married, false);
-        end.begin();
+        let mut end = NpcScript::wedding_staff(JACKIE, WeddingStage::Married, false, false);
+        assert_eq!(question(&end.begin()), text(keys::WEDDING_STAFF_ASK));
         let yes = end.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::EndWedding]);
+        let mut party = NpcScript::wedding_staff(NANCY, WeddingStage::Married, false, true);
+        assert_eq!(
+            question(&party.begin()),
+            text(keys::WEDDING_STAFF_PARTY_ASK)
+        );
+        let yes = party.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::EndWedding]);
+    }
+
+    #[test]
+    fn the_party_room_has_two_ways_out() {
+        let mut quit = NpcScript::wedding_party(TRAVIS).unwrap();
+        assert_eq!(question(&quit.begin()), text(keys::WEDDING_PARTY_QUIT_ASK));
+        let yes = quit.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::Warp(680000000)]);
+        let mut out = NpcScript::wedding_party(WEDDING_ROBIN).unwrap();
+        out.begin();
+        let yes = out.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::Warp(wedding::WEDDING_EXIT)]);
+        assert!(NpcScript::wedding_party(JACKIE).is_none());
     }
 
     #[test]

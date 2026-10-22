@@ -14,6 +14,10 @@
 //! gather, up to `MAX_GUESTS`, and go on to the altar with them; a guest
 //! may leave at any time without ending anything.
 //!
+//! Once married, the couple of a premium wedding may take everyone on to
+//! the party room for the rest of their time (report b080); the couple of
+//! any other may only end it.
+//!
 //! The priest speaks to everyone at the altar (report b075): his welcome as
 //! the ceremony begins, the pronouncement once the couple are married, and
 //! then the hearts between them and his farewell. He goes on from a line
@@ -31,7 +35,7 @@ use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use game::wedding::{
     GuestRefusal, Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING, MAX_GUESTS,
-    PRIEST_WELCOME,
+    PARTY_ROOM, PRIEST_WELCOME,
 };
 use net::events::scaled;
 use net::ClientId;
@@ -66,7 +70,8 @@ pub enum WeddingMessage {
         client_id: ClientId,
         reply: oneshot::Sender<Vows>,
     },
-    /// `client_id` asks the staff to end the wedding.
+    /// `client_id` asks the staff to end the wedding, or to take a premium
+    /// one on to its party room.
     End { client_id: ClientId },
     /// An invited guest asks to come in.
     Join {
@@ -103,6 +108,8 @@ pub struct WeddingTicket {
     member: ClientId,
     /// Held by a guest rather than one of the couple.
     pub guest: bool,
+    /// The wedding was booked with a premium ticket.
+    pub premium: bool,
     tx: mpsc::Sender<WeddingMessage>,
     /// The wedding's stage, shared with it; only it writes.
     stage: Arc<AtomicU8>,
@@ -190,7 +197,7 @@ impl WeddingTicket {
         counted
     }
 
-    /// Ask for the wedding to end.
+    /// Ask for the wedding to end, or to go on to its party room.
     pub async fn end(&self) {
         let _ = self
             .tx
@@ -216,10 +223,11 @@ pub struct WeddingStart {
 }
 
 /// Start the wedding's actor, which hands out the tickets, for the couple
-/// `groom` and `bride`.
+/// `groom` and `bride`, booked with a premium ticket or not.
 pub fn spawn(
     start: WeddingStart,
     (groom, bride): (i32, i32),
+    premium: bool,
     fields: Arc<FieldRegistry>,
     directory: mpsc::Sender<DirectoryMessage>,
 ) {
@@ -234,6 +242,8 @@ pub fn spawn(
         marriage_id: start.marriage_id,
         groom,
         bride,
+        premium,
+        partying: false,
         ends: Instant::now() + scaled(GATHERING),
         line: None,
         next_line: None,
@@ -279,6 +289,9 @@ struct WeddingActor {
     marriage_id: i32,
     groom: i32,
     bride: i32,
+    premium: bool,
+    /// Everyone went on to the party room.
+    partying: bool,
     /// When the current stage's time runs out.
     ends: Instant,
     /// The priest's last line at the altar.
@@ -286,7 +299,7 @@ struct WeddingActor {
     /// When the priest goes on from it if neither of the couple closes it
     /// first, if he does.
     next_line: Option<Instant>,
-    /// The guests who blessed the couple.
+    /// The guests still in the wedding who blessed the couple.
     blessers: HashSet<ClientId>,
     /// For the tickets; the directory keeps another for the guests.
     tx: mpsc::Sender<WeddingMessage>,
@@ -334,8 +347,9 @@ impl WeddingActor {
                         let _ = reply.send(vows);
                     }
                     Some(WeddingMessage::End { client_id }) => {
-                        over = self.members.contains_key(&client_id)
+                        let married = self.members.contains_key(&client_id)
                             && self.stage() == WeddingStage::Married;
+                        over = married && self.after_party(client_id);
                     }
                     Some(WeddingMessage::Join { guest, reply }) => {
                         // A ticket the guest can't take hands itself back.
@@ -402,6 +416,7 @@ impl WeddingActor {
             clock: Some(self.ends),
             member,
             guest,
+            premium: self.premium,
             tx: self.tx.clone(),
             stage: self.stage.clone(),
             talked: AtomicU8::new(0),
@@ -479,6 +494,34 @@ impl WeddingActor {
         counted
     }
 
+    /// The married couple asked the staff to see everyone out: a premium
+    /// wedding goes on to its party room first, with everyone still in it,
+    /// for the rest of the couple's time. Whether the wedding ends.
+    fn after_party(&mut self, client_id: ClientId) -> bool {
+        if !self.premium {
+            return true;
+        }
+        let (id, ends) = (self.id, self.ends);
+        let moved = || ServerMessage::WeddingMoved {
+            id,
+            to: PARTY_ROOM,
+            clock: Some(ends),
+        };
+        if self.partying {
+            // One who missed the move (in the Cash Shop) asks again.
+            if let Some(member) = self.members.get(&client_id) {
+                member.send(moved());
+            }
+            return false;
+        }
+        self.partying = true;
+        for member in self.members.values().chain(self.guests().values()) {
+            member.send(moved());
+        }
+        info!(venue = ?self.venue, id = self.id, "Wedding party started");
+        false
+    }
+
     fn set_stage(&self, stage: WeddingStage) {
         self.stage.store(stage as u8, Ordering::Release);
     }
@@ -487,6 +530,8 @@ impl WeddingActor {
     /// it goes on while one of the couple stays. A guest only goes.
     fn left(&mut self, client_id: ClientId) -> bool {
         if self.guests().remove(&client_id).is_some() {
+            // A blessing counts only from those who stay for the vows.
+            self.blessers.remove(&client_id);
             return false;
         }
         if self.members.remove(&client_id).is_none() {
@@ -559,11 +604,13 @@ impl WeddingActor {
         self.set_stage(WeddingStage::Married);
         self.ends = Instant::now() + scaled(AFTER_VOWS);
         info!(venue = ?self.venue, id = self.id, marriage_id, "Couple married");
+        let blessings = u32::try_from(self.blessers.len()).unwrap_or(u32::MAX);
         // The guests' time starts again with the couple's.
         for member in self.members.values().chain(self.guests().values()) {
             member.send(ServerMessage::Married {
                 id: self.id,
                 record: record.clone(),
+                blessings,
                 clock: self.ends,
             });
         }

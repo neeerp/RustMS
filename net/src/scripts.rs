@@ -374,7 +374,8 @@ pub enum Effect {
     /// the couple to do so marries them. The priest then says how it went,
     /// so nothing may follow it.
     Vows,
-    /// End the player's wedding, once married: everyone goes out.
+    /// End the player's wedding, once married: everyone goes out, or on
+    /// to the party room if it is premium.
     EndWedding,
     /// Go into the wedding at `venue` the player is invited to, while its
     /// couple gather. The assistant says why not, so nothing may follow it.

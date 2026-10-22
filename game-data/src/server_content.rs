@@ -1047,6 +1047,15 @@ pub mod keys {
     /// The altar staff asks the married couple whether to end the wedding.
     pub const WEDDING_STAFF_ASK: &str = "wedding.staff.ask";
 
+    /// The altar staff asks the couple of a premium wedding, once married, whether to go on to the party room.
+    pub const WEDDING_STAFF_PARTY_ASK: &str = "wedding.staff.party_ask";
+
+    /// Travis, in the party room, asks whether to leave the wedding for Amoria.
+    pub const WEDDING_PARTY_QUIT_ASK: &str = "wedding.party.quit_ask";
+
+    /// Robin, in the party room, asks whether to leave the wedding by its exit.
+    pub const WEDDING_PARTY_EXIT_ASK: &str = "wedding.party.exit_ask";
+
     /// The wedding's staff ask a guest whether to leave it.
     pub const WEDDING_STAFF_GUEST_LEAVE: &str = "wedding.staff.guest_leave";
 
@@ -1069,7 +1078,7 @@ pub mod keys {
     pub const WEDDING_GUEST_ERROR: &str = "wedding.guest.enter_error";
 
     /// The wedding itself: the starters, the priests and the altar staff (report b071).
-    pub const CEREMONY: [&str; 31] = [
+    pub const CEREMONY: [&str; 34] = [
         WEDDING_STARTER_INTRO,
         WEDDING_STARTER_NOT_BOOKED,
         WEDDING_STARTER_CHANNEL,
@@ -1094,6 +1103,9 @@ pub mod keys {
         WEDDING_PRIEST_FAILED,
         WEDDING_STAFF_WAIT,
         WEDDING_STAFF_ASK,
+        WEDDING_STAFF_PARTY_ASK,
+        WEDDING_PARTY_QUIT_ASK,
+        WEDDING_PARTY_EXIT_ASK,
         WEDDING_STAFF_GUEST_LEAVE,
         WEDDING_GUEST_ASK,
         WEDDING_GUEST_ASK_CLOTHES,

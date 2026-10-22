@@ -907,6 +907,16 @@ pub async fn wedding_due(marriage_id: i32, channel: i16) -> Result<(), HarnessEr
     .await
 }
 
+/// Make the couple `marriage_id`'s booked wedding a premium one.
+pub async fn wedding_premium(marriage_id: i32) -> Result<(), HarnessError> {
+    change_one_row("make a wedding premium", move |conn| {
+        diesel::sql_query("UPDATE wedding_reservations SET premium = true WHERE marriage_id = $1")
+            .bind::<Integer, _>(marriage_id)
+            .execute(conn)
+    })
+    .await
+}
+
 /// The couple `marriage_id`'s status, and whether a wedding is booked for
 /// them.
 pub async fn couple_status(marriage_id: i32) -> Result<(i16, bool), HarnessError> {

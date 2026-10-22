@@ -5,6 +5,7 @@
 //! the venue's assistant and out through the staff.
 
 use super::marriage::take_tokens;
+use super::quest::gain_exp;
 use super::ClientActor;
 use crate::actor::wedding::{PriestLine, WeddingTicket};
 use crate::db::spawn_db;
@@ -12,7 +13,7 @@ use crate::error::RuntimeError;
 use crate::message::DirectoryMessage;
 use db::parcel::NewParcel;
 use game::marriage::{self, MarriageRecord, ENGAGED};
-use game::wedding::{self, StartRefusal, Venue, Vows, AMORIA, WEDDING_EXIT};
+use game::wedding::{self, StartRefusal, Venue, Vows, AMORIA, PARTY_ROOM, WEDDING_EXIT};
 use game_data::server_content::keys;
 use net::npc_scripts::{self, NpcScript};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
@@ -62,20 +63,26 @@ impl ClientActor {
         }
         let inside = self
             .wedding_here()
-            .map(|ticket| (ticket.stage(), ticket.guest));
+            .map(|ticket| (ticket.stage(), ticket.guest, ticket.premium));
         let player = &self.in_game()?.player;
         let script = if let Some(venue) = npc_scripts::wedding_priest_venue(npc_id) {
             // Guests hear what anyone else does.
-            let couple = inside.filter(|&(_, guest)| !guest);
-            NpcScript::wedding_priest(venue, player, couple.map(|(stage, _)| stage))
+            let couple = inside.filter(|&(_, guest, _)| !guest);
+            NpcScript::wedding_priest(venue, player, couple.map(|(stage, ..)| stage))
         } else if npc_scripts::wedding_staff_venue(npc_id).is_some()
             || npc_scripts::wedding_venue(npc_id).is_some()
         {
             // The assistant stands in the hall too.
-            let Some((stage, guest)) = inside else {
+            let Some((stage, guest, premium)) = inside else {
                 return Ok(false);
             };
-            NpcScript::wedding_staff(npc_id, stage, guest)
+            NpcScript::wedding_staff(npc_id, stage, guest, premium)
+        } else if let Some(script) = NpcScript::wedding_party(npc_id) {
+            // Only in the party room, and to those in the wedding.
+            if inside.is_none() || player.stats.map_id != PARTY_ROOM {
+                return Ok(false);
+            }
+            script
         } else {
             return Ok(false);
         };
@@ -115,6 +122,7 @@ impl ClientActor {
         let startable = reservation.as_ref().is_some_and(|booked| {
             booked.venue == venue && booked.channel == self.channel_id && !booked.inviting(now)
         });
+        let premium = reservation.as_ref().is_some_and(|booked| booked.premium);
         if !startable || !clothes || self.event.is_some() || self.wedding.is_some() {
             warn!(self.client_id, marriage_id, "Wedding not startable");
             return self.starter_says(venue, keys::WEDDING_STARTER_ERROR).await;
@@ -133,6 +141,7 @@ impl ClientActor {
                 crate::actor::wedding::spawn(
                     start,
                     couple,
+                    premium,
                     self.services.fields.clone(),
                     self.services.directory.clone(),
                 );
@@ -364,12 +373,14 @@ impl ClientActor {
     }
 
     /// Wedding `id` married the couple `record`: the player gives up their
-    /// half of the engagement and takes the wedding ring, and their time
-    /// there starts again. A guest's time only starts again.
+    /// half of the engagement, takes the wedding ring and the EXP of the
+    /// `blessings`, and their guild and family hear; their time there starts
+    /// again. A guest's time only starts again.
     pub(super) async fn married(
         &mut self,
         id: u32,
         record: MarriageRecord,
+        blessings: u32,
         clock: Instant,
     ) -> Result<(), RuntimeError> {
         let Some(game) = self.game.as_ref() else {
@@ -388,6 +399,10 @@ impl ClientActor {
             let left = clock.saturating_duration_since(Instant::now());
             let seconds = u32::try_from(left.as_secs()).unwrap_or(u32::MAX);
             return self.send(&mut build_countdown(seconds)?).await;
+        }
+        // A guest who left while the vows were saved has no ticket now.
+        if ![record.groom_id, record.bride_id].contains(&game.player.id()) {
+            return Ok(());
         }
         let mut next = game.player.clone();
         let mut packets = Vec::new();
@@ -411,7 +426,18 @@ impl ClientActor {
             }
         }
         packets.push(build_married(&record)?);
-        info!(self.client_id, marriage_id = record.id, "Married");
+        let exp = i32::try_from(blessings)
+            .unwrap_or(i32::MAX)
+            .saturating_mul(wedding::BLESSING_EXP);
+        if exp > 0 {
+            gain_exp(&mut next, exp, &mut packets)?;
+        }
+        info!(
+            self.client_id,
+            marriage_id = record.id,
+            blessings,
+            "Married"
+        );
         next.marriage = Some(record);
         if let Some(ticket) = self.wedding.as_mut().filter(|ticket| ticket.id == id) {
             ticket.clock = Some(clock);
@@ -422,7 +448,10 @@ impl ClientActor {
                 u32::try_from(left.as_secs()).unwrap_or(u32::MAX),
             )?);
         }
-        self.commit_engagement(next, packets).await
+        self.commit_engagement(next, packets).await?;
+        let from = self.client_id;
+        self.send_to_directory(DirectoryMessage::Married { from })
+            .await
     }
 }
 

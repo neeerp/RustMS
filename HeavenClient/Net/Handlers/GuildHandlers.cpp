@@ -586,6 +586,19 @@ namespace ms
 		chat_line("<" + std::string(type == 0 ? "Guild" : "Family") + name + " has advanced to a(an) " + Job(static_cast<uint16_t>(job)).get_name() + ".");
 	}
 
+	void NotifyMarriageHandler::handle(InPacket& recv) const
+	{
+		uint8_t type = static_cast<uint8_t>(recv.read_byte());
+		std::string name = recv.read_string();
+
+		// 0xa139f5 prints nothing for another type.
+		if (type > 1)
+			return;
+
+		// 0x148d, like 0x148c, has no '>' after the group.
+		chat_line("<" + std::string(type == 0 ? "Guild" : "Family") + name + " is now married. Please congratulate them.");
+	}
+
 	void GuildNameChangedHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
