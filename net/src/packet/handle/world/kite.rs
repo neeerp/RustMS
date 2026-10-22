@@ -37,11 +37,7 @@ pub fn kite(
         );
     }
     let lines = message.split('\n');
-    if lines.clone().count() > LINES
-        || lines
-            .into_iter()
-            .any(|line| line.chars().count() > MAX_LINE)
-    {
+    if lines.clone().count() > LINES || lines.into_iter().any(|line| line.len() > MAX_LINE) {
         return Ok(HandlerResult::reply(unlock));
     }
     let Ok(changes) = ctx

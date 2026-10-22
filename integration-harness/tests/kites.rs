@@ -92,16 +92,24 @@ async fn a_kite_flies_over_the_map() {
         (flown.1, flown.2.as_str(), flown.3.as_str()),
         (KITE, "happy\nnew\nyear", name.as_str())
     );
-    assert_eq!(kite(next(w, &mut wt, SendOpcode::SpawnKite).await), flown);
+    assert_eq!(the_kite(w, &mut wt, flown.0).await, flown);
 
     // Someone arriving while it flies sees it too.
     assert_eq!(warp(w, HENESYS, "", &mut wt).await, HENESYS);
     assert_eq!(warp(w, KERNING, "", &mut wt).await, KERNING);
-    let seen = loop {
-        let seen = kite(next(w, &mut wt, SendOpcode::SpawnKite).await);
-        if seen.0 == flown.0 {
-            break seen;
+    assert_eq!(the_kite(w, &mut wt, flown.0).await, flown);
+}
+
+/// The spawn of kite `object_id`, past any an earlier run left flying.
+async fn the_kite(
+    c: &mut MapleTestConnection,
+    t: &mut Trace,
+    object_id: i32,
+) -> (i32, i32, String, String) {
+    loop {
+        let seen = kite(next(c, t, SendOpcode::SpawnKite).await);
+        if seen.0 == object_id {
+            return seen;
         }
-    };
-    assert_eq!(seen, flown);
+    }
 }
