@@ -835,11 +835,15 @@ item." Without the transformation, Shockwave, Demolition and Snatch say
 trade invite and opening a personal shop with the same line
 (`Player::shape_refuses`). A template that can't move the way the map
 does isn't put on: in water only 0004 (2210003), which has no `fly`,
-stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: the random
-morph items (2211000, 2212000; `spec/morphRandom`, which the server refuses
-without using one up rather than heal 50 with no morph), and
-the mini-game and hired merchant refusals,
-which wait on those rooms.
+stays off, and the buff just runs (`MorphTemplate::moves`). Cliff's
+Special Potion (2211000) heals 50 and morphs its user for an hour into one
+of the eight templates 23-30 of its `spec/morphRandom` pool, picked by the
+entries' `prop` weights (they add up to 100) in their order
+(`use_item::random_morph`; no reference server picks one, report c041).
+The Maplemas Party Potion (2212000) has the same pool but morphs another
+player named in v83's Transform dialog (send 0xA0, reply 0x77), which isn't
+done: USE_ITEM refuses it and keeps it. Not done anywhere: the mini-game
+and hired merchant refusals, which wait on those rooms.
 
 ### Item auras
 

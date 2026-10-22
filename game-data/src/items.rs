@@ -257,26 +257,25 @@ pub struct ConsumeSpec {
     /// How much a mount food (226xxxx) changes a mount's tiredness
     /// (`incFatigue`): negative takes it off.
     pub inc_fatigue: i32,
-    /// Whether it morphs the player into a random template (`morphRandom`,
-    /// 2211000 and 2212000), which the server doesn't choose yet.
-    pub morph_random: bool,
+    /// The morph templates it picks one of at random, each with its weight
+    /// (`morphRandom/<n>/{morph, prop}`, 2211000 and 2212000; the weights
+    /// add up to 100).
+    pub morph_random: Vec<(i16, i32)>,
     /// Whether picking it up applies it at once instead of bagging it
     /// (`consumeOnPickup`): the fruits 2022086-88, Carnival and Dojo items.
     pub consume_on_pickup: bool,
 }
 
 impl ConsumeSpec {
-    /// Whether USE_ITEM can apply any of it: HP or MP, a cure, or stats for
-    /// a time. A random morph has none yet, so its heal doesn't use it up
-    /// (report c012).
+    /// Whether USE_ITEM can apply any of it: HP or MP, a cure, or stats or
+    /// a random morph for a time.
     pub fn has_effect(&self) -> bool {
-        !self.morph_random
-            && (self.hp != 0
-                || self.mp != 0
-                || self.hp_r != 0
-                || self.mp_r != 0
-                || !self.cures.is_empty()
-                || (self.time > 0 && !self.stats.is_empty()))
+        self.hp != 0
+            || self.mp != 0
+            || self.hp_r != 0
+            || self.mp_r != 0
+            || !self.cures.is_empty()
+            || (self.time > 0 && (!self.stats.is_empty() || !self.morph_random.is_empty()))
     }
 }
 
@@ -550,6 +549,14 @@ impl ItemData {
                     pets.push(pet);
                 }
             }
+            let mut morph_random = Vec::new();
+            if let Some(pool) = nx.child_by_name(spec, "morphRandom")? {
+                while let Some(entry) = nx.child_by_name(pool, &morph_random.len().to_string())? {
+                    let morph = nx.int_child(entry, "morph")?.unwrap_or(0);
+                    let prop = nx.int_child(entry, "prop")?.unwrap_or(0);
+                    morph_random.push((i16::try_from(morph).unwrap_or(0), prop));
+                }
+            }
             info.spec = Some(ConsumeSpec {
                 hp: nx.int_child(spec, "hp")?.unwrap_or(0),
                 mp: nx.int_child(spec, "mp")?.unwrap_or(0),
@@ -579,7 +586,7 @@ impl ItemData {
                 return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
                 exp: nx.int_child(spec, "exp")?.unwrap_or(0),
                 inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
-                morph_random: nx.child_by_name(spec, "morphRandom")?.is_some(),
+                morph_random,
                 consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
             });
         }
@@ -979,7 +986,7 @@ mod tests {
         );
         let morph = data.info(2210000).unwrap().unwrap().spec.unwrap();
         assert!(morph.stats.contains(&(BuffStat::Morph, 1)));
-        assert!(!morph.morph_random && morph.has_effect());
+        assert!(morph.morph_random.is_empty() && morph.has_effect());
         for (id, ghost) in [(2360000, 1), (2360002, 2)] {
             let spec = data.info(id).unwrap().unwrap().spec.unwrap();
             assert_eq!(
@@ -989,8 +996,10 @@ mod tests {
         }
         for id in [2211000, 2212000] {
             let random = data.info(id).unwrap().unwrap().spec.unwrap();
-            assert_eq!((random.morph_random, random.hp), (true, 50));
-            assert!(!random.has_effect());
+            let pool = &random.morph_random;
+            assert_eq!((pool.len(), pool[0], pool[7]), (8, (23, 15), (30, 15)));
+            assert_eq!(pool.iter().map(|&(_, prop)| prop).sum::<i32>(), 100);
+            assert!(random.hp == 50 && random.has_effect());
         }
         let red_fruit = data.info(2022086).unwrap().unwrap().spec.unwrap();
         assert!(red_fruit.consume_on_pickup && red_fruit.has_effect());
