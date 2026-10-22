@@ -4,6 +4,7 @@
 use crate::handler::{
     FamilyRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
+use game::family::ENTITLEMENTS;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -96,6 +97,43 @@ impl WorldHandler for ChangeFamilyMessageHandler {
     }
 }
 
+/// `USE_FAMILY`: buy an entitlement, by its index in the list. Those that
+/// need a family member come with their name.
+pub struct UseFamilyHandler;
+
+impl WorldHandler for UseFamilyHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let index = reader.read_int()?;
+        let Some((index, entitlement)) = usize::try_from(index)
+            .ok()
+            .and_then(|index| Some((index, ENTITLEMENTS.get(index)?)))
+        else {
+            return Ok(HandlerResult::empty());
+        };
+        let target = if entitlement.targeted() {
+            Some(reader.read_str_with_length()?)
+        } else {
+            None
+        };
+        request(FamilyRequest::Use { index, target })
+    }
+}
+
+/// `FAMILY_SUMMON_RESPONSE`: the summoner's name, then yes or no.
+pub struct FamilySummonResponseHandler;
+
+impl WorldHandler for FamilySummonResponseHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let summoner = reader.read_str_with_length()?;
+        let accept = reader.read_byte()? != 0;
+        request(FamilyRequest::SummonAnswer { summoner, accept })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,6 +212,35 @@ mod tests {
             handle(&ChangeFamilyMessageHandler, precepts),
             FamilyRequest::Precepts {
                 precepts: "Be kind".into()
+            }
+        );
+        let mut teleport = packet(RecvOpcode::UseFamily);
+        teleport.write_int(0).unwrap();
+        teleport.write_str_with_length("Dave").unwrap();
+        assert_eq!(
+            handle(&UseFamilyHandler, teleport),
+            FamilyRequest::Use {
+                index: 0,
+                target: Some("Dave".into())
+            }
+        );
+        let mut rate = packet(RecvOpcode::UseFamily);
+        rate.write_int(3).unwrap();
+        assert_eq!(
+            handle(&UseFamilyHandler, rate),
+            FamilyRequest::Use {
+                index: 3,
+                target: None
+            }
+        );
+        let mut answer = packet(RecvOpcode::FamilySummonResponse);
+        answer.write_str_with_length("Erin").unwrap();
+        answer.write_byte(1).unwrap();
+        assert_eq!(
+            handle(&FamilySummonResponseHandler, answer),
+            FamilyRequest::SummonAnswer {
+                summoner: "Erin".into(),
+                accept: true
             }
         );
     }

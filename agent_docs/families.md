@@ -47,7 +47,8 @@ packets into `FamilyRequest`s, which the client actor
 - **Entering the game, and `OPEN_FAMILY`:** the server sends
   `FAMILY_INFO_RESULT` and `FAMILY_PRIVILEGE_LIST`. The client sends
   nothing except `OPEN_FAMILY` and `OPEN_FAMILY_PEDIGREE` until it has
-  received INFO. The privilege list is empty for now.
+  received INFO. The privilege list holds the eleven entitlements (see
+  below).
 - **`ADD_FAMILY` (name):**
   1. The actor checks the database rules (`db::family::may_add`): not
      yourself, the junior has no senior and isn't one of yours, you have a
@@ -146,11 +147,52 @@ Relatives (the senior and the juniors) get `FAMILY_NOTIFY_LOGIN_OR_LOGOUT`
 when a member enters or leaves the game. A channel change is held for
 `CHANNEL_CHANGE_GRACE` (`family_away`), as with guilds, so it says nothing.
 
+### Entitlements
+
+The Family window sells entitlements for Rep (report b050). v83's own list
+isn't known, so `game::family::ENTITLEMENTS` has Cosmic's costs, limits and
+benefits (report b049): 0 goes to a family member, 1 summons one, and 2-10
+raise EXP or drop rates. Their names and descriptions are content-pack
+text. `FAMILY_PRIVILEGE_LIST` sends them in that order, and INFO lists how
+often each was used today, which the client needs to enable the button.
+
+`USE_FAMILY` (0x97) carries the index and, for 0 and 1, a name. Spending
+(`db::family::spend`) takes the cost and counts the use in
+`family_entitlement_uses`, one row per character and entitlement for the
+day. A player short of Rep or past the day's limit gets no answer, since
+the client's button already stops both.
+After the spend, and after the trip or the summons is under way, the
+player gets `FAMILY_REP_GAIN` with minus the cost and an empty name, then
+INFO.
+
+- **Going to someone (0, 300 Rep):** the name must be a character
+  (`FAMILY_RESULT` 0x41) in the same family (0x43). The directory finds
+  them on the player's channel, and the player's actor checks the Teleport
+  Rock rules for their map (`may_travel`, which refuses the player's own
+  map). Either failing is 0x4b, "The summons has failed", a chat line. The
+  player then pays and goes to the spawn point nearest the member.
+- **Summoning (1, 500 Rep):** after the same checks, and the Teleport Rock
+  rules for the summoner's own map (`may_summon_to`), the summoner pays at
+  once. The directory keeps one summons per member (`family::Summons`); a
+  second gets 0x4a, a member not on the channel 0x41, and both are
+  refunded. The member gets `FAMILY_SUMMON_REQUEST` (104) with the
+  summoner's name and the map's name from String.nx, and answers with
+  `FAMILY_SUMMON_RESPONSE` (0x99). On no, or after 120 s without an
+  answer, the summoner gets the Rep back and a notice. On yes the member
+  goes to the summoner, unless the summoner has moved, or the member's map
+  forbids it: then the summoner gets it back and 0x4b. The answer names
+  the summoner, so a yes from an older summons' dialog, which the client
+  never closes, does nothing. A member who leaves, before or just after
+  saying yes, refunds the summoner. A summoner who leaves, even for
+  another channel, drops their summonses and gets the Rep back without a
+  word (`refund_summons`).
+
 ### Not yet
 
 These are not implemented yet:
 
-- entitlements (`USE_FAMILY`) and the summon.
+- the rate entitlements (2-10) and `FAMILY_SET_PRIVILEGE` (103), the icon
+  that shows one is running.
 
 ## Client
 
@@ -162,8 +204,7 @@ b045 (how they open).
   tree's 11 boxes as the v83 decoder does. `tests/family.cpp` covers the
   parser and the arrangement.
 - **Packets:** `Net/Handlers/FamilyHandlers.cpp` handles receive opcodes
-  94-102. `Net/Packets/FamilyPackets.h` builds the sends; the summon answer
-  (0x99) is not built yet.
+  94-102 and 104. `Net/Packets/FamilyPackets.h` builds the sends.
 - **Family window (`UIFamily`):** the Family key (F by default) and BtFamily
   on the player's own info open it, and each opening sends `OPEN_FAMILY`.
   It shows the family's name, the scrolling precepts, juniors, Rep and the
@@ -196,6 +237,9 @@ b045 (how they open).
   Yes/No before answering.
 - **Login notices:** a relative logging in shows a card, and the open tree
   updates who is online.
+- **Being summoned:** `FAMILY_SUMMON_REQUEST` asks "From %s, %s has
+  requested a summons. Would you like to transport?" with a Yes/No, and
+  either answer sends `FAMILY_SUMMON_RESPONSE` with the summoner's name.
 - **Level notices:** `NOTIFY_LEVELUP` type 0 is a family member who has
   passed the player's level. After the usual line the client adds "- The
   Reps you have received from %s will be reduced in half."

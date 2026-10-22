@@ -1,7 +1,8 @@
 //! The family's packets (recv 94-104 in the client; report b039).
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::family::{FamilyChart, FamilyInfo, Refusal, MAX_JUNIORS};
+use game::family::{FamilyChart, FamilyInfo, Refusal, ENTITLEMENTS, MAX_JUNIORS};
+use game_data::server_content::keys;
 use packet::{io::write::PktWrite, Packet};
 
 fn op(op: SendOpcode) -> Result<Packet, NetworkError> {
@@ -57,15 +58,39 @@ pub fn build_family_info(info: &FamilyInfo) -> Result<Packet, NetworkError> {
     packet.write_int(info.leader_id)?;
     packet.write_str_with_length(&info.name)?;
     packet.write_str_with_length(&info.precepts)?;
-    // The entitlements used today, none yet.
-    packet.write_int(0)?;
+    // The entitlements used today.
+    packet.write_int(info.used.len() as i32)?;
+    for &(index, times) in &info.used {
+        packet.write_int(index)?;
+        packet.write_int(times)?;
+    }
     Ok(packet)
 }
 
-/// FAMILY_PRIVILEGE_LIST: the entitlements, none yet.
+/// FAMILY_PRIVILEGE_LIST: the entitlements, in USE_FAMILY's order, with
+/// their names and descriptions from the content pack.
 pub fn build_privilege_list() -> Result<Packet, NetworkError> {
     let mut packet = op(SendOpcode::FamilyPrivilegeList)?;
-    packet.write_int(0)?;
+    packet.write_int(ENTITLEMENTS.len() as i32)?;
+    let text = crate::content::text();
+    for (index, entitlement) in ENTITLEMENTS.iter().enumerate() {
+        packet.write_byte(entitlement.kind)?;
+        packet.write_int(entitlement.cost)?;
+        packet.write_int(entitlement.limit)?;
+        packet.write_str_with_length(&text.get(&keys::family_entitlement_name(index), &[]))?;
+        packet
+            .write_str_with_length(&text.get(&keys::family_entitlement_description(index), &[]))?;
+    }
+    Ok(packet)
+}
+
+/// SUMMON_REQUEST: `name`, on `map`, asks to bring the player there. The
+/// client asks Yes or No (pool 0x1210) and answers with
+/// FAMILY_SUMMON_RESPONSE (report b050).
+pub fn build_summon_request(name: &str, map: &str) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::FamilySummonRequest)?;
+    packet.write_str_with_length(name)?;
+    packet.write_str_with_length(map)?;
     Ok(packet)
 }
 
@@ -174,6 +199,7 @@ mod tests {
             leader_id: 3,
             name: "Alice".into(),
             precepts: "Hi".into(),
+            used: vec![(3, 1)],
         };
         let packet = build_family_info(&info).unwrap();
         let mut expected = vec![0x5F, 0];
@@ -183,7 +209,7 @@ mod tests {
         expected.extend(b"Alice");
         expected.extend([2, 0]);
         expected.extend(b"Hi");
-        expected.extend([0, 0, 0, 0]);
+        expected.extend([1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0]);
         assert_eq!(packet.bytes, expected);
     }
 
@@ -199,5 +225,14 @@ mod tests {
     fn a_refusal_is_its_code_and_nothing() {
         let packet = build_family_refusal(Refusal::LevelGap).unwrap();
         assert_eq!(packet.bytes, [0x60, 0, 0x48, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn a_summons_names_the_summoner_then_the_map() {
+        let packet = build_summon_request("Al", "Ant").unwrap();
+        assert_eq!(
+            packet.bytes,
+            [0x68, 0, 2, 0, b'A', b'l', 3, 0, b'A', b'n', b't']
+        );
     }
 }

@@ -224,4 +224,20 @@ namespace ms
 		if (auto tree = own_tree())
 			tree->set_online(name, online);
 	}
+
+	// A modal Yes/No with nothing gating it; any answer but Yes is a no
+	// (report b050 3).
+	void FamilySummonRequestHandler::handle(InPacket& recv) const
+	{
+		std::string summoner = recv.read_string();
+		std::string map = recv.read_string();
+
+		// StringPool 0x1210.
+		std::string question = "From " + map + ", " + summoner + " has requested a summons. Would you like to transport?";
+
+		UI::get().emplace<UIYesNo>(question, [summoner](bool yes)
+		{
+			FamilySummonResponsePacket(summoner, yes).dispatch();
+		});
+	}
 }

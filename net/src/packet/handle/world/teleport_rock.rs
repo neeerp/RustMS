@@ -139,6 +139,23 @@ pub fn to_character(
     )
 }
 
+/// Whether the player may be taken to `map_id` by a family entitlement: as
+/// a VIP rock could, to another continent too, but not on the same map.
+pub fn may_travel(player: &Player, map_id: i32) -> bool {
+    refusal(player, true, map_id).is_none()
+}
+
+/// Take the player to the spawn point nearest `found`, checked first with
+/// [`may_travel`].
+pub fn travel_to(
+    player: &mut Player,
+    found: Whereabouts,
+    channel_id: u8,
+) -> Result<Vec<WorldAction>, crate::error::NetworkError> {
+    let near = crate::game_data::closest_spawn_point(found.map_id, found.x, found.y);
+    warp_to_spawn_point(player, found.map_id, near.unwrap_or(0), channel_id)
+}
+
 /// Take the player to `map_id` with the rock, at `spawn_point` (the map's
 /// first spawn point without one), unless something forbids it.
 fn go(
@@ -172,17 +189,26 @@ fn go(
     Ok(result)
 }
 
+/// Whether a family member may be summoned to the player's map.
+pub fn may_summon_to(player: &Player) -> bool {
+    player.stats.hp > 0 && open_to_rocks(player.stats.map_id)
+}
+
+/// Whether rocks may take players to `map_id`: it exists, allows them, and
+/// doesn't send players elsewhere on login (but Maple Island's maps).
+fn open_to_rocks(map_id: i32) -> bool {
+    crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(map_id))
+        .is_some_and(|there| {
+            there.field_limit & FIELD_LIMIT_TELEPORT_ROCK == 0
+                && (there.forced_return.is_none() || continent(map_id) == 0)
+        })
+}
+
 /// Why the player can't go to `map_id` by rock, if they can't.
 fn refusal(player: &Player, vip: bool, map_id: i32) -> Option<RockRefusal> {
     let here = player.stats.map_id;
-    let Some(there) = crate::game_data::get()
-        .ok()
-        .and_then(|data| data.field(map_id))
-    else {
-        return Some(RockRefusal::CannotGo);
-    };
-    // Maps that send the player elsewhere on login, but Maple Island's.
-    let held_back = there.forced_return.is_some() && continent(map_id) != 0;
     if map_id == here {
         Some(RockRefusal::SameMap)
     } else if player.stats.hp <= 0
@@ -191,10 +217,7 @@ fn refusal(player: &Player, vip: bool, map_id: i32) -> Option<RockRefusal> {
         Some(RockRefusal::CannotGo)
     } else if continent(here) == 0 && player.stats.level < MIN_LEVEL_OFF_ISLAND {
         Some(RockRefusal::MapleIsland)
-    } else if (!vip && continent(map_id) != continent(here))
-        || there.field_limit & FIELD_LIMIT_TELEPORT_ROCK != 0
-        || held_back
-    {
+    } else if (!vip && continent(map_id) != continent(here)) || !open_to_rocks(map_id) {
         Some(RockRefusal::CannotGo)
     } else {
         None

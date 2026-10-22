@@ -1,16 +1,45 @@
-//! The directory's part in families: asking someone to be a junior, and
-//! telling relatives of logins (report b039 section 5).
+//! The directory's part in families: asking someone to be a junior,
+//! telling relatives of logins (report b039 section 5), and finding and
+//! summoning relatives for the entitlements (report b050).
 
 use super::{Entry, WorldDirectory};
 use crate::actor::messenger::CHANNEL_CHANGE_GRACE;
-use crate::message::{Presence, ServerMessage};
-use game::family::{check_levels, FamilyChart, Refusal, Relatives};
+use crate::db::spawn_db;
+use crate::message::{FamilyTrip, Presence, ServerMessage, SummonFailure};
+use game::family::{check_levels, FamilyChart, Refusal, Relatives, ENTITLEMENTS, SUMMON};
 use net::packet::build::world::family::{
     build_family_chart, build_family_job_change, build_family_level_up, build_family_refusal,
-    build_join_request, build_join_result, build_relative_online,
+    build_join_request, build_join_result, build_relative_online, build_summon_request,
 };
 use net::ClientId;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tracing::warn;
+
+/// How long a summons waits for its answer. The client's dialog stays up
+/// until answered (report b050); a later answer is ignored.
+const SUMMON_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// A summons waiting for the answer of the member summoned.
+pub(super) struct Summons {
+    summoner: ClientId,
+    /// The member's name, for the summoner's notices.
+    name: String,
+    /// Where the summoner was; they must still be there.
+    map_id: i32,
+    asked: Instant,
+}
+
+/// Pay a summoner who has left back for a summons, in the background:
+/// their actor is gone.
+fn refund_summons(summoner: ClientId) {
+    let cost = ENTITLEMENTS[SUMMON].cost;
+    tokio::spawn(async move {
+        let refund = spawn_db(move || db::family::refund(summoner, SUMMON as i16, cost));
+        if let Err(error) = refund.await {
+            warn!(summoner, %error, "Failed to refund a summons");
+        }
+    });
+}
 
 /// A family member changing channel, and when they left.
 pub(super) struct Away {
@@ -81,6 +110,144 @@ impl WorldDirectory {
             }
         } else if self.family_invites.decline(from, inviter) {
             self.send_packet(inviter, build_join_result(false, &name));
+        }
+    }
+
+    /// `from` spent the teleport entitlement: ask `target` where they
+    /// stand, if they are on `from`'s channel.
+    pub(super) fn family_locate(&self, from: ClientId, target: ClientId) {
+        let Some(asker) = self.clients.get(&from) else {
+            return;
+        };
+        let trip = FamilyTrip::Teleport;
+        match self
+            .clients
+            .get(&target)
+            .filter(|entry| entry.channel_id == asker.channel_id)
+        {
+            Some(entry) => entry.handle.send(ServerMessage::FamilyLocate {
+                reply_to: asker.handle.clone(),
+                trip,
+            }),
+            None => asker
+                .handle
+                .send(ServerMessage::FamilyLocated { trip, found: None }),
+        };
+    }
+
+    /// `from` paid to summon `target` to `map_id`: ask them, if they are on
+    /// the channel and no one else is summoning them.
+    pub(super) fn family_summon(
+        &mut self,
+        from: ClientId,
+        target: ClientId,
+        name: String,
+        (map_id, map_name): (i32, &str),
+        now: Instant,
+    ) {
+        let Some(summoner) = self.clients.get(&from) else {
+            return;
+        };
+        let why = match self.clients.get(&target) {
+            Some(entry) if entry.channel_id == summoner.channel_id => {
+                if self.family_summons.contains_key(&target) {
+                    SummonFailure::Busy
+                } else {
+                    let packet = build_summon_request(&summoner.presence.name, map_name);
+                    self.send_packet(target, packet);
+                    let summons = Summons {
+                        summoner: from,
+                        name,
+                        map_id,
+                        asked: now,
+                    };
+                    self.family_summons.insert(target, summons);
+                    return;
+                }
+            }
+            _ => SummonFailure::NotFound,
+        };
+        self.tell(from, ServerMessage::SummonRefund { name, why });
+    }
+
+    /// `from` answered `summoner`'s summons. On a yes, the summoner, if
+    /// still where they summoned from, tells them where to go. An answer to
+    /// an older summons, whose dialog the client still shows, is ignored.
+    pub(super) fn family_summon_answer(&mut self, from: ClientId, summoner: &str, accept: bool) {
+        let answered = self.family_summons.get(&from).is_some_and(|summons| {
+            self.clients
+                .get(&summons.summoner)
+                .is_some_and(|entry| entry.presence.name == summoner)
+        });
+        if !answered {
+            return;
+        }
+        let Some(summons) = self.family_summons.remove(&from) else {
+            return;
+        };
+        let (Some(summoner), Some(member)) =
+            (self.clients.get(&summons.summoner), self.clients.get(&from))
+        else {
+            return;
+        };
+        let why = if !accept {
+            SummonFailure::Declined
+        } else if summoner.channel_id != member.channel_id
+            || summoner.presence.map_id != summons.map_id
+        {
+            SummonFailure::Location
+        } else {
+            summoner.handle.send(ServerMessage::FamilyLocate {
+                reply_to: member.handle.clone(),
+                trip: FamilyTrip::Summoned {
+                    summoner: summons.summoner,
+                },
+            });
+            return;
+        };
+        let name = summons.name;
+        summoner
+            .handle
+            .send(ServerMessage::SummonRefund { name, why });
+    }
+
+    /// `from` said yes but couldn't go; their summoner is paid back.
+    pub(super) fn family_summon_failed(&self, from: ClientId, summoner: ClientId) {
+        let Some(name) = self.clients.get(&from).map(|e| e.presence.name.clone()) else {
+            return;
+        };
+        let why = SummonFailure::Location;
+        self.tell(summoner, ServerMessage::SummonRefund { name, why });
+    }
+
+    /// `client_id` left: a summons waiting on them is paid back. Those they
+    /// sent are dropped and paid back too, without a word.
+    fn forget_summons(&mut self, client_id: ClientId) {
+        if let Some(summons) = self.family_summons.remove(&client_id) {
+            let (name, why) = (summons.name, SummonFailure::NotFound);
+            self.tell(summons.summoner, ServerMessage::SummonRefund { name, why });
+        }
+        let before = self.family_summons.len();
+        self.family_summons
+            .retain(|_, summons| summons.summoner != client_id);
+        for _ in self.family_summons.len()..before {
+            refund_summons(client_id);
+        }
+    }
+
+    /// Summonses unanswered for too long count as declined.
+    pub(super) fn purge_family_summons(&mut self, now: Instant) {
+        let late: Vec<_> = self
+            .family_summons
+            .iter()
+            .filter(|(_, summons)| now.duration_since(summons.asked) >= SUMMON_TIMEOUT)
+            .map(|(&id, _)| id)
+            .collect();
+        for id in late {
+            if let Some(summons) = self.family_summons.remove(&id) {
+                let (name, why) = (summons.name, SummonFailure::Declined);
+                self.tell(summons.summoner, ServerMessage::SummonRefund { name, why });
+            }
         }
     }
 
@@ -157,6 +324,7 @@ impl WorldDirectory {
     /// A member left: changing channel, they are held for a while;
     /// otherwise their relatives hear at once.
     pub(super) fn family_left(&mut self, entry: &Entry, changing_channel: bool) {
+        self.forget_summons(entry.handle.client_id);
         let relatives = &entry.presence.family;
         if relatives.senior.is_none() && relatives.juniors.is_empty() {
             return;

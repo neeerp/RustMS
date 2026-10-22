@@ -76,4 +76,12 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// A relative asks to summon the player
+	// Opcode: FAMILY_SUMMON_REQUEST(104)
+	class FamilySummonRequestHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

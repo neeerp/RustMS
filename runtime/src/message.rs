@@ -112,6 +112,24 @@ pub enum ServerMessage {
         gain: i32,
         senior_level: Option<u8>,
     },
+    /// A family member is coming to this player (`trip`); tell them where
+    /// this player stands.
+    FamilyLocate {
+        reply_to: ClientHandle,
+        trip: FamilyTrip,
+    },
+    /// Where the family member this player is going to stands, if they are
+    /// on the channel.
+    FamilyLocated {
+        trip: FamilyTrip,
+        found: Option<Whereabouts>,
+    },
+    /// The summons this player paid for to bring `name` didn't happen;
+    /// return the Rep and say why.
+    SummonRefund {
+        name: String,
+        why: SummonFailure,
+    },
     /// The invitation the player's guild had to `alliance_id` stands; join
     /// it.
     JoinAlliance {
@@ -261,6 +279,28 @@ pub enum ServerMessage {
         item_id: i32,
         packet: Packet,
     },
+}
+
+/// Why a family member goes to another.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FamilyTrip {
+    /// The player spent the teleport entitlement.
+    Teleport,
+    /// `summoner` spent the summon entitlement and the player said yes.
+    Summoned { summoner: ClientId },
+}
+
+/// Why a summons failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SummonFailure {
+    /// The member isn't on the summoner's channel, or left.
+    NotFound,
+    /// Someone else is summoning them.
+    Busy,
+    /// They said no, or didn't answer in time.
+    Declined,
+    /// The summoner moved, or the member may not leave where they are.
+    Location,
 }
 
 /// A cheap, clonable way to reach one client connection.
@@ -657,6 +697,31 @@ pub enum DirectoryMessage {
     FamilyEarn {
         from: ClientId,
         gain: i32,
+    },
+    /// `from` spent the teleport entitlement to go to `target`.
+    FamilyLocate {
+        from: ClientId,
+        target: ClientId,
+    },
+    /// `from`, on `map_id` (named `map_name`), spent the summon
+    /// entitlement to bring `target`, named `name`.
+    FamilySummon {
+        from: ClientId,
+        target: ClientId,
+        name: String,
+        map_id: i32,
+        map_name: String,
+    },
+    /// `from` answered the summons `summoner` sent them.
+    FamilySummonAnswer {
+        from: ClientId,
+        summoner: String,
+        accept: bool,
+    },
+    /// `from` said yes to `summoner` but may not leave their map.
+    FamilySummonFailed {
+        from: ClientId,
+        summoner: ClientId,
     },
     /// These characters' families changed; those online read theirs again.
     FamilyChanged {

@@ -69,8 +69,13 @@ pub enum RecvOpcode {
     SeparateFamilyByJunior = 0x95,
     /// An answer to a junior request (the card, or the client itself).
     AcceptFamily = 0x96,
+    /// An entitlement bought from the Family window, with a family
+    /// member's name for those that need one.
+    UseFamily = 0x97,
     /// The leader's new precepts, from the Family window.
     ChangeFamilyMessage = 0x98,
+    /// The answer to a family member's summons.
+    FamilySummonResponse = 0x99,
     /// The guild bulletin board (FUN_008166f6 and its siblings).
     GuildBbs = 0x9B,
     FaceExpression = 0x33,

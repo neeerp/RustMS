@@ -14,8 +14,8 @@ pub const MAX_GENERATIONS: usize = 1000;
 /// The longest precepts the client lets the leader type (b039).
 pub const MAX_PRECEPTS: usize = 200;
 
-/// Why a junior wasn't added: FAMILY_RESULT's code, which picks the
-/// client's line.
+/// Why a junior wasn't added, or an entitlement didn't apply:
+/// FAMILY_RESULT's code, which picks the client's line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refusal {
     /// 0x11f5: "You cannot add this character as a Junior."
@@ -38,6 +38,13 @@ pub enum Refusal {
     Generations,
     /// 0x11fd: the junior is below level 10.
     TooLow,
+    /// 0x11f7: "You do not belong to the same family."
+    NotSameFamily,
+    /// 0x11ff: someone else is summoning them.
+    SummonPending,
+    /// 0x1201, a chat line: "The summons has failed. Your current location
+    /// or state does not allow a summons." (report b050)
+    CannotSummon,
 }
 
 impl Refusal {
@@ -53,6 +60,9 @@ impl Refusal {
             Refusal::Busy => 0x49,
             Refusal::Generations => 0x4c,
             Refusal::TooLow => 0x4d,
+            Refusal::NotSameFamily => 0x43,
+            Refusal::SummonPending => 0x4a,
+            Refusal::CannotSummon => 0x4b,
         }
     }
 }
@@ -103,6 +113,99 @@ pub fn rep_gain(gain: i32, senior: u8, junior: u8) -> i32 {
     }
 }
 
+/// What spending an entitlement does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Benefit {
+    /// Go to a family member.
+    Teleport,
+    /// Bring a family member to the player.
+    Summon,
+    /// EXP or drops, or both, at `percent` for `minutes`, for the player or
+    /// for their party.
+    Rate {
+        exp: bool,
+        drop: bool,
+        percent: u16,
+        minutes: u16,
+        party: bool,
+    },
+    /// EXP and drops at `percent` for `minutes`, once enough of the family
+    /// below the player is online.
+    Bonding { percent: u16, minutes: u16 },
+}
+
+/// An entitlement the Family window offers, bought with Rep.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Entitlement {
+    /// The client asks for a family member's name first for 0 and 1.
+    pub kind: u8,
+    pub cost: i32,
+    /// Uses a day.
+    pub limit: i32,
+    pub benefit: Benefit,
+}
+
+impl Entitlement {
+    /// Whether USE_FAMILY names a family member.
+    pub fn targeted(&self) -> bool {
+        self.kind <= 1
+    }
+}
+
+const fn rate(cost: i32, exp: bool, percent: u16, minutes: u16, party: bool) -> Entitlement {
+    Entitlement {
+        kind: 2,
+        cost,
+        limit: 1,
+        benefit: Benefit::Rate {
+            exp,
+            drop: !exp,
+            percent,
+            minutes,
+            party,
+        },
+    }
+}
+
+/// The entitlements that go to a family member, by their index.
+pub const TELEPORT: usize = 0;
+pub const SUMMON: usize = 1;
+
+/// The entitlements, by the index USE_FAMILY sends. v83's own list isn't
+/// known; these costs, limits and benefits are Cosmic's (report b049), and
+/// their names and descriptions are content-pack text.
+pub const ENTITLEMENTS: [Entitlement; 11] = [
+    Entitlement {
+        kind: 1,
+        cost: 300,
+        limit: 1,
+        benefit: Benefit::Teleport,
+    },
+    Entitlement {
+        kind: 1,
+        cost: 500,
+        limit: 1,
+        benefit: Benefit::Summon,
+    },
+    rate(700, false, 150, 15, false),
+    rate(800, true, 150, 15, false),
+    Entitlement {
+        kind: 2,
+        cost: 1000,
+        limit: 1,
+        benefit: Benefit::Bonding {
+            percent: 200,
+            minutes: 30,
+        },
+    },
+    rate(1200, false, 200, 15, false),
+    rate(1500, true, 200, 15, false),
+    rate(2000, false, 200, 30, false),
+    rate(2500, true, 200, 30, false),
+    rate(4000, false, 200, 30, true),
+    rate(5000, true, 200, 30, true),
+];
+
 /// A character's senior and juniors, by character id; both empty out of a
 /// family.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -133,6 +236,8 @@ pub struct FamilyInfo {
     pub name: String,
     /// The leader's message to the family.
     pub precepts: String,
+    /// Entitlements used today: (index, times).
+    pub used: Vec<(i32, i32)>,
 }
 
 /// A member as the Family Tree draws them (FAMILY_CHART).
