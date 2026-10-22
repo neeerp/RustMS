@@ -148,9 +148,10 @@ book an engaged couple's wedding (report b066; `net::npc_scripts`,
 explains the steps or books. The booker needs the venue's ticket
 (Cathedral 5251000 or premium 5251003, Chapel 5251001 or premium 5251002)
 in the Cash inventory, no wedding ring held or worn, and Etc room for the
-invitations. In Cosmic, the scripts are `9201005.js` and `9201008.js`. No
-ticket is on sale in v83's `Etc.nx` commodities, so for now they come from
-elsewhere (tests grant them). Victoria (9201013), beside Nicole, explains
+invitations. In Cosmic, the scripts are `9201005.js` and `9201008.js`. The
+Cash Shop sells the four tickets under Etc > Wedding (SN 50400000-3, at
+25,000, 20,000, 24,000 and 29,000 NX for 90 days); the Event-tab
+copies of them are off sale. Victoria (9201013), beside Nicole, explains
 the booking in one page (`wedding.victoria.info`).
 
 The partner's side lives in the partner's actor, so a booking is a round
@@ -418,7 +419,7 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- Selling the tickets, the wedding field, and the wishlist. Report b066
+- The wedding field and the wishlist. Report b066
   lists the slices.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the

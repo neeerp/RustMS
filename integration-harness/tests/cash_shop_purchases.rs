@@ -237,6 +237,36 @@ async fn request(
     reply.packet.bytes[2..].to_vec()
 }
 
+/// Etc > Wedding: the Cathedral wedding ticket (25,000 NX), and the
+/// Event tab's copy of it, which is off sale.
+const CATHEDRAL_TICKET: i32 = 50400000;
+const OLD_CATHEDRAL_TICKET: i32 = 10100885;
+
+#[tokio::test]
+async fn wedding_tickets_are_on_sale() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    set_nx_credit(&config.username, 30_000)
+        .await
+        .expect("grant NX");
+    enter_cash_shop(&mut session.connection).await;
+    let connection = &mut session.connection;
+
+    let buy = build_cash_shop_buy(1, OLD_CATHEDRAL_TICKET).unwrap();
+    connection.send_packet(buy, "buy").await.expect("send purchase");
+    assert_eq!(failure(connection, "buy an old ticket").await, 0xC0);
+
+    let buy = build_cash_shop_buy(1, CATHEDRAL_TICKET).unwrap();
+    let bought = request(connection, buy, "buy a ticket").await;
+    assert_eq!(bought[0], 0x57, "buy a ticket");
+    // The item: cash id, account, character, then the item id.
+    let item_id = Cursor::new(&bought[17..]).read_int().expect("item id");
+    assert_eq!(item_id, 5251000);
+    assert_eq!(credit(connection, "buy a ticket").await, 5_000);
+}
+
 #[tokio::test]
 async fn nx_buys_items_packages_gifts_and_slots() {
     let config = load_harness_config_or_fail().await;
