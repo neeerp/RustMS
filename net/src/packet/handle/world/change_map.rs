@@ -75,6 +75,15 @@ impl WorldHandler for ChangeMapHandler {
                     BlockedMap::PortalClosed,
                 )?));
             };
+            // Below the map's `lvLimit`: "You cannot go to that place."
+            if !game_data
+                .field(destination_map)
+                .is_none_or(|field| crate::map_rules::may_walk_in(player, field))
+            {
+                return Ok(HandlerResult::reply(build::world::map::build_blocked_map(
+                    BlockedMap::CannotGo,
+                )?));
+            }
             let spawn_point = u8::try_from(spawn_portal.id).map_err(|_| {
                 NetworkError::PacketHandlerError("Destination spawn portal id out of range")
             })?;

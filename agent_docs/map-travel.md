@@ -105,6 +105,22 @@ level 50 and Step 3 from it, arriving at portal 0. Louis (`1032004`,
 keys (`shane.*`, `louis.ask`) are `unsourced`. `forest_of_patience.rs` checks
 them through the network harness.
 
+### Level limits
+
+The v83 client reads neither `info/lvLimit` (672 maps) nor
+`info/lvForceMove` (150), so the server applies them (`net::map_rules`).
+Nothing shows how a v83 server did; these are the recommended defaults
+from `v83ref/lanes/QUESTIONS.md` (row 196, 2026-10-22). Walking through a
+portal into a map whose `lvLimit` the player hasn't reached is refused with
+BLOCKED_MAP 2 ("You cannot go to that place."), as at Leafre's `west00`
+(level 15). NPCs, scripts, rocks and map-id warps don't check it. A player of
+level 20 or more who enters one of the five Training Centers (`910060000`,
+`910120000`, `910220000`, `910310000`, `912030000`, five maps each,
+`lvForceMove` 20) is sent at once to its `returnMap`, portal 0, by an
+expired map timer. The other `lvForceMove` maps (Kerning Square's 51,
+the Mushroom Castle's 39) are left alone. GMs pass both checks.
+`map_level_rules.rs` checks them through the network harness.
+
 ## Menu warps
 
 These NPCs warp straight off a menu choice, with no question after it
