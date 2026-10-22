@@ -221,8 +221,14 @@ impl FieldActor {
             .into_iter()
             .partition(|item: &ItemOnReactor| item.at <= now);
         self.items_on_reactors = waiting;
+        // One item per reactor a tick: what else lay due on it is looked
+        // at again after the take.
+        let mut took = Vec::new();
         for item in due {
-            self.take_item_on_reactor(item, now);
+            let reactor = item.reactor;
+            if !took.contains(&reactor) && self.take_item_on_reactor(item, now) {
+                took.push(reactor);
+            }
         }
         for object_id in self.reactors.respawn(now) {
             if let Some(reactor) = self.reactors.get(object_id) {
@@ -929,20 +935,20 @@ impl FieldActor {
 
     /// The reactor takes the item put on it, if both are still there and
     /// it still wants it, and moves on. A reactor that waits for another
-    /// item then looks at what already lies on it.
-    fn take_item_on_reactor(&mut self, on: ItemOnReactor, now: Instant) {
+    /// item then looks at what already lies on it. Says whether it took it.
+    fn take_item_on_reactor(&mut self, on: ItemOnReactor, now: Instant) -> bool {
         let Some(drop) = self.drops.get(on.drop) else {
-            return;
+            return false;
         };
         let Loot::Dropped(item) = &drop.loot else {
-            return;
+            return false;
         };
         let (owner, at) = (drop.owner, self.landing(drop));
         let Some(hit) = self
             .reactors
             .take_item(on.reactor, item.item_id, item.quantity, at, now)
         else {
-            return;
+            return false;
         };
         if let Some(drop) = self.drops.remove(on.drop) {
             if let Ok(packet) = build_remove_drop(drop.object_id, None) {
@@ -956,6 +962,7 @@ impl FieldActor {
                 self.put_on_reactor(&drop, now);
             }
         }
+        true
     }
 
     /// Send a drop packet to everyone who may see the drop.
@@ -2164,7 +2171,10 @@ impl FieldActor {
                 self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)))
             }
             reactors::Action::Drops => {
-                if let Some(occupant) = self.occupants.get(&by) {
+                // Whoever put the last item on it may have gone; the loot
+                // then falls to someone still here.
+                let occupant = self.occupants.get(&by);
+                if let Some(occupant) = occupant.or_else(|| self.occupants.values().next()) {
                     occupant.handle.send(ServerMessage::ReactorBroken {
                         reactor_id: view.reactor_id,
                         object_id: view.object_id,
