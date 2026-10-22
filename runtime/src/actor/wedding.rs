@@ -39,7 +39,7 @@ use tracing::{info, warn};
 const GRACE: Duration = Duration::from_secs(2);
 /// Room for each of the couple and the guests to leave while another
 /// message of theirs waits, so a dropped ticket is never turned away.
-pub const WEDDING_QUEUE_CAPACITY: usize = 2 * (MAX_GUESTS as usize + 2);
+pub const WEDDING_QUEUE_CAPACITY: usize = 2 * (MAX_GUESTS as usize + 2) + 16;
 
 #[derive(Debug)]
 pub enum WeddingMessage {
@@ -176,8 +176,8 @@ pub fn spawn(
     spawn_supervised(format!("wedding {venue:?} {id}"), actor.run(), move || {
         let guests = inside
             .lock()
-            .map(|guests| guests.clone())
-            .unwrap_or_default();
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
         for member in couple.iter().chain(guests.values()) {
             member.send(ServerMessage::WeddingEnded { id, failed: false });
         }

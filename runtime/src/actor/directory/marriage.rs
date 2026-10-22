@@ -229,7 +229,7 @@ impl WorldDirectory {
         if let Err(error) = wedding.tx.try_send(join) {
             let refusal = match error {
                 TrySendError::Full(_) => GuestRefusal::Full,
-                TrySendError::Closed(_) => GuestRefusal::NotStarted,
+                TrySendError::Closed(_) => GuestRefusal::Late,
             };
             if let WeddingMessage::Join { reply, .. } = error.into_inner() {
                 let _ = reply.send(Err(refusal));

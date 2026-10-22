@@ -198,6 +198,9 @@ pub const SLOT: Duration = Duration::from_secs(60 * 60);
 pub const LEAD: Duration = Duration::from_secs(120 * 60);
 /// How long after its start a wedding the couple never began is kept.
 pub const NO_SHOW: Duration = Duration::from_secs(10 * 60);
+/// How long after its start guests may come to a wedding: the couple may
+/// begin it until `NO_SHOW`, and guests come in during the gathering.
+pub const GUESTS_UNTIL: Duration = Duration::from_secs(NO_SHOW.as_secs() + GATHERING.as_secs());
 
 /// A couple's booked wedding.
 #[derive(Clone, Debug, PartialEq, Eq)]

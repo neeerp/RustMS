@@ -7505,7 +7505,7 @@ mod tests {
         assert_eq!(kind(&leave.begin()), Some(1));
         let yes = leave.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::LeaveWedding]);
-        let mut wait = NpcScript::wedding_staff(JACKIE, WeddingStage::Ceremony, false);
+        let wait = NpcScript::wedding_staff(JACKIE, WeddingStage::Ceremony, false);
         assert_eq!(page_text(&wait.begin()), text(keys::WEDDING_STAFF_WAIT));
         let mut end = NpcScript::wedding_staff(JACKIE, WeddingStage::Married, false);
         end.begin();
