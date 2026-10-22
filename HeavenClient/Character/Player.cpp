@@ -900,8 +900,11 @@ namespace ms
 		// Infinity zeroes every skill's MP cost (FUN_00764256, 0x76446d).
 		uint16_t mp = has_buff(Buffstat::Id::INFINITY_) ? UINT16_MAX : stats.get_stat(MapleStat::Id::MP);
 		// Shadow Stars throws its star whatever a skill's cost, and Soul Arrow
-		// needs no arrows at all (FUN_00949b5d, 0x969...).
-		uint16_t bullets = shadow_star() || soul_arrow() ? UINT16_MAX : inventory.get_most_bullets();
+		// needs no arrows at all (FUN_00949b5d, 0x969...). Once the star is
+		// gone, v83 shows no message either: the shot just does nothing
+		// (0x9698e2).
+		bool stars = shadow_star() || shadow_star_lost();
+		uint16_t bullets = stars || soul_arrow() ? UINT16_MAX : inventory.get_most_bullets();
 
 		SpecialMove::ForbidReason reason = move.can_use(level, weapon, job, hp, mp, bullets);
 
@@ -982,6 +985,14 @@ namespace ms
 		return inventory.find_item(InventoryType::Id::USE, star) ? star : 0;
 	}
 
+	bool Player::shadow_star_lost() const
+	{
+		int16_t value = get_buff_value(Buffstat::Id::SHADOW_CLAW);
+		bool held = value >= 1 && inventory.find_item(InventoryType::Id::USE, value + skill_use::SHADOW_STARS_BASE);
+
+		return skill_use::star_lost(value, held);
+	}
+
 	Attack Player::prepare_attack(int32_t skill, bool whack) const
 	{
 		Attack::Type attacktype;
@@ -1016,9 +1027,11 @@ namespace ms
 				case Weapon::Type::CROSSBOW:
 				case Weapon::Type::CLAW:
 				case Weapon::Type::GUN:
-					// Soul Arrow shoots even with an empty quiver (FUN_0094e256).
-					attacktype = inventory.has_projectile() || star || soul_arrow() ? Attack::Type::RANGED
-																					: Attack::Type::CLOSE;
+					// Soul Arrow shoots even with an empty quiver, and so
+					// does Shadow Stars when its star is gone (FUN_0094e256).
+					attacktype = inventory.has_projectile() || star || soul_arrow() || shadow_star_lost()
+									 ? Attack::Type::RANGED
+									 : Attack::Type::CLOSE;
 					break;
 				default:
 					attacktype = Attack::Type::CLOSE;

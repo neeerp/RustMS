@@ -18,6 +18,14 @@ namespace ms
 		constexpr int32_t DISPEL = 2311001;
 		constexpr int32_t RESURRECTION = 2321006;
 
+		// Whether Shadow Stars is on (its value names the star) and its star
+		// is gone from USE: v83 throws no other star then, so a shot does
+		// nothing at all (0x949b5d, 0x9537d5).
+		inline bool star_lost(int16_t value, bool held)
+		{
+			return value >= 1 && !held;
+		}
+
 		// Whether the packet carries where the user stands (0x96d6ca): the
 		// skills that place something, or reach the party around them.
 		inline bool sends_position(int32_t skill)

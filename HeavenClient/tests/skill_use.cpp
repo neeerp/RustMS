@@ -53,6 +53,10 @@ int main()
 		require(shadow_star(std::vector<std::pair<int32_t, int32_t>>{ { 2330000, 500 } }, 200) == 0,
 				"bullets aren't stars");
 
+		require(star_lost(1, false) && star_lost(7, false), "the buff's star gone from USE is lost");
+		require(!star_lost(1, true), "a star still held isn't");
+		require(!star_lost(0, false), "without Shadow Stars no star is lost");
+
 		std::cout << "SkillUse passed\n";
 		return 0;
 	}
