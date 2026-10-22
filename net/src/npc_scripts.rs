@@ -2290,7 +2290,8 @@ fn cloto_reward(player: &Player, rng: &mut impl Rng) -> NpcScript {
 }
 
 /// Whether `inventory` has a free slot in each of the Equip, Use and Etc
-/// tabs, which a party quest's rewards come in (Cosmic `hasRewardSlot`).
+/// tabs. Cosmic's `hasRewardSlot` checks the tabs its reward list comes in,
+/// which for Kerning City's and Ludibrium's lists are these three.
 fn has_reward_slot(inventory: &Inventory) -> bool {
     [InventoryType::Equip, InventoryType::Use, InventoryType::Etc]
         .into_iter()
