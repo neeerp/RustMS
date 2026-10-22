@@ -70,6 +70,7 @@ namespace ms
 		interval = SPIN;
 		last_spin = tick(now);
 		deadline = tick(now + TIME_LIMIT);
+		last_timer = -1;
 		hands_visible = true;
 	}
 
@@ -176,6 +177,7 @@ namespace ms
 				interval = SPIN;
 				last_spin = tick(now);
 				deadline = tick(now + TIME_LIMIT);
+				last_timer = -1;
 				hands_visible = true;
 			}
 			else

@@ -160,6 +160,20 @@ namespace
 		require(line(game, now).rfind("Please select", 0) == 0, "counting down again");
 	}
 
+	void a_draw_after_a_tick_ticks_all_ten_again()
+	{
+		int64_t now = 1000;
+		RpsGame game;
+		game.pressed();
+		game.start_round(now);
+		Run seen = run(game, now, now + 21500);
+		require(seen.timers == 1, "the nine");
+		game.chose(RpsGame::ROCK);
+		game.result(RpsGame::ROCK, 0);
+		seen = run(game, now, now + 40000);
+		require(seen.timers == 10 && seen.time_up, "ten in the replay");
+	}
+
 	void only_a_loss_from_no_streak_is_consoled()
 	{
 		int64_t now = 1000;
@@ -224,6 +238,7 @@ int main()
 	a_win_slows_the_spin_to_the_admins_hand();
 	a_draw_plays_again_by_itself();
 	a_chosen_hand_leaves_the_last_second();
+	a_draw_after_a_tick_ticks_all_ten_again();
 	only_a_loss_from_no_streak_is_consoled();
 	ten_wins_only_offer_retry();
 

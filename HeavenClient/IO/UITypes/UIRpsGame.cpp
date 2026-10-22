@@ -97,10 +97,11 @@ namespace ms
 
 		own_hands[game.choice()].draw(position + OWN_HAND_AT);
 		npc_hands[game.spin()].draw(position + NPC_HAND_AT);
-		banners[static_cast<size_t>(game.banner())].draw(position + BANNER_AT);
 
 		Stage::get().get_player().get_look().draw(position + AVATAR_AT, true, Stance::Id::STAND1, emotion);
 		npc.draw(DrawArgument(position + NPC_AT, false), alpha);
+		// Over the avatar and the admin (layer z 2 against their 1).
+		banners[static_cast<size_t>(game.banner())].draw(position + BANNER_AT);
 
 		Range<int16_t> line(position.x() + STATUS_AT.x(), position.x() + STATUS_AT.x() + STATUS_WIDTH);
 		status.draw_between(position + STATUS_AT + Point<int16_t>(status_x, -TEXT_RAISE), line);
