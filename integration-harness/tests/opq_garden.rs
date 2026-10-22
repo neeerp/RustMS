@@ -274,16 +274,16 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
         assert!(pink(&trace, keys::OPQ_NOTICE_GARDEN_OUT), "{trace:?}");
     }
     let grass = pick_up(&mut a[0], &mut seen, GRASS_OF_LIFE).await;
-    let trace = told(&mut a[0], enter(&out)).await;
-    assert_eq!(trace.portal_sounds, 1, "{trace:?}");
-    let mut hub = Vec::new();
-    for player in &mut a {
-        let mut trace = Trace::default();
-        until(&mut player.connection, &mut trace, |t| {
+    let leader = told(&mut a[0], enter(&out)).await;
+    assert_eq!(leader.portal_sounds, 1, "{leader:?}");
+    // The leader's own warp may come before or after the barrier.
+    let mut hub = vec![leader];
+    hub.resize_with(a.len(), Trace::default);
+    for (player, trace) in a.iter_mut().zip(&mut hub) {
+        until(&mut player.connection, trace, |t| {
             t.warps.contains(&OPQ_HUB)
         })
         .await;
-        hub.push(trace);
     }
     until(&mut a[0].connection, &mut hub[0], |t| {
         t.field.reactors.iter().any(|r| r.reactor_id == OPQ_STATUE)
