@@ -48,6 +48,8 @@ namespace ms
 		// An equip in the Cash Inventory: the equip as Character.nx makes it, with its date and who sent it
 		// (FUN_004b0764).
 		void set_cash_item(int32_t item_id, int64_t expiration, const std::string &gift_from);
+		// An equip that is not the player's, as a packet made it: in storage, a trade, a shop or a parcel.
+		void set_stored(Tooltip::Parent parent, const Equip &equip, bool cash);
 
 		void draw(Point<int16_t> position) const override;
 

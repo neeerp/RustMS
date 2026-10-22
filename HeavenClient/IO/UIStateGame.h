@@ -70,6 +70,8 @@ namespace ms
 
 		void show_equip(Tooltip::Parent parent, int16_t slot) override;
 
+		void show_stored_equip(Tooltip::Parent parent, const Equip &equip, bool cash) override;
+
 		void show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags, bool owned,
 					   int32_t remain_life, const std::string &owner) override;
 

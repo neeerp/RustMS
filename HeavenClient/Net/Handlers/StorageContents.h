@@ -26,6 +26,14 @@ namespace ms
 			// A pet's: when its Water of Life dries up, and the seconds one with limitedLife has left.
 			int64_t date_dead = 0;
 			int32_t remain_life = 0;
+			// An equip's: the upgrade slots left and the upgrades made, its stats in EquipStat order, then its
+			// item level, item EXP and the Vicious's Hammer uses.
+			uint8_t slots = 0;
+			uint8_t level = 0;
+			std::array<uint16_t, 15> stats = {};
+			uint8_t itemlevel = 0;
+			int16_t itemexp = 0;
+			int32_t vicious = 0;
 		};
 
 		// What a TRUNK_RESULT carries. A bag it leaves out keeps its items,
@@ -53,10 +61,29 @@ namespace ms
 			switch (type)
 			{
 			case 1:
-				recv.skip(2 + 15 * 2); // upgrade slots, level, stats
+				item.slots = static_cast<uint8_t>(recv.read_byte());
+				item.level = static_cast<uint8_t>(recv.read_byte());
+
+				for (uint16_t &stat : item.stats)
+					stat = static_cast<uint16_t>(recv.read_short());
+
 				item.owner = recv.read_string();
 				item.flags = recv.read_short();
-				recv.skip(item.cash ? 10 : 18);
+
+				if (item.cash)
+				{
+					recv.skip(10);
+				}
+				else
+				{
+					recv.skip(1);
+					item.itemlevel = static_cast<uint8_t>(recv.read_byte());
+					recv.skip(2);
+					item.itemexp = recv.read_short();
+					item.vicious = recv.read_int();
+					recv.skip(8);
+				}
+
 				recv.skip(12);
 				break;
 			case 3:

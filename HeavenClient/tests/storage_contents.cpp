@@ -47,13 +47,13 @@ struct Writer
 
 	Writer& equip(int32_t itemid, int16_t flags = 0)
 	{
-		head(1, itemid).put<int8_t>(7).put<int8_t>(0);
+		head(1, itemid).put<int8_t>(7).put<int8_t>(2);
 
 		for (int i = 0; i < 15; i++)
 			put<int16_t>(static_cast<int16_t>(i));
 
 		string("owner").put<int16_t>(flags);
-		put<int8_t>(0).put<int8_t>(1).put<int32_t>(0).put<int32_t>(0).put<int64_t>(0);
+		put<int8_t>(0).put<int8_t>(1).put<int16_t>(0).put<int16_t>(5).put<int32_t>(3).put<int64_t>(0);
 		return put<int64_t>(0).put<int32_t>(-1);
 	}
 };
@@ -80,6 +80,10 @@ int main()
 		require(contents.slots == 6 && contents.meso == 1234, "slots and mesos are read");
 		require(contents.bags[1]->size() == 1 && (*contents.bags[1])[0].itemid == 1302000, "an equip is read past its stats");
 		require((*contents.bags[1])[0].count == 1, "an equip is one");
+		const storage_contents::Stored &sword = (*contents.bags[1])[0];
+		require(sword.slots == 7 && sword.level == 2, "an equip's upgrade slots and upgrades are read");
+		require(sword.stats[0] == 0 && sword.stats[6] == 6 && sword.stats[14] == 14, "an equip's stats are read in order");
+		require(sword.itemlevel == 1 && sword.itemexp == 5 && sword.vicious == 3, "an equip's level, EXP and hammers are read");
 		require((*contents.bags[1])[0].flags == 0x10 && (*contents.bags[2])[0].flags == 0x02, "flags are read");
 		require(contents.bags[2]->size() == 2 && (*contents.bags[2])[1].count == 500, "stars are read past their recharge");
 		require(contents.bags[3]->empty() && contents.bags[5]->empty(), "empty bags are carried");
