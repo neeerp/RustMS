@@ -1,5 +1,5 @@
 use crate::load::asset_path;
-use game_data::NpcDialogueData;
+use game_data::{MapNpcTemplate, NpcDialogueData};
 use std::sync::OnceLock;
 
 static NPC_DIALOGUES: OnceLock<Result<NpcDialogueData, String>> = OnceLock::new();
@@ -17,4 +17,28 @@ pub fn get() -> Result<&'static NpcDialogueData, &'static str> {
         })
     });
     state.as_ref().map_err(|message| message.as_str())
+}
+
+/// NPCs the server stands in maps whose data leaves them out. v83's Map.nx
+/// places the Rock, Paper, Scissors Admin nowhere (report b038); here it
+/// stands on Henesys's lower street, by Spinel.
+const EXTRA_NPCS: &[(i32, MapNpcTemplate)] = &[(
+    100_000_000,
+    MapNpcTemplate {
+        npc_id: crate::rps::RPS_ADMIN,
+        x: 2190,
+        y: 324,
+        foothold: 124,
+        flip: false,
+        rx0: 2140,
+        rx1: 2240,
+    },
+)];
+
+/// The NPCs the server adds to `map_id`, after those of its data.
+pub fn extra_npcs(map_id: i32) -> impl Iterator<Item = &'static MapNpcTemplate> {
+    EXTRA_NPCS
+        .iter()
+        .filter(move |(map, _)| *map == map_id)
+        .map(|(_, npc)| npc)
 }

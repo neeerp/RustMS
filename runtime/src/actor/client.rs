@@ -18,6 +18,7 @@ mod npc_script;
 mod personal_shop;
 mod pets;
 mod quest;
+mod rps;
 mod script;
 mod ships;
 mod shop;
@@ -112,6 +113,8 @@ pub struct ClientActor {
     storage: Option<net::storage::OpenStorage>,
     /// The Duey window, while the player has it open.
     duey: Option<duey::DueyWindow>,
+    /// The Rock, Paper, Scissors game, while its window is open.
+    rps: Option<net::rps::RpsGame>,
     /// When natural recovery of HP and of MP was last accepted; the client
     /// times them separately.
     last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
@@ -187,6 +190,7 @@ impl ClientActor {
             shop: None,
             storage: None,
             duey: None,
+            rps: None,
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
@@ -428,6 +432,7 @@ impl ClientActor {
             WorldAction::Storage(request) => self.storage_request(request).await?,
             WorldAction::Duey(_) if self.in_cash_shop => {}
             WorldAction::Duey(request) => self.duey_request(request).await?,
+            WorldAction::Rps(request) => self.rps_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
                 self.shop_room_request(request).await?
@@ -689,6 +694,7 @@ impl ClientActor {
         // A new field takes the Duey window with it, and the client doesn't
         // say so (report b029).
         self.duey = None;
+        self.rps = None;
         self.pending_quest = None;
         self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
@@ -783,6 +789,7 @@ impl ClientActor {
         // The shop is a stage of its own, and takes the Duey window with it
         // (report b029).
         self.duey = None;
+        self.rps = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;

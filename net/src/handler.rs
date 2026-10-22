@@ -441,6 +441,8 @@ pub enum WorldAction {
     Storage(crate::storage::StorageRequest),
     /// Open Duey's window, send, claim, or delete a parcel, or close it.
     Duey(crate::duey::DueyRequest),
+    /// A button of the Rock, Paper, Scissors window.
+    Rps(crate::rps::RpsRequest),
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
     /// Open, stock, visit, or buy from a personal shop.
@@ -846,6 +848,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
             (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
+            (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),

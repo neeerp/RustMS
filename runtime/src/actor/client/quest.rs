@@ -446,7 +446,11 @@ fn buff_item(next: &mut Player, item_id: Option<i32>) -> Option<(i32, ItemEffect
 
 /// Pay a quest step's `money` to `next`, or take it if negative, with the
 /// stat update and the message in the chat log.
-fn pay_mesos(next: &mut Player, money: i32, packets: &mut Vec<Packet>) -> Result<(), RuntimeError> {
+pub(super) fn pay_mesos(
+    next: &mut Player,
+    money: i32,
+    packets: &mut Vec<Packet>,
+) -> Result<(), RuntimeError> {
     if money == 0 {
         return Ok(());
     }

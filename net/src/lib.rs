@@ -40,6 +40,7 @@ pub mod quests;
 pub mod rates;
 pub mod reactors;
 pub mod rides;
+pub mod rps;
 pub mod scripts;
 pub mod settings;
 pub mod shop;
@@ -56,4 +57,5 @@ pub use self::handler::{
     WhisperDelivery, WorldAction, WorldContext, WorldHandler, WorldRoute,
 };
 pub use self::io::error;
+pub use self::npc_data::extra_npcs;
 pub use self::npc_data::get as get_npc_dialogue_data;
