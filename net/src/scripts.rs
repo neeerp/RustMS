@@ -80,6 +80,13 @@ const WEDDING_HALL_ENTRANCE: i32 = 106021401;
 const SECRET_BASEMENT_PATH: i32 = 261030000;
 const ZENUMIST_HALLWAY: i32 = 261010000;
 const VERIFYING_THE_PASSWORD: i16 = 3360;
+/// The Forest of Evil's hidden way into the Cursed Forest (`curseforest`),
+/// open at night to players on Arwen's quests: Rage, Resentment, and
+/// Revenge (2224) or Arwen's Apology (2226) taken, or Defeat Faust (2227)
+/// done, after which the forest is the one Faust has left.
+const CURSED_FOREST: i32 = 910100000;
+const CURSED_FOREST_AFTER_FAUST: i32 = 910100001;
+const DEFEAT_FAUST: i16 = 2227;
 /// `rankRoom`: each job's hall (and Ereve's and the Dangerous Forest's),
 /// the room it leads into, and the room's portal back.
 const RANK_ROOMS: [(i32, i32, &str); 8] = [
@@ -465,6 +472,10 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ))
         }
         "secretDoor" => refused(keys::SECRET_DOOR_LOCKED),
+        "curseforest" => {
+            let hour = crate::conti::time_of_day(crate::conti::now()).0;
+            cursed_forest(player, hour)
+        }
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -476,6 +487,29 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         _ => return None,
     };
     Some(outcome)
+}
+
+/// The Cursed Forest's way in at `hour` of the world's (UTC) day, the hour
+/// the stations' clocks show: shut from 7:00 until 17:00.
+fn cursed_forest(player: &Player, hour: u8) -> ScriptOutcome {
+    let quest = |id: i16| player.quests.state(id);
+    let after_faust = quest(DEFEAT_FAUST) == QuestState::Completed;
+    if !(after_faust
+        || [2224, 2226]
+            .iter()
+            .any(|&id| quest(id) == QuestState::Started))
+    {
+        return refused(keys::CURSED_FOREST_CLOSED);
+    }
+    if (7..17).contains(&hour) {
+        return refused(keys::CURSED_FOREST_DAYTIME);
+    }
+    let forest = if after_faust {
+        CURSED_FOREST_AFTER_FAUST
+    } else {
+        CURSED_FOREST
+    };
+    through(Effect::WarpToPortal(forest, named(forest, "out00")))
 }
 
 /// A portal that lets the player through with its sound.
@@ -888,6 +922,31 @@ mod tests {
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 2)));
         player.stats.map_id = 261020200;
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
+    }
+
+    #[test]
+    fn the_cursed_forest_opens_at_night_to_arwens_helpers() {
+        let at = |quests: &[(i16, QuestState)], hour| cursed_forest(&player_with(quests), hour);
+        let started = QuestState::Started;
+        let forest = |forest| through(Effect::WarpToPortal(forest, named(forest, "out00")));
+        assert!(pink(&at(&[], 20)));
+        assert!(pink(&at(&[(2225, started)], 20)));
+        assert!(pink(&at(&[(DEFEAT_FAUST, started)], 20)));
+        for quests in [&[(2224, started)][..], &[(2226, started)][..]] {
+            for hour in [0, 6, 17, 23] {
+                assert_eq!(at(quests, hour), forest(CURSED_FOREST), "{hour}");
+            }
+            for hour in [7, 12, 16] {
+                assert!(pink(&at(quests, hour)), "{hour}");
+            }
+        }
+        let done = &[(DEFEAT_FAUST, QuestState::Completed)];
+        assert_eq!(at(done, 3), forest(CURSED_FOREST_AFTER_FAUST));
+        assert!(pink(&at(done, 9)));
+        assert_eq!(named(CURSED_FOREST, "out00"), 1);
+        assert_eq!(named(CURSED_FOREST_AFTER_FAUST, "out00"), 1);
+        // The closed and the daytime lines differ.
+        assert_ne!(at(&[], 20), at(&[(2224, started)], 12));
     }
 
     #[test]

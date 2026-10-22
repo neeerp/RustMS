@@ -339,6 +339,9 @@ pub mod keys {
     pub const SECRET_DOOR_LOCKED: &str = "portal.secret_door.locked";
     pub const ARIANT_PALACE_NO_PASS: &str = "portal.ariant_palace.no_pass";
     pub const WITCH_CAVE_CREEPY: &str = "portal.witch_cave.creepy";
+    /// The Cursed Forest (`curseforest`): not on Arwen's quests, and by day.
+    pub const CURSED_FOREST_CLOSED: &str = "portal.cursed_forest.closed";
+    pub const CURSED_FOREST_DAYTIME: &str = "portal.cursed_forest.daytime";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1003,6 +1006,8 @@ mod tests {
             keys::SECRET_DOOR_LOCKED,
             keys::ARIANT_PALACE_NO_PASS,
             keys::WITCH_CAVE_CREEPY,
+            keys::CURSED_FOREST_CLOSED,
+            keys::CURSED_FOREST_DAYTIME,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

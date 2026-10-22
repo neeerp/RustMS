@@ -473,6 +473,8 @@ unsourced = [
     "portal.secret_door.locked",
     "portal.ariant_palace.no_pass",
     "portal.witch_cave.creepy",
+    "portal.cursed_forest.closed",
+    "portal.cursed_forest.daytime",
     "time_gate.inactive",
     "time_gate.no_era",
     "statue.intro",
