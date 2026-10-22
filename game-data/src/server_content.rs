@@ -344,6 +344,10 @@ pub mod keys {
     pub const HPQ_GROWLIE_LEAVE_ASK: &str = "hpq.growlie.leave.ask";
     pub const HPQ_GROWLIE_STAY: &str = "hpq.growlie.stay";
     pub const HPQ_TOMMY_HOME: &str = "hpq.tommy.home";
+    /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
+    pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
+    /// The weather that blows then, telling the party what to do.
+    pub const HPQ_MOON_WEATHER: &str = "hpq.moon.weather";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -1091,6 +1095,8 @@ mod tests {
             keys::HPQ_GROWLIE_LEAVE_ASK,
             keys::HPQ_GROWLIE_STAY,
             keys::HPQ_TOMMY_HOME,
+            keys::HPQ_MOON_BUNNY_OUT,
+            keys::HPQ_MOON_WEATHER,
             keys::KPQ_CLOTO_Q1,
             keys::KPQ_CLOTO_Q2,
             keys::KPQ_CLOTO_Q3,

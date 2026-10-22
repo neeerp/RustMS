@@ -12,6 +12,7 @@ use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
+use game_data::server_content::keys;
 use net::conti::{self, Happening, State, Target};
 use net::loot::Loot;
 use net::meso_explosion::{self, Blast};
@@ -29,6 +30,7 @@ use net::packet::build::world::field::{
     parse_movement_state,
 };
 use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteView};
+use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
@@ -98,6 +100,11 @@ const SUMMON_REACH_Y: i32 = 150;
 /// How long a weather item's weather blows (Cosmic's 30 s; the v83 client
 /// waits for the server to stop it).
 const WEATHER_TIME: Duration = Duration::from_secs(30);
+
+/// The quest's own weather item ("rice cake quest") that tells Primrose
+/// Hill to guard the Moon Bunny, and how long it blows (Cosmic's 7 s).
+const MOON_WEATHER: i32 = 5120016;
+const MOON_WEATHER_TIME: Duration = Duration::from_secs(7);
 
 /// How long an item lies on a reactor before the reactor takes it
 /// (Cosmic's `ActivateItemReactor`).
@@ -1962,7 +1969,9 @@ impl FieldActor {
                     mob_id,
                     count,
                     at: (x, y),
-                } => self.board(mob_id, count, (x, y)),
+                } => {
+                    self.board(mob_id, count, (x, y));
+                }
                 Happening::Retreat => {
                     if let Ok(packet) = build_conti_move(Target::Deck, State::MobDestroy) {
                         self.broadcast(None, packet);
@@ -1984,11 +1993,12 @@ impl FieldActor {
     }
 
     /// Bring `count` of `mob_id` aboard on the ground below `(x, y)`, under
-    /// the first player here, or the next to come.
-    fn board(&mut self, mob_id: i32, count: usize, (x, y): (i16, i16)) {
+    /// the first player here, or the next to come; returns how many came.
+    fn board(&mut self, mob_id: i32, count: usize, (x, y): (i16, i16)) -> usize {
         let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
         let now = Instant::now();
+        let mut came = 0;
         for info in std::iter::repeat_with(|| net::mobs::info(mob_id))
             .take(count)
             .flatten()
@@ -1999,11 +2009,13 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
+            came += 1;
         }
         if let Some(controller) = self.occupants.keys().next().copied() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
         }
+        came
     }
 
     /// Send what `message` gives for the `nth` player a mob's cast
@@ -2231,6 +2243,9 @@ impl FieldActor {
                 if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }
+                if reactors::action(view.reactor_id) == reactors::Action::Bloom {
+                    self.bloom();
+                }
                 return;
             }
             Hit::Broke(view) => view,
@@ -2242,7 +2257,7 @@ impl FieldActor {
         }
         match reactors::action(view.reactor_id) {
             reactors::Action::BringOut(mob_id) => {
-                self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)))
+                self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)));
             }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
@@ -2380,11 +2395,52 @@ impl FieldActor {
     /// A player used a weather item: everyone here sees it, in place of any
     /// that was blowing, until it stops.
     fn blow_weather(&mut self, item_id: i32, message: String) {
+        self.blow_weather_for(item_id, message, WEATHER_TIME);
+    }
+
+    fn blow_weather_for(&mut self, item_id: i32, message: String, time: Duration) {
         match build_blow_weather(Some((item_id, &message))) {
             Ok(packet) => self.broadcast(None, packet),
             Err(error) => warn!(item_id, %error, "Failed to build weather"),
         }
-        self.weather = Some((item_id, message, Instant::now() + WEATHER_TIME));
+        self.weather = Some((item_id, message, Instant::now() + time));
+    }
+
+    /// A moonflower bloomed: the full moon waxes to as many phases as there
+    /// are flowers in bloom, and as it turns full, the Moon Bunny comes out
+    /// below it and everyone here is told to guard it.
+    fn bloom(&mut self) {
+        let flowers = self
+            .reactors
+            .live()
+            .filter(|reactor| reactors::stays(reactor.reactor_id));
+        let (mut bloomed, mut all) = (0u8, 0u8);
+        for flower in flowers {
+            all += 1;
+            bloomed += u8::from(flower.state > 0);
+        }
+        let waxed = self.reactors.set_state(reactors::FULL_MOON, bloomed);
+        for view in &waxed {
+            if let Ok(packet) = build_hit_reactor(view, 0, 0) {
+                self.broadcast(None, packet);
+            }
+        }
+        let [moon] = waxed[..] else {
+            return;
+        };
+        if bloomed < all {
+            return;
+        }
+        if self.board(reactors::MOON_BUNNY, 1, (moon.x, moon.y)) == 0 {
+            warn!(map_id = self.key.map_id, "No Moon Bunny to bring out");
+            return;
+        }
+        let text = net::content::text();
+        if let Ok(packet) = build_item_line(&text.get(keys::HPQ_MOON_BUNNY_OUT, &[]), 0) {
+            self.broadcast(None, packet);
+        }
+        let message = text.get(keys::HPQ_MOON_WEATHER, &[]);
+        self.blow_weather_for(MOON_WEATHER, message, MOON_WEATHER_TIME);
     }
 
     /// A player flew a kite: it floats above where they stand, for everyone

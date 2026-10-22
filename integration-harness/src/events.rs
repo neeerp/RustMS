@@ -157,8 +157,9 @@ pub async fn enter_kpq(team: &mut [WorldSession]) {
 }
 
 /// The party's leader, first, takes it up to Primrose Hill, once the party
-/// before them is out, and everyone arrives there.
-pub async fn enter_hpq(team: &mut [WorldSession]) {
+/// before them is out, and everyone arrives there; returns what each saw
+/// up to their arrival.
+pub async fn enter_hpq(team: &mut [WorldSession]) -> Vec<Trace> {
     let name = team[0].character_name.clone();
     let mut asked = false;
     for _ in 0..5 {
@@ -172,11 +173,14 @@ pub async fn enter_hpq(team: &mut [WorldSession]) {
     }
     assert!(asked, "Tory never let the party up");
     let mut seen = Some(step(&mut team[0].connection, &name, answer(1, 1, None)).await);
+    let mut traces = Vec::new();
     for player in team.iter_mut() {
         let mut trace = seen.take().unwrap_or_default();
         until(&mut player.connection, &mut trace, |t| {
             t.warps.contains(&HPQ.entry)
         })
         .await;
+        traces.push(trace);
     }
+    traces
 }
