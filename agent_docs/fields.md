@@ -128,9 +128,10 @@ sends `SET_CASH_SHOP` (character data plus the shop's lists) followed by the
 cash inventory, gifts, wish list and NX balance
 (`net/src/packet/build/world/cash_shop.rs`). The session stays on the channel
 and in the world directory, so whispers still arrive, but the client actor
-ignores every other opcode but `CHECK_CASH` until the player leaves. Leaving sends a
-`CHANGE_MAP` with no body; the actor answers it like a channel change to its
-own channel, and the client reconnects and enters the map it left.
+ignores every other opcode but `CHECK_CASH`, `COUPON_CODE` and `NOTE_ACTION`
+until the player leaves. Leaving sends a `CHANGE_MAP` with no body; the actor
+answers it like a channel change to its own channel, and the client reconnects
+and enters the map it left.
 
 In the shop, `CASHSHOP_OPERATION` (0xE5) buys a commodity and sets the wish
 list (`net/src/packet/handle/world/cash_shop.rs`). A purchase is checked against
@@ -200,6 +201,34 @@ with a message) and clears their messages. The gifts are in the Cash Inventory
 list sent in 0x4B, and 0x4D then names each with its sender and message for the
 client to announce; v83's handler adds nothing to the list. Notes sent back
 (NOTE_ACTION, 0x83) aren't handled yet.
+
+#### Coupons
+
+The Coupon button's dialog sends `COUPON_CODE` (0xE6): an empty string, then
+the code. Coupons live in `coupons` (the code in upper case, an optional
+expiry, and who redeemed it when) and `coupon_rewards` (kind 0 an item, 1 NX
+Credit, 2 Maple Points, 3 NX Prepaid, 4 mesos); there is no way to make one
+in the game, only SQL or `db::coupon::create`. A code is redeemed once, by one
+account. The server trims the typed code and upper-cases it, then answers with
+a failure (0x5C) or what the coupon gave (0x59), always followed by the
+balances, which is what lets v83 take the next request:
+
+- 0xB0: no such coupon. The third in a row on one connection is 0xB1 instead,
+  and v83 then leaves the shop by itself; a redemption starts the count again.
+- 0xB3: already used; 0xB2: expired.
+- 0xBB: a bag can't take the items or the mesos would overflow. Nothing is
+  given and the coupon stays unused.
+
+Otherwise `net::coupon::grant` puts the items for the bags and the mesos on the
+character (INVENTORY_OPERATION and a stat update) and sorts out the rest:
+cash items (5xxxxxx, or equipment marked cash) go to the Cash Inventory with
+the SN of a commodity selling them, if any, and the NX to the account.
+`db::coupon::redeem` marks the coupon used, adds the NX and the Cash Inventory
+items, and saves the character, in one transaction that locks the coupon's row,
+so two accounts can't both have it. 0x59 lists the cash items, the Maple Points,
+each bag item `(short quantity, short 0, int item id)` and the mesos for the
+client's notice (report b072); NX Credit and Prepaid show only in the
+balances.
 
 ## Packets
 

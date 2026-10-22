@@ -168,6 +168,7 @@ pub enum RecvOpcode {
     PartySearchStop = 0xDF,
     CheckCash = 0xE4,
     CashShopOperation = 0xE5,
+    CouponCode = 0xE6,
     UseHammer = 0x104,
 
     UnusedOpcode = 0xFF,

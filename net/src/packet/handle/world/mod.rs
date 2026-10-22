@@ -77,7 +77,9 @@ pub use self::alliance::{AllianceOperationHandler, DenyAllianceRequestHandler};
 pub use self::berserk::CalcDamageStatHandler;
 pub use self::buddy::BuddyListModifyHandler;
 pub use self::cash_item::UseCashItemHandler;
-pub use self::cash_shop::{CashShopOperationHandler, CheckCashHandler, EnterCashShopHandler};
+pub use self::cash_shop::{
+    CashShopOperationHandler, CheckCashHandler, CouponCodeHandler, EnterCashShopHandler,
+};
 pub use self::catch_item::{trade_catch, UseCatchItemHandler};
 pub use self::chair::{CancelChairHandler, UseChairHandler};
 pub use self::chalkboard::CloseChalkboardHandler;

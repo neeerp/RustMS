@@ -23,6 +23,7 @@ pub mod alliance;
 pub mod buddy;
 pub mod cash_shop;
 pub mod character;
+pub mod coupon;
 pub mod fame;
 pub mod family;
 pub mod guild;

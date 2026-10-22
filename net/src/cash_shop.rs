@@ -82,6 +82,8 @@ pub enum CashShopRequest {
     /// Send the account's balances again: the Check button, and v83 on every
     /// activation of the game window.
     Balance,
+    /// Redeem the coupon with this code, as typed.
+    Coupon(String),
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.
@@ -216,7 +218,7 @@ pub fn cash_item(account_id: i32, cash_id: i64, item: &Item) -> CashItem {
 
 /// The serial number of a commodity selling `count` of `item_id`, preferring
 /// one on sale; 0 if none does.
-fn commodity_sn(item_id: i32, count: i16) -> i32 {
+pub(crate) fn commodity_sn(item_id: i32, count: i16) -> i32 {
     commodities().ok().map_or(0, |data| {
         data.iter()
             .filter(|c| c.item_id == item_id)
