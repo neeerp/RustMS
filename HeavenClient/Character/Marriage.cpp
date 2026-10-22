@@ -2,6 +2,8 @@
 
 #include "../Net/InPacket.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	bool MarriageRecord::married() const
@@ -27,6 +29,18 @@ namespace ms
 		record.bride_name = recv.read_padded_string(13);
 
 		return record;
+	}
+
+	bool PartnerSpot::is(int32_t cid) const
+	{
+		return id != 0 && id == cid;
+	}
+
+	bool PartnerSpot::marks(const std::vector<int32_t>& spot_maps, int32_t own_map) const
+	{
+		auto has = [&](int32_t map) { return std::find(spot_maps.begin(), spot_maps.end(), map) != spot_maps.end(); };
+
+		return mapid != 0 && has(mapid) && !has(own_map);
 	}
 
 	namespace marriage

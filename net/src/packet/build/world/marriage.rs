@@ -39,6 +39,17 @@ pub fn write_marriage_record(
     Ok(())
 }
 
+/// NOTIFY_MARRIED_PARTNER_MAP_TRANSFER: the partner `partner_id` is on
+/// `map_id` (report b057). The mini-map marks the partner by the id, the
+/// world map their map unless it is 0; `(0, 0)` forgets both.
+pub fn build_partner_map(map_id: i32, partner_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NotifyMarriedPartnerMapTransfer as i16)?;
+    packet.write_int(map_id)?;
+    packet.write_int(partner_id)?;
+    Ok(packet)
+}
+
 /// MARRIAGE_REQUEST mode 0: `name` (id `proposer_id`) proposes; the client
 /// asks Yes or No and answers with RING_ACTION mode 2.
 pub fn build_proposal(name: &str, proposer_id: i32) -> Result<Packet, NetworkError> {
@@ -97,6 +108,15 @@ mod tests {
         assert_eq!(&packet.bytes[..3], &[0x49, 0x00, 11]);
         assert_eq!(&packet.bytes[3 + 22..3 + 27], b"Groom");
         assert_eq!(&packet.bytes[3 + 35..3 + 40], b"Bride");
+    }
+
+    #[test]
+    fn the_partner_map_is_two_ints() {
+        let packet = build_partner_map(100000000, 4).unwrap();
+        assert_eq!(
+            packet.bytes,
+            vec![0x4B, 0x00, 0x00, 0xe1, 0xf5, 0x05, 4, 0, 0, 0]
+        );
     }
 
     #[test]

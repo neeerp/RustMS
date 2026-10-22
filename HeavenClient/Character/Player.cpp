@@ -2278,6 +2278,16 @@ namespace ms
 		marriage = std::move(record);
 	}
 
+	const PartnerSpot &Player::get_partner() const
+	{
+		return partner;
+	}
+
+	void Player::set_partner(PartnerSpot spot)
+	{
+		partner = spot;
+	}
+
 	void Player::show_guild()
 	{
 		const GuildData &data = guild.get_data();

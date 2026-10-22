@@ -10,7 +10,7 @@ use game_data::server_content::keys;
 use net::packet::build::world::inventory;
 use net::packet::build::world::marriage::{
     build_couple_ended, build_engaged, build_marriage_notice, build_marriage_refusal,
-    build_proposal,
+    build_partner_map, build_proposal,
 };
 use net::{ClientId, RingRequest};
 use packet::Packet;
@@ -242,16 +242,22 @@ impl ClientActor {
             }
             next.marriage = None;
             packets.push(build_couple_ended(&record)?);
-            let partner = if record.groom_id == cid {
-                record.bride_id
-            } else {
-                record.groom_id
-            };
+            let partner = record.partner_of(cid);
             self.send_to_directory(DirectoryMessage::CoupleEnded { partner, record })
                 .await?;
         }
         take_tokens(&mut next, &mut packets)?;
         self.commit_engagement(next, packets).await
+    }
+
+    /// The partner is on `map_id` (report b057). The client keeps it,
+    /// across the player's own map changes too, until told again.
+    pub(super) async fn partner_map(
+        &mut self,
+        map_id: i32,
+        partner: ClientId,
+    ) -> Result<(), RuntimeError> {
+        self.send(&mut build_partner_map(map_id, partner)?).await
     }
 
     /// The partner broke off the couple `record`. A partner offline then

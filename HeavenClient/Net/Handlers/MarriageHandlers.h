@@ -19,4 +19,13 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// Where the partner is now: only kept, for the minimap and the world
+	// map to show (0xa0831d, report b057)
+	// Opcode: NOTIFY_MARRIED_PARTNER_MAP_TRANSFER(75)
+	class PartnerMapHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

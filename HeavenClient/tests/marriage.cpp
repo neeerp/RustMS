@@ -100,6 +100,21 @@ void tooltip_lines()
 	require(marriage::tooltip_line(2240000, couple, false).empty(), "a ring box has none");
 }
 
+void partner_spots()
+{
+	PartnerSpot none;
+	require(!none.is(0), "id 0 is no one");
+	require(!none.marks({ 0 }, 100000000), "map 0 is nowhere");
+
+	PartnerSpot spot;
+	spot.mapid = 102000000;
+	spot.id = 4;
+	require(spot.is(4) && !spot.is(5), "only the partner gets the dot");
+	require(spot.marks({ 102000000, 102000100 }, 100000000), "the partner's spot");
+	require(!spot.marks({ 100000000 }, 100000000), "another spot");
+	require(!spot.marks({ 102000000, 102000100 }, 102000100), "the player's own spot wins");
+}
+
 int main()
 {
 	try
@@ -107,6 +122,7 @@ int main()
 		reads_the_couples_record();
 		ring_boxes_and_result_texts();
 		tooltip_lines();
+		partner_spots();
 	}
 	catch (const std::exception& error)
 	{

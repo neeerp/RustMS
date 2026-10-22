@@ -722,6 +722,7 @@ impl WorldDirectory {
         if previous.is_none() && !back {
             self.tell_relatives(client_id, true);
         }
+        self.exchange_partner_maps(client_id);
     }
 
     fn unregister(&mut self, client_id: ClientId, connection_id: u64, changing_channel: bool) {
@@ -748,6 +749,15 @@ impl WorldDirectory {
                     }
                 }
                 self.family_left(&entry, changing_channel);
+                if let Some(partner) = self.partner_naming(&entry.presence, client_id) {
+                    self.tell(
+                        partner,
+                        ServerMessage::PartnerMap {
+                            map_id: 0,
+                            partner: 0,
+                        },
+                    );
+                }
                 let out = self
                     .messengers
                     .disconnected(client_id, changing_channel, Instant::now());
@@ -785,6 +795,7 @@ impl WorldDirectory {
             self.bring_team(client_id, channel_id, map_id, previous.map_id);
         }
 
+        self.tell_partner_progress(client_id, &previous);
         // Guild members needn't be in a party.
         self.tell_guild_progress(client_id, &previous);
         self.tell_family_progress(client_id, &previous);
@@ -1641,6 +1652,70 @@ impl WorldDirectory {
             .filter(move |(_, other)| other.shares_map_with(entry))
     }
 
+    /// The partner `presence` names, if they are online and name
+    /// `client_id` back.
+    fn partner_naming(&self, presence: &Presence, client_id: ClientId) -> Option<ClientId> {
+        let partner = presence.partner?;
+        let entry = self.clients.get(&partner)?;
+        (entry.presence.partner == Some(client_id)).then_some(partner)
+    }
+
+    /// Tell an online couple each other's maps (report b057). The client
+    /// marks the partner on its minimap and world map.
+    fn exchange_partner_maps(&self, client_id: ClientId) {
+        let Some(entry) = self.clients.get(&client_id) else {
+            return;
+        };
+        let Some(partner) = self.partner_naming(&entry.presence, client_id) else {
+            return;
+        };
+        let map_id = |id| self.clients.get(&id).map_or(0, |e| e.presence.map_id);
+        self.tell(
+            partner,
+            ServerMessage::PartnerMap {
+                map_id: map_id(client_id),
+                partner: client_id,
+            },
+        );
+        self.tell(
+            client_id,
+            ServerMessage::PartnerMap {
+                map_id: map_id(partner),
+                partner,
+            },
+        );
+    }
+
+    /// A couple formed or ended, or a partner moved map.
+    fn tell_partner_progress(&self, client_id: ClientId, previous: &Presence) {
+        let Some(entry) = self.clients.get(&client_id) else {
+            return;
+        };
+        if entry.presence.partner != previous.partner {
+            // An ended couple both forget the marks; the second to see it
+            // no longer names the first, so neither is told twice.
+            if let Some(old) = self.partner_naming(previous, client_id) {
+                let none = || ServerMessage::PartnerMap {
+                    map_id: 0,
+                    partner: 0,
+                };
+                self.tell(old, none());
+                self.tell(client_id, none());
+            }
+            self.exchange_partner_maps(client_id);
+        } else if entry.presence.map_id != previous.map_id {
+            if let Some(partner) = self.partner_naming(&entry.presence, client_id) {
+                self.tell(
+                    partner,
+                    ServerMessage::PartnerMap {
+                        map_id: entry.presence.map_id,
+                        partner: client_id,
+                    },
+                );
+            }
+        }
+    }
+
     /// Pass a message to `client`'s actor, if they are online.
     fn tell(&self, client: ClientId, message: ServerMessage) {
         if let Some(entry) = self.clients.get(&client) {
@@ -1706,6 +1781,7 @@ mod tests {
             guild_id: None,
             alliance_id: None,
             family: Default::default(),
+            partner: None,
         }
     }
 
@@ -2577,5 +2653,67 @@ mod tests {
         }
         assert!(!client.send_packet(Packet::new_empty()));
         assert!(kill.is_cancelled());
+    }
+
+    /// The PartnerMap messages a client got, as (map, partner).
+    fn partner_maps(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<(i32, ClientId)> {
+        std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|message| match message {
+                ServerMessage::PartnerMap { map_id, partner } => Some((map_id, partner)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_couple_is_told_each_others_maps_while_both_are_online() {
+        const HENESYS: i32 = 100000000;
+        const PERION: i32 = 102000000;
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let engaged = |name: &str, map_id, partner| Presence {
+            partner: Some(partner),
+            ..presence(name, map_id)
+        };
+        let mut alice = online(&mut directory, 1, "Alice", HENESYS);
+        let mut bobby = online(&mut directory, 2, "Bobby", PERION);
+
+        // Engaged: the first to know waits for the other.
+        directory.update_presence(2, engaged("Bobby", PERION, 1));
+        assert_eq!(partner_maps(&mut bobby), []);
+        directory.update_presence(1, engaged("Alice", HENESYS, 2));
+        assert_eq!(partner_maps(&mut alice), [(PERION, 2)]);
+        assert_eq!(partner_maps(&mut bobby), [(HENESYS, 1)]);
+
+        // A move tells only the other; HP doesn't.
+        directory.update_presence(2, engaged("Bobby", HENESYS, 1));
+        assert_eq!(partner_maps(&mut alice), [(HENESYS, 2)]);
+        assert_eq!(partner_maps(&mut bobby), []);
+        directory.update_presence(
+            2,
+            Presence {
+                hp: 1,
+                ..engaged("Bobby", HENESYS, 1)
+            },
+        );
+        assert_eq!(partner_maps(&mut alice), []);
+
+        // Logging off clears the mark; logging on exchanges again.
+        directory.unregister(2, 2, false);
+        assert_eq!(partner_maps(&mut alice), [(0, 0)]);
+        let (tx, rx) = mpsc::channel(64);
+        let mut bobby = rx;
+        let handle = ClientHandle::new(2, 3, tx, CancellationToken::new());
+        directory.register(handle, engaged("Bobby", PERION, 1), 1);
+        assert_eq!(partner_maps(&mut alice), [(PERION, 2)]);
+        assert_eq!(partner_maps(&mut bobby), [(HENESYS, 1)]);
+
+        // Broken off: both forget, once each.
+        directory.update_presence(1, presence("Alice", HENESYS));
+        assert_eq!(partner_maps(&mut alice), [(0, 0)]);
+        assert_eq!(partner_maps(&mut bobby), [(0, 0)]);
+        directory.update_presence(2, presence("Bobby", PERION));
+        assert_eq!(partner_maps(&mut alice), []);
+        assert_eq!(partner_maps(&mut bobby), []);
     }
 }

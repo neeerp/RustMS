@@ -99,6 +99,23 @@ keeps the token until they drop it, which then just takes it. Tokens in
 storage, a trade or a parcel are not taken. Both players are saved at once,
 as on engaging.
 
+## The partner's map
+
+While both of a couple are online, each client is told where the other is
+with `NOTIFY_MARRIED_PARTNER_MAP_TRANSFER` (0x4B): the partner's map and
+id (report b057). The client only keeps the two numbers. Its own map
+changes don't clear them; leaving the game does.
+
+The directory sends them through the client actors (`PartnerMap`). Each
+`Presence` names the partner from the record. Both are told when the
+second of the two logs in or changes channel, and when an engagement makes
+each name the other. A partner who changes map tells the other. Someone
+who logs off, changes channel, or ends the couple sends the other `(0, 0)`,
+and an ended couple both get it once.
+Engaged couples are told as well as married ones. The client doesn't
+tell the two apart, and whether v83's server told engaged couples is
+inferred (report b057 §6).
+
 ## Client
 
 - `Character/Marriage.h` has the record, the tokens, and the result
@@ -106,8 +123,14 @@ as on engaging.
 - `IO/MarriageActions` has the proposing flow.
 - `UIItemInventory::drop_on_stage` asks before a token is dropped and sends
   `RING_ACTION` 3.
-- `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72) and
-  `MARRIAGE_RESULT` (73).
+- `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72),
+  `MARRIAGE_RESULT` (73) and `NOTIFY_MARRIED_PARTNER_MAP_TRANSFER` (75),
+  which sets the player's `PartnerSpot`.
+- The minimap draws the partner, when they're on the map, with
+  `MapHelper.img/minimap/match` instead of their usual dot. The markers
+  follow v83's order: others, the partner, NPCs, portals, then the player.
+  The world map shows `worldMap/lovePos`, the heart, on the partner's spot
+  unless it is the player's own.
 - `ItemTooltip` puts "YOU ARE ENGAGED WITH : <name>" under a token's
   orange lines, in the same orange. A token keeps 16 px for the line even
   without a couple, as v83 does. `EquipTooltip` gives a wedding ring
@@ -128,7 +151,6 @@ answers, and the proposer waits until they withdraw.
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- The partner notices (`NOTIFY_MARRIED_PARTNER_MAP_TRANSFER`).
 - The ring's look.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.
 
