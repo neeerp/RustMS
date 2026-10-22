@@ -22,12 +22,12 @@
 #include "../../Constants.h"
 
 #include "../../Util/Misc.h"
+#include "../../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
 
-#include "../../Util/Randomizer.h"
-
 #include <cmath>
+#include <utility>
 
 namespace ms
 {
@@ -60,9 +60,13 @@ namespace ms
 			Flying &flying = iter->second;
 
 			flying.art.update();
-			flying.phase += kite::BOB_STEP * Constants::TIMESTEP / kite::BOB_MS;
 
-			if (flying.fading >= 0)
+			// A fading kite stops bobbing (FUN_0065b2ca).
+			if (flying.fading < 0)
+			{
+				flying.phase += kite::BOB_STEP * Constants::TIMESTEP / kite::BOB_MS;
+			}
+			else
 			{
 				flying.fading -= Constants::TIMESTEP;
 
@@ -82,11 +86,11 @@ namespace ms
 		for (const auto &iter : kites)
 		{
 			const Flying &flying = iter.second;
-			const Kite &kite = flying.kite;
+			const Kite &flown = flying.kite;
 			float opacity = flying.fading < 0 ? 1.0f : kite::fade_opacity(flying.fading);
-			int16_t bob = static_cast<int16_t>(std::lround(kite::bob(flying.phase)));
-			Point<int16_t> position(static_cast<int16_t>(std::round(kite.x + kite::SHIFT + viewx)),
-									static_cast<int16_t>(std::round(kite.y - kite::RISE + bob + viewy)));
+			int16_t bob = flying.fading < 0 ? static_cast<int16_t>(std::lround(kite::bob(flying.phase))) : 0;
+			Point<int16_t> position(static_cast<int16_t>(std::round(flown.x + kite::SHIFT + viewx)),
+									static_cast<int16_t>(std::round(flown.y - kite::RISE + bob + viewy)));
 
 			flying.art.draw(DrawArgument(position, opacity), alpha);
 		}
@@ -99,13 +103,14 @@ namespace ms
 
 	const MapKites::Kite *MapKites::at(Point<int16_t> position) const
 	{
-		// The newest kite is on top.
+		// The newest kite is on top. One fading out is already gone for v83, which takes it off the field and fades
+		// only its picture (FUN_0065b2ca).
 		for (auto iter = kites.rbegin(); iter != kites.rend(); ++iter)
 		{
-			const Kite &kite = iter->second.kite;
+			const Kite &flown = iter->second.kite;
 
-			if (kite::hit(kite.x, kite.y, position.x(), position.y()))
-				return &kite;
+			if (iter->second.fading < 0 && kite::hit(flown.x, flown.y, position.x(), position.y()))
+				return &flown;
 		}
 
 		return nullptr;

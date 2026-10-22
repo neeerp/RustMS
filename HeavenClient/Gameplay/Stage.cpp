@@ -1271,12 +1271,12 @@ namespace ms
 			npcstate = Cursor::State::HOUSE;
 
 		// Then a kite shows whose it is, with the arrow (FUN_0094cfc3).
-		const MapKites::Kite *kite = npcstate == Cursor::State::IDLE ? kite_at(position) : nullptr;
+		const MapKites::Kite *flown = npcstate == Cursor::State::IDLE ? kite_at(position) : nullptr;
 
-		if (kite)
+		if (flown)
 		{
 			tooltips.leave();
-			UI::get().show_line(Tooltip::Parent::FIELD, kite::hover_text(kite->name, kite->item_msg));
+			UI::get().show_line(Tooltip::Parent::FIELD, kite::hover_text(flown->name, flown->item_msg));
 		}
 		// Otherwise a map zone under the cursor shows its tip.
 		else if (npcstate == Cursor::State::IDLE)

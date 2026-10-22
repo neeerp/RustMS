@@ -68,7 +68,7 @@ namespace ms
 		buttons[Buttons::OK] = std::make_unique<MapleButton>(basic["BtOK2"], OK_BUTTON);
 		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(basic["BtCancel2"], CANCEL_BUTTON);
 
-		for (size_t i = 0; i < LINES; i++)
+		for (size_t i = 0; i < kite::LINES; i++)
 		{
 			Rectangle<int16_t> bounds(FIELD_LEFT, FIELD_LEFT + FIELD_WIDTH, FIELD_TOPS[i], FIELD_TOPS[i] + FIELD_HEIGHT);
 
@@ -86,7 +86,7 @@ namespace ms
 					KeyAction::Id::TAB,
 					[&, i]()
 					{
-						fields[(i + 1) % LINES].set_state(Textfield::State::FOCUSED);
+						fields[(i + 1) % kite::LINES].set_state(Textfield::State::FOCUSED);
 					}
 			);
 		}

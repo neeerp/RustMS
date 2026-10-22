@@ -3,6 +3,8 @@
 #include <iostream>
 #include <stdexcept>
 
+constexpr double PI = 3.14159265358979323846;
+
 void require(bool condition, const char* message)
 {
 	if (!condition) throw std::runtime_error(message);
@@ -20,6 +22,8 @@ int main()
 		require(allowed_on(100000100), "henesys market");
 		require(allowed_on(103000000), "kerning city");
 		require(allowed_on(920000000), "orbis tower");
+		require(!allowed_on(919999999), "last free market id");
+		require(allowed_on(909999999), "below the free market");
 
 		// Always three lines, empty ones kept.
 		require(join({ "a", "b", "c" }) == "a\nb\nc", "three lines");
@@ -34,7 +38,7 @@ int main()
 		rows = split("one");
 		require(rows.size() == 1 && rows[0] == "one", "split one");
 		rows = split("a\nb\nc\nd");
-		require(rows.size() == 3 && rows[2] == "c", "split stops at three");
+		require(rows.size() == 3 && rows[2] == "c\nd", "the third row takes the rest");
 
 		// The box is 60x80 around (x-3, y-100).
 		require(hit(0, 0, -3, -100), "centre");
@@ -44,17 +48,21 @@ int main()
 		require(!hit(0, 0, 28, -100), "right of it");
 		require(!hit(0, 0, -3, -141), "above it");
 		require(!hit(0, 0, -3, -59), "below it");
+		require(hit(100, 200, 97, 100), "away from the origin");
+		require(!hit(100, 200, 197, 0), "x and y not swapped");
 
 		// 3 px either way, once every 2 s of 30 ms steps.
 		require(std::abs(bob(0.0)) < 1e-9, "bob starts level");
-		require(std::abs(bob(M_PI / 2) - 3.0) < 1e-9, "bob top");
-		double period = 2 * M_PI / BOB_STEP * BOB_MS;
+		require(std::abs(bob(PI / 2) - 3.0) < 1e-9, "bob top");
+		double period = 2 * PI / BOB_STEP * BOB_MS;
 		require(std::abs(period - 2000.0) < 1.0, "bob period");
 
 		// The fade runs a second.
 		require(fade_opacity(FADE) == 1.0f, "fade start");
 		require(fade_opacity(500) == 0.5f, "fade half");
 		require(fade_opacity(0) == 0.0f, "fade end");
+		require(fade_opacity(FADE + 30) == 1.0f, "fade not begun");
+		require(fade_opacity(-30) == 0.0f, "fade past its end");
 
 		require(hover_text("Lanec", "is wishing you a happy new year.") == "Laneci" "s wishing you a happy new year.",
 				"hover text runs together");

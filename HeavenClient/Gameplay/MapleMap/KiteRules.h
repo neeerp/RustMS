@@ -58,7 +58,8 @@ namespace ms
 			return message;
 		}
 
-		// A kite's message as the viewer lays it out, a line per row.
+		// A kite's message as the viewer lays it out, a line per row: the
+		// first two lines, then all the rest as the third (FUN_00659300).
 		inline std::vector<std::string> split(const std::string &message)
 		{
 			std::vector<std::string> lines;
@@ -66,7 +67,7 @@ namespace ms
 
 			while (lines.size() < LINES)
 			{
-				size_t end = message.find('\n', start);
+				size_t end = lines.size() + 1 < LINES ? message.find('\n', start) : std::string::npos;
 
 				if (end == std::string::npos)
 				{

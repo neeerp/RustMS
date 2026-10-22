@@ -4,6 +4,7 @@
 
 #include "../Components/Textfield.h"
 
+#include "../../Gameplay/MapleMap/KiteRules.h"
 #include "../../Graphics/Text.h"
 
 #include <array>
@@ -49,12 +50,10 @@ namespace ms
 			CANCEL
 		};
 
-		static constexpr size_t LINES = 3;
-
 		std::function<void(const std::vector<std::string> &lines)> onsend;
 		Text prompt;
 		// Fields don't move once made: the UI keeps a pointer to the one with the keys.
-		std::array<Textfield, LINES> fields;
+		std::array<Textfield, kite::LINES> fields;
 	};
 
 	// Someone's kite, opened by double-clicking it (v83 FUN_00658e59 on UIWindow.img/MultiLine/backgrnd): the

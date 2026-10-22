@@ -909,7 +909,7 @@ namespace ms
 		int16_t x = recv.read_short();
 		int16_t y = recv.read_short();
 
-		Stage::get().get_kites().spawn(oid, itemid, message, name, x, y);
+		Stage::get().get_kites().spawn(oid, itemid, std::move(message), std::move(name), x, y);
 	}
 
 	void RemoveKiteHandler::handle(InPacket& recv) const
