@@ -92,10 +92,6 @@ namespace ms
 
 		int32_t channel = recv.read_int();
 
-		// v83 resumes a search in a new channel (0x776020).
-		if (channel != Configuration::get().get_channelid())
-			PartySearchActions::leaving_channel();
-
 		Configuration::get().set_channelid(static_cast<uint8_t>(channel));
 
 		// v83 (FUN_00776020) gives the new field the first byte as its key.
@@ -226,15 +222,16 @@ namespace ms
 		// Logging in or changing channel starts Berserk over (0x7763a9).
 		player.update_berserk(true);
 
-		// After a channel change or the Cash Shop, a search goes on.
-		PartySearchActions::field_entered();
-
 		uint8_t portalid = player.get_stats().get_portal();
 		int32_t mapid = player.get_stats().get_mapid();
 
 		transition(mapid, portalid);
 
 		UI::get().change_state(UI::State::GAME);
+
+		// After a channel change or the Cash Shop, a search goes on. Its
+		// indicator belongs to the new game state.
+		PartySearchActions::field_entered();
 	}
 
 	namespace

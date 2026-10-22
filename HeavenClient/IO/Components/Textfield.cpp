@@ -113,6 +113,8 @@ namespace ms
 	{
 		if (state != st)
 		{
+			// Disabling another field leaves the focused one alone.
+			bool focused = state == State::FOCUSED;
 			state = st;
 
 			if (state != State::DISABLED)
@@ -120,7 +122,7 @@ namespace ms
 				elapsed = 0;
 				showmarker = true;
 			}
-			else
+			else if (focused)
 			{
 				// Losing the focus sets a focused field back to NORMAL.
 				UI::get().remove_textfield();
