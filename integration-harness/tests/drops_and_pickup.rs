@@ -223,7 +223,7 @@ async fn a_party_members_quest_drop_shows_only_to_the_one_who_needs_it() {
     )
     .await;
     until(&mut helper.connection, &mut p, |t| {
-        t.items.contains(&(SHELLPIECE, 1))
+        t.added.iter().any(|added| added.2 == SHELLPIECE)
     })
     .await;
 }
