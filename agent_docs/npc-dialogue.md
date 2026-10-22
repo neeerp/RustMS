@@ -157,6 +157,14 @@ describes the job and yes applies `Effect::TakeSecondJob` and the Etc row.
 Upstream turns away a player whose test map is occupied and takes the
 crystals from one who leaves early; neither is done here.
 
+Amoria's engagement NPCs, after Cosmic, also use script markers (32300
+and up). See [marriage](./marriage.md) for the steps. Moony (9201000) offers to make a
+ring box or throw one away. Mom and Dad (9201003, in 680000004) want four
+different Proofs of Love (4031367 to 4031372). The Nanas (9201001,
+9201023 to 9201027) each give one for 50 of their town's drop. A Nana
+works only in her own town, and only while the player seeks the blessing;
+otherwise she and Mom and Dad say their own asset lines.
+
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
 `#h`, `#p`, `#t`/`#z`, `#o`, `#m`). The text layout (`Graphics/TextLayout.cpp`)

@@ -21,6 +21,45 @@ follows `MARRIAGE_RESULT` 11. Its two item ids are the couple's wedding
 ring (`MarriageRecord::ring_id`), the box's ring among 1112803, 1112806,
 1112807 and 1112809. v83 draws the ring look with the first of them.
 
+## Getting a ring box
+
+Moony (9201000) in Amoria makes the ring boxes (`net::npc_scripts`, after
+Cosmic's scripts; report b064). The steps are script markers, which are saved
+with the quests but never sent to the client:
+
+1. Moony sends the player to Mom and Dad (9201003) in "Meet the Parents"
+   (680000004). They ask for four different Proofs of Love. The way there
+   is a touch portal in 104040002, beyond Henesys Hunting Ground II.
+2. The Nanas give the proofs. Each Nana gives one, in her own town only,
+   for 50 of the town's drop:
+
+   | Town | Drop | Proof |
+   | --- | --- | --- |
+   | Henesys | 4000001 | 4031367 |
+   | Kerning City | 4000037 | 4031368 |
+   | Perion | 4000215 | 4031369 |
+   | Ellinia | 4000026 | 4031370 |
+   | Orbis | 4000070 | 4031371 |
+   | Ludibrium | 4000128 | 4031372 |
+
+   The first proof from each Nana also gives EXP, from 2,000 to 30,000. A
+   lost proof can be had again for the drops.
+3. With four different proofs, Mom and Dad take every proof the player
+   holds, give 20,000 EXP, and bless the player.
+4. Once blessed, a man without a box can buy one from Moony. A woman can
+   earn the blessing, but Moony makes rings only for men. Each box takes
+   a Diamond (4021007), one more stone, and a fee:
+
+   | Box | Stone | Fee |
+   | --- | --- | --- |
+   | 2240000 | 4011007 | 30,000 |
+   | 2240001 | 4021009 | 20,000 |
+   | 2240002 | 4011006 | 10,000 |
+   | 2240003 | 4011004 | 5,000 |
+
+Moony also throws away the boxes the player holds. He doesn't check
+whether the buyer is already engaged; the proposal does.
+
 ## Proposing
 
 The ring boxes are 2240000 to 2240003. Using one from the Use tab makes
@@ -258,6 +297,7 @@ For crush and friendship rings:
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- The wedding NPCs, reservations, the wedding field, and the wishlist.
+- The wedding NPCs past the ring box, reservations, the wedding field,
+  and the wishlist.
 
 Report b052 §7 lists them.
