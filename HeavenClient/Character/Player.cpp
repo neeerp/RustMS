@@ -2236,7 +2236,12 @@ namespace ms
 		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
 			[&](int32_t id) { return inventory.get_total_item_count(id) + (worn(id) ? 1 : 0); },
 			[&](int32_t id) { return skillbook.has_skill(id) || !SkillData::get(id).is_invisible(); }, worn,
-			Stage::get().get_mapid());
+			Stage::get().get_mapid(), first_pet());
+	}
+
+	int32_t Player::first_pet() const
+	{
+		return pets[0].get_itemid();
 	}
 
 	TeleportRock &Player::get_teleport_rock()

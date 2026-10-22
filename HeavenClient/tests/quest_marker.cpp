@@ -130,6 +130,16 @@ int main()
 		require(std::string(ms::stop_reason(ms::QuestStop::MESO)) == "default", "and shows stop/default");
 		meso = 10000;
 		require(stop(2002) == ms::QuestStop::NONE, "enough mesos complete it");
+		// A pet requirement looks at the first pet out only (codes 8 and 9).
+		hunt.end_pets = {5000000, 5000001};
+		auto pet_stop = [&](int32_t first_pet) {
+			return ms::completion_stop(hunt, 2002, [&](int16_t id) { return id == 1034 ? before : 1; },
+				[&](int32_t) { return shells; }, progress, meso, first_pet);
+		};
+		require(pet_stop(0) == ms::QuestStop::NO_PET, "no pet out stops it");
+		require(pet_stop(5000066) == ms::QuestStop::WRONG_PET, "a pet not listed stops it");
+		require(pet_stop(5000001) == ms::QuestStop::NONE, "a listed pet completes it");
+		hunt.end_pets.clear();
 		// Start requirements on what the player holds (FUN_00721163): worn
 		// copies count once, 0 means none, and a negative count is a maximum.
 		ms::QuestInfo mirror = quest(1000, 2101, 2101);
@@ -182,6 +192,17 @@ int main()
 		require(holds(cape), "both lists worn allow the start");
 		mapid = 261000001;
 		require(!holds(cape), "a fieldEnter quest starts only on its maps");
+		// Bartos's test (4646) needs one of its pets first in the list.
+		ms::QuestInfo test = quest(4646, 1012006, 1012006);
+		test.pets = {5000000, 5000001};
+		require(!holds(test), "no pet out hides it");
+		auto pet_holds = [&](int32_t first_pet) {
+			return ms::start_holdings_met(test, fame, [&](int32_t id) { return held[id]; },
+				[&](int32_t id) { return skills.count(id) > 0; }, [&](int32_t id) { return worn.count(id) > 0; },
+				mapid, first_pet);
+		};
+		require(!pet_holds(5000066), "a pet not listed hides it");
+		require(pet_holds(5000000), "a listed pet out allows the start");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };

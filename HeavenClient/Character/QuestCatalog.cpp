@@ -85,6 +85,12 @@ namespace ms
 			for (auto item : start["equipSelectNeed"])
 				info.worn_any.push_back(static_cast<int32_t>(item.get_integer()));
 
+			for (auto pet : start["pet"])
+				info.pets.push_back(static_cast<int32_t>(pet["id"].get_integer()));
+
+			for (auto pet : end["pet"])
+				info.end_pets.push_back(static_cast<int32_t>(pet["id"].get_integer()));
+
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));
 

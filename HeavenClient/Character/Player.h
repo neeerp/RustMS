@@ -400,6 +400,10 @@ namespace ms
 		// to repeat (repeat_due).
 		bool quest_start_met(const QuestInfo &quest) const;
 
+		// The item of the first pet out, 0 if none: the pet a quest's pet
+		// requirement looks at.
+		int32_t first_pet() const;
+
 		// Obtain a reference to the player's telerock locations.
 		TeleportRock &get_teleport_rock();
 

@@ -682,6 +682,16 @@ pub mod keys {
     pub const MAKER_CRYSTAL_TEST: [&str; 2] = ["maker.crystal_test.0", "maker.crystal_test.1"];
     pub const MAKER_GOLD_ANVIL: [&str; 2] = ["maker.gold_anvil.0", "maker.gold_anvil.1"];
 
+    /// Trainer Bartos's Follow the Lead (quests 4646 and 4647): the hidden
+    /// note of his test (NPC 9102100, `multipet_success`), then his end
+    /// script `q4647e`, which takes a Pet Snack.
+    pub const PET_NOTE_ASK: &str = "pet_trainer.note.ask";
+    pub const PET_NOTE_FULL: &str = "pet_trainer.note.full";
+    pub const PET_NOTE_HELD: &str = "pet_trainer.note.held";
+    pub const PET_NOTE_NOTHING: &str = "pet_trainer.note.nothing";
+    pub const PET_SECRET: [&str; 2] = ["pet_trainer.secret.0", "pet_trainer.secret.1"];
+    pub const PET_SECRET_NO_SNACK: &str = "pet_trainer.secret.no_snack";
+
     /// The family entitlements' names and descriptions, by index
     /// (`game::family::ENTITLEMENTS`), which the Family window lists.
     pub fn family_entitlement_name(index: usize) -> String {
@@ -1714,6 +1724,11 @@ mod tests {
             keys::OPQ_EAK_LEADER_ONLY,
             keys::OPQ_EAK_GATHER,
             keys::OPQ_NOTICE_STORAGE_CLOSED,
+            keys::PET_NOTE_ASK,
+            keys::PET_NOTE_FULL,
+            keys::PET_NOTE_HELD,
+            keys::PET_NOTE_NOTHING,
+            keys::PET_SECRET_NO_SNACK,
         ];
         for key in named
             .iter()
@@ -1727,6 +1742,7 @@ mod tests {
             .chain(&keys::MAKER_PRACTICE)
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
+            .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
             .chain(&keys::ENGAGEMENT)

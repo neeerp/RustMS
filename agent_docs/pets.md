@@ -2,7 +2,8 @@
 
 A pet is a cash item (`500xxxx`) bought in the Cash Shop. Taken out to the
 Cash tab, it can be summoned to follow its owner, and everyone on the map
-sees it. Up to three can be out with Follow the Lead, one without. It answers
+sees it. Up to three can be out with Follow the Lead, one without; Bartos
+teaches it in Henesys after his pet test (quests 4646 and 4647). It answers
 commands said in chat and grows closer when it obeys. It grows hungry, eats pet
 food and cash food, goes home when it starves, and can be renamed with a name
 tag. It wears pet equipment and loots with a Meso Magnet or Item Pouch,

@@ -73,6 +73,8 @@ pub enum QuestRejection {
     Mesos,
     /// Fewer maps visited than an explorer medal needs.
     Explored,
+    /// No pet out, or the first pet out isn't one the quest lists.
+    Pet,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -152,11 +154,23 @@ pub fn check_start(
     if start.not_before.is_some_and(|at| SystemTime::now() < at) {
         return Err(QuestRejection::Date);
     }
+    if !pet_met(&start.pets, player) {
+        return Err(QuestRejection::Pet);
+    }
     // v83's client doesn't check; it has the server's refusal text.
     if quest.start_money < 0 && player.meso < quest.start_money.saturating_neg() {
         return Err(QuestRejection::Mesos);
     }
     Ok(())
+}
+
+/// Whether `player` meets a `pet` requirement listing `pets`: v83's checks
+/// (FUN_00721163, FUN_00721d2c) look only at the first pet out.
+fn pet_met(pets: &[i32], player: &Player) -> bool {
+    pets.is_empty()
+        || player
+            .summoned_pet(0)
+            .is_some_and(|item| pets.contains(&item.item_id))
 }
 
 /// How many of `item_id` v83's start check sees `player` hold: those in the
@@ -217,6 +231,9 @@ pub fn check_complete(
         .is_some_and(|min| i16::from(player.stats.level) < min)
     {
         return Err(QuestRejection::Level);
+    }
+    if !pet_met(&quest.end_pets, player) {
+        return Err(QuestRejection::Pet);
     }
     // At least the count, as v83's own check (cond 1) has it.
     if let Some(explored) = quest.explored {
@@ -411,6 +428,7 @@ mod tests {
             end_quests: vec![],
             end_meso: 0,
             end_min_level: None,
+            end_pets: vec![],
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -518,6 +536,38 @@ mod tests {
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Explored));
         p.quests.explore(27010, 101000000);
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn a_pet_requirement_looks_at_the_first_pet_out() {
+        let mut q = quest();
+        q.start.max_level = None;
+        q.start.quests.clear();
+        q.start.pets = vec![5000000, 5000001];
+        q.end_pets = q.start.pets.clone();
+        let mut p = player(30, 0);
+        let pet = |serial, item_id| game::Item {
+            cash_serial: Some(serial),
+            pet: Some(game::PetData::new("Pet")),
+            ..game::Item::stack(item_id, 1)
+        };
+        p.inventory
+            .insert(game::InventoryType::Cash, 1, pet(7, 5000000));
+        p.inventory
+            .insert(game::InventoryType::Cash, 2, pet(8, 5000066));
+        // Carried but not out.
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Pet));
+        // Out, but not first.
+        p.pets = vec![8, 7];
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Pet));
+        p.pets = vec![7, 8];
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        p.pets = vec![8];
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
+        p.pets.clear();
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
     }
 
     #[test]

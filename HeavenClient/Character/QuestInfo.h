@@ -31,6 +31,10 @@ namespace ms
 		// be worn (equipSelectNeed), to start.
 		std::vector<int32_t> worn_all;
 		std::vector<int32_t> worn_any;
+		// Pet items of which the first pet out must be one (Check/0/pet and
+		// Check/1/pet); empty means no pet is needed.
+		std::vector<int32_t> pets;
+		std::vector<int32_t> end_pets;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
 		// Not offered before this FILETIME (Check/0/start, quest_date); 0

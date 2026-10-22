@@ -53,8 +53,23 @@ namespace ms
 	// Why a started quest can't be completed with an NPC, by v83's first
 	// failed check (FUN_00721d2c), or NONE. The names are the stop/<reason>
 	// pages they show.
-	// MESO has no stop key of its own, so it shows stop/default.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB, MESO };
+	// MESO has no stop key of its own, so it shows stop/default. NO_PET and
+	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB, MESO, NO_PET, WRONG_PET };
+
+	// Whether the first pet out, `first_pet` (0 for none), meets a quest's
+	// pet requirement: v83 looks at no other pet (FUN_00721163,
+	// FUN_00721d2c).
+	inline QuestStop pet_stop(const std::vector<int32_t>& pets, int32_t first_pet)
+	{
+		if (pets.empty())
+			return QuestStop::NONE;
+
+		if (first_pet == 0)
+			return QuestStop::NO_PET;
+
+		return std::find(pets.begin(), pets.end(), first_pet) == pets.end() ? QuestStop::WRONG_PET : QuestStop::NONE;
+	}
 
 	inline const char* stop_reason(QuestStop stop)
 	{
@@ -68,10 +83,11 @@ namespace ms
 		}
 	}
 
-	// `progress` is the quest's progress string (its kill counts).
+	// `progress` is the quest's progress string (its kill counts), and
+	// `first_pet` the item of the first pet out.
 	template<class Status, class Count>
 	QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id, Status status, Count count,
-		const std::string& progress, int64_t meso)
+		const std::string& progress, int64_t meso, int32_t first_pet = 0)
 	{
 		if (quest.end_npc != npc_id)
 			return QuestStop::NPC;
@@ -89,19 +105,23 @@ namespace ms
 		if (meso < quest.end_meso)
 			return QuestStop::MESO;
 
-		return QuestStop::NONE;
+		return pet_stop(quest.end_pets, first_pet);
 	}
 
 	// Whether the player's fame, items, skills, worn items and map meet a
-	// quest's start requirements, as v83 checks them (FUN_00721163). `held`
+	// quest's start requirements, as v83 checks them (FUN_00721163), with
+	// `first_pet` the item of the first pet out (0 for none). `held`
 	// gives how many of an item the player holds, plus one if a copy is worn,
 	// and `worn` whether a copy is worn. `has_skill` is v83's loose test: any
 	// skill not hidden from the skill book counts, and a hidden one once it
 	// has a record (FUN_007619b0).
 	template<class Held, class HasSkill, class Worn>
 	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,
-		int32_t mapid)
+		int32_t mapid, int32_t first_pet = 0)
 	{
+		if (pet_stop(quest.pets, first_pet) != QuestStop::NONE)
+			return false;
+
 		if (!std::all_of(quest.worn_all.begin(), quest.worn_all.end(), worn))
 			return false;
 
