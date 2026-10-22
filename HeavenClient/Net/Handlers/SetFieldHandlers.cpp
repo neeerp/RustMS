@@ -202,8 +202,8 @@ namespace ms
 
 		player.get_buddies().set_capacity(static_cast<uint8_t>(recv.read_byte()));
 
-		if (recv.read_bool())
-			recv.read_string(); // 'linkedname'
+		// The name Blessing of the Fairy's tooltip shows (0x4e59e7).
+		player.set_linked_name(recv.read_bool() ? recv.read_string() : "");
 
 		CharacterParser::parse_inventory(recv, player.get_inventory());
 		CharacterParser::parse_skillbook(recv, player.get_skills());

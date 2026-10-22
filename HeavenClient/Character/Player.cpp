@@ -2218,6 +2218,16 @@ namespace ms
 		return door;
 	}
 
+	void Player::set_linked_name(const std::string &name)
+	{
+		linked_name = name;
+	}
+
+	const std::string &Player::get_linked_name() const
+	{
+		return linked_name;
+	}
+
 	BuddyList &Player::get_buddies()
 	{
 		return buddies;

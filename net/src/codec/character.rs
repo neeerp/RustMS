@@ -14,7 +14,16 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     packet.write_byte(0)?;
     encode_character_stats(packet, &player.stats, player.pet_serials())?;
     packet.write_byte(player.buddy_capacity)?;
-    packet.write_byte(0)?; // no linked (blessing of the fairy) name
+    // The name Blessing of the Fairy's tooltip shows (0x4e59e7).
+    match &player.linked_name {
+        Some(name) => {
+            packet.write_byte(1)?;
+            packet.write_str_with_length(name)?;
+        }
+        None => {
+            packet.write_byte(0)?;
+        }
+    }
     packet.write_int(player.meso)?;
     encode_inventory(packet, &player.inventory)?;
 

@@ -101,6 +101,7 @@ mod tests {
             quests,
         );
         player.buddy_capacity = 30;
+        player.linked_name = Some("Sib".into());
         player.monster_book = MonsterBook::new(2380001, [(2380000, 5), (2380001, 2)]);
         player
     }
@@ -119,7 +120,7 @@ mod tests {
         expect.long(-1).byte(0);
         expect.stats(&player.stats);
         expect.byte(30); // buddy capacity
-        expect.byte(0); // no linked name
+        expect.byte(1).string("Sib"); // the linked name
         expect.int(12345);
 
         // addInventoryInfo: slot limits, then the equip timestamp

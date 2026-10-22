@@ -19,6 +19,9 @@
 
 #include "../Data/SkillData.h"
 
+#include "../../Character/FairyBlessing.h"
+#include "../../Gameplay/Stage.h"
+
 #include <algorithm>
 
 namespace ms
@@ -73,6 +76,11 @@ namespace ms
 			masterlevel = data.get_masterlevel();
 
 		std::string descstr = data.get_desc();
+
+		// Blessing of the Fairy, once it has a level, names the linked
+		// character instead (0x8f29c8).
+		if (fairy_blessing::is_blessing(id) && level > 0)
+			descstr = fairy_blessing::description(Stage::get().get_player().get_linked_name());
 
 		if (masterlevel > 0)
 		{

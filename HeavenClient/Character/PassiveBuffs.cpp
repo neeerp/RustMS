@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "PassiveBuffs.h"
 
+#include "FairyBlessing.h"
 #include "SecondaryStat.h"
 #include "SkillId.h"
 
@@ -61,6 +62,9 @@ namespace ms
 	{
 		// Beginner
 		buffs[SkillId::Id::ANGEL_BLESSING] = std::make_unique<AngelBlessingBuff>();
+		// The Noblesse's and the Legend's (SetFrom, 0x7801bb).
+		buffs[SkillId::Id::NOBLESSE_BLESSING] = std::make_unique<AngelBlessingBuff>();
+		buffs[SkillId::Id::LEGEND_BLESSING] = std::make_unique<AngelBlessingBuff>();
 
 		// Hero
 		buffs[SkillId::Id::ACHILLES_HERO] = std::make_unique<AchillesBuff>();
@@ -85,7 +89,9 @@ namespace ms
 		if (iter == buffs.end())
 			return;
 
-		bool wrong_job = !stats.get_job().can_use(skill_id);
+		// Blessing of the Fairy is the job tree's beginner skill, which
+		// can_use refuses past the first advancement.
+		bool wrong_job = !fairy_blessing::is_blessing(skill_id) && !stats.get_job().can_use(skill_id);
 
 		if (wrong_job)
 			return;

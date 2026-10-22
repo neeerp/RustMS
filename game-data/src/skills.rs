@@ -11,6 +11,8 @@ pub struct SkillInfo {
     pub max_level: i32,
     /// Hidden from the skill window until learned some other way.
     pub invisible: bool,
+    /// Never raised with SP (`disable`), as Blessing of the Fairy.
+    pub disabled: bool,
     /// The master level a fourth-job skill starts with at the advancement
     /// (`masterLevel`), or 0 for one learned some other way.
     pub master_level: i32,
@@ -204,6 +206,7 @@ impl SkillData {
             skill_id,
             max_level: levels.len() as i32,
             invisible: nx.int_child(skill, "invisible")?.unwrap_or(0) != 0,
+            disabled: nx.int_child(skill, "disable")?.unwrap_or(0) != 0,
             master_level: nx.int_child(skill, "masterLevel")?.unwrap_or(0),
             requirements,
             levels,

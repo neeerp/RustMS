@@ -204,6 +204,10 @@ pub struct Player {
     pub stats: CharacterStats,
     pub meso: i32,
     pub buddy_capacity: u8,
+    /// The account's highest other character in this world, whose name
+    /// Blessing of the Fairy's tooltip shows; looked up at each entry, not
+    /// saved.
+    pub linked_name: Option<String>,
     pub inventory: Inventory,
     pub skills: SkillBook,
     pub keymap: Keymap,
@@ -289,6 +293,7 @@ impl Player {
             stats,
             meso,
             buddy_capacity: 20,
+            linked_name: None,
             inventory,
             skills,
             keymap,
@@ -319,6 +324,30 @@ impl Player {
 
     pub fn id(&self) -> i32 {
         self.stats.id
+    }
+
+    /// Link the player to the account's highest other character, `(name,
+    /// level)`: Blessing of the Fairy takes one level for each 10 of its,
+    /// master level 20. With none, the skill goes.
+    pub fn link(&mut self, linked: Option<(String, i16)>) {
+        let Some(skill_id) = skill::fairy_blessing(self.stats.job) else {
+            return;
+        };
+        match linked {
+            Some((name, level)) => {
+                self.linked_name = Some(name);
+                self.skills.set(SkillRecord {
+                    skill_id,
+                    level: skill::fairy_blessing_level(level),
+                    master_level: 20,
+                    expiration: None,
+                });
+            }
+            None => {
+                self.linked_name = None;
+                self.skills.remove(skill_id);
+            }
+        }
     }
 
     pub fn name(&self) -> &str {
@@ -951,6 +980,22 @@ mod tests {
             Keymap::default(),
             QuestLog::default(),
         )
+    }
+
+    #[test]
+    fn a_linked_character_blesses_by_its_tens() {
+        let mut player = player();
+        player.link(Some(("Sib".into(), 57)));
+        assert_eq!(player.linked_name.as_deref(), Some("Sib"));
+        let record = player.skills.get(12).unwrap();
+        assert_eq!((record.level, record.master_level), (5, 20));
+        player.link(None);
+        assert_eq!(player.linked_name, None);
+        assert!(player.skills.get(12).is_none());
+
+        player.stats.job = 1100;
+        player.link(Some(("Sib".into(), 200)));
+        assert_eq!(player.skills.level(10_000_012), 20);
     }
 
     #[test]

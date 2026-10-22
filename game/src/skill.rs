@@ -22,6 +22,24 @@ pub fn is_fourth_job(skill_id: i32) -> bool {
     (skill_id / 10_000) % 10 == 2
 }
 
+/// Blessing of the Fairy for a character of `job`: 12, or the Noblesse's
+/// 10000012 or the Legend's 20000012 (v83 SetFrom, 0x7801bb). None for
+/// Evan, whose 20010012 has no data.
+pub fn fairy_blessing(job: i16) -> Option<i32> {
+    match job / 1000 {
+        _ if job / 100 == 22 || job == 2001 => None,
+        tree @ 0..=2 => Some(i32::from(tree) * 10_000_000 + 12),
+        _ => None,
+    }
+}
+
+/// Blessing of the Fairy's level for a linked character of `level`: one for
+/// each 10 levels, as Cosmic grants it (the client takes the record as
+/// sent).
+pub fn fairy_blessing_level(level: i16) -> i32 {
+    i32::from(level / 10).clamp(0, 20)
+}
+
 /// Three Snails, Recovery, and Nimble Feet (and their Cygnus and Aran
 /// copies) are raised from the beginner pool rather than SP.
 pub fn uses_beginner_sp(skill_id: i32) -> bool {
@@ -64,6 +82,10 @@ impl SkillBook {
         self.skills.insert(record.skill_id, record);
     }
 
+    pub fn remove(&mut self, skill_id: i32) {
+        self.skills.remove(&skill_id);
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &SkillRecord> {
         self.skills.values()
     }
@@ -79,6 +101,19 @@ impl SkillBook {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_fairy_blesses_by_the_linked_characters_tens() {
+        let levels: Vec<_> = [1, 9, 10, 199, 200].map(fairy_blessing_level).into();
+        assert_eq!(levels, [0, 0, 1, 19, 20]);
+        assert_eq!(fairy_blessing(0), Some(12));
+        assert_eq!(fairy_blessing(522), Some(12));
+        assert_eq!(fairy_blessing(1311), Some(10_000_012));
+        assert_eq!(fairy_blessing(2112), Some(20_000_012));
+        assert_eq!(fairy_blessing(2001), None);
+        assert_eq!(fairy_blessing(2218), None);
+        assert_eq!(fairy_blessing(900), Some(12));
+    }
+
     use super::*;
 
     #[test]

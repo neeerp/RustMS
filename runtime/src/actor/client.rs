@@ -638,6 +638,15 @@ impl ClientActor {
         // Sent even with none set, as flag 0 puts back the defaults; the
         // client otherwise keeps the last character's layout.
         self.send(&mut quick_slots).await?;
+        // The character data carries no master level for Blessing of the
+        // Fairy, so its tooltip's "[Master Level : 20]" line needs it again.
+        let blessing = game::skill::fairy_blessing(player.stats.job)
+            .and_then(|skill_id| player.skills.get(skill_id));
+        if let Some(record) = blessing {
+            let mut update = build::world::skill::build_update_skill(record)
+                .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+            self.send(&mut update).await?;
+        }
         if !expired.item_ids.is_empty() {
             let mut lines = build::world::inventory::build_items_expired(&expired.item_ids)
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;

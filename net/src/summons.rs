@@ -3,6 +3,7 @@
 //! moves it and decides when it attacks (v83 CSummoned, report 158), and
 //! the server shows the others and deals the damage.
 
+use crate::combat;
 use crate::error::NetworkError;
 use crate::skills::{self, Amount, Inflict, Learned};
 use game::{BuffStat, InventoryType, MobStat, Player};
@@ -134,7 +135,8 @@ pub fn max_damage(player: &Player, skill: &Learned) -> i32 {
     let [str, dex, int, luk] = stat;
     let roll = if magic(skill.skill_id) {
         let mad = player.buffs.value(BuffStat::Mad).map_or(0.0, f64::from);
-        let magic = (int + matk + mad).min(1999.0);
+        let blessing = f64::from(combat::fairy_blessing(player).1);
+        let magic = (int + matk + mad + blessing).min(1999.0);
         let squared = magic * 0.058;
         (magic * 3.3 + int * 0.5 + squared * squared) * f64::from(skill.effect.magic)
     } else {
