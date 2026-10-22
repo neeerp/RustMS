@@ -3,6 +3,7 @@
 
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::owl::OwlRequest;
+use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
@@ -26,17 +27,35 @@ impl WorldHandler for UseOwlHandler {
         r.read_short()?;
         let slot = r.read_short()?;
         let owl_id = r.read_int()?;
-        let item_id = r.read_int()?;
-        let descending = r.read_byte()? != 0;
-        Ok(
-            HandlerResult::empty().with(WorldAction::Owl(OwlRequest::Search {
-                slot,
-                owl_id,
-                item_id,
-                descending,
-            })),
-        )
+        owl_search(&mut r, InventoryType::Use, slot, owl_id)
     }
+}
+
+/// USE_CASH_ITEM (0x4F) type 0x1d, the Cash Owl (FUN_00a0a63f then
+/// FUN_008a2407): after its Cash slot and id, the same fields as 0x53.
+pub fn cash_owl(r: &mut Cursor<&Vec<u8>>, slot: i16, owl_id: i32) -> WorldResult {
+    owl_search(r, InventoryType::Cash, slot, owl_id)
+}
+
+/// The item to look for and the order (0 cheapest first); the tick is
+/// left.
+fn owl_search(
+    r: &mut Cursor<&Vec<u8>>,
+    inventory: InventoryType,
+    slot: i16,
+    owl_id: i32,
+) -> WorldResult {
+    let item_id = r.read_int()?;
+    let descending = r.read_byte()? != 0;
+    Ok(
+        HandlerResult::empty().with(WorldAction::Owl(OwlRequest::Search {
+            inventory,
+            slot,
+            owl_id,
+            item_id,
+            descending,
+        })),
+    )
 }
 
 /// OWL_GO (0x43, FUN_008a4423): GO on a row, which gives back the shop and

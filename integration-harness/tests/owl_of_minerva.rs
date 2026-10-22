@@ -1,6 +1,7 @@
-//! The Owl of Minerva (2310000): in the Free Market it searches the
-//! personal shops of every market room for an item, is used up only when
-//! something turns up, and GO on a row takes the player into that shop.
+//! The Owl of Minerva (2310000, and the Cash Owl 5230000): in the Free
+//! Market it searches the personal shops of every market room for an item,
+//! is used up only when something turns up, and GO on a row takes the
+//! player into that shop.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_item, grant_stack};
@@ -20,6 +21,7 @@ const STORE_PERMIT: i32 = 5140000;
 const SNAIL_SHELL: i32 = 4000000;
 const BLUE_SNAIL_SHELL: i32 = 4000001;
 const OWL: i32 = 2310000;
+const CASH_OWL: i32 = 5230000;
 const USE: u8 = 2;
 const ETC: u8 = 4;
 const CASH: u8 = 5;
@@ -68,6 +70,18 @@ fn use_owl(item_id: i32) -> Packet {
     p.write_int(OWL).unwrap();
     p.write_int(item_id).unwrap();
     p.write_byte(0).unwrap();
+    p.write_int(0).unwrap();
+    p
+}
+
+/// The Cash Owl in Cash slot 1 searches for `item_id` (0x4F type 0x1d).
+fn use_cash_owl(item_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
+    p.write_short(1).unwrap();
+    p.write_int(CASH_OWL).unwrap();
+    p.write_int(item_id).unwrap();
+    p.write_byte(1).unwrap();
     p.write_int(0).unwrap();
     p
 }
@@ -139,6 +153,9 @@ async fn the_owl_finds_a_shop_and_goes_there() {
     grant_stack(b_id, USE.into(), 1, OWL, 2)
         .await
         .expect("give B two owls");
+    grant_item(b_id, CASH.into(), 1, CASH_OWL)
+        .await
+        .expect("give B a Cash Owl");
     let mut a = relogin(&a_config).await;
     let mut b = relogin(&b_config).await;
 
@@ -188,6 +205,25 @@ async fn the_owl_finds_a_shop_and_goes_there() {
         (MARKET, "Shells", 2, 5, 100_000, 0, ETC)
     );
     assert_eq!(t.quantities, [(USE, 1, 1)]);
+
+    // The Cash Owl searches the same way, and is used up as well.
+    let t = step(
+        &mut b.connection,
+        "cash none",
+        use_cash_owl(BLUE_SNAIL_SHELL),
+    )
+    .await;
+    assert_eq!(results(&t), (BLUE_SNAIL_SHELL, vec![]));
+    assert!(t.quantities.is_empty() && t.removed.is_empty());
+    let t = step(&mut b.connection, "cash shells", use_cash_owl(SNAIL_SHELL)).await;
+    let (item, rows) = results(&t);
+    assert_eq!((item, rows.len()), (SNAIL_SHELL, 1), "{rows:?}");
+    assert_eq!(t.removed, [(CASH, 1)]);
+
+    // With no Cash Owl left, the request only unlocks the client.
+    let t = step(&mut b.connection, "no cash owl", use_cash_owl(SNAIL_SHELL)).await;
+    assert!(t.owl.is_empty(), "{:?}", t.owl);
+    assert!(t.stat_updates.iter().any(|s| s.is_empty()));
 
     // The window's list of most searched items has the shells now.
     let t = step(&mut b.connection, "popular", owl_open()).await;

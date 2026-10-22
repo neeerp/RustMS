@@ -1,14 +1,28 @@
-//! The Owl of Minerva (2310000, report c024): in the Free Market, it
+//! The Owl of Minerva (2310000 in USE, 5230000 in Cash; report c024): in
+//! the Free Market, it
 //! searches every channel's personal shops for an item and lists who sells
 //! it and for how much. The client filters item names itself and sends
 //! only the id it settled on; it is used up only if something turns up.
 //! GO on a row takes the player to the shop, on their own channel.
 
-use game::Item;
+use game::{InventoryType, Item};
 use std::collections::HashMap;
 
 /// The Owl of Minerva, the only USE item of class 231.
 pub const OWL: i32 = 2_310_000;
+
+/// The Cash Owl, the only Cash item of class 523. It opens the same
+/// window (FUN_00a0a63f type 0x1d calls FUN_00a0a2dc).
+pub const CASH_OWL: i32 = 5_230_000;
+
+/// The Owl that tab holds.
+pub fn owl_in(inventory: InventoryType) -> Option<i32> {
+    match inventory {
+        InventoryType::Use => Some(OWL),
+        InventoryType::Cash => Some(CASH_OWL),
+        _ => None,
+    }
+}
 
 /// The most rows a search answers with ("Show 200 results").
 pub const MAX_RESULTS: usize = 200;
@@ -32,9 +46,11 @@ pub fn is_market_room(map_id: i32) -> bool {
 pub enum OwlRequest {
     /// The search window opened and wants the most searched items (0x42).
     Popular,
-    /// Search the shops for `item_id`, using the Owl in USE `slot`; the
-    /// cheapest first unless `descending` (0x53).
+    /// Search the shops for `item_id`, using the Owl in `slot` of
+    /// `inventory` (USE, or Cash for the Cash Owl); the cheapest first
+    /// unless `descending` (0x53, or 0x4F for the Cash Owl).
     Search {
+        inventory: InventoryType,
         slot: i16,
         owl_id: i32,
         item_id: i32,
@@ -119,6 +135,13 @@ mod tests {
             bundles: 1,
             price,
         }
+    }
+
+    #[test]
+    fn each_owl_has_its_tab() {
+        assert_eq!(owl_in(InventoryType::Use), Some(OWL));
+        assert_eq!(owl_in(InventoryType::Cash), Some(CASH_OWL));
+        assert_eq!(owl_in(InventoryType::Etc), None);
     }
 
     #[test]

@@ -24,7 +24,8 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		// Opens the window for the Owl in USE `slot`, unless it is open.
+		// Opens the window for the Owl in USE `slot`, or the Cash Owl in
+		// Cash `slot`, unless it is open.
 		static void open(int16_t slot, int32_t owl_id);
 
 		UIItemSearch(int16_t slot, int32_t owl_id);

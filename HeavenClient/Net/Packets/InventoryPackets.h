@@ -368,19 +368,26 @@ namespace ms
 		}
 	};
 
-	// Searches the shops for `searchid` with the Owl in USE slot `slot`,
-	// cheapest first unless `descending` (FUN_00a0a25e, FUN_008a2407).
-	// Opcode: USE_OWL(83)
+	// Searches the shops for `searchid` with the Owl in USE slot `slot`
+	// (FUN_00a0a25e), or the Cash Owl (523xxxx, FUN_00a0a63f type 0x1d) in
+	// Cash slot `slot`, cheapest first unless `descending` (FUN_008a2407).
+	// Opcode: USE_OWL(83), USE_CASH_ITEM(79)
 	class UseOwlPacket : public OutPacket
 	{
 	public:
-		UseOwlPacket(int16_t slot, int32_t itemid, int32_t searchid, bool descending) : OutPacket(OutPacket::Opcode::USE_OWL)
+		UseOwlPacket(int16_t slot, int32_t itemid, int32_t searchid, bool descending) : OutPacket(opcode(itemid))
 		{
 			write_short(slot);
 			write_int(itemid);
 			write_int(searchid);
 			write_byte(descending);
 			write_time();
+		}
+
+	private:
+		static OutPacket::Opcode opcode(int32_t itemid)
+		{
+			return itemid / 10000 == 231 ? OutPacket::Opcode::USE_OWL : OutPacket::Opcode::USE_CASH_ITEM;
 		}
 	};
 
