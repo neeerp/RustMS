@@ -424,9 +424,14 @@ impl EventActor {
             EventCommand::ClearStage(stage) if leader && event.talk_clears.contains(&stage) => {
                 self.clear(stage);
             }
-            // By any member, whose hit broke the reactor.
+            // By any member, whose hit broke the reactor, or whose item
+            // set Minerva's statue to rights.
             EventCommand::ClearStage(stage) if event.member_clears.contains(&stage) => {
-                self.clear(stage);
+                if stage == event.last_stage() {
+                    self.win();
+                } else {
+                    self.clear(stage);
+                }
             }
             EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {

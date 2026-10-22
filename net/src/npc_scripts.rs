@@ -108,6 +108,9 @@ pub const RED_SIGN: i32 = 2040034;
 pub const WONKY: i32 = 2013000;
 /// Eak, at the Orbis party quest's way out.
 pub const EAK: i32 = 2013001;
+/// Minerva, whose statue brought back to life wins Orbis's party quest,
+/// and who gives the team that won it its prizes.
+pub const MINERVA: i32 = 2013002;
 /// The balloon on Ludibrium's maze stage.
 pub const AQUA_BALLOON: i32 = 2040041;
 /// The balloon on Ludibrium's stage 8, whose puzzle is its crates.
@@ -1087,7 +1090,7 @@ impl NpcScript {
     /// A script on an event's maps, for a player in the event, who may be
     /// its `leader`, and whose party may have `won` it: Growlie's, Tommy's
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
-    /// Ludibrium.
+    /// Ludibrium, Minerva's in the Tower of Goddess.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1095,6 +1098,7 @@ impl NpcScript {
             TORY => tory_after(player, won),
             PINK_BALLOON => pink_balloon(player),
             ARTURO if won => arturo(player, &mut rand::thread_rng()),
+            MINERVA if won => minerva(player, &mut rand::thread_rng()),
             _ => None,
         }
     }
@@ -2960,6 +2964,37 @@ fn arturo(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
     let pages = vec![Page::Say(text(keys::LPQ_ARTURO_THANKS)), last];
     let mut script = NpcScript::new(ARTURO, pages);
     script.inventory_full = Some(text(keys::LPQ_ARTURO_FULL));
+    Some(script)
+}
+
+/// Minerva (Cosmic `2013002`), once her statue is whole: on the hub she
+/// asks each member of the team whether to go, and sends those who will
+/// to her prize room alone; there she gives each one of `OPQ_REWARDS` and
+/// sends them back to Orbis, so nobody gets it twice. A member without
+/// room for any of the prizes (`has_reward_slot`) gets nothing yet.
+fn minerva(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    let pages = match player.stats.map_id {
+        events::OPQ_HUB => vec![Page::Ask {
+            text: text(keys::OPQ_MINERVA_ASK),
+            on_yes: vec![Effect::WarpToPortal(events::OPQ_PRIZE_ROOM, 0)],
+            on_no: None,
+        }],
+        events::OPQ_PRIZE_ROOM => {
+            let last = if has_reward_slot(&player.inventory) {
+                let &(item_id, quantity) = events::OPQ_REWARDS.choose(rng)?;
+                Page::Done(vec![
+                    Effect::GiveItem { item_id, quantity },
+                    Effect::WarpToPortal(events::OPQ.lobby, 0),
+                ])
+            } else {
+                Page::Say(text(keys::OPQ_MINERVA_FULL))
+            };
+            vec![Page::Say(text(keys::OPQ_MINERVA_THANKS)), last]
+        }
+        _ => return None,
+    };
+    let mut script = NpcScript::new(MINERVA, pages);
+    script.inventory_full = Some(text(keys::OPQ_MINERVA_FULL));
     Some(script)
 }
 
@@ -6562,6 +6597,45 @@ mod tests {
         let full = script.respond(ScriptInput::Next).unwrap();
         assert!(full.effects.is_empty());
         assert!(page_text(&full).contains(&text(keys::LPQ_ARTURO_FULL)));
+    }
+
+    #[test]
+    fn minerva_sends_each_winner_to_her_prize_room_then_gives_a_prize() {
+        let mut player = rider(60, 0, events::OPQ_HUB);
+        assert!(NpcScript::in_event(MINERVA, &player, true, false).is_none());
+        let mut ask = NpcScript::in_event(MINERVA, &player, false, true).unwrap();
+        assert_eq!(question(&ask.begin()), text(keys::OPQ_MINERVA_ASK));
+        let to = events::OPQ_PRIZE_ROOM;
+        let went = ask.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(went, [Effect::WarpToPortal(to, 0)]);
+        let mut ask = NpcScript::in_event(MINERVA, &player, false, true).unwrap();
+        ask.begin();
+        assert!(ask.respond(ScriptInput::No).unwrap().effects.is_empty());
+
+        player.stats.map_id = to;
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let mut script = minerva(&player, rng).unwrap();
+        assert_eq!(page_text(&script.begin()), text(keys::OPQ_MINERVA_THANKS));
+        let effects = script.respond(ScriptInput::Next).unwrap().effects;
+        let [Effect::GiveItem { item_id, quantity }, Effect::WarpToPortal(home, 0)] = effects[..]
+        else {
+            panic!("{effects:?}");
+        };
+        assert!(events::OPQ_REWARDS.contains(&(item_id, quantity)));
+        assert_eq!(home, events::OPQ.lobby);
+
+        // A full Etc tab: nothing yet, whatever the prize would be.
+        let inventory = &mut player.inventory;
+        inventory.set_slot_limit(InventoryType::Etc, 1);
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
+        let mut script = minerva(&player, rng).unwrap();
+        script.begin();
+        let full = script.respond(ScriptInput::Next).unwrap();
+        assert!(full.effects.is_empty());
+        assert!(page_text(&full).contains(&text(keys::OPQ_MINERVA_FULL)));
+        player.stats.map_id = events::OPQ.lobby;
+        assert!(minerva(&player, rng).is_none());
     }
 
     #[test]

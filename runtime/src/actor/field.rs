@@ -2562,12 +2562,17 @@ impl FieldActor {
             }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
-            // falls to someone still here.
+            // falls to someone still here. Minerva's statue brings her out
+            // first (Cosmic `spawnNpc`).
             action => {
+                if let reactors::Action::AppearAndClears(npc_id) = action {
+                    self.appear(npc_id, (view.x, view.y));
+                }
                 let occupant = match action {
                     reactors::Action::Drops
                     | reactors::Action::Spray { .. }
-                    | reactors::Action::DropsAndClears => self
+                    | reactors::Action::DropsAndClears
+                    | reactors::Action::AppearAndClears(_) => self
                         .occupants
                         .get(&by)
                         .or_else(|| self.occupants.values().next()),

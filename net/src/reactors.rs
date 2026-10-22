@@ -74,6 +74,10 @@ pub enum Action {
     /// Drop its loot, and clear the event stage on its map for whoever
     /// broke it: the garden's Grass of Life pot (Cosmic `2002003`).
     DropsAndClears,
+    /// Bring out an NPC on the ground below it, and clear the event stage
+    /// on its map for whoever broke it: Minerva's statue on the Tower of
+    /// Goddess's hub (Cosmic `2006001`), whose stage wins the event.
+    AppearAndClears(i32),
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -100,6 +104,9 @@ const LPQ_ROMBAD: i32 = 9300010;
 const LPQ_ALISHAR: i32 = 9300012;
 /// The light on Orbis's cloud stage, which Eak comes out of.
 pub const OPQ_LIGHT: i32 = 2006000;
+/// Minerva's statue on the Tower of Goddess's hub, which takes the Grass
+/// of Life.
+pub const OPQ_STATUE: i32 = 2006001;
 /// The first of the Salion stage's spots, `2001002` to `2001015`.
 pub const SALION_SPOTS: i32 = 2001002;
 /// The Cellion that comes out at the Salion stage's spots.
@@ -235,6 +242,9 @@ pub fn action(reactor_id: i32) -> Action {
             notice: keys::OPQ_NOTICE_LIGHT,
         },
         2008000..=2008005 => Action::Hold,
+        // The statue (`2006001`): the Grass of Life brings Minerva out, and
+        // wins the event.
+        OPQ_STATUE => Action::AppearAndClears(crate::npc_scripts::MINERVA),
         2001002..=2001015 => Action::Salion,
         // The garden's pots, the spots under them, and the Grass of Life.
         2001000 | 2001001 => Action::Pot,
@@ -245,11 +255,14 @@ pub fn action(reactor_id: i32) -> Action {
 }
 
 /// The state a reactor starts in, from 0 for most. Orbis's light waits at
-/// 20, the only state of v83's whose event takes an item: the 20 cloud
-/// pieces dropped on it (Reactor.nx `2006000.img/20`).
+/// 20, whose event takes the 20 cloud pieces dropped on it (Reactor.nx
+/// `2006000.img/20`). Minerva's statue
+/// waits at 6, whose event takes the Grass of Life (`2006001.img/6`; its
+/// states 0 to 5 take nothing, and the scars hold the pieces instead).
 pub fn first_state(reactor_id: i32) -> u8 {
     match reactor_id {
         OPQ_LIGHT => 20,
+        OPQ_STATUE => 6,
         _ => 0,
     }
 }
@@ -307,6 +320,20 @@ mod tests {
         assert!(light.takes_items(20) && !light.takes_items(0));
         assert_eq!(light.item_dropped(20, 4001063, 20, (0, 0)), Some((0, 21)));
         assert!(light.is_last(21));
+    }
+
+    #[test]
+    fn minervas_statue_takes_the_grass_of_life_and_brings_her_out() {
+        let minerva = Action::AppearAndClears(crate::npc_scripts::MINERVA);
+        assert_eq!((action(OPQ_STATUE), first_state(OPQ_STATUE)), (minerva, 6));
+        assert!(!stays(OPQ_STATUE));
+        let Some(statue) = template(OPQ_STATUE) else {
+            return;
+        };
+        assert!(statue.takes_items(6) && !statue.takes_items(0));
+        let grass = crate::events::GRASS_OF_LIFE;
+        assert_eq!(statue.item_dropped(6, grass, 1, (0, 0)), Some((0, 7)));
+        assert!(statue.is_last(7));
     }
 
     #[test]

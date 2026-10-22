@@ -787,6 +787,9 @@ unsourced = [
     "opq.eak.minerva",
     "opq.notice.papa_pixie",
     "opq.notice.garden_out",
+    "opq.minerva.ask",
+    "opq.minerva.thanks",
+    "opq.minerva.full",
 ]
 
 [text."glTutoMsg0.message"]

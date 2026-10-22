@@ -3,21 +3,26 @@
 //! another Nependeath or a Royal one; a Royal's seed set where a pot stood
 //! brings out Papa Pixie, whose seed in the Grass of Life's pot, and four
 //! blows, grows the Grass and clears the garden. Only the leader holding
-//! it takes the team back to the hub. The harness world pins the pots to
+//! it takes the team back to the hub, where the Grass set at the foot of
+//! Minerva's statue brings her out and wins the quest; she sends each
+//! member to her prize room for a prize, then home to Orbis. The harness
+//! world pins the pots to
 //! one Nependeath then Royals (`RUSTMS_OPQ_POTS`), and runs events 60
 //! times as fast, so the quest lasts a minute.
 
 use game_data::server_content::keys;
 use integration_harness::events::{
-    armed_in, break_open, cleared, enter_opq, maps, party, said, talk, throw_down, told,
+    armed_in, break_open, cleared, enter_opq, maps, party, said, talk, talk_to, throw_down, told,
     waiting_in, EAK,
 };
 use integration_harness::hunting::{attack, pickup, walk_to, Field, MapReactor};
+use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
-use net::events::{GRASS_OF_LIFE, OPQ, OPQ_GARDEN, OPQ_HUB};
+use net::events::{GRASS_OF_LIFE, OPQ, OPQ_GARDEN, OPQ_HUB, OPQ_PRIZE_ROOM, OPQ_REWARDS};
+use net::npc_scripts::MINERVA;
 use net::packet::op::RecvOpcode;
-use net::reactors::{NEPENDEATH, PAPA_PIXIE, ROYAL_NEPENDEATH};
+use net::reactors::{NEPENDEATH, OPQ_STATUE, PAPA_PIXIE, ROYAL_NEPENDEATH};
 use net::scripts::OPQ_GARDEN_OUT;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -143,7 +148,7 @@ async fn grows(player: &mut WorldSession, seen: &mut Trace, before: usize, mob_i
 }
 
 #[tokio::test]
-async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_leads_back() {
+async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerva() {
     let mut a = vec![armed_in(OPQ.lobby, 51).await];
     let pieces: Vec<_> = (4001044..=4001049).map(|piece| (piece, 1)).collect();
     a.push(waiting_in(OPQ.lobby, 51, &pieces).await);
@@ -257,16 +262,61 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_leads_back() {
         assert!(trace.arrivals.is_empty(), "{trace:?}");
         assert!(pink(&trace, keys::OPQ_NOTICE_GARDEN_OUT), "{trace:?}");
     }
-    pick_up(&mut a[0], &mut seen, GRASS_OF_LIFE).await;
+    let grass = pick_up(&mut a[0], &mut seen, GRASS_OF_LIFE).await;
     let trace = told(&mut a[0], enter(&out)).await;
     assert_eq!(trace.portal_sounds, 1, "{trace:?}");
+    let mut hub = Vec::new();
     for player in &mut a {
         let mut trace = Trace::default();
         until(&mut player.connection, &mut trace, |t| {
             t.warps.contains(&OPQ_HUB)
         })
         .await;
+        hub.push(trace);
     }
     let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
     assert!(said(&trace, keys::OPQ_EAK_GRASS), "{trace:?}");
+
+    // The Grass at the statue's foot brings Minerva out and wins: 3500 EXP
+    // and the clear for everyone, who stay on the hub.
+    until(&mut a[0].connection, &mut hub[0], |t| {
+        t.field.reactors.iter().any(|r| r.reactor_id == OPQ_STATUE)
+    })
+    .await;
+    let statue = reactor_at(&hub[0], OPQ_STATUE, (-48, -916));
+    assert_eq!(statue.state, 6);
+    set_in(&mut a[0], &mut hub[0], statue, grass).await;
+    for (player, trace) in a.iter_mut().zip(&mut hub) {
+        until(&mut player.connection, trace, |t| {
+            t.field.npc(MINERVA).is_some() && cleared(t) && t.gains.contains(&3500)
+        })
+        .await;
+        assert_eq!(trace.warps, [OPQ_HUB], "{trace:?}");
+    }
+    let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
+    assert!(said(&trace, keys::OPQ_EAK_MINERVA), "{trace:?}");
+
+    // She sends each member who will to her prize room, and there gives
+    // each a prize and sends them home to Orbis.
+    let minerva = hub[0].field.npc(MINERVA).unwrap();
+    for player in &mut a {
+        let mut trace = told(player, talk_to(minerva)).await;
+        assert!(said(&trace, keys::OPQ_MINERVA_ASK), "{trace:?}");
+        send(&mut player.connection, answer(1, 1, None)).await;
+        until(&mut player.connection, &mut trace, |t| {
+            t.warps.contains(&OPQ_PRIZE_ROOM)
+        })
+        .await;
+        let trace = told(player, talk(OPQ_PRIZE_ROOM, MINERVA)).await;
+        assert!(said(&trace, keys::OPQ_MINERVA_THANKS), "{trace:?}");
+        let mut trace = told(player, answer(0, 1, None)).await;
+        until(&mut player.connection, &mut trace, |t| {
+            t.warps.contains(&OPQ.lobby)
+        })
+        .await;
+        // A new stack, or more on one already in the bag.
+        let prize = |&(_, _, item): &(u8, i16, i32)| OPQ_REWARDS.iter().any(|r| r.0 == item);
+        assert!(trace.added.iter().all(prize), "{trace:?}");
+        assert_eq!(trace.added.len() + trace.quantities.len(), 1, "{trace:?}");
+    }
 }
