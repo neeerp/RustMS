@@ -405,6 +405,23 @@ only in its "This message will be sent to Maple TV in %d seconds." question.
 v83 draws the TV only in maps whose `info` sets `MapleTV` and its anchors,
 and no map in the v83 data does (report c056).
 
+In HeavenClient, using one opens `UIMapleTv`. This is v83's modal dialog on
+`UIWindow.img/MapleTV`: the To bar, one box that wraps onto five rows,
+and the ear for a Megassenger. A Messenger names a receiver only with its
+checkbox ticked, and unticking it empties the name. Enter does nothing, and
+only OK sends. Once the dialog closes:
+
+1. The client asks the 0xf79 question with the seconds from the last
+   SEND_TV (`MapleTv::line_wait`; REMOVE_TV sets it back to 0).
+2. A heart with no receiver is refused with 0xf78.
+3. Text the filter won't take is refused with "Cursing is not allowed.".
+   Otherwise its curse words are starred out and it is sent
+   (`UseMapleTvPacket`).
+
+TV_RESULT's codes 1 to 3 show StringPool 0xf75 to 0xf77
+(`Util/MapleTv.h`, `tests/maple_tv.cpp`). SEND_TV is read only for that
+wait, as there is no TV to draw.
+
 ### Chalkboard
 
 A chalkboard (537xxxx, `world/chalkboard.rs`) is used through USE_CASH_ITEM

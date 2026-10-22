@@ -44,6 +44,7 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../Util/CurseWords.h"
+#include "../../Util/MapleTv.h"
 #include "../../Util/Megaphones.h"
 #include "../../Util/Misc.h"
 
@@ -402,6 +403,38 @@ namespace ms
 	{
 		if (auto banner = UI::get().get_element<UIAvatarMegaphone>())
 			banner->hide();
+	}
+
+	void SendTvHandler::handle(InPacket& recv) const
+	{
+		// The flag (2: the receiver's look follows), the screen, the
+		// sender's look, the sender and receiver, and the five lines.
+		recv.skip_byte();
+		recv.skip_byte();
+		LoginParser::parse_look(recv);
+		recv.read_string();
+		recv.read_string();
+
+		for (size_t i = 0; i < MapleTv::ROWS; i++)
+			recv.read_string();
+
+		MapleTv::line_wait = recv.read_int();
+	}
+
+	void RemoveTvHandler::handle(InPacket&) const
+	{
+		MapleTv::line_wait = 0;
+	}
+
+	void TvResultHandler::handle(InPacket& recv) const
+	{
+		if (!recv.read_bool() || !recv.available())
+			return;
+
+		std::string text = MapleTv::refusal_text(static_cast<uint8_t>(recv.read_byte()));
+
+		if (!text.empty())
+			UI::get().emplace<UIOk>(text, [](bool) {});
 	}
 
 	void QuestClearHandler::handle(InPacket& recv) const

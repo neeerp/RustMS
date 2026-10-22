@@ -256,6 +256,14 @@ namespace ms
 					markerpos++;
 
 					modifytext(text);
+
+					if (wraprows > 0 && textlabel.line_starts().size() > wraprows)
+					{
+						markerpos--;
+						text.erase(markerpos, 1);
+
+						modifytext(text);
+					}
 				}
 			}
 			else if (c == '\r' || c == '\n')
@@ -436,11 +444,13 @@ namespace ms
 		crypt = character;
 	}
 
-	void Textfield::set_wrap(uint16_t width)
+	void Textfield::set_wrap(uint16_t width, int16_t line_adj, size_t max_rows)
 	{
 		wrapwidth = width;
+		wrapadj = line_adj;
+		wraprows = max_rows;
 		scroll = 0;
-		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false);
+		textlabel = Text(font, alignment, color, textlabel.get_text(), wrapwidth, false, wrapadj);
 	}
 
 	void Textfield::set_lines(uint16_t width, size_t shown, int16_t space)
@@ -467,7 +477,7 @@ namespace ms
 			return Point<int16_t>(textlabel.advance(markerpos) - scroll, 0);
 
 		// Where the text before the marker ends once wrapped.
-		Text before(font, alignment, color, textlabel.get_text().substr(0, markerpos), wrapwidth, false);
+		Text before(font, alignment, color, textlabel.get_text().substr(0, markerpos), wrapwidth, false, wrapadj);
 
 		return before.endoffset();
 	}

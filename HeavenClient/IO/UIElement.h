@@ -132,6 +132,7 @@ namespace ms
 			INCUBATOR,
 			INVITATION,
 			TRANSFORM,
+			MAPLETV,
 			NUM_TYPES
 		};
 

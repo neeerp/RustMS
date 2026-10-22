@@ -79,6 +79,29 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Puts a message on Maple TV (FUN_006371c1). No v83 map has a TV to
+	// show it on (report c056), so only the seconds the line still needs
+	// are kept, for the next sender's question.
+	// Opcode: SEND_TV(341)
+	class SendTvHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Takes the message down (FUN_006371ad): the line is clear.
+	// Opcode: REMOVE_TV(342)
+	class RemoveTvHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// How sending a message went (FUN_006373a0): 0, or 1 and why not.
+	// Opcode: TV_RESULT(343)
+	class TvResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// A quest's title is earned: its "Quest Complete!" notice (FUN_00a26d44)
 	// Opcode: QUEST_CLEAR(49)
 	class QuestClearHandler : public PacketHandler

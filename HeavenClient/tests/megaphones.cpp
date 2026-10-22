@@ -27,7 +27,8 @@ int main()
 		require(kind(5071000) == Kind::PLAIN && kind(5078000) == Kind::PLAIN, "kinds 1 and 8 are plain");
 		require(kind(5072000) == Kind::SUPER, "kind 2 is the super megaphone");
 		require(kind(5076000) == Kind::ITEM && kind(5075006) == Kind::ITEM, "kind 6, and 5 from 6, show an item");
-		require(kind(5075005) == Kind::NONE, "kind 5 below 6 is Maple TV");
+		require(kind(5075000) == Kind::TV && kind(5075003) == Kind::TV && kind(5075005) == Kind::TV, "5075000 to 5075005 are Maple TV");
+		require(kind(5075010) == Kind::NONE, "but not 5075010");
 		require(kind(5077000) == Kind::TRIPLE, "kind 7 is the triple megaphone");
 		require(kind(5073000) == Kind::NONE && kind(5370000) == Kind::NONE, "nothing else is asked for");
 
