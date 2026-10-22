@@ -1328,6 +1328,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn super_dragon_roar_hits_at_ten_times_for_a_gm_only() {
+        if skills::data().is_err() {
+            return;
+        }
+        // 9001001 level 1: damage 1000, 15 mobs, no MP.
+        let roar = |damage| parse_close_attack(&skill_attack_packet(9001001, 1, damage)).unwrap();
+        let mut player = beginner_with_sword();
+        player.stats.job = 900;
+        player.stats.mp = 0;
+        player.skills.set(game::SkillRecord {
+            skill_id: 9001001,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        assert_eq!(
+            validate(&roar(10), &player).unwrap_err(),
+            AttackRejection::Skill,
+            "not a GM"
+        );
+        player.gm_level = 1;
+        // Ten times the base cap of 20.
+        let used = validate(&roar(200), &player).unwrap().skill.unwrap();
+        assert_eq!((used.skill_id, used.effect.mob_count), (9001001, 15));
+        assert_eq!(
+            validate(&roar(201), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
+    }
+
     /// A shot or spell at one mob: CLOSE_RANGE_ATTACK's layout, plus a
     /// shot's 5 bytes before its targets, with its ammo slot.
     fn kind_attack_packet(kind: AttackKind, skill: i32, ammo_slot: i16, damage: &[i32]) -> Packet {
