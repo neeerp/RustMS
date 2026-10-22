@@ -321,6 +321,29 @@ pub mod keys {
     pub const KPQ_CLOTO_S5_CLEAR: &str = "kpq.cloto.s5.clear";
     pub const KPQ_CLOTO_S5_GATHER: &str = "kpq.cloto.s5.gather";
     pub const KPQ_CLOTO_S5_WON: &str = "kpq.cloto.s5.won";
+
+    /// Henesys's party quest: Tory, who takes a party in from Henesys Park
+    /// (the terms with `{least}`, `{most}` and `{low}`) and tells how it is
+    /// played; Growlie on Primrose Hill, who lets players out; and Tommy,
+    /// who sends them home from the way out.
+    pub const HPQ_TORY_MENU: &str = "hpq.tory.menu";
+    pub const HPQ_TORY_ENTER: &str = "hpq.tory.enter";
+    pub const HPQ_TORY_ABOUT: &str = "hpq.tory.about";
+    pub const HPQ_TORY_ABOUT_PAGES: [&str; 3] =
+        ["hpq.tory.about.0", "hpq.tory.about.1", "hpq.tory.about.2"];
+    pub const HPQ_TORY_NO_PARTY: &str = "hpq.tory.no_party";
+    pub const HPQ_TORY_NOT_LEADER: &str = "hpq.tory.not_leader";
+    pub const HPQ_TORY_NOT_ELIGIBLE: &str = "hpq.tory.not_eligible";
+    pub const HPQ_TORY_BUSY: &str = "hpq.tory.busy";
+    pub const HPQ_TORY_ASK: &str = "hpq.tory.ask";
+    pub const HPQ_TORY_DECLINE: &str = "hpq.tory.decline";
+    pub const HPQ_GROWLIE_MENU: &str = "hpq.growlie.menu";
+    pub const HPQ_GROWLIE_ABOUT: &str = "hpq.growlie.about";
+    pub const HPQ_GROWLIE_ABOUT_PAGES: [&str; 2] = ["hpq.growlie.about.0", "hpq.growlie.about.1"];
+    pub const HPQ_GROWLIE_LEAVE: &str = "hpq.growlie.leave";
+    pub const HPQ_GROWLIE_LEAVE_ASK: &str = "hpq.growlie.leave.ask";
+    pub const HPQ_GROWLIE_STAY: &str = "hpq.growlie.stay";
+    pub const HPQ_TOMMY_HOME: &str = "hpq.tommy.home";
     pub const JEFF_INTRO: &str = "jeff.intro";
     pub const JEFF_ASK: &str = "jeff.ask";
     pub const JEFF_DECLINE: &str = "jeff.decline";
@@ -1040,6 +1063,21 @@ mod tests {
             keys::KPQ_LAKELIS_DECLINE,
             keys::KPQ_NELLA_LEAVE,
             keys::KPQ_NELLA_HOME,
+            keys::HPQ_TORY_MENU,
+            keys::HPQ_TORY_ENTER,
+            keys::HPQ_TORY_ABOUT,
+            keys::HPQ_TORY_NO_PARTY,
+            keys::HPQ_TORY_NOT_LEADER,
+            keys::HPQ_TORY_NOT_ELIGIBLE,
+            keys::HPQ_TORY_BUSY,
+            keys::HPQ_TORY_ASK,
+            keys::HPQ_TORY_DECLINE,
+            keys::HPQ_GROWLIE_MENU,
+            keys::HPQ_GROWLIE_ABOUT,
+            keys::HPQ_GROWLIE_LEAVE,
+            keys::HPQ_GROWLIE_LEAVE_ASK,
+            keys::HPQ_GROWLIE_STAY,
+            keys::HPQ_TOMMY_HOME,
             keys::KPQ_CLOTO_Q1,
             keys::KPQ_CLOTO_Q2,
             keys::KPQ_CLOTO_Q3,
@@ -1171,6 +1209,8 @@ mod tests {
             .chain(&keys::MAKER_PRACTICE)
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
+            .chain(&keys::HPQ_TORY_ABOUT_PAGES)
+            .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

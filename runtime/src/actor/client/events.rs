@@ -49,6 +49,7 @@ impl ClientActor {
         };
         let script = match kind {
             EventKind::Kpq => NpcScript::lakelis(entry),
+            EventKind::Hpq => NpcScript::tory(entry),
         };
         self.start_script(script).await
     }

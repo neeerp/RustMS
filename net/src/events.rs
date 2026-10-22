@@ -14,6 +14,8 @@ use std::time::Duration;
 pub enum EventKind {
     /// Kerning City's party quest, started at Lakelis.
     Kpq,
+    /// Henesys's party quest, started at Tory.
+    Hpq,
 }
 
 /// An event's maps and terms.
@@ -25,7 +27,8 @@ pub struct Event {
     pub maps: RangeInclusive<i32>,
     /// Where everyone starts.
     pub entry: i32,
-    /// Where everyone goes when they leave or the event ends.
+    /// Where everyone goes when they leave or the event ends. Never one of
+    /// the event's maps, even within `maps`.
     pub exit: i32,
     pub levels: RangeInclusive<u8>,
     /// How many may play, the leader included.
@@ -68,10 +71,35 @@ pub const KPQ: Event = Event {
     passes: 10,
 };
 
+/// Henesys's party quest on Primrose Hill (Cosmic `HenesysPQ`: maps
+/// 910010000-400, of which 910010300 is the way out, 3 to 6 players from
+/// level 10, 10 minutes). One stage, played on 910010000, cleared by
+/// bringing Growlie 10 rice cakes; the seeds and cakes are the quest's own.
+pub const HPQ: Event = Event {
+    lobby: 100_000_200,
+    maps: 910_010_000..=910_010_400,
+    entry: 910_010_000,
+    exit: 910_010_300,
+    levels: 10..=u8::MAX,
+    team: 3..=6,
+    minutes: 10,
+    exp_per_stage: &[1600],
+    gated: 1..=0,
+    puzzles: 1..=0,
+    items: &[
+        4001095, 4001096, 4001097, 4001098, 4001099, 4001100, RICE_CAKE,
+    ],
+    passes: 10,
+};
+
+/// What the Moon Bunny makes on Primrose Hill, and Growlie wants.
+pub const RICE_CAKE: i32 = 4001101;
+
 impl EventKind {
     pub fn event(self) -> &'static Event {
         match self {
             EventKind::Kpq => &KPQ,
+            EventKind::Hpq => &HPQ,
         }
     }
 }
@@ -104,8 +132,9 @@ impl Event {
         Duration::from_secs(self.minutes * 60) / scale()
     }
 
+    /// Whether `map_id` is one of the event's maps; its exit never is.
     pub fn holds(&self, map_id: i32) -> bool {
-        self.maps.contains(&map_id)
+        self.maps.contains(&map_id) && map_id != self.exit
     }
 
     /// The map stage `stage` (from 1) is played on.
@@ -500,6 +529,39 @@ mod tests {
         );
         assert_eq!(player.inventory.count(4000000), 3);
         assert!(KPQ.take_items(&mut player).is_empty());
+    }
+
+    #[test]
+    fn hpq_is_played_on_primrose_hill_and_left_by_its_exit() {
+        let data = crate::game_data::get().unwrap();
+        let npcs = |map_id| -> Vec<i32> {
+            data.field(map_id)
+                .unwrap()
+                .map_npcs
+                .iter()
+                .map(|npc| npc.npc_id)
+                .collect()
+        };
+        assert!(npcs(HPQ.lobby).contains(&1012112));
+        assert!(npcs(HPQ.entry).contains(&1012114));
+        assert!(npcs(HPQ.exit).contains(&1012113));
+        assert!(HPQ.holds(HPQ.entry) && HPQ.holds(910_010_400));
+        assert!(!HPQ.holds(HPQ.exit) && !HPQ.holds(HPQ.lobby));
+        assert_eq!(data.field(HPQ.entry).unwrap().forced_return, Some(HPQ.exit));
+        assert_eq!((HPQ.stage_on(HPQ.entry), HPQ.last_stage()), (Some(1), 1));
+        assert_eq!(HPQ.gate_stage(HPQ.entry, "next00"), None);
+        let party = [
+            at(1, 10, HPQ.lobby),
+            at(2, 200, HPQ.lobby),
+            at(3, 9, HPQ.lobby),
+        ];
+        assert_eq!(HPQ.team(1, &party), None);
+        let party = [
+            at(1, 10, HPQ.lobby),
+            at(2, 200, HPQ.lobby),
+            at(3, 11, HPQ.lobby),
+        ];
+        assert_eq!(HPQ.team(1, &party), Some(vec![1, 2, 3]));
     }
 
     #[test]

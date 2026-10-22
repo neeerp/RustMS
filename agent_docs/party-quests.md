@@ -6,7 +6,8 @@ exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles of
 areas to stand on), with their clears and the gates on, and stage 5 (ten
 passes), which wins it. The rewards and the bonus stage come next (see
 `v83ref/reports/a005-instancing-kpq.md`, section 3, `a011-kpq-stage1.md`
-and `a016-kpq-stages-2-5.md`).
+and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) has its entry,
+exit and timer so far (`v83ref/reports/a058-henesys-pq.md`).
 
 ## Rules
 
@@ -17,6 +18,10 @@ and `a016-kpq-stages-2-5.md`).
   duration.
 - `KPQ` has lobby 103000000, maps 103000800-805, exit 103000890, levels
   21-30, 3-4 players and 30 minutes (Cosmic `KerningPQ`).
+- `HPQ` has lobby 100000200 (Henesys Park), maps 910010000-400, exit
+  910010300, levels 10 and up, 3-6 players and 10 minutes (Cosmic
+  `HenesysPQ`). Its exit lies inside its range of maps: `Event::holds`
+  never counts the exit as one of the event's maps.
 - `Event::team` picks who goes: the party's members online on the
   leader's channel, standing in the lobby, at the right levels. The leader
   must be one of them, and there must be enough of them and not too many.
@@ -81,8 +86,8 @@ and `a016-kpq-stages-2-5.md`).
    (`EventClosed`), which frees the lobby, about two seconds after the
    event ended. A won event frees it at the win (below).
 
-A player saved on an event map logs back in at its `forcedReturn`
-(103000890), outside the copy. A player without a ticket who warps onto an
+A player saved on an event map logs back in at its `forcedReturn`,
+the event's exit (103000890, 910010300), outside the copy. A player without a ticket who warps onto an
 event map by a debug warp lands on the channel's own copy of it, which the
 harness uses to check that copies are apart.
 
@@ -219,15 +224,23 @@ portal is closed for now." line, which also unlocks it
 | Cloto 9020001 | 103000800-804 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles, stage 5's passes |
 | Nella 9020002 | 103000800-805 | Out to 103000890 |
 | Nella 9020002 | 103000890 | Home to 103000000 |
+| Tory 1012112 | 100000200 | Runtime (`talk_about_event`): a menu of going up and how it is played |
+| Growlie 1012114 | 910010000 | How it is played, or out to 910010300 |
+| Tommy 1012113 | 910010300 | Home to 100000200 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
-`kpq.cloto.*` and `kpq.nella.*`.
+`kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*` and
+`hpq.tommy.*`.
 
 ## Not yet
 
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
+- HPQ's play: seeds on the moonflowers, the full moon and the Moon Bunny,
+  mobs hurting the bunny (`damagedByMob`, recv 0xC0), its rice cakes,
+  Growlie's hand-in, Tory's reward, and Tommy's Pig Town bonus
+  (a058, slices 2-4).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
