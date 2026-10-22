@@ -168,7 +168,10 @@ Nicole (9201005) and Bonnie (9201008) book weddings, in Amoria only. In
 their lobbies they lead guests in instead, which is not done yet. Their
 script ends with `Effect::BookWedding`, and the client actor does the
 partner round trip after it. Its refusals and its outcome open a one-page
-script of their own (`NpcScript::wedding_assistant_says`).
+script of their own (`NpcScript::wedding_assistant_says`). Their
+`WeddingView` also carries the wedding the player is a guest of, for the
+guest's choice, and a Wedding Invitation Ticket adds a choice ending with
+`Effect::ExtraInvitations`, handled the same way.
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

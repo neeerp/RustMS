@@ -5,6 +5,7 @@
 use crate::{codec::stats::write_padded_name, error::NetworkError, packet::op::SendOpcode};
 use game::marriage::{MarriageRecord, Refusal};
 use game::ring::{CoupleRing, RingKind, RingLooks};
+use game::wedding::Venue;
 use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
@@ -13,6 +14,8 @@ const ENGAGED: u8 = 11;
 const BROKEN: u8 = 13;
 /// The marriage is over; the client drops the record.
 const DIVORCED: u8 = 14;
+/// A wedding invitation opened.
+const INVITATION: u8 = 15;
 /// A line of the server's own.
 const NOTICE: u8 = 36;
 
@@ -118,11 +121,23 @@ pub enum WeddingNotice {
     Reserved = 16,
     /// 0x109b: no breaking off once a wedding is booked.
     NoBreakingOff = 32,
+    /// 0x109d: the invitation opened is not valid.
+    InvalidInvitation = 34,
 }
 
 /// MARRIAGE_RESULT with the client's line for `notice`.
 pub fn build_wedding_notice(notice: WeddingNotice) -> Result<Packet, NetworkError> {
     result(notice as u8)
+}
+
+/// MARRIAGE_RESULT 15: the invitation window for the wedding of `groom`
+/// and `bride` at `venue`.
+pub fn build_invitation(groom: &str, bride: &str, venue: Venue) -> Result<Packet, NetworkError> {
+    let mut packet = result(INVITATION)?;
+    packet.write_str_with_length(groom)?;
+    packet.write_str_with_length(bride)?;
+    packet.write_short(venue.window() as i16)?;
+    Ok(packet)
 }
 
 /// MARRIAGE_RESULT 11: "You are now engaged.", with the couple's record.
@@ -180,6 +195,19 @@ mod tests {
         assert_eq!(packet.bytes, [0x49, 0x00, 16]);
         let packet = build_wedding_notice(WeddingNotice::NoBreakingOff).unwrap();
         assert_eq!(packet.bytes, [0x49, 0x00, 32]);
+        let packet = build_wedding_notice(WeddingNotice::InvalidInvitation).unwrap();
+        assert_eq!(packet.bytes, [0x49, 0x00, 34]);
+    }
+
+    #[test]
+    fn an_invitation_names_the_couple_and_its_window() {
+        let packet = build_invitation("Al", "Bo", Venue::Cathedral).unwrap();
+        assert_eq!(
+            packet.bytes,
+            [0x49, 0x00, 15, 2, 0, b'A', b'l', 2, 0, b'B', b'o', 2, 0]
+        );
+        let packet = build_invitation("Al", "Bo", Venue::Chapel).unwrap();
+        assert_eq!(packet.bytes[packet.bytes.len() - 2..], [1, 0]);
     }
 
     #[test]

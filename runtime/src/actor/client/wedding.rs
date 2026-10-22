@@ -1,20 +1,27 @@
 //! Wedding reservations (report b066): Nicole and Bonnie book an engaged
 //! couple's wedding for a ticket while both stand beside them. The partner
 //! checks their own side through the directory; the booker then takes the
-//! ticket and books, and each partner takes their own invitations.
+//! ticket and books, and each partner takes their own invitations. A
+//! partner then sends an invitation to a guest by name: the guest takes it
+//! if online with room, or finds it at Duey with a note.
 
 use super::ClientActor;
 use crate::message::{DirectoryMessage, WeddingNews};
 use crate::{db::spawn_db, error::RuntimeError};
-use db::wedding::Booking;
+use db::parcel::{NewParcel, Sent};
+use db::wedding::{Booking, Invite};
 use game::marriage::ENGAGED;
-use game::wedding::{self, PartnerRefusal, Reservation, Venue, INVITATIONS};
-use game::Player;
+use game::wedding::{
+    self, Invitation, PartnerRefusal, Reservation, Venue, EXTRA_INVITATIONS, INVITATIONS,
+    INVITATION_TICKET,
+};
+use game::{InventoryType, Player};
 use game_data::server_content::keys;
 use net::npc_scripts::{self, NpcScript, WeddingView};
 use net::packet::build::world::inventory;
-use net::packet::build::world::marriage::{build_wedding_notice, WeddingNotice};
+use net::packet::build::world::marriage::{build_invitation, build_wedding_notice, WeddingNotice};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::stat::build_stat_update;
 use net::ClientId;
 use packet::Packet;
 use std::sync::OnceLock;
@@ -39,25 +46,43 @@ fn engagement(player: &Player) -> Option<(i32, ClientId)> {
     (record.status == ENGAGED).then(|| (record.id, record.partner_of(player.stats.id)))
 }
 
-/// Put the couple's invitations for `reservation` in `next`, expiring as
-/// the wedding starts, with the packets that show them.
+/// Put `quantity` of the couple's invitations for `reservation` in
+/// `next`, expiring as the wedding starts, with the packets that show
+/// them.
 fn give_invitations(
     next: &mut Player,
     reservation: &Reservation,
+    quantity: i16,
     packets: &mut Vec<Packet>,
 ) -> Result<bool, RuntimeError> {
     let item_id = reservation.venue.invitation();
     let until = Some(reservation.starts_at);
-    let Ok(changes) = net::items::give_until(&mut next.inventory, item_id, INVITATIONS, until)
-    else {
+    let Ok(changes) = net::items::give_until(&mut next.inventory, item_id, quantity, until) else {
         return Ok(false);
     };
     packets.push(inventory::build_inventory_operation(false, &changes)?);
     packets.push(inventory::build_item_gain_in_chat(
         item_id,
-        i32::from(INVITATIONS),
+        i32::from(quantity),
     )?);
     Ok(true)
+}
+
+/// `key`'s text for the guest of `invitation`: the couple's names, with
+/// the wedding's minutes left and channel.
+fn invitation_text(key: &str, invitation: &Invitation) -> String {
+    let reservation = &invitation.reservation;
+    let minutes = reservation.minutes_left(SystemTime::now()).to_string();
+    let channel = (u16::from(reservation.channel) + 1).to_string();
+    net::content::text().get(
+        key,
+        &[
+            ("groom", invitation.groom.as_str()),
+            ("bride", invitation.bride.as_str()),
+            ("minutes", minutes.as_str()),
+            ("channel", channel.as_str()),
+        ],
+    )
 }
 
 /// The packets both partners get for a booking: the client's notice and a
@@ -77,18 +102,25 @@ impl ClientActor {
         &mut self,
         npc_id: i32,
     ) -> Result<bool, RuntimeError> {
-        if npc_scripts::wedding_venue(npc_id).is_none() {
+        let Some(venue) = npc_scripts::wedding_venue(npc_id) else {
             return Ok(false);
-        }
-        let now = SystemTime::now();
-        let reservation = match engagement(&self.in_game()?.player) {
-            Some((marriage_id, _)) => {
-                spawn_db(move || db::wedding::current(marriage_id, now)).await?
-            }
-            None => None,
         };
+        let now = SystemTime::now();
+        let player = &self.in_game()?.player;
+        let couple = engagement(player).map(|(marriage_id, _)| marriage_id);
+        let cid = player.stats.id;
+        let (reservation, guest_of) = spawn_db(move || {
+            let reservation = match couple {
+                Some(marriage_id) => db::wedding::current(marriage_id, now)?,
+                None => None,
+            };
+            let guest_of = db::wedding::guest_of(cid, venue, now)?;
+            Ok::<_, db::Error>((reservation, guest_of.map(|(wedding, _)| wedding)))
+        })
+        .await?;
         let view = WeddingView {
             reservation: reservation.as_ref(),
+            guest_of: guest_of.as_ref(),
             now,
         };
         let player = &self.in_game()?.player;
@@ -144,6 +176,8 @@ impl ClientActor {
                 refusal: None,
             } => self.book_wedding(venue, premium).await,
             WeddingNews::Booked(reservation) => self.wedding_booked(reservation).await,
+            WeddingNews::Invited(invitation) => self.invited(invitation).await,
+            WeddingNews::Returned(invitation) => self.invitation_returned(invitation).await,
         }
     }
 
@@ -226,7 +260,7 @@ impl ClientActor {
             Ok(changes) => {
                 packets.push(inventory::build_inventory_operation(false, &changes)?);
                 packets.push(inventory::build_item_gain_in_chat(ticket, -1)?);
-                give_invitations(&mut next, &reservation, &mut packets)?
+                give_invitations(&mut next, &reservation, INVITATIONS, &mut packets)?
             }
             Err(_) => false,
         };
@@ -260,7 +294,7 @@ impl ClientActor {
         }
         let mut next = player.clone();
         let mut packets = Vec::new();
-        if !give_invitations(&mut next, &reservation, &mut packets)? {
+        if !give_invitations(&mut next, &reservation, INVITATIONS, &mut packets)? {
             warn!(self.client_id, "No room for the wedding invitations");
             packets.clear();
         } else if !self.commit_player(next, None, &mut packets).await? {
@@ -272,4 +306,259 @@ impl ClientActor {
         }
         self.save_if_dirty().await
     }
+
+    /// The player sends the invitation in Etc `slot` to the character
+    /// named `guest`, for the wedding of their couple `marriage_id`. The
+    /// invitation goes only once the guest is on the list.
+    pub(super) async fn invite(
+        &mut self,
+        guest: String,
+        marriage_id: i32,
+        slot: i16,
+    ) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let player = &self.in_game()?.player;
+        let record = player
+            .marriage
+            .clone()
+            .filter(|record| record.id == marriage_id && record.status == ENGAGED);
+        let venue = player
+            .inventory
+            .get(InventoryType::Etc, slot)
+            .and_then(|item| Venue::of_invitation(item.item_id));
+        let (Some(record), Some(venue)) = (record, venue) else {
+            warn!(
+                cid,
+                marriage_id, slot, "Wedding invitation without its couple or item"
+            );
+            return Ok(());
+        };
+        let name = guest.clone();
+        let Some((guest_id, guest)) = spawn_db(move || db::note::character(&name)).await? else {
+            return self
+                .pink(keys::WEDDING_INVITE_NOT_FOUND, &[("name", &guest)])
+                .await;
+        };
+        if guest_id == record.groom_id || guest_id == record.bride_id {
+            return self.pink(keys::WEDDING_INVITE_COUPLE, &[]).await;
+        }
+        let now = SystemTime::now();
+        let invited =
+            spawn_db(move || db::wedding::invite(marriage_id, venue, guest_id, now)).await;
+        let reservation = match invited {
+            Ok(Invite::Added(reservation)) => reservation,
+            Ok(Invite::AlreadyInvited) => {
+                return self
+                    .pink(keys::WEDDING_INVITE_ALREADY, &[("name", &guest)])
+                    .await;
+            }
+            Ok(Invite::Full) => return self.pink(keys::WEDDING_INVITE_FULL, &[]).await,
+            Ok(Invite::NotBooked) => return self.pink(keys::WEDDING_INVITE_NOT_BOOKED, &[]).await,
+            Ok(Invite::Started) => return self.pink(keys::WEDDING_INVITE_STARTED, &[]).await,
+            Err(error) => {
+                warn!(cid, %error, "Wedding guest not added");
+                return self.pink(keys::WEDDING_INVITE_ERROR, &[]).await;
+            }
+        };
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        match next.inventory.take(InventoryType::Etc, slot, 1) {
+            Ok(changes) => {
+                packets.push(inventory::build_inventory_operation(true, &changes)?);
+                if !self.commit_player(next, None, &mut packets).await? {
+                    packets.clear();
+                }
+            }
+            Err(error) => warn!(cid, slot, %error, "The invitation sent went meanwhile"),
+        }
+        let text = net::content::text().get(keys::WEDDING_INVITE_SENT, &[("name", &guest)]);
+        packets.push(build_broadcast(Broadcast::Pink, &text)?);
+        self.send_all(&mut packets).await?;
+        let from = self.in_game()?.player.stats.name.clone();
+        self.send_to_directory(DirectoryMessage::DeliverInvitation {
+            invitation: Invitation {
+                guest: guest_id,
+                guest_name: guest,
+                reservation,
+                groom: record.groom_name,
+                bride: record.bride_name,
+                sender: cid,
+                from,
+            },
+        })
+        .await?;
+        self.save_if_dirty().await
+    }
+
+    /// The player is invited to a wedding: take the invitation, which
+    /// expires a slot after the wedding starts, or find it at Duey without
+    /// room for it. In the Cash Shop, the player sees it on leaving.
+    async fn invited(&mut self, invitation: Invitation) -> Result<(), RuntimeError> {
+        let reservation = &invitation.reservation;
+        let item_id = reservation.venue.received_invitation();
+        let until = Some(reservation.invitation_expiry());
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        let taken = match net::items::give_until(&mut next.inventory, item_id, 1, until) {
+            Ok(changes) => {
+                packets.push(inventory::build_inventory_operation(false, &changes)?);
+                packets.push(inventory::build_item_gain_in_chat(item_id, 1)?);
+                self.commit_player(next, None, &mut packets).await?
+            }
+            Err(_) => false,
+        };
+        let key = if taken {
+            keys::WEDDING_INVITED
+        } else if leave_at_duey(&invitation).await {
+            packets.clear();
+            keys::WEDDING_INVITED_NOTE
+        } else {
+            return self
+                .send_to_directory(DirectoryMessage::ReturnInvitation { invitation })
+                .await;
+        };
+        let text = invitation_text(key, &invitation);
+        packets.push(build_broadcast(Broadcast::Pink, &text)?);
+        if !self.in_cash_shop {
+            self.send_all(&mut packets).await?;
+        }
+        self.save_if_dirty().await
+    }
+
+    /// The invitation the player sent reached nobody: take it back while
+    /// the wedding has not started, and say so.
+    async fn invitation_returned(&mut self, invitation: Invitation) -> Result<(), RuntimeError> {
+        let reservation = &invitation.reservation;
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        if reservation.inviting(SystemTime::now())
+            && give_invitations(&mut next, reservation, 1, &mut packets)?
+            && !self.commit_player(next, None, &mut packets).await?
+        {
+            packets.clear();
+        }
+        let text = net::content::text().get(
+            keys::WEDDING_INVITE_RETURNED,
+            &[("name", &invitation.guest_name)],
+        );
+        packets.push(build_broadcast(Broadcast::Pink, &text)?);
+        if !self.in_cash_shop {
+            self.send_all(&mut packets).await?;
+        }
+        self.save_if_dirty().await
+    }
+
+    /// The player opens the guest's invitation `item_id` in Etc `slot`: the
+    /// invitation window for the soonest wedding at its venue they are
+    /// invited to, or the client's "not valid" without one.
+    pub(super) async fn open_invitation(
+        &mut self,
+        slot: i16,
+        item_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let player = &self.in_game()?.player;
+        let held = player
+            .inventory
+            .get(InventoryType::Etc, slot)
+            .is_some_and(|item| item.item_id == item_id);
+        let venue = Venue::of_received_invitation(item_id).filter(|_| held);
+        let Some(venue) = venue else {
+            return self.send(&mut build_stat_update(true, &[])?).await;
+        };
+        let (cid, now) = (player.stats.id, SystemTime::now());
+        let mut packet = match spawn_db(move || db::wedding::guest_of(cid, venue, now)).await? {
+            Some((_, record)) => build_invitation(&record.groom_name, &record.bride_name, venue)?,
+            None => build_wedding_notice(WeddingNotice::InvalidInvitation)?,
+        };
+        self.send(&mut packet).await
+    }
+
+    /// The player trades a Wedding Invitation Ticket at the assistant of
+    /// `venue` for more invitations to their wedding there.
+    pub(super) async fn extra_invitations(&mut self, venue: Venue) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let error = || net::content::text().get(keys::WEDDING_ERROR, &[]);
+        let Some((marriage_id, _)) = engagement(player) else {
+            return self.assistant_says(venue, error()).await;
+        };
+        let now = SystemTime::now();
+        let reservation = spawn_db(move || db::wedding::current(marriage_id, now))
+            .await?
+            .filter(|reservation| reservation.venue == venue && reservation.inviting(now));
+        let Some(reservation) = reservation else {
+            let text = net::content::text().get(keys::WEDDING_EXTRA_NOT_BOOKED, &[]);
+            return self.assistant_says(venue, text).await;
+        };
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        let given = match next.inventory.remove(INVITATION_TICKET, 1) {
+            Ok(changes) => {
+                packets.push(inventory::build_inventory_operation(false, &changes)?);
+                packets.push(inventory::build_item_gain_in_chat(INVITATION_TICKET, -1)?);
+                give_invitations(&mut next, &reservation, EXTRA_INVITATIONS, &mut packets)?
+            }
+            Err(_) => false,
+        };
+        if !given || !self.commit_player(next, None, &mut packets).await? {
+            return self.assistant_says(venue, error()).await;
+        }
+        self.send_all(&mut packets).await?;
+        self.save_if_dirty().await?;
+        let quantity = EXTRA_INVITATIONS.to_string();
+        let text = net::content::text().get(keys::WEDDING_EXTRA_DONE, &[("quantity", &quantity)]);
+        self.assistant_says(venue, text).await
+    }
+}
+
+/// Leave `invitation` at Duey for its guest, with a note saying so. Failing
+/// that (their Duey inbox full), the guest goes off the list again, so
+/// that the couple may send another; false then.
+pub(crate) async fn leave_at_duey(invitation: &Invitation) -> bool {
+    let reservation = &invitation.reservation;
+    let item_id = reservation.venue.received_invitation();
+    let (guest, marriage_id) = (invitation.guest, reservation.marriage_id);
+    let left = match net::items::create(item_id, 1) {
+        Some(mut item) => {
+            item.expiration = Some(reservation.invitation_expiry());
+            let note = invitation_text(keys::WEDDING_INVITED_NOTE, invitation);
+            let from = invitation.from.clone();
+            spawn_db(move || {
+                let parcel = NewParcel {
+                    receiver_id: guest,
+                    sender: &from,
+                    mesos: 0,
+                    message: None,
+                    quick: false,
+                    sent_at: SystemTime::now(),
+                    item: Some(&item),
+                };
+                let sent = db::parcel::leave(&parcel, net::duey::INBOX_LIMIT as i64)?;
+                if !matches!(sent, Sent::Sent(_)) {
+                    return Ok(false);
+                }
+                // The note only points to the parcel.
+                if !db::note::send(guest, &from, &note, super::notes::INBOX_LIMIT)? {
+                    warn!(guest, "No room for the invitation's note");
+                }
+                Ok::<_, db::Error>(true)
+            })
+            .await
+        }
+        None => Ok(false),
+    };
+    match left {
+        Ok(true) => return true,
+        Ok(false) => warn!(guest, item_id, "No room at Duey for an invitation"),
+        Err(error) => warn!(guest, %error, "Invitation not left at Duey"),
+    }
+    if let Err(error) = spawn_db(move || db::wedding::uninvite(marriage_id, guest)).await {
+        warn!(guest, marriage_id, %error, "A guest without an invitation stays invited");
+    }
+    false
 }

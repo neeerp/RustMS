@@ -49,10 +49,39 @@ impl Venue {
             Self::Cathedral => 4031407,
         }
     }
+
+    /// The venue of the couple's invitation `item_id`.
+    pub fn of_invitation(item_id: i32) -> Option<Self> {
+        [Self::Chapel, Self::Cathedral]
+            .into_iter()
+            .find(|venue| venue.invitation() == item_id)
+    }
+
+    /// The venue of the guest's invitation `item_id`.
+    pub fn of_received_invitation(item_id: i32) -> Option<Self> {
+        [Self::Chapel, Self::Cathedral]
+            .into_iter()
+            .find(|venue| venue.received_invitation() == item_id)
+    }
+
+    /// What the client's invitation window draws for it: 2 the
+    /// Cathedral's, anything else the Chapel's.
+    pub fn window(self) -> u16 {
+        match self {
+            Self::Chapel => 1,
+            Self::Cathedral => 2,
+        }
+    }
 }
 
 /// Invitations each partner gets with a booking.
 pub const INVITATIONS: i16 = 15;
+/// Invitations a Wedding Invitation Ticket makes.
+pub const EXTRA_INVITATIONS: i16 = 3;
+/// The Cash Shop's Wedding Invitation Ticket.
+pub const INVITATION_TICKET: i32 = 5251100;
+/// The most guests a wedding may have.
+pub const MAX_GUESTS: i64 = 60;
 /// The length of a wedding's slot; weddings start on the hour.
 pub const SLOT: Duration = Duration::from_secs(60 * 60);
 /// The soonest a booking may start, unless configured otherwise.
@@ -83,11 +112,34 @@ impl Reservation {
         now >= self.starts_at + NO_SHOW
     }
 
+    /// Whether guests may still be invited at `now`.
+    pub fn inviting(&self, now: SystemTime) -> bool {
+        now < self.starts_at
+    }
+
+    /// When a guest's invitation to it expires: a slot after the start.
+    pub fn invitation_expiry(&self) -> SystemTime {
+        self.starts_at + SLOT
+    }
+
     /// Whole minutes until it starts, rounded up; 0 once it has.
     pub fn minutes_left(&self, now: SystemTime) -> u64 {
         let left = self.starts_at.duration_since(now).unwrap_or_default();
         left.as_secs().div_ceil(60)
     }
+}
+
+/// A guest's invitation to a couple's wedding, on its way to them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Invitation {
+    pub guest: i32,
+    pub guest_name: String,
+    pub reservation: Reservation,
+    pub groom: String,
+    pub bride: String,
+    /// The partner who sent it.
+    pub sender: i32,
+    pub from: String,
 }
 
 /// Why the partner's side can't take part in a booking.
@@ -175,7 +227,13 @@ mod tests {
         assert_eq!(Venue::Cathedral.received_invitation(), 4031407);
         for venue in [Venue::Chapel, Venue::Cathedral] {
             assert_eq!(Venue::from_i16(venue as i16), Some(venue));
+            assert_eq!(Venue::of_invitation(venue.invitation()), Some(venue));
+            let received = venue.received_invitation();
+            assert_eq!(Venue::of_received_invitation(received), Some(venue));
         }
+        assert_eq!(Venue::of_invitation(4031406), None);
+        assert_eq!(Venue::of_received_invitation(4031377), None);
+        assert_eq!(Venue::Cathedral.window(), 2);
     }
 
     #[test]
@@ -193,6 +251,9 @@ mod tests {
             120
         );
         assert_eq!(reservation.minutes_left(at(725)), 0);
+        assert!(reservation.inviting(at(719)));
+        assert!(!reservation.inviting(at(720)));
+        assert_eq!(reservation.invitation_expiry(), at(780));
         assert!(!reservation.over(at(729)));
         assert!(reservation.over(at(730)));
     }

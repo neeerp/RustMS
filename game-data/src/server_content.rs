@@ -849,6 +849,84 @@ pub mod keys {
     /// The line both partners get when the wedding is booked, as in `wedding.reserve.done`.
     pub const WEDDING_DONE_CHAT: &str = "wedding.reserve.done_chat";
 
+    /// The assistant's menu choice for a guest asking to go in.
+    pub const WEDDING_CHOICE_GUEST: &str = "wedding.assist.choice_guest";
+
+    /// The assistant's menu choice, with a Wedding Invitation Ticket in the Cash tab, for more invitations.
+    pub const WEDDING_CHOICE_EXTRA: &str = "wedding.assist.choice_extra";
+
+    /// The assistant, to a guest without an invitation to a wedding here.
+    pub const WEDDING_GUEST_NOT_INVITED: &str = "wedding.guest.not_invited";
+
+    /// The assistant, to a guest early: `{ticket}`, `{minutes}` and `{channel}` as in `wedding.reserve.booked`.
+    pub const WEDDING_GUEST_EARLY: &str = "wedding.guest.early";
+
+    /// The assistant, to a guest once the wedding is due.
+    pub const WEDDING_GUEST_WAIT: &str = "wedding.guest.wait";
+
+    /// The assistant, asked for more invitations by a couple without a wedding booked here.
+    pub const WEDDING_EXTRA_NOT_BOOKED: &str = "wedding.extra.not_booked";
+
+    /// The assistant, asked for more invitations once the wedding is due.
+    pub const WEDDING_EXTRA_STARTED: &str = "wedding.extra.started";
+
+    /// The assistant, having made more invitations: `{quantity}` of them.
+    pub const WEDDING_EXTRA_DONE: &str = "wedding.extra.done";
+
+    /// The line to a partner inviting someone who doesn't exist: `{name}`.
+    pub const WEDDING_INVITE_NOT_FOUND: &str = "wedding.invite.not_found";
+
+    /// The line to a partner inviting their own couple.
+    pub const WEDDING_INVITE_COUPLE: &str = "wedding.invite.couple";
+
+    /// The line to a partner inviting a guest twice: `{name}`.
+    pub const WEDDING_INVITE_ALREADY: &str = "wedding.invite.already";
+
+    /// The line to a partner whose wedding has its most guests.
+    pub const WEDDING_INVITE_FULL: &str = "wedding.invite.full";
+
+    /// The line to a partner sending an invitation for a wedding not booked at its venue.
+    pub const WEDDING_INVITE_NOT_BOOKED: &str = "wedding.invite.not_booked";
+
+    /// The line to a partner sending an invitation once the wedding is due.
+    pub const WEDDING_INVITE_STARTED: &str = "wedding.invite.started";
+
+    /// The line to a partner whose invitation failed.
+    pub const WEDDING_INVITE_ERROR: &str = "wedding.invite.error";
+
+    /// The line to a partner whose invitation went out: `{name}`.
+    pub const WEDDING_INVITE_SENT: &str = "wedding.invite.sent";
+    pub const WEDDING_INVITE_RETURNED: &str = "wedding.invite.returned";
+
+    /// The line to a guest online who got an invitation: `{groom}`, `{bride}`, `{minutes}` and `{channel}`.
+    pub const WEDDING_INVITED: &str = "wedding.guest.invited";
+
+    /// The note and parcel message to a guest who got an invitation by Duey: `{groom}`, `{bride}` and `{channel}`.
+    pub const WEDDING_INVITED_NOTE: &str = "wedding.guest.note";
+
+    /// Wedding invitations: sending, opening, and more of them.
+    pub const INVITATIONS: [&str; 19] = [
+        WEDDING_CHOICE_GUEST,
+        WEDDING_CHOICE_EXTRA,
+        WEDDING_GUEST_NOT_INVITED,
+        WEDDING_GUEST_EARLY,
+        WEDDING_GUEST_WAIT,
+        WEDDING_EXTRA_NOT_BOOKED,
+        WEDDING_EXTRA_STARTED,
+        WEDDING_EXTRA_DONE,
+        WEDDING_INVITE_NOT_FOUND,
+        WEDDING_INVITE_COUPLE,
+        WEDDING_INVITE_ALREADY,
+        WEDDING_INVITE_FULL,
+        WEDDING_INVITE_NOT_BOOKED,
+        WEDDING_INVITE_STARTED,
+        WEDDING_INVITE_ERROR,
+        WEDDING_INVITE_SENT,
+        WEDDING_INVITE_RETURNED,
+        WEDDING_INVITED,
+        WEDDING_INVITED_NOTE,
+    ];
+
     /// Nicole and Bonnie (wedding reservations).
     pub const RESERVATIONS: [&str; 16] = [
         WEDDING_MENU,
@@ -1529,6 +1607,7 @@ mod tests {
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
             .chain(&keys::ENGAGEMENT)
             .chain(&keys::RESERVATIONS)
+            .chain(&keys::INVITATIONS)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

@@ -325,6 +325,15 @@ pub enum RingRequest {
     Answer { proposer: ClientId, accept: bool },
     /// Break off by dropping the token `item_id`.
     Break { item_id: i32 },
+    /// Invite the character named `guest` to the couple `marriage_id`'s
+    /// wedding with the invitation in Etc `slot`.
+    Invite {
+        guest: String,
+        marriage_id: i32,
+        slot: i16,
+    },
+    /// Open the guest's invitation `item_id` in Etc `slot`.
+    OpenInvitation { slot: i16, item_id: i32 },
 }
 
 /// A guild operation, carried out by the client's actor.

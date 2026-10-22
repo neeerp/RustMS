@@ -13,7 +13,7 @@ use tokio::sync::oneshot;
 /// The most notes waiting for one character before more are refused
 /// ("The receiver's inbox is full."). v83 doesn't say how many; this is a
 /// choice.
-const INBOX_LIMIT: i64 = 20;
+pub(super) const INBOX_LIMIT: i64 = 20;
 
 impl ClientActor {
     /// On entering the game: the notes waiting, if any, which the client
