@@ -53,6 +53,8 @@ pub struct Event {
     /// The passes the leader hands Cloto to clear the last stage, which
     /// wins the event.
     pub passes: i32,
+    /// The stages cleared by the leader handing their NPC some items.
+    pub hand_ins: &'static [HandIn],
     /// Whether the stage maps have a `gate` object, shown once their stage
     /// is cleared (a map without one shows nothing).
     pub gates: bool,
@@ -60,6 +62,29 @@ pub struct Event {
     pub clear_map: Option<i32>,
     /// The bonus the leader may take the team to once it is won.
     pub bonus: Option<Bonus>,
+}
+
+/// A stage that `npc` clears once the leader hands it `count` of `item`
+/// (Ludibrium's balloons, Cosmic `2040036`-`2040044`).
+#[derive(Debug, PartialEq, Eq)]
+pub struct HandIn {
+    pub stage: u8,
+    pub npc: i32,
+    pub item: i32,
+    pub count: i16,
+}
+
+/// Where a member stands with a stage's `HandIn` NPC.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Balloon {
+    /// The stage is cleared; the way on is open.
+    Cleared,
+    /// Anyone but the leader, who is sent to fetch them.
+    NotLeader,
+    /// The leader's first talk: what the stage asks, and no hand-in yet.
+    Intro,
+    /// The leader again, who may hand the items in.
+    Ready,
 }
 
 /// A won event's bonus: the team plays `map` for `minutes`, then whoever is
@@ -98,6 +123,7 @@ pub const KPQ: Event = Event {
     puzzles: 2..=4,
     items: &[COUPON, PASS],
     passes: 10,
+    hand_ins: &[],
     gates: true,
     clear_map: None,
     bonus: None,
@@ -126,6 +152,7 @@ pub const HPQ: Event = Event {
         4001095, 4001096, 4001097, 4001098, 4001099, 4001100, RICE_CAKE,
     ],
     passes: 10,
+    hand_ins: &[],
     gates: false,
     clear_map: Some(910_010_100),
     bonus: Some(Bonus {
@@ -164,12 +191,40 @@ pub const LPQ: Event = Event {
         922_010_800,
     ],
     puzzles: 1..=0,
-    items: &[4001022, 4001023, 4001156],
+    items: &[LPQ_PASS, LPQ_KEY, LPQ_BOX_PASS],
     passes: 0,
+    hand_ins: &[
+        lpq_hand_in(1, 2040036, LPQ_PASS, 25),
+        lpq_hand_in(2, 2040037, LPQ_PASS, 15),
+        lpq_hand_in(3, 2040038, LPQ_PASS, 32),
+        lpq_hand_in(4, 2040039, LPQ_PASS, 6),
+        lpq_hand_in(5, 2040040, LPQ_PASS, 24),
+        lpq_hand_in(7, 2040042, LPQ_PASS, 3),
+        lpq_hand_in(9, 2040044, LPQ_KEY, 1),
+    ],
     gates: true,
     clear_map: None,
     bonus: None,
 };
+
+/// Ludibrium's Pass of Dimension, which most of its stages' monsters and
+/// boxes drop; the key the last stage takes; and the other pass, which
+/// stage 7's monsters drop and its reactors take.
+pub const LPQ_PASS: i32 = 4001022;
+pub const LPQ_KEY: i32 = 4001023;
+pub const LPQ_BOX_PASS: i32 = 4001156;
+
+/// One of Ludibrium's stages, handed in to its balloon (Cosmic's counts,
+/// `2040036`-`2040044`). Stage 6's maze and stage 8's crates are cleared
+/// otherwise.
+const fn lpq_hand_in(stage: u8, npc: i32, item: i32, count: i16) -> HandIn {
+    HandIn {
+        stage,
+        npc,
+        item,
+        count,
+    }
+}
 
 /// What the Moon Bunny makes on Primrose Hill, and Growlie wants.
 pub const RICE_CAKE: i32 = 4001101;
@@ -237,6 +292,17 @@ impl Event {
         (1..=self.exp_per_stage.len())
             .contains(&usize::from(stage))
             .then_some(stage)
+    }
+
+    /// The hand-in that clears `stage`, if it is cleared that way.
+    pub fn hand_in(&self, stage: u8) -> Option<&HandIn> {
+        self.hand_ins.iter().find(|hand_in| hand_in.stage == stage)
+    }
+
+    /// The hand-in `npc` takes on `map_id`, if any.
+    pub fn hand_in_on(&self, map_id: i32, npc: i32) -> Option<&HandIn> {
+        self.hand_in(self.stage_on(map_id)?)
+            .filter(|hand_in| hand_in.npc == npc)
     }
 
     /// The stage that must be cleared before `portal` on `map_id` lets
@@ -651,6 +717,20 @@ mod tests {
         assert_eq!(LPQ.gate_stage(922_010_201, "next00"), None);
         assert!(LPQ.holds(922_011_100) && !LPQ.holds(LPQ.exit));
         assert_eq!(EventKind::Lpq.event(), &LPQ);
+    }
+
+    #[test]
+    fn lpq_balloons_take_their_stages_passes() {
+        let first = LPQ.hand_in_on(922_010_100, 2040036).unwrap();
+        assert_eq!((first.stage, first.item, first.count), (1, LPQ_PASS, 25));
+        assert_eq!(LPQ.hand_in_on(922_010_100, 2040037), None);
+        assert_eq!(LPQ.hand_in_on(922_010_201, 2040037), None);
+        assert_eq!(LPQ.hand_in(6), None);
+        assert_eq!(LPQ.hand_in(8), None);
+        let boss = LPQ.hand_in_on(922_010_900, 2040044).unwrap();
+        assert_eq!((boss.stage, boss.item, boss.count), (9, LPQ_KEY, 1));
+        assert_eq!(boss.stage, LPQ.last_stage());
+        assert_eq!(KPQ.hand_in(1), None);
     }
 
     #[test]

@@ -21,10 +21,10 @@ use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use net::events::{
-    draw_combo, draw_question, Cloto, EventCommand, EventKind, Puzzles, Stage1, Team,
+    draw_combo, draw_question, Balloon, Cloto, EventCommand, EventKind, Puzzles, Stage1, Team,
 };
 use net::ClientId;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -47,6 +47,12 @@ pub enum EventMessage {
         client_id: ClientId,
         stage: u8,
         reply: oneshot::Sender<Option<Cloto>>,
+    },
+    /// `client_id` talks to the NPC `stage` is handed in to.
+    Balloon {
+        client_id: ClientId,
+        stage: u8,
+        reply: oneshot::Sender<Option<Balloon>>,
     },
     /// `client_id`'s script did something the event keeps track of.
     Command {
@@ -140,6 +146,22 @@ impl EventTicket {
         view.await.ok().flatten()
     }
 
+    /// Where the member stands with the NPC `stage` is handed in to, or
+    /// `None` if the event is over.
+    pub async fn balloon(&self, stage: u8) -> Option<Balloon> {
+        let (reply, view) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Balloon {
+                client_id: self.member,
+                stage,
+                reply,
+            })
+            .await
+            .ok()?;
+        view.await.ok().flatten()
+    }
+
     /// Tell the event what the member's script did.
     pub async fn command(&self, command: EventCommand) {
         let _ = self
@@ -193,6 +215,7 @@ pub fn spawn(
             .collect(),
         stage1: Stage1::default(),
         puzzles: Puzzles::default(),
+        heard: HashSet::new(),
         cleared: Arc::default(),
         directory: directory.clone(),
         failed: false,
@@ -242,6 +265,8 @@ struct EventActor {
     members: HashMap<ClientId, ClientHandle>,
     stage1: Stage1,
     puzzles: Puzzles,
+    /// The hand-in stages whose NPC the leader has heard out.
+    heard: HashSet<u8>,
     cleared: Arc<Cleared>,
     directory: mpsc::Sender<DirectoryMessage>,
     /// The party lost what it protected, which ends the event.
@@ -276,6 +301,9 @@ impl EventActor {
                     Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
                     Some(EventMessage::Cloto { client_id, stage, reply }) => {
                         let _ = reply.send(self.cloto(client_id, stage));
+                    }
+                    Some(EventMessage::Balloon { client_id, stage, reply }) => {
+                        let _ = reply.send(self.balloon(client_id, stage));
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
@@ -326,6 +354,23 @@ impl EventActor {
         )
     }
 
+    /// The leader first hears what the stage asks, and only then may hand
+    /// it in (Cosmic's `statusStg`); the others are sent to fetch them.
+    fn balloon(&mut self, client_id: ClientId, stage: u8) -> Option<Balloon> {
+        if !self.team.has(client_id) || self.kind.event().hand_in(stage).is_none() {
+            return None;
+        }
+        Some(if self.cleared.has(stage) {
+            Balloon::Cleared
+        } else if client_id != self.team.leader() {
+            Balloon::NotLeader
+        } else if self.heard.insert(stage) {
+            Balloon::Intro
+        } else {
+            Balloon::Ready
+        })
+    }
+
     fn command(&mut self, client_id: ClientId, command: EventCommand) {
         if !self.team.has(client_id) {
             return;
@@ -336,6 +381,16 @@ impl EventActor {
         let won = self.cleared.has(event.last_stage());
         match command {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
+            // Handed in, by a leader who has heard the stage out.
+            EventCommand::ClearStage(stage) if event.hand_in(stage).is_some() => {
+                if !leader || !self.heard.contains(&stage) {
+                    debug!(stage, client_id, "Clear not taken");
+                } else if stage == event.last_stage() {
+                    self.win();
+                } else {
+                    self.clear(stage);
+                }
+            }
             // Before stage 1's, for an event with only one.
             EventCommand::ClearStage(stage) if leader && stage == event.last_stage() => {
                 self.win();

@@ -9,8 +9,8 @@ passes), which wins it. The rewards and the bonus stage come next (see
 and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
 through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
-has its entry, exit and timer so far (`v83ref/reports/a066-ludibrium-pq.md`).
-Its stages come next.
+has its entry, exit, timer and balloons so far
+(`v83ref/reports/a066-ludibrium-pq.md`). The rest of its stages come next.
 
 ## Rules
 
@@ -333,8 +333,29 @@ default 5A in `v83ref/lanes/QUESTIONS.md`, LPQ). Five players are the
 fewest, so the first to leave ends the quest for a party of five.
 
 `922010100`-`500`, `700` and `800` keep `next00` shut until their stage is
-cleared (`Event::gated`); `600`'s maze has no clear. No stage can be
-cleared yet.
+cleared (`Event::gated`); `600`'s maze has no clear.
+
+## Ludibrium's balloons
+
+Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
+NPC the stage's items (`Event::hand_ins`, Cosmic `2040036`-`2040044`):
+25, 15, 32, 6, 24 and 3 passes 4001022, then Alishar's key 4001023. The
+event keeps which stages' balloons the leader has heard
+(`EventActor::balloon`, Cosmic's `statusStg`), and tells the runtime
+where a member stands (`EventTicket::balloon`, `Balloon`):
+
+- the stage is cleared: anyone is hurried on;
+- a member who isn't the leader is told to fetch the leader;
+- the leader's first talk only says what the stage asks, and clears
+  nothing, with or without the items;
+- after that, a leader holding the items hands them in and sends
+  `ClearStage(stage)`, which the event takes only from a leader who has
+  heard that stage out. The last stage's clear wins the quest.
+
+`talk_to_balloon` routes the click; the Aqua Balloon (2040041) on the maze
+says one line. Monsters drop passes by the content pack's rewards (stage
+1's Ratz do); the boxes, the stage 2 trap and the missing drops are the
+next slice.
 
 ## NPCs
 
@@ -351,19 +372,21 @@ cleared yet.
 | Tommy 1012113 | 910010200 | Out to 910010400 |
 | Tommy 1012113 | 910010300 | Home to 100000200 |
 | Red Sign 2040034 | 221024500 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
+| Balloons 2040036-2040044 | 922010100-900 | Runtime (`talk_to_balloon`): the stage's hand-in, the maze's line |
 | Sgt. Anderson 2040047 | 922010100-900 | Out to 922010000 |
 | Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
-`hpq.tommy.*`, `lpq.sign.*` and `lpq.anderson.*`.
+`hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*` and `lpq.anderson.*`.
 
 ## Not yet
 
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's stages, boss, bonus and reward (`a066`, slices S2 to S5).
+- LPQ's pass sources, stage 8's crates, the boss, bonus and reward
+  (`a066`, slices S2b to S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

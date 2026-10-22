@@ -49,6 +49,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::CLOTO && self.talk_to_cloto().await? {
             return Ok(());
         }
+        if self.talk_to_balloon(npc_id).await? {
+            return Ok(());
+        }
         let player = &self.in_game()?.player;
         if npc_id == net::npc_scripts::TORY && player.stats.map_id == net::events::HPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Hpq).await;
