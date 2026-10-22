@@ -863,6 +863,9 @@ pub mod keys {
     /// The line both partners get when the wedding is booked, as in `wedding.reserve.done`.
     pub const WEDDING_DONE_CHAT: &str = "wedding.reserve.done_chat";
 
+    /// Victoria, the Cathedral's coordinator: how a wedding is booked.
+    pub const WEDDING_VICTORIA: &str = "wedding.victoria.info";
+
     /// The assistant's menu choice for a guest asking to go in.
     pub const WEDDING_CHOICE_GUEST: &str = "wedding.assist.choice_guest";
 
@@ -942,7 +945,7 @@ pub mod keys {
     ];
 
     /// Nicole and Bonnie (wedding reservations).
-    pub const RESERVATIONS: [&str; 16] = [
+    pub const RESERVATIONS: [&str; 17] = [
         WEDDING_MENU,
         WEDDING_CHOICE_PREPARE,
         WEDDING_CHOICE_RESERVE,
@@ -959,6 +962,7 @@ pub mod keys {
         WEDDING_ERROR,
         WEDDING_DONE,
         WEDDING_DONE_CHAT,
+        WEDDING_VICTORIA,
     ];
 
     /// Every key: one per placeholder.

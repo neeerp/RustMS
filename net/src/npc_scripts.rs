@@ -50,6 +50,9 @@ pub const LENARIO: i32 = 2010009;
 /// (`NpcScript::wedding_assistant`).
 pub const NICOLE: i32 = 9201005;
 pub const BONNIE: i32 = 9201008;
+/// Victoria, the Cathedral's wedding coordinator in Amoria, who explains
+/// how a wedding is booked (report b066).
+const VICTORIA: i32 = 9201013;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -1076,6 +1079,10 @@ impl NpcScript {
                     on_yes: vec![Effect::WarpToPortal(ELLINIA, 0)],
                     on_no: None,
                 }],
+            )),
+            VICTORIA => Some(Self::new(
+                VICTORIA,
+                vec![Page::Say(text(keys::WEDDING_VICTORIA))],
             )),
             MYSTERIOUS_STATUE => Some(mysterious_statue(player)),
             CRUMBLING_STATUE => Some(Self::new(
@@ -5824,6 +5831,14 @@ mod tests {
             louis.respond(ScriptInput::Yes).unwrap().effects,
             [Effect::WarpToPortal(101000000, 0)]
         );
+    }
+
+    #[test]
+    fn victoria_explains_the_cathedral_wedding() {
+        let mut victoria = NpcScript::for_npc(VICTORIA, &with_quests(&[])).unwrap();
+        let page = victoria.begin();
+        assert_eq!(page_text(&page), text(keys::WEDDING_VICTORIA));
+        assert_eq!(victoria.respond(ScriptInput::Next), Some(Step::default()));
     }
 
     #[test]

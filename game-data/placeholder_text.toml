@@ -840,6 +840,7 @@
 "wedding.invite.error" = "[placeholder] The invitation couldn't be sent. Please try again later."
 "wedding.invite.sent" = "[placeholder] Your invitation is on its way to '{name}'."
 "wedding.invite.returned" = "[placeholder] Your invitation could not reach '{name}' and came back to you."
+"wedding.victoria.info" = "[placeholder] Planning a wedding at the Cathedral? Come to Nicole together, on the same channel, with an engagement ring and a Cathedral Wedding Ticket from the Cash Shop. She books the next free hour and gives you both invitations: double-click one in your Etc tab to invite a guest before the wedding starts."
 "wedding.guest.invited" = "[placeholder] {groom} and {bride} invited you to their wedding, in {minutes} minutes on channel {channel}. Check your Etc tab."
 "wedding.guest.note" = "[placeholder] {groom} and {bride} invited you to their wedding on channel {channel}. Your invitation waits at Duey."
 "opq.wonky.menu" = "[placeholder] The goddess Minerva lies sealed in the tower above, and its rooms are full of monsters. A party of {least} to {most}, all of levels {low} to {high}, may go up and free her. Have your party's leader talk to me."

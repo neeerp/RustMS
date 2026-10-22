@@ -150,7 +150,8 @@ explains the steps or books. The booker needs the venue's ticket
 in the Cash inventory, no wedding ring held or worn, and Etc room for the
 invitations. In Cosmic, the scripts are `9201005.js` and `9201008.js`. No
 ticket is on sale in v83's `Etc.nx` commodities, so for now they come from
-elsewhere (tests grant them).
+elsewhere (tests grant them). Victoria (9201013), beside Nicole, explains
+the booking in one page (`wedding.victoria.info`).
 
 The partner's side lives in the partner's actor, so a booking is a round
 trip through the directory:
@@ -419,6 +420,12 @@ For crush and friendship rings:
 - Taking the wedding rings when a married couple breaks up.
 - Selling the tickets, the wedding field, and the wishlist. Report b066
   lists the slices.
+- A hint, after booking, about the couple's wedding clothes. Report b066
+  (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
+  guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's
+  own are 1050113 and 1051114 (Wedding Tuxedo and Dress), 1050135 (Beau
+  Tuxedo) and 1051154-55 (Princess Isis, Queen Mary). The wedding field
+  (slice 7) decides which ones the priest asks for, and the hint follows it.
 - Sending `MARRIAGE_RESULT` 31 ("The reservation has been canceled...")
   when a no-show's booking goes. The client already has the text.
 
