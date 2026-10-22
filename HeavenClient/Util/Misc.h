@@ -90,7 +90,8 @@ namespace ms
 				std::string full_name;
 			};
 
-			// Returns all relative map info
+			// Returns all relative map info. A copy without names of its own
+			// goes by the map it copies.
 			MapInfo get_map_info_by_id(int32_t mapid);
 
 			// Returns the category of a map

@@ -75,6 +75,14 @@ namespace ms
 				std::string map_category = get_map_category(mapid);
 				nl::node map_info = nl::nx::string["Map.img"][map_category][mapid];
 
+				if (!map_info)
+				{
+					std::string link = get_map_node_name(mapid)["info"]["link"];
+
+					if (!link.empty())
+						return get_map_info_by_id(std::atoi(link.c_str()));
+				}
+
 				return {
 						map_info["mapDesc"],
 						map_info["mapName"],
