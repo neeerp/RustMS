@@ -64,6 +64,14 @@ impl ClientActor {
         }
         if let Some(ticket) = self.event.as_ref().filter(|t| t.holds(player.stats.map_id)) {
             let (leader, won) = (ticket.leader(), ticket.won());
+            if npc_id == net::npc_scripts::EAK && ticket.kind == net::events::EventKind::Opq {
+                let map_id = player.stats.map_id;
+                let script =
+                    net::npc_scripts::NpcScript::opq_eak(map_id, leader, ticket.cleared(1));
+                if let Some(script) = script {
+                    return self.start_script(script).await;
+                }
+            }
             let script = net::npc_scripts::NpcScript::in_event(npc_id, player, leader, won);
             if let Some(script) = script {
                 return self.start_script(script).await;

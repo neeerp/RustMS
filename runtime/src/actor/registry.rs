@@ -12,7 +12,7 @@ use tokio::sync::mpsc::error::TrySendError;
 use tracing::warn;
 
 const FIELD_QUEUE_CAPACITY: usize = 1024;
-const MAP_NPC_OBJECT_ID_BASE: i32 = 1_000_000_000;
+pub(crate) const MAP_NPC_OBJECT_ID_BASE: i32 = 1_000_000_000;
 
 /// Live field actors keyed by channel, map, and instance. Client actors look
 /// up their field here and then talk to it directly.

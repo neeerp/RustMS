@@ -169,6 +169,11 @@ impl DropSet {
         self.footholds.ground_below(x, y)
     }
 
+    /// The highest ground at `x` at or below `y`, and its foothold's id.
+    pub fn foothold_below(&self, x: i16, y: i16) -> Option<(i16, i16)> {
+        self.footholds.below(x, y)
+    }
+
     /// Spread `loot` around (x, y), each on the ground below its place (see
     /// `Footholds::drop_position`), and return the new drops.
     #[allow(clippy::too_many_arguments)]
@@ -679,18 +684,21 @@ mod tests {
                 y1: 100,
                 x2: 0,
                 y2: 100,
+                ..Foothold::default()
             },
             Foothold {
                 x1: 0,
                 y1: 100,
                 x2: 0,
                 y2: 200,
+                ..Foothold::default()
             },
             Foothold {
                 x1: 0,
                 y1: 200,
                 x2: 300,
                 y2: 200,
+                ..Foothold::default()
             },
         ]);
         let mut drops = DropSet::new(footholds);

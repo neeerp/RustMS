@@ -46,6 +46,9 @@ pub enum Action {
         at: (i16, i16),
         notice: &'static str,
     },
+    /// Bring out an NPC on the ground below it, with a pink line (the text
+    /// key `notice`) to everyone on its map.
+    Appear { npc_id: i32, notice: &'static str },
     /// A moonflower on Henesys's Primrose Hill, which blooms on its seed:
     /// it stays in bloom, the map's full moon (`FULL_MOON`) waxes a phase,
     /// and once every moonflower there blooms the Moon Bunny comes out below
@@ -75,6 +78,8 @@ const LPQ_TRAP_ROOM: i32 = 922010201;
 const LPQ_BLOCTOPUS: i32 = 9300007;
 const LPQ_ROMBAD: i32 = 9300010;
 const LPQ_ALISHAR: i32 = 9300012;
+/// The light on Orbis's cloud stage, which Eak comes out of.
+pub const OPQ_LIGHT: i32 = 2006000;
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
@@ -119,7 +124,23 @@ pub fn action(reactor_id: i32) -> Action {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
             notice: keys::LPQ_NOTICE_TRAP,
         },
+        // Orbis's cloud stage (`2006000`): the light takes the cloud pieces
+        // and Eak steps out of it.
+        OPQ_LIGHT => Action::Appear {
+            npc_id: crate::npc_scripts::EAK,
+            notice: keys::OPQ_NOTICE_LIGHT,
+        },
         _ => Action::Drops,
+    }
+}
+
+/// The state a reactor starts in, from 0 for most. Orbis's light waits at
+/// 20, the only state of v83's whose event takes an item: the 20 cloud
+/// pieces dropped on it (Reactor.nx `2006000.img/20`).
+pub fn first_state(reactor_id: i32) -> u8 {
+    match reactor_id {
+        OPQ_LIGHT => 20,
+        _ => 0,
     }
 }
 
@@ -154,6 +175,21 @@ mod tests {
         assert_eq!((mob_id, at), (LPQ_ALISHAR, (941, 184)));
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
+    }
+
+    #[test]
+    fn orbis_light_waits_for_its_cloud_pieces_then_brings_out_eak() {
+        let Action::Appear { npc_id, .. } = action(OPQ_LIGHT) else {
+            panic!("{:?}", action(OPQ_LIGHT));
+        };
+        assert_eq!(npc_id, crate::npc_scripts::EAK);
+        assert_eq!((first_state(OPQ_LIGHT), first_state(2000)), (20, 0));
+        let Some(light) = template(OPQ_LIGHT) else {
+            return;
+        };
+        assert!(light.takes_items(20) && !light.takes_items(0));
+        assert_eq!(light.item_dropped(20, 4001063, 20, (0, 0)), Some((0, 21)));
+        assert!(light.is_last(21));
     }
 
     #[test]

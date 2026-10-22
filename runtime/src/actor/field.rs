@@ -8,6 +8,7 @@ use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
 use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
+use crate::actor::registry::MAP_NPC_OBJECT_ID_BASE;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{FieldAvatar, MobStat};
@@ -2031,6 +2032,41 @@ impl FieldActor {
         }
     }
 
+    /// Bring out NPC `npc_id` on the ground below (x, y), there until the
+    /// field closes, and hand it to the NPCs' controller.
+    fn appear(&mut self, npc_id: i32, (x, y): (i16, i16)) {
+        let (ground, foothold) = self
+            .drops
+            .foothold_below(x, y.saturating_sub(10))
+            .unwrap_or((y, 0));
+        let object_id = self
+            .map_npcs
+            .iter()
+            .map(|npc| npc.object_id + 1)
+            .max()
+            .unwrap_or(MAP_NPC_OBJECT_ID_BASE);
+        let npc = FieldMapEntityNpc {
+            object_id,
+            npc_id,
+            x,
+            y: ground,
+            flip: false,
+            foothold,
+            rx0: x.saturating_sub(50),
+            rx1: x.saturating_add(50),
+        };
+        if let Ok(packet) = build_spawn_npc(&to_foreign_npc(&npc)) {
+            self.broadcast(None, packet);
+        }
+        let controller = self.npc_controller.and_then(|id| self.occupants.get(&id));
+        if let Some(occupant) = controller {
+            if let Ok(packet) = build_control_npc(&to_foreign_npc(&npc)) {
+                occupant.handle.send_packet(packet);
+            }
+        }
+        self.map_npcs.push(npc);
+    }
+
     /// Bring `count` of `mob_id` aboard on the ground below `(x, y)`, under
     /// the first player here, or the next to come; returns how many came.
     fn board(&mut self, mob_id: i32, count: usize, (x, y): (i16, i16)) -> usize {
@@ -2380,6 +2416,14 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
                 self.board(mob_id, 1, at);
+            }
+            // Cosmic `mapMessage(5, ..)` then `spawnNpc(..)`.
+            reactors::Action::Appear { npc_id, notice } => {
+                let notice = net::content::text().get(notice, &[]);
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+                self.appear(npc_id, (view.x, view.y));
             }
             // Everyone here is told, then goes (Cosmic `warpMap`).
             reactors::Action::WarpMap { notice, .. } => {

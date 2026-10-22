@@ -1381,6 +1381,10 @@ show everyone a pink line and bring out Rombad or Alishar at a fixed
 point of the map. The boxes on its bonus stage (`2202004`, `Action::Spray`)
 drop their loot with piles of mesos (`loot::spray`): one first, and more
 until there are 15 drops.
+Orbis's light (`2006000`, `Action::Appear`) shows everyone a pink line and
+brings out an NPC, Eak, on the ground below it (`FieldActor::appear`); it
+starts in state 20 (`reactors::first_state`, see "Orbis's cloud stage and
+hub" in `party-quests.md`).
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in

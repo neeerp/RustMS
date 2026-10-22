@@ -115,7 +115,7 @@ impl ReactorSet {
                     object_id,
                     spot: index,
                     reactor_id: spot.template.reactor_id,
-                    state: 0,
+                    state: net::reactors::first_state(spot.template.reactor_id),
                     x: spot.template.x,
                     y: spot.template.y,
                     flip: spot.template.flip,

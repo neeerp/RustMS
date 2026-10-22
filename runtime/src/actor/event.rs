@@ -420,6 +420,10 @@ impl EventActor {
             EventCommand::ClearStage(stage) if leader && stage == event.last_stage() => {
                 self.win();
             }
+            // Before Kerning City's stage 1, which takes its passes.
+            EventCommand::ClearStage(stage) if leader && event.talk_clears.contains(&stage) => {
+                self.clear(stage);
+            }
             EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {
                     self.clear(1);

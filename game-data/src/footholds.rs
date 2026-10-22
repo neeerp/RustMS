@@ -9,8 +9,10 @@ const FLOOR_TOLERANCE: i32 = 5;
 
 /// One foothold line, `Map.nx` `foothold/<layer>/<group>/<id>`. Lines with
 /// the same x at both ends are walls; the rest are floors.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Foothold {
+    /// Its `<id>`, by which packets name it.
+    pub id: i16,
     pub x1: i16,
     pub y1: i16,
     pub x2: i16,
@@ -112,12 +114,18 @@ impl Footholds {
 
     /// The highest ground at `x` that is at or below `y`.
     pub fn ground_below(&self, x: i16, y: i16) -> Option<i16> {
+        self.below(x, y).map(|(ground, _)| ground)
+    }
+
+    /// The highest ground at `x` that is at or below `y`, and the id of
+    /// the foothold it is on.
+    pub fn below(&self, x: i16, y: i16) -> Option<(i16, i16)> {
         self.lines
             .iter()
-            .filter_map(|fh| fh.ground_at(x))
-            .filter(|&ground| ground >= i32::from(y))
+            .filter_map(|fh| Some((fh.ground_at(x)?, fh.id)))
+            .filter(|&(ground, _)| ground >= i32::from(y))
             .min()
-            .and_then(|ground| i16::try_from(ground).ok())
+            .and_then(|(ground, id)| Some((i16::try_from(ground).ok()?, id)))
     }
 
     /// Whether a floor at about height `y` covers `x`.
@@ -179,7 +187,13 @@ mod tests {
     use super::*;
 
     fn line(x1: i16, y1: i16, x2: i16, y2: i16) -> Foothold {
-        Foothold { x1, y1, x2, y2 }
+        Foothold {
+            x1,
+            y1,
+            x2,
+            y2,
+            ..Foothold::default()
+        }
     }
 
     /// A cliff: upper ground at y 100 left of x 0, a wall down to the lower

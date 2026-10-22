@@ -885,6 +885,7 @@ fn build_footholds(
         for group in nx.child_indices(layer)? {
             for node in nx.child_indices(group)? {
                 lines.push(footholds::Foothold {
+                    id: nx.node_name(node)?.parse().unwrap_or(0),
                     x1: read_i16_child(nx, node, "x1", 0)?,
                     y1: read_i16_child(nx, node, "y1", 0)?,
                     x2: read_i16_child(nx, node, "x2", 0)?,
