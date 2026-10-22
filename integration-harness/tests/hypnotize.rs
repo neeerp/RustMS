@@ -14,7 +14,11 @@ use packet::io::write::PktWrite;
 use packet::Packet;
 use tokio::time::Duration;
 
-const HUNTING_GROUND: i32 = 40_001;
+// Each test has a snail map no other test hunts on, so its snails are
+// whole and none is dazzled by another test running beside it. Each kills
+// the snail it hurt, for the next run on the same stack.
+const HUNTING_GROUND: i32 = 1_000_004;
+const QUIET_GROUND: i32 = 40_002;
 const SNAIL: i32 = 100100;
 const CORSAIR: i16 = 522;
 const HYPNOTIZE: i32 = 5221009;
@@ -56,19 +60,23 @@ async fn hypnotize_dazzles_the_mob_it_hits() {
 
     send(c, attack(snails[0], 1)).await;
     until(c, &mut h, |t| t.field.aggro.contains(&snails[0])).await;
+    send(c, attack(snails[0], 8)).await;
+    until(c, &mut h, |t| t.field.killed.contains(&snails[0])).await;
 }
 
-/// Two snails no more than 600 x 300 apart, which can hurt each other.
-fn near_pair(field: &Field) -> Option<(i32, i32)> {
+/// The pairs of snails no more than 600 x 300 apart, which can hurt each
+/// other.
+fn near_pairs(field: &Field) -> Vec<(i32, i32)> {
     let snails = field.alive(SNAIL);
     let at = |oid: &i32| field.mob_positions[oid];
     snails
         .iter()
         .flat_map(|a| snails.iter().map(move |b| (*a, *b)))
-        .find(|(a, b)| {
+        .filter(|(a, b)| {
             let ((ax, ay), (bx, by)) = (at(a), at(b));
             a != b && (ax - bx).abs() <= 600 && (ay - by).abs() <= 300
         })
+        .collect()
 }
 
 /// MOB_DAMAGE_MOB as the v83 client sends it (FUN_00670c63).
@@ -109,16 +117,45 @@ async fn a_mob_hurts_a_hypnotized_neighbour() {
     let mut watcher = relogin(&other_config).await;
     let w = &mut watcher.connection;
     let mut wt = Trace::default();
-    assert_eq!(warp(w, HUNTING_GROUND, "", &mut wt).await, HUNTING_GROUND);
+    assert_eq!(warp(w, QUIET_GROUND, "", &mut wt).await, QUIET_GROUND);
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
     let mut h = Trace::default();
-    assert_eq!(warp(c, HUNTING_GROUND, "", &mut h).await, HUNTING_GROUND);
-    until(c, &mut h, |t| near_pair(&t.field).is_some()).await;
-    let (victim, attacker) = near_pair(&h.field).expect("two snails near each other");
+    assert_eq!(warp(c, QUIET_GROUND, "", &mut h).await, QUIET_GROUND);
+    until(c, &mut h, |t| !near_pairs(&t.field).is_empty()).await;
 
-    let t = step(c, "shot", skill_attack(HYPNOTIZE, victim, 1)).await;
-    assert_eq!(t.field.stat_sets, [(victim, DAZZLE, 1, HYPNOTIZE)]);
+    // A run that failed may have left a snail hurt, which could die of the
+    // first blow, so the victim is one the shot leaves at 4 of its 8 HP or
+    // more (a bar of 50%). A dazzled snail can't hurt another, so no snail
+    // already shot attacks.
+    let mut fresh = None;
+    let mut dead = h.field.killed.clone();
+    let mut shot = Vec::new();
+    for (victim, attacker) in near_pairs(&h.field) {
+        if [victim, attacker]
+            .iter()
+            .any(|oid| dead.contains(oid) || shot.contains(oid))
+        {
+            continue;
+        }
+        shot.push(victim);
+        let mut t = step(c, "shot", skill_attack(HYPNOTIZE, victim, 1)).await;
+        assert_eq!(t.field.stat_sets, [(victim, DAZZLE, 1, HYPNOTIZE)]);
+        let bar = |t: &Trace| {
+            let mut bars = t.field.hp_bars.iter();
+            bars.find(|&&(oid, _)| oid == victim).map(|&(_, hp)| hp)
+        };
+        until(c, &mut t, |t| {
+            bar(t).is_some() || t.field.killed.contains(&victim)
+        })
+        .await;
+        dead.extend(&t.field.killed);
+        if bar(&t) >= Some(50) {
+            fresh = Some((victim, attacker));
+            break;
+        }
+    }
+    let (victim, attacker) = fresh.expect("a snail with 4 HP or more beside another");
 
     // Only the Hypnotized one is hurt, once in 2 s; the others see it.
     send(c, mob_damage_mob(victim, id, attacker, 3)).await;
