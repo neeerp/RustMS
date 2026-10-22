@@ -804,7 +804,8 @@ trade invite and opening a personal shop with the same line
 (`Player::shape_refuses`). A template that can't move the way the map
 does isn't put on: in water only 0004 (2210003), which has no `fly`,
 stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: Ghost (bit 49), the random
-morph items (2211000, 2212000), and
+morph items (2211000, 2212000; `spec/morphRandom`, which the server refuses
+without using one up rather than heal 50 with no morph), and
 the mini-game and hired merchant refusals,
 which wait on those rooms.
 

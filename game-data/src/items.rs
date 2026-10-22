@@ -238,18 +238,23 @@ pub struct ConsumeSpec {
     /// How much a mount food (226xxxx) changes a mount's tiredness
     /// (`incFatigue`): negative takes it off.
     pub inc_fatigue: i32,
+    /// Whether it morphs the player into a random template (`morphRandom`,
+    /// 2211000 and 2212000), which the server doesn't choose yet.
+    pub morph_random: bool,
 }
 
 impl ConsumeSpec {
     /// Whether USE_ITEM can apply any of it: HP or MP, a cure, or stats for
-    /// a time.
+    /// a time. A random morph has none yet, so its heal doesn't use it up
+    /// (report c012).
     pub fn has_effect(&self) -> bool {
-        self.hp != 0
-            || self.mp != 0
-            || self.hp_r != 0
-            || self.mp_r != 0
-            || !self.cures.is_empty()
-            || (self.time > 0 && !self.stats.is_empty())
+        !self.morph_random
+            && (self.hp != 0
+                || self.mp != 0
+                || self.hp_r != 0
+                || self.mp_r != 0
+                || !self.cures.is_empty()
+                || (self.time > 0 && !self.stats.is_empty()))
     }
 }
 
@@ -551,6 +556,7 @@ impl ItemData {
                 return_map_qr: nx.int_child(spec, "returnMapQR")?.unwrap_or(0),
                 exp: nx.int_child(spec, "exp")?.unwrap_or(0),
                 inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
+                morph_random: nx.child_by_name(spec, "morphRandom")?.is_some(),
             });
         }
         if item_id / 10_000 == 210 {
@@ -882,6 +888,12 @@ mod tests {
         );
         let morph = data.info(2210000).unwrap().unwrap().spec.unwrap();
         assert!(morph.stats.contains(&(BuffStat::Morph, 1)));
+        assert!(!morph.morph_random && morph.has_effect());
+        for id in [2211000, 2212000] {
+            let random = data.info(id).unwrap().unwrap().spec.unwrap();
+            assert_eq!((random.morph_random, random.hp), (true, 50));
+            assert!(!random.has_effect());
+        }
         let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
         assert_eq!(
             (air_bubble.stats, air_bubble.time),

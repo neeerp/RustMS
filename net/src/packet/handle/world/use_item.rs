@@ -995,8 +995,9 @@ mod tests {
         }
         let mut player = crate::codec::stats::sample_player();
         // A Return Scroll is no USE_ITEM; a Warp Scroll for the Kerning PQ
-        // (2032000) has a spec but nothing USE_ITEM applies.
-        for (slot, item_id) in [(1, 2030000), (2, 2032000)] {
+        // (2032000) has a spec but nothing USE_ITEM applies; Cliff's Special
+        // Potion (2211000) heals 50 but morphs at random, which isn't chosen.
+        for (slot, item_id) in [(1, 2030000), (2, 2032000), (3, 2211000)] {
             player
                 .inventory
                 .insert(InventoryType::Use, slot, Item::stack(item_id, 1));
