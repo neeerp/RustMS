@@ -2258,6 +2258,16 @@ namespace ms
 		return alliance;
 	}
 
+	Family &Player::get_family()
+	{
+		return family;
+	}
+
+	const Family &Player::get_family() const
+	{
+		return family;
+	}
+
 	void Player::show_guild()
 	{
 		const GuildData &data = guild.get_data();

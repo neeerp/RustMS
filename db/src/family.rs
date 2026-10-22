@@ -144,8 +144,10 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
         return Ok(chart);
     }
     let leader = seniors.last().copied().unwrap_or(viewed);
-    let mut ids = vec![leader];
-    ids.extend(seniors.iter().take(2).rev());
+    // The client only shows the first entry, the leader, as the top of the
+    // tree and links the others by their seniors, so the leader comes again
+    // where it falls in that chain.
+    let mut ids: Vec<i32> = seniors.iter().take(2).rev().copied().collect();
     ids.push(viewed);
     if let Some(&senior) = seniors.first() {
         ids.extend(self::juniors(conn, senior)?);
@@ -156,6 +158,7 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
     }
     let mut seen = std::collections::HashSet::new();
     ids.retain(|id| seen.insert(*id));
+    ids.insert(0, leader);
 
     let rows = characters::table
         .inner_join(family_members::table)
@@ -173,11 +176,11 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
             characters::name,
         ))
         .load::<(i32, Option<i32>, i16, i16, i32, i32, i32, i32, i32, String)>(conn)?;
-    let mut rows: std::collections::HashMap<_, _> =
+    let rows: std::collections::HashMap<_, _> =
         rows.into_iter().map(|row| (row.0, row)).collect();
     chart.members = ids
         .iter()
-        .filter_map(|id| rows.remove(id))
+        .filter_map(|id| rows.get(id).cloned())
         .map(|row| ChartMember {
             id: row.0,
             senior_id: row.1.unwrap_or(0),
@@ -192,14 +195,6 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
             name: row.9,
         })
         .collect();
-    // The senior's senior hangs from the leader when generations between
-    // aren't shown.
-    let shown: Vec<i32> = chart.members.iter().map(|member| member.id).collect();
-    for member in chart.members.iter_mut().skip(1) {
-        if !shown.contains(&member.senior_id) {
-            member.senior_id = leader;
-        }
-    }
 
     let family = descendants(conn, leader)?.0.len();
     chart.counts = vec![(-1, family as i32), (0, seniors.len() as i32)];

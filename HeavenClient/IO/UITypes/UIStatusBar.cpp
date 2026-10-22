@@ -85,6 +85,7 @@ namespace ms
 			{ KeyAction::Id::MONSTERBOOK, 22 },
 			{ KeyAction::Id::CASHSHOP, 23 },
 			{ KeyAction::Id::ALLIANCECHAT, 24 },
+			{ KeyAction::Id::FAMILY, 26 },
 			{ KeyAction::Id::MEDALS, 27 },
 			{ KeyAction::Id::PICKUP, 50 },
 			{ KeyAction::Id::SIT, 51 },

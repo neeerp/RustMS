@@ -124,6 +124,8 @@ namespace ms
 			PARTYSEARCHICON,
 			RPSGAME,
 			SCRIPTMESSAGE,
+			FAMILY,
+			FAMILYTREE,
 			NUM_TYPES
 		};
 

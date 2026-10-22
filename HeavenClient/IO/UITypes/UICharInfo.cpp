@@ -24,6 +24,7 @@
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/FamilyActions.h"
 #include "../../IO/PartyCommands.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -47,7 +48,7 @@ namespace ms
 		constexpr int16_t TAMING_X = 5, PET_X = 93, COLLECTION_X = 145, EXCEPTION_X = 199;
 
 		const Point<int16_t> CLOSE = { 256, 6 };
-		const Point<int16_t> FAMILY = { 105, 23 };
+		const Point<int16_t> FAMILY_AT = { 105, 23 };
 		const Point<int16_t> PARTY = { 149, 23 };
 		const Point<int16_t> TRADE = { 149, 42 };
 		const Point<int16_t> ITEM = { 208, 22 };
@@ -134,7 +135,7 @@ namespace ms
 		wish_list = UserInfo["backgrnd3"];
 
 		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(Basic["BtClose"], CLOSE);
-		buttons[Buttons::BT_FAMILY] = std::make_unique<MapleButton>(UserInfo["BtFamily"], FAMILY);
+		buttons[Buttons::BT_FAMILY] = std::make_unique<MapleButton>(UserInfo["BtFamily"], FAMILY_AT);
 		buttons[Buttons::BT_PARTY] = std::make_unique<MapleButton>(UserInfo["BtParty"], PARTY);
 		buttons[Buttons::BT_TRADE] = std::make_unique<MapleButton>(UserInfo["BtTrade"], TRADE);
 		buttons[Buttons::BT_ITEM] = std::make_unique<MapleButton>(UserInfo["BtItem"], ITEM);
@@ -168,9 +169,9 @@ namespace ms
 		});
 		taming_slider = Slider(Slider::Type::CLASSIC, TAMING_SLIDER, ITEM_SLIDER_X, ITEM_ROWS, 0, [](bool) {});
 
-		// There are no families yet. The pet and taming boxes open once
-		// CHAR_INFO says there are pets or a mount.
-		for (auto button : { Buttons::BT_FAMILY, Buttons::BT_EXCEPTION, Buttons::BT_PET_SHOW, Buttons::BT_TAMING_SHOW })
+		// The pet and taming boxes open once CHAR_INFO says there are pets
+		// or a mount. BtFamily is always on (report b045).
+		for (auto button : { Buttons::BT_EXCEPTION, Buttons::BT_PET_SHOW, Buttons::BT_TAMING_SHOW })
 			buttons[button]->set_state(Button::State::DISABLED);
 
 		// v83 offers fame only from level 15 (FUN_009007a0), and never for
@@ -336,6 +337,13 @@ namespace ms
 			break;
 		case Buttons::BT_PANEL_HIDE:
 			set_panel(Panel::NO_PANEL);
+			break;
+		case Buttons::BT_FAMILY:
+			// The player's own opens the Family window, another's their tree.
+			if (name.get_text() == Stage::get().get_player().get_stats().get_name())
+				FamilyActions::toggle_window();
+			else
+				FamilyActions::open_tree(name.get_text());
 			break;
 		case Buttons::BT_FAME_UP:
 			give_fame(true);

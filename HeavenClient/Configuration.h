@@ -703,6 +703,21 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIFamily (v83's for type 0x1b, 0x49d1c4)
+	struct PosFAMILY : public Configuration::PointEntry
+	{
+		PosFAMILY() : PointEntry("PosFAMILY", "(244, 105)")
+		{}
+	};
+
+	// Where UIFamilyTree was last dragged; v83 opens it at (111, 107) every
+	// time.
+	struct PosFAMILYTREE : public Configuration::PointEntry
+	{
+		PosFAMILYTREE() : PointEntry("PosFAMILYTREE", "(111, 107)")
+		{}
+	};
+
 	// The default position of UIChannel
 	struct PosCHANNEL : public Configuration::PointEntry
 	{

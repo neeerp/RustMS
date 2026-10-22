@@ -68,10 +68,13 @@ packets into `FamilyRequest`s, which the client actor
       (`DirectoryMessage::FamilyChanged`).
 - **`OPEN_FAMILY_PEDIGREE` (name):** the server sends
   `FAMILY_CHART_RESULT` for the named character (`db::family::chart`).
-  - The chart lists the leader, the two seniors above the character, the
-    character, their sibling, their juniors, and their juniors' juniors,
-    each parent before its children. These are the 11 slots of the window.
-  - A senior's senior whose own senior isn't shown hangs from the leader.
+  - The chart lists the leader, then the two seniors above the character,
+    the character, their sibling, their juniors, and their juniors'
+    juniors, each parent before its children. These are the 11 slots of
+    the window.
+  - The client takes the first entry only as the top of the tree and never
+    links anyone to it (report b044), so the leader comes again in the
+    chain when it is one of the seniors or the character.
   - The directory marks who is online (a channel change counts) and fills
     in their current level, job and map.
   - Head counts:
@@ -100,4 +103,37 @@ These are not implemented yet:
 
 ## Client
 
-HeavenClient has no family windows yet.
+HeavenClient follows reports b042 (Family window), b044 (Family Tree) and
+b045 (how they open).
+
+- **State:** `Character/Family.h` keeps the player's INFO and the privilege
+  list on `Player`. `FamilyChart::arrange` puts a chart's members into the
+  tree's 11 boxes as the v83 decoder does. `tests/family.cpp` covers the
+  parser and the arrangement.
+- **Packets:** `Net/Handlers/FamilyHandlers.cpp` handles receive opcodes
+  94-102. `Net/Packets/FamilyPackets.h` builds the sends; separation (0x94,
+  0x95) and the summon answer (0x99) are not built yet.
+- **Family window (`UIFamily`):** the Family key (F by default) and BtFamily
+  on the player's own info open it, and each opening sends `OPEN_FAMILY`.
+  It shows the family's name, the scrolling precepts, juniors, Rep and the
+  entitlements one at a time, with their tooltips. BtJuniorEntry asks for
+  a name, BtTree opens the player's own tree, the precepts button (leader
+  only) sends `CHANGE_FAMILY_MESSAGE` and BtSpecial sends `USE_FAMILY`.
+  OK closes it, and so does Esc when it is the topmost window.
+- **Family Tree (`UIFamilyTree`):** BtTree, and BtFamily on someone else's
+  info, open it and send `OPEN_FAMILY_PEDIGREE`. It always opens at the same
+  place and fills when the chart arrives. Only the player's own tree
+  answers the mouse: the senior's and juniors' boxes light up, an empty
+  junior box asks for a name, and each member has a tooltip. Esc closes it.
+  Texts are centred in their boxes as v83 does it, halving the room left as
+  unsigned, so one wider than its box is never seen: the empty boxes'
+  "(You do not have family members.)" shows nothing.
+  BtBye stays disabled until separation exists.
+- **Adding a junior:** the name prompt, or the avatar menu's Family row
+  (shown once INFO says there is room), sends `ADD_FAMILY`.
+- **Being asked:** `FAMILY_JOIN_REQUEST` shows a Family card, unless one is
+  up or the Game Option blocks it, when the client declines by itself. The
+  card's X declines, and fading sends nothing. O asks once more with a
+  Yes/No before answering.
+- **Login notices:** a relative logging in shows a card, and the open tree
+  updates who is online.

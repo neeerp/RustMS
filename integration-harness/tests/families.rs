@@ -180,8 +180,13 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
     )
     .await;
     let mut chart = a_id.to_le_bytes().to_vec();
-    chart.extend(2i32.to_le_bytes());
-    for (id, senior, level, name) in [(a_id, 0, 30u8, &an), (b_id, a_id, 15, &bn)] {
+    chart.extend(3i32.to_le_bytes());
+    // The leader heads the tree and comes again as the one viewed.
+    for (id, senior, level, name) in [
+        (a_id, 0, 30u8, &an),
+        (a_id, 0, 30, &an),
+        (b_id, a_id, 15, &bn),
+    ] {
         chart.extend(id.to_le_bytes());
         chart.extend(senior.to_le_bytes());
         chart.extend(0i16.to_le_bytes());

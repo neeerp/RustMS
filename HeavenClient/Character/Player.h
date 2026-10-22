@@ -24,6 +24,7 @@
 #include "Diseases.h"
 #include "BuddyList.h"
 #include "Alliance.h"
+#include "Family.h"
 #include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
@@ -423,6 +424,10 @@ namespace ms
 		// Show the guild's name and emblem under the player's name.
 		void show_guild();
 
+		// The player's family, as the server last described it.
+		Family &get_family();
+		const Family &get_family() const;
+
 	private:
 		// Whether the key for an action is held.
 		bool is_held(KeyAction::Id action) const;
@@ -512,6 +517,7 @@ namespace ms
 		std::string linked_name;
 		Guild guild;
 		Alliance alliance;
+		Family family;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;
