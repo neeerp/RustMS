@@ -1388,7 +1388,9 @@ hub" in `party-quests.md`).
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in
-`party-quests.md`).
+`party-quests.md`). The scars on Orbis's hub (`2008000`-`2008005`,
+`Action::Hold`) stay too, holding the piece of the statue set in them (see
+"Orbis's walkway and lounge" in `party-quests.md`).
 
 The Berserk room's (`910500200`) reactors change places among themselves
 whenever the field starts afresh (`reactors::shuffled`,

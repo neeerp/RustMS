@@ -735,6 +735,10 @@ unsourced = [
     "pet_trainer.secret.0",
     "pet_trainer.secret.1",
     "pet_trainer.secret.no_snack",
+    "opq.eak.hand_in",
+    "opq.eak.piece",
+    "opq.eak.room_cleared",
+    "opq.eak.full",
 ]
 
 [text."glTutoMsg0.message"]

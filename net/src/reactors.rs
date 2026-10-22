@@ -54,6 +54,9 @@ pub enum Action {
     /// and once every moonflower there blooms the Moon Bunny comes out below
     /// the moon (Cosmic's 9108000-5).
     Bloom,
+    /// One of the scars on the Tower of Goddess's hub (`2008000`-`2008005`),
+    /// where a piece of Minerva's statue goes: it keeps the piece set in it.
+    Hold,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -130,6 +133,7 @@ pub fn action(reactor_id: i32) -> Action {
             npc_id: crate::npc_scripts::EAK,
             notice: keys::OPQ_NOTICE_LIGHT,
         },
+        2008000..=2008005 => Action::Hold,
         _ => Action::Drops,
     }
 }
@@ -145,9 +149,9 @@ pub fn first_state(reactor_id: i32) -> u8 {
 }
 
 /// Whether a reactor stays when it reaches its last state, rather than
-/// going away: a moonflower stays in bloom.
+/// going away: a moonflower stays in bloom, a scar keeps its piece.
 pub fn stays(reactor_id: i32) -> bool {
-    action(reactor_id) == Action::Bloom
+    matches!(action(reactor_id), Action::Bloom | Action::Hold)
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
@@ -199,6 +203,21 @@ mod tests {
             assert!(stays(reactor_id));
         }
         assert!(!stays(9108006) && !stays(9101000) && !stays(9102002));
+    }
+
+    #[test]
+    fn the_tower_of_goddess_s_scars_keep_the_pieces_set_in_them() {
+        for reactor_id in 2008000..=2008005 {
+            assert_eq!(action(reactor_id), Action::Hold);
+            assert!(stays(reactor_id));
+        }
+        assert_eq!(action(2008006), Action::Drops);
+        let Some(scar) = template(2008003) else {
+            return;
+        };
+        assert_eq!(scar.item_dropped(0, 4001044, 1, (0, 0)), Some((0, 1)));
+        assert_eq!(scar.item_dropped(0, 4001048, 1, (0, 0)), None);
+        assert!(scar.is_last(1));
     }
 
     #[test]

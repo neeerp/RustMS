@@ -382,14 +382,12 @@ impl EventActor {
                 _ => Balloon::NotLeader,
             });
         }
-        if event.hand_in(stage).is_none() {
-            return None;
-        }
+        let hand_in = event.hand_in(stage)?;
         Some(if self.cleared.has(stage) {
             Balloon::Cleared
         } else if client_id != self.team.leader() {
             Balloon::NotLeader
-        } else if self.heard.insert(stage) {
+        } else if hand_in.intro && self.heard.insert(stage) {
             Balloon::Intro
         } else {
             Balloon::Ready
@@ -408,7 +406,9 @@ impl EventActor {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
             // Handed in, by a leader who has heard the stage out.
             EventCommand::ClearStage(stage) if event.hand_in(stage).is_some() => {
-                if !leader || !self.heard.contains(&stage) {
+                let intro = event.hand_in(stage).is_some_and(|hand_in| hand_in.intro);
+                let heard = !intro || self.heard.contains(&stage);
+                if !leader || !heard {
                     debug!(stage, client_id, "Clear not taken");
                 } else if stage == event.last_stage() {
                     self.win();

@@ -2601,7 +2601,7 @@ impl FieldActor {
         let flowers = self
             .reactors
             .live()
-            .filter(|reactor| reactors::stays(reactor.reactor_id));
+            .filter(|reactor| reactors::action(reactor.reactor_id) == reactors::Action::Bloom);
         let (mut bloomed, mut all) = (0u8, 0u8);
         for flower in flowers {
             all += 1;
