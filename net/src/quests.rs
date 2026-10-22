@@ -506,6 +506,21 @@ mod tests {
     }
 
     #[test]
+    fn an_explorer_title_needs_its_places_seen() {
+        let mut q = quest();
+        q.explored = Some(game_data::quests::Explored {
+            record: 27010,
+            needed: 2,
+        });
+        let mut p = player(30, 0);
+        set(&mut p, 1033, QuestState::Started);
+        p.quests.explore(27010, 100000000);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Explored));
+        p.quests.explore(27010, 101000000);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
     fn complete_checks_the_end_level() {
         let mut q = quest();
         q.end_min_level = Some(200);

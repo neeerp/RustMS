@@ -87,13 +87,6 @@ impl QuestLog {
         self.explored.get(&record).map_or(0, BTreeSet::len)
     }
 
-    /// Every info record with a visit and its count.
-    pub fn explored_counts(&self) -> impl Iterator<Item = (i16, usize)> + '_ {
-        (self.explored.iter())
-            .filter(|(_, maps)| !maps.is_empty())
-            .map(|(&record, maps)| (record, maps.len()))
-    }
-
     /// Every `(info record, map)` visit.
     pub fn visits(&self) -> impl Iterator<Item = (i16, i32)> + '_ {
         (self.explored.iter())
@@ -241,10 +234,8 @@ mod tests {
         assert_eq!(log.explored(27010), 2);
         assert_eq!(log.explored(27012), 0);
         log.remove(29005);
-        assert_eq!(
-            log.explored_counts().collect::<Vec<_>>(),
-            [(27010, 2), (27011, 1)]
-        );
+        assert_eq!(log.explored(27010), 2);
+        assert_eq!(log.explored(27011), 1);
         assert_eq!(log.visits().count(), 3);
     }
 }

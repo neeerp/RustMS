@@ -1443,6 +1443,9 @@ mod tests {
             }]
         );
         assert!(!outcome.block);
+        // Touched the Sky counts from level 20.
+        player.stats.level = 19;
+        assert!(portal("highposition", &player).unwrap().effects.is_empty());
     }
 
     #[test]

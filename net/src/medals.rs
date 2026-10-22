@@ -39,14 +39,16 @@ pub fn region(map_id: i32) -> Option<i16> {
 }
 
 /// A visit to `map_id` toward `medal`, unless the medal is done, the player
-/// is below its level, or the map already counted.
+/// is below its level, or the map already counted. A map already counted
+/// still starts a forfeited medal again, whose maps were kept.
 pub fn explore(medal: i16, map_id: i32, player: &Player) -> Option<Effect> {
     let quest = catalog().ok()?.quest(medal)?;
     let explored = quest.explored?;
     let level = i16::from(player.stats.level);
-    if player.quests.state(medal) == QuestState::Completed
+    let state = player.quests.state(medal);
+    if state == QuestState::Completed
         || quest.start.min_level.is_some_and(|min| level < min)
-        || player.quests.has_explored(explored.record, map_id)
+        || (state == QuestState::Started && player.quests.has_explored(explored.record, map_id))
     {
         return None;
     }
@@ -77,8 +79,8 @@ pub fn messages(quest: &QuestTemplate, count: usize) -> Result<Vec<Packet>, Netw
             build_info_text(&text(keys::MEDAL_PROGRESS_INFO))?,
         ],
         std::cmp::Ordering::Equal => vec![
-            build_script_progress(&text(keys::MEDAL_EARNED))?,
             build_quest_clear(quest.id)?,
+            build_script_progress(&text(keys::MEDAL_EARNED))?,
             build_info_text(&text(keys::MEDAL_EARNED_INFO))?,
         ],
         std::cmp::Ordering::Greater => Vec::new(),
@@ -120,6 +122,8 @@ mod tests {
             let needed = quests.quest(medal).unwrap().explored.unwrap().needed;
             assert!(maps[&medal] >= needed as usize, "{medal}: {maps:?}");
         }
+        // 97 maps run explorationPoint; 910310000-910310004 are in no
+        // region.
         assert_eq!(maps.values().sum::<usize>(), 92);
     }
 
@@ -138,8 +142,15 @@ mod tests {
         });
         assert_eq!(explore(29005, henesys, &player), visit);
         player.quests.explore(27010, henesys);
+        // Seen, but the quest isn't started (it was forfeited): the visit
+        // starts it again.
+        assert_eq!(explore(29005, henesys, &player), visit);
+        player.quests.upsert(QuestRecord {
+            quest_id: 29005,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
         assert_eq!(explore(29005, henesys, &player), None);
-        assert_eq!(explore(29005, 101000000, &player).is_some(), true);
+        assert!(explore(29005, 101000000, &player).is_some());
         player.quests.upsert(QuestRecord {
             quest_id: 29005,
             status: QuestStatus::Completed {

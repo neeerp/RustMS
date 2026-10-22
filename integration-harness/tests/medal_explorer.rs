@@ -5,7 +5,7 @@
 
 use integration_harness::database::{explore_map, set_job};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::quests::{act, COMPLETE};
+use integration_harness::quests::{act, build_quest_action, COMPLETE, FORFEIT};
 use integration_harness::trace::{barrier, step, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::packet::op::RecvOpcode;
@@ -21,6 +21,8 @@ const SKY_RECORD: i16 = 27018;
 const DALAIR: i32 = 9000040;
 const HENESYS_PARK: i32 = 100000200;
 const HIGH_LOOKOUT: i32 = 101010103;
+/// An explorationPoint map in no medal's region.
+const STRAY: i32 = 910310000;
 /// The 20 explorationPoint maps of Victoria Island counted toward Beginner
 /// Explorer.
 const VICTORIA: [i32; 20] = [
@@ -93,14 +95,28 @@ async fn victorias_places_earn_the_beginner_explorer_medal() {
     let name = player.character_name.clone();
     let c = &mut player.connection;
     act(c, &mut early, &name, COMPLETE, BEGINNER_EXPLORER, DALAIR).await;
-    assert_ne!(early.states.get(&BEGINNER_EXPLORER), Some(&2));
+    assert_eq!(early.states.get(&BEGINNER_EXPLORER), None);
+    assert!(early.items.is_empty(), "{:?}", early.items);
+
+    // Forfeited, it keeps its maps and starts again on one already seen.
+    let gone = step(c, &name, build_quest_action(FORFEIT, BEGINNER_EXPLORER, 0)).await;
+    assert_eq!(gone.states.get(&BEGINNER_EXPLORER), Some(&0));
+    let back = visit(&mut player, VICTORIA[0]).await;
+    assert_eq!(back.states.get(&BEGINNER_EXPLORER), Some(&1));
+    assert_eq!(
+        back.kills.get(&BEGINNER_RECORD).map(String::as_str),
+        Some("2")
+    );
+    assert!(back.script_messages.is_empty());
     drop(player);
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    // Seen all but the last, the count comes back at login.
-    for map in &VICTORIA[2..19] {
+    // Seen all but two (and one place in no region, which counts as
+    // well), the count comes back at login.
+    for map in &VICTORIA[2..18] {
         explore_map(id, BEGINNER_RECORD, *map).await.unwrap();
     }
+    explore_map(id, BEGINNER_RECORD, STRAY).await.unwrap();
     let mut player = relogin(&config).await;
     assert_eq!(player.quests.get(&BEGINNER_EXPLORER), Some(&1));
     assert_eq!(
@@ -132,11 +148,14 @@ async fn victorias_places_earn_the_beginner_explorer_medal() {
         done.items
     );
 
-    // Once it is done its maps count nothing more; the lookout's
-    // highposition counts toward Touched the Sky without taking the player
-    // anywhere.
-    let lookout = visit(&mut player, HIGH_LOOKOUT).await;
-    assert_eq!(lookout.kills.get(&BEGINNER_RECORD), None);
+    // Once it is done its maps count nothing more.
+    let unseen = visit(&mut player, VICTORIA[18]).await;
+    assert_eq!(unseen.kills.get(&BEGINNER_RECORD), None);
+    assert!(unseen.script_messages.is_empty());
+
+    // The lookout's highposition counts toward Touched the Sky without
+    // taking the player anywhere.
+    visit(&mut player, HIGH_LOOKOUT).await;
     let up = step(&mut player.connection, &name, enter("highposition")).await;
     assert!(up.arrivals.is_empty(), "{:?}", up.arrivals);
     assert_eq!(up.states.get(&TOUCHED_THE_SKY), Some(&1));
