@@ -7,7 +7,7 @@
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
-use crate::events::{self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn};
+use crate::events::{self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, Standing};
 use crate::rides;
 use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
@@ -60,6 +60,8 @@ const GROWLIE: i32 = 1012114;
 pub const RED_SIGN: i32 = 2040034;
 /// The balloon on Ludibrium's maze stage.
 pub const AQUA_BALLOON: i32 = 2040041;
+/// The balloon on Ludibrium's stage 8, whose puzzle is its crates.
+pub const BLUE_BALLOON: i32 = 2040043;
 /// Sgt. Anderson, who lets players out of Ludibrium's party quest and back
 /// to Eos Tower.
 const ANDERSON: i32 = 2040047;
@@ -824,6 +826,26 @@ impl NpcScript {
     /// with it as `view`.
     pub fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> Self {
         balloon(hand_in, view, player)
+    }
+
+    /// The Blue Balloon on Ludibrium's puzzle stage `stage`, as the player
+    /// stands with it as `view`; a leader answering it is told how the team
+    /// `stood`, and clears the stage when right.
+    pub fn blue_balloon(stage: u8, view: Balloon, stood: Option<Standing>) -> Self {
+        let page = match (view, stood) {
+            (Balloon::Cleared, _) => Page::Say(text(keys::LPQ_BALLOON_HURRY)),
+            (Balloon::NotLeader, _) => Page::Say(text(keys::LPQ_BALLOON_NOT_LEADER)),
+            (Balloon::Intro, _) => Page::Say(text(keys::LPQ_BALLOON_INTRO_8)),
+            (Balloon::Answer { .. }, Some(Standing::Right)) => Page::Act {
+                text: text(keys::LPQ_BALLOON_DONE),
+                effects: vec![Effect::EventCommand(EventCommand::ClearStage(stage))],
+            },
+            (Balloon::Answer { .. }, Some(Standing::Wrong)) => {
+                Page::Say(text(keys::LPQ_BALLOON_WRONG))
+            }
+            _ => Page::Say(text(keys::LPQ_BALLOON_FEW)),
+        };
+        NpcScript::new(BLUE_BALLOON, vec![page])
     }
 
     /// The Aqua Balloon on Ludibrium's maze stage, which clears nothing.
@@ -2251,7 +2273,7 @@ fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
                 ],
             }
         }
-        Balloon::Ready => Page::Say(short.clone()),
+        Balloon::Ready | Balloon::Answer { .. } => Page::Say(short.clone()),
     };
     let mut script = NpcScript::new(hand_in.npc, vec![page]);
     // The items dropped since the page opened.
@@ -4839,6 +4861,30 @@ mod tests {
             Some(0)
         );
         assert!(sign.respond(ScriptInput::Next).unwrap().prompt.is_none());
+    }
+
+    #[test]
+    fn the_blue_balloon_clears_stage_8_only_for_five_on_the_right_crates() {
+        let said = |view, stood| {
+            let step = NpcScript::blue_balloon(8, view, stood).begin();
+            (step.effects.clone(), page_text(&step))
+        };
+        let answer = Balloon::Answer {
+            combo: 0b1_0010_1111,
+        };
+        let (effects, _) = said(answer, Some(Standing::Right));
+        assert_eq!(effects, [Effect::EventCommand(EventCommand::ClearStage(8))]);
+        for (view, stood, key) in [
+            (answer, Some(Standing::Wrong), keys::LPQ_BALLOON_WRONG),
+            (answer, Some(Standing::Few), keys::LPQ_BALLOON_FEW),
+            (Balloon::Intro, None, keys::LPQ_BALLOON_INTRO_8),
+            (Balloon::NotLeader, None, keys::LPQ_BALLOON_NOT_LEADER),
+            (Balloon::Cleared, None, keys::LPQ_BALLOON_HURRY),
+        ] {
+            let (effects, said) = said(view, stood);
+            assert!(effects.is_empty(), "{view:?}");
+            assert!(said.contains(&text(key)), "{view:?}: {said}");
+        }
     }
 
     #[test]

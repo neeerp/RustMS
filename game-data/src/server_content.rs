@@ -380,6 +380,11 @@ pub mod keys {
     pub const LPQ_BALLOON_DONE: &str = "lpq.balloon.done";
     pub const LPQ_BALLOON_HURRY: &str = "lpq.balloon.hurry";
     pub const LPQ_BALLOON_S6: &str = "lpq.balloon.s6";
+    /// Stage 8's balloon: what it asks, not five on the crates, and the
+    /// wrong five.
+    pub const LPQ_BALLOON_INTRO_8: &str = "lpq.balloon.intro.8";
+    pub const LPQ_BALLOON_FEW: &str = "lpq.balloon.few";
+    pub const LPQ_BALLOON_WRONG: &str = "lpq.balloon.wrong";
     pub const LPQ_NOTICE_TRAP: &str = "lpq.notice.trap";
     /// Pink lines as Rombad (stage 7) and Alishar (the boss) come out.
     pub const LPQ_NOTICE_ROMBAD: &str = "lpq.notice.rombad";
@@ -1295,6 +1300,9 @@ mod tests {
             keys::LPQ_BALLOON_DONE,
             keys::LPQ_BALLOON_HURRY,
             keys::LPQ_BALLOON_S6,
+            keys::LPQ_BALLOON_INTRO_8,
+            keys::LPQ_BALLOON_FEW,
+            keys::LPQ_BALLOON_WRONG,
             keys::LPQ_NOTICE_TRAP,
             keys::LPQ_NOTICE_ROMBAD,
             keys::LPQ_NOTICE_ALISHAR,

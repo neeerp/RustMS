@@ -7,9 +7,10 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
-use net::events::{on_areas, Cloto, EventCommand, EventKind};
+use game_data::Area;
+use net::events::{on_areas, standing, Balloon, Cloto, EventCommand, EventKind, Standing};
 use net::handler::FieldRequest;
-use net::npc_scripts::{NpcScript, AQUA_BALLOON};
+use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::build::world::effect::{
     build_field_effect, build_field_object, build_field_sound,
@@ -60,7 +61,8 @@ impl ClientActor {
     /// elsewhere she has nothing to say.
     pub(super) async fn talk_to_cloto(&mut self) -> Result<bool, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+        let in_kpq = |ticket: &&EventTicket| ticket.kind == EventKind::Kpq && ticket.holds(map_id);
+        let Some(ticket) = self.event.as_ref().filter(in_kpq) else {
             return Ok(false);
         };
         let Some(stage) = ticket.kind.event().stage_on(map_id) else {
@@ -70,7 +72,9 @@ impl ClientActor {
             None => return Ok(false),
             Some(Cloto::Puzzle { stage, combo }) => {
                 // Unchecked, she has nothing to say rather than a wrong.
-                let Some(right) = self.standing_on(map_id, combo).await? else {
+                let judge =
+                    |areas: &[Area], positions: &[(i32, i32)]| on_areas(combo, areas, positions);
+                let Some(right) = self.standing_on(map_id, judge).await? else {
                     return Ok(false);
                 };
                 if !right {
@@ -84,9 +88,9 @@ impl ClientActor {
         Ok(true)
     }
 
-    /// A balloon on one of the event's stages: the stage's hand-in, or the
-    /// maze's one line. Returns whether it spoke; elsewhere it has nothing
-    /// to say.
+    /// A balloon on one of the event's stages: the stage's hand-in, the
+    /// crates' puzzle, or the maze's one line. Returns whether it spoke;
+    /// elsewhere it has nothing to say.
     pub(super) async fn talk_to_balloon(&mut self, npc_id: i32) -> Result<bool, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
@@ -100,6 +104,31 @@ impl ClientActor {
             NpcScript::balloon(hand_in, view, &self.in_game()?.player)
         } else if npc_id == AQUA_BALLOON && ticket.kind == EventKind::Lpq {
             NpcScript::aqua_balloon()
+        } else if npc_id == BLUE_BALLOON && ticket.kind == EventKind::Lpq {
+            let puzzle = event.stage_on(map_id);
+            let Some(stage) = puzzle.filter(|stage| event.puzzles.contains(stage)) else {
+                return Ok(false);
+            };
+            let Some(view) = ticket.balloon(stage).await else {
+                return Ok(false);
+            };
+            let stood = match view {
+                Balloon::Answer { combo } => {
+                    let taken = event.areas_taken;
+                    let judge = |areas: &[Area], positions: &[(i32, i32)]| {
+                        standing(combo, taken, areas, positions)
+                    };
+                    let Some(stood) = self.standing_on(map_id, judge).await? else {
+                        return Ok(false);
+                    };
+                    if stood == Standing::Wrong {
+                        self.show_wrong_answer().await?;
+                    }
+                    Some(stood)
+                }
+                _ => None,
+            };
+            NpcScript::blue_balloon(stage, view, stood)
         } else {
             return Ok(false);
         };
@@ -107,10 +136,14 @@ impl ClientActor {
         Ok(true)
     }
 
-    /// Whether everyone on `map_id`, the player's map, stands on its areas
-    /// as `combo` asks; `None` if it can't be told. Only the event's members
-    /// can be on its copy.
-    async fn standing_on(&mut self, map_id: i32, combo: u32) -> Result<Option<bool>, RuntimeError> {
+    /// What `judge` makes of where everyone on `map_id`, the player's map,
+    /// stands on its areas; `None` if it can't be told. Only the event's
+    /// members can be on its copy.
+    async fn standing_on<T>(
+        &mut self,
+        map_id: i32,
+        judge: impl FnOnce(&[Area], &[(i32, i32)]) -> T,
+    ) -> Result<Option<T>, RuntimeError> {
         let Some(field) = net::get_game_data()
             .ok()
             .and_then(|data| data.field(map_id))
@@ -127,7 +160,7 @@ impl ClientActor {
             .into_iter()
             .map(|(x, y)| (i32::from(x), i32::from(y)))
             .collect();
-        Ok(Some(on_areas(combo, &field.areas, &positions)))
+        Ok(Some(judge(&field.areas, &positions)))
     }
 
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.

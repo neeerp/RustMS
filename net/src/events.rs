@@ -48,6 +48,9 @@ pub struct Event {
     pub gated: &'static [i32],
     /// The stages cleared by standing on their maps' areas (`on_areas`).
     pub puzzles: RangeInclusive<u8>,
+    /// How many of a puzzle stage's areas the team must stand on, one
+    /// member on each.
+    pub areas_taken: u32,
     /// Items of use only in the event, taken from whoever leaves it.
     pub items: &'static [i32],
     /// The passes the leader hands Cloto to clear the last stage, which
@@ -85,6 +88,9 @@ pub enum Balloon {
     Intro,
     /// The leader again, who may hand the items in.
     Ready,
+    /// The leader again on a puzzle stage, answering it: the team must
+    /// stand as `combo` asks (`on_areas`).
+    Answer { combo: u32 },
 }
 
 /// A won event's bonus: the team plays `map` for `minutes`, then whoever is
@@ -121,6 +127,7 @@ pub const KPQ: Event = Event {
     stride: 1,
     gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
+    areas_taken: 3,
     items: &[COUPON, PASS],
     passes: 10,
     hand_ins: &[],
@@ -148,6 +155,7 @@ pub const HPQ: Event = Event {
     stride: 1,
     gated: &[],
     puzzles: 1..=0,
+    areas_taken: 0,
     items: &[
         4001095, 4001096, 4001097, 4001098, 4001099, 4001100, RICE_CAKE,
     ],
@@ -166,7 +174,8 @@ pub const HPQ: Event = Event {
 /// to 6 players of levels 35 to 50, 45 minutes). Its stage maps are 100
 /// apart, from 922010100 to the boss's 922010900, with rooms between; the
 /// bonus is 922011000 and the reward 922011100, and 922010000 is the way
-/// out. Stage EXP is Cosmic's (`expStages`, stage 6 none). Stages 1 to 5,
+/// out. Stage EXP is Cosmic's (`expStages`, stage 6 none). Stage 8 is a
+/// puzzle: five members on the right five of its nine crates. Stages 1 to 5,
 /// 7 and 8 shut their `next00` until cleared (Map.nx, scripts `lpq0` to
 /// `lpq7`). The passes and the key are the quest's own, and so is the pass
 /// stage 7's boxes take (4001156; the default 5A of
@@ -190,7 +199,8 @@ pub const LPQ: Event = Event {
         922_010_700,
         922_010_800,
     ],
-    puzzles: 1..=0,
+    puzzles: 8..=8,
+    areas_taken: 5,
     items: &[LPQ_PASS, LPQ_KEY, LPQ_BOX_PASS],
     passes: 0,
     hand_ins: &[
@@ -619,36 +629,61 @@ impl Puzzles {
     }
 }
 
-/// A combo for a puzzle stage with `areas` areas: random, or the one
-/// `RUSTMS_KPQ_COMBO` (from 0, in `combos`' order) names for testing.
+/// A combo of `taken` of a puzzle stage's `areas` areas: random, or the
+/// one `RUSTMS_KPQ_COMBO` (from 0, in `combos`' order) names for testing.
 /// `None` for a map without enough areas.
-pub fn draw_combo(areas: usize) -> Option<u32> {
+pub fn draw_combo(areas: usize, taken: u32) -> Option<u32> {
     static PINNED: OnceLock<Option<usize>> = OnceLock::new();
     let pinned = *PINNED.get_or_init(|| {
         std::env::var("RUSTMS_KPQ_COMBO")
             .ok()
             .and_then(|combo| combo.parse::<usize>().ok())
     });
-    let count = combos(areas).count();
+    let count = combos(areas, taken).count();
     if count == 0 {
         return None;
     }
     let index = pinned
         .filter(|index| *index < count)
         .unwrap_or_else(|| rand::random::<usize>() % count);
-    combos(areas).nth(index)
+    combos(areas, taken).nth(index)
 }
 
-/// How many of a stage's areas the team must stand on, on Kerning City's
-/// party quest's stages 2 to 4 (Cosmic `9020001`): one member on each.
-pub const AREAS_TAKEN: u32 = 3;
-
-/// Each way of choosing `AREAS_TAKEN` of `areas` areas, as a bit per area
-/// (bit 0 for the first), in a fixed order: 4 for stage 2's ropes, 10 for
-/// stage 3's platforms and 20 for stage 4's barrels.
-pub fn combos(areas: usize) -> impl Iterator<Item = u32> {
+/// Each way of choosing `taken` of `areas` areas, as a bit per area (bit 0
+/// for the first), in a fixed order: on Kerning City's party quest three
+/// of 4 for stage 2's ropes, of 5 for stage 3's platforms and of 6 for
+/// stage 4's barrels (Cosmic `9020001`); on Ludibrium's five of stage 8's
+/// 9 crates (`2040043`).
+pub fn combos(areas: usize, taken: u32) -> impl Iterator<Item = u32> {
     let all = 1u32.checked_shl(areas as u32).unwrap_or(0);
-    (0..all).filter(|combo| combo.count_ones() == AREAS_TAKEN)
+    (0..all).filter(move |combo| combo.count_ones() == taken)
+}
+
+/// How many of `positions` stand on any of `areas`.
+pub fn standing_on_areas(areas: &[Area], positions: &[(i32, i32)]) -> usize {
+    let on_any = |&&(x, y): &&(i32, i32)| areas.iter().any(|area| area.contains(x, y));
+    positions.iter().filter(on_any).count()
+}
+
+/// How the team stands on a puzzle stage whose answer is checked only
+/// with `taken` on its areas (Ludibrium's stage 8, Cosmic `2040043`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Standing {
+    /// Not `taken` of them on the areas.
+    Few,
+    Wrong,
+    Right,
+}
+
+/// How `positions` stand on `areas` for `combo`, of `taken` areas.
+pub fn standing(combo: u32, taken: u32, areas: &[Area], positions: &[(i32, i32)]) -> Standing {
+    if standing_on_areas(areas, positions) != taken as usize {
+        Standing::Few
+    } else if on_areas(combo, areas, positions) {
+        Standing::Right
+    } else {
+        Standing::Wrong
+    }
 }
 
 /// Whether the team stands as `combo` asks: one of `positions` on each of
@@ -906,16 +941,18 @@ mod tests {
             Cloto::Intro { stage: 4 }
         );
         assert!(!puzzles.set(4));
-        assert_eq!(draw_combo(2), None);
-        assert!(draw_combo(4).is_some_and(|combo| combos(4).any(|c| c == combo)));
+        assert_eq!(draw_combo(2, 3), None);
+        assert!(draw_combo(4, 3).is_some_and(|combo| combos(4, 3).any(|c| c == combo)));
     }
 
     #[test]
-    fn each_puzzle_stage_has_a_combo_for_every_three_of_its_areas() {
-        for (areas, count) in [(4, 4), (5, 10), (6, 20)] {
-            let all: Vec<u32> = combos(areas).collect();
+    fn each_puzzle_stage_has_a_combo_for_every_choice_of_its_areas() {
+        for (areas, taken, count) in [(4, 3, 4), (5, 3, 10), (6, 3, 20), (9, 5, 126)] {
+            let all: Vec<u32> = combos(areas, taken).collect();
             assert_eq!(all.len(), count);
-            assert!(all.iter().all(|c| c.count_ones() == 3 && *c < 1 << areas));
+            assert!(all
+                .iter()
+                .all(|c| c.count_ones() == taken && *c < 1 << areas));
             assert_eq!(all.iter().collect::<HashSet<_>>().len(), count);
         }
     }
@@ -943,6 +980,13 @@ mod tests {
         assert!(on_areas(combo, &areas, &[(0, 0), (20, 9), (60, 0)]));
         assert!(!on_areas(combo, &areas, &[(10, 5), on(1), on(3)]));
         assert!(!on_areas(combo, &areas, &[on(0), (25, 10), on(3)]));
+        assert_eq!(standing_on_areas(&areas, &[on(0), on(0), (100, 5)]), 2);
+        // Checked only with that many on the areas, each one once.
+        let stand = |positions: &[(i32, i32)]| standing(combo, 3, &areas, positions);
+        assert_eq!(stand(&[on(0), on(1), (100, 5)]), Standing::Few);
+        assert_eq!(stand(&[on(0), on(1), on(3), on(2)]), Standing::Few);
+        assert_eq!(stand(&[on(0), on(0), on(3)]), Standing::Wrong);
+        assert_eq!(stand(&[on(3), on(1), (100, 5), on(0)]), Standing::Right);
     }
 
     #[test]
