@@ -381,6 +381,9 @@ pub mod keys {
     pub const LPQ_BALLOON_HURRY: &str = "lpq.balloon.hurry";
     pub const LPQ_BALLOON_S6: &str = "lpq.balloon.s6";
     pub const LPQ_NOTICE_TRAP: &str = "lpq.notice.trap";
+    /// Pink lines as Rombad (stage 7) and Alishar (the boss) come out.
+    pub const LPQ_NOTICE_ROMBAD: &str = "lpq.notice.rombad";
+    pub const LPQ_NOTICE_ALISHAR: &str = "lpq.notice.alishar";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1293,6 +1296,8 @@ mod tests {
             keys::LPQ_BALLOON_HURRY,
             keys::LPQ_BALLOON_S6,
             keys::LPQ_NOTICE_TRAP,
+            keys::LPQ_NOTICE_ROMBAD,
+            keys::LPQ_NOTICE_ALISHAR,
         ];
         for key in named
             .iter()

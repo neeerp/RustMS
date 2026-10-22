@@ -1286,6 +1286,9 @@ breaker's client actor (ReactorBroken), which rolls the drops or warps.
 Ludibrium's stage 2 trap box (`2200002`, `Action::WarpMap`) sends everyone
 on the map away: the field shows them all its pink line, then tells each
 of their client actors (see "Ludibrium's balloons" in `party-quests.md`).
+Its stage 7 and boss reactors (`2201002`, `2201003`, `Action::SpawnAt`)
+show everyone a pink line and bring out Rombad or Alishar at a fixed
+point of the map.
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in

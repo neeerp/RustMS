@@ -375,6 +375,14 @@ drop passes like the four already there. Stage 5's portals `in01`-`in06`
 lead to six rooms (922010501-506), each with four boxes 2202003 and an
 `out00` back; they are in the party's copy like every map in the range.
 
+Stage 7's three monsters each drop the other pass 4001156; put on one of
+the stage's three reactors 2201002 (Cosmic `ludiMob2`), it brings out
+Rombad (9300010) at (1, -211) with a pink line (`lpq.notice.rombad`), and
+each Rombad drops one of the stage's three passes. On the boss's map a
+pass put on reactor 2201003 (`ludiBoss0`) brings out Alishar (9300012) at
+(941, 184) with `lpq.notice.alishar`; he drops the key. Both use
+`Action::SpawnAt`.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -403,8 +411,7 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's reactors that bring out Rombad and Alishar, stage 8's crates,
-  the boss, bonus and reward (`a066`, slices S4 and S5).
+- LPQ's stage 8 crates, bonus and reward (`a066`, slices S4b and S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

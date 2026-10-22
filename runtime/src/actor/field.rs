@@ -2373,6 +2373,14 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
+            // Cosmic `mapMessage(5, ..)` then `spawnMonster(.., x, y)`.
+            reactors::Action::SpawnAt { mob_id, at, notice } => {
+                let notice = net::content::text().get(notice, &[]);
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+                self.board(mob_id, 1, at);
+            }
             // Everyone here is told, then goes (Cosmic `warpMap`).
             reactors::Action::WarpMap { notice, .. } => {
                 let notice = net::content::text().get(notice, &[]);
