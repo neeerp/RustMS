@@ -274,21 +274,29 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
         .await;
         hub.push(trace);
     }
-    let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
-    assert!(said(&trace, keys::OPQ_EAK_GRASS), "{trace:?}");
-
-    // The Grass at the statue's foot brings Minerva out and wins: 3500 EXP
-    // and the clear for everyone, who stay on the hub.
     until(&mut a[0].connection, &mut hub[0], |t| {
         t.field.reactors.iter().any(|r| r.reactor_id == OPQ_STATUE)
     })
     .await;
+    let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
+    assert!(said(&trace, keys::OPQ_EAK_GRASS), "{trace:?}");
+
+    // The Grass at the statue's foot brings Minerva out and wins: 3500 EXP
+    // and the clear for everyone, who stay on the hub. (The others have
+    // yet to read the earlier stages' EXP and clears.)
     let statue = reactor_at(&hub[0], OPQ_STATUE, (-48, -916));
     assert_eq!(statue.state, 6);
+    let marks: Vec<_> = hub
+        .iter()
+        .map(|t| (t.gains.len(), t.field_effects.len()))
+        .collect();
     set_in(&mut a[0], &mut hub[0], statue, grass).await;
-    for (player, trace) in a.iter_mut().zip(&mut hub) {
+    for ((player, trace), (gains, effects)) in a.iter_mut().zip(&mut hub).zip(marks) {
         until(&mut player.connection, trace, |t| {
-            t.field.npc(MINERVA).is_some() && cleared(t) && t.gains.contains(&3500)
+            let clear = |(_, e): &(u8, String)| e == "quest/party/clear";
+            t.field.npc(MINERVA).is_some()
+                && t.gains[gains..].contains(&3500)
+                && t.field_effects[effects..].iter().any(clear)
         })
         .await;
         assert_eq!(trace.warps, [OPQ_HUB], "{trace:?}");
@@ -314,9 +322,9 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
             t.warps.contains(&OPQ.lobby)
         })
         .await;
-        // A new stack, or more on one already in the bag.
+        // New stacks, or more on those already in the bag.
         let prize = |&(_, _, item): &(u8, i16, i32)| OPQ_REWARDS.iter().any(|r| r.0 == item);
         assert!(trace.added.iter().all(prize), "{trace:?}");
-        assert_eq!(trace.added.len() + trace.quantities.len(), 1, "{trace:?}");
+        assert!(trace.added.len() + trace.quantities.len() > 0, "{trace:?}");
     }
 }

@@ -598,8 +598,8 @@ Minerva on the hub asks each member, alone, whether to go
 (`opq.minerva.thanks`) and gives each one of `events::OPQ_REWARDS` (94
 items and counts, all equally likely, Cosmic `OrbisPQ`
 `setEventRewards`), then sends them home to 200080101, portal 0. A member
-without a free Equip, Use and Etc slot gets `opq.minerva.full` and nothing
-yet.
+without a free slot in each of the Equip, Use and Etc tabs gets
+`opq.minerva.full` and nothing yet.
 
 ## Ludibrium's balloons
 
