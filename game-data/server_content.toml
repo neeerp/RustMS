@@ -767,6 +767,15 @@ unsourced = [
     "opq.eak.levers.none_right",
     "opq.eak.levers.right",
     "opq.eak.levers.done",
+    "gachapon.ask",
+    "gachapon.won",
+    "gachapon.full",
+    "gachapon.no_ticket",
+    "gachapon.menu",
+    "gachapon.what.choice",
+    "gachapon.what",
+    "gachapon.where.choice",
+    "gachapon.where",
 ]
 
 [text."glTutoMsg0.message"]

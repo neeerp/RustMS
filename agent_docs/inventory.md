@@ -861,6 +861,41 @@ node, retried with the image's `.img` put back (`field_effect::with_image`),
 since Item.nx writes reward paths without it. A world message's item link
 (BROADCAST_MSG type 6) isn't drawn; the line shows as plain blue text.
 
+### Gachapon
+
+A Gachapon Ticket (5220000, from the Cash Shop) does nothing when
+double-clicked; only a machine takes it (report c058). The machines are the
+NPCs `Map.nx` places in ten towns (`net::gachapon::MACHINES`: 9100100
+Henesys to 9100117 Nautilus Harbor). v83 kept the prize lists on the server,
+so they come from the pack's `gachapon.json` or our stand-ins
+(`agent_docs/server-content.md`).
+
+When a ticket holder clicks a machine, the script
+(`npc_scripts::gachapon_machine`) rolls the prize at once
+(`gachapon::roll`): 90 in 100 common, 8 uncommon, 2 rare, then one of the
+tier's prizes; a tier with none gives way to the one below. Yes applies
+`Effect::Gachapon`: the ticket goes, the prize comes, and both inventory
+changes and their chat gain lines are sent together, then the next page
+names the prize. A ticket holder with any of the Equip, Use, Setup or Etc
+tabs full gets the "inventory full" page before anything is rolled: a
+prize turned away with the ticket kept would be a free roll, and would show
+which tab the prize was for. If the prize still doesn't fit when yes is
+pressed, the ticket stays and the same page shows. Without a ticket the
+machine only explains itself in a menu. `RUSTMS_GACHAPON_SEED` makes every roll the same (the
+harness uses 10, an uncommon prize).
+
+An uncommon or rare prize is announced to the whole world (a recommended
+default, `v83ref/lanes/QUESTIONS.md`) as BROADCAST_MSG type 11
+(`build_gachapon_message`): `str "<name> : got a(n)", i32 channel, str town`
+and the item as in an inventory. The v83 client shows it as a chat line,
+"<name> got a(n)  :  <item>  from the <town> Gachapon! Congrats!" (StringPool
+0x137d), black text on a green bar (chat type 0x12), with the item's tooltip
+on hover; a channel of -1 would name the Cash Shop Surprise. HeavenClient
+reads it in `MessagingHandlers.cpp` (case 11), writes the line with
+`Megaphones::gachapon` and shows it as `UIChatBar::GACHAPON`, without the
+tooltip. The Remote Gachapon (5451000, USE_REMOTE_GACHAPON `0x74`) isn't
+handled and isn't sold.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being

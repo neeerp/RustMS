@@ -50,6 +50,7 @@ const SUPER_MEGAPHONE: u8 = 3;
 const ITEM_LINE: u8 = 6;
 const ITEM_MEGAPHONE: u8 = 8;
 const TRIPLE_MEGAPHONE: u8 = 10;
+const GACHAPON: u8 = 11;
 
 /// A message from the server, shown as `kind` says.
 pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, NetworkError> {
@@ -80,6 +81,26 @@ pub fn build_super_megaphone(line: &str, channel: u8, ear: bool) -> Result<Packe
     packet.write_str_with_length(line)?;
     packet.write_byte(channel)?;
     packet.write_byte(ear as u8)?;
+    Ok(packet)
+}
+
+/// The world hears that `name` won `item` from `town`'s Gachapon (report
+/// c058 Q3). v83 FUN_00a22785 splits the line at " : " and shows "<name>
+/// got a(n)  :  <item>  from the <town> Gachapon! Congrats!" (StringPool
+/// 0x137d); a channel of -1 would name the Cash Shop Surprise instead.
+pub fn build_gachapon_message(
+    name: &str,
+    channel: u8,
+    town: &str,
+    item: &Item,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(GACHAPON)?;
+    packet.write_str_with_length(&format!("{name} : got a(n)"))?;
+    packet.write_int(i32::from(channel))?;
+    packet.write_str_with_length(town)?;
+    encode_item(&mut packet, SlotPrefix::None, item)?;
     Ok(packet)
 }
 
@@ -254,6 +275,22 @@ mod tests {
             .byte(6)
             .string("Tired")
             .int(0)
+            .end();
+    }
+
+    #[test]
+    fn a_gachapon_win_names_the_winner_the_channel_the_town_and_the_item() {
+        let item = Item::stack(2_049_100, 1);
+        let packet = build_gachapon_message("Lanec", 2, "Henesys", &item).unwrap();
+        let mut body = Packet::new_empty();
+        encode_item(&mut body, SlotPrefix::None, &item).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x44)
+            .byte(11)
+            .string("Lanec : got a(n)")
+            .int(2)
+            .string("Henesys")
+            .bytes(&body.bytes)
             .end();
     }
 

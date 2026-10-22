@@ -83,7 +83,9 @@ namespace ms
 			MEGAPHONE_PREVIEW,
 			// An avatar megaphone's banner, all its lines in one (v83 chat
 			// type 0x11)
-			AVATAR_MEGAPHONE
+			AVATAR_MEGAPHONE,
+			// A Gachapon win told to the world (v83 chat type 0x12)
+			GACHAPON
 		};
 
 		using Target = chat_target::Target;

@@ -70,6 +70,9 @@ services:
       RUSTMS_OPQ_LOUNGE: "23"
       RUSTMS_OPQ_TOWER: "1234123412341234"
       RUSTMS_OPQ_LEVERS: "14"
+      # Every Gachapon roll is the same uncommon prize, which the world hears
+      # of (see tests/gachapon.rs).
+      RUSTMS_GACHAPON_SEED: "10"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

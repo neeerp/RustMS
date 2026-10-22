@@ -6,9 +6,10 @@ use crate::message::{DirectoryMessage, FieldMessage};
 use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
+use net::handler::BroadcastScope;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
-use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::messaging::{build_broadcast, build_gachapon_message, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, quest, skill, stat};
 use net::quests::{self, QuestTemplate};
@@ -113,6 +114,7 @@ impl ClientActor {
         let mut wedding = None;
         let mut restyled = false;
         let mut command = None;
+        let mut gachapon_win = None;
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -204,6 +206,49 @@ impl ClientActor {
                         *item_id,
                         -i32::from(*quantity),
                     )?);
+                }
+                Effect::Gachapon {
+                    item_id,
+                    quantity,
+                    town,
+                    announced,
+                } => {
+                    let Ok(mut changes) = next.inventory.remove(net::gachapon::TICKET, 1) else {
+                        warn!("Gachapon Ticket no longer held; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    if net::items::refuses_only(&next.inventory, *item_id, (*quantity).into()) {
+                        return Ok(Applied::NoRoom);
+                    }
+                    let Ok(given) = net::items::give(&mut next.inventory, *item_id, *quantity)
+                    else {
+                        debug!(item_id, "Gachapon prize doesn't fit; nothing applied");
+                        return Ok(Applied::NoRoom);
+                    };
+                    // The world sees the prize as given, an equip with its
+                    // stats.
+                    let prize = given.iter().find_map(|change| match change {
+                        game::InventoryChange::Add { item, .. } if item.item_id == *item_id => {
+                            Some(item.clone())
+                        }
+                        _ => None,
+                    });
+                    changes.extend(given);
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    packets.push(inventory::build_item_gain_in_chat(
+                        net::gachapon::TICKET,
+                        -1,
+                    )?);
+                    packets.push(inventory::build_item_gain_in_chat(
+                        *item_id,
+                        i32::from(*quantity),
+                    )?);
+                    if *announced {
+                        gachapon_win = prize
+                            .or_else(|| net::items::create(*item_id, *quantity))
+                            .map(|prize| (*town, prize));
+                    }
                 }
                 Effect::RevivePet { serial, days } => {
                     let until = SystemTime::now() + Duration::from_secs(*days as u64 * 86_400);
@@ -452,6 +497,15 @@ impl ClientActor {
         }
         self.naming_guild |= name_guild;
         self.send_all(&mut packets).await?;
+        if let Some((town, prize)) = gachapon_win {
+            let name = self.in_game()?.player.name().to_owned();
+            let packet = build_gachapon_message(&name, self.channel_id, town, &prize)?;
+            Box::pin(self.apply(WorldAction::Broadcast {
+                scope: BroadcastScope::World,
+                packet,
+            }))
+            .await?;
+        }
         if restyled {
             let announce = inventory::build_char_look(&self.in_game()?.player)?;
             Box::pin(self.apply(WorldAction::LookChanged(announce))).await?;

@@ -20,6 +20,7 @@ pub mod duey;
 pub mod dungeons;
 pub mod energy;
 pub mod events;
+pub mod gachapon;
 mod game_data;
 pub mod handler;
 mod helpers;

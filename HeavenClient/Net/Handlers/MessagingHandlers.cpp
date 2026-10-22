@@ -545,6 +545,20 @@ namespace ms
 					chatbar->send_megaphone(message, UIChatBar::LineType::ITEM_MEGAPHONE, channel, ear);
 				break;
 			}
+			case 11:
+			{
+				// The winner's channel (-1 would be the Cash Shop Surprise,
+				// which RustMS doesn't send), the machine's town, then the
+				// prize after its kind; only its name is shown.
+				recv.read_int();
+				std::string town = recv.read_string();
+				recv.read_byte();
+				std::string item = ItemData::get(recv.read_int()).get_name();
+
+				if (chatbar)
+					chatbar->send_chatline(Megaphones::gachapon(message, item, town), UIChatBar::LineType::GACHAPON);
+				break;
+			}
 			case 10:
 			{
 				std::vector<std::string> lines = { message };

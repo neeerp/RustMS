@@ -14,8 +14,10 @@ tests.
 | `assets/server-content/text.toml` | no | Script text, `"key" = "text"` |
 | `assets/server-content/rewards.json` | no | Drops per mob or reactor id (`item`/`money`, `prob`, `min`/`max`) |
 | `assets/server-content/shops.json` | no | Shop rows per NPC id (`item`, `price`) |
+| `assets/server-content/gachapon.json` | no | Gachapon prizes: `global` and `machines` (by NPC id), each with `common`, `uncommon` and `rare` lists of `{item, count}` |
 | `game-data/placeholder_text.toml` | yes | A placeholder for **every** text key, written by us |
 | `game-data/reward_overrides.toml` | yes | v83 corrections, e.g. quest drops |
+| `game-data/gachapon_placeholder.toml` | yes | Our stand-in Gachapon prizes, in the same shape |
 | `game-data/server_content.toml` | yes | Where the importer finds each key, plus its SHA-256 |
 
 `RUSTMS_SERVER_CONTENT_PATH` overrides the pack directory (default
@@ -47,11 +49,17 @@ tests.
   from the boxes even without a pack.
 - **Shops** (`ShopTable`): without `shops.json` no NPC keeps a shop, and
   shopkeepers fall back to their normal speech.
+- **Gachapon prizes** (`GachaponTable`): v83 kept them on the server, and
+  the pack has none. Without `gachapon.json` (or if it doesn't parse) every
+  machine draws from `gachapon_placeholder.toml`, a few potions, ores,
+  scrolls and a sword we picked (a recommended default,
+  `v83ref/lanes/QUESTIONS.md`). A machine draws from its own lists plus the
+  global ones.
 
 The world server logs what it found at startup:
 
 ```
-Server content: assets/server-content: 63 text keys from the pack, 0 placeholders; drops for 646 mobs and 97 shops from the pack
+Server content: assets/server-content: 63 text keys from the pack, 0 placeholders; drops for 646 mobs and 97 shops from the pack; Gachapon prizes from the stand-ins
 ```
 
 ## Importing

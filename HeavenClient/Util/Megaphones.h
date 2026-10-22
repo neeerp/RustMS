@@ -37,6 +37,18 @@ namespace ms
 			return line.substr(0, split) + "[" + item + "]" + line.substr(split);
 		}
 
+		// A Gachapon win told to the world (BROADCAST_MSG type 11, 0xa233cb):
+		// the line "Name : got a(n)" around the prize and the machine's town,
+		// as StringPool 0x137d "%s %s  :  %s  from the %s Gachapon! Congrats!".
+		inline std::string gachapon(const std::string& line, const std::string& item, const std::string& town)
+		{
+			size_t split = line.find(SEPARATOR);
+			std::string name = line.substr(0, split);
+			std::string won = split == std::string::npos ? "" : line.substr(split + SEPARATOR.size());
+
+			return name + " " + won + "  :  " + item + "  from the " + town + " Gachapon! Congrats!";
+		}
+
 		// A triple megaphone's later line, under the first line's name.
 		inline std::string under_name(const std::string& first, const std::string& line)
 		{

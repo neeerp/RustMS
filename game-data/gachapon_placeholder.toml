@@ -1,0 +1,21 @@
+# Stand-in Gachapon prizes, our own picks (v83ref lanes/QUESTIONS.md,
+# 2026-10-22): v83 kept its prize lists on the server, and none ships with
+# the client. The pack's `gachapon.json`, in the same shape, replaces this
+# whole file. Every machine draws from `global` and, if it has them, from its
+# own `[machines.<npc id>]` prizes.
+
+[global]
+common = [
+    { item = 2000000, count = 30 }, # Red Potion
+    { item = 2000003, count = 30 }, # Blue Potion
+    { item = 2000002, count = 20 }, # White Potion
+    { item = 4010000, count = 5 },  # Bronze Ore
+    { item = 1302000 },             # Sword
+]
+uncommon = [
+    { item = 2040002 }, # Scroll for Helmet for DEF 10%
+    { item = 2044502 }, # Scroll for Bow for ATT 10%
+]
+rare = [
+    { item = 2049100 }, # Chaos Scroll 60%
+]
