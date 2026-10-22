@@ -8,7 +8,10 @@ use net::packet::build::world::buff;
 use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
-use net::packet::handle::world::{absorbed, catch_disease, countered, party_skill_reached};
+use net::packet::handle::world::{
+    absorbed, catch_disease, countered, item_effect_packets, morph_by_another, morphed_another,
+    party_skill_reached, PartyPotion,
+};
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
@@ -18,6 +21,48 @@ const MOUNT_TIRED: &str =
     "Your mount grew tired! Treat it some revitalizer before riding it again!";
 
 impl ClientActor {
+    /// Someone's Party Potion (`item_id`) named this player: morph them
+    /// unless they are dead, a ghost, in the Cash Shop or out of the game;
+    /// whether it took.
+    pub(super) async fn morph_by_another(&mut self, item_id: i32) -> Result<bool, RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(false);
+        }
+        let Some(game) = self.game.as_mut() else {
+            return Ok(false);
+        };
+        let player = &mut game.player;
+        let Some(effect) = morph_by_another(player, item_id, std::time::Instant::now()) else {
+            return Ok(false);
+        };
+        let (mut own, seen) = item_effect_packets(player, item_id, effect, false)?;
+        self.send_all(&mut own).await?;
+        for packet in seen {
+            self.show_buffs(packet).await?;
+        }
+        Ok(true)
+    }
+
+    /// The character this player's Party Potion named answered. In the
+    /// Cash Shop meanwhile, the potion is kept and nothing is said.
+    pub(super) async fn morphed_another(
+        &mut self,
+        potion: PartyPotion,
+        morphed: bool,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let result = morphed_another(&mut game.player, potion, morphed)?;
+        for action in result.actions {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
     /// A party member's skill reached the player: if they are still on its
     /// map, out of the Cash Shop, take its buffs or HP.
     pub(super) async fn party_skill_reached(

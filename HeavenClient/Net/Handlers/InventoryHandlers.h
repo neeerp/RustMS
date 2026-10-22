@@ -97,6 +97,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The answer to a Maplemas Party Potion (FUN_00a2b39a): it unlocks the
+	// client, and may say in the chat log why no one was transformed.
+	// Opcode: RANDOM_MORPH_RES(119)
+	class RandomMorphResHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

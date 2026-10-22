@@ -150,8 +150,9 @@ pub use self::teleport_rock::{
     UseTeleportRockHandler, Whereabouts,
 };
 pub use self::use_item::{
-    apply_item_effect, item_effect_packets, HealOverTimeHandler, ItemEffect, PetAutoPotHandler,
-    ReturnScrollHandler, UseItemHandler, UseSkillBookHandler, UseSummonSackHandler,
+    apply_item_effect, item_effect_packets, morph_by_another, morphed_another, HealOverTimeHandler,
+    ItemEffect, PartyPotion, PetAutoPotHandler, ReturnScrollHandler, UseItemHandler,
+    UseSkillBookHandler, UseSummonSackHandler, UseTargetItemHandler,
 };
 pub use self::use_item_reward::UseItemRewardHandler;
 pub use self::use_skill::{

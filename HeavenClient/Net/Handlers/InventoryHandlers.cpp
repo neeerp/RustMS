@@ -292,6 +292,31 @@ namespace ms
 			window->receive(code);
 	}
 
+	void RandomMorphResHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().request_answered();
+
+		if (recv.read_byte() != 1)
+			return;
+
+		std::string line;
+
+		switch (recv.read_byte())
+		{
+			case 2:
+				line = "Failed to find user " + recv.read_string() + ".";
+				break;
+			case 3:
+				line = "You can use random transform potion only in the town.";
+				break;
+			default:
+				return;
+		}
+
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
+	}
+
 	void ModifyInventoryHandler::handle(InPacket& recv) const
 	{
 		// Set when this answers the player's item request.

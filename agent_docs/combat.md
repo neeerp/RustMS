@@ -753,6 +753,23 @@ or has a trade or personal shop open, and says nothing (0xa092fb,
 The server refuses the first three too, and a ghost too, keeping the item
 (`world/use_item.rs` `potion_refused`).
 
+The Maplemas Party Potion (2212000, report c041) morphs someone else. Its
+`spec/morphRandom` lists templates 23-30, each with a weight `prop`. v83
+opens a dialog asking whom to transform (`UITransform`, from 0x4f03c1 and
+FUN_00a1005a), with no morph, ghost or chair check, only none while a
+request is pending or a mini room is open. OK sends USE_TARGET_ITEM (0xA0)
+`i32 tick, i16 slot, i32 item id, str name` and locks the client until
+RANDOM_MORPH_RES (0x77) comes: `[0]` unlocks, `[1, 2, str name]` also says
+"Failed to find user %s." and `[1, 3]` "You can use random transform
+potion only in the town." in the chat log. The server (`UseTargetItemHandler`)
+answers `[1, 3]` off a town map, and `[1, 2]` for an empty name, the
+user's own, or a character not on the channel, dead, a ghost or in the
+Cash Shop (the directory looks the name up, `morph_by_another` applies the
+potion to the target, and `morphed_another` tells the user). The target's
+morph, one of the weighted templates for the potion's `spec/time`,
+replaces any morph they had. One potion is used, and only when someone was
+morphed. These rules beyond the client's are defaults (lanes/QUESTIONS.md).
+
 A ghost item (2360000 and 2360001 `spec/ghost` 1, 2360002 `spec/ghost` 2,
 each for an hour) makes its user a ghost: a `BuffStat::Ghost` buff (bit 49)
 from the item, its value a short, after Morph in GIVE_FOREIGN_BUFF and

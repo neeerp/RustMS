@@ -530,6 +530,9 @@ pub enum WorldAction {
         name: String,
         rock: crate::packet::handle::world::Rock,
     },
+    /// Look on the channel for the character a Party Potion names, to
+    /// morph them.
+    MorphAnother(crate::packet::handle::world::PartyPotion),
     /// Natural HP/MP recovery the client reports; the runtime checks timing.
     NaturalHeal {
         hp: i16,
@@ -962,6 +965,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SkillMacro, InGame(&world::SkillMacroHandler)),
             (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
             (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
+            (Op::UseTargetItem, InGame(&world::UseTargetItemHandler)),
             (
                 Op::UseUpgradeScroll,
                 InGame(&world::UseUpgradeScrollHandler),

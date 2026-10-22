@@ -34,6 +34,7 @@
 #include "UITeleportRock.h"
 #include "UIItemSearch.h"
 #include "UITradingRoom.h"
+#include "UITransform.h"
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
 
@@ -318,6 +319,28 @@ namespace ms
 				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
 
 			return true;
+		}
+
+		// v83 0x4f03c1 and FUN_00a1005a: the Maplemas Party Potion asks whom
+		// to transform, unless a request is pending or a mini room is open,
+		// and the server answers with RANDOM_MORPH_RES. Being transformed,
+		// a ghost or seated doesn't stop it.
+		void use_party_potion(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_player().can_request(ExclRequest::USE_WAIT) || UI::get().dialog_open())
+				return;
+
+			UI::get().emplace<UITransform>([=](const std::string &name)
+			{
+				// FUN_00a5337f: the dialog stays while the last request is pending.
+				if (Stage::get().get_player().request(UseTargetItemPacket(slot, item_id, name), ExclRequest::WAIT))
+					return true;
+
+				UI::get().emplace<UIOk>(REQUEST_BUSY, [](bool)
+				{});
+
+				return false;
+			});
 		}
 
 		// v83 FUN_00a0a63f, type 0x20: a chalkboard asks for a note, which
@@ -1287,6 +1310,8 @@ namespace ms
 						// server before any other kind of USE item is tried.
 						else if (ItemData::get(item_id).has_reward())
 							Stage::get().get_player().request(UseItemRewardPacket(slot, item_id), ExclRequest::USE_WAIT);
+						else if (morph::targets_another(item_id))
+							use_party_potion(slot, item_id);
 						else if (item_id / 10000 == 203)
 							use_return_scroll(slot, item_id);
 						else if (item_id / 10000 == 210)

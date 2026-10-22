@@ -95,6 +95,9 @@ int main()
 		require(potion_refused(2210000, 0, false, 0, 0, true), "nor in a mini room");
 		require(!potion_refused(2210000, 0, false, 0, 1902000, false), "a tamed monster is refused elsewhere");
 		require(!potion_refused(2000000, 1, true, 3010000, 1932000, true), "other potions are not refused here");
+		require(targets_another(2212000) && !targets_another(2211000) && !targets_another(2210000),
+				"the Party Potion is used on someone else");
+		require(!targets_another(2022000) && !targets_another(2360000), "nothing else is");
 
 		require(ghost_action("stand1") == "ghoststand" && ghost_action("alert") == "ghoststand",
 			"a ghost stands, alert or not");

@@ -177,6 +177,39 @@ pub fn build_incubator_result(item_id: i32, count: i16) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// How a Party Potion used on someone went (report c041).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RandomMorphRes {
+    /// Used, or refused without a word: the client only unlocks.
+    Done,
+    /// "Failed to find user %s."
+    NotFound(String),
+    /// "You can use random transform potion only in the town."
+    NotInTown,
+}
+
+/// RANDOM_MORPH_RES (0x77): `u8 1` then a reason (2 with the name, 3) for a
+/// notice, anything else to only unlock the client's item use.
+pub fn build_random_morph_res(res: &RandomMorphRes) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::RandomMorphRes as i16)?;
+    match res {
+        RandomMorphRes::Done => {
+            p.write_byte(0)?;
+        }
+        RandomMorphRes::NotFound(name) => {
+            p.write_byte(1)?;
+            p.write_byte(2)?;
+            p.write_str_with_length(name)?;
+        }
+        RandomMorphRes::NotInTown => {
+            p.write_byte(1)?;
+            p.write_byte(3)?;
+        }
+    }
+    Ok(p)
+}
+
 /// UPDATE_CHAR_LOOK: other players redraw this character's equipment.
 pub fn build_char_look(player: &Player) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -194,6 +227,17 @@ mod tests {
     use super::*;
     use crate::codec::testing::Expect;
     use game::Item;
+
+    #[test]
+    fn a_random_morph_answer_unlocks_or_names_its_notice() {
+        let bytes = |res| build_random_morph_res(&res).unwrap().bytes;
+        assert_eq!(bytes(RandomMorphRes::Done), [0x77, 0, 0]);
+        assert_eq!(bytes(RandomMorphRes::NotInTown), [0x77, 0, 1, 3]);
+        assert_eq!(
+            bytes(RandomMorphRes::NotFound("Bo".into())),
+            [0x77, 0, 1, 2, 2, 0, b'B', b'o']
+        );
+    }
 
     #[test]
     fn quantity_and_removal_changes() {

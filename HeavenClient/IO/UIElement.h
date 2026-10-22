@@ -131,6 +131,7 @@ namespace ms
 			ITEMSEARCHRESULT,
 			INCUBATOR,
 			INVITATION,
+			TRANSFORM,
 			NUM_TYPES
 		};
 

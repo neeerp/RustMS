@@ -539,6 +539,13 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::MorphAnother(potion) => {
+                self.send_to_directory(DirectoryMessage::MorphAnother {
+                    from: self.client_id,
+                    potion,
+                })
+                .await?
+            }
             WorldAction::Find { target_name } => {
                 self.send_to_directory(DirectoryMessage::Find {
                     from: self.client_id,
@@ -1396,6 +1403,18 @@ impl ClientActor {
                 reply_to.send(ServerMessage::RockLocated { rock, found });
             }
             ServerMessage::RockLocated { rock, found } => self.rock_located(rock, found).await?,
+            ServerMessage::MorphAnother { reply_to, potion } => {
+                // The user is answered even when this client's packets fail.
+                let morphed = self.morph_by_another(potion.item_id).await;
+                reply_to.send(ServerMessage::MorphedAnother {
+                    potion,
+                    morphed: matches!(morphed, Ok(true)),
+                });
+                morphed?;
+            }
+            ServerMessage::MorphedAnother { potion, morphed } => {
+                self.morphed_another(potion, morphed).await?
+            }
             ServerMessage::FamilyLocate { reply_to, trip } => {
                 let found = self.whereabouts();
                 let summoned = matches!(trip, FamilyTrip::Summoned { .. });

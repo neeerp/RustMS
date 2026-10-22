@@ -38,6 +38,13 @@ namespace ms::morph
 		return morph != 0 || ghost || chair != 0 || vehicle / 10000 == 193 || mini_room;
 	}
 
+	// v83 0x4f03c1: a morph potion with 2 in the thousands (the Maplemas Party Potion 2212000) is used on
+	// someone else, named in the Transform dialog, and none of potion_refused's gates apply (report c041).
+	inline bool targets_another(int32_t item)
+	{
+		return item / 10000 == 221 && item % 10000 / 1000 == 2;
+	}
+
 	// A ghost item's (236xxxx, Ghost bit 49) actions in Character.nx's body, each with a variant per
 	// ghost value (report c039).
 	constexpr std::array<const char *, 8> GHOST_ACTIONS = {
