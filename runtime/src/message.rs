@@ -103,8 +103,10 @@ pub enum ServerMessage {
         origin: (i16, i16),
         map_id: i32,
     },
-    /// This player broke a reactor; its loot drops for them.
+    /// This player broke a reactor on `field`; its loot drops for them, or
+    /// it sends them somewhere.
     ReactorBroken {
+        field: FieldKey,
         reactor_id: i32,
         object_id: i32,
         x: i16,

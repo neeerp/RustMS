@@ -174,20 +174,20 @@ async fn the_berserk_rooms_statues_wait_for_its_monsters() {
         send(c, attack(guard, 50000)).await;
     }
     until(c, &mut trace, |t| t.field.alive(GUARD).is_empty()).await;
-    let up = step(&mut player.connection, &name, enter("in00")).await;
+    let mut up = step(&mut player.connection, &name, enter("in00")).await;
     assert_eq!(up.arrivals.len(), 1, "{:?}", up.arrivals);
     assert_eq!(up.arrivals[0].0, BERSERK_ROOM);
     assert_eq!(up.arrivals[0].1, 3);
     let c = &mut player.connection;
-    read_for(c, &mut trace, 600).await;
+    read_for(c, &mut up, 600).await;
+    assert_eq!(up.field.reactors.len(), 5, "{:?}", up.field.reactors);
     assert!(
-        trace
-            .field
+        up.field
             .reactors
             .iter()
             .all(|r| seen.contains(&r.object_id)),
         "{:?}",
-        trace.field.reactors
+        up.field.reactors
     );
 
     // The true statue gives its piece.

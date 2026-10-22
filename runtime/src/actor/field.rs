@@ -2189,6 +2189,7 @@ impl FieldActor {
                 };
                 if let Some(occupant) = occupant {
                     occupant.handle.send(ServerMessage::ReactorBroken {
+                        field: self.key,
                         reactor_id: view.reactor_id,
                         object_id: view.object_id,
                         x: view.x,
