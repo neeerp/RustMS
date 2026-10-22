@@ -65,6 +65,47 @@ namespace ms
 		// How often v83 looks at the quest-bound tags again (FUN_00531b8d).
 		constexpr int32_t QUEST_TAG_INTERVAL = 5000;
 
+		// What a mob's attack shows on the player it hits: Mob.nx
+		// <id>.img/attack<n>/info/hit, whether it stays on them (hit/attach),
+		// and its CharDam sound.
+		struct MobHit
+		{
+			Animation animation;
+			bool shown;
+			bool attach;
+			Sound sound;
+		};
+
+		// The hit of the mob's attack `index` (attack1 is 0), read once
+		// (FUN_0067fd81).
+		const MobHit &mob_hit(int32_t mobid, int8_t index)
+		{
+			static std::unordered_map<int64_t, MobHit> loaded;
+
+			int64_t key = static_cast<int64_t>(mobid) * 256 + index;
+			auto iter = loaded.find(key);
+
+			if (iter != loaded.end())
+				return iter->second;
+
+			std::string strid = string_format::extend_id(mobid, 7);
+			nl::node hit = nl::nx::mob[strid + ".img"]["attack" + std::to_string(index + 1)]["info"]["hit"];
+
+			// Nothing shows for a hit without frames (info+0x78 empty).
+			bool shown = false;
+
+			for (nl::node frame : hit)
+				shown = shown || frame.data_type() == nl::node::type::bitmap;
+
+			Sound sound;
+
+			if (const char *name = mob_attack::char_dam_sound(index))
+				if (nl::node src = nl::nx::sound["Mob.img"][strid][name])
+					sound = Sound(src);
+
+			return loaded.emplace(key, MobHit{ Animation(hit), shown, hit["attach"].get_bool(), sound }).first->second;
+		}
+
 		// The quest whose QuestInfo.img showLayerTag is `tag`, or 0. Every quest counts, not only the supported
 		// ones (CQuestMan 0x722fd6).
 		int16_t layer_tag_quest(const std::string &tag)
@@ -450,7 +491,7 @@ namespace ms
 			combat.interrupt_prepare(result.damage);
 
 			if (result.damage > 0)
-				player.show_attack_effect(landed.hit, 1);
+				show_mob_hit(player, result.mobid, result.index, result.direction != 0);
 
 			if (result.dodged)
 				combat.show_player_special(result.dodged);
@@ -1422,6 +1463,32 @@ namespace ms
 
 			Sound(sound).play(field_effect::summon_volume(length));
 		}
+	}
+
+	void Stage::show_mob_hit(Char &target, int32_t mobid, int8_t index, bool left)
+	{
+		if (index < 0)
+			return;
+
+		const MobHit &hit = mob_hit(mobid, index);
+
+		if (!hit.shown)
+			return;
+
+		Point<int16_t> position = target.get_position();
+		mob_attack::Box body = mob_attack::user_body(position.x(), position.y(), target.is_prone(), !target.getflip());
+		mob_attack::Spot spot = mob_attack::hit_spot(body, static_cast<uint32_t>(std::rand()), static_cast<uint32_t>(std::rand()));
+		Point<int16_t> at(static_cast<int16_t>(spot.x), static_cast<int16_t>(spot.y));
+
+		if (hit.attach)
+			target.show_attack_effect(hit.animation, 1);
+		else
+			field_effects.add(hit.animation, DrawArgument(at, left));
+
+		Point<int16_t> distance = at - player.get_position();
+		double length = std::sqrt(static_cast<double>(distance.x()) * distance.x() + static_cast<double>(distance.y()) * distance.y());
+		Sound sound = hit.sound;
+		sound.play(field_effect::summon_volume(length));
 	}
 
 	void Stage::set_object_state(const std::string &name, int32_t state)

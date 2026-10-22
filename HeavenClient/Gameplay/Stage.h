@@ -184,6 +184,13 @@ namespace ms
 		// FIELD_EFFECT 0: a summon's puff and sound at a point on the map.
 		void add_summon_effect(uint8_t type, Point<int16_t> position);
 
+		// A mob's attack `index` (attack1 is 0) hit `target`, the mob on the
+		// side `left` gives (1 the right): its info/hit on them, at a random
+		// spot on their body or following them when attached, and its
+		// CharDam sound, fainter further from the player (FUN_009832e3,
+		// FUN_009581a9).
+		void show_mob_hit(Char &target, int32_t mobid, int8_t index, bool left);
+
 		// Show a named map obj, such as a party quest's gate, in `state`, or in its current one again for -1.
 		void set_object_state(const std::string &name, int32_t state);
 

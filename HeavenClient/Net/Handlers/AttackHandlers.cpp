@@ -114,11 +114,14 @@ namespace ms
 		// -1 is a touch, 0 and up a mob's attack.
 		int8_t type = recv.read_byte();
 		int32_t damage = recv.read_int();
+		int32_t mobid = 0;
+		bool left = false;
 
 		if (type >= -1)
 		{
-			recv.read_int(); // the mob's id
-			recv.read_byte(); // whether it hit from the left
+			mobid = recv.read_int();
+			// 1 for a mob on the user's right.
+			left = recv.read_bool();
 
 			// The percent Power Guard or Mana Reflection sent back at the
 			// mob, shown over it; its hit action and position aren't used.
@@ -140,6 +143,9 @@ namespace ms
 
 		if (!otherchar)
 			return;
+
+		// A mob's attack shows its hit on the user, miss or not.
+		Stage::get().show_mob_hit(*otherchar, mobid, type, left);
 
 		if (shown >= 0)
 		{

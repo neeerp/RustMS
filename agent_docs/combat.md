@@ -1551,7 +1551,13 @@ DAMAGE_PLAYER (`mob::Hurt`): `cid, from, damage`, then for a mob `mob_id,
 left, reflect percent (and its 10 bytes), stance`, then the shown number,
 or -1 and the dodging skill. A receiver shows the reflect percent of the
 damage over the mob, at most a tenth of its max HP for a physical hit
-(HeavenClient's `Mob::show_reflect`). Hits with no mob (-4) end with a byte: 1
+(HeavenClient's `Mob::show_reflect`). A mob's attack, miss or not, plays its
+`info/hit` on the player it hit (`Stage::show_mob_hit`, FUN_009832e3): at a
+random spot on the body, flipped when the mob is on the right, or, for a
+`hit/attach` one, on the player. Its attack1, attack2 and attack9 also play
+the mob's `CharDam1`, `CharDam2` and `CharDamF` sound. The player's own hits
+do the same, but only when they take damage. Nobody else sees a player's
+Power Stance or knockback. Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is
 dead (`death_penalty`). Non-beginners lose part of their level's EXP: 1% in a
