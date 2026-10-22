@@ -184,6 +184,10 @@ pub enum SendOpcode {
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
     NpcDialogue = 0x130,
+    /// The priest's line at the altar (320; report b075).
+    WeddingProgress = 0x140,
+    /// The hearts between the married couple (321; report b075).
+    WeddingCeremonyEnd = 0x141,
     /// The Duey window and its parcels (322).
     Parcel = 0x142,
     QueryCashResult = 0x144,

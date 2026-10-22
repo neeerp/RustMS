@@ -344,6 +344,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME energy_bar_layout COMMAND energy_bar_layout_tests)
     add_executable(ships_tests tests/ships.cpp)
     add_test(NAME ships COMMAND ships_tests)
+    add_executable(wedding_rules_tests tests/wedding_rules.cpp)
+    add_test(NAME wedding_rules COMMAND wedding_rules_tests)
     add_executable(field_clock_tests tests/field_clock.cpp)
     add_test(NAME field_clock COMMAND field_clock_tests)
     add_executable(reactor_rules_tests tests/reactor_rules.cpp)
@@ -642,6 +644,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapShip.cpp
     Gameplay/MapleMap/MapShip.h
     Gameplay/MapleMap/ShipRules.h
+    Gameplay/MapleMap/MapWedding.cpp
+    Gameplay/MapleMap/MapWedding.h
+    Gameplay/MapleMap/WeddingRules.h
     Gameplay/MapleMap/MapTilesObjs.cpp
     Gameplay/MapleMap/MapTilesObjs.h
     Gameplay/MapleMap/MapTooltipRules.h

@@ -201,6 +201,9 @@ pub struct Trace {
     pub family: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST and MARRIAGE_RESULT: (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
+    /// Every WEDDING_PROGRESS and WEDDING_CEREMONY_END: (opcode, body), in
+    /// order.
+    pub wedding: Vec<(i16, Vec<u8>)>,
     /// UPDATE_CHAR_LOOK: (character, ring blocks), in order.
     pub looks: Vec<(i32, crate::packets::RingLooks)>,
     /// NOTIFY_MARRIED_PARTNER_MAP_TRANSFER: (map, partner), in order.
@@ -610,6 +613,10 @@ impl Trace {
             || op == SendOpcode::MarriageResult as i16
         {
             self.marriage.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::WeddingProgress as i16
+            || op == SendOpcode::WeddingCeremonyEnd as i16
+        {
+            self.wedding.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::UpdateCharLook as i16 {
             self.looks
                 .push(decode_char_look(p).expect("UPDATE_CHAR_LOOK"));

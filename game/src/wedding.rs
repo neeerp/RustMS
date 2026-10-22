@@ -93,7 +93,29 @@ impl Venue {
     pub fn holds(self, map_id: i32) -> bool {
         map_id == self.hall() || map_id == self.altar()
     }
+
+    /// The priest's line that pronounces the couple married: the step of
+    /// WEDDING_PROGRESS whose `String.nx` text is `wedding<step>` under
+    /// the venue's priest (report b075).
+    pub fn pronouncing(self) -> u8 {
+        match self {
+            Self::Chapel => 1,
+            Self::Cathedral => 3,
+        }
+    }
+
+    /// The priest's last line, sending the married couple on.
+    pub fn farewell(self) -> u8 {
+        match self {
+            Self::Chapel => 2,
+            Self::Cathedral => 4,
+        }
+    }
 }
+
+/// The priest's first line at the altar, which also starts the venue's
+/// music (report b075).
+pub const PRIEST_WELCOME: u8 = 0;
 
 /// Amoria, where Wayne starts the weddings.
 pub const AMORIA: i32 = 680000000;

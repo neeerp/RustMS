@@ -89,6 +89,36 @@ fn talk(map: i32, npc: i32) -> Packet {
     p
 }
 
+/// WEDDING_PROGRESS: the priest's `step` for the couple.
+fn priest(step: u8, groom: i32, bride: i32) -> (i16, Vec<u8>) {
+    let mut body = vec![step];
+    body.extend(groom.to_le_bytes());
+    body.extend(bride.to_le_bytes());
+    (SendOpcode::WeddingProgress as i16, body)
+}
+
+fn hearts() -> (i16, Vec<u8>) {
+    (SendOpcode::WeddingCeremonyEnd as i16, vec![])
+}
+
+/// Tell the priest the dialog of `step` is closed.
+fn talked(step: u8) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::WeddingTalk as i16).unwrap();
+    p.write_byte(step).unwrap();
+    p
+}
+
+/// Read on from `t` until `session` has `count` priest packets.
+async fn hear(session: &mut WorldSession, count: usize, mut t: Trace) -> Trace {
+    until(&mut session.connection, &mut t, |t| {
+        t.wedding.len() >= count
+    })
+    .await;
+    read_for(&mut session.connection, &mut t, 300).await;
+    t
+}
+
 /// The modes of the MARRIAGE_RESULT packets in `t`.
 fn results(t: &Trace) -> Vec<u8> {
     t.marriage
@@ -166,10 +196,16 @@ async fn wayne_starts_a_due_wedding_and_the_priest_marries_the_couple() {
     assert_eq!(at.countdowns.len(), 1, "{:?}", at.countdowns);
     arrive(&mut b, HALL, Trace::default()).await;
 
-    // The gathering over, both go on to the altar with a new clock.
+    // The gathering over, both go on to the altar with a new clock, where
+    // the priest welcomes them.
+    let (groom, bride) = (a.character_id, b.character_id);
     let at = arrive(&mut a, ALTAR, Trace::default()).await;
     assert_eq!(at.countdowns.len(), 1, "{:?}", at.countdowns);
-    arrive(&mut b, ALTAR, Trace::default()).await;
+    let at = hear(&mut a, 1, at).await;
+    assert_eq!(at.wedding, [priest(0, groom, bride)]);
+    let bt = arrive(&mut b, ALTAR, Trace::default()).await;
+    let bt = hear(&mut b, 1, bt).await;
+    assert_eq!(bt.wedding, [priest(0, groom, bride)]);
 
     // A's vows wait for B's; B's marry them.
     let at = say_yes(&mut a, ALTAR, PRIEST).await;
@@ -180,8 +216,11 @@ async fn wayne_starts_a_due_wedding_and_the_priest_marries_the_couple() {
     );
     let mut bt = say_yes(&mut b, ALTAR, PRIEST).await;
     until(&mut b.connection, &mut bt, |t| !t.marriage.is_empty()).await;
-    read_for(&mut b.connection, &mut bt, 300).await;
+    let bt = hear(&mut b, 1, bt).await;
     assert_eq!(results(&bt), [MARRIED]);
+    // The priest pronounces them over the altar, not in a dialog of B's.
+    assert_eq!(bt.wedding, [priest(1, groom, bride)]);
+    assert!(bt.prompts.is_empty(), "{:?}", bt.prompt_texts);
     assert!(bt.items.contains(&(WEDDING_RING, 1)), "{:?}", bt.items);
     assert!(
         bt.removed.iter().any(|&(kind, _)| kind == ETC as u8),
@@ -190,13 +229,26 @@ async fn wayne_starts_a_due_wedding_and_the_priest_marries_the_couple() {
     );
     let mut at = Trace::default();
     until(&mut a.connection, &mut at, |t| !t.marriage.is_empty()).await;
-    read_for(&mut a.connection, &mut at, 300).await;
+    let at = hear(&mut a, 1, at).await;
     assert_eq!(results(&at), [MARRIED]);
+    assert_eq!(at.wedding, [priest(1, groom, bride)]);
     assert!(at.items.contains(&(WEDDING_RING, 1)), "{:?}", at.items);
     assert_eq!(
         couple_status(marriage_id).await.unwrap(),
         (STATUS_MARRIED, false)
     );
+
+    // A closing the pronouncement brings the hearts and the priest's
+    // farewell to both; a second close changes nothing.
+    let m = a.character_name.clone();
+    let at = step(&mut a.connection, &format!("{m} closes"), talked(1)).await;
+    let at = hear(&mut a, 2, at).await;
+    assert_eq!(at.wedding, [hearts(), priest(2, groom, bride)]);
+    let bt = hear(&mut b, 2, Trace::default()).await;
+    assert_eq!(bt.wedding, [hearts(), priest(2, groom, bride)]);
+    let mut bt = step(&mut b.connection, "B closes", talked(1)).await;
+    read_for(&mut b.connection, &mut bt, 500).await;
+    assert_eq!(bt.wedding, []);
 
     // Jackie sees them out.
     let at = say_yes(&mut a, ALTAR, JACKIE).await;
@@ -331,9 +383,13 @@ async fn invited_guests_come_in_while_the_couple_gather() {
     // A guest logging out ends nothing.
     drop(drops);
 
-    // The couple go on to the altar, and the guests with them.
+    // The couple go on to the altar, and the guests with them, where all
+    // hear the priest's welcome.
+    let (groom, bride) = (a.character_id, b.character_id);
     for session in [&mut a, &mut b, &mut stays, &mut leaves] {
-        arrive(session, ALTAR, Trace::default()).await;
+        let t = arrive(session, ALTAR, Trace::default()).await;
+        let t = hear(session, 1, t).await;
+        assert_eq!(t.wedding, [priest(0, groom, bride)]);
     }
     // Then the doors are closed.
     let t = go_in(&mut late).await;

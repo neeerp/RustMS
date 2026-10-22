@@ -252,9 +252,9 @@ and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The wedding
 
-Slices 7a and 7b of report b071 marry a couple at the Chapel before their
-guests; the Cathedral, blessings, the priest's packets and the party
-afterwards are later slices.
+Slices 7a to 7c of report b071 marry a couple at the Chapel before their
+guests, with the priest's lines over the altar; the Cathedral, blessings
+and the party afterwards are later slices.
 
 Wayne (9201012) in Amoria starts a booked Chapel wedding
 (`NpcScript::wedding_starter`). He answers a player who isn't engaged,
@@ -285,6 +285,8 @@ follow either ticket. The stages, scaled by `RUSTMS_EVENT_SCALE`:
    `MARRIAGE_RESULT` 12 with the record (`build_married`), and their look
    updates if the ring is worn. A partner whose equipment filled up while
    the other vowed gets the ring as a Duey parcel from the other instead.
+   The second vows end with the priest's pronouncement (below), not a
+   dialog of his.
 3. Married (`AFTER_VOWS`, 45 minutes). Jackie (9201009) asks whether to
    end it; yes sends the couple to Ames's room (680000500), as does the
    time running out.
@@ -317,6 +319,36 @@ assistant in the hall and Jackie at the altar offer them the way out
 changes channel only leaves the wedding. When it ends, guests go out with
 the couple, without the couple's `MARRIAGE_RESULT` 31. Cosmic leaves the
 guests in the hall to walk to the altar themselves; RustMS moves them.
+
+### The priest's lines
+
+v83 shows the priest's lines over the altar itself (report b075).
+`WEDDING_PROGRESS` (0x140: `u8` step, the groom's and the bride's ids)
+opens a page with the priest's `String.nx` line `Npc.img/<priest>/wedding<step>`
+for everyone at the altar; `WEDDING_CEREMONY_END` (0x141, empty) ends the
+open page and shows the hearts over the couple. The couple's client
+answers each page with `WEDDING_TALK` (0x8B: `u8`, the latest step it
+heard); a guest's client sends nothing.
+
+The wedding actor sends `ServerMessage::WeddingPriest` with a
+`PriestLine` to the couple and the guests, and each client actor passes it
+on while the player stands on the venue's altar:
+
+- Step 0 (`PRIEST_WELCOME`) when the gathering ends and they reach the
+  altar. It also starts the Chapel's music.
+- `Venue::pronouncing` (Chapel 1) when the second vows marry them.
+- The hearts and then `Venue::farewell` (Chapel 2) when either partner
+  answers the pronouncement (`WeddingMessage::Talk` with that step), or
+  `HEARTS_AFTER` (10 seconds, not scaled) after it if neither does.
+
+Only the first answer to the pronouncement from either partner's ticket
+reaches the actor (`WeddingTicket::talk`); the rest, and a guest's, stop
+at the ticket, so a client repeating 0x8B can't fill the actor's queue.
+A player away from the altar when a line goes out (in the Cash Shop, for
+one) misses it, and nothing sends it again.
+
+The Cathedral's steps (0, 1, the guests' blessing 2, the pronouncement 3
+and the farewell 4) come with slice 7d.
 
 ## The partner's map
 
@@ -449,6 +481,26 @@ not made.
 - `MARRIAGE_RESULT` 12 sets the married couple's record, as 11 does
   the engaged one's, and says "You are now married!" (StringPool
   0x108C).
+- `Gameplay/MapleMap/MapWedding` is the altar's side of
+  `WEDDING_PROGRESS` (320) and `WEDDING_CEREMONY_END` (321), on 680000110
+  and 680000210 only, with each altar's priest known to the client
+  (`WeddingRules.h`). A step shows the priest's line in `UINpcTalk` with
+  NEXT and End Chat, answered locally; step 0 also clears the hearts and
+  loops `BgmGL.img/chapel` or `cathedral`. A Cathedral guest gets "Do you
+  want to bless this couple?" on step 2 instead, and Yes sends
+  `WEDDING_BLESS` (0x8C, empty); the couple see nothing then. The groom or
+  the bride sends `WEDDING_TALK` with the latest step when a page returns.
+  v83 runs each page as a modal inside the one it replaced, so a page
+  that a newer one ended returns only with it (`wedding::Pages`).
+  `WEDDING_CEREMONY_END` ends the open page and loops
+  `Effect/BasicEff.img/Wedding` 20 px above the couple's midpoint, on the
+  mists' layer, while both are on the map, until the next step 0 or map.
+  A line that arrives during a map change's fade waits for the new map
+  (`Stage::pending_wedding`, like `pending_clock`), so the welcome at the
+  altar shows. The priest's page is tagged
+  (`UINpcTalk::set_local_responder`'s `tag`): if another NPC's dialog
+  took its place, the next line neither closes that dialog nor answers
+  for the lost page.
 
 Any result ends the client's wait, as does a new field (a channel change
 or the Cash Shop, where the server drops the proposal). The result's OK
@@ -490,8 +542,9 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding (report b071 slices 7c-7g): the Cathedral, the priest's packets (0x140, 0x141), blessings, the party
-  and the hunting grounds. Also the wishlist.
+- The rest of the wedding (report b071 slices 7d-7g): the Cathedral and
+  its blessings (0x8C), the party and the hunting grounds. Also the
+  wishlist.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
   guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's

@@ -28,4 +28,20 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// The priest's line at a wedding's altar (0x58153d, report b075)
+	// Opcode: WEDDING_PROGRESS(320)
+	class WeddingProgressHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// The hearts over the married couple (0x581b49)
+	// Opcode: WEDDING_CEREMONY_END(321)
+	class WeddingCeremonyEndHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

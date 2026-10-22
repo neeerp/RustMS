@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "Combat/Combat.h"
 #include "Combat/Dash.h"
@@ -48,6 +49,7 @@
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapClock.h"
 #include "MapleMap/MapShip.h"
+#include "MapleMap/MapWedding.h"
 #include "Physics/Physics.h"
 
 #include "../Character/Player.h"
@@ -216,6 +218,18 @@ namespace ms
 		// CONTI_STATE: where the map's ship is, which the client asks on
 		// entering the map.
 		void show_ship_state(uint8_t state, uint8_t flag);
+
+		// WEDDING_PROGRESS: the priest's line at a wedding's altar.
+		void wedding_progress(uint8_t step, int32_t groom, int32_t bride);
+
+		// WEDDING_CEREMONY_END: the hearts over the married couple.
+		void wedding_hearts();
+
+		// The player answered the priest's page `page`.
+		void answer_priest(uint32_t page, int8_t response);
+
+		// Where the character `cid` stands on the map, if here.
+		std::optional<Point<int16_t>> position_of(int32_t cid);
 
 		// Shake the field's view, not the UI, replacing any shake under way
 		// (SetTremble 0x43da05). Unless forced, only with the ShakeScreen
@@ -413,6 +427,7 @@ namespace ms
 		MapDoors doors;
 		MapSummons summons;
 		MapShip ship;
+		MapWedding wedding;
 		MapClouds clouds;
 		MapWeather weather;
 		bool jukebox = false;
@@ -427,6 +442,17 @@ namespace ms
 		};
 
 		std::optional<ClockTime> pending_clock;
+		// The priest's packets that came before their altar loaded: a
+		// step, or the hearts.
+		struct WeddingNews
+		{
+			bool hearts;
+			uint8_t step;
+			int32_t groom;
+			int32_t bride;
+		};
+
+		std::vector<WeddingNews> pending_wedding;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
 		// One-time FIELD_EFFECT effects: on the map, on the screen, and on the screen above the UI.

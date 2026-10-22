@@ -97,6 +97,8 @@ namespace ms
 			OWL_GO = 67,
 			RPS_ACTION = 136,
 			RING_ACTION = 137,
+			WEDDING_TALK = 139,
+			WEDDING_BLESS = 140,
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,

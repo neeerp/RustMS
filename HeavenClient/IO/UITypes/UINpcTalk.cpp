@@ -523,9 +523,15 @@ namespace ms
 		respond(1, choices[selected].id);
 	}
 
-	void UINpcTalk::set_local_responder(std::function<void(int8_t, int32_t)> responder)
+	void UINpcTalk::set_local_responder(std::function<void(int8_t, int32_t)> responder, uint32_t tag)
 	{
 		local_responder = std::move(responder);
+		local_tag = tag;
+	}
+
+	uint32_t UINpcTalk::get_local_tag() const
+	{
+		return local_tag;
 	}
 
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -767,6 +773,7 @@ namespace ms
 	{
 		release_field();
 		local_responder = nullptr;
+		local_tag = 0;
 		message_type = msgtype;
 		type = get_by_value(msgtype);
 		input = prompt;

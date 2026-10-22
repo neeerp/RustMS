@@ -52,6 +52,8 @@ pub enum RecvOpcode {
     RpsAction = 0x88,
     /// Proposals with an engagement ring box, by mode (report b052).
     RingAction = 0x89,
+    /// One of the couple closed the priest's line (report b075).
+    WeddingTalk = 0x8B,
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,
