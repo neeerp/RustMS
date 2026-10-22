@@ -233,7 +233,7 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
     if !is_use_item(item_id) || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
         return None;
     }
-    if potion_refused(player, item_id) {
+    if potion_refused(player, item_id) || targets_another(item_id) {
         return None;
     }
     let spec = items::info(item_id)?.spec.filter(ConsumeSpec::has_effect)?;
@@ -265,8 +265,26 @@ fn potion_refused(player: &Player, item_id: i32) -> bool {
         || battleship
 }
 
+/// A morph potion whose id has 2 in the thousands (the Maplemas Party
+/// Potion 2212000) morphs another player named in v83's Transform dialog
+/// (send 0xA0, report c041), never the user, so USE_ITEM refuses it.
+fn targets_another(item_id: i32) -> bool {
+    item_id / 10_000 == 221 && item_id % 10_000 / 1_000 == 2
+}
+
+/// The template a random morph potion's roll in `0..` the sum of its
+/// weights lands on, taking the pool's entries in order (report c041).
+fn random_morph(pool: &[(i16, i32)], roll: i32) -> Option<i16> {
+    let mut left = roll;
+    pool.iter().find_map(|&(morph, prop)| {
+        left -= prop.max(0);
+        (left < 0).then_some(morph)
+    })
+}
+
 /// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it
-/// cures, then the stats it raises for its time as a buff of id `-item_id`.
+/// cures, then the stats it raises, and the morph it rolls from a random
+/// pool, for its time as a buff of id `-item_id`.
 fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instant) -> ItemEffect {
     let max_hp = player.effective_max_hp();
     let max_mp = player.effective_max_mp();
@@ -275,11 +293,16 @@ fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instan
     player.add_mp(spec.mp * more / 100 + max_mp * spec.mp_r / 100);
     let cured = player.buffs.cure(&spec.cures);
     let time = spec.time * longer / 100;
-    let given = if time > 0 {
+    let mut given = if time > 0 {
         spec.stats.clone()
     } else {
         Vec::new()
     };
+    let total: i32 = spec.morph_random.iter().map(|&(_, prop)| prop.max(0)).sum();
+    if time > 0 && total > 0 {
+        let roll = rand::thread_rng().gen_range(0, total);
+        given.extend(random_morph(&spec.morph_random, roll).map(|morph| (BuffStat::Morph, morph)));
+    }
     let lasts = Duration::from_millis(time.max(0) as u64);
     for &(stat, value) in &given {
         player
@@ -928,6 +951,47 @@ mod tests {
     }
 
     #[test]
+    fn a_random_morph_roll_falls_in_its_entry_by_weight() {
+        let pool = [(23, 15), (24, 10), (25, 0), (26, 75)];
+        let picks: Vec<_> = [0, 14, 15, 24, 25, 99, 100]
+            .iter()
+            .map(|&roll| random_morph(&pool, roll))
+            .collect();
+        assert_eq!(
+            picks,
+            [
+                Some(23),
+                Some(23),
+                Some(24),
+                Some(24),
+                Some(26),
+                Some(26),
+                None
+            ]
+        );
+    }
+
+    #[test]
+    fn cliffs_special_potion_morphs_into_one_of_its_pool_for_an_hour() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2211000, 2));
+        let used = use_item(&mut player, 1, 2211000, Instant::now()).unwrap();
+        let [(BuffStat::Morph, morph)] = used.effect.given[..] else {
+            panic!("no morph in {:?}", used.effect.given);
+        };
+        assert!((23..=30).contains(&morph));
+        assert_eq!(used.effect.time, 3_600_000);
+        assert_eq!(player.inventory.count(2211000), 1);
+        // Morphed, the next one waits.
+        assert!(use_item(&mut player, 1, 2211000, Instant::now()).is_none());
+    }
+
+    #[test]
     fn a_pill_buffs_for_its_time_and_all_cure_cures() {
         if items::data().is_err() {
             return;
@@ -1004,9 +1068,9 @@ mod tests {
         }
         let mut player = crate::codec::stats::sample_player();
         // A Return Scroll is no USE_ITEM; a Warp Scroll for the Kerning PQ
-        // (2032000) has a spec but nothing USE_ITEM applies; Cliff's Special
-        // Potion (2211000) heals 50 but morphs at random, which isn't chosen.
-        for (slot, item_id) in [(1, 2030000), (2, 2032000), (3, 2211000)] {
+        // (2032000) has a spec but nothing USE_ITEM applies; the Maplemas
+        // Party Potion (2212000) morphs someone else.
+        for (slot, item_id) in [(1, 2030000), (2, 2032000), (3, 2212000)] {
             player
                 .inventory
                 .insert(InventoryType::Use, slot, Item::stack(item_id, 1));
