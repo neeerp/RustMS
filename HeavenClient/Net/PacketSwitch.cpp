@@ -26,6 +26,7 @@
 #include "Handlers/FamilyHandlers.h"
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/LoginHandlers.h"
+#include "Handlers/MarriageHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/MemoHandlers.h"
 #include "Handlers/MessagingHandlers.h"
@@ -148,6 +149,8 @@ namespace ms
 		CASH_PET_FOOD_RESULT = 76,
 		OWL_RESULT = 70,
 		OWL_GO_RESULT = 71,
+		MARRIAGE_REQUEST = 72,
+		MARRIAGE_RESULT = 73,
 		CHAR_MOVED = 185,
 		SPAWN_SUMMON = 175,
 		REMOVE_SUMMON = 176,
@@ -322,6 +325,8 @@ namespace ms
 		emplace<CASH_PET_FOOD_RESULT, CashPetFoodResultHandler>();
 		emplace<OWL_RESULT, OwlResultHandler>();
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
+		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
+		emplace<MARRIAGE_RESULT, MarriageResultHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
 		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();

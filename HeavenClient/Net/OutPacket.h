@@ -96,6 +96,7 @@ namespace ms
 			OWL_OPEN = 66,
 			OWL_GO = 67,
 			RPS_ACTION = 136,
+			RING_ACTION = 137,
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,

@@ -25,6 +25,7 @@
 #include "BuddyList.h"
 #include "Alliance.h"
 #include "Family.h"
+#include "Marriage.h"
 #include "Guild.h"
 #include "ExclRequest.h"
 #include "MonsterBook.h"
@@ -427,6 +428,9 @@ namespace ms
 		// The player's family, as the server last described it.
 		Family &get_family();
 		const Family &get_family() const;
+		// The player's engagement or marriage, if any.
+		const std::optional<MarriageRecord> &get_marriage() const;
+		void set_marriage(std::optional<MarriageRecord> record);
 
 	private:
 		// Whether the key for an action is held.
@@ -518,6 +522,7 @@ namespace ms
 		Guild guild;
 		Alliance alliance;
 		Family family;
+		std::optional<MarriageRecord> marriage;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

@@ -36,6 +36,7 @@
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
 
+#include "../MarriageActions.h"
 #include "../Messages.h"
 #include "../UI.h"
 
@@ -44,6 +45,7 @@
 #include "../UITypes/UIKeyConfig.h"
 
 #include "../../Character/GachaExp.h"
+#include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
 #include "../../Character/MorphRules.h"
 #include "../../Character/Pets.h"
@@ -1255,6 +1257,8 @@ namespace ms
 							use_owl(slot, item_id);
 						else if (item_id / 10000 == 237)
 							use_solomon_writ(slot, item_id);
+						else if (marriage::is_ring_box(item_id))
+							MarriageActions::propose(item_id);
 						else if (item_id / 10000 == 226)
 							Stage::get().get_player().feed_mount(slot, item_id);
 						else if (item_id / 10000 == 227)

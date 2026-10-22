@@ -158,21 +158,16 @@ namespace ms
 		}
 	}
 
-	void CharacterParser::parse_ring3(InPacket& recv)
+	void CharacterParser::parse_ring3(InPacket& recv, Player& player)
 	{
 		int16_t rsize = recv.read_short();
+		std::optional<MarriageRecord> record;
 
+		// The server lists at most the one couple the character is in.
 		for (int16_t i = 0; i < rsize; i++)
-		{
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-			recv.read_short();
-			recv.read_int();
-			recv.read_int();
-			recv.read_padded_string(13);
-			recv.read_padded_string(13);
-		}
+			record = MarriageRecord::read(recv);
+
+		player.set_marriage(std::move(record));
 	}
 
 	void CharacterParser::parse_minigame(InPacket& recv)
