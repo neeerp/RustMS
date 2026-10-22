@@ -13,9 +13,10 @@ use tracing::debug;
 /// `USE_UPGRADE_SCROLL` (v83 FUN_00a09221): tick, scroll slot in the USE bag,
 /// target equip slot (negative: worn), White Scroll (2 = use one, 1 = none),
 /// Legendary Spirit. The client sends it when a scroll is dropped on the
-/// Equip window and only checks the category, so every rule is checked
-/// here. The reply unlocks the client's item actions, and everyone on the
-/// map sees the scroll's glow (SHOW_SCROLL_EFFECT).
+/// Equip window, or from Legendary Spirit's dialog for an equip in the Equip
+/// tab (positive slot, last byte 1), and only checks the category, so every
+/// rule is checked here. The reply unlocks the client's item actions, and
+/// everyone on the map sees the scroll's glow (SHOW_SCROLL_EFFECT).
 pub struct UseUpgradeScrollHandler;
 
 impl WorldHandler for UseUpgradeScrollHandler {
@@ -28,44 +29,69 @@ impl WorldHandler for UseUpgradeScrollHandler {
         let white = reader.read_short()? & 2 != 0;
         let legendary = reader.read_byte().unwrap_or(0) != 0;
         let unlock = stat::build_stat_update(true, &[])?;
-        if legendary {
-            // Legendary Spirit (skill 1003) is not supported: its dialog
-            // shows "You cannot use a Scroll with this item.".
-            debug!(scroll_slot, equip_slot, "Legendary Spirit scroll refused");
-            return Ok(
-                HandlerResult::reply(unlock).with_reply(effect::build_scroll_effect(
+        let target = if legendary {
+            (equip_slot > 0 && has_legendary_spirit(ctx.player)).then_some(InventoryType::Equip)
+        } else {
+            (equip_slot < 0).then_some(InventoryType::Equipped)
+        };
+        let used = target.and_then(|target| {
+            use_scroll(
+                ctx.player,
+                scroll_slot,
+                (target, equip_slot),
+                white,
+                &mut |lo, hi| rand::thread_rng().gen_range(lo, hi),
+            )
+        });
+        let Some(used) = used else {
+            debug!(
+                scroll_slot,
+                equip_slot, white, legendary, "Scroll use refused"
+            );
+            let result = HandlerResult::reply(unlock);
+            // Legendary Spirit's dialog waits for an answer and shows "You
+            // cannot use a Scroll with this item." for -1.
+            return Ok(if legendary {
+                result.with_reply(effect::build_scroll_effect(
                     ctx.player.id(),
                     -1,
                     false,
                     true,
                     false,
-                )?),
-            );
-        }
-        let Some(used) = use_scroll(ctx.player, scroll_slot, equip_slot, white, &mut |lo, hi| {
-            rand::thread_rng().gen_range(lo, hi)
-        }) else {
-            debug!(scroll_slot, equip_slot, white, "Scroll use refused");
-            return Ok(HandlerResult::reply(unlock));
+                )?)
+            } else {
+                result
+            });
         };
         let shown = effect::build_scroll_effect(
             ctx.player.id(),
             i8::from(used.outcome == ScrollOutcome::Success),
             used.outcome == ScrollOutcome::Cursed,
-            false,
+            legendary,
             used.white,
         )?;
         let mut result =
             HandlerResult::reply(inventory::build_inventory_operation(true, &used.changes)?)
                 .with_reply(shown.clone())
                 .with(WorldAction::Field(FieldRequest::Broadcast(shown)));
-        if used.outcome != ScrollOutcome::Fail {
+        if !legendary && used.outcome != ScrollOutcome::Fail {
             result = result.with(WorldAction::LookChanged(inventory::build_char_look(
                 ctx.player,
             )?));
         }
         Ok(result)
     }
+}
+
+/// Legendary Spirit for Beginners, Noblesses and Legends.
+const LEGENDARY_SPIRITS: [i32; 3] = [1003, 10001003, 20001003];
+
+/// Whether the player has learned Legendary Spirit, which lets them scroll
+/// equips in the Equip tab.
+fn has_legendary_spirit(player: &Player) -> bool {
+    LEGENDARY_SPIRITS
+        .iter()
+        .any(|&skill| player.skills.level(skill) > 0)
 }
 
 struct ScrollUse {
@@ -75,22 +101,22 @@ struct ScrollUse {
     white: bool,
 }
 
-/// Use the scroll in USE `scroll_slot` on the equip worn at `equip_slot`,
-/// with a White Scroll if `white` and the player has one; `roll` is
-/// `scroll::apply`'s. `None` (nothing changes) unless the player is alive,
-/// the scroll and the equip exist, the scroll fits it (category, `req`
-/// list, slots left) and it is not a cash item. The changes are the scroll
-/// and White Scroll taken, then the equip removed and, unless destroyed,
-/// added back with its new stats.
+/// Use the scroll in USE `scroll_slot` on the equip at `(kind, equip_slot)`
+/// (worn, or in the Equip tab for Legendary Spirit), with a White Scroll if
+/// `white` and the player has one; `roll` is `scroll::apply`'s. `None`
+/// (nothing changes) unless the player is alive, the scroll and the equip
+/// exist, the scroll fits it (category, `req` list, slots left) and it is not
+/// a cash item (in the Equip tab, pet equipment may be: the dialog lets
+/// 180xxxx through). The changes are the scroll and White Scroll taken, then
+/// the equip removed and, unless destroyed, added back with its new stats.
 fn use_scroll(
     player: &mut Player,
     scroll_slot: i16,
-    equip_slot: i16,
+    (kind, equip_slot): (InventoryType, i16),
     white: bool,
     roll: &mut impl FnMut(i32, i32) -> i32,
 ) -> Option<ScrollUse> {
-    // A positive slot is the Legendary Spirit's equip-inventory target.
-    if player.stats.hp <= 0 || equip_slot >= 0 {
+    if player.stats.hp <= 0 {
         return None;
     }
     let scroll_id = player
@@ -98,10 +124,7 @@ fn use_scroll(
         .get(InventoryType::Use, scroll_slot)?
         .item_id;
     let scroll = items::info(scroll_id)?.scroll?;
-    let mut item = player
-        .inventory
-        .get(InventoryType::Equipped, equip_slot)?
-        .clone();
+    let mut item = player.inventory.get(kind, equip_slot)?.clone();
     let base_slots = items::info(item.item_id)?.equip?.upgrade_slots;
     let fits = scroll::can_apply(
         scroll_id,
@@ -110,7 +133,8 @@ fn use_scroll(
         item.equip.as_ref()?,
         base_slots,
     );
-    if item.is_cash() || !fits {
+    let pet_equip = kind == InventoryType::Equip && item.item_id / 10_000 == 180;
+    if item.is_cash() && !pet_equip || !fits {
         return None;
     }
     let white_slot = if white && scroll.kind.takes_white_scroll() {
@@ -130,11 +154,11 @@ fn use_scroll(
     if let Some(slot) = white_slot {
         changes.extend(next.take(InventoryType::Use, slot, 1).ok()?);
     }
-    changes.extend(next.take(InventoryType::Equipped, equip_slot, 1).ok()?);
+    changes.extend(next.take(kind, equip_slot, 1).ok()?);
     if outcome != ScrollOutcome::Cursed {
-        next.insert(InventoryType::Equipped, equip_slot, item.clone());
+        next.insert(kind, equip_slot, item.clone());
         changes.push(InventoryChange::Add {
-            kind: InventoryType::Equipped,
+            kind,
             slot: equip_slot,
             item,
         });
@@ -156,6 +180,7 @@ mod tests {
     use packet::io::write::PktWrite;
 
     const SWORD: i32 = 1302000;
+    const WORN: (InventoryType, i16) = (InventoryType::Equipped, equip_slot::WEAPON);
 
     fn request(scroll_slot: i16, equip_slot: i16, white: i16, legendary: u8) -> Packet {
         let mut p = Packet::new_empty();
@@ -239,7 +264,7 @@ mod tests {
         }
         let mut player = armed_player(&[(2043001, 2), (WHITE_SCROLL, 1)]);
         let before = sword(&player).unwrap();
-        let used = use_scroll(&mut player, 1, equip_slot::WEAPON, true, &mut |_, _| 99).unwrap();
+        let used = use_scroll(&mut player, 1, WORN, true, &mut |_, _| 99).unwrap();
         assert_eq!((used.outcome, used.white), (ScrollOutcome::Fail, true));
         assert_eq!(
             used.changes,
@@ -270,7 +295,7 @@ mod tests {
         );
         assert_eq!(sword(&player).unwrap(), before);
         // Without a White Scroll left, the flag is ignored.
-        let used = use_scroll(&mut player, 1, equip_slot::WEAPON, true, &mut |_, _| 99).unwrap();
+        let used = use_scroll(&mut player, 1, WORN, true, &mut |_, _| 99).unwrap();
         assert!(!used.white);
         assert_eq!(
             sword(&player).unwrap().upgrade_slots,
@@ -285,7 +310,7 @@ mod tests {
         }
         let mut player = armed_player(&[(2043004, 1)]);
         let mut rolls = [99, 0].into_iter();
-        let used = use_scroll(&mut player, 1, equip_slot::WEAPON, false, &mut |_, _| {
+        let used = use_scroll(&mut player, 1, WORN, false, &mut |_, _| {
             rolls.next().unwrap()
         })
         .unwrap();
@@ -337,19 +362,91 @@ mod tests {
         )));
         assert_eq!(player.inventory.count(2043000), 1);
         player.stats.hp = 0;
-        assert!(use_scroll(&mut player, 2, equip_slot::WEAPON, false, &mut |_, _| 0).is_none());
+        assert!(use_scroll(&mut player, 2, WORN, false, &mut |_, _| 0).is_none());
+    }
+
+    /// Whether `actions` are Legendary Spirit's refusal: the unlock and a
+    /// -1 for its dialog.
+    fn refused_in_the_dialog(actions: &[WorldAction]) -> bool {
+        matches!(actions, [WorldAction::Reply(unlock), WorldAction::Reply(shown)]
+            if unlock.opcode() == SendOpcode::StatChange as i16
+                && shown.opcode() == SendOpcode::ShowScrollEffect as i16
+                && shown.bytes[6..] == [0xFF, 0, 1, 0])
+    }
+
+    fn learn(player: &mut Player, skill_id: i32) {
+        player.skills.set(game::SkillRecord {
+            skill_id,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
     }
 
     #[test]
-    fn legendary_spirit_requests_are_refused_in_its_dialog() {
-        let mut player = crate::codec::stats::sample_player();
+    fn legendary_spirit_scrolls_a_sword_in_the_equip_tab() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = armed_player(&[(2043000, 1)]);
+        player
+            .inventory
+            .insert(InventoryType::Equip, 3, items::create(SWORD, 1).unwrap());
+        let before = player
+            .inventory
+            .get(InventoryType::Equip, 3)
+            .unwrap()
+            .clone();
+        // Without the skill, the dialog is told no and nothing changes.
+        assert!(refused_in_the_dialog(&handle(
+            &mut player,
+            request(1, 3, 1, 1)
+        )));
+        assert_eq!(player.inventory.count(2043000), 1);
+
+        learn(&mut player, 10001003);
         let actions = handle(&mut player, request(1, 3, 1, 1));
-        let [WorldAction::Reply(unlock), WorldAction::Reply(shown)] = actions.as_slice() else {
+        let [WorldAction::Reply(op), WorldAction::Reply(own), WorldAction::Field(FieldRequest::Broadcast(seen))] =
+            actions.as_slice()
+        else {
             panic!("unexpected actions {actions:?}");
         };
-        assert_eq!(unlock.opcode(), SendOpcode::StatChange as i16);
-        assert_eq!(shown.opcode(), SendOpcode::ShowScrollEffect as i16);
-        assert_eq!(&shown.bytes[6..], &[0xFF, 0, 1, 0]);
+        assert_eq!(op.opcode(), SendOpcode::InventoryOperation as i16);
+        assert_eq!(&op.bytes[2..4], &[1, 3]);
+        assert_eq!(own.bytes, seen.bytes);
+        assert_eq!(&own.bytes[6..], &[1, 0, 1, 0]);
+        let after = player.inventory.get(InventoryType::Equip, 3).unwrap();
+        let (before, after) = (before.equip.unwrap(), after.equip.clone().unwrap());
+        assert_eq!(after.watk, before.watk + 1);
+        assert_eq!(after.upgrade_slots, before.upgrade_slots - 1);
+        assert!(player.inventory.get(InventoryType::Use, 1).is_none());
+    }
+
+    #[test]
+    fn legendary_spirit_takes_only_the_equip_tab() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = armed_player(&[(2043000, 2)]);
+        learn(&mut player, 1003);
+        // The worn sword from the dialog, an empty Equip-tab slot, and the
+        // Equip tab without the dialog's byte.
+        assert!(refused_in_the_dialog(&handle(
+            &mut player,
+            request(1, equip_slot::WEAPON, 1, 1)
+        )));
+        assert!(refused_in_the_dialog(&handle(
+            &mut player,
+            request(1, 3, 1, 1)
+        )));
+        player
+            .inventory
+            .insert(InventoryType::Equip, 3, items::create(SWORD, 1).unwrap());
+        let actions = handle(&mut player, request(1, 3, 1, 0));
+        assert!(
+            matches!(actions.as_slice(), [WorldAction::Reply(p)] if p.opcode() == SendOpcode::StatChange as i16)
+        );
+        assert_eq!(player.inventory.count(2043000), 2);
     }
 
     #[test]
