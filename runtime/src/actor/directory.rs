@@ -358,6 +358,14 @@ impl WorldDirectory {
             DirectoryMessage::FamilySummonFailed { from, summoner } => {
                 self.family_summon_failed(from, summoner)
             }
+            DirectoryMessage::FamilyPartyBuff { from, buff } => self.family_party_buff(from, buff),
+            DirectoryMessage::FamilyBondingCount { from, juniors } => {
+                let online = juniors
+                    .iter()
+                    .filter(|id| self.clients.contains_key(id))
+                    .count();
+                self.tell(from, ServerMessage::FamilyBondingCount(online));
+            }
             DirectoryMessage::FamilyChanged { ids } => {
                 for id in ids {
                     self.tell(id, ServerMessage::FamilyChanged);

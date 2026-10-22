@@ -13,7 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::alliance::Alliance;
-use game::family::Relatives;
+use game::family::{FamilyBuff, Relatives};
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
 use net::packet::build::world::door::DoorView;
@@ -130,6 +130,12 @@ pub enum ServerMessage {
         name: String,
         why: SummonFailure,
     },
+    /// A family rate entitlement now works for the player: their own, or
+    /// their party's.
+    FamilyBuff(FamilyBuff),
+    /// How many of the juniors the player's bonding entitlement needs are
+    /// online.
+    FamilyBondingCount(usize),
     /// The invitation the player's guild had to `alliance_id` stands; join
     /// it.
     JoinAlliance {
@@ -722,6 +728,17 @@ pub enum DirectoryMessage {
     FamilySummonFailed {
         from: ClientId,
         summoner: ClientId,
+    },
+    /// `from` bought `buff` for their party, and has it: each other member
+    /// on their channel gets it too.
+    FamilyPartyBuff {
+        from: ClientId,
+        buff: FamilyBuff,
+    },
+    /// How many of `juniors` are online, for `from`'s bonding entitlement.
+    FamilyBondingCount {
+        from: ClientId,
+        juniors: Vec<ClientId>,
     },
     /// These characters' families changed; those online read theirs again.
     FamilyChanged {

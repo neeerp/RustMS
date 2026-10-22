@@ -1,9 +1,10 @@
 //! The family's packets (recv 94-104 in the client; report b039).
 
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::family::{FamilyChart, FamilyInfo, Refusal, ENTITLEMENTS, MAX_JUNIORS};
+use game::family::{FamilyBuff, FamilyChart, FamilyInfo, Refusal, ENTITLEMENTS, MAX_JUNIORS};
 use game_data::server_content::keys;
 use packet::{io::write::PktWrite, Packet};
+use std::time::{Duration, SystemTime};
 
 fn op(op: SendOpcode) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
@@ -81,6 +82,30 @@ pub fn build_privilege_list() -> Result<Packet, NetworkError> {
         packet
             .write_str_with_length(&text.get(&keys::family_entitlement_description(index), &[]))?;
     }
+    Ok(packet)
+}
+
+/// SET_PRIVILEGE: the icon of `buff`, with the entitlement's tooltip and
+/// its time left at `now`; none clears it (report b050). The client's icon
+/// stays at 0 until cleared.
+pub fn build_set_privilege(
+    buff: Option<&FamilyBuff>,
+    now: SystemTime,
+) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::FamilySetPrivilege)?;
+    let Some(buff) = buff else {
+        packet.write_byte(0)?;
+        return Ok(packet);
+    };
+    packet.write_byte(buff.benefit().icon())?;
+    packet.write_int(buff.index as i32)?;
+    // Two numbers the client keeps but never reads.
+    packet.write_int(0)?;
+    packet.write_int(0)?;
+    // Ends in this many ms from now; 1 would make it ago.
+    packet.write_byte(0)?;
+    let left = buff.until.duration_since(now).unwrap_or(Duration::ZERO);
+    packet.write_int(i32::try_from(left.as_millis()).unwrap_or(i32::MAX))?;
     Ok(packet)
 }
 
@@ -188,6 +213,20 @@ pub fn build_family_job_change(job: i16, name: &str) -> Result<Packet, NetworkEr
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn set_privilege_gives_the_icon_the_tooltip_and_the_time_left() {
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let buff = FamilyBuff::new(3, now);
+        let packet = build_set_privilege(Some(&buff), now + Duration::from_secs(60)).unwrap();
+        let mut expected = vec![0x67, 0, 3];
+        expected.extend(3i32.to_le_bytes());
+        expected.extend([0; 8]);
+        expected.push(0);
+        expected.extend(840_000i32.to_le_bytes());
+        assert_eq!(packet.bytes, expected);
+        assert_eq!(build_set_privilege(None, now).unwrap().bytes, [0x67, 0, 0]);
+    }
 
     #[test]
     fn info_carries_the_numbers_then_the_names() {

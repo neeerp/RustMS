@@ -6,6 +6,7 @@ use super::{Entry, WorldDirectory};
 use crate::actor::messenger::CHANNEL_CHANGE_GRACE;
 use crate::db::spawn_db;
 use crate::message::{FamilyTrip, Presence, ServerMessage, SummonFailure};
+use game::family::FamilyBuff;
 use game::family::{check_levels, FamilyChart, Refusal, Relatives, ENTITLEMENTS, SUMMON};
 use net::packet::build::world::family::{
     build_family_chart, build_family_job_change, build_family_level_up, build_family_refusal,
@@ -232,6 +233,26 @@ impl WorldDirectory {
             .retain(|_, summons| summons.summoner != client_id);
         for _ in self.family_summons.len()..before {
             refund_summons(client_id);
+        }
+    }
+
+    /// `from` bought `buff` for their party, and has it: each other member
+    /// on their channel gets it too.
+    pub(super) fn family_party_buff(&self, from: ClientId, buff: FamilyBuff) {
+        let Some(channel) = self.clients.get(&from).map(|entry| entry.channel_id) else {
+            return;
+        };
+        let Some(party) = self.parties.of(from) else {
+            return;
+        };
+        for member in &party.members {
+            let here = self
+                .clients
+                .get(&member.id)
+                .is_some_and(|entry| entry.channel_id == channel);
+            if member.id != from && here {
+                self.tell(member.id, ServerMessage::FamilyBuff(buff));
+            }
         }
     }
 

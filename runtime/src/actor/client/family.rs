@@ -5,16 +5,21 @@ use super::ClientActor;
 use crate::message::{DirectoryMessage, FamilyTrip, SummonFailure};
 use crate::{db::spawn_db, error::RuntimeError};
 use db::family::{Separation, Spending};
-use game::family::{Benefit, Entitlement, Refusal, ENTITLEMENTS, SUMMON, TELEPORT};
+use game::family::{
+    Benefit, Entitlement, FamilyBuff, Refusal, BONDING_JUNIORS, ENTITLEMENTS, SUMMON, TELEPORT,
+};
 use game_data::server_content::keys;
 use net::packet::build::world::family::{
     build_family_info, build_family_refusal, build_join_accepted, build_join_result,
     build_privilege_list, build_rep_gain, build_separated, build_separation_fee,
+    build_set_privilege,
 };
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::handle::world::{may_summon_to, may_travel, travel_to, Whereabouts};
 use net::{ClientId, FamilyRequest};
+use std::time::SystemTime;
+use tokio::time::Instant;
 use tracing::warn;
 
 impl ClientActor {
@@ -98,10 +103,29 @@ impl ClientActor {
         let Some(entitlement) = ENTITLEMENTS.get(index) else {
             return Ok(());
         };
-        let (Benefit::Teleport | Benefit::Summon) = entitlement.benefit else {
-            // The rates come with their buff icon.
-            return Ok(());
-        };
+        match entitlement.benefit {
+            Benefit::Teleport | Benefit::Summon => {}
+            Benefit::Rate { party: false, .. } => return self.buy_buff(index).await,
+            Benefit::Rate { party: true, .. } => {
+                if !self.spend_entitlement(index).await? {
+                    return Ok(());
+                }
+                let buff = FamilyBuff::new(index, SystemTime::now());
+                self.family_buff(buff).await?;
+                let from = self.client_id;
+                self.send_to_directory(DirectoryMessage::FamilyPartyBuff { from, buff })
+                    .await?;
+                return self.tell_spent(index).await;
+            }
+            Benefit::Bonding { .. } => {
+                // Paid for once the juniors are counted.
+                let cid = self.client_id;
+                let juniors = spawn_db(move || db::family::tree_juniors(cid)).await?;
+                return self
+                    .send_to_directory(DirectoryMessage::FamilyBondingCount { from: cid, juniors })
+                    .await;
+            }
+        }
         let Some(name) = target else {
             return Ok(());
         };
@@ -149,6 +173,77 @@ impl ClientActor {
         })
         .await?;
         self.tell_spent(SUMMON).await
+    }
+
+    /// Pay for the rate entitlement `index`, for the player alone.
+    async fn buy_buff(&mut self, index: usize) -> Result<(), RuntimeError> {
+        if !self.spend_entitlement(index).await? {
+            return Ok(());
+        }
+        self.family_buff(FamilyBuff::new(index, SystemTime::now()))
+            .await?;
+        self.tell_spent(index).await
+    }
+
+    /// `online` of the juniors bonding needs are: buy it, or say why not.
+    pub(super) async fn family_bonding(&mut self, online: usize) -> Result<(), RuntimeError> {
+        if online >= BONDING_JUNIORS {
+            let index = ENTITLEMENTS
+                .iter()
+                .position(|entitlement| matches!(entitlement.benefit, Benefit::Bonding { .. }))
+                .unwrap_or_default();
+            return self.buy_buff(index).await;
+        }
+        // The client has the line (0x1200) but never shows it.
+        let text = net::content::text().get(keys::FAMILY_BONDING_SHORT, &[]);
+        self.send(&mut build_broadcast(Broadcast::Pink, &text)?)
+            .await
+    }
+
+    /// `buff` now works for the player, in place of any other, and its icon
+    /// shows.
+    pub(super) async fn family_buff(&mut self, buff: FamilyBuff) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        if let Err(error) = spawn_db(move || db::family::set_buff(&[cid], buff)).await {
+            warn!(cid, %error, "Failed to save a family entitlement");
+        }
+        // A party member may be on their way in.
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        game.player.family_buff = Some(buff);
+        self.show_family_buff().await
+    }
+
+    /// The icon of the family entitlement working for the player, if any.
+    pub(super) async fn show_family_buff(&mut self) -> Result<(), RuntimeError> {
+        let buff = self.in_game()?.player.family_buff;
+        self.send(&mut build_set_privilege(buff.as_ref(), SystemTime::now())?)
+            .await
+    }
+
+    /// When the family entitlement working for the player ends.
+    pub(super) fn family_buff_due(&self) -> Option<Instant> {
+        let until = self.game.as_ref()?.player.family_buff?.until;
+        let wait = until.duration_since(SystemTime::now()).unwrap_or_default();
+        Some(Instant::now() + wait)
+    }
+
+    /// The family entitlement ran out: its rates stop and its icon goes.
+    pub(super) async fn end_family_buff(&mut self) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        let Some(buff) = player
+            .family_buff
+            .filter(|buff| buff.until <= SystemTime::now())
+        else {
+            return Ok(());
+        };
+        player.family_buff = None;
+        let (cid, until) = (self.client_id, buff.until);
+        if let Err(error) = spawn_db(move || db::family::end_buff(cid, until)).await {
+            warn!(cid, %error, "Failed to end a family entitlement");
+        }
+        self.show_family_buff().await
     }
 
     /// Pay for entitlement `index`. False if the player can't: short of Rep

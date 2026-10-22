@@ -1,6 +1,7 @@
 //! The world's EXP, drop and meso rates, the 2x EXP (521xxxx) and drop
 //! (536xxxx) cards that raise them for whoever holds one, and Hunter's Luck
-//! (2450000), which raises kill EXP while its buff lasts.
+//! (2450000), which raises kill EXP while its buff lasts, and the family
+//! entitlements that raise EXP or drops for a while.
 //!
 //! v83's client never reads a card's `rate` or `time`, and no packet starts
 //! or ends one: the server multiplies kill EXP and drops while a card in the
@@ -47,7 +48,14 @@ pub fn exp(player: &Player, now: SystemTime) -> f64 {
         .buffs
         .value(BuffStat::ExpBuff)
         .map_or(1.0, |percent| f64::from(percent) / 100.0);
-    world().exp * card(player, EXP_CARDS, now) * buff
+    world().exp * card(player, EXP_CARDS, now) * buff * family(player, now).0
+}
+
+/// The EXP and drop rates of the family entitlement working for `player`.
+fn family(player: &Player, now: SystemTime) -> (f64, f64) {
+    player
+        .family_buff
+        .map_or((1.0, 1.0), |buff| buff.rates(now))
 }
 
 /// How much more EXP Holy Symbol (2311003) gives `player` from a kill: its
@@ -61,7 +69,7 @@ pub fn holy_symbol(player: &Player, shared: bool) -> f64 {
 
 /// How much likelier each of `player`'s drops is at `now`.
 pub fn drop(player: &Player, now: SystemTime) -> f64 {
-    world().drop * card(player, DROP_CARDS, now)
+    world().drop * card(player, DROP_CARDS, now) * family(player, now).1
 }
 
 /// How many more mesos each of `player`'s meso drops holds at `now`. A drop
@@ -122,6 +130,17 @@ mod tests {
 
     fn at(seconds: u64) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
+    }
+
+    #[test]
+    fn a_family_entitlement_raises_its_rate_until_it_ends() {
+        let mut player = crate::codec::stats::sample_player();
+        let now = at(1_000_000);
+        player.family_buff = Some(game::family::FamilyBuff::new(6, now));
+        assert_eq!(family(&player, now), (2.0, 1.0));
+        assert_eq!(family(&player, at(1_000_000 + 15 * 60)), (1.0, 1.0));
+        player.family_buff = Some(game::family::FamilyBuff::new(4, now));
+        assert_eq!(family(&player, now), (2.0, 2.0));
     }
 
     #[test]

@@ -549,6 +549,14 @@ diesel::table! {
     }
 }
 diesel::joinable!(family_entitlement_uses -> characters (character_id));
+diesel::table! {
+    family_buffs (character_id) {
+        character_id -> Int4,
+        entitlement -> Int2,
+        until -> Timestamp,
+    }
+}
+diesel::joinable!(family_buffs -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -587,4 +595,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     parcel_equipment_stats,
     family_members,
     family_entitlement_uses,
+    family_buffs,
 );

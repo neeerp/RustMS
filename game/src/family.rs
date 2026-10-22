@@ -2,6 +2,8 @@
 //! their own. The senior at the top leads, and the family goes by their
 //! name (report b039).
 
+use std::time::{Duration, SystemTime};
+
 /// Juniors a character may have. INFO and CHART tell the client, which
 /// hides Add Junior at this many.
 pub const MAX_JUNIORS: u16 = 2;
@@ -171,6 +173,11 @@ const fn rate(cost: i32, exp: bool, percent: u16, minutes: u16, party: bool) -> 
 pub const TELEPORT: usize = 0;
 pub const SUMMON: usize = 1;
 
+/// How many of the juniors and juniors' juniors, the six the Family Tree
+/// shows below the player, must be online for the bonding entitlement
+/// (pool 0x1200, which the client never shows).
+pub const BONDING_JUNIORS: usize = 6;
+
 /// The entitlements, by the index USE_FAMILY sends. v83's own list isn't
 /// known; these costs, limits and benefits are Cosmic's (report b049), and
 /// their names and descriptions are content-pack text.
@@ -205,6 +212,72 @@ pub const ENTITLEMENTS: [Entitlement; 11] = [
     rate(4000, false, 200, 30, true),
     rate(5000, true, 200, 30, true),
 ];
+
+impl Benefit {
+    /// The EXP and drop rates it gives, 1 for none.
+    pub fn rates(&self) -> (f64, f64) {
+        let rate = |on: bool, percent: u16| if on { f64::from(percent) / 100.0 } else { 1.0 };
+        match *self {
+            Benefit::Rate {
+                exp, drop, percent, ..
+            } => (rate(exp, percent), rate(drop, percent)),
+            Benefit::Bonding { percent, .. } => (rate(true, percent), rate(true, percent)),
+            Benefit::Teleport | Benefit::Summon => (1.0, 1.0),
+        }
+    }
+
+    /// How long it lasts; 0 for a trip.
+    pub fn duration(&self) -> Duration {
+        match *self {
+            Benefit::Rate { minutes, .. } | Benefit::Bonding { minutes, .. } => {
+                Duration::from_secs(u64::from(minutes) * 60)
+            }
+            Benefit::Teleport | Benefit::Summon => Duration::ZERO,
+        }
+    }
+
+    /// The icon `FAMILY_SET_PRIVILEGE` shows, `RightIcon/<n>`: 2 drops, 3
+    /// EXP, 4 both (report b042).
+    pub fn icon(&self) -> u8 {
+        match *self {
+            Benefit::Rate { exp: true, .. } => 3,
+            Benefit::Rate { .. } => 2,
+            _ => 4,
+        }
+    }
+}
+
+/// A rate entitlement working for a character until `until`. One at a
+/// time: a new one takes the old one's place, as its icon does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FamilyBuff {
+    /// Its index in `ENTITLEMENTS`.
+    pub index: usize,
+    pub until: SystemTime,
+}
+
+impl FamilyBuff {
+    /// Entitlement `index`, starting `now`.
+    pub fn new(index: usize, now: SystemTime) -> Self {
+        FamilyBuff {
+            index,
+            until: now + ENTITLEMENTS[index].benefit.duration(),
+        }
+    }
+
+    pub fn benefit(&self) -> Benefit {
+        ENTITLEMENTS[self.index].benefit
+    }
+
+    /// The EXP and drop rates it gives at `now`.
+    pub fn rates(&self, now: SystemTime) -> (f64, f64) {
+        if now < self.until {
+            self.benefit().rates()
+        } else {
+            (1.0, 1.0)
+        }
+    }
+}
 
 /// A character's senior and juniors, by character id; both empty out of a
 /// family.
@@ -294,6 +367,22 @@ mod tests {
         assert_eq!(separation_rep(50), 600);
         assert_eq!(separation_rep(19), 190);
         assert_eq!(separation_rep(20), 220);
+    }
+
+    #[test]
+    fn rate_entitlements_raise_their_rates_while_they_last() {
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let drops = FamilyBuff::new(2, now);
+        assert_eq!(drops.until, now + Duration::from_secs(15 * 60));
+        assert_eq!(drops.rates(now), (1.0, 1.5));
+        assert_eq!(drops.rates(drops.until), (1.0, 1.0));
+        assert_eq!(drops.benefit().icon(), 2);
+        let exp = FamilyBuff::new(10, now);
+        assert_eq!(exp.rates(now), (2.0, 1.0));
+        assert_eq!(exp.benefit().icon(), 3);
+        let bonding = FamilyBuff::new(4, now);
+        assert_eq!(bonding.rates(now), (2.0, 2.0));
+        assert_eq!(bonding.benefit().icon(), 4);
     }
 
     #[test]

@@ -10,7 +10,10 @@
 //! the asker a fee by the levels between them, and the seniors Rep by the
 //! junior's level.
 
-use integration_harness::database::{set_exp, set_family_reputation, set_job, set_meso};
+use integration_harness::database::{
+    end_family_buff_in, set_exp, set_family_reputation, set_job, set_meso,
+};
+use integration_harness::events::party;
 use integration_harness::hunting::attack;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
@@ -263,6 +266,9 @@ async fn take_junior(
     junior: &mut WorldSession,
     junior_name: &str,
 ) {
+    // The directory learns of a warp just after it; until then it may
+    // refuse with NOT_SAME_MAP.
+    tokio::time::sleep(Duration::from_millis(300)).await;
     send(
         &mut senior.connection,
         request(RecvOpcode::AddFamily, junior_name),
@@ -555,4 +561,111 @@ async fn members_spend_rep_to_go_to_and_summon_each_other() {
             assert!(matches!(&t.broadcasts[..], [(5, text)] if text.contains(&bn)));
         }
     }
+}
+
+/// SET_PRIVILEGE's icon and entitlement, and the ms it has left.
+fn privilege(packet: &(i16, Vec<u8>)) -> (u8, i32, i32) {
+    let (op, body) = packet;
+    assert_eq!(*op, SendOpcode::FamilySetPrivilege as i16);
+    if body == &[0] {
+        return (0, -1, 0);
+    }
+    assert_eq!(body.len(), 18);
+    assert_eq!(&body[5..14], &[0; 9], "two unused numbers, then from now");
+    let int = |at: usize| i32::from_le_bytes(body[at..at + 4].try_into().unwrap());
+    (body[0], int(1), int(14))
+}
+
+#[tokio::test]
+async fn members_buy_rates_and_see_their_icon_until_they_end() {
+    let (a_config, b_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let a_id = new_character(&a_config, 40).await;
+    let b_id = new_character(&b_config, 30).await;
+    let (an, bn) = (
+        a_config.character_name.clone(),
+        b_config.character_name.clone(),
+    );
+    let (mut a, _) = enter(&a_config, LITH_HARBOR).await;
+    let (mut b, _) = enter(&b_config, LITH_HARBOR).await;
+    take_junior(&mut a, &an, &mut b, &bn).await;
+    set_family_reputation(a_id, 10000).await.expect("rep");
+    let info = |rep: i32, used: &[(i32, i32)]| info_used([rep, 0, 0], 1, a_id, (&an, ""), used);
+    let fifteen_minutes = 900_000;
+
+    // 1.5x EXP for 15 minutes: the icon, then the bill.
+    send(&mut a.connection, use_family(3, "")).await;
+    let packets = family(&mut a, 3).await;
+    let (icon, index, left) = privilege(&packets[0]);
+    assert_eq!((icon, index), (3, 3));
+    assert!((fifteen_minutes - 5000..=fifteen_minutes).contains(&left));
+    assert_eq!(packets[1..], [spent(800), info(9200, &[(3, 1)])]);
+
+    // 2x drops takes its place.
+    send(&mut a.connection, use_family(5, "")).await;
+    let packets = family(&mut a, 3).await;
+    assert_eq!(privilege(&packets[0]).0, 2);
+    assert_eq!(privilege(&packets[0]).1, 5);
+    assert_eq!(packets[1..], [spent(1200), info(8000, &[(3, 1), (5, 1)])]);
+
+    // Bonding needs six juniors online; A has one, and isn't charged.
+    send(&mut a.connection, use_family(4, "")).await;
+    let mut t = Trace::default();
+    until(&mut a.connection, &mut t, |t| !t.broadcasts.is_empty()).await;
+    read_for(&mut a.connection, &mut t, 300).await;
+    assert!(t.family.is_empty());
+    assert_eq!(t.broadcasts.len(), 1);
+
+    // 2x EXP for the party: B gets the icon too.
+    let mut players = [a, b];
+    party(&mut players).await;
+    let [mut a, mut b] = players;
+    send(&mut a.connection, use_family(10, "")).await;
+    let packets = family(&mut a, 3).await;
+    assert_eq!(privilege(&packets[0]).0, 3);
+    assert_eq!(privilege(&packets[0]).1, 10);
+    assert_eq!(
+        packets[1..],
+        [spent(5000), info(3000, &[(3, 1), (5, 1), (10, 1)])]
+    );
+    let packets = family(&mut b, 1).await;
+    assert_eq!(privilege(&packets[0]).0, 3);
+    assert_eq!(privilege(&packets[0]).1, 10);
+
+    // It lasts across a relogin, and its icon goes when it ends.
+    drop(b);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    end_family_buff_in(b_id, 8).await.expect("buff");
+    let mut b = relogin(&b_config).await;
+    let mut t = Trace::default();
+    until(&mut b.connection, &mut t, |t| {
+        t.family
+            .iter()
+            .any(|(op, _)| *op == SendOpcode::FamilySetPrivilege as i16)
+    })
+    .await;
+    let icon = t
+        .family
+        .iter()
+        .find(|(op, _)| *op == SendOpcode::FamilySetPrivilege as i16)
+        .unwrap();
+    let (icon, index, left) = privilege(icon);
+    assert_eq!((icon, index), (3, 10));
+    assert!((0..=8000).contains(&left));
+    let mut t = Trace::default();
+    until(&mut b.connection, &mut t, |t| {
+        t.family
+            .iter()
+            .any(|(op, _)| *op == SendOpcode::FamilySetPrivilege as i16)
+    })
+    .await;
+    let ended = t
+        .family
+        .iter()
+        .find(|(op, _)| *op == SendOpcode::FamilySetPrivilege as i16)
+        .unwrap();
+    assert_eq!(privilege(ended), (0, -1, 0));
+    drop(a);
 }
