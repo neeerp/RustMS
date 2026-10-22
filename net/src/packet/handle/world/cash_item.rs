@@ -3,12 +3,13 @@
 //! item's own fields and the tick. The client then waits for an answer that
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
 //! teleport rocks, notes, weather items, the jukebox, meso sacks, avatar
-//! megaphones, AP Reset, SP Reset, the Vicious' Hammer, Vega's Spell and the
-//! cash mists are used so far.
+//! megaphones, AP Reset, SP Reset, the Vicious' Hammer, Vega's Spell, the
+//! cash mists, the Item Tag and the Magical Sandglasses are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
 use super::hammer::vicious_hammer;
+use super::item_tag::{item_tag, sandglass};
 use super::jukebox::jukebox;
 use super::megaphone::{avatar_megaphone, megaphone};
 use super::meso_sack::meso_sack;
@@ -43,6 +44,7 @@ impl WorldHandler for UseCashItemHandler {
             505 if held && game::sp_reset::item_tab(item_id).is_some() => {
                 sp_reset(ctx, &mut r, slot, item_id)
             }
+            506 if held && item_id == 5_060_000 => item_tag(ctx, &mut r, slot),
             507 if held => megaphone(ctx, &mut r, slot, item_id),
             509 if held => note(ctx, &mut r, slot, item_id),
             510 if held => jukebox(ctx, slot, item_id),
@@ -53,6 +55,7 @@ impl WorldHandler for UseCashItemHandler {
             528 if held => cash_mist(ctx, slot, item_id),
             537 if held => chalkboard(ctx, &mut r),
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
+            550 if held => sandglass(ctx, &mut r, slot, item_id),
             // The window waits for 354, so even a hammer not held gets one.
             557 => vicious_hammer(ctx, &mut r, slot, item_id),
             561 if held => vega_spell(ctx, &mut r, slot, item_id),

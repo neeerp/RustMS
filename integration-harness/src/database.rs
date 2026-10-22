@@ -678,3 +678,37 @@ async fn change_one_row(
     }
     Ok(())
 }
+
+/// The owner printed on the logged-out character `character_id`'s
+/// `item_id`, and the whole hours left until it expires (`None` for never).
+pub async fn item_owner_and_hours(
+    character_id: i32,
+    item_id: i32,
+) -> Result<(String, Option<i64>), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = Text)]
+        owner: String,
+        #[diesel(sql_type = Nullable<BigInt>)]
+        hours: Option<i64>,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read an item's owner and date",
+        message,
+    };
+    let row = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT owner, floor(extract(epoch FROM expires_at - now()::timestamp) / 3600)::bigint AS hours \
+             FROM inventory_items WHERE character_id = $1 AND item_id = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .get_result::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok((row.owner, row.hours))
+}

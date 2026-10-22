@@ -42,6 +42,7 @@
 #include "../../Character/MountRules.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/CashUpgrades.h"
+#include "../../Character/Inventory/EquipCash.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
@@ -1979,6 +1980,73 @@ namespace ms
 					UI::get().emplace<UIYesNo>("Would you like to use the White Scroll?", send);
 				else
 					send(false);
+
+				break;
+			}
+			case InventoryType::Id::CASH:
+			{
+				// v83 FUN_004f4bb7: an Item Tag or a Magical Sandglass dropped on a worn equip.
+				bool tag = equip_cash::is_tag(item_id);
+
+				if (!tag && !equip_cash::is_sandglass(item_id))
+					break;
+
+				const Inventory &inventory = Stage::get().get_player().get_inventory();
+				int16_t target = inventory.shown_equip(eqslot);
+				Optional<const Equip> equip = inventory.get_equip(InventoryType::Id::EQUIPPED, target);
+
+				if (!equip)
+					break;
+
+				const ItemData &data = ItemData::get(equip->get_item_id());
+
+				auto send = [slot = source, item_id = item_id, target](bool yes)
+				{
+					if (yes && may_use_cash_item() &&
+						Stage::get().get_player().request(UseCashItemPacket(slot, item_id, target), ExclRequest::WAIT))
+						Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+				};
+
+				if (tag)
+				{
+					if (equip->get_owner().empty())
+						UI::get().emplace<UIYesNo>(equip_cash::tag_question(data.get_name()), send);
+					else
+						UI::get().emplace<UIOk>(equip_cash::TAGGED, [](bool)
+						{});
+
+					break;
+				}
+
+				nl::node info = nl::nx::item["Cash"]["0550.img"][string_format::extend_id(item_id, 8)]["info"];
+				equip_cash::Sandglass sandglass { info["addTime"], info["maxDays"] };
+
+				if (sandglass.add_seconds <= 0)
+					break;
+
+				equip_cash::Target state {
+					equip->get_expiration(),
+					inventory.get_cash_id(InventoryType::Id::EQUIPPED, target) != 0,
+					(equip->get_flags() & item_expiry::SEALED) != 0,
+					data.get_properties().not_extend
+				};
+
+				switch (equip_cash::extend(state, sandglass, item_expiry::now()))
+				{
+					case equip_cash::Extend::NONE:
+						break;
+					case equip_cash::Extend::NOT_EXTENDABLE:
+						UI::get().emplace<UIOk>(equip_cash::NOT_EXTENDABLE, [](bool)
+						{});
+						break;
+					case equip_cash::Extend::TOO_FAR:
+						UI::get().emplace<UIOk>(equip_cash::too_far(sandglass.max_days), [](bool)
+						{});
+						break;
+					case equip_cash::Extend::ASK:
+						UI::get().emplace<UIYesNo>(equip_cash::extend_question(data.get_name(), sandglass.add_seconds), send);
+						break;
+				}
 
 				break;
 			}

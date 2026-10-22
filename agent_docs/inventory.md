@@ -604,6 +604,28 @@ spell is spent once sent), that Start refuses a scroll whose rate the spell
 doesn't raise and treats an unlock with no start code as a refusal, and the
 result window's hover area.
 
+### Item Tag and Magical Sandglasses
+
+Both are dragged from the Cash tab onto a worn equip in the Equip window
+(v83 FUN_004f4bb7, report c009) and come through USE_CASH_ITEM with the worn
+slot (negative) after the item id. The Item Tag (5060000) prints its user's
+name as the equip's owner (`world/item_tag.rs`); the client asks "Woulid like
+to print your name on %s?" (sic) first, or says "The item already has a
+printed name on it.." without sending. A Magical Sandglass (550xxxx, Item.nx
+`info/addTime` seconds and `info/maxDays`, read into `ItemInfo.sandglass`)
+adds its time to a time-limited equip. Nothing happens for a permanent,
+cash or sealed equip (`FLAG_LOCK`); one with Character.nx `info/notExtend`
+(the two medals 1140000 and 1141000) gets "Time limit extension is not
+possible on this item.", and a date past now plus `maxDays` "You cannot
+extend the effective date beyond %d days."; otherwise the client asks "When
+used on %s,  the effective date will be extended by %s. Would you like to
+use it?". The server checks the same, takes the item and re-sends the
+equip through INVENTORY_OPERATION, or only unlocks the client.
+
+The equip tooltip shows the owner over the name, in orange with a white
+"'s", like v83's (FUN_008f49bc); the client's checks are in
+`Character/Inventory/EquipCash.h`.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being
