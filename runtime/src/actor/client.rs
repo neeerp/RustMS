@@ -827,6 +827,11 @@ impl ClientActor {
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        // The shop can't answer a proposal (report b053).
+        self.send_to_directory(DirectoryMessage::ForgetProposals {
+            from: self.client_id,
+        })
+        .await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
             staying: false,
@@ -1247,8 +1252,8 @@ impl ClientActor {
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,
-            ServerMessage::ProposalAccepted { partner, item_id } => {
-                self.proposal_accepted(partner, item_id).await?
+            ServerMessage::ProposalAccepted { proposer, item_id } => {
+                self.proposal_accepted(proposer, item_id).await?
             }
             ServerMessage::Engaged(record) => self.engaged(record).await?,
             ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,

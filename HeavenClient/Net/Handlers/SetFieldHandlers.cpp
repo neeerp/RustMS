@@ -30,6 +30,7 @@
 #include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
+#include "../../IO/MarriageActions.h"
 #include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -182,6 +183,10 @@ namespace ms
 		{
 			return;
 		}
+
+		// The server forgets a proposal on a channel change, the Cash Shop
+		// and a new login, without answering it.
+		MarriageActions::answered();
 
 		// The cached entry is the character-select snapshot; after a channel
 		// change its map and stats are stale, so take them from this packet.

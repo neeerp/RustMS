@@ -12,6 +12,7 @@ use net::packet::build::world::marriage::{
     build_engaged, build_marriage_notice, build_marriage_refusal, build_proposal,
 };
 use net::{ClientId, RingRequest};
+use packet::Packet;
 use tracing::warn;
 
 /// Whether the player's ETC tab has no room for the token.
@@ -97,6 +98,8 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         let player = &self.in_game()?.player;
         let refusal = match &player.marriage {
+            // The shop can't answer.
+            _ if self.in_cash_shop => Some(Refusal::NotSameMap),
             Some(record) => Some(Refusal::taken(record, true)),
             None if etc_full(player) => Some(Refusal::PartnerEtcFull),
             None => None,
@@ -113,80 +116,40 @@ impl ClientActor {
         }
     }
 
-    /// `partner` said yes: record the engagement, trade the ring box for
-    /// its empty box, and send the partner the ring.
+    /// The player said yes to `proposer`: record the engagement and take
+    /// the ring, then let the proposer trade their ring box. Every failure
+    /// gives the proposer a result, which ends their wait.
     pub(super) async fn proposal_accepted(
         &mut self,
-        partner: ClientId,
+        proposer: ClientId,
         item_id: i32,
     ) -> Result<(), RuntimeError> {
         let cid = self.client_id;
         let player = &self.in_game()?.player;
-        let refusal = if player.inventory.count(item_id) < 1 {
-            warn!(cid, item_id, "The ring box went before the answer");
-            Some(Refusal::Withdrew)
-        } else if etc_full(player) {
-            Some(Refusal::EtcFull)
-        } else {
-            None
-        };
-        if let Some(refusal) = refusal {
-            if refusal == Refusal::EtcFull {
-                self.send(&mut build_marriage_refusal(refusal)?).await?;
-            }
-            return self.withdraw_from(partner).await;
+        if etc_full(player) {
+            self.send(&mut build_marriage_refusal(Refusal::EtcFull)?)
+                .await?;
+            return self
+                .refuse_proposer(proposer, Refusal::PartnerEtcFull)
+                .await;
         }
         let (groom, bride) = if player.stats.gender == 0 {
-            (cid, partner)
+            (cid, proposer)
         } else {
-            (partner, cid)
+            (proposer, cid)
         };
-        let record = match spawn_db(move || db::marriage::engage(cid, groom, bride, item_id)).await
-        {
-            Ok(Ok(record)) => record,
-            Ok(Err(refusal)) => {
-                self.send(&mut build_marriage_refusal(refusal)?).await?;
-                return self.withdraw_from(partner).await;
-            }
-            Err(error) => {
-                warn!(cid, partner, %error, "Failed to record an engagement");
-                return self.withdraw_from(partner).await;
-            }
-        };
-        let (empty_box, _) = marriage::tokens(item_id);
-        let mut next = self.in_game()?.player.clone();
-        let mut packets = Vec::new();
-        let mut changes = next.inventory.remove(item_id, 1).unwrap_or_default();
-        match net::items::give(&mut next.inventory, empty_box, 1) {
-            Ok(given) => {
-                changes.extend(given);
-                packets.push(inventory::build_inventory_operation(false, &changes)?);
-                packets.push(inventory::build_item_gain_in_chat(empty_box, 1)?);
-            }
-            Err(error) => warn!(cid, empty_box, %error, "No room for the empty box"),
-        }
-        next.marriage = Some(record.clone());
-        packets.push(build_engaged(&record)?);
-        if self.commit_player(next, None, &mut packets).await? {
-            self.send_all(&mut packets).await?;
-        }
-        self.send_to_directory(DirectoryMessage::Engaged { partner, record })
-            .await
-    }
-
-    /// The proposal fell through on the proposer's side; the partner hears
-    /// it was withdrawn.
-    async fn withdraw_from(&mut self, partner: ClientId) -> Result<(), RuntimeError> {
-        self.send_to_directory(DirectoryMessage::Deliver {
-            to: vec![partner],
-            packet: build_marriage_refusal(Refusal::Withdrew)?,
-        })
-        .await
-    }
-
-    /// The proposer recorded the engagement: take the ring.
-    pub(super) async fn engaged(&mut self, record: MarriageRecord) -> Result<(), RuntimeError> {
-        let (_, ring) = marriage::tokens(record.item_id);
+        let record =
+            match spawn_db(move || db::marriage::engage(proposer, groom, bride, item_id)).await {
+                Ok(Ok(record)) => record,
+                Ok(Err(refusal)) => return self.refuse_proposer(proposer, refusal).await,
+                Err(error) => {
+                    // Two who proposed to each other and both said yes: one
+                    // of the two engagements fails on the unique index.
+                    warn!(cid, proposer, %error, "Failed to record an engagement");
+                    return self.refuse_proposer(proposer, Refusal::Declined).await;
+                }
+            };
+        let (_, ring) = marriage::tokens(item_id);
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
         match net::items::give(&mut next.inventory, ring, 1) {
@@ -194,11 +157,64 @@ impl ClientActor {
                 packets.push(inventory::build_inventory_operation(false, &changes)?);
                 packets.push(inventory::build_item_gain_in_chat(ring, 1)?);
             }
-            Err(error) => warn!(self.client_id, ring, %error, "No room for the engagement ring"),
+            Err(error) => warn!(cid, ring, %error, "No room for the engagement ring"),
         }
         next.marriage = Some(record.clone());
         packets.push(build_engaged(&record)?);
-        if self.commit_player(next, None, &mut packets).await? {
+        self.send_to_directory(DirectoryMessage::Engaged { proposer, record })
+            .await?;
+        self.commit_engagement(next, packets).await
+    }
+
+    /// The proposal fell through on the partner's side; tell the proposer.
+    async fn refuse_proposer(
+        &mut self,
+        proposer: ClientId,
+        refusal: Refusal,
+    ) -> Result<(), RuntimeError> {
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to: vec![proposer],
+            packet: build_marriage_refusal(refusal)?,
+        })
+        .await
+    }
+
+    /// The partner recorded the engagement: trade the ring box for its empty
+    /// box. A box gone meanwhile leaves the player without the empty one.
+    pub(super) async fn engaged(&mut self, record: MarriageRecord) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let (empty_box, _) = marriage::tokens(record.item_id);
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        match next.inventory.remove(record.item_id, 1) {
+            Ok(mut changes) => match net::items::give(&mut next.inventory, empty_box, 1) {
+                Ok(given) => {
+                    changes.extend(given);
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    packets.push(inventory::build_item_gain_in_chat(empty_box, 1)?);
+                }
+                Err(error) => {
+                    warn!(cid, empty_box, %error, "No room for the empty box");
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                }
+            },
+            Err(error) => {
+                warn!(cid, item_id = record.item_id, %error, "The ring box went before the answer")
+            }
+        }
+        next.marriage = Some(record.clone());
+        packets.push(build_engaged(&record)?);
+        self.commit_engagement(next, packets).await
+    }
+
+    /// Keep `next`, and show it unless the player is in the Cash Shop, which
+    /// shows the whole inventory again on the way out.
+    async fn commit_engagement(
+        &mut self,
+        next: Player,
+        mut packets: Vec<Packet>,
+    ) -> Result<(), RuntimeError> {
+        if self.commit_player(next, None, &mut packets).await? && !self.in_cash_shop {
             self.send_all(&mut packets).await?;
         }
         Ok(())

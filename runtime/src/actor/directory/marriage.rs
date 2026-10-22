@@ -59,8 +59,9 @@ impl WorldDirectory {
         self.send_packet(partner, build_marriage_refusal(Refusal::Withdrew));
     }
 
-    /// `from` answered `proposer`. A yes goes to the proposer's actor, which
-    /// records it; a no is passed on.
+    /// `from` answered `proposer`. A yes goes back to `from`'s actor, which
+    /// records it and takes the ring while it is surely there; a no is passed
+    /// on.
     pub(super) fn answer_proposal(&mut self, from: ClientId, proposer: ClientId, accept: bool) {
         if self.proposals.get(&from).map(|p| p.proposer) != Some(proposer) {
             return;
@@ -80,9 +81,9 @@ impl WorldDirectory {
             return self.send_packet(proposer, build_marriage_refusal(Refusal::NotSameMap));
         }
         self.tell(
-            proposer,
+            from,
             ServerMessage::ProposalAccepted {
-                partner: from,
+                proposer,
                 item_id: proposal.item_id,
             },
         );
@@ -95,13 +96,14 @@ impl WorldDirectory {
         }
     }
 
-    /// `from` recorded the engagement; the partner takes the ring.
-    pub(super) fn engaged(&self, partner: ClientId, record: MarriageRecord) {
-        self.tell(partner, ServerMessage::Engaged(record));
+    /// The partner recorded the engagement; the proposer trades the ring box
+    /// for its empty box. A proposer gone by now keeps the box.
+    pub(super) fn engaged(&self, proposer: ClientId, record: MarriageRecord) {
+        self.tell(proposer, ServerMessage::Engaged(record));
     }
 
-    /// A player left: a proposal to them is declined, and one of theirs
-    /// withdrawn.
+    /// A player left, logged in again or went to the Cash Shop: a proposal
+    /// to them is declined, and one of theirs withdrawn.
     pub(super) fn forget_proposals(&mut self, client_id: ClientId) {
         if let Some(proposal) = self.proposals.remove(&client_id) {
             self.send_packet(proposal.proposer, build_marriage_refusal(Refusal::Declined));

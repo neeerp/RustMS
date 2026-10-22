@@ -334,7 +334,8 @@ impl WorldDirectory {
             DirectoryMessage::ProposalRefused { from, refusal } => {
                 self.refuse_proposal(from, refusal)
             }
-            DirectoryMessage::Engaged { partner, record } => self.engaged(partner, record),
+            DirectoryMessage::Engaged { proposer, record } => self.engaged(proposer, record),
+            DirectoryMessage::ForgetProposals { from } => self.forget_proposals(from),
             DirectoryMessage::FamilyInvite { from, junior } => {
                 self.family_invite(from, junior, Instant::now())
             }
@@ -674,6 +675,7 @@ impl WorldDirectory {
             // instead.
             self.party_searches.stop(client_id);
             self.left_dungeon(client_id, previous.channel_id, previous.presence.map_id);
+            self.forget_proposals(client_id);
         }
         info!(
             client_id,

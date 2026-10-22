@@ -61,13 +61,21 @@ proposer's name and id. The client shows a Yes/No dialog. The answer
 
 - A no gives the proposer mode 30.
 - A withdrawn proposal gives the partner mode 29.
-- A player who logs off ends the proposals they are part of.
+- A player who logs off, changes channel, enters the Cash Shop, or logs in
+  again from elsewhere ends the proposals they are part of.
 
-On a yes, the proposer's actor checks the box and the Etc room again and
-stores the couple (`db::marriage::engage`; the groom is the male one). It
-then replaces the box with its empty box (4031357 + 2 × the box's offset)
-and sends `MARRIAGE_RESULT` 11. The partner gets the same record and the
-ring (the empty box's id + 1).
+Proposals never expire: a partner who leaves the dialog open keeps others
+from asking them until the proposer withdraws or leaves.
+
+On a yes, the partner's actor stores the couple (`db::marriage::engage`; the
+groom is the male one). Its player is online because it is answering, so
+it takes the ring (the empty box's id + 1) and `MARRIAGE_RESULT` 11 itself.
+If its Etc tab filled while the dialog was open, it gets mode 20 and the
+proposer mode 21. It then sends the record through the directory to the
+proposer, whose actor replaces the box with its empty box (4031357 + 2 × the
+box's offset) and sends `MARRIAGE_RESULT` 11. A proposer who left meanwhile
+is engaged and keeps the box. Every refusal at this point reaches the
+proposer, so their wait always ends.
 
 ## Client
 
@@ -76,9 +84,14 @@ ring (the empty box's id + 1).
 - `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72) and
   `MARRIAGE_RESULT` (73).
 
-Any result ends the client's wait. The result's OK dialog replaces the
-waiting one, so no withdrawal is sent. v83's waiting dialog has a Cancel
-button; HeavenClient's has OK.
+Any result ends the client's wait, as does a new field (a channel change
+or the Cash Shop, where the server drops the proposal). The result's OK
+dialog replaces the waiting one, so no withdrawal is sent. v83's waiting
+dialog has a Cancel button; HeavenClient's has OK.
+
+HeavenClient shows one notice at a time, and a new one replaces the open
+one without calling its handler. A partner whose Yes/No is replaced never
+answers, and the proposer waits until they withdraw.
 
 ## Not done yet
 

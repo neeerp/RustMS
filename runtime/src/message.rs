@@ -101,12 +101,14 @@ pub enum ServerMessage {
         from: ClientId,
         name: String,
     },
-    /// `partner` said yes to the player's proposal with `item_id`.
+    /// The player said yes to `proposer`'s proposal with `item_id`: record
+    /// the engagement and take the ring.
     ProposalAccepted {
-        partner: ClientId,
+        proposer: ClientId,
         item_id: i32,
     },
-    /// The player's proposer recorded the engagement; take the ring.
+    /// The player's partner recorded the engagement; trade the ring box for
+    /// its empty box.
     Engaged(game::marriage::MarriageRecord),
     /// `junior` (named so) said yes to the player's request; add them.
     AddJunior {
@@ -723,10 +725,15 @@ pub enum DirectoryMessage {
         from: ClientId,
         refusal: game::marriage::Refusal,
     },
-    /// `from` is engaged to `partner` now; tell `partner`.
+    /// `from` is engaged to `proposer` now; tell `proposer`.
     Engaged {
-        partner: ClientId,
+        proposer: ClientId,
         record: game::marriage::MarriageRecord,
+    },
+    /// `from` went where they can't answer or be answered (the Cash Shop):
+    /// their proposals end.
+    ForgetProposals {
+        from: ClientId,
     },
     /// Ask `junior`, if they are on `from`'s map and of the levels, to be
     /// `from`'s junior.
