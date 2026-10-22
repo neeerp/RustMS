@@ -207,6 +207,9 @@ namespace ms
 		// Loop Invincibility's `repeat` at the feet while its Divine Body lasts (FUN_0093e344), or take it away
 		// with a skill of 0.
 		void show_divine_body(int32_t skill);
+		// Loop an item buff's aura, `Effect/ItemEff.img/<item>` above or behind the body by its `z`, until the
+		// item is 0 (FUN_0093abe2). It isn't drawn while the character is morphed.
+		void show_consume_effect(int32_t item);
 
 		// Dash's dust, the skill's `special` looping at the feet while the character dashes on a foothold and
 		// hidden in the air (FUN_00930b27); a skill of 0 takes it away.
@@ -438,6 +441,7 @@ namespace ms
 		EffectLayer energy_glow;
 		EffectLayer berserk_aura;
 		EffectLayer divine_body;
+		EffectLayer consume_aura;
 		int32_t divine_body_skill = 0;
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;

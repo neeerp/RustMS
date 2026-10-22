@@ -241,14 +241,15 @@ impl ClientActor {
     /// Queue what a quest's `buffItemID` did for the player; return what the
     /// others on the map see.
     fn show_buff_item(
-        &self,
+        &mut self,
         buff: Option<(i32, ItemEffect)>,
         packets: &mut Vec<Packet>,
     ) -> Result<Vec<Packet>, RuntimeError> {
         let Some((item_id, effect)) = buff else {
             return Ok(Vec::new());
         };
-        let (own, seen) = item_effect_packets(&self.in_game()?.player, item_id, effect, false)?;
+        let (own, seen) =
+            item_effect_packets(&mut self.in_game_mut()?.player, item_id, effect, false)?;
         packets.extend(own);
         Ok(seen)
     }

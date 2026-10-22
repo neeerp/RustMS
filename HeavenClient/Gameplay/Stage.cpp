@@ -179,6 +179,8 @@ namespace ms
 		// The server brings the player's pets out again on the new field.
 		player.clear_pets();
 		player.glide(false, false);
+		// And the aura of an item buff, as v83 makes the user anew (user+0x1f64).
+		player.show_consume_effect(0);
 		pending_clock.reset();
 	}
 

@@ -43,7 +43,9 @@ use net::cash_shop::{CashShopRequest, Expansion};
 use net::dialogue::{Conversation, NpcInteraction};
 use net::login_world::resolve_login_channel;
 use net::packet::build;
-use net::packet::build::world::field::{build_chalkboard, parse_movement_state};
+use net::packet::build::world::field::{
+    build_chalkboard, build_show_consume_effect, parse_movement_state,
+};
 use net::packet::build::world::map::{build_blocked_map, BlockedMap};
 use net::packet::build::world::messaging::{build_find_result, FindLocation};
 use net::packet::build::world::pet::PetGone;
@@ -770,6 +772,14 @@ impl ClientActor {
             // The player's client shows its own board only when told.
             self.send(&mut build_chalkboard(avatar.id, Some(note))?)
                 .await?;
+        }
+        if avatar.consume_effect != 0 {
+            // So is its own item buff's aura: v83 makes the user anew.
+            self.send(&mut build_show_consume_effect(
+                avatar.id,
+                avatar.consume_effect,
+            )?)
+            .await?;
         }
         self.run_map_enter_script().await
     }

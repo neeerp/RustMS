@@ -120,6 +120,13 @@ namespace ms
 
 	// Show another character's effect item, or stop it with 0
 	// Opcode: SHOW_ITEM_EFFECT(194)
+	// An item buff's aura over a character, the player's own included, or none with 0 (FUN_0093abc0)
+	// Opcode: SHOW_CONSUME_EFFECT(166)
+	class ShowConsumeEffectHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	class ShowItemEffectHandler : public PacketHandler
 	{
 		void handle(InPacket& recv) const override;

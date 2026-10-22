@@ -26,8 +26,8 @@ use net::packet::build::world::effect::{
     build_blow_weather, build_boss_hp_bar, build_item_emotion, build_mist_item_effect,
 };
 use net::packet::build::world::field::{
-    build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
-    parse_movement_state,
+    build_player_enter_field, build_player_leave_field, build_show_chair,
+    build_show_consume_effect, parse_movement, parse_movement_state,
 };
 use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteView};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
@@ -2427,16 +2427,22 @@ impl FieldActor {
             if !sees(&avatar, &occupant.avatar) {
                 continue;
             }
-            match build_player_enter_field(&occupant.avatar) {
-                Ok(packet) => {
-                    handle.send_packet(packet);
+            match player_spawn(&occupant.avatar) {
+                Ok(packets) => {
+                    for packet in packets {
+                        handle.send_packet(packet);
+                    }
                 }
                 Err(error) => warn!(client_id, %error, "Failed to build occupant spawn"),
             }
         }
 
-        match build_player_enter_field(&avatar) {
-            Ok(packet) => self.broadcast_seen(&avatar, packet),
+        match player_spawn(&avatar) {
+            Ok(packets) => {
+                for packet in packets {
+                    self.broadcast_seen(&avatar, packet);
+                }
+            }
             Err(error) => warn!(client_id, %error, "Failed to build join spawn"),
         }
 
@@ -2669,21 +2675,33 @@ impl FieldActor {
         let Some(gm) = self.occupants.get(&client_id) else {
             return;
         };
-        let packet = if gm.avatar.hidden {
-            build_player_leave_field(client_id)
+        let packets = if gm.avatar.hidden {
+            build_player_leave_field(client_id).map(|packet| vec![packet])
         } else {
-            build_player_enter_field(&gm.avatar)
+            player_spawn(&gm.avatar)
         };
-        let packet = match packet {
-            Ok(packet) => packet,
+        let packets = match packets {
+            Ok(packets) => packets,
             Err(error) => return warn!(client_id, %error, "Failed to build hide packet"),
         };
         for (&other, occupant) in &self.occupants {
             if other != client_id && !occupant.avatar.gm {
-                occupant.handle.send_packet(packet.clone());
+                for packet in &packets {
+                    occupant.handle.send_packet(packet.clone());
+                }
             }
         }
     }
+}
+
+/// SPAWN_PLAYER for `avatar`, then its item buff's aura, which v83 keeps
+/// apart from the spawn (report c029 A).
+fn player_spawn(avatar: &FieldAvatar) -> Result<Vec<Packet>, net::error::NetworkError> {
+    let mut packets = vec![build_player_enter_field(avatar)?];
+    if avatar.consume_effect != 0 {
+        packets.push(build_show_consume_effect(avatar.id, avatar.consume_effect)?);
+    }
+    Ok(packets)
 }
 
 /// Whether `viewer` sees `avatar`: a hidden GM shows only to GMs.
@@ -2756,6 +2774,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            consume_effect: 0,
             berserk: false,
             energy: None,
             dash: [None; 2],
