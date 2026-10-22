@@ -31,6 +31,7 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "equipSelectNeed",
     "fieldEnter",
     "start",
+    "pet",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -46,11 +47,12 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "endscript",
     "endmeso",
     "level",
+    "pet",
 ];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
+    "q1021s", "q1021e", "q4647e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
 ];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
@@ -134,6 +136,9 @@ pub struct StartRequirements {
     /// The hour (UTC) before which the quest can't be started (`start`,
     /// "yyyymmddhh").
     pub not_before: Option<SystemTime>,
+    /// Pet items of which the first pet out must be one (`pet`); empty means
+    /// no pet is needed.
+    pub pets: Vec<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,6 +158,8 @@ pub struct QuestTemplate {
     pub end_meso: i32,
     /// Least level to complete (`Check/1/level`).
     pub end_min_level: Option<i16>,
+    /// Pet items of which the first pet out must be one to complete (`pet`).
+    pub end_pets: Vec<i32>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -434,6 +441,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.maps = int_list(nx, start, "fieldEnter")?;
     requirements.not_before = nx.int_child(start, "start")?.map(date_hour).transpose()?;
     requirements.items = item_counts(nx, start)?;
+    requirements.pets = pet_ids(nx, start)?;
     if let Some(skills) = nx.child_by_name(start, "skill")? {
         for skill in nx.child_indices(skills)? {
             let skill_id = nx
@@ -503,6 +511,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .int_child(end, "level")?
             .map(|v| small(v, "level"))
             .transpose()?,
+        end_pets: pet_ids(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,
@@ -560,6 +569,23 @@ fn int_list(nx: &NxDataFile, check: u32, key: &str) -> Result<Vec<i32>, GameData
         result.push(
             nx.int_child(list, &name)?
                 .ok_or_else(|| invalid("non-integer list entry"))?,
+        );
+    }
+    Ok(result)
+}
+
+/// The pet items listed under `pet` of a `Check` node (`pet/<n>/id`).
+/// v83's client also reads `pettamenessmin`/`pettamenessmax`, which no
+/// supported quest has, so any closeness passes.
+fn pet_ids(nx: &NxDataFile, check: u32) -> Result<Vec<i32>, GameDataError> {
+    let Some(pets) = nx.child_by_name(check, "pet")? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for pet in nx.child_indices(pets)? {
+        result.push(
+            nx.int_child(pet, "id")?
+                .ok_or_else(|| invalid("pet requirement without id"))?,
         );
     }
     Ok(result)
@@ -780,8 +806,10 @@ mod tests {
         let mut expiring = hunting.clone();
         expiring.item_keys = vec!["id".into(), "count".into(), "dateExpire".into()];
         assert_eq!(classify(&expiring), Err("Act/item/dateExpire".into()));
-        let pet = keys(&["npc", "pet"], &["npc"], &[], &[]);
-        assert_eq!(classify(&pet), Err("Check/0/pet".into()));
+        let pet = keys(&["npc", "pet"], &["npc", "pet"], &[], &[]);
+        assert_eq!(classify(&pet), Ok(()));
+        let tame = keys(&["npc", "pet", "pettamenessmin"], &["npc"], &[], &[]);
+        assert_eq!(classify(&tame), Err("Check/0/pettamenessmin".into()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
         assert_eq!(classify(&money), Ok(()));
         let start_money = keys(&["npc"], &["npc"], &["money", "exp"], &[]);
@@ -851,6 +879,15 @@ mod tests {
         );
         assert_eq!(catalog.quest(3300).unwrap().end_meso, 10000);
         assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
+        // Bartos's test: any of the 45 pets out, to start and to finish.
+        let test = catalog.quest(4646).unwrap();
+        assert_eq!(test.start.pets.len(), 45);
+        assert!(test.start.pets.contains(&5000000));
+        assert_eq!(test.end_pets, test.start.pets);
+        assert_eq!(
+            catalog.quest(4647).unwrap().end_script.as_deref(),
+            Some("q4647e")
+        );
         // Rupi's paper lasts an hour.
         assert_eq!(catalog.quest(3085).unwrap().start_items[0].period, Some(60));
         // Not before Christmas Eve 2005; a fee, and EXP, to start; a

@@ -73,6 +73,8 @@ a conversation already open.
 | Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
 | `inside_pirate` | Clicking the proctor (1072008) inside Kyrin's tests | Yes warps to Kyrin; see below |
 | `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
+| `multipet_success` | Clicking the hidden spot (9102100) on the Pet-Walking Road (100000202) | While Bartos's test (4646) is started, yes gives the note (4031921) the test asks for, once; otherwise one page |
+| `q4647e` | QUEST_ACTION 5 for quest 4647 (Bartos) | Two pages, then takes a Pet Snack (5460000), completes the quest and teaches Follow the Lead for the player's line (8, 10000018 or 20000024); without a snack, one page |
 
 The five Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
 beginner a Warrior, Magician, Bowman, Thief, or Pirate. The beginner needs

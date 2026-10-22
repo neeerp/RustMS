@@ -13,6 +13,16 @@ pub const MAX_PETS: usize = 3;
 /// keeps one pet out at a time.
 pub const FOLLOW_THE_LEAD: [i32; 3] = [8, 10000018, 20000024];
 
+/// The Follow the Lead a player of `job` learns, by the thousands of the job
+/// as HeavenClient picks it (`pets::follow_the_lead`).
+pub fn follow_the_lead(job: i16) -> i32 {
+    FOLLOW_THE_LEAD[match job / 1000 {
+        1 => 1,
+        2 => 2,
+        _ => 0,
+    }]
+}
+
 /// The closeness a pet of each level needs to reach the next (Cosmic's
 /// ExpTable; the v83 client does not carry it). Level 30 is the last.
 const CLOSENESS: [i16; 30] = [

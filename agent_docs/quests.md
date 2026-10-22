@@ -73,8 +73,8 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `pet`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet` |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
@@ -106,6 +106,15 @@ With `fieldEnter`, the player must be on one of the listed maps. `start`
 (yyyymmddhh) is the hour before which the quest can't be started; v83
 compares it with its clock set to the server's, which for RustMS is UTC
 (the four quests with one, such as 3600, date from 2005–2007).
+
+`pet`, on either side, lists pet items (`pet/<n>/id`), and the pet in the
+first summon slot must be one of them; another pet out doesn't count, as in
+v83's checks (FUN_00721163, FUN_00721d2c). Without a pet out v83 doesn't
+offer the quest, and at completion shows "lack of pet" (no pet) or "with the
+current pet" (another pet). v83 also reads `pettamenessmin`/`pettamenessmax`
+(closeness), which stay unsupported, so the quests with a `pet` list that
+qualify (2103 Nella's Dream and Bartos's 4646/4647) accept any closeness;
+Nella's next quest, 2104, needs closeness and stays out.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
@@ -167,7 +176,7 @@ without a `skillLevel`, which already raise only the master level (Bahamut,
 6121–6124); `acquire` stays unsupported there. `npcAct` (always "quest") names an NPC animation that neither
 side plays; it is ignored. A quest with
 any other key (`infoex`,
-`pet`, ...) is **unsupported**: it is
+`pettamenessmin`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
 
@@ -196,7 +205,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1378 quests qualify
+changing the server's allowlist and regenerating the list. 1393 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

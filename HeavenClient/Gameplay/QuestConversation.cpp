@@ -8,6 +8,7 @@
 #include "../Data/ItemData.h"
 #include "../IO/UI.h"
 #include "../IO/UITypes/UINpcTalk.h"
+#include "../IO/UITypes/UINotice.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
 #include "../Net/Packets/QuestPackets.h"
 #include "../Util/Misc.h"
@@ -45,6 +46,11 @@ namespace ms
 			// Maple Administrator, who speaks for the quest alert, and what he says first (StringPool 0x104b).
 			constexpr int32_t ALERT_NPC = 9010000;
 			constexpr const char* ALERT_GREETING = "Someone in MapleStory would like to send you a message.";
+			// v83's notices for a pet requirement at completion (0xdb2, 0xdb3).
+			constexpr const char* NO_PET = "Unable to complete the quest\\ndue to a lack of pet.\\nPlease try again "
+				"after summoning a pet.";
+			constexpr const char* WRONG_PET = "Unable to complete the quest\\nwith the current pet you have "
+				"summoned.\\nPlease try again with a pet\\nthat meets the quest requirement.";
 
 			Player& player()
 			{
@@ -73,7 +79,8 @@ namespace ms
 
 				return ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
 					[&](int32_t id) { return inventory.get_total_item_count(id); },
-					progress == started.end() ? std::string() : progress->second, inventory.get_meso());
+					progress == started.end() ? std::string() : progress->second, inventory.get_meso(),
+					player().first_pet());
 			}
 
 			// Whether a quest item given at the start is no longer held, worn
@@ -263,6 +270,12 @@ namespace ms
 			// v83 checks Check.img/<id>/1 before saying anything (FUN_00716fe1).
 			QuestScript script = QuestCatalog::get().script(quest_id, true);
 			QuestStop stop = completion_stop(*quest, npc_id);
+
+			if (stop == QuestStop::NO_PET || stop == QuestStop::WRONG_PET)
+			{
+				UI::get().emplace<UIOk>(stop == QuestStop::NO_PET ? NO_PET : WRONG_PET, [](bool) {});
+				return;
+			}
 
 			if (stop != QuestStop::NONE)
 			{

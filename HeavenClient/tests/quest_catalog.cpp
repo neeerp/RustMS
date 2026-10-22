@@ -51,6 +51,15 @@ int main()
 		return 1;
 	}
 
+	// Bartos's test needs one of the 45 pets out to start and to finish.
+	const ms::QuestInfo* bartos = catalog.find(4646);
+
+	if (!bartos || bartos->pets.size() != 45 || bartos->end_pets != bartos->pets || bartos->pets[0] != 5000000)
+	{
+		std::cerr << "Quest 4646's pets did not parse as expected\n";
+		return 1;
+	}
+
 	const ms::QuestInfo* todd = catalog.find(1035);
 
 	if (!todd || todd->end_mobs.size() != 1 || todd->end_mobs[0] != std::make_pair(9300018, int16_t(1)))

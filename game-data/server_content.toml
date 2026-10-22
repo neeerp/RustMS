@@ -728,6 +728,13 @@ unsourced = [
     "opq.eak.leader_only",
     "opq.eak.gather",
     "opq.notice.storage_closed",
+    "pet_trainer.note.ask",
+    "pet_trainer.note.full",
+    "pet_trainer.note.held",
+    "pet_trainer.note.nothing",
+    "pet_trainer.secret.0",
+    "pet_trainer.secret.1",
+    "pet_trainer.secret.no_snack",
 ]
 
 [text."glTutoMsg0.message"]

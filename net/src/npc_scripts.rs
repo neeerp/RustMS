@@ -36,6 +36,15 @@ const CARSON: i32 = 2111000;
 const HUGHES: i32 = 2012017;
 const MEREN: i32 = 2110004;
 const GOLD_ANVIL: i32 = 4031980;
+/// Trainer Bartos on the Pet-Walking Road, who teaches Follow the Lead
+/// (quests 4646 and 4647), and the hidden spot at the top of the road
+/// (`multipet_success`) where his test's note lies.
+const BARTOS: i32 = 1012006;
+pub const PET_TEST_NOTE_SPOT: i32 = 9102100;
+const PET_TEST_QUEST: i16 = 4646;
+const PET_SECRET_QUEST: i16 = 4647;
+const HIDDEN_NOTE: i32 = 4031921;
+const PET_SNACK: i32 = 5460000;
 /// Heracle, at the guild headquarters. The runtime loads the player's
 /// guild for his script (`NpcScript::heracle`).
 pub const HERACLE: i32 = 2010007;
@@ -1158,6 +1167,7 @@ impl NpcScript {
                 vec![Page::Say(text(keys::WEDDING_VICTORIA))],
             )),
             MYSTERIOUS_STATUE => Some(mysterious_statue(player)),
+            PET_TEST_NOTE_SPOT => Some(hidden_note(player)),
             CRUMBLING_STATUE => Some(Self::new(
                 CRUMBLING_STATUE,
                 vec![Page::Ask {
@@ -1236,6 +1246,7 @@ impl NpcScript {
             "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
             "q6033e" => Some(maker_lesson(player, keys::MAKER_CRYSTAL_TEST, 6033)),
             "q6036e" => Some(maker_lesson(player, keys::MAKER_GOLD_ANVIL, 6036)),
+            "q4647e" => Some(pet_secret(player)),
             _ => None,
         }
     }
@@ -1491,6 +1502,56 @@ fn maker_lesson(player: &Player, pages: [&str; 2], quest: i16) -> NpcScript {
         },
         Effect::GainExp(exp),
     ]);
+    script
+}
+
+/// `multipet_success`: the hidden note of Bartos's test, which only someone
+/// on the test (4646) finds, once.
+fn hidden_note(player: &Player) -> NpcScript {
+    let say = |key| NpcScript::new(PET_TEST_NOTE_SPOT, vec![Page::Say(text(key))]);
+    if player.quests.state(PET_TEST_QUEST) != QuestState::Started {
+        return say(keys::PET_NOTE_NOTHING);
+    }
+    if player.inventory.count(HIDDEN_NOTE) > 0 {
+        return say(keys::PET_NOTE_HELD);
+    }
+    let mut script = NpcScript::new(
+        PET_TEST_NOTE_SPOT,
+        vec![Page::Ask {
+            text: text(keys::PET_NOTE_ASK),
+            on_yes: vec![Effect::GiveItem {
+                item_id: HIDDEN_NOTE,
+                quantity: 1,
+            }],
+            on_no: None,
+        }],
+    );
+    script.inventory_full = Some(text(keys::PET_NOTE_FULL));
+    script
+}
+
+/// `q4647e`: Bartos takes a Pet Snack and teaches Follow the Lead, which
+/// the quest data doesn't give.
+fn pet_secret(player: &Player) -> NpcScript {
+    if player.inventory.count(PET_SNACK) == 0 {
+        return NpcScript::new(BARTOS, vec![Page::Say(text(keys::PET_SECRET_NO_SNACK))]);
+    }
+    let mut script = NpcScript::new(
+        BARTOS,
+        keys::PET_SECRET.map(|key| Page::Say(text(key))).to_vec(),
+    );
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: PET_SNACK,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(PET_SECRET_QUEST),
+        Effect::TeachSkill {
+            skill_id: game::pet::follow_the_lead(player.stats.job),
+            level: 1,
+            master_level: 1,
+        },
+    ];
     script
 }
 
@@ -4577,6 +4638,71 @@ mod tests {
                 (npc, vec![Effect::CompleteQuest(quest)])
             );
         }
+    }
+
+    #[test]
+    fn bartos_teaches_follow_the_lead_for_a_pet_snack() {
+        let mut aran = player(50);
+        aran.stats.job = 2110;
+        let mut snackless = NpcScript::for_quest("q4647e", &aran).unwrap();
+        let step = snackless.begin();
+        assert!(step.effects.is_empty());
+        assert_eq!(buttons(&step), (false, false));
+        assert_eq!(snackless.respond(ScriptInput::Next), Some(Step::default()));
+        aran.inventory
+            .insert(InventoryType::Cash, 1, game::Item::stack(PET_SNACK, 1));
+        let lesson = |skill_id| {
+            (
+                BARTOS,
+                vec![
+                    Effect::TakeItem {
+                        item_id: PET_SNACK,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(PET_SECRET_QUEST),
+                    Effect::TeachSkill {
+                        skill_id,
+                        level: 1,
+                        master_level: 1,
+                    },
+                ],
+            )
+        };
+        assert_eq!(ending("q4647e", &aran), lesson(20000024));
+        aran.stats.job = 1210;
+        assert_eq!(ending("q4647e", &aran), lesson(10000018));
+        aran.stats.job = 411;
+        assert_eq!(ending("q4647e", &aran), lesson(8));
+    }
+
+    #[test]
+    fn the_hidden_note_is_found_once_on_bartoss_test() {
+        let mut tester = player(50);
+        let first = |player: &Player| {
+            let script = NpcScript::for_npc(PET_TEST_NOTE_SPOT, player).unwrap();
+            let step = script.begin();
+            (kind(&step), script)
+        };
+        // Off the test: only grass.
+        assert_eq!(first(&tester).0, Some(0));
+        tester.quests.upsert(game::QuestRecord {
+            quest_id: PET_TEST_QUEST,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        let (kind_on_test, mut script) = first(&tester);
+        assert_eq!(kind_on_test, Some(1));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            vec![Effect::GiveItem {
+                item_id: HIDDEN_NOTE,
+                quantity: 1,
+            }]
+        );
+        assert!(script.inventory_full().is_some());
+        tester
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(HIDDEN_NOTE, 1));
+        assert_eq!(first(&tester).0, Some(0));
     }
 
     #[test]
