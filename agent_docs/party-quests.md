@@ -453,6 +453,23 @@ last state, where it stays (`reactors::stays`) and keeps showing the piece.
 2008003 takes 4001044, 2008004 4001048; the others are for the rooms still
 to come.
 
+## Orbis's Salion stage
+
+On 920010300 (stage 3) a Cellion (9300040) stands at the first of fourteen
+spots, reactors 2001002 to 2001015 (Cosmic `2001002`). Killed, it drops
+4001074, which its spot takes (Reactor.nx: an item event for 4001074) like
+any item landing on a reactor (see `combat.md`): the spot breaks. Each
+break brings out another Cellion at the spot `reactors::salion_next` names,
+11 spots on each time, until a number of them, drawn when the first spot
+breaks (4 to 13, `reactors::salion_limit`, as Cosmic draws it), have gone.
+The field keeps that count (`FieldActor::salion`; each team has its own
+copy of the map). The spot that breaks after the last drops its loot, a
+piece of the statue, 4001045, for the owner of the drop that broke it (or
+anyone still on the map), whose client actor then tells the event the stage is cleared
+(`Event::reactor_clears`; any member may). The piece goes in 2008005 on
+the hub. Eak's backup path on this map, which Cosmic has for a team whose
+Cellions got stuck, isn't here yet.
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon

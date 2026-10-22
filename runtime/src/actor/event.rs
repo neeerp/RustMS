@@ -424,6 +424,10 @@ impl EventActor {
             EventCommand::ClearStage(stage) if leader && event.talk_clears.contains(&stage) => {
                 self.clear(stage);
             }
+            // By any member, whose hit broke the reactor.
+            EventCommand::ClearStage(stage) if event.reactor_clears.contains(&stage) => {
+                self.clear(stage);
+            }
             EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {
                     self.clear(1);

@@ -166,6 +166,14 @@ impl ReactorSet {
             .collect()
     }
 
+    /// Where reactor `reactor_id`'s spot is, whether or not it is there.
+    pub fn spot_of(&self, reactor_id: i32) -> Option<(i16, i16)> {
+        self.spots
+            .iter()
+            .find(|spot| spot.template.reactor_id == reactor_id)
+            .map(|spot| (spot.template.x, spot.template.y))
+    }
+
     /// The live reactor named `name`, if any.
     pub fn named(&self, name: &str) -> Option<&LiveReactor> {
         self.live
@@ -220,6 +228,13 @@ impl ReactorSet {
     }
 
     /// Whether `object_id`, in its state, waits for an item.
+    /// Whether any reactor here waits for an item now.
+    pub fn any_takes_items(&self) -> bool {
+        self.live
+            .values()
+            .any(|reactor| self.spots[reactor.spot].data.takes_items(reactor.state))
+    }
+
     pub fn takes_items(&self, object_id: i32) -> bool {
         self.live
             .get(&object_id)

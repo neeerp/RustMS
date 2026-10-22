@@ -57,6 +57,12 @@ pub enum Action {
     /// One of the scars on the Tower of Goddess's hub (`2008000`-`2008005`),
     /// where a piece of Minerva's statue goes: it keeps the piece set in it.
     Hold,
+    /// One of the fourteen spots on the Tower of Goddess's Salion stage
+    /// (`2001002`-`2001015`), which breaks on the Cellion's drop: the
+    /// field brings the next Cellion out at another spot (`salion_next`),
+    /// until enough have gone that this one drops its loot and clears the
+    /// stage (Cosmic `2001002`).
+    Salion,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -83,6 +89,23 @@ const LPQ_ROMBAD: i32 = 9300010;
 const LPQ_ALISHAR: i32 = 9300012;
 /// The light on Orbis's cloud stage, which Eak comes out of.
 pub const OPQ_LIGHT: i32 = 2006000;
+/// The first of the Salion stage's spots, `2001002` to `2001015`.
+pub const SALION_SPOTS: i32 = 2001002;
+/// The Cellion that comes out at the Salion stage's spots.
+pub const CELLION: i32 = 9300040;
+
+/// The spot the `count`th Cellion comes out at, after the first, which the
+/// map has at the first spot: Cosmic steps 11 spots on each time, so none
+/// comes back to a spot before all fourteen are used.
+pub fn salion_next(count: u32) -> i32 {
+    SALION_SPOTS + (11 * count % 14) as i32
+}
+
+/// How many Cellions go before a spot drops its loot: 4 to 13, at random
+/// as Cosmic draws it (`max(floor(random * 14), 4)`).
+pub fn salion_limit(rng: &mut impl rand::Rng) -> u32 {
+    rng.gen_range(0, 14).max(4)
+}
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
@@ -134,6 +157,7 @@ pub fn action(reactor_id: i32) -> Action {
             notice: keys::OPQ_NOTICE_LIGHT,
         },
         2008000..=2008005 => Action::Hold,
+        2001002..=2001015 => Action::Salion,
         _ => Action::Drops,
     }
 }
@@ -218,6 +242,28 @@ mod tests {
         assert_eq!(scar.item_dropped(0, 4001044, 1, (0, 0)), Some((0, 1)));
         assert_eq!(scar.item_dropped(0, 4001048, 1, (0, 0)), None);
         assert!(scar.is_last(1));
+    }
+
+    #[test]
+    fn the_cellions_come_out_at_every_salion_spot_but_the_first_in_turn() {
+        for reactor_id in 2001002..=2001015 {
+            assert_eq!(action(reactor_id), Action::Salion);
+        }
+        assert_eq!(action(2001016), Action::Drops);
+        let spots: Vec<i32> = (1..14).map(salion_next).collect();
+        assert_eq!(spots[..3], [2001013, 2001010, 2001007]);
+        let mut seen = spots.clone();
+        seen.sort();
+        seen.dedup();
+        assert_eq!(seen.len(), 13);
+        assert!(!spots.contains(&SALION_SPOTS));
+        let rng = &mut rand::thread_rng();
+        assert!((0..200).all(|_| (4..=13).contains(&salion_limit(rng))));
+        let Some(spot) = template(2001002) else {
+            return;
+        };
+        assert_eq!(spot.item_dropped(0, 4001074, 1, (0, 0)), Some((0, 1)));
+        assert!(spot.is_last(1));
     }
 
     #[test]
