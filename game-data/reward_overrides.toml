@@ -155,10 +155,13 @@ replace = [{ item = 4001061, prob = 1.0 }]
 replace = [{ item = 4001062, prob = 1.0 }]
 
 [reactors.2002011]
-# The stone boxes Eak brings out in the music room (`stone3`) and the
-# sealed room (`stone4`, 920010500) drop that room's piece of Minerva's
-# statue (Cosmic `2002011`, `2002012`).
+# The stone boxes Eak brings out in the music room (`stone3`), the
+# sealed room (`stone4`, 920010500) and the tall room (`stone6`, 920010700)
+# drop that room's piece of Minerva's statue (Cosmic `2002011`-`2002013`).
 replace = [{ item = 4001046, prob = 1.0 }]
 
 [reactors.2002012]
 replace = [{ item = 4001047, prob = 1.0 }]
+
+[reactors.2002013]
+replace = [{ item = 4001049, prob = 1.0 }]

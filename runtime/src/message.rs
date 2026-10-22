@@ -579,15 +579,26 @@ pub enum FieldMessage {
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
     },
-    /// The state of the live reactor named `name` here, if there is one.
-    ReactorState {
-        name: &'static str,
-        reply: tokio::sync::oneshot::Sender<Option<u8>>,
+    /// The states of the live reactors named `names` here, in turn, with
+    /// `None` for a name none has.
+    ReactorStates {
+        names: &'static [&'static str],
+        reply: tokio::sync::oneshot::Sender<Vec<Option<u8>>>,
     },
     /// How many Eak wants on each of the sealed room's platforms
     /// (`net::events::draw_split`), drawn when first asked.
     Split {
         reply: tokio::sync::oneshot::Sender<[u8; 3]>,
+    },
+    /// The right pad of each row of the map's climb
+    /// (`net::events::draw_climb`), drawn when first asked.
+    Climb {
+        reply: tokio::sync::oneshot::Sender<Vec<u8>>,
+    },
+    /// The two of the tall room's levers Eak wants up
+    /// (`net::events::draw_levers`), drawn when first asked.
+    Levers {
+        reply: tokio::sync::oneshot::Sender<[bool; 5]>,
     },
     /// The event whose copy of the map this is ended: stop.
     Close,

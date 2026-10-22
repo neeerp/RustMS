@@ -8,7 +8,7 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, Standing,
+    self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck, Standing,
 };
 use crate::items;
 use crate::rides;
@@ -1056,6 +1056,12 @@ impl NpcScript {
     /// stands on its platforms; `None` once the room is cleared.
     pub fn opq_head_count(count: Option<HeadCount>) -> Self {
         opq_head_count(count)
+    }
+
+    /// Eak in the Tower of Goddess's tall room, given how its levers
+    /// stand; `None` once the room is cleared.
+    pub fn opq_levers(check: Option<LeverCheck>) -> Self {
+        opq_levers(check)
     }
 
     /// Eak, still only a light, telling a player who has just come into
@@ -2753,16 +2759,11 @@ fn opq_music(played: bool, cleared: bool) -> NpcScript {
     let page = if cleared {
         Page::Say(text(keys::OPQ_EAK_MUSIC_DONE))
     } else if played {
-        Page::Act {
-            text: text(keys::OPQ_EAK_MUSIC_PLAYED),
-            effects: vec![
-                Effect::SetReactorState {
-                    name: "stone3",
-                    state: 1,
-                },
-                Effect::EventCommand(EventCommand::ClearStage(events::OPQ_MUSIC_STAGE)),
-            ],
-        }
+        stone_box_out(
+            keys::OPQ_EAK_MUSIC_PLAYED,
+            "stone3",
+            events::OPQ_MUSIC_STAGE,
+        )
     } else {
         Page::Say(text(keys::OPQ_EAK_MUSIC_ASK))
     };
@@ -2779,18 +2780,48 @@ fn opq_head_count(count: Option<HeadCount>) -> NpcScript {
         Some(HeadCount::Few) => Page::Say(text(keys::OPQ_EAK_HEADS_FEW)),
         Some(HeadCount::Wrong { right: 0 }) => Page::Say(text(keys::OPQ_EAK_HEADS_ALL_WRONG)),
         Some(HeadCount::Wrong { .. }) => Page::Say(text(keys::OPQ_EAK_HEADS_ONE_RIGHT)),
-        Some(HeadCount::Right) => Page::Act {
-            text: text(keys::OPQ_EAK_HEADS_RIGHT),
-            effects: vec![
-                Effect::SetReactorState {
-                    name: "stone4",
-                    state: 1,
-                },
-                Effect::EventCommand(EventCommand::ClearStage(events::OPQ_HEAD_COUNT_STAGE)),
-            ],
-        },
+        Some(HeadCount::Right) => stone_box_out(
+            keys::OPQ_EAK_HEADS_RIGHT,
+            "stone4",
+            events::OPQ_HEAD_COUNT_STAGE,
+        ),
     };
     NpcScript::new(EAK, vec![page])
+}
+
+/// Eak in the tall room (Cosmic `2013001`, `statusStg6`): with the two
+/// levers up that he wants (`events::lever_check`), he brings out the
+/// stone box beside him (`stone6`) and clears the room; with two others,
+/// he says whether one of them is right. Any member may ask.
+fn opq_levers(check: Option<LeverCheck>) -> NpcScript {
+    let page = match check {
+        None => Page::Say(text(keys::OPQ_EAK_LEVERS_DONE)),
+        Some(LeverCheck::Few) => Page::Say(text(keys::OPQ_EAK_LEVERS_ASK)),
+        Some(LeverCheck::Wrong { one_right: true }) => {
+            Page::Say(text(keys::OPQ_EAK_LEVERS_ONE_RIGHT))
+        }
+        Some(LeverCheck::Wrong { one_right: false }) => {
+            Page::Say(text(keys::OPQ_EAK_LEVERS_NONE_RIGHT))
+        }
+        Some(LeverCheck::Right) => stone_box_out(
+            keys::OPQ_EAK_LEVERS_RIGHT,
+            "stone6",
+            events::OPQ_LEVER_STAGE,
+        ),
+    };
+    NpcScript::new(EAK, vec![page])
+}
+
+/// Eak's line `key` as he brings out the stone box `name` (Cosmic
+/// `forceHitReactor`) and clears `stage`.
+fn stone_box_out(key: &str, name: &'static str, stage: u8) -> Page {
+    Page::Act {
+        text: text(key),
+        effects: vec![
+            Effect::SetReactorState { name, state: 1 },
+            Effect::EventCommand(EventCommand::ClearStage(stage)),
+        ],
+    }
 }
 
 /// The Pink Balloon (Cosmic `2040045`) lets players off Ludibrium's bonus
@@ -6172,6 +6203,28 @@ mod tests {
             (None, keys::OPQ_EAK_HEADS_DONE),
         ] {
             assert_eq!(heads(count), (text(key), vec![]));
+        }
+        let levers = |check| said(NpcScript::opq_levers(check));
+        assert_eq!(
+            levers(Some(LeverCheck::Right)),
+            (
+                text(keys::OPQ_EAK_LEVERS_RIGHT),
+                box_out("stone6", events::OPQ_LEVER_STAGE)
+            )
+        );
+        for (check, key) in [
+            (Some(LeverCheck::Few), keys::OPQ_EAK_LEVERS_ASK),
+            (
+                Some(LeverCheck::Wrong { one_right: true }),
+                keys::OPQ_EAK_LEVERS_ONE_RIGHT,
+            ),
+            (
+                Some(LeverCheck::Wrong { one_right: false }),
+                keys::OPQ_EAK_LEVERS_NONE_RIGHT,
+            ),
+            (None, keys::OPQ_EAK_LEVERS_DONE),
+        ] {
+            assert_eq!(levers(check), (text(key), vec![]));
         }
     }
 

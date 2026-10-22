@@ -53,7 +53,7 @@ pub struct Event {
     /// The stages any member may clear: when a reactor on their map drops
     /// the stage's loot, whoever broke it (the Tower of Goddess's Salion
     /// stage, `net::reactors::Action::Salion`), or when their NPC finds the
-    /// stage done, whoever asked (Eak in the music and head-count rooms).
+    /// stage done, whoever asked (Eak in the music, head-count and lever rooms).
     pub member_clears: &'static [u8],
     /// Where those on a stage's map go when it is cleared: the stage and
     /// the portal on its map.
@@ -445,9 +445,8 @@ const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
 /// are the six rooms off the tower's hub (920010100), each holding a piece
 /// of the statue; 8 is the garden (920010800); and 9, the win, is Minerva's
 /// statue on the hub. Each of the first seven gives 3500 EXP (Cosmic
-/// `giveEventPlayersExp`). The cloud stage and two of the rooms, the walkway
-/// and the lounge, where Eak takes what the team gathered, are played so far,
-/// so it can't be won.
+/// `giveEventPlayersExp`). The cloud stage and the six rooms are played so
+/// far, but not the garden, so it can't be won.
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
@@ -470,7 +469,7 @@ pub const OPQ: Event = Event {
         OPQ_HUB,
     ],
     talk_clears: &[1],
-    member_clears: &[3, OPQ_MUSIC_STAGE, OPQ_HEAD_COUNT_STAGE],
+    member_clears: &[3, OPQ_MUSIC_STAGE, OPQ_HEAD_COUNT_STAGE, OPQ_LEVER_STAGE],
     clear_portals: &[(1, "st00")],
     gated: &[],
     puzzles: 1..=0,
@@ -499,6 +498,15 @@ pub const OPQ_MUSIC_STAGE: u8 = 4;
 /// platforms (`HeadCount`), and its stage.
 pub const OPQ_HEAD_COUNT_ROOM: i32 = 920_010_500;
 pub const OPQ_HEAD_COUNT_STAGE: u8 = 5;
+/// The Tower of Goddess's lounge, whose climb pads (`party3_r4pt`) lead
+/// up to its upper rooms.
+pub const OPQ_LOUNGE: i32 = 920_010_600;
+/// The Tower of Goddess's tall room, climbed pad by pad (`party3_r6pt`)
+/// to the five levers Eak asks about (`LeverCheck`), and its stage.
+pub const OPQ_LEVER_ROOM: i32 = 920_010_700;
+pub const OPQ_LEVER_STAGE: u8 = 7;
+/// The lever reactors' names there.
+pub const OPQ_LEVERS: [&str; 5] = ["1", "2", "3", "4", "5"];
 
 /// The Orbis party quest's own items, 4001044 to 4001063.
 const OPQ_ITEMS: [i32; 20] = {
@@ -970,10 +978,7 @@ pub fn combos(areas: usize, taken: u32) -> impl Iterator<Item = u32> {
 pub fn draw_split(rng: &mut impl rand::Rng) -> [u8; 3] {
     static PINNED: OnceLock<Option<[u8; 3]>> = OnceLock::new();
     let pinned = *PINNED.get_or_init(|| {
-        let pin = std::env::var("RUSTMS_OPQ_SPLIT").ok()?;
-        let digits: Vec<u8> = pin.bytes().map(|b| b.wrapping_sub(b'0')).collect();
-        let split: [u8; 3] = digits.try_into().ok()?;
-        (split.iter().sum::<u8>() == 3).then_some(split)
+        pinned_digits("RUSTMS_OPQ_SPLIT", 0..=3).filter(|split| split.iter().sum::<u8>() == 3)
     });
     pinned.unwrap_or_else(|| {
         let mut left = 3;
@@ -1016,6 +1021,118 @@ pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> H
         HeadCount::Right
     } else {
         HeadCount::Wrong { right }
+    }
+}
+
+/// The digits of the environment variable `var`, if it holds `N` of them,
+/// each in `range`: a test's pin on a draw.
+fn pinned_digits<const N: usize>(var: &str, range: RangeInclusive<u8>) -> Option<[u8; N]> {
+    let pin = std::env::var(var).ok()?;
+    let digits: Vec<u8> = pin.bytes().map(|b| b.wrapping_sub(b'0')).collect();
+    let digits: [u8; N] = digits.try_into().ok()?;
+    digits.iter().all(|d| range.contains(d)).then_some(digits)
+}
+
+/// The right pad of each row of a climb, drawn the first time anyone
+/// steps on one (Cosmic `party3_r4pt`, `party3_r6pt`): on the lounge two
+/// rows of three, on the tall room sixteen rows of four. For testing,
+/// `RUSTMS_OPQ_LOUNGE` (`"23"`) and `RUSTMS_OPQ_TOWER` (16 digits) pin them.
+pub fn draw_climb(map_id: i32, rng: &mut impl rand::Rng) -> Vec<u8> {
+    static LOUNGE: OnceLock<Option<[u8; 2]>> = OnceLock::new();
+    static TOWER: OnceLock<Option<[u8; 16]>> = OnceLock::new();
+    let (rows, pads, pinned) = if map_id == OPQ_LOUNGE {
+        let pinned = LOUNGE.get_or_init(|| pinned_digits("RUSTMS_OPQ_LOUNGE", 1..=3));
+        (2, 3, pinned.map(|pin| pin.to_vec()))
+    } else {
+        let pinned = TOWER.get_or_init(|| pinned_digits("RUSTMS_OPQ_TOWER", 1..=4));
+        (16, 4, pinned.map(|pin| pin.to_vec()))
+    };
+    pinned.unwrap_or_else(|| (0..rows).map(|_| rng.gen_range(1, pads + 1)).collect())
+}
+
+/// The portal a climb pad, `name` with id `portal_id`, sends a player to
+/// on its own map given the right pads `combo`; `None` if it isn't one.
+///
+/// On the lounge (`r4rp<row><pad>`) the right pad of the first row leads
+/// to the same pad a row up, three ids on, and that of the second to
+/// `success` (1); a wrong one to `fail` (2), below the first row.
+///
+/// On the tall room (`rp<row, two digits><pad>`) the right pad leads to
+/// the same pad a row up, four ids on, or after every fourth row to that
+/// section's landing, `pt00`-`pt03` (1-4); a wrong one back to the start
+/// of its section, the landing below it or, in the first, `r6fail` (5).
+/// Cosmic's script means that but divides as JavaScript does, so from
+/// rows 5-8, 10-12 and 14-16 its portal is a fraction or the very bottom.
+pub fn climb(map_id: i32, combo: &[u8], portal_id: u8, name: &str) -> Option<u8> {
+    let digits = |s: &str| s.parse::<usize>().ok();
+    if map_id == OPQ_LOUNGE {
+        let rest = name.strip_prefix("r4rp").filter(|rest| rest.len() == 2)?;
+        let (row, pad) = (digits(&rest[..1])?, digits(&rest[1..])?);
+        let right = *combo.get(row.checked_sub(1)?)?;
+        return Some(match (usize::from(right) == pad, row) {
+            (true, 1) => portal_id + 3,
+            (true, _) => 1,
+            (false, _) => 2,
+        });
+    }
+    let rest = name.strip_prefix("rp").filter(|rest| rest.len() == 3)?;
+    let (row, pad) = (digits(&rest[..2])?, digits(&rest[2..])?);
+    let right = *combo.get(row.checked_sub(1)?)?;
+    let section = (row - 1) / 4;
+    Some(if usize::from(right) != pad {
+        if section == 0 {
+            5
+        } else {
+            section as u8
+        }
+    } else if row % 4 != 0 {
+        portal_id + 4
+    } else {
+        (row / 4) as u8
+    })
+}
+
+/// The two of the tall room's five levers Eak wants up, drawn the first
+/// time he is asked (Cosmic `2013001`, `stage6_c`). For testing,
+/// `RUSTMS_OPQ_LEVERS` pins them as their two names (`"14"`).
+pub fn draw_levers(rng: &mut impl rand::Rng) -> [bool; 5] {
+    static PINNED: OnceLock<Option<[u8; 2]>> = OnceLock::new();
+    let pinned = PINNED
+        .get_or_init(|| pinned_digits("RUSTMS_OPQ_LEVERS", 1..=5))
+        .filter(|[a, b]| a != b)
+        .map(|[a, b]| [usize::from(a) - 1, usize::from(b) - 1]);
+    let [first, second] = pinned.unwrap_or_else(|| {
+        let first = rng.gen_range(0, 5);
+        let second = (first + rng.gen_range(1, 5)) % 5;
+        [first, second]
+    });
+    let mut pair = [false; 5];
+    pair[first] = true;
+    pair[second] = true;
+    pair
+}
+
+/// What Eak makes of the tall room's levers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeverCheck {
+    /// Not two of them up.
+    Few,
+    /// Two, but not his pair: `one_right` if one of them is in it.
+    Wrong {
+        one_right: bool,
+    },
+    Right,
+}
+
+/// How the levers that are `up` stand against Eak's `pair`.
+pub fn lever_check(pair: [bool; 5], up: [bool; 5]) -> LeverCheck {
+    if up.iter().filter(|&&up| up).count() != 2 {
+        LeverCheck::Few
+    } else if up == pair {
+        LeverCheck::Right
+    } else {
+        let one_right = up.iter().zip(pair).any(|(&up, pair)| up && pair);
+        LeverCheck::Wrong { one_right }
     }
 }
 
@@ -1101,6 +1218,79 @@ mod tests {
         }
         // Every way of putting three on three platforms comes up.
         assert_eq!(seen.len(), 10);
+    }
+
+    #[test]
+    fn the_lounges_pads_lead_up_or_down_to_fail() {
+        let combo = [2, 3];
+        let step = |id, name| climb(OPQ_LOUNGE, &combo, id, name);
+        assert_eq!(step(12, "r4rp12"), Some(15));
+        assert_eq!(step(11, "r4rp11"), Some(2));
+        assert_eq!(step(16, "r4rp23"), Some(1));
+        assert_eq!(step(15, "r4rp22"), Some(2));
+        assert_eq!(step(7, "r4rp20"), Some(2));
+        assert_eq!(step(17, "st00"), None);
+    }
+
+    #[test]
+    fn the_tall_rooms_pads_lead_up_a_row_or_back_to_the_sections_start() {
+        let combo = [1, 2, 3, 4].repeat(4);
+        let step = |row: usize, pad: usize| {
+            let id = (24 + (row - 1) * 4 + (pad - 1)) as u8;
+            climb(OPQ_LEVER_ROOM, &combo, id, &format!("rp{row:02}{pad}"))
+        };
+        assert_eq!(step(1, 1), Some(28));
+        assert_eq!(step(2, 2), Some(33));
+        assert_eq!(step(4, 4), Some(1));
+        assert_eq!(step(8, 4), Some(2));
+        assert_eq!(step(12, 4), Some(3));
+        assert_eq!(step(16, 4), Some(4));
+        assert_eq!(step(1, 3), Some(5));
+        assert_eq!(step(4, 1), Some(5));
+        assert_eq!(step(5, 3), Some(1));
+        assert_eq!(step(8, 1), Some(1));
+        assert_eq!(step(9, 3), Some(2));
+        assert_eq!(step(13, 3), Some(3));
+        assert_eq!(step(16, 3), Some(3));
+        assert_eq!(climb(OPQ_LEVER_ROOM, &combo, 5, "r6fail"), None);
+    }
+
+    #[test]
+    fn every_climb_and_lever_pair_comes_up() {
+        let mut rng = rand::thread_rng();
+        let mut lounge = HashSet::new();
+        let mut pairs = HashSet::new();
+        for _ in 0..2000 {
+            let combo = draw_climb(OPQ_LOUNGE, &mut rng);
+            assert!(combo.iter().all(|pad| (1..=3).contains(pad)));
+            lounge.insert(combo);
+            let tower = draw_climb(OPQ_LEVER_ROOM, &mut rng);
+            assert_eq!(tower.len(), 16);
+            assert!(tower.iter().all(|pad| (1..=4).contains(pad)));
+            let pair = draw_levers(&mut rng);
+            assert_eq!(pair.iter().filter(|&&up| up).count(), 2);
+            pairs.insert(pair);
+        }
+        assert_eq!(lounge.len(), 9);
+        assert_eq!(pairs.len(), 10);
+    }
+
+    #[test]
+    fn eak_wants_two_levers_up_and_hints_at_the_pair() {
+        let pair = [true, false, false, true, false];
+        let up = |names: &[usize]| {
+            let mut up = [false; 5];
+            for &name in names {
+                up[name - 1] = true;
+            }
+            lever_check(pair, up)
+        };
+        assert_eq!(up(&[1, 4]), LeverCheck::Right);
+        assert_eq!(up(&[]), LeverCheck::Few);
+        assert_eq!(up(&[1]), LeverCheck::Few);
+        assert_eq!(up(&[1, 2, 4]), LeverCheck::Few);
+        assert_eq!(up(&[1, 2]), LeverCheck::Wrong { one_right: true });
+        assert_eq!(up(&[2, 3]), LeverCheck::Wrong { one_right: false });
     }
 
     #[test]

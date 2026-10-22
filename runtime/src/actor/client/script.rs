@@ -29,12 +29,19 @@ impl ClientActor {
     /// The client touched a script portal on its map.
     pub(super) async fn touch_script_portal(&mut self, portal: &str) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let script = net::get_game_data()
+        let template = net::get_game_data()
             .ok()
             .and_then(|data| data.field(map_id))
             .and_then(|field| field.portal_by_name(portal))
-            .and_then(|portal| portal.script.clone());
-        if let Some(script) = script.filter(|s| !self.blocked_scripts.contains(s)) {
+            .cloned();
+        let script = template.as_ref().and_then(|portal| portal.script.clone());
+        let climb = match (&script, &template) {
+            (Some(script), Some(portal)) => self.opq_climb(script, portal).await?,
+            _ => None,
+        };
+        if let Some(effects) = climb {
+            self.apply_effects(&effects).await?;
+        } else if let Some(script) = script.filter(|s| !self.blocked_scripts.contains(s)) {
             match scripts::portal(&script, &self.in_game()?.player) {
                 Some(outcome) => {
                     if outcome.block {

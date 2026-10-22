@@ -759,6 +759,11 @@ unsourced = [
     "opq.eak.heads.all_wrong",
     "opq.eak.heads.right",
     "opq.eak.heads.done",
+    "opq.eak.levers.ask",
+    "opq.eak.levers.one_right",
+    "opq.eak.levers.none_right",
+    "opq.eak.levers.right",
+    "opq.eak.levers.done",
 ]
 
 [text."glTutoMsg0.message"]
