@@ -221,6 +221,23 @@ void food()
 	require(closeness_change(4, 4).empty(), "no change, no line");
 }
 
+void speech()
+{
+	using ms::pets::Speech;
+	using ms::pets::speech;
+
+	require(speech(14, false, false) == Speech::NONE && speech(14, true, false) == Speech::NONE,
+			"below level 15, nothing");
+	require(speech(15, false, false) == Speech::SAY && speech(15, false, true) == Speech::SAY,
+			"a clean line is said, whatever the pet is doing");
+	require(speech(15, true, false) == Speech::SLANG, "a cursing one gives the slang");
+	require(speech(30, true, true) == Speech::NONE, "but not while it does an action");
+
+	require(ms::pets::quote_part(0) == 29 && ms::pets::quote_part(1) == 32 && ms::pets::quote_part(2) == 40,
+			"the quote rings' parts");
+	require(ms::pets::quote_part(3) == -1, "no fourth pet");
+}
+
 void naming()
 {
 	using ms::pets::check_name;
@@ -384,6 +401,7 @@ int main()
 		hearing();
 		actions();
 		food();
+		speech();
 		naming();
 		equipment();
 		info_page();

@@ -35,6 +35,7 @@
 #include "../PartyCommands.h"
 
 #include "../../Configuration.h"
+#include "../../Data/CurseData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
@@ -96,19 +97,25 @@ namespace ms
 				[](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
 		}
 
-		// Whether input is /find, with the name it looks for: whatever
-		// follows the command and one space, if anything (FUN_004a8e3d).
-		bool parse_find_command(const std::string& input, std::string& target)
+		// Whether input is `name`, ignoring case, then one space and some
+		// text: the command's argument (FUN_004a8e3d).
+		bool parse_command_argument(const std::string& input, const std::string& name, std::string& argument)
 		{
-			static const std::string COMMAND = "/find ";
+			const std::string COMMAND = name + " ";
 
 			auto same = [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); };
 
 			if (input.size() <= COMMAND.size() || !std::equal(COMMAND.begin(), COMMAND.end(), input.begin(), same))
 				return false;
 
-			target = input.substr(COMMAND.size());
+			argument = input.substr(COMMAND.size());
 			return true;
+		}
+
+		// Whether input is /find, with the name it looks for.
+		bool parse_find_command(const std::string& input, std::string& target)
+		{
+			return parse_command_argument(input, "/find", target);
 		}
 
 		// Whether input is exactly command, ignoring case, as v83 compares
@@ -352,6 +359,19 @@ namespace ms
 							}
 							else if (GuildCommands::run(msg))
 							{
+							}
+							else if (parse_command_argument(msg, "/pet", message))
+							{
+								// StringPool 0x110, for text the curse filter won't take.
+								if (!CurseData::valid(message))
+								{
+									UI::get().emplace<UIOk>("Cursing is not allowed.", [](bool) {});
+								}
+								else
+								{
+									std::string filtered = CurseData::filter(message);
+									Stage::get().get_player().pets_say(filtered, filtered != message);
+								}
 							}
 							// Commands the client doesn't know aren't chat, whatever
 							// the target; v83 sends them only for GMs.
