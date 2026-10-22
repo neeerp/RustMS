@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <utility>
 
@@ -328,6 +329,14 @@ namespace ms
 														 std::pair<uint8_t, uint8_t> granted)
 		{
 			return pending.first == 0 || granted.first != 0 ? granted : pending;
+		}
+
+		// How far the local player is from a firstAttack mob: a tenth of
+		// the x distance and a third of the y one, each rounded down
+		// (FUN_0066e32d, FUN_0066e146).
+		inline int32_t first_attack_distance(int32_t dx, int32_t dy)
+		{
+			return std::abs(dx) / 10 + std::abs(dy) / 3;
 		}
 	}
 }

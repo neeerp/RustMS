@@ -110,6 +110,10 @@ int main()
 		require(mob_hit(100, 20, true, 0.0, 0.0) == 165, "magic starts at 0.75");
 		require(mob_hit(10, 1000, false, 0.0, 0.0) == -489, "it may come out below 0");
 
+		require(first_attack_distance(400, 0) == 40 && first_attack_distance(-409, 0) == 40,
+				"a tenth of dx, rounded down, either way");
+		require(first_attack_distance(0, -122) == 40 && first_attack_distance(15, 5) == 2, "and a third of dy");
+
 		std::cout << "Mob attack passed\n";
 		return 0;
 	}

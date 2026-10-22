@@ -326,6 +326,12 @@ namespace ms
 		};
 
 		std::optional<Pick> pick_attack(const Physics &physics);
+		// The attacks that reach the local player from where the mob is.
+		std::vector<Pick> attack_candidates(const Physics &physics);
+		// Whether one of its attacks could reach the local player now,
+		// chasing them or not (FUN_0066a517 with no outputs, for
+		// FUN_0066e32d).
+		bool attack_reaches(const Physics &physics);
 
 		// Attack where the shown path is, hold the AI still while it plays,
 		// and send it (FUN_0066b6fc).
