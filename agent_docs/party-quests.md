@@ -333,7 +333,11 @@ default 5A in `v83ref/lanes/QUESTIONS.md`, LPQ). Five players are the
 fewest, so the first to leave ends the quest for a party of five.
 
 `922010100`-`500`, `700` and `800` keep `next00` shut until their stage is
-cleared (`Event::gated`); `600`'s maze has no clear.
+cleared (`Event::gated`); `600`'s maze has no clear. Its hidden portals
+(`h000`-`h044`) lead within the map, which the client does on its own:
+HeavenClient moves the player and sends nothing, and the v83 client sends
+only INNER_PORTAL (0x65), which needs no answer (`a069`). Its `next00`
+leads on to stage 7 unshut, as stage 5's gate already held the party back.
 
 ## Ludibrium's balloons
 
@@ -365,6 +369,12 @@ of stage 2's boxes, 2200002, is a trap (`reactors::Action::WarpMap`, Cosmic
 copy. That room's four boxes make up stage 2's 15 passes, and its `out00`
 leads back up.
 
+Each of stage 3's eight boxes (2201001, Cosmic `ludiMob1`) lets out three
+Bloctopuses (9300007) on the ground below it (`Action::BringOut`), which
+drop passes like the four already there. Stage 5's portals `in01`-`in06`
+lead to six rooms (922010501-506), each with four boxes 2202003 and an
+`out00` back; they are in the party's copy like every map in the range.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -393,8 +403,8 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's stage 3 and 7 reactors that bring out monsters, stage 6's maze,
-  stage 8's crates, the boss, bonus and reward (`a066`, slices S3 to S5).
+- LPQ's reactors that bring out Rombad and Alishar, stage 8's crates,
+  the boss, bonus and reward (`a066`, slices S4 and S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

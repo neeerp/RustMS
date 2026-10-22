@@ -1272,9 +1272,11 @@ three hits.
 
 What a broken reactor does is `net::reactors::action`, keyed by reactor id
 as Cosmic's scripts are: by default the breaker rolls its drops; the eggs
-bring out the Fire Hawk or Ice Eagle (`9300089`, `9300090`), and the
-Hitman's hideout boxes (`1021000`, `1021001`) its `9300091`, on the ground
-just below the reactor, without drops. Others send the breaker to a portal
+bring out the Fire Hawk or Ice Eagle (`9300089`, `9300090`), the
+Hitman's hideout boxes (`1021000`, `1021001`) its `9300091`, and
+Ludibrium's stage 3 boxes (`2201001`) three Bloctopuses (`9300007`), on
+the ground just below the reactor, without drops (`Action::BringOut`, a
+mob and a count). Others send the breaker to a portal
 (`Action::Warp`, looked up by name): the hideout's boxes `1020000` to
 `1020002` lead up its floors (`pt00` to `pt02`, within the map, so the room
 stays as it is). The Berserk room's false statues (`1050000`) drop their
