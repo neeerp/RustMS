@@ -15,7 +15,8 @@
 //! last stage wins the event: its clock stops, the next party may start
 //! their own, the team goes to the event's clear map if it has one, and it
 //! goes on until the last member leaves its maps. A won event's leader may
-//! take the team to its bonus, which runs on a clock of its own.
+//! take the team to its bonus, or the win takes it there at once; the
+//! bonus runs on a clock of its own.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -490,8 +491,14 @@ impl EventActor {
         info!(kind = ?self.kind, id = self.id, "Event won");
         // After the clear itself, so its EXP and effects come first (Cosmic
         // `clearPQ`).
-        if let Some(map) = self.kind.event().clear_map {
+        let event = self.kind.event();
+        if let Some(map) = event.clear_map {
             self.move_team(None, map, None);
+        }
+        // Ludibrium's takes the team on to its bonus at once (Cosmic
+        // `clearPQ`).
+        if event.bonus.as_ref().is_some_and(|bonus| bonus.on_win) {
+            self.start_bonus();
         }
     }
 

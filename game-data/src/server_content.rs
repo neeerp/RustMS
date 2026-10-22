@@ -385,6 +385,12 @@ pub mod keys {
     pub const LPQ_BALLOON_INTRO_8: &str = "lpq.balloon.intro.8";
     pub const LPQ_BALLOON_FEW: &str = "lpq.balloon.few";
     pub const LPQ_BALLOON_WRONG: &str = "lpq.balloon.wrong";
+    /// The Pink Balloon on the bonus stage: leave it early?, and staying.
+    pub const LPQ_PINK_LEAVE_ASK: &str = "lpq.pink.leave.ask";
+    pub const LPQ_PINK_STAY: &str = "lpq.pink.stay";
+    /// Arturo with the reward, and to a member without room for it.
+    pub const LPQ_ARTURO_THANKS: &str = "lpq.arturo.thanks";
+    pub const LPQ_ARTURO_FULL: &str = "lpq.arturo.full";
     pub const LPQ_NOTICE_TRAP: &str = "lpq.notice.trap";
     /// Pink lines as Rombad (stage 7) and Alishar (the boss) come out.
     pub const LPQ_NOTICE_ROMBAD: &str = "lpq.notice.rombad";
@@ -1303,6 +1309,10 @@ mod tests {
             keys::LPQ_BALLOON_INTRO_8,
             keys::LPQ_BALLOON_FEW,
             keys::LPQ_BALLOON_WRONG,
+            keys::LPQ_PINK_LEAVE_ASK,
+            keys::LPQ_PINK_STAY,
+            keys::LPQ_ARTURO_THANKS,
+            keys::LPQ_ARTURO_FULL,
             keys::LPQ_NOTICE_TRAP,
             keys::LPQ_NOTICE_ROMBAD,
             keys::LPQ_NOTICE_ALISHAR,

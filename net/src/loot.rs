@@ -98,6 +98,24 @@ pub fn roll_reactor(
     )
 }
 
+/// `loot` sprayed with mesos (Cosmic `sprayItems`): a pile of `from` to
+/// `to` first, then more such piles after it until there are `at_least`
+/// drops.
+pub fn spray(
+    loot: Vec<Loot>,
+    at_least: usize,
+    (from, to): (i32, i32),
+    rng: &mut impl Rng,
+) -> Vec<Loot> {
+    let mut pile = || Loot::Mesos(rng.gen_range(from, to + 1));
+    let mut sprayed = vec![pile()];
+    sprayed.extend(loot);
+    while sprayed.len() < at_least {
+        sprayed.push(pile());
+    }
+    sprayed
+}
+
 /// Roll what a friendly mob (`dropItemPeriod`) makes from its drops, for
 /// no one in particular: the Moon Bunny's rice cakes. Quest drops are left
 /// out.
@@ -319,6 +337,27 @@ mod tests {
             quest,
             premium: None,
         }
+    }
+
+    #[test]
+    fn a_spray_leads_with_mesos_and_tops_up_with_more() {
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(1);
+        let item = Loot::Item {
+            item_id: 2000002,
+            quantity: 1,
+            quest: None,
+        };
+        let sprayed = spray(vec![item.clone()], 15, (30, 60), rng);
+        assert_eq!(sprayed.len(), 15);
+        assert_eq!(sprayed[1], item);
+        let mesos = sprayed.iter().filter_map(|loot| match loot {
+            Loot::Mesos(amount) => Some(*amount),
+            _ => None,
+        });
+        assert!(mesos.clone().all(|amount| (30..=60).contains(&amount)));
+        assert_eq!(mesos.count(), 14);
+        let many = vec![item; 20];
+        assert_eq!(spray(many, 15, (30, 60), rng).len(), 21);
     }
 
     #[test]

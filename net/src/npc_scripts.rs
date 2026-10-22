@@ -62,6 +62,10 @@ pub const RED_SIGN: i32 = 2040034;
 pub const AQUA_BALLOON: i32 = 2040041;
 /// The balloon on Ludibrium's stage 8, whose puzzle is its crates.
 pub const BLUE_BALLOON: i32 = 2040043;
+/// The balloon on Ludibrium's bonus stage, which lets players out early.
+pub const PINK_BALLOON: i32 = 2040045;
+/// Arturo, who gives the team that won Ludibrium's party quest its reward.
+pub const ARTURO: i32 = 2040035;
 /// Sgt. Anderson, who lets players out of Ludibrium's party quest and back
 /// to Eos Tower.
 const ANDERSON: i32 = 2040047;
@@ -853,14 +857,17 @@ impl NpcScript {
         NpcScript::new(AQUA_BALLOON, vec![Page::Say(text(keys::LPQ_BALLOON_S6))])
     }
 
-    /// Growlie's, Tommy's or Tory's script on Primrose Hill's maps, for a
-    /// player in the party quest there, who may be its `leader`, and whose
-    /// party may have `won` it.
-    pub fn on_primrose_hill(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
+    /// A script on an event's maps, for a player in the event, who may be
+    /// its `leader`, and whose party may have `won` it: Growlie's, Tommy's
+    /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
+    /// Ludibrium.
+    pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
             TOMMY => tommy(player, leader, won),
             TORY => tory_after(player, won),
+            PINK_BALLOON => pink_balloon(player),
+            ARTURO if won => arturo(player, &mut rand::thread_rng()),
             _ => None,
         }
     }
@@ -2314,6 +2321,51 @@ fn anderson(player: &Player) -> Option<NpcScript> {
         return None;
     };
     Some(NpcScript::new(ANDERSON, pages))
+}
+
+/// The Pink Balloon (Cosmic `2040045`) lets players off Ludibrium's bonus
+/// stage early, to the reward.
+fn pink_balloon(player: &Player) -> Option<NpcScript> {
+    let bonus = events::LPQ.bonus.as_ref()?;
+    if player.stats.map_id != bonus.map {
+        return None;
+    }
+    let portal = crate::scripts::named(bonus.exit, "st00");
+    let page = Page::Ask {
+        text: text(keys::LPQ_PINK_LEAVE_ASK),
+        on_yes: vec![Effect::WarpToPortal(bonus.exit, portal)],
+        on_no: Some(text(keys::LPQ_PINK_STAY)),
+    };
+    Some(NpcScript::new(PINK_BALLOON, vec![page]))
+}
+
+/// Arturo (Cosmic `2040035`, `giveEventReward`) gives each member of the
+/// team that won Ludibrium's party quest one of `LPQ_REWARDS` and sends
+/// them back to Eos Tower, so nobody gets it twice. A member without a free
+/// slot in each of the Equip, Use and Etc tabs, which the rewards come in,
+/// gets nothing yet.
+fn arturo(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    let bonus = events::LPQ.bonus.as_ref()?;
+    if player.stats.map_id != bonus.exit {
+        return None;
+    }
+    let inventory = &player.inventory;
+    let roomy = [InventoryType::Equip, InventoryType::Use, InventoryType::Etc]
+        .into_iter()
+        .all(|kind| inventory.items(kind).count() < usize::from(inventory.slot_limit(kind)));
+    let last = if roomy {
+        let &(item_id, quantity) = events::LPQ_REWARDS.choose(rng)?;
+        Page::Done(vec![
+            Effect::GiveItem { item_id, quantity },
+            Effect::Warp(events::LPQ.lobby),
+        ])
+    } else {
+        Page::Say(text(keys::LPQ_ARTURO_FULL))
+    };
+    let pages = vec![Page::Say(text(keys::LPQ_ARTURO_THANKS)), last];
+    let mut script = NpcScript::new(ARTURO, pages);
+    script.inventory_full = Some(text(keys::LPQ_ARTURO_FULL));
+    Some(script)
 }
 
 /// Jeff (`goDungeon`): players from level 50 may go down to Sharp Cliff,
@@ -4885,6 +4937,52 @@ mod tests {
             assert!(effects.is_empty(), "{view:?}");
             assert!(said.contains(&text(key)), "{view:?}: {said}");
         }
+    }
+
+    #[test]
+    fn the_pink_balloon_lets_players_off_the_bonus_stage_early() {
+        let bonus = events::LPQ.bonus.as_ref().unwrap();
+        let player = rider(100, 0, bonus.map);
+        let ask = || NpcScript::in_event(PINK_BALLOON, &player, false, true).unwrap();
+        let mut pink = ask();
+        assert_eq!(kind(&pink.begin()), Some(1));
+        let effects = pink.respond(ScriptInput::Yes).unwrap().effects;
+        assert!(
+            matches!(effects[..], [Effect::WarpToPortal(map, _)] if map == bonus.exit),
+            "{effects:?}"
+        );
+        let stay = ask().respond(ScriptInput::No).unwrap();
+        assert!(page_text(&stay).contains(&text(keys::LPQ_PINK_STAY)));
+        assert!(stay.effects.is_empty());
+        let elsewhere = rider(100, 0, bonus.exit);
+        assert!(NpcScript::in_event(PINK_BALLOON, &elsewhere, false, true).is_none());
+    }
+
+    #[test]
+    fn arturo_gives_each_winner_a_reward_with_room_for_any_of_them() {
+        let reward_map = events::LPQ.bonus.as_ref().unwrap().exit;
+        let mut player = rider(100, 0, reward_map);
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let mut script = arturo(&player, rng).unwrap();
+        assert_eq!(kind(&script.begin()), Some(0));
+        let effects = script.respond(ScriptInput::Next).unwrap().effects;
+        let [Effect::GiveItem { item_id, quantity }, Effect::Warp(home)] = effects[..] else {
+            panic!("{effects:?}");
+        };
+        assert!(events::LPQ_REWARDS.contains(&(item_id, quantity)));
+        assert_eq!(home, events::LPQ.lobby);
+        assert!(NpcScript::in_event(ARTURO, &player, false, false).is_none());
+
+        // A full Use tab: nothing yet, whatever the reward would be.
+        let inventory = &mut player.inventory;
+        inventory.set_slot_limit(InventoryType::Use, 1);
+        inventory.insert(InventoryType::Use, 1, game::Item::stack(2000000, 1));
+        let mut script = arturo(&player, rng).unwrap();
+        script.begin();
+        let full = script.respond(ScriptInput::Next).unwrap();
+        assert!(full.effects.is_empty());
+        assert!(page_text(&full).contains(&text(keys::LPQ_ARTURO_FULL)));
     }
 
     #[test]

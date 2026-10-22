@@ -2402,7 +2402,7 @@ impl FieldActor {
             // falls to someone still here.
             action => {
                 let occupant = match action {
-                    reactors::Action::Drops => self
+                    reactors::Action::Drops | reactors::Action::Spray { .. } => self
                         .occupants
                         .get(&by)
                         .or_else(|| self.occupants.values().next()),

@@ -95,7 +95,14 @@ impl ClientActor {
         }
         let in_party = self.party_id.is_some();
         let player = &self.in_game()?.player;
-        let loot = loot::roll_reactor(reactor_id, player, in_party, &mut rand::thread_rng());
+        let loot = {
+            let rng = &mut rand::thread_rng();
+            let loot = loot::roll_reactor(reactor_id, player, in_party, rng);
+            match net::reactors::action(reactor_id) {
+                Action::Spray { at_least, mesos } => loot::spray(loot, at_least, mesos, rng),
+                _ => loot,
+            }
+        };
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
             .await
     }
