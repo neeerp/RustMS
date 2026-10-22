@@ -2481,7 +2481,7 @@ fn anderson(player: &Player) -> Option<NpcScript> {
 /// Wonky (Cosmic `2013000`) on the Orbis party quest's cloud stage lets a
 /// player out, who can't come back.
 fn wonky_inside(player: &Player) -> Option<NpcScript> {
-    if !events::OPQ.holds(player.stats.map_id) {
+    if player.stats.map_id != events::OPQ.entry {
         return None;
     }
     let page = Page::Ask {
