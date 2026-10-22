@@ -185,17 +185,17 @@ namespace ms
 	{
 		Stage::mapid = mapid;
 
-		std::string strid = string_format::extend_id(mapid, 9);
-		std::string prefix = std::to_string(mapid / 100000000);
+		// A copy of a map (a mini-dungeon's) keeps its own info but takes
+		// everything else from the map it copies.
+		nl::node src = mapid == -1 ? NxFiles::ui_classic["CashShopPreview.img"] : NxHelper::Map::get_map_body(mapid);
+		nl::node info = mapid == -1 ? src["info"] : NxHelper::Map::get_map_node_name(mapid)["info"];
 
-		nl::node src = mapid == -1 ? NxFiles::ui_classic["CashShopPreview.img"] : nl::nx::map["Map"]["Map" + prefix][strid + ".img"];
-
-		physics = Physics(src["foothold"], src["info"]);
+		physics = Physics(src["foothold"], info);
 		Range<int16_t> spacex = physics.get_fht().get_space_x();
 		Range<int16_t> spacey = physics.get_fht().get_space_y();
 		tilesobjs = MapTilesObjs(src, Point<int16_t>(spacex.second() - spacex.first(), spacey.second() - spacey.first()));
 		backgrounds = MapBackgrounds(src["back"]);
-		mapinfo = MapInfo(src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
+		mapinfo = MapInfo(info, src, physics.get_fht().get_walls(), physics.get_fht().get_borders());
 		clouds = mapinfo.has_clouds() ? MapClouds(physics.get_fht().get_space_x(), physics.get_fht().get_space_y())
 									  : MapClouds();
 		portals = MapPortals(src["portal"], mapid);

@@ -26,10 +26,8 @@
 
 namespace ms
 {
-	MapInfo::MapInfo(nl::node src, Range<int16_t> walls, Range<int16_t> borders)
+	MapInfo::MapInfo(nl::node info, nl::node src, Range<int16_t> walls, Range<int16_t> borders)
 	{
-		nl::node info = src["info"];
-
 		// v83 (FUN_005a768c) reads each edge of the view range on its own.
 		// One the map leaves out lies 20 px beyond the movement bounds at the
 		// sides, 60 px above them, and 110 px below the lowest foothold.

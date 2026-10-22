@@ -19,6 +19,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <cstdlib>
+
 namespace ms
 {
 	namespace string_format
@@ -131,7 +133,7 @@ namespace ms
 			{
 				std::unordered_map<int64_t, std::pair<std::string, std::string>> map_life;
 
-				nl::node portal = get_map_node_name(mapid);
+				nl::node portal = get_map_body(mapid);
 
 				for (nl::node life : portal["life"])
 				{
@@ -165,6 +167,14 @@ namespace ms
 				std::string mapid_str = string_format::extend_id(mapid, 9);
 
 				return nl::nx::map["Map"]["Map" + prefix][mapid_str + ".img"];
+			}
+
+			nl::node get_map_body(int32_t mapid)
+			{
+				nl::node map = get_map_node_name(mapid);
+				std::string link = map["info"]["link"];
+
+				return link.empty() ? map : get_map_node_name(std::atoi(link.c_str()));
 			}
 		}
 
