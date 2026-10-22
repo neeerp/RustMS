@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Inventory.h"
+#include "ItemExpiry.h"
 
 #include "../../Data/BulletData.h"
 #include "../../Data/EquipData.h"
@@ -478,6 +479,18 @@ namespace ms
 			return {};
 
 		return item_iter->second;
+	}
+
+	bool Inventory::is_sealed(InventoryType::Id type, int16_t slot) const
+	{
+		int16_t flags = 0;
+
+		if (Optional<const Equip> equip = get_equip(type, slot))
+			flags = equip->get_flags();
+		else if (Optional<const Item> item = get_item(type, slot))
+			flags = item->get_flags();
+
+		return flags & item_expiry::SEALED;
 	}
 
 	Inventory::Movement Inventory::movementbyvalue(int8_t value)

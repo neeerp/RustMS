@@ -8,6 +8,7 @@
 
 #include "../../Constants.h"
 #include "../../Character/Inventory/CashUpgrades.h"
+#include "../../Character/Inventory/ItemDrop.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
@@ -323,6 +324,14 @@ namespace ms
 		if (player.is_dead())
 		{
 			notice(DEAD);
+
+			return;
+		}
+
+		// 0x82cc78: so v83's later question about a sealed item (0x114f) never comes.
+		if (player.get_inventory().is_sealed(InventoryType::Id::EQUIP, equip_slot))
+		{
+			notice(item_drop::SEALED);
 
 			return;
 		}

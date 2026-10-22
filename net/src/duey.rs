@@ -110,9 +110,11 @@ pub fn fee(mesos: i32, quick: bool) -> i32 {
 
 /// Whether the item may go in a parcel: what storage takes, but neither
 /// items that expire nor those bound to an account, a party quest, or a
-/// session.
+/// session. Nor sealed ones, which storage takes but v83 won't put in a
+/// parcel (0x4f48d0).
 pub fn sendable(item: &Item) -> bool {
     storage::storable(item)
+        && !item.sealed()
         && item.expiration.is_none()
         && items::info(item.item_id)
             .is_some_and(|info| !info.account_sharable && !info.pquest && !info.expire_on_logout)
@@ -422,6 +424,26 @@ mod tests {
             result::INCORRECT
         );
         assert_eq!(sender.meso, 10_000);
+    }
+
+    #[test]
+    fn a_sealed_item_stays() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut sender = player(10_000, 30);
+        let sealed = Item {
+            flags: game::inventory::FLAG_LOCK,
+            ..Item::stack(RED_POTION, 1)
+        };
+        sender.inventory_mut().insert(InventoryType::Use, 1, sealed);
+        assert_eq!(
+            send(&mut sender, InventoryType::Use as u8, 1, 1, 0, false)
+                .unwrap()
+                .unwrap_err(),
+            result::INCORRECT
+        );
+        assert_eq!(sender.inventory.count(RED_POTION), 1);
     }
 
     #[test]

@@ -134,6 +134,16 @@ namespace ms
 				&& !item.account;
 		}
 
+		// Why an item can't be put up in a trade (FUN_004f3ef4), or nothing: a
+		// sealed item says so before anything else.
+		inline const char *trade_refusal(const Traits &item)
+		{
+			if (item.sealed)
+				return SEALED;
+
+			return tradeable(item) ? nullptr : UNAVAILABLE;
+		}
+
 		// Why an item can't be put up in a personal shop (FUN_006fd96c), or nothing.
 		inline const char *unsellable(const Traits &item)
 		{
