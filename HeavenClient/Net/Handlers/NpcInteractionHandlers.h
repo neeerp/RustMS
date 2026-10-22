@@ -57,6 +57,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Opens the Rock, Paper, Scissors window, or plays it (report b038)
+	// Opcode: RPS_GAME(312)
+	class RpsGameHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Opens Duey's window, or answers a request to it (report b028)
 	// Opcode: PARCEL(322)
 	class ParcelHandler : public PacketHandler

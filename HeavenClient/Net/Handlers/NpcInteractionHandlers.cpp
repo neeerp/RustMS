@@ -30,6 +30,7 @@
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPetChooser.h"
 #include "../IO/UITypes/UIQuiz.h"
+#include "../IO/UITypes/UIRpsGame.h"
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
@@ -438,6 +439,83 @@ namespace ms
 
 		storage.answered();
 		UI::get().emplace<UIOk>(message, [](bool) {});
+	}
+
+	void RpsGameHandler::handle(InPacket& recv) const
+	{
+		enum Mode : uint8_t
+		{
+			NO_MESOS = 6,
+			NO_SLOT = 7,
+			OPEN = 8,
+			START = 9,
+			TIME_OVER = 10,
+			RESULT = 11,
+			NEXT_ROUND = 12,
+			CLOSE = 13,
+			RESET = 14
+		};
+
+		auto mode = static_cast<uint8_t>(recv.read_byte());
+		auto window = UI::get().get_element<UIRpsGame>();
+		bool open = window && window->is_active();
+
+		// 0x73fff1: everything but the opening needs the window.
+		if (mode == Mode::OPEN)
+		{
+			if (open)
+				return;
+
+			int32_t npc_id = recv.read_int();
+
+			// The notice comes first, and the window once it is answered either way (StringPool 0xe5b).
+			UI::get().emplace<UINpcTalk>();
+			UI::get().enable();
+
+			if (auto talk = UI::get().get_element<UINpcTalk>())
+			{
+				talk->change_text(npc_id, UINpcTalk::TalkType::SENDOK, 0, 0, UIRpsGame::NOTICE);
+				talk->set_local_responder([npc_id](int8_t, int32_t)
+				{
+					UI::get().emplace<UIRpsGame>(npc_id);
+				});
+			}
+
+			return;
+		}
+
+		if (!open)
+			return;
+
+		switch (mode)
+		{
+			case Mode::NO_MESOS:
+			case Mode::NO_SLOT:
+			case Mode::RESET:
+				window->refused(mode == Mode::NO_MESOS ? UIRpsGame::Refusal::NO_MESOS
+					: mode == Mode::NO_SLOT ? UIRpsGame::Refusal::NO_SLOT
+					: UIRpsGame::Refusal::SILENT);
+				break;
+			case Mode::START:
+			case Mode::NEXT_ROUND:
+				window->start_round();
+				break;
+			case Mode::TIME_OVER:
+				window->time_over();
+				break;
+			case Mode::RESULT:
+			{
+				int8_t hand = recv.read_byte();
+				int8_t streak = recv.read_byte();
+				window->result(hand, streak);
+				break;
+			}
+			case Mode::CLOSE:
+				window->close();
+				break;
+			default:
+				break;
+		}
 	}
 
 	void ParcelHandler::handle(InPacket& recv) const
