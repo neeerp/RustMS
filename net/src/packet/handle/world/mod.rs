@@ -138,7 +138,7 @@ pub use self::quest_action::QuestActionHandler;
 pub use self::quick_slots::QuickSlotHandler;
 pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
-pub use self::ring::{RingActionHandler, WeddingTalkHandler};
+pub use self::ring::{RingActionHandler, WeddingBlessHandler, WeddingTalkHandler};
 pub use self::rps::RpsActionHandler;
 pub use self::script_portal::ChangeMapSpecialHandler;
 pub use self::scroll::UseUpgradeScrollHandler;

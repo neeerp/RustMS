@@ -976,6 +976,15 @@ pub mod keys {
     /// Wayne's line when the wedding could not begin.
     pub const WEDDING_STARTER_ERROR: &str = "wedding.start.error";
 
+    /// The High Priest's line in Amoria to anyone without a Cathedral wedding booked.
+    pub const WEDDING_CATHEDRAL_STARTER_INTRO: &str = "wedding.start.cathedral_intro";
+
+    /// The High Priest's line in Amoria to an engaged player without a Cathedral wedding booked.
+    pub const WEDDING_CATHEDRAL_STARTER_NOT_BOOKED: &str = "wedding.start.cathedral_not_booked";
+
+    /// The High Priest in Amoria asks one of a couple whether to begin their wedding.
+    pub const WEDDING_CATHEDRAL_STARTER_ASK: &str = "wedding.start.cathedral_ask";
+
     /// The priest's line to anyone but the couple.
     pub const WEDDING_PRIEST_INTRO: &str = "wedding.priest.intro";
 
@@ -996,6 +1005,12 @@ pub mod keys {
 
     /// The priest's line to the married couple.
     pub const WEDDING_PRIEST_MARRIED: &str = "wedding.priest.married";
+
+    /// The Cathedral's priest's line to the married couple.
+    pub const WEDDING_CATHEDRAL_PRIEST_MARRIED: &str = "wedding.priest.cathedral_married";
+
+    /// The line to a guest whose blessing of the couple counted.
+    pub const WEDDING_BLESSED: &str = "wedding.blessed";
 
     /// The priest's line when the vows could not be taken.
     pub const WEDDING_PRIEST_FAILED: &str = "wedding.priest.failed";
@@ -1027,8 +1042,8 @@ pub mod keys {
     /// The assistant, to a guest who could not go in.
     pub const WEDDING_GUEST_ERROR: &str = "wedding.guest.enter_error";
 
-    /// The wedding itself: Wayne, the priest and Jackie (report b071).
-    pub const CEREMONY: [&str; 26] = [
+    /// The wedding itself: the starters, the priests and the altar staff (report b071).
+    pub const CEREMONY: [&str; 31] = [
         WEDDING_STARTER_INTRO,
         WEDDING_STARTER_NOT_BOOKED,
         WEDDING_STARTER_CHANNEL,
@@ -1038,6 +1053,9 @@ pub mod keys {
         WEDDING_STARTER_PARTNER,
         WEDDING_STARTER_BUSY,
         WEDDING_STARTER_ERROR,
+        WEDDING_CATHEDRAL_STARTER_INTRO,
+        WEDDING_CATHEDRAL_STARTER_NOT_BOOKED,
+        WEDDING_CATHEDRAL_STARTER_ASK,
         WEDDING_PRIEST_INTRO,
         WEDDING_PRIEST_ASK,
         WEDDING_PRIEST_CLOTHES,
@@ -1045,6 +1063,8 @@ pub mod keys {
         WEDDING_PRIEST_ROOM,
         WEDDING_PRIEST_WAITING,
         WEDDING_PRIEST_MARRIED,
+        WEDDING_CATHEDRAL_PRIEST_MARRIED,
+        WEDDING_BLESSED,
         WEDDING_PRIEST_FAILED,
         WEDDING_STAFF_WAIT,
         WEDDING_STAFF_ASK,

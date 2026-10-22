@@ -72,6 +72,16 @@ impl WorldHandler for WeddingTalkHandler {
     }
 }
 
+/// The Cathedral guest's Yes to "Do you want to bless this couple?"
+/// (report b075). It has no body.
+pub struct WeddingBlessHandler;
+
+impl WorldHandler for WeddingBlessHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::empty().with(WorldAction::WeddingBless))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

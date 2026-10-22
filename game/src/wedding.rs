@@ -111,13 +111,33 @@ impl Venue {
             Self::Cathedral => 4,
         }
     }
+
+    /// The priest's line after `step` while the couple have yet to vow, if
+    /// he goes on: at the Cathedral his welcome leads to his call for the
+    /// guests' blessings, and that to the blessing itself.
+    pub fn before_vows(self, step: u8) -> Option<u8> {
+        match (self, step) {
+            (Self::Cathedral, 0 | 1) => Some(step + 1),
+            _ => None,
+        }
+    }
+
+    /// The step at which the guests may bless the couple, if the venue has
+    /// one: the Cathedral's asks each guest "Do you want to bless this
+    /// couple?" and shows the couple nothing (report b075).
+    pub fn blessing(self) -> Option<u8> {
+        match self {
+            Self::Chapel => None,
+            Self::Cathedral => Some(2),
+        }
+    }
 }
 
 /// The priest's first line at the altar, which also starts the venue's
 /// music (report b075).
 pub const PRIEST_WELCOME: u8 = 0;
 
-/// Amoria, where Wayne starts the weddings.
+/// Amoria, where Wayne and the High Priest start the weddings.
 pub const AMORIA: i32 = 680000000;
 
 /// Where everyone goes when a wedding ends: Ames's room, which both venues'

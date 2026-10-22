@@ -33,7 +33,11 @@ impl ClientActor {
         &mut self,
         npc_id: i32,
     ) -> Result<bool, RuntimeError> {
-        if let Some(venue) = npc_scripts::wedding_starter_venue(npc_id) {
+        let in_amoria = self.in_game()?.player.stats.map_id == AMORIA;
+        // The High Priest begins weddings in Amoria and marries at the altar,
+        // so only in Amoria is he the starter.
+        let starter = npc_scripts::wedding_starter_venue(npc_id).filter(|_| in_amoria);
+        if let Some(venue) = starter {
             let player = &self.in_game()?.player;
             let couple = engaged(player);
             let now = SystemTime::now();
@@ -204,6 +208,23 @@ impl ClientActor {
         if let Some(ticket) = self.wedding_here() {
             ticket.talk(step);
         }
+    }
+
+    /// The guest said Yes to the priest's "Do you want to bless this
+    /// couple?"; they hear when it counted.
+    pub(super) async fn bless_couple(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.wedding_here() else {
+            return Ok(());
+        };
+        // Only those at the altar were asked.
+        if map_id != ticket.venue.altar() {
+            return Ok(());
+        }
+        if ticket.bless().await {
+            self.pink(keys::WEDDING_BLESSED, &[]).await?;
+        }
+        Ok(())
     }
 
     /// The married player asked the staff to end their wedding.

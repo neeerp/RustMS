@@ -54,6 +54,9 @@ pub enum RecvOpcode {
     RingAction = 0x89,
     /// One of the couple closed the priest's line (report b075).
     WeddingTalk = 0x8B,
+    /// A guest at the Cathedral's altar said Yes to blessing the couple
+    /// (report b075).
+    WeddingBless = 0x8C,
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,
