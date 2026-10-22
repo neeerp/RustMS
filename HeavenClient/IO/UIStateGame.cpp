@@ -277,6 +277,9 @@ namespace ms
 	{
 		if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
+		// While a dialog is open the field takes no click (FUN_005299de).
+		else if (UI::get().dialog_open())
+			return;
 		// Someone's shop balloon comes before them (FUN_0094fbbf).
 		else if (int32_t serial = Stage::get().mini_room_at(pos))
 			MiniRoomVisitPacket(serial).dispatch();
@@ -299,6 +302,8 @@ namespace ms
 			focusedelement->rightclick(pos);
 		else if (UIElement *front = get_front(pos))
 			front->rightclick(pos);
+		else if (UI::get().dialog_open())
+			return;
 		// Releasing the button over someone else opens the menu on them
 		// (FUN_0095009a).
 		else if (int32_t cid = Stage::get().other_character_at(pos))

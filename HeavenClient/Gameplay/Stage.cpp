@@ -40,10 +40,8 @@
 #include "../IO/UITypes/UIMobGage.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
-#include "../IO/UITypes/UIPersonalShop.h"
 #include "../IO/UITypes/UIQuiz.h"
 #include "../IO/UITypes/UIStatusBar.h"
-#include "../IO/UITypes/UITradingRoom.h"
 #include "../Net/Packets/AttackAndSkillPackets.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/MessagingPackets.h"
@@ -977,6 +975,12 @@ namespace ms
 		if (state != State::ACTIVE || !playable || player.is_dead())
 			return;
 
+		// While one of v83's dialogs is open the field takes no key going
+		// down (FUN_00529968): no skill, item, face, macro, attack, jump,
+		// pickup, portal or arrow. Releases still let go of held keys.
+		if (down && UI::get().dialog_open())
+			return;
+
 		// Any other bound key going down drops the macro running (v83
 		// FUN_0094f2ed), and so do Left and Right going down or up
 		// (FUN_0094c856). Down isn't bound in v83.
@@ -1081,11 +1085,8 @@ namespace ms
 		if (player.has_buff(Buffstat::Id::DARKSIGHT) && step.skill != ASSASSINATE)
 			return false;
 
-		// Nor does anything while a mini room is open.
-		auto shop = UI::get().get_element<UIPersonalShop>();
-		auto trade = UI::get().get_element<UITradingRoom>();
-
-		if ((shop && shop->is_active()) || (trade && trade->is_active()))
+		// Nor does anything while a dialog is open (FUN_0063196b).
+		if (UI::get().dialog_open())
 			return false;
 
 		if (!combat.use_move(step.skill))
@@ -1234,13 +1235,12 @@ namespace ms
 
 		// The close button on the player's own chalkboard, which needs both
 		// the press and the release on it (FUN_0094fa8e). The board stays up
-		// until the server takes it down. An open mini room blocks it.
-		auto shop = UI::get().get_element<UIPersonalShop>();
-		auto trade = UI::get().get_element<UITradingRoom>();
-		bool mini_room = (shop && shop->is_active()) || (trade && trade->is_active());
+		// until the server takes it down. While a dialog is open the field
+		// takes no click (FUN_005299de), and the board no hover either.
+		bool locked = UI::get().dialog_open();
 		Point<int16_t> feet = player.get_position() + camera.position();
 
-		if (!mini_room && player.send_chalkboard_cursor(feet, position, pressed, UI::get().is_cursor_pressed()))
+		if (!locked && player.send_chalkboard_cursor(feet, position, pressed, UI::get().is_cursor_pressed()))
 		{
 			CloseChalkboardPacket().dispatch();
 
@@ -1252,17 +1252,18 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		if (!mini_room && player.on_chalkboard_close(feet, position))
+		if (!locked && player.on_chalkboard_close(feet, position))
 		{
 			tooltips.leave();
 
 			return Cursor::State::CANCLICK;
 		}
 
-		Cursor::State npcstate = npcs.send_cursor(pressed, position, camera.position());
+		// Nor do the NPCs or the quest alert, so no hand shows over them.
+		Cursor::State npcstate = locked ? Cursor::State::IDLE : npcs.send_cursor(pressed, position, camera.position());
 
 		// Then the quest alert (FUN_0094fa8e).
-		if (npcstate == Cursor::State::IDLE)
+		if (!locked && npcstate == Cursor::State::IDLE)
 			quest_alert.send_cursor(player.get_position() + player.get_face_offset() + camera.position(), position,
 									pressed, UI::get().is_cursor_pressed());
 

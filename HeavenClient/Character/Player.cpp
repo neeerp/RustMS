@@ -1372,11 +1372,13 @@ namespace ms
 
 		int64_t now = now_ms();
 
-		// A held walking key repeats, as Windows repeats it.
+		// A held walking key repeats, as Windows repeats it, but not while a
+		// dialog is open: the field takes no key then (FUN_00529968).
 		bool confused = has_buff(Buffstat::Id::CONFUSE);
 
-		if (is_held(KeyAction::Id::LEFT) || is_held(KeyAction::Id::RIGHT) ||
-			is_held(confused ? KeyAction::Id::UP : KeyAction::Id::DOWN))
+		if (!UI::get().dialog_open() &&
+			(is_held(KeyAction::Id::LEFT) || is_held(KeyAction::Id::RIGHT) ||
+			 is_held(confused ? KeyAction::Id::UP : KeyAction::Id::DOWN)))
 			stirred = now;
 
 		if (now - stirred <= disease::STILL_TIME)
@@ -1872,6 +1874,11 @@ namespace ms
 		case KeyAction::Id::RIGHT:
 		case KeyAction::Id::UP:
 		case KeyAction::Id::DOWN:
+			// v83 reads no arrow while a dialog is open, so the player
+			// stops walking, crouching or climbing (FUN_009cbefb).
+			if (UI::get().dialog_open())
+				return false;
+
 			break;
 		default:
 			return is_held(action);

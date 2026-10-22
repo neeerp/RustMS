@@ -64,8 +64,8 @@ namespace ms
 		bool modal_open() const;
 
 		// Whether one of v83's dialogs is open (0xbe7910, set by the dialog base 0x4eddb3): a trade or personal
-		// shop, an NPC shop, storage, Duey, the item megaphone's window, the Item Guard's, Karma's, the hammer's or
-		// Vega's (report c013).
+		// shop, an NPC shop, storage, Duey, the item megaphone's window, the Item Guard's, Karma's, the hammer's,
+		// Vega's or the kite's (reports c013, c015).
 		bool dialog_open();
 
 		void send_cursor(Point<int16_t> pos);

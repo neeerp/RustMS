@@ -37,6 +37,7 @@
 #include "UITypes/UIItemMegaphone.h"
 #include "UITypes/UIItemProtector.h"
 #include "UITypes/UIKarmaScissors.h"
+#include "UITypes/UIKite.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIPersonalShop.h"
 #include "UITypes/UIQuickSlotConfig.h"
@@ -135,7 +136,7 @@ namespace ms
 			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
 			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
 			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIViciousHammer>())
-			|| open(get_element<UIVegaSpell>());
+			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>());
 	}
 
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
