@@ -64,6 +64,14 @@ pub const SCRIPTS: &[&str] = &[
 /// differs: its classes stay done.
 pub const MEREN_INFO_QUESTS: &[i16] = &[6029, 6030, 6031, 6032];
 const INFO_KEYS: &[&str] = &["info", "infoNumber", "infoex"];
+/// The explorer medals: each counts the maps of a region visited
+/// (`map/onUserEnter/explorationPoint`, or for 29004 the `highposition`
+/// portals) into its info record, and completes at Dalair once that count is
+/// at least `Check/1/infoex` (cond 1, v83 FUN_00721d2c). The server keeps the
+/// maps; see [`QuestTemplate::explored`].
+pub const EXPLORER_QUESTS: &[i16] = &[
+    29004, 29005, 29006, 29007, 29008, 29009, 29010, 29011, 29014,
+];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -171,6 +179,17 @@ pub struct QuestTemplate {
     /// offers the quest wherever the player is.
     pub auto_start: bool,
     pub auto_complete: bool,
+    /// An explorer medal's count: its info record and the maps it needs.
+    pub explored: Option<Explored>,
+}
+
+/// What an explorer medal (`EXPLORER_QUESTS`) counts toward.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Explored {
+    /// The quest whose record holds the count (`Check/1/infoNumber`).
+    pub record: i16,
+    /// Maps needed to complete (`Check/1/infoex/0/value`).
+    pub needed: u32,
 }
 
 /// One `Act/<n>/item` entry.
@@ -332,6 +351,11 @@ impl QuestCatalog {
                     keys.skill_keys.extend(child_names(&nx, skill)?);
                 }
             }
+            if EXPLORER_QUESTS.contains(&id) {
+                if let Some(keys) = &mut keys.end_check {
+                    keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
+                }
+            }
             if MEREN_INFO_QUESTS.contains(&id) {
                 for keys in [&mut keys.start_check, &mut keys.end_check]
                     .into_iter()
@@ -459,6 +483,11 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             None => false,
         })
     };
+    let explored = if EXPLORER_QUESTS.contains(&id) {
+        Some(explored(nx, end)?)
+    } else {
+        None
+    };
     // See `classify`: quests without a completion NPC go back to the start NPC.
     let start_npc = requirements.npc;
     Ok(QuestTemplate {
@@ -491,6 +520,32 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .transpose()?,
         auto_start: flag("autoStart")?,
         auto_complete: flag("autoComplete")?,
+        explored,
+    })
+}
+
+/// An explorer medal's `infoNumber` and its one `infoex` entry, a count to
+/// reach (cond 1), kept as a string.
+fn explored(nx: &NxDataFile, end: u32) -> Result<Explored, GameDataError> {
+    let record = nx
+        .int_child(end, "infoNumber")?
+        .ok_or_else(|| invalid("explorer medal without infoNumber"))?;
+    let entry = match nx.child_by_name(end, "infoex")? {
+        Some(infoex) => nx.child_by_name(infoex, "0")?,
+        None => None,
+    }
+    .ok_or_else(|| invalid("explorer medal without infoex"))?;
+    if nx.int_child(entry, "cond")? != Some(1) {
+        return Err(invalid("explorer medal infoex isn't a count"));
+    }
+    // A numeric string, which reads as a number.
+    let needed = nx
+        .int_child(entry, "value")?
+        .and_then(|v| u32::try_from(v).ok())
+        .ok_or_else(|| invalid("explorer medal infoex value isn't a count"))?;
+    Ok(Explored {
+        record: small(record, "quest id")?,
+        needed,
     })
 }
 

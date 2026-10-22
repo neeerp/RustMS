@@ -3,6 +3,7 @@ use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
+use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
@@ -344,6 +345,31 @@ impl ClientActor {
                     packets.push(stat::build_stat_update(false, &[update])?);
                 }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
+                Effect::Explore { medal, map_id } => {
+                    let quest = template(*medal)?;
+                    let Some(explored) = quest.explored else {
+                        continue;
+                    };
+                    if !next.quests.explore(explored.record, *map_id) {
+                        continue;
+                    }
+                    changed = true;
+                    // Starting it sends the medal's record; so does each
+                    // visit after.
+                    match next.quests.state(*medal) {
+                        QuestState::NotStarted => change = Some(QuestChange::Start(quest)),
+                        _ => packets.push(net::packet::build::world::quest::build_quest_progress(
+                            *medal,
+                            next.quests.status(*medal),
+                        )?),
+                    }
+                    let count = next.quests.explored(explored.record);
+                    packets.push(net::packet::build::world::quest::build_quest_record(
+                        explored.record,
+                        &count.to_string(),
+                    )?);
+                    afterwards.extend(net::medals::messages(quest, count)?);
+                }
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),

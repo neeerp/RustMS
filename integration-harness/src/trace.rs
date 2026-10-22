@@ -195,6 +195,12 @@ pub struct Trace {
     /// Every family packet (FAMILY_CHART_RESULT to
     /// FAMILY_NOTIFY_LOGIN_OR_LOGOUT): (opcode, body), in order.
     pub family: Vec<(i16, Vec<u8>)>,
+    /// SHOW_STATUS_INFO mode 9: the info lines, in order.
+    pub info_texts: Vec<String>,
+    /// SCRIPT_PROGRESS_MESSAGE lines, in order.
+    pub script_messages: Vec<String>,
+    /// QUEST_CLEAR: the quests whose titles were earned, in order.
+    pub quest_clears: Vec<i16>,
     /// Every PLAYER_INTERACTION body (mode first), in order.
     pub rooms: Vec<Vec<u8>>,
     /// Every UPDATE_CHAR_BOX body (character id first), in order.
@@ -316,6 +322,7 @@ impl Trace {
                 }
                 4 => self.fame_gains.push(r.read_int().unwrap()),
                 5 => self.meso_gains.push(r.read_int().unwrap()),
+                9 => self.info_texts.push(r.read_str_with_length().unwrap()),
                 8 => {
                     for _ in 0..r.read_byte().unwrap() {
                         self.expired.push(r.read_int().unwrap());
@@ -573,6 +580,10 @@ impl Trace {
             .contains(&op)
         {
             self.family.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::ScriptProgressMessage as i16 {
+            self.script_messages.push(r.read_str_with_length().unwrap());
+        } else if op == SendOpcode::QuestClear as i16 {
+            self.quest_clears.push(r.read_short().unwrap());
         } else if op == SendOpcode::PlayerInteraction as i16 {
             self.rooms.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::UpdateCharBox as i16 {

@@ -374,6 +374,13 @@ pub mod keys {
     /// The Berserk room's way up to the statues (`s4berserk_move`) while a
     /// monster is left.
     pub const MONSTERS_LEFT: &str = "portal.s4berserk_move.monsters_left";
+    /// An explorer medal's count went up (`{name}`, `{count}`, `{needed}`):
+    /// the floating message and the info line.
+    pub const MEDAL_PROGRESS: &str = "medal.explorer.progress";
+    pub const MEDAL_PROGRESS_INFO: &str = "medal.explorer.progress_info";
+    /// It reached what the medal needs (`{name}`).
+    pub const MEDAL_EARNED: &str = "medal.explorer.earned";
+    pub const MEDAL_EARNED_INFO: &str = "medal.explorer.earned_info";
     /// The Master of Disguise's forests (`enterDisguise1` to `5`): someone
     /// else is searching, or he has already been found.
     pub const DISGUISE_FOREST_OCCUPIED: &str = "portal.disguise.occupied";
@@ -1090,6 +1097,10 @@ mod tests {
             keys::TREASURE_ROOM_OCCUPIED,
             keys::SOLO_MAP_OCCUPIED,
             keys::MONSTERS_LEFT,
+            keys::MEDAL_PROGRESS,
+            keys::MEDAL_PROGRESS_INFO,
+            keys::MEDAL_EARNED,
+            keys::MEDAL_EARNED_INFO,
             keys::DISGUISE_FOREST_OCCUPIED,
             keys::DISGUISE_ALREADY_FOUND,
             keys::MYSTERIOUS_FORCE,

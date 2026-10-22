@@ -380,6 +380,12 @@ pub enum Effect {
         mob_id: i32,
         at: (i16, i16),
     },
+    /// Count `map_id` toward an explorer medal (`crate::medals`), starting
+    /// it on the first.
+    Explore {
+        medal: i16,
+        map_id: i32,
+    },
     /// Take the player's party into its own copy of an event's maps
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
@@ -442,18 +448,28 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
                 .map(|(_, banner)| Effect::FieldEffect(format!("temaD/enter/{banner}")))
                 .collect(),
         ),
-        // The explorer medals' map visits aren't in yet; Lith Harbor shows
-        // its banner, and the Disciple shows himself to whoever hunts him.
-        "explorationPoint" => Some(match map_id {
-            LITH_HARBOR => vec![Effect::FieldEffect(format!("maplemap/enter/{map_id}"))],
-            DISCIPLES_HIDEOUT if player.quests.state(DISCIPLES_QUEST) == QuestState::Started => {
-                vec![Effect::BringOutMob {
-                    mob_id: DISCIPLE,
-                    at: (-1027, 216),
-                }]
-            }
-            _ => Vec::new(),
-        }),
+        // The map counts toward its region's explorer medal; Lith Harbor
+        // also shows its banner, and the Disciple shows himself to whoever
+        // hunts him.
+        "explorationPoint" => {
+            let mut effects = match map_id {
+                LITH_HARBOR => vec![Effect::FieldEffect(format!("maplemap/enter/{map_id}"))],
+                DISCIPLES_HIDEOUT
+                    if player.quests.state(DISCIPLES_QUEST) == QuestState::Started =>
+                {
+                    vec![Effect::BringOutMob {
+                        mob_id: DISCIPLE,
+                        at: (-1027, 216),
+                    }]
+                }
+                _ => Vec::new(),
+            };
+            effects.extend(
+                crate::medals::region(map_id)
+                    .and_then(|medal| crate::medals::explore(medal, map_id, player)),
+            );
+            Some(effects)
+        }
         // go<map id>: the map's name banner. HeavenMS also unlocks the UI
         // here, which HeavenClient never locks.
         _ => {
@@ -501,6 +517,19 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "infoWorldmap" => hint(true, 26),
         "infoReactor" if quest(1008) == QuestState::Completed => hint(true, 22),
         "infoReactor" => hint(quest(1020) == QuestState::Completed, 27),
+        // The highest places count toward One Who's Touched the Sky; the
+        // portal goes nowhere.
+        "highposition" => ScriptOutcome {
+            effects: (crate::medals::explore(
+                crate::medals::TOUCHED_THE_SKY,
+                player.stats.map_id,
+                player,
+            ))
+            .into_iter()
+            .collect(),
+            block: false,
+            occupied: None,
+        },
         "tutoChatNPC" => ScriptOutcome {
             effects: vec![Effect::OfferTutorialSkip],
             block: true,
@@ -1387,6 +1416,33 @@ mod tests {
             map_enter("explorationPoint", &at(LITH_HARBOR, &[])),
             Some(vec![Effect::FieldEffect("maplemap/enter/104000000".into())])
         );
+    }
+
+    #[test]
+    fn exploring_counts_toward_the_regions_medal() {
+        let mut player = at(LITH_HARBOR, &[]);
+        player.stats.level = 20;
+        assert_eq!(
+            map_enter("explorationPoint", &player),
+            Some(vec![
+                Effect::FieldEffect("maplemap/enter/104000000".into()),
+                Effect::Explore {
+                    medal: 29005,
+                    map_id: LITH_HARBOR,
+                },
+            ])
+        );
+        // The highest places' portals count toward their own medal.
+        player.stats.map_id = 101010103;
+        let outcome = portal("highposition", &player).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [Effect::Explore {
+                medal: crate::medals::TOUCHED_THE_SKY,
+                map_id: 101010103,
+            }]
+        );
+        assert!(!outcome.block);
     }
 
     #[test]

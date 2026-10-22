@@ -32,6 +32,34 @@ pub fn build_quest_progress(
     }
     Ok(p)
 }
+/// A started record with its own data string, as the explorer medals' info
+/// records (27010 ...) hold their counts.
+pub fn build_quest_record(quest_id: i16, data: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(1)?;
+    p.write_short(quest_id)?;
+    p.write_byte(QuestState::Started as u8)?;
+    p.write_str_with_length(data)?;
+    Ok(p)
+}
+
+/// `QUEST_CLEAR`: the quest's title is earned.
+pub fn build_quest_clear(quest_id: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::QuestClear as i16)?;
+    p.write_short(quest_id)?;
+    Ok(p)
+}
+
+/// `SCRIPT_PROGRESS_MESSAGE`: a floating message on screen.
+pub fn build_script_progress(text: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ScriptProgressMessage as i16)?;
+    p.write_str_with_length(text)?;
+    Ok(p)
+}
+
 /// `UPDATE_QUEST_INFO` success (mode 8): the quest action at `npc_id`
 /// succeeded. A nonzero `next_quest` makes the client continue straight into
 /// that quest's conversation with the same NPC (`Act/nextQuest`).
