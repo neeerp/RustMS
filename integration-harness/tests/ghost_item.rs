@@ -1,20 +1,24 @@
 //! A ghost item (report c039): 2360000 makes its user a ghost (Ghost,
 //! bit 49) for its `time`. The map sees it, another ghost or morph item
 //! waits until it ends, and right-clicking the icon ends it for everyone.
+//! Who comes to the map later sees the ghost, and dying ends it.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::grant_stack;
+use integration_harness::database::{grant_stack, set_hp};
 use integration_harness::hunting::{cancel_item_effect, use_item};
 use integration_harness::preconditions::load_multi_harness_config_or_fail;
 use integration_harness::trace::{send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
-use net::packet::op::SendOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::read::PktRead;
+use packet::io::write::PktWrite;
 use packet::Packet;
 use std::io::Cursor;
 use tokio::time::{timeout, Duration};
 
 const LITH_HARBOR: i32 = 104_000_000;
+const HENESYS: i32 = 100_000_000;
+const SNAIL: i32 = 100_100;
 const GHOST_ITEM: i32 = 2_360_000;
 /// Ghost's flag (bit 49), in the second half of a buff mask.
 const GHOST: i64 = 1 << 17;
@@ -43,6 +47,20 @@ fn body(p: &Packet, op: SendOpcode) -> Option<Cursor<&Vec<u8>>> {
     Some(r)
 }
 
+/// TAKE_DAMAGE for a snail's touch.
+fn touched(damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(-1i8 as u8).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(SNAIL).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0).unwrap();
+    p
+}
+
 #[tokio::test]
 async fn a_ghost_item_shows_to_the_map_until_cancelled() {
     let config = load_multi_harness_config_or_fail().await;
@@ -58,6 +76,7 @@ async fn a_ghost_item_shows_to_the_map_until_cancelled() {
     grant_stack(ghost_id, 2, 1, GHOST_ITEM, 2)
         .await
         .expect("grant the ghost item");
+    set_hp(ghost_id, 1, 50).await.expect("1 HP");
 
     let mut ghost = relogin(&ghost_config).await;
     let mut g = Trace::default();
@@ -121,4 +140,52 @@ async fn a_ghost_item_shows_to_the_map_until_cancelled() {
     })
     .await;
     assert_eq!(off, ghost_id);
+
+    // Someone coming to the map sees a ghost in its spawn: the Ghost flag,
+    // and its value, the only shown buff's data.
+    send(&mut ghost.connection, use_item(1, GHOST_ITEM)).await;
+    expect(&mut ghost.connection, |p| {
+        let mut r = body(p, SendOpcode::GiveBuff)?;
+        (r.read_long().unwrap() == 0 && r.read_long().unwrap() == GHOST).then_some(())
+    })
+    .await;
+    assert_eq!(
+        warp(&mut watcher.connection, HENESYS, "", &mut w).await,
+        HENESYS
+    );
+    assert_eq!(
+        warp(&mut watcher.connection, LITH_HARBOR, "", &mut w).await,
+        LITH_HARBOR
+    );
+    let spawned = expect(&mut watcher.connection, |p| {
+        let mut r = body(p, SendOpcode::SpawnPlayer)?;
+        (r.read_int().unwrap() == ghost_id).then_some(())?;
+        r.read_byte().unwrap(); // level
+        r.read_str_with_length().unwrap();
+        r.read_str_with_length().unwrap(); // guild
+        r.set_position(r.position() + 6); // emblem
+        r.read_long().unwrap(); // the two-state flags
+        let shown = r.read_long().unwrap();
+        Some((shown & GHOST, r.read_short().unwrap()))
+    })
+    .await;
+    assert_eq!(spawned, (GHOST, 1));
+
+    // Dying ends it, for the map too.
+    send(&mut ghost.connection, touched(1)).await;
+    expect(&mut ghost.connection, |p| {
+        let mut r = body(p, SendOpcode::CancelBuff)?;
+        (r.read_long().unwrap() == 0 && r.read_long().unwrap() == GHOST).then_some(())
+    })
+    .await;
+    let off = expect(&mut watcher.connection, |p| {
+        let mut r = body(p, SendOpcode::CancelForeignBuff)?;
+        let who = r.read_int().unwrap();
+        (r.read_long().unwrap() == 0 && r.read_long().unwrap() == GHOST).then_some(who)
+    })
+    .await;
+    assert_eq!(off, ghost_id);
+
+    // Back to life in town.
+    warp(&mut ghost.connection, LITH_HARBOR, "", &mut g).await;
 }
