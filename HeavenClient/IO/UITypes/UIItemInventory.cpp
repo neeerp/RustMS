@@ -27,6 +27,7 @@
 #include "UIKarmaScissors.h"
 #include "UIMemoSend.h"
 #include "UIKite.h"
+#include "UIMapleTv.h"
 #include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
@@ -65,6 +66,7 @@
 #include "../../Gameplay/MapleMap/FieldLimit.h"
 #include "../../Gameplay/MapleMap/KiteRules.h"
 #include "../../Util/Chalkboard.h"
+#include "../../Util/MapleTv.h"
 #include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
 
@@ -137,6 +139,8 @@ namespace ms
 		constexpr const char *MEGAPHONE_LONG = "Use the megaphone to text up to 60 characters.";
 		// StringPool 0xe89.
 		constexpr const char *ENTER_TEXT = "Please enter the text.";
+		// StringPool 0xf78.
+		constexpr const char *NO_RECEIVER = "You didn't enter the recipient's name.";
 		constexpr const char *SUMMON_SACK = "Too much interest can hinder your process of leveling up.\\n\\nwill you really summon the monster?";
 		constexpr const char *BOSS_PET = "Would you like to change your Boss Pet?\\n (The \"Item Ignore\" skill, as well as \\nthe stats for speed and jump will \\nfollow that of the Lead Pet)";
 		// StringPool 0x17a and 0x17b.
@@ -670,6 +674,33 @@ namespace ms
 					if (!in_dialog())
 						UI::get().emplace<UIItemMegaphone>(slot, item_id);
 
+					break;
+				case Megaphones::Kind::TV:
+					UI::get().emplace<UIMapleTv>(item_id, [=](const std::string &receiver, const MapleTv::Lines &typed, bool ear)
+					{
+						// The line's wait is asked about first, then the
+						// receiver and the text are checked (asm a0d0bf).
+						UI::get().emplace<UIYesNo>(MapleTv::wait_question(MapleTv::line_wait), [=](bool yes)
+						{
+							if (!yes)
+								return;
+
+							MapleTv::Lines lines = typed;
+
+							switch (MapleTv::check(item_id, receiver, lines, CurseData::filter))
+							{
+								case MapleTv::Refusal::NONE:
+									send_megaphone(UseMapleTvPacket(slot, item_id, receiver, lines, ear));
+									break;
+								case MapleTv::Refusal::NO_RECEIVER:
+									UI::get().emplace<UIOk>(NO_RECEIVER, [](bool) {});
+									break;
+								case MapleTv::Refusal::CURSING:
+									UI::get().emplace<UIOk>(NO_CURSING, [](bool) {});
+									break;
+							}
+						});
+					});
 					break;
 				case Megaphones::Kind::NONE:
 					break;

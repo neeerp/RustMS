@@ -59,11 +59,11 @@ namespace ms
 
 		// The megaphones the Cash tab uses, by what they ask for
 		// (FUN_0048645b's 507 kinds: 1 and 8 plain, 2 super, 5 from 6 and 6
-		// item, 7 triple; 5 below 6 is Maple TV), and the avatar megaphones
-		// (539).
+		// item, 7 triple; 5075000 to 5075005 are Maple TV), and the avatar
+		// megaphones (539).
 		enum class Kind : uint8_t
 		{
-			NONE, PLAIN, SUPER, ITEM, TRIPLE, AVATAR
+			NONE, PLAIN, SUPER, ITEM, TRIPLE, AVATAR, TV
 		};
 
 		inline Kind kind(int32_t item_id)
@@ -82,7 +82,10 @@ namespace ms
 				case 2:
 					return Kind::SUPER;
 				case 5:
-					return item_id % 10 >= 6 ? Kind::ITEM : Kind::NONE;
+					if (item_id % 10 >= 6)
+						return Kind::ITEM;
+
+					return item_id / 10 == 507'500 ? Kind::TV : Kind::NONE;
 				case 6:
 					return Kind::ITEM;
 				case 7:
@@ -186,13 +189,15 @@ namespace ms
 
 		using AvatarLines = std::array<std::string, AVATAR_LINES>;
 
-		// The lines an avatar megaphone sends: the field's text cut where it
-		// wraps (FUN_007f1525), `starts` being where each row begins. A row
-		// past the fourth is left out. The space a row wraps at stays on the
-		// row before, so the lines run together as typed.
-		inline AvatarLines avatar_lines(const std::string& text, const std::vector<size_t>& starts)
+		// The first `N` rows of a wrapped field's text, as the avatar
+		// megaphone (FUN_007f1525) and Maple TV (0x7f0dc9) send them,
+		// `starts` being where each row begins. A row past the last is left
+		// out. The space a row wraps at stays on the row before, so the lines
+		// run together as typed.
+		template <size_t N>
+		std::array<std::string, N> wrapped_lines(const std::string& text, const std::vector<size_t>& starts)
 		{
-			AvatarLines lines;
+			std::array<std::string, N> lines;
 			std::vector<size_t> cuts;
 
 			for (size_t start : starts)
@@ -203,7 +208,7 @@ namespace ms
 				cuts.push_back(std::min(start, text.size()));
 			}
 
-			for (size_t i = 0; i < AVATAR_LINES && i < cuts.size(); i++)
+			for (size_t i = 0; i < N && i < cuts.size(); i++)
 			{
 				size_t end = i + 1 < cuts.size() ? cuts[i + 1] : text.size();
 
@@ -212,6 +217,33 @@ namespace ms
 			}
 
 			return lines;
+		}
+
+		inline AvatarLines avatar_lines(const std::string& text, const std::vector<size_t>& starts)
+		{
+			return wrapped_lines<AVATAR_LINES>(text, starts);
+		}
+
+		// Whether the filter takes rows cut from one text (`joined`), and if
+		// it does their curse words starred out by `censor`. The text is
+		// censored as one, so a word cut by a wrap is caught, then cut back
+		// into the rows; stars keep the length.
+		template <size_t N, typename Censor>
+		bool censor_rows(std::array<std::string, N>& lines, const std::string& joined, Censor censor)
+		{
+			if (!CurseData::valid(joined))
+				return false;
+
+			std::string censored = censor(joined);
+			size_t start = 0;
+
+			for (std::string& line : lines)
+			{
+				line = censored.substr(start, line.size());
+				start += line.size();
+			}
+
+			return true;
 		}
 
 		// Checks an avatar megaphone's lines once its box has closed: v83
@@ -229,21 +261,7 @@ namespace ms
 			if (joined.empty())
 				return Refusal::EMPTY;
 
-			if (!CurseData::valid(joined))
-				return Refusal::CURSING;
-
-			// Censored as one text, so a word cut by a wrap is caught, then
-			// cut back into the lines; stars keep the length.
-			std::string censored = censor(joined);
-			size_t start = 0;
-
-			for (std::string& line : lines)
-			{
-				line = censored.substr(start, line.size());
-				start += line.size();
-			}
-
-			return Refusal::NONE;
+			return censor_rows(lines, joined, censor) ? Refusal::NONE : Refusal::CURSING;
 		}
 
 		// Where an avatar megaphone's banner (FUN_0045a825) puts the name:

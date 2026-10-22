@@ -430,6 +430,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::SHOPSALES);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
+					types.emplace_back(UIElement::Type::MAPLETV);
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::VICIOUSHAMMER);
 					types.emplace_back(UIElement::Type::MAKER);
@@ -464,6 +465,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::FRIENDGROUP);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
+					types.emplace_back(UIElement::Type::MAPLETV);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
 					types.emplace_back(UIElement::Type::INCUBATOR);

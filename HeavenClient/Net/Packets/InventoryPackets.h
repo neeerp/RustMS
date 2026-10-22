@@ -22,6 +22,7 @@
 
 #include "../Login.h"
 #include "../OutPacket.h"
+#include "../../Util/MapleTv.h"
 
 #include "../../Character/Inventory/Inventory.h"
 
@@ -349,6 +350,38 @@ namespace ms
 				write_string(line);
 
 			write_byte(ear);
+			write_time();
+		}
+	};
+
+	// Uses a Maple TV (FUN_00a0a63f types 0x2e to 0x33, report 179 1.6):
+	// a Messenger or Megassenger says first whether it names a receiver,
+	// a Megassenger then has the ear, and all but the Stars name the
+	// receiver before the five lines.
+	// Opcode: USE_CASH_ITEM(79)
+	class UseMapleTvPacket : public OutPacket
+	{
+	public:
+		UseMapleTvPacket(int16_t slot, int32_t itemid, const std::string &receiver, const MapleTv::Lines &lines,
+						 bool ear) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+
+			MapleTv::Mode mode = MapleTv::mode(itemid);
+
+			if (mode == MapleTv::Mode::MESSENGER)
+				write_byte(MapleTv::receiver_flag(receiver));
+
+			if (MapleTv::mega(itemid))
+				write_byte(ear);
+
+			if (mode != MapleTv::Mode::STAR)
+				write_string(receiver);
+
+			for (const std::string &line : lines)
+				write_string(line);
+
 			write_time();
 		}
 	};

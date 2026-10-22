@@ -72,8 +72,10 @@ namespace ms
 		// (0x4ca700).
 		void set_shown_disabled();
 
-		// Wrap the text at width pixels instead of keeping it on one line.
-		void set_wrap(uint16_t width);
+		// Wrap the text at width pixels instead of keeping it on one line,
+		// its lines `line_adj` px closer than the font's. With `max_rows`,
+		// what would start a row past them isn't taken.
+		void set_wrap(uint16_t width, int16_t line_adj = 0, size_t max_rows = 0);
 
 		// Take several lines wrapped at `width`, showing `rows` of them
 		// `linespace` px apart and scrolling to the caret: Enter breaks the
@@ -134,6 +136,8 @@ namespace ms
 		Text::Alignment alignment;
 		Color::Name color;
 		uint16_t wrapwidth = 0;
+		int16_t wrapadj = 0;
+		size_t wraprows = 0;
 		size_t rows = 0;
 		size_t top = 0;
 		int16_t linespace = 0;

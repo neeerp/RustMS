@@ -228,6 +228,9 @@ namespace ms
 		KEYMAP = 335,
 		AUTO_HP_POT = 336,
 		AUTO_MP_POT = 337,
+		SEND_TV = 341,
+		REMOVE_TV = 342,
+		TV_RESULT = 343,
 		VICIOUS_HAMMER = 354,
 		MAKER_RESULT = 217,
 		VEGA_SPELL = 358,
@@ -388,6 +391,9 @@ namespace ms
 		emplace<AUTO_HP_POT, AutoHpPotHandler>();
 		emplace<AUTO_MP_POT, AutoMpPotHandler>();
 		emplace<VICIOUS_HAMMER, ViciousHammerHandler>();
+		emplace<SEND_TV, SendTvHandler>();
+		emplace<REMOVE_TV, RemoveTvHandler>();
+		emplace<TV_RESULT, TvResultHandler>();
 		emplace<MAKER_RESULT, MakerResultHandler>();
 		emplace<VEGA_SPELL, VegaSpellHandler>();
 		emplace<CHECK_AUTO_HP, CheckAutoHpHandler>();

@@ -58,6 +58,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME chat_wrap COMMAND chat_wrap_tests)
     add_executable(megaphones_tests tests/megaphones.cpp)
     add_test(NAME megaphones COMMAND megaphones_tests)
+    add_executable(maple_tv_tests tests/maple_tv.cpp)
+    add_test(NAME maple_tv COMMAND maple_tv_tests)
     add_executable(chalkboard_tests tests/chalkboard.cpp)
     add_test(NAME chalkboard COMMAND chalkboard_tests)
     add_executable(memos_tests tests/memos.cpp)
@@ -902,6 +904,8 @@ add_executable(HeavenClient
     IO/UITypes/UITransform.h
     IO/UITypes/UIMegaphone.cpp
     IO/UITypes/UIMegaphone.h
+    IO/UITypes/UIMapleTv.cpp
+    IO/UITypes/UIMapleTv.h
     IO/UITypes/UIPetChooser.cpp
     IO/UITypes/UIPetChooser.h
     IO/UITypes/UIApReset.cpp
