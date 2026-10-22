@@ -60,6 +60,7 @@ namespace ms
 		// 0x80bf45). v83 indents the uses with a tab.
 		constexpr const char* PASSED_SENIOR = "#c* You have surpassed your Senior's level, so your cumulative Rep#\\n#cwill be reduced in half. Please help your Senior level up!#\\n";
 		constexpr const char* PASSED_YOU = "#c* Your Junior has surpassed your level, so your cumulative Rep#\\n#cwill be reduced in half. Please try harder to level up!#\\n";
+		constexpr const char* IN_USE = "Entitlement in use :\\n";
 		constexpr const char* USED_TODAY = "Entitlement used today :\\n";
 		constexpr const char* SEPARATOR = "______________________________________________\\n";
 		// 0x2ce: where a member is with no map.
@@ -347,9 +348,21 @@ namespace ms
 
 			text += SEPARATOR;
 
+			const Family& family = Stage::get().get_player().get_family();
+			const std::vector<FamilyPrivilege>& privileges = family.get_privileges();
+
+			// The player's own, even in another's tree (0x80bce7).
+			if (int32_t index = family.in_use(); index >= 0)
+			{
+				std::string name = index < static_cast<int32_t>(privileges.size())
+					? privileges[index].name : std::to_string(index);
+
+				text += IN_USE;
+				text += "    " + name + "\\n\\n";
+			}
+
 			if (!chart.used.empty())
 			{
-				const std::vector<FamilyPrivilege>& privileges = Stage::get().get_player().get_family().get_privileges();
 
 				text += USED_TODAY;
 

@@ -279,4 +279,14 @@ namespace ms
 		info = {};
 		privileges.clear();
 	}
+
+	int32_t Family::in_use() const
+	{
+		return using_index;
+	}
+
+	void Family::set_in_use(int32_t index)
+	{
+		using_index = index;
+	}
 }

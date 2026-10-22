@@ -200,17 +200,12 @@ A player has one of these at a time; a new one takes the old one's place.
 `Player.family_buff` (`FamilyBuff`: index and end time) holds it, and the
 `family_buffs` table keeps it across logins. `net::rates` multiplies its
 rates into the EXP and drop rates until it ends. `FAMILY_SET_PRIVILEGE`
-(103) shows its icon (`Benefit::icon`, the `RightIcon` art: 2 drops, 3 EXP,
-4 both), with its index and the ms left, on purchase and on entering the
+(103) shows its icon (`Benefit::icon`, the `RightIcon` art: 2 EXP, 3 drops,
+4 both; the `RightIcon/type` labels, which the client never reads, swap 2
+and 3), with its index and the ms left, on purchase and on entering the
 game. The client never takes the icon down by itself, so the client actor
 wakes when the buff ends (`family_buff_due`), drops it from the player and
 the table, and sends 103 with icon 0.
-
-### Not yet
-
-These are not implemented yet:
-
-- HeavenClient ignores `FAMILY_SET_PRIVILEGE` (103), so it shows no icon.
 
 ## Client
 
@@ -262,3 +257,9 @@ b045 (how they open).
   passed the player's level. After the usual line the client adds "- The
   Reps you have received from %s will be reduced in half."
   (`GuildHandlers.cpp`).
+- **Entitlement in use (report b050):** `FAMILY_SET_PRIVILEGE` puts the
+  `RightIcon/<n>` art in the buff row (`UIBuffList::set_family`), with the
+  cool-down sweep and the blink in the last 3 seconds. Its tooltip is the
+  entitlement's name and description; right-clicking it does nothing. Icon 0
+  takes it down. `Family::in_use` keeps the index, and the player's own box
+  in the tree adds "Entitlement in use :" and its name to the tooltip.

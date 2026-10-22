@@ -38,8 +38,11 @@ pub fn build_family_chart(chart: &FamilyChart) -> Result<Packet, NetworkError> {
         packet.write_int(key)?;
         packet.write_int(count)?;
     }
-    // The entitlements used today, none yet.
-    packet.write_int(0)?;
+    packet.write_int(chart.used.len() as i32)?;
+    for &(index, times) in &chart.used {
+        packet.write_int(index)?;
+        packet.write_int(times)?;
+    }
     packet.write_short(MAX_JUNIORS as i16)?;
     Ok(packet)
 }
@@ -219,7 +222,7 @@ mod tests {
         let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
         let buff = FamilyBuff::new(3, now);
         let packet = build_set_privilege(Some(&buff), now + Duration::from_secs(60)).unwrap();
-        let mut expected = vec![0x67, 0, 3];
+        let mut expected = vec![0x67, 0, 2];
         expected.extend(3i32.to_le_bytes());
         expected.extend([0; 8]);
         expected.push(0);
@@ -249,6 +252,21 @@ mod tests {
         expected.extend([2, 0]);
         expected.extend(b"Hi");
         expected.extend([1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0]);
+        assert_eq!(packet.bytes, expected);
+    }
+
+    #[test]
+    fn a_chart_ends_with_the_viewers_uses_then_the_junior_limit() {
+        let chart = FamilyChart {
+            viewed: 7,
+            used: vec![(3, 1)],
+            ..FamilyChart::default()
+        };
+        let packet = build_family_chart(&chart).unwrap();
+        let mut expected = vec![0x5E, 0, 7, 0, 0, 0];
+        expected.extend([0; 8]);
+        expected.extend([1, 0, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0]);
+        expected.extend([2, 0]);
         assert_eq!(packet.bytes, expected);
     }
 

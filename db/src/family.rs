@@ -125,19 +125,7 @@ pub fn info(character_id: i32) -> crate::Result<FamilyInfo> {
     let (reputation, total_reputation, today_reputation) = row.unwrap_or_default();
     let juniors = juniors(&mut conn, character_id)?;
     let seniors = seniors(&mut conn, character_id)?;
-    let used = family_entitlement_uses::table
-        .filter(family_entitlement_uses::character_id.eq(character_id))
-        .filter(family_entitlement_uses::used_on.eq(current_date()))
-        .filter(family_entitlement_uses::times.gt(0))
-        .order(family_entitlement_uses::entitlement)
-        .select((
-            family_entitlement_uses::entitlement,
-            family_entitlement_uses::times,
-        ))
-        .load::<(i16, i32)>(&mut conn)?
-        .into_iter()
-        .map(|(index, times)| (i32::from(index), times))
-        .collect();
+    let used = used_today(&mut conn, character_id)?;
     let mut info = FamilyInfo {
         reputation,
         total_reputation,
@@ -161,12 +149,31 @@ pub fn info(character_id: i32) -> crate::Result<FamilyInfo> {
     Ok(info)
 }
 
-/// The Family Tree around `viewed`, without who is online.
-pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
+/// The entitlements `character_id` used today: (index, times).
+fn used_today(conn: &mut PgConnection, character_id: i32) -> crate::Result<Vec<(i32, i32)>> {
+    Ok(family_entitlement_uses::table
+        .filter(family_entitlement_uses::character_id.eq(character_id))
+        .filter(family_entitlement_uses::used_on.eq(current_date()))
+        .filter(family_entitlement_uses::times.gt(0))
+        .order(family_entitlement_uses::entitlement)
+        .select((
+            family_entitlement_uses::entitlement,
+            family_entitlement_uses::times,
+        ))
+        .load::<(i16, i32)>(conn)?
+        .into_iter()
+        .map(|(index, times)| (i32::from(index), times))
+        .collect())
+}
+
+/// The Family Tree around `viewed`, without who is online, with what
+/// `viewer` used today for their own box's tooltip.
+pub fn chart(viewed: i32, viewer: i32) -> crate::Result<FamilyChart> {
     let mut conn = crate::connection()?;
     let conn = &mut conn;
     let mut chart = FamilyChart {
         viewed,
+        used: used_today(conn, viewer)?,
         ..FamilyChart::default()
     };
     let seniors = seniors(conn, viewed)?;

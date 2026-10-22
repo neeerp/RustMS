@@ -58,9 +58,17 @@ namespace ms
 		void cancel_buff(int32_t stat);
 		// The Battleship's HP: 0 takes its icon away.
 		void set_gauge(int32_t buffid, int32_t value);
+		// The family entitlement in use, `left` ms from its end, in place
+		// of any other: Family/RightIcon/<icon>. 0 takes it away.
+		void set_family(uint8_t icon, int32_t left);
 
 	private:
 		static constexpr int16_t CELL = 32;
+		// The family entitlement's id and stat in the row, which no skill
+		// or item has.
+		static constexpr int32_t FAMILY = INT32_MIN;
+
+		void show_family() const;
 
 		// The buff under the cursor (FUN_007b3055), if any.
 		const BuffRow<Texture>::Entry* entry_at(Point<int16_t> cursorpos) const;

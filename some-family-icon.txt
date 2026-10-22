@@ -1,0 +1,43 @@
+ Container rustms-lane-b-login-1 Stopping 
+ Container rustms-lane-b-world-1 Stopping 
+ Container rustms-lane-b-login-1 Stopped 
+ Container rustms-lane-b-login-1 Removing 
+ Container rustms-lane-b-login-1 Removed 
+ Container rustms-lane-b-world-1 Stopped 
+ Container rustms-lane-b-world-1 Removing 
+ Container rustms-lane-b-world-1 Removed 
+ Container rustms-lane-b-db-1 Stopping 
+ Container rustms-lane-b-db-1 Stopped 
+ Container rustms-lane-b-db-1 Removing 
+ Container rustms-lane-b-db-1 Removed 
+ Network rustms-lane-b_default Removing 
+ Network rustms-lane-b_default Removed 
+ Image rustms-server:lane-b Building 
+ Image rustms-server:lane-b Built 
+harness image build: 104.744s
+ Network rustms-lane-b_default Creating 
+ Network rustms-lane-b_default Created 
+ Container rustms-lane-b-db-1 Creating 
+ Container rustms-lane-b-db-1 Created 
+ Container rustms-lane-b-world-1 Creating 
+ Container rustms-lane-b-login-1 Creating 
+ Container rustms-lane-b-login-1 Created 
+ Container rustms-lane-b-world-1 Created 
+ Container rustms-lane-b-db-1 Starting 
+ Container rustms-lane-b-db-1 Started 
+ Container rustms-lane-b-db-1 Waiting 
+ Container rustms-lane-b-db-1 Waiting 
+ Container rustms-lane-b-db-1 Healthy 
+ Container rustms-lane-b-world-1 Starting 
+ Container rustms-lane-b-db-1 Healthy 
+ Container rustms-lane-b-login-1 Starting 
+ Container rustms-lane-b-login-1 Started 
+ Container rustms-lane-b-world-1 Started 
+harness startup/readiness: 5.089s
+== families
+
+running 5 tests
+.....
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.87s
+
+SOME_DONE

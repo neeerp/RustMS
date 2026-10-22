@@ -260,11 +260,40 @@ void parting_names_the_rep_and_the_fee()
 	require(!theirs.parting_at(FamilyChart::SENIOR), "not from another's tree");
 }
 
+void reads_the_entitlement_in_use()
+{
+	Writer w;
+	w.put<uint8_t>(3).put<int32_t>(6).put<int32_t>(0).put<int32_t>(0).put<uint8_t>(0).put<int32_t>(900000);
+
+	InPacket recv = w.packet();
+	FamilyPrivilegeInUse in_use = FamilyParser::parse_in_use(recv);
+	require(!recv.available(), "the whole SET_PRIVILEGE is read");
+	require(in_use.icon == 3 && in_use.index == 6 && in_use.left == 900000, "icon, index and time left");
+
+	Writer ago;
+	ago.put<uint8_t>(2).put<int32_t>(5).put<int32_t>(0).put<int32_t>(0).put<uint8_t>(1).put<int32_t>(100);
+	InPacket arecv = ago.packet();
+	require(FamilyParser::parse_in_use(arecv).left == 0, "one that ended has nothing left");
+
+	Writer none;
+	none.put<uint8_t>(0);
+	InPacket nrecv = none.packet();
+	FamilyPrivilegeInUse cleared = FamilyParser::parse_in_use(nrecv);
+	require(!nrecv.available() && cleared.icon == 0 && cleared.index == -1, "0 is all there is");
+
+	Family family;
+	require(family.in_use() == -1, "none at first");
+	family.set_in_use(6);
+	family.clear();
+	require(family.in_use() == 6, "outlasts the INFO");
+}
+
 int main()
 {
 	try
 	{
 		reads_info_and_privileges();
+		reads_the_entitlement_in_use();
 		the_leader_heads_the_tree_and_comes_again_as_the_one_viewed();
 		the_first_entry_is_nobodys_senior();
 		two_or_fewer_entries_leave_the_top_empty();
