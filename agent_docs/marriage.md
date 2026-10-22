@@ -252,11 +252,11 @@ and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The wedding
 
-Slices 7a to 7e of report b071 marry a couple at the Chapel or the
+Slices 7a to 7f of report b071 marry a couple at the Chapel or the
 Cathedral before their guests, with the priest's lines over the altar, the
 Cathedral guests' blessings and their reward, the news to the couple's
-guild and family, and a premium wedding's party room; the hunting grounds
-are a later slice.
+guild and family, and a premium wedding's party room and hunting grounds.
+The Giant Cake and the onyx chests are left for later.
 
 Wayne (9201012) in Amoria starts a booked Chapel wedding, and High Priest
 John (9201002) in Amoria a booked Cathedral one
@@ -301,7 +301,7 @@ scaled by `RUSTMS_EVENT_SCALE`:
    (`PARTY_ROOM`, 680000300) under the same clock. There Travis (9201010)
    offers the way back to Amoria and Robin (9201021) the way out to
    680000500; each only moves the one who asks, and the time running out
-   sends whoever is left to 680000500.
+   sends whoever is left to 680000500. See "The hunting grounds" below.
 
 A partner who leaves the wedding's maps, logs out or changes channel
 before the vows ends it: the booking is deleted, nothing is refunded
@@ -388,6 +388,30 @@ partner's guild online and to the partner's family. The client shows
 (report b079). The directory only knows a player's senior and juniors, so
 the family notice goes to them and the partner, not to the whole tree as
 in Cosmic.
+
+### The hunting grounds
+
+Robin's menu in the party room also leads to the hunting ground
+(`HUNTING_GROUND`, 680000400), where her menu instead offers the box room
+(`BOX_ROOM`, 680000401) for `BOX_KEYS` (7) Amoria Heart Keys
+(`HEART_KEY`, 4031409), and the way out in both (report b082). In the box
+room she offers the way back to the hunting ground; coming back costs
+seven more keys. Both maps are the wedding's own copies under its clock,
+and each player goes alone.
+
+`String.nx` says the Heart Key opens the hunting ground's treasure chest,
+and the content pack has the Cake and Candle Monsters drop it. Cosmic uses
+the Golden Key 4031217 instead; RustMS follows the client and the pack and
+takes Cosmic's count of seven. The keys are the wedding's own: leaving it
+any way takes them (`game::wedding::take_keys`, from
+`drop_wedding_ticket` and `forget_event`), and so does logging in, in case
+a crash saved them. If the keys are gone by the time the player picks the
+box room, Robin's `refused` text says how to get them. Robin asks for no
+Gold Maple Leaf (b071 Q4). The box room's boxes (6802000, 6802001) drop
+their loot with piles of 100-399 mesos, at least 15 drops in all
+(`net::reactors`, Cosmic `sprayItems(true, 1, 100, 400, 15)`). Most of
+them come back a second after breaking (`reactorTime 1`), so one entry
+lets a player break boxes until the clock runs out (review b083).
 
 ## The partner's map
 
@@ -581,8 +605,12 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding (report b071 slices 7f-7g): the hunting
-  grounds and the wishlist.
+- The rest of the wedding: the wishlist (report b071 slice 7g), and in the
+  hunting ground the Giant Cake 9400606 (Cosmic spawns it once per wedding
+  and its kill stops the clock) and the onyx chests 4031423/4 that Pila
+  9201014 opens (report b082). The content pack gives the keys and the
+  chests a `period`, which RustMS ignores: the chests it grants don't
+  expire (review b083).
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
   guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's

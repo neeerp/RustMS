@@ -13,7 +13,7 @@ use crate::error::RuntimeError;
 use crate::message::DirectoryMessage;
 use db::parcel::NewParcel;
 use game::marriage::{self, MarriageRecord, ENGAGED};
-use game::wedding::{self, StartRefusal, Venue, Vows, AMORIA, PARTY_ROOM, WEDDING_EXIT};
+use game::wedding::{self, StartRefusal, Venue, Vows, AMORIA, WEDDING_EXIT};
 use game_data::server_content::keys;
 use net::npc_scripts::{self, NpcScript};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
@@ -77,9 +77,13 @@ impl ClientActor {
                 return Ok(false);
             };
             NpcScript::wedding_staff(npc_id, stage, guest, premium)
-        } else if let Some(script) = NpcScript::wedding_party(npc_id) {
-            // Only in the party room, and to those in the wedding.
-            if inside.is_none() || player.stats.map_id != PARTY_ROOM {
+        } else if let Some(script) = NpcScript::wedding_party(
+            npc_id,
+            player.stats.map_id,
+            player.inventory.count(wedding::HEART_KEY),
+        ) {
+            // Only to those in the wedding.
+            if inside.is_none() {
                 return Ok(false);
             }
             script
@@ -364,12 +368,24 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Hand the wedding's ticket back, and with it its clock.
+    /// Hand the wedding's ticket back, and with it its clock and its keys.
     pub(super) async fn drop_wedding_ticket(&mut self) -> Result<(), RuntimeError> {
-        if self.wedding.take().is_none() || self.in_cash_shop || self.game.is_none() {
+        if self.wedding.take().is_none() {
             return Ok(());
         }
-        self.send(&mut build_stop_clock()?).await
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let changes = wedding::take_keys(&mut game.player);
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        self.send(&mut build_stop_clock()?).await?;
+        if !changes.is_empty() {
+            self.send(&mut inventory::build_inventory_operation(false, &changes)?)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Wedding `id` married the couple `record`: the player gives up their

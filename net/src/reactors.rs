@@ -176,6 +176,12 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (30, 60),
         },
+        // The boxes of a premium wedding's box room 680000401 (`6802000`,
+        // `6802001`: `sprayItems(true, 1, 100, 400, 15)`).
+        6802000 | 6802001 => Action::Spray {
+            at_least: 15,
+            mesos: (100, 400),
+        },
         // Ludibrium's stage 2 trap box (`go922010201`).
         2200002 => Action::WarpMap {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
@@ -227,6 +233,13 @@ mod tests {
         assert!(matches!(
             action(2202004),
             Action::Spray { at_least: 15, .. }
+        ));
+        assert!(matches!(
+            action(6802001),
+            Action::Spray {
+                at_least: 15,
+                mesos: (100, 400)
+            }
         ));
         let Action::SpawnAt { mob_id, at, .. } = action(2201003) else {
             panic!("{:?}", action(2201003));

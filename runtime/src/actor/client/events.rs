@@ -556,10 +556,13 @@ impl ClientActor {
         self.send(&mut build_countdown(seconds)?).await
     }
 
-    /// A player who leaves the game leaves the event, and its items.
+    /// A player who leaves the game leaves the event or the wedding, and
+    /// their items.
     pub(super) fn forget_event(&mut self) {
         // Dropping the wedding's ticket hands it back.
-        self.wedding = None;
+        if let (Some(_), Some(game)) = (self.wedding.take(), self.game.as_mut()) {
+            game::wedding::take_keys(&mut game.player);
+        }
         if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
             ticket.kind.event().take_items(&mut game.player);
         }
