@@ -299,8 +299,8 @@ pub enum ServerMessage {
     EventEnded {
         id: u32,
     },
-    /// The player handed their party to `to`; an event they lead goes with
-    /// it.
+    /// The player's party passed to `to`, from them or to them; an event
+    /// it is in goes with it.
     LeaderHandedOver {
         to: ClientId,
     },

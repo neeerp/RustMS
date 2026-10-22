@@ -440,7 +440,8 @@ impl EventActor {
                 self.start_bonus();
             }
             EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
-            EventCommand::HandOver(to) if leader => {
+            // Told by the old leader or the new one, whichever is first.
+            EventCommand::HandOver(to) if leader || client_id == to => {
                 self.leader.store(to, Ordering::Relaxed);
                 if self.team.hand_over(to) {
                     info!(kind = ?self.kind, id = self.id, to, "Event's lead left it");

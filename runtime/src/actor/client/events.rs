@@ -225,10 +225,12 @@ impl ClientActor {
         }
     }
 
-    /// The player handed their party to `to`: if they led an event, its
-    /// lead goes too, and the event ends if `to` is not in it.
+    /// The player's party passed from or to them, to `to`: their event, if
+    /// they led it or now do, follows, and ends if `to` is not in it. The
+    /// event checks who tells it, so a ticket's own view of the leader,
+    /// which may be behind, doesn't matter here.
     pub(super) async fn handed_over(&mut self, to: ClientId) {
-        if let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.leader()) {
+        if let Some(ticket) = &self.event {
             ticket.command(EventCommand::HandOver(to)).await;
         }
     }

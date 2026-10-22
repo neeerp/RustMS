@@ -9,6 +9,7 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{send, step, until, Trace};
 use integration_harness::WorldSession;
 use net::events::KPQ;
+use tokio::time::Duration;
 
 /// PARTY_OPERATION's new leader.
 const OP_CHANGE_LEADER: u8 = 0x1B;
@@ -29,6 +30,20 @@ async fn hand_over(from: &mut WorldSession, to: &mut WorldSession) {
         t.party_ops.contains(&OP_CHANGE_LEADER)
     })
     .await;
+}
+
+/// What Cloto says to `player` once it is `expected`: the event hears of a
+/// new leader a moment after the party does.
+async fn cloto_comes_to(player: &mut WorldSession, expected: &str) {
+    let mut told = String::new();
+    for _ in 0..20 {
+        told = ask_cloto(player).await;
+        if told == expected {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("Cloto still says {told:?}, not {expected:?}");
 }
 
 /// Wait until `player` is moved to `map`, carrying on from `trace`.
@@ -55,7 +70,7 @@ async fn a_new_leader_in_the_quest_leads_it_and_one_outside_ends_it() {
     // its leader.
     let (old, rest) = a.split_first_mut().unwrap();
     hand_over(old, &mut rest[0]).await;
-    assert_eq!(ask_cloto(&mut rest[0]).await, leading);
+    cloto_comes_to(&mut rest[0], &leading).await;
 
     // The old leader leaves, and the quest goes on with the other three:
     // the leader now needs a pass fewer.
