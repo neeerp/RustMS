@@ -439,8 +439,9 @@ pub struct Uses {
 }
 
 /// A shot fires the stack in the slot the client names, which the weapon
-/// must shoot and which must hold the skill's `bulletConsume`, else its
-/// `bulletCount`, else one. A few skills fire none.
+/// must shoot, the player's level must reach, and which must hold the
+/// skill's `bulletConsume`, else its `bulletCount`, else one. A few skills
+/// fire none.
 fn shot_ammo(
     attack: &Attack,
     player: &Player,
@@ -464,7 +465,7 @@ fn shot_ammo(
         player
             .inventory
             .get(InventoryType::Use, attack.ammo_slot)
-            .filter(|item| item.item_id == star && item.quantity >= 1)
+            .filter(|item| item.item_id == star && item.quantity >= 1 && may_fire(player, star))
             .ok_or(AttackRejection::Ammo)?;
         return Ok(Some(Ammo {
             slot: attack.ammo_slot,
@@ -483,13 +484,23 @@ fn shot_ammo(
     let item = player
         .inventory
         .get(InventoryType::Use, attack.ammo_slot)
-        .filter(|item| shoots(weapon, item.item_id) && i32::from(item.quantity) >= quantity)
+        .filter(|item| {
+            shoots(weapon, item.item_id)
+                && i32::from(item.quantity) >= quantity
+                && may_fire(player, item.item_id)
+        })
         .ok_or(AttackRejection::Ammo)?;
     Ok(Some(Ammo {
         slot: attack.ammo_slot,
         item_id: item.item_id,
         quantity: quantity as i16,
     }))
+}
+
+/// The client's picker passes over ammo above the player's level
+/// (FUN_00a10579), so only a forged shot fires it.
+fn may_fire(player: &Player, item_id: i32) -> bool {
+    crate::items::info(item_id).is_none_or(|info| info.req_level <= i32::from(player.stats.level))
 }
 
 /// Why an attack is refused.
@@ -1985,6 +1996,8 @@ mod tests {
         }
         let mut player = beginner_with_sword();
         player.stats.job = 521;
+        // Fire capsules need level 70.
+        player.stats.level = 120;
         player.stats.mp = 100;
         player.stats.dex = 200;
         player.inventory.insert(
@@ -2147,6 +2160,15 @@ mod tests {
                 validate(&shot(0, slot), &player).unwrap_err(),
                 AttackRejection::Ammo
             );
+        }
+        // Nor may a player fire ammo above their level.
+        if crate::items::data().is_ok() {
+            player.stats.level = 9;
+            assert_eq!(
+                validate(&shot(0, 1), &player).unwrap_err(),
+                AttackRejection::Ammo
+            );
+            player.stats.level = 10;
         }
         // A spell or a swing needs none.
         let swing = parse_close_attack(&attack_packet(1, 1)).unwrap();

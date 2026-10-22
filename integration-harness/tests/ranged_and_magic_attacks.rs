@@ -2,7 +2,7 @@
 //! mobs like a swing, uses up the stars it throws, and the map sees it as a
 //! shot; MAGIC_ATTACK needs a spell.
 
-use integration_harness::database::{grant_stack, replace_item};
+use integration_harness::database::{grant_stack, replace_item, set_job};
 use integration_harness::hunting::{magic_attack, ranged_attack};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
@@ -24,7 +24,8 @@ async fn shots_use_up_stars_and_spells_need_a_skill() {
     let hunter_config = load_harness_config_or_fail().await;
     let watcher_config = load_harness_config_or_fail().await;
 
-    // Make the hunter, then give it a claw and two stars while logged out.
+    // Make the hunter, then give it a claw and two stars while logged out,
+    // and the level 10 stars need.
     let hunter_id = login_to_world_session(&hunter_config)
         .await
         .expect("first login failed")
@@ -37,6 +38,7 @@ async fn shots_use_up_stars_and_spells_need_a_skill() {
     grant_stack(hunter_id, USE, STARS, SUBI, 2)
         .await
         .expect("give stars");
+    set_job(hunter_id, 0, 10, 50).await.expect("level 10");
 
     let mut hunter = relogin(&hunter_config).await;
     let mut watcher = login_to_world_session(&watcher_config).await.unwrap();

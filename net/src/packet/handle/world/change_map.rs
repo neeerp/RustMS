@@ -6,6 +6,7 @@ use crate::packet::build;
 use crate::packet::build::world::map::BlockedMap;
 use crate::packet::build::world::stat::StatUpdate;
 use crate::policy;
+use game::buff::BuffStat;
 use game::Player;
 use packet::{io::read::PktRead, Packet};
 use std::convert::TryFrom;
@@ -33,6 +34,12 @@ impl WorldHandler for ChangeMapHandler {
         reader.read_byte()?;
         // The death dialog's answer to "use a Wheel of Destiny?".
         let wheel = reader.read_byte()? != 0;
+        if target == -1 && held_at(ctx.player, &portal_name) {
+            return Ok(HandlerResult::reply(build::world::stat::build_stat_update(
+                true,
+                &[],
+            )?));
+        }
 
         let game_data = crate::game_data::get()?;
         let player = &mut *ctx.player;
@@ -110,6 +117,25 @@ impl WorldHandler for ChangeMapHandler {
         }
         Ok(result.with_reply(enable_actions))
     }
+}
+
+/// Whether a Stun or Seduce holds the player at `portal`. Their client
+/// takes no input then, so only a forged packet enters a portal by the Up
+/// key; but v83 still enters the touch portals a Seduce walks them into
+/// (FUN_0094dac6 checks those every update).
+pub fn held_at(player: &Player, portal: &str) -> bool {
+    let held = player.buffs.has(BuffStat::Stun) || player.buffs.has(BuffStat::Seduce);
+    held && !crate::game_data::get()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id))
+        .and_then(|field| field.portal_by_name(portal))
+        .is_some_and(|portal| by_touch(portal.portal_type))
+}
+
+/// Touch portals (3) and touch script portals (9): the client enters them
+/// on contact.
+fn by_touch(portal_type: i32) -> bool {
+    matches!(portal_type, 3 | 9)
 }
 
 /// The portal a CHANGE_MAP packet walks through, or `None` for a map-id
@@ -436,6 +462,33 @@ mod tests {
         p.write_byte(0).unwrap();
         p.write_byte(0).unwrap();
         p
+    }
+
+    #[test]
+    fn a_held_player_takes_no_portal() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        for stat in [BuffStat::Stun, BuffStat::Seduce] {
+            let mut p = player(50, 0);
+            p.buffs.give(game::Buff::new(0, stat, 1, now, long));
+            let mut ctx = WorldContext {
+                client_id: 1,
+                channel_id: 0,
+                player: &mut p,
+            };
+            let result = ChangeMapHandler
+                .handle(&mut change_map(-1, "next00"), &mut ctx)
+                .unwrap();
+            // Only the update that frees the client comes back.
+            assert!(matches!(result.actions.as_slice(), [WorldAction::Reply(_)]));
+            assert_eq!(p.stats.map_id, 100000000);
+        }
+    }
+
+    #[test]
+    fn a_held_player_still_takes_touch_portals() {
+        assert!(by_touch(3) && by_touch(9));
+        assert!(!by_touch(2) && !by_touch(7) && !by_touch(10));
     }
 
     #[test]

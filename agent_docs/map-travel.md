@@ -105,6 +105,15 @@ level 50 and Step 3 from it, arriving at portal 0. Louis (`1032004`,
 keys (`shane.*`, `louis.ask`) are `unsourced`. `forest_of_patience.rs` checks
 them through the network harness.
 
+### Stunned and seduced players
+
+A Stun or Seduce takes the client's input (HeavenClient's `disease::steer`),
+so an honest client enters no portal by the Up key then. The server answers
+CHANGE_MAP through such a portal, and CHANGE_MAP_SPECIAL, with only an empty
+STAT_CHANGED that frees the client (`change_map::held_at`). Touch portals
+(types 3 and 9) still work: v83 checks them every update, so a Seduce can
+walk the player into one. Map-id warps and revivals aren't affected.
+
 ### Level limits
 
 The v83 client reads neither `info/lvLimit` (672 maps) nor

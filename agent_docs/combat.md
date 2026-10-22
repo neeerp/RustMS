@@ -222,7 +222,9 @@ its damage (`MobInfo::hurt_by`), and HeavenClient rolls MISS for it as well.
 
 A shot fires from the USE slot the client names, as in v83 (`shot_ammo`). The
 item there must fit the weapon (stars for claws, arrows for bows and the
-Arrow claw 1472063, crossbow arrows, bullets for guns) and cover the cost:
+Arrow claw 1472063, crossbow arrows, bullets for guns), need no more than
+the player's level (`info/reqLevel`, which v83's picker also checks,
+FUN_00a10579; so does Shadow Stars' star), and cover the cost:
 the skill's `bulletConsume` if it has one (Avenger's 3), otherwise its
 `bulletCount` (Lucky Seven's 2), or 1 for a basic shot. Anything else refuses
 the attack. The cost is taken from that slot and the attacker gets
@@ -881,8 +883,8 @@ of the eight templates 23-30 of its `spec/morphRandom` pool, picked by the
 entries' `prop` weights (they add up to 100) in their order
 (`use_item::random_morph`; no reference server picks one, report c041).
 The Maplemas Party Potion (2212000) has the same pool but morphs another
-player named in v83's Transform dialog (send 0xA0, reply 0x77), which isn't
-done: USE_ITEM refuses it and keeps it. Not done anywhere: the mini-game
+player named in v83's Transform dialog (send 0xA0, reply 0x77; see the
+Party Potion above). Not done anywhere: the mini-game
 and hired merchant refusals, which wait on those rooms.
 
 ### Item auras
@@ -1529,8 +1531,13 @@ controller's client plays the cast and the server applies it
   respawn.
 - **Diseases** (120-126, 128, 132) reach the players in the area; see
   below.
-- Not cast yet: dispel (127), banish, poison mist, and the damage counters
-  (143-145).
+- **Counters** (143 physical, 144 magic, 145 both) put PCounter and
+  MCounter at `x` on the mobs it reaches: each attack on one hurts the
+  attacker `x`, give or take half of `y` (`MobSkillEffect::Counters`).
+- **Dispel** (127) ends the skill buffs, and **Banish** (129) sends up to
+  `count` players to the mob's `info/ban` map, of the players in its area,
+  each cast landing by its `prop`. **Poison Mist** (131) lays a mob mist over
+  its area by its `prop`; each client in it hurts itself (see above).
 
 ### Diseases
 

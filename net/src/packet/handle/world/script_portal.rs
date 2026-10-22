@@ -7,11 +7,16 @@ use std::io::Cursor;
 pub struct ChangeMapSpecialHandler;
 
 impl WorldHandler for ChangeMapSpecialHandler {
-    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         reader.read_byte()?;
         let portal = reader.read_str_with_length()?;
+        if super::change_map::held_at(ctx.player, &portal) {
+            return Ok(HandlerResult::reply(
+                crate::packet::build::world::stat::build_stat_update(true, &[])?,
+            ));
+        }
         Ok(HandlerResult::empty().with(WorldAction::ScriptPortal { portal }))
     }
 }
