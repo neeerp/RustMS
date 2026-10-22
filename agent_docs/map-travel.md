@@ -214,16 +214,19 @@ it for the player, who goes in with the portal sound. The party members
 who were beside the leader follow to the copy's `out00` once the leader is
 in (`ServerMessage::ShipWarp`). A copy's `out00`, like `MD00` anywhere but the base map,
 leads back to the base map's `MD00`. When the player who took the copy
-leaves it (by map change, logout, logging in again or channel change),
-everyone still in it is sent to the base map's portal 0. An empty copy puts its mobs back, as a
+leaves it (by map change, logout or logging in again),
+everyone still in it is sent to the base map's portal 0. If the leader
+hands the party to a member in the copy, the copy goes with it; if the new
+leader is anywhere else, the run ends the same way, as in Cosmic
+(`WorldDirectory::dungeon_leader_changed`). Nobody in a copy may change channel or
+enter the Cash Shop: both get the client's own refusal (BLOCKED_SERVER 1
+and 2). An empty copy puts its mobs back, as a
 clone's room does (`npc_scripts::resets_when_empty`). The clock is each
-player's own `MapTimer`, and a login or channel change into a copy lands
+player's own `MapTimer`, and a login into a copy lands
 on its forced return map.
 
-Not yet: the Cash Shop isn't closed to players in a copy, a party's new
-leader doesn't close the run (Cosmic closes it when the leadership passes
-to someone on another map), and the time limit runs per player rather than
-per copy.
+Not yet: the time limit runs per player rather than per copy (the members
+follow the leader in within seconds, so the clocks hardly differ).
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,

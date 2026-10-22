@@ -539,6 +539,43 @@ impl WorldDirectory {
         }
     }
 
+    /// `from` handed their party to `to`. A mini-dungeon's copy `from` took
+    /// goes with it if `to` is in it too; if not, the run is over and
+    /// everyone in it goes back to the dungeon's map (as in Cosmic).
+    fn dungeon_leader_changed(&mut self, from: ClientId, to: ClientId) {
+        let Some(entry) = self.clients.get(&from) else {
+            return;
+        };
+        let (channel_id, map_id) = (entry.channel_id, entry.presence.map_id);
+        let Some(run) = self
+            .dungeons
+            .get_mut(&(channel_id, map_id))
+            .filter(|run| run.leader == from)
+        else {
+            return;
+        };
+        let beside = self
+            .clients
+            .get(&to)
+            .is_some_and(|other| other.channel_id == channel_id && other.presence.map_id == map_id);
+        if beside {
+            run.leader = to;
+            return;
+        }
+        if let Some(dungeon) = net::dungeons::of_copy(map_id) {
+            for entry in self.clients.values() {
+                if entry.channel_id == channel_id && entry.presence.map_id == map_id {
+                    entry.handle.send(ServerMessage::ShipWarp {
+                        from_map: map_id,
+                        map_id: dungeon.base,
+                        portal: Portal::Id(0),
+                    });
+                }
+            }
+        }
+        self.dungeons.remove(&(channel_id, map_id));
+    }
+
     /// `client_id` left `map_id` on `channel_id`. If it is a mini-dungeon's
     /// copy they took, the run is over: whoever is still in it goes back to
     /// the dungeon's map.
@@ -1208,6 +1245,7 @@ impl WorldDirectory {
                 }
                 if let Some(party) = self.parties.change_leader(from, member_id).cloned() {
                     self.send_to_party(&party, |_| build_party_leader_changed(member_id));
+                    self.dungeon_leader_changed(from, member_id);
                 }
             }
             PartyRequest::Chat { text } => {
@@ -2409,6 +2447,44 @@ mod tests {
         ship_warps(&mut bobby);
         let _alice = online(&mut directory, 1, "Alice", FIRST);
         assert_eq!(ship_warps(&mut bobby), [(FIRST, PIG_FARM)]);
+    }
+
+    #[test]
+    fn a_mini_dungeon_follows_a_new_leader_in_it_and_closes_for_one_outside() {
+        const PIG_FARM: i32 = 100020000;
+        const FIRST: i32 = 100020100;
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", PIG_FARM);
+        let mut bobby = online(&mut directory, 2, "Bobby", PIG_FARM);
+        let _carol = online(&mut directory, 3, "Carol", 20000);
+        let now = Instant::now();
+        for name in ["Bobby", "Carol"] {
+            let name = name.into();
+            directory.party_request(1, PartyRequest::Invite { name }, now);
+        }
+        for id in [2, 3] {
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        assert_eq!(directory.enter_dungeon(1, FIRST, 1, now), Ok(FIRST));
+        directory.gather_team(1, FIRST, 0);
+        directory.update_presence(1, presence("Alice", FIRST));
+        directory.update_presence(2, presence("Bobby", FIRST));
+        ship_warps(&mut bobby);
+
+        // Bobby, in the copy with her, takes it over: Alice may leave.
+        directory.party_request(1, PartyRequest::ChangeLeader { member_id: 2 }, now);
+        directory.update_presence(1, presence("Alice", PIG_FARM));
+        assert_eq!(ship_warps(&mut bobby), []);
+        assert!(directory.dungeons.contains_key(&(0, FIRST)));
+
+        // Carol is elsewhere, so handing her the party ends the run.
+        directory.update_presence(1, presence("Alice", FIRST));
+        ship_warps(&mut alice);
+        directory.party_request(2, PartyRequest::ChangeLeader { member_id: 3 }, now);
+        assert_eq!(ship_warps(&mut alice), [(FIRST, PIG_FARM)]);
+        assert_eq!(ship_warps(&mut bobby), [(FIRST, PIG_FARM)]);
+        assert!(!directory.dungeons.contains_key(&(0, FIRST)));
     }
 
     #[test]
