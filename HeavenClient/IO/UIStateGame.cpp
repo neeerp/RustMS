@@ -32,6 +32,7 @@
 #include "UITypes/UIEquipInventory.h"
 #include "UITypes/UIItemInventory.h"
 #include "UITypes/UIKeyConfig.h"
+#include "UITypes/UIKite.h"
 #include "UITypes/UIMessenger.h"
 #include "UITypes/UIMiniMap.h"
 #include "UITypes/UIQuestComplete.h"
@@ -278,6 +279,9 @@ namespace ms
 		// Someone's shop balloon comes before them (FUN_0094fbbf).
 		else if (int32_t serial = Stage::get().mini_room_at(pos))
 			MiniRoomVisitPacket(serial).dispatch();
+		// Then a kite, which opens its message.
+		else if (const MapKites::Kite *kite = Stage::get().kite_at(pos))
+			emplace<UIKiteView>(kite->itemid, kite->name, kite->message);
 		else if (int32_t cid = Stage::get().character_at(pos))
 		{
 			// v83 asks only when it may ask the server, as for an item

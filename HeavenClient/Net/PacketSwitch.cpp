@@ -193,6 +193,9 @@ namespace ms
 		NPC_ACTION = 260,
 		DROP_LOOT = 268,
 		REMOVE_LOOT = 269,
+		CANNOT_SPAWN_KITE = 270,
+		SPAWN_KITE = 271,
+		REMOVE_KITE = 272,
 		SPAWN_MIST = 273,
 		REMOVE_MIST = 274,
 		SPAWN_DOOR = 275,
@@ -314,6 +317,9 @@ namespace ms
 		emplace<KILL_MOB, KillMobHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
+		emplace<CANNOT_SPAWN_KITE, CannotSpawnKiteHandler>();
+		emplace<SPAWN_KITE, SpawnKiteHandler>();
+		emplace<REMOVE_KITE, RemoveKiteHandler>();
 		emplace<SPAWN_MIST, SpawnMistHandler>();
 		emplace<REMOVE_MIST, RemoveMistHandler>();
 		emplace<SPAWN_DOOR, SpawnDoorHandler>();

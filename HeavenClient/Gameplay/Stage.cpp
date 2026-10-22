@@ -28,6 +28,7 @@
 #include "FieldEffectRules.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/FieldLimit.h"
+#include "MapleMap/KiteRules.h"
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
@@ -173,6 +174,7 @@ namespace ms
 		drops.clear();
 		reactors.clear();
 		mists.clear();
+		kites.clear();
 		doors.clear();
 		summons.clear();
 		// The server brings the player's pets out again on the new field.
@@ -284,6 +286,9 @@ namespace ms
 		if (party.shows_hp_marks())
 			chars.draw_party_hp(party, player.get_oid(), mapid, viewx, viewy, alpha);
 
+		// Kites share the mini room balloons' z (0xc0061440), in front of
+		// everyone and behind the effect layer.
+		kites.draw(viewx, viewy, alpha);
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
@@ -372,6 +377,7 @@ namespace ms
 
 		reactors.update(physics);
 		mists.update();
+		kites.update();
 		doors.update(physics);
 		npcs.update(physics);
 		Point<int16_t> playerpos = player.get_position();
@@ -1148,6 +1154,14 @@ namespace ms
 		return 0;
 	}
 
+	const MapKites::Kite *Stage::kite_at(Point<int16_t> cursorpos) const
+	{
+		if (state != State::ACTIVE)
+			return nullptr;
+
+		return kites.at(cursorpos - camera.position());
+	}
+
 	int32_t Stage::mini_room_at(Point<int16_t> cursorpos)
 	{
 		if (state != State::ACTIVE)
@@ -1256,8 +1270,16 @@ namespace ms
 		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
 			npcstate = Cursor::State::HOUSE;
 
+		// Then a kite shows whose it is, with the arrow (FUN_0094cfc3).
+		const MapKites::Kite *kite = npcstate == Cursor::State::IDLE ? kite_at(position) : nullptr;
+
+		if (kite)
+		{
+			tooltips.leave();
+			UI::get().show_line(Tooltip::Parent::FIELD, kite::hover_text(kite->name, kite->item_msg));
+		}
 		// Otherwise a map zone under the cursor shows its tip.
-		if (npcstate == Cursor::State::IDLE)
+		else if (npcstate == Cursor::State::IDLE)
 			tooltips.hover(position - camera.position());
 		else
 			tooltips.leave();
@@ -1288,6 +1310,11 @@ namespace ms
 	MapReactors &Stage::get_reactors()
 	{
 		return reactors;
+	}
+
+	MapKites &Stage::get_kites()
+	{
+		return kites;
 	}
 
 	MapMists &Stage::get_mists()

@@ -118,6 +118,8 @@ namespace ms
 			FRIENDGROUP,
 			MAKER,
 			DUEY,
+			KITEWRITE,
+			KITEVIEW,
 			NUM_TYPES
 		};
 

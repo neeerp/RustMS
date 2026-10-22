@@ -586,6 +586,7 @@ side yet.
 | Trade (`UITradingRoom`, `UIInviteCard`) | Implemented, without cash trades |
 | Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Cash mists (528xxxx) | Implemented: the use gate (`MapMists::item_busy`), the cloud (`MapMists`, type 3), the puff on the user (`Char::show_mist_puff`, user effect mode 20) and the face (ITEM_EMOTION, `Stage::use_item_emotion`); see `inventory.md` |
+| Kites (508xxxx) | Implemented: the use gates, the three-line entry window, the kite over the field with its bob, fade, hover line and double-click viewer (`MapKites`, `UIKiteWrite`, `UIKiteView`); see "Kites" in `fields.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Duey (`UIDuey`) | The tab strip, receiving, normal and quick sends, the arrival notice, and the Quick Delivery Coupon's window; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |

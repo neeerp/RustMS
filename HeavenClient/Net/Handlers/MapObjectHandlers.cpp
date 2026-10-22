@@ -892,6 +892,36 @@ namespace ms
 		);
 	}
 
+	void CannotSpawnKiteHandler::handle(InPacket&) const
+	{
+		// v83 FUN_0065acb4: a notice (StringPool 0x1db, FUN_009929dd).
+		UI::get().emplace<UIOk>("You can't fly it there.", [](bool) {});
+	}
+
+	void SpawnKiteHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_0065acdf: the message, then its flier's name, then where
+		// the flier stood.
+		int32_t oid = recv.read_int();
+		int32_t itemid = recv.read_int();
+		std::string message = recv.read_string();
+		std::string name = recv.read_string();
+		int16_t x = recv.read_short();
+		int16_t y = recv.read_short();
+
+		Stage::get().get_kites().spawn(oid, itemid, message, name, x, y);
+	}
+
+	void RemoveKiteHandler::handle(InPacket& recv) const
+	{
+		// v83 FUN_0065b2ca: type 0 fades the kite out, any other takes it
+		// down at once.
+		uint8_t type = recv.read_byte();
+		int32_t oid = recv.read_int();
+
+		Stage::get().get_kites().remove(oid, type == 0);
+	}
+
 	void SpawnMistHandler::handle(InPacket& recv) const
 	{
 		// v83 FUN_00431a63. The delay (in 100 ms) only starts the mist's own
