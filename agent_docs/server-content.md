@@ -38,7 +38,8 @@ tests.
   (cash) drops are filtered out.
 - **Reactor drops** (`RewardTable::reactor_drops`): `rewards.json` mixes
   reactor ids in with the mobs. `[reactors.<id>]` overrides add to the
-  pack's drops rather than replace them: `like = <id>` borrows another
+  pack's drops rather than replace them, unless `replace = [...]` names
+  the whole table (the Orbis records and stone boxes): `like = <id>` borrows another
   reactor's drops (Amherst's box 2001 has none of its own, so it borrows
   2000's), and `quest_items` makes items quest drops that always drop during
   that quest (for a player who still needs them, or anyone in a party),

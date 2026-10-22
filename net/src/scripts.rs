@@ -434,7 +434,8 @@ pub enum Effect {
     },
     /// Put the reactors named `name` on the player's map in `state`, shown
     /// to everyone there but without the events that lead to it, as
-    /// Cosmic's `forceHitReactor` (Eak bringing out a stone box).
+    /// Cosmic's `forceHitReactor` (Eak bringing out a stone box). Those
+    /// already in it or past it stay as they are.
     SetReactorState {
         name: &'static str,
         state: u8,

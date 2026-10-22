@@ -164,10 +164,21 @@ impl ReactorSet {
     /// elevator's car leaving or docking); returns the views of those that
     /// changed. It goes through no event, so nothing breaks.
     pub fn set_state(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
+        self.move_to(name, state, |now| now != state)
+    }
+
+    /// As `set_state`, but only those still short of `state`, so a second
+    /// script asking for it (two members talking to Eak at once) can't undo
+    /// the hits since the first.
+    pub fn force_forward(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
+        self.move_to(name, state, |now| now < state)
+    }
+
+    fn move_to(&mut self, name: &str, state: u8, moves: impl Fn(u8) -> bool) -> Vec<ReactorView> {
         let spots = &self.spots;
         self.live
             .values_mut()
-            .filter(|reactor| spots[reactor.spot].template.name == name && reactor.state != state)
+            .filter(|reactor| spots[reactor.spot].template.name == name && moves(reactor.state))
             .map(|reactor| {
                 reactor.state = state;
                 reactor.view()
@@ -371,6 +382,8 @@ mod tests {
         assert_eq!(reactors.named("elevator").unwrap().object_id, car);
         assert!(reactors.named("nothing").is_none());
         assert_eq!(reactors.set_state("elevator", 0)[0].state, 0);
+        assert_eq!(reactors.force_forward("elevator", 2)[0].state, 2);
+        assert!(reactors.force_forward("elevator", 1).is_empty());
     }
 
     #[test]

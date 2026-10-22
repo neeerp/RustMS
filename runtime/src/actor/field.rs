@@ -655,7 +655,7 @@ impl FieldActor {
                     self.handle_bring_out_mob(from, mob_id, at)
                 }
                 FieldRequest::SetReactorState { name, state } => {
-                    for view in self.reactors.set_state(name, state) {
+                    for view in self.reactors.force_forward(name, state) {
                         if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
                             self.broadcast(None, packet);
                         }

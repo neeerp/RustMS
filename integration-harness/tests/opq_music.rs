@@ -9,7 +9,7 @@
 use game_data::server_content::keys;
 use integration_harness::events::{enter_opq, party, talk, throw_down, waiting_in, EAK};
 use integration_harness::hunting::{hit_reactor, walk_to, MapReactor};
-use integration_harness::trace::{read_for, send, step, until, warp, Trace};
+use integration_harness::trace::{send, step, until, warp, Trace};
 use integration_harness::WorldSession;
 use net::events::{OPQ, OPQ_HEAD_COUNT_ROOM, OPQ_MUSIC_ROOM};
 use net::reactors::MUSIC;
@@ -124,15 +124,15 @@ async fn the_days_record_and_the_right_heads_bring_out_the_stone_boxes() {
     send(c, walk_to(music.x, music.y - 10)).await;
     send(c, throw_down(1, 1)).await;
     until(c, &mut seen, |t| t.field.item_drop(MONDAY_RECORD).is_some()).await;
-    read_for(c, &mut seen, 600).await;
-    let monday = seen.field.item_drop(MONDAY_RECORD).unwrap();
-    assert!(seen.field.removals(monday.object_id).is_empty(), "{seen:?}");
-    assert!(seen.field.reactor_hits.is_empty(), "{seen:?}");
     send(c, throw_down(2, 1)).await;
     until(c, &mut seen, |t| {
         t.field.reactor_hits.contains(&(music.object_id, 3))
     })
     .await;
+    // Monday's lay there first, past the reactor's wait, and is still there.
+    let monday = seen.field.item_drop(MONDAY_RECORD).unwrap();
+    assert!(seen.field.removals(monday.object_id).is_empty(), "{seen:?}");
+    assert_eq!(seen.field.reactor_hits, [(music.object_id, 3)], "{seen:?}");
 
     // Now Eak brings the stone box out and clears the room, once.
     let mut trace = told(&mut a[1], talk(OPQ_MUSIC_ROOM, EAK)).await;
