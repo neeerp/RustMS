@@ -113,7 +113,8 @@ v83's checks (FUN_00721163, FUN_00721d2c). Without a pet out v83 doesn't
 offer the quest, and at completion shows "lack of pet" (no pet) or "with the
 current pet" (another pet). v83 also reads `pettamenessmin`/`pettamenessmax`
 (closeness), which stay unsupported, so the quests with a `pet` list that
-qualify (2103 Nella's Dream and Bartos's 4646/4647) accept any closeness.
+qualify (2103 Nella's Dream and Bartos's 4646/4647) accept any closeness;
+Nella's next quest, 2104, needs closeness and stays out.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
@@ -204,7 +205,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1390 quests qualify
+changing the server's allowlist and regenerating the list. 1393 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
