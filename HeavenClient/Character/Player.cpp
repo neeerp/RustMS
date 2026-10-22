@@ -1313,6 +1313,9 @@ namespace ms
 		if (buff.stat == Buffstat::Id::MORPH)
 			transform(buff.value, false, underwater);
 
+		if (buff.stat == Buffstat::Id::GHOST_MORPH)
+			haunt(buff.value, false);
+
 		if (buff.stat == Buffstat::Id::DIVINE_BODY)
 			show_divine_body(pq_skills::family(stats.get_stat(MapleStat::Id::JOB), pq_skills::INVINCIBILITY));
 
@@ -1333,6 +1336,9 @@ namespace ms
 
 		if (stat == Buffstat::Id::MORPH)
 			transform(0, false);
+
+		if (stat == Buffstat::Id::GHOST_MORPH)
+			haunt(0, false);
 
 		if (stat == Buffstat::Id::DIVINE_BODY)
 			show_divine_body(0);
@@ -1755,6 +1761,28 @@ namespace ms
 		return true;
 	}
 
+	namespace
+	{
+		// Whether a Use item may not be cancelled by its icon (noCancelMouse).
+		bool no_cancel_mouse(int32_t item)
+		{
+			return item > 0 && nl::nx::item["Consume"][string_format::extend_id(item / 10000, 4) + ".img"]
+				[string_format::extend_id(item, 8)]["info"]["noCancelMouse"].get_bool();
+		}
+	}
+
+	bool Player::ghost_refuses() const
+	{
+		if (!is_ghost())
+			return false;
+
+		// Board the Spaceship (2360002) says the shorter line, as a fixed morph does (FUN_00a2a193).
+		bool fixed = no_cancel_mouse(-buffs[Buffstat::Id::GHOST_MORPH].skillid);
+		InChatMessage(fixed ? Messages::Type::MORPHED_FIXED : Messages::Type::MORPHED).drop();
+
+		return true;
+	}
+
 	bool Player::shape_refuses() const
 	{
 		if (morph_refuses())
@@ -1775,10 +1803,7 @@ namespace ms
 
 	bool Player::no_cancel_morph() const
 	{
-		int32_t item = -get_morph_reason();
-
-		return item > 0 && nl::nx::item["Consume"][string_format::extend_id(item / 10000, 4) + ".img"]
-			[string_format::extend_id(item, 8)]["info"]["noCancelMouse"].get_bool();
+		return no_cancel_mouse(-get_morph_reason());
 	}
 
 	bool Player::ride_keeps(int32_t itemid)

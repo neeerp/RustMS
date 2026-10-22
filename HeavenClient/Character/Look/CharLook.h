@@ -29,6 +29,7 @@
 #include "CharEquips.h"
 #include "Face.h"
 #include "Hair.h"
+#include "GhostLook.h"
 #include "MorphTemplate.h"
 #include "TamingMob.h"
 
@@ -158,6 +159,11 @@ namespace ms
 
 		int32_t get_morph() const;
 
+		// Look like a ghost item's ghost of a value, or as before with 0 (FUN_0045674a).
+		void set_ghost(int16_t ghost);
+
+		int16_t get_ghost() const;
+
 		// Whether it looks like Transformation's superman.
 		bool is_superman() const;
 
@@ -180,6 +186,14 @@ namespace ms
 
 		// The morph's action for a stance.
 		std::string morph_action(Stance::Id stance) const;
+
+		// Whether the ghost shows in this stance: a morph goes over it, and the dead look as anyone's.
+		bool ghosted(Stance::Id stance) const;
+
+		// Draw the ghost's body and the head on its neck, with only the cap, eye accessory and earrings
+		// (FUN_00407757 keeps those of the equipment).
+		void draw_ghost(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp,
+						uint8_t interframe, uint8_t interexpframe) const;
 
 		// Whether the mount shows in this stance: a dead rider is a ghost without one.
 		bool riding(Stance::Id stance) const;
@@ -239,6 +253,7 @@ namespace ms
 		int32_t vehicle = 0;
 		bool tired = false;
 		int32_t morph = 0;
+		int16_t ghost = 0;
 
 		Randomizer randomizer;
 		TimedBool alerted;

@@ -941,8 +941,9 @@ namespace ms
 
 	void Stage::check_seats()
 	{
-		// Not on a mount or morphed, wherever the player is (FUN_0094e45f).
-		if (player.is_sitting() || player.is_attacking() || player.ride_refuses() || player.morph_refuses())
+		// Not on a mount, morphed or a ghost, wherever the player is (FUN_0094e45f).
+		if (player.is_sitting() || player.is_attacking() || player.ride_refuses() || player.morph_refuses() ||
+			player.ghost_refuses())
 			return;
 
 		Optional<const Seat> seat = mapinfo.findseat(player.get_position());
@@ -1683,8 +1684,8 @@ namespace ms
 
 	void Stage::use_item_effect(int32_t item_id)
 	{
-		// Not morphed (FUN_00a24530).
-		if (player.shape_refuses())
+		// Not morphed or a ghost (FUN_00a24530).
+		if (player.shape_refuses() || player.ghost_refuses())
 			return;
 
 		int32_t next = item_effect::toggled(player.get_item_effect(), item_id);

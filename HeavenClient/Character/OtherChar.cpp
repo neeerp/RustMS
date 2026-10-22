@@ -141,6 +141,9 @@ namespace ms
 			if (stat == Buffstat::Id::MORPH)
 				transform(value, init, Stage::get().get_mapinfo().is_underwater());
 
+			if (stat == Buffstat::Id::GHOST_MORPH)
+				haunt(static_cast<int16_t>(value), init);
+
 			// The glow is Energy Charge's for the character's line (0x94b44b).
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
 				show_energy(job / 1000 == 1 ? 15100004 : 5110001, value >= energy_bar::FULL, init);
@@ -169,6 +172,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::MORPH)
 				transform(0, false);
+
+			if (stat == Buffstat::Id::GHOST_MORPH)
+				haunt(0, false);
 
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
 				show_energy(0, false, false);

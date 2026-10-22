@@ -235,10 +235,10 @@ namespace ms
 			return false;
 		}
 
-		// An item's morph or the barrel uses no skill and doesn't attack, nor does the player while the
-		// barrel drops or breaks (FUN_00966f7a, FUN_0094e256). v83 still attacks while it drops, which the
-		// server refuses.
-		if (player.morph_refuses())
+		// A ghost, an item's morph or the barrel uses no skill and doesn't attack, nor does the player while
+		// the barrel drops or breaks (FUN_00966f7a, FUN_0094e256). v83 still attacks while it drops, which
+		// the server refuses.
+		if (player.ghost_refuses() || player.morph_refuses())
 			return false;
 
 		// The Maker opens its window, with the skill learnt, and sends nothing (FUN_00966f7a).

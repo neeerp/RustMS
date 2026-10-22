@@ -27,15 +27,44 @@ namespace ms::morph
 		return chair != 0 || vehicle / 10000 == 190;
 	}
 
-	// v83 0xa092fb: a morph potion (221xxxx) or ghost item (236xxxx) isn't sent by one already morphed,
-	// seated, aboard the Battleship (193xxxx) or in a mini room, and nothing is said. The ghost state
-	// itself isn't modelled.
-	inline bool potion_refused(int32_t item, int32_t morph, int32_t chair, int32_t vehicle, bool mini_room)
+	// v83 0xa092fb: a morph potion (221xxxx) or ghost item (236xxxx) isn't sent by one already morphed or a
+	// ghost, seated, aboard the Battleship (193xxxx) or in a mini room, and nothing is said.
+	inline bool potion_refused(int32_t item, int32_t morph, bool ghost, int32_t chair, int32_t vehicle,
+		bool mini_room)
 	{
 		if (item / 10000 != 221 && item / 10000 != 236)
 			return false;
 
-		return morph != 0 || chair != 0 || vehicle / 10000 == 193 || mini_room;
+		return morph != 0 || ghost || chair != 0 || vehicle / 10000 == 193 || mini_room;
+	}
+
+	// A ghost item's (236xxxx, Ghost bit 49) actions in Character.nx's body, each with a variant per
+	// ghost value (report c039).
+	constexpr std::array<const char *, 8> GHOST_ACTIONS = {
+		"ghoststand", "ghostwalk", "ghostjump", "ghostproneStab", "ghostladder", "ghostrope", "ghostfly",
+		"ghostsit"
+	};
+
+	// The variant a ghost's value draws: 1 the sheet, 2 the saucer of 2360002, Board the Spaceship.
+	inline std::string ghost_variant(int16_t ghost)
+	{
+		return ghost == 2 ? "2" : "1";
+	}
+
+	// A ghost's action for a stance, by the stance's name. An alert ghost stands, and any other stance
+	// but the dead's, which a ghost doesn't draw, does too (FUN_00451ec8's table at 0x452054).
+	inline std::string ghost_action(const std::string &stance)
+	{
+		if (stance == "walk1" || stance == "walk2")
+			return "ghostwalk";
+
+		if (stance == "prone" || stance == "proneStab")
+			return "ghostproneStab";
+
+		if (stance == "jump" || stance == "ladder" || stance == "rope" || stance == "fly" || stance == "sit")
+			return "ghost" + stance;
+
+		return "ghoststand";
 	}
 
 	// The skills a superman can't use: Double Shot, Oak Barrel, Burst Fire, and the beginners' rides and

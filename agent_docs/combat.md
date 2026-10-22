@@ -758,9 +758,23 @@ SPAWN_PLAYER (report c039). It is a movement stat, so GIVE_BUFF ends with
 the extra byte. v83 lets a ghost neither attack nor use any skill (it can
 still emote and sit), so the server refuses both as for a morph
 (`morph::ghosted`, which `morph::refused` and the party quest skill check
-use). Right-clicking the icon ends it. What value 2 changes, and whether
-death or a map change ends it, isn't known. The client doesn't draw the
-ghost yet.
+use). Right-clicking the icon ends it. Whether death or a map change ends
+it isn't known.
+
+HeavenClient draws a ghost from the body's ghost actions in Character.nx
+(`ghoststand`, `ghostwalk`, `ghostjump`, `ghostproneStab`, `ghostladder`,
+`ghostrope`, `ghostfly`, `ghostsit`; `morph::ghost_action`), in the skin's
+body file or else `00002000.img`. The value picks the variant child:
+1 is the white sheet, 2 the flying saucer (`morph::ghost_variant`,
+`GhostLook`). The ghost frame replaces the body, arms and clothes; the
+head, hair, face, earrings, eye accessory and cap are drawn on its `neck`
+as in the stand (or, for `ladder` and `rope`, whose frames have `face` 0,
+from behind as on a ladder). A morph is drawn in its place. A ghost
+refuses attacks, skills, map seats, item effects, a trade invite, a
+personal shop and the morph and ghost items with the same lines as a
+morph (`Player::ghost_refuses`, chosen by the ghost item's
+`noCancelMouse`), but may emote and sit on a portable chair; its icon
+always cancels it.
 
 The cash morphs (Fungus Scroll 5300000, Oinker Delight 5300001 and Zeta
 Nightmare 5300002, templates 1-3 for ten minutes, report c012) are the
@@ -821,7 +835,7 @@ item." Without the transformation, Shockwave, Demolition and Snatch say
 trade invite and opening a personal shop with the same line
 (`Player::shape_refuses`). A template that can't move the way the map
 does isn't put on: in water only 0004 (2210003), which has no `fly`,
-stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: Ghost (bit 49), the random
+stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: the random
 morph items (2211000, 2212000; `spec/morphRandom`, which the server refuses
 without using one up rather than heal 50 with no morph), and
 the mini-game and hired merchant refusals,

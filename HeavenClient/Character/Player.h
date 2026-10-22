@@ -263,6 +263,10 @@ namespace ms
 		// and item effects (FUN_00a24470, FUN_00a24530).
 		bool shape_refuses() const;
 
+		// Whether being a ghost keeps the player from something, saying so in chat: attacks, skills, seats,
+		// trades, shops and item effects, but not emotes or chairs (report c039).
+		bool ghost_refuses() const;
+
 		// The skill the player is morphed by, or a morph item's id negated.
 		int32_t get_morph_reason() const;
 

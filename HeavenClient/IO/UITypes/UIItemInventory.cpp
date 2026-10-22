@@ -303,8 +303,8 @@ namespace ms
 		{
 			const Player &player = Stage::get().get_player();
 
-			return morph::potion_refused(item_id, player.get_look().get_morph(), player.get_chair(),
-				player.get_look().get_vehicle(), UI::get().dialog_open());
+			return morph::potion_refused(item_id, player.get_look().get_morph(), player.is_ghost(),
+				player.get_chair(), player.get_look().get_vehicle(), UI::get().dialog_open());
 		}
 
 		// Some cash items say so in the chat log while a dialog is open (v83 0xa0a63f's cases 0xe, 0x12, 0x13,

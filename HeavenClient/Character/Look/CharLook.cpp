@@ -255,6 +255,8 @@ namespace ms
 
 		if (morphed(interstance))
 			MorphTemplate::get(morph).draw(morph_action(interstance), interframe, relargs + args);
+		else if (ghosted(interstance))
+			draw_ghost(relargs + args, interstance, interexpression, interframe, interexpframe);
 		else if (riding(interstance))
 			draw_mounted(relargs + args, interstance, interexpression, interframe, interexpframe);
 		else
@@ -301,6 +303,62 @@ namespace ms
 			return tmplact;
 
 		return MorphTemplate::get(morph).action(Stance::names[st]);
+	}
+
+	bool CharLook::ghosted(Stance::Id st) const
+	{
+		return ghost != 0 && morph == 0 && st != Stance::Id::DEAD;
+	}
+
+	void CharLook::draw_ghost(const DrawArgument &args, Stance::Id interstance, Expression::Id interexp,
+							  uint8_t interframe, uint8_t interexpframe) const
+	{
+		const GhostLook &look = GhostLook::get(skin_id, ghost);
+		std::string ghostaction = morph::ghost_action(Stance::names[interstance]);
+		DrawArgument headargs = args + DrawArgument{look.neck(ghostaction, interframe), false, Point<int16_t>{}};
+
+		if (look.faces(ghostaction, interframe))
+		{
+			Stance::Id standing = Stance::Id::STAND1;
+			DrawArgument faceargs = headargs + DrawArgument{drawinfo.getfacepos(standing, 0), false, Point<int16_t>{}};
+
+			hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
+			equips.draw(EquipSlot::Id::HAT, standing, Clothing::Layer::CAP_BELOW_BODY, 0, headargs);
+			look.draw(ghostaction, interframe, args);
+			equips.draw(EquipSlot::Id::EARACC, standing, Clothing::Layer::EARRINGS, 0, headargs);
+			body->draw(standing, Body::Layer::HEAD, 0, headargs);
+			hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
+			face->draw(interexp, interexpframe, faceargs);
+			equips.draw(EquipSlot::Id::EYEACC, standing, Clothing::Layer::EYEACC, 0, headargs);
+			draw_cap(headargs, standing, 0);
+		}
+		else
+		{
+			// The back of the head, as on a ladder.
+			Stance::Id climbing = Stance::Id::LADDER;
+
+			look.draw(ghostaction, interframe, args);
+			body->draw(climbing, Body::Layer::HEAD, 0, headargs);
+			equips.draw(EquipSlot::Id::EARACC, climbing, Clothing::Layer::EARRINGS, 0, headargs);
+
+			switch (equips.getcaptype())
+			{
+			case CharEquips::CapType::NONE:
+				hair->draw(climbing, Hair::Layer::BACK, 0, headargs);
+				break;
+			case CharEquips::CapType::HEADBAND:
+				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
+				hair->draw(climbing, Hair::Layer::BACK, 0, headargs);
+				break;
+			case CharEquips::CapType::HALFCOVER:
+				hair->draw(climbing, Hair::Layer::BELOWCAP, 0, headargs);
+				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
+				break;
+			case CharEquips::CapType::FULLCOVER:
+				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
+				break;
+			}
+		}
 	}
 
 	bool CharLook::riding(Stance::Id st) const
@@ -663,6 +721,9 @@ namespace ms
 		if (morphed(st))
 			return MorphTemplate::get(morph).delay(morph_action(st), fr);
 
+		if (ghosted(st))
+			return GhostLook::get(skin_id, ghost).delay(morph::ghost_action(Stance::names[st]), fr);
+
 		// A rider keeps the mount's time (0x453ad1).
 		if (riding(st))
 			return TamingMob::get(get_mount()).delay(mount_action(st), fr);
@@ -675,6 +736,13 @@ namespace ms
 		if (morphed(st))
 		{
 			uint8_t count = MorphTemplate::get(morph).count(morph_action(st));
+
+			return fr + 1 < count ? fr + 1 : 0;
+		}
+
+		if (ghosted(st))
+		{
+			uint8_t count = GhostLook::get(skin_id, ghost).count(morph::ghost_action(Stance::names[st]));
 
 			return fr + 1 < count ? fr + 1 : 0;
 		}
@@ -956,6 +1024,21 @@ namespace ms
 	int32_t CharLook::get_morph() const
 	{
 		return morph;
+	}
+
+	void CharLook::set_ghost(int16_t g)
+	{
+		if (ghost == g)
+			return;
+
+		ghost = g;
+		stframe.set(0);
+		stelapsed = 0;
+	}
+
+	int16_t CharLook::get_ghost() const
+	{
+		return ghost;
 	}
 
 	bool CharLook::is_superman() const
