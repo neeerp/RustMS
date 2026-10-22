@@ -183,7 +183,8 @@ void couple_rings()
 	require(marriage::pair_tooltip_line(1112001, 0, records).empty(), "no serial");
 
 	require(!marriage::equip_gate(1112001, 0, { 1112800, 1112803 }), "one of each kind");
-	require(marriage::equip_gate(1112001, 0, { 0, 1112002 }) == std::string("Only one couple-ring can be equipped."),
+	const char* second = marriage::equip_gate(1112001, 0, { 0, 1112002 });
+	require(second && second == std::string("Only one couple-ring can be equipped."),
 		"a second crush ring");
 	require(!marriage::equip_gate(1112001, 1112002, { 1112002 }), "in place of one");
 	require(marriage::equip_gate(1112801, 1112001, { 1112001, 1112800 }) != nullptr, "a second friendship ring");

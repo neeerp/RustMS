@@ -236,9 +236,10 @@ For crush and friendship rings:
   `Stage::show_rings` pairs each kind's wearers on its own, and each
   kind has its own effect.
 - `EquipTooltip` names the partner of a ring whose serial a record has,
-  "A COUPLE-RING WITH : <name>", in place of the description. In the
-  Cash Shop the records aren't sent, so the line shows once the player
-  is back on a map.
+  in place of the description: "A COUPLE-RING WITH : <name>" for a crush
+  ring, "This is your Friendship Ring with '<name>'." for a friendship
+  ring. The records come with the character data, so a ring bought or
+  taken out during a Cash Shop visit gets its line on the next map.
 - `UIItemInventory::can_wear_equip` refuses a second ring of a kind
   with v83's notice (`marriage::equip_gate`). `Inventory::find_equipslot`
   looks for a free ring slot on the cash layer for a cash ring, so a
