@@ -143,7 +143,10 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
             }
         }
     }))
-    .with_capacity(mob_capacity(field.footholds.bounds(), field.mob_rate));
+    .with_capacity(mob_capacity(
+        field.footholds.bounds_within(field.view_limit),
+        field.mob_rate,
+    ));
     if full_spawn() {
         mobs.filling_every_point()
     } else {

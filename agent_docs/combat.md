@@ -13,7 +13,9 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
     (`field_mobs::mob_capacity`): one per 128,000 square pixels of its
     footholds' bounds (`Footholds::bounds`, the client's: 30 px in from the
     sides, 300 px above the top, 10 px below the bottom; the server adds 10
-    px a side), counted as at least 800 wide and 600 high after taking 450
+    px a side). On a map with `info/VRLimit` (only Orbis Tower<B2>) the
+    view range pulls those bounds in as the client does
+    (`Footholds::bounds_within`). The area is counted as at least 800 wide and 600 high after taking 450
     off the height, times `info/mobRate`, from 1 to 40. With more than half
     that many users on the field it grows, up to twice as many at twice as
     many users.
