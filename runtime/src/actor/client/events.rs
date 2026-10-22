@@ -61,7 +61,8 @@ impl ClientActor {
     /// elsewhere she has nothing to say.
     pub(super) async fn talk_to_cloto(&mut self) -> Result<bool, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+        let in_kpq = |ticket: &&EventTicket| ticket.kind == EventKind::Kpq && ticket.holds(map_id);
+        let Some(ticket) = self.event.as_ref().filter(in_kpq) else {
             return Ok(false);
         };
         let Some(stage) = ticket.kind.event().stage_on(map_id) else {

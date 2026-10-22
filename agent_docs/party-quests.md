@@ -149,7 +149,8 @@ to each (Cosmic `9020001`'s rope, platform and barrel stages):
   first talk on the stage and kept (`net::events::Puzzles`).
   `RUSTMS_KPQ_COMBO` pins the index into `combos`, from 0, on every stage
   of every event; an index past a stage's last is ignored there. The
-  harness world pins 1, areas 0, 1 and 3.
+  harness world pins 1: in Kerning City areas 0, 1 and 3, on Ludibrium's
+  stage 8 crates 0, 1, 2, 3 and 5.
 - A member who isn't the leader is told to follow the leader
   (`Cloto::Follow`). The leader's first talk sets out the puzzle
   (`Cloto::Intro`). Each later talk by the leader is an answer.

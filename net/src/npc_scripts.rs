@@ -4864,6 +4864,30 @@ mod tests {
     }
 
     #[test]
+    fn the_blue_balloon_clears_stage_8_only_for_five_on_the_right_crates() {
+        let said = |view, stood| {
+            let step = NpcScript::blue_balloon(8, view, stood).begin();
+            (step.effects.clone(), page_text(&step))
+        };
+        let answer = Balloon::Answer {
+            combo: 0b1_0010_1111,
+        };
+        let (effects, _) = said(answer, Some(Standing::Right));
+        assert_eq!(effects, [Effect::EventCommand(EventCommand::ClearStage(8))]);
+        for (view, stood, key) in [
+            (answer, Some(Standing::Wrong), keys::LPQ_BALLOON_WRONG),
+            (answer, Some(Standing::Few), keys::LPQ_BALLOON_FEW),
+            (Balloon::Intro, None, keys::LPQ_BALLOON_INTRO_8),
+            (Balloon::NotLeader, None, keys::LPQ_BALLOON_NOT_LEADER),
+            (Balloon::Cleared, None, keys::LPQ_BALLOON_HURRY),
+        ] {
+            let (effects, said) = said(view, stood);
+            assert!(effects.is_empty(), "{view:?}");
+            assert!(said.contains(&text(key)), "{view:?}: {said}");
+        }
+    }
+
+    #[test]
     fn anderson_lets_players_out_of_the_dimensional_crack_then_down() {
         for from in [922010100, 922010201, 922010900] {
             let mut anderson = NpcScript::for_npc(ANDERSON, &rider(100, 0, from)).unwrap();
