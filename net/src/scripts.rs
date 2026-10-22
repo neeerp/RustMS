@@ -5,7 +5,7 @@
 
 use crate::content;
 use crate::conti::Portal;
-use game::character::FREE_MARKET_RETURN;
+use game::character::{FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
@@ -187,6 +187,10 @@ const WARP_CARD: i32 = 4031890;
 /// id.
 const ARIANT_CASTLE: i32 = 260000300;
 const TIGUNS_DISGUISE: i32 = 2210005;
+/// Nett's Pyramid's lobby (`nets_in` from Sahel 3's `piramid00`, `nets_out`
+/// back to where the player came from). The party quest itself isn't in.
+const PYRAMID_DUNES: i32 = 926010000;
+const SAHEL_3: i32 = 260020500;
 /// The original Maple Island's instruction balloons (`advice00` to
 /// `advice09`, `adviceMap`): a text, and the balloon's width and height
 /// (Cosmic's).
@@ -795,6 +799,30 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: None,
         },
+        "nets_in" => ScriptOutcome {
+            effects: vec![
+                Effect::SaveLocation(PYRAMID_RETURN, Some(player.stats.map_id)),
+                Effect::PortalSound,
+                to(PYRAMID_DUNES, Portal::Named("out00")),
+            ],
+            block: false,
+            occupied: None,
+        },
+        "nets_out" => {
+            let back = player
+                .saved_locations
+                .get(&PYRAMID_RETURN)
+                .copied()
+                .unwrap_or(SAHEL_3);
+            go_back(
+                PYRAMID_RETURN,
+                if back == SAHEL_3 {
+                    to(SAHEL_3, Portal::Named("piramid00"))
+                } else {
+                    Effect::Warp(back)
+                },
+            )
+        }
         script if script.starts_with("advice") => {
             let &(_, key, width, height) = ADVICE.iter().find(|(name, ..)| *name == script)?;
             ScriptOutcome {
@@ -1714,5 +1742,36 @@ mod tests {
             assert_eq!((*w, *h), (width, height));
         }
         assert_eq!(portal("advice10", &fresh), None);
+    }
+
+    #[test]
+    fn the_pyramid_dunes_lead_back_where_the_player_came_from() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = SAHEL_3;
+        let outcome = portal("nets_in", &player).unwrap();
+        assert_eq!(named(PYRAMID_DUNES, "out00"), 4);
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::SaveLocation(PYRAMID_RETURN, Some(SAHEL_3)),
+                Effect::PortalSound,
+                Effect::WarpToPortal(PYRAMID_DUNES, 4),
+            ]
+        );
+        // Back to Sahel 3's pyramid portal, also when nothing was saved.
+        let back = [
+            Effect::SaveLocation(PYRAMID_RETURN, None),
+            Effect::PortalSound,
+            Effect::WarpToPortal(SAHEL_3, named(SAHEL_3, "piramid00")),
+        ];
+        assert_eq!(named(SAHEL_3, "piramid00"), 3);
+        assert_eq!(portal("nets_out", &player_with(&[])).unwrap().effects, back);
+        player.saved_locations.insert(PYRAMID_RETURN, SAHEL_3);
+        assert_eq!(portal("nets_out", &player).unwrap().effects, back);
+        player.saved_locations.insert(PYRAMID_RETURN, HENESYS);
+        assert_eq!(
+            portal("nets_out", &player).unwrap().effects[2],
+            Effect::Warp(HENESYS)
+        );
     }
 }

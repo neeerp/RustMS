@@ -113,6 +113,13 @@ async fn ways_through_open_and_quest_doors_stay_shut_to_a_new_character() {
         assert!(pink(&trace), "{map}: {:?}", trace.broadcasts);
     }
 
+    // Into Nett's Pyramid's lobby and back out to where the player was.
+    let trace = try_portal(&mut player, 260020500, "piramid00").await;
+    assert_eq!(arrived(&trace), (926010000, 4));
+    let name = player.character_name.clone();
+    let trace = step(&mut player.connection, &name, enter("out00")).await;
+    assert_eq!(arrived(&trace), (260020500, 3));
+
     // The queen's treasure room says nothing to a player not after it.
     let trace = try_portal(&mut player, 260000302, "hiden0").await;
     assert!(trace.warps.is_empty(), "{:?}", trace.warps);
