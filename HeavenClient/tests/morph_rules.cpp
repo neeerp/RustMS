@@ -80,6 +80,13 @@ int main()
 		barrel.stop();
 		require(!barrel.busy() && barrel.update(30) == 0, "a barrel stopped never lands");
 
+		require(is_cash_morph(5300000) && is_cash_morph(5300002), "530xxxx are cash morphs");
+		require(!is_cash_morph(2210000), "a morph potion isn't");
+		require(!cash_morph_refused(0, 0), "a cash morph is used standing");
+		require(cash_morph_refused(3010000, 0), "not on a chair");
+		require(cash_morph_refused(0, 1902000), "nor on a tamed monster");
+		require(!cash_morph_refused(0, 1932000), "but on another ride");
+
 		std::cout << "Morph rules passed\n";
 		return 0;
 	}

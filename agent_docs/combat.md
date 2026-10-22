@@ -737,6 +737,17 @@ any item buff. An item's morph (a value below 100) can't
 attack: the attack handlers drop the attack (`AttackRejection::Morphed`,
 Cosmic's `isMorphWithoutAttack`).
 
+The cash morphs (Fungus Scroll 5300000, Oinker Delight 5300001 and Zeta
+Nightmare 5300002, templates 1-3 for ten minutes, report c012) are the
+same, used from the Cash tab: USE_CASH_ITEM `i16 slot, i32 item id, i32
+tick` (v83 cash type 0x28). Unlike a morph potion, v83 sends one even
+while morphed, and the new morph takes the old one's place. It sends none,
+and says nothing, from a portable chair or a tamed monster (190xxxx;
+`morph::cash_morph_refused`); the server refuses those too, keeping the
+item (`world/use_item.rs` `cash_morph`). Otherwise it takes the item,
+applies its spec (which also heals 50 HP) and answers as for a USE item.
+Map seats aren't known to the server.
+
 Oak Barrel (5101007) and Transformation (5111005) and Super
 Transformation (5121003) give the skill level's `morph` (1002, 1000,
 1001) as the Morph buff, beside their leveled defence, speed and jump; a
@@ -786,7 +797,7 @@ trade invite and opening a personal shop with the same line
 (`Player::shape_refuses`). A template that can't move the way the map
 does isn't put on: in water only 0004 (2210003), which has no `fly`,
 stays off, and the buff just runs (`MorphTemplate::moves`). Not done anywhere: Ghost (bit 49), the random
-morph items (2211000, 2212000), the cash morphs (5300000-5300002), and
+morph items (2211000, 2212000), and
 the mini-game and hired merchant refusals,
 which wait on those rooms.
 
