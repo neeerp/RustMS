@@ -177,6 +177,11 @@ pub enum ServerMessage {
         origin: (i16, i16),
         map_id: i32,
     },
+    /// A party member on `map_id` picked up the party potion `item_id`.
+    PartyItem {
+        item_id: i32,
+        map_id: i32,
+    },
     /// This player broke a reactor on `field`; its loot drops for them, or
     /// it sends them somewhere.
     ReactorBroken {
@@ -622,6 +627,12 @@ pub enum DirectoryMessage {
         from: ClientId,
         used: PartySkill,
         origin: (i16, i16),
+    },
+    /// `from` picked up the party potion `item_id`: the other party
+    /// members on their map get it too.
+    PartyItem {
+        from: ClientId,
+        item_id: i32,
     },
     Unregister {
         client_id: ClientId,

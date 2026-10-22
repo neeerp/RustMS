@@ -245,6 +245,7 @@ impl WorldDirectory {
             DirectoryMessage::PartySkill { from, used, origin } => {
                 self.party_skill(from, used, origin)
             }
+            DirectoryMessage::PartyItem { from, item_id } => self.party_item(from, item_id),
             DirectoryMessage::BuddyList { owner, buddies } => self.send_buddy_list(owner, buddies),
             DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
             DirectoryMessage::Online { client_id, reply } => {
@@ -1614,6 +1615,25 @@ impl WorldDirectory {
         }
     }
 
+    /// Pass a picked-up party potion on to the other party members on the
+    /// picker's map.
+    fn party_item(&self, from: ClientId, item_id: i32) {
+        let (Some(entry), Some(party)) = (self.clients.get(&from), self.parties.of(from)) else {
+            return;
+        };
+        for member in party.members.iter().filter(|member| member.id != from) {
+            let Some(other) = self.clients.get(&member.id) else {
+                continue;
+            };
+            if other.shares_map_with(entry) {
+                other.handle.send(ServerMessage::PartyItem {
+                    item_id,
+                    map_id: entry.presence.map_id,
+                });
+            }
+        }
+    }
+
     fn door_opened(&mut self, owner: ClientId, view: DoorView) {
         let Some(entry) = self.clients.get(&owner) else {
             return;
@@ -2075,6 +2095,48 @@ mod tests {
         assert!(reached(&mut bobby).is_empty());
         assert!(reached(&mut carol).is_empty());
         assert!(reached(&mut dave).is_empty());
+    }
+
+    #[test]
+    fn a_party_potion_reaches_the_other_members_on_the_map() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut alice = online(&mut directory, 1, "Alice", 10000);
+        let mut bobby = online(&mut directory, 2, "Bobby", 10000);
+        let mut carol = online(&mut directory, 3, "Carol", 20000);
+        let mut erin = online(&mut directory, 5, "Erin", 10000);
+        let now = Instant::now();
+        for (id, name) in [(2, "Bobby"), (3, "Carol")] {
+            let invite = PartyRequest::Invite { name: name.into() };
+            directory.party_request(1, invite, now);
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        for rx in [&mut alice, &mut bobby, &mut carol, &mut erin] {
+            received(rx);
+        }
+        let reached = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut seen = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::PartyItem { item_id, map_id } = message {
+                    seen.push((item_id, map_id));
+                }
+            }
+            seen
+        };
+
+        // Bobby picked it up: Alice gets it, Carol on another map and Erin
+        // outside the party don't.
+        directory.party_item(2, 2022160);
+        assert_eq!(reached(&mut alice), [(2022160, 10000)]);
+        for rx in [&mut bobby, &mut carol, &mut erin] {
+            assert!(reached(rx).is_empty());
+        }
+
+        // Without a party it is the picker's alone.
+        directory.party_item(5, 2022160);
+        for rx in [&mut alice, &mut bobby, &mut carol, &mut erin] {
+            assert!(reached(rx).is_empty());
+        }
     }
 
     #[test]

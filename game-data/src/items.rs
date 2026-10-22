@@ -264,6 +264,10 @@ pub struct ConsumeSpec {
     /// Whether picking it up applies it at once instead of bagging it
     /// (`consumeOnPickup`): the fruits 2022086-88, Carnival and Dojo items.
     pub consume_on_pickup: bool,
+    /// Whether picking it up applies it to every living party member on
+    /// the map too (`party`): the Carnival and Dojo party potions
+    /// 2022160-63 and 2022430-33.
+    pub party: bool,
 }
 
 impl ConsumeSpec {
@@ -588,6 +592,7 @@ impl ItemData {
                 inc_fatigue: nx.int_child(spec, "incFatigue")?.unwrap_or(0),
                 morph_random,
                 consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
+                party: nx.int_child(spec, "party")?.unwrap_or(0) != 0,
             });
         }
         if item_id / 10_000 == 210 {
@@ -1008,6 +1013,10 @@ mod tests {
             .iter()
             .any(|&(stat, _)| stat == BuffStat::Pad));
         assert!(!warrior_pill.consume_on_pickup);
+        assert!(!red_fruit.party);
+        let party_elixir = data.info(2022160).unwrap().unwrap().spec.unwrap();
+        assert!(party_elixir.consume_on_pickup && party_elixir.party);
+        assert_eq!(party_elixir.mp, 300);
         let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
         assert_eq!(
             (air_bubble.stats, air_bubble.time),

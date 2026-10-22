@@ -1,7 +1,7 @@
 use super::ClientActor;
 use crate::actor::field_drops::{Drop, Ownership};
 use crate::error::RuntimeError;
-use crate::message::FieldMessage;
+use crate::message::{DirectoryMessage, FieldMessage};
 use game::monster_book::{self, MAX_CARD_LEVEL};
 use net::loot::{self, Loot};
 use net::packet::build::world::effect::{self, CharEffect};
@@ -266,24 +266,60 @@ impl ClientActor {
             .await
     }
 
-    /// A picked-up card goes straight into the Monster Book; once its page
-    /// holds five, more copies are wasted.
     /// Apply an item that works the moment it is picked up, such as the
     /// fruits 2022086-88, rather than bag it (report c036); `false` if
     /// `item_id` isn't one or does nothing the server supports yet.
     async fn consume_on_pickup(&mut self, item_id: i32) -> Result<bool, RuntimeError> {
-        if !net::items::info(item_id)
+        let Some(spec) = net::items::info(item_id)
             .and_then(|info| info.spec)
-            .is_some_and(|spec| spec.consume_on_pickup)
-        {
+            .filter(|spec| spec.consume_on_pickup)
+        else {
+            return Ok(false);
+        };
+        if !self.take_item_effect(item_id, true).await? {
             return Ok(false);
         }
+        if spec.party {
+            let from = self.client_id;
+            self.send_to_directory(DirectoryMessage::PartyItem { from, item_id })
+                .await?;
+        }
+        Ok(true)
+    }
+
+    /// A party member on `map_id` picked up the party potion `item_id`: it
+    /// works on this player too while they share the map and are alive.
+    pub(super) async fn party_item_reached(
+        &mut self,
+        item_id: i32,
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop {
+            return Ok(());
+        }
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+        if game.player.stats.map_id != map_id || game.player.stats.hp <= 0 {
+            return Ok(());
+        }
+        self.take_item_effect(item_id, false).await?;
+        Ok(())
+    }
+
+    /// Give the player `item_id`'s effect and tell them and the map;
+    /// `false` if it has none supported. `exclusive` unlocks the client's
+    /// pickup with the HP and MP update.
+    async fn take_item_effect(
+        &mut self,
+        item_id: i32,
+        exclusive: bool,
+    ) -> Result<bool, RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let Some(effect) = apply_item_effect(player, item_id, Instant::now()) else {
             return Ok(false);
         };
-        // Its HP and MP update unlocks the client's pickup.
-        let (mut own, seen) = item_effect_packets(player, item_id, effect, true)?;
+        let (mut own, seen) = item_effect_packets(player, item_id, effect, exclusive)?;
         self.send_all(&mut own).await?;
         for packet in seen {
             self.show_buffs(packet).await?;
@@ -291,6 +327,8 @@ impl ClientActor {
         Ok(true)
     }
 
+    /// A picked-up card goes straight into the Monster Book; once its page
+    /// holds five, more copies are wasted.
     async fn collect_card(&mut self, card: i32) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let character_id = player.id();
