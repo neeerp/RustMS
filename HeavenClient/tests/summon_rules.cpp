@@ -9,6 +9,7 @@ void require(bool condition, const char* message)
 }
 
 using namespace ms::summon_rules;
+using ms::Point;
 
 int main()
 {
@@ -117,6 +118,25 @@ int main()
 		require(hex_pick(all, { 0, 100, 25, 50, 15 }, 3) == HEX_PDD, "down to the lowest they lack");
 		require(hex_pick(all, { 100, 100, 25, 50, 15 }, 3) == HEX_ACC, "or the one picked, with all");
 		require(hex_pick(none, none, 3) == -1, "no Hex, no buff");
+
+		// The hits land after attackAfter: the spreading kinds' 120 ms
+		// later together, the others' 50 ms apart.
+		require(hit_after(GAVIOTA, 0) == 120 && hit_after(GAVIOTA, 3) == 120, "a spread lands at once");
+		require(hit_after(3111005, 0) == 0 && hit_after(2121005, 2) == 100, "the others 50 ms apart");
+		require(is_octopus(WRATH_OF_THE_OCTOPI) && !is_octopus(GAVIOTA), "only the Octopi fire a ball");
+
+		// The ball leaves the Octopus's sp, mirrored when it faces right,
+		// and flies 600 ms per bulletSpeed px.
+		Point<int16_t> sp(-23, -18);
+		require(muzzle({ 100, 50 }, sp, true) == Point<int16_t>(77, 32), "facing left, sp as drawn");
+		require(muzzle({ 100, 50 }, sp, false) == Point<int16_t>(123, 32), "facing right, mirrored");
+		require(ball_time({ 0, 0 }, { 300, 0 }, 300) == 600 && ball_time({ 0, 0 }, { 30, 40 }, 300) == 100,
+				"300 px at bulletSpeed 300 takes 600 ms");
+		require(ball_time({ 0, 0 }, { 0, 1 }, 300) == 2, "cut to a whole ms");
+		require(ball_angle({ 100, 0 }, { 0, 0 }) == 0.0f && ball_angle({ 0, 0 }, { 100, 0 }) == 0.0f,
+				"level either way: mirrored, not turned");
+		require(ball_angle({ 100, 0 }, { 0, 100 }) < -0.78f && ball_angle({ 0, 0 }, { 100, 100 }) > 0.78f,
+				"turned down toward a mob below");
 
 		std::cout << "Summon rules passed\n";
 		return 0;

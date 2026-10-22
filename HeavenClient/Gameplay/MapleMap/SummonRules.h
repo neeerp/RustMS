@@ -25,6 +25,8 @@
 #include <optional>
 #include <utility>
 
+#include "../../Template/Point.h"
+
 // How summons move, act, and hurt, without the map (v83 CSummoned and
 // CVecCtrlSummoned, report 158).
 namespace ms::summon_rules
@@ -93,8 +95,7 @@ namespace ms::summon_rules
 		}
 	}
 
-	// The summons that hit one mob, then spread to more around it, a hit
-	// every 120 ms.
+	// The summons that hit one mob, then spread to more around it.
 	inline bool spreads(int32_t skill)
 	{
 		return skill == 3121006 || skill == 3221005 || skill == GAVIOTA || skill == 11001004 ||
@@ -108,9 +109,47 @@ namespace ms::summon_rules
 		return skill == 3111002 || skill == 3211002 || skill == 13111004;
 	}
 
+	// The Octopi, the only summons that fire a ball (FUN_00766612).
 	inline bool is_octopus(int32_t skill)
 	{
 		return skill == OCTOPUS || skill == WRATH_OF_THE_OCTOPI;
+	}
+
+	// When a summon's hit lands, after its attackAfter (0x7a55d4): the
+	// spreading kinds' all 120 ms later, the others' 50 ms apart; a ball's
+	// lands when it arrives instead.
+	inline int32_t hit_after(int32_t skill, size_t index)
+	{
+		return spreads(skill) ? 120 : static_cast<int32_t>(50 * index);
+	}
+
+	// Where an Octopus's ball leaves it: its `sp`, drawn facing left, so
+	// mirrored when it faces right (0x7a5495).
+	inline Point<int16_t> muzzle(Point<int16_t> position, Point<int16_t> sp, bool left)
+	{
+		return { static_cast<int16_t>(position.x() + (left ? sp.x() : -sp.x())),
+				 static_cast<int16_t>(position.y() + sp.y()) };
+	}
+
+	// How long the ball flies from `from` to `to`: 600 ms per `speed` px
+	// (0x7a54ec), cut to a whole ms.
+	inline int32_t ball_time(Point<int16_t> from, Point<int16_t> to, int32_t speed)
+	{
+		double dx = to.x() - from.x();
+		double dy = to.y() - from.y();
+
+		return static_cast<int32_t>(std::sqrt(dx * dx + dy * dy) * 600.0 / std::max(speed, 1));
+	}
+
+	// How far the ball is turned, clockwise in radians, to point from
+	// `from` to `to`. Its art points left and is mirrored to fly right
+	// (0x7a46ac: v83 turns it by atan2(-dy, -dx) and mirrors it past 90°).
+	inline float ball_angle(Point<int16_t> from, Point<int16_t> to)
+	{
+		double dx = to.x() - from.x();
+		double dy = to.y() - from.y();
+
+		return static_cast<float>(dx > 0 ? std::atan2(dy, dx) : std::atan2(-dy, -dx));
 	}
 
 	// The Cygnus Knights' souls, which follow closer and spread their hits.

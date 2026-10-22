@@ -708,7 +708,9 @@ namespace ms
 				static_cast<int16_t>(range["r"].get_integer()),
 				range["lt"] ? Rectangle<int16_t>(range["lt"], range["rb"]) : Rectangle<int16_t>(),
 				static_cast<int16_t>(info["attackAfter"].get_integer()),
-				static_cast<int16_t>(info["ball"] ? info["bulletSpeed"].get_integer() : 0),
+				info["ball"] ? std::optional<Animation>(info["ball"]) : std::nullopt,
+				static_cast<int16_t>(info["bulletSpeed"] ? info["bulletSpeed"].get_integer() : 100),
+				range["sp"],
 				Animation(hit)
 		};
 
@@ -865,13 +867,21 @@ namespace ms
 							player.get_beacon().mob, target));
 
 				Point<int16_t> at = mobs.get_mob_position(target);
-				int16_t delay = info.attackafter;
+				int16_t delay = static_cast<int16_t>(info.attackafter + summon_rules::hit_after(skill, i));
 
-				if (info.bulletspeed > 0)
-					delay += static_cast<int16_t>(at.distance(position) * 1000 / info.bulletspeed);
-
-				if (summon_rules::spreads(skill))
-					delay += static_cast<int16_t>(120 * i);
+				// An Octopus's ball flies from its muzzle to where it hits
+				// the mob, and the hit lands as it arrives (0x7a548f).
+				if (info.ball && summon_rules::is_octopus(skill))
+				{
+					Point<int16_t> from = summon_rules::muzzle(position, info.sp, left);
+					int16_t reach = info.reach > 0 ? info.reach : 300;
+					Point<int16_t> to = shot_path::hit_point(
+							from, static_cast<int16_t>(position.x() + (left ? -reach : reach)), mobs.get_mob_body(target));
+					int32_t flight = summon_rules::ball_time(from, to, info.bulletspeed);
+					bulleteffects.push(info.attackafter, Bullet(*info.ball, from, to, static_cast<uint16_t>(flight),
+															   summon_rules::ball_angle(from, to)));
+					delay = static_cast<int16_t>(info.attackafter + flight);
+				}
 
 				hits.push_back({ target, mobs.get_mob_id(target), at, at.x() > position.x(), delay, damage });
 				summonhits.push(delay, { target, damage, left, skill });
@@ -969,22 +979,12 @@ namespace ms
 		bool left = action & 0x80;
 		int32_t skill = summon->get_skill();
 		const SummonInfo &info = get_summon_info(skill);
-		Point<int16_t> position = summon->get_position();
 		summon->play(static_cast<summon_rules::Action>(action & 0x7F));
 
-		for (size_t i = 0; i < hits.size(); i++)
-		{
-			int32_t delay = info.attackafter;
-
-			if (info.bulletspeed > 0)
-				delay += static_cast<int32_t>(mobs.get_mob_position(hits[i].first).distance(position) * 1000 /
-											  info.bulletspeed);
-
-			if (summon_rules::spreads(skill))
-				delay += static_cast<int32_t>(120 * i);
-
-			summonhits.push(delay, { hits[i].first, hits[i].second, left, skill });
-		}
+		// Another player's summon fires no ball, and its hits all land
+		// after its attackAfter (FUN_007a6882).
+		for (const auto &[target, damage] : hits)
+			summonhits.push(info.attackafter, { target, damage, left, skill });
 	}
 
 	std::optional<UseSkillPacket::Reach> Combat::find_reach(int32_t skill, int32_t level)
