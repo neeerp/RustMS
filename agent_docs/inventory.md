@@ -1050,8 +1050,32 @@ Continue, 4 Exit, 5 Retry. Requests that don't fit the game are ignored.
   the streak, 4031332 for one win up to 4031341 for ten. The tenth win ends
   the game and gives its certificate at once.
 
-The client's X closes the window without a packet, so the server's game
-stays until the next talk, which starts a new one.
+The server's game stays until the next talk, which starts a new one, in
+case a client closes the window without a packet.
+
+The client's window is `UIRpsGame` (reports b038 and b041), with the game
+itself in `Character/RpsGame`, which `rps_game_tests` covers:
+
+- Mode 8 shows the admin's notice as a local NPC dialog first, then opens
+  the window centred on the screen. It isn't modal, its top 15 pixels drag
+  it, and Exit is the only way out: there is no X, and Esc does nothing.
+- The player's hand and the admin's are drawn from the start, rock until
+  chosen. Start, Continue and Retry swap in the middle; the three hands show
+  while a round waits for a choice, and the player's 30 seconds run out
+  into RPS_ACTION 2, with MiniGame.img's Timer in the last ten.
+- The admin's hand spins with Reel every 120 ms. After the result it slows
+  by a fifth a step until it reaches his hand at 720 ms or more. The banner
+  is put up then but shows a second later with the jingle and the avatar's
+  face (smile, troubled or cry), and two seconds after that the next state
+  comes: a draw plays the round again without asking the server.
+- The line under the avatars is centred if it fits in 270 pixels. A wider
+  one starts halfway and scrolls left a pixel a frame. It is picked again
+  when the middle button changes or shows, and every frame while Start or
+  Continue is hidden, which is when it counts down. So the countdown, wider
+  than 270 in Arial 12, shows from halfway and never scrolls, and after
+  Retry the round keeps Restart's line, as v83 does.
+- Refusals 6 and 7 show v83's notices over the window, which shows Start
+  again.
 
 ## Trading
 

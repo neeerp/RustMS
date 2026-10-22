@@ -122,6 +122,7 @@ namespace ms
 			KITEVIEW,
 			PARTYSEARCH,
 			PARTYSEARCHICON,
+			RPSGAME,
 			NUM_TYPES
 		};
 

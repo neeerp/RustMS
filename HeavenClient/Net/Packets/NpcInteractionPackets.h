@@ -186,6 +186,34 @@ namespace ms
 		}
 	};
 
+	// A press in the Rock, Paper, Scissors window (v83 0x7403d0 to 0x7405a0)
+	// Opcode: RPS_ACTION(136)
+	class RpsActionPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			START = 0,
+			CHOOSE = 1,
+			TIME_UP = 2,
+			CONTINUE = 3,
+			EXIT = 4,
+			RETRY = 5
+		};
+
+		RpsActionPacket(Mode mode) : OutPacket(OutPacket::Opcode::RPS_ACTION)
+		{
+			write_byte(mode);
+		}
+
+		// A hand: 0 rock, 1 paper, 2 scissors
+		RpsActionPacket(int8_t hand) : OutPacket(OutPacket::Opcode::RPS_ACTION)
+		{
+			write_byte(Mode::CHOOSE);
+			write_byte(hand);
+		}
+	};
+
 	// Opcode: DUEY_ACTION(65)
 	class DueyActionPacket : public OutPacket
 	{

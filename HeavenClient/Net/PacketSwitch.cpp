@@ -209,6 +209,7 @@ namespace ms
 		OPEN_NPC_SHOP = 305,
 		CONFIRM_SHOP_TRANSACTION = 306,
 		TRUNK_RESULT = 309,
+		RPS_GAME = 312,
 		PARCEL = 322,
 		KEYMAP = 335,
 		AUTO_HP_POT = 336,
@@ -396,6 +397,7 @@ namespace ms
 		emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
 		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
 		emplace<TRUNK_RESULT, TrunkResultHandler>();
+		emplace<RPS_GAME, RpsGameHandler>();
 		emplace<PARCEL, ParcelHandler>();
 
 		// Player Interaction

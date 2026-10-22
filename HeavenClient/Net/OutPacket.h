@@ -93,6 +93,7 @@ namespace ms
 			NPC_SHOP_ACTION = 61,
 			TRUNK_REQUEST = 62,
 			DUEY_ACTION = 65,
+			RPS_ACTION = 136,
 
 			/// Player Interaction
 			CHAR_INFO_REQUEST = 97,

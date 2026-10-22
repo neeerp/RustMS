@@ -254,6 +254,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME parcels COMMAND parcels_tests)
     add_executable(party_search_tests tests/party_search.cpp Character/PartySearch.cpp)
     add_test(NAME party_search COMMAND party_search_tests)
+    add_executable(rps_game_tests tests/rps_game.cpp Character/RpsGame.cpp)
+    add_test(NAME rps_game COMMAND rps_game_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -488,6 +490,8 @@ add_executable(HeavenClient
     Character/Party.h
     Character/PartySearch.cpp
     Character/PartySearch.h
+    Character/RpsGame.cpp
+    Character/RpsGame.h
     Character/Pets.h
     Character/MiniRoomBalloon.cpp
     Character/MiniRoomBalloon.h
@@ -812,6 +816,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuestLog.h
     IO/UITypes/UIQuiz.cpp
     IO/UITypes/UIQuiz.h
+    IO/UITypes/UIRpsGame.cpp
+    IO/UITypes/UIRpsGame.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
     IO/UITypes/UIAvatarMegaphone.cpp
