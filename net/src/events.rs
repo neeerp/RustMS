@@ -445,8 +445,8 @@ const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
 /// are the six rooms off the tower's hub (920010100), each holding a piece
 /// of the statue; 8 is the garden (920010800); and 9, the win, is Minerva's
 /// statue on the hub. Each of the first seven gives 3500 EXP (Cosmic
-/// `giveEventPlayersExp`). The cloud stage and the six rooms are played so
-/// far, but not the garden, so it can't be won.
+/// `giveEventPlayersExp`). The cloud stage, the six rooms and the garden
+/// are played so far, but not the statue, so it can't be won.
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
@@ -469,7 +469,13 @@ pub const OPQ: Event = Event {
         OPQ_HUB,
     ],
     talk_clears: &[1],
-    member_clears: &[3, OPQ_MUSIC_STAGE, OPQ_HEAD_COUNT_STAGE, OPQ_LEVER_STAGE],
+    member_clears: &[
+        3,
+        OPQ_MUSIC_STAGE,
+        OPQ_HEAD_COUNT_STAGE,
+        OPQ_LEVER_STAGE,
+        OPQ_GARDEN_STAGE,
+    ],
     clear_portals: &[(1, "st00")],
     gated: &[],
     puzzles: 1..=0,
@@ -507,6 +513,27 @@ pub const OPQ_LEVER_ROOM: i32 = 920_010_700;
 pub const OPQ_LEVER_STAGE: u8 = 7;
 /// The lever reactors' names there.
 pub const OPQ_LEVERS: [&str; 5] = ["1", "2", "3", "4", "5"];
+/// The Tower of Goddess's garden, where Papa Pixie keeps the Grass of
+/// Life, and its stage, cleared as the Grass of Life's pot breaks.
+pub const OPQ_GARDEN: i32 = 920_010_800;
+pub const OPQ_GARDEN_STAGE: u8 = 8;
+/// The Grass of Life (Cosmic's "Root of Life"), which the leader brings
+/// from the garden for Minerva's statue.
+pub const GRASS_OF_LIFE: i32 = 4_001_055;
+/// The hub's scars, where the statue's six pieces go.
+pub const OPQ_SCARS: [&str; 6] = ["scar1", "scar2", "scar3", "scar4", "scar5", "scar6"];
+
+/// What Eak makes of the hub once its scars hold every piece: the team
+/// goes to the garden while it isn't cleared, then waits for the Grass of
+/// Life on the statue, then for Minerva (Cosmic `2013001`, 920010100).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Statue {
+    /// A scar still lacks its piece.
+    Gathering,
+    Garden,
+    GrassOfLife,
+    Won,
+}
 
 /// The Orbis party quest's own items, 4001044 to 4001063.
 const OPQ_ITEMS: [i32; 20] = {
@@ -794,6 +821,9 @@ pub enum EventCommand {
     StartBonus,
     /// The leader handed the party to this member (Cosmic `changedLeader`).
     HandOver(ClientId),
+    /// The leader takes the whole team to one of the event's maps, its
+    /// clock still running (Cosmic `warpEventTeam`).
+    MoveTeam(i32),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

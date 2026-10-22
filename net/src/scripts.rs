@@ -154,6 +154,8 @@ const OPQ_ROOMS_OUT: [(i32, u8); 7] = [
 /// the client actor answers from the field's draw (`events::climb`).
 pub const OPQ_LOUNGE_CLIMB: &str = "party3_r4pt";
 pub const OPQ_TOWER_CLIMB: &str = "party3_r6pt";
+/// The Orbis party quest's way out of the garden, back to the hub.
+pub const OPQ_GARDEN_OUT: &str = "party3_gardenin";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.

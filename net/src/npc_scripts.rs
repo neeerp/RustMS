@@ -9,6 +9,7 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck, Standing,
+    Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::items;
@@ -1121,6 +1122,12 @@ impl NpcScript {
     /// stand; `None` once the room is cleared.
     pub fn opq_levers(check: Option<LeverCheck>) -> Self {
         opq_levers(check)
+    }
+
+    /// Eak to the leader on the Tower of Goddess's hub, given how
+    /// Minerva's statue stands.
+    pub fn opq_hub(statue: Statue) -> Self {
+        opq_hub(statue)
     }
 
     /// Eak, still only a light, telling a player who has just come into
@@ -2823,9 +2830,25 @@ fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<NpcScript> {
         ],
         events::OPQ_HUB if !leader => vec![Page::Say(text(keys::OPQ_EAK_LEADER_ONLY))],
         events::OPQ_HUB => vec![Page::Say(text(keys::OPQ_EAK_GATHER))],
+        events::OPQ_GARDEN => vec![Page::Say(text(keys::OPQ_EAK_GARDEN))],
         _ => return None,
     };
     Some(NpcScript::new(EAK, pages))
+}
+
+/// Eak to the leader on the hub, as Minerva's statue stands (Cosmic
+/// `2013001`, 920010100): with all six pieces in it he takes the team to
+/// the garden, without a word, until it is cleared.
+fn opq_hub(statue: Statue) -> NpcScript {
+    let page = match statue {
+        Statue::Gathering => Page::Say(text(keys::OPQ_EAK_GATHER)),
+        Statue::Garden => Page::Done(vec![Effect::EventCommand(EventCommand::MoveTeam(
+            events::OPQ_GARDEN,
+        ))]),
+        Statue::GrassOfLife => Page::Say(text(keys::OPQ_EAK_GRASS)),
+        Statue::Won => Page::Say(text(keys::OPQ_EAK_MINERVA)),
+    };
+    NpcScript::new(EAK, vec![page])
 }
 
 /// Eak in the music room (Cosmic `2013001`, `statusStg3`): he asks for the
@@ -6369,6 +6392,30 @@ mod tests {
         assert_eq!(said(true), text(keys::OPQ_EAK_GATHER));
         assert_eq!(said(false), text(keys::OPQ_EAK_LEADER_ONLY));
         assert!(NpcScript::opq_eak(920_010_200, true, true).is_none());
+        let garden = NpcScript::opq_eak(events::OPQ_GARDEN, false, true).unwrap();
+        assert_eq!(page_text(&garden.begin()), text(keys::OPQ_EAK_GARDEN));
+    }
+
+    #[test]
+    fn eak_takes_the_team_to_the_garden_once_the_statue_has_its_pieces() {
+        let hub = |statue| NpcScript::opq_hub(statue).begin();
+        assert_eq!(
+            page_text(&hub(Statue::Gathering)),
+            text(keys::OPQ_EAK_GATHER)
+        );
+        let garden = hub(Statue::Garden);
+        assert!(garden.prompt.is_none());
+        assert_eq!(
+            garden.effects,
+            [Effect::EventCommand(EventCommand::MoveTeam(
+                events::OPQ_GARDEN
+            ))]
+        );
+        assert_eq!(
+            page_text(&hub(Statue::GrassOfLife)),
+            text(keys::OPQ_EAK_GRASS)
+        );
+        assert_eq!(page_text(&hub(Statue::Won)), text(keys::OPQ_EAK_MINERVA));
     }
 
     #[test]

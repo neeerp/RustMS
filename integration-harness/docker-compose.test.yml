@@ -73,6 +73,9 @@ services:
       # Every Gachapon roll is the same uncommon prize, which the world hears
       # of (see tests/gachapon.rs).
       RUSTMS_GACHAPON_SEED: "10"
+      # Its garden's first pot grows a Nependeath, the rest Royals (see
+      # tests/opq_garden.rs).
+      RUSTMS_OPQ_POTS: "1"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

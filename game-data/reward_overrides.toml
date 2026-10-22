@@ -70,6 +70,19 @@ add = [{ item = 4001156, prob = 1.0 }]
 # one every time, so the stage works without the pack too.
 replace = [{ item = 4001074, prob = 1.0 }]
 
+[mobs.9300048]
+# The garden's (Map.nx 920010800) seed chain, so it works without the pack
+# (whose rates these are): a Nependeath drops the seed its pots take
+# (Reactor.nx 2001000/1), a Royal Nependeath the one the spots under them
+# take (2001016), Papa Pixie the one for the Grass of Life's pot (2002003).
+replace = [{ item = 4001053, prob = 1.0 }]
+
+[mobs.9300049]
+replace = [{ item = 4001074, prob = 1.0 }]
+
+[mobs.9300039]
+replace = [{ item = 4001054, prob = 1.0 }]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).
@@ -165,3 +178,7 @@ replace = [{ item = 4001047, prob = 1.0 }]
 
 [reactors.2002013]
 replace = [{ item = 4001049, prob = 1.0 }]
+
+[reactors.2002003]
+# The garden's Grass of Life pot drops the Grass of Life (Cosmic `2002003`).
+replace = [{ item = 4001055, prob = 1.0 }]

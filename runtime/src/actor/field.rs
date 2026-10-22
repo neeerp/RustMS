@@ -179,6 +179,10 @@ pub struct FieldActor {
     /// On the Tower of Goddess's Salion stage, how many Cellions go before
     /// a spot drops its loot, and how many have gone, once the first has.
     salion: Option<(u32, u32)>,
+    /// In the Tower of Goddess's garden, how many pots have broken, and
+    /// whether Papa Pixie came out, after which they grow nothing.
+    pots: u32,
+    papa_pixie: bool,
     /// In the Tower of Goddess's sealed room, how many of the team Eak
     /// wants on each platform, once he has been asked.
     split: Option<[u8; 3]>,
@@ -235,6 +239,8 @@ impl FieldActor {
             bunny_cakes: 0,
             lost_at: None,
             salion: None,
+            pots: 0,
+            papa_pixie: false,
             split: None,
             climb: None,
             levers: None,
@@ -2534,12 +2540,34 @@ impl FieldActor {
                     });
                 }
             }
+            // A Nependeath grows out of it, or a Royal (Cosmic `2001000`).
+            reactors::Action::Pot => {
+                if !self.papa_pixie {
+                    self.pots += 1;
+                    let mob_id = reactors::pot_mob(self.pots, &mut rand::thread_rng());
+                    self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)));
+                }
+            }
+            // Cosmic `killAllMonsters`, `allowSummonState(false)`, then
+            // `spawnMonster` and `mapMessage(5, ..)`.
+            reactors::Action::PapaPixie => {
+                let left = self.mobs.leave_all(Instant::now());
+                self.show_left(left);
+                self.papa_pixie = true;
+                self.board(reactors::PAPA_PIXIE, 1, reactors::PAPA_PIXIE_AT);
+                let notice = net::content::text().get(keys::OPQ_NOTICE_PAPA_PIXIE, &[]);
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+            }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here.
             action => {
                 let occupant = match action {
-                    reactors::Action::Drops | reactors::Action::Spray { .. } => self
+                    reactors::Action::Drops
+                    | reactors::Action::Spray { .. }
+                    | reactors::Action::DropsAndClears => self
                         .occupants
                         .get(&by)
                         .or_else(|| self.occupants.values().next()),
@@ -2777,6 +2805,8 @@ impl FieldActor {
             self.mobs.renew(now);
             self.reactors.renew(now);
             self.salion = None;
+            self.pots = 0;
+            self.papa_pixie = false;
             if reactors::shuffled(self.key.map_id) {
                 self.reactors.shuffle(&mut rand::thread_rng());
             }

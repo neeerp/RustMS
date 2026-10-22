@@ -63,6 +63,17 @@ pub enum Action {
     /// until enough have gone that this one drops its loot and clears the
     /// stage (Cosmic `2001002`).
     Salion,
+    /// A pot in the Tower of Goddess's garden (`2001000`, `2001001`), which
+    /// breaks on a seed: a Nependeath or a Royal Nependeath grows out of
+    /// it (`pot_mob`), unless Papa Pixie is already out.
+    Pot,
+    /// A spot under a garden pot (`2001016`), which breaks on the Royal
+    /// Nependeath's seed: every mob in the garden goes, the pots grow no
+    /// more, and Papa Pixie comes out at `PAPA_PIXIE_AT`, with a pink line.
+    PapaPixie,
+    /// Drop its loot, and clear the event stage on its map for whoever
+    /// broke it: the garden's Grass of Life pot (Cosmic `2002003`).
+    DropsAndClears,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -105,6 +116,36 @@ pub fn salion_next(count: u32) -> i32 {
 /// as Cosmic draws it (`max(floor(random * 14), 4)`).
 pub fn salion_limit(rng: &mut impl rand::Rng) -> u32 {
     rng.gen_range(0, 14).max(4)
+}
+
+/// The Nependeath and the Royal Nependeath, which grow out of the
+/// garden's pots; Papa Pixie, and where he comes out (Cosmic `2001016`).
+pub const NEPENDEATH: i32 = 9300048;
+pub const ROYAL_NEPENDEATH: i32 = 9300049;
+pub const PAPA_PIXIE: i32 = 9300039;
+pub const PAPA_PIXIE_AT: (i16, i16) = (260, 490);
+
+/// What grows out of the garden's `nth` pot to break (from 1): a Royal
+/// Nependeath 40 times in a hundred for the first seven, then always
+/// (Cosmic `2001000`, `statusStg7_c`). For testing, `RUSTMS_OPQ_POTS`
+/// (a digit, 0-7) pins how many Nependeaths grow before the Royals.
+pub fn pot_mob(nth: u32, rng: &mut impl rand::Rng) -> i32 {
+    static PINNED: OnceLock<Option<u32>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        std::env::var("RUSTMS_OPQ_POTS")
+            .ok()
+            .and_then(|pots| pots.parse::<u32>().ok())
+            .filter(|pots| *pots <= 7)
+    });
+    let royal = match pinned {
+        Some(plain) => nth > plain,
+        None => nth > 7 || rng.gen_range(0, 100) < 40,
+    };
+    if royal {
+        ROYAL_NEPENDEATH
+    } else {
+        NEPENDEATH
+    }
 }
 
 /// The music box in the Tower of Goddess's music room (Cosmic `2008006`).
@@ -195,6 +236,10 @@ pub fn action(reactor_id: i32) -> Action {
         },
         2008000..=2008005 => Action::Hold,
         2001002..=2001015 => Action::Salion,
+        // The garden's pots, the spots under them, and the Grass of Life.
+        2001000 | 2001001 => Action::Pot,
+        2001016 => Action::PapaPixie,
+        2002003 => Action::DropsAndClears,
         _ => Action::Drops,
     }
 }
@@ -289,6 +334,23 @@ mod tests {
     }
 
     #[test]
+    fn the_gardens_pots_grow_royals_now_and_then_and_always_after_the_seventh() {
+        assert_eq!(action(2001000), Action::Pot);
+        assert_eq!(action(2001001), Action::Pot);
+        assert_eq!(action(2001016), Action::PapaPixie);
+        assert_eq!(action(2002003), Action::DropsAndClears);
+        let rng = &mut rand::thread_rng();
+        let first: Vec<i32> = (0..400).map(|_| pot_mob(1, rng)).collect();
+        assert!(first.contains(&NEPENDEATH) && first.contains(&ROYAL_NEPENDEATH));
+        assert!((0..50).all(|_| pot_mob(8, rng) == ROYAL_NEPENDEATH));
+        let Some(pot) = template(2001000) else {
+            return;
+        };
+        assert_eq!(pot.item_dropped(0, 4001053, 1, (0, 0)), Some((0, 1)));
+        assert!(pot.is_last(1));
+    }
+
+    #[test]
     fn the_music_box_plays_only_the_days_record_counting_from_sunday() {
         // 1 January 1970 was a Thursday.
         assert_eq!(music_day(std::time::SystemTime::UNIX_EPOCH), 4);
@@ -304,7 +366,7 @@ mod tests {
         for reactor_id in 2001002..=2001015 {
             assert_eq!(action(reactor_id), Action::Salion);
         }
-        assert_eq!(action(2001016), Action::Drops);
+        assert_eq!(action(2001017), Action::Drops);
         let spots: Vec<i32> = (1..14).map(salion_next).collect();
         assert_eq!(spots[..3], [2001013, 2001010, 2001007]);
         let mut seen = spots.clone();

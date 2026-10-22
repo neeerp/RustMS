@@ -11,10 +11,9 @@ through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
-its entry and exit, its cloud stage, the hub's ways into its rooms, and
-two of the rooms, the walkway and the lounge, so far; the other rooms, the
-garden and the win come in later slices
-(`v83ref/reports/a077-orbis-pq.md`).
+its entry and exit, its cloud stage, the hub's ways into its rooms, the
+six rooms and the garden so far; Minerva's statue and the win come in a
+later slice (`v83ref/reports/a077-orbis-pq.md`).
 
 ## Rules
 
@@ -430,7 +429,7 @@ The hub's portals `party3_room1` to `party3_room6` lead into the rooms
 (`PLAIN_WARPS`, Cosmic's portal ids), and each room's `party3_roomout`
 leads back to its own portal on the hub (`OPQ_ROOMS_OUT`). The storage's
 `party3_room8` stays shut with a pink line (`opq.notice.storage_closed`)
-until the garden is played.
+until the quest is won (not played yet).
 
 ## Orbis's walkway and lounge
 
@@ -508,7 +507,7 @@ The lounge (920010600) and the tall room (920010700) are climbed pad by
 pad: each row's pads (`party3_r4pt`, `party3_r6pt`, scripted portals the
 client asks about with CHANGE_MAP_SPECIAL) have one right pad, drawn the
 first time anyone steps on one (`FieldActor::climb`, `events::draw_climb`).
-`ClientActor::opq_climb` answers them from `events::climb`, with the
+`ClientActor::opq_portal` answers them from `events::climb`, with the
 portal sound and a warp to a portal of the same map (a full map change,
 as in Cosmic). On the lounge's two rows of three the right pad leads a row
 up and then to `success` at the top, a wrong one to `fail` below the first
@@ -531,6 +530,53 @@ member may ask him; Cosmic hears only the leader. `RUSTMS_OPQ_LOUNGE`
 (two digits 1-3), `RUSTMS_OPQ_TOWER` (sixteen digits 1-4) and
 `RUSTMS_OPQ_LEVERS` (two lever names, e.g. `14`) pin the draws; the
 harness world sets them (`tests/opq_levers.rs`).
+
+## Orbis's garden
+
+Once the six scars on the hub hold their pieces, Eak there takes the
+whole team to the garden 920010800 (stage 8) at the leader's word
+(`Statue::Garden`, `EventCommand::MoveTeam`, which the event takes only
+from the leader and only to one of its own maps, with its clock still
+running; Cosmic `warpEventTeam`). Eak in the garden tells anyone of Papa
+Pixie (`opq.eak.garden`).
+
+The garden is a chain of seeds set in its reactors, each taking an item
+that lands in its area (as the scars do):
+
+- Nine Nependeaths (9300048) stand there, spawned once. Each drops a
+  Strange Seed 4001053.
+- A seed in one of the eight pots (2001000, 2001001, `Action::Pot`) breaks
+  it and grows a mob on the ground below (`FieldActor::pots`,
+  `reactors::pot_mob`): a Royal Nependeath (9300049) 40 times in a hundred
+  for the first seven, then always; otherwise another Nependeath. A Royal
+  drops 4001074.
+- Under each pot spot is an invisible trigger (2001016,
+  `Action::PapaPixie`). A Royal's seed on one takes every mob off the
+  field, stops the pots growing anything (`FieldActor::papa_pixie`), brings
+  out Papa Pixie (9300039) on the ground below (260, 490), and shows
+  everyone there a pink line (`opq.notice.papa_pixie`). He drops 4001054.
+- His seed in the Grass of Life's pot (2002003) and four blows break it
+  (`Action::DropsAndClears`): it drops the Grass of Life 4001055 and clears
+  stage 8 for whoever broke it (`Event::member_clears`). The clear gives no
+  EXP but plays the clear effect and sound, as every stage here does; Cosmic
+  plays none (`v83ref/lanes/QUESTIONS.md`). A Royal grown from a pot and
+  killed where it stands drops its seed on the trigger under that pot.
+
+The four drops are in `game-data/reward_overrides.toml` for a world without
+the content pack. The garden's way out, `party3_gardenin`, takes the team
+back to the hub's first portal with the portal sound only for the leader
+holding the Grass (Cosmic keeps it); anyone else gets a pink line
+(`opq.notice.garden_out`). The client asks about it with
+CHANGE_MAP_SPECIAL, answered by `ClientActor::opq_portal`. Back on the hub
+Eak then tells the leader to set the Grass at the statue's foot
+(`opq.eak.grass`), and once the quest is won to talk to Minerva
+(`opq.eak.minerva`).
+
+Map.nx flags the pots for shuffling (`reactorShuffle`), but Cosmic doesn't
+shuffle them, and neither does RustMS. `RUSTMS_OPQ_POTS` (a digit 0-7)
+pins how many Nependeaths grow before the Royals; the harness world sets 1
+(`tests/opq_garden.rs`). Minerva's statue, the win and her prize are not
+played yet.
 
 ## Ludibrium's balloons
 
@@ -627,9 +673,10 @@ EXP at the reward.
 | Wonky 2013000 | 200080101 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
 | Wonky 2013000 | 920010000 | Out to 920011200 |
 | Eak 2013001 | 920010000 | Runtime (`opq_eak`): out of the light; the leader clears the cloud stage, the others go up to `st00` |
-| Eak 2013001 | 920010100 | Runtime (`opq_eak`): the six pieces, to the leader only |
+| Eak 2013001 | 920010100 | Runtime (`opq_eak`, `opq_hub`): the six pieces, then to the garden, the Grass and Minerva, to the leader only |
 | Eak 2013001 | 920010200, 920010600 | Runtime (`eak_hand_in`): 30 of 4001050 / 40 of 4001052 for a piece of the statue, clearing the room |
 | Eak 2013001 | 920010400, 920010500, 920010700 | Runtime (`opq_eak`): the music box, the head count, the levers; brings out the room's stone box and clears it |
+| Eak 2013001 | 920010800 | Runtime (`opq_eak`): Papa Pixie |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

@@ -782,6 +782,11 @@ unsourced = [
     "gachapon.what",
     "gachapon.where.choice",
     "gachapon.where",
+    "opq.eak.garden",
+    "opq.eak.grass",
+    "opq.eak.minerva",
+    "opq.notice.papa_pixie",
+    "opq.notice.garden_out",
 ]
 
 [text."glTutoMsg0.message"]

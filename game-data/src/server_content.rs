@@ -456,6 +456,18 @@ pub mod keys {
     pub const OPQ_EAK_LEVERS_RIGHT: &str = "opq.eak.levers.right";
     /// Eak in the tall room once it is cleared.
     pub const OPQ_EAK_LEVERS_DONE: &str = "opq.eak.levers.done";
+    /// Eak in the garden, on how to draw out Papa Pixie.
+    pub const OPQ_EAK_GARDEN: &str = "opq.eak.garden";
+    /// Eak on the hub once the garden is cleared: the Grass of Life goes
+    /// on the statue.
+    pub const OPQ_EAK_GRASS: &str = "opq.eak.grass";
+    /// Eak on the hub once Minerva is free.
+    pub const OPQ_EAK_MINERVA: &str = "opq.eak.minerva";
+    /// Told in the garden as Papa Pixie comes out (a pink line).
+    pub const OPQ_NOTICE_PAPA_PIXIE: &str = "opq.notice.papa_pixie";
+    /// Told to a player at the garden's way out who may not take it (a
+    /// pink line).
+    pub const OPQ_NOTICE_GARDEN_OUT: &str = "opq.notice.garden_out";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1999,6 +2011,11 @@ mod tests {
             keys::OPQ_EAK_LEVERS_NONE_RIGHT,
             keys::OPQ_EAK_LEVERS_RIGHT,
             keys::OPQ_EAK_LEVERS_DONE,
+            keys::OPQ_EAK_GARDEN,
+            keys::OPQ_EAK_GRASS,
+            keys::OPQ_EAK_MINERVA,
+            keys::OPQ_NOTICE_PAPA_PIXIE,
+            keys::OPQ_NOTICE_GARDEN_OUT,
         ];
         for key in named
             .iter()
@@ -2157,6 +2174,13 @@ mod tests {
         assert_eq!(only(2002011), Some(4001046));
         assert_eq!(only(2002012), Some(4001047));
         assert_eq!(only(2002013), Some(4001049));
+        // The garden's Grass of Life, and the seeds its mobs drop.
+        assert_eq!(only(2002003), Some(4001055));
+        for (mob, seed) in [(9300048, 4001053), (9300049, 4001074), (9300039, 4001054)] {
+            let drops = table.drops(mob);
+            assert_eq!(drops.len(), 1, "{mob}");
+            assert_eq!((drops[0].item, drops[0].prob), (Some(seed), 1.0));
+        }
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {
