@@ -388,7 +388,7 @@ tiles so the arrow is centred, a longer note on 14 tiles, 5 px over the
 head. Another player's note, from CHALKBOARD or SPAWN_PLAYER, is trimmed,
 has its curse words starred out and is cut to 40 bytes; the player's own is
 only trimmed. The player's own board has the `Basic.img/BtClose` button,
-which takes a press and a release on it and does nothing while a mini room
+which takes a press and a release on it and does nothing while a dialog
 is open. It sends CLOSE_CHALKBOARD and logs "The chalkboard has closed.";
 the board stays until CHALKBOARD `id, 0`. The board follows the player to
 the next map, except to one where shops open, where it goes away with "You
@@ -668,15 +668,22 @@ and the date and re-sends the item.
 
 v83 keeps one "current dialog" (0xbe7910, set by the dialog base 0x4eddb3):
 a trade or personal shop, an NPC shop, storage, Duey, and the item
-megaphone's, Item Guard's, Karma's, the hammer's and Vega's windows, among
-those HeavenClient has (`UI::dialog_open`, report c013). While one is open,
+megaphone's, Item Guard's, Karma's, the hammer's, Vega's and the kite's
+windows, among those HeavenClient has (`UI::dialog_open`, report c013). While one is open,
 general chat says "You can't chat right now.", and trade invites, shop
 permits and the cash items that open a window or ask a question say "Not
 available": the item megaphone, meso sacks, AP and SP resets, the
 chalkboard, the Item Guard, Karma, the hammer, Vega and the Quick Delivery
 Coupon. Other cash items (pet food,
 faces, weather, morphs, ...) are still used. A morph potion is refused
-silently. v83's silent drop, skill, sort and movement gates aren't ported.
+silently. Everything else is silently inert (report c015): the field takes
+no key going down (skills, items, faces, macros, attack, jump, pickup, Up
+into a portal), the arrows read as released so the player stops walking,
+crouching or climbing, a queued macro waits, the field takes no click,
+double-click or right-click (NPCs, shop balloons, kites, players), the skill
+book's double-click uses nothing, an item dropped on the field stays, and
+Gather and Sort do nothing (nor while dead). Windows, menu keys, Enter and
+Esc still work.
 
 ### Scissors of Karma
 

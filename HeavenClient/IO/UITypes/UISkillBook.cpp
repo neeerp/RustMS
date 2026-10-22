@@ -302,7 +302,8 @@ namespace ms
 	{
 		int16_t row = row_by_position(cursorpos - position);
 
-		if (row < 0)
+		// Nor while a dialog is open (FUN_008abee4), silently.
+		if (row < 0 || UI::get().dialog_open())
 			return;
 
 		int32_t skill_id = skills[offset + row].get_id();

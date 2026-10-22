@@ -1127,11 +1127,17 @@ namespace ms
 				// left PRESSED would ignore every later click (#188).
 				break;
 			}
+			// v83 does nothing while the player is dead or a dialog is open
+			// (FUN_0081db22, FUN_0081db50).
 			case Buttons::BT_GATHER:
-				Stage::get().get_player().request(GatherItemsPacket(tab), ExclRequest::WAIT);
+				if (!Stage::get().get_player().is_dead() && !UI::get().dialog_open())
+					Stage::get().get_player().request(GatherItemsPacket(tab), ExclRequest::WAIT);
+
 				break;
 			case Buttons::BT_SORT:
-				Stage::get().get_player().request(SortItemsPacket(tab), ExclRequest::WAIT);
+				if (!Stage::get().get_player().is_dead() && !UI::get().dialog_open())
+					Stage::get().get_player().request(SortItemsPacket(tab), ExclRequest::WAIT);
+
 				break;
 			case Buttons::BT_FULL:
 				set_full(true);
@@ -1992,6 +1998,11 @@ namespace ms
 	{
 		constexpr const char *dropmessage = "How many will you drop?";
 		constexpr const char *cashmessage = "You can't drop this item.";
+
+		// v83 drops nothing while a dialog is open, silently, before any
+		// other test (FUN_004f31a5).
+		if (UI::get().dialog_open())
+			return;
 
 		const Player &player = Stage::get().get_player();
 
