@@ -1705,6 +1705,15 @@ namespace ms
 		update_shoe(true);
 	}
 
+	void Mob::calm()
+	{
+		if (!control)
+			return;
+
+		hastarget = false;
+		update_shoe(false);
+	}
+
 	void Mob::update_shoe(bool chasing)
 	{
 		// v83 mobs walk on a CAttrShoe (FUN_005c55cd): its speed is

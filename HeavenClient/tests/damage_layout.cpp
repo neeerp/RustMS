@@ -33,6 +33,10 @@ int main()
 		require(!damage_layout::shows_number(5221009) && !damage_layout::shows_number(1221011),
 				"Hypnotize's and Heaven's Hammer's don't");
 
+		require(damage_layout::provokes(0) && damage_layout::provokes(4001334), "a hit leaves the chase alone");
+		require(!damage_layout::provokes(4001002) && !damage_layout::provokes(14001002)
+				&& !damage_layout::provokes(5221009), "Disorder's and Hypnotize's end it");
+
 		require(damage_layout::left(66) == -33 && damage_layout::left(67) == -33, "the canvas is centred, rounding left");
 
 		require(damage_layout::opacity(0) == 1.0f && damage_layout::opacity(400) == 1.0f, "opaque for 400 ms");

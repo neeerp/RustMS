@@ -773,6 +773,18 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
 /// The Corsair's Hypnotize, a close gun shot that puts Dazzle on the mob.
 pub const HYPNOTIZE: i32 = 5221009;
 
+/// Disorder (the Rogue's and the Night Walker's) and Hypnotize: a v83
+/// client that hits a mob with them doesn't have it chase the player, and
+/// drops any chase it had (0x7a82a2 passes 0 to FUN_007f73d8), so they
+/// don't give aggro over the mob either.
+const CALMING: [i32; 3] = [4001002, 14001002, HYPNOTIZE];
+
+/// Whether a hit with `skill` (None: a plain attack) gives the attacker
+/// aggro over the mob.
+pub fn provokes(skill: Option<i32>) -> bool {
+    !skill.is_some_and(|skill| CALMING.contains(&skill))
+}
+
 /// Elemental Boost, which adds its `damage` percent to Flamethrower's and
 /// Ice Splitter's (0x79004c) and, as its description says, its `y` seconds
 /// to Ice Splitter's freeze.
@@ -1585,6 +1597,14 @@ mod tests {
                 armed(3121007, MobStat::Speed),
                 armed(3221006, MobStat::Blind)
             ]
+        );
+    }
+
+    #[test]
+    fn disorder_and_hypnotize_give_no_aggro() {
+        assert!(provokes(None) && provokes(Some(4001334)) && provokes(Some(5221004)));
+        assert!(
+            !provokes(Some(4001002)) && !provokes(Some(14001002)) && !provokes(Some(HYPNOTIZE))
         );
     }
 

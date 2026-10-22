@@ -185,6 +185,9 @@ namespace ms
 		{
 			mob->apply_damage(damage, toleft);
 
+			if (user.calms)
+				mob->calm();
+
 			// TODO: Maybe move this into the method above too?
 			move.apply_hiteffects(user, *mob);
 		}
