@@ -57,7 +57,8 @@ beside it.
 - **Commands.** PET_COMMAND (`0xA9` in) is the pet's serial, whether the
   words began with its name, and the command (`interact/<n>` in Item.nx,
   read into `ItemInfo.pet_commands`). The server rolls `prob` and answers
-  the owner alone with 174 `cid, index, 0, command, obeyed, named`. Obeying
+  the owner alone with 174 `cid, index, 0, command, obeyed, quoted`, the last
+  byte set while the pet wears a quote ring (`Player::pet_quoted`). Obeying
   adds `inc` closeness (capped at 30000, levels from Cosmic's table): the
   pet's item is re-sent, and a level up shows effect 4 `0, index` to the
   owner (`0xCE`) and the map (`0xC6`).
@@ -66,7 +67,7 @@ beside it.
   of equals). A pet not yet full gains the food's `spec/inc` fullness (capped
   at 100) and, if its fullness was 75 or less, one closeness. A full pet
   refuses and loses one closeness, which can lower its level. The server
-  answers the owner with 174 `cid, index, 1, enjoyed, 0`, then an exclusive
+  answers the owner with 174 `cid, index, 1, enjoyed, quoted`, then an exclusive
   inventory operation that takes one food and re-sends the pet's item, then
   the level-up effect if it levelled. With no pet out or the wrong item in
   the slot, it sends only an empty stat change to unlock the client. The
@@ -105,9 +106,13 @@ beside it.
 - **Chat.** PET_CHAT (`0xA8` in) is what the owner's client showed the pet
   do and say. The server relays it as 171 `cid, index, kind, action, text,
   styled` to the others. 0xA8 doesn't carry the balloon style, so the
-  server remembers which pets the last command called by name
-  (`Player.pets_named`, not saved) and styles their answers. Echoing the
-  name flag is an inference; Cosmic always writes 0.
+  server styles all but the pet's idle lines (kind 3) while it wears a
+  quote ring. The owner's client styles them the same way: 174's last byte
+  for answers, the stored ring flag for `/pet`, and never for idle lines
+  (report c032). Reading 174's last byte as the quote ring, not whether
+  the command used the pet's name, is an inference: the client won't put a
+  quote ring on a pet without `info/chatBalloon`, and `/pet` uses the ring
+  flag. Cosmic always writes 0.
 - **Auto potions.** The potions the first pet gives are kept with the
   character in `auto_potions` (`Player.auto_potions`, 0 for none).
   CHANGE_KEYMAP (`0x87` in) mode 1 (HP) or 2 (MP) is followed by the item
@@ -164,7 +169,16 @@ beside it.
   any movement ends them. A command answered with one of the pet's own
   animations also plays its sound from `Sound.nx Pet.img/<id>`.
 - **Balloons.** Pets speak in `UI ChatBalloon.img/pet/<style>` for 5 s:
-  the pet's `info/chatBalloon` when the packet's flag is set, else 0.
+  the pet's `info/chatBalloon` when the packet's flag is set, else 0
+  (`ChatBalloon::pet`, report c032). A style the file lacks shows nothing.
+  The balloon goes at once, without the players' fade. Its width is an odd
+  number of `n` tiles around the text, which wraps at 14 tiles; the `arrow`
+  replaces the middle bottom tile and a `head` the middle top one. The
+  arrow's tip is placed when the pet speaks, 5 px above the top of its
+  frame then (its origin's y), and 90 px higher for Sun Wu Kong's
+  (5000026) action 20. It follows the pet at that height, and the box is
+  centred 3 px right of the pet. v83 draws the text in Arial at the
+  `w` piece's height less 2; HC keeps the balloon font.
 - **Idle.** Every 5 s a still pet with `randAction` entries has an even
   chance of playing one.
 - **Food.** Double-clicking pet food in the USE tab, or its hotkey, sends

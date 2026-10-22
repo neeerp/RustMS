@@ -72,6 +72,30 @@ namespace ms
 	ChatBalloon::ChatBalloon() : ChatBalloon(0)
 	{}
 
+	ChatBalloon ChatBalloon::pet(int32_t style)
+	{
+		std::string path = "pet/" + std::to_string(style);
+		ChatBalloon balloon;
+
+		balloon.for_pet = true;
+		balloon.missing = !balloons(path).resolve(path);
+		balloon.load(path, false, WRAP_WIDTH);
+
+		nl::node file = balloons(path);
+		balloon.head = piece(file, file.resolve(path), "head");
+
+		// Lines wrap at 14 tiles of the top edge (0x489942).
+		balloon.textlabel = Text(Text::Font::BALLOON, Text::Alignment::CENTER, Color::Name::WHITE, "", 14 * balloon.xtile, false);
+
+		for (Piece under : { SOUTH, SOUTHWEST, SOUTHEAST, ARROW })
+		{
+			const Texture &texture = balloon.pieces[under];
+			balloon.below = std::max<int16_t>(balloon.below, texture.height() - texture.get_origin().y());
+		}
+
+		return balloon;
+	}
+
 	void ChatBalloon::load(const std::string &style, bool formatted, uint16_t wrap_width)
 	{
 		nl::node file = balloons(style);
@@ -98,13 +122,20 @@ namespace ms
 	{
 		textlabel.change_text(text);
 
-		duration = DURATION + FADE;
+		// A pet's balloon goes at once (FUN_0048e6d4; only a user's fades).
+		duration = missing ? 0 : for_pet ? DURATION : DURATION + FADE;
 	}
 
 	void ChatBalloon::draw(Point<int16_t> position) const
 	{
 		if (duration == 0)
 			return;
+
+		if (for_pet)
+		{
+			draw_pet(position);
+			return;
+		}
 
 		float opacity = duration < FADE ? static_cast<float>(duration) / FADE : 1.0f;
 
@@ -142,6 +173,53 @@ namespace ms
 
 		int16_t text_top = top - TEXT_DESCENT;
 		textlabel.draw(DrawArgument(Point<int16_t>(position.x(), text_top), color));
+	}
+
+	void ChatBalloon::draw_pet(Point<int16_t> tip) const
+	{
+		// FUN_004890c4: an odd number of whole tiles, the arrow replacing
+		// the middle bottom one and the head the middle top one. The layer's
+		// bottom is the arrow tip, its left edge 3 - inner / 2 - R off the pet.
+		int16_t tiles = static_cast<int16_t>((textlabel.width() + xtile - 1) / xtile) | 1;
+		int16_t width = tiles * xtile;
+		int16_t height = std::max<int16_t>(textlabel.height(), ytile);
+		int16_t left = tip.x() + 3 - width / 2;
+		int16_t right = left + width;
+		int16_t bottom = tip.y() - below;
+		int16_t top = bottom - height;
+		int16_t middle = left + tiles / 2 * xtile;
+
+		auto stretched = [](int16_t x, int16_t y, int16_t w, int16_t h)
+		{
+			Point<int16_t> p(x, y);
+
+			return DrawArgument(p, p, Point<int16_t>(w, h), 1.0f, 1.0f, 1.0f, 0.0f);
+		};
+
+		pieces[CENTER].draw(stretched(left, top, width, height));
+		pieces[WEST].draw(stretched(left, top, 0, height));
+		pieces[EAST].draw(stretched(right, top, 0, height));
+
+		for (int16_t i = 0; i < tiles; i++)
+		{
+			int16_t x = left + i * xtile;
+
+			if (x != middle || !head.is_valid())
+				pieces[NORTH].draw(DrawArgument(x, top));
+
+			if (x != middle || !pieces[ARROW].is_valid())
+				pieces[SOUTH].draw(DrawArgument(x, bottom));
+		}
+
+		head.draw(DrawArgument(middle, top));
+		pieces[ARROW].draw(DrawArgument(middle, bottom));
+
+		pieces[NORTHWEST].draw(DrawArgument(left, top));
+		pieces[NORTHEAST].draw(DrawArgument(right, top));
+		pieces[SOUTHWEST].draw(DrawArgument(left, bottom));
+		pieces[SOUTHEAST].draw(DrawArgument(right, bottom));
+
+		textlabel.draw(DrawArgument(Point<int16_t>(left + width / 2, top - TEXT_DESCENT), textcolor));
 	}
 
 	void ChatBalloon::update()

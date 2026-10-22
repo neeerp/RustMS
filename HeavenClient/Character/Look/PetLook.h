@@ -197,6 +197,9 @@ namespace ms
 		EnumMap<Stance, std::vector<Texture>> dressing;
 		std::vector<Texture> acting_dressing;
 		ChatBalloon balloon;
+		// How far above its feet the balloon's arrow points: its frame's
+		// origin when it spoke, plus 5 (FUN_0048b448).
+		int16_t balloon_lift;
 		Animation effect;
 		bool effecting;
 		// A command sent and not yet answered (+0xb4).
