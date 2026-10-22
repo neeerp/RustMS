@@ -4,6 +4,7 @@ pub mod directory;
 pub mod event;
 pub mod field;
 pub mod field_drops;
+pub mod field_kites;
 pub mod field_mists;
 pub mod field_mobs;
 pub mod field_reactors;

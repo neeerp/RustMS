@@ -1,4 +1,5 @@
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
+use crate::actor::field_kites::KiteSet;
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{
     split_exp, BossBar, Cast, CastArea, Catch, LiveMob, MobSet, Sharer,
@@ -26,6 +27,7 @@ use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair, parse_movement,
     parse_movement_state,
 };
+use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteView};
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
@@ -120,6 +122,7 @@ pub struct FieldActor {
     trips: Option<i64>,
     /// The weather item blowing here, its message, and when it stops.
     weather: Option<(i32, String, Instant)>,
+    kites: KiteSet,
     tick: Duration,
 }
 
@@ -158,6 +161,7 @@ impl FieldActor {
             shops: Shops::default(),
             trips: conti::has_trips(key.map_id).then_some(route_time),
             weather: None,
+            kites: KiteSet::default(),
             tick,
         }
     }
@@ -206,6 +210,11 @@ impl FieldActor {
         }
         for object_id in self.mists.expire(now) {
             if let Ok(packet) = build_remove_mist(object_id) {
+                self.broadcast(None, packet);
+            }
+        }
+        for object_id in self.kites.expire(now) {
+            if let Ok(packet) = build_remove_kite(object_id, true) {
                 self.broadcast(None, packet);
             }
         }
@@ -495,6 +504,7 @@ impl FieldActor {
                 } => self.handle_mob_debuff(from, skill_id, level, origin, &mobs, &inflict),
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
+                FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
                 FieldRequest::Pickup { object_id, x, y } => {
                     self.handle_pickup(from, object_id, x, y)
                 }
@@ -2128,6 +2138,12 @@ impl FieldActor {
             }
         }
 
+        for kite in self.kites.views() {
+            if let Ok(packet) = build_spawn_kite(kite) {
+                handle.send_packet(packet);
+            }
+        }
+
         self.occupants.insert(
             client_id,
             Occupant {
@@ -2152,6 +2168,27 @@ impl FieldActor {
             Err(error) => warn!(item_id, %error, "Failed to build weather"),
         }
         self.weather = Some((item_id, message, Instant::now() + WEATHER_TIME));
+    }
+
+    /// A player flew a kite: it floats above where they stand, for everyone
+    /// here and whoever comes, until its hour is up.
+    fn fly_kite(&mut self, from: ClientId, item_id: i32, message: String) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let view = KiteView {
+            object_id: 0,
+            item_id,
+            message,
+            name: occupant.avatar.name.clone(),
+            x: occupant.avatar.x,
+            y: occupant.avatar.y,
+        };
+        let kite = self.kites.add(view, Instant::now());
+        match build_spawn_kite(kite) {
+            Ok(packet) => self.broadcast(None, packet),
+            Err(error) => warn!(item_id, %error, "Failed to build kite"),
+        }
     }
 
     fn handle_leave(&mut self, client_id: ClientId) {
@@ -2470,6 +2507,82 @@ mod tests {
         assert_eq!(weather(sent(&mut second_rx)), [stop]);
         actor.on_tick(Instant::now() + WEATHER_TIME * 2);
         assert!(weather(sent(&mut first_rx)).is_empty(), "stopped once");
+    }
+
+    #[tokio::test]
+    async fn a_kite_flies_over_its_flier_for_whoever_comes_until_its_hour_is_up() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        let kites = |packets: Vec<Packet>, op: i16| -> Vec<Vec<u8>> {
+            packets
+                .into_iter()
+                .filter(|packet| packet.opcode() == op)
+                .map(|packet| packet.bytes)
+                .collect()
+        };
+
+        actor.handle_message(FieldMessage::Join {
+            handle: first,
+            avatar: avatar(1, 10, 20),
+            party: None,
+        });
+        sent(&mut first_rx);
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::Kite {
+                item_id: 5080000,
+                message: "hi\n\n".into(),
+            },
+        });
+        let first_kite = actor.kites.views().next().unwrap().clone();
+        assert_eq!(first_kite.object_id, crate::actor::object_ids::KITES.start);
+        assert_eq!(
+            (first_kite.x, first_kite.y),
+            (10, 20),
+            "where its flier stands"
+        );
+        let spawn = build_spawn_kite(&first_kite).unwrap().bytes;
+        assert_eq!(
+            kites(sent(&mut first_rx), SendOpcode::SpawnKite as i16),
+            [spawn.clone()]
+        );
+
+        actor.handle_message(FieldMessage::Join {
+            handle: second,
+            avatar: avatar(2, 30, 40),
+            party: None,
+        });
+        assert_eq!(
+            kites(sent(&mut second_rx), SendOpcode::SpawnKite as i16),
+            [spawn]
+        );
+
+        actor.on_tick(Instant::now() + Duration::from_secs(60 * 59));
+        assert!(
+            kites(sent(&mut first_rx), SendOpcode::RemoveKite as i16).is_empty(),
+            "still flying"
+        );
+        actor.on_tick(Instant::now() + crate::actor::field_kites::KITE_TIME);
+        let down = build_remove_kite(first_kite.object_id, true).unwrap().bytes;
+        assert_eq!(
+            kites(sent(&mut first_rx), SendOpcode::RemoveKite as i16),
+            [down.clone()]
+        );
+        assert_eq!(
+            kites(sent(&mut second_rx), SendOpcode::RemoveKite as i16),
+            [down]
+        );
+        assert_eq!(actor.kites.views().count(), 0);
     }
 
     fn mob(x: i16, boss: bool) -> (game_data::MapMobTemplate, game_data::mobs::MobInfo) {

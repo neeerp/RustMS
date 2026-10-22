@@ -29,6 +29,8 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
 - **Trading rooms** (`field_trades::Trades`): who is in which room, and
   their turns and answers. The offers stay with the client actors; see
   "Trading" in [Inventory](./inventory.md).
+- **Kites** (`field_kites::KiteSet`): the kites players flew here; see
+  "Kites" below.
 - **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
   drops. A third job's clone room puts all its mobs back when its last
   player leaves (`MobSet::renew`).
@@ -232,6 +234,22 @@ feet, and drawn behind the character when `z` is negative. `effect2` comes
 from later data and is ignored. Sitting heals by the chair's
 `recoveryHP`/`recoveryMP`; see "Using items and recovery" in
 [Inventory](./inventory.md).
+
+## Kites
+
+A kite or banner (5080000-5080003) is used from the Cash tab with three
+lines of text: USE_CASH_ITEM (0x4F) with the slot, item id, the lines
+joined with `\n`, and the tick (report c014). `net::packet::handle::world::kite`
+refuses it in the Free Market (`map_id / 10,000,000 == 91`, as the v83
+client does) with CANNOT_SPAWN_KITE (0x10E, "You can't fly it there.") and
+an unlock, and refuses more than three lines or a line over 60 characters
+with an unlock alone. Otherwise it takes one item and sends the field
+`FieldRequest::Kite`. The field flies it where its flier stands, with
+their name, under an id from `object_ids::KITES`: SPAWN_KITE (0x10F: id,
+item, lines, name, x, y) goes to everyone there and to whoever comes
+later. After an hour (`KITE_TIME`, Cosmic's) REMOVE_KITE (0x110: type 0,
+id) fades it out. A client drops its kites itself on a map change. Cosmic
+sends the foothold id where the client reads y; RustMS sends y.
 
 ## Tests
 

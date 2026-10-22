@@ -16,6 +16,7 @@ pub mod hammer;
 pub mod info;
 pub mod inventory;
 pub mod keymap;
+pub mod kite;
 pub mod maker;
 pub mod map;
 pub mod messaging;
