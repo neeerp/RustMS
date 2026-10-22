@@ -255,7 +255,10 @@ async fn wedding_tickets_are_on_sale() {
     let connection = &mut session.connection;
 
     let buy = build_cash_shop_buy(1, OLD_CATHEDRAL_TICKET).unwrap();
-    connection.send_packet(buy, "buy").await.expect("send purchase");
+    connection
+        .send_packet(buy, "buy")
+        .await
+        .expect("send purchase");
     assert_eq!(failure(connection, "buy an old ticket").await, 0xC0);
 
     let buy = build_cash_shop_buy(1, CATHEDRAL_TICKET).unwrap();
