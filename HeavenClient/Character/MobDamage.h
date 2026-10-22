@@ -72,6 +72,25 @@ namespace ms
 			return 0;
 		}
 
+		// A job's Power Stance: the Hero's, the Paladin's, the Dark
+		// Knight's or the Aran's, or 0 (0x958aa9).
+		inline int32_t stance_skill(int32_t job)
+		{
+			switch (job)
+			{
+				case 112:
+					return 1121002;
+				case 122:
+					return 1221002;
+				case 132:
+					return 1321002;
+				case 2112:
+					return 21121003;
+				default:
+					return 0;
+			}
+		}
+
 		// The W.DEF a player of a job and level is expected to have
 		// (Base.wz StandardPDD.img, read by FUN_00792d21). Each level takes
 		// the last listed value at or below it, or 0 before the first.

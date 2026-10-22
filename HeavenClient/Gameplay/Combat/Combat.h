@@ -123,6 +123,9 @@ namespace ms
 		// dodged a hit, Guardian or Shadow Shifter, or Dragon Blood drinking HP (user effect 5).
 		void show_special(int32_t cid, int32_t skillid);
 		void show_player_special(int32_t skillid);
+		// The player held their ground: the skill's `special`, and Energy
+		// Charge's Use2 sound too (0x958c52).
+		void show_stance(int32_t skillid);
 
 		// Show Monster Magnet catching a mob, or failing to, over it
 		// (0x66d6b9, 0x438eb6).

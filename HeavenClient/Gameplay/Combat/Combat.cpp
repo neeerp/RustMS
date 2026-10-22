@@ -2878,6 +2878,17 @@ namespace ms
 		player.show_effect(get_skill(skillid).get_special());
 	}
 
+	void Combat::show_stance(int32_t skillid)
+	{
+		if (!skillid)
+			return;
+
+		show_player_special(skillid);
+
+		if (energy::charges(skillid))
+			get_skill(skillid).play_use2();
+	}
+
 	void Combat::show_prepare(int32_t cid, int32_t skillid, uint8_t level, uint16_t action_and_facing, uint8_t speed)
 	{
 		Optional<OtherChar> ouser = chars.get_char(cid);

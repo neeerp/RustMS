@@ -165,8 +165,10 @@ namespace ms
 		uint8_t direction;
 		int8_t index;
 		uint8_t element;
-		// Whether Power Stance kept the player in place.
+		// Whether Power Stance kept the player in place, and the skill
+		// that did: Power Stance, or Energy Charge with a full gauge.
 		bool stance;
+		int32_t stance_skill = 0;
 		// Power Guard's percent on a touch or Mana Reflection's on a spell,
 		// or 0, and the number it shows over the mob (0 a miss).
 		uint8_t reflect = 0;
