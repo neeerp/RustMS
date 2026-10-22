@@ -1,10 +1,12 @@
 //! Equipment scrolls (USE_UPGRADE_SCROLL): a 100% one-handed sword scroll
 //! on the starting sword, with a White Scroll and without; a helmet scroll
-//! that doesn't fit; the scroll's glow for the map; and the upgrade
-//! surviving a relogin.
+//! that doesn't fit; the scroll's glow for the map; the upgrade surviving a
+//! relogin; and Legendary Spirit's dialog scrolling a sword in the Equip tab.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{grant_item, grant_stack, set_weapon_attack};
+use integration_harness::database::{
+    equip_upgrades, grant_item, grant_skill, grant_stack, set_weapon_attack, stow_equip,
+};
 use integration_harness::packets::{build_all_chat, decode_item_stack};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read, send, Trace};
@@ -26,13 +28,17 @@ const WHITE_SCROLL: i32 = 2_340_000;
 const BASE_WATK: i16 = 17;
 
 fn use_scroll(scroll_slot: i16, white: bool) -> Packet {
+    scroll_request(scroll_slot, WEAPON, white, false)
+}
+
+fn scroll_request(scroll_slot: i16, equip_slot: i16, white: bool, legendary: bool) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::UseUpgradeScroll as i16).unwrap();
     p.write_int(0).unwrap();
     p.write_short(scroll_slot).unwrap();
-    p.write_short(WEAPON).unwrap();
+    p.write_short(equip_slot).unwrap();
     p.write_short(if white { 2 } else { 1 }).unwrap();
-    p.write_byte(0).unwrap();
+    p.write_byte(u8::from(legendary)).unwrap();
     p
 }
 
@@ -104,16 +110,16 @@ fn inventory_operation(packets: &[Packet]) -> (Vec<Change>, Option<u8>) {
     (changes, r.read_byte().ok())
 }
 
-/// The bytes after the character id of SHOW_SCROLL_EFFECT among `packets`,
-/// if `character_id`'s.
+/// The bytes after the character id of `character_id`'s SHOW_SCROLL_EFFECT
+/// among `packets` (other tests' characters may scroll on the same map).
 fn scroll_effect(packets: &[Packet], character_id: i32) -> Option<Vec<u8>> {
     packets
         .iter()
-        .find(|p| p.opcode() == SendOpcode::ShowScrollEffect as i16)
-        .map(|p| {
-            assert_eq!(&p.bytes[2..6], &character_id.to_le_bytes());
-            p.bytes[6..].to_vec()
+        .find(|p| {
+            p.opcode() == SendOpcode::ShowScrollEffect as i16
+                && p.bytes[2..6] == character_id.to_le_bytes()
         })
+        .map(|p| p.bytes[6..].to_vec())
 }
 
 /// What an observer sees of `character_id`'s next scroll: the effect bytes,
@@ -128,8 +134,9 @@ async fn observed_scroll(c: &mut MapleTestConnection, character_id: i32) -> Vec<
     };
     loop {
         let p = read(c, &mut trace).await;
-        if p.opcode() == SendOpcode::UpdateCharLook as i16 {
-            assert_eq!(&p.bytes[2..6], &character_id.to_le_bytes());
+        if p.opcode() == SendOpcode::UpdateCharLook as i16
+            && p.bytes[2..6] == character_id.to_le_bytes()
+        {
             return effect;
         }
     }
@@ -213,5 +220,63 @@ async fn scrolls_upgrade_the_worn_sword_for_everyone_to_see() {
     assert_eq!(
         observed_scroll(&mut observer.connection, id).await,
         [1, 0, 0, 0]
+    );
+}
+
+#[tokio::test]
+async fn legendary_spirit_scrolls_a_sword_in_the_equip_tab() {
+    const LEGENDARY_SPIRIT: i32 = 1003;
+    const TAB_SLOT: i16 = 3;
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config)
+        .await
+        .expect("first login failed")
+        .character_id;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    stow_equip(id, TAB_SLOT, SWORD, 7).await.expect("a sword");
+    grant_stack(id, USE, 1, SWORD_SCROLL, 2)
+        .await
+        .expect("grant sword scrolls");
+    let mut session = relogin(&config).await;
+
+    // Without the skill, the dialog is told no.
+    let request = || scroll_request(1, TAB_SLOT, false, true);
+    let got = answers(&mut session.connection, "unskilled", request()).await;
+    assert_eq!(scroll_effect(&got, id), Some(vec![0xFF, 0, 1, 0]));
+    assert!(got
+        .iter()
+        .all(|p| p.opcode() != SendOpcode::InventoryOperation as i16));
+    drop(session);
+
+    grant_skill(id, LEGENDARY_SPIRIT, 1)
+        .await
+        .expect("grant Legendary Spirit");
+    let mut session = relogin(&config).await;
+    let got = answers(&mut session.connection, "legendary", request()).await;
+    assert_eq!(
+        inventory_operation(&got),
+        (
+            vec![
+                Change::Quantity(USE as u8, 1, 1),
+                Change::Remove(1, TAB_SLOT),
+                Change::Sword(TAB_SLOT, 6, 1, 1),
+            ],
+            None
+        )
+    );
+    assert_eq!(scroll_effect(&got, id), Some(vec![1, 0, 1, 0]));
+    // The worn sword is not the dialog's.
+    let got = answers(
+        &mut session.connection,
+        "worn",
+        scroll_request(1, WEAPON, false, true),
+    )
+    .await;
+    assert_eq!(scroll_effect(&got, id), Some(vec![0xFF, 0, 1, 0]));
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(
+        equip_upgrades(id, TAB_SLOT).await.expect("read the sword"),
+        Some((6, 1, 0))
     );
 }

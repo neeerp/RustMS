@@ -257,9 +257,15 @@ INVENTORY_OPERATION takes the scroll and the White Scroll and replaces the
 worn equip (or only removes it when the curse destroys it), then
 SHOW_SCROLL_EFFECT (`0xA7`: character, success 1/0, cursed, Legendary
 Spirit, White Scroll) goes to the scroller and the map, then the look
-refresh unless it simply failed. Legendary Spirit requests are refused with
-SHOW_SCROLL_EFFECT -1 to the scroller alone; HeavenClient ignores that, as
-it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
+refresh unless it simply failed. Legendary Spirit (1003, 10001003,
+20001003) opens a dialog that scrolls an equip in the Equip tab: its
+request names a positive slot and ends in 1. The server takes it, with the
+same rules (pet equipment excepted from the cash refusal), only from a
+player who has one of the three skills, and answers with Legendary Spirit
+set in SHOW_SCROLL_EFFECT and no look refresh. Any refused dialog request
+gets SHOW_SCROLL_EFFECT -1 to the scroller alone, which the dialog shows as
+"You cannot use a Scroll with this item."; HeavenClient ignores both, as it
+has no Legendary Spirit window yet. HeavenClient plays the Enchant sound and
 the scroll glow, and gives the scroller the v83 chat line. A sealed scroll
 goes on nothing, and a sealed equip asks first whether to risk it (v83
 0x114f, "Due to the potency of the scroll..."; No keeps the scroll).
