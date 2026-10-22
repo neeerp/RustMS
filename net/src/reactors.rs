@@ -31,7 +31,17 @@ pub enum Action {
     /// Drop its loot `percent` times in a hundred, else send whoever broke
     /// it away.
     DropsOrWarp { percent: u32, warp: Warp },
+    /// A moonflower on Henesys's Primrose Hill, which blooms on its seed:
+    /// it stays in bloom, the map's full moon (`FULL_MOON`) waxes a phase,
+    /// and once every moonflower there blooms the Moon Bunny comes out below
+    /// the moon (Cosmic's 9108000-5).
+    Bloom,
 }
+
+/// The name of the reactor the moonflowers wax.
+pub const FULL_MOON: &str = "fullmoon";
+/// The Moon Bunny, who makes rice cakes.
+pub const MOON_BUNNY: i32 = 9300061;
 
 /// A map, and the name of the portal there to arrive at.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,8 +74,15 @@ pub fn action(reactor_id: i32) -> Action {
         // The Fire Hawk's and Ice Eagle's eggs (924000100).
         2401001 => Action::BringOut(9300089),
         2401002 => Action::BringOut(9300090),
+        9108000..=9108005 => Action::Bloom,
         _ => Action::Drops,
     }
+}
+
+/// Whether a reactor stays when it reaches its last state, rather than
+/// going away: a moonflower stays in bloom.
+pub fn stays(reactor_id: i32) -> bool {
+    action(reactor_id) == Action::Bloom
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
@@ -84,6 +101,15 @@ mod tests {
         assert_eq!(action(2401002), Action::BringOut(9300090));
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
+    }
+
+    #[test]
+    fn primrose_hills_six_moonflowers_bloom_and_stay() {
+        for reactor_id in 9108000..=9108005 {
+            assert_eq!(action(reactor_id), Action::Bloom);
+            assert!(stays(reactor_id));
+        }
+        assert!(!stays(9108006) && !stays(9101000) && !stays(9102002));
     }
 
     #[test]

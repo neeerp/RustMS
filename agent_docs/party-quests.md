@@ -216,6 +216,22 @@ before that stage's clear, it answers BLOCKED_MAP 1, the client's own "The
 portal is closed for now." line, which also unlocks it
 (`v83ref/reports/a012-kpq-gate.md`). Map-id warps aren't checked.
 
+## Henesys's moonflowers
+
+Primrose Hill (910010000) has six moonflowers (`9108000`-`9108005`, named
+`moonflower1`-`6`), each taking one seed of its own colour (`4001095`-
+`4001100`) put on it, as any reactor takes an item (`combat.md`). The seeds
+drop from the hill's nut reactors (`9102002`-`9102007`). A moonflower stays
+in bloom on its last state rather than breaking (`Action::Bloom`,
+`reactors::stays`). Each bloom puts the full moon (`9101000`, named
+`fullmoon`) in as many phases as there are flowers in bloom (HIT_REACTOR),
+and as it turns full, the Moon Bunny (`9300061`) comes out on the ground
+below the moon. Everyone on the map then gets a light-blue line
+(BROADCAST_MSG 6, `hpq.moon.bunny_out`) and, for 7 seconds, the quest's own
+weather item `5120016` with `hpq.moon.weather` (BLOW_WEATHER), which a
+player arriving meanwhile sees too. Each copy starts with its flowers and
+moon at state 0.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -237,8 +253,8 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- HPQ's play: seeds on the moonflowers, the full moon and the Moon Bunny,
-  mobs hurting the bunny (`damagedByMob`, recv 0xC0), its rice cakes,
+- HPQ's play: the Moon Bunny is still an ordinary mob, which players can
+  kill and other mobs can't hurt; mobs hurting the bunny (`damagedByMob`, recv 0xC0), its rice cakes,
   Growlie's hand-in, Tory's reward, and Tommy's Pig Town bonus
   (a058, slices 2-4).
 - A new leader chosen inside the copy: the event still counts the first

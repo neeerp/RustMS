@@ -226,6 +226,10 @@ pub struct Trace {
     /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
     /// message (0, 1, 5).
     pub broadcasts: Vec<(u8, String)>,
+    /// BROADCAST_MSG kind 6: (message, linked item or 0).
+    pub item_lines: Vec<(String, i32)>,
+    /// BLOW_WEATHER: (item, message) of each weather that starts blowing.
+    pub weathers: Vec<(i32, String)>,
     /// PLAYER_HINT: (text, width, height) of each instruction balloon.
     pub hints: Vec<(String, i16, i16)>,
     /// CLOCK kind 1, a wall clock's time of day: (hour, minute, second).
@@ -397,6 +401,16 @@ impl Trace {
             if matches!(kind, 0 | 1 | 5) {
                 self.broadcasts
                     .push((kind, r.read_str_with_length().unwrap()));
+            } else if kind == 6 {
+                let message = r.read_str_with_length().unwrap();
+                self.item_lines.push((message, r.read_int().unwrap()));
+            }
+        } else if op == SendOpcode::BlowWeather as i16 {
+            r.read_byte().unwrap();
+            let item_id = r.read_int().unwrap();
+            if item_id != 0 {
+                self.weathers
+                    .push((item_id, r.read_str_with_length().unwrap()));
             }
         } else if op == SendOpcode::PlayerHint as i16 {
             let text = r.read_str_with_length().unwrap();

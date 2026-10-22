@@ -166,6 +166,13 @@ impl ReactorSet {
             .collect()
     }
 
+    /// The live reactor named `name`, if any.
+    pub fn named(&self, name: &str) -> Option<&LiveReactor> {
+        self.live
+            .values()
+            .find(|reactor| self.spots[reactor.spot].template.name == name)
+    }
+
     /// A player at `from` swung at `object_id`; `flags` are the client's
     /// (bit 0 facing left, bit 1 on a foothold). `None` if it is gone, out
     /// of reach, or no event fits.
@@ -233,12 +240,12 @@ impl ReactorSet {
     }
 
     /// Move `object_id` to `next` through `event`, breaking it if that is
-    /// its last state.
+    /// its last state, unless it is one that stays (`net::reactors::stays`).
     fn advance(&mut self, object_id: i32, event: u8, next: u8, now: Instant) -> Option<Hit> {
         let reactor = self.live.get_mut(&object_id)?;
         let spot = &mut self.spots[reactor.spot];
         reactor.state = next;
-        if !spot.data.is_last(next) {
+        if !spot.data.is_last(next) || net::reactors::stays(reactor.reactor_id) {
             return Some(Hit::Moved {
                 view: reactor.view(),
                 event,
@@ -334,6 +341,8 @@ mod tests {
         assert_eq!(reactors.get(other).unwrap().state, 0);
         assert!(reactors.set_state("elevator", 1).is_empty());
         assert!(reactors.set_state("nothing", 3).is_empty());
+        assert_eq!(reactors.named("elevator").unwrap().object_id, car);
+        assert!(reactors.named("nothing").is_none());
         assert_eq!(reactors.set_state("elevator", 0)[0].state, 0);
     }
 
@@ -453,5 +462,23 @@ mod tests {
         }
         assert!(!reactors.takes_items(id));
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
+    }
+
+    #[test]
+    fn a_moonflower_stays_in_bloom() {
+        let (mut template, mut data) = mound();
+        template.reactor_id = 9108000;
+        data.reactor_id = 9108000;
+        data.states.remove(1);
+        data.states[0].events[0].item = Some((4001095, 1));
+        let mut reactors = ReactorSet::new([(template, data)]);
+        let now = Instant::now();
+        let id = reactors.respawn(now)[0];
+        match reactors.take_item(id, 4001095, 1, (105, 150), now) {
+            Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, 1),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(reactors.get(id).unwrap().state, 1);
+        assert!(!reactors.takes_items(id));
     }
 }
