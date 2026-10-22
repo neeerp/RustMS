@@ -85,6 +85,19 @@ int main()
 		require(reset.read_byte() == 9, "A reset reads past the burns' ids");
 		require(!MobStatParser::stops(burned), "Burns don't stop the mob");
 
+		// Hypnotize's Dazzle (28) is a plain status after the burns.
+		BuffParser::Flags dazzle{ 0, 0 };
+		dazzle.set(MobStatParser::DAZZLE);
+		Writer d;
+		d.status(1, 5221009, 21).put(int8_t(9));
+
+		InPacket dazzled(d.bytes.data(), d.bytes.size());
+		std::vector<MobStatParser::Status> hypnotized = MobStatParser::parse(dazzled, dazzle);
+		require(hypnotized.size() == 1 && hypnotized[0].stat == 28 && hypnotized[0].reason == 5221009 &&
+				hypnotized[0].duration == 21, "Dazzle is read as bit 28");
+		require(dazzled.read_byte() == 9, "And nothing more");
+		require(!MobStatParser::stops(dazzle), "Dazzle doesn't stop the mob");
+
 		std::cout << "mob stat parser tests passed\n";
 		return 0;
 	}

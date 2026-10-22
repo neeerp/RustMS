@@ -1002,7 +1002,10 @@ namespace ms
 		}
 
 		// A box hits the player where they are once due; a jump attack only
-		// one standing on a foothold. A direct shot hits regardless.
+		// one standing on a foothold. A direct shot hits regardless. A
+		// dazzled mob's attacks hit no player (0x6663d2, 0x95825c).
+		bool strikes = !targetdead && !dazzled();
+
 		for (auto iter = pendinghits.begin(); iter != pendinghits.end();)
 		{
 			if (clock < iter->due)
@@ -1015,7 +1018,7 @@ namespace ms
 			bool hit = !iter->box || (mob_attack::intersects(*iter->box, targetbody) &&
 									  (info.type != 0 || !info.jump || targetonground));
 
-			if (hit && !targetdead)
+			if (hit && strikes)
 				landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
 
 			iter = pendinghits.erase(iter);
@@ -1039,7 +1042,7 @@ namespace ms
 				int32_t bx = static_cast<int32_t>(iter->from.x() + (iter->to.x() - iter->from.x()) * progress);
 				int32_t by = static_cast<int32_t>(iter->from.y() + (iter->to.y() - iter->from.y()) * progress);
 
-				if (mob_attack::contains(targetbody, bx, by) && !targetdead)
+				if (mob_attack::contains(targetbody, bx, by) && strikes)
 					landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
 			}
 
@@ -2051,6 +2054,11 @@ namespace ms
 			   statuses.count(MobStatParser::WEB);
 	}
 
+	bool Mob::dazzled() const
+	{
+		return statuses.count(MobStatParser::DAZZLE);
+	}
+
 	void Mob::show_status(int32_t reason, bool effects)
 	{
 		// A player's skill, or a mob skill's id and level (0x5d3d02).
@@ -2525,7 +2533,7 @@ namespace ms
 
 	bool Mob::deals_touch_damage() const
 	{
-		return touchdamage && !notattack;
+		return touchdamage && !notattack && !dazzled();
 	}
 
 	bool Mob::is_in_range(const Rectangle<int16_t> &range) const

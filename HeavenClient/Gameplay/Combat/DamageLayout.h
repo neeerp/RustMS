@@ -95,5 +95,13 @@ namespace ms
 		{
 			return 15 + line * (close ? 15 : 30);
 		}
+
+		// Whether a hit by `skill` shows a number or a miss on the mob:
+		// Heaven's Hammer's and Hypnotize's show neither, whoever hits
+		// (0x5c9e7d).
+		inline bool shows_number(int32_t skill)
+		{
+			return skill != 1221011 && skill != 5221009;
+		}
 	}
 }

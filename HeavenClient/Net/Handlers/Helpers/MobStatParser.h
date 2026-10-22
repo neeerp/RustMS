@@ -55,6 +55,8 @@ namespace ms
 			VENOM = 24,
 			BLIND = 25,
 			BURNED = 27,
+			// Hypnotize's: the mob hurts no player (0x6663d2, 0x95825c).
+			DAZZLE = 28,
 			PCOUNTER = 29,
 			MCOUNTER = 30,
 			DISABLE = 31,
