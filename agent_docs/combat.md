@@ -1003,10 +1003,20 @@ fruits 2022086-88, which reactors 2402000 and 2402001 drop, are the ones a
 player can reach today. The client actor applies the spec as USE_ITEM would
 (`apply_item_effect`); its HP and MP update unlocks the pickup, and GIVE_BUFF
 `-item_id` follows. One whose spec the server doesn't support yet (the EXP
-chests, Carnival points) goes to the bag as before. Not done yet:
-- `spec/party` (Carnival and Dojo items), which would apply the item to every
-  living party member on the map, applies to the picker alone.
-- `specEx` (2022198, 2022268) isn't read.
+chests, Carnival points) goes to the bag as before.
+
+A party potion (`spec/party`: the Carnival items 2022160-63 and the Dojo
+items 2022430-33) works on every living party member on the picker's map
+too, as in Cosmic. The picker's client actor tells the directory
+(`DirectoryMessage::PartyItem`). The directory passes it on to the other
+members on the same channel and map (`ServerMessage::PartyItem`). Each
+member's actor then applies the spec as for the picker, unless they have
+died, left the map or are in the Cash Shop, and sends the update without
+the unlock. The harness test `party_potions` covers this.
+
+Not done yet: `specEx` (2022198 Russellon's Pills, 2022268 Crazy Skull) isn't
+read. Its `0` node names a mob skill and level (125/7, and 132/1 with
+`target`), so these items would bring on a disease, which needs RE first.
 
 ## Monster Book cards
 

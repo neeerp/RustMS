@@ -1378,6 +1378,9 @@ impl ClientActor {
                 origin,
                 map_id,
             } => self.party_skill_reached(used, origin, map_id).await?,
+            ServerMessage::PartyItem { item_id, map_id } => {
+                self.party_item_reached(item_id, map_id).await?
+            }
             ServerMessage::ReactorBroken {
                 field,
                 reactor_id,
