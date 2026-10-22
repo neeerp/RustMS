@@ -43,7 +43,7 @@ mod note;
 mod npc_dialogue;
 mod npc_shop;
 mod party;
-mod party_search_update;
+mod party_search;
 mod pet;
 mod pickup;
 mod player_interaction;
@@ -109,7 +109,7 @@ pub use self::note::NoteActionHandler;
 pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::npc_shop::NpcShopActionHandler;
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
-pub use self::party_search_update::PartySearchUpdateHandler;
+pub use self::party_search::{PartySearchStartHandler, PartySearchStopHandler};
 pub use self::pet::{
     next_dry_up, pets_dry_up, pets_grow_hungry, revive_pet, DeadPetHandler, MovePetHandler,
     PetChatHandler, PetCommandHandler, PetExcludeItemsHandler, PetFoodHandler, PetLootHandler,
