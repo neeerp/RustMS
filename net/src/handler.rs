@@ -589,6 +589,13 @@ pub enum WorldAction {
         item_id: i32,
         banner: Packet,
     },
+    /// Put a Maple TV message, from the item in Cash `slot`, in the TV's
+    /// line; the item is used up only if it gets in
+    /// (`maple_tv::spend_maple_tv`).
+    MapleTv {
+        slot: i16,
+        tv: crate::maple_tv::MapleTv,
+    },
     ChangeChannel {
         channel_id: u8,
     },

@@ -6,7 +6,8 @@
 //! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
 //! Hammer, Vega's Spell, the cash mists, the Item Tag, the Magical
 //! Sandglasses, the Item Guards, the Scissors of Karma, the cash morphs,
-//! the kites, the Cash Owl, the Incubator and the cash bags are used so far.
+//! the kites, the Cash Owl, the Incubator, the cash bags and Maple TV are
+//! used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -17,6 +18,7 @@ use super::item_tag::{item_tag, sandglass};
 use super::jukebox::jukebox;
 use super::karma::{karma_scissors, KARMA_SCISSORS};
 use super::kite::kite;
+use super::maple_tv::maple_tv;
 use super::megaphone::{avatar_megaphone, megaphone};
 use super::meso_sack::meso_sack;
 use super::note::note;
@@ -57,6 +59,7 @@ impl WorldHandler for UseCashItemHandler {
             506 if held && item_id == ITEM_GUARD => item_guard(ctx, &mut r, slot, item_id),
             506 if held && item_id == INCUBATOR => incubator(ctx, &mut r, slot),
             506 if held && item_id / 1000 == 5061 => item_guard(ctx, &mut r, slot, item_id),
+            507 if held && item_id / 10 == 507_500 => maple_tv(ctx, &mut r, slot, item_id),
             507 if held => megaphone(ctx, &mut r, slot, item_id),
             508 if held => kite(ctx, &mut r, slot, item_id),
             509 if held => note(ctx, &mut r, slot, item_id),
