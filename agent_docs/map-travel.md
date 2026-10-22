@@ -117,7 +117,9 @@ BLOCKED_MAP 2 ("You cannot go to that place."), as at Leafre's `west00`
 level 20 or more who enters one of the five Training Centers (`910060000`,
 `910120000`, `910220000`, `910310000`, `912030000`, five maps each,
 `lvForceMove` 20) is sent at once to its `returnMap`, portal 0, by an
-expired map timer. The other `lvForceMove` maps (Kerning Square's 51,
+expired map timer. That happens on every entry, a login or a return from
+the Cash Shop included; a player who reaches level 20 inside stays until
+they next enter. The other `lvForceMove` maps (Kerning Square's 51,
 the Mushroom Castle's 39) are left alone. GMs pass both checks.
 `map_level_rules.rs` checks them through the network harness.
 

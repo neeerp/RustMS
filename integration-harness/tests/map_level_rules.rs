@@ -37,6 +37,8 @@ async fn level_limits_close_portals_and_training_centers_send_veterans_home() {
     barrier(c, &m, &mut t).await;
     read_for(c, &mut t, 500).await;
     assert_eq!(t.warps, [TRAINING_CENTER]);
+    // Leave before logging out, so the next login lands in Leafre.
+    assert_eq!(warp(c, LEAFRE, "", &mut t).await, LEAFRE);
 
     drop(session);
     drop(relogin(&config).await);
@@ -48,7 +50,6 @@ async fn level_limits_close_portals_and_training_centers_send_veterans_home() {
     // At level 20 the portal opens, and the Training Center sends the
     // player to its return map at once.
     let mut t = Trace::default();
-    assert_eq!(warp(c, LEAFRE, "", &mut t).await, LEAFRE);
     assert_eq!(warp(c, -1, "west00", &mut t).await, FOREST);
     let mut t = Trace::default();
     assert_eq!(warp(c, TRAINING_CENTER, "", &mut t).await, TRAINING_CENTER);
