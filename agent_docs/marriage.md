@@ -108,6 +108,12 @@ as on engaging.
   `RING_ACTION` 3.
 - `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72) and
   `MARRIAGE_RESULT` (73).
+- `ItemTooltip` puts "YOU ARE ENGAGED WITH : <name>" under a token's
+  orange lines, in the same orange. A token keeps 16 px for the line even
+  without a couple, as v83 does. `EquipTooltip` gives a wedding ring
+  "YOU ARE MARRIED WITH : <name>" in place of its description. Both
+  appear whenever there is a record, whatever its status. The name is the
+  partner's, chosen by the player's own gender (report b056).
 
 Any result ends the client's wait, as does a new field (a channel change
 or the Cash Shop, where the server drops the proposal). The result's OK
@@ -122,8 +128,6 @@ answers, and the proposer waits until they withdraw.
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- The tokens' tooltip lines, "YOU ARE ENGAGED WITH : %s" and "YOU ARE
-  MARRIED WITH : %s".
 - The partner notices (`NOTIFY_MARRIED_PARTNER_MAP_TRANSFER`).
 - The ring's look.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.

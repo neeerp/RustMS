@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace ms
@@ -23,8 +24,8 @@ namespace ms
 		std::string bride_name;
 
 		bool married() const;
-		// The other one's name.
-		const std::string& partner(int32_t self) const;
+		// The other one's name, chosen by the player's own gender (0x8ef073).
+		const std::string& partner(bool female) const;
 
 		static MarriageRecord read(InPacket& recv);
 	};
@@ -48,6 +49,12 @@ namespace ms
 		// The empty boxes and rings a couple holds (4031357 to 4031364), which
 		// the player drops to break off (0x4f33ee).
 		bool is_token(int32_t item_id);
+		// The wedding rings 1112803, 1112806, 1112807 and 1112809.
+		bool is_wedding_ring(int32_t item_id);
+		// The tooltip's line naming the partner: 0x1069 on a token, 0x1068 on
+		// a wedding ring, whatever the record's status (0x8ef061, 0x8e90a8).
+		// Empty without a record or for any other item.
+		std::string tooltip_line(int32_t item_id, const std::optional<MarriageRecord>& record, bool female);
 		// The question before a token goes: 0x10a3, or 0x10a4 for a couple
 		// whose record says married (0x4f3475).
 		const char* break_question(bool married);

@@ -21,6 +21,7 @@
 #include "../../Character/Inventory/Equip.h"
 #include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Character/Inventory/ItemProperties.h"
+#include "../../Character/Marriage.h"
 #include "../../Data/WeaponData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
@@ -403,8 +404,14 @@ namespace ms
 		if (!owner.empty())
 			height += OWNER_HEIGHT;
 
+		// A wedding ring names the partner in place of its description (0x8e9109).
+		const Player &player = Stage::get().get_player();
+		std::string descstr = marriage::tooltip_line(item_id, player.get_marriage(), charstats.get_female());
+
+		if (descstr.empty())
+			descstr = itemdata.get_desc();
+
 		// One that could trade with Scissors of Karma says so.
-		std::string descstr = itemdata.get_desc();
 
 		if (info.trade_available && !(equip.get_flags() & item_properties::EQUIP_KARMA))
 			descstr = item_properties::with_karma_hint(descstr);

@@ -69,6 +69,9 @@ namespace ms
 		// The orange lines under the name.
 		std::array<Text, 2> properties;
 		int16_t properties_height;
+		// A couple's token names the partner under them, in the same orange.
+		Text marriage_line;
+		int16_t marriage_height;
 		Texture expiry_dot;
 		Text expiry;
 		int16_t expiry_height;
