@@ -80,6 +80,23 @@ const WEDDING_HALL_ENTRANCE: i32 = 106021401;
 const SECRET_BASEMENT_PATH: i32 = 261030000;
 const ZENUMIST_HALLWAY: i32 = 261010000;
 const VERIFYING_THE_PASSWORD: i16 = 3360;
+/// Rien's way out to the Dangerous Forest (`rienTutor8`). While an Aran
+/// beginner is on Basic Fitness Training 1-3 (21015-21017), it keeps them in
+/// town, saying which way their training lies.
+const DANGEROUS_FOREST: i32 = 140010000;
+const ARAN_BEGINNER: i16 = 2000;
+const FITNESS_TRAINING: [(i16, &str); 3] = [
+    (21015, keys::RIEN_TUTOR_FITNESS_1),
+    (21016, keys::RIEN_TUTOR_FITNESS_2),
+    (21017, keys::RIEN_TUTOR_FITNESS_3),
+];
+/// The Forest of Evil's hidden way into the Cursed Forest (`curseforest`),
+/// open at night to players on Arwen's quests: Rage, Resentment, and
+/// Revenge (2224) or Arwen's Apology (2226) taken, or Defeat Faust (2227)
+/// done, after which the forest is the one Faust has left.
+const CURSED_FOREST: i32 = 910100000;
+const CURSED_FOREST_AFTER_FAUST: i32 = 910100001;
+const DEFEAT_FAUST: i16 = 2227;
 /// `rankRoom`: each job's hall (and Ereve's and the Dangerous Forest's),
 /// the room it leads into, and the room's portal back.
 const RANK_ROOMS: [(i32, i32, &str); 8] = [
@@ -208,6 +225,9 @@ pub enum Effect {
     /// A line in pink chat, as a portal that won't let the player through
     /// says why.
     Pink(String),
+    /// A line in the chat log by SHOW_STATUS_INFO 9 (Cosmic's
+    /// `showInfoText`), as Rien's tutorial portal tells an Aran where to go.
+    InfoText(String),
     /// Take the player's party into its own copy of an event's maps
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
@@ -465,6 +485,29 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ))
         }
         "secretDoor" => refused(keys::SECRET_DOOR_LOCKED),
+        "rienTutor8" => {
+            let training = FITNESS_TRAINING
+                .iter()
+                .find(|&&(id, _)| quest(id) == QuestState::Started)
+                .filter(|_| player.stats.job == ARAN_BEGINNER);
+            match training {
+                Some(&(_, key)) => ScriptOutcome {
+                    effects: vec![Effect::InfoText(content::text().get(key, &[]))],
+                    block: false,
+                },
+                // Cosmic's portal 2, the forest's `east00`.
+                None => through(Effect::WarpToPortal(
+                    DANGEROUS_FOREST,
+                    named(DANGEROUS_FOREST, "east00"),
+                )),
+            }
+        }
+        // The hour of the route clock, which RUSTMS_CONTI_SCALE speeds up
+        // as it does the stations' clocks.
+        "curseforest" => {
+            let hour = crate::conti::time_of_day(crate::conti::now()).0;
+            cursed_forest(player, hour)
+        }
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -476,6 +519,29 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         _ => return None,
     };
     Some(outcome)
+}
+
+/// The Cursed Forest's way in at `hour` of the world's (UTC) day, the hour
+/// the stations' clocks show: shut from 7:00 until 17:00.
+fn cursed_forest(player: &Player, hour: u8) -> ScriptOutcome {
+    let quest = |id: i16| player.quests.state(id);
+    let after_faust = quest(DEFEAT_FAUST) == QuestState::Completed;
+    if !(after_faust
+        || [2224, 2226]
+            .iter()
+            .any(|&id| quest(id) == QuestState::Started))
+    {
+        return refused(keys::CURSED_FOREST_CLOSED);
+    }
+    if (7..17).contains(&hour) {
+        return refused(keys::CURSED_FOREST_DAYTIME);
+    }
+    let forest = if after_faust {
+        CURSED_FOREST_AFTER_FAUST
+    } else {
+        CURSED_FOREST
+    };
+    through(Effect::WarpToPortal(forest, named(forest, "out00")))
 }
 
 /// A portal that lets the player through with its sound.
@@ -888,6 +954,55 @@ mod tests {
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 2)));
         player.stats.map_id = 261020200;
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
+    }
+
+    #[test]
+    fn rien_keeps_an_aran_in_training_in_town() {
+        let forest = || Some(through(Effect::WarpToPortal(DANGEROUS_FOREST, 2)));
+        assert_eq!(portal("rienTutor8", &player_with(&[])), forest());
+        let mut lines = std::collections::HashSet::new();
+        for (quest, _) in FITNESS_TRAINING {
+            let mut player = player_with(&[(quest, QuestState::Started)]);
+            // Only an Aran beginner is held back.
+            assert_eq!(portal("rienTutor8", &player), forest());
+            player.stats.job = ARAN_BEGINNER;
+            let held = portal("rienTutor8", &player).unwrap();
+            let [Effect::InfoText(text)] = held.effects.as_slice() else {
+                panic!("{held:?}");
+            };
+            assert!(!text.is_empty());
+            lines.insert(text.clone());
+        }
+        // Each training names its own quarry.
+        assert_eq!(lines.len(), 3);
+        let mut done = player_with(&[(21015, QuestState::Completed)]);
+        done.stats.job = ARAN_BEGINNER;
+        assert_eq!(portal("rienTutor8", &done), forest());
+    }
+
+    #[test]
+    fn the_cursed_forest_opens_at_night_to_arwens_helpers() {
+        let at = |quests: &[(i16, QuestState)], hour| cursed_forest(&player_with(quests), hour);
+        let started = QuestState::Started;
+        let forest = |forest| through(Effect::WarpToPortal(forest, named(forest, "out00")));
+        assert!(pink(&at(&[], 20)));
+        assert!(pink(&at(&[(2225, started)], 20)));
+        assert!(pink(&at(&[(DEFEAT_FAUST, started)], 20)));
+        for quests in [&[(2224, started)][..], &[(2226, started)][..]] {
+            for hour in [0, 6, 17, 23] {
+                assert_eq!(at(quests, hour), forest(CURSED_FOREST), "{hour}");
+            }
+            for hour in [7, 12, 16] {
+                assert!(pink(&at(quests, hour)), "{hour}");
+            }
+        }
+        let done = &[(DEFEAT_FAUST, QuestState::Completed)];
+        assert_eq!(at(done, 3), forest(CURSED_FOREST_AFTER_FAUST));
+        assert!(pink(&at(done, 9)));
+        assert_eq!(named(CURSED_FOREST, "out00"), 1);
+        assert_eq!(named(CURSED_FOREST_AFTER_FAUST, "out00"), 1);
+        // The closed and the daytime lines differ.
+        assert_ne!(at(&[], 20), at(&[(2224, started)], 12));
     }
 
     #[test]
