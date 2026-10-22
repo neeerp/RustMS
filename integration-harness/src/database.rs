@@ -801,3 +801,18 @@ pub async fn item_flags_and_hours(
     .map_err(fixture)?;
     Ok((row.flags, row.hours))
 }
+
+/// Make the family entitlement working for `character_id` end in
+/// `seconds`.
+pub async fn end_family_buff_in(character_id: i32, seconds: i32) -> Result<(), HarnessError> {
+    change_one_row("end family buff", move |conn| {
+        diesel::sql_query(
+            "UPDATE family_buffs SET until = (now() AT TIME ZONE 'utc') \
+             + make_interval(secs => $2) WHERE character_id = $1",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(seconds)
+        .execute(conn)
+    })
+    .await
+}

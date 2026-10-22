@@ -230,6 +230,7 @@ impl ClientActor {
             let pets_due = self.pets_due();
             let items_due = self.items_due();
             let later_due = self.later_due();
+            let family_buff_due = self.family_buff_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -260,6 +261,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(later_due.unwrap_or_else(Instant::now)), if later_due.is_some() => {
                     self.send_later().await
+                }
+                _ = sleep_until(family_buff_due.unwrap_or_else(Instant::now)), if family_buff_due.is_some() => {
+                    self.end_family_buff().await
                 }
             };
             if let Err(error) = step {
@@ -686,6 +690,9 @@ impl ClientActor {
         self.load_buddies().await?;
         self.load_guild().await?;
         self.load_family().await?;
+        if self.in_game()?.player.family_buff.is_some() {
+            self.show_family_buff().await?;
+        }
         self.load_notes().await?;
         self.announce_parcels().await?;
         info!(
@@ -1280,6 +1287,8 @@ impl ClientActor {
                 self.family_located(trip, found).await?
             }
             ServerMessage::SummonRefund { name, why } => self.summon_refund(name, why).await?,
+            ServerMessage::FamilyBuff(buff) => self.family_buff(buff).await?,
+            ServerMessage::FamilyBondingCount(online) => self.family_bonding(online).await?,
             ServerMessage::CharInfoRequested { requester } => {
                 let alliance = match self.alliance_id()? {
                     Some(alliance_id) => spawn_db(move || db::alliance::name(alliance_id))

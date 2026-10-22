@@ -609,6 +609,9 @@ pub mod keys {
 
     /// To a summoner: the family member they asked for said no.
     pub const FAMILY_SUMMON_DECLINED: &str = "family.summon_declined";
+    /// To a player who tried the bonding entitlement with too few juniors
+    /// online.
+    pub const FAMILY_BONDING_SHORT: &str = "family.bonding_short";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {

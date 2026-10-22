@@ -225,6 +225,9 @@ pub struct Player {
     /// The character's senior and juniors; saved by `db::family`, not with
     /// the player.
     pub family: crate::family::Relatives,
+    /// The family rate entitlement working for the character; saved by
+    /// `db::family`, not with the player.
+    pub family_buff: Option<crate::family::FamilyBuff>,
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
@@ -307,6 +310,7 @@ impl Player {
             chair: 0,
             guild: None,
             family: Default::default(),
+            family_buff: None,
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,

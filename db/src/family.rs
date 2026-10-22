@@ -2,15 +2,16 @@
 //! juniors are the rows naming them. The senior at the top leads the family,
 //! which goes by their name, and keeps its message.
 
-use crate::schema::{characters, family_entitlement_uses, family_members};
+use crate::schema::{characters, family_buffs, family_entitlement_uses, family_members};
 use diesel::dsl::sql;
 use diesel::expression::SqlLiteral;
 use diesel::prelude::*;
 use diesel::sql_types::Integer;
 use game::family::{
-    rep_gain, separation_fee, separation_rep, ChartMember, FamilyChart, FamilyInfo, Refusal,
-    Relatives, MAX_GENERATIONS, MAX_JUNIORS, MAX_PRECEPTS,
+    rep_gain, separation_fee, separation_rep, ChartMember, FamilyBuff, FamilyChart, FamilyInfo,
+    Refusal, Relatives, ENTITLEMENTS, MAX_GENERATIONS, MAX_JUNIORS, MAX_PRECEPTS,
 };
+use std::time::SystemTime;
 
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
 
@@ -440,6 +441,70 @@ pub fn refund(character_id: i32, index: i16, cost: i32) -> crate::Result<()> {
         Ok(())
     })?;
     Ok(())
+}
+
+/// The rate entitlement working for the character, if one still is.
+pub fn buff(conn: &mut PgConnection, character_id: i32) -> QueryResult<Option<FamilyBuff>> {
+    let row = family_buffs::table
+        .find(character_id)
+        .filter(family_buffs::until.gt(SystemTime::now()))
+        .select((family_buffs::entitlement, family_buffs::until))
+        .first::<(i16, SystemTime)>(conn)
+        .optional()?;
+    Ok(row.and_then(|(index, until)| {
+        let index = usize::try_from(index).ok()?;
+        ENTITLEMENTS.get(index)?;
+        Some(FamilyBuff { index, until })
+    }))
+}
+
+/// `buff` works for each of `ids` now, in place of any they had.
+pub fn set_buff(ids: &[i32], buff: FamilyBuff) -> crate::Result<()> {
+    use diesel::upsert::excluded;
+    let rows: Vec<_> = ids
+        .iter()
+        .map(|&id| {
+            (
+                family_buffs::character_id.eq(id),
+                family_buffs::entitlement.eq(buff.index as i16),
+                family_buffs::until.eq(buff.until),
+            )
+        })
+        .collect();
+    diesel::insert_into(family_buffs::table)
+        .values(&rows)
+        .on_conflict(family_buffs::character_id)
+        .do_update()
+        .set((
+            family_buffs::entitlement.eq(excluded(family_buffs::entitlement)),
+            family_buffs::until.eq(excluded(family_buffs::until)),
+        ))
+        .execute(&mut crate::connection()?)?;
+    Ok(())
+}
+
+/// The character's buff that lasted until `until` is over; one that took
+/// its place stays.
+pub fn end_buff(character_id: i32, until: SystemTime) -> crate::Result<()> {
+    diesel::delete(
+        family_buffs::table
+            .find(character_id)
+            .filter(family_buffs::until.le(until)),
+    )
+    .execute(&mut crate::connection()?)?;
+    Ok(())
+}
+
+/// The character's juniors and their juniors: the six places below them
+/// on the Family Tree.
+pub fn tree_juniors(character_id: i32) -> crate::Result<Vec<i32>> {
+    let mut conn = crate::connection()?;
+    let juniors = juniors(&mut conn, character_id)?;
+    let mut all = juniors.clone();
+    for junior in juniors {
+        all.extend(self::juniors(&mut conn, junior)?);
+    }
+    Ok(all)
 }
 
 /// Whether `a` and `b` are in one family: under the same leader.

@@ -186,13 +186,31 @@ INFO.
   saying yes, refunds the summoner. A summoner who leaves, even for
   another channel, drops their summonses and gets the Rep back without a
   word (`refund_summons`).
+- **Rates (2, 3 and 5-10):** 1.5x or 2x EXP or drops for 15 or 30
+  minutes (`Benefit::rates`, `duration`). 9 and 10 also go to the party
+  members on the player's channel (`family_party_buff` in the directory),
+  who needn't be in the family and don't pay.
+- **Bonding (4):** 2x both for 30 minutes, if at least `BONDING_JUNIORS`
+  (6) of the player's juniors and juniors' juniors are online
+  (`tree_juniors`, counted by the directory). If fewer are, the player
+  isn't charged and gets a pink placeholder notice: the client has the
+  line (pool 0x1200) but never shows it.
+
+A player has one of these at a time; a new one takes the old one's place.
+`Player.family_buff` (`FamilyBuff`: index and end time) holds it, and the
+`family_buffs` table keeps it across logins. `net::rates` multiplies its
+rates into the EXP and drop rates until it ends. `FAMILY_SET_PRIVILEGE`
+(103) shows its icon (`Benefit::icon`, the `RightIcon` art: 2 drops, 3 EXP,
+4 both), with its index and the ms left, on purchase and on entering the
+game. The client never takes the icon down by itself, so the client actor
+wakes when the buff ends (`family_buff_due`), drops it from the player and
+the table, and sends 103 with icon 0.
 
 ### Not yet
 
 These are not implemented yet:
 
-- the rate entitlements (2-10) and `FAMILY_SET_PRIVILEGE` (103), the icon
-  that shows one is running.
+- HeavenClient ignores `FAMILY_SET_PRIVILEGE` (103), so it shows no icon.
 
 ## Client
 
