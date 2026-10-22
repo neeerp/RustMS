@@ -661,7 +661,8 @@ A few skills do more than buff:
   the server's damage cap counts it (`beacon::damage_percent`).
 
 Teleport and Flash Jump move the player on the client alone; the server
-only spends the MP. HeavenClient's Flash Jump (4111006 and the Night
+only spends the MP, with no buff or cooldown, and refuses a level not
+learned or too little MP (harness `flash_jump`). HeavenClient's Flash Jump (4111006 and the Night
 Walker's 14101004, `flash_jump`) follows v83 (FUN_0096be38). It works only
 in the air, off any rope or ladder, and, out of water, not once the player
 is falling. It works once until the player lands or grabs a rope, and maps
