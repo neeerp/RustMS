@@ -394,7 +394,7 @@ namespace ms
 
 			for (int32_t i = 0; i < bag_items; i++)
 			{
-				int32_t quantity = recv.read_short();
+				int32_t quantity = static_cast<uint16_t>(recv.read_short());
 				recv.skip_short();
 				int32_t item_id = recv.read_int();
 				int32_t kind = item_id / 1000000;
