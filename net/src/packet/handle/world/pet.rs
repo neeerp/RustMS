@@ -233,7 +233,7 @@ impl WorldHandler for PetCommandHandler {
         let mut r = Cursor::new(&packet.bytes);
         r.read_short()?;
         let serial = r.read_long()?;
-        let named = r.read_byte()? != 0;
+        r.read_byte()?; // whether the words began with its name
         let command = r.read_byte()?;
         let roll = rand::thread_rng().gen_range(0, 100);
         let known = |item_id| {
@@ -243,10 +243,6 @@ impl WorldHandler for PetCommandHandler {
         let Some(done) = command_pet(ctx.player, serial, known, roll) else {
             return Ok(HandlerResult::empty());
         };
-        ctx.player.pets_named.retain(|&pet| pet != serial);
-        if named {
-            ctx.player.pets_named.push(serial);
-        }
         let owner = ctx.player.id();
         // The answer goes first: the client checks the command's levels
         // against the pet's level before the item update raises it.
@@ -255,7 +251,7 @@ impl WorldHandler for PetCommandHandler {
             done.index,
             command,
             done.obeyed,
-            named,
+            ctx.player.pet_quoted(usize::from(done.index)),
         )?);
         if !done.changes.is_empty() {
             result = result.with_reply(build_inventory_operation(false, &done.changes)?);
@@ -366,8 +362,9 @@ impl WorldHandler for PetFoodHandler {
             return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
         };
         let owner = ctx.player.id();
+        let quoted = ctx.player.pet_quoted(usize::from(fed.index));
         // As with commands, the answer goes before the item update.
-        let result = HandlerResult::reply(build_pet_food(owner, fed.index, fed.enjoyed)?)
+        let result = HandlerResult::reply(build_pet_food(owner, fed.index, fed.enjoyed, quoted)?)
             .with_reply(build_inventory_operation(true, &fed.changes)?);
         if fed.levelled {
             return level_up(result, owner, fed.index);
@@ -426,8 +423,9 @@ pub fn cash_pet_food(ctx: &mut WorldContext, slot: i16, item_id: i32) -> WorldRe
             .with_reply(build_stat_update(true, &[])?));
     };
     let owner = ctx.player.id();
+    let quoted = ctx.player.pet_quoted(usize::from(fed.index));
     let result = HandlerResult::reply(build_cash_pet_food(Some(fed.index))?)
-        .with_reply(build_pet_food(owner, fed.index, fed.enjoyed)?)
+        .with_reply(build_pet_food(owner, fed.index, fed.enjoyed, quoted)?)
         .with_reply(build_inventory_operation(true, &fed.changes)?);
     if fed.levelled {
         return level_up(result, owner, fed.index);
@@ -516,7 +514,6 @@ pub fn pets_grow_hungry(player: &mut Player, hunger: impl Fn(i32) -> i32) -> Pet
         hungry.changes.extend(put_back(player, slot, item));
         if home {
             player.pets_mut().remove(index);
-            player.pets_named.retain(|&pet| pet != serial);
             hungry
                 .gone
                 .push(PetChange::Dismissed { index: index as u8 });
@@ -544,7 +541,6 @@ pub fn pets_dry_up(player: &mut Player, now: SystemTime) -> PetsAged {
         let serial = item.cash_serial;
         if let Some(index) = player.pets.iter().position(|&pet| Some(pet) == serial) {
             player.pets_mut().remove(index);
-            player.pets_named.retain(|&pet| Some(pet) != serial);
             dried.gone.push(PetChange::Dismissed { index: index as u8 });
         }
         item.expiration = Some(pet::doll_date());
@@ -599,9 +595,10 @@ impl WorldHandler for PetChatHandler {
         let Some(index) = index.filter(|_| text.len() <= PET_CHAT_MAX) else {
             return Ok(HandlerResult::empty());
         };
-        // 0xA8 doesn't say how the owner's client showed the line; a
-        // command's answer (kind 0) takes the style its 174 had.
-        let styled = kind == 0 && ctx.player.pets_named.contains(&serial);
+        // 0xA8 doesn't say how the owner's client showed the line: all but
+        // the pet's idle lines (kind 3, FUN_00704bb8) take the quote ring's
+        // style, as 174 and /pet do.
+        let styled = kind != 3 && ctx.player.pet_quoted(index);
         let shown = build_pet_chat(ctx.player.id(), index as u8, kind, action, &text, styled)?;
         Ok(HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown))))
     }
@@ -878,11 +875,9 @@ mod tests {
     #[test]
     fn starving_pets_go_home_and_the_rest_close_up() {
         let mut player = two_pets(8, 30);
-        player.pets_named = vec![77];
         let hungry = pets_grow_hungry(&mut player, |id| if id == TIGER { 3 } else { 2 });
         assert_eq!(hungry.gone, [PetChange::Dismissed { index: 0 }]);
         assert_eq!(player.pets, [78]);
-        assert!(player.pets_named.is_empty());
         assert_eq!((fullness(&player, 3), fullness(&player, 4)), (15, 28));
         assert_eq!(hungry.changes.len(), 4);
     }

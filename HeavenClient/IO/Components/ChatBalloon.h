@@ -42,7 +42,14 @@ namespace ms
 
 		ChatBalloon();
 
-		// Draws the balloon so that its arrow hangs down to the given point.
+		// A pet's balloon in ChatBalloon.img/pet/<style> (FUN_0048a935, kind
+		// 0x3ea): 5 s with no fade, lines wrapped at 14 top tiles, the box
+		// whole tiles wide with the arrow on the middle one and a style's
+		// head over it. A style that doesn't exist shows nothing.
+		static ChatBalloon pet(int32_t style);
+
+		// Draws the balloon so that its arrow hangs down to the given point;
+		// a pet's arrow tip is the point, its box centred 3 px to the right.
 		void draw(Point<int16_t> position) const;
 
 		void update();
@@ -55,6 +62,7 @@ namespace ms
 
 	private:
 		void load(const std::string &style, bool formatted, uint16_t wrap_width);
+		void draw_pet(Point<int16_t> tip) const;
 
 		// v83 CUser::OnChat shows a balloon for 5 s, then fades it out over 1 s.
 		static constexpr int16_t DURATION = 5000;
@@ -73,6 +81,11 @@ namespace ms
 		};
 
 		std::array<Texture, NUM_PIECES> pieces;
+		Texture head;
+		bool for_pet = false;
+		bool missing = false;
+		// How far the pieces under the box reach below it: the arrow tip.
+		int16_t below = 0;
 		int16_t xtile = 1;
 		int16_t ytile = 1;
 		Color textcolor;

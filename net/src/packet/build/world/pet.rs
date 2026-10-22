@@ -117,14 +117,14 @@ pub fn build_pet_name(
 
 /// PET_COMMAND (174, FUN_007048ab) mode 0: whether the pet at `index`
 /// obeyed `command`. Only its owner's client reacts: it picks the action
-/// and line and sends them back as PET_CHAT for the others. A pet `named`
-/// in the command answers in its own chat balloon.
+/// and line and sends them back as PET_CHAT for the others. A `quoted` pet
+/// (one wearing a quote ring) answers in its kind's chat balloon.
 pub fn build_pet_command(
     owner_id: i32,
     index: u8,
     command: u8,
     obeyed: bool,
-    named: bool,
+    quoted: bool,
 ) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::PetCommand as i16)?;
@@ -133,21 +133,26 @@ pub fn build_pet_command(
     p.write_byte(0)?;
     p.write_byte(command)?;
     p.write_byte(u8::from(obeyed))?;
-    p.write_byte(u8::from(named))?;
+    p.write_byte(u8::from(quoted))?;
     Ok(p)
 }
 
 /// PET_COMMAND (174) mode 1: whether the pet at `index` enjoyed its food.
 /// As with commands, its owner's client picks the reaction and sends it
-/// back as PET_CHAT.
-pub fn build_pet_food(owner_id: i32, index: u8, enjoyed: bool) -> Result<Packet, NetworkError> {
+/// back as PET_CHAT, in its kind's balloon if `quoted`.
+pub fn build_pet_food(
+    owner_id: i32,
+    index: u8,
+    enjoyed: bool,
+    quoted: bool,
+) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::PetCommand as i16)?;
     p.write_int(owner_id)?;
     p.write_byte(index)?;
     p.write_byte(1)?;
     p.write_byte(u8::from(enjoyed))?;
-    p.write_byte(0)?;
+    p.write_byte(u8::from(quoted))?;
     Ok(p)
 }
 

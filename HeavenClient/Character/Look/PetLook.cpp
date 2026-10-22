@@ -103,7 +103,7 @@ namespace ms
 													   shown({ static_cast<double>(entry.position.x()),
 															   static_cast<double>(entry.position.y()), 0.0, 0.0,
 															   entry.fh, entry.stance }),
-													   action(-1), wear(0), effecting(false), pending(false), still(0)
+													   action(-1), wear(0), balloon_lift(0), effecting(false), pending(false), still(0)
 	{
 		set_position(entry.position.x(), entry.position.y());
 		set_stance(entry.stance);
@@ -122,7 +122,7 @@ namespace ms
 	}
 
 	PetLook::PetLook() : itemid(0), serial(0), local(false), stance(Stance::STAND), flip(false),
-						 name_tag(false), shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), wear(0), effecting(false),
+						 name_tag(false), shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), wear(0), balloon_lift(0), effecting(false),
 						 pending(false), still(0)
 	{}
 
@@ -146,7 +146,7 @@ namespace ms
 
 		// The tag's top is 2 px under the pet's feet (origin cy -2, 0x5f1654).
 		nametag.draw(absp + Point<int16_t>(0, 2));
-		balloon.draw(absp - Point<int16_t>(0, animations[Stance::STAND].get_origin().y()));
+		balloon.draw(absp - Point<int16_t>(0, balloon_lift));
 	}
 
 	void PetLook::draw_standing(Point<int16_t> pos, float alpha) const
@@ -349,8 +349,14 @@ namespace ms
 
 		if (!said.text.empty())
 		{
-			balloon = ChatBalloon("pet/" + std::to_string(styled ? data.get_balloon() : 0), false);
+			balloon = ChatBalloon::pet(styled ? data.get_balloon() : 0);
 			balloon.change_text(said.text);
+
+			// The balloon follows the pet at the height it was put at. One
+			// pet's (5000026) action 20 lifts it 90 px more (0x7056f7).
+			const Animation &shown_now = action >= 0 ? acting : animations[stance];
+			bool lifted = itemid == 5000026 && said.action == 0x14;
+			balloon_lift = shown_now.get_origin().y() + 5 + (lifted ? 0x5a : 0);
 		}
 
 		return true;

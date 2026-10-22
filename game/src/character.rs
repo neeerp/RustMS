@@ -236,9 +236,6 @@ pub struct Player {
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
-    /// The pets whose last command called them by name; their answer shows
-    /// in their own chat balloon. Not saved.
-    pub pets_named: Vec<i64>,
     /// The note on the chalkboard the player holds up, if any; not saved.
     pub chalkboard: Option<String>,
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0; not
@@ -321,7 +318,6 @@ impl Player {
             family_buff: None,
             marriage: None,
             pets: Vec::new(),
-            pets_named: Vec::new(),
             chalkboard: None,
             item_effect: 0,
             consume_effect: 0,
@@ -462,6 +458,14 @@ impl Player {
             .or_else(|| self.inventory.get(InventoryType::Equipped, slot))
     }
 
+    /// Whether the pet out at `index` wears a quote ring, so that it speaks
+    /// in its kind's chat balloon.
+    pub fn pet_quoted(&self, index: usize) -> bool {
+        equip_slot::PET_QUOTES
+            .get(index)
+            .is_some_and(|&slot| self.pet_equip(slot).is_some())
+    }
+
     /// The projection a field broadcasts for this player at a position.
     pub fn field_avatar(&self, x: i16, y: i16, stance: u8) -> FieldAvatar {
         FieldAvatar {
@@ -491,7 +495,7 @@ impl Player {
                     stance: 0,
                     foothold: 0,
                     name_tag: self.pet_equip(equip_slot::PET_LABELS[index]).is_some(),
-                    chat_balloon: self.pet_equip(equip_slot::PET_QUOTES[index]).is_some(),
+                    chat_balloon: self.pet_quoted(index),
                 })
                 .collect(),
             chalkboard: self.chalkboard.clone(),
