@@ -90,6 +90,20 @@ Likely causes and fixes:
 - missing runtime DB libs (`libpq.so.5`): ensure runtime image includes `libpq`
 - missing game assets (`Failed to load game data`): ensure world mounts `../assets:/app/assets:ro`
 
+## A step sometimes sees nothing
+
+Symptom:
+
+- a `step` or `barrier` in one test of a file sometimes returns before the
+  server's answer, though the test passes on its own (`cargo test ... name`)
+
+Cause and fix:
+
+- `barrier` ends on the first all-chat line carrying its marker, from anyone
+  on the map. The tests in one file run at once, so two of them on the same
+  map with the same marker end each other's steps. Give each test its own
+  marker, or its own map.
+
 ## Quick diagnostic bundle
 
 When a run fails, collect these first:
