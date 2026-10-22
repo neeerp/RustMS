@@ -142,6 +142,9 @@ namespace ms
 		// The field's countdown and boss HP bar go with it.
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
 
+		// So does Duey's window, and the server isn't told (report b029).
+		UI::get().remove(UIElement::Type::DUEY);
+
 		if (auto gage = UI::get().get_element<UIMobGage>())
 			gage->hide();
 

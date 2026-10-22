@@ -24,6 +24,7 @@
 #include "../IO/UI.h"
 #include "../IO/UITypes/UIAvatarSelect.h"
 #include "../IO/UITypes/UIChatBar.h"
+#include "../IO/UITypes/UIDuey.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPetChooser.h"
@@ -436,5 +437,64 @@ namespace ms
 
 		storage.answered();
 		UI::get().emplace<UIOk>(message, [](bool) {});
+	}
+
+	void ParcelHandler::handle(InPacket& recv) const
+	{
+		enum Mode : uint8_t
+		{
+			OPEN = 0x08,
+			REMOVED = 0x17,
+			ADDED = 0x18,
+			ARRIVED = 0x19,
+			QUICK_SEND = 0x1a,
+			WAITING = 0x1b
+		};
+
+		auto mode = static_cast<uint8_t>(recv.read_byte());
+		auto duey = UI::get().get_element<UIDuey>();
+		bool open = duey && duey->is_active();
+
+		switch (mode)
+		{
+			case Mode::OPEN:
+			{
+				// v83 can't take a second window (FUN_006f56ea).
+				if (open)
+					return;
+
+				bool receive_only = recv.read_bool();
+				UI::get().emplace<UIDuey>(receive_only ? UIDuey::Kind::RECEIVE : UIDuey::Kind::PARCELS);
+
+				if (auto window = UI::get().get_element<UIDuey>())
+					window->open(parcels::read_lists(recv));
+
+				return;
+			}
+			case Mode::REMOVED:
+				if (open)
+				{
+					int32_t id = recv.read_int();
+					duey->removed(id, recv.read_byte() == 3);
+				}
+
+				return;
+			case Mode::ADDED:
+				if (open)
+					duey->added(parcels::read(recv));
+
+				return;
+			case Mode::ARRIVED:
+			case Mode::QUICK_SEND:
+			case Mode::WAITING:
+				// The notifier and the coupon's window: not done yet, and none
+				// of them answers a request.
+				return;
+			default:
+				if (open)
+					duey->answered(mode);
+
+				return;
+		}
 	}
 }

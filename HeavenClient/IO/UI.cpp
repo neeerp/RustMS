@@ -400,6 +400,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ITEMMEGAPHONE);
 					types.emplace_back(UIElement::Type::VICIOUSHAMMER);
 					types.emplace_back(UIElement::Type::MAKER);
+					types.emplace_back(UIElement::Type::DUEY);
 					types.emplace_back(UIElement::Type::VEGASPELL);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::VEGARESULT);

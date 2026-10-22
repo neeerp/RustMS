@@ -74,6 +74,8 @@ namespace ms
 					return Tooltip::Parent::SHOP;
 				case UIElement::Type::STORAGE:
 					return Tooltip::Parent::STORAGE;
+				case UIElement::Type::DUEY:
+					return Tooltip::Parent::DUEY;
 				case UIElement::Type::TRADINGROOM:
 					return Tooltip::Parent::TRADINGROOM;
 				case UIElement::Type::PERSONALSHOP:

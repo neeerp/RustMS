@@ -185,4 +185,37 @@ namespace ms
 			write_int(meso);
 		}
 	};
+
+	// Opcode: DUEY_ACTION(65)
+	class DueyActionPacket : public OutPacket
+	{
+	public:
+		enum Mode : int8_t
+		{
+			OPEN = 0,
+			CLAIM = 4,
+			REMOVE = 5,
+			CLOSE = 7
+		};
+
+		// Opens or closes the window
+		DueyActionPacket(Mode mode) : OutPacket(OutPacket::Opcode::DUEY_ACTION)
+		{
+			write_byte(mode);
+
+			// The notifier's open request, as v83 sends it (FUN_00522585).
+			if (mode == Mode::OPEN)
+			{
+				write_int(-1);
+				write_int(2);
+			}
+		}
+
+		// Claims or deletes a parcel
+		DueyActionPacket(Mode mode, int32_t id) : OutPacket(OutPacket::Opcode::DUEY_ACTION)
+		{
+			write_byte(mode);
+			write_int(id);
+		}
+	};
 }
