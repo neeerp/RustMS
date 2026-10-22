@@ -885,6 +885,8 @@ add_executable(HeavenClient
     IO/UITypes/UITeleportRock.h
     IO/UITypes/UIKite.cpp
     IO/UITypes/UIKite.h
+    IO/UITypes/UITransform.cpp
+    IO/UITypes/UITransform.h
     IO/UITypes/UIMegaphone.cpp
     IO/UITypes/UIMegaphone.h
     IO/UITypes/UIPetChooser.cpp

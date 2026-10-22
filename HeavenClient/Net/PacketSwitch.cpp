@@ -98,6 +98,7 @@ namespace ms
 		AVATAR_MEGAPHONE_RESULT = 110,
 		AVATAR_MEGAPHONE = 111,
 		CLEAR_AVATAR_MEGAPHONE = 112,
+		RANDOM_MORPH_RES = 119,
 
 		/// Monster Book
 		MONSTER_BOOK_SET_CARD = 83,
@@ -414,6 +415,7 @@ namespace ms
 		emplace<AVATAR_MEGAPHONE_RESULT, AvatarMegaphoneResultHandler>();
 		emplace<AVATAR_MEGAPHONE, AvatarMegaphoneHandler>();
 		emplace<CLEAR_AVATAR_MEGAPHONE, ClearAvatarMegaphoneHandler>();
+		emplace<RANDOM_MORPH_RES, RandomMorphResHandler>();
 		emplace<QUEST_CLEAR, QuestClearHandler>();
 		emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();

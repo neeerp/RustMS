@@ -139,6 +139,9 @@ pub enum RecvOpcode {
     ChangeKeybinds = 0x87,
     UseSolomonItem = 0x9D,
     UseGachaExp = 0x9E,
+    /// An item used on the character named in v83's Transform dialog: the
+    /// Maplemas Party Potion (report c041).
+    UseTargetItem = 0xA0,
     MovePet = 0xA7,
     PetChat = 0xA8,
     PetCommand = 0xA9,

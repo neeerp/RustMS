@@ -35,7 +35,7 @@ use net::packet::build::world::party::{
     build_party_member_hp, build_party_search_invite, build_party_status, build_party_update,
     Departure, PartyMemberView, PartyStatus, PartyView,
 };
-use net::packet::handle::world::{DoorExit, Rock};
+use net::packet::handle::world::{DoorExit, PartyPotion, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::cmp::Reverse;
@@ -218,6 +218,7 @@ impl WorldDirectory {
             DirectoryMessage::RockLocate { from, name, rock } => {
                 self.rock_locate(from, &name, rock)
             }
+            DirectoryMessage::MorphAnother { from, potion } => self.morph_another(from, potion),
             DirectoryMessage::Broadcast {
                 from,
                 scope,
@@ -907,6 +908,33 @@ impl WorldDirectory {
                 .handle
                 .send(ServerMessage::RockLocated { rock, found: None }),
         };
+    }
+
+    /// Hand a Party Potion to the character it names, if they are on the
+    /// user's channel; otherwise tell the user they weren't found.
+    fn morph_another(&self, from: ClientId, potion: PartyPotion) {
+        let Some(user) = self.clients.get(&from) else {
+            return;
+        };
+        let target = self
+            .names
+            .get(&potion.name)
+            .and_then(|id| self.clients.get(id))
+            .filter(|target| target.channel_id == user.channel_id);
+        // A target that has just gone counts as not found, so the user's
+        // client is always unlocked.
+        let reached = target.is_some_and(|target| {
+            target.handle.send(ServerMessage::MorphAnother {
+                reply_to: user.handle.clone(),
+                potion: potion.clone(),
+            })
+        });
+        if !reached {
+            user.handle.send(ServerMessage::MorphedAnother {
+                potion,
+                morphed: false,
+            });
+        }
     }
 
     fn messenger(&mut self, from: ClientId, request: MessengerRequest) {

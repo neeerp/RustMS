@@ -18,7 +18,7 @@ use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
 use net::packet::build::world::door::DoorView;
 use net::packet::build::world::guild::InviteRefusal;
-use net::packet::handle::world::{Rock, Whereabouts};
+use net::packet::handle::world::{PartyPotion, Rock, Whereabouts};
 use net::{
     BroadcastScope, ClientId, FieldRequest, MessengerRequest, PartyRequest, PartySkill,
     WhisperDelivery,
@@ -223,6 +223,17 @@ pub enum ServerMessage {
     RockLocated {
         rock: Rock,
         found: Option<Whereabouts>,
+    },
+    /// Someone on this channel used a Party Potion on this player; morph
+    /// them and say whether it took.
+    MorphAnother {
+        reply_to: ClientHandle,
+        potion: PartyPotion,
+    },
+    /// Whether the character this player's `potion` named was morphed.
+    MorphedAnother {
+        potion: PartyPotion,
+        morphed: bool,
     },
     /// `requester` (maybe this player) double-clicked this player; send them
     /// CHAR_INFO.
@@ -632,6 +643,12 @@ pub enum DirectoryMessage {
         from: ClientId,
         name: String,
         rock: Rock,
+    },
+    /// Find the character a Party Potion names on the sender's channel, to
+    /// morph them.
+    MorphAnother {
+        from: ClientId,
+        potion: PartyPotion,
     },
     Broadcast {
         from: ClientId,

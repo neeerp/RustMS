@@ -87,6 +87,9 @@ pub enum SendOpcode {
     FamilySetPrivilege = 0x67,
     /// A family member asks to summon the player.
     FamilySummonRequest = 0x68,
+    /// The answer to a Party Potion used on someone (0xA0): unlocks, or a
+    /// notice (report c041).
+    RandomMorphRes = 0x77,
     /// A line among the floating script messages (0xa13f20).
     ScriptProgressMessage = 0x7A,
     MacroSysDataInit = 0x7C,

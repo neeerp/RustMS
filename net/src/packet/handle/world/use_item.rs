@@ -17,6 +17,7 @@ use game_data::items::ConsumeSpec;
 use game_data::{
     is_use_item, FIELD_LIMIT_MAP_SCROLLS, FIELD_LIMIT_RETURN_SCROLLS, NO_DESTINATION_MAP,
 };
+use inventory::RandomMorphRes;
 use packet::{io::read::PktRead, Packet};
 use rand::Rng;
 use std::io::Cursor;
@@ -270,6 +271,121 @@ fn potion_refused(player: &Player, item_id: i32) -> bool {
 /// (send 0xA0, report c041), never the user, so USE_ITEM refuses it.
 fn targets_another(item_id: i32) -> bool {
     item_id / 10_000 == 221 && item_id % 10_000 / 1_000 == 2
+}
+
+/// `USE_TARGET_ITEM` (0xA0, report c041): tick, slot in the USE bag, item
+/// id, and the name typed in v83's Transform dialog. A Party Potion
+/// (2212000) used in a town morphs the character of that name on the
+/// channel as their own random morph potion would, replacing any morph they
+/// have; the potion is used up once it has. Who may be morphed, and where,
+/// isn't known from v83 (lanes/QUESTIONS.md, c60). The client's item use
+/// stays locked until RANDOM_MORPH_RES.
+pub struct UseTargetItemHandler;
+
+impl WorldHandler for UseTargetItemHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_int()?; // client tick
+        let slot = reader.read_short()?;
+        let item_id = reader.read_int()?;
+        let name = reader.read_str_with_length()?;
+        let player = &*ctx.player;
+        let field = crate::get_game_data()
+            .ok()
+            .and_then(|data| data.field(player.stats.map_id));
+        let Some(field) = field.filter(|field| field.may_use(item_id)) else {
+            return random_morph_res(RandomMorphRes::Done);
+        };
+        if !may_target(player, slot, item_id) {
+            debug!(slot, item_id, "Party Potion refused");
+            return random_morph_res(RandomMorphRes::Done);
+        }
+        if !field.town {
+            return random_morph_res(RandomMorphRes::NotInTown);
+        }
+        if name.is_empty() || name.eq_ignore_ascii_case(player.name()) {
+            return random_morph_res(RandomMorphRes::NotFound(name));
+        }
+        let potion = PartyPotion {
+            slot,
+            item_id,
+            name,
+        };
+        Ok(HandlerResult::empty().with(WorldAction::MorphAnother(potion)))
+    }
+}
+
+/// A Party Potion in use, while the server looks for the character named.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PartyPotion {
+    pub slot: i16,
+    pub item_id: i32,
+    pub name: String,
+}
+
+fn random_morph_res(res: RandomMorphRes) -> WorldResult {
+    Ok(HandlerResult::reply(inventory::build_random_morph_res(
+        &res,
+    )?))
+}
+
+/// Whether the player may use the potion in `slot` on someone: alive, not
+/// under Stop Potion, and holding an item that `targets_another` with a
+/// morph pool. v83 opens the dialog (0x4f03c1, FUN_00a1005a) whether or not
+/// the user is morphed, a ghost or seated.
+fn may_target(player: &Player, slot: i16, item_id: i32) -> bool {
+    let held = player
+        .inventory
+        .get(InventoryType::Use, slot)
+        .is_some_and(|item| item.item_id == item_id);
+    let pool = items::info(item_id)
+        .and_then(|info| info.spec)
+        .is_some_and(|spec| !spec.morph_random.is_empty());
+    player.stats.hp > 0
+        && !player.buffs.has(BuffStat::StopPotion)
+        && targets_another(item_id)
+        && held
+        && pool
+}
+
+/// A Party Potion's morph landing on `player`, the character it was used
+/// on: its effect as though they had drunk it, replacing any morph they
+/// have. `None` while they are dead or a ghost, who aren't found.
+pub fn morph_by_another(player: &mut Player, item_id: i32, now: Instant) -> Option<ItemEffect> {
+    if player.stats.hp <= 0 || crate::morph::ghosted(player) || !targets_another(item_id) {
+        return None;
+    }
+    apply_item_effect(player, item_id, now)
+}
+
+/// The user's side once the character `potion` named answered: used up if
+/// they were morphed, kept with "Failed to find user %s." if not. A potion
+/// moved away meanwhile isn't taken.
+pub fn morphed_another(player: &mut Player, potion: PartyPotion, morphed: bool) -> WorldResult {
+    if !morphed {
+        return random_morph_res(RandomMorphRes::NotFound(potion.name));
+    }
+    let held = player
+        .inventory
+        .get(InventoryType::Use, potion.slot)
+        .is_some_and(|item| item.item_id == potion.item_id);
+    let changes = if held {
+        player
+            .inventory_mut()
+            .take(InventoryType::Use, potion.slot, 1)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let done = inventory::build_random_morph_res(&RandomMorphRes::Done)?;
+    if changes.is_empty() {
+        return Ok(HandlerResult::reply(done));
+    }
+    Ok(
+        HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?)
+            .with_reply(done),
+    )
 }
 
 /// The template a random morph potion's roll in `0..` the sum of its
@@ -989,6 +1105,132 @@ mod tests {
         assert_eq!(player.inventory.count(2211000), 1);
         // Morphed, the next one waits.
         assert!(use_item(&mut player, 1, 2211000, Instant::now()).is_none());
+    }
+
+    fn target_request(slot: i16, item_id: i32, name: &str) -> Packet {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::UseTargetItem as i16).unwrap();
+        p.write_int(0).unwrap();
+        p.write_short(slot).unwrap();
+        p.write_int(item_id).unwrap();
+        p.write_str_with_length(name).unwrap();
+        p
+    }
+
+    fn use_on(player: &mut Player, slot: i16, item_id: i32, name: &str) -> Vec<WorldAction> {
+        let mut packet = target_request(slot, item_id, name);
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player,
+        };
+        UseTargetItemHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions
+    }
+
+    fn morph_res(actions: &[WorldAction]) -> Vec<u8> {
+        match actions {
+            [WorldAction::Reply(p)] if p.opcode() == SendOpcode::RandomMorphRes as i16 => {
+                p.bytes[2..].to_vec()
+            }
+            _ => panic!("not a lone RANDOM_MORPH_RES: {actions:?}"),
+        }
+    }
+
+    #[test]
+    fn a_party_potion_names_someone_in_town_and_is_used_up_once_they_morph() {
+        if items::data().is_err() || crate::get_game_data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.map_id = 100_000_000;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2212000, 2));
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2211000, 1));
+        let potion = PartyPotion {
+            slot: 1,
+            item_id: 2212000,
+            name: "Bo".into(),
+        };
+        let actions = use_on(&mut player, 1, 2212000, "Bo");
+        assert!(matches!(&actions[..], [WorldAction::MorphAnother(p)] if *p == potion));
+        assert_eq!(player.inventory.count(2212000), 2);
+
+        // No one, or the user: not found. Cliff's own potion: only unlocked.
+        let own = player.name().to_string();
+        for name in ["", own.as_str()] {
+            let mut expected = vec![1, 2];
+            expected.extend((name.len() as u16).to_le_bytes());
+            expected.extend(name.bytes());
+            assert_eq!(morph_res(&use_on(&mut player, 1, 2212000, name)), expected);
+        }
+        assert_eq!(morph_res(&use_on(&mut player, 2, 2211000, "Bo")), [0]);
+        assert_eq!(morph_res(&use_on(&mut player, 3, 2212000, "Bo")), [0]);
+
+        // Out of town.
+        player.stats.map_id = 100_010_000;
+        assert_eq!(morph_res(&use_on(&mut player, 1, 2212000, "Bo")), [1, 3]);
+        assert_eq!(player.inventory.count(2212000), 2);
+
+        // Bo wasn't found, then was morphed.
+        let result = morphed_another(&mut player, potion.clone(), false).unwrap();
+        assert_eq!(morph_res(&result.actions), [1, 2, 2, 0, b'B', b'o']);
+        assert_eq!(player.inventory.count(2212000), 2);
+        let opcodes: Vec<_> = morphed_another(&mut player, potion, true)
+            .unwrap()
+            .actions
+            .iter()
+            .map(|action| match action {
+                WorldAction::Reply(p) => p.opcode(),
+                _ => 0,
+            })
+            .collect();
+        assert_eq!(
+            opcodes,
+            [
+                SendOpcode::InventoryOperation as i16,
+                SendOpcode::RandomMorphRes as i16
+            ]
+        );
+        assert_eq!(player.inventory.count(2212000), 1);
+    }
+
+    #[test]
+    fn a_party_potion_morphs_its_target_over_a_morph_but_not_a_ghost() {
+        if items::data().is_err() {
+            return;
+        }
+        let now = Instant::now();
+        let mut target = crate::codec::stats::sample_player();
+        let hour = Duration::from_secs(3600);
+        target
+            .buffs
+            .give(Buff::new(-2210000, BuffStat::Morph, 5, now, hour));
+        let effect = morph_by_another(&mut target, 2212000, now).unwrap();
+        let [(BuffStat::Morph, morph)] = effect.given[..] else {
+            panic!("no morph in {:?}", effect.given);
+        };
+        assert!((23..=30).contains(&morph));
+        assert_eq!(effect.time, 3_600_000);
+        let shown = target.buffs.shown();
+        assert!(shown
+            .iter()
+            .any(|b| b.stat == BuffStat::Morph && b.value == morph && b.skill_id == -2212000));
+
+        // Only the Party Potion, and not on a ghost or the dead.
+        assert!(morph_by_another(&mut target, 2211000, now).is_none());
+        target
+            .buffs
+            .give(Buff::new(-2360000, BuffStat::Ghost, 1, now, hour));
+        assert!(morph_by_another(&mut target, 2212000, now).is_none());
+        let mut dead = crate::codec::stats::sample_player();
+        dead.stats.hp = 0;
+        assert!(morph_by_another(&mut dead, 2212000, now).is_none());
     }
 
     #[test]

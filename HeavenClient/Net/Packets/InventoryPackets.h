@@ -122,6 +122,23 @@ namespace ms
 		}
 	};
 
+	// Uses the Maplemas Party Potion (2212xxx) in USE slot `slot` on the
+	// character named, who takes one of its random transformations
+	// (FUN_00a5337f; no sound)
+	// Opcode: USE_TARGET_ITEM(160)
+	class UseTargetItemPacket : public OutPacket
+	{
+	public:
+		UseTargetItemPacket(int16_t slot, int32_t itemid, const std::string &name)
+				: OutPacket(OutPacket::Opcode::USE_TARGET_ITEM)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+			write_string(name);
+		}
+	};
+
 	// Feeds the pet food (212xxxx) in USE slot `slot` to the pet out that
 	// is least full (FUN_00a09905)
 	// Opcode: PET_FOOD(76)

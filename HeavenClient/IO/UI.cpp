@@ -40,6 +40,7 @@
 #include "UITypes/UIIncubator.h"
 #include "UITypes/UIKarmaScissors.h"
 #include "UITypes/UIKite.h"
+#include "UITypes/UITransform.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIPersonalShop.h"
 #include "UITypes/UIQuickSlotConfig.h"
@@ -141,6 +142,7 @@ namespace ms
 			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIIncubator>())
 			|| open(get_element<UIViciousHammer>())
 			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>())
+			|| open(get_element<UITransform>())
 			|| open(get_element<UIEnchantSkill>());
 	}
 
@@ -446,6 +448,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 					types.emplace_back(UIElement::Type::KITEWRITE);
+					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
 					types.emplace_back(UIElement::Type::FAMILY);
 					types.emplace_back(UIElement::Type::FAMILYTREE);
@@ -472,6 +475,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 					types.emplace_back(UIElement::Type::KITEWRITE);
+					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
 				} else if (tab)
 				{
