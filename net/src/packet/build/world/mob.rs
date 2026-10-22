@@ -175,11 +175,22 @@ pub fn build_move_mob_response(
     Ok(p)
 }
 
-/// DAMAGE_MONSTER: a number over a mob (0x66c6c2), here only the HP a mob
-/// skill healed, sent negative, then its HP and max HP for its HP tag.
+/// DAMAGE_MONSTER: a number over a mob (0x66c6c2), here the HP a mob skill
+/// healed, sent negative, then its HP and max HP for its HP tag.
 pub fn build_heal_mob(
     object_id: i32,
     healed: i32,
+    hp: i32,
+    max_hp: i32,
+) -> Result<Packet, NetworkError> {
+    build_damage_mob(object_id, -healed, hp, max_hp)
+}
+
+/// DAMAGE_MONSTER for the damage another mob dealt a Dazzled mob, which
+/// the client that sent it has already shown.
+pub fn build_damage_mob(
+    object_id: i32,
+    damage: i32,
     hp: i32,
     max_hp: i32,
 ) -> Result<Packet, NetworkError> {
@@ -187,7 +198,7 @@ pub fn build_heal_mob(
     p.write_short(SendOpcode::DamageMonster as i16)?;
     p.write_int(object_id)?;
     p.write_byte(0)?;
-    p.write_int(-healed)?;
+    p.write_int(damage)?;
     p.write_int(hp)?;
     p.write_int(max_hp)?;
     Ok(p)

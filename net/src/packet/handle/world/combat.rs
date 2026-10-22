@@ -90,6 +90,31 @@ impl WorldHandler for MobBombHandler {
     }
 }
 
+/// `MOB_DAMAGE_MOB`: a mob's attack reached a Dazzled mob, which the client
+/// hurt with its own formula (FUN_00670c63): the attacker's object id, the
+/// character's id, the victim's, a byte for the attack, the damage, then a
+/// flag and a point for its hit effect, which go unread.
+pub struct MobDamageMobHandler;
+
+impl WorldHandler for MobDamageMobHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let attacker = r.read_int()?;
+        r.read_int()?;
+        let victim = r.read_int()?;
+        r.read_byte()?;
+        let damage = r.read_int()?;
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::MobDamageMob {
+                attacker,
+                victim,
+                damage,
+            })),
+        )
+    }
+}
+
 /// `NPC_ACTION`: the NPCs' controller chose an idle action. Object id, the
 /// action (an animation index from 2, or -1 for a line alone), the line
 /// (-1 for none), then a path for an NPC that walks.

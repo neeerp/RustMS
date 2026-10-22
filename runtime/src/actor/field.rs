@@ -2,7 +2,7 @@ use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_kites::KiteSet;
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{
-    split_exp, BossBar, Cast, CastArea, Catch, LiveMob, MobSet, Sharer,
+    split_exp, BossBar, Cast, CastArea, Catch, Kill, LiveMob, MobSet, Sharer,
 };
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
@@ -32,8 +32,8 @@ use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteV
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
-    build_catch_fail, build_catch_with_item, build_control_mob, build_heal_mob, build_kill_mob,
-    build_mob_hp, build_mob_stat_reset, build_mob_stat_set, build_move_mob,
+    build_catch_fail, build_catch_with_item, build_control_mob, build_damage_mob, build_heal_mob,
+    build_kill_mob, build_mob_hp, build_mob_stat_reset, build_mob_stat_set, build_move_mob,
     build_move_mob_response, build_show_magnet, build_spawn_mob, build_stop_controlling_mob,
     CatchFail, MobMoveView, MobView,
 };
@@ -484,6 +484,11 @@ impl FieldActor {
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
                 FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
+                FieldRequest::MobDamageMob {
+                    attacker,
+                    victim,
+                    damage,
+                } => self.handle_mob_damage_mob(from, attacker, victim, damage),
                 FieldRequest::NpcAction { object_id, action } => {
                     self.handle_npc_action(from, object_id, &action)
                 }
@@ -1145,37 +1150,7 @@ impl FieldActor {
                         }
                     }
                 }
-                Some(Err(kill)) => {
-                    if let Ok(packet) = build_kill_mob(kill.object_id, kill.leave) {
-                        self.broadcast(None, packet);
-                    }
-                    self.show_boss_bar(kill.boss_bar);
-                    let sharers: Vec<Sharer> = self
-                        .occupants
-                        .iter()
-                        .map(|(&client, occupant)| Sharer {
-                            client,
-                            level: occupant.avatar.level,
-                            party: occupant.party,
-                        })
-                        .collect();
-                    // One roll per kill, for whoever hit it hardest.
-                    let looter = kill.damage_by.first().map(|&(client, _)| client);
-                    for share in split_exp(kill.exp, kill.level, &kill.damage_by, &sharers) {
-                        if let Some(occupant) = self.occupants.get(&share.client) {
-                            occupant.handle.send(ServerMessage::MobKilled {
-                                mob_id: kill.mob_id,
-                                object_id: kill.object_id,
-                                exp: share.exp,
-                                party_bonus: share.party_bonus,
-                                looter: looter == Some(share.client),
-                                x: kill.x,
-                                y: kill.y,
-                                showdown: kill.showdown,
-                            });
-                        }
-                    }
-                }
+                Some(Err(kill)) => self.killed(&kill),
                 None => {}
             }
         }
@@ -1194,6 +1169,68 @@ impl FieldActor {
                 mp: mp_taken,
                 map_id: self.key.map_id,
             });
+        }
+    }
+
+    /// A mob died: everyone sees it go, and those who hurt it share its
+    /// EXP.
+    fn killed(&mut self, kill: &Kill) {
+        if let Ok(packet) = build_kill_mob(kill.object_id, kill.leave) {
+            self.broadcast(None, packet);
+        }
+        self.show_boss_bar(kill.boss_bar);
+        let sharers: Vec<Sharer> = self
+            .occupants
+            .iter()
+            .map(|(&client, occupant)| Sharer {
+                client,
+                level: occupant.avatar.level,
+                party: occupant.party,
+            })
+            .collect();
+        // One roll per kill, for whoever hit it hardest.
+        let looter = kill.damage_by.first().map(|&(client, _)| client);
+        for share in split_exp(kill.exp, kill.level, &kill.damage_by, &sharers) {
+            if let Some(occupant) = self.occupants.get(&share.client) {
+                occupant.handle.send(ServerMessage::MobKilled {
+                    mob_id: kill.mob_id,
+                    object_id: kill.object_id,
+                    exp: share.exp,
+                    party_bonus: share.party_bonus,
+                    looter: looter == Some(share.client),
+                    x: kill.x,
+                    y: kill.y,
+                    showdown: kill.showdown,
+                });
+            }
+        }
+    }
+
+    /// `from`'s client says a mob's attack hurt a Dazzled mob: it takes the
+    /// damage, if it may, as if `from` dealt it (as in Cosmic), and the
+    /// others see the number `from` already showed.
+    fn handle_mob_damage_mob(&mut self, from: ClientId, attacker: i32, victim: i32, damage: i32) {
+        let now = Instant::now();
+        let Some(damage) = self.mobs.mob_hit(attacker, victim, damage, now) else {
+            return;
+        };
+        match self.mobs.damage(from, victim, damage, now) {
+            Some(Ok(_)) => {
+                let Some(mob) = self.mobs.get(victim) else {
+                    return;
+                };
+                let hp = i32::try_from(mob.hp).unwrap_or(i32::MAX);
+                let packet = build_damage_mob(victim, damage as i32, hp, mob.info.max_hp);
+                let bar = mob.boss_bar();
+                if let Ok(packet) = packet {
+                    self.broadcast(Some(from), packet);
+                }
+                if damage > 0 {
+                    self.show_boss_bar(bar);
+                }
+            }
+            Some(Err(kill)) => self.killed(&kill),
+            None => {}
         }
     }
 

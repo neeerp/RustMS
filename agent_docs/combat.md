@@ -960,9 +960,18 @@ carry the statuses a mob has. Entries come in the client's decode order
   OdinMS-family rule).
 - Hypnotize (5221009) has no `damage` and hits for the plain blow, like
   Disorder and Taunt. Its Dazzle (bit 28) stops the mob attacking players
-  on the client. In v83 other mobs may then hit it, reported by their
-  controller as MOB_DAMAGE_MOB (0xC2); the server has no handler for that
-  yet.
+  on the client. Other mobs' attacks that reach it then hurt it: each
+  client that sees it computes the damage and sends MOB_DAMAGE_MOB (0xC2:
+  attacker, character, victim, a byte, damage, then a flag and a point that
+  go unread). The server (`MobSet::mob_hit`) takes it only for a live
+  Dazzled victim of a live attacker that isn't, within 600 x 300 px, once
+  in 2 s per victim (so the copies from several clients count once), and
+  cuts it to the most the client's formula gives the attacker's best
+  attack and statuses against the victim's defense, or its magic attack
+  against none (`mob_hit_cap`); a hit that comes to nothing is dropped.
+  The sender is credited as if they dealt it (Cosmic's rule), and the
+  others get DAMAGE_MONSTER (0xF6) with the number and HP; a kill goes the
+  usual way. The friendly-mob variant (0xC0) is not handled.
 - Bosses shrug off Stun, Freeze, Seal, Doom, Web and Dazzle. A mob immune to poison
   (`elemAttr` S1) or ice (I1) shrugs off Poison or Freeze.
 - Poison, Venom and Ambush take HP each second on the field tick

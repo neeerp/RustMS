@@ -76,6 +76,8 @@ pub struct LiveMob {
     pub leaves_at: Option<Instant>,
     /// Steal took its item; it gives no other.
     pub stolen: bool,
+    /// When another mob last hurt it, while it was Dazzled.
+    pub mob_hit_at: Option<Instant>,
 }
 
 /// A mob skill and level the server let a mob cast, and when.
@@ -176,6 +178,15 @@ pub struct MobAct {
 /// second from when it was put on (0x6675a8).
 pub const HURT_INTERVAL: Duration = Duration::from_secs(1);
 
+/// How long a Dazzled mob goes between hits from other mobs (v83
+/// 0x670c99, for each client).
+const MOB_HIT_INTERVAL: Duration = Duration::from_secs(2);
+
+/// How far apart (x, y) two mobs may be for one's attack to reach the
+/// other: more than any attack range, as the client doesn't say which
+/// attack it was.
+const MOB_HIT_REACH: (i32, i32) = (600, 300);
+
 /// A mob hurt by a status, the player who put it on, and the mob's HP
 /// percent after.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -185,7 +196,38 @@ pub struct Hurt {
     pub percent: u8,
 }
 
+/// The most a mob with attack `attack` hurts one with defence `defense`
+/// for (v83 FUN_00792ae1 and FUN_00792c01): its attack times at most 0.85
+/// (0.8 for magic, less here) plus 100, a hundredth of that times the
+/// attack, less at least half the defence.
+fn mob_hit_cap(attack: i32, defense: i32) -> i64 {
+    let attack = f64::from(attack.max(0));
+    let most = (attack * 0.85 + 100.0) * attack * 0.01 - f64::from(defense.max(0)) * 0.5;
+    most.max(0.0) as i64
+}
+
 impl LiveMob {
+    /// Its physical attack at its strongest: the best of its own and its
+    /// attacks', and what statuses add.
+    fn pad(&self) -> i32 {
+        let attacks = self.info.attacks.iter().map(|attack| attack.attack);
+        let base = attacks.fold(self.info.attack, i32::max);
+        base + self.boost(&[MobStat::Pad, MobStat::PowerUp])
+    }
+
+    /// Its magic attack with what statuses add.
+    fn mad(&self) -> i32 {
+        self.info.magic_attack + self.boost(&[MobStat::Mad, MobStat::MagicUp])
+    }
+
+    fn boost(&self, stats: &[MobStat]) -> i32 {
+        stats
+            .iter()
+            .filter_map(|stat| self.statuses.get(stat))
+            .map(|status| i32::from(status.value).max(0))
+            .sum()
+    }
+
     fn new(
         object_id: i32,
         info: MobInfo,
@@ -223,6 +265,7 @@ impl LiveMob {
             cooldowns: HashMap::new(),
             leaves_at,
             stolen: false,
+            mob_hit_at: None,
         }
     }
 
@@ -1232,6 +1275,45 @@ impl MobSet {
         gone
     }
 
+    /// A client says the mob `attacker`'s attack hurt the mob `victim` for
+    /// `damage` (MOB_DAMAGE_MOB, v83 FUN_00670c63): only a Dazzled mob, by
+    /// one that isn't, near enough, and once in 2 s however many clients
+    /// saw it (each client waits that long between such hits on a mob).
+    /// Returns the damage to deal, cut to the most the client's formula
+    /// gives the attacker; a hit that comes to nothing is dropped and
+    /// doesn't hold off the next one.
+    pub fn mob_hit(
+        &mut self,
+        attacker: i32,
+        victim: i32,
+        damage: i32,
+        now: Instant,
+    ) -> Option<i64> {
+        if attacker == victim {
+            return None;
+        }
+        let dazzled = |mob: &LiveMob| {
+            mob.statuses
+                .get(&MobStat::Dazzle)
+                .is_some_and(|status| status.until > now)
+        };
+        let from = self.live.get(&attacker).filter(|mob| !dazzled(mob))?;
+        let (x, y, pad, mad) = (from.x, from.y, from.pad(), from.mad());
+        let mob = self.live.get_mut(&victim).filter(|mob| dazzled(mob))?;
+        let near = (i32::from(mob.x) - i32::from(x)).abs() <= MOB_HIT_REACH.0
+            && (i32::from(mob.y) - i32::from(y)).abs() <= MOB_HIT_REACH.1;
+        if !near || mob.mob_hit_at.is_some_and(|at| now < at + MOB_HIT_INTERVAL) {
+            return None;
+        }
+        let most = mob_hit_cap(pad, mob.info.defense).max(mob_hit_cap(mad, 0));
+        let damage = i64::from(damage).clamp(0, most);
+        if damage == 0 {
+            return None;
+        }
+        mob.mob_hit_at = Some(now);
+        Some(damage)
+    }
+
     /// A client says a mob that bombs (`selfDestruction` action 3, the
     /// Darkstars Papulatus calls) has a player in reach: take it away as if
     /// it left. Returns whether it was there to take.
@@ -1929,6 +2011,42 @@ mod tests {
         let mut mobs = MobSet::new([(template, info)]);
         let bomb = mobs.spawn_all(now)[0];
         assert_eq!(mobs.leave(now), [(bomb, 4, None)]);
+    }
+
+    #[test]
+    fn only_a_dazzled_mob_near_another_takes_its_hits_once_in_2_s() {
+        let now = Instant::now();
+        let mut mobs = MobSet::new([snail_spawn(100), snail_spawn(200), snail_spawn(900)]);
+        let [near, dazzled, far] = mobs.spawn_all(now)[..] else {
+            panic!("three snails");
+        };
+        assert_eq!(mobs.mob_hit(near, dazzled, 5, now), None);
+        let until = now + Duration::from_secs(60);
+        for mob in [dazzled, far] {
+            mobs.add_statuses(mob, &[(MobStat::Dazzle, 1)], 5221009, 1, now, until);
+        }
+        assert_eq!(mobs.mob_hit(dazzled, dazzled, 5, now), None);
+        assert_eq!(mobs.mob_hit(dazzled, near, 5, now), None);
+        assert_eq!(mobs.mob_hit(near, far, 5, now), None);
+        // A snail's 12 attack hurts for at most (12 * 0.85 + 100) * 0.12.
+        assert_eq!(mobs.mob_hit(near, dazzled, 500, now), Some(13));
+        let soon = now + Duration::from_millis(1999);
+        assert_eq!(mobs.mob_hit(near, dazzled, 5, soon), None);
+        let later = now + MOB_HIT_INTERVAL;
+        assert_eq!(mobs.mob_hit(near, dazzled, -5, later), None);
+        assert_eq!(mobs.mob_hit(near, dazzled, 4, later), Some(4));
+        // A Dazzled mob hurts none.
+        mobs.add_statuses(near, &[(MobStat::Dazzle, 1)], 5221009, 1, now, until);
+        let much_later = later + MOB_HIT_INTERVAL;
+        assert_eq!(mobs.mob_hit(near, dazzled, 5, much_later), None);
+    }
+
+    #[test]
+    fn the_most_a_mob_hits_another_for() {
+        assert_eq!(mob_hit_cap(12, 0), 13);
+        assert_eq!(mob_hit_cap(100, 20), 175);
+        assert_eq!(mob_hit_cap(10, 1000), 0);
+        assert_eq!(mob_hit_cap(-5, 0), 0);
     }
 
     #[test]
