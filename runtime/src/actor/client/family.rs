@@ -45,9 +45,10 @@ impl ClientActor {
         match request {
             FamilyRequest::Open => self.load_family().await,
             FamilyRequest::Chart { name } => {
+                let viewer = self.client_id;
                 let chart = spawn_db(move || {
                     db::family::character(&name)?
-                        .map(db::family::chart)
+                        .map(|viewed| db::family::chart(viewed, viewer))
                         .transpose()
                 })
                 .await?;

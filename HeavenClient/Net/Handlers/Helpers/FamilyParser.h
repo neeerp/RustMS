@@ -14,6 +14,9 @@ namespace ms
 		// FAMILY_PRIVILEGE_LIST.
 		std::vector<FamilyPrivilege> parse_privileges(InPacket& recv);
 
+		// SET_PRIVILEGE (0xa35074): an icon of 0 is all there is.
+		FamilyPrivilegeInUse parse_in_use(InPacket& recv);
+
 		// FAMILY_CHART_RESULT (0x80a5f7), not yet arranged into boxes.
 		FamilyChart parse_chart(InPacket& recv, int32_t self);
 	}

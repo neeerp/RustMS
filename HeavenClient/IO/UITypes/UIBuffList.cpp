@@ -104,13 +104,15 @@ namespace ms
 		// FUN_007b2e58
 		if (auto entry = entry_at(cursorpos))
 		{
-			if (entry->id >= 0)
+			if (entry->id == FAMILY)
+				show_family();
+			else if (entry->id >= 0)
 				UI::get().show_skill(Tooltip::Parent::BUFFLIST, entry->id, 0, 0, 0, false);
 			else
 				UI::get().show_item(Tooltip::Parent::BUFFLIST, -entry->id);
 		} else
 		{
-			UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
+			remove_cursor();
 		}
 
 		return Cursor::State::IDLE;
@@ -124,6 +126,7 @@ namespace ms
 	void UIBuffList::remove_cursor()
 	{
 		UI::get().clear_tooltip(Tooltip::Parent::BUFFLIST);
+		UI::get().clear_help(TYPE);
 	}
 
 	void UIBuffList::rightclick(Point<int16_t> cursorpos)
@@ -132,10 +135,11 @@ namespace ms
 		// Dragon Roar's can't be cancelled, nor Oak Barrel's while it drops
 		// or breaks (FUN_0095009a). An item buff (negative id) sends
 		// CANCEL_ITEM_EFFECT, but a morph item's with noCancelMouse is
-		// refused while morphed (FUN_00a096af).
+		// refused while morphed (FUN_00a096af). A family entitlement's
+		// (type 4) does nothing.
 		constexpr int32_t DRAGON_ROAR = 1311006;
 
-		if (auto entry = entry_at(cursorpos))
+		if (auto entry = entry_at(cursorpos); entry && entry->id != FAMILY)
 		{
 			const Player &player = Stage::get().get_player();
 
@@ -181,6 +185,37 @@ namespace ms
 		{
 			timer->set(value);
 		}
+	}
+
+	void UIBuffList::set_family(uint8_t icon, int32_t left)
+	{
+		row.remove(FAMILY);
+
+		if (icon != 0)
+		{
+			row.add(FAMILY, FAMILY, left, [icon] {
+				return Texture(NxFiles::ui_classic["UIWindow.img"]["Family"]["RightIcon"][std::to_string(icon)]);
+			});
+		}
+
+		remove_cursor();
+	}
+
+	// The entitlement's name and description, in the box button help uses
+	// (0x7b2f02: 0x8e7150 with a7 = 0, a8 = 0, a9 = 1).
+	void UIBuffList::show_family() const
+	{
+		const Family& family = Stage::get().get_player().get_family();
+		const std::vector<FamilyPrivilege>& privileges = family.get_privileges();
+		int32_t index = family.in_use();
+
+		if (index < 0 || index >= static_cast<int32_t>(privileges.size()))
+		{
+			UI::get().clear_help(TYPE);
+			return;
+		}
+
+		UI::get().show_help(TYPE, privileges[index].name, privileges[index].description);
 	}
 
 	void UIBuffList::cancel_buff(int32_t stat)

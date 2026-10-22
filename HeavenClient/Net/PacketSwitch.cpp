@@ -252,6 +252,7 @@ namespace ms
 		FAMILY_PRIVILEGE_LIST = 100,
 		FAMILY_REP_GAIN = 101,
 		FAMILY_NOTIFY_LOGIN_OR_LOGOUT = 102,
+		FAMILY_SET_PRIVILEGE = 103,
 		FAMILY_SUMMON_REQUEST = 104,
 
 		/// Cash Shop
@@ -454,6 +455,7 @@ namespace ms
 		emplace<FAMILY_PRIVILEGE_LIST, FamilyPrivilegeListHandler>();
 		emplace<FAMILY_REP_GAIN, FamilyRepGainHandler>();
 		emplace<FAMILY_NOTIFY_LOGIN_OR_LOGOUT, FamilyNotifyLoginOrLogoutHandler>();
+		emplace<FAMILY_SET_PRIVILEGE, FamilySetPrivilegeHandler>();
 		emplace<FAMILY_SUMMON_REQUEST, FamilySummonRequestHandler>();
 
 		// Cash Shop

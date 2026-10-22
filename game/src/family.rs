@@ -236,12 +236,13 @@ impl Benefit {
         }
     }
 
-    /// The icon `FAMILY_SET_PRIVILEGE` shows, `RightIcon/<n>`: 2 drops, 3
-    /// EXP, 4 both (report b042).
+    /// The icon `FAMILY_SET_PRIVILEGE` shows, `RightIcon/<n>`: 2 EXP, 3
+    /// drops, 4 both. That is what the art shows; the `RightIcon/type`
+    /// labels beside it, which the client never reads, swap 2 and 3.
     pub fn icon(&self) -> u8 {
         match *self {
-            Benefit::Rate { exp: true, .. } => 3,
-            Benefit::Rate { .. } => 2,
+            Benefit::Rate { exp: true, .. } => 2,
+            Benefit::Rate { .. } => 3,
             _ => 4,
         }
     }
@@ -341,6 +342,9 @@ pub struct FamilyChart {
     /// Head counts: -1 for the whole family, 0 for `viewed`'s seniors, and a
     /// junior's id for their branch.
     pub counts: Vec<(i32, i32)>,
+    /// The viewer's entitlements used today: (index, times). The client
+    /// lists them in the tooltip of the player's own box.
+    pub used: Vec<(i32, i32)>,
 }
 
 #[cfg(test)]
@@ -376,10 +380,10 @@ mod tests {
         assert_eq!(drops.until, now + Duration::from_secs(15 * 60));
         assert_eq!(drops.rates(now), (1.0, 1.5));
         assert_eq!(drops.rates(drops.until), (1.0, 1.0));
-        assert_eq!(drops.benefit().icon(), 2);
+        assert_eq!(drops.benefit().icon(), 3);
         let exp = FamilyBuff::new(10, now);
         assert_eq!(exp.rates(now), (2.0, 1.0));
-        assert_eq!(exp.benefit().icon(), 3);
+        assert_eq!(exp.benefit().icon(), 2);
         let bonding = FamilyBuff::new(4, now);
         assert_eq!(bonding.rates(now), (2.0, 2.0));
         assert_eq!(bonding.benefit().icon(), 4);

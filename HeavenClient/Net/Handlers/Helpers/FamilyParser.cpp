@@ -1,5 +1,7 @@
 #include "FamilyParser.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace FamilyParser
@@ -55,6 +57,26 @@ namespace ms
 			}
 
 			return privileges;
+		}
+
+		FamilyPrivilegeInUse parse_in_use(InPacket& recv)
+		{
+			FamilyPrivilegeInUse in_use;
+			in_use.icon = recv.read_byte();
+
+			if (in_use.icon == 0)
+				return in_use;
+
+			in_use.index = recv.read_int();
+			// Two numbers kept but never read.
+			recv.skip_int();
+			recv.skip_int();
+			// It ends `delta` ms from now, or ended that long ago (0xa33f82).
+			bool ago = recv.read_byte() != 0;
+			int32_t delta = recv.read_int();
+			in_use.left = ago ? 0 : std::max(delta, 0);
+
+			return in_use;
 		}
 
 		FamilyChart parse_chart(InPacket& recv, int32_t self)

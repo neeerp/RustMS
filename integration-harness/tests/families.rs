@@ -610,16 +610,31 @@ async fn members_buy_rates_and_see_their_icon_until_they_end() {
     send(&mut a.connection, use_family(3, "")).await;
     let packets = family(&mut a, 3).await;
     let (icon, index, left) = privilege(&packets[0]);
-    assert_eq!((icon, index), (3, 3));
+    assert_eq!((icon, index), (2, 3));
     assert!((fifteen_minutes - 5000..=fifteen_minutes).contains(&left));
     assert_eq!(packets[1..], [spent(800), info(9200, &[(3, 1)])]);
 
     // 2x drops takes its place.
     send(&mut a.connection, use_family(5, "")).await;
     let packets = family(&mut a, 3).await;
-    assert_eq!(privilege(&packets[0]).0, 2);
+    assert_eq!(privilege(&packets[0]).0, 3);
     assert_eq!(privilege(&packets[0]).1, 5);
     assert_eq!(packets[1..], [spent(1200), info(8000, &[(3, 1), (5, 1)])]);
+
+    // A's own tree lists them too, for A's tooltip.
+    send(
+        &mut a.connection,
+        request(RecvOpcode::OpenFamilyPedigree, &an),
+    )
+    .await;
+    let packets = family(&mut a, 1).await;
+    let mut used = 2i32.to_le_bytes().to_vec();
+    for (index, times) in [(3, 1), (5, 1)] {
+        used.extend([index, times].map(i32::to_le_bytes).concat());
+    }
+    used.extend(2u16.to_le_bytes());
+    assert_eq!(packets[0].0, SendOpcode::FamilyChart as i16);
+    assert!(packets[0].1.ends_with(&used));
 
     // Bonding needs six juniors online; A has one, and isn't charged.
     send(&mut a.connection, use_family(4, "")).await;
@@ -635,14 +650,14 @@ async fn members_buy_rates_and_see_their_icon_until_they_end() {
     let [mut a, mut b] = players;
     send(&mut a.connection, use_family(10, "")).await;
     let packets = family(&mut a, 3).await;
-    assert_eq!(privilege(&packets[0]).0, 3);
+    assert_eq!(privilege(&packets[0]).0, 2);
     assert_eq!(privilege(&packets[0]).1, 10);
     assert_eq!(
         packets[1..],
         [spent(5000), info(3000, &[(3, 1), (5, 1), (10, 1)])]
     );
     let packets = family(&mut b, 1).await;
-    assert_eq!(privilege(&packets[0]).0, 3);
+    assert_eq!(privilege(&packets[0]).0, 2);
     assert_eq!(privilege(&packets[0]).1, 10);
 
     // It lasts across a relogin, and its icon goes when it ends.
@@ -666,7 +681,7 @@ async fn members_buy_rates_and_see_their_icon_until_they_end() {
         .find(|(op, _)| *op == SendOpcode::FamilySetPrivilege as i16)
         .unwrap();
     let (icon, index, left) = privilege(icon);
-    assert_eq!((icon, index), (3, 10));
+    assert_eq!((icon, index), (2, 10));
     assert!((0..=8000).contains(&left));
     let mut t = Trace::default();
     until(&mut b.connection, &mut t, |t| {

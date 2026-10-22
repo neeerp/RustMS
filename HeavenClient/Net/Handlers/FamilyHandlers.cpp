@@ -8,6 +8,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/FamilyActions.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UIBuffList.h"
 #include "../../IO/UITypes/UIFamily.h"
 #include "../../IO/UITypes/UIFamilyTree.h"
 #include "../../IO/UITypes/UIInviteCard.h"
@@ -223,6 +224,18 @@ namespace ms
 
 		if (auto tree = own_tree())
 			tree->set_online(name, online);
+	}
+
+	// A new one takes the old one's icon away (0xa34fa4). The client never
+	// takes it away by itself: the server sends 0 when it ends.
+	void FamilySetPrivilegeHandler::handle(InPacket& recv) const
+	{
+		FamilyPrivilegeInUse in_use = FamilyParser::parse_in_use(recv);
+
+		Stage::get().get_player().get_family().set_in_use(in_use.index);
+
+		if (auto bufflist = UI::get().get_element<UIBuffList>())
+			bufflist->set_family(in_use.icon, in_use.left);
 	}
 
 	// A modal Yes/No with nothing gating it; any answer but Yes is a no

@@ -24,6 +24,16 @@ namespace ms
 		bool needs_target() const;
 	};
 
+	// The entitlement working for the player (SET_PRIVILEGE, 0xa35074).
+	struct FamilyPrivilegeInUse
+	{
+		// UIWindow.img/Family/RightIcon/<icon>; 0 for none.
+		uint8_t icon = 0;
+		int32_t index = -1;
+		// The ms it has left.
+		int32_t left = 0;
+	};
+
 	// The player's own numbers (FAMILY_INFO_RESULT).
 	struct FamilyInfo
 	{
@@ -146,9 +156,15 @@ namespace ms
 		void set_privileges(std::vector<FamilyPrivilege> privileges);
 		void clear();
 
+		// The place in the list of the entitlement working for the player,
+		// -1 for none (0xa137b4). It outlasts the INFO.
+		int32_t in_use() const;
+		void set_in_use(int32_t index);
+
 	private:
 		bool has_info = false;
 		FamilyInfo info;
 		std::vector<FamilyPrivilege> privileges;
+		int32_t using_index = -1;
 	};
 }
