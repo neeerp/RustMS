@@ -1,10 +1,11 @@
 //! Reward boxes: USE_ITEM_REWARD trades a box for one of its entries, and
-//! keeps the box when what it gives doesn't fit.
+//! keeps the box when what it gives doesn't fit; the map sees the prize's
+//! effect.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_item, grant_stack};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::send;
+use integration_harness::trace::{read_for, send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -20,6 +21,7 @@ const STORIES: [i32; 2] = [4_001_201, 4_001_202];
 const SLOT: i16 = 5;
 /// Bronze Ore, to fill the Etc tab with.
 const ORE: i32 = 4_010_000;
+const FOREST: i32 = 50_000;
 
 fn open(slot: i16, item_id: i32) -> Packet {
     let mut p = Packet::new_empty();
@@ -117,4 +119,45 @@ async fn a_box_not_held_is_refused() {
         answer(&mut session.connection).await,
         [SendOpcode::StatChange as i16]
     );
+}
+
+#[tokio::test]
+async fn the_map_sees_the_prize() {
+    let (_, config) = holding(1).await;
+    let watcher_config = load_harness_config_or_fail().await;
+    let mut opener = relogin(&config).await;
+    let mut watcher = login_to_world_session(&watcher_config).await.unwrap();
+    let (mut o, mut w) = (Trace::default(), Trace::default());
+    assert_eq!(
+        warp(&mut opener.connection, FOREST, "", &mut o).await,
+        FOREST
+    );
+    assert_eq!(
+        warp(&mut watcher.connection, FOREST, "", &mut w).await,
+        FOREST
+    );
+    read_for(&mut opener.connection, &mut o, 300).await;
+    read_for(&mut watcher.connection, &mut w, 300).await;
+
+    send(&mut opener.connection, open(SLOT, BOX)).await;
+    loop {
+        let p = timeout(
+            Duration::from_secs(5),
+            watcher.connection.read_packet("prize"),
+        )
+        .await
+        .expect("no effect within 5 s")
+        .expect("read packet")
+        .packet;
+        let b = &p.bytes;
+        if p.opcode() != SendOpcode::ShowForeignEffect as i16 || b[6] != 14 {
+            continue;
+        }
+        // The opener, then one of the stories and no animation.
+        let cid = i32::from_le_bytes([b[2], b[3], b[4], b[5]]);
+        let item = i32::from_le_bytes([b[7], b[8], b[9], b[10]]);
+        assert_eq!(cid, opener.character_id);
+        assert!(STORIES.contains(&item), "{item}");
+        break;
+    }
 }

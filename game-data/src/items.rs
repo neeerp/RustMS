@@ -92,12 +92,18 @@ pub struct ItemInfo {
 
 /// One of a box's prizes (`reward/N`): `count` of `item_id`, weighted by
 /// `prob` among the box's entries, lasting `period` minutes (0 for good).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Reward {
     pub item_id: i32,
     pub count: i16,
     pub prob: u32,
     pub period: i32,
+    /// The animation the opener plays (`Effect`), as the data writes it,
+    /// such as `Effect/BasicEff/Event1/Best`.
+    pub effect: Option<String>,
+    /// What the world is told (`worldMsg`), with `/name` and `/item` to
+    /// fill in.
+    pub world_msg: Option<String>,
 }
 
 /// A Magical Sandglass's `info`: the seconds it adds to a time-limited
@@ -597,6 +603,8 @@ impl ItemData {
                         .int_child(entry, "prob")?
                         .map_or(0, |prob| u32::try_from(prob).unwrap_or(0)),
                     period: nx.int_child(entry, "period")?.unwrap_or(0),
+                    effect: nx.string_child(entry, "Effect")?,
+                    world_msg: nx.string_child(entry, "worldMsg")?,
                 });
             }
         }
@@ -768,6 +776,38 @@ impl ItemNames {
             return Ok(None);
         };
         nx.string_child(node, "msg")
+    }
+
+    /// An item's name: `Eqp.img/Eqp/<kind>/<id>`, `Consume.img/<id>`,
+    /// `Ins.img/<id>`, `Etc.img/Etc/<id>`, `Pet.img/<id>` or `Cash.img/<id>`.
+    pub fn item(&self, item_id: i32) -> Result<Option<String>, GameDataError> {
+        let nx = &self.strings;
+        let id = item_id.to_string();
+        let node = match item_id / 1_000_000 {
+            1 => {
+                let Some(kinds) = path_index(nx, "Eqp.img/Eqp")? else {
+                    return Ok(None);
+                };
+                let mut found = None;
+                for kind in nx.child_indices(kinds)? {
+                    if let Some(node) = nx.child_by_name(kind, &id)? {
+                        found = Some(node);
+                        break;
+                    }
+                }
+                found
+            }
+            2 => path_index(nx, &format!("Consume.img/{id}"))?,
+            3 => path_index(nx, &format!("Ins.img/{id}"))?,
+            4 => path_index(nx, &format!("Etc.img/Etc/{id}"))?,
+            5 if item_id / 10_000 == 500 => path_index(nx, &format!("Pet.img/{id}"))?,
+            5 => path_index(nx, &format!("Cash.img/{id}"))?,
+            _ => None,
+        };
+        match node {
+            Some(node) => nx.string_child(node, "name"),
+            None => Ok(None),
+        }
     }
 
     /// A map's name (`Map.img/<region>/<id>/mapName`), as the client shows
@@ -1003,7 +1043,9 @@ mod tests {
                 item_id: 4_170_012,
                 count: 12,
                 prob: 50,
-                period: 21_600
+                period: 21_600,
+                effect: Some("Effect/BasicEff/Event1/Success".to_string()),
+                world_msg: None,
             }]
         );
         let pig = data.info(2022503).unwrap().unwrap().reward;
@@ -1012,6 +1054,12 @@ mod tests {
         assert!(pig
             .iter()
             .any(|r| r.item_id == 1_132_010 && r.period == 7_200));
+        assert!(pig.iter().any(
+            |r| r.effect.as_deref() == Some("Effect/BasicEff/Event1/Best")
+                && r.world_msg
+                    .as_deref()
+                    .is_some_and(|msg| msg.contains("/name"))
+        ));
         assert!(data.info(2000000).unwrap().unwrap().reward.is_empty());
     }
 
@@ -1092,6 +1140,17 @@ mod tests {
             Some("Henesys")
         );
         assert_eq!(names.map_name(123_456).unwrap(), None);
+        for (id, name) in [
+            (1_132_010, "Golden Pig Belt"),
+            (2_000_000, "Red Potion"),
+            (3_010_000, "The Relaxer"),
+            (4_000_000, "Blue Snail Shell"),
+            (5_000_000, "Brown Kitty"),
+            (5_530_000, "DS Egg Basket"),
+        ] {
+            assert_eq!(names.item(id).unwrap().as_deref(), Some(name), "{id}");
+        }
+        assert_eq!(names.item(2_009_999).unwrap(), None);
     }
 
     #[test]

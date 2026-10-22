@@ -50,6 +50,11 @@ pub fn cash_message(item_id: i32) -> Option<String> {
     names().ok()?.cash_message(item_id).ok().flatten()
 }
 
+/// An item's name, as String.nx has it.
+pub fn item_name(item_id: i32) -> Option<String> {
+    names().ok()?.item(item_id).ok().flatten()
+}
+
 /// The map's name, as the client shows it.
 pub fn map_name(map_id: i32) -> Option<String> {
     names().ok()?.map_name(map_id).ok().flatten()

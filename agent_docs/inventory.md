@@ -770,8 +770,22 @@ expiring after `period` minutes when it has one (a recommended default,
 chat gain line. If the entry doesn't fit, or is one of a kind and already
 held, it sends "Your inventory is full." and keeps the box. Anything else
 (no box in that slot, no reward node, dead, a map that bars the item) only
-unlocks the client. The entries' `Effect` and `worldMsg` aren't sent yet,
-and the nine cash bags (5530000-5530008) aren't handled.
+unlocks the client. The nine cash bags (5530000-5530008) aren't handled
+yet.
+
+An entry may also name an `Effect` (an animation path such as
+`Effect/BasicEff/Event1/Best`) and a `worldMsg` (report c038). On a
+successful open the server sends user effect mode 14 (`u8 14, i32 item,
+u8 has_path, [str path]`; `build_reward_item_effect`) to the opener as
+SHOW_ITEM_GAIN_INCHAT and to the rest of the map as SHOW_FOREIGN_EFFECT
+with the opener's id first. The item is the prize, which only picks the use
+sound. Item.nx writes the path without the `.img` of its image node, so the
+server adds it after the image's name (`Effect/BasicEff.img/Event1/Best`),
+and an empty path is sent as none. When the
+entry has a `worldMsg`, the whole world gets it as a BROADCAST_MSG type 6
+item line, with `/name` replaced by the opener's name and `/item` by the
+prize's name from String.nx (`ItemNames::item`); if the name can't be found
+nothing is sent.
 
 In HeavenClient, `ItemData::has_reward` says whether the item has a
 `reward` node, and a double-click on such a Use item sends

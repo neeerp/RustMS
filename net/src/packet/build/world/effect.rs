@@ -178,6 +178,37 @@ pub fn build_mist_item_effect(
     Ok(p)
 }
 
+/// A reward box's prize (FUN_009377d9 mode 14, report c038): the prize's use
+/// sound, and the entry's `Effect` drawn where the opener stands, as the data
+/// writes it. SHOW_ITEM_GAIN_INCHAT for the opener, SHOW_FOREIGN_EFFECT
+/// naming `character_id` for the others.
+pub fn build_reward_item_effect(
+    character_id: Option<i32>,
+    item_id: i32,
+    effect: Option<&str>,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    match character_id {
+        Some(id) => {
+            p.write_short(SendOpcode::ShowForeignEffect as i16)?;
+            p.write_int(id)?;
+        }
+        None => p.write_short(SendOpcode::ShowItemGainInChat as i16)?,
+    }
+    p.write_byte(14)?;
+    p.write_int(item_id)?;
+    match effect {
+        Some(path) => {
+            p.write_byte(1)?;
+            p.write_str_with_length(path)?;
+        }
+        None => {
+            p.write_byte(0)?;
+        }
+    }
+    Ok(p)
+}
+
 /// ITEM_EMOTION (0xE2, FUN_00938b3e): the user of the cash mist `item_id`
 /// pulls one of its `emotion` faces, which their client picks and shows.
 pub fn build_item_emotion(item_id: i32) -> Result<Packet, NetworkError> {
@@ -384,6 +415,29 @@ mod tests {
             .short(SendOpcode::PlayerHint as i16)
             .string("Once you leave");
         expect.short(150).short(5).byte(1);
+        expect.end();
+    }
+
+    #[test]
+    fn a_prize_plays_its_box_effect() {
+        let own =
+            build_reward_item_effect(None, 2049100, Some("Effect/BasicEff/Event1/Best")).unwrap();
+        let mut expect = Expect::new(&own.bytes);
+        expect
+            .short(SendOpcode::ShowItemGainInChat as i16)
+            .byte(14)
+            .int(2049100)
+            .byte(1)
+            .string("Effect/BasicEff/Event1/Best");
+        expect.end();
+        let foreign = build_reward_item_effect(Some(7), 4001201, None).unwrap();
+        let mut expect = Expect::new(&foreign.bytes);
+        expect
+            .short(SendOpcode::ShowForeignEffect as i16)
+            .int(7)
+            .byte(14)
+            .int(4001201)
+            .byte(0);
         expect.end();
     }
 }
