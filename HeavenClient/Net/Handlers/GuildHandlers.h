@@ -45,6 +45,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// "<Guild> Name is now married. Please congratulate them.", or a
+	// family's
+	// Opcode: NOTIFY_MARRIAGE(106)
+	class NotifyMarriageHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// The guild name under another character's name
 	// Opcode: GUILD_NAME_CHANGED(202)
 	class GuildNameChangedHandler : public PacketHandler

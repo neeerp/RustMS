@@ -58,6 +58,7 @@ pub enum SendOpcode {
     /// The guild bulletin board's list and threads (0x816c32).
     GuildBbs = 0x3B,
     NotifyLevelUp = 0x69,
+    NotifyMarriage = 0x6A,
     NotifyJobChange = 0x6B,
     /// An avatar megaphone was refused (`u8` reason) (0xa2a3bc).
     AvatarMegaphoneResult = 0x6E,

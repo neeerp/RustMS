@@ -383,6 +383,7 @@ impl WorldDirectory {
                 marriage_id,
                 reply,
             } => self.join_wedding(from, venue, marriage_id, reply),
+            DirectoryMessage::Married { from } => self.tell_married(from),
             DirectoryMessage::WeddingClosed {
                 channel_id,
                 venue,

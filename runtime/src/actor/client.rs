@@ -1403,7 +1403,12 @@ impl ClientActor {
                 self.wedding_moved(id, to, clock).await?
             }
             ServerMessage::WeddingEnded { id, failed } => self.wedding_ended(id, failed).await?,
-            ServerMessage::Married { id, record, clock } => self.married(id, record, clock).await?,
+            ServerMessage::Married {
+                id,
+                record,
+                blessings,
+                clock,
+            } => self.married(id, record, blessings, clock).await?,
             ServerMessage::WeddingPriest { id, line } => self.wedding_priest(id, line).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,

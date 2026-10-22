@@ -252,10 +252,11 @@ and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The wedding
 
-Slices 7a to 7d of report b071 marry a couple at the Chapel or the
-Cathedral before their guests, with the priest's lines over the altar and
-the Cathedral guests' blessings; the party afterwards and the hunting
-grounds are later slices.
+Slices 7a to 7e of report b071 marry a couple at the Chapel or the
+Cathedral before their guests, with the priest's lines over the altar, the
+Cathedral guests' blessings and their reward, the news to the couple's
+guild and family, and a premium wedding's party room; the hunting grounds
+are a later slice.
 
 Wayne (9201012) in Amoria starts a booked Chapel wedding, and High Priest
 John (9201002) in Amoria a booked Cathedral one
@@ -294,7 +295,13 @@ scaled by `RUSTMS_EVENT_SCALE`:
    (below), not a dialog of his.
 3. Married (`AFTER_VOWS`, 45 minutes). Jackie (9201009) at the Chapel or
    Nancy (9201007) at the Cathedral asks whether to end it; yes sends the
-   couple to Ames's room (680000500), as does the time running out.
+   couple to Ames's room (680000500), as does the time running out. A
+   premium booking (the reservation's `premium`, report b080) goes on
+   instead: yes moves the couple and the guests to the party room
+   (`PARTY_ROOM`, 680000300) under the same clock. There Travis (9201010)
+   offers the way back to Amoria and Robin (9201021) the way out to
+   680000500; each only moves the one who asks, and the time running out
+   sends whoever is left to 680000500.
 
 A partner who leaves the wedding's maps, logs out or changes channel
 before the vows ends it: the booking is deleted, nothing is refunded
@@ -366,9 +373,21 @@ on the altar during the ceremony, the guest's ticket asks the actor
 (`blessers`) once per guest while the priest's last line is the blessing
 and the couple aren't married yet; the guest then reads `wedding.blessed`
 in pink. A blessing at any other time or place, or from the couple, does
-nothing. The count is kept for the blessings' reward (slice 7e); it still
-holds guests who have left since, and the couple may vow before the
-blessing, which then never comes.
+nothing. A guest who leaves drops out of the count, and the couple may
+vow before the blessing, which then never comes.
+
+### After the vows
+
+Each partner gets `BLESSING_EXP` (30000) for every guest who blessed and
+is still in the wedding when the second vows marry them, with no EXP rate
+applied (report b080). Then each partner's client actor tells the
+directory (`DirectoryMessage::Married`), which sends `NOTIFY_MARRIAGE`
+(0x6A: `u8` 0 guild or 1 family, then "> name") to everyone of the
+partner's guild online and to the partner's family. The client shows
+"<Guild> name is now married. Please congratulate them." as a chat line
+(report b079). The directory only knows a player's senior and juniors, so
+the family notice goes to them and the partner, not to the whole tree as
+in Cosmic.
 
 ## The partner's map
 
@@ -562,8 +581,8 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding (report b071 slices 7e-7g): the blessings'
-  reward, the party and the hunting grounds. Also the wishlist.
+- The rest of the wedding (report b071 slices 7f-7g): the hunting
+  grounds and the wishlist.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
   guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's

@@ -374,11 +374,12 @@ pub enum ServerMessage {
         id: u32,
         line: crate::actor::wedding::PriestLine,
     },
-    /// Wedding `id` married the couple `record`; their time there now runs
-    /// out at `clock`.
+    /// Wedding `id` married the couple `record`, whom `blessings` guests
+    /// there blessed; their time there now runs out at `clock`.
     Married {
         id: u32,
         record: game::marriage::MarriageRecord,
+        blessings: u32,
         clock: tokio::time::Instant,
     },
     SendPacket(Packet),
@@ -809,6 +810,10 @@ pub enum DirectoryMessage {
         reply: tokio::sync::oneshot::Sender<
             Result<crate::actor::wedding::WeddingTicket, game::wedding::GuestRefusal>,
         >,
+    },
+    /// `from` married: their guild and family read so.
+    Married {
+        from: ClientId,
     },
     /// Wedding `id` at `venue` on `channel_id` is over; the venue is free.
     WeddingClosed {

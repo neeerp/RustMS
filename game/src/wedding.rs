@@ -89,9 +89,11 @@ impl Venue {
         }
     }
 
-    /// Whether `map_id` is one of the maps the wedding has its own copy of.
+    /// Whether `map_id` is one of the maps the wedding has its own copy of:
+    /// the venue's hall and altar, and the party room both venues' premium
+    /// weddings go on to.
     pub fn holds(self, map_id: i32) -> bool {
-        map_id == self.hall() || map_id == self.altar()
+        map_id == self.hall() || map_id == self.altar() || map_id == PARTY_ROOM
     }
 
     /// The priest's line that pronounces the couple married: the step of
@@ -140,6 +142,10 @@ pub const PRIEST_WELCOME: u8 = 0;
 /// Amoria, where Wayne and the High Priest start the weddings.
 pub const AMORIA: i32 = 680000000;
 
+/// Where a premium wedding goes on once the couple are married, when they
+/// ask the altar staff (report b080).
+pub const PARTY_ROOM: i32 = 680000300;
+
 /// Where everyone goes when a wedding ends: Ames's room, which both venues'
 /// maps return to.
 pub const WEDDING_EXIT: i32 = 680000500;
@@ -149,6 +155,10 @@ pub const GATHERING: Duration = Duration::from_secs(10 * 60);
 pub const CEREMONY: Duration = Duration::from_secs(20 * 60);
 /// How long the wedding lasts once they are married.
 pub const AFTER_VOWS: Duration = Duration::from_secs(45 * 60);
+
+/// The EXP each of the couple gains at their vows for every guest who
+/// blessed them and is still at the wedding (report b080).
+pub const BLESSING_EXP: i32 = 30000;
 
 /// The clothes a partner may marry in (report b071 Q1): the couple's own
 /// tuxedo and gowns, or the groomsman's and bridesmaid's.
@@ -396,6 +406,7 @@ mod tests {
         assert!(Venue::Chapel.holds(680000100) && Venue::Chapel.holds(680000110));
         assert!(Venue::Cathedral.holds(680000200) && Venue::Cathedral.holds(680000210));
         assert!(!Venue::Chapel.holds(680000210) && !Venue::Chapel.holds(WEDDING_EXIT));
+        assert!(Venue::Chapel.holds(PARTY_ROOM) && Venue::Cathedral.holds(PARTY_ROOM));
         assert_eq!(
             WeddingStage::from_u8(WeddingStage::Ceremony as u8),
             WeddingStage::Ceremony

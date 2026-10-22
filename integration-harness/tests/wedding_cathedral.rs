@@ -6,11 +6,16 @@
 //! the guests' own closes don't move him on. The vows bring his
 //! pronouncement, its close the hearts and his farewell, and Nancy sees
 //! the couple out.
+//!
+//! The vows bring the couple 30000 EXP for each guest who blessed them and
+//! stayed (slice 7e), and their guild reads that they married. A premium
+//! wedding's couple go on with everyone to the party room, where Travis
+//! and Robin show the way out.
 
 use game_data::server_content::keys;
 use integration_harness::database::{
-    add_wedding_guest, book_wedding, engage, grant_stack, replace_item, set_gender, set_job,
-    wedding_due,
+    add_wedding_guest, book_wedding, engage, found_guild, grant_stack, join_guild, replace_item,
+    set_gender, set_job, wedding_due, wedding_premium,
 };
 use integration_harness::events::talk;
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -20,15 +25,23 @@ use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldS
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
+use tokio::sync::Mutex;
 use tokio::time::Duration;
 
 const AMORIA: i32 = 680_000_000;
 const HALL: i32 = 680_000_200;
 const ALTAR: i32 = 680_000_210;
 const EXIT: i32 = 680_000_500;
+const PARTY_ROOM: i32 = 680_000_300;
 const HIGH_PRIEST: i32 = 9201002;
 const NANCY: i32 = 9201007;
+const TRAVIS: i32 = 9201010;
+const ROBIN: i32 = 9201021;
 const NICOLE: i32 = 9201005;
+
+/// One wedding at a time may use the Cathedral on the harness's channel.
+static CATHEDRAL_IN_USE: Mutex<()> = Mutex::const_new(());
+
 /// The invitation a Cathedral guest receives.
 const INVITATION: i32 = 4031407;
 /// The assistants' menu choice for guests.
@@ -46,6 +59,13 @@ const CATHEDRAL: i16 = 1;
 const MARRIED: u8 = 12;
 /// BROADCAST_MSG in pink.
 const PINK: u8 = 5;
+/// The EXP for each guest's blessing.
+const BLESSING_EXP: i32 = 30000;
+
+/// NOTIFY_MARRIAGE to `name`'s guild.
+fn guild_married(name: &str) -> (i16, u8, i32, String) {
+    (SendOpcode::NotifyMarriage as i16, 0, 0, format!("> {name}"))
+}
 
 /// WEDDING_PROGRESS: the priest's `step` for the couple.
 fn priest(step: u8, groom: i32, bride: i32) -> (i16, Vec<u8>) {
@@ -155,18 +175,19 @@ async fn go_in(session: &mut WorldSession) {
     arrive(session, HALL, t).await;
 }
 
-#[tokio::test]
-async fn the_high_priest_marries_a_couple_their_guests_bless() {
-    let mut configs = Vec::new();
-    for _ in 0..4 {
-        configs.push(load_harness_config_or_fail().await);
-    }
+/// An engaged couple behind `configs[0..2]` with their Cathedral wedding
+/// due, and the invited guests behind the rest of `configs`: the groom's
+/// and the bride's ids, the couple's, and the guests' ids.
+async fn book(configs: &[HarnessConfig], premium: bool) -> (i32, i32, i32, Vec<i32>) {
     let groom = new_character(&configs[0], 0, GROOM_CLOTHES).await;
     let bride = new_character(&configs[1], 1, BRIDE_CLOTHES).await;
     engage(groom, bride, MOONSTONE_BOX).await.expect("engage");
     grant_stack(groom, ETC, 1, EMPTY_BOX, 1).await.expect("box");
     grant_stack(bride, ETC, 1, RING, 1).await.expect("ring");
     let marriage_id = book_wedding(groom, CATHEDRAL, 0).await.expect("book");
+    if premium {
+        wedding_premium(marriage_id).await.expect("premium");
+    }
     wedding_due(marriage_id, 0).await.expect("due");
     let mut guests = Vec::new();
     for config in &configs[2..] {
@@ -175,8 +196,42 @@ async fn the_high_priest_marries_a_couple_their_guests_bless() {
             .await
             .expect("invitation");
         add_wedding_guest(marriage_id, id).await.expect("guest");
+        guests.push(id);
+    }
+    (groom, bride, marriage_id, guests)
+}
+
+/// Both of the couple take their vows; what each then heard, the
+/// marriage result included.
+async fn vow(a: &mut WorldSession, b: &mut WorldSession) -> (Trace, Trace) {
+    let at = say_yes(a, ALTAR, HIGH_PRIEST).await;
+    assert_eq!(at.marriage, []);
+    let mut bt = say_yes(b, ALTAR, HIGH_PRIEST).await;
+    until(&mut b.connection, &mut bt, |t| !t.marriage.is_empty()).await;
+    let bt = hear(b, 1, bt).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| !t.marriage.is_empty()).await;
+    let at = hear(a, 1, at).await;
+    (at, bt)
+}
+
+#[tokio::test]
+async fn the_high_priest_marries_a_couple_their_guests_bless() {
+    let _cathedral = CATHEDRAL_IN_USE.lock().await;
+    let mut configs = Vec::new();
+    for _ in 0..5 {
+        configs.push(load_harness_config_or_fail().await);
+    }
+    let (groom, bride, _, guest_ids) = book(&configs, false).await;
+    // The groom and the late guest are in a guild; the bride isn't.
+    let guild = format!("Wed{groom}");
+    found_guild(groom, &guild).await.expect("guild");
+    join_guild(guest_ids[1], &guild).await.expect("join");
+    let mut guests = Vec::new();
+    for config in &configs[2..] {
         guests.push(enter(config).await);
     }
+    let mut leaver = guests.pop().unwrap();
     let mut late = guests.pop().unwrap();
     let mut blesser = guests.pop().unwrap();
     let mut a = enter(&configs[0]).await;
@@ -189,9 +244,10 @@ async fn the_high_priest_marries_a_couple_their_guests_bless() {
     arrive(&mut b, HALL, Trace::default()).await;
     go_in(&mut blesser).await;
     go_in(&mut late).await;
+    go_in(&mut leaver).await;
 
     // At the altar everyone hears his welcome.
-    let mut everyone = [&mut a, &mut b, &mut blesser, &mut late];
+    let mut everyone = [&mut a, &mut b, &mut blesser, &mut late, &mut leaver];
     for session in everyone.iter_mut() {
         let t = arrive(session, ALTAR, Trace::default()).await;
         let t = hear(session, 1, t).await;
@@ -224,34 +280,51 @@ async fn the_high_priest_marries_a_couple_their_guests_bless() {
         t.wedding,
         [priest(1, groom, bride), priest(2, groom, bride)]
     );
+    let t = hear(&mut leaver, 2, Trace::default()).await;
+    assert_eq!(
+        t.wedding,
+        [priest(1, groom, bride), priest(2, groom, bride)]
+    );
 
     // The guest's blessing counts once; the couple have none to give.
     let blessed = net::content::text().get(keys::WEDDING_BLESSED, &[]);
     let t = quietly(&mut blesser, "blesses", bless()).await;
-    assert_eq!(t.broadcasts, [(PINK, blessed)]);
+    assert_eq!(t.broadcasts, [(PINK, blessed.clone())]);
     let t = quietly(&mut blesser, "blesses again", bless()).await;
     assert_eq!(t.broadcasts, []);
     let t = quietly(&mut a, "blesses", bless()).await;
     assert_eq!(t.broadcasts, []);
 
-    // The vows marry them and bring the pronouncement; after that a
-    // blessing is too late.
-    let at = say_yes(&mut a, ALTAR, HIGH_PRIEST).await;
-    assert_eq!(at.marriage, []);
-    let mut bt = say_yes(&mut b, ALTAR, HIGH_PRIEST).await;
-    until(&mut b.connection, &mut bt, |t| !t.marriage.is_empty()).await;
-    let bt = hear(&mut b, 1, bt).await;
+    // Another guest blesses and leaves: their blessing goes with them.
+    let t = quietly(&mut leaver, "blesses", bless()).await;
+    assert_eq!(t.broadcasts, [(PINK, blessed)]);
+    let t = say_yes(&mut leaver, ALTAR, NANCY).await;
+    arrive(&mut leaver, EXIT, t).await;
+
+    // The vows marry them and bring the pronouncement, and each of the
+    // couple the EXP of the one blessing left; after that a blessing is
+    // too late.
+    let (at, bt) = vow(&mut a, &mut b).await;
     assert_eq!(marriage_results(&bt), [MARRIED]);
     assert_eq!(bt.wedding, [priest(3, groom, bride)]);
-    let lt = hear(&mut late, 1, Trace::default()).await;
+    assert_eq!(bt.gains, [BLESSING_EXP]);
+    assert_eq!(at.gains, [BLESSING_EXP]);
+    let mut lt = hear(&mut late, 1, Trace::default()).await;
     assert_eq!(lt.wedding, [priest(3, groom, bride)]);
     let t = quietly(&mut late, "blesses late", bless()).await;
     assert_eq!(t.broadcasts, []);
 
+    // The groom's guild reads that he married, and so does he; the bride,
+    // in no guild or family, hears nothing.
+    let notice = guild_married(&a.character_name);
+    until(&mut late.connection, &mut lt, |t| !t.notices.is_empty()).await;
+    assert_eq!(lt.notices, [notice.clone()]);
+    let mut at = at;
+    until(&mut a.connection, &mut at, |t| !t.notices.is_empty()).await;
+    assert_eq!(at.notices, [notice]);
+    assert_eq!(bt.notices, []);
+
     // A's close of it brings the hearts and the farewell.
-    let mut at = Trace::default();
-    until(&mut a.connection, &mut at, |t| !t.marriage.is_empty()).await;
-    let at = hear(&mut a, 1, at).await;
     assert_eq!(at.wedding, [priest(3, groom, bride)]);
     let at = quietly(&mut a, "closes the pronouncement", talked(3)).await;
     let at = hear(&mut a, 2, at).await;
@@ -266,5 +339,48 @@ async fn the_high_priest_marries_a_couple_their_guests_bless() {
     let at = say_yes(&mut a, ALTAR, NANCY).await;
     arrive(&mut a, EXIT, at).await;
     arrive(&mut b, EXIT, Trace::default()).await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+}
+
+#[tokio::test]
+async fn a_premium_wedding_goes_on_to_the_party_room() {
+    let _cathedral = CATHEDRAL_IN_USE.lock().await;
+    let mut configs = Vec::new();
+    for _ in 0..3 {
+        configs.push(load_harness_config_or_fail().await);
+    }
+    book(&configs, true).await;
+    let mut guest = enter(&configs[2]).await;
+    let mut a = enter(&configs[0]).await;
+    let mut b = enter(&configs[1]).await;
+    let at = say_yes(&mut a, AMORIA, HIGH_PRIEST).await;
+    arrive(&mut a, HALL, at).await;
+    arrive(&mut b, HALL, Trace::default()).await;
+    go_in(&mut guest).await;
+    for session in [&mut a, &mut b, &mut guest] {
+        arrive(session, ALTAR, Trace::default()).await;
+    }
+
+    // Married without a blessing, they gain no EXP; Nancy takes everyone
+    // on to the party room.
+    let (at, bt) = vow(&mut a, &mut b).await;
+    assert_eq!(marriage_results(&bt), [MARRIED]);
+    assert_eq!((at.gains.len(), bt.gains.len()), (0, 0));
+    let at = say_yes(&mut a, ALTAR, NANCY).await;
+    arrive(&mut a, PARTY_ROOM, at).await;
+    arrive(&mut b, PARTY_ROOM, Trace::default()).await;
+    arrive(&mut guest, PARTY_ROOM, Trace::default()).await;
+
+    // Robin shows the guest to the exit and Travis the groom back to
+    // Amoria; the bride stays until she too goes.
+    let t = say_yes(&mut guest, PARTY_ROOM, ROBIN).await;
+    arrive(&mut guest, EXIT, t).await;
+    let at = say_yes(&mut a, PARTY_ROOM, TRAVIS).await;
+    arrive(&mut a, AMORIA, at).await;
+    let mut t = Trace::default();
+    read_for(&mut b.connection, &mut t, 500).await;
+    assert!(t.warps.is_empty(), "{:?}", t.warps);
+    let bt = say_yes(&mut b, PARTY_ROOM, ROBIN).await;
+    arrive(&mut b, EXIT, bt).await;
     tokio::time::sleep(Duration::from_secs(3)).await;
 }

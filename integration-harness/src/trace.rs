@@ -175,8 +175,8 @@ pub struct Trace {
     /// GUILD_MARK_CHANGED: (character, [background, its colour, mark, its
     /// colour]).
     pub guild_marks: Vec<(i32, [u16; 4])>,
-    /// NOTIFY_LEVELUP and NOTIFY_JOB_CHANGE: (opcode, type, level or job,
-    /// name).
+    /// NOTIFY_LEVELUP, NOTIFY_JOB_CHANGE and NOTIFY_MARRIAGE: (opcode,
+    /// type, level or job or 0, name).
     pub notices: Vec<(i16, u8, i32, String)>,
     /// Other players appearing on the field.
     pub players: Vec<SpawnPlayerPacket>,
@@ -642,6 +642,10 @@ impl Trace {
             let (kind, value) = (r.read_byte().unwrap(), r.read_int().unwrap());
             self.notices
                 .push((op, kind, value, r.read_str_with_length().unwrap()));
+        } else if op == SendOpcode::NotifyMarriage as i16 {
+            let kind = r.read_byte().unwrap();
+            self.notices
+                .push((op, kind, 0, r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::GuildNameChanged as i16 {
             self.guild_names
                 .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));

@@ -185,6 +185,17 @@ pub fn build_wedding_hearts() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// NOTIFY_MARRIAGE: "<Guild> `name` is now married. Please congratulate
+/// them." in the chat log, or "<Family>" to a relative (report b079). The
+/// client's text has no '>' after the group, so it goes with the name.
+pub fn build_married_notice(family: bool, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NotifyMarriage as i16)?;
+    packet.write_byte(u8::from(family))?;
+    packet.write_str_with_length(&format!("> {name}"))?;
+    Ok(packet)
+}
+
 /// MARRIAGE_RESULT 36: `text` in the client's OK box.
 pub fn build_marriage_notice(text: &str) -> Result<Packet, NetworkError> {
     let mut packet = result(NOTICE)?;
@@ -226,6 +237,17 @@ mod tests {
         let packet = build_wedding_progress(1, 7, 8).unwrap();
         assert_eq!(packet.bytes, [0x40, 0x01, 1, 7, 0, 0, 0, 8, 0, 0, 0]);
         assert_eq!(build_wedding_hearts().unwrap().bytes, [0x41, 0x01]);
+    }
+
+    #[test]
+    fn the_married_notice_names_its_group_and_the_partner() {
+        let packet = build_married_notice(false, "Bob").unwrap();
+        assert_eq!(
+            packet.bytes,
+            [0x6a, 0x00, 0, 5, 0, b'>', b' ', b'B', b'o', b'b']
+        );
+        let packet = build_married_notice(true, "Bob").unwrap();
+        assert_eq!(packet.bytes[2], 1);
     }
 
     #[test]

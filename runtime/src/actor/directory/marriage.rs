@@ -10,7 +10,9 @@ use crate::message::{ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
 use game::wedding::{GuestRefusal, Invitation, PartnerRefusal, StartRefusal, Venue};
 use game_data::server_content::keys;
-use net::packet::build::world::marriage::{build_marriage_notice, build_marriage_refusal};
+use net::packet::build::world::marriage::{
+    build_marriage_notice, build_marriage_refusal, build_married_notice,
+};
 use net::ClientId;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::{mpsc, oneshot};
@@ -115,6 +117,25 @@ impl WorldDirectory {
     /// for its empty box. A proposer gone by now keeps the box.
     pub(super) fn engaged(&self, proposer: ClientId, record: MarriageRecord) {
         self.tell(proposer, ServerMessage::Engaged(record));
+    }
+
+    /// `client_id` married: their guild online and their relatives online
+    /// read so, and so do they (report b079).
+    pub(super) fn tell_married(&self, client_id: ClientId) {
+        let Some(presence) = self.clients.get(&client_id).map(|entry| &entry.presence) else {
+            return;
+        };
+        if let Some(guild_id) = presence.guild_id {
+            for (id, _) in self.guild_online(guild_id) {
+                self.send_packet(id, build_married_notice(false, &presence.name));
+            }
+        }
+        let relatives = &presence.family;
+        if relatives.senior.is_some() || !relatives.juniors.is_empty() {
+            for id in relatives.ids().chain([client_id]) {
+                self.send_packet(id, build_married_notice(true, &presence.name));
+            }
+        }
     }
 
     /// A player left, logged in again or went to the Cash Shop: a proposal

@@ -250,6 +250,7 @@ namespace ms
 		GUILD_OPERATION = 65,
 		ALLIANCE_OPERATION = 66,
 		NOTIFY_LEVELUP = 105,
+		NOTIFY_MARRIAGE = 106,
 		NOTIFY_JOB_CHANGE = 107,
 		GUILD_NAME_CHANGED = 202,
 		GUILD_MARK_CHANGED = 203,
@@ -464,6 +465,7 @@ namespace ms
 		emplace<GUILD_OPERATION, GuildOperationHandler>();
 		emplace<ALLIANCE_OPERATION, AllianceOperationHandler>();
 		emplace<NOTIFY_LEVELUP, NotifyLevelUpHandler>();
+		emplace<NOTIFY_MARRIAGE, NotifyMarriageHandler>();
 		emplace<NOTIFY_JOB_CHANGE, NotifyJobChangeHandler>();
 		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
 		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
