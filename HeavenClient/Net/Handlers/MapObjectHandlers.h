@@ -299,6 +299,27 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The server refused to fly a kite here
+	// Opcode: CANNOT_SPAWN_KITE(270)
+	class CannotSpawnKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A player flies a kite over the map
+	// Opcode: SPAWN_KITE(271)
+	class SpawnKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A kite comes down
+	// Opcode: REMOVE_KITE(272)
+	class RemoveKiteHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Cover an area with a skill's clouds
 	// Opcode: SPAWN_MIST(273)
 	class SpawnMistHandler : public PacketHandler

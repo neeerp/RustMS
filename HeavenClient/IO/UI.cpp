@@ -433,6 +433,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::GUILDMARKMAKER);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
+					types.emplace_back(UIElement::Type::KITEWRITE);
+					types.emplace_back(UIElement::Type::KITEVIEW);
 				}
 				else if (enter)
 				{
@@ -453,6 +455,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::GUILDMARKMAKER);
 					types.emplace_back(UIElement::Type::AVATARSELECT);
 					types.emplace_back(UIElement::Type::SLIDEMENU);
+					types.emplace_back(UIElement::Type::KITEWRITE);
+					types.emplace_back(UIElement::Type::KITEVIEW);
 				} else if (tab)
 				{
 					// Game

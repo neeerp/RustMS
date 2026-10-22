@@ -253,6 +253,35 @@ later. After an hour (`KITE_TIME`, Cosmic's) REMOVE_KITE (0x110: type 0,
 id) fades it out. A client drops its kites itself on a map change. Cosmic
 sends the foothold id where the client reads y; RustMS sends y.
 
+On the client, double-clicking a kite in the Cash tab
+(`UIItemInventory::use_kite`) checks v83's gates in order: an open dialog
+gives "Not available", the Free Market gives "Not available in the Free
+Market." in the chat log, and otherwise `UIKiteWrite` asks for the three
+lines (UIClassic `UIWindow.img/MultiLine/backgrnd2`, the item's `msgIn` as
+the prompt, 60 characters a line, Enter does nothing, Esc cancels). OK
+joins the lines with `kite::join`, refuses what the curse filter refuses,
+and sends the packet. CANNOT_SPAWN_KITE shows its notice. `MapKites` keeps
+the field's kites: the item's `iconReward` animation 100 px above and 3 px
+left of the flier's feet, bobbing 3 px once every 2 s from a random phase,
+drawn after every map layer and before the mists. REMOVE_KITE type 0 stops
+the bob and fades the picture over a second, with the kite already out of
+reach of the mouse; other types drop it at once. With the mouse over a
+kite's 60x80 box, the one-line tooltip shows the flier's name run straight
+into the item's `msg` ("Lanecis wishing you a happy new year."), as v83
+does. A double click opens `UIKiteView` (`backgrnd`): the name in orange,
+the `msg` in cream after it, and the lines in white, the third holding
+whatever follows the second break. Esc, Enter and the close button close
+it. A shop balloon takes the mouse before a kite, and a click on the
+player's own quest alert bulb opens its menu even under a kite. The rules are in
+`Gameplay/MapleMap/KiteRules.h`, tested by `tests/kite_rules.cpp`.
+
+Differences from v83: HC opens one viewer at a time where v83 can stack
+several. UIClassic's `backgrnd2` has a header band above its icon and lined
+rows, so the prompt and fields sit 50 px lower than the exe puts them. Tab
+cycles only the three lines, where v83 also stops on OK and Cancel.
+HeavenClient draws chat balloons with their owners, so a kite covers an
+NPC's balloon (v83's layer for those balloons wasn't checked).
+
 ## Tests
 
 - Unit tests in `runtime/src/actor/field.rs`: join/leave visibility, a

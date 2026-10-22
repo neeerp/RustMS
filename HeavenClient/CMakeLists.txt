@@ -269,6 +269,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME tremble_rules COMMAND tremble_rules_tests)
     add_executable(field_effect_rules_tests tests/field_effect_rules.cpp)
     add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
+    add_executable(kite_rules_tests tests/kite_rules.cpp)
+    add_test(NAME kite_rules COMMAND kite_rules_tests)
     add_executable(weather_rules_tests tests/weather_rules.cpp)
     add_test(NAME weather_rules COMMAND weather_rules_tests)
     add_executable(item_effect_rules_tests tests/item_effect_rules.cpp)
@@ -570,6 +572,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapWeather.cpp
     Gameplay/MapleMap/MapWeather.h
     Gameplay/WeatherRules.h
+    Gameplay/MapleMap/MapKites.cpp
+    Gameplay/MapleMap/MapKites.h
+    Gameplay/MapleMap/KiteRules.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapDoors.cpp
     Gameplay/MapleMap/MapMists.h
@@ -819,6 +824,8 @@ add_executable(HeavenClient
     IO/UITypes/UIDuey.h
     IO/UITypes/UITeleportRock.cpp
     IO/UITypes/UITeleportRock.h
+    IO/UITypes/UIKite.cpp
+    IO/UITypes/UIKite.h
     IO/UITypes/UIMegaphone.cpp
     IO/UITypes/UIMegaphone.h
     IO/UITypes/UIPetChooser.cpp

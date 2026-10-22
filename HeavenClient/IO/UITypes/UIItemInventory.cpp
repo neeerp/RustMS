@@ -25,6 +25,7 @@
 #include "UIItemProtector.h"
 #include "UIKarmaScissors.h"
 #include "UIMemoSend.h"
+#include "UIKite.h"
 #include "UIMegaphone.h"
 #include "UINotice.h"
 #include "UIPersonalShop.h"
@@ -56,6 +57,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/WeatherRules.h"
 #include "../../Gameplay/MapleMap/FieldLimit.h"
+#include "../../Gameplay/MapleMap/KiteRules.h"
 #include "../../Util/Chalkboard.h"
 #include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
@@ -117,6 +119,8 @@ namespace ms
 		// StringPool 0x112 and 0x318.
 		constexpr const char *EFFECT_BUSY = "The effect is taking place right now.\\nPlease try it later.";
 		constexpr const char *WEATHER_PROMPT = "Please enter the attached message";
+		// StringPool 0xe3a.
+		constexpr const char *KITE_FREE_MARKET = "Not available in the Free Market.";
 		// StringPool 0x12ee.
 		constexpr const char *MIST_BUSY = "An Effect Item is currently in use. \\nplease try again later.";
 		// StringPool 0x10f, 0xea1 and 0x111.
@@ -364,6 +368,38 @@ namespace ms
 					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, CurseData::filter(text)),
 													  ExclRequest::WAIT);
 			}, weather::MAX_MESSAGE);
+		}
+
+		// v83 FUN_00a0a63f, type 0x12 (0xa0bd2b): a kite asks for three lines
+		// anywhere but the Free Market, and goes up once the server sends it
+		// to the map. Empty lines are sent too, and cursing is refused.
+		void use_kite(int16_t slot, int32_t item_id)
+		{
+			if (!may_use_cash_item() || in_dialog())
+				return;
+
+			if (!kite::allowed_on(Stage::get().get_mapid()))
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(KITE_FREE_MARKET, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			UI::get().emplace<UIKiteWrite>(item_id, [=](const std::vector<std::string> &lines)
+			{
+				std::string message = kite::join(lines);
+
+				if (!CurseData::valid(message))
+				{
+					UI::get().emplace<UIOk>(NO_CURSING, [](bool)
+					{});
+					return;
+				}
+
+				if (may_use_cash_item())
+					Stage::get().get_player().request(UseCashItemPacket(slot, item_id, message), ExclRequest::WAIT);
+			});
 		}
 
 		// v83 FUN_00a0a63f, type 0x14: a jukebox asks whether to play its
@@ -1244,6 +1280,8 @@ namespace ms
 						}
 						else if (weather::is_weather(item_id))
 							use_weather(slot, item_id);
+						else if (item_id / 10000 == 508)
+							use_kite(slot, item_id);
 						else if (field_effect::is_jukebox(item_id))
 							use_jukebox(slot, item_id);
 						else if (item_id == ap_reset::ITEM)

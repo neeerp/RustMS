@@ -146,6 +146,7 @@ namespace ms
 			ALLIANCEGREEN,
 			PARCELRED,
 			PARCELSELECT,
+			KITEMSG,
 			NUM_COLORS
 		};
 
@@ -241,7 +242,8 @@ namespace ms
 						{0.65f, 0.63f, 0.60f}, // Combo hover (#A5A198, the row under the cursor in one)
 						{0.65f, 1.00f, 0.50f}, // Alliance green (#A6FF7F, v83 chat font 5: alliance chat)
 						{1.00f, 0.13f, 0.13f}, // Parcel red (#FF2020, v83 font 6: a parcel expiring, a level limit)
-						{0.14f, 0.28f, 0.41f}  // Parcel select (#244768, the parcel Duey selects)
+						{0.14f, 0.28f, 0.41f}, // Parcel select (#244768, the parcel Duey selects)
+						{0.80f, 0.80f, 0.60f}  // Kite msg (#CCCC99, the item's words after a kite's flier)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
