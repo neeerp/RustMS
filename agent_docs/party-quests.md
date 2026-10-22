@@ -12,8 +12,9 @@ bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
 its entry and exit, its cloud stage, the hub's ways into its rooms, the
-six rooms and the garden so far; Minerva's statue and the win come in a
-later slice (`v83ref/reports/a077-orbis-pq.md`).
+six rooms, the garden, Minerva's statue and the win, and her prizes; its
+bonus and the storage come in a later slice
+(`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`).
 
 ## Rules
 
@@ -34,9 +35,9 @@ later slice (`v83ref/reports/a077-orbis-pq.md`).
 - `OPQ` has lobby 200080101 (Orbis), maps 920010000-920011300, exit
   920011200, levels 51-70, 5-6 players and 60 minutes (Server.NX
   `FieldSet.img/Party5`; Cosmic has 45). Its exit lies inside its range of
-  maps too, and the win will take the team to 920011300. Its nine stages
-  are listed in `Event::stage_maps` (see "Orbis's cloud stage and hub");
-  only the first is played yet, so it can't be won.
+  maps too. The win leaves the team where it is (no `clear_map`): Minerva
+  sends each member to her prize room 920011300. Its nine stages are
+  listed in `Event::stage_maps` (see "Orbis's cloud stage and hub").
 - `Event::team` picks who goes: the party's members online on the
   leader's channel, standing in the lobby, at the right levels. Members
   in the Cash Shop are on no map and don't count: the client tells the
@@ -398,8 +399,8 @@ OPQ's stages are Cosmic's `statusStg0` to `statusStg8`, numbered from 1
 (`OPQ.stage_maps`): 1 the cloud stage 920010000; 2 to 7 the six rooms off
 the hub, 920010200 to 920010700, each hiding a piece of Minerva's statue;
 8 the garden 920010800; and 9, the win, Minerva's statue on the hub
-920010100 (`OPQ_HUB`). Stages 1 to 7 give 3500 EXP each (Cosmic
-`giveEventPlayersExp`).
+920010100 (`OPQ_HUB`). Every stage but the garden gives 3500 EXP (Cosmic
+`giveEventPlayersExp`; for the win, see "Orbis's garden").
 
 On the cloud stage the light (reactor 2006000) starts in state 20
 (`reactors::first_state`): v83's Reactor.nx has its item event, 20 Cloud
@@ -429,7 +430,7 @@ The hub's portals `party3_room1` to `party3_room6` lead into the rooms
 (`PLAIN_WARPS`, Cosmic's portal ids), and each room's `party3_roomout`
 leads back to its own portal on the hub (`OPQ_ROOMS_OUT`). The storage's
 `party3_room8` stays shut with a pink line (`opq.notice.storage_closed`)
-until the quest is won (not played yet).
+even after the quest is won, until the bonus is played.
 
 ## Orbis's walkway and lounge
 
@@ -575,8 +576,30 @@ Eak then tells the leader to set the Grass at the statue's foot
 Map.nx flags the pots for shuffling (`reactorShuffle`), but Cosmic doesn't
 shuffle them, and neither does RustMS. `RUSTMS_OPQ_POTS` (a digit 0-7)
 pins how many Nependeaths grow before the Royals; the harness world sets 1
-(`tests/opq_garden.rs`). Minerva's statue, the win and her prize are not
-played yet.
+(`tests/opq_garden.rs`).
+
+Minerva's statue (reactor 2006001 at (-48, -916) on the hub,
+`reactors::OPQ_STATUE`) starts in state 6 (`reactors::first_state`), the
+one whose Reactor.nx event takes the Grass of Life; its states 0 to 5 take
+nothing. The Grass dropped at its foot by anyone breaks it
+(`Action::AppearAndClears`): Minerva (2013002) comes out on the ground
+below it, and stage 9 clears for whoever set it (`OPQ_WIN_STAGE` in
+`Event::member_clears`, whose last stage wins rather than only clears).
+The win gives 3500 EXP and plays the clear effect and sound, and stops
+the clock with no new one; the team stays on the hub. Cosmic's statue
+script means to give that EXP and effect and start a five-minute clock,
+but fails before them, so its team gets neither
+(`v83ref/lanes/QUESTIONS.md`). Eak then tells the leader to talk to
+Minerva.
+
+Minerva on the hub asks each member, alone, whether to go
+(`opq.minerva.ask`), and sends those who say yes to her prize room
+920011300 (`OPQ_PRIZE_ROOM`, portal 0). There she thanks them
+(`opq.minerva.thanks`) and gives each one of `events::OPQ_REWARDS` (94
+items and counts, all equally likely, Cosmic `OrbisPQ`
+`setEventRewards`), then sends them home to 200080101, portal 0. A member
+without a free slot in each of the Equip, Use and Etc tabs gets
+`opq.minerva.full` and nothing yet.
 
 ## Ludibrium's balloons
 
@@ -677,9 +700,12 @@ EXP at the reward.
 | Eak 2013001 | 920010200, 920010600 | Runtime (`eak_hand_in`): 30 of 4001050 / 40 of 4001052 for a piece of the statue, clearing the room |
 | Eak 2013001 | 920010400, 920010500, 920010700 | Runtime (`opq_eak`): the music box, the head count, the levers; brings out the room's stone box and clears it |
 | Eak 2013001 | 920010800 | Runtime (`opq_eak`): Papa Pixie |
+| Minerva 2013002 | 920010100 | Once won, alone to 920011300 |
+| Minerva 2013002 | 920011300 | The prize once won, and home to 200080101 |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
-`lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*` and `opq.eak.*`.
+`lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*` and
+`opq.minerva.*`.

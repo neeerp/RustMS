@@ -468,6 +468,12 @@ pub mod keys {
     /// Told to a player at the garden's way out who may not take it (a
     /// pink line).
     pub const OPQ_NOTICE_GARDEN_OUT: &str = "opq.notice.garden_out";
+    /// Minerva on the hub, freed, asking whether to go to her prize room.
+    pub const OPQ_MINERVA_ASK: &str = "opq.minerva.ask";
+    /// Minerva's thanks in her prize room, before the prize.
+    pub const OPQ_MINERVA_THANKS: &str = "opq.minerva.thanks";
+    /// Minerva to a player without room for any of her prizes.
+    pub const OPQ_MINERVA_FULL: &str = "opq.minerva.full";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -2016,6 +2022,9 @@ mod tests {
             keys::OPQ_EAK_MINERVA,
             keys::OPQ_NOTICE_PAPA_PIXIE,
             keys::OPQ_NOTICE_GARDEN_OUT,
+            keys::OPQ_MINERVA_ASK,
+            keys::OPQ_MINERVA_THANKS,
+            keys::OPQ_MINERVA_FULL,
         ];
         for key in named
             .iter()

@@ -435,7 +435,8 @@ const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
 /// 920010000-920011300, 3600 seconds, the default 1A of
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, Orbis PQ). The team starts on
 /// the cloud stage, 920010000, and leaves by 920011200, from where Eak
-/// sends players back to Orbis; the win takes it to Minerva on 920011300.
+/// sends players back to Orbis; after the win Minerva gives her prizes on
+/// 920011300.
 /// Its items are the statue's pieces and everything its stages take
 /// (Cosmic `setExclusiveItems`).
 ///
@@ -444,9 +445,11 @@ const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
 /// has brought out his light, which takes everyone on it to `st00`; 2 to 7
 /// are the six rooms off the tower's hub (920010100), each holding a piece
 /// of the statue; 8 is the garden (920010800); and 9, the win, is Minerva's
-/// statue on the hub. Each of the first seven gives 3500 EXP (Cosmic
-/// `giveEventPlayersExp`). The cloud stage, the six rooms and the garden
-/// are played so far, but not the statue, so it can't be won.
+/// statue on the hub, which the Grass of Life brings back to life. Each
+/// but the garden gives 3500 EXP (Cosmic `giveEventPlayersExp`; the
+/// statue's script means to give the win's but fails before it). On the
+/// win the team stays on the hub, where Minerva sends each member on to
+/// her prize room, 920011300, alone (`OPQ_PRIZE_ROOM`).
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
@@ -455,7 +458,7 @@ pub const OPQ: Event = Event {
     levels: 51..=70,
     team: 5..=6,
     minutes: 60,
-    exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 0],
+    exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 3500],
     stride: 100,
     stage_maps: &[
         920_010_000,
@@ -475,6 +478,7 @@ pub const OPQ: Event = Event {
         OPQ_HEAD_COUNT_STAGE,
         OPQ_LEVER_STAGE,
         OPQ_GARDEN_STAGE,
+        OPQ_WIN_STAGE,
     ],
     clear_portals: &[(1, "st00")],
     gated: &[],
@@ -489,7 +493,7 @@ pub const OPQ: Event = Event {
         opq_hand_in(6, 4_001_052, 40, 4_001_048),
     ],
     gates: false,
-    clear_map: Some(920_011_300),
+    clear_map: None,
     bonus: None,
 };
 
@@ -520,6 +524,112 @@ pub const OPQ_GARDEN_STAGE: u8 = 8;
 /// The Grass of Life (Cosmic's "Root of Life"), which the leader brings
 /// from the garden for Minerva's statue.
 pub const GRASS_OF_LIFE: i32 = 4_001_055;
+/// The Orbis party quest's last stage, won as the Grass of Life is set at
+/// the foot of Minerva's statue, by whoever sets it.
+pub const OPQ_WIN_STAGE: u8 = 9;
+/// Where Minerva gives each member of the team that won one of
+/// `OPQ_REWARDS`, sent there by her on the hub (Cosmic `2013002`).
+pub const OPQ_PRIZE_ROOM: i32 = 920_011_300;
+
+/// What Minerva may give each member of a team that won Orbis's party
+/// quest: one of these items, and how many, all equally likely (Cosmic
+/// `OrbisPQ` `setEventRewards`).
+pub const OPQ_REWARDS: [(i32, i16); 94] = [
+    (2040602, 1),
+    (2040802, 1),
+    (2040002, 1),
+    (2040402, 1),
+    (2040505, 1),
+    (2040502, 1),
+    (2040601, 1),
+    (2044501, 1),
+    (2044701, 1),
+    (2044601, 1),
+    (2041019, 1),
+    (2041016, 1),
+    (2041022, 1),
+    (2041013, 1),
+    (2041007, 1),
+    (2043301, 1),
+    (2040301, 1),
+    (2040801, 1),
+    (2040001, 1),
+    (2040004, 1),
+    (2040504, 1),
+    (2040501, 1),
+    (2040513, 1),
+    (2043101, 1),
+    (2044201, 1),
+    (2044401, 1),
+    (2040701, 1),
+    (2044301, 1),
+    (2043801, 1),
+    (2040401, 1),
+    (2043701, 1),
+    (2040803, 1),
+    (2000003, 100),
+    (2000002, 100),
+    (2000004, 15),
+    (2000006, 80),
+    (2000005, 5),
+    (2022000, 25),
+    (2001001, 20),
+    (2001002, 20),
+    (2022003, 25),
+    (2001000, 20),
+    (2020014, 15),
+    (2020015, 10),
+    (4003000, 45),
+    (1102015, 1),
+    (1102016, 1),
+    (1102017, 1),
+    (1102018, 1),
+    (1102021, 1),
+    (1102022, 1),
+    (1102023, 1),
+    (1102024, 1),
+    (1102084, 1),
+    (1102085, 1),
+    (1102086, 1),
+    (1032019, 1),
+    (1032020, 1),
+    (1032021, 1),
+    (1032014, 1),
+    (2070011, 1),
+    (4010003, 15),
+    (4010000, 15),
+    (4010006, 10),
+    (4010002, 15),
+    (4010005, 15),
+    (4010004, 15),
+    (4010001, 15),
+    (4020001, 15),
+    (4020002, 15),
+    (4020008, 10),
+    (4020007, 10),
+    (4020003, 15),
+    (4020000, 15),
+    (4020004, 15),
+    (4020005, 15),
+    (4020006, 15),
+    (2210000, 5),
+    (2210001, 5),
+    (2210002, 5),
+    (2070006, 1),
+    (2070005, 1),
+    (2070007, 1),
+    (2070004, 1),
+    (2061003, 2000),
+    (2060003, 2000),
+    (2060004, 2000),
+    (2061004, 2000),
+    (2100000, 1),
+    (2100001, 1),
+    (2100002, 1),
+    (2100003, 1),
+    (2100004, 1),
+    (2100005, 1),
+];
 /// The hub's scars, where the statue's six pieces go.
 pub const OPQ_SCARS: [&str; 6] = ["scar1", "scar2", "scar3", "scar4", "scar5", "scar6"];
 
@@ -1388,9 +1498,12 @@ mod tests {
         assert_eq!(OPQ.stage_on(920_010_900), None);
         assert_eq!(OPQ.stage_on(OPQ.exit), None);
         assert_eq!(
-            (OPQ.stage_exp(1), OPQ.stage_exp(7), OPQ.stage_exp(9)),
+            (OPQ.stage_exp(1), OPQ.stage_exp(7), OPQ.stage_exp(8)),
             (3500, 3500, 0)
         );
+        assert_eq!(OPQ.stage_exp(OPQ_WIN_STAGE), 3500);
+        assert!(OPQ.member_clears.contains(&OPQ_WIN_STAGE));
+        assert_eq!(OPQ.clear_map, None);
         assert_eq!(OPQ.clear_portal(1), Some("st00"));
         assert_eq!(OPQ.clear_portal(2), None);
         // The others keep their stride.

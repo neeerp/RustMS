@@ -1391,7 +1391,10 @@ until there are 15 drops.
 Orbis's light (`2006000`, `Action::Appear`) shows everyone a pink line and
 brings out an NPC, Eak, on the ground below it (`FieldActor::appear`); it
 starts in state 20 (`reactors::first_state`, see "Orbis's cloud stage and
-hub" in `party-quests.md`).
+hub" in `party-quests.md`). Minerva's statue on Orbis's hub (`2006001`,
+`Action::AppearAndClears`) starts in state 6 and brings out Minerva the
+same way, without a line, then tells the breaker's client actor, which
+clears (and so wins) the stage (see "Orbis's garden").
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in
