@@ -40,11 +40,19 @@ pub struct Event {
     pub team: RangeInclusive<usize>,
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
-    /// is played on `entry + (n - 1) * stride`.
+    /// is played on `entry + (n - 1) * stride`, unless `stage_maps` says.
     pub exp_per_stage: &'static [i32],
     /// How far apart the stage maps' ids are; the maps between them are
     /// rooms off the stages.
     pub stride: i32,
+    /// The map each stage is played on, in order, for an event whose
+    /// stages don't follow `stride`; empty for one whose do.
+    pub stage_maps: &'static [i32],
+    /// The stages the leader clears just by talking to their NPC.
+    pub talk_clears: &'static [u8],
+    /// Where those on a stage's map go when it is cleared: the stage and
+    /// the portal on its map.
+    pub clear_portals: &'static [(u8, &'static str)],
     /// The stage maps whose `next00` portal stays shut until their stage is
     /// cleared.
     pub gated: &'static [i32],
@@ -132,6 +140,9 @@ pub const KPQ: Event = Event {
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
     stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    clear_portals: &[],
     gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
     areas_taken: 3,
@@ -212,6 +223,9 @@ pub const HPQ: Event = Event {
     minutes: 10,
     exp_per_stage: &[1600],
     stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -250,6 +264,9 @@ pub const LPQ: Event = Event {
     minutes: 45,
     exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
     stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    clear_portals: &[],
     gated: &[
         922_010_100,
         922_010_200,
@@ -390,9 +407,17 @@ const fn lpq_hand_in(stage: u8, npc: i32, item: i32, count: i16) -> HandIn {
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, Orbis PQ). The team starts on
 /// the cloud stage, 920010000, and leaves by 920011200, from where Eak
 /// sends players back to Orbis; the win takes it to Minerva on 920011300.
-/// Its stages are not played yet, so it can't be won. Its items are the
-/// statue's pieces and everything its stages take (Cosmic
-/// `setExclusiveItems`).
+/// Its items are the statue's pieces and everything its stages take
+/// (Cosmic `setExclusiveItems`).
+///
+/// Its stages (Cosmic's `statusStg0` to `statusStg8`) are not 100 apart:
+/// 1 is the cloud stage, cleared by the leader talking to Eak once the team
+/// has brought out his light, which takes everyone on it to `st00`; 2 to 7
+/// are the six rooms off the tower's hub (920010100), each holding a piece
+/// of the statue; 8 is the garden (920010800); and 9, the win, is Minerva's
+/// statue on the hub. Each of the first seven gives 3500 EXP (Cosmic
+/// `giveEventPlayersExp`). Only the cloud stage is played yet, so it can't
+/// be won.
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
@@ -401,8 +426,21 @@ pub const OPQ: Event = Event {
     levels: 51..=70,
     team: 5..=6,
     minutes: 60,
-    exp_per_stage: &[],
+    exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 0],
     stride: 100,
+    stage_maps: &[
+        920_010_000,
+        920_010_200,
+        920_010_300,
+        920_010_400,
+        920_010_500,
+        920_010_600,
+        920_010_700,
+        920_010_800,
+        OPQ_HUB,
+    ],
+    talk_clears: &[1],
+    clear_portals: &[(1, "st00")],
     gated: &[],
     puzzles: 1..=0,
     areas_taken: 0,
@@ -413,6 +451,10 @@ pub const OPQ: Event = Event {
     clear_map: Some(920_011_300),
     bonus: None,
 };
+
+/// The Tower of Goddess's hub, where Minerva's statue stands and its six
+/// rooms open off.
+pub const OPQ_HUB: i32 = 920_010_100;
 
 /// The Orbis party quest's own items, 4001044 to 4001063.
 const OPQ_ITEMS: [i32; 20] = {
@@ -479,11 +521,19 @@ impl Event {
 
     /// The map stage `stage` (from 1) is played on.
     pub fn stage_map(&self, stage: u8) -> i32 {
+        if !self.stage_maps.is_empty() {
+            let index = usize::from(stage).saturating_sub(1);
+            return self.stage_maps.get(index).copied().unwrap_or(self.entry);
+        }
         self.entry + (i32::from(stage) - 1) * self.stride
     }
 
     /// The stage played on `map_id`, if any; none is played in its rooms.
     pub fn stage_on(&self, map_id: i32) -> Option<u8> {
+        if !self.stage_maps.is_empty() {
+            let index = self.stage_maps.iter().position(|&map| map == map_id)?;
+            return u8::try_from(index + 1).ok();
+        }
         let offset = map_id.checked_sub(self.entry)?;
         if offset.checked_rem(self.stride)? != 0 {
             return None;
@@ -492,6 +542,15 @@ impl Event {
         (1..=self.exp_per_stage.len())
             .contains(&usize::from(stage))
             .then_some(stage)
+    }
+
+    /// The portal on `stage`'s map that those on it go to when it is
+    /// cleared, if any.
+    pub fn clear_portal(&self, stage: u8) -> Option<&'static str> {
+        self.clear_portals
+            .iter()
+            .find(|(cleared, _)| *cleared == stage)
+            .map(|(_, portal)| *portal)
     }
 
     /// The hand-in that clears `stage`, if it is cleared that way.
@@ -955,13 +1014,35 @@ mod tests {
     }
 
     #[test]
-    fn opq_holds_the_tower_but_not_its_way_out_and_has_no_stages_yet() {
+    fn opq_holds_the_tower_but_not_its_way_out() {
         assert!(OPQ.holds(OPQ.entry) && OPQ.holds(920_011_300));
         assert!(!OPQ.holds(OPQ.exit) && !OPQ.holds(OPQ.lobby));
         assert_eq!((OPQ.items[0], OPQ.items[19]), (4_001_044, 4_001_063));
-        assert_eq!(OPQ.stage_on(OPQ.entry), None);
-        assert_eq!(OPQ.last_stage(), 0);
         assert_eq!(EventKind::Opq.event(), &OPQ);
+    }
+
+    #[test]
+    fn opq_stages_follow_its_table_not_its_stride() {
+        assert_eq!(OPQ.stage_on(OPQ.entry), Some(1));
+        assert_eq!(OPQ.stage_map(1), OPQ.entry);
+        assert_eq!(OPQ.stage_on(920_010_200), Some(2));
+        assert_eq!(OPQ.stage_map(7), 920_010_700);
+        assert_eq!(OPQ.stage_on(920_010_800), Some(8));
+        assert_eq!(OPQ.stage_on(OPQ_HUB), Some(9));
+        assert_eq!(OPQ.last_stage(), 9);
+        assert_eq!(OPQ.stage_map(OPQ.last_stage()), OPQ_HUB);
+        assert_eq!(OPQ.stage_on(920_010_900), None);
+        assert_eq!(OPQ.stage_on(OPQ.exit), None);
+        assert_eq!(
+            (OPQ.stage_exp(1), OPQ.stage_exp(7), OPQ.stage_exp(9)),
+            (3500, 3500, 0)
+        );
+        assert_eq!(OPQ.clear_portal(1), Some("st00"));
+        assert_eq!(OPQ.clear_portal(2), None);
+        // The others keep their stride.
+        assert_eq!(LPQ.stage_on(922_010_300), Some(3));
+        assert_eq!(KPQ.stage_map(5), 103_000_804);
+        assert_eq!(KPQ.clear_portal(1), None);
     }
 
     #[test]

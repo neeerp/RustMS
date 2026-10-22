@@ -266,9 +266,14 @@ impl ClientActor {
     }
 
     pub(super) async fn warp_within_event(&mut self, map_id: i32) -> Result<(), RuntimeError> {
+        self.warp_within_event_to(map_id, 0).await
+    }
+
+    /// `warp_within_event`, arriving at `portal` on `map_id`.
+    async fn warp_within_event_to(&mut self, map_id: i32, portal: u8) -> Result<(), RuntimeError> {
         let channel_id = self.channel_id;
         let player = &mut self.in_game_mut()?.player;
-        for action in warp_to_spawn_point(player, map_id, 0, channel_id)? {
+        for action in warp_to_spawn_point(player, map_id, portal, channel_id)? {
             self.apply(action).await?;
         }
         Ok(())
@@ -332,7 +337,9 @@ impl ClientActor {
 
     /// The party cleared `stage` of event `id`: those on its map see and
     /// hear it and its gate opens, and everyone gets the stage's EXP. The
-    /// last stage wins the event, and everyone's clock stops.
+    /// last stage wins the event, and everyone's clock stops. A stage with a
+    /// `clear_portal` first takes those on its map there (Cosmic's Eak warps
+    /// the team before the clear effect).
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -342,6 +349,12 @@ impl ClientActor {
         }
         let event = ticket.kind.event();
         let map_id = event.stage_map(stage);
+        if let Some(portal) = event.clear_portal(stage) {
+            if self.in_game()?.player.stats.map_id == map_id {
+                self.warp_within_event_to(map_id, net::scripts::named(map_id, portal))
+                    .await?;
+            }
+        }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
         if next.stats.map_id == map_id {
@@ -399,6 +412,9 @@ impl ClientActor {
             return Ok(());
         };
         let event = ticket.kind.event();
+        if !event.gates {
+            return Ok(());
+        }
         let cleared = event
             .stage_on(map_id)
             .is_some_and(|stage| ticket.cleared(stage));

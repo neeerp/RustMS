@@ -872,3 +872,8 @@
 "opq.wonky.busy" = "[placeholder] Another party is already in the tower. Wait until they come back, or try another channel."
 "opq.wonky.leave.ask" = "[placeholder] If you leave the tower now, you'll have to start over to come back. Leave anyway?"
 "opq.eak.home" = "[placeholder] I'll send you back down to Orbis."
+"opq.notice.light" = "[placeholder] The light flickers, and someone steps out of it."
+"opq.eak.cloud" = "[placeholder] You came for Minerva! Papa Pixie has sealed her away and scattered the pieces of her statue through the tower. I am Eak, who serves her. Up you go!"
+"opq.eak.leader_only" = "[placeholder] I will only speak with your leader."
+"opq.eak.gather" = "[placeholder] Find the six pieces of Minerva's statue in the tower's rooms, then speak to me again for the last one."
+"opq.notice.storage_closed" = "[placeholder] The storage is sealed while the Pixies' power lingers in the tower."

@@ -49,9 +49,15 @@ pub fn talk(map: i32, npc: i32) -> Packet {
         .iter()
         .position(|n| n.npc_id == npc)
         .unwrap();
+    talk_to(1_000_000_000 + index as i32)
+}
+
+/// TALK_TO_NPC: click the NPC with object id `object_id`, such as one that
+/// came out on the map.
+pub fn talk_to(object_id: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
-    p.write_int(1_000_000_000 + index as i32).unwrap();
+    p.write_int(object_id).unwrap();
     p
 }
 

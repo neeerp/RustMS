@@ -111,7 +111,7 @@ const RANK_ROOMS: [(i32, i32, &str); 8] = [
     (140010100, 140010110, "out00"),
 ];
 /// Portals that just let the player through, and where to (Cosmic's).
-const PLAIN_WARPS: [(&str, i32, Portal); 10] = [
+const PLAIN_WARPS: [(&str, i32, Portal); 16] = [
     // Two of the Bottom of the Temple's ways back up the stairway; the
     // other (`OutPerrion_1`) says it's a shortcut.
     ("OutPerrion_2", UNDERGROUND_TEMPLE_STAIRS, Portal::Id(0)),
@@ -130,6 +130,25 @@ const PLAIN_WARPS: [(&str, i32, Portal); 10] = [
     ("enterInfo", 104000004, Portal::Id(1)),
     // Ludibrium's Time Control Room into Ellin Forest, saying so.
     ("move_elin", 300000100, Portal::Named("out00")),
+    // The Tower of Goddess's hub into its six rooms (Orbis's party quest).
+    ("party3_room1", 920010200, Portal::Id(13)),
+    ("party3_room2", 920010300, Portal::Id(1)),
+    ("party3_room3", 920010400, Portal::Id(8)),
+    ("party3_room4", 920010500, Portal::Id(3)),
+    ("party3_room5", 920010600, Portal::Id(17)),
+    ("party3_room6", 920010700, Portal::Id(23)),
+];
+/// Where each room off the Tower of Goddess's hub lets out on it (Cosmic
+/// `party3_roomout`): the room, and the hub's portal. The storage is the
+/// seventh; anywhere else lets out at the hub's portal 0, as in Cosmic.
+const OPQ_ROOMS_OUT: [(i32, u8); 7] = [
+    (920010200, 4),
+    (920010300, 12),
+    (920010400, 5),
+    (920010500, 13),
+    (920010600, 15),
+    (920010700, 14),
+    (920011000, 16),
 ];
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
@@ -796,6 +815,16 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             }
             outcome
         }
+        "party3_roomout" => {
+            let map = player.stats.map_id;
+            let out = OPQ_ROOMS_OUT.iter().find(|&&(room, _)| room == map);
+            through(Effect::WarpToPortal(
+                crate::events::OPQ_HUB,
+                out.map_or(0, |&(_, portal)| portal),
+            ))
+        }
+        // The hub's storage stays shut until Minerva's garden is played.
+        "party3_room8" => refused(keys::OPQ_NOTICE_STORAGE_CLOSED),
         "OutPerrion_1" => ScriptOutcome {
             effects: vec![
                 Effect::Pink(content::text().get(keys::TEMPLE_SHORTCUT, &[])),
@@ -1247,7 +1276,7 @@ fn is_market_portal(portal: &PortalTemplate) -> bool {
 }
 
 /// The id of `map_id`'s portal called `name`, else 0.
-pub(crate) fn named(map_id: i32, name: &str) -> u8 {
+pub fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)
 }
 
@@ -1577,6 +1606,21 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(map, portal)] => Some((*map, *portal)),
             _ => None,
         }
+    }
+
+    #[test]
+    fn the_tower_of_goddess_rooms_let_out_by_their_own_hub_portals() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 920010500;
+        let out = portal("party3_roomout", &player).unwrap();
+        assert_eq!(warp_of(&out), Some((crate::events::OPQ_HUB, 13)));
+        player.stats.map_id = 920011000;
+        let out = portal("party3_roomout", &player).unwrap();
+        assert_eq!(warp_of(&out), Some((crate::events::OPQ_HUB, 16)));
+        let shut = portal("party3_room8", &player).unwrap();
+        assert!(matches!(shut.effects.as_slice(), [Effect::Pink(_)]));
+        let room = portal("party3_room5", &player).unwrap();
+        assert_eq!(warp_of(&room), Some((920010600, 17)));
     }
 
     #[test]

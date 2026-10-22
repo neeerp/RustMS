@@ -84,7 +84,7 @@ pub const RED_SIGN: i32 = 2040034;
 /// (`NpcScript::wonky`), and lets players out from its cloud stage.
 pub const WONKY: i32 = 2013000;
 /// Eak, at the Orbis party quest's way out.
-const EAK: i32 = 2013001;
+pub const EAK: i32 = 2013001;
 /// The balloon on Ludibrium's maze stage.
 pub const AQUA_BALLOON: i32 = 2040041;
 /// The balloon on Ludibrium's stage 8, whose puzzle is its crates.
@@ -1011,6 +1011,13 @@ impl NpcScript {
             ARTURO if won => arturo(player, &mut rand::thread_rng()),
             _ => None,
         }
+    }
+
+    /// Eak (Cosmic `2013001`) to a player in the Orbis party quest on
+    /// `map_id`, who may be its `leader`, whose team may have `cleared` the
+    /// cloud stage. None elsewhere.
+    pub fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<Self> {
+        opq_eak(map_id, leader, cleared)
     }
 
     /// Cloto's script on the party quest's stages, for `player`, who
@@ -2569,6 +2576,30 @@ fn eak(player: &Player) -> Option<NpcScript> {
         Page::Say(text(keys::OPQ_EAK_HOME)),
         Page::Done(vec![Effect::Warp(events::OPQ.lobby)]),
     ];
+    Some(NpcScript::new(EAK, pages))
+}
+
+/// Eak in the Tower of Goddess. On the cloud stage he sends anyone but the
+/// leader up to its top (`st00`), and the leader too once it is cleared;
+/// before then the leader hears of Minerva and clears it, which takes the
+/// whole team there (`OPQ.clear_portals`). Cosmic clears first and tells
+/// after, but the warp would close his dialog here, so he tells first. On
+/// the hub only the leader hears him.
+fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<NpcScript> {
+    let cloud = events::OPQ.entry;
+    let pages = match map_id {
+        _ if map_id == cloud && (!leader || cleared) => {
+            let portal = crate::scripts::named(cloud, "st00");
+            vec![Page::Done(vec![Effect::WarpToPortal(cloud, portal)])]
+        }
+        _ if map_id == cloud => vec![
+            Page::Say(text(keys::OPQ_EAK_CLOUD)),
+            Page::Done(vec![Effect::EventCommand(EventCommand::ClearStage(1))]),
+        ],
+        events::OPQ_HUB if !leader => vec![Page::Say(text(keys::OPQ_EAK_LEADER_ONLY))],
+        events::OPQ_HUB => vec![Page::Say(text(keys::OPQ_EAK_GATHER))],
+        _ => return None,
+    };
     Some(NpcScript::new(EAK, pages))
 }
 
@@ -5740,6 +5771,36 @@ mod tests {
         let effects = eak.respond(ScriptInput::Next).unwrap().effects;
         assert_eq!(effects, [Effect::Warp(events::OPQ.lobby)]);
         assert!(NpcScript::for_npc(EAK, &inside).is_none());
+    }
+
+    #[test]
+    fn eak_tells_the_leader_of_minerva_then_clears_the_cloud_stage() {
+        let cloud = events::OPQ.entry;
+        let mut leader = NpcScript::opq_eak(cloud, true, false).unwrap();
+        let step = leader.begin();
+        assert_eq!(
+            (kind(&step), page_text(&step)),
+            (Some(0), text(keys::OPQ_EAK_CLOUD))
+        );
+        let effects = leader.respond(ScriptInput::Next).unwrap().effects;
+        assert_eq!(effects, [Effect::EventCommand(EventCommand::ClearStage(1))]);
+        // The others, and the leader after, go up to the top.
+        let top = crate::scripts::named(cloud, "st00");
+        for (leader, cleared) in [(false, false), (false, true), (true, true)] {
+            let step = NpcScript::opq_eak(cloud, leader, cleared).unwrap().begin();
+            assert!(step.prompt.is_none());
+            assert_eq!(step.effects, [Effect::WarpToPortal(cloud, top)]);
+        }
+        let said = |leader| {
+            page_text(
+                &NpcScript::opq_eak(events::OPQ_HUB, leader, true)
+                    .unwrap()
+                    .begin(),
+            )
+        };
+        assert_eq!(said(true), text(keys::OPQ_EAK_GATHER));
+        assert_eq!(said(false), text(keys::OPQ_EAK_LEADER_ONLY));
+        assert!(NpcScript::opq_eak(920_010_200, true, true).is_none());
     }
 
     #[test]

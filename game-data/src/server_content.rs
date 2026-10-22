@@ -411,6 +411,14 @@ pub mod keys {
     pub const OPQ_WONKY_BUSY: &str = "opq.wonky.busy";
     pub const OPQ_WONKY_LEAVE_ASK: &str = "opq.wonky.leave.ask";
     pub const OPQ_EAK_HOME: &str = "opq.eak.home";
+    /// Told on the cloud stage as Eak steps out of the light (a pink line).
+    pub const OPQ_NOTICE_LIGHT: &str = "opq.notice.light";
+    pub const OPQ_EAK_CLOUD: &str = "opq.eak.cloud";
+    pub const OPQ_EAK_LEADER_ONLY: &str = "opq.eak.leader_only";
+    pub const OPQ_EAK_GATHER: &str = "opq.eak.gather";
+    /// Told to a player at the hub's storage door while it is shut (a pink
+    /// line).
+    pub const OPQ_NOTICE_STORAGE_CLOSED: &str = "opq.notice.storage_closed";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1698,6 +1706,11 @@ mod tests {
             keys::OPQ_WONKY_BUSY,
             keys::OPQ_WONKY_LEAVE_ASK,
             keys::OPQ_EAK_HOME,
+            keys::OPQ_NOTICE_LIGHT,
+            keys::OPQ_EAK_CLOUD,
+            keys::OPQ_EAK_LEADER_ONLY,
+            keys::OPQ_EAK_GATHER,
+            keys::OPQ_NOTICE_STORAGE_CLOSED,
         ];
         for key in named
             .iter()

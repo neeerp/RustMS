@@ -722,6 +722,11 @@ unsourced = [
     "opq.wonky.busy",
     "opq.wonky.leave.ask",
     "opq.eak.home",
+    "opq.notice.light",
+    "opq.eak.cloud",
+    "opq.eak.leader_only",
+    "opq.eak.gather",
+    "opq.notice.storage_closed",
 ]
 
 [text."glTutoMsg0.message"]

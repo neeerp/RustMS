@@ -11,7 +11,8 @@ through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
-its entry and exit only so far; its stages come in later slices
+its entry and exit, its cloud stage, and the hub's ways into its rooms so
+far; the rooms' stages, the garden and the win come in later slices
 (`v83ref/reports/a077-orbis-pq.md`).
 
 ## Rules
@@ -33,8 +34,9 @@ its entry and exit only so far; its stages come in later slices
 - `OPQ` has lobby 200080101 (Orbis), maps 920010000-920011300, exit
   920011200, levels 51-70, 5-6 players and 60 minutes (Server.NX
   `FieldSet.img/Party5`; Cosmic has 45). Its exit lies inside its range of
-  maps too, and the win will take the team to 920011300. It has no stages
-  yet, so it can't be won.
+  maps too, and the win will take the team to 920011300. Its nine stages
+  are listed in `Event::stage_maps` (see "Orbis's cloud stage and hub");
+  only the first is played yet, so it can't be won.
 - `Event::team` picks who goes: the party's members online on the
   leader's channel, standing in the lobby, at the right levels. Members
   in the Cash Shop are on no map and don't count: the client tells the
@@ -243,7 +245,8 @@ event ends when the last member has left its maps.
 Stage n is played on `entry + (n - 1) * stride` (`Event::stage_map`):
 KPQ's and HPQ's stage maps follow one another (`stride` 1), and LPQ's are
 100 apart (922010100 to the boss's 922010900), with rooms off a stage
-between them, on which no stage is played (`Event::stage_on`). `Cleared`
+between them, on which no stage is played (`Event::stage_on`). OPQ's
+don't follow a stride and are listed instead (`Event::stage_maps`). `Cleared`
 holds 16 stages. A clear, taken once and only from the
 leader, goes like this (`EventActor::clear`):
 
@@ -389,6 +392,42 @@ out to 920011200, from where Eak (2013001) sends them back to 200080101.
 Leaving takes the quest's items, 4001044 to 4001063 (Cosmic
 `setExclusiveItems`), and five players are the fewest, as in Ludibrium.
 
+## Orbis's cloud stage and hub
+
+OPQ's stages are Cosmic's `statusStg0` to `statusStg8`, numbered from 1
+(`OPQ.stage_maps`): 1 the cloud stage 920010000; 2 to 7 the six rooms off
+the hub, 920010200 to 920010700, each hiding a piece of Minerva's statue;
+8 the garden 920010800; and 9, the win, Minerva's statue on the hub
+920010100 (`OPQ_HUB`). Stages 1 to 7 give 3500 EXP each (Cosmic
+`giveEventPlayersExp`).
+
+On the cloud stage the light (reactor 2006000) starts in state 20
+(`reactors::first_state`): v83's Reactor.nx has its item event, 20 Cloud
+Pieces 4001063, only there, where Cosmic's XML has it on state 0. The
+pieces dropped on it break it (`Action::Appear`, Cosmic's `2006000.js`):
+everyone on the map is shown a pink line (`opq.notice.light`), and Eak
+(2013001) comes out on the ground below it. The field adds him to its NPCs
+(`FieldActor::appear`, the next object id after the map's own and the
+foothold's id), shows him to everyone, and hands him to the NPCs'
+controller; whoever joins later sees him with the rest.
+
+Eak there (`NpcScript::opq_eak`, from `dialogue.rs` with the ticket's
+leader and stage 1's clear) sends anyone but the leader up to the stage's
+`st00`, and the leader too once it is cleared. The leader first hears of
+Minerva (`opq.eak.cloud`), then sends `ClearStage(1)`, which the event
+takes from the leader (`Event::talk_clears`). The clear takes everyone on
+the cloud stage to `st00` before its effect and EXP (`Event::clear_portals`,
+`stage_cleared`). Cosmic warps first and talks after; a warp closes the
+dialog here, so Eak talks first. On the hub Eak tells the leader to
+gather the six pieces (`opq.eak.gather`) and anyone else that he speaks
+only with the leader (`opq.eak.leader_only`).
+
+The hub's portals `party3_room1` to `party3_room6` lead into the rooms
+(`PLAIN_WARPS`, Cosmic's portal ids), and each room's `party3_roomout`
+leads back to its own portal on the hub (`OPQ_ROOMS_OUT`). The storage's
+`party3_room8` stays shut with a pink line (`opq.notice.storage_closed`)
+until the garden is played.
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
@@ -483,6 +522,8 @@ EXP at the reward.
 | Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
 | Wonky 2013000 | 200080101 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
 | Wonky 2013000 | 920010000 | Out to 920011200 |
+| Eak 2013001 | 920010000 | Runtime (`opq_eak`): out of the light; the leader clears the cloud stage, the others go up to `st00` |
+| Eak 2013001 | 920010100 | Runtime (`opq_eak`): the six pieces, to the leader only |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
