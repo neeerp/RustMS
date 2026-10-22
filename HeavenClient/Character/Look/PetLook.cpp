@@ -164,9 +164,8 @@ namespace ms
 		animations[Stance::STAND].update();
 	}
 
-	std::optional<move_path::Path> PetLook::update(const Physics &physics, Point<int16_t> charpos)
+	std::optional<move_path::Path> PetLook::update(const Physics &physics, Point<int16_t> charpos, bool owner_left)
 	{
-		static const double PETWALKFORCE = 0.35;
 		static const double PETFLYFORCE = 0.2;
 
 		Point<int16_t> before = phobj.get_position();
@@ -187,9 +186,13 @@ namespace ms
 			return std::nullopt;
 		}
 
-		if (charpos != ownerpos)
+		// The sweep waits for the pet's spot to stay put: its owner
+		// standing, facing the same way (FUN_009c4122).
+		petfollow::Goal goal = petfollow::goal(role, charpos.x(), owner_left);
+
+		if (goal.x != goalx)
 		{
-			ownerpos = charpos;
+			goalx = goal.x;
 			owner_still = 0;
 		} else if (!pickup::sweep_ready(owner_still))
 		{
@@ -203,48 +206,32 @@ namespace ms
 		{
 			case Stance::STAND:
 			case Stance::MOVE:
+			case Stance::JUMP:
+				// On the ground it walks as its owner does (CVecCtrl).
+				phobj.type = PhysicsObject::Type::NORMAL;
+				phobj.shoe = true;
+				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
+
 				// v83 calls a pet back once its owner leaves a box around
 				// it (FUN_009c4122), wide enough for a sweep.
 				if (!pickup::within_leash(curpos, charpos))
 				{
 					set_position(charpos.x(), charpos.y());
+					phobj.hspeed = 0.0;
+					phobj.vspeed = 0.0;
+					phobj.onground = false;
+					held = 0;
+					steer = 0;
+					lastx = charpos.x();
 					teleported = true;
 				} else
 				{
-					if (charpos.x() - curpos.x() > 50)
-					{
-						phobj.hforce = PETWALKFORCE;
-						flip = true;
-
-						set_stance(Stance::MOVE);
-					} else if (charpos.x() - curpos.x() < -50)
-					{
-						phobj.hforce = -PETWALKFORCE;
-						flip = false;
-
-						set_stance(Stance::MOVE);
-					} else
-					{
-						phobj.hforce = 0.0;
-
-						set_stance(Stance::STAND);
-					}
-
-					// In Wing Boots it walks toward its drop instead, once its
-					// owner has stood still a moment (FUN_009c4122).
-					if (sweep != 0 && pickup::sweep_ready(owner_still))
-					{
-						phobj.hforce = sweep * PETWALKFORCE;
-						flip = sweep > 0;
-
-						set_stance(Stance::MOVE);
-					}
+					follow(physics, charpos, goal, owner_left);
 				}
 
-				phobj.type = PhysicsObject::Type::NORMAL;
-				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
 				break;
 			case Stance::HANG:
+				phobj.shoe = false;
 				set_position(charpos.x(), charpos.y());
 				phobj.set_flag(PhysicsObject::Flag::NOGRAVITY);
 				break;
@@ -276,6 +263,7 @@ namespace ms
 						phobj.vforce = 0.0f;
 				}
 
+				phobj.shoe = false;
 				phobj.type = PhysicsObject::Type::FLYING;
 				phobj.clear_flag(PhysicsObject::Flag::NOGRAVITY);
 				break;
@@ -585,6 +573,115 @@ namespace ms
 	void PetLook::set_sweep(int8_t direction)
 	{
 		sweep = direction;
+	}
+
+	void PetLook::set_role(uint8_t r)
+	{
+		role = r;
+	}
+
+	void PetLook::set_long_range(bool lr)
+	{
+		longrange = lr;
+	}
+
+	void PetLook::follow(const Physics &physics, Point<int16_t> charpos, const petfollow::Goal &goal, bool owner_left)
+	{
+		// Its mind steps every 30 ms, and only on the ground: in the air
+		// it keeps steering as it was.
+		if (phobj.onground && petfollow::step(thinking, Constants::TIMESTEP))
+		{
+			const FootholdTree &fht = physics.get_fht();
+			int32_t x = phobj.get_x();
+			bool moved = x != lastx;
+			bool jump = false;
+
+			// A rising wall ahead it hops, or turns from once against it.
+			switch (steer != 0 ? fht.get_wall_ahead(phobj, steer) : FootholdTree::WallAhead::NONE)
+			{
+				case FootholdTree::WallAhead::NEAR:
+					Physics::jump(phobj, Physics::jump_speed(1.0), steer);
+					jump = true;
+					break;
+				case FootholdTree::WallAhead::AGAINST:
+					steer = -steer;
+					break;
+				default:
+					break;
+			}
+
+			// Under its owner's platforms it jumps up to them.
+			uint16_t ownergroup = fht.get_group_below(charpos);
+			Range<int16_t> reach = fht.get_group_reach(ownergroup);
+
+			if (!jump
+				&& petfollow::jumps_up(fht.get_group(phobj.fhid), ownergroup, charpos.y(), phobj.get_y(),
+									   reach.first(), reach.second(), x))
+			{
+				if (held == 0)
+					steer = petfollow::jump_direction(charpos.x(), x, owner_left);
+
+				held = 0;
+				Physics::jump(phobj, Physics::jump_speed(1.0), steer);
+				jump = true;
+			}
+
+			if (!jump)
+			{
+				// Now and then one of several pets hops, or dashes about
+				// its spot, at twice its speed for 700 ms.
+				Randomizer random;
+				bool running = ran >= 0;
+
+				if (petfollow::hops(role, sweep != 0, running, moved, random.next_int(32768)))
+				{
+					ran = 0;
+					jump = true;
+				} else if (petfollow::dashes(role, sweep != 0, running, moved, random.next_int(32768)))
+				{
+					ran = 0;
+					bonus = petfollow::RUN_BONUS;
+				} else if (running)
+				{
+					ran += petfollow::TICK;
+
+					if (petfollow::run_over(ran))
+					{
+						ran = -1;
+						bonus = 0;
+					}
+				}
+
+				int32_t away = std::abs(goal.x - x) + bonus;
+				held = petfollow::walk(away, goal, petfollow::turn_distance(longrange), sweep != 0, !moved, held, x);
+				steer = held;
+
+				// In Wing Boots it walks toward its drop instead, once its
+				// spot has stayed put a moment.
+				if (sweep != 0 && pickup::sweep_ready(owner_still))
+					steer = sweep;
+
+				// A hop leaps at its running speed.
+				if (jump)
+				{
+					phobj.walkspeed = petfollow::BURST_SPEED;
+					Physics::jump(phobj, Physics::jump_speed(1.0), steer);
+				}
+
+				lastx = x;
+			}
+		}
+
+		phobj.walkdir = steer;
+		phobj.walkspeed = ran >= 0 ? petfollow::BURST_SPEED : 1.0;
+
+		if (steer != 0)
+			flip = steer > 0;
+
+		if (!phobj.onground)
+			set_stance(Stance::JUMP);
+		else
+			set_stance(steer != 0 ? Stance::MOVE : Stance::STAND);
 	}
 
 	const std::vector<int32_t> &PetLook::get_ignored() const

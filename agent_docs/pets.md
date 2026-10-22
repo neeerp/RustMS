@@ -145,14 +145,27 @@ beside it.
   question, is ignored). Only the owner reads the reason a pet went back:
   hungry, its magic time ran out, or "You cannot use pet here.", each shown
   as a chat line.
-- The player's own pets follow with HeavenClient's follow physics and send
-  their path as MOVE_PET on the movement timer. Other players' pets play
-  the paths from 170 (`PetLook`). As in v83 (FUN_009c4122), a pet on the
-  ground is called back to its owner once the owner leaves a box from 300 px
-  left of it to 300 px right and 200 px above to 200 px below (a flying pet
-  keeps HeavenClient's 250 px).
+- The player's own pets follow their owner and send their path as MOVE_PET
+  on the movement timer. Other players' pets play the paths from 170
+  (`PetLook`). On the ground a pet walks as its owner does (shoe physics,
+  speed 1), and thinks every 30 ms as v83's CVecCtrlPet does
+  (FUN_009c4122, `petfollow` in `Character/Look/PetFollow.h`):
+  - Its role comes from the owner's slots: a lone pet 0, two pets 1 and 2,
+    three pets 5, 3 and 4. Each role has a spot: at the owner, 160 px ahead
+    of them, or 40 px behind. It also has a distance to keep, from 60 to
+    80 px.
+  - A standing pet starts once farther than that and stops once nearer. A
+    walking pet turns back only 80 px past its spot (170 with a Binocular).
+  - It hops a rising wall ahead. Below its owner's platforms it jumps up
+    toward them.
+  - With other pets out, about once every 30 s it hops, and about once
+    every 20 s it dashes about at double speed for 700 ms.
+  - Once the owner leaves a box around the pet, it is called back to them.
+    The box reaches from 300 px left of the pet to 300 px right, and from
+    200 px above it to 200 px below. A swimming pet (FLY) keeps
+    HeavenClient's old 250 px leash and force-based follow.
 - A pet in Wing Boots (1812004) with a Meso Magnet or Item Pouch walks toward
-  a drop while its owner has stood still for over 100 ms (FUN_00508268,
+  a drop once its spot near its owner has stayed put for over 100 ms (FUN_00508268,
   `Stage::sweep_pets`, `MapDrops::sweep`). It looks within 124 px to either
   side of the owner (274 with a Binocular) and from 49 px above its feet to
   9 px below, at drops it would loot by the rules of `Drop::pet_lootable`,
