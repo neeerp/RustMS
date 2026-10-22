@@ -151,7 +151,6 @@ namespace ms
 		struct Landed
 		{
 			MobAttack attack;
-			Animation hit;
 		};
 
 		// The local player's hits from this mob's attacks since last asked.

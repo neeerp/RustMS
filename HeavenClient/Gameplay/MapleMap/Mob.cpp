@@ -1033,7 +1033,7 @@ namespace ms
 									  (info.type != 0 || !info.jump || targetonground));
 
 			if (hit && strikes)
-				landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+				landed.push_back({ make_attack(iter->index, iter->left) });
 
 			if (iter->box && sweeping)
 				sweeps.push_back({ iter->index, iter->left, *iter->box });
@@ -1060,7 +1060,7 @@ namespace ms
 				int32_t by = static_cast<int32_t>(iter->from.y() + (iter->to.y() - iter->from.y()) * progress);
 
 				if (mob_attack::contains(targetbody, bx, by) && strikes)
-					landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+					landed.push_back({ make_attack(iter->index, iter->left) });
 
 				// On its way it reaches the mobs at its point (0x6674fd).
 				if (sweeping)

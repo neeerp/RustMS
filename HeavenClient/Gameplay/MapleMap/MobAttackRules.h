@@ -75,6 +75,44 @@ namespace ms
 			return body.shift(x, y);
 		}
 
+		struct Spot
+		{
+			int32_t x;
+			int32_t y;
+		};
+
+		// Where on a player's body an attack's hit shows, from two random
+		// numbers: somewhere inside it, or the bare number along a side it
+		// has no length on (0x983398-0x9833eb).
+		inline Spot hit_spot(const Box &body, uint32_t rx, uint32_t ry)
+		{
+			uint32_t width = static_cast<uint32_t>(body.right - body.left);
+			uint32_t height = static_cast<uint32_t>(body.bottom - body.top);
+
+			return { width ? body.left + static_cast<int32_t>(rx % width) : static_cast<int32_t>(rx),
+					 height ? body.top + static_cast<int32_t>(ry % height) : static_cast<int32_t>(ry) };
+		}
+
+		// The Sound.nx Mob.img/<id> sound attack `index` (attack1 is 0)
+		// plays on the player it hits: slots 11 on of FUN_00989ba1's table
+		// (0x98a238), where only the first two and the ninth have one. The
+		// table goes on to the Skill sounds past the ninth; those aren't
+		// played here.
+		inline const char *char_dam_sound(int32_t index)
+		{
+			switch (index)
+			{
+				case 0:
+					return "CharDam1";
+				case 1:
+					return "CharDam2";
+				case 8:
+					return "CharDamF";
+				default:
+					return nullptr;
+			}
+		}
+
 		// Whether a cone from (x0, y) towards `end` meets `target`: 20 px
 		// strips that widen by a quarter of their distance up and down
 		// (FUN_0066afb7).

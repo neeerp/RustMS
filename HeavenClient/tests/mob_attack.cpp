@@ -1,6 +1,7 @@
 #include "../Gameplay/MapleMap/MobAttackRules.h"
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 void require(bool condition, const char* message)
 {
@@ -28,6 +29,23 @@ int main()
 		require(same(user_body(100, 200, false, false), { 78, 135, 122, 200 }), "and the same either way");
 		require(same(user_body(100, 200, true, true), { 54, 169, 100, 200 }), "a prone body lies behind");
 		require(same(user_body(100, 200, true, false), { 100, 169, 146, 200 }), "facing either way");
+
+		Spot spot = hit_spot(user_body(100, 200, false, true), 0, 0);
+		require(spot.x == 78 && spot.y == 135, "a hit shows from the body's top left");
+		spot = hit_spot(user_body(100, 200, false, true), 43, 64);
+		require(spot.x == 121 && spot.y == 199, "to within its right and bottom edges");
+		spot = hit_spot(user_body(100, 200, false, true), 44 + 5, 65 * 3 + 7);
+		require(spot.x == 83 && spot.y == 142, "the random numbers wrap around the body");
+		spot = hit_spot(user_body(100, 200, true, true), 45, 30);
+		require(spot.x == 99 && spot.y == 199, "on a prone body too");
+		spot = hit_spot({ 10, 20, 10, 20 }, 7, 9);
+		require(spot.x == 7 && spot.y == 9, "a side with no length takes the bare number");
+
+		require(std::string(char_dam_sound(0)) == "CharDam1" && std::string(char_dam_sound(1)) == "CharDam2",
+				"attack1 and attack2 play CharDam1 and CharDam2");
+		require(!char_dam_sound(2) && !char_dam_sound(7), "attack3 to attack8 play nothing");
+		require(std::string(char_dam_sound(8)) == "CharDamF", "attack9 plays CharDamF");
+		require(!char_dam_sound(9) && !char_dam_sound(-1), "nor does a touch");
 
 		// Leftward strips: x 0..-20 at height 1, -20..-40 at +-5, -40..-60 at
 		// +-10, -60..-80 at +-15.
