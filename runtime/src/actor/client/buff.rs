@@ -397,6 +397,24 @@ impl ClientActor {
         self.send(&mut packet).await
     }
 
+    /// The player's own client makes the user anew in each field and draws
+    /// a ghost again only when a GIVE_BUFF says so (report c044): after a
+    /// map change, tell it what is left of a ghost item's buff.
+    pub(super) async fn show_ghost(&mut self) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let Some(ghost) = (player.buffs.active().iter()).find(|buff| buff.stat == BuffStat::Ghost)
+        else {
+            return Ok(());
+        };
+        let left = ghost
+            .expires
+            .saturating_duration_since(std::time::Instant::now());
+        let ms = i32::try_from(left.as_millis()).unwrap_or(i32::MAX).max(1);
+        let stats = [(BuffStat::Ghost, ghost.value)];
+        let mut packet = buff::build_give_buff(ghost.skill_id, ms, &stats)?;
+        self.send(&mut packet).await
+    }
+
     pub(super) async fn summon_broken(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
         self.end_buff(skill_id).await
     }
