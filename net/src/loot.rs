@@ -98,8 +98,8 @@ pub fn roll_reactor(
     )
 }
 
-/// `loot` sprayed with mesos (Cosmic `sprayItems`): a pile of `from` to
-/// `to` first, then more such piles after it until there are `at_least`
+/// `loot` sprayed with mesos (Cosmic `sprayItems`): a pile of `from` up to
+/// but not including `to` first, then more such piles after it until there are `at_least`
 /// drops.
 pub fn spray(
     loot: Vec<Loot>,
@@ -107,7 +107,7 @@ pub fn spray(
     (from, to): (i32, i32),
     rng: &mut impl Rng,
 ) -> Vec<Loot> {
-    let mut pile = || Loot::Mesos(rng.gen_range(from, to + 1));
+    let mut pile = || Loot::Mesos(rng.gen_range(from, to));
     let mut sprayed = vec![pile()];
     sprayed.extend(loot);
     while sprayed.len() < at_least {
@@ -354,7 +354,7 @@ mod tests {
             Loot::Mesos(amount) => Some(*amount),
             _ => None,
         });
-        assert!(mesos.clone().all(|amount| (30..=60).contains(&amount)));
+        assert!(mesos.clone().all(|amount| (30..60).contains(&amount)));
         assert_eq!(mesos.count(), 14);
         let many = vec![item; 20];
         assert_eq!(spray(many, 15, (30, 60), rng).len(), 21);

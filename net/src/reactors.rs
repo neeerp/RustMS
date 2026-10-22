@@ -25,8 +25,9 @@ pub fn template(reactor_id: i32) -> Option<ReactorTemplate> {
 pub enum Action {
     /// Drop its loot (`reactor_drops`), as every reactor not listed does.
     Drops,
-    /// Drop its loot with a pile of mesos (`mesos`, from and to): one pile
-    /// first, and more after it until there are `at_least` drops.
+    /// Drop its loot with a pile of mesos (`mesos`, from and up to but not
+    /// including to, as Cosmic rolls them): one pile first, and more after
+    /// it until there are `at_least` drops.
     Spray { at_least: usize, mesos: (i32, i32) },
     /// Bring out `count` of `mob_id` on the ground below it instead.
     BringOut(i32, usize),

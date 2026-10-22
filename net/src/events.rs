@@ -179,10 +179,10 @@ pub const HPQ: Event = Event {
 /// to 6 players of levels 35 to 50, 45 minutes). Its stage maps are 100
 /// apart, from 922010100 to the boss's 922010900, with rooms between; the
 /// bonus is 922011000, where the win takes the team for a minute, the
-/// reward 922011100, and 922010000 is the way out. Stage EXP is Cosmic's (`expStages`, stage 6 none). Stage 8 is a
-/// puzzle: five members on the right five of its nine crates. Stages 1 to 5,
-/// 7 and 8 shut their `next00` until cleared (Map.nx, scripts `lpq0` to
-/// `lpq7`). The passes and the key are the quest's own, and so is the pass
+/// reward 922011100, and 922010000 is the way out. Stage EXP is Cosmic's
+/// (`expStages`, stage 6 none). Stage 8 is a puzzle: five members on the
+/// right five of its nine crates. Stages 1 to 5, 7 and 8 shut their
+/// `next00` until cleared (Map.nx, scripts `lpq0` to `lpq7`). The passes and the key are the quest's own, and so is the pass
 /// stage 7's boxes take (4001156; the default 5A of
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, LPQ).
 pub const LPQ: Event = Event {

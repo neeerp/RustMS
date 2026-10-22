@@ -402,7 +402,7 @@ The key handed in wins the quest, and the win itself takes the team on
 to the bonus stage, 922011000, for a minute (`Bonus::on_win`; Cosmic
 `clearPQ` has no NPC step), after the clear's EXP and effects. Its 36
 boxes 2202004 (`Action::Spray`, Cosmic `ludiquest4`) drop the pack's
-rows with a pile of 30-60 mesos first, and more piles until there are 15
+rows with a pile of 30-59 mesos first, and more piles until there are 15
 drops. The Pink Balloon (2040045) lets a player off early, to the
 reward's `st00`; when the minute is up everyone still there is moved on
 (`time_up`). On 922011100 Arturo (2040035) gives each member of the team

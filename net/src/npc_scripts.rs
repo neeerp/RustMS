@@ -4972,6 +4972,9 @@ mod tests {
         };
         assert!(events::LPQ_REWARDS.contains(&(item_id, quantity)));
         assert_eq!(home, events::LPQ.lobby);
+        // Should the give fail all the same, he says so and keeps them.
+        let refused = script.inventory_full().unwrap();
+        assert!(page_text(&refused).contains(&text(keys::LPQ_ARTURO_FULL)));
         assert!(NpcScript::in_event(ARTURO, &player, false, false).is_none());
 
         // A full Use tab: nothing yet, whatever the reward would be.
