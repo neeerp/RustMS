@@ -3,13 +3,23 @@
 //! which goes by their name, and keeps its message.
 
 use crate::schema::{characters, family_members};
+use diesel::dsl::sql;
+use diesel::expression::SqlLiteral;
 use diesel::prelude::*;
+use diesel::sql_types::Integer;
 use game::family::{
-    separation_fee, separation_rep, ChartMember, FamilyChart, FamilyInfo, Refusal, Relatives,
-    MAX_GENERATIONS, MAX_JUNIORS, MAX_PRECEPTS,
+    rep_gain, separation_fee, separation_rep, ChartMember, FamilyChart, FamilyInfo, Refusal,
+    Relatives, MAX_GENERATIONS, MAX_JUNIORS, MAX_PRECEPTS,
 };
 
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
+
+/// A counter for today: as written if `rep_day` is today, else 0.
+fn today(column: &str) -> SqlLiteral<Integer> {
+    sql(&format!(
+        "CASE WHEN family_members.rep_day = CURRENT_DATE THEN family_members.{column} ELSE 0 END"
+    ))
+}
 
 /// The id of the character named `name`, ignoring case.
 pub fn character(name: &str) -> crate::Result<Option<i32>> {
@@ -102,7 +112,7 @@ pub fn info(character_id: i32) -> crate::Result<FamilyInfo> {
         .select((
             family_members::reputation,
             family_members::total_reputation,
-            family_members::today_reputation,
+            today("today_reputation"),
         ))
         .first::<(i32, i32, i32)>(&mut conn)
         .optional()?;
@@ -171,8 +181,8 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
             characters::level,
             family_members::reputation,
             family_members::total_reputation,
-            family_members::senior_reputation,
-            family_members::today_reputation,
+            today("senior_reputation"),
+            today("today_reputation"),
             characters::map_id,
             characters::name,
         ))
@@ -281,6 +291,62 @@ pub fn set_precepts(leader: i32, precepts: &str) -> crate::Result<Option<Vec<i32
             .set(family_members::precepts.eq(precepts))
             .execute(conn)?;
         Ok(Some(descendants(conn, leader)?.0))
+    })?)
+}
+
+/// `junior` (level `junior_level`) earned their senior and the senior's
+/// senior `gain` Rep, halved if the senior (level `senior_level`, else as
+/// saved) is below them. Each gets it to spend, in their total and in
+/// today's; the junior records the senior's share. Returns who got how
+/// much.
+pub fn earn(
+    junior: i32,
+    gain: i32,
+    junior_level: u8,
+    senior_level: Option<u8>,
+) -> crate::Result<Vec<(i32, i32)>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        let Some(senior) = senior_of(conn, junior)? else {
+            return Ok(Vec::new());
+        };
+        let senior_level = match senior_level {
+            Some(level) => level,
+            None => characters::table
+                .find(senior)
+                .select(characters::level)
+                .first::<i16>(conn)?
+                .clamp(0, 255) as u8,
+        };
+        let gain = rep_gain(gain, senior_level, junior_level);
+        if gain <= 0 {
+            return Ok(Vec::new());
+        }
+        let earners: Vec<i32> = std::iter::once(senior)
+            .chain(senior_of(conn, senior)?)
+            .collect();
+        // Rows in id order, as `separate` locks them.
+        let mut rows: Vec<i32> = earners.iter().copied().chain([junior]).collect();
+        rows.sort_unstable();
+        for id in rows {
+            let (earned, given) = if id == junior { (0, gain) } else { (gain, 0) };
+            diesel::sql_query(
+                "UPDATE family_members SET \
+                 reputation = reputation + $1, \
+                 total_reputation = total_reputation + $1, \
+                 today_reputation = CASE WHEN rep_day = CURRENT_DATE \
+                     THEN today_reputation ELSE 0 END + $1, \
+                 senior_reputation = CASE WHEN rep_day = CURRENT_DATE \
+                     THEN senior_reputation ELSE 0 END + $2, \
+                 rep_day = CURRENT_DATE \
+                 WHERE character_id = $3",
+            )
+            .bind::<Integer, _>(earned)
+            .bind::<Integer, _>(given)
+            .bind::<Integer, _>(id)
+            .execute(conn)?;
+        }
+        Ok(earners.into_iter().map(|id| (id, gain)).collect())
     })?)
 }
 

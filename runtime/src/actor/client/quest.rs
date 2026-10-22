@@ -408,6 +408,11 @@ impl ClientActor {
             })
             .await?;
         }
+        if levelled {
+            let levels = self.in_game()?.player.stats.level - previous_level;
+            self.family_earn(game::family::REP_PER_LEVEL * i32::from(levels))
+                .await?;
+        }
         Ok(true)
     }
 

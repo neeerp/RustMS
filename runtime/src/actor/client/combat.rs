@@ -1,6 +1,7 @@
 use super::quest::gain_exp_with_bonus;
 use super::ClientActor;
 use crate::error::RuntimeError;
+use game::family::{REP_PER_BOSS, REP_PER_KILL};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat;
 use net::packet::handle::world::{death_penalty, warp};
@@ -13,7 +14,7 @@ impl ClientActor {
     /// the kill was shared.
     pub(super) async fn mob_killed(
         &mut self,
-        _mob_id: i32,
+        mob_id: i32,
         exp: i32,
         party_bonus: i32,
     ) -> Result<(), RuntimeError> {
@@ -33,7 +34,10 @@ impl ClientActor {
         let mut packets = Vec::new();
         gain_exp_with_bonus(&mut next, exp, party_bonus, &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
-        self.send_all(&mut packets).await
+        self.send_all(&mut packets).await?;
+        let boss = net::mobs::info(mob_id).is_some_and(|mob| mob.boss);
+        self.family_earn(if boss { REP_PER_BOSS } else { REP_PER_KILL })
+            .await
     }
 
     /// EXP from outside a kill or quest, such as gacha EXP: the stat update

@@ -14,7 +14,8 @@ who has ever been in a family:
 - `senior_id` points at the character's senior; the juniors are the rows
   that point at them.
 - It also holds the rep counters: current, total, today, and rep recorded
-  to the senior. Nothing earns rep yet; only separating takes it away.
+  to the senior. `rep_day` is the day the two daily counters belong to;
+  on another day they read as 0 and the next gain starts them again.
 - `precepts` matters only on the leader's row. A junior who leaves keeps an
   empty one until they gain juniors of their own.
 
@@ -27,6 +28,8 @@ who has ever been in a family:
 - The precepts are at most 200 characters (`MAX_PRECEPTS`).
 - Separating costs Rep and mesos (`separation_rep`, `separation_fee`; see
   below).
+- Juniors earn their seniors Rep (`REP_PER_KILL`, `REP_PER_BOSS`,
+  `REP_PER_LEVEL`, `rep_gain`; see below).
 - `Refusal` maps each refusal to the `FAMILY_RESULT` code that picks the
   client's line.
 
@@ -117,6 +120,26 @@ packets into `FamilyRequest`s, which the client actor
      which the client shows with the name it remembered. Everyone in the old
      family gets INFO again.
 
+### Earning Rep
+
+v83's own amounts aren't known, so these are Cosmic's (report b049): 4 Rep
+for each kill a junior gets EXP from (a share counts; a kill worth no EXP
+doesn't), 20 for a boss, and 200 for each level they gain. The player's actor (`family_earn`) asks the directory
+(`DirectoryMessage::FamilyEarn`) for the senior's level if they are online,
+and `ServerMessage::EarnRep` then runs `db::family::earn`. The senior and
+the senior's own senior each get the gain, halved when the senior's level
+is below the junior's. It is added to their current, total and today's
+counters and to the Rep the junior has recorded to the senior. Each gets
+`FAMILY_REP_GAIN` (the gain and the junior's name) and then INFO again.
+
+### Level and job notices
+
+When a member goes up a level, the senior gets `NOTIFY_LEVELUP` for each
+level: type 1, or type 0 when the new level is above the senior's, which
+the client adds the halving line to. When a member changes job, the senior
+and the juniors get `NOTIFY_JOB_CHANGE` type 1 with the job and "> " and the
+name (`tell_family_progress`, next to the guild's).
+
 ### Login notices
 
 Relatives (the senior and the juniors) get `FAMILY_NOTIFY_LOGIN_OR_LOGOUT`
@@ -127,8 +150,7 @@ when a member enters or leaves the game. A channel change is held for
 
 These are not implemented yet:
 
-- entitlements (`USE_FAMILY`) and the summon;
-- earning rep.
+- entitlements (`USE_FAMILY`) and the summon.
 
 ## Client
 
@@ -174,3 +196,7 @@ b045 (how they open).
   Yes/No before answering.
 - **Login notices:** a relative logging in shows a card, and the open tree
   updates who is online.
+- **Level notices:** `NOTIFY_LEVELUP` type 0 is a family member who has
+  passed the player's level. After the usual line the client adds "- The
+  Reps you have received from %s will be reduced in half."
+  (`GuildHandlers.cpp`).

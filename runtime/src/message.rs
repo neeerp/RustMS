@@ -106,6 +106,12 @@ pub enum ServerMessage {
         junior: ClientId,
         levels: (Option<u8>, Option<u8>),
     },
+    /// The player earned their seniors `gain` Rep; the senior is of
+    /// `senior_level` if online.
+    EarnRep {
+        gain: i32,
+        senior_level: Option<u8>,
+    },
     /// The invitation the player's guild had to `alliance_id` stands; join
     /// it.
     JoinAlliance {
@@ -620,6 +626,11 @@ pub enum DirectoryMessage {
         from: ClientId,
         senior: ClientId,
         junior: ClientId,
+    },
+    /// `from` earned their seniors `gain` Rep.
+    FamilyEarn {
+        from: ClientId,
+        gain: i32,
     },
     /// These characters' families changed; those online read theirs again.
     FamilyChanged {
