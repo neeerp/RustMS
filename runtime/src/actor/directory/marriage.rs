@@ -1,9 +1,11 @@
 //! The directory's part in engagements (report b052): a proposal waits
-//! here for the partner's answer, and goes when either leaves.
+//! here for the partner's answer, and goes when either leaves. A wedding
+//! booking (report b066) passes through here to the partner and back.
 
 use super::WorldDirectory;
-use crate::message::ServerMessage;
+use crate::message::{ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
+use game::wedding::{PartnerRefusal, Venue};
 use game_data::server_content::keys;
 use net::packet::build::world::marriage::{build_marriage_notice, build_marriage_refusal};
 use net::ClientId;
@@ -109,6 +111,38 @@ impl WorldDirectory {
             self.send_packet(proposal.proposer, build_marriage_refusal(Refusal::Declined));
         }
         self.cancel_proposal(client_id);
+    }
+
+    /// `from` books their wedding with `partner` (report b066): the partner
+    /// checks their side if they are beside `from`.
+    pub(super) fn reserve_wedding(
+        &self,
+        from: ClientId,
+        partner: ClientId,
+        venue: Venue,
+        premium: bool,
+    ) {
+        let Some(booker) = self.clients.get(&from) else {
+            return;
+        };
+        let refusal = match self.clients.get(&partner) {
+            None => PartnerRefusal::Offline,
+            Some(entry) if !entry.shares_map_with(booker) => PartnerRefusal::Elsewhere,
+            Some(_) => {
+                let news = WeddingNews::Check {
+                    booker: from,
+                    venue,
+                    premium,
+                };
+                return self.tell(partner, ServerMessage::Wedding(news));
+            }
+        };
+        let news = WeddingNews::Checked {
+            venue,
+            premium,
+            refusal: Some(refusal),
+        };
+        self.tell(from, ServerMessage::Wedding(news));
     }
 
     fn partner_of(&self, proposer: ClientId) -> Option<ClientId> {

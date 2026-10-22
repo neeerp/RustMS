@@ -133,6 +133,17 @@ pub fn give(
     give_until(inventory, item_id, quantity, None)
 }
 
+/// Whether [`give_until`] would find room for `quantity` of `item_id`.
+/// Items that expire never join a stack, so any `until` checks for them.
+pub fn fits_until(
+    inventory: &Inventory,
+    item_id: i32,
+    quantity: i16,
+    until: Option<SystemTime>,
+) -> bool {
+    give_until(&mut inventory.clone(), item_id, quantity, until).is_ok()
+}
+
 /// [`give`] items that expire at `until`; `None` never does.
 pub fn give_until(
     inventory: &mut Inventory,

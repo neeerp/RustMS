@@ -54,6 +54,8 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
     let cleared = spawn_db(move || db::session::clear_world_sessions(&channel_ids)).await?;
     info!(cleared = cleared.len(), "Cleared stale in-game sessions");
     drop_stale_logout_items(cleared).await?;
+    let passed = spawn_db(|| db::wedding::drop_over(std::time::SystemTime::now())).await?;
+    info!(passed, "Dropped weddings booked for before the restart");
 
     let (directory_tx, directory_rx) = mpsc::channel(DIRECTORY_QUEUE_CAPACITY);
     spawn_supervised(

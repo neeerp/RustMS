@@ -28,6 +28,7 @@ mod shop;
 mod storage;
 mod time_limit;
 mod trade;
+mod wedding;
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
@@ -1348,6 +1349,7 @@ impl ClientActor {
             }
             ServerMessage::Engaged(record) => self.engaged(record).await?,
             ServerMessage::CoupleEnded(record) => self.couple_ended(record).await?,
+            ServerMessage::Wedding(news) => self.wedding_news(news).await?,
             ServerMessage::PartnerMap { map_id, partner } => {
                 self.partner_map(map_id, partner).await?
             }

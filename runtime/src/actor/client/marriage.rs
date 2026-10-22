@@ -10,10 +10,11 @@ use game_data::server_content::keys;
 use net::packet::build::world::inventory;
 use net::packet::build::world::marriage::{
     build_couple_ended, build_engaged, build_marriage_notice, build_marriage_refusal,
-    build_partner_map, build_proposal,
+    build_partner_map, build_proposal, build_wedding_notice, WeddingNotice,
 };
 use net::{ClientId, RingRequest, WorldAction};
 use packet::Packet;
+use std::time::SystemTime;
 use tracing::warn;
 
 /// Whether the player's ETC tab has no room for the token.
@@ -241,12 +242,25 @@ impl ClientActor {
             warn!(cid, item_id, "Breaking off without a token");
             return Ok(());
         }
+        // A booked wedding stops it (report b066).
+        let mut ended = None;
+        if let Some(id) = player.marriage.as_ref().map(|record| record.id) {
+            let now = SystemTime::now();
+            match spawn_db(move || db::marriage::end_unless_booked(id, now)).await? {
+                None => {
+                    return self
+                        .send(&mut build_wedding_notice(WeddingNotice::NoBreakingOff)?)
+                        .await;
+                }
+                was_there => ended = was_there,
+            }
+        }
+        let player = &self.in_game()?.player;
         let mut next = player.clone();
         let mut packets = Vec::new();
         if let Some(record) = player.marriage.clone() {
-            let id = record.id;
-            if !spawn_db(move || db::marriage::end(id)).await? {
-                warn!(cid, id, "The couple was over already");
+            if ended == Some(false) {
+                warn!(cid, id = record.id, "The couple was over already");
             }
             next.marriage = None;
             packets.push(build_couple_ended(&record)?);
