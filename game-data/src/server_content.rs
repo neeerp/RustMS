@@ -397,6 +397,20 @@ pub mod keys {
     /// Pink lines as Rombad (stage 7) and Alishar (the boss) come out.
     pub const LPQ_NOTICE_ROMBAD: &str = "lpq.notice.rombad";
     pub const LPQ_NOTICE_ALISHAR: &str = "lpq.notice.alishar";
+    /// Orbis's party quest: Wonky, who takes a party into the Tower of
+    /// Goddess from Orbis (the terms with `{least}`, `{most}`, `{low}` and
+    /// `{high}`), says what the quest is, and lets players out from the
+    /// cloud stage; and Eak, who sends them back to Orbis from the way out.
+    pub const OPQ_WONKY_MENU: &str = "opq.wonky.menu";
+    pub const OPQ_WONKY_ENTER: &str = "opq.wonky.enter";
+    pub const OPQ_WONKY_ABOUT: &str = "opq.wonky.about";
+    pub const OPQ_WONKY_INFO: &str = "opq.wonky.info";
+    pub const OPQ_WONKY_NO_PARTY: &str = "opq.wonky.no_party";
+    pub const OPQ_WONKY_NOT_LEADER: &str = "opq.wonky.not_leader";
+    pub const OPQ_WONKY_NOT_ELIGIBLE: &str = "opq.wonky.not_eligible";
+    pub const OPQ_WONKY_BUSY: &str = "opq.wonky.busy";
+    pub const OPQ_WONKY_LEAVE_ASK: &str = "opq.wonky.leave.ask";
+    pub const OPQ_EAK_HOME: &str = "opq.eak.home";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1590,6 +1604,16 @@ mod tests {
             keys::LPQ_NOTICE_TRAP,
             keys::LPQ_NOTICE_ROMBAD,
             keys::LPQ_NOTICE_ALISHAR,
+            keys::OPQ_WONKY_MENU,
+            keys::OPQ_WONKY_ENTER,
+            keys::OPQ_WONKY_ABOUT,
+            keys::OPQ_WONKY_INFO,
+            keys::OPQ_WONKY_NO_PARTY,
+            keys::OPQ_WONKY_NOT_LEADER,
+            keys::OPQ_WONKY_NOT_ELIGIBLE,
+            keys::OPQ_WONKY_BUSY,
+            keys::OPQ_WONKY_LEAVE_ASK,
+            keys::OPQ_EAK_HOME,
         ];
         for key in named
             .iter()

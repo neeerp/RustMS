@@ -692,6 +692,16 @@ unsourced = [
     "lpq.pink.stay",
     "lpq.arturo.thanks",
     "lpq.arturo.full",
+    "opq.wonky.menu",
+    "opq.wonky.enter",
+    "opq.wonky.about",
+    "opq.wonky.info",
+    "opq.wonky.no_party",
+    "opq.wonky.not_leader",
+    "opq.wonky.not_eligible",
+    "opq.wonky.busy",
+    "opq.wonky.leave.ask",
+    "opq.eak.home",
 ]
 
 [text."glTutoMsg0.message"]

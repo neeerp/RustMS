@@ -67,6 +67,11 @@ const GROWLIE: i32 = 1012114;
 /// Ludibrium's party quest; its script needs to know whether the party may
 /// go (`NpcScript::red_sign`).
 pub const RED_SIGN: i32 = 2040034;
+/// Wonky the Fairy in Orbis, who sends parties into Orbis's party quest
+/// (`NpcScript::wonky`), and lets players out from its cloud stage.
+pub const WONKY: i32 = 2013000;
+/// Eak, at the Orbis party quest's way out.
+const EAK: i32 = 2013001;
 /// The balloon on Ludibrium's maze stage.
 pub const AQUA_BALLOON: i32 = 2040041;
 /// The balloon on Ludibrium's stage 8, whose puzzle is its crates.
@@ -893,6 +898,12 @@ impl NpcScript {
         red_sign(entry)
     }
 
+    /// Wonky's script in Orbis, for a player whose party may or may not go
+    /// into the Tower of Goddess.
+    pub fn wonky(entry: Entry) -> Self {
+        wonky(entry)
+    }
+
     /// The balloon that clears `hand_in`'s stage, to `player`, who stands
     /// with it as `view`.
     pub fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> Self {
@@ -1050,6 +1061,8 @@ impl NpcScript {
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
             ANDERSON => anderson(player),
+            WONKY => wonky_inside(player),
+            EAK => eak(player),
             GROWLIE => growlie(player, false, false),
             TOMMY => tommy(player, false, false),
             TORY => tory_after(player, false),
@@ -2056,14 +2069,14 @@ fn red_sign(entry: Entry) -> NpcScript {
     let enter = match entry {
         Entry::NoParty => Page::Say(text(keys::LPQ_SIGN_NO_PARTY)),
         Entry::NotLeader => Page::Say(text(keys::LPQ_SIGN_NOT_LEADER)),
-        Entry::NotEligible => Page::Say(lpq_terms(keys::LPQ_SIGN_NOT_ELIGIBLE)),
+        Entry::NotEligible => Page::Say(event_terms(&events::LPQ, keys::LPQ_SIGN_NOT_ELIGIBLE)),
         Entry::Busy => Page::Say(text(keys::LPQ_SIGN_BUSY)),
         Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Lpq)]),
     };
     let mut script = NpcScript::new(
         RED_SIGN,
         vec![Page::Menu {
-            text: lpq_terms(keys::LPQ_SIGN_MENU),
+            text: event_terms(&events::LPQ, keys::LPQ_SIGN_MENU),
             choices: vec![
                 (text(keys::LPQ_SIGN_ENTER), vec![enter]),
                 (
@@ -2074,13 +2087,42 @@ fn red_sign(entry: Entry) -> NpcScript {
         }],
     );
     // Someone left or moved since it checked, or another party went in.
-    script.refused = Some(lpq_terms(keys::LPQ_SIGN_NOT_ELIGIBLE));
+    script.refused = Some(event_terms(&events::LPQ, keys::LPQ_SIGN_NOT_ELIGIBLE));
     script
 }
 
-/// `key`, with who may play Ludibrium's party quest.
-fn lpq_terms(key: &str) -> String {
-    let (team, levels) = (&events::LPQ.team, &events::LPQ.levels);
+/// Wonky (Cosmic `2013000`) in Orbis: the party's leader takes the party
+/// into the Tower of Goddess at once, and anyone may read what the quest
+/// is. Cosmic's party search and prize lines are not offered.
+fn wonky(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::OPQ_WONKY_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::OPQ_WONKY_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::OPQ, keys::OPQ_WONKY_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::OPQ_WONKY_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Opq)]),
+    };
+    let mut script = NpcScript::new(
+        WONKY,
+        vec![Page::Menu {
+            text: event_terms(&events::OPQ, keys::OPQ_WONKY_MENU),
+            choices: vec![
+                (text(keys::OPQ_WONKY_ENTER), vec![enter]),
+                (
+                    text(keys::OPQ_WONKY_ABOUT),
+                    vec![Page::Say(text(keys::OPQ_WONKY_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since he checked, or another party went in.
+    script.refused = Some(event_terms(&events::OPQ, keys::OPQ_WONKY_NOT_ELIGIBLE));
+    script
+}
+
+/// `key`, with who may play `event`.
+fn event_terms(event: &events::Event, key: &str) -> String {
+    let (team, levels) = (&event.team, &event.levels);
     content::text().get(
         key,
         &[
@@ -2434,6 +2476,33 @@ fn anderson(player: &Player) -> Option<NpcScript> {
         return None;
     };
     Some(NpcScript::new(ANDERSON, pages))
+}
+
+/// Wonky (Cosmic `2013000`) on the Orbis party quest's cloud stage lets a
+/// player out, who can't come back.
+fn wonky_inside(player: &Player) -> Option<NpcScript> {
+    if player.stats.map_id != events::OPQ.entry {
+        return None;
+    }
+    let page = Page::Ask {
+        text: text(keys::OPQ_WONKY_LEAVE_ASK),
+        on_yes: vec![Effect::Warp(events::OPQ.exit)],
+        on_no: None,
+    };
+    Some(NpcScript::new(WONKY, vec![page]))
+}
+
+/// Eak (Cosmic `2013001`) at the Orbis party quest's way out sends players
+/// back to Orbis. His lines on its stages come with them.
+fn eak(player: &Player) -> Option<NpcScript> {
+    if player.stats.map_id != events::OPQ.exit {
+        return None;
+    }
+    let pages = vec![
+        Page::Say(text(keys::OPQ_EAK_HOME)),
+        Page::Done(vec![Effect::Warp(events::OPQ.lobby)]),
+    ];
+    Some(NpcScript::new(EAK, pages))
 }
 
 /// The Pink Balloon (Cosmic `2040045`) lets players off Ludibrium's bonus
@@ -5461,6 +5530,42 @@ mod tests {
             Some(0)
         );
         assert!(sign.respond(ScriptInput::Next).unwrap().prompt.is_none());
+    }
+
+    #[test]
+    fn wonky_takes_a_ready_party_into_the_tower_and_lets_players_out() {
+        let mut ready = NpcScript::wonky(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Opq)]);
+        assert!(ready.refused().is_some());
+        for entry in [
+            Entry::NoParty,
+            Entry::NotLeader,
+            Entry::NotEligible,
+            Entry::Busy,
+        ] {
+            let mut wonky = NpcScript::wonky(entry);
+            wonky.begin();
+            assert_eq!(
+                kind(&wonky.respond(ScriptInput::Select(0)).unwrap()),
+                Some(0)
+            );
+        }
+
+        // On the cloud stage he lets a player out; Eak sends them home.
+        let inside = rider(100, 0, events::OPQ.entry);
+        let mut out = NpcScript::for_npc(WONKY, &inside).unwrap();
+        assert_eq!(kind(&out.begin()), Some(1));
+        let effects = out.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(effects, [Effect::Warp(events::OPQ.exit)]);
+        let left = rider(100, 0, events::OPQ.exit);
+        assert!(NpcScript::for_npc(WONKY, &left).is_none());
+        let mut eak = NpcScript::for_npc(EAK, &left).unwrap();
+        assert_eq!(kind(&eak.begin()), Some(0));
+        let effects = eak.respond(ScriptInput::Next).unwrap().effects;
+        assert_eq!(effects, [Effect::Warp(events::OPQ.lobby)]);
+        assert!(NpcScript::for_npc(EAK, &inside).is_none());
     }
 
     #[test]

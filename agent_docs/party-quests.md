@@ -10,7 +10,9 @@ and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
 through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
-(`v83ref/reports/a066-ludibrium-pq.md`).
+(`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
+its entry and exit only so far; its stages come in later slices
+(`v83ref/reports/a077-orbis-pq.md`).
 
 ## Rules
 
@@ -28,6 +30,11 @@ is played through too: its nine stages, bonus and reward
 - `LPQ` has lobby 221024500 (Eos Tower's 101st floor), maps
   922010000-922011100, exit 922010000, levels 35-50, 5-6 players and 45
   minutes (Cosmic `LudiPQ`). Its exit also lies inside its range of maps.
+- `OPQ` has lobby 200080101 (Orbis), maps 920010000-920011300, exit
+  920011200, levels 51-70, 5-6 players and 60 minutes (Server.NX
+  `FieldSet.img/Party5`; Cosmic has 45). Its exit lies inside its range of
+  maps too, and the win will take the team to 920011300. It has no stages
+  yet, so it can't be won.
 - `Event::team` picks who goes: the party's members online on the
   leader's channel, standing in the lobby, at the right levels. Members
   in the Cash Shop are on no map and don't count: the client tells the
@@ -371,6 +378,17 @@ HeavenClient moves the player and sends nothing, and the v83 client sends
 only INNER_PORTAL (0x65), which needs no answer (`a069`). Its `next00`
 leads on to stage 7 unshut, as stage 5's gate already held the party back.
 
+## Orbis's entry
+
+On 200080101 Wonky (2013000) has a menu like the Red Sign's: taking the
+party in, or what the quest is (`talk_about_event`). Those who go are the
+party's members on 200080101 at levels 51 to 70, five at least, and
+everyone starts on 920010000. Cosmic's party search and Wristband
+exchange are left out. On 920010000 Wonky asks before letting a player
+out to 920011200, from where Eak (2013001) sends them back to 200080101.
+Leaving takes the quest's items, 4001044 to 4001063 (Cosmic
+`setExclusiveItems`), and five players are the fewest, as in Ludibrium.
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
@@ -463,8 +481,11 @@ EXP at the reward.
 | Arturo 2040035 | 922011100 | The reward once won, and down to 221024500 |
 | Sgt. Anderson 2040047 | 922010100-900 | Out to 922010000 |
 | Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
+| Wonky 2013000 | 200080101 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
+| Wonky 2013000 | 920010000 | Out to 920011200 |
+| Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
-`lpq.arturo.*` and `lpq.anderson.*`.
+`lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*` and `opq.eak.*`.

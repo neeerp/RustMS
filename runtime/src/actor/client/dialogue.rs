@@ -56,6 +56,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::TORY && player.stats.map_id == net::events::HPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Hpq).await;
         }
+        if npc_id == net::npc_scripts::WONKY && player.stats.map_id == net::events::OPQ.lobby {
+            return self.talk_about_event(net::events::EventKind::Opq).await;
+        }
         if let Some(ticket) = self.event.as_ref().filter(|t| t.holds(player.stats.map_id)) {
             let (leader, won) = (ticket.leader(), ticket.won());
             let script = net::npc_scripts::NpcScript::in_event(npc_id, player, leader, won);
