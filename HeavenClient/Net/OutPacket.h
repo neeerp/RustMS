@@ -192,6 +192,7 @@ namespace ms
 			PARTY_SEARCH_STOP = 223,
 			CHECK_CASH = 228,
 			CASHSHOP_OPERATION = 229,
+			COUPON_CODE = 230,
 			USE_HAMMER = 260
 		};
 

@@ -20,6 +20,7 @@
 #include "Helpers/CashShopParser.h"
 #include "Helpers/ItemParser.h"
 
+#include "../../Data/CashCoupon.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/PartySearchActions.h"
@@ -151,10 +152,13 @@ namespace ms
 		}
 
 		// The notice for a failed request, as v83 shows it (FUN_0047c17a).
-		// Codes for coupons, gift tokens and character transfers, which
-		// there are none of here, get the default.
+		// Codes for gift tokens and character transfers, which there are
+		// none of here, get the default.
 		std::string failure_message(uint8_t code)
 		{
+			if (const char* coupon = cash_coupon::failure(code))
+				return coupon;
+
 			switch (code)
 			{
 			case 0xA3:
@@ -218,9 +222,11 @@ namespace ms
 		if (!cashshop)
 			return;
 
-		cashshop->answered();
-
 		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
+
+		// v83 waits for the balance after a coupon's items.
+		if (mode != 0x59)
+			cashshop->answered();
 
 		switch (mode)
 		{
@@ -367,9 +373,67 @@ namespace ms
 			cashshop->add_cash_items({ item });
 			break;
 		}
-		case 0x5C:
-			UI::get().emplace<UIOk>(failure_message(recv.read_byte()), [](bool) {});
+		case 0x59:
+		{
+			// A coupon gave cash items, now in the Cash Inventory, then
+			// MaplePoints, items for the bags and mesos, already there; the
+			// balance follows (v83 0x479d8a).
+			uint8_t count = static_cast<uint8_t>(recv.read_byte());
+			std::vector<UICashShop::CashItem> items;
+			std::vector<cash_coupon::Received> received;
+
+			for (uint8_t i = 0; i < count; i++)
+			{
+				UICashShop::CashItem item = read_cash_item(recv);
+				items.push_back(item);
+				received.push_back({ item.count, ItemData::get(item.item_id).get_name() });
+			}
+
+			int32_t points = recv.read_int();
+			int32_t bag_items = recv.read_int();
+
+			for (int32_t i = 0; i < bag_items; i++)
+			{
+				int32_t quantity = static_cast<uint16_t>(recv.read_short());
+				recv.skip_short();
+				int32_t item_id = recv.read_int();
+				int32_t kind = item_id / 1000000;
+
+				// v83 counts one of anything that doesn't stack.
+				if (quantity == 0 && kind != 2 && kind != 3 && kind != 4)
+					quantity = 1;
+
+				received.push_back({ quantity, ItemData::get(item_id).get_name() });
+			}
+
+			int32_t mesos = recv.read_int();
+
+			cashshop->add_cash_items(items);
+			UI::get().emplace<UIOk>(cash_coupon::notice(received, points, mesos), [](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
+		}
+		case 0x5C:
+		{
+			uint8_t code = static_cast<uint8_t>(recv.read_byte());
+
+			if (code == cash_coupon::STRIKES)
+			{
+				// The third wrong code: v83 says so, then leaves the shop.
+				UI::get().emplace<UIOk>(failure_message(code), [](bool)
+				{
+					UI::get().emplace<UIOk>(cash_coupon::STRUCK_OUT, [](bool)
+					{
+						if (auto cashshop = UI::get().get_element<UICashShop>())
+							cashshop->leave();
+					});
+				});
+
+				break;
+			}
+
+			UI::get().emplace<UIOk>(failure_message(code), [](bool) {});
+			break;
+		}
 		default:
 			break;
 		}

@@ -98,6 +98,9 @@ namespace ms
 		// A balance or an operation result came.
 		void answered();
 
+		// Back to the map the player came from.
+		void leave();
+
 	private:
 		void change_tab(cash_catalog::Tab tab);
 		// Add a wish, or say why not.

@@ -19,6 +19,7 @@
 
 #include "UICashBuy.h"
 #include "UICashGift.h"
+#include "UICouponDialog.h"
 #include "UINotice.h"
 
 #include "../UI.h"
@@ -449,21 +450,15 @@ namespace ms
 
 			return Button::State::PRESSED;
 		case Buttons::BT_EXIT:
-		{
-			Window::get().fadeout(
-				[]()
-				{
-					GraphicsGL::get().clear();
-					ChangeMapPacket().dispatch();
-				}
-			);
-
-			GraphicsGL::get().lock();
-			Stage::get().clear();
-			Timer::get().start();
+			leave();
 
 			return Button::State::NORMAL;
-		}
+		case Buttons::BT_COUPON:
+			// v83 (0x471240) ignores it while a request is out.
+			if (!pending)
+				UI::get().emplace<UICouponDialog>();
+
+			return Button::State::NORMAL;
 		case Buttons::BT_CHECK:
 			if (request())
 				CheckCashPacket().dispatch();
@@ -877,6 +872,21 @@ namespace ms
 		ui.enable();
 		Timer::get().start();
 		GraphicsGL::get().unlock();
+	}
+
+	void UICashShop::leave()
+	{
+		Window::get().fadeout(
+			[]()
+			{
+				GraphicsGL::get().clear();
+				ChangeMapPacket().dispatch();
+			}
+		);
+
+		GraphicsGL::get().lock();
+		Stage::get().clear();
+		Timer::get().start();
 	}
 
 	void UICashShop::confirm_exit()
