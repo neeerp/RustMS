@@ -126,6 +126,7 @@ namespace ms
 			SCRIPTMESSAGE,
 			FAMILY,
 			FAMILYTREE,
+			ENCHANTSKILL,
 			NUM_TYPES
 		};
 

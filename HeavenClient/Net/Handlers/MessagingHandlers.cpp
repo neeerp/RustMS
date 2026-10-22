@@ -34,6 +34,7 @@
 #include "StatusMessages.h"
 
 #include "../../IO/UITypes/UIAvatarMegaphone.h"
+#include "../../IO/UITypes/UIEnchantSkill.h"
 #include "../../IO/UITypes/UIQuestComplete.h"
 #include "../../IO/UITypes/UIScriptMessage.h"
 #include "../../IO/UITypes/UIChatBar.h"
@@ -807,19 +808,26 @@ namespace ms
 
 	// v83 FUN_0093354d. Everyone sees the glow and hears the sound; the
 	// scroller also reads the outcome in the chat log. The Legendary Spirit's
-	// result (legendary = 1) belongs to its dialog, which HeavenClient lacks.
+	// own result (legendary = 1) belongs to its window, UIEnchantSkill.
 	// The inventory operation, not this, answers the scroller's request.
 	void ScrollResultHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();
-		bool success = recv.read_byte() != 0;
+		int8_t result = recv.read_byte();
+		bool success = result > 0;
 		bool cursed = recv.read_bool();
 		bool legendary = recv.read_bool();
 		bool whitescroll = recv.read_bool();
 		bool own = Stage::get().is_player(cid);
 
+		// Legendary Spirit's window shows the player's own result (FUN_0093354d); no window, nothing.
 		if (own && legendary)
+		{
+			if (auto window = UI::get().get_element<UIEnchantSkill>(); window && window->is_active())
+				window->receive(result, cursed);
+
 			return;
+		}
 
 		Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
 		Stage::get().show_character_effect(cid, success ? CharEffect::Id::SCROLL_SUCCESS : CharEffect::Id::SCROLL_FAILURE);

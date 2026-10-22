@@ -877,6 +877,8 @@ add_executable(HeavenClient
     IO/UITypes/UIKarmaScissors.h
     IO/UITypes/UIVegaSpell.cpp
     IO/UITypes/UIVegaSpell.h
+    IO/UITypes/UIEnchantSkill.cpp
+    IO/UITypes/UIEnchantSkill.h
     IO/UITypes/UIInviteCard.cpp
     IO/UITypes/UIInviteCard.h
     IO/UITypes/UIGuildBBS.cpp

@@ -52,6 +52,8 @@
 #include "../../IO/Messages.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIMaker.h"
+#include "../../IO/UITypes/UIEnchantSkill.h"
+#include "../../Character/Inventory/ScrollRules.h"
 #include "../../Util/Misc.h"
 #include "../../Util/Randomizer.h"
 
@@ -247,6 +249,18 @@ namespace ms
 
 			if (!open && player.get_skills().get_level(move_id) > 0 && player.can_request(200))
 				UI::get().emplace<UIMaker>();
+
+			return false;
+		}
+
+		// So does Legendary Spirit (FUN_0096d085).
+		if (scroll_rules::is_legendary_spirit(move_id))
+		{
+			auto window = UI::get().get_element<UIEnchantSkill>();
+			bool open = window && window->is_active();
+
+			if (!open && player.get_skills().get_level(move_id) > 0 && player.can_request(200))
+				UI::get().emplace<UIEnchantSkill>();
 
 			return false;
 		}

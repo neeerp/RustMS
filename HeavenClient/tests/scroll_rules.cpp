@@ -15,6 +15,13 @@ int main()
 		using namespace ms::scroll_rules;
 
 		require(fits(2043001, 1302000), "a one-handed sword scroll fits a sword");
+
+		require(is_legendary_spirit(1003) && is_legendary_spirit(10001003) && is_legendary_spirit(20001003),
+				"the three Legendary Spirits");
+		require(!is_legendary_spirit(1004), "Monster Rider isn't one");
+		require(may_enchant(1302000, false), "the window takes a sword");
+		require(!may_enchant(1702000, true), "but no cash weapon");
+		require(may_enchant(1802000, true), "and pet equipment, cash or not");
 		require(!fits(2043001, 1402000), "a one-handed sword scroll doesn't fit a two-handed one");
 		require(fits(2040000, 1002067), "a helmet scroll fits a hat");
 		require(!fits(2040000, 1302000), "a helmet scroll doesn't fit a sword");

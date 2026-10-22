@@ -15,9 +15,28 @@ namespace ms
 		constexpr const char *SEALED_TARGET = "Due to the potency of the scroll,\\nthe sealed item might be destroyed."
 			"\\nAre you sure you still want to use the scroll?";
 
+		// Legendary Spirit's window (FUN_007f63fa, FUN_007f651c): StringPool
+		// 0x1063 for a cash equip dropped in, and the literal at 0xb388cc for
+		// the server's -1.
+		constexpr const char *CASH_REFUSED = "You may not use scrolls on this item.";
+		constexpr const char *ENCHANT_REFUSED = "You cannot use a Scroll with this item.";
+
 		inline bool is_scroll(int32_t item_id)
 		{
 			return item_id / 10000 == 204;
+		}
+
+		// Legendary Spirit: the Beginner's, the Noblesse's and the Legend's.
+		inline bool is_legendary_spirit(int32_t skill_id)
+		{
+			return skill_id == 1003 || skill_id == 10001003 || skill_id == 20001003;
+		}
+
+		// Whether Legendary Spirit's window takes the equip (FUN_007f63fa):
+		// no cash equip but pet equipment.
+		inline bool may_enchant(int32_t equip_id, bool cash)
+		{
+			return !cash || equip_id / 10000 == 180;
 		}
 
 		// FUN_004f5497. Clean Slate (20490xx) and Chaos (20491xx) fit any

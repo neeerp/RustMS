@@ -476,6 +476,23 @@ namespace ms
 		}
 	};
 
+	// Uses the scroll in USE `scroll` on the equip in Equip-tab `equip`, from Legendary Spirit's window
+	// (FUN_00a09221 with legendary 1).
+	// Opcode: SCROLL_EQUIP(86)
+	class LegendaryScrollPacket : public OutPacket
+	{
+	public:
+		LegendaryScrollPacket(int16_t scroll, int16_t equip, bool whitescroll)
+				: OutPacket(OutPacket::Opcode::SCROLL_EQUIP)
+		{
+			write_time();
+			write_short(scroll);
+			write_short(equip);
+			write_short(whitescroll ? 2 : 1);
+			write_byte(1);
+		}
+	};
+
 	// Uses the cash item in Cash `slot` on the item in `target_slot` of `tab`:
 	// an Item Guard (v83 CUIItemProtector's Yes, 0x82a2ee) or the Scissors
 	// of Karma (0x830fb5).
