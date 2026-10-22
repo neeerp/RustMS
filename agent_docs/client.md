@@ -575,7 +575,7 @@ side yet.
 | Chat, whisper, `/find`, `/?`, `/party`, `/buddy`, `/all`, server messages, megaphones | Implemented; the megaphone dialogs are in `inventory.md`; buddy whisper/find modes ignored; `/w NAME` alone whispers every line to NAME, or says "Incorrect ID." for a name no character could have, as v83's `/whisper NAME` does; other commands are dropped, as v83 does for non-GMs |
 | Character info, minimap, world map | Implemented |
 | UI and game sounds | v83's: GameIn as the server lets a character in, not on map loads; RollDown/RollUp for the channel panel; SelectMap alone on world map links and right-click; BuyShopItem on Cash Shop purchase notices; other players' level-up, job, quest and card sounds. QuestAlert and a few rarer sounds are missing |
-| Party (`UIUserList` Party tab, `UIPartyHP`, party chat) | Implemented; see `parties.md` |
+| Party (`UIUserList` Party tab, `UIPartyHP`, party chat, Party Search) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
 | Alliance (`Character/Alliance`, invitation and login cards, alliance chat) | State, cards, chat and the Alliance tab with its rank panel implemented; see `guilds.md` |

@@ -46,7 +46,7 @@ namespace ms
 
 	void Textfield::draw(Point<int16_t> posiiton) const
 	{
-		if (state == State::DISABLED)
+		if (state == State::DISABLED && !shown_disabled)
 			return;
 
 		Point<int16_t> absp = bounds.get_left_top() + posiiton;
@@ -113,6 +113,8 @@ namespace ms
 	{
 		if (state != st)
 		{
+			// Disabling another field leaves the focused one alone.
+			bool focused = state == State::FOCUSED;
 			state = st;
 
 			if (state != State::DISABLED)
@@ -120,7 +122,7 @@ namespace ms
 				elapsed = 0;
 				showmarker = true;
 			}
-			else
+			else if (focused)
 			{
 				// Losing the focus sets a focused field back to NORMAL.
 				UI::get().remove_textfield();
@@ -242,6 +244,9 @@ namespace ms
 
 		for (char c : str)
 		{
+			if (digits && (c < '0' || c > '9'))
+				continue;
+
 			if (rows == 0)
 			{
 				if (belowlimit())
@@ -414,6 +419,16 @@ namespace ms
 		selected = false;
 		markerpos = 0;
 		modifytext("");
+	}
+
+	void Textfield::set_digits_only()
+	{
+		digits = true;
+	}
+
+	void Textfield::set_shown_disabled()
+	{
+		shown_disabled = true;
 	}
 
 	void Textfield::set_cryptchar(int8_t character)

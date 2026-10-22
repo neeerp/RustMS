@@ -66,6 +66,12 @@ namespace ms
 
 		void set_cryptchar(int8_t character);
 
+		// Take digits only, as an ES_NUMBER edit does.
+		void set_digits_only();
+		// Keep drawing the text while disabled, as v83's edits do
+		// (0x4ca700).
+		void set_shown_disabled();
+
 		// Wrap the text at width pixels instead of keeping it on one line.
 		void set_wrap(uint16_t width);
 
@@ -147,6 +153,8 @@ namespace ms
 		Point<int16_t> parentpos;
 		size_t limit;
 		int8_t crypt;
+		bool digits = false;
+		bool shown_disabled = false;
 		State state;
 		bool selected = false;
 		Text selectedlabel;

@@ -1187,11 +1187,28 @@ namespace ms
 		CalcDamageStatPacket() : OutPacket(OutPacket::Opcode::CALC_DAMAGE_STAT) {}
 	};
 
-	// Opcode: PLAYER_UPDATE(223)
-	class PlayerUpdatePacket : public OutPacket
+	// Searches for party members (0xa3e264): the levels, the party size
+	// wanted, and the job boxes.
+	// Opcode: PARTY_SEARCH_START(222)
+	class PartySearchStartPacket : public OutPacket
 	{
 	public:
-		// Finished updating player stats
-		PlayerUpdatePacket() : OutPacket(OutPacket::Opcode::PLAYER_UPDATE) {}
+		PartySearchStartPacket(int32_t min_level, int32_t max_level, int32_t members, int32_t jobs)
+			: OutPacket(OutPacket::Opcode::PARTY_SEARCH_START)
+		{
+			write_int(min_level);
+			write_int(max_level);
+			write_int(members);
+			write_int(jobs);
+		}
+	};
+
+	// Pauses or stops a search (0xa3e2d7); v83 also sends it on field
+	// entries that end one.
+	// Opcode: PARTY_SEARCH_STOP(223)
+	class PartySearchStopPacket : public OutPacket
+	{
+	public:
+		PartySearchStopPacket() : OutPacket(OutPacket::Opcode::PARTY_SEARCH_STOP) {}
 	};
 }

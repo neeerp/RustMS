@@ -24,6 +24,7 @@
 
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIPartyHP.h"
+#include "UITypes/UIPartySearch.h"
 #include "UITypes/UIQuestHelper.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UICharInfo.h"
@@ -381,6 +382,9 @@ namespace ms
 								break;
 							case KeyAction::Id::WORLDMAP:
 								UIWorldMap::open();
+								break;
+							case KeyAction::Id::PARTYSEARCH:
+								UIPartySearch::toggle();
 								break;
 							case KeyAction::Id::MAPLECHAT:
 								UIMessenger::toggle();
@@ -775,7 +779,8 @@ namespace ms
 					UIElement::Type::EVENTCLOCK,
 					UIElement::Type::MOBGAGE,
 					UIElement::Type::ENERGYBAR,
-					UIElement::Type::AVATARMEGAPHONE
+					UIElement::Type::AVATARMEGAPHONE,
+					UIElement::Type::PARTYSEARCHICON
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())

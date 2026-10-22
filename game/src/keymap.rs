@@ -12,9 +12,8 @@ pub const KEY_COUNT: i16 = 90;
 
 /// Default bindings for new characters: (key, kind, action). Keys are scan
 /// codes and actions HeavenClient's (`IO/KeyAction.h`); the layout is v83's.
-/// v83 also binds O to party search and F to family, which the client has
-/// no actions for.
-const DEFAULT_BINDINGS: [(i16, u8, i32); 39] = [
+/// v83 also binds F to family, which the client has no action for.
+const DEFAULT_BINDINGS: [(i16, u8, i32); 40] = [
     (59, 6, 100),
     (60, 6, 101),
     (61, 6, 102),
@@ -49,6 +48,8 @@ const DEFAULT_BINDINGS: [(i16, u8, i32); 39] = [
     (27, 4, 16),
     (34, 4, 18),
     (25, 4, 20),
+    // O opens the Party Search window (HeavenClient's PARTYSEARCH 26).
+    (24, 4, 26),
     (38, 4, 21),
     (41, 4, 24),
     (39, 4, 28),
@@ -106,6 +107,6 @@ mod tests {
         assert!(keymap.get(59).is_some());
         keymap.bind(59, KeyBinding { kind: 0, action: 0 });
         assert!(keymap.get(59).is_none());
-        assert_eq!(keymap.iter().count(), 38);
+        assert_eq!(keymap.iter().count(), 39);
     }
 }

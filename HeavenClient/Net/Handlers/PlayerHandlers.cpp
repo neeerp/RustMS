@@ -30,6 +30,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/Window.h"
 
@@ -71,6 +72,8 @@ namespace ms
 	void ChangeChannelHandler::handle(InPacket& recv) const
 	{
 		int32_t character_id = Stage::get().get_player().get_oid();
+		// v83 resumes a search in the new channel (0x776020).
+		PartySearchActions::leaving_channel();
 		transition_channel_change();
 		LoginParser::parse_login(recv);
 

@@ -668,6 +668,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIPartySearch, where v83 makes it (0x49d15c)
+	struct PosPARTYSEARCH : public Configuration::PointEntry
+	{
+		PosPARTYSEARCH() : PointEntry("PosPARTYSEARCH", "(500, 100)")
+		{}
+	};
+
 	// The default position of UITradingRoom: centred, like the v83 dialog
 	struct PosTRADE : public Configuration::PointEntry
 	{

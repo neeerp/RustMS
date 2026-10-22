@@ -26,6 +26,7 @@
 #include "UIMemoSend.h"
 #include "UIMessenger.h"
 #include "UINotice.h"
+#include "UIPartySearch.h"
 
 #include "../BuddyCommands.h"
 #include "../GuildCommands.h"
@@ -977,6 +978,9 @@ namespace ms
 					chatbar->set_target(UIChatBar::Target::PARTY);
 
 				break;
+			case Buttons::BT_SEARCH:
+				UIPartySearch::toggle();
+				break;
 			case Buttons::BT_CREATE:
 				PartyCommands::create();
 				break;
@@ -1553,7 +1557,7 @@ namespace ms
 				&& field_limit::may_change_leader(Stage::get().get_mapinfo().get_fieldlimit()));
 		enable(Buttons::BT_WHISPER, member && member->online());
 		enable(Buttons::BT_CHAT, in_party);
-		enable(Buttons::BT_SEARCH, false);
+		enable(Buttons::BT_SEARCH, true);
 		enable(Buttons::BT_CREATE, !in_party);
 		enable(Buttons::BT_LEAVE, in_party);
 		enable(Buttons::BT_EXPEL, leader && member);

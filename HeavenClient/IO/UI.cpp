@@ -409,6 +409,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MONSTERBOOK);
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
+					types.emplace_back(UIElement::Type::PARTYSEARCH);
 					types.emplace_back(UIElement::Type::FRIENDGROUP);
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::PETITEMSEARCH);

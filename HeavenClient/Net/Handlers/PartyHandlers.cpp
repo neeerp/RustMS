@@ -10,6 +10,7 @@
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
+#include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
@@ -199,6 +200,8 @@ namespace ms
 			leader.door = read_door(recv);
 			party.update(party_id, self, { leader });
 
+			// A new party ends any search (0xa3e81d).
+			PartySearchActions::stop();
 			party_line("You have created a new party.");
 			break;
 		}
@@ -214,7 +217,10 @@ namespace ms
 				party.clear();
 
 				if (led)
+				{
+					PartySearchActions::stop();
 					party_line("You have quit as the leader of the party. The party has been disbanded.");
+				}
 				else
 					party_line("You have left the party since the party leader quit.");
 
@@ -248,6 +254,8 @@ namespace ms
 			else
 				party_line("'" + name + "' has joined the party.");
 
+			// Big enough ends the search (0xa3ec18).
+			PartySearchActions::joined(party.get_members().size());
 			break;
 		}
 		case Operation::ALREADY_JOINED:

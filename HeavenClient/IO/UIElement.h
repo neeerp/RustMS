@@ -120,6 +120,8 @@ namespace ms
 			DUEY,
 			KITEWRITE,
 			KITEVIEW,
+			PARTYSEARCH,
+			PARTYSEARCHICON,
 			NUM_TYPES
 		};
 
@@ -138,6 +140,13 @@ namespace ms
 		void deactivate();
 
 		bool is_active() const;
+
+		// The top left corner on the screen, and the size.
+		Point<int16_t> get_position() const
+		{ return position; }
+
+		Point<int16_t> get_dimension() const
+		{ return dimension; }
 
 		virtual void toggle_active();
 
