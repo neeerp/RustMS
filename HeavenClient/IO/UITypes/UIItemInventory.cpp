@@ -290,22 +290,17 @@ namespace ms
 		// v83 0xa092fb: a morph potion or ghost item, silently.
 		bool refuses_potion(int32_t item_id)
 		{
-			auto shop = UI::get().get_element<UIPersonalShop>();
-			auto trade = UI::get().get_element<UITradingRoom>();
-			bool mini_room = (shop && shop->is_active()) || (trade && trade->is_active());
 			const Player &player = Stage::get().get_player();
 
 			return morph::potion_refused(item_id, player.get_look().get_morph(), player.get_chair(),
-				player.get_look().get_vehicle(), mini_room);
+				player.get_look().get_vehicle(), UI::get().dialog_open());
 		}
 
-		// Some cash items say so in the chat log while a shop or trade is open.
-		bool in_mini_room()
+		// Some cash items say so in the chat log while a dialog is open (v83 0xa0a63f's cases 0xe, 0x12, 0x13,
+		// 0x17, 0x18, 0x1a, 0x1b, 0x1f, 0x20, 0x25, 0x3f, 0x40, 0x41, 0x42, 0x44; report c013). The others are used.
+		bool in_dialog()
 		{
-			auto shop = UI::get().get_element<UIPersonalShop>();
-			auto trade = UI::get().get_element<UITradingRoom>();
-
-			if ((!shop || !shop->is_active()) && (!trade || !trade->is_active()))
+			if (!UI::get().dialog_open())
 				return false;
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -318,7 +313,7 @@ namespace ms
 		// goes up once the server sends it back. A blank note isn't sent.
 		void use_chalkboard(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item() || in_mini_room())
+			if (!may_use_cash_item() || in_dialog())
 				return;
 
 			if (Stage::get().get_mapinfo().allows_personal_shop())
@@ -403,7 +398,7 @@ namespace ms
 		// leaves and where it goes. A GM can't use it, and says nothing.
 		void use_ap_reset(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item() || in_mini_room())
+			if (!may_use_cash_item() || in_dialog())
 				return;
 
 			if (!ap_reset::may_use(Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB)))
@@ -421,7 +416,7 @@ namespace ms
 		// not advanced as far as the item can't use it, and are told nothing.
 		void use_sp_reset(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item() || in_mini_room())
+			if (!may_use_cash_item() || in_dialog())
 				return;
 
 			int32_t job = Stage::get().get_player().get_stats().get_stat(MapleStat::Id::JOB);
@@ -471,17 +466,12 @@ namespace ms
 		}
 
 		// v83 FUN_00a0a63f, type 0x1f: the Quick Delivery Coupon asks the
-		// server for its window, which can't open over Duey's (FUN_00a14a1c).
-		// Only a send uses it up.
+		// server for its window, which can't open over a dialog such as
+		// Duey's. Only a send uses it up.
 		void use_quick_delivery(int16_t slot, int32_t item_id)
 		{
-			if (auto duey = UI::get().get_element<UIDuey>(); duey && duey->is_active())
-			{
-				if (auto chatbar = UI::get().get_element<UIChatBar>())
-					chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
-
+			if (in_dialog())
 				return;
-			}
 
 			if (may_use_cash_item())
 				Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
@@ -491,7 +481,7 @@ namespace ms
 		// last request is waited for only once the player says yes.
 		void use_meso_bag(int16_t slot, int32_t item_id)
 		{
-			if (in_mini_room())
+			if (in_dialog())
 				return;
 
 			nl::node info = nl::nx::item["Cash"]["0520.img"]["0" + std::to_string(item_id)]["info"];
@@ -603,7 +593,7 @@ namespace ms
 					});
 					break;
 				case Megaphones::Kind::ITEM:
-					if (!in_mini_room())
+					if (!in_dialog())
 						UI::get().emplace<UIItemMegaphone>(slot, item_id);
 
 					break;
@@ -616,13 +606,13 @@ namespace ms
 		// the equip (and the scroll) dragged in.
 		void use_hammer(int16_t slot)
 		{
-			if (may_use_cash_item())
+			if (may_use_cash_item() && !in_dialog())
 				UI::get().emplace<UIViciousHammer>(slot);
 		}
 
 		void use_vega_spell(int16_t slot, int32_t item_id)
 		{
-			if (may_use_cash_item())
+			if (may_use_cash_item() && !in_dialog())
 				UI::get().emplace<UIVegaSpell>(slot, item_id);
 		}
 
@@ -630,7 +620,7 @@ namespace ms
 		// seals for (`info/protectTime`), none for 5060001.
 		void use_item_guard(int16_t slot, int32_t item_id)
 		{
-			if (!may_use_cash_item())
+			if (!may_use_cash_item() || in_dialog())
 				return;
 
 			int32_t days = nl::nx::item["Cash"]["0506.img"][string_format::extend_id(item_id, 8)]["info"]["protectTime"];
@@ -643,24 +633,8 @@ namespace ms
 
 		void use_karma_scissors(int16_t slot, int32_t item_id)
 		{
-			if (may_use_cash_item())
+			if (may_use_cash_item() && !in_dialog())
 				UI::get().emplace<UIKarmaScissors>(slot, item_id);
-		}
-
-		// v83 0x4f00ab: no cash item is used while the guard's or the
-		// scissors' window is open.
-		bool guard_open()
-		{
-			auto protector = UI::get().get_element<UIItemProtector>();
-			auto scissors = UI::get().get_element<UIKarmaScissors>();
-
-			if ((!protector || !protector->is_active()) && (!scissors || !scissors->is_active()))
-				return false;
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
-
-			return true;
 		}
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
@@ -1236,9 +1210,6 @@ namespace ms
 						Stage::get().get_player().use_item(item_id);
 						break;
 					case InventoryType::Id::CASH:
-						if (guard_open())
-							break;
-
 						// As in v83, a face item (516xxxx) makes its emote
 						// (id % 100 + 8) as a face key would, without being
 						// used up.

@@ -400,10 +400,10 @@ namespace ms
 		if (Stage::get().get_player().shape_refuses())
 			return;
 
-		auto room = UI::get().get_element<UITradingRoom>();
 		const char *refusal = nullptr;
 
-		if (room && room->is_active())
+		// Nor while a dialog is open.
+		if (UI::get().dialog_open())
 			refusal = "Not available";
 		else if (Stage::get().is_player(cid) || !Stage::get().get_character(cid))
 			refusal = "Unable to find the character.";

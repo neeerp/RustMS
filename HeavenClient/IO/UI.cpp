@@ -32,13 +32,21 @@
 #include "UITypes/UICashShop.h"
 #include "UITypes/UIChannel.h"
 #include "UITypes/UIChatBar.h"
+#include "UITypes/UIDuey.h"
 #include "UITypes/UIGameOption.h"
+#include "UITypes/UIItemMegaphone.h"
+#include "UITypes/UIItemProtector.h"
+#include "UITypes/UIKarmaScissors.h"
 #include "UITypes/UINpcTalk.h"
+#include "UITypes/UIPersonalShop.h"
 #include "UITypes/UIQuickSlotConfig.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStorage.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UISystemOption.h"
+#include "UITypes/UITradingRoom.h"
+#include "UITypes/UIVegaSpell.h"
+#include "UITypes/UIViciousHammer.h"
 #include "UITypes/UIWorldMap.h"
 
 namespace ms
@@ -114,6 +122,20 @@ namespace ms
 	bool UI::modal_open() const
 	{
 		return state->modal_open();
+	}
+
+	bool UI::dialog_open()
+	{
+		auto open = [](auto element)
+		{
+			return element && element->is_active();
+		};
+
+		return open(get_element<UITradingRoom>()) || open(get_element<UIPersonalShop>())
+			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
+			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
+			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIViciousHammer>())
+			|| open(get_element<UIVegaSpell>());
 	}
 
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)

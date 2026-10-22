@@ -560,7 +560,7 @@ namespace ms
 		if (player.ride_refuses() || player.shape_refuses())
 			return;
 
-		if (auto shop = UI::get().get_element<UIPersonalShop>(); shop && shop->is_active())
+		if (UI::get().dialog_open())
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
