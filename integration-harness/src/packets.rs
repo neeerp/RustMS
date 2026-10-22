@@ -531,6 +531,16 @@ pub fn build_check_cash() -> Packet {
     packet_with_opcode(RecvOpcode::CheckCash as i16)
 }
 
+/// COUPON_CODE (0xE6): the Coupon dialog's code, after an empty string.
+pub fn build_coupon_code(code: &str) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CouponCode as i16);
+    packet
+        .write_str_with_length("")
+        .and_then(|_| packet.write_str_with_length(code))
+        .map_err(|e| e.to_string())?;
+    Ok(packet)
+}
+
 /// CASHSHOP_OPERATION 0x1E: buy package `sn`, paying with `cash_type`.
 pub fn build_cash_shop_buy_package(cash_type: i32, sn: i32) -> Result<Packet, String> {
     cash_shop_purchase(0x1E, cash_type, sn)

@@ -592,6 +592,26 @@ diesel::table! {
     }
 }
 diesel::joinable!(wedding_guests -> wedding_reservations (marriage_id));
+diesel::table! {
+    coupons (id) {
+        id -> Int4,
+        code -> Varchar,
+        expires_at -> Nullable<Timestamp>,
+        redeemed_by -> Nullable<Int4>,
+        redeemed_at -> Nullable<Timestamp>,
+    }
+}
+diesel::joinable!(coupons -> accounts (redeemed_by));
+diesel::table! {
+    coupon_rewards (id) {
+        id -> Int4,
+        coupon_id -> Int4,
+        kind -> Int2,
+        item_id -> Int4,
+        quantity -> Int4,
+    }
+}
+diesel::joinable!(coupon_rewards -> coupons (coupon_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -635,4 +655,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     rings,
     wedding_reservations,
     wedding_guests,
+    coupons,
+    coupon_rewards,
 );

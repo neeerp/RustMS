@@ -14,6 +14,7 @@ pub mod combo;
 pub mod consume_effect;
 pub mod content;
 pub mod conti;
+pub mod coupon;
 pub mod dialogue;
 pub mod duey;
 pub mod dungeons;

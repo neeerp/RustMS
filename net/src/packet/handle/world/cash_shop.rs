@@ -66,6 +66,20 @@ impl WorldHandler for CheckCashHandler {
     }
 }
 
+/// 0xE6, `COUPON_CODE`: the Coupon dialog's OK. v83 sends an empty string
+/// (the gift receiver, never filled in), then the code (report b072).
+pub struct CouponCodeHandler;
+
+impl WorldHandler for CouponCodeHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        reader.read_str_with_length()?;
+        let code = reader.read_str_with_length()?;
+        Ok(HandlerResult::empty().with(WorldAction::CashShop(CashShopRequest::Coupon(code))))
+    }
+}
+
 impl WorldHandler for CashShopOperationHandler {
     fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
         let mut reader = Cursor::new(&packet.bytes);

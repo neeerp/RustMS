@@ -994,3 +994,48 @@ pub async fn fill_parcels(receiver_id: i32, count: i32) -> Result<(), HarnessErr
     .map_err(fixture)?;
     Ok(())
 }
+
+/// Make coupon `code` (upper case) giving `rewards`, each `(kind, item_id,
+/// quantity)` with kind 0 an item, 1 NX Credit, 2 Maple Points, 3 NX
+/// Prepaid and 4 mesos; already expired if `expired`.
+pub async fn create_coupon(
+    code: &str,
+    expired: bool,
+    rewards: &[(i16, i32, i32)],
+) -> Result<(), HarnessError> {
+    let code = code.to_string();
+    let rewards = rewards.to_vec();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "create a coupon",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        conn.transaction(|conn| {
+            diesel::sql_query(
+                "INSERT INTO coupons (code, expires_at) \
+                 VALUES ($1, CASE WHEN $2 THEN now()::timestamp - interval '1 day' END)",
+            )
+            .bind::<Text, _>(&code)
+            .bind::<Bool, _>(expired)
+            .execute(conn)?;
+            for (kind, item_id, quantity) in rewards {
+                diesel::sql_query(
+                    "INSERT INTO coupon_rewards (coupon_id, kind, item_id, quantity) \
+                     SELECT id, $2, $3, $4 FROM coupons WHERE code = $1",
+                )
+                .bind::<Text, _>(&code)
+                .bind::<SmallInt, _>(kind)
+                .bind::<Integer, _>(item_id)
+                .bind::<Integer, _>(quantity)
+                .execute(conn)?;
+            }
+            diesel::QueryResult::Ok(())
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(())
+}

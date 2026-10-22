@@ -63,6 +63,7 @@ const GIFTS: u8 = 0x4D;
 const WISH_LIST: u8 = 0x4F;
 const WISH_LIST_UPDATED: u8 = 0x55;
 const BOUGHT: u8 = 0x57;
+const COUPON_REDEEMED: u8 = 0x59;
 const FAILED: u8 = 0x5C;
 const GIFT_SENT: u8 = 0x5E;
 const INVENTORY_SLOTS: u8 = 0x60;
@@ -88,6 +89,15 @@ pub enum CashShopFailure {
     /// "This item has a gender restriction. Please confirm the gender of
     /// the recipient."
     Gender = 0xAA,
+    /// "Please check and see if the coupon number is right."
+    CouponNotFound = 0xB0,
+    /// The third wrong code on this connection: v83 says so and leaves the
+    /// shop itself (report b072).
+    CouponStrikes = 0xB1,
+    /// "This coupon has expired."
+    CouponExpired = 0xB2,
+    /// "This coupon was already used."
+    CouponUsed = 0xB3,
     /// "Please check if your inventory is full or not."
     InventoryFull = 0xBB,
     /// "The item is out of stock, and therefore not available for sale."
@@ -121,6 +131,34 @@ pub fn build_bought_cash_item(item: &CashItem) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(BOUGHT)?;
     encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a coupon was redeemed. `cash_items` are new in the
+/// Cash Inventory; the Maple Points, the bag items (item id, quantity) and
+/// the mesos are already the player's and only shown in the notice. The
+/// balances follow in QUERY_CASH_RESULT, which unlocks the shop.
+pub fn build_coupon_redeemed(
+    cash_items: &[CashItem],
+    maple_points: i32,
+    items: &[(i32, i16)],
+    mesos: i32,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(COUPON_REDEEMED)?;
+    packet.write_byte(cash_items.len() as u8)?;
+    for item in cash_items {
+        encode_cash_item(&mut packet, item)?;
+    }
+    packet.write_int(maple_points)?;
+    packet.write_int(items.len() as i32)?;
+    for &(item_id, quantity) in items {
+        packet.write_short(quantity)?;
+        packet.write_short(0)?;
+        packet.write_int(item_id)?;
+    }
+    packet.write_int(mesos)?;
     Ok(packet)
 }
 
@@ -497,6 +535,49 @@ mod tests {
             .int(1002357)
             .short(1)
             .int(3400);
+        expect.end();
+    }
+
+    #[test]
+    fn a_redeemed_coupon_lists_what_it_gave() {
+        let item = CashItem {
+            id: 9,
+            account_id: 3,
+            item_id: 5150000,
+            sn: 50100000,
+            quantity: 1,
+            gift_from: String::new(),
+            expires_at: None,
+            gift_message: None,
+        };
+        let packet = build_coupon_redeemed(&[item], 500, &[(2000000, 20)], 1000).unwrap();
+        assert_eq!(packet.bytes.len(), 2 + 1 + 1 + 55 + 4 + 4 + 8 + 4);
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x59)
+            .byte(1)
+            .long(9)
+            .int(3)
+            .int(0)
+            .int(5150000)
+            .int(50100000)
+            .short(1)
+            .skip(13 + 8 + 8)
+            .int(500)
+            .int(1)
+            .short(20)
+            .short(0)
+            .int(2000000)
+            .int(1000);
+        expect.end();
+
+        let packet = build_cash_shop_failure(CashShopFailure::CouponStrikes).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x5C)
+            .byte(0xB1);
         expect.end();
     }
 }

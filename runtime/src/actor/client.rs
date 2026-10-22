@@ -2,6 +2,7 @@ mod alliances;
 mod buddies;
 mod buff;
 mod combat;
+mod coupon;
 mod dialogue;
 mod door;
 mod duey;
@@ -138,6 +139,8 @@ pub struct ClientActor {
     changing_channel: bool,
     /// The player left their field for the Cash Shop.
     in_cash_shop: bool,
+    /// Wrong coupon codes in a row on this connection.
+    coupon_strikes: u8,
     /// The party the directory says the player is in; fields need it to
     /// share EXP.
     party_id: Option<i32>,
@@ -210,6 +213,7 @@ impl ClientActor {
             npc_request_id: 0,
             changing_channel: false,
             in_cash_shop: false,
+            coupon_strikes: 0,
             party_id: None,
             presence: None,
             door: None,
@@ -325,11 +329,12 @@ impl ClientActor {
             return Ok(());
         };
         // In the Cash Shop the player is off the map; only leaving, the shop
-        // itself and thanking for gifts count.
+        // itself, its coupons and thanking for gifts count.
         if self.in_cash_shop
             && opcode != RecvOpcode::ChangeMap as i16
             && opcode != RecvOpcode::CashShopOperation as i16
             && opcode != RecvOpcode::CheckCash as i16
+            && opcode != RecvOpcode::CouponCode as i16
             && opcode != RecvOpcode::NoteAction as i16
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
@@ -984,6 +989,7 @@ impl ClientActor {
                 self.expand_storage(account_id, cash_type, slots, price)
                     .await?
             }
+            CashShopRequest::Coupon(code) => self.redeem_coupon(code).await?,
             CashShopRequest::Balance => {
                 let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
                 vec![cs::build_cash_balance(
