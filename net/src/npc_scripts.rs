@@ -362,7 +362,8 @@ const MOM_AND_DAD: i32 = 9201003;
 /// The Nanas (`ProofHene` and so on): each gives her Proof of Love for 50 of
 /// a town's monster drops while the blessing is sought. One script for the
 /// six; the town decides which she is.
-const NANAS: [i32; 6] = [9201001, 9201023, 9201024, 9201025, 9201026, 9201027];
+/// The Nanas, in the order of their towns in `NANA_TASKS`.
+const NANAS: [i32; 6] = [9201001, 9201023, 9201027, 9201024, 9201025, 9201026];
 /// By Nana: her town, the drop she asks for and the EXP she gives the first
 /// time. Her Proof of Love is `PROOF_OF_LOVE` plus her place here (Cosmic).
 const NANA_TASKS: [(i32, i32, i32); 6] = [

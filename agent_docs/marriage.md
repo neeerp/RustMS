@@ -28,7 +28,8 @@ Cosmic's scripts; report b064). The steps are script markers, which are saved
 with the quests but never sent to the client:
 
 1. Moony sends the player to Mom and Dad (9201003) in "Meet the Parents"
-   (680000004). They ask for four different Proofs of Love.
+   (680000004). They ask for four different Proofs of Love. The way there
+   is a touch portal in 104040002, beyond Henesys Hunting Ground II.
 2. The Nanas give the proofs. Each Nana gives one, in her own town only,
    for 50 of the town's drop:
 
@@ -43,9 +44,10 @@ with the quests but never sent to the client:
 
    The first proof from each Nana also gives EXP, from 2,000 to 30,000. A
    lost proof can be had again for the drops.
-3. With four different proofs, Mom and Dad take them all, give 20,000 EXP,
-   and bless the player.
-4. Once blessed, a man without a box can buy one from Moony. Each box takes
+3. With four different proofs, Mom and Dad take every proof the player
+   holds, give 20,000 EXP, and bless the player.
+4. Once blessed, a man without a box can buy one from Moony. A woman can
+   earn the blessing, but Moony makes rings only for men. Each box takes
    a Diamond (4021007), one more stone, and a fee:
 
    | Box | Stone | Fee |

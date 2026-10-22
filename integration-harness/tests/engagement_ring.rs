@@ -177,3 +177,19 @@ async fn a_groom_earns_the_blessing_and_buys_a_ring_box_from_moony() {
     assert_eq!(t.prompts, [(MOONY, 0)]);
     assert_eq!(t.items, [(SILVER_SWAN_BOX, -1)]);
 }
+
+#[test]
+fn each_nana_stands_in_her_town() {
+    let towns = [
+        (100_000_000, 9201001),
+        (103_000_000, 9201023),
+        (102_000_000, 9201027),
+        (101_000_000, 9201024),
+        (200_000_000, 9201025),
+        (220_000_000, 9201026),
+    ];
+    for (town, nana) in towns {
+        talk(town, nana);
+    }
+    talk(MEET_THE_PARENTS, MOM_AND_DAD);
+}
