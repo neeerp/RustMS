@@ -179,6 +179,7 @@ nothing. A script returns effects that the client actor sends:
 | `enter_earth00`, `enter_earth01` | The Nautilus's Navigation Room (`120000101` `earth01`) to Omega Sector's Command Center (`221000300` `earth00`) and back, for a holder of a Warp Card (`4031890`, kept); else a pink line. Cosmic sends that line as type 6; it's pink here, as Edelstein's scripts send theirs |
 | `ariant_queens` | Ariant's palace rooms (`260000301`-`260000303`, `ring00`-`ring06`): nothing for a player in Tigun's disguise (the morph of item `2210005`, a buff of id `-2210005`); anyone else is turned out to Ariant Castle's `R001` (`260000300`) with portal sound and a pink line |
 | `advice00`-`advice09`, `adviceMap` | The original Maple Island's instruction balloons (moving, Heena, jumping, climbing, Sera, the quest window, portals, the World Map, stats, jumping down), each a PLAYER_HINT with Cosmic's width and height; no warp |
+| `nets_in`, `nets_out` | Nett's Pyramid's lobby, the Pyramid Dunes (`926010000` `out00`), from Sahel 3's `piramid00` (`260020500`), saving the map in `saved_locations` kind 3 (`PYRAMID_RETURN`); its `out00` goes back there (Sahel 3 by its `piramid00`, else the map's spawn point), or to Sahel 3 when nothing was saved. The party quest itself isn't in |
 
 A portal that takes one player at a time puts `Effect::RequireEmptyMap`
 first; when someone is there, nothing applies and the client actor says the

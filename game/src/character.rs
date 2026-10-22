@@ -26,6 +26,9 @@ pub const FREE_MARKET_RETURN: i16 = 0;
 pub const WORLD_TOUR_RETURN: i16 = 1;
 /// The `saved_locations` key of the town a trip to Florina Beach left from.
 pub const FLORINA_RETURN: i16 = 2;
+/// The `saved_locations` key of the map the player entered Nett's Pyramid's
+/// Pyramid Dunes from.
+pub const PYRAMID_RETURN: i16 = 3;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
