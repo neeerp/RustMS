@@ -342,7 +342,8 @@ from `UI.nx`. Moved so far:
   COLLECTION lengthen it to `backgrnd5`, `backgrnd2`, and `backgrnd7`, and ITEM
   and WISHLIST open `backgrnd4` and `backgrnd3` beside it; all are empty, as
   RustMS has no mounts or monster book, and the pet and wish list pages are
-  not read. Family and excluded items are disabled. REQ PARTY, greyed in the
+  not read. Excluded items are disabled. Family opens the player's own Family
+  window or someone else's Family Tree (`agent_docs/families.md`). REQ PARTY, greyed in the
   player's own window, invites the character when the player leads a party,
   and otherwise does nothing (v83 FUN_008ff5b0). TRADE, also greyed in the
   player's own window, invites the character to a trade. The fame buttons send
@@ -358,18 +359,22 @@ from `UI.nx`. Moved so far:
   `char_click::menu_hits`). It opens at the cursor, pushed back inside the
   view, with their name in the top cap. The rows are PERSONAL INFO, SAVE NAME,
   TRADE REQUEST, WHISPER, PARTY INVITE (party leaders, or players in no
-  party), GUILD INVITE (guild masters and Jr. Masters), and ALERT GM; rows left
+  party), GUILD INVITE (guild masters and Jr. Masters), ALERT GM, and FAMILY (once
+  the family is known and has room for a junior); rows left
   out move up (`IO/Components/ContextMenuLayout.h`). It holds the mouse and
   keys: a press or right release outside, ESC, or Enter closes it, and it
   closes before a row acts. Info opens the character info window, SAVE NAME
   copies the name and opens the chat field, WHISPER puts the chat into
   whisper mode for them, TRADE and PARTY INVITE do what the info window's
   trade and `/party invite` do, GUILD INVITE sends GUILD_OPERATION 5 after
-  v83's guild checks, and ALERT GM shows v83's notice that reports are down.
+  v83's guild checks, and ALERT GM shows v83's notice that reports are down, and FAMILY sends
+  ADD_FAMILY.
   Approximations: v83 also hits the character's second position and a
-  morph's own box, and it offers Add Junior to family members, which HC
-  doesn't have. The right button acts when it comes up, everywhere, as in
+  morph's own box. The right button acts when it comes up, everywhere, as in
   v83.
+- **Family** (`UIFamily`, `UIFamilyTree`, `UIWindow.img/Family` and
+  `FamilyTree`): the Family window from the Family key, and the Family Tree
+  from it or from someone's info. See `agent_docs/families.md`.
 - **Quest log** (`UIQuestLog`, `UIWindow.img/Quest`): Available, In Progress,
   and Complete tabs (`Basic.img/Tab2`), quests folded by area, and a detail
   panel with the quest's text and FIND NPC or QUEST HELPER, laid out from

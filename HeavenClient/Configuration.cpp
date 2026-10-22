@@ -79,6 +79,8 @@ namespace ms
 		settings.emplace<PosPERSONALSHOP>();
 		settings.emplace<PosNOTICE>();
 		settings.emplace<PosMESSENGER>();
+		settings.emplace<PosFAMILY>();
+		settings.emplace<PosFAMILYTREE>();
 		settings.emplace<PosCHANNEL>();
 		settings.emplace<PosKEYCONFIG>();
 		settings.emplace<PosGAMEOPTION>();

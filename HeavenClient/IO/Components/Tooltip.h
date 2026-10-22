@@ -65,7 +65,9 @@ namespace ms
 			HELP,
 			// The item search's results, whose tooltips go right of the cursor.
 			PETITEMSEARCH,
-			DUEY
+			DUEY,
+			FAMILY,
+			FAMILYTREE
 		};
 
 		virtual ~Tooltip()

@@ -51,6 +51,7 @@ namespace ms
 			GUILDCHAT = 25,
 			// v83's 25, which this enum gives to guild chat.
 			PARTYSEARCH = 26,
+			FAMILY = 27,
 			MEDALS = 28,
 			BITS,
 			ALLIANCECHAT,

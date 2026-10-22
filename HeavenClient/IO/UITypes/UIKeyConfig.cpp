@@ -138,7 +138,6 @@ namespace ms
 		}
 
 		// The functions the window offers, by the index of their v83 icon.
-		// Family has no counterpart here.
 		struct Function
 		{
 			KeyAction::Id action;
@@ -172,6 +171,7 @@ namespace ms
 			{ KeyAction::Id::CASHSHOP, 23 },
 			{ KeyAction::Id::ALLIANCECHAT, 24 },
 			{ KeyAction::Id::PARTYSEARCH, 25 },
+			{ KeyAction::Id::FAMILY, 26 },
 			{ KeyAction::Id::MEDALS, 27 },
 			{ KeyAction::Id::PICKUP, 50 },
 			{ KeyAction::Id::SIT, 51 },
@@ -228,6 +228,7 @@ namespace ms
 			{ KeyConfig::Key::LEFT_BRACKET, { KeyType::Id::MENU, KeyAction::Id::MENU } },
 			{ KeyConfig::Key::RIGHT_BRACKET, { KeyType::Id::MENU, KeyAction::Id::QUICKSLOTS } },
 			{ KeyConfig::Key::G, { KeyType::Id::MENU, KeyAction::Id::GUILD } },
+			{ KeyConfig::Key::F, { KeyType::Id::MENU, KeyAction::Id::FAMILY } },
 			{ KeyConfig::Key::P, { KeyType::Id::MENU, KeyAction::Id::PARTY } },
 			{ KeyConfig::Key::O, { KeyType::Id::MENU, KeyAction::Id::PARTYSEARCH } },
 			{ KeyConfig::Key::L, { KeyType::Id::MENU, KeyAction::Id::NOTIFIER } },

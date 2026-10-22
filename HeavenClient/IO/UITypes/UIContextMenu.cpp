@@ -5,6 +5,7 @@
 #include "UINotice.h"
 #include "UITradingRoom.h"
 
+#include "../FamilyActions.h"
 #include "../GuildCommands.h"
 #include "../PartyCommands.h"
 #include "../UI.h"
@@ -40,12 +41,6 @@ namespace ms
 		const Point<int16_t> TITLE_AT(11, -3);
 		constexpr size_t TITLE_WIDTH = 78;
 
-		// Juniors come from the family, which HC doesn't have.
-		bool can_add_junior()
-		{
-			return false;
-		}
-
 	}
 
 	UIContextMenu::UIContextMenu(int32_t c, const std::string& n, Point<int16_t> cursor) :
@@ -63,7 +58,7 @@ namespace ms
 		bool party_invite = !party.exists() || party.is_leader(player.get_oid());
 
 		std::vector<context_menu::Entry> entries =
-			context_menu::entries(party_invite, GuildCommands::can_invite(player), can_add_junior());
+			context_menu::entries(party_invite, GuildCommands::can_invite(player), FamilyActions::can_add_junior());
 		rows = entries.size();
 
 		for (size_t row = 0; row < rows; row++)
@@ -159,6 +154,9 @@ namespace ms
 				break;
 			case context_menu::GUILD:
 				GuildCommands::invite(name);
+				break;
+			case context_menu::FAMILY:
+				FamilyActions::add_junior(name);
 				break;
 			case context_menu::CLAIM:
 				// The server never opens reports, so v83 says they're down

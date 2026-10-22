@@ -23,6 +23,7 @@
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
+#include "Handlers/FamilyHandlers.h"
 #include "Handlers/InventoryHandlers.h"
 #include "Handlers/LoginHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
@@ -239,6 +240,17 @@ namespace ms
 		GUILD_NAME_CHANGED = 202,
 		GUILD_MARK_CHANGED = 203,
 
+		/// Family
+		FAMILY_CHART_RESULT = 94,
+		FAMILY_INFO_RESULT = 95,
+		FAMILY_RESULT = 96,
+		FAMILY_JOIN_REQUEST = 97,
+		FAMILY_JOIN_REQUEST_RESULT = 98,
+		FAMILY_JOIN_ACCEPTED = 99,
+		FAMILY_PRIVILEGE_LIST = 100,
+		FAMILY_REP_GAIN = 101,
+		FAMILY_NOTIFY_LOGIN_OR_LOGOUT = 102,
+
 		/// Cash Shop
 		SET_CASH_SHOP = 127,
 		QUERY_CASH_RESULT = 324,
@@ -426,6 +438,17 @@ namespace ms
 		emplace<NOTIFY_JOB_CHANGE, NotifyJobChangeHandler>();
 		emplace<GUILD_NAME_CHANGED, GuildNameChangedHandler>();
 		emplace<GUILD_MARK_CHANGED, GuildMarkChangedHandler>();
+
+		// Families
+		emplace<FAMILY_CHART_RESULT, FamilyChartHandler>();
+		emplace<FAMILY_INFO_RESULT, FamilyInfoHandler>();
+		emplace<FAMILY_RESULT, FamilyResultHandler>();
+		emplace<FAMILY_JOIN_REQUEST, FamilyJoinRequestHandler>();
+		emplace<FAMILY_JOIN_REQUEST_RESULT, FamilyJoinRequestResultHandler>();
+		emplace<FAMILY_JOIN_ACCEPTED, FamilyJoinAcceptedHandler>();
+		emplace<FAMILY_PRIVILEGE_LIST, FamilyPrivilegeListHandler>();
+		emplace<FAMILY_REP_GAIN, FamilyRepGainHandler>();
+		emplace<FAMILY_NOTIFY_LOGIN_OR_LOGOUT, FamilyNotifyLoginOrLogoutHandler>();
 
 		// Cash Shop
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();

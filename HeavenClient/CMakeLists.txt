@@ -258,6 +258,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME party_search COMMAND party_search_tests)
     add_executable(rps_game_tests tests/rps_game.cpp Character/RpsGame.cpp)
     add_test(NAME rps_game COMMAND rps_game_tests)
+    add_executable(family_tests tests/family.cpp Character/Family.cpp Net/InPacket.cpp Net/Handlers/Helpers/FamilyParser.cpp)
+    target_include_directories(family_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME family COMMAND family_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -494,6 +497,8 @@ add_executable(HeavenClient
     Character/PartySearch.h
     Character/RpsGame.cpp
     Character/RpsGame.h
+    Character/Family.cpp
+    Character/Family.h
     Character/Pets.h
     Character/MiniRoomBalloon.cpp
     Character/MiniRoomBalloon.h
@@ -744,6 +749,10 @@ add_executable(HeavenClient
     IO/UITypes/UIPartyHP.h
     IO/UITypes/UIPartySearch.cpp
     IO/UITypes/UIPartySearch.h
+    IO/UITypes/UIFamily.cpp
+    IO/UITypes/UIFamily.h
+    IO/UITypes/UIFamilyTree.cpp
+    IO/UITypes/UIFamilyTree.h
     IO/UITypes/UIPartySearchIcon.cpp
     IO/UITypes/UIPartySearchIcon.h
     IO/UITypes/UIQuestHelper.h
@@ -927,6 +936,8 @@ add_executable(HeavenClient
     IO/PartyCommands.h
     IO/PartySearchActions.cpp
     IO/PartySearchActions.h
+    IO/FamilyActions.cpp
+    IO/FamilyActions.h
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
@@ -968,6 +979,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/AllianceNews.h
     Net/Handlers/Helpers/GuildParser.cpp
     Net/Handlers/Helpers/GuildParser.h
+    Net/Handlers/Helpers/FamilyParser.cpp
+    Net/Handlers/Helpers/FamilyParser.h
     Net/Handlers/AttackHandlers.cpp
     Net/Handlers/AttackHandlers.h
     Net/Handlers/BuddyHandlers.cpp
@@ -980,6 +993,8 @@ add_executable(HeavenClient
     Net/Handlers/CommonHandlers.h
     Net/Handlers/GuildHandlers.cpp
     Net/Handlers/GuildHandlers.h
+    Net/Handlers/FamilyHandlers.cpp
+    Net/Handlers/FamilyHandlers.h
     Net/Handlers/InventoryHandlers.cpp
     Net/Handlers/InventoryHandlers.h
     Net/Handlers/LoginHandlers.cpp
@@ -1004,6 +1019,7 @@ add_executable(HeavenClient
     Net/Packets/CharCreationPackets.h
     Net/Packets/CommonPackets.h
     Net/Packets/GameplayPackets.h
+    Net/Packets/FamilyPackets.h
     Net/Packets/InventoryPackets.h
     Net/Packets/LoginPackets.h
     Net/Packets/MessagingPackets.h

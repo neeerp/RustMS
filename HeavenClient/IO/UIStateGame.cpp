@@ -20,6 +20,7 @@
 
 #include "UI.h"
 #include "InputFocus.h"
+#include "FamilyActions.h"
 #include "Components/TooltipBox.h"
 
 #include "UITypes/UIBuffList.h"
@@ -79,6 +80,10 @@ namespace ms
 					return Tooltip::Parent::STORAGE;
 				case UIElement::Type::DUEY:
 					return Tooltip::Parent::DUEY;
+				case UIElement::Type::FAMILY:
+					return Tooltip::Parent::FAMILY;
+				case UIElement::Type::FAMILYTREE:
+					return Tooltip::Parent::FAMILYTREE;
 				case UIElement::Type::TRADINGROOM:
 					return Tooltip::Parent::TRADINGROOM;
 				case UIElement::Type::PERSONALSHOP:
@@ -392,6 +397,9 @@ namespace ms
 								break;
 							case KeyAction::Id::PARTYSEARCH:
 								UIPartySearch::toggle();
+								break;
+							case KeyAction::Id::FAMILY:
+								FamilyActions::toggle_window();
 								break;
 							case KeyAction::Id::MAPLECHAT:
 								UIMessenger::toggle();

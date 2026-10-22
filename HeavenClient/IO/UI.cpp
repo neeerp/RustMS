@@ -437,6 +437,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::SLIDEMENU);
 					types.emplace_back(UIElement::Type::KITEWRITE);
 					types.emplace_back(UIElement::Type::KITEVIEW);
+					types.emplace_back(UIElement::Type::FAMILY);
+					types.emplace_back(UIElement::Type::FAMILYTREE);
 				}
 				else if (enter)
 				{

@@ -50,7 +50,9 @@ namespace ms
 			{ "icon2", "Trade request", Point<int16_t>(24, 2) },
 			{ "icon5", "Party invite", Point<int16_t>(26, 4) },
 			{ "icon5", "Guild invite", Point<int16_t>(26, 4), true },
-			{ "icon5", "Guild Alliance Invitation.", Point<int16_t>(26, 4), true, true }
+			{ "icon5", "Guild Alliance Invitation.", Point<int16_t>(26, 4), true, true },
+			// v83 writes it as the alliance's (FUN_00524298).
+			{ "icon8", "It's a Family Invitation.", Point<int16_t>(26, 4), true }
 		};
 
 		// v83 writes the arrivals at (25, 7), in Arial 11.
