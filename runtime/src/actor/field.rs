@@ -2370,8 +2370,8 @@ impl FieldActor {
             self.broadcast(None, packet);
         }
         match reactors::action(view.reactor_id) {
-            reactors::Action::BringOut(mob_id) => {
-                self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)));
+            reactors::Action::BringOut(mob_id, count) => {
+                self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
             // Everyone here is told, then goes (Cosmic `warpMap`).
             reactors::Action::WarpMap { notice, .. } => {

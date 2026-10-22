@@ -25,8 +25,8 @@ pub fn template(reactor_id: i32) -> Option<ReactorTemplate> {
 pub enum Action {
     /// Drop its loot (`reactor_drops`), as every reactor not listed does.
     Drops,
-    /// Bring out one `mob_id` on the ground below it instead.
-    BringOut(i32),
+    /// Bring out `count` of `mob_id` on the ground below it instead.
+    BringOut(i32, usize),
     /// Send whoever broke it to a map's portal.
     Warp(Warp),
     /// Drop its loot `percent` times in a hundred, else send whoever broke
@@ -61,6 +61,7 @@ impl Warp {
 const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
 const LPQ_TRAP_ROOM: i32 = 922010201;
+const LPQ_BLOCTOPUS: i32 = 9300007;
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
@@ -69,7 +70,7 @@ pub fn action(reactor_id: i32) -> Action {
         1020000 => Action::Warp(Warp(HITMAN_HIDEOUT, "pt00")),
         1020001 => Action::Warp(Warp(HITMAN_HIDEOUT, "pt01")),
         1020002 => Action::Warp(Warp(HITMAN_HIDEOUT, "pt02")),
-        1021000 | 1021001 => Action::BringOut(9300091),
+        1021000 | 1021001 => Action::BringOut(9300091, 1),
         // The Berserk room's four false statues: most throw the player out
         // to the Sleepy Dungeon below.
         1050000 => Action::DropsOrWarp {
@@ -77,9 +78,11 @@ pub fn action(reactor_id: i32) -> Action {
             warp: Warp(105090200, "sp"),
         },
         // The Fire Hawk's and Ice Eagle's eggs (924000100).
-        2401001 => Action::BringOut(9300089),
-        2401002 => Action::BringOut(9300090),
+        2401001 => Action::BringOut(9300089, 1),
+        2401002 => Action::BringOut(9300090, 1),
         9108000..=9108005 => Action::Bloom,
+        // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
+        2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
         // Ludibrium's stage 2 trap box (`go922010201`).
         2200002 => Action::WarpMap {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
@@ -107,8 +110,9 @@ mod tests {
 
     #[test]
     fn eggs_hatch_and_other_reactors_drop_their_loot() {
-        assert_eq!(action(2401001), Action::BringOut(9300089));
-        assert_eq!(action(2401002), Action::BringOut(9300090));
+        assert_eq!(action(2401001), Action::BringOut(9300089, 1));
+        assert_eq!(action(2401002), Action::BringOut(9300090, 1));
+        assert_eq!(action(2201001), Action::BringOut(LPQ_BLOCTOPUS, 3));
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
     }
