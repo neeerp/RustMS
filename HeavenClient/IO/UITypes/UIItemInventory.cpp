@@ -42,6 +42,7 @@
 
 #include "../../Character/GachaExp.h"
 #include "../../Character/MountRules.h"
+#include "../../Character/MorphRules.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/EquipCash.h"
@@ -441,6 +442,19 @@ namespace ms
 
 			if (may_use_cash_item() && player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
+		// v83 FUN_00a0a63f type 0x28: a cash morph (530xxxx) is sent unless the player sits on a portable chair
+		// or rides a tamed monster, even while morphed (report c012).
+		void use_cash_morph(int16_t slot, int32_t item_id)
+		{
+			Player &player = Stage::get().get_player();
+
+			if (morph::cash_morph_refused(player.get_chair(), player.get_look().get_vehicle()))
+				return;
+
+			if (may_use_cash_item())
+				player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
 		}
 
 		// v83 FUN_00a0a63f, type 0x13: a meso sack asks before it opens. The
@@ -1208,6 +1222,8 @@ namespace ms
 							use_meso_bag(slot, item_id);
 						else if (item_id / 10000 == 528)
 							use_cash_mist(slot, item_id);
+						else if (morph::is_cash_morph(item_id))
+							use_cash_morph(slot, item_id);
 						else if (item_id / 10000 == 504)
 							use_teleport_rock(slot, item_id);
 						else if (item_id / 10000 == 507 || item_id / 10000 == 539)

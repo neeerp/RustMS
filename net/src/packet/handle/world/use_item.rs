@@ -183,6 +183,37 @@ pub fn item_effect_packets(
     Ok((own, seen))
 }
 
+/// A cash morph (530xxxx: Fungus Scroll, Oinker Delight, Zeta Nightmare;
+/// v83 cash type 0x28, report c012) from Cash `slot`: its `spec` heals and
+/// morphs as a USE morph potion's does. v83 sends one even while morphed,
+/// and the new morph takes the old one's place; it sends none from a
+/// portable chair or a tamed monster, and the server refuses those too.
+pub fn cash_morph(ctx: &mut WorldContext, slot: i16, item_id: i32) -> WorldResult {
+    let used = use_cash_morph(ctx.player, slot, item_id, Instant::now());
+    if used.is_none() {
+        debug!(slot, item_id, "Cash morph refused");
+    }
+    answer_use(ctx.player, item_id, used)
+}
+
+fn use_cash_morph(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Option<Used> {
+    let tamed = player
+        .ride()
+        .is_some_and(|ride| ride.item_id / 10_000 == 190);
+    if player.stats.hp <= 0 || player.chair != 0 || tamed {
+        return None;
+    }
+    let spec = items::info(item_id)?.spec.filter(ConsumeSpec::has_effect)?;
+    let changes = player
+        .inventory_mut()
+        .take(InventoryType::Cash, slot, 1)
+        .ok()?;
+    Some(Used {
+        changes,
+        effect: apply_spec(player, item_id, &spec, now),
+    })
+}
+
 fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Option<Used> {
     if player.stats.hp <= 0 || player.buffs.has(BuffStat::StopPotion) {
         return None;
@@ -782,6 +813,57 @@ mod tests {
         assert!(use_item(&mut player, 3, 2000000, now).is_none());
         let field = crate::get_game_data().unwrap().field(109_090_300).unwrap();
         assert!(field.may_use(2022539) && !field.may_use(2000000));
+    }
+
+    #[test]
+    fn a_cash_morph_takes_a_morphs_place_but_not_on_a_chair_or_a_hog() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Cash, 1, Item::stack(5300000, 2));
+        player
+            .inventory
+            .insert(InventoryType::Cash, 2, Item::stack(5300001, 1));
+        let now = std::time::Instant::now();
+        // Fungus Scroll: template 1 for ten minutes.
+        let used = use_cash_morph(&mut player, 1, 5300000, now).unwrap();
+        assert_eq!(
+            (used.effect.given, used.effect.time),
+            (vec![(BuffStat::Morph, 1)], 600_000)
+        );
+        // Oinker Delight's pig takes the mushroom's place.
+        use_cash_morph(&mut player, 2, 5300001, now).unwrap();
+        let morphs: Vec<_> = player
+            .buffs
+            .active()
+            .iter()
+            .filter(|buff| buff.stat == BuffStat::Morph)
+            .map(|buff| (buff.skill_id, buff.value))
+            .collect();
+        assert_eq!(morphs, [(-5300001, 2)]);
+        assert!(player.inventory.get(InventoryType::Cash, 2).is_none());
+
+        player.chair = 3010000;
+        assert!(use_cash_morph(&mut player, 1, 5300000, now).is_none());
+        player.chair = 0;
+        player.inventory.insert(
+            InventoryType::Equipped,
+            equip_slot::MOUNT,
+            Item::equipment(1902000, game::EquipStats::default()),
+        );
+        player.buffs.give(game::Buff::new(
+            1004,
+            BuffStat::Riding,
+            1,
+            now,
+            std::time::Duration::from_secs(60),
+        ));
+        assert!(use_cash_morph(&mut player, 1, 5300000, now).is_none());
+        let left = player.inventory.get(InventoryType::Cash, 1).unwrap();
+        assert_eq!(left.quantity, 1);
     }
 
     #[test]

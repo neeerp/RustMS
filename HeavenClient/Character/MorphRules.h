@@ -14,6 +14,19 @@ namespace ms::morph
 	constexpr int32_t SUPER_TRANSFORMATION = 5121003;
 	constexpr int32_t ALBATROSS = 13111005;
 
+	// A cash morph: Fungus Scroll, Oinker Delight or Zeta Nightmare (530xxxx, v83 cash type 0x28, report c012).
+	inline bool is_cash_morph(int32_t item)
+	{
+		return item / 10000 == 530;
+	}
+
+	// v83 0xa0caf0: a cash morph isn't sent from a portable chair or a tamed monster (190xxxx), and nothing is
+	// said. One already morphed may use another.
+	inline bool cash_morph_refused(int32_t chair, int32_t vehicle)
+	{
+		return chair != 0 || vehicle / 10000 == 190;
+	}
+
 	// The skills a superman can't use: Double Shot, Oak Barrel, Burst Fire, and the beginners' rides and
 	// the like (0x9673cf).
 	inline bool superman_refuses(int32_t skill)

@@ -5,7 +5,8 @@
 //! teleport rocks, notes, the Quick Delivery Coupon, weather items, the
 //! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
 //! Hammer, Vega's Spell, the cash mists, the Item Tag, the Magical
-//! Sandglasses, the Item Guards and the Scissors of Karma are used so far.
+//! Sandglasses, the Item Guards, the Scissors of Karma and the cash morphs
+//! are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -20,6 +21,7 @@ use super::note::note;
 use super::pet::{cash_pet_food, pet_name_tag};
 use super::stat_reset::{ap_reset, sp_reset};
 use super::teleport_rock::teleport_rock;
+use super::use_item::cash_morph;
 use super::vega::vega_spell;
 use super::weather::weather;
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
@@ -59,6 +61,7 @@ impl WorldHandler for UseCashItemHandler {
             520 if held => meso_sack(ctx, slot, item_id),
             524 if held => cash_pet_food(ctx, slot, item_id),
             528 if held => cash_mist(ctx, slot, item_id),
+            530 if held => cash_morph(ctx, slot, item_id),
             // The coupon is used up by the send it opens the window for.
             533 if held => Ok(HandlerResult::empty()
                 .with(WorldAction::Duey(crate::duey::DueyRequest::OpenQuickSend))),
