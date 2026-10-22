@@ -242,6 +242,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(personal_shop_tests tests/personal_shop.cpp Net/InPacket.cpp)
     target_include_directories(personal_shop_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME personal_shop COMMAND personal_shop_tests)
+    add_executable(owl_tests tests/owl.cpp Net/InPacket.cpp)
+    target_include_directories(owl_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME owl COMMAND owl_tests)
     add_executable(movement_path_tests tests/movement_path.cpp Net/InPacket.cpp Net/Handlers/Helpers/MovementParser.cpp)
     target_include_directories(movement_path_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME movement_path COMMAND movement_path_tests)
@@ -533,6 +536,7 @@ add_executable(HeavenClient
     Data/EquipData.h
     Data/ItemData.cpp
     Data/ItemData.h
+    Data/ItemNames.h
     Data/CashCatalog.h
     Data/JobData.cpp
     Data/JobData.h
@@ -774,6 +778,10 @@ add_executable(HeavenClient
     IO/UITypes/UIPetExceptions.h
     IO/UITypes/UIPetItemSearch.cpp
     IO/UITypes/UIPetItemSearch.h
+    IO/UITypes/UIItemSearch.cpp
+    IO/UITypes/UIItemSearch.h
+    IO/UITypes/UIItemSearchResult.cpp
+    IO/UITypes/UIItemSearchResult.h
     IO/UITypes/UIContextMenu.cpp
     IO/UITypes/UIContextMenu.h
     IO/UITypes/UICharCreation.cpp

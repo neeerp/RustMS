@@ -31,6 +31,7 @@
 #include "UIPersonalShop.h"
 #include "UIPetChooser.h"
 #include "UITeleportRock.h"
+#include "UIItemSearch.h"
 #include "UITradingRoom.h"
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
@@ -63,6 +64,7 @@
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Handlers/MiniRoom.h"
+#include "../../Net/Handlers/OwlResults.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
@@ -673,6 +675,33 @@ namespace ms
 				UI::get().emplace<UIKarmaScissors>(slot, item_id);
 		}
 
+		// v83 FUN_00a0a25e and FUN_00a0a2dc: the Owl of Minerva opens its
+		// search window in the Free Market. It waits as an item use does and
+		// says nothing while another request waits; nothing goes to the
+		// server until a search.
+		void use_owl(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_player().can_request(ExclRequest::USE_WAIT))
+				return;
+
+			const char *refusal = nullptr;
+
+			if (UI::get().dialog_open())
+				refusal = owl::NOT_AVAILABLE;
+			else if (!owl::in_free_market(Stage::get().get_mapid()))
+				refusal = owl::OUTSIDE;
+
+			if (refusal)
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(refusal, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			UIItemSearch::open(slot, item_id);
+		}
+
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
 		// character chosen in its list. The dead, and maps that don't allow
 		// teleports, are refused before the list opens. The USE-tab rock
@@ -1222,6 +1251,8 @@ namespace ms
 							use_summon_sack(slot, item_id);
 						else if (item_id / 10000 == 232)
 							use_teleport_rock(slot, item_id);
+						else if (item_id / 10000 == 231)
+							use_owl(slot, item_id);
 						else if (item_id / 10000 == 237)
 							use_solomon_writ(slot, item_id);
 						else if (item_id / 10000 == 226)

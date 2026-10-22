@@ -9,6 +9,7 @@
 
 #include "../../Character/Pets.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/ItemNames.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Util/NxFiles.h"
 
@@ -48,33 +49,6 @@ namespace ms
 			static const int16_t line = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "|").height();
 
 			return y + 11 - line;
-		}
-
-		// Every item's name without spaces, in String's order: equipment,
-		// use, set-up, cash, pets and etc. (FUN_005d8796).
-		const std::vector<std::pair<std::string, int32_t>> &item_names()
-		{
-			static std::vector<std::pair<std::string, int32_t>> names;
-
-			if (!names.empty())
-				return names;
-
-			auto add = [&](nl::node items)
-			{
-				for (nl::node item : items)
-					names.emplace_back(pets::search_key(item["name"].get_string()), std::stoi(item.name()));
-			};
-
-			for (nl::node category : nl::nx::string["Eqp.img"]["Eqp"])
-				add(category);
-
-			add(nl::nx::string["Consume.img"]);
-			add(nl::nx::string["Ins.img"]);
-			add(nl::nx::string["Cash.img"]);
-			add(nl::nx::string["Pet.img"]);
-			add(nl::nx::string["Etc.img"]["Etc"]);
-
-			return names;
 		}
 
 		// Whether the search offers the item (FUN_005d3f1b, FUN_005d4a2b):
@@ -327,7 +301,7 @@ namespace ms
 		std::string key = pets::search_key(text);
 
 		if (!key.empty())
-			for (const auto &[name, id] : item_names())
+			for (const auto &[name, id] : item_search_names())
 				if (name.find(key) != std::string::npos && offered(id))
 					results.push_back(id);
 

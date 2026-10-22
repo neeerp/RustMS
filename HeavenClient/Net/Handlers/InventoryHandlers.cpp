@@ -19,6 +19,7 @@
 
 #include "Helpers/ItemParser.h"
 #include "StatusMessages.h"
+#include "OwlResults.h"
 #include "../Data/ItemData.h"
 
 #include "../Gameplay/Stage.h"
@@ -28,6 +29,8 @@
 #include "../Character/Inventory/Inventory.h"
 #include "../IO/UITypes/UIEquipInventory.h"
 #include "../IO/UITypes/UIItemInventory.h"
+#include "../IO/UITypes/UIItemSearch.h"
+#include "../IO/UITypes/UIItemSearchResult.h"
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIKeyConfig.h"
 #include "../IO/UITypes/UIMaker.h"
@@ -42,6 +45,40 @@
 
 namespace ms
 {
+	void OwlResultHandler::handle(InPacket& recv) const
+	{
+		switch (recv.read_byte())
+		{
+			case owl::POPULAR:
+				// Dropped once the search window has closed.
+				if (auto search = UI::get().get_element<UIItemSearch>(); search && search->is_active())
+					search->set_popular(owl::read_popular(recv));
+
+				break;
+			case owl::RESULTS:
+			{
+				owl::Results results = owl::read_results(recv);
+				Stage::get().get_player().request_answered();
+
+				if (results.empty())
+					UI::get().emplace<UIOk>(owl::NOTHING_FOUND, [](bool)
+					{});
+				else
+					UIItemSearchResult::open(std::move(results));
+
+				break;
+			}
+		}
+	}
+
+	void OwlGoResultHandler::handle(InPacket& recv) const
+	{
+		int8_t code = recv.read_byte();
+
+		if (auto window = UI::get().get_element<UIItemSearchResult>(); window && window->is_active())
+			window->go_result(code);
+	}
+
 	void GatherResultHandler::handle(InPacket&) const
 	{
 		if (auto iteminventory = UI::get().get_element<UIItemInventory>())

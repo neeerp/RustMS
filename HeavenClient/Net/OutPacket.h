@@ -93,6 +93,8 @@ namespace ms
 			NPC_SHOP_ACTION = 61,
 			TRUNK_REQUEST = 62,
 			DUEY_ACTION = 65,
+			OWL_OPEN = 66,
+			OWL_GO = 67,
 			RPS_ACTION = 136,
 
 			/// Player Interaction
@@ -114,6 +116,7 @@ namespace ms
 			DEAD_PET = 80,
 			USE_CATCH_ITEM = 81,
 			USE_SKILL_BOOK = 82,
+			USE_OWL = 83,
 			USE_TELEPORT_ROCK = 84,
 			USE_RETURN_SCROLL = 85,
 			MESO_DROP = 94,

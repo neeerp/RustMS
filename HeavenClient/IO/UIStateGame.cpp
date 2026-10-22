@@ -120,6 +120,8 @@ namespace ms
 					return Tooltip::Parent::STATUSBAR;
 				case UIElement::Type::PETITEMSEARCH:
 					return Tooltip::Parent::PETITEMSEARCH;
+				case UIElement::Type::ITEMSEARCHRESULT:
+					return Tooltip::Parent::ITEMSEARCHRESULT;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -138,6 +140,8 @@ namespace ms
 		const Point<int16_t> QUICKSLOT_TOOLTIP_POS = Point<int16_t>(0, -128) - tooltip::OFFSET;
 		// The item search's results put it 20 right of the cursor (FUN_008fbd2e).
 		const Point<int16_t> SEARCH_TOOLTIP_POS = Point<int16_t>(20, 0) - tooltip::OFFSET;
+		// The Owl of Minerva's results put it 20 right of and below the cursor (FUN_008a45b9).
+		const Point<int16_t> OWL_TOOLTIP_POS = Point<int16_t>(20, 20) - tooltip::OFFSET;
 
 		Point<int16_t> tooltip_pos(Tooltip::Parent parent)
 		{
@@ -147,6 +151,8 @@ namespace ms
 					return QUICKSLOT_TOOLTIP_POS;
 				case Tooltip::Parent::PETITEMSEARCH:
 					return SEARCH_TOOLTIP_POS;
+				case Tooltip::Parent::ITEMSEARCHRESULT:
+					return OWL_TOOLTIP_POS;
 				default:
 					return TOOLTIP_POS;
 			}
