@@ -936,6 +936,17 @@ of both the pickup key and pets' looting (FUN_005d5224 in FUN_0050463c and
 FUN_0050483a), and so does HeavenClient (`Drop::blocked`); the server refuses
 them too (`Loot::blocked`).
 
+A Use item with `spec/consumeOnPickup` works the moment it is picked up and
+never reaches the bag (report c036; Cosmic's `applyConsumeOnPickup`). The
+fruits 2022086-88, which reactors 2402000 and 2402001 drop, are the ones a
+player can reach today. The client actor applies the spec as USE_ITEM would
+(`apply_item_effect`); its HP and MP update unlocks the pickup, and GIVE_BUFF
+`-item_id` follows. One whose spec the server doesn't support yet (the EXP
+chests, Carnival points) goes to the bag as before. Not done yet:
+- `spec/party` (Carnival and Dojo items), which would apply the item to every
+  living party member on the map, applies to the picker alone.
+- `specEx` (2022198, 2022268) isn't read.
+
 ## Monster Book cards
 
 Every mob with a card (`Item.nx/Consume/0238.img`, matched by each card's
