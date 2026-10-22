@@ -545,6 +545,14 @@ plays no more than once every 90 ms (FUN_00504bff). Other players see each
 line as its own number, all at once, with the same `fixedDamage` and
 `damagedBy` rules (FUN_009803ab).
 
+Harness `meso_explosion` throws mesos and sets them off. It checks the 30
+MP, the mode-4 delays of 300 and 400 ms, and that a line of 1000 from 100
+mesos kills while 400 from 10 does nothing. It also checks that a drop
+already set off doesn't go off again. Finally, a drop named twice, a line
+from no drop, a bit naming no target and 21 drops are refused and leave
+the drop in place. Its builder is `hunting::meso_explosion`, and
+`Field::exploded` records mode 4.
+
 ## Buff skills
 
 USE_SKILL (`0x5B`, `handle::world::use_skill`) casts a skill that doesn't

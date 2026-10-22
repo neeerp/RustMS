@@ -1,7 +1,7 @@
 //! Players dropping items (ITEM_MOVE to slot 0) and mesos (MESO_DROP): the
 //! drop is anyone's at once, and the dropper's loss is saved.
 
-use integration_harness::hunting::{attack, pickup};
+use integration_harness::hunting::{attack, meso_drop, pickup};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -26,14 +26,6 @@ fn item_move(kind: i8, from: i16, to: i16, quantity: i16) -> Packet {
     p.write_short(from).unwrap();
     p.write_short(to).unwrap();
     p.write_short(quantity).unwrap();
-    p
-}
-
-fn meso_drop(amount: i32) -> Packet {
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::MesoDrop as i16).unwrap();
-    p.write_int(0).unwrap();
-    p.write_int(amount).unwrap();
     p
 }
 
