@@ -41,10 +41,39 @@
 #include "../IO/UITypes/UIVegaSpell.h"
 #include "../IO/UITypes/UIViciousHammer.h"
 #include "../IO/UITypes/UINotice.h"
+#include "../IO/UITypes/UINpcTalk.h"
+#include "../Character/Inventory/Incubator.h"
 #include "../Character/Pets.h"
 
 namespace ms
 {
+	void IncubatorResultHandler::handle(InPacket& recv) const
+	{
+		int32_t item_id = recv.read_int();
+		int16_t count = recv.read_short();
+
+		if (item_id <= 0)
+		{
+			UI::get().emplace<UIOk>(incubator::FULL, [](bool) {});
+
+			return;
+		}
+
+		// The item's line in the chat log (type 7), then what was found in an NPC-style box with OK.
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->send_chatline(status_messages::item_line(status_messages::tab_name(item_id),
+									   ItemData::get(item_id).get_name(), count),
+								   UIChatBar::LineType::GREY);
+
+		UI::get().emplace<UINpcTalk>();
+
+		if (auto talk = UI::get().get_element<UINpcTalk>())
+		{
+			talk->change_text(0, 0, 0, 0, incubator::found(item_id, count));
+			talk->set_local_responder([](int8_t, int32_t) {});
+		}
+	}
+
 	void OwlResultHandler::handle(InPacket& recv) const
 	{
 		switch (recv.read_byte())

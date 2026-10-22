@@ -37,6 +37,7 @@
 #include "UITypes/UIGameOption.h"
 #include "UITypes/UIItemMegaphone.h"
 #include "UITypes/UIItemProtector.h"
+#include "UITypes/UIIncubator.h"
 #include "UITypes/UIKarmaScissors.h"
 #include "UITypes/UIKite.h"
 #include "UITypes/UINpcTalk.h"
@@ -137,7 +138,8 @@ namespace ms
 		return open(get_element<UITradingRoom>()) || open(get_element<UIPersonalShop>())
 			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
 			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
-			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIViciousHammer>())
+			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIIncubator>())
+			|| open(get_element<UIViciousHammer>())
 			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>())
 			|| open(get_element<UIEnchantSkill>());
 	}
@@ -433,6 +435,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::VEGASPELL);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
+					types.emplace_back(UIElement::Type::INCUBATOR);
 					types.emplace_back(UIElement::Type::VEGARESULT);
 					types.emplace_back(UIElement::Type::ENCHANTSKILL);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
@@ -459,6 +462,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
+					types.emplace_back(UIElement::Type::INCUBATOR);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
 					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::SPRESET);

@@ -147,6 +147,7 @@ namespace ms
 		PET_EXCEPTION_LIST = 173,
 		PET_COMMAND = 174,
 		CASH_PET_FOOD_RESULT = 76,
+		INCUBATOR_RESULT = 69,
 		OWL_RESULT = 70,
 		OWL_GO_RESULT = 71,
 		MARRIAGE_REQUEST = 72,
@@ -324,6 +325,7 @@ namespace ms
 		emplace<PET_EXCEPTION_LIST, PetExceptionListHandler>();
 		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<CASH_PET_FOOD_RESULT, CashPetFoodResultHandler>();
+		emplace<INCUBATOR_RESULT, IncubatorResultHandler>();
 		emplace<OWL_RESULT, OwlResultHandler>();
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
 		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
