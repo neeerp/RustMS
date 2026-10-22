@@ -28,6 +28,7 @@
 #include "QuestAlert.h"
 #include "FameCooldown.h"
 #include "SkillMacroRules.h"
+#include "BlackoutRules.h"
 #include "TrembleRules.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
@@ -221,6 +222,9 @@ namespace ms
 		// option on.
 		void tremble(double force, bool heavy, int32_t delay, int32_t additional, bool forced);
 
+		// Lay black layers over the field, behind the player (FUN_004370cd).
+		void black_out(int32_t layers);
+
 		// Leave a Flash Jump's `effect` where a player jumped, flipped when
 		// they face `right` (0x96c107, 0x97ffa4).
 		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
@@ -355,6 +359,10 @@ namespace ms
 		// The view's shake, and when it next moves.
 		tremble::State shake;
 		int32_t next_shake = 0;
+		// The black layers of Bamboo Rain and Rage of Pharaoh, and how
+		// opaque they are now.
+		blackout::State blackout;
+		float blackout_alpha = 0.0f;
 		Physics physics;
 		Player player;
 

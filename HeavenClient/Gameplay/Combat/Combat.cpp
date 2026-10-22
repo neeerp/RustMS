@@ -1461,6 +1461,10 @@ namespace ms
 				Stage::get().tremble(tremble::skill_force(attack.skill, 0), tremble::skill_heavy(attack.skill),
 									 player.get_attackdelay(0), 0, false);
 
+			// Bamboo Rain and Rage of Pharaoh black out the field at once (0x951b0d).
+			if (!follow)
+				Stage::get().black_out(blackout::layers(attack.skill, true));
+
 			AttackPacket(result, player.get_position()).dispatch();
 
 			// The first strike strikes again an attack delay later if it found
@@ -2060,6 +2064,9 @@ namespace ms
 				Stage::get().tremble(tremble::skill_force(attack.skill, distance), tremble::skill_heavy(attack.skill),
 									 user.get_attackdelay(0), 0, false);
 			}
+
+			// And their Bamboo Rain or Rage of Pharaoh blacks it out too (0x98091c).
+			Stage::get().black_out(blackout::layers(attack.skill, false));
 
 			Rectangle<int16_t> range = place_range(user.get_position(), user.get_afterimage().get_range(), 1.0f,
 												   attack.toleft);

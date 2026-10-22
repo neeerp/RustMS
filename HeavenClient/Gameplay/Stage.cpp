@@ -310,6 +310,13 @@ namespace ms
 			npcs.draw(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
+
+			// Bamboo Rain's black is just behind the player (z less 100).
+			if (id == player.get_layer() && blackout_alpha > 0.0f)
+				GraphicsGL::get().drawrectangle(0, 0, Constants::Constants::get().get_viewwidth(),
+												Constants::Constants::get().get_viewheight(), 0.0f, 0.0f, 0.0f,
+												blackout_alpha);
+
 			player.draw(id, viewx, viewy, alpha);
 
 			// The quest alert is in front of the player (z 3 at the face, FUN_00941417).
@@ -466,6 +473,8 @@ namespace ms
 			auto offset = tremble::step(shake, now, std::rand(), std::rand());
 			camera.shake({ static_cast<int16_t>(offset.x), static_cast<int16_t>(offset.y) });
 		}
+
+		blackout_alpha = blackout.update(now);
 
 		camera.update(player.get_position());
 		tooltips.update(player.get_position());
@@ -937,6 +946,11 @@ namespace ms
 			return;
 
 		shake = tremble::set(force, heavy, delay, additional, static_cast<int32_t>(get_uptime() / 1000));
+	}
+
+	void Stage::black_out(int32_t layers)
+	{
+		blackout.add(static_cast<int32_t>(get_uptime() / 1000), layers);
 	}
 
 	void Stage::check_seats()
