@@ -28,6 +28,10 @@ int main()
 		require(bgm_path("Jukebox/Congratulation") == "Jukebox.img/Congratulation", "the jukebox's too");
 		require(bgm_path("Bgm09").empty(), "no track");
 
+		require(with_image("BasicEff/Event1/Best") == "BasicEff.img/Event1/Best", "a reward's path gets its .img");
+		require(with_image("BasicEff.img/Event1/Best").empty(), "one with it is left alone");
+		require(with_image("BasicEff").empty(), "no node");
+
 		require(fade_gain(0, BGM_FADE) == 1.0f && fade_gain(600, BGM_FADE) == 0.0f, "full to silent");
 		require(std::abs(fade_gain(300, BGM_FADE) - 0.53f) < 0.01f, "half the volume is 5.5 dB down");
 		require(fade_gain(450, BGM_FADE) < 0.2f && fade_gain(450, BGM_FADE) > fade_gain(540, BGM_FADE), "falls away");

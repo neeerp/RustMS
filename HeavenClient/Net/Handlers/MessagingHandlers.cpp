@@ -972,15 +972,15 @@ namespace ms
 			std::string path = recv.read_string();
 			recv.read_int();
 
-			// The path names an NX file ("UI/tutorial.img/25"), then a node in it.
-			size_t slash = path.find('/');
-			nl::node file = slash == std::string::npos ? nl::node() :
-				path.compare(0, slash, "UI") == 0 ? nl::nx::ui :
-				path.compare(0, slash, "Effect") == 0 ? nl::nx::effect :
-				path.compare(0, slash, "Map") == 0 ? nl::nx::map : nl::node();
+			if (nl::node effect = Stage::effect_node(path))
+				Stage::get().get_player().show_effect(Animation(effect));
+		}
+		else if (mode1 == 14) // a reward box's prize: its sound, and the box's animation where the player stands
+		{
+			int32_t itemid = recv.read_int();
+			std::string path = recv.read_bool() ? recv.read_string() : "";
 
-			if (file)
-				Stage::get().get_player().show_effect(Animation(file.resolve(path.substr(slash + 1))));
+			Stage::get().show_reward_effect(Stage::get().get_player().get_position(), itemid, path);
 		}
 		else if (mode1 == 0x10)
 		{

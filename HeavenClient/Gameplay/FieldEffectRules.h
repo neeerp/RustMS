@@ -44,6 +44,17 @@ namespace ms::field_effect
 		return name.substr(0, split) + ".img/" + name.substr(split + 1);
 	}
 
+	// A user effect's path names an NX file, then a node in it ("Effect/BasicEff.img/Event1/Best"). Item.nx's
+	// reward paths leave out the image's ".img" ("Effect/BasicEff/Event1/Best"), so the `node` is also looked for
+	// with it put back after the image's name: this path, or "" if `node` already has an ".img" or names no node.
+	inline std::string with_image(const std::string &node)
+	{
+		if (node.find(".img") != std::string::npos)
+			return "";
+
+		return bgm_path(node);
+	}
+
 	// A changed BGM fades out over this many ms before the next one starts (PlayBGM 0x43f301).
 	constexpr int32_t BGM_FADE = 600;
 

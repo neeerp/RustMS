@@ -508,6 +508,14 @@ namespace ms
 
 			Stage::get().get_combat().show_affected(cid, skillid);
 		}
+		else if (effect == 14) // a reward box's prize: its sound, and the box's animation where they stand
+		{
+			int32_t itemid = recv.read_int();
+			std::string path = recv.read_bool() ? recv.read_string() : "";
+
+			if (Optional<Char> character = Stage::get().get_character(cid))
+				Stage::get().show_reward_effect(character->get_position(), itemid, path);
+		}
 		else if (recv.available()) // skill
 		{
 			int32_t skillid = recv.read_int();

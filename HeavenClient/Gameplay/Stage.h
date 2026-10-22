@@ -225,6 +225,14 @@ namespace ms
 		// they face `right` (0x96c107, 0x97ffa4).
 		void show_flash_jump(const char *effect, Point<int16_t> position, bool right);
 
+		// A user effect's path ("Effect/BasicEff.img/Event1/Best", "UI/tutorial.img/25"): the NX file it names first,
+		// then the node in it, also tried with the image's ".img" put back; null if there is none.
+		static nl::node effect_node(const std::string &path);
+
+		// User effect 14, a reward box's prize (0x9382b0): the prize's use sound, and the box's `path` played once
+		// where the opener stands, not following them.
+		void show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path);
+
 		// BLOW_WEATHER and a map's own weathers: start a 512xxxx item's weather with its message, or stop the one
 		// blowing with item 0. One from the map or a whisper stops itself after 22 s.
 		void blow_weather(int32_t item_id, const std::string &msg, bool from_map);
