@@ -1169,7 +1169,10 @@ client's delay); the hit into the last state removes it (REMOVE_REACTOR
 (`net::loot::roll_reactor`) where it stood. A broken reactor comes back after
 the map's `reactorTime` seconds, under a new object id since HeavenClient
 keeps a broken reactor under its old one; one without a `reactorTime` stays
-broken.
+broken until the field renews: a field that starts afresh when its last
+player leaves (`npc_scripts::resets_when_empty`) puts every reactor back with
+its mobs (`ReactorSet::renew`), so the fourth job's nests have their eggs for
+the next player.
 
 | Op | Direction | Body |
 | --- | --- | --- |

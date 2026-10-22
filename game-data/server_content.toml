@@ -489,6 +489,7 @@ unsourced = [
     "portal.doll_way.blocked",
     "portal.sand_bandits.members_only",
     "portal.treasure_room.occupied",
+    "portal.solo_map.occupied",
     "portal.disguise.occupied",
     "portal.disguise.already_found",
     "portal.mysterious_force",

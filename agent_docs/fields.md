@@ -32,8 +32,9 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
 - **Kites** (`field_kites::KiteSet`): the kites players flew here; see
   "Kites" below.
 - **Time**: a 100 ms tick (`on_tick`) respawns mobs and reactors and expires
-  drops. A third job's clone room and a mini-dungeon's copy put all their
-  mobs back when their last player leaves (`MobSet::renew`,
+  drops. A third job's clone room, a mini-dungeon's copy and a fourth job's
+  solo room put all their mobs and reactors back when their last player
+  leaves (`MobSet::renew`, `ReactorSet::renew`,
   `npc_scripts::resets_when_empty`).
 
 Some maps are copies of another (mini-dungeons, the Dojo): their node has

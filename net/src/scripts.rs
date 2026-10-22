@@ -172,6 +172,15 @@ const DISGUISE_PROOF: i32 = 4032101;
 /// searches for the jewel quest 3935 is after.
 const QUEENS_TREASURE_ROOM: i32 = 926000010;
 const QUEENS_JEWEL: i32 = 4031574;
+/// The fourth job's rooms one player at a time takes on alone, which start
+/// afresh once they're left (`npc_scripts::resets_when_empty`): the Fire
+/// Hawk's and Ice Eagle's nests by El Nath (`s4firehawk`, `s4iceeagle`) and
+/// Ludibrium's Tornado room (`s4tornado_enter`).
+const FIREHAWK_NEST: i32 = 921100200;
+const ICE_EAGLE_NEST: i32 = 921100210;
+const TORNADO_ROOM: i32 = 922020200;
+pub const SOLO_MAPS: [i32; 3] = [FIREHAWK_NEST, ICE_EAGLE_NEST, TORNADO_ROOM];
+const TORNADO_PROOF: i32 = 4001110;
 /// The shortcut between the Field Up North of Ellinia and Leafre's Minar
 /// Forest (`minar_elli`), which spends a Magic Seed each way.
 const FIELD_NORTH_OF_ELLINIA: i32 = 101010000;
@@ -876,6 +885,18 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "s4rush" if quest(6110) == QuestState::Started => {
             through(Effect::WarpToPortal(910500100, 0))
         }
+        "s4firehawk" => solo_map(quest(6240) == QuestState::Started, FIREHAWK_NEST),
+        "s4iceeagle" => solo_map(quest(6242) == QuestState::Started, ICE_EAGLE_NEST),
+        // Closed, it says nothing, as in Cosmic.
+        "s4tornado_enter"
+            if [6230, 6231]
+                .iter()
+                .any(|&id| quest(id) == QuestState::Started)
+                || player.inventory.count(TORNADO_PROOF) > 0 =>
+        {
+            solo_map(true, TORNADO_ROOM)
+        }
+        "s4tornado_enter" => ScriptOutcome::default(),
         "tristanEnter" | "s4resur_enter" | "s4rush" => refused(keys::MYSTERIOUS_FORCE),
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
@@ -956,6 +977,22 @@ fn disguise(player: &Player, job: usize) -> ScriptOutcome {
         effects,
         block: false,
         occupied: Some(content::text().get(keys::DISGUISE_FOREST_OCCUPIED, &[])),
+    }
+}
+
+/// Into `map`, one of `SOLO_MAPS`, when `open` and nobody is in it.
+fn solo_map(open: bool, map: i32) -> ScriptOutcome {
+    if !open {
+        return refused(keys::MYSTERIOUS_FORCE);
+    }
+    ScriptOutcome {
+        effects: vec![
+            Effect::RequireEmptyMap(map),
+            Effect::PortalSound,
+            Effect::WarpToPortal(map, 0),
+        ],
+        block: false,
+        occupied: Some(content::text().get(keys::SOLO_MAP_OCCUPIED, &[])),
     }
 }
 
@@ -1643,6 +1680,66 @@ mod tests {
             portal("skyrom", &holding(&quest, QUEENS_JEWEL)),
             Some(ScriptOutcome::default())
         );
+    }
+
+    #[test]
+    fn a_fourth_jobs_solo_room_takes_one_player_at_a_time() {
+        let opened = |script, player: &Player, map| {
+            let outcome = portal(script, player).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [
+                    Effect::RequireEmptyMap(map),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(map, 0),
+                ],
+                "{script}"
+            );
+            assert!(outcome.occupied.is_some(), "{script}");
+        };
+        let fresh = player_with(&[]);
+        for (script, quest, map) in [
+            ("s4firehawk", 6240, FIREHAWK_NEST),
+            ("s4iceeagle", 6242, ICE_EAGLE_NEST),
+        ] {
+            opened(script, &player_with(&[(quest, QuestState::Started)]), map);
+            assert!(pink(&portal(script, &fresh).unwrap()), "{script}");
+            let done = player_with(&[(quest, QuestState::Completed)]);
+            assert!(pink(&portal(script, &done).unwrap()), "{script}");
+        }
+        for quest in [6230, 6231] {
+            let player = player_with(&[(quest, QuestState::Started)]);
+            opened("s4tornado_enter", &player, TORNADO_ROOM);
+        }
+        opened(
+            "s4tornado_enter",
+            &holding(&[], TORNADO_PROOF),
+            TORNADO_ROOM,
+        );
+        // Closed, the Tornado room's way says nothing.
+        assert_eq!(
+            portal("s4tornado_enter", &fresh),
+            Some(ScriptOutcome::default())
+        );
+    }
+
+    #[test]
+    fn each_solo_room_is_reached_by_its_script_and_has_a_way_back() {
+        let data = crate::get_game_data().unwrap();
+        for (from, name, script, map) in [
+            (211042200, "in00", "s4firehawk", FIREHAWK_NEST),
+            (211040700, "in00", "s4iceeagle", ICE_EAGLE_NEST),
+            (220010001, "pt00", "s4tornado_enter", TORNADO_ROOM),
+        ] {
+            let way_in = data.field(from).unwrap().portal_by_name(name).unwrap();
+            assert_eq!(way_in.script.as_deref(), Some(script));
+            let room = data.field(map).unwrap();
+            assert!(room.portal_by_id(0).is_some(), "{map}");
+            let way_out = room.portal_by_name("out00").unwrap();
+            let back = way_out.to_map.and_then(|to| data.field(to));
+            assert!(back.is_some(), "{map}");
+            assert!(crate::npc_scripts::resets_when_empty(map));
+        }
     }
 
     #[test]

@@ -3004,11 +3004,14 @@ fn is_clone_room(map_id: i32) -> bool {
     THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
 }
 
-/// Whether the field puts its mobs back when the last player leaves, as a
-/// clone's room does for the next challenger and a mini-dungeon's copy for
-/// the next party.
+/// Whether the field puts its mobs and reactors back when the last player
+/// leaves, as a clone's room does for the next challenger, a mini-dungeon's
+/// copy for the next party, and a fourth job's solo room for the next
+/// player.
 pub fn resets_when_empty(map_id: i32) -> bool {
-    is_clone_room(map_id) || crate::dungeons::of_copy(map_id).is_some()
+    is_clone_room(map_id)
+        || crate::dungeons::of_copy(map_id).is_some()
+        || crate::scripts::SOLO_MAPS.contains(&map_id)
 }
 
 /// The Holy Stone takes a Dark Crystal from the player the chief sent and

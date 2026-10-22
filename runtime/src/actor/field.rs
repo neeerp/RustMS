@@ -2218,9 +2218,11 @@ impl FieldActor {
                 self.send_npc_control(next);
             }
         }
-        // A boss room is fresh for its next challenger.
+        // A boss or solo room is fresh for its next challenger.
         if next.is_none() && net::npc_scripts::resets_when_empty(self.key.map_id) {
-            self.mobs.renew(Instant::now());
+            let now = Instant::now();
+            self.mobs.renew(now);
+            self.reactors.renew(now);
         }
     }
 
