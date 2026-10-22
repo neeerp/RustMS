@@ -138,6 +138,8 @@ pub struct Trace {
     pub party_ops: Vec<u8>,
     /// Party invitations: (party id, inviter).
     pub party_invites: Vec<(i32, String)>,
+    /// Each invitation's last byte: nonzero for a party search's.
+    pub party_invite_searches: Vec<u8>,
     /// UPDATE_PARTYMEMBER_HP: (character, HP, max HP).
     pub party_hp: Vec<(i32, i32, i32)>,
     /// Party chat lines: (sender, text).
@@ -473,6 +475,7 @@ impl Trace {
                 let party_id = r.read_int().unwrap();
                 self.party_invites
                     .push((party_id, r.read_str_with_length().unwrap()));
+                self.party_invite_searches.push(r.read_byte().unwrap_or(0));
             } else if party_op == 0x25 {
                 self.party_doors.push((
                     r.read_byte().unwrap(),

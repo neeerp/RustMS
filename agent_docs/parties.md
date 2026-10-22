@@ -40,6 +40,43 @@ server restart.
 The packets are built in `net/src/packet/build/world/party.rs`. The member
 block always has six slots.
 
+### Party search
+
+v83's Party Search window lets a leader ask for members. It sends
+`PARTY_SEARCH_START` (0xDE) with four ints: the minimum and maximum level,
+the party size wanted, and a mask of the window's 25 job boxes.
+`PARTY_SEARCH_STOP` (0xDF) carries nothing. The client sends it to pause or
+to stop a search, and after any map change within a channel. There is no
+reply. The server answers only with invitations.
+
+- The directory keeps searches in `PartySearches`
+  (`runtime/src/actor/party_search.rs`). `job_bit` maps a job to its box.
+  Each class has a head box and branch boxes, and a branch box covers every
+  advancement of that branch.
+- A start is ignored unless its sender leads a party and passes v83's own
+  checks:
+  - the maximum level is at most 200;
+  - the range spans at most 30 levels and the sender's level is in it;
+  - the size is 2 to 6 and larger than the party;
+  - at least one box is set.
+- A search asks one character right away, then one more on each 10 s purge
+  tick. The character must:
+  - be on the leader's channel;
+  - have no party and no pending invitation;
+  - fit the levels and boxes;
+  - not have been asked already by this search.
+
+  The highest level goes first, and ties go to the lowest id. These rules
+  are RustMS's own: Cosmic searches the whole world, and v83's server rules
+  are unknown.
+- The invitation is the ordinary one with its last byte set to 1. v83 then
+  joins without asking if the player allows party searches. Otherwise it
+  drops the invitation silently. A search's invitation never makes anyone
+  busy, and an ordinary invitation replaces it.
+- A search ends on 0xDF, when the leader goes offline or changes channel,
+  and at a tick where the party is gone, has a new leader, or has reached the
+  size wanted. The client starts it again after a channel change.
+
 ### EXP
 
 `split_exp` (`runtime/src/actor/field_mobs.rs`) follows Cosmic's

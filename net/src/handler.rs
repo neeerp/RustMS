@@ -216,6 +216,18 @@ pub enum PartyRequest {
     Chat {
         text: String,
     },
+    /// The leader starts a party search (`PARTY_SEARCH_START`): members of
+    /// these levels and jobs (the window's checkboxes, one bit each), until
+    /// the party has `members`.
+    SearchStart {
+        min_level: i32,
+        max_level: i32,
+        members: i32,
+        jobs: u32,
+    },
+    /// Stop searching, sent also to pause and after any map change in the
+    /// channel.
+    SearchStop,
 }
 
 /// A buddy list operation, carried out by the client's actor.
@@ -778,9 +790,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::PlayerMapTransferHandler),
             ),
             (
-                Op::PartySearchUpdate,
-                InGame(&world::PartySearchUpdateHandler),
+                Op::PartySearchStart,
+                InGame(&world::PartySearchStartHandler),
             ),
+            (Op::PartySearchStop, InGame(&world::PartySearchStopHandler)),
             (
                 Op::ContiStateRequest,
                 InGame(&world::ContiStateRequestHandler),

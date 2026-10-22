@@ -36,6 +36,9 @@ struct Invite {
     party_id: i32,
     inviter: ClientId,
     sent: Instant,
+    /// From a party search. v83 answers those itself or drops them without
+    /// a word, so they never make their receiver busy.
+    search: bool,
 }
 
 /// What leaving did to a party.
@@ -86,6 +89,37 @@ impl Parties {
         invitee: ClientId,
         now: Instant,
     ) -> Result<(), PartyStatus> {
+        self.send_invite(inviter, invitee, now, false)
+    }
+
+    /// Record a party search's invitation from `leader`. Someone already
+    /// asked to join any party is left alone.
+    pub fn search_invite(
+        &mut self,
+        leader: ClientId,
+        invitee: ClientId,
+        now: Instant,
+    ) -> Result<(), PartyStatus> {
+        if self.is_asked(invitee, now) {
+            return Err(PartyStatus::BusyWithInvite);
+        }
+        self.send_invite(leader, invitee, now, true)
+    }
+
+    /// Whether `invitee` has an invitation still waiting.
+    pub fn is_asked(&self, invitee: ClientId, now: Instant) -> bool {
+        self.invites
+            .get(&invitee)
+            .is_some_and(|invite| now < invite.sent + INVITE_TIMEOUT)
+    }
+
+    fn send_invite(
+        &mut self,
+        inviter: ClientId,
+        invitee: ClientId,
+        now: Instant,
+        search: bool,
+    ) -> Result<(), PartyStatus> {
         let party = self.of(inviter).ok_or(PartyStatus::NotFound)?;
         let party_id = party.id;
         if self.party_of.contains_key(&invitee) {
@@ -95,7 +129,10 @@ impl Parties {
             return Err(PartyStatus::Full);
         }
         if let Some(pending) = self.invites.get(&invitee) {
-            if pending.party_id != party_id && now < pending.sent + INVITE_TIMEOUT {
+            if pending.party_id != party_id
+                && !pending.search
+                && now < pending.sent + INVITE_TIMEOUT
+            {
                 return Err(PartyStatus::BusyWithInvite);
             }
         }
@@ -105,6 +142,7 @@ impl Parties {
                 party_id,
                 inviter,
                 sent: now,
+                search,
             },
         );
         Ok(())
@@ -112,11 +150,12 @@ impl Parties {
 
     /// Join `party_id` if invited to it recently and there is room.
     pub fn accept(&mut self, member: Member, party_id: i32, now: Instant) -> Option<&Party> {
+        // Another party's answer leaves this invitation alone.
+        if self.invites.get(&member.id)?.party_id != party_id {
+            return None;
+        }
         let invite = self.invites.remove(&member.id)?;
-        if invite.party_id != party_id
-            || now >= invite.sent + INVITE_TIMEOUT
-            || self.party_of.contains_key(&member.id)
-        {
+        if now >= invite.sent + INVITE_TIMEOUT || self.party_of.contains_key(&member.id) {
             return None;
         }
         let party = self.parties.get_mut(&party_id)?;
@@ -219,6 +258,28 @@ mod tests {
 
     fn ids(party: &Party) -> Vec<ClientId> {
         party.members.iter().map(|m| m.id).collect()
+    }
+
+    #[test]
+    fn a_search_invitation_never_makes_anyone_busy() {
+        let now = Instant::now();
+        let mut parties = Parties::default();
+        let first = parties.create(member(1)).unwrap().id;
+        parties.create(member(2)).unwrap();
+        parties.search_invite(1, 3, now).unwrap();
+        assert!(parties.is_asked(3, now));
+        // An ordinary invitation replaces it; a search's doesn't.
+        parties.invite(2, 3, now).unwrap();
+        assert!(parties.is_invited(3, 2));
+        assert_eq!(
+            parties.search_invite(1, 3, now).unwrap_err(),
+            PartyStatus::BusyWithInvite
+        );
+        assert!(!parties.is_asked(3, now + INVITE_TIMEOUT));
+        parties.search_invite(1, 3, now + INVITE_TIMEOUT).unwrap();
+        assert!(parties
+            .accept(member(3), first, now + INVITE_TIMEOUT)
+            .is_some());
     }
 
     #[test]

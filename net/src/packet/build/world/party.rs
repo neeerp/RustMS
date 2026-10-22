@@ -163,10 +163,21 @@ pub fn build_party_door(slot: u8, door: Option<&DoorView>) -> Result<Packet, Net
 
 /// `inviter` asks the receiver to join `party_id`.
 pub fn build_party_invite(party_id: i32, inviter: &str) -> Result<Packet, NetworkError> {
+    invite(party_id, inviter, 0)
+}
+
+/// A party search found the receiver for `leader`'s party. The flag makes
+/// v83 join at once if the receiver's Game Options allow party searches,
+/// and drop the invitation without a word if not (FUN_00a3e383).
+pub fn build_party_search_invite(party_id: i32, leader: &str) -> Result<Packet, NetworkError> {
+    invite(party_id, leader, 1)
+}
+
+fn invite(party_id: i32, inviter: &str, search: u8) -> Result<Packet, NetworkError> {
     let mut packet = party_operation(OP_INVITE)?;
     packet.write_int(party_id)?;
     packet.write_str_with_length(inviter)?;
-    packet.write_byte(0)?;
+    packet.write_byte(search)?;
     Ok(packet)
 }
 
@@ -387,6 +398,12 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::PartyOperation as i16).byte(4);
         expect.int(7).string("Alice").byte(0);
+        expect.end();
+
+        let packet = build_party_search_invite(7, "Alice").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::PartyOperation as i16).byte(4);
+        expect.int(7).string("Alice").byte(1);
         expect.end();
 
         let packet = build_party_status(PartyStatus::Full, "ignored").unwrap();

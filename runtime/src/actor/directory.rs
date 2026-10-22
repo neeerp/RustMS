@@ -3,6 +3,7 @@ use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
 use crate::actor::messenger::{Messengers, Outbox, CHANNEL_CHANGE_GRACE};
 use crate::actor::parties::{self, Member, Parties, Party};
+use crate::actor::party_search::{PartySearches, Wanted};
 use crate::message::{
     AllianceNews, ClientHandle, DirectoryMessage, ListedBuddy, Presence, ServerMessage,
 };
@@ -25,12 +26,13 @@ use net::packet::build::world::messaging::{
 use net::packet::build::world::party::{
     build_party_chat, build_party_created, build_party_disbanded, build_party_door,
     build_party_invite, build_party_joined, build_party_leader_changed, build_party_left,
-    build_party_member_hp, build_party_status, build_party_update, Departure, PartyMemberView,
-    PartyStatus, PartyView,
+    build_party_member_hp, build_party_search_invite, build_party_status, build_party_update,
+    Departure, PartyMemberView, PartyStatus, PartyView,
 };
 use net::packet::handle::world::{DoorExit, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -92,6 +94,7 @@ pub struct WorldDirectory {
     clients: HashMap<ClientId, Entry>,
     names: HashMap<String, ClientId>,
     parties: Parties,
+    party_searches: PartySearches,
     guild_invites: GuildInvites,
     /// Invitations to alliances, to guild masters, by alliance id.
     alliance_invites: GuildInvites,
@@ -114,6 +117,7 @@ impl WorldDirectory {
             clients: HashMap::new(),
             names: HashMap::new(),
             parties: Parties::default(),
+            party_searches: PartySearches::default(),
             guild_invites: GuildInvites::default(),
             alliance_invites: GuildInvites::default(),
             messengers: Messengers::default(),
@@ -138,6 +142,7 @@ impl WorldDirectory {
                     let out = self.messengers.purge(now);
                     self.deliver(out);
                     self.purge_guild_away(now);
+                    self.run_party_searches(now);
                 }
                 _ = at(self.avatar_banners.until()) => {
                     if let Some(banner) = self.avatar_banners.next(Instant::now()) {
@@ -383,6 +388,8 @@ impl WorldDirectory {
             );
             previous.handle.kick();
             self.names.remove(&previous.presence.name);
+            // Its unregister will be stale; the search ends here instead.
+            self.party_searches.stop(client_id);
         }
         info!(
             client_id,
@@ -453,6 +460,9 @@ impl WorldDirectory {
                 self.deliver(out);
             }
             self.parties.forget_invites(client_id);
+            // A leader changing channel starts again on arrival (b034
+            // section 7).
+            self.party_searches.stop(client_id);
             self.guild_invites.forget(client_id);
             self.alliance_invites.forget(client_id);
             if let Some(party) = self.parties.of(client_id) {
@@ -1002,6 +1012,82 @@ impl WorldDirectory {
                     }
                 }
             }
+            PartyRequest::SearchStart {
+                min_level,
+                max_level,
+                members,
+                jobs,
+            } => {
+                let wanted = Wanted {
+                    min_level,
+                    max_level,
+                    members,
+                    jobs,
+                };
+                // v83 refuses all of these itself, so nothing answers them.
+                let Some(party) = self.parties.of(from).filter(|party| party.leader == from) else {
+                    return;
+                };
+                if !wanted.is_valid(member.level, party.members.len()) {
+                    return;
+                }
+                let party_id = party.id;
+                self.party_searches.start(from, party_id, wanted);
+                self.party_search(from, party_id, wanted, now);
+            }
+            PartyRequest::SearchStop => self.party_searches.stop(from),
+        }
+    }
+
+    /// One round of every party search: each invites one more character.
+    /// The reference server's cadence, every ten seconds (b035).
+    fn run_party_searches(&mut self, now: Instant) {
+        for (leader, party_id, wanted) in self.party_searches.all() {
+            self.party_search(leader, party_id, wanted, now);
+        }
+    }
+
+    /// Invite the highest-level character on `leader`'s channel who fits
+    /// the search, has no party, and hasn't been asked to join one, unless
+    /// the party is gone, has a new leader, or is as big as wanted, which
+    /// ends the search.
+    fn party_search(&mut self, leader: ClientId, party_id: i32, wanted: Wanted, now: Instant) {
+        let party = self
+            .parties
+            .of(leader)
+            .filter(|party| party.id == party_id && party.leader == leader);
+        let (Some(party), Some(entry)) = (party, self.clients.get(&leader)) else {
+            return self.party_searches.stop(leader);
+        };
+        if party.members.len() >= wanted.members as usize {
+            return self.party_searches.stop(leader);
+        }
+        let found = self
+            .clients
+            .values()
+            .filter(|candidate| {
+                let id = candidate.handle.client_id;
+                candidate.channel_id == entry.channel_id
+                    && id != leader
+                    && self.parties.of(id).is_none()
+                    && !self.parties.is_asked(id, now)
+                    && !self.party_searches.has_invited(leader, id)
+                    && wanted.fits(candidate.presence.level, candidate.presence.job)
+            })
+            .max_by_key(|candidate| {
+                (
+                    candidate.presence.level,
+                    Reverse(candidate.handle.client_id),
+                )
+            })
+            .map(|candidate| candidate.handle.client_id);
+        let Some(found) = found else {
+            return;
+        };
+        let name = entry.presence.name.clone();
+        if self.parties.search_invite(leader, found, now).is_ok() {
+            self.party_searches.invited(leader, found);
+            self.send_packet(found, build_party_search_invite(party_id, &name));
         }
     }
 
@@ -1402,6 +1488,81 @@ mod tests {
             });
         }
         seen
+    }
+
+    #[test]
+    fn a_party_search_invites_one_fitting_character_a_round() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut seen = HashMap::new();
+        for (id, name, job, level, channel) in [
+            (1, "Alice", 0, 10, 0),
+            (2, "Bobby", 0, 12, 0),
+            (3, "Carol", 1000, 15, 0),
+            (4, "Davey", 0, 30, 0),
+            (5, "Erinn", 110, 14, 0),
+            (6, "Frank", 0, 16, 1),
+        ] {
+            let (tx, rx) = mpsc::channel(64);
+            let handle = ClientHandle::new(id, id as u64, tx, CancellationToken::new());
+            let mut presence = presence(name, 10000);
+            presence.job = job;
+            presence.level = level;
+            directory.register(handle, presence, channel);
+            seen.insert(id, rx);
+        }
+        let now = Instant::now();
+        let mut heard = |id| received(seen.get_mut(&id).unwrap());
+        let beginners = PartyRequest::SearchStart {
+            min_level: 5,
+            max_level: 20,
+            members: 3,
+            jobs: 1 << 1,
+        };
+
+        // Only a party's leader searches, and only as v83 allows.
+        directory.party_request(1, beginners.clone(), now);
+        assert!(directory.party_searches.all().is_empty());
+        directory.party_request(1, PartyRequest::Create, now);
+        heard(1);
+        let wide = PartyRequest::SearchStart {
+            min_level: 5,
+            max_level: 40,
+            members: 3,
+            jobs: 1 << 1,
+        };
+        directory.party_request(1, wide, now);
+        assert!(directory.party_searches.all().is_empty());
+
+        // Starting asks the highest level who fits at once, then one more
+        // each round: not the warrior, the level 30, or another channel.
+        directory.party_request(1, beginners.clone(), now);
+        assert_eq!(heard(3), ["op 0x4"]);
+        directory.run_party_searches(now);
+        assert_eq!(heard(2), ["op 0x4"]);
+        directory.run_party_searches(now);
+        for id in [4, 5, 6] {
+            assert!(heard(id).is_empty(), "{id} was asked");
+        }
+
+        // Once the party is as big as wanted, the search ends.
+        directory.party_request(3, PartyRequest::Accept { party_id: 1 }, now);
+        directory.party_request(2, PartyRequest::Accept { party_id: 1 }, now);
+        assert_eq!(directory.parties.of(1).unwrap().members.len(), 3);
+        directory.run_party_searches(now);
+        assert!(directory.party_searches.all().is_empty());
+
+        // 0xDF stops one.
+        let more = PartyRequest::SearchStart {
+            min_level: 5,
+            max_level: 20,
+            members: 6,
+            jobs: 1 << 1,
+        };
+        directory.party_request(1, more, now);
+        assert_eq!(directory.party_searches.all().len(), 1);
+        directory.party_request(1, PartyRequest::SearchStop, now);
+        assert!(directory.party_searches.all().is_empty());
     }
 
     #[test]
