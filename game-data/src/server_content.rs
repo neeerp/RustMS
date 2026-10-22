@@ -1227,6 +1227,9 @@ struct ReactorOverride {
     /// and always drop then, even without the pack.
     #[serde(default)]
     quest_items: BTreeMap<String, i16>,
+    /// Drops added to the pack's (or `like`'s) list.
+    #[serde(default)]
+    add: Vec<RewardEntry>,
 }
 
 /// Mob and reactor drops: the pack's `rewards.json` (both kinds share its id
@@ -1292,6 +1295,7 @@ impl RewardTable {
                     });
                 }
             }
+            drops.extend(entry.add);
             table.reactors.insert(id, drops);
         }
         Ok(table)
@@ -1898,6 +1902,17 @@ mod tests {
         let drops = table.drops(8180000);
         assert_eq!(drops[0].item, Some(4031343));
         assert_eq!(drops[1..], [pirate(4031860)]);
+    }
+
+    #[test]
+    fn every_salion_spot_drops_a_piece_of_minervas_statue() {
+        let table = RewardTable::load(None).unwrap();
+        for reactor_id in 2001002..=2001015 {
+            let drops = table.reactor_drops(reactor_id);
+            assert_eq!(drops.len(), 1, "{reactor_id}");
+            assert_eq!((drops[0].item, drops[0].prob), (Some(4001045), 1.0));
+            assert_eq!(drops[0].quest, None);
+        }
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {

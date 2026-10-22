@@ -1349,9 +1349,10 @@ them.
 
 An event of type 100 takes an item instead: exactly `1` of item `0`
 landing within `lt`-`rb` of the reactor (`ReactorTemplate::item_dropped`).
-When a player drops such an item (not one that vanishes) and it lands, on
-the ground below where they stand, in such an area, the field waits 5
-seconds, as Cosmic's `ActivateItemReactor` does (`ITEM_TAKEN_AFTER`). If the
+When a player drops such an item (not one that vanishes), or a mob or
+reactor drops one that isn't a quest drop (`reactor_item`, as Cosmic's
+`spawnDrop` does), and it lands, on the ground below, in such an area,
+the field waits 5 seconds, as Cosmic's `ActivateItemReactor` does (`ITEM_TAKEN_AFTER`). If the
 item still lies there and the reactor still wants it, the item goes
 (REMOVE_ITEM_FROM_MAP, no one picking it up) and the reactor moves on as if
 hit, shown with HIT_REACTOR event 0, or breaks. A reactor that then waits
@@ -1390,7 +1391,10 @@ break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in
 `party-quests.md`). The scars on Orbis's hub (`2008000`-`2008005`,
 `Action::Hold`) stay too, holding the piece of the statue set in them (see
-"Orbis's walkway and lounge" in `party-quests.md`).
+"Orbis's walkway and lounge" in `party-quests.md`). The spots of Orbis's
+Salion stage (`2001002`-`2001015`, `Action::Salion`) take the Cellion's
+drop and bring out the next Cellion, until the last drops its loot and
+clears the stage (see "Orbis's Salion stage" in `party-quests.md`).
 
 The Berserk room's (`910500200`) reactors change places among themselves
 whenever the field starts afresh (`reactors::shuffled`,

@@ -166,6 +166,14 @@ impl ReactorSet {
             .collect()
     }
 
+    /// Where reactor `reactor_id`'s spot is, whether or not it is there.
+    pub fn spot_of(&self, reactor_id: i32) -> Option<(i16, i16)> {
+        self.spots
+            .iter()
+            .find(|spot| spot.template.reactor_id == reactor_id)
+            .map(|spot| (spot.template.x, spot.template.y))
+    }
+
     /// The live reactor named `name`, if any.
     pub fn named(&self, name: &str) -> Option<&LiveReactor> {
         self.live

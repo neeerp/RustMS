@@ -3,6 +3,7 @@ use crate::actor::field_drops::{Drop, Ownership};
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
 use game::monster_book::{self, MAX_CARD_LEVEL};
+use net::events::EventCommand;
 use net::loot::{self, Loot};
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::stat::{self, StatUpdate};
@@ -104,7 +105,19 @@ impl ClientActor {
             }
         };
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
-            .await
+            .await?;
+        // The last Cellion's spot clears the Salion stage.
+        if net::reactors::action(reactor_id) == Action::Salion {
+            let map_id = self.in_game()?.player.stats.map_id;
+            let stage = self
+                .event
+                .as_ref()
+                .and_then(|ticket| ticket.kind.event().stage_on(map_id));
+            if let Some(stage) = stage {
+                self.tell_event(EventCommand::ClearStage(stage)).await;
+            }
+        }
+        Ok(())
     }
 
     /// This player's loot is kept for them, or their party, at first.

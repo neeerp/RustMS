@@ -120,6 +120,21 @@ const BUNNY_SICK_HITS: u32 = 6;
 /// (Cosmic's `ActivateItemReactor`).
 const ITEM_TAKEN_AFTER: Duration = Duration::from_secs(5);
 
+/// The item a drop is, if a reactor may take it: one a player dropped, or
+/// one a mob or reactor dropped for anyone, as Cosmic's `spawnDrop` also
+/// sets off the reactors it lands on; never a quest drop.
+fn reactor_item(loot: &Loot) -> Option<(i32, i16)> {
+    match loot {
+        Loot::Dropped(item) => Some((item.item_id, item.quantity)),
+        &Loot::Item {
+            item_id,
+            quantity,
+            quest: None,
+        } => Some((item_id, quantity)),
+        _ => None,
+    }
+}
+
 /// An item a player put on a reactor that takes it, once it has lain there
 /// long enough.
 struct ItemOnReactor {
@@ -161,6 +176,9 @@ pub struct FieldActor {
     /// When, after a friendly mob in an event's copy went, its party is
     /// sent off.
     lost_at: Option<Instant>,
+    /// On the Tower of Goddess's Salion stage, how many Cellions go before
+    /// a spot drops its loot, and how many have gone, once the first has.
+    salion: Option<(u32, u32)>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -207,6 +225,7 @@ impl FieldActor {
             bunny_hits: 0,
             bunny_cakes: 0,
             lost_at: None,
+            salion: None,
             kites: KiteSet::default(),
             tick,
         }
@@ -861,6 +880,7 @@ impl FieldActor {
             .collect();
         for (drop, packet) in packets {
             self.show_drop(&drop, packet);
+            self.put_on_reactor(&drop, now);
         }
     }
 
@@ -971,10 +991,10 @@ impl FieldActor {
         (drop.x, ground.unwrap_or(drop.y))
     }
 
-    /// If a player's drop lands on a reactor that takes it, the reactor
-    /// takes it a little later.
+    /// If a drop lands on a reactor that takes it, the reactor takes it a
+    /// little later.
     fn put_on_reactor(&mut self, drop: &Drop, now: Instant) {
-        let Loot::Dropped(item) = &drop.loot else {
+        let Some((item_id, quantity)) = reactor_item(&drop.loot) else {
             return;
         };
         if self
@@ -985,7 +1005,7 @@ impl FieldActor {
             return;
         }
         let at = self.landing(drop);
-        if let Some(reactor) = self.reactors.taking(item.item_id, item.quantity, at) {
+        if let Some(reactor) = self.reactors.taking(item_id, quantity, at) {
             self.items_on_reactors.push(ItemOnReactor {
                 at: now + ITEM_TAKEN_AFTER,
                 drop: drop.object_id,
@@ -1001,13 +1021,13 @@ impl FieldActor {
         let Some(drop) = self.drops.get(on.drop) else {
             return false;
         };
-        let Loot::Dropped(item) = &drop.loot else {
+        let Some((item_id, quantity)) = reactor_item(&drop.loot) else {
             return false;
         };
         let (owner, at) = (drop.owner, self.landing(drop));
         let Some(hit) = self
             .reactors
-            .take_item(on.reactor, item.item_id, item.quantity, at, now)
+            .take_item(on.reactor, item_id, quantity, at, now)
         else {
             return false;
         };
@@ -2441,6 +2461,32 @@ impl FieldActor {
                     });
                 }
             }
+            // Another Cellion comes out at the next spot, until enough have
+            // gone; then this spot drops its loot, and clears the stage, by
+            // whoever broke it or someone still here (Cosmic `2001002`).
+            reactors::Action::Salion => {
+                let (limit, gone) = *self
+                    .salion
+                    .get_or_insert_with(|| (reactors::salion_limit(&mut rand::thread_rng()), 0));
+                if gone < limit {
+                    self.salion = Some((limit, gone + 1));
+                    if let Some(at) = self.reactors.spot_of(reactors::salion_next(gone + 1)) {
+                        self.board(reactors::CELLION, 1, at);
+                    }
+                } else if let Some(occupant) = self
+                    .occupants
+                    .get(&by)
+                    .or_else(|| self.occupants.values().next())
+                {
+                    occupant.handle.send(ServerMessage::ReactorBroken {
+                        field: self.key,
+                        reactor_id: view.reactor_id,
+                        object_id: view.object_id,
+                        x: view.x,
+                        y: view.y,
+                    });
+                }
+            }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here.
@@ -2683,6 +2729,7 @@ impl FieldActor {
             let now = Instant::now();
             self.mobs.renew(now);
             self.reactors.renew(now);
+            self.salion = None;
             if reactors::shuffled(self.key.map_id) {
                 self.reactors.shuffle(&mut rand::thread_rng());
             }
@@ -3894,6 +3941,96 @@ mod tests {
             staying: false,
         });
         assert_eq!(state(&actor), Some(0));
+    }
+
+    #[tokio::test]
+    async fn the_cellions_drop_sets_off_its_spot_and_the_last_spot_drops_its_loot() {
+        let spot = |reactor_id, x, y| {
+            let data = net::reactors::template(reactor_id)?;
+            let spot = game_data::MapReactorTemplate {
+                reactor_id,
+                x,
+                y,
+                flip: false,
+                reactor_time: -1,
+                name: String::new(),
+            };
+            Some((spot, data))
+        };
+        let (Some(first), Some(next), Some(_)) = (
+            spot(2001002, -222, -520),
+            spot(2001013, 140, -2731),
+            net::mobs::info(reactors::CELLION),
+        ) else {
+            return;
+        };
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 920010300),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::new([first, next]),
+            Duration::from_millis(50),
+        );
+        let (handle, mut rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle,
+            avatar: avatar(1, 0, -244),
+            party: None,
+        });
+        opcodes(&mut rx).await;
+        actor.salion = Some((1, 0));
+        let cellion_drops = |x, y| FieldMessage::SpawnLoot {
+            owner: 1,
+            ownership: Ownership::Owner,
+            loot: vec![Loot::Item {
+                item_id: 4001074,
+                quantity: 1,
+                quest: None,
+            }],
+            x,
+            y,
+            dropper: 1,
+        };
+        let broken = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            std::iter::from_fn(|| rx.try_recv().ok()).any(|message| {
+                matches!(message, ServerMessage::ReactorBroken { reactor_id, .. }
+                    if (2001002..=2001015).contains(&reactor_id))
+            })
+        };
+
+        // The first Cellion's drop breaks its spot, and the next comes out
+        // at 2001013's.
+        actor.handle_message(cellion_drops(-222, -520));
+        let start = Instant::now();
+        actor.on_tick(start + Duration::from_secs(6));
+        assert_eq!(actor.reactors.live().count(), 1);
+        assert_eq!(actor.drops.all().count(), 0);
+        let cellions: Vec<_> = actor
+            .mobs
+            .live()
+            .map(|mob| (mob.info.mob_id, mob.x))
+            .collect();
+        assert_eq!(cellions, [(reactors::CELLION, 140)]);
+        assert!(!broken(&mut rx));
+
+        // That one's is the last: its spot drops the loot.
+        actor.handle_message(cellion_drops(140, -2731));
+        actor.on_tick(start + Duration::from_secs(12));
+        assert_eq!(actor.reactors.live().count(), 0);
+        assert_eq!(actor.mobs.live().count(), 1);
+        assert!(broken(&mut rx));
+        assert_eq!(actor.salion, Some((1, 1)));
+
+        // A quest drop doesn't lie on a reactor.
+        let quest_drop = Loot::Item {
+            item_id: 4001074,
+            quantity: 1,
+            quest: Some(1),
+        };
+        assert_eq!(reactor_item(&quest_drop), None);
     }
 
     fn summon(skill_id: i32, at: (i16, i16), lasts: Duration) -> FieldMessage {

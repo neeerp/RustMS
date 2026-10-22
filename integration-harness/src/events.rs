@@ -3,7 +3,7 @@
 //! gathered in the event's lobby, NPC talk on the event's maps, and getting
 //! the party in.
 
-use crate::database::{grant_stack, set_job};
+use crate::database::{grant_stack, replace_item, set_job, set_str, set_weapon_attack};
 use crate::preconditions::load_harness_config_or_fail;
 use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
@@ -113,6 +113,16 @@ pub async fn in_lobby(level: i16, items: &[(i32, i16)]) -> WorldSession {
 /// A new character at `level`, holding `items` in their Etc tab, logged in
 /// and waiting on `lobby`.
 pub async fn waiting_in(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSession {
+    waiting_with(lobby, level, items, false).await
+}
+
+/// A new character at `level`, as `waiting_in`, with a sword and the
+/// strength to kill the event's monsters in a blow or two.
+pub async fn armed_in(lobby: i32, level: i16) -> WorldSession {
+    waiting_with(lobby, level, &[], true).await
+}
+
+async fn waiting_with(lobby: i32, level: i16, items: &[(i32, i16)], armed: bool) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
@@ -120,6 +130,11 @@ pub async fn waiting_in(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSe
     set_job(id, 0, level, 50).await.unwrap();
     for (slot, &(item_id, quantity)) in (1..).zip(items) {
         grant_stack(id, 4, slot, item_id, quantity).await.unwrap();
+    }
+    if armed {
+        replace_item(id, -1, -11, 1302000).await.unwrap();
+        set_weapon_attack(id, 500).await.unwrap();
+        set_str(id, 999).await.unwrap();
     }
     let mut session = relogin(&config).await;
     let mut trace = Trace::default();

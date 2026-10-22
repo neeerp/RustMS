@@ -74,3 +74,50 @@ quest_items = { 4031161 = 1008, 4031162 = 1008 }
 # the mBoxItem0 action), which the pack only lists under 2000.
 like = 2000
 quest_items = { 4031161 = 1008, 4031162 = 1008 }
+
+[reactors.2001002]
+# The Tower of Goddess's Salion stage (Map.nx 920010300): the spot that
+# takes the last Cellion's 4001074 (Reactor.nx 2001002-15, item event)
+# drops a piece of Minerva's statue, 4001045, which the pack doesn't list
+# (Cosmic `2001002`: `dropItems`; its reactor drops have 4001045 for every
+# spot, every time).
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001003]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001004]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001005]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001006]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001007]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001008]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001009]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001010]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001011]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001012]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001013]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001014]
+add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2001015]
+add = [{ item = 4001045, prob = 1.0 }]

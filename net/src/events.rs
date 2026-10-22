@@ -50,6 +50,10 @@ pub struct Event {
     pub stage_maps: &'static [i32],
     /// The stages the leader clears just by talking to their NPC.
     pub talk_clears: &'static [u8],
+    /// The stages cleared when a reactor on their map drops the stage's
+    /// loot, whoever broke it (the Tower of Goddess's Salion stage,
+    /// `net::reactors::Action::Salion`).
+    pub reactor_clears: &'static [u8],
     /// Where those on a stage's map go when it is cleared: the stage and
     /// the portal on its map.
     pub clear_portals: &'static [(u8, &'static str)],
@@ -148,6 +152,7 @@ pub const KPQ: Event = Event {
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
+    reactor_clears: &[],
     clear_portals: &[],
     gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
@@ -231,6 +236,7 @@ pub const HPQ: Event = Event {
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
+    reactor_clears: &[],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -272,6 +278,7 @@ pub const LPQ: Event = Event {
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
+    reactor_clears: &[],
     clear_portals: &[],
     gated: &[
         922_010_100,
@@ -462,6 +469,7 @@ pub const OPQ: Event = Event {
         OPQ_HUB,
     ],
     talk_clears: &[1],
+    reactor_clears: &[3],
     clear_portals: &[(1, "st00")],
     gated: &[],
     puzzles: 1..=0,
