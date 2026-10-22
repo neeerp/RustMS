@@ -1256,6 +1256,7 @@ impl ClientActor {
                 self.proposal_accepted(proposer, item_id).await?
             }
             ServerMessage::Engaged(record) => self.engaged(record).await?,
+            ServerMessage::CoupleEnded(record) => self.couple_ended(record).await?,
             ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,
             ServerMessage::FamilyChanged => self.family_changed().await?,
             ServerMessage::Separate {

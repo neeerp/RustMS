@@ -8,6 +8,10 @@ use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
 const ENGAGED: u8 = 11;
+/// The engagement is broken; the client drops the record.
+const BROKEN: u8 = 13;
+/// The marriage is over; the client drops the record.
+const DIVORCED: u8 = 14;
 /// A line of the server's own.
 const NOTICE: u8 = 36;
 
@@ -56,6 +60,12 @@ pub fn build_engaged(record: &MarriageRecord) -> Result<Packet, NetworkError> {
     let mut packet = result(ENGAGED)?;
     write_marriage_record(&mut packet, record)?;
     Ok(packet)
+}
+
+/// MARRIAGE_RESULT 13, "Your engagement has been broken.", or for a married
+/// couple 14, "You are no longer married."
+pub fn build_couple_ended(record: &MarriageRecord) -> Result<Packet, NetworkError> {
+    result(if record.married() { DIVORCED } else { BROKEN })
 }
 
 /// MARRIAGE_RESULT 36: `text` in the client's OK box.

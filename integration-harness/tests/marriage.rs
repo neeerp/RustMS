@@ -5,6 +5,8 @@
 //! second proposal, and a partner already asked or engaged; a proposer may
 //! withdraw (RING_ACTION 1). On a yes both get MARRIAGE_RESULT 11 with the
 //! couple's record, the proposer the empty box and the partner the ring.
+//! Dropping either token (RING_ACTION 3, report b054) breaks it off: both
+//! get MARRIAGE_RESULT 13 and lose their tokens.
 
 use integration_harness::database::{grant_stack, set_gender, set_job};
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -21,8 +23,10 @@ const MOONSTONE_BOX: i32 = 2240000;
 const EMPTY_BOX: i32 = 4031357;
 const RING: i32 = 4031358;
 const USE: i16 = 2;
+const ETC: u8 = 4;
 
 const ENGAGED: u8 = 11;
+const BROKEN: u8 = 13;
 const WRONG_NAME: u8 = 18;
 const NOT_SAME_MAP: u8 = 19;
 const SAME_GENDER: u8 = 22;
@@ -57,6 +61,14 @@ fn answer(accept: bool, name: &str, proposer: i32) -> Packet {
     p.write_byte(u8::from(accept)).unwrap();
     p.write_str_with_length(name).unwrap();
     p.write_int(proposer).unwrap();
+    p
+}
+
+fn break_off(token: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::RingAction as i16).unwrap();
+    p.write_byte(3).unwrap();
+    p.write_int(token).unwrap();
     p
 }
 
@@ -192,4 +204,17 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     tokio::time::sleep(Duration::from_millis(500)).await;
     let mut a = enter(a_config, HENESYS).await;
     refused(&mut a, &cn, ALREADY_ENGAGED).await;
+
+    // B drops the ring: both are told, and both tokens go.
+    send(&mut b.connection, break_off(RING)).await;
+    let bt = marriage(&mut b, 1).await;
+    let at = marriage(&mut a, 1).await;
+    assert_eq!(bt.marriage, [result(BROKEN)]);
+    assert_eq!(at.marriage, [result(BROKEN)]);
+    assert!(matches!(bt.removed[..], [(ETC, _)]), "{:?}", bt.removed);
+    assert!(matches!(at.removed[..], [(ETC, _)]), "{:?}", at.removed);
+
+    // Free again: A may ask B once more.
+    send(&mut a.connection, propose(&bn)).await;
+    assert_eq!(marriage(&mut b, 1).await.marriage, [asked(&an, a_id)]);
 }

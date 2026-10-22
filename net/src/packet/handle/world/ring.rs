@@ -5,9 +5,9 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
 
-/// `RING_ACTION` (report b052): a proposal with an engagement ring box, its
-/// withdrawal, and the partner's answer. Breaking off, invitations and the
-/// wishlist come later.
+/// `RING_ACTION` (reports b052 and b054): a proposal with an engagement ring
+/// box, its withdrawal, the partner's answer, and breaking off by dropping a
+/// token. Invitations and the wishlist come later.
 pub struct RingActionHandler;
 
 impl WorldHandler for RingActionHandler {
@@ -27,6 +27,9 @@ impl WorldHandler for RingActionHandler {
                 let proposer = reader.read_int()?;
                 RingRequest::Answer { proposer, accept }
             }
+            3 => RingRequest::Break {
+                item_id: reader.read_int()?,
+            },
             other => {
                 debug!(mode = other, "Ignoring RING_ACTION");
                 return Ok(HandlerResult::empty());
@@ -82,6 +85,10 @@ mod tests {
                 proposer: 9,
                 accept: true
             })
+        );
+        assert_eq!(
+            read(&[3, 0x7d, 0x83, 0x3d, 0]),
+            Some(RingRequest::Break { item_id: 4031357 })
         );
         assert_eq!(read(&[9, 0, 0]), None);
     }

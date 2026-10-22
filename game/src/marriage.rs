@@ -26,6 +26,12 @@ pub fn tokens(ring_box: i32) -> (i32, i32) {
     (empty_box, empty_box + 1)
 }
 
+/// The empty boxes and rings a couple holds. The client lets a player drop
+/// one only to break off (report b054).
+pub fn is_token(item_id: i32) -> bool {
+    (4031357..=4031364).contains(&item_id)
+}
+
 /// A couple, engaged or married: GW_MarriageRecord.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MarriageRecord {
@@ -100,5 +106,7 @@ mod tests {
         assert_eq!(tokens(2240003), (4031363, 4031364));
         assert!(is_ring_box(2240002));
         assert!(!is_ring_box(2240004));
+        assert!(is_token(4031357) && is_token(4031364));
+        assert!(!is_token(4031365));
     }
 }
