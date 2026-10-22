@@ -175,6 +175,10 @@ nothing. A script returns effects that the client actor sends:
 | `dragonNest`, `go_secretroom`, `tristanEnter`, `q2073`, `enterDollWay`, `ariant_Agit`, `s4resur_enter`, `s4rush` | Doors a quest opens, else a pink line: the Nine Spirit's Nest (`240040612` `out00`, 3706 completed; Cosmic's egg event isn't in), the Mushroom Castle's Security Room (`106021001` portal 1, 2335 completed, or taken with its key `4032405`, which completes it, gives 5000 EXP and takes the key, once 2335 is in the quest catalog), Tristan's Resting Place (`105100101` `in00`, 2238 completed), Utah's Pig Farm (`900000000`, 2073 taken), the Cave of Evil Eye III (`105070300` portal 3, 20730 or 21734 completed) or the Puppeteer's Secret Passage (`910510100`, 21734 taken), the Sand Bandits' house (`260000201` portal 1, 3928, 3931 and 3934 completed), the Forgotten Darkness (`922020000`, 6134 taken), the Secret Shrine (`910500100`, 6110 taken). Several of these quests aren't supported yet (2238, 2335, 3706, 21201, 21302), so their doors stay shut for now |
 | `skyrom` | Ariant's Treasure Room of Queen (`926000010`): with 3935 taken and no Queen's jewel (`4031574`), portal sound and in, one player at a time (a pink line while someone is there); else nothing |
 | `enterDisguise1`-`enterDisguise5` | Ereve's Training Forests' ways on to the next (`130010010`, `130010020`, `130010110`, `130010120` `out00`, `130020000` `east00`); while a Master of Disguise quest (20301-20305) is taken, into the Knight's hideout instead (`108010600` + 10 per job, `out00`, the fifth `east00`), one player at a time, with a pink line if someone is there or the player holds his proof (`4032101` + job) already |
+| `minar_elli` | The shortcut between the Field Up North of Ellinia (`101010000` `minar00`) and Leafre's Minar Forest West Border (`240010100` `elli00`): spends a Magic Seed (`4031346`) with a pink line, portal sound, and on to the other side's portal; without one, a pink line |
+| `enter_earth00`, `enter_earth01` | The Nautilus's Navigation Room (`120000101` `earth01`) to Omega Sector's Command Center (`221000300` `earth00`) and back, for a holder of a Warp Card (`4031890`, kept); else a pink line. Cosmic sends that line as type 6; it's pink here, as Edelstein's scripts send theirs |
+| `ariant_queens` | Ariant's palace rooms (`260000301`-`260000303`, `ring00`-`ring06`): nothing for a player in Tigun's disguise (the morph of item `2210005`, a buff of id `-2210005`); anyone else is turned out to Ariant Castle's `R001` (`260000300`) with portal sound and a pink line |
+| `advice00`-`advice09`, `adviceMap` | The original Maple Island's instruction balloons (moving, Heena, jumping, climbing, Sera, the quest window, portals, the World Map, stats, jumping down), each a PLAYER_HINT with Cosmic's width and height; no warp |
 
 A portal that takes one player at a time puts `Effect::RequireEmptyMap`
 first; when someone is there, nothing applies and the client actor says the
@@ -184,8 +188,8 @@ portals do nothing in Cosmic either, so they're left unserved.
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,
 and `tutoChatNPC`, were for the revamped island's maps and are unused. The
-original island's touch portals run `advice00`-`advice09` and `adviceMap`,
-which have no implementation yet, so they do nothing.
+original island's touch portals run `advice00`-`advice09` and `adviceMap`
+(see the table above).
 
 HeavenClient sends CHANGE_MAP_SPECIAL (`0x64`, portal name, player x and y)
 while the player stands in a script portal's box, and the server answers with

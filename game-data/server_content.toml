@@ -492,6 +492,18 @@ unsourced = [
     "portal.disguise.occupied",
     "portal.disguise.already_found",
     "portal.mysterious_force",
+    "portal.earth.no_card",
+    "portal.ariant_palace.intruder",
+    "portal.advice.move",
+    "portal.advice.heena",
+    "portal.advice.jump",
+    "portal.advice.climb",
+    "portal.advice.sera",
+    "portal.advice.quest_window",
+    "portal.advice.portal",
+    "portal.advice.world_map",
+    "portal.advice.stats",
+    "portal.advice.jump_down",
     "time_gate.inactive",
     "time_gate.no_era",
     "statue.intro",
@@ -1279,3 +1291,13 @@ sha256 = "6a0b4a048c118e1c2fb6afb5fc4f0d52349ba38a2bd5e007586cec02df40cbab"
 source = "Server.Scripts/src/elevator.lua"
 template = "{s2}"
 sha256 = "003d13235046bf505da5f866a9de7e83fd15cede3d64b433ae4732e921025ea5"
+
+[text."portal.minar_elli.spent"]
+source = "Server.Scripts/src/minar_elli.lua"
+template = "{s8}"
+sha256 = "6a5fb47c4cfbf76ee6d67a23b9660a246b2df4535282e38e2a01c2e643010bf9"
+
+[text."portal.minar_elli.no_seed"]
+source = "Server.Scripts/src/minar_elli.lua"
+template = "{s9}"
+sha256 = "f69d305721965dc19275393e1d235bba08e2e64a1172b4540aaf1fae42c0bcfa"
