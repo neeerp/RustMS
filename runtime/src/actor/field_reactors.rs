@@ -124,6 +124,20 @@ impl ReactorSet {
         spawned
     }
 
+    /// Start afresh, as when the field loaded: every reactor goes without a
+    /// trace and every spot gets one again, the broken ones that never come
+    /// back too. For a field nobody is on. Returns the new reactors' object
+    /// ids.
+    pub fn renew(&mut self, now: Instant) -> Vec<i32> {
+        self.live.clear();
+        for spot in &mut self.spots {
+            spot.live = None;
+            spot.next_spawn = None;
+            spot.spent = false;
+        }
+        self.respawn(now)
+    }
+
     /// Put every reactor named `name` in `state`, as a script does (the
     /// elevator's car leaving or docking); returns the views of those that
     /// changed. It goes through no event, so nothing breaks.
@@ -274,5 +288,20 @@ mod tests {
             reactors.hit(id, SWING, (610, 254), now).unwrap();
         }
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
+    }
+
+    #[test]
+    fn a_renewed_field_has_its_broken_boxes_back() {
+        let mut reactors = ReactorSet::new([scrap_box(610, 0), scrap_box(700, 30)]);
+        let now = Instant::now();
+        let ids = reactors.respawn(now);
+        for _ in 0..4 {
+            reactors.hit(ids[0], SWING, (610, 254), now).unwrap();
+        }
+        let renewed = reactors.renew(now);
+        assert_eq!(renewed.len(), 2);
+        assert_eq!(reactors.live().count(), 2);
+        assert!(renewed.iter().all(|id| !ids.contains(id)));
+        assert!(reactors.live().all(|reactor| reactor.state == 0));
     }
 }
