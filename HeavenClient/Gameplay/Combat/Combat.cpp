@@ -2852,7 +2852,7 @@ namespace ms
 		if (Optional<OtherChar> ouser = chars.get_char(cid))
 		{
 			const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
-			ouser->show_attack_effect(affected.animation, affected.z);
+			ouser->show_user_effect(affected.animation, affected.z);
 		}
 	}
 
@@ -2864,7 +2864,7 @@ namespace ms
 	void Combat::show_player_affected(int32_t skillid)
 	{
 		const SkillPrepare::Effect &affected = get_skill(skillid).get_affected();
-		player.show_attack_effect(affected.animation, affected.z);
+		player.show_user_effect(affected.animation, affected.z);
 	}
 
 	void Combat::show_special(int32_t cid, int32_t skillid)
@@ -3437,6 +3437,11 @@ namespace ms
 	void Combat::clear_grenades()
 	{
 		grenades.clear();
+	}
+
+	void Combat::clear_final_attack()
+	{
+		pending_final.reset();
 	}
 
 	const Skill &Combat::get_skill(int32_t skill_id)

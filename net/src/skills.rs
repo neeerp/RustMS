@@ -637,9 +637,11 @@ pub enum Amount {
     Value(i16),
     /// Poison from a skill at `level`: each second the mob's max HP over
     /// 70 less the level, rounded up (OdinMS-family servers; v83's server
-    /// isn't available, and the client only shows the value it's sent).
+    /// isn't available, and the client only shows the value it's sent),
+    /// and `bonus` percent more (Elemental Boost's on Flamethrower).
     Poison {
         level: i32,
+        bonus: i32,
     },
 }
 
@@ -648,11 +650,11 @@ impl Amount {
     pub fn against(self, max_hp: i32) -> i16 {
         match self {
             Amount::Value(value) => value,
-            Amount::Poison { level } => {
+            Amount::Poison { level, bonus } => {
                 let per = (70 - level).max(1);
-                (max_hp.max(0) as u32)
-                    .div_ceil(per as u32)
-                    .clamp(1, i16::MAX as u32) as i16
+                let tick = (max_hp.max(0) as u32).div_ceil(per as u32);
+                let tick = u64::from(tick) * (100 + bonus.max(0)) as u64 / 100;
+                tick.clamp(1, i16::MAX as u64) as i16
             }
         }
     }
@@ -751,7 +753,13 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
         // Flamethrower. The demons' reason also turns the mob's element
         // weakness on the client (0x78c7ab).
         2101005 | 2111006 | 2121003 | 2221003 | 5211004 => {
-            vec![(MobStat::Poison, Amount::Poison { level: skill.level })]
+            vec![(
+                MobStat::Poison,
+                Amount::Poison {
+                    level: skill.level,
+                    bonus: 0,
+                },
+            )]
         }
         // Disorder: less attack (x) and defence (y), both negative.
         4001002 | 14001002 => vec![value(MobStat::Pad, effect.x), value(MobStat::Pdr, effect.y)],
@@ -786,8 +794,8 @@ pub fn provokes(skill: Option<i32>) -> bool {
 }
 
 /// Elemental Boost, which adds its `damage` percent to Flamethrower's and
-/// Ice Splitter's (0x79004c) and, as its description says, its `y` seconds
-/// to Ice Splitter's freeze.
+/// Ice Splitter's (0x79004c) and, as its description says, its `x` percent
+/// to Flamethrower's burn and its `y` seconds to Ice Splitter's freeze.
 pub const ELEMENTAL_BOOST: i32 = 5220001;
 const FLAMETHROWER: i32 = 5211004;
 const ICE_SPLITTER: i32 = 5211005;
@@ -825,9 +833,16 @@ pub fn on_hit(player: &Player, skill: Option<&Learned>, ranged: bool, roll: f64)
             if skill.skill_id == DRAGON_ROAR {
                 inflict.duration = Duration::from_secs(skill.effect.y.max(0) as u64);
             }
-            if skill.skill_id == ICE_SPLITTER {
-                if let Some(boost) = elemental_boost(player, ICE_SPLITTER) {
+            if let Some(boost) = elemental_boost(player, skill.skill_id) {
+                if skill.skill_id == ICE_SPLITTER {
                     inflict.duration += Duration::from_secs(boost.effect.y.max(0) as u64);
+                }
+                // Its `x` percent more on Flamethrower's burn ("dot damage
+                // +x%").
+                for (_, amount) in &mut inflict.statuses {
+                    if let Amount::Poison { bonus, .. } = amount {
+                        *bonus = boost.effect.x;
+                    }
                 }
             }
             inflicts.push(inflict);
@@ -996,7 +1011,13 @@ pub fn mist(skill: &Learned) -> Option<Inflict> {
     match skill.skill_id {
         POISON_MIST => Some(Inflict::new(
             skill,
-            vec![(MobStat::Poison, Amount::Poison { level: skill.level })],
+            vec![(
+                MobStat::Poison,
+                Amount::Poison {
+                    level: skill.level,
+                    bonus: 0,
+                },
+            )],
         )),
         SMOKESCREEN => Some(Inflict::new(skill, Vec::new())),
         _ => None,
@@ -1559,7 +1580,10 @@ mod tests {
 
     #[test]
     fn poison_takes_a_share_of_max_hp_each_second() {
-        let poison = Amount::Poison { level: 30 };
+        let poison = Amount::Poison {
+            level: 30,
+            bonus: 0,
+        };
         assert_eq!(poison.against(1000), 25);
         assert_eq!(poison.against(1001), 26);
         assert_eq!(poison.against(0), 1);
@@ -1646,7 +1670,13 @@ mod tests {
         let breath = at_level(2101005, 30).unwrap();
         assert_eq!(
             on_hit(&player, Some(&breath), false, 0.5)[0].statuses,
-            [(MobStat::Poison, Amount::Poison { level: 30 })]
+            [(
+                MobStat::Poison,
+                Amount::Poison {
+                    level: 30,
+                    bonus: 0,
+                }
+            )]
         );
         assert!(on_hit(&player, None, true, 0.5).is_empty());
 
@@ -1665,6 +1695,15 @@ mod tests {
             200
         );
         assert!(elemental_boost(&corsair, 5221004).is_none());
+        // Flamethrower at 20 burns a 6,500 HP mob for 130 a second, and
+        // Elemental Boost at 30 adds 5%.
+        let flamethrower = at_level(FLAMETHROWER, 20).unwrap();
+        let burn = |player: &Player| {
+            on_hit(player, Some(&flamethrower), true, 0.5)[0].statuses[0]
+                .1
+                .against(6500)
+        };
+        assert_eq!((burn(&player), burn(&corsair)), (130, 136));
 
         // Venomous Star at 30 (mad 60, 30% for 4 seconds) poisons a
         // claw's shots only. STR 35, DEX 4, LUK 4: between 3.2 and 7.295
@@ -1739,7 +1778,13 @@ mod tests {
         assert_eq!(mist.duration, Duration::from_secs(40));
         assert_eq!(
             mist.statuses,
-            vec![(MobStat::Poison, Amount::Poison { level: 30 })]
+            vec![(
+                MobStat::Poison,
+                Amount::Poison {
+                    level: 30,
+                    bonus: 0,
+                }
+            )]
         );
         assert!(super::mist(&at_level(2111006, 30).unwrap()).is_none());
 

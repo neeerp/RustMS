@@ -458,6 +458,11 @@ namespace ms
 		effects.add(toshow, DrawArgument(facing_right), z, attackspeed);
 	}
 
+	void Char::show_user_effect(Animation toshow, int8_t z)
+	{
+		effects.add(toshow, DrawArgument(facing_right), z, 1.0f);
+	}
+
 	void Char::show_combo(int32_t orbs, bool init)
 	{
 		combo_orbs.set(orbs, init);
