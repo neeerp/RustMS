@@ -3,6 +3,7 @@
 //! field.
 
 use crate::packets::build_player_move;
+use net::packet::build::world::mob::{Hurt, FROM_TOUCH};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::{read::PktRead, write::PktWrite};
 use packet::Packet;
@@ -351,6 +352,8 @@ pub struct Field {
     pub effects: Vec<(i32, u8)>,
     /// DAMAGE_PLAYER: (character id, source, damage).
     pub players_hurt: Vec<(i32, i8, i32)>,
+    /// DAMAGE_PLAYER in full: (character id, what it showed).
+    pub hurts: Vec<(i32, Hurt)>,
     pub reactors: Vec<MapReactor>,
     /// (object id, state it moved to)
     pub reactor_hits: Vec<(i32, u8)>,
@@ -415,6 +418,33 @@ fn read_mob_stats(r: &mut Cursor<&Vec<u8>>) -> u128 {
     let high = r.read_long().unwrap() as u64;
     let low = r.read_long().unwrap() as u64;
     ((high.rotate_left(32) as u128) << 64) | low.rotate_left(32) as u128
+}
+
+/// DAMAGE_PLAYER after its opcode, read as the v83 client does
+/// (FUN_009832e3): the mob's part only from a touch or an attack, the
+/// reflect block only with a percent, and the dodging skill after a -1.
+fn read_hurt(r: &mut Cursor<&Vec<u8>>) -> (i32, Hurt) {
+    let id = r.read_int().unwrap();
+    let mut hurt = Hurt {
+        from: r.read_byte().unwrap() as i8,
+        damage: r.read_int().unwrap(),
+        ..Hurt::default()
+    };
+    if hurt.from >= FROM_TOUCH {
+        hurt.mob_id = r.read_int().unwrap();
+        hurt.left = r.read_byte().unwrap();
+        let percent = r.read_byte().unwrap();
+        if percent > 0 {
+            let shown = r.read_bytes(10).unwrap().try_into().unwrap();
+            hurt.reflect = Some((percent, shown));
+        }
+        hurt.stance = r.read_byte().unwrap() != 0;
+    }
+    hurt.shown = r.read_int().unwrap();
+    if hurt.shown == -1 {
+        hurt.dodged_by = Some(r.read_int().unwrap());
+    }
+    (id, hurt)
 }
 
 impl Field {
@@ -561,8 +591,9 @@ impl Field {
                     .push((mob.unwrap(), hp.unwrap(), max_hp.unwrap(), colors));
             }
         } else if op == SendOpcode::DamagePlayer as i16 {
-            let (id, from) = (r.read_int().unwrap(), r.read_byte().unwrap() as i8);
-            self.players_hurt.push((id, from, r.read_int().unwrap()));
+            let (id, hurt) = read_hurt(&mut r);
+            self.players_hurt.push((id, hurt.from, hurt.damage));
+            self.hurts.push((id, hurt));
         } else if op == SendOpcode::KillMonster as i16 {
             let oid = r.read_int().unwrap();
             self.killed.push(oid);
