@@ -18,8 +18,8 @@ pub enum PetGone {
     NotHere = 3,
 }
 
-/// A pet as the field shows it (`CPet::Init`, FUN_00703314). The name tag
-/// and chat balloon styles come from rings this server does not have yet.
+/// A pet as the field shows it (`CPet::Init`, FUN_00703314), with whether
+/// its label and quote rings are worn.
 pub fn write_pet(packet: &mut Packet, pet: &FieldPet) -> Result<(), NetworkError> {
     packet.write_int(pet.item_id)?;
     packet.write_str_with_length(&pet.name)?;
@@ -28,8 +28,8 @@ pub fn write_pet(packet: &mut Packet, pet: &FieldPet) -> Result<(), NetworkError
     packet.write_short(pet.y)?;
     packet.write_byte(pet.stance)?;
     packet.write_short(pet.foothold)?;
-    packet.write_byte(0)?; // name tag
-    packet.write_byte(0)?; // chat balloon
+    packet.write_byte(u8::from(pet.name_tag))?;
+    packet.write_byte(u8::from(pet.chat_balloon))?;
     Ok(())
 }
 
@@ -97,15 +97,21 @@ pub fn build_pet_chat(
 }
 
 /// PET_NAMECHANGE (172, FUN_00704801): the pet at `index` is now called
-/// `name`. Its owner's client needs it too, as pet commands may start with
-/// the name. The name tag style byte matches the spawn's (none).
-pub fn build_pet_name(owner_id: i32, index: u8, name: &str) -> Result<Packet, NetworkError> {
+/// `name`, and shows its kind's name tag if `name_tag` (a label ring is
+/// worn for it). Its owner's client needs it too, as pet commands may
+/// start with the name.
+pub fn build_pet_name(
+    owner_id: i32,
+    index: u8,
+    name: &str,
+    name_tag: bool,
+) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::PetNameChange as i16)?;
     p.write_int(owner_id)?;
     p.write_byte(index)?;
     p.write_str_with_length(name)?;
-    p.write_byte(0)?; // name tag
+    p.write_byte(u8::from(name_tag))?;
     Ok(p)
 }
 
@@ -214,6 +220,8 @@ mod tests {
             y: 20,
             stance: 4,
             foothold: 12,
+            name_tag: true,
+            chat_balloon: false,
         }
     }
 
@@ -233,7 +241,7 @@ mod tests {
             .short(20)
             .byte(4)
             .short(12)
-            .byte(0)
+            .byte(1) // a label ring
             .byte(0);
         expect.end();
     }
@@ -302,13 +310,13 @@ mod tests {
 
     #[test]
     fn a_pet_is_renamed() {
-        let packet = build_pet_name(9, 0, "Tigger").unwrap();
+        let packet = build_pet_name(9, 0, "Tigger", true).unwrap();
         let mut expect = Expect::new(&packet.bytes);
         expect
             .short(SendOpcode::PetNameChange as i16)
             .int(9)
             .byte(0);
-        expect.string("Tigger").byte(0);
+        expect.string("Tigger").byte(1);
         expect.end();
     }
 }

@@ -295,13 +295,12 @@ namespace ms
 		uint8_t index = recv.read_byte();
 		std::string name = recv.read_string();
 
-		// The name tag's style (`info/nameTag`) when set; HeavenClient
-		// draws one plain tag for every pet.
-		recv.read_bool();
+		// Whether it shows its kind's name tag (a label ring is worn).
+		bool name_tag = recv.read_bool();
 
 		if (Optional<Char> character = Stage::get().get_character(cid))
 			if (Optional<PetLook> pet = character->get_pet(index))
-				pet->set_name(name);
+				pet->set_name(name, name_tag);
 	}
 
 	void PetExceptionListHandler::handle(InPacket& recv) const

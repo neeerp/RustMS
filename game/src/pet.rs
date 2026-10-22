@@ -189,6 +189,12 @@ pub struct FieldPet {
     pub y: i16,
     pub stance: u8,
     pub foothold: i16,
+    /// Something is worn in its label ring's part, so it shows its kind's
+    /// name tag (v83 FUN_00705e2c), else a plain one.
+    pub name_tag: bool,
+    /// Something is worn in its quote ring's part, so it speaks in its
+    /// kind's chat balloon.
+    pub chat_balloon: bool,
 }
 
 /// One change to a player's pets out, at its position in the list.

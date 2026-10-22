@@ -40,7 +40,10 @@ beside it.
 - **Packets.** 168 is `cid, index, 1, replace, body` to show a pet and
   `cid, index, 0, reason` to take it away. The body is `item id, name,
   serial, x, y, stance, foothold, name tag, balloon`; SPAWN_PLAYER repeats it
-  after a 1 for each pet out and ends the list with a 0. The pet stat bits
+  after a 1 for each pet out and ends the list with a 0. The name tag byte is
+  1 while something (a label ring, or the Pet Collar) is worn in the pet's
+  label part (21, 31, 39 by list index), and the balloon byte while a quote
+  ring is worn in its part (29, 32, 40) (`Player::pet_equip`). The pet stat bits
   (0x8, 0x80000, 0x100000) are written right after HAIR, 8 bytes each.
   CHAR_INFO lists the pets out, without equipment.
 - **Moving.** MOVE_PET (`0xA7` in) is the pet's cash serial and a movement
@@ -86,7 +89,11 @@ beside it.
   re-sends the pet's item, then 172 `cid, index, name, 0` to the owner and the
   map; the owner needs it too, since the client hears commands by the pet's
   name. Without a pet out, or with a name the client wouldn't send, it sends
-  only an empty stat change. The trailing 0 is the name tag style, as in 168.
+  only an empty stat change. The trailing byte is the name tag flag, as in
+  168.
+- **Label rings.** Putting a label ring on or taking it off while its pet
+  is out re-sends 172 with the pet's name and new flag to the owner and the
+  map, since that is the only packet that can restyle another's pet.
 - **Hunger.** Every 3 minutes (`client/pets.rs`) each pet out loses its
   `info/hungry` fullness (1 if unset; the Baby Tiger loses 3) and its item is
   re-sent. One left at 5 or less is set to 15 and goes home with 168 reason
@@ -178,7 +185,17 @@ beside it.
   the kind's name in any case or the pet's own ("That name is not
   available."). "Do you want to name your pet 'X'?" then sends USE_CASH_ITEM
   under the WAIT lock and plays `UseShopItem`. 172 sets the pet's name and
-  label; the packet's name tag style is ignored, so the label stays plain.
+  whether it shows its name tag.
+- **Name tags.** Every pet has a name tag, its top 2 px under the pet's
+  feet (FUN_005f0334 type 0x3eb, origin cy -2). With its flag set (168,
+  SPAWN_PLAYER, 172; for the owner's own pets, a label ring worn in its part,
+  as FUN_00705e2c re-derives it) the tag is drawn in the kind's
+  `info/nameTag` style from `UI NameTag.img/pet/<style>` (UIClassic, else
+  the newer UI, which alone has style 42): the left cap `w`, the tile `c`
+  repeated under the name, the right cap `e`, and the name in Arial 12 in
+  the colour `clr`, laid out as the medal tag is (`StyledTag`,
+  `MedalTagLayout`). Without the flag, or for a kind with no style, it is
+  the plain translucent box with the name in white (0x5f0e1d).
 - **Closeness.** After every inventory operation, a pet out whose item now
   shows different closeness gets the yellow status line "The closeness
   increased (+N)" or "The closeness decreased (-N)".

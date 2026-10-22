@@ -17,12 +17,15 @@ namespace ms
 		Point<int16_t> position;
 		uint8_t stance;
 		int16_t fh;
+		// A label ring is worn for it, so it shows its kind's name tag.
+		bool name_tag = false;
+		// A quote ring is worn for it.
+		bool chat_balloon = false;
 	};
 
 	namespace PetParser
 	{
-		// CPet::Init (FUN_00703314). The name tag and chat balloon styles
-		// come from rings HC doesn't show yet.
+		// CPet::Init (FUN_00703314).
 		inline PetEntry parse_pet(InPacket &recv)
 		{
 			PetEntry pet;
@@ -32,7 +35,8 @@ namespace ms
 			pet.position = recv.read_point();
 			pet.stance = recv.read_byte();
 			pet.fh = recv.read_short();
-			recv.skip(2);
+			pet.name_tag = recv.read_bool();
+			pet.chat_balloon = recv.read_bool();
 
 			return pet;
 		}

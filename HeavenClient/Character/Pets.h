@@ -483,6 +483,15 @@ namespace ms
 			}
 		}
 
+		// The part where the label ring of the pet at `index` in the list
+		// is worn.
+		inline int16_t label_part(size_t index)
+		{
+			constexpr int16_t LABELS[3] = { 21, 31, 39 };
+
+			return index < 3 ? LABELS[index] : -1;
+		}
+
 		// A pet in the list, as far as putting equipment on it goes.
 		struct Wearer
 		{

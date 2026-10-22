@@ -334,6 +334,8 @@ namespace ms
 			// Another's pet goes where its owner's client says.
 			if (pet.is_local())
 			{
+				pet.set_name_tag(look.get_pet_parts().count(pets::label_part(i)) > 0);
+
 				switch (state)
 				{
 					case State::LADDER:

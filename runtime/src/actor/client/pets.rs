@@ -58,7 +58,7 @@ impl ClientActor {
                     let Some(pet) = avatar.pets.get(usize::from(index)) else {
                         continue;
                     };
-                    let packet = build_pet_name(avatar.id, index, &pet.name)?;
+                    let packet = build_pet_name(avatar.id, index, &pet.name, pet.name_tag)?;
                     own.push(packet.clone());
                     announce.push(packet);
                 }

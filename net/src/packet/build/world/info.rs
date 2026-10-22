@@ -32,7 +32,7 @@ pub fn build_character_info(player: &Player, alliance: &str) -> Result<Packet, N
         packet.write_short(0)?;
         let clothes = equip_slot::PET_CLOTHES
             .get(index)
-            .and_then(|&slot| player.inventory.get(InventoryType::Equipped, slot));
+            .and_then(|&slot| player.pet_equip(slot));
         packet.write_int(clothes.map_or(0, |item| item.item_id))?;
     }
     packet.write_byte(0)?; // end of pets
@@ -124,7 +124,7 @@ mod tests {
         player.pets = vec![77];
         player.inventory.insert(
             InventoryType::Equipped,
-            equip_slot::PET_CLOTHES[0],
+            equip_slot::PET_CLOTHES[0] - 100,
             Item::equipment(1802000, EquipStats::default()),
         );
         let packet = build_character_info(&player, "").unwrap();

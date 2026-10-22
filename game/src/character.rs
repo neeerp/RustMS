@@ -454,6 +454,14 @@ impl Player {
         Some(Ride { item_id, skill_id })
     }
 
+    /// What a pet wears at `slot` (one of `equip_slot`'s pet slots, such
+    /// as `PET_CLOTHES`), worn as cash 100 below it or as regular equipment.
+    pub fn pet_equip(&self, slot: i16) -> Option<&Item> {
+        self.inventory
+            .get(InventoryType::Equipped, slot - 100)
+            .or_else(|| self.inventory.get(InventoryType::Equipped, slot))
+    }
+
     /// The projection a field broadcasts for this player at a position.
     pub fn field_avatar(&self, x: i16, y: i16, stance: u8) -> FieldAvatar {
         FieldAvatar {
@@ -469,9 +477,9 @@ impl Player {
             buffs: self.buffs.shown(),
             guild: self.guild.clone(),
             mini_room: None,
-            pets: self
-                .summoned_pets()
-                .map(|item| FieldPet {
+            pets: (0..self.pets.len())
+                .filter_map(|index| Some((index, self.summoned_pet(index)?)))
+                .map(|(index, item)| FieldPet {
                     item_id: item.item_id,
                     name: item
                         .pet
@@ -482,6 +490,8 @@ impl Player {
                     y,
                     stance: 0,
                     foothold: 0,
+                    name_tag: self.pet_equip(equip_slot::PET_LABELS[index]).is_some(),
+                    chat_balloon: self.pet_equip(equip_slot::PET_QUOTES[index]).is_some(),
                 })
                 .collect(),
             chalkboard: self.chalkboard.clone(),
