@@ -44,6 +44,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME slide_menu COMMAND slide_menu_tests)
     add_executable(quiz_tests tests/quiz.cpp)
     add_test(NAME quiz COMMAND quiz_tests)
+    add_executable(floating_lines_tests tests/floating_lines.cpp)
+    add_test(NAME floating_lines COMMAND floating_lines_tests)
     add_executable(world_map_lookup_tests tests/world_map_lookup.cpp)
     add_test(NAME world_map_lookup COMMAND world_map_lookup_tests)
     add_executable(swindle_words_tests tests/swindle_words.cpp)
@@ -818,6 +820,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuiz.h
     IO/UITypes/UIRpsGame.cpp
     IO/UITypes/UIRpsGame.h
+    IO/UITypes/UIScriptMessage.cpp
+    IO/UITypes/UIScriptMessage.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
     IO/UITypes/UIAvatarMegaphone.cpp

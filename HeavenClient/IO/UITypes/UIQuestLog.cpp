@@ -184,9 +184,10 @@ namespace ms
 		}
 
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
-		// #c how many of an item the player holds, and #a a kill count
-		// (#a<index># for this quest's mobs, or #a<quest><index>#). Line
-		// breaks become the renderer's escapes.
+		// #c how many of an item the player holds, #a a kill count
+		// (#a<index># for this quest's mobs, or #a<quest><index>#), and #R
+		// a quest's record as it stands (#R27010# an explorer title's count of
+		// places). Line breaks become the renderer's escapes.
 		std::string quest_counts(const std::string& text, int16_t quest_id)
 		{
 			auto& player = Stage::get().get_player();
@@ -208,7 +209,7 @@ namespace ms
 				size_t close = c == '#' && i + 2 < text.size() ? text.find('#', i + 2) : std::string::npos;
 				char tag = i + 1 < text.size() ? text[i + 1] : 0;
 
-				if (close == std::string::npos || (tag != 'c' && tag != 'a')
+				if (close == std::string::npos || (tag != 'c' && tag != 'a' && tag != 'R')
 					|| !NpcTextMarkup::is_digits(text.substr(i + 2, close - i - 2)) || close - i - 2 > 9)
 				{
 					out += c;
@@ -220,6 +221,12 @@ namespace ms
 				if (tag == 'c')
 				{
 					out += std::to_string(player.get_inventory().get_total_item_count(id));
+				}
+				else if (tag == 'R')
+				{
+					const auto& started = player.get_quests().started_quests();
+					auto record = started.find(static_cast<int16_t>(id));
+					out += record == started.end() || record->second.empty() ? "0" : record->second;
 				}
 				else
 				{

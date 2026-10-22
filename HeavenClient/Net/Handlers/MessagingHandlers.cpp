@@ -34,6 +34,8 @@
 #include "StatusMessages.h"
 
 #include "../../IO/UITypes/UIAvatarMegaphone.h"
+#include "../../IO/UITypes/UIQuestComplete.h"
+#include "../../IO/UITypes/UIScriptMessage.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIMessenger.h"
@@ -399,6 +401,26 @@ namespace ms
 	{
 		if (auto banner = UI::get().get_element<UIAvatarMegaphone>())
 			banner->hide();
+	}
+
+	void QuestClearHandler::handle(InPacket& recv) const
+	{
+		int16_t quest_id = recv.read_short();
+
+		if (auto notices = UI::get().get_element<UIQuestComplete>())
+			notices->add_notice(quest_id);
+	}
+
+	void ScriptProgressMessageHandler::handle(InPacket& recv) const
+	{
+		std::string text = recv.read_string();
+
+		// v83 ignores an empty one.
+		if (text.empty())
+			return;
+
+		if (auto lines = UI::get().get_element<UIScriptMessage>())
+			lines->show(text);
 	}
 
 	void ServerMessageHandler::handle(InPacket& recv) const
