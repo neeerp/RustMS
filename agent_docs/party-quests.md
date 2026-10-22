@@ -1,10 +1,10 @@
 # Party quests and instanced events
 
 A party event is played in a copy of its maps of its own: an instance.
-Kerning City's party quest (KPQ) is the first. So far it has its entry,
-exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles of
-areas to stand on), with their clears and the gates on, and stage 5 (ten
-passes), which wins it. The rewards and the bonus stage come next (see
+Kerning City's party quest (KPQ) is the first, and is played through: its
+entry, exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles
+of areas to stand on), with their clears and the gates on, stage 5 (ten
+passes), which wins it, and Cloto's reward and the bonus stage (see
 `v83ref/reports/a005-instancing-kpq.md`, section 3, `a011-kpq-stage1.md`
 and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
 through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
@@ -209,8 +209,24 @@ The clear is a stage clear like the others, and then wins the event
 - Leaving the party, or the leader breaking it up, no longer sends anyone
   out (Cosmic `playerLeft` and `disbandParty` once cleared).
 
-So far the won party leaves by Nella; Cloto's reward and the warp to the
-bonus stage (103000805) are not done yet.
+## Kerning City's reward and bonus stage
+
+Once stage 5 is won, Cloto on 103000804 congratulates each member who
+comes to her (`Cloto::Won`, `kpq.cloto.s5.won`), and on the next page
+gives them one of `KPQ_REWARDS` (Cosmic `KerningPQ`'s 42: scrolls,
+earrings, hats, potions and ores, all equally likely) and sends them to
+the bonus stage, `KPQ_BONUS` (103000805, `st00`), so nobody gets it twice
+(Cosmic `9020001`, `giveEventReward`). A member without a free slot in
+each of the Equip, Use and Etc tabs, which the rewards come in, is told to
+make room (`kpq.cloto.s5.full`) and stays. There is no EXP in the reward;
+the stage EXP came with each clear.
+
+The bonus stage has no time limit, as in Cosmic, where `clearPQ` stops the
+event's timer (Cloto's text there speaks of one, of unsourced length).
+Nella there asks only whether the player
+is ready to go (`kpq.nella.bonus`) and sends them to 103000890 like on the
+other stages, which takes the coupons and passes they still hold. The won
+event ends when the last member has left its maps.
 
 ## Clearing a stage
 
@@ -429,8 +445,8 @@ EXP at the reward.
 | NPC | Where | Script |
 | --- | --- | --- |
 | Lakelis 9020000 | 103000000 | Runtime (`talk_about_event`), like Heracle |
-| Cloto 9020001 | 103000800-804 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles, stage 5's passes |
-| Nella 9020002 | 103000800-805 | Out to 103000890 |
+| Cloto 9020001 | 103000800-804 | Runtime (`talk_to_cloto`): stage 1's quiz, stages 2-4's puzzles, stage 5's passes, then the reward and on to 103000805 |
+| Nella 9020002 | 103000800-805 | Out to 103000890 (on 103000805 her own question) |
 | Nella 9020002 | 103000890 | Home to 103000000 |
 | Tory 1012112 | 100000200 | Runtime (`talk_about_event`): a menu of going up and how it is played |
 | Growlie 1012114 | 910010000 | How it is played, the leader's rice cakes, or out to 910010300 |
@@ -454,6 +470,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 
 These are not done yet:
 
-- Cloto's reward after the win, and the bonus stage (103000805).
 - Members in the Cash Shop still pass the entry check, which doesn't know
   where they are; they drop their ticket, which can end the event at once.
