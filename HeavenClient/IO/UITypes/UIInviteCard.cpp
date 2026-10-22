@@ -26,6 +26,12 @@ namespace ms
 		constexpr int16_t ICON_X = 6, ICON_BAND = 37;
 		// How far the "from" line sits below the heading.
 		constexpr int16_t LINE = 13;
+		// A party quest's: "Party Quest" at v83's (47, 9) and the name at
+		// (47, 26), moved up like the parcels', and the mark at (4, 4).
+		const Point<int16_t> PARTY_QUEST_TEXT(46, 4), PARTY_QUEST_MARK(4, 4);
+		constexpr int16_t PARTY_QUEST_LINE = 17;
+		// v83 cuts the name to 80 pixels, ".." included (FUN_00988cf3).
+		constexpr int16_t PARTY_QUEST_NAME_WIDTH = 80;
 		// The parcels' buttons, at v83's x 136 like the quest notice's.
 		const Point<int16_t> PARCEL_OK_AT(133, 5), PARCEL_CANCEL_AT(133, 19);
 		// How long from appearing until it fades out unanswered.
@@ -61,8 +67,8 @@ namespace ms
 		const Point<int16_t> PARCEL_TEXT(26, 2), PARCEL_LINE(26, 9);
 
 		// v83 draws on the notice's own window, which cuts off what runs
-		// past its edge; here whole letters go.
-		Text cut(const std::string& line, int16_t width)
+		// past its edge; here whole letters go, and `more` marks the cut.
+		Text cut(const std::string& line, int16_t width, const std::string& more = "")
 		{
 			Text text(Text::A12M, Text::LEFT, Color::Name::WHITE, line);
 			std::string kept = line;
@@ -70,10 +76,22 @@ namespace ms
 			while (!kept.empty() && text.width() > width)
 			{
 				kept.pop_back();
-				text.change_text(kept);
+				text.change_text(kept + more);
 			}
 
 			return text;
+		}
+
+		// A party quest's mark, from its path in Map.nx, such as
+		// "Map/MapHelper/mark/KerningParty".
+		Texture map_mark(const std::string& path)
+		{
+			const std::string prefix = "Map/MapHelper/mark/";
+
+			if (path.rfind(prefix, 0) != 0)
+				return Texture();
+
+			return nl::nx::map["MapHelper.img"]["mark"][path.substr(prefix.size())];
 		}
 	}
 
@@ -84,6 +102,7 @@ namespace ms
 		background = fade["backgrnd"];
 		arrival_background = fade["backgrnd2"];
 		parcel_background = fade["backgrnd4"];
+		party_quest_background = fade["backgrnd5"];
 
 		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 	}
@@ -96,14 +115,13 @@ namespace ms
 			float opacity = notice.life.opacity();
 			const Texture& icon = notice.icon;
 
-			const Texture& back = notice.kind == ARRIVAL ? arrival_background
-				: notice.kind == PARCEL ? parcel_background : background;
-			back.draw(DrawArgument(at, opacity));
+			backdrop(notice).draw(DrawArgument(at, opacity));
 			// v83 places an icon's top left; Duey's has an origin.
-			icon.draw(DrawArgument(at + Point<int16_t>(ICON_X, (ICON_BAND - icon.get_dimensions().y()) / 2)
-				+ icon.get_origin(), opacity));
+			Point<int16_t> icon_at = notice.icon_at.value_or(
+				Point<int16_t>(ICON_X, (ICON_BAND - icon.get_dimensions().y()) / 2));
+			icon.draw(DrawArgument(at + icon_at + icon.get_origin(), opacity));
 			notice.first.draw(DrawArgument(at + notice.text, opacity));
-			notice.second.draw(DrawArgument(at + notice.text + Point<int16_t>(0, LINE), opacity));
+			notice.second.draw(DrawArgument(at + notice.text + Point<int16_t>(0, notice.line), opacity));
 		}
 
 		// Only the top notice can be reached; the others' buttons lie under it.
@@ -199,11 +217,26 @@ namespace ms
 		});
 	}
 
+	void UIInviteCard::party_quest(const PartyQuest& quest, std::function<void(bool)> answer)
+	{
+		push({
+			PARTY_QUEST,
+			map_mark(quest.mark),
+			Text(Text::A12M, Text::LEFT, Color::Name::WHITE, "Party Quest"),
+			cut(quest.name, PARTY_QUEST_NAME_WIDTH, ".."),
+			PARTY_QUEST_TEXT,
+			std::move(answer),
+			FadeNotice(LIFETIME),
+			PARTY_QUEST_LINE,
+			PARTY_QUEST_MARK
+		});
+	}
+
 	void UIInviteCard::push(Notice notice)
 	{
 		Kind kind = notice.kind;
 
-		if (kind != BUDDY)
+		if (kind != BUDDY && kind != PARTY_QUEST)
 			notices.erase(std::remove_if(notices.begin(), notices.end(), [kind](const Notice& n) { return n.kind == kind; }),
 				notices.end());
 
@@ -234,7 +267,7 @@ namespace ms
 		{
 			buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + ARRIVAL_CANCEL_AT);
 		}
-		else if (notices.back().kind == PARCEL)
+		else if (notices.back().kind == PARCEL || notices.back().kind == PARTY_QUEST)
 		{
 			buttons[OK] = std::make_unique<MapleButton>(fade["BtOK"], at + PARCEL_OK_AT);
 			buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + PARCEL_CANCEL_AT);
@@ -251,6 +284,21 @@ namespace ms
 		return Point<int16_t>(0, -notice.life.raised());
 	}
 
+	const Texture& UIInviteCard::backdrop(const Notice& notice) const
+	{
+		switch (notice.kind)
+		{
+			case ARRIVAL:
+				return arrival_background;
+			case PARCEL:
+				return parcel_background;
+			case PARTY_QUEST:
+				return party_quest_background;
+			default:
+				return background;
+		}
+	}
+
 	void UIInviteCard::update_screen(int16_t, int16_t new_height)
 	{
 		position = Point<int16_t>(LEFT, new_height - ABOVE_BOTTOM);
@@ -263,7 +311,13 @@ namespace ms
 
 		bool invitations = std::any_of(notices.begin(), notices.end(), [](const Notice& n) { return n.kind < ARRIVAL; });
 		Point<int16_t> top = position + offset(notices.back());
-		Point<int16_t> bottom = position + offset(notices.front()) + Point<int16_t>(invitations ? WIDTH : ARRIVAL_WIDTH, HEIGHT);
+		// The parcels' and party quests' cards are taller than the others.
+		int16_t lowest = 0;
+
+		for (const Notice& notice : notices)
+			lowest = std::max<int16_t>(lowest, offset(notice).y() + std::max(HEIGHT, backdrop(notice).get_dimensions().y()));
+
+		Point<int16_t> bottom = position + Point<int16_t>(invitations ? WIDTH : ARRIVAL_WIDTH, lowest);
 
 		return Rectangle<int16_t>(top, bottom).contains(cursorpos);
 	}

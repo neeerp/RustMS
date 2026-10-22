@@ -779,14 +779,20 @@ namespace ms
 		});
 	}
 
-	void UIQuestLog::show_quest(int16_t id)
+	void UIQuestLog::show_quest(int16_t id, uint16_t tabid)
 	{
 		int16_t area = nl::nx::quest["QuestInfo.img"][std::to_string(id)]["area"].get_integer();
-		change_tab(TAB1);
-		folded[TAB1].erase(area);
+		change_tab(tabid);
+		bool was_folded = folded[tab].erase(area) != 0;
 		selected = id;
 		refresh_list();
 		auto found = std::find_if(rows.begin(), rows.end(), [&](const Row& row) { return row.quest == id; });
+		// Not listed: the area folds back as it was.
+		if (found == rows.end() && was_folded)
+		{
+			folded[tab].insert(area);
+			refresh_list();
+		}
 		if (found != rows.end())
 		{
 			int16_t row = static_cast<int16_t>(found - rows.begin());

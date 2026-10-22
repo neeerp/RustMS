@@ -114,6 +114,36 @@ int main()
 		return 1;
 	}
 
+	// The ten party quests, which are never offered.
+	const std::vector<ms::PartyQuest>& party = catalog.party_quests();
+
+	if (party.size() != 10 || party.front().id != 1200 || party.back().id != 1302)
+	{
+		std::cerr << "Expected the party quests 1200-1206 and 1300-1302, got " << party.size() << '\n';
+		return 1;
+	}
+
+	for (const ms::PartyQuest& quest : party)
+	{
+		if (catalog.find(quest.id) || quest.name.empty() || quest.min_level == 0 ||
+			quest.mark.rfind("Map/MapHelper/mark/", 0) != 0)
+		{
+			std::cerr << "Party quest " << quest.id << " did not parse as expected\n";
+			return 1;
+		}
+	}
+
+	const ms::PartyQuest& kerning = party[1];
+	const ms::PartyQuest& ellin = party[6];
+
+	if (kerning.id != 1201 || kerning.name != "First Time Together" || kerning.min_level != 21 || kerning.max_level != 30 ||
+		kerning.mark != "Map/MapHelper/mark/KerningParty" || !kerning.jobs.empty() || ellin.id != 1206 ||
+		ellin.min_level != 45 || ellin.max_level != 55 || ellin.jobs.size() != 42)
+	{
+		std::cerr << "Party quests 1201 and 1206 did not parse as expected\n";
+		return 1;
+	}
+
 	std::cout << "All " << catalog.quests().size() << " supported quests load\n";
 	return 0;
 }

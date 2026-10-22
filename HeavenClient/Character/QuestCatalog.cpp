@@ -136,11 +136,41 @@ namespace ms
 
 			return info;
 		}
+
+		// The party quests, 1200-1399 (FUN_00a1fb52 looks no further).
+		std::vector<PartyQuest> read_party_quests(nl::node root)
+		{
+			std::vector<PartyQuest> quests;
+
+			for (int16_t id = 1200; id < 1400; ++id)
+			{
+				std::string name = std::to_string(id);
+				nl::node info = root["QuestInfo.img"][name];
+				nl::node start = root["Check.img"][name]["0"];
+
+				if (!info)
+					continue;
+
+				PartyQuest quest;
+				quest.id = id;
+				quest.name = info["name"].get_string();
+				quest.min_level = static_cast<int16_t>(start["lvmin"].get_integer(0));
+				quest.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
+				quest.mark = root["PQuest.img"][name]["mark"].get_string();
+
+				for (auto job : start["job"])
+					quest.jobs.push_back(static_cast<int16_t>(job.get_integer()));
+
+				quests.push_back(std::move(quest));
+			}
+
+			return quests;
+		}
 	}
 
 	// The server already refused every quest it can't run, so the list needs
 	// no checks here.
-	QuestCatalog::QuestCatalog(nl::node quest_root, std::istream& ids) : root(quest_root)
+	QuestCatalog::QuestCatalog(nl::node quest_root, std::istream& ids) : root(quest_root), party(read_party_quests(quest_root))
 	{
 		for (std::string line; std::getline(ids, line);)
 			if (!line.empty() && line[0] != '#')
@@ -175,6 +205,11 @@ namespace ms
 	const std::vector<QuestInfo>& QuestCatalog::quests() const
 	{
 		return supported;
+	}
+
+	const std::vector<PartyQuest>& QuestCatalog::party_quests() const
+	{
+		return party;
 	}
 
 	QuestScript QuestCatalog::script(int16_t id, bool completion) const

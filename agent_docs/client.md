@@ -152,7 +152,12 @@ from `UI.nx`. Moved so far:
   replaces a card of its kind, except buddy requests, which pile up. The
   smaller pink cards (`backgrnd2`, FUN_00523a2c) say "<name> is logged
   in." or "You're on the same ch. with <name>." for six seconds, with only
-  an X. Each
+  an X. On a level-up, each party quest (1200-1399) whose `lvmin` is the
+  new level, for the player's job, gets a 51 px tall `backgrnd5` card:
+  its `PQuest.img` mark, "Party Quest", and its name cut to 80 px with
+  ".." (FUN_00a1fb52, FUN_0052065d type 0xb, reports a074 and a075). These
+  pile up too, and O opens the Quest Log's Available tab on the quest
+  (`UIQuestLog::show_quest`); neither sends a packet. Each
   card, quest completions included, sits 5 px above the one before it
   (`FadeNotice::raised`), and only the newest can be clicked. Not done: the
   cash trade card, holding cards back while the UI is locked, and the Game
