@@ -3,11 +3,11 @@
 
 use super::{Entry, WorldDirectory};
 use crate::actor::messenger::CHANNEL_CHANGE_GRACE;
-use crate::message::ServerMessage;
+use crate::message::{Presence, ServerMessage};
 use game::family::{check_levels, FamilyChart, Refusal, Relatives};
 use net::packet::build::world::family::{
-    build_family_chart, build_family_refusal, build_join_request, build_join_result,
-    build_relative_online,
+    build_family_chart, build_family_job_change, build_family_level_up, build_family_refusal,
+    build_join_request, build_join_result, build_relative_online,
 };
 use net::ClientId;
 use std::time::Instant;
@@ -98,6 +98,46 @@ impl WorldDirectory {
             }
         }
         self.send_packet(owner, build_family_chart(&chart));
+    }
+
+    /// `from` earned their seniors `gain` Rep: their actor applies it, with
+    /// the senior's level if they are online, for the halving.
+    pub(super) fn family_earn(&self, from: ClientId, gain: i32) {
+        let Some(senior) = self
+            .clients
+            .get(&from)
+            .and_then(|entry| entry.presence.family.senior)
+        else {
+            return;
+        };
+        let senior_level = self.clients.get(&senior).map(|entry| entry.presence.level);
+        self.tell(from, ServerMessage::EarnRep { gain, senior_level });
+    }
+
+    /// The senior reads a line for each level a junior gains, with a
+    /// warning once the junior has passed them; relatives read a line for
+    /// a new job (report b049 section 5).
+    pub(super) fn tell_family_progress(&self, client_id: ClientId, previous: &Presence) {
+        let Some(now) = self.clients.get(&client_id).map(|entry| &entry.presence) else {
+            return;
+        };
+        if now.family != previous.family {
+            return;
+        }
+        if let Some(senior) = now.family.senior.and_then(|id| self.clients.get(&id)) {
+            for level in previous.level.saturating_add(1)..=now.level {
+                let halved = senior.presence.level < level;
+                self.send_packet(
+                    senior.handle.client_id,
+                    build_family_level_up(halved, level, &now.name),
+                );
+            }
+        }
+        if previous.job != now.job {
+            for id in now.family.ids() {
+                self.send_packet(id, build_family_job_change(now.job, &now.name));
+            }
+        }
     }
 
     /// Tells the senior and juniors online that `client_id` logged in or out.

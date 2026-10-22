@@ -414,6 +414,17 @@ pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> 
     .await
 }
 
+/// Give the logged-out character `character_id` `exp` EXP into their level.
+pub async fn set_exp(character_id: i32, exp: i32) -> Result<(), HarnessError> {
+    change_one_row("set exp", move |conn| {
+        diesel::sql_query("UPDATE characters SET exp = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<Integer, _>(exp)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Give `character_id`, who is in a family, `reputation` Rep to spend.
 pub async fn set_family_reputation(character_id: i32, reputation: i32) -> Result<(), HarnessError> {
     change_one_row("set family reputation", move |conn| {

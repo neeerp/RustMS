@@ -10,7 +10,8 @@
 //! the asker a fee by the levels between them, and the seniors Rep by the
 //! junior's level.
 
-use integration_harness::database::{set_family_reputation, set_job, set_meso};
+use integration_harness::database::{set_exp, set_family_reputation, set_job, set_meso};
+use integration_harness::hunting::attack;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
@@ -21,6 +22,8 @@ use tokio::time::Duration;
 
 const LITH_HARBOR: i32 = 104_000_000;
 const HENESYS: i32 = 100_000_000;
+const FOREST: i32 = 50_000;
+const SNAIL: i32 = 100100;
 
 const NOT_FOUND: i32 = 0x41;
 const SAME_FAMILY: i32 = 0x42;
@@ -56,7 +59,18 @@ fn info(juniors: u16, leader: i32, name: &str) -> (i16, Vec<u8>) {
 }
 
 fn info_with(rep: i32, juniors: u16, leader: i32, name: &str, precepts: &str) -> (i16, Vec<u8>) {
-    let mut body = [rep, 0, 0].map(i32::to_le_bytes).concat();
+    info_full([rep, 0, 0], juniors, leader, name, precepts)
+}
+
+/// FAMILY_INFO_RESULT with `reps`: to spend, ever earned, and today's.
+fn info_full(
+    reps: [i32; 3],
+    juniors: u16,
+    leader: i32,
+    name: &str,
+    precepts: &str,
+) -> (i16, Vec<u8>) {
+    let mut body = reps.map(i32::to_le_bytes).concat();
     body.extend(juniors.to_le_bytes());
     body.extend(2u16.to_le_bytes());
     body.extend(0u16.to_le_bytes());
@@ -352,4 +366,65 @@ async fn the_leader_sets_the_precepts_and_parting_costs_rep_and_mesos() {
         family(&mut b, 1).await,
         [info_with(5000 - 440, 0, 0, "", "")]
     );
+}
+
+#[tokio::test]
+async fn a_juniors_kills_and_levels_earn_both_seniors_rep() {
+    let (a_config, b_config, c_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let a_id = new_character(&a_config, 40).await;
+    new_character(&b_config, 30).await;
+    let c_id = new_character(&c_config, 20).await;
+    // One EXP short of level 21.
+    set_exp(c_id, 13_476).await.expect("exp");
+    let (an, bn, cn) = (
+        a_config.character_name.clone(),
+        b_config.character_name.clone(),
+        c_config.character_name.clone(),
+    );
+    let (mut a, _) = enter(&a_config, LITH_HARBOR).await;
+    let (mut b, _) = enter(&b_config, LITH_HARBOR).await;
+    let (mut c, _) = enter(&c_config, LITH_HARBOR).await;
+    take_junior(&mut a, &an, &mut b, &bn).await;
+    take_junior(&mut b, &bn, &mut c, &cn).await;
+
+    // C kills a snail and goes up a level: 200 for the level and 4 for the
+    // kill, to B and to A. Only B, the direct senior, reads of the level.
+    let mut ct = Trace::default();
+    assert_eq!(warp(&mut c.connection, FOREST, "", &mut ct).await, FOREST);
+    until(&mut c.connection, &mut ct, |t| {
+        !t.field.alive(SNAIL).is_empty()
+    })
+    .await;
+    let snail = ct.field.alive(SNAIL)[0];
+    send(&mut c.connection, attack(snail, 8)).await;
+    until(&mut c.connection, &mut ct, |t| {
+        t.field.killed.contains(&snail)
+    })
+    .await;
+    let gain = |rep: i32| {
+        let mut body = rep.to_le_bytes().to_vec();
+        body.extend(str_bytes(&cn));
+        (SendOpcode::FamilyRepGain as i16, body)
+    };
+    let level_up = (SendOpcode::NotifyLevelUp as i16, 1, 21, cn.clone());
+    for (session, notices) in [(&mut b, vec![level_up]), (&mut a, vec![])] {
+        let mut t = Trace::default();
+        until(&mut session.connection, &mut t, |t| {
+            t.family.last() == Some(&info_full([204; 3], 1, a_id, &an, ""))
+        })
+        .await;
+        read_for(&mut session.connection, &mut t, 300).await;
+        let gains: Vec<_> = t
+            .family
+            .iter()
+            .filter(|(op, _)| *op == SendOpcode::FamilyRepGain as i16)
+            .cloned()
+            .collect();
+        assert_eq!(gains, [gain(200), gain(4)]);
+        assert_eq!(t.notices, notices);
+    }
 }

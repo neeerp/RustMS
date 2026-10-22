@@ -536,6 +536,7 @@ diesel::table! {
         senior_reputation -> Int4,
         #[max_length = 200]
         precepts -> Varchar,
+        rep_day -> Date,
     }
 }
 diesel::joinable!(family_members -> characters (character_id));

@@ -329,6 +329,7 @@ impl WorldDirectory {
                     },
                 );
             }
+            DirectoryMessage::FamilyEarn { from, gain } => self.family_earn(from, gain),
             DirectoryMessage::FamilyChanged { ids } => {
                 for id in ids {
                     self.tell(id, ServerMessage::FamilyChanged);
@@ -725,6 +726,7 @@ impl WorldDirectory {
 
         // Guild members needn't be in a party.
         self.tell_guild_progress(client_id, &previous);
+        self.tell_family_progress(client_id, &previous);
 
         let updated = self.parties.update(member).is_some();
         let Some(party) = self.parties.of(client_id) else {

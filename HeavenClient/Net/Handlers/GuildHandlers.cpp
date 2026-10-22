@@ -564,9 +564,12 @@ namespace ms
 		int32_t level = recv.read_int();
 		std::string name = recv.read_string();
 
-		// 0x1245; type 0 also tells a family junior of a lower level that
-		// their reps are halved (0x1246), which needs families.
+		// 0x1245; type 0 also tells a senior the junior has passed that
+		// the junior's Rep is halved (0x1246, 0xa1396f).
 		chat_line("<" + std::string(type == 2 ? "Guild" : "Family") + "> " + name + " has reached Lv. " + std::to_string(level) + ".");
+
+		if (type == 0 && level > Stage::get().get_player().get_stats().get_stat(MapleStat::Id::LEVEL))
+			chat_line("- The Reps you have received from " + name + " will be reduced in half.");
 	}
 
 	void NotifyJobChangeHandler::handle(InPacket& recv) const

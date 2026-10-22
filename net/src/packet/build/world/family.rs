@@ -129,6 +129,37 @@ pub fn build_relative_online(online: bool, name: &str) -> Result<Packet, Network
     Ok(packet)
 }
 
+/// FAMILY_REP_GAIN: "Your Rep has increased (`from`, +`gain`)" in the chat
+/// log, or for a negative `gain`, the Rep used (0x120b, 0x120c).
+pub fn build_rep_gain(gain: i32, from: &str) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::FamilyRepGain)?;
+    packet.write_int(gain)?;
+    packet.write_str_with_length(from)?;
+    Ok(packet)
+}
+
+/// NOTIFY_LEVELUP for a senior: "<Family> `name` has reached Lv. `level`."
+/// When `halved`, a senior below that level also reads that Rep from `name`
+/// is halved (0x1246; report 178-guilds).
+pub fn build_family_level_up(halved: bool, level: u8, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::NotifyLevelUp)?;
+    packet.write_byte(u8::from(!halved))?;
+    packet.write_int(i32::from(level))?;
+    packet.write_str_with_length(name)?;
+    Ok(packet)
+}
+
+/// NOTIFY_JOB_CHANGE for a relative: "<Family> `name` has advanced to a(an)
+/// `job`." The client's text has no '>' after the group, so it goes with
+/// the name.
+pub fn build_family_job_change(job: i16, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::NotifyJobChange)?;
+    packet.write_byte(1)?;
+    packet.write_int(i32::from(job))?;
+    packet.write_str_with_length(&format!("> {name}"))?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +185,14 @@ mod tests {
         expected.extend(b"Hi");
         expected.extend([0, 0, 0, 0]);
         assert_eq!(packet.bytes, expected);
+    }
+
+    #[test]
+    fn a_halved_level_up_is_type_0() {
+        let packet = build_family_level_up(true, 31, "Bo").unwrap();
+        assert_eq!(packet.bytes, [0x69, 0, 0, 31, 0, 0, 0, 2, 0, b'B', b'o']);
+        let packet = build_family_level_up(false, 31, "Bo").unwrap();
+        assert_eq!(packet.bytes[2], 1);
     }
 
     #[test]

@@ -1230,6 +1230,9 @@ impl ClientActor {
                 junior,
                 levels,
             } => self.separate(senior, junior, levels).await?,
+            ServerMessage::EarnRep { gain, senior_level } => {
+                self.earn_rep(gain, senior_level).await?
+            }
             ServerMessage::JoinAlliance { alliance_id } => self.join_alliance(alliance_id).await?,
             ServerMessage::PartySkill {
                 used,

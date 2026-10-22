@@ -85,6 +85,24 @@ pub fn separation_rep(junior: u8) -> i32 {
     (level / 20 + 10) * level
 }
 
+/// Rep a junior earns their senior and their senior's senior for each mob
+/// they share in killing, each boss, and each level they gain. v83's own
+/// rule isn't known; these are Cosmic's settings (report b049).
+pub const REP_PER_KILL: i32 = 4;
+pub const REP_PER_BOSS: i32 = 20;
+pub const REP_PER_LEVEL: i32 = 200;
+
+/// What `gain` Rep from a junior of level `junior` comes to for a senior of
+/// level `senior`: half, once the junior has passed them (the client's
+/// warnings 0x121b, 0x121c and 0x1246).
+pub fn rep_gain(gain: i32, senior: u8, junior: u8) -> i32 {
+    if senior < junior {
+        gain / 2
+    } else {
+        gain
+    }
+}
+
 /// A character's senior and juniors, by character id; both empty out of a
 /// family.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -171,5 +189,13 @@ mod tests {
         assert_eq!(separation_rep(50), 600);
         assert_eq!(separation_rep(19), 190);
         assert_eq!(separation_rep(20), 220);
+    }
+
+    #[test]
+    fn a_junior_who_has_passed_their_senior_earns_them_half() {
+        assert_eq!(rep_gain(REP_PER_KILL, 30, 20), 4);
+        assert_eq!(rep_gain(REP_PER_KILL, 30, 30), 4);
+        assert_eq!(rep_gain(REP_PER_KILL, 30, 31), 2);
+        assert_eq!(rep_gain(5, 30, 31), 2);
     }
 }

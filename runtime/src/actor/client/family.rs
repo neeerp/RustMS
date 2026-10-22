@@ -7,7 +7,7 @@ use db::family::Separation;
 use game::family::Refusal;
 use net::packet::build::world::family::{
     build_family_info, build_family_refusal, build_join_accepted, build_join_result,
-    build_privilege_list, build_separated, build_separation_fee,
+    build_privilege_list, build_rep_gain, build_separated, build_separation_fee,
 };
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::{ClientId, FamilyRequest};
@@ -132,6 +132,50 @@ impl ClientActor {
             .await?;
         }
         self.send(&mut build_separated()?).await?;
+        self.send_to_directory(DirectoryMessage::FamilyChanged { ids })
+            .await
+    }
+
+    /// The player earned their seniors `gain` Rep, by a kill or a level.
+    pub(super) async fn family_earn(&mut self, gain: i32) -> Result<(), RuntimeError> {
+        if self.in_game()?.player.family.senior.is_none() {
+            return Ok(());
+        }
+        self.send_to_directory(DirectoryMessage::FamilyEarn {
+            from: self.client_id,
+            gain,
+        })
+        .await
+    }
+
+    /// Credit the seniors with `gain`. Each online hears it and gets INFO.
+    pub(super) async fn earn_rep(
+        &mut self,
+        gain: i32,
+        senior_level: Option<u8>,
+    ) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let stats = &self.in_game()?.player.stats;
+        let (level, name) = (stats.level, stats.name.clone());
+        let earned = match spawn_db(move || db::family::earn(cid, gain, level, senior_level)).await
+        {
+            Ok(earned) => earned,
+            Err(error) => {
+                warn!(cid, %error, "Failed to earn Rep");
+                return Ok(());
+            }
+        };
+        for &(id, gain) in &earned {
+            self.send_to_directory(DirectoryMessage::Deliver {
+                to: vec![id],
+                packet: build_rep_gain(gain, &name)?,
+            })
+            .await?;
+        }
+        if earned.is_empty() {
+            return Ok(());
+        }
+        let ids = earned.into_iter().map(|(id, _)| id).collect();
         self.send_to_directory(DirectoryMessage::FamilyChanged { ids })
             .await
     }
