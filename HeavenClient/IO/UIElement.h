@@ -129,6 +129,7 @@ namespace ms
 			ENCHANTSKILL,
 			ITEMSEARCH,
 			ITEMSEARCHRESULT,
+			INCUBATOR,
 			NUM_TYPES
 		};
 

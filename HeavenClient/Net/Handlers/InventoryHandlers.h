@@ -74,6 +74,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// What a Pigmy Egg held, or nothing when the inventory was full (v83
+	// 0xa28298). It does not unlock the client.
+	// Opcode: INCUBATOR_RESULT(69)
+	class IncubatorResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// The Owl of Minerva's answers: the items searched for most, for its
 	// search window, or a search's rows (FUN_00a28c29).
 	// Opcode: OWL_RESULT(70)

@@ -541,8 +541,8 @@ namespace ms
 	};
 
 	// Uses the cash item in Cash `slot` on the item in `target_slot` of `tab`:
-	// an Item Guard (v83 CUIItemProtector's Yes, 0x82a2ee) or the Scissors
-	// of Karma (0x830fb5).
+	// an Item Guard (v83 CUIItemProtector's Yes, 0x82a2ee), the Scissors
+	// of Karma (0x830fb5) or the Incubator, on a Pigmy Egg (0x81ab54).
 	// Opcode: USE_CASH_ITEM(79)
 	class UseOnItemPacket : public OutPacket
 	{

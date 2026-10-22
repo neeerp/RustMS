@@ -23,6 +23,7 @@
 #include "UIDuey.h"
 #include "UIItemMegaphone.h"
 #include "UIItemProtector.h"
+#include "UIIncubator.h"
 #include "UIKarmaScissors.h"
 #include "UIMemoSend.h"
 #include "UIKite.h"
@@ -51,6 +52,7 @@
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/EquipCash.h"
+#include "../../Character/Inventory/Incubator.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
@@ -676,6 +678,28 @@ namespace ms
 		{
 			if (may_use_cash_item() && !in_dialog())
 				UI::get().emplace<UIKarmaScissors>(slot, item_id);
+		}
+
+		// v83 0x4f009e: a Pigmy Egg (417xxxx) goes into the Incubator's window, opened for the first incubator in the
+		// Cash tab. The wait for the last request is silent.
+		void incubate(int16_t egg_slot)
+		{
+			const Inventory &inventory = Stage::get().get_player().get_inventory();
+
+			if (!Stage::get().get_player().can_request(ExclRequest::WAIT) || in_dialog())
+				return;
+
+			for (int16_t slot = 1; slot <= inventory.get_slotmax(InventoryType::Id::CASH); slot++)
+			{
+				if (inventory.get_item_id(InventoryType::Id::CASH, slot) == incubator::INCUBATOR)
+				{
+					UI::get().emplace<UIIncubator>(slot, incubator::INCUBATOR, InventoryType::Id::ETC, egg_slot);
+
+					return;
+				}
+			}
+
+			UI::get().emplace<UIOk>(incubator::NO_INCUBATOR, [](bool) {});
 		}
 
 		// v83 FUN_00a0a2dc: either Owl opens its search window in the Free
@@ -1350,6 +1374,12 @@ namespace ms
 							if (may_use_cash_item())
 								open_owl(slot, item_id);
 						}
+						// The Incubator (type 0x1b) opens its window empty.
+						else if (item_id == incubator::INCUBATOR)
+						{
+							if (may_use_cash_item() && !in_dialog())
+								UI::get().emplace<UIIncubator>(slot, item_id, InventoryType::Id::NONE, 0);
+						}
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
 						else if (item_id / 10000 == 518)
@@ -1359,6 +1389,8 @@ namespace ms
 					case InventoryType::Id::ETC:
 						if (item_id / 10000 == 429)
 							Stage::get().use_item_effect(item_id);
+						else if (incubator::opens(item_id))
+							incubate(slot);
 
 						break;
 					default:

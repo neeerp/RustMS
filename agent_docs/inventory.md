@@ -747,6 +747,15 @@ full.") and the client is unlocked with nothing used. Anything else (the DS
 Egg 4170012, a slot with no egg, an incubator not held) only unlocks it.
 Nothing in our content gives eggs yet.
 
+In HeavenClient, `UIIncubator` draws `UIClassic.nx` `UIWindow.img/Incubator`.
+Double-clicking the incubator in the Cash tab opens it empty. Double-clicking
+any 417 item in the Etc tab opens it with that item in, for the first
+incubator in the Cash tab (or says one must be bought). An egg can also be
+dragged in from the Item window; anything outside 4170000-4170009 is refused
+there. OK asks the Yes/No from `Character/Inventory/Incubator.h`, then sends
+`UseOnItemPacket` and closes. `IncubatorResultHandler` (opcode 69) prints the
+gain line and opens a `UINpcTalk` with what was found.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being
