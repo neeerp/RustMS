@@ -1,7 +1,8 @@
 //! Battleship (report 228): a Corsair boards the ship whatever mount they
 //! wear, gaining its defense, and the map sees them on it. Hits wear the
 //! ship down, it stays damaged between rides, and once it sinks the
-//! Corsair is put off it and has to wait out its cooldown.
+//! Corsair is put off it and has to wait out its cooldown. On the ship
+//! only the skills used from it work.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_skill, set_hp, set_job, wear_equip};
@@ -24,6 +25,8 @@ const SHIP_HP: i32 = 5221999;
 const HOG: i32 = 1902000;
 const SADDLE: i32 = 1912000;
 const STUMPY: i32 = 3_220_000;
+/// Haste, which isn't used from the ship.
+const HASTE: i32 = 4_101_003;
 /// Riding's flag, in the first half of a buff mask.
 const RIDING: i64 = 1 << 53;
 /// Weapon and magic defense, in the second half.
@@ -97,6 +100,7 @@ async fn the_battleship_wears_down_and_sinks() {
     grant_skill(id, BATTLESHIP, 1)
         .await
         .expect("teach Battleship");
+    grant_skill(id, HASTE, 1).await.expect("teach Haste");
     wear_equip(id, -18, HOG).await.expect("wear the Hog");
     wear_equip(id, -19, SADDLE).await.expect("saddle it");
 
@@ -144,6 +148,11 @@ async fn the_battleship_wears_down_and_sinks() {
     let t = step(c, &m, use_skill(BATTLESHIP, 1)).await;
     assert_eq!(t.cooldowns, [(SHIP_HP, 300)]);
 
+    // Haste isn't used from the ship: refused, with nothing spent.
+    let t = step(c, &m, use_skill(HASTE, 1)).await;
+    assert!(t.buffs.is_empty());
+    assert!(t.stat_values(stat::MP).is_empty());
+
     // It sinks at 0: its cooldown starts and the player is put off it.
     for left in [200, 100] {
         let t = step(c, &m, touched(100, STUMPY)).await;
@@ -157,4 +166,9 @@ async fn the_battleship_wears_down_and_sinks() {
     let t = step(c, &m, use_skill(BATTLESHIP, 1)).await;
     assert!(t.buffs.is_empty());
     assert_eq!(t.cancelled_buffs, [0]);
+
+    // Off the ship, Haste works again.
+    let t = step(c, &m, use_skill(HASTE, 1)).await;
+    assert_eq!(t.buffs.len(), 1);
+    assert_eq!(t.buffs[0].0, HASTE);
 }

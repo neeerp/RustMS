@@ -494,6 +494,8 @@ pub enum AttackRejection {
     NotCharged,
     /// Morphed by an item, or by a skill that rules this attack out.
     Morphed,
+    /// Not from the Battleship, or only from it.
+    Ship,
 }
 
 /// Whether this is Assassinate's second strike.
@@ -560,6 +562,10 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         || crate::morph::refused(player, attack.skill)
     {
         return Err(AttackRejection::Morphed);
+    }
+    let on_ship = player.ride_skill() == Some(game::mount::BATTLESHIP);
+    if game::mount::ship_refuses(on_ship, attack.skill) {
+        return Err(AttackRejection::Ship);
     }
     // v83 won't use a finisher without an orb (0x969623).
     if combo::finisher(attack.skill) && combo::orbs(player).unwrap_or(0) < 1 {
@@ -1480,6 +1486,21 @@ mod tests {
         player
             .buffs
             .give(game::Buff::new(5111005, BuffStat::Morph, 1000, now, long));
+        assert!(validate(&swing, &player).is_ok());
+    }
+
+    #[test]
+    fn the_battleship_takes_no_basic_attack() {
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let swing = parse_close_attack(&attack_packet(1, 1)).unwrap();
+        let mut player = beginner_with_sword();
+        let ship = game::mount::BATTLESHIP;
+        player
+            .buffs
+            .give(game::Buff::new(ship, BuffStat::Riding, 0, now, long));
+        assert_eq!(validate(&swing, &player), Err(AttackRejection::Ship));
+        player.buffs.cancel(ship);
         assert!(validate(&swing, &player).is_ok());
     }
 
