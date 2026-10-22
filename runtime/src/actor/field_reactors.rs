@@ -163,14 +163,67 @@ impl ReactorSet {
         from: (i16, i16),
         now: Instant,
     ) -> Option<Hit> {
-        let reactor = self.live.get_mut(&object_id)?;
+        let reactor = self.live.get(&object_id)?;
         if (i32::from(reactor.x) - i32::from(from.0)).abs() > REACH_X
             || (i32::from(reactor.y) - i32::from(from.1)).abs() > REACH_Y
         {
             return None;
         }
+        let (event, next) = self.spots[reactor.spot].data.swing(reactor.state, flags)?;
+        self.advance(object_id, event, next, now)
+    }
+
+    /// The reactor an item lying at `(x, y)` would move on: `quantity` of
+    /// `item_id`, exactly, within the area of an event of its state.
+    pub fn taking(&self, item_id: i32, quantity: i16, (x, y): (i16, i16)) -> Option<i32> {
+        self.live
+            .values()
+            .find(|reactor| {
+                self.item_event(reactor, item_id, quantity, (x, y))
+                    .is_some()
+            })
+            .map(|reactor| reactor.object_id)
+    }
+
+    /// `object_id` takes the item lying at `(x, y)`, if it still would.
+    pub fn take_item(
+        &mut self,
+        object_id: i32,
+        item_id: i32,
+        quantity: i16,
+        at: (i16, i16),
+        now: Instant,
+    ) -> Option<Hit> {
+        let reactor = self.live.get(&object_id)?;
+        let (event, next) = self.item_event(reactor, item_id, quantity, at)?;
+        self.advance(object_id, event, next, now)
+    }
+
+    /// Whether `object_id`, in its state, waits for an item.
+    pub fn takes_items(&self, object_id: i32) -> bool {
+        self.live
+            .get(&object_id)
+            .is_some_and(|reactor| self.spots[reactor.spot].data.takes_items(reactor.state))
+    }
+
+    fn item_event(
+        &self,
+        reactor: &LiveReactor,
+        item_id: i32,
+        quantity: i16,
+        (x, y): (i16, i16),
+    ) -> Option<(u8, u8)> {
+        let from = (x.checked_sub(reactor.x)?, y.checked_sub(reactor.y)?);
+        self.spots[reactor.spot]
+            .data
+            .item_dropped(reactor.state, item_id, quantity, from)
+    }
+
+    /// Move `object_id` to `next` through `event`, breaking it if that is
+    /// its last state.
+    fn advance(&mut self, object_id: i32, event: u8, next: u8, now: Instant) -> Option<Hit> {
+        let reactor = self.live.get_mut(&object_id)?;
         let spot = &mut self.spots[reactor.spot];
-        let (event, next) = spot.data.swing(reactor.state, flags)?;
         reactor.state = next;
         if !spot.data.is_last(next) {
             return Some(Hit::Moved {
@@ -191,7 +244,7 @@ impl ReactorSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use game_data::reactors::{ReactorEvent, ReactorState};
+    use game_data::reactors::{ReactorEvent, ReactorState, ITEM_DROPPED};
 
     /// Facing right on a foothold.
     const SWING: i32 = 2;
@@ -201,6 +254,7 @@ mod tests {
             events: vec![ReactorEvent {
                 kind: 0,
                 next: Some(next),
+                ..ReactorEvent::default()
             }],
         };
         (
@@ -303,5 +357,70 @@ mod tests {
         assert_eq!(reactors.live().count(), 2);
         assert!(renewed.iter().all(|id| !ids.contains(id)));
         assert!(reactors.live().all(|reactor| reactor.state == 0));
+    }
+
+    /// A mound that takes one Cold Flame, then one Black Book, landing
+    /// within 40 px of it.
+    fn mound() -> (MapReactorTemplate, ReactorTemplate) {
+        let takes = |item_id, next| ReactorState {
+            events: vec![ReactorEvent {
+                kind: ITEM_DROPPED,
+                next: Some(next),
+                item: Some((item_id, 1)),
+                area: Some(((-40, -40), (40, 0))),
+            }],
+        };
+        (
+            MapReactorTemplate {
+                reactor_id: 2302003,
+                x: 105,
+                y: 164,
+                flip: false,
+                reactor_time: -1,
+                name: String::new(),
+            },
+            ReactorTemplate {
+                reactor_id: 2302003,
+                states: vec![
+                    takes(4001108, 1),
+                    takes(4001107, 2),
+                    ReactorState::default(),
+                ],
+                action: None,
+            },
+        )
+    }
+
+    #[test]
+    fn a_mound_takes_its_items_in_turn_where_they_land() {
+        let mut reactors = ReactorSet::new([mound(), scrap_box(610, 90)]);
+        let now = Instant::now();
+        let [id, scrap] = reactors.respawn(now)[..] else {
+            panic!("two reactors");
+        };
+        assert!(reactors.takes_items(id) && !reactors.takes_items(scrap));
+        // Not a swing, nor the wrong item, count or place.
+        assert!(reactors.hit(id, SWING, (105, 164), now).is_none());
+        assert_eq!(reactors.taking(4001107, 1, (105, 150)), None);
+        assert_eq!(reactors.taking(4001108, 2, (105, 150)), None);
+        assert_eq!(reactors.taking(4001108, 1, (160, 150)), None);
+        assert_eq!(reactors.taking(4001108, 1, (105, 170)), None);
+        assert_eq!(reactors.taking(4001108, 1, (105, 150)), Some(id));
+
+        match reactors.take_item(id, 4001108, 1, (105, 150), now) {
+            Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, 1),
+            other => panic!("{other:?}"),
+        }
+        // Moved on, it no longer takes the first.
+        assert!(reactors
+            .take_item(id, 4001108, 1, (105, 150), now)
+            .is_none());
+        assert_eq!(reactors.taking(4001107, 1, (70, 124)), Some(id));
+        match reactors.take_item(id, 4001107, 1, (70, 124), now) {
+            Some(Hit::Broke(view)) => assert_eq!(view.state, 2),
+            other => panic!("{other:?}"),
+        }
+        assert!(!reactors.takes_items(id));
+        assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
     }
 }

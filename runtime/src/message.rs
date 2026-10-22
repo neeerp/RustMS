@@ -301,6 +301,9 @@ pub enum FieldMessage {
     },
     Leave {
         client_id: ClientId,
+        /// The player is warping within this field: it isn't left empty,
+        /// so a solo room doesn't start afresh.
+        staying: bool,
     },
     /// The occupant's appearance or level changed.
     UpdateAvatar {

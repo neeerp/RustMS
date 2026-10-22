@@ -319,6 +319,15 @@ impl DropSet {
         self.drops.remove(&object_id)
     }
 
+    pub fn get(&self, object_id: i32) -> Option<&Drop> {
+        self.drops.get(&object_id)
+    }
+
+    /// Take a drop away for nobody, as a reactor does an item put on it.
+    pub fn remove(&mut self, object_id: i32) -> Option<Drop> {
+        self.drops.remove(&object_id)
+    }
+
     /// Put back a drop that couldn't be picked up (a full inventory).
     pub fn restore(&mut self, drop: Drop) {
         self.drops.insert(drop.object_id, drop);

@@ -35,7 +35,9 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   drops. A third job's clone room, a mini-dungeon's copy and a fourth job's
   solo room put all their mobs and reactors back when their last player
   leaves (`MobSet::renew`, `ReactorSet::renew`,
-  `npc_scripts::resets_when_empty`).
+  `npc_scripts::resets_when_empty`), but not when that player only warps
+  within it (`FieldMessage::Leave`'s `staying`). The tick also hands
+  reactors the items that have lain on them long enough.
 
 Some maps are copies of another (mini-dungeons, the Dojo): their node has
 only `info`, and `info/link` names the map they copy. `game-data` and the

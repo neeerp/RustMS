@@ -698,8 +698,10 @@ impl ClientActor {
         self.leave_personal_shop().await?;
         self.keep_mounts_off(map_id).await?;
         self.drop_beacon().await?;
+        let staying = self.in_game()?.field.key == self.field_key(map_id);
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
+            staying,
         })
         .await?;
         self.leaving_for(map_id).await?;
@@ -786,6 +788,7 @@ impl ClientActor {
         self.leave_personal_shop().await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
+            staying: false,
         })
         .await?;
         self.in_cash_shop = true;
@@ -1447,6 +1450,7 @@ impl ClientActor {
                 let _ = self
                     .send_to_field(FieldMessage::Leave {
                         client_id: self.client_id,
+                        staying: false,
                     })
                     .await;
             }

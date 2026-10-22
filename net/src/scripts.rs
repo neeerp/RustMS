@@ -188,12 +188,23 @@ const TIME_GATE: i32 = 2083006;
 const DOLL_CAVE_WAY_BACK: (i32, u8) = (105040201, 2);
 /// The fourth job's rooms one player at a time takes on alone, which start
 /// afresh once they're left (`npc_scripts::resets_when_empty`): the Fire
-/// Hawk's and Ice Eagle's nests by El Nath (`s4firehawk`, `s4iceeagle`) and
-/// Ludibrium's Tornado room (`s4tornado_enter`).
+/// Hawk's and Ice Eagle's nests by El Nath (`s4firehawk`, `s4iceeagle`),
+/// Ludibrium's Tornado room (`s4tornado_enter`), Aqua Road's resurrection
+/// mound (`s4resurrection`) and Leafre's nest of the eggs (`s4nest`).
 const FIREHAWK_NEST: i32 = 921100200;
 const ICE_EAGLE_NEST: i32 = 921100210;
 const TORNADO_ROOM: i32 = 922020200;
-pub const SOLO_MAPS: [i32; 3] = [FIREHAWK_NEST, ICE_EAGLE_NEST, TORNADO_ROOM];
+const RESURRECTION_ROOM: i32 = 923000100;
+const EGG_NEST: i32 = 924000100;
+pub const SOLO_MAPS: [i32; 5] = [
+    FIREHAWK_NEST,
+    ICE_EAGLE_NEST,
+    TORNADO_ROOM,
+    RESURRECTION_ROOM,
+    EGG_NEST,
+];
+/// The Cold Flame, which opens the way to the resurrection mound.
+const COLD_FLAME: i32 = 4001108;
 const TORNADO_PROOF: i32 = 4001110;
 /// The shortcut between the Field Up North of Ellinia and Leafre's Minar
 /// Forest (`minar_elli`), which spends a Magic Seed each way.
@@ -977,6 +988,14 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         }
         "s4firehawk" => solo_map(quest(6240) == QuestState::Started, FIREHAWK_NEST),
         "s4iceeagle" => solo_map(quest(6242) == QuestState::Started, ICE_EAGLE_NEST),
+        // Whoever holds a Cold Flame, on the quest or not, as in Cosmic.
+        "s4resurrection" => solo_map(player.inventory.count(COLD_FLAME) > 0, RESURRECTION_ROOM),
+        "s4nest" => solo_map(
+            [6241, 6243]
+                .iter()
+                .any(|&id| quest(id) == QuestState::Started),
+            EGG_NEST,
+        ),
         // Closed, it says nothing, as in Cosmic.
         "s4tornado_enter"
             if [6230, 6231]
@@ -1917,6 +1936,20 @@ mod tests {
             let player = player_with(&[(quest, QuestState::Started)]);
             opened("s4tornado_enter", &player, TORNADO_ROOM);
         }
+        for quest in [6241, 6243] {
+            opened(
+                "s4nest",
+                &player_with(&[(quest, QuestState::Started)]),
+                EGG_NEST,
+            );
+        }
+        assert!(pink(&portal("s4nest", &fresh).unwrap()));
+        opened(
+            "s4resurrection",
+            &holding(&[], COLD_FLAME),
+            RESURRECTION_ROOM,
+        );
+        assert!(pink(&portal("s4resurrection", &fresh).unwrap()));
         opened(
             "s4tornado_enter",
             &holding(&[], TORNADO_PROOF),
@@ -1936,6 +1969,8 @@ mod tests {
             (211042200, "in00", "s4firehawk", FIREHAWK_NEST),
             (211040700, "in00", "s4iceeagle", ICE_EAGLE_NEST),
             (220010001, "pt00", "s4tornado_enter", TORNADO_ROOM),
+            (230040300, "in01", "s4resurrection", RESURRECTION_ROOM),
+            (240010700, "pt00", "s4nest", EGG_NEST),
         ] {
             let way_in = data.field(from).unwrap().portal_by_name(name).unwrap();
             assert_eq!(way_in.script.as_deref(), Some(script));
