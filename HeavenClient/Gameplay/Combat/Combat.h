@@ -139,6 +139,10 @@ namespace ms
 		// Drop the grenades in flight, as on leaving the map.
 		void clear_grenades();
 
+		// Drop a Final Attack still to come, as on leaving the map: v83
+		// makes the user anew in each field.
+		void clear_final_attack();
+
 		// Show another user's summon attacking: its animation, then each
 		// mob's hit as it gets there (FUN_007a6882). `hits` are the mobs
 		// and their damage.

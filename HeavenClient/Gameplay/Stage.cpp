@@ -229,6 +229,7 @@ namespace ms
 		Point<int16_t> startpos = physics.get_y_below(spawnpoint);
 		combat.clear_prepare();
 		combat.clear_grenades();
+		combat.clear_final_attack();
 		player.respawn(startpos, mapinfo.is_underwater());
 		// v83 makes the user anew in each field, showing their orbs as they
 		// are (FUN_0092e499).

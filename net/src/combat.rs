@@ -54,6 +54,8 @@ const RAPID_FIRE: i32 = 5221004;
 /// Shadow Meso, which throws mesos, and the Shadow Partner that raises
 /// what it costs.
 const SHADOW_MESO: i32 = 4111004;
+/// The Sniper's Blizzard, a crossbow shot.
+const BLIZZARD: i32 = 3211003;
 const SHADOW_PARTNER: i32 = 4111002;
 
 /// Snipe, whose shot hits for 199,999 less a roll from 0 to 10,000
@@ -338,8 +340,15 @@ pub(crate) fn fairy_blessing(player: &Player) -> (i32, i32) {
 /// weapon's critical skill for a shot or a punch, or Assassinate's own
 /// `criticalDamage` for its second strike, then Sharp Eyes as the server
 /// gives it, then Stun Mastery's whole damage, as the monster may be
-/// stunned.
+/// stunned. Blizzard, Shadow Meso (its own critical is in its cap) and
+/// Assassinate's first strike never crit (FUN_0078df87's gate).
 fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
+    if attack.skill == BLIZZARD
+        || attack.skill == SHADOW_MESO
+        || (attack.skill == ASSASSINATE && !second_strike(attack))
+    {
+        return 0;
+    }
     let shot = attack.kind == AttackKind::Ranged;
     let cygnus = player.stats.job / 1000 == 1;
     let source = match weapon(player) / 10_000 {
@@ -1814,6 +1823,19 @@ mod tests {
         player.buffs.give(sharp_eyes);
         assert_eq!(shot(&player, 387), Ok(()));
         assert_eq!(shot(&player, 388), Err(AttackRejection::Damage));
+        // Blizzard, Shadow Meso and Assassinate's first strike never crit.
+        let bonus = |skill| {
+            let attack = parse_attack(
+                &kind_attack_packet(AttackKind::Ranged, skill, 1, &[1]),
+                AttackKind::Ranged,
+            )
+            .unwrap();
+            critical_bonus(&player, &attack)
+        };
+        assert_eq!(bonus(0), 240);
+        for skill in [BLIZZARD, SHADOW_MESO, ASSASSINATE] {
+            assert_eq!(bonus(skill), 0);
+        }
     }
 
     #[test]

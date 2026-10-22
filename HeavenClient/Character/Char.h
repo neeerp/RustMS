@@ -171,6 +171,9 @@ namespace ms
 
 		// Display an animation as an effect with the character
 		void show_attack_effect(Animation animation, int8_t z);
+		// Display a user effect, such as a party skill's `affected`, at its
+		// normal speed whatever the attack speed (0x93632a passes 1000).
+		void show_user_effect(Animation animation, int8_t z);
 
 		// Display a held skill's effect with the character, once or over and
 		// over until clear_held_effects.

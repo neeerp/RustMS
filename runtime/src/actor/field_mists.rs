@@ -120,7 +120,13 @@ mod tests {
             skill_id: skills::POISON_MIST,
             prop: 70,
             duration: Duration::from_secs(40),
-            statuses: vec![(MobStat::Poison, Amount::Poison { level: 30 })],
+            statuses: vec![(
+                MobStat::Poison,
+                Amount::Poison {
+                    level: 30,
+                    bonus: 0,
+                },
+            )],
         };
         let view = MistView {
             object_id: 0,
