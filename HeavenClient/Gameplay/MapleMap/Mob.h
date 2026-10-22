@@ -722,6 +722,8 @@ namespace ms
 		bool targetdead;
 		// The Puppet it chases instead, if any, and where it stands.
 		int32_t puppet = 0;
+		// Whether `puppet` is a friendly mob it chases rather than a Puppet.
+		bool puppetfriendly = false;
 		Point<int16_t> puppetpos;
 		// Ms until a firstAttack mob next reports the local player's distance.
 		int16_t reporttime;

@@ -1227,7 +1227,10 @@ namespace ms
 		}
 
 		if (!hastarget)
+		{
 			puppet = 0;
+			puppetfriendly = false;
+		}
 
 		// v83 (FUN_005cc410) picks a walking mob's action as it goes:
 		// its chase animation for as long as it has a target.
@@ -1713,11 +1716,20 @@ namespace ms
 
 		// v83 (FUN_005d511d) has a mob given with aggro chase the local
 		// player.
+		// A mob given with aggro, or let go of, stops chasing a friendly:
+		// it goes for whoever hit it instead.
+		if (mode != 1 && puppetfriendly)
+		{
+			puppet = 0;
+			puppetfriendly = false;
+		}
+
 		if (mode == 2)
 		{
 			chase();
 		} else if (mode == 0)
 		{
+			puppet = 0;
 			hastarget = false;
 			flinch.reset();
 			update_shoe(false);
@@ -1822,6 +1834,7 @@ namespace ms
 			return;
 
 		puppet = 0;
+		puppetfriendly = false;
 		hastarget = false;
 	}
 
@@ -1926,6 +1939,7 @@ namespace ms
 		// on the way.
 		chase();
 		puppet = friendlyoid;
+		puppetfriendly = true;
 		puppetpos = position;
 		targetpos = position;
 		targetdead = false;

@@ -37,6 +37,7 @@ int main()
 		require(!meet(0, 0, 10, 10, 10, 0, 20, 10), "side by side");
 		require(!meet(0, 0, 10, 10, 0, 10, 10, 20), "one on the other");
 		require(!meet(0, 0, 10, 10, 20, 20, 30, 30), "apart");
+		require(!meet(0, 0, 10, 10, 5, 5, 5, 5), "an empty body inside");
 
 		// The gauge's fill, rounded down, within 0 and 100.
 		require(percent(5000, 5000) == 100, "full");

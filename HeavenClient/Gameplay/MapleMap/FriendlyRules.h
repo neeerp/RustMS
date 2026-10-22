@@ -44,9 +44,13 @@ namespace ms
 		}
 
 		// Whether two bodies, each left, top, right and bottom, meet: they
-		// share more than an edge (IntersectRect, 0x667f0f).
+		// share more than an edge, and an empty body meets nothing
+		// (IntersectRect, 0x667f0f).
 		inline bool meet(int16_t l1, int16_t t1, int16_t r1, int16_t b1, int16_t l2, int16_t t2, int16_t r2, int16_t b2)
 		{
+			if (l1 >= r1 || t1 >= b1 || l2 >= r2 || t2 >= b2)
+				return false;
+
 			return l1 < r2 && l2 < r1 && t1 < b2 && t2 < b1;
 		}
 

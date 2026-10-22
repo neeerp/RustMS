@@ -55,6 +55,7 @@ namespace ms
 	void MapChars::clear()
 	{
 		chars.clear();
+		spawns = {};
 	}
 
 	size_t MapChars::size() const
