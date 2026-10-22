@@ -97,6 +97,11 @@ namespace ms
 		type->drop_on_megaphone();
 	}
 
+	void Icon::drop_on_duey() const
+	{
+		type->drop_on_duey();
+	}
+
 	void Icon::drop_on_potion(bool mp) const
 	{
 		type->drop_on_potion(mp);

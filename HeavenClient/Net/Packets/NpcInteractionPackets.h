@@ -193,6 +193,7 @@ namespace ms
 		enum Mode : int8_t
 		{
 			OPEN = 0,
+			SEND = 2,
 			CLAIM = 4,
 			REMOVE = 5,
 			CLOSE = 7
@@ -216,6 +217,36 @@ namespace ms
 		{
 			write_byte(mode);
 			write_int(id);
+		}
+
+		// Sends an item from an inventory slot, if any, and mesos (FUN_006f36a8)
+		DueyActionPacket(int8_t tab, int16_t slot, int16_t count, int32_t meso, const std::string& to)
+			: OutPacket(OutPacket::Opcode::DUEY_ACTION)
+		{
+			write_sent(tab, slot, count, meso, to);
+			write_byte(0);
+		}
+
+		// The same as a quick delivery, with a message and the coupon's Cash
+		// slot (FUN_006f1df5)
+		DueyActionPacket(int8_t tab, int16_t slot, int16_t count, int32_t meso, const std::string& to,
+			const std::string& message, int32_t coupon) : OutPacket(OutPacket::Opcode::DUEY_ACTION)
+		{
+			write_sent(tab, slot, count, meso, to);
+			write_byte(1);
+			write_string(message);
+			write_int(coupon);
+		}
+
+	private:
+		void write_sent(int8_t tab, int16_t slot, int16_t count, int32_t meso, const std::string& to)
+		{
+			write_byte(Mode::SEND);
+			write_byte(tab);
+			write_short(slot);
+			write_short(count);
+			write_int(meso);
+			write_string(to);
 		}
 	};
 }

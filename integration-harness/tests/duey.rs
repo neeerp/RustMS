@@ -338,17 +338,23 @@ async fn ten_parcels_fill_a_characters_inbox() {
         .character_id;
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_meso(sender_id, 100_000).await.expect("give mesos");
+    grant_stack(sender_id, CASH, 1, COUPON, 1)
+        .await
+        .expect("give a coupon");
 
     let mut sender = relogin(&sender_config).await;
     let s = &mut sender.connection;
     let mut seen = Trace::default();
     assert_eq!(warp(s, HENESYS, "", &mut seen).await, HENESYS);
     open(s, &mut seen).await;
-    for n in 0..10 {
+    for n in 0..9 {
         let marker = format!("duey-fill-{n}");
         let t = step(s, &marker, normal(0, 0, 0, 1, &receiver_name)).await;
         assert_eq!(t.parcels, [[SENT]], "parcel {n}");
     }
+    // Duey's own window has a quick tab as well.
+    let t = step(s, "duey-fill-quick", quick(1, &receiver_name, "last")).await;
+    assert_eq!(t.parcels, [[SENT]]);
     let t = step(s, "duey-full", normal(0, 0, 0, 1, &receiver_name)).await;
     assert_eq!(t.parcels, [[INBOX_FULL]]);
     assert!(t.stat(stat::MESO).is_none());

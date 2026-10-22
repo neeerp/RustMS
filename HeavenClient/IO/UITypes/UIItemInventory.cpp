@@ -20,6 +20,7 @@
 #include "UIApReset.h"
 #include "UISpReset.h"
 #include "UIChatBar.h"
+#include "UIDuey.h"
 #include "UIItemMegaphone.h"
 #include "UIItemProtector.h"
 #include "UIKarmaScissors.h"
@@ -1880,6 +1881,27 @@ namespace ms
 		// v83 takes any item here; the server decides (FUN_004f49b3).
 		if (auto megaphone = UI::get().get_element<UIItemMegaphone>())
 			megaphone->set_item(sourcetab, source);
+	}
+
+	void UIItemInventory::ItemIcon::drop_on_duey() const
+	{
+		// v83 refuses these whichever panel is open (FUN_004f483e).
+		if (traits.sealed)
+		{
+			UI::get().emplace<UIOk>(item_drop::SEALED, [](bool) {});
+
+			return;
+		}
+
+		if (!item_drop::sendable(traits))
+		{
+			UI::get().emplace<UIOk>("This item cannot be sent.", [](bool) {});
+
+			return;
+		}
+
+		if (auto duey = UI::get().get_element<UIDuey>())
+			duey->offer(sourcetab, source, item_id, count);
 	}
 
 	void UIItemInventory::ItemIcon::drop_on_potion(bool mp) const
