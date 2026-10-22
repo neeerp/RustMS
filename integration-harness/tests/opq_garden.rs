@@ -178,6 +178,9 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
             == 6
     })
     .await;
+    // All six at once: each lies there five seconds before its scar
+    // takes it, and the event runs on a one-minute clock here.
+    let mut scars = Vec::new();
     for (scar, slot) in SCARS {
         let at = *seen
             .field
@@ -185,8 +188,16 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
             .iter()
             .find(|r| r.reactor_id == scar)
             .unwrap();
-        set_in(holder, &mut seen, at, slot).await;
+        send(&mut holder.connection, walk_to(at.x, at.y - 10)).await;
+        send(&mut holder.connection, throw_down(slot, 1)).await;
+        scars.push(at.object_id);
     }
+    until(&mut holder.connection, &mut seen, |t| {
+        scars
+            .iter()
+            .all(|oid| t.field.reactor_hits.contains(&(*oid, 1)))
+    })
+    .await;
 
     // Now the leader's word takes everyone to the garden.
     let mut seen = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
