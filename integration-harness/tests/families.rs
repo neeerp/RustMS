@@ -125,10 +125,20 @@ async fn new_character(config: &HarnessConfig, level: i16) -> i32 {
 /// Log in and go to `map`; the family packets of entering the game.
 async fn enter(config: &HarnessConfig, map: i32) -> (WorldSession, Trace) {
     let mut session = relogin(config).await;
-    let mut t = Trace::default();
-    until(&mut session.connection, &mut t, |t| t.family.len() >= 2).await;
+    let mut t = Trace {
+        family: entered(&mut session, 2).await,
+        ..Trace::default()
+    };
     assert_eq!(warp(&mut session.connection, map, "", &mut t).await, map);
     (session, t)
+}
+
+/// The family packets of `session` entering the game, at least `count`:
+/// those the login read past, then any still to come.
+async fn entered(session: &mut WorldSession, count: usize) -> Vec<(i16, Vec<u8>)> {
+    let mut packets = std::mem::take(&mut session.family);
+    packets.extend(family(session, count.saturating_sub(packets.len())).await);
+    packets
 }
 
 /// The next `count` family packets `session` gets.
@@ -157,9 +167,10 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
 
     // Out of a family: no leader and no name, and nothing else on login.
     let mut a = relogin(&a_config).await;
-    let mut at = Trace::default();
-    until(&mut a.connection, &mut at, |t| t.family.len() >= 2).await;
-    read_for(&mut a.connection, &mut at, 300).await;
+    let mut at = Trace {
+        family: entered(&mut a, 2).await,
+        ..Trace::default()
+    };
     assert_eq!(at.family.len(), 2);
     assert_eq!(at.family[0], info(0, 0, ""));
     // The eleven entitlements, the first two to a relative named next.
@@ -255,8 +266,8 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
     assert_eq!(family(&mut a, 1).await, [online(0)]);
     let mut b = relogin(&b_config).await;
     assert_eq!(family(&mut a, 1).await, [online(1)]);
-    let entered = family(&mut b, 2).await;
-    assert_eq!(entered[0], info(0, a_id, &an));
+    let packets = entered(&mut b, 2).await;
+    assert_eq!(packets[0], info(0, a_id, &an));
 }
 
 /// `senior` asks `junior`, both on one map, who says yes.
@@ -639,7 +650,10 @@ async fn members_buy_rates_and_see_their_icon_until_they_end() {
     tokio::time::sleep(Duration::from_millis(500)).await;
     end_family_buff_in(b_id, 8).await.expect("buff");
     let mut b = relogin(&b_config).await;
-    let mut t = Trace::default();
+    let mut t = Trace {
+        family: std::mem::take(&mut b.family),
+        ..Trace::default()
+    };
     until(&mut b.connection, &mut t, |t| {
         t.family
             .iter()

@@ -17,7 +17,7 @@ use crate::packets::{
 use net::packet::op::SendOpcode;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +73,10 @@ pub struct WorldSession {
     pub quick_slots: Option<[i32; 8]>,
     /// The name Blessing of the Fairy's tooltip shows, if any.
     pub linked_name: Option<String>,
+    /// The family packets of entering the game the login read past (INFO,
+    /// the entitlements, and a working entitlement's icon), as (opcode,
+    /// body). Any that came after another packet are still to be read.
+    pub family: Vec<(i16, Vec<u8>)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -258,7 +262,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     };
 
-    drain_spawn_npcs(&mut world_conn).await;
+    let family = drain_spawn_npcs(&mut world_conn).await;
 
     Ok(WorldSession {
         connection: world_conn,
@@ -291,6 +295,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         spawn_point: world_entry.spawn_point,
         login_addr: config.login_addr.to_string(),
         world_addr: format!("{}:{}", redirect.redirect_ip, redirect.redirect_port),
+        family,
     })
 }
 
@@ -492,18 +497,44 @@ async fn login_until_char_select(
     Ok((login_conn, selected))
 }
 
-async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
-    while let Ok(Ok(envelope)) = timeout(
-        Duration::from_millis(100),
-        connection.read_packet("drain spawn npcs"),
-    )
-    .await
-    {
+/// Reads past map setup and returns the family packets of entering the
+/// game. Every entry ends with the Family window's INFO and entitlements,
+/// so this waits for those; anything else that comes first is left to read,
+/// in order.
+async fn drain_spawn_npcs(connection: &mut MapleTestConnection) -> Vec<(i16, Vec<u8>)> {
+    let mut family = Vec::new();
+    let mut held = Vec::new();
+    let mut listed = false;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let wait = if listed {
+            Duration::from_millis(100)
+        } else {
+            deadline.saturating_duration_since(Instant::now())
+        };
+        let Ok(Ok(envelope)) = timeout(wait, connection.read_packet("drain spawn npcs")).await
+        else {
+            break;
+        };
+        let opcode = envelope.opcode();
+        // The Family window's INFO and entitlements, and a working
+        // entitlement's icon.
+        if [
+            SendOpcode::FamilyInfo as i16,
+            SendOpcode::FamilyPrivilegeList as i16,
+            SendOpcode::FamilySetPrivilege as i16,
+        ]
+        .contains(&opcode)
+        {
+            listed |= opcode == SendOpcode::FamilyPrivilegeList as i16;
+            family.push((opcode, envelope.packet.bytes[2..].to_vec()));
+            continue;
+        }
         // Map setup: NPC spawns and control, and the map entry banner.
         // ...and the map's mobs, drops, and reactors, and the skill update
         // that gives Blessing of the Fairy its master level (SET_FIELD
         // already carries its level).
-        if ![
+        let setup = [
             SendOpcode::SpawnNpc as i16,
             SendOpcode::SpawnNpcRequestController as i16,
             SendOpcode::FieldEffect as i16,
@@ -513,12 +544,19 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
             SendOpcode::SpawnReactor as i16,
             SendOpcode::UpdateSkills as i16,
         ]
-        .contains(&envelope.opcode())
-        {
-            connection.push_back_packet(envelope);
+        .contains(&opcode);
+        if setup && held.is_empty() {
+            continue;
+        }
+        held.push(envelope);
+        if listed {
             break;
         }
     }
+    for envelope in held.into_iter().rev() {
+        connection.push_back_packet(envelope);
+    }
+    family
 }
 
 /// Log in again right after dropping a session. The server closes the old
