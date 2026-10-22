@@ -1070,6 +1070,26 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOB_DAMAGE_MOB(194)
+	class MobDamageMobPacket : public OutPacket
+	{
+	public:
+		// Tells the server a mob's attack hurt a Hypnotized mob, which it
+		// hit at `at` with attack `index` facing left or not (FUN_00670c63)
+		MobDamageMobPacket(int32_t attacker, int32_t charid, int32_t victim, uint8_t index, int32_t damage, bool left,
+						   Point<int16_t> at) : OutPacket(OutPacket::Opcode::MOB_DAMAGE_MOB)
+		{
+			write_int(attacker);
+			write_int(charid);
+			write_int(victim);
+			write_byte(static_cast<int8_t>(index));
+			write_int(damage);
+			write_byte(left);
+			write_short(at.x());
+			write_short(at.y());
+		}
+	};
+
 	// Opcode: PICKUP_ITEM(202)
 	class PickupItemPacket : public OutPacket
 	{

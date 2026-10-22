@@ -157,6 +157,23 @@ namespace ms
 		// The local player's hits from this mob's attacks since last asked.
 		std::vector<Landed> take_attacks();
 
+		// Where one of its attacks landed, which hurts a Hypnotized mob
+		// there (FUN_00678476).
+		struct Sweep
+		{
+			uint8_t index;
+			bool left;
+			mob_attack::Box box;
+		};
+
+		// Where its attacks landed since last asked; only the controller of
+		// a mob that isn't dazzled keeps them.
+		std::vector<Sweep> take_sweeps();
+
+		// Another mob's attack reached this one (FUN_00670c63): a dazzled
+		// mob takes it at most once in 2 s, shows it, and tells the server.
+		void hurt_by(const Mob &attacker, uint8_t index, bool left);
+
 		// Kill the mob with the appropriate type (FUN_0067961d): 0 makes it
 		// inactive, 1 plays its death, 3 its skill1, and 2 or 4 and up blow
 		// it up with attack1. The death waits for any hits still on their
@@ -517,6 +534,9 @@ namespace ms
 
 		std::vector<PendingEffect> pendingeffects;
 		std::vector<Landed> landed;
+		std::vector<Sweep> sweeps;
+		// When another mob's attack last reached it.
+		std::optional<int32_t> mobhitat;
 		int32_t targetid = 0;
 		mob_attack::Box targetbody{};
 		bool targetonground = false;

@@ -59,6 +59,39 @@ namespace ms
 		}
 
 		mobs.update(physics);
+
+		// A mob's attack reaches up to 15 other mobs where it lands, each
+		// of which takes it if Hypnotized (FUN_00678476, 0x667138).
+		for (auto &mmo : mobs)
+		{
+			Optional<Mob> attacker = mmo.second.get();
+
+			if (!attacker)
+				continue;
+
+			for (const Mob::Sweep &sweep : attacker->take_sweeps())
+			{
+				int32_t reached = 0;
+
+				for (auto &other : mobs)
+				{
+					Optional<Mob> victim = other.second.get();
+
+					if (!victim || other.first == mmo.first || !victim->is_alive())
+						continue;
+
+					Rectangle<int16_t> body = victim->get_body();
+
+					if (!mob_attack::intersects(sweep.box, { body.left(), body.top(), body.right(), body.bottom() }))
+						continue;
+
+					victim->hurt_by(*attacker, sweep.index, sweep.left);
+
+					if (++reached == 15)
+						break;
+				}
+			}
+		}
 	}
 
 	std::vector<Mob::Landed> MapMobs::take_attacks()

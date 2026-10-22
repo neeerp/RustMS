@@ -1003,8 +1003,10 @@ namespace ms
 
 		// A box hits the player where they are once due; a jump attack only
 		// one standing on a foothold. A direct shot hits regardless. A
-		// dazzled mob's attacks hit no player (0x6663d2, 0x95825c).
+		// dazzled mob's attacks hit no player (0x6663d2, 0x95825c). Nor do
+		// they hurt other mobs, which the controller works out.
 		bool strikes = !targetdead && !dazzled();
+		bool sweeping = control && !dazzled();
 
 		for (auto iter = pendinghits.begin(); iter != pendinghits.end();)
 		{
@@ -1020,6 +1022,9 @@ namespace ms
 
 			if (hit && strikes)
 				landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+
+			if (iter->box && sweeping)
+				sweeps.push_back({ iter->index, iter->left, *iter->box });
 
 			iter = pendinghits.erase(iter);
 		}
@@ -1044,6 +1049,10 @@ namespace ms
 
 				if (mob_attack::contains(targetbody, bx, by) && strikes)
 					landed.push_back({ make_attack(iter->index, iter->left), attacks[iter->index].hit });
+
+				// On its way it reaches the mobs at its point (0x6674fd).
+				if (sweeping)
+					sweeps.push_back({ iter->index, iter->left, { bx, by, bx + 1, by + 1 } });
 			}
 
 			++iter;
@@ -1830,6 +1839,46 @@ namespace ms
 	std::vector<Mob::Landed> Mob::take_attacks()
 	{
 		return std::exchange(landed, {});
+	}
+
+	std::vector<Mob::Sweep> Mob::take_sweeps()
+	{
+		return std::exchange(sweeps, {});
+	}
+
+	void Mob::hurt_by(const Mob &attacker, uint8_t index, bool left)
+	{
+		// Only one mob of the two may be dazzled; the attacker never is.
+		if (!active || !is_alive() || !dazzled() || attacker.dazzled() || index >= attacker.attacks.size())
+			return;
+
+		// v83 counts the 2 s per mob hit, whoever hits it (0x670c99).
+		if (mobhitat && clock - *mobhitat < 2000)
+			return;
+
+		mobhitat = clock;
+
+		// The attack's power (as in make_attack) and the victim's defense, statuses and all
+		// (CMobStat +0x24/+0x44 and +0x34/+0x54).
+		const AttackInfo &info = attacker.attacks[index];
+		int32_t attack = info.magic ? attacker.matk + attacker.status_value(MobStatParser::MAD)
+									: info.watk + attacker.status_value(MobStatParser::PAD);
+		int32_t guard = info.magic ? mdef + status_value(MobStatParser::MDR) : defense();
+		double attackroll = randomizer.next_real(1.0);
+		int32_t damage = mob_attack::mob_hit(attack, guard, info.magic, attackroll, randomizer.next_real(1.0));
+
+		// It shows the attack's hit and the number on the spot; the server
+		// tells the others (0x670d17-0x670e3b). Turning the mob on its
+		// attacker (FUN_0066b562) waits for a mob chase target.
+		Rectangle<int16_t> body = get_body();
+		show_hit(info.hit, body, !left);
+		show_damage(std::max(damage, 0));
+
+		Point<int16_t> at(static_cast<int16_t>((body.left() + body.right()) / 2),
+						  static_cast<int16_t>((body.top() + body.bottom()) / 2));
+
+		MobDamageMobPacket(attacker.get_oid(), Stage::get().get_player().get_oid(), get_oid(), index, damage, left, at)
+			.dispatch();
 	}
 
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const

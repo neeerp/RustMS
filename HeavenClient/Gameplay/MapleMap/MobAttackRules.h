@@ -192,6 +192,20 @@ namespace ms
 			return { ox + static_cast<int32_t>(dx * range / length), oy + static_cast<int32_t>(dy * range / length) };
 		}
 
+		// What a mob's attack does to a Hypnotized mob it reaches: its
+		// attack times [0.8, 0.85], plus 100, times its attack / 100, less
+		// the other's defense times [0.5, 0.6]; a magic one's attack times
+		// [0.75, 0.8] (FUN_00792ae1, FUN_00792c01). Rolls are in [0, 1);
+		// it may come out below 0, which v83 sends as it is.
+		inline int32_t mob_hit(int32_t attack, int32_t defense, bool magic, double attackroll, double defenseroll)
+		{
+			double low = magic ? 0.75 : 0.8;
+			double reach = low + 0.05 * attackroll;
+			double guard = defense < 1 ? 0.0 : defense * (0.5 + 0.1 * defenseroll);
+
+			return static_cast<int32_t>((attack * reach + 100.0) * attack * 0.01 - guard);
+		}
+
 		// How long a ball flies over its range, in ms.
 		inline int32_t ball_time(int32_t range, int32_t speed)
 		{
