@@ -544,6 +544,7 @@ impl ClientActor {
             WorldAction::Family(request) => self.family_request(request).await?,
             WorldAction::Ring(request) => self.ring_request(request).await?,
             WorldAction::WeddingTalk { step } => self.wedding_talk(step),
+            WorldAction::WeddingBless => self.bless_couple().await?,
             WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,

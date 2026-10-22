@@ -252,44 +252,49 @@ and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The wedding
 
-Slices 7a to 7c of report b071 marry a couple at the Chapel before their
-guests, with the priest's lines over the altar; the Cathedral, blessings
-and the party afterwards are later slices.
+Slices 7a to 7d of report b071 marry a couple at the Chapel or the
+Cathedral before their guests, with the priest's lines over the altar and
+the Cathedral guests' blessings; the party afterwards and the hunting
+grounds are later slices.
 
-Wayne (9201012) in Amoria starts a booked Chapel wedding
-(`NpcScript::wedding_starter`). He answers a player who isn't engaged,
-has no Chapel booking, is on another channel than the booking's, or comes
-before its `starts_at`. A partner without wedding clothes worn or in the
-Equip tab (`game::wedding::has_clothes`) is told to bring them. The couple
-has `NO_SHOW` (10 minutes) after `starts_at` to start; then the booking
-goes when next read. Saying yes (`Effect::StartWedding`) re-reads the
-booking and asks the directory (`DirectoryMessage::StartWedding`): the
-partner must stand beside the player, and one wedding at a time may use
-a venue on a channel (`weddings` by channel and venue; ids come from the
-same counter as party events', so copies never meet).
+Wayne (9201012) in Amoria starts a booked Chapel wedding, and High Priest
+John (9201002) in Amoria a booked Cathedral one
+(`NpcScript::wedding_starter`). The High Priest also marries couples at
+the Cathedral's altar, so he starts weddings only in Amoria. The starter
+answers a player who isn't engaged, has no booking at his venue, is on
+another channel than the booking's, or comes before its `starts_at`. A
+partner without wedding clothes worn or in the Equip tab
+(`game::wedding::has_clothes`) is told to bring them. The couple has
+`NO_SHOW` (10 minutes) after `starts_at` to start; then the booking goes
+when next read. Saying yes (`Effect::StartWedding`) re-reads the booking
+and asks the directory (`DirectoryMessage::StartWedding`): the partner
+must stand beside the player, and one wedding at a time may use a venue on
+a channel (`weddings` by channel and venue; ids come from the same counter
+as party events', so copies never meet).
 
 `runtime::actor::wedding` runs one wedding. Like a party event
-(`party-quests.md`) it opens its own copy of the venue's hall (680000100)
-and altar (680000110) and gives each partner a `WeddingTicket` (the
-client actor's `wedding`); `field_key`, `leaving_for` and the clock
-follow either ticket. The stages, scaled by `RUSTMS_EVENT_SCALE`:
+(`party-quests.md`) it opens its own copy of the venue's hall (Chapel
+680000100, Cathedral 680000200) and altar (680000110, 680000210) and gives
+each partner a `WeddingTicket` (the client actor's `wedding`);
+`field_key`, `leaving_for` and the clock follow either ticket. The stages,
+scaled by `RUSTMS_EVENT_SCALE`:
 
 1. Gathering (`GATHERING`, 10 minutes) in the hall, with its countdown.
-2. Ceremony (`CEREMONY`, 20 minutes) at the altar. The priest (9201011)
-   asks each partner for their vows once they wear wedding clothes, hold
-   their token (the box or the ring of the couple's set) and have room for
-   the wedding ring. The checks are made again on yes. The first vows
-   wait; the second marry the couple in one transaction
-   (`db::marriage::marry`: status 3, booking deleted). Each partner then
-   loses their tokens, gets the wedding ring of the set (`ring_id`) and
-   `MARRIAGE_RESULT` 12 with the record (`build_married`), and their look
-   updates if the ring is worn. A partner whose equipment filled up while
-   the other vowed gets the ring as a Duey parcel from the other instead.
-   The second vows end with the priest's pronouncement (below), not a
-   dialog of his.
-3. Married (`AFTER_VOWS`, 45 minutes). Jackie (9201009) asks whether to
-   end it; yes sends the couple to Ames's room (680000500), as does the
-   time running out.
+2. Ceremony (`CEREMONY`, 20 minutes) at the altar. The priest (Chapel
+   9201011, Cathedral 9201002) asks each partner for their vows once they
+   wear wedding clothes, hold their token (the box or the ring of the
+   couple's set) and have room for the wedding ring. The checks are made
+   again on yes. The first vows wait; the second marry the couple in one
+   transaction (`db::marriage::marry`: status 3, booking deleted). Each
+   partner then loses their tokens, gets the wedding ring of the set
+   (`ring_id`) and `MARRIAGE_RESULT` 12 with the record (`build_married`),
+   and their look updates if the ring is worn. A partner whose equipment
+   filled up while the other vowed gets the ring as a Duey parcel from the
+   other instead. The second vows end with the priest's pronouncement
+   (below), not a dialog of his.
+3. Married (`AFTER_VOWS`, 45 minutes). Jackie (9201009) at the Chapel or
+   Nancy (9201007) at the Cathedral asks whether to end it; yes sends the
+   couple to Ames's room (680000500), as does the time running out.
 
 A partner who leaves the wedding's maps, logs out or changes channel
 before the vows ends it: the booking is deleted, nothing is refunded
@@ -314,11 +319,11 @@ wedding clothes are reminded of them but let in (b071 Q1).
 
 Guests go on to the altar with the couple, and their clock follows the
 couple's after the vows. The priest treats them as anyone else. The
-assistant in the hall and Jackie at the altar offer them the way out
-(`Effect::LeaveWedding`, to 680000500); a guest who leaves, logs out or
-changes channel only leaves the wedding. When it ends, guests go out with
-the couple, without the couple's `MARRIAGE_RESULT` 31. Cosmic leaves the
-guests in the hall to walk to the altar themselves; RustMS moves them.
+assistant in the hall and Jackie or Nancy at the altar offer them the way
+out (`Effect::LeaveWedding`, to 680000500); a guest who leaves, logs out
+or changes channel only leaves the wedding. When it ends, guests go out
+with the couple, without the couple's `MARRIAGE_RESULT` 31. Cosmic leaves
+the guests in the hall to walk to the altar themselves; RustMS moves them.
 
 ### The priest's lines
 
@@ -335,20 +340,35 @@ The wedding actor sends `ServerMessage::WeddingPriest` with a
 on while the player stands on the venue's altar:
 
 - Step 0 (`PRIEST_WELCOME`) when the gathering ends and they reach the
-  altar. It also starts the Chapel's music.
-- `Venue::pronouncing` (Chapel 1) when the second vows marry them.
-- The hearts and then `Venue::farewell` (Chapel 2) when either partner
-  answers the pronouncement (`WeddingMessage::Talk` with that step), or
-  `HEARTS_AFTER` (10 seconds, not scaled) after it if neither does.
+  altar. It also starts the venue's music.
+- At the Cathedral, before the vows, `Venue::before_vows`: step 1 (his
+  call for blessings) after the welcome, then step 2
+  (`Venue::blessing`), which asks each guest "Do you want to bless this
+  couple?" and shows the couple nothing.
+- `Venue::pronouncing` (Chapel 1, Cathedral 3) when the second vows marry
+  them, whatever step came before.
+- The hearts and then `Venue::farewell` (Chapel 2, Cathedral 4) after the
+  pronouncement.
 
-Only the first answer to the pronouncement from either partner's ticket
-reaches the actor (`WeddingTicket::talk`); the rest, and a guest's, stop
-at the ticket, so a client repeating 0x8B can't fill the actor's queue.
-A player away from the altar when a line goes out (in the Cash Shop, for
-one) misses it, and nothing sends it again.
+The priest goes on from a line that leads on (the Cathedral's 0 and 1,
+and the pronouncement) when either partner answers it
+(`WeddingMessage::Talk` with the step he last said), or `LINE_WAIT`
+(10 seconds, not scaled) after it if neither does. Each partner's ticket
+passes on only the first answer to each step, never going back
+(`WeddingTicket::talk`); the rest, and a guest's, stop at the ticket, so
+a client repeating 0x8B can't fill the actor's queue. A player away from
+the altar when a line goes out (in the Cash Shop, for one) misses it, and
+nothing sends it again.
 
-The Cathedral's steps (0, 1, the guests' blessing 2, the pronouncement 3
-and the farewell 4) come with slice 7d.
+A Cathedral guest's Yes sends `WEDDING_BLESS` (0x8C, empty). From a guest
+on the altar during the ceremony, the guest's ticket asks the actor
+(`WeddingTicket::bless`, `WeddingMessage::Bless`), which counts it
+(`blessers`) once per guest while the priest's last line is the blessing
+and the couple aren't married yet; the guest then reads `wedding.blessed`
+in pink. A blessing at any other time or place, or from the couple, does
+nothing. The count is kept for the blessings' reward (slice 7e); it still
+holds guests who have left since, and the couple may vow before the
+blessing, which then never comes.
 
 ## The partner's map
 
@@ -542,9 +562,8 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding (report b071 slices 7d-7g): the Cathedral and
-  its blessings (0x8C), the party and the hunting grounds. Also the
-  wishlist.
+- The rest of the wedding (report b071 slices 7e-7g): the blessings'
+  reward, the party and the hunting grounds. Also the wishlist.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the
   guests' suits and dresses ("Groomsman's", "Bridesmaid's"). The couple's

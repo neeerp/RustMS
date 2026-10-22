@@ -557,6 +557,8 @@ pub enum WorldAction {
     WeddingTalk {
         step: u8,
     },
+    /// A guest at the Cathedral's altar blessed the couple (report b075).
+    WeddingBless,
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -959,6 +961,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
             (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
+            (Op::WeddingBless, InGame(&world::WeddingBlessHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -1080,7 +1083,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 117);
+        assert_eq!(world_routes().len(), 118);
     }
 
     #[test]

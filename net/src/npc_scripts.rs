@@ -72,6 +72,11 @@ pub const CHAPEL_PRIEST: i32 = 9201011;
 /// Jackie, at the Chapel's altar, who sees the wedding out
 /// (`NpcScript::wedding_staff`).
 pub const JACKIE: i32 = 9201009;
+/// High Priest John, who begins the Cathedral's weddings in Amoria and
+/// marries the couple at its altar (report b075).
+pub const HIGH_PRIEST: i32 = 9201002;
+/// Nancy, the Cathedral's assistant at its altar, Jackie's counterpart.
+pub const NANCY: i32 = 9201007;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -930,12 +935,16 @@ impl NpcScript {
 
     /// The priest at `venue`'s altar says how the vows went.
     pub fn wedding_priest_says(venue: Venue, vows: Vows) -> Self {
-        let key = match vows {
-            Vows::Waiting => keys::WEDDING_PRIEST_WAITING,
-            Vows::Married => keys::WEDDING_PRIEST_MARRIED,
-            Vows::Refused => keys::WEDDING_PRIEST_FAILED,
+        let text = match vows {
+            Vows::Waiting => text(keys::WEDDING_PRIEST_WAITING),
+            Vows::Married => venue_text(
+                venue,
+                keys::WEDDING_PRIEST_MARRIED,
+                keys::WEDDING_CATHEDRAL_PRIEST_MARRIED,
+            ),
+            Vows::Refused => text(keys::WEDDING_PRIEST_FAILED),
         };
-        Self::new(wedding_priest_of(venue), vec![Page::Say(text(key))])
+        Self::new(wedding_priest_of(venue), vec![Page::Say(text)])
     }
 
     /// `npc_id`, staff in a wedding's hall or at its altar, to someone in
@@ -3527,30 +3536,58 @@ fn wedding_assistant_of(venue: Venue) -> i32 {
     }
 }
 
-/// The venue whose weddings `npc_id` begins, if it is one who does.
+/// The venue whose weddings `npc_id` begins in Amoria, if it is one who
+/// does.
 pub fn wedding_starter_venue(npc_id: i32) -> Option<Venue> {
-    (npc_id == WAYNE).then_some(Venue::Chapel)
+    match npc_id {
+        WAYNE => Some(Venue::Chapel),
+        HIGH_PRIEST => Some(Venue::Cathedral),
+        _ => None,
+    }
 }
 
-fn wedding_starter_of(_venue: Venue) -> i32 {
-    WAYNE
+fn wedding_starter_of(venue: Venue) -> i32 {
+    match venue {
+        Venue::Chapel => WAYNE,
+        Venue::Cathedral => HIGH_PRIEST,
+    }
 }
 
 /// The venue whose altar `npc_id` marries couples at, if a priest.
 pub fn wedding_priest_venue(npc_id: i32) -> Option<Venue> {
-    (npc_id == CHAPEL_PRIEST).then_some(Venue::Chapel)
+    match npc_id {
+        CHAPEL_PRIEST => Some(Venue::Chapel),
+        HIGH_PRIEST => Some(Venue::Cathedral),
+        _ => None,
+    }
 }
 
-fn wedding_priest_of(_venue: Venue) -> i32 {
-    CHAPEL_PRIEST
+fn wedding_priest_of(venue: Venue) -> i32 {
+    match venue {
+        Venue::Chapel => CHAPEL_PRIEST,
+        Venue::Cathedral => HIGH_PRIEST,
+    }
 }
 
 /// The venue whose altar `npc_id` sees weddings out of, if one who does.
 pub fn wedding_staff_venue(npc_id: i32) -> Option<Venue> {
-    (npc_id == JACKIE).then_some(Venue::Chapel)
+    match npc_id {
+        JACKIE => Some(Venue::Chapel),
+        NANCY => Some(Venue::Cathedral),
+        _ => None,
+    }
 }
 
-/// The wedding starter of `venue` (Wayne for the Chapel) begins the
+/// `chapel`'s text, or `cathedral`'s at the Cathedral.
+fn venue_text(venue: Venue, chapel: &str, cathedral: &str) -> String {
+    text(match venue {
+        Venue::Chapel => chapel,
+        Venue::Cathedral => cathedral,
+    })
+}
+
+/// The wedding starter of `venue` (Wayne for the Chapel, the High Priest
+/// for the Cathedral) begins the
 /// couple's wedding booked there on this channel once its hour has come,
 /// with wedding clothes at hand; their partner must be beside them, which
 /// the directory checks (report b071).
@@ -3567,8 +3604,16 @@ fn wedding_starter(
         .is_some_and(|record| record.status == marriage::ENGAGED);
     let booked = reservation.filter(|reservation| engaged && reservation.venue == venue);
     let page = match booked {
-        None if engaged => Page::Say(text(keys::WEDDING_STARTER_NOT_BOOKED)),
-        None => Page::Say(text(keys::WEDDING_STARTER_INTRO)),
+        None if engaged => Page::Say(venue_text(
+            venue,
+            keys::WEDDING_STARTER_NOT_BOOKED,
+            keys::WEDDING_CATHEDRAL_STARTER_NOT_BOOKED,
+        )),
+        None => Page::Say(venue_text(
+            venue,
+            keys::WEDDING_STARTER_INTRO,
+            keys::WEDDING_CATHEDRAL_STARTER_INTRO,
+        )),
         Some(reservation) if reservation.channel != channel => Page::Say(wedding_text(
             keys::WEDDING_STARTER_CHANNEL,
             reservation,
@@ -3579,7 +3624,11 @@ fn wedding_starter(
         }
         Some(_) if !wedding::has_clothes(player) => Page::Say(text(keys::WEDDING_STARTER_CLOTHES)),
         Some(_) => Page::Ask {
-            text: text(keys::WEDDING_STARTER_ASK),
+            text: venue_text(
+                venue,
+                keys::WEDDING_STARTER_ASK,
+                keys::WEDDING_CATHEDRAL_STARTER_ASK,
+            ),
             on_yes: vec![Effect::StartWedding { venue }],
             on_no: None,
         },
@@ -3592,6 +3641,13 @@ fn wedding_starter(
 /// room for the ring (report b071). The marriage comes with the second.
 fn wedding_priest(venue: Venue, player: &Player, stage: Option<WeddingStage>) -> NpcScript {
     let say = |key| Page::Say(text(key));
+    let married = || {
+        Page::Say(venue_text(
+            venue,
+            keys::WEDDING_PRIEST_MARRIED,
+            keys::WEDDING_CATHEDRAL_PRIEST_MARRIED,
+        ))
+    };
     let record = player.marriage.as_ref();
     let token = record.is_some_and(|record| {
         let (empty_box, ring) = marriage::tokens(record.item_id);
@@ -3600,7 +3656,7 @@ fn wedding_priest(venue: Venue, player: &Player, stage: Option<WeddingStage>) ->
     let page = match stage {
         None => say(keys::WEDDING_PRIEST_INTRO),
         Some(WeddingStage::Gathering) => say(keys::WEDDING_STAFF_WAIT),
-        Some(WeddingStage::Married) => say(keys::WEDDING_PRIEST_MARRIED),
+        Some(WeddingStage::Married) => married(),
         Some(WeddingStage::Ceremony) if !wedding::dressed(player) => {
             say(keys::WEDDING_PRIEST_CLOTHES)
         }
