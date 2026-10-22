@@ -384,6 +384,10 @@ pub enum FieldMessage {
     Positions {
         reply: tokio::sync::oneshot::Sender<Vec<(i16, i16)>>,
     },
+    /// How many monsters are alive on the map.
+    MobCount {
+        reply: tokio::sync::oneshot::Sender<usize>,
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

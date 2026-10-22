@@ -5,6 +5,8 @@ use crate::actor::object_ids::{self, ObjectIds};
 use game_data::reactors::ReactorTemplate;
 use game_data::MapReactorTemplate;
 use net::packet::build::world::reactor::ReactorView;
+use rand::seq::SliceRandom;
+use rand::Rng;
 use std::collections::BTreeMap;
 use tokio::time::{Duration, Instant};
 
@@ -138,6 +140,17 @@ impl ReactorSet {
         self.respawn(now)
     }
 
+    /// Deal the live reactors' places out among them afresh, so that one
+    /// may stand where another stood.
+    pub fn shuffle(&mut self, rng: &mut impl Rng) {
+        let mut places: Vec<_> = self.live.values().map(|r| (r.x, r.y)).collect();
+        places.shuffle(rng);
+        for (reactor, (x, y)) in self.live.values_mut().zip(places) {
+            reactor.x = x;
+            reactor.y = y;
+        }
+    }
+
     /// Put every reactor named `name` in `state`, as a script does (the
     /// elevator's car leaving or docking); returns the views of those that
     /// changed. It goes through no event, so nothing breaks.
@@ -245,6 +258,7 @@ impl ReactorSet {
 mod tests {
     use super::*;
     use game_data::reactors::{ReactorEvent, ReactorState, ITEM_DROPPED};
+    use rand::SeedableRng;
 
     /// Facing right on a foothold.
     const SWING: i32 = 2;
@@ -357,6 +371,23 @@ mod tests {
         assert_eq!(reactors.live().count(), 2);
         assert!(renewed.iter().all(|id| !ids.contains(id)));
         assert!(reactors.live().all(|reactor| reactor.state == 0));
+    }
+
+    #[test]
+    fn shuffled_reactors_keep_the_same_places_between_them() {
+        let xs = [100, 200, 300, 400, 500];
+        let mut reactors = ReactorSet::new(xs.map(|x| scrap_box(x, 0)));
+        reactors.respawn(Instant::now());
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut moved = false;
+        for _ in 0..8 {
+            reactors.shuffle(&mut rng);
+            let mut places: Vec<_> = reactors.live().map(|r| r.x).collect();
+            moved |= places != xs;
+            places.sort();
+            assert_eq!(places, xs);
+        }
+        assert!(moved);
     }
 
     /// A mound that takes one Cold Flame, then one Black Book, landing

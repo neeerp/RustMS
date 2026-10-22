@@ -371,6 +371,9 @@ pub mod keys {
     /// The Treasure Room of Queen (`skyrom`) while someone is in it.
     pub const TREASURE_ROOM_OCCUPIED: &str = "portal.treasure_room.occupied";
     pub const SOLO_MAP_OCCUPIED: &str = "portal.solo_map.occupied";
+    /// The Berserk room's way up to the statues (`s4berserk_move`) while a
+    /// monster is left.
+    pub const MONSTERS_LEFT: &str = "portal.s4berserk_move.monsters_left";
     /// The Master of Disguise's forests (`enterDisguise1` to `5`): someone
     /// else is searching, or he has already been found.
     pub const DISGUISE_FOREST_OCCUPIED: &str = "portal.disguise.occupied";
@@ -1086,6 +1089,7 @@ mod tests {
             keys::SAND_BANDITS_ONLY,
             keys::TREASURE_ROOM_OCCUPIED,
             keys::SOLO_MAP_OCCUPIED,
+            keys::MONSTERS_LEFT,
             keys::DISGUISE_FOREST_OCCUPIED,
             keys::DISGUISE_ALREADY_FOUND,
             keys::MYSTERIOUS_FORCE,

@@ -153,6 +153,9 @@ impl FieldActor {
     ) -> Self {
         mobs.start(Instant::now());
         reactors.respawn(Instant::now());
+        if reactors::shuffled(key.map_id) {
+            reactors.shuffle(&mut rand::thread_rng());
+        }
         // The trips are read from the same moment the elevator's car is
         // placed, so that no change is missed or shown twice.
         let route_time = conti::now();
@@ -427,6 +430,9 @@ impl FieldActor {
                     .map(|occupant| (occupant.avatar.x, occupant.avatar.y))
                     .collect();
                 let _ = reply.send(positions);
+            }
+            FieldMessage::MobCount { reply } => {
+                let _ = reply.send(self.mobs.live().count());
             }
             FieldMessage::Move {
                 from,
@@ -2170,11 +2176,18 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id) => {
                 self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)))
             }
-            reactors::Action::Drops => {
-                // Whoever put the last item on it may have gone; the loot
-                // then falls to someone still here.
-                let occupant = self.occupants.get(&by);
-                if let Some(occupant) = occupant.or_else(|| self.occupants.values().next()) {
+            // Whoever broke it drops its loot or goes where it sends them.
+            // Whoever put the last item on it may have gone; the loot then
+            // falls to someone still here.
+            action => {
+                let occupant = match action {
+                    reactors::Action::Drops => self
+                        .occupants
+                        .get(&by)
+                        .or_else(|| self.occupants.values().next()),
+                    _ => self.occupants.get(&by),
+                };
+                if let Some(occupant) = occupant {
                     occupant.handle.send(ServerMessage::ReactorBroken {
                         reactor_id: view.reactor_id,
                         object_id: view.object_id,
@@ -2359,6 +2372,9 @@ impl FieldActor {
             let now = Instant::now();
             self.mobs.renew(now);
             self.reactors.renew(now);
+            if reactors::shuffled(self.key.map_id) {
+                self.reactors.shuffle(&mut rand::thread_rng());
+            }
         }
     }
 

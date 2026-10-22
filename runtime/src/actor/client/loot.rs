@@ -8,6 +8,7 @@ use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::{drop, inventory, monster_book as book};
 use net::packet::handle::world::trade_catch;
+use net::reactors::Action;
 use net::FieldRequest;
 use tracing::debug;
 
@@ -55,7 +56,8 @@ impl ClientActor {
         .await
     }
 
-    /// A reactor this player broke drops its loot for them.
+    /// A reactor this player broke drops its loot for them, or sends them
+    /// where it leads (`net::reactors::action`).
     pub(super) async fn drop_reactor_loot(
         &mut self,
         reactor_id: i32,
@@ -63,6 +65,25 @@ impl ClientActor {
         x: i16,
         y: i16,
     ) -> Result<(), RuntimeError> {
+        let warp = match net::reactors::action(reactor_id) {
+            Action::Warp(warp) => Some(warp),
+            Action::DropsOrWarp { percent, warp } => {
+                (rand::random::<u32>() % 100 >= percent).then_some(warp)
+            }
+            _ => None,
+        };
+        if let Some(warp) = warp {
+            let (map_id, portal) = warp.to();
+            let channel_id = self.channel_id;
+            let player = &mut self.in_game_mut()?.player;
+            let actions = net::packet::handle::world::warp_to_spawn_point(
+                player, map_id, portal, channel_id,
+            )?;
+            for action in actions {
+                Box::pin(self.apply(action)).await?;
+            }
+            return Ok(());
+        }
         let loot = loot::roll_reactor(reactor_id, &self.in_game()?.player, &mut rand::thread_rng());
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
             .await
