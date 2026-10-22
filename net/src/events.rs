@@ -50,10 +50,11 @@ pub struct Event {
     pub stage_maps: &'static [i32],
     /// The stages the leader clears just by talking to their NPC.
     pub talk_clears: &'static [u8],
-    /// The stages cleared when a reactor on their map drops the stage's
-    /// loot, whoever broke it (the Tower of Goddess's Salion stage,
-    /// `net::reactors::Action::Salion`).
-    pub reactor_clears: &'static [u8],
+    /// The stages any member may clear: when a reactor on their map drops
+    /// the stage's loot, whoever broke it (the Tower of Goddess's Salion
+    /// stage, `net::reactors::Action::Salion`), or when their NPC finds the
+    /// stage done, whoever asked (Eak in the music and head-count rooms).
+    pub member_clears: &'static [u8],
     /// Where those on a stage's map go when it is cleared: the stage and
     /// the portal on its map.
     pub clear_portals: &'static [(u8, &'static str)],
@@ -152,7 +153,7 @@ pub const KPQ: Event = Event {
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
-    reactor_clears: &[],
+    member_clears: &[],
     clear_portals: &[],
     gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
@@ -236,7 +237,7 @@ pub const HPQ: Event = Event {
     stride: 1,
     stage_maps: &[],
     talk_clears: &[],
-    reactor_clears: &[],
+    member_clears: &[],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -278,7 +279,7 @@ pub const LPQ: Event = Event {
     stride: 100,
     stage_maps: &[],
     talk_clears: &[],
-    reactor_clears: &[],
+    member_clears: &[],
     clear_portals: &[],
     gated: &[
         922_010_100,
@@ -469,7 +470,7 @@ pub const OPQ: Event = Event {
         OPQ_HUB,
     ],
     talk_clears: &[1],
-    reactor_clears: &[3],
+    member_clears: &[3, OPQ_MUSIC_STAGE, OPQ_HEAD_COUNT_STAGE],
     clear_portals: &[(1, "st00")],
     gated: &[],
     puzzles: 1..=0,
@@ -490,6 +491,14 @@ pub const OPQ: Event = Event {
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
 /// rooms open off.
 pub const OPQ_HUB: i32 = 920_010_100;
+/// The Tower of Goddess's music room, where the day's record must play,
+/// and its stage.
+pub const OPQ_MUSIC_ROOM: i32 = 920_010_400;
+pub const OPQ_MUSIC_STAGE: u8 = 4;
+/// The Tower of Goddess's sealed room, where Eak counts heads on its three
+/// platforms (`HeadCount`), and its stage.
+pub const OPQ_HEAD_COUNT_ROOM: i32 = 920_010_500;
+pub const OPQ_HEAD_COUNT_STAGE: u8 = 5;
 
 /// The Orbis party quest's own items, 4001044 to 4001063.
 const OPQ_ITEMS: [i32; 20] = {
@@ -953,6 +962,63 @@ pub fn combos(areas: usize, taken: u32) -> impl Iterator<Item = u32> {
     (0..all).filter(move |combo| combo.count_ones() == taken)
 }
 
+/// How many of the three members on the sealed room's platforms Eak wants
+/// on each (Cosmic `2013001`, `stage4_0`-`2`): the first two drawn as
+/// `round(random * left)` of the three, the last platform the rest. For
+/// testing, `RUSTMS_OPQ_SPLIT` pins it as three digits that add up to 3
+/// (`"210"`).
+pub fn draw_split(rng: &mut impl rand::Rng) -> [u8; 3] {
+    static PINNED: OnceLock<Option<[u8; 3]>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        let pin = std::env::var("RUSTMS_OPQ_SPLIT").ok()?;
+        let digits: Vec<u8> = pin.bytes().map(|b| b.wrapping_sub(b'0')).collect();
+        let split: [u8; 3] = digits.try_into().ok()?;
+        (split.iter().sum::<u8>() == 3).then_some(split)
+    });
+    pinned.unwrap_or_else(|| {
+        let mut left = 3;
+        let mut split = [0; 3];
+        for heads in &mut split[..2] {
+            *heads = (rng.gen::<f64>() * f64::from(left)).round() as u8;
+            left -= *heads;
+        }
+        split[2] = left;
+        split
+    })
+}
+
+/// How the team stands on the sealed room's platforms for Eak.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HeadCount {
+    /// Not three of them on the platforms in all.
+    Few,
+    /// Three, but not as he wants: `right` platforms have their number.
+    Wrong {
+        right: usize,
+    },
+    Right,
+}
+
+/// How `positions` stand on the first three of `areas` for `split`. A
+/// position counts for the first area that holds it.
+pub fn head_count(split: [u8; 3], areas: &[Area], positions: &[(i32, i32)]) -> HeadCount {
+    let platforms = &areas[..areas.len().min(3)];
+    let mut heads = [0u8; 3];
+    for &(x, y) in positions {
+        if let Some(area) = platforms.iter().position(|area| area.contains(x, y)) {
+            heads[area] = heads[area].saturating_add(1);
+        }
+    }
+    let right = heads.iter().zip(split).filter(|(h, s)| **h == *s).count();
+    if heads.iter().map(|&h| usize::from(h)).sum::<usize>() != 3 {
+        HeadCount::Few
+    } else if right == 3 {
+        HeadCount::Right
+    } else {
+        HeadCount::Wrong { right }
+    }
+}
+
 /// How many of `positions` stand on any of `areas`.
 pub fn standing_on_areas(areas: &[Area], positions: &[(i32, i32)]) -> usize {
     let on_any = |&&(x, y): &&(i32, i32)| areas.iter().any(|area| area.contains(x, y));
@@ -1002,6 +1068,39 @@ mod tests {
 
     fn at(id: ClientId, level: u8, map_id: i32) -> Candidate {
         Candidate { id, level, map_id }
+    }
+
+    #[test]
+    fn eak_counts_three_heads_on_the_sealed_rooms_platforms() {
+        let area = |x1, x2| Area {
+            x1,
+            x2,
+            y1: 0,
+            y2: 10,
+        };
+        let platforms = [area(0, 10), area(20, 30), area(40, 50)];
+        let on = |platform: i32| (platform * 20 + 5, 5);
+        let count = |positions: &[(i32, i32)]| head_count([2, 1, 0], &platforms, positions);
+        assert_eq!(count(&[on(0), on(0), on(1)]), HeadCount::Right);
+        // One off every platform doesn't count.
+        assert_eq!(count(&[on(0), on(0), on(1), (100, 5)]), HeadCount::Right);
+        assert_eq!(count(&[on(0), on(1)]), HeadCount::Few);
+        assert_eq!(count(&[on(0), on(0), on(1), on(2)]), HeadCount::Few);
+        assert_eq!(count(&[on(0), on(1), on(2)]), HeadCount::Wrong { right: 1 });
+        assert_eq!(count(&[on(1), on(1), on(2)]), HeadCount::Wrong { right: 0 });
+    }
+
+    #[test]
+    fn every_split_puts_three_on_the_platforms() {
+        let mut rng = rand::thread_rng();
+        let mut seen = HashSet::new();
+        for _ in 0..2000 {
+            let split = draw_split(&mut rng);
+            assert_eq!(split.iter().sum::<u8>(), 3);
+            seen.insert(split);
+        }
+        // Every way of putting three on three platforms comes up.
+        assert_eq!(seen.len(), 10);
     }
 
     #[test]

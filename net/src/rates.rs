@@ -112,6 +112,11 @@ fn day_and_hour(now: SystemTime) -> (u8, u8) {
     weekday_hour(now, offset)
 }
 
+/// The weekday at `now` (Monday is 0) on the rate cards' clock.
+pub fn weekday(now: SystemTime) -> u8 {
+    day_and_hour(now).0
+}
+
 fn weekday_hour(now: SystemTime, offset: i64) -> (u8, u8) {
     let seconds = now
         .duration_since(SystemTime::UNIX_EPOCH)

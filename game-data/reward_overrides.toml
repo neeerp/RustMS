@@ -127,3 +127,38 @@ add = [{ item = 4001045, prob = 1.0 }]
 
 [reactors.2001015]
 add = [{ item = 4001045, prob = 1.0 }]
+
+[reactors.2002004]
+# The Tower of Goddess's music room (Map.nx 920010400): each `lp` reactor,
+# 2002004-10 in order, drops one day's record, Sunday's 4001056 to
+# Saturday's 4001062, every time (Cosmic `2002004`-`10`: `dropItems`;
+# its reactor drops list them so). `replace` so that a pack listing them
+# too doesn't drop two.
+replace = [{ item = 4001056, prob = 1.0 }]
+
+[reactors.2002005]
+replace = [{ item = 4001057, prob = 1.0 }]
+
+[reactors.2002006]
+replace = [{ item = 4001058, prob = 1.0 }]
+
+[reactors.2002007]
+replace = [{ item = 4001059, prob = 1.0 }]
+
+[reactors.2002008]
+replace = [{ item = 4001060, prob = 1.0 }]
+
+[reactors.2002009]
+replace = [{ item = 4001061, prob = 1.0 }]
+
+[reactors.2002010]
+replace = [{ item = 4001062, prob = 1.0 }]
+
+[reactors.2002011]
+# The stone boxes Eak brings out in the music room (`stone3`) and the
+# sealed room (`stone4`, 920010500) drop that room's piece of Minerva's
+# statue (Cosmic `2002011`, `2002012`).
+replace = [{ item = 4001046, prob = 1.0 }]
+
+[reactors.2002012]
+replace = [{ item = 4001047, prob = 1.0 }]

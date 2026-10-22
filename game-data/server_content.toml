@@ -751,6 +751,14 @@ unsourced = [
     "opq.eak.piece",
     "opq.eak.room_cleared",
     "opq.eak.full",
+    "opq.eak.music.ask",
+    "opq.eak.music.played",
+    "opq.eak.music.done",
+    "opq.eak.heads.few",
+    "opq.eak.heads.one_right",
+    "opq.eak.heads.all_wrong",
+    "opq.eak.heads.right",
+    "opq.eak.heads.done",
 ]
 
 [text."glTutoMsg0.message"]

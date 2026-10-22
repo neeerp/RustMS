@@ -579,6 +579,16 @@ pub enum FieldMessage {
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
     },
+    /// The state of the live reactor named `name` here, if there is one.
+    ReactorState {
+        name: &'static str,
+        reply: tokio::sync::oneshot::Sender<Option<u8>>,
+    },
+    /// How many Eak wants on each of the sealed room's platforms
+    /// (`net::events::draw_split`), drawn when first asked.
+    Split {
+        reply: tokio::sync::oneshot::Sender<[u8; 3]>,
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

@@ -63,6 +63,9 @@ pub struct ReactorSet {
     spots: Vec<Spot>,
     live: BTreeMap<i32, LiveReactor>,
     object_ids: ObjectIds,
+    /// The day (Sunday 0) whose record the music box takes, fixed as the
+    /// field loads (`net::reactors::music_day`).
+    day: u8,
 }
 
 impl Default for ReactorSet {
@@ -86,7 +89,13 @@ impl ReactorSet {
                 .collect(),
             live: BTreeMap::new(),
             object_ids: ObjectIds::new(object_ids::REACTORS),
+            day: net::reactors::music_day(std::time::SystemTime::now()),
         }
+    }
+
+    #[cfg(test)]
+    pub fn set_day(&mut self, day: u8) {
+        self.day = day;
     }
 
     pub fn live(&self) -> impl Iterator<Item = &LiveReactor> {
@@ -155,10 +164,21 @@ impl ReactorSet {
     /// elevator's car leaving or docking); returns the views of those that
     /// changed. It goes through no event, so nothing breaks.
     pub fn set_state(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
+        self.move_to(name, state, |now| now != state)
+    }
+
+    /// As `set_state`, but only those still short of `state`, so a second
+    /// script asking for it (two members talking to Eak at once) can't undo
+    /// the hits since the first.
+    pub fn force_forward(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
+        self.move_to(name, state, |now| now < state)
+    }
+
+    fn move_to(&mut self, name: &str, state: u8, moves: impl Fn(u8) -> bool) -> Vec<ReactorView> {
         let spots = &self.spots;
         self.live
             .values_mut()
-            .filter(|reactor| spots[reactor.spot].template.name == name && reactor.state != state)
+            .filter(|reactor| spots[reactor.spot].template.name == name && moves(reactor.state))
             .map(|reactor| {
                 reactor.state = state;
                 reactor.view()
@@ -227,7 +247,6 @@ impl ReactorSet {
         self.advance(object_id, event, next, now)
     }
 
-    /// Whether `object_id`, in its state, waits for an item.
     /// Whether any reactor here waits for an item now.
     pub fn any_takes_items(&self) -> bool {
         self.live
@@ -235,6 +254,7 @@ impl ReactorSet {
             .any(|reactor| self.spots[reactor.spot].data.takes_items(reactor.state))
     }
 
+    /// Whether `object_id`, in its state, waits for an item.
     pub fn takes_items(&self, object_id: i32) -> bool {
         self.live
             .get(&object_id)
@@ -248,6 +268,9 @@ impl ReactorSet {
         quantity: i16,
         (x, y): (i16, i16),
     ) -> Option<(u8, u8)> {
+        if !net::reactors::takes(reactor.reactor_id, item_id, self.day) {
+            return None;
+        }
         let from = (x.checked_sub(reactor.x)?, y.checked_sub(reactor.y)?);
         self.spots[reactor.spot]
             .data
@@ -359,6 +382,8 @@ mod tests {
         assert_eq!(reactors.named("elevator").unwrap().object_id, car);
         assert!(reactors.named("nothing").is_none());
         assert_eq!(reactors.set_state("elevator", 0)[0].state, 0);
+        assert_eq!(reactors.force_forward("elevator", 2)[0].state, 2);
+        assert!(reactors.force_forward("elevator", 1).is_empty());
     }
 
     #[test]
@@ -477,6 +502,51 @@ mod tests {
         }
         assert!(!reactors.takes_items(id));
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
+    }
+
+    #[test]
+    fn the_music_box_takes_only_the_days_record() {
+        let records = || ReactorState {
+            events: (0..7)
+                .map(|day| ReactorEvent {
+                    kind: ITEM_DROPPED,
+                    next: Some(day + 1),
+                    item: Some((net::reactors::SUNDAY_RECORD + i32::from(day), 1)),
+                    area: Some(((-52, -64), (40, 79))),
+                })
+                .collect(),
+        };
+        let music = (
+            MapReactorTemplate {
+                reactor_id: net::reactors::MUSIC,
+                x: -1706,
+                y: -240,
+                flip: false,
+                reactor_time: -1,
+                name: net::reactors::MUSIC_BOX.into(),
+            },
+            ReactorTemplate {
+                reactor_id: net::reactors::MUSIC,
+                states: (0..8).map(|_| records()).collect(),
+                action: None,
+            },
+        );
+        let mut reactors = ReactorSet::new([music]);
+        reactors.set_day(2);
+        let now = Instant::now();
+        let [id] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        // Monday's and Wednesday's records stay where they land.
+        assert_eq!(reactors.taking(4001057, 1, (-1706, -240)), None);
+        assert!(reactors
+            .take_item(id, 4001059, 1, (-1706, -240), now)
+            .is_none());
+        match reactors.take_item(id, 4001058, 1, (-1706, -240), now) {
+            Some(Hit::Moved { view, event: 2 }) => assert_eq!(view.state, 3),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(reactors.named(net::reactors::MUSIC_BOX).unwrap().state, 3);
     }
 
     #[test]

@@ -425,7 +425,7 @@ impl EventActor {
                 self.clear(stage);
             }
             // By any member, whose hit broke the reactor.
-            EventCommand::ClearStage(stage) if event.reactor_clears.contains(&stage) => {
+            EventCommand::ClearStage(stage) if event.member_clears.contains(&stage) => {
                 self.clear(stage);
             }
             EventCommand::ClearStage(1) if leader => {

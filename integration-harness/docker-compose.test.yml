@@ -60,6 +60,10 @@ services:
       # Cloto's puzzles on stages 2-4 are all the second set of three areas,
       # 0, 1 and 3 (see tests/kpq_stages.rs).
       RUSTMS_KPQ_COMBO: "1"
+      # Orbis's music box plays Tuesday's record, and Eak's sealed room
+      # wants two, one and none on its platforms (see tests/opq_music.rs).
+      RUSTMS_OPQ_DAY: "2"
+      RUSTMS_OPQ_SPLIT: "210"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

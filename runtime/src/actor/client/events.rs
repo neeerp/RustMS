@@ -8,7 +8,9 @@ use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use game_data::Area;
-use net::events::{on_areas, standing, Balloon, Cloto, EventCommand, EventKind, Standing};
+use net::events::{
+    self, on_areas, standing, Balloon, Cloto, EventCommand, EventKind, HeadCount, Standing,
+};
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
@@ -141,6 +143,57 @@ impl ClientActor {
         };
         self.start_script(script).await?;
         Ok(true)
+    }
+
+    /// What Eak says to the player in the Orbis party quest, if anything:
+    /// in the music room whether its music box plays, in the sealed room
+    /// how the team stands on its platforms (a wrong count shows as a
+    /// wrong answer), and elsewhere his lines for the cloud stage and the
+    /// hub.
+    pub(super) async fn opq_eak(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+            return Ok(None);
+        };
+        if ticket.kind != EventKind::Opq {
+            return Ok(None);
+        }
+        match map_id {
+            events::OPQ_MUSIC_ROOM => {
+                let cleared = ticket.cleared(events::OPQ_MUSIC_STAGE);
+                let (reply, state) = oneshot::channel();
+                let name = net::reactors::MUSIC_BOX;
+                self.send_to_field(FieldMessage::ReactorState { name, reply })
+                    .await?;
+                let played = state.await.ok().flatten().is_some_and(|state| state > 0);
+                Ok(Some(NpcScript::opq_music(played, cleared)))
+            }
+            events::OPQ_HEAD_COUNT_ROOM => {
+                if ticket.cleared(events::OPQ_HEAD_COUNT_STAGE) {
+                    return Ok(Some(NpcScript::opq_head_count(None)));
+                }
+                let (reply, split) = oneshot::channel();
+                self.send_to_field(FieldMessage::Split { reply }).await?;
+                let Ok(split) = split.await else {
+                    return Ok(None);
+                };
+                let judge = |areas: &[Area], positions: &[(i32, i32)]| {
+                    events::head_count(split, areas, positions)
+                };
+                let Some(count) = self.standing_on(map_id, judge).await? else {
+                    return Ok(None);
+                };
+                if matches!(count, HeadCount::Wrong { .. }) {
+                    self.show_wrong_answer().await?;
+                }
+                Ok(Some(NpcScript::opq_head_count(Some(count))))
+            }
+            _ => Ok(NpcScript::opq_eak(
+                map_id,
+                ticket.leader(),
+                ticket.cleared(1),
+            )),
+        }
     }
 
     /// What `judge` makes of where everyone on `map_id`, the player's map,

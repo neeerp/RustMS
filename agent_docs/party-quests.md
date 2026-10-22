@@ -466,9 +466,41 @@ The field keeps that count (`FieldActor::salion`; each team has its own
 copy of the map). The spot that breaks after the last drops its loot, a
 piece of the statue, 4001045, for the owner of the drop that broke it (or
 anyone still on the map), whose client actor then tells the event the stage is cleared
-(`Event::reactor_clears`; any member may). The piece goes in 2008005 on
+(`Event::member_clears`; any member may). The piece goes in 2008005 on
 the hub. Eak's backup path on this map, which Cosmic has for a team whose
 Cellions got stuck, isn't here yet.
+
+## Orbis's music room and sealed room
+
+On 920010400 (stage 4) the music box, reactor 2008006 named `music`,
+plays only the day's record: 4001056 on Sunday to 4001062 on Saturday
+(Cosmic `2008006`), so `reactors::takes` turns every other record away
+and it stays where it lands. Every state of the box has the seven item
+events in Reactor.nx; the day is the field's (`ReactorSet::day`, fixed
+when the field actor starts, from `reactors::music_day`). Once the box plays,
+Eak (`ClientActor::opq_eak`) brings out the stone box `stone3` (2002011)
+by setting it to state 1 (`Effect::SetReactorState`, Cosmic
+`forceHitReactor`, though never back to an earlier state) and clears
+the stage; before then he asks for the
+day's record, and after he only thanks them. The stone box, out of its
+fade-in, takes four hits and drops 4001046.
+
+On 920010500 (stage 5) Eak wants three of the team on the room's three
+platforms (Map.nx `area` 1-3), so many on each. The field draws the split
+the first time he is asked (`FieldActor::split`, `events::draw_split`,
+Cosmic's rule) and keeps it; `events::head_count` counts who stands where,
+each player on the first platform that holds them. Other than three on
+the platforms, he only says so; with three but a wrong split, the room
+shows the wrong effect and he says whether any platform is right; the
+right split brings out `stone4` (2002012) as above and clears the stage.
+Its box drops 4001047. Any member may clear either stage
+(`Event::member_clears`). The pieces drop without the content pack
+(`replace` in `reward_overrides.toml`).
+
+The weekday is UTC plus `RUSTMS_RATE_CARD_UTC_OFFSET`.
+`RUSTMS_OPQ_DAY` (0-6, Sunday first) pins the day and `RUSTMS_OPQ_SPLIT`
+(three digits summing to 3, e.g. `210`) the split; the harness world sets
+both (`tests/opq_music.rs`).
 
 ## Ludibrium's balloons
 
