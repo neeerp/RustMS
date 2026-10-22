@@ -868,9 +868,11 @@ and inventory, as Cosmic's `spawnDrop` does. Removals go to everyone; clients
 ignore drops they never saw.
 
 For 15 s only the owner may pick a drop up, or with a party, the owner's
-party as it was at the drop. A quest drop is also refused to anyone who
-doesn't need it, the owner included: the pickup carries a `QuestNeeds`
-snapshot of the taker's started quests and finished item counts. Drops of
+party as it was at the drop; a player outside it who needs a quest drop
+sees it but waits like anyone else. A quest drop is also refused to anyone
+who doesn't need it, the owner included: the pickup carries a `QuestNeeds`
+snapshot of the taker's started quests and the quest items they already hold
+enough of. Drops of
 mobs with `publicReward` are anyone's at once, as are those of mobs with
 `explosiveReward`, which fly out 40 px apart instead of 25. The packet's
 ownership type tells the client which (v83 FUN_0050483a, whose pets follow

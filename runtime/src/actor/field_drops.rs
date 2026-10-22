@@ -262,6 +262,7 @@ impl DropSet {
     }
 
     /// Take a drop for `client`, in `party`, standing at (x, y).
+    #[allow(clippy::too_many_arguments)]
     pub fn take(
         &mut self,
         client: ClientId,
@@ -291,6 +292,7 @@ impl DropSet {
     /// mesos and items as `takes` says, but not the ids `ignored` (mesos
     /// as `IGNORED_MESOS`). As in v83 (FUN_0050483a), pets leave what
     /// players threw away.
+    #[allow(clippy::too_many_arguments)]
     pub fn take_for_pet(
         &mut self,
         client: ClientId,

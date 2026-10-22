@@ -114,9 +114,9 @@ fn roll_at(
     let mut loot = Vec::new();
     for entry in entries {
         // Quest drops only while the quest is started and the player holds
-        // fewer than it needs. In a party they roll anyway, as Cosmic's do,
-        // for the members who need them: only those who do see them
-        // (`QuestNeeds`).
+        // fewer than it needs. In a party quest items roll anyway, as
+        // Cosmic's do, for the members who need them: only those who do see
+        // them (`QuestNeeds`).
         let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
         if let Some(quest) = quest {
             let needed = entry
@@ -124,7 +124,7 @@ fn roll_at(
                 .map_or(player.quests.state(quest) == QuestState::Started, |item| {
                     wants(player, quest, item)
                 });
-            if !needed && !in_party {
+            if !needed && !(in_party && entry.item.is_some()) {
                 continue;
             }
         }
@@ -261,9 +261,7 @@ impl QuestNeeds {
                 Some(
                     items
                         .iter()
-                        .filter(|&&(item, count)| {
-                            count > 0 && player.inventory.count(item) >= count
-                        })
+                        .filter(|&&(item, count)| player.inventory.count(item) >= count)
                         .map(move |&(item, _)| (quest, item))
                         .collect::<Vec<_>>(),
                 )
@@ -357,6 +355,41 @@ mod tests {
             .add(game::Item::stack(4031802, 1), 100)
             .unwrap();
         assert!(roll_entries(&shellpiece, &player, &mut rng).is_empty());
+    }
+
+    #[test]
+    fn a_party_rolls_quest_items_and_their_takers_need_them() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let table = [
+            entry(Some(4031802), None, 1.0, Some(1035)),
+            entry(None, Some(10), 1.0, Some(1035)),
+        ];
+        let mut player = crate::codec::stats::sample_player();
+        let rolled = roll_at(&table, (1.0, 1.0), &player, true, &mut rng);
+        assert_eq!(
+            rolled,
+            [Loot::Item {
+                item_id: 4031802,
+                quantity: 1,
+                quest: Some(1035)
+            }]
+        );
+        let agree = |player: &Player| {
+            let needs = QuestNeeds::of(player);
+            assert_eq!(needs.wants(1035, 4031802), wants(player, 1035, 4031802));
+            needs.wants(1035, 4031802)
+        };
+        assert!(!agree(&player));
+        player.quests.upsert(QuestRecord {
+            quest_id: 1035,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        assert!(agree(&player));
+        player
+            .inventory
+            .add(game::Item::stack(4031802, 1), 100)
+            .unwrap();
+        assert!(!agree(&player));
     }
 
     #[test]
