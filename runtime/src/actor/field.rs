@@ -545,9 +545,12 @@ impl FieldActor {
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
-                FieldRequest::Pickup { object_id, x, y } => {
-                    self.handle_pickup(from, object_id, x, y)
-                }
+                FieldRequest::Pickup {
+                    object_id,
+                    x,
+                    y,
+                    needs,
+                } => self.handle_pickup(from, object_id, x, y, &needs),
                 FieldRequest::Throw { loot, vanish } => self.handle_throw(from, loot, vanish),
                 FieldRequest::HitReactor {
                     object_id,
@@ -601,6 +604,7 @@ impl FieldActor {
                     mesos,
                     items,
                     ignored,
+                    needs,
                 } => {
                     let now = Instant::now();
                     let party = self.occupants.get(&from).and_then(|o| o.party);
@@ -612,6 +616,7 @@ impl FieldActor {
                         now,
                         (mesos, items),
                         &ignored,
+                        &needs,
                     );
                     if let (Ok(drop), Some(occupant)) = (taken, self.occupants.get(&from)) {
                         occupant
@@ -648,13 +653,13 @@ impl FieldActor {
                 if !taken {
                     self.drops.restore(drop);
                 } else if let Ok(packet) = build_pet_loot_drop(drop.object_id, looter, pet) {
-                    self.send_drop_packet(&drop, packet);
+                    self.send_drop_packet(packet);
                 }
             }
             FieldMessage::ReturnDrop { drop } => {
                 let now = Instant::now();
                 if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
-                    self.send_drop_packet(&drop, packet);
+                    self.show_drop(&drop, packet);
                 }
                 self.drops.restore(drop);
             }
@@ -810,7 +815,7 @@ impl FieldActor {
             })
             .collect();
         for (drop, packet) in packets {
-            self.send_drop_packet(&drop, packet);
+            self.show_drop(&drop, packet);
         }
     }
 
@@ -834,7 +839,7 @@ impl FieldActor {
                 };
                 if let Ok(packet) = build_drop(&drop.view(now), falling) {
                     let drop = drop.clone();
-                    self.send_drop_packet(&drop, packet);
+                    self.show_drop(&drop, packet);
                 }
             }
         }
@@ -911,7 +916,7 @@ impl FieldActor {
             (drop, falling)
         };
         if let Ok(packet) = build_drop(&drop.view(now), appearance) {
-            self.send_drop_packet(&drop, packet);
+            self.show_drop(&drop, packet);
         }
     }
 
@@ -963,7 +968,7 @@ impl FieldActor {
         };
         if let Some(drop) = self.drops.remove(on.drop) {
             if let Ok(packet) = build_remove_drop(drop.object_id, None) {
-                self.send_drop_packet(&drop, packet);
+                self.send_drop_packet(packet);
             }
         }
         self.show_reactor_hit(owner, hit, 0);
@@ -976,27 +981,41 @@ impl FieldActor {
         true
     }
 
-    /// Send a drop packet to everyone who may see the drop.
-    fn send_drop_packet(&self, drop: &Drop, packet: Packet) {
-        for (&client, occupant) in &self.occupants {
-            if drop.visible_to(client) {
-                occupant.handle.send_packet(packet.clone());
-            }
+    /// Send a drop packet to everyone here. Those who don't see a quest
+    /// drop ignore it going away.
+    fn send_drop_packet(&self, packet: Packet) {
+        for occupant in self.occupants.values() {
+            occupant.handle.send_packet(packet.clone());
         }
     }
 
-    fn handle_pickup(&mut self, from: ClientId, object_id: i32, x: i16, y: i16) {
+    /// Show a drop to everyone here who may see it: a quest drop only to
+    /// those who still need it, which their client actors decide.
+    fn show_drop(&self, drop: &Drop, packet: Packet) {
+        for occupant in self.occupants.values() {
+            show_drop_to(&occupant.handle, drop, packet.clone());
+        }
+    }
+
+    fn handle_pickup(
+        &mut self,
+        from: ClientId,
+        object_id: i32,
+        x: i16,
+        y: i16,
+        needs: &net::loot::QuestNeeds,
+    ) {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
         let handle = occupant.handle.clone();
         match self
             .drops
-            .take(from, occupant.party, object_id, x, y, Instant::now())
+            .take(from, occupant.party, object_id, x, y, Instant::now(), needs)
         {
             Ok(drop) => {
                 if let Ok(packet) = build_remove_drop(object_id, Some(from)) {
-                    self.send_drop_packet(&drop, packet);
+                    self.send_drop_packet(packet);
                 }
                 handle.send(ServerMessage::PickedUp { drop });
             }
@@ -1249,10 +1268,10 @@ impl FieldActor {
         let mut mesos = Vec::new();
         for (index, &object_id) in blast.drops.iter().enumerate() {
             let drop = self.drops.explode(from, party, object_id, reaches, now);
-            if let Some(drop) = &drop {
+            if drop.is_some() {
                 let delay = meso_explosion::delay(blast.delay, index);
                 if let Ok(packet) = build_explode_drop(object_id, delay) {
-                    self.send_drop_packet(drop, packet);
+                    self.send_drop_packet(packet);
                 }
             }
             mesos.push(drop.and_then(|drop| match drop.loot {
@@ -2314,9 +2333,9 @@ impl FieldActor {
         }
 
         let now = Instant::now();
-        for drop in self.drops.all().filter(|drop| drop.visible_to(client_id)) {
+        for drop in self.drops.all() {
             if let Ok(packet) = build_drop(&drop.view(now), DropAppearance::Lying) {
-                handle.send_packet(packet);
+                show_drop_to(&handle, drop, packet);
             }
         }
 
@@ -2490,6 +2509,23 @@ impl FieldActor {
 }
 
 /// Whether `viewer` sees `avatar`: a hidden GM shows only to GMs.
+/// Show `drop` to one player: a quest drop goes through their client actor,
+/// which shows it only if they still need it.
+fn show_drop_to(handle: &ClientHandle, drop: &Drop, packet: Packet) {
+    match drop.quest_item() {
+        Some((quest, item_id)) => {
+            handle.send(ServerMessage::QuestDrop {
+                quest,
+                item_id,
+                packet,
+            });
+        }
+        None => {
+            handle.send_packet(packet);
+        }
+    }
+}
+
 fn sees(viewer: &FieldAvatar, avatar: &FieldAvatar) -> bool {
     !avatar.hidden || viewer.gm
 }

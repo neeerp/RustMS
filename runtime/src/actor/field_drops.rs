@@ -4,7 +4,7 @@
 use crate::actor::object_ids::{self, ObjectIds};
 use game::pet::IGNORED_MESOS;
 use game_data::footholds::Footholds;
-use net::loot::Loot;
+use net::loot::{Loot, QuestNeeds};
 use net::packet::build::world::drop::DropView;
 use net::ClientId;
 use std::collections::BTreeMap;
@@ -77,9 +77,10 @@ impl Drop {
         }
     }
 
-    /// Who may see it: quest items only show to their owner.
-    pub fn visible_to(&self, client: ClientId) -> bool {
-        self.loot.quest().is_none() || self.owner == client
+    /// The quest a quest drop is for, and its item: only players who still
+    /// need it see it (Cosmic's `spawnDrop`).
+    pub fn quest_item(&self) -> Option<(i16, i32)> {
+        self.loot.quest_item()
     }
 
     /// Still kept for its owner or their party.
@@ -87,14 +88,24 @@ impl Drop {
         !self.player_drop && now < self.dropped_at + OWNERSHIP
     }
 
-    /// Whether `client`, in `party`, may pick it up: quest items only their
-    /// owner, others whoever its ownership allows until it runs out.
-    fn takeable_by(&self, client: ClientId, party: Option<i32>, now: Instant) -> bool {
+    /// Whether `client`, in `party`, may pick it up: whoever its ownership
+    /// allows until it runs out, and quest drops only if they still need
+    /// them (`needs`).
+    fn takeable_by(
+        &self,
+        client: ClientId,
+        party: Option<i32>,
+        needs: &QuestNeeds,
+        now: Instant,
+    ) -> bool {
+        if self
+            .quest_item()
+            .is_some_and(|(quest, item)| !needs.wants(quest, item))
+        {
+            return false;
+        }
         if self.owner == client {
             return true;
-        }
-        if self.loot.quest().is_some() {
-            return false;
         }
         match self.ownership {
             Ownership::Owner => !self.owned(now),
@@ -259,6 +270,7 @@ impl DropSet {
         x: i16,
         y: i16,
         now: Instant,
+        needs: &QuestNeeds,
     ) -> Result<Drop, PickupError> {
         let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
         if drop.loot.blocked() {
@@ -269,7 +281,7 @@ impl DropSet {
         {
             return Err(PickupError::TooFar);
         }
-        if !drop.takeable_by(client, party, now) {
+        if !drop.takeable_by(client, party, needs, now) {
             return Err(PickupError::NotYours);
         }
         self.drops.remove(&object_id).ok_or(PickupError::Gone)
@@ -288,6 +300,7 @@ impl DropSet {
         now: Instant,
         (mesos, items): (bool, bool),
         ignored: &[i32],
+        needs: &QuestNeeds,
     ) -> Result<Drop, PickupError> {
         let drop = self.drops.get(&object_id).ok_or(PickupError::Gone)?;
         let (wanted, id) = match &drop.loot {
@@ -298,7 +311,7 @@ impl DropSet {
         if drop.player_drop || !wanted || ignored.contains(&id) {
             return Err(PickupError::NotForPets);
         }
-        self.take(client, party, object_id, x, y, now)
+        self.take(client, party, object_id, x, y, now, needs)
     }
 
     /// Set off mesos for `client`, in `party`, with Meso Explosion: the
@@ -313,7 +326,10 @@ impl DropSet {
     ) -> Option<Drop> {
         let drop = self.drops.get(&object_id)?;
         let mesos = matches!(drop.loot, Loot::Mesos(_));
-        if !mesos || !drop.takeable_by(client, party, now) || !reaches(drop.x, drop.y) {
+        if !mesos
+            || !drop.takeable_by(client, party, &QuestNeeds::default(), now)
+            || !reaches(drop.x, drop.y)
+        {
             return None;
         }
         self.drops.remove(&object_id)
@@ -382,22 +398,41 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert_eq!(drops.all().map(|d| d.x).collect::<Vec<_>>(), [88, 112]);
         assert_eq!(
-            drops.take(2, None, ids[0], 100, 0, now).unwrap_err(),
+            drops
+                .take(2, None, ids[0], 100, 0, now, &QuestNeeds::default())
+                .unwrap_err(),
             PickupError::NotYours
         );
         assert_eq!(
-            drops.take(1, None, ids[0], 2000, 0, now).unwrap_err(),
+            drops
+                .take(1, None, ids[0], 2000, 0, now, &QuestNeeds::default())
+                .unwrap_err(),
             PickupError::TooFar
         );
         assert_eq!(
-            drops.take(1, None, ids[0], 100, 0, now).unwrap().loot,
+            drops
+                .take(1, None, ids[0], 100, 0, now, &QuestNeeds::default())
+                .unwrap()
+                .loot,
             Loot::Mesos(5)
         );
         assert_eq!(
-            drops.take(1, None, ids[0], 100, 0, now).unwrap_err(),
+            drops
+                .take(1, None, ids[0], 100, 0, now, &QuestNeeds::default())
+                .unwrap_err(),
             PickupError::Gone
         );
-        assert!(drops.take(2, None, ids[1], 100, 0, now + OWNERSHIP).is_ok());
+        assert!(drops
+            .take(
+                2,
+                None,
+                ids[1],
+                100,
+                0,
+                now + OWNERSHIP,
+                &QuestNeeds::default()
+            )
+            .is_ok());
     }
 
     #[test]
@@ -429,20 +464,47 @@ mod tests {
         // A meso magnet alone leaves items, and no pet takes what was thrown.
         assert_eq!(
             drops
-                .take_for_pet(1, None, ids[1], at, now, (true, false), &[])
+                .take_for_pet(
+                    1,
+                    None,
+                    ids[1],
+                    at,
+                    now,
+                    (true, false),
+                    &[],
+                    &QuestNeeds::default()
+                )
                 .unwrap_err(),
             PickupError::NotForPets
         );
         assert_eq!(
             drops
-                .take_for_pet(1, None, thrown, at, now, (true, true), &[])
+                .take_for_pet(
+                    1,
+                    None,
+                    thrown,
+                    at,
+                    now,
+                    (true, true),
+                    &[],
+                    &QuestNeeds::default()
+                )
                 .unwrap_err(),
             PickupError::NotForPets
         );
         // Someone else's pet waits for the owner's time to pass.
         assert_eq!(
             drops
-                .take_for_pet(2, None, ids[0], at, now, (true, true), &[])
+                .take_for_pet(
+                    2,
+                    None,
+                    ids[0],
+                    at,
+                    now,
+                    (true, true),
+                    &[],
+                    &QuestNeeds::default()
+                )
                 .unwrap_err(),
             PickupError::NotYours
         );
@@ -450,13 +512,31 @@ mod tests {
         for (id, ignored) in [(ids[0], IGNORED_MESOS), (ids[1], 4000019)] {
             assert_eq!(
                 drops
-                    .take_for_pet(1, None, id, at, now, (true, true), &[ignored])
+                    .take_for_pet(
+                        1,
+                        None,
+                        id,
+                        at,
+                        now,
+                        (true, true),
+                        &[ignored],
+                        &QuestNeeds::default()
+                    )
                     .unwrap_err(),
                 PickupError::NotForPets
             );
         }
         let drop = drops
-            .take_for_pet(1, None, ids[0], at, now, (true, false), &[4000019])
+            .take_for_pet(
+                1,
+                None,
+                ids[0],
+                at,
+                now,
+                (true, false),
+                &[4000019],
+                &QuestNeeds::default(),
+            )
             .unwrap();
         assert_eq!(drop.loot, Loot::Mesos(5));
     }
@@ -475,15 +555,21 @@ mod tests {
         assert_eq!(view(&drops, party, now), (7, 1));
         assert_eq!(view(&drops, party, now + OWNERSHIP), (1, 2));
         assert_eq!(
-            drops.take(2, Some(8), party, 0, 0, now).unwrap_err(),
+            drops
+                .take(2, Some(8), party, 0, 0, now, &QuestNeeds::default())
+                .unwrap_err(),
             PickupError::NotYours
         );
-        assert!(drops.take(2, Some(7), party, 0, 0, now).is_ok());
+        assert!(drops
+            .take(2, Some(7), party, 0, 0, now, &QuestNeeds::default())
+            .is_ok());
 
         let public =
             drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::FreeForAll, 0, 0, 9, now)[0].object_id;
         assert_eq!(view(&drops, public, now), (1, 2));
-        assert!(drops.take(2, None, public, 0, 0, now).is_ok());
+        assert!(drops
+            .take(2, None, public, 0, 0, now, &QuestNeeds::default())
+            .is_ok());
 
         // Flung wider than the usual 25 apart.
         let flung: Vec<(i32, i16)> = drops
@@ -501,7 +587,9 @@ mod tests {
             .collect();
         assert_eq!(flung.iter().map(|&(_, x)| x).collect::<Vec<_>>(), [-20, 20]);
         assert_eq!(view(&drops, flung[0].0, now), (1, 3));
-        assert!(drops.take(2, None, flung[0].0, 0, 0, now).is_ok());
+        assert!(drops
+            .take(2, None, flung[0].0, 0, 0, now, &QuestNeeds::default())
+            .is_ok());
     }
 
     #[test]
@@ -517,13 +605,16 @@ mod tests {
             (2, 0, true)
         );
         assert_eq!(
-            drops.take(2, None, id, 40, 7, now).unwrap().loot,
+            drops
+                .take(2, None, id, 40, 7, now, &QuestNeeds::default())
+                .unwrap()
+                .loot,
             Loot::Dropped(item)
         );
     }
 
     #[test]
-    fn quest_items_stay_with_their_owner_and_drops_expire() {
+    fn quest_drops_go_to_whoever_needs_them_and_drops_expire() {
         let now = Instant::now();
         let mut drops = DropSet::default();
         let id = drops.spawn(
@@ -533,7 +624,7 @@ mod tests {
                 quest: Some(1035),
             }],
             1,
-            Ownership::Owner,
+            Ownership::Party(7),
             0,
             0,
             9,
@@ -541,13 +632,26 @@ mod tests {
         )[0]
         .object_id;
         let drop = drops.all().next().unwrap();
-        assert!(drop.visible_to(1) && !drop.visible_to(2));
-        assert_eq!(
-            drops
-                .take(2, None, id, 0, 0, now + OWNERSHIP * 2)
-                .unwrap_err(),
-            PickupError::NotYours
-        );
+        assert_eq!(drop.quest_item(), Some((1035, 4031802)));
+        let needing = QuestNeeds {
+            started: vec![1035],
+            enough: Vec::new(),
+        };
+        let done = QuestNeeds {
+            started: vec![1035],
+            enough: vec![(1035, 4031802)],
+        };
+        // Not even its owner takes it once they hold enough; outside the
+        // party only after the 15 s.
+        for (client, party, needs) in [(1, Some(7), &done), (3, Some(8), &needing)] {
+            assert_eq!(
+                drops.take(client, party, id, 0, 0, now, needs).unwrap_err(),
+                PickupError::NotYours
+            );
+        }
+        assert!(drops.take(2, Some(7), id, 0, 0, now, &needing).is_ok());
+
+        let id = drops.spawn(vec![Loot::Mesos(5)], 1, Ownership::Owner, 0, 0, 9, now)[0].object_id;
         assert_eq!(drops.expire(now + LIFETIME), [id]);
         assert_eq!(drops.all().count(), 0);
     }

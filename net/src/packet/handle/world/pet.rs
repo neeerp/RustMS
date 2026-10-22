@@ -162,6 +162,7 @@ impl WorldHandler for PetLootHandler {
                 mesos,
                 items,
                 ignored,
+                needs: crate::loot::QuestNeeds::of(player),
             })),
         )
     }
