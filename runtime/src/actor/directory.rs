@@ -313,6 +313,22 @@ impl WorldDirectory {
                 accept,
             } => self.family_answer(from, inviter, accept, Instant::now()),
             DirectoryMessage::FamilyChart { owner, chart } => self.send_family_chart(owner, chart),
+            DirectoryMessage::FamilySeparate {
+                from,
+                senior,
+                junior,
+            } => {
+                let level = |id| self.clients.get(&id).map(|entry| entry.presence.level);
+                let levels = (level(senior), level(junior));
+                self.tell(
+                    from,
+                    ServerMessage::Separate {
+                        senior,
+                        junior,
+                        levels,
+                    },
+                );
+            }
             DirectoryMessage::FamilyChanged { ids } => {
                 for id in ids {
                     self.tell(id, ServerMessage::FamilyChanged);

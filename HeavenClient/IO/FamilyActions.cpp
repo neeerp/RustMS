@@ -19,8 +19,19 @@ namespace ms
 			// StringPool 0x11e9 and 0x11f5.
 			constexpr const char* ADD_PROMPT = "Enter the name of the character you wish to add as Junior. You must be in the same channel as well as map to add.";
 			constexpr const char* CANNOT_ADD = "You cannot add this character as a Junior.";
+			// 0x11ea.
+			constexpr const char* PART_PROMPT = "Enter the name of the character you wish to delete.";
 			// A character's name.
 			constexpr size_t NAME_LIMIT = 12;
+
+			// v83 keeps it on yes and never clears it (ctx+0x3858).
+			std::string parted;
+
+			void deselect_tree()
+			{
+				if (auto tree = UI::get().get_element<UIFamilyTree>())
+					tree->deselect();
+			}
 		}
 
 		void toggle_window()
@@ -61,6 +72,38 @@ namespace ms
 			}
 
 			AddFamilyPacket(name).dispatch();
+		}
+
+		void prompt_parting(const FamilyChart& chart)
+		{
+			UI::get().emplace<UIEnterText>(PART_PROMPT, [chart](const std::string& name)
+			{
+				if (auto parting = chart.parting_named(name))
+					confirm_parting(*parting);
+			}, NAME_LIMIT);
+		}
+
+		void confirm_parting(const FamilyParting& parting)
+		{
+			UI::get().emplace<UIYesNo>(parting.text(), [parting](bool yes)
+			{
+				deselect_tree();
+
+				if (!yes || !Stage::get().get_player().get_family().loaded())
+					return;
+
+				if (parting.junior)
+					SeparateFamilyBySeniorPacket(parting.id).dispatch();
+				else
+					SeparateFamilyByJuniorPacket().dispatch();
+
+				parted = parting.name;
+			});
+		}
+
+		const std::string& parted_from()
+		{
+			return parted;
 		}
 
 		bool can_add_junior()

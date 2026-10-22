@@ -414,6 +414,17 @@ pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> 
     .await
 }
 
+/// Give `character_id`, who is in a family, `reputation` Rep to spend.
+pub async fn set_family_reputation(character_id: i32, reputation: i32) -> Result<(), HarnessError> {
+    change_one_row("set family reputation", move |conn| {
+        diesel::sql_query("UPDATE family_members SET reputation = $2 WHERE character_id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<Integer, _>(reputation)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Start quest `quest_id` for the logged-out character `character_id`.
 pub async fn start_quest(character_id: i32, quest_id: i16) -> Result<(), HarnessError> {
     change_one_row("start quest", move |conn| {

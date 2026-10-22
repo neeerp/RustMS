@@ -214,6 +214,52 @@ void four_generations_around_the_one_viewed()
 	require(c.count(-1) == 10 && c.count(42) == 0, "counts");
 }
 
+void parting_names_the_rep_and_the_fee()
+{
+	// V (70) under S1 (90) under S2 (100); juniors J1 (50) and J2 (80).
+	FamilyChart c = chart(5, 5, {
+		{ 1, 0, 120, "L" },
+		{ 3, 2, 100, "S2" },
+		{ 4, 3, 90, "S1" },
+		{ 5, 4, 70, "V" },
+		{ 7, 5, 50, "J1" },
+		{ 8, 5, 80, "J2" },
+	});
+
+	// Parting from a junior: 2X for the owner, X for their senior, by the
+	// junior's level, and the fee by the levels between.
+	auto j1 = c.parting_at(5);
+	require(j1 && j1->junior && j1->id == 7, "J1 is a junior");
+	require(j1->rep == 1200 && j1->second_rep == 600, "X(50) = 600");
+	require(j1->fee == 2520 * 20, "20 levels between");
+	require(j1->text().find("1200 Reputation Points for yourself and 600") == 0, "both figures");
+	require(j1->text().find("Fee:50400 Mesos") != std::string::npos, "the fee");
+
+	// One who passed the owner costs no fee.
+	auto j2 = c.parting_named("J2");
+	require(j2 && j2->junior && j2->fee == 0, "no fee upwards");
+	require(j2->text().find("Fee") == std::string::npos, "no fee line");
+
+	// Parting from the senior goes by the owner's level.
+	auto s1 = c.parting_named("S1");
+	require(s1 && !s1->junior, "S1 is the senior");
+	require(s1->rep == 2 * 910 && s1->second_rep == 910, "X(70) = 910");
+	require(s1->fee == 2520 * 20, "S1 is 20 above");
+	require(s1->text().find("for the Senior and") != std::string::npos, "the 2nd Senior too");
+
+	require(!c.parting_named("S2") && !c.parting_named("j1") && !c.parting_at(4), "only the senior and juniors, by exact name");
+	require(!c.parting_at(0), "not the leader");
+
+	// A senior who leads has nobody above.
+	FamilyChart junior = chart(2, 2, { { 1, 0, 30, "A" }, { 1, 0, 30, "A" }, { 2, 1, 15, "B" } });
+	auto a = junior.parting_at(FamilyChart::SENIOR);
+	require(a && !a->junior && a->second_rep == 0 && a->rep == 2 * 150, "X(15) = 150");
+	require(a->text().find("Reputations for the Senior") == 4, "the one figure");
+
+	FamilyChart theirs = chart(2, 1, { { 1, 0, 30, "A" }, { 1, 0, 30, "A" }, { 2, 1, 15, "B" } });
+	require(!theirs.parting_at(FamilyChart::SENIOR), "not from another's tree");
+}
+
 int main()
 {
 	try
@@ -223,6 +269,7 @@ int main()
 		the_first_entry_is_nobodys_senior();
 		two_or_fewer_entries_leave_the_top_empty();
 		four_generations_around_the_one_viewed();
+		parting_names_the_rep_and_the_fee();
 	}
 	catch (const std::exception& error)
 	{

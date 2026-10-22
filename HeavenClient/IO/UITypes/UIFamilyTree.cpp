@@ -134,6 +134,23 @@ namespace ms
 		return chart.mine;
 	}
 
+	void UIFamilyTree::deselect()
+	{
+		selected = -1;
+	}
+
+	void UIFamilyTree::bye()
+	{
+		if (!chart.mine)
+			return;
+
+		if (selected < 0)
+			return FamilyActions::prompt_parting(chart);
+
+		if (auto parting = chart.parting_at(static_cast<size_t>(selected)))
+			FamilyActions::confirm_parting(*parting);
+	}
+
 	void UIFamilyTree::lay_out()
 	{
 		const FamilyNode* leader = chart.at(FamilyChart::LEADER);
@@ -187,9 +204,8 @@ namespace ms
 		}
 
 		buttons[JUNIOR]->set_state(chart.can_add_junior() ? Button::State::NORMAL : Button::State::DISABLED);
-		// Severing ties comes with the separation packets; until then the
-		// button stays off.
-		buttons[BYE]->set_state(Button::State::DISABLED);
+		// On whatever is selected, in the player's own tree only.
+		buttons[BYE]->set_state(chart.mine ? Button::State::NORMAL : Button::State::DISABLED);
 	}
 
 	void UIFamilyTree::draw(float inter) const
@@ -405,10 +421,27 @@ namespace ms
 		}
 	}
 
+	// Only a box that lights up, with someone in it, and nothing else.
+	void UIFamilyTree::doubleclick(Point<int16_t> cursorpos)
+	{
+		if (!chart.mine)
+			return;
+
+		int16_t slot = slot_at(cursorpos - position);
+
+		if (!hoverable(slot) || !chart.at(slot))
+			return;
+
+		selected = slot;
+		bye();
+	}
+
 	Button::State UIFamilyTree::button_pressed(uint16_t buttonid)
 	{
 		if (buttonid == JUNIOR)
 			FamilyActions::prompt_junior();
+		else if (buttonid == BYE)
+			bye();
 
 		return Button::State::NORMAL;
 	}

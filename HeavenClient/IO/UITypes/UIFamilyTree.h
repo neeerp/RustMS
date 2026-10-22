@@ -27,6 +27,7 @@ namespace ms
 		void draw(float inter) const override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 		void remove_cursor() override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
@@ -37,6 +38,8 @@ namespace ms
 		// A relative logged in or out (FAMILY_NOTIFY_LOGIN_OR_LOGOUT).
 		void set_online(const std::string& name, bool online);
 		bool is_mine() const;
+		// The parting asked about is answered, either way.
+		void deselect();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -49,6 +52,8 @@ namespace ms
 		bool hoverable(int16_t slot) const;
 		std::string member_tooltip(size_t slot) const;
 		void clear_tooltip();
+		// BtBye (0x80b7cc): the box selected, or a name asked for.
+		void bye();
 
 		FamilyChart chart;
 

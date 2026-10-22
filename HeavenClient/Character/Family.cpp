@@ -1,5 +1,6 @@
 #include "Family.h"
 
+#include <algorithm>
 #include <unordered_map>
 #include <utility>
 
@@ -55,6 +56,98 @@ namespace ms
 			return false;
 
 		return node->level > nodes[node->senior].level;
+	}
+
+	namespace
+	{
+		// StringPool 0x146d-0x1470 and the fee, 0x146c.
+		constexpr const char* JUNIOR_BOTH = "%d Reputation Points for yourself and %d Reputation Points for your Senior will be deducted\\nand all lower Family members will be affected.\\nDo you really want to separate from the selected character?";
+		constexpr const char* JUNIOR_ONE = "%d Reputation Points will be deducted from you, \\nand all lower Family members will be affected.\\nDo you really want to separate from the selected character?";
+		constexpr const char* SENIOR_BOTH = "%d Reputation Points for the Senior and %d Reputation Points for the 2nd Senior will be deducted, and all lower Family members will be affected.\\nDo you really want to separate from the selected character?";
+		constexpr const char* SENIOR_ONE = "%d Reputations for the Senior will be deducted, and\\nall lower Family members will be affected. Do you really want to separate from the selected character?";
+		constexpr const char* FEE = "\\n\\nFee:%d Mesos";
+
+		std::string format(std::string text, std::initializer_list<int32_t> values)
+		{
+			for (int32_t value : values)
+			{
+				size_t at = text.find("%d");
+
+				if (at != std::string::npos)
+					text.replace(at, 2, std::to_string(value));
+			}
+
+			return text;
+		}
+	}
+
+	std::string FamilyParting::text() const
+	{
+		std::string result = second_rep > 0
+			? format(junior ? JUNIOR_BOTH : SENIOR_BOTH, { rep, second_rep })
+			: format(junior ? JUNIOR_ONE : SENIOR_ONE, { rep });
+
+		if (fee > 0)
+			result += format(FEE, { fee });
+
+		return result;
+	}
+
+	FamilyParting FamilyChart::parting(const FamilyNode& other, bool junior) const
+	{
+		const FamilyNode& owner = *at(OWNER);
+		const FamilyNode& senior = junior ? owner : other;
+		const FamilyNode& below = junior ? other : owner;
+
+		// The junior's level sets the Rep, the levels between the fee.
+		int32_t level = below.level;
+		int32_t rep = (level / 20 + 10) * level;
+		int32_t gap = std::max(0, senior.level - below.level);
+
+		FamilyParting result;
+		result.id = other.id;
+		result.name = other.name;
+		result.junior = junior;
+		result.rep = 2 * rep;
+		result.second_rep = senior.senior >= 0 ? rep : 0;
+		result.fee = (gap + 2500) * gap;
+
+		return result;
+	}
+
+	std::optional<FamilyParting> FamilyChart::parting_at(size_t slot) const
+	{
+		const FamilyNode* owner = at(OWNER);
+		const FamilyNode* other = at(slot);
+
+		if (!mine || !owner || !other)
+			return std::nullopt;
+
+		if (owner->senior >= 0 && nodes[owner->senior].id == other->id)
+			return parting(*other, false);
+
+		for (int32_t junior : owner->juniors)
+			if (nodes[junior].id == other->id)
+				return parting(*other, true);
+
+		return std::nullopt;
+	}
+
+	std::optional<FamilyParting> FamilyChart::parting_named(const std::string& name) const
+	{
+		const FamilyNode* owner = at(OWNER);
+
+		if (!mine || !owner)
+			return std::nullopt;
+
+		if (owner->senior >= 0 && nodes[owner->senior].name == name)
+			return parting(nodes[owner->senior], false);
+
+		for (int32_t junior : owner->juniors)
+			if (nodes[junior].name == name)
+				return parting(nodes[junior], true);
+
+		return std::nullopt;
 	}
 
 	void FamilyChart::arrange(const FamilyNode& self)

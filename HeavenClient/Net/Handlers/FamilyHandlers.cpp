@@ -21,12 +21,13 @@ namespace ms
 	{
 		// FAMILY_RESULT's codes (0xa345fb, report b039 1.3) with their
 		// StringPool texts. 0x4b and 0x4c go to the chat log; the others
-		// are OK dialogs. Code 1, the end of a relationship the player
-		// severed, comes with separation.
+		// are OK dialogs. Code 1 (0x120a) names whom the player parted
+		// from, by the name kept when they said yes (report b048).
 		const char* result_text(int32_t code)
 		{
 			switch (code)
 			{
+			case 1: return "You have severed ties with %s.\\nYour family relationship has ended.";
 			case 0x40: return "You cannot add this character as a Junior.";
 			case 0x41: return "The name you entered is incorrect or he/she is currently not logged in.";
 			case 0x42: return "You belong to the same family.";
@@ -47,6 +48,16 @@ namespace ms
 			case 0x52: return "The Entitlement does not apply because your level does not match the corresponding area.";
 			default: return nullptr;
 			}
+		}
+
+		std::string with_name(std::string text, const std::string& name)
+		{
+			size_t at = text.find("%s");
+
+			if (at != std::string::npos)
+				text.replace(at, 2, name);
+
+			return text;
 		}
 
 		std::string with_number(std::string text, int32_t value)
@@ -127,6 +138,8 @@ namespace ms
 
 		if (code == 0x4b || code == 0x4c)
 			FamilyActions::chat_line(text);
+		else if (code == 1)
+			ok(with_name(text, FamilyActions::parted_from()));
 		else
 			ok(with_number(text, arg));
 	}

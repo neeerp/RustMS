@@ -93,7 +93,8 @@ pub use self::duey::DueyActionHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
 pub use self::family::{
-    AcceptFamilyHandler, AddFamilyHandler, OpenFamilyHandler, OpenFamilyPedigreeHandler,
+    AcceptFamilyHandler, AddFamilyHandler, ChangeFamilyMessageHandler, OpenFamilyHandler,
+    OpenFamilyPedigreeHandler, SeparateFamilyByJuniorHandler, SeparateFamilyBySeniorHandler,
 };
 pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};
 pub use self::guild_bbs::GuildBbsHandler;

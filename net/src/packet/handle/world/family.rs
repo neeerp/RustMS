@@ -60,6 +60,42 @@ impl WorldHandler for AcceptFamilyHandler {
     }
 }
 
+/// `SEPARATE_FAMILY_BY_SENIOR`: the player parts from a junior, by id
+/// (report b048).
+pub struct SeparateFamilyBySeniorHandler;
+
+impl WorldHandler for SeparateFamilyBySeniorHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let junior = reader.read_int()?;
+        request(FamilyRequest::Separate {
+            junior: Some(junior),
+        })
+    }
+}
+
+/// `SEPARATE_FAMILY_BY_JUNIOR`: the player parts from their senior.
+pub struct SeparateFamilyByJuniorHandler;
+
+impl WorldHandler for SeparateFamilyByJuniorHandler {
+    fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        request(FamilyRequest::Separate { junior: None })
+    }
+}
+
+/// `CHANGE_FAMILY_MESSAGE`: the leader's new precepts.
+pub struct ChangeFamilyMessageHandler;
+
+impl WorldHandler for ChangeFamilyMessageHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let precepts = reader.read_str_with_length()?;
+        request(FamilyRequest::Precepts { precepts })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,6 +153,27 @@ mod tests {
             FamilyRequest::Answer {
                 inviter: 7,
                 accept: true
+            }
+        );
+        let mut separate = packet(RecvOpcode::SeparateFamilyBySenior);
+        separate.write_int(9).unwrap();
+        assert_eq!(
+            handle(&SeparateFamilyBySeniorHandler, separate),
+            FamilyRequest::Separate { junior: Some(9) }
+        );
+        assert_eq!(
+            handle(
+                &SeparateFamilyByJuniorHandler,
+                packet(RecvOpcode::SeparateFamilyByJunior)
+            ),
+            FamilyRequest::Separate { junior: None }
+        );
+        let mut precepts = packet(RecvOpcode::ChangeFamilyMessage);
+        precepts.write_str_with_length("Be kind").unwrap();
+        assert_eq!(
+            handle(&ChangeFamilyMessageHandler, precepts),
+            FamilyRequest::Precepts {
+                precepts: "Be kind".into()
             }
         );
     }

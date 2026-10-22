@@ -3,11 +3,13 @@
 
 use super::ClientActor;
 use crate::{db::spawn_db, error::RuntimeError, message::DirectoryMessage};
+use db::family::Separation;
 use game::family::Refusal;
 use net::packet::build::world::family::{
     build_family_info, build_family_refusal, build_join_accepted, build_join_result,
-    build_privilege_list,
+    build_privilege_list, build_separated, build_separation_fee,
 };
+use net::packet::build::world::stat::{self, StatUpdate};
 use net::{ClientId, FamilyRequest};
 use tracing::warn;
 
@@ -58,7 +60,80 @@ impl ClientActor {
                 })
                 .await
             }
+            FamilyRequest::Precepts { precepts } => {
+                let cid = self.client_id;
+                let ids = spawn_db(move || db::family::set_precepts(cid, &precepts)).await?;
+                match ids {
+                    Some(ids) => {
+                        self.send_to_directory(DirectoryMessage::FamilyChanged { ids })
+                            .await
+                    }
+                    None => Ok(()),
+                }
+            }
+            FamilyRequest::Separate { junior } => self.ask_separate(junior).await,
         }
+    }
+
+    /// Part from `junior`, or from the senior. The directory has the levels
+    /// of those online, which the client worked the fee out from.
+    async fn ask_separate(&mut self, junior: Option<ClientId>) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let family = &self.in_game()?.player.family;
+        let (senior, junior) = match (junior, family.senior) {
+            (Some(junior), _) if family.juniors.contains(&junior) => (cid, junior),
+            (None, Some(senior)) => (senior, cid),
+            _ => return Ok(()),
+        };
+        self.send_to_directory(DirectoryMessage::FamilySeparate {
+            from: cid,
+            senior,
+            junior,
+        })
+        .await
+    }
+
+    /// Part `junior` from `senior` for the player, who pays. Only they hear
+    /// how it went; the whole family as it was gets INFO again.
+    pub(super) async fn separate(
+        &mut self,
+        senior: ClientId,
+        junior: ClientId,
+        levels: (Option<u8>, Option<u8>),
+    ) -> Result<(), RuntimeError> {
+        let meso = self.in_game()?.player.meso;
+        let separation = spawn_db(move || db::family::separate(senior, junior, levels, meso)).await;
+        let (fee, ids) = match separation {
+            // The client's tree is out of date, or the rows were busy: show
+            // the family as it is.
+            Ok(Separation::NotRelated) => return self.family_changed().await,
+            Err(error) => {
+                warn!(senior, junior, %error, "Failed to separate");
+                return self.family_changed().await;
+            }
+            Ok(Separation::Short { fee }) => {
+                let from_junior = senior == self.client_id;
+                return self
+                    .send(&mut build_separation_fee(from_junior, fee)?)
+                    .await;
+            }
+            Ok(Separation::Parted { fee, ids }) => (fee, ids),
+        };
+        if fee > 0 {
+            let player = &mut self.in_game_mut()?.player;
+            player.meso -= fee;
+            player.mark_dirty();
+            let meso = player.meso;
+            self.flush().await?;
+            self.send(&mut stat::build_stat_update(
+                false,
+                &[StatUpdate::Meso(meso)],
+            )?)
+            .await?;
+        }
+        self.send(&mut build_separated()?).await?;
+        self.send_to_directory(DirectoryMessage::FamilyChanged { ids })
+            .await
     }
 
     /// Ask the character named `name` to be the player's junior. The

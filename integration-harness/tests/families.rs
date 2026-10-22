@@ -4,9 +4,13 @@
 //! may say no or yes (ACCEPT_FAMILY). The server refuses a name not online,
 //! another map, too low a level, a junior who has a senior, and a senior of
 //! the same family. The Family Tree (OPEN_FAMILY_PEDIGREE) shows who is in
-//! it and online, and relatives hear who logs in or out.
+//! it and online, and relatives hear who logs in or out. The leader alone
+//! may change the precepts, which the whole family sees. Parting from a
+//! junior or a senior (SEPARATE_FAMILY_BY_SENIOR/JUNIOR, report b048) costs
+//! the asker a fee by the levels between them, and the seniors Rep by the
+//! junior's level.
 
-use integration_harness::database::set_job;
+use integration_harness::database::{set_family_reputation, set_job, set_meso};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
@@ -48,13 +52,17 @@ fn str_bytes(text: &str) -> Vec<u8> {
 
 /// FAMILY_INFO_RESULT with no rep yet.
 fn info(juniors: u16, leader: i32, name: &str) -> (i16, Vec<u8>) {
-    let mut body = [0i32; 3].map(i32::to_le_bytes).concat();
+    info_with(0, juniors, leader, name, "")
+}
+
+fn info_with(rep: i32, juniors: u16, leader: i32, name: &str, precepts: &str) -> (i16, Vec<u8>) {
+    let mut body = [rep, 0, 0].map(i32::to_le_bytes).concat();
     body.extend(juniors.to_le_bytes());
     body.extend(2u16.to_le_bytes());
     body.extend(0u16.to_le_bytes());
     body.extend(leader.to_le_bytes());
     body.extend(str_bytes(name));
-    body.extend(str_bytes(""));
+    body.extend(str_bytes(precepts));
     body.extend(0i32.to_le_bytes());
     (SendOpcode::FamilyInfo as i16, body)
 }
@@ -215,4 +223,133 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
     assert_eq!(family(&mut a, 1).await, [online(1)]);
     let entered = family(&mut b, 2).await;
     assert_eq!(entered[0], info(0, a_id, &an));
+}
+
+/// `senior` asks `junior`, both on one map, who says yes.
+async fn take_junior(
+    senior: &mut WorldSession,
+    senior_name: &str,
+    junior: &mut WorldSession,
+    junior_name: &str,
+) {
+    send(
+        &mut senior.connection,
+        request(RecvOpcode::AddFamily, junior_name),
+    )
+    .await;
+    family(junior, 1).await;
+    send(
+        &mut junior.connection,
+        answer(senior.character_id, senior_name, true),
+    )
+    .await;
+    family(senior, 2).await;
+    family(junior, 2).await;
+}
+
+fn result(code: i32, arg: i32) -> (i16, Vec<u8>) {
+    let body = [code, arg].map(i32::to_le_bytes).concat();
+    (SendOpcode::FamilyResult as i16, body)
+}
+
+#[tokio::test]
+async fn the_leader_sets_the_precepts_and_parting_costs_rep_and_mesos() {
+    let (a_config, b_config, c_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let a_id = new_character(&a_config, 50).await;
+    let b_id = new_character(&b_config, 35).await;
+    let c_id = new_character(&c_config, 20).await;
+    set_meso(a_id, 100_000).await.expect("meso");
+    set_meso(b_id, 0).await.expect("meso");
+    set_meso(c_id, 100_000).await.expect("meso");
+    let (an, bn, cn) = (
+        a_config.character_name.clone(),
+        b_config.character_name.clone(),
+        c_config.character_name.clone(),
+    );
+    let (mut a, _) = enter(&a_config, LITH_HARBOR).await;
+    let (mut b, _) = enter(&b_config, LITH_HARBOR).await;
+    let (mut c, _) = enter(&c_config, LITH_HARBOR).await;
+    take_junior(&mut a, &an, &mut b, &bn).await;
+    take_junior(&mut b, &bn, &mut c, &cn).await;
+    set_family_reputation(a_id, 5000).await.expect("rep");
+    set_family_reputation(b_id, 5000).await.expect("rep");
+
+    // Only the leader's precepts count, and everyone sees them.
+    let precepts = |text: &str| {
+        let mut p = Packet::new_empty();
+        p.write_short(RecvOpcode::ChangeFamilyMessage as i16)
+            .unwrap();
+        p.write_str_with_length(text).unwrap();
+        p
+    };
+    send(&mut b.connection, precepts("Not mine to say")).await;
+    send(&mut a.connection, precepts("Be kind")).await;
+    assert_eq!(
+        family(&mut a, 1).await,
+        [info_with(5000, 1, a_id, &an, "Be kind")]
+    );
+    assert_eq!(
+        family(&mut b, 1).await,
+        [info_with(5000, 1, a_id, &an, "Be kind")]
+    );
+    assert_eq!(
+        family(&mut c, 1).await,
+        [info_with(0, 0, a_id, &an, "Be kind")]
+    );
+
+    // B can't pay to part from C: 15 levels between them.
+    let mut cut = Packet::new_empty();
+    cut.write_short(RecvOpcode::SeparateFamilyBySenior as i16)
+        .unwrap();
+    cut.write_int(c_id).unwrap();
+    send(&mut b.connection, cut).await;
+    assert_eq!(family(&mut b, 1).await, [result(0x51, (15 + 2500) * 15)]);
+
+    // C parts from B and pays. B loses 2 * (20 / 20 + 10) * 20, A half.
+    let mut leave = Packet::new_empty();
+    leave
+        .write_short(RecvOpcode::SeparateFamilyByJunior as i16)
+        .unwrap();
+    let mut ct = Trace::default();
+    send(&mut c.connection, leave).await;
+    until(&mut c.connection, &mut ct, |t| t.family.len() >= 2).await;
+    assert_eq!(ct.family, [result(1, 0), info(0, 0, "")]);
+    let meso = ct
+        .stat_updates
+        .iter()
+        .find_map(|u| u.get(&integration_harness::trace::stat::MESO));
+    assert_eq!(meso, Some(&(100_000 - 37_725)));
+    assert_eq!(
+        family(&mut b, 1).await,
+        [info_with(5000 - 440, 0, a_id, &an, "Be kind")]
+    );
+    assert_eq!(
+        family(&mut a, 1).await,
+        [info_with(5000 - 220, 1, a_id, &an, "Be kind")]
+    );
+
+    // A cuts off B, with no senior above to lose half. Neither is left in
+    // a family.
+    let mut cut = Packet::new_empty();
+    cut.write_short(RecvOpcode::SeparateFamilyBySenior as i16)
+        .unwrap();
+    cut.write_int(b_id).unwrap();
+    let mut at = Trace::default();
+    send(&mut a.connection, cut).await;
+    until(&mut a.connection, &mut at, |t| t.family.len() >= 2).await;
+    let a_rep = 5000 - 220 - 2 * (35 / 20 + 10) * 35;
+    assert_eq!(at.family, [result(1, 0), info_with(a_rep, 0, 0, "", "")]);
+    let meso = at
+        .stat_updates
+        .iter()
+        .find_map(|u| u.get(&integration_harness::trace::stat::MESO));
+    assert_eq!(meso, Some(&(100_000 - 37_725)));
+    assert_eq!(
+        family(&mut b, 1).await,
+        [info_with(5000 - 440, 0, 0, "", "")]
+    );
 }

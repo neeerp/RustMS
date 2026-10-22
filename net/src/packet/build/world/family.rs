@@ -69,6 +69,24 @@ pub fn build_privilege_list() -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// FAMILY_RESULT 1: the asker parted, and the client says from whom, by
+/// the name it kept (report b048).
+pub fn build_separated() -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::FamilyResult)?;
+    packet.write_int(1)?;
+    packet.write_int(0)?;
+    Ok(packet)
+}
+
+/// FAMILY_RESULT 0x51 or 0x50: parting from a junior, or from the senior,
+/// costs `fee`, more than the asker has.
+pub fn build_separation_fee(from_junior: bool, fee: i32) -> Result<Packet, NetworkError> {
+    let mut packet = op(SendOpcode::FamilyResult)?;
+    packet.write_int(if from_junior { 0x51 } else { 0x50 })?;
+    packet.write_int(fee)?;
+    Ok(packet)
+}
+
 /// FAMILY_RESULT with a refusal's line.
 pub fn build_family_refusal(refusal: Refusal) -> Result<Packet, NetworkError> {
     let mut packet = op(SendOpcode::FamilyResult)?;
