@@ -98,6 +98,16 @@ pub fn build_fame_gain_in_chat(gain: i16) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO 9: a line in the chat log (the v83 client's chat type
+/// 0xc, salmon), as Cosmic's `showInfoText`.
+pub fn build_info_text(text: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(9)?;
+    p.write_str_with_length(text)?;
+    Ok(p)
+}
+
 fn write_gain_exp(gain: i32, party_bonus: i32, in_chat: bool) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
@@ -129,6 +139,16 @@ mod tests {
 
     /// FILETIME of the unix epoch plus 1000 seconds.
     const FILETIME_1000S: i64 = 116_444_746_000_000_000;
+
+    #[test]
+    fn an_info_text_is_mode_9_and_its_line() {
+        let packet = build_info_text("Go right").unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(9)
+            .string("Go right")
+            .end();
+    }
 
     #[test]
     fn an_only_one_refusal_is_mode_14_alone() {

@@ -342,6 +342,10 @@ pub mod keys {
     /// The Cursed Forest (`curseforest`): not on Arwen's quests, and by day.
     pub const CURSED_FOREST_CLOSED: &str = "portal.cursed_forest.closed";
     pub const CURSED_FOREST_DAYTIME: &str = "portal.cursed_forest.daytime";
+    /// Rien's way out (`rienTutor8`) during an Aran's fitness training.
+    pub const RIEN_TUTOR_FITNESS_1: &str = "portal.rien_tutor.fitness1";
+    pub const RIEN_TUTOR_FITNESS_2: &str = "portal.rien_tutor.fitness2";
+    pub const RIEN_TUTOR_FITNESS_3: &str = "portal.rien_tutor.fitness3";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1008,6 +1012,9 @@ mod tests {
             keys::WITCH_CAVE_CREEPY,
             keys::CURSED_FOREST_CLOSED,
             keys::CURSED_FOREST_DAYTIME,
+            keys::RIEN_TUTOR_FITNESS_1,
+            keys::RIEN_TUTOR_FITNESS_2,
+            keys::RIEN_TUTOR_FITNESS_3,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

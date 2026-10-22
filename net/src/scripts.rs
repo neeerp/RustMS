@@ -84,6 +84,16 @@ const VERIFYING_THE_PASSWORD: i16 = 3360;
 /// open at night to players on Arwen's quests: Rage, Resentment, and
 /// Revenge (2224) or Arwen's Apology (2226) taken, or Defeat Faust (2227)
 /// done, after which the forest is the one Faust has left.
+/// Rien's way out to the Dangerous Forest (`rienTutor8`). While an Aran
+/// beginner is on Basic Fitness Training 1-3 (21015-21017), it keeps them in
+/// town, saying which way their training lies.
+const DANGEROUS_FOREST: i32 = 140010000;
+const ARAN_BEGINNER: i16 = 2000;
+const FITNESS_TRAINING: [(i16, &str); 3] = [
+    (21015, keys::RIEN_TUTOR_FITNESS_1),
+    (21016, keys::RIEN_TUTOR_FITNESS_2),
+    (21017, keys::RIEN_TUTOR_FITNESS_3),
+];
 const CURSED_FOREST: i32 = 910100000;
 const CURSED_FOREST_AFTER_FAUST: i32 = 910100001;
 const DEFEAT_FAUST: i16 = 2227;
@@ -215,6 +225,9 @@ pub enum Effect {
     /// A line in pink chat, as a portal that won't let the player through
     /// says why.
     Pink(String),
+    /// A line in the chat log by SHOW_STATUS_INFO 9 (Cosmic's
+    /// `showInfoText`), as Rien's tutorial portal tells an Aran where to go.
+    InfoText(String),
     /// Take the player's party into its own copy of an event's maps
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
@@ -472,6 +485,23 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ))
         }
         "secretDoor" => refused(keys::SECRET_DOOR_LOCKED),
+        "rienTutor8" => {
+            let training = FITNESS_TRAINING
+                .iter()
+                .find(|&&(id, _)| quest(id) == QuestState::Started)
+                .filter(|_| player.stats.job == ARAN_BEGINNER);
+            match training {
+                Some(&(_, key)) => ScriptOutcome {
+                    effects: vec![Effect::InfoText(content::text().get(key, &[]))],
+                    block: false,
+                },
+                // Cosmic's portal 2, the forest's `east00`.
+                None => through(Effect::WarpToPortal(
+                    DANGEROUS_FOREST,
+                    named(DANGEROUS_FOREST, "east00"),
+                )),
+            }
+        }
         "curseforest" => {
             let hour = crate::conti::time_of_day(crate::conti::now()).0;
             cursed_forest(player, hour)
@@ -922,6 +952,26 @@ mod tests {
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 2)));
         player.stats.map_id = 261020200;
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
+    }
+
+    #[test]
+    fn rien_keeps_an_aran_in_training_in_town() {
+        let forest = || Some(through(Effect::WarpToPortal(DANGEROUS_FOREST, 2)));
+        assert_eq!(portal("rienTutor8", &player_with(&[])), forest());
+        for (quest, _) in FITNESS_TRAINING {
+            let mut player = player_with(&[(quest, QuestState::Started)]);
+            // Only an Aran beginner is held back.
+            assert_eq!(portal("rienTutor8", &player), forest());
+            player.stats.job = ARAN_BEGINNER;
+            let held = portal("rienTutor8", &player).unwrap();
+            assert!(
+                matches!(held.effects.as_slice(), [Effect::InfoText(text)] if !text.is_empty()),
+                "{held:?}"
+            );
+        }
+        let mut done = player_with(&[(21015, QuestState::Completed)]);
+        done.stats.job = ARAN_BEGINNER;
+        assert_eq!(portal("rienTutor8", &done), forest());
     }
 
     #[test]

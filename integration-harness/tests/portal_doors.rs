@@ -1,7 +1,8 @@
 //! Portal scripts of a004's section 3: halls anyone may walk into
 //! (`enterAchter`, `enterMagiclibrar`, `balogTemple`), doors that keep
 //! players back with a pink line until they hold a pass or have done a
-//! quest (`ariant_castle`, `enterWitch`, `secretDoor`), and the Temple of
+//! quest (`ariant_castle`, `enterWitch`, `secretDoor`, `curseforest`),
+//! Rien's way out (`rienTutor8`), and the Temple of
 //! Time's lanes, which send a player who isn't ready back to where the lane
 //! began (`timeQuest`).
 
@@ -54,6 +55,8 @@ async fn halls_open_and_gated_doors_stay_shut_to_a_new_character() {
         (100000200, "in02", (100000201, 9)),
         (101000000, "jobin00", (101000003, 8)),
         (105090200, "under00", (105100000, 2)),
+        // Rien holds back only an Aran in training.
+        (140000000, "west00", (140010000, 2)),
     ] {
         assert_eq!(arrived(&try_portal(&mut player, map, portal).await), to);
     }
@@ -62,6 +65,8 @@ async fn halls_open_and_gated_doors_stay_shut_to_a_new_character() {
         (260000300, "in00"),
         (240040510, "in00"),
         (261010000, "secret00"),
+        // Off Arwen's quests, at any hour.
+        (100040105, "secret00"),
     ] {
         let trace = try_portal(&mut player, map, portal).await;
         assert!(trace.warps.is_empty(), "{map}: {:?}", trace.warps);

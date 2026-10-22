@@ -124,6 +124,9 @@ impl ClientActor {
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
+                Effect::InfoText(text) => {
+                    afterwards.push(net::packet::build::world::quest::build_info_text(text)?)
+                }
                 Effect::Hint {
                     text,
                     width,
