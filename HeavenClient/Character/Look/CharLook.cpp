@@ -331,6 +331,7 @@ namespace ms
 			face->draw(interexp, interexpframe, faceargs);
 			equips.draw(EquipSlot::Id::EYEACC, standing, Clothing::Layer::EYEACC, 0, headargs);
 			draw_cap(headargs, standing, 0);
+			look.draw_arm(ghostaction, interframe, args);
 		}
 		else
 		{

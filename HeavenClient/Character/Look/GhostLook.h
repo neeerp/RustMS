@@ -23,6 +23,9 @@ namespace ms
 
 		void draw(const std::string &action, uint8_t frame, const DrawArgument &args) const;
 
+		// The arm the sheet's prone frames draw over the hair (`armOverHair`), if the frame has one.
+		void draw_arm(const std::string &action, uint8_t frame, const DrawArgument &args) const;
+
 		// How many frames an action has, 0 for none.
 		uint8_t count(const std::string &action) const;
 
@@ -39,6 +42,7 @@ namespace ms
 		struct Frame
 		{
 			Texture texture;
+			Texture arm;
 			uint16_t delay;
 			Point<int16_t> neck;
 			bool face;

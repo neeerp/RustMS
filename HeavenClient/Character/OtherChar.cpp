@@ -114,12 +114,14 @@ namespace ms
 
 	void OtherChar::update_look(const LookEntry &newlook)
 	{
-		// The new look rides, and is morphed, as the old was.
+		// The new look rides, and is morphed or a ghost, as the old was.
 		int32_t riding = look.get_vehicle();
 		int32_t morph = look.get_morph();
+		int16_t ghost = look.get_ghost();
 		look = newlook;
 		look.set_vehicle(riding);
 		look.set_morph(morph);
+		look.set_ghost(ghost);
 		look.set_tired(mount::tired(mount_level, mount_fatigue));
 
 		set_state(path.get_state().stance);

@@ -25,19 +25,30 @@ namespace ms
 
 			for (uint8_t f = 0; nl::node framenode = variant[std::to_string(f)]; ++f)
 			{
-				// The body is the frame's canvas, named `body` but for ghostsit/1/0's `0`.
-				nl::node canvas;
+				// The body is the frame's `body` canvas, or its other one (ghostsit/1/0's is named `0`).
+				// ghostproneStab/1 also has an `arm`, put on the body's navel.
+				nl::node canvas = framenode["body"];
+				nl::node armnode = framenode["arm"];
 
-				for (nl::node part : framenode)
-					if (part.data_type() == nl::node::type::bitmap)
-						canvas = part;
+				if (canvas.data_type() != nl::node::type::bitmap)
+					for (nl::node part : framenode)
+						if (part.data_type() == nl::node::type::bitmap && part.name() != "arm")
+							canvas = part;
+
+				Texture arm;
+
+				if (armnode.data_type() == nl::node::type::bitmap)
+				{
+					arm = Texture(armnode);
+					arm.shift(Point<int16_t>(canvas["map"]["navel"]) - Point<int16_t>(armnode["map"]["navel"]));
+				}
 
 				// A frame's delay, else its body's, as ghostsit/2/0 has.
 				auto delay = static_cast<uint16_t>(framenode["delay"].get_integer(canvas["delay"].get_integer(0)));
 				bool face = framenode["face"].get_bool();
 				Point<int16_t> neck = canvas["map"]["neck"];
 
-				frames.push_back({ canvas, delay > 0 ? delay : static_cast<uint16_t>(100),
+				frames.push_back({ canvas, arm, delay > 0 ? delay : static_cast<uint16_t>(100),
 					neck - (face ? standing : climbing), face });
 			}
 		}
@@ -58,6 +69,12 @@ namespace ms
 	{
 		if (const Frame *f = find(action, frame))
 			f->texture.draw(args);
+	}
+
+	void GhostLook::draw_arm(const std::string &action, uint8_t frame, const DrawArgument &args) const
+	{
+		if (const Frame *f = find(action, frame))
+			f->arm.draw(args);
 	}
 
 	uint8_t GhostLook::count(const std::string &action) const
