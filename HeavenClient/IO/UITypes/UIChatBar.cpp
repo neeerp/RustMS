@@ -23,8 +23,6 @@
 
 #include "UIGroupPicker.h"
 #include "UINotice.h"
-#include "UIPersonalShop.h"
-#include "UITradingRoom.h"
 #include "UIWhisperPrompt.h"
 #include "UIStatusBar.h"
 
