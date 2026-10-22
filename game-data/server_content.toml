@@ -490,6 +490,7 @@ unsourced = [
     "portal.sand_bandits.members_only",
     "portal.treasure_room.occupied",
     "portal.solo_map.occupied",
+    "portal.s4berserk_move.monsters_left",
     "portal.disguise.occupied",
     "portal.disguise.already_found",
     "portal.mysterious_force",

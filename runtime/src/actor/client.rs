@@ -1218,11 +1218,17 @@ impl ClientActor {
                 map_id,
             } => self.party_skill_reached(used, origin, map_id).await?,
             ServerMessage::ReactorBroken {
+                field,
                 reactor_id,
                 object_id,
                 x,
                 y,
-            } => self.drop_reactor_loot(reactor_id, object_id, x, y).await?,
+            } => {
+                // Unless they have gone elsewhere since.
+                if self.in_game()?.field.key == field {
+                    self.drop_reactor_loot(reactor_id, object_id, x, y).await?
+                }
+            }
             ServerMessage::PickedUp { drop } => self.picked_up(drop).await?,
             ServerMessage::Caught {
                 slot,

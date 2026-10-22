@@ -1201,8 +1201,19 @@ What a broken reactor does is `net::reactors::action`, keyed by reactor id
 as Cosmic's scripts are: by default the breaker rolls its drops; the eggs
 bring out the Fire Hawk or Ice Eagle (`9300089`, `9300090`), and the
 Hitman's hideout boxes (`1021000`, `1021001`) its `9300091`, on the ground
-just below the reactor, without drops. Warps and chances (the Hitman's
-other boxes, the Berserk room's decoys) aren't in yet.
+just below the reactor, without drops. Others send the breaker to a portal
+(`Action::Warp`, looked up by name): the hideout's boxes `1020000` to
+`1020002` lead up its floors (`pt00` to `pt02`, within the map, so the room
+stays as it is). The Berserk room's false statues (`1050000`) drop their
+loot (none) 30 times in a hundred, else throw the breaker out to
+`105090200`'s first `sp` (`Action::DropsOrWarp`). The field tells the
+breaker's client actor (ReactorBroken), which rolls the drops or warps.
+
+The Berserk room's (`910500200`) reactors change places among themselves
+whenever the field starts afresh (`reactors::shuffled`,
+`ReactorSet::shuffle`), so the true statue (`1052000`) stands somewhere new,
+as Cosmic's `shuffleReactors` at the room's entry does. The map's
+`info/reactorShuffle` flag isn't read.
 
 Server logic can also set a reactor's state by its map name
 (`ReactorSet::set_state`, shown with HIT_REACTOR): the Helios Tower

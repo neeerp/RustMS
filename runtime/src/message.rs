@@ -103,8 +103,10 @@ pub enum ServerMessage {
         origin: (i16, i16),
         map_id: i32,
     },
-    /// This player broke a reactor; its loot drops for them.
+    /// This player broke a reactor on `field`; its loot drops for them, or
+    /// it sends them somewhere.
     ReactorBroken {
+        field: FieldKey,
         reactor_id: i32,
         object_id: i32,
         x: i16,
@@ -383,6 +385,10 @@ pub enum FieldMessage {
     /// Where everyone on the map stands, as of their last move.
     Positions {
         reply: tokio::sync::oneshot::Sender<Vec<(i16, i16)>>,
+    },
+    /// How many monsters are alive on the map.
+    MobCount {
+        reply: tokio::sync::oneshot::Sender<usize>,
     },
     /// The event whose copy of the map this is ended: stop.
     Close,

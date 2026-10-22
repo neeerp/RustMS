@@ -190,19 +190,27 @@ const DOLL_CAVE_WAY_BACK: (i32, u8) = (105040201, 2);
 /// afresh once they're left (`npc_scripts::resets_when_empty`): the Fire
 /// Hawk's and Ice Eagle's nests by El Nath (`s4firehawk`, `s4iceeagle`),
 /// Ludibrium's Tornado room (`s4tornado_enter`), Aqua Road's resurrection
-/// mound (`s4resurrection`) and Leafre's nest of the eggs (`s4nest`).
+/// mound (`s4resurrection`), Leafre's nest of the eggs (`s4nest`), the
+/// Hitman's hideout by Kerning City (`s4hitman`) and the Berserk room in
+/// the Sleepy Dungeon (`s4berserk`).
 const FIREHAWK_NEST: i32 = 921100200;
 const ICE_EAGLE_NEST: i32 = 921100210;
 const TORNADO_ROOM: i32 = 922020200;
 const RESURRECTION_ROOM: i32 = 923000100;
 const EGG_NEST: i32 = 924000100;
-pub const SOLO_MAPS: [i32; 5] = [
+const HITMAN_HIDEOUT: i32 = 910200000;
+const BERSERK_ROOM: i32 = 910500200;
+pub const SOLO_MAPS: [i32; 7] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
     RESURRECTION_ROOM,
     EGG_NEST,
+    HITMAN_HIDEOUT,
+    BERSERK_ROOM,
 ];
+/// The key that opens the Berserk room.
+const BERSERK_KEY: i32 = 4031475;
 /// The Cold Flame, which opens the way to the resurrection mound.
 const COLD_FLAME: i32 = 4001108;
 const TORNADO_PROOF: i32 = 4001110;
@@ -346,6 +354,9 @@ pub enum Effect {
     /// Nothing is applied while anyone is on this map in the player's
     /// channel; the script says its `refused` text instead.
     RequireEmptyMap(i32),
+    /// Nothing is applied while a monster is left on the player's map; the
+    /// script says its `refused` text instead.
+    RequireNoMobs,
     /// Add a row of four slots to a bag, up to 96.
     AddSlotRow(InventoryType),
     /// Give the player a new hair (3xxxx), face (2xxxx) or skin (anything
@@ -392,7 +403,8 @@ pub struct ScriptOutcome {
     pub effects: Vec<Effect>,
     /// Don't run this portal's script again this session.
     pub block: bool,
-    /// Said in pink when a `RequireEmptyMap` keeps the player back.
+    /// Said in pink when a `RequireEmptyMap` or `RequireNoMobs` keeps the
+    /// player back.
     pub occupied: Option<String>,
 }
 
@@ -996,6 +1008,22 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 .any(|&id| quest(id) == QuestState::Started),
             EGG_NEST,
         ),
+        "s4hitman" => solo_map(quest(6201) == QuestState::Started, HITMAN_HIDEOUT),
+        "s4berserk" => solo_map_at(
+            quest(6153) == QuestState::Started && player.inventory.count(BERSERK_KEY) > 0,
+            BERSERK_ROOM,
+            named(BERSERK_ROOM, "out01"),
+        ),
+        // Up to the statues, once the room's monsters are all gone.
+        "s4berserk_move" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(BERSERK_ROOM, named(BERSERK_ROOM, "out00")),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::MONSTERS_LEFT, &[])),
+        },
         // Closed, it says nothing, as in Cosmic.
         "s4tornado_enter"
             if [6230, 6231]
@@ -1091,6 +1119,11 @@ fn disguise(player: &Player, job: usize) -> ScriptOutcome {
 
 /// Into `map`, one of `SOLO_MAPS`, when `open` and nobody is in it.
 fn solo_map(open: bool, map: i32) -> ScriptOutcome {
+    solo_map_at(open, map, 0)
+}
+
+/// Into `map`'s `portal`, as `solo_map`.
+fn solo_map_at(open: bool, map: i32, portal: u8) -> ScriptOutcome {
     if !open {
         return refused(keys::MYSTERIOUS_FORCE);
     }
@@ -1098,7 +1131,7 @@ fn solo_map(open: bool, map: i32) -> ScriptOutcome {
         effects: vec![
             Effect::RequireEmptyMap(map),
             Effect::PortalSound,
-            Effect::WarpToPortal(map, 0),
+            Effect::WarpToPortal(map, portal),
         ],
         block: false,
         occupied: Some(content::text().get(keys::SOLO_MAP_OCCUPIED, &[])),
@@ -1159,7 +1192,7 @@ fn is_market_portal(portal: &PortalTemplate) -> bool {
 }
 
 /// The id of `map_id`'s portal called `name`, else 0.
-fn named(map_id: i32, name: &str) -> u8 {
+pub(crate) fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)
 }
 
@@ -1926,6 +1959,7 @@ mod tests {
         for (script, quest, map) in [
             ("s4firehawk", 6240, FIREHAWK_NEST),
             ("s4iceeagle", 6242, ICE_EAGLE_NEST),
+            ("s4hitman", 6201, HITMAN_HIDEOUT),
         ] {
             opened(script, &player_with(&[(quest, QuestState::Started)]), map);
             assert!(pink(&portal(script, &fresh).unwrap()), "{script}");
@@ -1960,6 +1994,52 @@ mod tests {
             portal("s4tornado_enter", &fresh),
             Some(ScriptOutcome::default())
         );
+        // The Berserk room wants its key as well as the quest, and lets
+        // the player in at the bottom.
+        let on_quest = player_with(&[(6153, QuestState::Started)]);
+        assert!(pink(&portal("s4berserk", &on_quest).unwrap()));
+        assert!(pink(
+            &portal("s4berserk", &holding(&[], BERSERK_KEY)).unwrap()
+        ));
+        let keyed = holding(&[(6153, QuestState::Started)], BERSERK_KEY);
+        let outcome = portal("s4berserk", &keyed).unwrap();
+        assert_eq!(outcome.effects[0], Effect::RequireEmptyMap(BERSERK_ROOM));
+        assert!(matches!(
+            outcome.effects[2],
+            Effect::WarpToPortal(BERSERK_ROOM, _)
+        ));
+    }
+
+    #[test]
+    fn the_berserk_rooms_way_up_waits_for_its_monsters() {
+        let outcome = portal("s4berserk_move", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects[..2],
+            [Effect::RequireNoMobs, Effect::PortalSound]
+        );
+        assert!(matches!(
+            outcome.effects[2],
+            Effect::WarpToPortal(BERSERK_ROOM, _)
+        ));
+        assert!(outcome.occupied.is_some());
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        let way_up = named(BERSERK_ROOM, "out00");
+        assert_eq!(
+            portal(
+                "s4berserk",
+                &holding(&[(6153, QuestState::Started)], BERSERK_KEY)
+            )
+            .unwrap()
+            .effects[2],
+            Effect::WarpToPortal(BERSERK_ROOM, 2)
+        );
+        assert_eq!(
+            outcome.effects[2],
+            Effect::WarpToPortal(BERSERK_ROOM, way_up)
+        );
+        assert_eq!(way_up, 3);
     }
 
     #[test]
@@ -1971,6 +2051,8 @@ mod tests {
             (220010001, "pt00", "s4tornado_enter", TORNADO_ROOM),
             (230040300, "in01", "s4resurrection", RESURRECTION_ROOM),
             (240010700, "pt00", "s4nest", EGG_NEST),
+            (101030104, "pt00", "s4hitman", HITMAN_HIDEOUT),
+            (105090800, "in00", "s4berserk", BERSERK_ROOM),
         ] {
             let way_in = data.field(from).unwrap().portal_by_name(name).unwrap();
             assert_eq!(way_in.script.as_deref(), Some(script));

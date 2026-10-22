@@ -306,6 +306,13 @@ impl ClientActor {
                         return Ok(Applied::Refused);
                     }
                 }
+                Effect::RequireNoMobs => {
+                    let (reply, count) = oneshot::channel();
+                    self.send_to_field(FieldMessage::MobCount { reply }).await?;
+                    if count.await.unwrap_or(1) > 0 {
+                        return Ok(Applied::Refused);
+                    }
+                }
                 Effect::AddSlotRow(kind) => {
                     let limit = next
                         .inventory
