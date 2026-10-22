@@ -69,6 +69,7 @@
 #include "../../Net/Handlers/OwlResults.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/InventoryPackets.h"
+#include "../../Net/Packets/MarriagePackets.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 
 #include <nlnx/audio.hpp>
@@ -2063,6 +2064,21 @@ namespace ms
 		// v83 FUN_004f31a5 drops nothing on an everlast map, silently.
 		if (Stage::get().get_mapinfo().is_everlast())
 			return;
+
+		// A token breaks the couple off instead (0x4f33ee); the server takes
+		// it.
+		if (marriage::is_token(item_id))
+		{
+			const std::optional<MarriageRecord> &record = player.get_marriage();
+
+			UI::get().emplace<UIYesNo>(marriage::break_question(record && record->married()), [id = item_id](bool yes)
+			{
+				if (yes)
+					BreakOffPacket(id).dispatch();
+			});
+
+			return;
+		}
 
 		if (item_drop::refused(item_id, traits.cash))
 		{

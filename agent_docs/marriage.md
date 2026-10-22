@@ -1,8 +1,9 @@
 # Engagement and marriage
 
 Two players of different genders become engaged with an engagement ring
-box, and may later marry. Only the engagement is done so far. The protocol
-comes from report b052 in the v83 reference notes.
+box, may break it off, and may later marry. Only the engagement and
+breaking it off are done so far. The protocol comes from reports b052 and
+b054 in the v83 reference notes.
 
 ## Storage
 
@@ -78,10 +79,33 @@ box's offset) and sends `MARRIAGE_RESULT` 11. A proposer who left meanwhile
 is engaged and keeps the box. Every refusal at this point reaches the
 proposer, so their wait always ends.
 
+## Breaking off
+
+The empty boxes and rings, 4031357 to 4031364, are the couple's tokens.
+Dropping one onto the field asks one Yes/No: "Dropping this item will break
+your engagement...", or for a record that says married, "You will not be
+able to receive the wedding ring...". A yes sends `RING_ACTION` 3 with the
+token's id and nothing else; the client keeps the token until the server
+takes it. v83 refuses to drop a wedding ring at all, so only a token breaks
+a couple off.
+
+The client actor (`break_off`) deletes the couple's row, clears the
+record, takes every token the player holds, and sends `MARRIAGE_RESULT` 13
+("Your engagement has been broken."), or 14 for a married couple. The
+directory passes the record to the partner (`CoupleEnded`), whose actor
+does the same, without the OK box if they are in the Cash Shop. A partner
+offline, or between channels, finds no record on their next login and
+keeps the token until they drop it, which then just takes it. Tokens in
+storage, a trade or a parcel are not taken. Both players are saved at once,
+as on engaging.
+
 ## Client
 
-- `Character/Marriage.h` has the record and the result texts.
+- `Character/Marriage.h` has the record, the tokens, and the result
+  texts.
 - `IO/MarriageActions` has the proposing flow.
+- `UIItemInventory::drop_on_stage` asks before a token is dropped and sends
+  `RING_ACTION` 3.
 - `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72) and
   `MARRIAGE_RESULT` (73).
 
@@ -96,7 +120,10 @@ answers, and the proposer waits until they withdraw.
 
 ## Not done yet
 
-- Breaking an engagement and divorce.
+- Mode 32, refusing to break off after a reservation, and taking the
+  wedding rings when a married couple breaks up.
+- The tokens' tooltip lines, "YOU ARE ENGAGED WITH : %s" and "YOU ARE
+  MARRIED WITH : %s".
 - The partner notices (`NOTIFY_MARRIED_PARTNER_MAP_TRANSFER`).
 - The ring's look.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.

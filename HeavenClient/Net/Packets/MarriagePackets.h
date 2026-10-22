@@ -38,4 +38,16 @@ namespace ms
 			write_int(proposer);
 		}
 	};
+
+	// Breaks off by dropping the token `item_id` (RING_ACTION 3, report
+	// b054); the token stays until the server takes it.
+	class BreakOffPacket : public OutPacket
+	{
+	public:
+		BreakOffPacket(int32_t item_id) : OutPacket(OutPacket::Opcode::RING_ACTION)
+		{
+			write_byte(3);
+			write_int(item_id);
+		}
+	};
 }

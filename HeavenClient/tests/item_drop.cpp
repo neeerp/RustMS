@@ -20,6 +20,7 @@ int main()
 		require(!refused(4000000, false), "a Snail Shell can be dropped");
 
 		require(kept(1112803) && kept(2240000) && kept(4031481) && !kept(4031482), "wedding rings stay silently");
+		require(kept(3994085) && !kept(3994597), "0x3cf1e5 stays silently");
 
 		Traits plain;
 		require(steps(4000000, plain).empty(), "an ordinary item drops without a question");

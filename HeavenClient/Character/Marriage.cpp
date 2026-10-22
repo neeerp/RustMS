@@ -36,12 +36,25 @@ namespace ms
 			return item_id / 10000 == 224;
 		}
 
-		// StringPool 0x108b and 0x1090 to 0x109a.
+		bool is_token(int32_t item_id)
+		{
+			return item_id >= 4031357 && item_id <= 4031364;
+		}
+
+		const char* break_question(bool married)
+		{
+			return married ? "You will not be able to receive the wedding ring.\\nIs that okay?"
+						   : "Dropping this item will break your engagement.\\nDo you still wish to drop this item?";
+		}
+
+		// StringPool 0x108b, 0x108e, 0x108f, 0x1090 to 0x109b.
 		const char* result_text(int8_t mode)
 		{
 			switch (mode)
 			{
 			case RESULT_ENGAGED: return "You are now engaged.";
+			case RESULT_BROKEN: return "Your engagement has been broken.";
+			case RESULT_DIVORCED: return "You are no longer married.";
 			case 18: return "You have entered the wrong character name.";
 			case 19: return "Your partner has to be in the same map.";
 			case 20: return "Your ETC slot is full.\\nPlease remove some items.";
@@ -55,6 +68,7 @@ namespace ms
 			case 28: return "She is currently being asked by another suitor.";
 			case 29: return "Unfortunately, the man who proposed to you has withdrawn his request for an engagement.";
 			case 30: return "She has politely declined your engagement request.";
+			case 32: return "You can't break the engagement after making reservations.";
 			default: return nullptr;
 			}
 		}
