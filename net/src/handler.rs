@@ -793,10 +793,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::PartySearchStart,
                 InGame(&world::PartySearchStartHandler),
             ),
-            (
-                Op::PartySearchStop,
-                InGame(&world::PartySearchStopHandler),
-            ),
+            (Op::PartySearchStop, InGame(&world::PartySearchStopHandler)),
             (
                 Op::ContiStateRequest,
                 InGame(&world::ContiStateRequestHandler),

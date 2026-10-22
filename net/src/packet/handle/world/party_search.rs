@@ -1,4 +1,6 @@
-use crate::handler::{HandlerResult, PartyRequest, WorldAction, WorldContext, WorldHandler, WorldResult};
+use crate::handler::{
+    HandlerResult, PartyRequest, WorldAction, WorldContext, WorldHandler, WorldResult,
+};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 
