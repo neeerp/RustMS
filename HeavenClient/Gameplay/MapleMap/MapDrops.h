@@ -17,7 +17,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <optional>
 
 #include "MapObjects.h"
 
@@ -81,6 +83,24 @@ namespace ms
 		// `ignored`, or 0 for none (FUN_0050483a).
 		int32_t find_pet_loot_at(Point<int16_t> petpos, int32_t self, int32_t party, bool mesos, bool items,
 								 bool others, const std::vector<int32_t> &ignored);
+
+		// A pet out in Wing Boots, as the sweep sees it: where it is, whether
+		// it takes items and others' drops, whether it wears a Binocular,
+		// and the ids it leaves.
+		struct Sweeper
+		{
+			Point<int16_t> position;
+			bool items;
+			bool others;
+			bool longrange;
+			const std::vector<int32_t> *ignored;
+		};
+
+		// Which way each of `pets` walks toward a drop, 0 for none
+		// (FUN_00508268): drop by drop, each goes to the nearest pet that
+		// would walk to it and isn't walking to another.
+		std::array<int8_t, 3> sweep(Point<int16_t> owner, const std::array<std::optional<Sweeper>, 3> &pets,
+									int32_t self, int32_t party);
 
 	private:
 		MapObjects drops;

@@ -336,6 +336,15 @@ namespace ms
 		// drop at its feet (FUN_00705c5d).
 		void check_pet_loot();
 
+		// What the pets leave (FUN_00508679): nothing unless the first pet
+		// wears an Item Ignore Pendant, and then what the lists of those of
+		// the pets out that wear one name.
+		std::vector<int32_t> pets_ignore();
+
+		// Each pet out in Wing Boots picks a drop near its owner to walk to
+		// (FUN_00508268), before the pets move.
+		void sweep_pets();
+
 		// Couples wearing their wedding rings near each other show the
 		// ring's mark, and its big effect when close (CUserPool::Update
 		// 0x9717b5).

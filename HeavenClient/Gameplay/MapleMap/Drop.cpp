@@ -356,6 +356,26 @@ namespace ms
 		sincepet = 0;
 	}
 
+	bool Drop::pet_sweepable(Point<int16_t> ownerpos, Point<int16_t> pet, int32_t self, int32_t party, bool items,
+							 bool others, bool longrange, const std::vector<int32_t> &ignored) const
+	{
+		if (playerdrop || (get_itemid() && !items && !others) || blocked())
+			return false;
+
+		if (pickup::pet_owned_by_other(pickuptype, owner, self, party, age - delay, others))
+			return false;
+
+		if (state != Drop::State::FLOATING || sincepet < pickup::RETRY)
+			return false;
+
+		if (!pickup::in_sweep_reach(ownerpos, pet, spot, longrange))
+			return false;
+
+		int32_t id = get_itemid() ? get_itemid() : pets::IGNORED_MESOS;
+
+		return std::find(ignored.begin(), ignored.end(), id) == ignored.end();
+	}
+
 	int32_t Drop::get_itemid() const
 	{
 		return 0;

@@ -145,6 +145,10 @@ namespace ms
 
 		const std::vector<int32_t> &get_ignored() const;
 
+		// Which way it walks toward a drop in Wing Boots: -1 left, 1 right,
+		// 0 none (FUN_00508268).
+		void set_sweep(int8_t direction);
+
 		bool is_local() const;
 
 		Stance get_stance() const;
@@ -174,6 +178,11 @@ namespace ms
 		Stance stance;
 		// Facing right.
 		bool flip;
+		// Which way it walks toward a drop, 0 for none.
+		int8_t sweep = 0;
+		// Where its owner was last, and how long they have stood there.
+		Point<int16_t> ownerpos;
+		int32_t owner_still = 0;
 
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;

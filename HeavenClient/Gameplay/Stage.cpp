@@ -451,6 +451,7 @@ namespace ms
 		Point<int16_t> drawn = player.get_position();
 
 		Point<int16_t> before = drawn;
+		sweep_pets();
 		player.update(physics);
 		catch_ladders(before);
 
@@ -1041,6 +1042,66 @@ namespace ms
 		}
 	}
 
+	std::vector<int32_t> Stage::pets_ignore()
+	{
+		std::vector<int32_t> ignored;
+
+		if (player.get_pet(0) && player.pet_wears(0, pets::ITEM_IGNORE))
+			for (uint8_t index = 0; index < 3; index++)
+			{
+				Optional<PetLook> pet = player.get_pet(index);
+
+				if (!pet)
+					break;
+
+				if (player.pet_wears(index, pets::ITEM_IGNORE))
+					ignored.insert(ignored.end(), pet->get_ignored().begin(), pet->get_ignored().end());
+			}
+
+		return ignored;
+	}
+
+	void Stage::sweep_pets()
+	{
+		auto wears = [&](uint8_t index, int32_t itemid) {
+			return player.pet_wears(index, itemid);
+		};
+
+		// Not for a dead owner, or in the Extra Frosty Snow Zone, as with
+		// looting.
+		bool sweeping = !player.is_dead() && mapid != 209080000;
+		std::vector<int32_t> ignored = sweeping ? pets_ignore() : std::vector<int32_t>();
+		const std::vector<int32_t> none;
+		std::array<std::optional<MapDrops::Sweeper>, 3> sweepers;
+
+		for (uint8_t index = 0; sweeping && index < 3; index++)
+		{
+			Optional<PetLook> pet = player.get_pet(index);
+
+			// A pet uses the ignore list only if it wears a pendant itself.
+			if (pet && wears(index, pets::SWEEPER))
+				sweepers[index] = MapDrops::Sweeper{ pet->get_position(), wears(index, pets::ITEM_POUCH),
+													 wears(index, pets::MAGIC_SCALES), wears(index, pets::LONG_RANGE),
+													 wears(index, pets::ITEM_IGNORE) ? &ignored : &none };
+		}
+
+		std::array<int8_t, 3> directions =
+			drops.sweep(player.get_position(), sweepers, player.get_oid(), player.get_party().get_id());
+
+		for (uint8_t index = 0; index < 3; index++)
+		{
+			Optional<PetLook> pet = player.get_pet(index);
+
+			if (!pet)
+				continue;
+
+			// A pet takes a drop even if it can't loot, but only one that
+			// loots walks to it (FUN_009c4122).
+			bool loots = wears(index, pets::MESO_MAGNET) || wears(index, pets::ITEM_POUCH);
+			pet->set_sweep(loots ? directions[index] : 0);
+		}
+	}
+
 	void Stage::check_pet_loot()
 	{
 		// Pets don't loot for a dead owner, or in the Extra Frosty Snow Zone
@@ -1052,22 +1113,7 @@ namespace ms
 			return player.pet_wears(index, itemid);
 		};
 
-		// What every pet leaves (FUN_00508679): nothing unless the first pet
-		// wears an Item Ignore Pendant, and then what the lists of those of
-		// the pets out that wear one name.
-		std::vector<int32_t> ignored;
-
-		if (player.get_pet(0) && wears(0, pets::ITEM_IGNORE))
-			for (uint8_t index = 0; index < 3; index++)
-			{
-				Optional<PetLook> pet = player.get_pet(index);
-
-				if (!pet)
-					break;
-
-				if (wears(index, pets::ITEM_IGNORE))
-					ignored.insert(ignored.end(), pet->get_ignored().begin(), pet->get_ignored().end());
-			}
+		std::vector<int32_t> ignored = pets_ignore();
 
 		for (uint8_t index = 0; index < 3; index++)
 		{

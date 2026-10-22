@@ -18,6 +18,7 @@
 #include "MapDrops.h"
 
 #include "Drop.h"
+#include "Pickup.h"
 #include "ItemDrop.h"
 #include "MesoDrop.h"
 
@@ -207,5 +208,48 @@ namespace ms
 		}
 
 		return 0;
+	}
+
+	std::array<int8_t, 3> MapDrops::sweep(Point<int16_t> owner, const std::array<std::optional<Sweeper>, 3> &pets,
+										  int32_t self, int32_t party)
+	{
+		std::array<int8_t, 3> directions = {0, 0, 0};
+		std::array<bool, 3> free;
+		std::array<int16_t, 3> petx = {0, 0, 0};
+
+		for (size_t i = 0; i < 3; i++)
+		{
+			free[i] = pets[i].has_value();
+
+			if (pets[i])
+				petx[i] = pets[i]->position.x();
+		}
+
+		for (auto &mmo : drops)
+		{
+			if (std::none_of(free.begin(), free.end(), [](bool f) { return f; }))
+				break;
+
+			Optional<Drop> drop = mmo.second.get();
+
+			if (!drop)
+				continue;
+
+			std::array<bool, 3> can = {false, false, false};
+
+			for (size_t i = 0; i < 3; i++)
+				can[i] = free[i] && drop->pet_sweepable(owner, pets[i]->position, self, party, pets[i]->items,
+														pets[i]->others, pets[i]->longrange, *pets[i]->ignored);
+
+			int8_t pet = pickup::sweeper_for(petx, can, drop->get_spot().x());
+
+			if (pet < 0)
+				continue;
+
+			directions[pet] = pickup::sweep_direction(drop->get_spot().x(), petx[pet]);
+			free[pet] = false;
+		}
+
+		return directions;
 	}
 }
