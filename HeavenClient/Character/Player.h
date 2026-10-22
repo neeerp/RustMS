@@ -431,6 +431,9 @@ namespace ms
 		// The player's engagement or marriage, if any.
 		const std::optional<MarriageRecord> &get_marriage() const;
 		void set_marriage(std::optional<MarriageRecord> record);
+		// Where the partner is, while the server says.
+		const PartnerSpot &get_partner() const;
+		void set_partner(PartnerSpot spot);
 
 	private:
 		// Whether the key for an action is held.
@@ -523,6 +526,7 @@ namespace ms
 		Alliance alliance;
 		Family family;
 		std::optional<MarriageRecord> marriage;
+		PartnerSpot partner;
 
 		EnumMap<Buffstat::Id, Buff> buffs;
 		ActiveBuffs active_buffs;

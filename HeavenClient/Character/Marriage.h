@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace ms
 {
@@ -28,6 +29,22 @@ namespace ms
 		const std::string& partner(bool female) const;
 
 		static MarriageRecord read(InPacket& recv);
+	};
+
+	// Where the partner is, as NOTIFY_MARRIED_PARTNER_MAP_TRANSFER last said
+	// (ctx+0x300c and +0x3010, report b057). Kept across the player's own
+	// map changes; map 0 is nowhere and id 0 no one.
+	struct PartnerSpot
+	{
+		int32_t mapid = 0;
+		int32_t id = 0;
+
+		// Whether a character on the map gets the minimap's partner dot.
+		bool is(int32_t cid) const;
+		// Whether a world map spot of `spot_maps` shows the partner's heart:
+		// it is the partner's but not the player's own on `own_map`
+		// (0x9edb98).
+		bool marks(const std::vector<int32_t>& spot_maps, int32_t own_map) const;
 	};
 
 	namespace marriage

@@ -151,6 +151,7 @@ namespace ms
 		OWL_GO_RESULT = 71,
 		MARRIAGE_REQUEST = 72,
 		MARRIAGE_RESULT = 73,
+		NOTIFY_MARRIED_PARTNER_MAP_TRANSFER = 75,
 		CHAR_MOVED = 185,
 		SPAWN_SUMMON = 175,
 		REMOVE_SUMMON = 176,
@@ -327,6 +328,7 @@ namespace ms
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
 		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
 		emplace<MARRIAGE_RESULT, MarriageResultHandler>();
+		emplace<NOTIFY_MARRIED_PARTNER_MAP_TRANSFER, PartnerMapHandler>();
 		emplace<SPAWN_NPC, SpawnNpcHandler>();
 		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();

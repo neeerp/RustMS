@@ -51,4 +51,13 @@ namespace ms
 		if (const char* text = marriage::result_text(mode))
 			UI::get().emplace<UIOk>(text, [](bool) {});
 	}
+
+	void PartnerMapHandler::handle(InPacket& recv) const
+	{
+		PartnerSpot spot;
+		spot.mapid = recv.read_int();
+		spot.id = recv.read_int();
+
+		Stage::get().get_player().set_partner(spot);
+	}
 }

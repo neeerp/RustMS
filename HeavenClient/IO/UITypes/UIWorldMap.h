@@ -117,6 +117,7 @@ namespace ms
 		Texture path_img;
 
 		Animation cur_pos;
+		Animation love_pos;
 		Animation npc_pos[MAPSPOT_TYPE_MAX];
 
 		std::map<uint16_t, Texture> link_images;

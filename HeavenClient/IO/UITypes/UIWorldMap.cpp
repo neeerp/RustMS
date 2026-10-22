@@ -94,6 +94,7 @@ namespace ms
 		map_edge[1] = ColorBox(1, MAP_HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
 
 		cur_pos = MapHelper["curPos"];
+		love_pos = MapHelper["lovePos"];
 
 		for (size_t i = 0; i < MAPSPOT_TYPE_MAX; i++)
 			npc_pos[i] = MapHelper["npcPos" + std::to_string(i)];
@@ -152,6 +153,13 @@ namespace ms
 				npc_pos[std::min<uint8_t>(spot.second.type, MAPSPOT_TYPE_MAX - 1)].draw(spot.first + position + base_position, alpha);
 		}
 
+		// The partner's spot shows a heart, unless it is the player's own.
+		const PartnerSpot& partner = Stage::get().get_player().get_partner();
+
+		for (const auto& spot : map_spots)
+			if (partner.marks(spot.second.map_ids, mapid))
+				love_pos.draw(spot.first + position + base_position, alpha);
+
 		for (auto spot : map_spots)
 		{
 			if (std::find(spot.second.map_ids.begin(), spot.second.map_ids.end(), mapid) != spot.second.map_ids.end())
@@ -207,6 +215,7 @@ namespace ms
 			npc_pos[i].update(1);
 
 		cur_pos.update();
+		love_pos.update();
 
 		UIElement::update();
 	}

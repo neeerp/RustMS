@@ -136,20 +136,32 @@ namespace ms
 				marker.draw(position + to_window(map_position) - Point<int16_t>(size.x() / 2, size.y()));
 			};
 
-			Texture portal_marker = markers["portal"];
+			// v83's order (0x85a126): others, the partner, NPCs, portals and
+			// the player on top. The partner's dot replaces their other one.
+			Texture other_marker = markers["another"];
+			const PartnerSpot& partner = Stage::get().get_player().get_partner();
+			const MapObject* partner_char = nullptr;
 
-			for (const auto& portal : portals)
-				draw_marker(portal_marker, portal.position);
+			for (const auto& chr : *Stage::get().get_chars().get_chars())
+			{
+				if (partner.is(chr.first))
+					partner_char = chr.second.get();
+				else
+					draw_marker(other_marker, chr.second->get_position());
+			}
+
+			if (partner_char)
+				draw_marker(markers["match"], partner_char->get_position());
 
 			Texture npc_marker = markers["npc"];
 
 			for (const auto& npc : *Stage::get().get_npcs().get_npcs())
 				draw_marker(npc_marker, npc.second->get_position());
 
-			Texture other_marker = markers["another"];
+			Texture portal_marker = markers["portal"];
 
-			for (const auto& chr : *Stage::get().get_chars().get_chars())
-				draw_marker(other_marker, chr.second->get_position());
+			for (const auto& portal : portals)
+				draw_marker(portal_marker, portal.position);
 
 			draw_marker(markers["user"], Stage::get().get_player().get_position());
 		}
