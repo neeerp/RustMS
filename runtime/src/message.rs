@@ -13,6 +13,7 @@
 //! whose queue is full is kicked instead. That makes wait cycles impossible.
 
 use game::alliance::Alliance;
+use game::family::Relatives;
 use game::{AvatarLook, FieldAvatar, Guild, Player};
 use net::events::{Entry, EventKind};
 use net::packet::build::world::door::DoorView;
@@ -91,6 +92,13 @@ pub enum ServerMessage {
     /// Someone else changed the player's guild (expelled them); read it
     /// again.
     GuildChanged,
+    /// `junior` (named so) said yes to the player's request; add them.
+    AddJunior {
+        junior: ClientId,
+        name: String,
+    },
+    /// The player's family changed; read it again.
+    FamilyChanged,
     /// The invitation the player's guild had to `alliance_id` stands; join
     /// it.
     JoinAlliance {
@@ -414,6 +422,8 @@ pub struct Presence {
     pub guild_id: Option<i32>,
     /// The guild's alliance, for its members' logins, levels and jobs.
     pub alliance_id: Option<i32>,
+    /// The senior and juniors, who hear of logins.
+    pub family: Relatives,
 }
 
 impl Presence {
@@ -432,6 +442,7 @@ impl Presence {
                 .as_ref()
                 .map(|guild| guild.alliance_id)
                 .filter(|&id| id != 0),
+            family: player.family.clone(),
         }
     }
 }
@@ -583,6 +594,27 @@ pub enum DirectoryMessage {
     /// `client_id` was put in or out of a guild by someone else.
     GuildChanged {
         client_id: ClientId,
+    },
+    /// Ask `junior`, if they are on `from`'s map and of the levels, to be
+    /// `from`'s junior.
+    FamilyInvite {
+        from: ClientId,
+        junior: ClientId,
+    },
+    /// `from` answered `inviter`'s junior request.
+    FamilyAnswer {
+        from: ClientId,
+        inviter: ClientId,
+        accept: bool,
+    },
+    /// These characters' families changed; those online read theirs again.
+    FamilyChanged {
+        ids: Vec<ClientId>,
+    },
+    /// Send `owner` the Family Tree with who is online, where.
+    FamilyChart {
+        owner: ClientId,
+        chart: game::family::FamilyChart,
     },
     /// The guild is gone; its invitations no longer stand.
     GuildDisbanded {

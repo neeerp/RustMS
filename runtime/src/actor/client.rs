@@ -8,6 +8,7 @@ mod duey;
 mod events;
 mod expiry;
 mod fame;
+mod family;
 mod guild_bbs;
 mod guilds;
 mod hazard;
@@ -510,6 +511,7 @@ impl ClientActor {
             WorldAction::Buddy(request) => self.buddy_request(request).await?,
             WorldAction::Note(request) => self.note_request(request).await?,
             WorldAction::Guild(request) => self.guild_request(request).await?,
+            WorldAction::Family(request) => self.family_request(request).await?,
             WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
@@ -680,6 +682,7 @@ impl ClientActor {
         self.show_mount().await?;
         self.load_buddies().await?;
         self.load_guild().await?;
+        self.load_family().await?;
         self.load_notes().await?;
         self.announce_parcels().await?;
         info!(
@@ -1220,6 +1223,8 @@ impl ClientActor {
             ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
+            ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,
+            ServerMessage::FamilyChanged => self.family_changed().await?,
             ServerMessage::JoinAlliance { alliance_id } => self.join_alliance(alliance_id).await?,
             ServerMessage::PartySkill {
                 used,

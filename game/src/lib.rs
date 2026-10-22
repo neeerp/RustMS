@@ -9,6 +9,7 @@ pub mod ap_reset;
 pub mod buff;
 pub mod character;
 pub mod exp;
+pub mod family;
 pub mod guild;
 pub mod guild_bbs;
 pub mod inventory;

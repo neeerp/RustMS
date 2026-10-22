@@ -18,6 +18,7 @@ mod door;
 mod duey;
 mod emote;
 mod fame;
+mod family;
 mod guild;
 mod guild_bbs;
 mod hammer;
@@ -91,6 +92,9 @@ pub use self::door::UseDoorHandler;
 pub use self::duey::DueyActionHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
+pub use self::family::{
+    AcceptFamilyHandler, AddFamilyHandler, OpenFamilyHandler, OpenFamilyPedigreeHandler,
+};
 pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};
 pub use self::guild_bbs::GuildBbsHandler;
 pub use self::hammer::UseHammerHandler;
