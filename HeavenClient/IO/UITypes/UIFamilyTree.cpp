@@ -351,7 +351,7 @@ namespace ms
 			const Family& family = Stage::get().get_player().get_family();
 			const std::vector<FamilyPrivilege>& privileges = family.get_privileges();
 
-			// The player's own, even in another's tree (0x80bce7).
+			// The player's own (0x80bce7); HC shows tooltips only in their own tree.
 			if (int32_t index = family.in_use(); index >= 0)
 			{
 				std::string name = index < static_cast<int32_t>(privileges.size())
@@ -363,7 +363,6 @@ namespace ms
 
 			if (!chart.used.empty())
 			{
-
 				text += USED_TODAY;
 
 				for (auto& [index, times] : chart.used)

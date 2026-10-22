@@ -210,7 +210,10 @@ namespace ms
 		int32_t index = family.in_use();
 
 		if (index < 0 || index >= static_cast<int32_t>(privileges.size()))
+		{
+			UI::get().clear_help(TYPE);
 			return;
+		}
 
 		UI::get().show_help(TYPE, privileges[index].name, privileges[index].description);
 	}

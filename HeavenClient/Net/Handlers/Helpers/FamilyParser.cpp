@@ -72,7 +72,7 @@ namespace ms
 			recv.skip_int();
 			recv.skip_int();
 			// It ends `delta` ms from now, or ended that long ago (0xa33f82).
-			bool ago = recv.read_bool();
+			bool ago = recv.read_byte() != 0;
 			int32_t delta = recv.read_int();
 			in_use.left = ago ? 0 : std::max(delta, 0);
 

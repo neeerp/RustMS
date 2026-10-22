@@ -226,8 +226,6 @@ namespace ms
 			tree->set_online(name, online);
 	}
 
-	// A modal Yes/No with nothing gating it; any answer but Yes is a no
-	// (report b050 3).
 	// A new one takes the old one's icon away (0xa34fa4). The client never
 	// takes it away by itself: the server sends 0 when it ends.
 	void FamilySetPrivilegeHandler::handle(InPacket& recv) const
@@ -240,6 +238,8 @@ namespace ms
 			bufflist->set_family(in_use.icon, in_use.left);
 	}
 
+	// A modal Yes/No with nothing gating it; any answer but Yes is a no
+	// (report b050 3).
 	void FamilySummonRequestHandler::handle(InPacket& recv) const
 	{
 		std::string summoner = recv.read_string();
