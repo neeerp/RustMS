@@ -346,6 +346,8 @@ pub mod keys {
     pub const RIEN_TUTOR_FITNESS_1: &str = "portal.rien_tutor.fitness1";
     pub const RIEN_TUTOR_FITNESS_2: &str = "portal.rien_tutor.fitness2";
     pub const RIEN_TUTOR_FITNESS_3: &str = "portal.rien_tutor.fitness3";
+    /// The Helios Tower elevator (`elevator`) while the car is away.
+    pub const ELEVATOR_AWAY: &str = "portal.elevator.away";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1015,6 +1017,7 @@ mod tests {
             keys::RIEN_TUTOR_FITNESS_1,
             keys::RIEN_TUTOR_FITNESS_2,
             keys::RIEN_TUTOR_FITNESS_3,
+            keys::ELEVATOR_AWAY,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

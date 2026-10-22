@@ -89,6 +89,35 @@ Its NPCs, with placeholder lines under the `plane.*` keys:
   Changi's let passengers back out to the airport; the ticket is gone. On
   either plane, Kerny only says it lands soon (`conti::riding_on`).
 
+### The Helios Tower elevator
+
+Ludibrium's Helios Tower has an elevator between its 2nd floor (222020100)
+and its 99th (222020200), made of two more shipless routes. The car docks on
+a floor for a minute, rides for one, and leaves the other floor two minutes
+after it left this one: a 4-minute term, the way up 2 minutes behind the way
+down (`Timetable::offset`; Edelstein's Continent 4 and 5, Cosmic's
+`Elevator.js`). It is free: no ticket, no fare, no NPC.
+
+| Route | Boards at | Waiting room | Car | Arrives at | Leaves at |
+| --- | --- | --- | --- | --- | --- |
+| `ELEVATOR_UP` | 222020100 | 222020110 | 222020111 | 222020200 portal 0 | :02 and every 4 minutes |
+| `ELEVATOR_DOWN` | 222020200 | 222020210 | 222020211 | 222020100 `st00` | :00 and every 4 minutes |
+
+- The floors' `in00` (pt 8, the `elevator` portal script) lets a player into
+  the waiting room, portal 0, with the portal sound while that floor's route
+  boards (the car is there), else says so in pink
+  (`portal.elevator.away`, sourced from Server.Scripts' `elevator.lua`).
+- Each floor has the reactor `elevator` (2208004): state 0 the car with its
+  door open (`conti::CAR_HERE`), 1 the door shut (`CAR_AWAY`). `Route::car`
+  names it. A floor's field sets it from the clock (`conti::car_state`) when
+  it starts and on every trips reading, so it goes to 1 as the car leaves
+  (`Move`) and to 0 as it docks (the other way's `End`); a change is shown
+  with HIT_REACTOR, delay 0 and event 0 (`ReactorSet::set_state`). Reading
+  the state rather than the changes keeps the door right across a stalled
+  tick. Its events are item events (type 100), so nobody can hit it.
+- The waiting rooms and cars have no time limit and no NPC; their
+  `forcedReturn` is the floor. Players walk out by `out00` or fall out.
+
 `conti::now()` is route time in milliseconds: the wall clock times
 `RUSTMS_CONTI_SCALE` (a whole number, default 1). The harness world sets it
 to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
@@ -103,7 +132,9 @@ to 60, so a 15-minute cycle takes 15 seconds (`tests/ships.rs`).
     (CONTI_MOVE 12, 6). Ellinia's platform is both, so it sees each;
   - in the waiting room at `Move`, and on the deck and in the cabin at
     `End`, everyone is moved on (`ServerMessage::ShipWarp`);
-  - on an Ellinia-Orbis deck, the Crimson Balrog's attack (below).
+  - on an Ellinia-Orbis deck, the Crimson Balrog's attack (below);
+  - on the Helios Tower's floors, the elevator's door, set from the clock
+    on each reading (`conti::car_state`).
 - The client actor (`runtime/src/actor/client/ships.rs`) warps on
   `ShipWarp` only if the player is still on that map. A player in the Cash
   Shop stays where they are.

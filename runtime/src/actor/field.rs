@@ -135,6 +135,12 @@ impl FieldActor {
     ) -> Self {
         mobs.start(Instant::now());
         reactors.respawn(Instant::now());
+        // The trips are read from the same moment the elevator's car is
+        // placed, so that no change is missed or shown twice.
+        let route_time = conti::now();
+        if let Some((name, state)) = conti::car_state(key.map_id, route_time) {
+            reactors.set_state(name, state);
+        }
         Self {
             key,
             rx,
@@ -150,7 +156,7 @@ impl FieldActor {
             doors: HashMap::new(),
             trades: Trades::default(),
             shops: Shops::default(),
-            trips: conti::has_trips(key.map_id).then(conti::now),
+            trips: conti::has_trips(key.map_id).then_some(route_time),
             weather: None,
             tick,
         }
@@ -1763,6 +1769,15 @@ impl FieldActor {
                     }
                     let left = self.mobs.leave_all(Instant::now());
                     self.show_left(left);
+                }
+            }
+        }
+        // The elevator's door, from the clock: shut as the car leaves,
+        // open as it docks.
+        if let Some((name, state)) = conti::car_state(self.key.map_id, now) {
+            for view in self.reactors.set_state(name, state) {
+                if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                    self.broadcast(None, packet);
                 }
             }
         }

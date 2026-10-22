@@ -508,6 +508,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             let hour = crate::conti::time_of_day(crate::conti::now()).0;
             cursed_forest(player, hour)
         }
+        "elevator" => elevator(player.stats.map_id, crate::conti::now()),
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -542,6 +543,20 @@ fn cursed_forest(player: &Player, hour: u8) -> ScriptOutcome {
         CURSED_FOREST
     };
     through(Effect::WarpToPortal(forest, named(forest, "out00")))
+}
+
+/// The Helios Tower elevator's door on `map_id` at route time `t`: into the
+/// floor's waiting room while the car is there, which the car takes up or
+/// down when it leaves (`net::conti`).
+fn elevator(map_id: i32, t: i64) -> ScriptOutcome {
+    match crate::conti::departing_from(map_id) {
+        Some(route)
+            if route.car.is_some() && route.timetable.state(t) == crate::conti::State::Wait =>
+        {
+            through(Effect::WarpToPortal(route.waiting_room, 0))
+        }
+        _ => refused(keys::ELEVATOR_AWAY),
+    }
 }
 
 /// A portal that lets the player through with its sound.
@@ -1003,6 +1018,35 @@ mod tests {
         assert_eq!(named(CURSED_FOREST_AFTER_FAUST, "out00"), 1);
         // The closed and the daytime lines differ.
         assert_ne!(at(&[], 20), at(&[(2224, started)], 12));
+    }
+
+    #[test]
+    fn the_elevator_door_opens_onto_the_waiting_room_while_the_car_is_there() {
+        const MINUTE: i64 = 60_000;
+        // The car leaves the 99th floor on the hour and the 2nd floor two
+        // minutes later; each boards for the minute before.
+        let hour = 5 * 60 * MINUTE;
+        let door = |map_id, at| elevator(map_id, at);
+        let waiting = |room| through(Effect::WarpToPortal(room, 0));
+        assert_eq!(door(222020100, hour + 90_000), waiting(222020110));
+        assert_eq!(door(222020200, hour - 30_000), waiting(222020210));
+        for minute in [0, 2, 3] {
+            assert!(pink(&door(222020100, hour + minute * MINUTE + 30_000)));
+        }
+        for minute in [0, 1, 2] {
+            assert!(pink(&door(222020200, hour + minute * MINUTE + 30_000)));
+        }
+        assert!(pink(&door(103000100, hour + 90_000)));
+        assert_eq!(
+            portal_id(222020100, |portal| portal.script.as_deref()
+                == Some("elevator")),
+            5
+        );
+        assert_eq!(
+            portal_id(222020200, |portal| portal.script.as_deref()
+                == Some("elevator")),
+            5
+        );
     }
 
     #[test]
