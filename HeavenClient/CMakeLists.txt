@@ -451,6 +451,8 @@ add_executable(HeavenClient
     Character/Look/PetLook.h
     Character/Look/Stance.cpp
     Character/Look/Stance.h
+    Character/Look/GhostLook.cpp
+    Character/Look/GhostLook.h
     Character/Look/MorphTemplate.cpp
     Character/Look/MorphTemplate.h
     Character/Look/TamingMob.cpp

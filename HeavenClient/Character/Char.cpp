@@ -850,6 +850,22 @@ namespace ms
 		return shape.is_item() || shape.is_hide() ? &shape : nullptr;
 	}
 
+	void Char::haunt(int16_t ghost, bool at_once)
+	{
+		if (look.get_ghost() == ghost)
+			return;
+
+		look.set_ghost(ghost);
+
+		if (!at_once)
+			show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+	}
+
+	bool Char::is_ghost() const
+	{
+		return look.get_ghost() != 0;
+	}
+
 	bool Char::is_barrelled() const
 	{
 		int32_t morph = look.get_morph();

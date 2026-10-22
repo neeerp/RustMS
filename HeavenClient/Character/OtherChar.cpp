@@ -114,12 +114,14 @@ namespace ms
 
 	void OtherChar::update_look(const LookEntry &newlook)
 	{
-		// The new look rides, and is morphed, as the old was.
+		// The new look rides, and is morphed or a ghost, as the old was.
 		int32_t riding = look.get_vehicle();
 		int32_t morph = look.get_morph();
+		int16_t ghost = look.get_ghost();
 		look = newlook;
 		look.set_vehicle(riding);
 		look.set_morph(morph);
+		look.set_ghost(ghost);
 		look.set_tired(mount::tired(mount_level, mount_fatigue));
 
 		set_state(path.get_state().stance);
@@ -140,6 +142,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::MORPH)
 				transform(value, init, Stage::get().get_mapinfo().is_underwater());
+
+			if (stat == Buffstat::Id::GHOST_MORPH)
+				haunt(static_cast<int16_t>(value), init);
 
 			// The glow is Energy Charge's for the character's line (0x94b44b).
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
@@ -169,6 +174,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::MORPH)
 				transform(0, false);
+
+			if (stat == Buffstat::Id::GHOST_MORPH)
+				haunt(0, false);
 
 			if (stat == Buffstat::Id::ENERGY_CHARGE)
 				show_energy(0, false, false);

@@ -554,10 +554,10 @@ namespace ms
 
 	void UIPersonalShop::create(int16_t slot, int32_t itemid)
 	{
-		// Not on a mount, then not while transformed (FUN_00a1dd99).
+		// Not on a mount, then not while transformed or a ghost (FUN_00a1dd99).
 		Player &player = Stage::get().get_player();
 
-		if (player.ride_refuses() || player.shape_refuses())
+		if (player.ride_refuses() || player.shape_refuses() || player.ghost_refuses())
 			return;
 
 		if (UI::get().dialog_open())

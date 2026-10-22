@@ -86,13 +86,27 @@ int main()
 		require(cash_morph_refused(3010000, 0), "not on a chair");
 		require(cash_morph_refused(0, 1902000), "nor on a tamed monster");
 		require(!cash_morph_refused(0, 1932000), "but on another ride");
-		require(!potion_refused(2210000, 0, 0, 0, false), "a morph potion is used standing");
-		require(potion_refused(2210000, 1, 0, 0, false), "not while morphed");
-		require(potion_refused(2360000, 0, 3010000, 0, false), "nor a ghost item on a chair");
-		require(potion_refused(2210000, 0, 0, 1932000, false), "nor aboard the Battleship");
-		require(potion_refused(2210000, 0, 0, 0, true), "nor in a mini room");
-		require(!potion_refused(2210000, 0, 0, 1902000, false), "a tamed monster is refused elsewhere");
-		require(!potion_refused(2000000, 1, 3010000, 1932000, true), "other potions are not refused here");
+		require(!potion_refused(2210000, 0, false, 0, 0, false), "a morph potion is used standing");
+		require(potion_refused(2210000, 1, false, 0, 0, false), "not while morphed");
+		require(potion_refused(2210000, 0, true, 0, 0, false), "nor by a ghost");
+		require(potion_refused(2360000, 0, true, 0, 0, false), "and a ghost item neither");
+		require(potion_refused(2360000, 0, false, 3010000, 0, false), "nor a ghost item on a chair");
+		require(potion_refused(2210000, 0, false, 0, 1932000, false), "nor aboard the Battleship");
+		require(potion_refused(2210000, 0, false, 0, 0, true), "nor in a mini room");
+		require(!potion_refused(2210000, 0, false, 0, 1902000, false), "a tamed monster is refused elsewhere");
+		require(!potion_refused(2000000, 1, true, 3010000, 1932000, true), "other potions are not refused here");
+
+		require(ghost_action("stand1") == "ghoststand" && ghost_action("alert") == "ghoststand",
+			"a ghost stands, alert or not");
+		require(ghost_action("walk2") == "ghostwalk", "and walks");
+		require(ghost_action("prone") == "ghostproneStab", "lies as its proneStab");
+		require(ghost_action("ladder") == "ghostladder" && ghost_action("rope") == "ghostrope", "climbs");
+		require(ghost_action("jump") == "ghostjump" && ghost_action("fly") == "ghostfly", "jumps and swims");
+		require(ghost_action("sit") == "ghostsit", "and sits");
+		require(ghost_action("swingO1") == "ghoststand", "anything else stands");
+		require(ghost_variant(1) == "1" && ghost_variant(2) == "2", "a ghost's value is its variant");
+		require(std::find(GHOST_ACTIONS.begin(), GHOST_ACTIONS.end(), ghost_action("sit")) != GHOST_ACTIONS.end(),
+			"each action is loaded");
 
 		std::cout << "Morph rules passed\n";
 		return 0;

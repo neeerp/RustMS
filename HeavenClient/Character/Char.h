@@ -371,6 +371,13 @@ namespace ms
 		// Whether the character is hidden in Oak Barrel.
 		bool is_barrelled() const;
 
+		// Look like a ghost item's ghost of a value, or as before with 0, in a puff of smoke unless coming
+		// into view `at_once` (FUN_00941c87).
+		void haunt(int16_t ghost, bool at_once);
+
+		// Whether it is a ghost item's ghost (Ghost, bit 49).
+		bool is_ghost() const;
+
 		// Whether it is Transformation's superman.
 		bool is_superman() const;
 
