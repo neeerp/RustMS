@@ -11,6 +11,8 @@ pub const MIN_JUNIOR_LEVEL: u8 = 10;
 pub const MAX_LEVEL_GAP: u8 = 20;
 /// The most generations a family may span, top to bottom (0x1202).
 pub const MAX_GENERATIONS: usize = 1000;
+/// The longest precepts the client lets the leader type (b039).
+pub const MAX_PRECEPTS: usize = 200;
 
 /// Why a junior wasn't added: FAMILY_RESULT's code, which picks the
 /// client's line.
@@ -66,6 +68,21 @@ pub fn check_levels(senior: u8, junior: u8) -> Result<(), Refusal> {
     } else {
         Ok(())
     }
+}
+
+/// What parting a senior of level `senior` from a junior of level `junior`
+/// costs whoever asks, in mesos: `(d + 2500) * d` for the levels between
+/// them, as the client's confirmation shows it (report b048).
+pub fn separation_fee(senior: u8, junior: u8) -> i32 {
+    let gap = i32::from(senior.saturating_sub(junior));
+    (gap + 2500) * gap
+}
+
+/// The Rep that parting from a junior of level `junior` takes from the
+/// senior's own senior; the senior loses twice it (report b048).
+pub fn separation_rep(junior: u8) -> i32 {
+    let level = i32::from(junior);
+    (level / 20 + 10) * level
 }
 
 /// A character's senior and juniors, by character id; both empty out of a
@@ -143,5 +160,16 @@ mod tests {
         assert_eq!(check_levels(30, 31), Err(Refusal::NotLower));
         assert_eq!(check_levels(50, 30), Ok(()));
         assert_eq!(check_levels(51, 30), Err(Refusal::LevelGap));
+    }
+
+    #[test]
+    fn separating_costs_by_the_gap_and_the_juniors_level() {
+        assert_eq!(separation_fee(60, 50), 25_100);
+        assert_eq!(separation_fee(50, 50), 0);
+        // A junior who has outgrown the senior costs nothing.
+        assert_eq!(separation_fee(50, 60), 0);
+        assert_eq!(separation_rep(50), 600);
+        assert_eq!(separation_rep(19), 190);
+        assert_eq!(separation_rep(20), 220);
     }
 }

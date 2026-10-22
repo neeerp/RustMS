@@ -34,6 +34,24 @@ namespace ms
 		}
 	};
 
+	// Parts the player from one of their juniors, by id
+	// (SEPARATE_FAMILY_BY_SENIOR, report b048).
+	class SeparateFamilyBySeniorPacket : public OutPacket
+	{
+	public:
+		SeparateFamilyBySeniorPacket(int32_t junior) : OutPacket(OutPacket::Opcode::SEPARATE_FAMILY_BY_SENIOR)
+		{
+			write_int(junior);
+		}
+	};
+
+	// Parts the player from their senior (SEPARATE_FAMILY_BY_JUNIOR).
+	class SeparateFamilyByJuniorPacket : public OutPacket
+	{
+	public:
+		SeparateFamilyByJuniorPacket() : OutPacket(OutPacket::Opcode::SEPARATE_FAMILY_BY_JUNIOR) {}
+	};
+
 	// The answer to a senior's invitation (ACCEPT_FAMILY).
 	class AcceptFamilyPacket : public OutPacket
 	{

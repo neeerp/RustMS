@@ -14,8 +14,9 @@ who has ever been in a family:
 - `senior_id` points at the character's senior; the juniors are the rows
   that point at them.
 - It also holds the rep counters: current, total, today, and rep recorded
-  to the senior. Nothing earns rep yet.
-- `precepts` matters only on the leader's row.
+  to the senior. Nothing earns rep yet; only separating takes it away.
+- `precepts` matters only on the leader's row. A junior who leaves keeps an
+  empty one until they gain juniors of their own.
 
 `game::family` holds the rules and the types:
 
@@ -23,6 +24,9 @@ who has ever been in a family:
 - A junior must be level 10 or above, below the senior's level, and at
   most 20 levels below the senior (`check_levels`).
 - A family may span at most 1000 generations.
+- The precepts are at most 200 characters (`MAX_PRECEPTS`).
+- Separating costs Rep and mesos (`separation_rep`, `separation_fee`; see
+  below).
 - `Refusal` maps each refusal to the `FAMILY_RESULT` code that picks the
   client's line.
 
@@ -86,6 +90,33 @@ packets into `FamilyRequest`s, which the client actor
   - When INFO arrives while the player's own tree is open, the client asks
     for the chart again.
 
+- **`CHANGE_FAMILY_MESSAGE` (text):** only the leader (a character with
+  juniors and no senior) may set the precepts (`db::family::set_precepts`).
+  The whole family then gets INFO again.
+- **Separating:** `SEPARATE_FAMILY_BY_SENIOR` (0x94, the junior's id) is
+  sent when the player cuts off one of their juniors, and
+  `SEPARATE_FAMILY_BY_JUNIOR` (0x95, empty) when they leave their senior
+  (report b048 corrects b039 on which is which).
+  1. The actor names the pair from `Player.family`. A junior who isn't the
+     player's, or 0x95 without a senior, is ignored.
+  2. The directory adds the levels of whichever of the two is online
+     (`DirectoryMessage::FamilySeparate`), and the player's actor runs
+     `db::family::separate` (`ServerMessage::Separate`). It reads an offline
+     character's level from the database.
+  3. In one transaction that locks both rows and the senior's senior, it
+     checks that they are still senior and junior and works out the fee:
+     `(d + 2500) * d` mesos, where `d` is how many levels the senior is
+     above the junior. The player pays, whichever side they are on. If the
+     two are no longer related, the player just gets INFO again. If they can't, `FAMILY_RESULT` 0x50
+     (leaving a senior) or 0x51 (cutting a junior) tells them how much they
+     need.
+  4. With `X = (L / 20 + 10) * L` for the junior's level `L`, the senior
+     loses `2X` Rep and the senior's own senior `X`, never below 0. The
+     junior's link and the Rep recorded to the senior are cleared.
+  5. The player gets their mesos as a stat update, then `FAMILY_RESULT` 1,
+     which the client shows with the name it remembered. Everyone in the old
+     family gets INFO again.
+
 ### Login notices
 
 Relatives (the senior and the juniors) get `FAMILY_NOTIFY_LOGIN_OR_LOGOUT`
@@ -96,9 +127,7 @@ when a member enters or leaves the game. A channel change is held for
 
 These are not implemented yet:
 
-- separating from a senior or a junior;
 - entitlements (`USE_FAMILY`) and the summon;
-- changing the precepts;
 - earning rep.
 
 ## Client
@@ -111,8 +140,8 @@ b045 (how they open).
   tree's 11 boxes as the v83 decoder does. `tests/family.cpp` covers the
   parser and the arrangement.
 - **Packets:** `Net/Handlers/FamilyHandlers.cpp` handles receive opcodes
-  94-102. `Net/Packets/FamilyPackets.h` builds the sends; separation (0x94,
-  0x95) and the summon answer (0x99) are not built yet.
+  94-102. `Net/Packets/FamilyPackets.h` builds the sends; the summon answer
+  (0x99) is not built yet.
 - **Family window (`UIFamily`):** the Family key (F by default) and BtFamily
   on the player's own info open it, and each opening sends `OPEN_FAMILY`.
   It shows the family's name, the scrolling precepts, juniors, Rep and the
@@ -128,7 +157,15 @@ b045 (how they open).
   Texts are centred in their boxes as v83 does it, halving the room left as
   unsigned, so one wider than its box is never seen: the empty boxes'
   "(You do not have family members.)" shows nothing.
-  BtBye stays disabled until separation exists.
+- **Separating (report b048):** BtBye is enabled on the player's own tree.
+  With the senior or a junior selected it goes straight to the Yes/No;
+  otherwise it asks for a name and matches it exactly against the senior,
+  then the juniors, saying nothing if none match. Double-clicking a filled
+  senior or junior box does the same as BtBye. There is a single Yes/No
+  (`FamilyParting::text`). It gives the Rep lost and, when there is one, the
+  fee, from the levels on the chart. Either answer clears the selection.
+  Yes sends 0x94 or 0x95 and remembers the name for `FAMILY_RESULT` 1's "You
+  have severed ties with %s." The tree stays open and refreshes on INFO.
 - **Adding a junior:** the name prompt, or the avatar menu's Family row
   (shown once INFO says there is room), sends `ADD_FAMILY`.
 - **Being asked:** `FAMILY_JOIN_REQUEST` shows a Family card, unless one is

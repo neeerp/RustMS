@@ -1225,6 +1225,11 @@ impl ClientActor {
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,
             ServerMessage::FamilyChanged => self.family_changed().await?,
+            ServerMessage::Separate {
+                senior,
+                junior,
+                levels,
+            } => self.separate(senior, junior, levels).await?,
             ServerMessage::JoinAlliance { alliance_id } => self.join_alliance(alliance_id).await?,
             ServerMessage::PartySkill {
                 used,

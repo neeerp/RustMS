@@ -5,7 +5,8 @@
 use crate::schema::{characters, family_members};
 use diesel::prelude::*;
 use game::family::{
-    ChartMember, FamilyChart, FamilyInfo, Refusal, Relatives, MAX_GENERATIONS, MAX_JUNIORS,
+    separation_fee, separation_rep, ChartMember, FamilyChart, FamilyInfo, Refusal, Relatives,
+    MAX_GENERATIONS, MAX_JUNIORS, MAX_PRECEPTS,
 };
 
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
@@ -262,5 +263,102 @@ pub fn add_junior(senior: i32, junior: i32) -> crate::Result<Result<Vec<i32>, Re
         let (mut changed, _) = descendants(conn, junior)?;
         changed.insert(0, senior);
         Ok(Ok(changed))
+    })?)
+}
+
+/// The leader's new precepts. Anyone else, or a leader of no one, changes
+/// nothing; otherwise everyone in the family, who see them in the window.
+pub fn set_precepts(leader: i32, precepts: &str) -> crate::Result<Option<Vec<i32>>> {
+    if precepts.chars().count() > MAX_PRECEPTS {
+        return Ok(None);
+    }
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        if senior_of(conn, leader)?.is_some() || juniors(conn, leader)?.is_empty() {
+            return Ok(None);
+        }
+        diesel::update(family_members::table.find(leader))
+            .set(family_members::precepts.eq(precepts))
+            .execute(conn)?;
+        Ok(Some(descendants(conn, leader)?.0))
+    })?)
+}
+
+/// How parting a senior from a junior went.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Separation {
+    /// They aren't senior and junior (any more).
+    NotRelated,
+    /// The asker hasn't the fee.
+    Short { fee: i32 },
+    /// Parted, for `fee`. `ids` is the family as it was, whose windows all
+    /// change.
+    Parted { fee: i32, ids: Vec<i32> },
+}
+
+/// Part `junior`, with their branch, from `senior`, for the asker, who has
+/// `meso`. Levels are those online now where given, else the saved ones.
+/// The senior loses twice `separation_rep` and their senior once; the
+/// junior leads a family of their own, with no precepts yet (report b048).
+pub fn separate(
+    senior: i32,
+    junior: i32,
+    levels: (Option<u8>, Option<u8>),
+    meso: i32,
+) -> crate::Result<Separation> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        // The senior's senior loses Rep too: lock all three in id order, so
+        // as not to deadlock with a separation or an add one level up.
+        let above = senior_of(conn, senior)?;
+        let mut rows: Vec<i32> = [senior, junior].into_iter().chain(above).collect();
+        rows.sort_unstable();
+        family_members::table
+            .filter(family_members::character_id.eq_any(rows))
+            .order(family_members::character_id)
+            .select(family_members::character_id)
+            .for_update()
+            .load::<i32>(conn)?;
+        if senior_of(conn, junior)? != Some(senior) || senior_of(conn, senior)? != above {
+            return Ok(Separation::NotRelated);
+        }
+        let mut level = |id: i32, known: Option<u8>| -> QueryResult<u8> {
+            match known {
+                Some(level) => Ok(level),
+                None => characters::table
+                    .find(id)
+                    .select(characters::level)
+                    .first::<i16>(conn)
+                    .map(|level| level.clamp(0, 255) as u8),
+            }
+        };
+        let (senior_level, junior_level) = (level(senior, levels.0)?, level(junior, levels.1)?);
+        let fee = separation_fee(senior_level, junior_level);
+        if meso < fee {
+            return Ok(Separation::Short { fee });
+        }
+        let seniors = seniors(conn, senior)?;
+        let leader = seniors.last().copied().unwrap_or(senior);
+        let (ids, _) = descendants(conn, leader)?;
+
+        let rep = separation_rep(junior_level);
+        let losses = std::iter::once((senior, 2 * rep)).chain(above.map(|s| (s, rep)));
+        for (id, loss) in losses {
+            let reputation = family_members::table
+                .find(id)
+                .select(family_members::reputation)
+                .first::<i32>(conn)?;
+            diesel::update(family_members::table.find(id))
+                .set(family_members::reputation.eq((reputation - loss).max(0)))
+                .execute(conn)?;
+        }
+        diesel::update(family_members::table.find(junior))
+            .set((
+                family_members::senior_id.eq(None::<i32>),
+                family_members::senior_reputation.eq(0),
+                family_members::precepts.eq(""),
+            ))
+            .execute(conn)?;
+        Ok(Separation::Parted { fee, ids })
     })?)
 }

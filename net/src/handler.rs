@@ -301,6 +301,10 @@ pub enum FamilyRequest {
     Add { name: String },
     /// Answer `inviter`'s request to be their junior.
     Answer { inviter: ClientId, accept: bool },
+    /// The leader's new precepts.
+    Precepts { precepts: String },
+    /// Part from the junior with this id, or from the player's senior.
+    Separate { junior: Option<ClientId> },
 }
 
 /// A guild operation, carried out by the client's actor.
@@ -849,7 +853,19 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::OpenFamily, InGame(&world::OpenFamilyHandler)),
             (Op::AddFamily, InGame(&world::AddFamilyHandler)),
+            (
+                Op::SeparateFamilyBySenior,
+                InGame(&world::SeparateFamilyBySeniorHandler),
+            ),
+            (
+                Op::SeparateFamilyByJunior,
+                InGame(&world::SeparateFamilyByJuniorHandler),
+            ),
             (Op::AcceptFamily, InGame(&world::AcceptFamilyHandler)),
+            (
+                Op::ChangeFamilyMessage,
+                InGame(&world::ChangeFamilyMessageHandler),
+            ),
             (
                 Op::AllianceOperation,
                 InGame(&world::AllianceOperationHandler),

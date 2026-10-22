@@ -99,6 +99,13 @@ pub enum ServerMessage {
     },
     /// The player's family changed; read it again.
     FamilyChanged,
+    /// Part `junior` from `senior` for the player, at these levels where
+    /// they are online.
+    Separate {
+        senior: ClientId,
+        junior: ClientId,
+        levels: (Option<u8>, Option<u8>),
+    },
     /// The invitation the player's guild had to `alliance_id` stands; join
     /// it.
     JoinAlliance {
@@ -606,6 +613,13 @@ pub enum DirectoryMessage {
         from: ClientId,
         inviter: ClientId,
         accept: bool,
+    },
+    /// `from` would part `junior` from `senior`; their levels now, for the
+    /// fee.
+    FamilySeparate {
+        from: ClientId,
+        senior: ClientId,
+        junior: ClientId,
     },
     /// These characters' families changed; those online read theirs again.
     FamilyChanged {

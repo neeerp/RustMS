@@ -51,7 +51,7 @@ namespace ms
 			{ "icon5", "Party invite", Point<int16_t>(26, 4) },
 			{ "icon5", "Guild invite", Point<int16_t>(26, 4), true },
 			{ "icon5", "Guild Alliance Invitation.", Point<int16_t>(26, 4), true, true },
-			// v83 writes it as the alliance's (FUN_00524298).
+			// "from '<name>'" first, as the guild's (0x5221fa, report b047).
 			{ "icon8", "It's a Family Invitation.", Point<int16_t>(26, 4), true }
 		};
 
