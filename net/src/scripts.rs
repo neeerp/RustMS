@@ -28,6 +28,60 @@ const LINE_1_AREA_2: i32 = 103000103;
 /// and Rien's (`enterPort`).
 const ELLINIA_SKY_FERRY: i32 = 101000400;
 const RIEN_DOCK: i32 = 140020300;
+/// The Temple of Time's lanes (`timeQuest`): each lane's portal, the quest
+/// that opens it, and where it leads (through its `out00`). Lane five of
+/// each road leads on to the next road (Cosmic's quest ids).
+const TIME_LANES: [(i32, i16, i32); 15] = [
+    (270010100, 3501, 270010110),
+    (270010200, 3502, 270010210),
+    (270010300, 3503, 270010310),
+    (270010400, 3504, 270010410),
+    (270010500, 3507, 270020000),
+    (270020100, 3508, 270020110),
+    (270020200, 3509, 270020210),
+    (270020300, 3510, 270020310),
+    (270020400, 3511, 270020410),
+    (270020500, 3514, 270030000),
+    (270030100, 3515, 270030110),
+    (270030200, 3516, 270030210),
+    (270030300, 3517, 270030310),
+    (270030400, 3518, 270030410),
+    (270030500, 3519, 270040000),
+];
+/// The Broken Corridor's way into the Temple Ruins, open with a Marble of
+/// Chaos or once Beyond the Ruins is done.
+const BROKEN_CORRIDOR: i32 = 270040000;
+const TEMPLE_RUINS: i32 = 270040100;
+const MARBLE_OF_CHAOS: i32 = 4032002;
+const BEYOND_THE_RUINS: i16 = 3522;
+/// The halls behind Henesys Park (`enterAchter`), Ellinia (`enterMagiclibrar`)
+/// and the Sleepywood dungeon (`balogTemple`).
+const BOWMAN_SCHOOL: i32 = 100000201;
+const MAGIC_LIBRARY: i32 = 101000003;
+const UNDERGROUND_TEMPLE_STAIRS: i32 = 105100000;
+/// Orbis's Neglected Strolling Path (`enterNepenthes`).
+const NEGLECTED_STROLLING_PATH: i32 = 200060001;
+/// Ariant's Castle Garden and the pass it takes (`ariant_castle`).
+const CASTLE_GARDEN: i32 = 260000301;
+const PALACE_ENTRY_PASS: i32 = 4031582;
+/// Ereve's Training Forest, locked down during the Master of Disguise
+/// quests (20301 to 20305) to all but holders of a permit (`enterDisguise0`).
+const TRAINING_FOREST: i32 = 130010000;
+const INVESTIGATION_PERMIT: i32 = 4032179;
+/// Leafre's Cave of Black Witches (`enterWitch`): the cave The Stolen Egg
+/// (20404) opens, then the one each later quest moves on to.
+const STOLEN_EGG: i16 = 20404;
+const WITCH_CAVES: [(i16, i32); 2] = [(20407, 924010200), (20406, 924010100)];
+const WITCH_CAVE: i32 = 924010000;
+/// The Mushroom Castle's Wedding Hall entrance (`TD_MC_enterboss1`), past
+/// the Yeti brothers Stop the Wedding (2330) sends the player against.
+const WEDDING_HALL_ENTRANCE: i32 = 106021401;
+const STOP_THE_WEDDING: i16 = 2330;
+/// Magatia's secret basement (`secretDoor`), from Zenumist's hallway or
+/// Alcadno's lab, once Verifying the Password (3360) is taken.
+const SECRET_BASEMENT_PATH: i32 = 261030000;
+const ZENUMIST_HALLWAY: i32 = 261010000;
+const VERIFYING_THE_PASSWORD: i16 = 3360;
 /// `rankRoom`: each job's hall (and Ereve's and the Dangerous Forest's),
 /// the room it leads into, and the room's portal back.
 const RANK_ROOMS: [(i32, i32, &str); 8] = [
@@ -320,6 +374,110 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "photoOut" => go_back(7686, Effect::Warp(saved(7686))),
         "StudioZone_Out" => go_back(7752, Effect::Warp(saved(7752))),
         "outBabyBird" => go_back(10061, Effect::Warp(saved(10061))),
+        "timeQuest" => {
+            let map = player.stats.map_id;
+            let to = if map == BROKEN_CORRIDOR {
+                (player.inventory.count(MARBLE_OF_CHAOS) > 0
+                    || quest(BEYOND_THE_RUINS) == QuestState::Completed)
+                    .then_some(TEMPLE_RUINS)
+            } else {
+                let &(_, gate, to) = TIME_LANES.iter().find(|&&(lane, _, _)| lane == map)?;
+                (quest(gate) == QuestState::Completed).then_some(to)
+            };
+            match to {
+                Some(to) => through(Effect::WarpToPortal(to, named(to, "out00"))),
+                // Back to the start of the lane's road.
+                None => {
+                    let start = match map / 10000 {
+                        27001 => 270010000,
+                        27002 => 270020000,
+                        _ => 270030000,
+                    };
+                    ScriptOutcome {
+                        effects: vec![
+                            Effect::Pink(content::text().get(keys::TIME_LANE_LOST, &[])),
+                            Effect::PortalSound,
+                            Effect::WarpToPortal(start, named(start, "in00")),
+                        ],
+                        block: false,
+                    }
+                }
+            }
+        }
+        "enterAchter" => through(Effect::WarpToPortal(
+            BOWMAN_SCHOOL,
+            named(BOWMAN_SCHOOL, "out02"),
+        )),
+        // Cosmic starts a Cygnus quest's instance here while Maybe it's
+        // Grendel! (20718) is taken; that isn't in.
+        "enterMagiclibrar" => through(Effect::WarpToPortal(
+            MAGIC_LIBRARY,
+            named(MAGIC_LIBRARY, "jobout00"),
+        )),
+        "balogTemple" => through(Effect::WarpToPortal(
+            UNDERGROUND_TEMPLE_STAIRS,
+            named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
+        )),
+        // Cosmic sends an Aran on To the Sealed Garden (21739) to its fight
+        // instead; that isn't in.
+        "enterNepenthes" => through(Effect::WarpToPortal(
+            NEGLECTED_STROLLING_PATH,
+            named(NEGLECTED_STROLLING_PATH, "out00"),
+        )),
+        "ariant_castle" if player.inventory.count(PALACE_ENTRY_PASS) > 0 => through(
+            Effect::WarpToPortal(CASTLE_GARDEN, named(CASTLE_GARDEN, "out00")),
+        ),
+        "ariant_castle" => refused(keys::ARIANT_PALACE_NO_PASS),
+        "enterDisguise0"
+            if (20301..=20305).any(|id| quest(id) == QuestState::Started)
+                && player.inventory.count(INVESTIGATION_PERMIT) == 0 =>
+        {
+            refused(keys::DISGUISE_NO_PERMIT)
+        }
+        "enterDisguise0" => through(Effect::WarpToPortal(
+            TRAINING_FOREST,
+            named(TRAINING_FOREST, "east00"),
+        )),
+        "enterWitch" if quest(STOLEN_EGG) == QuestState::Completed => {
+            let cave = WITCH_CAVES
+                .iter()
+                .find(|&&(id, _)| quest(id) == QuestState::Completed)
+                .map_or(WITCH_CAVE, |&(_, cave)| cave);
+            through(Effect::WarpToPortal(cave, named(cave, "out00")))
+        }
+        "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
+        // Cosmic starts the fight with the Yeti brothers here while their
+        // quest is unfinished; that isn't in, so the way stays shut.
+        "TD_MC_enterboss1"
+            if quest(STOP_THE_WEDDING) == QuestState::Started
+                && player
+                    .quests
+                    .kills(STOP_THE_WEDDING)
+                    .iter()
+                    .filter(|&&n| n > 0)
+                    .count()
+                    < 3 =>
+        {
+            refused(keys::WEDDING_HALL_GUARDED)
+        }
+        "TD_MC_enterboss1" => through(Effect::WarpToPortal(
+            WEDDING_HALL_ENTRANCE,
+            named(WEDDING_HALL_ENTRANCE, "out00"),
+        )),
+        // Cosmic asks for the password while the quest is taken; its start
+        // script, which sets one, isn't run, so the door just opens.
+        "secretDoor" if quest(VERIFYING_THE_PASSWORD) != QuestState::NotStarted => {
+            let side = if player.stats.map_id == ZENUMIST_HALLWAY {
+                "sp_jenu"
+            } else {
+                "sp_alca"
+            };
+            through(Effect::WarpToPortal(
+                SECRET_BASEMENT_PATH,
+                named(SECRET_BASEMENT_PATH, side),
+            ))
+        }
+        "secretDoor" => refused(keys::SECRET_DOOR_LOCKED),
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -605,6 +763,146 @@ mod tests {
             })
         );
         assert_eq!(portal("somethingElse", &fresh), None);
+    }
+
+    /// Where an outcome that lets the player through warps them.
+    fn warp_of(outcome: &ScriptOutcome) -> Option<(i32, u8)> {
+        match outcome.effects.as_slice() {
+            [Effect::PortalSound, Effect::WarpToPortal(map, portal)] => Some((*map, *portal)),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn the_temple_of_time_lanes_open_quest_by_quest() {
+        let at = |map, quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = map;
+            portal("timeQuest", &player).unwrap()
+        };
+        for (lane, gate, to) in TIME_LANES {
+            assert_eq!(
+                warp_of(&at(lane, &[(gate, QuestState::Completed)])),
+                Some((to, named(to, "out00")))
+            );
+            let lost = at(lane, &[(gate, QuestState::Started)]);
+            assert!(matches!(lost.effects[0], Effect::Pink(_)));
+            let start = lane / 10000 * 10000;
+            assert_eq!(
+                lost.effects.last(),
+                Some(&Effect::WarpToPortal(start, named(start, "in00")))
+            );
+        }
+        // A lane's rest spot is through its `out00` (3); a road's last lane
+        // leads to the next road's square (4).
+        assert_eq!(
+            warp_of(&at(270010100, &[(3501, QuestState::Completed)])),
+            Some((270010110, 3))
+        );
+        assert_eq!(
+            warp_of(&at(270010500, &[(3507, QuestState::Completed)])),
+            Some((270020000, 4))
+        );
+        // The Broken Corridor sends the lost back to the Road to Oblivion.
+        let lost = at(BROKEN_CORRIDOR, &[]);
+        assert_eq!(
+            lost.effects.last(),
+            Some(&Effect::WarpToPortal(270030000, 3))
+        );
+        let ruins = Some((TEMPLE_RUINS, 3));
+        assert_eq!(
+            warp_of(&at(
+                BROKEN_CORRIDOR,
+                &[(BEYOND_THE_RUINS, QuestState::Completed)]
+            )),
+            ruins
+        );
+        let mut player = player_with(&[]);
+        player.stats.map_id = BROKEN_CORRIDOR;
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MARBLE_OF_CHAOS, 1));
+        assert_eq!(warp_of(&portal("timeQuest", &player).unwrap()), ruins);
+        // Off the lanes, the script does nothing.
+        player.stats.map_id = HENESYS;
+        assert_eq!(portal("timeQuest", &player), None);
+    }
+
+    #[test]
+    fn halls_and_gated_doors_of_section_three_let_the_right_players_through() {
+        let fresh = player_with(&[]);
+        let go = |script, player: &Player| warp_of(&portal(script, player).unwrap());
+        assert_eq!(go("enterAchter", &fresh), Some((BOWMAN_SCHOOL, 9)));
+        assert_eq!(go("enterMagiclibrar", &fresh), Some((MAGIC_LIBRARY, 8)));
+        assert_eq!(
+            go("balogTemple", &fresh),
+            Some((UNDERGROUND_TEMPLE_STAIRS, 2))
+        );
+        assert_eq!(
+            go("enterNepenthes", &fresh),
+            Some((NEGLECTED_STROLLING_PATH, 2))
+        );
+
+        let with = |quests, item: Option<i32>| {
+            let mut player = player_with(quests);
+            if let Some(item) = item {
+                player
+                    .inventory
+                    .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
+            }
+            player
+        };
+        assert!(pink(&portal("ariant_castle", &fresh).unwrap()));
+        assert_eq!(
+            go("ariant_castle", &with(&[], Some(PALACE_ENTRY_PASS))),
+            Some((CASTLE_GARDEN, 5))
+        );
+
+        // Ereve's forest is open, except to Master of Disguise players
+        // without a permit.
+        assert_eq!(go("enterDisguise0", &fresh), Some((TRAINING_FOREST, 3)));
+        let disguise = [(20303, QuestState::Started)];
+        assert!(pink(
+            &portal("enterDisguise0", &with(&disguise, None)).unwrap()
+        ));
+        assert_eq!(
+            go(
+                "enterDisguise0",
+                &with(&disguise, Some(INVESTIGATION_PERMIT))
+            ),
+            Some((TRAINING_FOREST, 3))
+        );
+
+        assert!(pink(&portal("enterWitch", &fresh).unwrap()));
+        let done = QuestState::Completed;
+        for (quests, cave) in [
+            (&[(STOLEN_EGG, done)][..], 924010000),
+            (&[(STOLEN_EGG, done), (20406, done)][..], 924010100),
+            (
+                &[(STOLEN_EGG, done), (20406, done), (20407, done)][..],
+                924010200,
+            ),
+        ] {
+            assert_eq!(go("enterWitch", &with(quests, None)), Some((cave, 1)));
+        }
+
+        // The Wedding Hall stays shut until the Yeti brothers are beaten.
+        let wedding = Some((WEDDING_HALL_ENTRANCE, 1));
+        assert_eq!(go("TD_MC_enterboss1", &fresh), wedding);
+        let mut hunting = player_with(&[(STOP_THE_WEDDING, QuestState::Started)]);
+        assert!(pink(&portal("TD_MC_enterboss1", &hunting).unwrap()));
+        *hunting.quests.kills_mut(STOP_THE_WEDDING).unwrap() = vec![1, 1, 0];
+        assert!(pink(&portal("TD_MC_enterboss1", &hunting).unwrap()));
+        *hunting.quests.kills_mut(STOP_THE_WEDDING).unwrap() = vec![1, 1, 1];
+        assert_eq!(go("TD_MC_enterboss1", &hunting), wedding);
+
+        // Magatia's secret doors open to each lab's side of the basement.
+        assert!(pink(&portal("secretDoor", &fresh).unwrap()));
+        let mut player = player_with(&[(VERIFYING_THE_PASSWORD, QuestState::Started)]);
+        player.stats.map_id = ZENUMIST_HALLWAY;
+        assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 2)));
+        player.stats.map_id = 261020200;
+        assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
     }
 
     #[test]

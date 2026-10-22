@@ -157,6 +157,13 @@ nothing. A script returns effects that the client actor sends:
 | `inERShip` | Ellinia's (`101000000` `in04`) way down to its Sky Ferry dock: portal sound, warp to `101000400` portal `out00` |
 | `enterPort` | Rien's pier (`140020200` `east00`) onto the dock: portal sound, warp to `140020300` portal `west00`. Cosmic's Aran-quest fight here isn't in |
 | `rankRoom` | A job hall's (or Ereve's, or the Dangerous Forest's) way into its room: portal sound, warp to the room's portal back (`RANK_ROOMS`) |
+| `timeQuest` | A Temple of Time lane's way on (`TIME_LANES`, 16 portals `in00` on `270010100`-`270040000`): portal sound, warp to the next map's `out00` once the lane's quest (3501-3504, 3507-3511, 3514-3519) is completed; the Broken Corridor's with a Marble of Chaos (`4032002`) or 3522 completed. Else a pink line, portal sound, back to `270010000`/`270020000`/`270030000` `in00`. The Temple itself is only reached by Corba's flight, which isn't in |
+| `enterAchter`, `enterMagiclibrar`, `balogTemple`, `enterNepenthes` | Henesys Park's way into the Bowman Instructional School (`100000201` `out02`), Ellinia's into the Magic Library (`101000003` `jobout00`), the dungeon's into the Underground Temple's stairway (`105100000` `top00`), Orbis's into the Neglected Strolling Path (`200060001` `out00`): portal sound and warp. Cosmic's Cygnus (20718) and Aran (21739) quest instances on the last two aren't in |
+| `ariant_castle` | Ariant Castle's door: with an Entry Pass to the Palace (`4031582`, kept), portal sound, warp to `260000301` `out00`; else a pink line |
+| `enterDisguise0` | Ereve's Crossroads into the Training Forest (`130010000` `east00`): portal sound and warp, except while a Master of Disguise quest (20301-20305) is taken without an Ereve Investigation Permit (`4032179`): a pink line |
+| `enterWitch` | Leafre's nest into the Cave of Black Witches once 20404 is completed: `924010200` after 20407, `924010100` after 20406, else `924010000`, portal `out00`; else a pink line |
+| `TD_MC_enterboss1` | The castle tower's way to the Wedding Hall entrance (`106021401` `out00`); while 2330 is taken and its three Yeti brothers aren't all killed, a pink line (Cosmic's fight with them isn't in) |
+| `secretDoor` | Magatia's lab doors (`261010000`, `261020200` `secret00`) once 3360 is taken or done: portal sound, warp to `261030000` `sp_jenu` (from Zenumist's) or `sp_alca`; else a pink line. Cosmic's password prompt while 3360 is taken is left out: the quest's start script that sets the password isn't run |
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,
