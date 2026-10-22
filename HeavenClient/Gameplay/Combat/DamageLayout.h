@@ -103,5 +103,14 @@ namespace ms
 		{
 			return skill != 1221011 && skill != 5221009;
 		}
+
+		// Whether the local player's hit by `skill` (0: a plain attack)
+		// leaves the mob it hits chasing them as before. Disorder's and
+		// Hypnotize's don't, and the mob gives up any chase (0x7a82a2 passes
+		// 0 to FUN_007f73d8).
+		inline bool provokes(int32_t skill)
+		{
+			return skill != 4001002 && skill != 14001002 && skill != 5221009;
+		}
 	}
 }

@@ -1,11 +1,12 @@
 //! Hypnotize: a Corsair's close gun shot with no `damage` of its own hits
 //! for the plain blow and dazzles the mob (MobStat bit 28), at level 20
-//! always. A shot that misses puts nothing on it.
+//! always. A shot that misses puts nothing on it. Unlike a plain blow, its
+//! hit doesn't give the shooter aggro over the mob.
 
 use integration_harness::database::{grant_skill, replace_item, set_job};
-use integration_harness::hunting::skill_attack;
+use integration_harness::hunting::{attack, skill_attack};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{step, until, warp, Trace};
+use integration_harness::trace::{send, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use tokio::time::Duration;
 
@@ -47,4 +48,8 @@ async fn hypnotize_dazzles_the_mob_it_hits() {
     let t = step(c, "shot", skill_attack(HYPNOTIZE, snails[0], 1)).await;
     assert!(!t.stat_updates.is_empty(), "the shot is taken");
     assert_eq!(t.field.stat_sets, [(snails[0], DAZZLE, 1, HYPNOTIZE)]);
+    assert!(t.field.aggro.is_empty(), "the shot draws no aggro");
+
+    send(c, attack(snails[0], 1)).await;
+    until(c, &mut h, |t| t.field.aggro.contains(&snails[0])).await;
 }

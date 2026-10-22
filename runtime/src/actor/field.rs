@@ -1135,7 +1135,9 @@ impl FieldActor {
                     if let Some(eater) = eater {
                         mp_taken += self.mobs.eat_mp(object_id, eater.x);
                     }
-                    self.provoke(from, &attacker, object_id, now);
+                    if net::skills::provokes(skill) {
+                        self.provoke(from, &attacker, object_id, now);
+                    }
                     // A miss puts nothing on it.
                     for inflict in inflicts.iter().filter(|_| damage > 0) {
                         if inflict.takes(rand::random()) {

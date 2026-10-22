@@ -200,6 +200,10 @@ namespace ms
 		// Apply damage to the mob.
 		void apply_damage(int32_t damage, bool toleft);
 
+		// End a controlled mob's chase, as a local Disorder or Hypnotize hit
+		// does (FUN_007f73d8 with 0).
+		void calm();
+
 		// Monster Magnet caught the mob for the user at `user`: if this
 		// client moves it, it flinches toward them, is pulled in, and
 		// chases them (0x66b6fc, 0x66b562).

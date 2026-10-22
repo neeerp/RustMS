@@ -242,5 +242,8 @@ namespace ms
 		Rectangle<int16_t> range;
 		// The element of the charge on the weapon, or 0.
 		uint8_t charge = 0;
+		// Whether the hit ends the mob's chase: the local player's Disorder
+		// or Hypnotize.
+		bool calms = false;
 	};
 }

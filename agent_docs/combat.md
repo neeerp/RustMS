@@ -80,7 +80,11 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
 - **Aggro:** a hit hands the mob to the attacker with aggro
   (SPAWN_MONSTER_CONTROL 2) for `AGGRO_DURATION` (180 s, v83's minimum chase
   time). The previous controller gets SPAWN_MONSTER_CONTROL 0, and later hits
-  from the same player within that time send nothing.
+  from the same player within that time send nothing. Hits by Disorder
+  (4001002, 14001002) and Hypnotize (5221009) give no aggro
+  (`skills::provokes`): v83's client has the mob they hit give up its chase
+  instead (0x7a82a2 passes 0 to FUN_007f73d8), as HeavenClient's `Mob::calm`
+  does for the local player's hits.
 - **Client AI:** HeavenClient decides each mob's movement in v83's 90 ms
   steps. Each decision holds for a random time: 1 to 3 s when idle (walk
   left, right, or stand), and 0.8 to 1.2 s when chasing. A mob given aggro

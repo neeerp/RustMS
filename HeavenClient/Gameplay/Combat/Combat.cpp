@@ -2132,7 +2132,8 @@ namespace ms
 				user.get_look().get_equips().get_weapon(),
 				result.stance,
 				range,
-				physical_damage::charge_element(user.get_charge())
+				physical_damage::charge_element(user.get_charge()),
+				&user == &player && !damage_layout::provokes(move.get_id())
 		};
 
 		bool chain = chain_lightning::chains(result.skill);
