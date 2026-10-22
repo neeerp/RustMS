@@ -74,6 +74,21 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The Owl of Minerva's answers: the items searched for most, for its
+	// search window, or a search's rows (FUN_00a28c29).
+	// Opcode: OWL_RESULT(70)
+	class OwlResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether GO on a search row may go (FUN_00a29013, FUN_008a4e7a).
+	// Opcode: OWL_GO_RESULT(71)
+	class OwlGoResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

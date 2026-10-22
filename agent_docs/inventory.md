@@ -1269,6 +1269,35 @@ rules and `client/owl.rs` the flow.
    player is warped to the shop's map if needed and visits the shop as if
    they had clicked its balloon.
 
+**The client.** Double-clicking the Owl in the Free Market opens
+`UIItemSearch` (v83 FUN_008a0c7b, report c026), which sends `0x42` as it
+opens. Its two GO buttons slide a panel out from under its right edge (a
+pixel a millisecond, and back the same way) with the 10 items
+searched for most (five a page, icon and name; a click asks at once) or a
+category tree (Eqp, Use, Etc and Setup, each opening its own categories by
+item id range). The search box lists, ten a page, every item whose String
+name has the text, ignoring case and spaces (`Data/ItemNames.h`, shared
+with the pet's item search). Choosing a row and the panel's SEARCH asks
+"Would you like to search for [name]?" (SP 0xe2d, with the order picked by
+the panel's SORT BY PRICE box, ticked for the dearest first), then sends `0x53` behind the client's half-second
+request gate and closes the window. An empty answer says "Unable to find
+the item you have entered."; otherwise `UIItemSearchResult` opens with
+eight rows a page. GO is offered only on rows on the player's own channel
+(greyed out elsewhere); the others say "Can't Go", with a tooltip naming the
+room and channel. The owner, title, column headings and item info have
+tooltips too. GO's answer 0 closes the window, 1 marks the row "Store Closed", and
+each code shows its notice. Names can repeat: in this data 4000000 is "Blue
+Snail Shell" and 4000019 is "Snail Shell".
+
+Not decoded, and approximated: which way the order box's tick means, the
+Setup and Summon ranges, the tree's layout once a part is open, and where
+the result window opens (centred). A panel's buttons appear once it is all
+the way out, and switching panels starts the new one from under the window
+instead of sliding both at once. The text colours of the result rows are
+not decoded (all black, the status red). Equip tooltips show the base item:
+the stats are read but not kept. GO after leaving the Free Market gets
+answer 1 from the server, so the row shows "Store Closed".
+
 The cash Owl (5230000) and hired merchants are not supported yet.
 
 ## Tests

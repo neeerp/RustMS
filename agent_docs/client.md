@@ -608,6 +608,7 @@ side yet.
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
 | Rock, Paper, Scissors (`UIRpsGame`, `Character/RpsGame`) | Implemented: the admin's notice, the window, rounds, results and certificates; see `inventory.md` |
 | Duey (`UIDuey`) | The tab strip, receiving, normal and quick sends, the arrival notice, and the Quick Delivery Coupon's window; see `inventory.md` |
+| Owl of Minerva (`UIItemSearch`, `UIItemSearchResult`) | The search window with its most-searched and category panels, the search, the results with GO; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
 | Item Maker (`UIMaker`) | Recipes with their stimulator and gems, monster crystals, disassembly and the random make: the drop lists, ingredient counts, fee, gauge, result dialog and chat lines; see `inventory.md` |
 | Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |

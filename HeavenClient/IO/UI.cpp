@@ -416,6 +416,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::FRIENDGROUP);
 					types.emplace_back(UIElement::Type::NPCTALK);
 					types.emplace_back(UIElement::Type::PETITEMSEARCH);
+					types.emplace_back(UIElement::Type::ITEMSEARCH);
+					types.emplace_back(UIElement::Type::ITEMSEARCHRESULT);
 					types.emplace_back(UIElement::Type::CHARINFO);
 					types.emplace_back(UIElement::Type::TRADINGROOM);
 					types.emplace_back(UIElement::Type::PERSONALSHOP);

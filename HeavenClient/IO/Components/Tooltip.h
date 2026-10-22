@@ -68,7 +68,9 @@ namespace ms
 			PETITEMSEARCH,
 			DUEY,
 			FAMILY,
-			FAMILYTREE
+			FAMILYTREE,
+			// The Owl of Minerva's results, whose tooltips go below and right of the cursor.
+			ITEMSEARCHRESULT
 		};
 
 		virtual ~Tooltip()

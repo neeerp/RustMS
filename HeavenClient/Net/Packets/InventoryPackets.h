@@ -356,6 +356,46 @@ namespace ms
 		}
 	};
 
+	// The Owl of Minerva's search window opened and asks for the items
+	// searched for most (FUN_008a0e9a).
+	// Opcode: OWL_OPEN(66)
+	class OwlOpenPacket : public OutPacket
+	{
+	public:
+		OwlOpenPacket() : OutPacket(OutPacket::Opcode::OWL_OPEN)
+		{
+			write_byte(5);
+		}
+	};
+
+	// Searches the shops for `searchid` with the Owl in USE slot `slot`,
+	// cheapest first unless `descending` (FUN_00a0a25e, FUN_008a2407).
+	// Opcode: USE_OWL(83)
+	class UseOwlPacket : public OutPacket
+	{
+	public:
+		UseOwlPacket(int16_t slot, int32_t itemid, int32_t searchid, bool descending) : OutPacket(OutPacket::Opcode::USE_OWL)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(searchid);
+			write_byte(descending);
+			write_time();
+		}
+	};
+
+	// GO on a search row: the shop's room and map (FUN_008a4423).
+	// Opcode: OWL_GO(67)
+	class OwlGoPacket : public OutPacket
+	{
+	public:
+		OwlGoPacket(int32_t room, int32_t mapid) : OutPacket(OutPacket::Opcode::OWL_GO)
+		{
+			write_int(room);
+			write_int(mapid);
+		}
+	};
+
 	// Keeps the player's map for a teleport rock, or drops a kept one
 	// (FUN_00a261bc). The server answers with the list.
 	// Opcode: TELEPORT_ROCK_LIST(102)
