@@ -264,9 +264,16 @@ same rules (pet equipment excepted from the cash refusal), only from a
 player who has one of the three skills, and answers with Legendary Spirit
 set in SHOW_SCROLL_EFFECT and no look refresh. Any refused dialog request
 gets SHOW_SCROLL_EFFECT -1 to the scroller alone, which the dialog shows as
-"You cannot use a Scroll with this item."; HeavenClient ignores both, as it
-has no Legendary Spirit window yet. HeavenClient plays the Enchant sound and
-the scroll glow, and gives the scroller the v83 chat line. A sealed scroll
+"You cannot use a Scroll with this item." HeavenClient's window is
+`UIEnchantSkill` (v83 CUIEnchantSkill, UIWindow.img/EnchantSkill), opened by
+the skill's key: an equip dropped in from the Equip tab (a cash one refused
+unless it is a pet's), then a scroll from the Use tab, sent at once with a
+White Scroll if the box (shown only to a player holding one) is ticked. Its
+own answer goes to the window alone: -1 shows the refusal; otherwise it plays
+the Enchant sound and its effect, then the chat line, the scroll sound and
+glow, and closes on a cursed equip or waits for the next scroll. Cancel,
+Close and Esc wait for the answer. For other scrolls, HeavenClient plays
+the scroll sound and glow, and gives the scroller the v83 chat line. A sealed scroll
 goes on nothing, and a sealed equip asks first whether to risk it (v83
 0x114f, "Due to the potency of the scroll..."; No keeps the scroll).
 

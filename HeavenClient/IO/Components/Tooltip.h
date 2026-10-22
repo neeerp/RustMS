@@ -54,6 +54,7 @@ namespace ms
 			ITEMPROTECTOR,
 			KARMASCISSORS,
 			VEGARESULT,
+			ENCHANTSKILL,
 			STATUSBAR,
 			// The status bar's quick slots, whose tooltips go above the cursor.
 			QUICKSLOT,

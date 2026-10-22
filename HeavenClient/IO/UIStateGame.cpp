@@ -102,6 +102,8 @@ namespace ms
 					return Tooltip::Parent::KARMASCISSORS;
 				case UIElement::Type::VEGARESULT:
 					return Tooltip::Parent::VEGARESULT;
+				case UIElement::Type::ENCHANTSKILL:
+					return Tooltip::Parent::ENCHANTSKILL;
 				case UIElement::Type::EVENT:
 					return Tooltip::Parent::EVENT;
 				case UIElement::Type::KEYCONFIG:

@@ -47,6 +47,7 @@
 #include "UITypes/UISystemOption.h"
 #include "UITypes/UITradingRoom.h"
 #include "UITypes/UIVegaSpell.h"
+#include "UITypes/UIEnchantSkill.h"
 #include "UITypes/UIViciousHammer.h"
 #include "UITypes/UIWorldMap.h"
 
@@ -136,7 +137,8 @@ namespace ms
 			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
 			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
 			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIViciousHammer>())
-			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>());
+			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>())
+			|| open(get_element<UIEnchantSkill>());
 	}
 
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
@@ -429,6 +431,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
 					types.emplace_back(UIElement::Type::VEGARESULT);
+					types.emplace_back(UIElement::Type::ENCHANTSKILL);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
 					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::SPRESET);
