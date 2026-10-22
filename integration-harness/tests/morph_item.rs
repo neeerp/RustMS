@@ -1,7 +1,8 @@
 //! A morph item (report 225): 2210000 turns its user into Morph.nx
 //! template 1 for its `time`. The map sees the morph
 //! (GIVE_FOREIGN_BUFF, and SPAWN_PLAYER for someone coming in), and
-//! right-clicking the icon ends it for everyone.
+//! right-clicking the icon ends it for everyone. Another morph item waits
+//! until it ends (report c012).
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::grant_stack;
@@ -64,7 +65,7 @@ async fn a_morph_item_shows_to_the_map_until_cancelled() {
         .character_id;
     drop(relogin(&morpher_config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    grant_stack(morpher_id, 2, 1, MORPH_ITEM, 1)
+    grant_stack(morpher_id, 2, 1, MORPH_ITEM, 2)
         .await
         .expect("grant the morph item");
 
@@ -102,6 +103,20 @@ async fn a_morph_item_shows_to_the_map_until_cancelled() {
     })
     .await;
     assert_eq!(seen, (morpher_id, 1));
+
+    // A second one is refused while morphed, and kept.
+    send(&mut morpher.connection, use_item(1, MORPH_ITEM)).await;
+    expect(&mut morpher.connection, |p| {
+        assert_ne!(p.opcode(), SendOpcode::GiveBuff as i16, "morphed again");
+        assert_ne!(
+            p.opcode(),
+            SendOpcode::InventoryOperation as i16,
+            "the second morph item was taken"
+        );
+        let r = body(p, SendOpcode::StatChange)?;
+        (r.get_ref()[2..] == [1, 0, 0, 0, 0]).then_some(())
+    })
+    .await;
 
     // So does someone coming onto the map.
     assert_eq!(

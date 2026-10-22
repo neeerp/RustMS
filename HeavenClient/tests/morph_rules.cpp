@@ -86,6 +86,13 @@ int main()
 		require(cash_morph_refused(3010000, 0), "not on a chair");
 		require(cash_morph_refused(0, 1902000), "nor on a tamed monster");
 		require(!cash_morph_refused(0, 1932000), "but on another ride");
+		require(!potion_refused(2210000, 0, 0, 0, false), "a morph potion is used standing");
+		require(potion_refused(2210000, 1, 0, 0, false), "not while morphed");
+		require(potion_refused(2360000, 0, 3010000, 0, false), "nor a ghost item on a chair");
+		require(potion_refused(2210000, 0, 0, 1932000, false), "nor aboard the Battleship");
+		require(potion_refused(2210000, 0, 0, 0, true), "nor in a mini room");
+		require(!potion_refused(2210000, 0, 0, 1902000, false), "a tamed monster is refused elsewhere");
+		require(!potion_refused(2000000, 1, 3010000, 1932000, true), "other potions are not refused here");
 
 		std::cout << "Morph rules passed\n";
 		return 0;

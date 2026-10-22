@@ -737,6 +737,13 @@ any item buff. An item's morph (a value below 100) can't
 attack: the attack handlers drop the attack (`AttackRejection::Morphed`,
 Cosmic's `isMorphWithoutAttack`).
 
+v83 sends no morph item, nor a ghost item (236xxxx), while the user is
+already morphed, sits on a portable chair, rides the Battleship (193xxxx)
+or has a trade or personal shop open, and says nothing (0xa092fb,
+`morph::potion_refused`). To change morph, the user cancels the first.
+The server refuses the first three too, keeping the item (`world/use_item.rs`
+`potion_refused`).
+
 The cash morphs (Fungus Scroll 5300000, Oinker Delight 5300001 and Zeta
 Nightmare 5300002, templates 1-3 for ten minutes, report c012) are the
 same, used from the Cash tab: USE_CASH_ITEM `i16 slot, i32 item id, i32

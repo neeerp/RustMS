@@ -287,6 +287,18 @@ namespace ms
 			return false;
 		}
 
+		// v83 0xa092fb: a morph potion or ghost item, silently.
+		bool refuses_potion(int32_t item_id)
+		{
+			auto shop = UI::get().get_element<UIPersonalShop>();
+			auto trade = UI::get().get_element<UITradingRoom>();
+			bool mini_room = (shop && shop->is_active()) || (trade && trade->is_active());
+			const Player &player = Stage::get().get_player();
+
+			return morph::potion_refused(item_id, player.get_look().get_morph(), player.get_chair(),
+				player.get_look().get_vehicle(), mini_room);
+		}
+
 		// Some cash items say so in the chat log while a shop or trade is open.
 		bool in_mini_room()
 		{
@@ -1190,6 +1202,8 @@ namespace ms
 						else if (!Stage::get().get_mapinfo().can_use_item(item_id))
 							InChatMessage(Messages::ITEM_FIELD).drop();
 						else if (field_limit::is_use_item(item_id) && Stage::get().get_player().ride_refuses(true))
+							break;
+						else if (refuses_potion(item_id))
 							break;
 						else if (!disease::can_use_item(Stage::get().get_player().get_diseases()))
 							break;
