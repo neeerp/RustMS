@@ -35,6 +35,13 @@ pub enum Action {
     /// Send everyone on its map away, with a pink line (the text key
     /// `notice`) first.
     WarpMap { warp: Warp, notice: &'static str },
+    /// Bring out one `mob_id` on the ground below `at`, a fixed point on
+    /// its map, with a pink line (the text key `notice`) to everyone there.
+    SpawnAt {
+        mob_id: i32,
+        at: (i16, i16),
+        notice: &'static str,
+    },
     /// A moonflower on Henesys's Primrose Hill, which blooms on its seed:
     /// it stays in bloom, the map's full moon (`FULL_MOON`) waxes a phase,
     /// and once every moonflower there blooms the Moon Bunny comes out below
@@ -62,6 +69,8 @@ const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
 const LPQ_TRAP_ROOM: i32 = 922010201;
 const LPQ_BLOCTOPUS: i32 = 9300007;
+const LPQ_ROMBAD: i32 = 9300010;
+const LPQ_ALISHAR: i32 = 9300012;
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
@@ -83,6 +92,18 @@ pub fn action(reactor_id: i32) -> Action {
         9108000..=9108005 => Action::Bloom,
         // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
         2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
+        // Stage 7's (`ludiMob2`), which take the other pass, and the
+        // boss's (`ludiBoss0`), which takes a pass.
+        2201002 => Action::SpawnAt {
+            mob_id: LPQ_ROMBAD,
+            at: (1, -211),
+            notice: keys::LPQ_NOTICE_ROMBAD,
+        },
+        2201003 => Action::SpawnAt {
+            mob_id: LPQ_ALISHAR,
+            at: (941, 184),
+            notice: keys::LPQ_NOTICE_ALISHAR,
+        },
         // Ludibrium's stage 2 trap box (`go922010201`).
         2200002 => Action::WarpMap {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
@@ -113,6 +134,10 @@ mod tests {
         assert_eq!(action(2401001), Action::BringOut(9300089, 1));
         assert_eq!(action(2401002), Action::BringOut(9300090, 1));
         assert_eq!(action(2201001), Action::BringOut(LPQ_BLOCTOPUS, 3));
+        let Action::SpawnAt { mob_id, at, .. } = action(2201003) else {
+            panic!("{:?}", action(2201003));
+        };
+        assert_eq!((mob_id, at), (LPQ_ALISHAR, (941, 184)));
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
     }
