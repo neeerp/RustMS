@@ -138,12 +138,28 @@ namespace ms
 		constexpr int8_t RESULT_DIVORCED = 14;
 		// The mode whose text the server sends.
 		constexpr int8_t RESULT_NOTICE = 36;
+		// The mode opening a guest's invitation (report b069).
+		constexpr int8_t RESULT_INVITATION = 15;
 
 		// The engagement ring boxes (224xxxx) a proposal is made with.
 		bool is_ring_box(int32_t item_id);
 		// The empty boxes and rings a couple holds (4031357 to 4031364), which
 		// the player drops to break off (0x4f33ee).
 		bool is_token(int32_t item_id);
+		// A couple's wedding invitations, which they send to guests (4031377
+		// the Chapel's, 4031395 the Cathedral's; 0x4eff9d).
+		bool is_invitation(int32_t item_id);
+		// A guest's received invitations (4031406 and 4031407; 0x4effe3).
+		bool is_received_invitation(int32_t item_id);
+		// Why the guest `name` can't be sent an invitation from `record`
+		// (0xa10199): no record, or not engaged, says nothing (an empty
+		// string); one of the couple's own names, compared exactly, says
+		// 0x10a2. Nullptr when it may be sent.
+		const char* invitation_refusal(const std::optional<MarriageRecord>& record, const std::string& name);
+		// The invitation window's art under UIWindow.img/Wedding/Invitation
+		// for MARRIAGE_RESULT 15's type: 2 the Cathedral, else the Chapel
+		// (0x7eca1f).
+		const char* invitation_art(int16_t type);
 		// The wedding rings 1112803, 1112806, 1112807 and 1112809.
 		bool is_wedding_ring(int32_t item_id);
 		// The kind of ring an item is: 1112001 to 1112099 a crush ring,

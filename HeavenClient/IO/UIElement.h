@@ -130,6 +130,7 @@ namespace ms
 			ITEMSEARCH,
 			ITEMSEARCHRESULT,
 			INCUBATOR,
+			INVITATION,
 			NUM_TYPES
 		};
 

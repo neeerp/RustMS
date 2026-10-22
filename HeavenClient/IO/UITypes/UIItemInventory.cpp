@@ -1403,6 +1403,10 @@ namespace ms
 					case InventoryType::Id::ETC:
 						if (item_id / 10000 == 429)
 							Stage::get().use_item_effect(item_id);
+						else if (marriage::is_invitation(item_id))
+							MarriageActions::invite(slot);
+						else if (marriage::is_received_invitation(item_id))
+							MarriageActions::open_invitation(slot, item_id);
 						else if (incubator::opens(item_id))
 							incubate(slot);
 

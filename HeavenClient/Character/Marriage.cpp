@@ -201,6 +201,33 @@ namespace ms
 			return item_id / 10000 == 224;
 		}
 
+		bool is_invitation(int32_t item_id)
+		{
+			return item_id == 4031377 || item_id == 4031395;
+		}
+
+		bool is_received_invitation(int32_t item_id)
+		{
+			return item_id == 4031406 || item_id == 4031407;
+		}
+
+		const char* invitation_refusal(const std::optional<MarriageRecord>& record, const std::string& name)
+		{
+			if (!record || record->status != ENGAGED)
+				return "";
+
+			// StringPool 0x10a2.
+			if (name == record->groom_name || name == record->bride_name)
+				return "You may not send the wedding invitation to yourself.\\nYou're the one getting married!";
+
+			return nullptr;
+		}
+
+		const char* invitation_art(int16_t type)
+		{
+			return type == 2 ? "Cathedral" : "Vegas";
+		}
+
 		bool is_token(int32_t item_id)
 		{
 			return item_id >= 4031357 && item_id <= 4031364;
@@ -265,7 +292,7 @@ namespace ms
 						   : "Dropping this item will break your engagement.\\nDo you still wish to drop this item?";
 		}
 
-		// StringPool 0x108b, 0x108e, 0x108f, 0x1090 to 0x109b.
+		// StringPool 0x108b, 0x108e, 0x108f, 0x1090 to 0x109e.
 		const char* result_text(int8_t mode)
 		{
 			switch (mode)
@@ -286,7 +313,10 @@ namespace ms
 			case 28: return "She is currently being asked by another suitor.";
 			case 29: return "Unfortunately, the man who proposed to you has withdrawn his request for an engagement.";
 			case 30: return "She has politely declined your engagement request.";
+			case 16: return "Congratulations!\\nYour reservation was successfully made!";
+			case 31: return "The reservation has been canceled. Please try again later.";
 			case 32: return "You can't break the engagement after making reservations.";
+			case 34: return "This invitation is not valid.";
 			default: return nullptr;
 			}
 		}

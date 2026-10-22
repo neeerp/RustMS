@@ -19,6 +19,8 @@ namespace ms
 		constexpr int32_t RIDING = 0x200;
 		constexpr int32_t CONSUMABLES = 0x400;
 		constexpr int32_t PARTY_LEADER = 0x800;
+		// A guest's wedding invitation can't be opened (0xa103f4).
+		constexpr int32_t INVITATIONS = 0x2000;
 		constexpr int32_t WEATHER_ITEMS = 0x4000;
 		constexpr int32_t DOWN_JUMP = 0x20000;
 		constexpr int32_t DROPS = 0x400000;

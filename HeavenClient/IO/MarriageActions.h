@@ -13,5 +13,11 @@ namespace ms
 		// MARRIAGE_RESULT, whatever it says, or a new field after a channel
 		// change: the wait is over.
 		void answered();
+		// The couple's invitation in Etc `slot` double-clicked: ask whom to
+		// send it to (0xa10199, report b069).
+		void invite(int16_t slot);
+		// A guest's invitation in Etc `slot` double-clicked: ask the server
+		// for the window, unless the map forbids it (0xa103e7).
+		void open_invitation(int16_t slot, int32_t item_id);
 	}
 }

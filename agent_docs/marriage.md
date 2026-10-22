@@ -363,6 +363,19 @@ not made.
   "YOU ARE MARRIED WITH : <name>" in place of its description. Both
   appear whenever there is a record, whatever its status. The name is the
   partner's, chosen by the player's own gender (report b056).
+- Double-clicking a wedding invitation in the Etc tab calls
+  `MarriageActions::invite` (report b069). It does nothing unless the
+  record says engaged. It asks for the guest's name (4 to 12
+  characters; a shorter one gives v83's notice and asks again), refuses
+  the groom's or the bride's exact name with v83's "yourself" notice, and
+  sends `RING_ACTION` 5 as a `USE_WAIT` request, which the server's stat
+  update ends. A received invitation sends `RING_ACTION` 6, or, on a map
+  whose field limit has 0x2000, says "You can't use it here in this map."
+  in the chat.
+- `MARRIAGE_RESULT` 15 opens `UIInvitation`: the Cathedral art
+  (`UIClassic.nx UIWindow.img/Wedding/Invitation`) for type 2, else the
+  Vegas art, with the groom's and the bride's names. OK, Enter and Esc
+  close it, and nothing is sent. Modes 16, 31 and 34 say v83's notices.
 
 Any result ends the client's wait, as does a new field (a channel change
 or the Cash Shop, where the server drops the proposal). The result's OK
@@ -404,11 +417,9 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- Selling the tickets, the wedding field, and the wishlist. The client
-  does not yet send invitations (an Etc double-click), open its
-  invitation window, or say the texts of modes 16 and 34. Report b066
+- Selling the tickets, the wedding field, and the wishlist. Report b066
   lists the slices.
-- `MARRIAGE_RESULT` 31 ("The reservation has been canceled...") when a
-  no-show's booking goes.
+- Sending `MARRIAGE_RESULT` 31 ("The reservation has been canceled...")
+  when a no-show's booking goes. The client already has the text.
 
 Report b052 §7 lists them.

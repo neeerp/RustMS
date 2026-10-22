@@ -6,6 +6,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/MarriageActions.h"
 #include "../../IO/UI.h"
+#include "../../IO/UITypes/UIInvitation.h"
 #include "../../IO/UITypes/UINotice.h"
 
 namespace ms
@@ -39,6 +40,17 @@ namespace ms
 
 		if (mode == marriage::RESULT_BROKEN || mode == marriage::RESULT_DIVORCED)
 			Stage::get().get_player().set_marriage(std::nullopt);
+
+		if (mode == marriage::RESULT_INVITATION)
+		{
+			std::string groom = recv.read_string();
+			std::string bride = recv.read_string();
+			int16_t type = recv.read_short();
+
+			UI::get().emplace<UIInvitation>(groom, bride, type);
+
+			return;
+		}
 
 		if (mode == marriage::RESULT_NOTICE)
 		{
