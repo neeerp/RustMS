@@ -184,7 +184,7 @@ void view_limits(nl::node footholds)
 			auto borders = physics.get_fht().get_borders();
 			require(walls.first() == -1970 && walls.second() == 1970 && borders.first() == -200,
 				"zero or missing movement edges narrowed the physical bounds");
-			ms::MapInfo view(info.root(), walls, borders);
+			ms::MapInfo view(info.root()["info"], info.root(), walls, borders);
 			require(view.get_walls().first() == (zero ? 0 : -1990) && view.get_walls().second() == (zero ? 0 : 1990),
 				"zero camera edges were treated as missing");
 			require(view.get_borders().first() == (zero ? 0 : -260) && view.get_borders().second() == (zero ? 0 : 1410),
@@ -206,7 +206,7 @@ void view_limits(nl::node footholds)
 			auto borders = physics.get_fht().get_borders();
 			require(walls.first() == (limit ? -480 : -1970) && walls.second() == (limit ? 580 : 1970) &&
 				borders.first() == (limit ? -35 : -200), "nonzero movement edges ignored VRLimit");
-			ms::MapInfo view(info.root(), walls, borders);
+			ms::MapInfo view(info.root()["info"], info.root(), walls, borders);
 			require(view.get_walls().first() == -500 && view.get_walls().second() == 600 &&
 				view.get_borders().first() == -100 && view.get_borders().second() == 900,
 				"camera edges incorrectly depended on VRLimit");

@@ -33,6 +33,13 @@ Fields are created on demand by `FieldRegistry` and kept alive afterwards.
   drops. A third job's clone room puts all its mobs back when its last
   player leaves (`MobSet::renew`).
 
+Some maps are copies of another (mini-dungeons, the Dojo): their node has
+only `info`, and `info/link` names the map they copy. `game-data` and the
+client's `Stage::load_map` (`NxHelper::Map::get_map_body`) take the body
+(footholds, portals, life, reactors, tiles) from the linked map and keep
+the copy's own `info`, which can differ (BGM, view range, field limit,
+forced return).
+
 A field does not own character state (stats, inventory, quests). Those live
 in the client's `Player`.
 

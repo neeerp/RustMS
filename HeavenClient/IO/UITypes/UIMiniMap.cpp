@@ -168,17 +168,17 @@ namespace ms
 	void UIMiniMap::change_map()
 	{
 		mapid = Stage::get().get_mapid();
-		map = NxHelper::Map::get_map_node_name(mapid);
+		map = NxHelper::Map::get_map_body(mapid);
 
 		nl::node minimap = map["miniMap"];
-		nl::node map_info = map["info"];
+		nl::node map_info = NxHelper::Map::get_map_node_name(mapid)["info"];
 		has_map = field_limit::shows_minimap(Configuration::get().get_admin(), minimap.size() > 0,
 											 map_info["hideMinimap"].get_bool(), map_info["miniMapOnOff"].get_bool(),
 											 switched_on);
 		canvas = minimap["canvas"];
 		scale = static_cast<int16_t>(1 << static_cast<int>(minimap["mag"]));
 		center_offset = Point<int16_t>(minimap["centerX"], minimap["centerY"]);
-		mark = nl::nx::map["MapHelper.img"]["mark"][map["info"]["mapMark"].get_string()];
+		mark = nl::nx::map["MapHelper.img"]["mark"][map_info["mapMark"].get_string()];
 
 		NxHelper::Map::MapInfo info = NxHelper::Map::get_map_info_by_id(mapid);
 		street.change_text(info.street_name);

@@ -90,7 +90,8 @@ namespace ms
 				std::string full_name;
 			};
 
-			// Returns all relative map info
+			// Returns all relative map info. A copy without names of its own
+			// goes by the map it copies.
 			MapInfo get_map_info_by_id(int32_t mapid);
 
 			// Returns the category of a map
@@ -101,6 +102,11 @@ namespace ms
 
 			// Returns the name of the node, under which the argument map id is in
 			nl::node get_map_node_name(int32_t mapid);
+
+			// The node a map takes its body (footholds, portals, life, tiles)
+			// from. A copy, such as a mini-dungeon's, has only an info node
+			// and names the map it copies in info/link.
+			nl::node get_map_body(int32_t mapid);
 		}
 
 		namespace Npc

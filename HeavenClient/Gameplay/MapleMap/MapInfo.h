@@ -71,7 +71,7 @@ namespace ms
 	class MapInfo
 	{
 	public:
-		MapInfo(nl::node src, Range<int16_t> walls, Range<int16_t> borders);
+		MapInfo(nl::node info, nl::node src, Range<int16_t> walls, Range<int16_t> borders);
 
 		MapInfo();
 

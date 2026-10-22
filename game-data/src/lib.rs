@@ -469,6 +469,7 @@ impl GameData {
         let mut fields = BTreeMap::new();
         let trap_objs = trap_objs(&nx)?;
 
+        let mut map_nodes = BTreeMap::new();
         for map_group_idx in nx.child_indices(map_root)? {
             let group_name = nx.node_name(map_group_idx)?;
             if !group_name.starts_with("Map") {
@@ -477,13 +478,26 @@ impl GameData {
 
             for map_node_idx in nx.child_indices(map_group_idx)? {
                 let map_node_name = nx.node_name(map_node_idx)?;
-                let Some(map_id) = parse_map_id(map_node_name.as_str()) else {
-                    continue;
-                };
-
-                let field = build_field_template(&nx, map_node_idx, map_id, &trap_objs)?;
-                fields.insert(map_id, field);
+                if let Some(map_id) = parse_map_id(map_node_name.as_str()) {
+                    map_nodes.insert(map_id, map_node_idx);
+                }
             }
+        }
+
+        for (&map_id, &map_node_idx) in &map_nodes {
+            // A copy of a map (`info/link`, as the mini-dungeons' and the
+            // Dojo's are) has only its own `info`; the rest is the linked
+            // map's.
+            let body_idx = match nx.child_by_name(map_node_idx, "info")? {
+                Some(info) => nx
+                    .string_child(info, "link")?
+                    .and_then(|link| link.parse::<i32>().ok())
+                    .and_then(|link| map_nodes.get(&link).copied())
+                    .unwrap_or(map_node_idx),
+                None => map_node_idx,
+            };
+            let field = build_field_template(&nx, map_node_idx, body_idx, map_id, &trap_objs)?;
+            fields.insert(map_id, field);
         }
 
         let mut area_codes = HashMap::new();
@@ -524,9 +538,13 @@ impl GameData {
     }
 }
 
+/// The template of the map whose node is `map_node_idx`, with its `info`
+/// from that node and the rest from `body_idx` (the node itself, or the map
+/// it links to).
 fn build_field_template(
     nx: &NxDataFile,
     map_node_idx: u32,
+    body_idx: u32,
     map_id: i32,
     trap_objs: &TrapObjs,
 ) -> Result<FieldTemplate, GameDataError> {
@@ -541,11 +559,11 @@ fn build_field_template(
             (None, None, None)
         };
 
-    let map_npcs = build_map_npcs_from_life(nx, map_node_idx)?;
-    let mob_spawns = build_mob_spawns_from_life(nx, map_node_idx)?;
-    let reactors = build_reactors(nx, map_node_idx)?;
-    let footholds = build_footholds(nx, map_node_idx)?;
-    let traps = traps(nx, map_node_idx, trap_objs)?;
+    let map_npcs = build_map_npcs_from_life(nx, body_idx)?;
+    let mob_spawns = build_mob_spawns_from_life(nx, body_idx)?;
+    let reactors = build_reactors(nx, body_idx)?;
+    let footholds = build_footholds(nx, body_idx)?;
+    let traps = traps(nx, body_idx, trap_objs)?;
     let mob_rate = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "mobRate"))
@@ -579,7 +597,7 @@ fn build_field_template(
             None => (false, 0, 0, Vec::new(), false, false, None),
         };
     // v83 FUN_0052bc72 makes the clock only if all four are non-zero.
-    let clock = match nx.child_by_name(map_node_idx, "clock")? {
+    let clock = match nx.child_by_name(body_idx, "clock")? {
         Some(clock) => {
             let mut all_set = true;
             for key in ["x", "y", "width", "height"] {
@@ -592,7 +610,7 @@ fn build_field_template(
 
     let mut portals_by_id = BTreeMap::new();
 
-    if let Some(portal_root_idx) = nx.child_by_name(map_node_idx, "portal")? {
+    if let Some(portal_root_idx) = nx.child_by_name(body_idx, "portal")? {
         for portal_node_idx in nx.child_indices(portal_root_idx)? {
             let portal_id_name = nx.node_name(portal_node_idx)?;
             let Ok(portal_id) = portal_id_name.parse::<u32>() else {
@@ -630,7 +648,7 @@ fn build_field_template(
     }
 
     let mut areas = Vec::new();
-    if let Some(area_root) = nx.child_by_name(map_node_idx, "area")? {
+    if let Some(area_root) = nx.child_by_name(body_idx, "area")? {
         for area in nx.child_indices(area_root)? {
             let edge =
                 |key| -> Result<i32, GameDataError> { Ok(nx.int_child(area, key)?.unwrap_or(0)) };
@@ -1524,6 +1542,32 @@ mod tests {
             game_data.field(100_000_000).expect("Henesys").time_limit,
             None
         );
+    }
+
+    #[test]
+    fn a_maps_copies_take_its_body_through_their_link() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let pig_farm = game_data.field(100_020_100).expect("a mini dungeon");
+        // Its copy has only an `info` node, linking it.
+        let copy = game_data.field(100_020_101).expect("a copy of it");
+        assert_eq!(copy.map_id, 100_020_101);
+        assert_eq!(copy.time_limit, Some(7200));
+        assert_eq!(copy.forced_return, Some(100_020_000));
+        let names = |field: &FieldTemplate| {
+            let portals = field.portals_by_id.values();
+            portals
+                .map(|portal| portal.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert!(names(copy).contains(&"out00".to_string()));
+        assert_eq!(names(copy), names(pig_farm));
+        assert_eq!(copy.footholds.bounds(), pig_farm.footholds.bounds());
+        assert!(copy.footholds.bounds().is_some());
+        assert_eq!(copy.mob_spawns.len(), pig_farm.mob_spawns.len());
+        assert!(!copy.mob_spawns.is_empty());
     }
 
     #[test]
