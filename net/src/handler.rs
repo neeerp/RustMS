@@ -676,7 +676,13 @@ pub enum FieldRequest {
     Kite { item_id: i32, message: String },
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
-    Pickup { object_id: i32, x: i16, y: i16 },
+    Pickup {
+        object_id: i32,
+        x: i16,
+        y: i16,
+        /// The quest drops the player may take.
+        needs: crate::loot::QuestNeeds,
+    },
     /// Throw `loot` down where the player stands; anyone may pick it up at
     /// once. With `vanish` it falls and fades instead (quest items).
     Throw {
@@ -745,6 +751,8 @@ pub enum FieldRequest {
         mesos: bool,
         items: bool,
         ignored: Vec<i32>,
+        /// The quest drops the player may take.
+        needs: crate::loot::QuestNeeds,
     },
     /// The player's client moved their pet at `index` in their pet list.
     PetMove {

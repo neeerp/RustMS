@@ -1310,6 +1310,16 @@ impl ClientActor {
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::PersonalShop { room, event } => self.shop_event(room, event).await?,
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
+            ServerMessage::QuestDrop {
+                quest,
+                item_id,
+                mut packet,
+            } => {
+                let player = &self.in_game()?.player;
+                if net::loot::wants(player, quest, item_id) {
+                    self.send(&mut packet).await?;
+                }
+            }
         }
         Ok(())
     }

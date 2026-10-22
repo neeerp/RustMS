@@ -254,6 +254,13 @@ pub enum ServerMessage {
         stage: u8,
     },
     SendPacket(Packet),
+    /// A quest drop's packet, which the player sees only if they still need
+    /// `item_id` for `quest` (`net::loot::wants`).
+    QuestDrop {
+        quest: i16,
+        item_id: i32,
+        packet: Packet,
+    },
 }
 
 /// A cheap, clonable way to reach one client connection.

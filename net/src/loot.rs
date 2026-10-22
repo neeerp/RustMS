@@ -14,7 +14,8 @@ pub enum Loot {
     Item {
         item_id: i32,
         quantity: i16,
-        /// Only for its owner, while they have this quest started.
+        /// Seen and taken only by those who still need it for this quest
+        /// (`QuestNeeds`).
         quest: Option<i16>,
     },
     Mesos(i32),
@@ -25,9 +26,18 @@ pub enum Loot {
 
 impl Loot {
     pub fn quest(&self) -> Option<i16> {
+        self.quest_item().map(|(quest, _)| quest)
+    }
+
+    /// The quest a quest drop is for, and its item.
+    pub fn quest_item(&self) -> Option<(i16, i32)> {
         match self {
-            Loot::Item { quest, .. } => *quest,
-            Loot::Mesos(_) | Loot::Dropped(_) => None,
+            Loot::Item {
+                item_id,
+                quest: Some(quest),
+                ..
+            } => Some((*quest, *item_id)),
+            Loot::Item { .. } | Loot::Mesos(_) | Loot::Dropped(_) => None,
         }
     }
 
@@ -45,18 +55,20 @@ impl Loot {
 
 /// Roll one mob's drops for `player` at `now`, each `showdown` percent more
 /// likely (Taunt's) and scaled by the world's and their cards' rates
-/// (`crate::rates`), then its Monster Book card.
+/// (`crate::rates`), then its Monster Book card. `in_party` rolls quest
+/// drops the player doesn't need too, for their party.
 pub fn roll(
     mob_id: i32,
     showdown: i32,
     player: &Player,
+    in_party: bool,
     now: SystemTime,
     rng: &mut impl Rng,
 ) -> Vec<Loot> {
     let rate = f64::from(100 + showdown) / 100.0 * crate::rates::drop(player, now);
     let mesos = crate::rates::meso(player, now);
     let entries = crate::content::rewards().drops(mob_id);
-    let mut loot = roll_at(entries, (rate, mesos), player, rng);
+    let mut loot = roll_at(entries, (rate, mesos), player, in_party, rng);
     if let Some(card) = crate::monster_book::card_for(mob_id) {
         if rng.gen_bool(crate::monster_book::drop_rate()) {
             loot.push(Loot::Item {
@@ -69,17 +81,25 @@ pub fn roll(
     loot
 }
 
-/// Roll one broken reactor's drops for `player`.
-pub fn roll_reactor(reactor_id: i32, player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    roll_entries(
+/// Roll one broken reactor's drops for `player` (`in_party` as for
+/// `roll`).
+pub fn roll_reactor(
+    reactor_id: i32,
+    player: &Player,
+    in_party: bool,
+    rng: &mut impl Rng,
+) -> Vec<Loot> {
+    roll_at(
         crate::content::rewards().reactor_drops(reactor_id),
+        (1.0, 1.0),
         player,
+        in_party,
         rng,
     )
 }
 
 pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
-    roll_at(entries, (1.0, 1.0), player, rng)
+    roll_at(entries, (1.0, 1.0), player, false, rng)
 }
 
 /// `roll_entries`, with every chance times `rate` and every meso amount
@@ -88,21 +108,23 @@ fn roll_at(
     entries: &[RewardEntry],
     (rate, mesos): (f64, f64),
     player: &Player,
+    in_party: bool,
     rng: &mut impl Rng,
 ) -> Vec<Loot> {
     let mut loot = Vec::new();
     for entry in entries {
         // Quest drops only while the quest is started and the player holds
-        // fewer than it needs.
+        // fewer than it needs. In a party quest items roll anyway, as
+        // Cosmic's do, for the members who need them: only those who do see
+        // them (`QuestNeeds`).
         let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
         if let Some(quest) = quest {
-            if player.quests.state(quest) != QuestState::Started {
-                continue;
-            }
-            if entry
+            let needed = entry
                 .item
-                .is_some_and(|item| player.inventory.count(item) >= needed(quest, item))
-            {
+                .map_or(player.quests.state(quest) == QuestState::Started, |item| {
+                    wants(player, quest, item)
+                });
+            if !needed && !(in_party && entry.item.is_some()) {
                 continue;
             }
         }
@@ -206,6 +228,54 @@ fn quest_for(item: i32) -> Option<i16> {
     asked_by.get(&item).copied().flatten()
 }
 
+/// Whether `player` still needs `item` for `quest`: it is started and they
+/// hold fewer than its completion asks for (Cosmic's `needQuestItem`).
+pub fn wants(player: &Player, quest: i16, item: i32) -> bool {
+    player.quests.state(quest) == QuestState::Started
+        && player.inventory.count(item) < needed(quest, item)
+}
+
+/// Which quest drops a player still needs, as `wants` has it, taken when
+/// they reach for one: the field decides with it who may take a quest
+/// drop.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct QuestNeeds {
+    /// The quests the player has started.
+    pub started: Vec<i16>,
+    /// Items of those quests the player holds enough of.
+    pub enough: Vec<(i16, i32)>,
+}
+
+impl QuestNeeds {
+    pub fn of(player: &Player) -> Self {
+        let started: Vec<i16> = player
+            .quests
+            .started()
+            .map(|record| record.quest_id)
+            .collect();
+        let enough = started
+            .iter()
+            .filter_map(|&quest| {
+                let catalog = crate::quests::catalog().ok()?;
+                let items = &catalog.quest(quest)?.end_items;
+                Some(
+                    items
+                        .iter()
+                        .filter(|&&(item, count)| player.inventory.count(item) >= count)
+                        .map(move |&(item, _)| (quest, item))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect();
+        QuestNeeds { started, enough }
+    }
+
+    pub fn wants(&self, quest: i16, item: i32) -> bool {
+        self.started.contains(&quest) && !self.enough.contains(&(quest, item))
+    }
+}
+
 /// How many of `item` completing `quest` takes: any number when the quest
 /// doesn't ask for it.
 fn needed(quest: i16, item: i32) -> i32 {
@@ -288,6 +358,41 @@ mod tests {
     }
 
     #[test]
+    fn a_party_rolls_quest_items_and_their_takers_need_them() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let table = [
+            entry(Some(4031802), None, 1.0, Some(1035)),
+            entry(None, Some(10), 1.0, Some(1035)),
+        ];
+        let mut player = crate::codec::stats::sample_player();
+        let rolled = roll_at(&table, (1.0, 1.0), &player, true, &mut rng);
+        assert_eq!(
+            rolled,
+            [Loot::Item {
+                item_id: 4031802,
+                quantity: 1,
+                quest: Some(1035)
+            }]
+        );
+        let agree = |player: &Player| {
+            let needs = QuestNeeds::of(player);
+            assert_eq!(needs.wants(1035, 4031802), wants(player, 1035, 4031802));
+            needs.wants(1035, 4031802)
+        };
+        assert!(!agree(&player));
+        player.quests.upsert(QuestRecord {
+            quest_id: 1035,
+            status: QuestStatus::Started { kills: Vec::new() },
+        });
+        assert!(agree(&player));
+        player
+            .inventory
+            .add(game::Item::stack(4031802, 1), 100)
+            .unwrap();
+        assert!(!agree(&player));
+    }
+
+    #[test]
     fn quest_drops_continue_until_the_quest_has_enough() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(4);
         // Quest 1034 needs ten of item 4031792.
@@ -362,7 +467,10 @@ mod tests {
         let half = [entry(Some(4000019), None, 0.5, None)];
         // Twice as likely: always.
         for _ in 0..50 {
-            assert_eq!(roll_at(&half, (2.0, 1.0), &player, &mut rng).len(), 1);
+            assert_eq!(
+                roll_at(&half, (2.0, 1.0), &player, false, &mut rng).len(),
+                1
+            );
         }
     }
 
@@ -372,7 +480,8 @@ mod tests {
         let player = crate::codec::stats::sample_player();
         let mesos = [entry(None, Some(100), 1.0, None)];
         for _ in 0..50 {
-            let [Loot::Mesos(amount)] = roll_at(&mesos, (1.0, 2.0), &player, &mut rng)[..] else {
+            let [Loot::Mesos(amount)] = roll_at(&mesos, (1.0, 2.0), &player, false, &mut rng)[..]
+            else {
                 panic!("one meso drop");
             };
             assert!((160..=240).contains(&amount) && amount % 2 == 0);

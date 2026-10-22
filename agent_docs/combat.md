@@ -846,9 +846,11 @@ take 4/5 of the table amount plus up to 2/5 more (OrionAlpha's
 what scales them). A mob worth no EXP still drops and
 counts for quests. Quest drops are the entries
 the overrides tag with a quest, and quest items (`info/quest`) that only one
-quest's completion check (`Check.img/<quest>/1/item`) asks for. They roll
-only while that quest is started and the player holds fewer than the check
-asks for (any number if it doesn't name the item). Without a content pack,
+quest's completion check (`Check.img/<quest>/1/item`) asks for. For a
+player out of a party they roll only while that quest is started and the
+player holds fewer than the check asks for (any number if it doesn't name the
+item); in a party they roll anyway, as Cosmic's do, for the members who need
+them. Without a content pack,
 mobs drop only the overrides. The client actor rolls (it has
 the player's quests) and asks the field to place the loot.
 
@@ -859,10 +861,18 @@ entering see lying drops (mode 2). Each drop lands on the map's footholds
 ground below its column, searched from 50 px above the mob as v83 servers do.
 A wall between the mob and the drop's column, or no ground under it, keeps
 the drop on the ground below the mob, so drops don't end up inside a cliff or
-in the air. Quest drops are shown only to their owner.
+in the air. A quest drop is shown only to the players on the map who still
+need it (`net::loot::wants`): the field hands its packet to each occupant's
+client actor as `ServerMessage::QuestDrop`, which checks the player's quests
+and inventory, as Cosmic's `spawnDrop` does. Removals go to everyone; clients
+ignore drops they never saw.
 
 For 15 s only the owner may pick a drop up, or with a party, the owner's
-party as it was at the drop (quest drops: always only the owner). Drops of
+party as it was at the drop; a player outside it who needs a quest drop
+sees it but waits like anyone else. A quest drop is also refused to anyone
+who doesn't need it, the owner included: the pickup carries a `QuestNeeds`
+snapshot of the taker's started quests and the quest items they already hold
+enough of. Drops of
 mobs with `publicReward` are anyone's at once, as are those of mobs with
 `explosiveReward`, which fly out 40 px apart instead of 25. The packet's
 ownership type tells the client which (v83 FUN_0050483a, whose pets follow

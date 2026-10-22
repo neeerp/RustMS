@@ -24,6 +24,7 @@ impl WorldHandler for ItemPickupHandler {
                 object_id,
                 x,
                 y,
+                needs: crate::loot::QuestNeeds::of(ctx.player),
             })),
         )
     }
