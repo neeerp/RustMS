@@ -176,8 +176,7 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
             characters::name,
         ))
         .load::<(i32, Option<i32>, i16, i16, i32, i32, i32, i32, i32, String)>(conn)?;
-    let rows: std::collections::HashMap<_, _> =
-        rows.into_iter().map(|row| (row.0, row)).collect();
+    let rows: std::collections::HashMap<_, _> = rows.into_iter().map(|row| (row.0, row)).collect();
     chart.members = ids
         .iter()
         .filter_map(|id| rows.get(id).cloned())
