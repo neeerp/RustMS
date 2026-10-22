@@ -740,8 +740,9 @@ The ride ends on death, a mob's Dispel, logout, and entering a map with
 field limit 0x200 (`keep_mounts_off`). The mount and saddle, and their
 cash covers, can't be moved while riding. Not done: Cosmic's explorer and
 Cygnus restrictions on who may equip which mount, getting the skill and
-the Hog (quest 6002's `skill` act and the Tame Pig maps), event mounts,
-and HeavenClient's side.
+the Hog (quest 6002's `skill` act and the Tame Pig maps), and event
+mounts. HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
+report 201).
 
 Battleship (5221006, report 228) is a ride too, on the vehicle 1932000
 whatever is worn (`Player::ride`), with no mount or saddle needed
@@ -1084,8 +1085,8 @@ carry the statuses a mob has. Entries come in the client's decode order
   (stuns, freezes, poisons, Disorder's lower attack and defence, Taunt's
   higher defence, Hypnotize's Dazzle) and a learned Venom's poison. Each mob hit for more than
   0 rolls each. Elemental Boost makes Ice Splitter's freeze last its `y`
-  seconds longer; the extra poison its description promises for
-  Flamethrower is not modelled.
+  seconds longer and Flamethrower's burn hit its `x` percent harder
+  (`skills::elemental_boost`).
 - Taunt also puts on Showdown (bit 11), which no v83 client reads: a mob
   that dies with it gives its value in percent more EXP and makes each of
   its drops that much likelier (`Kill::showdown`, `loot::roll`; the

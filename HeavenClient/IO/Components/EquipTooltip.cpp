@@ -250,6 +250,14 @@ namespace ms
 			gift_from.empty() ? "" : "IT'S A GIFT FROM '" + gift_from + "'");
 	}
 
+	void EquipTooltip::set_stored(Tooltip::Parent p, const Equip &equip, bool cash)
+	{
+		parent = p;
+		// No slot of the player's, so the next set_equip builds again.
+		invpos = -1;
+		build(equip, item_expiry::line(equip.get_expiration(), cash, equip.get_flags() & item_expiry::SEALED), "");
+	}
+
 	void EquipTooltip::build(const Equip &equip, const std::string &expirystr, const std::string &giftstr,
 							 int64_t cash_id)
 	{

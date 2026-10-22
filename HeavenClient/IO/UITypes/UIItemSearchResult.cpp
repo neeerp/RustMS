@@ -310,8 +310,7 @@ namespace ms
 				if (x >= INFO_X && x < INFO_X + 57)
 				{
 					if (entry.equip)
-						return UI::get().show_item(Tooltip::Parent::ITEMSEARCHRESULT, entry.equip->itemid,
-												   entry.equip->expiration, entry.equip->flags);
+						return UI::get().show_item(Tooltip::Parent::ITEMSEARCHRESULT, *entry.equip);
 
 					return UI::get().show_item(Tooltip::Parent::ITEMSEARCHRESULT, results.itemid);
 				}

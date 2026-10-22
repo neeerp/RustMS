@@ -24,6 +24,7 @@
 #include "UIStateLogin.h"
 #include "Window.h"
 
+#include "../Character/Inventory/Equip.h"
 #include "../Gameplay/Stage.h"
 #include "../Net/Handlers/StorageContents.h"
 #include "../Net/Packets/GameplayPackets.h"
@@ -590,13 +591,27 @@ namespace ms
 
 	void UI::show_item(Tooltip::Parent parent, const storage_contents::Stored &item)
 	{
-		// Equips have no tooltip of their own here yet, and name their owner differently ("'s").
 		if (item.itemid / 10000 == 500)
+		{
 			show_item(parent, item.itemid, item.date_dead, 0, true, item.remain_life);
+		}
 		else if (item.itemid / 1000000 == 1)
-			show_item(parent, item.itemid, item.expiration, item.flags, true);
+		{
+			// The equip as the packet made it, upgrades and all, like one in the inventory.
+			EnumMap<EquipStat::Id, uint16_t> stats;
+
+			for (EquipStat::Id es : EquipStat::values)
+				stats[es] = item.stats[es];
+
+			state->show_stored_equip(parent,
+									 Equip(item.itemid, item.expiration, item.owner, item.flags, item.slots,
+										   item.level, stats, item.itemlevel, item.itemexp, item.vicious),
+									 item.cash);
+		}
 		else
+		{
 			show_item(parent, item.itemid, item.expiration, item.flags, true, 0, item.owner);
+		}
 	}
 
 	void

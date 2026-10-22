@@ -666,6 +666,13 @@ namespace ms
 		}
 	}
 
+	void UIStateGame::show_stored_equip(Tooltip::Parent parent, const Equip &equip, bool cash)
+	{
+		eqtooltip.set_stored(parent, equip, cash);
+		tooltip = eqtooltip;
+		tooltipparent = parent;
+	}
+
 	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
 								bool owned, int32_t remain_life, const std::string &owner)
 	{

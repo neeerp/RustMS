@@ -693,7 +693,11 @@ The equip tooltip shows the owner over the name, in orange with a white
 (`item_properties::shows_maker`), except greeting cards (430xxxx) and the
 two wedding invitations, whose owner field means something else, and pets.
 The inventory, storage, trading room, personal shop, Duey and NPC shop
-tooltips all show an item's own expiry, flags and owner.
+tooltips all show an item's own expiry, flags and owner. An equip in
+storage, a trade, a personal shop, a parcel or an Owl of Minerva result
+shows the full equip tooltip with its own stats, upgrades and owner, the
+way the packet sent it (`storage_contents::Stored`,
+`EquipTooltip::set_stored`), not the equip as Character.nx makes it.
 
 ### Item Guards
 
@@ -1467,8 +1471,8 @@ Setup and Summon ranges, the tree's layout once a part is open, and where
 the result window opens (centred). A panel's buttons appear once it is all
 the way out, and switching panels starts the new one from under the window
 instead of sliding both at once. The text colours of the result rows are
-not decoded (all black, the status red). Equip tooltips show the base item:
-the stats are read but not kept. GO after leaving the Free Market gets
+not decoded (all black, the status red). Equip tooltips show the listed
+equip's own stats. GO after leaving the Free Market gets
 answer 1 from the server, so the row shows "Store Closed".
 
 Hired merchants are not supported yet.
