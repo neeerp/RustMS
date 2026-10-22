@@ -239,6 +239,9 @@ pub struct Trace {
     pub broadcasts: Vec<(u8, String)>,
     /// BROADCAST_MSG kind 6: (message, linked item or 0).
     pub item_lines: Vec<(String, i32)>,
+    /// BROADCAST_MSG kind 11, a Gachapon win: (message, channel, town,
+    /// item).
+    pub gachapon_wins: Vec<(String, i32, String, i32)>,
     /// BLOW_WEATHER: (item, message) of each weather that starts blowing.
     pub weathers: Vec<(i32, String)>,
     /// PLAYER_HINT: (text, width, height) of each instruction balloon.
@@ -415,6 +418,14 @@ impl Trace {
             } else if kind == 6 {
                 let message = r.read_str_with_length().unwrap();
                 self.item_lines.push((message, r.read_int().unwrap()));
+            } else if kind == 11 {
+                let message = r.read_str_with_length().unwrap();
+                let channel = r.read_int().unwrap();
+                let town = r.read_str_with_length().unwrap();
+                // The item's kind, then its id.
+                r.read_byte().unwrap();
+                self.gachapon_wins
+                    .push((message, channel, town, r.read_int().unwrap()));
             }
         } else if op == SendOpcode::BlowWeather as i16 {
             r.read_byte().unwrap();

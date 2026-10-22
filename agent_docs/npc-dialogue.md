@@ -75,6 +75,7 @@ a conversation already open.
 | `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
 | `multipet_success` | Clicking the hidden spot (9102100) on the Pet-Walking Road (100000202) | While Bartos's test (4646) is started, yes gives the note (4031921) the test asks for, once; otherwise one page |
 | `q4647e` | QUEST_ACTION 5 for quest 4647 (Bartos) | Two pages, then takes a Pet Snack (5460000), completes the quest and teaches Follow the Lead for the player's line (8, 10000018 or 20000024); without a snack, one page |
+| Gachapon machines | Clicking a machine (9100100-9100107, 9100109, 9100117) | With a Gachapon Ticket (5220000), yes trades it for the prize rolled when the conversation opened, and the next page names it; without one, a menu explains the machine. See `agent_docs/inventory.md`, "Gachapon" |
 
 The five Explorer instructors (`INSTRUCTORS` in `npc_scripts.rs`) make a
 beginner a Warrior, Magician, Bowman, Thief, or Pirate. The beginner needs

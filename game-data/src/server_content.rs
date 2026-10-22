@@ -15,6 +15,7 @@ use std::path::Path;
 
 const PLACEHOLDER_TEXT: &str = include_str!("../placeholder_text.toml");
 const REWARD_OVERRIDES: &str = include_str!("../reward_overrides.toml");
+const GACHAPON_PLACEHOLDER: &str = include_str!("../gachapon_placeholder.toml");
 
 /// Text keys used by server scripts. `placeholder_text.toml` lists them all.
 pub mod keys {
@@ -725,6 +726,19 @@ pub mod keys {
     pub const PET_NOTE_NOTHING: &str = "pet_trainer.note.nothing";
     pub const PET_SECRET: [&str; 2] = ["pet_trainer.secret.0", "pet_trainer.secret.1"];
     pub const PET_SECRET_NO_SNACK: &str = "pet_trainer.secret.no_snack";
+
+    /// A Gachapon machine (report c058): the question to a player with a
+    /// ticket, the prize, the menu of explanations without one, and the
+    /// refusals.
+    pub const GACHAPON_ASK: &str = "gachapon.ask";
+    pub const GACHAPON_WON: &str = "gachapon.won";
+    pub const GACHAPON_FULL: &str = "gachapon.full";
+    pub const GACHAPON_NO_TICKET: &str = "gachapon.no_ticket";
+    pub const GACHAPON_MENU: &str = "gachapon.menu";
+    pub const GACHAPON_WHAT_CHOICE: &str = "gachapon.what.choice";
+    pub const GACHAPON_WHAT: &str = "gachapon.what";
+    pub const GACHAPON_WHERE_CHOICE: &str = "gachapon.where.choice";
+    pub const GACHAPON_WHERE: &str = "gachapon.where";
 
     /// The family entitlements' names and descriptions, by index
     /// (`game::family::ENTITLEMENTS`), which the Family window lists.
@@ -1439,6 +1453,109 @@ impl ShopTable {
     }
 }
 
+/// How rare a Gachapon prize is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GachaponTier {
+    Common,
+    Uncommon,
+    Rare,
+}
+
+/// A Gachapon prize: `count` of `item`.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+pub struct GachaponPrize {
+    pub item: i32,
+    #[serde(default = "one")]
+    pub count: i16,
+}
+
+fn one() -> i16 {
+    1
+}
+
+/// The prizes of each tier.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+pub struct GachaponPool {
+    #[serde(default)]
+    pub common: Vec<GachaponPrize>,
+    #[serde(default)]
+    pub uncommon: Vec<GachaponPrize>,
+    #[serde(default)]
+    pub rare: Vec<GachaponPrize>,
+}
+
+impl GachaponPool {
+    fn tier(&self, tier: GachaponTier) -> &[GachaponPrize] {
+        match tier {
+            GachaponTier::Common => &self.common,
+            GachaponTier::Uncommon => &self.uncommon,
+            GachaponTier::Rare => &self.rare,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct GachaponFile {
+    #[serde(default)]
+    global: GachaponPool,
+    #[serde(default)]
+    machines: BTreeMap<String, GachaponPool>,
+}
+
+/// Gachapon prizes: the pack's `gachapon.json`, else our committed
+/// stand-ins (`gachapon_placeholder.toml`). Every machine draws from the
+/// global prizes and its own.
+#[derive(Debug, Default)]
+pub struct GachaponTable {
+    global: GachaponPool,
+    machines: BTreeMap<i32, GachaponPool>,
+    from_pack: bool,
+}
+
+impl GachaponTable {
+    pub fn load(pack: Option<&Path>) -> Result<Self, GameDataError> {
+        let path = pack.map(|p| p.join("gachapon.json")).filter(|p| p.exists());
+        let (file, from_pack): (GachaponFile, _) = match &path {
+            Some(path) => {
+                let file = std::fs::File::open(path)?;
+                let parsed = serde_json::from_reader(std::io::BufReader::new(file))
+                    .map_err(|e| GameDataError::InvalidData(format!("{}: {e}", path.display())))?;
+                (parsed, true)
+            }
+            None => (
+                toml::from_str(GACHAPON_PLACEHOLDER).map_err(|e| {
+                    GameDataError::InvalidData(format!("gachapon_placeholder.toml: {e}"))
+                })?,
+                false,
+            ),
+        };
+        let mut machines = BTreeMap::new();
+        for (npc, pool) in file.machines {
+            machines.insert(parse_id(&npc, "gachapon machine")?, pool);
+        }
+        Ok(Self {
+            global: file.global,
+            machines,
+            from_pack,
+        })
+    }
+
+    /// The prizes of `tier` machine `npc_id` draws from: its own, then the
+    /// global ones.
+    pub fn prizes(&self, npc_id: i32, tier: GachaponTier) -> Vec<GachaponPrize> {
+        let own = self
+            .machines
+            .get(&npc_id)
+            .map_or(&[][..], |pool| pool.tier(tier));
+        own.iter().chain(self.global.tier(tier)).copied().collect()
+    }
+
+    /// Whether the prizes came from the pack rather than the stand-ins.
+    pub fn from_pack(&self) -> bool {
+        self.from_pack
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1832,6 +1949,15 @@ mod tests {
             keys::PET_NOTE_HELD,
             keys::PET_NOTE_NOTHING,
             keys::PET_SECRET_NO_SNACK,
+            keys::GACHAPON_ASK,
+            keys::GACHAPON_WON,
+            keys::GACHAPON_FULL,
+            keys::GACHAPON_NO_TICKET,
+            keys::GACHAPON_MENU,
+            keys::GACHAPON_WHAT_CHOICE,
+            keys::GACHAPON_WHAT,
+            keys::GACHAPON_WHERE_CHOICE,
+            keys::GACHAPON_WHERE,
             keys::OPQ_EAK_HAND_IN,
             keys::OPQ_EAK_PIECE,
             keys::OPQ_EAK_ROOM_CLEARED,
@@ -2080,6 +2206,49 @@ mod tests {
             ]
         );
         assert!(shops.shop(11000).is_none());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn gachapon_prizes_fall_back_to_the_stand_ins() {
+        let stand_ins = GachaponTable::load(None).unwrap();
+        assert!(!stand_ins.from_pack());
+        for tier in [
+            GachaponTier::Common,
+            GachaponTier::Uncommon,
+            GachaponTier::Rare,
+        ] {
+            assert!(!stand_ins.prizes(9100100, tier).is_empty(), "{tier:?}");
+        }
+        assert!(stand_ins
+            .prizes(9100100, GachaponTier::Common)
+            .contains(&GachaponPrize {
+                item: 2000000,
+                count: 30
+            }));
+
+        // The pack replaces them all; a machine's own come first.
+        let dir = std::env::temp_dir().join(format!("rustms-gachapon-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("gachapon.json"),
+            r#"{"global": {"common": [{"item": 2000001, "count": 10}]},
+                "machines": {"9100101": {"common": [{"item": 1302000}], "rare": [{"item": 2049100}]}}}"#,
+        )
+        .unwrap();
+        let pack = GachaponTable::load(Some(&dir)).unwrap();
+        assert!(pack.from_pack());
+        let potion = GachaponPrize {
+            item: 2000001,
+            count: 10,
+        };
+        let sword = GachaponPrize {
+            item: 1302000,
+            count: 1,
+        };
+        assert_eq!(pack.prizes(9100101, GachaponTier::Common), [sword, potion]);
+        assert_eq!(pack.prizes(9100100, GachaponTier::Common), [potion]);
+        assert!(pack.prizes(9100100, GachaponTier::Rare).is_empty());
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

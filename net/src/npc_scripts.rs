@@ -10,6 +10,7 @@ use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck, Standing,
 };
+use crate::gachapon::{self, Prize};
 use crate::items;
 use crate::rides;
 use crate::scripts::Effect;
@@ -1181,6 +1182,23 @@ impl NpcScript {
         }
         if let Some(&(_, ride, fare)) = FERRIES.iter().find(|(pilot, ..)| *pilot == npc_id) {
             return Some(ferry(npc_id, ride, fare, player));
+        }
+        if let Some(town) = gachapon::town(npc_id) {
+            let inventory = &player.inventory;
+            if inventory.count(gachapon::TICKET) == 0 {
+                return Some(gachapon_machine(npc_id, town, None));
+            }
+            // A prize may go to any bag. Rolling with one full would turn
+            // some prizes away with the ticket kept: a free roll, which
+            // also tells which bag the prize was for.
+            if gachapon::BAGS.iter().any(|&bag| inventory.free(bag) == 0) {
+                return Some(NpcScript::new(
+                    npc_id,
+                    vec![Page::Say(text(keys::GACHAPON_FULL))],
+                ));
+            }
+            let prize = gachapon::roll(npc_id, &mut gachapon::rng());
+            return Some(gachapon_machine(npc_id, town, prize));
         }
         match npc_id {
             DOOR_OF_DIMENSION => Some(door_of_dimension(player)),
@@ -4516,6 +4534,48 @@ pub fn resets_when_empty(map_id: i32) -> bool {
         || crate::scripts::SOLO_MAPS.contains(&map_id)
 }
 
+/// A Gachapon machine in `town` (report c058 Q6). To a player with a
+/// ticket it offers the `prize` already rolled, named once it is theirs;
+/// to anyone else it explains itself.
+fn gachapon_machine(npc_id: i32, town: &'static str, prize: Option<Prize>) -> NpcScript {
+    let Some(prize) = prize else {
+        let choice = |label, answer| (text(label), vec![Page::Say(text(answer))]);
+        return NpcScript::new(
+            npc_id,
+            vec![Page::Menu {
+                text: content::text().get(keys::GACHAPON_MENU, &[("town", town)]),
+                choices: vec![
+                    choice(keys::GACHAPON_WHAT_CHOICE, keys::GACHAPON_WHAT),
+                    choice(keys::GACHAPON_WHERE_CHOICE, keys::GACHAPON_WHERE),
+                ],
+            }],
+        );
+    };
+    let item = prize.item_id.to_string();
+    let count = prize.quantity.to_string();
+    let mut script = NpcScript::new(
+        npc_id,
+        vec![
+            Page::Ask {
+                text: content::text().get(keys::GACHAPON_ASK, &[("town", town)]),
+                on_yes: vec![Effect::Gachapon {
+                    item_id: prize.item_id,
+                    quantity: prize.quantity,
+                    town,
+                    announced: prize.announced(),
+                }],
+                on_no: None,
+            },
+            Page::Say(
+                content::text().get(keys::GACHAPON_WON, &[("item", &item), ("count", &count)]),
+            ),
+        ],
+    );
+    script.inventory_full = Some(text(keys::GACHAPON_FULL));
+    script.refused = Some(text(keys::GACHAPON_NO_TICKET));
+    script
+}
+
 /// The Holy Stone takes a Dark Crystal from the player the chief sent and
 /// asks them `QUIZ_LENGTH` questions picked from the text's; all right
 /// earns the Necklace of Wisdom, any wrong ends the try (the crystal is
@@ -4822,6 +4882,97 @@ mod tests {
         // Answers that don't fit the prompt end the conversation.
         let mut script = NpcScript::for_quest("q1021s", &player(50)).unwrap();
         assert_eq!(script.respond(ScriptInput::Yes), None);
+    }
+
+    #[test]
+    fn a_gachapon_machine_trades_a_ticket_for_its_prize() {
+        let mut player = player(50);
+        crate::items::give(&mut player.inventory, gachapon::TICKET, 1).unwrap();
+        let mut script = NpcScript::for_npc(9100100, &player).unwrap();
+        let ask = script.begin();
+        assert_eq!(kind(&ask), Some(1));
+        let Some(Effect::Gachapon {
+            item_id,
+            quantity,
+            town,
+            announced,
+        }) = script
+            .respond(ScriptInput::Yes)
+            .unwrap()
+            .effects
+            .first()
+            .cloned()
+        else {
+            panic!("the yes trades the ticket");
+        };
+        assert_eq!(town, "Henesys");
+        assert!(crate::items::item_name(item_id).is_some());
+        assert!(quantity > 0);
+        let _ = announced;
+
+        // The same prize, by hand, to name it after the trade.
+        let prize = Prize {
+            item_id: 2_049_100,
+            quantity: 1,
+            tier: game_data::server_content::GachaponTier::Rare,
+        };
+        let mut script = gachapon_machine(9100101, "Ellinia", Some(prize));
+        let yes = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            yes.effects,
+            [Effect::Gachapon {
+                item_id: 2_049_100,
+                quantity: 1,
+                town: "Ellinia",
+                announced: true,
+            }]
+        );
+        assert!(page_text(&yes).contains("2049100"));
+        assert_eq!(buttons(&yes), (false, false));
+        assert_eq!(script.respond(ScriptInput::Next), Some(Step::default()));
+        // A full inventory, or a ticket gone since, is told.
+        let mut script = gachapon_machine(9100101, "Ellinia", Some(prize));
+        script.respond(ScriptInput::Yes);
+        let full = script.inventory_full().unwrap();
+        assert!(full.effects.is_empty());
+        assert_eq!(page_text(&full), text(keys::GACHAPON_FULL));
+        let mut script = gachapon_machine(9100101, "Ellinia", Some(prize));
+        script.respond(ScriptInput::Yes);
+        assert_eq!(
+            page_text(&script.refused().unwrap()),
+            text(keys::GACHAPON_NO_TICKET)
+        );
+    }
+
+    #[test]
+    fn a_gachapon_machine_wants_room_in_every_bag_before_it_rolls() {
+        let mut player = player(50);
+        crate::items::give(&mut player.inventory, gachapon::TICKET, 1).unwrap();
+        for slot in 1..=player.inventory.slot_limit(InventoryType::Setup) as i16 {
+            player
+                .inventory
+                .insert(InventoryType::Setup, slot, game::Item::stack(3_010_000, 1));
+        }
+        let mut script = NpcScript::for_npc(9100100, &player).unwrap();
+        let full = script.begin();
+        assert_eq!(kind(&full), Some(0));
+        assert_eq!(page_text(&full), text(keys::GACHAPON_FULL));
+        assert!(full.effects.is_empty());
+    }
+
+    #[test]
+    fn a_gachapon_machine_explains_itself_without_a_ticket() {
+        let mut script = NpcScript::for_npc(9100117, &player(50)).unwrap();
+        assert_eq!(kind(&script.begin()), Some(4));
+        for (choice, answer) in [(0, keys::GACHAPON_WHAT), (1, keys::GACHAPON_WHERE)] {
+            let mut script = script.clone();
+            let page = script.respond(ScriptInput::Select(choice)).unwrap();
+            assert!(page.effects.is_empty());
+            assert_eq!(page_text(&page), text(answer));
+        }
+        assert!(script.respond(ScriptInput::Select(2)).is_none());
+        // A machine Map.nx never places stays silent.
+        assert!(NpcScript::for_npc(9100108, &player(50)).is_none());
     }
 
     #[test]

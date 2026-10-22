@@ -19,6 +19,10 @@ int main()
 		require(with_item("Hero : selling", "Ilbi") == "Hero : [Ilbi]selling", "the item goes before the text");
 		require(with_item("selling", "Ilbi") == "[Ilbi]selling", "even without a name");
 
+		require(gachapon("Hero : got a(n)", "Chaos Scroll 60%", "Henesys") ==
+					"Hero got a(n)  :  Chaos Scroll 60%  from the Henesys Gachapon! Congrats!",
+				"a Gachapon win names the winner, the prize and the town");
+
 		require(under_name("Hero : one", "Hero : two") == "Hero : two", "a later line keeps the name");
 		require(under_name("Hero : one", "Other : two : three") == "Hero : two : three",
 				"a later line takes the first line's name");

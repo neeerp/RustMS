@@ -298,6 +298,16 @@ pub enum Effect {
         item_id: i32,
         quantity: i16,
     },
+    /// Trade a Gachapon Ticket for the prize rolled when the machine in
+    /// `town` was opened (`gachapon::roll`). Nothing is applied if the
+    /// ticket is gone or the prize doesn't fit; the world hears of an
+    /// `announced` prize.
+    Gachapon {
+        item_id: i32,
+        quantity: i16,
+        town: &'static str,
+        announced: bool,
+    },
     /// Nothing is applied if the player no longer has them.
     TakeItem {
         item_id: i32,
