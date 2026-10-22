@@ -1,10 +1,10 @@
 //! Families (report b039): the client gets the Family window's numbers on
 //! entering the game. A senior asks a character on their map to be their
-//! junior (ADD_FAMILY), who may say no or yes (ACCEPT_FAMILY); the server
-//! refuses a name not online, another map, too low a level, a junior who
-//! has a senior, and a senior of the same family. The Family Tree
-//! (OPEN_FAMILY_PEDIGREE) shows who is in it and online, and relatives hear
-//! who logs in or out.
+//! junior (ADD_FAMILY), who gets one card however often they are asked, and
+//! may say no or yes (ACCEPT_FAMILY). The server refuses a name not online,
+//! another map, too low a level, a junior who has a senior, and a senior of
+//! the same family. The Family Tree (OPEN_FAMILY_PEDIGREE) shows who is in
+//! it and online, and relatives hear who logs in or out.
 
 use integration_harness::database::set_job;
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -151,6 +151,8 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
         LITH_HARBOR
     );
     let asked = with_name(SendOpcode::FamilyJoinRequest, &a_id.to_le_bytes(), &an);
+    // Asking again while the card is up shows no second card.
+    send(&mut a.connection, request(RecvOpcode::AddFamily, &bn)).await;
     send(&mut a.connection, request(RecvOpcode::AddFamily, &bn)).await;
     assert_eq!(family(&mut b, 1).await, [asked.clone()]);
     send(&mut b.connection, answer(a_id, &an, false)).await;

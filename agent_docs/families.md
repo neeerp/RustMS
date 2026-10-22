@@ -27,7 +27,9 @@ who has ever been in a family:
   client's line.
 
 `Player.family` (`Relatives`) holds the senior and juniors. It is loaded
-with the character and copied into the directory's `Presence`.
+with the character, read again once the character is in the directory (a
+change made while they were entering the game reached no one), and copied
+into the directory's `Presence`.
 
 ### Requests
 
@@ -47,11 +49,16 @@ packets into `FamilyRequest`s, which the client actor
      that the junior is online, on the same channel and map, and of the
      right level.
   3. `GuildInvites`, keyed by the senior's id, lets one senior ask at a
-     time, for 180 s. A second senior gets "busy".
+     time, for 180 s. A second senior gets "busy". The same senior asking
+     again while the card is up is ignored, because the junior's client
+     would decline the second card. A senior's requests end when they
+     leave the channel.
   4. The junior gets `FAMILY_JOIN_REQUEST`.
 - **`ACCEPT_FAMILY` (inviter id, name, yes/no):**
   - A no reaches the senior as `FAMILY_JOIN_REQUEST_RESULT` 0.
-  - A yes goes to the senior's actor (`ServerMessage::AddJunior`), which
+  - A yes is checked again for the map and levels, since either may have
+    moved or levelled meanwhile. It then goes to the senior's actor
+    (`ServerMessage::AddJunior`), which
     runs `db::family::add_junior`. That function checks the rules again
     inside a transaction that locks both rows. On success:
     - the senior gets `FAMILY_JOIN_REQUEST_RESULT` 1;
@@ -64,8 +71,9 @@ packets into `FamilyRequest`s, which the client actor
   - The chart lists the leader, the two seniors above the character, the
     character, their sibling, their juniors, and their juniors' juniors,
     each parent before its children. These are the 11 slots of the window.
-  - The directory marks who is online and fills in their current level,
-    job and map.
+  - A senior's senior whose own senior isn't shown hangs from the leader.
+  - The directory marks who is online (a channel change counts) and fills
+    in their current level, job and map.
   - Head counts:
     - key -1: the whole family;
     - key 0: the character's seniors;

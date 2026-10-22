@@ -63,6 +63,13 @@ impl GuildInvites {
         }
     }
 
+    /// Whether `invitee` still has `guild_id`'s invitation in front of them.
+    pub fn is_pending(&self, invitee: ClientId, guild_id: i32, now: Instant) -> bool {
+        self.invites
+            .get(&invitee)
+            .is_some_and(|invite| invite.guild_id == guild_id && now < invite.sent + INVITE_TIMEOUT)
+    }
+
     /// Whether `inviter`'s invitation to `invitee` is waiting.
     pub fn is_invited(&self, invitee: ClientId, inviter: ClientId) -> bool {
         self.invites

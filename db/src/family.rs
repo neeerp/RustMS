@@ -192,6 +192,14 @@ pub fn chart(viewed: i32) -> crate::Result<FamilyChart> {
             name: row.9,
         })
         .collect();
+    // The senior's senior hangs from the leader when generations between
+    // aren't shown.
+    let shown: Vec<i32> = chart.members.iter().map(|member| member.id).collect();
+    for member in chart.members.iter_mut().skip(1) {
+        if !shown.contains(&member.senior_id) {
+            member.senior_id = leader;
+        }
+    }
 
     let family = descendants(conn, leader)?.0.len();
     chart.counts = vec![(-1, family as i32), (0, seniors.len() as i32)];

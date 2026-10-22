@@ -647,6 +647,8 @@ impl WorldDirectory {
             self.guild_invites.forget(client_id);
             self.alliance_invites.forget(client_id);
             self.family_invites.forget(client_id);
+            // Requests the player made go with them (keyed by the senior).
+            self.family_invites.forget_guild(client_id);
             if let Some(party) = self.parties.of(client_id) {
                 self.send_party_update(party);
             }

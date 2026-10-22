@@ -9,12 +9,15 @@ use net::packet::build::world::family::{
     build_privilege_list,
 };
 use net::{ClientId, FamilyRequest};
+use tracing::warn;
 
 impl ClientActor {
     /// On entering the game, and when the Family window opens: its numbers
     /// and the entitlements. The client asks for nothing else until then.
+    /// Relatives are read again too: a change made while the player was
+    /// entering the game reached no one.
     pub(super) async fn load_family(&mut self) -> Result<(), RuntimeError> {
-        self.send_family_info().await?;
+        self.family_changed().await?;
         self.send(&mut build_privilege_list()?).await
     }
 
@@ -86,10 +89,16 @@ impl ClientActor {
         name: String,
     ) -> Result<(), RuntimeError> {
         let cid = self.client_id;
-        let added = spawn_db(move || db::family::add_junior(cid, junior)).await?;
-        let ids = match added {
-            Ok(ids) => ids,
-            Err(refusal) => return self.send(&mut build_family_refusal(refusal)?).await,
+        let ids = match spawn_db(move || db::family::add_junior(cid, junior)).await {
+            Ok(Ok(ids)) => ids,
+            Ok(Err(refusal)) => return self.send(&mut build_family_refusal(refusal)?).await,
+            // The junior's character may be gone meanwhile.
+            Err(error) => {
+                warn!(cid, junior, %error, "Failed to add a junior");
+                return self
+                    .send(&mut build_family_refusal(Refusal::CannotAdd)?)
+                    .await;
+            }
         };
         self.send(&mut build_join_result(true, &name)?).await?;
         let senior = self.in_game()?.player.stats.name.clone();

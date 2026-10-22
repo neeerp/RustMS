@@ -23,25 +23,35 @@ impl WorldDirectory {
     /// `from` asks `junior` to be their junior. The database's checks have
     /// passed; these need both online.
     pub(super) fn family_invite(&mut self, from: ClientId, junior: ClientId, now: Instant) {
-        let Some(senior) = self.clients.get(&from) else {
-            return;
-        };
-        let refusal = match self.clients.get(&junior) {
-            None => Some(Refusal::NotFound),
-            Some(entry) if !entry.shares_map_with(senior) => Some(Refusal::NotSameMap),
-            Some(entry) => check_levels(senior.presence.level, entry.presence.level).err(),
-        };
-        if let Some(refusal) = refusal {
+        if let Some(refusal) = self.junior_refusal(from, junior) {
             self.send_packet(from, build_family_refusal(refusal));
             return;
         }
-        let name = senior.presence.name.clone();
-        // One senior at a time may ask; the same one may ask again.
+        // The junior's client would decline a second card for the first,
+        // so the same senior asking again while it is up is ignored.
+        if self.family_invites.is_pending(junior, from, now) {
+            return;
+        }
+        let Some(name) = self.clients.get(&from).map(|e| e.presence.name.clone()) else {
+            return;
+        };
+        // One senior at a time may ask.
         if !self.family_invites.invite(from, from, junior, now) {
             self.send_packet(from, build_family_refusal(Refusal::Busy));
             return;
         }
         self.send_packet(junior, build_join_request(from, &name));
+    }
+
+    /// Why `junior` can't be `senior`'s now: not online, on another map,
+    /// or of the wrong level.
+    fn junior_refusal(&self, senior: ClientId, junior: ClientId) -> Option<Refusal> {
+        let senior = self.clients.get(&senior)?;
+        match self.clients.get(&junior) {
+            None => Some(Refusal::NotFound),
+            Some(entry) if !entry.shares_map_with(senior) => Some(Refusal::NotSameMap),
+            Some(entry) => check_levels(senior.presence.level, entry.presence.level).err(),
+        }
     }
 
     /// `from` answers `inviter`'s request. A yes goes to the senior's actor,
@@ -61,8 +71,13 @@ impl WorldDirectory {
             return;
         };
         if accept {
-            if self.family_invites.accept(from, inviter, now) {
-                self.tell(inviter, ServerMessage::AddJunior { junior: from, name });
+            if !self.family_invites.accept(from, inviter, now) {
+                return;
+            }
+            // Either may have moved or levelled since the card came up.
+            match self.junior_refusal(inviter, from) {
+                None => self.tell(inviter, ServerMessage::AddJunior { junior: from, name }),
+                Some(refusal) => self.send_packet(inviter, build_family_refusal(refusal)),
             }
         } else if self.family_invites.decline(from, inviter) {
             self.send_packet(inviter, build_join_result(false, &name));
@@ -77,6 +92,9 @@ impl WorldDirectory {
                 member.job = entry.presence.job;
                 member.level = entry.presence.level;
                 member.map_id = entry.presence.map_id;
+            } else if self.family_away.contains_key(&member.id) {
+                // Changing channel, as the guild list has it.
+                member.online = true;
             }
         }
         self.send_packet(owner, build_family_chart(&chart));
