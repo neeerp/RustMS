@@ -14,6 +14,7 @@ pub struct Dungeon {
     pub script: &'static str,
     /// The map whose `MD00` leads in.
     pub base: i32,
+    /// The first copy; the others follow it.
     pub first: i32,
     /// How many copies there are: as many as Cosmic offers, but never more
     /// than Map.nx has.
@@ -92,12 +93,20 @@ mod tests {
             let base = data.field(dungeon.base).unwrap();
             let way_in = base.portal_by_name("MD00").unwrap();
             assert_eq!(way_in.script.as_deref(), Some(dungeon.script));
+            // A party arrives at the first copy's `out00` id in any copy.
+            let arrival = data
+                .field(dungeon.first)
+                .unwrap()
+                .portal_by_name("out00")
+                .unwrap()
+                .id;
             for copy in dungeon.copies() {
                 let field = data.field(copy).unwrap_or_else(|| panic!("{copy}"));
                 let way_out = field.portal_by_name("out00").unwrap();
                 assert_eq!(way_out.script.as_deref(), Some(dungeon.script), "{copy}");
+                assert_eq!(way_out.id, arrival, "{copy}");
                 assert_eq!(field.forced_return, Some(dungeon.base), "{copy}");
-                assert!(field.time_limit.is_some(), "{copy}");
+                assert_eq!(field.time_limit, Some(7200), "{copy}");
             }
             assert_eq!(of_copy(dungeon.first), Some(dungeon));
             assert_eq!(of_copy(dungeon.base), None);

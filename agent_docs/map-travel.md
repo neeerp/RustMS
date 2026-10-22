@@ -202,12 +202,12 @@ On the base map, `MD00` asks the directory for a copy
 party is refused with a pink line, and so is anyone when every copy is
 taken. Otherwise the directory picks the first copy on the player's
 channel with nobody in it and not kept for a team on its way (10 s), keeps
-it for the player, and sends the party members on the leader's map to the
-copy's `out00` too (`ServerMessage::ShipWarp`). The player follows with the
-portal sound. A copy's `out00`, like `MD00` anywhere but the base map,
+it for the player, who goes in with the portal sound. The party members
+who were beside the leader follow to the copy's `out00` once the leader is
+in (`ServerMessage::ShipWarp`). A copy's `out00`, like `MD00` anywhere but the base map,
 leads back to the base map's `MD00`. When the player who took the copy
-leaves it (by map change, logout or channel change), everyone still in it is
-sent to the base map's portal 0. An empty copy puts its mobs back, as a
+leaves it (by map change, logout, logging in again or channel change),
+everyone still in it is sent to the base map's portal 0. An empty copy puts its mobs back, as a
 clone's room does (`npc_scripts::resets_when_empty`). The clock is each
 player's own `MapTimer`, and a login or channel change into a copy lands
 on its forced return map.
