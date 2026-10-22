@@ -377,6 +377,28 @@ pub mod keys {
     /// Ways a quest has yet to open (`tristanEnter`, `s4resur_enter`,
     /// `s4rush`).
     pub const MYSTERIOUS_FORCE: &str = "portal.mysterious_force";
+    /// The Ellinia-Leafre shortcut (`minar_elli`), which spends a Magic
+    /// Seed.
+    pub const MAGIC_SEED_SPENT: &str = "portal.minar_elli.spent";
+    pub const MAGIC_SEED_NEEDED: &str = "portal.minar_elli.no_seed";
+    /// The Nautilus-Omega Sector link (`enter_earth00`, `enter_earth01`)
+    /// without a Warp Card.
+    pub const WARP_CARD_NEEDED: &str = "portal.earth.no_card";
+    /// Ariant's palace rooms (`ariant_queens`) turning out a player not in
+    /// Tigun's disguise.
+    pub const PALACE_INTRUDER: &str = "portal.ariant_palace.intruder";
+    /// The original Maple Island's instruction balloons (`advice00` to
+    /// `advice09`, `adviceMap`).
+    pub const ADVICE_MOVE: &str = "portal.advice.move";
+    pub const ADVICE_HEENA: &str = "portal.advice.heena";
+    pub const ADVICE_JUMP: &str = "portal.advice.jump";
+    pub const ADVICE_CLIMB: &str = "portal.advice.climb";
+    pub const ADVICE_SERA: &str = "portal.advice.sera";
+    pub const ADVICE_QUEST_WINDOW: &str = "portal.advice.quest_window";
+    pub const ADVICE_PORTAL: &str = "portal.advice.portal";
+    pub const ADVICE_WORLD_MAP: &str = "portal.advice.world_map";
+    pub const ADVICE_STATS: &str = "portal.advice.stats";
+    pub const ADVICE_JUMP_DOWN: &str = "portal.advice.jump_down";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1061,6 +1083,20 @@ mod tests {
             keys::DISGUISE_FOREST_OCCUPIED,
             keys::DISGUISE_ALREADY_FOUND,
             keys::MYSTERIOUS_FORCE,
+            keys::MAGIC_SEED_SPENT,
+            keys::MAGIC_SEED_NEEDED,
+            keys::WARP_CARD_NEEDED,
+            keys::PALACE_INTRUDER,
+            keys::ADVICE_MOVE,
+            keys::ADVICE_HEENA,
+            keys::ADVICE_JUMP,
+            keys::ADVICE_CLIMB,
+            keys::ADVICE_SERA,
+            keys::ADVICE_QUEST_WINDOW,
+            keys::ADVICE_PORTAL,
+            keys::ADVICE_WORLD_MAP,
+            keys::ADVICE_STATS,
+            keys::ADVICE_JUMP_DOWN,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

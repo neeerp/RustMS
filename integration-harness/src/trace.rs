@@ -211,6 +211,8 @@ pub struct Trace {
     /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
     /// message (0, 1, 5).
     pub broadcasts: Vec<(u8, String)>,
+    /// PLAYER_HINT: (text, width, height) of each instruction balloon.
+    pub hints: Vec<(String, i16, i16)>,
     /// CLOCK kind 1, a wall clock's time of day: (hour, minute, second).
     pub clocks: Vec<(u8, u8, u8)>,
     /// CLOCK kind 2, the field's countdown: its seconds.
@@ -380,6 +382,10 @@ impl Trace {
                 self.broadcasts
                     .push((kind, r.read_str_with_length().unwrap()));
             }
+        } else if op == SendOpcode::PlayerHint as i16 {
+            let text = r.read_str_with_length().unwrap();
+            self.hints
+                .push((text, r.read_short().unwrap(), r.read_short().unwrap()));
         } else if op == SendOpcode::FameResponse as i16 {
             let mode = r.read_byte().unwrap();
             let (name, up, fame) = match mode {

@@ -4,12 +4,17 @@
 //! Forest, Leafre's and Aqua Road's boss areas), doors that keep players
 //! back with a pink line until a quest opens them, and Ereve's forests,
 //! where the Master of Disguise's hideouts take one searcher at a time.
+//! Then a032's second: the ways an item opens (a Magic Seed between
+//! Ellinia and Leafre, a Warp Card between the Nautilus and Omega Sector),
+//! Ariant's palace, which turns out anyone not in Tigun's disguise, and
+//! the original Maple Island's instruction balloons.
 
-use integration_harness::database::set_quest;
+use integration_harness::database::{grant_stack, set_quest};
+use integration_harness::hunting::use_item;
 use integration_harness::preconditions::{
     load_harness_config_or_fail, load_multi_harness_config_or_fail,
 };
-use integration_harness::trace::{step, warp, Trace};
+use integration_harness::trace::{step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -151,5 +156,75 @@ async fn the_master_of_disguises_forest_takes_one_searcher_at_a_time() {
     );
     let trace = try_portal(&mut searcher, TRAINING_FOREST, "in00").await;
     assert_eq!(arrived(&trace).0, TINOS_FOREST);
+    assert!(trace.broadcasts.is_empty(), "{:?}", trace.broadcasts);
+}
+
+#[tokio::test]
+async fn seeds_cards_and_tiguns_disguise_open_their_ways() {
+    const USE: i16 = 2;
+    const ETC: i16 = 4;
+    const MAGIC_SEED: i32 = 4031346;
+    const WARP_CARD: i32 = 4031890;
+    const TIGUNS_DISGUISE: i32 = 2210005;
+    let config = load_harness_config_or_fail().await;
+    let mut player = login_to_world_session(&config).await.unwrap();
+    let id = player.character_id;
+
+    // Without the item, each way says what it needs.
+    for (map, portal) in [
+        (101010000, "minar00"),
+        (240010100, "elli00"),
+        (120000101, "earth01"),
+        (221000300, "earth00"),
+    ] {
+        let trace = try_portal(&mut player, map, portal).await;
+        assert!(trace.warps.is_empty(), "{map}: {:?}", trace.warps);
+        assert!(pink(&trace), "{map}: {:?}", trace.broadcasts);
+    }
+    // The palace turns a stranger out to Ariant Castle's `R001`.
+    let trace = try_portal(&mut player, 260000301, "ring00").await;
+    assert_eq!(arrived(&trace), (260000300, 7));
+    assert!(pink(&trace), "{:?}", trace.broadcasts);
+    // Maple Island's balloons.
+    let trace = try_portal(&mut player, 0, "tutorial0").await;
+    assert!(trace.warps.is_empty(), "{:?}", trace.warps);
+    assert!(
+        matches!(trace.hints.as_slice(), [(text, 250, 5)] if !text.is_empty()),
+        "{:?}",
+        trace.hints
+    );
+
+    drop(player);
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    grant_stack(id, ETC, 1, MAGIC_SEED, 2).await.unwrap();
+    grant_stack(id, ETC, 2, WARP_CARD, 1).await.unwrap();
+    grant_stack(id, USE, 1, TIGUNS_DISGUISE, 1).await.unwrap();
+    let mut player = relogin(&config).await;
+
+    // A seed each way.
+    let trace = try_portal(&mut player, 101010000, "minar00").await;
+    assert_eq!(arrived(&trace).0, 240010100);
+    assert!(trace.quantities.contains(&(ETC as u8, 1, 1)), "{trace:?}");
+    assert!(pink(&trace), "{:?}", trace.broadcasts);
+    let trace = try_portal(&mut player, 240010100, "elli00").await;
+    assert_eq!(arrived(&trace).0, 101010000);
+    assert_eq!(trace.removed, [(ETC as u8, 1)]);
+    // The card is kept.
+    for (map, portal, to) in [
+        (120000101, "earth01", 221000300),
+        (221000300, "earth00", 120000101),
+    ] {
+        let trace = try_portal(&mut player, map, portal).await;
+        assert_eq!(arrived(&trace).0, to, "{map} {portal}");
+        assert!(trace.removed.is_empty(), "{trace:?}");
+    }
+
+    // In Tigun's disguise, the palace lets the player be.
+    let name = player.character_name.clone();
+    let mut trace = step(&mut player.connection, &name, use_item(1, TIGUNS_DISGUISE)).await;
+    until(&mut player.connection, &mut trace, |t| !t.buffs.is_empty()).await;
+    let trace = try_portal(&mut player, 260000301, "ring00").await;
+    assert!(trace.warps.is_empty(), "{:?}", trace.warps);
     assert!(trace.broadcasts.is_empty(), "{:?}", trace.broadcasts);
 }

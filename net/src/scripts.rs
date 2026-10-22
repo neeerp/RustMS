@@ -6,7 +6,7 @@
 use crate::content;
 use crate::conti::Portal;
 use game::character::FREE_MARKET_RETURN;
-use game::{InventoryType, Player, QuestState};
+use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
 
@@ -172,6 +172,37 @@ const DISGUISE_PROOF: i32 = 4032101;
 /// searches for the jewel quest 3935 is after.
 const QUEENS_TREASURE_ROOM: i32 = 926000010;
 const QUEENS_JEWEL: i32 = 4031574;
+/// The shortcut between the Field Up North of Ellinia and Leafre's Minar
+/// Forest (`minar_elli`), which spends a Magic Seed each way.
+const FIELD_NORTH_OF_ELLINIA: i32 = 101010000;
+const MINAR_FOREST_WEST_BORDER: i32 = 240010100;
+const MAGIC_SEED: i32 = 4031346;
+/// The Nautilus's Navigation Room and Omega Sector's Command Center
+/// (`enter_earth00`, `enter_earth01`), linked for holders of a Warp Card.
+const NAVIGATION_ROOM: i32 = 120000101;
+const OMEGA_COMMAND_CENTER: i32 = 221000300;
+const WARP_CARD: i32 = 4031890;
+/// Ariant's palace rooms (`ariant_queens`) turn out anyone not disguised by
+/// Tigun's potion, whose morph is listed as a buff of the item's negative
+/// id.
+const ARIANT_CASTLE: i32 = 260000300;
+const TIGUNS_DISGUISE: i32 = 2210005;
+/// The original Maple Island's instruction balloons (`advice00` to
+/// `advice09`, `adviceMap`): a text, and the balloon's width and height
+/// (Cosmic's).
+const ADVICE: [(&str, &str, i16, i16); 11] = [
+    ("advice00", keys::ADVICE_MOVE, 250, 5),
+    ("advice01", keys::ADVICE_HEENA, 100, 5),
+    ("advice02", keys::ADVICE_JUMP, 100, 5),
+    ("advice03", keys::ADVICE_CLIMB, 350, 5),
+    ("advice04", keys::ADVICE_SERA, 100, 5),
+    ("advice05", keys::ADVICE_QUEST_WINDOW, 250, 5),
+    ("advice06", keys::ADVICE_PORTAL, 230, 5),
+    ("advice07", keys::ADVICE_WORLD_MAP, 350, 5),
+    ("advice08", keys::ADVICE_STATS, 350, 5),
+    ("advice09", keys::ADVICE_JUMP_DOWN, 450, 6),
+    ("adviceMap", keys::ADVICE_PORTAL, 230, 5),
+];
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -717,6 +748,65 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             }
         }
         "skyrom" => ScriptOutcome::default(),
+        "minar_elli" if player.inventory.count(MAGIC_SEED) > 0 => {
+            let (map, name) = if player.stats.map_id == FIELD_NORTH_OF_ELLINIA {
+                (MINAR_FOREST_WEST_BORDER, "elli00")
+            } else {
+                (FIELD_NORTH_OF_ELLINIA, "minar00")
+            };
+            ScriptOutcome {
+                effects: vec![
+                    Effect::Pink(content::text().get(keys::MAGIC_SEED_SPENT, &[])),
+                    Effect::TakeItem {
+                        item_id: MAGIC_SEED,
+                        quantity: 1,
+                    },
+                    Effect::PortalSound,
+                    to(map, Portal::Named(name)),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
+        "minar_elli" => refused(keys::MAGIC_SEED_NEEDED),
+        "enter_earth00" | "enter_earth01" if player.inventory.count(WARP_CARD) > 0 => {
+            through(if script == "enter_earth00" {
+                to(OMEGA_COMMAND_CENTER, Portal::Named("earth00"))
+            } else {
+                to(NAVIGATION_ROOM, Portal::Named("earth01"))
+            })
+        }
+        "enter_earth00" | "enter_earth01" => refused(keys::WARP_CARD_NEEDED),
+        "ariant_queens"
+            if player
+                .buffs
+                .active()
+                .iter()
+                .any(|buff| buff.stat == BuffStat::Morph && buff.skill_id == -TIGUNS_DISGUISE) =>
+        {
+            ScriptOutcome::default()
+        }
+        "ariant_queens" => ScriptOutcome {
+            effects: vec![
+                Effect::PortalSound,
+                to(ARIANT_CASTLE, Portal::Named("R001")),
+                Effect::Pink(content::text().get(keys::PALACE_INTRUDER, &[])),
+            ],
+            block: false,
+            occupied: None,
+        },
+        script if script.starts_with("advice") => {
+            let &(_, key, width, height) = ADVICE.iter().find(|(name, ..)| *name == script)?;
+            ScriptOutcome {
+                effects: vec![Effect::Hint {
+                    text: content::text().get(key, &[]),
+                    width,
+                    height,
+                }],
+                block: false,
+                occupied: None,
+            }
+        }
         script if script.starts_with("enterDisguise") => {
             let job = script["enterDisguise".len()..]
                 .parse::<usize>()
@@ -1534,5 +1624,95 @@ mod tests {
             [Effect::RequireEmptyMap(108010610), Effect::Pink(_)]
         ));
         assert_eq!(super::portal("enterDisguise6", &fresh), None);
+    }
+
+    #[test]
+    fn a_magic_seed_carries_the_player_between_ellinia_and_leafre() {
+        assert!(pink(&portal("minar_elli", &player_with(&[])).unwrap()));
+        for (from, to, name) in [
+            (FIELD_NORTH_OF_ELLINIA, MINAR_FOREST_WEST_BORDER, "elli00"),
+            (MINAR_FOREST_WEST_BORDER, FIELD_NORTH_OF_ELLINIA, "minar00"),
+        ] {
+            let mut player = holding(&[], MAGIC_SEED);
+            player.stats.map_id = from;
+            let outcome = portal("minar_elli", &player).unwrap();
+            let [Effect::Pink(_), take, Effect::PortalSound, warp] = outcome.effects.as_slice()
+            else {
+                panic!("{outcome:?}");
+            };
+            assert_eq!(
+                *take,
+                Effect::TakeItem {
+                    item_id: MAGIC_SEED,
+                    quantity: 1
+                }
+            );
+            assert_ne!(named(to, name), 0);
+            assert_eq!(*warp, Effect::WarpToPortal(to, named(to, name)));
+        }
+    }
+
+    #[test]
+    fn a_warp_card_links_the_nautilus_and_omega_sector() {
+        for script in ["enter_earth00", "enter_earth01"] {
+            assert!(pink(&portal(script, &player_with(&[])).unwrap()));
+        }
+        let holder = holding(&[], WARP_CARD);
+        for (script, to, name) in [
+            ("enter_earth00", OMEGA_COMMAND_CENTER, "earth00"),
+            ("enter_earth01", NAVIGATION_ROOM, "earth01"),
+        ] {
+            assert_ne!(named(to, name), 0);
+            // The card is kept.
+            assert_eq!(
+                warp_of(&portal(script, &holder).unwrap()),
+                Some((to, named(to, name)))
+            );
+        }
+    }
+
+    #[test]
+    fn the_ariant_palace_turns_out_all_but_tiguns_disguise() {
+        let mut player = player_with(&[]);
+        let outcome = portal("ariant_queens", &player).unwrap();
+        assert_eq!(named(ARIANT_CASTLE, "R001"), 7);
+        assert!(matches!(
+            outcome.effects.as_slice(),
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(ARIANT_CASTLE, 7),
+                Effect::Pink(_)
+            ]
+        ));
+        // Another morph, the Brawler's barrel, doesn't fool the guards.
+        let now = std::time::Instant::now();
+        let long = std::time::Duration::from_secs(60);
+        let morph = |id| game::Buff::new(id, BuffStat::Morph, 1, now, long);
+        player.buffs.give(morph(crate::morph::OAK_BARREL));
+        assert_eq!(portal("ariant_queens", &player).unwrap().effects.len(), 3);
+        player.buffs.give(morph(-TIGUNS_DISGUISE));
+        assert_eq!(
+            portal("ariant_queens", &player),
+            Some(ScriptOutcome::default())
+        );
+    }
+
+    #[test]
+    fn maple_islands_advice_portals_show_their_balloons() {
+        let fresh = player_with(&[]);
+        for (script, _, width, height) in ADVICE {
+            let outcome = portal(script, &fresh).unwrap();
+            let [Effect::Hint {
+                text,
+                width: w,
+                height: h,
+            }] = outcome.effects.as_slice()
+            else {
+                panic!("{script}: {outcome:?}");
+            };
+            assert!(!text.is_empty());
+            assert_eq!((*w, *h), (width, height));
+        }
+        assert_eq!(portal("advice10", &fresh), None);
     }
 }
