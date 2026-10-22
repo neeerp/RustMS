@@ -4,6 +4,7 @@ mod buff;
 mod combat;
 mod dialogue;
 mod door;
+mod duey;
 mod events;
 mod expiry;
 mod fame;
@@ -109,6 +110,8 @@ pub struct ClientActor {
     shop: Option<net::shop::Shop>,
     /// The account's storage, while the player has it open.
     storage: Option<net::storage::OpenStorage>,
+    /// The Duey window, while the player has it open.
+    duey: Option<duey::DueyWindow>,
     /// When natural recovery of HP and of MP was last accepted; the client
     /// times them separately.
     last_heal: (Option<tokio::time::Instant>, Option<tokio::time::Instant>),
@@ -183,6 +186,7 @@ impl ClientActor {
             script: None,
             shop: None,
             storage: None,
+            duey: None,
             last_heal: (None, None),
             last_moved: None,
             pending_quest: None,
@@ -422,6 +426,8 @@ impl ClientActor {
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
+            WorldAction::Duey(_) if self.in_cash_shop => {}
+            WorldAction::Duey(request) => self.duey_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
                 self.shop_room_request(request).await?
@@ -656,6 +662,7 @@ impl ClientActor {
         self.load_buddies().await?;
         self.load_guild().await?;
         self.load_notes().await?;
+        self.announce_parcels().await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -674,6 +681,9 @@ impl ClientActor {
         self.script = None;
         self.shop = None;
         self.storage = None;
+        // A new field takes the Duey window with it, and the client doesn't
+        // say so (report b029).
+        self.duey = None;
         self.pending_quest = None;
         self.naming_guild = false;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
@@ -763,6 +773,9 @@ impl ClientActor {
         self.script = None;
         self.pending_quest = None;
         self.naming_guild = false;
+        // The shop is a stage of its own, and takes the Duey window with it
+        // (report b029).
+        self.duey = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;

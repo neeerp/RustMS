@@ -471,6 +471,53 @@ diesel::table! {
 }
 diesel::joinable!(guild_bbs_replies -> guild_bbs_threads (thread_id));
 diesel::joinable!(guild_bbs_replies -> characters (poster_id));
+diesel::table! {
+    parcels (id) {
+        id -> Int8,
+        receiver_id -> Int4,
+        #[max_length = 13]
+        sender -> Varchar,
+        mesos -> Int4,
+        message -> Nullable<Text>,
+        quick -> Bool,
+        sent_at -> Timestamp,
+        announced -> Bool,
+        item_id -> Nullable<Int4>,
+        quantity -> Int2,
+        #[max_length = 13]
+        owner -> Varchar,
+        flags -> Int2,
+        expires_at -> Nullable<Timestamp>,
+        cash_serial -> Nullable<Int8>,
+    }
+}
+diesel::table! {
+    parcel_equipment_stats (parcel_id) {
+        parcel_id -> Int8,
+        upgrade_slots -> Int2,
+        level -> Int2,
+        stre -> Int2,
+        dex -> Int2,
+        int -> Int2,
+        luk -> Int2,
+        hp -> Int2,
+        mp -> Int2,
+        watk -> Int2,
+        matk -> Int2,
+        wdef -> Int2,
+        mdef -> Int2,
+        acc -> Int2,
+        avoid -> Int2,
+        hands -> Int2,
+        speed -> Int2,
+        jump -> Int2,
+        vicious -> Int4,
+        item_level -> Int2,
+        item_exp -> Int4,
+    }
+}
+diesel::joinable!(parcels -> characters (receiver_id));
+diesel::joinable!(parcel_equipment_stats -> parcels (parcel_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -504,4 +551,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     guild_bbs_threads,
     guild_bbs_replies,
     alliances,
+    parcels,
+    parcel_equipment_stats,
 );

@@ -184,6 +184,8 @@ pub struct Trace {
     pub shop_results: Vec<u8>,
     /// Every TRUNK_RESULT, in order.
     pub storage: Vec<StorageResult>,
+    /// Every PARCEL body (mode first), in order.
+    pub parcels: Vec<Vec<u8>>,
     /// Every PLAYER_INTERACTION body (mode first), in order.
     pub rooms: Vec<Vec<u8>>,
     /// Every UPDATE_CHAR_BOX body (character id first), in order.
@@ -542,6 +544,8 @@ impl Trace {
         } else if op == SendOpcode::TrunkResult as i16 {
             let mode = r.read_byte().unwrap();
             self.storage.push(StorageResult::read(mode, &p.bytes[3..]));
+        } else if op == SendOpcode::Parcel as i16 {
+            self.parcels.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::PlayerInteraction as i16 {
             self.rooms.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::UpdateCharBox as i16 {

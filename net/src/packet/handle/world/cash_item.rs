@@ -2,9 +2,10 @@
 //! Cash Inventory. Every request is the item's Cash slot and id, then the
 //! item's own fields and the tick. The client then waits for an answer that
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
-//! teleport rocks, notes, weather items, the jukebox, meso sacks, avatar
-//! megaphones, AP Reset, SP Reset, the Vicious' Hammer, Vega's Spell, the
-//! cash mists, the Item Tag and the Magical Sandglasses are used so far.
+//! teleport rocks, notes, the Quick Delivery Coupon, weather items, the
+//! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
+//! Hammer, Vega's Spell, the cash mists, the Item Tag and the Magical
+//! Sandglasses are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -19,7 +20,7 @@ use super::stat_reset::{ap_reset, sp_reset};
 use super::teleport_rock::teleport_rock;
 use super::vega::vega_spell;
 use super::weather::weather;
-use crate::handler::{HandlerResult, WorldContext, WorldHandler, WorldResult};
+use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::packet::build::world::stat::build_stat_update;
 use game::InventoryType;
 use packet::{io::read::PktRead, Packet};
@@ -53,6 +54,9 @@ impl WorldHandler for UseCashItemHandler {
             520 if held => meso_sack(ctx, slot, item_id),
             524 if held => cash_pet_food(ctx, slot, item_id),
             528 if held => cash_mist(ctx, slot, item_id),
+            // The coupon is used up by the send it opens the window for.
+            533 if held => Ok(HandlerResult::empty()
+                .with(WorldAction::Duey(crate::duey::DueyRequest::OpenQuickSend))),
             537 if held => chalkboard(ctx, &mut r),
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
             550 if held => sandglass(ctx, &mut r, slot, item_id),

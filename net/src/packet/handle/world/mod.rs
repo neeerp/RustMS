@@ -15,6 +15,7 @@ mod chat;
 mod combat;
 mod conti;
 mod door;
+mod duey;
 mod emote;
 mod fame;
 mod guild;
@@ -83,6 +84,7 @@ pub use self::combat::{
 };
 pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;
+pub use self::duey::DueyActionHandler;
 pub use self::emote::FaceExpressionHandler;
 pub use self::fame::{GiveFameHandler, MIN_FAME_LEVEL};
 pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};

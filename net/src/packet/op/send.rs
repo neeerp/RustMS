@@ -141,6 +141,8 @@ pub enum SendOpcode {
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
     NpcDialogue = 0x130,
+    /// The Duey window and its parcels (322).
+    Parcel = 0x142,
     QueryCashResult = 0x144,
     CashShopOperation = 0x145,
     Messenger = 0x139,
