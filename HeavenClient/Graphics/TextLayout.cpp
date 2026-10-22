@@ -52,6 +52,8 @@ namespace ms
 			Text::Font fontid;
 			Color::Name color;
 			bool bold;
+			// Inside a #c run: the next '#' ends it.
+			bool highlight;
 			int16_t maxwidth;
 			bool formatted;
 
@@ -82,6 +84,7 @@ namespace ms
 			fontid = Text::Font::NUM_FONTS;
 			color = Color::Name::NUM_COLORS;
 			bold = false;
+			highlight = false;
 			ax = 0;
 			ay = linespace;
 			width = 0;
@@ -132,7 +135,15 @@ namespace ms
 						skip++;
 						break;
 					case '#':
-						if (first + 1 < last)
+						if (highlight)
+						{
+							// As v83's tooltip text (0x8e4217): a '#' after #c
+							// closes the run whatever follows, and only the
+							// '#' is skipped, so "#c%s#'s" keeps its "'s".
+							color = Color::Name::NUM_COLORS;
+							highlight = false;
+						}
+						else if (first + 1 < last)
 						{
 							switch (text[first + 1])
 							{
@@ -152,6 +163,7 @@ namespace ms
 									break;
 								case 'c':
 									color = Color::Name::ORANGE;
+									highlight = true;
 									break;
 								case 'd':
 									color = Color::Name::SCRIPTPURPLE;

@@ -77,6 +77,25 @@ int main()
 		require(bold.advance(4) == 14 && bold.advance(7) == 21 && bold.width() == 27, "bold characters are wider");
 		require(bold_at(2) && bold_at(4) && !bold_at(7), "words between #e and #n are bold");
 
+		// A '#' after #c ends the orange run and skips only itself, as in
+		// Blessing of the Fairy's "#c%s#'s energy" (v83 0x8e4217).
+		const std::string blessing = "of #cSib#'s energy";
+		auto tip = layout(blessing, 200);
+		auto word_at = [&tip](size_t pos)
+		{
+			for (const auto &line : tip)
+				for (const auto &word : line.words)
+					if (word.first <= pos && pos < word.last)
+						return word;
+
+			throw std::runtime_error("no word holds the character");
+		};
+		size_t apostrophe = blessing.find('\'');
+		require(word_at(5).color == ms::Color::Name::ORANGE, "#c turns the name orange");
+		require(word_at(apostrophe).color == ms::Color::Name::NUM_COLORS, "the closing # ends the orange");
+		require(tip.advance(apostrophe + 1) - tip.advance(apostrophe) == 6, "the apostrophe is drawn");
+		require(word_at(blessing.find('e')).color == ms::Color::Name::NUM_COLORS, "the words after stay plain");
+
 		std::cout << "text layout tests passed\n";
 		return 0;
 	}

@@ -95,6 +95,8 @@ pub struct SetFieldPacket {
     /// The Monster Book's cover card and each card's copies, by card id.
     pub monster_book_cover: i32,
     pub monster_book: BTreeMap<i32, u8>,
+    /// The name Blessing of the Fairy's tooltip shows, if any.
+    pub linked_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -814,9 +816,11 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     skip(&mut cursor, 9)?;
     let meta = decode_character_meta(&mut cursor)?;
     cursor.read_byte().map_err(|e| e.to_string())?; // buddy capacity
-    if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
-        cursor.read_str_with_length().map_err(|e| e.to_string())?; // linked name
-    }
+    let linked_name = if cursor.read_byte().map_err(|e| e.to_string())? != 0 {
+        Some(cursor.read_str_with_length().map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
     let meso = cursor.read_int().map_err(|e| e.to_string())?;
     let mut slot_limits = [0; 5];
     for limit in &mut slot_limits {
@@ -924,6 +928,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         slot_limits,
         monster_book_cover,
         monster_book,
+        linked_name,
     })
 }
 

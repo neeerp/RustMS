@@ -319,10 +319,19 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
         + buff(player, BuffStat::Pad)
         + expert_attack(player, weapon)
         + ammo_attack(attack, player, weapon)
-        + bare_hands;
+        + bare_hands
+        + fairy_blessing(player).0;
     let watk = watk + echo_bonus(player, watk);
     let stats = weapon_stats(weapon, job, attack.skill, skills::total_stats(player));
     (stats / 100.0 * f64::from(watk.clamp(1, 1999))).ceil() as i32
+}
+
+/// What Blessing of the Fairy adds: x to attack, y to magic attack (v83
+/// SetFrom, 0x7801ee).
+pub(crate) fn fairy_blessing(player: &Player) -> (i32, i32) {
+    game::skill::fairy_blessing(player.stats.job)
+        .and_then(|skill_id| skills::learned(player, skill_id))
+        .map_or((0, 0), |skill| (skill.effect.x, skill.effect.y))
 }
 
 /// The most a critical adds to a hit, in percent of it (FUN_0078df87): the
@@ -376,7 +385,8 @@ pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
             (int + i32::from(equip.int), matk + i32::from(equip.matk))
         });
     // The client caps magic at 1999 before and after Echo (0x79167b).
-    let magic = (int + matk + buff(player, BuffStat::Mad)).clamp(0, 1999);
+    let magic =
+        (int + matk + buff(player, BuffStat::Mad) + fairy_blessing(player).1).clamp(0, 1999);
     let magic = f64::from((magic + echo_bonus(player, magic)).min(1999));
     let max = ((magic * magic / 1000.0 + magic) / 30.0 + f64::from(int) / 200.0) * f64::from(spell);
     max.ceil() as i32
@@ -1584,6 +1594,18 @@ mod tests {
         buffed.buffs.give(rage);
         let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
         assert!(max_base_damage(&buffed, &basic) > max_base_damage(&player, &basic));
+    }
+
+    #[test]
+    fn blessing_of_the_fairy_adds_its_attack() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = beginner_with_sword();
+        player.link(Some(("Sib".into(), 200)));
+        let basic = parse_close_attack(&attack_packet(1, 0)).unwrap();
+        // ceil((4.0 * 12 + 5) / 100 * (17 + 20)) = 20
+        assert_eq!(max_base_damage(&player, &basic), 20);
     }
 
     #[test]

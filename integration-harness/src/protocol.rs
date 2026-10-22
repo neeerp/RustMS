@@ -71,6 +71,8 @@ pub struct WorldSession {
     pub auto_potions: (i32, i32),
     /// The world-entry QUICKSLOT_INIT's keys, or None for the defaults.
     pub quick_slots: Option<[i32; 8]>,
+    /// The name Blessing of the Fairy's tooltip shows, if any.
+    pub linked_name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -279,6 +281,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         slot_limits: world_entry.slot_limits,
         monster_book_cover: world_entry.monster_book_cover,
         monster_book: world_entry.monster_book,
+        linked_name: world_entry.linked_name,
         keymap,
         skill_macros,
         auto_potions: (auto_hp, auto_mp),
@@ -497,7 +500,9 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
     .await
     {
         // Map setup: NPC spawns and control, and the map entry banner.
-        // ...and the map's mobs, drops, and reactors.
+        // ...and the map's mobs, drops, and reactors, and the skill update
+        // that gives Blessing of the Fairy its master level (SET_FIELD
+        // already carries its level).
         if ![
             SendOpcode::SpawnNpc as i16,
             SendOpcode::SpawnNpcRequestController as i16,
@@ -506,6 +511,7 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) {
             SendOpcode::SpawnMonsterControl as i16,
             SendOpcode::DropItemFromMapObject as i16,
             SendOpcode::SpawnReactor as i16,
+            SendOpcode::UpdateSkills as i16,
         ]
         .contains(&envelope.opcode())
         {

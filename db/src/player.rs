@@ -231,6 +231,18 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         player.auto_potions = AutoPotions { hp, mp };
     }
     player.quick_slots = load_quick_slots(&mut conn, character_id)?;
+    // Blessing of the Fairy follows the account's highest other character in
+    // this world.
+    player.link(
+        characters::table
+            .filter(characters::accountid.eq(character.accountid))
+            .filter(characters::world.eq(character.world))
+            .filter(characters::id.ne(character_id))
+            .order((characters::level.desc(), characters::id))
+            .select((characters::name, characters::level))
+            .first(&mut conn)
+            .optional()?,
+    );
     player.stats.gacha_exp = gacha_exp::table
         .find(character_id)
         .select(gacha_exp::exp)

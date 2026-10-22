@@ -84,7 +84,7 @@ fn spend_sp(player: &mut Player, skill_id: i32) -> Option<SkillRecord> {
         return None;
     }
     let info = skills::info(skill_id)?;
-    if info.invisible && player.skills.get(skill_id).is_none() {
+    if info.disabled || info.invisible && player.skills.get(skill_id).is_none() {
         return None;
     }
     let requirements_met = info
@@ -187,6 +187,23 @@ mod tests {
         );
         assert_eq!(replies, [STAT, SKILL]);
         assert_eq!((player.skills.level(2001002), player.stats.sp), (1, 0));
+    }
+
+    #[test]
+    fn sp_never_raises_blessing_of_the_fairy() {
+        if skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.link(Some(("Sib".into(), 10)));
+        player.stats.sp = 1;
+        let replies = handle(
+            &SpendSpHandler,
+            &mut player,
+            request(RecvOpcode::SpendSp, 12),
+        );
+        assert_eq!(replies, [STAT]);
+        assert_eq!((player.skills.level(12), player.stats.sp), (1, 1));
     }
 
     #[test]

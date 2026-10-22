@@ -405,6 +405,11 @@ namespace ms
 		MysticDoor &get_door();
 		const MysticDoor &get_door() const;
 
+		// The account's highest other character, named in Blessing of the
+		// Fairy's tooltip (CharacterData+0x5d7); empty if none.
+		void set_linked_name(const std::string &name);
+		const std::string &get_linked_name() const;
+
 		// Obtain a reference to the player's buddy list.
 		BuddyList &get_buddies();
 		const BuddyList &get_buddies() const;
@@ -504,6 +509,7 @@ namespace ms
 		Party party;
 		MysticDoor door;
 		BuddyList buddies;
+		std::string linked_name;
 		Guild guild;
 		Alliance alliance;
 
