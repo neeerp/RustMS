@@ -324,6 +324,8 @@ pub struct Field {
     pub grants: Vec<(i32, u8, u8)>,
     /// Mobs healed: (object id, HP regained).
     pub heals: Vec<(i32, i32)>,
+    /// Mobs another mob hurt: (object id, damage, HP left).
+    pub mobs_hurt: Vec<(i32, i32, i32)>,
     /// How each mob appeared: a summon effect, -2 fading in, or -1 just
     /// there.
     pub appearances: BTreeMap<i32, i8>,
@@ -543,7 +545,11 @@ impl Field {
         } else if op == SendOpcode::DamageMonster as i16 {
             let oid = r.read_int().unwrap();
             r.read_byte().unwrap();
-            self.heals.push((oid, -r.read_int().unwrap()));
+            // A heal comes negative.
+            match r.read_int().unwrap() {
+                healed if healed <= 0 => self.heals.push((oid, -healed)),
+                damage => self.mobs_hurt.push((oid, damage, r.read_int().unwrap())),
+            }
         } else if op == SendOpcode::ShowMonsterHp as i16 {
             self.hp_bars
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

@@ -599,6 +599,12 @@ pub enum FieldRequest {
     MobDistance { object_id: i32, distance: i32 },
     /// A mob that bombs has a player in reach.
     MobBomb { object_id: i32 },
+    /// A mob's attack hurt another, a Dazzled one, for `damage`.
+    MobDamageMob {
+        attacker: i32,
+        victim: i32,
+        damage: i32,
+    },
     /// The NPCs' controller chose an idle action for one: what followed the
     /// object id (action, line, and a path for an NPC that walks).
     NpcAction { object_id: i32, action: Vec<u8> },
@@ -909,6 +915,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::MoveLife, InGame(&world::MoveLifeHandler)),
             (Op::MobDistance, InGame(&world::MobDistanceHandler)),
             (Op::MobBomb, InGame(&world::MobBombHandler)),
+            (Op::MobDamageMob, InGame(&world::MobDamageMobHandler)),
             (Op::NpcAction, InGame(&world::NpcActionHandler)),
             (
                 Op::CloseRangeAttack,
@@ -997,7 +1004,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 102);
+        assert_eq!(world_routes().len(), 106);
     }
 
     #[test]
