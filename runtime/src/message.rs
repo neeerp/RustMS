@@ -765,8 +765,8 @@ pub enum DirectoryMessage {
         record: game::marriage::MarriageRecord,
     },
     /// `from` went where they can't answer or be answered (the Cash Shop):
-    /// their proposals end.
-    ForgetProposals {
+    /// their proposals end, and their party can't take them into an event.
+    EnteredCashShop {
         from: ClientId,
     },
     /// Ask `junior`, if they are on `from`'s map and of the levels, to be

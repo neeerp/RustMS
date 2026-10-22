@@ -29,7 +29,10 @@ is played through too: its nine stages, bonus and reward
   922010000-922011100, exit 922010000, levels 35-50, 5-6 players and 45
   minutes (Cosmic `LudiPQ`). Its exit also lies inside its range of maps.
 - `Event::team` picks who goes: the party's members online on the
-  leader's channel, standing in the lobby, at the right levels. The leader
+  leader's channel, standing in the lobby, at the right levels. Members
+  in the Cash Shop are on no map and don't count: the client tells the
+  directory (`EnteredCashShop`), which marks their entry until they leave
+  the shop and register again (Cosmic `isLoggedinWorld`). The leader
   must be one of them, and there must be enough of them and not too many.
 - `Team::leave` ends the event when the leader leaves or too few remain.
   Once the event is won (`Team::win`), only the last member's leaving
@@ -465,10 +468,3 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
 `lpq.arturo.*` and `lpq.anderson.*`.
-
-## Not yet
-
-These are not done yet:
-
-- Members in the Cash Shop still pass the entry check, which doesn't know
-  where they are; they drop their ticket, which can end the event at once.

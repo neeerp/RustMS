@@ -829,7 +829,7 @@ impl ClientActor {
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
         // The shop can't answer a proposal (report b053).
-        self.send_to_directory(DirectoryMessage::ForgetProposals {
+        self.send_to_directory(DirectoryMessage::EnteredCashShop {
             from: self.client_id,
         })
         .await?;
