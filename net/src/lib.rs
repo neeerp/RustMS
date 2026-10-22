@@ -26,6 +26,7 @@ pub mod items;
 mod load;
 pub mod login_world;
 pub mod loot;
+pub mod map_rules;
 pub mod medals;
 pub mod meso_explosion;
 pub mod mobs;

@@ -18,16 +18,29 @@ impl ClientActor {
     /// `npc_scripts::time_limit`) and another map to return to, the client
     /// shows the countdown and the player has that long. A ride
     /// (`rides::ride_on`) takes its own time and arrives at its own map. Any
-    /// other map clears the timer, so coming back starts it again.
+    /// other map clears the timer, so coming back starts it again. A player
+    /// too high for a Training Center (`net::map_rules::moved_out_to`) has
+    /// no time at all there.
     pub(super) async fn start_map_timer(&mut self) -> Result<(), RuntimeError> {
         self.map_timer = None;
-        let map_id = self.in_game()?.player.stats.map_id;
+        let player = &self.in_game()?.player;
+        let map_id = player.stats.map_id;
         let Ok(data) = net::get_game_data() else {
             return Ok(());
         };
         let Some(field) = data.field(map_id) else {
             return Ok(());
         };
+        if let Some(to) =
+            net::map_rules::moved_out_to(player, field).filter(|&to| data.field_exists(to))
+        {
+            self.map_timer = Some(MapTimer {
+                map_id,
+                ends: Instant::now(),
+                to: (to, 0),
+            });
+            return Ok(());
+        }
         let limit = match net::rides::ride_on(map_id) {
             Some(ride) => Some((ride.countdown(), ride.to)),
             None => field

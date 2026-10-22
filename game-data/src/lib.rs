@@ -244,6 +244,13 @@ pub struct FieldTemplate {
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
     pub view_limit: Option<(i32, i32, i32, i32)>,
+    /// `info/lvLimit`: the level a player needs to walk in through a portal.
+    /// Only the server reads it.
+    pub level_limit: Option<u8>,
+    /// `info/lvForceMove`: the level at which a player is moved out to
+    /// `return_map` (applied on the Training Centers only, see
+    /// `net::map_rules`). Only the server reads it.
+    pub level_force_move: Option<u8>,
     /// `info/recovery`: how much faster players recover HP and MP at rest,
     /// e.g. 2 in the Sleepywood sauna.
     pub recovery: f64,
@@ -597,6 +604,16 @@ fn build_field_template(
         }
         _ => None,
     };
+    let level_key = |key| -> Result<Option<u8>, GameDataError> {
+        Ok(match nx.child_by_name(map_node_idx, "info")? {
+            Some(info) => nx
+                .int_child(info, key)?
+                .and_then(|level| u8::try_from(level).ok())
+                .filter(|&level| level > 0),
+            None => None,
+        })
+    };
+    let (level_limit, level_force_move) = (level_key("lvLimit")?, level_key("lvForceMove")?);
     let time_limit = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.int_child(info, "timeLimit"))
@@ -700,6 +717,8 @@ fn build_field_template(
         reactors,
         mob_rate,
         view_limit,
+        level_limit,
+        level_force_move,
         recovery,
         town,
         field_limit,
@@ -1315,6 +1334,8 @@ mod tests {
             reactors: Vec::new(),
             mob_rate: 1.0,
             view_limit: None,
+            level_limit: None,
+            level_force_move: None,
             recovery: 1.0,
             town: false,
             field_limit: 0,
@@ -1391,6 +1412,8 @@ mod tests {
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
             view_limit: None,
+            level_limit: None,
+            level_force_move: None,
             recovery: 1.0,
             town: false,
             field_limit: 0,
@@ -1436,6 +1459,22 @@ mod tests {
         assert!(!field(910000001).may_drop(), "the Free Market rooms");
         let henesys = field(100000000);
         assert!(henesys.may_use(2000000) && henesys.may_drop());
+    }
+
+    #[test]
+    fn level_limits_come_from_the_map_info() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = |map_id| game_data.field(map_id).expect("map");
+        // Leafre's forest, past the town's west00.
+        assert_eq!(field(240010000).level_limit, Some(15));
+        assert_eq!(field(240000000).level_limit, None);
+        let center = field(910060000);
+        assert_eq!(center.level_force_move, Some(20));
+        assert_eq!(center.level_limit, None);
+        assert_eq!(field(103040100).level_force_move, Some(51));
     }
 
     #[test]
