@@ -52,6 +52,7 @@ namespace ms
 			MAKER,
 			VEGASPELL,
 			ITEMPROTECTOR,
+			KARMASCISSORS,
 			VEGARESULT,
 			STATUSBAR,
 			// The status bar's quick slots, whose tooltips go above the cursor.

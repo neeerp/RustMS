@@ -26,6 +26,7 @@ mod item_guard;
 mod item_move;
 mod item_tag;
 mod jukebox;
+mod karma;
 mod keybinds;
 mod logged_in;
 mod maker;

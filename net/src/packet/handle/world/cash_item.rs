@@ -4,8 +4,8 @@
 //! unlocks it. Cash pet food, the pet name tag, megaphones, the chalkboard,
 //! teleport rocks, notes, the Quick Delivery Coupon, weather items, the
 //! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
-//! Hammer, Vega's Spell, the cash mists, the Item Tag and the Magical
-//! Sandglasses are used so far.
+//! Hammer, Vega's Spell, the cash mists, the Item Tag, the Magical
+//! Sandglasses, the Item Guards and the Scissors of Karma are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -13,6 +13,7 @@ use super::hammer::vicious_hammer;
 use super::item_guard::{item_guard, ITEM_GUARD};
 use super::item_tag::{item_tag, sandglass};
 use super::jukebox::jukebox;
+use super::karma::{karma_scissors, KARMA_SCISSORS};
 use super::megaphone::{avatar_megaphone, megaphone};
 use super::meso_sack::meso_sack;
 use super::note::note;
@@ -64,6 +65,7 @@ impl WorldHandler for UseCashItemHandler {
             537 if held => chalkboard(ctx, &mut r),
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
             550 if held => sandglass(ctx, &mut r, slot, item_id),
+            552 if held && item_id == KARMA_SCISSORS => karma_scissors(ctx, &mut r, slot),
             // The window waits for 354, so even a hammer not held gets one.
             557 => vicious_hammer(ctx, &mut r, slot, item_id),
             561 if held => vega_spell(ctx, &mut r, slot, item_id),

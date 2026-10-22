@@ -24,6 +24,9 @@ pub struct ItemInfo {
     pub trade_block: bool,
     /// Equipment that can't change hands once worn (`info/equipTradeBlock`).
     pub equip_trade_block: bool,
+    /// Items the Scissors of Karma let change hands once
+    /// (`info/tradeAvailable`).
+    pub trade_available: bool,
     /// Items nobody may pick up (`info/pickUpBlock`): the invisible ones
     /// party quests drop.
     pub pickup_block: bool,
@@ -421,6 +424,9 @@ impl ItemData {
             info.quest = nx.int_child(meta, "quest")? == Some(1);
             info.only = nx.int_child(meta, "only")? == Some(1);
             info.trade_block = nx.int_child(meta, "tradeBlock")? == Some(1);
+            info.trade_available = nx
+                .int_child(meta, "tradeAvailable")?
+                .is_some_and(|v| v != 0);
             info.pickup_block = nx.int_child(meta, "pickUpBlock")? == Some(1);
             info.account_sharable = nx.int_child(meta, "accountSharable")? == Some(1);
             info.pquest = nx.int_child(meta, "pquest")? == Some(1);
@@ -659,6 +665,9 @@ impl ItemData {
             only: nx.int_child(meta, "only")? == Some(1),
             trade_block: nx.int_child(meta, "tradeBlock")? == Some(1),
             equip_trade_block: nx.int_child(meta, "equipTradeBlock")? == Some(1),
+            trade_available: nx
+                .int_child(meta, "tradeAvailable")?
+                .is_some_and(|v| v != 0),
             pickup_block: nx.int_child(meta, "pickUpBlock")? == Some(1),
             account_sharable: nx.int_child(meta, "accountSharable")? == Some(1),
             pquest: nx.int_child(meta, "pquest")? == Some(1),
@@ -1096,5 +1105,16 @@ mod tests {
             [7, 30, 90, 365]
         );
         assert_eq!(days(5060001), 0);
+    }
+
+    #[test]
+    fn reads_what_scissors_of_karma_may_cut() {
+        let Some(data) = data() else {
+            return;
+        };
+        let cut = |id| data.info(id).unwrap().unwrap().trade_available;
+        // Skill books and some equipment have it.
+        assert!(cut(2280004) && !cut(2000000));
+        assert!(cut(1302112) && !cut(1302000));
     }
 }

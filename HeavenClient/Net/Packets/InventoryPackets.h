@@ -476,13 +476,14 @@ namespace ms
 		}
 	};
 
-	// Seals the item in `target_slot` of `tab` with the Item Guard in Cash
-	// `slot` (v83 CUIItemProtector's Yes, 0x82a2ee).
+	// Uses the cash item in Cash `slot` on the item in `target_slot` of `tab`:
+	// an Item Guard (v83 CUIItemProtector's Yes, 0x82a2ee) or the Scissors
+	// of Karma (0x830fb5).
 	// Opcode: USE_CASH_ITEM(79)
-	class UseItemGuardPacket : public OutPacket
+	class UseOnItemPacket : public OutPacket
 	{
 	public:
-		UseItemGuardPacket(int16_t slot, int32_t itemid, InventoryType::Id tab, int16_t target_slot)
+		UseOnItemPacket(int16_t slot, int32_t itemid, InventoryType::Id tab, int16_t target_slot)
 				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
 		{
 			write_short(slot);
