@@ -6,7 +6,7 @@ use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
 use game::marriage::{MarriageRecord, ENGAGED};
-use game::wedding::{next_slot, Reservation, Venue, MAX_GUESTS, NO_SHOW, SLOT};
+use game::wedding::{next_slot, Reservation, Venue, GUESTS_UNTIL, MAX_GUESTS, NO_SHOW, SLOT};
 use std::time::{Duration, SystemTime};
 
 type Row = (i32, i16, bool, i16, SystemTime);
@@ -152,7 +152,7 @@ pub fn cancel(marriage_id: i32) -> crate::Result<bool> {
 /// Drop every booking whose couple let it pass by `now`; how many went.
 pub fn drop_over(now: SystemTime) -> crate::Result<usize> {
     let mut conn = crate::connection()?;
-    let cutoff = now - game::wedding::NO_SHOW;
+    let cutoff = now - NO_SHOW;
     Ok(diesel::delete(
         wedding_reservations::table.filter(wedding_reservations::starts_at.le(cutoff)),
     )
@@ -231,7 +231,7 @@ pub fn uninvite(marriage_id: i32, guest_id: i32) -> crate::Result<()> {
 }
 
 /// The soonest wedding at `venue` that `guest_id` is invited to and that
-/// has not passed by `now`, with its couple.
+/// guests may still come to at `now`, with its couple.
 pub fn guest_of(
     guest_id: i32,
     venue: Venue,
@@ -242,7 +242,7 @@ pub fn guest_of(
         .inner_join(wedding_reservations::table)
         .filter(wedding_guests::guest_id.eq(guest_id))
         .filter(wedding_reservations::venue.eq(venue as i16))
-        .filter(wedding_reservations::starts_at.gt(now - NO_SHOW))
+        .filter(wedding_reservations::starts_at.gt(now - GUESTS_UNTIL))
         .order(wedding_reservations::starts_at.asc())
         .select(columns())
         .first::<Row>(&mut conn)

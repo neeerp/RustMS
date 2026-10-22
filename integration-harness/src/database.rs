@@ -880,6 +880,18 @@ pub async fn book_wedding(groom_id: i32, venue: i16, hours: i32) -> Result<i32, 
     Ok(row.marriage_id)
 }
 
+/// Put `guest_id` on the guest list of the couple `marriage_id`'s booked
+/// wedding.
+pub async fn add_wedding_guest(marriage_id: i32, guest_id: i32) -> Result<(), HarnessError> {
+    change_one_row("invite a wedding guest", move |conn| {
+        diesel::sql_query("INSERT INTO wedding_guests (marriage_id, guest_id) VALUES ($1, $2)")
+            .bind::<Integer, _>(marriage_id)
+            .bind::<Integer, _>(guest_id)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Move the couple `marriage_id`'s booked wedding to the zero-based
 /// `channel`, starting a minute ago, so it may begin now.
 pub async fn wedding_due(marriage_id: i32, channel: i16) -> Result<(), HarnessError> {

@@ -6,15 +6,21 @@
 //! MARRIAGE_RESULT 12, and the booking is gone. Jackie then sees them out.
 //! A partner who leaves before the vows ends the wedding and its booking
 //! (MARRIAGE_RESULT 31).
+//!
+//! Guests (slice 7b) holding their invitation come in through Bonnie while
+//! the couple gather, go on to the altar with them, may leave through
+//! Jackie or by logging out without ending anything, and are seen out with
+//! the couple at the end.
 
+use game_data::server_content::keys;
 use game_data::GameData;
 use integration_harness::database::{
-    book_wedding, couple_status, engage, grant_stack, replace_item, set_gender, set_job,
-    wedding_due,
+    add_wedding_guest, book_wedding, couple_status, engage, grant_stack, replace_item, set_gender,
+    set_job, wedding_due,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, step, until, warp, Trace};
+use integration_harness::trace::{read_for, send, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -31,6 +37,13 @@ const EXIT: i32 = 680_000_500;
 const WAYNE: i32 = 9201012;
 const PRIEST: i32 = 9201011;
 const JACKIE: i32 = 9201009;
+const BONNIE: i32 = 9201008;
+const NICOLE: i32 = 9201005;
+/// The invitation a Chapel guest receives.
+const INVITATION: i32 = 4031406;
+/// The assistants' menu choice for guests.
+const AS_GUEST: i32 = 2;
+const UNDERSHIRT: i32 = 1040002;
 const MOONSTONE_BOX: i32 = 2240000;
 /// The couple's halves of the engagement: the groom's empty box and the
 /// bride's ring.
@@ -211,6 +224,146 @@ async fn a_partner_leaving_before_the_vows_ends_the_wedding() {
     let mut at = arrive(&mut a, EXIT, Trace::default()).await;
     until(&mut a.connection, &mut at, |t| !t.marriage.is_empty()).await;
     assert_eq!(results(&at), [CANCELLED]);
+    assert_eq!(
+        couple_status(marriage_id).await.unwrap(),
+        (STATUS_ENGAGED, false)
+    );
+    tokio::time::sleep(Duration::from_secs(3)).await;
+}
+
+/// A character holding a Chapel invitation, on the guest list of the
+/// couple `marriage_id` if any, in Amoria.
+async fn guest(config: &HarnessConfig, marriage_id: Option<i32>) -> WorldSession {
+    let id = new_character(config, 0, UNDERSHIRT).await;
+    grant_stack(id, ETC, 1, INVITATION, 1)
+        .await
+        .expect("invitation");
+    if let Some(marriage_id) = marriage_id {
+        add_wedding_guest(marriage_id, id).await.expect("guest");
+    }
+    enter(config, AMORIA).await
+}
+
+/// Tell `npc` in Amoria the player is a guest; what they were asked or
+/// told.
+async fn as_guest(session: &mut WorldSession, npc: i32) -> Trace {
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let t = step(c, &format!("{m} talks to {npc}"), talk(AMORIA, npc)).await;
+    assert_eq!(t.prompts, [(npc, 4)], "{:?}", t.prompt_texts);
+    send(c, answer(4, 1, Some(AS_GUEST))).await;
+    let mut t = Trace::default();
+    until(c, &mut t, |t| !t.prompts.is_empty()).await;
+    read_for(c, &mut t, 300).await;
+    t
+}
+
+/// What `npc` told the guest, who then closes the dialogue.
+async fn told(session: &mut WorldSession, npc: i32, t: Trace) -> String {
+    assert_eq!(t.prompts, [(npc, 0)], "{:?}", t.prompt_texts);
+    let m = session.character_name.clone();
+    step(
+        &mut session.connection,
+        &format!("{m} ok"),
+        answer(0, 1, None),
+    )
+    .await;
+    t.prompt_texts[0].clone()
+}
+
+/// Ask Bonnie to go in and say yes; what followed, once in the hall or
+/// told why not.
+async fn go_in(session: &mut WorldSession) -> Trace {
+    let t = as_guest(session, BONNIE).await;
+    assert_eq!(t.prompts, [(BONNIE, 1)], "{:?}", t.prompt_texts);
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let mut t = step(c, &format!("{m} yes"), answer(1, 1, None)).await;
+    until(c, &mut t, |t| {
+        t.warps.contains(&HALL) || !t.prompts.is_empty()
+    })
+    .await;
+    read_for(c, &mut t, 300).await;
+    t
+}
+
+#[tokio::test]
+async fn invited_guests_come_in_while_the_couple_gather() {
+    let _chapel = CHAPEL_IN_USE.lock().await;
+    let couple = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    let mut configs = Vec::new();
+    for _ in 0..5 {
+        configs.push(load_harness_config_or_fail().await);
+    }
+    let (marriage_id, mut a, mut b) = due_couple(&couple).await;
+    let mut stays = guest(&configs[0], Some(marriage_id)).await;
+    let mut leaves = guest(&configs[1], Some(marriage_id)).await;
+    let drops = guest(&configs[2], Some(marriage_id)).await;
+    let mut late = guest(&configs[3], Some(marriage_id)).await;
+    let mut uninvited = guest(&configs[4], None).await;
+    let text = |key| net::content::text().get(key, &[]);
+
+    // Off the list, or at the other venue, no one gets in.
+    let t = as_guest(&mut uninvited, BONNIE).await;
+    let said = told(&mut uninvited, BONNIE, t).await;
+    assert_eq!(said, text(keys::WEDDING_GUEST_NOT_INVITED));
+    let t = as_guest(&mut stays, NICOLE).await;
+    let said = told(&mut stays, NICOLE, t).await;
+    assert_eq!(said, text(keys::WEDDING_GUEST_NOT_INVITED));
+    // Until the couple begin it, the guests wait.
+    let t = go_in(&mut stays).await;
+    let said = told(&mut stays, BONNIE, t).await;
+    assert_eq!(said, text(keys::WEDDING_GUEST_WAIT));
+
+    // While the couple gather, the guests come into their hall.
+    let at = say_yes(&mut a, AMORIA, WAYNE).await;
+    arrive(&mut a, HALL, at).await;
+    arrive(&mut b, HALL, Trace::default()).await;
+    let mut drops = drops;
+    for guest in [&mut stays, &mut leaves, &mut drops] {
+        let t = go_in(guest).await;
+        assert!(t.warps.contains(&HALL), "{:?}", t.prompt_texts);
+        assert_eq!(t.countdowns.len(), 1, "{:?}", t.countdowns);
+    }
+    // A guest logging out ends nothing.
+    drop(drops);
+
+    // The couple go on to the altar, and the guests with them.
+    for session in [&mut a, &mut b, &mut stays, &mut leaves] {
+        arrive(session, ALTAR, Trace::default()).await;
+    }
+    // Then the doors are closed.
+    let t = go_in(&mut late).await;
+    assert!(!t.warps.contains(&HALL), "{:?}", t.warps);
+    let said = told(&mut late, BONNIE, t).await;
+    assert_eq!(said, text(keys::WEDDING_GUEST_LATE));
+
+    // The priest has no vows for a guest; Jackie sees one out, and the
+    // wedding goes on.
+    let m = leaves.character_name.clone();
+    let c = &mut leaves.connection;
+    let t = step(c, &format!("{m} talks to the priest"), talk(ALTAR, PRIEST)).await;
+    assert_eq!(t.prompts, [(PRIEST, 0)], "{:?}", t.prompt_texts);
+    assert_eq!(t.prompt_texts, [text(keys::WEDDING_PRIEST_INTRO)]);
+    step(c, &format!("{m} ok"), answer(0, 1, None)).await;
+    let t = say_yes(&mut leaves, ALTAR, JACKIE).await;
+    let t = arrive(&mut leaves, EXIT, t).await;
+    assert!(results(&t).is_empty());
+    let mut at = Trace::default();
+    read_for(&mut a.connection, &mut at, 500).await;
+    assert!(at.warps.is_empty(), "{:?}", at.warps);
+
+    // B logs out before the vows: the couple's booking is gone, and the
+    // guest still in goes out with A, without the couple's notice.
+    drop(b);
+    let mut at = arrive(&mut a, EXIT, Trace::default()).await;
+    until(&mut a.connection, &mut at, |t| !t.marriage.is_empty()).await;
+    assert_eq!(results(&at), [CANCELLED]);
+    let st = arrive(&mut stays, EXIT, Trace::default()).await;
+    assert!(results(&st).is_empty());
     assert_eq!(
         couple_status(marriage_id).await.unwrap(),
         (STATUS_ENGAGED, false)

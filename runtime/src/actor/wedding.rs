@@ -10,19 +10,25 @@
 //! ends the wedding, and the booking with it; after them the couple may
 //! stay until the staff see them out or the time runs out.
 //!
-//! As with a party event (`crate::actor::event`), the partners' client
-//! actors do the moving, and a ticket hands itself back when dropped.
+//! Invited guests come in through the venue's assistant while the couple
+//! gather, up to `MAX_GUESTS`, and go on to the altar with them; a guest
+//! may leave at any time without ending anything.
+//!
+//! As with a party event (`crate::actor::event`), the client actors do the
+//! moving, and a ticket hands itself back when dropped.
 
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
-use game::wedding::{Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING};
+use game::wedding::{
+    GuestRefusal, Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING, MAX_GUESTS,
+};
 use net::events::scaled;
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{sleep, sleep_until, Instant};
@@ -31,7 +37,9 @@ use tracing::{info, warn};
 /// How long the couple have to get out after the wedding ends before its
 /// fields close.
 const GRACE: Duration = Duration::from_secs(2);
-const WEDDING_QUEUE_CAPACITY: usize = 16;
+/// Room for each of the couple and the guests to leave while another
+/// message of theirs waits, so a dropped ticket is never turned away.
+pub const WEDDING_QUEUE_CAPACITY: usize = 2 * (MAX_GUESTS as usize + 2) + 16;
 
 #[derive(Debug)]
 pub enum WeddingMessage {
@@ -46,11 +54,16 @@ pub enum WeddingMessage {
     },
     /// `client_id` asks the staff to end the wedding.
     End { client_id: ClientId },
+    /// An invited guest asks to come in.
+    Join {
+        guest: ClientHandle,
+        reply: oneshot::Sender<Result<WeddingTicket, GuestRefusal>>,
+    },
 }
 
-/// What a partner holds while in the wedding: the wedding's own fields for
-/// the venue's maps, and when its stage ends. Dropping it leaves the
-/// wedding.
+/// What one of the couple or a guest holds while in the wedding: the
+/// wedding's own fields for the venue's maps, and when its stage ends.
+/// Dropping it leaves the wedding.
 #[derive(Debug)]
 pub struct WeddingTicket {
     pub id: u32,
@@ -58,6 +71,8 @@ pub struct WeddingTicket {
     /// When the time shown on the wedding's maps runs out.
     pub clock: Option<Instant>,
     member: ClientId,
+    /// Held by a guest rather than one of the couple.
+    pub guest: bool,
     tx: mpsc::Sender<WeddingMessage>,
     /// The wedding's stage, shared with it; only it writes.
     stage: Arc<AtomicU8>,
@@ -65,7 +80,7 @@ pub struct WeddingTicket {
 
 impl Drop for WeddingTicket {
     fn drop(&mut self) {
-        // Each partner has one ticket, so the queue can't fill.
+        // The queue has room for everyone in it to leave.
         let _ = self.tx.try_send(WeddingMessage::Left {
             client_id: self.member,
         });
@@ -115,7 +130,8 @@ impl WeddingTicket {
 }
 
 /// A wedding the directory let a couple start: `id` at `venue` on
-/// `channel_id`, for the couple `marriage_id`.
+/// `channel_id`, for the couple `marriage_id`. Guests reach it by `tx`,
+/// which the directory keeps.
 #[derive(Debug)]
 pub struct WeddingStart {
     pub id: u32,
@@ -123,6 +139,8 @@ pub struct WeddingStart {
     pub channel_id: u8,
     pub marriage_id: i32,
     pub couple: Vec<ClientHandle>,
+    pub tx: mpsc::Sender<WeddingMessage>,
+    pub rx: mpsc::Receiver<WeddingMessage>,
 }
 
 /// Start the wedding's actor, which hands out the tickets.
@@ -133,15 +151,17 @@ pub fn spawn(
 ) {
     let (id, venue, channel_id) = (start.id, start.venue, start.channel_id);
     fields.open_instance(channel_id, id);
-    let (tx, rx) = mpsc::channel(WEDDING_QUEUE_CAPACITY);
     let couple = start.couple.clone();
+    let guests = Arc::new(Mutex::new(HashMap::new()));
+    let inside = guests.clone();
     let actor = WeddingActor {
         id,
         venue,
         marriage_id: start.marriage_id,
         ends: Instant::now() + scaled(GATHERING),
-        tx: Some(tx),
-        rx,
+        tx: start.tx,
+        rx: start.rx,
+        guests,
         members: start
             .couple
             .into_iter()
@@ -151,10 +171,14 @@ pub fn spawn(
         stage: Arc::new(AtomicU8::new(WeddingStage::Gathering as u8)),
         failed: false,
     };
-    // However it ends, even by a panic, the couple are sent out, the copy
-    // closes and the venue is free again.
+    // However it ends, even by a panic, the couple and guests are sent
+    // out, the copy closes and the venue is free again.
     spawn_supervised(format!("wedding {venue:?} {id}"), actor.run(), move || {
-        for member in &couple {
+        let guests = inside
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        for member in couple.iter().chain(guests.values()) {
             member.send(ServerMessage::WeddingEnded { id, failed: false });
         }
         fields.close_instance(channel_id, id);
@@ -176,11 +200,13 @@ struct WeddingActor {
     marriage_id: i32,
     /// When the current stage's time runs out.
     ends: Instant,
-    /// Ours until the tickets are out; then only they keep the queue open.
-    tx: Option<mpsc::Sender<WeddingMessage>>,
+    /// For the tickets; the directory keeps another for the guests.
+    tx: mpsc::Sender<WeddingMessage>,
     rx: mpsc::Receiver<WeddingMessage>,
     /// The partners still in the wedding.
     members: HashMap<ClientId, ClientHandle>,
+    /// The guests in it, shared with whoever sees them out after a panic.
+    guests: Arc<Mutex<HashMap<ClientId, ClientHandle>>>,
     vowed: HashSet<ClientId>,
     stage: Arc<AtomicU8>,
     /// The wedding ended before the couple married.
@@ -198,18 +224,10 @@ impl WeddingActor {
             ?couple,
             "Wedding started"
         );
-        if let Some(tx) = self.tx.take() {
-            for member in self.members.values() {
-                // A ticket that doesn't arrive hands itself back.
-                member.send(ServerMessage::WeddingStarted(WeddingTicket {
-                    id,
-                    venue,
-                    clock: Some(self.ends),
-                    member: member.client_id,
-                    tx: tx.clone(),
-                    stage: self.stage.clone(),
-                }));
-            }
+        for member in self.members.values() {
+            // A ticket that doesn't arrive hands itself back.
+            let ticket = self.ticket(member.client_id, false);
+            member.send(ServerMessage::WeddingStarted(ticket));
         }
         let mut over = false;
         while !over {
@@ -230,6 +248,10 @@ impl WeddingActor {
                         over = self.members.contains_key(&client_id)
                             && self.stage() == WeddingStage::Married;
                     }
+                    Some(WeddingMessage::Join { guest, reply }) => {
+                        // A ticket the guest can't take hands itself back.
+                        let _ = reply.send(self.join(guest));
+                    }
                     None => over = true,
                 },
                 _ = sleep_until(ends) => over = self.time_up(),
@@ -247,11 +269,18 @@ impl WeddingActor {
         }
         // Nothing is answered from here on.
         drop(self.rx);
+        let failed = self.failed;
+        let ended = || ServerMessage::WeddingEnded { id, failed };
         for member in self.members.values() {
-            member.send(ServerMessage::WeddingEnded {
-                id,
-                failed: self.failed,
-            });
+            member.send(ended());
+        }
+        for guest in self
+            .guests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+        {
+            guest.send(ended());
         }
         // Give them time to get out before the copy closes.
         sleep(GRACE).await;
@@ -261,13 +290,48 @@ impl WeddingActor {
         WeddingStage::from_u8(self.stage.load(Ordering::Acquire))
     }
 
+    fn guests(&self) -> MutexGuard<'_, HashMap<ClientId, ClientHandle>> {
+        self.guests.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn ticket(&self, member: ClientId, guest: bool) -> WeddingTicket {
+        WeddingTicket {
+            id: self.id,
+            venue: self.venue,
+            clock: Some(self.ends),
+            member,
+            guest,
+            tx: self.tx.clone(),
+            stage: self.stage.clone(),
+        }
+    }
+
+    /// Let an invited guest in while the couple gather and there is room.
+    fn join(&mut self, guest: ClientHandle) -> Result<WeddingTicket, GuestRefusal> {
+        if self.stage() != WeddingStage::Gathering {
+            return Err(GuestRefusal::Late);
+        }
+        let client_id = guest.client_id;
+        let mut guests = self.guests();
+        if guests.len() >= MAX_GUESTS as usize && !guests.contains_key(&client_id) {
+            return Err(GuestRefusal::Full);
+        }
+        guests.insert(client_id, guest);
+        drop(guests);
+        info!(venue = ?self.venue, id = self.id, client_id, "Wedding guest came in");
+        Ok(self.ticket(client_id, true))
+    }
+
     fn set_stage(&self, stage: WeddingStage) {
         self.stage.store(stage as u8, Ordering::Release);
     }
 
     /// A partner left: before the vows that ends the wedding; after them,
-    /// it goes on while one of the couple stays.
+    /// it goes on while one of the couple stays. A guest only goes.
     fn left(&mut self, client_id: ClientId) -> bool {
+        if self.guests().remove(&client_id).is_some() {
+            return false;
+        }
         if self.members.remove(&client_id).is_none() {
             return false;
         }
@@ -285,7 +349,8 @@ impl WeddingActor {
             WeddingStage::Gathering => {
                 self.set_stage(WeddingStage::Ceremony);
                 self.ends = Instant::now() + scaled(CEREMONY);
-                for member in self.members.values() {
+                // The guests take their seats at the altar too.
+                for member in self.members.values().chain(self.guests().values()) {
                     member.send(ServerMessage::WeddingMoved {
                         id: self.id,
                         to: self.venue.altar(),
@@ -336,7 +401,8 @@ impl WeddingActor {
         self.set_stage(WeddingStage::Married);
         self.ends = Instant::now() + scaled(AFTER_VOWS);
         info!(venue = ?self.venue, id = self.id, marriage_id, "Couple married");
-        for member in self.members.values() {
+        // The guests' time starts again with the couple's.
+        for member in self.members.values().chain(self.guests().values()) {
             member.send(ServerMessage::Married {
                 id: self.id,
                 record: record.clone(),

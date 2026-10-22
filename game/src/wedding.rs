@@ -162,6 +162,17 @@ pub enum StartRefusal {
     Busy,
 }
 
+/// Why an invited guest could not go into the wedding.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GuestRefusal {
+    /// The couple have not begun it.
+    NotStarted,
+    /// The gathering is over: the ceremony has begun.
+    Late,
+    /// The hall holds its most guests.
+    Full,
+}
+
 /// What came of a partner's vows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Vows {
@@ -187,6 +198,9 @@ pub const SLOT: Duration = Duration::from_secs(60 * 60);
 pub const LEAD: Duration = Duration::from_secs(120 * 60);
 /// How long after its start a wedding the couple never began is kept.
 pub const NO_SHOW: Duration = Duration::from_secs(10 * 60);
+/// How long after its start guests may come to a wedding: the couple may
+/// begin it until `NO_SHOW`, and guests come in during the gathering.
+pub const GUESTS_UNTIL: Duration = Duration::from_secs(NO_SHOW.as_secs() + GATHERING.as_secs());
 
 /// A couple's booked wedding.
 #[derive(Clone, Debug, PartialEq, Eq)]

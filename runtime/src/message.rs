@@ -750,6 +750,17 @@ pub enum DirectoryMessage {
             Result<crate::actor::wedding::WeddingStart, game::wedding::StartRefusal>,
         >,
     },
+    /// `from`, invited to the wedding of `marriage_id` at `venue`, asks to
+    /// go in. Answers their ticket if the wedding is under way on their
+    /// channel and lets them in.
+    JoinWedding {
+        from: ClientId,
+        venue: game::wedding::Venue,
+        marriage_id: i32,
+        reply: tokio::sync::oneshot::Sender<
+            Result<crate::actor::wedding::WeddingTicket, game::wedding::GuestRefusal>,
+        >,
+    },
     /// Wedding `id` at `venue` on `channel_id` is over; the venue is free.
     WeddingClosed {
         channel_id: u8,

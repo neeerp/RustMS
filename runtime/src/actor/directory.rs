@@ -139,8 +139,8 @@ pub struct WorldDirectory {
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
-    /// The wedding under way at each channel's venues, by id.
-    weddings: HashMap<(u8, game::wedding::Venue), u32>,
+    /// The wedding under way at each channel's venues.
+    weddings: HashMap<(u8, game::wedding::Venue), marriage::Wedding>,
     avatar_banners: AvatarBanners,
     /// Mini-dungeon copies taken, by channel and copy.
     dungeons: HashMap<(u8, i32), Run>,
@@ -368,12 +368,22 @@ impl WorldDirectory {
                     self.weddings.remove(&(start.channel_id, venue));
                 }
             }
+            DirectoryMessage::JoinWedding {
+                from,
+                venue,
+                marriage_id,
+                reply,
+            } => self.join_wedding(from, venue, marriage_id, reply),
             DirectoryMessage::WeddingClosed {
                 channel_id,
                 venue,
                 id,
             } => {
-                if self.weddings.get(&(channel_id, venue)) == Some(&id) {
+                if self
+                    .weddings
+                    .get(&(channel_id, venue))
+                    .is_some_and(|wedding| wedding.id == id)
+                {
                     self.weddings.remove(&(channel_id, venue));
                 }
             }
