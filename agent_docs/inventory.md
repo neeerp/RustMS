@@ -790,7 +790,15 @@ nothing is sent.
 In HeavenClient, `ItemData::has_reward` says whether the item has a
 `reward` node, and a double-click on such a Use item sends
 `UseItemRewardPacket` (USE_WAIT) right after the sealed check, before any
-other kind of Use item is tried, as v83 does (0x4f0372).
+other kind of Use item is tried, as v83 does (0x4f0372). User effect 14
+(local in `ShowItemGainInChatHandler`, foreign in `ShowForeignEffectHandler`)
+calls `Stage::show_reward_effect`: the prize's use sound (`Sound(itemid)`),
+and the path once in `ground_effects` where the opener stood, not following
+them (0x9382b0). `Stage::effect_node` finds the path's node, as user effect
+23 does too: the NX file named first (`UI`, `Effect` or `Map`), then the
+node, retried with the image's `.img` put back (`field_effect::with_image`),
+since Item.nx writes reward paths without it. A world message's item link
+(BROADCAST_MSG type 6) isn't drawn; the line shows as plain blue text.
 
 ### Item Maker
 

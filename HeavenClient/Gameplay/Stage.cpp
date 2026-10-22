@@ -900,6 +900,37 @@ namespace ms
 		ground_effects.add(nl::nx::effect["BasicEff.img"][effect], DrawArgument(position, right));
 	}
 
+	nl::node Stage::effect_node(const std::string &path)
+	{
+		size_t slash = path.find('/');
+
+		if (slash == std::string::npos)
+			return nl::node();
+
+		std::string file = path.substr(0, slash);
+		nl::node root = file == "UI" ? nl::nx::ui : file == "Effect" ? nl::nx::effect : file == "Map" ? nl::nx::map : nl::node();
+
+		if (!root)
+			return root;
+
+		std::string node = path.substr(slash + 1);
+
+		if (nl::node found = root.resolve(node))
+			return found;
+
+		std::string image = field_effect::with_image(node);
+
+		return image.empty() ? nl::node() : root.resolve(image);
+	}
+
+	void Stage::show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path)
+	{
+		Sound(item_id).play();
+
+		if (nl::node effect = effect_node(path))
+			ground_effects.add(effect, DrawArgument(position));
+	}
+
 	void Stage::tremble(double force, bool heavy, int32_t delay, int32_t additional, bool forced)
 	{
 		if (!forced && !Setting<ShakeScreen>::get().load())
