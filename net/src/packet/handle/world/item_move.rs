@@ -104,6 +104,9 @@ fn drop_item(
     {
         return Err("a pet that is out");
     }
+    if item.sealed() {
+        return Err("sealed");
+    }
     // Throwing stars and bullets always go as a whole set.
     let quantity = if matches!(item.item_id / 10_000, 207 | 233) {
         item.quantity

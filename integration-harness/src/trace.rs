@@ -96,6 +96,8 @@ pub struct Trace {
     pub removed: Vec<(u8, i16)>,
     /// Items said to have expired (SHOW_STATUS_INFO 8).
     pub expired: Vec<i32>,
+    /// Items said to be sealed no more (SHOW_STATUS_INFO 11).
+    pub seals_expired: Vec<i32>,
     /// Cash mists puffed on this player (SHOW_ITEM_GAIN_INCHAT 20).
     pub mist_puffs: Vec<i32>,
     /// Cash mists whose face this player pulls (ITEM_EMOTION).
@@ -308,6 +310,11 @@ impl Trace {
                 8 => {
                     for _ in 0..r.read_byte().unwrap() {
                         self.expired.push(r.read_int().unwrap());
+                    }
+                }
+                11 => {
+                    for _ in 0..r.read_byte().unwrap() {
+                        self.seals_expired.push(r.read_int().unwrap());
                     }
                 }
                 _ => {}

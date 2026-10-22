@@ -105,6 +105,7 @@ namespace ms
 			properties.account_sharable = src["accountSharable"].get_bool();
 			properties.not_extend = src["notExtend"].get_bool();
 			properties.trade_available = src["tradeAvailable"].get_bool();
+			properties.expire_on_logout = src["expireOnLogout"].get_bool();
 			pet_life.permanent = src["permanent"].get_bool();
 			pet_life.limited = src["limitedLife"];
 			pet_life.days = src["life"];

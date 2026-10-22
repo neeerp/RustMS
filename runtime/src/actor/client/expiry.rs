@@ -4,7 +4,7 @@ use super::ClientActor;
 use crate::error::RuntimeError;
 use net::items::{expire_items, next_expiry};
 use net::packet::build::world::inventory::{
-    build_char_look, build_inventory_operation, build_items_expired,
+    build_char_look, build_inventory_operation, build_items_expired, build_seals_expired,
 };
 use net::packet::build::world::stat::build_hp_mp;
 use net::WorldAction;
@@ -28,13 +28,17 @@ impl ClientActor {
     pub(super) async fn expire_items(&mut self) -> Result<(), RuntimeError> {
         let player = &mut self.in_game_mut()?.player;
         let expired = expire_items(player, SystemTime::now());
-        if expired.item_ids.is_empty() {
+        if expired.changes.is_empty() {
             return Ok(());
         }
-        let mut packets = vec![
-            build_items_expired(&expired.item_ids)?,
-            build_inventory_operation(false, &expired.changes)?,
-        ];
+        let mut packets = Vec::new();
+        if !expired.item_ids.is_empty() {
+            packets.push(build_items_expired(&expired.item_ids)?);
+        }
+        if !expired.released.is_empty() {
+            packets.push(build_seals_expired(&expired.released)?);
+        }
+        packets.push(build_inventory_operation(false, &expired.changes)?);
         if !expired.worn {
             return self.send_all(&mut packets).await;
         }

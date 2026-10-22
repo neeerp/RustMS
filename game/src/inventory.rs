@@ -260,6 +260,11 @@ impl Item {
         self.item_id / 1_000_000 == 5 || self.cash_serial.is_some()
     }
 
+    /// Whether an Item Guard seals the item. Pets are never sealed.
+    pub fn sealed(&self) -> bool {
+        self.flags & FLAG_LOCK != 0 && self.pet.is_none()
+    }
+
     fn karma_flag(&self) -> i16 {
         if self.item_id / 1_000_000 == 1 {
             FLAG_EQUIP_KARMA

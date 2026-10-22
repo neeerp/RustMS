@@ -51,6 +51,7 @@ namespace ms
 			VICIOUSHAMMER,
 			MAKER,
 			VEGASPELL,
+			ITEMPROTECTOR,
 			VEGARESULT,
 			STATUSBAR,
 			// The status bar's quick slots, whose tooltips go above the cursor.

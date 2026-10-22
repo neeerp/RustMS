@@ -476,6 +476,23 @@ namespace ms
 		}
 	};
 
+	// Seals the item in `target_slot` of `tab` with the Item Guard in Cash
+	// `slot` (v83 CUIItemProtector's Yes, 0x82a2ee).
+	// Opcode: USE_CASH_ITEM(79)
+	class UseItemGuardPacket : public OutPacket
+	{
+	public:
+		UseItemGuardPacket(int16_t slot, int32_t itemid, InventoryType::Id tab, int16_t target_slot)
+				: OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_int(tab);
+			write_int(target_slot);
+			write_time();
+		}
+	};
+
 	// Uses Vicious' Hammer on the equip in `equip_slot` of the Equip tab
 	// (v83 FUN_0082aed3, BtStart).
 	// Opcode: USE_CASH_ITEM(79)

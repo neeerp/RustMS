@@ -105,9 +105,19 @@ pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkErr
 /// therefore, deleted from your inventory." for each of up to 255
 /// `item_ids` (v83 FUN_00a209d4).
 pub fn build_items_expired(item_ids: &[i32]) -> Result<Packet, NetworkError> {
+    build_item_lines(8, item_ids)
+}
+
+/// SHOW_STATUS_INFO mode 11: "[name]'s seal has expired." for each of up
+/// to 255 `item_ids` (v83 FUN_00a2187e, report c009).
+pub fn build_seals_expired(item_ids: &[i32]) -> Result<Packet, NetworkError> {
+    build_item_lines(11, item_ids)
+}
+
+fn build_item_lines(mode: u8, item_ids: &[i32]) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowStatusInfo as i16)?;
-    p.write_byte(8)?;
+    p.write_byte(mode)?;
     let item_ids = &item_ids[..item_ids.len().min(255)];
     p.write_byte(item_ids.len() as u8)?;
     for &item_id in item_ids {

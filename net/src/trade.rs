@@ -107,9 +107,11 @@ pub fn received(offer: &Offer) -> Offer {
 }
 
 /// Whether the item may be put up in a trade (FUN_007c359f): what storage
-/// takes, short of items that stay within the account.
+/// takes, short of items that stay within the account and sealed ones.
 pub fn tradeable(item: &Item) -> bool {
-    storable(item) && !items::info(item.item_id).is_some_and(|info| info.account_sharable)
+    storable(item)
+        && !item.sealed()
+        && !items::info(item.item_id).is_some_and(|info| info.account_sharable)
 }
 
 /// Take `count` of the item in a bag slot out of the inventory and into

@@ -329,8 +329,9 @@ fn disassemble(player: &mut Player, item_id: i32, slot: i16) -> Result<Made, Mak
     let recipe = items::maker().and_then(|maker| maker.recipe(item_id));
     let recipe = recipe.ok_or(Failed)?;
     let held = player.inventory.get(InventoryType::Equip, slot);
+    // A sealed item stays whole (v83 0xd58 when dropped on the window).
     let stats = held
-        .filter(|item| item.item_id == item_id)
+        .filter(|item| item.item_id == item_id && !item.sealed())
         .and_then(|item| item.equip.as_ref())
         .ok_or(Failed)?;
     let own = items::create(item_id, 1).and_then(|item| item.equip);
@@ -866,6 +867,14 @@ mod tests {
         // Not what is in that slot, nor another tab.
         assert_eq!(request(&mut player, &[4, SWORD, 1, 2], None), [refusal(2)]);
         assert_eq!(request(&mut player, &[4, SWORD, 4, 3], None), [refusal(2)]);
+        // Nor a sealed one.
+        let mut sealed = items::create(SWORD, 1).unwrap();
+        sealed.flags |= game::inventory::FLAG_LOCK;
+        let whole = player.inventory.insert(InventoryType::Equip, 3, sealed);
+        assert_eq!(request(&mut player, &[4, SWORD, 1, 3], None), [refusal(2)]);
+        player
+            .inventory
+            .insert(InventoryType::Equip, 3, whole.unwrap());
         let replies = request(&mut player, &[4, SWORD, 1, 3], None);
         let meso = disassembly_fee(60_000, 0);
         assert_eq!(meso, 9_000);

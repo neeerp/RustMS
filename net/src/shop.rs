@@ -205,7 +205,7 @@ pub fn sell(
     let item = player
         .inventory
         .get(kind, slot)
-        .filter(|item| item.item_id == item_id && !item.is_cash())
+        .filter(|item| item.item_id == item_id && !item.is_cash() && !item.sealed())
         .ok_or(ShopError::Invalid)?;
     let info = items::info(item_id).ok_or(ShopError::Invalid)?;
     let (quantity, mesos) = if is_rechargeable(item_id) {

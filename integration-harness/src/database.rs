@@ -712,3 +712,51 @@ pub async fn item_owner_and_hours(
     .map_err(fixture)?;
     Ok((row.owner, row.hours))
 }
+
+/// Set the flags of the logged-out character `character_id`'s `item_id`.
+pub async fn flag_item(character_id: i32, item_id: i32, flags: i16) -> Result<(), HarnessError> {
+    change_one_row("flag item", move |conn| {
+        diesel::sql_query(
+            "UPDATE inventory_items SET flags = $3 WHERE character_id = $1 AND item_id = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .bind::<SmallInt, _>(flags)
+        .execute(conn)
+    })
+    .await
+}
+
+/// The flags of `character_id`'s `item_id`, and the whole hours it has
+/// left if it is dated.
+pub async fn item_flags_and_hours(
+    character_id: i32,
+    item_id: i32,
+) -> Result<(i16, Option<i64>), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = SmallInt)]
+        flags: i16,
+        #[diesel(sql_type = Nullable<BigInt>)]
+        hours: Option<i64>,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read an item's flags and date",
+        message,
+    };
+    let row = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT flags, floor(extract(epoch FROM expires_at - now()::timestamp) / 3600)::bigint AS hours \
+             FROM inventory_items WHERE character_id = $1 AND item_id = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(item_id)
+        .get_result::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok((row.flags, row.hours))
+}

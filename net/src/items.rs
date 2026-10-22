@@ -2,6 +2,7 @@
 //! turn them into inventory items.
 
 use crate::load::{self, asset_path};
+use game::inventory::FLAG_LOCK;
 use game::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item, Player};
 use game_data::items::{EquipInfo, ItemData, ItemInfo, ItemNames};
 use game_data::maker::MakerData;
@@ -246,6 +247,8 @@ pub fn can_wear(equip: &EquipInfo, player: &game::Player) -> bool {
 pub struct Expired {
     /// The items gone, for the "has been expired" lines.
     pub item_ids: Vec<i32>,
+    /// The items whose seal ran out, for the "seal has expired" lines.
+    pub released: Vec<i32>,
     pub changes: Vec<InventoryChange>,
     /// Whether one was worn, which changes the player's look.
     pub worn: bool,
@@ -259,18 +262,31 @@ fn expires(item: &Item) -> Option<SystemTime> {
 }
 
 /// Take every item, worn or in the bags, whose date passed by `now`
-/// (Cosmic's expirationTask). v83's client removes none itself.
+/// (Cosmic's expirationTask). v83's client removes none itself. A timed
+/// seal's date is the seal's: the item stays, unsealed and lasting forever.
 pub fn expire_items(player: &mut Player, now: SystemTime) -> Expired {
-    let due: Vec<(InventoryType, i16, i32, i16)> = player
+    let due: Vec<(InventoryType, i16, Item)> = player
         .inventory
         .all()
         .filter(|(_, _, item)| expires(item).is_some_and(|at| at <= now))
-        .map(|(kind, slot, item)| (kind, slot, item.item_id, item.quantity))
+        .map(|(kind, slot, item)| (kind, slot, item.clone()))
         .collect();
     let mut expired = Expired::default();
-    for (kind, slot, item_id, quantity) in due {
-        if let Ok(changes) = player.inventory_mut().take(kind, slot, quantity) {
-            expired.changes.extend(changes);
+    for (kind, slot, mut item) in due {
+        let item_id = item.item_id;
+        let Ok(changes) = player.inventory_mut().take(kind, slot, item.quantity) else {
+            continue;
+        };
+        expired.changes.extend(changes);
+        if item.sealed() {
+            item.flags &= !FLAG_LOCK;
+            item.expiration = None;
+            player.inventory_mut().insert(kind, slot, item.clone());
+            expired
+                .changes
+                .push(InventoryChange::Add { kind, slot, item });
+            expired.released.push(item_id);
+        } else {
             expired.item_ids.push(item_id);
             expired.worn |= kind == InventoryType::Equipped;
         }
