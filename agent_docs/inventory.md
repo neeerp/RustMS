@@ -993,8 +993,18 @@ folded panel lets clicks through below it. SEND asks to confirm the fee
 less than the server takes). The quick panel needs a Quick Delivery Coupon
 and a message of up to 100 letters, filtered as chat is, and cuts the item's
 name to fit. Return sends from SEND PA. While a send waits for its answer,
-the buttons, fields and tabs are off; `0x12` empties both panels. Not done
-yet: the notifier and the coupon's window.
+the buttons, fields and tabs are off; `0x12` empties both panels.
+
+Modes `0x19` and `0x1b` bring an open window to the front (`UI::raise`);
+otherwise they show v83's type-10 notice, a `PARCEL` card in
+`UIInviteCard`: `FadeYesNo/backgrnd4` with `Basic.img/icon/delivery`, and
+the text from `parcels::arrival`, cut at the card's edge. A plain parcel's
+card fades out after six seconds. A quick one's stays until answered, and its
+O sends op 0, which opens the receive-only window. A new card replaces the
+one before. Mode `0x1a` opens the coupon's window: the quick panel alone,
+which closes on `0x12`. Using a Quick Delivery Coupon (533xxxx) from the Cash
+tab sends USE_CASH_ITEM unless a Duey window is open, which gets "Not
+available" in the chat log. Only a send uses the coupon up.
 
 ## Trading
 

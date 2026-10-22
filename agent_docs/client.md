@@ -587,7 +587,7 @@ side yet.
 | Chalkboards (`ChalkboardBalloon`) | Implemented: the board, the note prompt and the close button; see `inventory.md` |
 | Cash mists (528xxxx) | Implemented: the use gate (`MapMists::item_busy`), the cloud (`MapMists`, type 3), the puff on the user (`Char::show_mist_puff`, user effect mode 20) and the face (ITEM_EMOTION, `Stage::use_item_emotion`); see `inventory.md` |
 | Storage (`UIStorage`) | Implemented; see `inventory.md` |
-| Duey (`UIDuey`) | The tab strip, receiving, and normal and quick sends from Duey's window; no notifier or coupon window yet; see `inventory.md` |
+| Duey (`UIDuey`) | The tab strip, receiving, normal and quick sends, the arrival notice, and the Quick Delivery Coupon's window; see `inventory.md` |
 | Teleport rocks (`UITeleportRock`) | Implemented: the map list, keeping and dropping maps, and moving to a map or a character; see `inventory.md` |
 | Item Maker (`UIMaker`) | Recipes with their stimulator and gems, monster crystals, disassembly and the random make: the drop lists, ingredient counts, fee, gauge, result dialog and chat lines; see `inventory.md` |
 | Writs of Solomon, gacha EXP | Implemented: using a writ, the EXP gauge's tooltip and taking the EXP by double-click; see `inventory.md` |

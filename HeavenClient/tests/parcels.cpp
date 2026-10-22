@@ -125,6 +125,16 @@ int main()
 		require(result_text(0x1c) == result_text(0x13), "0x1c is the unknown error too");
 		require(!result_text(0x09) && !result_text(0x14), "some codes say nothing");
 
+		// The notice of an arrival.
+		Arrival named = arrival("Amyo", false), quick_named = arrival("Amyo", true);
+		require(named.first == "Package Received." && named.second == "[Amyo]", "a plain parcel names its sender");
+		require(quick_named.first == "The Quick Delivery has arrived!" && quick_named.second == "[Amyo]",
+			"so does a quick one");
+		require(arrival("", false).first == "Package Received." && arrival("", false).second.empty(),
+			"waiting parcels say one line");
+		require(arrival("", true).first == "Quick delivey/Package" && arrival("", true).second == "Arrived!",
+			"a waiting quick one two, spelt as v83 has it");
+
 		std::cout << "parcels tests passed\n";
 		return 0;
 	}

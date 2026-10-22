@@ -25,6 +25,7 @@
 #include "../IO/UITypes/UIAvatarSelect.h"
 #include "../IO/UITypes/UIChatBar.h"
 #include "../IO/UITypes/UIDuey.h"
+#include "../IO/UITypes/UIInviteCard.h"
 #include "../IO/UITypes/UINotice.h"
 #include "../IO/UITypes/UINpcTalk.h"
 #include "../IO/UITypes/UIPetChooser.h"
@@ -485,10 +486,24 @@ namespace ms
 
 				return;
 			case Mode::ARRIVED:
-			case Mode::QUICK_SEND:
 			case Mode::WAITING:
-				// The notifier and the coupon's window: not done yet, and none
-				// of them answers a request.
+			{
+				// Mode 0x19 names who sent it; 0x1b says some wait.
+				std::string sender = mode == Mode::ARRIVED ? recv.read_string() : "";
+				bool quick = recv.read_bool();
+
+				if (open)
+					UI::get().raise(UIDuey::TYPE);
+				else if (auto cards = UI::get().get_element<UIInviteCard>())
+					cards->parcel(sender, quick);
+
+				return;
+			}
+			case Mode::QUICK_SEND:
+				// The Quick Delivery Coupon's window, alone.
+				if (!open)
+					UI::get().emplace<UIDuey>(UIDuey::Kind::QUICK_SEND);
+
 				return;
 			default:
 				if (open)

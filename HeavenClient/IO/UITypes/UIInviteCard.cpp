@@ -4,11 +4,14 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
+#include "../../Net/Handlers/Parcels.h"
+#include "../../Net/Packets/NpcInteractionPackets.h"
 #include "../../Util/NxFiles.h"
 
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <limits>
 
 namespace ms
 {
@@ -23,8 +26,10 @@ namespace ms
 		constexpr int16_t ICON_X = 6, ICON_BAND = 37;
 		// How far the "from" line sits below the heading.
 		constexpr int16_t LINE = 13;
+		// The parcels' buttons, at v83's x 136 like the quest notice's.
+		const Point<int16_t> PARCEL_OK_AT(133, 5), PARCEL_CANCEL_AT(133, 19);
 		// How long from appearing until it fades out unanswered.
-		constexpr uint32_t LIFETIME = 180000, ARRIVAL_LIFETIME = 6000;
+		constexpr uint32_t LIFETIME = 180000, ARRIVAL_LIFETIME = 6000, PARCEL_LIFETIME = 6000;
 
 		struct Look
 		{
@@ -50,6 +55,24 @@ namespace ms
 
 		// v83 writes the arrivals at (25, 7), in Arial 11.
 		const Point<int16_t> ARRIVAL_TEXT(24, 4);
+		// And the parcels' at (27, 7), or one line at (27, 14), in Arial 12.
+		const Point<int16_t> PARCEL_TEXT(26, 2), PARCEL_LINE(26, 9);
+
+		// v83 draws on the notice's own window, which cuts off what runs
+		// past its edge; here whole letters go.
+		Text cut(const std::string& line, int16_t width)
+		{
+			Text text(Text::A12M, Text::LEFT, Color::Name::WHITE, line);
+			std::string kept = line;
+
+			while (!kept.empty() && text.width() > width)
+			{
+				kept.pop_back();
+				text.change_text(kept);
+			}
+
+			return text;
+		}
 	}
 
 	UIInviteCard::UIInviteCard() : UIElement(Point<int16_t>(), Point<int16_t>(WIDTH, 0))
@@ -58,6 +81,7 @@ namespace ms
 
 		background = fade["backgrnd"];
 		arrival_background = fade["backgrnd2"];
+		parcel_background = fade["backgrnd4"];
 
 		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 	}
@@ -70,8 +94,12 @@ namespace ms
 			float opacity = notice.life.opacity();
 			const Texture& icon = notice.icon;
 
-			(notice.kind == ARRIVAL ? arrival_background : background).draw(DrawArgument(at, opacity));
-			icon.draw(DrawArgument(at + Point<int16_t>(ICON_X, (ICON_BAND - icon.get_dimensions().y()) / 2), opacity));
+			const Texture& back = notice.kind == ARRIVAL ? arrival_background
+				: notice.kind == PARCEL ? parcel_background : background;
+			back.draw(DrawArgument(at, opacity));
+			// v83 places an icon's top left; Duey's has an origin.
+			icon.draw(DrawArgument(at + Point<int16_t>(ICON_X, (ICON_BAND - icon.get_dimensions().y()) / 2)
+				+ icon.get_origin(), opacity));
 			notice.first.draw(DrawArgument(at + notice.text, opacity));
 			notice.second.draw(DrawArgument(at + notice.text + Point<int16_t>(0, LINE), opacity));
 		}
@@ -148,6 +176,27 @@ namespace ms
 		});
 	}
 
+	void UIInviteCard::parcel(const std::string& sender, bool quick)
+	{
+		parcels::Arrival lines = parcels::arrival(sender, quick);
+		Point<int16_t> text = lines.second.empty() ? PARCEL_LINE : PARCEL_TEXT;
+		std::function<void(bool)> answer = [quick](bool yes)
+		{
+			if (yes && quick)
+				DueyActionPacket(DueyActionPacket::Mode::OPEN).dispatch();
+		};
+
+		push({
+			PARCEL,
+			NxFiles::ui_classic["Basic.img"]["icon"]["delivery"],
+			cut(lines.first, ARRIVAL_WIDTH - text.x()),
+			cut(lines.second, ARRIVAL_WIDTH - text.x()),
+			text,
+			answer,
+			FadeNotice(quick ? std::numeric_limits<int32_t>::max() : PARCEL_LIFETIME)
+		});
+	}
+
 	void UIInviteCard::push(Notice notice)
 	{
 		Kind kind = notice.kind;
@@ -183,6 +232,11 @@ namespace ms
 		{
 			buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + ARRIVAL_CANCEL_AT);
 		}
+		else if (notices.back().kind == PARCEL)
+		{
+			buttons[OK] = std::make_unique<MapleButton>(fade["BtOK"], at + PARCEL_OK_AT);
+			buttons[CANCEL] = std::make_unique<MapleButton>(fade["BtCancel"], at + PARCEL_CANCEL_AT);
+		}
 		else
 		{
 			buttons[OK] = std::make_unique<MapleButton>(fade["BtOK"], at + OK_AT);
@@ -205,7 +259,7 @@ namespace ms
 		if (notices.empty())
 			return false;
 
-		bool invitations = std::any_of(notices.begin(), notices.end(), [](const Notice& n) { return n.kind != ARRIVAL; });
+		bool invitations = std::any_of(notices.begin(), notices.end(), [](const Notice& n) { return n.kind < ARRIVAL; });
 		Point<int16_t> top = position + offset(notices.back());
 		Point<int16_t> bottom = position + offset(notices.front()) + Point<int16_t>(invitations ? WIDTH : ARRIVAL_WIDTH, HEIGHT);
 

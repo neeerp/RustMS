@@ -187,6 +187,23 @@ namespace ms::parcels
 		return most < MOST_MESOS ? most : MOST_MESOS;
 	}
 
+	// What the notice of a parcel's arrival says (FUN_0052065d, type 10):
+	// two lines, or one when the second is empty. Only mode 0x19 names the
+	// sender. v83 draws each string on one line: "Package Received." alone
+	// sits centred, and the name goes where its second line would be.
+	struct Arrival
+	{
+		std::string first, second;
+	};
+
+	inline Arrival arrival(const std::string& sender, bool quick)
+	{
+		if (sender.empty())
+			return quick ? Arrival{ "Quick delivey/Package", "Arrived!" } : Arrival{ "Package Received.", "" };
+
+		return { quick ? "The Quick Delivery has arrived!" : "Package Received.", "[" + sender + "]" };
+	}
+
 	// What a result code says (FUN_006f5be2), with UIOk's line breaks; some
 	// say nothing.
 	inline std::optional<std::string> result_text(uint8_t mode)
