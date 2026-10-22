@@ -688,6 +688,9 @@ pub enum FieldRequest {
     /// The player opened a summoning sack: bring out these mobs on the
     /// ground below them.
     SummonMobs(Vec<i32>),
+    /// A script brings out `mob_id` on the ground below `at`, unless one
+    /// is out already.
+    BringOutMob { mob_id: i32, at: (i16, i16) },
     /// The player threw the catch item in USE `slot` at the mob `object_id`:
     /// catch it if it is a `catch.mob` within `catch.area` of them, below
     /// `catch.mob_hp` percent of its HP. Answered with

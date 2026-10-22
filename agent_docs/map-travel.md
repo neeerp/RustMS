@@ -131,13 +131,16 @@ them through the network harness.
 
 ## Map and portal scripts
 
-Map entry (`info/onUserEnter`) and touch portals (`pt` 9) run native scripts
+Map entry (`info/onUserEnter`, `scripts::map_enter`, which sees the
+entering player) and touch portals (`pt` 9) run native scripts
 from `net::scripts`, keyed by the script names in `Map.nx`; unknown names do
 nothing. A script returns effects that the client actor sends:
 
 | Script | Effect |
 | --- | --- |
 | `go<map id>` (entry) | Map name banner, FIELD_EFFECT `maplemap/enter/<map id>` |
+| `TD_NC_title`, `TD_MC_title` (entry) | The Time Gate's and the Mushroom Kingdom's theme banners, FIELD_EFFECT `temaD/enter/<name>`: `teraForest` on `240070000`, `neoCity1`-`neoCity6` on `240070100`-`240070600`, `mushCatle` on `106020000`. Neither script is in Cosmic; the pairing is by name and by the maps' years |
+| `explorationPoint` (entry) | Lith Harbor's (`104000000`) name banner; in the Disciples' hideout (`100000006`), while 2175 is taken, the Disciple (`9300156`) comes out at (-1027, 216) unless one is out already (`Effect::BringOutMob`, under the player's control, never respawning). The exploration medals' counting isn't in |
 | `infoMinimap` | `UI/tutorial.img/25` once 1031 is started |
 | `infoAttack`, `infoPickup` | `/20`, `/21` once 1035 is started |
 | `infoSkill` | `/23` once 1035 is completed |

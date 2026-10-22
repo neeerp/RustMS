@@ -17,7 +17,7 @@ impl ClientActor {
         else {
             return Ok(());
         };
-        match scripts::map_enter(&script) {
+        match scripts::map_enter(&script, &self.in_game()?.player) {
             Some(effects) => self.apply_effects(&effects).await.map(drop),
             None => {
                 debug!(map_id, script, "No native map entry script");
