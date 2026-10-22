@@ -7,10 +7,11 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
+use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::events::{
     self, on_areas, standing, Balloon, Cloto, EventCommand, EventKind, HeadCount, LeverCheck,
-    Standing,
+    Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
@@ -207,6 +208,21 @@ impl ClientActor {
                 }
                 Ok(Some(NpcScript::opq_head_count(Some(count))))
             }
+            events::OPQ_HUB if ticket.leader() => {
+                let garden = ticket.cleared(events::OPQ_GARDEN_STAGE);
+                let won = ticket.cleared(ticket.kind.event().last_stage());
+                let scars = self.reactor_states(&events::OPQ_SCARS).await?;
+                let statue = if !scars.iter().all(|state| state.is_some_and(|s| s > 0)) {
+                    Statue::Gathering
+                } else if !garden {
+                    Statue::Garden
+                } else if !won {
+                    Statue::GrassOfLife
+                } else {
+                    Statue::Won
+                };
+                Ok(Some(NpcScript::opq_hub(statue)))
+            }
             _ => Ok(NpcScript::opq_eak(
                 map_id,
                 ticket.leader(),
@@ -215,20 +231,43 @@ impl ClientActor {
         }
     }
 
-    /// Where a climb pad of the Orbis party quest, `portal` running
-    /// `script`, sends the player: a sound and a warp on the same map.
-    /// `None` off the quest's lounge and tall room.
-    pub(super) async fn opq_climb(
+    /// What a portal of the Orbis party quest, `portal` running `script`,
+    /// does for the player: a climb pad sends them on up the lounge or the
+    /// tall room, or down, with a sound; the garden's way out takes the
+    /// whole team back to the hub, for a leader holding the Grass of Life
+    /// (Cosmic `party3_gardenin`), else the player hears what it needs.
+    /// `None` for any other portal.
+    pub(super) async fn opq_portal(
         &mut self,
         script: &str,
         portal: &PortalTemplate,
     ) -> Result<Option<Vec<Effect>>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let in_opq = self
+        let Some(ticket) = self
             .event
             .as_ref()
-            .is_some_and(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Opq);
-        if !in_opq || ![scripts::OPQ_LOUNGE_CLIMB, scripts::OPQ_TOWER_CLIMB].contains(&script) {
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Opq)
+        else {
+            return Ok(None);
+        };
+        if script == scripts::OPQ_GARDEN_OUT {
+            let holds = self
+                .in_game()?
+                .player
+                .inventory
+                .count(events::GRASS_OF_LIFE)
+                > 0;
+            return Ok(Some(if ticket.leader() && holds {
+                vec![
+                    Effect::PortalSound,
+                    Effect::EventCommand(EventCommand::MoveTeam(events::OPQ_HUB)),
+                ]
+            } else {
+                let line = net::content::text().get(keys::OPQ_NOTICE_GARDEN_OUT, &[]);
+                vec![Effect::Pink(line)]
+            }));
+        }
+        if ![scripts::OPQ_LOUNGE_CLIMB, scripts::OPQ_TOWER_CLIMB].contains(&script) {
             return Ok(None);
         }
         let (reply, combo) = oneshot::channel();

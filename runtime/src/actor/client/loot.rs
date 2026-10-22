@@ -106,8 +106,12 @@ impl ClientActor {
         };
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
             .await?;
-        // The last Cellion's spot clears the Salion stage.
-        if net::reactors::action(reactor_id) == Action::Salion {
+        // The last Cellion's spot clears the Salion stage, and the Grass of
+        // Life's pot the garden.
+        if matches!(
+            net::reactors::action(reactor_id),
+            Action::Salion | Action::DropsAndClears
+        ) {
             let map_id = self.in_game()?.player.stats.map_id;
             let stage = self
                 .event

@@ -457,6 +457,10 @@ impl EventActor {
                 }
             }
             EventCommand::HandOver(_) => {}
+            EventCommand::MoveTeam(map) if leader && event.maps.contains(&map) => {
+                self.move_team(None, map, self.ends);
+            }
+            EventCommand::MoveTeam(map) => debug!(map, client_id, "Move not taken"),
         }
     }
 
