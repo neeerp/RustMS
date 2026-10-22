@@ -3,7 +3,7 @@ use super::stats::encode_character_stats;
 use super::time::{expiration, filetime};
 use crate::error::NetworkError;
 use game::quest::{encode_kills, SCRIPT_MARKERS};
-use game::Player;
+use game::{Player, QuestState};
 use packet::{io::write::PktWrite, Packet};
 
 /// Write the full character data block sent on world entry
@@ -38,16 +38,35 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
     }
     packet.write_short(0)?; // cooldowns
 
-    // Script markers are the server's own.
-    let started: Vec<_> = player
+    // Script markers are the server's own. A started explorer medal's info
+    // record follows, holding how many maps were visited.
+    let mut started: Vec<_> = player
         .quests
         .started()
         .filter(|quest| quest.quest_id < SCRIPT_MARKERS)
+        .map(|quest| {
+            let kills = encode_kills(player.quests.kills(quest.quest_id));
+            (quest.quest_id, kills)
+        })
         .collect();
+    let medals = (crate::quests::catalog().ok().into_iter())
+        .flat_map(|catalog| {
+            game_data::quests::EXPLORER_QUESTS
+                .iter()
+                .map(move |&id| catalog.quest(id))
+        })
+        .flatten()
+        .filter(|quest| player.quests.state(quest.id) == QuestState::Started);
+    for explored in medals.filter_map(|quest| quest.explored) {
+        if started.iter().all(|&(id, _)| id != explored.record) {
+            let count = player.quests.explored(explored.record);
+            started.push((explored.record, count.to_string()));
+        }
+    }
     packet.write_short(started.len() as i16)?;
-    for quest in started {
-        packet.write_short(quest.quest_id)?;
-        packet.write_str_with_length(&encode_kills(player.quests.kills(quest.quest_id)))?;
+    for (quest_id, progress) in started {
+        packet.write_short(quest_id)?;
+        packet.write_str_with_length(&progress)?;
     }
     let completed: Vec<_> = player.quests.completed().collect();
     packet.write_short(completed.len() as i16)?;

@@ -71,6 +71,8 @@ pub enum QuestRejection {
     Date,
     /// Fewer mesos than the quest takes.
     Mesos,
+    /// Fewer maps visited than an explorer medal needs.
+    Explored,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -215,6 +217,12 @@ pub fn check_complete(
         .is_some_and(|min| i16::from(player.stats.level) < min)
     {
         return Err(QuestRejection::Level);
+    }
+    // At least the count, as v83's own check (cond 1) has it.
+    if let Some(explored) = quest.explored {
+        if (player.quests.explored(explored.record) as u64) < u64::from(explored.needed) {
+            return Err(QuestRejection::Explored);
+        }
     }
     Ok(())
 }
@@ -418,6 +426,7 @@ mod tests {
             next_quest: None,
             auto_start: false,
             auto_complete: false,
+            explored: None,
         }
     }
 
@@ -494,6 +503,21 @@ mod tests {
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
         q.end_meso = 1;
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Mesos));
+    }
+
+    #[test]
+    fn an_explorer_title_needs_its_places_seen() {
+        let mut q = quest();
+        q.explored = Some(game_data::quests::Explored {
+            record: 27010,
+            needed: 2,
+        });
+        let mut p = player(30, 0);
+        set(&mut p, 1033, QuestState::Started);
+        p.quests.explore(27010, 100000000);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Explored));
+        p.quests.explore(27010, 101000000);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]

@@ -450,6 +450,25 @@ pub async fn set_quest(
     .await
 }
 
+/// Record that the logged-out character `character_id` has explored
+/// `map_id` toward the medal counted in quest record `record_id`.
+pub async fn explore_map(
+    character_id: i32,
+    record_id: i16,
+    map_id: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("explore map", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO explored_maps (character_id, record_id, map_id) VALUES ($1, $2, $3)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(record_id)
+        .bind::<Integer, _>(map_id)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Make the logged-out character `character_id`'s completion of quest
 /// `quest_id` look `minutes` minutes older.
 pub async fn backdate_quest(

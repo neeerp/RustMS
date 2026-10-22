@@ -3,13 +3,14 @@ use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
+use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{drop, effect, guild, inventory, npc, skill, stat};
+use net::packet::build::world::{drop, effect, guild, inventory, npc, quest, skill, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::{FieldRequest, WorldAction};
@@ -126,9 +127,7 @@ impl ClientActor {
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
-                Effect::InfoText(text) => {
-                    afterwards.push(net::packet::build::world::quest::build_info_text(text)?)
-                }
+                Effect::InfoText(text) => afterwards.push(quest::build_info_text(text)?),
                 Effect::Hint {
                     text,
                     width,
@@ -344,6 +343,33 @@ impl ClientActor {
                     packets.push(stat::build_stat_update(false, &[update])?);
                 }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
+                Effect::Explore { medal, map_id } => {
+                    let title = template(*medal)?;
+                    let Some(explored) = title.explored else {
+                        continue;
+                    };
+                    let new = next.quests.explore(explored.record, *map_id);
+                    // Starting it sends the medal's record; so does each
+                    // visit after. A forfeited medal starts again on a map
+                    // it has already counted.
+                    match next.quests.state(*medal) {
+                        QuestState::NotStarted => change = Some(QuestChange::Start(title)),
+                        _ if !new => continue,
+                        _ => packets.push(quest::build_quest_progress(
+                            *medal,
+                            next.quests.status(*medal),
+                        )?),
+                    }
+                    changed = true;
+                    let count = next.quests.explored(explored.record);
+                    packets.push(quest::build_quest_record(
+                        explored.record,
+                        &count.to_string(),
+                    )?);
+                    if new {
+                        afterwards.extend(net::medals::messages(title, count)?);
+                    }
+                }
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),

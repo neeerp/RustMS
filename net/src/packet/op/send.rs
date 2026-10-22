@@ -26,6 +26,8 @@ pub enum SendOpcode {
     MemoResult = 0x29,
     MapTransferResult = 0x2A,
     SetTamingMobInfo = 0x30,
+    /// A quest's title is earned (`u16` quest id) (0xa26d44).
+    QuestClear = 0x31,
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
@@ -68,6 +70,8 @@ pub enum SendOpcode {
     FamilyRepGain = 0x65,
     /// A senior or junior came online or left.
     FamilyNotifyLoginOrLogout = 0x66,
+    /// A line among the floating script messages (0xa13f20).
+    ScriptProgressMessage = 0x7A,
     MacroSysDataInit = 0x7C,
     SetField = 0x7D,
     SetCashShop = 0x7F,

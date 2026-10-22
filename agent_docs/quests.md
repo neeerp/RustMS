@@ -229,6 +229,36 @@ Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with
 `CharEffect::QuestClear`).
 
+## Exploration medals
+
+The explorer titles (`game_data::quests::EXPLORER_QUESTS`: 29004-29011 and
+29014) count places rather than monsters. Their `Check/1` names an info record
+(`infoNumber`, e.g. 27010 for Beginner Explorer) and the number of places
+(`infoex/0/value`), read into `QuestTemplate::explored`; completion needs at
+least that many (`QuestRejection::Explored`), and Dalair (9000040) gives the
+medal through the usual `QUEST_ACTION`.
+
+`net::medals::region` picks the medal for a map by id range, as
+`explorationPoint` does; the `highposition` touch portals count toward
+Touched the Sky (29004). A map counts once, from the medal's `lvmin`, until
+the quest is completed (`medals::explore`, `Effect::Explore`). The first
+place starts the quest. Each new place sends the info record with the count
+(SHOW_STATUS_INFO mode 1), a progress line (SCRIPT_PROGRESS_MESSAGE, 0x7A)
+and an info text; the place that reaches the count sends QUEST_CLEAR (0x31),
+the title line and the "see Dalair" text instead. The texts are the
+`medal.explorer.*` keys (placeholders until the content pack has them).
+HeavenClient doesn't handle 0x7A or 0x31 yet.
+
+Places seen are `QuestLog::explored`, keyed by the info record, and are stored
+in `explored_maps (character_id, record_id, map_id)`. They outlast a forfeit:
+the next region map, even one already seen, starts the medal again with its
+old count. At login a started medal's info record is sent among the started
+quests with its count, so the client's quest window shows it. The level gate,
+the kept places and "at least the count" have no source either way (v83ref
+`lanes/QUESTIONS.md`). Ossyria Explorer (29012) and
+Maple Explorer (29013), which need other medals and an info record 27020 that
+nothing sets, are not supported.
+
 ## Conversations in the client
 
 `Character/QuestDialogue.h` is a pure state machine over one side of

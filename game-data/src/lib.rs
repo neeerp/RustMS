@@ -533,6 +533,10 @@ impl GameData {
         self.fields.get(&map_id)
     }
 
+    pub fn field_ids(&self) -> impl Iterator<Item = i32> + '_ {
+        self.fields.keys().copied()
+    }
+
     pub fn field_exists(&self, map_id: i32) -> bool {
         self.fields.contains_key(&map_id)
     }

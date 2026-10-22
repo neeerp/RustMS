@@ -140,7 +140,8 @@ nothing. A script returns effects that the client actor sends:
 | --- | --- |
 | `go<map id>` (entry) | Map name banner, FIELD_EFFECT `maplemap/enter/<map id>` |
 | `TD_NC_title`, `TD_MC_title` (entry) | The Time Gate's and the Mushroom Kingdom's theme banners, FIELD_EFFECT `temaD/enter/<name>`: `teraForest` on `240070000`, `neoCity1`-`neoCity6` on `240070100`-`240070600`, `mushCatle` on `106020000`. Neither script is in Cosmic; the pairing is by name and by the maps' years |
-| `explorationPoint` (entry) | Lith Harbor's (`104000000`) name banner; in the Disciples' hideout (`100000006`), while 2175 is taken, the Disciple (`9300156`) comes out at (-1027, 216) unless one is out already (`Effect::BringOutMob`, under the player's control, never respawning). The exploration medals' counting isn't in |
+| `explorationPoint` (entry) | Lith Harbor's (`104000000`) name banner; in the Disciples' hideout (`100000006`), while 2175 is taken, the Disciple (`9300156`) comes out at (-1027, 216) unless one is out already (`Effect::BringOutMob`, under the player's control, never respawning). It also counts the map toward its region's exploration medal (`net::medals`, see "Exploration medals" in `quests.md`) |
+| `highposition` (touch) | Counts the map toward Touched the Sky (29004); it takes the player nowhere |
 | `infoMinimap` | `UI/tutorial.img/25` once 1031 is started |
 | `infoAttack`, `infoPickup` | `/20`, `/21` once 1035 is started |
 | `infoSkill` | `/23` once 1035 is completed |

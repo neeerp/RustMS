@@ -9,8 +9,8 @@ use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, auto_potions, character_mounts, character_quests, characters, equipment_stats,
-    gacha_exp, inventory_items, keybindings, monster_book_cards, quick_slots, saved_locations,
-    skill_macros, skills, teleport_rocks,
+    explored_maps, gacha_exp, inventory_items, keybindings, monster_book_cards, quick_slots,
+    saved_locations, skill_macros, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -190,6 +190,12 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         character_quests::table
             .filter(character_quests::character_id.eq(character_id))
             .load::<QuestProgress>(&mut conn)?,
+    )
+    .with_explored(
+        explored_maps::table
+            .filter(explored_maps::character_id.eq(character_id))
+            .select((explored_maps::record_id, explored_maps::map_id))
+            .load::<(i16, i32)>(&mut conn)?,
     );
 
     let mut player = Player::new(
@@ -454,6 +460,24 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         if !markers.is_empty() {
             diesel::insert_into(character_quests::table)
                 .values(&markers)
+                .execute(conn)?;
+        }
+        // Explorer medal visits are only ever added.
+        let visits: Vec<_> = player
+            .quests
+            .visits()
+            .map(|(record, map_id)| {
+                (
+                    explored_maps::character_id.eq(id),
+                    explored_maps::record_id.eq(record),
+                    explored_maps::map_id.eq(map_id),
+                )
+            })
+            .collect();
+        if !visits.is_empty() {
+            diesel::insert_into(explored_maps::table)
+                .values(&visits)
+                .on_conflict_do_nothing()
                 .execute(conn)?;
         }
         // Kill progress of started quests.

@@ -233,6 +233,14 @@ diesel::table! {
 }
 diesel::joinable!(monster_book_cards -> characters (character_id));
 diesel::table! {
+    explored_maps (character_id, record_id, map_id) {
+        character_id -> Int4,
+        record_id -> Int2,
+        map_id -> Int4,
+    }
+}
+diesel::joinable!(explored_maps -> characters (character_id));
+diesel::table! {
     teleport_rocks (character_id, vip, place) {
         character_id -> Int4,
         vip -> Bool,
@@ -545,6 +553,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     cash_sales,
     wish_lists,
     monster_book_cards,
+    explored_maps,
     teleport_rocks,
     skill_macros,
     saved_locations,

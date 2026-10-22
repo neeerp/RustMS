@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::SystemTime;
 
 /// Quest ids from here up are not in Quest.nx (its last is 29933). Scripts
@@ -47,13 +47,50 @@ pub struct QuestRecord {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct QuestLog {
     records: BTreeMap<i16, QuestRecord>,
+    /// The maps visited toward each explorer medal, keyed by the info
+    /// record that shows their count (27010 for Victoria's, ...). They stay
+    /// through a forfeit, so a restarted medal carries on.
+    explored: BTreeMap<i16, BTreeSet<i32>>,
 }
 
 impl QuestLog {
     pub fn from_records(records: impl IntoIterator<Item = QuestRecord>) -> Self {
         Self {
             records: records.into_iter().map(|r| (r.quest_id, r)).collect(),
+            explored: BTreeMap::new(),
         }
+    }
+
+    /// The log with these `(info record, map)` visits.
+    pub fn with_explored(mut self, visits: impl IntoIterator<Item = (i16, i32)>) -> Self {
+        for (record, map_id) in visits {
+            self.explore(record, map_id);
+        }
+        self
+    }
+
+    /// Count a visit to `map_id` toward the medal whose info record is
+    /// `record`; `false` if it was visited before.
+    pub fn explore(&mut self, record: i16, map_id: i32) -> bool {
+        self.explored.entry(record).or_default().insert(map_id)
+    }
+
+    /// Whether `map_id` was visited toward the medal with info record `record`.
+    pub fn has_explored(&self, record: i16, map_id: i32) -> bool {
+        self.explored
+            .get(&record)
+            .is_some_and(|maps| maps.contains(&map_id))
+    }
+
+    /// How many maps were visited toward the medal with info record `record`.
+    pub fn explored(&self, record: i16) -> usize {
+        self.explored.get(&record).map_or(0, BTreeSet::len)
+    }
+
+    /// Every `(info record, map)` visit.
+    pub fn visits(&self) -> impl Iterator<Item = (i16, i32)> + '_ {
+        (self.explored.iter())
+            .flat_map(|(&record, maps)| maps.iter().map(move |&map| (record, map)))
     }
 
     pub fn upsert(&mut self, record: QuestRecord) {
@@ -186,5 +223,19 @@ mod tests {
         });
         assert_eq!(log.kills(1037), []);
         assert_eq!(log.kills_mut(1037), None);
+    }
+
+    #[test]
+    fn explored_maps_count_once_and_outlast_a_forfeit() {
+        let mut log = QuestLog::default().with_explored([(27010, 100000000)]);
+        assert!(!log.explore(27010, 100000000));
+        assert!(log.explore(27010, 101000000));
+        assert!(log.explore(27011, 200000000));
+        assert_eq!(log.explored(27010), 2);
+        assert_eq!(log.explored(27012), 0);
+        log.remove(29005);
+        assert_eq!(log.explored(27010), 2);
+        assert_eq!(log.explored(27011), 1);
+        assert_eq!(log.visits().count(), 3);
     }
 }
