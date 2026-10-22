@@ -409,6 +409,11 @@ impl Inventory {
     }
 
     /// Equipped regular items (slot > -100), ordered by slot.
+    /// How many slots of `kind` are empty.
+    pub fn free(&self, kind: InventoryType) -> usize {
+        self.free_slots(kind).count()
+    }
+
     pub fn equipped_regular(&self) -> impl Iterator<Item = (i16, &Item)> {
         self.equipped
             .iter()
