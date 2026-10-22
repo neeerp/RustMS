@@ -760,10 +760,16 @@ fn hit_statuses(skill: &Learned) -> Option<Vec<(MobStat, Amount)>> {
             value(MobStat::Pdr, effect.x),
             value(MobStat::Mdr, effect.x),
         ],
+        // Hypnotize: the mob stops attacking players and other mobs may hit
+        // it (MobStat bit 28, 0x6663d2), by its `prop` for its `time`.
+        HYPNOTIZE => one(MobStat::Dazzle),
         _ => return None,
     };
     Some(statuses)
 }
+
+/// The Corsair's Hypnotize, a close gun shot that puts Dazzle on the mob.
+pub const HYPNOTIZE: i32 = 5221009;
 
 /// Elemental Boost, which adds its `damage` percent to Flamethrower's and
 /// Ice Splitter's (0x79004c) and, as its description says, its `y` seconds
@@ -1659,6 +1665,21 @@ mod tests {
                 ],
             }]
         );
+    }
+
+    #[test]
+    fn hypnotize_dazzles_by_its_prop_for_its_time() {
+        let player = knowing(&[]);
+        let hypnotize = at_level(HYPNOTIZE, 1).unwrap();
+        let [inflict] = &on_hit(&player, Some(&hypnotize), false, 0.5)[..] else {
+            panic!("one inflict");
+        };
+        assert_eq!(inflict.skill_id, HYPNOTIZE);
+        assert_eq!(inflict.prop, 43);
+        assert_eq!(inflict.duration, Duration::from_secs(21));
+        assert_eq!(inflict.statuses, [(MobStat::Dazzle, Amount::Value(1))]);
+        assert!(inflict.takes(0.42) && !inflict.takes(0.43));
+        assert!(MobStat::Dazzle.spares_bosses());
     }
 
     #[test]
