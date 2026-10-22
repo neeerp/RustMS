@@ -604,4 +604,9 @@ namespace ms
 
 		state->remove(type);
 	}
+
+	void UI::raise(UIElement::Type type)
+	{
+		state->raise(type);
+	}
 }

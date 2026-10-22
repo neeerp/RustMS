@@ -147,6 +147,9 @@ namespace ms
 
 		void remove(UIElement::Type type);
 
+		// Brings an open window to the front of its layer.
+		void raise(UIElement::Type type);
+
 	private:
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;

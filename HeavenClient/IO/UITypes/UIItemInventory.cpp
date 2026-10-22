@@ -470,6 +470,23 @@ namespace ms
 				player.request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
 		}
 
+		// v83 FUN_00a0a63f, type 0x1f: the Quick Delivery Coupon asks the
+		// server for its window, which can't open over Duey's (FUN_00a14a1c).
+		// Only a send uses it up.
+		void use_quick_delivery(int16_t slot, int32_t item_id)
+		{
+			if (auto duey = UI::get().get_element<UIDuey>(); duey && duey->is_active())
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			if (may_use_cash_item())
+				Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
+		}
+
 		// v83 FUN_00a0a63f, type 0x13: a meso sack asks before it opens. The
 		// last request is waited for only once the player says yes.
 		void use_meso_bag(int16_t slot, int32_t item_id)
@@ -1241,6 +1258,8 @@ namespace ms
 							use_meso_bag(slot, item_id);
 						else if (item_id / 10000 == 528)
 							use_cash_mist(slot, item_id);
+						else if (item_id / 10000 == 533)
+							use_quick_delivery(slot, item_id);
 						else if (morph::is_cash_morph(item_id))
 							use_cash_morph(slot, item_id);
 						else if (item_id / 10000 == 504)

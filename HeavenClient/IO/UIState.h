@@ -102,6 +102,9 @@ namespace ms
 		virtual Iterator pre_add(UIElement::Type type, bool toggled, bool focused) = 0;
 
 		virtual void remove(UIElement::Type type) = 0;
+
+		// Brings an open window to the front of its layer.
+		virtual void raise(UIElement::Type type) {}
 		
 		virtual UIElement* get(UIElement::Type type) = 0;
 

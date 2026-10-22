@@ -19,10 +19,10 @@ namespace ms
 	// or an alliance's, "'<name>'s Guild Alliance Invitation.". O accepts and X
 	// turns it down; one left alone fades out after three minutes and sends
 	// nothing. Smaller pink ones say a buddy logged in or came to the
-	// player's channel, for six seconds, with only an X. A new one replaces
-	// any of its kind still there, except buddy requests, which pile up
-	// (FUN_00a247cf). Newer notices stack above older ones, quest
-	// completions included.
+	// player's channel, for six seconds, with only an X. Duey's say a parcel
+	// came. A new one replaces any of its kind still there, except buddy
+	// requests, which pile up (FUN_00a247cf). Newer notices stack above
+	// older ones, quest completions included.
 	class UIInviteCard : public UIElement
 	{
 	public:
@@ -30,8 +30,8 @@ namespace ms
 		static constexpr bool FOCUSED = false;
 		static constexpr bool TOGGLED = false;
 
-		// v83's notice types 0, 1, 2, 5, 8, 6 and 9.
-		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, GUILD, ALLIANCE, ARRIVAL, NUM_KINDS };
+		// v83's notice types 0, 1, 2, 5, 8, 6, 9 and 10.
+		enum Kind : uint8_t { MESSENGER, BUDDY, TRADE, PARTY, GUILD, ALLIANCE, ARRIVAL, PARCEL, NUM_KINDS };
 
 		UIInviteCard();
 
@@ -46,6 +46,10 @@ namespace ms
 		void add(Kind kind, const std::string& inviter, std::function<void(bool)> answer);
 		// A buddy logged in, or came to the player's channel (FUN_00523a2c).
 		void notify(const std::string& name, bool same_channel);
+		// A parcel came (PARCEL modes 0x19 and 0x1b, FUN_00523c60), from
+		// `sender` if named. A plain one's goes in six seconds; O on a
+		// quick one's opens the parcels.
+		void parcel(const std::string& sender, bool quick);
 		// Whether a notice of `kind` is still there, even fading out.
 		bool showing(Kind kind) const;
 
@@ -73,7 +77,7 @@ namespace ms
 		// From the bottom of the stack to `notice`.
 		Point<int16_t> offset(const Notice& notice) const;
 
-		Texture background, arrival_background;
+		Texture background, arrival_background, parcel_background;
 		// Oldest first; the newest is drawn last, over the others.
 		std::vector<Notice> notices;
 		// How high the buttons sit, to move them when the stack shifts.
