@@ -492,6 +492,37 @@ namespace ms
 			return index < 3 ? LABELS[index] : -1;
 		}
 
+		// The part where the quote ring of the pet at `index` in the list
+		// is worn. With one on, the pet talks in its kind's chat balloon.
+		inline int16_t quote_part(size_t index)
+		{
+			constexpr int16_t QUOTES[3] = { 29, 32, 40 };
+
+			return index < 3 ? QUOTES[index] : -1;
+		}
+
+		// What `/pet <text>` makes a pet at `level` do (FUN_0052c40c). Below
+		// level 15 nothing. A line the curse filter changed gives its slang
+		// instead, and only to a pet not already doing an action
+		// (FUN_00705110); others say the line (FUN_007050be).
+		enum class Speech
+		{
+			NONE,
+			SAY,
+			SLANG
+		};
+
+		inline Speech speech(int16_t level, bool censored, bool acting)
+		{
+			if (level < 15)
+				return Speech::NONE;
+
+			if (!censored)
+				return Speech::SAY;
+
+			return acting ? Speech::NONE : Speech::SLANG;
+		}
+
 		// A pet in the list, as far as putting equipment on it goes.
 		struct Wearer
 		{

@@ -352,6 +352,10 @@ namespace ms
 		// the server whether it obeys (FUN_00704d5d).
 		void command_pets(const std::string &line);
 
+		// `/pet <text>`: the pets out, in list order, say the text, or do
+		// their slang if the curse filter `censored` it (FUN_0052c40c).
+		void pets_say(const std::string &text, bool censored);
+
 		// Give the pet food in USE slot `slot` to the pets (FUN_00a09905).
 		void feed_pets(int16_t slot, int32_t itemid);
 

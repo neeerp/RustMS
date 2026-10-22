@@ -28,6 +28,8 @@
 #include "../../Util/NxFiles.h"
 #include "../../Util/Randomizer.h"
 
+#include <algorithm>
+
 #include <nlnx/nx.hpp>
 
 namespace ms
@@ -429,6 +431,36 @@ namespace ms
 			return std::nullopt;
 
 		return said;
+	}
+
+	std::optional<PetLook::Said> PetLook::say(const std::string &text, bool censored, bool styled, int16_t level)
+	{
+		switch (pets::speech(level, censored, action >= 0))
+		{
+			case pets::Speech::SAY:
+			{
+				Said said = { 2, 0, text };
+				act(said, styled);
+
+				return said;
+			}
+			case pets::Speech::SLANG:
+			{
+				const PetData &data = PetData::get(itemid);
+				const pets::Command *slang = pets::food_for(data.get_slang(), level);
+
+				if (!slang || slang->success.empty())
+					return std::nullopt;
+
+				// The pet shows the slang's action, but only its line is sent.
+				Said said = pick(2, slang->success, data.get_customs());
+				act({ 2, std::max<int16_t>(said.action, 0), said.text }, styled);
+
+				return Said{ 2, 0, said.text };
+			}
+			default:
+				return std::nullopt;
+		}
 	}
 
 	void PetLook::show_effect(uint8_t kind)

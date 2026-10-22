@@ -198,6 +198,16 @@ beside it.
   nothing. Base actions loop until the pet moves, its own play once, and
   any movement ends them. A command answered with one of the pet's own
   animations also plays its sound from `Sound.nx Pet.img/<id>`.
+- **`/pet <text>`.** The chat bar sends this to the pets out, not the
+  server (report c030). Text the curse filter won't take (`CurseData::valid`)
+  gets the "Cursing is not allowed." box. Otherwise each pet of level 15 or
+  more says it as PET_CHAT kind 2, action 0, in its kind's balloon if it
+  wears a quote ring (`Player::pets_say`). If the filter starred a word,
+  a pet not doing an action shows its `slang` instead: the first `slang/N`
+  whose levels hold its level, its act and one of its lines. Only the line
+  is sent, still with action 0. Only the Snail's slang reaches level 15, so
+  other pets do nothing. v83's chat-ban check on slang isn't kept, as HC
+  has no chat ban.
 - **Balloons.** Pets speak in `UI ChatBalloon.img/pet/<style>` for 5 s:
   the pet's `info/chatBalloon` when the packet's flag is set, else 0
   (`ChatBalloon::pet`, report c032). A style the file lacks shows nothing.

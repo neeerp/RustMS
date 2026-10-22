@@ -79,6 +79,16 @@ namespace ms
 							 reactions(entry["fail"], dialog) });
 		}
 
+		nl::node slangs = src["slang"];
+
+		for (int i = 0; slangs[std::to_string(i)]; i++)
+		{
+			nl::node entry = slangs[std::to_string(i)];
+
+			slang.push_back({ static_cast<int16_t>(entry["l0"].get_integer()),
+							  static_cast<int16_t>(entry["l1"].get_integer()), {}, { reaction(entry, dialog) }, {} });
+		}
+
 		idle = reactions(src["randAction"], dialog);
 		no_potion[0] = dialog["e_NOHPPotion"].get_string();
 		no_potion[1] = dialog["e_NOMPPotion"].get_string();
@@ -111,6 +121,11 @@ namespace ms
 	const std::vector<pets::Command> &PetData::get_food() const
 	{
 		return food;
+	}
+
+	const std::vector<pets::Command> &PetData::get_slang() const
+	{
+		return slang;
 	}
 
 	const std::vector<pets::Reaction> &PetData::get_idle() const

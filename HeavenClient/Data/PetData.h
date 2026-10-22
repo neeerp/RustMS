@@ -47,6 +47,10 @@ namespace ms
 		// How it answers food by level (food/N), with no words.
 		const std::vector<pets::Command> &get_food() const;
 
+		// What it does instead of saying a cursing `/pet` line, by level
+		// (slang/N, one answer each).
+		const std::vector<pets::Command> &get_slang() const;
+
 		// What it may do when left standing (randAction).
 		const std::vector<pets::Reaction> &get_idle() const;
 
@@ -68,6 +72,7 @@ namespace ms
 		int8_t name_tag;
 		std::vector<pets::Command> commands;
 		std::vector<pets::Command> food;
+		std::vector<pets::Command> slang;
 		std::vector<pets::Reaction> idle;
 		std::vector<std::string> customs;
 		std::string no_potion[2];

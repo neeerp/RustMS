@@ -2031,6 +2031,24 @@ namespace ms
 		}
 	}
 
+	void Player::pets_say(const std::string &text, bool censored)
+	{
+		for (size_t i = 0; i < pets.size(); i++)
+		{
+			PetLook &pet = pets[i];
+
+			if (!pet.get_itemid())
+				break;
+
+			// A pet wearing a quote ring talks in its kind's balloon.
+			bool styled = look.get_pet_parts().count(pets::quote_part(i)) > 0;
+			int16_t level = inventory.get_pet_level(pet.get_serial());
+
+			if (std::optional<PetLook::Said> said = pet.say(text, censored, styled, level))
+				PetChatPacket(pet.get_serial(), said->type, said->action, said->text).dispatch();
+		}
+	}
+
 	void Player::feed_pets(int16_t slot, int32_t itemid)
 	{
 		// Whether a pet is out is the server's to check.

@@ -83,7 +83,8 @@ namespace ms
 		// What a pet does and says, as PET_CHAT (0xA8) sends it.
 		struct Said
 		{
-			// 0 a command's answer, 1 food's, 3 one of its own.
+			// 0 a command's answer, 1 food's, 2 a `/pet` line, 3 one of its
+			// own.
 			uint8_t type;
 			int16_t action;
 			std::string text;
@@ -106,6 +107,11 @@ namespace ms
 		// PET_COMMAND (174) for food: whether it enjoyed it. Picks the food
 		// answer for its level, shows it and returns it to send.
 		std::optional<Said> eat(bool enjoyed, bool styled, int16_t level);
+
+		// `/pet <text>`: the pet at `level` says `text`, or does its slang
+		// if the curse filter `censored` it (pets::speech). Shows it and
+		// returns what to send, always action 0 (FUN_007050be).
+		std::optional<Said> say(const std::string &text, bool censored, bool styled, int16_t level);
 
 		// Plays `Sound.nx Pet.img/<id>/eat`, if it has one.
 		void play_eat_sound() const;
