@@ -102,6 +102,7 @@ impl ClientActor {
         let mut packets = Vec::new();
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
+        let mut open_npc = None;
         let mut warp = None;
         let mut name_guild = false;
         let mut grow_guild = None;
@@ -133,6 +134,7 @@ impl ClientActor {
                     height,
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
+                Effect::OpenNpc(npc_id) => open_npc = Some(*npc_id),
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);
@@ -414,6 +416,9 @@ impl ClientActor {
             {
                 Box::pin(self.start_script(script)).await?;
             }
+        }
+        if let Some(npc_id) = open_npc {
+            Box::pin(self.open_npc(npc_id)).await?;
         }
         // These change the player themselves, so they wait for the commit.
         if let Some(from) = grow_guild {

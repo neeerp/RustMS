@@ -18,6 +18,21 @@ impl ClientActor {
         if field != game.field.key {
             return Ok(());
         }
+        self.talk_to(npc_id).await
+    }
+
+    /// Open `npc_id`'s conversation without a click, as a portal does, but
+    /// not over one the player is in already.
+    pub(super) async fn open_npc(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
+        if self.script.is_some() || self.conversation.is_some() {
+            return Ok(());
+        }
+        self.talk_to(npc_id).await
+    }
+
+    /// Whatever `npc_id` has to say: its script, its shop or storage, or its
+    /// speech.
+    async fn talk_to(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
         self.conversation = None;
         if npc_id == net::npc_scripts::HERACLE || npc_id == net::npc_scripts::LEA {
             return self.talk_about_guild(npc_id).await;
