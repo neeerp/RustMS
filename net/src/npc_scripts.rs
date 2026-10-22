@@ -805,6 +805,18 @@ impl NpcScript {
         tory(entry)
     }
 
+    /// Growlie's, Tommy's or Tory's script on Primrose Hill's maps, for a
+    /// player in the party quest there, who may be its `leader`, and whose
+    /// party may have `won` it.
+    pub fn on_primrose_hill(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
+        match npc_id {
+            GROWLIE => growlie(player, leader, won),
+            TOMMY => tommy(player, leader, won),
+            TORY => tory_after(player, won),
+            _ => None,
+        }
+    }
+
     /// Cloto's script on the party quest's stages, for `player`, who
     /// stands with her as `view`. A leader answering a puzzle gets
     /// `cloto_answer` instead.
@@ -912,8 +924,9 @@ impl NpcScript {
             CRANE => crane(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
-            GROWLIE => growlie(player),
-            TOMMY => tommy(player),
+            GROWLIE => growlie(player, false, false),
+            TOMMY => tommy(player, false, false),
+            TORY => tory_after(player, false),
             JEFF => Some(jeff(player)),
             TIME_GATE => Some(time_gate(player)),
             SHANE => Some(shane(player)),
@@ -1915,10 +1928,14 @@ fn hpq_terms(key: &str) -> String {
     )
 }
 
-/// Growlie (Cosmic `1012114`) on Primrose Hill: what the place is, and the
-/// way out.
-fn growlie(player: &Player) -> Option<NpcScript> {
-    if !events::HPQ.holds(player.stats.map_id) {
+/// The rice cakes Growlie wants for the party quest's one stage.
+const CAKES_WANTED: i16 = 10;
+
+/// Growlie (Cosmic `1012114`) on Primrose Hill: what the place is, the way
+/// out, and for the party's leader until the party has `won`, the hand-in
+/// of 10 rice cakes, which wins the party quest.
+fn growlie(player: &Player, leader: bool, won: bool) -> Option<NpcScript> {
+    if player.stats.map_id != events::HPQ.entry {
         return None;
     }
     let about = keys::HPQ_GROWLIE_ABOUT_PAGES
@@ -1930,31 +1947,108 @@ fn growlie(player: &Player) -> Option<NpcScript> {
         on_yes: vec![Effect::Warp(events::HPQ.exit)],
         on_no: Some(text(keys::HPQ_GROWLIE_STAY)),
     }];
-    Some(NpcScript::new(
+    let mut choices = vec![(text(keys::HPQ_GROWLIE_ABOUT), about)];
+    let n = CAKES_WANTED.to_string();
+    let short = content::text().get(keys::HPQ_GROWLIE_CAKES_SHORT, &[("n", &n)]);
+    if leader && !won {
+        let held = player.inventory.count(events::RICE_CAKE);
+        let cakes = if held >= i32::from(CAKES_WANTED) {
+            Page::Act {
+                text: text(keys::HPQ_GROWLIE_CAKES_OK),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: events::RICE_CAKE,
+                        quantity: CAKES_WANTED,
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(1)),
+                ],
+            }
+        } else {
+            Page::Say(short.clone())
+        };
+        choices.push((text(keys::HPQ_GROWLIE_CAKES), vec![cakes]));
+    }
+    choices.push((text(keys::HPQ_GROWLIE_LEAVE), leave));
+    let mut script = NpcScript::new(
         GROWLIE,
         vec![Page::Menu {
             text: text(keys::HPQ_GROWLIE_MENU),
-            choices: vec![
-                (text(keys::HPQ_GROWLIE_ABOUT), about),
-                (text(keys::HPQ_GROWLIE_LEAVE), leave),
-            ],
+            choices,
         }],
-    ))
+    );
+    // The cakes dropped since the menu opened.
+    script.refused = Some(short);
+    Some(script)
 }
 
-/// Tommy (Cosmic `1012113`) at Primrose Hill's way out sends players back
-/// to Henesys Park.
-fn tommy(player: &Player) -> Option<NpcScript> {
-    (player.stats.map_id == events::HPQ.exit).then(|| {
-        NpcScript::new(
-            TOMMY,
-            vec![Page::Ask {
-                text: text(keys::HPQ_TOMMY_HOME),
-                on_yes: vec![Effect::Warp(events::HPQ.lobby)],
+/// Tommy (Cosmic `1012113`): where the party that won Primrose Hill comes
+/// out, he tells of Pig Town and its leader may take the party there; in
+/// Pig Town he lets players out to its exit; at Primrose Hill's way out he
+/// sends players back to Henesys Park.
+fn tommy(player: &Player, leader: bool, won: bool) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let bonus = events::HPQ.bonus.as_ref()?;
+    let pages = if map_id == events::HPQ.exit {
+        vec![Page::Ask {
+            text: text(keys::HPQ_TOMMY_HOME),
+            on_yes: vec![Effect::Warp(events::HPQ.lobby)],
+            on_no: None,
+        }]
+    } else if Some(map_id) == events::HPQ.clear_map {
+        let go = if leader && won {
+            Page::Ask {
+                text: text(keys::HPQ_TOMMY_PIGS_ASK),
+                on_yes: vec![Effect::EventCommand(EventCommand::StartBonus)],
                 on_no: None,
-            }],
-        )
-    })
+            }
+        } else {
+            Page::Say(text(keys::HPQ_TOMMY_PIGS_LEADER))
+        };
+        vec![Page::Say(text(keys::HPQ_TOMMY_PIGS)), go]
+    } else if map_id == bonus.map {
+        vec![Page::Ask {
+            text: text(keys::HPQ_TOMMY_PIGS_LEAVE),
+            on_yes: vec![Effect::Warp(bonus.exit)],
+            on_no: None,
+        }]
+    } else {
+        return None;
+    };
+    Some(NpcScript::new(TOMMY, pages))
+}
+
+/// Tory (Cosmic `1012112`) where the party that won Primrose Hill comes out,
+/// and at Pig Town's exit: she gives each member who comes to her the
+/// reward and sends them home, so nobody gets it twice. Without the win
+/// she only sends them home.
+fn tory_after(player: &Player, won: bool) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let bonus = events::HPQ.bonus.as_ref()?;
+    if Some(map_id) != events::HPQ.clear_map && map_id != bonus.exit {
+        return None;
+    }
+    let page = if won {
+        Page::Ask {
+            text: text(keys::HPQ_TORY_REWARD_ASK),
+            on_yes: vec![
+                Effect::GiveItem {
+                    item_id: events::HPQ_REWARD,
+                    quantity: 1,
+                },
+                Effect::Warp(events::HPQ.lobby),
+            ],
+            on_no: None,
+        }
+    } else {
+        Page::Ask {
+            text: text(keys::HPQ_TORY_HOME_ASK),
+            on_yes: vec![Effect::Warp(events::HPQ.lobby)],
+            on_no: None,
+        }
+    };
+    let mut script = NpcScript::new(TORY, vec![page]);
+    script.inventory_full = Some(text(keys::HPQ_TORY_REWARD_FULL));
+    Some(script)
 }
 
 /// Cloto (Cosmic `9020001`). On stage 1 each member but the leader is

@@ -6,8 +6,9 @@ exit and timer, stage 1 (Cloto's quiz), stages 2 to 4 (her puzzles of
 areas to stand on), with their clears and the gates on, and stage 5 (ten
 passes), which wins it. The rewards and the bonus stage come next (see
 `v83ref/reports/a005-instancing-kpq.md`, section 3, `a011-kpq-stage1.md`
-and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) has its entry,
-exit and timer so far (`v83ref/reports/a058-henesys-pq.md`).
+and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
+through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
+bonus (`v83ref/reports/a058-henesys-pq.md`).
 
 ## Rules
 
@@ -61,7 +62,8 @@ exit and timer so far (`v83ref/reports/a058-henesys-pq.md`).
    otherwise they drop it. While a
    member holds a ticket, `change_field` uses `field_key`, so the event's
    maps resolve to its copy. On arrival the client is sent the countdown
-   (`show_event_clock`), unless the event is won.
+   (`show_event_clock`) while the ticket has a deadline (`EventTicket::clock`,
+   none once the event is won until a bonus starts).
 5. **Leaving.** A ticket hands itself back when dropped
    (`EventMessage::Left`), including one that never reached its member.
    Each of these ways out drops it and stops the clock:
@@ -179,7 +181,7 @@ The clear is a stage clear like the others, and then wins the event
 
 - The deadline goes (`ends` is `None`), and every member is sent
   STOP_CLOCK with the clear. Coming onto one of the event's maps after
-  that shows no clock (`EventTicket::won`).
+  that shows no clock (the ticket's `clock` is `None`).
 - `Team::win`: the event no longer ends when the leader leaves or too few
   remain, only when the last member leaves its maps or the game.
 - The lobby is freed at once (`EventClosed`, said again when the event
@@ -201,7 +203,8 @@ leader, goes like this (`EventActor::clear`):
    member who sees the clear can go on.
 2. Every member gets `ServerMessage::StageCleared{id, stage}`. Those on
    the stage's map are shown FIELD_EFFECT 3 `quest/party/clear`, 4
-   `Party1/Clear` (the sound), and 2 `gate` (every stage map has one).
+   `Party1/Clear` (the sound), and 2 `gate` for an event whose stage maps
+   have one (`Event::gates`: KPQ's do, HPQ's doesn't).
    Everyone in the event, wherever they are in it, gets the stage's EXP
    as quest EXP (`Event::exp_per_stage`: 100, 200, 400, 800, 1500,
    Cosmic's, though not scaled by an EXP rate as Cosmic's is). A member in
@@ -272,6 +275,35 @@ failed (`ServerMessage::EventFailed`, `EventCommand::Fail`), which ends it
 and sends everyone to the way out, unless it is already won. Players'
 mists don't reach a friendly mob either.
 
+## Henesys's win and Pig Town
+
+On 910010000 the party's leader hands Growlie (1012114) ten rice cakes
+(`RICE_CAKE`, his menu shows the choice to the leader only): he takes them
+(`ClearStage(1)`), which is the quest's one stage, so it is a clear (1600
+EXP, the clear effect and sound, no gate) and the win. An event with a
+`clear_map` then moves everyone in it there (`EventActor::move_team`,
+`ServerMessage::EventMoved`, Cosmic `warpEventTeam`): HPQ's is 910010100.
+Cosmic also kills the mobs that aren't friendly; we don't, since everyone
+leaves the map at once.
+
+On 910010100 Tory (1012112) gives each member who comes to her the reward
+(`HPQ_REWARD`, `4001158` x1) and sends them home, so nobody gets it twice;
+with a full Etc tab she says `hpq.tory.reward.full` and keeps them. The
+item and the once-per-member rule are recommended defaults in
+`v83ref/lanes/QUESTIONS.md` (row 180, 2A and 3A). Tommy (1012113) tells
+of Pig Town; the leader may take everyone still in the event there
+(`EventCommand::StartBonus`, once): the event moves them to the bonus map
+(`Event::bonus`, 910010200) with a new deadline of 5 minutes (shortened
+like events' time), which their clients show. In Pig Town Tommy lets a
+player out to its exit (910010400), where the bonus's clock still shows
+until it runs out, as Cosmic shows an event's timer on any of its maps. When the bonus's time is up, those
+still in Pig Town are moved to its exit with the clock stopped, and the
+event carries on, won, until its last member leaves (`time_up`). On
+910010400 Tory gives the reward and sends them home too. A copy's NPCs
+talk this way only to a player holding its ticket
+(`NpcScript::on_primrose_hill`); without one, Tory and Tommy only send
+players home.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -281,7 +313,10 @@ mists don't reach a friendly mob either.
 | Nella 9020002 | 103000800-805 | Out to 103000890 |
 | Nella 9020002 | 103000890 | Home to 103000000 |
 | Tory 1012112 | 100000200 | Runtime (`talk_about_event`): a menu of going up and how it is played |
-| Growlie 1012114 | 910010000 | How it is played, or out to 910010300 |
+| Growlie 1012114 | 910010000 | How it is played, the leader's rice cakes, or out to 910010300 |
+| Tory 1012112 | 910010100, 910010400 | The reward once won, and home to 100000200 |
+| Tommy 1012113 | 910010100 | Pig Town: the leader may take the party there once won |
+| Tommy 1012113 | 910010200 | Out to 910010400 |
 | Tommy 1012113 | 910010300 | Home to 100000200 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
@@ -293,8 +328,6 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- HPQ's play: Growlie's hand-in of the rice cakes, Tory's reward, and
-  Tommy's Pig Town bonus (a058, slice 4).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

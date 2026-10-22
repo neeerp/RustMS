@@ -48,6 +48,29 @@ pub struct Event {
     /// The passes the leader hands Cloto to clear the last stage, which
     /// wins the event.
     pub passes: i32,
+    /// Whether each stage map has a `gate` object, shown once its stage is
+    /// cleared.
+    pub gates: bool,
+    /// Where the whole team goes on winning, if anywhere.
+    pub clear_map: Option<i32>,
+    /// The bonus the leader may take the team to once it is won.
+    pub bonus: Option<Bonus>,
+}
+
+/// A won event's bonus: the team plays `map` for `minutes`, then whoever is
+/// still there goes on to `exit`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Bonus {
+    pub map: i32,
+    pub exit: i32,
+    pub minutes: u64,
+}
+
+impl Bonus {
+    /// How long the bonus lasts, shortened like the event's time.
+    pub fn duration(&self) -> Duration {
+        scaled(Duration::from_secs(self.minutes * 60))
+    }
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
@@ -69,12 +92,18 @@ pub const KPQ: Event = Event {
     puzzles: 2..=4,
     items: &[COUPON, PASS],
     passes: 10,
+    gates: true,
+    clear_map: None,
+    bonus: None,
 };
 
 /// Henesys's party quest on Primrose Hill (Cosmic `HenesysPQ`: maps
 /// 910010000-400, of which 910010300 is the way out, 3 to 6 players from
 /// level 10, 10 minutes). One stage, played on 910010000, cleared by
 /// bringing Growlie 10 rice cakes; the seeds and cakes are the quest's own.
+/// Winning takes the team to 910010100, from where Tommy may take it to
+/// Pig Town (910010200) for 5 minutes, which ends at 910010400 (Cosmic
+/// `1012113`, `scheduledTimeout`).
 pub const HPQ: Event = Event {
     lobby: 100_000_200,
     maps: 910_010_000..=910_010_400,
@@ -90,10 +119,22 @@ pub const HPQ: Event = Event {
         4001095, 4001096, 4001097, 4001098, 4001099, 4001100, RICE_CAKE,
     ],
     passes: 10,
+    gates: false,
+    clear_map: Some(910_010_100),
+    bonus: Some(Bonus {
+        map: 910_010_200,
+        exit: 910_010_400,
+        minutes: 5,
+    }),
 };
 
 /// What the Moon Bunny makes on Primrose Hill, and Growlie wants.
 pub const RICE_CAKE: i32 = 4001101;
+
+/// What Tory gives each member of a party that won Henesys's party quest,
+/// once (Cosmic `setEventRewards`; the default in
+/// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, row 180).
+pub const HPQ_REWARD: i32 = 4001158;
 
 impl EventKind {
     pub fn event(self) -> &'static Event {
@@ -316,6 +357,8 @@ pub enum EventCommand {
     /// The party lost what it was to protect (the Moon Bunny): the event
     /// ends for everyone, unless it is won.
     Fail,
+    /// The leader takes the team that won to the event's bonus.
+    StartBonus,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
