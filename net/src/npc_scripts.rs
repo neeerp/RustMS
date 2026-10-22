@@ -2556,6 +2556,9 @@ fn nella(player: &Player) -> Option<NpcScript> {
 /// hears what its stage asks, then hands in what it takes, which clears the
 /// stage; the others are sent to fetch them.
 fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
+    if hand_in.npc == EAK {
+        return eak_hand_in(hand_in, view, player);
+    }
     let item = hand_in.item.to_string();
     let n = hand_in.count.to_string();
     let get = |key| content::text().get(key, &[("item", &item), ("n", &n)]);
@@ -2581,6 +2584,49 @@ fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(hand_in.npc, vec![page]);
     // The items dropped since the page opened.
     script.refused = Some(short);
+    script
+}
+
+/// Eak in the walkway and the lounge (Cosmic `2013001`): he takes what the
+/// leader gathered for a piece of the statue, which clears the room.
+/// Cosmic lets the walkway's be handed in twice; here a cleared room only
+/// sends the team on.
+fn eak_hand_in(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
+    let item = hand_in.item.to_string();
+    let n = hand_in.count.to_string();
+    let piece = hand_in.prize.unwrap_or_default().to_string();
+    let vars = [
+        ("item", item.as_str()),
+        ("n", n.as_str()),
+        ("piece", piece.as_str()),
+    ];
+    let get = |key| content::text().get(key, &vars);
+    let short = get(keys::OPQ_EAK_HAND_IN);
+    let page = match view {
+        Balloon::Cleared => Page::Say(text(keys::OPQ_EAK_ROOM_CLEARED)),
+        Balloon::NotLeader => Page::Say(text(keys::OPQ_EAK_LEADER_ONLY)),
+        Balloon::Ready if player.inventory.count(hand_in.item) >= i32::from(hand_in.count) => {
+            let mut effects = vec![Effect::TakeItem {
+                item_id: hand_in.item,
+                quantity: hand_in.count,
+            }];
+            effects.extend(hand_in.prize.map(|item_id| Effect::GiveItem {
+                item_id,
+                quantity: 1,
+            }));
+            effects.push(Effect::EventCommand(EventCommand::ClearStage(
+                hand_in.stage,
+            )));
+            Page::Act {
+                text: get(keys::OPQ_EAK_PIECE),
+                effects,
+            }
+        }
+        Balloon::Intro | Balloon::Ready | Balloon::Answer { .. } => Page::Say(short.clone()),
+    };
+    let mut script = NpcScript::new(EAK, vec![page]);
+    script.refused = Some(short);
+    script.inventory_full = Some(text(keys::OPQ_EAK_FULL));
     script
 }
 
@@ -6069,6 +6115,47 @@ mod tests {
         for hand_in in events::LPQ.hand_ins {
             assert!(lpq_balloon_intro(hand_in.stage).ends_with(&hand_in.stage.to_string()));
         }
+    }
+
+    #[test]
+    fn eak_trades_a_rooms_gatherings_for_a_piece_of_the_statue_at_once() {
+        let lounge = events::OPQ.hand_in(6).unwrap();
+        let holding = |quantity| hunter(&[(4_001_052, quantity)], &[]);
+        let says = |view, quantity| {
+            let page = NpcScript::balloon(lounge, view, &holding(quantity)).begin();
+            assert_eq!(kind(&page), Some(0));
+            (page_text(&page), page.effects)
+        };
+        let short = content::text().get(keys::OPQ_EAK_HAND_IN, &[("item", "4001052"), ("n", "40")]);
+        for (view, said) in [
+            (Balloon::Cleared, text(keys::OPQ_EAK_ROOM_CLEARED)),
+            (Balloon::NotLeader, text(keys::OPQ_EAK_LEADER_ONLY)),
+            (Balloon::Ready, short),
+        ] {
+            let (page, effects) = says(view, 39);
+            assert!(page.contains(&said), "{page}");
+            assert!(effects.is_empty());
+        }
+        let (said, effects) = says(Balloon::Ready, 40);
+        let piece = content::text().get(keys::OPQ_EAK_PIECE, &[("piece", "4001048")]);
+        assert!(said.contains(&piece), "{said}");
+        assert_eq!(
+            effects,
+            [
+                Effect::TakeItem {
+                    item_id: 4_001_052,
+                    quantity: 40
+                },
+                Effect::GiveItem {
+                    item_id: 4_001_048,
+                    quantity: 1
+                },
+                Effect::EventCommand(EventCommand::ClearStage(6))
+            ]
+        );
+        let mut script = NpcScript::balloon(lounge, Balloon::Ready, &holding(40));
+        assert_eq!(script.npc_id, EAK);
+        assert!(script.refused().is_some());
     }
 
     #[test]

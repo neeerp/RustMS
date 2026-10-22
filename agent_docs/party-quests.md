@@ -11,8 +11,9 @@ through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
-its entry and exit, its cloud stage, and the hub's ways into its rooms so
-far; the rooms' stages, the garden and the win come in later slices
+its entry and exit, its cloud stage, the hub's ways into its rooms, and
+two of the rooms, the walkway and the lounge, so far; the other rooms, the
+garden and the win come in later slices
 (`v83ref/reports/a077-orbis-pq.md`).
 
 ## Rules
@@ -431,6 +432,27 @@ leads back to its own portal on the hub (`OPQ_ROOMS_OUT`). The storage's
 `party3_room8` stays shut with a pink line (`opq.notice.storage_closed`)
 until the garden is played.
 
+## Orbis's walkway and lounge
+
+In two of the rooms Eak takes what the team gathered for a piece of the
+statue (`Event::hand_ins`, `opq_hand_in`): on the walkway 920010200
+(stage 2) 30 of 4001050 for 4001044, and in the lounge 920010600 (stage 6)
+40 of 4001052 for 4001048 (Cosmic `2013001`, `statusStg1` and
+`statusStg5`). They go through the balloons' path (`talk_to_balloon`,
+`EventTicket::balloon`), but `HandIn::intro` is false: the leader need not
+hear the stage out first, and `HandIn::prize` is the piece Eak gives with
+the clear (`eak_hand_in`). A leader short of them hears what to bring
+(`opq.eak.hand_in`), anyone else is sent to the leader
+(`opq.eak.leader_only`), and once the room is cleared he only sends the
+team on (`opq.eak.room_cleared`). Cosmic lets the walkway's be handed in
+again after the clear; here they can't.
+
+The leader sets each piece in its scar on the hub (reactors 2008000 to
+2008005, `Action::Hold`): dropping the right piece on it takes it to its
+last state, where it stays (`reactors::stays`) and keeps showing the piece.
+2008003 takes 4001044, 2008004 4001048; the others are for the rooms still
+to come.
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
@@ -527,6 +549,7 @@ EXP at the reward.
 | Wonky 2013000 | 920010000 | Out to 920011200 |
 | Eak 2013001 | 920010000 | Runtime (`opq_eak`): out of the light; the leader clears the cloud stage, the others go up to `st00` |
 | Eak 2013001 | 920010100 | Runtime (`opq_eak`): the six pieces, to the leader only |
+| Eak 2013001 | 920010200, 920010600 | Runtime (`eak_hand_in`): 30 of 4001050 / 40 of 4001052 for a piece of the statue, clearing the room |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

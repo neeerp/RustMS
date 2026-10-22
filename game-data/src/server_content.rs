@@ -421,6 +421,14 @@ pub mod keys {
     /// Told to a player at the hub's storage door while it is shut (a pink
     /// line).
     pub const OPQ_NOTICE_STORAGE_CLOSED: &str = "opq.notice.storage_closed";
+    /// Eak in a room, asking for `{n}` of `{item}`.
+    pub const OPQ_EAK_HAND_IN: &str = "opq.eak.hand_in";
+    /// Eak giving the leader `{piece}`, a piece of the statue.
+    pub const OPQ_EAK_PIECE: &str = "opq.eak.piece";
+    /// Eak in a room already cleared, sending the team on.
+    pub const OPQ_EAK_ROOM_CLEARED: &str = "opq.eak.room_cleared";
+    /// Eak to a leader with no room in ETC for the piece.
+    pub const OPQ_EAK_FULL: &str = "opq.eak.full";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1729,6 +1737,10 @@ mod tests {
             keys::PET_NOTE_HELD,
             keys::PET_NOTE_NOTHING,
             keys::PET_SECRET_NO_SNACK,
+            keys::OPQ_EAK_HAND_IN,
+            keys::OPQ_EAK_PIECE,
+            keys::OPQ_EAK_ROOM_CLEARED,
+            keys::OPQ_EAK_FULL,
         ];
         for key in named
             .iter()

@@ -79,13 +79,19 @@ pub struct Event {
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
-/// (Ludibrium's balloons, Cosmic `2040036`-`2040044`).
+/// (Ludibrium's balloons, Cosmic `2040036`-`2040044`; Eak in two of the
+/// Tower of Goddess's rooms).
 #[derive(Debug, PartialEq, Eq)]
 pub struct HandIn {
     pub stage: u8,
     pub npc: i32,
     pub item: i32,
     pub count: i16,
+    /// What `npc` gives the leader for them, if anything.
+    pub prize: Option<i32>,
+    /// Whether the leader first hears what the stage asks, and only then
+    /// may hand them in (Ludibrium's `statusStg`); Eak takes them at once.
+    pub intro: bool,
 }
 
 /// Where a member stands with a stage's `HandIn` NPC.
@@ -398,6 +404,21 @@ const fn lpq_hand_in(stage: u8, npc: i32, item: i32, count: i16) -> HandIn {
         npc,
         item,
         count,
+        prize: None,
+        intro: true,
+    }
+}
+
+/// One of the Tower of Goddess's rooms: Eak takes `count` of `item` from
+/// the leader for a piece of Minerva's statue, `piece`.
+const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
+    HandIn {
+        stage,
+        npc: crate::npc_scripts::EAK,
+        item,
+        count,
+        prize: Some(piece),
+        intro: false,
     }
 }
 
@@ -416,8 +437,9 @@ const fn lpq_hand_in(stage: u8, npc: i32, item: i32, count: i16) -> HandIn {
 /// are the six rooms off the tower's hub (920010100), each holding a piece
 /// of the statue; 8 is the garden (920010800); and 9, the win, is Minerva's
 /// statue on the hub. Each of the first seven gives 3500 EXP (Cosmic
-/// `giveEventPlayersExp`). Only the cloud stage is played yet, so it can't
-/// be won.
+/// `giveEventPlayersExp`). The cloud stage and two of the rooms, the walkway
+/// and the lounge, where Eak takes what the team gathered, are played so far,
+/// so it can't be won.
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
@@ -446,7 +468,12 @@ pub const OPQ: Event = Event {
     areas_taken: 0,
     items: &OPQ_ITEMS,
     passes: 0,
-    hand_ins: &[],
+    hand_ins: &[
+        // The walkway's pixies' 30 (Cosmic `2013001`, `statusStg1`).
+        opq_hand_in(2, 4_001_050, 30, 4_001_044),
+        // The 40 from the lounge's rooms (`statusStg5`).
+        opq_hand_in(6, 4_001_052, 40, 4_001_048),
+    ],
     gates: false,
     clear_map: Some(920_011_300),
     bonus: None,
@@ -1057,6 +1084,24 @@ mod tests {
         assert_eq!((boss.stage, boss.item, boss.count), (9, LPQ_KEY, 1));
         assert_eq!(boss.stage, LPQ.last_stage());
         assert_eq!(KPQ.hand_in(1), None);
+    }
+
+    #[test]
+    fn eak_takes_the_walkways_and_the_lounges_gatherings_without_an_intro() {
+        let walkway = OPQ
+            .hand_in_on(920_010_200, crate::npc_scripts::EAK)
+            .unwrap();
+        assert_eq!(
+            (walkway.stage, walkway.item, walkway.count, walkway.prize),
+            (2, 4_001_050, 30, Some(4_001_044))
+        );
+        let lounge = OPQ
+            .hand_in_on(920_010_600, crate::npc_scripts::EAK)
+            .unwrap();
+        assert_eq!((lounge.stage, lounge.prize), (6, Some(4_001_048)));
+        assert!(!walkway.intro && !lounge.intro);
+        assert_eq!(OPQ.hand_in_on(920_010_000, crate::npc_scripts::EAK), None);
+        assert!(LPQ.hand_ins.iter().all(|h| h.intro && h.prize.is_none()));
     }
 
     #[test]
