@@ -118,7 +118,8 @@ impl Bonus {
 /// Cosmic's; `next00` leads on from 103000800-803, and 800-804 each have a
 /// `gate` object (Map.nx). Stages 2 to 4 are Cloto's ropes, platforms and
 /// barrels; stage 5's monsters drop the 10 passes that clear it (Cosmic
-/// `9020001`, `clearPQ`).
+/// `9020001`, `clearPQ`). After the win Cloto gives each member a reward
+/// and sends them to `KPQ_BONUS`, which has no time limit.
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
@@ -139,6 +140,58 @@ pub const KPQ: Event = Event {
     clear_map: None,
     bonus: None,
 };
+
+/// Kerning City's bonus stage, 103000805, where the members of a team that
+/// won go one by one from Cloto, and stay until they leave by Nella.
+pub const KPQ_BONUS: i32 = 103_000_805;
+
+/// What Cloto may give each member of a team that won Kerning City's party
+/// quest: one of these items, and how many, all equally likely (Cosmic
+/// `KerningPQ` `setEventRewards`).
+pub const KPQ_REWARDS: [(i32, i16); 42] = [
+    (2040505, 1),
+    (2040514, 1),
+    (2040502, 1),
+    (2040002, 1),
+    (2040602, 1),
+    (2040402, 1),
+    (2040802, 1),
+    (1032009, 1),
+    (1032004, 1),
+    (1032005, 1),
+    (1032006, 1),
+    (1032007, 1),
+    (1032010, 1),
+    (1032002, 1),
+    (1002026, 1),
+    (1002089, 1),
+    (1002090, 1),
+    (2000003, 80),
+    (2000001, 80),
+    (2000002, 80),
+    (2000006, 50),
+    (2022003, 5),
+    (2022000, 15),
+    (2000004, 15),
+    (4003000, 30),
+    (4010000, 15),
+    (4010001, 15),
+    (4010002, 15),
+    (4010003, 15),
+    (4010004, 8),
+    (4010005, 8),
+    (4010006, 8),
+    (4010007, 8),
+    (4020000, 8),
+    (4020001, 8),
+    (4020002, 8),
+    (4020003, 8),
+    (4020004, 8),
+    (4020005, 8),
+    (4020006, 8),
+    (4020007, 3),
+    (4020008, 3),
+];
 
 /// Henesys's party quest on Primrose Hill (Cosmic `HenesysPQ`: maps
 /// 910010000-400, of which 910010300 is the way out, 3 to 6 players from

@@ -296,6 +296,7 @@ pub mod keys {
     pub const KPQ_LAKELIS_DECLINE: &str = "kpq.lakelis.decline";
     pub const KPQ_NELLA_LEAVE: &str = "kpq.nella.leave";
     pub const KPQ_NELLA_HOME: &str = "kpq.nella.home";
+    pub const KPQ_NELLA_BONUS: &str = "kpq.nella.bonus";
     pub const KPQ_CLOTO_Q1: &str = "kpq.cloto.q1";
     pub const KPQ_CLOTO_Q2: &str = "kpq.cloto.q2";
     pub const KPQ_CLOTO_Q3: &str = "kpq.cloto.q3";
@@ -321,6 +322,7 @@ pub mod keys {
     pub const KPQ_CLOTO_S5_CLEAR: &str = "kpq.cloto.s5.clear";
     pub const KPQ_CLOTO_S5_GATHER: &str = "kpq.cloto.s5.gather";
     pub const KPQ_CLOTO_S5_WON: &str = "kpq.cloto.s5.won";
+    pub const KPQ_CLOTO_S5_FULL: &str = "kpq.cloto.s5.full";
 
     /// Henesys's party quest: Tory, who takes a party in from Henesys Park
     /// (the terms with `{least}`, `{most}` and `{low}`) and tells how it is
@@ -1269,6 +1271,7 @@ mod tests {
             keys::KPQ_LAKELIS_DECLINE,
             keys::KPQ_NELLA_LEAVE,
             keys::KPQ_NELLA_HOME,
+            keys::KPQ_NELLA_BONUS,
             keys::HPQ_TORY_MENU,
             keys::HPQ_TORY_ENTER,
             keys::HPQ_TORY_ABOUT,
@@ -1315,6 +1318,7 @@ mod tests {
             keys::KPQ_CLOTO_S5_CLEAR,
             keys::KPQ_CLOTO_S5_GATHER,
             keys::KPQ_CLOTO_S5_WON,
+            keys::KPQ_CLOTO_S5_FULL,
             keys::JEFF_INTRO,
             keys::JEFF_ASK,
             keys::JEFF_DECLINE,

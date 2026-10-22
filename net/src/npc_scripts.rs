@@ -13,7 +13,7 @@ use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
-use game::{InventoryType, Player, QuestState};
+use game::{Inventory, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -2207,7 +2207,7 @@ fn cloto(view: Cloto, player: &Player) -> NpcScript {
     let held = |item_id| player.inventory.count(item_id);
     let page = match view {
         Cloto::Cleared => Page::Say(text(keys::KPQ_CLOTO_CLEARED)),
-        Cloto::Won => Page::Say(text(keys::KPQ_CLOTO_S5_WON)),
+        Cloto::Won => return cloto_reward(player, &mut rand::thread_rng()),
         Cloto::Follow => Page::Say(text(keys::KPQ_CLOTO_FOLLOW)),
         Cloto::Gather => Page::Say(text(keys::KPQ_CLOTO_S5_GATHER)),
         // A puzzle unanswered (`cloto_answer`) is set out again.
@@ -2267,6 +2267,37 @@ fn cloto(view: Cloto, player: &Player) -> NpcScript {
     script
 }
 
+/// Cloto on the last stage once it is won (Cosmic `9020001`,
+/// `giveEventReward`) gives each member who comes to her one of
+/// `KPQ_REWARDS` and sends them on to the bonus stage, so nobody gets it
+/// twice. A member without room for any of the rewards gets nothing yet.
+fn cloto_reward(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let reward = events::KPQ_REWARDS.choose(rng);
+    let last = match reward {
+        Some(&(item_id, quantity)) if has_reward_slot(&player.inventory) => {
+            let portal = crate::scripts::named(events::KPQ_BONUS, "st00");
+            Page::Done(vec![
+                Effect::GiveItem { item_id, quantity },
+                Effect::WarpToPortal(events::KPQ_BONUS, portal),
+            ])
+        }
+        _ => Page::Say(text(keys::KPQ_CLOTO_S5_FULL)),
+    };
+    let pages = vec![Page::Say(text(keys::KPQ_CLOTO_S5_WON)), last];
+    let mut script = NpcScript::new(CLOTO, pages);
+    script.inventory_full = Some(text(keys::KPQ_CLOTO_S5_FULL));
+    script
+}
+
+/// Whether `inventory` has a free slot in each of the Equip, Use and Etc
+/// tabs. Cosmic's `hasRewardSlot` checks the tabs its reward list comes in,
+/// which for Kerning City's and Ludibrium's lists are these three.
+fn has_reward_slot(inventory: &Inventory) -> bool {
+    [InventoryType::Equip, InventoryType::Use, InventoryType::Etc]
+        .into_iter()
+        .all(|kind| inventory.items(kind).count() < usize::from(inventory.slot_limit(kind)))
+}
+
 /// Cloto's puzzles on stages 2 to 4: the ropes, platforms and barrels.
 const PUZZLES: [&str; 3] = [
     keys::KPQ_CLOTO_S2_INTRO,
@@ -2286,10 +2317,13 @@ const QUESTIONS: [&str; 7] = [
 ];
 
 /// Nella (Cosmic `9020002`): out of the party quest, then back to town.
+/// On the bonus stage she asks only whether the player is ready to go.
 fn nella(player: &Player) -> Option<NpcScript> {
     let map_id = player.stats.map_id;
     let (key, to) = if map_id == events::KPQ.exit {
         (keys::KPQ_NELLA_HOME, events::KPQ.lobby)
+    } else if map_id == events::KPQ_BONUS {
+        (keys::KPQ_NELLA_BONUS, events::KPQ.exit)
     } else if events::KPQ.holds(map_id) {
         (keys::KPQ_NELLA_LEAVE, events::KPQ.exit)
     } else {
@@ -2390,19 +2424,14 @@ fn pink_balloon(player: &Player) -> Option<NpcScript> {
 
 /// Arturo (Cosmic `2040035`, `giveEventReward`) gives each member of the
 /// team that won Ludibrium's party quest one of `LPQ_REWARDS` and sends
-/// them back to Eos Tower, so nobody gets it twice. A member without a free
-/// slot in each of the Equip, Use and Etc tabs, which the rewards come in,
-/// gets nothing yet.
+/// them back to Eos Tower, so nobody gets it twice. A member without room
+/// for any of the rewards (`has_reward_slot`) gets nothing yet.
 fn arturo(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
     let bonus = events::LPQ.bonus.as_ref()?;
     if player.stats.map_id != bonus.exit {
         return None;
     }
-    let inventory = &player.inventory;
-    let roomy = [InventoryType::Equip, InventoryType::Use, InventoryType::Etc]
-        .into_iter()
-        .all(|kind| inventory.items(kind).count() < usize::from(inventory.slot_limit(kind)));
-    let last = if roomy {
+    let last = if has_reward_slot(&player.inventory) {
         let &(item_id, quantity) = events::LPQ_REWARDS.choose(rng)?;
         Page::Done(vec![
             Effect::GiveItem { item_id, quantity },
@@ -5168,15 +5197,55 @@ mod tests {
 
     #[test]
     fn nella_lets_players_out_of_the_party_quest_then_home() {
-        for (from, to) in [(103000801, 103000890), (103000890, 103000000)] {
+        let mut asked = vec![];
+        for (from, to) in [
+            (103000801, 103000890),
+            (events::KPQ_BONUS, 103000890),
+            (103000890, 103000000),
+        ] {
             let mut nella = NpcScript::for_npc(NELLA, &rider(100, 0, from)).unwrap();
-            assert_eq!(kind(&nella.begin()), Some(1));
+            let page = nella.begin();
+            assert_eq!(kind(&page), Some(1));
+            asked.push(page.prompt);
             assert_eq!(
                 nella.respond(ScriptInput::Yes).unwrap().effects,
                 [Effect::Warp(to)]
             );
         }
+        // The bonus stage's question is its own.
+        assert!(asked[1] != asked[0] && asked[1] != asked[2], "{asked:?}");
         assert_eq!(NpcScript::for_npc(NELLA, &rider(100, 0, 103000000)), None);
+    }
+
+    #[test]
+    fn cloto_gives_each_winner_a_reward_and_sends_them_to_the_bonus() {
+        let mut player = rider(100, 0, events::KPQ.stage_map(5));
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let won = NpcScript::cloto(Cloto::Won, &player).begin();
+        assert!(page_text(&won).contains(&text(keys::KPQ_CLOTO_S5_WON)));
+        let mut script = cloto_reward(&player, rng);
+        assert_eq!(kind(&script.begin()), Some(0));
+        let effects = script.respond(ScriptInput::Next).unwrap().effects;
+        let [Effect::GiveItem { item_id, quantity }, Effect::WarpToPortal(bonus, _)] = effects[..]
+        else {
+            panic!("{effects:?}");
+        };
+        assert!(events::KPQ_REWARDS.contains(&(item_id, quantity)));
+        assert_eq!(bonus, events::KPQ_BONUS);
+        // Should the give fail all the same, she says so and keeps them.
+        let refused = script.inventory_full().unwrap();
+        assert!(page_text(&refused).contains(&text(keys::KPQ_CLOTO_S5_FULL)));
+
+        // A full Etc tab: nothing yet, whatever the reward would be.
+        let inventory = &mut player.inventory;
+        inventory.set_slot_limit(InventoryType::Etc, 1);
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
+        let mut script = cloto_reward(&player, rng);
+        script.begin();
+        let full = script.respond(ScriptInput::Next).unwrap();
+        assert!(full.effects.is_empty());
+        assert!(page_text(&full).contains(&text(keys::KPQ_CLOTO_S5_FULL)));
     }
 
     #[test]
