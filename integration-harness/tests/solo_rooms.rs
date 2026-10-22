@@ -86,7 +86,9 @@ async fn the_fire_hawks_nest_takes_one_player_on_the_quest_at_a_time() {
     let trace = try_portal(&mut player, NEST_WAY, "in00").await;
     assert_eq!(arrived(&trace), (FIREHAWK_NEST, 0));
     assert!(trace.broadcasts.is_empty(), "{:?}", trace.broadcasts);
-    let name = player.character_name.clone();
-    let trace = step(&mut player.connection, &name, enter("out00")).await;
-    assert_eq!(arrived(&trace).0, NEST_WAY);
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(&mut player.connection, -1, "out00", &mut trace).await,
+        NEST_WAY
+    );
 }
