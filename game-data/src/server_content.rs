@@ -348,6 +348,35 @@ pub mod keys {
     pub const RIEN_TUTOR_FITNESS_3: &str = "portal.rien_tutor.fitness3";
     /// The Helios Tower elevator (`elevator`) while the car is away.
     pub const ELEVATOR_AWAY: &str = "portal.elevator.away";
+    /// Ludibrium's Time Control Room into Ellin Forest (`move_elin`).
+    pub const ELLIN_GATE_PASSING: &str = "portal.ellin_gate.passing";
+    /// The Bottom of the Temple's shortcut up (`OutPerrion_1`).
+    pub const TEMPLE_SHORTCUT: &str = "portal.temple.shortcut";
+    /// The Dangerous Forest's way on (`rienTutor7`) during the Aran tutorial.
+    pub const RIEN_TUTOR_TO_TOWN: &str = "portal.rien_tutor.to_town";
+    /// The training grounds (`enterGym`) without one of Puo's lessons.
+    pub const TRAINING_GROUND_NO_LESSON: &str = "portal.training_ground.no_lesson";
+    /// The Mirror Cave (`rienCaveEnter`) before the Aran's quests lead there.
+    pub const MIRROR_CAVE_BLOCKED: &str = "portal.mirror_cave.blocked";
+    /// The Nine Spirit's Nest (`dragonNest`) before quest 3706 is done.
+    pub const NINE_SPIRIT_NEST_BLOCKED: &str = "portal.nine_spirit_nest.blocked";
+    /// The Mushroom Castle's Security Room (`go_secretroom`) without its key.
+    pub const SECURITY_ROOM_LOCKED: &str = "portal.security_room.locked";
+    /// Utah's Pig Farm (`q2073`) without Camila's errand.
+    pub const PIG_FARM_PRIVATE: &str = "portal.pig_farm.private";
+    /// The way past the Cave of Evil Eye (`enterDollWay`) before it's open.
+    pub const DOLL_WAY_BLOCKED: &str = "portal.doll_way.blocked";
+    /// Ariant's Sand Bandits' hideout (`ariant_Agit`) to anyone else.
+    pub const SAND_BANDITS_ONLY: &str = "portal.sand_bandits.members_only";
+    /// The Treasure Room of Queen (`skyrom`) while someone is in it.
+    pub const TREASURE_ROOM_OCCUPIED: &str = "portal.treasure_room.occupied";
+    /// The Master of Disguise's forests (`enterDisguise1` to `5`): someone
+    /// else is searching, or he has already been found.
+    pub const DISGUISE_FOREST_OCCUPIED: &str = "portal.disguise.occupied";
+    pub const DISGUISE_ALREADY_FOUND: &str = "portal.disguise.already_found";
+    /// Ways a quest has yet to open (`tristanEnter`, `s4resur_enter`,
+    /// `s4rush`).
+    pub const MYSTERIOUS_FORCE: &str = "portal.mysterious_force";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1018,6 +1047,20 @@ mod tests {
             keys::RIEN_TUTOR_FITNESS_2,
             keys::RIEN_TUTOR_FITNESS_3,
             keys::ELEVATOR_AWAY,
+            keys::ELLIN_GATE_PASSING,
+            keys::TEMPLE_SHORTCUT,
+            keys::RIEN_TUTOR_TO_TOWN,
+            keys::TRAINING_GROUND_NO_LESSON,
+            keys::MIRROR_CAVE_BLOCKED,
+            keys::NINE_SPIRIT_NEST_BLOCKED,
+            keys::SECURITY_ROOM_LOCKED,
+            keys::PIG_FARM_PRIVATE,
+            keys::DOLL_WAY_BLOCKED,
+            keys::SAND_BANDITS_ONLY,
+            keys::TREASURE_ROOM_OCCUPIED,
+            keys::DISGUISE_FOREST_OCCUPIED,
+            keys::DISGUISE_ALREADY_FOUND,
+            keys::MYSTERIOUS_FORCE,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

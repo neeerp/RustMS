@@ -4,6 +4,7 @@
 //! runtime would have. Unknown names do nothing.
 
 use crate::content;
+use crate::conti::Portal;
 use game::character::FREE_MARKET_RETURN;
 use game::{InventoryType, Player, QuestState};
 use game_data::server_content::keys;
@@ -109,6 +110,68 @@ const RANK_ROOMS: [(i32, i32, &str); 8] = [
     (130000200, 130000100, "west00"),
     (140010100, 140010110, "out00"),
 ];
+/// Portals that just let the player through, and where to (Cosmic's).
+const PLAIN_WARPS: [(&str, i32, Portal); 10] = [
+    // Two of the Bottom of the Temple's ways back up the stairway; the
+    // other (`OutPerrion_1`) says it's a shortcut.
+    ("OutPerrion_2", UNDERGROUND_TEMPLE_STAIRS, Portal::Id(0)),
+    // Leafre's Valley of the Antelope, and the forests' boss areas.
+    ("minar_job4", 240010501, Portal::Named("out00")),
+    ("gryphius", 240020101, Portal::Named("out00")),
+    ("mayong", 240020401, Portal::Named("out00")),
+    ("Pianus", 230040420, Portal::Named("out00")),
+    // Out of the Horntail cave's entrance, back to the Peak of the Big
+    // Nest.
+    ("hontale_morph2", 240040600, Portal::Id(4)),
+    ("eliza_Garden", 920020000, Portal::Id(2)),
+    ("catPriest_map", 925000000, Portal::Id(2)),
+    // Lith Harbor's Info Shop. Cosmic also brings out an Aran quest's
+    // monster (21733) here; that isn't in.
+    ("enterInfo", 104000004, Portal::Id(1)),
+    // Ludibrium's Time Control Room into Ellin Forest, saying so.
+    ("move_elin", 300000100, Portal::Named("out00")),
+];
+/// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
+/// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
+/// the tutorial (21014) yet is put at Rien's start and kept from going on.
+const RIEN: i32 = 140000000;
+const SECOND_DANGEROUS_FOREST: i32 = 140010100;
+const RIEN_TUTORIAL: i16 = 21014;
+/// The Snow Island training grounds Puo's lessons (21701 to 21703) send an
+/// Aran to (`enterGym`), and the Mirror Cave, open on The Five Heroes'
+/// quests (21201, 21302) (`rienCaveEnter`).
+const TRAINING_GROUNDS: [(i16, i32); 3] =
+    [(21701, 914010000), (21702, 914010100), (21703, 914010200)];
+const MIRROR_CAVE: i32 = 140030000;
+/// Fox Ridge's way back to Tiger Ridge (`foxLaidy_map`) leads into the
+/// Gloomy Forest instead for a player on quest 3647 who holds the Old Fox's
+/// Tail.
+const TIGER_RIDGE: i32 = 222010200;
+const GLOOMY_FOREST: i32 = 922220000;
+const OLD_FOX_TAIL: i32 = 4031793;
+/// The Mushroom Castle's Security Room (`go_secretroom`): its key opens it
+/// while quest 2335 is taken, which the door completes. (The quest isn't
+/// supported yet, so only players who finished it some other way get in.)
+const SECURITY_ROOM: i32 = 106021001;
+const SECURITY_ROOM_KEY: i32 = 4032405;
+const SECURITY_ROOM_QUEST: i16 = 2335;
+/// Ereve's Training Forests' ways on (`enterDisguise1` to `5`), into the
+/// next forest, or while the Master of Disguise quests (20301 to 20305)
+/// are taken, into the forest he hides in for each job's Knight, which one
+/// player searches at a time; his proof (4032101 on) shows it's done.
+const DISGUISE_WAYS: [(i32, &str); 5] = [
+    (130010010, "out00"),
+    (130010020, "out00"),
+    (130010110, "out00"),
+    (130010120, "out00"),
+    (130020000, "east00"),
+];
+const DISGUISE_FORESTS: i32 = 108010600;
+const DISGUISE_PROOF: i32 = 4032101;
+/// Ariant's Treasure Room of Queen (`skyrom`), which one player at a time
+/// searches for the jewel quest 3935 is after.
+const QUEENS_TREASURE_ROOM: i32 = 926000010;
+const QUEENS_JEWEL: i32 = 4031574;
 
 /// What a map, portal, or NPC script does. Scripts only return effects; the
 /// runtime applies them, committing player changes together.
@@ -242,6 +305,8 @@ pub struct ScriptOutcome {
     pub effects: Vec<Effect>,
     /// Don't run this portal's script again this session.
     pub block: bool,
+    /// Said in pink when a `RequireEmptyMap` keeps the player back.
+    pub occupied: Option<String>,
 }
 
 /// A map's `onUserEnter` script. `None` if the script is unknown.
@@ -266,6 +331,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ScriptOutcome {
                 effects: vec![Effect::AvatarEffect(format!("UI/tutorial.img/{image}"))],
                 block: true,
+                occupied: None,
             }
         } else {
             ScriptOutcome::default()
@@ -279,6 +345,8 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             .copied()
             .unwrap_or(HENESYS)
     };
+    let aran_in_tutorial =
+        || player.stats.job == ARAN_BEGINNER && quest(RIEN_TUTORIAL) != QuestState::Completed;
     let outcome = match script {
         "infoMinimap" => hint(quest(1031) == QuestState::Started, 25),
         "infoAttack" => hint(quest(1035) == QuestState::Started, 20),
@@ -290,6 +358,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "tutoChatNPC" => ScriptOutcome {
             effects: vec![Effect::OfferTutorialSkip],
             block: true,
+            occupied: None,
         },
         // The Free Market's exit, back to the town the player came from.
         "market00" => {
@@ -310,6 +379,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 ),
             ],
             block: false,
+            occupied: None,
         },
         // Leafre Station's way back into town (Cosmic's `dracoout`).
         "dracoout" => ScriptOutcome {
@@ -321,6 +391,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 ),
             ],
             block: false,
+            occupied: None,
         },
         // The Haunted House's gate, from its grounds (Cosmic's
         // `halloween_enter`).
@@ -333,6 +404,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 ),
             ],
             block: false,
+            occupied: None,
         },
         // An Empty House's way to the Mushroom Kingdom, open once the
         // quest that leads there is done or its first quests are taken.
@@ -355,6 +427,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 Effect::WarpToPortal(SPLIT_ROAD, named(SPLIT_ROAD, "left00")),
             ],
             block: false,
+            occupied: None,
         },
         "obstacle" => refused(keys::MC_OBSTACLE_BLOCKED),
         // Over the castle wall, once the Thorn Remover quest is done.
@@ -418,6 +491,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                             Effect::WarpToPortal(start, named(start, "in00")),
                         ],
                         block: false,
+                        occupied: None,
                     }
                 }
             }
@@ -494,6 +568,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 Some(&(_, key)) => ScriptOutcome {
                     effects: vec![Effect::InfoText(content::text().get(key, &[]))],
                     block: false,
+                    occupied: None,
                 },
                 // Cosmic's portal 2, the forest's `east00`.
                 None => through(Effect::WarpToPortal(
@@ -509,6 +584,154 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             cursed_forest(player, hour)
         }
         "elevator" => elevator(player.stats.map_id, crate::conti::now()),
+        script if PLAIN_WARPS.iter().any(|&(name, _, _)| name == script) => {
+            let &(_, map, portal) = PLAIN_WARPS.iter().find(|&&(name, _, _)| name == script)?;
+            let mut outcome = through(to(map, portal));
+            if script == "move_elin" {
+                outcome.effects.insert(
+                    0,
+                    Effect::Pink(content::text().get(keys::ELLIN_GATE_PASSING, &[])),
+                );
+            }
+            outcome
+        }
+        "OutPerrion_1" => ScriptOutcome {
+            effects: vec![
+                Effect::Pink(content::text().get(keys::TEMPLE_SHORTCUT, &[])),
+                Effect::PortalSound,
+                Effect::WarpToPortal(UNDERGROUND_TEMPLE_STAIRS, 2),
+            ],
+            block: false,
+            occupied: None,
+        },
+        "enterRienFirst" => {
+            let start = if aran_in_tutorial() { "st00" } else { "west00" };
+            through(Effect::WarpToPortal(RIEN, named(RIEN, start)))
+        }
+        "rienTutor7" if aran_in_tutorial() => ScriptOutcome {
+            effects: vec![Effect::InfoText(
+                content::text().get(keys::RIEN_TUTOR_TO_TOWN, &[]),
+            )],
+            block: false,
+            occupied: None,
+        },
+        "rienTutor7" => through(Effect::WarpToPortal(SECOND_DANGEROUS_FOREST, 2)),
+        "enterGym" => match TRAINING_GROUNDS
+            .iter()
+            .find(|&&(id, _)| quest(id) == QuestState::Started)
+        {
+            Some(&(_, ground)) => through(Effect::WarpToPortal(ground, 1)),
+            None => refused(keys::TRAINING_GROUND_NO_LESSON),
+        },
+        "rienCaveEnter"
+            if [21201, 21302]
+                .iter()
+                .any(|&id| quest(id) == QuestState::Started) =>
+        {
+            through(Effect::WarpToPortal(MIRROR_CAVE, 1))
+        }
+        "rienCaveEnter" => refused(keys::MIRROR_CAVE_BLOCKED),
+        // Cosmic also starts quest 23647 here, which isn't in Quest.nx.
+        "foxLaidy_map"
+            if quest(3647) == QuestState::Started && player.inventory.count(OLD_FOX_TAIL) > 0 =>
+        {
+            through(Effect::WarpToPortal(
+                GLOOMY_FOREST,
+                named(GLOOMY_FOREST, "east00"),
+            ))
+        }
+        "foxLaidy_map" => through(Effect::WarpToPortal(
+            TIGER_RIDGE,
+            named(TIGER_RIDGE, "east00"),
+        )),
+        // Cosmic starts the Nine Spirit's egg event for a player on quest
+        // 100203 or holding item 4001094; that isn't in, so they're kept
+        // out as anyone else.
+        "dragonNest" if quest(3706) == QuestState::Completed => {
+            through(Effect::WarpToPortal(240040612, named(240040612, "out00")))
+        }
+        "dragonNest" => refused(keys::NINE_SPIRIT_NEST_BLOCKED),
+        "go_secretroom" if quest(SECURITY_ROOM_QUEST) == QuestState::Completed => {
+            through(Effect::WarpToPortal(SECURITY_ROOM, 1))
+        }
+        // Completing the quest needs it in the catalog.
+        "go_secretroom"
+            if quest(SECURITY_ROOM_QUEST) == QuestState::Started
+                && player.inventory.count(SECURITY_ROOM_KEY) > 0
+                && crate::quests::catalog()
+                    .is_ok_and(|catalog| catalog.quest(SECURITY_ROOM_QUEST).is_some()) =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::CompleteQuest(SECURITY_ROOM_QUEST),
+                    Effect::GainExp(5000),
+                    Effect::TakeItem {
+                        item_id: SECURITY_ROOM_KEY,
+                        quantity: 1,
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(SECURITY_ROOM, 1),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
+        "go_secretroom" => refused(keys::SECURITY_ROOM_LOCKED),
+        "tristanEnter" if quest(2238) == QuestState::Completed => {
+            through(Effect::WarpToPortal(105100101, named(105100101, "in00")))
+        }
+        "q2073" if quest(2073) == QuestState::Started => {
+            through(Effect::WarpToPortal(900000000, 0))
+        }
+        "q2073" => refused(keys::PIG_FARM_PRIVATE),
+        "enterDollWay"
+            if [20730, 21734]
+                .iter()
+                .any(|&id| quest(id) == QuestState::Completed) =>
+        {
+            through(Effect::WarpToPortal(105070300, 3))
+        }
+        "enterDollWay" if quest(21734) == QuestState::Started => {
+            through(Effect::WarpToPortal(910510100, 0))
+        }
+        "enterDollWay" => refused(keys::DOLL_WAY_BLOCKED),
+        "ariant_Agit"
+            if [3928, 3931, 3934]
+                .iter()
+                .all(|&id| quest(id) == QuestState::Completed) =>
+        {
+            through(Effect::WarpToPortal(260000201, 1))
+        }
+        "ariant_Agit" => refused(keys::SAND_BANDITS_ONLY),
+        "skyrom"
+            if quest(3935) == QuestState::Started && player.inventory.count(QUEENS_JEWEL) == 0 =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireEmptyMap(QUEENS_TREASURE_ROOM),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(QUEENS_TREASURE_ROOM, 0),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::TREASURE_ROOM_OCCUPIED, &[])),
+            }
+        }
+        "skyrom" => ScriptOutcome::default(),
+        script if script.starts_with("enterDisguise") => {
+            let job = script["enterDisguise".len()..]
+                .parse::<usize>()
+                .ok()
+                .and_then(|n| n.checked_sub(1))
+                .filter(|&job| job < DISGUISE_WAYS.len())?;
+            disguise(player, job)
+        }
+        "s4resur_enter" if quest(6134) == QuestState::Started => {
+            through(Effect::WarpToPortal(922020000, 0))
+        }
+        "s4rush" if quest(6110) == QuestState::Started => {
+            through(Effect::WarpToPortal(910500100, 0))
+        }
+        "tristanEnter" | "s4resur_enter" | "s4rush" => refused(keys::MYSTERIOUS_FORCE),
         "glTutoMsg0" => ScriptOutcome {
             effects: vec![Effect::Hint {
                 text: content::text().get(keys::LEAVE_AREA_WARNING, &[]),
@@ -516,6 +739,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 height: 5,
             }],
             block: false,
+            occupied: None,
         },
         _ => return None,
     };
@@ -559,11 +783,52 @@ fn elevator(map_id: i32, t: i64) -> ScriptOutcome {
     }
 }
 
+/// Ereve's Training Forest way on for the Knight `job` (0 to 4); see
+/// `DISGUISE_WAYS`.
+fn disguise(player: &Player, job: usize) -> ScriptOutcome {
+    let searching = (20301..=20305).any(|id| player.quests.state(id) == QuestState::Started);
+    if !searching {
+        let (map, portal) = DISGUISE_WAYS[job];
+        return through(Effect::WarpToPortal(map, named(map, portal)));
+    }
+    let job = job as i32;
+    let forest = DISGUISE_FORESTS + 10 * job;
+    // Someone else in the forest is said first, as in Cosmic.
+    let effects = if player.inventory.count(DISGUISE_PROOF + job) > 0 {
+        vec![
+            Effect::RequireEmptyMap(forest),
+            Effect::Pink(content::text().get(keys::DISGUISE_ALREADY_FOUND, &[])),
+        ]
+    } else {
+        let portal = if job == 4 { "east00" } else { "out00" };
+        vec![
+            Effect::RequireEmptyMap(forest),
+            Effect::PortalSound,
+            Effect::WarpToPortal(forest, named(forest, portal)),
+        ]
+    };
+    ScriptOutcome {
+        effects,
+        block: false,
+        occupied: Some(content::text().get(keys::DISGUISE_FOREST_OCCUPIED, &[])),
+    }
+}
+
+/// To `map`'s `portal`.
+fn to(map: i32, portal: Portal) -> Effect {
+    let id = match portal {
+        Portal::Named(name) => named(map, name),
+        Portal::Id(id) => id,
+    };
+    Effect::WarpToPortal(map, id)
+}
+
 /// A portal that lets the player through with its sound.
 fn through(warp: Effect) -> ScriptOutcome {
     ScriptOutcome {
         effects: vec![Effect::PortalSound, warp],
         block: false,
+        occupied: None,
     }
 }
 
@@ -572,6 +837,7 @@ fn refused(key: &str) -> ScriptOutcome {
     ScriptOutcome {
         effects: vec![Effect::Pink(content::text().get(key, &[]))],
         block: false,
+        occupied: None,
     }
 }
 
@@ -581,6 +847,7 @@ fn go_back(kind: i16, warp: Effect) -> ScriptOutcome {
     ScriptOutcome {
         effects: vec![Effect::SaveLocation(kind, None), Effect::PortalSound, warp],
         block: false,
+        occupied: None,
     }
 }
 
@@ -629,6 +896,7 @@ mod tests {
         ScriptOutcome {
             effects: vec![Effect::AvatarEffect(path.into())],
             block: true,
+            occupied: None,
         }
     }
 
@@ -827,7 +1095,8 @@ mod tests {
             portal("tutoChatNPC", &fresh),
             Some(ScriptOutcome {
                 effects: vec![Effect::OfferTutorialSkip],
-                block: true
+                block: true,
+                occupied: None
             })
         );
         assert_eq!(portal("somethingElse", &fresh), None);
@@ -1063,5 +1332,207 @@ mod tests {
         };
         assert!(!text.is_empty());
         assert_eq!((*width, *height), (150, 5));
+    }
+
+    #[test]
+    fn plain_warps_lead_to_portals_that_exist() {
+        let fresh = player_with(&[]);
+        for (script, map, portal) in PLAIN_WARPS {
+            if let Portal::Named(name) = portal {
+                assert_ne!(named(map, name), 0, "{script}");
+            }
+            let outcome = super::portal(script, &fresh).unwrap();
+            assert_eq!(outcome.effects.last(), Some(&to(map, portal)), "{script}");
+        }
+        // Only the Time Gate says something on the way.
+        let gate = portal("move_elin", &fresh).unwrap();
+        assert!(matches!(gate.effects[0], Effect::Pink(_)));
+        assert_eq!(
+            warp_of(&portal("Pianus", &fresh).unwrap()),
+            Some((230040420, 2))
+        );
+        let shortcut = portal("OutPerrion_1", &fresh).unwrap();
+        assert!(matches!(
+            shortcut.effects.as_slice(),
+            [
+                Effect::Pink(_),
+                Effect::PortalSound,
+                Effect::WarpToPortal(UNDERGROUND_TEMPLE_STAIRS, 2)
+            ]
+        ));
+    }
+
+    #[test]
+    fn the_dangerous_forest_keeps_an_aran_on_the_tutorial_near_rien() {
+        let mut aran = player_with(&[]);
+        aran.stats.job = ARAN_BEGINNER;
+        let rien = |player: &Player| warp_of(&portal("enterRienFirst", player).unwrap());
+        assert_ne!(named(RIEN, "st00"), named(RIEN, "west00"));
+        assert_eq!(rien(&aran), Some((RIEN, named(RIEN, "st00"))));
+        assert_eq!(rien(&player_with(&[])), Some((RIEN, named(RIEN, "west00"))));
+        let held = portal("rienTutor7", &aran).unwrap();
+        assert!(matches!(held.effects.as_slice(), [Effect::InfoText(_)]));
+        let mut done = player_with(&[(RIEN_TUTORIAL, QuestState::Completed)]);
+        done.stats.job = ARAN_BEGINNER;
+        assert_eq!(rien(&done), Some((RIEN, named(RIEN, "west00"))));
+        assert_eq!(
+            warp_of(&portal("rienTutor7", &done).unwrap()),
+            Some((SECOND_DANGEROUS_FOREST, 2))
+        );
+    }
+
+    #[test]
+    fn quest_gated_ways_open_on_their_quests() {
+        let started = QuestState::Started;
+        let done = QuestState::Completed;
+        let go =
+            |script, quests: &[(i16, QuestState)]| portal(script, &player_with(quests)).unwrap();
+        for (script, open, to) in [
+            ("enterGym", (21702, started), (914010100, 1)),
+            ("rienCaveEnter", (21302, started), (MIRROR_CAVE, 1)),
+            (
+                "dragonNest",
+                (3706, done),
+                (240040612, named(240040612, "out00")),
+            ),
+            ("go_secretroom", (2335, done), (SECURITY_ROOM, 1)),
+            (
+                "tristanEnter",
+                (2238, done),
+                (105100101, named(105100101, "in00")),
+            ),
+            ("q2073", (2073, started), (900000000, 0)),
+            ("enterDollWay", (20730, done), (105070300, 3)),
+            ("enterDollWay", (21734, done), (105070300, 3)),
+            ("enterDollWay", (21734, started), (910510100, 0)),
+            ("s4resur_enter", (6134, started), (922020000, 0)),
+            ("s4rush", (6110, started), (910500100, 0)),
+        ] {
+            assert!(pink(&go(script, &[])), "{script}");
+            assert_eq!(warp_of(&go(script, &[open])), Some(to), "{script}");
+        }
+        let bandits = [(3928, done), (3931, done), (3934, done)];
+        assert!(pink(&go("ariant_Agit", &bandits[..2])));
+        assert_eq!(warp_of(&go("ariant_Agit", &bandits)), Some((260000201, 1)));
+        assert_ne!(named(240040612, "out00"), 0);
+        assert_ne!(named(105100101, "in00"), 0);
+    }
+
+    fn holding(quests: &[(i16, QuestState)], item: i32) -> Player {
+        let mut player = player_with(quests);
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
+        player
+    }
+
+    #[test]
+    fn the_security_room_key_completes_its_quest_at_the_door() {
+        let quest = [(SECURITY_ROOM_QUEST, QuestState::Started)];
+        assert!(pink(
+            &portal("go_secretroom", &player_with(&quest)).unwrap()
+        ));
+        let opened = portal("go_secretroom", &holding(&quest, SECURITY_ROOM_KEY)).unwrap();
+        if crate::quests::catalog()
+            .unwrap()
+            .quest(SECURITY_ROOM_QUEST)
+            .is_none()
+        {
+            // Not supported yet: the door stays shut rather than fail.
+            assert!(pink(&opened));
+            return;
+        }
+        assert_eq!(
+            opened.effects,
+            [
+                Effect::CompleteQuest(SECURITY_ROOM_QUEST),
+                Effect::GainExp(5000),
+                Effect::TakeItem {
+                    item_id: SECURITY_ROOM_KEY,
+                    quantity: 1
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(SECURITY_ROOM, 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn fox_ridge_leads_a_fox_hunter_into_the_gloomy_forest() {
+        let tiger = Some((TIGER_RIDGE, named(TIGER_RIDGE, "east00")));
+        let quest = [(3647, QuestState::Started)];
+        assert_eq!(
+            warp_of(&portal("foxLaidy_map", &player_with(&quest)).unwrap()),
+            tiger
+        );
+        assert_eq!(
+            warp_of(&portal("foxLaidy_map", &holding(&[], OLD_FOX_TAIL)).unwrap()),
+            tiger
+        );
+        assert_eq!(
+            warp_of(&portal("foxLaidy_map", &holding(&quest, OLD_FOX_TAIL)).unwrap()),
+            Some((GLOOMY_FOREST, named(GLOOMY_FOREST, "east00")))
+        );
+        assert_ne!(named(GLOOMY_FOREST, "east00"), 0);
+    }
+
+    #[test]
+    fn the_queens_treasure_room_takes_one_searcher_at_a_time() {
+        let quest = [(3935, QuestState::Started)];
+        let outcome = portal("skyrom", &player_with(&quest)).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireEmptyMap(QUEENS_TREASURE_ROOM),
+                Effect::PortalSound,
+                Effect::WarpToPortal(QUEENS_TREASURE_ROOM, 0),
+            ]
+        );
+        assert!(outcome.occupied.is_some());
+        // Without the quest, or with the jewel found, nothing happens.
+        assert_eq!(
+            portal("skyrom", &player_with(&[])),
+            Some(ScriptOutcome::default())
+        );
+        assert_eq!(
+            portal("skyrom", &holding(&quest, QUEENS_JEWEL)),
+            Some(ScriptOutcome::default())
+        );
+    }
+
+    #[test]
+    fn ereves_forests_lead_on_or_to_the_master_of_disguise() {
+        let fresh = player_with(&[]);
+        for (n, (map, portal)) in DISGUISE_WAYS.into_iter().enumerate() {
+            let script = format!("enterDisguise{}", n + 1);
+            assert_ne!(named(map, portal), 0);
+            assert_eq!(
+                warp_of(&super::portal(&script, &fresh).unwrap()),
+                Some((map, named(map, portal)))
+            );
+        }
+        let quest = [(20305, QuestState::Started)];
+        let tiru = super::portal("enterDisguise4", &player_with(&quest)).unwrap();
+        assert_eq!(
+            tiru.effects,
+            [
+                Effect::RequireEmptyMap(108010630),
+                Effect::PortalSound,
+                Effect::WarpToPortal(108010630, named(108010630, "out00")),
+            ]
+        );
+        assert!(tiru.occupied.is_some());
+        let drill_hall = super::portal("enterDisguise5", &player_with(&quest)).unwrap();
+        assert_eq!(
+            drill_hall.effects.last(),
+            Some(&Effect::WarpToPortal(108010640, named(108010640, "east00")))
+        );
+        // His proof means he has been found already.
+        let found = super::portal("enterDisguise2", &holding(&quest, DISGUISE_PROOF + 1)).unwrap();
+        assert!(matches!(
+            found.effects.as_slice(),
+            [Effect::RequireEmptyMap(108010610), Effect::Pink(_)]
+        ));
+        assert_eq!(super::portal("enterDisguise6", &fresh), None);
     }
 }

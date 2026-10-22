@@ -1,5 +1,7 @@
+use super::npc_script::Applied;
 use super::ClientActor;
 use crate::error::RuntimeError;
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat;
 use net::scripts;
 use tracing::debug;
@@ -38,7 +40,11 @@ impl ClientActor {
                     if outcome.block {
                         self.blocked_scripts.insert(script);
                     }
-                    self.apply_effects(&outcome.effects).await?;
+                    let applied = self.apply_effects(&outcome.effects).await?;
+                    if let (Applied::Refused, Some(text)) = (applied, outcome.occupied) {
+                        let mut line = build_broadcast(Broadcast::Pink, &text)?;
+                        self.send(&mut line).await?;
+                    }
                 }
                 None => debug!(map_id, portal, script, "No native portal script"),
             }
