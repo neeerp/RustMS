@@ -2997,13 +2997,18 @@ fn sparkling_crystal(player: &Player) -> Option<NpcScript> {
 /// The clone's room: the time a challenger has in it, which the map itself
 /// doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
-    resets_when_empty(map_id).then_some(CLONE_TIME_LIMIT)
+    is_clone_room(map_id).then_some(CLONE_TIME_LIMIT)
+}
+
+fn is_clone_room(map_id: i32) -> bool {
+    THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
 }
 
 /// Whether the field puts its mobs back when the last player leaves, as a
-/// clone's room does for the next challenger.
+/// clone's room does for the next challenger and a mini-dungeon's copy for
+/// the next party.
 pub fn resets_when_empty(map_id: i32) -> bool {
-    THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
+    is_clone_room(map_id) || crate::dungeons::of_copy(map_id).is_some()
 }
 
 /// The Holy Stone takes a Dark Crystal from the player the chief sent and

@@ -399,6 +399,10 @@ pub mod keys {
     pub const ADVICE_WORLD_MAP: &str = "portal.advice.world_map";
     pub const ADVICE_STATS: &str = "portal.advice.stats";
     pub const ADVICE_JUMP_DOWN: &str = "portal.advice.jump_down";
+    /// A mini-dungeon's way in (`MD_*`) refusing a party member who isn't
+    /// its leader, and saying every copy is taken.
+    pub const DUNGEON_NOT_LEADER: &str = "portal.mini_dungeon.not_leader";
+    pub const DUNGEON_FULL: &str = "portal.mini_dungeon.full";
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
@@ -1097,6 +1101,8 @@ mod tests {
             keys::ADVICE_WORLD_MAP,
             keys::ADVICE_STATS,
             keys::ADVICE_JUMP_DOWN,
+            keys::DUNGEON_NOT_LEADER,
+            keys::DUNGEON_FULL,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
             keys::STATUE_INTRO,

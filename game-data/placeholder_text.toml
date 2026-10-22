@@ -278,6 +278,8 @@
 "portal.advice.world_map" = "[placeholder] W opens the World Map."
 "portal.advice.stats" = "[placeholder] S shows your character's stats."
 "portal.advice.jump_down" = "[placeholder] Hold Down and press Alt to drop through the platform below you."
+"portal.mini_dungeon.not_leader" = "[placeholder] In a party, only its leader may open the way into the dungeon."
+"portal.mini_dungeon.full" = "[placeholder] Every one of these dungeons is taken. Come back a little later."
 "time_gate.inactive" = "[placeholder] The Time Gate is silent. It doesn't seem to work yet."
 "time_gate.no_era" = "[placeholder] The Time Gate won't open until Guardian Nex is beaten."
 "statue.intro" = "[placeholder] An old statue stands among the flowers. Something seems to call you into the forest behind it."

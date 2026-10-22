@@ -180,11 +180,42 @@ nothing. A script returns effects that the client actor sends:
 | `ariant_queens` | Ariant's palace rooms (`260000301`-`260000303`, `ring00`-`ring06`): nothing for a player in Tigun's disguise (the morph of item `2210005`, a buff of id `-2210005`); anyone else is turned out to Ariant Castle's `R001` (`260000300`) with portal sound and a pink line |
 | `advice00`-`advice09`, `adviceMap` | The original Maple Island's instruction balloons (moving, Heena, jumping, climbing, Sera, the quest window, portals, the World Map, stats, jumping down), each a PLAYER_HINT with Cosmic's width and height; no warp |
 | `nets_in`, `nets_out` | Nett's Pyramid's lobby, the Pyramid Dunes (`926010000` `out00`), from Sahel 3's `piramid00` (`260020500`), saving the map in `saved_locations` kind 3 (`PYRAMID_RETURN`); its `out00` goes back there (Sahel 3 by its `piramid00`, else the map's spawn point), or to Sahel 3 when nothing was saved. The party quest itself isn't in |
+| `MD_pig`, `MD_golem`, `MD_mushroom`, `MD_drakeroom`, `MD_rabbit`, `MD_roundTable`, `MD_remember`, `MD_protect`, `MD_treasure`, `MD_sand`, `MD_error`, `MD_high` | A mini-dungeon's way in (the base map's `MD00`) and out (each copy's `out00`); see below |
 
 A portal that takes one player at a time puts `Effect::RequireEmptyMap`
 first; when someone is there, nothing applies and the client actor says the
 outcome's `occupied` line in pink instead. Leafre Station's `reundodraco`
 portals do nothing in Cosmic either, so they're left unserved.
+
+### Mini-dungeons
+
+Twelve maps have a mini-dungeon behind their `MD00` portal
+(`net::dungeons::DUNGEONS`: `100020000`, `105040304`, `105050100`,
+`105090311`, `221023400`, `240020500`, `240040511`, `240040520`,
+`251010402`, `260020600`, `261020300`, `551030000`). Each
+dungeon has 19 to 34 copies, maps of their own (`base`'s `first` and on)
+that take their body from one map through `info/link` (see `fields.md`)
+and carry their own `forcedReturn` (the base map) and `timeLimit` (7200 s).
+
+On the base map, `MD00` asks the directory for a copy
+(`DirectoryMessage::EnterDungeon`). A party member who doesn't lead their
+party is refused with a pink line, and so is anyone when every copy is
+taken. Otherwise the directory picks the first copy on the player's
+channel with nobody in it and not kept for a team on its way (10 s), keeps
+it for the player, and sends the party members on the leader's map to the
+copy's `out00` too (`ServerMessage::ShipWarp`). The player follows with the
+portal sound. A copy's `out00`, like `MD00` anywhere but the base map,
+leads back to the base map's `MD00`. When the player who took the copy
+leaves it (by map change, logout or channel change), everyone still in it is
+sent to the base map's portal 0. An empty copy puts its mobs back, as a
+clone's room does (`npc_scripts::resets_when_empty`). The clock is each
+player's own `MapTimer`, and a login or channel change into a copy lands
+on its forced return map.
+
+Not yet: the Cash Shop isn't closed to players in a copy, a party's new
+leader doesn't close the run (Cosmic closes it when the leadership passes
+to someone on another map), and the time limit runs per player rather than
+per copy.
 
 Only the `go<map id>` banners are used by the current maps, on the Adventurer
 Training Centers and the revamp's Southperry (`2000000`). The other scripts,
