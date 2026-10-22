@@ -244,16 +244,17 @@ invitation is not valid."), where Cosmic answers nothing.
 
 The assistants' menu has two more choices. "I am a guest" answers from the
 list: not invited (no list entry at this venue, or no received
-invitation), the minutes left, or, once the wedding is due, a wait line
-that slice 7's ceremony replaces with the way in. With a Wedding
+invitation), the minutes left, the channel the wedding is on, or, once it
+is due there, whether to go in (see "Guests" below). With a Wedding
 Invitation Ticket (5251100) in the Cash tab, a booked couple may trade it
 for 3 more invitations to their wedding at that venue, before it starts
 and with a free Etc slot (`Effect::ExtraInvitations`).
 
 ## The wedding
 
-Slice 7a of report b071 marries a couple at the Chapel; guests, the
-Cathedral, the priest's packets and the party afterwards are later slices.
+Slices 7a and 7b of report b071 marry a couple at the Chapel before their
+guests; the Cathedral, blessings, the priest's packets and the party
+afterwards are later slices.
 
 Wayne (9201012) in Amoria starts a booked Chapel wedding
 (`NpcScript::wedding_starter`). He answers a player who isn't engaged,
@@ -295,6 +296,27 @@ before the vows ends it: the booking is deleted, nothing is refunded
 same way. The venue's maps return to 680000500, so a player logging in
 there after a restart lands outside; a booking still inside its window
 can be started again (b071 Q10).
+
+### Guests
+
+A guest on the list holding the received invitation asks the assistant in
+Amoria to go in (`Effect::EnterWedding`). The client actor reads the list
+again and asks the directory (`DirectoryMessage::JoinWedding`), which
+keeps each wedding's queue beside its id and hands the guest's handle to
+the wedding of that couple under way at the venue on the guest's channel.
+The wedding lets guests in during the gathering only, up to `MAX_GUESTS`,
+and answers a `WeddingTicket` with `guest` set; the guest goes to the
+hall. Otherwise the assistant says the couple haven't begun yet, the
+doors are closed, or the hall is full (`GuestRefusal`). Guests without
+wedding clothes are reminded of them but let in (b071 Q1).
+
+Guests go on to the altar with the couple, and their clock follows the
+couple's after the vows. The priest treats them as anyone else. The
+assistant in the hall and Jackie at the altar offer them the way out
+(`Effect::LeaveWedding`, to 680000500); a guest who leaves, logs out or
+changes channel only leaves the wedding. When it ends, guests go out with
+the couple, without the couple's `MARRIAGE_RESULT` 31. Cosmic leaves the
+guests in the hall to walk to the altar themselves; RustMS moves them.
 
 ## The partner's map
 
@@ -468,8 +490,7 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding (report b071 slices 7b-7g): guests, the
-  Cathedral, the priest's packets (0x140, 0x141), blessings, the party
+- The rest of the wedding (report b071 slices 7c-7g): the Cathedral, the priest's packets (0x140, 0x141), blessings, the party
   and the hunting grounds. Also the wishlist.
 - A hint, after booking, about the couple's wedding clothes. Report b066
   (D13) names 1050131-34 and 1051150-53, but `String.nx` calls those the

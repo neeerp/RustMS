@@ -5,14 +5,23 @@
 
 use super::WorldDirectory;
 use crate::actor::client::leave_at_duey;
-use crate::actor::wedding::WeddingStart;
+use crate::actor::wedding::{WeddingMessage, WeddingStart, WeddingTicket, WEDDING_QUEUE_CAPACITY};
 use crate::message::{ServerMessage, WeddingNews};
 use game::marriage::{MarriageRecord, Refusal, MIN_LEVEL};
-use game::wedding::{Invitation, PartnerRefusal, StartRefusal, Venue};
+use game::wedding::{GuestRefusal, Invitation, PartnerRefusal, StartRefusal, Venue};
 use game_data::server_content::keys;
 use net::packet::build::world::marriage::{build_marriage_notice, build_marriage_refusal};
 use net::ClientId;
+use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::{mpsc, oneshot};
 use tracing::info;
+
+/// A wedding under way, which guests reach through here.
+pub(super) struct Wedding {
+    pub(super) id: u32,
+    marriage_id: i32,
+    tx: mpsc::Sender<WeddingMessage>,
+}
 
 /// A proposal waiting for the partner's answer.
 pub(super) struct Proposal {
@@ -172,7 +181,13 @@ impl WorldDirectory {
         // Weddings and party events share ids, so their copies don't meet.
         let id = self.next_event;
         self.next_event = self.next_event.wrapping_add(1).max(1);
-        self.weddings.insert((channel_id, venue), id);
+        let (tx, rx) = mpsc::channel(WEDDING_QUEUE_CAPACITY);
+        let wedding = Wedding {
+            id,
+            marriage_id,
+            tx: tx.clone(),
+        };
+        self.weddings.insert((channel_id, venue), wedding);
         info!(?venue, id, channel_id, marriage_id, "Wedding reserved");
         Ok(WeddingStart {
             id,
@@ -180,7 +195,46 @@ impl WorldDirectory {
             channel_id,
             marriage_id,
             couple,
+            tx,
+            rx,
         })
+    }
+
+    /// `from`, invited to the wedding of `marriage_id` at `venue`, asks to
+    /// go in: the wedding answers, if it is under way on their channel.
+    pub(super) fn join_wedding(
+        &mut self,
+        from: ClientId,
+        venue: Venue,
+        marriage_id: i32,
+        reply: oneshot::Sender<Result<WeddingTicket, GuestRefusal>>,
+    ) {
+        let Some(guest) = self.clients.get(&from) else {
+            return;
+        };
+        let wedding = self
+            .weddings
+            .get(&(guest.channel_id, venue))
+            .filter(|wedding| wedding.marriage_id == marriage_id);
+        let Some(wedding) = wedding else {
+            let _ = reply.send(Err(GuestRefusal::NotStarted));
+            return;
+        };
+        let join = WeddingMessage::Join {
+            guest: guest.handle.clone(),
+            reply,
+        };
+        // The wedding is never waited on; one that can't take the guest now
+        // has no room for them.
+        if let Err(error) = wedding.tx.try_send(join) {
+            let refusal = match error {
+                TrySendError::Full(_) => GuestRefusal::Full,
+                TrySendError::Closed(_) => GuestRefusal::NotStarted,
+            };
+            if let WeddingMessage::Join { reply, .. } = error.into_inner() {
+                let _ = reply.send(Err(refusal));
+            }
+        }
     }
 
     /// Hand `invitation` to its guest if they are online. Otherwise leave

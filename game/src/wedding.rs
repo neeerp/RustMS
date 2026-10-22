@@ -162,6 +162,17 @@ pub enum StartRefusal {
     Busy,
 }
 
+/// Why an invited guest could not go into the wedding.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GuestRefusal {
+    /// The couple have not begun it.
+    NotStarted,
+    /// The gathering is over: the ceremony has begun.
+    Late,
+    /// The hall holds its most guests.
+    Full,
+}
+
 /// What came of a partner's vows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Vows {

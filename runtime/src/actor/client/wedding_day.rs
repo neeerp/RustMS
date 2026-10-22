@@ -1,7 +1,8 @@
 //! The couple's side of their wedding (`crate::actor::wedding`, report
 //! b071): Wayne starts it, the ticket puts them in the venue's own copy of
 //! its hall and altar, the priest takes their vows, the marriage brings the
-//! rings, and the staff or the clock see them out.
+//! rings, and the staff or the clock see them out. Guests go in through
+//! the venue's assistant and out through the staff.
 
 use super::marriage::take_tokens;
 use super::ClientActor;
@@ -52,15 +53,22 @@ impl ClientActor {
                 None => Ok(false),
             };
         }
-        let stage = self.wedding_here().map(WeddingTicket::stage);
+        let inside = self
+            .wedding_here()
+            .map(|ticket| (ticket.stage(), ticket.guest));
         let player = &self.in_game()?.player;
         let script = if let Some(venue) = npc_scripts::wedding_priest_venue(npc_id) {
-            NpcScript::wedding_priest(venue, player, stage)
-        } else if let Some(venue) = npc_scripts::wedding_staff_venue(npc_id) {
-            let Some(stage) = stage else {
+            // Guests hear what anyone else does.
+            let couple = inside.filter(|&(_, guest)| !guest);
+            NpcScript::wedding_priest(venue, player, couple.map(|(stage, _)| stage))
+        } else if npc_scripts::wedding_staff_venue(npc_id).is_some()
+            || npc_scripts::wedding_venue(npc_id).is_some()
+        {
+            // The assistant stands in the hall too.
+            let Some((stage, guest)) = inside else {
                 return Ok(false);
             };
-            NpcScript::wedding_staff(venue, stage)
+            NpcScript::wedding_staff(npc_id, stage, guest)
         } else {
             return Ok(false);
         };
@@ -163,6 +171,52 @@ impl ClientActor {
         }
     }
 
+    /// The player said yes to the assistant of `venue`: go into the wedding
+    /// there they are invited to, if its couple still gather. The booking
+    /// is read again, as it may have changed while the assistant asked.
+    pub(super) async fn enter_wedding(&mut self, venue: Venue) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let invited = player.inventory.count(venue.received_invitation()) > 0;
+        let (guest, now) = (player.stats.id, SystemTime::now());
+        let wedding = spawn_db(move || db::wedding::guest_of(guest, venue, now)).await?;
+        let due = wedding.filter(|(booked, _)| {
+            invited && !booked.inviting(now) && booked.channel == self.channel_id
+        });
+        let free = !self.in_cash_shop && self.event.is_none() && self.wedding.is_none();
+        let Some((booked, _)) = due.filter(|_| free) else {
+            warn!(self.client_id, ?venue, "Wedding not open to the guest");
+            let text = net::content::text().get(keys::WEDDING_GUEST_ERROR, &[]);
+            return self.assistant_says(venue, text).await;
+        };
+        let (reply, joined) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::JoinWedding {
+            from: self.client_id,
+            venue,
+            marriage_id: booked.marriage_id,
+            reply,
+        })
+        .await?;
+        let refusal = match joined.await {
+            Ok(Ok(ticket)) => {
+                let hall = ticket.venue.hall();
+                self.wedding = Some(ticket);
+                return self.warp_within_event(hall).await;
+            }
+            Ok(Err(refusal)) => npc_scripts::guest_refusal_text(refusal),
+            Err(_) => net::content::text().get(keys::WEDDING_GUEST_ERROR, &[]),
+        };
+        self.assistant_says(venue, refusal).await
+    }
+
+    /// The guest asked the staff to see them out.
+    pub(super) async fn leave_wedding(&mut self) -> Result<(), RuntimeError> {
+        if self.wedding_here().is_some_and(|ticket| ticket.guest) {
+            // Changing field to the exit hands the ticket back.
+            self.warp_within_event(WEDDING_EXIT).await?;
+        }
+        Ok(())
+    }
+
     /// The couple's wedding began: the player takes their ticket to the
     /// hall, unless they have since left Amoria, or are in the Cash Shop or
     /// an event.
@@ -219,6 +273,8 @@ impl ClientActor {
         let Some(ticket) = self.wedding.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
         };
+        // The booking was the couple's, so only they are told it is gone.
+        let failed = failed && !ticket.guest;
         let here = self
             .game
             .as_ref()
@@ -246,7 +302,7 @@ impl ClientActor {
 
     /// Wedding `id` married the couple `record`: the player gives up their
     /// half of the engagement and takes the wedding ring, and their time
-    /// there starts again.
+    /// there starts again. A guest's time only starts again.
     pub(super) async fn married(
         &mut self,
         id: u32,
@@ -256,6 +312,20 @@ impl ClientActor {
         let Some(game) = self.game.as_ref() else {
             return Ok(());
         };
+        let here = self.wedding_here().is_some_and(|ticket| ticket.id == id);
+        if let Some(ticket) = self
+            .wedding
+            .as_mut()
+            .filter(|ticket| ticket.id == id && ticket.guest)
+        {
+            ticket.clock = Some(clock);
+            if !here || self.in_cash_shop {
+                return Ok(());
+            }
+            let left = clock.saturating_duration_since(Instant::now());
+            let seconds = u32::try_from(left.as_secs()).unwrap_or(u32::MAX);
+            return self.send(&mut build_countdown(seconds)?).await;
+        }
         let mut next = game.player.clone();
         let mut packets = Vec::new();
         take_tokens(&mut next, &mut packets)?;
@@ -280,7 +350,6 @@ impl ClientActor {
         packets.push(build_married(&record)?);
         info!(self.client_id, marriage_id = record.id, "Married");
         next.marriage = Some(record);
-        let here = self.wedding_here().is_some_and(|ticket| ticket.id == id);
         if let Some(ticket) = self.wedding.as_mut().filter(|ticket| ticket.id == id) {
             ticket.clock = Some(clock);
         }

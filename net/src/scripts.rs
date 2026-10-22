@@ -372,6 +372,13 @@ pub enum Effect {
     Vows,
     /// End the player's wedding, once married: everyone goes out.
     EndWedding,
+    /// Go into the wedding at `venue` the player is invited to, while its
+    /// couple gather. The assistant says why not, so nothing may follow it.
+    EnterWedding {
+        venue: game::wedding::Venue,
+    },
+    /// A guest leaves the wedding they are in for its exit.
+    LeaveWedding,
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

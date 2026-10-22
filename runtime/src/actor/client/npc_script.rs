@@ -154,7 +154,9 @@ impl ClientActor {
                 | Effect::ExtraInvitations { .. }
                 | Effect::StartWedding { .. }
                 | Effect::Vows
-                | Effect::EndWedding => wedding = Some(effect.clone()),
+                | Effect::EndWedding
+                | Effect::EnterWedding { .. }
+                | Effect::LeaveWedding => wedding = Some(effect.clone()),
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -495,6 +497,8 @@ impl ClientActor {
             Some(Effect::StartWedding { venue }) => Box::pin(self.start_wedding(venue)).await?,
             Some(Effect::Vows) => Box::pin(self.take_vows()).await?,
             Some(Effect::EndWedding) => self.end_wedding().await,
+            Some(Effect::EnterWedding { venue }) => Box::pin(self.enter_wedding(venue)).await?,
+            Some(Effect::LeaveWedding) => Box::pin(self.leave_wedding()).await?,
             _ => {}
         }
         if let Some((map_id, portal)) = warp {

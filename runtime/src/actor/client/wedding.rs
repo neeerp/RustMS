@@ -121,6 +121,7 @@ impl ClientActor {
         let view = WeddingView {
             reservation: reservation.as_ref(),
             guest_of: guest_of.as_ref(),
+            channel: self.channel_id,
             now,
         };
         let player = &self.in_game()?.player;
@@ -130,7 +131,11 @@ impl ClientActor {
         }
     }
 
-    async fn assistant_says(&mut self, venue: Venue, text: String) -> Result<(), RuntimeError> {
+    pub(super) async fn assistant_says(
+        &mut self,
+        venue: Venue,
+        text: String,
+    ) -> Result<(), RuntimeError> {
         self.start_script(NpcScript::wedding_assistant_says(venue, text))
             .await
     }

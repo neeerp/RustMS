@@ -1006,8 +1006,29 @@ pub mod keys {
     /// The altar staff asks the married couple whether to end the wedding.
     pub const WEDDING_STAFF_ASK: &str = "wedding.staff.ask";
 
+    /// The wedding's staff ask a guest whether to leave it.
+    pub const WEDDING_STAFF_GUEST_LEAVE: &str = "wedding.staff.guest_leave";
+
+    /// The assistant asks a guest whether to go into the wedding.
+    pub const WEDDING_GUEST_ASK: &str = "wedding.guest.enter_ask";
+
+    /// The assistant asks a guest without wedding clothes whether to go in, with a word on them.
+    pub const WEDDING_GUEST_ASK_CLOTHES: &str = "wedding.guest.enter_clothes";
+
+    /// The assistant, to a guest on another channel than the wedding's: `{channel}` as in `wedding.reserve.booked`.
+    pub const WEDDING_GUEST_CHANNEL: &str = "wedding.guest.enter_channel";
+
+    /// The assistant, to a guest once the ceremony has begun.
+    pub const WEDDING_GUEST_LATE: &str = "wedding.guest.enter_late";
+
+    /// The assistant, to a guest when the hall holds its most guests.
+    pub const WEDDING_GUEST_FULL: &str = "wedding.guest.enter_full";
+
+    /// The assistant, to a guest who could not go in.
+    pub const WEDDING_GUEST_ERROR: &str = "wedding.guest.enter_error";
+
     /// The wedding itself: Wayne, the priest and Jackie (report b071).
-    pub const CEREMONY: [&str; 19] = [
+    pub const CEREMONY: [&str; 26] = [
         WEDDING_STARTER_INTRO,
         WEDDING_STARTER_NOT_BOOKED,
         WEDDING_STARTER_CHANNEL,
@@ -1027,6 +1048,13 @@ pub mod keys {
         WEDDING_PRIEST_FAILED,
         WEDDING_STAFF_WAIT,
         WEDDING_STAFF_ASK,
+        WEDDING_STAFF_GUEST_LEAVE,
+        WEDDING_GUEST_ASK,
+        WEDDING_GUEST_ASK_CLOTHES,
+        WEDDING_GUEST_CHANNEL,
+        WEDDING_GUEST_LATE,
+        WEDDING_GUEST_FULL,
+        WEDDING_GUEST_ERROR,
     ];
 
     /// Wedding invitations: sending, opening, and more of them.

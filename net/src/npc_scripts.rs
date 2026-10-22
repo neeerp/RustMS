@@ -15,7 +15,7 @@ use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
 use game::marriage;
-use game::wedding::{self, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
+use game::wedding::{self, GuestRefusal, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
 use game::{Inventory, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use rand::seq::SliceRandom;
@@ -938,10 +938,16 @@ impl NpcScript {
         Self::new(wedding_priest_of(venue), vec![Page::Say(text(key))])
     }
 
-    /// The staff at `venue`'s altar, to one of the couple whose wedding is
-    /// at `stage`: once married, the way out.
-    pub fn wedding_staff(venue: Venue, stage: WeddingStage) -> Self {
+    /// `npc_id`, staff in a wedding's hall or at its altar, to someone in
+    /// the wedding at `stage`: to a guest, the way out; to one of the
+    /// couple, once married, the end of the wedding.
+    pub fn wedding_staff(npc_id: i32, stage: WeddingStage, guest: bool) -> Self {
         let page = match stage {
+            _ if guest => Page::Ask {
+                text: text(keys::WEDDING_STAFF_GUEST_LEAVE),
+                on_yes: vec![Effect::LeaveWedding],
+                on_no: None,
+            },
             WeddingStage::Married => Page::Ask {
                 text: text(keys::WEDDING_STAFF_ASK),
                 on_yes: vec![Effect::EndWedding],
@@ -949,7 +955,7 @@ impl NpcScript {
             },
             _ => Page::Say(text(keys::WEDDING_STAFF_WAIT)),
         };
-        Self::new(wedding_staff_of(venue), vec![page])
+        Self::new(npc_id, vec![page])
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -1708,10 +1714,11 @@ pub struct AllianceView<'a> {
 
 /// What a wedding assistant needs besides the player: the couple's booked
 /// wedding, if any, the soonest wedding at the assistant's venue the
-/// player is a guest of, and the time.
+/// player is a guest of, the player's channel, and the time.
 pub struct WeddingView<'a> {
     pub reservation: Option<&'a Reservation>,
     pub guest_of: Option<&'a Reservation>,
+    pub channel: u8,
     pub now: SystemTime,
 }
 
@@ -3543,10 +3550,6 @@ pub fn wedding_staff_venue(npc_id: i32) -> Option<Venue> {
     (npc_id == JACKIE).then_some(Venue::Chapel)
 }
 
-fn wedding_staff_of(_venue: Venue) -> i32 {
-    JACKIE
-}
-
 /// The wedding starter of `venue` (Wayne for the Chapel) begins the
 /// couple's wedding booked there on this channel once its hour has come,
 /// with wedding clothes at hand; their partner must be beside them, which
@@ -3723,19 +3726,42 @@ fn wedding_assistant(venue: Venue, player: &Player, view: WeddingView) -> NpcScr
 }
 
 /// A guest asking to go in: invited, with the invitation, to a wedding at
-/// the venue that has begun. Going in comes with the ceremony itself.
+/// the venue that is due on this channel. Whether the couple have begun it
+/// and still gather is the wedding's to say; guests are only reminded of
+/// the clothes (report b071 Q1).
 fn wedding_guest(venue: Venue, player: &Player, view: &WeddingView) -> Vec<Page> {
     let say = match view.guest_of {
         Some(wedding) if holds(player, venue.received_invitation()) => {
             if wedding.inviting(view.now) {
                 wedding_text(keys::WEDDING_GUEST_EARLY, wedding, view.now)
+            } else if wedding.channel != view.channel {
+                wedding_text(keys::WEDDING_GUEST_CHANNEL, wedding, view.now)
             } else {
-                text(keys::WEDDING_GUEST_WAIT)
+                let key = if wedding::has_clothes(player) {
+                    keys::WEDDING_GUEST_ASK
+                } else {
+                    keys::WEDDING_GUEST_ASK_CLOTHES
+                };
+                return vec![Page::Ask {
+                    text: text(key),
+                    on_yes: vec![Effect::EnterWedding { venue }],
+                    on_no: None,
+                }];
             }
         }
         _ => text(keys::WEDDING_GUEST_NOT_INVITED),
     };
     vec![Page::Say(say)]
+}
+
+/// What the assistant of `venue` says to a guest the wedding didn't let
+/// in.
+pub fn guest_refusal_text(refusal: GuestRefusal) -> String {
+    text(match refusal {
+        GuestRefusal::NotStarted => keys::WEDDING_GUEST_WAIT,
+        GuestRefusal::Late => keys::WEDDING_GUEST_LATE,
+        GuestRefusal::Full => keys::WEDDING_GUEST_FULL,
+    })
 }
 
 /// Whether the player has room for `quantity` invitations to `venue`'s
@@ -7372,6 +7398,7 @@ mod tests {
             let view = WeddingView {
                 reservation,
                 guest_of: None,
+                channel: 0,
                 now,
             };
             let mut script = NpcScript::wedding_assistant(npc_id, player, view).unwrap();
@@ -7386,6 +7413,7 @@ mod tests {
         let view = WeddingView {
             reservation: None,
             guest_of: None,
+            channel: 0,
             now,
         };
         assert!(NpcScript::wedding_assistant(BONNIE, &lobby, view).is_none());
@@ -7472,6 +7500,20 @@ mod tests {
     }
 
     #[test]
+    fn the_wedding_staff_see_guests_out_and_the_married_couple_off() {
+        let mut leave = NpcScript::wedding_staff(BONNIE, WeddingStage::Gathering, true);
+        assert_eq!(kind(&leave.begin()), Some(1));
+        let yes = leave.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::LeaveWedding]);
+        let mut wait = NpcScript::wedding_staff(JACKIE, WeddingStage::Ceremony, false);
+        assert_eq!(page_text(&wait.begin()), text(keys::WEDDING_STAFF_WAIT));
+        let mut end = NpcScript::wedding_staff(JACKIE, WeddingStage::Married, false);
+        end.begin();
+        let yes = end.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::EndWedding]);
+    }
+
+    #[test]
     fn the_wedding_assistants_answer_guests_and_make_more_invitations() {
         if crate::items::data().is_err() {
             return;
@@ -7493,6 +7535,7 @@ mod tests {
             let view = WeddingView {
                 reservation: None,
                 guest_of,
+                channel: 0,
                 now,
             };
             page_text(&choose(NICOLE, player, view, 2))
@@ -7506,15 +7549,58 @@ mod tests {
         assert_eq!(as_guest(&bride(&invitation), None), not_invited);
         let early = as_guest(&bride(&invitation), Some(&later));
         assert_eq!(early, wedding_text(keys::WEDDING_GUEST_EARLY, &later, now));
+        // Once it is due on their channel, whether to go in, with a word
+        // on the clothes for a guest without any.
         let due = wedding(Venue::Cathedral, 595);
-        let wait = as_guest(&bride(&invitation), Some(&due));
-        assert_eq!(wait, text(keys::WEDDING_GUEST_WAIT));
+        let enter = |player: &Player, guest_of: &Reservation| {
+            let view = WeddingView {
+                reservation: None,
+                guest_of: Some(guest_of),
+                channel: 0,
+                now,
+            };
+            choose(NICOLE, player, view, 2)
+        };
+        let question = |step: &Step| match &step.prompt {
+            Some(Prompt::YesNo { text, .. }) => text.clone(),
+            other => panic!("question expected, got {other:?}"),
+        };
+        let ask = enter(&bride(&invitation), &due);
+        assert_eq!(question(&ask), text(keys::WEDDING_GUEST_ASK_CLOTHES));
+        let dressed = bride(&[invitation[0], (InventoryType::Equip, 1051150)]);
+        let ask = enter(&dressed, &due);
+        assert_eq!(question(&ask), text(keys::WEDDING_GUEST_ASK));
+        let mut script = NpcScript::wedding_assistant(
+            NICOLE,
+            &dressed,
+            WeddingView {
+                reservation: None,
+                guest_of: Some(&due),
+                channel: 0,
+                now,
+            },
+        )
+        .unwrap();
+        script.begin();
+        script.respond(ScriptInput::Select(2)).unwrap();
+        let yes = script.respond(ScriptInput::Yes).unwrap();
+        let cathedral = Effect::EnterWedding {
+            venue: Venue::Cathedral,
+        };
+        assert_eq!(yes.effects, [cathedral]);
+        let elsewhere = Reservation { channel: 2, ..due };
+        let channel = page_text(&enter(&bride(&invitation), &elsewhere));
+        assert_eq!(
+            channel,
+            wedding_text(keys::WEDDING_GUEST_CHANNEL, &elsewhere, now)
+        );
 
         // More invitations only with the ticket.
         fn own(reservation: Option<&Reservation>, now: SystemTime) -> WeddingView<'_> {
             WeddingView {
                 reservation,
                 guest_of: None,
+                channel: 0,
                 now,
             }
         }
