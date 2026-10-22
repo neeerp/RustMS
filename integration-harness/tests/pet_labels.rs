@@ -3,7 +3,7 @@
 //! ring comes off or goes back on.
 
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{grant_pet, wear_cash_equip};
+use integration_harness::database::{grant_pet, grant_skill, wear_cash_equip};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{read, send, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -15,6 +15,10 @@ const BABY_TIGER: i32 = 5_000_066;
 const LABEL_RING: i32 = 1_822_000;
 /// Where the first pet out wears its label ring.
 const FIRST_PET_LABEL: i16 = -121;
+/// Where the second pet out wears its label ring.
+const SECOND_PET_LABEL: i16 = -131;
+/// Follow the Lead: more than one pet out.
+const FOLLOW_THE_LEAD: i32 = 8;
 /// A free Equip slot.
 const BAG_SLOT: i16 = 24;
 
@@ -51,6 +55,16 @@ fn item_move(kind: i8, from: i16, to: i16) -> Packet {
     p
 }
 
+/// The 172 for pet `index`, `name`, with or without its name tag.
+fn renamed(owner_id: i32, index: u8, name: &str, tagged: u8) -> Vec<u8> {
+    let mut body = owner_id.to_le_bytes().to_vec();
+    body.push(index);
+    body.extend((name.len() as u16).to_le_bytes());
+    body.extend(name.as_bytes());
+    body.push(tagged);
+    body
+}
+
 #[tokio::test]
 async fn a_label_ring_shows_its_pets_name_tag() {
     let config = load_harness_config_or_fail().await;
@@ -58,11 +72,17 @@ async fn a_label_ring_shows_its_pets_name_tag() {
     let owner_id = session.character_id;
     drop(session);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    let serial = 9_182_000_000 + 2 * i64::from(owner_id);
+    let serial = 9_182_000_000 + 3 * i64::from(owner_id);
+    grant_skill(owner_id, FOLLOW_THE_LEAD, 1)
+        .await
+        .expect("grant Follow the Lead");
     grant_pet(owner_id, 1, BABY_TIGER, serial, "Baby Tiger")
         .await
         .expect("grant a pet");
-    wear_cash_equip(owner_id, FIRST_PET_LABEL, LABEL_RING, serial + 1)
+    grant_pet(owner_id, 2, BABY_TIGER, serial + 1, "Tigger")
+        .await
+        .expect("grant a second pet");
+    wear_cash_equip(owner_id, FIRST_PET_LABEL, LABEL_RING, serial + 2)
         .await
         .expect("put the label ring on the pet");
     let mut owner = relogin(&config).await;
@@ -73,16 +93,28 @@ async fn a_label_ring_shows_its_pets_name_tag() {
     let spawned = next(o, &mut t, SendOpcode::SpawnPet).await;
     assert_eq!(spawned[spawned.len() - 2..], [1, 0], "name tag, no balloon");
 
-    let renamed = |tagged: u8| {
-        let mut body = owner_id.to_le_bytes().to_vec();
-        body.extend([0, 10, 0]); // pet 0, then the name's length
-        body.extend(b"Baby Tiger");
-        body.push(tagged);
-        body
-    };
     // Taking the ring off takes the tag away; putting it back shows it.
     send(o, item_move(-1, FIRST_PET_LABEL, BAG_SLOT)).await;
-    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, renamed(0));
+    let tiger = |tagged| renamed(owner_id, 0, "Baby Tiger", tagged);
+    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, tiger(0));
     send(o, item_move(1, BAG_SLOT, FIRST_PET_LABEL)).await;
-    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, renamed(1));
+    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, tiger(1));
+
+    // A second pet comes out without a ring, then gets the first pet's.
+    send(o, spawn_pet(2)).await;
+    let second = next(o, &mut t, SendOpcode::SpawnPet).await;
+    assert_eq!(second[second.len() - 2..], [0, 0], "no ring on Tigger");
+    send(o, item_move(-1, FIRST_PET_LABEL, BAG_SLOT)).await;
+    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, tiger(0));
+    send(o, item_move(1, BAG_SLOT, SECOND_PET_LABEL)).await;
+    let tigger = |tagged| renamed(owner_id, 1, "Tigger", tagged);
+    assert_eq!(next(o, &mut t, SendOpcode::PetNameChange).await, tigger(1));
+
+    // Sending the first pet back moves Tigger to the first label slot, which
+    // is empty.
+    send(o, spawn_pet(1)).await;
+    assert_eq!(
+        next(o, &mut t, SendOpcode::PetNameChange).await,
+        renamed(owner_id, 0, "Tigger", 0)
+    );
 }

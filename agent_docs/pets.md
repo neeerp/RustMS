@@ -93,7 +93,10 @@ beside it.
   168.
 - **Label rings.** Putting a label ring on or taking it off while its pet
   is out re-sends 172 with the pet's name and new flag to the owner and the
-  map, since that is the only packet that can restyle another's pet.
+  map, since that is the only packet that can restyle another's pet. So
+  does sending a pet back: those after it move down the list into the next
+  index's label slot. The quote ring's balloon flag goes out only with
+  SPAWN_PET, which has no update packet.
 - **Hunger.** Every 3 minutes (`client/pets.rs`) each pet out loses its
   `info/hungry` fullness (1 if unset; the Baby Tiger loses 3) and its item is
   re-sent. One left at 5 or less is set to 15 and goes home with 168 reason
