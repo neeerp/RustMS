@@ -4,6 +4,7 @@
 //! the party in.
 
 use crate::database::{grant_stack, replace_item, set_job, set_str, set_weapon_attack};
+use crate::hunting::{hit_reactor, walk_to, MapReactor};
 use crate::preconditions::load_harness_config_or_fail;
 use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
@@ -264,4 +265,77 @@ async fn enter_from_menu(team: &mut [WorldSession], event: &Event, npc: i32) -> 
         traces.push(trace);
     }
     traces
+}
+
+/// The trace of `player` sending `packet`, up to the barrier.
+pub async fn told(player: &mut WorldSession, packet: Packet) -> Trace {
+    let name = player.character_name.clone();
+    step(&mut player.connection, &name, packet).await
+}
+
+/// Whether an NPC said the line `key` in `trace`.
+pub fn said(trace: &Trace, key: &str) -> bool {
+    let text = net::content::text().get(key, &[]);
+    trace.prompt_texts.iter().any(|said| said.contains(&text))
+}
+
+/// Whether `trace` shows a stage cleared.
+pub fn cleared(trace: &Trace) -> bool {
+    trace
+        .field_effects
+        .iter()
+        .any(|(_, e)| e == "quest/party/clear")
+}
+
+/// Whether `trace` shows a wrong answer to a stage's puzzle.
+pub fn wrong(trace: &Trace) -> bool {
+    trace
+        .field_effects
+        .iter()
+        .any(|(_, e)| e == "quest/party/wrong_kor")
+}
+
+/// Go to `map` and wait to see its reactor `reactor_id`.
+pub async fn go_to(player: &mut WorldSession, map: i32, reactor_id: i32) -> (Trace, MapReactor) {
+    let mut seen = Trace::default();
+    assert_eq!(warp(&mut player.connection, map, "", &mut seen).await, map);
+    until(&mut player.connection, &mut seen, |t| {
+        t.field.reactors.iter().any(|r| r.reactor_id == reactor_id)
+    })
+    .await;
+    let reactor = *seen
+        .field
+        .reactors
+        .iter()
+        .find(|r| r.reactor_id == reactor_id)
+        .unwrap();
+    (seen, reactor)
+}
+
+/// Break open the stone box `stone`, out after Eak's fade-in, for `piece`:
+/// it takes four hits.
+pub async fn break_open(
+    player: &mut WorldSession,
+    seen: &mut Trace,
+    stone: MapReactor,
+    piece: i32,
+) {
+    let c = &mut player.connection;
+    send(c, walk_to(stone.x, stone.y)).await;
+    for state in 2..=4u8 {
+        send(c, hit_reactor(stone.object_id)).await;
+        until(c, seen, |t| {
+            t.field.reactor_hits.contains(&(stone.object_id, state))
+        })
+        .await;
+    }
+    send(c, hit_reactor(stone.object_id)).await;
+    until(c, seen, |t| {
+        t.field
+            .reactors_removed
+            .iter()
+            .any(|&(oid, _)| oid == stone.object_id)
+            && t.field.item_drop(piece).is_some()
+    })
+    .await;
 }

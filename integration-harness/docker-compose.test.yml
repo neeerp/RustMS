@@ -64,6 +64,12 @@ services:
       # wants two, one and none on its platforms (see tests/opq_music.rs).
       RUSTMS_OPQ_DAY: "2"
       RUSTMS_OPQ_SPLIT: "210"
+      # Its lounge's climb wants the second pad then the third, its tall
+      # room's 1, 2, 3, 4 over and over, and Eak the first and fourth
+      # levers (see tests/opq_levers.rs).
+      RUSTMS_OPQ_LOUNGE: "23"
+      RUSTMS_OPQ_TOWER: "1234123412341234"
+      RUSTMS_OPQ_LEVERS: "14"
       # The Crimson Balrog attacks every Ellinia-Orbis trip.
       RUSTMS_CONTI_BALROG: "100"
       # Every spawn point keeps a mob, bosses too, rather than the v83 rule

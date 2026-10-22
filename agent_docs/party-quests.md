@@ -502,6 +502,36 @@ The weekday is UTC plus `RUSTMS_RATE_CARD_UTC_OFFSET`.
 (three digits summing to 3, e.g. `210`) the split; the harness world sets
 both (`tests/opq_music.rs`).
 
+## Orbis's climbs and levers
+
+The lounge (920010600) and the tall room (920010700) are climbed pad by
+pad: each row's pads (`party3_r4pt`, `party3_r6pt`, scripted portals the
+client asks about with CHANGE_MAP_SPECIAL) have one right pad, drawn the
+first time anyone steps on one (`FieldActor::climb`, `events::draw_climb`).
+`ClientActor::opq_climb` answers them from `events::climb`, with the
+portal sound and a warp to a portal of the same map (a full map change,
+as in Cosmic). On the lounge's two rows of three the right pad leads a row
+up and then to `success` at the top, a wrong one to `fail` below the first
+row. On the tall room's sixteen rows of four the right pad leads a row up,
+or after every fourth row to that section's landing (`pt00`-`pt03`), and
+a wrong one back to the start of its section (`r6fail` in the first).
+Cosmic's script divides with a fraction there, so from rows 6-8, 10-12
+and 14-16 it names no whole portal and row 5 sends a player to the very
+bottom; here they fall to their section's start (`v83ref/lanes/QUESTIONS.md`).
+
+At the tall room's top are five levers, reactors 2008007 named "1" to
+"5", which flip between 0 and 1 on each hit and never break. Eak, at the
+bottom, wants two of them up, drawn the first time he is asked
+(`FieldActor::levers`, `events::draw_levers`), and judges them with
+`events::lever_check`: other than two up, he asks for two; two others
+show the wrong effect, and he says whether one of them is his; his two
+bring out the stone box `stone6` (2002013, a link to 2002011) and clear
+stage 7. The box drops 4001049. As in the music and sealed rooms any
+member may ask him; Cosmic hears only the leader. `RUSTMS_OPQ_LOUNGE`
+(two digits 1-3), `RUSTMS_OPQ_TOWER` (sixteen digits 1-4) and
+`RUSTMS_OPQ_LEVERS` (two lever names, e.g. `14`) pin the draws; the
+harness world sets them (`tests/opq_levers.rs`).
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
@@ -599,6 +629,7 @@ EXP at the reward.
 | Eak 2013001 | 920010000 | Runtime (`opq_eak`): out of the light; the leader clears the cloud stage, the others go up to `st00` |
 | Eak 2013001 | 920010100 | Runtime (`opq_eak`): the six pieces, to the leader only |
 | Eak 2013001 | 920010200, 920010600 | Runtime (`eak_hand_in`): 30 of 4001050 / 40 of 4001052 for a piece of the statue, clearing the room |
+| Eak 2013001 | 920010400, 920010500, 920010700 | Runtime (`opq_eak`): the music box, the head count, the levers; brings out the room's stone box and clears it |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

@@ -7,9 +7,10 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
-use game_data::Area;
+use game_data::{Area, PortalTemplate};
 use net::events::{
-    self, on_areas, standing, Balloon, Cloto, EventCommand, EventKind, HeadCount, Standing,
+    self, on_areas, standing, Balloon, Cloto, EventCommand, EventKind, HeadCount, LeverCheck,
+    Standing,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
@@ -19,6 +20,7 @@ use net::packet::build::world::effect::{
 };
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
+use net::scripts::{self, Effect};
 use net::ClientId;
 use packet::Packet;
 use tokio::sync::oneshot;
@@ -161,12 +163,29 @@ impl ClientActor {
         match map_id {
             events::OPQ_MUSIC_ROOM => {
                 let cleared = ticket.cleared(events::OPQ_MUSIC_STAGE);
-                let (reply, state) = oneshot::channel();
-                let name = net::reactors::MUSIC_BOX;
-                self.send_to_field(FieldMessage::ReactorState { name, reply })
-                    .await?;
-                let played = state.await.ok().flatten().is_some_and(|state| state > 0);
+                let states = self.reactor_states(&[net::reactors::MUSIC_BOX]).await?;
+                let played = states[0].is_some_and(|state| state > 0);
                 Ok(Some(NpcScript::opq_music(played, cleared)))
+            }
+            events::OPQ_LEVER_ROOM => {
+                if ticket.cleared(events::OPQ_LEVER_STAGE) {
+                    return Ok(Some(NpcScript::opq_levers(None)));
+                }
+                let (reply, pair) = oneshot::channel();
+                self.send_to_field(FieldMessage::Levers { reply }).await?;
+                let Ok(pair) = pair.await else {
+                    return Ok(None);
+                };
+                let states = self.reactor_states(&events::OPQ_LEVERS).await?;
+                let mut up = [false; 5];
+                for (up, state) in up.iter_mut().zip(states) {
+                    *up = state.is_some_and(|state| state > 0);
+                }
+                let check = events::lever_check(pair, up);
+                if matches!(check, LeverCheck::Wrong { .. }) {
+                    self.show_wrong_answer().await?;
+                }
+                Ok(Some(NpcScript::opq_levers(Some(check))))
             }
             events::OPQ_HEAD_COUNT_ROOM => {
                 if ticket.cleared(events::OPQ_HEAD_COUNT_STAGE) {
@@ -194,6 +213,42 @@ impl ClientActor {
                 ticket.cleared(1),
             )),
         }
+    }
+
+    /// Where a climb pad of the Orbis party quest, `portal` running
+    /// `script`, sends the player: a sound and a warp on the same map.
+    /// `None` off the quest's lounge and tall room.
+    pub(super) async fn opq_climb(
+        &mut self,
+        script: &str,
+        portal: &PortalTemplate,
+    ) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let in_opq = self
+            .event
+            .as_ref()
+            .is_some_and(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Opq);
+        if !in_opq || ![scripts::OPQ_LOUNGE_CLIMB, scripts::OPQ_TOWER_CLIMB].contains(&script) {
+            return Ok(None);
+        }
+        let (reply, combo) = oneshot::channel();
+        self.send_to_field(FieldMessage::Climb { reply }).await?;
+        let (Ok(combo), Ok(id)) = (combo.await, u8::try_from(portal.id)) else {
+            return Ok(None);
+        };
+        Ok(events::climb(map_id, &combo, id, &portal.name)
+            .map(|to| vec![Effect::PortalSound, Effect::WarpToPortal(map_id, to)]))
+    }
+
+    /// The states of the reactors named `names` on the player's map.
+    async fn reactor_states(
+        &mut self,
+        names: &'static [&'static str],
+    ) -> Result<Vec<Option<u8>>, RuntimeError> {
+        let (reply, states) = oneshot::channel();
+        self.send_to_field(FieldMessage::ReactorStates { names, reply })
+            .await?;
+        Ok(states.await.unwrap_or_else(|_| vec![None; names.len()]))
     }
 
     /// What `judge` makes of where everyone on `map_id`, the player's map,

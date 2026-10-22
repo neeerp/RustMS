@@ -150,6 +150,10 @@ const OPQ_ROOMS_OUT: [(i32, u8); 7] = [
     (920010700, 14),
     (920011000, 16),
 ];
+/// The climb pads of the Tower of Goddess's lounge and tall room, which
+/// the client actor answers from the field's draw (`events::climb`).
+pub const OPQ_LOUNGE_CLIMB: &str = "party3_r4pt";
+pub const OPQ_TOWER_CLIMB: &str = "party3_r6pt";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.

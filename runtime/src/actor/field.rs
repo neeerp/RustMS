@@ -182,6 +182,12 @@ pub struct FieldActor {
     /// In the Tower of Goddess's sealed room, how many of the team Eak
     /// wants on each platform, once he has been asked.
     split: Option<[u8; 3]>,
+    /// On the Tower of Goddess's lounge and tall room, the right pad of
+    /// each row of the climb, once anyone has stepped on one.
+    climb: Option<Vec<u8>>,
+    /// In the tall room, the two levers Eak wants up, once he has been
+    /// asked.
+    levers: Option<[bool; 5]>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -230,6 +236,8 @@ impl FieldActor {
             lost_at: None,
             salion: None,
             split: None,
+            climb: None,
+            levers: None,
             kites: KiteSet::default(),
             tick,
         }
@@ -499,14 +507,30 @@ impl FieldActor {
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }
-            FieldMessage::ReactorState { name, reply } => {
-                let _ = reply.send(self.reactors.named(name).map(|reactor| reactor.state));
+            FieldMessage::ReactorStates { names, reply } => {
+                let states = names
+                    .iter()
+                    .map(|name| self.reactors.named(name).map(|r| r.state));
+                let _ = reply.send(states.collect());
             }
             FieldMessage::Split { reply } => {
                 let split = self
                     .split
                     .get_or_insert_with(|| net::events::draw_split(&mut rand::thread_rng()));
                 let _ = reply.send(*split);
+            }
+            FieldMessage::Climb { reply } => {
+                let map_id = self.key.map_id;
+                let climb = self.climb.get_or_insert_with(|| {
+                    net::events::draw_climb(map_id, &mut rand::thread_rng())
+                });
+                let _ = reply.send(climb.clone());
+            }
+            FieldMessage::Levers { reply } => {
+                let levers = self
+                    .levers
+                    .get_or_insert_with(|| net::events::draw_levers(&mut rand::thread_rng()));
+                let _ = reply.send(*levers);
             }
             FieldMessage::Move {
                 from,

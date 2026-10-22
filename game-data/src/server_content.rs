@@ -445,6 +445,16 @@ pub mod keys {
     pub const OPQ_EAK_HEADS_RIGHT: &str = "opq.eak.heads.right";
     /// Eak in the sealed room once it is cleared.
     pub const OPQ_EAK_HEADS_DONE: &str = "opq.eak.heads.done";
+    /// Eak in the tall room, before two levers are up.
+    pub const OPQ_EAK_LEVERS_ASK: &str = "opq.eak.levers.ask";
+    /// Eak in the tall room: one of the two levers up is right.
+    pub const OPQ_EAK_LEVERS_ONE_RIGHT: &str = "opq.eak.levers.one_right";
+    /// Eak in the tall room: neither lever up is right.
+    pub const OPQ_EAK_LEVERS_NONE_RIGHT: &str = "opq.eak.levers.none_right";
+    /// Eak in the tall room: the right two are up, and the stone box is out.
+    pub const OPQ_EAK_LEVERS_RIGHT: &str = "opq.eak.levers.right";
+    /// Eak in the tall room once it is cleared.
+    pub const OPQ_EAK_LEVERS_DONE: &str = "opq.eak.levers.done";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1822,6 +1832,11 @@ mod tests {
             keys::OPQ_EAK_HEADS_ALL_WRONG,
             keys::OPQ_EAK_HEADS_RIGHT,
             keys::OPQ_EAK_HEADS_DONE,
+            keys::OPQ_EAK_LEVERS_ASK,
+            keys::OPQ_EAK_LEVERS_ONE_RIGHT,
+            keys::OPQ_EAK_LEVERS_NONE_RIGHT,
+            keys::OPQ_EAK_LEVERS_RIGHT,
+            keys::OPQ_EAK_LEVERS_DONE,
         ];
         for key in named
             .iter()
@@ -1965,7 +1980,7 @@ mod tests {
     }
 
     #[test]
-    fn the_music_and_sealed_rooms_boxes_drop_their_pieces_without_the_pack() {
+    fn the_orbis_records_and_stone_boxes_drop_without_the_pack() {
         let table = RewardTable::load(None).unwrap();
         let only = |reactor_id| {
             let drops = table.reactor_drops(reactor_id);
@@ -1979,6 +1994,7 @@ mod tests {
         }
         assert_eq!(only(2002011), Some(4001046));
         assert_eq!(only(2002012), Some(4001047));
+        assert_eq!(only(2002013), Some(4001049));
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {

@@ -7,89 +7,26 @@
 //! 60 times as fast (`RUSTMS_EVENT_SCALE`), so the quest lasts a minute.
 
 use game_data::server_content::keys;
-use integration_harness::events::{enter_opq, party, talk, throw_down, waiting_in, EAK};
-use integration_harness::hunting::{hit_reactor, walk_to, MapReactor};
-use integration_harness::trace::{send, step, until, warp, Trace};
+use integration_harness::events::{
+    break_open, cleared, enter_opq, go_to, party, said, talk, throw_down, told, waiting_in, wrong,
+    EAK,
+};
+use integration_harness::hunting::walk_to;
+use integration_harness::trace::{send, until};
 use integration_harness::WorldSession;
 use net::events::{OPQ, OPQ_HEAD_COUNT_ROOM, OPQ_MUSIC_ROOM};
 use net::reactors::MUSIC;
-use packet::Packet;
 
 const MONDAY_RECORD: i32 = 4001057;
 const TUESDAY_RECORD: i32 = 4001058;
 const STONE3: i32 = 2002011;
 const STONE4: i32 = 2002012;
 
-/// The trace of `player` sending `packet`, up to the barrier.
-async fn told(player: &mut WorldSession, packet: Packet) -> Trace {
-    let name = player.character_name.clone();
-    step(&mut player.connection, &name, packet).await
-}
-
-fn said(trace: &Trace, key: &str) -> bool {
-    let text = net::content::text().get(key, &[]);
-    trace.prompt_texts.iter().any(|said| said.contains(&text))
-}
-
-fn cleared(trace: &Trace) -> bool {
-    trace
-        .field_effects
-        .iter()
-        .any(|(_, e)| e == "quest/party/clear")
-}
-
-fn wrong(trace: &Trace) -> bool {
-    trace
-        .field_effects
-        .iter()
-        .any(|(_, e)| e == "quest/party/wrong_kor")
-}
-
 /// Stand on the sealed room's platform `n` (Map.nx `area` n + 1), or off
 /// them all for `None`, before anything else this player does.
 async fn stand(player: &mut WorldSession, n: Option<usize>) {
     let (x, y) = n.map_or((84, -80), |n| [(-160, -800), (-40, -920), (80, -800)][n]);
     told(player, walk_to(x, y)).await;
-}
-
-/// Go to `map` and wait to see its reactor `reactor_id`.
-async fn go_to(player: &mut WorldSession, map: i32, reactor_id: i32) -> (Trace, MapReactor) {
-    let mut seen = Trace::default();
-    assert_eq!(warp(&mut player.connection, map, "", &mut seen).await, map);
-    until(&mut player.connection, &mut seen, |t| {
-        t.field.reactors.iter().any(|r| r.reactor_id == reactor_id)
-    })
-    .await;
-    let reactor = *seen
-        .field
-        .reactors
-        .iter()
-        .find(|r| r.reactor_id == reactor_id)
-        .unwrap();
-    (seen, reactor)
-}
-
-/// Break open the stone box `stone`, out after Eak's fade-in, for `piece`:
-/// it takes four hits.
-async fn break_open(player: &mut WorldSession, seen: &mut Trace, stone: MapReactor, piece: i32) {
-    let c = &mut player.connection;
-    send(c, walk_to(stone.x, stone.y)).await;
-    for state in 2..=4u8 {
-        send(c, hit_reactor(stone.object_id)).await;
-        until(c, seen, |t| {
-            t.field.reactor_hits.contains(&(stone.object_id, state))
-        })
-        .await;
-    }
-    send(c, hit_reactor(stone.object_id)).await;
-    until(c, seen, |t| {
-        t.field
-            .reactors_removed
-            .iter()
-            .any(|&(oid, _)| oid == stone.object_id)
-            && t.field.item_drop(piece).is_some()
-    })
-    .await;
 }
 
 #[tokio::test]
