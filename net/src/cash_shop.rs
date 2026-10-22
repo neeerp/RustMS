@@ -325,6 +325,31 @@ mod tests {
     }
 
     #[test]
+    fn wedding_tickets_are_sold_under_etc_wedding() {
+        if commodities().is_err() {
+            return;
+        }
+        // Etc > Wedding sells the four tickets; the Event-tab copies of
+        // them are off sale.
+        let tickets: Vec<_> = (50400000..=50400003)
+            .map(|sn| check_purchase(commodity(sn), 1).map(|c| (c.item_id, c.price)))
+            .collect();
+        assert_eq!(
+            tickets,
+            [
+                Ok((5251000, 25000)),
+                Ok((5251001, 20000)),
+                Ok((5251002, 24000)),
+                Ok((5251003, 29000)),
+            ]
+        );
+        assert_eq!(
+            check_purchase(commodity(10100885), 0),
+            Err(CashShopFailure::SoldOut)
+        );
+    }
+
+    #[test]
     fn best_items_are_on_sale_for_each_gender() {
         if commodities().is_err() {
             return;
