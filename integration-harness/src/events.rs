@@ -78,6 +78,13 @@ fn invite(name: &str) -> Packet {
     p
 }
 
+/// Pass the party's lead to `member_id`.
+pub fn pass_lead(member_id: i32) -> Packet {
+    let mut p = party_operation(6);
+    p.write_int(member_id).unwrap();
+    p
+}
+
 /// Leave the party, which its leader's leaving disbands.
 pub fn leave_party() -> Packet {
     party_operation(2)

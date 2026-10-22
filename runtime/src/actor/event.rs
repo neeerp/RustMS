@@ -27,7 +27,7 @@ use net::events::{
 };
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -100,11 +100,11 @@ pub struct EventTicket {
     /// When the time shown on the event's maps runs out; none once it is
     /// won, until a bonus starts.
     pub clock: Option<Instant>,
-    /// Whether the member leads the team.
-    pub leader: bool,
     member: ClientId,
     event: EventHandle,
     cleared: Arc<Cleared>,
+    /// Who leads the team, shared with the event, which hands it on.
+    leader: Arc<AtomicI32>,
 }
 
 impl Drop for EventTicket {
@@ -120,6 +120,11 @@ impl EventTicket {
     /// Whether `map_id` is one of the event's maps, played in its copy.
     pub fn holds(&self, map_id: i32) -> bool {
         self.kind.event().holds(map_id)
+    }
+
+    /// Whether the member leads the team.
+    pub fn leader(&self) -> bool {
+        self.leader.load(Ordering::Relaxed) == self.member
     }
 
     /// Whether the party has cleared `stage`.
@@ -219,6 +224,7 @@ pub fn spawn(
         puzzles: Puzzles::default(),
         heard: HashSet::new(),
         cleared: Arc::default(),
+        leader: Arc::new(AtomicI32::new(start.leader)),
         directory: directory.clone(),
         failed: false,
         bonus_taken: false,
@@ -270,8 +276,11 @@ struct EventActor {
     /// The hand-in stages whose NPC the leader has heard out.
     heard: HashSet<u8>,
     cleared: Arc<Cleared>,
+    /// The team's leader, for the tickets.
+    leader: Arc<AtomicI32>,
     directory: mpsc::Sender<DirectoryMessage>,
-    /// The party lost what it protected, which ends the event.
+    /// The party lost what it protected, or its lead went to someone not
+    /// in it, which ends the event.
     failed: bool,
     /// The leader took the team to the bonus.
     bonus_taken: bool,
@@ -288,10 +297,10 @@ impl EventActor {
                     id,
                     kind,
                     clock: Some(ends),
-                    leader: member.client_id == self.team.leader(),
                     member: member.client_id,
                     event: event.clone(),
                     cleared: self.cleared.clone(),
+                    leader: self.leader.clone(),
                 }));
             }
         }
@@ -431,6 +440,15 @@ impl EventActor {
                 self.start_bonus();
             }
             EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
+            // Told by the old leader or the new one, whichever is first.
+            EventCommand::HandOver(to) if leader || client_id == to => {
+                self.leader.store(to, Ordering::Relaxed);
+                if self.team.hand_over(to) {
+                    info!(kind = ?self.kind, id = self.id, to, "Event's lead left it");
+                    self.failed = true;
+                }
+            }
+            EventCommand::HandOver(_) => {}
         }
     }
 

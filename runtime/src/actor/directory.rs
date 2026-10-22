@@ -1318,6 +1318,10 @@ impl WorldDirectory {
                     return;
                 }
                 if let Some(party) = self.parties.change_leader(from, member_id).cloned() {
+                    // An event they're in follows; the first to tell it wins.
+                    for who in [from, member_id] {
+                        self.tell(who, ServerMessage::LeaderHandedOver { to: member_id });
+                    }
                     self.send_to_party(&party, |_| build_party_leader_changed(member_id));
                     self.dungeon_leader_changed(from, member_id);
                 }

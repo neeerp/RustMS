@@ -17,6 +17,7 @@ use net::packet::build::world::effect::{
 };
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
+use net::ClientId;
 use packet::Packet;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
@@ -221,6 +222,16 @@ impl ClientActor {
     pub(super) async fn event_failed(&mut self, id: u32) {
         if let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) {
             ticket.command(EventCommand::Fail).await;
+        }
+    }
+
+    /// The player's party passed from or to them, to `to`: their event, if
+    /// they led it or now do, follows, and ends if `to` is not in it. The
+    /// event checks who tells it, so a ticket's own view of the leader,
+    /// which may be behind, doesn't matter here.
+    pub(super) async fn handed_over(&mut self, to: ClientId) {
+        if let Some(ticket) = &self.event {
+            ticket.command(EventCommand::HandOver(to)).await;
         }
     }
 

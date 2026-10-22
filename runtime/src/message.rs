@@ -299,6 +299,11 @@ pub enum ServerMessage {
     EventEnded {
         id: u32,
     },
+    /// The player's party passed to `to`, from them or to them; an event
+    /// it is in goes with it.
+    LeaderHandedOver {
+        to: ClientId,
+    },
     /// The party in event `id` lost what it protected there.
     EventFailed {
         id: u32,
