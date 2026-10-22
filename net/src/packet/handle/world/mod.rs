@@ -22,6 +22,7 @@ mod family;
 mod guild;
 mod guild_bbs;
 mod hammer;
+mod incubator;
 mod item_effect;
 mod item_guard;
 mod item_move;

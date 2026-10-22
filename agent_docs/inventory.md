@@ -731,6 +731,22 @@ used."), where v83 would take it. The server then takes the scissors and
 re-sends the item, or only unlocks the client. The Item Guards' lock-out
 also covers this window.
 
+### Incubator
+
+The Incubator (5060002) hatches a Pigmy Egg (4170000-4170009) (report
+c035). The client's Incubator window sends USE_CASH_ITEM with the egg's
+inventory type (4) and slot. The server (`world/incubator.rs`) takes the
+incubator and one egg and gives one of 20 prizes, each as likely as the
+next. The list is Cosmic's, since neither the client nor any server we can
+read has the real one (a recommended default, `v83ref/lanes/QUESTIONS.md`).
+It answers INCUBATOR_RESULT (`0x45`, item id and count; the client shows
+them in the chat log and a popup) and then the inventory changes, which
+unlock the client. Unless 1 Equip, 3 Use and 1 Etc slot are free once the
+egg and the incubator are gone, the result is item 0 ("Your inventory is
+full.") and the client is unlocked with nothing used. Anything else (the DS
+Egg 4170012, a slot with no egg, an incubator not held) only unlocks it.
+Nothing in our content gives eggs yet.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being

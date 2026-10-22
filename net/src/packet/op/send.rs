@@ -31,6 +31,8 @@ pub enum SendOpcode {
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
+    /// What a Pigmy Egg held, or 0 for a full inventory (FUN_00a28298).
+    IncubatorResult = 0x45,
     /// The Owl of Minerva's answers by mode: 6 a search's results, 7 the
     /// most searched items (FUN_00a28c29).
     OwlResult = 0x46,

@@ -166,6 +166,17 @@ pub fn build_item_gain_in_chat(item_id: i32, quantity: i32) -> Result<Packet, Ne
     Ok(p)
 }
 
+/// INCUBATOR_RESULT: `count` of `item_id` was in the Pigmy Egg, shown in
+/// the chat log and a popup; an `item_id` of 0 says "Your inventory is
+/// full." (FUN_00a28298). It does not unlock the client.
+pub fn build_incubator_result(item_id: i32, count: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::IncubatorResult as i16)?;
+    p.write_int(item_id)?;
+    p.write_short(count)?;
+    Ok(p)
+}
+
 /// UPDATE_CHAR_LOOK: other players redraw this character's equipment.
 pub fn build_char_look(player: &Player) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -208,6 +219,18 @@ mod tests {
             .byte(2);
         expect.byte(1).byte(2).short(2).short(7);
         expect.byte(3).byte(4).short(1);
+        expect.end();
+    }
+
+    #[test]
+    fn incubator_result_is_the_item_and_count() {
+        let packet = build_incubator_result(2_000_004, 240).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x45).int(2_000_004).short(240);
+        expect.end();
+        let packet = build_incubator_result(0, 0).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(0x45).int(0).short(0);
         expect.end();
     }
 
