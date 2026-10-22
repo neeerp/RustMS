@@ -151,7 +151,7 @@ namespace ms
 		class SellItem
 		{
 		public:
-			SellItem(int32_t item_id, int16_t count, int16_t slot, bool showcount, Texture cur);
+			SellItem(int32_t item_id, int16_t count, int16_t slot, bool showcount, bool sealed, Texture cur);
 
 			void draw(Point<int16_t> position) const;
 
@@ -161,6 +161,8 @@ namespace ms
 
 			int16_t get_sellable() const;
 
+			bool is_sealed() const;
+
 		private:
 			Texture icon;
 			Texture currency;
@@ -168,6 +170,7 @@ namespace ms
 			int16_t slot;
 			int16_t sellable;
 			bool showcount;
+			bool sealed;
 			Text namelabel;
 			Text pricelabel;
 		};

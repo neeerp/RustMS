@@ -260,8 +260,9 @@ Spirit, White Scroll) goes to the scroller and the map, then the look
 refresh unless it simply failed. Legendary Spirit requests are refused with
 SHOW_SCROLL_EFFECT -1 to the scroller alone; HeavenClient ignores that, as
 it has no Legendary Spirit window. HeavenClient plays the Enchant sound and
-the scroll glow, and gives the scroller the v83 chat line. The v83 prompts
-for scrolling a sealed item are skipped.
+the scroll glow, and gives the scroller the v83 chat line. A sealed scroll
+goes on nothing, and a sealed equip asks first whether to risk it (v83
+0x114f, "Due to the potency of the scroll..."; No keeps the scroll).
 
 ### Megaphones
 
@@ -652,11 +653,14 @@ still in place, the packet naming only slots. Worn equips are refused: v83
 only takes drops from the Item window.
 
 A sealed item can't be dropped, sold or traded, in a trade or a personal
-shop (`Item::sealed`), nor taken apart by the Maker; it can be stored
-(report c009 would refuse that too), and a timed seal in storage runs on
-until the item comes out. HeavenClient refuses the drop itself, not yet a
-sale (v83 says "Sealed items cannot be sold, traded, or dropped.") or a
-Maker drop, and shows "Seal Released on" with a timed seal's date in the
+shop (`Item::sealed`), sent by Duey, nor taken apart by the Maker. It can
+be stored, as in v83 (report c013), and a timed seal in storage runs on
+until the item comes out. HeavenClient says "Sealed items cannot be sold,
+traded, or dropped." (v83's 0xd58, report c013) before anything else at
+each place v83 does: a drop on the ground, into a trade or a personal shop,
+onto the Maker, a sale in an NPC shop (the item stays listed), a
+double-click on a USE item, a USE or cash item dropped on a worn equip, and
+Vega's Start. It shows "Seal Released on" with a timed seal's date in the
 tooltip. When a timed seal's date passes, the expiry sweep lifts the seal
 and the date and re-sends the item.
 

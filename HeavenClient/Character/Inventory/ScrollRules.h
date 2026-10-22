@@ -11,6 +11,10 @@ namespace ms
 	{
 		constexpr int32_t WHITE_SCROLL = 2340000;
 
+		// StringPool 0x114f: asked before a scroll goes on a sealed equip.
+		constexpr const char *SEALED_TARGET = "Due to the potency of the scroll,\\nthe sealed item might be destroyed."
+			"\\nAre you sure you still want to use the scroll?";
+
 		inline bool is_scroll(int32_t item_id)
 		{
 			return item_id / 10000 == 204;

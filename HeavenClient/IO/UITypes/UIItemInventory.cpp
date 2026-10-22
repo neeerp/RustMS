@@ -1167,7 +1167,11 @@ namespace ms
 
 						break;
 					case InventoryType::Id::USE:
-						if (item_id / 10000 == 203)
+						// v83 0x4f033e: before any kind of USE item does anything.
+						if (inventory.is_sealed(tab, slot))
+							UI::get().emplace<UIOk>(item_drop::SEALED, [](bool)
+							{});
+						else if (item_id / 10000 == 203)
 							use_return_scroll(slot, item_id);
 						else if (item_id / 10000 == 210)
 							use_summon_sack(slot, item_id);
@@ -1837,9 +1841,9 @@ namespace ms
 		if (!player.can_request(ExclRequest::WAIT))
 			return;
 
-		if (!item_drop::tradeable(traits))
+		if (const char *refusal = item_drop::trade_refusal(traits))
 		{
-			UI::get().emplace<UIOk>(item_drop::UNAVAILABLE, [](bool) {});
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
 
 			return;
 		}
@@ -2024,8 +2028,7 @@ namespace ms
 				break;
 			case InventoryType::Id::USE:
 			{
-				// v83 FUN_004f4bb7: a scroll dropped on a worn equip. HeavenClient
-				// has no sealed items, so v83's notices about those don't apply.
+				// v83 FUN_004f4bb7: a scroll dropped on a worn equip.
 				Player &player = Stage::get().get_player();
 
 				if (player.get_look().get_alerted())
@@ -2038,6 +2041,14 @@ namespace ms
 				if (player.is_dead())
 				{
 					UI::get().emplace<UIOk>(DEAD, [](bool)
+					{});
+					break;
+				}
+
+				// A sealed USE item goes on nothing (0x4f4c69).
+				if (traits.sealed)
+				{
+					UI::get().emplace<UIOk>(item_drop::SEALED, [](bool)
 					{});
 					break;
 				}
@@ -2059,17 +2070,39 @@ namespace ms
 				};
 
 				// Either answer scrolls; only Yes uses the White Scroll.
-				if (scroll_rules::takes_white_scroll(item_id) &&
-					inventory.find_item(InventoryType::Id::USE, scroll_rules::WHITE_SCROLL) != 0)
-					UI::get().emplace<UIYesNo>("Would you like to use the White Scroll?", send);
+				bool white = scroll_rules::takes_white_scroll(item_id) &&
+					inventory.find_item(InventoryType::Id::USE, scroll_rules::WHITE_SCROLL) != 0;
+
+				auto scroll = [send, white]()
+				{
+					if (white)
+						UI::get().emplace<UIYesNo>("Would you like to use the White Scroll?", send);
+					else
+						send(false);
+				};
+
+				// A sealed equip asks first (0x4f4e41); No stops there.
+				if (inventory.is_sealed(InventoryType::Id::EQUIPPED, target))
+					UI::get().emplace<UIYesNo>(scroll_rules::SEALED_TARGET, [scroll](bool yes)
+					{
+						if (yes)
+							scroll();
+					});
 				else
-					send(false);
+					scroll();
 
 				break;
 			}
 			case InventoryType::Id::CASH:
 			{
 				// v83 FUN_004f4bb7: an Item Tag or a Magical Sandglass dropped on a worn equip.
+				if (traits.sealed)
+				{
+					UI::get().emplace<UIOk>(item_drop::SEALED, [](bool)
+					{});
+					break;
+				}
+
 				bool tag = equip_cash::is_tag(item_id);
 
 				if (!tag && !equip_cash::is_sandglass(item_id))

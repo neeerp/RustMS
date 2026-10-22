@@ -25,6 +25,7 @@
 #include "../Components/MapleButton.h"
 #include "../Audio/Audio.h"
 #include "../Data/ItemData.h"
+#include "../../Character/Inventory/ItemDrop.h"
 
 #include "../Net/Packets/NpcInteractionPackets.h"
 #include "../Util/NxFiles.h"
@@ -591,7 +592,7 @@ namespace ms
 		return row.buyable;
 	}
 
-	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, Texture cur) : currency(cur)
+	UIShop::SellItem::SellItem(int32_t item_id, int16_t count, int16_t s, bool sc, bool sl, Texture cur) : currency(cur)
 	{
 		const ItemData &idata = ItemData::get(item_id);
 
@@ -600,6 +601,7 @@ namespace ms
 		sellable = count;
 		slot = s;
 		showcount = sc;
+		sealed = sl;
 
 		namelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
 		pricelabel = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);
@@ -642,6 +644,11 @@ namespace ms
 	int16_t UIShop::SellItem::get_sellable() const
 	{
 		return sellable;
+	}
+
+	bool UIShop::SellItem::is_sealed() const
+	{
+		return sealed;
 	}
 
 	void UIShop::BuyState::reset()
@@ -761,7 +768,7 @@ namespace ms
 			if (int32_t item_id = inventory.get_item_id(tab, i))
 			{
 				int16_t count = inventory.get_item_count(tab, i);
-				items.emplace_back(item_id, count, i, tab != InventoryType::Id::EQUIP, meso);
+				items.emplace_back(item_id, count, i, tab != InventoryType::Id::EQUIP, inventory.is_sealed(tab, i), meso);
 			}
 		}
 
@@ -817,6 +824,14 @@ namespace ms
 		int32_t itemid = item.get_id();
 		int16_t sellable = item.get_sellable();
 		int16_t slot = item.get_slot();
+
+		// v83 0x756aa7: listed, but refused before any question.
+		if (item.is_sealed())
+		{
+			UI::get().emplace<UIOk>(item_drop::SEALED, [](bool) {});
+
+			return;
+		}
 
 		// A set of stars or bullets is sold whole
 		if (shop_list::is_rechargeable(itemid))

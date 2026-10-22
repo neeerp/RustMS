@@ -65,6 +65,10 @@ int main()
 		karma.karma = true;
 		require(tradeable(karma), "Karma lets it trade once");
 		require(!tradeable(account), "account items stay in the account");
+		require(trade_refusal(plain) == nullptr && trade_refusal(quest) == UNAVAILABLE, "a trade says why it refuses");
+		Traits sealed_karma = karma;
+		sealed_karma.sealed = true;
+		require(trade_refusal(sealed_karma) == SEALED, "a sealed item says so first, even with Karma");
 
 		require(unsellable(plain) == nullptr && unsellable(karma) == nullptr, "a shop takes what may trade");
 		require(unsellable(account) == SEALED, "a sealed item says so first");

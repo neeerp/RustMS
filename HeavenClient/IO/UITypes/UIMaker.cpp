@@ -8,6 +8,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
+#include "../../Character/Inventory/ItemDrop.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -783,6 +784,25 @@ namespace ms
 
 	bool UIMaker::send_icon(const Icon &icon, Point<int16_t> cursorpos)
 	{
+		auto [tab, s] = icon.get_source();
+
+		if (tab == InventoryType::Id::NONE || tab == InventoryType::Id::EQUIPPED)
+			return true;
+
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+		int32_t id = inventory.get_item_id(tab, s);
+
+		if (id == 0)
+			return true;
+
+		// FUN_004f3dbd, before the Maker sees it (0x4f3e57).
+		if (inventory.is_sealed(tab, s))
+		{
+			notice(item_drop::SEALED);
+
+			return true;
+		}
+
 		// FUN_00825d15: only while nothing is under way.
 		if (state != State::IDLE && state != State::READY)
 			return true;
@@ -795,16 +815,6 @@ namespace ms
 		}
 
 		Point<int16_t> cursor = cursorpos - position;
-
-		auto [tab, s] = icon.get_source();
-
-		if (tab == InventoryType::Id::NONE || tab == InventoryType::Id::EQUIPPED)
-			return true;
-
-		int32_t id = Stage::get().get_player().get_inventory().get_item_id(tab, s);
-
-		if (id == 0)
-			return true;
 
 		// A recipe's ingredients are its own; dropped ones are the crystal's drops or the equipment to take
 		// apart (FUN_00825dd2).
