@@ -32,6 +32,7 @@
 #include "../Configuration.h"
 #include "../Data/BulletData.h"
 #include "../Data/EquipData.h"
+#include "../Data/ItemData.h"
 #include "../Data/PetData.h"
 #include "../Data/SkillData.h"
 #include "../Data/WeaponData.h"
@@ -362,9 +363,13 @@ namespace ms
 	{
 		InventoryType::Id type = InventoryType::by_item_id(itemid);
 
-		if (int16_t slot = inventory.find_item(type, itemid))
+		if (int16_t slot = inventory.find_unsealed(type, itemid))
 		{
-			if (type == InventoryType::Id::USE && itemid / 10000 == 226)
+			// v83 0x94f882: a reward box is sent before any other kind of item
+			// is tried, as from a double-click.
+			if (type == InventoryType::Id::USE && ItemData::get(itemid).has_reward())
+				request(UseItemRewardPacket(slot, itemid), ExclRequest::USE_WAIT);
+			else if (type == InventoryType::Id::USE && itemid / 10000 == 226)
 				feed_mount(slot, itemid);
 			else if (type == InventoryType::Id::USE && itemid / 10000 == 227)
 				use_catch_item(slot, itemid);

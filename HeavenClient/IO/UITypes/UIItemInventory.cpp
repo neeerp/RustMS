@@ -495,6 +495,14 @@ namespace ms
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
 		}
 
+		// v83 FUN_00a0a63f type 0x45: a cash bag (553xxxx) is sent as it is,
+		// and the server opens its reward like a reward box's (report c040).
+		void use_cash_bag(int16_t slot, int32_t item_id)
+		{
+			if (may_use_cash_item() && Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
+				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+		}
+
 		// v83 FUN_00a0a63f type 0x28: a cash morph (530xxxx) is sent unless the player sits on a portable chair
 		// or rides a tamed monster, even while morphed (report c012).
 		void use_cash_morph(int16_t slot, int32_t item_id)
@@ -1338,6 +1346,8 @@ namespace ms
 							use_meso_bag(slot, item_id);
 						else if (item_id / 10000 == 528)
 							use_cash_mist(slot, item_id);
+						else if (item_id / 10000 == 553)
+							use_cash_bag(slot, item_id);
 						else if (item_id / 10000 == 533)
 							use_quick_delivery(slot, item_id);
 						else if (morph::is_cash_morph(item_id))

@@ -6,7 +6,7 @@
 //! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
 //! Hammer, Vega's Spell, the cash mists, the Item Tag, the Magical
 //! Sandglasses, the Item Guards, the Scissors of Karma, the cash morphs,
-//! the kites, the Cash Owl and the Incubator are used so far.
+//! the kites, the Cash Owl, the Incubator and the cash bags are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -25,6 +25,7 @@ use super::pet::{cash_pet_food, pet_name_tag};
 use super::stat_reset::{ap_reset, sp_reset};
 use super::teleport_rock::teleport_rock;
 use super::use_item::cash_morph;
+use super::use_item_reward::open_box;
 use super::vega::vega_spell;
 use super::weather::weather;
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
@@ -74,6 +75,7 @@ impl WorldHandler for UseCashItemHandler {
             539 if held => avatar_megaphone(ctx, &mut r, slot, item_id),
             550 if held => sandglass(ctx, &mut r, slot, item_id),
             552 if held && item_id == KARMA_SCISSORS => karma_scissors(ctx, &mut r, slot),
+            553 if held => open_box(ctx, InventoryType::Cash, slot, item_id),
             // The window waits for 354, so even a hammer not held gets one.
             557 => vicious_hammer(ctx, &mut r, slot, item_id),
             561 if held => vega_spell(ctx, &mut r, slot, item_id),

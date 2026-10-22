@@ -141,6 +141,10 @@ namespace ms
 		// Return the first slot which contains the specified item.
 		int16_t find_item(InventoryType::Id type, int32_t itemid) const;
 
+		// Return the first slot which contains the specified item and isn't
+		// sealed, as v83's key handler looks for one (0x94f80a).
+		int16_t find_unsealed(InventoryType::Id type, int32_t itemid) const;
+
 		// Return how many slots of the specified inventory hold an item.
 		int16_t count_slots(InventoryType::Id type, int32_t itemid) const;
 

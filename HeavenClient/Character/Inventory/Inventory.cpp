@@ -365,6 +365,15 @@ namespace ms
 		return 0;
 	}
 
+	int16_t Inventory::find_unsealed(InventoryType::Id type, int32_t itemid) const
+	{
+		for (auto &iter : inventories[type])
+			if (iter.second.item_id == itemid && !is_sealed(type, iter.first))
+				return iter.first;
+
+		return 0;
+	}
+
 	int16_t Inventory::count_slots(InventoryType::Id type, int32_t itemid) const
 	{
 		int16_t slots = 0;

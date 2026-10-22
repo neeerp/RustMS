@@ -1,6 +1,6 @@
 //! Reward boxes: USE_ITEM_REWARD trades a box for one of its entries, and
 //! keeps the box when what it gives doesn't fit; the map sees the prize's
-//! effect.
+//! effect. A cash bag, sent as USE_CASH_ITEM, opens the same way.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_item, grant_stack};
@@ -15,6 +15,10 @@ use tokio::time::timeout;
 
 const USE: i16 = 2;
 const ETC: i16 = 4;
+const CASH: i16 = 5;
+/// A cash bag of a hundred Elixirs.
+const BAG: i32 = 5_530_004;
+const ELIXIR: i32 = 2_022_456;
 /// Small Stories: one of two Etc items, 4001201 or 4001202.
 const BOX: i32 = 2_022_422;
 const STORIES: [i32; 2] = [4_001_201, 4_001_202];
@@ -86,6 +90,32 @@ async fn a_box_gives_one_of_its_entries() {
     assert_eq!(session.items.get(&BOX), Some(&1));
     let got: i32 = STORIES.iter().filter_map(|id| session.items.get(id)).sum();
     assert_eq!(got, 1);
+}
+
+#[tokio::test]
+async fn a_cash_bag_opens_from_the_cash_tab() {
+    let (id, config) = holding(1).await;
+    grant_item(id, CASH, 1, BAG).await.expect("bag");
+    let mut session = relogin(&config).await;
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseCashItem as i16).unwrap();
+    p.write_short(1).unwrap();
+    p.write_int(BAG).unwrap();
+    p.write_int(0).unwrap();
+    send(&mut session.connection, p).await;
+    assert_eq!(
+        answer(&mut session.connection).await,
+        [
+            SendOpcode::InventoryOperation as i16,
+            SendOpcode::ShowItemGainInChat as i16
+        ]
+    );
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let session = relogin(&config).await;
+    assert_eq!(session.items.get(&BAG), None);
+    assert_eq!(session.items.get(&ELIXIR), Some(&100));
 }
 
 #[tokio::test]

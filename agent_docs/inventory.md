@@ -770,8 +770,17 @@ expiring after `period` minutes when it has one (a recommended default,
 chat gain line. If the entry doesn't fit, or is one of a kind and already
 held, it sends "Your inventory is full." and keeps the box. Anything else
 (no box in that slot, no reward node, dead, a map that bars the item) only
-unlocks the client. The nine cash bags (5530000-5530008) aren't handled
-yet.
+unlocks the client.
+
+The nine cash bags (5530000-5530008, each one entry: DS Eggs, a medal, a
+Golden Compass, Gaga potions or Elixirs; report c040) are the same boxes in
+the Cash tab. v83 sends them as USE_CASH_ITEM (`0x4F`, `i16 slot, i32 item,
+i32 tick`, its cash type 0x45), never as `0x70`, and the server opens them
+with the same `open_box` from the Cash tab. That path has no map check. A
+reward box bound to a key or quickslot is sent as `0x70`, the same as a
+double-click; cash bags can't be bound. `spec/onlyPickup` (the Dojo buffs
+and the King Pepe boxes) has no reader in the v83 client, and the boxes open
+from the bag as any other.
 
 An entry may also name an `Effect` (an animation path such as
 `Effect/BasicEff/Event1/Best`) and a `worldMsg` (report c038). On a
@@ -790,7 +799,11 @@ nothing is sent.
 In HeavenClient, `ItemData::has_reward` says whether the item has a
 `reward` node, and a double-click on such a Use item sends
 `UseItemRewardPacket` (USE_WAIT) right after the sealed check, before any
-other kind of Use item is tried, as v83 does (0x4f0372). User effect 14
+other kind of Use item is tried, as v83 does (0x4f0372); a key or
+quickslot bound to one sends the same (`Player::use_item`, 0x94f882), from
+the first slot holding it that isn't sealed (`Inventory::find_unsealed`,
+which every item key uses). A double-click on a cash bag sends
+`UseCashItemPacket` and plays `UseShopItem` (`use_cash_bag`). User effect 14
 (local in `ShowItemGainInChatHandler`, foreign in `ShowForeignEffectHandler`)
 calls `Stage::show_reward_effect`: the prize's use sound (`Sound(itemid)`),
 and the path once in `ground_effects` where the opener stood, not following

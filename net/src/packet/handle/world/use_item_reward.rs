@@ -1,7 +1,9 @@
 //! Reward boxes (report c037): the Use items with a `reward` node, such as
 //! the Golden Pig's eggs and the King Pepe boxes. The client sends them as
 //! USE_ITEM_REWARD rather than USE_ITEM and leaves the roll to the server,
-//! which trades the box for one of the entries, picked by weight.
+//! which trades the box for one of the entries, picked by weight. The cash
+//! bags (5530000-5530008) are the same boxes, sent as USE_CASH_ITEM (report
+//! c040).
 
 use crate::handler::{
     BroadcastScope, FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler,
@@ -34,57 +36,71 @@ impl WorldHandler for UseItemRewardHandler {
         r.read_short()?;
         let slot = r.read_short()?;
         let item_id = r.read_int()?;
-        let unlock = build_stat_update(true, &[])?;
-        let Some(rewards) = may_open(ctx.player, slot, item_id) else {
-            debug!(slot, item_id, "Reward box refused");
-            return Ok(HandlerResult::reply(unlock));
-        };
-        let Some(reward) = pick(&rewards, &mut rand::thread_rng()) else {
-            return Ok(HandlerResult::reply(unlock));
-        };
-        let Some(changes) = open(ctx.player, slot, &reward, SystemTime::now()) else {
-            return Ok(HandlerResult::reply(build_inventory_full()?).with_reply(unlock));
-        };
-        // The prize's sound and the entry's animation, for the opener and
-        // the others on the map.
-        let effect = reward
-            .effect
-            .as_deref()
-            .filter(|effect| !effect.is_empty())
-            .map(effect_path);
-        let effect = effect.as_deref();
-        let mut result = HandlerResult::reply(build_inventory_operation(true, &changes)?)
-            .with_reply(build_item_gain_in_chat(
-                reward.item_id,
-                i32::from(reward.count),
-            )?)
-            .with_reply(build_reward_item_effect(None, reward.item_id, effect)?)
-            .with(WorldAction::Field(FieldRequest::Broadcast(
-                build_reward_item_effect(Some(ctx.player.id()), reward.item_id, effect)?,
-            )));
-        if let Some(line) = world_line(ctx.player.name(), &reward) {
-            result = result.with(WorldAction::Broadcast {
-                scope: BroadcastScope::World,
-                packet: build_item_line(&line, reward.item_id)?,
-            });
-        }
-        Ok(result)
+        open_box(ctx, InventoryType::Use, slot, item_id)
     }
 }
 
-/// What the box `item_id` in USE `slot` holds, if the player may open it
-/// here: they're alive, the map allows the item, and it is there.
-fn may_open(player: &Player, slot: i16, item_id: i32) -> Option<Vec<Reward>> {
-    if player.stats.hp <= 0 || !is_use_item(item_id) {
+/// Open the box `item_id` in `slot` of the `kind` tab (Use, or Cash for a
+/// cash bag) and answer it.
+pub fn open_box(
+    ctx: &mut WorldContext,
+    kind: InventoryType,
+    slot: i16,
+    item_id: i32,
+) -> WorldResult {
+    let unlock = build_stat_update(true, &[])?;
+    let Some(rewards) = may_open(ctx.player, kind, slot, item_id) else {
+        debug!(slot, item_id, "Reward box refused");
+        return Ok(HandlerResult::reply(unlock));
+    };
+    let Some(reward) = pick(&rewards, &mut rand::thread_rng()) else {
+        return Ok(HandlerResult::reply(unlock));
+    };
+    let Some(changes) = open(ctx.player, kind, slot, &reward, SystemTime::now()) else {
+        return Ok(HandlerResult::reply(build_inventory_full()?).with_reply(unlock));
+    };
+    // The prize's sound and the entry's animation, for the opener and
+    // the others on the map.
+    let effect = reward
+        .effect
+        .as_deref()
+        .filter(|effect| !effect.is_empty())
+        .map(effect_path);
+    let effect = effect.as_deref();
+    let mut result = HandlerResult::reply(build_inventory_operation(true, &changes)?)
+        .with_reply(build_item_gain_in_chat(
+            reward.item_id,
+            i32::from(reward.count),
+        )?)
+        .with_reply(build_reward_item_effect(None, reward.item_id, effect)?)
+        .with(WorldAction::Field(FieldRequest::Broadcast(
+            build_reward_item_effect(Some(ctx.player.id()), reward.item_id, effect)?,
+        )));
+    if let Some(line) = world_line(ctx.player.name(), &reward) {
+        result = result.with(WorldAction::Broadcast {
+            scope: BroadcastScope::World,
+            packet: build_item_line(&line, reward.item_id)?,
+        });
+    }
+    Ok(result)
+}
+
+/// What the box `item_id` in `slot` of the `kind` tab holds, if the player
+/// may open it here: they're alive, the map allows a Use item (a cash bag's
+/// path has no map check), and it is there.
+fn may_open(player: &Player, kind: InventoryType, slot: i16, item_id: i32) -> Option<Vec<Reward>> {
+    if player.stats.hp <= 0 {
         return None;
     }
-    let field = crate::get_game_data()
-        .ok()
-        .and_then(|data| data.field(player.stats.map_id));
-    if !field.is_none_or(|field| field.may_use(item_id)) {
-        return None;
+    if kind == InventoryType::Use {
+        let field = crate::get_game_data()
+            .ok()
+            .and_then(|data| data.field(player.stats.map_id));
+        if !is_use_item(item_id) || !field.is_none_or(|field| field.may_use(item_id)) {
+            return None;
+        }
     }
-    if player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
+    if player.inventory.get(kind, slot)?.item_id != item_id {
         return None;
     }
     let rewards = items::info(item_id)?.reward;
@@ -137,17 +153,18 @@ fn effect_path(effect: &str) -> String {
     parts.join("/")
 }
 
-/// Trade the box in USE `slot` for `reward`, which lasts its `period` in
-/// minutes from `now` (lanes/QUESTIONS.md); `None`, with nothing changed,
-/// if it doesn't fit.
+/// Trade the box in `slot` of the `kind` tab for `reward`, which lasts its
+/// `period` in minutes from `now` (lanes/QUESTIONS.md); `None`, with
+/// nothing changed, if it doesn't fit.
 fn open(
     player: &mut Player,
+    kind: InventoryType,
     slot: i16,
     reward: &Reward,
     now: SystemTime,
 ) -> Option<Vec<InventoryChange>> {
     let mut next = player.inventory.clone();
-    let mut changes = next.take(InventoryType::Use, slot, 1).ok()?;
+    let mut changes = next.take(kind, slot, 1).ok()?;
     if items::refuses_only(&next, reward.item_id, i32::from(reward.count)) {
         return None;
     }
@@ -322,7 +339,7 @@ mod tests {
         }
         let mut player = holding(NOTE, 1);
         let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
-        assert!(open(&mut player, SLOT, &belt, now).is_some());
+        assert!(open(&mut player, InventoryType::Use, SLOT, &belt, now).is_some());
         let (_, item) = player
             .inventory
             .items(InventoryType::Equip)
@@ -369,6 +386,31 @@ mod tests {
             ]
         );
         assert_eq!(player.inventory.count(NOTE), 2);
+    }
+
+    #[test]
+    fn a_cash_bag_opens_from_the_cash_tab() {
+        // 5530004: a hundred Elixirs, its one entry.
+        const BAG: i32 = 5_530_004;
+        if crate::items::info(BAG).is_none_or(|info| info.reward.is_empty()) {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Cash, SLOT, Item::stack(BAG, 1));
+        let before = player.inventory.count(2_022_456);
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 2,
+            player: &mut player,
+        };
+        // Not from the Use tab.
+        super::open_box(&mut ctx, InventoryType::Use, SLOT, BAG).unwrap();
+        assert_eq!(ctx.player.inventory.count(BAG), 1);
+        super::open_box(&mut ctx, InventoryType::Cash, SLOT, BAG).unwrap();
+        assert_eq!(player.inventory.count(BAG), 0);
+        assert_eq!(player.inventory.count(2_022_456), before + 100);
     }
 
     #[test]
