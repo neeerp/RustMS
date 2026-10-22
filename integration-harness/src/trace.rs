@@ -192,6 +192,8 @@ pub struct Trace {
     pub parcels: Vec<Vec<u8>>,
     /// Every RPS_GAME body (mode first), in order.
     pub rps: Vec<Vec<u8>>,
+    /// Every OWL_RESULT and OWL_GO_RESULT: (opcode, body), in order.
+    pub owl: Vec<(i16, Vec<u8>)>,
     /// Every family packet (FAMILY_CHART_RESULT to
     /// FAMILY_NOTIFY_LOGIN_OR_LOGOUT): (opcode, body), in order.
     pub family: Vec<(i16, Vec<u8>)>,
@@ -576,6 +578,8 @@ impl Trace {
             self.parcels.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::RpsGame as i16 {
             self.rps.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::OwlResult as i16 || op == SendOpcode::OwlGoResult as i16 {
+            self.owl.push((op, p.bytes[2..].to_vec()));
         } else if (SendOpcode::FamilyChart as i16..=SendOpcode::FamilyNotifyLoginOrLogout as i16)
             .contains(&op)
         {

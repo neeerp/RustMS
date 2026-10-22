@@ -431,6 +431,16 @@ impl FieldActor {
                     .collect();
                 let _ = reply.send(positions);
             }
+            FieldMessage::ShopSearch { item_id, reply } => {
+                let _ = reply.send(self.shops.search(
+                    item_id,
+                    self.key.map_id,
+                    self.key.channel_id,
+                ));
+            }
+            FieldMessage::ShopGo { room, name, reply } => {
+                let _ = reply.send(self.shops.go_result(room, &name));
+            }
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }

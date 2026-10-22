@@ -11,6 +11,7 @@ use crate::actor::field_trades::Outbox;
 use crate::message::ServerMessage;
 use game::{AvatarLook, Item, MiniRoomBox};
 use net::error::NetworkError;
+use net::owl::{go_result, ShopHit};
 use net::packet::build::world::mini_room::{
     build_enter_error, build_room_chat, build_room_leave, build_room_visit, build_seat_left,
     build_shop_items, build_shop_room, enter_error, leave_reason, PERSONAL_SHOP, SHOP_USERS,
@@ -251,6 +252,41 @@ impl Shops {
         shop.open = true;
         let balloon = shop.balloon(id);
         self.balloons.push((from, Some(balloon)));
+    }
+
+    /// The open shops' listings of `item_id` with bundles left, for the
+    /// Owl of Minerva, on `channel_id`'s `map_id`.
+    pub fn search(&self, item_id: i32, map_id: i32, channel_id: u8) -> Vec<ShopHit> {
+        self.rooms
+            .iter()
+            .filter(|(_, shop)| shop.open)
+            .flat_map(|(&room, shop)| {
+                shop.listings
+                    .iter()
+                    .filter(move |l| l.item.item_id == item_id && l.bundles > 0)
+                    .map(move |l| ShopHit {
+                        owner: shop.owner.name.clone(),
+                        title: shop.title.clone(),
+                        map_id,
+                        room,
+                        channel_id,
+                        item: l.item.clone(),
+                        bundles: l.bundles,
+                        price: l.price,
+                    })
+            })
+            .collect()
+    }
+
+    /// Whether `name` would get into shop `room` now, as GO on the Owl's
+    /// results asks (`owl::go_result`); the visit itself decides.
+    pub fn go_result(&self, room: i32, name: &str) -> u8 {
+        match self.rooms.get(&room) {
+            Some(shop) if shop.open && shop.barred(name) => go_result::BARRED,
+            Some(shop) if shop.open && shop.visitors.iter().all(Option::is_some) => go_result::FULL,
+            Some(shop) if shop.open => go_result::GO,
+            _ => go_result::CLOSED,
+        }
     }
 
     /// `busy`: the visitor is in another kind of room.
@@ -695,5 +731,42 @@ mod tests {
         shops.visit(BOB, ROOM, "Bob", &look(), false);
         assert!(shops.sold_out(BOB).is_empty());
         assert!(shops.contains(ROOM));
+    }
+
+    #[test]
+    fn the_owl_finds_open_shops_with_stock_left() {
+        let mut shops = Shops::default();
+        shops.create(ROOM, ALICE, "Alice", &look(), "Pots".into(), 2, false);
+        shops.listings(ALICE, vec![potions(3), potions(0)]);
+        // Not open yet.
+        assert!(shops.search(2000000, 910000001, 1).is_empty());
+        shops.open(ALICE);
+        let hits = shops.search(2000000, 910000001, 1);
+        assert_eq!(hits.len(), 1);
+        let hit = &hits[0];
+        assert_eq!(
+            (
+                hit.owner.as_str(),
+                hit.title.as_str(),
+                hit.room,
+                hit.channel_id
+            ),
+            ("Alice", "Pots", ROOM, 1)
+        );
+        assert_eq!((hit.bundles, hit.price, hit.item.quantity), (3, 500, 10));
+        assert!(shops.search(4000000, 910000001, 1).is_empty());
+    }
+
+    #[test]
+    fn go_says_whether_the_shop_lets_one_in() {
+        let mut shops = open_shop();
+        assert_eq!(shops.go_result(ROOM, "Bob"), go_result::GO);
+        assert_eq!(shops.go_result(ROOM + 1, "Bob"), go_result::CLOSED);
+        shops.blacklist_add(ALICE, "bob".into());
+        assert_eq!(shops.go_result(ROOM, "Bob"), go_result::BARRED);
+        for (who, name) in [(BOB, "Bob2"), (CAROL, "Carol"), (4, "Dan")] {
+            shops.visit(who, ROOM, name, &look(), false);
+        }
+        assert_eq!(shops.go_result(ROOM, "Erin"), go_result::FULL);
     }
 }

@@ -414,6 +414,17 @@ pub enum FieldMessage {
     Positions {
         reply: tokio::sync::oneshot::Sender<Vec<(i16, i16)>>,
     },
+    /// The open shops here selling `item_id`, for the Owl of Minerva.
+    ShopSearch {
+        item_id: i32,
+        reply: tokio::sync::oneshot::Sender<Vec<net::owl::ShopHit>>,
+    },
+    /// Whether `name` would get into shop `room` here (`owl::go_result`).
+    ShopGo {
+        room: i32,
+        name: String,
+        reply: tokio::sync::oneshot::Sender<u8>,
+    },
     /// How many monsters are alive on the map.
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
@@ -533,6 +544,14 @@ pub enum DirectoryMessage {
     AvatarBanner {
         banner: Packet,
         reply: tokio::sync::oneshot::Sender<bool>,
+    },
+    /// Someone searched for `item_id` with the Owl of Minerva.
+    OwlSearched {
+        item_id: i32,
+    },
+    /// The items searched for most with the Owl of Minerva.
+    OwlPopular {
+        reply: tokio::sync::oneshot::Sender<Vec<i32>>,
     },
     /// Send `owner` their buddy list with the channels of those online.
     BuddyList {

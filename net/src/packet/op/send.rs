@@ -31,6 +31,11 @@ pub enum SendOpcode {
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
+    /// The Owl of Minerva's answers by mode: 6 a search's results, 7 the
+    /// most searched items (FUN_00a28c29).
+    OwlResult = 0x46,
+    /// Whether GO on a row of the Owl's results may go (FUN_00a29013).
+    OwlGoResult = 0x47,
     CashPetFoodResult = 0x4C,
     BridleMobCatchFail = 0x4F,
 

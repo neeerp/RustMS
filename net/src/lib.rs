@@ -35,6 +35,7 @@ pub mod morph;
 pub mod names;
 mod npc_data;
 pub mod npc_scripts;
+pub mod owl;
 pub mod packet;
 pub mod personal_shop;
 pub mod policy;

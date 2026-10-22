@@ -43,6 +43,7 @@ mod move_player;
 mod note;
 mod npc_dialogue;
 mod npc_shop;
+mod owl;
 mod party;
 mod party_search;
 mod pet;
@@ -115,6 +116,7 @@ pub use self::move_player::PlayerMoveHandler;
 pub use self::note::NoteActionHandler;
 pub use self::npc_dialogue::{NpcTalkHandler, NpcTalkMoreHandler};
 pub use self::npc_shop::NpcShopActionHandler;
+pub use self::owl::{OwlGoHandler, OwlOpenHandler, UseOwlHandler};
 pub use self::party::{DenyPartyRequestHandler, MultiChatHandler, PartyOperationHandler};
 pub use self::party_search::{PartySearchStartHandler, PartySearchStopHandler};
 pub use self::pet::{
