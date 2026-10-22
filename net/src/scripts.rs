@@ -172,6 +172,20 @@ const DISGUISE_PROOF: i32 = 4032101;
 /// searches for the jewel quest 3935 is after.
 const QUEENS_TREASURE_ROOM: i32 = 926000010;
 const QUEENS_JEWEL: i32 = 4031574;
+/// The job instructors' rooms, whose `tutorial` portal (`tutorialNPC`) has
+/// a beginner up to level 10 hear their instructor out.
+const TUTORIAL_INSTRUCTORS: [(i32, i32); 5] = [
+    (101000003, 1032001),
+    (100000201, 1012100),
+    (102000003, 1022000),
+    (103000003, 1052001),
+    (120000101, 1090000),
+];
+/// Leafre's Time Gate, beside its `TD_neo` portal (`TD_chat_enter`).
+const TIME_GATE: i32 = 2083006;
+/// The Cave of Evil Eye III's back way (`enterDollcave`), open once the
+/// Puppeteer is beaten.
+const DOLL_CAVE_WAY_BACK: (i32, u8) = (105040201, 2);
 /// The fourth job's rooms one player at a time takes on alone, which start
 /// afresh once they're left (`npc_scripts::resets_when_empty`): the Fire
 /// Hawk's and Ice Eagle's nests by El Nath (`s4firehawk`, `s4iceeagle`) and
@@ -234,6 +248,9 @@ pub enum Effect {
     /// Offer to skip the tutorial (Maple Administrator), only to accounts
     /// that already have a level-30 character.
     OfferTutorialSkip,
+    /// Open an NPC's conversation without a click, as a portal does; the
+    /// NPC needn't be on the map. Not over a conversation already open.
+    OpenNpc(i32),
     SetHp(i16),
     GiveItem {
         item_id: i32,
@@ -748,6 +765,26 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(910510100, 0))
         }
         "enterDollWay" => refused(keys::DOLL_WAY_BLOCKED),
+        "enterDollcave"
+            if quest(20730) == QuestState::Completed || quest(21734) == QuestState::Completed =>
+        {
+            let (map, portal) = DOLL_CAVE_WAY_BACK;
+            through(Effect::WarpToPortal(map, portal))
+        }
+        // Cosmic asks for a password here; not yet.
+        "enterDollcave" => ScriptOutcome::default(),
+        "tutorialNPC" => {
+            let stats = &player.stats;
+            match TUTORIAL_INSTRUCTORS
+                .iter()
+                .find(|&&(map, _)| map == stats.map_id)
+                .filter(|_| stats.level <= 10 && stats.job == 0)
+            {
+                Some(&(_, npc)) => opens(npc),
+                None => ScriptOutcome::default(),
+            }
+        }
+        "TD_chat_enter" => opens(TIME_GATE),
         "ariant_Agit"
             if [3928, 3931, 3934]
                 .iter()
@@ -1009,6 +1046,15 @@ fn to(map: i32, portal: Portal) -> Effect {
 fn through(warp: Effect) -> ScriptOutcome {
     ScriptOutcome {
         effects: vec![Effect::PortalSound, warp],
+        block: false,
+        occupied: None,
+    }
+}
+
+/// A portal that opens `npc`'s conversation.
+fn opens(npc: i32) -> ScriptOutcome {
+    ScriptOutcome {
+        effects: vec![Effect::OpenNpc(npc)],
         block: false,
         occupied: None,
     }
@@ -1678,6 +1724,62 @@ mod tests {
         );
         assert_eq!(
             portal("skyrom", &holding(&quest, QUEENS_JEWEL)),
+            Some(ScriptOutcome::default())
+        );
+    }
+
+    #[test]
+    fn an_instructors_room_has_a_young_beginner_hear_the_instructor_out() {
+        let data = crate::get_game_data().unwrap();
+        let in_room = |map, level, job| {
+            let mut player = player_with(&[]);
+            player.stats.map_id = map;
+            player.stats.level = level;
+            player.stats.job = job;
+            portal("tutorialNPC", &player).unwrap()
+        };
+        for (map, npc) in TUTORIAL_INSTRUCTORS {
+            let way = data.field(map).unwrap().portal_by_name("tutorial").unwrap();
+            assert_eq!(way.script.as_deref(), Some("tutorialNPC"), "{map}");
+            for level in [1, 10] {
+                let outcome = in_room(map, level, 0);
+                assert_eq!(outcome.effects, [Effect::OpenNpc(npc)], "{map}");
+                assert!(!outcome.block);
+            }
+            assert_eq!(in_room(map, 11, 0), ScriptOutcome::default());
+            assert_eq!(in_room(map, 10, 100), ScriptOutcome::default());
+        }
+        assert_eq!(in_room(100000000, 1, 0), ScriptOutcome::default());
+    }
+
+    #[test]
+    fn the_time_gate_and_the_doll_caves_back_way_open_from_their_portals() {
+        let data = crate::get_game_data().unwrap();
+        let script = |map, name: &str| {
+            let field = data.field(map).unwrap();
+            field.portal_by_name(name).unwrap().script.clone()
+        };
+        assert_eq!(
+            script(240070000, "TD_neo").as_deref(),
+            Some("TD_chat_enter")
+        );
+        assert_eq!(
+            portal("TD_chat_enter", &player_with(&[])).unwrap().effects,
+            [Effect::OpenNpc(TIME_GATE)]
+        );
+        assert_eq!(script(105070300, "in00").as_deref(), Some("enterDollcave"));
+        let (map, id) = DOLL_CAVE_WAY_BACK;
+        assert_eq!(named(map, "in00"), id);
+        for quest in [20730, 21734] {
+            let done = player_with(&[(quest, QuestState::Completed)]);
+            assert_eq!(
+                warp_of(&portal("enterDollcave", &done).unwrap()),
+                Some(DOLL_CAVE_WAY_BACK)
+            );
+        }
+        let started = player_with(&[(20730, QuestState::Started)]);
+        assert_eq!(
+            portal("enterDollcave", &started),
             Some(ScriptOutcome::default())
         );
     }

@@ -57,13 +57,19 @@ conversation starts; effects that take items or mesos are checked again when
 applied, and apply nothing if the player no longer has them. Answers are matched to the prompt they answer
 (`npc_scripts::input`); anything else ends the script.
 
+A portal can open an NPC's conversation without a click
+(`Effect::OpenNpc`, `ClientActor::open_npc`): it starts whatever a click
+would, and the NPC needn't be on the map, since NPC_DIALOGUE carries the
+NPC's template id and HeavenClient reads nothing else. It doesn't open over
+a conversation already open.
+
 | Script | Trigger | Behavior |
 | --- | --- | --- |
 | `q1021s`/`q1021e` | QUEST_ACTION 4/5 for quest 1021 | Roger sets HP to 25 and gives Roger's Apple; finishing needs full HP and no apples left, then pays 3 Apples, 3 Green Apples, 10 EXP |
 | `begin5` | Clicking Robin (2003) | 18-topic Q&A menu |
 | `tutorialSkip` | Clicking the Maple Administrator (2007), or the `tutoChatNPC` portal for accounts with a level-30 character | Yes warps to Lith Harbor (104000000). Neither is on the original island, so this is unused |
 | `begin7` | Clicking Shanks (22000) in Southperry | Yes sails to Lith Harbor (104000000) for Lucas's recommendation letter (4031801), at any level, or for 150 mesos from level 7; otherwise he says why not |
-| `fighter`, `magician`, `bowman`, `rogue`, `kairinT` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), the Dark Lord (1052001), or Kyrin (1090000) | First and second job advancement: see below |
+| `fighter`, `magician`, `bowman`, `rogue`, `kairinT` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), the Dark Lord (1052001), or Kyrin (1090000), or a beginner up to level 10 touching the `tutorial` portal in their room | First and second job advancement: see below |
 | Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
 | `inside_pirate` | Clicking the proctor (1072008) inside Kyrin's tests | Yes warps to Kyrin; see below |
 | `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
