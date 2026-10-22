@@ -192,8 +192,12 @@ namespace ms
 			// Its box, from where it is, facing left; empty if none.
 			Rectangle<int16_t> area;
 			int16_t attackafter;
-			// How fast its ball flies, in px a second; 0 if it has none.
+			// Its ball, which flies 600 ms per `bulletspeed` px; the
+			// Octopi's only.
+			std::optional<Animation> ball;
 			int16_t bulletspeed;
+			// Where the ball leaves it, facing left.
+			Point<int16_t> sp;
 			Animation hit;
 		};
 

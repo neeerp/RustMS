@@ -1181,9 +1181,18 @@ HeavenClient's `MapSummons` (`Gameplay/MapleMap`) draws them and plays their
 - The mage summons hit the side of their `lt`/`rb` box with more mobs.
 - The others hit the nearest mobs within their `range/r`.
 - The spreading kinds hit one mob and then up to `mobCount`−1 more around
-  it, 120 ms apart.
-- Each hit lands `attackAfter` plus the projectile's flight time after the
-  attack starts.
+  it.
+- Each hit lands `attackAfter` after the attack starts, plus 120 ms for
+  every hit of the spreading kinds and 50 ms more for each hit after the
+  first of the others (v83 0x7a55d4, report c028 section 8).
+- Only the Octopus and Wrath of the Octopi fire a ball
+  (`summon/attack1/info/ball`). It leaves the summon's `range/sp`, mirrored
+  when the summon faces right, at `attackAfter`. It flies straight to where
+  the summon's row meets the mob, taking 600 ms per `bulletSpeed` px
+  (300 px in 600 ms), turned to point along its path. The hit lands as it
+  arrives (`summon_rules::muzzle`, `ball_time`, `ball_angle`).
+- Another player's summon fires no ball. All of its hits land at
+  `attackAfter` (FUN_007a6882).
 
 A Puppet draws the mobs already chasing the owner to it for 180–240 s.
 A mob touching it hurts it by its attack squared, scaled by the Puppet's
@@ -1202,7 +1211,6 @@ them:
 
 Where HeavenClient differs from v83:
 
-- Ball sprites aren't drawn.
 - Followers send their paths the way fliers do.
 - The fly speed (0.2 px/ms) is inferred.
 - Range targeting is a ±`r` × ±100 px box.
