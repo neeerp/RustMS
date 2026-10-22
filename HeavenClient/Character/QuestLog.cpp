@@ -119,6 +119,10 @@ namespace ms
 			if (state(quest.id) == 0 &&
 				quest_available(quest, job, level, [&](int16_t id) { return state(id); }, holds, all_levels))
 				result.push_back(quest.id);
+		// And the party quests, which can't be started from it.
+		for (const auto& quest : QuestCatalog::get().party_quests())
+			if (state(quest.id) == 0 && party_quest_listed(quest, job, level, all_levels))
+				result.push_back(quest.id);
 		return result;
 	}
 

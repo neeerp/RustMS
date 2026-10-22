@@ -28,7 +28,11 @@ shows its `notice` image.
 Available quests share `QuestLog::supported_rules()` (built from the client's
 `QuestCatalog`, see [Quests](./quests.md)) and eligibility rules with NPC
 markers. That keeps unsupported asset quests off the list. Started and
-completed records come from the server's quest ledger.
+completed records come from the server's quest ledger. The party quests
+(1200-1399, `QuestCatalog::party_quests`) are listed there too, under
+"Party Quest", as v83 does (FUN_00721163): never started, from five levels
+below their `lvmin` up to their `lvmax`, for their `job` list (or any job
+if empty, and GMs). No NPC starts them; they only describe the event.
 
 The detail panel shows:
 

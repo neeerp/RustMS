@@ -21,6 +21,7 @@
 #include "Helpers/LoginParser.h"
 #include "../../Audio/Audio.h"
 #include "../../Character/Diseases.h"
+#include "../../Character/QuestCatalog.h"
 #include "../../Character/MountRules.h"
 
 #include "../Packets/LoginPackets.h"
@@ -39,8 +40,10 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/EnergyBarLayout.h"
 #include "../../IO/UITypes/UIEnergyBar.h"
+#include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIMonsterBook.h"
 #include "../../IO/UITypes/UINotice.h"
+#include "../../IO/UITypes/UIQuestLog.h"
 #include "../../IO/UITypes/UISkillBook.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 
@@ -131,6 +134,26 @@ namespace ms
 			UI::get().emplace<UIOk>(
 				"If you do not use your AP when you level up, \\nthen you won't be able to receive any additional AP.\\nPlease use your AP.",
 				[](bool) {});
+
+		// Then it offers each party quest that opens at the new level; O shows
+		// it on the Quest Log's Available tab.
+		if (player.get_level() > oldlevel)
+			if (auto cards = UI::get().get_element<UIInviteCard>())
+				for (const PartyQuest* quest : party_quest_cards(QuestCatalog::get().party_quests(),
+					stats.get_job().get_id(), player.get_level()))
+					cards->party_quest(*quest, [id = quest->id](bool yes)
+					{
+						if (!yes)
+							return;
+
+						auto log = UI::get().get_element<UIQuestLog>();
+
+						if (!log || !log->is_active())
+							UI::get().emplace<UIQuestLog>(Stage::get().get_player().get_quests());
+
+						if (auto opened = UI::get().get_element<UIQuestLog>())
+							opened->show_quest(id, 0);
+					});
 
 		// v83 checks the alert's quests again on any stat change (FUN_00a0843c).
 		Stage::get().get_quest_alert().stats_changed();

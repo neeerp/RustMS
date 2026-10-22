@@ -109,6 +109,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME guild_bbs COMMAND guild_bbs_tests)
     add_executable(job_names_tests tests/job_names.cpp Character/Job.cpp)
     add_test(NAME job_names COMMAND job_names_tests)
+    add_executable(party_quest_cards_tests tests/party_quest_cards.cpp Character/PartyQuests.cpp)
+    add_test(NAME party_quest_cards COMMAND party_quest_cards_tests)
     add_executable(quest_requirements_tests tests/quest_requirements.cpp Character/QuestRequirements.cpp Character/Job.cpp)
     add_test(NAME quest_requirements COMMAND quest_requirements_tests)
     add_executable(npc_reach_tests tests/npc_reach.cpp)
@@ -521,6 +523,8 @@ add_executable(HeavenClient
     Character/MiniRoomBox.h
     Character/OtherChar.cpp
     Character/OtherChar.h
+    Character/PartyQuests.cpp
+    Character/PartyQuests.h
     Character/PassiveBuffs.cpp
     Character/PassiveBuffs.h
     Character/Player.cpp

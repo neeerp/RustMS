@@ -52,8 +52,9 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
 
-		// Show a quest in progress, opening it on the In Progress tab.
-		void show_quest(int16_t id);
+		// Open tab `tab` (0 Available, 1 In Progress, 2 Completed) and select
+		// quest `id` there, unfolding its area, if listed (FUN_00882b2e).
+		void show_quest(int16_t id, uint16_t tab = 1);
 
 		UIElement::Type get_type() const override;
 
