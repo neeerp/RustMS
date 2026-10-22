@@ -34,6 +34,12 @@ is played through too: its nine stages, bonus and reward
 - `Team::leave` ends the event when the leader leaves or too few remain.
   Once the event is won (`Team::win`), only the last member's leaving
   ends it.
+- `Team::hand_over`: when the leader passes the party's lead on, the new
+  leader leads the event too, if they are in its maps; if not, the event
+  ends, unless it is won (Cosmic `changedLeader`). The directory tells the
+  old leader's client actor (`ServerMessage::LeaderHandedOver`), which
+  tells the event (`EventCommand::HandOver`). The leader is shared with the
+  tickets (`EventTicket::leader`).
 - `RUSTMS_EVENT_SCALE` (a whole number, default 1) shortens every event.
   The harness world sets it to 60, so KPQ lasts 30 seconds.
 
@@ -84,8 +90,8 @@ is played through too: its nine stages, bonus and reward
    Whichever way they leave, the event's own items (`Event::items`, KPQ's
    coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
    `Event::take_items`, shown to the client unless they are logging out.
-6. **Ending.** The event ends when its time is up, when its leader leaves,
-   or when too few remain; once won, only when its last member leaves. It
+6. **Ending.** The event ends when its time is up, when its leader leaves
+   or passes the lead to someone not in it, or when too few remain; once won, only when its last member leaves. It
    sends `EventEnded{id}`, and members still on its maps go to the exit. Two seconds later the actor exits. Its
    `on_exit`, which runs even after a panic, sends every member
    `EventEnded` again, closes the instance (`FieldRegistry::close_instance`
@@ -444,7 +450,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- A new leader chosen inside the copy: the event still counts the first
-  leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
   where they are; they drop their ticket, which can end the event at once.

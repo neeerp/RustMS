@@ -1319,6 +1319,7 @@ impl WorldDirectory {
                 }
                 if let Some(party) = self.parties.change_leader(from, member_id).cloned() {
                     self.send_to_party(&party, |_| build_party_leader_changed(member_id));
+                    self.tell(from, ServerMessage::LeaderHandedOver { to: member_id });
                     self.dungeon_leader_changed(from, member_id);
                 }
             }

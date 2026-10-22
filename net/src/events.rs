@@ -561,6 +561,14 @@ impl Team {
         }
         member == self.leader || self.members.len() < self.least
     }
+
+    /// The leader handed the party to `to`, who leads the team from now
+    /// on. Returns whether that ends the event: it does if `to` is not in
+    /// its maps, unless it is won (Cosmic `changedLeader`).
+    pub fn hand_over(&mut self, to: ClientId) -> bool {
+        self.leader = to;
+        !self.won && !self.has(to)
+    }
 }
 
 /// What a member's script tells their event, once its items have changed
@@ -576,6 +584,8 @@ pub enum EventCommand {
     Fail,
     /// The leader takes the team that won to the event's bonus.
     StartBonus,
+    /// The leader handed the party to this member (Cosmic `changedLeader`).
+    HandOver(ClientId),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -953,6 +963,24 @@ mod tests {
         let mut team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
         assert!(team.leave(1));
         assert_eq!(team.members(), [2, 3, 4]);
+    }
+
+    #[test]
+    fn a_new_leader_in_the_event_leads_it_and_one_outside_ends_it() {
+        let mut team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
+        assert!(!team.hand_over(2));
+        assert_eq!(team.leader(), 2);
+        assert!(!team.leave(1));
+        assert!(team.leave(2));
+
+        let mut team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
+        team.leave(4);
+        assert!(team.hand_over(4));
+
+        let mut team = Team::new(&KPQ, 1, vec![1, 2, 3]);
+        team.win();
+        assert!(!team.hand_over(5));
+        assert!(!team.leave(1));
     }
 
     #[test]

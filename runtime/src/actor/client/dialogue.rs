@@ -57,7 +57,7 @@ impl ClientActor {
             return self.talk_about_event(net::events::EventKind::Hpq).await;
         }
         if let Some(ticket) = self.event.as_ref().filter(|t| t.holds(player.stats.map_id)) {
-            let (leader, won) = (ticket.leader, ticket.won());
+            let (leader, won) = (ticket.leader(), ticket.won());
             let script = net::npc_scripts::NpcScript::in_event(npc_id, player, leader, won);
             if let Some(script) = script {
                 return self.start_script(script).await;

@@ -17,6 +17,7 @@ use net::packet::build::world::effect::{
 };
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
+use net::ClientId;
 use packet::Packet;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
@@ -221,6 +222,14 @@ impl ClientActor {
     pub(super) async fn event_failed(&mut self, id: u32) {
         if let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) {
             ticket.command(EventCommand::Fail).await;
+        }
+    }
+
+    /// The player handed their party to `to`: if they led an event, its
+    /// lead goes too, and the event ends if `to` is not in it.
+    pub(super) async fn handed_over(&mut self, to: ClientId) {
+        if let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.leader()) {
+            ticket.command(EventCommand::HandOver(to)).await;
         }
     }
 
