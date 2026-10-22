@@ -64,6 +64,9 @@ struct Entry {
     handle: ClientHandle,
     presence: Presence,
     channel_id: u8,
+    /// In the Cash Shop, off every map until they leave it, which
+    /// registers them again.
+    in_cash_shop: bool,
 }
 
 impl Entry {
@@ -335,7 +338,12 @@ impl WorldDirectory {
                 self.refuse_proposal(from, refusal)
             }
             DirectoryMessage::Engaged { proposer, record } => self.engaged(proposer, record),
-            DirectoryMessage::ForgetProposals { from } => self.forget_proposals(from),
+            DirectoryMessage::EnteredCashShop { from } => {
+                self.forget_proposals(from);
+                if let Some(entry) = self.clients.get_mut(&from) {
+                    entry.in_cash_shop = true;
+                }
+            }
             DirectoryMessage::CoupleEnded { partner, record } => {
                 self.tell(partner, ServerMessage::CoupleEnded(record))
             }
@@ -468,7 +476,9 @@ impl WorldDirectory {
             .members
             .iter()
             .filter_map(|member| self.clients.get(&member.id))
-            .filter(|entry| entry.channel_id == asker.channel_id)
+            // Those in the Cash Shop are on no map (Cosmic's
+            // `isLoggedinWorld`).
+            .filter(|entry| entry.channel_id == asker.channel_id && !entry.in_cash_shop)
             .map(|entry| Candidate {
                 id: entry.handle.client_id,
                 level: entry.presence.level,
@@ -691,6 +701,7 @@ impl WorldDirectory {
             handle,
             presence,
             channel_id,
+            in_cash_shop: false,
         };
         let member = entry.member();
         self.clients.insert(client_id, entry);
@@ -1950,6 +1961,34 @@ mod tests {
         assert_eq!(directory.party_searches.all().len(), 1);
         directory.party_request(1, PartyRequest::SearchStop, now);
         assert!(directory.party_searches.all().is_empty());
+    }
+
+    #[test]
+    fn members_in_the_cash_shop_cannot_go_into_an_event() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let lobby = events::HPQ.lobby;
+        let _seen: Vec<_> = [(1, "Alice"), (2, "Bobby"), (3, "Carol")]
+            .into_iter()
+            .map(|(id, name)| online(&mut directory, id, name, lobby))
+            .collect();
+        let now = Instant::now();
+        directory.party_request(1, PartyRequest::Create, now);
+        for (id, name) in [(2, "Bobby"), (3, "Carol")] {
+            let invite = PartyRequest::Invite { name: name.into() };
+            directory.party_request(1, invite, now);
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        let entry = |directory: &WorldDirectory| directory.event_entry(1, EventKind::Hpq);
+        assert_eq!(entry(&directory), (events::Entry::Ready, vec![1, 2, 3]));
+
+        // Carol's map is still the lobby's, but she isn't on it.
+        directory.handle(DirectoryMessage::EnteredCashShop { from: 3 });
+        assert_eq!(entry(&directory).0, events::Entry::NotEligible);
+
+        // Leaving the shop registers her again, on the map.
+        let _carol = online(&mut directory, 3, "Carol", lobby);
+        assert_eq!(entry(&directory).0, events::Entry::Ready);
     }
 
     #[test]
