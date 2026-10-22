@@ -640,7 +640,12 @@ equip through INVENTORY_OPERATION, or only unlocks the client.
 
 The equip tooltip shows the owner over the name, in orange with a white
 "'s", like v83's (FUN_008f49bc); the client's checks are in
-`Character/Inventory/EquipCash.h`.
+`Character/Inventory/EquipCash.h`. Any other item with an owner says
+"Specially made by" and the owner, centred under its expiry line
+(`item_properties::shows_maker`), except greeting cards (430xxxx) and the
+two wedding invitations, whose owner field means something else, and pets.
+The inventory, storage, trading room, personal shop, Duey and NPC shop
+tooltips all show an item's own expiry, flags and owner.
 
 ### Item Guards
 

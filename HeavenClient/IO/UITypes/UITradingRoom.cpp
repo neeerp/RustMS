@@ -545,7 +545,7 @@ namespace ms
 
 			if (item)
 			{
-				UI::get().show_item(Tooltip::Parent::TRADINGROOM, item->itemid);
+				UI::get().show_item(Tooltip::Parent::TRADINGROOM, *item);
 
 				return;
 			}

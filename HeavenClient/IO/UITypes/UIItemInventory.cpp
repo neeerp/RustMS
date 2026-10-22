@@ -1593,7 +1593,7 @@ namespace ms
 
 			if (item)
 				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, item->get_expiration(), item->get_flags(),
-									true);
+									true, 0, item->get_owner());
 			else if (pet)
 				UI::get().show_item(Tooltip::Parent::ITEMINVENTORY, item_id, pet->get_date_dead(), 0, true,
 									pet->get_remain_life());

@@ -34,4 +34,9 @@ namespace ms
 	{
 		return flags;
 	}
+
+	const std::string &Item::get_owner() const
+	{
+		return owner;
+	}
 }

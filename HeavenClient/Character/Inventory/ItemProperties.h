@@ -124,6 +124,13 @@ namespace ms::item_properties
 		return lines;
 	}
 
+	// A bundle's tooltip names who made it ("Specially made by"), except on greeting cards and wedding
+	// invitations, whose owner is the sender or the guest (FUN_008edfc7, report c011).
+	inline bool shows_maker(int32_t item_id, const std::string &owner)
+	{
+		return !owner.empty() && item_id / 10000 != 430 && item_id != 4031406 && item_id != 4031407;
+	}
+
 	// A description with the hint that Scissors of Karma would let the item trade, on a line of its own.
 	inline std::string with_karma_hint(std::string desc)
 	{
