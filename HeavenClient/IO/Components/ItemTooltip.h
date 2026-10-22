@@ -37,10 +37,10 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		// An item in the inventory also has its expiry and flags, and is `owned`. A pet's expiry is when its Water
-		// of Life dries up, and one with limitedLife has `remain_life` seconds left.
+		// A real item also has its expiry, flags and `owner` (who made it), and is `owned`. A pet's expiry is when
+		// its Water of Life dries up, and one with limitedLife has `remain_life` seconds left.
 		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false,
-					  int32_t remain_life = 0);
+					  int32_t remain_life = 0, const std::string &owner = {});
 		// A Cash Shop commodity lasting `period` days, 0 for ever, as Item.nx makes it: the period for a date, and
 		// a pet's whole life (FUN_004baf1a).
 		void set_commodity(int32_t itemid, int32_t period);
@@ -57,6 +57,7 @@ namespace ms
 		int16_t flags;
 		bool owned;
 		int32_t remain_life;
+		std::string owner;
 		// Laid out by set_commodity or set_cash_item, so set_item lays it out again.
 		bool cash_shop;
 		Point<int16_t> size;
@@ -75,6 +76,9 @@ namespace ms
 		Texture expiry_dot;
 		Text expiry;
 		int16_t expiry_height;
+		// "Specially made by" and who, centred under the expiry line.
+		Text maker_label;
+		Text maker;
 		Text gift;
 		Text desc;
 	};

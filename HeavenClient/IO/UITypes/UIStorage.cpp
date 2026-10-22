@@ -540,7 +540,8 @@ namespace ms
 
 		if (row >= 0 && stored.offset + row < static_cast<int16_t>(stored.rows.size()))
 		{
-			UI::get().show_item(Tooltip::Parent::STORAGE, stored.rows[stored.offset + row].itemid);
+			// The rows are the bag's items in order.
+			UI::get().show_item(Tooltip::Parent::STORAGE, bags[tab][stored.offset + row]);
 
 			return;
 		}
@@ -553,6 +554,9 @@ namespace ms
 
 			if (tab == InventoryType::Id::EQUIP)
 				UI::get().show_equip(Tooltip::Parent::STORAGE, entry.slot);
+			else if (auto item = inventory.get_item(tab, entry.slot))
+				UI::get().show_item(Tooltip::Parent::STORAGE, entry.itemid, item->get_expiration(), item->get_flags(),
+									true, 0, item->get_owner());
 			else
 				UI::get().show_item(Tooltip::Parent::STORAGE, entry.itemid);
 

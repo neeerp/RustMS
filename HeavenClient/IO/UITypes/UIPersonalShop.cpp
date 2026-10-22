@@ -348,7 +348,7 @@ namespace ms
 		const mini_room::Listing &listing = listings[index];
 
 		// Sold out rows still show what they were (FUN_006fb864).
-		UI::get().show_item(Tooltip::Parent::PERSONALSHOP, listing.item.itemid);
+		UI::get().show_item(Tooltip::Parent::PERSONALSHOP, listing.item);
 
 		if (clicked)
 		{

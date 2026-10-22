@@ -101,7 +101,7 @@ namespace ms
 				UI::get().show_equip(Tooltip::Parent::KARMASCISSORS, target_slot);
 			else if (auto item = inventory.get_item(target_tab, target_slot))
 				UI::get().show_item(Tooltip::Parent::KARMASCISSORS, id, item->get_expiration(), item->get_flags(),
-									true);
+									true, 0, item->get_owner());
 		}
 		else
 		{

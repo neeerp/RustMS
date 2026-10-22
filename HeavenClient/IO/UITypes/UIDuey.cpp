@@ -573,8 +573,13 @@ namespace ms
 
 		if (on_slot && out.item_id != 0)
 		{
+			const Inventory &inventory = Stage::get().get_player().get_inventory();
+
 			if (out.tab == InventoryType::Id::EQUIP)
 				UI::get().show_equip(Tooltip::Parent::DUEY, out.slot);
+			else if (auto item = inventory.get_item(out.tab, out.slot))
+				UI::get().show_item(Tooltip::Parent::DUEY, out.item_id, item->get_expiration(), item->get_flags(),
+									true, 0, item->get_owner());
 			else
 				UI::get().show_item(Tooltip::Parent::DUEY, out.item_id);
 		} else
@@ -899,7 +904,7 @@ namespace ms
 		const Row *row = chosen();
 
 		if (row && row->parcel.item && ITEM_HOVER.contains(cursor))
-			UI::get().show_item(Tooltip::Parent::DUEY, row->parcel.item->itemid);
+			UI::get().show_item(Tooltip::Parent::DUEY, *row->parcel.item);
 		else
 			clear_tooltip();
 	}

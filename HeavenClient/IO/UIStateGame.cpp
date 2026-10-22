@@ -667,9 +667,9 @@ namespace ms
 	}
 
 	void UIStateGame::show_item(Tooltip::Parent parent, int32_t itemid, int64_t expiration, int16_t flags,
-								bool owned, int32_t remain_life)
+								bool owned, int32_t remain_life, const std::string &owner)
 	{
-		ittooltip.set_item(itemid, expiration, flags, owned, remain_life);
+		ittooltip.set_item(itemid, expiration, flags, owned, remain_life, owner);
 
 		if (itemid)
 		{

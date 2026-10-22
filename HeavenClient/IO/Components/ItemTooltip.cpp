@@ -50,6 +50,8 @@ namespace ms
 		// A token makes 16 px of room for its partner line, record or not (0x8ee4c3). v83 then starts the expiry
 		// line 19 lower; tokens have none.
 		constexpr int16_t TOKEN_HEIGHT = 16;
+		// Who made it: a centred line under the date, making 16 px of room (0x8ef29c).
+		constexpr int16_t MAKER_STEP = 16;
 
 		Text property_line(const std::string &line)
 		{
@@ -71,9 +73,11 @@ namespace ms
 		expiry_height = 0;
 	}
 
-	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag, bool own, int32_t remain)
+	bool ItemTooltip::set_item(int32_t iid, int64_t expire, int16_t flag, bool own, int32_t remain,
+							   const std::string &made_by)
 	{
-		if (!cash_shop && itemid == iid && expiration == expire && flags == flag && owned == own && remain_life == remain)
+		if (!cash_shop && itemid == iid && expiration == expire && flags == flag && owned == own &&
+			remain_life == remain && owner == made_by)
 			return false;
 
 		itemid = iid;
@@ -81,6 +85,7 @@ namespace ms
 		flags = flag;
 		owned = own;
 		remain_life = remain;
+		owner = made_by;
 		cash_shop = false;
 
 		if (itemid == 0)
@@ -101,6 +106,7 @@ namespace ms
 		flags = 0;
 		owned = false;
 		remain_life = 0;
+		owner.clear();
 		cash_shop = true;
 
 		bool pet = itemid / 10000 == 500;
@@ -115,6 +121,7 @@ namespace ms
 		flags = 0;
 		owned = false;
 		remain_life = 0;
+		owner.clear();
 		cash_shop = true;
 
 		bool pet = itemid / 10000 == 500;
@@ -148,6 +155,18 @@ namespace ms
 		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
 		expiry_height = expiry.empty() ? 0 : pet ? PET_LINE_HEIGHT : EXPIRY_HEIGHT;
 
+		// Pets have no line for it (FUN_008ed8f5).
+		if (!pet && item_properties::shows_maker(itemid, owner))
+		{
+			maker_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "Specially made by ");
+			maker = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::TIPORANGE, owner);
+		}
+		else
+		{
+			maker_label = Text();
+			maker = Text();
+		}
+
 		if (giftstr.empty())
 			gift = Text();
 		else if (pet)
@@ -155,7 +174,8 @@ namespace ms
 		else
 			gift = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, giftstr);
 
-		int16_t top = properties_height + marriage_height + expiry_height + (gift.empty() ? 0 : GIFT_STEP);
+		int16_t top = properties_height + marriage_height + expiry_height + (maker.empty() ? 0 : MAKER_STEP) +
+					  (gift.empty() ? 0 : GIFT_STEP);
 		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
 		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
 	}
@@ -188,11 +208,23 @@ namespace ms
 			expiry.draw(pos + EXPIRY_POS);
 		}
 
+		// The lines under the date, 16 apart: who made it, then who sent it.
+		Point<int16_t> line = pos + Point<int16_t>(0, expiry.empty() ? 0 : GIFT_STEP);
+
+		if (!maker.empty())
+		{
+			// The label and the name are centred as one, level with a dot line's text (FUN_008f49bc mode 0).
+			int16_t left = WIDTH / 2 - (maker_label.width() + maker.width()) / 2;
+			maker_label.draw(line + Point<int16_t>(left, EXPIRY_POS.y()));
+			maker.draw(line + Point<int16_t>(left + maker_label.width(), EXPIRY_POS.y()));
+
+			line.shift_y(MAKER_STEP);
+			pos.shift_y(MAKER_STEP);
+		}
+
 		if (!gift.empty())
 		{
 			// FUN_008edfc7 puts it 16 under the date, FUN_008ed8f5 centres a pet's.
-			Point<int16_t> line = pos + Point<int16_t>(0, expiry.empty() ? 0 : GIFT_STEP);
-
 			if (itemid / 10000 == 500)
 			{
 				gift.draw(line + Point<int16_t>(WIDTH / 2, PROPERTY_Y));

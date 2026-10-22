@@ -32,6 +32,11 @@
 
 namespace ms
 {
+	namespace storage_contents
+	{
+		struct Stored;
+	}
+
 	class UI : public Singleton<UI>
 	{
 	public:
@@ -105,10 +110,14 @@ namespace ms
 
 		void show_equip(Tooltip::Parent parent, int16_t slot);
 
-		// An item in the inventory also has its expiry and flags, and is `owned`. For a pet, `expiration` is when its
-		// Water of Life dries up and `remain_life` the seconds one with limitedLife has left.
+		// A real item, rather than a kind of item, also has its expiry, flags and `owner` (who made it), and is
+		// `owned`. For a pet, `expiration` is when its Water of Life dries up and `remain_life` the seconds one with
+		// limitedLife has left.
 		void show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration = 0, int16_t flags = 0,
-					   bool owned = false, int32_t remain_life = 0);
+					   bool owned = false, int32_t remain_life = 0, const std::string &owner = {});
+
+		// An item as storage, a trade, a personal shop or a parcel carries it.
+		void show_item(Tooltip::Parent parent, const storage_contents::Stored &item);
 
 		void
 		show_skill(Tooltip::Parent parent, int32_t skill_id, int32_t level, int32_t masterlevel, int64_t expiration,

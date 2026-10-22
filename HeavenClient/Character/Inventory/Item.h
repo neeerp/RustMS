@@ -31,6 +31,8 @@ namespace ms
 
 		int16_t get_flags() const;
 
+		const std::string &get_owner() const;
+
 	private:
 		int32_t item_id;
 		int64_t expiration;

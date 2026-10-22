@@ -69,6 +69,11 @@ int main()
 		require(with_karma_hint("").find("#c") == 0, "hint alone");
 		require(with_karma_hint("A ring.") == std::string("A ring.\\n") + KARMA_HINT, "hint on its own line");
 
+		require(shows_maker(2000000, "Maker") && shows_maker(5040000, "Maker"), "a made item names its maker");
+		require(!shows_maker(2000000, ""), "no owner, no line");
+		require(!shows_maker(4300000, "Maker") && !shows_maker(4031406, "Maker") && !shows_maker(4031407, "Maker"),
+			"cards and wedding invitations keep their owner to themselves");
+
 		std::cout << "item properties passed\n";
 		return 0;
 	}

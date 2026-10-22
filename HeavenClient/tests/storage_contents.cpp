@@ -35,9 +35,9 @@ struct Writer
 		return put(type).put(itemid).put<int8_t>(0).put<int64_t>(0);
 	}
 
-	Writer& stack(int32_t itemid, int16_t count, int16_t flags = 0)
+	Writer& stack(int32_t itemid, int16_t count, int16_t flags = 0, const std::string& owner = "")
 	{
-		head(2, itemid).put(count).string("").put<int16_t>(flags);
+		head(2, itemid).put(count).string(owner).put<int16_t>(flags);
 
 		if (itemid / 10000 == 207)
 			put<int32_t>(2).put<int32_t>(0x34000054);
@@ -70,7 +70,7 @@ int main()
 		w.put<int8_t>(1).equip(1302000, 0x10);
 		w.put<int8_t>(2).stack(2000000, 3, 0x02).stack(2070000, 500);
 		w.put<int8_t>(0);
-		w.put<int8_t>(1).stack(4000000, 7);
+		w.put<int8_t>(1).stack(4000000, 7, 0, "Maker");
 		w.put<int8_t>(0);
 
 		InPacket recv(w.bytes.data(), w.bytes.size());
@@ -84,6 +84,8 @@ int main()
 		require(contents.bags[2]->size() == 2 && (*contents.bags[2])[1].count == 500, "stars are read past their recharge");
 		require(contents.bags[3]->empty() && contents.bags[5]->empty(), "empty bags are carried");
 		require((*contents.bags[4])[0].itemid == 4000000 && (*contents.bags[4])[0].count == 7, "etc items are read");
+		require((*contents.bags[4])[0].owner == "Maker" && (*contents.bags[1])[0].owner == "owner", "owners are read");
+		require((*contents.bags[2])[0].owner.empty(), "an item without an owner has none");
 
 		// A store or take-out carries one bag, a meso change only the mesos.
 		Writer bag;
@@ -101,6 +103,20 @@ int main()
 		auto mesos = storage_contents::read(meso_recv);
 
 		require(!meso_recv.available() && mesos.meso == 50, "a meso result carries only the mesos");
+
+		// A pet keeps when its Water of Life dries up and its life left, past its name and stats.
+		Writer pet;
+		pet.put<int8_t>(3).put<int32_t>(5000054).put<int8_t>(1).put<int64_t>(77).put<int64_t>(-1);
+		for (int i = 0; i < 13; i++)
+			pet.put<int8_t>(0);
+		pet.put<int8_t>(1).put<int16_t>(0).put<int8_t>(100).put<int64_t>(150000000000000000);
+		pet.put<int16_t>(0).put<int16_t>(0).put<int32_t>(3600).put<int16_t>(0);
+		InPacket pet_recv(pet.bytes.data(), pet.bytes.size());
+		auto snail = storage_contents::read_item(pet_recv);
+
+		require(!pet_recv.available(), "a pet is read");
+		require(snail.cash && snail.date_dead == 150000000000000000 && snail.remain_life == 3600,
+			"a pet's life is read");
 
 		std::cout << "Storage contents passed\n";
 		return 0;

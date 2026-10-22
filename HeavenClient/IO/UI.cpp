@@ -25,6 +25,7 @@
 #include "Window.h"
 
 #include "../Gameplay/Stage.h"
+#include "../Net/Handlers/StorageContents.h"
 #include "../Net/Packets/GameplayPackets.h"
 
 #include "Components/Slider.h"
@@ -570,9 +571,20 @@ namespace ms
 	}
 
 	void UI::show_item(Tooltip::Parent parent, int32_t item_id, int64_t expiration, int16_t flags, bool owned,
-					   int32_t remain_life)
+					   int32_t remain_life, const std::string &owner)
 	{
-		state->show_item(parent, item_id, expiration, flags, owned, remain_life);
+		state->show_item(parent, item_id, expiration, flags, owned, remain_life, owner);
+	}
+
+	void UI::show_item(Tooltip::Parent parent, const storage_contents::Stored &item)
+	{
+		// Equips have no tooltip of their own here yet, and name their owner differently ("'s").
+		if (item.itemid / 10000 == 500)
+			show_item(parent, item.itemid, item.date_dead, 0, true, item.remain_life);
+		else if (item.itemid / 1000000 == 1)
+			show_item(parent, item.itemid, item.expiration, item.flags, true);
+		else
+			show_item(parent, item.itemid, item.expiration, item.flags, true, 0, item.owner);
 	}
 
 	void

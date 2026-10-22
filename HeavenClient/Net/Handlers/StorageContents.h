@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace ms
@@ -20,6 +21,11 @@ namespace ms
 			// It has a Cash Shop serial.
 			bool cash = false;
 			int64_t expiration = item_expiry::BEFORE;
+			// Who made or tagged it.
+			std::string owner;
+			// A pet's: when its Water of Life dries up, and the seconds one with limitedLife has left.
+			int64_t date_dead = 0;
+			int32_t remain_life = 0;
 		};
 
 		// What a TRUNK_RESULT carries. A bag it leaves out keeps its items,
@@ -48,18 +54,22 @@ namespace ms
 			{
 			case 1:
 				recv.skip(2 + 15 * 2); // upgrade slots, level, stats
-				recv.skip_string();
+				item.owner = recv.read_string();
 				item.flags = recv.read_short();
 				recv.skip(item.cash ? 10 : 18);
 				recv.skip(12);
 				break;
 			case 3:
 				recv.skip_padded_string(13);
-				recv.skip(1 + 2 + 1 + 18);
+				recv.skip(1 + 2 + 1); // level, closeness, fullness
+				item.date_dead = recv.read_long();
+				recv.skip(2 + 2); // attribute, skills
+				item.remain_life = recv.read_int();
+				recv.skip(2);
 				break;
 			default:
 				item.count = recv.read_short();
-				recv.skip_string();
+				item.owner = recv.read_string();
 				item.flags = recv.read_short();
 
 				if (item.itemid / 10000 == 207 || item.itemid / 10000 == 233)
