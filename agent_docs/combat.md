@@ -1556,7 +1556,10 @@ damage over the mob, at most a tenth of its max HP for a physical hit
 random spot on the body, flipped when the mob is on the right, or, for a
 `hit/attach` one, on the player. Its attack1, attack2 and attack9 also play
 the mob's `CharDam1`, `CharDam2` and `CharDamF` sound. The player's own hits
-do the same, but only when they take damage. Nobody else sees a player's
+do the same, but only when they take damage. When Power Stance (or, with
+a full gauge, Energy Charge) keeps the player in place, their own client
+plays the skill's `special` at their feet, and Energy Charge's `Use2`
+sound (`Combat::show_stance`, 0x958c52). Nobody else sees a player's
 Power Stance or knockback. Hits with no mob (-4) end with a byte: 1
 poison (ignored, the server ticks poison itself), 2 a mist (Achilles
 applies), or 3 Stop Motion (no guards, never fatal). At 0 HP the player is

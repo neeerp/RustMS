@@ -128,6 +128,11 @@ int main()
 		require(guard(true, true) == 2 && guard(true, false) == 1 && guard(false, true) == 0,
 				"the Guardian byte tells a touch from an attack");
 
+		require(stance_skill(112) == 1121002 && stance_skill(122) == 1221002 && stance_skill(132) == 1321002,
+				"Power Stance is the Hero's, the Paladin's and the Dark Knight's");
+		require(stance_skill(2112) == 21121003 && stance_skill(111) == 0 && stance_skill(512) == 0,
+				"and the Aran's, from fourth job only");
+
 		// Resistances by job line and element.
 		require(resistance_skill(131, 2) == 1310000 && resistance_skill(132, 4) == 1310000,
 				"Dragon and Dark Knights resist every element");

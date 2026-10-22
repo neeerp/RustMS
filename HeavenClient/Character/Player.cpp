@@ -1256,6 +1256,14 @@ namespace ms
 		uint8_t direction = fromleft ? 0 : 1;
 
 		MobAttackResult result(attack, damage, direction, stance);
+
+		// Without Power Stance, a full Energy Charge gauge lends its chance (0x958bc9).
+		if (stance)
+		{
+			int32_t job = stats.get_stat(MapleStat::Id::JOB);
+			result.stance_skill = has_buff(Buffstat::Id::STANCE) ? mob_damage::stance_skill(job) : energy::skill(job);
+		}
+
 		result.reflect = reflect;
 		result.reflected = reflected.shown;
 		result.guard = mob_damage::guard(blocked, attack.index < 0);

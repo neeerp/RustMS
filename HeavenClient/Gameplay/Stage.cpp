@@ -497,6 +497,9 @@ namespace ms
 			if (result.dodged)
 				combat.show_player_special(result.dodged);
 
+			if (result.stance)
+				combat.show_stance(result.stance_skill);
+
 			// What Mana Reflection sent back shows over the mob.
 			if (result.reflect)
 				mobs.show_damage(result.oid, result.reflected);
@@ -537,6 +540,9 @@ namespace ms
 
 				if (result.dodged)
 					combat.show_player_special(result.dodged);
+
+				if (result.stance)
+					combat.show_stance(result.stance_skill);
 
 				// What Power Guard sent back shows over the mob.
 				if (result.reflect)
