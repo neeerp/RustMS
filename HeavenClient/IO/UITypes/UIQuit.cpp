@@ -19,6 +19,7 @@
 
 #include "Timer.h"
 #include "UINotice.h"
+#include "../PartySearchActions.h"
 #include "../UI.h"
 #include "../Window.h"
 
@@ -39,6 +40,7 @@ namespace ms
 					{
 						GraphicsGL::get().clear();
 
+						PartySearchActions::reset();
 						UI::get().change_state(UI::State::LOGIN);
 						UI::get().set_scrollnotice("");
 						Session::get().reconnect();

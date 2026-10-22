@@ -252,6 +252,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(parcels_tests tests/parcels.cpp Net/InPacket.cpp)
     target_include_directories(parcels_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME parcels COMMAND parcels_tests)
+    add_executable(party_search_tests tests/party_search.cpp Character/PartySearch.cpp)
+    add_test(NAME party_search COMMAND party_search_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -482,6 +484,8 @@ add_executable(HeavenClient
     Character/MountRules.h
     Character/Party.cpp
     Character/Party.h
+    Character/PartySearch.cpp
+    Character/PartySearch.h
     Character/Pets.h
     Character/MiniRoomBalloon.cpp
     Character/MiniRoomBalloon.h
@@ -729,6 +733,10 @@ add_executable(HeavenClient
     IO/UITypes/UIQuestComplete.h
     IO/UITypes/UIPartyHP.cpp
     IO/UITypes/UIPartyHP.h
+    IO/UITypes/UIPartySearch.cpp
+    IO/UITypes/UIPartySearch.h
+    IO/UITypes/UIPartySearchIcon.cpp
+    IO/UITypes/UIPartySearchIcon.h
     IO/UITypes/UIQuestHelper.h
     IO/UITypes/UICashBuy.cpp
     IO/UITypes/UICashBuy.h
@@ -904,6 +912,8 @@ add_executable(HeavenClient
     IO/BuddyCommands.h
     IO/PartyCommands.cpp
     IO/PartyCommands.h
+    IO/PartySearchActions.cpp
+    IO/PartySearchActions.h
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h

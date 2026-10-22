@@ -22,6 +22,7 @@
 
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UIGiftNotice.h"
@@ -34,6 +35,9 @@ namespace ms
 {
 	void SetCashShopHandler::handle(InPacket& recv) const
 	{
+		// Back from the Cash Shop, a search goes on (0x776a4f).
+		PartySearchActions::leaving_channel();
+
 		CashShopParser::parseCharacterInfo(recv);
 
 		recv.skip_byte();	// Not MTS

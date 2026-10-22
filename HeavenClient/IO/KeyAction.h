@@ -49,6 +49,8 @@ namespace ms
 			NOTIFIER = 21,
 			CASHSHOP = 24,
 			GUILDCHAT = 25,
+			// v83's 25, which this enum gives to guild chat.
+			PARTYSEARCH = 26,
 			MEDALS = 28,
 			BITS,
 			ALLIANCECHAT,

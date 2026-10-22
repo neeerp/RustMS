@@ -4,6 +4,7 @@
 #include "UI.h"
 
 #include "UITypes/UIChatBar.h"
+#include "UITypes/UIPartySearch.h"
 
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
@@ -51,6 +52,8 @@ namespace ms
 				create();
 			else if (same_text(input, "/leaveparty"))
 				leave();
+			else if (same_text(input, "/partysearch"))
+				UIPartySearch::toggle();
 			else if (with_argument(input, "/partyinvite", name))
 				invite(name);
 			else if (with_argument(input, "/partyexpel", name))

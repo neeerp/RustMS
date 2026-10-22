@@ -30,6 +30,7 @@
 #include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
+#include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
@@ -90,6 +91,11 @@ namespace ms
 		Constants::Constants::get().set_viewheight(Setting<Height>::get().load());
 
 		int32_t channel = recv.read_int();
+
+		// v83 resumes a search in a new channel (0x776020).
+		if (channel != Configuration::get().get_channelid())
+			PartySearchActions::leaving_channel();
+
 		Configuration::get().set_channelid(static_cast<uint8_t>(channel));
 
 		// v83 (FUN_00776020) gives the new field the first byte as its key.
@@ -148,9 +154,8 @@ namespace ms
 		if (auto gage = UI::get().get_element<UIMobGage>())
 			gage->hide();
 
-		// v83 (FUN_00a03eba, from CField::OnSetField) sends this on every
-		// field change, not only on entering the game.
-		PlayerUpdatePacket().dispatch();
+		// A search ends with any map change in the channel (0xa03f2e).
+		PartySearchActions::field_entered();
 
 		transition(mapid, portalid, chase);
 	}
@@ -221,7 +226,8 @@ namespace ms
 		// Logging in or changing channel starts Berserk over (0x7763a9).
 		player.update_berserk(true);
 
-		PlayerUpdatePacket().dispatch();
+		// After a channel change or the Cash Shop, a search goes on.
+		PartySearchActions::field_entered();
 
 		uint8_t portalid = player.get_stats().get_portal();
 		int32_t mapid = player.get_stats().get_mapid();

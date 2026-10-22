@@ -133,6 +133,33 @@ reconstruction of v83:
   full party, and expelling someone who isn't a member. v83's check for maps
   where leaving or expelling isn't allowed is not implemented.
 
+### Party search
+
+- `Character/PartySearch` holds the leader's search: idle, searching or
+  paused, and what was asked. It outlives the window, as v83 keeps it in its
+  context. Each change says which packet to send, and
+  `IO/PartySearchActions` sends it and updates the window and the indicator.
+  - Every field entry sends `PARTY_SEARCH_STOP` and ends the search. After a
+    channel change or a return from the Cash Shop, a running search sends
+    `PARTY_SEARCH_START` again instead, and a paused one stays paused.
+  - A join that brings the party to the size wanted ends the search, and so
+    does logging out.
+- `UIPartySearch` is v83's Party Search window (`UIWindow.img/PartySearch`).
+  The O key (`KeyAction::PARTYSEARCH`, 26), `/partysearch`, and the Party
+  tab's Search button open it. With the user list open, it docks to its
+  right.
+  - Its edits take digits only. Its 25 job boxes show the job names for the
+    player's tier (below 70, to 119, from 120). Below level 30 only All,
+    Beginner, Aran and the class heads show. All and each head set their
+    whole group, and are set again when all of it is.
+  - Start refuses what v83 refuses, in its order and words
+    (`PartySearch::refusal`), and only the party leader may start.
+  - While searching, the boxes and edits are disabled and Start is greyed.
+    Paused, they work again.
+- `UIPartySearchIcon` is the indicator at the top right, magnifier art
+  animated while searching and still while paused. Clicking it pauses or
+  resumes the search, and right-clicking stops it. It fades in and out.
+
 ## Unverified against period footage
 
 - The party chat colour (#FF99CC).

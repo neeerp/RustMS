@@ -74,6 +74,7 @@ namespace ms
 		settings.emplace<PosSHOP>();
 		settings.emplace<PosSTORAGE>();
 		settings.emplace<PosDUEY>();
+		settings.emplace<PosPARTYSEARCH>();
 		settings.emplace<PosTRADE>();
 		settings.emplace<PosPERSONALSHOP>();
 		settings.emplace<PosNOTICE>();

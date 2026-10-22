@@ -138,7 +138,7 @@ namespace ms
 		}
 
 		// The functions the window offers, by the index of their v83 icon.
-		// Party search and family have no counterpart here.
+		// Family has no counterpart here.
 		struct Function
 		{
 			KeyAction::Id action;
@@ -171,6 +171,7 @@ namespace ms
 			{ KeyAction::Id::MONSTERBOOK, 22 },
 			{ KeyAction::Id::CASHSHOP, 23 },
 			{ KeyAction::Id::ALLIANCECHAT, 24 },
+			{ KeyAction::Id::PARTYSEARCH, 25 },
 			{ KeyAction::Id::MEDALS, 27 },
 			{ KeyAction::Id::PICKUP, 50 },
 			{ KeyAction::Id::SIT, 51 },
@@ -228,6 +229,7 @@ namespace ms
 			{ KeyConfig::Key::RIGHT_BRACKET, { KeyType::Id::MENU, KeyAction::Id::QUICKSLOTS } },
 			{ KeyConfig::Key::G, { KeyType::Id::MENU, KeyAction::Id::GUILD } },
 			{ KeyConfig::Key::P, { KeyType::Id::MENU, KeyAction::Id::PARTY } },
+			{ KeyConfig::Key::O, { KeyType::Id::MENU, KeyAction::Id::PARTYSEARCH } },
 			{ KeyConfig::Key::L, { KeyType::Id::MENU, KeyAction::Id::NOTIFIER } },
 			{ KeyConfig::Key::GRAVE_ACCENT, { KeyType::Id::MENU, KeyAction::Id::CASHSHOP } },
 			{ KeyConfig::Key::SEMICOLON, { KeyType::Id::MENU, KeyAction::Id::MEDALS } },
@@ -913,6 +915,7 @@ namespace ms
 		case KeyAction::Id::NOTIFIER:
 		case KeyAction::Id::CASHSHOP:
 		case KeyAction::Id::GUILDCHAT:
+		case KeyAction::Id::PARTYSEARCH:
 		case KeyAction::Id::MEDALS:
 		case KeyAction::Id::BITS:
 		case KeyAction::Id::ALLIANCECHAT:
