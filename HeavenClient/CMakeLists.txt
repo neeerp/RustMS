@@ -264,6 +264,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(family_tests tests/family.cpp Character/Family.cpp Net/InPacket.cpp Net/Handlers/Helpers/FamilyParser.cpp)
     target_include_directories(family_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME family COMMAND family_tests)
+    add_executable(marriage_tests tests/marriage.cpp Character/Marriage.cpp Net/InPacket.cpp)
+    target_include_directories(marriage_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME marriage COMMAND marriage_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -504,6 +507,7 @@ add_executable(HeavenClient
     Character/RpsGame.cpp
     Character/RpsGame.h
     Character/Family.cpp
+    Character/Marriage.cpp
     Character/Family.h
     Character/Pets.h
     Character/MiniRoomBalloon.cpp
@@ -951,6 +955,8 @@ add_executable(HeavenClient
     IO/PartySearchActions.h
     IO/FamilyActions.cpp
     IO/FamilyActions.h
+    IO/MarriageActions.cpp
+    IO/MarriageActions.h
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
@@ -1008,6 +1014,8 @@ add_executable(HeavenClient
     Net/Handlers/GuildHandlers.h
     Net/Handlers/FamilyHandlers.cpp
     Net/Handlers/FamilyHandlers.h
+    Net/Handlers/MarriageHandlers.cpp
+    Net/Handlers/MarriageHandlers.h
     Net/Handlers/InventoryHandlers.cpp
     Net/Handlers/InventoryHandlers.h
     Net/Handlers/LoginHandlers.cpp
@@ -1033,6 +1041,7 @@ add_executable(HeavenClient
     Net/Packets/CommonPackets.h
     Net/Packets/GameplayPackets.h
     Net/Packets/FamilyPackets.h
+    Net/Packets/MarriagePackets.h
     Net/Packets/InventoryPackets.h
     Net/Packets/LoginPackets.h
     Net/Packets/MessagingPackets.h

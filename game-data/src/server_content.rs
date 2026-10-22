@@ -621,6 +621,9 @@ pub mod keys {
     /// online.
     pub const FAMILY_BONDING_SHORT: &str = "family.bonding_short";
 
+    /// To a proposer: one of the two is below the level to be engaged.
+    pub const MARRIAGE_LEVEL: &str = "marriage.level";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")

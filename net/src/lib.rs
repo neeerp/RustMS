@@ -58,8 +58,8 @@ pub use self::handler::{
     login_route, world_route, AllianceRequest, BbsRequest, BroadcastScope, BuddyRequest, ClientId,
     FamilyRequest, FieldRequest, GuildRequest, HandlerResult, LoginAction, LoginContext,
     LoginHandler, LoginStage, MessengerRequest, NoteRequest, PartyRequest, PartySkill,
-    PreGameHandler, SpawnPosition, WhisperDelivery, WorldAction, WorldContext, WorldHandler,
-    WorldRoute,
+    PreGameHandler, RingRequest, SpawnPosition, WhisperDelivery, WorldAction, WorldContext,
+    WorldHandler, WorldRoute,
 };
 pub use self::io::error;
 pub use self::npc_data::extra_npcs;

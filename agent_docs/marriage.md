@@ -1,0 +1,104 @@
+# Engagement and marriage
+
+Two players of different genders become engaged with an engagement ring
+box, and may later marry. Only the engagement is done so far. The protocol
+comes from report b052 in the v83 reference notes.
+
+## Storage
+
+The `marriages` table (`db/src/marriage.rs`) has one row per couple:
+
+- `groom_id` and `bride_id` are both unique, so a character is in at most
+  one couple. The rows go when either character is deleted.
+- `status` is 1 when the couple is engaged and 3 when they are married.
+- `item_id` is the ring box the couple were engaged with.
+
+`Player.marriage` holds the couple's `game::marriage::MarriageRecord`. It is
+loaded with the character, and the character data sends it as the third
+ring list, a 0x30-byte record (`write_marriage_record`). The same record
+follows `MARRIAGE_RESULT` 11.
+
+## Proposing
+
+The ring boxes are 2240000 to 2240003. Using one from the Use tab makes
+the client check these, in this order:
+
+1. The player has a free Etc slot.
+2. The player is male. v83 ignores a woman's box without a word.
+3. The player isn't already engaged or married.
+4. No dialog is open, which includes the wait for an earlier proposal.
+
+If all of them pass, the client asks for the partner's name and sends
+`RING_ACTION` 0 with the name and the box. While the proposal waits, it
+shows "Waiting for her response...". Closing that dialog sends
+`RING_ACTION` 1, which withdraws the proposal.
+
+The proposer's client actor (`runtime/src/actor/client/marriage.rs`)
+refuses with a `MARRIAGE_RESULT` mode (`game::marriage::Refusal`) in these
+cases:
+
+- the proposer is engaged or married;
+- the proposer's Etc tab is full;
+- the name is their own, longer than 12 characters, or not a character's;
+- the partner is engaged or married;
+- the two are the same gender.
+
+If the proposer is below level 50, they get a `MARRIAGE_RESULT` 36 notice
+instead (`marriage.level` in the content pack).
+
+The directory (`runtime/src/actor/directory/marriage.rs`) then holds the
+proposal, keyed by the partner. It refuses these cases:
+
+- the proposer already has a proposal out;
+- the partner is offline;
+- the partner is on another map;
+- the partner is already being asked;
+- the partner is below level 50 (a notice).
+
+If the directory accepts the proposal, the partner's actor checks the
+partner's own record and Etc room, then sends `MARRIAGE_REQUEST` 0 with the
+proposer's name and id. The client shows a Yes/No dialog. The answer
+(`RING_ACTION` 2) goes back to the directory:
+
+- A no gives the proposer mode 30.
+- A withdrawn proposal gives the partner mode 29.
+- A player who logs off, changes channel, enters the Cash Shop, or logs in
+  again from elsewhere ends the proposals they are part of.
+
+Proposals never expire: a partner who leaves the dialog open keeps others
+from asking them until the proposer withdraws or leaves.
+
+On a yes, the partner's actor stores the couple (`db::marriage::engage`; the
+groom is the male one). Its player is online because it is answering, so
+it takes the ring (the empty box's id + 1) and `MARRIAGE_RESULT` 11 itself.
+If its Etc tab filled while the dialog was open, it gets mode 20 and the
+proposer mode 21. It then sends the record through the directory to the
+proposer, whose actor replaces the box with its empty box (4031357 + 2 × the
+box's offset) and sends `MARRIAGE_RESULT` 11. A proposer who left meanwhile
+is engaged and keeps the box. Every refusal at this point reaches the
+proposer, so their wait always ends.
+
+## Client
+
+- `Character/Marriage.h` has the record and the result texts.
+- `IO/MarriageActions` has the proposing flow.
+- `Net/Handlers/MarriageHandlers` handles `MARRIAGE_REQUEST` (72) and
+  `MARRIAGE_RESULT` (73).
+
+Any result ends the client's wait, as does a new field (a channel change
+or the Cash Shop, where the server drops the proposal). The result's OK
+dialog replaces the waiting one, so no withdrawal is sent. v83's waiting
+dialog has a Cancel button; HeavenClient's has OK.
+
+HeavenClient shows one notice at a time, and a new one replaces the open
+one without calling its handler. A partner whose Yes/No is replaced never
+answers, and the proposer waits until they withdraw.
+
+## Not done yet
+
+- Breaking an engagement and divorce.
+- The partner notices (`NOTIFY_MARRIED_PARTNER_MAP_TRANSFER`).
+- The ring's look.
+- The wedding NPCs, reservations, the wedding field, and the wishlist.
+
+Report b052 §7 lists them.

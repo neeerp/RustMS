@@ -31,7 +31,8 @@ namespace ms
 		void parse_questlog(InPacket& recv, QuestLog& quests);
 		void parse_ring1(InPacket& recv);
 		void parse_ring2(InPacket& recv);
-		void parse_ring3(InPacket& recv);
+		// The couple the character is in, if any.
+		void parse_ring3(InPacket& recv, Player& player);
 		void parse_minigame(InPacket& recv);
 		void parse_monsterbook(InPacket& recv, MonsterBook& monsterbook);
 		void parse_teleportrock(InPacket& recv, TeleportRock& teleportrock);

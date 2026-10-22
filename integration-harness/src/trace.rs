@@ -197,6 +197,8 @@ pub struct Trace {
     /// Every family packet (FAMILY_CHART_RESULT to
     /// FAMILY_NOTIFY_LOGIN_OR_LOGOUT): (opcode, body), in order.
     pub family: Vec<(i16, Vec<u8>)>,
+    /// Every MARRIAGE_REQUEST and MARRIAGE_RESULT: (opcode, body), in order.
+    pub marriage: Vec<(i16, Vec<u8>)>,
     /// SHOW_STATUS_INFO mode 9: the info lines, in order.
     pub info_texts: Vec<String>,
     /// SCRIPT_PROGRESS_MESSAGE lines, in order.
@@ -598,6 +600,10 @@ impl Trace {
             .contains(&op)
         {
             self.family.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::MarriageRequest as i16
+            || op == SendOpcode::MarriageResult as i16
+        {
+            self.marriage.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::ScriptProgressMessage as i16 {
             self.script_messages.push(r.read_str_with_length().unwrap());
         } else if op == SendOpcode::QuestClear as i16 {

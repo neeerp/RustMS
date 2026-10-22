@@ -28,6 +28,7 @@ pub mod family;
 pub mod guild;
 pub mod guild_bbs;
 pub mod keybinding;
+pub mod marriage;
 pub mod note;
 pub mod parcel;
 pub mod pet;

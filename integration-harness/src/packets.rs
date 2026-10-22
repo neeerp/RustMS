@@ -278,6 +278,8 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::FamilyInfo as i16 => "FamilyInfo",
         x if x == SendOpcode::FamilyPrivilegeList as i16 => "FamilyPrivilegeList",
         x if x == SendOpcode::FamilySetPrivilege as i16 => "FamilySetPrivilege",
+        x if x == SendOpcode::MarriageRequest as i16 => "MarriageRequest",
+        x if x == SendOpcode::MarriageResult as i16 => "MarriageResult",
         _ => "Unknown",
     }
 }
@@ -892,13 +894,18 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         quests.insert(id, 2);
     }
 
-    // Minigame records and rings (the server sends none), then the teleport
-    // rocks.
-    for _ in 0..4 {
+    // Minigame records and rings (the server sends none), the couple's
+    // 0x30-byte marriage records, then the teleport rocks.
+    for _ in 0..3 {
         if cursor.read_short().map_err(|e| e.to_string())? != 0 {
             return Err("unexpected minigame or ring records".into());
         }
     }
+    let marriages = cursor.read_short().map_err(|e| e.to_string())?;
+    skip(
+        &mut cursor,
+        usize::try_from(marriages).map_err(|_| "negative marriage count")? * 0x30,
+    )?;
     skip(&mut cursor, 15 * 4)?;
     let monster_book_cover = cursor.read_int().map_err(|e| e.to_string())?;
     cursor.read_byte().map_err(|e| e.to_string())?;

@@ -14,6 +14,7 @@ mod guilds;
 mod hazard;
 mod later;
 mod loot;
+mod marriage;
 mod notes;
 mod npc_script;
 mod owl;
@@ -521,6 +522,7 @@ impl ClientActor {
             WorldAction::Note(request) => self.note_request(request).await?,
             WorldAction::Guild(request) => self.guild_request(request).await?,
             WorldAction::Family(request) => self.family_request(request).await?,
+            WorldAction::Ring(request) => self.ring_request(request).await?,
             WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
@@ -825,6 +827,11 @@ impl ClientActor {
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        // The shop can't answer a proposal (report b053).
+        self.send_to_directory(DirectoryMessage::ForgetProposals {
+            from: self.client_id,
+        })
+        .await?;
         self.send_to_field(FieldMessage::Leave {
             client_id: self.client_id,
             staying: false,
@@ -1244,6 +1251,11 @@ impl ClientActor {
             ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
+            ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,
+            ServerMessage::ProposalAccepted { proposer, item_id } => {
+                self.proposal_accepted(proposer, item_id).await?
+            }
+            ServerMessage::Engaged(record) => self.engaged(record).await?,
             ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,
             ServerMessage::FamilyChanged => self.family_changed().await?,
             ServerMessage::Separate {

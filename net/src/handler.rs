@@ -314,6 +314,17 @@ pub enum FamilyRequest {
     SummonAnswer { summoner: String, accept: bool },
 }
 
+/// An engagement, carried out by the client's actor (report b052).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RingRequest {
+    /// Propose to the character named so with the ring box `item_id`.
+    Propose { name: String, item_id: i32 },
+    /// Withdraw the proposal the player is waiting on.
+    Cancel,
+    /// Answer the proposal of the character with id `proposer`.
+    Answer { proposer: ClientId, accept: bool },
+}
+
 /// A guild operation, carried out by the client's actor.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuildRequest {
@@ -526,6 +537,7 @@ pub enum WorldAction {
     Guild(GuildRequest),
     Alliance(AllianceRequest),
     Family(FamilyRequest),
+    Ring(RingRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -918,6 +930,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
+            (Op::RingAction, InGame(&world::RingActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),
@@ -1037,7 +1050,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 112);
+        assert_eq!(world_routes().len(), 113);
     }
 
     #[test]

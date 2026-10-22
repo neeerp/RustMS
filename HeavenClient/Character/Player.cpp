@@ -2268,6 +2268,16 @@ namespace ms
 		return family;
 	}
 
+	const std::optional<MarriageRecord> &Player::get_marriage() const
+	{
+		return marriage;
+	}
+
+	void Player::set_marriage(std::optional<MarriageRecord> record)
+	{
+		marriage = std::move(record);
+	}
+
 	void Player::show_guild()
 	{
 		const GuildData &data = guild.get_data();

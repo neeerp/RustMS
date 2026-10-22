@@ -16,6 +16,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/buddies.md`: buddy list storage, requests, channel visibility, buddy chat, and the client's Friend tab
 - `agent_docs/notes.md`: notes (memos) left for offline characters, gift thank-yous, and the client's inbox and send dialog
 - `agent_docs/families.md`: family storage, juniors and seniors, the Family window's numbers, the Family Tree, and login notices
+- `agent_docs/marriage.md`: engagement with a ring box, the marriages table, proposals and their refusals, and the client's dialogs
 - `agent_docs/guilds.md`: guild storage, founding at Heracle, invitations, leaving and expelling, ranks, titles and the notice, guild chat, name tags, and the client's Guild tab
 - `agent_docs/pets.md`: pet items and storage, summoning, the list of pets out, their packets, and the client's side
 - `agent_docs/inventory.md`: inventory operations, item data, item moves, NPC shops, storage, Duey parcels, the Rock, Paper, Scissors game, and their packets

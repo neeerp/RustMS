@@ -230,6 +230,9 @@ pub struct Player {
     /// The family rate entitlement working for the character; saved by
     /// `db::family`, not with the player.
     pub family_buff: Option<crate::family::FamilyBuff>,
+    /// The character's engagement or marriage; saved by `db::marriage`,
+    /// not with the player.
+    pub marriage: Option<crate::marriage::MarriageRecord>,
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
@@ -316,6 +319,7 @@ impl Player {
             guild: None,
             family: Default::default(),
             family_buff: None,
+            marriage: None,
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,
