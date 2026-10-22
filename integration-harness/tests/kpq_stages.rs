@@ -84,7 +84,7 @@ async fn the_team_takes_cloto_s_areas_to_clear_stages_two_to_four() {
     for stage in 2..=4u8 {
         let map = KPQ.stage_map(stage);
         let centres = area_centres(map);
-        let combo = combos(centres.len()).nth(COMBO).unwrap();
+        let combo = combos(centres.len(), KPQ.areas_taken).nth(COMBO).unwrap();
         assert_eq!(combo, 0b1011, "areas 0, 1 and 3");
 
         // The way on is shut.

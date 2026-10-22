@@ -21,7 +21,8 @@ use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use net::events::{
-    draw_combo, draw_question, Balloon, Cloto, EventCommand, EventKind, Puzzles, Stage1, Team,
+    draw_combo, draw_question, Balloon, Cloto, Event, EventCommand, EventKind, Puzzles, Stage1,
+    Team,
 };
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
@@ -343,11 +344,7 @@ impl EventActor {
             return None;
         }
         let cleared = self.cleared.has(stage);
-        let draw = || {
-            let map_id = event.stage_map(stage);
-            let field = net::get_game_data().ok()?.field(map_id)?;
-            draw_combo(field.areas.len())
-        };
+        let draw = || draw_stage_combo(event, stage);
         Some(
             self.puzzles
                 .talk(stage, client_id, &self.team, cleared, draw),
@@ -355,9 +352,27 @@ impl EventActor {
     }
 
     /// The leader first hears what the stage asks, and only then may hand
-    /// it in (Cosmic's `statusStg`); the others are sent to fetch them.
+    /// it in or answer its puzzle (Cosmic's `statusStg`); the others are
+    /// sent to fetch them.
     fn balloon(&mut self, client_id: ClientId, stage: u8) -> Option<Balloon> {
-        if !self.team.has(client_id) || self.kind.event().hand_in(stage).is_none() {
+        if !self.team.has(client_id) {
+            return None;
+        }
+        let event = self.kind.event();
+        if event.puzzles.contains(&stage) {
+            let cleared = self.cleared.has(stage);
+            let draw = || draw_stage_combo(event, stage);
+            let talk = self
+                .puzzles
+                .talk(stage, client_id, &self.team, cleared, draw);
+            return Some(match talk {
+                Cloto::Cleared => Balloon::Cleared,
+                Cloto::Intro { .. } => Balloon::Intro,
+                Cloto::Puzzle { combo, .. } => Balloon::Answer { combo },
+                _ => Balloon::NotLeader,
+            });
+        }
+        if event.hand_in(stage).is_none() {
             return None;
         }
         Some(if self.cleared.has(stage) {
@@ -495,6 +510,12 @@ impl EventActor {
         }
         true
     }
+}
+
+/// A combo for puzzle stage `stage` of `event`, from its map's areas.
+fn draw_stage_combo(event: &Event, stage: u8) -> Option<u32> {
+    let field = net::get_game_data().ok()?.field(event.stage_map(stage))?;
+    draw_combo(field.areas.len(), event.areas_taken)
 }
 
 /// Wait until `ends`, or forever without it.

@@ -144,11 +144,12 @@ to each (Cosmic `9020001`'s rope, platform and barrel stages):
 - The areas are the map's own (`Map.nx` `area`, `FieldTemplate::areas`,
   in node order; `Area::contains` is half-open): 4 ropes, 5 platforms and
   6 barrels.
-- A puzzle is three of them (`combos(n)`: the masks below `2^n` with three
-  bits, in order). It is drawn at the leader's first talk on the stage and
-  kept (`net::events::Puzzles`). `RUSTMS_KPQ_COMBO` pins the index into
-  `combos(n)`, from 0, on every stage; an index past a stage's last is
-  ignored there. The harness world pins 1, areas 0, 1 and 3.
+- A puzzle is three of them (`combos(n, Event::areas_taken)`: the masks
+  below `2^n` with that many bits, in order). It is drawn at the leader's
+  first talk on the stage and kept (`net::events::Puzzles`).
+  `RUSTMS_KPQ_COMBO` pins the index into `combos`, from 0, on every stage
+  of every event; an index past a stage's last is ignored there. The
+  harness world pins 1, areas 0, 1 and 3.
 - A member who isn't the leader is told to follow the leader
   (`Cloto::Follow`). The leader's first talk sets out the puzzle
   (`Cloto::Intro`). Each later talk by the leader is an answer.
@@ -359,6 +360,17 @@ where a member stands (`EventTicket::balloon`, `Balloon`):
 `talk_to_balloon` routes the click; the Aqua Balloon (2040041) on the maze
 says one line.
 
+Stage 8 is a puzzle like Kerning City's (`Event::puzzles`, see "Stages 2
+to 4"), but five of the map's nine crates (`areas_taken` 5), and the Blue
+Balloon (2040043) sets it. The event answers its talks through the same
+`Puzzles` (`EventActor::balloon` maps them to `Balloon`; the leader's first
+talk draws the combo), and a later talk by the leader is an answer
+(`Balloon::Answer`). The client actor counts who stands on any crate
+(`standing`, Cosmic counts every member): other than five, the balloon asks
+for five and shows nothing; five wrong, everyone on the map sees and hears
+the wrong effects; five right, the leader sends `ClearStage(8)`, which the
+event takes as it does a Kerning City puzzle's.
+
 The passes come from the content pack's rewards: stage 1's Ratz, the
 boxes 2202003 of stages 2 and 5, and the monsters of stages 3 to 5 each
 drop one, and Alishar drops the key. Stage 7's three monsters drop the
@@ -398,7 +410,7 @@ pass put on reactor 2201003 (`ludiBoss0`) brings out Alishar (9300012) at
 | Tommy 1012113 | 910010200 | Out to 910010400 |
 | Tommy 1012113 | 910010300 | Home to 100000200 |
 | Red Sign 2040034 | 221024500 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
-| Balloons 2040036-2040044 | 922010100-900 | Runtime (`talk_to_balloon`): the stage's hand-in, the maze's line |
+| Balloons 2040036-2040044 | 922010100-900 | Runtime (`talk_to_balloon`): the stage's hand-in, stage 8's crates, the maze's line |
 | Sgt. Anderson 2040047 | 922010100-900 | Out to 922010000 |
 | Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
 
@@ -411,7 +423,7 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's stage 8 crates, bonus and reward (`a066`, slices S4b and S5).
+- LPQ's bonus and reward (`a066`, slice S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
