@@ -184,7 +184,7 @@ pub fn build_char_look(player: &Player) -> Result<Packet, NetworkError> {
     p.write_int(player.id())?;
     p.write_byte(1)?;
     encode_avatar_look(&mut p, &player.look(), false)?;
-    super::marriage::write_ring_looks(&mut p, player.marriage_ring().as_ref())?;
+    super::marriage::write_ring_looks(&mut p, &player.ring_looks())?;
     p.write_int(0)?; // read by no v83 client
     Ok(p)
 }

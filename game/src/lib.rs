@@ -23,6 +23,7 @@ pub mod mount;
 pub mod pet;
 pub mod quest;
 pub mod quick_slots;
+pub mod ring;
 pub mod scroll;
 pub mod skill;
 pub mod skill_macro;

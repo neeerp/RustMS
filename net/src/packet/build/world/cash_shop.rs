@@ -69,6 +69,7 @@ const INVENTORY_SLOTS: u8 = 0x60;
 const STORAGE_SLOTS: u8 = 0x62;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
+const BOUGHT_RING: u8 = 0x87;
 const BOUGHT_PACKAGE: u8 = 0x89;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
@@ -120,6 +121,20 @@ pub fn build_bought_cash_item(item: &CashItem) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(BOUGHT)?;
     encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a crush or friendship ring was bought. The buyer's
+/// ring, `item`, is in its Cash Inventory, and its partner's went to `to`
+/// as a gift (report b061).
+pub fn build_bought_ring(item: &CashItem, to: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BOUGHT_RING)?;
+    encode_cash_item(&mut packet, item)?;
+    packet.write_str_with_length(to)?;
+    packet.write_int(item.item_id)?;
+    packet.write_short(item.quantity)?;
     Ok(packet)
 }
 

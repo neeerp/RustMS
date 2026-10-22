@@ -160,8 +160,9 @@ pub struct FieldAvatar {
     pub consume_effect: i32,
     /// Whether the player's Berserk aura shows.
     pub berserk: bool,
-    /// The couple's ring effect, while the player wears a wedding ring.
-    pub marriage_ring: Option<crate::marriage::MarriageRing>,
+    /// The pairs' ring effects, while the player wears a crush, friendship
+    /// or wedding ring.
+    pub rings: crate::ring::RingLooks,
     /// Energy Charge's gauge, as `Buffs::energy`.
     pub energy: Option<ShownBuff>,
     /// Dash's speed and jump, while the player dashes.
@@ -235,6 +236,9 @@ pub struct Player {
     /// The character's engagement or marriage; saved by `db::marriage`,
     /// not with the player.
     pub marriage: Option<crate::marriage::MarriageRecord>,
+    /// The crush and friendship rings the character carries, worn or not;
+    /// saved by `db::ring`, not with the player.
+    pub rings: Vec<crate::ring::CoupleRing>,
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
@@ -319,6 +323,7 @@ impl Player {
             family: Default::default(),
             family_buff: None,
             marriage: None,
+            rings: Vec::new(),
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
@@ -483,6 +488,32 @@ impl Player {
             })
     }
 
+    /// The crush or friendship block of the player's look: the first ring of
+    /// `kind` worn, if one of the player's pairs has it (report b061).
+    pub fn ring_look(&self, kind: crate::ring::RingKind) -> Option<crate::ring::RingLook> {
+        crate::ring::cash_ring_slots()
+            .filter_map(|slot| self.inventory.get(InventoryType::Equipped, slot))
+            .filter(|item| crate::ring::kind(item.item_id) == Some(kind))
+            .find_map(|item| {
+                let serial = item.cash_serial?;
+                let ring = self.rings.iter().find(|ring| ring.id == serial)?;
+                Some(crate::ring::RingLook {
+                    ring_id: ring.id,
+                    partner_ring_id: ring.partner_ring_id,
+                    item_id: item.item_id,
+                })
+            })
+    }
+
+    /// The ring blocks of the player's look.
+    pub fn ring_looks(&self) -> crate::ring::RingLooks {
+        crate::ring::RingLooks {
+            crush: self.ring_look(crate::ring::RingKind::Crush),
+            friendship: self.ring_look(crate::ring::RingKind::Friendship),
+            marriage: self.marriage_ring(),
+        }
+    }
+
     /// The projection a field broadcasts for this player at a position.
     pub fn field_avatar(&self, x: i16, y: i16, stance: u8) -> FieldAvatar {
         FieldAvatar {
@@ -519,7 +550,7 @@ impl Player {
             item_effect: self.item_effect,
             consume_effect: self.consume_effect,
             berserk: self.berserk,
-            marriage_ring: self.marriage_ring(),
+            rings: self.ring_looks(),
             energy: self.buffs.energy(),
             dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),
             ride: self.ride(),
@@ -1058,9 +1089,34 @@ mod tests {
             item_id: 1112807,
         };
         assert_eq!(player.marriage_ring(), Some(ring));
-        assert_eq!(player.field_avatar(0, 0, 0).marriage_ring, Some(ring));
+        assert_eq!(player.field_avatar(0, 0, 0).rings.marriage, Some(ring));
         player.inventory.unequip(-12, 1).unwrap();
         assert_eq!(player.marriage_ring(), None);
+    }
+
+    #[test]
+    fn a_worn_crush_ring_of_a_pair_shows_in_the_look() {
+        let mut player = player();
+        let mut ring = Item::equipment(1112001, EquipStats::default());
+        ring.cash_serial = Some(40);
+        player.inventory.insert(InventoryType::Equipped, -112, ring);
+        assert_eq!(player.ring_looks(), crate::ring::RingLooks::default());
+        player.rings.push(crate::ring::CoupleRing {
+            id: 40,
+            partner_ring_id: 41,
+            partner_id: 7,
+            partner_name: "Partner".into(),
+            item_id: 1112001,
+        });
+        let look = crate::ring::RingLook {
+            ring_id: 40,
+            partner_ring_id: 41,
+            item_id: 1112001,
+        };
+        assert_eq!(player.field_avatar(0, 0, 0).rings.crush, Some(look));
+        assert_eq!(player.ring_looks().friendship, None);
+        player.inventory.unequip(-112, 1).unwrap();
+        assert_eq!(player.ring_looks().crush, None);
     }
 
     #[test]

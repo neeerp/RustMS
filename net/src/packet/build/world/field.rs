@@ -48,7 +48,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_int(avatar.mount.tiredness)?;
     write_mini_room_box(&mut packet, avatar.mini_room.as_ref())?;
     write_chalkboard(&mut packet, avatar.chalkboard.as_deref())?;
-    super::marriage::write_ring_looks(&mut packet, avatar.marriage_ring.as_ref())?;
+    super::marriage::write_ring_looks(&mut packet, &avatar.rings)?;
     packet.write_byte(0)?; // new year cards
     packet.write_byte(u8::from(avatar.berserk))?; // the aura (0x97fc24)
     packet.write_byte(0)?; // an Evan's Dragon Fury
@@ -303,7 +303,7 @@ mod tests {
             item_effect: 0,
             consume_effect: 0,
             berserk: false,
-            marriage_ring: None,
+            rings: game::ring::RingLooks::default(),
             energy: None,
             dash: [None; 2],
             ride: None,
@@ -352,7 +352,7 @@ mod tests {
     fn spawn_player_matches_reference() {
         let mut avatar = avatar();
         avatar.item_effect = 5010000;
-        avatar.marriage_ring = Some(game::marriage::MarriageRing {
+        avatar.rings.marriage = Some(game::marriage::MarriageRing {
             self_id: 0x0102_0304,
             partner_id: 9,
             item_id: 1112803,

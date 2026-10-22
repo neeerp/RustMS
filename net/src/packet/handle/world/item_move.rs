@@ -1,9 +1,9 @@
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
-use crate::items;
 use crate::loot::Loot;
 use crate::packet::build::world::{inventory, stat};
+use crate::{cash_shop, items};
 use game::inventory::{equip_slot, FLAG_UNTRADEABLE};
 use game::pet::PetChange;
 use game::{InventoryType, Item, Player};
@@ -90,7 +90,8 @@ impl WorldHandler for ItemMoveHandler {
 /// Take `quantity` of the item in bag slot `from` to throw on the ground.
 /// Returns the changes, what to throw, and whether it vanishes instead of
 /// landing (quest and untradeable items, and equipment made untradeable,
-/// unless Scissors of Karma were used on them).
+/// unless Scissors of Karma were used on them, and the rings of a crush or
+/// friendship pair, which no one else can wear).
 fn drop_item(
     player: &mut Player,
     kind: i8,
@@ -138,7 +139,8 @@ fn drop_item(
         .map_err(|_| "bad quantity")?;
     let vanish = !item.has_karma()
         && (items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
-            || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0);
+            || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0)
+        || cash_shop::pair_ring(item.item_id);
     // A Karma item lands, its Karma used up: "Once dropped, the item cannot
     // be traded." (0x1232)
     let mut thrown = Item { quantity, ..item };
@@ -397,6 +399,21 @@ mod tests {
             thrown(&actions),
             Some((&Loot::Dropped(Item::stack(2010007, 1)), false))
         );
+    }
+
+    #[test]
+    fn a_ring_of_a_pair_vanishes() {
+        // A Crush Ring, tradeable in the item data.
+        let mut player = crate::codec::stats::sample_player();
+        let ring = Item {
+            cash_serial: Some(7),
+            ..Item::equipment(1112001, EquipStats::default())
+        };
+        player
+            .inventory
+            .insert(InventoryType::Equip, 1, ring.clone());
+        let actions = handle(&mut player, drop_request(1, 1, 0, 1));
+        assert_eq!(thrown(&actions), Some((&Loot::Dropped(ring), true)));
     }
 
     #[test]

@@ -73,6 +73,8 @@ pub struct WorldSession {
     pub quick_slots: Option<[i32; 8]>,
     /// The name Blessing of the Fairy's tooltip shows, if any.
     pub linked_name: Option<String>,
+    /// The crush and friendship ring records, from the world-entry SET_FIELD.
+    pub couple_rings: Vec<crate::packets::CoupleRingRecord>,
     /// The family packets of entering the game the login read past (INFO,
     /// the entitlements, and a working entitlement's icon), as (opcode,
     /// body). Any that came after another packet are still to be read.
@@ -286,6 +288,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         monster_book_cover: world_entry.monster_book_cover,
         monster_book: world_entry.monster_book,
         linked_name: world_entry.linked_name,
+        couple_rings: world_entry.couple_rings,
         keymap,
         skill_macros,
         auto_potions: (auto_hp, auto_mp),

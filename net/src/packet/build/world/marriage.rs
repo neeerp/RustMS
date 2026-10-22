@@ -3,7 +3,8 @@
 //! proposer's "Waiting for her response..." box.
 
 use crate::{codec::stats::write_padded_name, error::NetworkError, packet::op::SendOpcode};
-use game::marriage::{MarriageRecord, MarriageRing, Refusal};
+use game::marriage::{MarriageRecord, Refusal};
+use game::ring::{CoupleRing, RingKind, RingLooks};
 use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
@@ -40,20 +41,45 @@ pub fn write_marriage_record(
 }
 
 /// The ring blocks of a look, as SPAWN_PLAYER and UPDATE_CHAR_LOOK end
-/// it: crush and friendship rings (none), then the marriage ring
-/// (report b059). The client pairs the effect only with real ids on both
-/// sides.
-pub fn write_ring_looks(
-    packet: &mut Packet,
-    marriage: Option<&MarriageRing>,
-) -> Result<(), NetworkError> {
-    packet.write_byte(0)?; // crush ring
-    packet.write_byte(0)?; // friendship ring
-    packet.write_byte(u8::from(marriage.is_some()))?;
-    if let Some(ring) = marriage {
+/// it: the crush ring, the friendship ring, then the marriage ring
+/// (reports b059 and b061). The client pairs the effect only with real ids
+/// on both sides.
+pub fn write_ring_looks(packet: &mut Packet, rings: &RingLooks) -> Result<(), NetworkError> {
+    for look in [rings.crush, rings.friendship] {
+        packet.write_byte(u8::from(look.is_some()))?;
+        if let Some(look) = look {
+            packet.write_long(look.ring_id)?;
+            packet.write_long(look.partner_ring_id)?;
+            packet.write_int(look.item_id)?;
+        }
+    }
+    packet.write_byte(u8::from(rings.marriage.is_some()))?;
+    if let Some(ring) = rings.marriage {
         packet.write_int(ring.self_id)?;
         packet.write_int(ring.partner_id)?;
         packet.write_int(ring.item_id)?;
+    }
+    Ok(())
+}
+
+/// The character data's crush and friendship ring lists: GW_CoupleRecord,
+/// 0x21 bytes, then GW_FriendRecord, which adds the item (report b061).
+pub fn write_couple_rings(packet: &mut Packet, rings: &[CoupleRing]) -> Result<(), NetworkError> {
+    for kind in [RingKind::Crush, RingKind::Friendship] {
+        let of_kind: Vec<_> = rings
+            .iter()
+            .filter(|ring| game::ring::kind(ring.item_id) == Some(kind))
+            .collect();
+        packet.write_short(of_kind.len() as i16)?;
+        for ring in of_kind {
+            packet.write_int(ring.partner_id)?;
+            write_padded_name(packet, &ring.partner_name)?;
+            packet.write_long(ring.id)?;
+            packet.write_long(ring.partner_ring_id)?;
+            if kind == RingKind::Friendship {
+                packet.write_int(ring.item_id)?;
+            }
+        }
     }
     Ok(())
 }
@@ -137,18 +163,62 @@ mod tests {
     #[test]
     fn a_marriage_ring_follows_two_empty_ring_blocks() {
         let mut packet = Packet::new_empty();
-        write_ring_looks(&mut packet, None).unwrap();
+        write_ring_looks(&mut packet, &RingLooks::default()).unwrap();
         assert_eq!(packet.bytes, vec![0, 0, 0]);
-        let ring = MarriageRing {
-            self_id: 2,
-            partner_id: 1,
-            item_id: 1112803,
+        let rings = RingLooks {
+            marriage: Some(game::marriage::MarriageRing {
+                self_id: 2,
+                partner_id: 1,
+                item_id: 1112803,
+            }),
+            ..RingLooks::default()
         };
         let mut packet = Packet::new_empty();
-        write_ring_looks(&mut packet, Some(&ring)).unwrap();
+        write_ring_looks(&mut packet, &rings).unwrap();
         assert_eq!(
             packet.bytes,
             vec![0, 0, 1, 2, 0, 0, 0, 1, 0, 0, 0, 0xe3, 0xfa, 0x10, 0]
+        );
+    }
+
+    #[test]
+    fn a_crush_ring_block_holds_both_serials_and_the_item() {
+        let rings = RingLooks {
+            crush: Some(game::ring::RingLook {
+                ring_id: 5,
+                partner_ring_id: 6,
+                item_id: 1112001,
+            }),
+            ..RingLooks::default()
+        };
+        let mut packet = Packet::new_empty();
+        write_ring_looks(&mut packet, &rings).unwrap();
+        let mut expected = vec![1, 5, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0];
+        expected.extend(1112001i32.to_le_bytes());
+        expected.extend([0, 0]);
+        assert_eq!(packet.bytes, expected);
+    }
+
+    #[test]
+    fn couple_rings_are_listed_by_kind() {
+        let ring = |id, item_id| CoupleRing {
+            id,
+            partner_ring_id: id + 1,
+            partner_id: 9,
+            partner_name: "Pal".into(),
+            item_id,
+        };
+        let mut packet = Packet::new_empty();
+        write_couple_rings(&mut packet, &[ring(3, 1112800), ring(1, 1112001)]).unwrap();
+        assert_eq!(packet.bytes.len(), 2 + 0x21 + 2 + 0x25);
+        assert_eq!(&packet.bytes[..6], &[1, 0, 9, 0, 0, 0]);
+        assert_eq!(&packet.bytes[6..9], b"Pal");
+        assert_eq!(packet.bytes[2 + 0x11], 1);
+        assert_eq!(packet.bytes[2 + 0x19], 2);
+        assert_eq!(&packet.bytes[2 + 0x21..2 + 0x21 + 2], &[1, 0]);
+        assert_eq!(
+            packet.bytes[packet.bytes.len() - 4..],
+            1112800i32.to_le_bytes()
         );
     }
 

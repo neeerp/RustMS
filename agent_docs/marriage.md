@@ -122,8 +122,9 @@ inferred (report b057 §6).
 
 A couple wearing their wedding rings show it to the map (report b059).
 `SPAWN_PLAYER` and `UPDATE_CHAR_LOOK` both end with three ring blocks:
-crush, friendship and marriage (`write_ring_looks`). RustMS sends the
-first two empty. The marriage block is a flag, then the wearer's id, the
+crush, friendship and marriage (`write_ring_looks`, from
+`Player::ring_looks`). The crush and friendship blocks are described
+below. The marriage block is a flag, then the wearer's id, the
 partner's id, and the ring's item id. It is set while the character has a
 couple and wears a wedding ring in a ring slot
 (`Player::marriage_ring`), whatever the couple's status.
@@ -144,6 +145,50 @@ COM layer code that wasn't decoded. The mark is drawn at each
 character's feet, and the big effect at the point midway between their
 feet, with the sprites' own origins. Footage of a 2012 couple's ring
 agrees with this (inferred).
+
+## Crush and friendship rings
+
+Crush rings (1112001 to 1112099) and friendship rings (1112800 to 1112802,
+1112810 to 1112812, and so on) are cash rings sold in pairs (report b061,
+`game::ring::kind`). `CASHSHOP_OPERATION` 0x1D buys a crush ring and 0x23
+a friendship ring. Both send the birthday code, the balance to pay with,
+the commodity's serial number, the partner's name and a message. The
+server checks the commodity is a ring of the request's kind, then the
+birthday code and the message, and then, as for a gift, that the partner
+exists, is on another account and may have the item. One transaction
+pays, puts one ring in the buyer's Cash Inventory, sends the other to
+the partner's as a gift with the message, and records the pair
+(`db::cash_shop::buy_ring`). The answer is mode 0x87, the buyer's
+ring's 0x37-byte item, the partner's name, the item id and the
+quantity, followed by the balance.
+
+The `rings` table has a row for each ring of a pair, keyed by the ring's
+cash serial, with its partner ring's serial, the partner's character
+id and the item. `Player::rings` holds the pairs of the rings the
+character carries, worn or in the Equip bag (`db::ring::carried`).
+Taking a ring out of the Cash Inventory adds its pair, and putting it
+back drops it.
+
+The character data lists them after the minigame records
+(`write_couple_rings`). A crush record is 0x21 bytes: the partner's id,
+name (13 bytes), the ring's serial and the partner ring's serial. A
+friendship record adds the item id. While a ring of a pair is worn in a
+ring slot, the look's crush or friendship block is a flag, the ring's
+serial, the partner ring's serial (both i64) and the item. Each client
+pairs two users when one's partner serial is the other's serial.
+
+A character wears one ring of each kind (crush, friendship, wedding) at a
+time. `Inventory::equip` refuses a second, though a ring may replace one
+of its own kind. v83's client refuses first, with its own notices.
+
+Plain Buy and Gift requests for a pair ring fail, as does paying for one
+with Maple Points, which the client's ring dialog doesn't offer. A
+dropped pair ring vanishes. The partner named in a record is the
+character typed in; the ring goes to that account's Cash Inventory, so
+another of its characters may take it out. Deleting a character leaves
+the other half of a pair as a row no one pairs with. As with gifts, the
+inventory-full checks (0xAB, 0xBB) and the Cash Inventory cap (0xAC) are
+not made.
 
 ## Client
 
@@ -185,8 +230,9 @@ answers, and the proposer waits until they withdraw.
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- Crush and friendship rings: their cash serial numbers and the
-  character data's lists.
+- The client side of crush and friendship rings: reading their lists and
+  blocks, their pair effects, tooltips and equip notices, and the Cash
+  Shop's ring dialogs.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.
 
 Report b052 §7 lists them.

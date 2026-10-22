@@ -38,6 +38,7 @@ use crate::message::{
     ServerMessage, SummonFailure, CLIENT_QUEUE_CAPACITY,
 };
 use db::cash_shop::CashType;
+use game::ring::RingKind;
 use game::{InventoryType, Player};
 use game_data::commodities::Commodity;
 use net::cash_shop::{CashShopRequest, Expansion};
@@ -936,6 +937,12 @@ impl ClientActor {
                 to,
                 message,
             } => self.send_gift(account_id, commodity, to, message).await?,
+            CashShopRequest::BuyRing {
+                cash_type,
+                commodity,
+                to,
+                message,
+            } => self.buy_ring(cash_type, commodity, to, message).await?,
             CashShopRequest::SetWishList(sns) => {
                 let saved = sns.clone();
                 spawn_db(move || db::cash_shop::set_wish_list(character_id, &saved)).await?;
@@ -1030,6 +1037,75 @@ impl ClientActor {
         ])
     }
 
+    /// Pay for a crush or friendship ring and its partner, which goes to the
+    /// character named `to` as a gift (report b061).
+    async fn buy_ring(
+        &mut self,
+        cash_type: CashType,
+        commodity: Commodity,
+        to: String,
+        message: String,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let player = &self.in_game()?.player;
+        let (account_id, buyer_id) = (player.account_id, player.stats.id);
+        let buyer = player.stats.name.clone();
+        let receiver = spawn_db(move || db::cash_shop::gift_receiver(&to)).await?;
+        let failure = match &receiver {
+            None => Some(cs::CashShopFailure::NoSuchCharacter),
+            Some(receiver) if receiver.account_id == account_id => {
+                Some(cs::CashShopFailure::OwnAccount)
+            }
+            Some(receiver) if !commodity.for_gender(receiver.gender) => {
+                Some(cs::CashShopFailure::Gender)
+            }
+            Some(_) => None,
+        };
+        let Some(receiver) = receiver.filter(|_| failure.is_none()) else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                failure.unwrap_or(cs::CashShopFailure::Unknown),
+            )?]);
+        };
+        let expires_at = expiry(commodity.item_id, commodity.period);
+        let ring = db::cash_shop::NewCashItem {
+            account_id,
+            item_id: commodity.item_id,
+            sn: commodity.sn,
+            quantity: commodity.count,
+            expires_at,
+        };
+        let gift = db::cash_shop::NewGift {
+            account_id: receiver.account_id,
+            item_id: commodity.item_id,
+            sn: commodity.sn,
+            quantity: commodity.count,
+            expires_at,
+            gift_from: buyer,
+            gift_message: Some(message),
+        };
+        let (price, receiver_id) = (commodity.price, receiver.id);
+        let bought = spawn_db(move || {
+            db::cash_shop::buy_ring(cash_type, price, (&ring, buyer_id), (&gift, receiver_id))
+        })
+        .await?;
+        let Some((bought, balance)) = bought else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::NotEnoughCash,
+            )?]);
+        };
+        info!(
+            self.client_id,
+            sn = commodity.sn,
+            to = receiver.name,
+            price,
+            "Bought a ring pair from the Cash Shop"
+        );
+        Ok(vec![
+            cs::build_bought_ring(&bought, &receiver.name)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
+    }
+
     /// Pay for `slots` more slots in the bag of `kind`, up to 96.
     async fn expand_bag(
         &mut self,
@@ -1115,6 +1191,12 @@ impl ClientActor {
                 item.pet = Some(pet);
             }
         }
+        let ring = match game::ring::kind(item.item_id) {
+            Some(RingKind::Crush | RingKind::Friendship) => {
+                spawn_db(move || db::ring::find(cash_id)).await?
+            }
+            _ => None,
+        };
         let player = &mut self.in_game_mut()?.player;
         // The client refuses a second one-of-a-kind item itself (0xb94).
         if net::items::refuses_only(&player.inventory, item.item_id, item.quantity.into()) {
@@ -1137,6 +1219,7 @@ impl ClientActor {
         match taken {
             Ok(true) => {
                 player.mark_saved();
+                player.rings.extend(ring);
                 info!(
                     self.client_id,
                     cash_id,
@@ -1184,6 +1267,7 @@ impl ClientActor {
         match put {
             Ok(()) => {
                 player.mark_saved();
+                player.rings.retain(|ring| ring.id != cash_id);
                 info!(
                     self.client_id,
                     cash_id,
