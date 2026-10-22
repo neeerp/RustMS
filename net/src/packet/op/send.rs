@@ -148,6 +148,8 @@ pub enum SendOpcode {
     Parcel = 0x142,
     QueryCashResult = 0x144,
     CashShopOperation = 0x145,
+    /// The Rock, Paper, Scissors window (312; report b038).
+    RpsGame = 0x138,
     Messenger = 0x139,
     PlayerInteraction = 0x13A,
     OpenNpcShop = 0x131,

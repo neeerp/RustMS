@@ -17,7 +17,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/notes.md`: notes (memos) left for offline characters, gift thank-yous, and the client's inbox and send dialog
 - `agent_docs/guilds.md`: guild storage, founding at Heracle, invitations, leaving and expelling, ranks, titles and the notice, guild chat, name tags, and the client's Guild tab
 - `agent_docs/pets.md`: pet items and storage, summoning, the list of pets out, their packets, and the client's side
-- `agent_docs/inventory.md`: inventory operations, item data, item moves, NPC shops, storage, Duey parcels, and their packets
+- `agent_docs/inventory.md`: inventory operations, item data, item moves, NPC shops, storage, Duey parcels, the Rock, Paper, Scissors game, and their packets
 - `agent_docs/server-content.md`: the ignored content pack (script text, drops), placeholders, and the importer
 - `agent_docs/client-testing.md`: fast client logic tests and private-display GUI verification
 - `agent_docs/quest-window.md`: original quest UI assets, layout, controls, and visual validation

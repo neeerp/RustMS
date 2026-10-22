@@ -48,6 +48,8 @@ pub enum RecvOpcode {
     BuddyListModify = 0x82,
     NoteAction = 0x83,
     UseDoor = 0x85,
+    /// The Rock, Paper, Scissors window's buttons (report b038).
+    RpsAction = 0x88,
     DenyPartyRequest = 0x7D,
     GuildOperation = 0x7E,
     DenyGuildRequest = 0x7F,

@@ -33,6 +33,7 @@ pub mod pet;
 pub mod quest;
 pub mod quick_slots;
 pub mod reactor;
+pub mod rps;
 pub mod shop;
 pub mod skill;
 pub mod skill_macro;

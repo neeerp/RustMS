@@ -1023,6 +1023,36 @@ which closes on `0x12`. Using a Quick Delivery Coupon (533xxxx) from the Cash
 tab sends USE_CASH_ITEM unless a dialog is open (Duey's among them; see
 "Dialogs that lock the game"), which gets "Not available" in the chat log. Only a send uses the coupon up.
 
+## Rock, Paper, Scissors
+
+The Rock, Paper, Scissor Admin (9000019, `info/rpsGame`) runs a minigame
+(report b038 in `v83ref`). No map in v83's Map.nx places him, so the server
+does: `net::npc_data::extra_npcs` adds NPCs to a field's own list, and puts
+him on Henesys's lower street by Spinel. Talking to him sends RPS_GAME
+(0x138) mode 8 with his id, which opens the client's window, and the
+ClientActor holds a `net::rps::RpsGame` until the window closes or the map
+changes. The window sends RPS_ACTION (0x88), a mode byte: 0 Start, 1 a
+hand (one more byte: 0 rock, 1 paper, 2 scissors), 2 out of time, 3
+Continue, 4 Exit, 5 Retry. Requests that don't fit the game are ignored.
+
+- Start and Retry cost 1000 mesos and need a free etc. slot; without them
+  the reply is mode 6 or 7 and the window shows Start again. Otherwise mode
+  9 starts the first round.
+- A hand gets mode 11: the admin's random hand and the streak, signed. A
+  draw keeps the streak, and the client plays the round again by itself. A
+  loss sends -1 and ends the game. The client calls the loss consoled (500
+  mesos) only while the streak it last heard is 0, which a new game doesn't
+  reset, only a new window or a refusal; the server keeps that streak too
+  and pays to match. A win adds one; after it, Continue (mode 12) risks the streak on
+  another round, and Exit keeps it.
+- Running out of time (mode 10) ends the game with nothing.
+- Exit closes the window (mode 13). After a win it gives the certificate for
+  the streak, 4031332 for one win up to 4031341 for ten. The tenth win ends
+  the game and gives its certificate at once.
+
+The client's X closes the window without a packet, so the server's game
+stays until the next talk, which starts a new one.
+
 ## Trading
 
 Two players on one map trade in a trading room (mini room type 3). The
@@ -1244,6 +1274,11 @@ layout and the other modes, and the Duey handler parses every op. `duey`
   delivery sent with a coupon joins it, with its message, and the receiver
   hears of it. They delete it, and Duey's own window is then empty.
 - The third fills an inbox with ten parcels and is refused an eleventh.
+
+`net::rps` covers each round's outcome, the consolation, the ten-win end,
+and requests out of turn. `rps` (integration) is refused a game for want of
+mesos, then plays until it wins: a win risked on the next round and lost to
+the clock leaves nothing, and a win kept gives the one-win certificate.
 
 Trading is tested at three levels:
 

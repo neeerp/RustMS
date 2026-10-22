@@ -196,6 +196,7 @@ fn load_field_map_npcs(field_key: FieldKey) -> Vec<FieldMapEntityNpc> {
     field
         .map_npcs
         .iter()
+        .chain(net::extra_npcs(field_key.map_id))
         .enumerate()
         .filter_map(|(index, npc)| {
             i32::try_from(index).ok().map(|offset| FieldMapEntityNpc {
