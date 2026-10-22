@@ -49,6 +49,15 @@ impl MarriageRecord {
     pub fn married(&self) -> bool {
         self.status == MARRIED
     }
+
+    /// The other one of the couple, for one of them, `id`.
+    pub fn partner_of(&self, id: i32) -> i32 {
+        if self.groom_id == id {
+            self.bride_id
+        } else {
+            self.groom_id
+        }
+    }
 }
 
 /// Why a proposal failed, or what became of it: MARRIAGE_RESULT's mode,

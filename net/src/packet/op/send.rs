@@ -40,6 +40,8 @@ pub enum SendOpcode {
     MarriageRequest = 0x48,
     /// The answer to a proposal, by mode; closes the proposer's waiting box.
     MarriageResult = 0x49,
+    /// The partner's map, or 0 (report b057).
+    NotifyMarriedPartnerMapTransfer = 0x4B,
     CashPetFoodResult = 0x4C,
     BridleMobCatchFail = 0x4F,
 

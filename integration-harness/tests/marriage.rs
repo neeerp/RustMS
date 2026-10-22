@@ -6,7 +6,9 @@
 //! withdraw (RING_ACTION 1). On a yes both get MARRIAGE_RESULT 11 with the
 //! couple's record, the proposer the empty box and the partner the ring.
 //! Dropping either token (RING_ACTION 3, report b054) breaks it off: both
-//! get MARRIAGE_RESULT 13 and lose their tokens.
+//! get MARRIAGE_RESULT 13 and lose their tokens. While both are online each
+//! is told the other's map (NOTIFY_MARRIED_PARTNER_MAP_TRANSFER, report
+//! b057), and (0, 0) once the other logs off or the couple ends.
 
 use integration_harness::database::{grant_stack, set_gender, set_job};
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -196,6 +198,8 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(bt.marriage, at.marriage);
     assert_eq!(at.items, [(EMPTY_BOX, 1)]);
     assert_eq!(bt.items, [(RING, 1)]);
+    assert_eq!(at.partner_maps, [(HENESYS, b_id)]);
+    assert_eq!(bt.partner_maps, [(HENESYS, a_id)]);
 
     // Engaged now, on this login and the next.
     refused(&mut c, &bn, PARTNER_ENGAGED).await;
@@ -205,6 +209,16 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     let mut a = enter(a_config, HENESYS).await;
     refused(&mut a, &cn, ALREADY_ENGAGED).await;
 
+    // B saw A go and come back; A sees B move.
+    let mut bt = Trace::default();
+    assert_eq!(warp(&mut b.connection, PERION, "", &mut bt).await, PERION);
+    assert_eq!(warp(&mut b.connection, HENESYS, "", &mut bt).await, HENESYS);
+    read_for(&mut b.connection, &mut bt, 300).await;
+    assert_eq!(bt.partner_maps, [(0, 0), (HENESYS, a_id)]);
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| t.partner_maps.len() >= 2).await;
+    assert_eq!(at.partner_maps, [(PERION, b_id), (HENESYS, b_id)]);
+
     // B drops the ring: both are told, and both tokens go.
     send(&mut b.connection, break_off(RING)).await;
     let bt = marriage(&mut b, 1).await;
@@ -213,6 +227,8 @@ async fn a_proposal_said_yes_to_engages_the_two() {
     assert_eq!(at.marriage, [result(BROKEN)]);
     assert!(matches!(bt.removed[..], [(ETC, _)]), "{:?}", bt.removed);
     assert!(matches!(at.removed[..], [(ETC, _)]), "{:?}", at.removed);
+    assert_eq!(bt.partner_maps, [(0, 0)]);
+    assert_eq!(at.partner_maps, [(0, 0)]);
 
     // Free again: A may ask B once more.
     send(&mut a.connection, propose(&bn)).await;

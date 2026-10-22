@@ -1263,6 +1263,9 @@ impl ClientActor {
             }
             ServerMessage::Engaged(record) => self.engaged(record).await?,
             ServerMessage::CoupleEnded(record) => self.couple_ended(record).await?,
+            ServerMessage::PartnerMap { map_id, partner } => {
+                self.partner_map(map_id, partner).await?
+            }
             ServerMessage::AddJunior { junior, name } => self.add_junior(junior, name).await?,
             ServerMessage::FamilyChanged => self.family_changed().await?,
             ServerMessage::Separate {

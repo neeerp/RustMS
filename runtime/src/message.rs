@@ -113,6 +113,12 @@ pub enum ServerMessage {
     /// The player's partner broke off the couple `record`; forget it and
     /// take back the token.
     CoupleEnded(game::marriage::MarriageRecord),
+    /// The player's partner is on `map_id`, or 0 with `partner` 0 for no
+    /// partner online (report b057).
+    PartnerMap {
+        map_id: i32,
+        partner: ClientId,
+    },
     /// `junior` (named so) said yes to the player's request; add them.
     AddJunior {
         junior: ClientId,
@@ -534,6 +540,8 @@ pub struct Presence {
     pub alliance_id: Option<i32>,
     /// The senior and juniors, who hear of logins.
     pub family: Relatives,
+    /// The other one of the couple, who is told the player's map.
+    pub partner: Option<ClientId>,
 }
 
 impl Presence {
@@ -553,6 +561,10 @@ impl Presence {
                 .map(|guild| guild.alliance_id)
                 .filter(|&id| id != 0),
             family: player.family.clone(),
+            partner: player
+                .marriage
+                .as_ref()
+                .map(|record| record.partner_of(player.id())),
         }
     }
 }
@@ -577,7 +589,8 @@ pub enum DirectoryMessage {
         presence: Presence,
         channel_id: u8,
     },
-    /// The character's map, level, job, or HP changed.
+    /// The character's map, level, job, HP, guild, family or partner
+    /// changed.
     Presence {
         client_id: ClientId,
         presence: Presence,

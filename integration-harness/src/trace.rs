@@ -199,6 +199,8 @@ pub struct Trace {
     pub family: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST and MARRIAGE_RESULT: (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
+    /// NOTIFY_MARRIED_PARTNER_MAP_TRANSFER: (map, partner), in order.
+    pub partner_maps: Vec<(i32, i32)>,
     /// SHOW_STATUS_INFO mode 9: the info lines, in order.
     pub info_texts: Vec<String>,
     /// SCRIPT_PROGRESS_MESSAGE lines, in order.
@@ -604,6 +606,9 @@ impl Trace {
             || op == SendOpcode::MarriageResult as i16
         {
             self.marriage.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::NotifyMarriedPartnerMapTransfer as i16 {
+            self.partner_maps
+                .push((r.read_int().unwrap(), r.read_int().unwrap()));
         } else if op == SendOpcode::ScriptProgressMessage as i16 {
             self.script_messages.push(r.read_str_with_length().unwrap());
         } else if op == SendOpcode::QuestClear as i16 {
