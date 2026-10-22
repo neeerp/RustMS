@@ -575,6 +575,23 @@ diesel::table! {
     }
 }
 diesel::joinable!(rings -> characters (partner_id));
+diesel::table! {
+    wedding_reservations (marriage_id) {
+        marriage_id -> Int4,
+        venue -> Int2,
+        premium -> Bool,
+        channel -> Int2,
+        starts_at -> Timestamp,
+    }
+}
+diesel::joinable!(wedding_reservations -> marriages (marriage_id));
+diesel::table! {
+    wedding_guests (marriage_id, guest_id) {
+        marriage_id -> Int4,
+        guest_id -> Int4,
+    }
+}
+diesel::joinable!(wedding_guests -> wedding_reservations (marriage_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -616,4 +633,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     family_buffs,
     marriages,
     rings,
+    wedding_reservations,
+    wedding_guests,
 );

@@ -140,6 +140,63 @@ keeps the token until they drop it, which then just takes it. Tokens in
 storage, a trade or a parcel are not taken. Both players are saved at once,
 as on engaging.
 
+## Booking the wedding
+
+Nicole (9201005, the Cathedral) and Bonnie (9201008, the Chapel) in Amoria
+book an engaged couple's wedding (report b066; `net::npc_scripts`,
+`wedding_assistant`, and `runtime::actor::client::wedding`). Their menu
+explains the steps or books. The booker needs the venue's ticket
+(Cathedral 5251000 or premium 5251003, Chapel 5251001 or premium 5251002)
+in the Cash inventory, no wedding ring held or worn, and Etc room for the
+invitations. In Cosmic, the scripts are `9201005.js` and `9201008.js`. No
+ticket is on sale in v83's `Etc.nx` commodities, so for now they come from
+elsewhere (tests grant them).
+
+The partner's side lives in the partner's actor, so a booking is a round
+trip through the directory:
+
+1. The script ends with `Effect::BookWedding`, and the booker's actor sends
+   `ReserveWedding`. The directory refuses a partner who is offline, or not
+   on the booker's map and channel.
+2. The partner's actor checks for a wedding ring and Etc room, and answers
+   `WeddingNews::Checked` with any refusal.
+3. The booker's actor checks its own side again and books
+   (`db::wedding::book`). Then it takes the ticket and gives itself 15
+   invitations (Cathedral 4031395, Chapel 4031377), which expire as the
+   wedding starts. If that commit fails, it cancels the booking.
+4. The partner's actor gets `WeddingNews::Booked` and gives itself 15
+   invitations too.
+
+Both partners get `MARRIAGE_RESULT` 16 ("Congratulations! Your
+reservation was successfully made!") and a pink line saying when. A
+partner who misses step 4 (offline by then, out of Etc room, or in the
+Cash Shop, where it arrives on leaving) still has the booking. Only a
+partner offline or full goes without invitations; the booker's 15 serve
+both.
+
+The booker's own refusals come first, in the script: not engaged, booked
+already, a wedding ring, no Etc room, no ticket. Then the partner's:
+offline, elsewhere (another map or channel, or in the Cash Shop), a
+wedding ring, no Etc room. Invitations expire, so they never join a stack
+and always need a free slot.
+
+`wedding_reservations` holds one row per couple: the venue, premium or
+not, the channel, and `starts_at`. A booking takes the first top of the
+hour at least two hours away (`RUSTMS_WEDDING_LEAD_MINUTES` on the world
+server changes the lead) and after the venue's latest booking on that
+channel. A unique key on (channel, venue, starts_at) keeps two couples off
+the same hour. A booked couple asking again hears the minutes left. A
+couple who has not begun their wedding 10 minutes after its start loses
+it: the row goes the next time it is read, and at world start.
+`wedding_guests` is for slice 6b's invitations. The couple's
+`marriages.status` stays engaged.
+
+While a booking stands, dropping a token is refused with `MARRIAGE_RESULT`
+32 ("You can't break the engagement after making reservations."). The
+check and the delete are one transaction, and booking and breaking off
+both lock the couple's row first, so one of the two always sees the
+other.
+
 ## The partner's map
 
 While both of a couple are online, each client is told where the other is
@@ -295,9 +352,12 @@ For crush and friendship rings:
 
 ## Not done yet
 
-- Mode 32, refusing to break off after a reservation, and taking the
-  wedding rings when a married couple breaks up.
-- The wedding NPCs past the ring box, reservations, the wedding field,
-  and the wishlist.
+- Taking the wedding rings when a married couple breaks up.
+- Sending invitations to guests, more invitations for a partner without
+  them, selling the tickets, the wedding field, and the wishlist. The
+  client does not yet open its invitation window or say mode 16's text.
+  Report b066 lists the slices.
+- `MARRIAGE_RESULT` 31 ("The reservation has been canceled...") when a
+  no-show's booking goes.
 
 Report b052 §7 lists them.

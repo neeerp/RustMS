@@ -113,6 +113,8 @@ pub enum ServerMessage {
     /// The player's partner broke off the couple `record`; forget it and
     /// take back the token.
     CoupleEnded(game::marriage::MarriageRecord),
+    /// Word between the partners of a wedding being booked (report b066).
+    Wedding(WeddingNews),
     /// The player's partner is on `map_id`, or 0 with `partner` 0 for no
     /// partner online (report b057).
     PartnerMap {
@@ -764,6 +766,19 @@ pub enum DirectoryMessage {
         partner: ClientId,
         record: game::marriage::MarriageRecord,
     },
+    /// `from` books their wedding with `partner` at `venue`: ask the partner
+    /// for their side if they are on `from`'s map, else tell `from` why not.
+    ReserveWedding {
+        from: ClientId,
+        partner: ClientId,
+        venue: game::wedding::Venue,
+        premium: bool,
+    },
+    /// Pass word of a wedding being booked to the partner `to`.
+    Wedding {
+        to: ClientId,
+        news: WeddingNews,
+    },
     /// `from` went where they can't answer or be answered (the Cash Shop):
     /// their proposals end, and their party can't take them into an event.
     EnteredCashShop {
@@ -920,4 +935,25 @@ pub enum AllianceNews {
     },
     /// Guild `guild_id`'s members changed.
     GuildChanged { alliance: Alliance, guild_id: i32 },
+}
+
+/// Word between the partners of a wedding being booked (report b066).
+#[derive(Clone, Debug)]
+pub enum WeddingNews {
+    /// The partner `booker` books the couple's wedding at `venue`: check the
+    /// player's side.
+    Check {
+        booker: ClientId,
+        venue: game::wedding::Venue,
+        premium: bool,
+    },
+    /// The partner's side of the booking the player asked for: whether they
+    /// can't take part.
+    Checked {
+        venue: game::wedding::Venue,
+        premium: bool,
+        refusal: Option<game::wedding::PartnerRefusal>,
+    },
+    /// The partner booked the couple's wedding: take the invitations.
+    Booked(game::wedding::Reservation),
 }

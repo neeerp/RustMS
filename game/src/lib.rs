@@ -30,6 +30,7 @@ pub mod skill_macro;
 pub mod sp_reset;
 pub mod storage;
 pub mod teleport_rock;
+pub mod wedding;
 
 pub use buff::{Beacon, Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{

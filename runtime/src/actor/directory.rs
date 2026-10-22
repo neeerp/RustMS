@@ -344,6 +344,13 @@ impl WorldDirectory {
                     entry.in_cash_shop = true;
                 }
             }
+            DirectoryMessage::ReserveWedding {
+                from,
+                partner,
+                venue,
+                premium,
+            } => self.reserve_wedding(from, partner, venue, premium),
+            DirectoryMessage::Wedding { to, news } => self.tell(to, ServerMessage::Wedding(news)),
             DirectoryMessage::CoupleEnded { partner, record } => {
                 self.tell(partner, ServerMessage::CoupleEnded(record))
             }

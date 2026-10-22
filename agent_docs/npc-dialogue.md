@@ -164,6 +164,11 @@ different Proofs of Love (4031367 to 4031372). The Nanas (9201001,
 9201023 to 9201027) each give one for 50 of their town's drop. A Nana
 works only in her own town, and only while the player seeks the blessing;
 otherwise she and Mom and Dad say their own asset lines.
+Nicole (9201005) and Bonnie (9201008) book weddings, in Amoria only. In
+their lobbies they lead guests in instead, which is not done yet. Their
+script ends with `Effect::BookWedding`, and the client actor does the
+partner round trip after it. Its refusals and its outcome open a one-page
+script of their own (`NpcScript::wedding_assistant_says`).
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

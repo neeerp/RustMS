@@ -111,6 +111,20 @@ pub fn build_marriage_refusal(refusal: Refusal) -> Result<Packet, NetworkError> 
     result(refusal as u8)
 }
 
+/// MARRIAGE_RESULT's notices about a booked wedding (report b066).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WeddingNotice {
+    /// 0x109e: the reservation was made.
+    Reserved = 16,
+    /// 0x109b: no breaking off once a wedding is booked.
+    NoBreakingOff = 32,
+}
+
+/// MARRIAGE_RESULT with the client's line for `notice`.
+pub fn build_wedding_notice(notice: WeddingNotice) -> Result<Packet, NetworkError> {
+    result(notice as u8)
+}
+
 /// MARRIAGE_RESULT 11: "You are now engaged.", with the couple's record.
 pub fn build_engaged(record: &MarriageRecord) -> Result<Packet, NetworkError> {
     let mut packet = result(ENGAGED)?;
@@ -158,6 +172,14 @@ mod tests {
         );
         assert_eq!(&packet.bytes[3 + 22..3 + 27], b"Groom");
         assert_eq!(&packet.bytes[3 + 35..3 + 40], b"Bride");
+    }
+
+    #[test]
+    fn a_wedding_notice_is_its_mode_alone() {
+        let packet = build_wedding_notice(WeddingNotice::Reserved).unwrap();
+        assert_eq!(packet.bytes, [0x49, 0x00, 16]);
+        let packet = build_wedding_notice(WeddingNotice::NoBreakingOff).unwrap();
+        assert_eq!(packet.bytes, [0x49, 0x00, 32]);
     }
 
     #[test]

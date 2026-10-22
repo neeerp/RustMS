@@ -110,6 +110,7 @@ impl ClientActor {
         let mut grow_guild = None;
         let mut disband_guild = false;
         let mut alliance = None;
+        let mut wedding = None;
         let mut restyled = false;
         let mut command = None;
         for effect in effects {
@@ -149,6 +150,7 @@ impl ClientActor {
                 Effect::CreateAlliance { .. }
                 | Effect::GrowAlliance { .. }
                 | Effect::DisbandAlliance => alliance = Some(effect.clone()),
+                Effect::BookWedding { venue, premium } => wedding = Some((*venue, *premium)),
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -478,6 +480,9 @@ impl ClientActor {
             Some(Effect::GrowAlliance { from }) => Box::pin(self.grow_alliance(from)).await?,
             Some(Effect::DisbandAlliance) => Box::pin(self.disband_alliance()).await?,
             _ => {}
+        }
+        if let Some((venue, premium)) = wedding {
+            Box::pin(self.reserve_wedding(venue, premium)).await?;
         }
         if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;

@@ -4,6 +4,7 @@
 use crate::schema::{characters, marriages};
 use diesel::prelude::*;
 use game::marriage::{MarriageRecord, Refusal, ENGAGED};
+use std::time::SystemTime;
 
 diesel::define_sql_function!(fn lower(x: diesel::sql_types::Text) -> diesel::sql_types::Text);
 
@@ -98,12 +99,23 @@ pub fn engage(
     })?)
 }
 
-/// End the couple `id`; whether it was still there.
-pub fn end(id: i32) -> crate::Result<bool> {
+/// End the couple `id`, unless it has a wedding booked that has not passed
+/// by `now` (report b066): `None` if it has, else whether the couple was
+/// still there. It locks the couple's row as `wedding::book` does, so a
+/// booking made at the same moment either comes first and stops this, or
+/// finds the couple gone.
+pub fn end_unless_booked(id: i32, now: SystemTime) -> crate::Result<Option<bool>> {
     let mut conn = crate::connection()?;
-    let deleted =
-        diesel::delete(marriages::table.filter(marriages::id.eq(id))).execute(&mut conn)?;
-    Ok(deleted > 0)
+    Ok(conn.transaction(|conn| -> QueryResult<Option<bool>> {
+        if crate::wedding::lock_couple(conn, id)?.is_none() {
+            return Ok(Some(false));
+        }
+        if crate::wedding::current_in(conn, id, now)?.is_some() {
+            return Ok(None);
+        }
+        diesel::delete(marriages::table.find(id)).execute(conn)?;
+        Ok(Some(true))
+    })?)
 }
 
 /// The one a proposal names: their id, gender, and any couple they are in.

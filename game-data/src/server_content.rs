@@ -801,6 +801,74 @@ pub mod keys {
         NANA_FULL,
     ];
 
+    /// A wedding assistant's greeting, over her menu.
+    pub const WEDDING_MENU: &str = "wedding.assist.menu";
+
+    /// The assistant's choice to hear how a wedding is prepared.
+    pub const WEDDING_CHOICE_PREPARE: &str = "wedding.assist.choice_prepare";
+
+    /// The assistant's choice to book the wedding.
+    pub const WEDDING_CHOICE_RESERVE: &str = "wedding.assist.choice_reserve";
+
+    /// How a wedding is prepared: `{ticket}` and `{premium}` are the venue's tickets.
+    pub const WEDDING_PREPARE: &str = "wedding.assist.prepare";
+
+    /// The assistant, to a player who isn't engaged.
+    pub const WEDDING_NO_RING: &str = "wedding.reserve.no_ring";
+
+    /// The assistant, to a couple booked already: `{ticket}`, `{minutes}` and `{channel}` tell which wedding and when.
+    pub const WEDDING_BOOKED: &str = "wedding.reserve.booked";
+
+    /// The assistant, when the partner isn't online.
+    pub const WEDDING_PARTNER_OFFLINE: &str = "wedding.reserve.partner_offline";
+
+    /// The assistant, when the player has a wedding ring already.
+    pub const WEDDING_HAS_RING: &str = "wedding.reserve.has_ring";
+
+    /// The assistant, when the partner has a wedding ring already.
+    pub const WEDDING_PARTNER_HAS_RING: &str = "wedding.reserve.partner_has_ring";
+
+    /// The assistant, when the partner is online but not beside the player.
+    pub const WEDDING_PARTNER_ELSEWHERE: &str = "wedding.reserve.partner_elsewhere";
+
+    /// The assistant, when the invitations won't fit the player's Etc tab.
+    pub const WEDDING_NO_ROOM: &str = "wedding.reserve.no_room";
+
+    /// The assistant, when the invitations won't fit the partner's Etc tab.
+    pub const WEDDING_PARTNER_NO_ROOM: &str = "wedding.reserve.partner_no_room";
+
+    /// The assistant, without a ticket in the Cash tab: `{ticket}` and `{premium}` are the venue's tickets.
+    pub const WEDDING_NO_TICKET: &str = "wedding.reserve.no_ticket";
+
+    /// The assistant, when the booking failed.
+    pub const WEDDING_ERROR: &str = "wedding.reserve.error";
+
+    /// The assistant, having booked the wedding: `{ticket}`, `{minutes}` and `{channel}` as in `wedding.reserve.booked`.
+    pub const WEDDING_DONE: &str = "wedding.reserve.done";
+
+    /// The line both partners get when the wedding is booked, as in `wedding.reserve.done`.
+    pub const WEDDING_DONE_CHAT: &str = "wedding.reserve.done_chat";
+
+    /// Nicole and Bonnie (wedding reservations).
+    pub const RESERVATIONS: [&str; 16] = [
+        WEDDING_MENU,
+        WEDDING_CHOICE_PREPARE,
+        WEDDING_CHOICE_RESERVE,
+        WEDDING_PREPARE,
+        WEDDING_NO_RING,
+        WEDDING_BOOKED,
+        WEDDING_PARTNER_OFFLINE,
+        WEDDING_HAS_RING,
+        WEDDING_PARTNER_HAS_RING,
+        WEDDING_PARTNER_ELSEWHERE,
+        WEDDING_NO_ROOM,
+        WEDDING_PARTNER_NO_ROOM,
+        WEDDING_NO_TICKET,
+        WEDDING_ERROR,
+        WEDDING_DONE,
+        WEDDING_DONE_CHAT,
+    ];
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -1460,6 +1528,7 @@ mod tests {
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
             .chain(&keys::ENGAGEMENT)
+            .chain(&keys::RESERVATIONS)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

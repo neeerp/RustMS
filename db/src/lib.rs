@@ -37,6 +37,7 @@ pub mod quest;
 pub mod ring;
 pub mod session;
 pub mod storage;
+pub mod wedding;
 
 pub type DbPool = Pool<ConnectionManager<PgConnection>>;
 pub type DbConnection = PooledConnection<ConnectionManager<PgConnection>>;

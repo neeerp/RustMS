@@ -327,6 +327,14 @@ pub enum Effect {
     /// Disband the player's alliance, if they are its master. Nothing may
     /// follow it.
     DisbandAlliance,
+    /// Book the player's wedding at `venue` with its ticket, premium or
+    /// not, once their partner beside them has room for the invitations
+    /// (Nicole, Bonnie). The assistant then says how it went, so nothing
+    /// may follow it.
+    BookWedding {
+        venue: game::wedding::Venue,
+        premium: bool,
+    },
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),
