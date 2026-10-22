@@ -1099,6 +1099,7 @@ namespace ms
 			// loots walks to it (FUN_009c4122).
 			bool loots = wears(index, pets::MESO_MAGNET) || wears(index, pets::ITEM_POUCH);
 			pet->set_sweep(loots ? directions[index] : 0);
+			pet->set_long_range(wears(index, pets::LONG_RANGE));
 		}
 	}
 

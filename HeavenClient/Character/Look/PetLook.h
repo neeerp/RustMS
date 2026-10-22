@@ -21,6 +21,8 @@
 
 #include <cstdint>
 
+#include "PetFollow.h"
+
 #include "../Pets.h"
 #include "../StyledTag.h"
 
@@ -70,9 +72,10 @@ namespace ms
 
 		void update_standing();
 
-		// Follow the owner at `charpos`, returning a path to send once
-		// there is one, or play the paths received.
-		std::optional<move_path::Path> update(const Physics &physics, Point<int16_t> charpos);
+		// Follow the owner at `charpos`, facing left if `owner_left`,
+		// returning a path to send once there is one, or play the paths
+		// received.
+		std::optional<move_path::Path> update(const Physics &physics, Point<int16_t> charpos, bool owner_left);
 
 		// MOVE_PET (170): where another's pet went.
 		void send_movement(const std::vector<Movement> &movements);
@@ -148,6 +151,10 @@ namespace ms
 		// Which way it walks toward a drop in Wing Boots: -1 left, 1 right,
 		// 0 none (FUN_00508268).
 		void set_sweep(int8_t direction);
+		// Its place among its owner's pets (petfollow::role).
+		void set_role(uint8_t role);
+		// Whether it wears a Binocular, and so strays farther.
+		void set_long_range(bool longrange);
 
 		bool is_local() const;
 
@@ -161,6 +168,10 @@ namespace ms
 		// Count how long it has stood at `before`, end what it was showing
 		// once it moves, and now and then act on its own.
 		void update_acting(Point<int16_t> before);
+
+		// Walk toward its spot near the owner at `charpos`, jumping up to
+		// them or over a wall, with now and then a run.
+		void follow(const Physics &physics, Point<int16_t> charpos, const petfollow::Goal &goal, bool owner_left);
 
 		// Its name tag: its kind's style (info/nameTag) when shown, else
 		// the plain box (FUN_005f0334 type 0x3eb).
@@ -180,9 +191,21 @@ namespace ms
 		bool flip;
 		// Which way it walks toward a drop, 0 for none.
 		int8_t sweep = 0;
-		// Where its owner was last, and how long they have stood there.
-		Point<int16_t> ownerpos;
+		// Its spot near its owner, and how long it has stayed put.
+		int32_t goalx = 0;
 		int32_t owner_still = 0;
+		// How it follows on the ground (petfollow): its role, the way it
+		// walks and the way it steers, ms toward its next step, its x at
+		// the last one, how long it has been running (-1 when not) and
+		// the distance a dash adds.
+		uint8_t role = 0;
+		bool longrange = false;
+		int8_t held = 0;
+		int8_t steer = 0;
+		int32_t thinking = 0;
+		int32_t lastx = 0;
+		int32_t ran = -1;
+		int32_t bonus = 0;
 
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;

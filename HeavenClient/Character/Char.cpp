@@ -371,7 +371,9 @@ namespace ms
 				}
 			}
 
-			if (std::optional<move_path::Path> path = pet.update(physics, get_position()))
+			pet.set_role(petfollow::role(pets[1].get_itemid() != 0, pets[2].get_itemid() != 0, static_cast<uint8_t>(i)));
+
+			if (std::optional<move_path::Path> path = pet.update(physics, get_position(), !getflip()))
 				MovePetPacket(pet.get_serial(), *path).dispatch();
 		}
 
