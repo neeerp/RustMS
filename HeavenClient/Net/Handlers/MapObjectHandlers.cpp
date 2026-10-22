@@ -161,6 +161,15 @@ namespace ms
 			other->set_chalkboard(text ? Chalkboard::remote_text(*text, CurseData::filter) : text, false);
 	}
 
+	void ShowConsumeEffectHandler::handle(InPacket& recv) const
+	{
+		int32_t cid = recv.read_int();
+		int32_t item = recv.read_int();
+
+		if (Optional<Char> character = Stage::get().get_character(cid))
+			character->show_consume_effect(item);
+	}
+
 	void UpdateCharBoxHandler::handle(InPacket& recv) const
 	{
 		int32_t cid = recv.read_int();

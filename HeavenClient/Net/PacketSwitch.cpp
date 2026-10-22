@@ -135,6 +135,7 @@ namespace ms
 		CHAT_RECEIVED = 162,
 		CHALKBOARD = 164,
 		UPDATE_CHAR_BOX = 165,
+		SHOW_CONSUME_EFFECT = 166,
 		SCROLL_RESULT = 167,
 
 		/// MapObject
@@ -301,6 +302,7 @@ namespace ms
 		emplace<SPAWN_CHAR, SpawnCharHandler>();
 		emplace<CHALKBOARD, ChalkboardHandler>();
 		emplace<UPDATE_CHAR_BOX, UpdateCharBoxHandler>();
+		emplace<SHOW_CONSUME_EFFECT, ShowConsumeEffectHandler>();
 		emplace<CHAR_MOVED, CharMovedHandler>();
 		emplace<FACIAL_EXPRESSION, FacialExpressionHandler>();
 		emplace<SHOW_ITEM_EFFECT, ShowItemEffectHandler>();

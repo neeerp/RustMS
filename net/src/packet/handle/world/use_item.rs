@@ -1,5 +1,6 @@
 use super::change_map::warp;
 use super::use_skill::show_given;
+use crate::consume_effect;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -76,7 +77,7 @@ impl WorldHandler for PetAutoPotHandler {
 
 /// The answer to an item use: the bag change and what the item did, or an
 /// empty stat update for a refusal. Either unlocks the client's item use.
-fn answer_use(player: &Player, item_id: i32, used: Option<Used>) -> WorldResult {
+fn answer_use(player: &mut Player, item_id: i32, used: Option<Used>) -> WorldResult {
     let Some(used) = used else {
         return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
     };
@@ -155,10 +156,11 @@ pub fn apply_item_effect(player: &mut Player, item_id: i32, now: Instant) -> Opt
 }
 
 /// The packets telling the player what `effect` did, from their HP and MP
-/// on, and those telling the others on the map what they now see.
-/// `exclusive` unlocks the client's item use.
+/// on, and those telling the others on the map what they now see, an
+/// aura the buff shows among them. `exclusive` unlocks the client's item
+/// use.
 pub fn item_effect_packets(
-    player: &Player,
+    player: &mut Player,
     item_id: i32,
     effect: ItemEffect,
     exclusive: bool,
@@ -179,6 +181,10 @@ pub fn item_effect_packets(
     if !effect.given.is_empty() {
         own.push(buff::build_give_buff(-item_id, effect.time, &effect.given)?);
         seen.extend(show_given(player, &effect.given)?);
+    }
+    if let Some(aura) = consume_effect::refresh(player)? {
+        own.push(aura.clone());
+        seen.push(aura);
     }
     Ok((own, seen))
 }

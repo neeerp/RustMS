@@ -102,6 +102,8 @@ pub enum SendOpcode {
     ChatText = 0xA2,
     Chalkboard = 0xA4,
     UpdateCharBox = 0xA5,
+    /// An item buff's aura over a player, the owner included (FUN_0093abc0).
+    ShowConsumeEffect = 0xA6,
     ShowScrollEffect = 0xA7,
     SpawnPet = 0xA8,
     MovePet = 0xAA,

@@ -225,8 +225,13 @@ impl ClientActor {
         .await
     }
 
-    /// Tell the others which of the buffs they saw ended.
+    /// Tell the others which of the buffs they saw ended, and the player
+    /// too if an item buff's aura went with them.
     async fn hide_buffs(&mut self, ended: &[BuffStat]) -> Result<(), RuntimeError> {
+        if let Some(aura) = net::consume_effect::refresh(&mut self.in_game_mut()?.player)? {
+            self.send(&mut aura.clone()).await?;
+            self.show_buffs(aura).await?;
+        }
         let unseen: Vec<_> = ended.iter().copied().filter(|stat| stat.shown()).collect();
         if unseen.is_empty() {
             return Ok(());

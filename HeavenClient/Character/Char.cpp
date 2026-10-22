@@ -66,6 +66,9 @@ namespace ms
 		berserk_aura.drawbelow(absp, alpha);
 		divine_body.drawbelow(absp, alpha);
 
+		if (!look.get_morph())
+			consume_aura.drawbelow(absp, alpha);
+
 		if (dashing && phobj.onground)
 			dash_dust.draw(DrawArgument(absp, facing_right), alpha);
 
@@ -174,6 +177,9 @@ namespace ms
 		berserk_aura.drawabove(absp, alpha);
 		divine_body.drawabove(absp, alpha);
 
+		if (!look.get_morph())
+			consume_aura.drawabove(absp, alpha);
+
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
 
@@ -244,6 +250,7 @@ namespace ms
 		energy_glow.update();
 		berserk_aura.update();
 		divine_body.update();
+		consume_aura.update();
 
 		if (dashing)
 			dash_dust.update();
@@ -625,6 +632,20 @@ namespace ms
 		if (skill != 0)
 			divine_body.add_looping(nl::nx::skill[string_format::skill_img(skill)]["skill"][string_format::extend_id(skill, 7)]
 									["repeat"], DrawArgument(facing_right), 0, 1.0f);
+	}
+
+	void Char::show_consume_effect(int32_t item)
+	{
+		consume_aura.clear();
+
+		if (item == 0)
+			return;
+
+		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(item)];
+		nl::node z = src["z"];
+		int8_t layer = z ? static_cast<int8_t>(std::clamp<int64_t>(z.get_integer(), -5, 20)) : 5;
+
+		consume_aura.add_looping(src, DrawArgument(), layer, 1.0f);
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)

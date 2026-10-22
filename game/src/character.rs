@@ -156,6 +156,8 @@ pub struct FieldAvatar {
     pub chalkboard: Option<String>,
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0.
     pub item_effect: i32,
+    /// The item whose aura (recv 166) the player's buffs show, or 0.
+    pub consume_effect: i32,
     /// Whether the player's Berserk aura shows.
     pub berserk: bool,
     /// Energy Charge's gauge, as `Buffs::energy`.
@@ -239,6 +241,9 @@ pub struct Player {
     /// The effect item (501xxxx or 429xxxx) the player shows, or 0; not
     /// saved.
     pub item_effect: i32,
+    /// The item whose aura (recv 166) the others were last shown, or 0;
+    /// not saved. `net::consume_effect` keeps it up to date.
+    pub consume_effect: i32,
     /// A charm kept the player's EXP when they last died, so they revive
     /// with 30% of their max HP and MP; not saved.
     pub charmed: bool,
@@ -315,6 +320,7 @@ impl Player {
             pets_named: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            consume_effect: 0,
             charmed: false,
             berserk: false,
             hidden: false,
@@ -476,6 +482,7 @@ impl Player {
                 .collect(),
             chalkboard: self.chalkboard.clone(),
             item_effect: self.item_effect,
+            consume_effect: self.consume_effect,
             berserk: self.berserk,
             energy: self.buffs.energy(),
             dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),

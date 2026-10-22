@@ -11,6 +11,7 @@ pub mod charge;
 pub mod codec;
 pub mod combat;
 pub mod combo;
+pub mod consume_effect;
 pub mod content;
 pub mod conti;
 pub mod dialogue;

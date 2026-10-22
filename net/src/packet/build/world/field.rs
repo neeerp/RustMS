@@ -147,6 +147,17 @@ pub fn build_show_item_effect(character_id: i32, item_id: i32) -> Result<Packet,
     Ok(packet)
 }
 
+/// SHOW_CONSUME_EFFECT (recv 166): the aura of the item buff `item_id`
+/// over a player, or none with 0. The owner is told too, and the client
+/// keeps it until told otherwise.
+pub fn build_show_consume_effect(character_id: i32, item_id: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ShowConsumeEffect as i16)?;
+    packet.write_int(character_id)?;
+    packet.write_int(item_id)?;
+    Ok(packet)
+}
+
 /// SHOW_CHAIR: show the others on the map that a player sat on the portable
 /// chair `item_id`, or stood up from it when `item_id` is 0.
 pub fn build_show_chair(character_id: i32, item_id: i32) -> Result<Packet, NetworkError> {
@@ -292,6 +303,7 @@ mod tests {
             pets: Vec::new(),
             chalkboard: None,
             item_effect: 0,
+            consume_effect: 0,
             berserk: false,
             energy: None,
             dash: [None; 2],

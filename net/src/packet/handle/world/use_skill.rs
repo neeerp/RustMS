@@ -1,6 +1,7 @@
 use super::combat::set_combo;
 use super::mount::dismount;
 use crate::combo;
+use crate::consume_effect;
 use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, PartySkill, WorldAction, WorldContext, WorldHandler, WorldResult,
@@ -362,6 +363,11 @@ impl WorldHandler for CancelBuffHandler {
                 skill_id: Some(skill_id),
                 why: Gone::Dismissed,
             }));
+        }
+        if let Some(aura) = consume_effect::refresh(ctx.player)? {
+            result = result
+                .with_reply(aura.clone())
+                .with(WorldAction::BuffsChanged(aura));
         }
         let unseen: Vec<_> = ended.into_iter().filter(|stat| stat.shown()).collect();
         if unseen.is_empty() {

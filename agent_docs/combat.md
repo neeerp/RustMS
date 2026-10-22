@@ -816,6 +816,33 @@ without using one up rather than heal 50 with no morph), and
 the mini-game and hired merchant refusals,
 which wait on those rooms.
 
+### Item auras
+
+Some item buffs draw an aura over the player: Horntail and Pink Bean
+Squad Victory, Breath of Nine Spirit, the ARPQ shield,
+Pharaoh's Blessing 1-4 and Power Buff, the flat entries of
+`Effect/ItemEff.img` (report c029 A). v83 shows it through
+SHOW_CONSUME_EFFECT (`0xA6`: character id, item id, 0 for none). The client
+keeps the id (user+0x1f64) and loops the item's frames at their `z` until
+told 0, the owner's own client included; SPAWN_PLAYER doesn't carry it.
+`net::consume_effect` derives the aura from the active buffs (an item buff is
+kept under `-item_id`) and `refresh` sends the 166 to the player and the map
+whenever it changes: when the item is used, and with 0 when its buff is
+cancelled, expires or ends at death. The field sends it after SPAWN_PLAYER to
+those who arrive later and when a hidden player shows, and the client actor
+tells the player's own client again on each map join, as v83 makes the user
+anew there. `Player.consume_effect` holds what the others were last shown
+(not saved).
+
+HeavenClient draws it in `Char::show_consume_effect` (layers clamped to -5
+to 20, 5 without a `z`), not while morphed, and `Stage::clear` clears the
+player's own at the map change, before the server's resend. Not done:
+Pharaoh's Blessing and Power Buff themselves, whose `berserk` and
+`booster` specs the server doesn't apply yet; the skills that show an item's
+aura (5110000, 4300000, 5100000); facing (the aura isn't flipped); and a
+skill buff replacing the item buff's stat, which takes the aura away only at
+the next refresh.
+
 ## Spending AP and SP
 
 The client locks its UI after SPEND_AP or SPEND_SP until the server answers,
@@ -1680,6 +1707,11 @@ Panic.
 `boss_hp_bar` has a player hit Neo City's 7220003 and checks that another
 player on the field sees its bar in its colours, and the bar's removal when
 it dies.
+`net::consume_effect` covers the aura following the item buff;
+`consume_effects` has a player drink Horntail Squad Victory and checks that
+they and a watcher see the aura, that it is shown again to the watcher
+coming back and to the drinker on each new map, and that cancelling the
+buff takes it away for both.
 `map_traps` has a player in the Forest of Patience take a thorn's 1 damage,
 which another player sees as DAMAGE_PLAYER -3, and has a hit of 2 refused.
 `map_hazards` warps to El Nath's Ice Valley in its cape, which keeps the
