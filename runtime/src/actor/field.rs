@@ -110,9 +110,9 @@ const MOON_WEATHER_TIME: Duration = Duration::from_secs(7);
 /// sent off (Cosmic's `bunnyDefeated`, 5 s), shortened like events' time.
 const FRIENDLY_LOST_AFTER: Duration = Duration::from_secs(5);
 
-/// Every how many hits on the Moon Bunny its guards hear it is being hurt
-/// (Cosmic's script means every sixth, which a bug there keeps from
-/// showing).
+/// The Moon Bunny's guards are told it is being hurt on every sixth hit
+/// (Cosmic's script means to, but a bug there keeps the line from showing;
+/// a recommended default in `v83ref/lanes/QUESTIONS.md`, row 180).
 const BUNNY_SICK_HITS: u32 = 6;
 
 /// How long an item lies on a reactor before the reactor takes it
@@ -1792,7 +1792,9 @@ impl FieldActor {
                     .statuses
                     .iter()
                     .any(|(stat, _)| !mob.statuses.contains_key(stat));
-                if mob.hp > 0 && lacks && mist.covers((mob.x, mob.y)) {
+                // A friendly mob takes nothing from players' mists.
+                let friendly = mob.info.damaged_by_mob;
+                if mob.hp > 0 && lacks && !friendly && mist.covers((mob.x, mob.y)) {
                     reached.push((mist.owner, mob.object_id, mist.inflict.clone()));
                 }
             }
@@ -2156,13 +2158,10 @@ impl FieldActor {
         }
     }
 
-    /// A client says a Darkstar has a player in reach: it blows up, giving
-    /// nothing, as in Cosmic, with leave type 4 so every client plays its
-    /// explosion and the players it reaches get hit.
     /// A client says mob `attacker` touched the friendly mob `victim`:
     /// everyone sees what it lost and its HP. The Moon Bunny's guards hear
-    /// of every sixth hit and of its going home; a friendly that goes in an
-    /// event's copy loses its party the event.
+    /// of every sixth hit and of its going home, and its going in an
+    /// event's copy loses its party the event (Cosmic's script).
     fn handle_friendly_hit(&mut self, attacker: i32, victim: i32) {
         let now = Instant::now();
         let mut rng = rand::thread_rng();
@@ -2189,7 +2188,7 @@ impl FieldActor {
         if bunny {
             self.item_line(&text.get(keys::HPQ_BUNNY_GONE, &[]));
         }
-        if self.key.instance_id != 0 {
+        if bunny && self.key.instance_id != 0 {
             self.lost_at = Some(now + net::events::scaled(FRIENDLY_LOST_AFTER));
         }
     }
@@ -2234,6 +2233,9 @@ impl FieldActor {
         }
     }
 
+    /// A client says a Darkstar has a player in reach: it blows up, giving
+    /// nothing, as in Cosmic, with leave type 4 so every client plays its
+    /// explosion and the players it reaches get hit.
     fn handle_mob_bomb(&mut self, object_id: i32) {
         if !self.mobs.bomb(object_id, Instant::now()) {
             return;
@@ -2548,9 +2550,7 @@ impl FieldActor {
             return;
         }
         let text = net::content::text();
-        if let Ok(packet) = build_item_line(&text.get(keys::HPQ_MOON_BUNNY_OUT, &[]), 0) {
-            self.broadcast(None, packet);
-        }
+        self.item_line(&text.get(keys::HPQ_MOON_BUNNY_OUT, &[]));
         let message = text.get(keys::HPQ_MOON_WEATHER, &[]);
         self.blow_weather_for(MOON_WEATHER, message, MOON_WEATHER_TIME);
     }

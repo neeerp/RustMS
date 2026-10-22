@@ -248,8 +248,8 @@ shows as the friendly's gauge. Every sixth hit tells the map
 
 Its `dropItemPeriod` (6, in tens of seconds) is a third as long for the
 bunny, so every 20 seconds it drops what the content pack's drops give mob
-`9300061` (a rice cake, `4001101`), with no quest items and no mesos
-(`loot::roll_friendly`), owned by the party of a player there, and the map
+`9300061` (a rice cake, `4001101`), without the quest items or the
+drops every mob shares (`loot::roll_friendly`), owned by the party of a player there, and the map
 hears `hpq.bunny.cake` with the count. 20 s is a recommended default in
 `v83ref/lanes/QUESTIONS.md` (row 180).
 
@@ -258,7 +258,8 @@ drops, no EXP) and the map hears `hpq.bunny.gone`. In an event's copy, 5
 seconds later (shortened like events' time) everyone there gets a pink
 `hpq.bunny.lost` (BROADCAST_MSG 5) and their clients tell the event it
 failed (`ServerMessage::EventFailed`, `EventCommand::Fail`), which ends it
-and sends everyone to the way out.
+and sends everyone to the way out, unless it is already won. Players'
+mists don't reach a friendly mob either.
 
 ## NPCs
 
