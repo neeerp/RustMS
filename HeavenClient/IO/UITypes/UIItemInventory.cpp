@@ -1738,11 +1738,29 @@ namespace ms
 			return false;
 		}
 
-		// A tamed monster and a saddle worn together must fit, each layer
-		// on its own; one that doesn't goes on with nothing said (FUN_004f1c2d).
 		EquipSlot::Id part = inventory.find_equipslot(item_id);
 		bool cash = inventory.get_cash_id(InventoryType::Id::EQUIP, slot) != 0;
 		int16_t layer = cash ? Inventory::CASH_EQUIP : 0;
+
+		// One crush, one friendship and one wedding ring are worn at a time, though a ring may take the place
+		// of one of its kind (FUN_004f1c2d).
+		std::vector<int32_t> rings;
+
+		for (auto ring : { EquipSlot::Id::RING1, EquipSlot::Id::RING2, EquipSlot::Id::RING3, EquipSlot::Id::RING4 })
+			for (int16_t position : { static_cast<int16_t>(ring), static_cast<int16_t>(ring + Inventory::CASH_EQUIP) })
+				rings.push_back(inventory.get_item_id(InventoryType::Id::EQUIPPED, position));
+
+		int32_t replaced = inventory.get_item_id(InventoryType::Id::EQUIPPED, inventory.equip_position(slot, part));
+
+		if (const char* notice = marriage::equip_gate(item_id, replaced, rings))
+		{
+			UI::get().emplace<UIOk>(notice, [](bool)
+			{});
+			return false;
+		}
+
+		// A tamed monster and a saddle worn together must fit, each layer
+		// on its own; one that doesn't goes on with nothing said (FUN_004f1c2d).
 
 		if (part == EquipSlot::Id::TAMEDMOB || part == EquipSlot::Id::SADDLE)
 		{

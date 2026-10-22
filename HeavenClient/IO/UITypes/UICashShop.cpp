@@ -27,6 +27,7 @@
 #include "../Components/MapleButton.h"
 #include "../Components/TwoSpriteButton.h"
 
+#include "../../Character/Marriage.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Misc.h"
@@ -491,7 +492,8 @@ namespace ms
 					wish_added = false;
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
 				}
-				else if (list_button % 3 == 0)
+				// BUY or GIFT, a ring of a pair is for two (v83 472fb6).
+				else if (list_button % 3 == 0 || (list_button % 3 == 1 && marriage::is_pair_ring(commodity.item_id)))
 					UICashBuy::open(commodity, credit, points, prepaid);
 				else if (list_button % 3 == 1)
 					UI::get().emplace<UICashGift>(commodity);

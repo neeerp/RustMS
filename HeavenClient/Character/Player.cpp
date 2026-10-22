@@ -2286,6 +2286,52 @@ namespace ms
 		marriage = std::move(record);
 	}
 
+	const std::vector<CoupleRingRecord> &Player::get_couple_rings() const
+	{
+		return couple_rings;
+	}
+
+	void Player::set_couple_rings(std::vector<CoupleRingRecord> records)
+	{
+		couple_rings = std::move(records);
+	}
+
+	std::optional<RingWearer> Player::ring_wearer(RingKind kind) const
+	{
+		static constexpr EquipSlot::Id RINGS[] = { EquipSlot::Id::RING1, EquipSlot::Id::RING2, EquipSlot::Id::RING3,
+												   EquipSlot::Id::RING4 };
+
+		if (kind == RingKind::WEDDING)
+		{
+			// A wedding ring is worn in a regular slot.
+			bool wearing = false;
+
+			for (auto slot : RINGS)
+				wearing |= marriage::is_wedding_ring(inventory.get_item_id(InventoryType::Id::EQUIPPED, slot));
+
+			if (auto ring = marriage::own_ring(marriage, stats.get_female(), wearing))
+				return RingWearer::of(get_oid(), get_position(), *ring);
+
+			return std::nullopt;
+		}
+
+		// Crush and friendship rings are cash items, worn 100 above the slot.
+		std::vector<std::pair<int32_t, int64_t>> worn;
+
+		for (auto slot : RINGS)
+		{
+			int16_t position = slot + Inventory::CASH_EQUIP;
+
+			if (int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, position))
+				worn.emplace_back(item_id, inventory.get_cash_id(InventoryType::Id::EQUIPPED, position));
+		}
+
+		if (auto ring = marriage::own_pair_ring(kind, worn, couple_rings))
+			return RingWearer::of(get_oid(), get_position(), *ring);
+
+		return std::nullopt;
+	}
+
 	const PartnerSpot &Player::get_partner() const
 	{
 		return partner;

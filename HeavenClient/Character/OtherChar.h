@@ -59,9 +59,9 @@ namespace ms
 		// Update the character look.
 		void update_look(const LookEntry &look);
 
-		// The marriage ring block their look came with, if any.
-		const std::optional<MarriageRing> &get_marriage_ring() const;
-		void set_marriage_ring(std::optional<MarriageRing> ring);
+		// The ring blocks their look came with.
+		const RingLooks &get_ring_looks() const;
+		void set_ring_looks(const RingLooks &looks);
 
 		// Show these buffs, each with its value, as well as those shown
 		// already. Those the character spawned with (`init`) show without
@@ -99,7 +99,7 @@ namespace ms
 		std::unordered_map<int32_t, uint8_t> skilllevels;
 		uint8_t attackspeed;
 		std::map<Buffstat::Id, int32_t> buffs;
-		std::optional<MarriageRing> marriage_ring;
+		RingLooks ring_looks;
 
 		void show_diseases();
 	};

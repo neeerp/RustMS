@@ -60,13 +60,13 @@ namespace ms
 		// Update a characters movement.
 		void send_movement(int32_t cid, const std::vector<Movement> &movements);
 
-		// Update a characters look, and the marriage ring block with it.
-		void update_look(int32_t cid, const LookEntry &look, std::optional<MarriageRing> marriage_ring);
+		// Update a characters look, and the ring blocks with it.
+		void update_look(int32_t cid, const LookEntry &look, const RingLooks &ring_looks);
 
-		// The characters with a marriage ring block, where they stand.
-		std::vector<RingWearer> ring_wearers() const;
-		// Show each character its couple's ring effect, and the others none.
-		void show_rings(const std::vector<std::pair<int32_t, RingEffect>> &effects);
+		// The characters with a ring block of a kind, where they stand.
+		std::vector<RingWearer> ring_wearers(RingKind kind) const;
+		// Show each character its pair's ring effect of a kind, and the others none.
+		void show_rings(RingKind kind, const std::vector<std::pair<int32_t, RingEffect>> &effects);
 
 		Optional<OtherChar> get_char(int32_t cid);
 

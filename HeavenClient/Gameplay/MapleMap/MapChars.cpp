@@ -74,31 +74,38 @@ namespace ms
 			otherchar->send_movement(movements);
 	}
 
-	void MapChars::update_look(int32_t cid, const LookEntry &look, std::optional<MarriageRing> marriage_ring)
+	void MapChars::update_look(int32_t cid, const LookEntry &look, const RingLooks &ring_looks)
 	{
 		if (Optional<OtherChar> otherchar = get_char(cid))
 		{
 			otherchar->update_look(look);
-			otherchar->set_marriage_ring(marriage_ring);
+			otherchar->set_ring_looks(ring_looks);
 		}
 	}
 
-	std::vector<RingWearer> MapChars::ring_wearers() const
+	std::vector<RingWearer> MapChars::ring_wearers(RingKind kind) const
 	{
 		std::vector<RingWearer> wearers;
 
 		for (auto &[oid, object] : chars)
 		{
 			auto &otherchar = static_cast<const OtherChar &>(*object);
+			const RingLooks &looks = otherchar.get_ring_looks();
+			Point<int16_t> position = otherchar.get_position();
 
-			if (auto &ring = otherchar.get_marriage_ring())
-				wearers.push_back({ oid, otherchar.get_position(), *ring });
+			if (kind == RingKind::WEDDING && looks.marriage)
+				wearers.push_back(RingWearer::of(oid, position, *looks.marriage));
+
+			const std::optional<PairRing> &pair = kind == RingKind::CRUSH ? looks.crush : looks.friendship;
+
+			if (kind != RingKind::WEDDING && pair)
+				wearers.push_back(RingWearer::of(oid, position, *pair));
 		}
 
 		return wearers;
 	}
 
-	void MapChars::show_rings(const std::vector<std::pair<int32_t, RingEffect>> &effects)
+	void MapChars::show_rings(RingKind kind, const std::vector<std::pair<int32_t, RingEffect>> &effects)
 	{
 		for (auto &[oid, object] : chars)
 		{
@@ -108,7 +115,7 @@ namespace ms
 				if (id == oid)
 					effect = shown;
 
-			static_cast<OtherChar &>(*object).show_ring(effect);
+			static_cast<OtherChar &>(*object).show_ring(kind, effect);
 		}
 	}
 

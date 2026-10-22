@@ -121,11 +121,11 @@ namespace ms
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
 						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm,
 						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie, int32_t ml, int32_t me,
-						 int32_t mf, bool bs, std::optional<MarriageRing> mr) : cid(c), look(lk), level(l),
+						 int32_t mf, bool bs, RingLooks rl) : cid(c), look(lk), level(l),
 						 job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
 						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie),
 						 mount_level(ml), mount_exp(me), mount_fatigue(mf), berserk(bs),
-						 marriage_ring(mr)
+						 ring_looks(rl)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -145,7 +145,7 @@ namespace ms
 		otherchar->set_chalkboard(chalkboard, false);
 		otherchar->set_item_effect(item_effect);
 		otherchar->show_berserk(berserk);
-		otherchar->set_marriage_ring(marriage_ring);
+		otherchar->set_ring_looks(ring_looks);
 
 		for (size_t i = 0; i < pets.size(); i++)
 			otherchar->add_pet(static_cast<uint8_t>(i), false, pets[i], false);

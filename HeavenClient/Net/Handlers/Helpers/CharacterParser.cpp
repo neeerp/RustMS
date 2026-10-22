@@ -127,35 +127,26 @@ namespace ms
 		}
 	}
 
-	void CharacterParser::parse_ring1(InPacket& recv)
+	void CharacterParser::parse_ring1(InPacket& recv, Player& player)
 	{
 		int16_t rsize = recv.read_short();
+		std::vector<CoupleRingRecord> records;
 
 		for (int16_t i = 0; i < rsize; i++)
-		{
-			recv.read_int();
-			recv.read_padded_string(13);
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-		}
+			records.push_back(marriage::read_couple_ring(recv, false));
+
+		player.set_couple_rings(std::move(records));
 	}
 
-	void CharacterParser::parse_ring2(InPacket& recv)
+	void CharacterParser::parse_ring2(InPacket& recv, Player& player)
 	{
 		int16_t rsize = recv.read_short();
+		std::vector<CoupleRingRecord> records = player.get_couple_rings();
 
 		for (int16_t i = 0; i < rsize; i++)
-		{
-			recv.read_int();
-			recv.read_padded_string(13);
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-			recv.read_int();
-		}
+			records.push_back(marriage::read_couple_ring(recv, true));
+
+		player.set_couple_rings(std::move(records));
 	}
 
 	void CharacterParser::parse_ring3(InPacket& recv, Player& player)

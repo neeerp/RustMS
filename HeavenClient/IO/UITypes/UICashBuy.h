@@ -22,11 +22,23 @@
 #include "../../Data/CashCatalog.h"
 #include "../../Graphics/Text.h"
 
+#include <optional>
+
 namespace ms
 {
+	// A crush or friendship ring's order, which the BUY dialog sends once a
+	// balance is picked (v83 46ffe7 and 470a5a).
+	struct RingOrder
+	{
+		bool friendship;
+		int32_t birthday;
+		std::string to;
+		std::string message;
+	};
+
 	// The Cash Shop's BUY dialog (UIClassic.nx CashShop.img/CSNotice/0): the
 	// item, its price, and which balance pays for it. A commodity with sn 0
-	// is a slot button's four slots.
+	// is a slot button's four slots. For a ring, Maple Points can't pay.
 	class UICashBuy : public UIElement
 	{
 	public:
@@ -34,7 +46,7 @@ namespace ms
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
 
-		UICashBuy(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
+		UICashBuy(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring = {});
 
 		// Opens the dialog, after v83's checks for a slot expansion: some
 		// balance must cover the price, a slot button must find room in the
@@ -70,5 +82,6 @@ namespace ms
 		int32_t sn;
 		int32_t item_id;
 		size_t payment;
+		std::optional<RingOrder> ring;
 	};
 }

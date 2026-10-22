@@ -431,6 +431,12 @@ namespace ms
 		// The player's engagement or marriage, if any.
 		const std::optional<MarriageRecord> &get_marriage() const;
 		void set_marriage(std::optional<MarriageRecord> record);
+		// The rings of the crush and friendship pairs the player is in.
+		const std::vector<CoupleRingRecord> &get_couple_rings() const;
+		void set_couple_rings(std::vector<CoupleRingRecord> records);
+		// The player's own ring block of a kind, from the worn rings
+		// (0x95b335, 0x95b47c, 0x95b5c8).
+		std::optional<RingWearer> ring_wearer(RingKind kind) const;
 		// Where the partner is, while the server says.
 		const PartnerSpot &get_partner() const;
 		void set_partner(PartnerSpot spot);
@@ -526,6 +532,7 @@ namespace ms
 		Alliance alliance;
 		Family family;
 		std::optional<MarriageRecord> marriage;
+		std::vector<CoupleRingRecord> couple_rings;
 		PartnerSpot partner;
 
 		EnumMap<Buffstat::Id, Buff> buffs;

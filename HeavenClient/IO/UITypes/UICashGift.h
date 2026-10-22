@@ -23,11 +23,15 @@
 
 #include "../../Data/CashCatalog.h"
 
+#include <optional>
+
 namespace ms
 {
 	// The Cash Shop's GIFT dialog: the receiver and a message
 	// (UIClassic.nx CashShop.img/CSGift), then the birthday code that
-	// confirms the purchase (CSNotice/1).
+	// confirms the purchase (CSNotice/1). A crush or friendship ring asks
+	// for the birthday code first, then the partner and a message, and is
+	// paid for in the BUY dialog (v83 46ffe7 and 470a5a).
 	class UICashGift : public UIElement
 	{
 	public:
@@ -36,6 +40,8 @@ namespace ms
 		static constexpr bool TOGGLED = false;
 
 		UICashGift(const cash_catalog::Commodity& commodity);
+		// A ring pair for the player and a partner, with the balances.
+		UICashGift(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
 
 		void draw(float inter) const override;
 
@@ -56,6 +62,10 @@ namespace ms
 
 		void confirm();
 
+		// A ring's steps after each page: the price check, then the
+		// question and the BUY dialog.
+		void confirm_ring();
+
 		void close();
 
 		enum Buttons : uint16_t
@@ -70,5 +80,9 @@ namespace ms
 		Textfield birthday;
 		bool asking_birthday;
 		int32_t sn;
+		std::optional<cash_catalog::Commodity> ring;
+		int32_t credit;
+		int32_t points;
+		int32_t prepaid;
 	};
 }

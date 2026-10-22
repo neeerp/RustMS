@@ -294,6 +294,21 @@ namespace ms
 									[](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
 		}
+		case 0x87:
+		{
+			// A ring pair is bought: the buyer's ring is in the Cash
+			// Inventory and the other is on its way to the partner; the
+			// balance follows (v83 47b78e, StringPool 0x212).
+			cashshop->add_cash_items({ read_cash_item(recv) });
+
+			std::string to = recv.read_string();
+			int32_t item_id = recv.read_int();
+			int16_t count = recv.read_short();
+
+			UI::get().emplace<UIOk>("You have given '" + to + "'\\n " + std::to_string(count) + " [ " + ItemData::get(item_id).get_name() + " ].",
+									[](bool) {}, Sound::Name::BUYSHOPITEM);
+			break;
+		}
 		case 0x60:
 		{
 			// A bag has more slots; the balance follows.

@@ -226,13 +226,37 @@ HeavenClient shows one notice at a time, and a new one replaces the open
 one without calling its handler. A partner whose Yes/No is replaced never
 answers, and the proposer waits until they withdraw.
 
+For crush and friendship rings:
+
+- `CharacterParser` reads the character data's crush and friendship
+  lists into `Player::get_couple_rings`. `read_ring_looks` reads the
+  crush and friendship blocks, which `OtherChar` keeps by kind.
+- `Player::ring_wearer` makes the player's own block of a kind from
+  the worn cash rings and the records (`marriage::own_pair_ring`).
+  `Stage::show_rings` pairs each kind's wearers on its own, and each
+  kind has its own effect.
+- `EquipTooltip` names the partner of a ring whose serial a record has,
+  "A COUPLE-RING WITH : <name>", in place of the description. In the
+  Cash Shop the records aren't sent, so the line shows once the player
+  is back on a map.
+- `UIItemInventory::can_wear_equip` refuses a second ring of a kind
+  with v83's notice (`marriage::equip_gate`). `Inventory::find_equipslot`
+  looks for a free ring slot on the cash layer for a cash ring, so a
+  double-clicked second crush ring meets the notice instead of
+  replacing the worn one.
+- In the Cash Shop, BUY or GIFT on a pair ring opens `UICashGift` in
+  ring mode: the birthday code, a check that credit or prepaid covers
+  the price, the partner's name and message, a Yes/No naming the price
+  and the partner, then `UICashBuy`'s payment choice without Maple
+  Points. It sends `BuyCoupleRingPacket` (0x1D or 0x23). Mode 0x87 adds
+  the ring to the Cash Inventory and says what was given. HeavenClient
+  clears its wait on any Cash Shop reply, so a second ring can be bought
+  in the same visit.
+
 ## Not done yet
 
 - Mode 32, refusing to break off after a reservation, and taking the
   wedding rings when a married couple breaks up.
-- The client side of crush and friendship rings: reading their lists and
-  blocks, their pair effects, tooltips and equip notices, and the Cash
-  Shop's ring dialogs.
 - The wedding NPCs, reservations, the wedding field, and the wishlist.
 
 Report b052 §7 lists them.

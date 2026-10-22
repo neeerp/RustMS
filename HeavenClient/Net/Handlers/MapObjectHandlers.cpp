@@ -129,7 +129,7 @@ namespace ms
 		if (recv.read_bool())
 			chalkboard = Chalkboard::remote_text(recv.read_string(), CurseData::filter);
 
-		std::optional<MarriageRing> marriage_ring = marriage::read_ring_looks(recv);
+		RingLooks ring_looks = marriage::read_ring_looks(recv);
 
 		// The new year cards the player sent.
 		if (recv.read_bool())
@@ -141,7 +141,7 @@ namespace ms
 
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
-			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue, berserk, marriage_ring }
+			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue, berserk, ring_looks }
 		);
 	}
 
@@ -431,11 +431,11 @@ namespace ms
 		int32_t cid = recv.read_int();
 		recv.read_byte();
 		LookEntry look = LoginParser::parse_look(recv);
-		// A look drops the character's couple until its ring block pairs it
+		// A look drops the character's pairs until its ring blocks pair it
 		// again (0x98367e).
-		std::optional<MarriageRing> marriage_ring = marriage::read_ring_looks(recv);
+		RingLooks ring_looks = marriage::read_ring_looks(recv);
 
-		Stage::get().get_chars().update_look(cid, look, marriage_ring);
+		Stage::get().get_chars().update_look(cid, look, ring_looks);
 	}
 
 	namespace
