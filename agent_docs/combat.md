@@ -240,7 +240,12 @@ the star as `id - 2069999`, an i16 in GIVE_BUFF and an i32 for the others.
 While it lasts, a claw throws that star from a slot holding one and spends
 none; the shot sets display bit 0x40 and, unless the skill is ammo-free,
 carries the star as an int after the cash slot byte (v83 0x95514b). The
-others are shown the star in the attack's projectile.
+others are shown the star in the attack's projectile. If that star is gone
+from USE (dropped, sold or moved away mid-buff), v83 throws no other star: a
+shot that takes ammo does nothing at all, with no throw, packet or message,
+unless Soul Arrow is on; a whack at a mob in front still swings (0x949b5d,
+0x9537d5). HeavenClient does the same (`Player::shadow_star_lost`,
+`Combat::apply_move`), and the server refuses such a shot anyway.
 
 HeavenClient refuses a skill before sending it, with v83's lines in the skill
 chat colour (`Player::can_use`, `Skill::can_use`, `Combat::can_use_move`). The

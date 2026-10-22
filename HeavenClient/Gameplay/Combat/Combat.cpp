@@ -1161,6 +1161,15 @@ namespace ms
 				attack = player.prepare_attack(0, true);
 			}
 
+			// Once Shadow Stars' star is gone, a shot that would take one
+			// does nothing at all, with no throw, packet or message, unless
+			// Soul Arrow is on. A whack still swings (0x9537d5).
+			bool takes_ammo = !move.is_skill() || follow || SkillData::get(move.get_id()).uses_ammo();
+
+			if (whack == Stance::Id::NONE && attack.type == Attack::Type::RANGED && takes_ammo &&
+				!player.soul_arrow() && player.shadow_star_lost())
+				return false;
+
 			// Assassinate's first strike shows Dark Sight going, and ends
 			// it before the attack goes out; its second shows `special`
 			// instead of its effect (0x951a20).
