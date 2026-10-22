@@ -368,6 +368,18 @@ pub mod keys {
     pub const LPQ_SIGN_BUSY: &str = "lpq.sign.busy";
     pub const LPQ_ANDERSON_LEAVE_ASK: &str = "lpq.anderson.leave.ask";
     pub const LPQ_ANDERSON_HOME: &str = "lpq.anderson.home";
+    pub const LPQ_BALLOON_INTRO_1: &str = "lpq.balloon.intro.1";
+    pub const LPQ_BALLOON_INTRO_2: &str = "lpq.balloon.intro.2";
+    pub const LPQ_BALLOON_INTRO_3: &str = "lpq.balloon.intro.3";
+    pub const LPQ_BALLOON_INTRO_4: &str = "lpq.balloon.intro.4";
+    pub const LPQ_BALLOON_INTRO_5: &str = "lpq.balloon.intro.5";
+    pub const LPQ_BALLOON_INTRO_7: &str = "lpq.balloon.intro.7";
+    pub const LPQ_BALLOON_INTRO_9: &str = "lpq.balloon.intro.9";
+    pub const LPQ_BALLOON_NOT_LEADER: &str = "lpq.balloon.not_leader";
+    pub const LPQ_BALLOON_SHORT: &str = "lpq.balloon.short";
+    pub const LPQ_BALLOON_DONE: &str = "lpq.balloon.done";
+    pub const LPQ_BALLOON_HURRY: &str = "lpq.balloon.hurry";
+    pub const LPQ_BALLOON_S6: &str = "lpq.balloon.s6";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1267,6 +1279,18 @@ mod tests {
             keys::LPQ_SIGN_BUSY,
             keys::LPQ_ANDERSON_LEAVE_ASK,
             keys::LPQ_ANDERSON_HOME,
+            keys::LPQ_BALLOON_INTRO_1,
+            keys::LPQ_BALLOON_INTRO_2,
+            keys::LPQ_BALLOON_INTRO_3,
+            keys::LPQ_BALLOON_INTRO_4,
+            keys::LPQ_BALLOON_INTRO_5,
+            keys::LPQ_BALLOON_INTRO_7,
+            keys::LPQ_BALLOON_INTRO_9,
+            keys::LPQ_BALLOON_NOT_LEADER,
+            keys::LPQ_BALLOON_SHORT,
+            keys::LPQ_BALLOON_DONE,
+            keys::LPQ_BALLOON_HURRY,
+            keys::LPQ_BALLOON_S6,
         ];
         for key in named
             .iter()

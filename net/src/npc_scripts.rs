@@ -7,7 +7,7 @@
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
-use crate::events::{self, Cloto, Entry, EventCommand, EventKind};
+use crate::events::{self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn};
 use crate::rides;
 use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
@@ -58,6 +58,8 @@ const GROWLIE: i32 = 1012114;
 /// Ludibrium's party quest; its script needs to know whether the party may
 /// go (`NpcScript::red_sign`).
 pub const RED_SIGN: i32 = 2040034;
+/// The balloon on Ludibrium's maze stage.
+pub const AQUA_BALLOON: i32 = 2040041;
 /// Sgt. Anderson, who lets players out of Ludibrium's party quest and back
 /// to Eos Tower.
 const ANDERSON: i32 = 2040047;
@@ -816,6 +818,17 @@ impl NpcScript {
     /// party may or may not go into the Dimensional Crack.
     pub fn red_sign(entry: Entry) -> Self {
         red_sign(entry)
+    }
+
+    /// The balloon that clears `hand_in`'s stage, to `player`, who stands
+    /// with it as `view`.
+    pub fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> Self {
+        balloon(hand_in, view, player)
+    }
+
+    /// The Aqua Balloon on Ludibrium's maze stage, which clears nothing.
+    pub fn aqua_balloon() -> Self {
+        NpcScript::new(AQUA_BALLOON, vec![Page::Say(text(keys::LPQ_BALLOON_S6))])
     }
 
     /// Growlie's, Tommy's or Tory's script on Primrose Hill's maps, for a
@@ -2212,6 +2225,51 @@ fn nella(player: &Player) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// A Ludibrium balloon (Cosmic `2040036`-`2040044`): the leader first
+/// hears what its stage asks, then hands in what it takes, which clears the
+/// stage; the others are sent to fetch them.
+fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
+    let item = hand_in.item.to_string();
+    let n = hand_in.count.to_string();
+    let get = |key| content::text().get(key, &[("item", &item), ("n", &n)]);
+    let short = get(keys::LPQ_BALLOON_SHORT);
+    let page = match view {
+        Balloon::Cleared => Page::Say(text(keys::LPQ_BALLOON_HURRY)),
+        Balloon::NotLeader => Page::Say(text(keys::LPQ_BALLOON_NOT_LEADER)),
+        Balloon::Intro => Page::Say(get(lpq_balloon_intro(hand_in.stage))),
+        Balloon::Ready if player.inventory.count(hand_in.item) >= i32::from(hand_in.count) => {
+            Page::Act {
+                text: text(keys::LPQ_BALLOON_DONE),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: hand_in.item,
+                        quantity: hand_in.count,
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(hand_in.stage)),
+                ],
+            }
+        }
+        Balloon::Ready => Page::Say(short.clone()),
+    };
+    let mut script = NpcScript::new(hand_in.npc, vec![page]);
+    // The items dropped since the page opened.
+    script.refused = Some(short);
+    script
+}
+
+/// What Ludibrium's balloon on `stage` asks of the party.
+fn lpq_balloon_intro(stage: u8) -> &'static str {
+    match stage {
+        1 => keys::LPQ_BALLOON_INTRO_1,
+        2 => keys::LPQ_BALLOON_INTRO_2,
+        3 => keys::LPQ_BALLOON_INTRO_3,
+        4 => keys::LPQ_BALLOON_INTRO_4,
+        5 => keys::LPQ_BALLOON_INTRO_5,
+        7 => keys::LPQ_BALLOON_INTRO_7,
+        _ => keys::LPQ_BALLOON_INTRO_9,
+    }
 }
 
 /// Sgt. Anderson (Cosmic `2040047`): on the party quest's maps he lets a
@@ -4803,6 +4861,47 @@ mod tests {
             NpcScript::for_npc(ANDERSON, &rider(100, 0, 221024500)),
             None
         );
+    }
+
+    #[test]
+    fn a_balloon_takes_its_stage_s_passes_from_a_leader_who_heard_it_out() {
+        let first = events::LPQ.hand_in(1).unwrap();
+        let holding = |quantity| hunter(&[(events::LPQ_PASS, quantity)], &[]);
+        let says = |view, passes| {
+            let page = NpcScript::balloon(first, view, &holding(passes)).begin();
+            assert_eq!(kind(&page), Some(0));
+            (page_text(&page), page.effects)
+        };
+        let item = events::LPQ_PASS.to_string();
+        let get = |key| content::text().get(key, &[("item", &item), ("n", "25")]);
+        for (view, key) in [
+            (Balloon::Cleared, keys::LPQ_BALLOON_HURRY),
+            (Balloon::NotLeader, keys::LPQ_BALLOON_NOT_LEADER),
+            (Balloon::Intro, keys::LPQ_BALLOON_INTRO_1),
+            (Balloon::Ready, keys::LPQ_BALLOON_SHORT),
+        ] {
+            let (said, effects) = says(view, 24);
+            assert!(said.contains(&get(key)), "{said}");
+            assert!(effects.is_empty());
+        }
+        let (said, effects) = says(Balloon::Ready, 25);
+        assert!(said.contains(&text(keys::LPQ_BALLOON_DONE)), "{said}");
+        assert_eq!(
+            effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::LPQ_PASS,
+                    quantity: 25
+                },
+                Effect::EventCommand(EventCommand::ClearStage(1))
+            ]
+        );
+        let mut script = NpcScript::balloon(first, Balloon::Ready, &holding(25));
+        assert_eq!(script.npc_id, 2040036);
+        assert!(script.refused().is_some());
+        for hand_in in events::LPQ.hand_ins {
+            assert!(lpq_balloon_intro(hand_in.stage).ends_with(&hand_in.stage.to_string()));
+        }
     }
 
     #[test]

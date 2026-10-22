@@ -9,7 +9,7 @@ use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use net::events::{on_areas, Cloto, EventCommand, EventKind};
 use net::handler::FieldRequest;
-use net::npc_scripts::NpcScript;
+use net::npc_scripts::{NpcScript, AQUA_BALLOON};
 use net::packet::build::world::conti::{build_countdown, build_stop_clock};
 use net::packet::build::world::effect::{
     build_field_effect, build_field_object, build_field_sound,
@@ -79,6 +79,29 @@ impl ClientActor {
                 NpcScript::cloto_answer(stage, right)
             }
             Some(view) => NpcScript::cloto(view, &self.in_game()?.player),
+        };
+        self.start_script(script).await?;
+        Ok(true)
+    }
+
+    /// A balloon on one of the event's stages: the stage's hand-in, or the
+    /// maze's one line. Returns whether it spoke; elsewhere it has nothing
+    /// to say.
+    pub(super) async fn talk_to_balloon(&mut self, npc_id: i32) -> Result<bool, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+            return Ok(false);
+        };
+        let event = ticket.kind.event();
+        let script = if let Some(hand_in) = event.hand_in_on(map_id, npc_id) {
+            let Some(view) = ticket.balloon(hand_in.stage).await else {
+                return Ok(false);
+            };
+            NpcScript::balloon(hand_in, view, &self.in_game()?.player)
+        } else if npc_id == AQUA_BALLOON && ticket.kind == EventKind::Lpq {
+            NpcScript::aqua_balloon()
+        } else {
+            return Ok(false);
         };
         self.start_script(script).await?;
         Ok(true)
