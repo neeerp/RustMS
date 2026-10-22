@@ -76,6 +76,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME map_tooltip COMMAND map_tooltip_tests)
     add_executable(cash_catalog_tests tests/cash_catalog.cpp)
     add_test(NAME cash_catalog COMMAND cash_catalog_tests)
+    add_executable(cash_coupon_tests tests/cash_coupon.cpp)
+    add_test(NAME cash_coupon COMMAND cash_coupon_tests)
     add_executable(package_tooltip_tests tests/package_tooltip.cpp)
     add_test(NAME package_tooltip COMMAND package_tooltip_tests)
     add_executable(answer_focus_tests tests/answer_focus.cpp)
@@ -787,6 +789,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashBuy.h
     IO/UITypes/UICashGift.cpp
     IO/UITypes/UICashGift.h
+    IO/UITypes/UICouponDialog.cpp
+    IO/UITypes/UICouponDialog.h
     IO/UITypes/UIGiftNotice.cpp
     IO/UITypes/UIGiftNotice.h
     IO/UITypes/UIInvitation.cpp

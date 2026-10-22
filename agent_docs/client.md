@@ -772,7 +772,7 @@ the screen size.
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
   Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
-  0x57 (a bought item), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
+  0x57 (a bought item), 0x59 (a redeemed coupon), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
   new slot count), 0x62 (the storage's), 0x68 (an item taken out), 0x6A (an
   item put back) and 0x89 (a bought package) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
@@ -785,8 +785,7 @@ the screen size.
   mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
   a zero (no free trial). The result is a "successful purchase" or a failure
   notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
-  except coupon, gift-token and character-transfer codes, which get the
-  default.
+  except gift-token and character-transfer codes, which get the default.
 - **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
   getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the
@@ -834,7 +833,17 @@ the screen size.
 - **Leaving:** EXIT sends CHANGE_MAP with no body at once. Esc first asks
   "Are you sure you want to leave the Cash Shop?", as v83 does
   (`FUN_004bcc86`).
-- **Not served yet:** CHARGE and COUPON do nothing.
+- **Coupons:** COUPON opens `UICouponDialog` (`UIWindow.img/Coupon`, v83
+  0x471240) unless a request is out. A "-" typed at the end is dropped, as
+  the art asks. OK or Enter trims the code and sends COUPON_CODE (230) with
+  an empty string and the code; an empty code says "Please enter the coupon
+  code." instead. 0x59 adds the cash items to the Cash Inventory and says
+  what was received, glued together as v83 does (`cash_coupon::notice`,
+  report b073); unlike other modes it leaves the request out until the
+  balances come. Each coupon failure code has v83's text, and the third
+  wrong code (0xB1) shows the default notice, then "You are disconnected
+  from Cash Shop", then leaves the shop.
+- **Not served yet:** CHARGE does nothing.
 
 ## Estimated client work for a complete game
 
@@ -842,7 +851,7 @@ the screen size.
 | --- | --- | --- |
 | Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting) | M |
 | Player shops | Nothing | L |
-| Cash shop | No coupons, charging, or storage window | S |
+| Cash shop | No charging or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
 | Pets | Summon, follow, chat commands, food, cash food, name tags, equipment, looting, the exception list and auto potions | M |
 | Mounts | Partial rendering, no interaction | M |

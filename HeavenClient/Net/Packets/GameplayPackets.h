@@ -138,6 +138,19 @@ namespace ms
 		CheckCashPacket() : OutPacket(OutPacket::Opcode::CHECK_CASH) {}
 	};
 
+	// Opcode: COUPON_CODE(230)
+	class CouponCodePacket : public OutPacket
+	{
+	public:
+		// Redeem the code typed in the Coupon dialog. v83 (0x471bfc) writes
+		// an empty string before it.
+		CouponCodePacket(const std::string& code) : OutPacket(OutPacket::Opcode::COUPON_CODE)
+		{
+			write_string("");
+			write_string(code);
+		}
+	};
+
 	// Opcode: CASHSHOP_OPERATION(229)
 	class BuyCashItemPacket : public OutPacket
 	{
