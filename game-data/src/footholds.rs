@@ -82,6 +82,34 @@ impl Footholds {
         ))
     }
 
+    /// The map's bounds (`bounds`) inside its view range, for a map with
+    /// `info/VRLimit` (`FieldTemplate::view_limit`), as the v83 client
+    /// narrows them (r25 0xa44c3a): the left edge to 20 px inside the view's,
+    /// the right to 20 px inside, the top to 65 px below and the bottom to
+    /// the view's bottom, each only inward and only when the view's edge is
+    /// not 0.
+    pub fn bounds_within(
+        &self,
+        view: Option<(i32, i32, i32, i32)>,
+    ) -> Option<(i32, i32, i32, i32)> {
+        let (mut left, mut top, mut right, mut bottom) = self.bounds()?;
+        if let Some((view_left, view_top, view_right, view_bottom)) = view {
+            if view_left != 0 {
+                left = left.max(view_left + 20);
+            }
+            if view_top != 0 {
+                top = top.max(view_top + 65);
+            }
+            if view_right != 0 {
+                right = right.min(view_right - 20);
+            }
+            if view_bottom != 0 {
+                bottom = bottom.min(view_bottom);
+            }
+        }
+        Some((left, top, right, bottom))
+    }
+
     /// The highest ground at `x` that is at or below `y`.
     pub fn ground_below(&self, x: i16, y: i16) -> Option<i16> {
         self.lines
@@ -170,6 +198,23 @@ mod tests {
         // The cliff spans x -300..300 and y 100..200, its wall included.
         assert_eq!(cliff().bounds(), Some((-270, -200, 270, 210)));
         assert_eq!(Footholds::default().bounds(), None);
+    }
+
+    #[test]
+    fn a_view_range_only_pulls_the_bounds_in() {
+        let cliff = cliff();
+        assert_eq!(cliff.bounds_within(None), cliff.bounds());
+        // Left and top move in; the right and bottom view edges lie outside.
+        assert_eq!(
+            cliff.bounds_within(Some((-200, -300, 400, 500))),
+            Some((-180, -200, 270, 210))
+        );
+        // Right and bottom move in; an edge of 0 is left alone.
+        assert_eq!(
+            cliff.bounds_within(Some((0, 0, 200, 150))),
+            Some((-270, -200, 180, 150))
+        );
+        assert_eq!(Footholds::default().bounds_within(Some((1, 1, 1, 1))), None);
     }
 
     #[test]

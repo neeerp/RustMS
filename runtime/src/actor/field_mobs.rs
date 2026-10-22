@@ -1318,8 +1318,9 @@ fn near(mob: (i16, i16), at: (i16, i16)) -> bool {
 /// How many mobs a field holds with few users on it (CField's mob
 /// capacity): one per 128,000 square pixels of the map, at least 800 wide
 /// and 600 high after taking off 450, times its `mobRate`, from 1 to 40.
-/// `bounds` are its footholds' bounds (`Footholds::bounds`), which the
-/// server grows by 10 px on every side.
+/// `bounds` are its footholds' bounds inside any view range
+/// (`Footholds::bounds_within`), which the server grows by 10 px on every
+/// side.
 pub fn mob_capacity(bounds: Option<(i32, i32, i32, i32)>, mob_rate: f64) -> usize {
     let (width, height) = bounds.map_or((0, 0), |(left, top, right, bottom)| {
         (right - left + 20, bottom - top + 20)
@@ -2240,6 +2241,9 @@ mod tests {
         assert_eq!(mob_capacity(Some((0, 0, 1580, 1030)), 1.0), 7);
         assert_eq!(mob_capacity(Some((0, 0, 9000, 9000)), 1.0), 40);
         assert_eq!(mob_capacity(None, 0.0), 1);
+        // Orbis Tower<B2>, by its footholds and then inside its view range.
+        assert_eq!(mob_capacity(Some((-335, -2610, 335, 160)), 1.0), 14);
+        assert_eq!(mob_capacity(Some((-335, -2174, 335, 160)), 1.0), 11);
     }
 
     #[test]

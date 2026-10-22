@@ -240,6 +240,10 @@ pub struct FieldTemplate {
     pub mob_spawns: Vec<MapMobTemplate>,
     pub reactors: Vec<MapReactorTemplate>,
     pub mob_rate: f64,
+    /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
+    /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
+    /// the map's bounds (`Footholds::bounds_within`).
+    pub view_limit: Option<(i32, i32, i32, i32)>,
     /// `info/recovery`: how much faster players recover HP and MP at rest,
     /// e.g. 2 in the Sleepywood sauna.
     pub recovery: f64,
@@ -580,6 +584,19 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let view_limit = match nx.child_by_name(map_node_idx, "info")? {
+        Some(info) if nx.int_child(info, "VRLimit")?.unwrap_or(0) != 0 => {
+            let edge =
+                |key| -> Result<i32, GameDataError> { Ok(nx.int_child(info, key)?.unwrap_or(0)) };
+            Some((
+                edge("VRLeft")?,
+                edge("VRTop")?,
+                edge("VRRight")?,
+                edge("VRBottom")?,
+            ))
+        }
+        _ => None,
+    };
     let time_limit = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.int_child(info, "timeLimit"))
@@ -682,6 +699,7 @@ fn build_field_template(
         mob_spawns,
         reactors,
         mob_rate,
+        view_limit,
         recovery,
         town,
         field_limit,
@@ -1296,6 +1314,7 @@ mod tests {
             mob_spawns: Vec::new(),
             reactors: Vec::new(),
             mob_rate: 1.0,
+            view_limit: None,
             recovery: 1.0,
             town: false,
             field_limit: 0,
@@ -1371,6 +1390,7 @@ mod tests {
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
+            view_limit: None,
             recovery: 1.0,
             town: false,
             field_limit: 0,
@@ -1416,6 +1436,26 @@ mod tests {
         assert!(!field(910000001).may_drop(), "the Free Market rooms");
         let henesys = field(100000000);
         assert!(henesys.may_use(2000000) && henesys.may_drop());
+    }
+
+    #[test]
+    fn orbis_towers_view_range_narrows_its_bounds() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let tower = game_data.field(200082300).expect("Orbis Tower<B2>");
+        assert_eq!(tower.view_limit, Some((-400, -2239, 400, 285)));
+        // Only the top moves in, to 65 px below the view's.
+        assert_eq!(tower.footholds.bounds(), Some((-335, -2610, 335, 160)));
+        assert_eq!(
+            tower.footholds.bounds_within(tower.view_limit),
+            Some((-335, -2174, 335, 160))
+        );
+        assert_eq!(
+            game_data.field(100000000).expect("Henesys").view_limit,
+            None
+        );
     }
 
     #[test]
