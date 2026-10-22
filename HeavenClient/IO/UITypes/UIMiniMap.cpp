@@ -363,7 +363,9 @@ namespace ms
 				break;
 			case BT_MAP:
 				UIWorldMap::open();
-				break;
+				// Back to normal, or the button stays pressed and takes no
+				// more clicks.
+				return Button::State::NORMAL;
 		}
 
 		return buttons[buttonid]->get_state();
