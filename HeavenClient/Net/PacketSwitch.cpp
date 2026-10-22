@@ -69,6 +69,7 @@ namespace ms
 		CANCEL_BUFF = 33,
 		RECALCULATE_STATS = 35,
 		SET_TAMING_MOB_INFO = 48,
+		QUEST_CLEAR = 49,
 		UPDATE_SKILL = 36,
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
@@ -101,6 +102,7 @@ namespace ms
 		MONSTER_BOOK_SET_COVER = 84,
 		MINIMAP_ON_OFF = 86,
 
+		SCRIPT_PROGRESS_MESSAGE = 122,
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
 		SET_BACK_EFFECT = 128,
@@ -383,6 +385,8 @@ namespace ms
 		emplace<AVATAR_MEGAPHONE_RESULT, AvatarMegaphoneResultHandler>();
 		emplace<AVATAR_MEGAPHONE, AvatarMegaphoneHandler>();
 		emplace<CLEAR_AVATAR_MEGAPHONE, ClearAvatarMegaphoneHandler>();
+		emplace<QUEST_CLEAR, QuestClearHandler>();
+		emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
 
 		// Inventory Handlers

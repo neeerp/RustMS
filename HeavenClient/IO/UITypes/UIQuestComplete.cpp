@@ -78,12 +78,13 @@ namespace ms
 		bool changed = false;
 
 		// Quests handed in or forfeited take their notice with them; the rest
-		// fade, and those below a notice that leaves move down.
+		// fade, and those below a notice that leaves move down. The server's
+		// notices may be for quests the catalog lacks, as the explorer titles.
 		for (auto it = notices.begin(); it != notices.end();)
 		{
 			it->life.update(Constants::TIMESTEP);
 
-			if (it->life.gone() || !started.count(it->id))
+			if (it->life.gone() || !quests.is_started(it->id))
 			{
 				it = notices.erase(it);
 				changed = true;
@@ -96,15 +97,7 @@ namespace ms
 
 		for (int16_t id : completion.update(started))
 		{
-			const QuestInfo* quest = QuestCatalog::get().find(id);
-			Text name(Text::A12M, Text::LEFT, Color::Name::WHITE, quest ? quest->name : std::to_string(id));
-			string_format::format_with_ellipsis(name, NAME_WIDTH);
-
-			notices.erase(std::remove_if(notices.begin(), notices.end(), [&](const Notice& n) { return n.id == id; }),
-				notices.end());
-			notices.push_back({ id, std::move(name), FadeNotice(LIFETIME) });
-			Sound(Sound::Name::INVITE).play();
-
+			push_notice(id);
 			changed = true;
 		}
 
@@ -113,6 +106,24 @@ namespace ms
 			rebuild();
 
 		UIElement::update();
+	}
+
+	void UIQuestComplete::add_notice(int16_t id)
+	{
+		push_notice(id);
+		rebuild();
+	}
+
+	void UIQuestComplete::push_notice(int16_t id)
+	{
+		std::string title = nl::nx::quest["QuestInfo.img"][std::to_string(id)]["name"];
+		Text name(Text::A12M, Text::LEFT, Color::Name::WHITE, title.empty() ? std::to_string(id) : title);
+		string_format::format_with_ellipsis(name, NAME_WIDTH);
+
+		notices.erase(std::remove_if(notices.begin(), notices.end(), [&](const Notice& n) { return n.id == id; }),
+			notices.end());
+		notices.push_back({ id, std::move(name), FadeNotice(LIFETIME) });
+		Sound(Sound::Name::INVITE).play();
 	}
 
 	void UIQuestComplete::rebuild()

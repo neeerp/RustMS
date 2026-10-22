@@ -15,7 +15,8 @@
 namespace ms
 {
 	// v83's red "Quest Complete!" notice (UIWindow.img/FadeYesNo/backgrnd4)
-	// above the status bar, shown when a quest's last objective is met. O
+	// above the status bar, shown when a quest's last objective is met, or
+	// when the server says so (QUEST_CLEAR, as for an explorer title). O
 	// opens the quest in the quest log and X dismisses it. Each notice stays
 	// until then, or until the quest is no longer in progress; newer notices
 	// stack above older ones, invitations included.
@@ -35,6 +36,9 @@ namespace ms
 
 		UIElement::Type get_type() const override;
 
+		// A notice for quest `id`, replacing one it already has.
+		void add_notice(int16_t id);
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -49,6 +53,7 @@ namespace ms
 			FadeNotice life;
 		};
 
+		void push_notice(int16_t id);
 		void rebuild();
 		// From the bottom of the stack to `notice`.
 		Point<int16_t> offset(const Notice& notice) const;

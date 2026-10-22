@@ -247,7 +247,9 @@ place starts the quest. Each new place sends the info record with the count
 and an info text; the place that reaches the count sends QUEST_CLEAR (0x31),
 the title line and the "see Dalair" text instead. The texts are the
 `medal.explorer.*` keys (placeholders until the content pack has them).
-HeavenClient doesn't handle 0x7A or 0x31 yet.
+HeavenClient shows 0x7A as a gold line near the top of the screen
+(`UIScriptMessage`) and 0x31 as a Quest Complete! card (`UIQuestComplete`),
+and its quest log fills `#R27010#` in the quest text with the record's count.
 
 Places seen are `QuestLog::explored`, keyed by the info record, and are stored
 in `explored_maps (character_id, record_id, map_id)`. They outlast a forfeit:

@@ -79,6 +79,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A quest's title is earned: its "Quest Complete!" notice (FUN_00a26d44)
+	// Opcode: QUEST_CLEAR(49)
+	class QuestClearHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A line among the floating script lines (FUN_00a13f20)
+	// Opcode: SCRIPT_PROGRESS_MESSAGE(122)
+	class ScriptProgressMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Show another type of server message
 	// Opcode: WEEK_EVENT_MESSAGE(77)
 	class WeekEventMessageHandler : public PacketHandler

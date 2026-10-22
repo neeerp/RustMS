@@ -149,6 +149,7 @@ namespace ms
 			KITEMSG,
 			JOBHEAD,
 			JOBDISABLED,
+			SCRIPTGOLD,
 			NUM_COLORS
 		};
 
@@ -247,7 +248,8 @@ namespace ms
 						{0.14f, 0.28f, 0.41f}, // Parcel select (#244768, the parcel Duey selects)
 						{0.80f, 0.80f, 0.60f}, // Kite msg (#CCCC99, the item's words after a kite's flier)
 						{0.47f, 0.50f, 0.53f}, // Job head (#777F88, a class's box in the Party Search window)
-						{0.55f, 0.54f, 0.55f}  // Job disabled (#8C8A8C, a greyed box's label there)
+						{0.55f, 0.54f, 0.55f}, // Job disabled (#8C8A8C, a greyed box's label there)
+						{1.00f, 0.78f, 0.00f}  // Script gold (#FFC600, the floating script lines)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

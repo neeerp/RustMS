@@ -123,6 +123,7 @@ namespace ms
 			PARTYSEARCH,
 			PARTYSEARCHICON,
 			RPSGAME,
+			SCRIPTMESSAGE,
 			NUM_TYPES
 		};
 
