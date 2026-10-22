@@ -1246,7 +1246,8 @@ The owner gets the unsold stock back, and the visitors get LEAVE reason 3.
 ### Owl of Minerva
 
 The Owl of Minerva (2310000, the only USE item of class 231) searches the
-open personal shops of every channel for an item. The client lets it be used
+open personal shops of every channel for an item. The Cash Owl (5230000,
+the only Cash item of class 523) does the same. The client lets it be used
 only on the Free Market maps (910000000 to 910000022). `net::owl` holds the
 rules and `client/owl.rs` the flow.
 
@@ -1254,7 +1255,8 @@ rules and `client/owl.rs` the flow.
    (`0x46`) mode 7: the 10 items searched for most in the world since it
    started (`DirectoryMessage::OwlPopular`).
 2. **A search** (`0x53`: USE slot, owl id, item id, order 0 cheapest first or
-   1 dearest, tick) asks every running market room (910000001 to
+   1 dearest, tick; the Cash Owl sends the same fields as USE_CASH_ITEM
+   `0x4F` type 0x1d, from its Cash slot) asks every running market room (910000001 to
    910000022, instance 0, all channels, `FieldRegistry::running`) for its
    open shops that still have the item (`FieldMessage::ShopSearch`), waiting
    at most a second. Up to 200 rows go back in mode 6: owner, map, title,
@@ -1269,7 +1271,7 @@ rules and `client/owl.rs` the flow.
    player is warped to the shop's map if needed and visits the shop as if
    they had clicked its balloon.
 
-**The client.** Double-clicking the Owl in the Free Market opens
+**The client.** Double-clicking either Owl in the Free Market opens
 `UIItemSearch` (v83 FUN_008a0c7b, report c026), which sends `0x42` as it
 opens. Its two GO buttons slide a panel out from under its right edge (a
 pixel a millisecond, and back the same way) with the 10 items
@@ -1279,7 +1281,8 @@ item id range). The search box lists, ten a page, every item whose String
 name has the text, ignoring case and spaces (`Data/ItemNames.h`, shared
 with the pet's item search). Choosing a row and the panel's SEARCH asks
 "Would you like to search for [name]?" (SP 0xe2d, with the order picked by
-the panel's SORT BY PRICE box, ticked for the dearest first), then sends `0x53` behind the client's half-second
+the panel's SORT BY PRICE box, ticked for the dearest first), then sends `0x53`
+(or `0x4F` for the Cash Owl) behind the client's half-second
 request gate and closes the window. An empty answer says "Unable to find
 the item you have entered."; otherwise `UIItemSearchResult` opens with
 eight rows a page. GO is offered only on rows on the player's own channel
@@ -1298,7 +1301,7 @@ not decoded (all black, the status red). Equip tooltips show the base item:
 the stats are read but not kept. GO after leaving the Free Market gets
 answer 1 from the server, so the row shows "Store Closed".
 
-The cash Owl (5230000) and hired merchants are not supported yet.
+Hired merchants are not supported yet.
 
 ## Tests
 
@@ -1406,5 +1409,5 @@ the rows, and the most searched list; the build tests cover the packets;
 `field_shops` covers which shops a search finds and GO's answers.
 `owl_of_minerva` (integration) is refused off the Free Market, keeps the Owl
 when nothing turns up, finds a shop in another room and uses up one Owl,
-sees the item in the most searched list, goes into the shop with GO, and
+does the same with a Cash Owl, sees the item in the most searched list, goes into the shop with GO, and
 gets "closed" once the owner logs out.

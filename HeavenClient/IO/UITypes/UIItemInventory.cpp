@@ -678,15 +678,10 @@ namespace ms
 				UI::get().emplace<UIKarmaScissors>(slot, item_id);
 		}
 
-		// v83 FUN_00a0a25e and FUN_00a0a2dc: the Owl of Minerva opens its
-		// search window in the Free Market. It waits as an item use does and
-		// says nothing while another request waits; nothing goes to the
-		// server until a search.
-		void use_owl(int16_t slot, int32_t item_id)
+		// v83 FUN_00a0a2dc: either Owl opens its search window in the Free
+		// Market. Nothing goes to the server until a search.
+		void open_owl(int16_t slot, int32_t item_id)
 		{
-			if (!Stage::get().get_player().can_request(ExclRequest::USE_WAIT))
-				return;
-
 			const char *refusal = nullptr;
 
 			if (UI::get().dialog_open())
@@ -703,6 +698,14 @@ namespace ms
 			}
 
 			UIItemSearch::open(slot, item_id);
+		}
+
+		// v83 FUN_00a0a25e: the Owl of Minerva waits as an item use does and
+		// says nothing while another request waits.
+		void use_owl(int16_t slot, int32_t item_id)
+		{
+			if (Stage::get().get_player().can_request(ExclRequest::USE_WAIT))
+				open_owl(slot, item_id);
 		}
 
 		// v83 FUN_00a0a4aa: a teleport rock goes to the map or the
@@ -1340,6 +1343,13 @@ namespace ms
 							use_item_guard(slot, item_id);
 						else if (item_id == karma_scissors::KARMA_SCISSORS)
 							use_karma_scissors(slot, item_id);
+						// The Cash Owl (523xxxx, type 0x1d) waits as a cash
+						// item does, then opens the Owl's window.
+						else if (item_id / 10000 == 523)
+						{
+							if (may_use_cash_item())
+								open_owl(slot, item_id);
+						}
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
 						else if (item_id / 10000 == 518)

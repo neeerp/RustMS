@@ -5,7 +5,7 @@ use super::ClientActor;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use game::InventoryType;
-use net::owl::{self, go_result, OwlRequest, ShopHit, OWL};
+use net::owl::{self, go_result, OwlRequest, ShopHit};
 use net::packet::build::world::owl::{build_owl_go_result, build_owl_popular, build_owl_results};
 use net::packet::build::world::{inventory, stat};
 use net::packet::handle::world::warp_to_spawn_point;
@@ -28,33 +28,38 @@ impl ClientActor {
                 self.send(&mut build_owl_popular(&popular)?).await
             }
             OwlRequest::Search {
+                inventory,
                 slot,
                 owl_id,
                 item_id,
                 descending,
-            } => self.owl_search(slot, owl_id, item_id, descending).await,
+            } => {
+                self.owl_search(inventory, slot, owl_id, item_id, descending)
+                    .await
+            }
             OwlRequest::Go { room, map_id } => self.owl_go(room, map_id).await,
         }
     }
 
-    /// Search with the Owl in USE `slot`, used up only if something turns
-    /// up. The answer, even an empty one, lets the client make requests
-    /// again.
+    /// Search with the Owl in `slot` of `inventory`, used up only if
+    /// something turns up. The answer, even an empty one, lets the client
+    /// make requests again.
     async fn owl_search(
         &mut self,
+        inventory: InventoryType,
         slot: i16,
         owl_id: i32,
         item_id: i32,
         descending: bool,
     ) -> Result<(), RuntimeError> {
         let player = &self.in_game()?.player;
-        let may = owl_id == OWL
+        let may = owl::owl_in(inventory) == Some(owl_id)
             && player.stats.hp > 0
             && owl::in_free_market(player.stats.map_id)
             && player
                 .inventory
-                .get(InventoryType::Use, slot)
-                .is_some_and(|item| item.item_id == OWL)
+                .get(inventory, slot)
+                .is_some_and(|item| item.item_id == owl_id)
             && self.trade.is_none()
             && self.personal_shop.is_none();
         if !may {
@@ -69,7 +74,7 @@ impl ClientActor {
         let mut packets = vec![build_owl_results(item_id, &hits)?];
         if !hits.is_empty() {
             let player = &mut self.in_game_mut()?.player;
-            match player.inventory_mut().take(InventoryType::Use, slot, 1) {
+            match player.inventory_mut().take(inventory, slot, 1) {
                 Ok(changes) => packets.push(inventory::build_inventory_operation(true, &changes)?),
                 Err(error) => tracing::warn!(slot, ?error, "Owl not taken after a search"),
             }
