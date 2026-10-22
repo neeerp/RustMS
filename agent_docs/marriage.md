@@ -112,6 +112,9 @@ second of the two logs in or changes channel, and when an engagement makes
 each name the other. A partner who changes map tells the other. Someone
 who logs off, changes channel, or ends the couple sends the other `(0, 0)`,
 and an ended couple both get it once.
+Engaged couples are told as well as married ones. The client doesn't
+tell the two apart, and whether v83's server told engaged couples is
+inferred (report b057 §6).
 
 ## Client
 
