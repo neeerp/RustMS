@@ -281,7 +281,7 @@ impl ConsumeSpec {
 }
 
 /// The `spec` keys of the stats a consumable raises.
-const SPEC_STATS: [(&str, BuffStat); 11] = [
+const SPEC_STATS: [(&str, BuffStat); 12] = [
     ("pad", BuffStat::Pad),
     ("pdd", BuffStat::Pdd),
     ("mad", BuffStat::Mad),
@@ -293,6 +293,7 @@ const SPEC_STATS: [(&str, BuffStat); 11] = [
     ("thaw", BuffStat::Thaw),
     ("expBuff", BuffStat::ExpBuff),
     ("morph", BuffStat::Morph),
+    ("ghost", BuffStat::Ghost),
 ];
 
 /// The `spec` keys of the diseases a consumable cures.
@@ -979,6 +980,13 @@ mod tests {
         let morph = data.info(2210000).unwrap().unwrap().spec.unwrap();
         assert!(morph.stats.contains(&(BuffStat::Morph, 1)));
         assert!(!morph.morph_random && morph.has_effect());
+        for (id, ghost) in [(2360000, 1), (2360002, 2)] {
+            let spec = data.info(id).unwrap().unwrap().spec.unwrap();
+            assert_eq!(
+                (spec.stats, spec.time),
+                (vec![(BuffStat::Ghost, ghost)], 3_600_000)
+            );
+        }
         for id in [2211000, 2212000] {
             let random = data.info(id).unwrap().unwrap().spec.unwrap();
             assert_eq!((random.morph_random, random.hp), (true, 50));

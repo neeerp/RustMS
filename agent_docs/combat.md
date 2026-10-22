@@ -748,8 +748,19 @@ v83 sends no morph item, nor a ghost item (236xxxx), while the user is
 already morphed, sits on a portable chair, rides the Battleship (193xxxx)
 or has a trade or personal shop open, and says nothing (0xa092fb,
 `morph::potion_refused`). To change morph, the user cancels the first.
-The server refuses the first three too, keeping the item (`world/use_item.rs`
-`potion_refused`).
+The server refuses the first three too, and a ghost too, keeping the item
+(`world/use_item.rs` `potion_refused`).
+
+A ghost item (2360000 and 2360001 `spec/ghost` 1, 2360002 `spec/ghost` 2,
+each for an hour) makes its user a ghost: a `BuffStat::Ghost` buff (bit 49)
+from the item, its value a short, after Morph in GIVE_FOREIGN_BUFF and
+SPAWN_PLAYER (report c039). It is a movement stat, so GIVE_BUFF ends with
+the extra byte. v83 lets a ghost neither attack nor use any skill (it can
+still emote and sit), so the server refuses both as for a morph
+(`morph::ghosted`, which `morph::refused` and the party quest skill check
+use). Right-clicking the icon ends it. What value 2 changes, and whether
+death or a map change ends it, isn't known. The client doesn't draw the
+ghost yet.
 
 The cash morphs (Fungus Scroll 5300000, Oinker Delight 5300001 and Zeta
 Nightmare 5300002, templates 1-3 for ten minutes, report c012) are the

@@ -94,7 +94,11 @@ fn pq_skill_allowed(kind: PqSkill, player: &Player) -> bool {
         PqSkill::RageOfPharaoh => field_type == FIELD_TYPE_PYRAMID,
     };
     let attack = kind != PqSkill::DojoBuff;
-    on_its_map && !(attack && (player.ride_skill().is_some() || player.buffs.has(BuffStat::Morph)))
+    on_its_map
+        && !(attack
+            && (player.ride_skill().is_some()
+                || player.buffs.has(BuffStat::Morph)
+                || crate::morph::ghosted(player)))
 }
 
 /// The most a secret attack may take from a mob: all its max HP, but only

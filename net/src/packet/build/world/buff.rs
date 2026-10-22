@@ -45,6 +45,7 @@ fn moves(stat: BuffStat) -> bool {
             | BuffStat::Weakness
             | BuffStat::Slow
             | BuffStat::Morph
+            | BuffStat::Ghost
             | BuffStat::MapleWarrior
             | BuffStat::Seduce
     )
@@ -121,7 +122,7 @@ pub(crate) fn write_shown(
                 p.write_short(buff.value)?;
                 p.write_int(buff.skill_id)?;
             }
-            BuffStat::Morph => {
+            BuffStat::Morph | BuffStat::Ghost => {
                 p.write_short(buff.value)?;
             }
             BuffStat::WeaponCharge
@@ -601,6 +602,37 @@ mod tests {
         expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
         expect.long(0).long((1 << 1) | (1 << 7));
         expect.short(1).int(128 | 3 << 16);
+        expect.byte(0).byte(0).short(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_ghost_moves_and_shows_its_value_after_a_morph() {
+        let packet = build_give_buff(-2360000, 3_600_000, &[(BuffStat::Ghost, 1)]).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveBuff as i16);
+        expect.long(0).long(1 << 17);
+        expect.short(1).int(-2360000).int(3_600_000);
+        expect.byte(0).byte(0).short(0).byte(0);
+        expect.end();
+
+        let shown = [
+            ShownBuff {
+                stat: BuffStat::Ghost,
+                value: 2,
+                skill_id: -2360002,
+            },
+            ShownBuff {
+                stat: BuffStat::Morph,
+                value: 1,
+                skill_id: -2210000,
+            },
+        ];
+        let packet = build_give_foreign_buff(7, &shown).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::GiveForeignBuff as i16).int(7);
+        expect.long(0).long((1 << 1) | (1 << 17));
+        expect.short(1).short(2);
         expect.byte(0).byte(0).short(0);
         expect.end();
     }
