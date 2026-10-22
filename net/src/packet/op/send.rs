@@ -52,8 +52,22 @@ pub enum SendOpcode {
     ClearAvatarMegaphone = 0x70,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
+    /// The Family Tree (report b039).
+    FamilyChart = 0x5E,
     FamilyInfo = 0x5F,
-    FamilyList = 0x64,
+    /// A refusal or an end, by code.
+    FamilyResult = 0x60,
+    /// Someone asks the player to be their junior.
+    FamilyJoinRequest = 0x61,
+    /// The junior asked answered.
+    FamilyJoinRequestResult = 0x62,
+    /// The player has a new senior.
+    FamilyJoinAccepted = 0x63,
+    /// The entitlements and their prices.
+    FamilyPrivilegeList = 0x64,
+    FamilyRepGain = 0x65,
+    /// A senior or junior came online or left.
+    FamilyNotifyLoginOrLogout = 0x66,
     MacroSysDataInit = 0x7C,
     SetField = 0x7D,
     SetCashShop = 0x7F,

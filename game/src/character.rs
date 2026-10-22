@@ -222,6 +222,9 @@ pub struct Player {
     /// The guild the character belongs to; saved by `db::guild`, not with
     /// the player.
     pub guild: Option<GuildTag>,
+    /// The character's senior and juniors; saved by `db::family`, not with
+    /// the player.
+    pub family: crate::family::Relatives,
     /// The cash serials of the summoned pets, in the client's list order;
     /// saved with the pets.
     pub pets: Vec<i64>,
@@ -303,6 +306,7 @@ impl Player {
             buffs: Buffs::default(),
             chair: 0,
             guild: None,
+            family: Default::default(),
             pets: Vec::new(),
             pets_named: Vec::new(),
             chalkboard: None,

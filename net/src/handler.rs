@@ -290,6 +290,19 @@ pub enum AllianceRequest {
     Deny { inviter: String },
 }
 
+/// A family request (report b039), carried out by the client's actor.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FamilyRequest {
+    /// The Family window opened (`OPEN_FAMILY`).
+    Open,
+    /// Show the Family Tree of the character named so.
+    Chart { name: String },
+    /// Ask the character named so to be the player's junior.
+    Add { name: String },
+    /// Answer `inviter`'s request to be their junior.
+    Answer { inviter: ClientId, accept: bool },
+}
+
 /// A guild operation, carried out by the client's actor.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuildRequest {
@@ -498,6 +511,7 @@ pub enum WorldAction {
     Note(NoteRequest),
     Guild(GuildRequest),
     Alliance(AllianceRequest),
+    Family(FamilyRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -830,6 +844,13 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::GuildBbs, InGame(&world::GuildBbsHandler)),
             (
+                Op::OpenFamilyPedigree,
+                InGame(&world::OpenFamilyPedigreeHandler),
+            ),
+            (Op::OpenFamily, InGame(&world::OpenFamilyHandler)),
+            (Op::AddFamily, InGame(&world::AddFamilyHandler)),
+            (Op::AcceptFamily, InGame(&world::AcceptFamilyHandler)),
+            (
                 Op::AllianceOperation,
                 InGame(&world::AllianceOperationHandler),
             ),
@@ -960,7 +981,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 97);
+        assert_eq!(world_routes().len(), 102);
     }
 
     #[test]

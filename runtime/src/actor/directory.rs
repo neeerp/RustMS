@@ -1,3 +1,5 @@
+mod family;
+
 use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
 use crate::actor::guild_invites::GuildInvites;
@@ -120,6 +122,11 @@ pub struct WorldDirectory {
     /// Guild members changing channel: their guild and alliance hear they
     /// logged out only if they don't arrive in time.
     guild_away: HashMap<ClientId, Away>,
+    /// Requests to be someone's junior, by the senior asking.
+    family_invites: GuildInvites,
+    /// Family members changing channel, who are said to log out only if
+    /// they don't arrive in time.
+    family_away: HashMap<ClientId, family::Away>,
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
@@ -141,6 +148,8 @@ impl WorldDirectory {
             messengers: Messengers::default(),
             doors: HashMap::new(),
             guild_away: HashMap::new(),
+            family_invites: GuildInvites::default(),
+            family_away: HashMap::new(),
             events: HashMap::new(),
             next_event: 1,
             avatar_banners: AvatarBanners::default(),
@@ -161,6 +170,7 @@ impl WorldDirectory {
                     let out = self.messengers.purge(now);
                     self.deliver(out);
                     self.purge_guild_away(now);
+                    self.purge_family_away(now);
                     self.run_party_searches(now);
                 }
                 _ = at(self.avatar_banners.until()) => {
@@ -293,6 +303,20 @@ impl WorldDirectory {
             } => self.guild_deny(from, &inviter, refusal),
             DirectoryMessage::GuildChanged { client_id } => {
                 self.tell(client_id, ServerMessage::GuildChanged)
+            }
+            DirectoryMessage::FamilyInvite { from, junior } => {
+                self.family_invite(from, junior, Instant::now())
+            }
+            DirectoryMessage::FamilyAnswer {
+                from,
+                inviter,
+                accept,
+            } => self.family_answer(from, inviter, accept, Instant::now()),
+            DirectoryMessage::FamilyChart { owner, chart } => self.send_family_chart(owner, chart),
+            DirectoryMessage::FamilyChanged { ids } => {
+                for id in ids {
+                    self.tell(id, ServerMessage::FamilyChanged);
+                }
             }
             DirectoryMessage::GuildDisbanded { guild_id } => {
                 self.guild_invites.forget_guild(guild_id)
@@ -580,6 +604,10 @@ impl WorldDirectory {
                 }
             }
         }
+        let back = self.family_away.remove(&client_id).is_some();
+        if previous.is_none() && !back {
+            self.tell_relatives(client_id, true);
+        }
     }
 
     fn unregister(&mut self, client_id: ClientId, connection_id: u64, changing_channel: bool) {
@@ -605,6 +633,7 @@ impl WorldDirectory {
                         self.tell_offline(client_id, away);
                     }
                 }
+                self.family_left(&entry, changing_channel);
                 let out = self
                     .messengers
                     .disconnected(client_id, changing_channel, Instant::now());
@@ -617,6 +646,7 @@ impl WorldDirectory {
             self.party_searches.stop(client_id);
             self.guild_invites.forget(client_id);
             self.alliance_invites.forget(client_id);
+            self.family_invites.forget(client_id);
             if let Some(party) = self.parties.of(client_id) {
                 self.send_party_update(party);
             }
@@ -1556,6 +1586,7 @@ mod tests {
             max_hp: 50,
             guild_id: None,
             alliance_id: None,
+            family: Default::default(),
         }
     }
 

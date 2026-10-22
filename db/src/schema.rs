@@ -518,6 +518,19 @@ diesel::table! {
 }
 diesel::joinable!(parcels -> characters (receiver_id));
 diesel::joinable!(parcel_equipment_stats -> parcels (parcel_id));
+diesel::table! {
+    family_members (character_id) {
+        character_id -> Int4,
+        senior_id -> Nullable<Int4>,
+        reputation -> Int4,
+        total_reputation -> Int4,
+        today_reputation -> Int4,
+        senior_reputation -> Int4,
+        #[max_length = 200]
+        precepts -> Varchar,
+    }
+}
+diesel::joinable!(family_members -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -553,4 +566,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     alliances,
     parcels,
     parcel_equipment_stats,
+    family_members,
 );

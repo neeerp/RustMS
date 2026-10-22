@@ -9,6 +9,7 @@ pub mod door;
 pub mod drop;
 pub mod effect;
 pub mod fame;
+pub mod family;
 pub mod field;
 pub mod guild;
 pub mod guild_bbs;

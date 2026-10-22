@@ -57,6 +57,14 @@ pub enum RecvOpcode {
     AllianceOperation = 0x8F,
     /// An alliance invitation declined, by the card or the client itself.
     DenyAllianceRequest = 0x90,
+    /// A character's Family Tree (report b039).
+    OpenFamilyPedigree = 0x91,
+    /// The Family window opened.
+    OpenFamily = 0x92,
+    /// Add Junior, by name.
+    AddFamily = 0x93,
+    /// An answer to a junior request (the card, or the client itself).
+    AcceptFamily = 0x96,
     /// The guild bulletin board (FUN_008166f6 and its siblings).
     GuildBbs = 0x9B,
     FaceExpression = 0x33,

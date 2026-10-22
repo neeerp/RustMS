@@ -24,6 +24,7 @@ pub mod buddy;
 pub mod cash_shop;
 pub mod character;
 pub mod fame;
+pub mod family;
 pub mod guild;
 pub mod guild_bbs;
 pub mod keybinding;
