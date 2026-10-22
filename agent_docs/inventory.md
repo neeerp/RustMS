@@ -327,7 +327,7 @@ Double-clicking a megaphone in the Cash tab opens its dialog
   nothing, and with no item asks first. It sends the line itself, refusing
   with "Other requests are in process." while a request is waiting.
 
-The item megaphone can't be opened in a shop or trade ("Not available").
+The item megaphone can't be opened while a dialog is open ("Not available").
 The gates are in `Util/Megaphones.h`.
 
 #### Avatar megaphones
@@ -394,7 +394,7 @@ the board stays until CHALKBOARD `id, 0`. The board follows the player to
 the next map, except to one where shops open, where it goes away with "You
 cannot use the chalkboard here.". Double-clicking a chalkboard in the Cash
 tab asks "Enter a note." (40 bytes; a blank note sends nothing), unless a
-mini room is open ("Not available") or shops open on the map ("You can't use
+dialog is open ("Not available") or shops open on the map ("You can't use
 it here in this map.").
 
 ### Teleport rocks
@@ -664,9 +664,18 @@ Vega's Start. It shows "Seal Released on" with a timed seal's date in the
 tooltip. When a timed seal's date passes, the expiry sweep lifts the seal
 and the date and re-sends the item.
 
-While the guard's window is open, no cash item can be used from a
-double-click ("Not available" in the chat). v83 also refuses chat and some inventory actions
-then; HeavenClient doesn't.
+### Dialogs that lock the game
+
+v83 keeps one "current dialog" (0xbe7910, set by the dialog base 0x4eddb3):
+a trade or personal shop, an NPC shop, storage, Duey, and the item
+megaphone's, Item Guard's, Karma's, the hammer's and Vega's windows, among
+those HeavenClient has (`UI::dialog_open`, report c013). While one is open,
+general chat says "You can't chat right now.", and trade invites, shop
+permits and the cash items that open a window or ask a question say "Not
+available": the item megaphone, meso sacks, AP and SP resets, the
+chalkboard, the Item Guard, Karma, the hammer and Vega. Other cash items (pet food,
+faces, weather, morphs, ...) are still used. A morph potion is refused
+silently. v83's silent drop, skill, sort and movement gates aren't ported.
 
 ### Scissors of Karma
 

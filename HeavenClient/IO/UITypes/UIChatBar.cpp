@@ -48,15 +48,6 @@ namespace ms
 {
 	namespace
 	{
-		// A shop or trade window is open (v83's mini-room, 0xbe7910).
-		bool mini_room_open()
-		{
-			auto shop = UI::get().get_element<UIPersonalShop>();
-			auto trade = UI::get().get_element<UITradingRoom>();
-
-			return (shop && shop->is_active()) || (trade && trade->is_active());
-		}
-
 		enum class WhisperParseResult
 		{
 			NotWhisper,
@@ -1314,9 +1305,9 @@ namespace ms
 				// No one to whisper to, as the player has been told.
 				break;
 			case Target::ALL:
-				// Not while a shop or trade is open, which has its own chat
+				// Not while a dialog is open; a shop or trade has its own chat
 				// (FUN_0052c315).
-				if (mini_room_open())
+				if (UI::get().dialog_open())
 					send_chatline("You can't chat right now.", LineType::SKILL);
 				else
 					GeneralChatPacket(message, false).dispatch();
