@@ -47,6 +47,9 @@ impl ClientActor {
             return Ok(());
         }
         let player = &self.in_game()?.player;
+        if npc_id == net::npc_scripts::TORY && player.stats.map_id == net::events::HPQ.lobby {
+            return self.talk_about_event(net::events::EventKind::Hpq).await;
+        }
         if let Some(script) = net::npc_scripts::NpcScript::for_npc(npc_id, player) {
             return self.start_script(script).await;
         }

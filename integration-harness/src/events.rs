@@ -1,5 +1,6 @@
-//! Helpers for party events (`tests/kpq*.rs`): a party gathered in Kerning
-//! City, NPC talk on the event's maps, and getting the party in.
+//! Helpers for party events (`tests/kpq*.rs`, `tests/hpq*.rs`): a party
+//! gathered in the event's lobby, NPC talk on the event's maps, and getting
+//! the party in.
 
 use crate::database::{grant_stack, set_job};
 use crate::preconditions::load_harness_config_or_fail;
@@ -7,7 +8,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::KPQ;
+use net::events::{HPQ, KPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -18,6 +19,9 @@ use tokio::time::Duration;
 pub const LAKELIS: i32 = 9020000;
 pub const CLOTO: i32 = 9020001;
 pub const NELLA: i32 = 9020002;
+pub const TORY: i32 = 1012112;
+pub const TOMMY: i32 = 1012113;
+pub const GROWLIE: i32 = 1012114;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -85,6 +89,12 @@ fn accept(party_id: i32) -> Packet {
 /// A new character at `level` holding `items` (Etc stacks, from slot 1),
 /// logged in and waiting in Kerning City.
 pub async fn in_lobby(level: i16, items: &[(i32, i16)]) -> WorldSession {
+    waiting_in(KPQ.lobby, level, items).await
+}
+
+/// A new character at `level`, holding `items` in their Etc tab, logged in
+/// and waiting on `lobby`.
+pub async fn waiting_in(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
@@ -96,8 +106,8 @@ pub async fn in_lobby(level: i16, items: &[(i32, i16)]) -> WorldSession {
     let mut session = relogin(&config).await;
     let mut trace = Trace::default();
     assert_eq!(
-        warp(&mut session.connection, KPQ.lobby, "", &mut trace).await,
-        KPQ.lobby
+        warp(&mut session.connection, lobby, "", &mut trace).await,
+        lobby
     );
     session
 }
@@ -141,6 +151,31 @@ pub async fn enter_kpq(team: &mut [WorldSession]) {
         let mut trace = seen.take().unwrap_or_default();
         until(&mut player.connection, &mut trace, |t| {
             t.warps.contains(&KPQ.entry)
+        })
+        .await;
+    }
+}
+
+/// The party's leader, first, takes it up to Primrose Hill, once the party
+/// before them is out, and everyone arrives there.
+pub async fn enter_hpq(team: &mut [WorldSession]) {
+    let name = team[0].character_name.clone();
+    let mut asked = false;
+    for _ in 0..5 {
+        step(&mut team[0].connection, &name, talk(HPQ.lobby, TORY)).await;
+        let trace = step(&mut team[0].connection, &name, answer(4, 1, Some(0))).await;
+        if trace.prompts == [(TORY, 1)] {
+            asked = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    assert!(asked, "Tory never let the party up");
+    let mut seen = Some(step(&mut team[0].connection, &name, answer(1, 1, None)).await);
+    for player in team.iter_mut() {
+        let mut trace = seen.take().unwrap_or_default();
+        until(&mut player.connection, &mut trace, |t| {
+            t.warps.contains(&HPQ.entry)
         })
         .await;
     }

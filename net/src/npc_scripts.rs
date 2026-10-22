@@ -48,6 +48,12 @@ pub const LAKELIS: i32 = 9020000;
 const NELLA: i32 = 9020002;
 /// Cloto, who sets each stage of Kerning City's party quest.
 pub const CLOTO: i32 = 9020001;
+/// Tory, who takes parties up to Primrose Hill from Henesys Park.
+pub const TORY: i32 = 1012112;
+/// Tommy, at Primrose Hill's way out.
+const TOMMY: i32 = 1012113;
+/// Growlie, the hungry one on Primrose Hill.
+const GROWLIE: i32 = 1012114;
 /// Jeff, at the way down from Ice Valley II.
 const JEFF: i32 = 2030000;
 /// Sharp Cliff I and its `under00` portal, the top of the dungeon below.
@@ -793,6 +799,12 @@ impl NpcScript {
         lakelis(entry)
     }
 
+    /// Tory's script in Henesys Park, for a player whose party may or may
+    /// not go up to Primrose Hill.
+    pub fn tory(entry: Entry) -> Self {
+        tory(entry)
+    }
+
     /// Cloto's script on the party quest's stages, for `player`, who
     /// stands with her as `view`. A leader answering a puzzle gets
     /// `cloto_answer` instead.
@@ -900,6 +912,8 @@ impl NpcScript {
             CRANE => crane(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
+            GROWLIE => growlie(player),
+            TOMMY => tommy(player),
             JEFF => Some(jeff(player)),
             TIME_GATE => Some(time_gate(player)),
             SHANE => Some(shane(player)),
@@ -1853,6 +1867,94 @@ fn kpq_terms() -> String {
             ("high", &levels.end().to_string()),
         ],
     )
+}
+
+/// Tory (Cosmic `1012112`): the party's leader may take the party up to
+/// Primrose Hill, and anyone may hear how it is played.
+fn tory(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::HPQ_TORY_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::HPQ_TORY_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(hpq_terms(keys::HPQ_TORY_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::HPQ_TORY_BUSY)),
+        Entry::Ready => Page::Ask {
+            text: text(keys::HPQ_TORY_ASK),
+            on_yes: vec![Effect::StartEvent(EventKind::Hpq)],
+            on_no: Some(text(keys::HPQ_TORY_DECLINE)),
+        },
+    };
+    let about = keys::HPQ_TORY_ABOUT_PAGES
+        .iter()
+        .map(|&key| Page::Say(text(key)))
+        .collect();
+    let mut script = NpcScript::new(
+        TORY,
+        vec![Page::Menu {
+            text: hpq_terms(keys::HPQ_TORY_MENU),
+            choices: vec![
+                (text(keys::HPQ_TORY_ENTER), vec![enter]),
+                (text(keys::HPQ_TORY_ABOUT), about),
+            ],
+        }],
+    );
+    // Someone left or moved since she checked, or another party went up.
+    script.refused = Some(hpq_terms(keys::HPQ_TORY_NOT_ELIGIBLE));
+    script
+}
+
+/// `key`, with who may play Henesys's party quest.
+fn hpq_terms(key: &str) -> String {
+    let (team, levels) = (&events::HPQ.team, &events::HPQ.levels);
+    content::text().get(
+        key,
+        &[
+            ("least", &team.start().to_string()),
+            ("most", &team.end().to_string()),
+            ("low", &levels.start().to_string()),
+        ],
+    )
+}
+
+/// Growlie (Cosmic `1012114`) on Primrose Hill: what the place is, and the
+/// way out.
+fn growlie(player: &Player) -> Option<NpcScript> {
+    if !events::HPQ.holds(player.stats.map_id) {
+        return None;
+    }
+    let about = keys::HPQ_GROWLIE_ABOUT_PAGES
+        .iter()
+        .map(|&key| Page::Say(text(key)))
+        .collect();
+    let leave = vec![Page::Ask {
+        text: text(keys::HPQ_GROWLIE_LEAVE_ASK),
+        on_yes: vec![Effect::Warp(events::HPQ.exit)],
+        on_no: Some(text(keys::HPQ_GROWLIE_STAY)),
+    }];
+    Some(NpcScript::new(
+        GROWLIE,
+        vec![Page::Menu {
+            text: text(keys::HPQ_GROWLIE_MENU),
+            choices: vec![
+                (text(keys::HPQ_GROWLIE_ABOUT), about),
+                (text(keys::HPQ_GROWLIE_LEAVE), leave),
+            ],
+        }],
+    ))
+}
+
+/// Tommy (Cosmic `1012113`) at Primrose Hill's way out sends players back
+/// to Henesys Park.
+fn tommy(player: &Player) -> Option<NpcScript> {
+    (player.stats.map_id == events::HPQ.exit).then(|| {
+        NpcScript::new(
+            TOMMY,
+            vec![Page::Ask {
+                text: text(keys::HPQ_TOMMY_HOME),
+                on_yes: vec![Effect::Warp(events::HPQ.lobby)],
+                on_no: None,
+            }],
+        )
+    })
 }
 
 /// Cloto (Cosmic `9020001`). On stage 1 each member but the leader is
@@ -4414,6 +4516,57 @@ mod tests {
                 .effects
                 .is_empty());
         }
+    }
+
+    #[test]
+    fn tory_takes_a_ready_party_up_and_tells_anyone_how_it_is_played() {
+        let mut ready = NpcScript::tory(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let ask = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        assert_eq!(
+            ready.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::StartEvent(EventKind::Hpq)]
+        );
+        for entry in [
+            Entry::NoParty,
+            Entry::NotLeader,
+            Entry::NotEligible,
+            Entry::Busy,
+        ] {
+            let mut tory = NpcScript::tory(entry);
+            tory.begin();
+            let said = tory.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(kind(&said), Some(0));
+            assert!(tory.respond(ScriptInput::Next).unwrap().effects.is_empty());
+        }
+        // How it is played: three pages, whatever the party.
+        let mut tory = NpcScript::tory(Entry::NoParty);
+        tory.begin();
+        tory.respond(ScriptInput::Select(1)).unwrap();
+        tory.respond(ScriptInput::Next).unwrap();
+        let last = tory.respond(ScriptInput::Next).unwrap();
+        assert!(last.prompt.is_some());
+        assert!(tory.respond(ScriptInput::Next).unwrap().prompt.is_none());
+    }
+
+    #[test]
+    fn growlie_and_tommy_let_players_off_primrose_hill_then_home() {
+        let mut growlie = NpcScript::for_npc(GROWLIE, &rider(100, 0, 910010000)).unwrap();
+        assert_eq!(kind(&growlie.begin()), Some(4));
+        growlie.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(
+            growlie.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(910010300)]
+        );
+        let mut tommy = NpcScript::for_npc(TOMMY, &rider(100, 0, 910010300)).unwrap();
+        assert_eq!(kind(&tommy.begin()), Some(1));
+        assert_eq!(
+            tommy.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(100000200)]
+        );
+        assert_eq!(NpcScript::for_npc(GROWLIE, &rider(100, 0, 100000200)), None);
+        assert_eq!(NpcScript::for_npc(TOMMY, &rider(100, 0, 910010000)), None);
     }
 
     #[test]
