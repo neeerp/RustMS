@@ -80,10 +80,6 @@ const WEDDING_HALL_ENTRANCE: i32 = 106021401;
 const SECRET_BASEMENT_PATH: i32 = 261030000;
 const ZENUMIST_HALLWAY: i32 = 261010000;
 const VERIFYING_THE_PASSWORD: i16 = 3360;
-/// The Forest of Evil's hidden way into the Cursed Forest (`curseforest`),
-/// open at night to players on Arwen's quests: Rage, Resentment, and
-/// Revenge (2224) or Arwen's Apology (2226) taken, or Defeat Faust (2227)
-/// done, after which the forest is the one Faust has left.
 /// Rien's way out to the Dangerous Forest (`rienTutor8`). While an Aran
 /// beginner is on Basic Fitness Training 1-3 (21015-21017), it keeps them in
 /// town, saying which way their training lies.
@@ -94,6 +90,10 @@ const FITNESS_TRAINING: [(i16, &str); 3] = [
     (21016, keys::RIEN_TUTOR_FITNESS_2),
     (21017, keys::RIEN_TUTOR_FITNESS_3),
 ];
+/// The Forest of Evil's hidden way into the Cursed Forest (`curseforest`),
+/// open at night to players on Arwen's quests: Rage, Resentment, and
+/// Revenge (2224) or Arwen's Apology (2226) taken, or Defeat Faust (2227)
+/// done, after which the forest is the one Faust has left.
 const CURSED_FOREST: i32 = 910100000;
 const CURSED_FOREST_AFTER_FAUST: i32 = 910100001;
 const DEFEAT_FAUST: i16 = 2227;
@@ -502,6 +502,8 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 )),
             }
         }
+        // The hour of the route clock, which RUSTMS_CONTI_SCALE speeds up
+        // as it does the stations' clocks.
         "curseforest" => {
             let hour = crate::conti::time_of_day(crate::conti::now()).0;
             cursed_forest(player, hour)
@@ -958,17 +960,21 @@ mod tests {
     fn rien_keeps_an_aran_in_training_in_town() {
         let forest = || Some(through(Effect::WarpToPortal(DANGEROUS_FOREST, 2)));
         assert_eq!(portal("rienTutor8", &player_with(&[])), forest());
+        let mut lines = std::collections::HashSet::new();
         for (quest, _) in FITNESS_TRAINING {
             let mut player = player_with(&[(quest, QuestState::Started)]);
             // Only an Aran beginner is held back.
             assert_eq!(portal("rienTutor8", &player), forest());
             player.stats.job = ARAN_BEGINNER;
             let held = portal("rienTutor8", &player).unwrap();
-            assert!(
-                matches!(held.effects.as_slice(), [Effect::InfoText(text)] if !text.is_empty()),
-                "{held:?}"
-            );
+            let [Effect::InfoText(text)] = held.effects.as_slice() else {
+                panic!("{held:?}");
+            };
+            assert!(!text.is_empty());
+            lines.insert(text.clone());
         }
+        // Each training names its own quarry.
+        assert_eq!(lines.len(), 3);
         let mut done = player_with(&[(21015, QuestState::Completed)]);
         done.stats.job = ARAN_BEGINNER;
         assert_eq!(portal("rienTutor8", &done), forest());
