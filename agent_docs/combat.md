@@ -158,7 +158,9 @@ star, arrow or bullet `incPAD`, and a weaponless pirate's 10 + 0.7 a level, at
 most 31). Criticals raise every cap by their bonus over
 100%: the weapon's critical skill (Critical Shot and Critical Throw with
 their Cygnus twins, and Critical Punch), Sharp Eyes's low byte as sent, and
-Stun Mastery. An attack naming a skill needs that skill learned at some level; its `Skill.nx`
+Stun Mastery. An attack naming a skill needs that skill learned at some level (a GM
+skill, 900 or 910, also needs a GM account: Super Dragon Roar is ten times a
+blow on up to 15 mobs); its `Skill.nx`
 level (`game_data::skills::SkillLevel`) gives the mobs allowed, the hits (a
 shot's `bulletCount`, otherwise `attackCount`), the MP spent, and the cap: a
 `fixdamage` skill (Three Snails: 10/25/40) hits for at most that, a `mad`
