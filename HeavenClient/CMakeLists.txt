@@ -469,6 +469,8 @@ add_executable(HeavenClient
     Character/MedalTag.cpp
     Character/MedalTag.h
     Character/MedalTagLayout.h
+    Character/StyledTag.cpp
+    Character/StyledTag.h
     Character/CharEffect.cpp
     Character/CharEffect.h
     Character/ItemEffect.cpp

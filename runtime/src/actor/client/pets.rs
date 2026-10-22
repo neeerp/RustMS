@@ -22,7 +22,8 @@ pub(super) const PET_HUNGER_INTERVAL: Duration = Duration::from_secs(180);
 impl ClientActor {
     /// The player summoned, sent back or renamed pets: show everyone on the
     /// map, and keep the field avatar for those who arrive later. The owner
-    /// reads why those sent back went.
+    /// reads why those sent back went. Pets that moved down the list wear
+    /// another index's label slot, so everyone reads their name tags again.
     pub(super) async fn pets_changed(
         &mut self,
         changes: Vec<PetChange>,
@@ -33,12 +34,15 @@ impl ClientActor {
         let avatar = game.player.field_avatar(x, y, 0);
         let mut announce = Vec::new();
         let mut own = Vec::new();
+        let mut shifted = None;
+        let mut summoned = Vec::new();
         for change in changes {
             match change {
                 PetChange::Summoned { index, serial } => {
                     let Some(pet) = avatar.pets.iter().find(|pet| pet.serial == serial) else {
                         continue;
                     };
+                    summoned.push(serial);
                     let packet = build_spawn_pet(avatar.id, index, pet)?;
                     own.push(packet.clone());
                     own.push(build_pet_exception_list(
@@ -50,6 +54,7 @@ impl ClientActor {
                     announce.push(packet);
                 }
                 PetChange::Dismissed { index } => {
+                    shifted = Some(shifted.map_or(index, |first: u8| first.min(index)));
                     let packet = build_remove_pet(avatar.id, index, why)?;
                     own.push(packet.clone());
                     announce.push(packet);
@@ -58,11 +63,22 @@ impl ClientActor {
                     let Some(pet) = avatar.pets.get(usize::from(index)) else {
                         continue;
                     };
-                    let packet = build_pet_name(avatar.id, index, &pet.name)?;
+                    let packet = build_pet_name(avatar.id, index, &pet.name, pet.name_tag)?;
                     own.push(packet.clone());
                     announce.push(packet);
                 }
             }
+        }
+        let shifted = avatar
+            .pets
+            .iter()
+            .enumerate()
+            .skip(shifted.map_or(avatar.pets.len(), usize::from))
+            .filter(|(_, pet)| !summoned.contains(&pet.serial));
+        for (index, pet) in shifted {
+            let packet = build_pet_name(avatar.id, index as u8, &pet.name, pet.name_tag)?;
+            own.push(packet.clone());
+            announce.push(packet);
         }
         self.send_all(&mut own).await?;
         self.send_to_field(FieldMessage::UpdateAvatar {

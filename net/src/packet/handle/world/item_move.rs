@@ -5,6 +5,7 @@ use crate::items;
 use crate::loot::Loot;
 use crate::packet::build::world::{inventory, stat};
 use game::inventory::{equip_slot, FLAG_UNTRADEABLE};
+use game::pet::PetChange;
 use game::{InventoryType, Item, Player};
 use game_data::items::EquipInfo;
 use packet::{io::read::PktRead, Packet};
@@ -58,6 +59,21 @@ impl WorldHandler for ItemMoveHandler {
                     // Taking off equipment that raised max HP or MP.
                     if ctx.player.fit_hp_mp() {
                         actions = actions.with_reply(stat::build_hp_mp(&ctx.player.stats)?);
+                    }
+                    // A pet out with its label ring put on or taken off
+                    // changes its name tag for everyone (PET_NAMECHANGE).
+                    let renamed: Vec<PetChange> = [from, to]
+                        .into_iter()
+                        .filter_map(|slot| {
+                            let index = equip_slot::PET_LABELS
+                                .iter()
+                                .position(|&label| label == slot % 100)?;
+                            ctx.player.summoned_pet(index)?;
+                            Some(PetChange::Renamed { index: index as u8 })
+                        })
+                        .collect();
+                    if !renamed.is_empty() {
+                        actions = actions.with(WorldAction::PetsChanged(renamed));
                     }
                 }
             }
@@ -534,8 +550,34 @@ mod tests {
     }
 
     fn worn(actions: &[WorldAction]) -> bool {
-        matches!(actions, [WorldAction::Reply(p), WorldAction::LookChanged(_)]
+        matches!(actions, [WorldAction::Reply(p), WorldAction::LookChanged(_), ..]
             if p.opcode() == SendOpcode::InventoryOperation as i16)
+    }
+
+    #[test]
+    fn a_label_ring_shows_its_pets_name_tag() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = pet_owner(&[1822000]);
+        let renamed = |actions: &[WorldAction]| {
+            actions.iter().any(|action| {
+                matches!(action, WorldAction::PetsChanged(changes)
+                    if changes[..] == [PetChange::Renamed { index: 1 }])
+            })
+        };
+        let tagged = |player: &Player| {
+            let avatar = player.field_avatar(0, 0, 0);
+            avatar
+                .pets
+                .iter()
+                .map(|pet| pet.name_tag)
+                .collect::<Vec<_>>()
+        };
+        assert!(renamed(&handle(&mut player, request(1, 1, -131))));
+        assert_eq!(tagged(&player), [false, true]);
+        assert!(renamed(&handle(&mut player, request(-1, -131, 1))));
+        assert_eq!(tagged(&player), [false, false]);
     }
 
     #[test]

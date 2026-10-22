@@ -89,6 +89,10 @@ pub mod equip_slot {
     pub const MEDAL: i16 = -49;
     /// Where each summoned pet's clothes (180xxxx) are worn, in list order.
     pub const PET_CLOTHES: [i16; 3] = [-14, -30, -38];
+    /// Where each summoned pet's label ring (182xxxx) and quote ring
+    /// (183xxxx) are worn, in list order.
+    pub const PET_LABELS: [i16; 3] = [-21, -31, -39];
+    pub const PET_QUOTES: [i16; 3] = [-29, -32, -40];
     pub const BELT: i16 = -50;
 
     /// The regular slot an equip id is worn in, from its id range. Rings

@@ -1,9 +1,6 @@
 #pragma once
 
-#include "MedalTagLayout.h"
-
-#include "../Graphics/Text.h"
-#include "../Graphics/Texture.h"
+#include "StyledTag.h"
 
 namespace ms
 {
@@ -25,11 +22,6 @@ namespace ms
 
 	private:
 		int32_t itemid;
-		bool shown;
-		bool art;
-		Texture left, tile, right;
-		MedalTagLayout::Layout layout;
-		Text text;
-		Color color;
+		StyledTag tag;
 	};
 }

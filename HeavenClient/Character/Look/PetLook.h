@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "../Pets.h"
+#include "../StyledTag.h"
 
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Text.h"
@@ -126,8 +127,13 @@ namespace ms
 
 		const PhysicsObject &get_phobj() const;
 
-		// PET_NAMECHANGE (172): the pet answers to its new name.
-		void set_name(const std::string &name);
+		// PET_NAMECHANGE (172): the pet answers to its new name, and shows
+		// its kind's name tag if `name_tag`.
+		void set_name(const std::string &name, bool name_tag);
+
+		// Its owner's client shows its kind's name tag while a label ring
+		// is worn for it (FUN_00705e2c).
+		void set_name_tag(bool name_tag);
 
 		// Dress it in the clothes `wear` (180xxxx) its owner's look gives
 		// its place in the list, or none for 0 (FUN_00703d15).
@@ -152,6 +158,10 @@ namespace ms
 		// once it moves, and now and then act on its own.
 		void update_acting(Point<int16_t> before);
 
+		// Its name tag: its kind's style (info/nameTag) when shown, else
+		// the plain box (FUN_005f0334 type 0x3eb).
+		void build_name_tag();
+
 		// Draw the clothes' frame for the one `animation` shows.
 		void draw_dressing(const std::vector<Texture> &textures, const Animation &animation, const DrawArgument &args,
 						   float alpha) const;
@@ -167,7 +177,8 @@ namespace ms
 
 		EnumMap<Stance, Animation> animations;
 		PhysicsObject phobj;
-		Text namelabel;
+		bool name_tag;
+		StyledTag nametag;
 
 		// The owner's: the path not yet sent.
 		move_path::Recorder recorder;

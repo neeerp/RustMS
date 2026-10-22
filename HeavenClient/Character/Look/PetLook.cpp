@@ -23,6 +23,7 @@
 #include "../../Audio/Audio.h"
 #include "../../Data/PetData.h"
 #include "../../Util/Misc.h"
+#include "../../Util/NxFiles.h"
 #include "../../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
@@ -98,6 +99,7 @@ namespace ms
 
 	PetLook::PetLook(const PetEntry &entry, bool lc) : itemid(entry.itemid), name(entry.name), serial(entry.serial),
 													   local(lc), stance(Stance::STAND), flip(false),
+													   name_tag(entry.name_tag),
 													   shown({ static_cast<double>(entry.position.x()),
 															   static_cast<double>(entry.position.y()), 0.0, 0.0,
 															   entry.fh, entry.stance }),
@@ -106,9 +108,7 @@ namespace ms
 		set_position(entry.position.x(), entry.position.y());
 		set_stance(entry.stance);
 		recorder.reset(Movement(phobj, get_stancebyte()));
-
-		namelabel = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG,
-						 name);
+		build_name_tag();
 
 		std::string strid = std::to_string(itemid);
 		nl::node src = nl::nx::item["Pet"][strid + ".img"];
@@ -122,8 +122,8 @@ namespace ms
 	}
 
 	PetLook::PetLook() : itemid(0), serial(0), local(false), stance(Stance::STAND), flip(false),
-						 shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), wear(0), effecting(false), pending(false),
-						 still(0)
+						 name_tag(false), shown({ 0.0, 0.0, 0.0, 0.0, 0, 0 }), action(-1), wear(0), effecting(false),
+						 pending(false), still(0)
 	{}
 
 	void PetLook::draw(double viewx, double viewy, float alpha) const
@@ -144,7 +144,8 @@ namespace ms
 		if (effecting)
 			effect.draw(DrawArgument(absp), alpha);
 
-		namelabel.draw(absp);
+		// The tag's top is 2 px under the pet's feet (origin cy -2, 0x5f1654).
+		nametag.draw(absp + Point<int16_t>(0, 2));
 		balloon.draw(absp - Point<int16_t>(0, animations[Stance::STAND].get_origin().y()));
 	}
 
@@ -516,10 +517,35 @@ namespace ms
 		return phobj;
 	}
 
-	void PetLook::set_name(const std::string &n)
+	void PetLook::set_name(const std::string &n, bool tagged)
 	{
 		name = n;
-		namelabel.change_text(name);
+		name_tag = tagged;
+		build_name_tag();
+	}
+
+	void PetLook::set_name_tag(bool tagged)
+	{
+		if (name_tag == tagged)
+			return;
+
+		name_tag = tagged;
+		build_name_tag();
+	}
+
+	void PetLook::build_name_tag()
+	{
+		int64_t style = name_tag
+			? nl::nx::item["Pet"][std::to_string(itemid) + ".img"]["info"]["nameTag"].get_integer()
+			: 0;
+		std::string path = std::to_string(style);
+		nl::node art = NxFiles::ui_classic["NameTag.img"]["pet"][path];
+
+		// Style 42 is only in the newer UI.
+		if (!art)
+			art = nl::nx::ui["NameTag.img"]["pet"][path];
+
+		nametag = StyledTag(art, name);
 	}
 
 	void PetLook::set_ignored(std::vector<int32_t> ids)

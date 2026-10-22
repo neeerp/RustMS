@@ -385,6 +385,8 @@ mod tests {
             y: 275,
             stance: 0,
             foothold: 0,
+            name_tag: false,
+            chat_balloon: false,
         };
         avatar.pets = vec![
             pet(5000066, "Baby Tiger", 77),
