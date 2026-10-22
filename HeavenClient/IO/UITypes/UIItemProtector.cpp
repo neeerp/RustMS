@@ -247,7 +247,7 @@ namespace ms
 				return;
 			}
 
-			if (player.request(UseItemGuardPacket(slot, item_id, tab, target_slot), ExclRequest::WAIT))
+			if (player.request(UseOnItemPacket(slot, item_id, tab, target_slot), ExclRequest::WAIT))
 				Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
 
 			if (auto protector = UI::get().get_element<UIItemProtector>())

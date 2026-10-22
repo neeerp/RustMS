@@ -190,6 +190,7 @@ namespace ms
 			case Tooltip::Parent::VICIOUSHAMMER:
 			case Tooltip::Parent::VEGASPELL:
 			case Tooltip::Parent::ITEMPROTECTOR:
+			case Tooltip::Parent::KARMASCISSORS:
 			case Tooltip::Parent::VEGARESULT:
 				invtype = InventoryType::Id::EQUIP;
 				break;

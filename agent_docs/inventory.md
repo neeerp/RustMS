@@ -664,6 +664,34 @@ While the guard's window is open, no cash item can be used from a
 double-click ("Not available" in the chat). v83 also refuses chat and some inventory actions
 then; HeavenClient doesn't.
 
+### Scissors of Karma
+
+The Scissors of Karma (5520000) let an untradeable item change hands once
+(report c010). Only items with Item.nx or Character.nx `info/tradeAvailable`
+(read into `ItemInfo.trade_available`) can be cut: 148 equips and a few
+skill books (2280004-10, 2280013-16). Cutting sets the item's Karma flag
+(0x10 on equipment, 0x02 on other items). A trade, a personal shop sale, a
+drop, a Duey parcel or taking it out of storage then uses it up
+(`Item::use_karma`), and equipment becomes untradeable again.
+
+Double-clicking the scissors in the Cash tab opens their window
+(`UIKarmaScissors`, v83 `UIWindow.img/KarmaScissors`). An item dragged in
+from the Item window is checked in v83's order: a sealed one gets "You must
+break the seal first.", one without `tradeAvailable` "This item cannot be
+used.", and one already cut "This item has already been unlocked."
+(`Character/Inventory/KarmaScissors.h`). Otherwise it stays in the window,
+its icon drawn and its tooltip shown on hover. OK sends USE_CASH_ITEM with
+the item's tab and slot, like an Item Guard, plays the cash item sound,
+prints "You have used the Scissors of Karma, so 1 time of trading has been
+enabled." and closes the window; OK with nothing in it does nothing. Unlike
+v83, OK checks again that the scissors and the same item are still in
+place. The server (`world/karma.rs`) refuses the same items, and also an
+equip bound by a past trade or by wearing it (`FLAG_UNTRADEABLE`), which is
+our choice; HeavenClient refuses that one too ("This item cannot be
+used."), where v83 would take it. The server then takes the scissors and
+re-sends the item, or only unlocks the client. The Item Guards' lock-out
+also covers this window.
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being
@@ -1113,7 +1141,9 @@ while playing, and finds a worn cape that expired offline gone at login.
 seal running out; `item_guard` (integration) seals an equip for a week,
 extends it, makes it lasting and is refused its drop, then has a timed seal
 run out at login, and the client's `item_guard` test covers the checks and
-the questions.
+the questions. `net`'s karma handler covers what the scissors cut and
+refuse; `karma` (integration) cuts an equip, is refused a second cut, and
+finds the flag saved; the client's `karma_scissors` test covers the checks.
 `net::shop` covers buying, selling, recharging, and their refusals, and
 `npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,

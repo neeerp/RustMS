@@ -278,6 +278,11 @@ impl Item {
         self.flags & self.karma_flag() != 0
     }
 
+    /// Let the item change hands once more (the Scissors of Karma).
+    pub fn give_karma(&mut self) {
+        self.flags |= self.karma_flag();
+    }
+
     /// Use up the item's Karma as it changes hands. Equipment can't change
     /// hands again; other items go back to what their data says.
     pub fn use_karma(&mut self) {

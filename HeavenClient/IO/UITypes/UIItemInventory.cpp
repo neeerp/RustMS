@@ -22,6 +22,7 @@
 #include "UIChatBar.h"
 #include "UIItemMegaphone.h"
 #include "UIItemProtector.h"
+#include "UIKarmaScissors.h"
 #include "UIMemoSend.h"
 #include "UIMegaphone.h"
 #include "UINotice.h"
@@ -596,13 +597,20 @@ namespace ms
 			UI::get().emplace<UIItemProtector>(slot, item_id, days);
 		}
 
-		// v83 0x4f00ab: no cash item is used while the guard's window is
-		// open.
+		void use_karma_scissors(int16_t slot, int32_t item_id)
+		{
+			if (may_use_cash_item())
+				UI::get().emplace<UIKarmaScissors>(slot, item_id);
+		}
+
+		// v83 0x4f00ab: no cash item is used while the guard's or the
+		// scissors' window is open.
 		bool guard_open()
 		{
 			auto protector = UI::get().get_element<UIItemProtector>();
+			auto scissors = UI::get().get_element<UIKarmaScissors>();
 
-			if (!protector || !protector->is_active())
+			if ((!protector || !protector->is_active()) && (!scissors || !scissors->is_active()))
 				return false;
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -1225,6 +1233,8 @@ namespace ms
 							use_vega_spell(slot, item_id);
 						else if (item_guard::is_guard(item_id))
 							use_item_guard(slot, item_id);
+						else if (item_id == karma_scissors::KARMA_SCISSORS)
+							use_karma_scissors(slot, item_id);
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
 						else if (item_id / 10000 == 518)
