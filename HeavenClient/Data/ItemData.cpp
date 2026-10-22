@@ -29,6 +29,7 @@ namespace ms
 		cashitem = false;
 		questitem = false;
 		pickupblock = false;
+		reward = false;
 		gender = 0;
 
 		nl::node src;
@@ -50,6 +51,7 @@ namespace ms
 			case 2:
 				category = "Consume";
 				src = nl::nx::item["Consume"][strprefix + ".img"][strid]["info"];
+				reward = nl::nx::item["Consume"][strprefix + ".img"][strid]["reward"].size() > 0;
 				strsrc = nl::nx::string["Consume.img"][std::to_string(itemid)];
 				break;
 			case 3:
@@ -74,6 +76,7 @@ namespace ms
 
 				category = "Cash";
 				src = nl::nx::item["Cash"][strprefix + ".img"][strid]["info"];
+				reward = nl::nx::item["Cash"][strprefix + ".img"][strid]["reward"].size() > 0;
 				strsrc = nl::nx::string["Cash.img"][std::to_string(itemid)];
 				break;
 			case 9:
@@ -212,6 +215,11 @@ namespace ms
 	bool ItemData::is_pickup_blocked() const
 	{
 		return pickupblock;
+	}
+
+	bool ItemData::has_reward() const
+	{
+		return reward;
 	}
 
 	const item_properties::Info &ItemData::get_properties() const

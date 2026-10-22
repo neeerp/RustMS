@@ -56,6 +56,10 @@ namespace ms
 		// with the invisible items party quests drop (FUN_005d5224).
 		bool is_pickup_blocked() const;
 
+		// Returns whether the item has a `reward` node beside its info, as
+		// the boxes the server opens into one of its entries (0x4f2ed6).
+		bool has_reward() const;
+
 		// What its info node says for the orange lines under its name in a tooltip.
 		const item_properties::Info &get_properties() const;
 
@@ -116,6 +120,7 @@ namespace ms
 		bool cashitem;
 		bool questitem;
 		bool pickupblock;
+		bool reward;
 		item_properties::Info properties;
 		item_expiry::PetLife pet_life;
 	};

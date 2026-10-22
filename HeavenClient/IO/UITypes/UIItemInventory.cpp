@@ -1275,6 +1275,10 @@ namespace ms
 						if (inventory.is_sealed(tab, slot))
 							UI::get().emplace<UIOk>(item_drop::SEALED, [](bool)
 							{});
+						// v83 0x4f0372: a box with a `reward` node goes to the
+						// server before any other kind of USE item is tried.
+						else if (ItemData::get(item_id).has_reward())
+							Stage::get().get_player().request(UseItemRewardPacket(slot, item_id), ExclRequest::USE_WAIT);
 						else if (item_id / 10000 == 203)
 							use_return_scroll(slot, item_id);
 						else if (item_id / 10000 == 210)
