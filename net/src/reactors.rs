@@ -2,6 +2,7 @@
 
 use crate::load::{self, asset_path};
 use game_data::reactors::{ReactorData, ReactorTemplate};
+use game_data::server_content::keys;
 use std::sync::OnceLock;
 
 pub fn data() -> Result<&'static ReactorData, &'static str> {
@@ -31,6 +32,9 @@ pub enum Action {
     /// Drop its loot `percent` times in a hundred, else send whoever broke
     /// it away.
     DropsOrWarp { percent: u32, warp: Warp },
+    /// Send everyone on its map away, with a pink line (the text key
+    /// `notice`) first.
+    WarpMap { warp: Warp, notice: &'static str },
     /// A moonflower on Henesys's Primrose Hill, which blooms on its seed:
     /// it stays in bloom, the map's full moon (`FULL_MOON`) waxes a phase,
     /// and once every moonflower there blooms the Moon Bunny comes out below
@@ -56,6 +60,7 @@ impl Warp {
 
 const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
+const LPQ_TRAP_ROOM: i32 = 922010201;
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
@@ -75,6 +80,11 @@ pub fn action(reactor_id: i32) -> Action {
         2401001 => Action::BringOut(9300089),
         2401002 => Action::BringOut(9300090),
         9108000..=9108005 => Action::Bloom,
+        // Ludibrium's stage 2 trap box (`go922010201`).
+        2200002 => Action::WarpMap {
+            warp: Warp(LPQ_TRAP_ROOM, "sp"),
+            notice: keys::LPQ_NOTICE_TRAP,
+        },
         _ => Action::Drops,
     }
 }
@@ -119,11 +129,16 @@ mod tests {
             panic!("{:?}", action(1050000));
         };
         assert_eq!(action(1052000), Action::Drops);
+        let Action::WarpMap { warp: trap, .. } = action(2200002) else {
+            panic!("{:?}", action(2200002));
+        };
+        assert_eq!(action(2202003), Action::Drops);
         if crate::game_data::get().is_err() {
             return;
         }
         assert_eq!(Warp(HITMAN_HIDEOUT, "pt02").to(), (HITMAN_HIDEOUT, 3));
         assert_eq!(warp.to(), (105090200, 0));
+        assert_eq!(trap.to(), (LPQ_TRAP_ROOM, 0));
         assert!(shuffled(BERSERK_ROOM) && !shuffled(HITMAN_HIDEOUT));
     }
 }

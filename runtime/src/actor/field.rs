@@ -2373,6 +2373,22 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id) => {
                 self.board(mob_id, 1, (view.x, view.y.saturating_sub(10)));
             }
+            // Everyone here is told, then goes (Cosmic `warpMap`).
+            reactors::Action::WarpMap { notice, .. } => {
+                let notice = net::content::text().get(notice, &[]);
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+                for occupant in self.occupants.values() {
+                    occupant.handle.send(ServerMessage::ReactorBroken {
+                        field: self.key,
+                        reactor_id: view.reactor_id,
+                        object_id: view.object_id,
+                        x: view.x,
+                        y: view.y,
+                    });
+                }
+            }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here.

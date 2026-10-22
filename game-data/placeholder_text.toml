@@ -282,6 +282,7 @@
 "lpq.balloon.short" = "[placeholder] You don't have all {n} #b#t{item}##k yet. Come back when you do."
 "lpq.balloon.done" = "[placeholder] Well done! You have cleared this stage."
 "lpq.balloon.hurry" = "[placeholder] The way on is open. Hurry to the next stage!"
+"lpq.notice.trap" = "[placeholder] A strange force pulls everyone here into a trap!"
 "lpq.balloon.s6" = "[placeholder] Somewhere in this room is a path of doors that leads on. Find the right one."
 "hpq.moon.bunny_out" = "[placeholder] The moon is full and the Moon Bunny is out. Guard it!"
 "hpq.moon.weather" = "[placeholder] Guard the Moon Bunny as it pounds rice cakes, and bring Growlie 10 of them."
