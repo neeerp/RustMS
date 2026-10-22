@@ -13,7 +13,9 @@
 //! The stages cleared are shared with the tickets, so a member's client
 //! actor can tell at once whether a stage's way on is open. Clearing the
 //! last stage wins the event: its clock stops, the next party may start
-//! their own, and it goes on until the last member leaves its maps.
+//! their own, the team goes to the event's clear map if it has one, and it
+//! goes on until the last member leaves its maps. A won event's leader may
+//! take the team to its bonus, which runs on a clock of its own.
 
 use crate::actor::registry::FieldRegistry;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
@@ -87,7 +89,11 @@ pub struct EventHandle {
 pub struct EventTicket {
     pub id: u32,
     pub kind: EventKind,
-    pub ends: Instant,
+    /// When the time shown on the event's maps runs out; none once it is
+    /// won, until a bonus starts.
+    pub clock: Option<Instant>,
+    /// Whether the member leads the team.
+    pub leader: bool,
     member: ClientId,
     event: EventHandle,
     cleared: Arc<Cleared>,
@@ -190,6 +196,7 @@ pub fn spawn(
         cleared: Arc::default(),
         directory: directory.clone(),
         failed: false,
+        bonus_taken: false,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -239,6 +246,8 @@ struct EventActor {
     directory: mpsc::Sender<DirectoryMessage>,
     /// The party lost what it protected, which ends the event.
     failed: bool,
+    /// The leader took the team to the bonus.
+    bonus_taken: bool,
 }
 
 impl EventActor {
@@ -251,7 +260,8 @@ impl EventActor {
                 member.send(ServerMessage::EventStarted(EventTicket {
                     id,
                     kind,
-                    ends,
+                    clock: Some(ends),
+                    leader: member.client_id == self.team.leader(),
                     member: member.client_id,
                     event: event.clone(),
                     cleared: self.cleared.clone(),
@@ -273,7 +283,7 @@ impl EventActor {
                     }
                     None => over = true,
                 },
-                _ = until(ends) => over = true,
+                _ = until(ends) => over = self.time_up(),
             }
         }
         info!(?kind, id, "Event ended");
@@ -323,8 +333,13 @@ impl EventActor {
         let leader = client_id == self.team.leader();
         let event = self.kind.event();
         let puzzles = &event.puzzles;
+        let won = self.cleared.has(event.last_stage());
         match command {
             EventCommand::PassGiven => self.stage1.pass_given(client_id),
+            // Before stage 1's, for an event with only one.
+            EventCommand::ClearStage(stage) if leader && stage == event.last_stage() => {
+                self.win();
+            }
             EventCommand::ClearStage(1) if leader => {
                 if self.stage1.clear() {
                     self.clear(1);
@@ -335,15 +350,59 @@ impl EventActor {
             {
                 self.clear(stage);
             }
-            EventCommand::ClearStage(stage) if leader && stage == event.last_stage() => {
-                self.win();
-            }
             EventCommand::ClearStage(stage) => debug!(stage, client_id, "Clear not taken"),
-            EventCommand::Fail if self.ends.is_some() => {
+            EventCommand::Fail if !won => {
                 info!(kind = ?self.kind, id = self.id, "Event failed");
                 self.failed = true;
             }
             EventCommand::Fail => {}
+            EventCommand::StartBonus if leader && won && !self.bonus_taken => {
+                self.start_bonus();
+            }
+            EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
+        }
+    }
+
+    /// The leader takes the team to the bonus, on a clock of its own
+    /// (Cosmic `1012113`: `startEventTimer`, `warpEventTeam`).
+    fn start_bonus(&mut self) {
+        let Some(bonus) = &self.kind.event().bonus else {
+            return;
+        };
+        let ends = Instant::now() + bonus.duration();
+        self.bonus_taken = true;
+        self.ends = Some(ends);
+        self.move_team(None, bonus.map, Some(ends));
+        info!(kind = ?self.kind, id = self.id, "Bonus started");
+    }
+
+    /// The time ran out. A bonus's ends, taking whoever is still on its map
+    /// to its exit (Cosmic `scheduledTimeout`); otherwise the event ends.
+    fn time_up(&mut self) -> bool {
+        let bonus = self.kind.event().bonus.as_ref();
+        match bonus {
+            Some(bonus) if self.bonus_taken => {
+                self.ends = None;
+                self.move_team(Some(bonus.map), bonus.exit, None);
+                info!(kind = ?self.kind, id = self.id, "Bonus over");
+                false
+            }
+            _ => true,
+        }
+    }
+
+    /// Take the members on `from`, or everyone, to `to`, with the time
+    /// shown there.
+    fn move_team(&self, from: Option<i32>, to: i32, clock: Option<Instant>) {
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventMoved {
+                    id: self.id,
+                    from,
+                    to,
+                    clock,
+                });
+            }
         }
     }
 
@@ -359,6 +418,11 @@ impl EventActor {
         self.ends = None;
         free_lobby(&self.directory, self.channel_id, self.kind, self.id);
         info!(kind = ?self.kind, id = self.id, "Event won");
+        // After the clear itself, so its EXP and effects come first (Cosmic
+        // `clearPQ`).
+        if let Some(map) = self.kind.event().clear_map {
+            self.move_team(None, map, None);
+        }
     }
 
     /// The way on from `stage` opens before anyone hears of the clear, so a

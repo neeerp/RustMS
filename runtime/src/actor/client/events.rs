@@ -266,15 +266,49 @@ impl ClientActor {
         if next.stats.map_id == map_id {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
-            packets.push(build_field_object("gate")?);
+            if event.gates {
+                packets.push(build_field_object("gate")?);
+            }
         }
         gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
         // The EXP comes before the clock stops, as in Cosmic's `clearPQ`.
         if stage == event.last_stage() {
+            if let Some(ticket) = self.event.as_mut() {
+                ticket.clock = None;
+            }
             packets.push(build_stop_clock()?);
         }
         self.send_all(&mut packets).await
+    }
+
+    /// Event `id` takes the player, if on `from` (or anywhere in it), to
+    /// `to`, where the time left is `clock`.
+    pub(super) async fn event_moved(
+        &mut self,
+        id: u32,
+        from: Option<i32>,
+        to: i32,
+        clock: Option<Instant>,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop || self.game.is_none() {
+            return Ok(());
+        }
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_mut().filter(|ticket| ticket.id == id) else {
+            return Ok(());
+        };
+        if !ticket.holds(map_id) || from.is_some_and(|from| from != map_id) {
+            return Ok(());
+        }
+        // The clock shows on arriving; the client keeps one already shown.
+        let shown = ticket.clock.is_some();
+        ticket.clock = clock;
+        self.warp_within_event(to).await?;
+        if shown && clock.is_none() {
+            self.send(&mut build_stop_clock()?).await?;
+        }
+        Ok(())
     }
 
     /// A cleared stage's gate stays open for whoever comes onto its map.
@@ -294,14 +328,16 @@ impl ClientActor {
     }
 
     /// On one of the event's maps the client shows the time left, until the
-    /// event is won.
+    /// event is won, and again during its bonus.
     pub(super) async fn show_event_clock(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let shown = |ticket: &&EventTicket| ticket.holds(map_id) && !ticket.won();
-        let Some(ticket) = self.event.as_ref().filter(shown) else {
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
             return Ok(());
         };
-        let left = ticket.ends.saturating_duration_since(Instant::now());
+        let Some(ends) = ticket.clock else {
+            return Ok(());
+        };
+        let left = ends.saturating_duration_since(Instant::now());
         let seconds = u32::try_from(left.as_secs()).unwrap_or(u32::MAX);
         self.send(&mut build_countdown(seconds)?).await
     }

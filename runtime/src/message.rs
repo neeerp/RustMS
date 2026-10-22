@@ -302,6 +302,14 @@ pub enum ServerMessage {
         id: u32,
         stage: u8,
     },
+    /// Event `id` takes its members on `from`, or all of them, to `to`,
+    /// where the time left is `clock`.
+    EventMoved {
+        id: u32,
+        from: Option<i32>,
+        to: i32,
+        clock: Option<tokio::time::Instant>,
+    },
     SendPacket(Packet),
     /// A quest drop's packet, which the player sees only if they still need
     /// `item_id` for `quest` (`net::loot::wants`).
