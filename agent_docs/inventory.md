@@ -773,6 +773,11 @@ held, it sends "Your inventory is full." and keeps the box. Anything else
 unlocks the client. The entries' `Effect` and `worldMsg` aren't sent yet,
 and the nine cash bags (5530000-5530008) aren't handled.
 
+In HeavenClient, `ItemData::has_reward` says whether the item has a
+`reward` node, and a double-click on such a Use item sends
+`UseItemRewardPacket` (USE_WAIT) right after the sealed check, before any
+other kind of Use item is tried, as v83 does (0x4f0372).
+
 ### Item Maker
 
 The Maker skill (`net::skills::maker_skill`: `base*10000+1007`, base being

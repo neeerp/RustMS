@@ -110,6 +110,18 @@ namespace ms
 		}
 	};
 
+	// Opens the box in USE slot `slot`, an item with a `reward` node; the
+	// server picks what it gives (FUN_00a1249f, report c037)
+	class UseItemRewardPacket : public OutPacket
+	{
+	public:
+		UseItemRewardPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_ITEM_REWARD)
+		{
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Feeds the pet food (212xxxx) in USE slot `slot` to the pet out that
 	// is least full (FUN_00a09905)
 	// Opcode: PET_FOOD(76)
