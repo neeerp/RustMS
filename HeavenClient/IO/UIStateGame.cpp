@@ -869,6 +869,7 @@ namespace ms
 				case UIElement::Type::INVITECARD:
 				case UIElement::Type::MEMONOTICE:
 				case UIElement::Type::QUESTCOMPLETE:
+				case UIElement::Type::SCRIPTMESSAGE:
 				case UIElement::Type::NOTICE:
 				case UIElement::Type::ENTERNUMBER:
 				case UIElement::Type::FRIENDGROUP:

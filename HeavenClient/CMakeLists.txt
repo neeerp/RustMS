@@ -693,6 +693,7 @@ add_executable(HeavenClient
     IO/Components/EquipTooltip.h
     IO/Components/ContextMenuLayout.h
     IO/Components/FadeNotice.h
+    IO/Components/FloatingLines.h
     IO/Components/Gauge.cpp
     IO/Components/Gauge.h
     IO/Components/Icon.cpp

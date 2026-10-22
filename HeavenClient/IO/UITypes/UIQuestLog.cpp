@@ -210,7 +210,7 @@ namespace ms
 				char tag = i + 1 < text.size() ? text[i + 1] : 0;
 
 				if (close == std::string::npos || (tag != 'c' && tag != 'a' && tag != 'R')
-					|| !NpcTextMarkup::is_digits(text.substr(i + 2, close - i - 2)) || close - i - 2 > 9)
+					|| !NpcTextMarkup::is_digits(text.substr(i + 2, close - i - 2)) || close - i - 2 > (tag == 'R' ? 5 : 9))
 				{
 					out += c;
 					continue;

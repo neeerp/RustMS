@@ -32,8 +32,10 @@ namespace ms
 
 			Point<int16_t> at = position + Point<int16_t>(0, FIRST_Y - HALF_LINE - LINE_HEIGHT * static_cast<int16_t>(i));
 
+			// v83 fades the outlined line as one layer. Drawn apart, edges at full fade would darken the gold
+			// they lie under, so they fade faster.
 			for (const Point<int16_t> &edge : EDGE)
-				edges[i].draw(DrawArgument(at + edge, opacity));
+				edges[i].draw(DrawArgument(at + edge, opacity * opacity));
 
 			texts[i].draw(DrawArgument(at, opacity));
 		}
@@ -63,8 +65,9 @@ namespace ms
 	{
 		if (auto slot = lines.add(text))
 		{
-			texts[*slot] = Text(Text::Font::A15B, Text::Alignment::CENTER, Color::Name::SCRIPTGOLD, text);
-			edges[*slot] = Text(Text::Font::A15B, Text::Alignment::CENTER, Color::Name::BLACK, text);
+			// One plain line: no colour codes or breaks.
+			texts[*slot] = Text(Text::Font::A15B, Text::Alignment::CENTER, Color::Name::SCRIPTGOLD, text, 0, false);
+			edges[*slot] = Text(Text::Font::A15B, Text::Alignment::CENTER, Color::Name::BLACK, text, 0, false);
 		}
 	}
 }

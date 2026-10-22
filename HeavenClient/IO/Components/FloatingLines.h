@@ -10,7 +10,7 @@ namespace ms
 {
 	// v83's five floating lines near the top of the screen (CWvsContext+0x3680, FUN_006ce251), which
 	// SCRIPT_PROGRESS_MESSAGE writes to. A line takes the first slot that is free: never used, or shown for
-	// 3 s already, though it may still be fading. With all five busy the line is dropped. A line stays for
+	// more than 3 s, though it may still be fading. With all five busy the line is dropped. A line stays for
 	// 3 s and then fades out over 3 more.
 	class FloatingLines
 	{
@@ -26,7 +26,7 @@ namespace ms
 			{
 				Slot &slot = slots[i];
 
-				if (slot.age < 0 || slot.age >= SHOWN)
+				if (slot.age < 0 || slot.age > SHOWN)
 				{
 					slot = { text, 0 };
 					return i;

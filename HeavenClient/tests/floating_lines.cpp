@@ -27,6 +27,7 @@ int main()
 
 		lines.update(2000);
 		require(lines.opacity(0) == 1.0f, "still solid at 3 s");
+		require(!lines.add("at 3 s"), "a slot frees only after 3 s");
 		lines.update(1500);
 		require(lines.opacity(0) == 0.5f, "half faded 1.5 s later");
 
