@@ -16,7 +16,6 @@ namespace ms
 		{
 			// StringPool 0x109f, 0x10ac, 0x1095, 0x1094, 0x10a0 and 0x106f.
 			constexpr const char* ETC_FULL = "Your ETC slot is full.\\nPlease remove some items.";
-			constexpr const char* TOO_MANY = "You have exceeded the maximum number of requests.";
 			constexpr const char* MARRIED = "You are already married.";
 			constexpr const char* ENGAGED = "You are already engaged.";
 			constexpr const char* NAME_PROMPT = "Please enter your partner's name.";
@@ -59,11 +58,16 @@ namespace ms
 			if (!player.get_inventory().find_free_slot(InventoryType::Id::ETC))
 				return notice(ETC_FULL);
 
-			if (proposing)
-				return notice(TOO_MANY);
+			// Only men propose; v83 ignores a woman's box (0xa0fcbb).
+			if (player.get_stats().get_female())
+				return;
 
 			if (auto& record = player.get_marriage())
 				return notice(record->married() ? MARRIED : ENGAGED);
+
+			// The waiting dialog is one of these, so a second box waits too.
+			if (proposing || UI::get().dialog_open())
+				return;
 
 			UI::get().emplace<UIEnterText>(NAME_PROMPT, [item_id](const std::string& name)
 			{

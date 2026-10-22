@@ -21,13 +21,14 @@ follows `MARRIAGE_RESULT` 11.
 ## Proposing
 
 The ring boxes are 2240000 to 2240003. Using one from the Use tab makes
-the client check three things, in this order:
+the client check these, in this order:
 
 1. The player has a free Etc slot.
-2. The player has no proposal still waiting.
+2. The player is male. v83 ignores a woman's box without a word.
 3. The player isn't already engaged or married.
+4. No dialog is open, which includes the wait for an earlier proposal.
 
-If all three pass, the client asks for the partner's name and sends
+If all of them pass, the client asks for the partner's name and sends
 `RING_ACTION` 0 with the name and the box. While the proposal waits, it
 shows "Waiting for her response...". Closing that dialog sends
 `RING_ACTION` 1, which withdraws the proposal.
