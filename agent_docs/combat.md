@@ -1281,6 +1281,9 @@ stays as it is). The Berserk room's false statues (`1050000`) drop their
 loot (none) 30 times in a hundred, else throw the breaker out to
 `105090200`'s first `sp` (`Action::DropsOrWarp`). The field tells the
 breaker's client actor (ReactorBroken), which rolls the drops or warps.
+Ludibrium's stage 2 trap box (`2200002`, `Action::WarpMap`) sends everyone
+on the map away: the field shows them all its pink line, then tells each
+of their client actors (see "Ludibrium's balloons" in `party-quests.md`).
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in

@@ -74,7 +74,7 @@ impl ClientActor {
         y: i16,
     ) -> Result<(), RuntimeError> {
         let warp = match net::reactors::action(reactor_id) {
-            Action::Warp(warp) => Some(warp),
+            Action::Warp(warp) | Action::WarpMap { warp, .. } => Some(warp),
             Action::DropsOrWarp { percent, warp } => {
                 (rand::random::<u32>() % 100 >= percent).then_some(warp)
             }

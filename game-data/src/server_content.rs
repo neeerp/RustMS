@@ -380,6 +380,7 @@ pub mod keys {
     pub const LPQ_BALLOON_DONE: &str = "lpq.balloon.done";
     pub const LPQ_BALLOON_HURRY: &str = "lpq.balloon.hurry";
     pub const LPQ_BALLOON_S6: &str = "lpq.balloon.s6";
+    pub const LPQ_NOTICE_TRAP: &str = "lpq.notice.trap";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1291,6 +1292,7 @@ mod tests {
             keys::LPQ_BALLOON_DONE,
             keys::LPQ_BALLOON_HURRY,
             keys::LPQ_BALLOON_S6,
+            keys::LPQ_NOTICE_TRAP,
         ];
         for key in named
             .iter()
@@ -1377,6 +1379,20 @@ mod tests {
         };
         assert_eq!(table.drops(9001006), [crystal(4031856, 2191)]);
         assert_eq!(table.drops(9001005), [crystal(4031857, 2192)]);
+    }
+
+    #[test]
+    fn ludibriums_stage_7_monsters_drop_the_other_pass() {
+        let table = RewardTable::load(None).unwrap();
+        for mob in 9300169..=9300171 {
+            let [pass] = &table.drops(mob)[..] else {
+                panic!("{mob}: {:?}", table.drops(mob));
+            };
+            assert_eq!(
+                (pass.item, pass.prob, pass.quest),
+                (Some(4001156), 1.0, None)
+            );
+        }
     }
 
     #[test]

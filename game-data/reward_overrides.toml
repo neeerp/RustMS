@@ -51,6 +51,19 @@ add = [{ item = 4031860, prob = 0.4, quest = 6944 }]
 # Griffey (Leafre): likewise the pirates' 4031861 for 6944.
 add = [{ item = 4031861, prob = 0.4, quest = 6944 }]
 
+[mobs.9300169]
+# Ludibrium's party quest, stage 7 (Map.nx 922010700): its three monsters
+# "from Another Dimension" each drop the other Pass of Dimension 4001156,
+# which its three reactors 2201002 take (Reactor.nx: item 4001156). The pack
+# has no drops for them; one each, every time, as on the community servers.
+add = [{ item = 4001156, prob = 1.0 }]
+
+[mobs.9300170]
+add = [{ item = 4001156, prob = 1.0 }]
+
+[mobs.9300171]
+add = [{ item = 4001156, prob = 1.0 }]
+
 [reactors.2000]
 # Maple Island's scrap box. Pio's Collecting Recycled Goods (1008) checks for
 # 4031161 and 4031162 (Quest.nx Check.img/1008/1/item).

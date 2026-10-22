@@ -353,9 +353,17 @@ where a member stands (`EventTicket::balloon`, `Balloon`):
   heard that stage out. The last stage's clear wins the quest.
 
 `talk_to_balloon` routes the click; the Aqua Balloon (2040041) on the maze
-says one line. Monsters drop passes by the content pack's rewards (stage
-1's Ratz do); the boxes, the stage 2 trap and the missing drops are the
-next slice.
+says one line.
+
+The passes come from the content pack's rewards: stage 1's Ratz, the
+boxes 2202003 of stages 2 and 5, and the monsters of stages 3 to 5 each
+drop one, and Alishar drops the key. Stage 7's three monsters drop the
+other pass 4001156, which the pack lacks (`reward_overrides.toml`). One
+of stage 2's boxes, 2200002, is a trap (`reactors::Action::WarpMap`, Cosmic
+`go922010201`). Breaking it shows everyone on the map a pink line
+(`lpq.notice.trap`) and sends them all to 922010201, still in the party's
+copy. That room's four boxes make up stage 2's 15 passes, and its `out00`
+leads back up.
 
 ## NPCs
 
@@ -385,8 +393,8 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's pass sources, stage 8's crates, the boss, bonus and reward
-  (`a066`, slices S2b to S5).
+- LPQ's stage 3 and 7 reactors that bring out monsters, stage 6's maze,
+  stage 8's crates, the boss, bonus and reward (`a066`, slices S3 to S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
