@@ -18,15 +18,13 @@
 #include "Stance.h"
 
 #include <iostream>
+#include <iterator>
 
 namespace ms
 {
 	Stance::Id Stance::by_state(int8_t state)
 	{
 		int8_t index = (state / 2) - 1;
-
-		if (index < 0 || index > 10)
-			return WALK1;
 
 		constexpr Id statevalues[10] =
 		{
@@ -41,6 +39,10 @@ namespace ms
 			DEAD,
 			SIT
 		};
+
+		// States past sitting (22 and up) have no stance here.
+		if (index < 0 || index >= static_cast<int8_t>(std::size(statevalues)))
+			return WALK1;
 
 		return statevalues[index];
 	}
