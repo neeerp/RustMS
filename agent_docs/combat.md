@@ -609,7 +609,9 @@ A few skills do more than buff:
   A Dawn Warrior's skills follow the same rules, with Combo Attack's last
   level at 20. Enrage, a buff of its `pad`, wants a value of 10 (nine
   orbs: the client compares the value, 0x764379) and resets it to 1 the
-  same way (`combo::enrage_refused`).
+  same way (`combo::enrage_refused`). Harness `enrage` charges a Hero's
+  Combo on snails and checks the refusals below 10, the 40 MP, the 240 s
+  buff, the value back to 1 and the 360 s cooldown.
   HeavenClient draws the orbs as v83 does (`combo::Orbs`, FUN_0093cdbc):
   the newest five on a turning ring 40 pixels over the feet, the newest
   popping in, all fading out when spent, and a finisher's
