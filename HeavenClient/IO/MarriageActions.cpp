@@ -2,9 +2,11 @@
 
 #include "UI.h"
 
+#include "UITypes/UIChatBar.h"
 #include "UITypes/UINotice.h"
 
 #include "../Character/Marriage.h"
+#include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/MarriagePackets.h"
 
@@ -20,6 +22,12 @@ namespace ms
 			constexpr const char* ENGAGED = "You are already engaged.";
 			constexpr const char* NAME_PROMPT = "Please enter your partner's name.";
 			constexpr const char* WAITING = "Waiting for her response...";
+			// StringPool 0x10a1, 0x335 and 0x114.
+			constexpr const char* GUEST_PROMPT = "Please enter the guest name.";
+			constexpr const char* TOO_SHORT = "Please enter at least 4 characters.";
+			constexpr const char* NOT_HERE = "You can't use it here in this map.";
+			// The guest prompt's shortest name.
+			constexpr size_t GUEST_MIN = 4;
 			// A character's name.
 			constexpr size_t NAME_LIMIT = 12;
 
@@ -78,6 +86,60 @@ namespace ms
 		void answered()
 		{
 			proposing = false;
+		}
+
+		void invite(int16_t slot)
+		{
+			Player& player = Stage::get().get_player();
+
+			if (!player.can_request(ExclRequest::USE_WAIT) || UI::get().dialog_open())
+				return;
+
+			// No name refuses only a couple that isn't engaged.
+			if (marriage::invitation_refusal(player.get_marriage(), "") != nullptr)
+				return;
+
+			UI::get().emplace<UIEnterText>(GUEST_PROMPT, [slot](const std::string& name)
+			{
+				// v83's prompt stays open on a short name.
+				if (name.size() < GUEST_MIN)
+				{
+					UI::get().emplace<UIOk>(TOO_SHORT, [slot](bool) { invite(slot); });
+
+					return;
+				}
+
+				Player& player = Stage::get().get_player();
+				auto& record = player.get_marriage();
+
+				if (const char* refusal = marriage::invitation_refusal(record, name))
+				{
+					if (*refusal)
+						notice(refusal);
+
+					return;
+				}
+
+				// The server's answer, whatever it is, ends the wait.
+				player.request(InviteGuestPacket(name, record->id, slot), ExclRequest::USE_WAIT);
+			}, NAME_LIMIT);
+		}
+
+		void open_invitation(int16_t slot, int32_t item_id)
+		{
+			if (!Stage::get().get_player().can_request(ExclRequest::USE_WAIT))
+				return;
+
+			if (Stage::get().get_mapinfo().get_fieldlimit() & field_limit::INVITATIONS)
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(NOT_HERE, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			// Nothing waits on the answer.
+			OpenInvitationPacket(slot, item_id).dispatch();
 		}
 	}
 }

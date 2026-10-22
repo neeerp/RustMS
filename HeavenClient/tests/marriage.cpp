@@ -72,7 +72,11 @@ void ring_boxes_and_result_texts()
 	for (int8_t mode = 18; mode <= 30; mode++)
 		require(marriage::result_text(mode) != nullptr, "every refusal has its text");
 
-	require(!marriage::result_text(17) && !marriage::result_text(31), "no text around them");
+	require(!marriage::result_text(17) && !marriage::result_text(33), "no text around them");
+	require(!marriage::result_text(marriage::RESULT_INVITATION), "the invitation is a window");
+	require(std::string(marriage::result_text(16)).rfind("Congratulations!", 0) == 0, "booked");
+	require(std::string(marriage::result_text(31)).rfind("The reservation has been canceled", 0) == 0, "dropped");
+	require(std::string(marriage::result_text(34)) == "This invitation is not valid.", "not valid");
 	require(std::string(marriage::result_text(marriage::RESULT_BROKEN)) == "Your engagement has been broken.", "broken");
 	require(std::string(marriage::result_text(marriage::RESULT_DIVORCED)) == "You are no longer married.", "divorced");
 	require(marriage::result_text(32) != nullptr, "reserved");
@@ -82,6 +86,32 @@ void ring_boxes_and_result_texts()
 	require(std::string(marriage::break_question(false)).rfind("Dropping this item", 0) == 0, "engaged question");
 	require(std::string(marriage::break_question(true)).rfind("You will not", 0) == 0, "married question");
 	require(!marriage::result_text(marriage::RESULT_NOTICE), "the server's own text");
+}
+
+void invitations()
+{
+	require(marriage::is_invitation(4031377) && marriage::is_invitation(4031395), "the couple's invitations");
+	require(!marriage::is_invitation(4031406) && !marriage::is_invitation(4031378), "not the couple's");
+	require(marriage::is_received_invitation(4031406) && marriage::is_received_invitation(4031407), "a guest's");
+	require(!marriage::is_received_invitation(4031395), "not a guest's");
+
+	MarriageRecord record;
+	record.status = marriage::ENGAGED;
+	record.groom_name = "Groom";
+	record.bride_name = "Bride";
+	std::optional<MarriageRecord> couple = record;
+	require(marriage::invitation_refusal(couple, "Guest") == nullptr, "a guest");
+	require(std::string(marriage::invitation_refusal(couple, "Bride")).rfind("You may not send", 0) == 0, "the bride");
+	require(std::string(marriage::invitation_refusal(couple, "Groom")).rfind("You may not send", 0) == 0, "the groom");
+	// The client compares exactly; the server catches the rest.
+	require(marriage::invitation_refusal(couple, "bride") == nullptr, "another case");
+	require(std::string(marriage::invitation_refusal(std::nullopt, "Guest")).empty(), "no couple, no word");
+	record.status = marriage::MARRIED;
+	require(std::string(marriage::invitation_refusal(record, "Guest")).empty(), "married, no word");
+
+	require(std::string(marriage::invitation_art(2)) == "Cathedral", "the Cathedral's");
+	require(std::string(marriage::invitation_art(1)) == "Vegas" && std::string(marriage::invitation_art(0)) == "Vegas",
+		"the Chapel's otherwise");
 }
 
 void tooltip_lines()
@@ -245,6 +275,7 @@ int main()
 	{
 		reads_the_couples_record();
 		ring_boxes_and_result_texts();
+		invitations();
 		tooltip_lines();
 		partner_spots();
 		ring_looks();

@@ -785,6 +785,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashGift.h
     IO/UITypes/UIGiftNotice.cpp
     IO/UITypes/UIGiftNotice.h
+    IO/UITypes/UIInvitation.cpp
+    IO/UITypes/UIInvitation.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp

@@ -50,4 +50,30 @@ namespace ms
 			write_int(item_id);
 		}
 	};
+
+	// Sends the invitation in Etc `slot` to `guest`, for the couple
+	// `marriage_id` (RING_ACTION 5, report b069).
+	class InviteGuestPacket : public OutPacket
+	{
+	public:
+		InviteGuestPacket(const std::string& guest, int32_t marriage_id, int16_t slot) : OutPacket(OutPacket::Opcode::RING_ACTION)
+		{
+			write_byte(5);
+			write_string(guest);
+			write_int(marriage_id);
+			write_int(slot);
+		}
+	};
+
+	// Opens the received invitation `item_id` in Etc `slot` (RING_ACTION 6).
+	class OpenInvitationPacket : public OutPacket
+	{
+	public:
+		OpenInvitationPacket(int16_t slot, int32_t item_id) : OutPacket(OutPacket::Opcode::RING_ACTION)
+		{
+			write_byte(6);
+			write_int(slot);
+			write_int(item_id);
+		}
+	};
 }

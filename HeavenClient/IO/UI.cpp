@@ -436,6 +436,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
 					types.emplace_back(UIElement::Type::INCUBATOR);
+					types.emplace_back(UIElement::Type::INVITATION);
 					types.emplace_back(UIElement::Type::VEGARESULT);
 					types.emplace_back(UIElement::Type::ENCHANTSKILL);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
@@ -463,6 +464,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
 					types.emplace_back(UIElement::Type::INCUBATOR);
+					types.emplace_back(UIElement::Type::INVITATION);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
 					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::SPRESET);
