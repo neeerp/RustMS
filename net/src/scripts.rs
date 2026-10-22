@@ -333,6 +333,15 @@ pub enum Effect {
     /// Tell the player's event something happened, once the effects before
     /// it have applied. Scripts end on it.
     EventCommand(crate::events::EventCommand),
+    /// Take the player, or the party they lead with the members on their
+    /// map, to `portal` on the first free copy of a mini-dungeon
+    /// (`dungeons::Dungeon::copies`). Nothing after it is applied if they
+    /// may not go; the runtime says why in pink.
+    EnterDungeon {
+        first: i32,
+        count: i32,
+        portal: u8,
+    },
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -822,6 +831,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                     Effect::Warp(back)
                 },
             )
+        }
+        script if script.starts_with("MD_") => {
+            let dungeon = crate::dungeons::by_script(script)?;
+            if player.stats.map_id != dungeon.base {
+                return Some(through(to(dungeon.base, Portal::Named("MD00"))));
+            }
+            ScriptOutcome {
+                effects: vec![
+                    Effect::EnterDungeon {
+                        first: dungeon.first,
+                        count: dungeon.count,
+                        portal: named(dungeon.first, "out00"),
+                    },
+                    Effect::PortalSound,
+                ],
+                block: false,
+                occupied: None,
+            }
         }
         script if script.starts_with("advice") => {
             let &(_, key, width, height) = ADVICE.iter().find(|(name, ..)| *name == script)?;
@@ -1742,6 +1769,31 @@ mod tests {
             assert_eq!((*w, *h), (width, height));
         }
         assert_eq!(portal("advice10", &fresh), None);
+    }
+
+    #[test]
+    fn a_mini_dungeons_way_in_asks_for_a_copy_and_its_way_out_leads_back() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 100020000;
+        let outcome = portal("MD_pig", &player).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::EnterDungeon {
+                    first: 100020100,
+                    count: 30,
+                    portal: 4,
+                },
+                Effect::PortalSound,
+            ]
+        );
+        player.stats.map_id = 100020105;
+        let outcome = portal("MD_pig", &player).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [Effect::PortalSound, Effect::WarpToPortal(100020000, 8)]
+        );
+        assert_eq!(portal("MD_cakeEnter", &player), None);
     }
 
     #[test]

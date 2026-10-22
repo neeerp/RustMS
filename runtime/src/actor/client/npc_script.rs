@@ -333,6 +333,30 @@ impl ClientActor {
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
+                Effect::EnterDungeon {
+                    first,
+                    count,
+                    portal,
+                } => {
+                    let (reply, entered) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::EnterDungeon {
+                        from: self.client_id,
+                        first: *first,
+                        count: *count,
+                        portal: *portal,
+                        reply,
+                    })
+                    .await?;
+                    match entered.await {
+                        Ok(Ok(copy)) => warp = Some((copy, Some(*portal))),
+                        Ok(Err(refusal)) => {
+                            let mut line = build_broadcast(Broadcast::Pink, &refusal.text())?;
+                            self.send(&mut line).await?;
+                            return Ok(Applied::Refused);
+                        }
+                        Err(_) => return Ok(Applied::Refused),
+                    }
+                }
                 Effect::StartEvent(kind) => {
                     // Scripts end on this effect: once the directory reserves
                     // the event, the party goes in.

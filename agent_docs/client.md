@@ -820,7 +820,8 @@ the screen size.
 | Mounts | Partial rendering, no interaction | M |
 | Memo, mail, MTS | Nothing | M each |
 | Buddy whisper/find modes | Ignored | S |
-| Mini-dungeons, boss/event UI | Nothing | M |
+| Mini-dungeons | Copies load their body through `info/link`; the field clock shows the time limit | - |
+| Boss/event UI | Nothing | M |
 
 ## Protocol deviations fixed
 

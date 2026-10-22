@@ -80,9 +80,11 @@ async fn banners_show_and_unscripted_portals_do_nothing() {
     let c = &mut session.connection;
     assert_eq!(session.map_id, 0);
 
-    // The original island's advice portals name scripts the server doesn't
-    // have; touching them, or portals without scripts, does nothing.
-    assert_eq!(touch_portal(c, "tutorial0").await, []);
+    // The original island's advice portals show their balloon; portals
+    // without scripts do nothing.
+    assert!(
+        matches!(touch_portal(c, "tutorial0").await.as_slice(), [Seen::Hint(text, 250, 5)] if !text.is_empty())
+    );
     assert_eq!(touch_portal(c, "out00").await, []);
     assert_eq!(touch_portal(c, "no-such-portal").await, []);
 

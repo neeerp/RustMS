@@ -10,6 +10,8 @@ use crate::message::{
 use game::alliance::Alliance;
 use game::Guild;
 use game_data::server_content::keys;
+use net::conti::Portal;
+use net::dungeons::Refusal;
 use net::events::{self, Candidate, EventKind};
 use net::packet::build::world::alliance;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
@@ -33,7 +35,7 @@ use net::packet::handle::world::{DoorExit, Rock};
 use net::{BroadcastScope, ClientId, MessengerRequest, PartyRequest, PartySkill, WhisperDelivery};
 use packet::Packet;
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
@@ -41,6 +43,10 @@ use tracing::{error, info, warn};
 /// How often messenger seats and guild members held through a channel
 /// change are checked.
 const PURGE_INTERVAL: Duration = Duration::from_secs(10);
+
+/// How long a mini-dungeon's copy stays taken for a team that hasn't
+/// arrived yet.
+const DUNGEON_GRACE: Duration = Duration::from_secs(10);
 
 /// Wait until `instant`, or forever without one.
 async fn at(instant: Option<Instant>) {
@@ -69,6 +75,16 @@ impl Entry {
     fn shares_map_with(&self, other: &Entry) -> bool {
         self.channel_id == other.channel_id && self.presence.map_id == other.presence.map_id
     }
+}
+
+/// A mini-dungeon's copy in use: who took it, and until when it is kept
+/// for them should nobody be in it yet.
+struct Run {
+    leader: ClientId,
+    reserved_until: Instant,
+    /// The members who follow the leader in once they arrive, to `portal`.
+    team: Vec<ClientId>,
+    portal: u8,
 }
 
 /// A guild member changing channel, and when they left.
@@ -108,6 +124,8 @@ pub struct WorldDirectory {
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
     avatar_banners: AvatarBanners,
+    /// Mini-dungeon copies taken, by channel and copy.
+    dungeons: HashMap<(u8, i32), Run>,
 }
 
 impl WorldDirectory {
@@ -126,6 +144,7 @@ impl WorldDirectory {
             events: HashMap::new(),
             next_event: 1,
             avatar_banners: AvatarBanners::default(),
+            dungeons: HashMap::new(),
         }
     }
 
@@ -200,6 +219,26 @@ impl WorldDirectory {
             DirectoryMessage::GuildInfo { owner, guild } => self.send_guild_info(owner, guild),
             DirectoryMessage::Online { client_id, reply } => {
                 let _ = reply.send(self.clients.contains_key(&client_id));
+            }
+            DirectoryMessage::EnterDungeon {
+                from,
+                first,
+                count,
+                portal,
+                reply,
+            } => {
+                let entered = self.enter_dungeon(from, first, count, Instant::now());
+                match (reply.send(entered), entered) {
+                    (Ok(()), Ok(copy)) => self.gather_team(from, copy, portal),
+                    // A leader who can't take the reply doesn't go.
+                    (Err(_), Ok(copy)) => {
+                        warn!(leader = from, copy, "Mini-dungeon reply dropped");
+                        if let Some(entry) = self.clients.get(&from) {
+                            self.dungeons.remove(&(entry.channel_id, copy));
+                        }
+                    }
+                    (_, Err(_)) => {}
+                }
             }
             DirectoryMessage::MapOccupied {
                 channel_id,
@@ -376,6 +415,116 @@ impl WorldDirectory {
         })
     }
 
+    /// Take the first free of the `count` mini-dungeon copies from `first`
+    /// on `from`'s channel for them: free means nobody is in it and it isn't
+    /// kept for a team on its way in. A party member who doesn't lead it
+    /// can't.
+    fn enter_dungeon(
+        &mut self,
+        from: ClientId,
+        first: i32,
+        count: i32,
+        now: Instant,
+    ) -> Result<i32, Refusal> {
+        let channel_id = self.clients.get(&from).ok_or(Refusal::Full)?.channel_id;
+        if self
+            .parties
+            .of(from)
+            .is_some_and(|party| party.leader != from)
+        {
+            return Err(Refusal::NotLeader);
+        }
+        let occupied: HashSet<i32> = self
+            .clients
+            .values()
+            .filter(|entry| entry.channel_id == channel_id)
+            .map(|entry| entry.presence.map_id)
+            .collect();
+        let copy = (first..first + count)
+            .find(|copy| {
+                let kept = self
+                    .dungeons
+                    .get(&(channel_id, *copy))
+                    .is_some_and(|run| run.reserved_until > now);
+                !kept && !occupied.contains(copy)
+            })
+            .ok_or(Refusal::Full)?;
+        self.dungeons.insert(
+            (channel_id, copy),
+            Run {
+                leader: from,
+                reserved_until: now + DUNGEON_GRACE,
+                team: Vec::new(),
+                portal: 0,
+            },
+        );
+        info!(leader = from, channel_id, copy, "Mini-dungeon taken");
+        Ok(copy)
+    }
+
+    /// The members of the party `from` leads who stand beside them follow
+    /// `from` to `portal` of the copy they took, once `from` is in.
+    fn gather_team(&mut self, from: ClientId, copy: i32, portal: u8) {
+        let Some(channel_id) = self.clients.get(&from).map(|entry| entry.channel_id) else {
+            return;
+        };
+        let mut team = self.party_here(from).unwrap_or_default();
+        team.retain(|&member| member != from);
+        if let Some(run) = self.dungeons.get_mut(&(channel_id, copy)) {
+            run.team = team;
+            run.portal = portal;
+        }
+    }
+
+    /// `client_id` came to `map_id` from `from_map`. If they took it as a
+    /// mini-dungeon's copy, the members still beside where they were follow.
+    fn bring_team(&mut self, client_id: ClientId, channel_id: u8, map_id: i32, from_map: i32) {
+        let Some(run) = self
+            .dungeons
+            .get_mut(&(channel_id, map_id))
+            .filter(|run| run.leader == client_id)
+        else {
+            return;
+        };
+        let (team, portal) = (std::mem::take(&mut run.team), run.portal);
+        for member in team {
+            self.tell(
+                member,
+                ServerMessage::ShipWarp {
+                    from_map,
+                    map_id,
+                    portal: Portal::Id(portal),
+                },
+            );
+        }
+    }
+
+    /// `client_id` left `map_id` on `channel_id`. If it is a mini-dungeon's
+    /// copy they took, the run is over: whoever is still in it goes back to
+    /// the dungeon's map.
+    fn left_dungeon(&mut self, client_id: ClientId, channel_id: u8, map_id: i32) {
+        let key = (channel_id, map_id);
+        if !matches!(self.dungeons.get(&key), Some(run) if run.leader == client_id) {
+            return;
+        }
+        self.dungeons.remove(&key);
+        let Some(dungeon) = net::dungeons::of_copy(map_id) else {
+            return;
+        };
+        for entry in self.clients.values() {
+            if entry.channel_id == channel_id
+                && entry.presence.map_id == map_id
+                && entry.handle.client_id != client_id
+            {
+                entry.handle.send(ServerMessage::ShipWarp {
+                    from_map: map_id,
+                    map_id: dungeon.base,
+                    portal: Portal::Id(0),
+                });
+            }
+        }
+    }
+
     fn register(&mut self, handle: ClientHandle, presence: Presence, channel_id: u8) {
         let client_id = handle.client_id;
         let (guild_id, alliance_id) = (presence.guild_id, presence.alliance_id);
@@ -388,8 +537,10 @@ impl WorldDirectory {
             );
             previous.handle.kick();
             self.names.remove(&previous.presence.name);
-            // Its unregister will be stale; the search ends here instead.
+            // Its unregister will be stale; the search and the run end here
+            // instead.
             self.party_searches.stop(client_id);
+            self.left_dungeon(client_id, previous.channel_id, previous.presence.map_id);
         }
         info!(
             client_id,
@@ -458,6 +609,7 @@ impl WorldDirectory {
                     .messengers
                     .disconnected(client_id, changing_channel, Instant::now());
                 self.deliver(out);
+                self.left_dungeon(client_id, entry.channel_id, entry.presence.map_id);
             }
             self.parties.forget_invites(client_id);
             // A leader changing channel starts again on arrival (b034
@@ -480,6 +632,11 @@ impl WorldDirectory {
         let moved = previous.map_id != entry.presence.map_id;
         let hp_changed =
             (previous.hp, previous.max_hp) != (entry.presence.hp, entry.presence.max_hp);
+        if moved {
+            let (channel_id, map_id) = (entry.channel_id, entry.presence.map_id);
+            self.left_dungeon(client_id, channel_id, previous.map_id);
+            self.bring_team(client_id, channel_id, map_id, previous.map_id);
+        }
 
         // Guild members needn't be in a party.
         self.tell_guild_progress(client_id, &previous);
@@ -2118,6 +2275,91 @@ mod tests {
         }
         assert_eq!(directory.party_here(1), Some(vec![1, 2]));
         assert_eq!(directory.party_here(2), None, "not the leader");
+    }
+
+    /// The copies `rx` was sent to, and from where.
+    fn ship_warps(rx: &mut mpsc::Receiver<ServerMessage>) -> Vec<(i32, i32)> {
+        std::iter::from_fn(|| rx.try_recv().ok())
+            .filter_map(|message| match message {
+                ServerMessage::ShipWarp {
+                    from_map, map_id, ..
+                } => Some((from_map, map_id)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_mini_dungeon_gives_each_team_a_copy_and_closes_when_its_leader_leaves() {
+        const PIG_FARM: i32 = 100020000;
+        const FIRST: i32 = 100020100;
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let _alice = online(&mut directory, 1, "Alice", PIG_FARM);
+        let mut bobby = online(&mut directory, 2, "Bobby", PIG_FARM);
+        let mut carol = online(&mut directory, 3, "Carol", 20000);
+        let _dave = online(&mut directory, 4, "Dave", PIG_FARM);
+        let now = Instant::now();
+        for name in ["Bobby", "Carol"] {
+            let name = name.into();
+            directory.party_request(1, PartyRequest::Invite { name }, now);
+        }
+        for id in [2, 3] {
+            directory.party_request(id, PartyRequest::Accept { party_id: 1 }, now);
+        }
+        assert_eq!(
+            directory.enter_dungeon(2, FIRST, 2, now),
+            Err(Refusal::NotLeader)
+        );
+        assert_eq!(directory.enter_dungeon(1, FIRST, 2, now), Ok(FIRST));
+        directory.gather_team(1, FIRST, 4);
+        // The copy is kept while the team is on its way.
+        assert_eq!(directory.enter_dungeon(4, FIRST, 2, now), Ok(FIRST + 1));
+        assert_eq!(
+            directory.enter_dungeon(4, FIRST, 2, now),
+            Err(Refusal::Full)
+        );
+        // Only the member beside the leader follows, once the leader is in.
+        assert_eq!(ship_warps(&mut bobby), []);
+        directory.update_presence(1, presence("Alice", FIRST));
+        assert_eq!(ship_warps(&mut bobby), [(PIG_FARM, FIRST)]);
+        assert_eq!(ship_warps(&mut carol), []);
+        directory.update_presence(2, presence("Bobby", FIRST));
+        // A copy nobody came to is free after the grace; one in use isn't.
+        let later = now + DUNGEON_GRACE;
+        assert_eq!(directory.enter_dungeon(4, FIRST, 2, later), Ok(FIRST + 1));
+        assert_eq!(
+            directory.enter_dungeon(4, FIRST, 1, later),
+            Err(Refusal::Full)
+        );
+        // A member leaving keeps it going; the leader leaving ends it.
+        directory.update_presence(2, presence("Bobby", PIG_FARM));
+        directory.update_presence(2, presence("Bobby", FIRST));
+        assert!(directory.dungeons.contains_key(&(0, FIRST)));
+        ship_warps(&mut bobby);
+        directory.update_presence(1, presence("Alice", PIG_FARM));
+        assert_eq!(ship_warps(&mut bobby), [(FIRST, PIG_FARM)]);
+        assert!(!directory.dungeons.contains_key(&(0, FIRST)));
+
+        // So does the leader logging out.
+        directory.update_presence(2, presence("Bobby", PIG_FARM));
+        assert_eq!(directory.enter_dungeon(1, FIRST, 1, later), Ok(FIRST));
+        directory.update_presence(1, presence("Alice", FIRST));
+        directory.update_presence(2, presence("Bobby", FIRST));
+        ship_warps(&mut bobby);
+        directory.unregister(1, 1, false);
+        assert_eq!(ship_warps(&mut bobby), [(FIRST, PIG_FARM)]);
+
+        // And the leader logging in again, whose old session's unregister
+        // comes too late.
+        let _alice = online(&mut directory, 1, "Alice", PIG_FARM);
+        directory.update_presence(2, presence("Bobby", PIG_FARM));
+        assert_eq!(directory.enter_dungeon(1, FIRST, 1, later), Ok(FIRST));
+        directory.update_presence(1, presence("Alice", FIRST));
+        directory.update_presence(2, presence("Bobby", FIRST));
+        ship_warps(&mut bobby);
+        let _alice = online(&mut directory, 1, "Alice", FIRST);
+        assert_eq!(ship_warps(&mut bobby), [(FIRST, PIG_FARM)]);
     }
 
     #[test]

@@ -530,6 +530,17 @@ pub enum DirectoryMessage {
         kind: EventKind,
         id: u32,
     },
+    /// `from` takes a mini-dungeon's way in: the first free of the `count`
+    /// copies from `first` on their channel is theirs, and the members of
+    /// the party they lead who stand beside them go to its `portal`.
+    /// Answers the copy, which `from` still has to go to.
+    EnterDungeon {
+        from: ClientId,
+        first: i32,
+        count: i32,
+        portal: u8,
+        reply: tokio::sync::oneshot::Sender<Result<i32, net::dungeons::Refusal>>,
+    },
     /// Whether anyone is on `map_id` in `channel_id`.
     MapOccupied {
         channel_id: u8,

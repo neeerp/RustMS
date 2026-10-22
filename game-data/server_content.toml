@@ -504,6 +504,8 @@ unsourced = [
     "portal.advice.world_map",
     "portal.advice.stats",
     "portal.advice.jump_down",
+    "portal.mini_dungeon.not_leader",
+    "portal.mini_dungeon.full",
     "time_gate.inactive",
     "time_gate.no_era",
     "statue.intro",
