@@ -30,8 +30,11 @@ use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
 /// Capacity of each client's inbound queue. A client this far behind is
-/// considered dead weight and disconnected.
-pub const CLIENT_QUEUE_CAPACITY: usize = 256;
+/// considered dead weight and disconnected. Entering a map queues a packet
+/// for each of its NPCs, players, mobs (and control of them), reactors and
+/// drops while the client is still busy with the map change, close to 200
+/// in Kerning City's subway, so this leaves room for the busiest maps.
+pub const CLIENT_QUEUE_CAPACITY: usize = 1024;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct FieldKey {

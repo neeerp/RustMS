@@ -275,6 +275,9 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::SpawnReactor as i16 => "SpawnReactor",
         x if x == SendOpcode::HitReactor as i16 => "HitReactor",
         x if x == SendOpcode::RemoveReactor as i16 => "RemoveReactor",
+        x if x == SendOpcode::FamilyInfo as i16 => "FamilyInfo",
+        x if x == SendOpcode::FamilyPrivilegeList as i16 => "FamilyPrivilegeList",
+        x if x == SendOpcode::FamilySetPrivilege as i16 => "FamilySetPrivilege",
         _ => "Unknown",
     }
 }
