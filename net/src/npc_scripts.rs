@@ -352,6 +352,42 @@ const PISON: i32 = 1081001;
 const THOMAS_SWIFT: i32 = 9201022;
 const HENESYS: (i32, u8) = (100000000, 5);
 const AMORIA: (i32, u8) = (680000000, 0);
+/// Moony (`EngageRing`), Amoria's ring maker: once the player has their
+/// parents' blessing, a groom trades a ring's stone, a Diamond and a fee for
+/// an engagement ring box (report b064).
+const MOONY: i32 = 9201000;
+/// Mom and Dad (`MeetPare`), in Meet the Parents (680000004): they ask for
+/// four of the six Proofs of Love and give their blessing.
+const MOM_AND_DAD: i32 = 9201003;
+/// The Nanas (`ProofHene` and so on): each gives her Proof of Love for 50 of
+/// a town's monster drops while the blessing is sought. One script for the
+/// six; the town decides which she is.
+const NANAS: [i32; 6] = [9201001, 9201023, 9201024, 9201025, 9201026, 9201027];
+/// By Nana: her town, the drop she asks for and the EXP she gives the first
+/// time. Her Proof of Love is `PROOF_OF_LOVE` plus her place here (Cosmic).
+const NANA_TASKS: [(i32, i32, i32); 6] = [
+    (100000000, 4000001, 2000),
+    (103000000, 4000037, 5000),
+    (102000000, 4000215, 10000),
+    (101000000, 4000026, 17000),
+    (200000000, 4000070, 22000),
+    (220000000, 4000128, 30000),
+];
+/// How many of her drop a Nana asks for.
+const NANA_TASK_COUNT: i16 = 50;
+const PROOF_OF_LOVE: i32 = 4031367;
+/// How many different Proofs of Love Mom and Dad want.
+const PROOFS_WANTED: usize = 4;
+const BLESSING_EXP: i32 = 20000;
+/// Moony's rings: the box, its stone and the fee; each also takes a
+/// Diamond (Cosmic).
+const RING_BOXES: [(i32, i32, i32); 4] = [
+    (2240000, 4011007, 30000),
+    (2240001, 4021009, 20000),
+    (2240002, 4011006, 10000),
+    (2240003, 4011004, 5000),
+];
+const DIAMOND: i32 = 4021007;
 /// Audrey (`Malay_Warp2`), Malaysia's tour guide (Cosmic's fares): from the
 /// Central Business District, where the plane lands, to Trend Zone
 /// Metropolis; between Trend Zone and Kampung Village; and from Trend Zone
@@ -656,6 +692,15 @@ const CHIEF_ASSIGNED: i16 = 32100;
 const INSTRUCTOR_ASSIGNED: i16 = 32101;
 /// The chief has sent the player to the Holy Stone (`JBQ`).
 const HOLY_STONE_ASSIGNED: i16 = 32102;
+/// Moony has sent the player for their parents' blessing.
+const BLESSING_SOUGHT: i16 = 32300;
+/// Mom and Dad have asked for the Proofs of Love.
+const PROOFS_ASKED: i16 = 32301;
+/// Mom and Dad have given their blessing; Moony makes rings.
+const BLESSED: i16 = 32302;
+/// A Nana's favour, by her place in `NANA_TASKS`: asked, and done once.
+const NANA_ASKED: i16 = 32310;
+const NANA_DONE: i16 = 32320;
 const DOOR_OF_DIMENSION: i32 = 1061009;
 const SPARKLING_CRYSTAL: i32 = 1061010;
 const HOLY_STONE: i32 = 2030006;
@@ -975,6 +1020,9 @@ impl NpcScript {
             SPINEL => Some(spinel(player)),
             PISON => Some(pison(player)),
             THOMAS_SWIFT => thomas_swift(player),
+            MOONY => Some(moony(player)),
+            MOM_AND_DAD => mom_and_dad(player),
+            id if NANAS.contains(&id) => nana(id, player),
             AUDREY => audrey(player),
             CRANE => crane(player),
             NATALIE => Some(natalie(player)),
@@ -2870,6 +2918,250 @@ fn thomas_swift(player: &Player) -> Option<NpcScript> {
             Page::Done(vec![Effect::WarpToPortal(to, portal)]),
         ],
     ))
+}
+
+/// `EngageRing`: Moony makes a ring box for a blessed groom, or throws
+/// away the boxes the player holds.
+fn moony(player: &Player) -> NpcScript {
+    let boxes: Vec<(i32, i32)> = RING_BOXES
+        .iter()
+        .map(|&(ring_box, ..)| (ring_box, player.inventory.count(ring_box)))
+        .filter(|&(_, count)| count > 0)
+        .collect();
+    let make = if marked(player, BLESSED) {
+        if !boxes.is_empty() {
+            vec![Page::Say(text(keys::MOONY_HAVE_BOX))]
+        } else if player.stats.gender != 0 {
+            vec![Page::Say(text(keys::MOONY_GROOM_ONLY))]
+        } else {
+            vec![Page::Menu {
+                text: text(keys::MOONY_CHOOSE),
+                choices: RING_BOXES
+                    .iter()
+                    .map(|&ring| (format!("#t{}#", ring.0), ring_order(ring, player)))
+                    .collect(),
+            }]
+        }
+    } else if marked(player, BLESSING_SOUGHT) {
+        vec![Page::Say(text(keys::MOONY_SEEKING))]
+    } else {
+        vec![
+            Page::Say(text(keys::MOONY_NEED_BLESSING)),
+            Page::Done(vec![Effect::Mark(BLESSING_SOUGHT)]),
+        ]
+    };
+    let discard = if boxes.is_empty() {
+        vec![Page::Say(text(keys::MOONY_NO_BOX))]
+    } else {
+        let effects = boxes
+            .iter()
+            .map(|&(item_id, count)| Effect::TakeItem {
+                item_id,
+                quantity: count as i16,
+            })
+            .collect();
+        vec![Page::Act {
+            text: text(keys::MOONY_DISCARDED),
+            effects,
+        }]
+    };
+    let mut script = NpcScript::new(
+        MOONY,
+        vec![Page::Menu {
+            text: text(keys::MOONY_MENU),
+            choices: vec![
+                (text(keys::MOONY_MAKE), make),
+                (text(keys::MOONY_DISCARD), discard),
+            ],
+        }],
+    );
+    script.inventory_full = Some(text(keys::MOONY_FULL));
+    script.refused = Some(text(keys::MOONY_NO_STONES));
+    script
+}
+
+/// Moony's question for one ring: the stones and the fee, and on yes the
+/// box.
+fn ring_order((ring_box, stone, fee): (i32, i32, i32), player: &Player) -> Vec<Page> {
+    let (box_id, stone_id, diamond, price) = (
+        ring_box.to_string(),
+        stone.to_string(),
+        DIAMOND.to_string(),
+        fee.to_string(),
+    );
+    let ask = content::text().get(
+        keys::MOONY_ASK,
+        &[
+            ("box", box_id.as_str()),
+            ("stone", stone_id.as_str()),
+            ("diamond", diamond.as_str()),
+            ("price", price.as_str()),
+        ],
+    );
+    let refusal = if player.meso < fee {
+        Some(keys::MOONY_SHORT)
+    } else if !holds(player, stone) || !holds(player, DIAMOND) {
+        Some(keys::MOONY_NO_STONES)
+    } else {
+        None
+    };
+    let on_yes = vec![
+        Effect::SpendMeso(fee),
+        Effect::TakeItem {
+            item_id: stone,
+            quantity: 1,
+        },
+        Effect::TakeItem {
+            item_id: DIAMOND,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: ring_box,
+            quantity: 1,
+        },
+    ];
+    let mut pages = gated(
+        ask,
+        Some(keys::MOONY_DECLINE),
+        refusal.unwrap_or(keys::MOONY_NO_STONES),
+        refusal.is_none(),
+        on_yes,
+    );
+    if refusal.is_none() {
+        pages.push(Page::Say(text(keys::MOONY_DONE)));
+    }
+    pages
+}
+
+/// `MeetPare`: Mom and Dad ask the player sent by Moony for four Proofs of
+/// Love, and bless them for the proofs. `None` (their own lines) otherwise.
+fn mom_and_dad(player: &Player) -> Option<NpcScript> {
+    if !marked(player, BLESSING_SOUGHT) {
+        return None;
+    }
+    if !marked(player, PROOFS_ASKED) {
+        let mut script = NpcScript::new(
+            MOM_AND_DAD,
+            vec![
+                Page::Say(text(keys::PARENTS_ASK_1)),
+                Page::Say(text(keys::PARENTS_ASK_2)),
+                Page::Say(text(keys::PARENTS_ASK_3)),
+            ],
+        );
+        script.on_end = vec![Effect::Mark(PROOFS_ASKED)];
+        return Some(script);
+    }
+    let proofs: Vec<(i32, i32)> = (0..NANAS.len() as i32)
+        .map(|i| (PROOF_OF_LOVE + i, player.inventory.count(PROOF_OF_LOVE + i)))
+        .filter(|&(_, count)| count > 0)
+        .collect();
+    if proofs.len() < PROOFS_WANTED {
+        return Some(NpcScript::new(
+            MOM_AND_DAD,
+            vec![Page::Say(text(keys::PARENTS_REMIND))],
+        ));
+    }
+    let mut effects = vec![
+        Effect::Unmark(BLESSING_SOUGHT),
+        Effect::Unmark(PROOFS_ASKED),
+        Effect::Mark(BLESSED),
+        Effect::GainExp(BLESSING_EXP),
+    ];
+    for i in 0..NANAS.len() as i16 {
+        effects.extend([
+            Effect::Unmark(NANA_ASKED + i),
+            Effect::Unmark(NANA_DONE + i),
+        ]);
+    }
+    effects.extend(proofs.iter().map(|&(item_id, count)| Effect::TakeItem {
+        item_id,
+        quantity: count as i16,
+    }));
+    let mut script = NpcScript::new(
+        MOM_AND_DAD,
+        vec![
+            Page::Say(text(keys::PARENTS_PROUD)),
+            Page::Act {
+                text: text(keys::PARENTS_BLESS),
+                effects,
+            },
+        ],
+    );
+    script.refused = Some(text(keys::PARENTS_REMIND));
+    Some(script)
+}
+
+/// `ProofHene` and the rest: while the blessing is sought, a Nana asks for
+/// 50 of her town's drop and gives her Proof of Love for them, the first
+/// time with EXP. `None` (her own lines) otherwise, and in towns without a
+/// task, as the Kerning City Nana in Magatia and Singapore.
+fn nana(npc_id: i32, player: &Player) -> Option<NpcScript> {
+    if !marked(player, BLESSING_SOUGHT) {
+        return None;
+    }
+    let here = player.stats.map_id;
+    let place = NANA_TASKS.iter().position(|&(town, ..)| town == here)?;
+    let (_, drop, exp) = NANA_TASKS[place];
+    let proof = PROOF_OF_LOVE + place as i32;
+    let (asked, done) = (NANA_ASKED + place as i16, NANA_DONE + place as i16);
+    let drop_id = drop.to_string();
+    let drop_arg = [("item", drop_id.as_str())];
+    let say = |key: &str| content::text().get(key, &drop_arg);
+    let enough = player.inventory.count(drop) >= i32::from(NANA_TASK_COUNT);
+    let mut trade = vec![
+        Effect::TakeItem {
+            item_id: drop,
+            quantity: NANA_TASK_COUNT,
+        },
+        Effect::GiveItem {
+            item_id: proof,
+            quantity: 1,
+        },
+    ];
+    let pages = if holds(player, proof) {
+        vec![Page::Say(say(keys::NANA_HAVE_PROOF))]
+    } else if marked(player, done) {
+        // Again, for the drops alone.
+        vec![
+            Page::Ask {
+                text: say(keys::NANA_AGAIN),
+                on_yes: if enough { trade } else { Vec::new() },
+                on_no: None,
+            },
+            Page::Say(say(if enough {
+                keys::NANA_THANKS
+            } else {
+                keys::NANA_NEED
+            })),
+        ]
+    } else if marked(player, asked) {
+        if enough {
+            trade.extend([
+                Effect::GainExp(exp),
+                Effect::Unmark(asked),
+                Effect::Mark(done),
+            ]);
+            vec![Page::Act {
+                text: say(keys::NANA_THANKS),
+                effects: trade,
+            }]
+        } else {
+            vec![Page::Say(say(keys::NANA_NEED))]
+        }
+    } else {
+        vec![
+            Page::Ask {
+                text: say(keys::NANA_FAVOUR),
+                on_yes: vec![Effect::Mark(asked)],
+                on_no: Some(say(keys::NANA_DECLINE)),
+            },
+            Page::Say(say(keys::NANA_TASK)),
+        ]
+    };
+    let mut script = NpcScript::new(npc_id, pages);
+    script.inventory_full = Some(say(keys::NANA_FULL));
+    script.refused = Some(say(keys::NANA_NEED));
+    Some(script)
 }
 
 /// A choice of a trip to `to` for `fare`, which on a yes pays and `warp`s.
@@ -6109,5 +6401,240 @@ mod tests {
         player.meso -= 1;
         let mut spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
         assert_eq!(spiruna.respond(ScriptInput::Yes).unwrap().effects, []);
+    }
+
+    fn engaging(markers: &[i16], gender: u8, meso: i32, items: &[(i32, i16)]) -> Player {
+        let mut player = traveller(30, meso, false);
+        player.stats.gender = gender;
+        for &quest_id in markers {
+            let status = QuestStatus::Started { kills: Vec::new() };
+            player.quests.upsert(game::QuestRecord { quest_id, status });
+        }
+        for (slot, &(item_id, count)) in items.iter().enumerate() {
+            let tab = if item_id / 1_000_000 == 2 {
+                game::InventoryType::Use
+            } else {
+                game::InventoryType::Etc
+            };
+            player
+                .inventory
+                .insert(tab, slot as i16 + 1, game::Item::stack(item_id, count));
+        }
+        player
+    }
+
+    #[test]
+    fn moony_sends_a_groom_for_the_blessing_then_makes_his_ring_box() {
+        let make = |player: &Player| {
+            let mut moony = NpcScript::for_npc(MOONY, player).unwrap();
+            assert_eq!(kind(&moony.begin()), Some(4));
+            let step = moony.respond(ScriptInput::Select(0)).unwrap();
+            (moony, step)
+        };
+
+        // First the blessing, then a word while it is sought.
+        let (mut moony, step) = make(&engaging(&[], 0, 0, &[]));
+        assert_eq!(page_text(&step), text(keys::MOONY_NEED_BLESSING));
+        assert_eq!(
+            moony.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Mark(BLESSING_SOUGHT)]
+        );
+        let (_, step) = make(&engaging(&[BLESSING_SOUGHT], 0, 0, &[]));
+        assert_eq!(page_text(&step), text(keys::MOONY_SEEKING));
+
+        // Blessed, the groom picks a ring and pays its stones and fee.
+        let stones = [(4021009, 1), (DIAMOND, 1)];
+        let groom = engaging(&[BLESSED], 0, 20_000, &stones);
+        let (mut moony, step) = make(&groom);
+        assert_eq!(menu_text(&step).matches("#L").count(), 4);
+        let ask = moony.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        let made = moony.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(20_000),
+                Effect::TakeItem {
+                    item_id: 4021009,
+                    quantity: 1
+                },
+                Effect::TakeItem {
+                    item_id: DIAMOND,
+                    quantity: 1
+                },
+                Effect::GiveItem {
+                    item_id: 2240001,
+                    quantity: 1
+                },
+            ]
+        );
+        assert_eq!(page_text(&made), text(keys::MOONY_DONE));
+
+        // Short of the fee, or of a stone, nothing changes hands.
+        let refused = |player: &Player, ring: i32| {
+            let (mut moony, _) = make(player);
+            moony.respond(ScriptInput::Select(ring)).unwrap();
+            let step = moony.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(step.effects, []);
+            page_text(&step)
+        };
+        let poor = engaging(&[BLESSED], 0, 19_999, &stones);
+        assert_eq!(refused(&poor, 1), text(keys::MOONY_SHORT));
+        assert_eq!(refused(&groom, 2), text(keys::MOONY_NO_STONES));
+        let no_diamond = engaging(&[BLESSED], 0, 20_000, &stones[..1]);
+        assert_eq!(refused(&no_diamond, 1), text(keys::MOONY_NO_STONES));
+
+        // One box at a time, and only for a groom.
+        let holding = engaging(&[BLESSED], 0, 20_000, &[(2240003, 1)]);
+        assert_eq!(page_text(&make(&holding).1), text(keys::MOONY_HAVE_BOX));
+        let bride = engaging(&[BLESSED], 1, 20_000, &stones);
+        assert_eq!(page_text(&make(&bride).1), text(keys::MOONY_GROOM_ONLY));
+    }
+
+    #[test]
+    fn moony_throws_away_every_ring_box_held() {
+        let discard = |player: &Player| {
+            let mut moony = NpcScript::for_npc(MOONY, player).unwrap();
+            moony.begin();
+            moony.respond(ScriptInput::Select(1)).unwrap()
+        };
+        let none = discard(&engaging(&[], 0, 0, &[]));
+        assert_eq!(page_text(&none), text(keys::MOONY_NO_BOX));
+        assert_eq!(none.effects, []);
+        let boxes = discard(&engaging(&[], 0, 0, &[(2240000, 1), (2240002, 2)]));
+        assert_eq!(page_text(&boxes), text(keys::MOONY_DISCARDED));
+        assert_eq!(
+            boxes.effects,
+            [
+                Effect::TakeItem {
+                    item_id: 2240000,
+                    quantity: 1
+                },
+                Effect::TakeItem {
+                    item_id: 2240002,
+                    quantity: 2
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn mom_and_dad_bless_for_four_different_proofs_of_love() {
+        // Their own lines until Moony sends the player.
+        assert!(NpcScript::for_npc(MOM_AND_DAD, &engaging(&[], 0, 0, &[])).is_none());
+
+        let mut asking =
+            NpcScript::for_npc(MOM_AND_DAD, &engaging(&[BLESSING_SOUGHT], 0, 0, &[])).unwrap();
+        assert_eq!(page_text(&asking.begin()), text(keys::PARENTS_ASK_1));
+        asking.respond(ScriptInput::Next).unwrap();
+        let last = asking.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&last), text(keys::PARENTS_ASK_3));
+        assert_eq!(
+            asking.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Mark(PROOFS_ASKED)]
+        );
+
+        // Two of one proof count once.
+        let asked = [BLESSING_SOUGHT, PROOFS_ASKED];
+        let three = [(4031367, 2), (4031368, 1), (4031370, 1)];
+        let waiting = NpcScript::for_npc(MOM_AND_DAD, &engaging(&asked, 0, 0, &three)).unwrap();
+        assert_eq!(page_text(&waiting.begin()), text(keys::PARENTS_REMIND));
+
+        let four = [(4031367, 2), (4031368, 1), (4031370, 1), (4031372, 1)];
+        let mut proud = NpcScript::for_npc(MOM_AND_DAD, &engaging(&asked, 0, 0, &four)).unwrap();
+        assert_eq!(page_text(&proud.begin()), text(keys::PARENTS_PROUD));
+        let blessed = proud.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&blessed), text(keys::PARENTS_BLESS));
+        let effects = &blessed.effects;
+        assert_eq!(
+            effects[..4],
+            [
+                Effect::Unmark(BLESSING_SOUGHT),
+                Effect::Unmark(PROOFS_ASKED),
+                Effect::Mark(BLESSED),
+                Effect::GainExp(BLESSING_EXP),
+            ]
+        );
+        for i in 0..6 {
+            assert!(effects.contains(&Effect::Unmark(NANA_ASKED + i)));
+            assert!(effects.contains(&Effect::Unmark(NANA_DONE + i)));
+        }
+        let taken: Vec<_> = effects
+            .iter()
+            .filter_map(|effect| match effect {
+                Effect::TakeItem { item_id, quantity } => Some((*item_id, *quantity)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(taken, four);
+    }
+
+    #[test]
+    fn each_nana_trades_her_proof_of_love_for_fifty_of_her_towns_drop() {
+        let sought = |more: &[i16], map: i32, items: &[(i32, i16)]| {
+            let mut player = engaging(&[&[BLESSING_SOUGHT][..], more].concat(), 0, 0, items);
+            player.stats.map_id = map;
+            player
+        };
+        for (i, &(town, drop, exp)) in NANA_TASKS.iter().enumerate() {
+            let (npc, proof) = (NANAS[i], PROOF_OF_LOVE + i as i32);
+            let (asked, done) = (NANA_ASKED + i as i16, NANA_DONE + i as i16);
+            let say = |key: &str| content::text().get(key, &[("item", &drop.to_string())]);
+            let trade = [
+                Effect::TakeItem {
+                    item_id: drop,
+                    quantity: 50,
+                },
+                Effect::GiveItem {
+                    item_id: proof,
+                    quantity: 1,
+                },
+            ];
+
+            // Her own lines before Moony's errand.
+            assert!(NpcScript::for_npc(npc, &engaging(&[], 0, 0, &[])).is_none());
+
+            // The favour: on yes, her drop named.
+            let mut nana = NpcScript::for_npc(npc, &sought(&[], town, &[])).unwrap();
+            assert_eq!(kind(&nana.begin()), Some(1));
+            let task = nana.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(task.effects, [Effect::Mark(asked)]);
+            assert_eq!(page_text(&task), say(keys::NANA_TASK));
+
+            // Short, a reminder; with 50, the proof and the EXP.
+            let short = sought(&[asked], town, &[(drop, 49)]);
+            let nana = NpcScript::for_npc(npc, &short).unwrap();
+            assert_eq!(page_text(&nana.begin()), say(keys::NANA_NEED));
+            let ready = sought(&[asked], town, &[(drop, 50)]);
+            let thanks = NpcScript::for_npc(npc, &ready).unwrap().begin();
+            assert_eq!(page_text(&thanks), say(keys::NANA_THANKS));
+            let mut paid = trade.to_vec();
+            paid.extend([
+                Effect::GainExp(exp),
+                Effect::Unmark(asked),
+                Effect::Mark(done),
+            ]);
+            assert_eq!(thanks.effects, paid);
+
+            // Holding her proof, nothing more; done and without it, another
+            // for the drops alone.
+            let holding = sought(&[done], town, &[(proof, 1), (drop, 50)]);
+            let nana = NpcScript::for_npc(npc, &holding).unwrap();
+            assert_eq!(page_text(&nana.begin()), say(keys::NANA_HAVE_PROOF));
+            let again = sought(&[done], town, &[(drop, 50)]);
+            let mut nana = NpcScript::for_npc(npc, &again).unwrap();
+            assert_eq!(kind(&nana.begin()), Some(1));
+            assert_eq!(nana.respond(ScriptInput::Yes).unwrap().effects, trade);
+            let poor = sought(&[done], town, &[]);
+            let mut nana = NpcScript::for_npc(npc, &poor).unwrap();
+            nana.begin();
+            let refused = nana.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(refused.effects, []);
+            assert_eq!(page_text(&refused), say(keys::NANA_NEED));
+        }
+
+        // A Nana in a town without a task keeps her own lines.
+        let elsewhere = sought(&[], 260000000, &[]);
+        assert!(NpcScript::for_npc(NANAS[1], &elsewhere).is_none());
     }
 }

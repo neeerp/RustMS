@@ -675,6 +675,130 @@ pub mod keys {
     /// To a proposer: one of the two is below the level to be engaged.
     pub const MARRIAGE_LEVEL: &str = "marriage.level";
 
+    /// Moony's menu.
+    pub const MOONY_MENU: &str = "moony.menu";
+
+    /// Moony's choice to make a ring.
+    pub const MOONY_MAKE: &str = "moony.make";
+
+    /// Moony's choice to throw away ring boxes.
+    pub const MOONY_DISCARD: &str = "moony.discard";
+
+    /// Moony sends the player for their parents' blessing.
+    pub const MOONY_NEED_BLESSING: &str = "moony.need_blessing";
+
+    /// Moony, while the blessing is still sought.
+    pub const MOONY_SEEKING: &str = "moony.seeking";
+
+    /// Moony to a player who already holds a ring box.
+    pub const MOONY_HAVE_BOX: &str = "moony.have_box";
+
+    /// Moony to a woman who asks for a ring.
+    pub const MOONY_GROOM_ONLY: &str = "moony.groom_only";
+
+    /// Moony's choice of rings.
+    pub const MOONY_CHOOSE: &str = "moony.choose";
+
+    /// Moony's price for a ring: {box}, {stone} and {diamond} are item ids, {price} mesos.
+    pub const MOONY_ASK: &str = "moony.ask";
+
+    /// Moony, when the player turns the price down.
+    pub const MOONY_DECLINE: &str = "moony.decline";
+
+    /// Moony to a player short of the fee.
+    pub const MOONY_SHORT: &str = "moony.short";
+
+    /// Moony to a player without the stones.
+    pub const MOONY_NO_STONES: &str = "moony.no_stones";
+
+    /// Moony, when the box doesn't fit.
+    pub const MOONY_FULL: &str = "moony.full";
+
+    /// Moony hands over the ring box.
+    pub const MOONY_DONE: &str = "moony.done";
+
+    /// Moony throws the player's ring boxes away.
+    pub const MOONY_DISCARDED: &str = "moony.discarded";
+
+    /// Moony to a player without a ring box to throw away.
+    pub const MOONY_NO_BOX: &str = "moony.no_box";
+
+    /// Mom and Dad hear the player out.
+    pub const PARENTS_ASK_1: &str = "parents.ask_1";
+
+    /// Mom and Dad agree.
+    pub const PARENTS_ASK_2: &str = "parents.ask_2";
+
+    /// Mom and Dad set the task.
+    pub const PARENTS_ASK_3: &str = "parents.ask_3";
+
+    /// Mom and Dad, until the player has four proofs.
+    pub const PARENTS_REMIND: &str = "parents.remind";
+
+    /// Mom and Dad see the proofs.
+    pub const PARENTS_PROUD: &str = "parents.proud";
+
+    /// Mom and Dad take the proofs and give their blessing.
+    pub const PARENTS_BLESS: &str = "parents.bless";
+
+    /// A Nana asks a favour: {item} is the drop's item id.
+    pub const NANA_FAVOUR: &str = "nana.favour";
+
+    /// A Nana, when the favour is turned down.
+    pub const NANA_DECLINE: &str = "nana.decline";
+
+    /// A Nana names her drop.
+    pub const NANA_TASK: &str = "nana.task";
+
+    /// A Nana to a player with fewer than 50 of her drop.
+    pub const NANA_NEED: &str = "nana.need";
+
+    /// A Nana gives her Proof of Love.
+    pub const NANA_THANKS: &str = "nana.thanks";
+
+    /// A Nana to a player who holds her proof.
+    pub const NANA_HAVE_PROOF: &str = "nana.have_proof";
+
+    /// A Nana offers her proof again for the drops.
+    pub const NANA_AGAIN: &str = "nana.again";
+
+    /// A Nana, when her proof doesn't fit.
+    pub const NANA_FULL: &str = "nana.full";
+
+    /// Moony, Mom and Dad, and the Nanas (Amoria's engagement rings).
+    pub const ENGAGEMENT: [&str; 30] = [
+        MOONY_MENU,
+        MOONY_MAKE,
+        MOONY_DISCARD,
+        MOONY_NEED_BLESSING,
+        MOONY_SEEKING,
+        MOONY_HAVE_BOX,
+        MOONY_GROOM_ONLY,
+        MOONY_CHOOSE,
+        MOONY_ASK,
+        MOONY_DECLINE,
+        MOONY_SHORT,
+        MOONY_NO_STONES,
+        MOONY_FULL,
+        MOONY_DONE,
+        MOONY_DISCARDED,
+        MOONY_NO_BOX,
+        PARENTS_ASK_1,
+        PARENTS_ASK_2,
+        PARENTS_ASK_3,
+        PARENTS_REMIND,
+        PARENTS_PROUD,
+        PARENTS_BLESS,
+        NANA_FAVOUR,
+        NANA_DECLINE,
+        NANA_TASK,
+        NANA_NEED,
+        NANA_THANKS,
+        NANA_HAVE_PROOF,
+        NANA_AGAIN,
+        NANA_FULL,
+    ];
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -1331,6 +1455,7 @@ mod tests {
             .chain(&keys::MAKER_GOLD_ANVIL)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
+            .chain(&keys::ENGAGEMENT)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }
