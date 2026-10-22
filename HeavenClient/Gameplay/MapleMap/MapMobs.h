@@ -40,8 +40,9 @@ namespace ms
 		void draw(Layer::Id layer, double viewx, double viewy, float alpha) const;
 
 		// Update all mobs. Those with aggro chase the local player, whom all
-		// their attacks may hit.
-		void update(const Physics &physics, const Mob::Target &target);
+		// their attacks may hit. The `reporter` tells the server of mobs
+		// that run into a friendly mob.
+		void update(const Physics &physics, const Mob::Target &target, bool reporter);
 
 		// The local player's hits from mob attacks since last asked.
 		std::vector<Mob::Landed> take_attacks();
@@ -63,6 +64,12 @@ namespace ms
 
 		// Show a number on a mob: damage, a heal if negative, or a miss.
 		void show_damage(int32_t oid, int32_t damage);
+
+		// Whether a mob is a friendly, which mobs hurt rather than players.
+		bool is_friendly(int32_t oid) const;
+
+		// The server's word of a hit on a friendly mob, with its HP after.
+		void friendly_hit(int32_t oid, int32_t damage, int32_t hp, int32_t maxhp);
 
 		// Show on a mob what another player's Power Guard or Mana Reflection
 		// sent back at it.
@@ -157,8 +164,19 @@ namespace ms
 		MapObjects *get_mobs();
 
 	private:
+		// The friendly mob's pull on the mobs that hurt it, and the reports
+		// of those that run into it (FUN_006675a8, 0x667e40).
+		void update_friendly(int32_t charid, bool reporter);
+
 		MapObjects mobs;
 
 		std::queue<MobSpawn> spawns;
+
+		// The ms the mobs have run, the friendly on the map, if any (one at
+		// a time, the last to come), and when this client last reported a
+		// hit on it, which its coming counts as (0x679565).
+		int64_t clock = 0;
+		int32_t friendlyoid = 0;
+		int64_t reportedat = 0;
 	};
 }

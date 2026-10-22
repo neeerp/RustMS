@@ -17,7 +17,11 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MapMobs.h"
 #include "FieldLimit.h"
+#include "FriendlyRules.h"
 #include "Mob.h"
+
+#include "../../Constants.h"
+#include "../../Net/Packets/GameplayPackets.h"
 
 #include <algorithm>
 #include <iostream>
@@ -30,13 +34,16 @@ namespace ms
 		mobs.draw(layer, viewx, viewy, alpha);
 	}
 
-	void MapMobs::update(const Physics &physics, const Mob::Target &target)
+	void MapMobs::update(const Physics &physics, const Mob::Target &target, bool reporter)
 	{
+		clock += Constants::TIMESTEP;
+
 		for (; !spawns.empty(); spawns.pop())
 		{
 			const MobSpawn &spawn = spawns.front();
+			int32_t oid = spawn.get_oid();
 
-			if (Optional<Mob> mob = mobs.get(spawn.get_oid()))
+			if (Optional<Mob> mob = mobs.get(oid))
 			{
 				int8_t mode = spawn.get_mode();
 
@@ -47,6 +54,14 @@ namespace ms
 			} else
 			{
 				mobs.add(spawn.instantiate(physics));
+			}
+
+			Optional<Mob> mob = mobs.get(oid);
+
+			if (mob && mob->is_friendly())
+			{
+				friendlyoid = oid;
+				reportedat = clock;
 			}
 		}
 
@@ -59,6 +74,7 @@ namespace ms
 		}
 
 		mobs.update(physics);
+		update_friendly(target.id, reporter);
 
 		// A mob's attack reaches up to 15 other mobs where it lands, each
 		// of which takes it if Hypnotized (FUN_00678476, 0x667138).
@@ -77,7 +93,7 @@ namespace ms
 				{
 					Optional<Mob> victim = other.second.get();
 
-					if (!victim || other.first == mmo.first || !victim->is_alive())
+					if (!victim || other.first == mmo.first || !victim->is_alive() || victim->is_friendly())
 						continue;
 
 					Rectangle<int16_t> body = victim->get_body();
@@ -91,6 +107,42 @@ namespace ms
 						break;
 				}
 			}
+		}
+	}
+
+	void MapMobs::update_friendly(int32_t charid, bool reporter)
+	{
+		Optional<Mob> victim = mobs.get(friendlyoid);
+
+		if (!victim || !victim->is_alive())
+			return;
+
+		Point<int16_t> position = victim->get_position();
+		Rectangle<int16_t> body = victim->get_body();
+
+		for (auto &mmo : mobs)
+		{
+			Optional<Mob> attacker = mmo.second.get();
+
+			if (!attacker || mmo.first == friendlyoid || !attacker->is_alive() ||
+				!victim->is_hurt_by_mob(attacker->get_id()))
+				continue;
+
+			// A mob this client moves that chases no one goes after it.
+			attacker->chase_friendly(friendlyoid, position);
+
+			Rectangle<int16_t> other = attacker->get_body();
+
+			if (!reporter || !friendly::may_report(clock, reportedat) ||
+				!friendly::meet(body.left(), body.top(), body.right(), body.bottom(), other.left(), other.top(),
+								other.right(), other.bottom()))
+				continue;
+
+			MobDamageFriendlyPacket(mmo.first, charid, friendlyoid).dispatch();
+			reportedat = clock;
+
+			// Its own controller has it flinch at once (0x667fc6).
+			victim->flinch_from(attacker->get_position());
 		}
 	}
 
@@ -119,11 +171,19 @@ namespace ms
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 			mob->kill(animation);
+
+		// The mobs after a friendly that goes give it up (0x679590).
+		if (oid == friendlyoid)
+		{
+			release_puppet(oid);
+			friendlyoid = 0;
+		}
 	}
 
 	void MapMobs::clear()
 	{
 		mobs.clear();
+		friendlyoid = 0;
 	}
 
 	void MapMobs::set_control(int32_t oid, bool control)
@@ -145,6 +205,20 @@ namespace ms
 	{
 		if (Optional<Mob> mob = mobs.get(oid))
 			mob->show_damage(damage);
+	}
+
+	bool MapMobs::is_friendly(int32_t oid) const
+	{
+		if (Optional<const Mob> mob = mobs.get(oid))
+			return mob->is_friendly();
+
+		return false;
+	}
+
+	void MapMobs::friendly_hit(int32_t oid, int32_t damage, int32_t hp, int32_t maxhp)
+	{
+		if (Optional<Mob> mob = mobs.get(oid))
+			mob->friendly_hit(damage, hp, maxhp);
 	}
 
 	void MapMobs::show_reflect(int32_t oid, uint8_t percent, int32_t damage, bool physical)
@@ -269,7 +343,7 @@ namespace ms
 				[&](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->deals_touch_damage() && mob->is_in_range(area)
+					return mob && mob->is_alive() && mob->deals_touch_damage() && !mob->is_friendly() && mob->is_in_range(area)
 							&& field_limit::may_touch(fieldlimit, hidden, mob->get_id());
 				}
 		);
@@ -390,7 +464,7 @@ namespace ms
 		{
 			auto mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (mob && mob->is_alive())
+			if (mob && mob->is_alive() && !mob->is_friendly())
 				found.push_back({ mobs.entry_order(mmo.first), { mmo.first, mob->get_body() } });
 		}
 

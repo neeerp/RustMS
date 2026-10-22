@@ -246,6 +246,17 @@ gets DAMAGE_MONSTER (0xF6) with the number, HP and max HP, which the client
 shows as the friendly's gauge. Every sixth hit tells the map
 `hpq.bunny.sick` (BROADCAST_MSG 6).
 
+In HeavenClient (`FriendlyRules.h`, `MapMobs::update_friendly`), a mob
+whose Mob.wz `info/damagedByMob` is set is friendly. Its client's attacks
+and skills skip it, and so do Hypnotize, touch damage and Mine. Mobs this
+client controls that may hurt it (any mob, or those on its
+`damagedBySelectedMob` list) chase it. The party's leader's client, or a
+lone player's, sends 0xC0 for a mob whose body meets it, at most once in
+1.5 s across the map; the victim flinches away from the attacker. Its
+DAMAGE_MONSTER sets a red 52x10 gauge, which it shows from the start
+(other mobs' bars are now light green), and makes it take its hit stance,
+blinking grey 30 ms on and off, unless the hit is under its knockback.
+
 Its `dropItemPeriod` (6, in tens of seconds) is a third as long for the
 bunny, so every 20 seconds it drops what the content pack's drops give mob
 `9300061` (a rice cake, `4001101`), without the quest items or the
@@ -283,8 +294,7 @@ These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
 - HPQ's play: Growlie's hand-in of the rice cakes, Tory's reward, and
-  Tommy's Pig Town bonus (a058, slice 4). HeavenClient doesn't send 0xC0
-  or show a friendly's gauge yet (a061).
+  Tommy's Pig Town bonus (a058, slice 4).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

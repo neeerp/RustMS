@@ -54,6 +54,9 @@ namespace ms
 		// Returns a reference to the MapObjects object.
 		MapObjects *get_chars();
 
+		// How many other characters are on the map.
+		size_t size() const;
+
 		// Update a characters movement.
 		void send_movement(int32_t cid, const std::vector<Movement> &movements);
 
