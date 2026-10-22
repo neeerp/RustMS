@@ -327,7 +327,7 @@ impl ClientActor {
     /// Give the player `item_id`'s effect and tell them and the map;
     /// `false` if it has none supported. `exclusive` unlocks the client's
     /// pickup with the HP and MP update.
-    async fn take_item_effect(
+    pub(super) async fn take_item_effect(
         &mut self,
         item_id: i32,
         exclusive: bool,

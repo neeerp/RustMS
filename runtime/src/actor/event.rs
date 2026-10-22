@@ -105,6 +105,9 @@ pub struct EventTicket {
     cleared: Arc<Cleared>,
     /// Who leads the team, shared with the event, which hands it on.
     leader: Arc<AtomicI32>,
+    /// The item buff the member gets on arrival and loses on leaving, if
+    /// the team earned one (`Event::blessing`).
+    pub blessing: Option<i32>,
 }
 
 impl Drop for EventTicket {
@@ -191,6 +194,8 @@ pub struct EventStart {
     pub channel_id: u8,
     pub leader: ClientId,
     pub team: Vec<ClientHandle>,
+    /// The item buff everyone gets on arrival, if the team earned one.
+    pub blessing: Option<i32>,
 }
 
 /// Start the event's actor, which hands out the tickets.
@@ -228,6 +233,7 @@ pub fn spawn(
         directory: directory.clone(),
         failed: false,
         bonus_taken: false,
+        blessing: start.blessing,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -284,12 +290,13 @@ struct EventActor {
     failed: bool,
     /// The leader took the team to the bonus.
     bonus_taken: bool,
+    blessing: Option<i32>,
 }
 
 impl EventActor {
     async fn run(mut self) {
         let (id, kind) = (self.id, self.kind);
-        info!(?kind, id, members = ?self.team.members(), "Event started");
+        info!(?kind, id, members = ?self.team.members(), blessing = ?self.blessing, "Event started");
         if let (Some(event), Some(ends)) = (self.event.take(), self.ends) {
             for member in self.members.values() {
                 // A ticket that doesn't arrive hands itself back.
@@ -301,6 +308,7 @@ impl EventActor {
                     event: event.clone(),
                     cleared: self.cleared.clone(),
                     leader: self.leader.clone(),
+                    blessing: self.blessing,
                 }));
             }
         }

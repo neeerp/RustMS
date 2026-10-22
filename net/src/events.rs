@@ -81,6 +81,10 @@ pub struct Event {
     /// The bonus the team that won goes to: taken there by the leader, or
     /// at once (`Bonus::on_win`).
     pub bonus: Option<Bonus>,
+    /// The item buffs, one drawn at random, that every member gets on
+    /// arrival when the team has all five job lines among it (Orbis's
+    /// "Blessing from Wonky the Fairy"); none for the other events.
+    pub blessings: &'static [i32],
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -164,6 +168,7 @@ pub const KPQ: Event = Event {
     gates: true,
     clear_map: None,
     bonus: None,
+    blessings: &[],
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -255,6 +260,7 @@ pub const HPQ: Event = Event {
         minutes: 5,
         on_win: false,
     }),
+    blessings: &[],
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -311,6 +317,7 @@ pub const LPQ: Event = Event {
         minutes: 1,
         on_win: true,
     }),
+    blessings: &[],
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -495,6 +502,9 @@ pub const OPQ: Event = Event {
     gates: false,
     clear_map: None,
     bonus: None,
+    // Attack, defence, accuracy and avoidability, or speed and jump, for
+    // 30 minutes (Cosmic `afterSetup`).
+    blessings: &[2_022_090, 2_022_091, 2_022_092, 2_022_093],
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -821,7 +831,26 @@ impl Event {
             .collect();
         (team.contains(&leader) && self.team.contains(&team.len())).then_some(team)
     }
+
+    /// The blessing a team of these `jobs` gets, if any: one of
+    /// `blessings`, at random, when they cover the warrior, magician,
+    /// bowman, thief and pirate lines, whatever the advancement (Cosmic
+    /// `isTeamAllJobs`, whose `getJobNiche` is the job's hundreds digit,
+    /// so Cygnus Knights count for their line too).
+    pub fn blessing(&self, jobs: &[i16], rng: &mut impl rand::Rng) -> Option<i32> {
+        let lines = jobs
+            .iter()
+            .fold(0u16, |lines, &job| lines | 1 << (job / 100 % 10));
+        if self.blessings.is_empty() || lines & ALL_JOB_LINES != ALL_JOB_LINES {
+            return None;
+        }
+        Some(self.blessings[rng.gen_range(0, self.blessings.len())])
+    }
 }
+
+/// The job lines' bits (`1 << line`), warrior 1 to pirate 5, beginners
+/// (0) left out.
+const ALL_JOB_LINES: u16 = 0b11_1110;
 
 /// How often a friendly mob makes what it drops: its `dropItemPeriod`, in
 /// tens of seconds, and a third of that for the Moon Bunny (Cosmic's, as
@@ -1483,6 +1512,24 @@ mod tests {
         assert!(!OPQ.holds(OPQ.exit) && !OPQ.holds(OPQ.lobby));
         assert_eq!((OPQ.items[0], OPQ.items[19]), (4_001_044, 4_001_063));
         assert_eq!(EventKind::Opq.event(), &OPQ);
+    }
+
+    #[test]
+    fn only_a_team_of_every_job_line_is_blessed_in_orbis() {
+        let mut rng = rand::thread_rng();
+        // A warrior, a Fire/Poison mage, a hunter, a Night Walker (thief
+        // line) and a gunslinger, with a beginner along.
+        let all = [110, 210, 300, 1400, 520, 0];
+        let mut seen = HashSet::new();
+        for _ in 0..200 {
+            seen.insert(OPQ.blessing(&all, &mut rng).unwrap());
+        }
+        assert_eq!(seen, OPQ.blessings.iter().copied().collect());
+        // No pirate: nothing, however many others.
+        assert_eq!(OPQ.blessing(&[100, 200, 300, 400, 412, 0], &mut rng), None);
+        assert_eq!(OPQ.blessing(&[], &mut rng), None);
+        // The other events bless nobody.
+        assert_eq!(LPQ.blessing(&all, &mut rng), None);
     }
 
     #[test]

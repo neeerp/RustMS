@@ -356,12 +356,16 @@ impl ClientActor {
             // Dropping the ticket hands it back.
             return Ok(());
         }
-        let kind = ticket.kind;
+        let (kind, blessing) = (ticket.kind, ticket.blessing);
         let entry = kind.event().entry;
         self.event = Some(ticket);
         self.warp_within_event(entry).await?;
         if kind == EventKind::Opq {
             self.start_script(NpcScript::opq_arrival()).await?;
+        }
+        // Once there, as Cosmic's `afterSetup` follows `playerEntry`.
+        if let Some(item_id) = blessing {
+            self.take_item_effect(item_id, false).await?;
         }
         Ok(())
     }
@@ -461,6 +465,13 @@ impl ClientActor {
             return Ok(());
         };
         let changes = ticket.kind.event().take_items(&mut game.player);
+        // The blessing stays in the event (Cosmic `playerUnregistered`).
+        // Only the player hears of it: they are leaving the map, and arrive
+        // on the next without it.
+        let unblessed = ticket
+            .blessing
+            .map(|item_id| game.player.buffs.cancel(-item_id))
+            .unwrap_or_default();
         if self.in_cash_shop {
             return Ok(());
         }
@@ -468,6 +479,9 @@ impl ClientActor {
         if !changes.is_empty() {
             self.send(&mut build_inventory_operation(false, &changes)?)
                 .await?;
+        }
+        if !unblessed.is_empty() {
+            self.send_cancelled(&unblessed).await?;
         }
         Ok(())
     }

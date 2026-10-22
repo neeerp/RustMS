@@ -106,6 +106,8 @@ bonus and the storage come in a later slice
    Whichever way they leave, the event's own items (`Event::items`, KPQ's
    coupons and passes, Cosmic's `setExclusiveItems`) are taken from them:
    `Event::take_items`, shown to the client unless they are logging out.
+   A blessing given on arrival (Orbis's, below) ends too, told only to
+   the player, and not at all on logging out, when buffs go anyway.
 6. **Ending.** The event ends when its time is up, when its leader leaves
    or passes the lead to someone not in it, or when too few remain; once
    won, only when its last member leaves. It sends `EventEnded{id}`, and
@@ -392,6 +394,15 @@ exchange are left out. On 920010000 Wonky asks before letting a player
 out to 920011200, from where Eak (2013001) sends them back to 200080101.
 Leaving takes the quest's items, 4001044 to 4001063 (Cosmic
 `setExclusiveItems`), and five players are the fewest, as in Ludibrium.
+
+A team with a warrior, a magician, a bowman, a thief and a pirate among
+it, at any advancement and Cygnus Knights included, gets one of Wonky's
+four blessings (2022090 to 2022093, two stats each for 30 minutes), drawn
+once for the team (`Event::blessing`, Cosmic `afterSetup`). The directory
+draws it from the members' `Presence::job` when it reserves the event, and
+`EventTicket::blessing` carries it. Each member gets it as an item buff
+(`take_item_effect`) once on 920010000, and loses it whichever way they
+leave the tower (`drop_event_ticket`, Cosmic `playerUnregistered`).
 
 ## Orbis's cloud stage and hub
 

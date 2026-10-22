@@ -929,6 +929,19 @@ mod tests {
     }
 
     #[test]
+    fn wonkys_blessings_raise_two_stats_for_half_an_hour() {
+        if items::data().is_err() {
+            return;
+        }
+        for &item_id in crate::events::OPQ.blessings {
+            let mut player = crate::codec::stats::sample_player();
+            let effect = apply_item_effect(&mut player, item_id, Instant::now()).unwrap();
+            assert_eq!(effect.given.len(), 2, "{item_id}");
+            assert_eq!(effect.time, 30 * 60 * 1000, "{item_id}");
+        }
+    }
+
+    #[test]
     fn alchemist_strengthens_flat_potions_and_lengthens_item_buffs() {
         if items::data().is_err() || skills::data().is_err() {
             return;
