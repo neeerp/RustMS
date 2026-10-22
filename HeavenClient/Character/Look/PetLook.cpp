@@ -19,6 +19,8 @@
 
 #include "../Pets.h"
 
+#include "../../Gameplay/MapleMap/Pickup.h"
+
 #include "../../Constants.h"
 #include "../../Audio/Audio.h"
 #include "../../Data/PetData.h"
@@ -185,6 +187,15 @@ namespace ms
 			return std::nullopt;
 		}
 
+		if (charpos != ownerpos)
+		{
+			ownerpos = charpos;
+			owner_still = 0;
+		} else if (!pickup::sweep_ready(owner_still))
+		{
+			owner_still += Constants::TIMESTEP;
+		}
+
 		Point<int16_t> curpos = phobj.get_position();
 		bool teleported = false;
 
@@ -192,7 +203,9 @@ namespace ms
 		{
 			case Stance::STAND:
 			case Stance::MOVE:
-				if (curpos.distance(charpos) > 150)
+				// v83 calls a pet back once its owner leaves a box around
+				// it (FUN_009c4122), wide enough for a sweep.
+				if (!pickup::within_leash(curpos, charpos))
 				{
 					set_position(charpos.x(), charpos.y());
 					teleported = true;
@@ -215,6 +228,16 @@ namespace ms
 						phobj.hforce = 0.0;
 
 						set_stance(Stance::STAND);
+					}
+
+					// In Wing Boots it walks toward its drop instead, once its
+					// owner has stood still a moment (FUN_009c4122).
+					if (sweep != 0 && pickup::sweep_ready(owner_still))
+					{
+						phobj.hforce = sweep * PETWALKFORCE;
+						flip = sweep > 0;
+
+						set_stance(Stance::MOVE);
 					}
 				}
 
@@ -557,6 +580,11 @@ namespace ms
 	void PetLook::set_ignored(std::vector<int32_t> ids)
 	{
 		ignored = std::move(ids);
+	}
+
+	void PetLook::set_sweep(int8_t direction)
+	{
+		sweep = direction;
 	}
 
 	const std::vector<int32_t> &PetLook::get_ignored() const

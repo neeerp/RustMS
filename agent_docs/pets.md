@@ -147,7 +147,23 @@ beside it.
   as a chat line.
 - The player's own pets follow with HeavenClient's follow physics and send
   their path as MOVE_PET on the movement timer. Other players' pets play
-  the paths from 170 (`PetLook`).
+  the paths from 170 (`PetLook`). As in v83 (FUN_009c4122), a pet on the
+  ground is called back to its owner once the owner leaves a box from 300 px
+  left of it to 300 px right and 200 px above to 200 px below (a flying pet
+  keeps HeavenClient's 250 px).
+- A pet in Wing Boots (1812004) with a Meso Magnet or Item Pouch walks toward
+  a drop while its owner has stood still for over 100 ms (FUN_00508268,
+  `Stage::sweep_pets`, `MapDrops::sweep`). It looks within 124 px to either
+  side of the owner (274 with a Binocular) and from 49 px above its feet to
+  9 px below, at drops it would loot by the rules of `Drop::pet_lootable`,
+  except that mesos draw any such pet. Drop by drop, the nearest pet takes
+  each, and walks toward one drop at a time; the loot scan then picks it up
+  at its feet. The path goes out as ordinary MOVE_PET.
+  v83's sweep differs from its loot scan in two ways that can leave a pet
+  standing at a drop it never takes, and both are kept: a pet without a
+  Meso Magnet still walks to mesos, and the ignore list holds back only a
+  pet that wears an Item Ignore Pendant itself, while the loot scan applies
+  every pendant's list to every pet.
 - A pet's stance is `action << 1 | left`; `pets::shown` maps the action to
   its animation.
 - `Stage::clear` drops the player's pets on a map change; the server sends

@@ -50,6 +50,13 @@ namespace ms
 		// Note a pet's request, so no pet tries the drop again for a while.
 		void try_pet_loot();
 
+		// Whether a pet in Wing Boots at `pet`, whose owner is at `ownerpos`,
+		// would walk toward the drop, if it takes items and others' drops
+		// as given and leaves the ids `ignored` (FUN_00508268). Any pet
+		// walks toward mesos. Unlike looting, this notes no try.
+		bool pet_sweepable(Point<int16_t> ownerpos, Point<int16_t> pet, int32_t self, int32_t party, bool items,
+						   bool others, bool longrange, const std::vector<int32_t> &ignored) const;
+
 		// The item, or 0 for mesos.
 		virtual int32_t get_itemid() const;
 

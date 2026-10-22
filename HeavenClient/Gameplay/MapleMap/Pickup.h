@@ -2,7 +2,9 @@
 
 #include "../../Template/Point.h"
 
+#include <array>
 #include <cstdint>
+#include <cstdlib>
 
 namespace ms
 {
@@ -45,6 +47,66 @@ namespace ms
 				return false;
 
 			return (type == 0 && owner != self) || (type == 1 && owner != party);
+		}
+
+		// Whether a pet in Wing Boots walks toward a drop at `spot`
+		// (FUN_00508268): within 124 px to either side of its owner, 274
+		// with a Binocular (`longrange`), and from 49 px above the pet's
+		// feet to 9 px below them.
+		inline bool in_sweep_reach(Point<int16_t> owner, Point<int16_t> pet, Point<int16_t> spot, bool longrange)
+		{
+			int32_t reach = longrange ? 274 : 124;
+
+			return std::abs(spot.x() - owner.x()) <= reach && spot.y() >= pet.y() - 49 && spot.y() <= pet.y() + 9;
+		}
+
+		// Which way a pet walks to a drop at `dropx`: left (-1) for one at or
+		// left of its feet, else right (1).
+		inline int8_t sweep_direction(int16_t dropx, int16_t petx)
+		{
+			return dropx <= petx ? -1 : 1;
+		}
+
+		// The pet of those that `can` reach a drop at `dropx` that walks to
+		// it: the nearest across, the first on a tie, or -1 for none.
+		inline int8_t sweeper_for(const std::array<int16_t, 3> &petx, const std::array<bool, 3> &can, int16_t dropx)
+		{
+			int8_t found = -1;
+			int32_t nearest = 0;
+
+			for (int8_t i = 0; i < 3; i++)
+			{
+				if (!can[i])
+					continue;
+
+				int32_t gap = std::abs(dropx - petx[i]);
+
+				if (found < 0 || gap < nearest)
+				{
+					found = i;
+					nearest = gap;
+				}
+			}
+
+			return found;
+		}
+
+		// A pet walks only once its owner has stood still for more than
+		// 100 ms (FUN_009c4122).
+		inline bool sweep_ready(int32_t still)
+		{
+			return still > 100;
+		}
+
+		// Whether the owner is near enough that its pet isn't called back
+		// (FUN_009c4122): from 300 px left of the pet to just short of 300 px
+		// right of it, and from 200 px above to just short of 200 px below.
+		inline bool within_leash(Point<int16_t> pet, Point<int16_t> owner)
+		{
+			int32_t dx = owner.x() - pet.x();
+			int32_t dy = owner.y() - pet.y();
+
+			return dx >= -300 && dx < 300 && dy >= -200 && dy < 200;
 		}
 	}
 }
