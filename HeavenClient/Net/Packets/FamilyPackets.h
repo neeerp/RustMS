@@ -80,6 +80,18 @@ namespace ms
 		}
 	};
 
+	// The answer to a relative's summons, with their name
+	// (FAMILY_SUMMON_RESPONSE).
+	class FamilySummonResponsePacket : public OutPacket
+	{
+	public:
+		FamilySummonResponsePacket(const std::string& summoner, bool yes) : OutPacket(OutPacket::Opcode::FAMILY_SUMMON_RESPONSE)
+		{
+			write_string(summoner);
+			write_byte(yes);
+		}
+	};
+
 	// New precepts from the leader (CHANGE_FAMILY_MESSAGE).
 	class ChangeFamilyMessagePacket : public OutPacket
 	{

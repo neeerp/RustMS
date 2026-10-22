@@ -570,6 +570,19 @@ pub mod keys {
     pub const MAKER_CRYSTAL_TEST: [&str; 2] = ["maker.crystal_test.0", "maker.crystal_test.1"];
     pub const MAKER_GOLD_ANVIL: [&str; 2] = ["maker.gold_anvil.0", "maker.gold_anvil.1"];
 
+    /// The family entitlements' names and descriptions, by index
+    /// (`game::family::ENTITLEMENTS`), which the Family window lists.
+    pub fn family_entitlement_name(index: usize) -> String {
+        format!("family.entitlement.{index}.name")
+    }
+
+    pub fn family_entitlement_description(index: usize) -> String {
+        format!("family.entitlement.{index}.description")
+    }
+
+    /// To a summoner: the family member they asked for said no.
+    pub const FAMILY_SUMMON_DECLINED: &str = "family.summon_declined";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")

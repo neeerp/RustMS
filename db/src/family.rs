@@ -2,7 +2,7 @@
 //! juniors are the rows naming them. The senior at the top leads the family,
 //! which goes by their name, and keeps its message.
 
-use crate::schema::{characters, family_members};
+use crate::schema::{characters, family_entitlement_uses, family_members};
 use diesel::dsl::sql;
 use diesel::expression::SqlLiteral;
 use diesel::prelude::*;
@@ -19,6 +19,11 @@ fn today(column: &str) -> SqlLiteral<Integer> {
     sql(&format!(
         "CASE WHEN family_members.rep_day = CURRENT_DATE THEN family_members.{column} ELSE 0 END"
     ))
+}
+
+/// Today, by the database's clock.
+fn current_date() -> SqlLiteral<diesel::sql_types::Date> {
+    sql("CURRENT_DATE")
 }
 
 /// The id of the character named `name`, ignoring case.
@@ -119,11 +124,25 @@ pub fn info(character_id: i32) -> crate::Result<FamilyInfo> {
     let (reputation, total_reputation, today_reputation) = row.unwrap_or_default();
     let juniors = juniors(&mut conn, character_id)?;
     let seniors = seniors(&mut conn, character_id)?;
+    let used = family_entitlement_uses::table
+        .filter(family_entitlement_uses::character_id.eq(character_id))
+        .filter(family_entitlement_uses::used_on.eq(current_date()))
+        .filter(family_entitlement_uses::times.gt(0))
+        .order(family_entitlement_uses::entitlement)
+        .select((
+            family_entitlement_uses::entitlement,
+            family_entitlement_uses::times,
+        ))
+        .load::<(i16, i32)>(&mut conn)?
+        .into_iter()
+        .map(|(index, times)| (i32::from(index), times))
+        .collect();
     let mut info = FamilyInfo {
         reputation,
         total_reputation,
         today_reputation,
         juniors: juniors.len() as u16,
+        used,
         ..FamilyInfo::default()
     };
     if seniors.is_empty() && juniors.is_empty() {
@@ -348,6 +367,93 @@ pub fn earn(
         }
         Ok(earners.into_iter().map(|id| (id, gain)).collect())
     })?)
+}
+
+/// Whether an entitlement could be paid for.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Spending {
+    Spent,
+    /// Not enough Rep to spend.
+    Short,
+    /// Used as often as it may be today.
+    UsedUp,
+}
+
+/// Pay `cost` Rep for entitlement `index`, which may be used `limit` times a
+/// day. Only the Rep to spend goes down; what was earned stays.
+pub fn spend(character_id: i32, index: i16, cost: i32, limit: i32) -> crate::Result<Spending> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        let reputation = family_members::table
+            .find(character_id)
+            .select(family_members::reputation)
+            .for_update()
+            .first::<i32>(conn)
+            .optional()?;
+        if reputation.is_none_or(|reputation| reputation < cost) {
+            return Ok(Spending::Short);
+        }
+        let times = family_entitlement_uses::table
+            .find((character_id, index))
+            .filter(family_entitlement_uses::used_on.eq(current_date()))
+            .select(family_entitlement_uses::times)
+            .first::<i32>(conn)
+            .optional()?
+            .unwrap_or(0);
+        if times >= limit {
+            return Ok(Spending::UsedUp);
+        }
+        diesel::update(family_members::table.find(character_id))
+            .set(family_members::reputation.eq(family_members::reputation - cost))
+            .execute(conn)?;
+        diesel::sql_query(
+            "INSERT INTO family_entitlement_uses (character_id, entitlement, used_on, times) \
+             VALUES ($1, $2, CURRENT_DATE, 1) \
+             ON CONFLICT (character_id, entitlement) DO UPDATE SET \
+             times = CASE WHEN family_entitlement_uses.used_on = CURRENT_DATE \
+                 THEN family_entitlement_uses.times ELSE 0 END + 1, \
+             used_on = CURRENT_DATE",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<diesel::sql_types::SmallInt, _>(index)
+        .execute(conn)?;
+        Ok(Spending::Spent)
+    })?)
+}
+
+/// Give back `cost` Rep and today's use of entitlement `index`, which
+/// came to nothing.
+pub fn refund(character_id: i32, index: i16, cost: i32) -> crate::Result<()> {
+    let mut conn = crate::connection()?;
+    conn.transaction(|conn| -> QueryResult<_> {
+        diesel::update(family_members::table.find(character_id))
+            .set(family_members::reputation.eq(family_members::reputation + cost))
+            .execute(conn)?;
+        diesel::update(
+            family_entitlement_uses::table
+                .find((character_id, index))
+                .filter(family_entitlement_uses::used_on.eq(current_date()))
+                .filter(family_entitlement_uses::times.gt(0)),
+        )
+        .set(family_entitlement_uses::times.eq(family_entitlement_uses::times - 1))
+        .execute(conn)?;
+        Ok(())
+    })?;
+    Ok(())
+}
+
+/// Whether `a` and `b` are in one family: under the same leader.
+pub fn same_family(a: i32, b: i32) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    let leader = |conn: &mut PgConnection, id: i32| -> QueryResult<Option<i32>> {
+        let seniors = seniors(conn, id)?;
+        if seniors.is_empty() && juniors(conn, id)?.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(seniors.last().copied().unwrap_or(id)))
+    };
+    let leader_a = leader(&mut conn, a)?;
+    Ok(leader_a.is_some() && leader_a == leader(&mut conn, b)?)
 }
 
 /// How parting a senior from a junior went.

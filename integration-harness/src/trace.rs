@@ -580,7 +580,7 @@ impl Trace {
             self.rps.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::OwlResult as i16 || op == SendOpcode::OwlGoResult as i16 {
             self.owl.push((op, p.bytes[2..].to_vec()));
-        } else if (SendOpcode::FamilyChart as i16..=SendOpcode::FamilyNotifyLoginOrLogout as i16)
+        } else if (SendOpcode::FamilyChart as i16..=SendOpcode::FamilySummonRequest as i16)
             .contains(&op)
         {
             self.family.push((op, p.bytes[2..].to_vec()));

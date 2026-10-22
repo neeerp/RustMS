@@ -305,6 +305,13 @@ pub enum FamilyRequest {
     Precepts { precepts: String },
     /// Part from the junior with this id, or from the player's senior.
     Separate { junior: Option<ClientId> },
+    /// Buy entitlement `index`, naming `target` for those that need one.
+    Use {
+        index: usize,
+        target: Option<String>,
+    },
+    /// Answer the summons the player was sent by `summoner`.
+    SummonAnswer { summoner: String, accept: bool },
 }
 
 /// A guild operation, carried out by the client's actor.
@@ -883,6 +890,11 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 Op::ChangeFamilyMessage,
                 InGame(&world::ChangeFamilyMessageHandler),
             ),
+            (Op::UseFamily, InGame(&world::UseFamilyHandler)),
+            (
+                Op::FamilySummonResponse,
+                InGame(&world::FamilySummonResponseHandler),
+            ),
             (
                 Op::AllianceOperation,
                 InGame(&world::AllianceOperationHandler),
@@ -1018,7 +1030,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 109);
+        assert_eq!(world_routes().len(), 111);
     }
 
     #[test]

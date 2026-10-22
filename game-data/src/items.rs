@@ -705,7 +705,8 @@ impl ItemData {
     }
 }
 
-/// Item names (`String.nx`); pets' and the cash items' messages so far.
+/// Item names (`String.nx`); pets' and the cash items' messages so far,
+/// and map names.
 pub struct ItemNames {
     strings: NxDataFile,
 }
@@ -734,6 +735,22 @@ impl ItemNames {
             return Ok(None);
         };
         nx.string_child(node, "msg")
+    }
+
+    /// A map's name (`Map.img/<region>/<id>/mapName`), as the client shows
+    /// it in its corner.
+    pub fn map_name(&self, map_id: i32) -> Result<Option<String>, GameDataError> {
+        let nx = &self.strings;
+        let Some(regions) = path_index(nx, "Map.img")? else {
+            return Ok(None);
+        };
+        let id = map_id.to_string();
+        for region in nx.child_indices(regions)? {
+            if let Some(node) = nx.child_by_name(region, &id)? {
+                return nx.string_child(node, "mapName");
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -1003,6 +1020,11 @@ mod tests {
             Some("%s's snow : %s")
         );
         assert_eq!(names.cash_message(5121011).unwrap(), None);
+        assert_eq!(
+            names.map_name(100000000).unwrap().as_deref(),
+            Some("Henesys")
+        );
+        assert_eq!(names.map_name(123_456).unwrap(), None);
     }
 
     #[test]

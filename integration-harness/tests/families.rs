@@ -21,12 +21,14 @@ use packet::Packet;
 use tokio::time::Duration;
 
 const LITH_HARBOR: i32 = 104_000_000;
+const PERION: i32 = 102_000_000;
 const HENESYS: i32 = 100_000_000;
 const FOREST: i32 = 50_000;
 const SNAIL: i32 = 100100;
 
 const NOT_FOUND: i32 = 0x41;
 const SAME_FAMILY: i32 = 0x42;
+const NOT_SAME_FAMILY: i32 = 0x43;
 const NOT_SAME_MAP: i32 = 0x45;
 const HAS_SENIOR: i32 = 0x46;
 const TOO_LOW: i32 = 0x4d;
@@ -70,6 +72,17 @@ fn info_full(
     name: &str,
     precepts: &str,
 ) -> (i16, Vec<u8>) {
+    info_used(reps, juniors, leader, (name, precepts), &[])
+}
+
+/// FAMILY_INFO_RESULT with the entitlements used today: (index, times).
+fn info_used(
+    reps: [i32; 3],
+    juniors: u16,
+    leader: i32,
+    (name, precepts): (&str, &str),
+    used: &[(i32, i32)],
+) -> (i16, Vec<u8>) {
     let mut body = reps.map(i32::to_le_bytes).concat();
     body.extend(juniors.to_le_bytes());
     body.extend(2u16.to_le_bytes());
@@ -77,7 +90,11 @@ fn info_full(
     body.extend(leader.to_le_bytes());
     body.extend(str_bytes(name));
     body.extend(str_bytes(precepts));
-    body.extend(0i32.to_le_bytes());
+    body.extend((used.len() as i32).to_le_bytes());
+    for &(index, times) in used {
+        body.extend(index.to_le_bytes());
+        body.extend(times.to_le_bytes());
+    }
     (SendOpcode::FamilyInfo as i16, body)
 }
 
@@ -140,13 +157,13 @@ async fn a_senior_takes_a_junior_on_their_map_who_says_yes() {
     let mut at = Trace::default();
     until(&mut a.connection, &mut at, |t| t.family.len() >= 2).await;
     read_for(&mut a.connection, &mut at, 300).await;
-    assert_eq!(
-        at.family,
-        [
-            info(0, 0, ""),
-            (SendOpcode::FamilyPrivilegeList as i16, vec![0; 4])
-        ]
-    );
+    assert_eq!(at.family.len(), 2);
+    assert_eq!(at.family[0], info(0, 0, ""));
+    // The eleven entitlements, the first two to a relative named next.
+    let (op, list) = &at.family[1];
+    assert_eq!(*op, SendOpcode::FamilyPrivilegeList as i16);
+    assert_eq!(list[..4], 11i32.to_le_bytes());
+    assert_eq!(list[4..13], [1, 44, 1, 0, 0, 1, 0, 0, 0]);
     assert_eq!(
         warp(&mut a.connection, LITH_HARBOR, "", &mut at).await,
         LITH_HARBOR
@@ -426,5 +443,116 @@ async fn a_juniors_kills_and_levels_earn_both_seniors_rep() {
             .collect();
         assert_eq!(gains, [gain(200), gain(4)]);
         assert_eq!(t.notices, notices);
+    }
+}
+
+fn use_family(index: i32, name: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::UseFamily as i16).unwrap();
+    p.write_int(index).unwrap();
+    p.write_str_with_length(name).unwrap();
+    p
+}
+
+fn summon_answer(summoner: &str, accept: bool) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::FamilySummonResponse as i16)
+        .unwrap();
+    p.write_str_with_length(summoner).unwrap();
+    p.write_byte(u8::from(accept)).unwrap();
+    p
+}
+
+/// REP_GAIN for spending `cost`: "You have used %d Rep Points."
+fn spent(cost: i32) -> (i16, Vec<u8>) {
+    with_name(SendOpcode::FamilyRepGain, &(-cost).to_le_bytes(), "")
+}
+
+#[tokio::test]
+async fn members_spend_rep_to_go_to_and_summon_each_other() {
+    let (a_config, b_config, d_config) = (
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    );
+    let a_id = new_character(&a_config, 40).await;
+    new_character(&b_config, 30).await;
+    new_character(&d_config, 30).await;
+    let (an, bn, dn) = (
+        a_config.character_name.clone(),
+        b_config.character_name.clone(),
+        d_config.character_name.clone(),
+    );
+    let (mut a, _) = enter(&a_config, LITH_HARBOR).await;
+    let (mut b, _) = enter(&b_config, LITH_HARBOR).await;
+    let (_d, _) = enter(&d_config, LITH_HARBOR).await;
+    take_junior(&mut a, &an, &mut b, &bn).await;
+    set_family_reputation(a_id, 1000).await.expect("rep");
+    let info = |rep: i32, used: &[(i32, i32)]| info_used([rep, 0, 0], 1, a_id, (&an, ""), used);
+
+    // Only relatives on the channel may be reached.
+    send(&mut a.connection, use_family(0, "nobody")).await;
+    assert_eq!(family(&mut a, 1).await, [refusal(NOT_FOUND)]);
+    send(&mut a.connection, use_family(0, &dn)).await;
+    assert_eq!(family(&mut a, 1).await, [refusal(NOT_SAME_FAMILY)]);
+
+    // A goes to B in Perion for 300.
+    let mut bt = Trace::default();
+    assert_eq!(warp(&mut b.connection, PERION, "", &mut bt).await, PERION);
+    send(&mut a.connection, use_family(0, &bn)).await;
+    let mut at = Trace::default();
+    until(&mut a.connection, &mut at, |t| t.warps.contains(&PERION)).await;
+    read_for(&mut a.connection, &mut at, 300).await;
+    assert_eq!(at.family, [spent(300), info(700, &[(0, 1)])]);
+    // Once a day.
+    assert_eq!(
+        warp(&mut b.connection, LITH_HARBOR, "", &mut bt).await,
+        LITH_HARBOR
+    );
+    send(&mut a.connection, use_family(0, &bn)).await;
+    assert!(family(&mut a, 0).await.is_empty());
+
+    // A summons B, and B's answer to some other summons changes nothing.
+    // A leaves before B answers, and gets the Rep back.
+    send(&mut a.connection, use_family(1, &bn)).await;
+    assert_eq!(
+        family(&mut a, 2).await,
+        [spent(500), info(200, &[(0, 1), (1, 1)])]
+    );
+    assert_eq!(family(&mut b, 1).await.len(), 1);
+    send(&mut b.connection, summon_answer("nobody", true)).await;
+    assert!(family(&mut a, 0).await.is_empty());
+    drop(a);
+    let (mut a, at) = enter(&a_config, LITH_HARBOR).await;
+    assert_eq!(at.family[0], info(700, &[(0, 1)]));
+    // B hears A go and come back.
+    let notices = family(&mut b, 2).await;
+    assert!(notices
+        .iter()
+        .all(|(op, _)| *op == SendOpcode::FamilyNotifyLoginOrLogout as i16));
+    let mut at = Trace::default();
+    assert_eq!(warp(&mut a.connection, PERION, "", &mut at).await, PERION);
+
+    // A summons B to Perion for 500; B says no, and A gets it back. Asked
+    // again, B says yes.
+    for accept in [false, true] {
+        send(&mut a.connection, use_family(1, &bn)).await;
+        assert_eq!(
+            family(&mut a, 2).await,
+            [spent(500), info(200, &[(0, 1), (1, 1)])]
+        );
+        let request = with_name(SendOpcode::FamilySummonRequest, &str_bytes(&an), "Perion");
+        assert_eq!(family(&mut b, 1).await, [request]);
+        send(&mut b.connection, summon_answer(&an, accept)).await;
+        if accept {
+            let mut bt = Trace::default();
+            until(&mut b.connection, &mut bt, |t| t.warps.contains(&PERION)).await;
+        } else {
+            let mut t = Trace::default();
+            until(&mut a.connection, &mut t, |t| !t.family.is_empty()).await;
+            read_for(&mut a.connection, &mut t, 300).await;
+            assert_eq!(t.family, [info(700, &[(0, 1)])]);
+            assert!(matches!(&t.broadcasts[..], [(5, text)] if text.contains(&bn)));
+        }
     }
 }

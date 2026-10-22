@@ -75,6 +75,8 @@ pub enum SendOpcode {
     FamilyRepGain = 0x65,
     /// A senior or junior came online or left.
     FamilyNotifyLoginOrLogout = 0x66,
+    /// A family member asks to summon the player.
+    FamilySummonRequest = 0x68,
     /// A line among the floating script messages (0xa13f20).
     ScriptProgressMessage = 0x7A,
     MacroSysDataInit = 0x7C,

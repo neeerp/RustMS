@@ -50,6 +50,11 @@ pub fn cash_message(item_id: i32) -> Option<String> {
     names().ok()?.cash_message(item_id).ok().flatten()
 }
 
+/// The map's name, as the client shows it.
+pub fn map_name(map_id: i32) -> Option<String> {
+    names().ok()?.map_name(map_id).ok().flatten()
+}
+
 /// The template for `item_id`, if the data has it.
 pub fn info(item_id: i32) -> Option<ItemInfo> {
     data().ok()?.info(item_id).ok().flatten()

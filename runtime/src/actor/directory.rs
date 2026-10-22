@@ -128,6 +128,8 @@ pub struct WorldDirectory {
     /// Family members changing channel, who are said to log out only if
     /// they don't arrive in time.
     family_away: HashMap<ClientId, family::Away>,
+    /// Summonses waiting for their answer, by the member summoned.
+    family_summons: HashMap<ClientId, family::Summons>,
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
     next_event: u32,
@@ -153,6 +155,7 @@ impl WorldDirectory {
             guild_away: HashMap::new(),
             family_invites: GuildInvites::default(),
             family_away: HashMap::new(),
+            family_summons: HashMap::new(),
             events: HashMap::new(),
             next_event: 1,
             avatar_banners: AvatarBanners::default(),
@@ -175,6 +178,7 @@ impl WorldDirectory {
                     self.deliver(out);
                     self.purge_guild_away(now);
                     self.purge_family_away(now);
+                    self.purge_family_summons(now);
                     self.run_party_searches(now);
                 }
                 _ = at(self.avatar_banners.until()) => {
@@ -338,6 +342,22 @@ impl WorldDirectory {
                 );
             }
             DirectoryMessage::FamilyEarn { from, gain } => self.family_earn(from, gain),
+            DirectoryMessage::FamilyLocate { from, target } => self.family_locate(from, target),
+            DirectoryMessage::FamilySummon {
+                from,
+                target,
+                name,
+                map_id,
+                map_name,
+            } => self.family_summon(from, target, name, (map_id, &map_name), Instant::now()),
+            DirectoryMessage::FamilySummonAnswer {
+                from,
+                summoner,
+                accept,
+            } => self.family_summon_answer(from, &summoner, accept),
+            DirectoryMessage::FamilySummonFailed { from, summoner } => {
+                self.family_summon_failed(from, summoner)
+            }
             DirectoryMessage::FamilyChanged { ids } => {
                 for id in ids {
                     self.tell(id, ServerMessage::FamilyChanged);

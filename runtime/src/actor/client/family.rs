@@ -1,15 +1,19 @@
-//! Families: the Family window, the Family Tree, and taking juniors
-//! (report b039).
+//! Families: the Family window, the Family Tree, taking juniors (report
+//! b039), and the entitlements bought with Rep (report b050).
 
 use super::ClientActor;
-use crate::{db::spawn_db, error::RuntimeError, message::DirectoryMessage};
-use db::family::Separation;
-use game::family::Refusal;
+use crate::message::{DirectoryMessage, FamilyTrip, SummonFailure};
+use crate::{db::spawn_db, error::RuntimeError};
+use db::family::{Separation, Spending};
+use game::family::{Benefit, Entitlement, Refusal, ENTITLEMENTS, SUMMON, TELEPORT};
+use game_data::server_content::keys;
 use net::packet::build::world::family::{
     build_family_info, build_family_refusal, build_join_accepted, build_join_result,
     build_privilege_list, build_rep_gain, build_separated, build_separation_fee,
 };
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::{self, StatUpdate};
+use net::packet::handle::world::{may_summon_to, may_travel, travel_to, Whereabouts};
 use net::{ClientId, FamilyRequest};
 use tracing::warn;
 
@@ -72,7 +76,162 @@ impl ClientActor {
                 }
             }
             FamilyRequest::Separate { junior } => self.ask_separate(junior).await,
+            FamilyRequest::Use { index, target } => self.use_entitlement(index, target).await,
+            FamilyRequest::SummonAnswer { summoner, accept } => {
+                self.send_to_directory(DirectoryMessage::FamilySummonAnswer {
+                    from: self.client_id,
+                    summoner,
+                    accept,
+                })
+                .await
+            }
         }
+    }
+
+    /// Spend entitlement `index`. The client lets the player choose one
+    /// only with the Rep and uses left, but checks nothing else.
+    async fn use_entitlement(
+        &mut self,
+        index: usize,
+        target: Option<String>,
+    ) -> Result<(), RuntimeError> {
+        let Some(entitlement) = ENTITLEMENTS.get(index) else {
+            return Ok(());
+        };
+        let (Benefit::Teleport | Benefit::Summon) = entitlement.benefit else {
+            // The rates come with their buff icon.
+            return Ok(());
+        };
+        let Some(name) = target else {
+            return Ok(());
+        };
+        let cid = self.client_id;
+        let member = spawn_db(move || {
+            let member = db::family::character(&name)?.filter(|&id| id != cid);
+            let Some(id) = member else {
+                return Ok(Err(Refusal::NotFound));
+            };
+            if !db::family::same_family(cid, id)? {
+                return Ok(Err(Refusal::NotSameFamily));
+            }
+            Ok(Ok((id, name)))
+        })
+        .await?;
+        let (target, name) = match member {
+            Ok(member) => member,
+            Err(refusal) => return self.send(&mut build_family_refusal(refusal)?).await,
+        };
+        if entitlement.benefit == Benefit::Teleport {
+            // Paid for once they are found.
+            return self
+                .send_to_directory(DirectoryMessage::FamilyLocate { from: cid, target })
+                .await;
+        }
+        let player = &self.in_game()?.player;
+        if !may_summon_to(player) {
+            return self
+                .send(&mut build_family_refusal(Refusal::CannotSummon)?)
+                .await;
+        }
+        let map_id = player.stats.map_id;
+        if !self.spend_entitlement(SUMMON).await? {
+            return Ok(());
+        }
+        // The summons is sent before the player hears they paid, so that it
+        // can be refunded whatever happens next.
+        let map_name = net::items::map_name(map_id).unwrap_or_default();
+        self.send_to_directory(DirectoryMessage::FamilySummon {
+            from: cid,
+            target,
+            name,
+            map_id,
+            map_name,
+        })
+        .await?;
+        self.tell_spent(SUMMON).await
+    }
+
+    /// Pay for entitlement `index`. False if the player can't: short of Rep
+    /// or out of uses, which the client's button already showed.
+    async fn spend_entitlement(&self, index: usize) -> Result<bool, RuntimeError> {
+        let cid = self.client_id;
+        let Entitlement { cost, limit, .. } = ENTITLEMENTS[index];
+        let slot = index as i16;
+        let spending = spawn_db(move || db::family::spend(cid, slot, cost, limit)).await?;
+        Ok(spending == Spending::Spent)
+    }
+
+    /// "You have used %d Rep Points.", and the window's numbers.
+    async fn tell_spent(&mut self, index: usize) -> Result<(), RuntimeError> {
+        self.send(&mut build_rep_gain(-ENTITLEMENTS[index].cost, "")?)
+            .await?;
+        self.send_family_info().await
+    }
+
+    /// Where the family member the player is going to stands, if found.
+    pub(super) async fn family_located(
+        &mut self,
+        trip: FamilyTrip,
+        found: Option<Whereabouts>,
+    ) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let found = found.filter(|found| may_travel(player, found.map_id));
+        match (trip, found) {
+            (FamilyTrip::Teleport, None) => {
+                self.send(&mut build_family_refusal(Refusal::CannotSummon)?)
+                    .await
+            }
+            (FamilyTrip::Teleport, Some(found)) => {
+                if self.spend_entitlement(TELEPORT).await? {
+                    self.travel(found).await?;
+                    self.tell_spent(TELEPORT).await?;
+                }
+                Ok(())
+            }
+            (FamilyTrip::Summoned { summoner }, None) => {
+                self.send_to_directory(DirectoryMessage::FamilySummonFailed {
+                    from: self.client_id,
+                    summoner,
+                })
+                .await
+            }
+            (FamilyTrip::Summoned { .. }, Some(found)) => self.travel(found).await,
+        }
+    }
+
+    async fn travel(&mut self, found: Whereabouts) -> Result<(), RuntimeError> {
+        let channel_id = self.channel_id;
+        let player = &mut self.in_game_mut()?.player;
+        for action in travel_to(player, found, channel_id)? {
+            self.apply(action).await?;
+        }
+        Ok(())
+    }
+
+    /// The summons the player paid for to bring `name` didn't happen.
+    pub(super) async fn summon_refund(
+        &mut self,
+        name: String,
+        why: SummonFailure,
+    ) -> Result<(), RuntimeError> {
+        let cid = self.client_id;
+        let cost = ENTITLEMENTS[SUMMON].cost;
+        let slot = SUMMON as i16;
+        if let Err(error) = spawn_db(move || db::family::refund(cid, slot, cost)).await {
+            warn!(cid, %error, "Failed to refund a summons");
+        }
+        let mut packet = match why {
+            SummonFailure::NotFound => build_family_refusal(Refusal::NotFound)?,
+            SummonFailure::Busy => build_family_refusal(Refusal::SummonPending)?,
+            SummonFailure::Location => build_family_refusal(Refusal::CannotSummon)?,
+            SummonFailure::Declined => {
+                let text =
+                    net::content::text().get(keys::FAMILY_SUMMON_DECLINED, &[("name", &name)]);
+                build_broadcast(Broadcast::Pink, &text)?
+            }
+        };
+        self.send(&mut packet).await?;
+        self.send_family_info().await
     }
 
     /// Part from `junior`, or from the senior. The directory has the levels

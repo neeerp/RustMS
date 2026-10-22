@@ -33,8 +33,8 @@ use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::io::{PacketReader, PacketWriter};
 use crate::message::{
-    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, Presence, ServerMessage,
-    CLIENT_QUEUE_CAPACITY,
+    ClientHandle, DirectoryMessage, FamilyTrip, FieldHandle, FieldKey, FieldMessage, Presence,
+    ServerMessage, SummonFailure, CLIENT_QUEUE_CAPACITY,
 };
 use db::cash_shop::CashType;
 use game::{InventoryType, Player};
@@ -1263,18 +1263,23 @@ impl ClientActor {
             ServerMessage::PetPickedUp { drop, pet } => self.pet_picked_up(drop, pet).await?,
             ServerMessage::Locate { reply_to } => self.locate(&reply_to),
             ServerMessage::RockLocate { reply_to, rock } => {
-                let found = self
-                    .game
-                    .as_ref()
-                    .filter(|_| !self.in_cash_shop)
-                    .map(|game| Whereabouts {
-                        map_id: game.player.stats.map_id,
-                        x: game.position.0,
-                        y: game.position.1,
-                    });
+                let found = self.whereabouts();
                 reply_to.send(ServerMessage::RockLocated { rock, found });
             }
             ServerMessage::RockLocated { rock, found } => self.rock_located(rock, found).await?,
+            ServerMessage::FamilyLocate { reply_to, trip } => {
+                let found = self.whereabouts();
+                let summoned = matches!(trip, FamilyTrip::Summoned { .. });
+                if !reply_to.send(ServerMessage::FamilyLocated { trip, found }) && summoned {
+                    // The member left after saying yes.
+                    let why = SummonFailure::NotFound;
+                    self.summon_refund(String::new(), why).await?;
+                }
+            }
+            ServerMessage::FamilyLocated { trip, found } => {
+                self.family_located(trip, found).await?
+            }
+            ServerMessage::SummonRefund { name, why } => self.summon_refund(name, why).await?,
             ServerMessage::CharInfoRequested { requester } => {
                 let alliance = match self.alliance_id()? {
                     Some(alliance_id) => spawn_db(move || db::alliance::name(alliance_id))
@@ -1327,7 +1332,18 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Tell someone who looked for this player which map they are on.
+    /// Where the player stands, unless they are out of the field.
+    fn whereabouts(&self) -> Option<Whereabouts> {
+        self.game
+            .as_ref()
+            .filter(|_| !self.in_cash_shop)
+            .map(|game| Whereabouts {
+                map_id: game.player.stats.map_id,
+                x: game.position.0,
+                y: game.position.1,
+            })
+    }
+
     /// Take the player to the character their teleport rock looked for.
     async fn rock_located(
         &mut self,
