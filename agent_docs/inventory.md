@@ -1243,6 +1243,34 @@ When the last bundle sells, the shop closes: the visitors get LEAVE reason
 maps or channels, entering the Cash Shop, or logging out also closes it.
 The owner gets the unsold stock back, and the visitors get LEAVE reason 3.
 
+### Owl of Minerva
+
+The Owl of Minerva (2310000, the only USE item of class 231) searches the
+open personal shops of every channel for an item. The client lets it be used
+only on the Free Market maps (910000000 to 910000022). `net::owl` holds the
+rules and `client/owl.rs` the flow.
+
+1. **Opening the search window** sends `0x42 {5}`. The answer is OWL_RESULT
+   (`0x46`) mode 7: the 10 items searched for most in the world since it
+   started (`DirectoryMessage::OwlPopular`).
+2. **A search** (`0x53`: USE slot, owl id, item id, order 0 cheapest first or
+   1 dearest, tick) asks every running market room (910000001 to
+   910000022, instance 0, all channels, `FieldRegistry::running`) for its
+   open shops that still have the item (`FieldMessage::ShopSearch`), waiting
+   at most a second. Up to 200 rows go back in mode 6: owner, map, title,
+   bundles, per bundle, price, room id, 0-based channel and item kind, with
+   the whole item after an equip. The Owl is used up only if a row turns
+   up; no rows makes the client say it found nothing. A search by a dead
+   player, off the Free Market, in a room, or without the Owl in that slot
+   only unlocks the client.
+3. **GO** on a row (`0x43`: room id, map) gets OWL_GO_RESULT (`0x47`): 0 go,
+   1 closed (no such open shop on the player's channel), 2 full, 3 busy (in
+   a room, or the field did not answer), 4 dead, `0x11` banned. On 0 the
+   player is warped to the shop's map if needed and visits the shop as if
+   they had clicked its balloon.
+
+The cash Owl (5230000) and hired merchants are not supported yet.
+
 ## Tests
 
 `game` unit tests cover stacking, full bags, removal order, merging,
@@ -1343,3 +1371,11 @@ has two tests:
   are saved after a relogin.
 - The second bans a visitor, who can't come back. The owner gets the stock
   back on leaving and on logging out.
+
+The Owl of Minerva: `net::owl` covers the market maps, the order and cap of
+the rows, and the most searched list; the build tests cover the packets;
+`field_shops` covers which shops a search finds and GO's answers.
+`owl_of_minerva` (integration) is refused off the Free Market, keeps the Owl
+when nothing turns up, finds a shop in another room and uses up one Owl,
+sees the item in the most searched list, goes into the shop with GO, and
+gets "closed" once the owner logs out.

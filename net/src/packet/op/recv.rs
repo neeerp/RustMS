@@ -84,6 +84,11 @@ pub enum RecvOpcode {
     NpcShopAction = 0x3D,
     TrunkRequest = 0x3E,
     DueyAction = 0x41,
+    /// The Owl of Minerva's search window opened (`u8 5`): it wants the
+    /// most searched items.
+    OwlOpen = 0x42,
+    /// GO on a row of the Owl's results: the shop and its map.
+    OwlGo = 0x43,
     GatherItems = 0x45,
     SortItems = 0x46,
     ItemMove = 0x47,
@@ -98,6 +103,8 @@ pub enum RecvOpcode {
     UseCatchItem = 0x51,
     CancelItemEffect = 0x49,
     UseSkillBook = 0x52,
+    /// The Owl of Minerva's search (FUN_008a2407).
+    UseOwl = 0x53,
     UseTeleportRock = 0x54,
     UseReturnScroll = 0x55,
     UseUpgradeScroll = 0x56,

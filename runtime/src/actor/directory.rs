@@ -15,6 +15,7 @@ use game_data::server_content::keys;
 use net::conti::Portal;
 use net::dungeons::Refusal;
 use net::events::{self, Candidate, EventKind};
+use net::owl::Searches;
 use net::packet::build::world::alliance;
 use net::packet::build::world::buddy::{build_buddy_list, BuddyView};
 use net::packet::build::world::door::{build_spawn_portal, DoorView};
@@ -133,6 +134,8 @@ pub struct WorldDirectory {
     avatar_banners: AvatarBanners,
     /// Mini-dungeon copies taken, by channel and copy.
     dungeons: HashMap<(u8, i32), Run>,
+    /// What the Owl of Minerva was asked to find.
+    owl_searches: Searches,
 }
 
 impl WorldDirectory {
@@ -154,6 +157,7 @@ impl WorldDirectory {
             next_event: 1,
             avatar_banners: AvatarBanners::default(),
             dungeons: HashMap::new(),
+            owl_searches: Searches::default(),
         }
     }
 
@@ -218,6 +222,10 @@ impl WorldDirectory {
                     Queued::Refused => false,
                 };
                 let _ = reply.send(queued);
+            }
+            DirectoryMessage::OwlSearched { item_id } => self.owl_searches.record(item_id),
+            DirectoryMessage::OwlPopular { reply } => {
+                let _ = reply.send(self.owl_searches.popular());
             }
             DirectoryMessage::Party { from, request } => {
                 self.party_request(from, request, Instant::now())

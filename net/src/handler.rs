@@ -462,6 +462,9 @@ pub enum WorldAction {
     Rps(crate::rps::RpsRequest),
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
+    /// Search the Free Market's shops with the Owl of Minerva, or go to
+    /// one it found.
+    Owl(crate::owl::OwlRequest),
     /// Open, stock, visit, or buy from a personal shop.
     PersonalShop(crate::personal_shop::PersonalShopRequest),
     /// The player touched the named script portal on their map.
@@ -913,6 +916,9 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
             (Op::UseCatchItem, InGame(&world::UseCatchItemHandler)),
             (Op::UseTeleportRock, InGame(&world::UseTeleportRockHandler)),
+            (Op::UseOwl, InGame(&world::UseOwlHandler)),
+            (Op::OwlOpen, InGame(&world::OwlOpenHandler)),
+            (Op::OwlGo, InGame(&world::OwlGoHandler)),
             (Op::SkillMacro, InGame(&world::SkillMacroHandler)),
             (Op::UseSolomonItem, InGame(&world::UseSolomonItemHandler)),
             (Op::UseGachaExp, InGame(&world::UseGachaExpHandler)),
@@ -1012,7 +1018,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 106);
+        assert_eq!(world_routes().len(), 109);
     }
 
     #[test]

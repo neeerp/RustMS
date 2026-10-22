@@ -73,6 +73,18 @@ impl FieldRegistry {
         handle
     }
 
+    /// The fields already running whose keys pass `wanted`; none is
+    /// started.
+    pub fn running(&self, wanted: impl Fn(&FieldKey) -> bool) -> Vec<FieldHandle> {
+        self.fields
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|(key, handle)| wanted(key) && !handle.tx.is_closed())
+            .map(|(_, handle)| handle.clone())
+            .collect()
+    }
+
     /// Whether `key` is the channel's own field or one of a copy still
     /// running.
     pub fn is_open(&self, key: FieldKey) -> bool {

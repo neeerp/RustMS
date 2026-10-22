@@ -16,6 +16,7 @@ mod later;
 mod loot;
 mod notes;
 mod npc_script;
+mod owl;
 mod personal_shop;
 mod pets;
 mod quest;
@@ -439,6 +440,8 @@ impl ClientActor {
                 self.shop_room_request(request).await?
             }
             WorldAction::Trade(request) => self.trade_request(request).await?,
+            WorldAction::Owl(_) if self.in_cash_shop => {}
+            WorldAction::Owl(request) => self.owl_request(request).await?,
             WorldAction::PersonalShop(request) => {
                 if !self.in_cash_shop {
                     self.personal_shop_request(request).await?
