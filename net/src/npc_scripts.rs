@@ -1020,6 +1020,12 @@ impl NpcScript {
         opq_eak(map_id, leader, cleared)
     }
 
+    /// Eak, still only a light, telling a player who has just come into
+    /// the tower what to bring him (Cosmic `OrbisPQ` `playerEntry`).
+    pub fn opq_arrival() -> Self {
+        NpcScript::new(EAK, vec![Page::Say(text(keys::OPQ_EAK_ARRIVAL))])
+    }
+
     /// Cloto's script on the party quest's stages, for `player`, who
     /// stands with her as `view`. A leader answering a puzzle gets
     /// `cloto_answer` instead.

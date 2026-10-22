@@ -409,7 +409,10 @@ everyone on the map is shown a pink line (`opq.notice.light`), and Eak
 (2013001) comes out on the ground below it. The field adds him to its NPCs
 (`FieldActor::appear`, the next object id after the map's own and the
 foothold's id), shows him to everyone, and hands him to the NPCs'
-controller; whoever joins later sees him with the rest.
+controller; whoever joins later sees him with the rest. Until then he is
+only the light, and as each member arrives he tells them to bring him the
+20 Cloud Pieces (`NpcScript::opq_arrival`, `opq.eak.arrival`, Cosmic
+`playerEntry`).
 
 Eak there (`NpcScript::opq_eak`, from `dialogue.rs` with the ticket's
 leader and stage 1's clear) sends anyone but the leader up to the stage's

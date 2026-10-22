@@ -213,7 +213,15 @@ pub async fn enter_lpq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// The party's leader, first, takes it into the Tower of Goddess from
 /// Wonky, as `enter_lpq` does.
 pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
-    enter_from_menu(team, &OPQ, WONKY).await
+    let mut traces = enter_from_menu(team, &OPQ, WONKY).await;
+    // Eak tells each of them what to bring him.
+    for (player, trace) in team.iter_mut().zip(&mut traces) {
+        until(&mut player.connection, trace, |t| {
+            t.prompts.contains(&(EAK, 0))
+        })
+        .await;
+    }
+    traces
 }
 
 /// The leader picks the first choice of `npc`'s menu in `event`'s lobby
@@ -224,7 +232,7 @@ async fn enter_from_menu(team: &mut [WorldSession], event: &Event, npc: i32) -> 
     for _ in 0..5 {
         step(&mut team[0].connection, &name, talk(event.lobby, npc)).await;
         let trace = step(&mut team[0].connection, &name, answer(4, 1, Some(0))).await;
-        if trace.prompts.is_empty() {
+        if !trace.prompts.iter().any(|&(from, _)| from == npc) {
             seen = Some(trace);
             break;
         }

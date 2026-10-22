@@ -209,9 +209,14 @@ impl ClientActor {
             // Dropping the ticket hands it back.
             return Ok(());
         }
-        let entry = ticket.kind.event().entry;
+        let kind = ticket.kind;
+        let entry = kind.event().entry;
         self.event = Some(ticket);
-        self.warp_within_event(entry).await
+        self.warp_within_event(entry).await?;
+        if kind == EventKind::Opq {
+            self.start_script(NpcScript::opq_arrival()).await?;
+        }
+        Ok(())
     }
 
     /// Event `id` ended: out of its maps, if the player still holds its

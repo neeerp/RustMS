@@ -413,6 +413,8 @@ pub mod keys {
     pub const OPQ_EAK_HOME: &str = "opq.eak.home";
     /// Told on the cloud stage as Eak steps out of the light (a pink line).
     pub const OPQ_NOTICE_LIGHT: &str = "opq.notice.light";
+    /// Said to each member as the team arrives on the cloud stage.
+    pub const OPQ_EAK_ARRIVAL: &str = "opq.eak.arrival";
     pub const OPQ_EAK_CLOUD: &str = "opq.eak.cloud";
     pub const OPQ_EAK_LEADER_ONLY: &str = "opq.eak.leader_only";
     pub const OPQ_EAK_GATHER: &str = "opq.eak.gather";
@@ -1707,6 +1709,7 @@ mod tests {
             keys::OPQ_WONKY_LEAVE_ASK,
             keys::OPQ_EAK_HOME,
             keys::OPQ_NOTICE_LIGHT,
+            keys::OPQ_EAK_ARRIVAL,
             keys::OPQ_EAK_CLOUD,
             keys::OPQ_EAK_LEADER_ONLY,
             keys::OPQ_EAK_GATHER,

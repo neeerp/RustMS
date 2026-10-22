@@ -2032,8 +2032,6 @@ impl FieldActor {
         }
     }
 
-    /// Bring `count` of `mob_id` aboard on the ground below `(x, y)`, under
-    /// the first player here, or the next to come; returns how many came.
     /// Bring out NPC `npc_id` on the ground below (x, y), there until the
     /// field closes, and hand it to the NPCs' controller.
     fn appear(&mut self, npc_id: i32, (x, y): (i16, i16)) {
@@ -2069,6 +2067,8 @@ impl FieldActor {
         self.map_npcs.push(npc);
     }
 
+    /// Bring `count` of `mob_id` aboard on the ground below `(x, y)`, under
+    /// the first player here, or the next to come; returns how many came.
     fn board(&mut self, mob_id: i32, count: usize, (x, y): (i16, i16)) -> usize {
         let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
