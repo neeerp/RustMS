@@ -104,7 +104,7 @@ impl ClientActor {
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
         let mut open_npc = None;
-        let mut bring_out = Vec::new();
+        let mut to_field = Vec::new();
         let mut warp = None;
         let mut name_guild = false;
         let mut grow_guild = None;
@@ -136,10 +136,16 @@ impl ClientActor {
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
                 Effect::OpenNpc(npc_id) => open_npc = Some(*npc_id),
-                Effect::BringOutMob { mob_id, at } => bring_out.push(FieldRequest::BringOutMob {
+                Effect::BringOutMob { mob_id, at } => to_field.push(FieldRequest::BringOutMob {
                     mob_id: *mob_id,
                     at: *at,
                 }),
+                Effect::SetReactorState { name, state } => {
+                    to_field.push(FieldRequest::SetReactorState {
+                        name,
+                        state: *state,
+                    })
+                }
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);
@@ -466,7 +472,7 @@ impl ClientActor {
         if let Some(npc_id) = open_npc {
             Box::pin(self.open_npc(npc_id)).await?;
         }
-        for request in bring_out {
+        for request in to_field {
             self.send_to_field(FieldMessage::FromClient {
                 from: self.client_id,
                 request,

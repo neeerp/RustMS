@@ -7,7 +7,9 @@
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
-use crate::events::{self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, Standing};
+use crate::events::{
+    self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, Standing,
+};
 use crate::items;
 use crate::rides;
 use crate::scripts::Effect;
@@ -1042,6 +1044,18 @@ impl NpcScript {
     /// cloud stage. None elsewhere.
     pub fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<Self> {
         opq_eak(map_id, leader, cleared)
+    }
+
+    /// Eak in the Tower of Goddess's music room, once the music box
+    /// `played` the day's record or the room was `cleared`.
+    pub fn opq_music(played: bool, cleared: bool) -> Self {
+        opq_music(played, cleared)
+    }
+
+    /// Eak in the Tower of Goddess's sealed room, given how the team
+    /// stands on its platforms; `None` once the room is cleared.
+    pub fn opq_head_count(count: Option<HeadCount>) -> Self {
+        opq_head_count(count)
     }
 
     /// Eak, still only a light, telling a player who has just come into
@@ -2730,6 +2744,53 @@ fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<NpcScript> {
         _ => return None,
     };
     Some(NpcScript::new(EAK, pages))
+}
+
+/// Eak in the music room (Cosmic `2013001`, `statusStg3`): he asks for the
+/// day's record until the music box plays it, then brings out the stone
+/// box (`stone3`, its fade-in) and clears the room. Any member may ask.
+fn opq_music(played: bool, cleared: bool) -> NpcScript {
+    let page = if cleared {
+        Page::Say(text(keys::OPQ_EAK_MUSIC_DONE))
+    } else if played {
+        Page::Act {
+            text: text(keys::OPQ_EAK_MUSIC_PLAYED),
+            effects: vec![
+                Effect::SetReactorState {
+                    name: "stone3",
+                    state: 1,
+                },
+                Effect::EventCommand(EventCommand::ClearStage(events::OPQ_MUSIC_STAGE)),
+            ],
+        }
+    } else {
+        Page::Say(text(keys::OPQ_EAK_MUSIC_ASK))
+    };
+    NpcScript::new(EAK, vec![page])
+}
+
+/// Eak in the sealed room (Cosmic `2013001`, `statusStg4`): with three of
+/// the team on its platforms as he wants (`events::head_count`), he brings
+/// out the stone box at its top (`stone4`) and clears the room; otherwise
+/// he hints how many platforms are right. Any member may ask.
+fn opq_head_count(count: Option<HeadCount>) -> NpcScript {
+    let page = match count {
+        None => Page::Say(text(keys::OPQ_EAK_HEADS_DONE)),
+        Some(HeadCount::Few) => Page::Say(text(keys::OPQ_EAK_HEADS_FEW)),
+        Some(HeadCount::Wrong { right: 0 }) => Page::Say(text(keys::OPQ_EAK_HEADS_ALL_WRONG)),
+        Some(HeadCount::Wrong { .. }) => Page::Say(text(keys::OPQ_EAK_HEADS_ONE_RIGHT)),
+        Some(HeadCount::Right) => Page::Act {
+            text: text(keys::OPQ_EAK_HEADS_RIGHT),
+            effects: vec![
+                Effect::SetReactorState {
+                    name: "stone4",
+                    state: 1,
+                },
+                Effect::EventCommand(EventCommand::ClearStage(events::OPQ_HEAD_COUNT_STAGE)),
+            ],
+        },
+    };
+    NpcScript::new(EAK, vec![page])
 }
 
 /// The Pink Balloon (Cosmic `2040045`) lets players off Ludibrium's bonus
@@ -6061,6 +6122,57 @@ mod tests {
         assert_eq!(said(true), text(keys::OPQ_EAK_GATHER));
         assert_eq!(said(false), text(keys::OPQ_EAK_LEADER_ONLY));
         assert!(NpcScript::opq_eak(920_010_200, true, true).is_none());
+    }
+
+    #[test]
+    fn eak_brings_out_a_stone_box_once_the_music_plays_or_the_heads_are_right() {
+        let said = |script: NpcScript| {
+            let step = script.begin();
+            (page_text(&step), step.effects)
+        };
+        let box_out = |name, stage| {
+            vec![
+                Effect::SetReactorState { name, state: 1 },
+                Effect::EventCommand(EventCommand::ClearStage(stage)),
+            ]
+        };
+        assert_eq!(
+            said(NpcScript::opq_music(false, false)),
+            (text(keys::OPQ_EAK_MUSIC_ASK), vec![])
+        );
+        assert_eq!(
+            said(NpcScript::opq_music(true, false)),
+            (
+                text(keys::OPQ_EAK_MUSIC_PLAYED),
+                box_out("stone3", events::OPQ_MUSIC_STAGE)
+            )
+        );
+        assert_eq!(
+            said(NpcScript::opq_music(true, true)),
+            (text(keys::OPQ_EAK_MUSIC_DONE), vec![])
+        );
+        let heads = |count| said(NpcScript::opq_head_count(count));
+        assert_eq!(
+            heads(Some(HeadCount::Right)),
+            (
+                text(keys::OPQ_EAK_HEADS_RIGHT),
+                box_out("stone4", events::OPQ_HEAD_COUNT_STAGE)
+            )
+        );
+        for (count, key) in [
+            (Some(HeadCount::Few), keys::OPQ_EAK_HEADS_FEW),
+            (
+                Some(HeadCount::Wrong { right: 1 }),
+                keys::OPQ_EAK_HEADS_ONE_RIGHT,
+            ),
+            (
+                Some(HeadCount::Wrong { right: 0 }),
+                keys::OPQ_EAK_HEADS_ALL_WRONG,
+            ),
+            (None, keys::OPQ_EAK_HEADS_DONE),
+        ] {
+            assert_eq!(heads(count), (text(key), vec![]));
+        }
     }
 
     #[test]

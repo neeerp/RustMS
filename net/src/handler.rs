@@ -776,6 +776,9 @@ pub enum FieldRequest {
     /// A script brings out `mob_id` on the ground below `at`, unless one
     /// is out already.
     BringOutMob { mob_id: i32, at: (i16, i16) },
+    /// A script puts the reactors named `name` here in `state`
+    /// (`scripts::Effect::SetReactorState`).
+    SetReactorState { name: &'static str, state: u8 },
     /// The player threw the catch item in USE `slot` at the mob `object_id`:
     /// catch it if it is a `catch.mob` within `catch.area` of them, below
     /// `catch.mob_hp` percent of its HP. Answered with

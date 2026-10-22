@@ -107,6 +107,37 @@ pub fn salion_limit(rng: &mut impl rand::Rng) -> u32 {
     rng.gen_range(0, 14).max(4)
 }
 
+/// The music box in the Tower of Goddess's music room (Cosmic `2008006`).
+/// It plays one record a day: the event set aside for its day is the only
+/// one it reacts to (`OrbisPQ.js` sets its event state to the weekday as
+/// the event starts), so another day's record stays on the floor.
+pub const MUSIC: i32 = 2008006;
+/// The music box's name on its map, by which Eak hears whether it plays.
+pub const MUSIC_BOX: &str = "music";
+/// Sunday's record; the other days' follow it in order.
+pub const SUNDAY_RECORD: i32 = 4001056;
+
+/// The day (Sunday is 0, as Cosmic counts) whose record the music box
+/// plays at `now`: `RUSTMS_OPQ_DAY` for testing, else the weekday on the
+/// rate cards' clock (`rates::weekday`).
+pub fn music_day(now: std::time::SystemTime) -> u8 {
+    static PINNED: OnceLock<Option<u8>> = OnceLock::new();
+    let pinned = *PINNED.get_or_init(|| {
+        std::env::var("RUSTMS_OPQ_DAY")
+            .ok()
+            .and_then(|day| day.parse::<u8>().ok())
+            .filter(|day| *day < 7)
+    });
+    pinned.unwrap_or_else(|| (crate::rates::weekday(now) + 1) % 7)
+}
+
+/// Whether reactor `reactor_id` takes `item_id` on `day` (Sunday 0): the
+/// music box only that day's record, every other reactor whatever its
+/// events take.
+pub fn takes(reactor_id: i32, item_id: i32, day: u8) -> bool {
+    reactor_id != MUSIC || item_id == SUNDAY_RECORD + i32::from(day)
+}
+
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
         // The boxes in the Hitman's hideout: those that lead up the floors,
@@ -242,6 +273,17 @@ mod tests {
         assert_eq!(scar.item_dropped(0, 4001044, 1, (0, 0)), Some((0, 1)));
         assert_eq!(scar.item_dropped(0, 4001048, 1, (0, 0)), None);
         assert!(scar.is_last(1));
+    }
+
+    #[test]
+    fn the_music_box_plays_only_the_days_record_counting_from_sunday() {
+        // 1 January 1970 was a Thursday.
+        assert_eq!(music_day(std::time::SystemTime::UNIX_EPOCH), 4);
+        for day in 0..7 {
+            let records = (0..7).filter(|d| takes(MUSIC, SUNDAY_RECORD + d, day));
+            assert_eq!(records.collect::<Vec<_>>(), [i32::from(day)]);
+        }
+        assert!(takes(2001002, 4001074, 3));
     }
 
     #[test]

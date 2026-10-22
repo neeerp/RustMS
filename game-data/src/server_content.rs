@@ -429,6 +429,22 @@ pub mod keys {
     pub const OPQ_EAK_ROOM_CLEARED: &str = "opq.eak.room_cleared";
     /// Eak to a leader with no room in ETC for the piece.
     pub const OPQ_EAK_FULL: &str = "opq.eak.full";
+    /// Eak in the music room before the day's record plays.
+    pub const OPQ_EAK_MUSIC_ASK: &str = "opq.eak.music.ask";
+    /// Eak once it plays, as the stone box comes out.
+    pub const OPQ_EAK_MUSIC_PLAYED: &str = "opq.eak.music.played";
+    /// Eak in the music room once it is cleared.
+    pub const OPQ_EAK_MUSIC_DONE: &str = "opq.eak.music.done";
+    /// Eak in the sealed room when not three stand on its platforms.
+    pub const OPQ_EAK_HEADS_FEW: &str = "opq.eak.heads.few";
+    /// Eak when one platform has the number he wants.
+    pub const OPQ_EAK_HEADS_ONE_RIGHT: &str = "opq.eak.heads.one_right";
+    /// Eak when no platform has the number he wants.
+    pub const OPQ_EAK_HEADS_ALL_WRONG: &str = "opq.eak.heads.all_wrong";
+    /// Eak when all three do, as the stone box comes out above.
+    pub const OPQ_EAK_HEADS_RIGHT: &str = "opq.eak.heads.right";
+    /// Eak in the sealed room once it is cleared.
+    pub const OPQ_EAK_HEADS_DONE: &str = "opq.eak.heads.done";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1243,6 +1259,9 @@ struct ReactorOverride {
     /// Use the pack's drops for this other reactor (the same box).
     #[serde(default)]
     like: Option<i32>,
+    /// Drops that replace whatever the pack (or `like`) says for it.
+    #[serde(default)]
+    replace: Option<Vec<RewardEntry>>,
     /// Quest items, by item id: they drop only while their quest is started,
     /// and always drop then, even without the pack.
     #[serde(default)]
@@ -1290,11 +1309,13 @@ impl RewardTable {
         }
         for (reactor, entry) in overrides.reactors {
             let id = parse_id(&reactor, "override reactor id")?;
-            let mut drops = table
-                .pack
-                .get(&entry.like.unwrap_or(id))
-                .cloned()
-                .unwrap_or_default();
+            let mut drops = entry.replace.unwrap_or_else(|| {
+                table
+                    .pack
+                    .get(&entry.like.unwrap_or(id))
+                    .cloned()
+                    .unwrap_or_default()
+            });
             for (item, quest) in entry.quest_items {
                 let item = parse_id(&item, "override quest item id")?;
                 let mut found = false;
@@ -1793,6 +1814,14 @@ mod tests {
             keys::OPQ_EAK_PIECE,
             keys::OPQ_EAK_ROOM_CLEARED,
             keys::OPQ_EAK_FULL,
+            keys::OPQ_EAK_MUSIC_ASK,
+            keys::OPQ_EAK_MUSIC_PLAYED,
+            keys::OPQ_EAK_MUSIC_DONE,
+            keys::OPQ_EAK_HEADS_FEW,
+            keys::OPQ_EAK_HEADS_ONE_RIGHT,
+            keys::OPQ_EAK_HEADS_ALL_WRONG,
+            keys::OPQ_EAK_HEADS_RIGHT,
+            keys::OPQ_EAK_HEADS_DONE,
         ];
         for key in named
             .iter()
@@ -1933,6 +1962,23 @@ mod tests {
             assert_eq!((drops[0].item, drops[0].prob), (Some(4001045), 1.0));
             assert_eq!(drops[0].quest, None);
         }
+    }
+
+    #[test]
+    fn the_music_and_sealed_rooms_boxes_drop_their_pieces_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        let only = |reactor_id| {
+            let drops = table.reactor_drops(reactor_id);
+            assert_eq!(drops.len(), 1, "{reactor_id}");
+            assert_eq!((drops[0].prob, drops[0].quest), (1.0, None));
+            drops[0].item
+        };
+        // The records, Sunday's to Saturday's.
+        for day in 0..7 {
+            assert_eq!(only(2002004 + day), Some(4001056 + day));
+        }
+        assert_eq!(only(2002011), Some(4001046));
+        assert_eq!(only(2002012), Some(4001047));
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {

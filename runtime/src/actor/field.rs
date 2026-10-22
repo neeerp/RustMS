@@ -179,6 +179,9 @@ pub struct FieldActor {
     /// On the Tower of Goddess's Salion stage, how many Cellions go before
     /// a spot drops its loot, and how many have gone, once the first has.
     salion: Option<(u32, u32)>,
+    /// In the Tower of Goddess's sealed room, how many of the team Eak
+    /// wants on each platform, once he has been asked.
+    split: Option<[u8; 3]>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -226,6 +229,7 @@ impl FieldActor {
             bunny_cakes: 0,
             lost_at: None,
             salion: None,
+            split: None,
             kites: KiteSet::default(),
             tick,
         }
@@ -495,6 +499,15 @@ impl FieldActor {
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }
+            FieldMessage::ReactorState { name, reply } => {
+                let _ = reply.send(self.reactors.named(name).map(|reactor| reactor.state));
+            }
+            FieldMessage::Split { reply } => {
+                let split = self
+                    .split
+                    .get_or_insert_with(|| net::events::draw_split(&mut rand::thread_rng()));
+                let _ = reply.send(*split);
+            }
             FieldMessage::Move {
                 from,
                 packet,
@@ -640,6 +653,13 @@ impl FieldActor {
                 FieldRequest::SummonMobs(mobs) => self.handle_summon_mobs(from, mobs),
                 FieldRequest::BringOutMob { mob_id, at } => {
                     self.handle_bring_out_mob(from, mob_id, at)
+                }
+                FieldRequest::SetReactorState { name, state } => {
+                    for view in self.reactors.set_state(name, state) {
+                        if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                            self.broadcast(None, packet);
+                        }
+                    }
                 }
                 FieldRequest::Catch {
                     object_id,
