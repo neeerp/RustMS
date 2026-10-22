@@ -227,6 +227,9 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
     if !is_use_item(item_id) || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id {
         return None;
     }
+    if potion_refused(player, item_id) {
+        return None;
+    }
     let spec = items::info(item_id)?.spec.filter(ConsumeSpec::has_effect)?;
     let changes = player
         .inventory_mut()
@@ -236,6 +239,21 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
         changes,
         effect: apply_spec(player, item_id, &spec, now),
     })
+}
+
+/// v83 0xa092fb sends no morph potion (221xxxx) or ghost item (236xxxx)
+/// while the player is morphed, seated or aboard the Battleship (report
+/// c012), and the server refuses one too, keeping it. To change morph, one
+/// cancels the first. The client's other refusal, in a mini room, isn't
+/// checked here.
+fn potion_refused(player: &Player, item_id: i32) -> bool {
+    if item_id / 10_000 != 221 && item_id / 10_000 != 236 {
+        return false;
+    }
+    let battleship = player
+        .ride()
+        .is_some_and(|ride| ride.item_id / 10_000 == 193);
+    player.buffs.has(BuffStat::Morph) || player.chair != 0 || battleship
 }
 
 /// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it
@@ -864,6 +882,40 @@ mod tests {
         assert!(use_cash_morph(&mut player, 1, 5300000, now).is_none());
         let left = player.inventory.get(InventoryType::Cash, 1).unwrap();
         assert_eq!(left.quantity, 1);
+    }
+
+    #[test]
+    fn a_morph_potion_waits_for_the_morph_chair_and_battleship_to_end() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2210000, 3));
+        let now = std::time::Instant::now();
+        use_item(&mut player, 1, 2210000, now).unwrap();
+        assert!(use_item(&mut player, 1, 2210000, now).is_none());
+
+        player.buffs.cancel(-2210000);
+        player.chair = 3010000;
+        assert!(use_item(&mut player, 1, 2210000, now).is_none());
+        player.chair = 0;
+        player.buffs.give(game::Buff::new(
+            game::mount::BATTLESHIP,
+            BuffStat::Riding,
+            1,
+            now,
+            std::time::Duration::from_secs(60),
+        ));
+        assert!(use_item(&mut player, 1, 2210000, now).is_none());
+        let left = player.inventory.get(InventoryType::Use, 1).unwrap();
+        assert_eq!(left.quantity, 2);
+        // A plain potion is still drunk aboard.
+        player
+            .inventory
+            .insert(InventoryType::Use, 2, Item::stack(2000000, 1));
+        assert!(use_item(&mut player, 2, 2000000, now).is_some());
     }
 
     #[test]

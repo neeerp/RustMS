@@ -27,6 +27,17 @@ namespace ms::morph
 		return chair != 0 || vehicle / 10000 == 190;
 	}
 
+	// v83 0xa092fb: a morph potion (221xxxx) or ghost item (236xxxx) isn't sent by one already morphed,
+	// seated, aboard the Battleship (193xxxx) or in a mini room, and nothing is said. The ghost state
+	// itself isn't modelled.
+	inline bool potion_refused(int32_t item, int32_t morph, int32_t chair, int32_t vehicle, bool mini_room)
+	{
+		if (item / 10000 != 221 && item / 10000 != 236)
+			return false;
+
+		return morph != 0 || chair != 0 || vehicle / 10000 == 193 || mini_room;
+	}
+
 	// The skills a superman can't use: Double Shot, Oak Barrel, Burst Fire, and the beginners' rides and
 	// the like (0x9673cf).
 	inline bool superman_refuses(int32_t skill)
