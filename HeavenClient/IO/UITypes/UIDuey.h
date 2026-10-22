@@ -146,6 +146,7 @@ namespace ms
 		void set_mesos(Tab panel, int32_t meso);
 		void put(Tab panel, InventoryType::Id from, int16_t slot, int32_t item_id, int16_t count);
 		void take_back(Tab panel);
+		bool still_offered(Tab panel);
 		void toggle_table();
 		void send();
 		void send_quick();

@@ -810,7 +810,9 @@ namespace ms
 				"How many do you wish to send?",
 				[panel, from, slot, item_id](int32_t number)
 				{
-					if (Optional<UIDuey> duey = open_window())
+					Optional<UIDuey> duey = open_window();
+
+					if (duey && !duey->pending && duey->tab == panel)
 						duey->put(panel, from, slot, item_id, static_cast<int16_t>(number));
 				},
 				count, 1);
@@ -1040,6 +1042,27 @@ namespace ms
 		clear_tooltip();
 	}
 
+	bool UIDuey::still_offered(Tab panel)
+	{
+		const Outgoing &out = outgoing(panel);
+
+		if (out.item_id == 0)
+			return true;
+
+		// HC keeps the slot where v83 keeps the item, so a move since it was
+		// offered (a sort, a swap, a potion used) takes it back.
+		const Inventory &inventory = Stage::get().get_player().get_inventory();
+
+		if (inventory.get_item_id(out.tab, out.slot) == out.item_id
+			&& inventory.get_item_count(out.tab, out.slot) >= out.count)
+			return true;
+
+		take_back(panel);
+		notice(*parcels::result_text(0x0b));
+
+		return false;
+	}
+
 	void UIDuey::toggle_table()
 	{
 		if (tab == Tab::RECEIVE)
@@ -1083,6 +1106,9 @@ namespace ms
 					Optional<UIDuey> duey = open_window();
 
 					if (!yes || !duey || duey->pending)
+						return;
+
+					if (!duey->still_offered(Tab::SEND))
 						return;
 
 					const Outgoing &sent = duey->outgoing(Tab::SEND);
@@ -1140,6 +1166,9 @@ namespace ms
 					Optional<UIDuey> duey = open_window();
 
 					if (!yes || !duey || duey->pending)
+						return;
+
+					if (!duey->still_offered(Tab::QUICK))
 						return;
 
 					const Outgoing &sent = duey->outgoing(Tab::QUICK);
