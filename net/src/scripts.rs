@@ -352,6 +352,12 @@ pub enum Effect {
     /// A line in the chat log by SHOW_STATUS_INFO 9 (Cosmic's
     /// `showInfoText`), as Rien's tutorial portal tells an Aran where to go.
     InfoText(String),
+    /// Bring out `mob_id` on the ground below `at` in the player's map,
+    /// unless one is out already. It never respawns.
+    BringOutMob {
+        mob_id: i32,
+        at: (i16, i16),
+    },
     /// Take the player's party into its own copy of an event's maps
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
@@ -379,15 +385,62 @@ pub struct ScriptOutcome {
     pub occupied: Option<String>,
 }
 
-/// A map's `onUserEnter` script. `None` if the script is unknown.
-pub fn map_enter(script: &str) -> Option<Vec<Effect>> {
-    // go<map id>: the map's name banner. HeavenMS also unlocks the UI here,
-    // which HeavenClient never locks.
-    let map = script.strip_prefix("go")?;
-    if map.is_empty() || !map.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
+/// The theme banners (`Effect.img/temaD/enter`) of the maps whose
+/// `TD_NC_title` or `TD_MC_title` script shows one. Neither script is in
+/// Cosmic; each banner goes to the map it is named after, the six Neo City
+/// ones in the order of the maps' years.
+const THEME_BANNERS: [(i32, &str); 8] = [
+    (240070000, "teraForest"),
+    (240070100, "neoCity1"),
+    (240070200, "neoCity2"),
+    (240070300, "neoCity3"),
+    (240070400, "neoCity4"),
+    (240070500, "neoCity5"),
+    (240070600, "neoCity6"),
+    (106020000, "mushCatle"),
+];
+
+const LITH_HARBOR: i32 = 104000000;
+/// Where the Disciples of the Black Magician hide (quest 2175), and the
+/// one the player is out to find.
+const DISCIPLES_HIDEOUT: i32 = 100000006;
+const DISCIPLES_QUEST: i16 = 2175;
+const DISCIPLE: i32 = 9300156;
+
+/// The map `player` just entered runs its `onUserEnter` script. `None` if
+/// the script is unknown.
+pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
+    let map_id = player.stats.map_id;
+    match script {
+        "TD_NC_title" | "TD_MC_title" => Some(
+            THEME_BANNERS
+                .iter()
+                .filter(|&&(map, _)| map == map_id)
+                .map(|(_, banner)| Effect::FieldEffect(format!("temaD/enter/{banner}")))
+                .collect(),
+        ),
+        // The explorer medals' map visits aren't in yet; Lith Harbor shows
+        // its banner, and the Disciple shows himself to whoever hunts him.
+        "explorationPoint" => Some(match map_id {
+            LITH_HARBOR => vec![Effect::FieldEffect(format!("maplemap/enter/{map_id}"))],
+            DISCIPLES_HIDEOUT if player.quests.state(DISCIPLES_QUEST) == QuestState::Started => {
+                vec![Effect::BringOutMob {
+                    mob_id: DISCIPLE,
+                    at: (-1027, 216),
+                }]
+            }
+            _ => Vec::new(),
+        }),
+        // go<map id>: the map's name banner. HeavenMS also unlocks the UI
+        // here, which HeavenClient never locks.
+        _ => {
+            let map = script.strip_prefix("go")?;
+            if map.is_empty() || !map.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            Some(vec![Effect::FieldEffect(format!("maplemap/enter/{map}"))])
+        }
     }
-    Some(vec![Effect::FieldEffect(format!("maplemap/enter/{map}"))])
 }
 
 /// A touch portal's script. `None` if the script is unknown.
@@ -1263,14 +1316,65 @@ mod tests {
         );
     }
 
+    fn at(map_id: i32, quests: &[(i16, QuestState)]) -> Player {
+        let mut player = player_with(quests);
+        player.stats.map_id = map_id;
+        player
+    }
+
     #[test]
     fn map_entry_shows_the_maps_banner() {
+        let player = player_with(&[]);
         assert_eq!(
-            map_enter("go10000"),
+            map_enter("go10000", &player),
             Some(vec![Effect::FieldEffect("maplemap/enter/10000".into())])
         );
-        assert_eq!(map_enter("goAdventure"), None);
-        assert_eq!(map_enter("go"), None);
+        assert_eq!(map_enter("goAdventure", &player), None);
+        assert_eq!(map_enter("go", &player), None);
+        assert_eq!(
+            map_enter("explorationPoint", &at(LITH_HARBOR, &[])),
+            Some(vec![Effect::FieldEffect("maplemap/enter/104000000".into())])
+        );
+    }
+
+    #[test]
+    fn the_time_gate_and_mushroom_castle_show_their_theme_banners() {
+        let data = crate::get_game_data().unwrap();
+        for (map_id, banner) in THEME_BANNERS {
+            let script = data.field(map_id).unwrap().on_user_enter.clone().unwrap();
+            assert_eq!(
+                map_enter(&script, &at(map_id, &[])),
+                Some(vec![Effect::FieldEffect(format!("temaD/enter/{banner}"))]),
+                "{map_id}"
+            );
+        }
+        // A map with the script but no banner of its own shows none.
+        assert_eq!(map_enter("TD_NC_title", &at(HENESYS, &[])), Some(vec![]));
+    }
+
+    #[test]
+    fn the_disciple_comes_out_for_whoever_hunts_him() {
+        let data = crate::get_game_data().unwrap();
+        let script = data
+            .field(DISCIPLES_HIDEOUT)
+            .unwrap()
+            .on_user_enter
+            .clone()
+            .unwrap();
+        let hunting = at(DISCIPLES_HIDEOUT, &[(DISCIPLES_QUEST, QuestState::Started)]);
+        assert_eq!(
+            map_enter(&script, &hunting),
+            Some(vec![Effect::BringOutMob {
+                mob_id: DISCIPLE,
+                at: (-1027, 216)
+            }])
+        );
+        for quests in [&[][..], &[(DISCIPLES_QUEST, QuestState::Completed)]] {
+            assert_eq!(
+                map_enter(&script, &at(DISCIPLES_HIDEOUT, quests)),
+                Some(vec![])
+            );
+        }
     }
 
     #[test]

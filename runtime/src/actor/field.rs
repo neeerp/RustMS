@@ -531,6 +531,9 @@ impl FieldActor {
                     appear,
                 } => self.handle_summon(from, skill_id, level, at, left, lasts, appear),
                 FieldRequest::SummonMobs(mobs) => self.handle_summon_mobs(from, mobs),
+                FieldRequest::BringOutMob { mob_id, at } => {
+                    self.handle_bring_out_mob(from, mob_id, at)
+                }
                 FieldRequest::Catch {
                     object_id,
                     slot,
@@ -1386,6 +1389,28 @@ impl FieldActor {
             placed.push(object_id);
         }
         self.send_control(from, &placed);
+    }
+
+    /// Bring out the mob a script calls for on the ground below `(x, y)`
+    /// (as a summoning sack places one), under `from`'s control, unless one
+    /// is out already.
+    fn handle_bring_out_mob(&mut self, from: ClientId, mob_id: i32, (x, y): (i16, i16)) {
+        if self.mobs.live().any(|mob| mob.info.mob_id == mob_id) {
+            return;
+        }
+        let Some(info) = net::mobs::info(mob_id) else {
+            return;
+        };
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let at = (x, ground.saturating_sub(1));
+        let object_id = self.mobs.place(info, at, 4, Some(from), Instant::now());
+        let Some(mob) = self.mobs.get(object_id) else {
+            return;
+        };
+        if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+            self.broadcast(None, packet);
+        }
+        self.send_control(from, &[object_id]);
     }
 
     fn handle_unsummon(&mut self, from: ClientId, skill_id: Option<i32>, why: Gone) {

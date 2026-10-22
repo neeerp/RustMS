@@ -2,7 +2,7 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
-use crate::message::DirectoryMessage;
+use crate::message::{DirectoryMessage, FieldMessage};
 use net::conti::{self, State};
 use net::dialogue::Prompt;
 use net::npc_scripts::{self, NpcScript, Step};
@@ -12,7 +12,7 @@ use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{drop, effect, guild, inventory, npc, skill, stat};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
-use net::WorldAction;
+use net::{FieldRequest, WorldAction};
 use std::time::{Duration, SystemTime};
 use tokio::sync::oneshot;
 use tracing::{debug, warn};
@@ -103,6 +103,7 @@ impl ClientActor {
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
         let mut open_npc = None;
+        let mut bring_out = Vec::new();
         let mut warp = None;
         let mut name_guild = false;
         let mut grow_guild = None;
@@ -135,6 +136,10 @@ impl ClientActor {
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
                 Effect::OpenNpc(npc_id) => open_npc = Some(*npc_id),
+                Effect::BringOutMob { mob_id, at } => bring_out.push(FieldRequest::BringOutMob {
+                    mob_id: *mob_id,
+                    at: *at,
+                }),
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);
@@ -419,6 +424,13 @@ impl ClientActor {
         }
         if let Some(npc_id) = open_npc {
             Box::pin(self.open_npc(npc_id)).await?;
+        }
+        for request in bring_out {
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request,
+            })
+            .await?;
         }
         // These change the player themselves, so they wait for the commit.
         if let Some(from) = grow_guild {
