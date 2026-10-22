@@ -1,4 +1,5 @@
-//! Helpers for party events (`tests/kpq*.rs`, `tests/hpq*.rs`): a party
+//! Helpers for party events (`tests/kpq*.rs`, `tests/hpq*.rs`,
+//! `tests/lpq*.rs`): a party
 //! gathered in the event's lobby, NPC talk on the event's maps, and getting
 //! the party in.
 
@@ -8,7 +9,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{HPQ, KPQ};
+use net::events::{HPQ, KPQ, LPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -22,6 +23,8 @@ pub const NELLA: i32 = 9020002;
 pub const TORY: i32 = 1012112;
 pub const TOMMY: i32 = 1012113;
 pub const GROWLIE: i32 = 1012114;
+pub const RED_SIGN: i32 = 2040034;
+pub const ANDERSON: i32 = 2040047;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -178,6 +181,34 @@ pub async fn enter_hpq(team: &mut [WorldSession]) -> Vec<Trace> {
         let mut trace = seen.take().unwrap_or_default();
         until(&mut player.connection, &mut trace, |t| {
             t.warps.contains(&HPQ.entry)
+        })
+        .await;
+        traces.push(trace);
+    }
+    traces
+}
+
+/// The party's leader, first, takes it into the Dimensional Crack from the
+/// Red Sign, once the party before them is out, and everyone arrives there;
+/// returns what each saw up to their arrival.
+pub async fn enter_lpq(team: &mut [WorldSession]) -> Vec<Trace> {
+    let name = team[0].character_name.clone();
+    let mut seen = None;
+    for _ in 0..5 {
+        step(&mut team[0].connection, &name, talk(LPQ.lobby, RED_SIGN)).await;
+        let trace = step(&mut team[0].connection, &name, answer(4, 1, Some(0))).await;
+        if trace.prompts.is_empty() {
+            seen = Some(trace);
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    assert!(seen.is_some(), "the Red Sign never let the party in");
+    let mut traces = Vec::new();
+    for player in team.iter_mut() {
+        let mut trace = seen.take().unwrap_or_default();
+        until(&mut player.connection, &mut trace, |t| {
+            t.warps.contains(&LPQ.entry)
         })
         .await;
         traces.push(trace);

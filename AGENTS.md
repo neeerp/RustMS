@@ -9,7 +9,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/quests.md`: the v83 client-driven quest flow, supported requirements/actions, persistence, and rewards
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, legacy map variants, and map/portal scripts
-- `agent_docs/party-quests.md`: instanced party events (Kerning City's and Henesys's party quests): entry, tickets, copies of maps, leaving and ending
+- `agent_docs/party-quests.md`: instanced party events (Kerning City's, Henesys's and Ludibrium's party quests): entry, tickets, copies of maps, leaving and ending
 - `agent_docs/ships.md`: the Ellinia–Orbis ship's timetable, boarding NPCs, CONTI packets, and the station wall clock
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death
 - `agent_docs/parties.md`: party state and flows, EXP sharing, party chat, and the client's party window and HP displays

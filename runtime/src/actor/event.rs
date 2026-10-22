@@ -25,7 +25,7 @@ use net::events::{
 };
 use net::ClientId;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -58,7 +58,7 @@ pub enum EventMessage {
 /// The stages an event's party has cleared, one bit each. Only the event
 /// writes it.
 #[derive(Debug, Default)]
-pub struct Cleared(AtomicU8);
+pub struct Cleared(AtomicU16);
 
 impl Cleared {
     pub fn has(&self, stage: u8) -> bool {
@@ -71,10 +71,10 @@ impl Cleared {
     }
 }
 
-fn bit(stage: u8) -> Option<u8> {
+fn bit(stage: u8) -> Option<u16> {
     stage
         .checked_sub(1)
-        .and_then(|shift| 1u8.checked_shl(shift.into()))
+        .and_then(|shift| 1u16.checked_shl(shift.into()))
 }
 
 /// A way to reach one running event.
@@ -459,10 +459,10 @@ mod tests {
         let cleared = Cleared::default();
         assert!(cleared.set(1) && cleared.set(3) && !cleared.set(1));
         assert!(cleared.has(1) && !cleared.has(2) && cleared.has(3));
-        // Stages are counted from 1, and eight fit.
-        assert!(!cleared.set(0) && !cleared.set(9));
-        assert!(!cleared.has(0) && !cleared.has(9) && !cleared.has(8));
-        assert!(cleared.set(8));
-        assert!(cleared.has(8));
+        // Stages are counted from 1, and sixteen fit.
+        assert!(!cleared.set(0) && !cleared.set(17));
+        assert!(!cleared.has(0) && !cleared.has(17) && !cleared.has(9));
+        assert!(cleared.set(9) && cleared.set(16));
+        assert!(cleared.has(9) && cleared.has(16));
     }
 }

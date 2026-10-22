@@ -354,6 +354,20 @@ pub mod keys {
     pub const HPQ_TORY_REWARD_ASK: &str = "hpq.tory.reward.ask";
     pub const HPQ_TORY_REWARD_FULL: &str = "hpq.tory.reward.full";
     pub const HPQ_TORY_HOME_ASK: &str = "hpq.tory.home.ask";
+    /// Ludibrium's party quest: the Red Sign, which takes a party in from
+    /// Eos Tower's 101st floor (the terms with `{least}`, `{most}`, `{low}`
+    /// and `{high}`) and says what the quest is; and Sgt. Anderson, who
+    /// lets players out, then sends them down to Eos Tower.
+    pub const LPQ_SIGN_MENU: &str = "lpq.sign.menu";
+    pub const LPQ_SIGN_ENTER: &str = "lpq.sign.enter";
+    pub const LPQ_SIGN_ABOUT: &str = "lpq.sign.about";
+    pub const LPQ_SIGN_INFO: &str = "lpq.sign.info";
+    pub const LPQ_SIGN_NO_PARTY: &str = "lpq.sign.no_party";
+    pub const LPQ_SIGN_NOT_LEADER: &str = "lpq.sign.not_leader";
+    pub const LPQ_SIGN_NOT_ELIGIBLE: &str = "lpq.sign.not_eligible";
+    pub const LPQ_SIGN_BUSY: &str = "lpq.sign.busy";
+    pub const LPQ_ANDERSON_LEAVE_ASK: &str = "lpq.anderson.leave.ask";
+    pub const LPQ_ANDERSON_HOME: &str = "lpq.anderson.home";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -1243,6 +1257,16 @@ mod tests {
             keys::SPIRUNA_ASK,
             keys::SPIRUNA_DONE,
             keys::SPIRUNA_SHORT,
+            keys::LPQ_SIGN_MENU,
+            keys::LPQ_SIGN_ENTER,
+            keys::LPQ_SIGN_ABOUT,
+            keys::LPQ_SIGN_INFO,
+            keys::LPQ_SIGN_NO_PARTY,
+            keys::LPQ_SIGN_NOT_LEADER,
+            keys::LPQ_SIGN_NOT_ELIGIBLE,
+            keys::LPQ_SIGN_BUSY,
+            keys::LPQ_ANDERSON_LEAVE_ASK,
+            keys::LPQ_ANDERSON_HOME,
         ];
         for key in named
             .iter()

@@ -8,7 +8,9 @@ passes), which wins it. The rewards and the bonus stage come next (see
 `v83ref/reports/a005-instancing-kpq.md`, section 3, `a011-kpq-stage1.md`
 and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
 through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
-bonus (`v83ref/reports/a058-henesys-pq.md`).
+bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
+has its entry, exit and timer so far (`v83ref/reports/a066-ludibrium-pq.md`).
+Its stages come next.
 
 ## Rules
 
@@ -23,6 +25,9 @@ bonus (`v83ref/reports/a058-henesys-pq.md`).
   910010300, levels 10 and up, 3-6 players and 10 minutes (Cosmic
   `HenesysPQ`). Its exit lies inside its range of maps: `Event::holds`
   never counts the exit as one of the event's maps.
+- `LPQ` has lobby 221024500 (Eos Tower's 101st floor), maps
+  922010000-922011100, exit 922010000, levels 35-50, 5-6 players and 45
+  minutes (Cosmic `LudiPQ`). Its exit also lies inside its range of maps.
 - `Event::team` picks who goes: the party's members online on the
   leader's channel, standing in the lobby, at the right levels. The leader
   must be one of them, and there must be enough of them and not too many.
@@ -196,7 +201,11 @@ bonus stage (103000805) are not done yet.
 
 ## Clearing a stage
 
-Stage n is played on `entry + n - 1`. A clear, taken once and only from the
+Stage n is played on `entry + (n - 1) * stride` (`Event::stage_map`):
+KPQ's and HPQ's stage maps follow one another (`stride` 1), and LPQ's are
+100 apart (922010100 to the boss's 922010900), with rooms off a stage
+between them, on which no stage is played (`Event::stage_on`). `Cleared`
+holds 16 stages. A clear, taken once and only from the
 leader, goes like this (`EventActor::clear`):
 
 1. The event sets the stage's bit in `Cleared` before telling anyone, so a
@@ -215,8 +224,8 @@ leader, goes like this (`EventActor::clear`):
 The client doesn't stop anyone at a closed gate: it sends CHANGE_MAP with
 the portal's name either way. So `handle_packet` checks CHANGE_MAP before
 the handler moves the player (`gate_closed`). For `next00` on 103000800-803
-before that stage's clear, it answers BLOCKED_MAP 1, the client's own "The
-portal is closed for now." line, which also unlocks it
+(`Event::gated`) before that stage's clear, it answers BLOCKED_MAP 1, the
+client's own "The portal is closed for now." line, which also unlocks it
 (`v83ref/reports/a012-kpq-gate.md`). Map-id warps aren't checked.
 
 ## Henesys's moonflowers
@@ -304,6 +313,29 @@ talk this way only to a player holding its ticket
 (`NpcScript::on_primrose_hill`); without one, Tory and Tommy only send
 players home.
 
+## Ludibrium's entry
+
+On 221024500 the Red Sign (2040034) has a menu (Cosmic `2040034`): taking
+the party in, or what the quest is. As with Lakelis and Tory, the entry
+check is the runtime's (`talk_about_event`); the party's leader takes the
+party in at once, without being asked again, as in Cosmic. Those who go
+are the party's members on 221024500 at levels 35 to 50, so a member of a
+higher level, or elsewhere, stays behind, and there must still be five.
+Everyone starts on 922010100. Cosmic's party-search toggle is left out,
+as with Tory.
+
+Sgt. Anderson (2040047) is on every stage map: he asks before letting a
+player out to 922010000, as they can't come back. On 922010000 he sends
+them down to 221024500 after one page. Leaving takes the quest's items
+(`Event::items`): the passes 4001022, the key 4001023, and the pass
+4001156 for stage 7's boxes, which Cosmic leaves with the player (the
+default 5A in `v83ref/lanes/QUESTIONS.md`, LPQ). Five players are the
+fewest, so the first to leave ends the quest for a party of five.
+
+`922010100`-`500`, `700` and `800` keep `next00` shut until their stage is
+cleared (`Event::gated`); `600`'s maze has no clear. No stage can be
+cleared yet.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -318,16 +350,20 @@ players home.
 | Tommy 1012113 | 910010100 | Pig Town: the leader may take the party there once won |
 | Tommy 1012113 | 910010200 | Out to 910010400 |
 | Tommy 1012113 | 910010300 | Home to 100000200 |
+| Red Sign 2040034 | 221024500 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
+| Sgt. Anderson 2040047 | 922010100-900 | Out to 922010000 |
+| Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
-`kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*` and
-`hpq.tommy.*`.
+`kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
+`hpq.tommy.*`, `lpq.sign.*` and `lpq.anderson.*`.
 
 ## Not yet
 
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
+- LPQ's stages, boss, bonus and reward (`a066`, slices S2 to S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know
