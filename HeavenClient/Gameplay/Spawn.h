@@ -25,6 +25,7 @@
 
 #include "../Character/Buff.h"
 #include "../Character/Guild.h"
+#include "../Character/Marriage.h"
 #include "../Character/MiniRoomBox.h"
 #include "../Graphics/Animation.h"
 #include "../Net/Login.h"
@@ -139,7 +140,8 @@ namespace ms
 				  const GuildEmblem &emblem, std::optional<MiniRoomBox> room = std::nullopt,
 				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt,
 				  int32_t item_effect = 0, int32_t mount_level = 0, int32_t mount_exp = 0,
-				  int32_t mount_fatigue = 0, bool berserk = false);
+				  int32_t mount_fatigue = 0, bool berserk = false,
+				  std::optional<MarriageRing> marriage_ring = std::nullopt);
 
 		int32_t get_cid() const;
 
@@ -165,5 +167,6 @@ namespace ms
 		int32_t mount_exp;
 		int32_t mount_fatigue;
 		bool berserk;
+		std::optional<MarriageRing> marriage_ring;
 	};
 }

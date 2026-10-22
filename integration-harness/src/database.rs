@@ -816,3 +816,18 @@ pub async fn end_family_buff_in(character_id: i32, seconds: i32) -> Result<(), H
     })
     .await
 }
+
+/// Marry the logged-out characters `groom_id` and `bride_id`, as if they
+/// had proposed with the ring box `ring_box`.
+pub async fn marry(groom_id: i32, bride_id: i32, ring_box: i32) -> Result<(), HarnessError> {
+    change_one_row("marry", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO marriages (groom_id, bride_id, status, item_id) VALUES ($1, $2, 3, $3)",
+        )
+        .bind::<Integer, _>(groom_id)
+        .bind::<Integer, _>(bride_id)
+        .bind::<Integer, _>(ring_box)
+        .execute(conn)
+    })
+    .await
+}

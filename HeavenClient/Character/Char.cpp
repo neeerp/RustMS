@@ -180,6 +180,12 @@ namespace ms
 		if (!look.get_morph())
 			consume_aura.drawabove(absp, alpha);
 
+		if (ring.mark)
+			ring_mark.draw(DrawArgument(absp), alpha);
+
+		if (ring.pair)
+			ring_pair.draw(DrawArgument(absp + ring.offset), alpha);
+
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.draw(affliction.at_face ? facepos : absp, alpha);
 
@@ -251,6 +257,12 @@ namespace ms
 		berserk_aura.update();
 		divine_body.update();
 		consume_aura.update();
+
+		if (ring.mark)
+			ring_mark.update();
+
+		if (ring.pair)
+			ring_pair.update();
 
 		if (dashing)
 			dash_dust.update();
@@ -648,6 +660,22 @@ namespace ms
 		int8_t layer = z ? static_cast<int8_t>(std::clamp<int64_t>(z.get_integer(), -5, 20)) : 5;
 
 		consume_aura.add_looping(src, DrawArgument(), layer, 1.0f);
+	}
+
+	void Char::show_ring(const RingEffect &effect)
+	{
+		if (effect == ring)
+			return;
+
+		nl::node src = nl::nx::effect["ItemEff.img"][std::to_string(effect.item_id)];
+
+		if (effect.mark && (!ring.mark || effect.item_id != ring.item_id))
+			ring_mark = Animation(src["0"]);
+
+		if (effect.pair && (!ring.pair || effect.item_id != ring.item_id))
+			ring_pair = Animation(src["1"]);
+
+		ring = effect;
 	}
 
 	void Char::show_held_effect(Animation toshow, int8_t z, bool looping)

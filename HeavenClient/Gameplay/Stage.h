@@ -324,6 +324,11 @@ namespace ms
 		// drop at its feet (FUN_00705c5d).
 		void check_pet_loot();
 
+		// Couples wearing their wedding rings near each other show the
+		// ring's mark, and its big effect when close (CUserPool::Update
+		// 0x9717b5).
+		void show_rings();
+
 		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
 		void draw_fear(double viewx, double viewy, float alpha) const;
 

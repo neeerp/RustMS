@@ -115,6 +115,65 @@ void partner_spots()
 	require(!spot.marks({ 102000000, 102000100 }, 102000100), "the player's own spot wins");
 }
 
+void ring_looks()
+{
+	Writer none;
+	none.put<int8_t>(0).put<int8_t>(0).put<int8_t>(0);
+	InPacket recv = none.packet();
+	require(!marriage::read_ring_looks(recv) && !recv.available(), "three empty blocks");
+
+	Writer worn;
+	worn.put<int8_t>(1).put<int64_t>(11).put<int64_t>(12).put<int32_t>(1112001);
+	worn.put<int8_t>(0);
+	worn.put<int8_t>(1).put<int32_t>(5).put<int32_t>(4).put<int32_t>(1112806);
+	recv = worn.packet();
+	std::optional<MarriageRing> ring = marriage::read_ring_looks(recv);
+	require(!recv.available(), "a crush block is skipped");
+	require(ring && ring->self_id == 5 && ring->partner_id == 4 && ring->item_id == 1112806, "the marriage block");
+
+	MarriageRecord record;
+	record.groom_id = 4;
+	record.bride_id = 5;
+	record.groom_item = 1112803;
+	require(!marriage::own_ring(record, false, false), "not without the ring worn");
+	require(!marriage::own_ring(std::nullopt, false, true), "not without a couple");
+	std::optional<MarriageRing> groom = marriage::own_ring(record, false, true);
+	require(groom && groom->self_id == 4 && groom->partner_id == 5 && groom->item_id == 1112803, "the groom's");
+	std::optional<MarriageRing> bride = marriage::own_ring(record, true, true);
+	require(bride && bride->self_id == 5 && bride->partner_id == 4, "the bride's");
+}
+
+void ring_effects()
+{
+	MarriageRing groom{ 4, 5, 1112803 };
+	MarriageRing bride{ 5, 4, 1112803 };
+	MarriageRing other{ 7, 8, 1112806 };
+
+	auto effects = marriage::ring_effects({ { 5, Point<int16_t>(300, 0), bride }, { 7, Point<int16_t>(0, 0), other },
+		{ 4, Point<int16_t>(100, 0), groom } });
+	require(effects.size() == 2, "only the couple");
+	auto [low, low_effect] = effects[0];
+	auto [high, high_effect] = effects[1];
+	require(low == 4 && high == 5, "the lower id first");
+	require(low_effect.mark && high_effect.mark, "both marked on one screen");
+	require(low_effect.pair && low_effect.offset == Point<int16_t>(100, 0), "close: the big effect midway");
+	require(!high_effect.pair && low_effect.item_id == 1112803, "on the lower id only");
+
+	auto apart = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(250, 0), bride } });
+	require(apart[0].second.mark && !apart[0].second.pair, "250 apart is not close");
+	auto far = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(0, 500), bride } });
+	require(!far[0].second.mark && !far[1].second.mark, "500 below is off the screen");
+
+	auto edge = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(249, 99), bride } });
+	require(edge[0].second.pair, "249 across and 99 down is close");
+	auto low_edge = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(0, 100), bride } });
+	require(!low_edge[0].second.pair, "100 down is not close");
+	auto screen = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(-699, 499), bride } });
+	require(screen[0].second.mark && screen[1].second.mark, "699 across and 499 down share a screen");
+	auto off = marriage::ring_effects({ { 4, Point<int16_t>(0, 0), groom }, { 5, Point<int16_t>(700, 0), bride } });
+	require(!off[0].second.mark, "700 across is off the screen");
+}
+
 int main()
 {
 	try
@@ -123,6 +182,8 @@ int main()
 		ring_boxes_and_result_texts();
 		tooltip_lines();
 		partner_spots();
+		ring_looks();
+		ring_effects();
 	}
 	catch (const std::exception& error)
 	{

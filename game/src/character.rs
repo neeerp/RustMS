@@ -160,6 +160,8 @@ pub struct FieldAvatar {
     pub consume_effect: i32,
     /// Whether the player's Berserk aura shows.
     pub berserk: bool,
+    /// The couple's ring effect, while the player wears a wedding ring.
+    pub marriage_ring: Option<crate::marriage::MarriageRing>,
     /// Energy Charge's gauge, as `Buffs::energy`.
     pub energy: Option<ShownBuff>,
     /// Dash's speed and jump, while the player dashes.
@@ -466,6 +468,21 @@ impl Player {
             .is_some_and(|&slot| self.pet_equip(slot).is_some())
     }
 
+    /// The marriage block of the player's look: while the player has a
+    /// couple and wears a wedding ring. The ring named is the record's, as
+    /// the client takes for the player's own (report b059).
+    pub fn marriage_ring(&self) -> Option<crate::marriage::MarriageRing> {
+        let record = self.marriage.as_ref()?;
+        self.inventory
+            .equipped_regular()
+            .any(|(_, item)| crate::marriage::is_wedding_ring(item.item_id))
+            .then(|| crate::marriage::MarriageRing {
+                self_id: self.stats.id,
+                partner_id: record.partner_of(self.stats.id),
+                item_id: record.ring_id(),
+            })
+    }
+
     /// The projection a field broadcasts for this player at a position.
     pub fn field_avatar(&self, x: i16, y: i16, stance: u8) -> FieldAvatar {
         FieldAvatar {
@@ -502,6 +519,7 @@ impl Player {
             item_effect: self.item_effect,
             consume_effect: self.consume_effect,
             berserk: self.berserk,
+            marriage_ring: self.marriage_ring(),
             energy: self.buffs.energy(),
             dash: [BuffStat::DashSpeed, BuffStat::DashJump].map(|stat| self.buffs.two_state(stat)),
             ride: self.ride(),
@@ -1013,6 +1031,36 @@ mod tests {
             Keymap::default(),
             QuestLog::default(),
         )
+    }
+
+    #[test]
+    fn a_wedding_ring_worn_by_one_of_a_couple_shows_their_ring() {
+        let mut player = player();
+        let id = player.stats.id;
+        player.inventory.insert(
+            InventoryType::Equipped,
+            -12,
+            Item::equipment(1112806, EquipStats::default()),
+        );
+        assert_eq!(player.marriage_ring(), None);
+        player.marriage = Some(crate::marriage::MarriageRecord {
+            id: 3,
+            groom_id: 7,
+            bride_id: id,
+            status: crate::marriage::MARRIED,
+            item_id: 2240002,
+            groom_name: "Groom".into(),
+            bride_name: "Bride".into(),
+        });
+        let ring = crate::marriage::MarriageRing {
+            self_id: id,
+            partner_id: 7,
+            item_id: 1112807,
+        };
+        assert_eq!(player.marriage_ring(), Some(ring));
+        assert_eq!(player.field_avatar(0, 0, 0).marriage_ring, Some(ring));
+        player.inventory.unequip(-12, 1).unwrap();
+        assert_eq!(player.marriage_ring(), None);
     }
 
     #[test]
