@@ -673,7 +673,8 @@ those HeavenClient has (`UI::dialog_open`, report c013). While one is open,
 general chat says "You can't chat right now.", and trade invites, shop
 permits and the cash items that open a window or ask a question say "Not
 available": the item megaphone, meso sacks, AP and SP resets, the
-chalkboard, the Item Guard, Karma, the hammer and Vega. Other cash items (pet food,
+chalkboard, the Item Guard, Karma, the hammer, Vega and the Quick Delivery
+Coupon. Other cash items (pet food,
 faces, weather, morphs, ...) are still used. A morph potion is refused
 silently. v83's silent drop, skill, sort and movement gates aren't ported.
 
@@ -1012,8 +1013,8 @@ card fades out after six seconds. A quick one's stays until answered, and its
 O sends op 0, which opens the receive-only window. A new card replaces the
 one before. Mode `0x1a` opens the coupon's window: the quick panel alone,
 which closes on `0x12`. Using a Quick Delivery Coupon (533xxxx) from the Cash
-tab sends USE_CASH_ITEM unless a Duey window is open, which gets "Not
-available" in the chat log. Only a send uses the coupon up.
+tab sends USE_CASH_ITEM unless a dialog is open (Duey's among them; see
+"Dialogs that lock the game"), which gets "Not available" in the chat log. Only a send uses the coupon up.
 
 ## Trading
 
