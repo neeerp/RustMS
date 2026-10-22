@@ -1059,6 +1059,21 @@ namespace ms
 		}
 	};
 
+	// Opcode: MOB_DAMAGE_MOB_FRIENDLY(192)
+	class MobDamageFriendlyPacket : public OutPacket
+	{
+	public:
+		// Tells the server mob `attacker` ran into the friendly mob `victim`
+		// (0x667f50)
+		MobDamageFriendlyPacket(int32_t attacker, int32_t charid, int32_t victim) : OutPacket(
+				OutPacket::Opcode::MOB_DAMAGE_MOB_FRIENDLY)
+		{
+			write_int(attacker);
+			write_int(charid);
+			write_int(victim);
+		}
+	};
+
 	// Opcode: MOB_BOMB(193)
 	class MobBombPacket : public OutPacket
 	{

@@ -174,6 +174,25 @@ namespace ms
 		// mob takes it at most once in 2 s, shows it, and tells the server.
 		void hurt_by(const Mob &attacker, uint8_t index, bool left);
 
+		// Whether mobs hurt it rather than players (damagedByMob), as they
+		// do Henesys's Moon Bunny.
+		bool is_friendly() const;
+
+		// Whether this friendly is hurt by mob template `id` (FUN_00670bc0).
+		bool is_hurt_by_mob(int32_t id) const;
+
+		// A mob this client moves that chases no one goes after the friendly
+		// `oid` at `position` (0x667e89); one already after it follows it.
+		void chase_friendly(int32_t oid, Point<int16_t> position);
+
+		// This client moves the friendly, which flinches from a mob at
+		// `from` that ran into it (0x667fc6).
+		void flinch_from(Point<int16_t> from);
+
+		// The server's word of a hit on the friendly (FUN_0066c6c2): the
+		// number, the hit stance, and its gauge at `hp` of `maxhp`.
+		void friendly_hit(int32_t damage, int32_t hp, int32_t maxhp);
+
 		// Kill the mob with the appropriate type (FUN_0067961d): 0 makes it
 		// inactive, 1 plays its death, 3 its skill1, and 2 or 4 and up blow
 		// it up with attack1. The death waits for any hits still on their
@@ -418,7 +437,8 @@ namespace ms
 
 		// Return the current 'head' position
 		Point<int16_t> get_head_position(Point<int16_t> position) const;
-		void draw_hp_bar(Point<int16_t> position) const;
+		// The HP bar over its body, `percent` full of `fill`.
+		void draw_hp_bar(Point<int16_t> position, int16_t percent, Color::Name fill) const;
 
 		// Load the level tag in one of ShowLevel's sets: 0 white, 1 yellow,
 		// 2 orange.
@@ -537,6 +557,14 @@ namespace ms
 		std::vector<Sweep> sweeps;
 		// When another mob's attack last reached it.
 		std::optional<int32_t> mobhitat;
+		// Mobs hurt it rather than players (damagedByMob), only these
+		// templates of them (damagedBySelectedMob), or any if none.
+		bool friendly;
+		std::vector<int32_t> friendlyby;
+		// A friendly's red gauge, full from the start (0x663407), and the
+		// ms it has blinked through its hit stance, if it is in one.
+		int16_t friendlypct = 100;
+		std::optional<int32_t> blink;
 		int32_t targetid = 0;
 		mob_attack::Box targetbody{};
 		bool targetonground = false;

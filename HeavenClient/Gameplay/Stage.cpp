@@ -28,6 +28,7 @@
 #include "FieldEffectRules.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/FieldLimit.h"
+#include "MapleMap/FriendlyRules.h"
 #include "MapleMap/KiteRules.h"
 #include "MapleMap/Npc.h"
 
@@ -383,9 +384,13 @@ namespace ms
 		mob_attack::Box playerbody = mob_attack::user_body(playerpos.x(), playerpos.y(), player.is_prone(),
 														   !player.getflip());
 
+		// Hits on a friendly mob are reported by the party's leader, or by
+		// a player alone on the map (0x667ed5).
+		bool reporter = friendly::reports(player.get_party().is_leader(player.get_oid()), chars.size());
+
 		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
 							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.is_barrelled(),
-							   player.get_beacon() });
+							   player.get_beacon() }, reporter);
 		chars.update(physics);
 		drops.update(physics);
 

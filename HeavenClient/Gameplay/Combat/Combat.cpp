@@ -1096,7 +1096,7 @@ namespace ms
 		{
 			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (mob && mob->is_alive() && mob->is_undead() && mob->is_in_range(range))
+			if (mob && mob->is_alive() && !mob->is_friendly() && mob->is_undead() && mob->is_in_range(range))
 				candidates.emplace(objs->entry_order(mob->get_oid()), mob->get_oid());
 		}
 
@@ -1761,7 +1761,7 @@ namespace ms
 			{
 				const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-				if (mob && mob->is_alive() && (!only || mob->get_oid() == only)
+				if (mob && mob->is_alive() && !mob->is_friendly() && (!only || mob->get_oid() == only)
 					&& shot_path::in_step(step, mob->get_body()))
 				{
 					uint32_t entry = objs->entry_order(mob->get_oid());
@@ -1791,7 +1791,7 @@ namespace ms
 		{
 			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (!mob || !mob->is_alive())
+			if (!mob || !mob->is_alive() || mob->is_friendly())
 				continue;
 
 			chain_lightning::Mob candidate = {
@@ -1874,7 +1874,7 @@ namespace ms
 		{
 			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (mob && mob->is_alive() && mob->is_in_range(range))
+			if (mob && mob->is_alive() && !mob->is_friendly() && mob->is_in_range(range))
 			{
 				int32_t oid = mob->get_oid();
 				uint32_t key = closest_first ? mob->get_position().distance(origin) : objs->entry_order(oid);
@@ -3262,7 +3262,7 @@ namespace ms
 		{
 			const Mob *mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (!mob || !mob->is_alive())
+			if (!mob || !mob->is_alive() || mob->is_friendly())
 				continue;
 
 			Rectangle<int16_t> body = mob->get_body();

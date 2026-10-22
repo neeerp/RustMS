@@ -57,6 +57,11 @@ namespace ms
 		chars.clear();
 	}
 
+	size_t MapChars::size() const
+	{
+		return chars.size() + spawns.size();
+	}
+
 	MapObjects *MapChars::get_chars()
 	{
 		return &chars;

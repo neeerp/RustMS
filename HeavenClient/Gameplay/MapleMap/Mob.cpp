@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Mob.h"
+#include "FriendlyRules.h"
 #include "Layer.h"
 #include "SummonRules.h"
 
@@ -103,6 +104,11 @@ namespace ms
 			damagedby.push_back(skill.get_integer());
 
 		onlynormal = info["onlyNormalAttack"].get_bool();
+		friendly = info["damagedByMob"].get_bool();
+
+		for (nl::node mob : info["damagedBySelectedMob"])
+			friendlyby.push_back(mob.get_integer());
+
 		hidename = info["hideName"].get_bool();
 		hidehp = info["hideHP"].get_bool();
 
@@ -547,6 +553,12 @@ namespace ms
 
 			if (!acting)
 				show_stance(now.stance);
+
+			// A friendly blinks through its hit stance (0x6686d5).
+			if (friendly && acting && stance == Stance::HIT)
+				blink = blink ? *blink + Constants::TIMESTEP : 0;
+			else
+				blink.reset();
 
 			phobj.hspeed = now.x - phobj.crnt_x();
 			phobj.vspeed = now.y - phobj.crnt_y();
@@ -1576,8 +1588,16 @@ namespace ms
 				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
 			else if (casting)
 				skillanimations.at(*casting).draw(DrawArgument(absp, !attackleft, interopc), alpha);
+			else if (blink && friendly::grey(*blink))
+				animations.at(stance).draw(DrawArgument(absp, absp, Point<int16_t>(0, 0), flip && !noflip ? -1.0f : 1.0f,
+														1.0f, Color(0.5f, 0.5f, 0.5f, interopc), 0.0f), alpha);
 			else
 				animations.at(stance).draw(DrawArgument(absp, flip && !noflip, interopc), alpha);
+
+			// A friendly's red gauge stays up while it lives, apart from the
+			// HP mobs show when hit (0x663407, 0x668748).
+			if (friendly && !dying)
+				draw_hp_bar(absp, friendlypct, Color::Name::RED);
 
 			if (showhp)
 			{
@@ -1603,7 +1623,7 @@ namespace ms
 				}
 
 				if (!dying && hppercent > 0 && !hidehp)
-					draw_hp_bar(absp);
+					draw_hp_bar(absp, hppercent, Color::Name::LIGHTGREEN);
 			}
 		}
 
@@ -1660,7 +1680,7 @@ namespace ms
 		fieldeffects.drawabove(viewp, alpha);
 	}
 
-	void Mob::draw_hp_bar(Point<int16_t> position) const
+	void Mob::draw_hp_bar(Point<int16_t> position, int16_t percent, Color::Name fill) const
 	{
 		// As in v83 (FUN_005d004e), the bar sits centred over the body, its
 		// top 30 px above the body's. A frame without a body has no bar.
@@ -1674,7 +1694,7 @@ namespace ms
 		if (flip && !noflip)
 			centre = -centre;
 
-		hpbar.draw(position + Point<int16_t>(centre - MobHpBar::WIDTH / 2, body.top() - 30), hppercent);
+		hpbar.draw(position + Point<int16_t>(centre - MobHpBar::WIDTH / 2, body.top() - 30), percent, fill);
 	}
 
 	void Mob::set_control(int8_t mode)
@@ -1881,6 +1901,64 @@ namespace ms
 			.dispatch();
 	}
 
+	bool Mob::is_friendly() const
+	{
+		return friendly;
+	}
+
+	bool Mob::is_hurt_by_mob(int32_t mobid) const
+	{
+		return friendly::hurt_by(friendly, friendlyby, mobid);
+	}
+
+	void Mob::chase_friendly(int32_t friendlyoid, Point<int16_t> position)
+	{
+		if (puppet == friendlyoid)
+		{
+			puppetpos = position;
+			return;
+		}
+
+		if (!control || hastarget || !is_alive())
+			return;
+
+		// It chases the friendly as it would a Puppet, attacking no one
+		// on the way.
+		chase();
+		puppet = friendlyoid;
+		puppetpos = position;
+		targetpos = position;
+		targetdead = false;
+	}
+
+	void Mob::flinch_from(Point<int16_t> from)
+	{
+		if (!control || !is_alive() || acting)
+			return;
+
+		bool right = from.x() > get_position().x();
+
+		show_stance(Stance::HIT, right);
+		attacking.reset();
+		casting.reset();
+		acting = true;
+		flinch = Flinch{ right, std::nullopt };
+	}
+
+	void Mob::friendly_hit(int32_t damage, int32_t hp, int32_t maxhp)
+	{
+		show_damage(damage);
+		friendlypct = friendly::percent(hp, maxhp);
+
+		// It flinches unless it attacks, casts or flinches already, or the
+		// hit is too weak to push it (FUN_0066fb4d).
+		if (!is_alive() || acting || attacking || casting || damage < knockback)
+			return;
+
+		show_stance(Stance::HIT, flip);
+		acting = true;
+	}
+
 	Point<int16_t> Mob::get_head_position(Point<int16_t> position) const
 	{
 		Point<int16_t> head = animations.at(stance).get_head();
@@ -1959,6 +2037,10 @@ namespace ms
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
 	{
+		// A friendly has only its own gauge (0x668748).
+		if (friendly)
+			return;
+
 		// A boss shows its HP only in the bar the server sends (0x66d652).
 		if (boss && !gaugehide)
 			return;

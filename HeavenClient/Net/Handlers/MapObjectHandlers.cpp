@@ -650,9 +650,20 @@ namespace ms
 		int32_t oid = recv.read_int();
 		recv.read_byte();
 		int32_t damage = recv.read_int();
+		MapMobs &mobs = Stage::get().get_mobs();
 
-		// An HP indicator may follow; SHOW_MOB_HP shows HP here.
-		Stage::get().get_mobs().show_damage(oid, damage);
+		// A friendly mob's HP follows, for its gauge (FUN_0066c6c2); other
+		// mobs' comes with SHOW_MOB_HP.
+		if (mobs.is_friendly(oid))
+		{
+			int32_t hp = recv.read_int();
+			int32_t maxhp = recv.read_int();
+
+			mobs.friendly_hit(oid, damage, hp, maxhp);
+		} else
+		{
+			mobs.show_damage(oid, damage);
+		}
 	}
 
 	void ShowMobHpHandler::handle(InPacket& recv) const
