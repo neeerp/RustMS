@@ -96,6 +96,10 @@ pub enum BuffStat {
     /// Echo of Hero (the client's MaxLevelBuff): attack and magic rise by
     /// `value` percent of their whole.
     EchoOfHero = 47,
+    /// A ghost: the client draws the body's `ghost*` stances and only the
+    /// head's items, and lets it neither attack nor use skills (a ghost
+    /// item's `ghost`; report c039).
+    Ghost = 49,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
     /// No mob can hurt the player: the client dodges every hit
@@ -144,7 +148,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 21] = [
+    pub const SHOWN: [BuffStat; 22] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -158,6 +162,7 @@ impl BuffStat {
         BuffStat::DarkSight,
         BuffStat::SoulArrow,
         BuffStat::Morph,
+        BuffStat::Ghost,
         BuffStat::Seduce,
         BuffStat::ShadowStars,
         BuffStat::Undead,

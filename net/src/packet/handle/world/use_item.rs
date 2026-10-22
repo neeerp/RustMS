@@ -248,8 +248,8 @@ fn use_item(player: &mut Player, slot: i16, item_id: i32, now: Instant) -> Optio
 }
 
 /// v83 0xa092fb sends no morph potion (221xxxx) or ghost item (236xxxx)
-/// while the player is morphed, seated or aboard the Battleship (report
-/// c012), and the server refuses one too, keeping it. To change morph, one
+/// while the player is morphed or a ghost, seated or aboard the Battleship
+/// (reports c012, c039), and the server refuses one too, keeping it. To change morph, one
 /// cancels the first. The client's other refusal, in a mini room, isn't
 /// checked here.
 fn potion_refused(player: &Player, item_id: i32) -> bool {
@@ -259,7 +259,10 @@ fn potion_refused(player: &Player, item_id: i32) -> bool {
     let battleship = player
         .ride()
         .is_some_and(|ride| ride.item_id / 10_000 == 193);
-    player.buffs.has(BuffStat::Morph) || player.chair != 0 || battleship
+    player.buffs.has(BuffStat::Morph)
+        || crate::morph::ghosted(player)
+        || player.chair != 0
+        || battleship
 }
 
 /// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it

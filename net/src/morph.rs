@@ -35,12 +35,23 @@ fn morphed_by(player: &Player) -> Option<i32> {
     Some(buff.skill_id)
 }
 
+/// Whether the player is a ghost (a ghost item, 236xxxx; report c039),
+/// which v83 lets neither attack nor use any skill (FUN_0094e256,
+/// FUN_00966f7a).
+pub fn ghosted(player: &Player) -> bool {
+    player.buffs.has(BuffStat::Ghost)
+}
+
 /// Whether the v83 client refuses `skill_id` (0 for a normal attack) for
-/// the player's morph. Shockwave needs a transformation and Demolition and
-/// Snatch Super Transformation (FUN_00969465); a superman can't use Double
-/// Shot, Oak Barrel or Burst Fire, and in the barrel nothing at all, as the
-/// attack key breaks it instead (FUN_00966f7a, FUN_0094e256).
+/// the player's morph, or because they are a ghost. Shockwave needs a
+/// transformation and Demolition and Snatch Super Transformation
+/// (FUN_00969465); a superman can't use Double Shot, Oak Barrel or Burst
+/// Fire, and in the barrel nothing at all, as the attack key breaks it
+/// instead (FUN_00966f7a, FUN_0094e256).
 pub fn refused(player: &Player, skill_id: i32) -> bool {
+    if ghosted(player) {
+        return true;
+    }
     let by = morphed_by(player);
     let transformed = matches!(by, Some(TRANSFORMATION | SUPER_TRANSFORMATION));
     match skill_id {
