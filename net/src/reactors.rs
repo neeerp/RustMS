@@ -25,6 +25,10 @@ pub fn template(reactor_id: i32) -> Option<ReactorTemplate> {
 pub enum Action {
     /// Drop its loot (`reactor_drops`), as every reactor not listed does.
     Drops,
+    /// Drop its loot with a pile of mesos (`mesos`, from and up to but not
+    /// including to, as Cosmic rolls them): one pile first, and more after
+    /// it until there are `at_least` drops.
+    Spray { at_least: usize, mesos: (i32, i32) },
     /// Bring out `count` of `mob_id` on the ground below it instead.
     BringOut(i32, usize),
     /// Send whoever broke it to a map's portal.
@@ -104,6 +108,12 @@ pub fn action(reactor_id: i32) -> Action {
             at: (941, 184),
             notice: keys::LPQ_NOTICE_ALISHAR,
         },
+        // The boxes on Ludibrium's bonus stage (`ludiquest4`:
+        // `sprayItems(true, 1, 30, 60, 15)`).
+        2202004 => Action::Spray {
+            at_least: 15,
+            mesos: (30, 60),
+        },
         // Ludibrium's stage 2 trap box (`go922010201`).
         2200002 => Action::WarpMap {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
@@ -134,6 +144,10 @@ mod tests {
         assert_eq!(action(2401001), Action::BringOut(9300089, 1));
         assert_eq!(action(2401002), Action::BringOut(9300090, 1));
         assert_eq!(action(2201001), Action::BringOut(LPQ_BLOCTOPUS, 3));
+        assert!(matches!(
+            action(2202004),
+            Action::Spray { at_least: 15, .. }
+        ));
         let Action::SpawnAt { mob_id, at, .. } = action(2201003) else {
             panic!("{:?}", action(2201003));
         };

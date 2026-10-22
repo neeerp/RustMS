@@ -9,8 +9,8 @@ passes), which wins it. The rewards and the bonus stage come next (see
 and `a016-kpq-stages-2-5.md`). Henesys's party quest (HPQ) is played
 through: its moonflowers, Moon Bunny, rice cakes, win, reward and Pig Town
 bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
-has its entry, exit, timer and balloons so far
-(`v83ref/reports/a066-ludibrium-pq.md`). The rest of its stages come next.
+is played through too: its nine stages, bonus and reward
+(`v83ref/reports/a066-ludibrium-pq.md`).
 
 ## Rules
 
@@ -312,8 +312,8 @@ still in Pig Town are moved to its exit with the clock stopped, and the
 event carries on, won, until its last member leaves (`time_up`). On
 910010400 Tory gives the reward and sends them home too. A copy's NPCs
 talk this way only to a player holding its ticket
-(`NpcScript::on_primrose_hill`); without one, Tory and Tommy only send
-players home.
+(`NpcScript::in_event`); without one, Tory and Tommy only send players
+home.
 
 ## Ludibrium's entry
 
@@ -396,6 +396,23 @@ pass put on reactor 2201003 (`ludiBoss0`) brings out Alishar (9300012) at
 (941, 184) with `lpq.notice.alishar`; he drops the key. Both use
 `Action::SpawnAt`.
 
+## Ludibrium's bonus and reward
+
+The key handed in wins the quest, and the win itself takes the team on
+to the bonus stage, 922011000, for a minute (`Bonus::on_win`; Cosmic
+`clearPQ` has no NPC step), after the clear's EXP and effects. Its 36
+boxes 2202004 (`Action::Spray`, Cosmic `ludiquest4`) drop the pack's
+rows with a pile of 30-59 mesos first, and more piles until there are 15
+drops. The Pink Balloon (2040045) lets a player off early, to the
+reward's `st00`; when the minute is up everyone still there is moved on
+(`time_up`). On 922011100 Arturo (2040035) gives each member of the team
+that won one of `LPQ_REWARDS` (Cosmic's 77, scrolls, potions, capes,
+earrings, ores; the default 1A of `v83ref/lanes/QUESTIONS.md`) and sends
+them back to 221024500, so nobody gets it twice. Without a free slot in
+each of the Equip, Use and Etc tabs, which the rewards come in, he says
+`lpq.arturo.full` and gives nothing yet (`giveEventReward`). There is no
+EXP at the reward.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -412,19 +429,21 @@ pass put on reactor 2201003 (`ludiBoss0`) brings out Alishar (9300012) at
 | Tommy 1012113 | 910010300 | Home to 100000200 |
 | Red Sign 2040034 | 221024500 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
 | Balloons 2040036-2040044 | 922010100-900 | Runtime (`talk_to_balloon`): the stage's hand-in, stage 8's crates, the maze's line |
+| Pink Balloon 2040045 | 922011000 | Off the bonus to 922011100 |
+| Arturo 2040035 | 922011100 | The reward once won, and down to 221024500 |
 | Sgt. Anderson 2040047 | 922010100-900 | Out to 922010000 |
 | Sgt. Anderson 2040047 | 922010000 | Down to 221024500 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
-`hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*` and `lpq.anderson.*`.
+`hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
+`lpq.arturo.*` and `lpq.anderson.*`.
 
 ## Not yet
 
 These are not done yet:
 
 - Cloto's reward after the win, and the bonus stage (103000805).
-- LPQ's bonus and reward (`a066`, slice S5).
 - A new leader chosen inside the copy: the event still counts the first
   leader, so the leader leaving ends it until it is won.
 - Members in the Cash Shop still pass the entry check, which doesn't know

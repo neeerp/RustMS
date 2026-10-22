@@ -63,7 +63,8 @@ pub struct Event {
     pub gates: bool,
     /// Where the whole team goes on winning, if anywhere.
     pub clear_map: Option<i32>,
-    /// The bonus the leader may take the team to once it is won.
+    /// The bonus the team that won goes to: taken there by the leader, or
+    /// at once (`Bonus::on_win`).
     pub bonus: Option<Bonus>,
 }
 
@@ -100,6 +101,9 @@ pub struct Bonus {
     pub map: i32,
     pub exit: i32,
     pub minutes: u64,
+    /// Whether the win itself takes the team there, rather than the leader
+    /// later.
+    pub on_win: bool,
 }
 
 impl Bonus {
@@ -167,17 +171,18 @@ pub const HPQ: Event = Event {
         map: 910_010_200,
         exit: 910_010_400,
         minutes: 5,
+        on_win: false,
     }),
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
 /// to 6 players of levels 35 to 50, 45 minutes). Its stage maps are 100
 /// apart, from 922010100 to the boss's 922010900, with rooms between; the
-/// bonus is 922011000 and the reward 922011100, and 922010000 is the way
-/// out. Stage EXP is Cosmic's (`expStages`, stage 6 none). Stage 8 is a
-/// puzzle: five members on the right five of its nine crates. Stages 1 to 5,
-/// 7 and 8 shut their `next00` until cleared (Map.nx, scripts `lpq0` to
-/// `lpq7`). The passes and the key are the quest's own, and so is the pass
+/// bonus is 922011000, where the win takes the team for a minute, the
+/// reward 922011100, and 922010000 is the way out. Stage EXP is Cosmic's
+/// (`expStages`, stage 6 none). Stage 8 is a puzzle: five members on the
+/// right five of its nine crates. Stages 1 to 5, 7 and 8 shut their
+/// `next00` until cleared (Map.nx, scripts `lpq0` to `lpq7`). The passes and the key are the quest's own, and so is the pass
 /// stage 7's boxes take (4001156; the default 5A of
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, LPQ).
 pub const LPQ: Event = Event {
@@ -214,8 +219,96 @@ pub const LPQ: Event = Event {
     ],
     gates: true,
     clear_map: None,
-    bonus: None,
+    bonus: Some(Bonus {
+        map: 922_011_000,
+        exit: 922_011_100,
+        minutes: 1,
+        on_win: true,
+    }),
 };
+
+/// What Arturo may give each member of a team that won Ludibrium's party
+/// quest: one of these items, and how many, all equally likely (Cosmic
+/// `LudiPQ` `setEventRewards`, which lists one earring twice).
+pub const LPQ_REWARDS: [(i32, i16); 77] = [
+    (2040602, 1),
+    (2040802, 1),
+    (2040002, 1),
+    (2040402, 1),
+    (2040505, 1),
+    (2040502, 1),
+    (2040601, 1),
+    (2044501, 1),
+    (2044701, 1),
+    (2044601, 1),
+    (2041019, 1),
+    (2041016, 1),
+    (2041022, 1),
+    (2041013, 1),
+    (2041007, 1),
+    (2043301, 1),
+    (2040301, 1),
+    (2040801, 1),
+    (2040001, 1),
+    (2040004, 1),
+    (2040504, 1),
+    (2040501, 1),
+    (2040513, 1),
+    (2043101, 1),
+    (2044201, 1),
+    (2044401, 1),
+    (2040701, 1),
+    (2044301, 1),
+    (2043801, 1),
+    (2040401, 1),
+    (2043701, 1),
+    (2040803, 1),
+    (2000003, 85),
+    (2000002, 85),
+    (2000004, 10),
+    (2000006, 60),
+    (2000005, 2),
+    (2022000, 20),
+    (2001001, 15),
+    (2001002, 15),
+    (2022003, 20),
+    (2001000, 15),
+    (2020014, 10),
+    (2020015, 5),
+    (4003000, 35),
+    (1102003, 1),
+    (1102004, 1),
+    (1102000, 1),
+    (1102002, 1),
+    (1102001, 1),
+    (1102011, 1),
+    (1102012, 1),
+    (1102013, 1),
+    (1102014, 1),
+    (1032011, 1),
+    (1032012, 1),
+    (1032013, 1),
+    (1032002, 1),
+    (1032008, 1),
+    (1032011, 1),
+    (2070011, 1),
+    (4010003, 10),
+    (4010000, 10),
+    (4010006, 6),
+    (4010002, 10),
+    (4010005, 10),
+    (4010004, 10),
+    (4010001, 10),
+    (4020001, 10),
+    (4020002, 10),
+    (4020008, 4),
+    (4020007, 4),
+    (4020003, 10),
+    (4020000, 10),
+    (4020004, 10),
+    (4020005, 10),
+    (4020006, 10),
+];
 
 /// Ludibrium's Pass of Dimension, which most of its stages' monsters and
 /// boxes drop; the key the last stage takes; and the other pass, which

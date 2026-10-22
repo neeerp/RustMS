@@ -1299,7 +1299,9 @@ on the map away: the field shows them all its pink line, then tells each
 of their client actors (see "Ludibrium's balloons" in `party-quests.md`).
 Its stage 7 and boss reactors (`2201002`, `2201003`, `Action::SpawnAt`)
 show everyone a pink line and bring out Rombad or Alishar at a fixed
-point of the map.
+point of the map. The boxes on its bonus stage (`2202004`, `Action::Spray`)
+drop their loot with piles of mesos (`loot::spray`): one first, and more
+until there are 15 drops.
 Primrose Hill's moonflowers (`9108000`-`9108005`, `Action::Bloom`) never
 break: reaching their last state they stay (`reactors::stays`), and the
 field waxes its full moon (see "Henesys's moonflowers" in
