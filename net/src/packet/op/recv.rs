@@ -131,6 +131,8 @@ pub enum RecvOpcode {
     CalcDamageStat = 0x6C,
     ThrowGrenade = 0x6D,
     SkillMacro = 0x6E,
+    /// A box with a `reward` node (FUN_00a1249f): the USE slot and the item.
+    UseItemReward = 0x70,
     /// The Item Maker's Start, once its gauge is full (FUN_00827096).
     ItemMake = 0x71,
 

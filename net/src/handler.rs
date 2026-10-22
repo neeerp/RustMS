@@ -941,6 +941,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::SortItems, InGame(&world::SortItemsHandler)),
             (Op::ItemMove, InGame(&world::ItemMoveHandler)),
             (Op::UseItem, InGame(&world::UseItemHandler)),
+            (Op::UseItemReward, InGame(&world::UseItemRewardHandler)),
             (Op::UseSkillBook, InGame(&world::UseSkillBookHandler)),
             (Op::UseReturnScroll, InGame(&world::ReturnScrollHandler)),
             (Op::UseSummonBag, InGame(&world::UseSummonSackHandler)),
