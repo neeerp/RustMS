@@ -1230,6 +1230,7 @@ impl ClientActor {
             }
             ServerMessage::EventStarted(ticket) => self.event_started(ticket).await?,
             ServerMessage::EventEnded { id } => self.event_ended(id).await?,
+            ServerMessage::EventFailed { id } => self.event_failed(id).await,
             ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,

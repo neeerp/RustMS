@@ -129,7 +129,7 @@ impl Event {
     /// How long the event lasts: `minutes`, shortened by
     /// `RUSTMS_EVENT_SCALE` (a whole number, default 1) for testing.
     pub fn duration(&self) -> Duration {
-        Duration::from_secs(self.minutes * 60) / scale()
+        scaled(Duration::from_secs(self.minutes * 60))
     }
 
     /// Whether `map_id` is one of the event's maps; its exit never is.
@@ -220,6 +220,27 @@ impl Event {
     }
 }
 
+/// How often a friendly mob makes what it drops: its `dropItemPeriod`, in
+/// tens of seconds, and a third of that for the Moon Bunny (Cosmic's, as
+/// a whole period of 60 s would leave no time for 10 rice cakes; the
+/// default in `v83ref/lanes/QUESTIONS.md`, 2026-10-22, row 180), shortened
+/// like the events' time (`scaled`). None for a mob that makes
+/// nothing.
+pub fn friendly_drop_period(mob_id: i32, period: i32) -> Option<Duration> {
+    let period = Duration::from_secs(u64::try_from(period).ok().filter(|&p| p > 0)? * 10);
+    let period = if mob_id == crate::reactors::MOON_BUNNY {
+        period / 3
+    } else {
+        period
+    };
+    Some(scaled(period))
+}
+
+/// An event's `time`, shortened by `RUSTMS_EVENT_SCALE` for testing.
+pub fn scaled(time: Duration) -> Duration {
+    time / scale()
+}
+
 fn scale() -> u32 {
     static SCALE: OnceLock<u32> = OnceLock::new();
     *SCALE.get_or_init(|| {
@@ -292,6 +313,9 @@ pub enum EventCommand {
     PassGiven,
     /// The leader handed Cloto the passes for stage `n`.
     ClearStage(u8),
+    /// The party lost what it was to protect (the Moon Bunny): the event
+    /// ends for everyone, unless it is won.
+    Fail,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -492,6 +516,16 @@ mod tests {
 
     fn at(id: ClientId, level: u8, map_id: i32) -> Candidate {
         Candidate { id, level, map_id }
+    }
+
+    #[test]
+    fn the_moon_bunny_makes_a_rice_cake_every_20_seconds() {
+        // Unscaled outside the harness.
+        let bunny = friendly_drop_period(crate::reactors::MOON_BUNNY, 6);
+        assert_eq!(bunny, Some(Duration::from_secs(20) / scale()));
+        let watch_hog = friendly_drop_period(9300102, 6);
+        assert_eq!(watch_hog, Some(Duration::from_secs(60) / scale()));
+        assert_eq!(friendly_drop_period(100100, 0), None);
     }
 
     #[test]

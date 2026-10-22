@@ -98,6 +98,23 @@ pub fn roll_reactor(
     )
 }
 
+/// Roll what a friendly mob (`dropItemPeriod`) makes from its drops, for
+/// no one in particular: the Moon Bunny's rice cakes. Quest drops are left
+/// out.
+pub fn roll_friendly(mob_id: i32, rng: &mut impl Rng) -> Vec<Loot> {
+    friendly_from(crate::content::rewards().drops(mob_id), rng)
+}
+
+fn friendly_from(entries: &[RewardEntry], rng: &mut impl Rng) -> Vec<Loot> {
+    let mut loot = Vec::new();
+    for entry in entries.iter().filter(|entry| entry.quest.is_none()) {
+        if rng.gen_bool(entry.prob.clamp(0.0, 1.0)) {
+            loot.extend(loot_of(entry, None, 1.0, rng));
+        }
+    }
+    loot
+}
+
 pub fn roll_entries(entries: &[RewardEntry], player: &Player, rng: &mut impl Rng) -> Vec<Loot> {
     roll_at(entries, (1.0, 1.0), player, false, rng)
 }
@@ -330,6 +347,22 @@ mod tests {
         }
         // Three items for each meso bag.
         assert!((250..350).contains(&counts.0), "{counts:?}");
+    }
+
+    #[test]
+    fn a_friendly_mob_makes_its_items_but_no_quest_items() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let table = [
+            entry(Some(4001101), None, 1.0, None),
+            entry(Some(4031802), None, 1.0, Some(1035)),
+            entry(Some(4000019), None, 0.0, None),
+        ];
+        let cake = Loot::Item {
+            item_id: 4001101,
+            quantity: 1,
+            quest: None,
+        };
+        assert_eq!(friendly_from(&table, &mut rng), [cake]);
     }
 
     #[test]

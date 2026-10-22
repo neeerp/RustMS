@@ -30,7 +30,7 @@ use net::packet::build::world::field::{
     parse_movement_state,
 };
 use net::packet::build::world::kite::{build_remove_kite, build_spawn_kite, KiteView};
-use net::packet::build::world::messaging::build_item_line;
+use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::packet::build::world::mini_room::build_char_box;
 use net::packet::build::world::mist::{build_remove_mist, build_spawn_mist, MistKind, MistView};
 use net::packet::build::world::mob::{
@@ -106,6 +106,15 @@ const WEATHER_TIME: Duration = Duration::from_secs(30);
 const MOON_WEATHER: i32 = 5120016;
 const MOON_WEATHER_TIME: Duration = Duration::from_secs(7);
 
+/// How long after a friendly mob in an event's copy goes the party is
+/// sent off (Cosmic's `bunnyDefeated`, 5 s), shortened like events' time.
+const FRIENDLY_LOST_AFTER: Duration = Duration::from_secs(5);
+
+/// Every how many hits on the Moon Bunny its guards hear it is being hurt
+/// (Cosmic's script means every sixth, which a bug there keeps from
+/// showing).
+const BUNNY_SICK_HITS: u32 = 6;
+
 /// How long an item lies on a reactor before the reactor takes it
 /// (Cosmic's `ActivateItemReactor`).
 const ITEM_TAKEN_AFTER: Duration = Duration::from_secs(5);
@@ -144,6 +153,13 @@ pub struct FieldActor {
     trips: Option<i64>,
     /// The weather item blowing here, its message, and when it stops.
     weather: Option<(i32, String, Instant)>,
+    /// Hits on the Moon Bunny since its guards last heard of them, and the
+    /// rice cakes it made.
+    bunny_hits: u32,
+    bunny_cakes: u32,
+    /// When, after a friendly mob in an event's copy went, its party is
+    /// sent off.
+    lost_at: Option<Instant>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -187,6 +203,9 @@ impl FieldActor {
             shops: Shops::default(),
             trips: conti::has_trips(key.map_id).then_some(route_time),
             weather: None,
+            bunny_hits: 0,
+            bunny_cakes: 0,
+            lost_at: None,
             kites: KiteSet::default(),
             tick,
         }
@@ -212,6 +231,11 @@ impl FieldActor {
     /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
+        self.friendly_drops(now);
+        if self.lost_at.is_some_and(|at| at <= now) {
+            self.lost_at = None;
+            self.lose_event();
+        }
         if self
             .weather
             .as_ref()
@@ -501,6 +525,9 @@ impl FieldActor {
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
                 FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
+                FieldRequest::MobDamageMobFriendly { attacker, victim } => {
+                    self.handle_friendly_hit(attacker, victim)
+                }
                 FieldRequest::MobDamageMob {
                     attacker,
                     victim,
@@ -1114,6 +1141,16 @@ impl FieldActor {
         if let Some(broadcast) = broadcast {
             self.broadcast(Some(from), broadcast);
         }
+        // Players can't hurt a friendly mob (`damagedByMob`), only mobs can.
+        let friendly = |object_id| {
+            self.mobs
+                .get(object_id)
+                .is_some_and(|mob| mob.info.damaged_by_mob)
+        };
+        let hits: Vec<_> = hits
+            .into_iter()
+            .filter(|&(object_id, _)| !friendly(object_id))
+            .collect();
         let now = Instant::now();
         let countered: i32 = counter.map_or(0, |stat| {
             hits.iter()
@@ -2122,6 +2159,81 @@ impl FieldActor {
     /// A client says a Darkstar has a player in reach: it blows up, giving
     /// nothing, as in Cosmic, with leave type 4 so every client plays its
     /// explosion and the players it reaches get hit.
+    /// A client says mob `attacker` touched the friendly mob `victim`:
+    /// everyone sees what it lost and its HP. The Moon Bunny's guards hear
+    /// of every sixth hit and of its going home; a friendly that goes in an
+    /// event's copy loses its party the event.
+    fn handle_friendly_hit(&mut self, attacker: i32, victim: i32) {
+        let now = Instant::now();
+        let mut rng = rand::thread_rng();
+        let Some(hit) = self.mobs.friendly_hit(attacker, victim, now, &mut rng) else {
+            return;
+        };
+        if let Ok(packet) = build_damage_mob(victim, hit.damage, hit.hp, hit.max_hp) {
+            self.broadcast(None, packet);
+        }
+        let bunny = hit.mob_id == reactors::MOON_BUNNY;
+        let text = net::content::text();
+        if !hit.gone {
+            self.bunny_hits += u32::from(bunny);
+            if self.bunny_hits >= BUNNY_SICK_HITS {
+                self.bunny_hits = 0;
+                self.item_line(&text.get(keys::HPQ_BUNNY_SICK, &[]));
+            }
+            return;
+        }
+        // It goes home rather than dying (Cosmic's `killFriendlies`).
+        if let Ok(packet) = build_kill_mob(victim, 0) {
+            self.broadcast(None, packet);
+        }
+        if bunny {
+            self.item_line(&text.get(keys::HPQ_BUNNY_GONE, &[]));
+        }
+        if self.key.instance_id != 0 {
+            self.lost_at = Some(now + net::events::scaled(FRIENDLY_LOST_AFTER));
+        }
+    }
+
+    /// The friendly mobs due to drop what they make do, on the ground
+    /// around them, for the party of a player here (Cosmic's rule), and the
+    /// Moon Bunny's guards hear how many rice cakes it has made.
+    fn friendly_drops(&mut self, now: Instant) {
+        for (object_id, mob_id, x, y) in self.mobs.friendly_drops(now) {
+            let Some((&owner, occupant)) = self.occupants.iter().next() else {
+                continue;
+            };
+            let ownership = occupant.party.map_or(Ownership::Owner, Ownership::Party);
+            let loot = net::loot::roll_friendly(mob_id, &mut rand::thread_rng());
+            self.spawn_loot(owner, ownership, loot, x, y, object_id);
+            if mob_id == reactors::MOON_BUNNY {
+                self.bunny_cakes += 1;
+                let count = self.bunny_cakes.to_string();
+                let line = net::content::text().get(keys::HPQ_BUNNY_CAKE, &[("count", &count)]);
+                self.item_line(&line);
+            }
+        }
+    }
+
+    /// The party lost the friendly mob it protected: everyone here hears
+    /// so, and their event ends, which sends them off.
+    fn lose_event(&mut self) {
+        let line = net::content::text().get(keys::HPQ_BUNNY_LOST, &[]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &line) {
+            self.broadcast(None, packet);
+        }
+        let id = self.key.instance_id;
+        for occupant in self.occupants.values() {
+            occupant.handle.send(ServerMessage::EventFailed { id });
+        }
+    }
+
+    /// A light-blue line for everyone here (BROADCAST_MSG 6, no item).
+    fn item_line(&self, line: &str) {
+        if let Ok(packet) = build_item_line(line, 0) {
+            self.broadcast(None, packet);
+        }
+    }
+
     fn handle_mob_bomb(&mut self, object_id: i32) {
         if !self.mobs.bomb(object_id, Instant::now()) {
             return;

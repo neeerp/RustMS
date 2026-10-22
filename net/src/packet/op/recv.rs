@@ -148,6 +148,7 @@ pub enum RecvOpcode {
     QuickSlot = 0xB7,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
+    MobDamageMobFriendly = 0xC0,
     MobBomb = 0xC1,
     MobDamageMob = 0xC2,
     NpcAction = 0xC5,

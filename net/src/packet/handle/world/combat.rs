@@ -90,6 +90,29 @@ impl WorldHandler for MobBombHandler {
     }
 }
 
+/// `MOB_DAMAGE_MOB_FRIENDLY`: a mob's body touched the friendly mob's
+/// (`damagedByMob`): the attacker's object id, the character's id, and the
+/// friendly's. The client says nothing of damage; the server rolls it. Only
+/// one client on the map sends it (the party's leader, or a player alone),
+/// once every 1.5 seconds at most (v83 `CMob::Update`, 0x667e40; a061).
+pub struct MobDamageMobFriendlyHandler;
+
+impl WorldHandler for MobDamageMobFriendlyHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let attacker = r.read_int()?;
+        r.read_int()?;
+        let victim = r.read_int()?;
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::MobDamageMobFriendly {
+                attacker,
+                victim,
+            })),
+        )
+    }
+}
+
 /// `MOB_DAMAGE_MOB`: a mob's attack reached a Dazzled mob, which the client
 /// hurt with its own formula (FUN_00670c63): the attacker's object id, the
 /// character's id, the victim's, a byte for the attack, the damage, then a

@@ -74,6 +74,12 @@ pub struct MobInfo {
     /// The client draws its boss bar itself from the HP percent its
     /// attacker is sent (`HPgaugeHide`), as for Mushmom.
     pub hp_gauge_hide: bool,
+    /// Only other mobs hurt it (`damagedByMob`): a friendly mob, such as
+    /// the Moon Bunny in Henesys's party quest, which players protect.
+    pub damaged_by_mob: bool,
+    /// How often a friendly mob drops what it makes, in units of 10
+    /// seconds (`dropItemPeriod`), or 0 for never.
+    pub drop_item_period: i32,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -244,6 +250,8 @@ impl MobData {
             hp_tag_color: u8::try_from(int("hpTagColor")?).unwrap_or(0),
             hp_tag_bg_color: u8::try_from(int("hpTagBgcolor")?).unwrap_or(0),
             hp_gauge_hide: int("HPgaugeHide")? != 0,
+            damaged_by_mob: int("damagedByMob")? != 0,
+            drop_item_period: int("dropItemPeriod")?,
         }))
     }
 
@@ -423,6 +431,12 @@ mod tests {
         // Bergamot's drops are anyone's; Mano's in Mu Lung Dojo fly out.
         assert!(mob(7220003).public_reward && !mob(7220003).explosive_reward);
         assert!(mob(9300184).explosive_reward);
+        // Henesys's Moon Bunny is friendly and makes rice cakes.
+        assert!(mob(9300061).damaged_by_mob && !mob(100100).damaged_by_mob);
+        assert_eq!(
+            (mob(9300061).drop_item_period, mob(100100).drop_item_period),
+            (6, 0)
+        );
         assert!(!mob(100100).public_reward && !mob(100100).explosive_reward);
     }
 

@@ -981,7 +981,8 @@ carry the statuses a mob has. Entries come in the client's decode order
   against none (`mob_hit_cap`); a hit that comes to nothing is dropped.
   The sender is credited as if they dealt it (Cosmic's rule), and the
   others get DAMAGE_MONSTER (0xF6) with the number and HP; a kill goes the
-  usual way. The friendly-mob variant (0xC0) is not handled. In
+  usual way. The friendly-mob variant (0xC0, the Moon Bunny's) is in
+  `party-quests.md`. In
   HeavenClient the client controlling an undazzled attacker collects its
   landed box hits and its balls in flight (`Mob::take_sweeps`), checks them
   against up to 15 other mobs' bodies (`MapMobs::update`), and the victim

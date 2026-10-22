@@ -272,6 +272,10 @@ pub enum ServerMessage {
     EventEnded {
         id: u32,
     },
+    /// The party in event `id` lost what it protected there.
+    EventFailed {
+        id: u32,
+    },
     /// The party in event `id` cleared `stage`.
     StageCleared {
         id: u32,

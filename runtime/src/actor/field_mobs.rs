@@ -76,8 +76,22 @@ pub struct LiveMob {
     pub leaves_at: Option<Instant>,
     /// Steal took its item; it gives no other.
     pub stolen: bool,
-    /// When another mob last hurt it, while it was Dazzled.
+    /// When another mob last hurt it, while it was Dazzled or as a
+    /// friendly mob.
     pub mob_hit_at: Option<Instant>,
+    /// When a friendly mob next drops what it makes (`dropItemPeriod`).
+    pub next_drop: Option<Instant>,
+}
+
+/// What a mob touching a friendly mob did to it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FriendlyHit {
+    pub mob_id: i32,
+    pub damage: i32,
+    pub hp: i32,
+    pub max_hp: i32,
+    /// It had no HP left, and is gone.
+    pub gone: bool,
 }
 
 /// A mob skill and level the server let a mob cast, and when.
@@ -182,6 +196,12 @@ pub const HURT_INTERVAL: Duration = Duration::from_secs(1);
 /// 0x670c99, for each client).
 const MOB_HIT_INTERVAL: Duration = Duration::from_secs(2);
 
+/// How long a friendly mob goes between hits from other mobs. Its map's
+/// reporting client sends one at most every 1.5 s (v83 0x667efe); this only
+/// stops a second client from doubling them. Shortened like events'
+/// time (`net::events::scaled`).
+const FRIENDLY_HIT_INTERVAL: Duration = Duration::from_secs(1);
+
 /// How far apart (x, y) two mobs may be for one's attack to reach the
 /// other: more than any attack range, as the client doesn't say which
 /// attack it was.
@@ -243,6 +263,8 @@ impl LiveMob {
             _ => (info.remove_after > 0).then_some(info.remove_after),
         };
         let leaves_at = stays.map(|secs| now + Duration::from_secs(secs as u64));
+        let next_drop = net::events::friendly_drop_period(info.mob_id, info.drop_item_period)
+            .map(|period| now + period);
         Self {
             object_id,
             spawn: None,
@@ -266,6 +288,7 @@ impl LiveMob {
             leaves_at,
             stolen: false,
             mob_hit_at: None,
+            next_drop,
         }
     }
 
@@ -1314,6 +1337,69 @@ impl MobSet {
         Some(damage)
     }
 
+    /// A client says mob `attacker` touched the friendly mob `victim`
+    /// (`damagedByMob`), which a mob near it that isn't friendly may do
+    /// once a second. The client sends no damage: it loses a tenth of a
+    /// roll under (its maxHP / 13 + its PADamage * 10) * 2 + 500, as in
+    /// Cosmic, and once that leaves it nothing it goes.
+    pub fn friendly_hit(
+        &mut self,
+        attacker: i32,
+        victim: i32,
+        now: Instant,
+        rng: &mut impl Rng,
+    ) -> Option<FriendlyHit> {
+        let from = self
+            .live
+            .get(&attacker)
+            .filter(|mob| !mob.info.damaged_by_mob)?;
+        let (x, y) = (from.x, from.y);
+        let mob = self
+            .live
+            .get_mut(&victim)
+            .filter(|mob| mob.info.damaged_by_mob)?;
+        let near = (i32::from(mob.x) - i32::from(x)).abs() <= MOB_HIT_REACH.0
+            && (i32::from(mob.y) - i32::from(y)).abs() <= MOB_HIT_REACH.1;
+        let interval = net::events::scaled(FRIENDLY_HIT_INTERVAL);
+        if !near || mob.mob_hit_at.is_some_and(|at| now < at + interval) {
+            return None;
+        }
+        mob.mob_hit_at = Some(now);
+        let info = &mob.info;
+        let most = (info.max_hp.max(0) / 13 + info.attack.max(0) * 10) * 2 + 500;
+        let damage = rng.gen_range(0, most) / 10;
+        mob.hp = (mob.hp - i64::from(damage)).max(0);
+        let hit = FriendlyHit {
+            mob_id: info.mob_id,
+            damage,
+            hp: i32::try_from(mob.hp).unwrap_or(i32::MAX),
+            max_hp: info.max_hp,
+            gone: mob.hp < 1,
+        };
+        if hit.gone {
+            if let Some(mob) = self.live.remove(&victim) {
+                self.emptied(mob.spawn, now);
+            }
+        }
+        Some(hit)
+    }
+
+    /// The friendly mobs due to drop what they make, each with its mob id
+    /// and where it is; each is next due a period later.
+    pub fn friendly_drops(&mut self, now: Instant) -> Vec<(i32, i32, i16, i16)> {
+        let mut due = Vec::new();
+        for mob in self.live.values_mut() {
+            if mob.next_drop.is_none_or(|at| at > now) {
+                continue;
+            }
+            let info = &mob.info;
+            let period = net::events::friendly_drop_period(info.mob_id, info.drop_item_period);
+            mob.next_drop = period.map(|period| now + period);
+            due.push((mob.object_id, info.mob_id, mob.x, mob.y));
+        }
+        due
+    }
+
     /// A client says a mob that bombs (`selfDestruction` action 3, the
     /// Darkstars Papulatus calls) has a player in reach: take it away as if
     /// it left. Returns whether it was there to take.
@@ -2039,6 +2125,65 @@ mod tests {
         mobs.add_statuses(near, &[(MobStat::Dazzle, 1)], 5221009, 1, now, until);
         let much_later = later + MOB_HIT_INTERVAL;
         assert_eq!(mobs.mob_hit(near, dazzled, 5, much_later), None);
+    }
+
+    #[test]
+    fn mobs_near_a_friendly_mob_hurt_it_until_it_goes() {
+        let now = Instant::now();
+        let mut rng = StdRng::seed_from_u64(1);
+        let (template, mut info) = snail_spawn(150);
+        info.damaged_by_mob = true;
+        info.max_hp = 200;
+        info.attack = 0;
+        let mut mobs = MobSet::new([snail_spawn(100), (template, info), snail_spawn(900)]);
+        let [near, bunny, far] = mobs.spawn_all(now)[..] else {
+            panic!("three mobs");
+        };
+        // Only a mob near it, and not itself, hurts it; players' snails
+        // aren't friendly.
+        assert_eq!(mobs.friendly_hit(far, bunny, now, &mut rng), None);
+        assert_eq!(mobs.friendly_hit(bunny, bunny, now, &mut rng), None);
+        assert_eq!(mobs.friendly_hit(bunny, near, now, &mut rng), None);
+        let mut at = now;
+        let mut hp = 200;
+        loop {
+            let hit = mobs.friendly_hit(near, bunny, at, &mut rng).unwrap();
+            // At most (200 / 13 + 0) * 2 + 500 = 530, a tenth of it.
+            assert!((0..53).contains(&hit.damage), "{hit:?}");
+            hp = (hp - hit.damage).max(0);
+            assert_eq!((hit.hp, hit.max_hp, hit.gone), (hp, 200, hp == 0));
+            assert_eq!(
+                mobs.friendly_hit(near, bunny, at + Duration::from_millis(999), &mut rng),
+                None
+            );
+            if hit.gone {
+                break;
+            }
+            at += FRIENDLY_HIT_INTERVAL;
+        }
+        assert!(mobs.get(bunny).is_none());
+    }
+
+    #[test]
+    fn a_friendly_mob_drops_what_it_makes_every_period() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(150);
+        info.mob_id = net::reactors::MOON_BUNNY;
+        info.damaged_by_mob = true;
+        info.drop_item_period = 6;
+        let mut mobs = MobSet::new([snail_spawn(100), (template, info)]);
+        let [_, bunny] = mobs.spawn_all(now)[..] else {
+            panic!("two mobs");
+        };
+        let period = net::events::friendly_drop_period(net::reactors::MOON_BUNNY, 6).unwrap();
+        assert!(mobs
+            .friendly_drops(now + period - Duration::from_millis(1))
+            .is_empty());
+        let (x, y) = (mobs.get(bunny).unwrap().x, mobs.get(bunny).unwrap().y);
+        let due = [(bunny, net::reactors::MOON_BUNNY, x, y)];
+        assert_eq!(mobs.friendly_drops(now + period), due);
+        assert!(mobs.friendly_drops(now + period).is_empty());
+        assert_eq!(mobs.friendly_drops(now + period * 2), due);
     }
 
     #[test]
