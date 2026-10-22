@@ -54,7 +54,7 @@ void reads_the_couples_record()
 	require(record.status == marriage::ENGAGED && !record.married(), "engaged");
 	require(record.groom_item == 2240000 && record.bride_item == 2240001, "the boxes");
 	require(record.groom_name == "Groom" && record.bride_name == "Bridetwelvech", "the names without padding");
-	require(record.partner(100) == "Bridetwelvech" && record.partner(200) == "Groom", "each one's partner");
+	require(record.partner(false) == "Bridetwelvech" && record.partner(true) == "Groom", "each one's partner, by own gender");
 
 	record.status = marriage::MARRIED;
 	require(record.married(), "married");
@@ -84,12 +84,29 @@ void ring_boxes_and_result_texts()
 	require(!marriage::result_text(marriage::RESULT_NOTICE), "the server's own text");
 }
 
+void tooltip_lines()
+{
+	MarriageRecord record;
+	record.groom_name = "Groom";
+	record.bride_name = "Bride";
+	std::optional<MarriageRecord> couple = record;
+
+	require(marriage::tooltip_line(4031357, couple, false) == "YOU ARE ENGAGED WITH : Bride", "a token, the groom");
+	require(marriage::tooltip_line(4031364, couple, true) == "YOU ARE ENGAGED WITH : Groom", "a token, the bride");
+	require(marriage::tooltip_line(1112803, couple, false) == "YOU ARE MARRIED WITH : Bride", "a wedding ring");
+	require(marriage::tooltip_line(1112809, couple, true) == "YOU ARE MARRIED WITH : Groom", "the last ring");
+	require(marriage::tooltip_line(4031357, std::nullopt, false).empty(), "no record, no line");
+	require(marriage::tooltip_line(1112804, couple, false).empty(), "not a wedding ring");
+	require(marriage::tooltip_line(2240000, couple, false).empty(), "a ring box has none");
+}
+
 int main()
 {
 	try
 	{
 		reads_the_couples_record();
 		ring_boxes_and_result_texts();
+		tooltip_lines();
 	}
 	catch (const std::exception& error)
 	{

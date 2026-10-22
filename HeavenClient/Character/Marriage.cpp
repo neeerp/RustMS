@@ -9,9 +9,9 @@ namespace ms
 		return status == marriage::MARRIED;
 	}
 
-	const std::string& MarriageRecord::partner(int32_t self) const
+	const std::string& MarriageRecord::partner(bool female) const
 	{
-		return self == groom_id ? bride_name : groom_name;
+		return female ? groom_name : bride_name;
 	}
 
 	MarriageRecord MarriageRecord::read(InPacket& recv)
@@ -39,6 +39,25 @@ namespace ms
 		bool is_token(int32_t item_id)
 		{
 			return item_id >= 4031357 && item_id <= 4031364;
+		}
+
+		bool is_wedding_ring(int32_t item_id)
+		{
+			return item_id == 1112803 || item_id == 1112806 || item_id == 1112807 || item_id == 1112809;
+		}
+
+		std::string tooltip_line(int32_t item_id, const std::optional<MarriageRecord>& record, bool female)
+		{
+			if (!record)
+				return "";
+
+			if (is_token(item_id))
+				return "YOU ARE ENGAGED WITH : " + record->partner(female);
+
+			if (is_wedding_ring(item_id))
+				return "YOU ARE MARRIED WITH : " + record->partner(female);
+
+			return "";
 		}
 
 		const char* break_question(bool married)

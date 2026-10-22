@@ -19,7 +19,9 @@
 
 #include "../Character/Inventory/ItemExpiry.h"
 #include "../Character/Inventory/ItemProperties.h"
+#include "../Character/Marriage.h"
 #include "../Data/ItemData.h"
+#include "../Gameplay/Stage.h"
 #include "../Util/NxFiles.h"
 
 #include <algorithm>
@@ -45,6 +47,9 @@ namespace ms
 		// The sender of a present: a dot line 16 under the date, or a pet's centred line, either making 16 px of
 		// room.
 		constexpr int16_t GIFT_STEP = 16;
+		// A token makes 16 px of room for its partner line, record or not (0x8ee4c3). v83 then starts the expiry
+		// line 19 lower; tokens have none.
+		constexpr int16_t TOKEN_HEIGHT = 16;
 
 		Text property_line(const std::string &line)
 		{
@@ -62,6 +67,7 @@ namespace ms
 		remain_life = 0;
 		cash_shop = false;
 		properties_height = 0;
+		marriage_height = 0;
 		expiry_height = 0;
 	}
 
@@ -124,6 +130,10 @@ namespace ms
 		properties = { property_line(lines.first), property_line(lines.second) };
 		properties_height = PROPERTY_STEP * ((lines.first.empty() ? 0 : 1) + (lines.second.empty() ? 0 : 1));
 
+		const Player &player = Stage::get().get_player();
+		marriage_line = property_line(marriage::tooltip_line(itemid, player.get_marriage(), player.get_stats().get_female()));
+		marriage_height = marriage::is_token(itemid) ? TOKEN_HEIGHT : 0;
+
 		// One the player has, and could trade with Scissors of Karma, says so.
 		std::string descstr = idata.get_desc();
 
@@ -145,7 +155,7 @@ namespace ms
 		else
 			gift = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, giftstr);
 
-		int16_t top = properties_height + expiry_height + (gift.empty() ? 0 : GIFT_STEP);
+		int16_t top = properties_height + marriage_height + expiry_height + (gift.empty() ? 0 : GIFT_STEP);
 		int16_t bottom = std::max<int16_t>(tooltip::ICON_POS.y() + tooltip::ICON_BOX, DESC_POS.y() + desc.height());
 		size = Point<int16_t>(WIDTH, top + bottom + tooltip::BOTTOM);
 	}
@@ -166,6 +176,11 @@ namespace ms
 				properties[i].draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y + PROPERTY_STEP * static_cast<int16_t>(i)));
 
 		pos.shift_y(properties_height);
+
+		if (!marriage_line.empty())
+			marriage_line.draw(pos + Point<int16_t>(WIDTH / 2, PROPERTY_Y));
+
+		pos.shift_y(marriage_height);
 
 		if (!expiry.empty())
 		{
