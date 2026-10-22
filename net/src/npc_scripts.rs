@@ -54,6 +54,13 @@ pub const TORY: i32 = 1012112;
 const TOMMY: i32 = 1012113;
 /// Growlie, the hungry one on Primrose Hill.
 const GROWLIE: i32 = 1012114;
+/// The Red Sign on Eos Tower's 101st floor, which sends parties into
+/// Ludibrium's party quest; its script needs to know whether the party may
+/// go (`NpcScript::red_sign`).
+pub const RED_SIGN: i32 = 2040034;
+/// Sgt. Anderson, who lets players out of Ludibrium's party quest and back
+/// to Eos Tower.
+const ANDERSON: i32 = 2040047;
 /// Jeff, at the way down from Ice Valley II.
 const JEFF: i32 = 2030000;
 /// Sharp Cliff I and its `under00` portal, the top of the dungeon below.
@@ -805,6 +812,12 @@ impl NpcScript {
         tory(entry)
     }
 
+    /// The Red Sign's script on Eos Tower's 101st floor, for a player whose
+    /// party may or may not go into the Dimensional Crack.
+    pub fn red_sign(entry: Entry) -> Self {
+        red_sign(entry)
+    }
+
     /// Growlie's, Tommy's or Tory's script on Primrose Hill's maps, for a
     /// player in the party quest there, who may be its `leader`, and whose
     /// party may have `won` it.
@@ -924,6 +937,7 @@ impl NpcScript {
             CRANE => crane(player),
             NATALIE => Some(natalie(player)),
             NELLA => nella(player),
+            ANDERSON => anderson(player),
             GROWLIE => growlie(player, false, false),
             TOMMY => tommy(player, false, false),
             TORY => tory_after(player, false),
@@ -1915,6 +1929,48 @@ fn tory(entry: Entry) -> NpcScript {
     script
 }
 
+/// The Red Sign (Cosmic `2040034`): the party's leader takes the party in
+/// at once, and anyone may read what the quest is.
+fn red_sign(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::LPQ_SIGN_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::LPQ_SIGN_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(lpq_terms(keys::LPQ_SIGN_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::LPQ_SIGN_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Lpq)]),
+    };
+    let mut script = NpcScript::new(
+        RED_SIGN,
+        vec![Page::Menu {
+            text: lpq_terms(keys::LPQ_SIGN_MENU),
+            choices: vec![
+                (text(keys::LPQ_SIGN_ENTER), vec![enter]),
+                (
+                    text(keys::LPQ_SIGN_ABOUT),
+                    vec![Page::Say(text(keys::LPQ_SIGN_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since it checked, or another party went in.
+    script.refused = Some(lpq_terms(keys::LPQ_SIGN_NOT_ELIGIBLE));
+    script
+}
+
+/// `key`, with who may play Ludibrium's party quest.
+fn lpq_terms(key: &str) -> String {
+    let (team, levels) = (&events::LPQ.team, &events::LPQ.levels);
+    content::text().get(
+        key,
+        &[
+            ("least", &team.start().to_string()),
+            ("most", &team.end().to_string()),
+            ("low", &levels.start().to_string()),
+            ("high", &levels.end().to_string()),
+        ],
+    )
+}
+
 /// `key`, with who may play Henesys's party quest.
 fn hpq_terms(key: &str) -> String {
     let (team, levels) = (&events::HPQ.team, &events::HPQ.levels);
@@ -2156,6 +2212,28 @@ fn nella(player: &Player) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// Sgt. Anderson (Cosmic `2040047`): on the party quest's maps he lets a
+/// player out, who can't come back; at the way out he sends them on down
+/// to Eos Tower.
+fn anderson(player: &Player) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let pages = if map_id == events::LPQ.exit {
+        vec![
+            Page::Say(text(keys::LPQ_ANDERSON_HOME)),
+            Page::Done(vec![Effect::Warp(events::LPQ.lobby)]),
+        ]
+    } else if events::LPQ.holds(map_id) {
+        vec![Page::Ask {
+            text: text(keys::LPQ_ANDERSON_LEAVE_ASK),
+            on_yes: vec![Effect::Warp(events::LPQ.exit)],
+            on_no: None,
+        }]
+    } else {
+        return None;
+    };
+    Some(NpcScript::new(ANDERSON, pages))
 }
 
 /// Jeff (`goDungeon`): players from level 50 may go down to Sharp Cliff,
@@ -4674,6 +4752,57 @@ mod tests {
             );
         }
         assert_eq!(NpcScript::for_npc(NELLA, &rider(100, 0, 103000000)), None);
+    }
+
+    #[test]
+    fn the_red_sign_takes_a_ready_party_in_and_tells_anyone_what_it_is() {
+        let mut ready = NpcScript::red_sign(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert!(step.prompt.is_none());
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Lpq)]);
+        assert!(ready.refused().is_some());
+        for entry in [
+            Entry::NoParty,
+            Entry::NotLeader,
+            Entry::NotEligible,
+            Entry::Busy,
+        ] {
+            let mut sign = NpcScript::red_sign(entry);
+            sign.begin();
+            let said = sign.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(kind(&said), Some(0));
+            assert!(sign.respond(ScriptInput::Next).unwrap().effects.is_empty());
+        }
+        let mut sign = NpcScript::red_sign(Entry::NoParty);
+        sign.begin();
+        assert_eq!(
+            kind(&sign.respond(ScriptInput::Select(1)).unwrap()),
+            Some(0)
+        );
+        assert!(sign.respond(ScriptInput::Next).unwrap().prompt.is_none());
+    }
+
+    #[test]
+    fn anderson_lets_players_out_of_the_dimensional_crack_then_down() {
+        for from in [922010100, 922010201, 922010900] {
+            let mut anderson = NpcScript::for_npc(ANDERSON, &rider(100, 0, from)).unwrap();
+            assert_eq!(kind(&anderson.begin()), Some(1));
+            assert_eq!(
+                anderson.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(922010000)]
+            );
+        }
+        let mut anderson = NpcScript::for_npc(ANDERSON, &rider(100, 0, 922010000)).unwrap();
+        assert_eq!(kind(&anderson.begin()), Some(0));
+        assert_eq!(
+            anderson.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(221024500)]
+        );
+        assert_eq!(
+            NpcScript::for_npc(ANDERSON, &rider(100, 0, 221024500)),
+            None
+        );
     }
 
     #[test]

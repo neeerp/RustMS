@@ -16,6 +16,9 @@ pub enum EventKind {
     Kpq,
     /// Henesys's party quest, started at Tory.
     Hpq,
+    /// Ludibrium's party quest, started at the Red Sign on Eos Tower's
+    /// 101st floor.
+    Lpq,
 }
 
 /// An event's maps and terms.
@@ -35,12 +38,14 @@ pub struct Event {
     pub team: RangeInclusive<usize>,
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
-    /// is played on `entry + n - 1`.
+    /// is played on `entry + (n - 1) * stride`.
     pub exp_per_stage: &'static [i32],
+    /// How far apart the stage maps' ids are; the maps between them are
+    /// rooms off the stages.
+    pub stride: i32,
     /// The stage maps whose `next00` portal stays shut until their stage is
-    /// cleared. Every stage map has a `gate` object, shown once its stage is
     /// cleared.
-    pub gated: RangeInclusive<i32>,
+    pub gated: &'static [i32],
     /// The stages cleared by standing on their maps' areas (`on_areas`).
     pub puzzles: RangeInclusive<u8>,
     /// Items of use only in the event, taken from whoever leaves it.
@@ -48,8 +53,8 @@ pub struct Event {
     /// The passes the leader hands Cloto to clear the last stage, which
     /// wins the event.
     pub passes: i32,
-    /// Whether each stage map has a `gate` object, shown once its stage is
-    /// cleared.
+    /// Whether the stage maps have a `gate` object, shown once their stage
+    /// is cleared (a map without one shows nothing).
     pub gates: bool,
     /// Where the whole team goes on winning, if anywhere.
     pub clear_map: Option<i32>,
@@ -88,7 +93,8 @@ pub const KPQ: Event = Event {
     team: 3..=4,
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
-    gated: 103_000_800..=103_000_803,
+    stride: 1,
+    gated: &[103_000_800, 103_000_801, 103_000_802, 103_000_803],
     puzzles: 2..=4,
     items: &[COUPON, PASS],
     passes: 10,
@@ -113,7 +119,8 @@ pub const HPQ: Event = Event {
     team: 3..=6,
     minutes: 10,
     exp_per_stage: &[1600],
-    gated: 1..=0,
+    stride: 1,
+    gated: &[],
     puzzles: 1..=0,
     items: &[
         4001095, 4001096, 4001097, 4001098, 4001099, 4001100, RICE_CAKE,
@@ -126,6 +133,42 @@ pub const HPQ: Event = Event {
         exit: 910_010_400,
         minutes: 5,
     }),
+};
+
+/// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
+/// to 6 players of levels 35 to 50, 45 minutes). Its stage maps are 100
+/// apart, from 922010100 to the boss's 922010900, with rooms between; the
+/// bonus is 922011000 and the reward 922011100, and 922010000 is the way
+/// out. Stage EXP is Cosmic's (`expStages`, stage 6 none). Stages 1 to 5,
+/// 7 and 8 shut their `next00` until cleared (Map.nx, scripts `lpq0` to
+/// `lpq7`). The passes and the key are the quest's own, and so is the pass
+/// stage 7's boxes take (4001156; the default 5A of
+/// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, LPQ).
+pub const LPQ: Event = Event {
+    lobby: 221_024_500,
+    maps: 922_010_000..=922_011_100,
+    entry: 922_010_100,
+    exit: 922_010_000,
+    levels: 35..=50,
+    team: 5..=6,
+    minutes: 45,
+    exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
+    stride: 100,
+    gated: &[
+        922_010_100,
+        922_010_200,
+        922_010_300,
+        922_010_400,
+        922_010_500,
+        922_010_700,
+        922_010_800,
+    ],
+    puzzles: 1..=0,
+    items: &[4001022, 4001023, 4001156],
+    passes: 0,
+    gates: true,
+    clear_map: None,
+    bonus: None,
 };
 
 /// What the Moon Bunny makes on Primrose Hill, and Growlie wants.
@@ -141,6 +184,7 @@ impl EventKind {
         match self {
             EventKind::Kpq => &KPQ,
             EventKind::Hpq => &HPQ,
+            EventKind::Lpq => &LPQ,
         }
     }
 }
@@ -180,12 +224,16 @@ impl Event {
 
     /// The map stage `stage` (from 1) is played on.
     pub fn stage_map(&self, stage: u8) -> i32 {
-        self.entry + i32::from(stage) - 1
+        self.entry + (i32::from(stage) - 1) * self.stride
     }
 
-    /// The stage played on `map_id`, if any.
+    /// The stage played on `map_id`, if any; none is played in its rooms.
     pub fn stage_on(&self, map_id: i32) -> Option<u8> {
-        let stage = u8::try_from(map_id.checked_sub(self.entry)? + 1).ok()?;
+        let offset = map_id.checked_sub(self.entry)?;
+        if offset.checked_rem(self.stride)? != 0 {
+            return None;
+        }
+        let stage = u8::try_from(offset / self.stride + 1).ok()?;
         (1..=self.exp_per_stage.len())
             .contains(&usize::from(stage))
             .then_some(stage)
@@ -584,6 +632,25 @@ mod tests {
         assert_eq!(KPQ.gate_stage(103_000_800, "st00"), None);
         assert_eq!((KPQ.stage_exp(1), KPQ.stage_exp(5)), (100, 1500));
         assert_eq!((KPQ.stage_exp(0), KPQ.stage_exp(6)), (0, 0));
+    }
+
+    #[test]
+    fn lpq_stages_are_100_maps_apart_with_rooms_between() {
+        assert_eq!(LPQ.stage_on(922_010_100), Some(1));
+        assert_eq!(LPQ.stage_on(922_010_900), Some(9));
+        assert_eq!(LPQ.stage_on(922_010_201), None);
+        assert_eq!(LPQ.stage_on(922_011_000), None);
+        assert_eq!(LPQ.stage_on(922_010_000), None);
+        assert_eq!(
+            (LPQ.stage_map(1), LPQ.stage_map(9)),
+            (LPQ.entry, 922_010_900)
+        );
+        assert_eq!(LPQ.last_stage(), 9);
+        assert_eq!(LPQ.gate_stage(922_010_800, "next00"), Some(8));
+        assert_eq!(LPQ.gate_stage(922_010_600, "next00"), None);
+        assert_eq!(LPQ.gate_stage(922_010_201, "next00"), None);
+        assert!(LPQ.holds(922_011_100) && !LPQ.holds(LPQ.exit));
+        assert_eq!(EventKind::Lpq.event(), &LPQ);
     }
 
     #[test]

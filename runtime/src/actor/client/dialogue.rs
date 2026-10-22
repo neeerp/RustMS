@@ -43,6 +43,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::LAKELIS {
             return self.talk_about_event(net::events::EventKind::Kpq).await;
         }
+        if npc_id == net::npc_scripts::RED_SIGN {
+            return self.talk_about_event(net::events::EventKind::Lpq).await;
+        }
         if npc_id == net::npc_scripts::CLOTO && self.talk_to_cloto().await? {
             return Ok(());
         }
