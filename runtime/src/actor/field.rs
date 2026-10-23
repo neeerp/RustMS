@@ -433,6 +433,13 @@ impl FieldActor {
             if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
                 self.broadcast(None, packet);
             }
+            if let Some(boss) = net::mobs::area_boss_on(self.key.map_id, mob.info.mob_id) {
+                let notice =
+                    net::content::text().get(keys::AREA_BOSS_APPEARED, &[("mob", boss.name)]);
+                if let Ok(packet) = build_item_line(&notice, 0) {
+                    self.broadcast(None, packet);
+                }
+            }
         }
         if let Some(controller) = controller {
             let controlled = self.mobs.assign_uncontrolled(controller);
@@ -3878,6 +3885,62 @@ mod tests {
         assert_eq!(weather(sent(&mut second_rx)), [stop]);
         actor.on_tick(Instant::now() + WEATHER_TIME * 2);
         assert!(weather(sent(&mut first_rx)).is_empty(), "stopped once");
+    }
+
+    #[test]
+    fn an_area_boss_coming_out_is_told_to_its_map() {
+        let mano = *net::mobs::area_boss_on(104000400, 2220000).unwrap();
+        let spawn = game_data::MapMobTemplate {
+            mob_id: mano.mob,
+            x: mano.at.0,
+            y: mano.at.1,
+            foothold: 0,
+            flip: false,
+            mob_time: net::mobs::AREA_BOSS_TIME,
+            hide: false,
+        };
+        let info = game_data::mobs::MobInfo {
+            mob_id: mano.mob,
+            max_hp: 8,
+            boss: true,
+            ..Default::default()
+        };
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, mano.map),
+            rx,
+            Vec::new(),
+            MobSet::new([(spawn, info)]),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        let (first, mut first_rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle: first,
+            avatar: avatar(1, 10, 20),
+            party: None,
+        });
+        sent(&mut first_rx);
+
+        // Its point waits at most seven tenths of its mobTime at first.
+        let time = Duration::from_secs(net::mobs::AREA_BOSS_TIME as u64);
+        actor.on_tick(Instant::now() + time);
+        let packets = sent(&mut first_rx);
+        let opcodes: Vec<i16> = packets.iter().map(Packet::opcode).collect();
+        assert!(
+            opcodes.contains(&(SendOpcode::SpawnMonster as i16)),
+            "{opcodes:?}"
+        );
+        let line = net::content::text().get(keys::AREA_BOSS_APPEARED, &[("mob", mano.name)]);
+        let notice = build_item_line(&line, 0).unwrap();
+        assert!(packets.iter().any(|packet| packet.bytes == notice.bytes));
+
+        // Nothing more while it is out.
+        actor.on_tick(Instant::now() + time * 3);
+        assert!(sent(&mut first_rx)
+            .iter()
+            .all(|packet| packet.bytes != notice.bytes));
     }
 
     #[tokio::test]

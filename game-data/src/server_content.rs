@@ -1696,6 +1696,8 @@ pub mod keys {
     pub const MILK_CALF_DRINKS: &str = "milk.calf.drinks";
     pub const MILK_CALF_NO_BOTTLE: &str = "milk.calf.no_bottle";
     pub const MILK_JUG_NOT_FULL: &str = "milk.jug_not_full";
+    /// An area boss came out, to its map; `{mob}` is its name.
+    pub const AREA_BOSS_APPEARED: &str = "area_boss.appeared";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2575,6 +2577,7 @@ mod tests {
             .chain(&keys::HORNTAIL)
             .chain(&keys::HTPQ)
             .chain(&[
+                keys::AREA_BOSS_APPEARED,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,
