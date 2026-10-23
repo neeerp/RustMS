@@ -38,6 +38,11 @@ const ITEM_REACH: f64 = 210.0;
 /// construction site's tunnel comes out.
 const LINE_1_AREA_1: i32 = 103000101;
 const LINE_1_AREA_2: i32 = 103000103;
+/// Find Fresh Milk, whose bottles run empty to full; the stable's way out
+/// (`end_cow`) leads back to Tangyoon's kitchen once the bottle is full.
+pub(crate) const FRESH_MILK: i16 = 2180;
+pub(crate) const MILK_BOTTLES: [i32; 4] = [4031847, 4031848, 4031849, 4031850];
+const TANGYOONS_KITCHEN: i32 = 120000103;
 /// The ferry docks a town's portal leads down to: Ellinia's (`inERShip`)
 /// and Rien's (`enterPort`).
 const ELLINIA_SKY_FERRY: i32 = 101000400;
@@ -812,6 +817,16 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         )),
         // The second of the area's spawn points, as in Cosmic.
         "met_in" => through(Effect::WarpToPortal(LINE_1_AREA_2, 1)),
+        "end_cow"
+            if quest(FRESH_MILK) == QuestState::Started
+                && MILK_BOTTLES[..3]
+                    .iter()
+                    .any(|&bottle| player.inventory.count(bottle) > 0)
+                && player.inventory.count(MILK_BOTTLES[3]) == 0 =>
+        {
+            refused(keys::MILK_JUG_NOT_FULL)
+        }
+        "end_cow" => through(Effect::Warp(TANGYOONS_KITCHEN)),
         "inERShip" => through(Effect::WarpToPortal(
             ELLINIA_SKY_FERRY,
             named(ELLINIA_SKY_FERRY, "out00"),
@@ -2183,6 +2198,24 @@ mod tests {
             .inventory
             .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
         player
+    }
+
+    #[test]
+    fn the_stable_lets_players_out_with_a_full_bottle_or_none() {
+        let quest = [(FRESH_MILK, QuestState::Started)];
+        let kitchen = [Effect::PortalSound, Effect::Warp(TANGYOONS_KITCHEN)];
+        for bottle in &MILK_BOTTLES[..3] {
+            let outcome = portal("end_cow", &holding(&quest, *bottle)).unwrap();
+            assert!(matches!(&outcome.effects[..], [Effect::Pink(_)]));
+        }
+        let full = holding(&quest, MILK_BOTTLES[3]);
+        assert_eq!(portal("end_cow", &full).unwrap().effects, kitchen);
+        let done = holding(&[(FRESH_MILK, QuestState::Completed)], MILK_BOTTLES[1]);
+        assert_eq!(portal("end_cow", &done).unwrap().effects, kitchen);
+        assert_eq!(
+            portal("end_cow", &player_with(&quest)).unwrap().effects,
+            kitchen
+        );
     }
 
     #[test]

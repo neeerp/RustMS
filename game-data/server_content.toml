@@ -945,6 +945,19 @@ unsourced = [
     "maker.gloves.bowman_upgraded",
     "maker.gloves.magician_upgraded",
     "maker.gloves.thief_upgraded",
+    "milk.tangyoon.full",
+    "milk.cow.last",
+    "milk.cow.no_bottle",
+    "milk.cow.full",
+    "milk.calf.empty",
+    "milk.calf.drinks",
+    "milk.calf.no_bottle",
+    "milk.jug_not_full",
+    "milk.tangyoon.0",
+    "milk.tangyoon.1",
+    "milk.cow.fills.0",
+    "milk.cow.fills.1",
+    "milk.cow.fills.2",
 ]
 
 [text."glTutoMsg0.message"]
