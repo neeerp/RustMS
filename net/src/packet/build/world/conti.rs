@@ -1,5 +1,5 @@
-//! Continent ships, the station wall clock (`net::conti`) and the field
-//! countdown.
+//! Continent ships, the station wall clock (`net::conti`), the field
+//! countdown and the boss sites' closing times.
 
 use crate::conti::{State, Target};
 use crate::{error::NetworkError, packet::op::SendOpcode};
@@ -54,6 +54,35 @@ pub fn build_stop_clock() -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// A boss site whose closing time the client can tell: the Zakum Shrine
+/// (ZAKUM_SHRINE) or Horntail's Cave (HORNTAIL_CAVE).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BossSite {
+    ZakumShrine,
+    HorntailCave,
+}
+
+/// ZAKUM_SHRINE or HORNTAIL_CAVE: a chat line saying when the site closes
+/// (v83 FUN_0053347c and FUN_005335a3). Before the boss is summoned it
+/// "will close if you do not summon" it in `minutes`, afterwards it "will
+/// close in" them; 0 minutes says it has closed.
+pub fn build_boss_site_closing(
+    site: BossSite,
+    summoned: bool,
+    minutes: u32,
+) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    let opcode = match site {
+        BossSite::ZakumShrine => SendOpcode::ZakumShrine,
+        BossSite::HorntailCave => SendOpcode::HorntailCave,
+    };
+    p.write_short(opcode as i16)?;
+    p.write_byte(u8::from(summoned))?;
+    // The client shows nothing for a negative count.
+    p.write_int(i32::try_from(minutes).unwrap_or(i32::MAX))?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,5 +134,21 @@ mod tests {
             [0x93, 0, 2, 0x20, 0x1c, 0, 0]
         );
         assert_eq!(build_stop_clock().unwrap().bytes, [0x9a, 0]);
+    }
+
+    #[test]
+    fn a_boss_site_says_whether_the_boss_is_out_then_the_minutes_left() {
+        assert_eq!(
+            build_boss_site_closing(BossSite::ZakumShrine, false, 120)
+                .unwrap()
+                .bytes,
+            [0x2f, 1, 0, 120, 0, 0, 0]
+        );
+        assert_eq!(
+            build_boss_site_closing(BossSite::HorntailCave, true, 0)
+                .unwrap()
+                .bytes,
+            [0x2e, 1, 1, 0, 0, 0, 0]
+        );
     }
 }

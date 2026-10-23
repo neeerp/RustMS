@@ -349,6 +349,9 @@ pub enum ServerMessage {
     /// The player's field saw what clears `stage` of the event they are
     /// in, as Zakum's last body dying on its altar: tell the event.
     ClearEventStage(u8),
+    /// The player's field summoned its boss, as Zakum on its altar: an
+    /// event held there tells when it closes.
+    BossSummoned,
     /// The party in event `id` cleared `stage`.
     StageCleared {
         id: u32,

@@ -1543,6 +1543,7 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await
             }
+            ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::EventMoved {
                 id,
                 from,

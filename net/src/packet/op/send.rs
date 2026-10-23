@@ -206,6 +206,10 @@ pub enum SendOpcode {
     HitReactor = 0x115,
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
+    /// How long Horntail's Cave stays open (302; v83 FUN_005335a3).
+    HorntailCave = 0x12E,
+    /// How long the Zakum Shrine stays open (303; v83 FUN_0053347c).
+    ZakumShrine = 0x12F,
     NpcDialogue = 0x130,
     /// The priest's line at the altar (320; report b075).
     WeddingProgress = 0x140,

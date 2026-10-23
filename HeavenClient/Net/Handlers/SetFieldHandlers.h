@@ -69,6 +69,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A chat line saying when Horntail's Cave closes (v83 0x5335a3).
+	class HorntailCaveHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// A chat line saying when the Zakum Shrine closes (v83 0x53347c).
+	class ZakumShrineHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// A named map obj, such as a party quest's gate or trap, switches state
 	// (v83 0x53300b for FIELD_OBSTACLE_ONOFF, 0x537a1e for SET_OBJECT_STATE).
 	class ObjectStateHandler : public PacketHandler

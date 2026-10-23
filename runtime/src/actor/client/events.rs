@@ -15,7 +15,9 @@ use net::events::{
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
-use net::packet::build::world::conti::{build_countdown, build_stop_clock};
+use net::packet::build::world::conti::{
+    build_boss_site_closing, build_countdown, build_stop_clock, BossSite,
+};
 use net::packet::build::world::effect::{
     build_field_effect, build_field_object, build_field_sound,
 };
@@ -471,8 +473,18 @@ impl ClientActor {
     /// Event `id` ended: out of its maps, if the player still holds its
     /// ticket.
     pub(super) async fn event_ended(&mut self, id: u32) -> Result<(), RuntimeError> {
-        if self.event.as_ref().is_none_or(|ticket| ticket.id != id) {
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
+        };
+        // A boss site whose time ran out, unwon, has closed.
+        let closed = boss_site(ticket.kind).filter(|_| {
+            !self.in_cash_shop
+                && !ticket.won()
+                && ticket.clock.is_some_and(|ends| ends <= Instant::now())
+        });
+        if let Some(site) = closed {
+            self.send(&mut build_boss_site_closing(site, false, 0)?)
+                .await?;
         }
         self.leave_event().await
     }
@@ -719,7 +731,39 @@ impl ClientActor {
         };
         let left = ends.saturating_duration_since(Instant::now());
         let seconds = u32::try_from(left.as_secs()).unwrap_or(u32::MAX);
-        self.send(&mut build_countdown(seconds)?).await
+        self.send(&mut build_countdown(seconds)?).await?;
+        self.tell_closing_time(None).await
+    }
+
+    /// At an event's boss site a chat line says when it closes: on
+    /// arrival, before or after the boss is out (the site has monsters
+    /// only once it is), and again as it is summoned.
+    pub(super) async fn tell_closing_time(
+        &mut self,
+        summoned: Option<bool>,
+    ) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some((site, ends)) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id))
+            .and_then(|ticket| Some((boss_site(ticket.kind)?, ticket.clock?)))
+        else {
+            return Ok(());
+        };
+        let summoned = match summoned {
+            Some(summoned) => summoned,
+            None => {
+                let (reply, mobs) = oneshot::channel();
+                self.send_to_field(FieldMessage::MobCount { reply }).await?;
+                mobs.await.unwrap_or(0) > 0
+            }
+        };
+        // Until it closes, at least a minute is left.
+        let left = ends.saturating_duration_since(Instant::now()).as_secs();
+        let minutes = u32::try_from(left.div_ceil(60)).unwrap_or(u32::MAX).max(1);
+        self.send(&mut build_boss_site_closing(site, summoned, minutes)?)
+            .await
     }
 
     /// A player who leaves the game leaves the event or the wedding, and
@@ -732,5 +776,14 @@ impl ClientActor {
         if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
             ticket.kind.event().take_items(&mut game.player);
         }
+    }
+}
+
+/// The boss site an event is held at, whose closing time its players are
+/// told.
+fn boss_site(kind: EventKind) -> Option<BossSite> {
+    match kind {
+        EventKind::Zakum => Some(BossSite::ZakumShrine),
+        _ => None,
     }
 }

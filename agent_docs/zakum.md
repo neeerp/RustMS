@@ -118,6 +118,17 @@ asks it what the player finds (`SquadView`) and tells it what they chose
   is under way.
 - **The win:** Zakum's fall on the expedition's altar clears its last stage
   (`ServerMessage::ClearEventStage`), so the run is won.
+- **The shrine's time:** v83's ZAKUM_SHRINE (303, `FUN_0053347c`; byte
+  summoned, int minutes) writes a chat line from the client's own strings:
+  the shrine "will close if you do not summon Zakum in" so many minutes, or
+  once it is out "will close in" them, or at 0 that it "has closed"
+  (HORNTAIL_CAVE, 302, is the same for Horntail's Cave). The server sends
+  it (`build_boss_site_closing`) to each member arriving on the altar,
+  summoned if there are monsters there, to everyone there as the Eye
+  brings Zakum out (`ServerMessage::BossSummoned`), and as "closed" when
+  the time runs out, before they are sent back. The minutes are the run's
+  time left, rounded up. Nothing closes the shrine sooner for a Zakum
+  never summoned: no source says how soon that is.
 
 Where this differs from Cosmic (the choices are in v83ref's
 `lanes/QUESTIONS.md`):
@@ -197,6 +208,10 @@ expedition, where the boss works the same.
   as does the recruiter. The one who wandered off comes in late, and the
   member steps out and comes back, both to the leader's altar. Zakum
   falls, the gate opens, and the fourth player may gather a new squad.
+  The leader reads the shrine's time on arrival and as Zakum comes out.
+  The new squad never summons it: its time runs out, the shrine has
+  closed, and its members are back at the Entrance.
+- `conti::tests::a_boss_site_says_whether_the_boss_is_out_then_the_minutes_left`
 - `integration-harness/tests/zakum_trials.rs`: a level-50 Fighter, unapproved
   and then without the trials, is turned back at the gate. They are approved
   by Tylus, cross the Breath of Lava, get the Breath of Fire from Lira, have
