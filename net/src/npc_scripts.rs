@@ -1424,6 +1424,13 @@ impl NpcScript {
             ALI => return Some(ali()),
             LIRA => return Some(lira()),
             AMON => return Some(amon(player)),
+            TOMBSTONE => {
+                return Some(NpcScript::new(
+                    TOMBSTONE,
+                    vec![Page::Say(text(keys::PAPULATUS_TOMBSTONE))],
+                ))
+            }
+            MACHINE_APPARATUS => return Some(machine_apparatus()),
             JAKE => return Some(jake(player)),
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
@@ -5858,6 +5865,23 @@ fn amon(player: &Player) -> NpcScript {
     )
 }
 
+/// The Tombstone at Deep Inside the Clocktower, by the way to Papulatus.
+const TOMBSTONE: i32 = 2041024;
+/// The Machine Apparatus at the Origin of Clocktower, the way out of the
+/// fight with Papulatus.
+const MACHINE_APPARATUS: i32 = 2041025;
+
+fn machine_apparatus() -> NpcScript {
+    NpcScript::new(
+        MACHINE_APPARATUS,
+        vec![Page::Ask {
+            text: text(keys::PAPULATUS_MACHINE_LEAVE),
+            on_yes: vec![Effect::Warp(events::CLOCKTOWER_DEPTHS)],
+            on_no: None,
+        }],
+    )
+}
+
 /// A magic rock in Orbis Tower or Eos Tower: one of its scroll takes the
 /// player to another rock of the tower, by the `go00` portal beside it in
 /// Eos Tower.
@@ -10208,6 +10232,20 @@ mod tests {
         assert_eq!(
             ali.respond(ScriptInput::Next).unwrap().effects,
             [Effect::Warp(DOOR_TO_ZAKUM)]
+        );
+    }
+
+    #[test]
+    fn the_tombstone_talks_and_the_machine_takes_the_party_out_of_papulatus() {
+        let player = player(50);
+        let tombstone = NpcScript::for_npc(TOMBSTONE, &player).unwrap();
+        assert_eq!(kind(&tombstone.begin()), Some(0));
+
+        let mut machine = NpcScript::for_npc(MACHINE_APPARATUS, &player).unwrap();
+        assert_eq!(kind(&machine.begin()), Some(1));
+        assert_eq!(
+            machine.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(events::CLOCKTOWER_DEPTHS)]
         );
     }
 

@@ -70,8 +70,8 @@ impl ClientActor {
             EventKind::Lpq => NpcScript::red_sign(entry),
             EventKind::Opq => NpcScript::wonky(entry),
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
-            // A squad's, above.
-            EventKind::Zakum => return Ok(()),
+            // A squad's, above; Papulatus's has a portal, not an NPC.
+            EventKind::Zakum | EventKind::Papulatus => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -371,6 +371,22 @@ impl ClientActor {
         }))
     }
 
+    /// The way to Papulatus: the directory says whether the player's party
+    /// may go in.
+    pub(super) async fn papulatus_portal(&mut self) -> Result<Vec<Effect>, RuntimeError> {
+        let (reply, entry) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::EventEntry {
+            from: self.client_id,
+            kind: EventKind::Papulatus,
+            reply,
+        })
+        .await?;
+        Ok(entry
+            .await
+            .map(scripts::papulatus_portal)
+            .unwrap_or_default())
+    }
+
     /// The states of the reactors named `names` on the player's map.
     pub(super) async fn reactor_states(
         &mut self,
@@ -508,12 +524,13 @@ impl ClientActor {
     }
 
     /// Without a party there is no event: the player leaves it, unless it
-    /// is already won (Cosmic `playerLeft`) or a squad's.
+    /// is already won (Cosmic `playerLeft`), a squad's, or one that lasts
+    /// until empty (Papulatus's `leftParty` does nothing).
     pub(super) async fn left_party_in_event(&mut self) -> Result<(), RuntimeError> {
         let playing = self
             .event
             .as_ref()
-            .is_some_and(|ticket| !ticket.won() && !ticket.kind.event().squad);
+            .is_some_and(|ticket| !ticket.won() && !ticket.kind.event().lasts_until_empty());
         if self.party_id.is_none() && playing {
             self.leave_event().await?;
         }

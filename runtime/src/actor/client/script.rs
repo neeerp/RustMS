@@ -36,6 +36,9 @@ impl ClientActor {
             .cloned();
         let script = template.as_ref().and_then(|portal| portal.script.clone());
         let in_event = match (&script, &template) {
+            (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
+                Some(self.papulatus_portal().await?)
+            }
             (Some(script), Some(portal)) => match self.opq_portal(script, portal).await? {
                 None => self.zpq_portal(script)?,
                 effects => effects,

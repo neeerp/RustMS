@@ -1363,6 +1363,24 @@ pub mod keys {
     pub const ZAKUM_SQUAD_NOTICE_STARTED: &str = "zakum.squad.notice.started";
     pub const ZAKUM_GATE_BLOCKED: &str = "zakum.gate.blocked";
 
+    /// The way to Papulatus: the portal at Deep Inside the Clocktower
+    /// that takes a party in (`{least}`/`{most}` are the team's size), the
+    /// Tombstone beside it, and the Machine Apparatus that lets them out.
+    pub const PAPULATUS_NO_PARTY: &str = "papulatus.portal.no_party";
+    pub const PAPULATUS_NOT_LEADER: &str = "papulatus.portal.not_leader";
+    pub const PAPULATUS_NOT_ELIGIBLE: &str = "papulatus.portal.not_eligible";
+    pub const PAPULATUS_BUSY: &str = "papulatus.portal.busy";
+    pub const PAPULATUS_TOMBSTONE: &str = "papulatus.tombstone";
+    pub const PAPULATUS_MACHINE_LEAVE: &str = "papulatus.machine.leave";
+    pub const PAPULATUS: [&str; 6] = [
+        PAPULATUS_NO_PARTY,
+        PAPULATUS_NOT_LEADER,
+        PAPULATUS_NOT_ELIGIBLE,
+        PAPULATUS_BUSY,
+        PAPULATUS_TOMBSTONE,
+        PAPULATUS_MACHINE_LEAVE,
+    ];
+
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
     pub const ZAKUM: [&str; 76] = [
@@ -2445,6 +2463,7 @@ mod tests {
             .chain(&keys::CEREMONY)
             .chain(&keys::GIFTS)
             .chain(&keys::ZAKUM)
+            .chain(&keys::PAPULATUS)
             .chain(&[
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
