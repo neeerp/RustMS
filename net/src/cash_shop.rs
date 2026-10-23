@@ -84,6 +84,17 @@ pub enum CashShopRequest {
     Balance,
     /// Redeem the coupon with this code, as typed.
     Coupon(String),
+    /// Whether the character may ask for a new name (op 0x10): CS 0x149.
+    NameChangeRules,
+    /// Whether the name typed in the Name Change dialog is free (op 0x15 in
+    /// the shop): CS 0x148.
+    CheckNewName(String),
+    /// Pay for Name Change `commodity` from the NX Prepaid and ask for
+    /// `new_name`, already checked against the name rules.
+    RequestNameChange {
+        commodity: Commodity,
+        new_name: String,
+    },
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.
@@ -104,6 +115,18 @@ pub fn pair_ring(item_id: i32) -> bool {
         Some(game::ring::RingKind::Crush | game::ring::RingKind::Friendship)
     )
 }
+
+/// Name Change, whose receipt is a request for a new name (report c060).
+pub const NAME_CHANGE: i32 = 5_400_000;
+
+/// Whether `item_id` is bought only with its own request: the pair rings
+/// and Name Change. Neither can be a gift.
+pub fn own_request(item_id: i32) -> bool {
+    pair_ring(item_id) || item_id == NAME_CHANGE
+}
+
+/// The lowest level that may ask for a new name (the rules sheet, Text02).
+pub const NAME_CHANGE_LEVEL: u8 = 10;
 
 /// Whether a character of `gender` can buy `commodity`.
 pub fn check_purchase(
@@ -129,14 +152,14 @@ pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopF
 
 /// The classes (`item_id / 10_000`) of cash items on sale that do nothing
 /// here yet: hired merchants (503) and their Store Remote Controller (547),
-/// the Rock of Evolution (538), Name Change and Character Transfer (540),
-/// Maple Life (543), and Miu Miu and Remote Gachapon (545). The shop calls
-/// them sold out rather than take NX for nothing (report c046). Take a class
-/// out once its item works.
+/// the Rock of Evolution (538), Character Transfer (540, all but Name
+/// Change), Maple Life (543), and Miu Miu and Remote Gachapon (545). The
+/// shop calls them sold out rather than take NX for nothing (report c046).
+/// Take a class out once its item works.
 const INERT_CLASSES: [i32; 6] = [503, 538, 540, 543, 545, 547];
 
 fn inert(item_id: i32) -> bool {
-    INERT_CLASSES.contains(&(item_id / 10_000))
+    item_id != NAME_CHANGE && INERT_CLASSES.contains(&(item_id / 10_000))
 }
 
 /// Whether `commodity` is for sale as an item or a package. The other
@@ -369,18 +392,21 @@ mod tests {
 
     #[test]
     fn items_that_do_nothing_yet_are_sold_out() {
-        let name_change = Commodity {
-            item_id: 5400000,
+        let transfer = Commodity {
+            item_id: 5401000,
             ..ticket()
         };
         assert_eq!(
-            check_purchase(Some(&name_change), 0),
+            check_purchase(Some(&transfer), 0),
             Err(CashShopFailure::SoldOut)
         );
-        assert_eq!(
-            check_gift(Some(&name_change)),
-            Err(CashShopFailure::SoldOut)
-        );
+        assert_eq!(check_gift(Some(&transfer)), Err(CashShopFailure::SoldOut));
+        let name_change = Commodity {
+            item_id: NAME_CHANGE,
+            ..ticket()
+        };
+        assert!(check_purchase(Some(&name_change), 0).is_ok());
+        assert!(own_request(NAME_CHANGE) && !own_request(5401000));
         if commodities().is_err() {
             return;
         }
@@ -390,11 +416,10 @@ mod tests {
                 .iter()
                 .any(|c| c.item_id == item_id && c.on_sale)
         };
-        // A hired merchant, the Rock of Evolution, Name Change, Character
-        // Transfer, Maple Life, Miu Miu, Remote Gachapon, the Store Remote
-        // Controller.
+        // A hired merchant, the Rock of Evolution, Character Transfer,
+        // Maple Life, Miu Miu, Remote Gachapon, the Store Remote Controller.
         for item_id in [
-            5030000, 5380000, 5400000, 5401000, 5431000, 5450000, 5451000, 5470000,
+            5030000, 5380000, 5401000, 5431000, 5450000, 5451000, 5470000,
         ] {
             assert!(on_sale(item_id), "{item_id}");
             let sn = commodity_sn(item_id, 1);
@@ -404,8 +429,9 @@ mod tests {
                 "{item_id}"
             );
         }
-        // Gachapon Tickets, Pet Snacks and guild emoticons still sell.
-        for item_id in [5220000, 5460000, 5290000] {
+        // Gachapon Tickets, Pet Snacks, guild emoticons and Name Change
+        // still sell.
+        for item_id in [5220000, 5460000, 5290000, NAME_CHANGE] {
             let sn = commodity_sn(item_id, 1);
             assert!(check_purchase(commodity(sn), 0).is_ok(), "{item_id}");
         }

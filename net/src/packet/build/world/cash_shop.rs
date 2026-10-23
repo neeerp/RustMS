@@ -72,6 +72,7 @@ const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
 const BOUGHT_RING: u8 = 0x87;
 const BOUGHT_PACKAGE: u8 = 0x89;
+const BOUGHT_NAME_CHANGE: u8 = 0x9E;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -223,6 +224,16 @@ pub fn build_put_back(item: &CashItem) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(PUT_BACK)?;
+    encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: a Name Change request is made; its receipt is in the
+/// Cash Inventory (0x47bccb). The balances follow.
+pub fn build_bought_name_change(item: &CashItem) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BOUGHT_NAME_CHANGE)?;
     encode_cash_item(&mut packet, item)?;
     Ok(packet)
 }

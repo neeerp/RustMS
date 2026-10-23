@@ -24,6 +24,9 @@ pub enum RecvOpcode {
     LoginStarted = 0x23,
 
     // World Server Opcodes
+    /// Name Change bought in the Cash Shop: the character id and birthday
+    /// code (0x4733ca; report c060). Its name check is `CheckCharName`.
+    NameChangeRules = 0x10,
     PlayerLoggedIn = 0x14,
     ChangeChannel = 0x27,
 

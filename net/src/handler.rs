@@ -636,6 +636,11 @@ pub enum WorldAction {
     LeaveCashShop,
     /// Buy something or save the wish list, in the Cash Shop.
     CashShop(crate::cash_shop::CashShopRequest),
+    /// Cancel the character's Name Change request with the receipt in Cash
+    /// `slot`, or say there is none.
+    CancelNameChange {
+        slot: i16,
+    },
     Disconnect,
 }
 
@@ -896,6 +901,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::EnterCashShop, InGame(&world::EnterCashShopHandler)),
             (Op::CheckCash, InGame(&world::CheckCashHandler)),
             (Op::CouponCode, InGame(&world::CouponCodeHandler)),
+            (Op::NameChangeRules, InGame(&world::NameChangeRulesHandler)),
+            (Op::CheckCharName, InGame(&world::CheckNewNameHandler)),
             (
                 Op::CashShopOperation,
                 InGame(&world::CashShopOperationHandler),
@@ -1108,7 +1115,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 119);
+        assert_eq!(world_routes().len(), 121);
     }
 
     #[test]

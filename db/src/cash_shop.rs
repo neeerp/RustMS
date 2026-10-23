@@ -276,7 +276,7 @@ pub fn best_sellers(limit: i64) -> crate::Result<Vec<i32>> {
 }
 
 /// Count one more sale of commodity `sn`.
-fn record_sale(conn: &mut PgConnection, sn: i32) -> diesel::QueryResult<()> {
+pub(crate) fn record_sale(conn: &mut PgConnection, sn: i32) -> diesel::QueryResult<()> {
     diesel::insert_into(cash_sales::table)
         .values((cash_sales::sn.eq(sn), cash_sales::sold.eq(1)))
         .on_conflict(cash_sales::sn)
@@ -287,7 +287,7 @@ fn record_sale(conn: &mut PgConnection, sn: i32) -> diesel::QueryResult<()> {
 }
 
 /// Take `price` from the account's `cash_type` balance; false if it is short.
-fn pay(
+pub(crate) fn pay(
     conn: &mut PgConnection,
     account_id: i32,
     cash_type: CashType,
@@ -308,7 +308,7 @@ fn pay(
     Ok(paid > 0)
 }
 
-fn balance_of(conn: &mut PgConnection, account_id: i32) -> diesel::QueryResult<Balance> {
+pub(crate) fn balance_of(conn: &mut PgConnection, account_id: i32) -> diesel::QueryResult<Balance> {
     accounts::table
         .find(account_id)
         .select((

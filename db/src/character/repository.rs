@@ -5,7 +5,7 @@ use diesel::dsl::exists;
 use diesel::expression_methods::*;
 use diesel::pg::PgConnection;
 use diesel::sql_types::Text;
-use diesel::{select, QueryDsl, QueryResult, RunQueryDsl};
+use diesel::{select, Connection, QueryDsl, QueryResult, RunQueryDsl};
 
 diesel::define_sql_function!(fn lower(x: Text) -> Text);
 
@@ -59,10 +59,13 @@ pub(crate) fn insert_character(
 
 pub fn delete_character(character_id: i32, account_id: i32) -> crate::Result<usize> {
     let mut connection = crate::connection()?;
-    Ok(diesel::delete(
-        characters
-            .filter(id.eq(character_id))
-            .filter(accountid.eq(account_id)),
-    )
-    .execute(&mut connection)?)
+    Ok(connection.transaction(|connection| {
+        crate::name_change::withdraw(connection, character_id, account_id)?;
+        diesel::delete(
+            characters
+                .filter(id.eq(character_id))
+                .filter(accountid.eq(account_id)),
+        )
+        .execute(connection)
+    })?)
 }

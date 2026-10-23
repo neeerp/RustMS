@@ -36,6 +36,30 @@ pub async fn set_nx_credit(user_name: &str, credit: i32) -> Result<(), HarnessEr
     Ok(())
 }
 
+/// Set the NX Prepaid of the account named `user_name`.
+pub async fn set_nx_prepaid(user_name: &str, prepaid: i32) -> Result<(), HarnessError> {
+    let user_name = user_name.to_string();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "set NX Prepaid",
+        message,
+    };
+    let updated = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query("UPDATE accounts SET nx_prepaid = $1 WHERE user_name = $2")
+            .bind::<Integer, _>(prepaid)
+            .bind::<Text, _>(user_name)
+            .execute(&mut conn)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    if updated == 0 {
+        return Err(fixture("no such account".to_string()));
+    }
+    Ok(())
+}
+
 /// Make the account named `user_name` a GM of `level`, or not with 0.
 pub async fn set_gm_level(user_name: &str, level: i16) -> Result<(), HarnessError> {
     let user_name = user_name.to_string();
@@ -114,6 +138,18 @@ pub async fn replace_item(
         .bind::<SmallInt, _>(slot)
         .bind::<Integer, _>(item_id)
         .execute(conn)
+    })
+    .await
+}
+
+/// Rename the character `character_id` behind the game's back.
+pub async fn rename_character(character_id: i32, name: &str) -> Result<(), HarnessError> {
+    let name = name.to_string();
+    change_one_row("rename character", move |conn| {
+        diesel::sql_query("UPDATE characters SET name = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<Text, _>(name)
+            .execute(conn)
     })
     .await
 }
