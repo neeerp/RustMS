@@ -101,6 +101,13 @@ at (598,-91), which never comes back once broken. Its sixth hit
   `restartEventTimer`), shown to each member as a new countdown;
 - says a line to the map (`horntail.summoned`, BROADCAST_MSG type 6).
 
+As at Zakum's shrine (see [zakum](./zakum.md)), a chat line tells those
+in the expedition's cave when it closes (HORNTAIL_CAVE, 302,
+`BossSite::HorntailCave`): on arrival, that it closes unless Horntail is
+summoned within the time left; when his clock starts over, that it closes
+in 60 minutes; and, if the time runs out before the win, that it has closed.
+Cosmic never sends it.
+
 The parts share the body's HP (`Link` in `field_mobs`, after Cosmic's
 `spawnHorntailOnGroundBelow`):
 
@@ -154,7 +161,8 @@ through the shop, the slate and both ways out;
 away, lets its leader step out and back, and frees the channel once the last
 has left; `tests/horntail_trials.rs` beats both heads and walks through
 the sealed and then open doors into Horntail's Cave; `tests/horntail_boss.rs`
-breaks the stone, checks the summoning, the body, the parts and the clock,
+breaks the stone, checks the cave's closing lines, the summoning, the body,
+the parts and the clock,
 and beats the tail, which lowers the body's bar but leaves it alive; then
 beats all eight parts and checks that the body and dead parts die, the
 clear, the stopped clock, the leader's Victory buff, and the world's line.

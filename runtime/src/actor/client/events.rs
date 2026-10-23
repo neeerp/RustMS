@@ -495,7 +495,7 @@ impl ClientActor {
             return Ok(());
         };
         // A boss site whose time ran out, unwon, has closed.
-        let closed = boss_site(ticket.kind).filter(|_| {
+        let closed = boss_site(ticket.kind).map(|(site, _)| site).filter(|_| {
             !self.in_cash_shop
                 && !ticket.won()
                 && ticket.clock.is_some_and(|ends| ends <= Instant::now())
@@ -774,7 +774,8 @@ impl ClientActor {
 
     /// At an event's boss site a chat line says when it closes: on
     /// arrival, before or after the boss is out (the site has monsters
-    /// only once it is), and again as it is summoned.
+    /// only once it is), and again as it is summoned (Horntail's, as his
+    /// clock starts over).
     pub(super) async fn tell_closing_time(
         &mut self,
         summoned: Option<bool>,
@@ -783,8 +784,9 @@ impl ClientActor {
         let Some((site, ends)) = self
             .event
             .as_ref()
-            .filter(|ticket| ticket.holds(map_id))
             .and_then(|ticket| Some((boss_site(ticket.kind)?, ticket.clock?)))
+            .filter(|((_, site_map), _)| *site_map == map_id)
+            .map(|((site, _), ends)| (site, ends))
         else {
             return Ok(());
         };
@@ -817,10 +819,11 @@ impl ClientActor {
 }
 
 /// The boss site an event is held at, whose closing time its players are
-/// told.
-fn boss_site(kind: EventKind) -> Option<BossSite> {
+/// told, and its map.
+fn boss_site(kind: EventKind) -> Option<(BossSite, i32)> {
     match kind {
-        EventKind::Zakum => Some(BossSite::ZakumShrine),
+        EventKind::Zakum => Some((BossSite::ZakumShrine, net::mobs::ZAKUM_ALTAR_MAP)),
+        EventKind::Horntail => Some((BossSite::HorntailCave, events::HORNTAILS_CAVE)),
         _ => None,
     }
 }

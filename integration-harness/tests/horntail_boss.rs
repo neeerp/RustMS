@@ -139,6 +139,14 @@ async fn summon(leader: &mut WorldSession, member: &mut WorldSession) -> Trace {
     .await;
     let mut lt = clear(leader, &mut lt, LEFT_HEAD, TRIAL_II).await;
     let mut lt = clear(leader, &mut lt, RIGHT_HEAD, CAVE).await;
+    // A line says the cave closes unless he is summoned in the
+    // expedition's time (120 minutes, two in the harness).
+    until(&mut leader.connection, &mut lt, |t| {
+        !t.cave_closings.is_empty()
+    })
+    .await;
+    let (summoned, minutes) = lt.cave_closings[0];
+    assert!(!summoned && (1..=2).contains(&minutes), "{lt:?}");
     until(&mut leader.connection, &mut lt, |t| {
         t.field
             .reactors
@@ -194,9 +202,11 @@ async fn horntails_stone_brings_him_out_and_beating_his_parts_brings_him_down() 
     }
 
     // The expedition's clock starts over, at 60 minutes (one minute in the
-    // harness, where event time runs sixty times faster).
+    // harness, where event time runs sixty times faster), and the cave now
+    // closes in that.
     until(c, &mut lt, |t| {
         t.countdowns.last().is_some_and(|s| (55..=60).contains(s))
+            && t.cave_closings.last() == Some(&(true, 1))
     })
     .await;
 
