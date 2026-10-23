@@ -34,6 +34,14 @@ pub const ZAKUM_ARMS: RangeInclusive<i32> = 8800003..=8800010;
 pub const ZAKUM_LAST: i32 = 8800002;
 pub const ZAKUM_ALTAR_MAP: i32 = 280030000;
 
+/// The Time Sphere the Piece of Cracked Dimension brings out on the Origin
+/// of Clocktower (Mob.nx `revive`s it into the Papulatus Clock, 8500001,
+/// and that into Papulatus).
+pub const TIME_SPHERE: i32 = 8500000;
+/// Papulatus himself: his death on the Origin of Clocktower wins the
+/// fight.
+pub const PAPULATUS_LAST: i32 = 8500002;
+
 /// The mobs that keep `mob_id` from harm while any of them is out: Zakum's
 /// arms its body (Cosmic `MapleMap.damageMonster`). Until then it has no
 /// controller either; the last arm to die makes it real.

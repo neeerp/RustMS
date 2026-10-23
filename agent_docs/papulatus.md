@@ -2,10 +2,9 @@
 
 The fight with Papulatus at the bottom of Ludibrium's Clocktower, after
 Cosmic. Built so far: the way in at Deep Inside the Clocktower, its gates,
-and the way out. The boss itself (the cracked dimension, reactor 2201004,
-and the win) comes in a later slice. The slice plan and its open questions
-are in v83ref's `reports/a110-papulatus.md`; the defaults shipped are under
-"a110" in `lanes/QUESTIONS.md`.
+the way out, the summon at the cracked dimension, and the win. The slice
+plan and its open questions are in v83ref's `reports/a110-papulatus.md`;
+the defaults shipped are under "a110" in `lanes/QUESTIONS.md`.
 
 All dialogue is placeholder text (`papulatus.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -49,6 +48,26 @@ actor sets them to state 1 (`shut_gate`), and when the event ends to state 0
 (`free_lobby`), each by `FieldMessage::SetReactor`, so everyone on the lobby
 sees them close and open.
 
+## The boss
+
+On the Origin of Clocktower the cracked dimension, reactor 2201004 (`boss`,
+`reactors::PAPULATUS_CRACK`), takes a Piece of Cracked Dimension (4031179,
+from quest 7103) dropped on the ledge above it (Reactor.nx's area). It is
+`Action::SpawnAt`: everyone there reads a pink line (`papulatus.summoned`),
+the music turns to `Bgm09/TimeAttack`, and the Time Sphere (8500000,
+`mobs::TIME_SPHERE`) comes out on the ground below (-410, -400). The reactor
+is spent after the one item. Mob.nx's `revive` chain does the rest: the
+sphere dies into the Papulatus Clock (8500001), and the clock into Papulatus
+(8500002, `mobs::PAPULATUS_LAST`).
+
+Papulatus's death on 220080001 is `boss_falls` in the field
+(`runtime/src/actor/field.rs`, shared with Zakum's `zakum_falls`): the
+map sees the party quests' clear effect and hears their jingle, and in the
+event's copy each player's client actor clears the event's one stage,
+which wins it. There is no stage EXP and no world notice. The win stops the
+clock and frees the lobby (`free_lobby`), so the gates open and the next
+party may go in while the winners loot.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -59,7 +78,9 @@ sees them close and open.
 ## Tests
 
 `net` has unit tests for the event's end (`events.rs`), the portal
-(`scripts.rs`) and the NPCs (`npc_scripts.rs`). The harness's
-`tests/papulatus_gate.rs` walks a party in, sees the gates shut, turns the
-next party away while any member of the first is inside, and sees them open
-once the last leaves.
+(`scripts.rs`), the NPCs (`npc_scripts.rs`) and the reactor
+(`reactors.rs`). The harness's `tests/papulatus_gate.rs` walks a party in,
+sees the gates shut, turns the next party away while any member of the
+first is inside, and sees them open once the last leaves.
+`tests/papulatus_boss.rs` drops the piece, sees the line, music and sphere,
+beats the three bodies, and sees the clear and the gates open.

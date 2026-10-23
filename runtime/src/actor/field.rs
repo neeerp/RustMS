@@ -1660,15 +1660,17 @@ impl FieldActor {
             }
         }
         self.make_real(kill.mob_id);
-        if kill.mob_id == net::mobs::ZAKUM_LAST && self.key.map_id == net::mobs::ZAKUM_ALTAR_MAP {
-            self.zakum_falls();
+        match (kill.mob_id, self.key.map_id) {
+            (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
+            (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            _ => {}
         }
     }
 
-    /// Zakum's last body died on its altar: the map sees the party quests' clear effect
-    /// and hears their jingle, and the world reads of it (Cosmic
-    /// `ZakumBattle.monsterKilled`, `broadcastZakumVictory`).
-    fn zakum_falls(&mut self) {
+    /// A boss whose death wins its fight died: the map sees the party
+    /// quests' clear effect and hears their jingle, and in an event's copy
+    /// of the map the event is won (Cosmic `showClearEffect`, `clearPQ`).
+    fn boss_falls(&mut self) {
         for packet in [
             build_field_effect("quest/party/clear"),
             build_field_sound("Party1/Clear"),
@@ -1678,12 +1680,18 @@ impl FieldActor {
         {
             self.broadcast(None, packet);
         }
-        // In an expedition's copy of the altar, the expedition has won.
         if self.key.instance_id != 0 {
             for occupant in self.occupants.values() {
                 occupant.handle.send(ServerMessage::ClearEventStage(1));
             }
         }
+    }
+
+    /// Zakum's last body died on its altar: it falls as any boss, and the
+    /// world reads of it (Cosmic `ZakumBattle.monsterKilled`,
+    /// `broadcastZakumVictory`).
+    fn zakum_falls(&mut self) {
+        self.boss_falls();
         let line = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
         let Ok(packet) = build_item_line(&line, 0) else {
             return;
@@ -2892,10 +2900,19 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
-            // Cosmic `mapMessage(5, ..)` then `spawnMonster(.., x, y)`.
-            reactors::Action::SpawnAt { mob_id, at, notice } => {
+            // Cosmic `mapMessage(5, ..)`, `changeMusic(..)`, then
+            // `spawnMonster(.., x, y)`.
+            reactors::Action::SpawnAt {
+                mob_id,
+                at,
+                notice,
+                music,
+            } => {
                 let notice = net::content::text().get(notice, &[]);
                 if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+                if let Some(Ok(packet)) = music.map(build_field_music) {
                     self.broadcast(None, packet);
                 }
                 self.board(mob_id, 1, at);

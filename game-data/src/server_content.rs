@@ -1365,20 +1365,24 @@ pub mod keys {
 
     /// The way to Papulatus: the portal at Deep Inside the Clocktower
     /// that takes a party in (`{least}`/`{most}` are the team's size), the
-    /// Tombstone beside it, and the Machine Apparatus that lets them out.
+    /// Tombstone beside it, the Machine Apparatus that lets them out, and
+    /// the pink line as the Piece of Cracked Dimension brings out the Time
+    /// Sphere.
     pub const PAPULATUS_NO_PARTY: &str = "papulatus.portal.no_party";
     pub const PAPULATUS_NOT_LEADER: &str = "papulatus.portal.not_leader";
     pub const PAPULATUS_NOT_ELIGIBLE: &str = "papulatus.portal.not_eligible";
     pub const PAPULATUS_BUSY: &str = "papulatus.portal.busy";
     pub const PAPULATUS_TOMBSTONE: &str = "papulatus.tombstone";
     pub const PAPULATUS_MACHINE_LEAVE: &str = "papulatus.machine.leave";
-    pub const PAPULATUS: [&str; 6] = [
+    pub const PAPULATUS_SUMMONED: &str = "papulatus.summoned";
+    pub const PAPULATUS: [&str; 7] = [
         PAPULATUS_NO_PARTY,
         PAPULATUS_NOT_LEADER,
         PAPULATUS_NOT_ELIGIBLE,
         PAPULATUS_BUSY,
         PAPULATUS_TOMBSTONE,
         PAPULATUS_MACHINE_LEAVE,
+        PAPULATUS_SUMMONED,
     ];
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
