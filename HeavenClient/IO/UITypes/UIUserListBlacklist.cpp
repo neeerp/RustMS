@@ -152,15 +152,9 @@ namespace ms
 
 		if (Rectangle<int16_t>(count_left, BLACK_COUNT.x() + BLACK_COUNT_MARGIN, BLACK_COUNT_TOP, BLACK_COUNT_BOTTOM)
 				.contains(local))
-		{
-			UI::get().show_text(Tooltip::Parent::USERLIST, BLACK_COUNT_HELP);
-			black_tooltip = true;
-		}
-		else if (black_tooltip)
-		{
-			UI::get().clear_tooltip(Tooltip::Parent::USERLIST);
-			black_tooltip = false;
-		}
+			show_tip(BLACK_COUNT_HELP);
+		else
+			show_tip(nullptr);
 
 		if (!clicked || !UIElement::is_in_range(cursorpos))
 			return UIElement::send_cursor(clicked, cursorpos);

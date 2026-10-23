@@ -73,6 +73,9 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
+		// Leaving the window takes its tip away.
+		void remove_cursor() override;
+
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		void send_scroll(double yoffset) override;
@@ -323,6 +326,10 @@ namespace ms
 		void rebuild_blacklist();
 		void draw_blacklist() const;
 		Cursor::State blacklist_cursor(bool clicked, Point<int16_t> cursorpos);
+		// Shows text as the window's tip, or hides it for none.
+		void show_tip(const char* text);
+		// The Friend tab's tip for the cursor (0x91d82f, 0x90b304).
+		void friend_tip(Point<int16_t> cursor_relative);
 		Button::State blacklist_button(uint16_t buttonid);
 		// The Add prompt, and its checks once answered (0x919214).
 		void prompt_blacklist();
@@ -350,6 +357,7 @@ namespace ms
 		Texture friend_background, unfolded_icon, folded_icon, same_channel_icon, blocked_icon, dot;
 		Text friend_count, location;
 		std::vector<Buddy> shown_buddies;
+		uint8_t shown_capacity = 0;
 		// Point into shown_buddies.
 		std::vector<FriendGroups::Group> friend_groups;
 		std::vector<FriendLine> friend_lines;
@@ -421,6 +429,7 @@ namespace ms
 		std::vector<Text> black_texts;
 		// By place in the list, which survives adding and deleting (0x87c).
 		size_t black_picked = NO_BLACK_PICK;
-		bool black_tooltip = false;
+		// Whether a tip of the window's shows (the Friend tab's, the Blacklist's count).
+		bool tip_shown = false;
 	};
 }

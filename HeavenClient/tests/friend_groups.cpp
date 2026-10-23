@@ -76,6 +76,17 @@ int main()
 		require(away(list[4], blocks), "and a blocked buddy is away");
 		blocks.set(5, false);
 
+		require(std::string(tip(list[0], blocks, 0)) == "Double-click to send a whisper. (same channel)",
+				"a whisper tip on the player's channel");
+		require(std::string(tip(list[4], blocks, 0)) == "Double-click to send a whisper.", "elsewhere");
+		require(std::string(tip(list[2], blocks, 0)) == "Double-click to send a note.", "a note to one offline");
+		require(std::string(tip(list[2], blocks, -1)) == "Double-click to send a note.",
+				"offline matches no channel");
+		require(std::string(tip(list[1], blocks, 0)) == "This user has been blocked.", "blocked though offline");
+		blocks.set(1, true);
+		require(std::string(tip(list[0], blocks, 0)) == "This user has been blocked.", "blocked first");
+		blocks.set(1, false);
+
 		auto online = buttons(list[4], blocks);
 		require(online.mod && online.remove && online.chat && online.whisper && online.message && online.party
 				&& online.block && !online.unblock, "an online buddy has every button");

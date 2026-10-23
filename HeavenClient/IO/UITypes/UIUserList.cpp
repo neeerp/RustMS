@@ -612,7 +612,8 @@ namespace ms
 		if (now != shown || party.get_leader() != shown_leader || mapid != shown_mapid)
 			rebuild();
 
-		if (buddies.get_buddies() != shown_buddies)
+		// A new capacity (BUDDYLIST 0x15) redraws the count, as 0x91dfaf does.
+		if (buddies.get_buddies() != shown_buddies || buddies.get_capacity() != shown_capacity)
 			rebuild_buddies();
 
 		if (mapid != shown_location)
@@ -671,6 +672,13 @@ namespace ms
 			   (grade_shown && Rectangle<int16_t>(panel, panel + grade_background.get_dimensions()).contains(cursorpos)) ||
 			   (union_shown &&
 				Rectangle<int16_t>(union_panel, union_panel + union_background.get_dimensions()).contains(cursorpos));
+	}
+
+	void UIUserList::remove_cursor()
+	{
+		UIDragElement::remove_cursor();
+
+		show_tip(nullptr);
 	}
 
 	Cursor::State UIUserList::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -764,6 +772,8 @@ namespace ms
 
 		if (tab == Tab::FRIEND)
 		{
+			friend_tip(cursor_relative);
+
 			if (Cursor::State state = friend_slider.send_cursor(cursor_relative, clicked))
 				return state;
 
@@ -936,11 +946,8 @@ namespace ms
 
 		if (tab == Tab::BLACKLIST)
 			rebuild_blacklist();
-		else if (black_tooltip)
-		{
-			UI::get().clear_tooltip(Tooltip::Parent::USERLIST);
-			black_tooltip = false;
-		}
+
+		show_tip(nullptr);
 
 		// Also shows or hides the section buttons.
 		rebuild_guild();
@@ -1080,20 +1087,25 @@ namespace ms
 						break;
 					}
 
-					// A group is only its members' names: v83 deletes one by
-					// moving each into the Default Group.
-					std::vector<std::string> names;
+					// On Yes each member in turn is deleted, with the box checked,
+					// or moved into the Default Group (FUN_0090a303). The list
+					// changes as the server answers.
+					std::vector<std::pair<int32_t, std::string>> members;
 
 					for (const Buddy* member : group->members)
-						names.push_back(member->name);
+						members.emplace_back(member->id, member->name);
 
-					UI::get().emplace<UIYesNo>(
-							"'" + group->name + "' group will be deleted. Your friends in the group will be moved to Default Group.",
-							[names](bool yes)
+					UI::get().emplace<UIDeleteGroup>(
+							group->name,
+							[members](bool delete_buddies)
 							{
-								if (yes)
-									for (const std::string& name : names)
+								for (const auto& [id, name] : members)
+								{
+									if (delete_buddies)
+										BuddyCommands::remove(id);
+									else
 										BuddyCommands::add(name, FriendGroups::DEFAULT);
+								}
 							}
 					);
 				}
@@ -1205,6 +1217,12 @@ namespace ms
 							}
 					);
 				}
+
+				break;
+			case Buttons::BT_GUILD_WHERE:
+				// The same find as /find: the answer comes as a chat line.
+				if (const GuildMember* picked = picked_online_member())
+					FindPacket(picked->name).dispatch();
 
 				break;
 			case Buttons::BT_GUILD_WHISPER:
@@ -1345,6 +1363,7 @@ namespace ms
 	void UIUserList::rebuild_buddies()
 	{
 		shown_buddies = buddies.get_buddies();
+		shown_capacity = buddies.get_capacity();
 		friend_groups = FriendGroups::arrange(shown_buddies);
 
 		// The headers count a blocked buddy as offline, as v83 does.
@@ -1458,6 +1477,35 @@ namespace ms
 			return nullptr;
 
 		return &line;
+	}
+
+	void UIUserList::show_tip(const char* text)
+	{
+		if (text)
+		{
+			UI::get().show_text(Tooltip::Parent::USERLIST, text);
+			tip_shown = true;
+		}
+		else if (tip_shown)
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::USERLIST);
+			tip_shown = false;
+		}
+	}
+
+	void UIUserList::friend_tip(Point<int16_t> cursor_relative)
+	{
+		size_t half = 0;
+		const FriendLine* line = buddy_line_at(cursor_relative, half);
+
+		if (!line)
+			return show_tip(nullptr);
+
+		if (line->header)
+			return show_tip(FriendGroups::GROUP_TIP);
+
+		const Buddy* buddy = buddies.find(line->ids[half]);
+		show_tip(buddy ? FriendGroups::tip(*buddy, blocks, Configuration::get().get_channelid()) : nullptr);
 	}
 
 	const FriendGroups::Group* UIUserList::selected_group() const
@@ -1607,8 +1655,7 @@ namespace ms
 		buttons[Buttons::BT_FRIEND_UNBLOCK]->set_active(tab == Tab::FRIEND && friend_buttons.unblock);
 
 		// The client's rules (FUN_0090f17c). Without a guild the player's
-		// rank is 0, which greys out all of them. HeavenClient has no
-		// member search yet.
+		// rank is 0, which greys out all of them.
 		int32_t rank = guild.rank(self);
 		const GuildMember* picked = picked_member();
 		const GuildMember* guild_member = picked_online_member();
@@ -1619,7 +1666,8 @@ namespace ms
 		enable(Buttons::BT_GUILD_KICK, Guild::may_kick(rank, picked_rank));
 		enable(Buttons::BT_GUILD_UP, Guild::may_raise(rank, picked_rank));
 		enable(Buttons::BT_GUILD_DOWN, guild.may_lower(rank, picked_rank));
-		enable(Buttons::BT_GUILD_WHERE, false);
+		// MAP finds someone else picked and online (FUN_00911c5c).
+		enable(Buttons::BT_GUILD_WHERE, guild_member);
 		enable(Buttons::BT_GUILD_INFO, guild.exists());
 		enable(Buttons::BT_GUILD_NOTICE, rank == 1 || rank == 2);
 		// Any member may open the board (178-guild-ui).

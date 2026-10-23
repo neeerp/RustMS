@@ -87,7 +87,8 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
     online, grey if away (offline, on no channel, or blocked), red if
     blocked, and white when picked. An empty group shows "none". A
     header's online count leaves out those away.
-  - The tab header counts buddies against the capacity.
+  - The tab header counts buddies against the capacity, and is redrawn
+    when the server sends a new one (0x15).
   - SHOW ONLINE / SHOW ALL hides or shows those away (kept in
     `FriendShowOnline`). The two buttons share a spot, so `filter_clicked`
     makes sure one press toggles only once.
@@ -108,9 +109,21 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
     blank name, nothing checked among the 7 rows in view, or a name taken,
     as v83 does. Otherwise it moves each buddy checked into the group and
     each unchecked one out to the Default Group, one add each.
-  - DELETE removes a buddy after asking. On a group it asks, then moves
-    every member to the Default Group. The Default Group can be neither
-    edited nor deleted.
+  - DELETE removes a buddy after asking. On a group it opens v83's
+    checkbox prompt (`UIDeleteGroup`, report b092): YesNo3's top and
+    middle over `Notice5/s_`, whose "DELETE BUDDIES AS WELL" caption is
+    part of the art, a `CheckBox` at (11, height - 69), and OK2 and
+    Cancel2 5 higher than usual. Enter and OK say yes; Esc and Cancel say
+    no. On yes it deletes every member, box checked, or moves each to the
+    Default Group, one request per member; the tab changes as the server
+    answers. The Default Group can be neither edited nor deleted.
+  - Hovering over a header shows "Double-click to make changes to the
+    group."; over a member of an open group, "This user has been
+    blocked.", "Double-click to send a whisper. (same channel)",
+    "Double-click to send a whisper." or "Double-click to send a note."
+    (`FriendGroups::tip`, FUN_0090b304; a request still waiting counts as
+    away). The tip shows 20 pixels right of and below the cursor at once,
+    as v83 does, and so does the Blacklist tab's count tip.
   - GROUP WHISPER sets the chat target to a group. CHAT opens a messenger
     and invites the buddy; WHISPER, MESSAGE (a note) and PARTY do what they
     say.
@@ -123,13 +136,12 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 
 ## Not implemented
 
-- Raising the capacity (packet 0x15 is parsed but never sent), and the
-  Cash Shop flags.
-- The MAP button. The Blacklist tab is in `inventory.md` ("Personal
-  shops").
-- Deleting a group's buddies along with it (v83's "DELETE BUDDIES AS WELL"
-  checkbox).
-- The hover tip on a buddy ("Double-click to send a note." or to whisper).
+- Raising the capacity: the client shows any capacity 0x15 brings, but
+  the server never sends it, and v83's client has no way to ask for one.
+  The Cash Shop flags.
+- v83's Friend tab has no MAP button, and neither does this one; the
+  Guild tab's is in `guilds.md`. The Blacklist tab is in `inventory.md`
+  ("Personal shops").
 - Keeping folded groups per character (they are kept per client), and
   scrolling back to a header after it is clicked shut.
 
