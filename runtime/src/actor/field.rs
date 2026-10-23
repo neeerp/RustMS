@@ -404,16 +404,22 @@ impl FieldActor {
         }
         let left = self.mobs.leave(now);
         self.show_left(left);
+        let mut dead_part = false;
         for object_id in self.mobs.revive(now, net::mobs::info) {
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
+            dead_part |= net::mobs::DEAD_HORNTAIL_PARTS.contains(&mob.info.mob_id);
             if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
                 self.broadcast(None, packet);
             }
             if let Some(controller) = mob.controller {
                 self.send_control(controller, &[object_id]);
             }
+        }
+        let parts = net::mobs::DEAD_HORNTAIL_PARTS;
+        if dead_part && parts.clone().all(|mob_id| !self.out(mob_id).is_empty()) {
+            self.horntail_defeated(now);
         }
         let spawned = self.mobs.respawn(now, self.occupants.len());
         if spawned.is_empty() {
@@ -1713,9 +1719,18 @@ impl FieldActor {
                 });
             }
         }
+        // Each living player here takes what it leaves (Cosmic
+        // `getBuffToGive`); the client knows who is alive.
+        let buff = net::mobs::info(kill.mob_id).map_or(0, |info| info.buff);
+        if buff > 0 {
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::MobBuff(buff));
+            }
+        }
         self.make_real(kill.mob_id);
         match (kill.mob_id, self.key.map_id) {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
+            (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
             _ => {}
         }
@@ -1778,6 +1793,51 @@ impl FieldActor {
                 .handle
                 .send(ServerMessage::Announce(packet.clone()))
         });
+    }
+
+    /// Horntail died in his cave: in the expedition's copy, its last stage
+    /// clears, which wins it and shows those here the clear; and the world
+    /// reads of it (Cosmic `HorntailBattle.monsterKilled`,
+    /// `broadcastHorntailVictory`).
+    fn horntail_falls(&mut self) {
+        if self.key.instance_id != 0 {
+            let stage = net::events::HORNTAIL.last_stage();
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::ClearEventStage(stage));
+            }
+        }
+        let line = net::content::text().get(keys::HORNTAIL_VICTORY, &[]);
+        let Ok(packet) = build_item_line(&line, 0) else {
+            return;
+        };
+        // Through the first client that takes it.
+        self.occupants.values().any(|occupant| {
+            occupant
+                .handle
+                .send(ServerMessage::Announce(packet.clone()))
+        });
+    }
+
+    /// The object ids of the live `mob_id`s here.
+    fn out(&self, mob_id: i32) -> Vec<i32> {
+        let mobs = self.mobs.live().filter(|mob| mob.info.mob_id == mob_id);
+        mobs.map(|mob| mob.object_id).collect()
+    }
+
+    /// All eight of Horntail's dead parts are out: he dies, then they do,
+    /// each as if those who hurt it had killed it (Cosmic's `revive` with
+    /// `isHorntailDefeated`).
+    fn horntail_defeated(&mut self, now: Instant) {
+        let dead_parts = net::mobs::DEAD_HORNTAIL_PARTS.rev();
+        let doomed: Vec<i32> = std::iter::once(net::mobs::HORNTAIL)
+            .chain(dead_parts)
+            .flat_map(|mob_id| self.out(mob_id))
+            .collect();
+        for object_id in doomed {
+            if let Some(kill) = self.mobs.slay(object_id, now) {
+                self.killed(&kill);
+            }
+        }
     }
 
     /// The mobs the death of a `mob_id` left unshielded become real: their

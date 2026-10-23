@@ -640,7 +640,7 @@ impl ClientActor {
     /// the team before the clear effect). The Dead Mine's win shows nothing,
     /// and gives more EXP with the documents (Cosmic's Aura). Zakum's fall
     /// showed itself on the altar already (the field's `zakum_falls`), and
-    /// gives none; nor do Horntail's trials.
+    /// gives none; nor do Horntail's stages.
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());

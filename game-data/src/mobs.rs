@@ -83,6 +83,9 @@ pub struct MobInfo {
     /// It never turns (`noFlip`): it faces left whatever its stance says,
     /// as Pianus does at either end of his cave.
     pub no_flip: bool,
+    /// The item whose effect each living player on its map takes when it
+    /// is killed (`buff`), as Horntail gives 2022108, or 0 for none.
+    pub buff: i32,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -256,6 +259,7 @@ impl MobData {
             damaged_by_mob: int("damagedByMob")? != 0,
             drop_item_period: int("dropItemPeriod")?,
             no_flip: int("noFlip")? != 0,
+            buff: int("buff")?,
         }))
     }
 
@@ -590,6 +594,17 @@ mod tests {
         assert!(mushmom.hp_gauge_hide);
         assert_eq!(mushmom.boss_bar(), None);
         assert_eq!(data.info(100100).unwrap().unwrap().boss_bar(), None);
+    }
+
+    #[test]
+    fn horntail_leaves_his_victory_buff() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // A string in Mob.nx, as for Pink Bean (8820001).
+        assert_eq!(data.info(8810018).unwrap().unwrap().buff, 2022108);
+        assert_eq!(data.info(8810002).unwrap().unwrap().buff, 0);
     }
 
     #[test]

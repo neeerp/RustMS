@@ -3,7 +3,9 @@
 //! summoning (8810026) and from it the body (8810018) and its eight parts,
 //! and restarts the expedition's clock. The parts share the body's HP: a
 //! hit on one lowers the body's bar, and a part's death lets out its dead
-//! part but leaves the body alive.
+//! part but leaves the body alive. Once all eight dead parts are out, he
+//! dies, then they do; the expedition wins, each player there takes his
+//! Victory buff (2022108), and the world reads of it.
 
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
@@ -14,7 +16,7 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
-use net::mobs::{HORNTAIL, HORNTAIL_INTRO, HORNTAIL_PARTS};
+use net::mobs::{DEAD_HORNTAIL_PARTS, HORNTAIL, HORNTAIL_INTRO, HORNTAIL_PARTS};
 use net::packet::op::RecvOpcode;
 use net::reactors::{HORNTAIL_MUSIC, HORNTAIL_STONE};
 use packet::io::write::PktWrite;
@@ -35,6 +37,8 @@ const DEAD_TAIL: i32 = 8810017;
 /// Under the most a level-100 character with 32000 STR and a 1999-attack
 /// sword may hit for.
 const HIT: i32 = 5_000_000;
+/// Horntail Squad : Victory, what Horntail leaves those who beat him.
+const VICTORY: i32 = 2022108;
 
 /// A new level-100 character hitting very hard, logged in on the Entrance
 /// to Horntail's Cave.
@@ -66,7 +70,8 @@ fn door() -> Packet {
 
 /// Hit `object_id` until `seen` sees it die, each hit once answered.
 async fn beat(c: &mut MapleTestConnection, seen: &mut Trace, object_id: i32) {
-    for _ in 0..100 {
+    // His left head, the toughest part, takes 98.
+    for _ in 0..120 {
         if seen.field.killed.contains(&object_id) {
             return;
         }
@@ -114,27 +119,26 @@ async fn clear(player: &mut WorldSession, seen: &mut Trace, head: i32, next: i32
     through(player, next).await
 }
 
-#[tokio::test]
-async fn horntails_stone_brings_him_out_with_his_parts_sharing_his_hp() {
-    let mut leader = hunter().await;
-    let mut member = hunter().await;
+/// An expedition of `leader` and `member` beats both heads, and `leader`
+/// reaches Horntail's Cave, breaks the stone and brings him out.
+async fn summon(leader: &mut WorldSession, member: &mut WorldSession) -> Trace {
     let recruiter = || talk(ENTRANCE, RECRUITER);
 
     // An expedition sets out, beats both heads and reaches Horntail's Cave.
-    told(&mut leader, recruiter()).await;
-    told(&mut leader, answer(1, 1, None)).await;
-    told(&mut leader, answer(0, 1, None)).await;
-    told(&mut member, recruiter()).await;
-    told(&mut member, answer(1, 1, None)).await;
-    told(&mut member, answer(0, 1, None)).await;
-    told(&mut leader, recruiter()).await;
-    let mut lt = told(&mut leader, answer(4, 1, Some(1))).await;
+    told(leader, recruiter()).await;
+    told(leader, answer(1, 1, None)).await;
+    told(leader, answer(0, 1, None)).await;
+    told(member, recruiter()).await;
+    told(member, answer(1, 1, None)).await;
+    told(member, answer(0, 1, None)).await;
+    told(leader, recruiter()).await;
+    let mut lt = told(leader, answer(4, 1, Some(1))).await;
     until(&mut leader.connection, &mut lt, |t| {
         t.arrivals.iter().any(|a| a.0 == TRIAL_I)
     })
     .await;
-    let mut lt = clear(&mut leader, &mut lt, LEFT_HEAD, TRIAL_II).await;
-    let mut lt = clear(&mut leader, &mut lt, RIGHT_HEAD, CAVE).await;
+    let mut lt = clear(leader, &mut lt, LEFT_HEAD, TRIAL_II).await;
+    let mut lt = clear(leader, &mut lt, RIGHT_HEAD, CAVE).await;
     until(&mut leader.connection, &mut lt, |t| {
         t.field
             .reactors
@@ -163,6 +167,16 @@ async fn horntails_stone_brings_him_out_with_his_parts_sharing_his_hp() {
         t.item_lines.contains(&(summoned.clone(), 0)) && t.field.mobs.len() >= 10
     })
     .await;
+    lt
+}
+
+// One test, as a channel holds one expedition at a time.
+#[tokio::test]
+async fn horntails_stone_brings_him_out_and_beating_his_parts_brings_him_down() {
+    let mut leader = hunter().await;
+    let mut member = hunter().await;
+    let mut lt = summon(&mut leader, &mut member).await;
+    let c = &mut leader.connection;
     assert!(
         (lt.field_effects.iter()).any(|(mode, name)| *mode == 6 && name == HORNTAIL_MUSIC),
         "{lt:?}"
@@ -222,5 +236,58 @@ async fn horntails_stone_brings_him_out_with_his_parts_sharing_his_hp() {
         .find(|b| b.0 == HORNTAIL)
         .unwrap();
     assert!(0 < last.1 && last.1 < bar.1, "{last:?} after {bar:?}");
-    drop(member);
+
+    // The leader beats the other seven parts, and each leaves its dead
+    // part; the last of those brings him down, and then them.
+    for part in HORNTAIL_PARTS.rev().skip(1) {
+        let part = the(&lt, part);
+        beat(c, &mut lt, part).await;
+    }
+    read_for(c, &mut lt, 300).await;
+    assert!(!lt.field.killed.contains(&body), "{lt:?}");
+    let last_part = the(&lt, *HORNTAIL_PARTS.start());
+    beat(c, &mut lt, last_part).await;
+    until(c, &mut lt, |t| t.field.killed.contains(&body)).await;
+    until(c, &mut lt, |t| {
+        let dead = t
+            .field
+            .mobs
+            .iter()
+            .filter(|m| DEAD_HORNTAIL_PARTS.contains(&m.1));
+        dead.clone().count() == 8 && dead.clone().all(|m| t.field.killed.contains(&m.0))
+    })
+    .await;
+    // He dies before them, and nothing of him is left.
+    let killed = |id: &i32| lt.field.killed.iter().position(|k| k == id);
+    for dead in lt
+        .field
+        .mobs
+        .iter()
+        .filter(|m| DEAD_HORNTAIL_PARTS.contains(&m.1))
+    {
+        assert!(killed(&body) < killed(&dead.0), "{lt:?}");
+    }
+    read_for(c, &mut lt, 300).await;
+    let left = lt
+        .field
+        .mobs
+        .iter()
+        .filter(|m| !lt.field.killed.contains(&m.0));
+    assert_eq!(left.count(), 0, "{lt:?}");
+
+    // His expedition wins: the clear shows, the clock stops, and the
+    // leader, still alive, takes his Victory buff for an hour.
+    until(c, &mut lt, |t| saw_cleared(t) && t.clocks_stopped > 0).await;
+    until(c, &mut lt, |t| t.buffs.iter().any(|b| b.0 == -VICTORY)).await;
+    let buff = lt.buffs.iter().find(|b| b.0 == -VICTORY).unwrap();
+    assert_eq!(buff.2, 3_600_000, "{buff:?}");
+
+    // The member, back on the first trial, reads of it with the world.
+    let victory = net::content::text().get(keys::HORNTAIL_VICTORY, &[]);
+    let mut mt = Trace::default();
+    until(&mut member.connection, &mut mt, |t| {
+        t.item_lines.contains(&(victory.clone(), 0))
+    })
+    .await;
+    assert!(!mt.buffs.iter().any(|b| b.0 == -VICTORY), "{mt:?}");
 }

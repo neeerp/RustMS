@@ -1412,9 +1412,10 @@ pub mod keys {
     /// A trial's door, while its head lives.
     pub const HORNTAIL_TRIAL_SEALED: &str = "horntail.trial.sealed";
     pub const HORNTAIL_SUMMONED: &str = "horntail.summoned";
+    pub const HORNTAIL_VICTORY: &str = "horntail.victory";
     /// Keroben, the Encrypted Slate of the Squad, the Crystal of Roots,
     /// the Mark of the Squad and the trials: the way to Horntail.
-    pub const HORNTAIL: [&str; 21] = [
+    pub const HORNTAIL: [&str; 22] = [
         HORNTAIL_KEROBEN_AWAY,
         HORNTAIL_KEROBEN_MENU,
         HORNTAIL_KEROBEN_BUY_CHOICE,
@@ -1436,6 +1437,7 @@ pub mod keys {
         HORNTAIL_SQUAD_NOTICE_STARTED,
         HORNTAIL_TRIAL_SEALED,
         HORNTAIL_SUMMONED,
+        HORNTAIL_VICTORY,
     ];
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
