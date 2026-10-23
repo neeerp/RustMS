@@ -100,6 +100,9 @@ pub enum RecvOpcode {
     NpcTalkMore = 0x3C,
     NpcShopAction = 0x3D,
     TrunkRequest = 0x3E,
+    /// A hired merchant permit was used; the client waits for
+    /// ENTRUSTED_SHOP_CHECK_RESULT.
+    EntrustedShopRequest = 0x3F,
     DueyAction = 0x41,
     /// The Owl of Minerva's search window opened (`u8 5`): it wants the
     /// most searched items.

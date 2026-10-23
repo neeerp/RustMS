@@ -296,8 +296,8 @@ pub fn take_back(player: &Player, stock: i64, bundles: i16) -> crate::Result<boo
     })?)
 }
 
-/// Open `player`'s merchant at `now` and save them, who used up the
-/// permit, in one transaction. Whether it was being set up.
+/// Open `player`'s merchant at `now` and save them, in one transaction.
+/// Whether it was being set up.
 pub fn open(player: &Player, now: SystemTime) -> crate::Result<bool> {
     let mut conn = crate::connection()?;
     Ok(conn.transaction(|conn| -> QueryResult<_> {
@@ -414,11 +414,39 @@ pub struct Retrieved {
 
 /// Close `player`'s merchant at `now` and save them, with what they took
 /// from it, in one transaction. A merchant they emptied goes; one with
-/// items or mesos left stays closed, for Fredrick.
-pub fn close(player: &Player, retrieved: Retrieved, now: SystemTime) -> crate::Result<()> {
+/// items or mesos left stays closed, for Fredrick. Whether it still held
+/// what `seen` holds: a purchase written since, which a stalled buyer can
+/// still do, leaves it as it is.
+pub fn close(
+    player: &Player,
+    seen: &HiredMerchant,
+    retrieved: Retrieved,
+    now: SystemTime,
+) -> crate::Result<bool> {
     let mut conn = crate::connection()?;
     let owner = player.id();
-    conn.transaction(|conn| -> QueryResult<()> {
+    let mut expected: Vec<(i64, i16)> = seen
+        .stock
+        .iter()
+        .map(|stock| (stock.id, stock.listing.bundles))
+        .collect();
+    expected.sort_unstable();
+    Ok(conn.transaction(|conn| -> QueryResult<bool> {
+        // A purchase takes this row first, so it waits for the close.
+        let meso: Option<i32> = hired_merchants::table
+            .find(owner)
+            .select(hired_merchants::meso)
+            .for_update()
+            .first(conn)
+            .optional()?;
+        let held: Vec<(i64, i16)> = hired_merchant_items::table
+            .filter(hired_merchant_items::owner_id.eq(owner))
+            .select((hired_merchant_items::id, hired_merchant_items::bundles))
+            .order(hired_merchant_items::id)
+            .load(conn)?;
+        if meso != Some(seen.meso) || held != expected {
+            return Ok(false);
+        }
         if retrieved.items {
             diesel::delete(
                 hired_merchant_items::table.filter(hired_merchant_items::owner_id.eq(owner)),
@@ -450,9 +478,9 @@ pub fn close(player: &Player, retrieved: Retrieved, now: SystemTime) -> crate::R
                 ))
                 .execute(conn)?;
         }
-        write_player(conn, player)
-    })?;
-    Ok(())
+        write_player(conn, player)?;
+        Ok(true)
+    })?)
 }
 
 /// Close `owner`'s open merchant whose time ran out at `now`, keeping what

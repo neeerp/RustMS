@@ -13,6 +13,7 @@ mod family;
 mod guild_bbs;
 mod guilds;
 mod hazard;
+mod hired_merchant;
 mod later;
 mod loot;
 mod marriage;
@@ -36,6 +37,7 @@ mod wedding_gift;
 
 pub(crate) use wedding::leave_at_duey;
 
+use crate::actor::field_merchants::MerchantRequest;
 use crate::actor::registry::FieldRegistry;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
@@ -167,6 +169,10 @@ pub struct ClientActor {
     trade: Option<trade::Trade>,
     /// The player's own shop, or the one they visit.
     personal_shop: Option<personal_shop::PersonalShop>,
+    hired_merchant: Option<hired_merchant::MerchantRoom>,
+    /// The owners of the merchants the player asked to visit here and
+    /// hasn't been let into yet.
+    merchant_visits: Vec<i32>,
     /// Heracle asked for a new guild's name; only then is one founded.
     naming_guild: bool,
     /// The player's ticket into the party event they are in.
@@ -234,6 +240,8 @@ impl ClientActor {
             later: Vec::new(),
             trade: None,
             personal_shop: None,
+            hired_merchant: None,
+            merchant_visits: Vec::new(),
             naming_guild: false,
             event: None,
             wedding: None,
@@ -474,17 +482,22 @@ impl ClientActor {
             WorldAction::WeddingGift(request) => self.gift_request(request).await?,
             WorldAction::Rps(request) => self.rps_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
+            WorldAction::Trade(request) if self.hired_merchant.is_some() => {
+                self.merchant_room_request(request).await?
+            }
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
                 self.shop_room_request(request).await?
             }
             WorldAction::Trade(request) => self.trade_request(request).await?,
             WorldAction::Owl(_) if self.in_cash_shop => {}
             WorldAction::Owl(request) => self.owl_request(request).await?,
-            WorldAction::PersonalShop(request) => {
-                if !self.in_cash_shop {
-                    self.personal_shop_request(request).await?
-                }
+            WorldAction::PersonalShop(_) if self.in_cash_shop => {}
+            WorldAction::PersonalShop(request) if self.hired_merchant.is_some() => {
+                self.merchant_shop_request(request).await?
             }
+            WorldAction::PersonalShop(request) => self.personal_shop_request(request).await?,
+            WorldAction::HiredMerchant(_) if self.in_cash_shop => {}
+            WorldAction::HiredMerchant(request) => self.hired_merchant_request(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -803,6 +816,7 @@ impl ClientActor {
 
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_hired_merchant().await?;
         self.keep_mounts_off(map_id).await?;
         self.drop_beacon().await?;
         let staying = self.in_game()?.field.key == self.field_key(map_id);
@@ -875,6 +889,7 @@ impl ClientActor {
         self.close_door().await?;
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_hired_merchant().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
@@ -904,6 +919,7 @@ impl ClientActor {
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_hired_merchant().await?;
         // The shop can't answer a proposal (report b053).
         self.send_to_directory(DirectoryMessage::EnteredCashShop {
             from: self.client_id,
@@ -1612,11 +1628,8 @@ impl ClientActor {
             } => self.ship_warp(from_map, map_id, portal).await?,
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::PersonalShop { room, event } => self.shop_event(room, event).await?,
-            ServerMessage::HiredMerchant { event, .. } => {
-                if let crate::actor::field_merchants::MerchantEvent::Left(Some(mut packet)) = event
-                {
-                    self.send(&mut packet).await?;
-                }
+            ServerMessage::HiredMerchant { owner, event } => {
+                self.merchant_event(owner, event).await?
             }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
             ServerMessage::QuestDrop {
@@ -1702,13 +1715,26 @@ impl ClientActor {
                     .send(rejoin)
                     .await
                     .map_err(|_| RuntimeError::ChannelSend)?;
-                if !matches!(
+                // The new field reads the merchants back, but perhaps
+                // before this one opened or sold.
+                let merchant_news = matches!(
                     message,
-                    FieldMessage::Join { .. }
-                        | FieldMessage::Leave { .. }
-                        | FieldMessage::Trade { .. }
-                        | FieldMessage::PersonalShop { .. }
-                ) {
+                    FieldMessage::Merchant {
+                        request: MerchantRequest::Place { .. }
+                            | MerchantRequest::Settle { sale: Some(_), .. },
+                        ..
+                    }
+                );
+                if merchant_news
+                    || !matches!(
+                        message,
+                        FieldMessage::Join { .. }
+                            | FieldMessage::Leave { .. }
+                            | FieldMessage::Trade { .. }
+                            | FieldMessage::PersonalShop { .. }
+                            | FieldMessage::Merchant { .. }
+                    )
+                {
                     field
                         .tx
                         .send(message)
@@ -1717,7 +1743,8 @@ impl ClientActor {
                 }
                 // The trading room or shop died with the field.
                 self.abandon_trade().await?;
-                self.abandon_personal_shop().await
+                self.abandon_personal_shop().await?;
+                self.abandon_hired_merchant().await
             }
         }
     }
@@ -1810,6 +1837,9 @@ impl ClientActor {
             }
             if let Err(error) = self.leave_personal_shop().await {
                 warn!(self.client_id, %error, "Failed to close personal shop");
+            }
+            if let Err(error) = self.leave_hired_merchant().await {
+                warn!(self.client_id, %error, "Failed to leave hired merchant");
             }
             if !self.in_cash_shop {
                 let _ = self

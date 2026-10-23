@@ -288,7 +288,7 @@ impl ClientActor {
         self.refuse_purchase(result).await
     }
 
-    async fn refuse_purchase(&mut self, result: u8) -> Result<(), RuntimeError> {
+    pub(super) async fn refuse_purchase(&mut self, result: u8) -> Result<(), RuntimeError> {
         self.send(&mut build_buy_result(result)?).await?;
         self.unlock().await
     }

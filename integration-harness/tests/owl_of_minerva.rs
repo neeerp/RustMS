@@ -127,6 +127,15 @@ fn results(t: &Trace) -> (i32, Vec<(String, i32, String, i32, i32, i32, i32, u8,
     (item, rows)
 }
 
+/// Other tests' shops and merchants may sell shells too.
+#[allow(clippy::type_complexity)]
+fn ours(
+    rows: Vec<(String, i32, String, i32, i32, i32, i32, u8, u8)>,
+    owner: &str,
+) -> Vec<(String, i32, String, i32, i32, i32, i32, u8, u8)> {
+    rows.into_iter().filter(|row| row.0 == owner).collect()
+}
+
 async fn new_character(config: &HarnessConfig) -> i32 {
     let session = login_to_world_session(config).await.expect("first login");
     let id = session.character_id;
@@ -188,6 +197,7 @@ async fn the_owl_finds_a_shop_and_goes_there() {
     // A's shells turn up from the other room, and one Owl goes.
     let t = step(&mut b.connection, "shells", use_owl(SNAIL_SHELL)).await;
     let (item, rows) = results(&t);
+    let rows = ours(rows, &a.character_name);
     assert_eq!(item, SNAIL_SHELL);
     assert_eq!(rows.len(), 1, "{rows:?}");
     let (owner, map, title, bundles, per_bundle, price, room, channel, kind) = rows[0].clone();
@@ -217,6 +227,7 @@ async fn the_owl_finds_a_shop_and_goes_there() {
     assert!(t.quantities.is_empty() && t.removed.is_empty());
     let t = step(&mut b.connection, "cash shells", use_cash_owl(SNAIL_SHELL)).await;
     let (item, rows) = results(&t);
+    let rows = ours(rows, &a.character_name);
     assert_eq!((item, rows.len()), (SNAIL_SHELL, 1), "{rows:?}");
     assert_eq!(t.removed, [(CASH, 1)]);
 

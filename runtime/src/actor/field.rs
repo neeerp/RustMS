@@ -12,7 +12,7 @@ use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::actor::registry::MAP_NPC_OBJECT_ID_BASE;
 use crate::db::spawn_db;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
-use game::hired_merchant::HiredMerchant;
+use game::hired_merchant::{HiredMerchant, Stand};
 use game::mob_skill::{self, MobSkillEffect};
 use game::{wedding, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
@@ -954,13 +954,28 @@ impl FieldActor {
     fn handle_merchant(&mut self, from: ClientId, request: MerchantRequest) {
         let now = Instant::now();
         let wall = SystemTime::now();
-        if let MerchantRequest::Settle { owner, id, sale } = request {
-            let out = self.merchants.settle(owner, id, sale, wall);
+        if let MerchantRequest::Settle {
+            owner,
+            id,
+            sale,
+            refused,
+        } = request
+        {
+            let out = self.merchants.settle(owner, id, sale, refused, wall);
             self.deliver_trade(out);
             self.show_merchants();
             return;
         }
-        if !self.occupants.contains_key(&from) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        if let MerchantRequest::Stand { reply, hold } = request {
+            let (x, y) = (occupant.avatar.x, occupant.avatar.y);
+            let stand = self.merchant_stand(from, x, y);
+            if let Some(stand) = stand.as_ref().filter(|_| hold) {
+                self.merchants.hold_stand(from, stand.x, stand.y);
+            }
+            let _ = reply.send(stand);
             return;
         }
         let merchants = &mut self.merchants;
@@ -969,7 +984,7 @@ impl FieldActor {
                 merchant,
                 blacklist,
             } => {
-                merchants.place(*merchant, blacklist);
+                merchants.place(from, *merchant, blacklist);
                 Outbox::new()
             }
             MerchantRequest::Chat { text } => merchants.chat(from, &text),
@@ -978,7 +993,9 @@ impl FieldActor {
                 bundles,
                 reply,
             } => merchants.buy(from, index, bundles, reply, now),
-            MerchantRequest::Settle { .. } => unreachable!("settled above"),
+            MerchantRequest::Settle { .. } | MerchantRequest::Stand { .. } => {
+                unreachable!("answered above")
+            }
             MerchantRequest::Restock { stock, meso } => {
                 merchants.restock(from, stock, meso);
                 Outbox::new()
@@ -994,10 +1011,35 @@ impl FieldActor {
                 Outbox::new()
             }
             MerchantRequest::Reopen | MerchantRequest::Leave => merchants.leave(from, now),
+            MerchantRequest::Unseat { owner } => merchants.unseat(from, owner, now),
             MerchantRequest::Close { reply } => merchants.close(from, reply),
         };
         self.deliver_trade(out);
         self.show_merchants();
+    }
+
+    /// Where `from`, at (x, y), would set up a merchant: the ground under
+    /// them on a map with merchants, clear of the others and of the
+    /// personal shops.
+    fn merchant_stand(&self, from: ClientId, x: i16, y: i16) -> Option<Stand> {
+        if self.key.instance_id != 0 || !net::personal_shop::allowed_on(self.key.map_id) {
+            return None;
+        }
+        let (ground, foothold) = self.drops.foothold_below(x, y)?;
+        let shops = self
+            .occupants
+            .iter()
+            .filter(|(&id, o)| id != from && o.avatar.mini_room.is_some())
+            .map(|(_, o)| (o.avatar.x, o.avatar.y));
+        self.merchants
+            .clear_of(from, x, ground, shops)
+            .then_some(Stand {
+                channel_id: self.key.channel_id,
+                map_id: self.key.map_id,
+                x,
+                y: ground,
+                foothold,
+            })
     }
 
     /// Show everyone the merchants that came, changed or went, and read
