@@ -1328,6 +1328,22 @@ pub mod keys {
     /// The piles at the end of the Forests of Patience, with no room for
     /// what they give.
     pub const PATIENCE_FULL: &str = "patience.full";
+    /// Line 3's construction sites: Jake's tickets (`{price}` in mesos),
+    /// the Kerning City gate's choice of site, the box at each site's end
+    /// with no room for what it gives, and the way out.
+    pub const LINE3_JAKE_HELLO: &str = "line3.jake.hello";
+    pub const LINE3_JAKE_MENU: &str = "line3.jake.menu";
+    pub const LINE3_JAKE_SHORT: &str = "line3.jake.short";
+    pub const LINE3_JAKE_FULL: &str = "line3.jake.full";
+    pub const LINE3_GATE_MENU: &str = "line3.gate.menu";
+    pub const LINE3_GATE_SITE: &str = "line3.gate.site";
+    pub const LINE3_GATE_SUBWAY: &str = "line3.gate.subway";
+    pub const LINE3_GATE_TICKETS: &str = "line3.gate.tickets";
+    pub const LINE3_GATE_NO_TICKET: &str = "line3.gate.no_ticket";
+    pub const LINE3_CHEST_FULL: &str = "line3.chest.full";
+    pub const LINE3_EXIT_SAY: &str = "line3.exit.say";
+    pub const LINE3_EXIT_ASK: &str = "line3.exit.ask";
+    pub const LINE3_EXIT_STAY: &str = "line3.exit.stay";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2186,6 +2202,19 @@ mod tests {
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,
                 keys::PATIENCE_FULL,
+                keys::LINE3_JAKE_HELLO,
+                keys::LINE3_JAKE_MENU,
+                keys::LINE3_JAKE_SHORT,
+                keys::LINE3_JAKE_FULL,
+                keys::LINE3_GATE_MENU,
+                keys::LINE3_GATE_SITE,
+                keys::LINE3_GATE_SUBWAY,
+                keys::LINE3_GATE_TICKETS,
+                keys::LINE3_GATE_NO_TICKET,
+                keys::LINE3_CHEST_FULL,
+                keys::LINE3_EXIT_SAY,
+                keys::LINE3_EXIT_ASK,
+                keys::LINE3_EXIT_STAY,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");

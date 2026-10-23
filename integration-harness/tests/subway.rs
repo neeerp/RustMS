@@ -135,6 +135,8 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
 
     until_boarding(route).await;
     let t = step(c, &m, board).await;
+    assert_eq!(t.prompts, [(KERNING_CITY_GATE, 4)]);
+    let t = step(c, &m, answer(4, 1, Some(1))).await;
     assert_eq!(t.prompts, [(KERNING_CITY_GATE, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.warps, [route.waiting_room]);
