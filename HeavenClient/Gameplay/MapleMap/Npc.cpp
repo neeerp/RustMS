@@ -24,6 +24,8 @@
 
 #include <nlnx/nx.hpp>
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -32,7 +34,8 @@ namespace ms
 		constexpr int16_t QUEST_MARKER_HALF = 22;
 	}
 
-	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position) : MapObject(o)
+	Npc::Npc(int32_t id, int32_t o, bool fl, uint16_t f, bool cnt, Point<int16_t> position, bool en) :
+		MapObject(o), enabled(en)
 	{
 		std::string strid = std::to_string(id);
 		strid.insert(0, 7 - strid.size(), '0');
@@ -110,6 +113,12 @@ namespace ms
 	{
 		Point<int16_t> absp = phobj.get_absolute(viewx, viewy, alpha);
 
+		if (summoning)
+			summon_effect.draw(DrawArgument(absp), alpha);
+
+		if (!enabled)
+			return;
+
 		if (animations.count(stance))
 			animations.at(stance).draw(DrawArgument(absp, flip), alpha);
 
@@ -133,6 +142,9 @@ namespace ms
 	{
 		if (!active)
 			return phobj.fhlayer;
+
+		if (summoning && summon_effect.update())
+			summoning = false;
 
 		physics.move_object(phobj);
 		auto& player = Stage::get().get_player();
@@ -169,7 +181,10 @@ namespace ms
 
 			// An idle action plays once.
 			if (aniend && stance != "stand")
+			{
 				set_stance("stand");
+				special = false;
+			}
 		}
 
 		return phobj.fhlayer;
@@ -197,7 +212,7 @@ namespace ms
 
 	bool Npc::inrange(Point<int16_t> cursorpos, Point<int16_t> viewpos) const
 	{
-		if (!active)
+		if (!active || !enabled)
 			return false;
 
 		Point<int16_t> absp = get_position() + viewpos;
@@ -260,15 +275,48 @@ namespace ms
 
 		const std::string &name = actions[index];
 		set_stance(name);
+		special = index >= static_cast<int32_t>(actions.size()) - specials;
 
 		if (line >= 0 && line < static_cast<int32_t>(lines[name].size()))
 			speech.change_text(lines[name][line]);
 	}
 
+	void Npc::request_action(const std::string &name)
+	{
+		if (special)
+			return;
+
+		auto iter = std::find(actions.begin(), actions.end(), name);
+
+		if (iter == actions.end())
+			return;
+
+		NpcActionPacket(oid, static_cast<int8_t>(iter - actions.begin() + 2), 0).dispatch();
+		pending = true;
+	}
+
+	void Npc::set_enabled(bool en)
+	{
+		enabled = en;
+	}
+
+	void Npc::summon(bool en)
+	{
+		enabled = en;
+		summon_effect = nl::nx::effect["MapEff.img"][en ? "NpcSummon" : "NpcReturn"];
+		summoning = true;
+	}
+
+	bool Npc::is_enabled() const
+	{
+		return enabled;
+	}
+
 	void Npc::update_idle()
 	{
 		// Only the controller chooses, and everyone plays what comes back.
-		if (!control)
+		// A hidden NPC has nothing to show.
+		if (!control || !enabled)
 			return;
 
 		if (idle_cooldown > 0)

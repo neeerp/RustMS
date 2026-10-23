@@ -68,6 +68,8 @@ pub struct ForeignNpc {
     pub foothold: i16,
     pub rx0: i16,
     pub rx1: i16,
+    /// False hides the NPC: it is not drawn and takes no clicks.
+    pub enabled: bool,
 }
 
 pub fn build_spawn_npc(npc: &ForeignNpc) -> Result<Packet, NetworkError> {
@@ -106,8 +108,53 @@ fn write_npc(packet: &mut Packet, npc: &ForeignNpc) -> Result<(), NetworkError> 
     packet.write_short(npc.foothold)?;
     packet.write_short(npc.rx0)?;
     packet.write_short(npc.rx1)?;
-    packet.write_byte(1)?; // show on the minimap
+    packet.write_byte(if npc.enabled { 1 } else { 0 })?;
     Ok(())
+}
+
+/// Show the NPC with Effect/MapEff.img/NpcSummon, or hide it with NpcReturn,
+/// for everyone on the map. Keep its spawn's `enabled` the same for those
+/// who come later.
+pub fn build_npc_enabled(object_id: i32, enabled: bool) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NpcEnabled as i16)?;
+    packet.write_int(object_id)?;
+    packet.write_byte(if enabled { 1 } else { 0 })?;
+    Ok(packet)
+}
+
+/// The NPC's controller asks for the action called `name` with an NPC_ACTION
+/// request, unless the NPC is playing a special action or has no such action.
+pub fn build_npc_special_action(object_id: i32, name: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::NpcSpecialAction as i16)?;
+    packet.write_int(object_id)?;
+    packet.write_str_with_length(name)?;
+    Ok(packet)
+}
+
+/// A script an NPC runs from `start` to `end`, both YYYYMMDD and included.
+pub struct NpcScriptWindow<'a> {
+    pub npc_id: i32,
+    pub script: &'a str,
+    pub start: i32,
+    pub end: i32,
+}
+
+/// Adds script windows to NPCs for the rest of the client's session. When
+/// talked to, an NPC with a script open today asks the server; one without
+/// shows its own String/Npc.img line. The newest open window wins.
+pub fn build_set_npc_scriptable(windows: &[NpcScriptWindow]) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SetNpcScriptable as i16)?;
+    packet.write_byte(windows.len() as u8)?;
+    for window in windows {
+        packet.write_int(window.npc_id)?;
+        packet.write_str_with_length(window.script)?;
+        packet.write_int(window.start)?;
+        packet.write_int(window.end)?;
+    }
+    Ok(packet)
 }
 
 #[cfg(test)]
@@ -126,6 +173,7 @@ mod tests {
             foothold: 32,
             rx0: 1150,
             rx1: 1250,
+            enabled: true,
         }
     }
 
@@ -176,6 +224,66 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::NpcAction as i16);
         expect.int(1_000_000_001).byte(3).byte(0xff);
+        expect.end();
+    }
+
+    #[test]
+    fn a_hidden_npc_spawns_with_zero_last() {
+        let npc = ForeignNpc {
+            enabled: false,
+            ..foreign_npc(true)
+        };
+        let packet = build_spawn_npc(&npc).unwrap();
+
+        assert_eq!(packet.bytes.last(), Some(&0));
+    }
+
+    #[test]
+    fn npc_enabled_is_the_object_and_the_flag() {
+        let packet = build_npc_enabled(1_000_000_001, false).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcEnabled as i16);
+        expect.int(1_000_000_001).byte(0);
+        expect.end();
+    }
+
+    #[test]
+    fn npc_special_action_names_the_action() {
+        let packet = build_npc_special_action(1_000_000_001, "act1").unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcSpecialAction as i16);
+        expect.int(1_000_000_001).string("act1");
+        expect.end();
+    }
+
+    #[test]
+    fn set_npc_scriptable_lists_the_windows() {
+        let windows = [
+            NpcScriptWindow {
+                npc_id: 9000021,
+                script: "gaga",
+                start: 20261201,
+                end: 20261231,
+            },
+            NpcScriptWindow {
+                npc_id: 2100,
+                script: "sera",
+                start: 19000101,
+                end: 20790101,
+            },
+        ];
+        let packet = build_set_npc_scriptable(&windows).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SetNpcScriptable as i16).byte(2);
+        expect
+            .int(9000021)
+            .string("gaga")
+            .int(20261201)
+            .int(20261231);
+        expect.int(2100).string("sera").int(19000101).int(20790101);
         expect.end();
     }
 

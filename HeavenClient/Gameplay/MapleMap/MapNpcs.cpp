@@ -40,7 +40,10 @@ namespace ms
 			Optional<MapObject> npc = npcs.get(oid);
 
 			if (npc)
+			{
 				npc->makeactive();
+				static_cast<Npc *>(npc.get())->set_enabled(spawn.is_enabled());
+			}
 			else
 				npcs.add(spawn.instantiate(physics));
 		}
@@ -51,6 +54,14 @@ namespace ms
 
 			if (auto npc = npcs.get(oid))
 				static_cast<Npc *>(npc.get())->set_control(control);
+		}
+
+		for (; !summons.empty(); summons.pop())
+		{
+			auto [oid, enabled] = summons.front();
+
+			if (auto npc = npcs.get(oid))
+				static_cast<Npc *>(npc.get())->summon(enabled);
 		}
 
 		npcs.update(physics);
@@ -76,6 +87,17 @@ namespace ms
 	{
 		if (auto npc = npcs.get(oid))
 			static_cast<Npc *>(npc.get())->act(action, line);
+	}
+
+	void MapNpcs::summon(int32_t oid, bool enabled)
+	{
+		summons.emplace(oid, enabled);
+	}
+
+	void MapNpcs::request_action(int32_t oid, const std::string &name)
+	{
+		if (auto npc = npcs.get(oid))
+			static_cast<Npc *>(npc.get())->request_action(name);
 	}
 
 	void MapNpcs::clear()
@@ -121,7 +143,8 @@ namespace ms
 		{
 			Npc *npc = static_cast<Npc *>(map_object.second.get());
 
-			if (!npc || !npc->is_active() || !npc_reach::in_reach(position, npc->get_position()))
+			if (!npc || !npc->is_active() || !npc->is_enabled() ||
+				!npc_reach::in_reach(position, npc->get_position()))
 				continue;
 
 			if (!nearest || npc_reach::nearer(position, npc->get_position(), nearest->get_position()))

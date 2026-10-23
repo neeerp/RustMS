@@ -28,8 +28,8 @@
 
 namespace ms
 {
-	NpcSpawn::NpcSpawn(int32_t o, int32_t i, Point<int16_t> p, bool fl, uint16_t f) : oid(o), id(i), position(p),
-																					  flip(fl), fh(f)
+	NpcSpawn::NpcSpawn(int32_t o, int32_t i, Point<int16_t> p, bool fl, uint16_t f, bool en) : oid(o), id(i),
+		position(p), flip(fl), fh(f), enabled(en)
 	{}
 
 	int32_t NpcSpawn::get_oid() const
@@ -37,10 +37,15 @@ namespace ms
 		return oid;
 	}
 
+	bool NpcSpawn::is_enabled() const
+	{
+		return enabled;
+	}
+
 	std::unique_ptr<MapObject> NpcSpawn::instantiate(const Physics &physics) const
 	{
 		auto spawnposition = physics.get_y_below(position);
-		return std::make_unique<Npc>(id, oid, flip, fh, false, spawnposition);
+		return std::make_unique<Npc>(id, oid, flip, fh, false, spawnposition, enabled);
 	}
 
 	MobSpawn::MobSpawn(int32_t o, int32_t i, int8_t m, int8_t st, uint16_t f, uint16_t hf, bool ns, int8_t t,

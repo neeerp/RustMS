@@ -292,6 +292,30 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Show an NPC with Effect/MapEff.img/NpcSummon, or hide it with
+	// NpcReturn (FUN_006d59b0)
+	// Opcode: NPC_SPECIAL_ACTION_BYTE(261)
+	class NpcEnableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Ask the server for an NPC's action by name, which comes back as
+	// NPC_ACTION (FUN_006d590d)
+	// Opcode: NPC_SPECIAL_ACTION_STRING(262)
+	class NpcSpecialActionHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Give NPCs scripts for some dates, for the rest of the session
+	// (FUN_006deeb7)
+	// Opcode: SET_NPC_SCRIPTABLE(263)
+	class SetNpcScriptableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Drop an item on the stage
 	// Opcode: DROP_LOOT(268)
 	class DropLootHandler : public PacketHandler

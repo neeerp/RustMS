@@ -205,6 +205,9 @@ namespace ms
 		REMOVE_NPC = 258,
 		SPAWN_NPC_C = 259,
 		NPC_ACTION = 260,
+		NPC_SPECIAL_ACTION_BYTE = 261,
+		NPC_SPECIAL_ACTION_STRING = 262,
+		SET_NPC_SCRIPTABLE = 263,
 		SPAWN_HIRED_MERCHANT = 265,
 		DESTROY_HIRED_MERCHANT = 266,
 		UPDATE_HIRED_MERCHANT = 267,
@@ -358,6 +361,9 @@ namespace ms
 		emplace<REMOVE_NPC, RemoveNpcHandler>();
 		emplace<SPAWN_NPC_C, SpawnNpcControllerHandler>();
 		emplace<NPC_ACTION, NpcActionHandler>();
+		emplace<NPC_SPECIAL_ACTION_BYTE, NpcEnableHandler>();
+		emplace<NPC_SPECIAL_ACTION_STRING, NpcSpecialActionHandler>();
+		emplace<SET_NPC_SCRIPTABLE, SetNpcScriptableHandler>();
 		emplace<SPAWN_MOB, SpawnMobHandler>();
 		emplace<SPAWN_MOB_C, SpawnMobControllerHandler>();
 		emplace<MOB_MOVED, MobMovedHandler>();
