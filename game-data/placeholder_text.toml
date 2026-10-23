@@ -309,6 +309,8 @@
 "portal.mc_obstacle.blocked" = "[placeholder] Poisonous mushrooms block the way."
 "portal.mc_obstacle.used" = "[placeholder] The Poison Spore clears the way."
 "portal.mc_castle.blocked" = "[placeholder] Thorny vines block the way to the castle."
+"item.mc_spore.used" = "[placeholder] The Killer Mushroom Spore opens the way."
+"item.mc_thorns.removed" = "[placeholder] The Thorn Remover clears the path."
 "portal.time_lane.lost" = "[placeholder] Time twists around you, and you find yourself back where the lane began."
 "portal.disguise.no_permit" = "[placeholder] The forest is closed. You need an investigation permit to enter."
 "portal.secret_door.locked" = "[placeholder] This door is locked."

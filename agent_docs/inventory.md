@@ -618,6 +618,27 @@ others) and sends nothing. It shows CATCH_MONSTER_WITH_ITEM as the item's
 `Game.img/CatchSuccess` or `CatchFaild` for the Element Rock. The rules are
 `Character/CatchItemRules.h`; every line is in the skill chat colour.
 
+### Scripted items
+
+A scripted item (243xxxx) names a script in `spec/script`
+(`ConsumeSpec.script`). In the Use tab the client (v83 FUN_00a09b26, after
+the Writs of Solomon and before the map's item checks) waits for the last
+request and sends USE_SCRIPTED_ITEM (`0x4E`: tick, USE slot, item id). The
+handler (`world/scripted_item.rs`) checks that the player is alive and the
+item is in that slot, and the client actor runs `scripts::item` where the
+player stands (the last position they moved to). Every answer ends with the
+unlock. Two such items exist, both on the Mushroom Kingdom's way in, and
+both work only within 210 px of one portal, taking every one held (as
+Cosmic's item scripts do):
+
+| Item | Script | Where | What it does |
+|---|---|---|---|
+| Killer Mushroom Spore (2430014, quest 2318's reward) | `killarmush` | `106020300`, by `obstacle` | Sets marker 32500, after which `obstacle` lets the player by without a Poison Spore; a pink line |
+| Thorn Remover (2430015, given as quest 2324 starts) | `removethorns` | `106020400`, by `right00`, while 2324 is under way | Sets 2324's record to 1 (`Effect::QuestRecord`), which its `Check/1 infoex` asks for; the Secretary of Magic (1300004) then completes it (3300 EXP), which opens `gotocastle`; a pink line |
+
+Elsewhere nothing happens and the item is kept. The pink lines are
+placeholders (`item.mc_spore.used`, `item.mc_thorns.removed`).
+
 ### Vicious' Hammer and Vega's Spell
 
 Both come through USE_CASH_ITEM. Vicious' Hammer (5570000) sends the equip's
@@ -1577,6 +1598,12 @@ be taken, and the tooltip.
 mobs a catch takes; `catch_items` (integration) throws the perfume at a Hog
 out of reach, then beside it, and finds the Hog mount in its place. The
 client's `catch_items` test covers the lines.
+`net`'s scripted item handler covers the slot and item checks, and
+`net::scripts` what each script does near and far from its portal;
+`scripted_items` (integration) starts 2324 with the Secretary of Magic,
+uses both items away from and beside their portals, goes through
+`obstacle`, completes 2324 with her once the thorns are gone, goes over the
+castle wall, and after a relogin through `obstacle` again.
 `net`'s Miu Miu handler covers the item and map checks, one taken a call
 and Mu Mu's list; `miu_miu` (integration) calls him in Henesys, buys an
 apple, is refused in the Pig Farm mini dungeon, and finds one Miu Miu left.

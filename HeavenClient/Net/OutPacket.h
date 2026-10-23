@@ -117,6 +117,7 @@ namespace ms
 			USE_SUMMON_BAG = 75,
 			PET_FOOD = 76,
 			USE_MOUNT_FOOD = 77,
+			USE_SCRIPTED_ITEM = 78,
 			USE_CASH_ITEM = 79,
 			DEAD_PET = 80,
 			USE_CATCH_ITEM = 81,

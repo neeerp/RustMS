@@ -60,6 +60,7 @@ mod rearrange;
 mod ring;
 mod rps;
 mod script_portal;
+mod scripted_item;
 mod scroll;
 mod skill_macro;
 mod solomon;
@@ -147,6 +148,7 @@ pub use self::ring::{
 };
 pub use self::rps::RpsActionHandler;
 pub use self::script_portal::ChangeMapSpecialHandler;
+pub use self::scripted_item::ScriptedItemHandler;
 pub use self::scroll::UseUpgradeScrollHandler;
 pub use self::skill_macro::SkillMacroHandler;
 pub use self::solomon::{UseGachaExpHandler, UseSolomonItemHandler};

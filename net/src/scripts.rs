@@ -22,6 +22,18 @@ const SPLIT_ROAD: i32 = 106020400;
 const CASTLE_WALL_EDGE: i32 = 106020501;
 const CASTLE_EAST_GATE: i32 = 106021300;
 const POISON_SPORE: i32 = 4000507;
+/// Where the `obstacle` portal is, and the scripted items that open the
+/// way past it for good (`killarmush`) and over the castle wall
+/// (`removethorns`, quest 2324).
+const DEEP_INSIDE: i32 = 106020300;
+const KILLER_MUSHROOM_SPORE: i32 = 2430014;
+const THORN_REMOVER: i32 = 2430015;
+const THORN_REMOVER_QUEST: i16 = 2324;
+/// Set once a Killer Mushroom Spore opened the `obstacle` portal (Cosmic
+/// starts the unknown quest 100202).
+const OBSTACLE_OPENED: i16 = 32500;
+/// How near a scripted item's portal the player must stand.
+const ITEM_REACH: f64 = 210.0;
 /// Kerning City's subway: Line 1's first area, and its second, where the
 /// construction site's tunnel comes out.
 const LINE_1_AREA_1: i32 = 103000101;
@@ -333,6 +345,12 @@ pub enum Effect {
     GainExp(i32),
     StartQuest(i16),
     CompleteQuest(i16),
+    /// Set a started quest's own record to `count`, toward its completion
+    /// (`QuestTemplate::end_record`); nothing is applied unless it is started.
+    QuestRecord {
+        quest_id: i16,
+        count: u16,
+    },
     Warp(i32),
     /// To a map's portal by id, rather than its first spawn point.
     WarpToPortal(i32, u8),
@@ -577,6 +595,61 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
     }
 }
 
+/// What the scripted item with `script` (243xxxx `spec/script`) does when
+/// `player`, standing `at`, uses it. Each works near one portal of one map
+/// and takes every one the player holds; elsewhere nothing happens. `None`
+/// if the script is unknown.
+pub fn item(script: &str, player: &Player, at: (i16, i16)) -> Option<Vec<Effect>> {
+    let near = |map_id: i32, portal: &str| {
+        player.stats.map_id == map_id
+            && crate::game_data::get()
+                .ok()
+                .and_then(|data| data.field(map_id))
+                .and_then(|field| field.portal_by_name(portal))
+                .is_some_and(|portal| {
+                    let dx = f64::from(portal.x) - f64::from(at.0);
+                    let dy = f64::from(portal.y) - f64::from(at.1);
+                    dx.hypot(dy) < ITEM_REACH
+                })
+    };
+    let all = |item_id: i32| Effect::TakeItem {
+        item_id,
+        quantity: i16::try_from(player.inventory.count(item_id)).unwrap_or(i16::MAX),
+    };
+    let pink = |key: &str| Effect::Pink(content::text().get(key, &[]));
+    match script {
+        // The Killer Mushroom Spore (2430014), beside the poisonous
+        // mushrooms: the `obstacle` portal lets the player by from now on.
+        "killarmush" if near(DEEP_INSIDE, "obstacle") => {
+            let mut effects = Vec::new();
+            if player.quests.state(OBSTACLE_OPENED) == QuestState::NotStarted {
+                effects.push(Effect::Mark(OBSTACLE_OPENED));
+            }
+            effects.extend([all(KILLER_MUSHROOM_SPORE), pink(keys::MC_SPORE_USED)]);
+            Some(effects)
+        }
+        // The Thorn Remover (2430015), beside the castle wall's thorns
+        // while quest 2324 is under way: its record turns to "1", which
+        // its `Check/1 infoex` asks for, so the Secretary of Magic
+        // (1300004) can complete it; that opens `gotocastle`.
+        "removethorns"
+            if player.quests.state(THORN_REMOVER_QUEST) == QuestState::Started
+                && near(SPLIT_ROAD, "right00") =>
+        {
+            Some(vec![
+                Effect::QuestRecord {
+                    quest_id: THORN_REMOVER_QUEST,
+                    count: 1,
+                },
+                all(THORN_REMOVER),
+                pink(keys::MC_THORNS_REMOVED),
+            ])
+        }
+        "killarmush" | "removethorns" => Some(Vec::new()),
+        _ => None,
+    }
+}
+
 /// A touch portal's script. `None` if the script is unknown.
 pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
     let quest = |id: i16| player.quests.state(id);
@@ -685,6 +758,10 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::Warp(MUSHROOM_FOREST_FIELD))
         }
         "TD_MC_first" => refused(keys::MC_FIRST_BLOCKED),
+        // Opened for good by a Killer Mushroom Spore (`item`).
+        "obstacle" if quest(OBSTACLE_OPENED) != QuestState::NotStarted => through(
+            Effect::WarpToPortal(SPLIT_ROAD, named(SPLIT_ROAD, "left00")),
+        ),
         // A Poison Spore clears the poisonous mushrooms in the way.
         "obstacle" if player.inventory.count(POISON_SPORE) > 0 => ScriptOutcome {
             effects: vec![
@@ -1429,6 +1506,90 @@ mod tests {
             effects.last(),
             Some(Effect::WarpToPortal(106020400, _))
         ));
+    }
+
+    /// Where `map_id`'s portal `name` is, as a player position.
+    fn at_portal(map_id: i32, name: &str) -> (i16, i16) {
+        let data = crate::game_data::get().unwrap();
+        let portal = data.field(map_id).unwrap().portal_by_name(name).unwrap();
+        (portal.x as i16, portal.y as i16)
+    }
+
+    #[test]
+    fn a_killer_mushroom_spore_opens_the_obstacle_for_good() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = DEEP_INSIDE;
+        player.inventory.insert(
+            InventoryType::Use,
+            1,
+            game::Item::stack(KILLER_MUSHROOM_SPORE, 2),
+        );
+        let (x, y) = at_portal(DEEP_INSIDE, "obstacle");
+        let effects = item("killarmush", &player, (x - 150, y - 100)).unwrap();
+        assert!(matches!(
+            &effects[..],
+            [
+                Effect::Mark(OBSTACLE_OPENED),
+                Effect::TakeItem {
+                    item_id: KILLER_MUSHROOM_SPORE,
+                    quantity: 2,
+                },
+                Effect::Pink(_),
+            ]
+        ));
+        // Too far, or on another map, nothing happens.
+        assert_eq!(
+            item("killarmush", &player, (x - 150, y - 150)),
+            Some(vec![])
+        );
+        player.stats.map_id = SPLIT_ROAD;
+        assert_eq!(item("killarmush", &player, (x, y)), Some(vec![]));
+
+        // Once opened, the portal lets the player by without a spore, and
+        // another spore doesn't mark it again.
+        player.stats.map_id = DEEP_INSIDE;
+        player.quests.mark(OBSTACLE_OPENED);
+        assert!(matches!(
+            item("killarmush", &player, (x, y)).unwrap()[..],
+            [Effect::TakeItem { .. }, Effect::Pink(_)]
+        ));
+        assert_eq!(
+            portal("obstacle", &player).unwrap().effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(SPLIT_ROAD, named(SPLIT_ROAD, "left00")),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_thorn_remover_sets_its_quests_record_by_the_castle_wall() {
+        let mut player = player_with(&[(THORN_REMOVER_QUEST, QuestState::Started)]);
+        player.stats.map_id = SPLIT_ROAD;
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, game::Item::stack(THORN_REMOVER, 1));
+        let (x, y) = at_portal(SPLIT_ROAD, "right00");
+        let effects = item("removethorns", &player, (x, y)).unwrap();
+        assert!(matches!(
+            &effects[..],
+            [
+                Effect::QuestRecord {
+                    quest_id: THORN_REMOVER_QUEST,
+                    count: 1,
+                },
+                Effect::TakeItem {
+                    item_id: THORN_REMOVER,
+                    quantity: 1,
+                },
+                Effect::Pink(_),
+            ]
+        ));
+        assert_eq!(item("removethorns", &player, (x + 210, y)), Some(vec![]));
+        let mut done = player_with(&[(THORN_REMOVER_QUEST, QuestState::Completed)]);
+        done.stats.map_id = SPLIT_ROAD;
+        assert_eq!(item("removethorns", &done, (x, y)), Some(vec![]));
+        assert_eq!(item("nosuchscript", &done, (x, y)), None);
     }
 
     #[test]

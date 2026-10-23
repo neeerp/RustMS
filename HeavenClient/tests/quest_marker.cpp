@@ -140,6 +140,36 @@ int main()
 		require(pet_stop(5000066) == ms::QuestStop::WRONG_PET, "a pet not listed stops it");
 		require(pet_stop(5000001) == ms::QuestStop::NONE, "a listed pet completes it");
 		hunt.end_pets.clear();
+		// Check/1/infoex on a quest's record (FUN_00721d2c): the Thorn
+		// Remover makes 2324's own "001", which is at least "1".
+		ms::QuestInfo walls = quest(2324, 1300004, 1300004);
+		walls.end_info_record = 2324;
+		walls.end_info = {{1, "1"}};
+		std::string record;
+		auto info_stop = [&](const std::string* held) {
+			return ms::completion_stop(walls, 1300004, [](int16_t) { return 1; }, [](int32_t) { return 0; },
+				std::string(), 0, 0, held);
+		};
+		auto walls_marker = [&]() {
+			return ms::select_quest_marker(1300004, 0, {walls}, [](int16_t) { return 1; }, 30,
+				[](int32_t) { return 0; }, [&](int16_t id) { return id == 2324 ? record : std::string(); },
+				[](const ms::QuestInfo&) { return true; });
+		};
+		require(info_stop(nullptr) == ms::QuestStop::INFO, "a record not started stops it");
+		require(info_stop(&record) == ms::QuestStop::INFO, "an empty record counts as 0");
+		require(std::string(ms::stop_reason(ms::QuestStop::INFO)) == "info", "and shows stop/info");
+		require(walls_marker() == QuestMarker::IN_PROGRESS, "the NPC shows it under way");
+		record = "001";
+		require(info_stop(&record) == ms::QuestStop::NONE, "the count completes it");
+		require(walls_marker() == QuestMarker::READY, "and the NPC shows it ready");
+		walls.end_info = {{2, "0"}, {0, "abc"}};
+		require(info_stop(&record) == ms::QuestStop::INFO, "cond 2 is at most the value, cond 0 equal");
+		record = "abc";
+		require(info_stop(&record) == ms::QuestStop::NONE, "one entry holding is enough");
+		// Meren's 6029 names no record; the server checks it.
+		walls.end_info_record = 0;
+		walls.end_info = {{0, "111"}};
+		require(info_stop(nullptr) == ms::QuestStop::NONE, "infoex without infoNumber is the server's");
 		// Start requirements on what the player holds (FUN_00721163): worn
 		// copies count once, 0 means none, and a negative count is a maximum.
 		ms::QuestInfo mirror = quest(1000, 2101, 2101);

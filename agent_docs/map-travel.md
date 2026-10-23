@@ -243,8 +243,8 @@ nothing. A script returns effects that the client actor sends:
 | `halloween_enter` | The Haunted House's gate: portal sound, warp to `682000100` portal `st00` |
 | `photoOut`, `StudioZone_Out`, `outBabyBird` | An event map's exit: portal sound, back to where its invitation was used (else Henesys), forget it |
 | `TD_MC_first` | The Empty House's (`100000002`) way to the Mushroom Kingdom: portal sound, warp to `106020000`, once 2260 is completed or any of 2300-2310 is taken; else a pink line |
-| `obstacle` | The poisonous mushrooms on `106020300`: with a Poison Spore (`4000507`), a pink line, portal sound, take one, warp to `106020400` portal `left00`; else a pink line |
-| `gotocastle` | Split Road of Destiny's way over the castle wall: portal sound, warp to `106020501`, once 2324 is completed; else a pink line |
+| `obstacle` | The poisonous mushrooms on `106020300`: once a Killer Mushroom Spore opened them (marker 32500, see `inventory.md`, "Scripted items"), portal sound, warp to `106020400` portal `left00`; with a Poison Spore (`4000507`), a pink line, portal sound, take one, the same warp; else a pink line |
+| `gotocastle` | Split Road of Destiny's way over the castle wall: portal sound, warp to `106020501`, once 2324 is completed (with the Secretary of Magic, after the Thorn Remover); else a pink line |
 | `TD_MC_jump` | Portal sound, warp to `106020501` |
 | `TD_MC_Egate` | Portal sound, warp to `106021300` portal `right00` |
 | `subway_in2` | Kerning City's ticketing booth (`103000100` `in00`) into the tunnels: portal sound, warp to `103000101` portal `out00` |

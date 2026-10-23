@@ -113,6 +113,9 @@ pub enum RecvOpcode {
     UseSummonBag = 0x4B,
     PetFood = 0x4C,
     UseMountFood = 0x4D,
+    /// A scripted item (243xxxx) used from the Use tab (FUN_00a09b26): the
+    /// tick, its slot and the item.
+    UseScriptedItem = 0x4E,
     UseCashItem = 0x4F,
     /// A doll that can't be revived (FUN_00a240a2), before the client
     /// offers the Cash Shop.

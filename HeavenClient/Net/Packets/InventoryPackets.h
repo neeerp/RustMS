@@ -542,6 +542,20 @@ namespace ms
 		}
 	};
 
+	// Uses the scripted item (243xxxx) in USE slot `slot`; the server runs
+	// its script where the player stands, v83 FUN_00a09b26 (report c083)
+	// Opcode: USE_SCRIPTED_ITEM(78)
+	class UseScriptedItemPacket : public OutPacket
+	{
+	public:
+		UseScriptedItemPacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_SCRIPTED_ITEM)
+		{
+			write_time();
+			write_short(slot);
+			write_int(itemid);
+		}
+	};
+
 	// Requests throwing the catch item (227xxxx) in a USE slot at the mob
 	// `oid`, found within the item's area, v83 FUN_00a09bdf
 	// Opcode: USE_CATCH_ITEM(81)

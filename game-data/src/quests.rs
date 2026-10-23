@@ -74,6 +74,12 @@ const INFO_KEYS: &[&str] = &["info", "infoNumber", "infoex"];
 pub const EXPLORER_QUESTS: &[i16] = &[
     29004, 29005, 29006, 29007, 29008, 29009, 29010, 29011, 29014,
 ];
+/// Quests that complete once their own record reaches a count
+/// (`Check/1/infoNumber` is the quest itself, one `infoex` entry, cond 1):
+/// "Over the Castle Walls (4)" (2324), whose Thorn Remover sets it. The
+/// server keeps the count as the record's only "kill"; see
+/// [`QuestTemplate::end_record`].
+pub const OWN_RECORD_QUESTS: &[i16] = &[2324];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -188,6 +194,8 @@ pub struct QuestTemplate {
     pub auto_complete: bool,
     /// An explorer medal's count: its info record and the maps it needs.
     pub explored: Option<Explored>,
+    /// The count its own record must reach (`OWN_RECORD_QUESTS`).
+    pub end_record: Option<u16>,
 }
 
 /// What an explorer medal (`EXPLORER_QUESTS`) counts toward.
@@ -358,7 +366,7 @@ impl QuestCatalog {
                     keys.skill_keys.extend(child_names(&nx, skill)?);
                 }
             }
-            if EXPLORER_QUESTS.contains(&id) {
+            if EXPLORER_QUESTS.contains(&id) || OWN_RECORD_QUESTS.contains(&id) {
                 if let Some(keys) = &mut keys.end_check {
                     keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
                 }
@@ -491,6 +499,15 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             None => false,
         })
     };
+    let end_record = if OWN_RECORD_QUESTS.contains(&id) {
+        let record = explored(nx, end)?;
+        if record.record != id || !end_mobs.is_empty() {
+            return Err(invalid("own-record quest with another record or mobs"));
+        }
+        Some(u16::try_from(record.needed).map_err(|_| invalid("record count too large"))?)
+    } else {
+        None
+    };
     let explored = if EXPLORER_QUESTS.contains(&id) {
         Some(explored(nx, end)?)
     } else {
@@ -530,6 +547,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         auto_start: flag("autoStart")?,
         auto_complete: flag("autoComplete")?,
         explored,
+        end_record,
     })
 }
 
@@ -923,6 +941,11 @@ mod tests {
         );
         let nina = catalog.quest(1032).unwrap();
         assert_eq!(nina.next_quest, Some(1033));
+        let walls = catalog.quest(2324).unwrap();
+        assert_eq!(
+            (walls.end_npc, walls.end_record, walls.exp),
+            (1300004, Some(1), 3300)
+        );
         let sen = catalog.quest(1033).unwrap();
         assert_eq!(
             sen.start.quests,

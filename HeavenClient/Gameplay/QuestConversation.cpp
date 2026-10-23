@@ -76,11 +76,12 @@ namespace ms
 				const Inventory& inventory = player().get_inventory();
 				const auto& started = player().get_quests().started_quests();
 				auto progress = started.find(quest.id);
+				auto record = started.find(quest.end_info_record);
 
 				return ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
 					[&](int32_t id) { return inventory.get_total_item_count(id); },
 					progress == started.end() ? std::string() : progress->second, inventory.get_meso(),
-					player().first_pet());
+					player().first_pet(), record == started.end() ? nullptr : &record->second);
 			}
 
 			// Whether a quest item given at the start is no longer held, worn

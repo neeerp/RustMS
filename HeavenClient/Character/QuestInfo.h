@@ -50,6 +50,11 @@ namespace ms
 		std::vector<std::pair<int16_t, int16_t>> end_prerequisites;
 		// Mesos to hold to complete (Check/1/endmeso).
 		int32_t end_meso = 0;
+		// The quest whose record (its data string) Check/1/infoex looks at
+		// (Check/1/infoNumber, 0 for none), and the entries, (cond, value),
+		// of which one must hold.
+		int16_t end_info_record = 0;
+		std::vector<std::pair<int32_t, std::string>> end_info;
 		// Items given when the quest starts: (item id, count).
 		std::vector<std::pair<int32_t, int32_t>> start_items;
 		// Mobs to kill before completing: (mob id, count).

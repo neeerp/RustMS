@@ -271,6 +271,10 @@ pub struct ConsumeSpec {
     /// the map too (`party`): the Carnival and Dojo party potions
     /// 2022160-63 and 2022430-33.
     pub party: bool,
+    /// The script a scripted item (243xxxx) runs where it is used
+    /// (`script`): `killarmush` for the Killer Mushroom Spore 2430014,
+    /// `removethorns` for the Thorn Remover 2430015.
+    pub script: Option<String>,
 }
 
 impl ConsumeSpec {
@@ -597,6 +601,7 @@ impl ItemData {
                 morph_random,
                 consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
                 party: nx.int_child(spec, "party")?.unwrap_or(0) != 0,
+                script: nx.string_child(spec, "script")?,
             });
         }
         if item_id / 10_000 == 210 {

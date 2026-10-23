@@ -193,6 +193,13 @@ v83. Only a forfeited and restarted 6029 differs: its classes stay done.
 skill action. Its Evan entry (20011007) has no `job` list, so it teaches
 no one; v83 has no Evan skills, and the crystal test teaches level 2 anyway.
 The class end scripts (`q6030e`-`q6032e`) complete the class.
+
+"Over the Castle Walls (4)" (2324, `OWN_RECORD_QUESTS`) needs its own record
+to reach `infoex/0/value` (cond 1). The server keeps that count as the
+record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
+so it is saved and sent as its progress string ("001"). The Thorn Remover the
+quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
+items"), and the Secretary of Magic (1300004) then completes the quest.
 Meren's crystal test (6033, level 75, a level 75 crystal shown) and the
 Gold Anvil (6036, level 105, after the paper 6035; the anvil is taken)
 carry no rewards in the data; their scripts (`q6033e`, `q6036e`) teach
@@ -280,8 +287,13 @@ the v83ref notes):
   yes/no. Yes sends start and closes; No shows the `no` pages. No pages at
   all sends start at once.
 - **Completion** (`/1`): before anything is said, `Check/1` is checked in
-  v83's order (NPC, items, quests, kills; `completion_stop` in
-  `QuestMarker.h`). A failure shows `stop/<npc|item|quest|mob>`, else
+  v83's order (NPC, items, quests, info, kills; `completion_stop` in
+  `QuestMarker.h`). The info check (`end_info_met`) reads the started
+  record `infoNumber` names and needs one `infoex` entry to hold (cond 0
+  equal, 1 at least, 2 at most, as numbers), so an explorer medal short of
+  its places or 2324 before the Thorn Remover shows `stop/info`; entries
+  without an `infoNumber` (6029) are left to the server. A failure shows
+  `stop/<npc|item|quest|info|mob>`, else
   `stop/default`, else the NPC's own `String/Npc.img/<npc>/d0`, and sends
   nothing. At the wrong NPC, `lost` replaces `stop/npc` when a quest item
   given at the start (`Act/0/item`) is no longer held or worn. Otherwise

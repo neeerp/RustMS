@@ -1387,6 +1387,9 @@ namespace ms
 							use_owl(slot, item_id);
 						else if (item_id / 10000 == 237)
 							use_solomon_writ(slot, item_id);
+						// v83 0x4f085b: the server runs its script (FUN_00a09b26).
+						else if (item_id / 10000 == 243)
+							Stage::get().get_player().request(UseScriptedItemPacket(slot, item_id), ExclRequest::WAIT);
 						else if (marriage::is_ring_box(item_id))
 							MarriageActions::propose(item_id);
 						else if (item_id / 10000 == 226)

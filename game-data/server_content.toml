@@ -470,6 +470,8 @@ unsourced = [
     "portal.mc_obstacle.blocked",
     "portal.mc_obstacle.used",
     "portal.mc_castle.blocked",
+    "item.mc_spore.used",
+    "item.mc_thorns.removed",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",
     "portal.secret_door.locked",
