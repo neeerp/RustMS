@@ -608,6 +608,18 @@ mod tests {
     }
 
     #[test]
+    fn the_trial_grounds_monsters_are_all_there() {
+        let Some(path) = crate::test_assets::path("Mob.nx") else {
+            return;
+        };
+        let data = MobData::load(path).unwrap();
+        // The Cornians, Wyverns and Skelegons of Horntail's party quest.
+        for mob in 9300065..=9300078 {
+            assert!(data.info(mob).unwrap().is_some(), "{mob}");
+        }
+    }
+
+    #[test]
     fn reads_numbers_stored_as_strings() {
         let Some(path) = crate::test_assets::path("Mob.nx") else {
             return;

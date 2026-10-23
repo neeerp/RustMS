@@ -2,8 +2,9 @@
 
 The way to Horntail in Leafre's Cave of Life, after Cosmic. Built so far:
 the quests, the doors, the ways out, the expedition into the cave, its
-two trials, the fight and its win. The Horntail party quest is still to
-come. The slice
+two trials, the fight and its win. The Horntail party quest, on the
+Trial Grounds before the slate, is in
+[party-quests](./party-quests.md) ("Horntail's Trial Grounds"). The slice
 plan and its open questions are in v83ref's `reports/a115-horntail.md`; the
 defaults shipped are under "a115" in `lanes/QUESTIONS.md`.
 

@@ -40,7 +40,10 @@ impl ClientActor {
                 Some(self.papulatus_portal().await?)
             }
             (Some(script), Some(portal)) => match self.opq_portal(script, portal).await? {
-                None => self.zpq_portal(script)?,
+                None => match self.zpq_portal(script)? {
+                    None => self.htpq_portal(script).await?,
+                    effects => effects,
+                },
                 effects => effects,
             },
             _ => None,

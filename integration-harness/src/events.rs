@@ -10,7 +10,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, HPQ, KPQ, LPQ, OPQ, ZPQ};
+use net::events::{Event, HPQ, HTPQ, KPQ, LPQ, OPQ, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -30,6 +30,8 @@ pub const WONKY: i32 = 2013000;
 pub const EAK: i32 = 2013001;
 pub const ADOBIS: i32 = 2030008;
 pub const AURA: i32 = 2032002;
+pub const HTPQ_KEEPER: i32 = 2083001;
+pub const CRYSTAL_OF_ROOTS: i32 = 2083002;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -258,6 +260,12 @@ pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// `enter_lpq` does; each needs a chief's approval for Zakum.
 pub async fn enter_zpq(team: &mut [WorldSession]) -> Vec<Trace> {
     enter_from_menu(team, &ZPQ, ADOBIS).await
+}
+
+/// The party's leader, first, takes it into Horntail's Trial Grounds from
+/// the gatekeeper, as `enter_lpq` does.
+pub async fn enter_htpq(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &HTPQ, HTPQ_KEEPER).await
 }
 
 /// The leader picks the first choice of `npc`'s menu in `event`'s lobby

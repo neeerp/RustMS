@@ -70,6 +70,7 @@ impl ClientActor {
             EventKind::Lpq => NpcScript::red_sign(entry),
             EventKind::Opq => NpcScript::wonky(entry),
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
+            EventKind::Htpq => NpcScript::htpq_gatekeeper(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -373,6 +374,35 @@ impl ClientActor {
         }))
     }
 
+    /// What the way into the Trial Grounds' rooms does for a member on
+    /// their first map (`scripts::htpq_into_rooms`). `None` for any other
+    /// portal.
+    pub(super) async fn htpq_portal(
+        &mut self,
+        script: &str,
+    ) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let in_htpq = self
+            .event
+            .as_ref()
+            .is_some_and(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Htpq);
+        if !in_htpq || script != scripts::HTPQ_INTO_ROOMS {
+            return Ok(None);
+        }
+        let holding_key = self
+            .in_game()?
+            .player
+            .inventory
+            .count(events::CRYSTAL_KEYS[0])
+            > 0;
+        let (reply, positions) = oneshot::channel();
+        self.send_to_field(FieldMessage::Positions { reply })
+            .await?;
+        // Only the event's members can be on its copy.
+        let alone = positions.await.map_or(true, |p| p.len() <= 1);
+        Ok(Some(scripts::htpq_into_rooms(alone, holding_key)))
+    }
+
     /// The way to Papulatus: the directory says whether the player's party
     /// may go in.
     pub(super) async fn papulatus_portal(&mut self) -> Result<Vec<Effect>, RuntimeError> {
@@ -651,7 +681,7 @@ impl ClientActor {
         let event = ticket.kind.event();
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
-        let no_exp = zakum || ticket.kind == EventKind::Horntail;
+        let no_exp = zakum || matches!(ticket.kind, EventKind::Horntail | EventKind::Htpq);
         let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
             events::ZPQ_DOCUMENTS_EXP
         } else {
