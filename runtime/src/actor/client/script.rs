@@ -35,11 +35,14 @@ impl ClientActor {
             .and_then(|field| field.portal_by_name(portal))
             .cloned();
         let script = template.as_ref().and_then(|portal| portal.script.clone());
-        let opq = match (&script, &template) {
-            (Some(script), Some(portal)) => self.opq_portal(script, portal).await?,
+        let in_event = match (&script, &template) {
+            (Some(script), Some(portal)) => match self.opq_portal(script, portal).await? {
+                None => self.zpq_portal(script)?,
+                effects => effects,
+            },
             _ => None,
         };
-        if let Some(effects) = opq {
+        if let Some(effects) = in_event {
             self.apply_effects(&effects).await?;
         } else if let Some(script) = script.filter(|s| !self.blocked_scripts.contains(s)) {
             match scripts::portal(&script, &self.in_game()?.player) {

@@ -8,8 +8,8 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck, Standing,
-    Statue,
+    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck,
+    Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
@@ -1256,6 +1256,18 @@ impl NpcScript {
         wonky(entry)
     }
 
+    /// Adobis at the Door to Zakum, for a player whose party may or may not
+    /// go into the Dead Mine.
+    pub fn adobis(entry: Entry, player: &Player) -> Self {
+        adobis(entry, player)
+    }
+
+    /// Aura on the Dead Mine's hub, to `player`, who stands with her as
+    /// `view`.
+    pub fn aura(view: Aura, player: &Player) -> Self {
+        aura(view, player)
+    }
+
     /// The balloon that clears `hand_in`'s stage, to `player`, who stands
     /// with it as `view`.
     pub fn balloon(hand_in: &HandIn, view: Balloon, player: &Player) -> Self {
@@ -1402,7 +1414,7 @@ impl NpcScript {
             return Some(fourth_job_instructor(line, player));
         }
         match npc_id {
-            ADOBIS => return Some(adobis(player)),
+            ALI => return Some(ali()),
             LIRA => return Some(lira()),
             AMON => return Some(amon(player)),
             JAKE => return Some(jake(player)),
@@ -5503,7 +5515,11 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
 /// The lowest level a chief approves for Zakum, and Adobis warns of the
 /// trials (upstream).
 const ZAKUM_LEVEL: u8 = 50;
-const ADOBIS: i32 = 2030008;
+pub const ADOBIS: i32 = 2030008;
+pub const AURA: i32 = 2032002;
+/// In the Room of Tragedy, 280090000, where those who die or come back to
+/// the game inside the Dead Mine land.
+const ALI: i32 = 2030011;
 const LIRA: i32 = 2032003;
 const AMON: i32 = 2030010;
 /// From the Dead Mine (stage 1), for the Breath of Lava.
@@ -5542,7 +5558,7 @@ fn zakum_approval(player: &Player) -> Vec<Page> {
 /// the trials. The Dead Mine (stage 1) is not built yet; the Breath of
 /// Lava takes its Fire Ore, and the forge turns both trials' items and 30
 /// Gold Teeth into five Eyes of Fire.
-fn adobis(player: &Player) -> NpcScript {
+fn adobis(entry: Entry, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(ADOBIS, Vec::new());
     if !zakum_approved(player) {
         let key = if player.stats.level >= ZAKUM_LEVEL {
@@ -5585,15 +5601,121 @@ fn adobis(player: &Player) -> NpcScript {
             ],
         }
     };
+    let mine = match entry {
+        Entry::NoParty => Page::End(text(keys::ZAKUM_ADOBIS_MINE_NO_PARTY)),
+        Entry::NotLeader => Page::End(text(keys::ZAKUM_ADOBIS_MINE_NOT_LEADER)),
+        Entry::NotEligible => Page::End(event_terms(
+            &events::ZPQ,
+            keys::ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE,
+        )),
+        Entry::Busy => Page::End(text(keys::ZAKUM_ADOBIS_MINE_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Zpq)]),
+    };
     script.pages = vec![Page::Menu {
         text: text(keys::ZAKUM_ADOBIS_MENU),
         choices: vec![
+            (text(keys::ZAKUM_ADOBIS_MINE_CHOICE), vec![mine]),
             (text(keys::ZAKUM_ADOBIS_LAVA_CHOICE), vec![lava]),
             (text(keys::ZAKUM_ADOBIS_FORGE_CHOICE), vec![forge]),
         ],
     }];
     script.inventory_full = Some(text(keys::ZAKUM_ADOBIS_FORGE_FULL));
+    // Someone left or moved since he checked, or another party went in.
+    script.refused = Some(event_terms(
+        &events::ZPQ,
+        keys::ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE,
+    ));
     script
+}
+
+/// Aura (Cosmic `2032002`). Before the win: what the mine asks, the
+/// leader's hand-in of the Fire Ore, which with 30 documents wins more
+/// (`EventCommand::WinWithDocuments`), and a way out for anyone. After it,
+/// each member's share once: a piece of the Fire Ore, and with the
+/// documents five of the mine's return scrolls.
+fn aura(view: Aura, player: &Player) -> NpcScript {
+    let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+    let mut script = NpcScript::new(AURA, Vec::new());
+    match view {
+        Aura::Playing { leader } => {
+            let documents = player.inventory.count(events::ZPQ_DOCUMENT)
+                >= i32::from(events::ZPQ_DOCUMENTS_WANTED);
+            let hand_in = if !leader {
+                Page::End(text(keys::ZAKUM_AURA_LEADER_ONLY))
+            } else if !holds(player, events::FIRE_ORE) {
+                Page::End(text(keys::ZAKUM_AURA_NEED_ORE))
+            } else if documents {
+                Page::Ask {
+                    text: text(keys::ZAKUM_AURA_ASK_DOCUMENTS),
+                    on_yes: vec![
+                        take(events::FIRE_ORE, 1),
+                        take(events::ZPQ_DOCUMENT, events::ZPQ_DOCUMENTS_WANTED),
+                        Effect::EventCommand(EventCommand::WinWithDocuments),
+                    ],
+                    on_no: None,
+                }
+            } else {
+                Page::Ask {
+                    text: text(keys::ZAKUM_AURA_ASK),
+                    on_yes: vec![
+                        take(events::FIRE_ORE, 1),
+                        Effect::EventCommand(EventCommand::ClearStage(1)),
+                    ],
+                    on_no: None,
+                }
+            };
+            let out = Page::Ask {
+                text: text(keys::ZAKUM_AURA_OUT_ASK),
+                on_yes: vec![Effect::Warp(events::ZPQ.exit)],
+                on_no: None,
+            };
+            script.pages = vec![Page::Menu {
+                text: text(keys::ZAKUM_AURA_MENU),
+                choices: vec![
+                    (
+                        text(keys::ZAKUM_AURA_ABOUT_CHOICE),
+                        vec![Page::End(text(keys::ZAKUM_AURA_ABOUT))],
+                    ),
+                    (text(keys::ZAKUM_AURA_HAND_IN_CHOICE), vec![hand_in]),
+                    (text(keys::ZAKUM_AURA_OUT_CHOICE), vec![out]),
+                ],
+            }];
+            // The ore or the documents went before the yes.
+            script.refused = Some(text(keys::ZAKUM_AURA_NEED_ORE));
+        }
+        Aura::Won { taken: true, .. } => {
+            script.pages = vec![
+                Page::Say(text(keys::ZAKUM_AURA_WON)),
+                Page::End(text(keys::ZAKUM_AURA_PRIZE_TAKEN)),
+            ];
+        }
+        Aura::Won { documents, .. } => {
+            let mut share = vec![Effect::GiveItem {
+                item_id: events::FIRE_ORE_PIECE,
+                quantity: 1,
+            }];
+            if documents {
+                let (item_id, quantity) = events::DEAD_MINE_SCROLL;
+                share.insert(0, Effect::GiveItem { item_id, quantity });
+            }
+            share.push(Effect::EventCommand(EventCommand::PrizeTaken));
+            script.pages = vec![Page::Say(text(keys::ZAKUM_AURA_WON)), Page::Done(share)];
+            script.inventory_full = Some(text(keys::ZAKUM_AURA_PRIZE_FULL));
+        }
+    }
+    script
+}
+
+/// Ali (Cosmic `2030011`) in the Room of Tragedy sends players back to the
+/// Door to Zakum; leaving the Dead Mine already took its items.
+fn ali() -> NpcScript {
+    NpcScript::new(
+        ALI,
+        vec![
+            Page::Say(text(keys::ZAKUM_ALI_BYE)),
+            Page::Done(vec![Effect::Warp(events::ZPQ.exit)]),
+        ],
+    )
 }
 
 /// Lira at the far end of the Breath of Lava: the Breath of Fire and EXP,
@@ -9881,6 +10003,114 @@ mod tests {
     }
 
     #[test]
+    fn adobis_lets_a_ready_party_into_the_dead_mine_and_aura_takes_the_ore() {
+        let approved = hunter(&[], &[ZAKUM_APPROVED]);
+        let mine = |entry| {
+            let mut adobis = NpcScript::adobis(entry, &approved);
+            adobis.begin();
+            adobis.respond(ScriptInput::Select(0)).unwrap()
+        };
+        assert_eq!(
+            mine(Entry::Ready).effects,
+            [Effect::StartEvent(EventKind::Zpq)]
+        );
+        assert_eq!(
+            page_text(&mine(Entry::Busy)),
+            text(keys::ZAKUM_ADOBIS_MINE_BUSY)
+        );
+        assert!(page_text(&mine(Entry::NotEligible)).contains("50"));
+        // The unapproved hear the warning, party or not.
+        let warned = NpcScript::adobis(Entry::Ready, &hunter(&[], &[]));
+        assert_eq!(
+            page_text(&warned.begin()),
+            text(keys::ZAKUM_ADOBIS_UNAPPROVED)
+        );
+
+        // Aura: only the leader hands in, and only with the Fire Ore.
+        let hand_in = |leader, items: &[(i32, i16)]| {
+            let mut aura = NpcScript::aura(Aura::Playing { leader }, &hunter(items, &[]));
+            assert_eq!(kind(&aura.begin()), Some(4));
+            let step = aura.respond(ScriptInput::Select(1)).unwrap();
+            (aura, step)
+        };
+        let ore = (events::FIRE_ORE, 1);
+        let says = |step: &Step| page_text(step);
+        assert_eq!(
+            says(&hand_in(false, &[ore]).1),
+            text(keys::ZAKUM_AURA_LEADER_ONLY)
+        );
+        assert_eq!(says(&hand_in(true, &[]).1), text(keys::ZAKUM_AURA_NEED_ORE));
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let (mut aura, step) = hand_in(true, &[ore, (events::ZPQ_DOCUMENT, 29)]);
+        assert_eq!(question(&step), text(keys::ZAKUM_AURA_ASK));
+        assert_eq!(
+            aura.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                take(events::FIRE_ORE, 1),
+                Effect::EventCommand(EventCommand::ClearStage(1))
+            ]
+        );
+        let (mut aura, step) = hand_in(true, &[ore, (events::ZPQ_DOCUMENT, 30)]);
+        assert_eq!(question(&step), text(keys::ZAKUM_AURA_ASK_DOCUMENTS));
+        assert_eq!(
+            aura.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                take(events::FIRE_ORE, 1),
+                take(events::ZPQ_DOCUMENT, 30),
+                Effect::EventCommand(EventCommand::WinWithDocuments)
+            ]
+        );
+        assert!(aura.refused().is_some());
+        // Anyone may leave.
+        let mut aura = NpcScript::aura(Aura::Playing { leader: false }, &hunter(&[], &[]));
+        aura.begin();
+        aura.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(
+            aura.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Warp(events::ZPQ.exit)]
+        );
+
+        // After the win, each member's share, once.
+        let share = |documents, taken| {
+            let view = Aura::Won { documents, taken };
+            let mut aura = NpcScript::aura(view, &hunter(&[], &[]));
+            assert_eq!(page_text(&aura.begin()), text(keys::ZAKUM_AURA_WON));
+            let step = aura.respond(ScriptInput::Next).unwrap();
+            (aura, step)
+        };
+        let give = |item_id, quantity| Effect::GiveItem { item_id, quantity };
+        let (mut aura, step) = share(false, false);
+        assert_eq!(
+            step.effects,
+            [
+                give(events::FIRE_ORE_PIECE, 1),
+                Effect::EventCommand(EventCommand::PrizeTaken)
+            ]
+        );
+        assert!(aura.inventory_full().is_some());
+        let (scroll, scrolls) = events::DEAD_MINE_SCROLL;
+        assert_eq!(
+            share(true, false).1.effects,
+            [
+                give(scroll, scrolls),
+                give(events::FIRE_ORE_PIECE, 1),
+                Effect::EventCommand(EventCommand::PrizeTaken)
+            ]
+        );
+        let (_, again) = share(true, true);
+        assert!(again.effects.is_empty());
+        assert_eq!(page_text(&again), text(keys::ZAKUM_AURA_PRIZE_TAKEN));
+
+        // Ali sends whoever fell in the mine back to the Door to Zakum.
+        let mut ali = NpcScript::for_npc(ALI, &hunter(&[], &[])).unwrap();
+        ali.begin();
+        assert_eq!(
+            ali.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::Warp(DOOR_TO_ZAKUM)]
+        );
+    }
+
+    #[test]
     fn a_chief_approves_zakum_and_adobis_holds_its_trials() {
         const RENE: i32 = 2020010;
         // The chief's second choice approves, once.
@@ -9910,7 +10140,7 @@ mod tests {
         assert!(rene.begin().effects.is_empty());
 
         // Adobis warns the unapproved.
-        let adobis = |player: &Player| NpcScript::for_npc(ADOBIS, player).unwrap();
+        let adobis = |player: &Player| NpcScript::adobis(Entry::NoParty, player);
         let says = |player: &Player| page_text(&adobis(player).begin());
         assert_eq!(says(&hunter(&[], &[])), text(keys::ZAKUM_ADOBIS_UNAPPROVED));
         let mut young = hunter(&[], &[]);
@@ -9924,7 +10154,7 @@ mod tests {
             let step = adobis.respond(ScriptInput::Select(choice)).unwrap();
             (adobis, step)
         };
-        let lava = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 0);
+        let lava = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 1);
         assert_eq!(
             page_text(&lava(&[]).1),
             text(keys::ZAKUM_ADOBIS_LAVA_EARLIER)
@@ -9956,7 +10186,7 @@ mod tests {
         );
 
         // The forge wants both trials' items and 30 Gold Teeth.
-        let forge = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 1).1;
+        let forge = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 2).1;
         let trials = [(FIRE_ORE, 1), (BREATH_OF_FIRE, 1), (GOLD_TOOTH, 29)];
         assert_eq!(
             page_text(&forge(&trials[1..])),

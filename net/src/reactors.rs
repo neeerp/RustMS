@@ -268,7 +268,27 @@ pub fn action(reactor_id: i32) -> Action {
             npc_id: crate::npc_scripts::MINERVA,
             at: crate::events::OPQ_BONUS_MINERVA_AT,
         },
+        // The Dead Mine's (Cosmic `2110000`, `2111000`): back to the hub,
+        // or three Mimics out of the box.
+        ZPQ_TRAP => Action::Warp(Warp(crate::events::ZPQ_HUB, "sp")),
+        ZPQ_MIMIC_BOX => Action::BringOut(ZPQ_MIMIC, 3),
         _ => Action::Drops,
+    }
+}
+
+/// The Dead Mine's boxes that send whoever breaks one back to the hub, and
+/// those that hold Mimics.
+pub const ZPQ_TRAP: i32 = 2110000;
+pub const ZPQ_MIMIC_BOX: i32 = 2111000;
+pub const ZPQ_MIMIC: i32 = 9300004;
+
+/// The pink line whoever broke reactor `reactor_id` reads first, if any
+/// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
+pub fn breaker_notice(reactor_id: i32) -> Option<&'static str> {
+    match reactor_id {
+        ZPQ_TRAP => Some(keys::ZAKUM_MINE_UNKNOWN_FORCE),
+        ZPQ_MIMIC_BOX => Some(keys::ZAKUM_MINE_MIMICS),
+        _ => None,
     }
 }
 
@@ -461,5 +481,21 @@ mod tests {
         assert_eq!(warp.to(), (105090200, 0));
         assert_eq!(trap.to(), (LPQ_TRAP_ROOM, 0));
         assert!(shuffled(BERSERK_ROOM) && !shuffled(HITMAN_HIDEOUT));
+    }
+
+    #[test]
+    fn the_dead_mines_boxes_send_back_or_hold_mimics_and_say_so() {
+        let Action::Warp(back) = action(ZPQ_TRAP) else {
+            panic!("{:?}", action(ZPQ_TRAP));
+        };
+        assert_eq!(action(ZPQ_MIMIC_BOX), Action::BringOut(ZPQ_MIMIC, 3));
+        assert!(breaker_notice(ZPQ_TRAP).is_some() && breaker_notice(ZPQ_MIMIC_BOX).is_some());
+        // Its chests drop their loot, unannounced.
+        assert_eq!(action(2112012), Action::Drops);
+        assert_eq!(breaker_notice(2112012), None);
+        if crate::game_data::get().is_err() {
+            return;
+        }
+        assert_eq!(back.to(), (crate::events::ZPQ_HUB, 0));
     }
 }

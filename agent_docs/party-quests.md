@@ -15,7 +15,9 @@ its entry and exit, its cloud stage, the hub's ways into its rooms, the
 six rooms, the garden, Minerva's statue and the win, her prizes, and the
 storage and treasure room the win opens; its jails come in a later slice
 (`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`,
-`a091-opq-bonus-jail-re.md`).
+`a091-opq-bonus-jail-re.md`). Zakum's Dead Mine (ZPQ), the first of the
+trials before Zakum ([zakum](./zakum.md)), is played through too
+(`v83ref/reports/a105-zakum-dead-mine.md`).
 
 ## Rules
 
@@ -733,6 +735,48 @@ each of the Equip, Use and Etc tabs, which the rewards come in, he says
 `lpq.arturo.full` and gives nothing yet (`giveEventReward`). There is no
 EXP at the reward.
 
+## Zakum's Dead Mine
+
+At the Door to Zakum (211042300) Adobis (2030008) takes a party of one to
+six in, the first choice of his menu for those a chief has approved
+(`talk_about_event`): its members there at level 50 and up. Everyone starts
+on the hub, 280010000, and the quest runs for 30 minutes on 280010000 to
+280011006, a maze of rooms whose portals are Map.nx's own, in a fixed layout
+(Cosmic's is fixed too). Leaving takes the quest's items, the documents
+4001015, keys 4001016 and the Fire Ore 4001018. Dying or logging back in
+lands on the Room of Tragedy (280090000, the maps' `forcedReturn`), outside
+the event; Ali (2030011) there sends players back to 211042300.
+
+In the maze, a trap box (2110000) sends its breaker to the hub's `sp` and a
+Mimic box (2111000) lets out three Mimics (9300004); each tells the breaker
+so in a pink line (`reactors::breaker_notice`, sent from the field to the
+occupant who broke it, as Cosmic's reactor scripts tell only the
+breaker). The documents and keys come from the mine's chests: the pack has
+no rows for them, so `reward_overrides.toml` gives each its one item
+(2112004 and 2112011 a key, 2112005 and 2112012 a document), and the giant
+chest 2112014 in 280011005, which seven keys thrown near it open, the Fire
+Ore.
+
+Aura (2032002) on the hub has a menu: what the quest is, the hand-in, and
+out to 211042300. Only the leader hands in, and only with the Fire Ore.
+With 30 documents or more too, she takes the ore and 30 documents
+(`EventCommand::WinWithDocuments`, which sets the event's stage bit
+`ZPQ_DOCUMENTS` before the win); with fewer, the ore only
+(`ClearStage(1)`, the one stage, which wins it). Each member then gets
+20,000 EXP with the documents, or 12,000 without (`stage_cleared`; no
+clear effect, sound or gate, as Cosmic's `clearPQ` shows none). The EXP
+is not multiplied by the server's rate. Once won, Aura gives each member,
+once, five Return to Dead Mine scrolls (2030007) if the documents went in,
+and a Piece of Fire Ore (4031061); the claim is the member's own
+(`EventTicket::prize_taken`, set by `EventCommand::PrizeTaken`, which stays
+in the client), so it goes with leaving. Without the room in the Etc and
+Use tabs she gives nothing yet.
+
+The hub's way out, `ps01` (script `Zakum03`, `zpq_portal`), stays shut with
+a pink line until the quest is won and, after, until the player has
+claimed the prize. Aura's way out needs neither. Cosmic's warp of holders
+of 4001109 to 921100000 is a custom left out.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -766,9 +810,13 @@ EXP at the reward.
 | Minerva 2013002 | 920011100 | Out of the first box broken; alone to 920011300 |
 | Minerva 2013002 | 920011300 | The prize once won, and home to 200080101 |
 | Eak 2013001 | 920011200 | Home to 200080101 |
+| Adobis 2030008 | 211042300 | Runtime (`talk_about_event`): the Dead Mine, the Breath of Lava, the Eyes of Fire |
+| Aura 2032002 | 280010000 | Runtime (`zpq_aura`): what it is, the leader's hand-in, out to 211042300; the prize once won |
+| Ali 2030011 | 280090000 | Home to 211042300 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
-`lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*` and
-`opq.minerva.*`.
+`lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
+`opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`
+and `zakum.ali.*`.

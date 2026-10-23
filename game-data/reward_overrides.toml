@@ -182,3 +182,23 @@ replace = [{ item = 4001049, prob = 1.0 }]
 [reactors.2002003]
 # The garden's Grass of Life pot drops the Grass of Life (Cosmic `2002003`).
 replace = [{ item = 4001055, prob = 1.0 }]
+
+[reactors.2112004]
+# Zakum's Dead Mine (Map.nx 280010000-280011006), so it works without the
+# pack (whose drops these are, as Cosmic's): its rocks and chests that
+# hold the keys the giant chest 2112014 takes (Reactor.nx: item 4001016,
+# 7 of them), the documents Aura takes 30 of, and the giant chest's Fire
+# Ore.
+replace = [{ item = 4001016, prob = 1.0 }]
+
+[reactors.2112011]
+replace = [{ item = 4001016, prob = 1.0 }]
+
+[reactors.2112005]
+replace = [{ item = 4001015, prob = 1.0 }]
+
+[reactors.2112012]
+replace = [{ item = 4001015, prob = 1.0 }]
+
+[reactors.2112014]
+replace = [{ item = 4001018, prob = 1.0 }]

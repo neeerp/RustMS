@@ -21,6 +21,8 @@ pub enum EventKind {
     Lpq,
     /// Orbis's party quest in the Tower of Goddess, started at Wonky.
     Opq,
+    /// Zakum's Dead Mine, the first of Adobis's trials, started at Adobis.
+    Zpq,
 }
 
 /// An event's maps and terms.
@@ -136,6 +138,16 @@ impl Bonus {
     pub fn duration(&self) -> Duration {
         scaled(Duration::from_secs(self.minutes * 60))
     }
+}
+
+/// Where a member stands with Aura on the Dead Mine's hub.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Aura {
+    /// Before the win, when only the leader may hand her the Fire Ore.
+    Playing { leader: bool },
+    /// After it, with the documents or not, and the member's share of the
+    /// prize taken or not.
+    Won { documents: bool, taken: bool },
 }
 
 /// Kerning City's party quest (Cosmic `KerningPQ`, Server.NX
@@ -691,12 +703,68 @@ pub const RICE_CAKE: i32 = 4001101;
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, row 180).
 pub const HPQ_REWARD: i32 = 4001158;
 
+/// Zakum's Dead Mine (Cosmic `ZakumPQ`): a maze of mine shafts, 280010000
+/// to 280011006, all hub, rooms and end rooms with no monsters of their
+/// own. Its one stage is won when the leader hands Aura, on the hub, the
+/// Fire Ore from the giant chest in one of the end rooms; with it 30 of
+/// the mine's documents earn more EXP and a better prize
+/// (`ZPQ_DOCUMENTS`). The Room of Tragedy, 280090000, where those who die
+/// or come back to the game inside land, is outside it.
+pub const ZPQ: Event = Event {
+    lobby: 211_042_300,
+    maps: 280_010_000..=280_011_006,
+    entry: ZPQ_HUB,
+    exit: 211_042_300,
+    levels: 50..=u8::MAX,
+    team: 1..=6,
+    minutes: 30,
+    exp_per_stage: &[12_000],
+    stride: 10,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[ZPQ_DOCUMENT, ZPQ_KEY, FIRE_ORE],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+};
+
+/// The Dead Mine's hub, where Aura stands and its way out is.
+pub const ZPQ_HUB: i32 = 280_010_000;
+/// The mine's documents, under its rocks, and the keys that open its giant
+/// chest, seven thrown at it.
+pub const ZPQ_DOCUMENT: i32 = 4_001_015;
+pub const ZPQ_KEY: i32 = 4_001_016;
+/// What the giant chest holds, for the leader to hand Aura.
+pub const FIRE_ORE: i32 = 4_001_018;
+/// How many documents Aura takes with the Fire Ore for the better prize.
+pub const ZPQ_DOCUMENTS_WANTED: i16 = 30;
+/// Not a stage: the bit of the event's cleared stages that says the
+/// documents came with the Fire Ore (Cosmic's `gotDocuments`), set as the
+/// event is won (`EventCommand::WinWithDocuments`).
+pub const ZPQ_DOCUMENTS: u8 = 2;
+/// The EXP every member gets for the win with the documents, instead of
+/// the stage's.
+pub const ZPQ_DOCUMENTS_EXP: i32 = 20_000;
+/// What Aura gives each member once the event is won: a piece of the Fire
+/// Ore, and with the documents also the mine's return scrolls.
+pub const FIRE_ORE_PIECE: i32 = 4_031_061;
+pub const DEAD_MINE_SCROLL: (i32, i16) = (2_030_007, 5);
+
 impl EventKind {
-    pub const ALL: [EventKind; 4] = [
+    pub const ALL: [EventKind; 5] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
         EventKind::Opq,
+        EventKind::Zpq,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -705,6 +773,7 @@ impl EventKind {
             EventKind::Hpq => &HPQ,
             EventKind::Lpq => &LPQ,
             EventKind::Opq => &OPQ,
+            EventKind::Zpq => &ZPQ,
         }
     }
 }
@@ -993,6 +1062,13 @@ pub enum EventCommand {
     /// The leader takes the whole team to one of the event's maps, its
     /// clock still running (Cosmic `warpEventTeam`).
     MoveTeam(i32),
+    /// The leader handed Aura the Fire Ore and the documents: the Dead
+    /// Mine is won, with `ZPQ_DOCUMENTS` set first.
+    WinWithDocuments,
+    /// The member took their share of the won event's prize from Aura,
+    /// once each (Cosmic's `gridInsert`): only their own ticket keeps it,
+    /// so it goes when they leave.
+    PrizeTaken,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -1542,6 +1618,18 @@ mod tests {
         assert!(!OPQ.holds(OPQ.exit) && !OPQ.holds(OPQ.lobby));
         assert_eq!((OPQ.items[0], OPQ.items[19]), (4_001_044, 4_001_063));
         assert_eq!(EventKind::Opq.event(), &OPQ);
+    }
+
+    #[test]
+    fn the_dead_mine_is_one_stage_without_the_room_of_tragedy() {
+        assert!(ZPQ.holds(ZPQ_HUB) && ZPQ.holds(280_010_011) && ZPQ.holds(280_011_006));
+        assert!(!ZPQ.holds(ZPQ.exit) && !ZPQ.holds(280_090_000));
+        assert_eq!((ZPQ.last_stage(), ZPQ.stage_exp(1)), (1, 12_000));
+        assert_eq!(ZPQ.stage_map(1), ZPQ_HUB);
+        assert!(ZPQ_DOCUMENTS > ZPQ.last_stage());
+        assert_eq!(EventKind::Zpq.event(), &ZPQ);
+        // The piece of Fire Ore is Adobis's next trial's, so it stays.
+        assert!(!ZPQ.items.contains(&FIRE_ORE_PIECE));
     }
 
     #[test]

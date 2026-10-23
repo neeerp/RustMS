@@ -2713,6 +2713,13 @@ impl FieldActor {
         if let Ok(packet) = build_remove_reactor(&view) {
             self.broadcast(None, packet);
         }
+        if let Some(notice) = reactors::breaker_notice(view.reactor_id) {
+            let notice = net::content::text().get(notice, &[]);
+            let packet = build_broadcast(Broadcast::Pink, &notice);
+            if let (Some(occupant), Ok(packet)) = (self.occupants.get(&by), packet) {
+                occupant.handle.send(ServerMessage::SendPacket(packet));
+            }
+        }
         match reactors::action(view.reactor_id) {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));

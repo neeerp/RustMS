@@ -62,6 +62,14 @@ impl ClientActor {
         if npc_id == net::npc_scripts::WONKY && player.stats.map_id == net::events::OPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Opq).await;
         }
+        if npc_id == net::npc_scripts::ADOBIS && player.stats.map_id == net::events::ZPQ.lobby {
+            return self.talk_about_event(net::events::EventKind::Zpq).await;
+        }
+        if npc_id == net::npc_scripts::AURA {
+            if let Some(script) = self.zpq_aura()? {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::npc_scripts::EAK {
             if let Some(script) = self.opq_eak().await? {
                 return self.start_script(script).await;

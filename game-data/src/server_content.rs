@@ -1305,10 +1305,33 @@ pub mod keys {
     pub const ZAKUM_GATE_UNAPPROVED: &str = "zakum.gate.unapproved";
     pub const ZAKUM_GATE_TRIALS: &str = "zakum.gate.trials";
     pub const ZAKUM_GATE_NO_EYE: &str = "zakum.gate.no_eye";
+    pub const ZAKUM_ADOBIS_MINE_CHOICE: &str = "zakum.adobis.mine.choice";
+    pub const ZAKUM_ADOBIS_MINE_NO_PARTY: &str = "zakum.adobis.mine.no_party";
+    pub const ZAKUM_ADOBIS_MINE_NOT_LEADER: &str = "zakum.adobis.mine.not_leader";
+    pub const ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE: &str = "zakum.adobis.mine.not_eligible";
+    pub const ZAKUM_ADOBIS_MINE_BUSY: &str = "zakum.adobis.mine.busy";
+    pub const ZAKUM_AURA_MENU: &str = "zakum.aura.menu";
+    pub const ZAKUM_AURA_ABOUT_CHOICE: &str = "zakum.aura.about.choice";
+    pub const ZAKUM_AURA_ABOUT: &str = "zakum.aura.about";
+    pub const ZAKUM_AURA_HAND_IN_CHOICE: &str = "zakum.aura.hand_in.choice";
+    pub const ZAKUM_AURA_LEADER_ONLY: &str = "zakum.aura.leader_only";
+    pub const ZAKUM_AURA_NEED_ORE: &str = "zakum.aura.need_ore";
+    pub const ZAKUM_AURA_ASK: &str = "zakum.aura.ask";
+    pub const ZAKUM_AURA_ASK_DOCUMENTS: &str = "zakum.aura.ask_documents";
+    pub const ZAKUM_AURA_OUT_CHOICE: &str = "zakum.aura.out.choice";
+    pub const ZAKUM_AURA_OUT_ASK: &str = "zakum.aura.out.ask";
+    pub const ZAKUM_AURA_WON: &str = "zakum.aura.won";
+    pub const ZAKUM_AURA_PRIZE_FULL: &str = "zakum.aura.prize_full";
+    pub const ZAKUM_AURA_PRIZE_TAKEN: &str = "zakum.aura.prize_taken";
+    pub const ZAKUM_MINE_NOT_WON: &str = "zakum.mine.not_won";
+    pub const ZAKUM_MINE_NO_PRIZE: &str = "zakum.mine.no_prize";
+    pub const ZAKUM_MINE_UNKNOWN_FORCE: &str = "zakum.mine.unknown_force";
+    pub const ZAKUM_MINE_MIMICS: &str = "zakum.mine.mimics";
+    pub const ZAKUM_ALI_BYE: &str = "zakum.ali.bye";
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 23] = [
+    pub const ZAKUM: [&str; 46] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -1332,6 +1355,29 @@ pub mod keys {
         ZAKUM_GATE_UNAPPROVED,
         ZAKUM_GATE_TRIALS,
         ZAKUM_GATE_NO_EYE,
+        ZAKUM_ADOBIS_MINE_CHOICE,
+        ZAKUM_ADOBIS_MINE_NO_PARTY,
+        ZAKUM_ADOBIS_MINE_NOT_LEADER,
+        ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE,
+        ZAKUM_ADOBIS_MINE_BUSY,
+        ZAKUM_AURA_MENU,
+        ZAKUM_AURA_ABOUT_CHOICE,
+        ZAKUM_AURA_ABOUT,
+        ZAKUM_AURA_HAND_IN_CHOICE,
+        ZAKUM_AURA_LEADER_ONLY,
+        ZAKUM_AURA_NEED_ORE,
+        ZAKUM_AURA_ASK,
+        ZAKUM_AURA_ASK_DOCUMENTS,
+        ZAKUM_AURA_OUT_CHOICE,
+        ZAKUM_AURA_OUT_ASK,
+        ZAKUM_AURA_WON,
+        ZAKUM_AURA_PRIZE_FULL,
+        ZAKUM_AURA_PRIZE_TAKEN,
+        ZAKUM_MINE_NOT_WON,
+        ZAKUM_MINE_NO_PRIZE,
+        ZAKUM_MINE_UNKNOWN_FORCE,
+        ZAKUM_MINE_MIMICS,
+        ZAKUM_ALI_BYE,
     ];
 
     /// The magic rocks of Orbis Tower and Eos Tower; `{item}` is the
@@ -2601,6 +2647,22 @@ mod tests {
             let drops = table.drops(mob);
             assert_eq!(drops.len(), 1, "{mob}");
             assert_eq!((drops[0].item, drops[0].prob), (Some(seed), 1.0));
+        }
+    }
+
+    #[test]
+    fn the_dead_mines_keys_documents_and_fire_ore_drop_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        for (reactor_id, item) in [
+            (2112004, 4001016),
+            (2112011, 4001016),
+            (2112005, 4001015),
+            (2112012, 4001015),
+            (2112014, 4001018),
+        ] {
+            let drops = table.reactor_drops(reactor_id);
+            assert_eq!(drops.len(), 1, "{reactor_id}");
+            assert_eq!((drops[0].item, drops[0].prob), (Some(item), 1.0));
         }
     }
 
