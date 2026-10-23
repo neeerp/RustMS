@@ -124,6 +124,29 @@ The prize lists and weights come from Cosmic's scripts, and the shipped default 
 recorded in `v83ref/lanes/QUESTIONS.md`. With no room, `patience.full`
 replaces the visit and the player stays.
 
+## Line 3's construction sites
+
+Under Kerning City's station (`103000100`) are three construction sites,
+B1 to B3, one for each of Shumi's quests (2055 to 2057, each asking for
+an item lost down there):
+- Jake (`1052006`) greets the player and then sells a ticket for 1000 mesos
+  (`4031036`-`4031038`) to each site whose quest the player has begun or
+  finished, in order. Short of the price he only says so.
+- The ticket gate (`1052007`) asks first: the construction site or the
+  subway. The site choice lists the site tickets held, takes the one picked,
+  and warps to the site's first map (`103000900`, `103000903` or `103000906`)
+  at `st00`. With none it only speaks.
+- The way out (`1052011`) on each site's maps speaks, asks, and Yes goes back
+  to the ticketing booth's portal 0; No gets a word.
+- The box at each site's end (`1052008`-`1052010`, a `PATIENCE_PILES` entry)
+  gives the quest's item (`4031039`-`4031041`) to a player on it who lacks
+  it, else one random ore. It then returns the player to the ticketing
+  booth without a word, or says `line3.chest.full` if there is no room.
+
+The `line3.*` keys are `unsourced`, and the ids, price and prizes come from
+Cosmic's scripts. `line3_construction_site.rs` checks B1 through the network
+harness.
+
 ### Stunned and seduced players
 
 A Stun or Seduce takes the client's input (HeavenClient's `disease::steer`),

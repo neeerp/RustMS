@@ -187,8 +187,9 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 - The subway's ticket gates (`SUBWAY_GATES`: 1052007 in Kerning City,
   9201068 in New Leaf City) ask first, as `NLC_Move` does, and only then
   look for the ticket; a late yes is refused as at the ushers. Kerning
-  City's gate only serves the subway; its original menu also offered Kerning
-  Square and the Construction Site.
+  City's gate first asks where to: Line 3's construction sites (see
+  `agent_docs/map-travel.md`) or the subway. Its original menu also offered
+  Kerning Square.
 - Bell (9201057, `NLC_ticketing`) sells the ticket for the line leaving her
   platform from a one-choice menu, and in a waiting room lets the rider back
   out to its platform. The text is under the `subway.*` keys, from
@@ -274,7 +275,7 @@ again before it has finished docking.
 
 ## Not yet
 
-- Kerning City gate's Kerning Square and Construction Site choices.
+- Kerning City gate's Kerning Square choice.
 - Corba's dragon flight to Leafre.
 - Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
 - CLOCK countdown kinds 0 and 3.

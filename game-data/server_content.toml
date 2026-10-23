@@ -831,6 +831,19 @@ unsourced = [
     "tower_rock.menu",
     "tower_rock.ask",
     "patience.full",
+    "line3.jake.hello",
+    "line3.jake.menu",
+    "line3.jake.short",
+    "line3.jake.full",
+    "line3.gate.menu",
+    "line3.gate.site",
+    "line3.gate.subway",
+    "line3.gate.tickets",
+    "line3.gate.no_ticket",
+    "line3.chest.full",
+    "line3.exit.say",
+    "line3.exit.ask",
+    "line3.exit.stay",
 ]
 
 [text."glTutoMsg0.message"]

@@ -327,12 +327,25 @@ const OUTSIDE_ARIANT: i32 = 260020000;
 const MAGATIA: i32 = 261000000;
 const ARIANT: i32 = 260000000;
 /// The subway's ticket gates: Kerning City's (`subway_in`, whose menu also
-/// offers Kerning Square and the Construction Site, left out until those
-/// run) and New Leaf City's (`NLC_Move`).
+/// offers Line 3's construction sites, and Kerning Square, left out until
+/// it runs) and New Leaf City's (`NLC_Move`).
 const SUBWAY_GATES: [(i32, &Route); 2] = [
-    (1052007, &conti::TO_NLC),
+    (KERNING_CITY_GATE, &conti::TO_NLC),
     (9201068, &conti::TO_KERNING_CITY),
 ];
+const KERNING_CITY_GATE: i32 = 1052007;
+/// Line 3's construction sites under Kerning City's station, B1 to B3:
+/// Jake sells a ticket to each site whose quest of Shumi's (2055 to 2057)
+/// the player has begun, the gate takes it to the site's first map, and
+/// the site's way out sends the player back to the ticketing booth. The
+/// box at each site's end is a pile (`PATIENCE_PILES`).
+const JAKE: i32 = 1052006;
+const SITE_EXIT: i32 = 1052011;
+const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
+const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
+const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
+const SITE_TICKET_PRICE: i32 = 1000;
+const SUBWAY_TICKETING: i32 = 103000100;
 /// The airports' booths, Irene (`sellticket_sg`) in Kerning City and
 /// Shalon (`sellticket_cbd`) at Changi, with where each one's plane goes.
 const PLANE_BOOTHS: [(i32, &Route, &str); 2] = [
@@ -1296,6 +1309,8 @@ impl NpcScript {
             ADOBIS => return Some(adobis(player)),
             LIRA => return Some(lira()),
             AMON => return Some(amon(player)),
+            JAKE => return Some(jake(player)),
+            SITE_EXIT => return Some(site_exit()),
             _ => {}
         }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
@@ -2205,10 +2220,100 @@ fn subway_gate(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript
         closing: keys::SUBWAY_BOARD_CLOSING,
         full: keys::SUBWAY_BOARD_FULL,
     };
+    let mut pages = gate(route, &tickets, player, t, &says);
+    if npc_id == KERNING_CITY_GATE {
+        pages = vec![Page::Menu {
+            text: text(keys::LINE3_GATE_MENU),
+            choices: vec![
+                (text(keys::LINE3_GATE_SITE), construction_site(player)),
+                (text(keys::LINE3_GATE_SUBWAY), pages),
+            ],
+        }];
+    }
     // A yes that comes after boarding closed (`RequireBoarding`).
-    let mut script = NpcScript::new(npc_id, gate(route, &tickets, player, t, &says));
+    let mut script = NpcScript::new(npc_id, pages);
     script.refused = Some(text(says.closing));
     script
+}
+
+/// The Kerning City gate's way into Line 3's construction sites: a choice
+/// of the site tickets held, taking the one chosen.
+fn construction_site(player: &Player) -> Vec<Page> {
+    let choices: Vec<_> = SITE_TICKETS
+        .iter()
+        .zip(SITE_ENTRANCES)
+        .filter(|&(&ticket, _)| player.inventory.count(ticket) > 0)
+        .map(|(&ticket, map)| {
+            let effects = vec![
+                Effect::TakeItem {
+                    item_id: ticket,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(map, crate::scripts::named(map, "st00")),
+            ];
+            (format!("#t{ticket}#"), vec![Page::Done(effects)])
+        })
+        .collect();
+    if choices.is_empty() {
+        return vec![Page::Say(text(keys::LINE3_GATE_NO_TICKET))];
+    }
+    vec![Page::Menu {
+        text: text(keys::LINE3_GATE_TICKETS),
+        choices,
+    }]
+}
+
+/// Jake at the ticketing booth: a ticket to each construction site whose
+/// quest the player has begun, in order of the sites.
+fn jake(player: &Player) -> NpcScript {
+    let price = SITE_TICKET_PRICE.to_string();
+    let price = [("price", price.as_str())];
+    let mut pages = vec![Page::Say(text(keys::LINE3_JAKE_HELLO))];
+    let sites = SITE_QUESTS
+        .iter()
+        .filter(|&&quest| player.quests.state(quest) != QuestState::NotStarted)
+        .count();
+    if sites > 0 {
+        let buy = |ticket: i32| {
+            if player.meso < SITE_TICKET_PRICE {
+                Page::Say(content::text().get(keys::LINE3_JAKE_SHORT, &price))
+            } else {
+                Page::Done(vec![
+                    Effect::SpendMeso(SITE_TICKET_PRICE),
+                    Effect::GiveItem {
+                        item_id: ticket,
+                        quantity: 1,
+                    },
+                ])
+            }
+        };
+        pages.push(Page::Menu {
+            text: content::text().get(keys::LINE3_JAKE_MENU, &price),
+            choices: SITE_TICKETS[..sites]
+                .iter()
+                .map(|&ticket| (format!("#t{ticket}#"), vec![buy(ticket)]))
+                .collect(),
+        });
+    }
+    let mut script = NpcScript::new(JAKE, pages);
+    script.inventory_full = Some(text(keys::LINE3_JAKE_FULL));
+    script
+}
+
+/// The way out of a construction site, back to the ticketing booth; a no
+/// gets a word.
+fn site_exit() -> NpcScript {
+    NpcScript::new(
+        SITE_EXIT,
+        vec![
+            Page::Say(text(keys::LINE3_EXIT_SAY)),
+            Page::Ask {
+                text: text(keys::LINE3_EXIT_ASK),
+                on_yes: vec![Effect::WarpToPortal(SUBWAY_TICKETING, 0)],
+                on_no: Some(text(keys::LINE3_EXIT_STAY)),
+            },
+        ],
+    )
 }
 
 /// What a gate says: before boarding, after a no, without a ticket, once
@@ -4918,10 +5023,11 @@ fn tower_rock(rock: &TowerRock, player: &Player) -> NpcScript {
     NpcScript::new(rock.npc, vec![page])
 }
 
-/// A pile at the end of a Forest of Patience. A player on its quest who
-/// lacks the quest's items finds them there; anyone else finds a prize,
-/// and in Ellinia's forest everyone does. Then it sends the player out,
-/// with no words.
+/// A pile at the end of a Forest of Patience, or the box at the end of a
+/// construction site. A player on its quest who lacks the quest's items
+/// finds them there; anyone else finds a prize, and in Ellinia's forest
+/// everyone does. Then it sends the player out, with no words, or says
+/// `full` if there is no room.
 struct PatiencePile {
     npc: i32,
     quest: i16,
@@ -4932,10 +5038,11 @@ struct PatiencePile {
     /// out.
     prizes: &'static [(i32, i16, u32)],
     out: i32,
+    full: &'static str,
 }
 
 /// The piles, from Cosmic's scripts (ids, quantities, weights).
-const PATIENCE_PILES: [PatiencePile; 5] = [
+const PATIENCE_PILES: [PatiencePile; 8] = [
     // The pile of flowers and the pile of herbs in Ellinia's forest, for
     // Sabitrama's quests 2050 and 2051.
     PatiencePile {
@@ -4959,6 +5066,7 @@ const PATIENCE_PILES: [PatiencePile; 5] = [
             (1702015, 1, 5),
         ],
         out: ELLINIA,
+        full: keys::PATIENCE_FULL,
     },
     PatiencePile {
         npc: 1043001,
@@ -4982,6 +5090,7 @@ const PATIENCE_PILES: [PatiencePile; 5] = [
             (1702114, 1, 5),
         ],
         out: ELLINIA,
+        full: keys::PATIENCE_FULL,
     },
     // The pink, blue and white flowers at the ends of the Deep Forest's
     // steps, for John's quests 2052 to 2054.
@@ -5000,6 +5109,7 @@ const PATIENCE_PILES: [PatiencePile; 5] = [
             (4010005, 3, 1),
         ],
         out: STATUE_FOREST,
+        full: keys::PATIENCE_FULL,
     },
     PatiencePile {
         npc: 1063001,
@@ -5009,6 +5119,7 @@ const PATIENCE_PILES: [PatiencePile; 5] = [
         always_prize: false,
         prizes: &[(4020000, 4, 1), (4020002, 4, 1), (4020006, 4, 1)],
         out: STATUE_FOREST,
+        full: keys::PATIENCE_FULL,
     },
     PatiencePile {
         npc: 1063002,
@@ -5018,6 +5129,59 @@ const PATIENCE_PILES: [PatiencePile; 5] = [
         always_prize: false,
         prizes: &[(4010006, 4, 1), (4010007, 4, 1), (4020007, 4, 1)],
         out: STATUE_FOREST,
+        full: keys::PATIENCE_FULL,
+    },
+    // The boxes at the ends of Line 3's construction sites B1 to B3, for
+    // Shumi's quests 2055 to 2057.
+    PatiencePile {
+        npc: 1052008,
+        quest: 2055,
+        item: 4031039,
+        count: 1,
+        always_prize: false,
+        prizes: &[
+            (4020000, 1, 1),
+            (4020001, 1, 1),
+            (4020002, 1, 1),
+            (4020003, 1, 1),
+            (4020004, 1, 1),
+        ],
+        out: SUBWAY_TICKETING,
+        full: keys::LINE3_CHEST_FULL,
+    },
+    PatiencePile {
+        npc: 1052009,
+        quest: 2056,
+        item: 4031040,
+        count: 1,
+        always_prize: false,
+        prizes: &[
+            (4020005, 1, 1),
+            (4020006, 1, 1),
+            (4020007, 1, 1),
+            (4020008, 1, 1),
+            (4010000, 1, 1),
+        ],
+        out: SUBWAY_TICKETING,
+        full: keys::LINE3_CHEST_FULL,
+    },
+    PatiencePile {
+        npc: 1052010,
+        quest: 2057,
+        item: 4031041,
+        count: 1,
+        always_prize: false,
+        prizes: &[
+            (4010001, 1, 1),
+            (4010002, 1, 1),
+            (4010003, 1, 1),
+            (4010004, 1, 1),
+            (4010005, 1, 1),
+            (4010006, 1, 1),
+            (4010007, 1, 1),
+        ],
+        out: SUBWAY_TICKETING,
+        full: keys::LINE3_CHEST_FULL,
     },
 ];
 
@@ -5050,7 +5214,7 @@ fn patience_pile(pile: &PatiencePile, player: &Player, rng: &mut impl Rng) -> Np
     }
     effects.push(Effect::WarpToPortal(pile.out, 0));
     let mut script = NpcScript::new(pile.npc, vec![Page::Done(effects)]);
-    script.inventory_full = Some(text(keys::PATIENCE_FULL));
+    script.inventory_full = Some(text(pile.full));
     script
 }
 
@@ -6228,8 +6392,13 @@ mod tests {
             1,
             game::Item::stack(conti::TO_NLC.ticket, 1),
         );
-        let mut gate = subway_gate(1052007, &conti::TO_NLC, &holder, minute(2));
-        assert_eq!(kind(&gate.begin()), Some(1));
+        // Kerning City's gate asks where to first; the subway is second.
+        let mut gate = subway_gate(KERNING_CITY_GATE, &conti::TO_NLC, &holder, minute(2));
+        assert_eq!(kind(&gate.begin()), Some(4));
+        assert_eq!(
+            kind(&gate.respond(ScriptInput::Select(1)).unwrap()),
+            Some(1)
+        );
         assert_eq!(
             gate.respond(ScriptInput::Yes).unwrap().effects,
             [
@@ -6255,6 +6424,9 @@ mod tests {
             }
             let mut gate = subway_gate(npc, route, &both, minute(2));
             gate.begin();
+            if npc == KERNING_CITY_GATE {
+                gate.respond(ScriptInput::Select(1));
+            }
             assert!(gate
                 .respond(ScriptInput::Yes)
                 .unwrap()
@@ -6277,8 +6449,10 @@ mod tests {
         assert_eq!(buttons(&refused), (false, false));
         // Boarding closed, or the train gone.
         for t in [minute(4), minute(5)] {
-            let gate = subway_gate(1052007, &conti::TO_NLC, &holder, t);
-            assert_eq!(buttons(&gate.begin()), (false, false));
+            let mut gate = subway_gate(KERNING_CITY_GATE, &conti::TO_NLC, &holder, t);
+            gate.begin();
+            let closed = gate.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(buttons(&closed), (false, false));
         }
 
         // Bell sells the ticket for the line leaving her platform: the Basic
@@ -8440,6 +8614,109 @@ mod tests {
                 assert!(crate::items::info(item_id).is_some(), "{item_id}");
             }
         }
+    }
+
+    #[test]
+    fn line3_sells_site_tickets_and_takes_their_holders_in_and_out() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        // Jake sells a ticket for each of Shumi's quests begun.
+        let mut buyer = with_quests(&[(2055, true), (2056, false)]);
+        buyer.meso = SITE_TICKET_PRICE;
+        let mut jake = NpcScript::for_npc(JAKE, &buyer).unwrap();
+        assert_eq!(kind(&jake.begin()), Some(0));
+        let tickets = menu(jake.respond(ScriptInput::Next).unwrap());
+        assert!(tickets.contains("#t4031037#") && !tickets.contains("#t4031038#"));
+        assert_eq!(
+            jake.respond(ScriptInput::Select(1)).unwrap().effects,
+            [
+                Effect::SpendMeso(SITE_TICKET_PRICE),
+                Effect::GiveItem {
+                    item_id: 4031037,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(jake.inventory_full().is_some());
+        // Short of the price, a word and no ticket.
+        buyer.meso = SITE_TICKET_PRICE - 1;
+        let mut jake = NpcScript::for_npc(JAKE, &buyer).unwrap();
+        jake.begin();
+        jake.respond(ScriptInput::Next);
+        let short = jake.respond(ScriptInput::Select(0)).unwrap();
+        assert!(short.effects.is_empty());
+        assert_eq!(kind(&short), Some(0));
+        // Before the quests, only the greeting.
+        let mut jake = NpcScript::for_npc(JAKE, &with_quests(&[])).unwrap();
+        jake.begin();
+        assert!(jake
+            .respond(ScriptInput::Next)
+            .is_none_or(|step| step.prompt.is_none()));
+
+        // The gate's first choice offers the site tickets held.
+        let mut holder = traveller(30, 0, false);
+        for (slot, ticket) in [(1, 4031036), (2, 4031038)] {
+            holder
+                .inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(ticket, 1));
+        }
+        let mut gate = NpcScript::for_npc(KERNING_CITY_GATE, &holder).unwrap();
+        gate.begin();
+        let held = menu(gate.respond(ScriptInput::Select(0)).unwrap());
+        assert!(held.contains("#t4031036#") && !held.contains("#t4031037#"));
+        let b3 = 103000906;
+        assert_eq!(
+            gate.respond(ScriptInput::Select(1)).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: 4031038,
+                    quantity: 1
+                },
+                Effect::WarpToPortal(b3, crate::scripts::named(b3, "st00")),
+            ]
+        );
+        // Without one, a word.
+        let mut gate = NpcScript::for_npc(KERNING_CITY_GATE, &traveller(30, 0, false)).unwrap();
+        gate.begin();
+        let none = gate.respond(ScriptInput::Select(0)).unwrap();
+        assert!(none.effects.is_empty());
+        assert_eq!(kind(&none), Some(0));
+
+        // The box at B2's end: Shumi's money on her quest, else an ore.
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let b2 = PATIENCE_PILES
+            .iter()
+            .find(|pile| pile.npc == 1052009)
+            .unwrap();
+        assert_eq!(
+            patience_pile(b2, &with_quests(&[(2056, false)]), rng)
+                .begin()
+                .effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4031040,
+                    quantity: 1
+                },
+                Effect::WarpToPortal(SUBWAY_TICKETING, 0)
+            ]
+        );
+        let ore = patience_pile(b2, &with_quests(&[]), rng).begin().effects;
+        assert!(
+            matches!(ore[..], [Effect::GiveItem { item_id, quantity: 1 }, _]
+            if b2.prizes.iter().any(|prize| prize.0 == item_id))
+        );
+
+        // The way out asks, then goes back to the ticketing booth.
+        let mut exit = NpcScript::for_npc(SITE_EXIT, &holder).unwrap();
+        assert_eq!(kind(&exit.begin()), Some(0));
+        assert_eq!(kind(&exit.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert_eq!(
+            exit.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(SUBWAY_TICKETING, 0)]
+        );
     }
 
     #[test]
