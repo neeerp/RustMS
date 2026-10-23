@@ -375,8 +375,6 @@ const SUBWAY_LINES: [SubwayLine; 2] = [
         leave: keys::SUBWAY_TO_KERNING_CITY_LEAVE,
     },
 ];
-/// The NLC Taxi between New Leaf City and the Haunted House's grounds,
-/// either way (Cosmic's fare).
 const BASIC_LEVEL: u8 = 10;
 const BASIC_FARE: i32 = 1000;
 
@@ -397,6 +395,8 @@ impl SubwayLine {
     }
 }
 
+/// The NLC Taxi between New Leaf City and the Haunted House's grounds,
+/// either way (Cosmic's fare).
 const NLC_TAXI: i32 = 9201056;
 const NLC_TAXI_FARE: i32 = 15000;
 const NEW_LEAF_CITY: i32 = 600000000;
