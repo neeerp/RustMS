@@ -122,6 +122,13 @@ namespace ms
 			partner_frames[frame].draw(DrawArgument(absp + partner_offset(), facing_right));
 		}
 
+		std::array<Point<int16_t>, 3> pet_feet;
+
+		for (size_t i = 0; i < pets.size(); i++)
+			pet_feet[i] = pets[i].get_phobj().get_absolute(viewx, viewy, alpha);
+
+		// Behind the character, as v83 puts it under the avatar's layer (FUN_00707143).
+		set_effect.draw_pets(pet_feet, alpha);
 		set_effect.draw(false, absp, facepos, facing_right, alpha);
 		item_effect.draw(false, absp, facepos, facing_right, view, alpha);
 		draw_chair(false);
@@ -317,7 +324,7 @@ namespace ms
 
 		// An attack sends the background away too (FUN_0094c4f8).
 		set_effect.update(look, { pets[0].get_itemid(), pets[1].get_itemid(), pets[2].get_itemid() },
-						  state == State::STAND && !attacking);
+						  state == State::STAND && !attacking, facing_right);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.update();
