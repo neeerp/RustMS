@@ -1001,7 +1001,8 @@ place, and is dragged by its top 20 px, a height not checked against v83.
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
-`shops.json`) opens it instead of its speech: `net::shop::Shop::open` builds
+`shops.json` plus the shops it lacks in `game-data/shop_additions.toml`;
+see `agent_docs/server-content.md`) opens it instead of its speech: `net::shop::Shop::open` builds
 the list and the client actor holds it until the player leaves (mode 3),
 talks to another NPC, or changes maps. Rows whose item our v83 data lacks are
 dropped, as are price-0 rows other than throwing stars and bullets, which a

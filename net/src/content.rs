@@ -58,7 +58,7 @@ pub fn load() -> Result<String, String> {
     let shops = ShopTable::load(Some(&path)).map_err(|e| e.to_string())?;
     let gachapon = GachaponTable::load(Some(&path)).map_err(|e| e.to_string())?;
     let mut summary = format!(
-        "{}: {} text keys from the pack, {} placeholders; drops for {} mobs and {} shops from the pack; Gachapon prizes from {}",
+        "{}: {} text keys from the pack, {} placeholders; drops for {} mobs from the pack; {} shops; Gachapon prizes from {}",
         path.display(),
         text.from_pack(),
         text.placeholders(),

@@ -16,6 +16,7 @@ use std::path::Path;
 const PLACEHOLDER_TEXT: &str = include_str!("../placeholder_text.toml");
 const REWARD_OVERRIDES: &str = include_str!("../reward_overrides.toml");
 const GACHAPON_PLACEHOLDER: &str = include_str!("../gachapon_placeholder.toml");
+const SHOP_ADDITIONS: &str = include_str!("../shop_additions.toml");
 
 /// Text keys used by server scripts. `placeholder_text.toml` lists them all.
 pub mod keys {
@@ -1560,8 +1561,8 @@ pub struct ShopEntry {
     pub price: i32,
 }
 
-/// NPC shops: the pack's `shops.json`, by NPC id. Without the pack there are
-/// no shops.
+/// NPC shops: the pack's `shops.json`, by NPC id, and the shopkeepers it
+/// lacks from `shop_additions.toml`. Without the pack only those keep one.
 #[derive(Debug, Default)]
 pub struct ShopTable {
     npcs: BTreeMap<i32, Vec<ShopEntry>>,
@@ -1581,6 +1582,22 @@ impl ShopTable {
                     .map_err(|_| GameDataError::InvalidData(format!("bad shop npc id {npc}")))?;
                 npcs.insert(id, entries);
             }
+        }
+        #[derive(Deserialize)]
+        struct Additions {
+            shops: BTreeMap<String, Vec<(i32, i32)>>,
+        }
+        let additions: Additions = toml::from_str(SHOP_ADDITIONS)
+            .map_err(|e| GameDataError::InvalidData(format!("shop_additions.toml: {e}")))?;
+        for (npc, rows) in additions.shops {
+            let npc = npc.parse().map_err(|_| {
+                GameDataError::InvalidData(format!("shop_additions.toml: NPC id {npc}"))
+            })?;
+            npcs.entry(npc).or_insert_with(|| {
+                rows.into_iter()
+                    .map(|(item, price)| ShopEntry { item, price })
+                    .collect()
+            });
         }
         Ok(Self { npcs })
     }
@@ -2348,14 +2365,25 @@ mod tests {
 
     #[test]
     fn shops_come_from_the_pack() {
-        assert!(ShopTable::load(None).unwrap().is_empty());
+        // Without it, only the shopkeepers it lacks keep a shop.
+        let additions = ShopTable::load(None).unwrap();
+        assert_eq!(additions.len(), 13);
+        assert_eq!(
+            additions.shop(1091000).unwrap()[0],
+            ShopEntry {
+                item: 1492000,
+                price: 3000
+            }
+        );
+        assert!(additions.shop(1011100).is_none());
 
         let dir = std::env::temp_dir().join(format!("rustms-shops-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("shops.json"),
             r#"{"1011100": [{"item": 2000000, "price": 50, "stock": 100000},
-                            {"item": 2070001, "stock": 100000, "unitPrice": 0.4}]}"#,
+                            {"item": 2070001, "stock": 100000, "unitPrice": 0.4}],
+                "1091000": [{"item": 2000000, "price": 50}]}"#,
         )
         .unwrap();
         let shops = ShopTable::load(Some(&dir)).unwrap();
@@ -2372,6 +2400,9 @@ mod tests {
                 }
             ]
         );
+        // The pack's rows win over an addition for the same shopkeeper.
+        assert_eq!(shops.shop(1091000).unwrap().len(), 1);
+        assert_eq!(shops.shop(9270021), additions.shop(9270021));
         assert!(shops.shop(11000).is_none());
         std::fs::remove_dir_all(dir).unwrap();
     }
