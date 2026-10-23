@@ -1320,6 +1320,12 @@ pub mod keys {
         ZAKUM_GATE_NO_EYE,
     ];
 
+    /// The magic rocks of Orbis Tower and Eos Tower; `{item}` is the
+    /// scroll and `{map}` the floor.
+    pub const TOWER_ROCK_NONE: &str = "tower_rock.none";
+    pub const TOWER_ROCK_MENU: &str = "tower_rock.menu";
+    pub const TOWER_ROCK_ASK: &str = "tower_rock.ask";
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -2172,6 +2178,11 @@ mod tests {
             .chain(&keys::CEREMONY)
             .chain(&keys::GIFTS)
             .chain(&keys::ZAKUM)
+            .chain(&[
+                keys::TOWER_ROCK_NONE,
+                keys::TOWER_ROCK_MENU,
+                keys::TOWER_ROCK_ASK,
+            ])
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }
