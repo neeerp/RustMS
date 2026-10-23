@@ -80,6 +80,9 @@ pub struct MobInfo {
     /// How often a friendly mob drops what it makes, in units of 10
     /// seconds (`dropItemPeriod`), or 0 for never.
     pub drop_item_period: i32,
+    /// It never turns (`noFlip`): it faces left whatever its stance says,
+    /// as Pianus does at either end of his cave.
+    pub no_flip: bool,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -252,6 +255,7 @@ impl MobData {
             hp_gauge_hide: int("HPgaugeHide")? != 0,
             damaged_by_mob: int("damagedByMob")? != 0,
             drop_item_period: int("dropItemPeriod")?,
+            no_flip: int("noFlip")? != 0,
         }))
     }
 
@@ -438,6 +442,9 @@ mod tests {
             (6, 0)
         );
         assert!(!mob(100100).public_reward && !mob(100100).explosive_reward);
+        // Pianus, and his Bloody Booms, never turn.
+        assert!(mob(8510000).no_flip && mob(8520000).no_flip && mob(8510100).no_flip);
+        assert!(!mob(100100).no_flip);
     }
 
     #[test]

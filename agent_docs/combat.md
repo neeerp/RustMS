@@ -1537,7 +1537,10 @@ controller's client plays the cast and the server applies it
 - **What's cast:** the buffs (100-103 and the area versions 110-113, Haste
   115 and 156, the immunities 140-142, and 150-157) give MOB_STAT_SET
   statuses whose reason is skill | level << 16, on the caster or on every
-  mob in its `lt`/`rb` area, with chance `prop`, for `time` seconds. Power
+  mob in its `lt`/`rb` area, with chance `prop`, for `time` seconds. An
+  area is written for a caster facing left and mirrored when it faces
+  right, except for a mob that never turns (`noFlip`, as Pianus), whose
+  areas stay as written whatever stance its controller reports. Power
   Up and Magic Up set the PowerUp and MagicUp stats to `x`, a percent the
   client scales the mob's physical or magic hits by. Heal (114) gives the
   mobs in its area `x` HP and `y` MP, up to their maxima, shown to everyone as a blue
