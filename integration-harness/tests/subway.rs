@@ -1,6 +1,8 @@
 //! The subway from Kerning City to New Leaf City: Bell sells the ticket,
 //! the gate takes it while the train boards, and the waiting room rides to
-//! New Leaf City, all without a ship on the platforms. Then the NLC Taxi to
+//! New Leaf City, all without a ship on the platforms. Then back the same
+//! way, leaving the waiting room once by Bell, who keeps the ticket that
+//! was given up. Then the NLC Taxi to
 //! the Haunted House's grounds and its gate (`halloween_enter`). The
 //! harness world runs the route clock 60 times as fast
 //! (`RUSTMS_CONTI_SCALE`), so a train leaves every 5 seconds.
@@ -25,6 +27,7 @@ const SCALE: i64 = 60;
 const MINUTE: i64 = 60_000;
 const BELL: i32 = 9201057;
 const KERNING_CITY_GATE: i32 = 1052007;
+const NLC_GATE: i32 = 9201068;
 const NLC: i32 = 600_000_000;
 const NLC_TAXI: i32 = 9201056;
 const HAUNTED_HOUSE_GROUNDS: i32 = 682_000_000;
@@ -81,6 +84,15 @@ fn route_time() -> i64 {
     i64::try_from(millis).unwrap() * SCALE
 }
 
+/// Wait for `route`'s next boarding: it opens 4 minutes before each
+/// departure on the 5 minutes.
+async fn until_boarding(route: &conti::Route) {
+    let term = route.timetable.term * MINUTE;
+    let opens = (route.timetable.term - route.timetable.wait) * MINUTE;
+    let wait = (opens - route_time().rem_euclid(term)).rem_euclid(term) / SCALE;
+    tokio::time::sleep(Duration::from_millis((wait + 200) as u64)).await;
+}
+
 #[tokio::test]
 async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     let route = &conti::TO_NLC;
@@ -95,7 +107,7 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     let character_id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    set_meso(character_id, 20000).await.unwrap();
+    set_meso(character_id, 30000).await.unwrap();
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
     let mut trace = Trace::default();
@@ -111,17 +123,13 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     assert_eq!(t.prompts, [(BELL, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.items, [(route.ticket, 1)]);
-    assert_eq!(t.stat(stat::MESO), Some(15000));
+    assert_eq!(t.stat(stat::MESO), Some(25000));
 
     // The platform has no ship to ask about.
     let t = step(c, &m, ship_state(route.platform)).await;
     assert!(t.ship_states.is_empty());
 
-    // Boarding opens 4 minutes before each departure on the 5 minutes.
-    let term = route.timetable.term * MINUTE;
-    let opens = (route.timetable.term - route.timetable.wait) * MINUTE;
-    let wait = (opens - route_time().rem_euclid(term)).rem_euclid(term) / SCALE;
-    tokio::time::sleep(Duration::from_millis((wait + 200) as u64)).await;
+    until_boarding(route).await;
     let t = step(c, &m, board).await;
     assert_eq!(t.prompts, [(KERNING_CITY_GATE, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
@@ -132,6 +140,52 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     let mut trace = Trace::default();
     until(c, &mut trace, |t| t.warps.contains(&route.deck)).await;
     until(c, &mut trace, |t| t.warps.contains(&route.arrival.0)).await;
+    assert!(trace.ship_moves.is_empty());
+
+    // Bell at New Leaf City's station sells the ticket back.
+    let back = &conti::TO_KERNING_CITY;
+    assert_eq!(route.arrival.0, back.platform);
+    let buy_back = || {
+        (
+            talk(back.platform, BELL),
+            answer(4, 1, Some(0)),
+            answer(1, 1, None),
+        )
+    };
+    let (menu, choice, yes) = buy_back();
+    assert_eq!(step(c, &m, menu).await.prompts, [(BELL, 4)]);
+    assert_eq!(step(c, &m, choice).await.prompts, [(BELL, 1)]);
+    let t = step(c, &m, yes).await;
+    assert_eq!(t.items, [(back.ticket, 1)]);
+    assert_eq!(t.stat(stat::MESO), Some(20000));
+
+    // Its gate takes it; Bell in the waiting room lets the player out
+    // again, without it.
+    until_boarding(back).await;
+    let t = step(c, &m, talk(back.platform, NLC_GATE)).await;
+    assert_eq!(t.prompts, [(NLC_GATE, 1)]);
+    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.warps, [back.waiting_room]);
+    assert_eq!(t.items, [(back.ticket, -1)]);
+    let t = step(c, &m, talk(back.waiting_room, BELL)).await;
+    assert_eq!(t.prompts, [(BELL, 1)]);
+    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.warps, [back.platform]);
+    assert!(t.items.is_empty());
+
+    // With another ticket the train takes them home to Kerning City.
+    let (menu, choice, yes) = buy_back();
+    step(c, &m, menu).await;
+    step(c, &m, choice).await;
+    let t = step(c, &m, yes).await;
+    assert_eq!(t.stat(stat::MESO), Some(15000));
+    until_boarding(back).await;
+    step(c, &m, talk(back.platform, NLC_GATE)).await;
+    let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.warps, [back.waiting_room]);
+    let mut trace = Trace::default();
+    until(c, &mut trace, |t| t.warps.contains(&back.deck)).await;
+    until(c, &mut trace, |t| t.warps.contains(&back.arrival.0)).await;
     assert!(trace.ship_moves.is_empty());
 
     // The NLC Taxi to the Haunted House's grounds, and in by its gate.
