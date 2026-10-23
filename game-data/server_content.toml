@@ -802,6 +802,8 @@ unsourced = [
     "opq.minerva.full",
     "opq.eak.storage",
     "opq.minerva.bonus_ask",
+    "opq.eak.salion.find",
+    "opq.eak.salion.found",
 ]
 
 [text."glTutoMsg0.message"]

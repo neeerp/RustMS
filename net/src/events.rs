@@ -470,7 +470,7 @@ pub const OPQ: Event = Event {
     stage_maps: &[
         920_010_000,
         920_010_200,
-        920_010_300,
+        OPQ_SALION_ROOM,
         920_010_400,
         920_010_500,
         920_010_600,
@@ -480,7 +480,7 @@ pub const OPQ: Event = Event {
     ],
     talk_clears: &[1],
     member_clears: &[
-        3,
+        OPQ_SALION_STAGE,
         OPQ_MUSIC_STAGE,
         OPQ_HEAD_COUNT_STAGE,
         OPQ_LEVER_STAGE,
@@ -510,6 +510,13 @@ pub const OPQ: Event = Event {
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
 /// rooms open off.
 pub const OPQ_HUB: i32 = 920_010_100;
+/// The Tower of Goddess's storage room, where Cellions come out at the
+/// Salion's spots in turn, and its stage.
+pub const OPQ_SALION_ROOM: i32 = 920_010_300;
+pub const OPQ_SALION_STAGE: u8 = 3;
+/// The statue's second piece, dropped by the storage room's last spot, or
+/// given by Eak once the room is bare.
+pub const OPQ_SALION_PIECE: i32 = 4_001_045;
 /// The Tower of Goddess's music room, where the day's record must play,
 /// and its stage.
 pub const OPQ_MUSIC_ROOM: i32 = 920_010_400;

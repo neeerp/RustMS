@@ -1171,6 +1171,12 @@ impl NpcScript {
         opq_eak(map_id, leader, cleared)
     }
 
+    /// Eak in the Tower of Goddess's storage room, once it is `bare` of
+    /// monsters and drops or was `cleared`.
+    pub fn opq_salion(bare: bool, cleared: bool) -> Self {
+        opq_salion(bare, cleared)
+    }
+
     /// Eak in the Tower of Goddess's music room, once the music box
     /// `played` the day's record or the room was `cleared`.
     pub fn opq_music(played: bool, cleared: bool) -> Self {
@@ -2931,6 +2937,32 @@ fn opq_hub(statue: Statue) -> NpcScript {
         Statue::Won => Page::Say(text(keys::OPQ_EAK_MINERVA)),
     };
     NpcScript::new(EAK, vec![page])
+}
+
+/// Eak in the storage room (Cosmic `2013001`, `statusStg2`): lest the
+/// Salion stage stick, once no monster or drop is left in the room he
+/// gives the statue's second piece himself and clears the room, as its
+/// last spot would. Any member may ask.
+fn opq_salion(bare: bool, cleared: bool) -> NpcScript {
+    let page = if cleared {
+        Page::Say(text(keys::OPQ_EAK_ROOM_CLEARED))
+    } else if bare {
+        Page::Act {
+            text: text(keys::OPQ_EAK_SALION_FOUND),
+            effects: vec![
+                Effect::GiveItem {
+                    item_id: events::OPQ_SALION_PIECE,
+                    quantity: 1,
+                },
+                Effect::EventCommand(EventCommand::ClearStage(events::OPQ_SALION_STAGE)),
+            ],
+        }
+    } else {
+        Page::Say(text(keys::OPQ_EAK_SALION_FIND))
+    };
+    let mut script = NpcScript::new(EAK, vec![page]);
+    script.inventory_full = Some(text(keys::OPQ_EAK_FULL));
+    script
 }
 
 /// Eak in the music room (Cosmic `2013001`, `statusStg3`): he asks for the
@@ -6556,6 +6588,43 @@ mod tests {
             text(keys::OPQ_EAK_GRASS)
         );
         assert_eq!(page_text(&hub(Statue::Won)), text(keys::OPQ_EAK_MINERVA));
+    }
+
+    #[test]
+    fn eak_gives_the_second_piece_himself_once_the_storage_room_is_bare() {
+        let said = |script: NpcScript| {
+            let step = script.begin();
+            (page_text(&step), step.effects)
+        };
+        assert_eq!(
+            said(NpcScript::opq_salion(false, false)),
+            (text(keys::OPQ_EAK_SALION_FIND), vec![])
+        );
+        assert_eq!(
+            said(NpcScript::opq_salion(true, false)),
+            (
+                text(keys::OPQ_EAK_SALION_FOUND),
+                vec![
+                    Effect::GiveItem {
+                        item_id: events::OPQ_SALION_PIECE,
+                        quantity: 1,
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(events::OPQ_SALION_STAGE)),
+                ]
+            )
+        );
+        for bare in [false, true] {
+            assert_eq!(
+                said(NpcScript::opq_salion(bare, true)),
+                (text(keys::OPQ_EAK_ROOM_CLEARED), vec![])
+            );
+        }
+        let mut full = NpcScript::opq_salion(true, false);
+        full.begin();
+        assert_eq!(
+            page_text(&full.inventory_full().unwrap()),
+            text(keys::OPQ_EAK_FULL)
+        );
     }
 
     #[test]

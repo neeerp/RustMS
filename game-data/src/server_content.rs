@@ -478,6 +478,10 @@ pub mod keys {
     pub const OPQ_EAK_STORAGE: &str = "opq.eak.storage";
     /// Minerva in the treasure room, asking whether to leave it.
     pub const OPQ_MINERVA_BONUS_ASK: &str = "opq.minerva.bonus_ask";
+    /// Eak in the storage room while a monster or drop is left there.
+    pub const OPQ_EAK_SALION_FIND: &str = "opq.eak.salion.find";
+    /// Eak giving the statue's second piece in the bare storage room.
+    pub const OPQ_EAK_SALION_FOUND: &str = "opq.eak.salion.found";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -2075,6 +2079,8 @@ mod tests {
             keys::OPQ_MINERVA_FULL,
             keys::OPQ_EAK_STORAGE,
             keys::OPQ_MINERVA_BONUS_ASK,
+            keys::OPQ_EAK_SALION_FIND,
+            keys::OPQ_EAK_SALION_FOUND,
         ];
         for key in named
             .iter()

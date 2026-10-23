@@ -484,8 +484,22 @@ copy of the map). The spot that breaks after the last drops its loot, a
 piece of the statue, 4001045, for the owner of the drop that broke it (or
 anyone still on the map), whose client actor then tells the event the stage is cleared
 (`Event::member_clears`; any member may). The piece goes in 2008005 on
-the hub. Eak's backup path on this map, which Cosmic has for a team whose
-Cellions got stuck, isn't here yet.
+the hub.
+
+A Cellion can die away from any spot, and then its drop is never taken.
+For that case Eak here (`ClientActor::opq_eak`, `NpcScript::opq_salion`;
+Cosmic `2013001`, `statusStg2`) offers a backup. Once no monster
+(`FieldMessage::MobCount`) and no drop of any kind (`DropCount`) is left
+on the map, he gives whoever asks the piece himself, if they have room
+for it. That also clears the stage. Nobody can pick up a Cellion's drop
+(4001074 has `pickUpBlock`), so a stray one has to lie out its three
+minutes (`field_drops::LIFETIME`) before the room is bare. Like the
+hand-ins, two members asking at the same moment could each get a piece,
+and so could one asking just after the last spot's piece was picked up,
+before the clear reaches the ticket. Once the room is cleared, Eak only
+sends the team on. Harness `opq_salion` checks that he only says to
+search while a Cellion is out; the bare room is covered by
+`npc_scripts`'s unit test.
 
 ## Orbis's music room and sealed room
 
@@ -744,6 +758,7 @@ EXP at the reward.
 | Eak 2013001 | 920010000 | Runtime (`opq_eak`): out of the light; the leader clears the cloud stage, the others go up to `st00` |
 | Eak 2013001 | 920010100 | Runtime (`opq_eak`, `opq_hub`): the six pieces, then to the garden, the Grass and Minerva, to the leader only |
 | Eak 2013001 | 920010200, 920010600 | Runtime (`eak_hand_in`): 30 of 4001050 / 40 of 4001052 for a piece of the statue, clearing the room |
+| Eak 2013001 | 920010300 | Runtime (`opq_eak`, `opq_salion`): with no monster or drop left, the second piece of the statue, clearing the room |
 | Eak 2013001 | 920010400, 920010500, 920010700 | Runtime (`opq_eak`): the music box, the head count, the levers; brings out the room's stone box and clears it |
 | Eak 2013001 | 920010800 | Runtime (`opq_eak`): Papa Pixie |
 | Minerva 2013002 | 920010100 | Once won, alone to 920011300 |
