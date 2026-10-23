@@ -2478,7 +2478,7 @@ mod tests {
     fn shops_come_from_the_pack() {
         // Without it, only the shopkeepers it lacks keep a shop.
         let additions = ShopTable::load(None).unwrap();
-        assert_eq!(additions.len(), 13);
+        assert_eq!(additions.len(), 14);
         assert_eq!(
             additions.shop(1091000).unwrap()[0],
             ShopEntry {
