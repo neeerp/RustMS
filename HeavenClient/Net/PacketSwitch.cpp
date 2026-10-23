@@ -87,6 +87,8 @@ namespace ms
 		CHECK_AUTO_HP = 212,
 		ITEM_EMOTION = 226,
 		PLAYER_HINT = 214,
+		PLAY_EVENT_SOUND = 215,
+		PLAY_MINIGAME_SOUND = 216,
 
 		/// The server's hold on the UI
 		OPEN_UI = 220,
@@ -536,6 +538,8 @@ namespace ms
 		// TODO: New handlers, they need coded and moved to a proper file.
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();
 		emplace<FIELD_EFFECT, FieldEffectHandler>();
+		emplace<PLAY_EVENT_SOUND, PlayEventSoundHandler>();
+		emplace<PLAY_MINIGAME_SOUND, PlayMinigameSoundHandler>();
 
 		emplace<OPEN_UI, OpenUiHandler>();
 		emplace<LOCK_UI, LockUiHandler>();

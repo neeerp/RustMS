@@ -32,4 +32,18 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// A sound from Sound.nx Field.img, played once at full volume (FUN_0095da17).
+	// Opcode: PLAY_EVENT_SOUND(215)
+	class PlayEventSoundHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A sound from Sound.nx MiniGame.img, played once at full volume (FUN_0095da75).
+	// Opcode: PLAY_MINIGAME_SOUND(216)
+	class PlayMinigameSoundHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

@@ -142,4 +142,22 @@ namespace ms
 
 		std::cout << "[FieldEffectHandler]: Unknown value: [" << rand << "]" << std::endl;
 	}
+
+	void PlayEventSoundHandler::handle(InPacket& recv) const
+	{
+		// Sound/Field.img/<name> (StringPool 0x9fd) through FUN_0098a563.
+		nl::node sound = nl::nx::sound["Field.img"].resolve(recv.read_string());
+
+		if (sound)
+			Sound(sound).play(100);
+	}
+
+	void PlayMinigameSoundHandler::handle(InPacket& recv) const
+	{
+		// Sound/MiniGame.img/ (StringPool 0x89c) and the name, through FUN_00989a15.
+		nl::node sound = nl::nx::sound["MiniGame.img"].resolve(recv.read_string());
+
+		if (sound)
+			Sound(sound).play(100);
+	}
 }
