@@ -1384,6 +1384,32 @@ pub mod keys {
         PAPULATUS_MACHINE_LEAVE,
         PAPULATUS_SUMMONED,
     ];
+    pub const HORNTAIL_KEROBEN_AWAY: &str = "horntail.keroben.away";
+    pub const HORNTAIL_KEROBEN_MENU: &str = "horntail.keroben.menu";
+    pub const HORNTAIL_KEROBEN_BUY_CHOICE: &str = "horntail.keroben.buy_choice";
+    pub const HORNTAIL_KEROBEN_ENTER_CHOICE: &str = "horntail.keroben.enter_choice";
+    pub const HORNTAIL_KEROBEN_BOUGHT: &str = "horntail.keroben.bought";
+    pub const HORNTAIL_KEROBEN_SHORT: &str = "horntail.keroben.short";
+    pub const HORNTAIL_KEROBEN_FULL: &str = "horntail.keroben.full";
+    pub const HORNTAIL_KEROBEN_LOW_LEVEL: &str = "horntail.keroben.low_level";
+    pub const HORNTAIL_SLATE_ASK: &str = "horntail.slate.ask";
+    pub const HORNTAIL_SLATE_SEALED: &str = "horntail.slate.sealed";
+    pub const HORNTAIL_CRYSTAL_LEAVE: &str = "horntail.crystal.leave";
+    /// Keroben, the Encrypted Slate of the Squad, and the Crystal of
+    /// Roots: the way to Horntail.
+    pub const HORNTAIL: [&str; 11] = [
+        HORNTAIL_KEROBEN_AWAY,
+        HORNTAIL_KEROBEN_MENU,
+        HORNTAIL_KEROBEN_BUY_CHOICE,
+        HORNTAIL_KEROBEN_ENTER_CHOICE,
+        HORNTAIL_KEROBEN_BOUGHT,
+        HORNTAIL_KEROBEN_SHORT,
+        HORNTAIL_KEROBEN_FULL,
+        HORNTAIL_KEROBEN_LOW_LEVEL,
+        HORNTAIL_SLATE_ASK,
+        HORNTAIL_SLATE_SEALED,
+        HORNTAIL_CRYSTAL_LEAVE,
+    ];
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
@@ -2468,6 +2494,7 @@ mod tests {
             .chain(&keys::GIFTS)
             .chain(&keys::ZAKUM)
             .chain(&keys::PAPULATUS)
+            .chain(&keys::HORNTAIL)
             .chain(&[
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,

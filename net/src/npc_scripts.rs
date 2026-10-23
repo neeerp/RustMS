@@ -1431,6 +1431,9 @@ impl NpcScript {
                 ))
             }
             MACHINE_APPARATUS => return Some(machine_apparatus()),
+            KEROBEN => return Some(keroben(player)),
+            SQUAD_SLATE => return Some(squad_slate(player)),
+            CRYSTAL_OF_ROOTS => return Some(crystal_of_roots(player)),
             JAKE => return Some(jake(player)),
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
@@ -5882,6 +5885,109 @@ fn machine_apparatus() -> NpcScript {
     )
 }
 
+/// Keroben, at the Cave of Life's entrance (240040700), lets by only the
+/// Dragon Squad: those turned to dragons by the Dragon Elixir (2210003,
+/// quest 7301's reward) or holding its certificate (4001086, quest 7302's).
+const KEROBEN: i32 = 2081005;
+/// The Encrypted Slate of the Squad, at the Cave Entrance (240050000).
+const SQUAD_SLATE: i32 = 2083000;
+/// The Crystal of Roots, the way out of the cave's depths.
+const CRYSTAL_OF_ROOTS: i32 = 2083002;
+const DRAGON_ELIXIR: i32 = 2210003;
+const DRAGON_SQUAD_CERTIFICATE: i32 = 4001086;
+const POWER_ELIXIR: i32 = 2000005;
+/// What Keroben asks for ten Power Elixirs.
+const KEROBEN_ELIXIRS: (i16, i32) = (10, 100_000);
+const HORNTAIL_LEVEL: u8 = 100;
+const CAVE_OF_LIFE_ENTRANCE: i32 = 240040700;
+const CAVE_ENTRANCE: i32 = 240050000;
+pub(crate) const HORNTAIL_CAVE_ENTRANCE: i32 = 240050400;
+/// Cave : The Road in Between, from which `hontale_out1` leads back to the
+/// Entrance to Horntail's Cave.
+const ROAD_IN_BETWEEN: i32 = 240050600;
+
+fn keroben(player: &Player) -> NpcScript {
+    let dragon = player
+        .buffs
+        .active()
+        .iter()
+        .any(|buff| buff.skill_id == -DRAGON_ELIXIR);
+    if !dragon && !holds(player, DRAGON_SQUAD_CERTIFICATE) {
+        return NpcScript::new(KEROBEN, vec![Page::Say(text(keys::HORNTAIL_KEROBEN_AWAY))]);
+    }
+    let (quantity, price) = KEROBEN_ELIXIRS;
+    let buy = if player.meso >= price {
+        Page::Act {
+            text: text(keys::HORNTAIL_KEROBEN_BOUGHT),
+            effects: vec![
+                Effect::SpendMeso(price),
+                Effect::GiveItem {
+                    item_id: POWER_ELIXIR,
+                    quantity,
+                },
+            ],
+        }
+    } else {
+        Page::End(text(keys::HORNTAIL_KEROBEN_SHORT))
+    };
+    let enter = if player.stats.level >= HORNTAIL_LEVEL {
+        Page::Done(vec![Effect::WarpToPortal(CAVE_ENTRANCE, 0)])
+    } else {
+        Page::End(text(keys::HORNTAIL_KEROBEN_LOW_LEVEL))
+    };
+    let mut script = NpcScript::new(
+        KEROBEN,
+        vec![Page::Menu {
+            text: text(keys::HORNTAIL_KEROBEN_MENU),
+            choices: vec![
+                (text(keys::HORNTAIL_KEROBEN_BUY_CHOICE), vec![buy]),
+                (text(keys::HORNTAIL_KEROBEN_ENTER_CHOICE), vec![enter]),
+            ],
+        }],
+    );
+    script.inventory_full = Some(text(keys::HORNTAIL_KEROBEN_FULL));
+    script.refused = Some(text(keys::HORNTAIL_KEROBEN_SHORT));
+    script
+}
+
+/// The slate lets the squad's certificate holders on to the Entrance to
+/// Horntail's Cave. (Cosmic may also let in those holding the three
+/// bosses' proofs, with solo expeditions on; that is off by default.)
+fn squad_slate(player: &Player) -> NpcScript {
+    let page = if holds(player, DRAGON_SQUAD_CERTIFICATE) {
+        Page::Ask {
+            text: text(keys::HORNTAIL_SLATE_ASK),
+            on_yes: vec![Effect::WarpToPortal(HORNTAIL_CAVE_ENTRANCE, 0)],
+            on_no: None,
+        }
+    } else {
+        Page::Say(text(keys::HORNTAIL_SLATE_SEALED))
+    };
+    NpcScript::new(SQUAD_SLATE, vec![page])
+}
+
+/// The Crystal of Roots asks, then takes those past the Entrance to
+/// Horntail's Cave to the Road in Between, and others back out to the
+/// Cave of Life's entrance.
+fn crystal_of_roots(player: &Player) -> NpcScript {
+    let out = if player.stats.map_id > HORNTAIL_CAVE_ENTRANCE {
+        Effect::WarpToPortal(ROAD_IN_BETWEEN, 0)
+    } else {
+        Effect::WarpToPortal(
+            CAVE_OF_LIFE_ENTRANCE,
+            crate::scripts::named(CAVE_OF_LIFE_ENTRANCE, "out00"),
+        )
+    };
+    NpcScript::new(
+        CRYSTAL_OF_ROOTS,
+        vec![Page::Ask {
+            text: text(keys::HORNTAIL_CRYSTAL_LEAVE),
+            on_yes: vec![out],
+            on_no: None,
+        }],
+    )
+}
+
 /// A magic rock in Orbis Tower or Eos Tower: one of its scroll takes the
 /// player to another rock of the tower, by the `go00` portal beside it in
 /// Eos Tower.
@@ -10246,6 +10352,88 @@ mod tests {
         assert_eq!(
             machine.respond(ScriptInput::Yes).unwrap().effects,
             [Effect::Warp(events::CLOCKTOWER_DEPTHS)]
+        );
+    }
+
+    #[test]
+    fn keroben_and_the_slate_let_the_dragon_squad_on_toward_horntail() {
+        let squad = |level, meso| {
+            let mut player = hunter(&[(DRAGON_SQUAD_CERTIFICATE, 1)], &[]);
+            (player.stats.level, player.meso) = (level, meso);
+            player
+        };
+        let said =
+            |npc, player: &Player| page_text(&NpcScript::for_npc(npc, player).unwrap().begin());
+
+        // Keroben turns away all but dragons and certificate holders.
+        assert_eq!(
+            said(KEROBEN, &hunter(&[], &[])),
+            text(keys::HORNTAIL_KEROBEN_AWAY)
+        );
+        let mut dragon = hunter(&[], &[]);
+        dragon.stats.level = 100;
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        let morph =
+            game::buff::Buff::new(-DRAGON_ELIXIR, game::buff::BuffStat::Morph, 1, now, lasts);
+        dragon.buffs.give(morph);
+        let menu = NpcScript::for_npc(KEROBEN, &dragon).unwrap().begin();
+        assert_eq!(kind(&menu), Some(4));
+
+        // He sells ten Power Elixirs, and lets those of level 100 in.
+        let mut keroben = NpcScript::for_npc(KEROBEN, &squad(100, 100_000)).unwrap();
+        keroben.begin();
+        assert_eq!(
+            keroben.respond(ScriptInput::Select(0)).unwrap().effects,
+            [
+                Effect::SpendMeso(100_000),
+                Effect::GiveItem {
+                    item_id: POWER_ELIXIR,
+                    quantity: 10
+                }
+            ]
+        );
+        let mut keroben = NpcScript::for_npc(KEROBEN, &squad(99, 99_999)).unwrap();
+        keroben.begin();
+        let short = keroben.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&short), text(keys::HORNTAIL_KEROBEN_SHORT));
+        let mut keroben = NpcScript::for_npc(KEROBEN, &squad(99, 0)).unwrap();
+        keroben.begin();
+        let low = keroben.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&low), text(keys::HORNTAIL_KEROBEN_LOW_LEVEL));
+        let mut keroben = NpcScript::for_npc(KEROBEN, &squad(100, 0)).unwrap();
+        keroben.begin();
+        assert_eq!(
+            keroben.respond(ScriptInput::Select(1)).unwrap().effects,
+            [Effect::WarpToPortal(CAVE_ENTRANCE, 0)]
+        );
+
+        // The slate opens to the certificate alone.
+        assert_eq!(
+            said(SQUAD_SLATE, &dragon),
+            text(keys::HORNTAIL_SLATE_SEALED)
+        );
+        let mut slate = NpcScript::for_npc(SQUAD_SLATE, &squad(100, 0)).unwrap();
+        slate.begin();
+        assert_eq!(
+            slate.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(HORNTAIL_CAVE_ENTRANCE, 0)]
+        );
+
+        // The Crystal of Roots takes those past the entrance to the Road in
+        // Between, and others out of the cave.
+        let leave = |map_id| {
+            let mut player = squad(100, 0);
+            player.stats.map_id = map_id;
+            let mut crystal = NpcScript::for_npc(CRYSTAL_OF_ROOTS, &player).unwrap();
+            crystal.begin();
+            crystal.respond(ScriptInput::Yes).unwrap().effects
+        };
+        assert_eq!(leave(240060200), [Effect::WarpToPortal(ROAD_IN_BETWEEN, 0)]);
+        let out00 = crate::scripts::named(CAVE_OF_LIFE_ENTRANCE, "out00");
+        assert_eq!(
+            leave(HORNTAIL_CAVE_ENTRANCE),
+            [Effect::WarpToPortal(CAVE_OF_LIFE_ENTRANCE, out00)]
         );
     }
 
