@@ -104,6 +104,34 @@ int main()
 		require(!birthday_date(19831301) && !birthday_date(19830100) && !birthday_date(19830431), "no month or day past its end");
 		require(!birthday_date(0) && !birthday_date(-19830113), "nothing before 1900");
 
+		require(for_mesos(80000001) && for_mesos(89999999) && !for_mesos(79999999) && !for_mesos(90000000), "SNs 80000000 on cost mesos");
+
+		std::vector<Commodity> shop = {
+			{ 50200001, 5130000, 3200, 5, 2, NONE, 5 },
+			{ 50200003, 5220000, 30000, 35, 2, HOT, 12 },
+			{ 30100001, 2000000, 100, 1, 2, NONE, 1 },
+			{ 80000001, 4031191, 1, 1, -1, NONE, 0 },
+			{ 80000002, 4031192, 1, 1, -1, NONE, 0 },
+			{ 80000003, 4031063, 1, 1, 0, NONE, 0 },
+			{ 91000010, 1062050, 2400, 1, 2, NONE, 1 }
+		};
+		std::vector<uint32_t> rolls = { 0, 5, 1, 7, 3, 2 };
+		size_t next_roll = 0;
+		std::vector<Placement> placed = scatter(shop, [&]() { return rolls[next_roll++]; });
+		require(placed.size() == 3, "each mesos commodity is placed once");
+		require(placed[0].cat == 5 && placed[0].sub == 2 && placed[0].roll == 5, "a roll picks among the sub-tabs that have items");
+		require(placed[1].cat == 3 && placed[1].sub == 1 && placed[1].roll == 7, "in the order the shop lists them");
+		require(placed[2].cat == 3 && placed[2].sub == 1, "packages are no sub-tab of their own");
+
+		std::vector<Commodity> etc = list(shop, 5, 2, false);
+		place(etc, placed, 5, 2, false);
+		require(etc.size() == 3 && etc[1].sn == 80000001, "the roll modulo the list's size is its place");
+
+		std::vector<Commodity> use = list(shop, 3, 1, true);
+		place(use, placed, 3, 1, true);
+		require(use.size() == 2 && use[0].sn == 80000002, "a commodity for the other gender stays out");
+		require(scatter(std::vector<Commodity>(shop.begin() + 3, shop.end()), []() { return 0u; }).empty(), "no sub-tab, no place");
+
 		std::cout << "Cash catalog passed\n";
 		return 0;
 	}

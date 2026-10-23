@@ -41,7 +41,8 @@ impl WorldHandler for EnterCashShopHandler {
 /// the balance, and either 0 and (for a bag) the bag, from the slot buttons,
 /// or 1 and an expansion commodity's serial number. The Extra Character Slot
 /// Coupon (0x08) sends a byte, the balance and its serial number, as a
-/// purchase does. Name Change (0x2E),
+/// purchase does. A commodity sold for mesos (0x20) sends only its serial
+/// number. Name Change (0x2E),
 /// after its own checks (op 0x10, op 0x15), sends the serial number, the
 /// old name and the new.
 pub struct CashShopOperationHandler;
@@ -56,6 +57,7 @@ const EXPAND_STORAGE: u8 = 0x07;
 const BUY_CHARACTER_SLOT: u8 = 0x08;
 const BUY_PACKAGE: u8 = 0x1E;
 const BUY_CRUSH_RING: u8 = 0x1D;
+const BUY_WITH_MESOS: u8 = 0x20;
 const BUY_FRIENDSHIP_RING: u8 = 0x23;
 const BUY_NAME_CHANGE: u8 = 0x2E;
 /// Sent unasked by v83: a query for each commodity it has not cached, and
@@ -109,6 +111,16 @@ impl WorldHandler for CashShopOperationHandler {
                     },
                     (None, _) => return fail(CashShopFailure::Unknown),
                     (_, Err(failure)) => return fail(failure),
+                }
+            }
+            BUY_WITH_MESOS => {
+                let sn = reader.read_int()?;
+                match cash_shop::check_meso_sale(
+                    cash_shop::commodity(sn),
+                    ctx.player.stats.gender.into(),
+                ) {
+                    Ok(commodity) => CashShopRequest::BuyWithMesos(commodity.clone()),
+                    Err(failure) => return fail(failure),
                 }
             }
             GIFT => {
@@ -383,10 +395,10 @@ mod tests {
 
     #[test]
     fn unsupported_requests_fail_so_the_shop_unlocks() {
-        // Buying with mesos: v83 waits for an answer before the next request.
+        // The rebate: v83 waits for an answer before the next request.
         let result = handle(|p| {
-            p.write_byte(0x20).unwrap();
-            p.write_int(20000000).unwrap();
+            p.write_byte(0x1A).unwrap();
+            p.write_long(1).unwrap();
         });
         let [WorldAction::Reply(reply)] = result.actions.as_slice() else {
             panic!("expected a failure reply: {:?}", result.actions);
@@ -487,6 +499,43 @@ mod tests {
                 "{level} {name}"
             );
         }
+    }
+
+    #[test]
+    fn quest_items_are_bought_with_mesos_only_with_their_own_request() {
+        let Some(bell) = cash_shop::commodity(80000001) else {
+            return;
+        };
+        let buy = |sn: i32| {
+            handle(|p| {
+                p.write_byte(BUY_WITH_MESOS).unwrap();
+                p.write_int(sn).unwrap();
+            })
+            .actions
+        };
+        assert!(matches!(
+            buy(80000001).as_slice(),
+            [WorldAction::CashShop(CashShopRequest::BuyWithMesos(commodity))] if commodity == bell
+        ));
+        // Not one off sale, nor one sold for NX.
+        for sn in [80000004, 50200005] {
+            let actions = buy(sn);
+            let [WorldAction::Reply(reply)] = actions.as_slice() else {
+                panic!("expected a failure reply: {actions:?}");
+            };
+            assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::SoldOut as u8]);
+        }
+        let actions = handle(|p| {
+            p.write_byte(BUY).unwrap();
+            p.write_byte(0).unwrap();
+            p.write_int(1).unwrap();
+            p.write_int(80000001).unwrap();
+        })
+        .actions;
+        let [WorldAction::Reply(reply)] = actions.as_slice() else {
+            panic!("expected a failure reply: {actions:?}");
+        };
+        assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
     }
 
     #[test]

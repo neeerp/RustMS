@@ -4,7 +4,7 @@
 use crate::load::{self, asset_path};
 use crate::packet::build::world::cash_shop::{CashShopFailure, WISH_LIST_SLOTS};
 use db::cash_shop::{CashItem, CashType};
-use game::{InventoryType, Item};
+use game::{InventoryChange, InventoryType, Item, Player};
 use game_data::commodities::{Commodity, CommodityData};
 use std::sync::OnceLock;
 
@@ -103,6 +103,9 @@ pub enum CashShopRequest {
         commodity: Commodity,
         new_name: String,
     },
+    /// Pay mesos for the quest item `commodity`, which goes straight to the
+    /// character's bags.
+    BuyWithMesos(Commodity),
 }
 
 /// The balance a purchase names: 1 NX Credit, 2 Maple Points, 4 NX Prepaid.
@@ -179,9 +182,13 @@ fn inert(item_id: i32) -> bool {
 }
 
 /// Whether `commodity` is for sale as an item or a package. The other
-/// `9xxxxxx` items, the slot expansions, are bought with their own request.
+/// `9xxxxxx` items, the slot expansions, are bought with their own request,
+/// as are the commodities sold for mesos.
 fn check_sale(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailure> {
     let commodity = commodity.ok_or(CashShopFailure::Unknown)?;
+    if for_mesos(commodity.sn) {
+        return Err(CashShopFailure::Unknown);
+    }
     if !commodity.on_sale || commodity.price <= 0 {
         return Err(CashShopFailure::SoldOut);
     }
@@ -193,6 +200,49 @@ fn check_sale(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopFailu
         return Err(CashShopFailure::Unknown);
     }
     Ok(commodity)
+}
+
+/// Whether the commodity `sn` costs mesos rather than NX: v83 shows the
+/// ones on sale (quest items, for 1 meso) among the others, and buys them
+/// with their own request, 0x20 (report b094).
+pub fn for_mesos(sn: i32) -> bool {
+    (80_000_000..90_000_000).contains(&sn)
+}
+
+/// Whether a character of `gender` can buy `commodity` for mesos.
+pub fn check_meso_sale(
+    commodity: Option<&Commodity>,
+    gender: i16,
+) -> Result<&Commodity, CashShopFailure> {
+    match commodity {
+        Some(commodity) if for_mesos(commodity.sn) && commodity.on_sale && commodity.price > 0 => {
+            if !commodity.for_gender(gender) {
+                return Err(CashShopFailure::Gender);
+            }
+            Ok(commodity)
+        }
+        _ => Err(CashShopFailure::SoldOut),
+    }
+}
+
+/// Pay the price of the mesos commodity `commodity` once, as v83 does,
+/// whatever its count, and put the items in the player's bags.
+pub fn buy_with_mesos(
+    player: &mut Player,
+    commodity: &Commodity,
+) -> Result<Vec<InventoryChange>, CashShopFailure> {
+    if commodity.price > player.meso {
+        return Err(CashShopFailure::NotEnoughMesos);
+    }
+    let (item_id, count) = (commodity.item_id, commodity.count);
+    if crate::items::refuses_only(&player.inventory, item_id, count.into()) {
+        return Err(CashShopFailure::InventoryFull);
+    }
+    let changes = crate::items::give(player.inventory_mut(), item_id, count)
+        .map_err(|_| CashShopFailure::InventoryFull)?;
+    player.meso -= commodity.price;
+    player.mark_dirty();
+    Ok(changes)
 }
 
 /// The commodities in `commodity`, if it is a package (`CashPackage.img`).
@@ -361,6 +411,91 @@ mod tests {
             expansion(&slots),
             Some(Expansion::Bag(InventoryType::Equip))
         );
+    }
+
+    /// The Golden Bell, sold for 1 meso.
+    fn golden_bell() -> Commodity {
+        Commodity {
+            sn: 80000001,
+            item_id: 4031191,
+            count: 1,
+            price: 1,
+            period: 0,
+            gender: -1,
+            on_sale: true,
+        }
+    }
+
+    #[test]
+    fn mesos_buy_only_the_mesos_commodities_on_sale() {
+        let bell = golden_bell();
+        assert_eq!(check_meso_sale(Some(&bell), 1), Ok(&bell));
+        let for_men = Commodity {
+            gender: 0,
+            ..bell.clone()
+        };
+        assert_eq!(check_meso_sale(Some(&for_men), 0), Ok(&for_men));
+        assert_eq!(
+            check_meso_sale(Some(&for_men), 1),
+            Err(CashShopFailure::Gender)
+        );
+        assert_eq!(check_meso_sale(None, 0), Err(CashShopFailure::SoldOut));
+        assert_eq!(
+            check_meso_sale(Some(&ticket()), 0),
+            Err(CashShopFailure::SoldOut)
+        );
+        for retired in [
+            Commodity {
+                on_sale: false,
+                ..bell.clone()
+            },
+            Commodity {
+                price: 0,
+                ..bell.clone()
+            },
+        ] {
+            assert_eq!(
+                check_meso_sale(Some(&retired), 0),
+                Err(CashShopFailure::SoldOut)
+            );
+        }
+        // NX doesn't buy them, for anyone.
+        assert_eq!(
+            check_purchase(Some(&bell), 0),
+            Err(CashShopFailure::Unknown)
+        );
+        assert_eq!(check_gift(Some(&bell)), Err(CashShopFailure::Unknown));
+    }
+
+    #[test]
+    fn mesos_pay_once_for_the_items_if_they_fit() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.meso = 4;
+        let bells = Commodity {
+            count: 3,
+            price: 5,
+            ..golden_bell()
+        };
+        assert_eq!(
+            buy_with_mesos(&mut player, &bells),
+            Err(CashShopFailure::NotEnoughMesos)
+        );
+        player.meso = 7;
+        player.inventory.set_slot_limit(InventoryType::Etc, 0);
+        let before = player.inventory.clone();
+        assert_eq!(
+            buy_with_mesos(&mut player, &bells),
+            Err(CashShopFailure::InventoryFull)
+        );
+        assert_eq!((player.meso, &player.inventory), (7, &before));
+
+        player.inventory.set_slot_limit(InventoryType::Etc, 24);
+        let changes = buy_with_mesos(&mut player, &bells).unwrap();
+        assert!(matches!(changes.as_slice(), [InventoryChange::Add { .. }]));
+        assert_eq!((player.meso, player.inventory.count(4031191)), (2, 3));
     }
 
     #[test]

@@ -177,6 +177,16 @@ then the balance, which unlocks the shop. 0x4B ends with the count, and the
 login server's character list shows it. The Maple Life items (5431000 and
 5432000) are still sold out.
 
+Commodities 80000000-89999999 cost mesos (report b094): four Etc quest items
+for 1 meso, such as the Golden Bell (80000001, item 4031191). Only their own
+request sells them, op 0x20 (the SN); BUY and gifts refuse them. The item goes
+straight into the character's bag, and the price is charged once whatever the
+count (`net::cash_shop::buy_with_mesos`). The client gets the meso stat
+update, the inventory add, then 0x8D (an int count, then per item a short, the
+slot and the item ID) and the balance. A short purse fails with 0xC2, a full
+bag with 0xBB, the other gender with 0xAA and anything off sale with 0xC0. As with NPC shops, the
+character is saved later, not at once.
+
 Each sale and gift adds one to its SN in `cash_sales`. The shop's Best Items
 are the five best-selling SNs a character of each gender may buy
 (`net::cash_shop::best_items`), the same five on every tab.

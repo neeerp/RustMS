@@ -369,6 +369,18 @@ namespace ms
 	};
 
 	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyWithMesosPacket : public OutPacket
+	{
+	public:
+		// Buy a commodity that costs mesos (v83 46e5c5)
+		BuyWithMesosPacket(int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(0x20);
+			write_int(sn);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
 	class TakeOutCashItemPacket : public OutPacket
 	{
 	public:

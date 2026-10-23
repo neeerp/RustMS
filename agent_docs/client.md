@@ -775,7 +775,7 @@ the screen size.
   0x57 (a bought item), 0x59 (a redeemed coupon), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
   new slot count), 0x62 (the storage's), 0x64 (the account's character
   slots), 0x68 (an item taken out), 0x6A (an
-  item put back) and 0x89 (a bought package) are read. Inventory slots keep the item's cash serial,
+  item put back), 0x89 (a bought package) and 0x8D (bought with mesos) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
   price and period, and a checkbox per balance. It checks the first balance
@@ -788,6 +788,16 @@ the screen size.
   a zero (no free trial). The result is a "successful purchase" or a failure
   notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
   except gift-token and character-transfer codes, which get the default.
+- **Buying with mesos:** v83 has no tab for the commodities that cost mesos
+  (SN 80000000-89999999). When the shop opens, each one on sale goes into a
+  random sub-tab that has items, at a random place (v83 `0x471f37`;
+  `cash_catalog::scatter`). Its price reads "N mesos", and it has no GIFT or
+  RESERVE, like anything free (`0x4baa51`). BUY says "You do not have enough
+  mesos." when the purse is short, or else asks "Are you sure you want to buy
+  this item?" and sends 0x20 with the SN (`0x46e5c5`). On 0x8D the Item
+  Inventory turns to the item's tab and scrolls to its row, then says "You
+  have successfully made the purchase." (`0x47b603`). v83 also selects the
+  slot; HC doesn't.
 - **Check:** CHECK CASH sends CHECK_CASH (228), as does the game window
   getting the focus back while the shop is open; QUERY_CASH_RESULT answers.
 - **Slot buttons:** Equip Slot through Stor. Slot open `UICashBuy` for the

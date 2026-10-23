@@ -100,6 +100,9 @@ namespace ms
 		bool request();
 		// A balance or an operation result came.
 		void answered();
+		// Something was bought with mesos: show its tab and row in the Item
+		// Inventory (v83 47b603). v83 also selects the slot.
+		void bought_with_mesos(int32_t item_id, int16_t slot);
 
 		// The Name Change commodity whose rules were asked for (v83
 		// CCashShop+0x4e4).
@@ -113,6 +116,8 @@ namespace ms
 		void change_tab(cash_catalog::Tab tab);
 		// Add a wish, or say why not.
 		void reserve(int32_t sn);
+		// Buy a commodity that costs mesos, after asking (v83 46e5c5).
+		void buy_with_mesos(const cash_catalog::Commodity& commodity);
 		void change_subtab(size_t subtab);
 		void change_page(size_t page);
 		void update_list();
@@ -175,6 +180,8 @@ namespace ms
 		std::vector<cash_catalog::Commodity> commodities;
 		// Every commodity, on sale or not, for what a package's contents cost on their own.
 		std::vector<cash_catalog::Commodity> catalog;
+		// Where the commodities that cost mesos are listed this time.
+		std::vector<cash_catalog::Placement> mesos_placed;
 		std::array<std::vector<std::string>, cash_catalog::NUM_TABS> subtab_names;
 
 		Texture background;

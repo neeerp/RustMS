@@ -1,9 +1,10 @@
 use integration_harness::connection::{MapleTestConnection, PacketEnvelope};
-use integration_harness::database::set_nx_credit;
+use integration_harness::database::{item_owner_and_hours, set_meso, set_nx_credit};
 use integration_harness::packets::{
-    build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_expand, build_cash_shop_gift,
-    build_cash_shop_put_back, build_cash_shop_take_out, build_cash_shop_wish_list,
-    build_check_cash, build_enter_cash_shop, opcode_name,
+    build_cash_shop_buy, build_cash_shop_buy_package, build_cash_shop_buy_with_mesos,
+    build_cash_shop_expand, build_cash_shop_gift, build_cash_shop_put_back,
+    build_cash_shop_take_out, build_cash_shop_wish_list, build_check_cash, build_enter_cash_shop,
+    opcode_name,
 };
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::{login_to_world_session, relogin};
@@ -390,4 +391,64 @@ async fn nx_buys_items_packages_gifts_and_slots() {
         }
     }
     panic!("no gift list");
+}
+
+/// The Golden Bell, sold for 1 meso, and a commodity of the same range off
+/// sale (report b094).
+const GOLDEN_BELL: i32 = 80000001;
+const GOLDEN_BELL_ITEM: i32 = 4031191;
+const MESOS_OFF_SALE: i32 = 80000004;
+
+#[tokio::test]
+async fn quest_items_are_bought_with_mesos() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = login_to_world_session(&config)
+        .await
+        .expect("login-to-world session flow failed");
+    let character_id = session.character_id;
+    enter_cash_shop(&mut session.connection).await;
+    let connection = &mut session.connection;
+
+    // A new character has no mesos; NX doesn't buy the bell either.
+    let buy = build_cash_shop_buy_with_mesos(GOLDEN_BELL).unwrap();
+    connection.send_packet(buy, "buy").await.expect("send buy");
+    assert_eq!(failure(connection, "buy without mesos").await, 0xC2);
+    let buy = build_cash_shop_buy_with_mesos(MESOS_OFF_SALE).unwrap();
+    connection.send_packet(buy, "buy").await.expect("send buy");
+    assert_eq!(failure(connection, "buy one off sale").await, 0xC0);
+    let buy = build_cash_shop_buy(1, GOLDEN_BELL).unwrap();
+    connection.send_packet(buy, "buy").await.expect("send buy");
+    assert_eq!(failure(connection, "buy with NX").await, 0x00);
+    drop(session);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_meso(character_id, 10).await.expect("give mesos");
+    let mut session = relogin(&config).await;
+    enter_cash_shop(&mut session.connection).await;
+    let connection = &mut session.connection;
+    let buy = build_cash_shop_buy_with_mesos(GOLDEN_BELL).unwrap();
+    connection.send_packet(buy, "buy").await.expect("send buy");
+
+    // The mesos, the bag, where the bell went, then the balances.
+    let stat = read_until(connection, "buy", SendOpcode::StatChange).await;
+    let meso = Cursor::new(&stat.packet.bytes[stat.packet.bytes.len() - 4..])
+        .read_int()
+        .expect("meso");
+    assert_eq!(meso, 9);
+    let added = read_until(connection, "buy", SendOpcode::InventoryOperation).await;
+    // The tick byte, one change: add to Etc (4).
+    assert_eq!(added.packet.bytes[2..6], [1, 1, 0, 4]);
+    let slot = i16::from_le_bytes([added.packet.bytes[6], added.packet.bytes[7]]);
+    let bought = read_until(connection, "buy", SendOpcode::CashShopOperation).await;
+    let mut expected = vec![0x8D, 1, 0, 0, 0, 1, 0];
+    expected.extend(slot.to_le_bytes());
+    expected.extend(GOLDEN_BELL_ITEM.to_le_bytes());
+    assert_eq!(bought.packet.bytes[2..], expected);
+    read_until(connection, "buy", SendOpcode::QueryCashResult).await;
+    drop(session);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    item_owner_and_hours(character_id, GOLDEN_BELL_ITEM)
+        .await
+        .expect("the bell wasn't saved");
 }

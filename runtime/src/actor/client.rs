@@ -49,7 +49,7 @@ use crate::message::{
 };
 use db::cash_shop::CashType;
 use game::ring::RingKind;
-use game::{InventoryType, Player};
+use game::{InventoryChange, InventoryType, Player};
 use game_data::commodities::Commodity;
 use net::cash_shop::{CashShopRequest, Expansion};
 use net::dialogue::{Conversation, NpcInteraction};
@@ -1096,6 +1096,9 @@ impl ClientActor {
                 commodity,
                 new_name,
             } => self.request_name_change(commodity, new_name).await?,
+            CashShopRequest::BuyWithMesos(commodity) => {
+                self.buy_with_mesos(account_id, commodity).await?
+            }
             CashShopRequest::Balance => {
                 let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
                 vec![cs::build_cash_balance(
@@ -1295,6 +1298,50 @@ impl ClientActor {
         info!(self.client_id, limit, price, "Expanded the storage");
         Ok(vec![
             cs::build_storage_slots(limit)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
+    }
+
+    /// Pay mesos for the quest item `commodity` and put it in the bags; it
+    /// is saved with the character, as an NPC shop's goods are. v83 sees the
+    /// meso and bag changes first, then where the item went.
+    async fn buy_with_mesos(
+        &mut self,
+        account_id: i32,
+        commodity: Commodity,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let player = &mut self.in_game_mut()?.player;
+        let changes = match net::cash_shop::buy_with_mesos(player, &commodity) {
+            Ok(changes) => changes,
+            Err(failure) => return Ok(vec![cs::build_cash_shop_failure(failure)?]),
+        };
+        let meso = player.meso;
+        let slot = changes
+            .iter()
+            .rev()
+            .find_map(|change| match change {
+                InventoryChange::Add { slot, .. } | InventoryChange::Quantity { slot, .. } => {
+                    Some(*slot)
+                }
+                _ => None,
+            })
+            .unwrap_or(0);
+        info!(
+            self.client_id,
+            sn = commodity.sn,
+            item_id = commodity.item_id,
+            price = commodity.price,
+            "Bought from the Cash Shop with mesos"
+        );
+        let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
+        Ok(vec![
+            build::world::stat::build_stat_update(
+                false,
+                &[build::world::stat::StatUpdate::Meso(meso)],
+            )?,
+            build::world::inventory::build_inventory_operation(true, &changes)?,
+            cs::build_bought_with_mesos(commodity.item_id, commodity.count, slot)?,
             cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
         ])
     }

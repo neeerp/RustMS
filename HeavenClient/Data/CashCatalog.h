@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ms
@@ -136,6 +137,69 @@ namespace ms
 			);
 
 			return found;
+		}
+
+		// Commodities 80000000 to 89999999 cost mesos, not NX (v83 46e5c5).
+		inline bool for_mesos(int32_t sn)
+		{
+			return sn >= 80000000 && sn < 90000000;
+		}
+
+		// Where a mesos commodity is listed: a sub-tab and a roll for its
+		// place there.
+		struct Placement
+		{
+			Commodity commodity;
+			int32_t cat;
+			int32_t sub;
+			uint32_t roll;
+		};
+
+		// v83 (471f37) has no tab for the mesos commodities: when the shop
+		// opens, each one on sale goes into a random sub-tab that has items.
+		template<class Roll>
+		std::vector<Placement> scatter(const std::vector<Commodity>& on_sale, Roll roll)
+		{
+			std::vector<std::pair<int32_t, int32_t>> groups;
+
+			for (const Commodity& commodity : on_sale)
+			{
+				std::pair<int32_t, int32_t> group = { category(commodity.sn), subcategory(commodity.sn) };
+
+				if (group.first >= 1 && group.first < MAIN_CATEGORY
+					&& std::find(groups.begin(), groups.end(), group) == groups.end())
+					groups.push_back(group);
+			}
+
+			std::vector<Placement> placed;
+
+			if (groups.empty())
+				return placed;
+
+			for (const Commodity& commodity : on_sale)
+			{
+				if (!for_mesos(commodity.sn))
+					continue;
+
+				std::pair<int32_t, int32_t> group = groups[roll() % groups.size()];
+				placed.push_back({ commodity, group.first, group.second, static_cast<uint32_t>(roll()) });
+			}
+
+			return placed;
+		}
+
+		// Puts the mesos commodities scattered into this sub-tab among its
+		// list, each at its roll modulo the list's size, as v83 does.
+		inline void place(std::vector<Commodity>& found, const std::vector<Placement>& placed, int32_t cat, int32_t sub, bool female)
+		{
+			for (const Placement& placement : placed)
+			{
+				if (placement.cat != cat || placement.sub != sub || !for_gender(placement.commodity, female))
+					continue;
+
+				size_t index = found.empty() ? 0 : placement.roll % found.size();
+				found.insert(found.begin() + index, placement.commodity);
+			}
 		}
 
 		// The commodities with these SNs, in order, skipping unknown ones.

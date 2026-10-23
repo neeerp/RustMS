@@ -286,6 +286,24 @@ namespace ms
 			cashshop->add_cash_items({ read_cash_item(recv) });
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
+		case 0x8D:
+		{
+			// Items bought with mesos are in the inventory already, and the
+			// meso spent (v83 47b603).
+			int32_t count = recv.read_int();
+
+			for (int32_t i = 0; i < count; i++)
+			{
+				recv.skip_short();
+				int16_t slot = recv.read_short();
+				int32_t item_id = recv.read_int();
+
+				cashshop->bought_with_mesos(item_id, slot);
+			}
+
+			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
+			break;
+		}
 		case 0x89:
 		{
 			// A package's items are in the Cash Inventory, then the
