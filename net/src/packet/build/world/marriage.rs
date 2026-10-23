@@ -2,10 +2,13 @@
 //! MARRIAGE_RESULT answers the proposer; any result first closes the
 //! proposer's "Waiting for her response..." box.
 
+use crate::codec::item::{encode_item, SlotPrefix};
 use crate::{codec::stats::write_padded_name, error::NetworkError, packet::op::SendOpcode};
+use game::inventory::InventoryType;
 use game::marriage::{MarriageRecord, Refusal};
 use game::ring::{CoupleRing, RingKind, RingLooks};
 use game::wedding::Venue;
+use game::Item;
 use packet::{io::write::PktWrite, Packet};
 
 /// The couple is engaged now; the client keeps the record.
@@ -204,6 +207,141 @@ pub fn build_marriage_notice(text: &str) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// MARRIAGE_REQUEST mode 9: the couple's wishlist input window, which the
+/// client answers with RING_ACTION mode 9 (report b084). The client
+/// ignores it over another dialog.
+pub fn build_wishlist_input() -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::MarriageRequest as i16)?;
+    packet.write_byte(9)?;
+    Ok(packet)
+}
+
+/// WEDDING_GIFT_RESULT's modes (report b084). The client throws on an
+/// answer it didn't ask for, so each request gets exactly one.
+mod gift {
+    /// Open the give window on a partner's wishlist.
+    pub const REGISTRY: u8 = 9;
+    /// Open the receive window on the player's gifts.
+    pub const GIFTS: u8 = 10;
+    /// The gift went: "You have sent a gift.", and the window closes.
+    pub const SENT: u8 = 11;
+    /// 0x107f, one present for each wishlist. The client stays waiting, so
+    /// the window can only be closed.
+    pub const ALREADY_GIVEN: u8 = 12;
+    /// 0x10b0, "Failed to send the gift."
+    pub const FAILED: u8 = 14;
+    /// The gift was taken: the window shows the gifts left.
+    pub const TAKEN: u8 = 15;
+    /// The gift wasn't taken; the client says nothing.
+    pub const NOT_TAKEN: u8 = 16;
+}
+
+fn gift_result(mode: u8) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::WeddingGiftResult as i16)?;
+    packet.write_byte(mode)?;
+    Ok(packet)
+}
+
+fn write_wishes(packet: &mut Packet, wishes: &[String]) -> Result<(), NetworkError> {
+    let wishes = &wishes[..wishes.len().min(usize::from(u8::MAX))];
+    packet.write_byte(wishes.len() as u8)?;
+    for wish in wishes {
+        packet.write_str_with_length(wish)?;
+    }
+    Ok(())
+}
+
+/// The bag an item is listed under in the gift windows.
+pub fn gift_bag(item: &Item) -> Option<InventoryType> {
+    InventoryType::for_item(item.item_id).filter(|&bag| bag != InventoryType::Equipped)
+}
+
+/// The gift windows' lists of `bags`: a mask of the bags whose lists
+/// follow (bit `1 << (bag + 1)`), then for each, in order, a count and
+/// its items without a slot. The client keeps its lists of other bags. A
+/// list holds at most 255, as the client's take request numbers them
+/// with a byte.
+fn write_gifts<'a>(
+    packet: &mut Packet,
+    bags: &[InventoryType],
+    gifts: impl Iterator<Item = &'a Item> + Clone,
+) -> Result<(), NetworkError> {
+    let mut bags = bags.to_vec();
+    bags.sort_by_key(|&bag| bag as i8);
+    bags.dedup();
+    let mask = bags
+        .iter()
+        .fold(0i64, |mask, &bag| mask | 1 << (bag as i64 + 1));
+    packet.write_long(mask)?;
+    for bag in bags {
+        let listed: Vec<&Item> = gifts
+            .clone()
+            .filter(|item| gift_bag(item) == Some(bag))
+            .take(usize::from(u8::MAX))
+            .collect();
+        packet.write_byte(listed.len() as u8)?;
+        for item in listed {
+            encode_item(packet, SlotPrefix::None, item)?;
+        }
+    }
+    Ok(())
+}
+
+/// WEDDING_GIFT_RESULT mode 9: the give window, on a partner's `wishes`.
+pub fn build_registry(wishes: &[String]) -> Result<Packet, NetworkError> {
+    let mut packet = gift_result(gift::REGISTRY)?;
+    write_wishes(&mut packet, wishes)?;
+    Ok(packet)
+}
+
+/// WEDDING_GIFT_RESULT mode 10: the receive window, on every bag's list
+/// of the player's `gifts`, oldest first.
+pub fn build_gifts<'a>(
+    gifts: impl Iterator<Item = &'a Item> + Clone,
+) -> Result<Packet, NetworkError> {
+    let mut packet = gift_result(gift::GIFTS)?;
+    write_gifts(&mut packet, &InventoryType::BAGS, gifts)?;
+    Ok(packet)
+}
+
+/// WEDDING_GIFT_RESULT mode 11: `gift` went from the wishlist `wishes`;
+/// the window lists it as given before it closes.
+pub fn build_gift_sent(wishes: &[String], gift: &Item) -> Result<Packet, NetworkError> {
+    let mut packet = gift_result(gift::SENT)?;
+    write_wishes(&mut packet, wishes)?;
+    let bags: Vec<InventoryType> = gift_bag(gift).into_iter().collect();
+    write_gifts(&mut packet, &bags, std::iter::once(gift))?;
+    Ok(packet)
+}
+
+/// WEDDING_GIFT_RESULT mode 12: the player has given this partner a gift.
+pub fn build_gift_already_given() -> Result<Packet, NetworkError> {
+    gift_result(gift::ALREADY_GIVEN)
+}
+
+/// WEDDING_GIFT_RESULT mode 14: the gift didn't go.
+pub fn build_gift_failed() -> Result<Packet, NetworkError> {
+    gift_result(gift::FAILED)
+}
+
+/// WEDDING_GIFT_RESULT mode 15: a gift was taken from `bag`, whose list
+/// is now `gifts`' items of it.
+pub fn build_gift_taken<'a>(
+    bag: InventoryType,
+    gifts: impl Iterator<Item = &'a Item> + Clone,
+) -> Result<Packet, NetworkError> {
+    let mut packet = gift_result(gift::TAKEN)?;
+    write_gifts(&mut packet, &[bag], gifts)?;
+    Ok(packet)
+}
+
+/// WEDDING_GIFT_RESULT mode 16: the gift wasn't taken.
+pub fn build_gift_not_taken() -> Result<Packet, NetworkError> {
+    gift_result(gift::NOT_TAKEN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,5 +504,59 @@ mod tests {
     fn a_refusal_is_its_mode_alone() {
         let packet = build_marriage_refusal(Refusal::Declined).unwrap();
         assert_eq!(packet.bytes, vec![0x49, 0x00, 30]);
+    }
+
+    fn listed(bags: &[(u8, &[&Item])]) -> Vec<u8> {
+        let mut packet = Packet::new_empty();
+        for (count, items) in bags {
+            packet.write_byte(*count).unwrap();
+            for item in *items {
+                encode_item(&mut packet, SlotPrefix::None, item).unwrap();
+            }
+        }
+        packet.bytes
+    }
+
+    #[test]
+    fn the_gift_window_lists_every_bag_in_order() {
+        let gifts = [
+            Item::stack(4000000, 3),
+            Item::stack(2000000, 1),
+            Item::stack(4000001, 5),
+        ];
+        let packet = build_gifts(gifts.iter()).unwrap();
+        assert_eq!(&packet.bytes[..3], &[0x4A, 0x00, 10]);
+        assert_eq!(packet.bytes[3..11], 0x7Ci64.to_le_bytes());
+        let expected = listed(&[
+            (0, &[]),
+            (1, &[&gifts[1]]),
+            (0, &[]),
+            (2, &[&gifts[0], &gifts[2]]),
+            (0, &[]),
+        ]);
+        assert_eq!(packet.bytes[11..], expected[..]);
+    }
+
+    #[test]
+    fn a_take_relists_its_bag_alone() {
+        let gifts = [Item::stack(2000000, 1), Item::stack(4000001, 5)];
+        let packet = build_gift_taken(InventoryType::Etc, gifts.iter()).unwrap();
+        assert_eq!(&packet.bytes[..3], &[0x4A, 0x00, 15]);
+        assert_eq!(packet.bytes[3..11], 0x20i64.to_le_bytes());
+        assert_eq!(packet.bytes[11..], listed(&[(1, &[&gifts[1]])])[..]);
+    }
+
+    #[test]
+    fn a_sent_gift_comes_with_the_wishlist() {
+        let gift = Item::stack(2000000, 4);
+        let packet = build_gift_sent(&["Cake".into()], &gift).unwrap();
+        assert_eq!(
+            &packet.bytes[..9],
+            &[0x4A, 0x00, 11, 1, 4, 0, b'C', b'a', b'k']
+        );
+        assert_eq!(packet.bytes[10..18], 0x08i64.to_le_bytes());
+        assert_eq!(packet.bytes[18..], listed(&[(1, &[&gift])])[..]);
+        assert_eq!(build_registry(&[]).unwrap().bytes, vec![0x4A, 0x00, 9, 0]);
+        assert_eq!(build_wishlist_input().unwrap().bytes, vec![0x48, 0x00, 9]);
     }
 }

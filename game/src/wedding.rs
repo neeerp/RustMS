@@ -4,6 +4,7 @@
 
 use crate::marriage::is_wedding_ring;
 use crate::{InventoryChange, InventoryType, Player};
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 /// Where the wedding is held.
@@ -345,6 +346,70 @@ pub fn has_wedding_ring(player: &Player) -> bool {
         .any(|(_, item)| is_wedding_ring(item.item_id))
 }
 
+/// The most wishes a wishlist keeps, and the longest each may be: the
+/// client's input window takes 10 of up to 16 characters (report b084).
+pub const WISHES: usize = 10;
+pub const WISH_LENGTH: usize = 16;
+
+/// A wedding's wishlists, one for each of the couple, and who has given
+/// whom a gift from them (report b085). Each partner sends theirs once;
+/// each guest gives each partner one gift.
+#[derive(Debug, Default)]
+pub struct Registry {
+    wishes: HashMap<i32, Vec<String>>,
+    given: HashSet<(i32, i32)>,
+}
+
+impl Registry {
+    /// Keep `partner`'s wishlist, the first `WISHES` of `wishes` cut to
+    /// `WISH_LENGTH` and without blanks: whether they had sent none yet.
+    pub fn wish(&mut self, partner: i32, wishes: Vec<String>) -> bool {
+        if self.wishes.contains_key(&partner) {
+            return false;
+        }
+        let wishes = wishes
+            .into_iter()
+            .map(|wish| wish.trim().chars().take(WISH_LENGTH).collect::<String>())
+            .filter(|wish| !wish.is_empty())
+            .take(WISHES)
+            .collect();
+        self.wishes.insert(partner, wishes);
+        true
+    }
+
+    /// Whether `partner` has sent their wishlist.
+    pub fn wished(&self, partner: i32) -> bool {
+        self.wishes.contains_key(&partner)
+    }
+
+    /// `partner`'s wishlist, empty until they send it.
+    pub fn wishes(&self, partner: i32) -> &[String] {
+        self.wishes.get(&partner).map_or(&[], Vec::as_slice)
+    }
+
+    /// Count `giver`'s gift to `receiver`: whether it is their first.
+    pub fn give(&mut self, giver: i32, receiver: i32) -> bool {
+        self.given.insert((giver, receiver))
+    }
+
+    /// Whether `giver` has given `receiver` a gift.
+    pub fn gave(&self, giver: i32, receiver: i32) -> bool {
+        self.given.contains(&(giver, receiver))
+    }
+
+    /// Forget a gift that never reached its receiver.
+    pub fn ungive(&mut self, giver: i32, receiver: i32) {
+        self.given.remove(&(giver, receiver));
+    }
+}
+
+/// Whether `map_id` is one of either venue's wedding maps.
+pub fn wedding_map(map_id: i32) -> bool {
+    [Venue::Chapel, Venue::Cathedral]
+        .iter()
+        .any(|venue| venue.holds(map_id))
+}
+
 /// Take the wedding's Heart Keys from a player leaving it.
 pub fn take_keys(player: &mut Player) -> Vec<InventoryChange> {
     let held = i16::try_from(player.inventory.count(HEART_KEY)).unwrap_or(i16::MAX);
@@ -384,6 +449,31 @@ mod tests {
 
     fn at(minutes: u64) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(minutes * 60)
+    }
+
+    #[test]
+    fn each_partner_wishes_once_and_each_guest_gives_each_once() {
+        let mut registry = Registry::default();
+        assert!(registry.wishes(1).is_empty() && !registry.wished(1));
+        let long = "x".repeat(WISH_LENGTH + 5);
+        let mut wishes = vec![" Pink Gown ".to_string(), "  ".to_string(), long];
+        wishes.extend((0..WISHES).map(|n| n.to_string()));
+        assert!(registry.wish(1, wishes));
+        let kept = registry.wishes(1);
+        assert_eq!(kept.len(), WISHES);
+        assert_eq!(kept[0], "Pink Gown");
+        assert_eq!(kept[1].len(), WISH_LENGTH);
+        assert!(!registry.wish(1, vec!["again".to_string()]));
+        assert!(registry.wishes(2).is_empty());
+
+        assert!(!registry.gave(9, 1));
+        assert!(registry.give(9, 1));
+        assert!(registry.gave(9, 1));
+        assert!(!registry.give(9, 1));
+        assert!(registry.give(9, 2));
+        registry.ungive(9, 1);
+        assert!(!registry.gave(9, 1));
+        assert!(registry.give(9, 1));
     }
 
     #[test]
@@ -453,6 +543,12 @@ mod tests {
         }
         assert_eq!(Venue::of_invitation(4031406), None);
         assert_eq!(Venue::of_received_invitation(4031377), None);
+        for map in [680000100, 680000110, 680000210, 680000300, 680000401] {
+            assert!(wedding_map(map), "{map}");
+        }
+        for map in [680000000, 680000500] {
+            assert!(!wedding_map(map), "{map}");
+        }
         assert_eq!(Venue::Cathedral.window(), 2);
     }
 

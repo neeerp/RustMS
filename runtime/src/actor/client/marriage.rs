@@ -56,6 +56,7 @@ impl ClientActor {
             RingRequest::OpenInvitation { slot, item_id } => {
                 self.open_invitation(slot, item_id).await
             }
+            RingRequest::Wishlist { wishes } => self.wishlist(wishes),
         }
     }
 

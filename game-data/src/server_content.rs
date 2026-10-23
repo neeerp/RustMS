@@ -1106,6 +1106,36 @@ pub mod keys {
     /// Robin, in the box room, asks whether to go back to the hunting ground.
     pub const WEDDING_ROBIN_BACK_ASK: &str = "wedding.robin.back_ask";
 
+    /// The couple's greeter in the hall asks whether to write their wishlist, which goes once.
+    pub const WEDDING_WISHLIST_ASK: &str = "wedding.wishlist.ask";
+
+    /// The greeter, to one of the couple whose wishlist is with Pila.
+    pub const WEDDING_WISHLIST_SENT: &str = "wedding.wishlist.sent";
+
+    /// The greeter, to a guest: Pila takes the gifts.
+    pub const WEDDING_WISHLIST_GUEST: &str = "wedding.wishlist.guest";
+
+    /// Pila, in a wedding, asks whose wishlist to give from.
+    pub const WEDDING_PILA_MENU: &str = "wedding.pila.menu";
+
+    /// Pila's choice of the groom's wishlist.
+    pub const WEDDING_PILA_GROOM: &str = "wedding.pila.groom";
+
+    /// Pila's choice of the bride's wishlist.
+    pub const WEDDING_PILA_BRIDE: &str = "wedding.pila.bride";
+
+    /// Pila, to one of the couple who chose their own wishlist.
+    pub const WEDDING_PILA_OWN: &str = "wedding.pila.own";
+
+    /// Pila, to a guest who has given that partner a gift at this wedding.
+    pub const WEDDING_PILA_GIVEN: &str = "wedding.pila.given";
+
+    /// Pila, outside a wedding, asks someone with gifts waiting whether to take them.
+    pub const WEDDING_PILA_GIFTS: &str = "wedding.pila.gifts";
+
+    /// Pila, to anyone else.
+    pub const WEDDING_PILA_HELLO: &str = "wedding.pila.hello";
+
     /// The wedding's staff ask a guest whether to leave it.
     pub const WEDDING_STAFF_GUEST_LEAVE: &str = "wedding.staff.guest_leave";
 
@@ -1169,6 +1199,20 @@ pub mod keys {
         WEDDING_GUEST_LATE,
         WEDDING_GUEST_FULL,
         WEDDING_GUEST_ERROR,
+    ];
+
+    /// Wishlists and gifts: the greeters and Pila (report b085).
+    pub const GIFTS: [&str; 10] = [
+        WEDDING_WISHLIST_ASK,
+        WEDDING_WISHLIST_SENT,
+        WEDDING_WISHLIST_GUEST,
+        WEDDING_PILA_MENU,
+        WEDDING_PILA_GROOM,
+        WEDDING_PILA_BRIDE,
+        WEDDING_PILA_OWN,
+        WEDDING_PILA_GIVEN,
+        WEDDING_PILA_GIFTS,
+        WEDDING_PILA_HELLO,
     ];
 
     /// Wedding invitations: sending, opening, and more of them.
@@ -2045,6 +2089,7 @@ mod tests {
             .chain(&keys::RESERVATIONS)
             .chain(&keys::INVITATIONS)
             .chain(&keys::CEREMONY)
+            .chain(&keys::GIFTS)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

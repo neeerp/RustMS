@@ -334,6 +334,26 @@ pub enum RingRequest {
     },
     /// Open the guest's invitation `item_id` in Etc `slot`.
     OpenInvitation { slot: i16, item_id: i32 },
+    /// The groom's or bride's wishlist, from the window the greeter opened
+    /// (report b085).
+    Wishlist { wishes: Vec<String> },
+}
+
+/// What the player did in the Wedding Gift window (`WEDDING_ACTION`,
+/// report b085).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GiftRequest {
+    /// Give `quantity` of the item `item_id` in `slot` of its inventory.
+    Give {
+        slot: i16,
+        item_id: i32,
+        quantity: i16,
+    },
+    /// Take the gift at `index` in the list of inventory `kind` (1 equip to
+    /// 5 cash) last shown.
+    Take { kind: u8, index: u8 },
+    /// Close the window.
+    Close,
 }
 
 /// A guild operation, carried out by the client's actor.
@@ -559,6 +579,7 @@ pub enum WorldAction {
     },
     /// A guest at the Cathedral's altar blessed the couple (report b075).
     WeddingBless,
+    WeddingGift(GiftRequest),
     /// The player cast Mystic Door at `at` on their map, leading to `town`,
     /// for `lasts`. It replaces any door they had open.
     OpenDoor {
@@ -965,6 +986,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::RingAction, InGame(&world::RingActionHandler)),
             (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
             (Op::WeddingBless, InGame(&world::WeddingBlessHandler)),
+            (Op::WeddingAction, InGame(&world::WeddingActionHandler)),
             (
                 Op::ChangeMapSpecial,
                 InGame(&world::ChangeMapSpecialHandler),

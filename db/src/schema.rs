@@ -593,6 +593,48 @@ diesel::table! {
 }
 diesel::joinable!(wedding_guests -> wedding_reservations (marriage_id));
 diesel::table! {
+    wedding_gifts (id) {
+        id -> Int8,
+        receiver_id -> Int4,
+        giver_id -> Int4,
+        given_at -> Timestamp,
+        item_id -> Int4,
+        quantity -> Int2,
+        #[max_length = 13]
+        owner -> Varchar,
+        flags -> Int2,
+        expires_at -> Nullable<Timestamp>,
+        cash_serial -> Nullable<Int8>,
+    }
+}
+diesel::table! {
+    wedding_gift_equipment_stats (gift_id) {
+        gift_id -> Int8,
+        upgrade_slots -> Int2,
+        level -> Int2,
+        stre -> Int2,
+        dex -> Int2,
+        int -> Int2,
+        luk -> Int2,
+        hp -> Int2,
+        mp -> Int2,
+        watk -> Int2,
+        matk -> Int2,
+        wdef -> Int2,
+        mdef -> Int2,
+        acc -> Int2,
+        avoid -> Int2,
+        hands -> Int2,
+        speed -> Int2,
+        jump -> Int2,
+        vicious -> Int4,
+        item_level -> Int2,
+        item_exp -> Int4,
+    }
+}
+diesel::joinable!(wedding_gifts -> characters (receiver_id));
+diesel::joinable!(wedding_gift_equipment_stats -> wedding_gifts (gift_id));
+diesel::table! {
     coupons (id) {
         id -> Int4,
         code -> Varchar,
@@ -655,6 +697,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     rings,
     wedding_reservations,
     wedding_guests,
+    wedding_gifts,
+    wedding_gift_equipment_stats,
     coupons,
     coupon_rewards,
 );
