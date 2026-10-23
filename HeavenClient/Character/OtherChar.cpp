@@ -20,6 +20,7 @@
 #include "Diseases.h"
 #include "MountRules.h"
 
+#include "../Audio/Audio.h"
 #include "../Constants.h"
 #include "../Gameplay/Combat/Dash.h"
 #include "../Gameplay/Combat/FlashJump.h"
@@ -28,6 +29,8 @@
 #include "../Gameplay/Combat/Wings.h"
 #include "../Gameplay/Stage.h"
 #include "../IO/UITypes/EnergyBarLayout.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -136,9 +139,15 @@ namespace ms
 			if (stat == Buffstat::Id::COMBO)
 				show_combo(value - 1, init);
 
-			// One spawned on a mount is on it at once (0x983cdd).
+			// One spawned on a mount is on it at once (0x983cdd); one getting on shows it
+			// (FUN_0098385d).
 			if (stat == Buffstat::Id::MONSTER_RIDING)
+			{
+				if (!init)
+					show_mount_effect(value, true);
+
 				ride(value, init);
+			}
 
 			if (stat == Buffstat::Id::MORPH)
 				transform(value, init, Stage::get().get_mapinfo().is_underwater());
@@ -160,6 +169,20 @@ namespace ms
 		show_diseases();
 	}
 
+	void OtherChar::show_mount_effect(int32_t mount, bool boarding)
+	{
+		int32_t skill = mount::ride_effect_skill(mount, job);
+
+		if (skill == 0)
+			return;
+
+		show_ride_effect(skill);
+
+		// Boarding the ship sounds its Use (FUN_00989729 type 0x2a); its owner hears that on the cast.
+		if (boarding && skill == mount::BATTLESHIP)
+			Sound(nl::nx::sound["Skill.img"][std::to_string(skill)]["Use"]).play();
+	}
+
 	void OtherChar::hide_buffs(const std::vector<Buffstat::Id> &ended)
 	{
 		for (Buffstat::Id stat : ended)
@@ -169,8 +192,12 @@ namespace ms
 			if (stat == Buffstat::Id::COMBO)
 				show_combo(-1, false);
 
+			// Getting off shows the mount left (FUN_00983921).
 			if (stat == Buffstat::Id::MONSTER_RIDING)
+			{
+				show_mount_effect(get_vehicle(), false);
 				ride(0, false);
+			}
 
 			if (stat == Buffstat::Id::MORPH)
 				transform(0, false);

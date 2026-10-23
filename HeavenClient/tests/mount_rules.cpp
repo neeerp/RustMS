@@ -17,6 +17,10 @@ int main()
 		require(rider_skill(112) == 1004 && rider_skill(1111) == 10001004 && rider_skill(2112) == 20001004,
 			"each family its own");
 		require(rider_skill(2001) == 20011004 && rider_skill(2218) == 20011004, "Evan's");
+		require(ride_effect_skill(1902000, 112) == 1004 && ride_effect_skill(1902005, 1111) == 10001004,
+			"a tamed monster shows its rider's Monster Rider");
+		require(ride_effect_skill(BATTLESHIP_VEHICLE, 522) == BATTLESHIP, "the ship its own");
+		require(ride_effect_skill(1932003, 0) == 0 && ride_effect_skill(0, 112) == 0, "others none");
 
 		require(is_ground_only(5001005) && is_ground_only(10001027) && is_ground_only(20011031),
 			"dashes and event mounts keep off ladders");

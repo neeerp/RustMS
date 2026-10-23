@@ -1708,10 +1708,8 @@ namespace ms
 		if (shown <= 0)
 			return;
 
-		if (mount::is_tamed_monster(shown))
-			show_ride_effect(mount::rider_skill(stats.get_stat(MapleStat::Id::JOB)));
-		else if (shown == mount::BATTLESHIP_VEHICLE)
-			show_ride_effect(mount::BATTLESHIP);
+		if (int32_t skill = mount::ride_effect_skill(shown, stats.get_stat(MapleStat::Id::JOB)))
+			show_ride_effect(skill);
 
 		ride(v, false);
 
