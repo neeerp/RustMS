@@ -551,6 +551,12 @@ pub enum Effect {
         name: &'static str,
         state: u8,
     },
+    /// Nothing after it is applied unless the player's event has cleared
+    /// `stage`; they hear `refused` (a key) instead, as an item line.
+    RequireStage {
+        stage: u8,
+        refused: &'static str,
+    },
     /// Take the player, or the party they lead with the members on their
     /// map, to `portal` on the first free copy of a mini-dungeon
     /// (`dungeons::Dungeon::copies`). Nothing after it is applied if they
@@ -940,6 +946,29 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(cave, named(cave, "out00")))
         }
         "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
+        // The doors between Horntail's trials, sealed until the trial's
+        // head is down (Cosmic's `defeatedHead`; `events::HORNTAIL_HEADS`).
+        "hontale_BR" => {
+            use crate::events::{HORNTAIL, HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II};
+            let map_id = player.stats.map_id;
+            if ![HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II].contains(&map_id) {
+                return None;
+            }
+            let stage = HORNTAIL.stage_on(map_id)?;
+            let next = HORNTAIL.stage_map(stage + 1);
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireStage {
+                        stage,
+                        refused: keys::HORNTAIL_TRIAL_SEALED,
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(next, 0),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
         // The gate to Zakum: a chief's approval, the trials, an Eye of
         // Fire, and the gate reactor open, as no expedition is under way
         // (`events::ZAKUM`'s `gate`).
@@ -1955,6 +1984,32 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(map, portal)] => Some((*map, *portal)),
             _ => None,
         }
+    }
+
+    #[test]
+    fn horntails_trial_doors_open_on_to_the_next_once_their_stage_is_cleared() {
+        use crate::events::{HORNTAILS_CAVE, HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II};
+        let mut player = player_with(&[]);
+        for (map, stage, next) in [
+            (HORNTAIL_TRIAL_I, 1, HORNTAIL_TRIAL_II),
+            (HORNTAIL_TRIAL_II, 2, HORNTAILS_CAVE),
+        ] {
+            player.stats.map_id = map;
+            let out = portal("hontale_BR", &player).unwrap();
+            assert_eq!(
+                out.effects,
+                [
+                    Effect::RequireStage {
+                        stage,
+                        refused: keys::HORNTAIL_TRIAL_SEALED
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(next, 0),
+                ]
+            );
+        }
+        player.stats.map_id = HORNTAILS_CAVE;
+        assert_eq!(portal("hontale_BR", &player), None);
     }
 
     #[test]

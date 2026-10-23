@@ -640,7 +640,7 @@ impl ClientActor {
     /// the team before the clear effect). The Dead Mine's win shows nothing,
     /// and gives more EXP with the documents (Cosmic's Aura). Zakum's fall
     /// showed itself on the altar already (the field's `zakum_falls`), and
-    /// gives none.
+    /// gives none; nor do Horntail's trials.
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -651,6 +651,7 @@ impl ClientActor {
         let event = ticket.kind.event();
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
+        let no_exp = zakum || ticket.kind == EventKind::Horntail;
         let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
             events::ZPQ_DOCUMENTS_EXP
         } else {
@@ -672,7 +673,7 @@ impl ClientActor {
                 packets.push(build_field_object("gate")?);
             }
         }
-        if !zakum {
+        if !no_exp {
             gain_exp(&mut next, exp, &mut packets)?;
         }
         self.commit_player(next, None, &mut packets).await?;

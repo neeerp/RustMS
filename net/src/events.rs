@@ -883,20 +883,22 @@ pub const PAPULATUS: Event = Event {
 /// (240060000) on to Horntail's Cave (240060200), for two hours. It ends
 /// only when the last of them leaves (`isExpeditionTeamLackingNow`, which
 /// asks for neither the leader nor the minimum once in), everyone going to
-/// the Road in Between. The fight is still to come.
+/// the Road in Between. Each trial is a stage, cleared when its head
+/// (`HORNTAIL_HEADS`) dies, which unseals its door (`hontale_BR`); the
+/// cave is the last, for the fight still to come. No stage gives EXP.
 pub const HORNTAIL: Event = Event {
     lobby: crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE,
-    maps: HORNTAIL_TRIAL..=HORNTAILS_CAVE,
-    entry: HORNTAIL_TRIAL,
+    maps: HORNTAIL_TRIAL_I..=HORNTAILS_CAVE,
+    entry: HORNTAIL_TRIAL_I,
     exit: crate::npc_scripts::ROAD_IN_BETWEEN,
     levels: 100..=u8::MAX,
     team: 6..=30,
     minutes: 120,
-    exp_per_stage: &[0],
+    exp_per_stage: &[0, 0, 0],
     stride: 1,
-    stage_maps: &[],
+    stage_maps: &[HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II, HORNTAILS_CAVE],
     talk_clears: &[],
-    member_clears: &[],
+    member_clears: &[1, 2],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -913,10 +915,42 @@ pub const HORNTAIL: Event = Event {
     until_empty: false,
 };
 
-/// The Cave of Life's first trial, where Horntail's expedition comes in,
-/// and Horntail's Cave, the last of its maps.
-pub const HORNTAIL_TRIAL: i32 = 240_060_000;
+/// The Cave of Life's two trials, the first where Horntail's expedition
+/// comes in, and Horntail's Cave, the last of its maps.
+pub const HORNTAIL_TRIAL_I: i32 = 240_060_000;
+pub const HORNTAIL_TRIAL_II: i32 = 240_060_100;
 pub const HORNTAILS_CAVE: i32 = 240_060_200;
+
+/// A head of Horntail's that a trial's copy opens with, and whose death
+/// clears the trial's stage.
+#[derive(Debug, PartialEq, Eq)]
+pub struct TrialHead {
+    pub map: i32,
+    pub mob: i32,
+    /// Where it comes out, on the ground below.
+    pub at: (i16, i16),
+}
+
+/// The Left Head on the first trial and the Right Head on the second
+/// (Cosmic HorntailBattle's `setup`, `monsterKilled`).
+pub const HORNTAIL_HEADS: [TrialHead; 2] = [
+    TrialHead {
+        map: HORNTAIL_TRIAL_I,
+        mob: 8_810_000,
+        at: (960, 120),
+    },
+    TrialHead {
+        map: HORNTAIL_TRIAL_II,
+        mob: 8_810_001,
+        at: (-420, 120),
+    },
+];
+
+/// The head of the trial on `map_id`, if any, and the trial's stage.
+pub fn trial_head(map_id: i32) -> Option<(u8, &'static TrialHead)> {
+    let index = HORNTAIL_HEADS.iter().position(|head| head.map == map_id)?;
+    Some((HORNTAIL.stage_on(map_id)?, &HORNTAIL_HEADS[index]))
+}
 
 impl EventKind {
     pub const ALL: [EventKind; 8] = [
@@ -2083,6 +2117,26 @@ mod tests {
         assert!(EventKind::Horntail.event().holds(HORNTAILS_CAVE));
         assert!(!HORNTAIL.holds(HORNTAIL.exit));
         assert!(!event_map(HORNTAIL.lobby));
+        // Its trials are stages any member's kill clears; the cave is the
+        // last.
+        let heads = [HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II, HORNTAILS_CAVE].map(trial_head);
+        assert_eq!(
+            heads[0].map(|(stage, head)| (stage, head.mob)),
+            Some((1, 8_810_000))
+        );
+        assert_eq!(
+            heads[1].map(|(stage, head)| (stage, head.mob)),
+            Some((2, 8_810_001))
+        );
+        assert_eq!(heads[2], None);
+        assert_eq!(
+            HORNTAIL.stage_on(HORNTAILS_CAVE),
+            Some(HORNTAIL.last_stage())
+        );
+        assert!(HORNTAIL
+            .member_clears
+            .iter()
+            .all(|&stage| stage < HORNTAIL.last_stage()));
     }
 
     #[test]
