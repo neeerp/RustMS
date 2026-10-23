@@ -23,6 +23,8 @@ namespace ms
 		constexpr int32_t INVITATIONS = 0x2000;
 		constexpr int32_t WEATHER_ITEMS = 0x4000;
 		constexpr int32_t DOWN_JUMP = 0x20000;
+		// Miu Miu's merchant (5450000) doesn't come (0xa0ecab).
+		constexpr int32_t MIU_MIU = 0x40000;
 		constexpr int32_t DROPS = 0x400000;
 
 		// A return scroll's moveTo for "the nearest town": the map's return map.
@@ -157,6 +159,13 @@ namespace ms
 		inline bool sack_asks(int32_t item_id)
 		{
 			return item_id / 1000 != 2109 && item_id != 2100067;
+		}
+
+		// v83 FUN_00a0a63f, type 0x25: bit 0x40000 keeps Miu Miu's merchant
+		// away.
+		inline bool may_call_merchant(int32_t fieldlimit)
+		{
+			return !(fieldlimit & MIU_MIU);
 		}
 
 		// v83 FUN_00a0900a and FUN_00a23de5: bit 0x400000 keeps items and

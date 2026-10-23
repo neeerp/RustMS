@@ -33,6 +33,7 @@ int main()
 
 		require(may_drop(0x400), "consumable limits leave drops alone");
 		require(!may_drop(0x400000), "bit 0x400000 keeps items on the player");
+		require(may_call_merchant(0x20000) && !may_call_merchant(0x40000), "bit 0x40000 keeps Miu Miu away");
 
 		require(may_buff(0, 5001005) && may_buff(0x2, 1001003), "bit 0x2 leaves other buffs alone");
 		require(!may_buff(0x2, 5001005) && !may_buff(0x2, 13111005), "but stops Dash and Albatross");
