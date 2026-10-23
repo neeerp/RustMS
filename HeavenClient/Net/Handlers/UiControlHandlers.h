@@ -37,4 +37,12 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// A slideshow of images by path (0x961275).
+	// Opcode: OPEN_UI_STRING_LIST(233)
+	class OpenUiStringListHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

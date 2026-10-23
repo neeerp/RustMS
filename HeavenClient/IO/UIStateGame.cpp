@@ -831,6 +831,7 @@ namespace ms
 					UIElement::Type::SCRIPTMESSAGE,
 					UIElement::Type::PARTYHP,
 					UIElement::Type::NPCTALK,
+					UIElement::Type::IMAGESLIDES,
 					UIElement::Type::AVATARSELECT,
 					UIElement::Type::PETCHOOSER,
 					UIElement::Type::APRESET,
@@ -936,6 +937,7 @@ namespace ms
 				case UIElement::Type::ENTERNUMBER:
 				case UIElement::Type::FRIENDGROUP:
 				case UIElement::Type::NPCTALK:
+				case UIElement::Type::IMAGESLIDES:
 				case UIElement::Type::AVATARSELECT:
 				case UIElement::Type::PETCHOOSER:
 				case UIElement::Type::SLIDEMENU:

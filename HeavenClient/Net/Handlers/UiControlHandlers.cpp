@@ -13,6 +13,7 @@
 #include "../../IO/UITypes/UIFamily.h"
 #include "../../IO/UITypes/UIFamilyTree.h"
 #include "../../IO/UITypes/UIGuildBBS.h"
+#include "../../IO/UITypes/UIImageSlides.h"
 #include "../../IO/UITypes/UIItemInventory.h"
 #include "../../IO/UITypes/UIKeyConfig.h"
 #include "../../IO/UITypes/UIMaker.h"
@@ -138,5 +139,18 @@ namespace ms
 
 		if (auto chatbar = UI::get().get_element<UIChatBar>())
 			chatbar->send_chatline(text, UIChatBar::LineType::SKILL);
+	}
+
+	void OpenUiStringListHandler::handle(InPacket& recv) const
+	{
+		uint8_t count = static_cast<uint8_t>(recv.read_byte());
+		std::vector<std::string> paths;
+
+		for (uint8_t i = 0; i < count; i++)
+			paths.push_back(recv.read_string());
+
+		// The modal dialog takes the keys from a chat line being typed (FUN_004edba1).
+		UI::get().remove_textfield();
+		UI::get().emplace<UIImageSlides>(paths);
 	}
 }

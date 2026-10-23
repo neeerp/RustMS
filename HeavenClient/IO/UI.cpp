@@ -355,8 +355,11 @@ namespace ms
 			// the keys first.
 			UIElement *notice = state->get(UIElement::Type::NOTICE);
 			bool notice_open = notice && notice->is_active();
+			// So does a slideshow (233), modal over everything below it.
+			UIElement *slides = state->get(UIElement::Type::IMAGESLIDES);
+			bool slides_open = slides && slides->is_active();
 
-			if (npctalk && npctalk->is_active() && !notice_open)
+			if (npctalk && npctalk->is_active() && !notice_open && !slides_open)
 			{
 				npctalk->send_key(mapping.action, pressed, escape);
 				sent = true;
@@ -461,6 +464,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::KITEWRITE);
 					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
+					types.emplace_back(UIElement::Type::IMAGESLIDES);
 					types.emplace_back(UIElement::Type::FAMILY);
 					types.emplace_back(UIElement::Type::FAMILYTREE);
 				}
@@ -491,6 +495,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::KITEWRITE);
 					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
+					types.emplace_back(UIElement::Type::IMAGESLIDES);
 				} else if (tab)
 				{
 					// Game

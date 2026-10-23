@@ -35,6 +35,7 @@
 #include "../../Util/Misc.h"
 #include "../../Util/NpcTextMarkup.h"
 #include "../../Util/NxFiles.h"
+#include "../../Util/PathImage.h"
 
 #include <nlnx/nx.hpp>
 
@@ -92,46 +93,6 @@ namespace ms
 		int16_t line_height(Text::Font font)
 		{
 			return Text(font, Text::Alignment::LEFT, Color::Name::BLACK, "|").height();
-		}
-
-		// An image by path, such as UI/UIWindow.img/QuestIcon/4/0. UI paths
-		// name the v83 UI; our UI.nx has the quest icons under UIWindow2.img.
-		Texture path_image(const std::string &path)
-		{
-			size_t slash = path.find('/');
-
-			if (slash == std::string::npos)
-				return Texture();
-
-			const std::pair<std::string, nl::node> files[] = {
-				{ "UI", NxFiles::ui_classic }, { "Map", nl::nx::map }, { "Effect", nl::nx::effect },
-				{ "Item", nl::nx::item }, { "Skill", nl::nx::skill }, { "Mob", nl::nx::mob }, { "Npc", nl::nx::npc },
-				{ "Character", nl::nx::character }, { "Etc", nl::nx::etc }, { "Quest", nl::nx::quest },
-				{ "Reactor", nl::nx::reactor }
-			};
-
-			std::string file = path.substr(0, slash);
-			std::string rest = path.substr(slash + 1);
-
-			for (const auto &[name, root] : files)
-			{
-				if (name != file)
-					continue;
-
-				nl::node found = root.resolve(rest);
-
-				if (found.data_type() != nl::node::type::bitmap && name == "UI")
-				{
-					found = nl::nx::ui.resolve(rest);
-
-					if (found.data_type() != nl::node::type::bitmap && rest.rfind("UIWindow.img/", 0) == 0)
-						found = nl::nx::ui.resolve("UIWindow2.img/" + rest.substr(13));
-				}
-
-				return Texture(found);
-			}
-
-			return Texture();
 		}
 
 		// The dotted line under the selected choice.
