@@ -203,7 +203,12 @@ from `UI.nx`. Moved so far:
   not), then a line and one row per stat ("CATEGORY :OVERALL", "LUK : +11").
   Upgraded equips' names are light blue with the upgrades and gender run
   together, "(+4Male)", as in footage. Skills show the current and next levels
-  under a line, "[Next Level 1]".
+  under a line, "[Next Level 1]". Skills with a master level (4th job, and
+  Evan's 9th and 10th stages) get a "[Master Level : N]" line of their own
+  above the description, with the character's master level (0 until one is
+  taught), and show a next level only below it. Other skills' descriptions
+  already carry the tag and are drawn as they are, flaws included
+  (Improved MaxHP Increase's starts "Master Level : 10]").
 - **Stat window** (`UIStatsInfo`, `UIWindow.img/Stat`): the main panel and,
   behind DETAIL, the attack and defence panel (closed with `Basic.img/BtHide`),
   laid out from period footage. The job shows as the `Job/main` and `Job/sub`
