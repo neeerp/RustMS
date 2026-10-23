@@ -80,7 +80,10 @@ mod tests {
         let quests = QuestLog::from_records([
             QuestRecord {
                 quest_id: 1021,
-                status: QuestStatus::Started { kills: Vec::new() },
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: None,
+                },
             },
             QuestRecord {
                 quest_id: 2000,

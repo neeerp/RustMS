@@ -147,7 +147,10 @@ mod tests {
         assert_eq!(explore(29005, henesys, &player), visit);
         player.quests.upsert(QuestRecord {
             quest_id: 29005,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert_eq!(explore(29005, henesys, &player), None);
         assert!(explore(29005, 101000000, &player).is_some());

@@ -334,11 +334,13 @@ impl ClientActor {
         let previous_level = self.in_game()?.player.stats.level;
         let previous_job = self.in_game()?.player.stats.job;
         if let Some(QuestChange::Start(template)) = change {
-            // Hunting quests start with every kill count at 0 ("000").
+            // Hunting quests start with every kill count at 0 ("000"), info
+            // quests with their first info string.
             next.quests.upsert(QuestRecord {
                 quest_id: template.id,
                 status: QuestStatus::Started {
                     kills: vec![0; template.end_mobs.len()],
+                    info: template.start_info.clone(),
                 },
             });
         }

@@ -876,6 +876,10 @@ unsourced = [
     "maker.mos.pirate_stimulated",
     "maker.mos.dagger",
     "maker.mos.lost",
+    "quest_info.oasis",
+    "quest_info.secret_wall",
+    "quest_info.wall_ask",
+    "quest_info.wall_read",
 ]
 
 [text."glTutoMsg0.message"]

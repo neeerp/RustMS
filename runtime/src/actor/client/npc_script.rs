@@ -467,6 +467,21 @@ impl ClientActor {
                     packets.push(stat::build_stat_update(false, &[update])?);
                 }
                 Effect::StartQuest(id) => change = Some(QuestChange::Start(template(*id)?)),
+                Effect::SetQuestChar {
+                    quest: id,
+                    slot,
+                    from,
+                    to,
+                } => {
+                    if !next
+                        .quests
+                        .set_info_char(*id, usize::from(*slot), *from, *to)
+                    {
+                        return Ok(Applied::Refused);
+                    }
+                    changed = true;
+                    packets.push(quest::build_quest_progress(*id, next.quests.status(*id))?);
+                }
                 Effect::Explore { medal, map_id } => {
                     let title = template(*medal)?;
                     let Some(explored) = title.explored else {

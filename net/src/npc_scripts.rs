@@ -358,6 +358,29 @@ const MOS: i32 = 2080000;
 const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
 /// The money sack drawn beside a price.
 const MESO_ICON: i32 = 4031138;
+/// NPCs that set one character of an info quest's string
+/// (`game::quest::INFO_QUESTS`): `(npc, quest, slot, from, to)`.
+const INFO_SETTERS: [(i32, i16, u8, u8, u8); 3] = [
+    (PALACE_OASIS, 3900, 0, b'4', b'5'),
+    (SECRET_WALL, 3927, 0, b'0', b'1'),
+    (MAGATIA_WALL, 3311, 0, b'4', b'5'),
+];
+const PALACE_OASIS: i32 = 2103000;
+const SECRET_WALL: i32 = 2103001;
+const MAGATIA_WALL: i32 = 2111011;
+/// Ariant's houses and cupboards, each taking one of a quest's four
+/// deliveries: `(npc, quest, item, slot)`. A delivery turns its slot of
+/// the info string from '2' to '3'.
+const ARIANT_DELIVERIES: [(i32, i16, i32, u8); 8] = [
+    (2103003, 3929, 4031580, 0),
+    (2103005, 3929, 4031580, 1),
+    (2103004, 3929, 4031580, 2),
+    (2103006, 3929, 4031580, 3),
+    (2103009, 3926, 4031579, 0),
+    (2103011, 3926, 4031579, 1),
+    (2103010, 3926, 4031579, 2),
+    (2103012, 3926, 4031579, 3),
+];
 const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
 const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
 const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
@@ -1353,6 +1376,12 @@ impl NpcScript {
             }
             MOS => return Some(mos(player, &mut rand::thread_rng())),
             _ => {}
+        }
+        if let Some(&setter) = INFO_SETTERS.iter().find(|setter| setter.0 == npc_id) {
+            return info_setter(setter, player);
+        }
+        if let Some(&delivery) = ARIANT_DELIVERIES.iter().find(|d| d.0 == npc_id) {
+            return ariant_delivery(delivery, player);
         }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
             return Some(tower_rock(rock, player));
@@ -2417,6 +2446,74 @@ fn site_exit() -> NpcScript {
             },
         ],
     )
+}
+
+/// Whether character `slot` of a started info quest's string reads `from`.
+fn info_reads(player: &Player, quest: i16, slot: u8, from: u8) -> bool {
+    (player.quests.info(quest)).and_then(|info| info.as_bytes().get(usize::from(slot)).copied())
+        == Some(from)
+}
+
+/// The oasis, the secret wall, and Magatia's wall each move their quest
+/// on by one character as the player looks; otherwise they are silent.
+fn info_setter(
+    (npc, quest, slot, from, to): (i32, i16, u8, u8, u8),
+    player: &Player,
+) -> Option<NpcScript> {
+    if !info_reads(player, quest, slot, from) {
+        return None;
+    }
+    let set = vec![Effect::SetQuestChar {
+        quest,
+        slot,
+        from,
+        to,
+    }];
+    let pages = match npc {
+        MAGATIA_WALL => vec![
+            Page::Ask {
+                text: text(keys::QUEST_INFO_WALL_ASK),
+                on_yes: set,
+                on_no: None,
+            },
+            Page::Say(text(keys::QUEST_INFO_WALL_READ)),
+        ],
+        PALACE_OASIS => vec![Page::Act {
+            text: text(keys::QUEST_INFO_OASIS),
+            effects: set,
+        }],
+        _ => vec![Page::Act {
+            text: text(keys::QUEST_INFO_SECRET_WALL),
+            effects: set,
+        }],
+    };
+    Some(NpcScript::new(npc, pages))
+}
+
+/// A house in Ariant takes its delivery without a word, if it is still
+/// due and the player holds one.
+fn ariant_delivery(
+    (npc, quest, item, slot): (i32, i16, i32, u8),
+    player: &Player,
+) -> Option<NpcScript> {
+    if !info_reads(player, quest, slot, b'2') || player.inventory.count(item) == 0 {
+        return None;
+    }
+    Some(NpcScript::new(
+        npc,
+        vec![Page::Done(vec![
+            Effect::SetQuestChar {
+                quest,
+                slot,
+                from: b'2',
+                to: b'3',
+            },
+            Effect::TakeItem {
+                item_id: item,
+                quantity: 1,
+            },
+        ])],
+    ))
 }
 
 /// An item maker: pick a kind, then an item of it; the maker lists what it
@@ -6163,7 +6260,10 @@ mod tests {
         assert_eq!(first(&tester).0, Some(0));
         tester.quests.upsert(game::QuestRecord {
             quest_id: PET_TEST_QUEST,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         let (kind_on_test, mut script) = first(&tester);
         assert_eq!(kind_on_test, Some(1));
@@ -7882,7 +7982,10 @@ mod tests {
                     at: std::time::SystemTime::now(),
                 }
             } else {
-                QuestStatus::Started { kills: Vec::new() }
+                QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: None,
+                }
             };
             player.quests.upsert(game::QuestRecord { quest_id, status });
         }
@@ -8303,7 +8406,10 @@ mod tests {
             }
             player
         };
-        let started = || QuestStatus::Started { kills: Vec::new() };
+        let started = || QuestStatus::Started {
+            kills: Vec::new(),
+            info: None,
+        };
 
         // Without a quest, a word about them; with Brawler's started, the
         // way into its test.
@@ -9335,7 +9441,10 @@ mod tests {
         let mut player = traveller(30, meso, false);
         player.stats.gender = gender;
         for &quest_id in markers {
-            let status = QuestStatus::Started { kills: Vec::new() };
+            let status = QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            };
             player.quests.upsert(game::QuestRecord { quest_id, status });
         }
         for (slot, &(item_id, count)) in items.iter().enumerate() {
@@ -9929,6 +10038,61 @@ mod tests {
         // A Nana in a town without a task keeps her own lines.
         let elsewhere = sought(&[], 260000000, &[]);
         assert!(NpcScript::for_npc(NANAS[1], &elsewhere).is_none());
+    }
+
+    #[test]
+    fn info_quests_move_on_one_character_per_npc() {
+        let with_info = |quest_id, info: &str| {
+            let mut player = traveller(30, 0, false);
+            player.quests.upsert(game::QuestRecord {
+                quest_id,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(info.into()),
+                },
+            });
+            player
+        };
+        // House 4 (slot 1) takes its delivery without a word.
+        let mut sejan = with_info(3929, "3222");
+        assert!(NpcScript::for_npc(2103005, &sejan).is_none());
+        sejan
+            .inventory
+            .insert(game::InventoryType::Etc, 1, game::Item::stack(4031580, 4));
+        let house = NpcScript::for_npc(2103005, &sejan).unwrap();
+        let step = house.begin();
+        assert_eq!(step.prompt, None);
+        assert_eq!(
+            step.effects,
+            [
+                Effect::SetQuestChar {
+                    quest: 3929,
+                    slot: 1,
+                    from: b'2',
+                    to: b'3'
+                },
+                Effect::TakeItem {
+                    item_id: 4031580,
+                    quantity: 1
+                }
+            ]
+        );
+        // House 1 has had its delivery; quest 3926's cupboards aren't due.
+        assert!(NpcScript::for_npc(2103003, &sejan).is_none());
+        assert!(NpcScript::for_npc(2103009, &sejan).is_none());
+
+        // The oasis refreshes once; Magatia's wall asks first.
+        let oasis = NpcScript::for_npc(PALACE_OASIS, &with_info(3900, "4")).unwrap();
+        assert!(matches!(
+            &oasis.begin().effects[..],
+            [Effect::SetQuestChar { quest: 3900, .. }]
+        ));
+        assert!(NpcScript::for_npc(PALACE_OASIS, &with_info(3900, "5")).is_none());
+        let mut wall = NpcScript::for_npc(MAGATIA_WALL, &with_info(3311, "4")).unwrap();
+        assert!(matches!(wall.begin().prompt, Some(Prompt::YesNo { .. })));
+        let read = wall.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(read.effects.len(), 1);
+        assert!(NpcScript::for_npc(SECRET_WALL, &traveller(30, 0, false)).is_none());
     }
 
     #[test]

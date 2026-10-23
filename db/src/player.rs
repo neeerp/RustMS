@@ -16,7 +16,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
 use game::inventory::DEFAULT_SLOT_LIMIT;
-use game::quest::{decode_kills, encode_kills, SCRIPT_MARKERS};
+use game::quest::{decode_kills, INFO_QUESTS, SCRIPT_MARKERS};
 use game::{
     AutoPotions, AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item,
     KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, QuickSlots,
@@ -483,15 +483,15 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
                 .on_conflict_do_nothing()
                 .execute(conn)?;
         }
-        // Kill progress of started quests.
+        // Kill progress or info strings of started quests.
         for record in player.quests.started() {
-            let kills = player.quests.kills(record.quest_id);
+            let progress = record.status.record_string().unwrap_or_default();
             diesel::update(
                 character_quests::table
                     .find((id, record.quest_id))
                     .filter(character_quests::status.eq(1)),
             )
-            .set(character_quests::progress.eq(encode_kills(kills)))
+            .set(character_quests::progress.eq(progress))
             .execute(conn)?;
         }
 
@@ -683,8 +683,13 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
         quest_id: progress.quest_id,
         status: match (progress.status, progress.completed_at) {
             (2, Some(at)) => QuestStatus::Completed { at },
+            _ if INFO_QUESTS.contains(&progress.quest_id) => QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(progress.progress.clone()),
+            },
             _ => QuestStatus::Started {
                 kills: decode_kills(&progress.progress),
+                info: None,
             },
         },
     }

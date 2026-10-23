@@ -501,6 +501,15 @@ pub enum Effect {
         name: &'static str,
         state: u8,
     },
+    /// Set character `slot` of a started info quest's string
+    /// (`game::quest::INFO_QUESTS`) from `from` to `to`, as Ariant's houses
+    /// mark each delivery. Nothing is applied unless it reads `from`.
+    SetQuestChar {
+        quest: i16,
+        slot: u8,
+        from: u8,
+        to: u8,
+    },
     /// Count `map_id` toward an explorer medal (`crate::medals`), starting
     /// it on the first.
     Explore {
@@ -1449,7 +1458,10 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         for &(quest_id, state) in quests {
             let status = match state {
-                QuestState::Started => QuestStatus::Started { kills: Vec::new() },
+                QuestState::Started => QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: None,
+                },
                 _ => QuestStatus::Completed {
                     at: SystemTime::UNIX_EPOCH,
                 },

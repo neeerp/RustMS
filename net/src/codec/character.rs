@@ -2,7 +2,7 @@ use super::item::encode_inventory;
 use super::stats::encode_character_stats;
 use super::time::{expiration, filetime};
 use crate::error::NetworkError;
-use game::quest::{encode_kills, SCRIPT_MARKERS};
+use game::quest::SCRIPT_MARKERS;
 use game::{Player, QuestState};
 use packet::{io::write::PktWrite, Packet};
 
@@ -45,8 +45,8 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
         .started()
         .filter(|quest| quest.quest_id < SCRIPT_MARKERS)
         .map(|quest| {
-            let kills = encode_kills(player.quests.kills(quest.quest_id));
-            (quest.quest_id, kills)
+            let progress = quest.status.record_string().unwrap_or_default();
+            (quest.quest_id, progress)
         })
         .collect();
     let medals = (crate::quests::catalog().ok().into_iter())

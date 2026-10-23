@@ -10,6 +10,7 @@
 //! reads from `supported_quests.txt`.
 
 use crate::{GameDataError, NxDataFile};
+use game::quest::INFO_QUESTS;
 use game::QuestState;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -206,6 +207,45 @@ pub struct QuestTemplate {
     pub explored: Option<Explored>,
     /// The count its own record must reach (`OWN_RECORD_QUESTS`).
     pub end_record: Option<u16>,
+    /// For `game::quest::INFO_QUESTS`: the info string the start sets
+    /// (`Act/0/info`) and what it must read to complete (`Check/1/infoex`).
+    pub start_info: Option<String>,
+    pub end_info: Vec<InfoCheck>,
+}
+
+/// One `Check/1/infoex` entry on the quest's own info string.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InfoCheck {
+    /// 0 the string equals `value`, 1 it is at least `value`, 2 at most,
+    /// both read as numbers.
+    pub cond: u8,
+    pub value: String,
+}
+
+/// Whether an info string passes `checks`, as v83's completion check reads
+/// them: a missing string fails, and any one entry passing is enough.
+pub fn info_met(info: Option<&str>, checks: &[InfoCheck]) -> bool {
+    let Some(info) = info else {
+        return false;
+    };
+    checks.iter().any(|check| match check.cond {
+        1 => atoi(&check.value) <= atoi(info),
+        2 => atoi(info) <= atoi(&check.value),
+        _ => info == check.value,
+    })
+}
+
+/// C's `atoi`: the leading number, or 0.
+fn atoi(text: &str) -> i64 {
+    let text = text.trim_start();
+    let (sign, digits) = match text.strip_prefix('-') {
+        Some(rest) => (-1, rest),
+        None => (1, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let end = digits
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(digits.len());
+    sign * digits[..end].parse::<i64>().unwrap_or(0)
 }
 
 /// What an explorer medal (`EXPLORER_QUESTS`) counts toward.
@@ -390,6 +430,14 @@ impl QuestCatalog {
                     keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
                 }
             }
+            // The server keeps these quests' own info string (not one named
+            // by `infoNumber`, which stays unsupported).
+            if INFO_QUESTS.contains(&id) {
+                keys.start_act.retain(|key| key != "info");
+                if let Some(keys) = &mut keys.end_check {
+                    keys.retain(|key| key != "infoex");
+                }
+            }
             if id == REQUIREMENTS_IN_START_ACTIONS {
                 keys.start_act.clear();
             }
@@ -524,6 +572,15 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     } else {
         None
     };
+    let (start_info, end_info) = if INFO_QUESTS.contains(&id) {
+        let start_info = match start_actions {
+            Some(index) => text_child(nx, index, "info")?,
+            None => None,
+        };
+        (start_info, info_checks(nx, end)?)
+    } else {
+        (None, Vec::new())
+    };
     // See `classify`: quests without a completion NPC go back to the start NPC.
     let start_npc = requirements.npc;
     Ok(QuestTemplate {
@@ -560,7 +617,35 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         auto_complete: flag("autoComplete")?,
         explored,
         end_record,
+        start_info,
+        end_info,
     })
+}
+
+/// A string child, or an integer one written out ("0" may be stored as 0).
+fn text_child(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>, GameDataError> {
+    Ok(match nx.string_child(parent, key)? {
+        Some(text) => Some(text),
+        None => nx.int_child(parent, key)?.map(|value| value.to_string()),
+    })
+}
+
+/// Every `Check/1/infoex` entry.
+fn info_checks(nx: &NxDataFile, end: u32) -> Result<Vec<InfoCheck>, GameDataError> {
+    let Some(infoex) = nx.child_by_name(end, "infoex")? else {
+        return Ok(Vec::new());
+    };
+    let mut checks = Vec::new();
+    for entry in nx.child_indices(infoex)? {
+        let value =
+            text_child(nx, entry, "value")?.ok_or_else(|| invalid("infoex entry without value"))?;
+        let cond = nx.int_child(entry, "cond")?.unwrap_or(0);
+        checks.push(InfoCheck {
+            cond: u8::try_from(cond).map_err(|_| invalid("infoex cond out of range"))?,
+            value,
+        });
+    }
+    Ok(checks)
 }
 
 /// An explorer medal's `infoNumber` and its one `infoex` entry, a count to
@@ -892,6 +977,43 @@ mod tests {
             .map(|l| l.trim().parse().unwrap())
             .collect();
         assert_eq!(actual, golden, "update game-data/supported_quests.txt");
+    }
+
+    #[test]
+    fn info_checks_read_as_v83_reads_them() {
+        let check = |cond, value: &str| InfoCheck {
+            cond,
+            value: value.into(),
+        };
+        let exact = [check(0, "3333")];
+        assert!(info_met(Some("3333"), &exact));
+        assert!(!info_met(Some("3323"), &exact));
+        assert!(!info_met(None, &exact));
+        assert!(info_met(Some("12x"), &[check(1, "12")]));
+        assert!(!info_met(Some("11"), &[check(1, "12")]));
+        assert!(info_met(Some("abc"), &[check(2, "0")]));
+        assert!(info_met(Some("7"), &[check(0, "5"), check(2, "9")]));
+    }
+
+    #[test]
+    fn info_quests_load_their_strings() {
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let catalog = QuestCatalog::load_from_nx(path).unwrap();
+        let depots = catalog.quest(3926).unwrap();
+        assert_eq!(depots.start_info.as_deref(), Some("2222"));
+        assert_eq!(
+            depots.end_info,
+            [InfoCheck {
+                cond: 0,
+                value: "3333".into()
+            }]
+        );
+        let oasis = catalog.quest(3900).unwrap();
+        assert_eq!(oasis.start_info.as_deref(), Some("4"));
+        // Quests outside the list keep infoex unsupported.
+        assert!(catalog.quest(3114).is_none());
     }
 
     #[test]

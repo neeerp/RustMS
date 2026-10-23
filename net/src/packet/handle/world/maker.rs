@@ -966,7 +966,10 @@ mod tests {
             .any(|r| may_make(&player, r)));
         player.quests.upsert(QuestRecord {
             quest_id: 21_303,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert_eq!(
             [&started, &done, &either].map(|r| may_make(&player, r)),

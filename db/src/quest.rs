@@ -4,8 +4,7 @@ use crate::{
     schema::{character_quests, characters},
 };
 use diesel::prelude::*;
-use game::quest::encode_kills;
-use game::{Player, QuestState};
+use game::{Player, QuestState, QuestStatus};
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Queryable, Identifiable)]
@@ -71,7 +70,9 @@ pub fn start(
             Some(2) if repeatable => {}
             Some(_) => return Err(rejected()),
         }
-        let progress = encode_kills(player.quests.kills(qid));
+        let progress = (player.quests.status(qid))
+            .and_then(QuestStatus::record_string)
+            .unwrap_or_default();
         let progress = diesel::insert_into(character_quests::table)
             .values((
                 character_quests::character_id.eq(cid),

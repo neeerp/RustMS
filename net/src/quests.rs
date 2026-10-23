@@ -75,6 +75,8 @@ pub enum QuestRejection {
     Explored,
     /// The quest's own record short of its count (`end_record`).
     Record,
+    /// The quest's info string doesn't read what completion needs.
+    Info,
     /// No pet out, or the first pet out isn't one the quest lists.
     Pet,
     /// The item rewards don't fit.
@@ -232,6 +234,11 @@ pub fn check_complete(
         .find(|p| player.quests.state(p.quest_id) != p.state)
     {
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
+    }
+    if !quest.end_info.is_empty()
+        && !game_data::quests::info_met(player.quests.info(quest.id), &quest.end_info)
+    {
+        return Err(QuestRejection::Info);
     }
     if player.meso < quest.end_meso
         || (quest.money < 0 && player.meso < quest.money.saturating_neg())
@@ -464,6 +471,8 @@ mod tests {
             auto_complete: false,
             explored: None,
             end_record: None,
+            start_info: None,
+            end_info: Vec::new(),
         }
     }
 
@@ -477,7 +486,10 @@ mod tests {
     fn set(player: &mut Player, quest_id: i16, state: QuestState) {
         let status = match state {
             QuestState::NotStarted => return player.quests.remove(quest_id),
-            QuestState::Started => QuestStatus::Started { kills: Vec::new() },
+            QuestState::Started => QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
             QuestState::Completed => QuestStatus::Completed {
                 at: SystemTime::UNIX_EPOCH,
             },
@@ -632,6 +644,29 @@ mod tests {
         // Without a pet list, v83 doesn't read the range.
         q.end_pets.clear();
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn complete_needs_the_info_string_to_read_its_value() {
+        let mut q = quest();
+        q.end_info = vec![game_data::quests::InfoCheck {
+            cond: 0,
+            value: "3333".into(),
+        }];
+        let mut p = player(30, 0);
+        let mut started = |info: Option<&str>| {
+            p.quests.upsert(QuestRecord {
+                quest_id: q.id,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: info.map(String::from),
+                },
+            });
+            check_complete(&q, 2102, &p)
+        };
+        assert_eq!(started(Some("3323")), Err(QuestRejection::Info));
+        assert_eq!(started(None), Err(QuestRejection::Info));
+        assert_eq!(started(Some("3333")), Ok(()));
     }
 
     #[test]
