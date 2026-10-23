@@ -186,6 +186,10 @@ pub const ZPQ_OUT: &str = "Zakum03";
 /// client actor answers once the directory says whether the party may go
 /// (`papulatus_portal`).
 pub const PAPULATUS_IN: &str = "Populatus00";
+/// The way from the Trial Grounds' first map into their rooms (`in00`),
+/// which the client actor answers once it knows who else is on the map
+/// (`htpq_into_rooms`).
+pub const HTPQ_INTO_ROOMS: &str = "hontale_BtoB1";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.
@@ -1512,6 +1516,23 @@ fn is_market_portal(portal: &PortalTemplate) -> bool {
         .is_some_and(|script| script.contains("market"))
 }
 
+/// The way into the Trial Grounds' rooms (Cosmic `hontale_BtoB1`): someone
+/// must stay on the first map to gather the keys the rooms send there, so
+/// it lets no one through who is `alone` on it, nor anyone holding the
+/// first Crystal Key, which the leader hands in there; they are told in
+/// pink.
+pub fn htpq_into_rooms(alone: bool, holding_key: bool) -> Vec<Effect> {
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    if alone {
+        pink(keys::HTPQ_ROOMS_ALONE)
+    } else if holding_key {
+        pink(keys::HTPQ_ROOMS_HOLDING_KEY)
+    } else {
+        let first_room = crate::events::HTPQ.stage_map(1);
+        vec![Effect::PortalSound, Effect::WarpToPortal(first_room, 0)]
+    }
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2010,6 +2031,21 @@ mod tests {
         }
         player.stats.map_id = HORNTAILS_CAVE;
         assert_eq!(portal("hontale_BR", &player), None);
+    }
+
+    #[test]
+    fn the_way_into_the_trial_grounds_rooms_keeps_someone_and_the_first_key_back() {
+        let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+        assert_eq!(htpq_into_rooms(true, false), pink(keys::HTPQ_ROOMS_ALONE));
+        assert_eq!(htpq_into_rooms(true, true), pink(keys::HTPQ_ROOMS_ALONE));
+        assert_eq!(
+            htpq_into_rooms(false, true),
+            pink(keys::HTPQ_ROOMS_HOLDING_KEY)
+        );
+        assert_eq!(
+            htpq_into_rooms(false, false),
+            [Effect::PortalSound, Effect::WarpToPortal(240_050_101, 0)]
+        );
     }
 
     #[test]

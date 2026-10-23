@@ -32,6 +32,9 @@ pub enum EventKind {
     /// The expedition to Horntail's Cave, gathered by the Mark of the Squad
     /// (2083004) at the Entrance to Horntail's Cave (`crate::squads`).
     Horntail,
+    /// Horntail's party quest on the Trial Grounds, started at the
+    /// gatekeeper (2083001) at the Cave Entrance.
+    Htpq,
 }
 
 /// An event's maps and terms.
@@ -956,8 +959,80 @@ pub fn trial_head(map_id: i32) -> Option<(u8, &'static TrialHead)> {
     Some((HORNTAIL.stage_on(map_id)?, &HORNTAIL_HEADS[index]))
 }
 
+/// Horntail's party quest (Cosmic `HorntailPQ`): six of a party, all of
+/// level 120 or more, go from the Cave Entrance into their own copy of the
+/// Trial Grounds for 25 minutes. Stages 1 to 4 are the rooms whose seals
+/// break when their keys are thrown on them, stage 5 the last room's, which
+/// the leader lifts with the Blue Crystal Key; handing the gatekeeper the
+/// Blue Key and six Red Keys on either last map wins it (stage 6), which
+/// takes the team to the Entrance to Horntail's Cave. On the first map the
+/// leader hands the gatekeeper the five Crystal Keys, which takes the team
+/// on to the lamp's room. No stage gives EXP, and there is no prize. A
+/// member who dies lands outside it (240050500), and any one member's
+/// leaving ends it for all (Cosmic `isEventTeamLackingNow`, with
+/// six the least).
+pub const HTPQ: Event = Event {
+    lobby: crate::npc_scripts::CAVE_ENTRANCE,
+    maps: HTPQ_ENTRY..=HTPQ_DARK,
+    entry: HTPQ_ENTRY,
+    exit: crate::npc_scripts::CAVE_ENTRANCE,
+    levels: 120..=u8::MAX,
+    team: 6..=6,
+    minutes: 25,
+    exp_per_stage: &[0; 6],
+    stride: 1,
+    stage_maps: &[
+        HTPQ_ENTRY + 1,
+        HTPQ_ENTRY + 2,
+        HTPQ_ENTRY + 3,
+        HTPQ_ENTRY + 4,
+        HTPQ_ENTRY + 5,
+    ],
+    talk_clears: &[5],
+    member_clears: &[1, 2, 3, 4],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[
+        CRYSTAL_KEYS[0],
+        CRYSTAL_KEYS[1],
+        CRYSTAL_KEYS[2],
+        CRYSTAL_KEYS[3],
+        CRYSTAL_KEYS[4],
+        BLUE_CRYSTAL_KEY,
+        RED_CRYSTAL_KEY,
+    ],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: Some(crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE),
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+};
+
+/// The Trial Grounds' first map, where the team comes in and the leader
+/// hands in the five Crystal Keys; the lamp's room they then go to; and
+/// the two last maps, one of which the lamp opens.
+pub const HTPQ_ENTRY: i32 = 240_050_100;
+pub const HTPQ_LAMP: i32 = 240_050_200;
+pub const HTPQ_LIGHT: i32 = 240_050_300;
+pub const HTPQ_DARK: i32 = 240_050_310;
+/// The five Crystal Keys: the first from the entry's monsters, the others
+/// made by the seals of the four rooms.
+pub const CRYSTAL_KEYS: [i32; 5] = [4_001_087, 4_001_088, 4_001_089, 4_001_090, 4_001_091];
+/// The Blue Crystal Key, from the last room's monster, which lifts its
+/// seal and goes to the gatekeeper at the end; and the Red Crystal Keys,
+/// six of which go with it.
+pub const BLUE_CRYSTAL_KEY: i32 = 4_001_092;
+pub const RED_CRYSTAL_KEY: i32 = 4_001_093;
+pub const RED_KEYS_WANTED: i16 = 6;
+
 impl EventKind {
-    pub const ALL: [EventKind; 8] = [
+    pub const ALL: [EventKind; 9] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -966,6 +1041,7 @@ impl EventKind {
         EventKind::Zakum,
         EventKind::Papulatus,
         EventKind::Horntail,
+        EventKind::Htpq,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -978,6 +1054,7 @@ impl EventKind {
             EventKind::Zakum => &ZAKUM,
             EventKind::Papulatus => &PAPULATUS,
             EventKind::Horntail => &HORNTAIL,
+            EventKind::Htpq => &HTPQ,
         }
     }
 }
@@ -2142,6 +2219,33 @@ mod tests {
             Some(HORNTAIL.last_stage())
         );
         assert_eq!(HORNTAIL.member_clears, &[1, 2, HORNTAIL.last_stage()]);
+    }
+
+    #[test]
+    fn horntails_party_quest_takes_six_and_ends_when_any_one_leaves() {
+        let six: Vec<_> = (1..=6).map(|id| at(id, 120, HTPQ.lobby)).collect();
+        assert!(HTPQ.team(1, &six).is_some());
+        assert!(HTPQ.team(1, &six[..5]).is_none());
+        let mut low = six.clone();
+        low[5].level = 119;
+        assert!(HTPQ.team(1, &low).is_none());
+        // Any one member's leaving ends it, until it is won.
+        let mut team = Team::new(&HTPQ, 1, vec![1, 2, 3, 4, 5, 6]);
+        assert!(team.leave(6));
+        // Its ten maps are all its own, the Cave Entrance and the Entrance
+        // to Horntail's Cave outside them.
+        for map in [HTPQ_ENTRY, HTPQ_ENTRY + 5, HTPQ_LAMP, HTPQ_LIGHT, HTPQ_DARK] {
+            assert!(event_map(map), "{map}");
+        }
+        assert!(!event_map(HTPQ.lobby));
+        assert!(!event_map(HTPQ.clear_map.unwrap()));
+        assert!(!event_map(240_050_500));
+        // The four rooms' seals, then the last room's, then the win.
+        assert_eq!(HTPQ.stage_on(HTPQ_ENTRY + 1), Some(1));
+        assert_eq!(HTPQ.stage_on(HTPQ_ENTRY + 5), Some(5));
+        assert_eq!(HTPQ.stage_on(HTPQ_ENTRY), None);
+        assert_eq!(HTPQ.last_stage(), 6);
+        assert_eq!(HTPQ.items.len(), 7);
     }
 
     #[test]

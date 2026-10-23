@@ -17,7 +17,9 @@ storage and treasure room the win opens; its jails come in a later slice
 (`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`,
 `a091-opq-bonus-jail-re.md`). Zakum's Dead Mine (ZPQ), the first of the
 trials before Zakum ([zakum](./zakum.md)), is played through too
-(`v83ref/reports/a105-zakum-dead-mine.md`). Zakum's own altar is an event
+(`v83ref/reports/a105-zakum-dead-mine.md`). Horntail's Trial Grounds
+(HTPQ) has its entry, its first hand-in and its end rules; its rooms, lamp
+and win come in later slices (`v83ref/reports/a116-htpq.md`). Zakum's own altar is an event
 too, but of an expedition squad gathered across parties (`Event::squad`,
 `net/src/squads.rs`): its team comes from the squad's roster rather than a
 party, may come back in while it runs, and ends only when its last member
@@ -784,6 +786,35 @@ a pink line until the quest is won and, after, until the player has
 claimed the prize. Aura's way out needs neither. Cosmic's warp of holders
 of 4001109 to 921100000 is a custom left out.
 
+## Horntail's Trial Grounds
+
+At the Cave Entrance (240050000) the gatekeeper (2083001) takes a party of
+exactly six in, all there at level 120 and up (`events::HTPQ`,
+`EventKind::Htpq`): a menu of going in and what the quest is
+(`talk_about_event`). The quest runs for 25 minutes on 240050100 to
+240050310 and starts on 240050100. If any member leaves, the leader
+included, the party is below six and the quest ends for everyone, as in
+Cosmic. Leaving takes the quest's keys: the five Crystal Keys
+(4001087-4001091), the Blue (4001092) and the Red (4001093). Its clears
+give no EXP and no prize (Cosmic gives none either); the win sends the
+party to the Entrance to Horntail's Cave (240050400). The Crystal of Roots
+(2083002, see [horntail](./horntail.md)) takes a member out of it.
+
+On 240050100 the way into the rooms (`in00`, script `hontale_BtoB1`,
+`htpq_portal`) leads to the first room (240050101). It keeps back with a
+pink line whoever holds the first Crystal Key, so that someone keeps it
+for the hand-in, and whoever is alone on the map, so that one stays
+behind. Talking to the gatekeeper there (`in_event`, `htpq_keeper`), the
+leader hands in the five Crystal Keys and the party moves on to the lamp's
+map (240050200) with its clock; a member who isn't the leader, or a
+leader short of a key, is told so. On the light or dark map (240050300,
+240050310) the same hand-in takes the Blue Key and six Red Keys and wins
+the quest (`ClearStage` of the last stage).
+
+Not yet: the five rooms' keys and doors (the `passKey` reactor 2408002 and
+`hontale_Bopen`), the lamp (2408001, `hontale_C`), the Party Search entry
+and the stump (2083003).
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -820,10 +851,12 @@ of 4001109 to 921100000 is a custom left out.
 | Adobis 2030008 | 211042300 | Runtime (`talk_about_event`): the Dead Mine, the Breath of Lava, the Eyes of Fire |
 | Aura 2032002 | 280010000 | Runtime (`zpq_aura`): what it is, the leader's hand-in, out to 211042300; the prize once won |
 | Ali 2030011 | 280090000 | Home to 211042300 |
+| Gatekeeper 2083001 | 240050000 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
+| Gatekeeper 2083001 | 240050100, 240050300, 240050310 | Runtime (`htpq_keeper`): the leader's hand-in of the keys |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
-`opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`
-and `zakum.ali.*`.
+`opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
+`zakum.ali.*`, `htpq.keeper.*` and `htpq.rooms.*`.

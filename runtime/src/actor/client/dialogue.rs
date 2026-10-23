@@ -65,6 +65,10 @@ impl ClientActor {
         if npc_id == net::npc_scripts::ADOBIS && player.stats.map_id == net::events::ZPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Zpq).await;
         }
+        if npc_id == net::npc_scripts::HTPQ_KEEPER && player.stats.map_id == net::events::HTPQ.lobby
+        {
+            return self.talk_about_event(net::events::EventKind::Htpq).await;
+        }
         // The NPCs who gather squads, each on its event's lobby.
         for kind in net::events::EventKind::ALL {
             let recruiter = net::npc_scripts::recruiter(kind).map(|recruiter| recruiter.npc);

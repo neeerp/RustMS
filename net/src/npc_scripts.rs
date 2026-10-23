@@ -1271,6 +1271,12 @@ impl NpcScript {
         squad(kind, view, player)
     }
 
+    /// The gatekeeper (2083001) at the Cave Entrance, for a player whose
+    /// party may or may not go into the Trial Grounds.
+    pub fn htpq_gatekeeper(entry: Entry) -> Self {
+        htpq_gatekeeper(entry)
+    }
+
     /// Aura on the Dead Mine's hub, to `player`, who stands with her as
     /// `view`.
     pub fn aura(view: Aura, player: &Player) -> Self {
@@ -1320,6 +1326,7 @@ impl NpcScript {
             PINK_BALLOON => pink_balloon(player),
             ARTURO if won => arturo(player, &mut rand::thread_rng()),
             MINERVA if won => minerva(player, &mut rand::thread_rng()),
+            HTPQ_KEEPER if !won => htpq_keeper(player, leader),
             _ => None,
         }
     }
@@ -5928,7 +5935,7 @@ const POWER_ELIXIR: i32 = 2000005;
 const KEROBEN_ELIXIRS: (i16, i32) = (10, 100_000);
 const HORNTAIL_LEVEL: u8 = 100;
 const CAVE_OF_LIFE_ENTRANCE: i32 = 240040700;
-const CAVE_ENTRANCE: i32 = 240050000;
+pub(crate) const CAVE_ENTRANCE: i32 = 240050000;
 pub(crate) const HORNTAIL_CAVE_ENTRANCE: i32 = 240050400;
 /// Cave : The Road in Between, from which `hontale_out1` leads back to the
 /// Entrance to Horntail's Cave.
@@ -5992,6 +5999,81 @@ fn squad_slate(player: &Player) -> NpcScript {
         Page::Say(text(keys::HORNTAIL_SLATE_SEALED))
     };
     NpcScript::new(SQUAD_SLATE, vec![page])
+}
+
+/// The gatekeeper of Horntail's Trial Grounds (Cosmic `2083001`), on the
+/// Cave Entrance, on their first map, and on their two last ones.
+pub const HTPQ_KEEPER: i32 = 2083001;
+
+/// The gatekeeper at the Cave Entrance: in with the party, or what the
+/// Trial Grounds are. (Cosmic's Party Search toggle is left out.)
+fn htpq_gatekeeper(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::HTPQ_KEEPER_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::HTPQ_KEEPER_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::HTPQ, keys::HTPQ_KEEPER_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::HTPQ_KEEPER_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Htpq)]),
+    };
+    let mut script = NpcScript::new(
+        HTPQ_KEEPER,
+        vec![Page::Menu {
+            text: event_terms(&events::HTPQ, keys::HTPQ_KEEPER_MENU),
+            choices: vec![
+                (text(keys::HTPQ_KEEPER_ENTER), vec![enter]),
+                (
+                    text(keys::HTPQ_KEEPER_ABOUT),
+                    vec![Page::Say(text(keys::HTPQ_KEEPER_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since the gatekeeper checked, or another party
+    // went in.
+    script.refused = Some(event_terms(&events::HTPQ, keys::HTPQ_KEEPER_NOT_ELIGIBLE));
+    script
+}
+
+/// The gatekeeper inside the Trial Grounds hears only the leader. On the
+/// first map the five Crystal Keys take the team on to the lamp's room;
+/// on either last map the Blue Key and six Red Keys win the quest. Either
+/// way the keys go at once, without a word.
+fn htpq_keeper(player: &Player, leader: bool) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let (wanted, done, short): (Vec<(i32, i16)>, _, _) = match map_id {
+        events::HTPQ_ENTRY => (
+            events::CRYSTAL_KEYS.iter().map(|&key| (key, 1)).collect(),
+            EventCommand::MoveTeam(events::HTPQ_LAMP),
+            keys::HTPQ_KEEPER_KEYS_SHORT,
+        ),
+        events::HTPQ_LIGHT | events::HTPQ_DARK => (
+            vec![
+                (events::BLUE_CRYSTAL_KEY, 1),
+                (events::RED_CRYSTAL_KEY, events::RED_KEYS_WANTED),
+            ],
+            EventCommand::ClearStage(events::HTPQ.last_stage()),
+            keys::HTPQ_KEEPER_LAST_KEYS_SHORT,
+        ),
+        _ => return None,
+    };
+    let held =
+        |&(item_id, quantity): &(i32, i16)| player.inventory.count(item_id) >= i32::from(quantity);
+    let page = if !leader {
+        Page::Say(text(keys::HTPQ_KEEPER_LEADER_ONLY))
+    } else if wanted.iter().all(held) {
+        let mut effects: Vec<_> = wanted
+            .iter()
+            .map(|&(item_id, quantity)| Effect::TakeItem { item_id, quantity })
+            .collect();
+        effects.push(Effect::EventCommand(done));
+        Page::Done(effects)
+    } else {
+        Page::Say(text(short))
+    };
+    let mut script = NpcScript::new(HTPQ_KEEPER, vec![page]);
+    // A key dropped since the gatekeeper looked.
+    script.refused = Some(text(short));
+    Some(script)
 }
 
 /// The Crystal of Roots asks, then takes those past the Entrance to
@@ -10367,6 +10449,99 @@ mod tests {
             ali.respond(ScriptInput::Next).unwrap().effects,
             [Effect::Warp(DOOR_TO_ZAKUM)]
         );
+    }
+
+    #[test]
+    fn the_gatekeeper_lets_a_ready_party_into_the_trial_grounds_and_takes_its_keys() {
+        let mut ready = NpcScript::htpq_gatekeeper(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Htpq)]);
+        assert!(ready.refused().is_some());
+        for entry in [
+            Entry::NoParty,
+            Entry::NotLeader,
+            Entry::NotEligible,
+            Entry::Busy,
+        ] {
+            let mut keeper = NpcScript::htpq_gatekeeper(entry);
+            keeper.begin();
+            let step = keeper.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!((kind(&step), step.effects), (Some(0), vec![]));
+        }
+
+        // Inside, on the first map, only the leader with all five Crystal
+        // Keys is heard: the keys go, and the team goes on to the lamp.
+        let first = |items: &[(i32, i16)]| {
+            let mut player = hunter(items, &[]);
+            player.stats.map_id = events::HTPQ_ENTRY;
+            player
+        };
+        let five: Vec<_> = events::CRYSTAL_KEYS.iter().map(|&key| (key, 1)).collect();
+        let step = |player: &Player, leader| {
+            NpcScript::in_event(HTPQ_KEEPER, player, leader, false)
+                .unwrap()
+                .begin()
+        };
+        let mut taken: Vec<_> = events::CRYSTAL_KEYS
+            .iter()
+            .map(|&item_id| Effect::TakeItem {
+                item_id,
+                quantity: 1,
+            })
+            .collect();
+        taken.push(Effect::EventCommand(EventCommand::MoveTeam(
+            events::HTPQ_LAMP,
+        )));
+        let handed = step(&first(&five), true);
+        assert!(handed.prompt.is_none());
+        assert_eq!(handed.effects, taken);
+        assert_eq!(
+            page_text(&step(&first(&five), false)),
+            text(keys::HTPQ_KEEPER_LEADER_ONLY)
+        );
+        assert_eq!(
+            page_text(&step(&first(&five[1..]), true)),
+            text(keys::HTPQ_KEEPER_KEYS_SHORT)
+        );
+
+        // On either last map, the Blue Key and six Red Keys win it.
+        let last = |map, reds| {
+            let mut player = hunter(
+                &[
+                    (events::BLUE_CRYSTAL_KEY, 1),
+                    (events::RED_CRYSTAL_KEY, reds),
+                ],
+                &[],
+            );
+            player.stats.map_id = map;
+            player
+        };
+        for map in [events::HTPQ_LIGHT, events::HTPQ_DARK] {
+            assert_eq!(
+                step(&last(map, 6), true).effects,
+                [
+                    Effect::TakeItem {
+                        item_id: events::BLUE_CRYSTAL_KEY,
+                        quantity: 1
+                    },
+                    Effect::TakeItem {
+                        item_id: events::RED_CRYSTAL_KEY,
+                        quantity: 6
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(6)),
+                ]
+            );
+            assert_eq!(
+                page_text(&step(&last(map, 5), true)),
+                text(keys::HTPQ_KEEPER_LAST_KEYS_SHORT)
+            );
+        }
+        // Nothing to say elsewhere, or once won.
+        assert!(
+            NpcScript::in_event(HTPQ_KEEPER, &last(events::HTPQ_LAMP, 6), true, false).is_none()
+        );
+        assert!(NpcScript::in_event(HTPQ_KEEPER, &first(&five), true, true).is_none());
     }
 
     #[test]

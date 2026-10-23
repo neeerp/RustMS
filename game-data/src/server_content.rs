@@ -1440,6 +1440,36 @@ pub mod keys {
         HORNTAIL_VICTORY,
     ];
 
+    pub const HTPQ_KEEPER_MENU: &str = "htpq.keeper.menu";
+    pub const HTPQ_KEEPER_ENTER: &str = "htpq.keeper.enter";
+    pub const HTPQ_KEEPER_ABOUT: &str = "htpq.keeper.about";
+    pub const HTPQ_KEEPER_INFO: &str = "htpq.keeper.info";
+    pub const HTPQ_KEEPER_NO_PARTY: &str = "htpq.keeper.no_party";
+    pub const HTPQ_KEEPER_NOT_LEADER: &str = "htpq.keeper.not_leader";
+    pub const HTPQ_KEEPER_NOT_ELIGIBLE: &str = "htpq.keeper.not_eligible";
+    pub const HTPQ_KEEPER_BUSY: &str = "htpq.keeper.busy";
+    pub const HTPQ_KEEPER_LEADER_ONLY: &str = "htpq.keeper.leader_only";
+    pub const HTPQ_KEEPER_KEYS_SHORT: &str = "htpq.keeper.keys_short";
+    pub const HTPQ_KEEPER_LAST_KEYS_SHORT: &str = "htpq.keeper.last_keys_short";
+    pub const HTPQ_ROOMS_ALONE: &str = "htpq.rooms.alone";
+    pub const HTPQ_ROOMS_HOLDING_KEY: &str = "htpq.rooms.holding_key";
+    /// The gatekeeper and the ways through Horntail's Trial Grounds.
+    pub const HTPQ: [&str; 13] = [
+        HTPQ_KEEPER_MENU,
+        HTPQ_KEEPER_ENTER,
+        HTPQ_KEEPER_ABOUT,
+        HTPQ_KEEPER_INFO,
+        HTPQ_KEEPER_NO_PARTY,
+        HTPQ_KEEPER_NOT_LEADER,
+        HTPQ_KEEPER_NOT_ELIGIBLE,
+        HTPQ_KEEPER_BUSY,
+        HTPQ_KEEPER_LEADER_ONLY,
+        HTPQ_KEEPER_KEYS_SHORT,
+        HTPQ_KEEPER_LAST_KEYS_SHORT,
+        HTPQ_ROOMS_ALONE,
+        HTPQ_ROOMS_HOLDING_KEY,
+    ];
+
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
     pub const ZAKUM: [&str; 59] = [
@@ -2529,6 +2559,7 @@ mod tests {
             .chain(&keys::SQUAD)
             .chain(&keys::PAPULATUS)
             .chain(&keys::HORNTAIL)
+            .chain(&keys::HTPQ)
             .chain(&[
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
