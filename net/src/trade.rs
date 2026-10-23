@@ -25,9 +25,11 @@ pub enum TradeRequest {
         sn: i32,
         reason: u8,
     },
-    /// Accept room `sn`'s invitation.
+    /// Accept room `sn`'s invitation, or visit it; a private game asks for
+    /// its password.
     Visit {
         sn: i32,
+        password: Option<String>,
     },
     Chat {
         text: String,

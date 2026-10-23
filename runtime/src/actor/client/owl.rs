@@ -61,7 +61,8 @@ impl ClientActor {
                 .get(inventory, slot)
                 .is_some_and(|item| item.item_id == owl_id)
             && self.trade.is_none()
-            && self.personal_shop.is_none();
+            && self.personal_shop.is_none()
+            && self.mini_game.is_none();
         if !may {
             return self.send(&mut stat::build_stat_update(true, &[])?).await;
         }
@@ -116,7 +117,7 @@ impl ClientActor {
         let player = &self.in_game()?.player;
         let code = if player.stats.hp <= 0 {
             go_result::DEAD
-        } else if self.trade.is_some() || self.personal_shop.is_some() {
+        } else if self.trade.is_some() || self.personal_shop.is_some() || self.mini_game.is_some() {
             go_result::BUSY
         } else if !owl::in_free_market(player.stats.map_id) || !owl::is_market_room(map_id) {
             go_result::CLOSED
@@ -135,7 +136,11 @@ impl ClientActor {
                 Box::pin(self.apply(action)).await?;
             }
         }
-        self.trade_request(TradeRequest::Visit { sn: room }).await
+        self.trade_request(TradeRequest::Visit {
+            sn: room,
+            password: None,
+        })
+        .await
     }
 
     /// What shop `room` on this channel's `map_id` says to `name` coming in.

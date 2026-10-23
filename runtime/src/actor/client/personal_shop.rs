@@ -132,7 +132,7 @@ impl ClientActor {
         permit_slot: i16,
         permit_id: i32,
     ) -> Result<(), RuntimeError> {
-        if self.trade.is_some() || self.personal_shop.is_some() {
+        if self.trade.is_some() || self.personal_shop.is_some() || self.mini_game.is_some() {
             return Ok(());
         }
         let player = &self.in_game()?.player;

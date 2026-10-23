@@ -1,5 +1,6 @@
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::hired_merchant::{HiredMerchantRequest, ROOM_TYPE as HIRED_MERCHANT};
+use crate::mini_game::{MiniGameRequest, MATCH_CARDS, OMOK};
 use crate::packet::build::world::mini_room::{PERSONAL_SHOP, TRADE_ROOM};
 use crate::personal_shop::PersonalShopRequest;
 use crate::trade::TradeRequest;
@@ -7,7 +8,8 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::debug;
 
-/// `PLAYER_INTERACTION`, for trading rooms and personal shops. Mode 0
+/// `PLAYER_INTERACTION`, for trading rooms, personal shops and the games
+/// Omok and match cards. Mode 0
 /// creates a room of a type; 4 visits (accepting a trade invitation or
 /// entering a shop), 6 chats and 0xa leaves either. For trades, 2 invites, 3
 /// declines, 0xf puts up an item, 0x10 mesos, and 0x11 presses Trade. For
@@ -15,7 +17,9 @@ use tracing::debug;
 /// it, 0xb opens the shop, 0x17 buys, 0x1b takes a listing back, and
 /// 0x1c/0x1d ban a visitor. A hired merchant's modes are the shop's plus
 /// 0xb (0x21 lists, 0x22 buys, 0x26 takes back), and its owner's buttons
-/// send 0x27 to 0x31 (report 165 §3). Mode 0xe wraps an open or a visit
+/// send 0x27 to 0x31 (report 165 §3). The games send 0x32 to 0x41 and
+/// 0x44 (report 164 §4–5); their owner also sends 0xb on entering, which
+/// opens no shop. Mode 0xe wraps an open or a visit
 /// with the birthday, when a cash item is involved. The runtime holds the
 /// goods and the field the room.
 pub struct PlayerInteractionHandler;
@@ -27,6 +31,7 @@ impl WorldHandler for PlayerInteractionHandler {
         let shop = |request| Ok(HandlerResult::empty().with(WorldAction::PersonalShop(request)));
         let merchant =
             |request| Ok(HandlerResult::empty().with(WorldAction::HiredMerchant(request)));
+        let game = |request| Ok(HandlerResult::empty().with(WorldAction::MiniGame(request)));
         let request = match reader.read_byte()? {
             0x00 => match reader.read_byte()? {
                 TRADE_ROOM => TradeRequest::Create,
@@ -48,6 +53,20 @@ impl WorldHandler for PlayerInteractionHandler {
                         permit_id: reader.read_int()?,
                     });
                 }
+                kind @ (OMOK | MATCH_CARDS) => {
+                    let title = reader.read_str_with_length()?;
+                    let password = if reader.read_byte()? != 0 {
+                        Some(reader.read_str_with_length()?)
+                    } else {
+                        None
+                    };
+                    return game(MiniGameRequest::Create {
+                        kind,
+                        title,
+                        password,
+                        piece: reader.read_byte()?,
+                    });
+                }
                 kind => {
                     debug!(kind, "Ignoring mini room of another type");
                     return Ok(HandlerResult::empty());
@@ -60,9 +79,15 @@ impl WorldHandler for PlayerInteractionHandler {
                 sn: reader.read_int()?,
                 reason: reader.read_byte()?,
             },
-            0x04 => TradeRequest::Visit {
-                sn: reader.read_int()?,
-            },
+            0x04 => {
+                let sn = reader.read_int()?;
+                let password = if reader.read_byte().unwrap_or(0) != 0 {
+                    Some(reader.read_str_with_length()?)
+                } else {
+                    None
+                };
+                TradeRequest::Visit { sn, password }
+            }
             0x06 => TradeRequest::Chat {
                 text: reader.read_str_with_length()?,
             },
@@ -92,7 +117,7 @@ impl WorldHandler for PlayerInteractionHandler {
                     0x04 => {
                         let sn = reader.read_int()?;
                         if reader.read_byte()? == 0 {
-                            TradeRequest::Visit { sn }
+                            TradeRequest::Visit { sn, password: None }
                         } else {
                             return merchant(HiredMerchantRequest::RemoteVisit {
                                 sn,
@@ -189,6 +214,31 @@ impl WorldHandler for PlayerInteractionHandler {
                     reader.read_str_with_length()?,
                 ))
             }
+            0x32 => return game(MiniGameRequest::AskTie),
+            0x33 => return game(MiniGameRequest::AnswerTie(reader.read_byte()? != 0)),
+            0x34 => return game(MiniGameRequest::GiveUp),
+            0x36 => return game(MiniGameRequest::AskUndo),
+            0x37 => return game(MiniGameRequest::AnswerUndo(reader.read_byte()? != 0)),
+            0x38 => return game(MiniGameRequest::LeaveAfter(true)),
+            0x39 => return game(MiniGameRequest::LeaveAfter(false)),
+            0x3a => return game(MiniGameRequest::Ready(true)),
+            0x3b => return game(MiniGameRequest::Ready(false)),
+            0x3c => return game(MiniGameRequest::Expel),
+            0x3d => return game(MiniGameRequest::Start),
+            0x3f => return game(MiniGameRequest::Skip),
+            0x40 => {
+                return game(MiniGameRequest::Move {
+                    x: reader.read_int()?,
+                    y: reader.read_int()?,
+                    color: reader.read_byte()?,
+                })
+            }
+            0x44 => {
+                return game(MiniGameRequest::Flip {
+                    first: reader.read_byte()? != 0,
+                    index: reader.read_byte()?,
+                })
+            }
             other => {
                 // 0x14 answers the partner's Trade press with item CRCs;
                 // 0x2d renames a merchant, for GMs.
@@ -220,6 +270,85 @@ mod tests {
             None => None,
             Some(other) => panic!("unexpected {other:?}"),
         }
+    }
+
+    fn parse_game<T>(build: impl FnOnce(&mut Packet) -> T) -> Option<MiniGameRequest> {
+        match action(build) {
+            Some(WorldAction::MiniGame(request)) => Some(request),
+            None => None,
+            Some(other) => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reads_the_game_modes() {
+        let omok = parse_game(|p| {
+            p.write_bytes(&[0, 1]).unwrap();
+            p.write_str_with_length("omok").unwrap();
+            p.write_byte(1).unwrap();
+            p.write_str_with_length("pw").unwrap();
+            p.write_byte(7).unwrap();
+        });
+        assert_eq!(
+            omok,
+            Some(MiniGameRequest::Create {
+                kind: 1,
+                title: "omok".into(),
+                password: Some("pw".into()),
+                piece: 7
+            })
+        );
+        let cards = parse_game(|p| {
+            p.write_bytes(&[0, 2]).unwrap();
+            p.write_str_with_length("cards").unwrap();
+            p.write_bytes(&[0, 2]).unwrap();
+        });
+        assert_eq!(
+            cards,
+            Some(MiniGameRequest::Create {
+                kind: 2,
+                title: "cards".into(),
+                password: None,
+                piece: 2
+            })
+        );
+        for (bytes, request) in [
+            (&[0x32][..], MiniGameRequest::AskTie),
+            (&[0x33, 1], MiniGameRequest::AnswerTie(true)),
+            (&[0x34], MiniGameRequest::GiveUp),
+            (&[0x36], MiniGameRequest::AskUndo),
+            (&[0x37, 0], MiniGameRequest::AnswerUndo(false)),
+            (&[0x38], MiniGameRequest::LeaveAfter(true)),
+            (&[0x39], MiniGameRequest::LeaveAfter(false)),
+            (&[0x3a], MiniGameRequest::Ready(true)),
+            (&[0x3b], MiniGameRequest::Ready(false)),
+            (&[0x3c], MiniGameRequest::Expel),
+            (&[0x3d], MiniGameRequest::Start),
+            (&[0x3f], MiniGameRequest::Skip),
+            (
+                &[0x44, 1, 9],
+                MiniGameRequest::Flip {
+                    first: true,
+                    index: 9,
+                },
+            ),
+        ] {
+            assert_eq!(parse_game(|p| p.write_bytes(bytes).unwrap()), Some(request));
+        }
+        let stone = parse_game(|p| {
+            p.write_byte(0x40).unwrap();
+            p.write_int(3).unwrap();
+            p.write_int(14).unwrap();
+            p.write_byte(2).unwrap();
+        });
+        assert_eq!(
+            stone,
+            Some(MiniGameRequest::Move {
+                x: 3,
+                y: 14,
+                color: 2
+            })
+        );
     }
 
     fn parse_merchant(build: &dyn Fn(&mut Packet)) -> Option<HiredMerchantRequest> {
@@ -268,7 +397,27 @@ mod tests {
             p.write_int(5).unwrap();
             p.write_bytes(&[0, 0]).unwrap();
         });
-        assert_eq!(visit, Some(TradeRequest::Visit { sn: 5 }));
+        assert_eq!(
+            visit,
+            Some(TradeRequest::Visit {
+                sn: 5,
+                password: None
+            })
+        );
+        let private = parse(|p| {
+            p.write_byte(4).unwrap();
+            p.write_int(5).unwrap();
+            p.write_byte(1).unwrap();
+            p.write_str_with_length("pw").unwrap();
+            p.write_byte(0).unwrap();
+        });
+        assert_eq!(
+            private,
+            Some(TradeRequest::Visit {
+                sn: 5,
+                password: Some("pw".into())
+            })
+        );
         let chat = parse(|p| {
             p.write_byte(6).unwrap();
             p.write_str_with_length("hi").unwrap();
@@ -522,7 +671,7 @@ mod tests {
 
     #[test]
     fn ignores_other_rooms_and_the_crc_answer() {
-        assert_eq!(parse(|p| p.write_bytes(&[0, 1, 0])), None);
+        assert_eq!(parse(|p| p.write_bytes(&[0, 6, 0])), None);
         assert_eq!(parse(|p| p.write_bytes(&[0x14, 0])), None);
         assert_eq!(parse(|p| p.write_byte(0x2d)), None);
     }

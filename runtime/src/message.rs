@@ -326,6 +326,11 @@ pub enum ServerMessage {
         room: i32,
         event: crate::actor::field_shops::ShopEvent,
     },
+    /// News from Omok or match cards game `room` on this player's field.
+    MiniGame {
+        room: i32,
+        event: crate::actor::field_games::GameEvent,
+    },
     /// News from `owner`'s hired merchant on this player's field.
     HiredMerchant {
         owner: i32,
@@ -574,6 +579,11 @@ pub enum FieldMessage {
     PersonalShop {
         from: ClientId,
         request: crate::actor::field_shops::ShopRoomRequest,
+    },
+    /// A player's request of an Omok or match cards game.
+    MiniGame {
+        from: ClientId,
+        request: crate::actor::field_games::GameRoomRequest,
     },
     /// A player's request of a hired merchant; purchases and closing carry
     /// oneshots.

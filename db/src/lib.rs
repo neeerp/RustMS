@@ -31,6 +31,7 @@ pub mod guild_bbs;
 pub mod keybinding;
 pub mod marriage;
 pub mod merchant;
+pub mod mini_game;
 pub mod name_change;
 pub mod note;
 pub mod parcel;

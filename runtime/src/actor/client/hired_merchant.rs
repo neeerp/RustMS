@@ -66,7 +66,10 @@ impl MerchantRoom {
 
 impl ClientActor {
     fn in_a_room(&self) -> bool {
-        self.trade.is_some() || self.personal_shop.is_some() || self.hired_merchant.is_some()
+        self.trade.is_some()
+            || self.personal_shop.is_some()
+            || self.hired_merchant.is_some()
+            || self.mini_game.is_some()
     }
 
     pub(super) async fn hired_merchant_request(

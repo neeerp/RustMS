@@ -41,6 +41,7 @@ pub use character::{
 pub use guild::{Guild, GuildMember, GuildTag};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};
+pub use mini_room::{GameOutcome, GameRecord};
 pub use mob_stat::MobStat;
 pub use monster_book::MonsterBook;
 pub use mount::Mount;

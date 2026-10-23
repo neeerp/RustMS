@@ -79,12 +79,13 @@ impl ClientActor {
                 self.to_room(RoomRequest::Decline { room: sn, reason })
                     .await
             }
-            // The room may be a trading room or a personal shop: it says
-            // which by starting a trade or seating the player.
-            TradeRequest::Visit { sn } => {
+            // The room may be a trading room, a personal shop or a game: it
+            // says which by starting a trade or seating the player.
+            TradeRequest::Visit { sn, password } => {
                 if trading.is_some()
                     || self.personal_shop.is_some()
                     || self.merchant_field.is_some()
+                    || self.mini_game.is_some()
                 {
                     return Ok(());
                 }
@@ -93,7 +94,13 @@ impl ClientActor {
                         self.merchant_visits.push(owner);
                     }
                 }
-                self.to_room(RoomRequest::Visit { room: sn }).await
+                let records = self.game_records().await;
+                self.to_room(RoomRequest::Visit {
+                    room: sn,
+                    password,
+                    records,
+                })
+                .await
             }
             TradeRequest::Chat { text } => {
                 if trading.is_none() {

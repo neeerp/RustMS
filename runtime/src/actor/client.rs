@@ -17,6 +17,7 @@ mod hired_merchant;
 mod later;
 mod loot;
 mod marriage;
+mod mini_game;
 pub(crate) mod name_change;
 mod notes;
 mod npc_script;
@@ -172,6 +173,10 @@ pub struct ClientActor {
     trade: Option<trade::Trade>,
     /// The player's own shop, or the one they visit.
     personal_shop: Option<personal_shop::PersonalShop>,
+    /// The Omok or match cards game the player sits at.
+    mini_game: Option<mini_game::MiniGame>,
+    /// The player's Omok and match cards records, once read.
+    game_records: Option<[game::GameRecord; 2]>,
     hired_merchant: Option<hired_merchant::MerchantRoom>,
     /// The owners of the merchants the player asked to visit here and
     /// hasn't been let into yet.
@@ -248,6 +253,8 @@ impl ClientActor {
             later: Vec::new(),
             trade: None,
             personal_shop: None,
+            mini_game: None,
+            game_records: None,
             hired_merchant: None,
             merchant_visits: Vec::new(),
             merchant_field: None,
@@ -504,7 +511,12 @@ impl ClientActor {
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
                 self.shop_room_request(request).await?
             }
+            WorldAction::Trade(request) if self.mini_game.is_some() => {
+                self.game_room_request(request).await?
+            }
             WorldAction::Trade(request) => self.trade_request(request).await?,
+            WorldAction::MiniGame(_) if self.in_cash_shop => {}
+            WorldAction::MiniGame(request) => self.mini_game_request(request).await?,
             WorldAction::Owl(_) if self.in_cash_shop => {}
             WorldAction::Owl(request) => self.owl_request(request).await?,
             WorldAction::PersonalShop(_) if self.in_cash_shop => {}
@@ -835,6 +847,7 @@ impl ClientActor {
 
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_mini_game().await?;
         self.stop_remote_merchant().await?;
         self.leave_hired_merchant().await?;
         self.keep_mounts_off(map_id).await?;
@@ -909,6 +922,7 @@ impl ClientActor {
         self.close_door().await?;
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_mini_game().await?;
         self.leave_hired_merchant().await?;
         self.flush().await?;
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
@@ -940,6 +954,7 @@ impl ClientActor {
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.leave_mini_game().await?;
         self.leave_hired_merchant().await?;
         // The shop can't answer a proposal (report b053).
         self.send_to_directory(DirectoryMessage::EnteredCashShop {
@@ -1701,6 +1716,7 @@ impl ClientActor {
             } => self.ship_warp(from_map, map_id, portal).await?,
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::PersonalShop { room, event } => self.shop_event(room, event).await?,
+            ServerMessage::MiniGame { room, event } => self.game_event(room, event).await?,
             ServerMessage::HiredMerchant { owner, event } => {
                 self.merchant_event(owner, event).await?
             }
@@ -1812,6 +1828,7 @@ impl ClientActor {
                             | FieldMessage::Leave { .. }
                             | FieldMessage::Trade { .. }
                             | FieldMessage::PersonalShop { .. }
+                            | FieldMessage::MiniGame { .. }
                             | FieldMessage::Merchant { .. }
                     )
                 {
@@ -1825,6 +1842,7 @@ impl ClientActor {
                 // merchant the player manages from here stands elsewhere.
                 self.abandon_trade().await?;
                 self.abandon_personal_shop().await?;
+                self.abandon_mini_game().await?;
                 Box::pin(self.stop_remote_merchant()).await?;
                 self.abandon_hired_merchant().await
             }
@@ -1919,6 +1937,9 @@ impl ClientActor {
             }
             if let Err(error) = self.leave_personal_shop().await {
                 warn!(self.client_id, %error, "Failed to close personal shop");
+            }
+            if let Err(error) = self.leave_mini_game().await {
+                warn!(self.client_id, %error, "Failed to leave mini game");
             }
             if let Err(error) = self.leave_hired_merchant().await {
                 warn!(self.client_id, %error, "Failed to leave hired merchant");
