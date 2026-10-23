@@ -813,6 +813,87 @@ void swimming(const ms::Physics& physics)
 	require(std::abs(speed(-player.vforce) - 388.5) < 1e-9, "a jump in water did not rise at 0.7 of jumpSpeed");
 }
 
+// r25's fly map step (0x9b2ef8): sideways a flier tops out at flySpeed 200
+// px/s, pushed at 1200 px/s^2 and slowed at 1000; it sinks at up to 10.05
+// px/s, drops at 70.35 when steered down, and beats up at 350 (0x9b20a3).
+void fly_map(const ms::Physics& physics)
+{
+	auto speed = [](double perTick) { return perTick * TICKS_PER_SECOND; };
+	auto flier = [&]()
+	{
+		ms::PhysicsObject player;
+		player.shoe = true;
+		player.flymap = true;
+		player.onground = false;
+		player.set_x(0); player.set_y(-150);
+		return player;
+	};
+
+	// Not steering, it sinks at 10.05 px/s, with no gravity.
+	ms::PhysicsObject player = flier();
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 9.6) < 1e-9, "a flier did not sink at 1200 px/s^2");
+	for (int tick = 0; tick < 20; ++tick)
+		physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 10.05) < 1e-9, "a flier did not sink at 10.05 px/s");
+
+	// Up steers as nothing does.
+	player = flier();
+	player.flydir = -1;
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 9.6) < 1e-9, "flying up did not sink");
+
+	// Sideways it tops out at 200 px/s, whatever the shoe's swimSpeed, and
+	// slows at 1000 px/s^2 once it isn't steered.
+	player = flier();
+	player.swimspeed = 1.5;
+	physics.move_object(player);
+	require(std::abs(speed(player.hspeed)) < 1e-9, "a flier moved sideways unsteered");
+	for (int tick = 0; tick < 30; ++tick)
+	{
+		player.walkdir = 1;
+		physics.move_object(player);
+	}
+	require(std::abs(speed(player.hspeed) - 200.0) < 1e-9, "a flier did not top out at flySpeed");
+	physics.move_object(player);
+	require(std::abs(speed(player.hspeed) - 192.0) < 1e-9, "a flier did not slow at 1000 px/s^2");
+
+	// Down drops at 70.35 px/s at once, and it lands on the floor.
+	player = flier();
+	player.flydir = 1;
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) - 70.35) < 1e-9, "flying down did not drop at 70.35 px/s");
+	for (int tick = 0; tick < 600 && !player.onground; ++tick)
+		physics.move_object(player);
+	require(player.onground && player.crnt_y() == 100, "a diving flier did not land");
+
+	// A beat rises at 350 px/s, then slows at the drag and the sinking push
+	// together. Steering doubles the sideways speed, which then slows back
+	// to flySpeed.
+	player = flier();
+	player.hspeed = 200.0 / TICKS_PER_SECOND;
+	ms::Physics::fly_flap(player, false);
+	require(std::abs(speed(player.vspeed) + 350.0) < 1e-9 && std::abs(speed(player.hspeed) - 200.0) < 1e-9, "a beat was wrong");
+	physics.move_object(player);
+	require(std::abs(speed(player.vspeed) + 332.4) < 1e-9, "a beat did not slow at 2200 px/s^2");
+	player = flier();
+	player.hspeed = 200.0 / TICKS_PER_SECOND;
+	ms::Physics::fly_flap(player, true);
+	require(std::abs(speed(player.hspeed) - 400.0) < 1e-9, "a steered beat did not double the sideways speed");
+	player.walkdir = 1;
+	physics.move_object(player);
+	require(std::abs(speed(player.hspeed) - 392.0) < 1e-9, "a flier over flySpeed did not slow at 1000 px/s^2");
+
+	// On the floor it walks as on land and jumps at 0.7 of jumpSpeed.
+	player = grounded_shoe(physics);
+	player.flymap = true;
+	player.walkdir = 1;
+	physics.move_object(player);
+	require(player.onground && std::abs(speed(player.hspeed) - 11.2) < 1e-9, "walking in a fly map did not push as on land");
+	ms::Physics::jump(player, ms::Physics::jump_speed(1.0), 0);
+	require(std::abs(speed(-player.vforce) - 388.5) < 1e-9, "a jump in a fly map did not rise at 0.7 of jumpSpeed");
+}
+
 // A 100 px wall stops a walking player whichever way the map draws it:
 // going up along the chain (y1 > y2) or going down (y1 < y2).
 void walls(const ms::Physics& physics)
@@ -969,6 +1050,7 @@ int main()
 			falling(physics);
 			flying(physics);
 			swimming(physics);
+			fly_map(physics);
 			jumping_down(physics);
 			knockback(physics);
 			conveyor_belts();

@@ -55,6 +55,13 @@ namespace ms
 	const double SWIMWALK = 0.9;
 	const double SWIMJUMP = 0.7;
 	const double SWIMKICK = 5.0 * SWIMSPEED;
+	// In a fly map's air (r25 0x9b2ef8) a user moves sideways as a flier,
+	// whatever their shoe, and sinks at fallSpeed * 0.015, or drops at 7
+	// times that when steered down. A beat (0x9b20a3) rises at flyJumpDec
+	// * flySpeed * 5, doubling the sideways speed while steering.
+	const double FLYSINK = FALLSPEED * 0.015;
+	const double FLYDROP = 7.0 * FLYSINK;
+	const double FLYFLAP = 0.35 * FLYSPEED * 5.0;
 	const double TICK = Constants::TIMESTEP / 1000.0;
 
 	// CVecCtrl's accelerate (FUN_007f29ab): speeds up towards +-limit and
@@ -313,6 +320,24 @@ namespace ms
 
 			hspeed = speed * ux;
 			vspeed = 0.0;
+		} else if (phobj.flymap)
+		{
+			double drag = FLYDRAG * friction;
+
+			decelerate(hspeed, FLYSPEED, drag);
+
+			if (dir == 0)
+				decelerate(hspeed, 0.0, drag);
+			else
+				accelerate(hspeed, dir * FLYACC, FLYSPEED);
+
+			decelerate(vspeed, FLYSINK, drag);
+
+			// Up steers no differently from nothing.
+			if (phobj.flydir > 0)
+				vspeed = FLYDROP;
+			else
+				accelerate(vspeed, FLYACC, FLYSINK);
 		} else if (phobj.swim || phobj.flyspeed > 0.0)
 		{
 			// CVecCtrl's flying (FUN_007f2a1c) and swimming slow anything
@@ -413,7 +438,7 @@ namespace ms
 
 	void Physics::jump(PhysicsObject &phobj, double jumpspeed, int8_t dir)
 	{
-		phobj.vforce = -jumpspeed * (phobj.swim ? SWIMJUMP : 1.0);
+		phobj.vforce = -jumpspeed * (phobj.swim || phobj.flymap ? SWIMJUMP : 1.0);
 
 		if (dir == 0)
 			return;
@@ -446,6 +471,14 @@ namespace ms
 	void Physics::swim_jump(PhysicsObject &phobj)
 	{
 		phobj.vspeed = -SWIMKICK * phobj.swimkick * TICK;
+	}
+
+	void Physics::fly_flap(PhysicsObject &phobj, bool steering)
+	{
+		if (steering)
+			phobj.hspeed *= 2.0;
+
+		phobj.vspeed = -FLYFLAP * TICK;
 	}
 
 	// CVecCtrl's down-jump (FUN_007f1ac6) rises at jumpSpeed / sqrt(8)

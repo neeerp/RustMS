@@ -57,6 +57,10 @@ namespace ms
 		// Kick upwards while swimming.
 		static void swim_jump(PhysicsObject &phobj);
 
+		// Beat upwards in the air of a fly map, twice as fast sideways when
+		// steering.
+		static void fly_flap(PhysicsObject &phobj, bool steering);
+
 		// Hop off the current platform and fall through it.
 		static void jump_down(PhysicsObject &phobj);
 

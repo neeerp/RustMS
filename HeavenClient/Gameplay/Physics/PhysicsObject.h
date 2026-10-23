@@ -252,6 +252,10 @@ namespace ms
 		// steered by walkdir and flydir as a flier is, but still lands on
 		// platforms. It walks and jumps more slowly too.
 		bool swim = false;
+		// A shoe in a fly map floats when off a platform: it sinks slowly,
+		// drops when steered down, and beats up when it jumps (r25 0x9b2ef8).
+		// It lands on platforms and walks as anywhere else.
+		bool flymap = false;
 		// The shoe's swimSpeedH and swimSpeedV: its top speed in the water and
 		// its kick, as shares of the map's.
 		double swimspeed = 1.0;

@@ -57,6 +57,7 @@ namespace ms
 		hideminimap = info["hideMinimap"].get_bool();
 		mapmark = std::string(info["mapMark"]);
 		swim = info["swim"].get_bool();
+		fly = info["fly"].get_bool();
 
 		for (auto area : src["swimArea"])
 			swim_areas.push_back({ area["x1"], area["x2"], area["y1"], area["y2"] });
@@ -99,6 +100,11 @@ namespace ms
 	bool MapInfo::is_underwater() const
 	{
 		return swim;
+	}
+
+	bool MapInfo::is_flying() const
+	{
+		return fly && !swim;
 	}
 
 	bool MapInfo::is_swimming(Point<int16_t> position) const

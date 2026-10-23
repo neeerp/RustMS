@@ -70,6 +70,9 @@ namespace ms
 		if (!field_limit::may_jump(Stage::get().get_mapinfo().get_fieldlimit(), down))
 			return;
 
+		if (!player.may_jump_afloat())
+			return;
+
 		if (down)
 		{
 			if (player.get_phobj().enablejd)
@@ -214,7 +217,7 @@ namespace ms
 		if (player.get_phobj().onground)
 		{
 			player.set_state(ground_state(player));
-		} else if (player.is_underwater())
+		} else if (player.is_afloat())
 		{
 			player.set_state(Char::State::SWIM);
 		}
@@ -278,8 +281,9 @@ namespace ms
 	// Flying
 	void PlayerFlyState::initialize(Player &player) const
 	{
-		// Swimming is the shoe's swim step (r25 0x9b2c3c).
-		player.get_phobj().type = player.is_underwater() ? PhysicsObject::Type::NORMAL : PhysicsObject::Type::FLYING;
+		// Swimming, and flying in a fly map, are the shoe's air step (r25
+		// 0x9b2c3c).
+		player.get_phobj().type = player.is_afloat() ? PhysicsObject::Type::NORMAL : PhysicsObject::Type::FLYING;
 	}
 
 	void PlayerFlyState::send_action(Player &player, KeyAction::Id ka, bool down) const
@@ -295,10 +299,20 @@ namespace ms
 					player.set_direction(true);
 					break;
 				case KeyAction::Id::JUMP:
-					if (player.is_underwater() && !player.is_attacking())
+					if (player.is_afloat() && !player.is_attacking() && player.may_jump_afloat())
 					{
 						play_jumpsound();
-						Physics::swim_jump(player.get_phobj());
+
+						// A flier beats up, keeping on the way they steer (r25 0x9b20a3).
+						if (player.get_phobj().flymap && !player.is_underwater())
+						{
+							bool steering = player.is_key_down(KeyAction::Id::LEFT) ||
+											player.is_key_down(KeyAction::Id::RIGHT);
+							Physics::fly_flap(player.get_phobj(), steering);
+						} else
+						{
+							Physics::swim_jump(player.get_phobj());
+						}
 					}
 
 					break;
@@ -308,15 +322,16 @@ namespace ms
 
 	void PlayerFlyState::update(Player &player) const
 	{
-		if (player.is_underwater())
+		if (player.is_afloat())
 			player.get_phobj().flydir = 0;
 
 		if (player.is_attacking())
 			return;
 
-		if (player.is_underwater())
+		if (player.is_afloat())
 		{
 			// The arrows steer the swim: up glides, down drops, neither sinks.
+			// A flier drops on down and sinks otherwise.
 			PhysicsObject &phobj = player.get_phobj();
 
 			if (player.is_key_down(KeyAction::Id::LEFT))
@@ -346,7 +361,7 @@ namespace ms
 	void PlayerFlyState::update_state(Player &player) const
 	{
 		// Out of a swimArea's water, the player falls or stands.
-		if (!player.is_underwater())
+		if (!player.is_afloat())
 		{
 			player.set_state(player.get_phobj().onground ? ground_state(player) : Char::State::FALL);
 			return;
@@ -389,19 +404,22 @@ namespace ms
 			switch (ka)
 			{
 				case KeyAction::Id::JUMP:
+					if (!player.may_jump_afloat())
+						break;
+
 					if (player.is_key_down(KeyAction::Id::LEFT))
 					{
 						play_jumpsound();
 						player.set_direction(false);
 						player.get_phobj().hspeed = -ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
-						player.get_phobj().vspeed = -(player.is_underwater() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
+						player.get_phobj().vspeed = -(player.is_afloat() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
 						cancel_ladder(player);
 					} else if (player.is_key_down(KeyAction::Id::RIGHT))
 					{
 						play_jumpsound();
 						player.set_direction(true);
 						player.get_phobj().hspeed = ROPEJUMPH * Physics::walk_speed(player.get_walkspeed());
-						player.get_phobj().vspeed = -(player.is_underwater() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
+						player.get_phobj().vspeed = -(player.is_afloat() ? ROPEJUMPSWIM : ROPEJUMPV) * player.get_jumpforce();
 						cancel_ladder(player);
 					}
 
