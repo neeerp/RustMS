@@ -21,6 +21,9 @@
 
 #include <cstdint>
 
+#include "NoSkill.h"
+#include "SwimArea.h"
+
 #include "../../Template/Optional.h"
 #include "../../Template/Point.h"
 #include "../../Template/Range.h"
@@ -75,7 +78,15 @@ namespace ms
 
 		MapInfo();
 
+		// Whether the whole map is under water (info/swim).
 		bool is_underwater() const;
+
+		// Whether a character with its feet there swims: the map is under
+		// water or the point is in its swimArea (IsSwimming FUN_007046ac).
+		bool is_swimming(Point<int16_t> position) const;
+
+		// Whether the map's noSkill takes the skill away (FUN_00587f5f).
+		bool forbids_skill(int32_t skill_id) const;
 
 		// Whether the map is a town (info/town).
 		bool is_town() const;
@@ -141,7 +152,9 @@ namespace ms
 		std::string mapname;
 		std::string streetname;
 		std::string mapmark;
-		bool swim;
+		bool swim = false;
+		std::vector<swim_area::Rect> swim_areas;
+		no_skill::Lists no_skills;
 		bool town;
 		bool personal_shop = false;
 		bool everlast = false;

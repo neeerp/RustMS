@@ -1919,6 +1919,12 @@ namespace ms
 		return underwater;
 	}
 
+	void Player::set_underwater(bool uw)
+	{
+		underwater = uw;
+		phobj.swim = uw;
+	}
+
 	bool Player::is_key_down(KeyAction::Id action) const
 	{
 		switch (action)

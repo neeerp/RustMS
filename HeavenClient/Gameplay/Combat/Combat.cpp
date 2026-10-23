@@ -478,12 +478,15 @@ namespace ms
 		if (!field_limit::may_attack(mapinfo.get_fieldlimit(), move.get_id()))
 			return false;
 
-		// The secret skills go only on their own maps, which v83 checks
-		// first (FUN_00587f5f); the attacks need ground under the player,
-		// and no ride or transformation (0x9673cf, 0x951447).
+		// The secret skills go only on their own maps, and a map's noSkill
+		// takes skills away, which v83 checks first (FUN_00587f5f); the
+		// attacks need ground under the player, and no ride or
+		// transformation (0x9673cf, 0x951447).
 		pq_skills::Kind pq = pq_skills::kind(move.get_id());
 
-		if (!pq_skills::allowed(pq, mapinfo.get_fieldtype()))
+		bool forbidden = move.is_skill() && mapinfo.forbids_skill(move.get_id());
+
+		if (!pq_skills::allowed(pq, mapinfo.get_fieldtype()) || forbidden)
 		{
 			InChatMessage(Messages::SKILL_FIELD).drop();
 			return false;

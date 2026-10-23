@@ -345,7 +345,14 @@ namespace ms
 
 	void PlayerFlyState::update_state(Player &player) const
 	{
-		if (player.get_phobj().onground && player.is_underwater())
+		// Out of a swimArea's water, the player falls or stands.
+		if (!player.is_underwater())
+		{
+			player.set_state(player.get_phobj().onground ? ground_state(player) : Char::State::FALL);
+			return;
+		}
+
+		if (player.get_phobj().onground)
 		{
 			Char::State state;
 

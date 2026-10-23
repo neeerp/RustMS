@@ -302,6 +302,10 @@ namespace ms
 		// Return whether the player is underwater
 		bool is_underwater() const;
 
+		// Set whether the player is in the water, as the field finds each
+		// step from where their feet are.
+		void set_underwater(bool underwater);
+
 		// Returns if a Keyaction is currently active. The arrows are the
 		// way the player is steered, whatever their diseases make of the
 		// keys held.

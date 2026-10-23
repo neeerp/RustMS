@@ -295,7 +295,7 @@ namespace ms
 		combat.clear_prepare();
 		combat.clear_grenades();
 		combat.clear_final_attack();
-		player.respawn(startpos, mapinfo.is_underwater());
+		player.respawn(startpos, mapinfo.is_swimming(startpos));
 		// v83 makes the user anew in each field, showing their orbs as they
 		// are (FUN_0092e499).
 		player.show_combo(player.get_buff_value(Buffstat::Id::COMBO) - 1, true);
@@ -483,6 +483,9 @@ namespace ms
 
 		Point<int16_t> before = drawn;
 		sweep_pets();
+		// A swimArea's water is where the player's feet are (IsSwimming
+		// FUN_007046ac).
+		player.set_underwater(mapinfo.is_swimming(drawn));
 		player.update(physics);
 		catch_ladders(before);
 
@@ -867,7 +870,7 @@ namespace ms
 			player.get_phobj().fhid = *pending_teleport->foothold;
 		} else
 		{
-			player.respawn(pending_teleport->target, mapinfo.is_underwater());
+			player.respawn(pending_teleport->target, mapinfo.is_swimming(pending_teleport->target));
 		}
 
 		pending_teleport.reset();
