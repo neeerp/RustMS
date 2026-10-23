@@ -1,10 +1,14 @@
 //! Orbis's party quest, the Salion stage: each Cellion's drop lands on the
 //! spot it came out at, which takes it and breaks, and the next Cellion
 //! comes out at another spot (the field unit tests follow it to the spot
-//! that drops the piece of the statue). The harness world runs events 60
-//! times as fast (`RUSTMS_EVENT_SCALE`), so the quest lasts a minute.
+//! that drops the piece of the statue). While a Cellion or drop is left in
+//! the room Eak only says to search it (his backup, the piece once it is
+//! bare, needs a stray drop to lie out its three minutes; the script's unit
+//! test covers it). The harness world runs events 60 times as fast
+//! (`RUSTMS_EVENT_SCALE`), so the quest lasts a minute.
 
-use integration_harness::events::{armed_in, enter_opq, party, waiting_in};
+use game_data::server_content::keys;
+use integration_harness::events::{armed_in, enter_opq, party, said, talk, told, waiting_in, EAK};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
@@ -52,6 +56,10 @@ async fn each_cellions_drop_breaks_its_spot_and_the_next_comes_out_further_on() 
             .unwrap()
     };
 
+    let search = |trace: &Trace| said(trace, keys::OPQ_EAK_SALION_FIND) && trace.items.is_empty();
+    let trace = told(&mut a[0], talk(SALION, EAK)).await;
+    assert!(search(&trace), "{trace:?}");
+
     // The map's Cellion stands at the first spot; its drop breaks that
     // spot, and the next comes out at 2001013's.
     for (n, reactor_id) in [(1, SALION_SPOTS), (2, 2001013)] {
@@ -79,4 +87,8 @@ async fn each_cellions_drop_breaks_its_spot_and_the_next_comes_out_further_on() 
             assert_eq!(seen.field.removals(drop), [None], "{seen:?}");
         }
     }
+
+    // Another Cellion is out, so still no piece from Eak.
+    let trace = told(&mut a[0], talk(SALION, EAK)).await;
+    assert!(search(&trace), "{trace:?}");
 }

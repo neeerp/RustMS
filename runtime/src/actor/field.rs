@@ -513,6 +513,9 @@ impl FieldActor {
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }
+            FieldMessage::DropCount { reply } => {
+                let _ = reply.send(self.drops.all().count());
+            }
             FieldMessage::ReactorStates { names, reply } => {
                 let states = names
                     .iter()

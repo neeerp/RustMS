@@ -162,6 +162,16 @@ impl ClientActor {
             return Ok(None);
         }
         match map_id {
+            events::OPQ_SALION_ROOM => {
+                let cleared = ticket.cleared(events::OPQ_SALION_STAGE);
+                let (reply, mobs) = oneshot::channel();
+                self.send_to_field(FieldMessage::MobCount { reply }).await?;
+                let (reply, drops) = oneshot::channel();
+                self.send_to_field(FieldMessage::DropCount { reply })
+                    .await?;
+                let bare = mobs.await.unwrap_or(1) == 0 && drops.await.unwrap_or(1) == 0;
+                Ok(Some(NpcScript::opq_salion(bare, cleared)))
+            }
             events::OPQ_MUSIC_ROOM => {
                 let cleared = ticket.cleared(events::OPQ_MUSIC_STAGE);
                 let states = self.reactor_states(&[net::reactors::MUSIC_BOX]).await?;

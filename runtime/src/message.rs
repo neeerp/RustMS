@@ -580,6 +580,10 @@ pub enum FieldMessage {
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
     },
+    /// How many drops, items or mesos, lie on the map.
+    DropCount {
+        reply: tokio::sync::oneshot::Sender<usize>,
+    },
     /// The states of the live reactors named `names` here, in turn, with
     /// `None` for a name none has.
     ReactorStates {

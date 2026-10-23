@@ -936,6 +936,8 @@
 "opq.notice.storage_closed" = "[placeholder] The storage is sealed while the Pixies' power lingers in the tower."
 "opq.eak.storage" = "[placeholder] This is the tower's hidden storage. Defeat every monster in it, then talk to me, and I will take you on to the treasure room. The way back to the tower stays behind."
 "opq.minerva.bonus_ask" = "[placeholder] Have you taken all you want from the treasure room? Shall we leave?"
+"opq.eak.salion.find" = "[placeholder] A piece of the statue is hidden somewhere in this room. Search it well."
+"opq.eak.salion.found" = "[placeholder] The room is quiet now, and look: I found the second piece of the statue. Here, take #b#t4001045##k."
 "pet_trainer.note.ask" = "[placeholder] Something is hidden in the grass here. Pull it out?"
 "pet_trainer.note.full" = "[placeholder] Make room in your Etc. inventory first."
 "pet_trainer.note.held" = "[placeholder] You already found the note that was hidden here."
