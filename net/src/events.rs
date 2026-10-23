@@ -885,7 +885,8 @@ pub const PAPULATUS: Event = Event {
 /// asks for neither the leader nor the minimum once in), everyone going to
 /// the Road in Between. Each trial is a stage, cleared when its head
 /// (`HORNTAIL_HEADS`) dies, which unseals its door (`hontale_BR`); the
-/// cave is the last, for the fight still to come. No stage gives EXP.
+/// cave is the last, cleared, and the expedition won, when Horntail dies.
+/// No stage gives EXP.
 pub const HORNTAIL: Event = Event {
     lobby: crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE,
     maps: HORNTAIL_TRIAL_I..=HORNTAILS_CAVE,
@@ -898,7 +899,7 @@ pub const HORNTAIL: Event = Event {
     stride: 1,
     stage_maps: &[HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II, HORNTAILS_CAVE],
     talk_clears: &[],
-    member_clears: &[1, 2],
+    member_clears: &[1, 2, 3],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -2124,8 +2125,8 @@ mod tests {
         assert!(EventKind::Horntail.event().holds(HORNTAILS_CAVE));
         assert!(!HORNTAIL.holds(HORNTAIL.exit));
         assert!(!event_map(HORNTAIL.lobby));
-        // Its trials are stages any member's kill clears; the cave is the
-        // last.
+        // Its trials and its cave are stages any member's kill clears (a
+        // head's, then Horntail's); the cave is the last.
         let heads = [HORNTAIL_TRIAL_I, HORNTAIL_TRIAL_II, HORNTAILS_CAVE].map(trial_head);
         assert_eq!(
             heads[0].map(|(stage, head)| (stage, head.mob)),
@@ -2140,10 +2141,7 @@ mod tests {
             HORNTAIL.stage_on(HORNTAILS_CAVE),
             Some(HORNTAIL.last_stage())
         );
-        assert!(HORNTAIL
-            .member_clears
-            .iter()
-            .all(|&stage| stage < HORNTAIL.last_stage()));
+        assert_eq!(HORNTAIL.member_clears, &[1, 2, HORNTAIL.last_stage()]);
     }
 
     #[test]

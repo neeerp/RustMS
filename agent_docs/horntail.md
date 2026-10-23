@@ -2,8 +2,8 @@
 
 The way to Horntail in Leafre's Cave of Life, after Cosmic. Built so far:
 the quests, the doors, the ways out, the expedition into the cave, its
-two trials, and the start of the fight. Its win and the Horntail party
-quest are still to come. The slice
+two trials, the fight and its win. The Horntail party quest is still to
+come. The slice
 plan and its open questions are in v83ref's `reports/a115-horntail.md`; the
 defaults shipped are under "a115" in `lanes/QUESTIONS.md`.
 
@@ -113,9 +113,31 @@ The parts share the body's HP (`Link` in `field_mobs`, after Cosmic's
   part's.
 - A part's death lets out its dead part (8810010-17, its `revive`).
 
+## The win
+
+When the eighth dead part (`mobs::DEAD_HORNTAIL_PARTS`) comes out, so that
+all eight are on the map, the body dies, then each dead part from 8810017
+down to 8810010 (`horntail_defeated` in the field, `MobSet::slay`; Cosmic's
+`revive` with `isHorntailDefeated`). Each death is a kill like any other:
+the body's EXP (none) and drops go by who hurt it, its parts' damage
+included, and the dead parts, which no one hurt, give nothing.
+
+His death (`horntail_falls`):
+
+- in the expedition's copy, clears its last stage, a member clear
+  (`member_clears` 3), which wins it: those in the cave see the party
+  quests' clear effect, no one gets EXP, and every member's clock stops;
+- gives each living player on the map his `buff`, Horntail Squad :
+  Victory (2022108; see [combat](./combat.md));
+- tells the world (`horntail.victory`, BROADCAST_MSG type 6, a placeholder),
+  as Cosmic's `broadcastHorntailVictory` does.
+
+Cosmic also counts the kill toward quests for every member in the cave
+(`dispatchRaiseQuestMobCount`); here it counts, as any kill does, for
+those who hurt him.
+
 Not in yet:
 
-- The win: Cosmic kills the body once all eight dead parts are on the map.
 - HeavenClient shows the -3 children at once, rather than once their
   parent leaves as the original client does.
 
@@ -133,7 +155,9 @@ away, lets its leader step out and back, and frees the channel once the last
 has left; `tests/horntail_trials.rs` beats both heads and walks through
 the sealed and then open doors into Horntail's Cave; `tests/horntail_boss.rs`
 breaks the stone, checks the summoning, the body, the parts and the clock,
-and beats the tail, which lowers the body's bar but leaves it alive.
+and beats the tail, which lowers the body's bar but leaves it alive; then
+beats all eight parts and checks that the body and dead parts die, the
+clear, the stopped clock, the leader's Victory buff, and the world's line.
 `field_mobs`'s `horntails_parts_share_its_hp_but_never_kill_it` and
 `net`'s `horntails_stone_breaks_on_its_sixth_hit` and
 `a_mob_out_of_another_names_it` cover the rest.

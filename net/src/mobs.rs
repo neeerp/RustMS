@@ -56,6 +56,8 @@ pub const LOW_DARKSTAR: i32 = 8500004;
 pub const HORNTAIL_INTRO: i32 = 8810026;
 pub const HORNTAIL: i32 = 8810018;
 pub const HORNTAIL_PARTS: RangeInclusive<i32> = 8810002..=8810009;
+/// What the parts leave: once all eight are out, Horntail dies.
+pub const DEAD_HORNTAIL_PARTS: RangeInclusive<i32> = 8810010..=8810017;
 /// The ground below which Horntail and its parts come out.
 pub const HORNTAIL_AT: (i16, i16) = (71, 260);
 

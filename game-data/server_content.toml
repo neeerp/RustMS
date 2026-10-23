@@ -920,6 +920,7 @@ unsourced = [
     "horntail.squad.notice.started",
     "horntail.trial.sealed",
     "horntail.summoned",
+    "horntail.victory",
     "tower_rock.none",
     "tower_rock.menu",
     "tower_rock.ask",

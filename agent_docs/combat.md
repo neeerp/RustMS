@@ -54,6 +54,11 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   while any of its arms is out (`MobSet::shielded`); the field drops hits
   on it whole. The last arm's death makes it real (see
   [zakum](./zakum.md)).
+- **Buff:** a mob with `info/buff` (Horntail's 2022108, Pink Bean's
+  2022449) gives that item's effect, when it dies, to each living player
+  on its map not in the Cash Shop (`MobInfo::buff`, `ServerMessage::MobBuff`),
+  as Cosmic's `killMonster` does. Cosmic also shows the buff's effect to
+  the player and the map, naming the item id as a skill; that is left out.
 - **Leaving on their own:** a mob with `info/removeAfter` (the Kitties in
   Magatia's cheese storage, 926120400, ...) is taken away that many seconds
   after it spawned (`LiveMob::leaves_at`), as Cosmic does: KILL_MONSTER with

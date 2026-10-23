@@ -360,6 +360,9 @@ pub enum ServerMessage {
     /// The player's field brought out a boss whose event's clock starts
     /// over, as Horntail on its cave: tell the event.
     RestartEventClock,
+    /// A mob that leaves a buff (Mob.nx `buff`) was killed on the player's
+    /// field: if alive, the player takes this item's effect.
+    MobBuff(i32),
     /// Event `id`'s time left is now `clock`.
     EventClock {
         id: u32,

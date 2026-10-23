@@ -1391,6 +1391,19 @@ impl MobSet {
             return Some(Ok(mob.hp_percent()));
         }
         let leave = if destructs { mob.leave_type() } else { 1 };
+        self.finish(object_id, leave, now).map(Err)
+    }
+
+    /// Kill a mob outright, as one that dies, whatever its HP: what it
+    /// gives as if the players who hurt it had killed it (Cosmic
+    /// `setHpZero` and `killMonster`).
+    pub fn slay(&mut self, object_id: i32, now: Instant) -> Option<Kill> {
+        self.finish(object_id, 1, now)
+    }
+
+    /// Take a dying mob off the field, queue what it lets out, and give its
+    /// kill.
+    fn finish(&mut self, object_id: i32, leave: u8, now: Instant) -> Option<Kill> {
         let mob = self.live.remove(&object_id)?;
         self.emptied(mob.spawn, now);
         let showdown = mob
@@ -1409,7 +1422,7 @@ impl MobSet {
                 controller: mob.controller,
             });
         }
-        Some(Err(Kill {
+        Some(Kill {
             object_id,
             mob_id: mob.info.mob_id,
             x: mob.x,
@@ -1424,7 +1437,7 @@ impl MobSet {
                     .and_then(|body| self.live.get(&body))
                     .and_then(LiveMob::boss_bar)
             }),
-        }))
+        })
     }
 
     /// Take away the mobs whose time is up (`removeAfter`); returns their

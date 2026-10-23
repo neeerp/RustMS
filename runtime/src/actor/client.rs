@@ -1559,6 +1559,15 @@ impl ClientActor {
                     .await
             }
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
+            ServerMessage::MobBuff(item_id) => {
+                let alive = self
+                    .game
+                    .as_ref()
+                    .is_some_and(|game| game.player.stats.hp > 0);
+                if alive && !self.in_cash_shop {
+                    self.take_item_effect(item_id, false).await?;
+                }
+            }
             ServerMessage::RestartEventClock => {
                 self.tell_event(net::events::EventCommand::RestartClock)
                     .await
