@@ -28,8 +28,10 @@ refusal (no party, not the leader, too few or too many there, another party
 inside) or the start.
 
 It ends only when its last member leaves (`Event::until_empty`, as an
-expedition's), not when its leader does: a member who leaves the party
-inside stays, and passing the lead on changes nothing. Leaving is by the
+expedition's), or when its 45 minutes are up and everyone left is sent
+back to 220080000; not when its leader does. A member who leaves the party
+inside stays, and passing the lead on ends nothing: the lead moves only to
+a member still inside (`Team::hand_over`). Leaving is by the
 Machine Apparatus (2041025) on 220080001, which asks and sends the player
 back to 220080000, by dying (the respawn goes to the map's return map,
 Ludibrium), or by logging out (logging back in on 220080001 lands on
@@ -89,7 +91,8 @@ party may go in while the winners loot.
 (`scripts.rs`), the NPCs (`npc_scripts.rs`) and the reactor
 (`reactors.rs`). The harness's `tests/papulatus_gate.rs` walks a party in,
 sees the gates shut, turns the next party away while any member of the
-first is inside, and sees them open once the last leaves.
+first is inside, sees them open once the last leaves, and lets the next
+party in until its time is up.
 `tests/papulatus_boss.rs` drops the piece, sees the line, music and sphere,
 has the Clock call up its Darkstars and checks where they land, beats the
 three bodies, and sees the clear and the gates open.
