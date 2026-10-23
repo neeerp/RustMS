@@ -611,6 +611,30 @@ HeavenClient shows one notice at a time, and a new one replaces the open
 one without calling its handler. A partner whose Yes/No is replaced never
 answers, and the proposer waits until they withdraw.
 
+For the wishlist and the gifts (report b084 §6):
+
+- `MARRIAGE_REQUEST` 9 opens `UIWishlistInput` unless a dialog is open:
+  the groom's or the bride's art, a 16-character field whose Enter or
+  ENTER button adds a line (at most 10, then v83's "exceeded" notice),
+  DEL ITEM for the selected line, and OK, which asks once more and then
+  sends `WishlistPacket`. There is no other way out, as in v83.
+- `WEDDING_GIFT_RESULT` 9 and 10 open `UIWeddingRegistry`, the give
+  window (always the groom's art) or the receive window (the player's
+  gender's). `wedding_gifts::read_wishlist` and `read_gifts` read the
+  bodies; a bag whose bit is clear keeps the gifts listed before. Both
+  windows show the player's giftable items by tab (`item_drop::giftable`:
+  storable and not account-bound, v83 0x9d877b). That lists some items
+  the server refuses with 14: sealed ones, ones with an expiry, party
+  quest items and ones that go at logout. A double click on a row, or
+  the window's button, gives or takes: a stack asks how many,
+  then a Yes/No, then `WeddingActionPacket` 6 or 7, and the window waits
+  for the answer before the next. Mode 11 shows "You have sent a gift."
+  and closes; 12 shows the one-gift notice and keeps waiting; 13 and 14
+  say the gift failed; 15 lists the bag again and turns to its tab; 16
+  ends the wait. Exit, Esc and Enter close the window and send mode 8.
+  A mode 11 that comes after the window closed still says the gift was
+  sent. A map change closes either window (the server forgets it too).
+
 For crush and friendship rings:
 
 - `CharacterParser` reads the character data's crush and friendship
@@ -642,8 +666,6 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The client's wishlist, give and receive windows (report b084 §6); the
-  server's side is above.
 - The rest of the wedding: in the hunting ground the Giant Cake 9400606 (Cosmic spawns it once per wedding
   and its kill stops the clock) and the onyx chests 4031423/4 that Pila
   9201014 opens (report b082). The content pack gives the keys and the

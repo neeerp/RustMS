@@ -84,6 +84,8 @@ int main()
 		cash.cash = true;
 		cash.karma = true;
 		require(!storable(cash), "nor cash items");
+		require(giftable(plain) && giftable(karma), "the Wedding Registry takes what storage takes");
+		require(!giftable(account) && !giftable(cash) && !giftable(quest), "less account items");
 
 		require(sendable(plain) && sendable(karma), "Duey takes what may trade, Karma included");
 		require(!sendable(quest) && !sendable(bound) && !sendable(cash) && !sendable(pquest),

@@ -80,6 +80,8 @@ namespace ms
 					return Tooltip::Parent::STORAGE;
 				case UIElement::Type::DUEY:
 					return Tooltip::Parent::DUEY;
+				case UIElement::Type::WEDDINGREGISTRY:
+					return Tooltip::Parent::WEDDINGREGISTRY;
 				case UIElement::Type::FAMILY:
 					return Tooltip::Parent::FAMILY;
 				case UIElement::Type::FAMILYTREE:

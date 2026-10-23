@@ -37,6 +37,7 @@
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UIStatusMessenger.h"
 #include "../IO/UITypes/UIStorage.h"
+#include "../IO/UITypes/UIWeddingRegistry.h"
 #include "../IO/UITypes/UITeleportRock.h"
 #include "../IO/UITypes/UIVegaSpell.h"
 #include "../IO/UITypes/UIViciousHammer.h"
@@ -437,6 +438,9 @@ namespace ms
 
 			if (auto storage = UI::get().get_element<UIStorage>())
 				storage->modify(mod.type);
+
+			if (auto registry = UI::get().get_element<UIWeddingRegistry>())
+				registry->modify(mod.type);
 
 			auto eqinvent = UI::get().get_element<UIEquipInventory>();
 			auto itinvent = UI::get().get_element<UIItemInventory>();

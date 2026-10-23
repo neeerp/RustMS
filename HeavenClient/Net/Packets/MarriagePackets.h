@@ -2,6 +2,9 @@
 
 #include "../OutPacket.h"
 
+#include <string>
+#include <vector>
+
 namespace ms
 {
 	// Proposes to `name` with a ring box (RING_ACTION 0, report b052).
@@ -74,6 +77,50 @@ namespace ms
 			write_byte(6);
 			write_int(slot);
 			write_int(item_id);
+		}
+	};
+
+	// Hands in the wishlist the wedding staff asked for (RING_ACTION 9,
+	// report b084).
+	class WishlistPacket : public OutPacket
+	{
+	public:
+		WishlistPacket(const std::vector<std::string>& wishes) : OutPacket(OutPacket::Opcode::RING_ACTION)
+		{
+			write_byte(9);
+			write_short(static_cast<int16_t>(wishes.size()));
+
+			for (const std::string& wish : wishes)
+				write_string(wish);
+		}
+	};
+
+	// What the Wedding Registry and the gift window ask (WEDDING_ACTION):
+	// give `qty` of the item in `slot` of its bag, take a gift, or say the
+	// window closed.
+	class WeddingActionPacket : public OutPacket
+	{
+	public:
+		WeddingActionPacket(int16_t slot, int32_t item_id, int16_t qty) : OutPacket(OutPacket::Opcode::WEDDING_ACTION)
+		{
+			write_byte(6);
+			write_short(slot);
+			write_int(item_id);
+			write_short(qty);
+		}
+
+		// The gift at `index` of its type's list, the type being the
+		// inventory's (1 equip to 5 cash).
+		WeddingActionPacket(uint8_t type, uint8_t index) : OutPacket(OutPacket::Opcode::WEDDING_ACTION)
+		{
+			write_byte(7);
+			write_byte(type);
+			write_byte(index);
+		}
+
+		WeddingActionPacket() : OutPacket(OutPacket::Opcode::WEDDING_ACTION)
+		{
+			write_byte(8);
 		}
 	};
 

@@ -195,6 +195,7 @@ namespace ms
 			case Tooltip::Parent::VEGARESULT:
 			case Tooltip::Parent::ENCHANTSKILL:
 			case Tooltip::Parent::DUEY:
+			case Tooltip::Parent::WEDDINGREGISTRY:
 				invtype = InventoryType::Id::EQUIP;
 				break;
 			case Tooltip::Parent::EQUIPINVENTORY:

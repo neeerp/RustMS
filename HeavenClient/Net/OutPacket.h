@@ -97,6 +97,7 @@ namespace ms
 			OWL_GO = 67,
 			RPS_ACTION = 136,
 			RING_ACTION = 137,
+			WEDDING_ACTION = 138,
 			WEDDING_TALK = 139,
 			WEDDING_BLESS = 140,
 

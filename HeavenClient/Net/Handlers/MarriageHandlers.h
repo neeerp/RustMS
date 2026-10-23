@@ -4,9 +4,19 @@
 
 namespace ms
 {
-	// A player on the map proposes to this one
+	// A player on the map proposes to this one, or the wedding staff ask for
+	// a wishlist
 	// Opcode: MARRIAGE_REQUEST(72)
 	class MarriageRequestHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// What Pila's gift windows were answered, or one of them opened (0xa2a083,
+	// report b084)
+	// Opcode: WEDDING_GIFT_RESULT(74)
+	class WeddingGiftResultHandler : public PacketHandler
 	{
 	public:
 		void handle(InPacket& recv) const override;
