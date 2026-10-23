@@ -90,6 +90,7 @@ namespace ms
 
 			/// NPC Interaction
 			TALK_TO_NPC = 58,
+			REMOTE_SHOP_REQUEST = 59,
 			NPC_TALK_MORE = 60,
 			NPC_SHOP_ACTION = 61,
 			TRUNK_REQUEST = 62,

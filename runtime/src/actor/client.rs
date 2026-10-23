@@ -65,7 +65,7 @@ use net::packet::build::world::pet::PetGone;
 use net::packet::handle::world::{
     spend_avatar_megaphone, spend_maple_tv, to_character, Rock, Whereabouts,
 };
-use net::packet::op::RecvOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
 use net::quests::QuestRequest;
 use net::{ClientId, SpawnPosition, WorldAction, WorldContext, WorldRoute};
 use packet::Packet;
@@ -176,6 +176,10 @@ pub struct ClientActor {
     /// The owners of the merchants the player asked to visit here and
     /// hasn't been let into yet.
     merchant_visits: Vec<i32>,
+    /// The field of the merchant the owner came into from elsewhere with a
+    /// Store Remote Controller, or is waiting to; merchant requests go
+    /// there.
+    merchant_field: Option<FieldHandle>,
     /// Heracle asked for a new guild's name; only then is one founded.
     naming_guild: bool,
     /// The player's ticket into the party event they are in.
@@ -246,6 +250,7 @@ impl ClientActor {
             personal_shop: None,
             hired_merchant: None,
             merchant_visits: Vec::new(),
+            merchant_field: None,
             naming_guild: false,
             event: None,
             wedding: None,
@@ -402,7 +407,13 @@ impl ClientActor {
 
     async fn apply(&mut self, action: WorldAction) -> Result<(), RuntimeError> {
         match action {
-            WorldAction::Reply(mut packet) => self.send(&mut packet).await?,
+            WorldAction::Reply(mut packet) => {
+                // A remote visit ends before the client leaves the map.
+                if packet.opcode() == SendOpcode::SetField as i16 {
+                    self.stop_remote_merchant().await?;
+                }
+                self.send(&mut packet).await?
+            }
             WorldAction::ReplyLater { after, packet } => self.reply_later(after, packet),
             WorldAction::EnterGame { character_id } => self.enter_game(character_id).await?,
             WorldAction::ChangeField { map_id, spawn } => self.change_field(map_id, spawn).await?,
@@ -824,6 +835,7 @@ impl ClientActor {
 
         self.leave_trade().await?;
         self.leave_personal_shop().await?;
+        self.stop_remote_merchant().await?;
         self.leave_hired_merchant().await?;
         self.keep_mounts_off(map_id).await?;
         self.drop_beacon().await?;
@@ -1750,9 +1762,11 @@ impl ClientActor {
                         .await
                         .map_err(|_| RuntimeError::ChannelSend)?;
                 }
-                // The trading room or shop died with the field.
+                // The trading room or shop died with the field; a
+                // merchant the player manages from here stands elsewhere.
                 self.abandon_trade().await?;
                 self.abandon_personal_shop().await?;
+                Box::pin(self.stop_remote_merchant()).await?;
                 self.abandon_hired_merchant().await
             }
         }

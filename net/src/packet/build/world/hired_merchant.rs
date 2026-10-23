@@ -41,6 +41,27 @@ pub fn build_open_elsewhere(map_id: i32, channel: u8) -> Result<Packet, NetworkE
     Ok(packet)
 }
 
+/// The Remote Controller's answer when the player's merchant is open on
+/// `map_id` of another channel (0-based), or with `NO_CHANNEL` nowhere.
+/// The client reads the map id and doesn't use it.
+pub fn build_remote_elsewhere(map_id: i32, channel: u8) -> Result<Packet, NetworkError> {
+    let mut packet = build_check_result(crate::hired_merchant::check_result::REMOTE_ELSEWHERE)?;
+    packet.write_int(map_id)?;
+    packet.write_byte(channel)?;
+    Ok(packet)
+}
+
+/// The Remote Controller's answer when the player's merchant, room `sn`,
+/// is open on this channel. The client sends the controller's cash `slot`
+/// and serial back with its visit.
+pub fn build_remote_here(sn: i32, slot: i16, cash_sn: i64) -> Result<Packet, NetworkError> {
+    let mut packet = build_check_result(crate::hired_merchant::check_result::REMOTE_HERE)?;
+    packet.write_int(sn)?;
+    packet.write_short(slot)?;
+    packet.write_long(cash_sn)?;
+    Ok(packet)
+}
+
 /// The balloon over a merchant (0x50d897): it lists in room `sn`, open or
 /// in maintenance, with `visitors` in it.
 fn write_balloon(
@@ -306,6 +327,21 @@ mod tests {
             .byte(8)
             .int(910000003)
             .byte(2)
+            .end();
+        let remote = build_remote_elsewhere(910000003, 0xff).unwrap();
+        Expect::new(&remote.bytes)
+            .short(0x32)
+            .byte(0x10)
+            .int(910000003)
+            .byte(0xff)
+            .end();
+        let here = build_remote_here(0x4000_0001, 3, 0x1122_3344_5566).unwrap();
+        Expect::new(&here.bytes)
+            .short(0x32)
+            .byte(0x11)
+            .int(0x4000_0001)
+            .short(3)
+            .long(0x1122_3344_5566)
             .end();
     }
 

@@ -21,6 +21,7 @@
 #include "Helpers/LoginParser.h"
 
 #include "../../Configuration.h"
+#include "../../Data/CashCatalog.h"
 #include "../../IO/UI.h"
 
 #include "../../Gameplay/Stage.h"
@@ -479,13 +480,61 @@ namespace ms
 					chatbar->send_chatline(hired_merchant::rename_text(recv.read_bool()), UIChatBar::LineType::SKILL);
 
 				return;
+			case hired_merchant::Check::REMOTE_ELSEWHERE:
+			{
+				// The map id, which v83 doesn't use.
+				recv.skip_int();
+				auto channel = static_cast<uint8_t>(recv.read_byte());
+
+				if (!hired_merchant::remote_open(channel))
+				{
+					text = hired_merchant::REMOTE_NOT_OPEN;
+					break;
+				}
+
+				Configuration& config = Configuration::get();
+				std::string name = config.get_channel_name(config.get_worldid(), channel);
+
+				UI::get().emplace<UIYesNo>(hired_merchant::remote_channel_text(name), [channel](bool yes)
+				{
+					if (yes && Stage::get().change_channel(channel))
+						Configuration::get().set_channelid(channel);
+				});
+
+				return;
+			}
+			case hired_merchant::Check::REMOTE_HERE:
+			{
+				int32_t serial = recv.read_int();
+				int16_t slot = recv.read_short();
+				int64_t cash_id = recv.read_long();
+
+				// A hit in the last few seconds (0xa28023).
+				if (Stage::get().get_player().get_look().get_alerted())
+				{
+					text = "You can't do it right now.\\nCatch your breath and then try again.";
+					break;
+				}
+
+				UI::get().emplace<UIYesNo>(hired_merchant::REMOTE_MANAGE, [serial, slot, cash_id](bool yes)
+				{
+					if (!yes)
+						return;
+
+					UI::get().emplace<UIEnterText>(hired_merchant::BIRTHDAY_PROMPT, [serial, slot, cash_id](const std::string& code)
+					{
+						MerchantRemoteVisitPacket(cash_catalog::birthday_code(code), serial, slot, cash_id).dispatch();
+					}, cash_catalog::BIRTHDAY_LIMIT);
+				});
+
+				return;
+			}
 			case hired_merchant::Check::MESSAGE:
 				if (recv.read_bool())
 					text = recv.read_string();
 
 				break;
 			default:
-				// The Remote Controller's answers (0x10, 0x11) aren't supported.
 				text = hired_merchant::check_text(code);
 				break;
 		}

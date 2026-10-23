@@ -206,12 +206,21 @@ int main()
 
 		// What the server says about a permit.
 		require(hired_merchant::open_elsewhere_text("Scania-2", 910000005)
-				== "Your store is currently open\\nin Channel Scania-2, Free Market 5.\\nPlease use this after closing the store.",
+				== "Your store is currently open\\nin Channel 2, Free Market 5.\\nPlease use this after closing the store.",
 			"a store open elsewhere names its channel and room");
 		require(hired_merchant::check_text(0xf) == "Please retrieve your items from Fredrick."
 				&& hired_merchant::check_text(0xb) == "You are currently unable to open the store.",
 			"the notices of a refused permit");
 		require(hired_merchant::check_text(0xc).empty() && hired_merchant::check_text(7).empty(), "answers with no notice");
+		// The Store Remote Controller (0xa27ecd).
+		require(hired_merchant::is_remote_controller(5470000) && !hired_merchant::is_remote_controller(5030000),
+			"the remote controller");
+		require(hired_merchant::remote_open(0) && hired_merchant::remote_open(0xfc) && !hired_merchant::remote_open(0xfd)
+				&& !hired_merchant::remote_open(0xff),
+			"no store open from 0xfd on");
+		require(hired_merchant::remote_channel_text("Scania-3")
+				== "The store is open at Channel 3.\\nWould you like to change to that channel?",
+			"the remote controller names the channel");
 		require(hired_merchant::rename_text(false) == "Renaming Failed - Can't find the Hired Merchant.", "a failed rename");
 
 		// The contract keeps v83's line ends for the NPC dialog.

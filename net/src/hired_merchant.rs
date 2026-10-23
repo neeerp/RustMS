@@ -22,6 +22,12 @@ pub fn is_permit(item_id: i32) -> bool {
     item_id / 10_000 == 503 && items::info(item_id).is_some()
 }
 
+/// Whether `item_id` is a Store Remote Controller (547xxxx) that exists:
+/// its owner manages their merchant from anywhere on its channel.
+pub fn is_remote_controller(item_id: i32) -> bool {
+    item_id / 10_000 == 547 && items::info(item_id).is_some()
+}
+
 /// The merchant and balloon a permit gives (`Item/Cash/0503.img/050300NN`).
 pub fn skin(item_id: i32) -> u8 {
     (item_id % 100) as u8
@@ -79,6 +85,19 @@ pub enum HiredMerchantRequest {
     Blacklist,
     BlacklistAdd(String),
     BlacklistRemove(String),
+    /// The Store Remote Controller in cash `slot` was used (op 0x3B): where
+    /// is the player's merchant?
+    Remote {
+        slot: i16,
+    },
+    /// The owner said yes to managing their merchant, room `sn`, from
+    /// afar, with the controller in cash `slot` whose serial is `cash_sn`
+    /// (mode 0xe around a visit).
+    RemoteVisit {
+        sn: i32,
+        slot: i16,
+        cash_sn: i64,
+    },
 }
 
 /// The answers to a permit's use (ENTRUSTED_SHOP_CHECK_RESULT).
@@ -93,6 +112,14 @@ pub mod check_result {
     pub const UNAVAILABLE: u8 = 0x0b;
     /// "Please retrieve your items from Fredrick."
     pub const AT_FREDRICK: u8 = 0x0f;
+    /// The Remote Controller's: the merchant is open on another channel,
+    /// or, with channel `NO_CHANNEL`, nowhere.
+    pub const REMOTE_ELSEWHERE: u8 = 0x10;
+    /// The Remote Controller's: the merchant is open on this channel.
+    pub const REMOTE_HERE: u8 = 0x11;
+    /// The channel of `REMOTE_ELSEWHERE` when no merchant is open
+    /// ("Unable to use this due to the Remote Shop not being open.").
+    pub const NO_CHANNEL: u8 = 0xff;
 }
 
 /// What closing a merchant in its room brought back (mode 0x2a).
@@ -114,6 +141,9 @@ pub mod leave_reason {
     pub const MAINTENANCE: u8 = 0x11;
     /// "It is past the working hours, so the store will close."
     pub const CLOSED: u8 = 0x12;
+    /// "The use of the Remote Control stopped due to moving to another
+    /// map." (SP 0xd8d, report b088 §5).
+    pub const REMOTE_MOVED: u8 = 0x13;
 }
 
 #[cfg(test)]
@@ -129,6 +159,8 @@ mod tests {
         assert!(!is_permit(5030007), "no such item");
         assert!(!is_permit(5140000) && !is_permit(2000000));
         assert_eq!((skin(5030000), skin(5030012)), (0, 12));
+        assert!(is_remote_controller(5470000));
+        assert!(!is_remote_controller(5030000) && !is_remote_controller(5479999));
     }
 
     #[test]

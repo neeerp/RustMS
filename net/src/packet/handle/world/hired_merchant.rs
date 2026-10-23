@@ -1,5 +1,6 @@
 //! ENTRUSTED_SHOP_REQUEST (0x3F): the player used a hired merchant permit.
 //! STORE_BANK_REQUEST (0x40): the window of Fredrick's Store Bank.
+//! REMOTE_SHOP_REQUEST (0x3B): the player used a Store Remote Controller.
 
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
 use crate::hired_merchant::HiredMerchantRequest;
@@ -16,6 +17,23 @@ pub struct EntrustedShopRequestHandler;
 impl WorldHandler for EntrustedShopRequestHandler {
     fn handle(&self, _packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
         Ok(HandlerResult::empty().with(WorldAction::HiredMerchant(HiredMerchantRequest::Check)))
+    }
+}
+
+/// The controller's cash slot (0xa24606), sent when the player is in no
+/// room. The runtime answers with ENTRUSTED_SHOP_CHECK_RESULT 0x10 or 0x11.
+pub struct RemoteShopRequestHandler;
+
+impl WorldHandler for RemoteShopRequestHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let slot = reader.read_short()?;
+        Ok(
+            HandlerResult::empty().with(WorldAction::HiredMerchant(HiredMerchantRequest::Remote {
+                slot,
+            })),
+        )
     }
 }
 

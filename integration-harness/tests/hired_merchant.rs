@@ -2,7 +2,8 @@
 //! room type 5): a player over level 15 with a permit sets a merchant up
 //! on a Free Market map, lists items and opens it; it stays and sells
 //! after they leave. The owner comes back for maintenance, takes the
-//! mesos and closes it, and gets the unsold items back.
+//! mesos and closes it, and gets the unsold items back. With a Store
+//! Remote Controller they manage it from anywhere on the channel.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{grant_item, grant_stack, set_job, set_meso};
@@ -16,9 +17,13 @@ use packet::Packet;
 use tokio::time::Duration;
 
 const PLAIN_MAP: i32 = 40_000;
+const HUNTING_GROUND: i32 = 40_001;
 const MARKET: i32 = 910_000_001;
 const OTHER_MARKET: i32 = 910_000_002;
+/// Each test sets up in a room of its own: merchants keep their distance.
+const REMOTE_MARKET: i32 = 910_000_003;
 const PERMIT: i32 = 5030000;
+const REMOTE_CONTROLLER: i32 = 5470000;
 const SNAIL_SHELL: i32 = 4000000;
 const ETC: u8 = 4;
 const CASH: u8 = 5;
@@ -27,6 +32,8 @@ const CASH: u8 = 5;
 const OK: u8 = 7;
 const OPEN_ELSEWHERE: u8 = 8;
 const UNAVAILABLE: u8 = 0xb;
+const REMOTE_ELSEWHERE: u8 = 0x10;
+const REMOTE_HERE: u8 = 0x11;
 
 fn interaction(mode: u8) -> Packet {
     let mut p = Packet::new_empty();
@@ -62,6 +69,27 @@ fn put_item(kind: u8, slot: i16, bundles: i16, per_bundle: i16, price: i32) -> P
     p.write_short(bundles).unwrap();
     p.write_short(per_bundle).unwrap();
     p.write_int(price).unwrap();
+    p
+}
+
+/// The Store Remote Controller's use (REMOTE_SHOP_REQUEST).
+fn remote(slot: i16) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::RemoteShopRequest as i16).unwrap();
+    p.write_short(slot).unwrap();
+    p
+}
+
+/// The owner's visit from elsewhere, behind the birthday code (mode 0xe).
+fn remote_visit(birthday: i32, room: i32, slot: i16, cash_sn: i64) -> Packet {
+    let mut p = interaction(0xe);
+    p.write_byte(4).unwrap();
+    p.write_byte(5).unwrap();
+    p.write_int(birthday).unwrap();
+    p.write_int(room).unwrap();
+    p.write_byte(1).unwrap();
+    p.write_short(slot).unwrap();
+    p.write_long(cash_sn).unwrap();
     p
 }
 
@@ -308,4 +336,69 @@ async fn a_merchant_stays_open_when_its_owner_leaves_the_room_or_the_game() {
     warp(&mut a.connection, OTHER_MARKET, "", &mut at).await;
     let (again, title) = merchant(&mut a.connection, &mut at, a_id).await;
     assert_eq!((again, title.as_str()), (room, "Leftovers"));
+}
+
+#[tokio::test]
+async fn the_remote_controller_lets_the_owner_manage_the_merchant_from_elsewhere() {
+    let config = load_harness_config_or_fail().await;
+    let id = new_merchant(&config).await;
+    grant_item(id, CASH.into(), 2, REMOTE_CONTROLLER)
+        .await
+        .expect("give the owner a remote controller");
+    set_meso(id, 1_000).await.expect("give the owner mesos");
+    let mut a = relogin(&config).await;
+    let c = &mut a.connection;
+
+    // With no merchant open, the controller says so.
+    let mut t = Trace::default();
+    warp(c, PLAIN_MAP, "", &mut t).await;
+    let t = step(c, "none", remote(2)).await;
+    let mut none = vec![REMOTE_ELSEWHERE];
+    none.extend(0i32.to_le_bytes());
+    none.push(0xff);
+    assert_eq!(t.merchant_checks, [none]);
+
+    // A merchant opens in the Free Market, and its owner walks away.
+    let mut t = Trace::default();
+    warp(c, REMOTE_MARKET, "", &mut t).await;
+    step(c, "create", create("Remote")).await;
+    step(c, "shells", put_item(ETC, 1, 2, 5, 10)).await;
+    open(c).await;
+    let (room, _) = merchant(c, &mut t, id).await;
+    send(c, interaction(0xa)).await;
+    warp(c, PLAIN_MAP, "", &mut t).await;
+
+    // The controller finds it on this channel; a wrong birthday code
+    // doesn't get in, and the right one opens the maintenance window.
+    let t = step(c, "here", remote(2)).await;
+    let mut here = vec![REMOTE_HERE];
+    here.extend(room.to_le_bytes());
+    here.extend(2i16.to_le_bytes());
+    here.extend(0i64.to_le_bytes());
+    assert_eq!(t.merchant_checks, [here]);
+    let t = step(c, "no birthday", remote_visit(0, room, 2, 0)).await;
+    assert!(t.rooms.is_empty(), "{:?}", t.rooms);
+    send(c, remote_visit(19_830_113, room, 2, 0)).await;
+    let t = room_packet(c, &[5, 5, 4, 0]).await;
+    assert_eq!(t.rooms.len(), 1, "{:?}", t.rooms);
+
+    // Leaving the map closes the window (reason 0x13) but not the merchant.
+    let mut t = Trace::default();
+    warp(c, HUNTING_GROUND, "", &mut t).await;
+    assert!(t.rooms.contains(&vec![0xa, 0, 0x13]), "{:?}", t.rooms);
+
+    // From there it comes back in and is closed, the shells back in the bags.
+    let t = step(c, "again", remote(2)).await;
+    assert_eq!(t.merchant_checks.len(), 1, "{:?}", t.merchant_checks);
+    assert_eq!(t.merchant_checks[0][0], REMOTE_HERE);
+    send(c, remote_visit(19_830_113, room, 2, 0)).await;
+    room_packet(c, &[5, 5, 4, 0]).await;
+    let t = step(c, "close", interaction(0x29)).await;
+    assert!(t.rooms.contains(&vec![0x2a, 0]), "{:?}", t.rooms);
+    assert_eq!(t.quantities, [(ETC, 1, 20)]);
+    drop(a);
+
+    let a = relogin(&config).await;
+    assert_eq!(a.items.get(&SNAIL_SHELL), Some(&20));
+    assert_eq!(a.items.get(&REMOTE_CONTROLLER), Some(&1));
 }

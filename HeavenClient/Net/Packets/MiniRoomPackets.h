@@ -48,6 +48,7 @@ namespace ms
 			CHAT = 0x06,
 			LEAVE = 0x0A,
 			OPEN = 0x0B,
+			BIRTHDAY = 0x0E,
 			PUT_ITEM = 0x0F,
 			PUT_MESO = 0x10,
 			TRADE = 0x11,
@@ -317,6 +318,37 @@ namespace ms
 	private:
 		static constexpr int8_t BLACKLIST_ADD = 0x30;
 		static constexpr int8_t BLACKLIST_REMOVE = 0x31;
+	};
+
+	// The owner comes into their hired merchant from elsewhere on the
+	// channel, with the Store Remote Controller in cash slot `slot`: the
+	// visit, sure of the birthday code (0xa2806c).
+	class MerchantRemoteVisitPacket : public MiniRoomPacket
+	{
+	public:
+		MerchantRemoteVisitPacket(int32_t birthday, int32_t serial, int16_t slot, int64_t cash_id)
+			: MiniRoomPacket(Mode::BIRTHDAY)
+		{
+			write_byte(Mode::VISIT);
+			write_byte(5);
+			write_int(birthday);
+			write_int(serial);
+			write_byte(1);
+			write_short(slot);
+			write_long(cash_id);
+		}
+	};
+
+	// Uses the Store Remote Controller in cash slot `slot` (0xa24606); the
+	// server answers with ENTRUSTED_SHOP_CHECK_RESULT 0x10 or 0x11.
+	// Opcode: REMOTE_SHOP_REQUEST(59)
+	class RemoteShopRequestPacket : public OutPacket
+	{
+	public:
+		RemoteShopRequestPacket(int16_t slot) : OutPacket(OutPacket::Opcode::REMOTE_SHOP_REQUEST)
+		{
+			write_short(slot);
+		}
 	};
 
 	// Asks whether a hired merchant permit may be used (0xa27d17); the

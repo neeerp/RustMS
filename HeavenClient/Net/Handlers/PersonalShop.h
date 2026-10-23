@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MiniRoom.h"
+#include "StoreBank.h"
 
 #include "../../IO/UITypes/EnterNumber.h"
 #include "../../Util/CharacterName.h"
@@ -327,6 +328,13 @@ namespace ms
 
 		constexpr uint16_t MIN_LEVEL = 15;
 
+		// The Store Remote Controller (547xxxx) asks where the owner's
+		// merchant is open (0xa24606).
+		inline bool is_remote_controller(int32_t itemid)
+		{
+			return itemid / 10000 == 547;
+		}
+
 		// The answers of ENTRUSTED_SHOP_CHECK_RESULT (0xa27d75) with more
 		// to them than a notice.
 		enum Check : int8_t
@@ -335,8 +343,29 @@ namespace ms
 			OPEN_ELSEWHERE = 8,
 			UNKNOWN_INT = 0xd,
 			RENAMED = 0xe,
+			REMOTE_ELSEWHERE = 0x10,
+			REMOTE_HERE = 0x11,
 			MESSAGE = 0x12
 		};
+
+		// The Remote Controller's answers (0xa27ecd, 0xa27ffe). A channel
+		// from 0xfd on means no store is open.
+		inline bool remote_open(uint8_t channel)
+		{
+			return channel < 0xfd;
+		}
+
+		const std::string REMOTE_NOT_OPEN = "Unable to use this due to the Remote Shop not being open.";
+		const std::string REMOTE_MANAGE =
+			"You can't sell items while managing the store.\\nWould you like to start managing the store?";
+		const std::string BIRTHDAY_PROMPT =
+			"For the sake of privacy,\\nplease enter your 8-digit birthday code.\\nex) year/month/day -> 19820911";
+
+		inline std::string remote_channel_text(const std::string &channel_name)
+		{
+			return "The store is open at Channel " + store_bank::channel_number(channel_name) +
+				".\\nWould you like to change to that channel?";
+		}
 
 		// The notice of an answer, or nothing.
 		inline std::string check_text(int8_t code)
@@ -357,11 +386,12 @@ namespace ms
 			}
 		}
 
-		// A store already open: the channel's name, and the Free Market
-		// room that the map id ends in.
-		inline std::string open_elsewhere_text(const std::string &channel, int32_t mapid)
+		// A store already open: the channel's number (0x988557), and the
+		// Free Market room that the map id ends in.
+		inline std::string open_elsewhere_text(const std::string &channel_name, int32_t mapid)
 		{
-			return "Your store is currently open\\nin Channel " + channel + ", Free Market " + std::to_string(mapid % 100) +
+			return "Your store is currently open\\nin Channel " + store_bank::channel_number(channel_name) + ", Free Market " +
+				std::to_string(mapid % 100) +
 				".\\nPlease use this after closing the store.";
 		}
 
