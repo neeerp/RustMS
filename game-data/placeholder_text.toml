@@ -1048,6 +1048,7 @@
 "papulatus.portal.busy" = "[placeholder] Another party is already fighting beyond this door. Wait for them, or try another channel."
 "papulatus.tombstone" = "[placeholder] The tombstone says that the clock's master waits beyond the door, for one party at a time."
 "papulatus.machine.leave" = "[placeholder] Beep... The machine can take you back to safety. Leave this place?"
+"papulatus.summoned" = "[placeholder] The Piece of Cracked Dimension seals the hole in time, and something stirs within the clock."
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"

@@ -40,11 +40,13 @@ pub enum Action {
     /// `notice`) first.
     WarpMap { warp: Warp, notice: &'static str },
     /// Bring out one `mob_id` on the ground below `at`, a fixed point on
-    /// its map, with a pink line (the text key `notice`) to everyone there.
+    /// its map, with a pink line (the text key `notice`) to everyone there,
+    /// and `music`, if any, playing.
     SpawnAt {
         mob_id: i32,
         at: (i16, i16),
         notice: &'static str,
+        music: Option<&'static str>,
     },
     /// Bring out an NPC on the ground below it, with a pink line (the text
     /// key `notice`) to everyone on its map.
@@ -226,11 +228,21 @@ pub fn action(reactor_id: i32) -> Action {
             mob_id: LPQ_ROMBAD,
             at: (1, -211),
             notice: keys::LPQ_NOTICE_ROMBAD,
+            music: None,
         },
         2201003 => Action::SpawnAt {
             mob_id: LPQ_ALISHAR,
             at: (941, 184),
             notice: keys::LPQ_NOTICE_ALISHAR,
+            music: None,
+        },
+        // The cracked dimension on the Origin of Clocktower (`boss`, Cosmic
+        // `2201004`), which takes a Piece of Cracked Dimension (4031179).
+        PAPULATUS_CRACK => Action::SpawnAt {
+            mob_id: crate::mobs::TIME_SPHERE,
+            at: (-410, -400),
+            notice: keys::PAPULATUS_SUMMONED,
+            music: Some("Bgm09/TimeAttack"),
         },
         // The boxes on Ludibrium's bonus stage (`ludiquest4`:
         // `sprayItems(true, 1, 30, 60, 15)`).
@@ -286,6 +298,9 @@ pub fn action(reactor_id: i32) -> Action {
 pub const ZPQ_TRAP: i32 = 2110000;
 pub const ZPQ_MIMIC_BOX: i32 = 2111000;
 pub const ZPQ_MIMIC: i32 = 9300004;
+
+/// The cracked dimension where Papulatus comes out.
+pub const PAPULATUS_CRACK: i32 = 2201004;
 
 /// Zakum's altar, and the music it plays as it brings Zakum out.
 pub const ZAKUM_ALTAR: i32 = 2111001;
@@ -350,6 +365,16 @@ mod tests {
             panic!("{:?}", action(2201003));
         };
         assert_eq!((mob_id, at), (LPQ_ALISHAR, (941, 184)));
+        let Action::SpawnAt {
+            mob_id, at, music, ..
+        } = action(PAPULATUS_CRACK)
+        else {
+            panic!("{:?}", action(PAPULATUS_CRACK));
+        };
+        assert_eq!(
+            (mob_id, at, music),
+            (8500000, (-410, -400), Some("Bgm09/TimeAttack"))
+        );
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
     }

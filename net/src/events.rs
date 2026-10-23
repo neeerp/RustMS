@@ -840,7 +840,7 @@ pub const ORIGIN_OF_CLOCKTOWER: i32 = 220_080_001;
 /// the Clocktower with their leader, go to their own copy of the Origin of
 /// Clocktower for 45 minutes. Its three `ludigate` reactors before the
 /// portal stay shut until it ends, which is only when the last of them
-/// leaves. Papulatus's death is to win it, in a later slice.
+/// leaves. Papulatus's death on the copy wins it.
 pub const PAPULATUS: Event = Event {
     lobby: CLOCKTOWER_DEPTHS,
     maps: ORIGIN_OF_CLOCKTOWER..=ORIGIN_OF_CLOCKTOWER,
