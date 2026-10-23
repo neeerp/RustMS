@@ -92,6 +92,20 @@ namespace ms::FriendGroups
 		return blocks.blocked(buddy.id) || !buddy.online();
 	}
 
+	const char* tip(const Buddy& buddy, const Blocks& blocks, int32_t own_channel)
+	{
+		if (blocks.blocked(buddy.id))
+			return "This user has been blocked.";
+
+		if (!buddy.online())
+			return "Double-click to send a note.";
+
+		if (buddy.channel >= 0 && buddy.channel == own_channel)
+			return "Double-click to send a whisper. (same channel)";
+
+		return "Double-click to send a whisper.";
+	}
+
 	namespace
 	{
 		std::vector<std::string> split(const std::string& text, char separator)

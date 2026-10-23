@@ -66,4 +66,46 @@ namespace ms
 		ComboEdit combo;
 		Textfield name;
 	};
+
+	// The Friend tab's group delete (FUN_0090a303): a Yes/No CUtilDlg in its
+	// checkbox mode, the box's "DELETE BUDDIES AS WELL" caption baked into
+	// the bottom art. Yes hands over whether the box was checked.
+	class UIDeleteGroup : public UIElement
+	{
+	public:
+		static constexpr Type TYPE = UIElement::Type::NOTICE;
+		static constexpr bool FOCUSED = true;
+		static constexpr bool TOGGLED = false;
+
+		UIDeleteGroup(const std::string &group, std::function<void(bool delete_buddies)> yeshandler);
+
+		void draw(float alpha) const override;
+
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
+
+	private:
+		void answer(bool yes);
+
+		enum Buttons : uint16_t
+		{
+			YES,
+			NO
+		};
+
+		std::function<void(bool)> yeshandler;
+		Texture top;
+		Texture middle;
+		Texture bottom;
+		Texture box[2];
+		std::vector<Text> prompt;
+		Point<int16_t> box_pos;
+		bool checked = false;
+	};
 }

@@ -466,7 +466,9 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     another tab. Leaving the guild leaves it open with only its
     background.
   - Clicking a tab, even the one shown, drops the guild pick.
-  - WHERE stays disabled: there is no member search.
+  - MAP (BtWhere), with someone else picked who is online, sends the same
+    find as `/find` (WHISPER 0x05 and the name, FUN_00911c5c); the answer
+    comes back as a chat line.
   - BBS, for any member, opens the board window (below) unless it is open.
   - The client places the guild buttons by their top left, ignoring the
     origin that BtGuildBBS and BtInfo have (inferred from the button grid),

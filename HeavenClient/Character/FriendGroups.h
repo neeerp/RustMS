@@ -91,6 +91,13 @@ namespace ms::FriendGroups
 	// v83's offline class (FUN_00908fc4): offline, or blocked.
 	bool away(const Buddy& buddy, const Blocks& blocks);
 
+	// The tip over a group's header, Default Group's too (0x90b304, report b092).
+	constexpr const char* GROUP_TIP = "Double-click to make changes to the group.";
+
+	// The tip over a buddy (0x90b304): blocked first, then by where they are (0x908ff6). Channels are
+	// zero-based.
+	const char* tip(const Buddy& buddy, const Blocks& blocks, int32_t own_channel);
+
 	// Which of the buttons under the list are enabled, and which way BLOCK reads (FUN_0091dba9).
 	// ADD FRIEND, ADD GROUP, GROUP WHISPER and SHOW ONLINE always are.
 	struct Buttons
