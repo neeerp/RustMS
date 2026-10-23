@@ -65,6 +65,11 @@ impl ClientActor {
         if npc_id == net::npc_scripts::ADOBIS && player.stats.map_id == net::events::ZPQ.lobby {
             return self.talk_about_event(net::events::EventKind::Zpq).await;
         }
+        if npc_id == net::npc_scripts::ZAKUM_RECRUITER
+            && player.stats.map_id == net::events::ZAKUM.lobby
+        {
+            return self.talk_about_event(net::events::EventKind::Zakum).await;
+        }
         if npc_id == net::npc_scripts::AURA {
             if let Some(script) = self.zpq_aura()? {
                 return self.start_script(script).await;

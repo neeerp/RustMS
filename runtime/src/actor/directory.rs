@@ -1,5 +1,6 @@
 mod family;
 mod marriage;
+mod squad;
 
 use crate::actor::avatar_banners::{AvatarBanners, Queued};
 use crate::actor::event::EventStart;
@@ -141,6 +142,8 @@ pub struct WorldDirectory {
     proposals: HashMap<ClientId, marriage::Proposal>,
     /// The event each channel is playing of each kind, by id.
     events: HashMap<(u8, EventKind), u32>,
+    /// The squad each channel gathers, or sent out, of each kind.
+    squads: HashMap<(u8, EventKind), squad::SquadEntry>,
     next_event: u32,
     /// The wedding under way at each channel's venues.
     weddings: HashMap<(u8, game::wedding::Venue), marriage::Wedding>,
@@ -170,6 +173,7 @@ impl WorldDirectory {
             family_summons: HashMap::new(),
             proposals: HashMap::new(),
             events: HashMap::new(),
+            squads: HashMap::new(),
             next_event: 1,
             weddings: HashMap::new(),
             avatar_banners: AvatarBanners::default(),
@@ -311,7 +315,17 @@ impl WorldDirectory {
                 if self.events.get(&(channel_id, kind)) == Some(&id) {
                     self.events.remove(&(channel_id, kind));
                 }
+                self.squad_closed(channel_id, kind, id);
             }
+            DirectoryMessage::SquadTalk { from, kind, reply } => {
+                let _ = reply.send(self.squad_view(from, kind));
+            }
+            DirectoryMessage::Squad {
+                from,
+                kind,
+                command,
+                reply,
+            } => self.squad_command(from, kind, command, reply),
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
                     if let Some(entry) = self.clients.get(&client) {
@@ -582,6 +596,8 @@ impl WorldDirectory {
             leader: from,
             team: team.iter().map(|entry| entry.handle.clone()).collect(),
             blessing: kind.event().blessing(&jobs, &mut rand::thread_rng()),
+            queue: Default::default(),
+            roster: Vec::new(),
         })
     }
 

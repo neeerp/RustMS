@@ -3,10 +3,10 @@
 The way to Zakum in El Nath's Dead Mine, after Cosmic. Built so far: the
 chiefs' approval, the Dead Mine party quest (stage 1, in
 [party-quests](./party-quests.md)), the Breath of Lava (stage 2), the
-forging of the Eyes of Fire (stage 3), the gate, the boss on its altar, and
-its fall. Not yet: the expedition squad. The slice plan and its open
-questions are in v83ref's `reports/a097-zakum.md`,
-`reports/a105-zakum-dead-mine.md` and `reports/a106-zakum-boss.md`.
+forging of the Eyes of Fire (stage 3), the gate, the expedition squad, the
+boss on its altar, and its fall. The slice plan and its open questions are
+in v83ref's `reports/a097-zakum.md`, `reports/a105-zakum-dead-mine.md`,
+`reports/a106-zakum-boss.md` and `reports/a108-zakum-squad.md`.
 
 All dialogue is placeholder text (`zakum.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -72,9 +72,62 @@ Where this differs from Cosmic:
 The Door to Zakum's portal `ps00` (script `Zakum05`, in `scripts::portal`)
 checks in turn for the approval, the finished trials and an Eye of Fire,
 turning the player back with a pink line at the first missing one. With all
-three it plays the portal sound and leads to the Entrance to Zakum's
-`west00`. Upstream also keeps it shut while the gate reactor (2118002) is
-closed after a win; nothing closes it yet.
+three it then needs the gate reactor (2118002, named `gate`) not shut
+(`Effect::ShutByReactor`, `events::ZAKUM_GATE`): while an expedition
+fights it is in state 1, and the portal turns the player back with
+`zakum.gate.blocked`. Otherwise it plays the portal sound and leads to the
+Entrance to Zakum's `west00`.
+
+## The expedition
+
+Players reach the altar in an expedition (Cosmic's `Expedition` and
+`ZakumBattle`), gathered by 2030013 at the Entrance to Zakum (211042400)
+whatever their parties. The rules are `net::squads::Squad`; the directory
+keeps one squad of each kind per channel (`directory/squad.rs`), and the NPC
+asks it what the player finds (`SquadView`) and tells it what they chose
+(`SquadCommand`, through `Effect::Squad`).
+
+- **Opening:** a player of level 50 or more holding an Eye of Fire (only
+  checked) leads a new squad. Those on their map read a notice (chat line,
+  BROADCAST_MSG 6), and the leader's clock counts down the five minutes it
+  has to set out (`squads::REGISTRATION`, not scaled). One that doesn't set
+  out in time lapses quietly, found so the next time anyone asks.
+- **Gathering:** others of level 50 or more join it, up to 30; the members
+  read a notice, and the joiner's clock counts down what is left. The
+  leader's menu turns a member out for good (they read a notice and their
+  clock stops), sets out, or calls it off. Members can't leave it, and
+  if the leader goes it just runs out of time.
+- **Setting out:** with at least 6 members (`Event::least`,
+  `RUSTMS_EXPEDITION_MIN` overrides it; the harness uses 2), those of them
+  on the Entrance to Zakum and the channel go to the altar, however few;
+  the rest of the roster may come in later (Cosmic counts the whole roster
+  too). It is the event `events::ZAKUM` (`Event::squad`): the
+  altar is a copy of 280030000 of its own, and it lasts 120 minutes, scaled
+  by `RUSTMS_EVENT_SCALE` like the party quests, before everyone is sent
+  to the Entrance to Zakum. Unlike the party quests it doesn't end when the
+  leader leaves or too few are left, only when the last member has gone.
+  Its win frees the channel at once, as a party quest's does: the next
+  squad may gather and set out while the winners are still on their altar.
+- **The gate:** setting out shuts the gate on the Door to Zakum (the event
+  sends `FieldMessage::SetReactor` to the channel's 211042300). It opens
+  again when Zakum falls or the run ends otherwise. The end of a won run
+  leaves it alone, as a later expedition may have shut it.
+- **Coming back:** while the run lasts, a member on its roster who stepped
+  out, or wasn't there at the start, may go in through 2030013 (`EventMessage::Join`,
+  `Team::rejoin`), until Zakum falls. Anyone else hears that an expedition
+  is under way.
+- **The win:** Zakum's fall on the expedition's altar clears its last stage
+  (`ServerMessage::ClearEventStage`), so the run is won.
+
+Where this differs from Cosmic (the choices are in v83ref's
+`lanes/QUESTIONS.md`):
+
+- A squad lapses quietly instead of being dissolved by a timer, with no
+  notice.
+- The leader may come back in like any member.
+- Leaving a won run doesn't complete quest 100200 (the approval marker
+  `ZAKUM_APPROVED` stands in for it).
+- There is no daily limit (Cosmic's is off by default too).
 
 ## The boss
 
@@ -120,12 +173,9 @@ links no item, BROADCAST_MSG 6; placeholder `zakum.victory`), through
 `ServerMessage::Announce`, since a field has no way to the directory. This
 is Cosmic's `ZakumBattle.monsterKilled` and `broadcastZakumVictory`.
 
-Not yet built: the expedition that brings players to the altar and closes
-it after the summoning. Upstream's gate reactor (2118002) shuts the Door
-to Zakum while an expedition is in and opens again on its win or end, and a
-member of a won expedition completes quest 100200 on leaving. Both belong
-to the expedition: with none, nothing shuts the gate, and 100200 is the
-client-invisible marker `ZAKUM_APPROVED` here.
+On an expedition's altar the fall also wins the expedition (see above). A
+debug warp still reaches the channel's own altar map, outside any
+expedition, where the boss works the same.
 
 ## Tests
 
@@ -139,6 +189,14 @@ client-invisible marker `ZAKUM_APPROVED` here.
   it comes back plainly under control, and dies through 8800001 to 8800002.
   Its last death shows the map the clear effect and jingle, and a player on
   another map reads the victory line.
+- `squads::tests` and `events::tests::a_squad_*`: gathering, banning,
+  starting, the size limit, lapsing, and coming (back) in.
+- `integration-harness/tests/zakum_squad.rs`: a leader opens a squad and
+  two more join it from no party, one wandering off before the start. The
+  other two go to the altar; the gate shuts and turns a fourth player back,
+  as does the recruiter. The one who wandered off comes in late, and the
+  member steps out and comes back, both to the leader's altar. Zakum
+  falls, the gate opens, and the fourth player may gather a new squad.
 - `integration-harness/tests/zakum_trials.rs`: a level-50 Fighter, unapproved
   and then without the trials, is turned back at the gate. They are approved
   by Tylus, cross the Breath of Lava, get the Breath of Fire from Lira, have

@@ -55,6 +55,7 @@ pub mod scripts;
 pub mod settings;
 pub mod shop;
 pub mod skills;
+pub mod squads;
 pub mod storage;
 pub mod store_bank;
 pub mod stylists;

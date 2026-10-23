@@ -17,9 +17,16 @@
 //! goes on until the last member leaves its maps. A won event's leader may
 //! take the team to its bonus, or the win takes it there at once; the
 //! bonus runs on a clock of its own.
+//!
+//! A squad's event (`Event::squad`) is not a party's: it ends only when its
+//! last member leaves, and those on its roster who left may come back
+//! while it runs (`EventMessage::Join`). One with a gate keeps it shut
+//! until it is won or over.
 
 use crate::actor::registry::FieldRegistry;
-use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
+use crate::message::{
+    ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage, SquadAnswer,
+};
 use crate::supervisor::spawn_supervised;
 use net::events::{
     draw_combo, draw_question, Balloon, Cloto, Event, EventCommand, EventKind, Puzzles, Stage1,
@@ -28,7 +35,7 @@ use net::events::{
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicU16, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{sleep, sleep_until, Instant};
@@ -60,6 +67,12 @@ pub enum EventMessage {
     Command {
         client_id: ClientId,
         command: EventCommand,
+    },
+    /// `member`, on a squad's roster, comes back into its event: answered
+    /// with a ticket, or refused.
+    Join {
+        member: ClientHandle,
+        reply: oneshot::Sender<SquadAnswer>,
     },
 }
 
@@ -115,10 +128,19 @@ pub struct EventTicket {
 
 impl Drop for EventTicket {
     fn drop(&mut self) {
-        // Each member has one ticket, so the queue can't fill.
-        let _ = self.event.tx.try_send(EventMessage::Left {
+        let left = EventMessage::Left {
             client_id: self.member,
-        });
+        };
+        // A squad's thirty may fill the queue at once (a stage cleared, then
+        // all leaving): a member still counted could never come back.
+        if let Err(mpsc::error::TrySendError::Full(left)) = self.event.tx.try_send(left) {
+            if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                let tx = self.event.tx.clone();
+                runtime.spawn(async move {
+                    let _ = tx.send(left).await;
+                });
+            }
+        }
     }
 }
 
@@ -199,6 +221,62 @@ pub struct EventStart {
     pub team: Vec<ClientHandle>,
     /// The item buff everyone gets on arrival, if the team earned one.
     pub blessing: Option<i32>,
+    pub queue: EventQueue,
+    /// A squad's whole roster, who may come in while it runs, those who
+    /// stayed behind at the start too.
+    pub roster: Vec<ClientId>,
+}
+
+/// A queue for an event about to start, made by the directory so it can
+/// keep a way to it (`EventQueue::joiner`).
+#[derive(Debug)]
+pub struct EventQueue {
+    tx: mpsc::Sender<EventMessage>,
+    rx: mpsc::Receiver<EventMessage>,
+}
+
+impl Default for EventQueue {
+    fn default() -> Self {
+        let (tx, rx) = mpsc::channel(EVENT_QUEUE_CAPACITY);
+        Self { tx, rx }
+    }
+}
+
+impl EventQueue {
+    /// A way to the event that doesn't keep it going.
+    pub fn joiner(&self) -> EventJoiner {
+        EventJoiner(self.tx.downgrade())
+    }
+}
+
+/// A way for those on a squad's roster back into its event, while it runs.
+#[derive(Clone, Debug)]
+pub struct EventJoiner(mpsc::WeakSender<EventMessage>);
+
+impl EventJoiner {
+    /// Ask the event to take `member` back, answering `reply`. Returns
+    /// `reply` if the event is over or busy.
+    pub fn join(
+        &self,
+        member: ClientHandle,
+        reply: oneshot::Sender<SquadAnswer>,
+    ) -> Option<oneshot::Sender<SquadAnswer>> {
+        let message = EventMessage::Join { member, reply };
+        let Some(tx) = self.0.upgrade() else {
+            return taken_back(message);
+        };
+        match tx.try_send(message) {
+            Ok(()) => None,
+            Err(error) => taken_back(error.into_inner()),
+        }
+    }
+}
+
+fn taken_back(message: EventMessage) -> Option<oneshot::Sender<SquadAnswer>> {
+    match message {
+        EventMessage::Join { reply, .. } => Some(reply),
+        _ => None,
+    }
 }
 
 /// Start the event's actor, which hands out the tickets.
@@ -209,20 +287,28 @@ pub fn spawn(
 ) {
     let (id, kind, channel_id) = (start.id, start.kind, start.channel_id);
     fields.open_instance(channel_id, id);
-    let (tx, rx) = mpsc::channel(EVENT_QUEUE_CAPACITY);
-    let everyone = start.team.clone();
+    shut_gate(&fields, channel_id, kind);
+    let EventQueue { tx, rx } = start.queue;
+    let everyone = Arc::new(Mutex::new(start.team.clone()));
+    let cleared: Arc<Cleared> = Arc::default();
+    let won = cleared.clone();
     let actor = EventActor {
         id,
         kind,
         channel_id,
         ends: Some(Instant::now() + kind.event().duration()),
+        joiner: tx.downgrade(),
         event: Some(EventHandle { tx }),
         rx,
-        team: Team::new(
-            kind.event(),
-            start.leader,
-            start.team.iter().map(|m| m.client_id).collect(),
-        ),
+        team: {
+            let mut team = Team::new(
+                kind.event(),
+                start.leader,
+                start.team.iter().map(|m| m.client_id).collect(),
+            );
+            team.enlist(&start.roster);
+            team
+        },
         members: start
             .team
             .into_iter()
@@ -231,9 +317,11 @@ pub fn spawn(
         stage1: Stage1::default(),
         puzzles: Puzzles::default(),
         heard: HashSet::new(),
-        cleared: Arc::default(),
+        cleared,
         leader: Arc::new(AtomicI32::new(start.leader)),
         directory: directory.clone(),
+        fields: fields.clone(),
+        everyone: everyone.clone(),
         failed: false,
         bonus_taken: false,
         blessing: start.blessing,
@@ -241,24 +329,64 @@ pub fn spawn(
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
     spawn_supervised(format!("event {kind:?} {id}"), actor.run(), move || {
-        for member in &everyone {
+        let everyone = everyone
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for member in everyone.iter() {
             member.send(ServerMessage::EventEnded { id });
         }
         fields.close_instance(channel_id, id);
-        free_lobby(&directory, channel_id, kind, id);
+        // A win opened it already, and the next squad may have shut it.
+        let gate = (!won.has(kind.event().last_stage())).then_some(&fields);
+        free_lobby(&directory, gate, channel_id, kind, id);
+    });
+}
+
+/// The gate of `kind`'s event on `channel_id`, if it has one, and its
+/// reactor's name.
+fn gate(
+    fields: &Arc<FieldRegistry>,
+    channel_id: u8,
+    kind: EventKind,
+) -> Option<(FieldHandle, &'static str)> {
+    let (map_id, name) = kind.event().gate?;
+    Some((fields.field(FieldKey::new(channel_id, map_id)), name))
+}
+
+/// Shut the gate of `kind`'s event on `channel_id`, if it has one (Cosmic
+/// `updateGateState(1)`).
+fn shut_gate(fields: &Arc<FieldRegistry>, channel_id: u8, kind: EventKind) {
+    let Some((field, name)) = gate(fields, channel_id, kind) else {
+        return;
+    };
+    tokio::spawn(async move {
+        let _ = field
+            .tx
+            .send(FieldMessage::SetReactor { name, state: 1 })
+            .await;
     });
 }
 
 /// Tell the directory event `id` no longer holds its lobby, so the next
-/// party may go. Said again later, it changes nothing.
+/// party may go, opening the event's gate first if `open` has the fields
+/// (so the next squad shuts it only after). Said again later, it changes
+/// nothing.
 fn free_lobby(
     directory: &mpsc::Sender<DirectoryMessage>,
+    open: Option<&Arc<FieldRegistry>>,
     channel_id: u8,
     kind: EventKind,
     id: u32,
 ) {
     let directory = directory.clone();
+    let gate = open.and_then(|fields| gate(fields, channel_id, kind));
     tokio::spawn(async move {
+        if let Some((field, name)) = gate {
+            let _ = field
+                .tx
+                .send(FieldMessage::SetReactor { name, state: 0 })
+                .await;
+        }
         let _ = directory
             .send(DirectoryMessage::EventClosed {
                 channel_id,
@@ -277,6 +405,8 @@ struct EventActor {
     ends: Option<Instant>,
     /// Ours until the tickets are out; then only they keep the queue open.
     event: Option<EventHandle>,
+    /// For the tickets of those who come back (`EventMessage::Join`).
+    joiner: mpsc::WeakSender<EventMessage>,
     rx: mpsc::Receiver<EventMessage>,
     team: Team,
     members: HashMap<ClientId, ClientHandle>,
@@ -288,6 +418,10 @@ struct EventActor {
     /// The team's leader, for the tickets.
     leader: Arc<AtomicI32>,
     directory: mpsc::Sender<DirectoryMessage>,
+    fields: Arc<FieldRegistry>,
+    /// Everyone ever in it, those who came back too, to be sent out
+    /// however it ends.
+    everyone: Arc<Mutex<Vec<ClientHandle>>>,
     /// The party lost what it protected, or its lead went to someone not
     /// in it, which ends the event.
     failed: bool,
@@ -300,20 +434,11 @@ impl EventActor {
     async fn run(mut self) {
         let (id, kind) = (self.id, self.kind);
         info!(?kind, id, members = ?self.team.members(), blessing = ?self.blessing, "Event started");
-        if let (Some(event), Some(ends)) = (self.event.take(), self.ends) {
+        if let Some(event) = self.event.take() {
             for member in self.members.values() {
                 // A ticket that doesn't arrive hands itself back.
-                member.send(ServerMessage::EventStarted(EventTicket {
-                    id,
-                    kind,
-                    clock: Some(ends),
-                    member: member.client_id,
-                    event: event.clone(),
-                    cleared: self.cleared.clone(),
-                    leader: self.leader.clone(),
-                    blessing: self.blessing,
-                    prize_taken: false,
-                }));
+                let ticket = self.ticket(member.client_id, event.clone());
+                member.send(ServerMessage::EventStarted(ticket));
             }
         }
         let mut over = false;
@@ -332,6 +457,9 @@ impl EventActor {
                         self.command(client_id, command);
                         over = self.failed;
                     }
+                    Some(EventMessage::Join { member, reply }) => {
+                        let _ = reply.send(self.join(member));
+                    }
                     None => over = true,
                 },
                 _ = until(ends) => over = self.time_up(),
@@ -348,6 +476,39 @@ impl EventActor {
         }
         // Give them time to get out before the copy closes.
         sleep(GRACE).await;
+    }
+
+    fn ticket(&self, member: ClientId, event: EventHandle) -> EventTicket {
+        EventTicket {
+            id: self.id,
+            kind: self.kind,
+            clock: self.ends,
+            member,
+            event,
+            cleared: self.cleared.clone(),
+            leader: self.leader.clone(),
+            blessing: self.blessing,
+            prize_taken: false,
+        }
+    }
+
+    /// `member` of a squad's roster comes back while it is not won. A
+    /// ticket that doesn't arrive hands itself back.
+    fn join(&mut self, member: ClientHandle) -> SquadAnswer {
+        let Some(tx) = self.joiner.upgrade() else {
+            return SquadAnswer::Refused;
+        };
+        if !self.team.rejoin(member.client_id) {
+            return SquadAnswer::Refused;
+        }
+        info!(kind = ?self.kind, id = self.id, member = member.client_id, "Member came back");
+        let ticket = self.ticket(member.client_id, EventHandle { tx });
+        self.everyone
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(member.clone());
+        self.members.insert(member.client_id, member);
+        SquadAnswer::Rejoin(ticket)
     }
 
     fn cloto(&mut self, client_id: ClientId, stage: u8) -> Option<Cloto> {
@@ -466,7 +627,8 @@ impl EventActor {
             }
             EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
             // Told by the old leader or the new one, whichever is first.
-            EventCommand::HandOver(to) if leader || client_id == to => {
+            // A squad's lead stays its own, whatever the parties.
+            EventCommand::HandOver(to) if !event.squad && (leader || client_id == to) => {
                 self.leader.store(to, Ordering::Relaxed);
                 if self.team.hand_over(to) {
                     info!(kind = ?self.kind, id = self.id, to, "Event's lead left it");
@@ -541,7 +703,13 @@ impl EventActor {
         }
         self.team.win();
         self.ends = None;
-        free_lobby(&self.directory, self.channel_id, self.kind, self.id);
+        free_lobby(
+            &self.directory,
+            Some(&self.fields),
+            self.channel_id,
+            self.kind,
+            self.id,
+        );
         info!(kind = ?self.kind, id = self.id, "Event won");
         // After the clear itself, so its EXP and effects come first (Cosmic
         // `clearPQ`).

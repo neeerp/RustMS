@@ -1539,6 +1539,10 @@ impl ClientActor {
             ServerMessage::EventFailed { id } => self.event_failed(id).await,
             ServerMessage::LeaderHandedOver { to } => self.handed_over(to).await,
             ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
+            ServerMessage::ClearEventStage(stage) => {
+                self.tell_event(net::events::EventCommand::ClearStage(stage))
+                    .await
+            }
             ServerMessage::EventMoved {
                 id,
                 from,

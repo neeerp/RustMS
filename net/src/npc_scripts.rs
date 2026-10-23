@@ -18,6 +18,7 @@ use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
 use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
+use crate::squads::{SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
@@ -1260,6 +1261,12 @@ impl NpcScript {
     /// go into the Dead Mine.
     pub fn adobis(entry: Entry, player: &Player) -> Self {
         adobis(entry, player)
+    }
+
+    /// Adobis at the Entrance to Zakum, to `player`, who finds the
+    /// channel's expedition as `view`.
+    pub fn zakum_squad(view: SquadView, player: &Player) -> Self {
+        zakum_squad(view, player)
     }
 
     /// Aura on the Dead Mine's hub, to `player`, who stands with her as
@@ -3339,7 +3346,7 @@ fn event_terms(event: &events::Event, key: &str) -> String {
     content::text().get(
         key,
         &[
-            ("least", &team.start().to_string()),
+            ("least", &event.least().to_string()),
             ("most", &team.end().to_string()),
             ("low", &levels.start().to_string()),
             ("high", &levels.end().to_string()),
@@ -5623,6 +5630,102 @@ fn adobis(entry: Entry, player: &Player) -> NpcScript {
     // Someone left or moved since he checked, another party went in, or
     // the forge's items went.
     script.refused = Some(text(keys::ZAKUM_ADOBIS_REFUSED));
+    script
+}
+
+/// Adobis again (2030013), at the Entrance to Zakum.
+pub const ZAKUM_RECRUITER: i32 = 2030013;
+
+/// Adobis at the Entrance to Zakum (Cosmic `2030013`) gathers the
+/// channel's expedition (`crate::squads`): one with an Eye of Fire opens
+/// it, others of the levels join, and its leader turns members out, takes
+/// it to the altar, or calls it off. While it fights, those on its roster
+/// may go back in.
+fn zakum_squad(view: SquadView, player: &Player) -> NpcScript {
+    let event = &events::ZAKUM;
+    let squad = |command| Effect::Squad {
+        kind: EventKind::Zakum,
+        command,
+    };
+    let named = |key: &str, name: &str| content::text().get(key, &[("name", name)]);
+    let pages = match view {
+        _ if !event.levels.contains(&player.stats.level) => {
+            vec![Page::Say(event_terms(event, keys::ZAKUM_SQUAD_LEVEL))]
+        }
+        SquadView::None if !holds(player, EYE_OF_FIRE) => {
+            vec![Page::Say(text(keys::ZAKUM_SQUAD_NO_EYE))]
+        }
+        SquadView::None => vec![
+            Page::Ask {
+                text: event_terms(event, keys::ZAKUM_SQUAD_ASK),
+                on_yes: vec![squad(SquadCommand::Open)],
+                on_no: None,
+            },
+            Page::Say(text(keys::ZAKUM_SQUAD_OPENED)),
+        ],
+        SquadView::Leading(others) => {
+            let count = (others.len() + 1).to_string();
+            let expel = if others.is_empty() {
+                Page::End(text(keys::ZAKUM_SQUAD_ALONE))
+            } else {
+                Page::Menu {
+                    text: text(keys::ZAKUM_SQUAD_LIST),
+                    choices: others
+                        .iter()
+                        .map(|(id, name)| {
+                            let act = Page::Act {
+                                text: named(keys::ZAKUM_SQUAD_EXPELLED, name),
+                                effects: vec![squad(SquadCommand::Expel(*id))],
+                            };
+                            (name.clone(), vec![act])
+                        })
+                        .collect(),
+                }
+            };
+            let least = event.least();
+            let start = if others.len() + 1 < least {
+                let least = least.to_string();
+                Page::End(content::text().get(keys::ZAKUM_SQUAD_TOO_FEW, &[("least", &least)]))
+            } else {
+                Page::Done(vec![squad(SquadCommand::Start)])
+            };
+            let stop = Page::Act {
+                text: text(keys::ZAKUM_SQUAD_STOPPED),
+                effects: vec![squad(SquadCommand::Stop)],
+            };
+            vec![Page::Menu {
+                text: content::text().get(keys::ZAKUM_SQUAD_MENU, &[("count", &count)]),
+                choices: vec![
+                    (text(keys::ZAKUM_SQUAD_EXPEL_CHOICE), vec![expel]),
+                    (text(keys::ZAKUM_SQUAD_START_CHOICE), vec![start]),
+                    (text(keys::ZAKUM_SQUAD_STOP_CHOICE), vec![stop]),
+                ],
+            }]
+        }
+        SquadView::Registered { leader } => {
+            vec![Page::Say(named(keys::ZAKUM_SQUAD_REGISTERED, &leader))]
+        }
+        SquadView::Joinable => vec![
+            Page::Ask {
+                text: text(keys::ZAKUM_SQUAD_JOIN_ASK),
+                on_yes: vec![squad(SquadCommand::Join)],
+                on_no: None,
+            },
+            Page::Say(text(keys::ZAKUM_SQUAD_JOINED)),
+        ],
+        SquadView::Banned { leader } => vec![Page::Say(named(keys::ZAKUM_SQUAD_BANNED, &leader))],
+        SquadView::Full => vec![Page::Say(text(keys::ZAKUM_SQUAD_FULL))],
+        SquadView::Rejoin => vec![Page::Ask {
+            text: text(keys::ZAKUM_SQUAD_REJOIN_ASK),
+            on_yes: vec![squad(SquadCommand::Rejoin)],
+            on_no: None,
+        }],
+        SquadView::Taken => vec![Page::Say(text(keys::ZAKUM_SQUAD_TAKEN))],
+    };
+    let mut script = NpcScript::new(ZAKUM_RECRUITER, pages);
+    // The squad changed since he looked: another opened one, it filled,
+    // started, or ended, or the player left the map.
+    script.refused = Some(text(keys::ZAKUM_SQUAD_REFUSED));
     script
 }
 
@@ -10241,6 +10344,10 @@ mod tests {
         assert!(matches!(
             gate(&[(EYE_OF_FIRE, 1)], &done)[..],
             [
+                Effect::ShutByReactor {
+                    name: "gate",
+                    state: 1
+                },
                 Effect::PortalSound,
                 Effect::WarpToPortal(ENTRANCE_TO_ZAKUM, _)
             ]

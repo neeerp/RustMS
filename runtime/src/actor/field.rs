@@ -570,6 +570,13 @@ impl FieldActor {
                     .map(|name| self.reactors.named(name).map(|r| r.state));
                 let _ = reply.send(states.collect());
             }
+            FieldMessage::SetReactor { name, state } => {
+                for view in self.reactors.set_state(name, state) {
+                    if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
             FieldMessage::Split { reply } => {
                 let split = self
                     .split
@@ -1670,6 +1677,12 @@ impl FieldActor {
         .flatten()
         {
             self.broadcast(None, packet);
+        }
+        // In an expedition's copy of the altar, the expedition has won.
+        if self.key.instance_id != 0 {
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::ClearEventStage(1));
+            }
         }
         let line = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
         let Ok(packet) = build_item_line(&line, 0) else {

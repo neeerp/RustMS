@@ -49,6 +49,9 @@ impl ClientActor {
     /// The NPC who starts an event tells the player whether their party may
     /// go in.
     pub(super) async fn talk_about_event(&mut self, kind: EventKind) -> Result<(), RuntimeError> {
+        if kind.event().squad {
+            return self.talk_about_squad(kind).await;
+        }
         let (reply, entry) = oneshot::channel();
         self.send_to_directory(DirectoryMessage::EventEntry {
             from: self.client_id,
@@ -65,7 +68,26 @@ impl ClientActor {
             EventKind::Lpq => NpcScript::red_sign(entry),
             EventKind::Opq => NpcScript::wonky(entry),
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
+            // A squad's, above.
+            EventKind::Zakum => return Ok(()),
         };
+        self.start_script(script).await
+    }
+
+    /// The NPC who gathers a squad tells the player where they stand with
+    /// the one on their channel.
+    async fn talk_about_squad(&mut self, kind: EventKind) -> Result<(), RuntimeError> {
+        let (reply, view) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::SquadTalk {
+            from: self.client_id,
+            kind,
+            reply,
+        })
+        .await?;
+        let Ok(view) = view.await else {
+            return Ok(());
+        };
+        let script = NpcScript::zakum_squad(view, &self.in_game()?.player);
         self.start_script(script).await
     }
 
@@ -348,14 +370,16 @@ impl ClientActor {
     }
 
     /// The states of the reactors named `names` on the player's map.
-    async fn reactor_states(
+    pub(super) async fn reactor_states(
         &mut self,
-        names: &'static [&'static str],
+        names: &[&'static str],
     ) -> Result<Vec<Option<u8>>, RuntimeError> {
         let (reply, states) = oneshot::channel();
+        let names = names.to_vec();
+        let count = names.len();
         self.send_to_field(FieldMessage::ReactorStates { names, reply })
             .await?;
-        Ok(states.await.unwrap_or_else(|_| vec![None; names.len()]))
+        Ok(states.await.unwrap_or_else(|_| vec![None; count]))
     }
 
     /// What `judge` makes of where everyone on `map_id`, the player's map,
@@ -414,11 +438,12 @@ impl ClientActor {
     }
 
     /// The party went in: the player takes their ticket to the event's
-    /// first map, unless they have since left the party or the lobby, or
-    /// are in the Cash Shop or another event.
+    /// first map, unless they have since left the party (a squad's needs
+    /// none) or the lobby, or are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
-        let lobby = ticket.kind.event().lobby;
-        let waiting = self.party_id.is_some()
+        let event = ticket.kind.event();
+        let lobby = event.lobby;
+        let waiting = (self.party_id.is_some() || event.squad)
             && !self.in_cash_shop
             && self.event.is_none()
             && self
@@ -471,9 +496,12 @@ impl ClientActor {
     }
 
     /// Without a party there is no event: the player leaves it, unless it
-    /// is already won (Cosmic `playerLeft`).
+    /// is already won (Cosmic `playerLeft`) or a squad's.
     pub(super) async fn left_party_in_event(&mut self) -> Result<(), RuntimeError> {
-        let playing = self.event.as_ref().is_some_and(|ticket| !ticket.won());
+        let playing = self
+            .event
+            .as_ref()
+            .is_some_and(|ticket| !ticket.won() && !ticket.kind.event().squad);
         if self.party_id.is_none() && playing {
             self.leave_event().await?;
         }
@@ -579,7 +607,9 @@ impl ClientActor {
     /// last stage wins the event, and everyone's clock stops. A stage with a
     /// `clear_portal` first takes those on its map there (Cosmic's Eak warps
     /// the team before the clear effect). The Dead Mine's win shows nothing,
-    /// and gives more EXP with the documents (Cosmic's Aura).
+    /// and gives more EXP with the documents (Cosmic's Aura). Zakum's fall
+    /// showed itself on the altar already (the field's `zakum_falls`), and
+    /// gives none.
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -589,6 +619,7 @@ impl ClientActor {
         }
         let event = ticket.kind.event();
         let zpq = ticket.kind == EventKind::Zpq;
+        let zakum = ticket.kind == EventKind::Zakum;
         let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
             events::ZPQ_DOCUMENTS_EXP
         } else {
@@ -603,14 +634,16 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if next.stats.map_id == map_id && !zpq {
+        if next.stats.map_id == map_id && !zpq && !zakum {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             if event.gates {
                 packets.push(build_field_object("gate")?);
             }
         }
-        gain_exp(&mut next, exp, &mut packets)?;
+        if !zakum {
+            gain_exp(&mut next, exp, &mut packets)?;
+        }
         self.commit_player(next, None, &mut packets).await?;
         // The EXP comes before the clock stops, as in Cosmic's `clearPQ`.
         if stage == event.last_stage() {
