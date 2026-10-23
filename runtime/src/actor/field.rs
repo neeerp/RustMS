@@ -27,7 +27,8 @@ use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
 use net::packet::build::world::effect::{
-    build_blow_weather, build_boss_hp_bar, build_item_emotion, build_mist_item_effect,
+    build_blow_weather, build_boss_hp_bar, build_field_music, build_item_emotion,
+    build_mist_item_effect,
 };
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair,
@@ -1450,7 +1451,8 @@ impl FieldActor {
         if let Some(broadcast) = broadcast {
             self.broadcast(Some(from), broadcast);
         }
-        // Players can't hurt a friendly mob (`damagedByMob`), only mobs can.
+        // Players can't hurt a friendly mob (`damagedByMob`), only mobs can,
+        // and no one a shielded one: their hits do nothing to it at all.
         let friendly = |object_id| {
             self.mobs
                 .get(object_id)
@@ -1458,7 +1460,7 @@ impl FieldActor {
         };
         let hits: Vec<_> = hits
             .into_iter()
-            .filter(|&(object_id, _)| !friendly(object_id))
+            .filter(|&(object_id, _)| !friendly(object_id) && !self.mobs.shielded(object_id))
             .collect();
         let now = Instant::now();
         let countered: i32 = counter.map_or(0, |stat| {
@@ -1586,6 +1588,30 @@ impl FieldActor {
                 });
             }
         }
+        self.make_real(kill.mob_id);
+    }
+
+    /// The mobs the death of a `mob_id` left unshielded become real: their
+    /// clients see them just there (Cosmic `makeMonsterReal`), and the
+    /// first player here moves them.
+    fn make_real(&mut self, mob_id: i32) {
+        let real = self.mobs.unshielded_by(mob_id);
+        if real.is_empty() {
+            return;
+        }
+        for &object_id in &real {
+            if let Some(Ok(packet)) = self
+                .mobs
+                .get(object_id)
+                .map(|mob| build_spawn_mob(&mob.view(false)))
+            {
+                self.broadcast(None, packet);
+            }
+        }
+        if let Some(controller) = self.occupants.keys().next().copied() {
+            let controlled = self.mobs.assign_uncontrolled(controller);
+            self.send_control(controller, &controlled);
+        }
     }
 
     /// `from`'s client says a mob's attack hurt a Dazzled mob: it takes the
@@ -1593,6 +1619,9 @@ impl FieldActor {
     /// others see the number `from` already showed.
     fn handle_mob_damage_mob(&mut self, from: ClientId, attacker: i32, victim: i32, damage: i32) {
         let now = Instant::now();
+        if self.mobs.shielded(victim) {
+            return;
+        }
         let Some(damage) = self.mobs.mob_hit(attacker, victim, damage, now) else {
             return;
         };
@@ -2401,6 +2430,34 @@ impl FieldActor {
         came
     }
 
+    /// Zakum's altar took the Eye of Fire: its music plays, and its body
+    /// comes out on the ground below `(x, y)`, trembling in, not yet real
+    /// (no controller, and its arms shield it), then its arms with it.
+    fn bring_out_zakum(&mut self, (x, y): (i16, i16)) {
+        if let Ok(packet) = build_field_music(reactors::ZAKUM_MUSIC) {
+            self.broadcast(None, packet);
+        }
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let at = (x, ground.saturating_sub(1));
+        if let Some(info) = net::mobs::info(net::mobs::ZAKUM_BODY) {
+            let object_id = self.mobs.place(info, at, 5, None, Instant::now());
+            let view = self.mobs.get(object_id).map(|mob| MobView {
+                fake: true,
+                ..mob.view(false)
+            });
+            if let Some(Ok(packet)) = view.as_ref().map(build_spawn_mob) {
+                self.broadcast(None, packet);
+            }
+        }
+        for arm in net::mobs::ZAKUM_ARMS {
+            self.board(arm, 1, (x, y));
+        }
+        let notice = net::content::text().get(keys::ZAKUM_ALTAR_SUMMONED, &[]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+            self.broadcast(None, packet);
+        }
+    }
+
     /// Send what `message` gives for the `nth` player a mob's cast
     /// reaches: everyone in its area, or without one its controller
     /// (Cosmic's MobSkill.applyEffect).
@@ -2802,6 +2859,9 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
+            // Cosmic `changeMusic`, `spawnFakeMonster` (the body first),
+            // `spawnMonster` for each arm, then `mapMessage(5, ..)`.
+            reactors::Action::Zakum => self.bring_out_zakum((view.x, view.y)),
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out

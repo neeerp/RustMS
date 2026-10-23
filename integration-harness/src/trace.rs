@@ -426,7 +426,7 @@ impl Trace {
             self.blocked.push((op, r.read_byte().unwrap()));
         } else if op == SendOpcode::FieldEffect as i16 {
             let mode = r.read_byte().unwrap();
-            if matches!(mode, 2..=4) {
+            if matches!(mode, 2..=4 | 6) {
                 self.field_effects
                     .push((mode, r.read_str_with_length().unwrap()));
             }

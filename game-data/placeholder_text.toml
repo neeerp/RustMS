@@ -1013,6 +1013,7 @@
 "zakum.mine.unknown_force" = "[placeholder] A strange force carries you back to the start."
 "zakum.mine.mimics" = "[placeholder] Monsters were hiding in the box!"
 "zakum.ali.bye" = "[placeholder] Back you go. Until next time."
+"zakum.altar.summoned" = "[placeholder] The Eye of Fire has woken Zakum!"
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"

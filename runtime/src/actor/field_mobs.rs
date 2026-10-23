@@ -25,6 +25,9 @@ pub const SPAWN_INTERVAL: Duration = Duration::from_secs(7);
 /// The most mobs a field holds before its users raise it.
 const MAX_CAPACITY: usize = 40;
 
+/// A mob summons nothing on a field already holding this many mobs.
+const MOST_TO_SUMMON_AMONG: usize = 80;
+
 /// A spawn point without a `mobTime` stays empty while a mob, or another
 /// point filled in the same pass, is this close in both x and y.
 const SPAWN_ROOM: i32 = 100;
@@ -434,6 +437,7 @@ impl LiveMob {
             controlled: self.controller.is_some(),
             statuses: self.status_views(Instant::now()),
             summon_effect: None,
+            fake: false,
         }
     }
 
@@ -731,11 +735,49 @@ impl MobSet {
         object_id
     }
 
-    /// Give uncontrolled mobs to `candidate`; returns the ones it now controls.
+    /// Whether `mob` takes no harm, and has no controller, while another
+    /// mob is out: Zakum's body while any of its arms is.
+    fn shields(&self, mob: &LiveMob) -> bool {
+        net::mobs::shielded_by(mob.info.mob_id).is_some_and(|guards| {
+            self.live
+                .values()
+                .any(|other| guards.contains(&other.info.mob_id))
+        })
+    }
+
+    /// Whether the mob `object_id` takes no harm yet (see `shields`).
+    pub fn shielded(&self, object_id: i32) -> bool {
+        self.live
+            .get(&object_id)
+            .is_some_and(|mob| self.shields(mob))
+    }
+
+    /// The mobs that the death of a `mob_id` left unshielded: they are
+    /// real now (Cosmic `makeMonsterReal`, once no arm is left).
+    pub fn unshielded_by(&self, mob_id: i32) -> Vec<i32> {
+        self.live
+            .values()
+            .filter(|mob| {
+                net::mobs::shielded_by(mob.info.mob_id)
+                    .is_some_and(|guards| guards.contains(&mob_id))
+                    && !self.shields(mob)
+            })
+            .map(|mob| mob.object_id)
+            .collect()
+    }
+
+    /// Give uncontrolled mobs to `candidate`, save shielded ones; returns
+    /// the ones it now controls.
     pub fn assign_uncontrolled(&mut self, candidate: ClientId) -> Vec<i32> {
+        let shielded: Vec<i32> = self
+            .live
+            .values()
+            .filter(|mob| self.shields(mob))
+            .map(|mob| mob.object_id)
+            .collect();
         self.live
             .values_mut()
-            .filter(|mob| mob.controller.is_none())
+            .filter(|mob| mob.controller.is_none() && !shielded.contains(&mob.object_id))
             .map(|mob| {
                 mob.controller = Some(candidate);
                 mob.controller_distance = None;
@@ -964,7 +1006,8 @@ impl MobSet {
 
     /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
     /// (0 for none) leaves room for, where it stands, facing its way, and
-    /// under its controller. They never respawn.
+    /// under its controller, unless the field already holds
+    /// `MOST_TO_SUMMON_AMONG` mobs (Cosmic `MobSkill`). They never respawn.
     pub fn summon(
         &mut self,
         summoner: i32,
@@ -986,7 +1029,9 @@ impl MobSet {
             .values()
             .filter(|mob| mob.summoner == Some(summoner))
             .count();
-        let room = if limit > 0 {
+        let room = if self.live.len() >= MOST_TO_SUMMON_AMONG {
+            0
+        } else if limit > 0 {
             (limit as usize).saturating_sub(alive)
         } else {
             summoned.len()
@@ -1223,6 +1268,9 @@ impl MobSet {
         damage: i64,
         now: Instant,
     ) -> Option<Result<u8, Kill>> {
+        if self.shielded(object_id) {
+            return self.live.get(&object_id).map(|mob| Ok(mob.hp_percent()));
+        }
         let mob = self.live.get_mut(&object_id)?;
         let dealt = damage.clamp(0, mob.hp);
         mob.hp -= dealt;
@@ -2037,6 +2085,51 @@ mod tests {
             );
         }
         assert!(mobs.revive(now + Duration::from_secs(5), blue).is_empty());
+    }
+
+    #[test]
+    fn zakums_arms_shield_its_body_until_the_last_dies() {
+        let now = Instant::now();
+        let mut mobs = MobSet::default();
+        let mob = |mob_id| MobInfo {
+            mob_id,
+            max_hp: 100,
+            ..MobInfo::default()
+        };
+        let body = mobs.place(mob(net::mobs::ZAKUM_BODY), (0, 0), 5, None, now);
+        let arms = [8800003, 8800010].map(|arm| mobs.place(mob(arm), (0, 0), 5, None, now));
+        // Only the arms get a controller, and the body takes no harm.
+        assert_eq!(mobs.assign_uncontrolled(1), arms);
+        assert_eq!(mobs.damage(1, body, 60, now), Some(Ok(100)));
+        assert!(mobs.get(body).unwrap().damage_by.is_empty());
+        assert!(mobs.damage(1, arms[0], 100, now).unwrap().is_err());
+        assert!(mobs.unshielded_by(8800003).is_empty());
+        assert!(mobs.shielded(body));
+        // The last arm's death makes it real.
+        assert!(mobs.damage(1, arms[1], 100, now).unwrap().is_err());
+        assert_eq!(mobs.unshielded_by(8800010), [body]);
+        assert!(mobs.unshielded_by(100100).is_empty());
+        assert!(!mobs.shielded(body));
+        assert_eq!(mobs.assign_uncontrolled(2), [body]);
+        assert_eq!(mobs.damage(2, body, 60, now), Some(Ok(40)));
+    }
+
+    #[test]
+    fn a_full_field_lets_no_mob_summon() {
+        let now = Instant::now();
+        let mut mobs = MobSet::default();
+        let mob = |mob_id| MobInfo {
+            mob_id,
+            max_hp: 100,
+            ..MobInfo::default()
+        };
+        let caster = mobs.place(mob(1), (0, 0), 5, None, now);
+        for _ in 1..MOST_TO_SUMMON_AMONG - 1 {
+            mobs.place(mob(2), (0, 0), 5, None, now);
+        }
+        // One short of 80, it summons them all; at 80, none.
+        assert_eq!(mobs.summon(caster, &[mob(3), mob(3)], 0, now).len(), 2);
+        assert!(mobs.summon(caster, &[mob(3)], 0, now).is_empty());
     }
 
     #[test]

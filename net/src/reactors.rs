@@ -88,6 +88,10 @@ pub enum Action {
         npc_id: i32,
         at: (i16, i16),
     },
+    /// Zakum's altar (Cosmic `2111001`), which breaks on the Eye of Fire:
+    /// Zakum's music plays, its body comes out on the ground below, not yet
+    /// real, then its eight arms, with a pink line to everyone there.
+    Zakum,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -272,6 +276,7 @@ pub fn action(reactor_id: i32) -> Action {
         // or three Mimics out of the box.
         ZPQ_TRAP => Action::Warp(Warp(crate::events::ZPQ_HUB, "sp")),
         ZPQ_MIMIC_BOX => Action::BringOut(ZPQ_MIMIC, 3),
+        ZAKUM_ALTAR => Action::Zakum,
         _ => Action::Drops,
     }
 }
@@ -281,6 +286,10 @@ pub fn action(reactor_id: i32) -> Action {
 pub const ZPQ_TRAP: i32 = 2110000;
 pub const ZPQ_MIMIC_BOX: i32 = 2111000;
 pub const ZPQ_MIMIC: i32 = 9300004;
+
+/// Zakum's altar, and the music it plays as it brings Zakum out.
+pub const ZAKUM_ALTAR: i32 = 2111001;
+pub const ZAKUM_MUSIC: &str = "Bgm06/FinalFight";
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
@@ -497,5 +506,11 @@ mod tests {
             return;
         }
         assert_eq!(back.to(), (crate::events::ZPQ_HUB, 0));
+    }
+
+    #[test]
+    fn zakums_altar_brings_zakum_out() {
+        assert_eq!(action(ZAKUM_ALTAR), Action::Zakum);
+        assert_eq!(breaker_notice(ZAKUM_ALTAR), None);
     }
 }

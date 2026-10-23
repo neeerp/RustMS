@@ -50,6 +50,10 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
   in, facing its way, under its last controller, and never respawn. v83's
   SPAWN_MONSTER also has a -3 appearance that ties the new mob to the dying
   one, but by then the server has removed it, so they use -2.
+- **Shielded:** Zakum's body (8800000) takes no harm and has no controller
+  while any of its arms is out (`MobSet::shielded`); the field drops hits
+  on it whole. The last arm's death makes it real (see
+  [zakum](./zakum.md)).
 - **Leaving on their own:** a mob with `info/removeAfter` (the Kitties in
   Magatia's cheese storage, 926120400, ...) is taken away that many seconds
   after it spawned (`LiveMob::leaves_at`), as Cosmic does: KILL_MONSTER with
@@ -1541,7 +1545,8 @@ controller's client plays the cast and the server applies it
   listed mobs at the caster under the caster's controller, up to `limit`
   alive, with SPAWN_MONSTER's appearance set to `summonEffect`; clients
   play `Effect.nx` `Summon.img/<summonEffect>` on them. Summoned mobs don't
-  respawn.
+  respawn. A mob summons nothing on a field already holding 80 mobs
+  (Cosmic's cap).
 - **Diseases** (120-126, 128, 132) reach the players in the area; see
   below.
 - **Counters** (143 physical, 144 magic, 145 both) put PCounter and
