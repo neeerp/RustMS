@@ -110,9 +110,8 @@ namespace ms
 		for (int16_t part = 1; part < static_cast<int16_t>(now_worn.parts.size()); part++)
 			now_worn.parts[part] = equips.get_equip(static_cast<EquipSlot::Id>(part));
 
-		// The look keeps one ring.
-		for (int16_t ring : { 13, 15, 16 })
-			now_worn.parts[ring] = now_worn.parts[EquipSlot::Id::RING1];
+		for (int16_t ring : { 12, 13, 15, 16 })
+			now_worn.parts[ring] = look.get_ring(ring);
 
 		now_worn.cash_weapon = look.get_cash_weapon();
 		now_worn.pets = pets;

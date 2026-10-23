@@ -151,17 +151,18 @@ namespace ms
 				if (sets[i].kind == Kind::CASH)
 					return index;
 
-				if (sets[i].kind == Kind::PLAIN && plain < 0)
-					plain = index;
-				else if (sets[i].kind == Kind::MULTIPET && multipet < 0)
+				// A second pets' set takes the plain one's place, if that is free (asm 5d93a4).
+				if (sets[i].kind == Kind::MULTIPET && multipet < 0)
 					multipet = index;
+				else if (plain < 0)
+					plain = index;
 			}
 
 			return plain >= 0 ? plain : multipet;
 		}
 
 		// The background shows while the character stands. It fades out over half a second once they don't, and
-		// comes back, from its first frame, when they stand more than a second and a half after it went
+		// comes back, from its first frame, after they have stood for more than a second and a half
 		// (FUN_00939a28, every frame from FUN_00930b27).
 		constexpr int64_t FADE = 500;
 		constexpr int64_t RETURN = 1500;
@@ -175,11 +176,12 @@ namespace ms
 		// Steps the background at `now`, and returns whether it comes back.
 		inline bool step(Background &background, bool standing, int64_t now)
 		{
-			if (background.shown && !standing)
+			// Every moment they don't stand counts from again.
+			if (!standing)
 			{
 				background.shown = false;
 				background.hidden_at = now;
-			} else if (!background.shown && standing && now - background.hidden_at > RETURN)
+			} else if (!background.shown && now - background.hidden_at > RETURN)
 			{
 				background.shown = true;
 

@@ -81,14 +81,17 @@ int main()
 		require(match({ pets, earring }, both, 0, three) == 0, "then pets");
 		require(match({ ten, Set{ Kind::PLAIN, { { 1, { 1002317 } } }, {} } }, worn, 0, no_pets) == 0,
 				"the first of a kind");
+		require(match({ pets, pets }, both, 0, three) == 1, "a second pets' set takes the plain place");
+		require(match({ pets, pets, ten }, both, 0, three) == 1, "before a plain one after it");
 
 		// The background fades as the character moves, and returns after 1.5 s of standing.
 		Background background;
 		require(!step(background, true, 0) && background.shown, "shown at first");
 		require(!step(background, false, 100) && !background.shown, "hidden on moving");
-		require(!step(background, true, 1600) && !background.shown, "not yet back");
-		require(step(background, true, 1700) && background.shown, "back");
-		require(!step(background, true, 1800), "back only once");
+		require(!step(background, false, 3000), "still moving");
+		require(!step(background, true, 4500) && !background.shown, "not yet back");
+		require(step(background, true, 4508) && background.shown, "back");
+		require(!step(background, true, 4600), "back only once");
 
 		require(fade(1.0f, false, 250) == 0.5f && fade(0.1f, false, 250) == 0.0f, "fades out over 500 ms");
 		require(fade(0.0f, true, 250) == 0.5f && fade(0.9f, true, 250) == 1.0f, "and in");

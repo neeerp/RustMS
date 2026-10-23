@@ -152,6 +152,12 @@ namespace ms
 
 		int32_t get_cash_weapon() const;
 
+		// The ring worn on a finger (equip slot 12, 13, 15 or 16), 0 for none. The equipment keeps only one,
+		// in RING1, as they aren't drawn.
+		void set_ring(int16_t slot, int32_t itemid);
+
+		int32_t get_ring(int16_t slot) const;
+
 		// Ride a mount (190xxxx or 193xxxx), or get off with 0 (report 201).
 		void set_vehicle(int32_t vehicle);
 
@@ -255,6 +261,7 @@ namespace ms
 		int32_t face_id = 0;
 		CharEquips equips;
 		int32_t cash_weapon = 0;
+		std::map<int16_t, int32_t> rings;
 		std::array<int32_t, 3> pet_wear = {};
 		std::map<int16_t, int32_t> pet_parts;
 		int32_t vehicle = 0;

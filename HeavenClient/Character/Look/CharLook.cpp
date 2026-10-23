@@ -46,6 +46,7 @@ namespace ms
 			}
 
 			add_equip(equip.second);
+			set_ring(equip.first, equip.second);
 		}
 
 		if (auto cash = entry.maskedequips.find(-111); cash != entry.maskedequips.end())
@@ -1033,6 +1034,25 @@ namespace ms
 	int32_t CharLook::get_cash_weapon() const
 	{
 		return cash_weapon;
+	}
+
+	void CharLook::set_ring(int16_t slot, int32_t itemid)
+	{
+		if (slot != EquipSlot::Id::RING1 && slot != EquipSlot::Id::RING2 && slot != EquipSlot::Id::RING3 &&
+			slot != EquipSlot::Id::RING4)
+			return;
+
+		if (itemid)
+			rings[slot] = itemid;
+		else
+			rings.erase(slot);
+	}
+
+	int32_t CharLook::get_ring(int16_t slot) const
+	{
+		auto ring = rings.find(slot);
+
+		return ring != rings.end() ? ring->second : 0;
 	}
 
 	int32_t CharLook::get_morph() const
