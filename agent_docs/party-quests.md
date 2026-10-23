@@ -824,8 +824,17 @@ cleared, then leads on to the next room. The last room's (240050105,
 Key, who lifts it (`ClearStage(5)`, pink lines) and goes back to
 240050100's `st00`, keeping the key; after that anyone goes through.
 
-Not yet: the lamp (2408001, `hontale_C`), the Party Search entry and the
-stump (2083003).
+On the lamp's map (240050200) the lamp (`reactors::HTPQ_LAMP` 2408001,
+named `light`) moves on with every hit, 0 to 1 to 2 to 3 and back to 0,
+and never breaks. The way on (`east00`, `hontale_C`, `htpq_lamp_door`)
+takes only the leader's word: lit (state 1) it moves the whole team to the
+light map (240050300), dark (state 3) to the dark one (240050310), with
+the clock; at 0 or 2 it tells the leader in pink to hit the lamp, and
+anyone else that only the leader may choose. On the light map the
+T-Skelegons (9300077) drop the Red Keys; on the dark one the six crates
+(2402006) do, each breaking in four hits (both from the content pack).
+
+Not yet: the Party Search entry and the stump (2083003).
 
 ## NPCs
 
@@ -871,5 +880,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
-`zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*` and
-`htpq.key.*`.
+`zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*`,
+`htpq.key.*` and `htpq.lamp.*`.

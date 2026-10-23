@@ -1089,6 +1089,8 @@
 "htpq.seal.lifted" = "[placeholder] The Blue Crystal Key glows, and the seal gives way for a moment."
 "htpq.key.sent" = "[placeholder] The seal takes the key, and the key is gone in a flash."
 "htpq.key.appeared" = "[placeholder] A flash of light, and a key lies somewhere on this map."
+"htpq.lamp.hit" = "[placeholder] Hit the lamp to choose the way: lit or dark."
+"htpq.lamp.leader_only" = "[placeholder] Only the party leader may choose the way on."
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"

@@ -194,6 +194,11 @@ pub const HTPQ_INTO_ROOMS: &str = "hontale_BtoB1";
 /// 4's open once their seals take their keys; the last room's the leader
 /// lifts with the Blue Crystal Key (`htpq_last_seal`).
 pub const HTPQ_SEAL: &str = "hontale_Bopen";
+/// The lamp's room's way on (`htpq_lamp_door`), and the name of its lamp
+/// (`reactors::HTPQ_LAMP`): lit (state 1) it leads to the light map, dark
+/// (state 3) to the dark one.
+pub const HTPQ_LAMP_DOOR: &str = "hontale_C";
+pub const HTPQ_LAMP_NAME: &str = "light";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.
@@ -1582,6 +1587,25 @@ pub fn htpq_last_seal(lifted: bool, leader_with_key: bool) -> Vec<Effect> {
     }
 }
 
+/// The lamp's room's way on, for the leader or not, with the lamp in
+/// `lamp`: the leader takes the whole team to the light map or the dark
+/// one, as the lamp is lit or dark; at any other state, or for anyone
+/// else, it says why not (Cosmic `hontale_C`).
+pub fn htpq_lamp_door(leader: bool, lamp: Option<u8>) -> Vec<Effect> {
+    use crate::events::{EventCommand, HTPQ_DARK, HTPQ_LIGHT};
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    let to = match lamp {
+        _ if !leader => return pink(keys::HTPQ_LAMP_LEADER_ONLY),
+        Some(1) => HTPQ_LIGHT,
+        Some(3) => HTPQ_DARK,
+        _ => return pink(keys::HTPQ_LAMP_HIT),
+    };
+    vec![
+        Effect::PortalSound,
+        Effect::EventCommand(EventCommand::MoveTeam(to)),
+    ]
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2142,6 +2166,42 @@ mod tests {
         if crate::get_game_data().is_ok() {
             assert_eq!(named(HTPQ_ENTRY, "st00"), 1);
         }
+    }
+
+    #[test]
+    fn the_lamp_sends_the_leaders_team_to_the_light_or_the_dark() {
+        use crate::events::{EventCommand, HTPQ_DARK, HTPQ_LAMP, HTPQ_LIGHT};
+        let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+        let to = |map| {
+            vec![
+                Effect::PortalSound,
+                Effect::EventCommand(EventCommand::MoveTeam(map)),
+            ]
+        };
+        assert_eq!(htpq_lamp_door(true, Some(1)), to(HTPQ_LIGHT));
+        assert_eq!(htpq_lamp_door(true, Some(3)), to(HTPQ_DARK));
+        for lamp in [Some(0), Some(2), None] {
+            assert_eq!(htpq_lamp_door(true, lamp), pink(keys::HTPQ_LAMP_HIT));
+        }
+        for lamp in [Some(1), Some(3)] {
+            assert_eq!(
+                htpq_lamp_door(false, lamp),
+                pink(keys::HTPQ_LAMP_LEADER_ONLY)
+            );
+        }
+        let Ok(maps) = crate::get_game_data() else {
+            return;
+        };
+        let lamp_room = maps.field(HTPQ_LAMP).unwrap();
+        let door = lamp_room.portal_by_name("east00").unwrap();
+        assert_eq!(door.script.as_deref(), Some(HTPQ_LAMP_DOOR));
+        let lamps: Vec<_> = lamp_room
+            .reactors
+            .iter()
+            .filter(|reactor| reactor.name == HTPQ_LAMP_NAME)
+            .map(|reactor| reactor.reactor_id)
+            .collect();
+        assert_eq!(lamps, [crate::reactors::HTPQ_LAMP]);
     }
 
     #[test]

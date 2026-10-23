@@ -939,6 +939,8 @@ unsourced = [
     "htpq.seal.lifted",
     "htpq.key.sent",
     "htpq.key.appeared",
+    "htpq.lamp.hit",
+    "htpq.lamp.leader_only",
     "tower_rock.none",
     "tower_rock.menu",
     "tower_rock.ask",
