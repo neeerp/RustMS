@@ -20,6 +20,7 @@
 
 #include "UI.h"
 #include "InputFocus.h"
+#include "UiControl.h"
 #include "FamilyActions.h"
 #include "Components/TooltipBox.h"
 
@@ -174,6 +175,7 @@ namespace ms
 		tooltipparent = Tooltip::Parent::NONE;
 		// A shop left by a channel change or a lost connection never closed.
 		Blacklist::live = false;
+		ui_control::state() = {};
 
 		const CharLook &look = Stage::get().get_player().get_look();
 		const Inventory &inventory = Stage::get().get_player().get_inventory();
@@ -363,6 +365,11 @@ namespace ms
 	{
 		dispatch_focused_key(get_focused(), action, pressed, escape, [&]
 		{
+			// A locked UI takes no hotkeys and the player no keys
+			// (FUN_00a07431, FUN_0094c856).
+			if (ui_control::state().locked)
+				return;
+
 			switch (type)
 			{
 				case KeyType::Id::MENU:
@@ -948,6 +955,97 @@ namespace ms
 		};
 
 		window_layer::raise(elementorder, type, is_top);
+	}
+
+	void UIStateGame::lock_hud(bool locked)
+	{
+		if (!locked)
+		{
+			// FUN_00a13220(1) builds the HUD again, fitted to the window as
+			// it is now.
+			for (UIElement::Type type : hidden_hud)
+			{
+				if (auto &element = elements[type])
+				{
+					element->makeactive();
+					element->update_screen(Constants::Constants::get().get_viewwidth(),
+							Constants::Constants::get().get_viewheight());
+				}
+			}
+
+			hidden_hud.clear();
+
+			return;
+		}
+
+		// FUN_00a13220(0): the status bar and the rest of the HUD go, and so
+		// do the windows OPEN_UI opens. Nothing typed, held or dragged in
+		// them outlives them.
+		if (auto chatbar = UI::get().get_element<UIChatBar>())
+			chatbar->toggle_chatfield(false);
+
+		if (auto statusbar = UI::get().get_element<UIStatusBar>())
+			statusbar->remove_menus();
+
+		UI::get().remove_textfield();
+		cancel_drag();
+
+		if (dragged)
+		{
+			dragged->remove_cursor();
+			dragged = nullptr;
+		}
+
+		constexpr UIElement::Type HUD[] = {
+				UIElement::Type::STATUSMESSENGER,
+				UIElement::Type::STATUSBAR,
+				UIElement::Type::CHATBAR,
+				UIElement::Type::MINIMAP,
+				UIElement::Type::BUFFLIST,
+				UIElement::Type::QUESTHELPER,
+				UIElement::Type::QUESTCOMPLETE,
+				UIElement::Type::PARTYHP
+		};
+		constexpr UIElement::Type WINDOWS[] = {
+				UIElement::Type::ITEMINVENTORY,
+				UIElement::Type::EQUIPINVENTORY,
+				UIElement::Type::STATSINFO,
+				UIElement::Type::SKILLBOOK,
+				UIElement::Type::KEYCONFIG,
+				UIElement::Type::QUESTLOG,
+				UIElement::Type::MONSTERBOOK,
+				UIElement::Type::CHARINFO,
+				UIElement::Type::GUILDBBS,
+				UIElement::Type::ENERGYBAR,
+				UIElement::Type::PARTYSEARCH,
+				UIElement::Type::MAKER,
+				UIElement::Type::FAMILY,
+				UIElement::Type::FAMILYTREE
+		};
+
+		for (UIElement::Type type : HUD)
+		{
+			if (auto &element = elements[type])
+			{
+				if (element->is_active())
+				{
+					if (owns_tooltip(type))
+						clear_tooltip(tooltipparent);
+
+					element->deactivate();
+					hidden_hud.push_back(type);
+				}
+			}
+		}
+
+		for (UIElement::Type type : WINDOWS)
+			if (elements[type])
+				remove(type);
+
+		// Nothing walks on with a key held from before, or casts on from a
+		// macro.
+		Stage::get().release_keys();
+		Stage::get().stop_macro();
 	}
 
 	void UIStateGame::remove(UIElement::Type type)

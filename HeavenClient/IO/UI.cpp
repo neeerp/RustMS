@@ -22,6 +22,7 @@
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
+#include "UiControl.h"
 #include "Window.h"
 
 #include "../Character/Inventory/Equip.h"
@@ -515,7 +516,11 @@ namespace ms
 
 			if (!sent)
 			{
-				auto chatbar = UI::get().get_element<UIChatBar>();
+				// A locked UI has no chat bar to open (FUN_00a07431).
+				Optional<UIChatBar> chatbar;
+
+				if (!ui_control::state().locked)
+					chatbar = UI::get().get_element<UIChatBar>();
 
 				if (escape)
 				{
@@ -692,5 +697,16 @@ namespace ms
 	void UI::raise(UIElement::Type type)
 	{
 		state->raise(type);
+	}
+
+	void UI::lock(bool locked)
+	{
+		ui_control::State &control = ui_control::state();
+
+		if (control.locked == locked)
+			return;
+
+		control.locked = locked;
+		state->lock_hud(locked);
 	}
 }

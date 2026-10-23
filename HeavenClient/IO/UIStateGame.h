@@ -100,6 +100,8 @@ namespace ms
 		// Brings type to the front of its window layer (WindowLayer.h).
 		void raise(UIElement::Type type) override;
 
+		void lock_hud(bool locked) override;
+
 		UIElement *get(UIElement::Type type) override;
 
 		UIElement *get_front(std::list<UIElement::Type> types) override;
@@ -110,6 +112,8 @@ namespace ms
 
 	private:
 		const CharStats &stats;
+		// The HUD LOCK_UI hid, to show again on unlock.
+		std::vector<UIElement::Type> hidden_hud;
 
 		bool drop_icon(const Icon &icon, Point<int16_t> pos);
 

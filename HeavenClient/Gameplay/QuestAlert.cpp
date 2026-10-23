@@ -7,6 +7,7 @@
 #include "../Character/QuestCatalog.h"
 #include "../Constants.h"
 #include "../IO/UI.h"
+#include "../IO/UiControl.h"
 #include "../IO/UITypes/UIChatBar.h"
 
 #include <nlnx/nx.hpp>
@@ -106,7 +107,7 @@ namespace ms
 		quest_alert::Bulb before = state.bulb;
 		bool appear_done = before == quest_alert::Bulb::APPEAR && appear.update();
 
-		if (quest_alert::update(state, false, appear_done))
+		if (quest_alert::update(state, ui_control::state().locked, appear_done))
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
 				chatbar->send_chatline(ARRIVED, UIChatBar::LineType::GREY);

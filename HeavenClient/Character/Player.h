@@ -188,6 +188,7 @@ namespace ms
 
 		// The Energy Charge gauge changed.
 		void set_energy(int32_t value);
+		int32_t get_energy() const;
 		// Whether the gauge is full and the player has Energy Charge.
 		bool energy_full() const;
 

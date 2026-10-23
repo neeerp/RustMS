@@ -1433,6 +1433,11 @@ namespace ms
 		return buffs[stat].value;
 	}
 
+	int32_t Player::get_energy() const
+	{
+		return energy;
+	}
+
 	void Player::set_energy(int32_t value)
 	{
 		bool was_full = energy_full();

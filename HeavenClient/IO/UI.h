@@ -164,6 +164,9 @@ namespace ms
 		// Brings an open window to the front of its layer.
 		void raise(UIElement::Type type);
 
+		// LOCK_UI and its unlock (FUN_0095ff5a).
+		void lock(bool locked);
+
 	private:
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;

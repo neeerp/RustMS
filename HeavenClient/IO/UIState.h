@@ -111,6 +111,10 @@ namespace ms
 
 		// Brings an open window to the front of its layer.
 		virtual void raise(UIElement::Type type) {}
+
+		// LOCK_UI: hides the HUD and closes the windows OPEN_UI opens, or
+		// brings the HUD back.
+		virtual void lock_hud(bool locked) {}
 		
 		virtual UIElement* get(UIElement::Type type) = 0;
 
