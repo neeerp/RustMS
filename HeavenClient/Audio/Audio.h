@@ -97,6 +97,9 @@ namespace ms
 			TOMBSTONE,
 			ENCHANTSUCCESS,
 			ENCHANTFAILURE,
+			// What bystanders hear of a Legendary Spirit's result (FUN_0093354d)
+			ENCHANTSUCCESS_DELAY,
+			ENCHANTFAILURE_DELAY,
 			MCARDGET,
 			ITEMLEVELUP,
 			INCEXP,
