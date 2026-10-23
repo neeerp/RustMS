@@ -432,6 +432,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::PERSONALSHOP);
 					types.emplace_back(UIElement::Type::SHOPSELL);
 					types.emplace_back(UIElement::Type::SHOPSALES);
+					types.emplace_back(UIElement::Type::MERCHANTVISITORS);
+					types.emplace_back(UIElement::Type::MERCHANTBLACKLIST);
 					types.emplace_back(UIElement::Type::TELEPORTROCK);
 					types.emplace_back(UIElement::Type::MEGAPHONE);
 					types.emplace_back(UIElement::Type::MAPLETV);
@@ -474,6 +476,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
 					types.emplace_back(UIElement::Type::INCUBATOR);
 					types.emplace_back(UIElement::Type::INVITATION);
+					types.emplace_back(UIElement::Type::MERCHANTVISITORS);
+					types.emplace_back(UIElement::Type::MERCHANTBLACKLIST);
 					types.emplace_back(UIElement::Type::PETCHOOSER);
 					types.emplace_back(UIElement::Type::APRESET);
 					types.emplace_back(UIElement::Type::SPRESET);

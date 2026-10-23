@@ -10,6 +10,7 @@
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Texture.h"
 #include "../../Net/Handlers/PersonalShop.h"
+#include "../../Template/Rectangle.h"
 
 #include <array>
 #include <chrono>
@@ -83,6 +84,10 @@ namespace ms
 		// The owner took the merchant's mesos (mode 0x2c).
 		void meso_taken();
 
+		// The owner's list `list` (MERCHANTVISITORS or MERCHANTBLACKLIST)
+		// opened or closed: its button is off while it shows.
+		void list_shown(UIElement::Type list, bool shown);
+
 		// Someone bought from my shop (mode 0x1a).
 		void sold(const personal_shop::SoldNotice &notice);
 
@@ -105,9 +110,16 @@ namespace ms
 
 		uint8_t get_own_slot() const;
 
-		// Sets up a shop with the permit in cash slot `slot`
-		// (FUN_00a1dd99): one room at a time, in the free market.
-		static void create(int16_t slot, int32_t itemid);
+		// Sets up a shop, or a hired merchant, with the permit in cash slot
+		// `slot` (FUN_00a1dd99): one room at a time, in the free market.
+		static void create(int16_t slot, int32_t itemid, bool merchant = false);
+
+		// Asks the server whether the hired merchant permit in cash slot
+		// `slot` may be used (0xa27b7d); it answers with recv 50.
+		static void hire(int16_t slot, int32_t itemid, int64_t cash_id);
+
+		// The server's yes: the permit asked about sets up the merchant.
+		static void hire_approved();
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -175,7 +187,9 @@ namespace ms
 			// A hired merchant's owner's (0x6fa4b2)
 			RESUME,
 			ARRANGE,
-			COIN
+			COIN,
+			BLACKLIST,
+			VISITORS
 		};
 
 		struct Member
@@ -342,5 +356,122 @@ namespace ms
 		Text received;
 		int16_t first_row;
 		Slider slider;
+	};
+
+	// A hired merchant owner's list of names (0x51a1ec, 0x519781): a plain
+	// window centred on the screen whose rows are clicked to select one.
+	// OK, Enter and Esc close it and send nothing.
+	class UIMerchantList : public UIElement
+	{
+	public:
+		void draw(float inter) const override;
+
+		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
+
+		void remove_cursor() override;
+
+		void send_key(int32_t keycode, bool pressed, bool escape) override;
+
+	protected:
+		UIMerchantList(const std::string &background, int16_t detail_x);
+
+		// Where row `index` is, inside the window; the right and bottom
+		// edges are outside it.
+		virtual Rectangle<int16_t> cell(size_t index) const = 0;
+
+		virtual size_t capacity() const = 0;
+
+		// The buttons that follow the selection and the count.
+		virtual void refresh_buttons() = 0;
+
+		bool has_selection() const;
+
+		// Closes the list, giving the shop its button back.
+		void close();
+
+		void add_row(const std::string &name, const std::string &detail = "");
+
+		void remove_selected();
+
+		struct Row
+		{
+			std::string name;
+			Text name_text;
+			Text detail;
+		};
+
+		std::vector<Row> rows;
+		int16_t selected;
+
+	private:
+		void select(int16_t index);
+
+		Texture backgrnd;
+		// Where a row's detail (a visit's time) starts after its name.
+		int16_t detail_x;
+		bool mouse_down = false;
+	};
+
+	// Who visited the store, and how long ago (0x51a1ec).
+	class UIMerchantVisitors : public UIMerchantList
+	{
+	public:
+		static constexpr Type TYPE = UIElement::Type::MERCHANTVISITORS;
+		static constexpr bool FOCUSED = false;
+		static constexpr bool TOGGLED = false;
+
+		UIMerchantVisitors(const std::vector<hired_merchant::Visitor> &visitors);
+
+		UIElement::Type get_type() const override;
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
+
+		Rectangle<int16_t> cell(size_t index) const override;
+
+		size_t capacity() const override;
+
+		void refresh_buttons() override;
+
+	private:
+		enum Buttons : uint16_t
+		{
+			SAVE_NAME,
+			OK
+		};
+	};
+
+	// The names turned away from the store (0x519781). Adding and deleting
+	// tell the server at once, which doesn't answer.
+	class UIMerchantBlacklist : public UIMerchantList
+	{
+	public:
+		static constexpr Type TYPE = UIElement::Type::MERCHANTBLACKLIST;
+		static constexpr bool FOCUSED = false;
+		static constexpr bool TOGGLED = false;
+
+		UIMerchantBlacklist(const std::vector<std::string> &names);
+
+		UIElement::Type get_type() const override;
+
+		// Adds a typed name if it may be (0x519bac).
+		void add(const std::string &typed);
+
+	protected:
+		Button::State button_pressed(uint16_t buttonid) override;
+
+		Rectangle<int16_t> cell(size_t index) const override;
+
+		size_t capacity() const override;
+
+		void refresh_buttons() override;
+
+	private:
+		enum Buttons : uint16_t
+		{
+			ADD,
+			REMOVE,
+			OK
+		};
 	};
 }

@@ -93,6 +93,7 @@ namespace ms
 			NPC_TALK_MORE = 60,
 			NPC_SHOP_ACTION = 61,
 			TRUNK_REQUEST = 62,
+			ENTRUSTED_SHOP_REQUEST = 63,
 			DUEY_ACTION = 65,
 			OWL_OPEN = 66,
 			OWL_GO = 67,

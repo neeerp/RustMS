@@ -929,6 +929,8 @@ namespace ms
 				case UIElement::Type::PERSONALSHOP:
 				case UIElement::Type::SHOPSELL:
 				case UIElement::Type::SHOPSALES:
+				case UIElement::Type::MERCHANTVISITORS:
+				case UIElement::Type::MERCHANTBLACKLIST:
 					return true;
 				default:
 					return false;

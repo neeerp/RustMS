@@ -188,16 +188,19 @@ namespace ms
 		}
 	};
 
-	// Opens a personal shop (type 4) with a permit from the cash tab (v83
-	// FUN_00a1dd99). The shop stays closed to visitors until it opens.
+	// Opens a personal shop (type 4) or a hired merchant (type 5) with a
+	// permit from the cash tab (v83 FUN_00a1dd99). The shop stays closed to
+	// visitors until it opens.
 	class ShopCreatePacket : public MiniRoomPacket
 	{
 	public:
 		static constexpr int8_t PERSONAL_SHOP = 4;
+		static constexpr int8_t HIRED_MERCHANT = 5;
 
-		ShopCreatePacket(const std::string &title, int16_t permit_slot, int32_t permit_id) : MiniRoomPacket(Mode::CREATE)
+		ShopCreatePacket(const std::string &title, int16_t permit_slot, int32_t permit_id, bool merchant)
+			: MiniRoomPacket(Mode::CREATE)
 		{
-			write_byte(PERSONAL_SHOP);
+			write_byte(merchant ? HIRED_MERCHANT : PERSONAL_SHOP);
 			write_string(title);
 			write_byte(0);
 			write_short(permit_slot);
@@ -298,5 +301,34 @@ namespace ms
 		};
 
 		MerchantPacket(Request request) : MiniRoomPacket(static_cast<Mode>(request)) {}
+	};
+
+	// Adds a name to my merchant's blacklist, or takes one off (0x519611,
+	// 0x519695).
+	class MerchantBlacklistPacket : public MiniRoomPacket
+	{
+	public:
+		MerchantBlacklistPacket(bool add, const std::string &name)
+			: MiniRoomPacket(static_cast<Mode>(add ? BLACKLIST_ADD : BLACKLIST_REMOVE))
+		{
+			write_string(name);
+		}
+
+	private:
+		static constexpr int8_t BLACKLIST_ADD = 0x30;
+		static constexpr int8_t BLACKLIST_REMOVE = 0x31;
+	};
+
+	// Asks whether a hired merchant permit may be used (0xa27d17); the
+	// server answers with ENTRUSTED_SHOP_CHECK_RESULT.
+	// Opcode: ENTRUSTED_SHOP_REQUEST(63)
+	class EntrustedShopRequestPacket : public OutPacket
+	{
+	public:
+		EntrustedShopRequestPacket(int64_t cash_id) : OutPacket(OutPacket::Opcode::ENTRUSTED_SHOP_REQUEST)
+		{
+			write_byte(0);
+			write_long(cash_id);
+		}
 	};
 }

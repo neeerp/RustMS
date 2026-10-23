@@ -3,7 +3,10 @@
 #include "MiniRoom.h"
 
 #include "../../IO/UITypes/EnterNumber.h"
+#include "../../Util/CharacterName.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -315,6 +318,161 @@ namespace ms
 	// 0x517eca, which builds on the personal shop's).
 	namespace hired_merchant
 	{
+		// Hired merchant permits, the 503 items, ask the server first
+		// (0xa27b7d), and only for characters over level 15.
+		inline bool is_permit(int32_t itemid)
+		{
+			return itemid / 10000 == 503;
+		}
+
+		constexpr uint16_t MIN_LEVEL = 15;
+
+		// The answers of ENTRUSTED_SHOP_CHECK_RESULT (0xa27d75) with more
+		// to them than a notice.
+		enum Check : int8_t
+		{
+			CHECK_OK = 7,
+			OPEN_ELSEWHERE = 8,
+			UNKNOWN_INT = 0xd,
+			RENAMED = 0xe,
+			MESSAGE = 0x12
+		};
+
+		// The notice of an answer, or nothing.
+		inline std::string check_text(int8_t code)
+		{
+			switch (code)
+			{
+			case 9:
+				return "Please use this after retrieving items\\n from Fredrick of Free Market.";
+			case 0xa:
+				return "Another character is currently using the item.\\nPlease log on as a different character and close\\n"
+					"the store, or empty out the Store Bank.";
+			case 0xb:
+				return "You are currently unable to open the store.";
+			case 0xf:
+				return "Please retrieve your items from Fredrick.";
+			default:
+				return "";
+			}
+		}
+
+		// A store already open: the channel's name, and the Free Market
+		// room that the map id ends in.
+		inline std::string open_elsewhere_text(const std::string &channel, int32_t mapid)
+		{
+			return "Your store is currently open\\nin Channel " + channel + ", Free Market " + std::to_string(mapid % 100) +
+				".\\nPlease use this after closing the store.";
+		}
+
+		// A GM renaming a store.
+		inline std::string rename_text(bool renamed)
+		{
+			return renamed ? "Renaming Successful." : "Renaming Failed - Can't find the Hired Merchant.";
+		}
+
+		// Fredrick's contract (0xa1dff8), shown in an NPC dialog once the
+		// store has a name.
+		constexpr int32_t FREDRICK = 9030000;
+
+		const std::string CONTRACT = "Hello. I'm Fredrick, the Union Chief of the Hired Merchant Union. The way to use Hired Merchants "
+			"is really not that different from using a regular store, so you need not worry. There are a few things you'll need "
+			"to be aware of, however, so please read this contract of agreement VERY carefully before hiring the Merchants.\r\n\r\n"
+			"Hired Merchant Contract\r\n"
+			"1) According to the points stated below, Hired Merchants disappear after storing your items and mesos at the Store Bank.\r\n"
+			"  - If the Hired Merchant works at the same spot for more than #r24 Hours#k straight, #rthe Hired Merchant's contract "
+			"will expire, and the Merchant will disappear.#k\r\n"
+			"  - #rIf the inventory is full#k, the Hired Merchant will be removed from its post (executes after 1st warning)\r\n"
+			"2) After Hired Merchant disappears, you'll need to see #rFredrick#k, who's at the Free Market Entrance, and retrieve "
+			"your items and mesos.\r\n"
+			"3) You will not be able to hire Merchants until you have retrieved all of your mesos and items.\r\n"
+			"4) A 1% storing fee of the total sales and original price of the item will be charged daily to the user storing "
+			"the mesos and items at the Store Bank past #r24 hours#k.\r\n"
+			"5) Once the storing fee exceeds 100%, the mesos and items stored will be donated to the Free Market Fund.\r\n"
+			"6) GM's hold the right to change the name of the store without notice if it contains vulgar, inappropriate language.\r\n"
+			"7) Players can have only one Hired Merchant set up at a time.";
+
+		// The owner's list of visitors (mode 0x2e): who came in, and how
+		// many milliseconds ago.
+		struct Visitor
+		{
+			std::string name;
+			uint32_t ms;
+		};
+
+		inline std::vector<Visitor> read_visitors(InPacket &recv)
+		{
+			std::vector<Visitor> visitors(static_cast<uint16_t>(recv.read_short()));
+
+			for (Visitor &visitor : visitors)
+			{
+				visitor.name = recv.read_string();
+				visitor.ms = static_cast<uint32_t>(recv.read_int());
+			}
+
+			return visitors;
+		}
+
+		// The list shows ten (0x51a8b3).
+		constexpr size_t VISITOR_ROWS = 10;
+
+		// " 1hrs 5min" (0x51a565).
+		inline std::string visit_time_text(uint32_t ms)
+		{
+			return " " + std::to_string(ms / 3600000) + "hrs " + std::to_string(ms % 3600000 / 60000) + "min";
+		}
+
+		// The owner's blacklist (mode 0x2f).
+		inline std::vector<std::string> read_blacklist(InPacket &recv)
+		{
+			std::vector<std::string> names(static_cast<uint16_t>(recv.read_short()));
+
+			for (std::string &name : names)
+				name = recv.read_string();
+
+			return names;
+		}
+
+		constexpr size_t BLACKLIST_MAX = 20;
+		// The longest name the add prompt takes.
+		constexpr size_t BLACKLIST_NAME_MAX = 12;
+
+		inline std::string trimmed(const std::string &text)
+		{
+			size_t first = text.find_first_not_of(' ');
+
+			if (first == std::string::npos)
+				return "";
+
+			return text.substr(first, text.find_last_not_of(' ') - first + 1);
+		}
+
+		// Why a typed name can't be added (0x519bac), in v83's order, or
+		// nothing. The client only checks how the name is spelled; myself
+		// matches exactly, a listed name in any case.
+		inline std::string blacklist_problem(const std::string &name, const std::string &own,
+			const std::vector<std::string> &listed)
+		{
+			if (!character_name_valid(name))
+				return "This character name does not exist\\nPlease check again";
+
+			if (name == own)
+				return "You may not enter yourself in the Blacklist";
+
+			auto lower = [](std::string text)
+			{
+				std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return std::tolower(c); });
+
+				return text;
+			};
+
+			for (const std::string &other : listed)
+				if (lower(other) == lower(name))
+					return "This name has already been registered\\nPlease check again";
+
+			return "";
+		}
+
 		// Why the merchant closed on us (0x518d5f), and whether the window
 		// goes; v83 keeps it open, with an empty notice, for anything else.
 		struct Leave

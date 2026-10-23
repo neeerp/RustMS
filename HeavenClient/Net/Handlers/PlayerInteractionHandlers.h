@@ -41,4 +41,11 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// Whether the hired merchant permit asked about may be used (0xa27d75).
+	// Opcode: ENTRUSTED_SHOP_CHECK_RESULT(50)
+	class EntrustedShopCheckResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

@@ -3,12 +3,15 @@
 #include "UICharInfo.h"
 #include "UIChatBar.h"
 #include "UIItemInventory.h"
+#include "UINpcTalk.h"
 #include "UINotice.h"
 
 #include "../UI.h"
+#include "../Window.h"
 
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
+#include "../../Audio/Audio.h"
 
 #include "../../Character/ExclRequest.h"
 #include "../../Character/Inventory/ItemProperties.h"
@@ -17,6 +20,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/Geometry.h"
+#include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MiniRoomPackets.h"
 #include "../../Net/Packets/PlayerInteractionPackets.h"
 #include "../../Util/Misc.h"
@@ -108,6 +112,8 @@ namespace ms
 		// A hired merchant's owner's buttons and countdown (0x6fa4b2, 0x518314).
 		constexpr Point<int16_t> BT_ARRANGE = Point<int16_t>(144, 42);
 		constexpr Point<int16_t> BT_COIN = Point<int16_t>(114, 135);
+		constexpr Point<int16_t> BT_BLACKLIST = Point<int16_t>(236, 345);
+		constexpr Point<int16_t> BT_VISITORS = Point<int16_t>(306, 345);
 		constexpr Point<int16_t> COUNTDOWN = Point<int16_t>(380, 11);
 		constexpr Point<int16_t> COUNTDOWN_BOX = Point<int16_t>(130, 12);
 
@@ -126,6 +132,10 @@ namespace ms
 		{
 			UI::get().emplace<UIOk>(text, [](bool) {});
 		}
+
+		// The slot and id of the hired merchant permit the server was asked
+		// about (0xa27d17).
+		std::pair<int16_t, int32_t> hiring;
 	}
 
 	UIPersonalShop::UIPersonalShop(const mini_room::Enter &enter) : UIDragElement<PosPERSONALSHOP>(),
@@ -179,6 +189,17 @@ namespace ms
 
 			buttons[Buttons::BUY] = std::make_unique<MapleButton>(PersonalShop["BtBuy"], BT_MIDDLE);
 			buttons[Buttons::EXIT] = std::make_unique<MapleButton>(PersonalShop["BtExit"], BT_BOTTOM);
+		}
+
+		// A merchant's lists, which only its owner may ask for (0x518c50).
+		if (merchant)
+		{
+			buttons[Buttons::BLACKLIST] = std::make_unique<MapleButton>(PersonalShop["BtBlackList"], BT_BLACKLIST);
+			buttons[Buttons::VISITORS] = std::make_unique<MapleButton>(PersonalShop["BtVisit"], BT_VISITORS);
+
+			if (!is_owner())
+				for (uint16_t id : { Buttons::BLACKLIST, Buttons::VISITORS })
+					buttons[id]->set_state(Button::State::DISABLED);
 		}
 
 		buttons[Buttons::ENTER] = std::make_unique<MapleButton>(PersonalShop["BtEnter"], BT_ENTER);
@@ -596,6 +617,14 @@ namespace ms
 		merchant_meso = 0;
 	}
 
+	void UIPersonalShop::list_shown(UIElement::Type list, bool shown)
+	{
+		uint16_t id = list == UIElement::Type::MERCHANTBLACKLIST ? Buttons::BLACKLIST : Buttons::VISITORS;
+
+		if (merchant && is_owner())
+			buttons[id]->set_state(shown ? Button::State::DISABLED : Button::State::NORMAL);
+	}
+
 	void UIPersonalShop::leave(int8_t reason)
 	{
 		// A merchant's reasons, some of which keep the window (0x518d5f).
@@ -630,7 +659,8 @@ namespace ms
 		input.set_state(Textfield::State::NORMAL);
 		input.change_text("");
 
-		for (UIElement::Type type : { UIElement::Type::SHOPSELL, UIElement::Type::SHOPSALES })
+		for (UIElement::Type type : { UIElement::Type::SHOPSELL, UIElement::Type::SHOPSALES, UIElement::Type::MERCHANTVISITORS,
+				UIElement::Type::MERCHANTBLACKLIST })
 			UI::get().remove(type);
 
 		deactivate();
@@ -701,7 +731,7 @@ namespace ms
 		return own_slot;
 	}
 
-	void UIPersonalShop::create(int16_t slot, int32_t itemid)
+	void UIPersonalShop::create(int16_t slot, int32_t itemid, bool merchant)
 	{
 		// Not on a mount, then not while transformed or a ghost (FUN_00a1dd99).
 		Player &player = Stage::get().get_player();
@@ -726,17 +756,76 @@ namespace ms
 
 		UI::get().emplace<UIEnterText>(
 				"Please enter the name of the store.\\n\\nIf you move before you open the store,\\n the store may not be opened.",
-				[slot, itemid](const std::string &title)
+				[slot, itemid, merchant](const std::string &title)
 				{
 					if (title.empty())
 						return;
 
 					// v83 (FUN_00a1dd99) opens the store with curse words
 					// starred out rather than refusing the name.
-					ShopCreatePacket(CurseData::filter(title), slot, itemid).dispatch();
+					auto send = [name = CurseData::filter(title), slot, itemid, merchant]()
+					{
+						ShopCreatePacket(name, slot, itemid, merchant).dispatch();
+						Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+					};
+
+					if (!merchant)
+					{
+						send();
+
+						return;
+					}
+
+					// Fredrick's contract comes first, and closing it any way
+					// sets the merchant up (0xa1e0a5).
+					UI::get().emplace<UINpcTalk>();
+					UI::get().enable();
+
+					if (auto talk = UI::get().get_element<UINpcTalk>())
+					{
+						talk->change_text(hired_merchant::FREDRICK, UINpcTalk::SENDOK, 0, 0, hired_merchant::CONTRACT);
+						talk->set_local_responder([send](int8_t, int32_t) { send(); });
+					}
 				},
 				50
 		);
+	}
+
+	void UIPersonalShop::hire(int16_t slot, int32_t itemid, int64_t cash_id)
+	{
+		Player &player = Stage::get().get_player();
+
+		if (!Stage::get().get_mapinfo().allows_personal_shop())
+		{
+			notice("The personal store can only be built\\nat the free market available at main towns.");
+
+			return;
+		}
+
+		if (!player.get_phobj().onground)
+		{
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline("You may not open the store while jumping.", UIChatBar::LineType::SKILL);
+
+			return;
+		}
+
+		// v83 also refuses near a portal (712be4); the server checks that.
+		if (player.get_level() <= hired_merchant::MIN_LEVEL)
+		{
+			notice("Hired Merchant's Shop is only available for \\ncharacters that are over Level 15.");
+
+			return;
+		}
+
+		hiring = { slot, itemid };
+
+		EntrustedShopRequestPacket(cash_id).dispatch();
+	}
+
+	void UIPersonalShop::hire_approved()
+	{
+		create(hiring.first, hiring.second, true);
 	}
 
 	Button::State UIPersonalShop::button_pressed(uint16_t buttonid)
@@ -798,6 +887,17 @@ namespace ms
 				// Only with mesos to take (0x51930f).
 				if (merchant_meso != 0)
 					MerchantPacket(MerchantPacket::Request::TAKE_MESO).dispatch();
+
+				break;
+			case Buttons::BLACKLIST:
+				// The server answers with the list (0x519382).
+				if (auto list = UI::get().get_element<UIMerchantBlacklist>(); !list || !list->is_active())
+					MerchantPacket(MerchantPacket::Request::BLACKLIST).dispatch();
+
+				break;
+			case Buttons::VISITORS:
+				if (auto list = UI::get().get_element<UIMerchantVisitors>(); !list || !list->is_active())
+					MerchantPacket(MerchantPacket::Request::VISITORS).dispatch();
 
 				break;
 			case Buttons::INFO:
@@ -1481,5 +1581,299 @@ namespace ms
 		auto count = static_cast<int16_t>(records.size());
 
 		return count < SALES_ROWS ? SALES_ROWS : count + 2;
+	}
+
+	namespace
+	{
+		// The owner's lists (0x51a1ec, 0x519781): rows of 18 from y 51, lit
+		// behind when selected, and the buttons along the bottom.
+		constexpr int16_t LIST_TOP = 51;
+		constexpr int16_t LIST_PITCH = 18;
+		constexpr Point<int16_t> LIST_TEXT = Point<int16_t>(3, 4);
+		constexpr Color LIST_SELECTED = Color(0x244768FFu);
+
+		constexpr int16_t VISITOR_X = 7;
+		constexpr int16_t VISITOR_WIDTH = 189;
+		constexpr int16_t VISIT_TIME_X = 125;
+		constexpr Point<int16_t> BT_SAVE_NAME = Point<int16_t>(4, 245);
+		constexpr Point<int16_t> BT_VISITORS_OK = Point<int16_t>(163, 245);
+
+		constexpr int16_t BLACKLIST_LEFT_X = 7;
+		constexpr int16_t BLACKLIST_RIGHT_X = 135;
+		constexpr int16_t BLACKLIST_WIDTH = 124;
+		constexpr Point<int16_t> BT_ADD = Point<int16_t>(5, 245);
+		constexpr Point<int16_t> BT_DELETE = Point<int16_t>(42, 245);
+		constexpr Point<int16_t> BT_BLACKLIST_OK = Point<int16_t>(227, 245);
+
+		const std::string BLACKLIST_PROMPT = "Please enter the name of the character you'd like to add to the Blacklist.";
+	}
+
+	UIMerchantList::UIMerchantList(const std::string &background, int16_t x) : UIElement(), selected(-1), detail_x(x)
+	{
+		backgrnd = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"][background];
+
+		dimension = backgrnd.get_dimensions();
+		position = centred(dimension);
+	}
+
+	void UIMerchantList::draw(float inter) const
+	{
+		backgrnd.draw(position);
+
+		for (size_t index = 0; index < rows.size() && index < capacity(); index++)
+		{
+			Rectangle<int16_t> area = cell(index);
+			Point<int16_t> origin = position + Point<int16_t>(area.left(), area.top());
+
+			if (static_cast<int16_t>(index) == selected)
+				GraphicsGL::get().drawrectangle(origin.x(), origin.y(), area.width(), area.height(),
+						LIST_SELECTED.r(), LIST_SELECTED.g(), LIST_SELECTED.b(), LIST_SELECTED.a());
+
+			rows[index].name_text.draw(origin + LIST_TEXT + TEXT_Y);
+			rows[index].detail.draw(origin + Point<int16_t>(detail_x, LIST_TEXT.y()) + TEXT_Y);
+		}
+
+		UIElement::draw(inter);
+	}
+
+	Cursor::State UIMerchantList::send_cursor(bool clicked, Point<int16_t> cursorpos)
+	{
+		bool released = !clicked && mouse_down;
+		mouse_down = clicked;
+
+		Cursor::State state = UIElement::send_cursor(clicked, cursorpos);
+
+		// The button coming up on a row selects it, and off the rows selects
+		// none; the buttons take theirs first.
+		if (released && !is_holding_button())
+		{
+			Point<int16_t> at = cursorpos - position;
+			int16_t index = -1;
+
+			for (size_t k = 0; k < capacity(); k++)
+			{
+				Rectangle<int16_t> area = cell(k);
+
+				if (at.x() >= area.left() && at.x() < area.right() && at.y() >= area.top() && at.y() < area.bottom())
+					index = static_cast<int16_t>(k);
+			}
+
+			select(index < static_cast<int16_t>(rows.size()) ? index : -1);
+		}
+
+		return state;
+	}
+
+	void UIMerchantList::remove_cursor()
+	{
+		UIElement::remove_cursor();
+
+		mouse_down = false;
+	}
+
+	void UIMerchantList::send_key(int32_t keycode, bool pressed, bool escape)
+	{
+		if (pressed && (escape || keycode == KeyAction::Id::RETURN))
+			close();
+	}
+
+	bool UIMerchantList::has_selection() const
+	{
+		return selected >= 0 && static_cast<size_t>(selected) < rows.size();
+	}
+
+	void UIMerchantList::close()
+	{
+		deactivate();
+
+		if (auto shop = UI::get().get_element<UIPersonalShop>())
+			shop->list_shown(get_type(), false);
+	}
+
+	void UIMerchantList::add_row(const std::string &name, const std::string &detail)
+	{
+		Row row;
+		row.name = name;
+		row.name_text = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, name);
+		row.detail = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, detail);
+
+		rows.push_back(row);
+		select(selected);
+	}
+
+	void UIMerchantList::remove_selected()
+	{
+		if (!has_selection())
+			return;
+
+		rows.erase(rows.begin() + selected);
+
+		// The selection stays where it was, on the next name if there is one
+		// (0x519695).
+		select(selected);
+	}
+
+	void UIMerchantList::select(int16_t index)
+	{
+		selected = index;
+
+		for (size_t k = 0; k < rows.size(); k++)
+		{
+			Color::Name color = static_cast<int16_t>(k) == selected ? Color::Name::WHITE : Color::Name::BLACK;
+
+			rows[k].name_text.change_color(color);
+			rows[k].detail.change_color(color);
+		}
+
+		refresh_buttons();
+	}
+
+	UIMerchantVisitors::UIMerchantVisitors(const std::vector<hired_merchant::Visitor> &visitors)
+			: UIMerchantList("backgrnd4", VISIT_TIME_X)
+	{
+		nl::node PersonalShop = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"];
+
+		buttons[Buttons::SAVE_NAME] = std::make_unique<MapleButton>(PersonalShop["BtSaveName"], BT_SAVE_NAME);
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(PersonalShop["BtOK"], BT_VISITORS_OK);
+
+		for (const hired_merchant::Visitor &visitor : visitors)
+			add_row(visitor.name, hired_merchant::visit_time_text(visitor.ms));
+
+		refresh_buttons();
+	}
+
+	UIElement::Type UIMerchantVisitors::get_type() const
+	{
+		return TYPE;
+	}
+
+	Button::State UIMerchantVisitors::button_pressed(uint16_t buttonid)
+	{
+		// Save Name copies the name to the clipboard and tells no one.
+		if (buttonid == Buttons::SAVE_NAME)
+		{
+			if (has_selection())
+				Window::get().setclipboard(rows[selected].name);
+
+			return Button::State::NORMAL;
+		}
+
+		close();
+
+		return Button::State::NORMAL;
+	}
+
+	Rectangle<int16_t> UIMerchantVisitors::cell(size_t index) const
+	{
+		auto top = static_cast<int16_t>(LIST_TOP + LIST_PITCH * index);
+
+		return Rectangle<int16_t>(VISITOR_X, VISITOR_X + VISITOR_WIDTH, top, top + LIST_PITCH);
+	}
+
+	size_t UIMerchantVisitors::capacity() const
+	{
+		return hired_merchant::VISITOR_ROWS;
+	}
+
+	void UIMerchantVisitors::refresh_buttons()
+	{
+		if (buttons.count(Buttons::SAVE_NAME))
+			buttons[Buttons::SAVE_NAME]->set_state(has_selection() ? Button::State::NORMAL : Button::State::DISABLED);
+	}
+
+	UIMerchantBlacklist::UIMerchantBlacklist(const std::vector<std::string> &names) : UIMerchantList("backgrnd5", 0)
+	{
+		nl::node PersonalShop = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"];
+
+		buttons[Buttons::ADD] = std::make_unique<MapleButton>(PersonalShop["BtAdd"], BT_ADD);
+		buttons[Buttons::REMOVE] = std::make_unique<MapleButton>(PersonalShop["BtDelete"], BT_DELETE);
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(PersonalShop["BtOK"], BT_BLACKLIST_OK);
+
+		for (const std::string &name : names)
+			add_row(name);
+
+		refresh_buttons();
+	}
+
+	UIElement::Type UIMerchantBlacklist::get_type() const
+	{
+		return TYPE;
+	}
+
+	void UIMerchantBlacklist::add(const std::string &typed)
+	{
+		if (rows.size() >= capacity())
+			return;
+
+		std::string name = hired_merchant::trimmed(typed);
+		std::vector<std::string> listed;
+
+		for (const Row &row : rows)
+			listed.push_back(row.name);
+
+		std::string problem = hired_merchant::blacklist_problem(name, Stage::get().get_player().get_name(), listed);
+
+		if (!problem.empty())
+		{
+			notice(problem);
+
+			return;
+		}
+
+		add_row(name);
+		MerchantBlacklistPacket(true, name).dispatch();
+	}
+
+	Button::State UIMerchantBlacklist::button_pressed(uint16_t buttonid)
+	{
+		switch (buttonid)
+		{
+			case Buttons::ADD:
+				// Cancelling the prompt does nothing.
+				UI::get().emplace<UIEnterText>(
+						BLACKLIST_PROMPT,
+						[](const std::string &text)
+						{
+							if (auto list = UI::get().get_element<UIMerchantBlacklist>(); list && list->is_active())
+								list->add(text);
+						},
+						hired_merchant::BLACKLIST_NAME_MAX
+				);
+				break;
+			case Buttons::REMOVE:
+				if (has_selection())
+				{
+					MerchantBlacklistPacket(false, rows[selected].name).dispatch();
+					remove_selected();
+				}
+				break;
+			default:
+				close();
+				break;
+		}
+
+		return buttons[buttonid]->get_state() == Button::State::DISABLED ? Button::State::DISABLED : Button::State::NORMAL;
+	}
+
+	Rectangle<int16_t> UIMerchantBlacklist::cell(size_t index) const
+	{
+		int16_t left = index % 2 == 0 ? BLACKLIST_LEFT_X : BLACKLIST_RIGHT_X;
+		auto top = static_cast<int16_t>(LIST_TOP + LIST_PITCH * (index / 2));
+
+		return Rectangle<int16_t>(left, left + BLACKLIST_WIDTH, top, top + LIST_PITCH);
+	}
+
+	size_t UIMerchantBlacklist::capacity() const
+	{
+		return hired_merchant::BLACKLIST_MAX;
+	}
+
+	void UIMerchantBlacklist::refresh_buttons()
+	{
+		if (buttons.count(Buttons::ADD))
+			buttons[Buttons::ADD]->set_state(rows.size() < capacity() ? Button::State::NORMAL : Button::State::DISABLED);
+
+		if (buttons.count(Buttons::REMOVE))
+			buttons[Buttons::REMOVE]->set_state(has_selection() ? Button::State::NORMAL : Button::State::DISABLED);
 	}
 }
