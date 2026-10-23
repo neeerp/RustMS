@@ -105,6 +105,12 @@ namespace ms
 			Color::Name::PRICEORANGE, Color::Name::PRICEPINK, Color::Name::PRICEPLUM
 		};
 
+		// A hired merchant's owner's buttons and countdown (0x6fa4b2, 0x518314).
+		constexpr Point<int16_t> BT_ARRANGE = Point<int16_t>(144, 42);
+		constexpr Point<int16_t> BT_COIN = Point<int16_t>(114, 135);
+		constexpr Point<int16_t> COUNTDOWN = Point<int16_t>(380, 11);
+		constexpr Point<int16_t> COUNTDOWN_BOX = Point<int16_t>(130, 12);
+
 		const std::string FULL = "You can't sell it anymore.";
 		const std::string TOO_PRICEY = "The total price for the items exceeded\\nthe maximum amount of mesos that can be sold.";
 
@@ -123,7 +129,8 @@ namespace ms
 	}
 
 	UIPersonalShop::UIPersonalShop(const mini_room::Enter &enter) : UIDragElement<PosPERSONALSHOP>(),
-			own_slot(enter.own_slot < SEATS ? enter.own_slot : OWNER), max_items(enter.max_items), open(own_slot != OWNER), selected(-1),
+			own_slot(enter.own_slot < SEATS ? enter.own_slot : OWNER), merchant(enter.type == mini_room::HIRED_MERCHANT), merchant_meso(enter.meso), open_ms(enter.open_ms),
+			entered(std::chrono::steady_clock::now()), max_items(enter.max_items), selected(-1),
 			first_row(0), log_rows(0), log_row(0)
 	{
 		nl::node PersonalShop = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"];
@@ -132,15 +139,33 @@ namespace ms
 		backgrnd = PersonalShop["backgrnd6"];
 		select = PersonalShop["select"];
 
+		// Visitors only ever see an open shop; a merchant's owner comes back
+		// to one open unless it is still being set up (0x518b0a).
+		open = !is_owner() || (merchant && !enter.setup);
+
 		// Each side gets only its own buttons (FUN_006fc46b).
 		if (is_owner())
 		{
 			buttons[Buttons::ITEM] = std::make_unique<MapleButton>(PersonalShop["BtItem"], BT_TOP);
-			buttons[Buttons::START] = std::make_unique<MapleButton>(PersonalShop["BtStart"], BT_MIDDLE);
 			buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(PersonalShop["BtClose"], BT_BOTTOM);
 
-			// A ban button shows over each visitor while they stay.
-			for (uint8_t slot = 1; slot < SEATS; slot++)
+			// A merchant's owner in maintenance reopens it instead (0x518b0a).
+			if (open)
+				buttons[Buttons::RESUME] = std::make_unique<MapleButton>(PersonalShop["BtExit"], BT_MIDDLE);
+			else
+				buttons[Buttons::START] = std::make_unique<MapleButton>(PersonalShop["BtStart"], BT_MIDDLE);
+
+			if (merchant)
+			{
+				nl::node EntrustedShop = NxFiles::ui_classic["UIWindow.img"]["EntrustedShop"];
+
+				buttons[Buttons::ARRANGE] = std::make_unique<MapleButton>(EntrustedShop["BtArrange"], BT_ARRANGE);
+				buttons[Buttons::COIN] = std::make_unique<MapleButton>(EntrustedShop["BtCoin"], BT_COIN);
+			}
+
+			// A ban button shows over each visitor while they stay, though
+			// not in a merchant (0x518873).
+			for (uint8_t slot = 1; slot < SEATS && !merchant; slot++)
 			{
 				uint16_t id = Buttons::BAN1 + slot - 1;
 				buttons[id] = std::make_unique<MapleButton>(PersonalShop["BtBan"], Point<int16_t>(seat_x(slot) + 30, BT_BAN_Y));
@@ -148,7 +173,10 @@ namespace ms
 			}
 		} else
 		{
-			buttons[Buttons::INFO] = std::make_unique<MapleButton>(PersonalShop["BtInfo"], BT_TOP);
+			// A merchant's visitors can't look its owner up (0x518873).
+			if (!merchant)
+				buttons[Buttons::INFO] = std::make_unique<MapleButton>(PersonalShop["BtInfo"], BT_TOP);
+
 			buttons[Buttons::BUY] = std::make_unique<MapleButton>(PersonalShop["BtBuy"], BT_MIDDLE);
 			buttons[Buttons::EXIT] = std::make_unique<MapleButton>(PersonalShop["BtExit"], BT_BOTTOM);
 		}
@@ -156,7 +184,9 @@ namespace ms
 		buttons[Buttons::ENTER] = std::make_unique<MapleButton>(PersonalShop["BtEnter"], BT_ENTER);
 		buttons[Buttons::CLAIM] = std::make_unique<MapleButton>(Basic["BtClaim"], BT_CLAIM);
 
-		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK, enter.title);
+		// A merchant's caption names its owner (SP 0xd86).
+		std::string caption = merchant ? enter.owner + "'s Hired Merchant : " + enter.title : enter.title;
+		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK, caption);
 		string_format::format_with_ellipsis(title, TITLE_WIDTH);
 
 		meso = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
@@ -166,6 +196,14 @@ namespace ms
 
 		for (const mini_room::Member &member : enter.members)
 			visit(member);
+
+		if (merchant)
+		{
+			// Slot 0 is the merchant's employee (0x518531).
+			employee = nl::nx::item["Cash"]["0503.img"][string_format::extend_id(enter.employee, 8)]["employee"]["stand"]["0"];
+			countdown = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::BLACK);
+			sales = hired_merchant::sales(enter.sold, enter.net);
+		}
 
 		items = Slider(
 				Slider::Type::CLASSIC, ITEMS_RANGE, ITEMS_X, ROWS, 0,
@@ -210,6 +248,10 @@ namespace ms
 
 		set_listings(enter.listings);
 
+		// What was said before we came in (0x518888).
+		for (const auto &[line, slot] : enter.chat)
+			add_chat(slot, line);
+
 		dimension = backgrnd.get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), DRAG_HEIGHT);
 	}
@@ -233,7 +275,14 @@ namespace ms
 
 			if (slot == OWNER)
 			{
-				look.draw(position + OWNER_FEET, true, Stance::Id::STAND1, Expression::Id::DEFAULT);
+				// The employee stands bottom centre on the spot, its origin
+				// ignored (0x5181ee).
+				if (merchant)
+					employee.draw(position + OWNER_FEET + employee.get_origin()
+						- Point<int16_t>(employee.get_dimensions().x() / 2, employee.get_dimensions().y()));
+				else
+					look.draw(position + OWNER_FEET, true, Stance::Id::STAND1, Expression::Id::DEFAULT);
+
 				member.name.draw(position + Point<int16_t>(OWNER_NAME_X, NAME_Y) + TEXT_Y);
 			} else
 			{
@@ -243,6 +292,13 @@ namespace ms
 		}
 
 		meso.draw(position + MESO + TEXT_Y);
+
+		// On a white strip, only while there is time left (0x518314).
+		if (merchant && is_owner() && !countdown.get_text().empty())
+		{
+			ColorBox(COUNTDOWN_BOX.x(), COUNTDOWN_BOX.y(), Color::Name::WHITE, 1.0f).draw(position + COUNTDOWN);
+			countdown.draw(position + COUNTDOWN + TEXT_Y);
+		}
 
 		for (int16_t k = 0; k < ROWS; k++)
 		{
@@ -294,7 +350,16 @@ namespace ms
 	{
 		UIElement::update();
 
-		meso.change_text(mini_room::meso_text(Stage::get().get_player().get_inventory().get_meso()));
+		// A merchant's owner sees what it holds (0x51819a).
+		int64_t shown = merchant && is_owner() ? merchant_meso : Stage::get().get_player().get_inventory().get_meso();
+		meso.change_text(mini_room::meso_text(shown));
+
+		if (merchant && is_owner())
+		{
+			auto since = std::chrono::steady_clock::now() - entered;
+			countdown.change_text(hired_merchant::countdown_text(open_ms + std::chrono::duration_cast<std::chrono::milliseconds>(since).count()));
+		}
+
 		input.update(position);
 	}
 
@@ -354,9 +419,9 @@ namespace ms
 		{
 			selected = index;
 
-			// Before opening, the owner can take a row back by dragging it
-			// to the inventory (FUN_006fb368).
-			if (is_owner() && !open && listing.bundles >= 1)
+			// Before opening, or in a merchant's maintenance, the owner can
+			// take a row back by dragging it to the inventory (FUN_006fb368).
+			if (is_owner() && (!open || merchant) && listing.bundles >= 1)
 			{
 				Point<int16_t> top_left = Point<int16_t>(ICON.x(), ROW_TOP + ROW_PITCH * (index - first_row) + ICON.y() - 32);
 				const Texture &icon = ItemData::get(listing.item.itemid).get_icon(false);
@@ -403,7 +468,12 @@ namespace ms
 	void UIPersonalShop::send_key(int32_t, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-			exit();
+		{
+			if (merchant)
+				close_merchant(2);
+			else
+				exit();
+		}
 	}
 
 	bool UIPersonalShop::is_in_range(Point<int16_t> cursorpos) const
@@ -428,10 +498,14 @@ namespace ms
 
 		Member &seat = members[member.slot];
 		seat.present = true;
-		seat.look = CharLook(member.look);
+
+		// A merchant's slot 0 is its employee, with no look.
+		if (!merchant || member.slot != OWNER)
+			seat.look = CharLook(member.look);
 		seat.name.change_text(member.name);
 
-		if (member.slot != OWNER && is_owner())
+		// A merchant has no ban buttons.
+		if (member.slot != OWNER && is_owner() && !merchant)
 			buttons[Buttons::BAN1 + member.slot - 1]->set_active(true);
 	}
 
@@ -443,7 +517,7 @@ namespace ms
 		members[slot].present = false;
 		members[slot].name.change_text("");
 
-		if (is_owner())
+		if (is_owner() && !merchant)
 			buttons[Buttons::BAN1 + slot - 1]->set_active(false);
 	}
 
@@ -486,8 +560,57 @@ namespace ms
 			notice(text);
 	}
 
+	bool UIPersonalShop::is_merchant() const
+	{
+		return merchant;
+	}
+
+	void UIPersonalShop::set_merchant_meso(int32_t meso)
+	{
+		merchant_meso = meso;
+	}
+
+	void UIPersonalShop::organized(int32_t meso)
+	{
+		merchant_meso = meso;
+
+		listings.erase(
+				std::remove_if(listings.begin(), listings.end(), [](const mini_room::Listing &listing) { return listing.bundles == 0; }),
+				listings.end()
+		);
+		selected = -1;
+
+		refresh_rows();
+	}
+
+	void UIPersonalShop::store_closed(int8_t code)
+	{
+		std::string text = hired_merchant::close_text(code);
+
+		close_merchant(1);
+		notice(text);
+	}
+
+	void UIPersonalShop::meso_taken()
+	{
+		merchant_meso = 0;
+	}
+
 	void UIPersonalShop::leave(int8_t reason)
 	{
+		// A merchant's reasons, some of which keep the window (0x518d5f).
+		if (merchant)
+		{
+			hired_merchant::Leave left = hired_merchant::leave(reason);
+
+			if (left.closes)
+				close_merchant(1);
+
+			notice(left.text);
+
+			return;
+		}
+
 		std::string text = personal_shop::leave_text(reason);
 
 		close();
@@ -515,8 +638,9 @@ namespace ms
 
 	void UIPersonalShop::sell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t count)
 	{
-		// Nothing more goes in once the shop is full or open (FUN_006fd96c).
-		if (listings.size() >= max_items || open)
+		// Nothing more goes in once the shop is full or open, though a
+		// merchant takes more in maintenance (FUN_006fd96c).
+		if (listings.size() >= max_items || (open && !merchant))
 		{
 			notice(FULL);
 
@@ -526,20 +650,45 @@ namespace ms
 		if (auto dialog = UI::get().get_element<UIShopSell>(); dialog && dialog->is_active())
 			return;
 
+		// A merchant sells one of a one-of-a-kind item at a time (0x6fd9d6).
+		if (merchant && ItemData::get(itemid).get_properties().only)
+		{
+			for (const mini_room::Listing &listing : listings)
+			{
+				if (listing.item.itemid == itemid)
+				{
+					notice("You may only sell one of this item.");
+
+					return;
+				}
+			}
+		}
+
 		// A set of stars or bullets counts as one.
 		int16_t quantity = shop_list::is_rechargeable(itemid) ? 1 : count;
 
-		UI::get().emplace<UIShopSell>(tab, slot, itemid, quantity);
+		UI::get().emplace<UIShopSell>(tab, slot, itemid, quantity, merchant);
 	}
 
 	void UIPersonalShop::take_back(int16_t index) const
 	{
-		if (!is_owner() || open || index < 0 || index >= static_cast<int16_t>(listings.size()))
+		if (!is_owner() || (open && !merchant) || index < 0 || index >= static_cast<int16_t>(listings.size()))
 			return;
+
+		int32_t itemid = listings[index].item.itemid;
+
+		// Nor can its owner hold two of a one-of-a-kind item.
+		if (merchant && ItemData::get(itemid).get_properties().only
+			&& Stage::get().get_player().get_inventory().get_total_item_count(itemid) > 0)
+		{
+			notice("You may only possess one of this item.");
+
+			return;
+		}
 
 		// The row leaves when the server sends the new list.
 		if (listings[index].bundles >= 1)
-			Stage::get().get_player().request(ShopTakeBackPacket(index), ExclRequest::WAIT);
+			Stage::get().get_player().request(ShopTakeBackPacket(index, merchant), ExclRequest::WAIT);
 	}
 
 	const personal_shop::Sales &UIPersonalShop::get_sales() const
@@ -603,6 +752,14 @@ namespace ms
 					ShopBlacklistPacket({}).dispatch();
 					ShopOpenPacket().dispatch();
 
+					// The owner leaves a merchant to it (0x51876c).
+					if (merchant)
+					{
+						close_merchant(1);
+
+						return Button::State::NORMAL;
+					}
+
 					open = true;
 					buttons[Buttons::START]->set_state(Button::State::DISABLED);
 
@@ -614,10 +771,35 @@ namespace ms
 				buy(selected);
 				break;
 			case Buttons::CLOSE:
+				if (merchant)
+					close_merchant(8);
+				else
+					exit();
+
+				return Button::State::NORMAL;
 			case Buttons::EXIT:
 				exit();
 
 				return Button::State::NORMAL;
+			case Buttons::RESUME:
+				close_merchant(2);
+
+				return Button::State::NORMAL;
+			case Buttons::ARRANGE:
+				// Only with something listed, once the notice is read (0x519294).
+				if (!listings.empty())
+					UI::get().emplace<UIOk>(
+							"The sold items are crossed off the list, and\\nthe sales fee will be retrieved.",
+							[](bool) { MerchantPacket(MerchantPacket::Request::ORGANIZE).dispatch(); }
+					);
+
+				break;
+			case Buttons::COIN:
+				// Only with mesos to take (0x51930f).
+				if (merchant_meso != 0)
+					MerchantPacket(MerchantPacket::Request::TAKE_MESO).dispatch();
+
+				break;
 			case Buttons::INFO:
 				show_owner_info();
 				break;
@@ -683,7 +865,7 @@ namespace ms
 		}
 
 		// v83 doesn't check our mesos or space; the server answers that.
-		auto send = [row](int16_t bundles, int64_t total)
+		auto send = [row, merchant = merchant](int16_t bundles, int64_t total)
 		{
 			Player &player = Stage::get().get_player();
 
@@ -694,7 +876,7 @@ namespace ms
 				return;
 			}
 
-			player.request(ShopBuyPacket(row, bundles), ExclRequest::WAIT);
+			player.request(ShopBuyPacket(row, bundles, merchant), ExclRequest::WAIT);
 		};
 
 		mini_room::Listing chosen = listing;
@@ -895,6 +1077,61 @@ namespace ms
 		close();
 	}
 
+	void UIPersonalShop::close_merchant(int8_t reason)
+	{
+		// Leaving one still being set up closes it.
+		if (reason == 2 && !open)
+			reason = 8;
+
+		if (!is_owner() || (reason != 2 && reason != 8))
+		{
+			exit();
+
+			return;
+		}
+
+		// The merchant reopens as the owner goes.
+		if (reason == 2)
+		{
+			MerchantPacket(MerchantPacket::Request::REOPEN).dispatch();
+			exit();
+
+			return;
+		}
+
+		// What is left comes back through the server, which answers with
+		// mode 0x2a; with nothing left, the owner just goes.
+		auto finish = []()
+		{
+			auto shop = UI::get().get_element<UIPersonalShop>();
+
+			if (!shop || !shop->is_active())
+				return;
+
+			if (!shop->listings.empty() || shop->merchant_meso != 0)
+				MerchantPacket(MerchantPacket::Request::CLOSE).dispatch();
+			else
+				shop->exit();
+		};
+
+		if (!open)
+		{
+			finish();
+
+			return;
+		}
+
+		UI::get().emplace<UIYesNo>(
+				"If there's no slot available for the item at\\nthe inventory, the item can only be retrieved\\n"
+				"through Fredrick, the Store Bank NPC.\\nWill you close the store?",
+				[finish](bool yes)
+				{
+					if (yes)
+						finish();
+				}
+		);
+	}
+
 	UIPersonalShop::RowIcon::RowIcon(int16_t index, int32_t itemid) : index(index), itemid(itemid)
 	{}
 
@@ -922,8 +1159,8 @@ namespace ms
 		constexpr Point<int16_t> BT_CANCEL = Point<int16_t>(180, 120);
 	}
 
-	UIShopSell::UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity) : UIElement(),
-			tab(tab), slot(slot), itemid(itemid), quantity(quantity), whole(personal_shop::sells_whole(itemid)), bundled(false)
+	UIShopSell::UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool merchant) : UIElement(),
+			tab(tab), slot(slot), itemid(itemid), quantity(quantity), merchant(merchant), whole(personal_shop::sells_whole(itemid)), bundled(false)
 	{
 		nl::node PersonalShop = NxFiles::ui_classic["UIWindow.img"]["PersonalShop"];
 		nl::node Basic = NxFiles::ui_classic["Basic.img"];
@@ -1061,8 +1298,9 @@ namespace ms
 			return;
 		}
 
+
 		Stage::get().get_player().request(
-				ShopPutItemPacket(static_cast<int8_t>(tab), slot, sale.bundles, sale.per_bundle, sale.price),
+				ShopPutItemPacket(static_cast<int8_t>(tab), slot, sale.bundles, sale.per_bundle, sale.price, merchant),
 				ExclRequest::WAIT
 		);
 	}

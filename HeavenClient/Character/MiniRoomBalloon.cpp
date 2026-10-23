@@ -5,11 +5,14 @@
 
 #include <nlnx/nx.hpp>
 
+#include <cstdio>
+
 namespace ms
 {
 	namespace
 	{
 		constexpr int8_t PERSONAL_SHOP = 4;
+		constexpr int8_t HIRED_MERCHANT = 5;
 
 		// The title wraps once at 100 and the rest is cut short
 		// (FUN_0048dcbd); the seat sign sits in the white box.
@@ -31,8 +34,8 @@ namespace ms
 
 	void MiniRoomBalloon::change(const std::optional<MiniRoomBox> &box)
 	{
-		// Only shops have balloons here; games have none yet.
-		shown = box && box->type == PERSONAL_SHOP;
+		// Only shops and merchants have balloons here; games have none yet.
+		shown = box && (box->type == PERSONAL_SHOP || box->type == HIRED_MERCHANT);
 
 		if (!shown)
 			return;
@@ -40,16 +43,35 @@ namespace ms
 		nl::node miniroom = NxFiles::ui_classic["ChatBalloon.img"]["miniroom"];
 
 		serial = box->serial;
-		signboard = box->skin != 0;
-		skin = miniroom["PSSkin"][std::to_string(box->skin)];
 
-		if (!skin.is_valid())
+		if (box->type == HIRED_MERCHANT)
 		{
-			signboard = false;
-			skin = miniroom["PSSkin"]["0"];
-		}
+			// The permit's signboard, `050300%02d/skin` (SP 0xd80, 0xd82).
+			// The merchant's own seat counts, so one seat less is free
+			// (0x48c788).
+			char id[16];
+			std::snprintf(id, sizeof(id), "050300%02d", box->skin);
+			signboard = true;
+			skin = nl::nx::item["Cash"]["0503.img"][id]["skin"]["signboard"];
 
-		seats = miniroom[box->users < box->max_users ? "Able" : "Disable"];
+			if (!skin.is_valid())
+				skin = nl::nx::item["Cash"]["0503.img"]["05030000"]["skin"]["signboard"];
+
+			seats = miniroom[box->users + 1 < box->max_users ? "Able" : "Disable"];
+		}
+		else
+		{
+			signboard = box->skin != 0;
+			skin = miniroom["PSSkin"][std::to_string(box->skin)];
+
+			if (!skin.is_valid())
+			{
+				signboard = false;
+				skin = miniroom["PSSkin"]["0"];
+			}
+
+			seats = miniroom[box->users < box->max_users ? "Able" : "Disable"];
+		}
 
 		// v83 breaks the title where the first line runs out, not at a word.
 		Text measure = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK);

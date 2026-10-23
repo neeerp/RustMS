@@ -204,6 +204,9 @@ namespace ms
 		REMOVE_NPC = 258,
 		SPAWN_NPC_C = 259,
 		NPC_ACTION = 260,
+		SPAWN_HIRED_MERCHANT = 265,
+		DESTROY_HIRED_MERCHANT = 266,
+		UPDATE_HIRED_MERCHANT = 267,
 		DROP_LOOT = 268,
 		REMOVE_LOOT = 269,
 		CANNOT_SPAWN_KITE = 270,
@@ -364,6 +367,9 @@ namespace ms
 		emplace<CATCH_MONSTER_WITH_ITEM, CatchMonsterWithItemHandler>();
 		emplace<BRIDLE_MOB_CATCH_FAIL, BridleMobCatchFailHandler>();
 		emplace<KILL_MOB, KillMobHandler>();
+		emplace<SPAWN_HIRED_MERCHANT, SpawnHiredMerchantHandler>();
+		emplace<DESTROY_HIRED_MERCHANT, DestroyHiredMerchantHandler>();
+		emplace<UPDATE_HIRED_MERCHANT, UpdateHiredMerchantHandler>();
 		emplace<DROP_LOOT, DropLootHandler>();
 		emplace<REMOVE_LOOT, RemoveLootHandler>();
 		emplace<CANNOT_SPAWN_KITE, CannotSpawnKiteHandler>();

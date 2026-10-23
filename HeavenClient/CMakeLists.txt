@@ -630,6 +630,8 @@ add_executable(HeavenClient
     Gameplay/WeatherRules.h
     Gameplay/MapleMap/MapKites.cpp
     Gameplay/MapleMap/MapKites.h
+    Gameplay/MapleMap/MapMerchants.cpp
+    Gameplay/MapleMap/MapMerchants.h
     Gameplay/MapleMap/KiteRules.h
     Gameplay/MapleMap/MapMists.cpp
     Gameplay/MapleMap/MapDoors.cpp

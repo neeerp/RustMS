@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ms
@@ -24,6 +25,7 @@ namespace ms
 		// The room types of FUN_0065de20 that HC opens.
 		constexpr int8_t TRADING_ROOM = 3;
 		constexpr int8_t PERSONAL_SHOP = 4;
+		constexpr int8_t HIRED_MERCHANT = 5;
 
 		// Each side of a trade has nine slots, numbered from 1.
 		constexpr int8_t TRADE_SLOTS = 9;
@@ -79,9 +81,18 @@ namespace ms
 			return listings;
 		}
 
+		// A sale a hired merchant made, as its owner sees it (0x518f44).
+		struct MerchantSale
+		{
+			int32_t itemid = 0;
+			int16_t quantity = 0;
+			int32_t meso = 0;
+			std::string buyer;
+		};
+
 		// An enter (FUN_0065dff3): the room's type, or 0 and why we can't
-		// come in. Rooms other than the trading room and the personal shop
-		// are left unread.
+		// come in. Rooms other than the trading room, the personal shop and
+		// the hired merchant are left unread.
 		struct Enter
 		{
 			int8_t type = 0;
@@ -93,6 +104,18 @@ namespace ms
 			std::string title;
 			uint8_t max_items = 0;
 			std::vector<Listing> listings;
+			// A hired merchant's: its permit in slot 0, the chat so far,
+			// whose it is and its mesos (0x518873).
+			int32_t employee = 0;
+			std::vector<std::pair<std::string, uint8_t>> chat;
+			std::string owner;
+			int32_t meso = 0;
+			// The owner's books: how long it has been open, whether it is
+			// still being set up, and what it sold, after fees in all.
+			int32_t open_ms = 0;
+			bool setup = false;
+			std::vector<MerchantSale> sold;
+			int32_t net = 0;
 		};
 
 		using LookReader = LookEntry(*)(InPacket&);
@@ -128,6 +151,25 @@ namespace ms
 			return box;
 		}
 
+		// A hired merchant's balloon (0x50d897): no private or game byte.
+		inline std::optional<MiniRoomBox> read_merchant_box(InPacket& recv)
+		{
+			int8_t type = recv.read_byte();
+
+			if (type == 0)
+				return std::nullopt;
+
+			MiniRoomBox box;
+			box.type = type;
+			box.serial = recv.read_int();
+			box.title = recv.read_string();
+			box.skin = static_cast<uint8_t>(recv.read_byte());
+			box.users = static_cast<uint8_t>(recv.read_byte());
+			box.max_users = static_cast<uint8_t>(recv.read_byte());
+
+			return box;
+		}
+
 		// The members follow the room's size and our seat, up to slot 0xFF
 		// (FUN_0065ec3d); the trading room reads nothing more, and a
 		// personal shop its title, size and rows (FUN_007a0a3a).
@@ -139,6 +181,56 @@ namespace ms
 			if (enter.type == 0)
 			{
 				enter.error = recv.read_byte();
+			}
+			else if (enter.type == HIRED_MERCHANT)
+			{
+				enter.max_users = static_cast<uint8_t>(recv.read_byte());
+				enter.own_slot = static_cast<uint8_t>(recv.read_byte());
+
+				// Slot 0 is the employee, a permit and a name (0x65ec83).
+				for (auto slot = static_cast<uint8_t>(recv.read_byte()); slot != 0xFF; slot = static_cast<uint8_t>(recv.read_byte()))
+				{
+					if (slot == 0)
+					{
+						enter.employee = recv.read_int();
+						enter.members.push_back({ slot, {}, recv.read_string() });
+					}
+					else
+					{
+						enter.members.push_back(read_member(recv, slot, read_look));
+					}
+				}
+
+				for (auto lines = static_cast<uint16_t>(recv.read_short()); lines > 0; lines--)
+				{
+					std::string line = recv.read_string();
+					enter.chat.emplace_back(line, static_cast<uint8_t>(recv.read_byte()));
+				}
+
+				enter.owner = recv.read_string();
+
+				if (enter.own_slot == 0)
+				{
+					enter.open_ms = recv.read_int();
+					enter.setup = recv.read_byte() != 0;
+
+					for (auto count = static_cast<uint8_t>(recv.read_byte()); count > 0; count--)
+					{
+						MerchantSale sale;
+						sale.itemid = recv.read_int();
+						sale.quantity = recv.read_short();
+						sale.meso = recv.read_int();
+						sale.buyer = recv.read_string();
+						enter.sold.push_back(sale);
+					}
+
+					enter.net = recv.read_int();
+				}
+
+				enter.title = recv.read_string();
+				enter.max_items = static_cast<uint8_t>(recv.read_byte());
+				enter.meso = recv.read_int();
+				enter.listings = read_listings(recv);
 			}
 			else if (enter.type == TRADING_ROOM || enter.type == PERSONAL_SHOP)
 			{

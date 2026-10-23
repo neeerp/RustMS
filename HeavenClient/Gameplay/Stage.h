@@ -38,6 +38,7 @@
 #include "MapleMap/MapChars.h"
 #include "MapleMap/MapMobs.h"
 #include "MapleMap/MapKites.h"
+#include "MapleMap/MapMerchants.h"
 #include "MapleMap/MapMists.h"
 #include "MapleMap/MapClouds.h"
 #include "MapleMap/MapWeather.h"
@@ -106,6 +107,9 @@ namespace ms
 		// The kite under the cursor, newest first, or none.
 		const MapKites::Kite *kite_at(Point<int16_t> cursorpos) const;
 
+		// The hired merchant whose balloon is at `cursorpos`, if any.
+		std::optional<MapMerchants::Hit> merchant_at(Point<int16_t> cursorpos) const;
+
 		// Lets go of a held key whose release went elsewhere, such as to a
 		// dialog or a text field, so the player doesn't keep walking.
 		void release_key(KeyType::Id keytype, int32_t keycode);
@@ -136,6 +140,9 @@ namespace ms
 
 		// Returns a reference to the kites over the current map.
 		MapKites &get_kites();
+
+		// Returns a reference to the hired merchants on the current map.
+		MapMerchants &get_merchants();
 
 		// Returns a reference to the mists on the current map.
 		MapMists &get_mists();
@@ -420,6 +427,7 @@ namespace ms
 		MapDrops drops;
 		MapMists mists;
 		MapKites kites;
+		MapMerchants merchants;
 		// The ms since a mob's mist last hurt the player.
 		int32_t since_mist_hurt = mist::HURT_INTERVAL + 1;
 		// When a mob touching the barrel last tried to see through it.

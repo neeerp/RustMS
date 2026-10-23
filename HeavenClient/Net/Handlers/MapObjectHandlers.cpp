@@ -922,6 +922,34 @@ namespace ms
 		);
 	}
 
+	void SpawnHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		// v83 0x510e83: one already standing stays as it is.
+		int32_t owner = recv.read_int();
+		int32_t itemid = recv.read_int();
+		int16_t x = recv.read_short();
+		int16_t y = recv.read_short();
+		int16_t fh = recv.read_short();
+		std::string name = recv.read_string();
+		std::optional<MiniRoomBox> box = mini_room::read_merchant_box(recv);
+
+		Stage::get().get_merchants().spawn(owner, itemid, Point<int16_t>(x, y), fh, std::move(name), box);
+	}
+
+	void DestroyHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_merchants().remove(recv.read_int());
+	}
+
+	void UpdateHiredMerchantHandler::handle(InPacket& recv) const
+	{
+		// v83 0x510f7e reads the balloon only for a merchant it has.
+		int32_t owner = recv.read_int();
+
+		if (Stage::get().get_merchants().contains(owner))
+			Stage::get().get_merchants().change(owner, mini_room::read_merchant_box(recv));
+	}
+
 	void CannotSpawnKiteHandler::handle(InPacket&) const
 	{
 		// v83 FUN_0065acb4: a notice (StringPool 0x1db, FUN_009929dd).

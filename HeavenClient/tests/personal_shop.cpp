@@ -179,6 +179,27 @@ int main()
 
 		require(!mini_room::read_box(none_recv) && !none_recv.available(), "no room is one byte");
 
+		// A hired merchant's own reasons close the window; others leave it.
+		require(hired_merchant::leave(0x11).closes && hired_merchant::leave(0x12).text.rfind("It is past", 0) == 0,
+			"maintenance and closing time turn visitors out");
+		require(!hired_merchant::leave(3).closes && hired_merchant::leave(3).text.empty(),
+			"the personal shop's reasons mean nothing to a merchant");
+		require(hired_merchant::close_text(0).rfind("Both the items", 0) == 0 && hired_merchant::close_text(5).empty(),
+			"closing the store says how it went");
+
+		// The countdown runs from 23:59 down to 00:00, then shows nothing.
+		require(hired_merchant::countdown_text(0) == "Store Closed / 23 : 59", "a store just opened");
+		require(hired_merchant::countdown_text(90 * 60000 + 59999) == "Store Closed / 22 : 29", "whole minutes pass");
+		require(hired_merchant::countdown_text(1439 * 60000) == "Store Closed / 00 : 00", "the last minute");
+		require(hired_merchant::countdown_text(1440 * 60000).empty()
+			&& hired_merchant::countdown_text(1500 * 60000).empty() && hired_merchant::countdown_text(-61 * 60000).empty(),
+			"nothing outside its day");
+
+		// The owner's books total what the records add up to, after fees as sent.
+		personal_shop::Sales books = hired_merchant::sales({ { 4000000, 5, 1000, "Bob" }, { 2000000, 1, 300, "Amy" } }, 1261);
+		require(books.sold.size() == 2 && books.sold[1].units == 1 && books.sold[1].buyer == "Amy", "a record a sale");
+		require(books.total == 1300 && books.received == 1261, "the totals");
+
 		std::cout << "Personal shop passed\n";
 		return 0;
 	}

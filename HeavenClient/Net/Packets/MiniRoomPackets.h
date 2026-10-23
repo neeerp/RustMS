@@ -64,6 +64,13 @@ namespace ms
 			write_byte(mode);
 		}
 
+		// A hired merchant's put, buy and take back are the personal shop's
+		// modes plus 0xb (vt+0x5c).
+		static Mode shop_mode(Mode mode, bool merchant)
+		{
+			return merchant ? static_cast<Mode>(mode + 0x0B) : mode;
+		}
+
 		// The item ids of an offer, each with the item's template CRC. HC
 		// can't compute the CRC (v83 FUN_005dacd3) and sends 0.
 		void write_items(const std::vector<int32_t>& itemids)
@@ -202,8 +209,8 @@ namespace ms
 	class ShopPutItemPacket : public MiniRoomPacket
 	{
 	public:
-		ShopPutItemPacket(int8_t tab, int16_t slot, int16_t bundles, int16_t per_bundle, int32_t price)
-			: MiniRoomPacket(Mode::SHOP_PUT_ITEM)
+		ShopPutItemPacket(int8_t tab, int16_t slot, int16_t bundles, int16_t per_bundle, int32_t price, bool merchant)
+			: MiniRoomPacket(shop_mode(Mode::SHOP_PUT_ITEM, merchant))
 		{
 			write_byte(tab);
 			write_short(slot);
@@ -218,7 +225,8 @@ namespace ms
 	class ShopBuyPacket : public MiniRoomPacket
 	{
 	public:
-		ShopBuyPacket(uint8_t index, int16_t bundles) : MiniRoomPacket(Mode::SHOP_BUY)
+		ShopBuyPacket(uint8_t index, int16_t bundles, bool merchant)
+			: MiniRoomPacket(shop_mode(Mode::SHOP_BUY, merchant))
 		{
 			write_byte(static_cast<int8_t>(index));
 			write_short(bundles);
@@ -226,11 +234,12 @@ namespace ms
 		}
 	};
 
-	// Takes a row of my shop back into the inventory, before it opens.
+	// Takes a row of my shop back into the inventory, before it opens (or,
+	// for a hired merchant, in maintenance).
 	class ShopTakeBackPacket : public MiniRoomPacket
 	{
 	public:
-		ShopTakeBackPacket(int16_t index) : MiniRoomPacket(Mode::SHOP_TAKE_BACK)
+		ShopTakeBackPacket(int16_t index, bool merchant) : MiniRoomPacket(shop_mode(Mode::SHOP_TAKE_BACK, merchant))
 		{
 			write_short(index);
 		}
@@ -269,5 +278,25 @@ namespace ms
 			write_byte(static_cast<int8_t>(slot));
 			write_string(name);
 		}
+	};
+
+	// The owner's requests in a hired merchant (0x51804c).
+	class MerchantPacket : public MiniRoomPacket
+	{
+	public:
+		enum Request : int8_t
+		{
+			// Ends maintenance; the merchant opens again.
+			REOPEN = 0x27,
+			// Strikes off the sold-out rows.
+			ORGANIZE = 0x28,
+			// Closes the store, with its items and mesos back.
+			CLOSE = 0x29,
+			TAKE_MESO = 0x2B,
+			VISITORS = 0x2E,
+			BLACKLIST = 0x2F
+		};
+
+		MerchantPacket(Request request) : MiniRoomPacket(static_cast<Mode>(request)) {}
 	};
 }

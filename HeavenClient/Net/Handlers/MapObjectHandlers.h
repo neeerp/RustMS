@@ -306,6 +306,27 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A hired merchant stands on the map
+	// Opcode: SPAWN_HIRED_MERCHANT(265)
+	class SpawnHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A hired merchant leaves the map
+	// Opcode: DESTROY_HIRED_MERCHANT(266)
+	class DestroyHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A hired merchant's balloon changes
+	// Opcode: UPDATE_HIRED_MERCHANT(267)
+	class UpdateHiredMerchantHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// The server refused to fly a kite here
 	// Opcode: CANNOT_SPAWN_KITE(270)
 	class CannotSpawnKiteHandler : public PacketHandler
