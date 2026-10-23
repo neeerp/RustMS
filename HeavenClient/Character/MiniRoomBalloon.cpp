@@ -11,6 +11,8 @@ namespace ms
 {
 	namespace
 	{
+		constexpr int8_t OMOK = 1;
+		constexpr int8_t MATCH_CARDS = 2;
 		constexpr int8_t PERSONAL_SHOP = 4;
 		constexpr int8_t HIRED_MERCHANT = 5;
 
@@ -20,6 +22,12 @@ namespace ms
 		constexpr Point<int16_t> FIRST_LINE = Point<int16_t>(8, 8);
 		constexpr Point<int16_t> SECOND_LINE = Point<int16_t>(8, 22);
 		constexpr Point<int16_t> SEATS = Point<int16_t>(60, 39);
+		// A game's icon, lock and seats, which the Progress sign replaces
+		// while it is played (report b164-game-balloon).
+		constexpr Point<int16_t> ICON = Point<int16_t>(7, 40);
+		constexpr Point<int16_t> LOCK = Point<int16_t>(30, 39);
+		constexpr Point<int16_t> USERS = Point<int16_t>(70, 42);
+		constexpr Point<int16_t> MAX_USERS = Point<int16_t>(90, 42);
 		// v83 draws a line's cap top about 3 below where it is drawn, we 9.
 		constexpr Point<int16_t> TEXT_Y = Point<int16_t>(0, -6);
 
@@ -29,13 +37,13 @@ namespace ms
 		constexpr int16_t SIGN_DROP = 2;
 	}
 
-	MiniRoomBalloon::MiniRoomBalloon() : shown(false), serial(0), signboard(false)
+	MiniRoomBalloon::MiniRoomBalloon() : shown(false), serial(0), signboard(false), game(false), locked(false)
 	{}
 
 	void MiniRoomBalloon::change(const std::optional<MiniRoomBox> &box)
 	{
-		// Only shops and merchants have balloons here; games have none yet.
-		shown = box && (box->type == PERSONAL_SHOP || box->type == HIRED_MERCHANT);
+		shown = box && (box->type == OMOK || box->type == MATCH_CARDS || box->type == PERSONAL_SHOP
+				|| box->type == HIRED_MERCHANT);
 
 		if (!shown)
 			return;
@@ -43,8 +51,34 @@ namespace ms
 		nl::node miniroom = NxFiles::ui_classic["ChatBalloon.img"]["miniroom"];
 
 		serial = box->serial;
+		game = box->type == OMOK || box->type == MATCH_CARDS;
+		locked = game && box->locked;
+		icon = Texture();
+		lock = Texture();
+		users = Texture();
+		max_users = Texture();
 
-		if (box->type == HIRED_MERCHANT)
+		if (game)
+		{
+			// Match cards show their deck's back; neither game has
+			// Able/Disable (0x48c86d).
+			signboard = false;
+			skin = miniroom["backgrnd"];
+			icon = box->type == OMOK ? miniroom["Omok"] : miniroom["MemoryGame"][std::to_string(box->skin)];
+			lock = miniroom[box->locked ? "Lock" : "Unlock"];
+			seats = Texture();
+
+			if (box->in_progress)
+			{
+				seats = miniroom["Progress"];
+			}
+			else
+			{
+				users = miniroom["cNum"][std::to_string(box->users)];
+				max_users = miniroom["mNum"][std::to_string(box->max_users)];
+			}
+		}
+		else if (box->type == HIRED_MERCHANT)
 		{
 			// The permit's signboard, `050300%02d/skin` (SP 0xd80, 0xd82).
 			// The merchant's own seat counts, so one seat less is free
@@ -102,17 +136,29 @@ namespace ms
 		Point<int16_t> origin = top_left + skin.get_origin();
 
 		skin.draw(origin);
+		icon.draw(origin + ICON);
+		lock.draw(origin + LOCK);
 		seats.draw(origin + SEATS);
+		users.draw(origin + USERS);
+		max_users.draw(origin + MAX_USERS);
 		first.draw(origin + FIRST_LINE + TEXT_Y);
 		second.draw(origin + SECOND_LINE + TEXT_Y);
 	}
 
 	int32_t MiniRoomBalloon::serial_at(Point<int16_t> feet, int16_t avatar_height, Point<int16_t> cursor) const
 	{
-		if (shown && bounds(feet, avatar_height).contains(cursor))
-			return serial;
+		std::optional<MiniRoomHit> hit = hit_at(feet, avatar_height, cursor);
 
-		return 0;
+		return hit ? hit->serial : 0;
+	}
+
+	std::optional<MiniRoomHit> MiniRoomBalloon::hit_at(Point<int16_t> feet, int16_t avatar_height,
+			Point<int16_t> cursor) const
+	{
+		if (shown && bounds(feet, avatar_height).contains(cursor))
+			return MiniRoomHit{ serial, game, locked };
+
+		return std::nullopt;
 	}
 
 	Rectangle<int16_t> MiniRoomBalloon::bounds(Point<int16_t> feet, int16_t avatar_height) const

@@ -306,6 +306,49 @@ int main()
 		require(!browsing_recv.available() && shopper.own_slot == 1 && shopper.sold.empty(), "a visitor's enter has no books");
 		require(shopper.members.size() == 2 && shopper.members[1].look.hairid == 30030, "the visitors follow the employee");
 
+		// An Omok game for two: the members, then each one's record, then
+		// its title, its stones and that it is no tournament's.
+		Writer omok;
+		omok.put<int8_t>(1).put<uint8_t>(2).put<uint8_t>(1);
+		omok.put<uint8_t>(0).put<int32_t>(30000).string("Alice");
+		omok.put<uint8_t>(1).put<int32_t>(30030).string("Bob");
+		omok.put<uint8_t>(0xFF);
+		omok.put<int8_t>(0).put<int32_t>(1).put<int32_t>(3).put<int32_t>(0).put<int32_t>(2).put<int32_t>(2010);
+		omok.put<int8_t>(1).put<int32_t>(1).put<int32_t>(0).put<int32_t>(1).put<int32_t>(4).put<int32_t>(1990);
+		omok.put<int8_t>(-1);
+		omok.string("Omok").put<uint8_t>(2).put<uint8_t>(0);
+		InPacket omok_recv(omok.bytes.data(), omok.bytes.size());
+		Enter game = read_enter(omok_recv, read_hair);
+
+		require(!omok_recv.available() && game.type == OMOK && game.own_slot == 1, "a game's enter is read up to its end");
+		require(game.members.size() == 2 && game.members[1].name == "Bob", "with both players");
+		require(game.records[0].wins == 3 && game.records[0].losses == 2 && game.records[0].points == 2010, "the owner's record");
+		require(game.records[1].ties == 1 && game.records[1].losses == 4 && game.records[1].points == 1990, "the visitor's record");
+		require(game.title == "Omok" && game.piece == 2 && !game.tournament, "and the game's title and stones");
+
+		// A tournament's game has one byte more.
+		Writer cup;
+		cup.put<int8_t>(2).put<uint8_t>(2).put<uint8_t>(0);
+		cup.put<uint8_t>(0).put<int32_t>(30000).string("Alice");
+		cup.put<uint8_t>(0xFF);
+		cup.put<int8_t>(0).put<int32_t>(2).put<int32_t>(0).put<int32_t>(0).put<int32_t>(0).put<int32_t>(2000);
+		cup.put<int8_t>(-1);
+		cup.string("Cards").put<uint8_t>(1).put<uint8_t>(1).put<uint8_t>(3);
+		InPacket cup_recv(cup.bytes.data(), cup.bytes.size());
+		Enter cards = read_enter(cup_recv, read_hair);
+
+		require(!cup_recv.available() && cards.type == MATCH_CARDS && cards.tournament && cards.piece == 1, "a tournament's game");
+
+		// A game's balloon: locked, and being played.
+		Writer game_box;
+		game_box.put<int8_t>(1).put<int32_t>(7).string("Omok").put<uint8_t>(1).put<uint8_t>(2);
+		game_box.put<uint8_t>(2).put<uint8_t>(2).put<uint8_t>(1);
+		InPacket box_recv(game_box.bytes.data(), game_box.bytes.size());
+		std::optional<MiniRoomBox> balloon = read_box(box_recv);
+
+		require(!box_recv.available() && balloon && balloon->serial == 7 && balloon->skin == 2, "a game's balloon");
+		require(balloon->locked && balloon->in_progress && balloon->users == 2, "says it is locked and being played");
+
 		std::cout << "Mini room passed\n";
 		return 0;
 	}

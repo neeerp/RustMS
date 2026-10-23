@@ -52,6 +52,8 @@
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UISystemOption.h"
 #include "UITypes/UITradingRoom.h"
+#include "UITypes/UIMiniGame.h"
+#include "UITypes/UIMiniGameCreate.h"
 #include "UITypes/UIVegaSpell.h"
 #include "UITypes/UIWeddingRegistry.h"
 #include "UITypes/UIWishlistInput.h"
@@ -142,6 +144,7 @@ namespace ms
 		};
 
 		return open(get_element<UITradingRoom>()) || open(get_element<UIPersonalShop>())
+			|| open(get_element<UIMiniGame>()) || open(get_element<UIMiniGameCreate>())
 			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
 			|| open(get_element<UIStoreBank>())
 			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
@@ -467,6 +470,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::IMAGESLIDES);
 					types.emplace_back(UIElement::Type::FAMILY);
 					types.emplace_back(UIElement::Type::FAMILYTREE);
+					types.emplace_back(UIElement::Type::MINIGAME);
+					types.emplace_back(UIElement::Type::MINIGAMECREATE);
 				}
 				else if (enter)
 				{

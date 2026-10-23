@@ -45,6 +45,7 @@
 #include "../../IO/UITypes/UIMobGage.h"
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
+#include "../../IO/UITypes/UIMiniGame.h"
 
 #include <nlnx/nx.hpp>
 
@@ -141,6 +142,10 @@ namespace ms
 		// The server ends a trade when we leave the field.
 		if (auto room = UI::get().get_element<UITradingRoom>())
 			room->close();
+
+		// And a game, which the other player wins.
+		if (auto game = UI::get().get_element<UIMiniGame>())
+			game->close();
 
 		// The field's countdown and boss HP bar go with it.
 		UI::get().remove(UIElement::Type::FIELDCLOCK);

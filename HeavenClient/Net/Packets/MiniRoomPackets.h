@@ -120,7 +120,8 @@ namespace ms
 		}
 	};
 
-	// Joins the room we were invited to.
+	// Joins the room we were invited to, or a locked game with its
+	// password (0x94fbbf).
 	class MiniRoomVisitPacket : public MiniRoomPacket
 	{
 	public:
@@ -128,6 +129,14 @@ namespace ms
 		{
 			write_int(serial);
 			write_byte(0);
+			write_byte(0);
+		}
+
+		MiniRoomVisitPacket(int32_t serial, const std::string& password) : MiniRoomPacket(Mode::VISIT)
+		{
+			write_int(serial);
+			write_byte(1);
+			write_string(password);
 			write_byte(0);
 		}
 	};
@@ -298,6 +307,101 @@ namespace ms
 			write_byte(room_type);
 			write_int(birthday);
 		}
+	};
+
+	// Opens an Omok (type 1) or match cards (type 2) room with a game set
+	// from the Etc bag, which the server finds itself (0xa1d7b0). `piece` is
+	// the Omok stones, or the cards' board size.
+	class GameCreatePacket : public MiniRoomPacket
+	{
+	public:
+		GameCreatePacket(int8_t type, const std::string& title, const std::string& password, int8_t piece)
+			: MiniRoomPacket(Mode::CREATE)
+		{
+			write_byte(type);
+			write_string(title);
+			write_byte(!password.empty());
+
+			if (!password.empty())
+				write_string(password);
+
+			write_byte(piece);
+		}
+	};
+
+	// The owner's game room opens to the map's players as it opens on
+	// screen (0x6e38d6).
+	class GameOpenPacket : public MiniRoomPacket
+	{
+	public:
+		GameOpenPacket() : MiniRoomPacket(Mode::OPEN)
+		{
+			write_byte(1);
+		}
+	};
+
+	// A player's requests at an Omok or match cards game.
+	class GamePacket : public MiniRoomPacket
+	{
+	public:
+		enum Request : int8_t
+		{
+			ASK_TIE = 0x32,
+			GIVE_UP = 0x34,
+			ASK_UNDO = 0x36,
+			LEAVE_AFTER = 0x38,
+			STAY_AFTER = 0x39,
+			READY = 0x3A,
+			UNREADY = 0x3B,
+			EXPEL = 0x3C,
+			START = 0x3D,
+			// The turn's time ran out.
+			SKIP = 0x3F
+		};
+
+		enum Answer : int8_t
+		{
+			TIE = 0x33,
+			UNDO = 0x37
+		};
+
+		GamePacket(Request request) : MiniRoomPacket(static_cast<Mode>(request)) {}
+
+		// Yes or no to the opponent's request.
+		GamePacket(Answer answer, bool yes) : MiniRoomPacket(static_cast<Mode>(answer))
+		{
+			write_byte(yes);
+		}
+	};
+
+	// Puts my stone on the Omok board's cell (x, y).
+	class OmokMovePacket : public MiniRoomPacket
+	{
+	public:
+		OmokMovePacket(int32_t x, int32_t y, int8_t color) : MiniRoomPacket(static_cast<Mode>(MOVE))
+		{
+			write_int(x);
+			write_int(y);
+			write_byte(color);
+		}
+
+	private:
+		static constexpr int8_t MOVE = 0x40;
+	};
+
+	// Turns up match card `index`, the turn's first or its second
+	// (0x64ee2b).
+	class MatchCardsFlipPacket : public MiniRoomPacket
+	{
+	public:
+		MatchCardsFlipPacket(bool first, uint8_t index) : MiniRoomPacket(static_cast<Mode>(FLIP))
+		{
+			write_byte(first);
+			write_byte(index);
+		}
+
+	private:
+		static constexpr int8_t FLIP = 0x44;
 	};
 
 	// Sends the visitor in a seat away, for good.

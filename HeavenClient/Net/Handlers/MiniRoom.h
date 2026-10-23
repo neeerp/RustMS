@@ -19,10 +19,12 @@
 namespace ms
 {
 	// The parts of v83's mini rooms (PLAYER_INTERACTION, FUN_0065df4c) that
-	// need no UI. Only the trading room is supported.
+	// need no UI.
 	namespace mini_room
 	{
 		// The room types of FUN_0065de20 that HC opens.
+		constexpr int8_t OMOK = 1;
+		constexpr int8_t MATCH_CARDS = 2;
 		constexpr int8_t TRADING_ROOM = 3;
 		constexpr int8_t PERSONAL_SHOP = 4;
 		constexpr int8_t HIRED_MERCHANT = 5;
@@ -81,6 +83,28 @@ namespace ms
 			return listings;
 		}
 
+		// A game player's record (FUN_004e42fc): five ints, of which v83
+		// shows the last four (report 164 §3).
+		struct GameRecord
+		{
+			int32_t wins = 0;
+			int32_t ties = 0;
+			int32_t losses = 0;
+			int32_t points = 0;
+		};
+
+		inline GameRecord read_record(InPacket& recv)
+		{
+			GameRecord record;
+			recv.skip_int();
+			record.wins = recv.read_int();
+			record.ties = recv.read_int();
+			record.losses = recv.read_int();
+			record.points = recv.read_int();
+
+			return record;
+		}
+
 		// A sale a hired merchant made, as its owner sees it (0x518f44).
 		struct MerchantSale
 		{
@@ -116,6 +140,11 @@ namespace ms
 			bool setup = false;
 			std::vector<MerchantSale> sold;
 			int32_t net = 0;
+			// A game's records by slot, its Omok stones or cards' board size,
+			// and whether it is a tournament's.
+			std::array<GameRecord, 2> records;
+			uint8_t piece = 0;
+			bool tournament = false;
 		};
 
 		using LookReader = LookEntry(*)(InPacket&);
@@ -142,11 +171,11 @@ namespace ms
 			box.type = type;
 			box.serial = recv.read_int();
 			box.title = recv.read_string();
-			recv.skip_byte(); // private
+			box.locked = recv.read_bool();
 			box.skin = static_cast<uint8_t>(recv.read_byte());
 			box.users = static_cast<uint8_t>(recv.read_byte());
 			box.max_users = static_cast<uint8_t>(recv.read_byte());
-			recv.skip_byte(); // a game in progress
+			box.in_progress = recv.read_bool();
 
 			return box;
 		}
@@ -231,6 +260,30 @@ namespace ms
 				enter.max_items = static_cast<uint8_t>(recv.read_byte());
 				enter.meso = recv.read_int();
 				enter.listings = read_listings(recv);
+			}
+			else if (enter.type == OMOK || enter.type == MATCH_CARDS)
+			{
+				enter.max_users = static_cast<uint8_t>(recv.read_byte());
+				enter.own_slot = static_cast<uint8_t>(recv.read_byte());
+
+				for (auto slot = static_cast<uint8_t>(recv.read_byte()); slot != 0xFF; slot = static_cast<uint8_t>(recv.read_byte()))
+					enter.members.push_back(read_member(recv, slot, read_look));
+
+				// The records, to a negative slot (0x6e388e).
+				for (int8_t slot = recv.read_byte(); slot >= 0; slot = recv.read_byte())
+				{
+					GameRecord record = read_record(recv);
+
+					if (slot < 2)
+						enter.records[slot] = record;
+				}
+
+				enter.title = recv.read_string();
+				enter.piece = static_cast<uint8_t>(recv.read_byte());
+				enter.tournament = recv.read_bool();
+
+				if (enter.tournament)
+					recv.skip_byte();
 			}
 			else if (enter.type == TRADING_ROOM || enter.type == PERSONAL_SHOP)
 			{

@@ -300,7 +300,7 @@ namespace ms
 
 		// The room whose balloon is at `cursor`, or 0, with the feet at `feet`
 		// on the screen.
-		int32_t mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const;
+		std::optional<MiniRoomHit> mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const;
 
 		// Puts up the character's chalkboard with `text`, or takes it down.
 		// Only the player's own board can be closed.

@@ -103,7 +103,7 @@ namespace ms
 
 		// The room whose balloon over someone else is under the cursor, or
 		// 0; our own isn't (FUN_00972853).
-		int32_t mini_room_at(Point<int16_t> cursorpos);
+		std::optional<MiniRoomHit> mini_room_at(Point<int16_t> cursorpos);
 
 		// The kite under the cursor, newest first, or none.
 		const MapKites::Kite *kite_at(Point<int16_t> cursorpos) const;

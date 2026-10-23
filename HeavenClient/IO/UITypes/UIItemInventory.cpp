@@ -36,6 +36,7 @@
 #include "UITeleportRock.h"
 #include "UIItemSearch.h"
 #include "UITradingRoom.h"
+#include "UIMiniGameCreate.h"
 #include "UITransform.h"
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
@@ -72,6 +73,7 @@
 #include "../../Util/Megaphones.h"
 #include "../../Util/NxFiles.h"
 
+#include "../../Net/Handlers/MiniGame.h"
 #include "../../Net/Handlers/MiniRoom.h"
 #include "../../Net/Handlers/OwlResults.h"
 #include "../../Net/Packets/GameplayPackets.h"
@@ -1523,6 +1525,9 @@ namespace ms
 							MarriageActions::open_invitation(slot, item_id);
 						else if (incubator::opens(item_id))
 							incubate(slot);
+						// A game set opens a room of its game (0xa1d4d8).
+						else if (mini_game::is_game_set(item_id))
+							UIMiniGameCreate::open(item_id);
 
 						break;
 					default:
