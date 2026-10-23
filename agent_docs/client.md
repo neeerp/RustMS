@@ -685,6 +685,21 @@ force-and-friction model (`move_normal`).
   that. `phobj.flydir` -1 glides down at 0.3 of its top speed, and 0 dives at
   1200 px/s². `Physics::fly_jump` beats up at its full top speed. Fliers are
   drawn on the top layer.
+- **Fly maps.** A map with `info/fly` (and no `info/swim`, which wins) lets
+  the player fly whenever they are off a platform (r25 0x9b2ef8, report b108):
+  `MapInfo::is_flying` sets `phobj.flymap`, and `Player::is_afloat` puts them
+  in the swim state, so they show the `fly` pose, or a morph's `fly`. In the
+  air they move sideways as a flier at 200 px/s, whatever their shoe, sink at
+  up to 10.05 px/s with no gravity, and drop at 70.35 px/s while holding Down.
+  `Physics::fly_flap` beats up at 350 px/s and doubles the sideways speed if
+  an arrow is held. A jump from the ground goes at 0.7 of the usual speed, and
+  a rope jump as in water. On a platform they walk as on land. In water or
+  a fly map v83 takes one jump every 300 ms, from the ground, a rope or the
+  air (`Player::may_jump_afloat`), so swim maps have that limit too. The fly
+  flag is not a morph's `flying`: that gate is the water's. Not done: how a
+  remote flier moves between move packets, the air-attack gates for
+  specific skills, whether Flash Jump works in a fly map, and whether pets
+  take the flying stance there as they do while their owner swims.
 - **Walking.** On flat ground the player accelerates at 1400 px/s² toward
   125 px/s × walkspeed and brakes at 800 px/s². On a slope the push scales by
   1 ± slant², and a slant over 0.9 slides. Positions advance by the average of

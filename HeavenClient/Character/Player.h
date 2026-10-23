@@ -306,6 +306,17 @@ namespace ms
 		// step from where their feet are.
 		void set_underwater(bool underwater);
 
+		// Set whether the map is one to fly through (MapInfo::is_flying).
+		void set_flymap(bool flymap);
+
+		// Whether the player swims or flies when off a platform: in water,
+		// or in a fly map (CanJumpInAir, r25 0x9b214a, for a user).
+		bool is_afloat() const;
+
+		// Whether a jump may go now. Afloat, v83 takes one every 300 ms and
+		// drops the others (CUserLocal 0x94c383); a jump that goes restarts it.
+		bool may_jump_afloat();
+
 		// Returns if a Keyaction is currently active. The arrows are the
 		// way the player is steered, whatever their diseases make of the
 		// keys held.
@@ -595,5 +606,8 @@ namespace ms
 		Optional<const Ladder> ladder;
 
 		bool underwater;
+
+		static constexpr int64_t JUMP_AFLOAT_DELAY = 300;
+		int64_t jumped_afloat_at = -JUMP_AFLOAT_DELAY;
 	};
 }

@@ -842,6 +842,11 @@ namespace ms
 			if (st != Char::State::SIT)
 				set_chair(0);
 
+			// Only a swimmer or flier steers up and down; a dive held into a
+			// landing must not pull the next jump down.
+			if (st != Char::State::SWIM)
+				phobj.flydir = 0;
+
 			const PlayerState *pst = get_state(st);
 
 			if (pst)
@@ -1942,6 +1947,31 @@ namespace ms
 	{
 		underwater = uw;
 		phobj.swim = uw;
+	}
+
+	void Player::set_flymap(bool flymap)
+	{
+		phobj.flymap = flymap;
+	}
+
+	bool Player::is_afloat() const
+	{
+		return underwater || phobj.flymap;
+	}
+
+	bool Player::may_jump_afloat()
+	{
+		if (!is_afloat())
+			return true;
+
+		int64_t now = now_ms();
+
+		if (now - jumped_afloat_at < JUMP_AFLOAT_DELAY)
+			return false;
+
+		jumped_afloat_at = now;
+
+		return true;
 	}
 
 	bool Player::is_key_down(KeyAction::Id action) const

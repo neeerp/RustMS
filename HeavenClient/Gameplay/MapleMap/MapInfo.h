@@ -81,6 +81,11 @@ namespace ms
 		// Whether the whole map is under water (info/swim).
 		bool is_underwater() const;
 
+		// Whether the map is one to fly through (info/fly, CField+0x15c): a user
+		// in the air there neither falls nor swims, but floats (r25 0x9b2ef8).
+		// A map under water swims instead (0xa45c03).
+		bool is_flying() const;
+
 		// Whether a character with its feet there swims: the map is under
 		// water or the point is in its swimArea (IsSwimming FUN_007046ac).
 		bool is_swimming(Point<int16_t> position) const;
@@ -153,6 +158,7 @@ namespace ms
 		std::string streetname;
 		std::string mapmark;
 		bool swim = false;
+		bool fly = false;
 		std::vector<swim_area::Rect> swim_areas;
 		no_skill::Lists no_skills;
 		bool town;

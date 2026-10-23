@@ -303,6 +303,7 @@ namespace ms
 		combat.clear_prepare();
 		combat.clear_grenades();
 		combat.clear_final_attack();
+		player.set_flymap(mapinfo.is_flying());
 		player.respawn(startpos, mapinfo.is_swimming(startpos));
 		// v83 makes the user anew in each field, showing their orbs as they
 		// are (FUN_0092e499).
