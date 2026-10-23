@@ -396,6 +396,17 @@ pub enum Effect {
     },
     /// A guest leaves the wedding they are in for its exit.
     LeaveWedding,
+    /// Open the couple's wishlist input window (Travis, Debbie); what they
+    /// send is checked when it comes.
+    OpenWishlist,
+    /// Open the give window on the wishlist of the groom, or of the
+    /// `bride`, of the wedding the player is in (Pila). She then says why
+    /// not, so nothing may follow it.
+    OpenRegistry {
+        bride: bool,
+    },
+    /// Open the receive window on the player's gifts (Pila).
+    OpenGifts,
     /// Make a beginner a first-job Explorer (`Player::take_first_job`).
     /// Nothing is applied unless the player still qualifies.
     TakeFirstJob(i16),

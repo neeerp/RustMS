@@ -34,7 +34,7 @@ use crate::db::spawn_db;
 use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use game::wedding::{
-    GuestRefusal, Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING, MAX_GUESTS,
+    GuestRefusal, Registry, Venue, Vows, WeddingStage, AFTER_VOWS, CEREMONY, GATHERING, MAX_GUESTS,
     PARTY_ROOM, PRIEST_WELCOME,
 };
 use net::events::scaled;
@@ -110,7 +110,11 @@ pub struct WeddingTicket {
     pub guest: bool,
     /// The wedding was booked with a premium ticket.
     pub premium: bool,
+    /// The groom's and the bride's character ids.
+    pub couple: (i32, i32),
     tx: mpsc::Sender<WeddingMessage>,
+    /// The wishlists and gifts, shared with the other tickets.
+    registry: Arc<Mutex<Registry>>,
     /// The wedding's stage, shared with it; only it writes.
     stage: Arc<AtomicU8>,
     /// How many of the priest's lines have had their close passed on.
@@ -197,6 +201,11 @@ impl WeddingTicket {
         counted
     }
 
+    /// The wedding's wishlists and gifts.
+    pub fn registry(&self) -> MutexGuard<'_, Registry> {
+        self.registry.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     /// Ask for the wedding to end, or to go on to its party room.
     pub async fn end(&self) {
         let _ = self
@@ -249,6 +258,7 @@ pub fn spawn(
         next_line: None,
         blessers: HashSet::new(),
         tx: start.tx,
+        registry: Arc::default(),
         rx: start.rx,
         guests,
         members: start
@@ -303,6 +313,7 @@ struct WeddingActor {
     blessers: HashSet<ClientId>,
     /// For the tickets; the directory keeps another for the guests.
     tx: mpsc::Sender<WeddingMessage>,
+    registry: Arc<Mutex<Registry>>,
     rx: mpsc::Receiver<WeddingMessage>,
     /// The partners still in the wedding.
     members: HashMap<ClientId, ClientHandle>,
@@ -417,7 +428,9 @@ impl WeddingActor {
             member,
             guest,
             premium: self.premium,
+            couple: (self.groom, self.bride),
             tx: self.tx.clone(),
+            registry: self.registry.clone(),
             stage: self.stage.clone(),
             talked: AtomicU8::new(0),
             blessed: AtomicBool::new(false),

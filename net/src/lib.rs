@@ -55,6 +55,7 @@ pub mod skills;
 pub mod storage;
 pub mod summons;
 pub mod trade;
+pub mod wedding_gift;
 
 pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{

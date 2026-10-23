@@ -61,9 +61,13 @@ impl ClientActor {
                 None => Ok(false),
             };
         }
+        if npc_id == npc_scripts::PILA {
+            return self.pila().await.map(|()| true);
+        }
         let inside = self
             .wedding_here()
             .map(|ticket| (ticket.stage(), ticket.guest, ticket.premium));
+        let wished = self.wished();
         let player = &self.in_game()?.player;
         let script = if let Some(venue) = npc_scripts::wedding_priest_venue(npc_id) {
             // Guests hear what anyone else does.
@@ -77,6 +81,12 @@ impl ClientActor {
                 return Ok(false);
             };
             NpcScript::wedding_staff(npc_id, stage, guest, premium)
+        } else if let Some(script) = inside.and_then(|_| {
+            // Travis and Debbie take the couple's wishlists in the hall.
+            let map_id = player.stats.map_id;
+            NpcScript::wedding_greeter(npc_id, map_id, wished.is_some(), wished == Some(true))
+        }) {
+            script
         } else if let Some(script) = NpcScript::wedding_party(
             npc_id,
             player.stats.map_id,
@@ -94,7 +104,7 @@ impl ClientActor {
     }
 
     /// The player's wedding ticket, if they are on one of its maps.
-    fn wedding_here(&self) -> Option<&WeddingTicket> {
+    pub(super) fn wedding_here(&self) -> Option<&WeddingTicket> {
         let map_id = self.game.as_ref()?.player.stats.map_id;
         self.wedding.as_ref().filter(|ticket| ticket.holds(map_id))
     }

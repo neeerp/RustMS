@@ -11,7 +11,9 @@ use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::messaging::{build_broadcast, build_gachapon_message, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
-use net::packet::build::world::{drop, effect, guild, inventory, npc, quest, skill, stat};
+use net::packet::build::world::{
+    drop, effect, guild, inventory, marriage, npc, quest, skill, stat,
+};
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
 use net::{FieldRequest, WorldAction};
@@ -153,6 +155,7 @@ impl ClientActor {
                     afterwards.push(guild::build_name_prompt()?);
                 }
                 Effect::OpenEmblemMaker => afterwards.push(guild::build_emblem_maker()?),
+                Effect::OpenWishlist => afterwards.push(marriage::build_wishlist_input()?),
                 Effect::GrowGuild { from } => grow_guild = Some(*from),
                 Effect::DisbandGuild => disband_guild = true,
                 Effect::CreateAlliance { .. }
@@ -164,7 +167,9 @@ impl ClientActor {
                 | Effect::Vows
                 | Effect::EndWedding
                 | Effect::EnterWedding { .. }
-                | Effect::LeaveWedding => wedding = Some(effect.clone()),
+                | Effect::LeaveWedding
+                | Effect::OpenRegistry { .. }
+                | Effect::OpenGifts => wedding = Some(effect.clone()),
                 Effect::SetHp(hp) => {
                     next.stats.hp = (*hp).clamp(0, next.effective_max_hp() as i16);
                     changed = true;
@@ -559,6 +564,8 @@ impl ClientActor {
             Some(Effect::EndWedding) => self.end_wedding().await,
             Some(Effect::EnterWedding { venue }) => Box::pin(self.enter_wedding(venue)).await?,
             Some(Effect::LeaveWedding) => Box::pin(self.leave_wedding()).await?,
+            Some(Effect::OpenRegistry { bride }) => Box::pin(self.open_registry(bride)).await?,
+            Some(Effect::OpenGifts) => Box::pin(self.open_gifts()).await?,
             _ => {}
         }
         if let Some((map_id, portal)) = warp {

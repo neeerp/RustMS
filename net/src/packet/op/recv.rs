@@ -52,6 +52,8 @@ pub enum RecvOpcode {
     RpsAction = 0x88,
     /// Proposals with an engagement ring box, by mode (report b052).
     RingAction = 0x89,
+    /// The Wedding Gift window's give, take and close (report b085).
+    WeddingAction = 0x8A,
     /// One of the couple closed the priest's line (report b075).
     WeddingTalk = 0x8B,
     /// A guest at the Cathedral's altar said Yes to blessing the couple

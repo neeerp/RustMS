@@ -404,14 +404,51 @@ and the content pack has the Cake and Candle Monsters drop it. Cosmic uses
 the Golden Key 4031217 instead; RustMS follows the client and the pack and
 takes Cosmic's count of seven. The keys are the wedding's own: leaving it
 any way takes them (`game::wedding::take_keys`, from
-`drop_wedding_ticket` and `forget_event`), and so does logging in, in case
-a crash saved them. If the keys are gone by the time the player picks the
+`drop_wedding_ticket` and `forget_event`), and so does logging in on one
+of its maps, in case a crash saved them there. If the keys are gone by the time the player picks the
 box room, Robin's `refused` text says how to get them. Robin asks for no
 Gold Maple Leaf (b071 Q4). The box room's boxes (6802000, 6802001) drop
 their loot with piles of 100-399 mesos, at least 15 drops in all
 (`net::reactors`, Cosmic `sprayItems(true, 1, 100, 400, 15)`). Most of
 them come back a second after breaking (`reactorTime 1`), so one entry
 lets a player break boxes until the clock runs out (review b083).
+
+### The wishlist and gifts
+
+In the hall or at the altar, Travis (Chapel) or Debbie (Cathedral) asks
+each of the couple once whether to write a wishlist (reports b084, b085).
+Yes sends `MARRIAGE_REQUEST` mode 9 alone, which opens the client's
+wishlist window, and its OK sends `RING_ACTION` 9: a `u16` count and that
+many strings (at most 10 of 16 characters are kept). Only the first list
+counts. The lists live in the wedding's `game::wedding::Registry`, in the
+wedding actor's memory, so they go with the wedding. A guest gets the
+greeter's `guest` text.
+
+Pila (9201014) stands in both halls and in Amoria. In a wedding she asks
+whose wishlist to open; a guest's or the other partner's choice sends
+`WEDDING_GIFT_RESULT` (0x4A) mode 9 with that list, which opens the give
+window. Her `own` and `given` texts answer someone choosing themselves or
+a partner they have given to. The give window sends `WEDDING_ACTION`
+(0x8A) mode 6, `u16 slot, u32 itemId, u16 count`. What a parcel could
+carry may be given (`net::wedding_gift::giftable`), equips and stars
+whole. Each giver gives each partner one gift per wedding (`Registry`'s
+`give`, undone if the save fails). The gift goes into `wedding_gifts`
+(with `wedding_gift_equipment_stats`) in the same transaction that saves
+the giver. The giver gets the inventory change and mode 11 with the
+wishlist and the gift, then the client closes the window and sends mode 8.
+Mode 14 refuses a gift that isn't there or may not go; mode 12 answers a
+second gift that got past Pila's check. The client keeps mode 12's window
+waiting, so it can only be closed. The partner is not told.
+
+Outside a wedding Pila asks someone with gifts waiting whether to see
+them; yes sends mode 10, the gifts by bag (`i64` mask `1 << (type + 1)`,
+then per set bit a count and the items without slots). The receive
+window's take sends mode 7, `u8 type, u8 index` within that bag as last
+listed. The gift goes into the inventory and out of the table in one
+transaction, and mode 15 lists that bag again. A take that doesn't fit, a
+one-of-a-kind already held, or a stale index gets mode 16. Gifts wait
+without end. The window's state is the client actor's `gift_window`, which
+a map change drops.
 
 ## The partner's map
 
@@ -605,8 +642,9 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding: the wishlist (report b071 slice 7g), and in the
-  hunting ground the Giant Cake 9400606 (Cosmic spawns it once per wedding
+- The client's wishlist, give and receive windows (report b084 §6); the
+  server's side is above.
+- The rest of the wedding: in the hunting ground the Giant Cake 9400606 (Cosmic spawns it once per wedding
   and its kill stops the clock) and the onyx chests 4031423/4 that Pila
   9201014 opens (report b082). The content pack gives the keys and the
   chests a `period`, which RustMS ignores: the chests it grants don't

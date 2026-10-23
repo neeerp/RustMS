@@ -11,6 +11,10 @@
 //! the couple gather, go on to the altar with them, may leave through
 //! Jackie or by logging out without ending anything, and are seen out with
 //! the couple at the end.
+//!
+//! In the hall (report b085) the groom sends Travis a wishlist, and a guest
+//! gives him a gift from it at Pila, only once; after the wedding he takes
+//! it from Pila in Amoria.
 
 use game_data::server_content::keys;
 use game_data::GameData;
@@ -39,6 +43,10 @@ const PRIEST: i32 = 9201011;
 const JACKIE: i32 = 9201009;
 const BONNIE: i32 = 9201008;
 const NICOLE: i32 = 9201005;
+const TRAVIS: i32 = 9201010;
+const PILA: i32 = 9201014;
+const RED_POTION: i32 = 2000000;
+const USE: i16 = 2;
 /// The invitation a Chapel guest receives.
 const INVITATION: i32 = 4031406;
 /// The assistants' menu choice for guests.
@@ -424,5 +432,189 @@ async fn invited_guests_come_in_while_the_couple_gather() {
         couple_status(marriage_id).await.unwrap(),
         (STATUS_ENGAGED, false)
     );
+    tokio::time::sleep(Duration::from_secs(3)).await;
+}
+
+fn wishlist(wishes: &[&str]) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::RingAction as i16).unwrap();
+    p.write_byte(9).unwrap();
+    p.write_short(wishes.len() as i16).unwrap();
+    for wish in wishes {
+        p.write_str_with_length(wish).unwrap();
+    }
+    p
+}
+
+/// WEDDING_ACTION `mode` with `body`.
+fn wedding_action(mode: u8, body: &[u8]) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::WeddingAction as i16).unwrap();
+    p.write_byte(mode).unwrap();
+    p.write_bytes(body).unwrap();
+    p
+}
+
+/// The bodies of the WEDDING_GIFT_RESULT packets in `t`.
+fn gift_results(t: &Trace) -> Vec<Vec<u8>> {
+    t.marriage
+        .iter()
+        .filter(|(op, _)| *op == SendOpcode::WeddingGiftResult as i16)
+        .map(|(_, body)| body.clone())
+        .collect()
+}
+
+/// Read on from `t` until `session` has a WEDDING_GIFT_RESULT.
+async fn gift_result(session: &mut WorldSession, mut t: Trace) -> Vec<u8> {
+    until(&mut session.connection, &mut t, |t| {
+        !gift_results(t).is_empty()
+    })
+    .await;
+    let results = gift_results(&t);
+    assert_eq!(results.len(), 1, "{results:?}");
+    results[0].clone()
+}
+
+/// Pick `choice` from Pila's menu on `map`; what followed.
+async fn pila(session: &mut WorldSession, map: i32, choice: i32) -> Trace {
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+    let t = step(c, &format!("{m} talks to Pila"), talk(map, PILA)).await;
+    assert_eq!(t.prompts, [(PILA, 4)], "{:?}", t.prompt_texts);
+    step(
+        c,
+        &format!("{m} picks {choice}"),
+        answer(4, 1, Some(choice)),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn a_guest_gives_from_the_wishlist_once_and_the_groom_takes_it() {
+    let _chapel = CHAPEL_IN_USE.lock().await;
+    let configs = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    let couple = [configs[0].clone(), configs[1].clone()];
+    let (marriage_id, mut a, mut b) = due_couple(&couple).await;
+    let id = new_character(&configs[2], 0, UNDERSHIRT).await;
+    grant_stack(id, ETC, 1, INVITATION, 1)
+        .await
+        .expect("invitation");
+    grant_stack(id, USE, 1, RED_POTION, 10)
+        .await
+        .expect("potions");
+    add_wedding_guest(marriage_id, id).await.expect("guest");
+    let mut g = enter(&configs[2], AMORIA).await;
+    let text = |key| net::content::text().get(key, &[]);
+
+    let at = say_yes(&mut a, AMORIA, WAYNE).await;
+    arrive(&mut a, HALL, at).await;
+    arrive(&mut b, HALL, Trace::default()).await;
+    let t = go_in(&mut g).await;
+    assert!(t.warps.contains(&HALL), "{:?}", t.prompt_texts);
+
+    // Before the groom's wishlist, the guest's window opens on none.
+    let t = pila(&mut g, HALL, 0).await;
+    assert_eq!(gift_result(&mut g, t).await, [9, 0]);
+    step(&mut g.connection, "G closes", wedding_action(8, &[])).await;
+
+    // Travis opens the groom's wishlist window; what he sends is kept,
+    // once.
+    let at = say_yes(&mut a, HALL, TRAVIS).await;
+    let mut at2 = at;
+    until(&mut a.connection, &mut at2, |t| !t.marriage.is_empty()).await;
+    assert_eq!(
+        at2.marriage,
+        [(SendOpcode::MarriageRequest as i16, vec![9])]
+    );
+    step(
+        &mut a.connection,
+        "A wishes",
+        wishlist(&["Potions", "Cake"]),
+    )
+    .await;
+    step(&mut a.connection, "A again", wishlist(&["Nothing"])).await;
+    let m = a.character_name.clone();
+    let t = step(
+        &mut a.connection,
+        &format!("{m} talks to Travis"),
+        talk(HALL, TRAVIS),
+    )
+    .await;
+    assert_eq!(t.prompt_texts, [text(keys::WEDDING_WISHLIST_SENT)]);
+    step(&mut a.connection, "A ok", answer(0, 1, None)).await;
+
+    // The guest gives four potions from the groom's wishlist.
+    let t = pila(&mut g, HALL, 0).await;
+    let mut wishes = vec![9, 2, 7, 0];
+    wishes.extend(b"Potions");
+    wishes.extend([4, 0]);
+    wishes.extend(b"Cake");
+    assert_eq!(gift_result(&mut g, t).await, wishes);
+    let mut give = Vec::new();
+    give.extend(1i16.to_le_bytes());
+    give.extend(RED_POTION.to_le_bytes());
+    give.extend(4i16.to_le_bytes());
+    let t = step(&mut g.connection, "G gives", wedding_action(6, &give)).await;
+    assert!(
+        t.quantities.contains(&(USE as u8, 1, 6)),
+        "{:?}",
+        t.quantities
+    );
+    let sent = gift_result(&mut g, t).await;
+    assert_eq!(sent[0], 11);
+    assert_eq!(sent[1..wishes.len()], wishes[1..]);
+    step(&mut g.connection, "G closes", wedding_action(8, &[])).await;
+
+    // Once only; and not from one's own.
+    let t = pila(&mut g, HALL, 0).await;
+    assert_eq!(t.prompt_texts, [text(keys::WEDDING_PILA_GIVEN)]);
+    step(&mut g.connection, "G ok", answer(0, 1, None)).await;
+    let t = pila(&mut a, HALL, 0).await;
+    assert_eq!(t.prompt_texts, [text(keys::WEDDING_PILA_OWN)]);
+    step(&mut a.connection, "A ok", answer(0, 1, None)).await;
+
+    // The bride leaves, which ends the wedding; back in Amoria the groom
+    // takes his gift from Pila.
+    drop(b);
+    arrive(&mut a, EXIT, Trace::default()).await;
+    arrive(&mut g, EXIT, Trace::default()).await;
+    let mut t = Trace::default();
+    assert_eq!(warp(&mut a.connection, AMORIA, "", &mut t).await, AMORIA);
+    let t = say_yes(&mut a, AMORIA, PILA).await;
+    let gifts = gift_result(&mut a, t).await;
+    assert_eq!(gifts[0], 10);
+    assert_eq!(gifts[1..9], 0x7Ci64.to_le_bytes());
+    assert_eq!(gifts[9..11], [0, 1], "no equips, one potion");
+    let mut take = wedding_action(7, &[9, 0]);
+    let t = step(&mut a.connection, "A takes nothing", take).await;
+    assert_eq!(gift_result(&mut a, t).await, [16]);
+    take = wedding_action(7, &[USE as u8, 0]);
+    let t = step(&mut a.connection, "A takes", take).await;
+    let use_bag = |kind: &u8| *kind == USE as u8;
+    assert!(
+        t.added
+            .iter()
+            .any(|(kind, _, id)| use_bag(kind) && *id == RED_POTION)
+            || t.quantities.iter().any(|(kind, _, _)| use_bag(kind)),
+        "{t:?}"
+    );
+    let mut taken = vec![15];
+    taken.extend(0x08i64.to_le_bytes());
+    taken.push(0);
+    assert_eq!(gift_result(&mut a, t).await, taken);
+    step(&mut a.connection, "A closes", wedding_action(8, &[])).await;
+    // Nothing waits any more.
+    let m = a.character_name.clone();
+    let t = step(
+        &mut a.connection,
+        &format!("{m} talks to Pila"),
+        talk(AMORIA, PILA),
+    )
+    .await;
+    assert_eq!(t.prompt_texts, [text(keys::WEDDING_PILA_HELLO)]);
     tokio::time::sleep(Duration::from_secs(3)).await;
 }

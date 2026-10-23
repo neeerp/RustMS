@@ -31,6 +31,7 @@ mod time_limit;
 mod trade;
 mod wedding;
 mod wedding_day;
+mod wedding_gift;
 
 pub(crate) use wedding::leave_at_duey;
 
@@ -127,6 +128,8 @@ pub struct ClientActor {
     storage: Option<net::storage::OpenStorage>,
     /// The Duey window, while the player has it open.
     duey: Option<duey::DueyWindow>,
+    /// The wedding registry window open, if any.
+    gift_window: Option<wedding_gift::GiftWindow>,
     /// The Rock, Paper, Scissors game, while its window is open.
     rps: Option<net::rps::RpsGame>,
     /// When natural recovery of HP and of MP was last accepted; the client
@@ -211,6 +214,7 @@ impl ClientActor {
             shop: None,
             storage: None,
             duey: None,
+            gift_window: None,
             rps: None,
             last_heal: (None, None),
             last_moved: None,
@@ -461,6 +465,7 @@ impl ClientActor {
             WorldAction::Storage(request) => self.storage_request(request).await?,
             WorldAction::Duey(_) if self.in_cash_shop => {}
             WorldAction::Duey(request) => self.duey_request(request).await?,
+            WorldAction::WeddingGift(request) => self.gift_request(request).await?,
             WorldAction::Rps(request) => self.rps_request(request).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.personal_shop.is_some() => {
@@ -675,10 +680,12 @@ impl ClientActor {
         if player.account_id != session.account_id {
             return Err(RuntimeError::NotLoggedIn);
         }
+        // Heart Keys are a wedding's own, and nobody logs in to one: a
+        // crash may have saved them with the player in it.
+        if game::wedding::wedding_map(player.stats.map_id) {
+            game::wedding::take_keys(&mut player);
+        }
         ships::leave_forced_return_map(&mut player);
-        // Heart Keys are a wedding's own, and nobody logs in to one (a
-        // crash may have saved them).
-        game::wedding::take_keys(&mut player);
         // The client learns of pets that dried up meanwhile with the rest.
         net::packet::handle::world::pets_dry_up(&mut player, SystemTime::now());
         // Items that expired meanwhile are gone before the client sees them;
@@ -780,6 +787,7 @@ impl ClientActor {
         // A new field takes the Duey window with it, and the client doesn't
         // say so (report b029).
         self.duey = None;
+        self.gift_window = None;
         self.rps = None;
         self.pending_quest = None;
         self.naming_guild = false;
@@ -884,6 +892,7 @@ impl ClientActor {
         // The shop is a stage of its own, and takes the Duey window with it
         // (report b029).
         self.duey = None;
+        self.gift_window = None;
         self.rps = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         self.leave_trade().await?;

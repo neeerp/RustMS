@@ -86,6 +86,12 @@ pub const NANCY: i32 = 9201007;
 pub const TRAVIS: i32 = 9201010;
 /// Robin, who in a wedding's party room shows guests to its exit.
 pub const WEDDING_ROBIN: i32 = 9201021;
+/// Debbie, who in the Cathedral's hall and at its altar takes the couple's
+/// wishlist, as Travis does at the Chapel (`NpcScript::wedding_greeter`).
+pub const DEBBIE: i32 = 9201006;
+/// Pila, in Amoria and the halls, who keeps the wedding gifts
+/// (`NpcScript::pila`).
+pub const PILA: i32 = 9201014;
 /// Lakelis, who sends parties into Kerning City's party quest; her script
 /// needs to know whether the party may go (`NpcScript::lakelis`).
 pub const LAKELIS: i32 = 9020000;
@@ -1030,6 +1036,61 @@ impl NpcScript {
             script.refused = Some(text(keys::WEDDING_ROBIN_NO_KEYS));
         }
         Some(script)
+    }
+
+    /// `npc_id`'s script on `map_id`, if it takes the wishlists of a
+    /// wedding at its venue there (Travis, Debbie; report b085), to someone
+    /// in the wedding: to one of the couple who has `wished` or not, or to
+    /// a guest.
+    pub fn wedding_greeter(npc_id: i32, map_id: i32, couple: bool, wished: bool) -> Option<Self> {
+        let venue = match npc_id {
+            TRAVIS => Venue::Chapel,
+            DEBBIE => Venue::Cathedral,
+            _ => return None,
+        };
+        if map_id != venue.hall() && map_id != venue.altar() {
+            return None;
+        }
+        let page = match (couple, wished) {
+            (true, false) => Page::Ask {
+                text: text(keys::WEDDING_WISHLIST_ASK),
+                on_yes: vec![Effect::OpenWishlist],
+                on_no: None,
+            },
+            (true, true) => Page::Say(text(keys::WEDDING_WISHLIST_SENT)),
+            (false, _) => Page::Say(text(keys::WEDDING_WISHLIST_GUEST)),
+        };
+        Some(Self::new(npc_id, vec![page]))
+    }
+
+    /// Pila's script: in a wedding, the choice of whose wishlist to give
+    /// from; elsewhere, to someone with `gifts` waiting, whether to take
+    /// them.
+    pub fn pila(in_wedding: bool, gifts: bool) -> Self {
+        let registry = |bride| vec![Page::Done(vec![Effect::OpenRegistry { bride }])];
+        let page = if in_wedding {
+            Page::Menu {
+                text: text(keys::WEDDING_PILA_MENU),
+                choices: vec![
+                    (text(keys::WEDDING_PILA_GROOM), registry(false)),
+                    (text(keys::WEDDING_PILA_BRIDE), registry(true)),
+                ],
+            }
+        } else if gifts {
+            Page::Ask {
+                text: text(keys::WEDDING_PILA_GIFTS),
+                on_yes: vec![Effect::OpenGifts],
+                on_no: None,
+            }
+        } else {
+            Page::Say(text(keys::WEDDING_PILA_HELLO))
+        };
+        Self::new(PILA, vec![page])
+    }
+
+    /// Pila says why the give window didn't open.
+    pub fn pila_says(key: &str) -> Self {
+        Self::new(PILA, vec![Page::Say(text(key))])
     }
 
     /// Lakelis's script, for a player whose party may or may not go into
@@ -8127,6 +8188,46 @@ mod tests {
         assert_eq!(question(&back.begin()), text(keys::WEDDING_ROBIN_BACK_ASK));
         let yes = back.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [Effect::Warp(wedding::HUNTING_GROUND)]);
+    }
+
+    #[test]
+    fn the_greeters_take_the_couples_wishlists_once() {
+        let chapel = Venue::Chapel.hall();
+        let mut ask = NpcScript::wedding_greeter(TRAVIS, chapel, true, false).unwrap();
+        assert_eq!(question(&ask.begin()), text(keys::WEDDING_WISHLIST_ASK));
+        let yes = ask.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::OpenWishlist]);
+        assert!(yes.prompt.is_none());
+        let altar = Venue::Cathedral.altar();
+        let sent = NpcScript::wedding_greeter(DEBBIE, altar, true, true).unwrap();
+        assert_eq!(page_text(&sent.begin()), text(keys::WEDDING_WISHLIST_SENT));
+        let guest = NpcScript::wedding_greeter(DEBBIE, altar, false, false).unwrap();
+        assert_eq!(
+            page_text(&guest.begin()),
+            text(keys::WEDDING_WISHLIST_GUEST)
+        );
+        // Travis keeps to the party room's way back there, and each greeter
+        // to their own venue.
+        assert!(NpcScript::wedding_greeter(TRAVIS, wedding::PARTY_ROOM, true, false).is_none());
+        assert!(NpcScript::wedding_greeter(TRAVIS, altar, true, false).is_none());
+        assert!(NpcScript::wedding_greeter(PILA, chapel, true, false).is_none());
+    }
+
+    #[test]
+    fn pila_opens_a_wishlist_in_a_wedding_and_the_gifts_outside() {
+        for (choice, bride) in [(0, false), (1, true)] {
+            let mut give = NpcScript::pila(true, true);
+            give.begin();
+            let step = give.respond(ScriptInput::Select(choice)).unwrap();
+            assert_eq!(step.effects, [Effect::OpenRegistry { bride }]);
+            assert!(step.prompt.is_none());
+        }
+        let mut take = NpcScript::pila(false, true);
+        assert_eq!(question(&take.begin()), text(keys::WEDDING_PILA_GIFTS));
+        let yes = take.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [Effect::OpenGifts]);
+        let hello = NpcScript::pila(false, false);
+        assert_eq!(page_text(&hello.begin()), text(keys::WEDDING_PILA_HELLO));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use crate::handler::{
-    HandlerResult, RingRequest, WorldAction, WorldContext, WorldHandler, WorldResult,
+    GiftRequest, HandlerResult, RingRequest, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -7,8 +7,8 @@ use tracing::debug;
 
 /// `RING_ACTION` (reports b052 and b054): a proposal with an engagement ring
 /// box, its withdrawal, the partner's answer, and breaking off by dropping a
-/// token; and (report b066) sending and opening wedding invitations. The
-/// wishlist comes later.
+/// token; (report b066) sending and opening wedding invitations; and
+/// (report b085) the couple's wishlists.
 pub struct RingActionHandler;
 
 impl WorldHandler for RingActionHandler {
@@ -50,12 +50,50 @@ impl WorldHandler for RingActionHandler {
                 let item_id = reader.read_int()?;
                 RingRequest::OpenInvitation { slot, item_id }
             }
+            9 => {
+                let count = reader.read_short()?;
+                let wishes = (0..count.clamp(0, MAX_WISHES))
+                    .map(|_| reader.read_str_with_length())
+                    .collect::<Result<_, _>>()?;
+                RingRequest::Wishlist { wishes }
+            }
             other => {
                 debug!(mode = other, "Ignoring RING_ACTION");
                 return Ok(HandlerResult::empty());
             }
         };
         Ok(HandlerResult::empty().with(WorldAction::Ring(request)))
+    }
+}
+
+/// The most wishes read from a wishlist; the rest are ignored.
+const MAX_WISHES: i16 = 16;
+
+/// `WEDDING_ACTION` (report b085): the Wedding Gift window's give (mode 6),
+/// take (7) and close (8).
+pub struct WeddingActionHandler;
+
+impl WorldHandler for WeddingActionHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let request = match reader.read_byte()? {
+            6 => GiftRequest::Give {
+                slot: reader.read_short()?,
+                item_id: reader.read_int()?,
+                quantity: reader.read_short()?,
+            },
+            7 => GiftRequest::Take {
+                kind: reader.read_byte()?,
+                index: reader.read_byte()?,
+            },
+            8 => GiftRequest::Close,
+            other => {
+                debug!(mode = other, "Ignoring WEDDING_ACTION");
+                return Ok(HandlerResult::empty());
+            }
+        };
+        Ok(HandlerResult::empty().with(WorldAction::WeddingGift(request)))
     }
 }
 
