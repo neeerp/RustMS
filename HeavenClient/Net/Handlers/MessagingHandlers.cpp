@@ -21,6 +21,7 @@
 
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
+#include "../../Character/Blacklist.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Character/SkillId.h"
 #include "../../Data/CurseData.h"
@@ -655,8 +656,9 @@ namespace ms
 			bool from_admin = recv.read_bool();
 			std::string message = CurseData::filter(recv.read_string());
 
-			// Blocked, a whisper is turned away unseen, unless from an admin.
-			if (!from_admin && !Setting<AllowWhisper>::get().load())
+			// Blocked, or from a name on the Blacklist, a whisper is turned
+			// away unseen, unless from an admin (0x53228e, report b091).
+			if (!from_admin && (!Setting<AllowWhisper>::get().load() || Blacklist::listed(sender)))
 			{
 				WhisperBlockedPacket(sender).dispatch();
 
@@ -790,10 +792,13 @@ namespace ms
 				std::string from = recv.read_string();
 				recv.skip_byte();
 				int32_t messenger_id = recv.read_int();
+				// Nonzero skips the checks below; the server sends 0.
+				bool unchecked = recv.read_bool();
 				std::string self = Stage::get().get_player().get_stats().get_name();
 
-				// Blocked, the invitation is turned away unseen (FUN_00851478).
-				if (!Setting<AllowChatInvite>::get().load())
+				// Blocked, or from a name on the Blacklist, the invitation is
+				// turned away unseen (FUN_00851478, report b091).
+				if (!unchecked && (!Setting<AllowChatInvite>::get().load() || Blacklist::listed(from)))
 				{
 					MessengerDeclinePacket(from, self, true).dispatch();
 

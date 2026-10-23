@@ -34,6 +34,16 @@ namespace ms::Blacklist
 		return std::any_of(names.begin(), names.end(), [&](const std::string& listed) { return same_name(listed, name); });
 	}
 
+	// Letter for letter, as 0x49ed00 looks a sender or an inviter up (report b091).
+	inline bool listed(const std::vector<std::string>& names, const std::string& name)
+	{
+		return std::find(names.begin(), names.end(), name) != names.end();
+	}
+
+	// The same against the saved list (UIUserListBlacklist.cpp). Whispers, buddy, guild and alliance chat, and
+	// invitations from a listed name are turned away as if the Game Option blocked them.
+	bool listed(const std::string& name);
+
 	// The settings' list, split by commas, which no name holds, in the order added. As the load does
 	// (0x49e303), names that fail the filter or repeat one letter for letter (0x49ed00) are dropped, and
 	// the rest cut at MAX.
@@ -51,7 +61,7 @@ namespace ms::Blacklist
 
 			std::string name = text.substr(start, end - start);
 
-			if (character_name_valid(name) && std::find(names.begin(), names.end(), name) == names.end())
+			if (character_name_valid(name) && !listed(names, name))
 				names.push_back(name);
 
 			start = end + 1;

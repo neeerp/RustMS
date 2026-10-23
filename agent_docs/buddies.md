@@ -126,8 +126,7 @@ entry is the 39-byte `GW_Friend` record. Its channel is zero-based, or -1.
 - Raising the capacity (packet 0x15 is parsed but never sent), and the
   Cash Shop flags.
 - The MAP button. The Blacklist tab is in `inventory.md` ("Personal
-  shops"); v83 also turns away whispers and invitations from its names,
-  which HeavenClient does not.
+  shops").
 - Deleting a group's buddies along with it (v83's "DELETE BUDDIES AS WELL"
   checkbox).
 - The hover tip on a buddy ("Double-click to send a note." or to whisper).

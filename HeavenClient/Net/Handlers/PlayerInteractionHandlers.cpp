@@ -20,6 +20,7 @@
 
 #include "Helpers/LoginParser.h"
 
+#include "../../Character/Blacklist.h"
 #include "../../Configuration.h"
 #include "../../Data/CashCatalog.h"
 #include "../../IO/UI.h"
@@ -243,8 +244,9 @@ namespace ms
 						break;
 					}
 
-					// The Game Option turns trade requests away unseen (FUN_0065e53b).
-					if (!Setting<AllowTradeRequest>::get().load())
+					// The Game Option turns trade requests away unseen, as does
+					// the Blacklist (FUN_0065e53b, report b091).
+					if (!Setting<AllowTradeRequest>::get().load() || Blacklist::listed(inviter))
 					{
 						MiniRoomDeclinePacket(serial, MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
 						break;

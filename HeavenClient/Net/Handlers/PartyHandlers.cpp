@@ -3,6 +3,7 @@
 #include "../Packets/GameplayPackets.h"
 #include "../Packets/MessagingPackets.h"
 
+#include "../../Character/Blacklist.h"
 #include "../../Configuration.h"
 #include "../../Data/CurseData.h"
 
@@ -141,14 +142,16 @@ namespace ms
 			int32_t party_id = recv.read_int();
 			std::string inviter = recv.read_string();
 			// Nonzero for a party search's invitation, which v83 accepts
-			// unseen, or drops if the Game Option blocks either (FUN_00a3e31c).
+			// unseen, or drops if the Game Option blocks either or the
+			// inviter is on the Blacklist (FUN_00a3e31c, report b091).
 			int8_t search = recv.read_byte();
 			const std::string& self = player.get_stats().get_name();
+			bool listed = Blacklist::listed(inviter);
 			bool allowed = Setting<AllowPartyInvite>::get().load();
 
 			if (search)
 			{
-				if (allowed && Setting<AllowPartySearch>::get().load())
+				if (allowed && Setting<AllowPartySearch>::get().load() && !listed)
 					JoinPartyPacket(party_id, search).dispatch();
 
 				break;
@@ -165,7 +168,7 @@ namespace ms
 				break;
 			}
 
-			if (!allowed)
+			if (!allowed || listed)
 			{
 				DenyPartyRequestPacket(DenyPartyRequestPacket::BLOCKING, inviter, self).dispatch();
 				break;
@@ -365,6 +368,10 @@ namespace ms
 			return;
 
 		std::string name = recv.read_string();
+
+		// Nor from a name on the Blacklist, but for party chat (report b091).
+		if (mode != MultiChatPacket::Mode::PARTY && Blacklist::listed(name))
+			return;
 
 		// Nothing is heard from a buddy blocked in the Friend tab, whatever
 		// the mode; others aren't looked at (FUN_00531e00, report b020).
