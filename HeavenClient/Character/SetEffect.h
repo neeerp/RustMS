@@ -45,7 +45,7 @@ namespace ms
 
 		static std::optional<Layer> load(nl::node src);
 
-		// Show set `id`'s effect from its start, or none with -1.
+		// Show set `id`'s effect from its start, and its pets' backgrounds as the character faces, or none with -1.
 		void set(int32_t id, bool facing_right);
 
 		// A pet's `petBackgrnd` (FUN_00706678): it stands on the pet's feet, and mirrors as the character

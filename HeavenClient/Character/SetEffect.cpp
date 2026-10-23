@@ -7,6 +7,7 @@
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <utility>
 
 namespace ms
 {
@@ -213,7 +214,7 @@ namespace ms
 
 				again->shown = layer->shown;
 				again->opacity = layer->opacity;
-				layer = again;
+				layer = std::move(again);
 			}
 
 			layer->opacity = set_effect::fade(layer->opacity, layer->shown.shown, Constants::TIMESTEP);
