@@ -1216,3 +1216,4 @@
 "milk.cow.fills.0" = "[placeholder] You fill the bottle with milk. It is a third full."
 "milk.cow.fills.1" = "[placeholder] You fill the bottle with milk. It is two thirds full."
 "milk.cow.fills.2" = "[placeholder] You fill the bottle with milk. It is full."
+"area_boss.appeared" = "[placeholder] {mob} has appeared."

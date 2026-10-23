@@ -39,6 +39,21 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
     spawn point a mob of its own instead: no capacity, no room check and no
     first wait, and an emptied point fills again after its `mobTime`, at
     least 7 s.
+  - **Area bosses** (Mano, Stumpy, Faust, Timer, ..., 20 spots in
+    `net::mobs::AREA_BOSSES`) are in none of the world's map data, so
+    each gets a spawn point of its own as its field loads
+    (`area_boss_spawns`, on the ground below its spot; event copies of a
+    map get none), with `mobTime` `AREA_BOSS_TIME` (1800 s, as
+    Mushmom's): from then on it is a point with a `mobTime` like any
+    other, so the first boss comes out 3-21 min after the field loads,
+    not at server start as in Cosmic. Maps and spots are Cosmic's
+    `AreaBoss*` events', the middle of the line where Cosmic picks one at
+    random; the Snack Bar keeps only its first spot. Bamboo Warrior and
+    the six Door bosses are left out. Each time one comes out on a pass
+    after the load, its map gets a type-6 line (`area_boss.appeared`, a
+    placeholder naming it). The Snack Bar's point is emptied when the
+    stand dies, not the real boss it lets out, so a second stand can come
+    out while that boss lives. Defaults: QUESTIONS a117.
 - **Recovery:** every 8 s from its spawn a live mob regains its
   `hpRecovery` HP and `mpRecovery` MP, up to its maxima, as OrionAlpha's
   `Mob.update` does, hit or not (`MobSet::recover`, from the field tick).

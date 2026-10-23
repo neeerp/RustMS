@@ -1,8 +1,10 @@
 //! Mob templates (`Mob.nx`), loaded once.
 
 use crate::load::{self, asset_path};
+use game_data::footholds::Footholds;
 use game_data::mobs::{MobData, MobInfo};
 use game_data::skills::MobSkillLevel;
+use game_data::MapMobTemplate;
 use std::ops::RangeInclusive;
 use std::sync::OnceLock;
 
@@ -68,9 +70,108 @@ pub fn shielded_by(mob_id: i32) -> Option<RangeInclusive<i32>> {
     (mob_id == ZAKUM_BODY).then_some(ZAKUM_ARMS)
 }
 
+/// A boss that keeps coming back to its spot on one map: an area boss.
+/// The world's maps hold none of them, so each gets a spawn point of its
+/// own, which `mobTime` brings back as any boss's (Cosmic's `AreaBoss*`
+/// events give the maps, mobs and spots; a spot Cosmic picks at random
+/// along a line is the line's middle here, and Snack Bar's the first of
+/// its two). Its name is String.nx's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AreaBoss {
+    pub map: i32,
+    pub mob: i32,
+    pub name: &'static str,
+    /// It comes out on the ground below this point.
+    pub at: (i16, i16),
+}
+
+/// An area boss's spawn point's `mobTime`, in seconds: that of Mushmom's
+/// on Henesys Hunting Ground I, the like boss the world's maps do place.
+/// A placeholder (QUESTIONS a117).
+pub const AREA_BOSS_TIME: i32 = 1800;
+
+const fn area_boss(map: i32, mob: i32, name: &'static str, at: (i16, i16)) -> AreaBoss {
+    AreaBoss { map, mob, name, at }
+}
+
+pub const AREA_BOSSES: [AreaBoss; 20] = [
+    area_boss(104000400, 2220000, "Mano", (279, -496)),
+    area_boss(101030404, 3220000, "Stumpy", (800, 1280)),
+    area_boss(260010201, 3220001, "Deo", (645, 275)),
+    area_boss(230020100, 4220001, "Seruf", (-350, 520)),
+    area_boss(110040000, 5220001, "King Clang", (-400, 140)),
+    area_boss(100040105, 5220002, "Faust", (456, 278)),
+    area_boss(100040106, 5220002, "Faust", (474, 278)),
+    area_boss(220050100, 5220003, "Timer", (-385, 1030)),
+    area_boss(220050000, 5220003, "Timer", (-300, 1030)),
+    area_boss(220050200, 5220003, "Timer", (0, 1030)),
+    area_boss(251010102, 5220004, "Giant Centipede", (560, 50)),
+    area_boss(107000300, 6220000, "Dyle", (90, 119)),
+    area_boss(221040301, 6220001, "Zeno", (-4224, 776)),
+    area_boss(250010304, 7220000, "Tae Roon", (-450, 390)),
+    area_boss(222010310, 7220001, "Nine-Tailed Fox", (-150, 33)),
+    area_boss(250010504, 7220002, "King Sage Cat", (150, 540)),
+    area_boss(200010300, 8220000, "Eliza", (208, 83)),
+    area_boss(261030000, 8220002, "Chimera", (-450, 180)),
+    area_boss(240040401, 8220003, "Leviathan", (0, 1125)),
+    area_boss(105090310, 8220008, "Unknow Snack Bar", (-626, -604)),
+];
+
+/// The area boss `mob_id` on `map`, if it is one there.
+pub fn area_boss_on(map: i32, mob_id: i32) -> Option<&'static AreaBoss> {
+    AREA_BOSSES
+        .iter()
+        .find(|boss| boss.map == map && boss.mob == mob_id)
+}
+
+/// The spawn points of `map`'s area bosses, on the ground of `footholds`.
+pub fn area_boss_spawns(map: i32, footholds: &Footholds) -> Vec<MapMobTemplate> {
+    AREA_BOSSES
+        .iter()
+        .filter(|boss| boss.map == map)
+        .filter_map(|boss| {
+            let (x, y) = boss.at;
+            let (ground, foothold) = footholds.below(x, y)?;
+            Some(MapMobTemplate {
+                mob_id: boss.mob,
+                x,
+                y: ground,
+                foothold,
+                flip: false,
+                mob_time: AREA_BOSS_TIME,
+                hide: false,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn area_bosses_come_out_on_their_maps_ground() {
+        let Ok(data) = crate::get_game_data() else {
+            return;
+        };
+        for boss in AREA_BOSSES {
+            let field = data.field(boss.map).unwrap();
+            let spawns = area_boss_spawns(boss.map, &field.footholds);
+            let spawn = spawns.iter().find(|spawn| spawn.mob_id == boss.mob);
+            let spawn = spawn.unwrap_or_else(|| panic!("{boss:?} has no ground"));
+            // The ground right below the spot, not a floor further down.
+            assert!((0..150).contains(&(spawn.y - boss.at.1)), "{boss:?}");
+            assert!(info(boss.mob).is_some(), "{boss:?}");
+            // The world's maps place none of them already.
+            assert!(
+                field.mob_spawns.iter().all(|s| s.mob_id != boss.mob),
+                "{boss:?}"
+            );
+        }
+        assert_eq!(area_boss_on(104000400, 2220000).unwrap().name, "Mano");
+        assert_eq!(area_boss_on(104000400, 2220001), None);
+        assert_eq!(area_boss_on(100000000, 2220000), None);
+    }
 
     #[test]
     fn zakums_arms_shield_only_its_first_body() {

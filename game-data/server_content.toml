@@ -1066,6 +1066,7 @@ unsourced = [
     "milk.cow.fills.0",
     "milk.cow.fills.1",
     "milk.cow.fills.2",
+    "area_boss.appeared",
 ]
 
 [text."glTutoMsg0.message"]

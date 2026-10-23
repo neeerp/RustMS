@@ -146,15 +146,21 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
     else {
         return MobSet::default();
     };
-    let mobs = MobSet::new(field.mob_spawns.iter().filter_map(|spawn| {
-        match net::mobs::info(spawn.mob_id) {
-            Some(info) => Some((spawn.clone(), info)),
+    // Copies of a map made for an event keep its own mobs only.
+    let area_bosses = match field_key.instance_id {
+        0 => net::mobs::area_boss_spawns(field_key.map_id, &field.footholds),
+        _ => Vec::new(),
+    };
+    let spawns = field.mob_spawns.iter().cloned().chain(area_bosses);
+    let mobs = MobSet::new(
+        spawns.filter_map(|spawn| match net::mobs::info(spawn.mob_id) {
+            Some(info) => Some((spawn, info)),
             None => {
                 warn!(field = ?field_key, mob_id = spawn.mob_id, "Unknown mob in spawn list");
                 None
             }
-        }
-    }))
+        }),
+    )
     .with_capacity(mob_capacity(
         field.footholds.bounds_within(field.view_limit),
         field.mob_rate,
