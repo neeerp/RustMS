@@ -5,6 +5,7 @@
 #include "../../IO/UITypes/EnterNumber.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -307,6 +308,95 @@ namespace ms
 		inline bool over_low_level_limit(int32_t level, int64_t total)
 		{
 			return level <= LOW_LEVEL && total > LOW_LEVEL_MESO;
+		}
+	}
+
+	// The hired merchant's differences (mini room type 5, the dialog of
+	// 0x517eca, which builds on the personal shop's).
+	namespace hired_merchant
+	{
+		// Why the merchant closed on us (0x518d5f), and whether the window
+		// goes; v83 keeps it open, with an empty notice, for anything else.
+		struct Leave
+		{
+			std::string text;
+			bool closes;
+		};
+
+		inline Leave leave(int8_t reason)
+		{
+			switch (reason)
+			{
+			case 6:
+				return { "The store cannot be opened as the time limit has passed.", true };
+			case 0x11:
+				return { "The owner of the store is currently\\nundergoing store maintenance.\\nPlease try again in a bit.", true };
+			case 0x12:
+				return { "It is past the working hours,\\nso the store will close.", true };
+			case 0x13:
+				return { "The use of the Remote Control stopped\\ndue to moving to another map. Please use it later.", true };
+			case 0x14:
+				return { "Your shop was closed at the discretion of a GM. Please see Fred to recover your items.", true };
+			default:
+				return { "", false };
+			}
+		}
+
+		// How closing the store went (0x5190e1).
+		inline std::string close_text(int8_t code)
+		{
+			switch (code)
+			{
+			case 0:
+				return "Both the items and mesos\\nare successfully retrieved.";
+			case 1:
+				return "Unable to retrieve the items and mesos due to the store having too much money.\\n"
+					"Please go see Fredrick at the Free Market entrance.";
+			case 2:
+				return "Unable to retrieve the items because one of the items ___________, but the Mesos were retrieved.\\n"
+					"Please go see Fredrick at the Free Market entrance.";
+			case 3:
+				return "Unable to retrieve the items due to full inventory, but the Mesos were retrieved.\\n"
+					"the item could not be retrieved.\\nPlease go see Fredrick at the Free Market entrance.";
+			case 4:
+				return "Unable to retrieve the items for unknown reasons, but the Mesos were retrieved.\\n"
+					"Please go see Fredrick at the Free Market entrance.";
+			default:
+				return "";
+			}
+		}
+
+		// The owner's countdown (0x518314): a store lives 1440 minutes from
+		// opening. Nothing outside its last day.
+		inline std::string countdown_text(int64_t elapsed_ms)
+		{
+			auto left = static_cast<int32_t>(1439 - elapsed_ms / 60000);
+			int32_t hours = left / 60;
+
+			if (left < 0 || hours > 23)
+				return "";
+
+			char text[32];
+			std::snprintf(text, sizeof(text), "Store Closed / %02d : %02d", hours, left % 60);
+
+			return text;
+		}
+
+		// The owner's records as the shop's sales window keeps them; the
+		// total is what the records add up to.
+		inline personal_shop::Sales sales(const std::vector<mini_room::MerchantSale> &sold, int32_t net)
+		{
+			personal_shop::Sales sales;
+
+			for (const mini_room::MerchantSale &sale : sold)
+			{
+				sales.sold.push_back({ sale.itemid, sale.quantity, sale.buyer });
+				sales.total += sale.meso;
+			}
+
+			sales.received = net;
+
+			return sales;
 		}
 	}
 }

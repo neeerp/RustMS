@@ -248,6 +248,64 @@ int main()
 		require(filter_chat("Bob : a : b", stars) == "Bob : *****", "the first separator ends the name");
 		require(filter_chat("darn", stars) == "****", "a line without a name is filtered whole");
 
+		// A hired merchant's balloon has neither the private nor the game byte.
+		Writer merchant;
+		merchant.put<int8_t>(5).put<int32_t>(0x40000007).string("Cheap pots");
+		merchant.put<uint8_t>(3).put<uint8_t>(1).put<uint8_t>(4);
+		InPacket merchant_recv(merchant.bytes.data(), merchant.bytes.size());
+		std::optional<MiniRoomBox> box = read_merchant_box(merchant_recv);
+
+		require(box && box->type == HIRED_MERCHANT && box->serial == 0x40000007 && box->title == "Cheap pots",
+			"a merchant's balloon carries its room and title");
+		require(box->skin == 3 && box->users == 1 && box->max_users == 4, "then its skin and seats");
+		require(!merchant_recv.available(), "and nothing more");
+
+		Writer no_box;
+		no_box.put<int8_t>(0);
+		InPacket no_box_recv(no_box.bytes.data(), no_box.bytes.size());
+
+		require(!read_merchant_box(no_box_recv) && !no_box_recv.available(), "type 0 is no balloon");
+
+		// The owner in for maintenance: the employee in slot 0, a line of
+		// chat, then the books before the title and the rows.
+		Writer maintenance;
+		maintenance.put<int8_t>(5).put<uint8_t>(4).put<uint8_t>(0);
+		maintenance.put<uint8_t>(0).put<int32_t>(5030000).string("Alice");
+		maintenance.put<uint8_t>(0xFF);
+		maintenance.put<int16_t>(1).string("Bob : hi").put<uint8_t>(1);
+		maintenance.string("Alice");
+		maintenance.put<int32_t>(90000).put<uint8_t>(0);
+		maintenance.put<uint8_t>(1).put<int32_t>(4000000).put<int16_t>(5).put<int32_t>(1000).string("Bob");
+		maintenance.put<int32_t>(970);
+		maintenance.string("Shells").put<uint8_t>(16).put<int32_t>(970);
+		maintenance.put<uint8_t>(1).put<int16_t>(1).put<int16_t>(5).put<int32_t>(1000).stack(4000000, 5);
+		InPacket maintenance_recv(maintenance.bytes.data(), maintenance.bytes.size());
+		Enter books = read_enter(maintenance_recv, read_hair);
+
+		require(!maintenance_recv.available(), "a merchant's enter is read up to its end");
+		require(books.type == HIRED_MERCHANT && books.own_slot == 0 && books.employee == 5030000, "the employee sits in slot 0");
+		require(books.members.size() == 1 && books.members[0].name == "Alice" && books.owner == "Alice", "named for its owner");
+		require(books.chat.size() == 1 && books.chat[0].first == "Bob : hi" && books.chat[0].second == 1, "with the chat so far");
+		require(books.open_ms == 90000 && !books.setup && books.net == 970, "the owner sees how long it has been open");
+		require(books.sold.size() == 1 && books.sold[0].itemid == 4000000 && books.sold[0].quantity == 5
+			&& books.sold[0].meso == 1000 && books.sold[0].buyer == "Bob", "and what it sold");
+		require(books.title == "Shells" && books.max_items == 16 && books.meso == 970, "then its title and mesos");
+		require(books.listings.size() == 1 && books.listings[0].bundles == 1 && books.listings[0].item.itemid == 4000000, "and its rows");
+
+		// A visitor sees no books.
+		Writer browsing;
+		browsing.put<int8_t>(5).put<uint8_t>(4).put<uint8_t>(1);
+		browsing.put<uint8_t>(0).put<int32_t>(5030000).string("Alice");
+		browsing.put<uint8_t>(1).put<int32_t>(30030).string("Bob");
+		browsing.put<uint8_t>(0xFF);
+		browsing.put<int16_t>(0).string("Alice");
+		browsing.string("Shells").put<uint8_t>(16).put<int32_t>(0).put<uint8_t>(0);
+		InPacket browsing_recv(browsing.bytes.data(), browsing.bytes.size());
+		Enter shopper = read_enter(browsing_recv, read_hair);
+
+		require(!browsing_recv.available() && shopper.own_slot == 1 && shopper.sold.empty(), "a visitor's enter has no books");
+		require(shopper.members.size() == 2 && shopper.members[1].look.hairid == 30030, "the visitors follow the employee");
+
 		std::cout << "Mini room passed\n";
 		return 0;
 	}

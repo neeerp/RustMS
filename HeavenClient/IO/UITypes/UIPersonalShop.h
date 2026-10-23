@@ -12,6 +12,7 @@
 #include "../../Net/Handlers/PersonalShop.h"
 
 #include <array>
+#include <chrono>
 #include <vector>
 
 namespace ms
@@ -66,6 +67,22 @@ namespace ms
 		// The items for sale, after any change (mode 0x19).
 		void set_listings(const std::vector<mini_room::Listing> &listings);
 
+		// A hired merchant's window rather than a shop's.
+		bool is_merchant() const;
+
+		// The mesos a merchant holds, before its rows in mode 0x19.
+		void set_merchant_meso(int32_t meso);
+
+		// The merchant crossed off what sold and has `meso` (mode 0x28).
+		void organized(int32_t meso);
+
+		// The owner closed the merchant; leaves, saying what came back
+		// (mode 0x2a).
+		void store_closed(int8_t code);
+
+		// The owner took the merchant's mesos (mode 0x2c).
+		void meso_taken();
+
 		// Someone bought from my shop (mode 0x1a).
 		void sold(const personal_shop::SoldNotice &notice);
 
@@ -118,6 +135,10 @@ namespace ms
 
 		void exit();
 
+		// How a hired merchant's window closes (0x51809d): `reason` 1
+		// leaves, 2 also reopens a merchant in maintenance, 8 closes it.
+		void close_merchant(int8_t reason);
+
 		// A row of my shop dragged back to the inventory (FUN_006fb368).
 		class RowIcon : public Icon::Type
 		{
@@ -150,7 +171,11 @@ namespace ms
 			ENTER,
 			BAN1,
 			BAN2,
-			BAN3
+			BAN3,
+			// A hired merchant's owner's (0x6fa4b2)
+			RESUME,
+			ARRANGE,
+			COIN
 		};
 
 		struct Member
@@ -171,6 +196,14 @@ namespace ms
 
 		std::array<Member, personal_shop::SEATS> members;
 		uint8_t own_slot;
+		bool merchant;
+		Texture employee;
+		int32_t merchant_meso;
+		// How long the merchant had been open when we came in, and when
+		// that was, for the time it has left.
+		int64_t open_ms;
+		std::chrono::steady_clock::time_point entered;
+		Text countdown;
 		// Rows the shop holds (16).
 		uint8_t max_items;
 		// Visitors only ever see an open shop.
@@ -212,7 +245,7 @@ namespace ms
 		static constexpr bool FOCUSED = true;
 		static constexpr bool TOGGLED = false;
 
-		UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity);
+		UIShopSell(InventoryType::Id tab, int16_t slot, int32_t itemid, int16_t quantity, bool merchant);
 
 		void draw(float inter) const override;
 
@@ -248,6 +281,7 @@ namespace ms
 		int16_t slot;
 		int32_t itemid;
 		int16_t quantity;
+		bool merchant;
 		bool whole;
 		bool bundled;
 

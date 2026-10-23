@@ -195,7 +195,11 @@ namespace ms
 			// The personal shop's own
 			BUY_RESULT = 0x18,
 			LISTINGS = 0x19,
-			SOLD = 0x1A
+			SOLD = 0x1A,
+			// The hired merchant's own
+			ORGANIZED = 0x28,
+			STORE_CLOSED = 0x2A,
+			MESO_TAKEN = 0x2C
 		};
 
 		// The chat line of a notice by code rather than a member
@@ -262,7 +266,7 @@ namespace ms
 					{
 						UI::get().emplace<UITradingRoom>(enter);
 					}
-					else if (enter.type == mini_room::PERSONAL_SHOP)
+					else if (enter.type == mini_room::PERSONAL_SHOP || enter.type == mini_room::HIRED_MERCHANT)
 					{
 						UI::get().emplace<UIPersonalShop>(enter);
 					}
@@ -344,10 +348,29 @@ namespace ms
 					shop->buy_result(recv.read_byte());
 					break;
 				case Mode::LISTINGS:
+					// A merchant's mesos come first (0x518852).
+					if (shop->is_merchant())
+						shop->set_merchant_meso(recv.read_int());
+
 					shop->set_listings(mini_room::read_listings(recv));
 					break;
 				case Mode::SOLD:
 					shop->sold(personal_shop::read_sold(recv));
+					break;
+				case Mode::ORGANIZED:
+					if (shop->is_merchant())
+						shop->organized(recv.read_int());
+
+					break;
+				case Mode::STORE_CLOSED:
+					if (shop->is_merchant())
+						shop->store_closed(recv.read_byte());
+
+					break;
+				case Mode::MESO_TAKEN:
+					if (shop->is_merchant())
+						shop->meso_taken();
+
 					break;
 				default:
 					break;

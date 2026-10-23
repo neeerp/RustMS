@@ -224,6 +224,7 @@ namespace ms
 		reactors.clear();
 		mists.clear();
 		kites.clear();
+		merchants.clear();
 		doors.clear();
 		summons.clear();
 		// The server brings the player's pets out again on the new field.
@@ -318,6 +319,7 @@ namespace ms
 			tilesobjs.draw(id, viewpos, alpha);
 			doors.draw(id, town_doors, viewpos, alpha);
 			reactors.draw(id, viewx, viewy, alpha);
+			merchants.draw(id, viewx, viewy, alpha);
 			npcs.draw(id, viewx, viewy, alpha);
 			mobs.draw(id, viewx, viewy, alpha);
 			chars.draw(id, viewx, viewy, alpha);
@@ -350,6 +352,7 @@ namespace ms
 		// Kites share the mini room balloons' z (0xc0061440), in front of
 		// everyone and behind the effect layer.
 		kites.draw(viewx, viewy, alpha);
+		merchants.draw_balloons(viewx, viewy);
 		// v83 puts a mist's clouds on the effect layer, above the map's
 		// objects (z 0xc00614a4).
 		mists.draw(viewx, viewy, alpha);
@@ -443,6 +446,7 @@ namespace ms
 		reactors.update(physics);
 		mists.update();
 		kites.update();
+		merchants.update(physics);
 		doors.update(physics);
 		npcs.update(physics);
 		Point<int16_t> playerpos = player.get_position();
@@ -1348,6 +1352,14 @@ namespace ms
 		return kites.at(cursorpos - camera.position());
 	}
 
+	std::optional<MapMerchants::Hit> Stage::merchant_at(Point<int16_t> cursorpos) const
+	{
+		if (state != State::ACTIVE)
+			return std::nullopt;
+
+		return merchants.at(cursorpos - camera.position());
+	}
+
 	int32_t Stage::mini_room_at(Point<int16_t> cursorpos)
 	{
 		if (state != State::ACTIVE)
@@ -1511,6 +1523,11 @@ namespace ms
 	MapSummons &Stage::get_summons()
 	{
 		return summons;
+	}
+
+	MapMerchants &Stage::get_merchants()
+	{
+		return merchants;
 	}
 
 	MapDoors &Stage::get_doors()

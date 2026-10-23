@@ -37,6 +37,7 @@
 #include "UITypes/UIKite.h"
 #include "UITypes/UIMessenger.h"
 #include "UITypes/UIMiniMap.h"
+#include "UITypes/UINotice.h"
 #include "UITypes/UIQuestComplete.h"
 #include "UITypes/UIScriptMessage.h"
 #include "UITypes/UIQuestLog.h"
@@ -300,6 +301,26 @@ namespace ms
 		// Someone's shop balloon comes before them (FUN_0094fbbf).
 		else if (int32_t serial = Stage::get().mini_room_at(pos))
 			MiniRoomVisitPacket(serial).dispatch();
+		// Then a hired merchant's; its owner is asked first (SP 0xd8b).
+		else if (std::optional<MapMerchants::Hit> merchant = Stage::get().merchant_at(pos))
+		{
+			int32_t serial = merchant->serial;
+
+			if (merchant->owner != Stage::get().get_player().get_oid())
+			{
+				MiniRoomVisitPacket(serial).dispatch();
+				return;
+			}
+
+			std::string ask = "You can't sell items while managing the store.\\n"
+							  "Would you like to start managing the store?";
+
+			UI::get().emplace<UIYesNo>(ask, [serial](bool yes)
+			{
+				if (yes)
+					MiniRoomVisitPacket(serial).dispatch();
+			});
+		}
 		// Then a kite, which opens its message.
 		else if (const MapKites::Kite *kite = Stage::get().kite_at(pos))
 			emplace<UIKiteView>(kite->itemid, kite->name, kite->message);
