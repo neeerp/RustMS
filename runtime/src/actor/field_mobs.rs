@@ -1014,12 +1014,14 @@ impl MobSet {
     /// The mobs `summoner` calls up: as many of `summoned` as its `limit`
     /// (0 for none) leaves room for, where it stands, facing its way, and
     /// under its controller, unless the field already holds
-    /// `MOST_TO_SUMMON_AMONG` mobs (Cosmic `MobSkill`). They never respawn.
+    /// `MOST_TO_SUMMON_AMONG` mobs (Cosmic `MobSkill`). `spot` may put each
+    /// elsewhere, giving its place and foothold. They never respawn.
     pub fn summon(
         &mut self,
         summoner: i32,
         summoned: &[MobInfo],
         limit: i32,
+        mut spot: impl FnMut() -> Option<((i16, i16), i16)>,
         now: Instant,
     ) -> Vec<i32> {
         let Some(caster) = self.live.get(&summoner) else {
@@ -1046,6 +1048,7 @@ impl MobSet {
         let mut spawned = Vec::new();
         for info in summoned.iter().take(room) {
             let object_id = self.object_ids.next();
+            let (at, foothold) = spot().unwrap_or((at, foothold));
             let mut mob = LiveMob::new(object_id, info.clone(), at, stance, foothold, now);
             mob.summoner = Some(summoner);
             mob.controller = controller;
@@ -1899,6 +1902,7 @@ mod tests {
             mob,
             &[snail_spawn(0).1, snail_spawn(0).1, snail_spawn(0).1],
             2,
+            || None,
             now,
         );
         assert_eq!(summoned.len(), 2);
@@ -1908,7 +1912,9 @@ mod tests {
             (Some(mob), None, Some(2))
         );
         assert_eq!((summon.x, summon.y), (100, -25));
-        assert!(mobs.summon(mob, &[snail_spawn(0).1], 2, now).is_empty());
+        assert!(mobs
+            .summon(mob, &[snail_spawn(0).1], 2, || None, now)
+            .is_empty());
         // Hurt below half, only Heal remains while the summons live, and
         // only with MP for it.
         let later = now + GRANT_TIMEOUT;
@@ -2155,8 +2161,12 @@ mod tests {
             mobs.place(mob(2), (0, 0), 5, None, now);
         }
         // One short of 80, it summons them all; at 80, none.
-        assert_eq!(mobs.summon(caster, &[mob(3), mob(3)], 0, now).len(), 2);
-        assert!(mobs.summon(caster, &[mob(3)], 0, now).is_empty());
+        assert_eq!(
+            mobs.summon(caster, &[mob(3), mob(3)], 0, || None, now)
+                .len(),
+            2
+        );
+        assert!(mobs.summon(caster, &[mob(3)], 0, || None, now).is_empty());
     }
 
     #[test]
