@@ -1331,10 +1331,12 @@ pub mod keys {
     pub const ZAKUM_ALI_BYE: &str = "zakum.ali.bye";
     /// The pink line to Zakum's altar as the Eye of Fire brings Zakum out.
     pub const ZAKUM_ALTAR_SUMMONED: &str = "zakum.altar.summoned";
+    /// The line to the whole world as Zakum's last body dies.
+    pub const ZAKUM_VICTORY: &str = "zakum.victory";
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 48] = [
+    pub const ZAKUM: [&str; 49] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -1383,6 +1385,7 @@ pub mod keys {
         ZAKUM_MINE_MIMICS,
         ZAKUM_ALI_BYE,
         ZAKUM_ALTAR_SUMMONED,
+        ZAKUM_VICTORY,
     ];
 
     /// The magic rocks of Orbis Tower and Eos Tower; `{item}` is the

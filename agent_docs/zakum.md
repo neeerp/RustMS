@@ -3,8 +3,8 @@
 The way to Zakum in El Nath's Dead Mine, after Cosmic. Built so far: the
 chiefs' approval, the Dead Mine party quest (stage 1, in
 [party-quests](./party-quests.md)), the Breath of Lava (stage 2), the
-forging of the Eyes of Fire (stage 3), the gate, and the boss on its altar.
-Not yet: the win and the expedition squad. The slice plan and its open
+forging of the Eyes of Fire (stage 3), the gate, the boss on its altar, and
+its fall. Not yet: the expedition squad. The slice plan and its open
 questions are in v83ref's `reports/a097-zakum.md`,
 `reports/a105-zakum-dead-mine.md` and `reports/a106-zakum-boss.md`.
 
@@ -112,9 +112,20 @@ Players who come in while an arm lives see the body plainly (-1). Mobs, and
 Zakum's summons among them, summon nothing on a field that already holds 80
 mobs.
 
-Not yet built: the expedition that brings players to the altar, closing it
-after the summoning, and the win (clear effect, the gate reactor 2118002,
-the world notice, quest 100200).
+When 8800002 dies on the altar map (anywhere else it is just a mob),
+`zakum_falls` shows the map the party quests' clear
+effect (`quest/party/clear`) and plays their jingle (`Party1/Clear`). It
+also has the first player's client that takes the message tell the whole world (a chat line that
+links no item, BROADCAST_MSG 6; placeholder `zakum.victory`), through
+`ServerMessage::Announce`, since a field has no way to the directory. This
+is Cosmic's `ZakumBattle.monsterKilled` and `broadcastZakumVictory`.
+
+Not yet built: the expedition that brings players to the altar and closes
+it after the summoning. Upstream's gate reactor (2118002) shuts the Door
+to Zakum while an expedition is in and opens again on its win or end, and a
+member of a won expedition completes quest 100200 on leaving. Both belong
+to the expedition: with none, nothing shuts the gate, and 100200 is the
+client-invisible marker `ZAKUM_APPROVED` here.
 
 ## Tests
 
@@ -126,6 +137,8 @@ the world notice, quest 100200).
   altar brings out the music, the trembling body and its arms. Hits on the
   body do nothing, and no one moves it, until all eight arms are dead. Then
   it comes back plainly under control, and dies through 8800001 to 8800002.
+  Its last death shows the map the clear effect and jingle, and a player on
+  another map reads the victory line.
 - `integration-harness/tests/zakum_trials.rs`: a level-50 Fighter, unapproved
   and then without the trials, is turned back at the gate. They are approved
   by Tylus, cross the Breath of Lava, get the Breath of Fire from Lira, have

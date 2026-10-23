@@ -27,8 +27,8 @@ use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
 };
 use net::packet::build::world::effect::{
-    build_blow_weather, build_boss_hp_bar, build_field_music, build_item_emotion,
-    build_mist_item_effect,
+    build_blow_weather, build_boss_hp_bar, build_field_effect, build_field_music,
+    build_field_sound, build_item_emotion, build_mist_item_effect,
 };
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair,
@@ -1653,6 +1653,34 @@ impl FieldActor {
             }
         }
         self.make_real(kill.mob_id);
+        if kill.mob_id == net::mobs::ZAKUM_LAST && self.key.map_id == net::mobs::ZAKUM_ALTAR_MAP {
+            self.zakum_falls();
+        }
+    }
+
+    /// Zakum's last body died on its altar: the map sees the party quests' clear effect
+    /// and hears their jingle, and the world reads of it (Cosmic
+    /// `ZakumBattle.monsterKilled`, `broadcastZakumVictory`).
+    fn zakum_falls(&mut self) {
+        for packet in [
+            build_field_effect("quest/party/clear"),
+            build_field_sound("Party1/Clear"),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            self.broadcast(None, packet);
+        }
+        let line = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
+        let Ok(packet) = build_item_line(&line, 0) else {
+            return;
+        };
+        // Through the first client that takes it.
+        self.occupants.values().any(|occupant| {
+            occupant
+                .handle
+                .send(ServerMessage::Announce(packet.clone()))
+        });
     }
 
     /// The mobs the death of a `mob_id` left unshielded become real: their

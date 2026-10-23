@@ -1014,6 +1014,7 @@
 "zakum.mine.mimics" = "[placeholder] Monsters were hiding in the box!"
 "zakum.ali.bye" = "[placeholder] Back you go. Until next time."
 "zakum.altar.summoned" = "[placeholder] The Eye of Fire has woken Zakum!"
+"zakum.victory" = "[placeholder] Zakum has fallen. Its conquerors are the heroes of Ossyria!"
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"

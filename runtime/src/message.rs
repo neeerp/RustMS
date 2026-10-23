@@ -388,6 +388,9 @@ pub enum ServerMessage {
         clock: tokio::time::Instant,
     },
     SendPacket(Packet),
+    /// A packet for everyone in the world, sent on by this player's client
+    /// (a field has no way to the directory).
+    Announce(Packet),
     /// A quest drop's packet, which the player sees only if they still need
     /// `item_id` for `quest` (`net::loot::wants`).
     QuestDrop {
