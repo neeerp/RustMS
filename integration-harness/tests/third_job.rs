@@ -99,6 +99,8 @@ async fn a_fighter_passes_the_tests_and_becomes_a_crusader() {
     warp(c, CHIEFS_RESIDENCE, "", &mut t).await;
     barrier(c, &m, &mut t).await;
     let t = step(c, &m, talk(CHIEFS_RESIDENCE, TYLUS)).await;
+    assert_eq!(t.prompts, [(TYLUS, 4)], "the test or Zakum");
+    let t = step(c, &m, answer(4, 1, Some(0))).await;
     assert_eq!(t.prompts, [(TYLUS, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.prompts, [(TYLUS, 0)]);
@@ -173,9 +175,11 @@ async fn a_fighter_passes_the_tests_and_becomes_a_crusader() {
     warp(c, CHIEFS_RESIDENCE, "", &mut t).await;
     barrier(c, &m, &mut t).await;
     let t = step(c, &m, talk(CHIEFS_RESIDENCE, TYLUS)).await;
-    assert_eq!(t.prompts, [(TYLUS, 0)]);
-    let t = step(c, &m, answer(0, 1, None)).await;
+    assert_eq!(t.prompts, [(TYLUS, 4)]);
+    let t = step(c, &m, answer(4, 1, Some(0))).await;
     assert_eq!(t.items, [(NECKLACE_OF_STRENGTH, -1)]);
+    assert_eq!(t.prompts, [(TYLUS, 0)]);
+    step(c, &m, answer(0, 1, None)).await;
 
     // The Holy Stone takes the crystal and asks five questions.
     let mut t = Trace::default();

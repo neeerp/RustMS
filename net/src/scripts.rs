@@ -5,6 +5,7 @@
 
 use crate::content;
 use crate::conti::Portal;
+use crate::npc_scripts;
 use game::character::{FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
@@ -804,6 +805,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(cave, named(cave, "out00")))
         }
         "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
+        // The gate to Zakum: a chief's approval, the trials, and an Eye of
+        // Fire. Upstream also keeps it shut while the gate reactor is
+        // closed after a win; nothing closes it yet.
+        "Zakum05" if !npc_scripts::zakum_approved(player) => refused(keys::ZAKUM_GATE_UNAPPROVED),
+        "Zakum05" if quest(npc_scripts::ZAKUM_TRIALS_DONE) != QuestState::Started => {
+            refused(keys::ZAKUM_GATE_TRIALS)
+        }
+        "Zakum05" if player.inventory.count(npc_scripts::EYE_OF_FIRE) == 0 => {
+            refused(keys::ZAKUM_GATE_NO_EYE)
+        }
+        "Zakum05" => through(Effect::WarpToPortal(
+            npc_scripts::ENTRANCE_TO_ZAKUM,
+            named(npc_scripts::ENTRANCE_TO_ZAKUM, "west00"),
+        )),
         // Cosmic starts the fight with the Yeti brothers here while Stop the
         // Wedding (2330) is taken and they aren't all beaten; that isn't in,
         // so the way is open to everyone rather than shut for good.

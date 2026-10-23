@@ -786,6 +786,11 @@ const BLESSED: i16 = 32302;
 /// A Nana's favour, by her place in `NANA_TASKS`: asked, and done once.
 const NANA_ASKED: i16 = 32310;
 const NANA_DONE: i16 = 32320;
+/// A chief has approved the player for Zakum (upstream quest 100200).
+pub(crate) const ZAKUM_APPROVED: i16 = 32400;
+/// Adobis forged the player's Eyes of Fire: the trials are done (upstream
+/// quest 100201).
+pub(crate) const ZAKUM_TRIALS_DONE: i16 = 32401;
 const DOOR_OF_DIMENSION: i32 = 1061009;
 const SPARKLING_CRYSTAL: i32 = 1061010;
 const HOLY_STONE: i32 = 2030006;
@@ -1286,6 +1291,12 @@ impl NpcScript {
         }
         if let Some(line) = FOURTH_JOBS.iter().find(|line| line.instructor == npc_id) {
             return Some(fourth_job_instructor(line, player));
+        }
+        match npc_id {
+            ADOBIS => return Some(adobis(player)),
+            LIRA => return Some(lira()),
+            AMON => return Some(amon(player)),
+            _ => {}
         }
         if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
             return Some(ticket_seller(npc_id, route, player));
@@ -4608,11 +4619,21 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
     let say = |part: &str| text(&keys::third_job(line.text, part));
     let mut script = NpcScript::new(line.chief, Vec::new());
     if third_job_line(player).is_none_or(|own| own.job != line.job) {
-        script.pages = vec![Page::Say(say("chief.other"))];
+        let stats = &player.stats;
+        // Any job of the chief's class from level 50, Aran and Cygnus
+        // included (upstream), may ask for Zakum.
+        script.pages = if stats.job / 100 % 10 * 100 == line.job && stats.level >= ZAKUM_LEVEL {
+            zakum_approval(player)
+        } else {
+            vec![Page::Say(say("chief.other"))]
+        };
         return script;
     }
     let job = player.stats.job + 1;
-    script.pages = if marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM) {
+    // Past the Holy Stone, the chief only speaks of the advance; before,
+    // a second job may pick the test or Zakum.
+    let advancing = marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM);
+    let pages = if marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM) {
         if !player.can_take_third_job(job) {
             vec![Page::Say(say("chief.sp"))]
         } else {
@@ -4635,14 +4656,16 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
     } else if marked(player, HOLY_STONE_ASSIGNED) {
         vec![Page::Say(say("chief.wisdom"))]
     } else if holds(player, NECKLACE_OF_STRENGTH) {
-        script.on_end = vec![
-            Effect::TakeItem {
-                item_id: NECKLACE_OF_STRENGTH,
-                quantity: 1,
-            },
-            Effect::Mark(HOLY_STONE_ASSIGNED),
-        ];
-        vec![Page::Say(say("chief.strength"))]
+        vec![Page::Act {
+            text: say("chief.strength"),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: NECKLACE_OF_STRENGTH,
+                    quantity: 1,
+                },
+                Effect::Mark(HOLY_STONE_ASSIGNED),
+            ],
+        }]
     } else if marked(player, CHIEF_ASSIGNED) || marked(player, INSTRUCTOR_ASSIGNED) {
         vec![Page::Say(say("chief.remind"))]
     } else {
@@ -4655,7 +4678,152 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
             Page::Say(say("chief.go")),
         ]
     };
+    script.pages = if advancing {
+        pages
+    } else {
+        vec![Page::Menu {
+            text: text(keys::ZAKUM_CHIEF_MENU),
+            choices: vec![
+                (text(keys::ZAKUM_CHIEF_THIRD_JOB), pages),
+                (text(keys::ZAKUM_CHIEF_ZAKUM), zakum_approval(player)),
+            ],
+        }]
+    };
     script
+}
+
+/// The lowest level a chief approves for Zakum, and Adobis warns of the
+/// trials (upstream).
+const ZAKUM_LEVEL: u8 = 50;
+const ADOBIS: i32 = 2030008;
+const LIRA: i32 = 2032003;
+const AMON: i32 = 2030010;
+/// From the Dead Mine (stage 1), for the Breath of Lava.
+const FIRE_ORE: i32 = 4031061;
+/// Lira's, past the Breath of Lava (stage 2).
+const BREATH_OF_FIRE: i32 = 4031062;
+const GOLD_TOOTH: i32 = 4000082;
+const GOLD_TEETH_TO_FORGE: i16 = 30;
+pub(crate) const EYE_OF_FIRE: i32 = 4001017;
+/// Where Adobis stands, and the gate to Zakum.
+const DOOR_TO_ZAKUM: i32 = 211042300;
+const BREATH_OF_LAVA: i32 = 280020000;
+/// Amon's way out of Zakum's altar (upstream sends ZakumBattle there).
+const ZAKUM_ALTAR: i32 = 280030000;
+pub(crate) const ENTRANCE_TO_ZAKUM: i32 = 211042400;
+
+pub(crate) fn zakum_approved(player: &Player) -> bool {
+    marked(player, ZAKUM_APPROVED)
+}
+
+/// A chief's approval for Zakum, given once and repeated after.
+fn zakum_approval(player: &Player) -> Vec<Page> {
+    let approved = text(keys::ZAKUM_CHIEF_APPROVED);
+    if zakum_approved(player) {
+        vec![Page::Say(approved)]
+    } else {
+        vec![Page::Act {
+            text: approved,
+            effects: vec![Effect::Mark(ZAKUM_APPROVED)],
+        }]
+    }
+}
+
+/// Adobis at the Door to Zakum: a warning until a chief approves, then
+/// the trials. The Dead Mine (stage 1) is not built yet; the Breath of
+/// Lava takes its Fire Ore, and the forge turns both trials' items and 30
+/// Gold Teeth into five Eyes of Fire.
+fn adobis(player: &Player) -> NpcScript {
+    let mut script = NpcScript::new(ADOBIS, Vec::new());
+    if !zakum_approved(player) {
+        let key = if player.stats.level >= ZAKUM_LEVEL {
+            keys::ZAKUM_ADOBIS_UNAPPROVED
+        } else {
+            keys::ZAKUM_ADOBIS_WARNING
+        };
+        script.pages = vec![Page::Say(text(key))];
+        return script;
+    }
+    let (ore, breath) = (holds(player, FIRE_ORE), holds(player, BREATH_OF_FIRE));
+    let lava = if ore && !breath {
+        Page::Ask {
+            text: text(keys::ZAKUM_ADOBIS_LAVA_ASK),
+            on_yes: vec![Effect::WarpToPortal(BREATH_OF_LAVA, 0)],
+            on_no: None,
+        }
+    } else if breath {
+        Page::End(text(keys::ZAKUM_ADOBIS_LAVA_HAVE))
+    } else {
+        Page::End(text(keys::ZAKUM_ADOBIS_LAVA_EARLIER))
+    };
+    let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+    let forge = if !(ore && breath) {
+        Page::End(text(keys::ZAKUM_ADOBIS_FORGE_LACK))
+    } else if player.inventory.count(GOLD_TOOTH) < i32::from(GOLD_TEETH_TO_FORGE) {
+        Page::End(text(keys::ZAKUM_ADOBIS_FORGE_SHORT))
+    } else {
+        Page::Act {
+            text: text(keys::ZAKUM_ADOBIS_FORGE_DONE),
+            effects: vec![
+                take(FIRE_ORE, 1),
+                take(BREATH_OF_FIRE, 1),
+                take(GOLD_TOOTH, GOLD_TEETH_TO_FORGE),
+                Effect::GiveItem {
+                    item_id: EYE_OF_FIRE,
+                    quantity: 5,
+                },
+                Effect::Mark(ZAKUM_TRIALS_DONE),
+            ],
+        }
+    };
+    script.pages = vec![Page::Menu {
+        text: text(keys::ZAKUM_ADOBIS_MENU),
+        choices: vec![
+            (text(keys::ZAKUM_ADOBIS_LAVA_CHOICE), vec![lava]),
+            (text(keys::ZAKUM_ADOBIS_FORGE_CHOICE), vec![forge]),
+        ],
+    }];
+    script.inventory_full = Some(text(keys::ZAKUM_ADOBIS_FORGE_FULL));
+    script
+}
+
+/// Lira at the far end of the Breath of Lava: the Breath of Fire and EXP,
+/// and back to the Door to Zakum.
+fn lira() -> NpcScript {
+    let mut script = NpcScript::new(
+        LIRA,
+        vec![
+            Page::Say(text(keys::ZAKUM_LIRA_REWARD)),
+            Page::Say(text(keys::ZAKUM_LIRA_GO)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: BREATH_OF_FIRE,
+            quantity: 1,
+        },
+        Effect::GainExp(10_000),
+        Effect::Warp(DOOR_TO_ZAKUM),
+    ];
+    script.inventory_full = Some(text(keys::ZAKUM_LIRA_FULL));
+    script
+}
+
+/// Amon, a way out of the Breath of Lava, and of Zakum's altar.
+fn amon(player: &Player) -> NpcScript {
+    let out = if player.stats.map_id == ZAKUM_ALTAR {
+        ENTRANCE_TO_ZAKUM
+    } else {
+        DOOR_TO_ZAKUM
+    };
+    NpcScript::new(
+        AMON,
+        vec![Page::Ask {
+            text: text(keys::ZAKUM_AMON_LEAVE),
+            on_yes: vec![Effect::Warp(out)],
+            on_no: None,
+        }],
+    )
 }
 
 /// A fourth-job instructor in Leafre and a third job of their line: the
@@ -7836,12 +8004,13 @@ mod tests {
             quantity: 1,
         };
 
-        // Rene only trains her own line, from level 70.
+        // Rene only trains her own line, from level 70; younger, she
+        // approves them for Zakum.
         let mut young = hunter(&[], &[]);
         young.stats.level = 69;
         assert_eq!(
-            kind(&NpcScript::for_npc(RENE, &young).unwrap().begin()),
-            Some(0)
+            NpcScript::for_npc(RENE, &young).unwrap().begin().effects,
+            [Effect::Mark(ZAKUM_APPROVED)]
         );
         let mut tylus = NpcScript::for_npc(2020008, &hunter(&[], &[])).unwrap();
         assert_eq!(kind(&tylus.begin()), Some(0));
@@ -7849,6 +8018,8 @@ mod tests {
 
         // She assigns the test, and Athena sends the player to the door.
         let mut rene = NpcScript::for_npc(RENE, &hunter(&[], &[])).unwrap();
+        assert_eq!(kind(&rene.begin()), Some(4));
+        rene.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(
             rene.respond(ScriptInput::Yes).unwrap().effects,
             [Effect::Mark(CHIEF_ASSIGNED)]
@@ -7862,8 +8033,11 @@ mod tests {
             ]
         );
         let sent = hunter(&[], &[INSTRUCTOR_ASSIGNED]);
-        let rene = NpcScript::for_npc(RENE, &sent).unwrap();
-        assert_eq!(buttons(&rene.begin()), (false, false));
+        let mut rene = NpcScript::for_npc(RENE, &sent).unwrap();
+        assert_eq!(
+            buttons(&rene.respond(ScriptInput::Select(0)).unwrap()),
+            (false, false)
+        );
 
         // The door lets the player in from the line's map only, the clone's
         // room and the way in empty.
@@ -7909,7 +8083,7 @@ mod tests {
         let mut rene =
             NpcScript::for_npc(RENE, &hunter(&[(NECKLACE_OF_STRENGTH, 1)], &[])).unwrap();
         assert_eq!(
-            rene.respond(ScriptInput::Next).unwrap().effects,
+            rene.respond(ScriptInput::Select(0)).unwrap().effects,
             [
                 take(NECKLACE_OF_STRENGTH),
                 Effect::Mark(HOLY_STONE_ASSIGNED)
@@ -7935,6 +8109,138 @@ mod tests {
         // Unsent, Athena talks as she does to any second job.
         let athena = NpcScript::for_npc(ATHENA, &hunter(&[], &[])).unwrap();
         assert_eq!(athena, first_job(&INSTRUCTORS[2], &hunter(&[], &[])));
+    }
+
+    #[test]
+    fn a_chief_approves_zakum_and_adobis_holds_its_trials() {
+        const RENE: i32 = 2020010;
+        // The chief's second choice approves, once.
+        let mut rene = NpcScript::for_npc(RENE, &hunter(&[], &[])).unwrap();
+        assert_eq!(
+            rene.respond(ScriptInput::Select(1)).unwrap().effects,
+            [Effect::Mark(ZAKUM_APPROVED)]
+        );
+        let mut rene = NpcScript::for_npc(RENE, &hunter(&[], &[ZAKUM_APPROVED])).unwrap();
+        let again = rene.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&again), text(keys::ZAKUM_CHIEF_APPROVED));
+        assert!(again.effects.is_empty());
+        // A third job of the line goes straight to it; under 50, nothing.
+        let mut ranger = hunter(&[], &[]);
+        ranger.stats.job = 311;
+        let rene = NpcScript::for_npc(RENE, &ranger).unwrap();
+        assert_eq!(rene.begin().effects, [Effect::Mark(ZAKUM_APPROVED)]);
+        ranger.stats.level = 49;
+        let rene = NpcScript::for_npc(RENE, &ranger).unwrap();
+        assert!(rene.begin().effects.is_empty());
+
+        // Adobis warns the unapproved.
+        let adobis = |player: &Player| NpcScript::for_npc(ADOBIS, player).unwrap();
+        let says = |player: &Player| page_text(&adobis(player).begin());
+        assert_eq!(says(&hunter(&[], &[])), text(keys::ZAKUM_ADOBIS_UNAPPROVED));
+        let mut young = hunter(&[], &[]);
+        young.stats.level = 49;
+        assert_eq!(says(&young), text(keys::ZAKUM_ADOBIS_WARNING));
+
+        // The Breath of Lava takes the Dead Mine's Fire Ore.
+        let choose = |player: &Player, choice| {
+            let mut adobis = adobis(player);
+            assert_eq!(kind(&adobis.begin()), Some(4));
+            let step = adobis.respond(ScriptInput::Select(choice)).unwrap();
+            (adobis, step)
+        };
+        let lava = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 0);
+        assert_eq!(
+            page_text(&lava(&[]).1),
+            text(keys::ZAKUM_ADOBIS_LAVA_EARLIER)
+        );
+        assert_eq!(
+            page_text(&lava(&[(FIRE_ORE, 1), (BREATH_OF_FIRE, 1)]).1),
+            text(keys::ZAKUM_ADOBIS_LAVA_HAVE)
+        );
+        let (mut adobis_lava, step) = lava(&[(FIRE_ORE, 1)]);
+        assert_eq!(kind(&step), Some(1));
+        assert_eq!(
+            adobis_lava.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(BREATH_OF_LAVA, 0)]
+        );
+
+        // Lira gives the Breath of Fire and sends the player back.
+        let mut lira = NpcScript::for_npc(LIRA, &hunter(&[], &[ZAKUM_APPROVED])).unwrap();
+        lira.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            lira.respond(ScriptInput::Next).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: BREATH_OF_FIRE,
+                    quantity: 1
+                },
+                Effect::GainExp(10_000),
+                Effect::Warp(DOOR_TO_ZAKUM),
+            ]
+        );
+
+        // The forge wants both trials' items and 30 Gold Teeth.
+        let forge = |items: &[(i32, i16)]| choose(&hunter(items, &[ZAKUM_APPROVED]), 1).1;
+        let trials = [(FIRE_ORE, 1), (BREATH_OF_FIRE, 1), (GOLD_TOOTH, 29)];
+        assert_eq!(
+            page_text(&forge(&trials[1..])),
+            text(keys::ZAKUM_ADOBIS_FORGE_LACK)
+        );
+        assert_eq!(
+            page_text(&forge(&trials)),
+            text(keys::ZAKUM_ADOBIS_FORGE_SHORT)
+        );
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        assert_eq!(
+            forge(&[(FIRE_ORE, 1), (BREATH_OF_FIRE, 1), (GOLD_TOOTH, 30)]).effects,
+            [
+                take(FIRE_ORE, 1),
+                take(BREATH_OF_FIRE, 1),
+                take(GOLD_TOOTH, 30),
+                Effect::GiveItem {
+                    item_id: EYE_OF_FIRE,
+                    quantity: 5
+                },
+                Effect::Mark(ZAKUM_TRIALS_DONE),
+            ]
+        );
+
+        // Amon lets the player out.
+        let mut out = hunter(&[], &[]);
+        for (map, to) in [
+            (BREATH_OF_LAVA, DOOR_TO_ZAKUM),
+            (ZAKUM_ALTAR, ENTRANCE_TO_ZAKUM),
+        ] {
+            out.stats.map_id = map;
+            let mut amon = NpcScript::for_npc(AMON, &out).unwrap();
+            assert_eq!(kind(&amon.begin()), Some(1));
+            assert_eq!(
+                amon.respond(ScriptInput::Yes).unwrap().effects,
+                [Effect::Warp(to)]
+            );
+        }
+
+        // The gate wants the approval, the trials and an Eye of Fire.
+        let gate = |items: &[(i32, i16)], markers: &[i16]| {
+            crate::scripts::portal("Zakum05", &hunter(items, markers))
+                .unwrap()
+                .effects
+        };
+        let pink = |key| vec![Effect::Pink(text(key))];
+        assert_eq!(gate(&[], &[]), pink(keys::ZAKUM_GATE_UNAPPROVED));
+        assert_eq!(
+            gate(&[(EYE_OF_FIRE, 1)], &[ZAKUM_APPROVED]),
+            pink(keys::ZAKUM_GATE_TRIALS)
+        );
+        let done = [ZAKUM_APPROVED, ZAKUM_TRIALS_DONE];
+        assert_eq!(gate(&[], &done), pink(keys::ZAKUM_GATE_NO_EYE));
+        assert!(matches!(
+            gate(&[(EYE_OF_FIRE, 1)], &done)[..],
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(ENTRANCE_TO_ZAKUM, _)
+            ]
+        ));
     }
 
     #[test]
