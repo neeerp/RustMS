@@ -1310,6 +1310,7 @@ pub mod keys {
     pub const ZAKUM_ADOBIS_MINE_NOT_LEADER: &str = "zakum.adobis.mine.not_leader";
     pub const ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE: &str = "zakum.adobis.mine.not_eligible";
     pub const ZAKUM_ADOBIS_MINE_BUSY: &str = "zakum.adobis.mine.busy";
+    pub const ZAKUM_ADOBIS_REFUSED: &str = "zakum.adobis.refused";
     pub const ZAKUM_AURA_MENU: &str = "zakum.aura.menu";
     pub const ZAKUM_AURA_ABOUT_CHOICE: &str = "zakum.aura.about.choice";
     pub const ZAKUM_AURA_ABOUT: &str = "zakum.aura.about";
@@ -1331,7 +1332,7 @@ pub mod keys {
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 46] = [
+    pub const ZAKUM: [&str; 47] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -1360,6 +1361,7 @@ pub mod keys {
         ZAKUM_ADOBIS_MINE_NOT_LEADER,
         ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE,
         ZAKUM_ADOBIS_MINE_BUSY,
+        ZAKUM_ADOBIS_REFUSED,
         ZAKUM_AURA_MENU,
         ZAKUM_AURA_ABOUT_CHOICE,
         ZAKUM_AURA_ABOUT,

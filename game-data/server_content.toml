@@ -838,6 +838,7 @@ unsourced = [
     "zakum.adobis.mine.not_leader",
     "zakum.adobis.mine.not_eligible",
     "zakum.adobis.mine.busy",
+    "zakum.adobis.refused",
     "zakum.aura.menu",
     "zakum.aura.about.choice",
     "zakum.aura.about",

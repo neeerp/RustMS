@@ -5555,8 +5555,8 @@ fn zakum_approval(player: &Player) -> Vec<Page> {
 }
 
 /// Adobis at the Door to Zakum: a warning until a chief approves, then
-/// the trials. The Dead Mine (stage 1) is not built yet; the Breath of
-/// Lava takes its Fire Ore, and the forge turns both trials' items and 30
+/// the trials. The party's leader takes it into the Dead Mine (stage 1),
+/// whose prize, a Piece of Fire Ore, the Breath of Lava takes, and the forge turns both trials' items and 30
 /// Gold Teeth into five Eyes of Fire.
 fn adobis(entry: Entry, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(ADOBIS, Vec::new());
@@ -5620,11 +5620,9 @@ fn adobis(entry: Entry, player: &Player) -> NpcScript {
         ],
     }];
     script.inventory_full = Some(text(keys::ZAKUM_ADOBIS_FORGE_FULL));
-    // Someone left or moved since he checked, or another party went in.
-    script.refused = Some(event_terms(
-        &events::ZPQ,
-        keys::ZAKUM_ADOBIS_MINE_NOT_ELIGIBLE,
-    ));
+    // Someone left or moved since he checked, another party went in, or
+    // the forge's items went.
+    script.refused = Some(text(keys::ZAKUM_ADOBIS_REFUSED));
     script
 }
 
