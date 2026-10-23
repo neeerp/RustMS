@@ -816,6 +816,13 @@ namespace ms
 		{}
 	};
 
+	// The Blacklist tab's names, split by commas, in the order added (CConfig+0xb8).
+	struct BlackList : public Configuration::StringEntry
+	{
+		BlackList() : StringEntry("BlackList", "")
+		{}
+	};
+
 	template<typename T>
 	// Can be used to access settings.
 	struct Setting

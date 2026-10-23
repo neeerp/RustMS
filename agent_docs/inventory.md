@@ -1524,6 +1524,16 @@ The tax is 3% from 100,000,000 mesos, 2.5% from 25,000,000, 2% from
 and nothing below that. It is worked out in doubles and rounded down, as
 the client does.
 
+The blacklist is the User List's Blacklist tab (`UIUserList`, reports
+b089 and b090), one list for every character on the machine. HeavenClient
+keeps it in the `BlackList` setting, comma separated in the order added;
+v83 keeps it in the registry. Add asks for a name (4 to 12 letters) and
+refuses one that fails the name filter or a forbidden word (SP `0x2d7`),
+the player's own (`0x2d6`), or one listed already in any case (`0x2d8`).
+It holds 26, two to a row in byte order, and Delete removes the picked
+name with no confirmation. While the player's own shop is open, adding
+and deleting also send `0x1f` and `0x20`; a hired merchant's never do.
+
 When the last bundle sells, the shop closes: the visitors get LEAVE reason
 `0xe` and the owner `{0xa, 0, 0xe}`. The owner leaving (`0xa`), changing
 maps or channels, entering the Cash Shop, or logging out also closes it.
@@ -1729,9 +1739,16 @@ While the player is in alert stance, `0x11` says to catch their breath.
 Permits and controllers are sold in the Cash Shop.
 
 Not done yet: the blacklist's storage (it lasts as long as the merchant
-stays in memory). The server takes a `0xe`
-open, which v83 sends instead of `0xb` when a cash item is listed;
-HeavenClient sends `0xb`.
+stays in memory).
+
+With a cash item listed, the client asks for the birthday (SP `0x33a`)
+and opens with `{0xe, 0xb, room type, birthday}` in place of `{0xb, 1}`,
+for a shop or a merchant; cancelling sends nothing more, the blacklist
+having gone already. The server checks the birthday and opens, or ignores
+a wrong one without an answer. v83 leaves the window as it was after a
+`0xe` open; HeavenClient, given a real date, treats it like `0xb`,
+showing a shop open and leaving a merchant's room. As in v83, the
+Blacklist's changes are not sent to a shop opened this way.
 
 ## Tests
 

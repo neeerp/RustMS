@@ -53,6 +53,8 @@
 #include "UITypes/UIUserList.h"
 #include "UITypes/UIWorldMap.h"
 
+#include "../Character/Blacklist.h"
+
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/MiniRoomPackets.h"
 #include "../Net/Packets/PlayerInteractionPackets.h"
@@ -125,6 +127,8 @@ namespace ms
 					return Tooltip::Parent::PETITEMSEARCH;
 				case UIElement::Type::ITEMSEARCHRESULT:
 					return Tooltip::Parent::ITEMSEARCHRESULT;
+				case UIElement::Type::USERLIST:
+					return Tooltip::Parent::USERLIST;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -166,6 +170,8 @@ namespace ms
 	{
 		focused = UIElement::Type::NONE;
 		tooltipparent = Tooltip::Parent::NONE;
+		// A shop left by a channel change or a lost connection never closed.
+		Blacklist::live = false;
 
 		const CharLook &look = Stage::get().get_player().get_look();
 		const Inventory &inventory = Stage::get().get_player().get_inventory();

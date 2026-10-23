@@ -95,6 +95,7 @@ namespace ms
 		settings.emplace<FriendShowOnline>();
 		settings.emplace<FriendFolded>();
 		settings.emplace<FriendBlocked>();
+		settings.emplace<BlackList>();
 
 		load();
 	}
