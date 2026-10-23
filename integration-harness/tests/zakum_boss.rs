@@ -2,7 +2,8 @@
 //! plays Zakum's music and brings out its body, trembling in and not yet
 //! real, then its eight arms. While an arm is out the body takes no harm
 //! and no one moves it; the last arm's death makes it real, and from there
-//! it dies into its second body, and that into its third.
+//! it dies into its second body, and that into its third, whose death the
+//! map sees cleared and the whole world reads of.
 
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
@@ -44,6 +45,7 @@ async fn beat(c: &mut MapleTestConnection, seen: &mut Trace, object_id: i32) {
 async fn the_eye_of_fire_brings_out_zakum_whose_arms_shield_its_body() {
     let hunter_config = load_harness_config_or_fail().await;
     let watcher_config = load_harness_config_or_fail().await;
+    let elsewhere_config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&hunter_config)
         .await
         .unwrap()
@@ -55,6 +57,7 @@ async fn the_eye_of_fire_brings_out_zakum_whose_arms_shield_its_body() {
     grant_stack(id, 4, 1, EYE_OF_FIRE, 1).await.unwrap();
     let mut hunter = relogin(&hunter_config).await;
     let mut watcher = login_to_world_session(&watcher_config).await.unwrap();
+    let mut elsewhere = login_to_world_session(&elsewhere_config).await.unwrap();
     let mut wt = Trace::default();
     assert_eq!(
         warp(&mut watcher.connection, ALTAR_MAP, "", &mut wt).await,
@@ -143,4 +146,21 @@ async fn the_eye_of_fire_brings_out_zakum_whose_arms_shield_its_body() {
             until(h, &mut ht, |t| !t.field.alive(next).is_empty()).await;
         }
     }
+
+    // Its last death clears the map, and the world hears of it.
+    until(w, &mut wt, |t| {
+        t.field_effects.contains(&(4, "Party1/Clear".to_string()))
+    })
+    .await;
+    assert!(
+        wt.field_effects
+            .contains(&(3, "quest/party/clear".to_string())),
+        "{wt:?}"
+    );
+    let victory = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
+    let mut et = Trace::default();
+    until(&mut elsewhere.connection, &mut et, |t| {
+        t.item_lines.contains(&(victory.clone(), 0))
+    })
+    .await;
 }

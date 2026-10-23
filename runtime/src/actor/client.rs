@@ -1653,6 +1653,13 @@ impl ClientActor {
                 self.merchant_event(owner, event).await?
             }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
+            ServerMessage::Announce(packet) => {
+                self.apply(WorldAction::Broadcast {
+                    scope: net::BroadcastScope::World,
+                    packet,
+                })
+                .await?
+            }
             ServerMessage::QuestDrop {
                 quest,
                 item_id,

@@ -30,6 +30,8 @@ pub fn skill_level(skill: i32, level: i32) -> Option<MobSkillLevel> {
 /// and that into 8800002), and its eight arms, which come out with it.
 pub const ZAKUM_BODY: i32 = 8800000;
 pub const ZAKUM_ARMS: RangeInclusive<i32> = 8800003..=8800010;
+/// Zakum's last body: its death wins the fight.
+pub const ZAKUM_LAST: i32 = 8800002;
 
 /// The mobs that keep `mob_id` from harm while any of them is out: Zakum's
 /// arms its body (Cosmic `MapleMap.damageMonster`). Until then it has no
