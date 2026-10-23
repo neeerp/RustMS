@@ -899,7 +899,6 @@ unsourced = [
     "refiner.chris.hello",
     "refiner.chris.hoof",
     "refiner.chris.hoof_ask",
-    "refiner.chris.claws",
     "refiner.vogen.hello",
     "refiner.pi.hello",
     "refiner.muhamad.hello",
@@ -910,6 +909,15 @@ unsourced = [
     "altaire.how_many",
     "altaire.done",
     "altaire.full",
+    "refiner.upgrade_claw",
+    "refiner.make_claw",
+    "refiner.make_glove",
+    "refiner.upgrade_glove",
+    "refiner.bow",
+    "refiner.crossbow",
+    "refiner.smith.hello",
+    "refiner.vicious.hello",
+    "refiner.jm.hello",
 ]
 
 [text."glTutoMsg0.message"]
