@@ -2,7 +2,7 @@ use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
 /// Any server-driven NPC prompt: a text page, a yes/no question, a menu, a
-/// choice of styles, or a line of text to type.
+/// choice of styles, a line of text to type, or a number.
 pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkError> {
     use crate::dialogue::Prompt;
     let (npc_id, message_type, text) = match prompt {
@@ -11,6 +11,7 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         Prompt::Selection { npc_id, text } => (*npc_id, 4, text),
         Prompt::Style { npc_id, text, .. } => (*npc_id, 7, text),
         Prompt::AskText { npc_id, text, .. } => (*npc_id, 2, text),
+        Prompt::AskNumber { npc_id, text, .. } => (*npc_id, 3, text),
     };
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::NpcDialogue as i16)?;
@@ -31,6 +32,14 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         p.write_str_with_length("")?;
         p.write_short(*min)?;
         p.write_short(*max)?;
+    }
+    if let Prompt::AskNumber {
+        default, min, max, ..
+    } = prompt
+    {
+        p.write_int(*default)?;
+        p.write_int(*min)?;
+        p.write_int(*max)?;
     }
     Ok(p)
 }
@@ -275,6 +284,25 @@ mod tests {
         expect.byte(4).int(1012103).byte(7).byte(0);
         expect.string("Pick one");
         expect.byte(2).int(30060).int(30140);
+        expect.end();
+    }
+
+    #[test]
+    fn prompt_number_carries_the_default_and_range() {
+        let prompt = crate::dialogue::Prompt::AskNumber {
+            npc_id: 1022003,
+            text: "How many?".to_string(),
+            default: 1,
+            min: 1,
+            max: 100,
+        };
+        let packet = build_prompt(&prompt).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcDialogue as i16);
+        expect.byte(4).int(1022003).byte(3).byte(0);
+        expect.string("How many?");
+        expect.int(1).int(1).int(100);
         expect.end();
     }
 }

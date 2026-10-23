@@ -50,6 +50,14 @@ pub enum Prompt {
         min: i16,
         max: i16,
     },
+    /// A number from `min` to `max`, starting at `default`.
+    AskNumber {
+        npc_id: i32,
+        text: String,
+        default: i32,
+        min: i32,
+        max: i32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

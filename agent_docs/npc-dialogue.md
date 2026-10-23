@@ -254,7 +254,10 @@ client checks a text's trimmed length and a number's range, shows v83's
 notice and stays open when they are wrong, and answers `02 01 str`,
 `03 01 i32` or `0D 01 str`. A non-empty default in a text or number
 prompt comes selected, so the first key typed replaces it. The server
-sends none of them yet.
+sends text prompts (`Page::AskText`, Lenario's alliance name) and number
+prompts (`Page::AskNumber`, the refiners in `agent_docs/inventory.md`),
+and checks the answer against the bounds it sent: a number out of range
+closes the conversation. It sends no box text.
 
 Types 7 and 8 are a choice of styles: after the text come `u8 count` and
 that many `i32` style ids. The client shows the v83 `UtilDlgEx_Avatar`

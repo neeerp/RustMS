@@ -1392,6 +1392,32 @@ pub mod keys {
     pub const QUEST_INFO_SECRET_WALL: &str = "quest_info.secret_wall";
     pub const QUEST_INFO_WALL_ASK: &str = "quest_info.wall_ask";
     pub const QUEST_INFO_WALL_READ: &str = "quest_info.wall_read";
+    pub const REFINER_WHAT: &str = "refiner.what";
+    pub const REFINER_HOW_MANY: &str = "refiner.how_many";
+    pub const REFINER_ASK: &str = "refiner.ask";
+    pub const REFINER_MINERAL: &str = "refiner.mineral";
+    pub const REFINER_JEWEL: &str = "refiner.jewel";
+    pub const REFINER_ROCK: &str = "refiner.rock";
+    pub const REFINER_CRYSTAL: &str = "refiner.crystal";
+    pub const REFINER_MATERIALS: &str = "refiner.materials";
+    pub const REFINER_ARROWS: &str = "refiner.arrows";
+    pub const REFINER_THUNDER_HELLO: &str = "refiner.thunder.hello";
+    pub const REFINER_THUNDER_HELMETS: &str = "refiner.thunder.helmets";
+    pub const REFINER_THUNDER_SHIELDS: &str = "refiner.thunder.shields";
+    pub const REFINER_CHRIS_HELLO: &str = "refiner.chris.hello";
+    pub const REFINER_CHRIS_HOOF: &str = "refiner.chris.hoof";
+    pub const REFINER_CHRIS_HOOF_ASK: &str = "refiner.chris.hoof_ask";
+    pub const REFINER_CHRIS_CLAWS: &str = "refiner.chris.claws";
+    pub const REFINER_VOGEN_HELLO: &str = "refiner.vogen.hello";
+    pub const REFINER_PI_HELLO: &str = "refiner.pi.hello";
+    pub const REFINER_MUHAMAD_HELLO: &str = "refiner.muhamad.hello";
+    pub const REFINER_MUHAMAD_BYE: &str = "refiner.muhamad.bye";
+    pub const ALTAIRE_HELLO: &str = "altaire.hello";
+    pub const ALTAIRE_TRADE: &str = "altaire.trade";
+    pub const ALTAIRE_SHORT: &str = "altaire.short";
+    pub const ALTAIRE_HOW_MANY: &str = "altaire.how_many";
+    pub const ALTAIRE_DONE: &str = "altaire.done";
+    pub const ALTAIRE_FULL: &str = "altaire.full";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2313,6 +2339,32 @@ mod tests {
                 keys::QUEST_INFO_SECRET_WALL,
                 keys::QUEST_INFO_WALL_ASK,
                 keys::QUEST_INFO_WALL_READ,
+                keys::REFINER_WHAT,
+                keys::REFINER_HOW_MANY,
+                keys::REFINER_ASK,
+                keys::REFINER_MINERAL,
+                keys::REFINER_JEWEL,
+                keys::REFINER_ROCK,
+                keys::REFINER_CRYSTAL,
+                keys::REFINER_MATERIALS,
+                keys::REFINER_ARROWS,
+                keys::REFINER_THUNDER_HELLO,
+                keys::REFINER_THUNDER_HELMETS,
+                keys::REFINER_THUNDER_SHIELDS,
+                keys::REFINER_CHRIS_HELLO,
+                keys::REFINER_CHRIS_HOOF,
+                keys::REFINER_CHRIS_HOOF_ASK,
+                keys::REFINER_CHRIS_CLAWS,
+                keys::REFINER_VOGEN_HELLO,
+                keys::REFINER_PI_HELLO,
+                keys::REFINER_MUHAMAD_HELLO,
+                keys::REFINER_MUHAMAD_BYE,
+                keys::ALTAIRE_HELLO,
+                keys::ALTAIRE_TRADE,
+                keys::ALTAIRE_SHORT,
+                keys::ALTAIRE_HOW_MANY,
+                keys::ALTAIRE_DONE,
+                keys::ALTAIRE_FULL,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");

@@ -26,9 +26,10 @@ impl WorldHandler for NpcTalkMoreHandler {
         reader.read_short()?;
         let message_type = reader.read_byte()?;
         let response = reader.read_byte()? as i8;
-        // A menu answers with the choice, a style picker with its index.
+        // A menu answers with the choice, a style picker with its index, a
+        // number prompt with the number.
         let selection = match (message_type, response) {
-            (4, 1) => Some(reader.read_int()?),
+            (3 | 4, 1) => Some(reader.read_int()?),
             (7, 1) => Some(i32::from(reader.read_byte()?)),
             _ => None,
         };

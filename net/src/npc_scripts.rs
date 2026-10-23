@@ -15,6 +15,7 @@ use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
 use crate::items;
 use crate::packet::handle::world;
+use crate::refiners::{self, Refine};
 use crate::rides;
 use crate::scripts::Effect;
 use crate::stylists::{self, Look, Pick, Service};
@@ -844,11 +845,8 @@ const BLACK_CHARM: i32 = 4031059;
 const NECKLACE_OF_STRENGTH: i32 = 4031057;
 const NECKLACE_OF_WISDOM: i32 = 4031058;
 const DARK_CRYSTAL: i32 = 4005004;
-const DARK_CRYSTAL_ORE: i32 = 4004004;
 /// Spiruna refines for those who finished her quest (upstream).
 const SPIRUNA_QUEST: i16 = 3034;
-const ORE_PER_CRYSTAL: i16 = 10;
-const REFINING_FEE: i32 = 500_000;
 /// Questions asked of each challenger, any wrong answer failing.
 const QUIZ_LENGTH: usize = 5;
 /// How long a challenger has with the clone (upstream).
@@ -863,6 +861,7 @@ pub enum ScriptInput {
     No,
     Select(i32),
     Text(String),
+    Number(i32),
 }
 
 /// What a script does with a line of text the player typed.
@@ -877,6 +876,48 @@ impl OnText {
     fn pages(self, text: &str) -> Vec<Page> {
         match self {
             OnText::NameAlliance => confirm_alliance_name(text),
+        }
+    }
+}
+
+/// What a script does with a number the player picked.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnNumber {
+    /// Ask to make that many batches of `refine` at `percent` of its
+    /// price.
+    Refine {
+        refine: &'static Refine,
+        percent: i32,
+    },
+    /// Spiruna refines that many Dark Crystals at once.
+    Spiruna,
+    /// An Altaire camper trades that many hundred of `input` for Perfect
+    /// Pitches.
+    Pitches { input: i32 },
+}
+
+impl OnNumber {
+    /// The pages that follow the number.
+    fn pages(self, number: i32) -> Vec<Page> {
+        match self {
+            OnNumber::Refine { refine, percent } => refine_batches(refine, percent, number),
+            OnNumber::Spiruna => vec![Page::Act {
+                text: text(keys::SPIRUNA_DONE),
+                effects: refining(&refiners::SPIRUNA_DARK_CRYSTAL, 100, number),
+            }],
+            OnNumber::Pitches { input } => vec![Page::Act {
+                text: text(keys::ALTAIRE_DONE),
+                effects: vec![
+                    Effect::TakeItem {
+                        item_id: input,
+                        quantity: times(refiners::PER_PITCH, number),
+                    },
+                    Effect::GiveItem {
+                        item_id: refiners::PERFECT_PITCH,
+                        quantity: times(1, number),
+                    },
+                ],
+            }],
         }
     }
 }
@@ -903,6 +944,15 @@ pub enum Page {
         min: i16,
         max: i16,
         on_text: OnText,
+    },
+    /// A number from `min` to `max` (`Prompt::AskNumber`); what
+    /// `on_number` makes of it replaces the rest of the script.
+    AskNumber {
+        text: String,
+        default: i32,
+        min: i32,
+        max: i32,
+        on_number: OnNumber,
     },
     /// A choice of styles (`Prompt::Style`), each with the effects picking
     /// it applies before moving on.
@@ -1441,6 +1491,14 @@ impl NpcScript {
             SPARKLING_CRYSTAL => sparkling_crystal(player),
             HOLY_STONE => Some(holy_stone(player, &mut rand::thread_rng())),
             SPIRUNA => Some(spiruna(player)),
+            MR_THUNDER => Some(refiner(&THUNDER)),
+            CHRIS => Some(refiner(&CHRIS_REFINER)),
+            VOGEN => Some(refiner(&VOGEN_REFINER)),
+            PI => Some(refiner(&PI_REFINER)),
+            MUHAMAD => Some(refiner(&MUHAMAD_REFINER)),
+            id if refiners::PITCH_TRADERS.iter().any(|&(npc, _)| npc == id) => {
+                Some(pitch_trader(id, player))
+            }
             PIRATE_PROCTOR => Some(pirate_proctor(player)),
             ROBIN => Some(robin()),
             SHANKS => Some(shanks(player)),
@@ -1614,6 +1672,11 @@ impl NpcScript {
                 self.page = 0;
                 Some(self.begin())
             }
+            (Page::AskNumber { on_number, .. }, ScriptInput::Number(number)) => {
+                self.pages = on_number.pages(number);
+                self.page = 0;
+                Some(self.begin())
+            }
             (Page::Style { choices, .. }, ScriptInput::Select(choice)) => {
                 let (_, effects) = choices.get(usize::try_from(choice).ok()?)?;
                 let effects = effects.clone();
@@ -1710,6 +1773,19 @@ impl NpcScript {
             Page::AskText { text, min, max, .. } => Prompt::AskText {
                 npc_id,
                 text: text.clone(),
+                min: *min,
+                max: *max,
+            },
+            Page::AskNumber {
+                text,
+                default,
+                min,
+                max,
+                ..
+            } => Prompt::AskNumber {
+                npc_id,
+                text: text.clone(),
+                default: *default,
                 min: *min,
                 max: *max,
             },
@@ -5802,43 +5878,308 @@ fn holy_stone(player: &Player, rng: &mut impl Rng) -> NpcScript {
     script
 }
 
-/// Spiruna refines Dark Crystal Ore into a Dark Crystal, one at a time,
+/// Spiruna refines Dark Crystal Ore into Dark Crystals, as many as asked,
 /// for those who finished her quest.
 fn spiruna(player: &Player) -> NpcScript {
     if player.quests.state(SPIRUNA_QUEST) != QuestState::Completed {
         return NpcScript::new(SPIRUNA, vec![Page::Say(text(keys::SPIRUNA_OTHER))]);
     }
-    let can_pay = player.meso >= REFINING_FEE
-        && player.inventory.count(DARK_CRYSTAL_ORE) >= i32::from(ORE_PER_CRYSTAL);
-    let on_yes = if can_pay {
-        vec![
-            Effect::TakeItem {
-                item_id: DARK_CRYSTAL_ORE,
-                quantity: ORE_PER_CRYSTAL,
-            },
-            Effect::SpendMeso(REFINING_FEE),
-            Effect::GiveItem {
-                item_id: DARK_CRYSTAL,
-                quantity: 1,
-            },
-        ]
-    } else {
-        Vec::new()
-    };
     let pages = vec![
         Page::Ask {
             text: text(keys::SPIRUNA_ASK),
-            on_yes,
+            on_yes: Vec::new(),
             on_no: None,
         },
-        Page::Say(text(if can_pay {
-            keys::SPIRUNA_DONE
-        } else {
-            keys::SPIRUNA_SHORT
-        })),
+        how_many(&refiners::SPIRUNA_DARK_CRYSTAL, OnNumber::Spiruna),
     ];
     let mut script = NpcScript::new(SPIRUNA, pages);
+    script.refused = Some(text(keys::SPIRUNA_SHORT));
     script.inventory_full = Some(text(keys::THIRD_JOB_INVENTORY_FULL));
+    script
+}
+
+/// One kind of thing a refiner offers, under its label.
+enum Offer {
+    /// Refined in as many batches as asked.
+    Batches(&'static str, &'static [Refine]),
+    /// Made a bundle at a time, as arrows are.
+    Bundles(&'static str, &'static [Refine]),
+    /// Equipment made or upgraded one at a time.
+    Equips(&'static str, &'static [Recipe]),
+    /// Chris's Steel Plates from Iron Hog's Metal Hoofs.
+    MetalHoof,
+}
+
+/// A refiner: who, their greeting (a yes or no first, with the goodbye
+/// for a no, if `goodbye`), the share of the price they charge, and what
+/// they offer.
+struct Refiner {
+    npc: i32,
+    hello: &'static str,
+    goodbye: Option<&'static str>,
+    percent: i32,
+    offers: &'static [Offer],
+}
+
+const MR_THUNDER: i32 = 1022003;
+const CHRIS: i32 = 1052003;
+const VOGEN: i32 = 2020000;
+const PI: i32 = 2040016;
+const MUHAMAD: i32 = 2100001;
+
+const THUNDER: Refiner = Refiner {
+    npc: MR_THUNDER,
+    hello: keys::REFINER_THUNDER_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS),
+        Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
+        Offer::Equips(keys::REFINER_THUNDER_HELMETS, refiners::THUNDER_HELMETS),
+        Offer::Equips(keys::REFINER_THUNDER_SHIELDS, refiners::THUNDER_SHIELDS),
+    ],
+};
+
+const CHRIS_REFINER: Refiner = Refiner {
+    npc: CHRIS,
+    hello: keys::REFINER_CHRIS_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS),
+        Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
+        Offer::MetalHoof,
+        Offer::Equips(keys::REFINER_CHRIS_CLAWS, refiners::CHRIS_CLAWS),
+    ],
+};
+
+const VOGEN_REFINER: Refiner = Refiner {
+    npc: VOGEN,
+    hello: keys::REFINER_VOGEN_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS),
+        Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
+        Offer::Batches(keys::REFINER_ROCK, refiners::ROCKS),
+        Offer::Batches(keys::REFINER_CRYSTAL, refiners::CRYSTALS_AND_DARK),
+        Offer::Batches(keys::REFINER_MATERIALS, refiners::MATERIALS),
+        Offer::Bundles(keys::REFINER_ARROWS, refiners::ARROWS),
+    ],
+};
+
+/// Pi and Muhamad charge 90% of the others' prices (Cosmic).
+const PI_REFINER: Refiner = Refiner {
+    npc: PI,
+    hello: keys::REFINER_PI_HELLO,
+    goodbye: None,
+    percent: 90,
+    offers: &[
+        Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS),
+        Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
+        Offer::Batches(keys::REFINER_ROCK, refiners::ROCKS),
+        Offer::Batches(keys::REFINER_CRYSTAL, refiners::CRYSTALS),
+        Offer::Batches(keys::REFINER_MATERIALS, refiners::MATERIALS),
+        Offer::Bundles(keys::REFINER_ARROWS, refiners::ARROWS),
+    ],
+};
+
+const MUHAMAD_REFINER: Refiner = Refiner {
+    npc: MUHAMAD,
+    hello: keys::REFINER_MUHAMAD_HELLO,
+    goodbye: Some(keys::REFINER_MUHAMAD_BYE),
+    percent: 90,
+    offers: &[
+        Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS_AND_LIDIUM),
+        Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
+        Offer::Batches(keys::REFINER_CRYSTAL, refiners::CRYSTALS),
+    ],
+};
+
+/// A refiner's menu of offers, each a menu of its items.
+fn refiner(refiner: &Refiner) -> NpcScript {
+    let percent = refiner.percent;
+    let choices = refiner
+        .offers
+        .iter()
+        .map(|offer| match *offer {
+            Offer::Batches(label, refines) => (
+                text(label),
+                vec![refine_menu(refines, |refine| {
+                    vec![how_many(refine, OnNumber::Refine { refine, percent })]
+                })],
+            ),
+            Offer::Bundles(label, refines) => (
+                text(label),
+                vec![refine_menu(refines, |refine| {
+                    refine_batches(refine, percent, 1)
+                })],
+            ),
+            Offer::Equips(label, recipes) => {
+                let pages = recipes.iter().map(|recipe| make(recipe, None)).collect();
+                (text(label), vec![recipe_menu(recipes, pages)])
+            }
+            Offer::MetalHoof => {
+                let refine = &refiners::METAL_HOOF;
+                (
+                    text(keys::REFINER_CHRIS_HOOF),
+                    vec![
+                        Page::Ask {
+                            text: text(keys::REFINER_CHRIS_HOOF_ASK),
+                            on_yes: Vec::new(),
+                            on_no: None,
+                        },
+                        how_many(refine, OnNumber::Refine { refine, percent }),
+                    ],
+                )
+            }
+        })
+        .collect();
+    let pages = match refiner.goodbye {
+        Some(goodbye) => vec![
+            Page::Ask {
+                text: text(refiner.hello),
+                on_yes: Vec::new(),
+                on_no: Some(text(goodbye)),
+            },
+            Page::Menu {
+                text: text(keys::REFINER_WHAT),
+                choices,
+            },
+        ],
+        None => vec![Page::Menu {
+            text: text(refiner.hello),
+            choices,
+        }],
+    };
+    with_maker_words(NpcScript::new(refiner.npc, pages))
+}
+
+/// The menu of `refines`, each leading to its `pages`. Two ways of making
+/// the same item are told apart by their first material.
+fn refine_menu(refines: &'static [Refine], pages: impl Fn(&'static Refine) -> Vec<Page>) -> Page {
+    Page::Menu {
+        text: text(keys::MAKER_PICK),
+        choices: refines
+            .iter()
+            .map(|refine| {
+                let mut label = format!("#t{}#", refine.item);
+                if refine.yields > 1 {
+                    label.push_str(&format!(" x{}", refine.yields));
+                }
+                if refines
+                    .iter()
+                    .filter(|other| other.item == refine.item)
+                    .count()
+                    > 1
+                {
+                    label.push_str(&format!(" (#t{}#)", refine.materials[0].0));
+                }
+                (label, pages(refine))
+            })
+            .collect(),
+    }
+}
+
+/// Ask how many batches of `refine` to make, from one to a hundred.
+fn how_many(refine: &Refine, on_number: OnNumber) -> Page {
+    let item = refine.item.to_string();
+    Page::AskNumber {
+        text: content::text().get(keys::REFINER_HOW_MANY, &[("item", item.as_str())]),
+        default: 1,
+        min: 1,
+        max: refiners::MOST_AT_ONCE,
+        on_number,
+    }
+}
+
+/// Ask to make `batches` of `refine` at `percent` of its price, listing
+/// what they take, then say it is done.
+fn refine_batches(refine: &Refine, percent: i32, batches: i32) -> Vec<Page> {
+    let item = refine.item.to_string();
+    let count = (i32::from(refine.yields) * batches).to_string();
+    let mut ask = content::text().get(
+        keys::REFINER_ASK,
+        &[("count", count.as_str()), ("item", item.as_str())],
+    );
+    for &(item, quantity) in refine.materials {
+        let quantity = times(i32::from(quantity), batches);
+        ask.push_str(&format!("\r\n#i{item}# {quantity} #t{item}#"));
+    }
+    let meso = refine.meso(batches, percent);
+    if meso > 0 {
+        let meso = meso.to_string();
+        let meso = content::text().get(keys::MAKER_MESO, &[("meso", meso.as_str())]);
+        ask.push_str(&format!("\r\n#i{MESO_ICON}# {meso}"));
+    }
+    vec![
+        Page::Ask {
+            text: ask,
+            on_yes: refining(refine, percent, batches),
+            on_no: None,
+        },
+        Page::Say(text(keys::MAKER_DONE)),
+    ]
+}
+
+/// Making `batches` of `refine` at `percent` of its price: the item is
+/// given first, so a full inventory is told before short mesos, and those
+/// before missing materials; nothing applies unless all of it does.
+fn refining(refine: &Refine, percent: i32, batches: i32) -> Vec<Effect> {
+    let mut effects = vec![Effect::GiveItem {
+        item_id: refine.item,
+        quantity: times(i32::from(refine.yields), batches),
+    }];
+    let meso = refine.meso(batches, percent);
+    if meso > 0 {
+        effects.push(Effect::SpendMeso(meso));
+    }
+    effects.extend(
+        refine
+            .materials
+            .iter()
+            .map(|&(item_id, quantity)| Effect::TakeItem {
+                item_id,
+                quantity: times(i32::from(quantity), batches),
+            }),
+    );
+    effects
+}
+
+/// `quantity` `batches` times over, as an item count; the refiners' and
+/// traders' bounds keep it in range.
+fn times(quantity: i32, batches: i32) -> i16 {
+    i16::try_from(quantity * batches).unwrap_or(i16::MAX)
+}
+
+/// An Altaire camper offers a Perfect Pitch for each hundred of their
+/// item the player holds, up to three hundred at once.
+fn pitch_trader(npc: i32, player: &Player) -> NpcScript {
+    let input = refiners::PITCH_TRADERS
+        .iter()
+        .find(|&&(trader, _)| trader == npc)
+        .map_or(0, |&(_, input)| input);
+    let item = input.to_string();
+    let say = |key| content::text().get(key, &[("item", item.as_str())]);
+    let most = refiners::pitches(player.inventory.count(input));
+    let trade = if most == 0 {
+        vec![Page::Say(say(keys::ALTAIRE_SHORT))]
+    } else {
+        vec![Page::AskNumber {
+            text: text(keys::ALTAIRE_HOW_MANY),
+            default: most,
+            min: 1,
+            max: most,
+            on_number: OnNumber::Pitches { input },
+        }]
+    };
+    let menu = Page::Menu {
+        text: say(keys::ALTAIRE_HELLO),
+        choices: vec![(say(keys::ALTAIRE_TRADE), trade)],
+    };
+    let mut script = NpcScript::new(npc, vec![menu]);
+    script.refused = Some(say(keys::ALTAIRE_SHORT));
+    script.inventory_full = Some(text(keys::ALTAIRE_FULL));
     script
 }
 
@@ -5976,6 +6317,10 @@ pub fn input(
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
         (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
         (Prompt::AskText { .. }, 2, 1) => text.map(ScriptInput::Text),
+        // The client checks the range too, but only as typed.
+        (Prompt::AskNumber { min, max, .. }, 3, 1) => selection
+            .filter(|number| (min..=max).contains(&number))
+            .map(ScriptInput::Number),
         _ => None,
     }
 }
@@ -5999,6 +6344,7 @@ mod tests {
             Prompt::Selection { .. } => 4,
             Prompt::Style { .. } => 7,
             Prompt::AskText { .. } => 2,
+            Prompt::AskNumber { .. } => 3,
         })
     }
 
@@ -8652,6 +8998,20 @@ mod tests {
             Some(ScriptInput::Text("Union".into()))
         );
         assert_eq!(input(&ask, 2, 0, None, None), None, "cancelled");
+        let number = Prompt::AskNumber {
+            npc_id: 1,
+            text: String::new(),
+            default: 1,
+            min: 1,
+            max: 100,
+        };
+        assert_eq!(
+            input(&number, 3, 1, Some(100), None),
+            Some(ScriptInput::Number(100))
+        );
+        assert_eq!(input(&number, 3, 1, Some(0), None), None, "below");
+        assert_eq!(input(&number, 3, 1, Some(101), None), None, "above");
+        assert_eq!(input(&number, 3, 0, None, None), None, "cancelled");
     }
 
     fn styles(step: &Step) -> Vec<i32> {
@@ -9460,10 +9820,11 @@ mod tests {
 
     #[test]
     fn spiruna_refines_dark_crystals_after_her_quest() {
-        let mut player = hunter(&[(DARK_CRYSTAL_ORE, 12)], &[]);
-        player.meso = REFINING_FEE;
+        const ORE: i32 = 4004004;
+        let player = hunter(&[(ORE, 30)], &[]);
         let spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
         assert_eq!(kind(&spiruna.begin()), Some(0));
+        let mut player = player;
         player.quests.upsert(game::QuestRecord {
             quest_id: SPIRUNA_QUEST,
             status: QuestStatus::Completed {
@@ -9471,23 +9832,238 @@ mod tests {
             },
         });
         let mut spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
+        let step = spiruna.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(how_many_bounds(&step), (1, 1, 100));
         assert_eq!(
-            spiruna.respond(ScriptInput::Yes).unwrap().effects,
+            spiruna.respond(ScriptInput::Number(3)).unwrap().effects,
             [
-                Effect::TakeItem {
-                    item_id: DARK_CRYSTAL_ORE,
-                    quantity: 10
-                },
-                Effect::SpendMeso(REFINING_FEE),
                 Effect::GiveItem {
                     item_id: DARK_CRYSTAL,
+                    quantity: 3
+                },
+                Effect::SpendMeso(1_500_000),
+                Effect::TakeItem {
+                    item_id: ORE,
+                    quantity: 30
+                },
+            ]
+        );
+        assert_eq!(
+            page_text(&spiruna.refused().unwrap()),
+            text(keys::SPIRUNA_SHORT)
+        );
+    }
+
+    /// A quantity prompt's default, least and most.
+    fn how_many_bounds(step: &Step) -> (i32, i32, i32) {
+        match step.prompt {
+            Some(Prompt::AskNumber {
+                default, min, max, ..
+            }) => (default, min, max),
+            ref other => panic!("number expected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn refiners_refine_as_many_batches_as_asked() {
+        // Mr. Thunder: mineral ore, then Steel Plates, five batches.
+        let mut thunder = NpcScript::for_npc(MR_THUNDER, &player(30)).unwrap();
+        assert!(menu_text(&thunder.begin()).contains("#L3#"));
+        thunder.respond(ScriptInput::Select(0)).unwrap();
+        let step = thunder.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(how_many_bounds(&step), (1, 1, 100));
+        let ask = question(&thunder.respond(ScriptInput::Number(5)).unwrap());
+        assert!(ask.contains("#i4010001# 50 #t4010001#"), "{ask}");
+        assert!(ask.contains("1500"), "{ask}");
+        assert_eq!(
+            thunder.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4011001,
+                    quantity: 5
+                },
+                Effect::SpendMeso(1500),
+                Effect::TakeItem {
+                    item_id: 4010001,
+                    quantity: 50
+                },
+            ]
+        );
+
+        // Pi charges 90%, and makes Screws fifteen a batch for nothing.
+        let mut pi = NpcScript::for_npc(PI, &player(30)).unwrap();
+        pi.respond(ScriptInput::Select(0)).unwrap();
+        pi.respond(ScriptInput::Select(6)).unwrap();
+        pi.respond(ScriptInput::Number(2)).unwrap();
+        assert_eq!(
+            pi.respond(ScriptInput::Yes).unwrap().effects[1],
+            Effect::SpendMeso(1440)
+        );
+        let mut pi = NpcScript::for_npc(PI, &player(30)).unwrap();
+        pi.respond(ScriptInput::Select(4)).unwrap();
+        let menu = menu_text(&pi.begin()).to_owned();
+        assert!(menu.contains("#t4003001# (#t4000003#)"), "{menu}");
+        assert!(menu.contains("#t4003001# (#t4000018#)"), "{menu}");
+        assert!(menu.contains("#t4003000# x15"), "{menu}");
+        pi.respond(ScriptInput::Select(2)).unwrap();
+        let ask = question(&pi.respond(ScriptInput::Number(2)).unwrap());
+        assert!(ask.contains(" 30 "), "{ask}");
+        assert!(!ask.contains(&MESO_ICON.to_string()), "{ask}");
+        assert_eq!(
+            pi.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4003000,
+                    quantity: 30
+                },
+                Effect::TakeItem {
+                    item_id: 4011000,
+                    quantity: 2
+                },
+                Effect::TakeItem {
+                    item_id: 4011001,
+                    quantity: 2
+                },
+            ]
+        );
+
+        // Vogen's arrows come a bundle at a time, and his Dark Crystals
+        // cost a million each.
+        let mut vogen = NpcScript::for_npc(VOGEN, &player(30)).unwrap();
+        vogen.respond(ScriptInput::Select(5)).unwrap();
+        assert_eq!(
+            kind(&vogen.respond(ScriptInput::Select(2)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            vogen.respond(ScriptInput::Yes).unwrap().effects[0],
+            Effect::GiveItem {
+                item_id: 2060001,
+                quantity: 900
+            }
+        );
+        let mut vogen = NpcScript::for_npc(VOGEN, &player(30)).unwrap();
+        vogen.respond(ScriptInput::Select(3)).unwrap();
+        vogen.respond(ScriptInput::Select(4)).unwrap();
+        vogen.respond(ScriptInput::Number(100)).unwrap();
+        assert_eq!(
+            vogen.respond(ScriptInput::Yes).unwrap().effects[1],
+            Effect::SpendMeso(100_000_000)
+        );
+        assert!(with_maker_words(NpcScript::new(VOGEN, Vec::new()))
+            .refused
+            .is_some());
+    }
+
+    #[test]
+    fn muhamad_asks_first_and_refines_lidium() {
+        let mut muhamad = NpcScript::for_npc(MUHAMAD, &player(30)).unwrap();
+        assert_eq!(kind(&muhamad.begin()), Some(1));
+        assert_eq!(
+            page_text(&muhamad.respond(ScriptInput::No).unwrap()),
+            text(keys::REFINER_MUHAMAD_BYE)
+        );
+        let mut muhamad = NpcScript::for_npc(MUHAMAD, &player(30)).unwrap();
+        let menu = menu_text(&muhamad.respond(ScriptInput::Yes).unwrap()).to_owned();
+        assert!(menu.contains("#L2#") && !menu.contains("#L3#"), "{menu}");
+        muhamad.respond(ScriptInput::Select(0)).unwrap();
+        muhamad.respond(ScriptInput::Select(7)).unwrap();
+        muhamad.respond(ScriptInput::Number(1)).unwrap();
+        assert_eq!(
+            muhamad.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4011008,
+                    quantity: 1
+                },
+                Effect::SpendMeso(270),
+                Effect::TakeItem {
+                    item_id: 4010007,
+                    quantity: 10
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn thunder_and_chris_upgrade_equipment_one_at_a_time() {
+        let mut thunder = NpcScript::for_npc(MR_THUNDER, &player(30)).unwrap();
+        thunder.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(
+            kind(&thunder.respond(ScriptInput::Select(0)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            thunder.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SpendMeso(500),
+                Effect::TakeItem {
+                    item_id: 1002001,
+                    quantity: 1
+                },
+                Effect::TakeItem {
+                    item_id: 4011002,
+                    quantity: 1
+                },
+                Effect::GiveItem {
+                    item_id: 1002042,
                     quantity: 1
                 },
             ]
         );
-        player.meso -= 1;
-        let mut spiruna = NpcScript::for_npc(SPIRUNA, &player).unwrap();
-        assert_eq!(spiruna.respond(ScriptInput::Yes).unwrap().effects, []);
+
+        // Chris's Metal Hoofs: a word first, then how many.
+        let mut chris = NpcScript::for_npc(CHRIS, &player(30)).unwrap();
+        assert_eq!(
+            kind(&chris.respond(ScriptInput::Select(2)).unwrap()),
+            Some(1)
+        );
+        let step = chris.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(how_many_bounds(&step), (1, 1, 100));
+        chris.respond(ScriptInput::Number(2)).unwrap();
+        assert_eq!(
+            chris.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4011001,
+                    quantity: 2
+                },
+                Effect::SpendMeso(2000),
+                Effect::TakeItem {
+                    item_id: 4000039,
+                    quantity: 200
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn altaire_campers_trade_each_hundred_for_a_perfect_pitch() {
+        const PERZEN: i32 = 2131001;
+        const RUBBLE: i32 = 4000439;
+        let mut perzen = NpcScript::for_npc(PERZEN, &hunter(&[(RUBBLE, 99)], &[])).unwrap();
+        perzen.begin();
+        assert_eq!(
+            page_text(&perzen.respond(ScriptInput::Select(0)).unwrap()),
+            content::text().get(keys::ALTAIRE_SHORT, &[("item", "4000439")])
+        );
+        let player = hunter(&[(RUBBLE, 200), (RUBBLE, 50)], &[]);
+        let mut perzen = NpcScript::for_npc(PERZEN, &player).unwrap();
+        let step = perzen.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(how_many_bounds(&step), (2, 1, 2));
+        assert_eq!(
+            perzen.respond(ScriptInput::Number(2)).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: RUBBLE,
+                    quantity: 200
+                },
+                Effect::GiveItem {
+                    item_id: refiners::PERFECT_PITCH,
+                    quantity: 2
+                },
+            ]
+        );
     }
 
     fn engaging(markers: &[i16], gender: u8, meso: i32, items: &[(i32, i16)]) -> Player {

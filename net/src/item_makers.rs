@@ -11,7 +11,7 @@ pub struct Recipe {
     pub cost: i32,
 }
 
-const fn recipe(item: i32, materials: &'static [(i32, i16)], cost: i32) -> Recipe {
+pub(crate) const fn recipe(item: i32, materials: &'static [(i32, i16)], cost: i32) -> Recipe {
     Recipe {
         item,
         materials,

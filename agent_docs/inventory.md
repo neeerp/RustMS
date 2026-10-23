@@ -1061,9 +1061,40 @@ conversation opens. While quest 7301 or 7303 is started, Mos also makes
 Cornian's Dagger (4001078). No sourced text exists for these NPCs, so all
 of it is placeholder (`maker.*`).
 
-Not done: the refiners and makers of Victoria Island and elsewhere (Mr.
-Thunder, JM, Vogen and others), which need a quantity prompt (NPC talk
-type 3) on the server.
+### Refiners
+
+Refiners make plates, jewels, crystals, materials and arrows in batches.
+`net::refiners` keeps their tables: a `Refine` is an item, how many come
+from a batch (15 Screws, a bundle of 800 to 1000 arrows), the materials
+and the mesos per batch. Ids, counts and prices come from Cosmic's
+scripts (report `v83ref/reports/a103-refiners.md`). The conversation is a
+menu of kinds, then a menu of items, then a number prompt (NPC talk type
+3, `Page::AskNumber`, 1 to 100 with 1 selected), then a yes/no question
+listing the totals. Arrows skip the number prompt: one bundle at a time.
+The yes is one transactional step: the item first, then the mesos, then
+each material, so a full inventory is told (`maker.full`) before short
+mesos or materials (`maker.short`). Nothing is taken unless all of it applies.
+
+- Mr. Thunder (1022003, Perion) refines mineral and jewel ore, and
+  upgrades helmets and shields one at a time, as the item makers do.
+- Chris (1052003, Kerning City) refines mineral and jewel ore, makes Steel
+  Plates from 100 Iron Hog's Metal Hoofs each, and upgrades the Gigantic
+  claws.
+- Vogen (2020000, El Nath) refines ore, Moon and Star Rocks, crystals
+  (Dark Crystals at 1,000,000 mesos each), materials and arrows.
+- Pi (2040016, Ludibrium) offers the same except the Dark Crystal, at 90%
+  of the price. Muhamad (2100001, Ariant) asks first, then refines mineral
+  ore (and Lidium), jewel ore and crystals, also at 90%. The 90% is
+  Cosmic's, with no v83 source (`v83ref/lanes/QUESTIONS.md`).
+- Spiruna (2032001, Orbis), once quest 3034 is done, asks how many Dark
+  Crystals to refine at 500,000 mesos each, and refines them at once.
+- The five in Altaire Camp (Perzen, Loha, Sion, Duru and Tess, 2131001 to
+  2131007) each take 100 of one item for a Perfect Pitch (4310000). The
+  number prompt offers as many as the player's items buy, at most 300.
+
+All of their text is placeholder (`refiner.*`, `altaire.*`). Not done:
+the equipment makers Mr. Smith (1022004), Vicious (1012002) and JM
+(1052002), whose material rows also ask how many.
 
 ## NPC shops
 
