@@ -275,8 +275,6 @@ again before it has finished docking.
 ## Not yet
 
 - Kerning City gate's Kerning Square and Construction Site choices.
-
-- 8150000's drops, which belong in the content pack.
 - Corba's dragon flight to Leafre.
 - Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
 - CLOCK countdown kinds 0 and 3.
