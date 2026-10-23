@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "NpcInteractionHandlers.h"
 #include "ShopList.h"
+#include "StoreBank.h"
+#include "../../Configuration.h"
 
 #include "../Character/QuestResult.h"
 #include "../Data/ItemData.h"
@@ -34,6 +36,7 @@
 #include "../IO/UITypes/UIShop.h"
 #include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
+#include "../IO/UITypes/UIStoreBank.h"
 #include "../Gameplay/QuestConversation.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
 
@@ -439,6 +442,70 @@ namespace ms
 
 		storage.answered();
 		UI::get().emplace<UIOk>(message, [](bool) {});
+	}
+
+	void StoreBankMessageHandler::handle(InPacket& recv) const
+	{
+		if (auto window = UI::get().get_element<UIStoreBank>())
+			window->answered(recv.read_byte());
+	}
+
+	void StoreBankHandler::handle(InPacket& recv) const
+	{
+		int8_t mode = recv.read_byte();
+
+		switch (mode)
+		{
+		case store_bank::Mode::OPEN:
+		{
+			int32_t npcid = recv.read_int();
+			storage_contents::Contents contents = storage_contents::read(recv);
+			UI::get().emplace<UIStoreBank>();
+
+			if (auto window = UI::get().get_element<UIStoreBank>())
+				window->open(npcid, contents);
+
+			break;
+		}
+		case store_bank::Mode::FEE:
+		{
+			int32_t days = recv.read_int();
+			int32_t fee = recv.read_int();
+
+			if (auto window = UI::get().get_element<UIStoreBank>())
+				window->quote(days, fee);
+
+			break;
+		}
+		case store_bank::Mode::ELSEWHERE:
+		{
+			int32_t npcid = recv.read_int();
+			int32_t mapid = recv.read_int();
+			auto channel = static_cast<uint8_t>(recv.read_byte());
+			Configuration& config = Configuration::get();
+			std::string text = store_bank::elsewhere_text(mapid, channel,
+				config.get_channel_name(config.get_worldid(), channel));
+
+			UI::get().emplace<UINpcTalk>();
+			UI::get().enable();
+
+			if (auto talk = UI::get().get_element<UINpcTalk>())
+			{
+				talk->change_text(npcid, UINpcTalk::SENDOK, 0, 0, text);
+				talk->set_local_responder([](int8_t, int32_t) {});
+			}
+
+			break;
+		}
+		case store_bank::Mode::UNAVAILABLE:
+			// Not in v83, which leaves a Get All waiting: RustMS answers
+			// one that comes to nothing with this.
+			if (auto window = UI::get().get_element<UIStoreBank>())
+				window->answered_nothing();
+
+			UI::get().emplace<UIOk>(store_bank::UNAVAILABLE_TEXT, [](bool) {});
+			break;
+		}
 	}
 
 	void RpsGameHandler::handle(InPacket& recv) const

@@ -47,6 +47,7 @@
 #include "UITypes/UIQuickSlotConfig.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStorage.h"
+#include "UITypes/UIStoreBank.h"
 #include "UITypes/UIStatusBar.h"
 #include "UITypes/UISystemOption.h"
 #include "UITypes/UITradingRoom.h"
@@ -141,6 +142,7 @@ namespace ms
 
 		return open(get_element<UITradingRoom>()) || open(get_element<UIPersonalShop>())
 			|| open(get_element<UIShop>()) || open(get_element<UIStorage>()) || open(get_element<UIDuey>())
+			|| open(get_element<UIStoreBank>())
 			|| open(get_element<UIItemMegaphone>()) || open(get_element<UIItemProtector>())
 			|| open(get_element<UIKarmaScissors>()) || open(get_element<UIIncubator>())
 			|| open(get_element<UIViciousHammer>())
@@ -441,6 +443,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::VICIOUSHAMMER);
 					types.emplace_back(UIElement::Type::MAKER);
 					types.emplace_back(UIElement::Type::DUEY);
+					types.emplace_back(UIElement::Type::STOREBANK);
 					types.emplace_back(UIElement::Type::VEGASPELL);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);

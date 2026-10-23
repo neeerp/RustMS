@@ -53,6 +53,12 @@ namespace ms
 
 		hidename = info["hideName"].get_bool();
 		mouseonly = info["talkMouseOnly"].get_bool();
+		dc_left_top = Point<int16_t>(
+			static_cast<int16_t>(info["dcLeft"].get_integer(-22)),
+			static_cast<int16_t>(info["dcTop"].get_integer(-65)));
+		dc_right_bottom = Point<int16_t>(
+			static_cast<int16_t>(info["dcRight"].get_integer(22)),
+			static_cast<int16_t>(info["dcBottom"].get_integer(0)));
 		scripted = info["script"].size() > 0 || info["shop"].get_bool();
 
 		for (auto npcnode : src)
@@ -196,17 +202,7 @@ namespace ms
 
 		Point<int16_t> absp = get_position() + viewpos;
 
-		Point<int16_t> dim =
-				animations.count(stance) ?
-				animations.at(stance).get_dimensions() :
-				Point<int16_t>();
-
-		return Rectangle<int16_t>(
-				absp.x() - dim.x() / 2,
-				absp.x() + dim.x() / 2,
-				absp.y() - dim.y(),
-				absp.y()
-		).contains(cursorpos) || (quest_marker != QuestMarker::NONE &&
+		return Rectangle<int16_t>(absp + dc_left_top, absp + dc_right_bottom).contains(cursorpos) || (quest_marker != QuestMarker::NONE &&
 			Rectangle<int16_t>(absp + quest_marker_offset() - quest_marker_animation.get_origin(),
 				absp + quest_marker_offset() - quest_marker_animation.get_origin() + quest_marker_animation.get_dimensions()).contains(cursorpos));
 	}

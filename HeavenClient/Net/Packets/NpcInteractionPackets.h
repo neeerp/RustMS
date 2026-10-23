@@ -186,6 +186,17 @@ namespace ms
 		}
 	};
 
+	// The Store Bank's Get All, its confirm, and its closing
+	// Opcode: STORE_BANK_REQUEST(64)
+	class StoreBankRequestPacket : public OutPacket
+	{
+	public:
+		StoreBankRequestPacket(int8_t mode) : OutPacket(OutPacket::Opcode::STORE_BANK_REQUEST)
+		{
+			write_byte(mode);
+		}
+	};
+
 	// A press in the Rock, Paper, Scissors window (v83 0x7403d0 to 0x7405a0)
 	// Opcode: RPS_ACTION(136)
 	class RpsActionPacket : public OutPacket

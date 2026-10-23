@@ -138,6 +138,7 @@ namespace ms
 			WISHLISTINPUT,
 			WEDDINGREGISTRY,
 			NAMECHANGE,
+			STOREBANK,
 			NUM_TYPES
 		};
 

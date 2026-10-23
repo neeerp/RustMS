@@ -825,6 +825,7 @@ namespace ms
 					UIElement::Type::SPEEDQUIZ,
 					UIElement::Type::SHOP,
 					UIElement::Type::STORAGE,
+					UIElement::Type::STOREBANK,
 					UIElement::Type::INVITECARD,
 					UIElement::Type::MEMONOTICE,
 					UIElement::Type::CONTEXTMENU,
@@ -925,6 +926,7 @@ namespace ms
 				case UIElement::Type::SLIDEMENU:
 				case UIElement::Type::SHOP:
 				case UIElement::Type::STORAGE:
+				case UIElement::Type::STOREBANK:
 				case UIElement::Type::TRADINGROOM:
 				case UIElement::Type::PERSONALSHOP:
 				case UIElement::Type::SHOPSELL:

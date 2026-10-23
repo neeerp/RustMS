@@ -101,6 +101,11 @@ namespace ms
 		bool hidename;
 		bool scripted;
 		bool mouseonly;
+		// The double-click area around the feet, info/dcLeft..dcBottom (v83
+		// 0x6dd58c): (-22,-65) to (22,0) unless given. The Maple TV's is
+		// empty, so it doesn't take clicks meant for the NPCs before it.
+		Point<int16_t> dc_left_top;
+		Point<int16_t> dc_right_bottom;
 
 		int32_t npcid;
 		bool flip;
