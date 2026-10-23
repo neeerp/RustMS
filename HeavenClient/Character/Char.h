@@ -30,6 +30,7 @@
 #include "CharEffect.h"
 #include "GuildMark.h"
 #include "ItemEffect.h"
+#include "SetEffect.h"
 #include "Marriage.h"
 #include "MedalTag.h"
 #include "MorphRules.h"
@@ -503,6 +504,7 @@ namespace ms
 		std::vector<ChairLayer> chair_layers;
 
 		ItemEffect item_effect;
+		SetEffect set_effect;
 
 		// A disease's animation, on the face when its pos is 1 like the
 		// chair's.

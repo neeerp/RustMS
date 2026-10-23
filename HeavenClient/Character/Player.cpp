@@ -353,6 +353,11 @@ namespace ms
 		// weapons (v83 draws them over the regular weapon's stances).
 		int16_t shown = part == EquipSlot::Id::WEAPON ? part : inventory.shown_equip(part);
 
+		if (part == EquipSlot::Id::WEAPON)
+			look.set_cash_weapon(inventory.get_item_id(InventoryType::Id::EQUIPPED, part + Inventory::CASH_EQUIP));
+
+		look.set_ring(part, inventory.get_item_id(InventoryType::Id::EQUIPPED, shown));
+
 		if (int32_t itemid = inventory.get_item_id(InventoryType::Id::EQUIPPED, shown))
 			look.add_equip(itemid);
 		else

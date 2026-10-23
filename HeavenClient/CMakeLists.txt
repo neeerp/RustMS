@@ -329,6 +329,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME weather_rules COMMAND weather_rules_tests)
     add_executable(item_effect_rules_tests tests/item_effect_rules.cpp)
     add_test(NAME item_effect_rules COMMAND item_effect_rules_tests)
+    add_executable(set_effect_rules_tests tests/set_effect_rules.cpp)
+    add_test(NAME set_effect_rules COMMAND set_effect_rules_tests)
     add_executable(ap_reset_rules_tests tests/ap_reset_rules.cpp)
     add_test(NAME ap_reset_rules COMMAND ap_reset_rules_tests)
     add_executable(sp_reset_rules_tests tests/sp_reset_rules.cpp)
@@ -525,6 +527,9 @@ add_executable(HeavenClient
     Character/ItemEffect.cpp
     Character/ItemEffect.h
     Character/ItemEffectRules.h
+    Character/SetEffect.cpp
+    Character/SetEffect.h
+    Character/SetEffectRules.h
     Character/ApResetRules.h
     Character/Alliance.cpp
     Character/Alliance.h
