@@ -1012,6 +1012,13 @@ mod tests {
         );
         let oasis = catalog.quest(3900).unwrap();
         assert_eq!(oasis.start_info.as_deref(), Some("4"));
+        // Every info quest starts with a string and counts no mobs, whose
+        // counts would share the record with it.
+        for &id in INFO_QUESTS {
+            let quest = catalog.quest(id).unwrap_or_else(|| panic!("{id}"));
+            assert!(quest.start_info.is_some(), "{id}");
+            assert!(quest.end_mobs.is_empty(), "{id}");
+        }
         // Quests outside the list keep infoex unsupported.
         assert!(catalog.quest(3114).is_none());
     }

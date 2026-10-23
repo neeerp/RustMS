@@ -4,9 +4,10 @@
 
 use game_data::GameData;
 use integration_harness::database::{set_job, set_quest};
+use integration_harness::hunting::walk_to;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::{build_quest_action, build_quest_completion, START};
-use integration_harness::trace::{barrier, step, warp, Trace};
+use integration_harness::trace::{barrier, send, step, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -39,17 +40,18 @@ fn maps() -> &'static GameData {
     })
 }
 
-fn talk(map: i32, npc: i32) -> Packet {
-    let index = maps()
-        .field(map)
-        .unwrap()
-        .map_npcs
-        .iter()
-        .position(|n| n.npc_id == npc)
-        .unwrap();
+/// The NPC's object id on `map`, and a walk to where it stands.
+fn npc(map: i32, npc: i32) -> (i32, Packet) {
+    let npcs = &maps().field(map).unwrap().map_npcs;
+    let index = npcs.iter().position(|n| n.npc_id == npc).unwrap();
+    let at = &npcs[index];
+    (1_000_000_000 + index as i32, walk_to(at.x, at.y))
+}
+
+fn talk(object_id: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
-    p.write_int(1_000_000_000 + index as i32).unwrap();
+    p.write_int(object_id).unwrap();
     p
 }
 
@@ -72,6 +74,7 @@ async fn ariant_houses_fill_in_sejans_test() {
         warp(c, RESIDENTIAL_AREA, "", &mut trace).await,
         RESIDENTIAL_AREA
     );
+    send(c, npc(RESIDENTIAL_AREA, HASSAN).1).await;
     barrier(c, &m, &mut trace).await;
 
     let t = step(
@@ -82,6 +85,7 @@ async fn ariant_houses_fill_in_sejans_test() {
     .await;
     assert_eq!(t.states.get(&SCREWING_THE_SCORPIONS), None);
 
+    send(c, npc(RESIDENTIAL_AREA, SEJAN).1).await;
     // Sejan hands over four parcels of food and the string "2222".
     let t = step(c, &m, build_quest_action(START, SEJANS_TEST, SEJAN)).await;
     assert_eq!(t.states.get(&SEJANS_TEST), Some(&1));
@@ -93,14 +97,16 @@ async fn ariant_houses_fill_in_sejans_test() {
     let mut info = *b"2222";
     for (map, house, slot) in HOUSES {
         assert_eq!(warp(c, map, "", &mut trace).await, map);
+        let (house, walk) = npc(map, house);
+        send(c, walk).await;
         barrier(c, &m, &mut trace).await;
-        let t = step(c, &m, talk(map, house)).await;
+        let t = step(c, &m, talk(house)).await;
         info[slot] = b'3';
         assert_eq!(t.kills[&SEJANS_TEST].as_bytes(), info);
         assert_eq!(t.items, [(FOOD, -1)]);
         assert!(t.prompts.is_empty());
         // The house has had its delivery.
-        let t = step(c, &m, talk(map, house)).await;
+        let t = step(c, &m, talk(house)).await;
         assert!(t.kills.is_empty() && t.items.is_empty());
     }
 
@@ -113,6 +119,7 @@ async fn ariant_houses_fill_in_sejans_test() {
         warp(c, RESIDENTIAL_AREA, "", &mut trace).await,
         RESIDENTIAL_AREA
     );
+    send(c, npc(RESIDENTIAL_AREA, SEJAN).1).await;
     barrier(c, &m, &mut trace).await;
     let t = step(c, &m, build_quest_completion(SEJANS_TEST, SEJAN, -1)).await;
     assert_eq!(t.states.get(&SEJANS_TEST), Some(&2));

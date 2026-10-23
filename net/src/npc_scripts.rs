@@ -1377,11 +1377,20 @@ impl NpcScript {
             MOS => return Some(mos(player, &mut rand::thread_rng())),
             _ => {}
         }
-        if let Some(&setter) = INFO_SETTERS.iter().find(|setter| setter.0 == npc_id) {
-            return info_setter(setter, player);
+        // These fall through when silent, so the same NPCs can say more.
+        if let Some(script) = INFO_SETTERS
+            .iter()
+            .find(|setter| setter.0 == npc_id)
+            .and_then(|&setter| info_setter(setter, player))
+        {
+            return Some(script);
         }
-        if let Some(&delivery) = ARIANT_DELIVERIES.iter().find(|d| d.0 == npc_id) {
-            return ariant_delivery(delivery, player);
+        if let Some(script) = ARIANT_DELIVERIES
+            .iter()
+            .find(|d| d.0 == npc_id)
+            .and_then(|&delivery| ariant_delivery(delivery, player))
+        {
+            return Some(script);
         }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
             return Some(tower_rock(rock, player));
