@@ -20,7 +20,9 @@
 //!
 //! A squad's event (`Event::squad`) is not a party's: it ends only when its
 //! last member leaves, and those on its roster who left may come back
-//! while it runs (`EventMessage::Join`). One with a gate keeps it shut
+//! while it runs (`EventMessage::Join`). A party's event may end that way
+//! too (`Event::until_empty`, Papulatus's): leaving the party then keeps
+//! the ticket, and a new leader ends nothing. One with a gate keeps it shut
 //! until it is won or over.
 
 use crate::actor::registry::FieldRegistry;
@@ -342,34 +344,42 @@ pub fn spawn(
     });
 }
 
-/// The gate of `kind`'s event on `channel_id`, if it has one, and its
-/// reactor's name.
+/// The gates of `kind`'s event on `channel_id`, if it has any: their
+/// fields and reactors' names.
 fn gate(
     fields: &Arc<FieldRegistry>,
     channel_id: u8,
     kind: EventKind,
-) -> Option<(FieldHandle, &'static str)> {
-    let (map_id, name) = kind.event().gate?;
-    Some((fields.field(FieldKey::new(channel_id, map_id)), name))
+) -> Vec<(FieldHandle, &'static str)> {
+    kind.event()
+        .gate
+        .iter()
+        .map(|&(map_id, name)| (fields.field(FieldKey::new(channel_id, map_id)), name))
+        .collect()
 }
 
-/// Shut the gate of `kind`'s event on `channel_id`, if it has one (Cosmic
-/// `updateGateState(1)`).
-fn shut_gate(fields: &Arc<FieldRegistry>, channel_id: u8, kind: EventKind) {
-    let Some((field, name)) = gate(fields, channel_id, kind) else {
-        return;
-    };
-    tokio::spawn(async move {
+/// Set every reactor of `gate` to `state`.
+async fn set_gate(gate: Vec<(FieldHandle, &'static str)>, state: u8) {
+    for (field, name) in gate {
         let _ = field
             .tx
-            .send(FieldMessage::SetReactor { name, state: 1 })
+            .send(FieldMessage::SetReactor { name, state })
             .await;
-    });
+    }
+}
+
+/// Shut the gates of `kind`'s event on `channel_id`, if it has any (Cosmic
+/// `updateGateState(1)`).
+fn shut_gate(fields: &Arc<FieldRegistry>, channel_id: u8, kind: EventKind) {
+    let gate = gate(fields, channel_id, kind);
+    if !gate.is_empty() {
+        tokio::spawn(set_gate(gate, 1));
+    }
 }
 
 /// Tell the directory event `id` no longer holds its lobby, so the next
-/// party may go, opening the event's gate first if `open` has the fields
-/// (so the next squad shuts it only after). Said again later, it changes
+/// party may go, opening the event's gates first if `open` has the fields
+/// (so the next squad shuts them only after). Said again later, it changes
 /// nothing.
 fn free_lobby(
     directory: &mpsc::Sender<DirectoryMessage>,
@@ -379,14 +389,9 @@ fn free_lobby(
     id: u32,
 ) {
     let directory = directory.clone();
-    let gate = open.and_then(|fields| gate(fields, channel_id, kind));
+    let gate = open.map_or_else(Vec::new, |fields| gate(fields, channel_id, kind));
     tokio::spawn(async move {
-        if let Some((field, name)) = gate {
-            let _ = field
-                .tx
-                .send(FieldMessage::SetReactor { name, state: 0 })
-                .await;
-        }
+        set_gate(gate, 0).await;
         let _ = directory
             .send(DirectoryMessage::EventClosed {
                 channel_id,
@@ -627,7 +632,8 @@ impl EventActor {
             }
             EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
             // Told by the old leader or the new one, whichever is first.
-            // A squad's lead stays its own, whatever the parties.
+            // A squad's lead stays its own, whatever the parties; an event
+            // that lasts until it is empty doesn't end with a lead outside.
             EventCommand::HandOver(to) if !event.squad && (leader || client_id == to) => {
                 self.leader.store(to, Ordering::Relaxed);
                 if self.team.hand_over(to) {

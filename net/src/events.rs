@@ -26,6 +26,9 @@ pub enum EventKind {
     /// The expedition to Zakum's altar, gathered by Adobis (2030013) at the
     /// Entrance to Zakum (`crate::squads`).
     Zakum,
+    /// The fight with Papulatus at the Origin of Clocktower, which a
+    /// party's leader starts by its portal at Deep Inside the Clocktower.
+    Papulatus,
 }
 
 /// An event's maps and terms.
@@ -95,10 +98,14 @@ pub struct Event {
     /// whoever leads, and members on its roster may come back in while it
     /// runs (Cosmic `isExpeditionTeamLackingNow`).
     pub squad: bool,
-    /// The reactor, by its map and name, that the event shuts (state 1)
-    /// while it runs and opens (0) once it is won or over (Cosmic
-    /// ZakumBattle's `updateGateState`).
-    pub gate: Option<(i32, &'static str)>,
+    /// The reactors, by their map and name, that the event shuts (state
+    /// 1) while it runs and opens (0) once it is won or over (Cosmic
+    /// ZakumBattle's and PapulatusBattle's `updateGateState`).
+    pub gate: &'static [(i32, &'static str)],
+    /// Whether, like a squad's, it ends only when the last member leaves,
+    /// whoever leads and whatever becomes of the party (Cosmic
+    /// PapulatusBattle, whose `leftParty` and `changedLeader` do nothing).
+    pub until_empty: bool,
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -194,7 +201,8 @@ pub const KPQ: Event = Event {
     bonus: None,
     blessings: &[],
     squad: false,
-    gate: None,
+    gate: &[],
+    until_empty: false,
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -288,7 +296,8 @@ pub const HPQ: Event = Event {
     }),
     blessings: &[],
     squad: false,
-    gate: None,
+    gate: &[],
+    until_empty: false,
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -347,7 +356,8 @@ pub const LPQ: Event = Event {
     }),
     blessings: &[],
     squad: false,
-    gate: None,
+    gate: &[],
+    until_empty: false,
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -536,7 +546,8 @@ pub const OPQ: Event = Event {
     // 30 minutes (Cosmic `afterSetup`).
     blessings: &[2_022_090, 2_022_091, 2_022_092, 2_022_093],
     squad: false,
-    gate: None,
+    gate: &[],
+    until_empty: false,
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -755,7 +766,8 @@ pub const ZPQ: Event = Event {
     bonus: None,
     blessings: &[],
     squad: false,
-    gate: None,
+    gate: &[],
+    until_empty: false,
 };
 
 /// The Dead Mine's hub, where Aura stands and its way out is.
@@ -814,17 +826,63 @@ pub const ZAKUM: Event = Event {
     bonus: None,
     blessings: &[],
     squad: true,
-    gate: Some(ZAKUM_GATE),
+    gate: &[ZAKUM_GATE],
+    until_empty: false,
+};
+
+/// Deep Inside the Clocktower, the way to Papulatus, and the Origin of
+/// Clocktower where he is fought.
+pub const CLOCKTOWER_DEPTHS: i32 = 220_080_000;
+pub const ORIGIN_OF_CLOCKTOWER: i32 = 220_080_001;
+
+/// The fight with Papulatus (Cosmic `PapulatusBattle`, Server.NX
+/// `FieldSet.img/Populatus`): one to six of a party, all on Deep Inside
+/// the Clocktower with their leader, go to their own copy of the Origin of
+/// Clocktower for 45 minutes. Its three `ludigate` reactors before the
+/// portal stay shut until it ends, which is only when the last of them
+/// leaves. Papulatus's death is to win it, in a later slice.
+pub const PAPULATUS: Event = Event {
+    lobby: CLOCKTOWER_DEPTHS,
+    maps: ORIGIN_OF_CLOCKTOWER..=ORIGIN_OF_CLOCKTOWER,
+    entry: ORIGIN_OF_CLOCKTOWER,
+    exit: CLOCKTOWER_DEPTHS,
+    levels: 1..=u8::MAX,
+    team: 1..=6,
+    minutes: 45,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[
+        (CLOCKTOWER_DEPTHS, "ludigate1"),
+        (CLOCKTOWER_DEPTHS, "ludigate2"),
+        (CLOCKTOWER_DEPTHS, "ludigate3"),
+    ],
+    until_empty: true,
 };
 
 impl EventKind {
-    pub const ALL: [EventKind; 6] = [
+    pub const ALL: [EventKind; 7] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
         EventKind::Opq,
         EventKind::Zpq,
         EventKind::Zakum,
+        EventKind::Papulatus,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -835,6 +893,7 @@ impl EventKind {
             EventKind::Opq => &OPQ,
             EventKind::Zpq => &ZPQ,
             EventKind::Zakum => &ZAKUM,
+            EventKind::Papulatus => &PAPULATUS,
         }
     }
 }
@@ -887,6 +946,12 @@ impl Event {
             .then(fewer)
             .flatten()
             .unwrap_or(*self.team.start())
+    }
+
+    /// Whether only the last member's leaving ends it: a squad's, or one
+    /// that says so (`until_empty`).
+    pub fn lasts_until_empty(&self) -> bool {
+        self.squad || self.until_empty
     }
 
     /// Whether `map_id` is one of the event's maps; its exit never is.
@@ -1062,14 +1127,17 @@ fn scale() -> u32 {
 
 /// Who is still playing. The event ends when its leader leaves or too few
 /// remain, and once won, when the last of them leaves (Cosmic
-/// `isEventTeamLackingNow`). A squad's ends only when the last leaves
-/// (`isExpeditionTeamLackingNow`), and its members may come back.
+/// `isEventTeamLackingNow`). A squad's, and one that lasts until empty,
+/// ends only when the last leaves (`isExpeditionTeamLackingNow`), and a
+/// squad's members may come back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Team {
     leader: ClientId,
     members: Vec<ClientId>,
     least: usize,
     won: bool,
+    /// Whether only the last member's leaving ends it.
+    until_empty: bool,
     /// A squad's roster, who alone may come (back) in.
     roster: Option<HashSet<ClientId>>,
 }
@@ -1082,6 +1150,7 @@ impl Team {
             members,
             least: *event.team.start(),
             won: false,
+            until_empty: event.lasts_until_empty(),
         }
     }
 
@@ -1131,7 +1200,7 @@ impl Team {
             return false;
         };
         self.members.remove(index);
-        if self.won || self.roster.is_some() {
+        if self.won || self.until_empty {
             return self.members.is_empty();
         }
         member == self.leader || self.members.len() < self.least
@@ -1140,13 +1209,14 @@ impl Team {
     /// The leader handed the party to `to`, who leads the team from now
     /// on. Returns whether that ends the event: it does if `to` is not in
     /// its maps, unless it is won (Cosmic `changedLeader`). A squad isn't
-    /// a party, so a party's hand-over changes nothing for it.
+    /// a party, so a party's hand-over changes nothing for it, and one that
+    /// lasts until empty only follows the new leader.
     pub fn hand_over(&mut self, to: ClientId) -> bool {
         if self.roster.is_some() {
             return false;
         }
         self.leader = to;
-        !self.won && !self.has(to)
+        !self.won && !self.until_empty && !self.has(to)
     }
 }
 
@@ -1954,6 +2024,22 @@ mod tests {
         assert_eq!(ZAKUM.least(), 6);
         assert!(EventKind::Zakum.event().holds(280_030_000));
         assert!(!ZAKUM.holds(ZAKUM.lobby));
+    }
+
+    #[test]
+    fn papulatus_ends_only_when_its_last_member_leaves() {
+        let mut team = Team::new(&PAPULATUS, 1, vec![1, 2, 3]);
+        // A hand-over moves the lead, even to one outside, and ends nothing.
+        assert!(!team.hand_over(9));
+        assert_eq!(team.leader(), 9);
+        assert!(!team.leave(1));
+        assert!(!team.leave(2));
+        assert!(!team.rejoin(1), "a party's team takes no one back");
+        assert!(team.leave(3));
+        assert!(PAPULATUS.team(1, &[at(1, 1, PAPULATUS.lobby)]).is_some());
+        assert!(PAPULATUS.holds(ORIGIN_OF_CLOCKTOWER));
+        assert!(!PAPULATUS.holds(CLOCKTOWER_DEPTHS));
+        assert_eq!(PAPULATUS.gate.len(), 3);
     }
 
     #[test]

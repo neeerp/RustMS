@@ -180,6 +180,10 @@ pub const OPQ_STORAGE_IN: &str = "party3_room8";
 /// The Dead Mine's way out, on its hub (`ps01`), which the client actor
 /// answers from the player's ticket.
 pub const ZPQ_OUT: &str = "Zakum03";
+/// The way to Papulatus at Deep Inside the Clocktower (`in00`), which the
+/// client actor answers once the directory says whether the party may go
+/// (`papulatus_portal`).
+pub const PAPULATUS_IN: &str = "Populatus00";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.
@@ -1477,6 +1481,32 @@ fn is_market_portal(portal: &PortalTemplate) -> bool {
         .is_some_and(|script| script.contains("market"))
 }
 
+/// The way to Papulatus, for a player whose party stands as `entry`: the
+/// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
+pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
+    use crate::events::{Entry, EventKind, PAPULATUS};
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    match entry {
+        Entry::NoParty => pink(keys::PAPULATUS_NO_PARTY),
+        Entry::NotLeader => pink(keys::PAPULATUS_NOT_LEADER),
+        Entry::NotEligible => {
+            let (least, most) = (
+                PAPULATUS.least().to_string(),
+                PAPULATUS.team.end().to_string(),
+            );
+            let vars = [("least", least.as_str()), ("most", most.as_str())];
+            vec![Effect::Pink(
+                content::text().get(keys::PAPULATUS_NOT_ELIGIBLE, &vars),
+            )]
+        }
+        Entry::Busy => pink(keys::PAPULATUS_BUSY),
+        Entry::Ready => vec![
+            Effect::PortalSound,
+            Effect::StartEvent(EventKind::Papulatus),
+        ],
+    }
+}
+
 /// The id of `map_id`'s portal called `name`, else 0.
 pub fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)
@@ -1512,6 +1542,34 @@ mod tests {
             player.quests.upsert(QuestRecord { quest_id, status });
         }
         player
+    }
+
+    #[test]
+    fn the_way_to_papulatus_lets_a_ready_party_in_and_says_why_not_otherwise() {
+        use crate::events::{Entry, EventKind};
+        let text = |key, vars: &[(&str, &str)]| content::text().get(key, vars);
+        let refused = [
+            (Entry::NoParty, text(keys::PAPULATUS_NO_PARTY, &[])),
+            (Entry::NotLeader, text(keys::PAPULATUS_NOT_LEADER, &[])),
+            (
+                Entry::NotEligible,
+                text(
+                    keys::PAPULATUS_NOT_ELIGIBLE,
+                    &[("least", "1"), ("most", "6")],
+                ),
+            ),
+            (Entry::Busy, text(keys::PAPULATUS_BUSY, &[])),
+        ];
+        for (entry, line) in refused {
+            assert_eq!(papulatus_portal(entry), [Effect::Pink(line)]);
+        }
+        assert_eq!(
+            papulatus_portal(Entry::Ready),
+            [
+                Effect::PortalSound,
+                Effect::StartEvent(EventKind::Papulatus)
+            ]
+        );
     }
 
     fn avatar(path: &str) -> ScriptOutcome {
