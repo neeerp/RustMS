@@ -38,6 +38,18 @@ beside it.
   168 for each change to the owner and the map, with an empty exception list
   (173) for each pet that came out. A slot without a pet gets only the stat
   change, which unlocks the client.
+- **Eggs.** A pet that evolves without an item (`info/evol1..n` and
+  `evolProb1..n` with `evolReqItemID` 0, read into `ItemInfo::pet_evolutions`)
+  is an egg: the Dragon Egg (5000028) and the Robo Egg (5000047). Summoning
+  one hatches it instead, as Cosmic has it (no v83 source says when an egg
+  hatches; the client has no egg code). The item becomes the evolution its
+  weights pick (the Baby Dragon 5000029, the Baby Robo 5000048) in the same
+  slot, with the same serial, level, closeness and expiry, re-sent as a
+  remove and an add. A pet still called by its egg's kind ("Dragon", "Robo")
+  takes the baby's name. Nothing comes out; the stat change unlocks the
+  client. The evolutions of the babies themselves need the Rock of
+  Evolution (5380000) and pet level 15 (`pet_evolve_item`,
+  `pet_evolve_level`), which nothing uses yet.
 - **Packets.** 168 is `cid, index, 1, replace, body` to show a pet and
   `cid, index, 0, reason` to take it away. The body is `item id, name,
   serial, x, y, stance, foothold, name tag, balloon`; SPAWN_PLAYER repeats it
@@ -304,6 +316,8 @@ beside it.
   closeness, then gives it a cash food that suits it and one that doesn't.
   It renames the pet with a name tag, checks the 172 for the owner and the
   watcher, and that the watcher sees the new name after the relog.
+- `integration-harness/tests/pet_eggs.rs` hatches a Dragon Egg and a named
+  Robo Egg, summons both babies, and checks they stay babies after a relog.
 - `integration-harness/tests/pet_auto_potion.rs` sets a Red Potion beside a
   worn HP pouch, has the pet give one, checks that a pet not out is refused
   with an empty stat change, and that the potion is kept and cleared across
