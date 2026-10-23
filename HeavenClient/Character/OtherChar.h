@@ -92,6 +92,9 @@ namespace ms
 		int32_t get_shadow_partner() const override;
 
 	private:
+		// The effect of getting on or off `mount` (FUN_00936859).
+		void show_mount_effect(int32_t mount, bool boarding);
+
 		uint16_t level;
 		int16_t job;
 		move_path::Player path;

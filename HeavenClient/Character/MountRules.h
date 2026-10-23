@@ -147,6 +147,16 @@ namespace ms::mount
 		return base * 10000 + 1004;
 	}
 
+	// The skill whose effect plays as `mount` is got on or off (FUN_00936859): the rider's Monster
+	// Rider for a tamed monster, the Battleship for the ship, none for anything else.
+	inline int32_t ride_effect_skill(int32_t mount, int32_t job)
+	{
+		if (is_tamed_monster(mount))
+			return rider_skill(job);
+
+		return mount == BATTLESHIP_VEHICLE ? BATTLESHIP : 0;
+	}
+
 	// A mount this tired stands tired (FUN_00941eed).
 	inline bool tired(int32_t level, int32_t fatigue)
 	{

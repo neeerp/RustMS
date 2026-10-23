@@ -722,7 +722,13 @@ skill, a byte and an int (`buff::build_give_ride`). SPAWN_PLAYER carries
 the same block in its riding slot. The client locks every skill
 until it hears bit 85 back, so a refusal and CANCEL_BUFF for the skill
 both answer with CANCEL_BUFF for riding (`mount::dismount`). The map sees
-CANCEL_FOREIGN_BUFF when the player gets off.
+CANCEL_FOREIGN_BUFF when the player gets off. HeavenClient plays the
+mount's effect (the rider's Monster Rider, or the Battleship's) as a
+player gets on or off, for themselves (`Player::change_ride`) and for
+others (`OtherChar::show_mount_effect`, as v83's FUN_0098385d and
+FUN_00983921 do), but not for one already riding as they come into view.
+Another player boarding the ship also sounds its `Use`; the owner hears
+it on the cast.
 
 `Player.mount` holds the mount's level, EXP and tiredness, saved in
 `character_mounts` (a row once it differs from a new mount's 1 / 0 / 0).
