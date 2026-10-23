@@ -92,6 +92,8 @@ namespace ms
 		OPEN_UI = 220,
 		LOCK_UI = 221,
 		DISABLE_UI = 222,
+		SPAWN_GUIDE = 223,
+		TALK_GUIDE = 224,
 		MESSAGE_BOX = 232,
 		OPEN_UI_STRING_LIST = 233,
 
@@ -538,6 +540,8 @@ namespace ms
 		emplace<OPEN_UI, OpenUiHandler>();
 		emplace<LOCK_UI, LockUiHandler>();
 		emplace<DISABLE_UI, DisableUiHandler>();
+		emplace<SPAWN_GUIDE, SpawnGuideHandler>();
+		emplace<TALK_GUIDE, TalkGuideHandler>();
 		emplace<MESSAGE_BOX, MessageBoxHandler>();
 		emplace<OPEN_UI_STRING_LIST, OpenUiStringListHandler>();
 	}

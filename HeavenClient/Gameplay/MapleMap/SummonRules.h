@@ -67,7 +67,8 @@ namespace ms::summon_rules
 		ATTACK2 = 5,
 		SKILL1 = 6,
 		HIT = 12,
-		DIE = 13
+		DIE = 13,
+		SAY = 14
 	};
 
 	inline const char *action_name(int8_t action)

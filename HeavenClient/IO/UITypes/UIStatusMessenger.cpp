@@ -20,6 +20,7 @@
 #include "UIStatusBar.h"
 
 #include "../Constants.h"
+#include "../UiControl.h"
 
 namespace ms
 {
@@ -88,6 +89,11 @@ namespace ms
 
 	void UIStatusMessenger::show_status(Color::Name color, const std::string &message)
 	{
+		// A line that comes while LOCK_UI hides the HUD is dropped, not kept
+		// for later (FUN_0089b159).
+		if (ui_control::state().locked)
+			return;
+
 		statusinfos.push_front(StatusInfo(message, color));
 
 		if (statusinfos.size() > MAX_MESSAGES)

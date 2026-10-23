@@ -44,6 +44,7 @@
 #include "MapleMap/MapWeather.h"
 #include "MapleMap/MapTooltips.h"
 #include "MapleMap/MapDoors.h"
+#include "MapleMap/Guide.h"
 #include "MapleMap/MapSummons.h"
 #include "MapleMap/MapReactors.h"
 #include "MapleMap/MapNpcs.h"
@@ -149,6 +150,9 @@ namespace ms
 
 		// Returns a reference to the summons on the current map.
 		MapSummons &get_summons();
+
+		// Returns a reference to the tutorial guide following the player.
+		Guide &get_guide();
 
 		// Returns a reference to the Mystic Doors in the current field.
 		MapDoors &get_doors();
@@ -437,6 +441,8 @@ namespace ms
 		int64_t barrel_checked = INT32_MIN;
 		MapDoors doors;
 		MapSummons summons;
+		// Kept from map to map.
+		Guide guide;
 		MapShip ship;
 		MapWedding wedding;
 		MapClouds clouds;

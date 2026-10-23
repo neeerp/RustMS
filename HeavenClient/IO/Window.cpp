@@ -23,6 +23,7 @@
 #include "../Constants.h"
 #include "../Timer.h"
 #include "ScreenshotRules.h"
+#include "UiControl.h"
 
 #include <fstream>
 #include <vector>
@@ -237,7 +238,11 @@ namespace ms
 			} else if (opacity <= 0.0f)
 			{
 				opacity = 0.0f;
-				opcstep = -opcstep;
+
+				// The new stage comes back in over 600 ms, or 300 ms while
+				// LOCK_UI holds the UI (FUN_00776b64).
+				float fadein = ui_control::state().locked ? 300.0f : 600.0f;
+				opcstep = static_cast<float>(Constants::TIMESTEP) / fadein;
 
 				fadeprocedure();
 			}

@@ -45,4 +45,20 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// Brings the tutorial guide out, or sends it away (0x96014f).
+	// Opcode: SPAWN_GUIDE(223)
+	class SpawnGuideHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// A balloon or a hint picture over the guide (0x960239).
+	// Opcode: TALK_GUIDE(224)
+	class TalkGuideHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }
