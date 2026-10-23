@@ -55,6 +55,7 @@ pub mod settings;
 pub mod shop;
 pub mod skills;
 pub mod storage;
+pub mod stylists;
 pub mod summons;
 pub mod trade;
 pub mod wedding_gift;

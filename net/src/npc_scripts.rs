@@ -17,6 +17,7 @@ use crate::items;
 use crate::packet::handle::world;
 use crate::rides;
 use crate::scripts::Effect;
+use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
@@ -541,18 +542,8 @@ const BACK_TO_TREND_ZONE: (i32, u8) = (TREND_ZONE_METROPOLIS, 4);
 /// The portal the way back arrives at, on either town a tour of Malaysia
 /// begins in.
 const MALAYSIA_HOME_PORTAL: u8 = 4;
-/// Henesys's hair salon (`hair_henesys1`): a cut or a dye of the player's
-/// choosing, for a coupon each.
-const NATALIE: i32 = 1012103;
-const HAIRCUT_COUPON: i32 = 5150001;
-const DYE_COUPON: i32 = 5151001;
 /// Mar the Fairy, who pours the Water of Life on dolls.
 const MAR_THE_FAIRY: i32 = 1032102;
-const NATALIE_HAIRS: [[i32; 7]; 2] = [
-    [30060, 30140, 30200, 30210, 30310, 33040, 33100],
-    [31150, 31300, 31350, 31700, 31740, 34050, 34110],
-];
-
 /// The second job's test: the examiner's proctor gives this for the marbles,
 /// and the instructor takes it for the job.
 const PROOF_OF_A_HERO: i32 = 4031012;
@@ -1468,7 +1459,9 @@ impl NpcScript {
             id if NANAS.contains(&id) => nana(id, player),
             AUDREY => audrey(player),
             CRANE => crane(player),
-            NATALIE => Some(natalie(player)),
+            id if stylists::services(id).next().is_some() => {
+                stylist(id, player, &mut rand::thread_rng())
+            }
             NELLA => nella(player),
             ANDERSON => anderson(player),
             WONKY => wonky_inside(player),
@@ -5875,75 +5868,91 @@ fn robin() -> NpcScript {
     )
 }
 
-/// `hair_henesys1`: Natalie cuts or dyes the player's hair for a coupon.
-fn natalie(player: &Player) -> NpcScript {
-    let hair = player.stats.hair;
-    let gender = usize::from(player.stats.gender.min(1));
-    let cuts = NATALIE_HAIRS[gender].map(|style| style + hair % 10);
-    let dyes = (0..8).map(|colour| hair / 10 * 10 + colour);
-    NpcScript::new(
-        NATALIE,
+/// A stylist's menu of services (`hair_*`, `face_*`, `skin_*`), if `npc` is
+/// one. A service with nothing to offer the player is left out.
+fn stylist(npc: i32, player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    stylists::services(npc).next()?;
+    let choices: Vec<_> = stylists::services(npc)
+        .filter_map(|service| {
+            let label = content::text().get(
+                stylist_label(service.look),
+                &[("item", service.coupon.to_string().as_str())],
+            );
+            Some((label, stylist_pages(service, player, rng)?))
+        })
+        .collect();
+    // The client can't show an empty menu.
+    if choices.is_empty() {
+        return None;
+    }
+    Some(NpcScript::new(
+        npc,
         vec![Page::Menu {
-            text: text(keys::NATALIE_MENU),
-            // The client can't show an empty choice of styles.
-            choices: [
-                (
-                    keys::NATALIE_CUT,
-                    hair_salon(
-                        player,
-                        cuts.into_iter(),
-                        HAIRCUT_COUPON,
-                        keys::NATALIE_CUT_PAGES,
-                    ),
-                ),
-                (
-                    keys::NATALIE_DYE,
-                    hair_salon(player, dyes, DYE_COUPON, keys::NATALIE_DYE_PAGES),
-                ),
-            ]
-            .into_iter()
-            .filter_map(|(label, pages)| Some((text(label), pages?)))
-            .collect(),
+            text: text(keys::STYLIST_MENU),
+            choices,
         }],
-    )
+    ))
 }
 
-/// A choice of the hair `styles` that exist, other than the one worn, for a
-/// `coupon`; then what the stylist says after, or to a player without one.
-/// `None` if there are no such styles.
-fn hair_salon(
-    player: &Player,
-    styles: impl Iterator<Item = i32>,
-    coupon: i32,
-    [ask, done, no_coupon]: [&str; 3],
-) -> Option<Vec<Page>> {
-    let has_coupon = player.inventory.count(coupon) > 0;
-    let choices = styles
-        .filter(|&style| style != player.stats.hair && crate::items::has_style(style))
-        .map(|style| {
-            let effects = if has_coupon {
-                vec![
-                    Effect::TakeItem {
-                        item_id: coupon,
-                        quantity: 1,
-                    },
-                    Effect::SetStyle(style),
-                ]
+fn stylist_label(look: Look) -> &'static str {
+    match look {
+        Look::Cut => keys::STYLIST_CUT,
+        Look::Dye => keys::STYLIST_DYE,
+        Look::Face => keys::STYLIST_FACE,
+        Look::Lens => keys::STYLIST_LENS,
+        Look::OneTimeLens => keys::STYLIST_ONE_TIME_LENS,
+        Look::Skin => keys::STYLIST_SKIN,
+    }
+}
+
+/// A choice of the looks on offer, or a yes to a rolled one; then what
+/// the stylist says after, or to a player without the coupon. `None` if
+/// there is nothing to offer.
+fn stylist_pages(service: &Service, player: &Player, rng: &mut impl Rng) -> Option<Vec<Page>> {
+    let looks = service.looks(player);
+    if looks.is_empty() {
+        return (service.look == Look::OneTimeLens)
+            .then(|| vec![Page::Say(text(keys::STYLIST_NO_LENS))]);
+    }
+    let payment = service.payment(player);
+    let item = service.coupon.to_string();
+    let say = |key: &str| content::text().get(key, &[("item", item.as_str())]);
+    let effects = |(style, lens): (i32, Option<i32>)| match payment {
+        Some(coupon) => coupon
+            .or(lens)
+            .map(|item_id| Effect::TakeItem {
+                item_id,
+                quantity: 1,
+            })
+            .into_iter()
+            .chain([Effect::SetStyle(style)])
+            .collect(),
+        None => Vec::new(),
+    };
+    let after = Page::Say(say(if payment.is_some() {
+        keys::STYLIST_DONE
+    } else {
+        keys::STYLIST_NO_COUPON
+    }));
+    let ask = match service.pick {
+        Pick::Choose => Page::Style {
+            text: say(if service.look == Look::OneTimeLens {
+                keys::STYLIST_CHOOSE_LENS
             } else {
-                Vec::new()
-            };
-            (style, effects)
-        })
-        .collect::<Vec<_>>();
-    (!choices.is_empty()).then(|| {
-        vec![
-            Page::Style {
-                text: text(ask),
-                choices,
-            },
-            Page::Say(text(if has_coupon { done } else { no_coupon })),
-        ]
-    })
+                keys::STYLIST_CHOOSE
+            }),
+            choices: looks
+                .iter()
+                .map(|&(style, lens)| (style, effects((style, lens))))
+                .collect(),
+        },
+        Pick::Random => Page::Ask {
+            text: say(keys::STYLIST_RANDOM),
+            on_yes: effects(*looks.choose(rng)?),
+            on_no: None,
+        },
+    };
+    Some(vec![ask, after])
 }
 
 fn text(key: &str) -> String {
@@ -8652,6 +8661,9 @@ mod tests {
         }
     }
 
+    const NATALIE: i32 = 1012103;
+    const HAIRCUT_COUPON: i32 = 5150001;
+
     #[test]
     fn natalie_cuts_hair_for_a_coupon() {
         // A man with black hair (30030) and a haircut coupon.
@@ -8702,6 +8714,38 @@ mod tests {
         let refused = natalie.respond(ScriptInput::Select(0)).unwrap();
         assert!(refused.effects.is_empty());
         assert_eq!(kind(&refused), Some(0));
+    }
+
+    #[test]
+    fn dr_feeble_rolls_a_face_on_a_yes() {
+        const COUPON: i32 = 5152000;
+        let mut man = player(50);
+        man.stats.gender = 0;
+        man.inventory
+            .insert(InventoryType::Cash, 1, game::Item::stack(COUPON, 1));
+        let mut feeble = NpcScript::for_npc(1052005, &man).unwrap();
+        assert_eq!(kind(&feeble.begin()), Some(4));
+        let ask = feeble.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        let done = feeble.respond(ScriptInput::Yes).unwrap();
+        let faces = stylists::services(1052005).next().unwrap().looks(&man);
+        match &done.effects[..] {
+            [Effect::TakeItem {
+                item_id: COUPON,
+                quantity: 1,
+            }, Effect::SetStyle(face)] => assert!(faces.contains(&(*face, None))),
+            other => panic!("a coupon for a face expected, got {other:?}"),
+        }
+        assert_eq!(kind(&done), Some(0));
+    }
+
+    #[test]
+    fn a_lens_shop_says_so_to_a_player_without_one_time_lenses() {
+        let mut shop = NpcScript::for_npc(9200100, &player(50)).unwrap();
+        assert_eq!(kind(&shop.begin()), Some(4));
+        let none = shop.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(page_text(&none), text(keys::STYLIST_NO_LENS));
+        assert!(none.effects.is_empty());
     }
 
     #[test]

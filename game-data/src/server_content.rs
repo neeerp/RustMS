@@ -617,22 +617,23 @@ pub mod keys {
     pub const DOLPHIN_COUPON_ASK: &str = "dolphin.coupon_ask";
     pub const DOLPHIN_SHORT: &str = "dolphin.short";
 
-    /// Natalie, Henesys's hair salon: a menu of a cut or a dye, then for
-    /// each the choice of styles, the line after, and the line to a player
-    /// without the coupon.
-    pub const NATALIE_MENU: &str = "natalie.menu";
-    pub const NATALIE_CUT: &str = "natalie.cut";
-    pub const NATALIE_DYE: &str = "natalie.dye";
-    pub const NATALIE_CUT_PAGES: [&str; 3] = [
-        "natalie.cut.ask",
-        "natalie.cut.done",
-        "natalie.cut.no_coupon",
-    ];
-    pub const NATALIE_DYE_PAGES: [&str; 3] = [
-        "natalie.dye.ask",
-        "natalie.dye.done",
-        "natalie.dye.no_coupon",
-    ];
+    /// The stylists (`net::stylists`): the menu, a label per look taking
+    /// the coupon as `{item}`, the choice of looks or the yes to a rolled
+    /// one, the line after, the line to a player without the coupon, and
+    /// the line to one without a one-time lens.
+    pub const STYLIST_MENU: &str = "stylist.menu";
+    pub const STYLIST_CUT: &str = "stylist.cut";
+    pub const STYLIST_DYE: &str = "stylist.dye";
+    pub const STYLIST_FACE: &str = "stylist.face";
+    pub const STYLIST_LENS: &str = "stylist.lens";
+    pub const STYLIST_ONE_TIME_LENS: &str = "stylist.one_time_lens";
+    pub const STYLIST_SKIN: &str = "stylist.skin";
+    pub const STYLIST_CHOOSE: &str = "stylist.choose";
+    pub const STYLIST_CHOOSE_LENS: &str = "stylist.choose_lens";
+    pub const STYLIST_RANDOM: &str = "stylist.random";
+    pub const STYLIST_DONE: &str = "stylist.done";
+    pub const STYLIST_NO_COUPON: &str = "stylist.no_coupon";
+    pub const STYLIST_NO_LENS: &str = "stylist.no_lens";
 
     /// Robin's beginner Q&A (`begin5`): a menu, then each topic's pages.
     /// The placeholders decide how many topics and pages there are.
@@ -2111,9 +2112,19 @@ mod tests {
             keys::DOLPHIN_ASK,
             keys::DOLPHIN_COUPON_ASK,
             keys::DOLPHIN_SHORT,
-            keys::NATALIE_MENU,
-            keys::NATALIE_CUT,
-            keys::NATALIE_DYE,
+            keys::STYLIST_MENU,
+            keys::STYLIST_CUT,
+            keys::STYLIST_DYE,
+            keys::STYLIST_FACE,
+            keys::STYLIST_LENS,
+            keys::STYLIST_ONE_TIME_LENS,
+            keys::STYLIST_SKIN,
+            keys::STYLIST_CHOOSE,
+            keys::STYLIST_CHOOSE_LENS,
+            keys::STYLIST_RANDOM,
+            keys::STYLIST_DONE,
+            keys::STYLIST_NO_COUPON,
+            keys::STYLIST_NO_LENS,
             keys::ROBIN_MENU,
             keys::FIRST_JOB_INVENTORY_FULL,
             keys::SECOND_JOB_INVENTORY_FULL,
@@ -2236,8 +2247,6 @@ mod tests {
             .chain(&keys::ROGER_START)
             .chain(&keys::ROGER_END)
             .chain(&keys::SHANKS_LETTER)
-            .chain(&keys::NATALIE_CUT_PAGES)
-            .chain(&keys::NATALIE_DYE_PAGES)
             .chain(&keys::MAKER_ALCHEMY)
             .chain(&keys::MAKER_SCIENCE)
             .chain(&keys::MAKER_PRACTICE)
