@@ -18,6 +18,7 @@ tests.
 | `game-data/placeholder_text.toml` | yes | A placeholder for **every** text key, written by us |
 | `game-data/reward_overrides.toml` | yes | v83 corrections, e.g. quest drops |
 | `game-data/gachapon_placeholder.toml` | yes | Our stand-in Gachapon prizes, in the same shape |
+| `game-data/shop_additions.toml` | yes | Shops the pack lacks: rows of `[item, price]` per NPC id |
 | `game-data/server_content.toml` | yes | Where the importer finds each key, plus its SHA-256 |
 
 `RUSTMS_SERVER_CONTENT_PATH` overrides the pack directory (default
@@ -47,8 +48,13 @@ tests.
   that quest (for a player who still needs them, or anyone in a party),
   adding them if the pack lacks them. So Pio's materials for quest 1008 drop
   from the boxes even without a pack.
-- **Shops** (`ShopTable`): without `shops.json` no NPC keeps a shop, and
-  shopkeepers fall back to their normal speech.
+- **Shops** (`ShopTable`): the pack (from Server.NX, a v95 dump) has no
+  shop for 13 v83 shopkeepers, among them Morgan in Nautilus Harbor, Mayoren
+  in Amoria, and the Singapore and Malaysia vendors. `shop_additions.toml`
+  gives them their item ids and prices, in shop order, as facts taken from
+  Cosmic's shop tables; a shop the pack has wins. Without `shops.json` only
+  these 13 keep a shop, and other shopkeepers fall back to their normal
+  speech.
 - **Gachapon prizes** (`GachaponTable`): v83 kept them on the server, and
   the pack has none. Without `gachapon.json` (or if it doesn't parse) every
   machine draws from `gachapon_placeholder.toml`, a few potions, ores,
@@ -59,7 +65,7 @@ tests.
 The world server logs what it found at startup:
 
 ```
-Server content: assets/server-content: 63 text keys from the pack, 0 placeholders; drops for 646 mobs and 97 shops from the pack; Gachapon prizes from the stand-ins
+Server content: assets/server-content: 63 text keys from the pack, 0 placeholders; drops for 646 mobs from the pack; 110 shops; Gachapon prizes from the stand-ins
 ```
 
 ## Importing
