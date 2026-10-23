@@ -57,7 +57,8 @@ Only the Regular Cab's text is in the content pack (`taxi.*`). The VIP Cab,
 Danger Zone Taxi, Camel Cab, Dolphin and NLC Taxi keys are `unsourced` and show
 placeholder text. `taxis.rs` checks a beginner's Regular Cab ride and the
 VIP Cab's fare through the network harness.
-`subway.rs` rides the subway to New Leaf City and back, once leaving the
+`subway.rs` rides the subway to New Leaf City and back on a new
+character's Basic tickets, once leaving the
 waiting room by Bell (the ticket isn't returned), then rides the NLC Taxi
 and walks through `halloween_enter`. The
 Kerning City-New Leaf City subway runs on the ship clock (`ships.md`), as
