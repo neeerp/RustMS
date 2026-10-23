@@ -530,6 +530,19 @@ pub fn build_cash_shop_buy(cash_type: i32, sn: i32) -> Result<Packet, String> {
     cash_shop_purchase(0x03, cash_type, sn)
 }
 
+/// CASHSHOP_OPERATION 0x20: buy the commodity `sn` (80000000 to 89999999)
+/// with mesos. v83 sends nothing else.
+pub fn build_cash_shop_buy_with_mesos(sn: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_byte(0x20)
+        .map_err(|e| format!("failed to write purchase action: {e}"))?;
+    packet
+        .write_int(sn)
+        .map_err(|e| format!("failed to write purchase serial number: {e}"))?;
+    Ok(packet)
+}
+
 /// CHECK_CASH (0xE4): the Cash Shop's Check button asks for the balances.
 pub fn build_check_cash() -> Packet {
     packet_with_opcode(RecvOpcode::CheckCash as i16)

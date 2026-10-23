@@ -73,6 +73,7 @@ const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
 const BOUGHT_RING: u8 = 0x87;
 const BOUGHT_PACKAGE: u8 = 0x89;
+const BOUGHT_WITH_MESOS: u8 = 0x8D;
 const BOUGHT_NAME_CHANGE: u8 = 0x9E;
 
 /// Why a Cash Shop request failed; the client shows the matching notice.
@@ -104,6 +105,8 @@ pub enum CashShopFailure {
     InventoryFull = 0xBB,
     /// "The item is out of stock, and therefore not available for sale."
     SoldOut = 0xC0,
+    /// "You do not have enough mesos."
+    NotEnoughMesos = 0xC2,
     /// "Check your birthday code and please try again."
     BirthdayCode = 0xC4,
 }
@@ -237,6 +240,25 @@ pub fn build_put_back(item: &CashItem) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(PUT_BACK)?;
     encode_cash_item(&mut packet, item)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: `quantity` of `item_id`, bought with mesos, is in
+/// `slot` of its bag, which the shop's view of the bags turns to and
+/// selects; the item and meso changes come first. v83 says the purchase is
+/// made (0x47b603).
+pub fn build_bought_with_mesos(
+    item_id: i32,
+    quantity: i16,
+    slot: i16,
+) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BOUGHT_WITH_MESOS)?;
+    packet.write_int(1)?;
+    packet.write_short(quantity)?;
+    packet.write_short(slot)?;
+    packet.write_int(item_id)?;
     Ok(packet)
 }
 
@@ -417,6 +439,14 @@ mod tests {
         for _ in 2..10 {
             expect.int(0);
         }
+        expect.end();
+
+        let packet = build_bought_with_mesos(4031191, 1, 3).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x8D);
+        expect.int(1).short(1).short(3).int(4031191);
         expect.end();
 
         let packet = build_cash_shop_failure(CashShopFailure::NotEnoughCash).unwrap();

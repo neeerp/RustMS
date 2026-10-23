@@ -32,6 +32,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Misc.h"
+#include "../../Util/Randomizer.h"
 #include "../../Util/NxFiles.h"
 
 #include "../../Net/Packets/GameplayPackets.h"
@@ -104,6 +105,10 @@ namespace ms
 
 		std::string price_text(const Commodity& commodity)
 		{
+			// StringPool 0x24c, unsplit.
+			if (for_mesos(commodity.sn))
+				return std::to_string(commodity.price) + " mesos";
+
 			std::string price = std::to_string(commodity.price);
 			string_format::split_number(price);
 			price += " NX Cash";
@@ -248,6 +253,8 @@ namespace ms
 			if (item["OnSale"].get_integer() == 1)
 				commodities.push_back(catalog.back());
 		}
+
+		mesos_placed = scatter(commodities, []() { return Randomizer().next_int<uint32_t>(UINT32_MAX); });
 
 		name_label = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK, stats.get_name());
 		account_label = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
@@ -487,6 +494,8 @@ namespace ms
 					wish_added = false;
 					SetWishListPacket(unwish(wish_list, commodity.sn)).dispatch();
 				}
+				else if (list_button % 3 == 0 && for_mesos(commodity.sn))
+					buy_with_mesos(commodity);
 				// BUY or GIFT, a ring of a pair is for two (v83 472fb6).
 				else if (list_button % 3 == 0 || (list_button % 3 == 1 && marriage::is_pair_ring(commodity.item_id)))
 					UICashBuy::open(commodity, credit, points, prepaid);
@@ -1042,6 +1051,39 @@ namespace ms
 		}
 	}
 
+	void UICashShop::buy_with_mesos(const Commodity& commodity)
+	{
+		if (Stage::get().get_player().get_inventory().get_meso() < commodity.price)
+		{
+			UI::get().emplace<UIOk>("You do not have enough mesos.", [](bool) {});
+			return;
+		}
+
+		int32_t sn = commodity.sn;
+
+		UI::get().emplace<UIYesNo>("Are you sure you want to buy this item?", [this, sn](bool yes)
+			{
+				if (yes && request())
+					BuyWithMesosPacket(sn).dispatch();
+			}
+		);
+	}
+
+	void UICashShop::bought_with_mesos(int32_t item_id, int16_t slot)
+	{
+		item_tab = InventoryType::by_item_id(item_id);
+
+		// v83 4b1d81 scrolls just far enough to show the slot's row.
+		size_t row = slot > 0 ? (slot - 1) / ITEM_COLUMNS : 0;
+
+		if (row < item_row)
+			item_row = row;
+		else if (row >= item_row + ITEM_ROWS)
+			item_row = row - (ITEM_ROWS - 1);
+
+		update_item_slider();
+	}
+
 	void UICashShop::change_tab(Tab new_tab)
 	{
 		tab = new_tab;
@@ -1083,7 +1125,10 @@ namespace ms
 		else if (tab == MAIN)
 			listed.clear();
 		else
+		{
 			listed = list(commodities, category(tab), static_cast<int32_t>(subtab), female);
+			place(listed, mesos_placed, category(tab), static_cast<int32_t>(subtab), female);
+		}
 
 		// Skip commodities whose item this client's data doesn't have.
 		listed.erase(
@@ -1117,9 +1162,12 @@ namespace ms
 			bool shown = tab != MAIN && index < listed.size();
 			uint16_t first = Buttons::BT_LIST + 3 * i;
 
+			// A commodity for mesos, or for nothing, has no GIFT or WISH (v83 4baa51).
+			bool for_cash = shown && !for_mesos(listed[index].sn) && listed[index].price > 0;
+
 			buttons[first]->set_active(shown);
-			buttons[first + 1]->set_active(shown);
-			buttons[first + 2]->set_active(shown && tab != WISH_LIST);
+			buttons[first + 1]->set_active(for_cash);
+			buttons[first + 2]->set_active(for_cash && tab != WISH_LIST);
 			buttons[Buttons::BT_LIST + 3 * PAGE_SIZE + i]->set_active(shown && tab == WISH_LIST);
 
 			if (!shown)
