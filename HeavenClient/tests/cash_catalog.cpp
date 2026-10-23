@@ -91,6 +91,10 @@ int main()
 
 		require(page_count(0) == 1 && page_count(10) == 1 && page_count(11) == 2, "ten items to a page");
 
+		require(birthday_code("19830113") == 19830113, "a birthday of eight digits");
+		require(birthday_code("1983011") == 0 && birthday_code("198301133") == 0, "only eight");
+		require(birthday_code("1983O113") == 0, "only digits");
+
 		std::cout << "Cash catalog passed\n";
 		return 0;
 	}

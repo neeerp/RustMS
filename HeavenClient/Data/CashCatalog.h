@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace ms
@@ -249,6 +250,23 @@ namespace ms
 					return option;
 
 			return 1;
+		}
+
+		// The birthday code that confirms a gift or a Name Change, typed
+		// as the date YYYYMMDD.
+		constexpr size_t BIRTHDAY_LIMIT = 8;
+
+		// The birthday code as the number YYYYMMDD, or 0 if it isn't one.
+		inline int32_t birthday_code(const std::string& text)
+		{
+			if (text.size() != BIRTHDAY_LIMIT)
+				return 0;
+
+			for (char c : text)
+				if (c < '0' || c > '9')
+					return 0;
+
+			return std::stoi(text);
 		}
 
 		inline bool affordable(int32_t price, int32_t credit, int32_t points, int32_t prepaid)

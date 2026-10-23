@@ -48,25 +48,11 @@ namespace ms
 		// The client keeps names to 12 characters and messages to 73.
 		constexpr size_t NAME_LIMIT = 12;
 		constexpr size_t MESSAGE_LIMIT = 73;
-		constexpr size_t BIRTHDAY_LIMIT = 8;
 		// StringPool 0x217.
 		constexpr const char* NOT_ENOUGH_CASH = "You don't have enough cash.";
 		// OK and Cancel, from the right edge and the bottom of the art.
 		const Point<int16_t> OK_FROM_CORNER = Point<int16_t>(123, 31);
 		const Point<int16_t> CANCEL_FROM_CORNER = Point<int16_t>(73, 31);
-
-		// The birthday code as the number YYYYMMDD, or 0 if it isn't one.
-		int32_t birthday_code(const std::string& text)
-		{
-			if (text.size() != BIRTHDAY_LIMIT)
-				return 0;
-
-			for (char c : text)
-				if (c < '0' || c > '9')
-					return 0;
-
-			return std::stoi(text);
-		}
 	}
 
 	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), credit(0), points(0), prepaid(0)
@@ -76,7 +62,7 @@ namespace ms
 		to = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, TO_BOX, NAME_LIMIT);
 		message = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::BLACK, MESSAGE_BOX, MESSAGE_LIMIT);
 		message.set_wrap(MESSAGE_BOX.width());
-		birthday = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, BIRTHDAY_BOX, BIRTHDAY_LIMIT);
+		birthday = Textfield(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, BIRTHDAY_BOX, cash_catalog::BIRTHDAY_LIMIT);
 
 		to.set_enter_callback([&](std::string) { message.set_state(Textfield::State::FOCUSED); });
 		to.set_key_callback(KeyAction::Id::TAB, [&]() { message.set_state(Textfield::State::FOCUSED); });
@@ -210,7 +196,7 @@ namespace ms
 			// The server answers a wrong code with its own notice. v83
 			// (FUN_007e47ef) stars out curse words in both lines first.
 			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
-				GiftCashItemPacket(birthday_code(birthday.get_text()), sn, CurseData::filter(to.get_text()),
+				GiftCashItemPacket(cash_catalog::birthday_code(birthday.get_text()), sn, CurseData::filter(to.get_text()),
 								   CurseData::filter(message.get_text())).dispatch();
 
 			close();
@@ -285,7 +271,7 @@ namespace ms
 		// StringPool 0x200, then the BUY dialog. Opening the question
 		// replaces this dialog, so everything is copied first.
 		cash_catalog::Commodity commodity = *ring;
-		RingOrder order = { marriage::ring_kind(commodity.item_id) == RingKind::FRIENDSHIP, birthday_code(birthday.get_text()),
+		RingOrder order = { marriage::ring_kind(commodity.item_id) == RingKind::FRIENDSHIP, cash_catalog::birthday_code(birthday.get_text()),
 							CurseData::filter(to.get_text()), CurseData::filter(message.get_text()) };
 		int32_t balances[3] = { credit, points, prepaid };
 		std::string question = ItemData::get(commodity.item_id).get_name() + " (" + std::to_string(commodity.price) +

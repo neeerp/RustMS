@@ -188,6 +188,21 @@ namespace ms
 		}
 	};
 
+	// Cancels the waiting Name Change its receipt (5400000) stands for, with
+	// no refund (v83 a0b1b4).
+	// Opcode: USE_CASH_ITEM(79)
+	class CancelNameChangePacket : public OutPacket
+	{
+	public:
+		CancelNameChangePacket(int16_t slot, int32_t itemid) : OutPacket(OutPacket::Opcode::USE_CASH_ITEM)
+		{
+			write_short(slot);
+			write_int(itemid);
+			write_byte(1);
+			write_time();
+		}
+	};
+
 	// Sends a note with the note item (509xxxx, v83 a0b6e4).
 	// Opcode: USE_CASH_ITEM(79)
 	class SendNotePacket : public OutPacket

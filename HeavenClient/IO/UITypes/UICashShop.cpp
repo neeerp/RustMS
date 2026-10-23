@@ -115,7 +115,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), name_change_sn(0), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -836,6 +836,16 @@ namespace ms
 	void UICashShop::answered()
 	{
 		pending = false;
+	}
+
+	void UICashShop::set_name_change(int32_t sn)
+	{
+		name_change_sn = sn;
+	}
+
+	int32_t UICashShop::get_name_change() const
+	{
+		return name_change_sn;
 	}
 
 	int16_t UICashShop::grid_cell(Point<int16_t> cursor, Point<int16_t> grid, size_t columns, size_t rows) const

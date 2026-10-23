@@ -26,6 +26,7 @@
 #include "UIIncubator.h"
 #include "UIKarmaScissors.h"
 #include "UIMemoSend.h"
+#include "UINameChange.h"
 #include "UIKite.h"
 #include "UIMapleTv.h"
 #include "UIMegaphone.h"
@@ -59,6 +60,7 @@
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/EquipData.h"
+#include "../../Data/NameChange.h"
 #include "../../Data/PetData.h"
 #include "../../Gameplay/FieldEffectRules.h"
 #include "../../Gameplay/Stage.h"
@@ -573,6 +575,17 @@ namespace ms
 			{
 				if (yes && may_use_cash_item() && Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT))
 					Sound(nl::nx::sound["Game.img"]["UseShopItem"]).play();
+			});
+		}
+
+		// v83 FUN_00a0a63f, type 0x34: Name Change's receipt cancels the
+		// waiting request after two questions, with no refund.
+		void cancel_name_change(int16_t slot, int32_t item_id)
+		{
+			UICancelNameChange::ask([=]()
+			{
+				if (may_use_cash_item())
+					Stage::get().get_player().request(CancelNameChangePacket(slot, item_id), ExclRequest::WAIT);
 			});
 		}
 
@@ -1400,6 +1413,8 @@ namespace ms
 							use_chalkboard(slot, item_id);
 						else if (item_id / 10000 == 520)
 							use_meso_bag(slot, item_id);
+						else if (item_id == name_change::ITEM)
+							cancel_name_change(slot, item_id);
 						else if (item_id / 10000 == 528)
 							use_cash_mist(slot, item_id);
 						else if (item_id / 10000 == 553)

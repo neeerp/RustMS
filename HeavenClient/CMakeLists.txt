@@ -266,6 +266,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(pets_tests tests/pets.cpp Net/InPacket.cpp)
     target_include_directories(pets_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME pets COMMAND pets_tests)
+    add_executable(name_change_tests tests/name_change.cpp Net/InPacket.cpp)
+    target_include_directories(name_change_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME name_change COMMAND name_change_tests)
     add_executable(buff_parser_tests tests/buff_parser.cpp Net/InPacket.cpp Net/Handlers/Helpers/BuffParser.cpp Character/Buff.cpp)
     target_include_directories(buff_parser_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME buff_parser COMMAND buff_parser_tests)
@@ -801,6 +804,8 @@ add_executable(HeavenClient
     IO/UITypes/UICashGift.h
     IO/UITypes/UICouponDialog.cpp
     IO/UITypes/UICouponDialog.h
+    IO/UITypes/UINameChange.cpp
+    IO/UITypes/UINameChange.h
     IO/UITypes/UIGiftNotice.cpp
     IO/UITypes/UIGiftNotice.h
     IO/UITypes/UIInvitation.cpp
