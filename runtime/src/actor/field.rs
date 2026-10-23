@@ -290,6 +290,12 @@ impl FieldActor {
         if key.map_id == wedding::HUNTING_GROUND && key.instance_id != 0 {
             field.board(wedding::GIANT_CAKE, 1, wedding::GIANT_CAKE_AT);
         }
+        // A copy of one of Horntail's trials opens with its head.
+        if let Some((_, head)) = net::events::trial_head(key.map_id) {
+            if key.instance_id != 0 {
+                field.bring_out_head(head);
+            }
+        }
         field
     }
 
@@ -1666,6 +1672,28 @@ impl FieldActor {
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
             _ => {}
         }
+        // A trial's head clears its stage, which unseals its door; each
+        // member hears of it and those here see it (the event's
+        // `stage_cleared`).
+        let head = net::events::trial_head(self.key.map_id)
+            .filter(|(_, head)| head.mob == kill.mob_id && self.key.instance_id != 0);
+        if let Some((stage, _)) = head {
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::ClearEventStage(stage));
+            }
+        }
+    }
+
+    /// Put `head` on the ground below its place, for whoever comes in to
+    /// control (Cosmic `spawnMonsterOnGroundBelow`).
+    fn bring_out_head(&mut self, head: &net::events::TrialHead) {
+        let Some(info) = net::mobs::info(head.mob) else {
+            return;
+        };
+        let (x, y) = head.at;
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        self.mobs
+            .place(info, (x, ground.saturating_sub(1)), 5, None, Instant::now());
     }
 
     /// A boss whose death wins its fight died: the map sees the party

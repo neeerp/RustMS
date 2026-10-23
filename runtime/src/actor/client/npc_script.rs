@@ -10,7 +10,9 @@ use net::dialogue::Prompt;
 use net::handler::BroadcastScope;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
-use net::packet::build::world::messaging::{build_broadcast, build_gachapon_message, Broadcast};
+use net::packet::build::world::messaging::{
+    build_broadcast, build_gachapon_message, build_item_line, Broadcast,
+};
 use net::packet::build::world::pet::PetGone;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{
@@ -586,6 +588,18 @@ impl ClientActor {
                             warp = Some((kind.event().entry, None));
                             self.event = Some(ticket);
                         }
+                    }
+                }
+                Effect::RequireStage { stage, refused } => {
+                    let map_id = next.stats.map_id;
+                    let cleared = self
+                        .event
+                        .as_ref()
+                        .is_some_and(|ticket| ticket.holds(map_id) && ticket.cleared(*stage));
+                    if !cleared {
+                        let text = net::content::text().get(refused, &[]);
+                        self.send(&mut build_item_line(&text, 0)?).await?;
+                        return Ok(Applied::Refused);
                     }
                 }
                 Effect::ShutByReactor { name, state } => {
