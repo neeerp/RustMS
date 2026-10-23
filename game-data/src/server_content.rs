@@ -1426,6 +1426,33 @@ pub mod keys {
     pub const REFINER_SMITH_HELLO: &str = "refiner.smith.hello";
     pub const REFINER_VICIOUS_HELLO: &str = "refiner.vicious.hello";
     pub const REFINER_JM_HELLO: &str = "refiner.jm.hello";
+    pub const MAKER_STIMULATOR: &str = "maker.stimulator";
+    pub const MAKER_STIMULATOR_LOST: &str = "maker.stimulator_lost";
+    pub const MAKER_FRANCOIS_HELLO: &str = "maker.francois.hello";
+    pub const MAKER_CHRISHRAMA_HELLO: &str = "maker.chrishrama.hello";
+    pub const MAKER_GORDON_HELLO: &str = "maker.gordon.hello";
+    pub const MAKER_SARAH_HELLO: &str = "maker.sarah.hello";
+    pub const MAKER_TARA_HELLO: &str = "maker.tara.hello";
+    pub const MAKER_RYDOLE_HELLO: &str = "maker.rydole.hello";
+    pub const MAKER_MAKE_WAND: &str = "maker.make_wand";
+    pub const MAKER_MAKE_STAFF: &str = "maker.make_staff";
+    pub const MAKER_UPGRADE_HAT: &str = "maker.upgrade_hat";
+    pub const MAKER_SHOES_WARRIOR: &str = "maker.shoes.warrior";
+    pub const MAKER_SHOES_BOWMAN: &str = "maker.shoes.bowman";
+    pub const MAKER_SHOES_MAGICIAN: &str = "maker.shoes.magician";
+    pub const MAKER_SHOES_THIEF: &str = "maker.shoes.thief";
+    pub const MAKER_SHOES_WARRIOR_STIMULATED: &str = "maker.shoes.warrior_stimulated";
+    pub const MAKER_SHOES_BOWMAN_STIMULATED: &str = "maker.shoes.bowman_stimulated";
+    pub const MAKER_SHOES_MAGICIAN_STIMULATED: &str = "maker.shoes.magician_stimulated";
+    pub const MAKER_SHOES_THIEF_STIMULATED: &str = "maker.shoes.thief_stimulated";
+    pub const MAKER_GLOVES_WARRIOR: &str = "maker.gloves.warrior";
+    pub const MAKER_GLOVES_BOWMAN: &str = "maker.gloves.bowman";
+    pub const MAKER_GLOVES_MAGICIAN: &str = "maker.gloves.magician";
+    pub const MAKER_GLOVES_THIEF: &str = "maker.gloves.thief";
+    pub const MAKER_GLOVES_WARRIOR_UPGRADED: &str = "maker.gloves.warrior_upgraded";
+    pub const MAKER_GLOVES_BOWMAN_UPGRADED: &str = "maker.gloves.bowman_upgraded";
+    pub const MAKER_GLOVES_MAGICIAN_UPGRADED: &str = "maker.gloves.magician_upgraded";
+    pub const MAKER_GLOVES_THIEF_UPGRADED: &str = "maker.gloves.thief_upgraded";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2381,6 +2408,33 @@ mod tests {
                 keys::REFINER_SMITH_HELLO,
                 keys::REFINER_VICIOUS_HELLO,
                 keys::REFINER_JM_HELLO,
+                keys::MAKER_STIMULATOR,
+                keys::MAKER_STIMULATOR_LOST,
+                keys::MAKER_FRANCOIS_HELLO,
+                keys::MAKER_CHRISHRAMA_HELLO,
+                keys::MAKER_GORDON_HELLO,
+                keys::MAKER_SARAH_HELLO,
+                keys::MAKER_TARA_HELLO,
+                keys::MAKER_RYDOLE_HELLO,
+                keys::MAKER_MAKE_WAND,
+                keys::MAKER_MAKE_STAFF,
+                keys::MAKER_UPGRADE_HAT,
+                keys::MAKER_SHOES_WARRIOR,
+                keys::MAKER_SHOES_BOWMAN,
+                keys::MAKER_SHOES_MAGICIAN,
+                keys::MAKER_SHOES_THIEF,
+                keys::MAKER_SHOES_WARRIOR_STIMULATED,
+                keys::MAKER_SHOES_BOWMAN_STIMULATED,
+                keys::MAKER_SHOES_MAGICIAN_STIMULATED,
+                keys::MAKER_SHOES_THIEF_STIMULATED,
+                keys::MAKER_GLOVES_WARRIOR,
+                keys::MAKER_GLOVES_BOWMAN,
+                keys::MAKER_GLOVES_MAGICIAN,
+                keys::MAKER_GLOVES_THIEF,
+                keys::MAKER_GLOVES_WARRIOR_UPGRADED,
+                keys::MAKER_GLOVES_BOWMAN_UPGRADED,
+                keys::MAKER_GLOVES_MAGICIAN_UPGRADED,
+                keys::MAKER_GLOVES_THIEF_UPGRADED,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");
