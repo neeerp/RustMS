@@ -72,10 +72,14 @@ namespace ms::sp_reset
 		return -1;
 	}
 
-	// Skills with a master level only go up to it (FUN_004e8f04).
+	// Skills with a master level only go up to it (FUN_004e8f04): 4th job,
+	// and Evan's 9th and 10th stages (2217, 2218: FUN_004e8f66).
 	inline bool has_master_level(int32_t skill_id)
 	{
 		int32_t job = skill_id / 10000;
+
+		if (job / 100 == 22 || job == 2001)
+			return job == 2217 || job == 2218;
 
 		return job % 100 != 0 && job % 10 == 2;
 	}

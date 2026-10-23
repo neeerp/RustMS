@@ -37,6 +37,8 @@ int main()
 
 		require(skill_tab(job_path(112), RAGE) == 1 && skill_tab(job_path(112), 2001002) == -1, "skill tabs");
 		require(has_master_level(RUSH) && !has_master_level(RAGE) && !has_master_level(2001002), "master levels");
+		require(has_master_level(22170001) && has_master_level(22181002) && !has_master_level(22120001),
+				"Evan master levels");
 
 		// Level 30: 62 earned as a fighter, 61 of them as a warrior, all spent there.
 		Character fighter{ 110, 30, 1, { { POWER_STRIKE, 20 }, { SLASH_BLAST, 20 }, { HP_RECOVERY, 20 },

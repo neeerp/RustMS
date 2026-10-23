@@ -20,6 +20,7 @@
 #include "../Data/SkillData.h"
 
 #include "../../Character/FairyBlessing.h"
+#include "../../Character/SpResetRules.h"
 #include "../../Gameplay/Stage.h"
 
 #include <algorithm>
@@ -68,12 +69,10 @@ namespace ms
 
 		const SkillData &data = SkillData::get(id);
 
-		int32_t masterlevel;
-
-		if (mlevel > 0)
-			masterlevel = mlevel;
-		else
-			masterlevel = data.get_masterlevel();
+		// Skills with a master level go up to the character's own, 0 until one
+		// is taught; the rest to their data's (FUN_00a08e05).
+		bool own_master = sp_reset::has_master_level(id);
+		int32_t masterlevel = own_master ? mlevel : data.get_masterlevel();
 
 		std::string descstr = data.get_desc();
 
@@ -82,36 +81,10 @@ namespace ms
 		if (fairy_blessing::is_blessing(id) && level > 0)
 			descstr = fairy_blessing::description(Stage::get().get_player().get_linked_name());
 
-		if (masterlevel > 0)
-		{
-			const std::string mltag = "Master Level";
-			const std::string mlstr = std::to_string(masterlevel);
-			size_t mlstart = descstr.find(mltag);
-			size_t mlpos = descstr.find(':', mlstart) + 2;
-			size_t mlend = descstr.find("]", mlstart);
-
-			if (mlpos < mlend && mlend != std::string::npos)
-			{
-				size_t mlsize = mlend - mlpos;
-				descstr.erase(mlpos, mlsize);
-				descstr.insert(mlpos, mlstr);
-
-				// Fixing errors in the files...
-				if (mlstart == 0)
-				{
-					descstr.insert(0, "[");
-					mlend++;
-				}
-
-				size_t linebreak = descstr.find("]\\n", mlstart);
-
-				if (linebreak != mlend)
-					descstr.insert(mlend + 1, "\\n");
-			} else
-			{
-				descstr.insert(0, "[" + mltag + ": " + mlstr + "]\\n");
-			}
-		}
+		// Other skills' descriptions carry their "[Master Level : N]" already;
+		// these get a line of their own above it (0xf0c, 0x8f2909).
+		if (own_master)
+			descstr.insert(0, "[Master Level : " + std::to_string(mlevel) + "]\\n");
 
 		const std::string exptag = "#cAvailable until";
 
