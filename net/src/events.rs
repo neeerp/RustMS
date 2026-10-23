@@ -29,6 +29,9 @@ pub enum EventKind {
     /// The fight with Papulatus at the Origin of Clocktower, which a
     /// party's leader starts by its portal at Deep Inside the Clocktower.
     Papulatus,
+    /// The expedition to Horntail's Cave, gathered by the Mark of the Squad
+    /// (2083004) at the Entrance to Horntail's Cave (`crate::squads`).
+    Horntail,
 }
 
 /// An event's maps and terms.
@@ -874,8 +877,49 @@ pub const PAPULATUS: Event = Event {
     until_empty: true,
 };
 
+/// The expedition to Horntail (Cosmic `HorntailBattle`): like Zakum's, the
+/// squad's members on the Entrance to Horntail's Cave when its leader
+/// starts it go to their own copy of the cave, from the first trial
+/// (240060000) on to Horntail's Cave (240060200), for two hours. It ends
+/// only when the last of them leaves (`isExpeditionTeamLackingNow`, which
+/// asks for neither the leader nor the minimum once in), everyone going to
+/// the Road in Between. The fight is still to come.
+pub const HORNTAIL: Event = Event {
+    lobby: crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE,
+    maps: HORNTAIL_TRIAL..=HORNTAILS_CAVE,
+    entry: HORNTAIL_TRIAL,
+    exit: crate::npc_scripts::ROAD_IN_BETWEEN,
+    levels: 100..=u8::MAX,
+    team: 6..=30,
+    minutes: 120,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: &[],
+    until_empty: false,
+};
+
+/// The Cave of Life's first trial, where Horntail's expedition comes in,
+/// and Horntail's Cave, the last of its maps.
+pub const HORNTAIL_TRIAL: i32 = 240_060_000;
+pub const HORNTAILS_CAVE: i32 = 240_060_200;
+
 impl EventKind {
-    pub const ALL: [EventKind; 7] = [
+    pub const ALL: [EventKind; 8] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -883,6 +927,7 @@ impl EventKind {
         EventKind::Zpq,
         EventKind::Zakum,
         EventKind::Papulatus,
+        EventKind::Horntail,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -894,6 +939,7 @@ impl EventKind {
             EventKind::Zpq => &ZPQ,
             EventKind::Zakum => &ZAKUM,
             EventKind::Papulatus => &PAPULATUS,
+            EventKind::Horntail => &HORNTAIL,
         }
     }
 }
@@ -2024,6 +2070,19 @@ mod tests {
         assert_eq!(ZAKUM.least(), 6);
         assert!(EventKind::Zakum.event().holds(280_030_000));
         assert!(!ZAKUM.holds(ZAKUM.lobby));
+        // Horntail's ends the same way: neither the leader's leaving nor
+        // falling below six does.
+        let mut team = Team::new(&HORNTAIL, 1, vec![1, 2, 3, 4, 5, 6]);
+        assert!(!team.leave(1));
+        assert!(!team.leave(2));
+        assert!(team.rejoin(1));
+        for member in [3, 4, 5, 6] {
+            assert!(!team.leave(member));
+        }
+        assert!(team.leave(1));
+        assert!(EventKind::Horntail.event().holds(HORNTAILS_CAVE));
+        assert!(!HORNTAIL.holds(HORNTAIL.exit));
+        assert!(!event_map(HORNTAIL.lobby));
     }
 
     #[test]

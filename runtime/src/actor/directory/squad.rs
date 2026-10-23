@@ -91,6 +91,7 @@ impl WorldDirectory {
     /// those on their map hear of it, and their clock counts down the time
     /// it has.
     fn open_squad(&mut self, from: ClientId, kind: EventKind) -> Option<SquadAnswer> {
+        let says = net::squads::text(kind)?;
         let (channel_id, map_id, name) = self.squad_asker(from, kind)?;
         if self.live_squad(channel_id, kind).is_some() {
             return None;
@@ -107,7 +108,7 @@ impl WorldDirectory {
             .filter(|entry| entry.channel_id == channel_id && entry.presence.map_id == map_id)
             .map(|entry| entry.handle.client_id)
             .collect();
-        self.tell_squad(&beside, keys::ZAKUM_SQUAD_NOTICE_OPENED, &name);
+        self.tell_squad(&beside, says.notice_opened, &name);
         self.send_packet(from, build_countdown(left.as_secs() as u32));
         Some(SquadAnswer::Done)
     }
@@ -123,7 +124,7 @@ impl WorldDirectory {
         let left = entry.squad.closes_in(Instant::now());
         let members = member_ids(&entry.squad);
         info!(?kind, channel_id, member = from, "Squad joined");
-        self.tell_squad(&members, keys::ZAKUM_SQUAD_NOTICE_JOINED, &name);
+        self.tell_squad(&members, keys::SQUAD_NOTICE_JOINED, &name);
         self.send_packet(from, build_countdown(left.as_secs() as u32));
         Some(SquadAnswer::Done)
     }
@@ -141,7 +142,7 @@ impl WorldDirectory {
         let mut members = member_ids(&entry.squad);
         members.push(who);
         info!(?kind, channel_id, member = who, "Squad member expelled");
-        self.tell_squad(&members, keys::ZAKUM_SQUAD_NOTICE_EXPELLED, &name);
+        self.tell_squad(&members, keys::SQUAD_NOTICE_EXPELLED, &name);
         self.send_packet(who, build_stop_clock());
         Some(SquadAnswer::Done)
     }
@@ -156,7 +157,7 @@ impl WorldDirectory {
         let members = member_ids(&entry.squad);
         self.squads.remove(&(channel_id, kind));
         info!(?kind, channel_id, leader = from, "Squad stopped");
-        self.tell_squad(&members, keys::ZAKUM_SQUAD_NOTICE_STOPPED, &name);
+        self.tell_squad(&members, keys::SQUAD_NOTICE_STOPPED, &name);
         for member in members {
             self.send_packet(member, build_stop_clock());
         }
@@ -167,6 +168,7 @@ impl WorldDirectory {
     /// the event's lobby go, however few, and the rest may come in later
     /// (Cosmic `startInstance`, which counts the whole roster).
     fn start_squad(&mut self, from: ClientId, kind: EventKind) -> Option<SquadAnswer> {
+        let says = net::squads::text(kind)?;
         let (channel_id, _, name) = self.squad_asker(from, kind)?;
         if self.events.contains_key(&(channel_id, kind)) {
             return None;
@@ -201,7 +203,7 @@ impl WorldDirectory {
         entry.event = Some(queue.joiner());
         self.events.insert((channel_id, kind), id);
         info!(?kind, id, channel_id, leader = from, team = ?ids, "Squad set out");
-        self.tell_squad(&roster, keys::ZAKUM_SQUAD_NOTICE_STARTED, &name);
+        self.tell_squad(&roster, says.notice_started, &name);
         for &member in &roster {
             self.send_packet(member, build_stop_clock());
         }

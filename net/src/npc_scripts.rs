@@ -18,7 +18,7 @@ use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
 use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
-use crate::squads::{SquadCommand, SquadView};
+use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
@@ -1263,10 +1263,12 @@ impl NpcScript {
         adobis(entry, player)
     }
 
-    /// Adobis at the Entrance to Zakum, to `player`, who finds the
-    /// channel's expedition as `view`.
-    pub fn zakum_squad(view: SquadView, player: &Player) -> Self {
-        zakum_squad(view, player)
+    /// The NPC who gathers `kind`'s expeditions (Adobis at the Entrance to
+    /// Zakum, the Mark of the Squad at the Entrance to Horntail's Cave), to
+    /// `player`, who finds the channel's as `view`. None for a kind no
+    /// squad goes to.
+    pub fn squad(kind: EventKind, view: SquadView, player: &Player) -> Option<Self> {
+        squad(kind, view, player)
     }
 
     /// Aura on the Dead Mine's hub, to `player`, who stands with her as
@@ -5646,45 +5648,71 @@ fn adobis(entry: Entry, player: &Player) -> NpcScript {
 /// Adobis again (2030013), at the Entrance to Zakum.
 pub const ZAKUM_RECRUITER: i32 = 2030013;
 
-/// Adobis at the Entrance to Zakum (Cosmic `2030013`) gathers the
-/// channel's expedition (`crate::squads`): one with an Eye of Fire opens
-/// it, others of the levels join, and its leader turns members out, takes
-/// it to the altar, or calls it off. While it fights, those on its roster
-/// may go back in.
-fn zakum_squad(view: SquadView, player: &Player) -> NpcScript {
-    let event = &events::ZAKUM;
-    let squad = |command| Effect::Squad {
-        kind: EventKind::Zakum,
-        command,
-    };
+/// The Mark of the Squad (2083004), at the Entrance to Horntail's Cave.
+pub const HORNTAIL_RECRUITER: i32 = 2083004;
+
+/// The NPC who gathers a kind of expedition.
+#[derive(Clone, Copy, Debug)]
+pub struct Recruiter {
+    pub npc: i32,
+    /// The item one needs to lead one, if any, and what the NPC says to
+    /// one without.
+    pub needs: Option<(i32, &'static str)>,
+}
+
+/// Who gathers `kind`'s expeditions, if a squad goes to it.
+pub fn recruiter(kind: EventKind) -> Option<Recruiter> {
+    match kind {
+        EventKind::Zakum => Some(Recruiter {
+            npc: ZAKUM_RECRUITER,
+            needs: Some((EYE_OF_FIRE, keys::ZAKUM_SQUAD_NO_EYE)),
+        }),
+        EventKind::Horntail => Some(Recruiter {
+            npc: HORNTAIL_RECRUITER,
+            needs: None,
+        }),
+        _ => None,
+    }
+}
+
+/// The NPC who gathers the channel's expedition of `kind`
+/// (`crate::squads`; Cosmic `2030013`, `2083004`): one of the levels, with
+/// the item it needs if any (Zakum's Eye of Fire), opens it, others of the
+/// levels join, and its leader turns members out, takes it in, or calls it
+/// off. While it runs, those on its roster may go back in.
+fn squad(kind: EventKind, view: SquadView, player: &Player) -> Option<NpcScript> {
+    let Recruiter { npc, needs } = recruiter(kind)?;
+    let says = squads::text(kind)?;
+    let event = kind.event();
+    let squad = |command| Effect::Squad { kind, command };
     let named = |key: &str, name: &str| content::text().get(key, &[("name", name)]);
     let pages = match view {
         _ if !event.levels.contains(&player.stats.level) => {
-            vec![Page::Say(event_terms(event, keys::ZAKUM_SQUAD_LEVEL))]
+            vec![Page::Say(event_terms(event, says.level))]
         }
-        SquadView::None if !holds(player, EYE_OF_FIRE) => {
-            vec![Page::Say(text(keys::ZAKUM_SQUAD_NO_EYE))]
-        }
-        SquadView::None => vec![
-            Page::Ask {
-                text: event_terms(event, keys::ZAKUM_SQUAD_ASK),
-                on_yes: vec![squad(SquadCommand::Open)],
-                on_no: None,
-            },
-            Page::Say(text(keys::ZAKUM_SQUAD_OPENED)),
-        ],
+        SquadView::None => match needs.filter(|&(item, _)| !holds(player, item)) {
+            Some((_, without)) => vec![Page::Say(text(without))],
+            None => vec![
+                Page::Ask {
+                    text: event_terms(event, says.ask),
+                    on_yes: vec![squad(SquadCommand::Open)],
+                    on_no: None,
+                },
+                Page::Say(text(keys::SQUAD_OPENED)),
+            ],
+        },
         SquadView::Leading(others) => {
             let count = (others.len() + 1).to_string();
             let expel = if others.is_empty() {
-                Page::End(text(keys::ZAKUM_SQUAD_ALONE))
+                Page::End(text(keys::SQUAD_ALONE))
             } else {
                 Page::Menu {
-                    text: text(keys::ZAKUM_SQUAD_LIST),
+                    text: text(keys::SQUAD_LIST),
                     choices: others
                         .iter()
                         .map(|(id, name)| {
                             let act = Page::Act {
-                                text: named(keys::ZAKUM_SQUAD_EXPELLED, name),
+                                text: named(keys::SQUAD_EXPELLED, name),
                                 effects: vec![squad(SquadCommand::Expel(*id))],
                             };
                             (name.clone(), vec![act])
@@ -5695,48 +5723,48 @@ fn zakum_squad(view: SquadView, player: &Player) -> NpcScript {
             let least = event.least();
             let start = if others.len() + 1 < least {
                 let least = least.to_string();
-                Page::End(content::text().get(keys::ZAKUM_SQUAD_TOO_FEW, &[("least", &least)]))
+                Page::End(content::text().get(keys::SQUAD_TOO_FEW, &[("least", &least)]))
             } else {
                 Page::Done(vec![squad(SquadCommand::Start)])
             };
             let stop = Page::Act {
-                text: text(keys::ZAKUM_SQUAD_STOPPED),
+                text: text(keys::SQUAD_STOPPED),
                 effects: vec![squad(SquadCommand::Stop)],
             };
             vec![Page::Menu {
-                text: content::text().get(keys::ZAKUM_SQUAD_MENU, &[("count", &count)]),
+                text: content::text().get(keys::SQUAD_MENU, &[("count", &count)]),
                 choices: vec![
-                    (text(keys::ZAKUM_SQUAD_EXPEL_CHOICE), vec![expel]),
-                    (text(keys::ZAKUM_SQUAD_START_CHOICE), vec![start]),
-                    (text(keys::ZAKUM_SQUAD_STOP_CHOICE), vec![stop]),
+                    (text(keys::SQUAD_EXPEL_CHOICE), vec![expel]),
+                    (text(says.start_choice), vec![start]),
+                    (text(keys::SQUAD_STOP_CHOICE), vec![stop]),
                 ],
             }]
         }
         SquadView::Registered { leader } => {
-            vec![Page::Say(named(keys::ZAKUM_SQUAD_REGISTERED, &leader))]
+            vec![Page::Say(named(keys::SQUAD_REGISTERED, &leader))]
         }
         SquadView::Joinable => vec![
             Page::Ask {
-                text: text(keys::ZAKUM_SQUAD_JOIN_ASK),
+                text: text(says.join_ask),
                 on_yes: vec![squad(SquadCommand::Join)],
                 on_no: None,
             },
-            Page::Say(text(keys::ZAKUM_SQUAD_JOINED)),
+            Page::Say(text(keys::SQUAD_JOINED)),
         ],
-        SquadView::Banned { leader } => vec![Page::Say(named(keys::ZAKUM_SQUAD_BANNED, &leader))],
-        SquadView::Full => vec![Page::Say(text(keys::ZAKUM_SQUAD_FULL))],
+        SquadView::Banned { leader } => vec![Page::Say(named(keys::SQUAD_BANNED, &leader))],
+        SquadView::Full => vec![Page::Say(text(keys::SQUAD_FULL))],
         SquadView::Rejoin => vec![Page::Ask {
-            text: text(keys::ZAKUM_SQUAD_REJOIN_ASK),
+            text: text(says.rejoin_ask),
             on_yes: vec![squad(SquadCommand::Rejoin)],
             on_no: None,
         }],
-        SquadView::Taken => vec![Page::Say(text(keys::ZAKUM_SQUAD_TAKEN))],
+        SquadView::Taken => vec![Page::Say(text(says.taken))],
     };
-    let mut script = NpcScript::new(ZAKUM_RECRUITER, pages);
-    // The squad changed since he looked: another opened one, it filled,
+    let mut script = NpcScript::new(npc, pages);
+    // The squad changed since it looked: another opened one, it filled,
     // started, or ended, or the player left the map.
-    script.refused = Some(text(keys::ZAKUM_SQUAD_REFUSED));
-    script
+    script.refused = Some(text(keys::SQUAD_REFUSED));
+    Some(script)
 }
 
 /// Aura (Cosmic `2032002`). Before the win: what the mine asks, the
@@ -5904,7 +5932,7 @@ const CAVE_ENTRANCE: i32 = 240050000;
 pub(crate) const HORNTAIL_CAVE_ENTRANCE: i32 = 240050400;
 /// Cave : The Road in Between, from which `hontale_out1` leads back to the
 /// Entrance to Horntail's Cave.
-const ROAD_IN_BETWEEN: i32 = 240050600;
+pub(crate) const ROAD_IN_BETWEEN: i32 = 240050600;
 
 fn keroben(player: &Player) -> NpcScript {
     let dragon = player
@@ -10435,6 +10463,44 @@ mod tests {
             leave(HORNTAIL_CAVE_ENTRANCE),
             [Effect::WarpToPortal(CAVE_OF_LIFE_ENTRANCE, out00)]
         );
+    }
+
+    #[test]
+    fn the_mark_of_the_squad_gathers_horntails_expeditions() {
+        let at = |level| {
+            let mut player = hunter(&[], &[]);
+            player.stats.level = level;
+            player
+        };
+        let gather = |kind, level| NpcScript::squad(kind, SquadView::None, &at(level)).unwrap();
+        let low = gather(EventKind::Horntail, 99);
+        assert_eq!(low.npc_id, HORNTAIL_RECRUITER);
+        let level = event_terms(&events::HORNTAIL, keys::HORNTAIL_SQUAD_LEVEL);
+        assert_eq!(page_text(&low.begin()), level);
+        // Any of level 100 may lead one; Zakum's wants an Eye of Fire.
+        let mut open = gather(EventKind::Horntail, 100);
+        let ask = event_terms(&events::HORNTAIL, keys::HORNTAIL_SQUAD_ASK);
+        assert_eq!(question(&open.begin()), ask);
+        assert_eq!(
+            open.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::Squad {
+                kind: EventKind::Horntail,
+                command: SquadCommand::Open
+            }]
+        );
+        assert_eq!(
+            page_text(&gather(EventKind::Zakum, 100).begin()),
+            text(keys::ZAKUM_SQUAD_NO_EYE)
+        );
+        let taken = NpcScript::squad(EventKind::Horntail, SquadView::Taken, &at(100));
+        assert_eq!(
+            page_text(&taken.unwrap().begin()),
+            text(keys::HORNTAIL_SQUAD_TAKEN)
+        );
+        assert!(NpcScript::squad(EventKind::Kpq, SquadView::None, &at(100)).is_none());
+        for kind in EventKind::ALL {
+            assert_eq!(kind.event().squad, recruiter(kind).is_some(), "{kind:?}");
+        }
     }
 
     #[test]

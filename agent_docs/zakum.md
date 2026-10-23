@@ -85,7 +85,10 @@ Players reach the altar in an expedition (Cosmic's `Expedition` and
 whatever their parties. The rules are `net::squads::Squad`; the directory
 keeps one squad of each kind per channel (`directory/squad.rs`), and the NPC
 asks it what the player finds (`SquadView`) and tells it what they chose
-(`SquadCommand`, through `Effect::Squad`).
+(`SquadCommand`, through `Effect::Squad`). The same squads gather Horntail's
+expedition ([horntail](./horntail.md)): `npc_scripts::recruiter` gives each
+kind's NPC and the item one needs to lead one, and `squads::text` the lines
+that name its foe; the rest (`squad.*` keys) is every kind's.
 
 - **Opening:** a player of level 50 or more holding an Eye of Fire (only
   checked) leads a new squad. Those on their map read a notice (chat line,
