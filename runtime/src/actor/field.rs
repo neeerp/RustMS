@@ -11,7 +11,7 @@ use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::actor::registry::MAP_NPC_OBJECT_ID_BASE;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
 use game::mob_skill::{self, MobSkillEffect};
-use game::{FieldAvatar, MobStat};
+use game::{wedding, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
 use game_data::server_content::keys;
 use net::conti::{self, Happening, State, Target};
@@ -217,7 +217,7 @@ impl FieldActor {
         if let Some((name, state)) = conti::car_state(key.map_id, route_time) {
             reactors.set_state(name, state);
         }
-        Self {
+        let mut field = Self {
             key,
             rx,
             occupants: HashMap::new(),
@@ -246,7 +246,13 @@ impl FieldActor {
             levers: None,
             kites: KiteSet::default(),
             tick,
+        };
+        // A wedding's copy of the hunting ground opens with its one Giant
+        // Cake.
+        if key.map_id == wedding::HUNTING_GROUND && key.instance_id != 0 {
+            field.board(wedding::GIANT_CAKE, 1, wedding::GIANT_CAKE_AT);
         }
+        field
     }
 
     pub async fn run(mut self) {

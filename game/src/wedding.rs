@@ -153,6 +153,12 @@ pub const PARTY_ROOM: i32 = 680000300;
 /// drop the Heart Keys (report b082).
 pub const HUNTING_GROUND: i32 = 680000400;
 
+/// The Giant Cake, which comes out once in each wedding's copy of the
+/// hunting ground, on the ground below `GIANT_CAKE_AT` (Cosmic
+/// `spawnCakeBoss`). Killing it leaves the clock running (QUESTIONS Q3).
+pub const GIANT_CAKE: i32 = 9400606;
+pub const GIANT_CAKE_AT: (i16, i16) = (777, -177);
+
 /// The room of boxes that `BOX_KEYS` Heart Keys open, off the hunting
 /// ground.
 pub const BOX_ROOM: i32 = 680000401;
