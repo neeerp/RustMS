@@ -72,7 +72,7 @@ a conversation already open.
 | `fighter`, `magician`, `bowman`, `rogue`, `kairinT` | Clicking Dances with Balrog (1022000), Grendel the Really Old (1032001), Athena Pierce (1012100), the Dark Lord (1052001), or Kyrin (1090000), or a beginner up to level 10 touching the `tutorial` portal in their room | First and second job advancement: see below |
 | Job instructors | Clicking an examiner (1072000-1072003) or, inside the test, a proctor (1072004-1072007) | The second job's test: see below |
 | `inside_pirate` | Clicking the proctor (1072008) inside Kyrin's tests | Yes warps to Kyrin; see below |
-| `hair_henesys1` | Clicking Natalie (1012103) in Henesys's hair salon (100000104) | A haircut (5150001) or a dye (5151001) coupon buys one of her styles, picked on a preview of the player; without a coupon she says so and nothing changes |
+| `hair_*`, `face_*`, `lens_*`, `skin_*` | Clicking one of 53 stylists: hair salons, plastic surgeons, lens shops and skin care (`net::stylists`) | A menu of the NPC's services, each for its coupon. A VIP coupon lets the player pick the look on a preview; a regular or experimental one rolls it after a yes. A cut keeps the hair's colour and a face its lens colour, while a dye or a lens changes only the colour; a style that doesn't come in the player's colour is offered in colour 0. A salon's hair membership card (5420000-06) makes its cuts free and is kept, and a one-time lens (5152100-07) pays for its own colour. Without the coupon the NPC says so and nothing changes. Claudia (9201039) is not done yet |
 | `multipet_success` | Clicking the hidden spot (9102100) on the Pet-Walking Road (100000202) | While Bartos's test (4646) is started, yes gives the note (4031921) the test asks for, once; otherwise one page |
 | `q4647e` | QUEST_ACTION 5 for quest 4647 (Bartos) | Two pages, then takes a Pet Snack (5460000), completes the quest and teaches Follow the Lead for the player's line (8, 10000018 or 20000024); without a snack, one page |
 | Gachapon machines | Clicking a machine (9100100-9100107, 9100109, 9100117) | With a Gachapon Ticket (5220000), yes trades it for the prize rolled when the conversation opened, and the next page names it; without one, a menu explains the machine. See `agent_docs/inventory.md`, "Gachapon" |
@@ -264,7 +264,7 @@ is 2, a hairstyle if 3, otherwise a skin. BACK and NEXT go round the
 styles, TAKE OFF ALL shows the player without equipment and DEFAULT
 SETTINGS brings it back. OK or Enter answers `07 01 u8` (the style's index);
 CANCEL, LEAVE STORE or Escape answers `07 00`. The server sends type 7 for
-Natalie's hairstyles and applies the chosen one with `Effect::SetStyle`
+the stylists' looks and applies the chosen one with `Effect::SetStyle`
 (a stat change and UPDATE_CHAR_LOOK for others). The window has no scroll
 bar for text taller than its 100 px box, drops the text's images, and does
 not type the text out.
