@@ -3355,6 +3355,7 @@ fn to_foreign_npc(npc: &FieldMapEntityNpc) -> ForeignNpc {
         foothold: npc.foothold,
         rx0: npc.rx0,
         rx1: npc.rx1,
+        enabled: true,
     }
 }
 

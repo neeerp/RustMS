@@ -31,6 +31,7 @@
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
+#include "../../Gameplay/NpcScripts.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/Combat/Assassinate.h"
 #include "../../IO/UI.h"
@@ -765,9 +766,10 @@ namespace ms
 
 		recv.read_short(); // 'rx0'
 		recv.read_short(); // 'rx1'
+		bool enabled = recv.read_bool();
 
 		Stage::get().get_npcs().spawn(
-			{ oid, id, position, flip, fh }
+			{ oid, id, position, flip, fh, enabled }
 		);
 	}
 
@@ -794,11 +796,11 @@ namespace ms
 
 			recv.read_short();	// 'rx0'
 			recv.read_short();	// 'rx1'
-			recv.read_bool();	// 'minimap'
+			bool enabled = recv.read_bool();
 
 			// Spawned already, the NPC only changes hands.
 			Stage::get().get_npcs().spawn(
-				{ oid, id, position, flip, fh }
+				{ oid, id, position, flip, fh, enabled }
 			);
 			Stage::get().get_npcs().control(oid, true);
 		}
@@ -812,6 +814,37 @@ namespace ms
 
 		// A path follows for an NPC that walks; none does in v83.
 		Stage::get().get_npcs().act(oid, action, line);
+	}
+
+	void NpcEnableHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		bool enabled = recv.read_bool();
+
+		Stage::get().get_npcs().summon(oid, enabled);
+	}
+
+	void NpcSpecialActionHandler::handle(InPacket& recv) const
+	{
+		int32_t oid = recv.read_int();
+		std::string name = recv.read_string();
+
+		Stage::get().get_npcs().request_action(oid, name);
+	}
+
+	void SetNpcScriptableHandler::handle(InPacket& recv) const
+	{
+		uint8_t count = static_cast<uint8_t>(recv.read_byte());
+
+		for (uint8_t i = 0; i < count; i++)
+		{
+			int32_t npc_id = recv.read_int();
+			std::string script = recv.read_string();
+			int32_t start = recv.read_int();
+			int32_t end = recv.read_int();
+
+			npc_scripts::received()[npc_id].push_back({ script, start, end });
+		}
 	}
 
 	void DropLootHandler::handle(InPacket& recv) const

@@ -12,7 +12,7 @@ mod tests {
     /// uses. Builder tests compare against the enum, so this pins the enum.
     #[test]
     fn send_opcodes_match_v83_reference() {
-        let table: [(SendOpcode, i16); 28] = [
+        let table: [(SendOpcode, i16); 31] = [
             (SendOpcode::LoginStatus, 0x00),
             (SendOpcode::GuestIdLogin, 0x01),
             (SendOpcode::ServerStatus, 0x03),
@@ -37,6 +37,9 @@ mod tests {
             (SendOpcode::SpawnNpc, 0x101),
             (SendOpcode::SpawnNpcRequestController, 0x103),
             (SendOpcode::NpcAction, 0x104),
+            (SendOpcode::NpcEnabled, 0x105),
+            (SendOpcode::NpcSpecialAction, 0x106),
+            (SendOpcode::SetNpcScriptable, 0x107),
             (SendOpcode::NpcDialogue, 0x130),
             (SendOpcode::QueryCashResult, 0x144),
             (SendOpcode::CashShopOperation, 0x145),

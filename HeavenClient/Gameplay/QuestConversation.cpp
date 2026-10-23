@@ -1,5 +1,6 @@
 #include "QuestConversation.h"
 
+#include "NpcScripts.h"
 #include "Stage.h"
 
 #include "../Character/QuestCatalog.h"
@@ -119,27 +120,29 @@ namespace ms
 				return pages;
 			}
 
-			// The NPC's script (Npc/<id>.img/info/script/<n>/script): the
-			// last whose start and end dates include today (FUN_006de2d3).
-			// The server runs it when the NPC is talked to.
+			// The NPC's script (Npc/<id>.img/info/script/<n>/script, then
+			// what 0x107 added): the newest whose start and end dates
+			// include today (FUN_006de2d3, FUN_006dedf7). The server runs it
+			// when the NPC is talked to.
 			std::string npc_script(int32_t npc_id)
 			{
 				std::time_t now = std::time(nullptr);
 				std::tm local = *std::localtime(&now);
-				int64_t today = ((local.tm_year + 1900) * 100 + local.tm_mon + 1) * 100 + local.tm_mday;
+				int32_t today = ((local.tm_year + 1900) * 100 + local.tm_mon + 1) * 100 + local.tm_mday;
 				nl::node scripts = nl::nx::npc[string_format::extend_id(npc_id, 7) + ".img"]["info"]["script"];
-				std::string script;
+				std::vector<npc_scripts::Window> windows;
 
 				for (int n = 0; nl::node entry = scripts[std::to_string(n)]; n++)
-				{
-					std::string name = entry["script"];
+					windows.push_back({ entry["script"],
+						static_cast<int32_t>(entry["start"].get_integer(19000101)),
+						static_cast<int32_t>(entry["end"].get_integer(20790101)) });
 
-					if (!name.empty() && entry["start"].get_integer(19000101) <= today &&
-						today <= entry["end"].get_integer(20790101))
-						script = name;
-				}
+				auto received = npc_scripts::received().find(npc_id);
 
-				return script;
+				if (received != npc_scripts::received().end())
+					windows.insert(windows.end(), received->second.begin(), received->second.end());
+
+				return npc_scripts::active(windows, today);
 			}
 
 			// The NPC's own line, from String/Npc.img: d0 greets, d1 is for

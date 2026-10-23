@@ -35,9 +35,31 @@ client). Every 3 to 9 s a standing NPC either plays one of its actions once
 (any animation but `stand` and `move`, perhaps saying one of that action's
 `speak` lines) or says one of its `info/speak` lines, in an `npc`-style chat
 balloon. NPCs never walk: v83 moves only those with `info/move`, and none
-have it. In v83 the controlling client sends each choice as NPC_ACTION
-(`0xA6`) for the server to echo to the map; RustMS doesn't control NPCs, so
-each client chooses locally and players see different actions.
+have it. The field gives one client control of its NPCs (SPAWN_NPC_C,
+`0x103`); that client sends each choice as NPC_ACTION (`0xC5`) and the field
+echoes it to the map (`0x104`), so everyone sees the same action. Requests
+from other clients are dropped.
+
+Three more packets change NPCs, though no RustMS content sends them yet
+(builders in `net/src/packet/build/world/npc.rs`, report b095):
+
+- `0x105` (`build_npc_enabled`): `oid`, then 1 to show the NPC with
+  `Effect/MapEff.img/NpcSummon` or 0 to hide it with `NpcReturn`. A hidden
+  NPC is not drawn, takes no clicks and picks no idle actions. The spawn's
+  last byte (`ForeignNpc::enabled`) is the same flag, for those who come
+  later and for a new controller; the field doesn't keep it yet, so content
+  that hides an NPC must store it there first.
+- `0x106` (`build_npc_special_action`): `oid` and an action name. A client
+  that has the action asks for it as an NPC_ACTION request, which the field
+  echoes as usual if it comes from the controller; send it to the controller.
+  Nothing happens while the NPC plays a `special` action, or if it has no
+  such action.
+- `0x107` (`build_set_npc_scriptable`): NPC ids with a script name and
+  YYYYMMDD start and end days. The client adds them after the NPC's
+  `info/script` windows for the rest of the session, and the newest window
+  open today is the NPC's script (`Gameplay/NpcScripts.h`). Only an NPC with
+  a script asks the server to talk when it has no quests to list (see
+  `quests.md`).
 
 ## Scripted NPCs
 

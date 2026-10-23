@@ -12,10 +12,10 @@ Quests run the way the original client ran them:
    started quests, such as a hand-in still missing its items), under the
    `UtilDlgEx/list*` headers. Each line is v83's `quest_menu_line`: the
    QuestInfo `type` in red, the name, and "(Pre-completion enabled)" or
-   "(In Progress)". If the NPC has a script (`Npc/<id>.img/info/script`,
-   the last entry dated for today), an "ETC" line named by
-   `Etc/ScriptInfo.img/<script>` (or the script itself) asks the server to
-   talk. Party quests (1200-1399) are never listed. With nothing to list,
+   "(In Progress)". If the NPC has a script (`Npc/<id>.img/info/script`
+   and SET_NPC_SCRIPTABLE's windows, the newest dated for today), an
+   "ETC" line named by `Etc/ScriptInfo.img/<script>` (or the script
+   itself) asks the server to talk. Party quests (1200-1399) are never listed. With nothing to list,
    an NPC with a script goes straight to the server; one without says `d1`
    if all its quests are done for good, and `d0` otherwise, without the
    server. NPCs without quests always go to the server. Picking a quest

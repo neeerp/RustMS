@@ -38,7 +38,8 @@ namespace ms
 	{
 	public:
 		// Constructs an NPC by combining data from game files with data sent by the server
-		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position);
+		Npc(int32_t npcid, int32_t oid, bool mirrored, uint16_t fhid, bool control, Point<int16_t> position,
+			bool enabled = true);
 
 		// Draws the current animation and name/function tags
 		void draw(double viewx, double viewy, float alpha) const override;
@@ -56,6 +57,20 @@ namespace ms
 		// `action` is an index into the actions from 2, or -1 for `line`
 		// of the info/speak lines alone; `line` is -1 for none.
 		void act(int8_t action, int8_t line);
+
+		// Ask the server to play the action called `name`, unless a special
+		// action is playing or there is no such action (FUN_006d590d).
+		void request_action(const std::string &name);
+
+		// Show or hide the NPC, with no effect (the spawn's last byte).
+		void set_enabled(bool enabled);
+
+		// Show the NPC with Effect/MapEff.img/NpcSummon, or hide it with
+		// NpcReturn (FUN_006d59b0). Showing it again plays it again.
+		void summon(bool enabled);
+
+		// A hidden NPC is not drawn and takes no clicks (v83 CNpc +0x134).
+		bool is_enabled() const;
 
 		// Check whether this is a server-sided NPC
 		bool isscripted() const;
@@ -113,6 +128,13 @@ namespace ms
 		bool control;
 		// The controller waits for its last choice to come back.
 		bool pending = false;
+		// Playing one of the special actions, which the idle draw leaves out
+		// (v83 CNpc +0xc0), until it ends.
+		bool special = false;
+		bool enabled = true;
+		// NpcSummon or NpcReturn, played once where the NPC stands.
+		Animation summon_effect;
+		bool summoning = false;
 
 		Randomizer random;
 		Text namelabel;

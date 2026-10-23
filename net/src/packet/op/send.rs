@@ -182,6 +182,12 @@ pub enum SendOpcode {
     SpawnNpc = 0x101,
     SpawnNpcRequestController = 0x103,
     NpcAction = 0x104,
+    /// Show an NPC, or hide it, with an effect (261; report b095 §2).
+    NpcEnabled = 0x105,
+    /// Ask the controller to request an NPC's action by name (262).
+    NpcSpecialAction = 0x106,
+    /// Give NPCs scripts for some dates, for the session (263).
+    SetNpcScriptable = 0x107,
     /// A hired merchant stands on the map (265; report 165 §1).
     SpawnHiredMerchant = 0x109,
     /// A hired merchant left the map (266).

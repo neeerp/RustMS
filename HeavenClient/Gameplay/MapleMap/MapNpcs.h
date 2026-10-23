@@ -26,6 +26,7 @@
 #include "../IO/Cursor.h"
 
 #include <queue>
+#include <string>
 
 namespace ms
 {
@@ -52,6 +53,12 @@ namespace ms
 		// Play the action the NPC's controller chose.
 		void act(int32_t oid, int8_t action, int8_t line);
 
+		// Show or hide an NPC, with its effect, once it has spawned.
+		void summon(int32_t oid, bool enabled);
+
+		// Ask the server for an NPC's action by name.
+		void request_action(int32_t oid, const std::string &name);
+
 		// Remove all NPCs.
 		void clear();
 
@@ -69,5 +76,6 @@ namespace ms
 
 		std::queue<NpcSpawn> spawns;
 		std::queue<std::pair<int32_t, bool>> controls;
+		std::queue<std::pair<int32_t, bool>> summons;
 	};
 }

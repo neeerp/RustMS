@@ -42,9 +42,12 @@ namespace ms
 	class NpcSpawn
 	{
 	public:
-		NpcSpawn(int32_t oid, int32_t npcid, Point<int16_t> position, bool mirrored, uint16_t fh);
+		// `enabled` is the spawn's last byte: false hides the NPC (v83 CNpc +0x134).
+		NpcSpawn(int32_t oid, int32_t npcid, Point<int16_t> position, bool mirrored, uint16_t fh,
+				 bool enabled = true);
 
 		int32_t get_oid() const;
+		bool is_enabled() const;
 
 		std::unique_ptr<MapObject> instantiate(const Physics &physics) const;
 
@@ -54,6 +57,7 @@ namespace ms
 		Point<int16_t> position;
 		bool flip;
 		uint16_t fh;
+		bool enabled;
 	};
 
 	class MobSpawn
