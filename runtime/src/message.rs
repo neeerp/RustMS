@@ -346,6 +346,9 @@ pub enum ServerMessage {
     EventFailed {
         id: u32,
     },
+    /// The player's field saw what clears `stage` of the event they are
+    /// in, as Zakum's last body dying on its altar: tell the event.
+    ClearEventStage(u8),
     /// The party in event `id` cleared `stage`.
     StageCleared {
         id: u32,
@@ -601,8 +604,14 @@ pub enum FieldMessage {
     /// The states of the live reactors named `names` here, in turn, with
     /// `None` for a name none has.
     ReactorStates {
-        names: &'static [&'static str],
+        names: Vec<&'static str>,
         reply: tokio::sync::oneshot::Sender<Vec<Option<u8>>>,
+    },
+    /// Set the live reactors named `name` here to `state`, as an event's
+    /// gate shut while it runs (`net::events::Event::gate`).
+    SetReactor {
+        name: &'static str,
+        state: u8,
     },
     /// How many Eak wants on each of the sealed room's platforms
     /// (`net::events::draw_split`), drawn when first asked.
@@ -684,6 +693,18 @@ pub struct ListedBuddy {
     pub mutual: bool,
     /// They asked to be added and the owner hasn't answered.
     pub pending: bool,
+}
+
+/// What a squad made of a player's command (`DirectoryMessage::Squad`).
+#[derive(Debug)]
+pub enum SquadAnswer {
+    /// It no longer fits: the squad changed since its NPC looked.
+    Refused,
+    Done,
+    /// The squad set out: start its event.
+    Start(crate::actor::event::EventStart),
+    /// Back into the squad's event, with this ticket.
+    Rejoin(crate::actor::event::EventTicket),
 }
 
 /// Messages to the world directory.
@@ -798,6 +819,20 @@ pub enum DirectoryMessage {
         from: ClientId,
         kind: EventKind,
         reply: tokio::sync::oneshot::Sender<Option<crate::actor::event::EventStart>>,
+    },
+    /// What `from` finds of the squad of `kind` on their channel, at its
+    /// NPC (`net::squads`).
+    SquadTalk {
+        from: ClientId,
+        kind: EventKind,
+        reply: tokio::sync::oneshot::Sender<net::squads::SquadView>,
+    },
+    /// `from` tells the squad of `kind` on their channel `command`.
+    Squad {
+        from: ClientId,
+        kind: EventKind,
+        command: net::squads::SquadCommand,
+        reply: tokio::sync::oneshot::Sender<SquadAnswer>,
     },
     /// Event `id` of `kind` on `channel_id` is over or won; the next party
     /// may go.

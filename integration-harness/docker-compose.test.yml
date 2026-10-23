@@ -54,6 +54,8 @@ services:
       # Party events run 60 times as fast: Kerning City's party quest lasts
       # 30 seconds (see tests/kpq.rs).
       RUSTMS_EVENT_SCALE: "60"
+      # Two may set out against Zakum, not six (see tests/zakum_squad.rs).
+      RUSTMS_EXPEDITION_MIN: "2"
       # Cloto asks every member of Kerning City's party quest her last
       # question, whose answer is 8 coupons (see tests/kpq_stage1.rs).
       RUSTMS_KPQ_QUESTION: "7"

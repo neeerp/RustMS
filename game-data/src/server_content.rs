@@ -1333,10 +1333,39 @@ pub mod keys {
     pub const ZAKUM_ALTAR_SUMMONED: &str = "zakum.altar.summoned";
     /// The line to the whole world as Zakum's last body dies.
     pub const ZAKUM_VICTORY: &str = "zakum.victory";
+    /// Adobis's expeditions at the Entrance to Zakum (`{name}` is a
+    /// member), their notices, and the gate shut behind one.
+    pub const ZAKUM_SQUAD_LEVEL: &str = "zakum.squad.level";
+    pub const ZAKUM_SQUAD_NO_EYE: &str = "zakum.squad.no_eye";
+    pub const ZAKUM_SQUAD_ASK: &str = "zakum.squad.ask";
+    pub const ZAKUM_SQUAD_OPENED: &str = "zakum.squad.opened";
+    pub const ZAKUM_SQUAD_MENU: &str = "zakum.squad.menu";
+    pub const ZAKUM_SQUAD_EXPEL_CHOICE: &str = "zakum.squad.expel_choice";
+    pub const ZAKUM_SQUAD_ALONE: &str = "zakum.squad.alone";
+    pub const ZAKUM_SQUAD_LIST: &str = "zakum.squad.list";
+    pub const ZAKUM_SQUAD_EXPELLED: &str = "zakum.squad.expelled";
+    pub const ZAKUM_SQUAD_START_CHOICE: &str = "zakum.squad.start_choice";
+    pub const ZAKUM_SQUAD_TOO_FEW: &str = "zakum.squad.too_few";
+    pub const ZAKUM_SQUAD_STOP_CHOICE: &str = "zakum.squad.stop_choice";
+    pub const ZAKUM_SQUAD_STOPPED: &str = "zakum.squad.stopped";
+    pub const ZAKUM_SQUAD_REGISTERED: &str = "zakum.squad.registered";
+    pub const ZAKUM_SQUAD_JOIN_ASK: &str = "zakum.squad.join_ask";
+    pub const ZAKUM_SQUAD_JOINED: &str = "zakum.squad.joined";
+    pub const ZAKUM_SQUAD_BANNED: &str = "zakum.squad.banned";
+    pub const ZAKUM_SQUAD_FULL: &str = "zakum.squad.full";
+    pub const ZAKUM_SQUAD_REJOIN_ASK: &str = "zakum.squad.rejoin_ask";
+    pub const ZAKUM_SQUAD_TAKEN: &str = "zakum.squad.taken";
+    pub const ZAKUM_SQUAD_REFUSED: &str = "zakum.squad.refused";
+    pub const ZAKUM_SQUAD_NOTICE_OPENED: &str = "zakum.squad.notice.opened";
+    pub const ZAKUM_SQUAD_NOTICE_JOINED: &str = "zakum.squad.notice.joined";
+    pub const ZAKUM_SQUAD_NOTICE_EXPELLED: &str = "zakum.squad.notice.expelled";
+    pub const ZAKUM_SQUAD_NOTICE_STOPPED: &str = "zakum.squad.notice.stopped";
+    pub const ZAKUM_SQUAD_NOTICE_STARTED: &str = "zakum.squad.notice.started";
+    pub const ZAKUM_GATE_BLOCKED: &str = "zakum.gate.blocked";
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 49] = [
+    pub const ZAKUM: [&str; 76] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -1386,6 +1415,33 @@ pub mod keys {
         ZAKUM_ALI_BYE,
         ZAKUM_ALTAR_SUMMONED,
         ZAKUM_VICTORY,
+        ZAKUM_SQUAD_LEVEL,
+        ZAKUM_SQUAD_NO_EYE,
+        ZAKUM_SQUAD_ASK,
+        ZAKUM_SQUAD_OPENED,
+        ZAKUM_SQUAD_MENU,
+        ZAKUM_SQUAD_EXPEL_CHOICE,
+        ZAKUM_SQUAD_ALONE,
+        ZAKUM_SQUAD_LIST,
+        ZAKUM_SQUAD_EXPELLED,
+        ZAKUM_SQUAD_START_CHOICE,
+        ZAKUM_SQUAD_TOO_FEW,
+        ZAKUM_SQUAD_STOP_CHOICE,
+        ZAKUM_SQUAD_STOPPED,
+        ZAKUM_SQUAD_REGISTERED,
+        ZAKUM_SQUAD_JOIN_ASK,
+        ZAKUM_SQUAD_JOINED,
+        ZAKUM_SQUAD_BANNED,
+        ZAKUM_SQUAD_FULL,
+        ZAKUM_SQUAD_REJOIN_ASK,
+        ZAKUM_SQUAD_TAKEN,
+        ZAKUM_SQUAD_REFUSED,
+        ZAKUM_SQUAD_NOTICE_OPENED,
+        ZAKUM_SQUAD_NOTICE_JOINED,
+        ZAKUM_SQUAD_NOTICE_EXPELLED,
+        ZAKUM_SQUAD_NOTICE_STOPPED,
+        ZAKUM_SQUAD_NOTICE_STARTED,
+        ZAKUM_GATE_BLOCKED,
     ];
 
     /// The magic rocks of Orbis Tower and Eos Tower; `{item}` is the

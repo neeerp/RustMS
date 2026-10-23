@@ -2,7 +2,7 @@ use super::quest::{gain_exp, QuestChange};
 use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
-use crate::message::{DirectoryMessage, FieldMessage};
+use crate::message::{DirectoryMessage, FieldMessage, SquadAnswer};
 use game::pet::PetChange;
 use game::QuestState;
 use net::conti::{self, State};
@@ -18,6 +18,7 @@ use net::packet::build::world::{
 };
 use net::quests::{self, QuestTemplate};
 use net::scripts::Effect;
+use net::squads::SquadCommand;
 use net::{FieldRequest, WorldAction};
 use std::time::{Duration, SystemTime};
 use tokio::sync::oneshot;
@@ -557,6 +558,43 @@ impl ClientActor {
                     );
                 }
                 Effect::EventCommand(told) => command = Some(*told),
+                Effect::Squad { kind, command } => {
+                    // Not back into one while in an event.
+                    if *command == SquadCommand::Rejoin && self.event.is_some() {
+                        return Ok(Applied::Refused);
+                    }
+                    let (reply, answer) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::Squad {
+                        from: self.client_id,
+                        kind: *kind,
+                        command: *command,
+                        reply,
+                    })
+                    .await?;
+                    match answer.await.unwrap_or(SquadAnswer::Refused) {
+                        SquadAnswer::Refused => {
+                            debug!(?kind, ?command, "Squad refused; nothing applied");
+                            return Ok(Applied::Refused);
+                        }
+                        SquadAnswer::Done => {}
+                        SquadAnswer::Start(start) => crate::actor::event::spawn(
+                            start,
+                            self.services.fields.clone(),
+                            self.services.directory.clone(),
+                        ),
+                        SquadAnswer::Rejoin(ticket) => {
+                            warp = Some((kind.event().entry, None));
+                            self.event = Some(ticket);
+                        }
+                    }
+                }
+                Effect::ShutByReactor { name, state } => {
+                    let states = self.reactor_states(&[*name]).await?;
+                    if states.first().copied().flatten() == Some(*state) {
+                        debug!(name, state, "Shut by a reactor; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                }
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);

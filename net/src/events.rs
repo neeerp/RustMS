@@ -23,6 +23,9 @@ pub enum EventKind {
     Opq,
     /// Zakum's Dead Mine, the first of Adobis's trials, started at Adobis.
     Zpq,
+    /// The expedition to Zakum's altar, gathered by Adobis (2030013) at the
+    /// Entrance to Zakum (`crate::squads`).
+    Zakum,
 }
 
 /// An event's maps and terms.
@@ -87,6 +90,15 @@ pub struct Event {
     /// arrival when the team has all five job lines among it (Orbis's
     /// "Blessing from Wonky the Fairy"); none for the other events.
     pub blessings: &'static [i32],
+    /// Whether its team is a squad gathered at its NPC from anyone, not a
+    /// party (`crate::squads`): it ends only when the last member leaves,
+    /// whoever leads, and members on its roster may come back in while it
+    /// runs (Cosmic `isExpeditionTeamLackingNow`).
+    pub squad: bool,
+    /// The reactor, by its map and name, that the event shuts (state 1)
+    /// while it runs and opens (0) once it is won or over (Cosmic
+    /// ZakumBattle's `updateGateState`).
+    pub gate: Option<(i32, &'static str)>,
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -181,6 +193,8 @@ pub const KPQ: Event = Event {
     clear_map: None,
     bonus: None,
     blessings: &[],
+    squad: false,
+    gate: None,
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -273,6 +287,8 @@ pub const HPQ: Event = Event {
         on_win: false,
     }),
     blessings: &[],
+    squad: false,
+    gate: None,
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -330,6 +346,8 @@ pub const LPQ: Event = Event {
         on_win: true,
     }),
     blessings: &[],
+    squad: false,
+    gate: None,
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -517,6 +535,8 @@ pub const OPQ: Event = Event {
     // Attack, defence, accuracy and avoidability, or speed and jump, for
     // 30 minutes (Cosmic `afterSetup`).
     blessings: &[2_022_090, 2_022_091, 2_022_092, 2_022_093],
+    squad: false,
+    gate: None,
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -734,6 +754,8 @@ pub const ZPQ: Event = Event {
     clear_map: None,
     bonus: None,
     blessings: &[],
+    squad: false,
+    gate: None,
 };
 
 /// The Dead Mine's hub, where Aura stands and its way out is.
@@ -758,13 +780,51 @@ pub const ZPQ_DOCUMENTS_EXP: i32 = 20_000;
 pub const FIRE_ORE_PIECE: i32 = 4_031_061;
 pub const DEAD_MINE_SCROLL: (i32, i16) = (2_030_007, 5);
 
+/// The Door to Zakum's gate reactor (2118002) and its map, shut while an
+/// expedition is under way.
+pub const ZAKUM_GATE: (i32, &str) = (211_042_300, "gate");
+
+/// The expedition to Zakum (Cosmic `ZakumBattle`): the squad's members
+/// on the Entrance to Zakum when its leader starts it go to their own copy
+/// of the altar, for two hours. Zakum's last body's death wins it (its one
+/// stage, cleared by any member there); the gate at the Door to Zakum stays
+/// shut until then, or until it ends.
+pub const ZAKUM: Event = Event {
+    lobby: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
+    maps: crate::mobs::ZAKUM_ALTAR_MAP..=crate::mobs::ZAKUM_ALTAR_MAP,
+    entry: crate::mobs::ZAKUM_ALTAR_MAP,
+    exit: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
+    levels: 50..=u8::MAX,
+    team: 6..=30,
+    minutes: 120,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: true,
+    gate: Some(ZAKUM_GATE),
+};
+
 impl EventKind {
-    pub const ALL: [EventKind; 5] = [
+    pub const ALL: [EventKind; 6] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
         EventKind::Opq,
         EventKind::Zpq,
+        EventKind::Zakum,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -774,6 +834,7 @@ impl EventKind {
             EventKind::Lpq => &LPQ,
             EventKind::Opq => &OPQ,
             EventKind::Zpq => &ZPQ,
+            EventKind::Zakum => &ZAKUM,
         }
     }
 }
@@ -810,6 +871,22 @@ impl Event {
     /// `RUSTMS_EVENT_SCALE` (a whole number, default 1) for testing.
     pub fn duration(&self) -> Duration {
         scaled(Duration::from_secs(self.minutes * 60))
+    }
+
+    /// How many must go for the event to start: the start of `team`, or
+    /// for a squad `RUSTMS_EXPEDITION_MIN` if set, for testing.
+    pub fn least(&self) -> usize {
+        let fewer = || {
+            std::env::var("RUSTMS_EXPEDITION_MIN")
+                .ok()?
+                .parse()
+                .ok()
+                .filter(|least| *least >= 1)
+        };
+        self.squad
+            .then(fewer)
+            .flatten()
+            .unwrap_or(*self.team.start())
     }
 
     /// Whether `map_id` is one of the event's maps; its exit never is.
@@ -985,23 +1062,48 @@ fn scale() -> u32 {
 
 /// Who is still playing. The event ends when its leader leaves or too few
 /// remain, and once won, when the last of them leaves (Cosmic
-/// `isEventTeamLackingNow`).
+/// `isEventTeamLackingNow`). A squad's ends only when the last leaves
+/// (`isExpeditionTeamLackingNow`), and its members may come back.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Team {
     leader: ClientId,
     members: Vec<ClientId>,
     least: usize,
     won: bool,
+    /// A squad's roster, who alone may come (back) in.
+    roster: Option<HashSet<ClientId>>,
 }
 
 impl Team {
     pub fn new(event: &Event, leader: ClientId, members: Vec<ClientId>) -> Self {
         Self {
             leader,
+            roster: event.squad.then(|| members.iter().copied().collect()),
             members,
             least: *event.team.start(),
             won: false,
         }
+    }
+
+    /// Put those who stayed behind at a squad's start on its roster too.
+    pub fn enlist(&mut self, roster: &[ClientId]) {
+        if let Some(listed) = self.roster.as_mut() {
+            listed.extend(roster);
+        }
+    }
+
+    /// `member` of a squad's roster comes (back) in. Returns whether they
+    /// may: not once it is won, nor if they aren't on it or are in.
+    pub fn rejoin(&mut self, member: ClientId) -> bool {
+        let listed = self
+            .roster
+            .as_ref()
+            .is_some_and(|roster| roster.contains(&member));
+        if !listed || self.won || self.has(member) {
+            return false;
+        }
+        self.members.push(member);
+        true
     }
 
     /// The team won the event: from now on only the last member's leaving
@@ -1029,7 +1131,7 @@ impl Team {
             return false;
         };
         self.members.remove(index);
-        if self.won {
+        if self.won || self.roster.is_some() {
             return self.members.is_empty();
         }
         member == self.leader || self.members.len() < self.least
@@ -1037,8 +1139,12 @@ impl Team {
 
     /// The leader handed the party to `to`, who leads the team from now
     /// on. Returns whether that ends the event: it does if `to` is not in
-    /// its maps, unless it is won (Cosmic `changedLeader`).
+    /// its maps, unless it is won (Cosmic `changedLeader`). A squad isn't
+    /// a party, so a party's hand-over changes nothing for it.
     pub fn hand_over(&mut self, to: ClientId) -> bool {
+        if self.roster.is_some() {
+            return false;
+        }
         self.leader = to;
         !self.won && !self.has(to)
     }
@@ -1819,6 +1925,35 @@ mod tests {
         team.win();
         assert!(!team.hand_over(5));
         assert!(!team.leave(1));
+    }
+
+    #[test]
+    fn a_squad_ends_only_when_its_last_member_leaves_and_its_own_may_come_back() {
+        let mut team = Team::new(&ZAKUM, 1, vec![1, 2, 3]);
+        // Its leader's leaving, or too few, ends nothing; nor does a
+        // party's hand-over move it.
+        assert!(!team.leave(1));
+        assert!(!team.hand_over(9));
+        assert_eq!(team.leader(), 1);
+        assert!(!team.leave(2));
+        assert!(!team.rejoin(9), "not on the roster");
+        team.enlist(&[9]);
+        assert!(team.rejoin(9), "stayed behind");
+        assert!(!team.leave(9));
+        assert!(!team.rejoin(3), "still in");
+        assert!(team.rejoin(1));
+        assert_eq!(team.members(), [3, 1]);
+        assert!(!team.leave(3));
+        team.win();
+        assert!(!team.rejoin(2), "won");
+        assert!(team.leave(1));
+        // A party's team never takes anyone back.
+        let mut team = Team::new(&KPQ, 1, vec![1, 2, 3, 4]);
+        assert!(!team.leave(4));
+        assert!(!team.rejoin(4));
+        assert_eq!(ZAKUM.least(), 6);
+        assert!(EventKind::Zakum.event().holds(280_030_000));
+        assert!(!ZAKUM.holds(ZAKUM.lobby));
     }
 
     #[test]

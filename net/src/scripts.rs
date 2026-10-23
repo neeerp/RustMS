@@ -531,6 +531,20 @@ pub enum Effect {
     /// Tell the player's event something happened, once the effects before
     /// it have applied. Scripts end on it.
     EventCommand(crate::events::EventCommand),
+    /// Tell the squad of `kind` on the player's channel something
+    /// (`crate::squads`). Nothing after it is applied if it won't take it;
+    /// the script says its `refused` text instead.
+    Squad {
+        kind: crate::events::EventKind,
+        command: crate::squads::SquadCommand,
+    },
+    /// Nothing is applied while the reactor named `name` on the player's
+    /// map is in `state` (a missing reactor shuts nothing); the script says
+    /// its `refused` text, or the portal its `occupied` one, instead.
+    ShutByReactor {
+        name: &'static str,
+        state: u8,
+    },
     /// Take the player, or the party they lead with the members on their
     /// map, to `portal` on the first free copy of a mini-dungeon
     /// (`dungeons::Dungeon::copies`). Nothing after it is applied if they
@@ -547,8 +561,8 @@ pub struct ScriptOutcome {
     pub effects: Vec<Effect>,
     /// Don't run this portal's script again this session.
     pub block: bool,
-    /// Said in pink when a `RequireEmptyMap` or `RequireNoMobs` keeps the
-    /// player back.
+    /// Said in pink when a `RequireEmptyMap`, `RequireNoMobs` or
+    /// `ShutByReactor` keeps the player back.
     pub occupied: Option<String>,
 }
 
@@ -920,9 +934,9 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             through(Effect::WarpToPortal(cave, named(cave, "out00")))
         }
         "enterWitch" => refused(keys::WITCH_CAVE_CREEPY),
-        // The gate to Zakum: a chief's approval, the trials, and an Eye of
-        // Fire. Upstream also keeps it shut while the gate reactor is
-        // closed after a win; nothing closes it yet.
+        // The gate to Zakum: a chief's approval, the trials, an Eye of
+        // Fire, and the gate reactor open, as no expedition is under way
+        // (`events::ZAKUM`'s `gate`).
         "Zakum05" if !npc_scripts::zakum_approved(player) => refused(keys::ZAKUM_GATE_UNAPPROVED),
         "Zakum05" if quest(npc_scripts::ZAKUM_TRIALS_DONE) != QuestState::Started => {
             refused(keys::ZAKUM_GATE_TRIALS)
@@ -930,10 +944,21 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         "Zakum05" if player.inventory.count(npc_scripts::EYE_OF_FIRE) == 0 => {
             refused(keys::ZAKUM_GATE_NO_EYE)
         }
-        "Zakum05" => through(Effect::WarpToPortal(
-            npc_scripts::ENTRANCE_TO_ZAKUM,
-            named(npc_scripts::ENTRANCE_TO_ZAKUM, "west00"),
-        )),
+        "Zakum05" => ScriptOutcome {
+            effects: vec![
+                Effect::ShutByReactor {
+                    name: crate::events::ZAKUM_GATE.1,
+                    state: 1,
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    npc_scripts::ENTRANCE_TO_ZAKUM,
+                    named(npc_scripts::ENTRANCE_TO_ZAKUM, "west00"),
+                ),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::ZAKUM_GATE_BLOCKED, &[])),
+        },
         // Cosmic starts the fight with the Yeti brothers here while Stop the
         // Wedding (2330) is taken and they aren't all beaten; that isn't in,
         // so the way is open to everyone rather than shut for good.

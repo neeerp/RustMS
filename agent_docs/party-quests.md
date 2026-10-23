@@ -17,7 +17,11 @@ storage and treasure room the win opens; its jails come in a later slice
 (`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`,
 `a091-opq-bonus-jail-re.md`). Zakum's Dead Mine (ZPQ), the first of the
 trials before Zakum ([zakum](./zakum.md)), is played through too
-(`v83ref/reports/a105-zakum-dead-mine.md`).
+(`v83ref/reports/a105-zakum-dead-mine.md`). Zakum's own altar is an event
+too, but of an expedition squad gathered across parties (`Event::squad`,
+`net/src/squads.rs`): its team comes from the squad's roster rather than a
+party, may come back in while it runs, and ends only when its last member
+leaves (see the expedition in [zakum](./zakum.md)).
 
 ## Rules
 
