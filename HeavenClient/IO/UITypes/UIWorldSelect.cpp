@@ -438,8 +438,6 @@ namespace ms
 	void UIWorldSelect::remove_selected()
 	{
 		deactivate();
-
-		Sound(Sound::Name::SCROLLUP).play();
 	}
 
 	std::string UIWorldSelect::get_world_name(uint8_t worldid) const

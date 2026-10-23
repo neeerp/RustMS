@@ -611,8 +611,6 @@ namespace ms
 				break;
 			}
 
-			Sound(Sound::Name::SCROLLUP).play();
-
 			deactivate();
 			menu_focus = -1;
 
@@ -623,8 +621,6 @@ namespace ms
 			break;
 		case Buttons::BT_BACK:
 			deactivate();
-
-			Sound(Sound::Name::SCROLLUP).play();
 
 			if (auto worldselect = UI::get().get_element<UIWorldSelect>())
 			{

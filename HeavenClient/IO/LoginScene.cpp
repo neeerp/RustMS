@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "LoginScene.h"
 
+#include "../Audio/Audio.h"
 #include "../Configuration.h"
 #include "../Constants.h"
 #include "../Util/NxFiles.h"
@@ -164,6 +165,9 @@ namespace ms
 
 		if (next == step)
 			return;
+
+		// Every change of step scrolls up (v83 FUN_005f53c0, 5f5938).
+		Sound(Sound::Name::SCROLLUP).play();
 
 		// The flight leaves from the old step's stop, wherever the camera is.
 		double steps = std::abs(static_cast<int>(next) - static_cast<int>(step));
