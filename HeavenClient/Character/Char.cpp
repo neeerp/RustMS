@@ -122,11 +122,13 @@ namespace ms
 			partner_frames[frame].draw(DrawArgument(absp + partner_offset(), facing_right));
 		}
 
+		set_effect.draw(false, absp, facepos, facing_right, alpha);
 		item_effect.draw(false, absp, facepos, facing_right, view, alpha);
 		draw_chair(false);
 		look.draw(DrawArgument(absp, color), alpha);
 		draw_chair(true);
 		item_effect.draw(true, absp, facepos, facing_right, view, alpha);
+		set_effect.draw(true, absp, facepos, facing_right, alpha);
 
 		afterimage.draw(look.get_frame(), DrawArgument(absp, facing_right), alpha);
 
@@ -312,6 +314,10 @@ namespace ms
 		Point<int16_t> face = look.get_facepos();
 		item_effect.update(look.get_action_name(), feet,
 			feet + Point<int16_t>(facing_right ? -face.x() : face.x(), face.y()), look);
+
+		// An attack sends the background away too (FUN_0094c4f8).
+		set_effect.update(look, { pets[0].get_itemid(), pets[1].get_itemid(), pets[2].get_itemid() },
+						  state == State::STAND && !attacking);
 
 		for (auto &[reason, affliction] : afflictions)
 			affliction.animation.update();

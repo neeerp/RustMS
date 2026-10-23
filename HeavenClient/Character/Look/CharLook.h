@@ -146,6 +146,12 @@ namespace ms
 
 		const CharEquips &get_equips() const;
 
+		// The cash weapon worn over the weapon, 0 for none. It isn't drawn: v83 draws only the weapon's stances
+		// with it, and its set effects.
+		void set_cash_weapon(int32_t itemid);
+
+		int32_t get_cash_weapon() const;
+
 		// Ride a mount (190xxxx or 193xxxx), or get off with 0 (report 201).
 		void set_vehicle(int32_t vehicle);
 
@@ -248,6 +254,7 @@ namespace ms
 		int32_t hair_id = 0;
 		int32_t face_id = 0;
 		CharEquips equips;
+		int32_t cash_weapon = 0;
 		std::array<int32_t, 3> pet_wear = {};
 		std::map<int16_t, int32_t> pet_parts;
 		int32_t vehicle = 0;

@@ -47,6 +47,9 @@ namespace ms
 
 			add_equip(equip.second);
 		}
+
+		if (auto cash = entry.maskedequips.find(-111); cash != entry.maskedequips.end())
+			cash_weapon = cash->second;
 	}
 
 	CharLook::CharLook()
@@ -1020,6 +1023,16 @@ namespace ms
 			tmplact = "";
 			actionstr = "";
 		}
+	}
+
+	void CharLook::set_cash_weapon(int32_t itemid)
+	{
+		cash_weapon = itemid;
+	}
+
+	int32_t CharLook::get_cash_weapon() const
+	{
+		return cash_weapon;
 	}
 
 	int32_t CharLook::get_morph() const
