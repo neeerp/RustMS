@@ -71,7 +71,8 @@ namespace ms
 			FAMILYTREE,
 			// The Owl of Minerva's results, whose tooltips go below and right of the cursor.
 			ITEMSEARCHRESULT,
-			WEDDINGREGISTRY
+			WEDDINGREGISTRY,
+			USERLIST
 		};
 
 		virtual ~Tooltip()

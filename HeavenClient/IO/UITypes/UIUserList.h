@@ -35,12 +35,14 @@
 #include "../../Character/GuildMark.h"
 #include "../../Character/Party.h"
 
+#include "../../Graphics/Geometry.h"
+
 namespace ms
 {
-	// The v83 Maple User List & Guild window (UIWindow.img/UserList). The
-	// Friend, Party, Guild and Alliance tabs work so far; the Blacklist tab
-	// shows an empty window. The Alliance tab's code is in
-	// UIUserListAlliance.cpp.
+	// The v83 Maple User List & Guild window (UIWindow.img/UserList), with
+	// its Friend, Party, Guild, Alliance and Blacklist tabs. The Alliance
+	// tab's code is in UIUserListAlliance.cpp, the Blacklist tab's in
+	// UIUserListBlacklist.cpp.
 	class UIUserList : public UIDragElement<PosUSERLIST>
 	{
 	public:
@@ -148,7 +150,10 @@ namespace ms
 			BT_UNION_SAVE,
 			// The same four buttons for each of its five guild sections.
 			BT_ALLIANCE_SECTION,
-			BT_TAB0 = BT_ALLIANCE_SECTION + 20
+			BT_TAB0 = BT_ALLIANCE_SECTION + 20,
+			// The Blacklist tab's.
+			BT_BLACK_ADD = BT_TAB0 + Tab::NUM_TABS,
+			BT_BLACK_DELETE
 		};
 
 		// One member's row; y is relative to the window.
@@ -313,6 +318,19 @@ namespace ms
 		void edit_union_title(int32_t rank, const std::string& text);
 		void save_union_titles();
 
+		void init_blacklist();
+		// Reads the names from the settings, as the tab does when shown.
+		void rebuild_blacklist();
+		void draw_blacklist() const;
+		Cursor::State blacklist_cursor(bool clicked, Point<int16_t> cursorpos);
+		Button::State blacklist_button(uint16_t buttonid);
+		// The Add prompt, and its checks once answered (0x919214).
+		void prompt_blacklist();
+		void add_to_blacklist(const std::string& name);
+		// Deletes the name picked (0x919506).
+		void delete_from_blacklist();
+		void update_blacklist_buttons();
+
 		uint16_t tab;
 		Party& party;
 		BuddyList& buddies;
@@ -392,5 +410,17 @@ namespace ms
 		std::array<std::string, 5> union_titles;
 		int32_t union_picked = 0;
 		std::array<Text, 5> union_ranks, union_title_texts, union_labels;
+
+		static constexpr size_t NO_BLACK_PICK = SIZE_MAX;
+
+		Texture black_header, black_row, black_end;
+		ColorBox black_fill;
+		Text black_count;
+		// Sorted, as shown.
+		std::vector<std::string> black_names;
+		std::vector<Text> black_texts;
+		// By place in the list, which survives adding and deleting (0x87c).
+		size_t black_picked = NO_BLACK_PICK;
+		bool black_tooltip = false;
 	};
 }

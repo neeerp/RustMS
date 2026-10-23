@@ -269,6 +269,20 @@ namespace ms
 			return std::stoi(text);
 		}
 
+		// Whether the code is a real date, as the server requires before
+		// it acts on one (`net::cash_shop::birthday_code`).
+		inline bool birthday_date(int32_t code)
+		{
+			int32_t year = code / 10000, month = code / 100 % 100, day = code % 100;
+			bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+			constexpr int32_t DAYS[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+			if (year < 1900 || year > 9999 || month < 1 || month > 12)
+				return false;
+
+			return day >= 1 && day <= DAYS[month - 1] + (month == 2 && leap ? 1 : 0);
+		}
+
 		inline bool affordable(int32_t price, int32_t credit, int32_t points, int32_t prepaid)
 		{
 			return credit >= price || points >= price || prepaid >= price;

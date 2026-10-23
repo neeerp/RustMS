@@ -100,6 +100,9 @@ int main()
 		require(birthday_code("19830113") == 19830113, "a birthday of eight digits");
 		require(birthday_code("1983011") == 0 && birthday_code("198301133") == 0, "only eight");
 		require(birthday_code("1983O113") == 0, "only digits");
+		require(birthday_date(19830113) && birthday_date(20000229) && !birthday_date(19000229), "a real date");
+		require(!birthday_date(19831301) && !birthday_date(19830100) && !birthday_date(19830431), "no month or day past its end");
+		require(!birthday_date(0) && !birthday_date(-19830113), "nothing before 1900");
 
 		std::cout << "Cash catalog passed\n";
 		return 0;

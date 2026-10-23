@@ -57,7 +57,9 @@ namespace ms
 			SHOP_BUY = 0x17,
 			SHOP_TAKE_BACK = 0x1B,
 			SHOP_BAN = 0x1C,
-			SHOP_BLACKLIST = 0x1E
+			SHOP_BLACKLIST = 0x1E,
+			SHOP_BLACKLIST_ADD = 0x1F,
+			SHOP_BLACKLIST_REMOVE = 0x20
 		};
 
 		MiniRoomPacket(Mode mode) : OutPacket(OutPacket::Opcode::PLAYER_INTERACTION)
@@ -249,8 +251,8 @@ namespace ms
 		}
 	};
 
-	// The names my shop turns away. v83 sends its blacklist right before
-	// opening; HC has no blacklist yet and sends none.
+	// The names my shop turns away: the User List's Blacklist, in the
+	// order added, sent right before opening even when empty (0x6fdeda).
 	class ShopBlacklistPacket : public MiniRoomPacket
 	{
 	public:
@@ -263,6 +265,18 @@ namespace ms
 		}
 	};
 
+	// A name added to or deleted from the Blacklist while my personal shop
+	// is open (0x53792e, 0x5379a6).
+	class ShopBlacklistChangePacket : public MiniRoomPacket
+	{
+	public:
+		ShopBlacklistChangePacket(bool add, const std::string &name)
+			: MiniRoomPacket(add ? Mode::SHOP_BLACKLIST_ADD : Mode::SHOP_BLACKLIST_REMOVE)
+		{
+			write_string(name);
+		}
+	};
+
 	// Opens my shop to visitors.
 	class ShopOpenPacket : public MiniRoomPacket
 	{
@@ -270,6 +284,19 @@ namespace ms
 		ShopOpenPacket() : MiniRoomPacket(Mode::OPEN)
 		{
 			write_byte(1);
+		}
+	};
+
+	// Opens my shop, room type 4 or 5, with a cash item listed: the open
+	// with the birthday code in its place (0x6fca94).
+	class ShopOpenBirthdayPacket : public MiniRoomPacket
+	{
+	public:
+		ShopOpenBirthdayPacket(int8_t room_type, int32_t birthday) : MiniRoomPacket(Mode::BIRTHDAY)
+		{
+			write_byte(Mode::OPEN);
+			write_byte(room_type);
+			write_int(birthday);
 		}
 	};
 

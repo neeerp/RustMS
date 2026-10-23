@@ -602,7 +602,7 @@ side yet.
 | Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
 | Alliance (`Character/Alliance`, invitation and login cards, alliance chat) | State, cards, chat and the Alliance tab with its rank panel implemented; see `guilds.md` |
-| Blacklist tab (`UIUserList`) | Tab strip only |
+| Blacklist tab (`UIUserList`) | Implemented: Add and Delete, kept in the `BlackList` setting and sent with a shop's opening; see "Personal shops" in `inventory.md`. Whisper and invitation refusals are not done |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |

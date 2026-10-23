@@ -147,6 +147,11 @@ namespace ms
 
 		void exit();
 
+		// My shop has asked to open: a personal shop is shown open, a
+		// merchant left to it. `sync_blacklist` sends the Blacklist's
+		// changes while a personal shop is open.
+		void opened(bool sync_blacklist);
+
 		// How a hired merchant's window closes (0x51809d): `reason` 1
 		// leaves, 2 also reopens a merchant in maintenance, 8 closes it.
 		void close_merchant(int8_t reason);

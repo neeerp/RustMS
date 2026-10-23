@@ -72,6 +72,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME curse_words COMMAND curse_words_tests)
     add_executable(character_name_tests tests/character_name.cpp)
     add_test(NAME character_name COMMAND character_name_tests)
+    add_executable(blacklist_tests tests/blacklist.cpp)
+    add_test(NAME blacklist COMMAND blacklist_tests)
     add_executable(quest_result_tests tests/quest_result.cpp)
     add_test(NAME quest_result COMMAND quest_result_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
@@ -985,6 +987,7 @@ add_executable(HeavenClient
     IO/UITypes/UITermsOfService.h
     IO/UITypes/UIUserList.cpp
     IO/UITypes/UIUserListAlliance.cpp
+    IO/UITypes/UIUserListBlacklist.cpp
     IO/UITypes/UIUserList.h
     IO/UITypes/UserListLayout.h
     IO/UITypes/UIWorldMap.cpp

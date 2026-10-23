@@ -288,6 +288,7 @@ namespace ms
 		grade_points = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK);
 
 		init_alliance();
+		init_blacklist();
 
 		dimension = Texture(backgrnd).get_dimensions();
 		dragarea = Point<int16_t>(dimension.x(), 20);
@@ -296,6 +297,7 @@ namespace ms
 		rebuild_buddies();
 		rebuild_guild();
 		rebuild_alliance();
+		rebuild_blacklist();
 		change_tab(tab);
 	}
 
@@ -332,6 +334,10 @@ namespace ms
 
 			if (union_shown)
 				draw_union();
+		}
+		else if (tab == Tab::BLACKLIST)
+		{
+			draw_blacklist();
 		}
 
 		UIElement::draw_buttons(alpha);
@@ -680,6 +686,9 @@ namespace ms
 		if (tab == Tab::ALLIANCE)
 			return alliance_cursor(clicked, cursorpos);
 
+		if (tab == Tab::BLACKLIST)
+			return blacklist_cursor(clicked, cursorpos);
+
 		Point<int16_t> cursor_relative = cursorpos - position;
 
 		if (tab == Tab::GUILD && grade_shown && clicked)
@@ -922,6 +931,17 @@ namespace ms
 		for (uint16_t i = Buttons::BT_ALLIANCE_INVITE; i <= Buttons::BT_ALLIANCE_PARTY_INVITE; i++)
 			buttons[i]->set_active(tab == Tab::ALLIANCE);
 
+		buttons[Buttons::BT_BLACK_ADD]->set_active(tab == Tab::BLACKLIST);
+		buttons[Buttons::BT_BLACK_DELETE]->set_active(tab == Tab::BLACKLIST);
+
+		if (tab == Tab::BLACKLIST)
+			rebuild_blacklist();
+		else if (black_tooltip)
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::USERLIST);
+			black_tooltip = false;
+		}
+
 		// Also shows or hides the section buttons.
 		rebuild_guild();
 		rebuild_alliance();
@@ -937,6 +957,9 @@ namespace ms
 	{
 		if (buttonid >= Buttons::BT_ALLIANCE_INVITE && buttonid < Buttons::BT_TAB0)
 			return alliance_button(buttonid);
+
+		if (buttonid == Buttons::BT_BLACK_ADD || buttonid == Buttons::BT_BLACK_DELETE)
+			return blacklist_button(buttonid);
 
 		const PartyMember* member = selected_member();
 		const Buddy* buddy = selected_buddy();
@@ -1612,6 +1635,7 @@ namespace ms
 		enable(Buttons::BT_GRADE_SAVE, master);
 
 		update_alliance_buttons(leader);
+		update_blacklist_buttons();
 	}
 
 	const PartyMember* UIUserList::selected_member() const

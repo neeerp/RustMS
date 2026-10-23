@@ -12,10 +12,13 @@
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 #include "../../Audio/Audio.h"
+#include "../../Configuration.h"
 
+#include "../../Character/Blacklist.h"
 #include "../../Character/ExclRequest.h"
 #include "../../Character/Inventory/ItemProperties.h"
 #include "../../Constants.h"
+#include "../../Data/CashCatalog.h"
 #include "../../Data/CurseData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -650,6 +653,10 @@ namespace ms
 
 	void UIPersonalShop::close()
 	{
+		// Until the owner's window goes (0x6fa2db).
+		if (is_owner() && !merchant)
+			Blacklist::live = false;
+
 		clear_tooltip();
 		UI::get().cancel_drag();
 
@@ -838,21 +845,42 @@ namespace ms
 				// Opening an empty shop does nothing (FUN_006fcc19).
 				if (!listings.empty() && !open)
 				{
-					ShopBlacklistPacket({}).dispatch();
-					ShopOpenPacket().dispatch();
+					ShopBlacklistPacket(Blacklist::parse(Setting<BlackList>::get().load())).dispatch();
 
-					// The owner leaves a merchant to it (0x51876c).
-					if (merchant)
+					// A cash item listed asks for the birthday first, and
+					// the open goes with it; cancelling sends nothing more
+					// (0x6fca94).
+					bool cash = std::any_of(listings.begin(), listings.end(), [](const mini_room::Listing &listing)
 					{
-						close_merchant(1);
+						return listing.bundles != 0 && ItemData::get(listing.item.itemid).is_cashitem();
+					});
+
+					if (cash)
+					{
+						int8_t room_type = merchant ? mini_room::HIRED_MERCHANT : mini_room::PERSONAL_SHOP;
+
+						UI::get().emplace<UIEnterText>(hired_merchant::BIRTHDAY_PROMPT, [room_type](const std::string &text)
+						{
+							int32_t code = cash_catalog::birthday_code(text);
+
+							ShopOpenBirthdayPacket(room_type, code).dispatch();
+
+							// v83 leaves the window as it was; here it opens as
+							// the server does, which ignores a date that isn't
+							// one. The Blacklist's changes stay local, as v83
+							// never sets its flag on this path.
+							if (auto shop = UI::get().get_element<UIPersonalShop>(); shop && shop->is_active() &&
+								cash_catalog::birthday_date(code))
+								shop->opened(false);
+						}, cash_catalog::BIRTHDAY_LIMIT);
 
 						return Button::State::NORMAL;
 					}
 
-					open = true;
-					buttons[Buttons::START]->set_state(Button::State::DISABLED);
+					ShopOpenPacket().dispatch();
+					opened(true);
 
-					return Button::State::DISABLED;
+					return merchant ? Button::State::NORMAL : Button::State::DISABLED;
 				}
 
 				break;
@@ -1167,6 +1195,22 @@ namespace ms
 	void UIPersonalShop::clear_tooltip()
 	{
 		UI::get().clear_tooltip(Tooltip::Parent::PERSONALSHOP);
+	}
+
+	void UIPersonalShop::opened(bool sync_blacklist)
+	{
+		// The owner leaves a merchant to it (0x51876c).
+		if (merchant)
+		{
+			close_merchant(1);
+
+			return;
+		}
+
+		open = true;
+		buttons[Buttons::START]->set_state(Button::State::DISABLED);
+		// The Blacklist's changes go to the server from now on (0x6fcbe9).
+		Blacklist::live = sync_blacklist;
 	}
 
 	void UIPersonalShop::exit()
