@@ -60,6 +60,14 @@ is spent after the one item. Mob.nx's `revive` chain does the rest: the
 sphere dies into the Papulatus Clock (8500001), and the clock into Papulatus
 (8500002, `mobs::PAPULATUS_LAST`).
 
+Hurt below 95%, the Clock may call up Darkstars (skill 200, `limit` 5000):
+four High Darkstars (8500003, level 39) somewhere 150 to 500 px above it,
+or four Low ones (8500004, level 40) up to 150 px above, each within
+500 px either side and dropped onto the ground below, so the High ones
+mostly land on the clock's ledges. Both are bombs that blow up when
+touched ([combat](./combat.md)). It also heals itself, and dispels,
+slows and stuns its controller.
+
 Papulatus's death on 220080001 is `boss_falls` in the field
 (`runtime/src/actor/field.rs`, shared with Zakum's `zakum_falls`): the
 map sees the party quests' clear effect and hears their jingle, and in the
@@ -83,4 +91,5 @@ party may go in while the winners loot.
 sees the gates shut, turns the next party away while any member of the
 first is inside, and sees them open once the last leaves.
 `tests/papulatus_boss.rs` drops the piece, sees the line, music and sphere,
-beats the three bodies, and sees the clear and the gates open.
+has the Clock call up its Darkstars and checks where they land, beats the
+three bodies, and sees the clear and the gates open.

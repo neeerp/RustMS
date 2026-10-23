@@ -1543,7 +1543,11 @@ controller's client plays the cast and the server applies it
   mobs in its area `x` HP and `y` MP, up to their maxima, shown to everyone as a blue
   number (DAMAGE_MONSTER with a negative amount). Summon (200) spawns its
   listed mobs at the caster under the caster's controller, up to `limit`
-  alive, with SPAWN_MONSTER's appearance set to `summonEffect`; clients
+  alive, with SPAWN_MONSTER's appearance set to `summonEffect`. A level
+  with an `lt`/`rb` area (11 of 176: the Papulatus Clock's Darkstars,
+  Pianus's Bloody Booms, a few event mobs) puts each at a random point in
+  it, on the ground below; with no ground there, at the caster (the
+  field's `summon_spot`). Clients
   play `Effect.nx` `Summon.img/<summonEffect>` on them. Summoned mobs don't
   respawn. A mob summons nothing on a field already holding 80 mobs
   (Cosmic's cap).

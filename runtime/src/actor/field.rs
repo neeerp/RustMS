@@ -60,6 +60,7 @@ use net::skills::{self, Inflict, Takes};
 use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
+use rand::Rng;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
@@ -2326,9 +2327,15 @@ impl FieldActor {
                     .iter()
                     .filter_map(|&mob_id| net::mobs::info(mob_id))
                     .collect();
-                let spawned = self
-                    .mobs
-                    .summon(cast.object_id, &summoned, effect.limit, now);
+                let (area, drops) = (self.mobs.area(cast), &self.drops);
+                let mut rng = rand::thread_rng();
+                let spawned = self.mobs.summon(
+                    cast.object_id,
+                    &summoned,
+                    effect.limit,
+                    || summon_spot(drops, area.as_ref()?, &mut rng),
+                    now,
+                );
                 let summon_effect = u8::try_from(effect.summon_effect).ok();
                 for object_id in spawned {
                     let Some(mob) = self.mobs.get(object_id) else {
@@ -3356,7 +3363,18 @@ fn player_spawn(avatar: &FieldAvatar) -> Result<Vec<Packet>, net::error::Network
     Ok(packets)
 }
 
-/// Whether `viewer` sees `avatar`: a hidden GM shows only to GMs.
+/// Where a summon whose skill covers `area` comes out: a random place in
+/// it, on the ground below, with that ground's foothold; None if there is
+/// no ground below. (The Papulatus Clock's Darkstars and Pianus's Bloody
+/// Booms are the summons with an area.)
+fn summon_spot(drops: &DropSet, area: &CastArea, rng: &mut impl Rng) -> Option<((i16, i16), i16)> {
+    let x = rng.gen_range(area.left, area.right.max(area.left) + 1);
+    let y = rng.gen_range(area.top, area.bottom.max(area.top) + 1);
+    let (x, y) = (i16::try_from(x).ok()?, i16::try_from(y).ok()?);
+    let (ground, foothold) = drops.foothold_below(x, y)?;
+    Some(((x, ground), foothold))
+}
+
 /// Show `drop` to one player: a quest drop goes through their client actor,
 /// which shows it only if they still need it.
 fn show_drop_to(handle: &ClientHandle, drop: &Drop, packet: Packet) {
@@ -3374,6 +3392,7 @@ fn show_drop_to(handle: &ClientHandle, drop: &Drop, packet: Packet) {
     }
 }
 
+/// Whether `viewer` sees `avatar`: a hidden GM shows only to GMs.
 fn sees(viewer: &FieldAvatar, avatar: &FieldAvatar) -> bool {
     !avatar.hidden || viewer.gm
 }
@@ -3400,6 +3419,53 @@ mod tests {
     use std::collections::BTreeMap;
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
+
+    #[test]
+    fn summons_land_somewhere_in_their_skills_area() {
+        use game_data::footholds::{Foothold, Footholds};
+        let floor = |id, x1, x2, y| Foothold {
+            id,
+            x1,
+            y1: y,
+            x2,
+            y2: y,
+        };
+        // Two of the Origin of Clocktower's ledges and its floor; the High
+        // Darkstars' area over a clock at (0, -386), short of the floor's
+        // end at 262.
+        let drops = DropSet::new(Footholds::new(vec![
+            floor(16, -129, -74, -538),
+            floor(4, -634, -605, -584),
+            floor(21, -928, 262, -386),
+        ]));
+        let area = CastArea {
+            left: -500,
+            top: -886,
+            right: 250,
+            bottom: -536,
+        };
+        let mut rng = rand::thread_rng();
+        let mut ledges = 0;
+        for _ in 0..500 {
+            let ((x, y), fh) = summon_spot(&drops, &area, &mut rng).unwrap();
+            assert!((-500..=250).contains(&x), "{x}");
+            match fh {
+                16 => assert!((-129..=-74).contains(&x) && y == -538),
+                4 => assert!((-634..=-605).contains(&x) && y == -584),
+                _ => assert_eq!((fh, y), (21, -386)),
+            }
+            ledges += usize::from(fh == 16);
+        }
+        assert!(ledges > 0);
+        // No ground below: back to the caster.
+        let past = CastArea {
+            left: 300,
+            top: -500,
+            right: 400,
+            bottom: -400,
+        };
+        assert_eq!(summon_spot(&drops, &past, &mut rng), None);
+    }
 
     fn avatar(id: i32, x: i16, y: i16) -> FieldAvatar {
         FieldAvatar {

@@ -41,6 +41,10 @@ pub const TIME_SPHERE: i32 = 8500000;
 /// Papulatus himself: his death on the Origin of Clocktower wins the
 /// fight.
 pub const PAPULATUS_LAST: i32 = 8500002;
+/// The Darkstars the Papulatus Clock calls up (skill 200 levels 39 and
+/// 40), bombs that blow up when touched.
+pub const HIGH_DARKSTAR: i32 = 8500003;
+pub const LOW_DARKSTAR: i32 = 8500004;
 
 /// The mobs that keep `mob_id` from harm while any of them is out: Zakum's
 /// arms its body (Cosmic `MapleMap.damageMonster`). Until then it has no
@@ -58,5 +62,18 @@ mod tests {
         assert_eq!(shielded_by(ZAKUM_BODY), Some(8800003..=8800010));
         assert_eq!(shielded_by(8800001), None);
         assert_eq!(shielded_by(8800003), None);
+    }
+
+    #[test]
+    fn the_clock_calls_up_the_darkstars() {
+        let Ok(_) = data() else { return };
+        let high = skill_level(200, 39).unwrap();
+        let low = skill_level(200, 40).unwrap();
+        // Four at a time each, the High ones 150 to 500 px above the
+        // clock, the Low ones up to 150 px.
+        assert_eq!(high.summons, [HIGH_DARKSTAR; 4]);
+        assert_eq!((high.lt, high.rb), ((-500, -500), (500, -150)));
+        assert_eq!(low.summons, [LOW_DARKSTAR; 4]);
+        assert_eq!((low.lt, low.rb), ((-500, -150), (500, 0)));
     }
 }
