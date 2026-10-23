@@ -228,7 +228,15 @@ namespace ms
 
 	void UI::send_cursor(Point<int16_t> pos)
 	{
-		send_cursor(pos, cursor.get_state());
+		Cursor::State state = cursor.get_state();
+
+		// The states read as a held button mean one only while it is down: hovering a scroll bar or the chat's
+		// edge shows the same shape, and a release outside the window or a lost focus leaves it behind.
+		if (!cursor.is_pressed() && (state == Cursor::State::CLICKING || state == Cursor::State::VSCROLLIDLE
+									 || state == Cursor::State::HSCROLLIDLE))
+			state = Cursor::State::IDLE;
+
+		send_cursor(pos, state);
 	}
 
 	bool UI::is_cursor_pressed() const
