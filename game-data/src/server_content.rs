@@ -759,6 +759,14 @@ pub mod keys {
     pub const PET_SECRET: [&str; 2] = ["pet_trainer.secret.0", "pet_trainer.secret.1"];
     pub const PET_SECRET_NO_SNACK: &str = "pet_trainer.secret.no_snack";
 
+    /// Garnox's Rock of Evolution scripts (quests 8185, 4659 and 8189).
+    pub const PET_EVOLUTION_ASK: &str = "pet_evolution.ask";
+    pub const PET_EVOLUTION_DECLINE: &str = "pet_evolution.decline";
+    pub const PET_EVOLUTION_DONE: &str = "pet_evolution.done";
+    pub const PET_EVOLUTION_NO_MESOS: &str = "pet_evolution.no_mesos";
+    pub const PET_EVOLUTION_NO_PET: &str = "pet_evolution.no_pet";
+    pub const PET_EVOLUTION_REFUSED: &str = "pet_evolution.refused";
+
     /// A Gachapon machine (report c058): the question to a player with a
     /// ticket, the prize, the menu of explanations without one, and the
     /// refusals.
@@ -2174,6 +2182,12 @@ mod tests {
             keys::PET_NOTE_HELD,
             keys::PET_NOTE_NOTHING,
             keys::PET_SECRET_NO_SNACK,
+            keys::PET_EVOLUTION_ASK,
+            keys::PET_EVOLUTION_DECLINE,
+            keys::PET_EVOLUTION_DONE,
+            keys::PET_EVOLUTION_NO_MESOS,
+            keys::PET_EVOLUTION_NO_PET,
+            keys::PET_EVOLUTION_REFUSED,
             keys::GACHAPON_ASK,
             keys::GACHAPON_WON,
             keys::GACHAPON_FULL,

@@ -32,6 +32,8 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "fieldEnter",
     "start",
     "pet",
+    "pettamenessmin",
+    "pettamenessmax",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -48,11 +50,14 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "endmeso",
     "level",
     "pet",
+    "pettamenessmin",
+    "pettamenessmax",
 ];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q4647e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
+    "q1021s", "q1021e", "q4647e", "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
+    "q8185e", "q8189e",
 ];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
@@ -145,6 +150,9 @@ pub struct StartRequirements {
     /// Pet items of which the first pet out must be one (`pet`); empty means
     /// no pet is needed.
     pub pets: Vec<i32>,
+    /// The closeness the first pet out must have, from `pettamenessmin` to
+    /// `pettamenessmax` (30000 when only the least is given).
+    pub pet_closeness: Option<(i32, i32)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -166,6 +174,8 @@ pub struct QuestTemplate {
     pub end_min_level: Option<i16>,
     /// Pet items of which the first pet out must be one to complete (`pet`).
     pub end_pets: Vec<i32>,
+    /// The closeness the first pet out must have to complete.
+    pub end_pet_closeness: Option<(i32, i32)>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -450,6 +460,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.not_before = nx.int_child(start, "start")?.map(date_hour).transpose()?;
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
+    requirements.pet_closeness = pet_closeness(nx, start)?;
     if let Some(skills) = nx.child_by_name(start, "skill")? {
         for skill in nx.child_indices(skills)? {
             let skill_id = nx
@@ -529,6 +540,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .map(|v| small(v, "level"))
             .transpose()?,
         end_pets: pet_ids(nx, end)?,
+        end_pet_closeness: pet_closeness(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,
@@ -593,8 +605,6 @@ fn int_list(nx: &NxDataFile, check: u32, key: &str) -> Result<Vec<i32>, GameData
 }
 
 /// The pet items listed under `pet` of a `Check` node (`pet/<n>/id`).
-/// v83's client also reads `pettamenessmin`/`pettamenessmax`, which no
-/// supported quest has, so any closeness passes.
 fn pet_ids(nx: &NxDataFile, check: u32) -> Result<Vec<i32>, GameDataError> {
     let Some(pets) = nx.child_by_name(check, "pet")? else {
         return Ok(Vec::new());
@@ -607,6 +617,19 @@ fn pet_ids(nx: &NxDataFile, check: u32) -> Result<Vec<i32>, GameDataError> {
         );
     }
     Ok(result)
+}
+
+/// The closeness range of a `Check` node (`pettamenessmin`,
+/// `pettamenessmax`), if it has one. v83 (FUN_00721163, FUN_00721d2c)
+/// tests the first pet out's closeness against it, with 30000 for a
+/// missing most.
+fn pet_closeness(nx: &NxDataFile, check: u32) -> Result<Option<(i32, i32)>, GameDataError> {
+    let min = nx.int_child(check, "pettamenessmin")?;
+    let max = nx.int_child(check, "pettamenessmax")?;
+    if min.is_none() && max.is_none() {
+        return Ok(None);
+    }
+    Ok(Some((min.unwrap_or(0), max.unwrap_or(30_000))))
 }
 
 /// The `quest` requirements of a `Check` node: other quests' states.
@@ -827,7 +850,7 @@ mod tests {
         let pet = keys(&["npc", "pet"], &["npc", "pet"], &[], &[]);
         assert_eq!(classify(&pet), Ok(()));
         let tame = keys(&["npc", "pet", "pettamenessmin"], &["npc"], &[], &[]);
-        assert_eq!(classify(&tame), Err("Check/0/pettamenessmin".into()));
+        assert_eq!(classify(&tame), Ok(()));
         let money = keys(&["npc"], &["npc"], &[], &["money"]);
         assert_eq!(classify(&money), Ok(()));
         let start_money = keys(&["npc"], &["npc"], &["money", "exp"], &[]);
@@ -902,6 +925,11 @@ mod tests {
         assert_eq!(test.start.pets.len(), 45);
         assert!(test.start.pets.contains(&5000000));
         assert_eq!(test.end_pets, test.start.pets);
+        assert_eq!(test.start.pet_closeness, None);
+        // Garnox's first evolution quest wants a Baby Dragon at 1642.
+        let evolution = catalog.quest(8184).unwrap();
+        assert_eq!(evolution.start.pets, [5000029]);
+        assert_eq!(evolution.start.pet_closeness, Some((1642, 30_000)));
         assert_eq!(
             catalog.quest(4647).unwrap().end_script.as_deref(),
             Some("q4647e")

@@ -47,9 +47,31 @@ beside it.
   slot, with the same serial, level, closeness and expiry, re-sent as a
   remove and an add. A pet still called by its egg's kind ("Dragon", "Robo")
   takes the baby's name. Nothing comes out; the stat change unlocks the
-  client. The evolutions of the babies themselves need the Rock of
-  Evolution (5380000) and pet level 15 (`pet_evolve_item`,
-  `pet_evolve_level`), which nothing uses yet.
+  client.
+- **Rock of Evolution.** The babies evolve further with the Rock of
+  Evolution (5380000, sold in the Cash Shop), through Garnox (9102001, in
+  New Leaf City and Singapore). Three repeatable
+  quests (`interval 0`) do it, each with an end script (`net::npc_scripts`,
+  `pet_evolution`): "Baby Dragon's Evolution" (8185, a Baby Dragon), "Dragon's
+  Re-evolution" (8189, any of the evolved dragons, which turn into a
+  different one) and "Robo's Upgrade" (4659, a Baby Robo, which also takes 50
+  Cheap Batteries 4000111). The quests' `pet` lists and `pettamenessmin`
+  (1642) do the checking on both sides (see [Quests](./quests.md)), on the
+  first pet out only. The script asks (and if, by the answer, the pet no
+  longer leads or the rock or fee are gone, says so and changes nothing), then takes the rock and 10,000 mesos
+  (Cosmic's fee; no v83 source gives one), evolves the pet
+  (`Effect::EvolvePet`, `net::packet::handle::world::evolve_pet`) and
+  completes the quest. The new kind is rolled by the baby's `evol*` weights
+  (`rock_evolutions`, `roll_evolution`): the Baby Dragon's four dragons
+  33/33/33/1, the Baby Robo's five robos 330/330/330/9/1; a re-evolution
+  rolls among the rest of its family. The pet keeps its serial, level,
+  closeness and slot; its expiry restarts at the new kind's `info/life` (90
+  days), and a pet still called by its old kind takes the new kind's name.
+  The item is re-sent as a remove and an add, and a pet out is re-announced
+  as a 168 going away and coming back at its index. Pet level 15
+  (`evolReqPetLvl`, `pet_evolve_level`) is the level 1642 closeness reaches,
+  so the closeness check covers it. Without a pet out, or short of the fee,
+  Garnox only says so.
 - **Packets.** 168 is `cid, index, 1, replace, body` to show a pet and
   `cid, index, 0, reason` to take it away. The body is `item id, name,
   serial, x, y, stance, foothold, name tag, balloon`; SPAWN_PLAYER repeats it
@@ -318,6 +340,10 @@ beside it.
   watcher, and that the watcher sees the new name after the relog.
 - `integration-harness/tests/pet_eggs.rs` hatches a Dragon Egg and a named
   Robo Egg, summons both babies, and checks they stay babies after a relog.
+- `integration-harness/tests/pet_evolution.rs` has Garnox refuse a Baby
+  Dragon one point short of 1642 closeness, then evolve it into a dragon for
+  the rock and the fee, re-announce it, complete 8185, and keep it a dragon
+  after a relog.
 - `integration-harness/tests/pet_auto_potion.rs` sets a Red Potion beside a
   worn HP pouch, has the pet give one, checks that a pet not out is refused
   with an empty stat change, and that the potion is kept and cleared across

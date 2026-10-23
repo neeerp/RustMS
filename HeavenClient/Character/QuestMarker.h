@@ -87,18 +87,34 @@ namespace ms
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
 	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET };
 
-	// Whether the first pet out, `first_pet` (0 for none), meets a quest's
-	// pet requirement: v83 looks at no other pet (FUN_00721163,
-	// FUN_00721d2c).
-	inline QuestStop pet_stop(const std::vector<int32_t>& pets, int32_t first_pet)
+	// The first pet out: its item (0 for none) and its closeness.
+	struct FirstPet
+	{
+		int32_t item;
+		int32_t closeness;
+
+		FirstPet(int32_t item = 0, int32_t closeness = 0) : item(item), closeness(closeness) {}
+	};
+
+	// Whether the first pet out meets a quest's pet requirement, the pet
+	// items `pets` and the `closeness` range: v83 looks at no other pet, and
+	// at the closeness only with a pet list, where a pet outside the range
+	// is the wrong pet (FUN_00721163, FUN_00721d2c).
+	inline QuestStop pet_stop(const std::vector<int32_t>& pets, std::pair<int32_t, int32_t> closeness,
+		FirstPet first_pet)
 	{
 		if (pets.empty())
 			return QuestStop::NONE;
 
-		if (first_pet == 0)
+		if (first_pet.item == 0)
 			return QuestStop::NO_PET;
 
-		return std::find(pets.begin(), pets.end(), first_pet) == pets.end() ? QuestStop::WRONG_PET : QuestStop::NONE;
+		if (std::find(pets.begin(), pets.end(), first_pet.item) == pets.end())
+			return QuestStop::WRONG_PET;
+
+		bool close = first_pet.closeness >= closeness.first && first_pet.closeness <= closeness.second;
+
+		return close ? QuestStop::NONE : QuestStop::WRONG_PET;
 	}
 
 	inline const char* stop_reason(QuestStop stop)
@@ -115,11 +131,11 @@ namespace ms
 	}
 
 	// `progress` is the quest's progress string (its kill counts),
-	// `first_pet` the item of the first pet out, and `info_record` the data
+	// `first_pet` the first pet out, and `info_record` the data
 	// string of the quest's infoNumber quest (see end_info_met).
 	template<class Status, class Count>
 	QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id, Status status, Count count,
-		const std::string& progress, int64_t meso, int32_t first_pet = 0,
+		const std::string& progress, int64_t meso, FirstPet first_pet = {},
 		const std::string* info_record = nullptr)
 	{
 		if (quest.end_npc != npc_id)
@@ -141,21 +157,21 @@ namespace ms
 		if (meso < quest.end_meso)
 			return QuestStop::MESO;
 
-		return pet_stop(quest.end_pets, first_pet);
+		return pet_stop(quest.end_pets, quest.end_pet_closeness, first_pet);
 	}
 
 	// Whether the player's fame, items, skills, worn items and map meet a
 	// quest's start requirements, as v83 checks them (FUN_00721163), with
-	// `first_pet` the item of the first pet out (0 for none). `held`
+	// `first_pet` the first pet out. `held`
 	// gives how many of an item the player holds, plus one if a copy is worn,
 	// and `worn` whether a copy is worn. `has_skill` is v83's loose test: any
 	// skill not hidden from the skill book counts, and a hidden one once it
 	// has a record (FUN_007619b0).
 	template<class Held, class HasSkill, class Worn>
 	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,
-		int32_t mapid, int32_t first_pet = 0)
+		int32_t mapid, FirstPet first_pet = {})
 	{
-		if (pet_stop(quest.pets, first_pet) != QuestStop::NONE)
+		if (pet_stop(quest.pets, quest.pet_closeness, first_pet) != QuestStop::NONE)
 			return false;
 
 		if (!std::all_of(quest.worn_all.begin(), quest.worn_all.end(), worn))

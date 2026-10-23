@@ -2257,9 +2257,9 @@ namespace ms
 			Stage::get().get_mapid(), first_pet());
 	}
 
-	int32_t Player::first_pet() const
+	FirstPet Player::first_pet() const
 	{
-		return pets[0].get_itemid();
+		return { pets[0].get_itemid(), get_pet_closeness()[0] };
 	}
 
 	TeleportRock &Player::get_teleport_rock()

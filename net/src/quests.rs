@@ -156,7 +156,7 @@ pub fn check_start(
     if start.not_before.is_some_and(|at| SystemTime::now() < at) {
         return Err(QuestRejection::Date);
     }
-    if !pet_met(&start.pets, player) {
+    if !pet_met(&start.pets, start.pet_closeness, player) {
         return Err(QuestRejection::Pet);
     }
     // v83's client doesn't check; it has the server's refusal text.
@@ -166,13 +166,23 @@ pub fn check_start(
     Ok(())
 }
 
-/// Whether `player` meets a `pet` requirement listing `pets`: v83's checks
-/// (FUN_00721163, FUN_00721d2c) look only at the first pet out.
-fn pet_met(pets: &[i32], player: &Player) -> bool {
-    pets.is_empty()
-        || player
-            .summoned_pet(0)
-            .is_some_and(|item| pets.contains(&item.item_id))
+/// Whether `player` meets a `pet` requirement listing `pets`, with its
+/// `closeness` range (0 to 30000 when unset): v83's checks (FUN_00721163,
+/// FUN_00721d2c) look only at the first pet out, and at its closeness only
+/// when the quest lists pets.
+fn pet_met(pets: &[i32], closeness: Option<(i32, i32)>, player: &Player) -> bool {
+    if pets.is_empty() {
+        return true;
+    }
+    let Some(first) = player.summoned_pet(0) else {
+        return false;
+    };
+    let (min, max) = closeness.unwrap_or((0, 30_000));
+    let close = first
+        .pet
+        .as_ref()
+        .is_some_and(|pet| (min..=max).contains(&i32::from(pet.closeness)));
+    pets.contains(&first.item_id) && close
 }
 
 /// How many of `item_id` v83's start check sees `player` hold: those in the
@@ -234,7 +244,7 @@ pub fn check_complete(
     {
         return Err(QuestRejection::Level);
     }
-    if !pet_met(&quest.end_pets, player) {
+    if !pet_met(&quest.end_pets, quest.end_pet_closeness, player) {
         return Err(QuestRejection::Pet);
     }
     // At least the count, as v83's own check (cond 1) has it.
@@ -436,6 +446,7 @@ mod tests {
             end_meso: 0,
             end_min_level: None,
             end_pets: vec![],
+            end_pet_closeness: None,
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -587,6 +598,40 @@ mod tests {
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
         p.pets.clear();
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
+    }
+
+    #[test]
+    fn a_closeness_requirement_looks_at_the_first_pet_out() {
+        let mut q = quest();
+        q.start.max_level = None;
+        q.start.quests.clear();
+        q.start.pets = vec![5000029];
+        q.start.pet_closeness = Some((1642, 30_000));
+        q.end_pets = vec![5000029];
+        q.end_pet_closeness = Some((1642, 30_000));
+        let mut p = player(30, 0);
+        let mut baby = game::Item::stack(5000029, 1);
+        baby.cash_serial = Some(7);
+        baby.pet = Some(game::PetData::new("Baby Dragon"));
+        baby.pet.as_mut().unwrap().closeness = 1641;
+        p.inventory.insert(game::InventoryType::Cash, 1, baby);
+        p.pets = vec![7];
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Pet));
+        let mut closer = p
+            .inventory
+            .get(game::InventoryType::Cash, 1)
+            .unwrap()
+            .clone();
+        closer.pet.as_mut().unwrap().closeness = 1642;
+        p.inventory.insert(game::InventoryType::Cash, 1, closer);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        p.pets.clear();
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
+        // Without a pet list, v83 doesn't read the range.
+        q.end_pets.clear();
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]

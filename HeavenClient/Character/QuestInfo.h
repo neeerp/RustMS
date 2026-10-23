@@ -35,6 +35,11 @@ namespace ms
 		// Check/1/pet); empty means no pet is needed.
 		std::vector<int32_t> pets;
 		std::vector<int32_t> end_pets;
+		// The closeness range that pet must have (pettamenessmin and
+		// pettamenessmax, 0 and 30000 when unset), read only with a `pet`
+		// list.
+		std::pair<int32_t, int32_t> pet_closeness{ 0, 30000 };
+		std::pair<int32_t, int32_t> end_pet_closeness{ 0, 30000 };
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
 		// Not offered before this FILETIME (Check/0/start, quest_date); 0

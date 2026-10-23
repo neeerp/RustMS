@@ -340,6 +340,14 @@ pub enum Effect {
         serial: i64,
         days: i32,
     },
+    /// Evolve the pet with cash serial `serial` into `into`, which lives
+    /// `days` from now; one out is shown anew. Nothing is applied if the
+    /// player no longer has it.
+    EvolvePet {
+        serial: i64,
+        into: i32,
+        days: i32,
+    },
     /// Nothing is applied if the player no longer has that much.
     SpendMeso(i32),
     GainExp(i32),

@@ -338,6 +338,17 @@ pub async fn set_pet_fullness(serial: i64, fullness: i16) -> Result<(), HarnessE
     .await
 }
 
+/// Set the closeness of the pet `serial`, whose owner is logged out.
+pub async fn set_pet_closeness(serial: i64, closeness: i16) -> Result<(), HarnessError> {
+    change_one_row("set pet closeness", move |conn| {
+        diesel::sql_query("UPDATE pets SET closeness = $2 WHERE serial = $1")
+            .bind::<BigInt, _>(serial)
+            .bind::<SmallInt, _>(closeness)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Date the pet `serial`, whose owner is logged out, to dry up `seconds`
 /// from now; in the past if negative.
 pub async fn date_pet(serial: i64, seconds: i32) -> Result<(), HarnessError> {
