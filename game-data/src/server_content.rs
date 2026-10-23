@@ -1344,6 +1344,36 @@ pub mod keys {
     pub const LINE3_EXIT_SAY: &str = "line3.exit.say";
     pub const LINE3_EXIT_ASK: &str = "line3.exit.ask";
     pub const LINE3_EXIT_STAY: &str = "line3.exit.stay";
+    pub const MAKER_PICK: &str = "maker.pick";
+    pub const MAKER_ASK: &str = "maker.ask";
+    pub const MAKER_MESO: &str = "maker.meso";
+    pub const MAKER_SHORT: &str = "maker.short";
+    pub const MAKER_FULL: &str = "maker.full";
+    pub const MAKER_DONE: &str = "maker.done";
+    pub const MAKER_SERRYL_HELLO: &str = "maker.serryl.hello";
+    pub const MAKER_SERRYL_KNUCKLERS: &str = "maker.serryl.knucklers";
+    pub const MAKER_SERRYL_GUNS: &str = "maker.serryl.guns";
+    pub const MAKER_SERRYL_GLOVES: &str = "maker.serryl.gloves";
+    pub const MAKER_NEVE_HELLO: &str = "maker.neve.hello";
+    pub const MAKER_NEVE_WARRIOR: &str = "maker.neve.warrior";
+    pub const MAKER_NEVE_BOWMAN: &str = "maker.neve.bowman";
+    pub const MAKER_NEVE_MAGICIAN: &str = "maker.neve.magician";
+    pub const MAKER_NEVE_THIEF: &str = "maker.neve.thief";
+    pub const MAKER_MOS_HELLO: &str = "maker.mos.hello";
+    pub const MAKER_MOS_WHAT: &str = "maker.mos.what";
+    pub const MAKER_MOS_STIMULATOR: &str = "maker.mos.stimulator";
+    pub const MAKER_MOS_WARRIOR: &str = "maker.mos.warrior";
+    pub const MAKER_MOS_BOWMAN: &str = "maker.mos.bowman";
+    pub const MAKER_MOS_MAGICIAN: &str = "maker.mos.magician";
+    pub const MAKER_MOS_THIEF: &str = "maker.mos.thief";
+    pub const MAKER_MOS_PIRATE: &str = "maker.mos.pirate";
+    pub const MAKER_MOS_WARRIOR_STIMULATED: &str = "maker.mos.warrior_stimulated";
+    pub const MAKER_MOS_BOWMAN_STIMULATED: &str = "maker.mos.bowman_stimulated";
+    pub const MAKER_MOS_MAGICIAN_STIMULATED: &str = "maker.mos.magician_stimulated";
+    pub const MAKER_MOS_THIEF_STIMULATED: &str = "maker.mos.thief_stimulated";
+    pub const MAKER_MOS_PIRATE_STIMULATED: &str = "maker.mos.pirate_stimulated";
+    pub const MAKER_MOS_DAGGER: &str = "maker.mos.dagger";
+    pub const MAKER_MOS_LOST: &str = "maker.mos.lost";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2215,6 +2245,36 @@ mod tests {
                 keys::LINE3_EXIT_SAY,
                 keys::LINE3_EXIT_ASK,
                 keys::LINE3_EXIT_STAY,
+                keys::MAKER_PICK,
+                keys::MAKER_ASK,
+                keys::MAKER_MESO,
+                keys::MAKER_SHORT,
+                keys::MAKER_FULL,
+                keys::MAKER_DONE,
+                keys::MAKER_SERRYL_HELLO,
+                keys::MAKER_SERRYL_KNUCKLERS,
+                keys::MAKER_SERRYL_GUNS,
+                keys::MAKER_SERRYL_GLOVES,
+                keys::MAKER_NEVE_HELLO,
+                keys::MAKER_NEVE_WARRIOR,
+                keys::MAKER_NEVE_BOWMAN,
+                keys::MAKER_NEVE_MAGICIAN,
+                keys::MAKER_NEVE_THIEF,
+                keys::MAKER_MOS_HELLO,
+                keys::MAKER_MOS_WHAT,
+                keys::MAKER_MOS_STIMULATOR,
+                keys::MAKER_MOS_WARRIOR,
+                keys::MAKER_MOS_BOWMAN,
+                keys::MAKER_MOS_MAGICIAN,
+                keys::MAKER_MOS_THIEF,
+                keys::MAKER_MOS_PIRATE,
+                keys::MAKER_MOS_WARRIOR_STIMULATED,
+                keys::MAKER_MOS_BOWMAN_STIMULATED,
+                keys::MAKER_MOS_MAGICIAN_STIMULATED,
+                keys::MAKER_MOS_THIEF_STIMULATED,
+                keys::MAKER_MOS_PIRATE_STIMULATED,
+                keys::MAKER_MOS_DAGGER,
+                keys::MAKER_MOS_LOST,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");

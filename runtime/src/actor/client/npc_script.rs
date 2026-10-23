@@ -200,6 +200,30 @@ impl ClientActor {
                         i32::from(*quantity),
                     )?);
                 }
+                Effect::GiveVariedItem(item_id) => {
+                    if net::items::refuses_only(&next.inventory, *item_id, 1) {
+                        warn!(
+                            item_id,
+                            "Script item is one of a kind and held; nothing applied"
+                        );
+                        return Ok(Applied::NoRoom);
+                    }
+                    let changes = match net::items::give_dropped(
+                        &mut next.inventory,
+                        *item_id,
+                        1,
+                        &mut rand::thread_rng(),
+                    ) {
+                        Ok(changes) => changes,
+                        Err(error) => {
+                            warn!(item_id, %error, "Script item not given; nothing applied");
+                            return Ok(Applied::NoRoom);
+                        }
+                    };
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    packets.push(inventory::build_item_gain_in_chat(*item_id, 1)?);
+                }
                 Effect::TakeItem { item_id, quantity } => {
                     let Ok(changes) = next.inventory.remove(*item_id, *quantity) else {
                         warn!(item_id, "Script item no longer held; nothing applied");
