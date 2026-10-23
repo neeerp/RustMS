@@ -171,7 +171,11 @@ mod tests {
             read(&[3, 0x7d, 0x83, 0x3d, 0]),
             Some(RingRequest::Break { item_id: 4031357 })
         );
-        assert_eq!(read(&[9, 0, 0]), None);
+        assert_eq!(
+            read(&[9, 0, 0]),
+            Some(RingRequest::Wishlist { wishes: vec![] })
+        );
+        assert_eq!(read(&[4]), None);
     }
 
     #[test]
