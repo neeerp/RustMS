@@ -57,6 +57,15 @@ namespace ms
 		hideminimap = info["hideMinimap"].get_bool();
 		mapmark = std::string(info["mapMark"]);
 		swim = info["swim"].get_bool();
+
+		for (auto area : src["swimArea"])
+			swim_areas.push_back({ area["x1"], area["x2"], area["y1"], area["y2"] });
+
+		for (auto job : src["noSkill"]["class"])
+			no_skills.classes.push_back(job);
+
+		for (auto skill : src["noSkill"]["skill"])
+			no_skills.skills.push_back(skill);
 		town = info["town"].get_bool();
 		personal_shop = info["personalShop"].get_bool();
 		everlast = info["everlast"].get_bool();
@@ -90,6 +99,16 @@ namespace ms
 	bool MapInfo::is_underwater() const
 	{
 		return swim;
+	}
+
+	bool MapInfo::is_swimming(Point<int16_t> position) const
+	{
+		return swim_area::swimming(swim, swim_areas, position.x(), position.y());
+	}
+
+	bool MapInfo::forbids_skill(int32_t skill_id) const
+	{
+		return no_skill::forbids(no_skills, skill_id);
 	}
 
 	bool MapInfo::is_town() const
