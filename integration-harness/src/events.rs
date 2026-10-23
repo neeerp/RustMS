@@ -1,5 +1,5 @@
 //! Helpers for party events (`tests/kpq*.rs`, `tests/hpq*.rs`,
-//! `tests/lpq*.rs`, `tests/opq*.rs`): a party
+//! `tests/lpq*.rs`, `tests/opq*.rs`, `tests/zpq*.rs`): a party
 //! gathered in the event's lobby, NPC talk on the event's maps, and getting
 //! the party in.
 
@@ -10,7 +10,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, HPQ, KPQ, LPQ, OPQ};
+use net::events::{Event, HPQ, KPQ, LPQ, OPQ, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -28,6 +28,8 @@ pub const RED_SIGN: i32 = 2040034;
 pub const ANDERSON: i32 = 2040047;
 pub const WONKY: i32 = 2013000;
 pub const EAK: i32 = 2013001;
+pub const ADOBIS: i32 = 2030008;
+pub const AURA: i32 = 2032002;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -250,6 +252,12 @@ pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
         .await;
     }
     traces
+}
+
+/// The party's leader, first, takes it into the Dead Mine from Adobis, as
+/// `enter_lpq` does; each needs a chief's approval for Zakum.
+pub async fn enter_zpq(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &ZPQ, ADOBIS).await
 }
 
 /// The leader picks the first choice of `npc`'s menu in `event`'s lobby

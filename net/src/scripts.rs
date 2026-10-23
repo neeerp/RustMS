@@ -177,6 +177,9 @@ pub const OPQ_GARDEN_OUT: &str = "party3_gardenin";
 /// The hub's door to the hidden storage (`in06`), open once the event is
 /// won.
 pub const OPQ_STORAGE_IN: &str = "party3_room8";
+/// The Dead Mine's way out, on its hub (`ps01`), which the client actor
+/// answers from the player's ticket.
+pub const ZPQ_OUT: &str = "Zakum03";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.

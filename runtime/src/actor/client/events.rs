@@ -10,7 +10,7 @@ use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::events::{
-    self, on_areas, standing, Balloon, Cloto, EventCommand, EventKind, HeadCount, LeverCheck,
+    self, on_areas, standing, Aura, Balloon, Cloto, EventCommand, EventKind, HeadCount, LeverCheck,
     Standing, Statue,
 };
 use net::handler::FieldRequest;
@@ -64,6 +64,7 @@ impl ClientActor {
             EventKind::Hpq => NpcScript::tory(entry),
             EventKind::Lpq => NpcScript::red_sign(entry),
             EventKind::Opq => NpcScript::wonky(entry),
+            EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
         };
         self.start_script(script).await
     }
@@ -296,6 +297,56 @@ impl ClientActor {
             .map(|to| vec![Effect::PortalSound, Effect::WarpToPortal(map_id, to)]))
     }
 
+    /// Aura to a player in the Dead Mine, as their ticket stands; `None`
+    /// elsewhere.
+    pub(super) fn zpq_aura(&self) -> Result<Option<NpcScript>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        let map_id = player.stats.map_id;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Zpq)
+        else {
+            return Ok(None);
+        };
+        let view = if ticket.won() {
+            Aura::Won {
+                documents: ticket.cleared(events::ZPQ_DOCUMENTS),
+                taken: ticket.prize_taken,
+            }
+        } else {
+            Aura::Playing {
+                leader: ticket.leader(),
+            }
+        };
+        Ok(Some(NpcScript::aura(view, player)))
+    }
+
+    /// What the Dead Mine's way out (Cosmic `Zakum03`) does for the player:
+    /// it stays shut, with a pink line, until the party has won and the
+    /// player has taken their share from Aura. `None` for any other portal.
+    pub(super) fn zpq_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Zpq)
+        else {
+            return Ok(None);
+        };
+        if script != scripts::ZPQ_OUT {
+            return Ok(None);
+        }
+        let pink = |key| vec![Effect::Pink(net::content::text().get(key, &[]))];
+        Ok(Some(if !ticket.won() {
+            pink(keys::ZAKUM_MINE_NOT_WON)
+        } else if !ticket.prize_taken {
+            pink(keys::ZAKUM_MINE_NO_PRIZE)
+        } else {
+            vec![Effect::PortalSound, Effect::Warp(events::ZPQ.exit)]
+        }))
+    }
+
     /// The states of the reactors named `names` on the player's map.
     async fn reactor_states(
         &mut self,
@@ -350,10 +401,15 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
-    /// The player's script did something their event keeps track of.
-    pub(super) async fn tell_event(&self, command: EventCommand) {
-        if let Some(ticket) = &self.event {
-            ticket.command(command).await;
+    /// The player's script did something their event keeps track of. A
+    /// prize taken is the player's own, kept on their ticket.
+    pub(super) async fn tell_event(&mut self, command: EventCommand) {
+        if let Some(ticket) = &mut self.event {
+            if command == EventCommand::PrizeTaken {
+                ticket.prize_taken = true;
+            } else {
+                ticket.command(command).await;
+            }
         }
     }
 
@@ -522,7 +578,8 @@ impl ClientActor {
     /// hear it and its gate opens, and everyone gets the stage's EXP. The
     /// last stage wins the event, and everyone's clock stops. A stage with a
     /// `clear_portal` first takes those on its map there (Cosmic's Eak warps
-    /// the team before the clear effect).
+    /// the team before the clear effect). The Dead Mine's win shows nothing,
+    /// and gives more EXP with the documents (Cosmic's Aura).
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -531,6 +588,12 @@ impl ClientActor {
             return Ok(());
         }
         let event = ticket.kind.event();
+        let zpq = ticket.kind == EventKind::Zpq;
+        let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
+            events::ZPQ_DOCUMENTS_EXP
+        } else {
+            event.stage_exp(stage)
+        };
         let map_id = event.stage_map(stage);
         if let Some(portal) = event.clear_portal(stage) {
             if self.in_game()?.player.stats.map_id == map_id {
@@ -540,14 +603,14 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if next.stats.map_id == map_id {
+        if next.stats.map_id == map_id && !zpq {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             if event.gates {
                 packets.push(build_field_object("gate")?);
             }
         }
-        gain_exp(&mut next, event.stage_exp(stage), &mut packets)?;
+        gain_exp(&mut next, exp, &mut packets)?;
         self.commit_player(next, None, &mut packets).await?;
         // The EXP comes before the clock stops, as in Cosmic's `clearPQ`.
         if stage == event.last_stage() {

@@ -23,7 +23,7 @@ use crate::message::{ClientHandle, DirectoryMessage, ServerMessage};
 use crate::supervisor::spawn_supervised;
 use net::events::{
     draw_combo, draw_question, Balloon, Cloto, Event, EventCommand, EventKind, Puzzles, Stage1,
-    Team,
+    Team, ZPQ_DOCUMENTS,
 };
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
@@ -108,6 +108,9 @@ pub struct EventTicket {
     /// The item buff the member gets on arrival and loses on leaving, if
     /// the team earned one (`Event::blessing`).
     pub blessing: Option<i32>,
+    /// Whether the member took their share of the prize
+    /// (`EventCommand::PrizeTaken`).
+    pub prize_taken: bool,
 }
 
 impl Drop for EventTicket {
@@ -309,6 +312,7 @@ impl EventActor {
                     cleared: self.cleared.clone(),
                     leader: self.leader.clone(),
                     blessing: self.blessing,
+                    prize_taken: false,
                 }));
             }
         }
@@ -474,6 +478,13 @@ impl EventActor {
                 self.move_team(None, map, self.ends);
             }
             EventCommand::MoveTeam(map) => debug!(map, client_id, "Move not taken"),
+            EventCommand::WinWithDocuments if leader && self.kind == EventKind::Zpq && !won => {
+                self.cleared.set(ZPQ_DOCUMENTS);
+                self.win();
+            }
+            EventCommand::WinWithDocuments => debug!(client_id, "Win not taken"),
+            // Kept by the member's own ticket.
+            EventCommand::PrizeTaken => {}
         }
     }
 

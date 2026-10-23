@@ -108,7 +108,7 @@ async fn a_fighter_is_approved_forges_the_eyes_and_passes_the_gate() {
     barrier(c, &m, &mut t).await;
     let t = step(c, &m, talk(DOOR_TO_ZAKUM, ADOBIS)).await;
     assert_eq!(t.prompts, [(ADOBIS, 4)]);
-    let t = step(c, &m, answer(4, 1, Some(0))).await;
+    let t = step(c, &m, answer(4, 1, Some(1))).await;
     assert_eq!(t.prompts, [(ADOBIS, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.arrivals, [(BREATH_OF_LAVA, 0, None)]);
@@ -145,7 +145,7 @@ async fn a_fighter_is_approved_forges_the_eyes_and_passes_the_gate() {
     warp(c, DOOR_TO_ZAKUM, "", &mut t).await;
     barrier(c, &m, &mut t).await;
     step(c, &m, talk(DOOR_TO_ZAKUM, ADOBIS)).await;
-    let t = step(c, &m, answer(4, 1, Some(1))).await;
+    let t = step(c, &m, answer(4, 1, Some(2))).await;
     assert_eq!(
         t.items,
         [

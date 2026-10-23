@@ -1,10 +1,12 @@
 # Zakum
 
 The way to Zakum in El Nath's Dead Mine, after Cosmic. Built so far: the
-chiefs' approval, the Breath of Lava (stage 2), the forging of the Eyes of
-Fire (stage 3), and the gate. Not yet: the Dead Mine party quest (stage 1),
-the fight itself, the altar, and the expedition squad. The slice plan and its
-open questions are in v83ref's `reports/a097-zakum.md`.
+chiefs' approval, the Dead Mine party quest (stage 1, in
+[party-quests](./party-quests.md)), the Breath of Lava (stage 2), the
+forging of the Eyes of Fire (stage 3), and the gate. Not yet: the fight
+itself, the altar, and the expedition squad. The slice plan and its open
+questions are in v83ref's `reports/a097-zakum.md` and
+`reports/a105-zakum-dead-mine.md`.
 
 All dialogue is placeholder text (`zakum.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -34,6 +36,10 @@ Adobis (2030008) stands at the Door to Zakum (211042300). Unapproved
 players get a warning, which also tells those of level 50 and up what to do.
 Approved ones get a menu:
 
+- **The Dead Mine (stage 1):** the party's leader takes it in
+  (`talk_about_event`, see Zakum's Dead Mine in
+  [party-quests](./party-quests.md)). The win's prize includes the Piece of
+  Fire Ore the next two stages need.
 - **Breath of Lava (stage 2):** with a Piece of Fire Ore (4031061, from the
   Dead Mine) and no Breath of Fire (4031062), yes goes to 280020000, portal 0.
   Holding the Breath of Fire, he says the stage is done; otherwise, he says to
@@ -42,9 +48,6 @@ Approved ones get a menu:
   Fire and 30 Zombie's Lost Gold Teeth (4000082), he takes them all, gives
   five Eyes of Fire (4001017) and marks `ZAKUM_TRIALS_DONE`. He says what is
   missing otherwise, and that the Etc bag is full if it is.
-
-Upstream's first choice, the Dead Mine party quest, comes with its slice.
-Choices are by position, so the menu indexes shift when it does.
 
 At the far end of the Breath of Lava (280020001), Lira (2032003) gives the
 Breath of Fire and 10,000 EXP and sends the player back to the Door to
@@ -76,6 +79,8 @@ closed after a win; nothing closes it yet.
 ## Tests
 
 - `npc_scripts::tests::a_chief_approves_zakum_and_adobis_holds_its_trials`
+- `integration-harness/tests/zpq_dead_mine.rs`: the Dead Mine, in
+  [party-quests](./party-quests.md).
 - `integration-harness/tests/zakum_trials.rs`: a level-50 Fighter, unapproved
   and then without the trials, is turned back at the gate. They are approved
   by Tylus, cross the Breath of Lava, get the Breath of Fire from Lira, have
