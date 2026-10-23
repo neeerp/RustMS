@@ -260,6 +260,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(mini_room_tests tests/mini_room.cpp Net/InPacket.cpp)
     target_include_directories(mini_room_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME mini_room COMMAND mini_room_tests)
+    add_executable(mini_game_tests tests/mini_game.cpp)
+    add_test(NAME mini_game COMMAND mini_game_tests)
     add_executable(personal_shop_tests tests/personal_shop.cpp Net/InPacket.cpp)
     target_include_directories(personal_shop_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME personal_shop COMMAND personal_shop_tests)
@@ -981,6 +983,14 @@ add_executable(HeavenClient
     IO/UITypes/UIMemoSend.h
     IO/UITypes/UITradingRoom.cpp
     IO/UITypes/UITradingRoom.h
+    IO/UITypes/UIMatchCards.cpp
+    IO/UITypes/UIMatchCards.h
+    IO/UITypes/UIMiniGame.cpp
+    IO/UITypes/UIMiniGame.h
+    IO/UITypes/UIOmok.cpp
+    IO/UITypes/UIOmok.h
+    IO/UITypes/UIMiniGameCreate.cpp
+    IO/UITypes/UIMiniGameCreate.h
     IO/UITypes/UIPersonalShop.cpp
     IO/UITypes/UIPersonalShop.h
     IO/UITypes/UIMonsterBook.cpp

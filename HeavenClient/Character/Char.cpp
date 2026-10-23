@@ -1263,9 +1263,9 @@ namespace ms
 		miniroom.change(box);
 	}
 
-	int32_t Char::mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const
+	std::optional<MiniRoomHit> Char::mini_room_at(Point<int16_t> feet, Point<int16_t> cursor) const
 	{
-		return miniroom.serial_at(feet, AVATAR_HEIGHT, cursor);
+		return miniroom.hit_at(feet, AVATAR_HEIGHT, cursor);
 	}
 
 	void Char::set_chalkboard(const std::optional<std::string> &text, bool closable)

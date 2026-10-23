@@ -1377,10 +1377,10 @@ namespace ms
 		return merchants.at(cursorpos - camera.position());
 	}
 
-	int32_t Stage::mini_room_at(Point<int16_t> cursorpos)
+	std::optional<MiniRoomHit> Stage::mini_room_at(Point<int16_t> cursorpos)
 	{
 		if (state != State::ACTIVE)
-			return 0;
+			return std::nullopt;
 
 		Point<int16_t> viewpos = camera.position();
 
@@ -1391,11 +1391,11 @@ namespace ms
 			if (!other || !other->is_active())
 				continue;
 
-			if (int32_t serial = other->mini_room_at(other->get_position() + viewpos, cursorpos))
-				return serial;
+			if (std::optional<MiniRoomHit> hit = other->mini_room_at(other->get_position() + viewpos, cursorpos))
+				return hit;
 		}
 
-		return 0;
+		return std::nullopt;
 	}
 
 	void Stage::release_key(KeyType::Id type, int32_t action)
@@ -1481,9 +1481,11 @@ namespace ms
 			quest_alert.send_cursor(player.get_position() + player.get_face_offset() + camera.position(), position,
 									pressed, UI::get().is_cursor_pressed());
 
-		// A shop's balloon shows the house cursor (FUN_00531cc7).
-		if (npcstate == Cursor::State::IDLE && mini_room_at(position))
-			npcstate = Cursor::State::HOUSE;
+		// A shop's balloon shows the house cursor, a game's the game one
+		// (FUN_00531cc7).
+		if (npcstate == Cursor::State::IDLE)
+			if (std::optional<MiniRoomHit> hit = mini_room_at(position))
+				npcstate = hit->game ? Cursor::State::GAME : Cursor::State::HOUSE;
 
 		// Then a kite shows whose it is, with the arrow (FUN_0094cfc3).
 		const MapKites::Kite *flown = npcstate == Cursor::State::IDLE ? kite_at(position) : nullptr;

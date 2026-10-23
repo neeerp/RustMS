@@ -140,6 +140,8 @@ namespace ms
 			NAMECHANGE,
 			STOREBANK,
 			IMAGESLIDES,
+			MINIGAME,
+			MINIGAMECREATE,
 			NUM_TYPES
 		};
 

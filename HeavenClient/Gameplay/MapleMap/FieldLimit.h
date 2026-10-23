@@ -15,6 +15,8 @@ namespace ms
 		constexpr int32_t SUMMON_SACKS = 0x4;
 		constexpr int32_t RETURN_SCROLLS = 0x20;
 		constexpr int32_t TELEPORT_ROCKS = 0x40;
+		// No Omok or match cards here (0xa1d4d8).
+		constexpr int32_t MINI_GAMES = 0x80;
 		constexpr int32_t MAP_SCROLLS = 0x100;
 		constexpr int32_t RIDING = 0x200;
 		constexpr int32_t CONSUMABLES = 0x400;

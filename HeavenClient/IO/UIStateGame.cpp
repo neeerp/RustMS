@@ -56,6 +56,7 @@
 
 #include "../Character/Blacklist.h"
 
+#include "../Net/Handlers/MiniGame.h"
 #include "../Net/Packets/GameplayPackets.h"
 #include "../Net/Packets/MiniRoomPackets.h"
 #include "../Net/Packets/PlayerInteractionPackets.h"
@@ -308,9 +309,23 @@ namespace ms
 		// While a dialog is open the field takes no click (FUN_005299de).
 		else if (UI::get().dialog_open())
 			return;
-		// Someone's shop balloon comes before them (FUN_0094fbbf).
-		else if (int32_t serial = Stage::get().mini_room_at(pos))
-			MiniRoomVisitPacket(serial).dispatch();
+		// Someone's shop or game balloon comes before them; a locked game
+		// asks for its password (FUN_0094fbbf).
+		else if (std::optional<MiniRoomHit> room = Stage::get().mini_room_at(pos))
+		{
+			int32_t serial = room->serial;
+
+			if (!room->locked)
+			{
+				MiniRoomVisitPacket(serial).dispatch();
+				return;
+			}
+
+			UI::get().emplace<UIEnterText>("Please enter the password.", [serial](const std::string &password)
+			{
+				MiniRoomVisitPacket(serial, password).dispatch();
+			}, mini_game::PASSWORD_LIMIT);
+		}
 		// Then a hired merchant's; its owner is asked first (SP 0xd8b).
 		else if (std::optional<MapMerchants::Hit> merchant = Stage::get().merchant_at(pos))
 		{
@@ -950,6 +965,8 @@ namespace ms
 				case UIElement::Type::SHOPSALES:
 				case UIElement::Type::MERCHANTVISITORS:
 				case UIElement::Type::MERCHANTBLACKLIST:
+				case UIElement::Type::MINIGAME:
+				case UIElement::Type::MINIGAMECREATE:
 					return true;
 				default:
 					return false;

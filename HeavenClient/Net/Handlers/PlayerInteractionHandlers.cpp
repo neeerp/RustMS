@@ -31,6 +31,8 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UIPersonalShop.h"
+#include "../../IO/UITypes/UIMatchCards.h"
+#include "../../IO/UITypes/UIOmok.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../Packets/MiniRoomPackets.h"
 
@@ -203,7 +205,20 @@ namespace ms
 			STORE_CLOSED = 0x2A,
 			MESO_TAKEN = 0x2C,
 			VISITORS = 0x2E,
-			BLACKLIST = 0x2F
+			BLACKLIST = 0x2F,
+			// The games' own (0x6e3124)
+			TIE_ASKED = 0x32,
+			TIE_DENIED = 0x33,
+			UNDO_ASKED = 0x36,
+			UNDO_RESULT = 0x37,
+			READY = 0x3A,
+			UNREADY = 0x3B,
+			START = 0x3D,
+			RESULT = 0x3E,
+			TURN = 0x3F,
+			STONE = 0x40,
+			REJECTED = 0x41,
+			CARD = 0x44
 		};
 
 		// The chat line of a notice by code rather than a member
@@ -214,6 +229,8 @@ namespace ms
 		auto shop = UI::get().get_element<UIPersonalShop>();
 		bool trading = room && room->is_active();
 		bool shopping = shop && shop->is_active();
+		auto game = UI::get().get_element<UIMiniGame>();
+		bool gaming = game && game->is_active();
 
 		if (mode == Mode::INVITE_RESULT)
 		{
@@ -228,7 +245,7 @@ namespace ms
 			return;
 		}
 
-		if (!trading && !shopping)
+		if (!trading && !shopping && !gaming)
 		{
 			switch (mode)
 			{
@@ -275,6 +292,14 @@ namespace ms
 					{
 						UI::get().emplace<UIPersonalShop>(enter);
 					}
+					else if (enter.type == mini_room::OMOK)
+					{
+						UI::get().emplace<UIOmok>(enter);
+					}
+					else if (enter.type == mini_room::MATCH_CARDS)
+					{
+						UI::get().emplace<UIMatchCards>(enter);
+					}
 					else if (enter.type == 0)
 					{
 						std::string text = mini_room::enter_error_text(enter.error);
@@ -304,6 +329,145 @@ namespace ms
 			// v83 drops invites while a room is open; turn them down so the
 			// inviter hears back.
 			MiniRoomDeclinePacket(recv.read_int(), MiniRoomPacket::Decline::NOT_ACCEPTING).dispatch();
+
+			return;
+		}
+
+		if (gaming)
+		{
+			switch (mode)
+			{
+				case Mode::VISIT:
+				{
+					uint8_t slot = recv.read_byte();
+					mini_room::Member member = mini_room::read_member(recv, slot, LoginParser::parse_look);
+
+					game->visit(member, mini_room::read_record(recv));
+					break;
+				}
+				case Mode::CHAT:
+				{
+					// The game's notices name a player (0x65f79e).
+					if (recv.read_byte() == CHAT_NOTICE)
+					{
+						uint8_t id = recv.read_byte();
+
+						game->game_message(id, recv.read_string());
+						break;
+					}
+
+					uint8_t slot = recv.read_byte();
+					std::string line = recv.read_string();
+
+					game->add_chat(slot, line);
+					break;
+				}
+				case Mode::AVATAR:
+				{
+					uint8_t slot = recv.read_byte();
+
+					game->change_look(slot, LoginParser::parse_look(recv));
+					break;
+				}
+				case Mode::LEAVE:
+				{
+					uint8_t slot = recv.read_byte();
+
+					// Only our own leaving says why (0x6e3d06).
+					if (slot == game->get_own_slot())
+						game->leave(recv.read_byte());
+					else
+						game->seat_left(slot);
+
+					break;
+				}
+				case Mode::TIE_ASKED:
+					game->tie_asked();
+					break;
+				case Mode::TIE_DENIED:
+					game->tie_denied();
+					break;
+				case Mode::UNDO_ASKED:
+					game->undo_asked();
+					break;
+				case Mode::UNDO_RESULT:
+				{
+					bool undone = recv.read_bool();
+					uint8_t count = undone ? recv.read_byte() : 0;
+					uint8_t slot = undone ? recv.read_byte() : 0;
+
+					game->undo_result(undone, count, slot);
+					break;
+				}
+				case Mode::READY:
+				case Mode::UNREADY:
+					game->set_ready(mode == Mode::READY);
+					break;
+				case Mode::START:
+				{
+					uint8_t waits = recv.read_byte();
+					std::vector<int32_t> deck;
+
+					// Match cards come dealt (0x64e2e1).
+					if (game->get_game_type() == mini_room::MATCH_CARDS)
+					{
+						uint8_t count = recv.read_byte();
+
+						for (uint8_t i = 0; i < count; i++)
+							deck.push_back(recv.read_int());
+					}
+
+					game->start(waits, std::move(deck));
+					break;
+				}
+				case Mode::RESULT:
+				{
+					// Won, a tie or forfeited; a tie names no winner.
+					int8_t kind = recv.read_byte();
+					uint8_t winner = kind != 1 ? recv.read_byte() : 0;
+					std::array<mini_room::GameRecord, 2> records;
+
+					for (mini_room::GameRecord &record : records)
+						record = mini_room::read_record(recv);
+
+					game->result(kind == 1, winner, records);
+					break;
+				}
+				case Mode::TURN:
+					game->turn(recv.read_byte());
+					break;
+				case Mode::STONE:
+				{
+					mini_game::Stone stone;
+					stone.x = recv.read_int();
+					stone.y = recv.read_int();
+					stone.color = recv.read_byte();
+
+					game->stone(stone);
+					break;
+				}
+				case Mode::REJECTED:
+					game->rejected(recv.read_byte());
+					break;
+				case Mode::CARD:
+				{
+					// A turn's first card goes to the other player only; its
+					// second to both, with how it went.
+					if (recv.read_bool())
+					{
+						game->flipped_first(recv.read_byte());
+						break;
+					}
+
+					uint8_t index = recv.read_byte();
+					uint8_t first = recv.read_byte();
+
+					game->flipped_second(index, first, recv.read_byte());
+					break;
+				}
+				default:
+					break;
+			}
 
 			return;
 		}
