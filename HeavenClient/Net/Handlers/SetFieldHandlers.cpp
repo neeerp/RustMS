@@ -384,6 +384,43 @@ namespace ms
 		UI::get().remove(UIElement::Type::FIELDCLOCK);
 	}
 
+	namespace
+	{
+		// A boss site's closing time: a byte, whether the boss is out, then
+		// the minutes left, 0 once it has closed. A negative count shows
+		// nothing. The lines are v83's string pool entries for each site.
+		void closing_line(InPacket& recv, const std::string& summon, const std::string& left,
+						  const char* closed)
+		{
+			bool summoned = recv.read_byte() != 0;
+			int32_t minutes = recv.read_int();
+
+			if (minutes < 0)
+				return;
+
+			std::string line = minutes == 0
+				? std::string(closed)
+				: (summoned ? left : summon) + std::to_string(minutes) + " minutes.";
+
+			if (auto chatbar = UI::get().get_element<UIChatBar>())
+				chatbar->send_chatline(line, UIChatBar::LineType::SKILL);
+		}
+	}
+
+	// SP 0x1059, 0x105a, 0x105b.
+	void HorntailCaveHandler::handle(InPacket& recv) const
+	{
+		closing_line(recv, "The Horntail's Cave will close if you do not summon Horntail in ",
+					 "The Horntail's Cave will close in ", "The Horntail's Cave has closed.");
+	}
+
+	// SP 0x1056, 0x1057, 0x1058.
+	void ZakumShrineHandler::handle(InPacket& recv) const
+	{
+		closing_line(recv, "The Zakum Shrine will close if you do not summon Zakum in ",
+					 "The Zakum Shrine will close in ", "The Zakum Shrine has closed.");
+	}
+
 	void ObjectStateHandler::handle(InPacket& recv) const
 	{
 		std::string name = recv.read_string();

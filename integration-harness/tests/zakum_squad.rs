@@ -3,8 +3,11 @@
 //! and takes it to an altar of its own. While it fights, the gate on the
 //! Door to Zakum is shut and the recruiter turns others away; a member who
 //! stepped out, or wasn't there at the start, may go in. Once Zakum falls
-//! the gate opens and the channel may gather a new squad. The harness lets
-//! two set out (`RUSTMS_EXPEDITION_MIN`).
+//! the gate opens and the channel may gather a new squad. On the altar a
+//! line tells when the shrine closes, before Zakum is summoned and after;
+//! an expedition whose time runs out hears it has closed. The harness lets
+//! two set out (`RUSTMS_EXPEDITION_MIN`) and runs its 120 minutes in two
+//! (`RUSTMS_EVENT_SCALE`).
 
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
@@ -15,7 +18,7 @@ use integration_harness::events::{said, talk, throw_down, told};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{send, until, warp, Trace};
+use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -181,8 +184,9 @@ async fn an_expedition_shuts_the_gate_takes_its_own_back_and_opens_it_after_zaku
     let t = told(&mut leader, recruiter()).await;
     assert_eq!(t.prompts, [(RECRUITER, 4)]);
     let mut lt = told(&mut leader, answer(4, 1, Some(1))).await;
+    // On the altar, the shrine closes unless Zakum is summoned in time.
     until(&mut leader.connection, &mut lt, |t| {
-        t.arrivals.iter().any(|a| a.0 == ALTAR_MAP)
+        t.arrivals.iter().any(|a| a.0 == ALTAR_MAP) && t.shrine_closings == [(false, 2)]
     })
     .await;
     let mut mt = Trace::default();
@@ -251,7 +255,14 @@ async fn an_expedition_shuts_the_gate_takes_its_own_back_and_opens_it_after_zaku
         .unwrap();
     send(c, walk_to(altar.x - 30, altar.y - 36)).await;
     send(c, throw_down(1, 1)).await;
-    until(c, &mut lt, |t| t.field.mobs.len() == 9).await;
+    // Once it is, the shrine closes when the time is up.
+    until(c, &mut lt, |t| {
+        t.field.mobs.len() == 9
+            && t.shrine_closings
+                .last()
+                .is_some_and(|&(out, left)| out && left > 0)
+    })
+    .await;
     let arms: Vec<i32> = lt
         .field
         .mobs
@@ -285,14 +296,38 @@ async fn an_expedition_shuts_the_gate_takes_its_own_back_and_opens_it_after_zaku
 
     // Its expedition won, the channel may gather another, though the
     // winners are still on their altar.
+    let mut free = false;
     for _ in 0..20 {
         let t = told(&mut other, recruiter()).await;
         if t.prompts == [(RECRUITER, 1)] {
-            return;
+            free = true;
+            break;
         }
         assert!(said(&t, keys::ZAKUM_SQUAD_TAKEN), "{t:?}");
         told(&mut other, answer(0, 1, None)).await;
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
-    panic!("the expedition is still under way");
+    assert!(free, "the expedition is still under way");
+
+    // The next squad never summons Zakum: its time runs out, the shrine
+    // closes, and it is sent back to the Entrance.
+    told(&mut other, answer(1, 1, None)).await;
+    told(&mut other, answer(0, 1, None)).await;
+    let mut second = adventurer(ENTRANCE_TO_ZAKUM, false, false, false).await;
+    told(&mut second, recruiter()).await;
+    told(&mut second, answer(1, 1, None)).await;
+    told(&mut second, answer(0, 1, None)).await;
+    let t = told(&mut other, recruiter()).await;
+    assert_eq!(t.prompts, [(RECRUITER, 4)], "{t:?}");
+    let mut ot = told(&mut other, answer(4, 1, Some(1))).await;
+    until(&mut other.connection, &mut ot, |t| {
+        t.arrivals.iter().any(|a| a.0 == ALTAR_MAP)
+    })
+    .await;
+    read_for(&mut other.connection, &mut ot, 110_000).await;
+    until(&mut other.connection, &mut ot, |t| {
+        t.arrivals.last().map(|a| a.0) == Some(ENTRANCE_TO_ZAKUM)
+    })
+    .await;
+    assert_eq!(ot.shrine_closings, [(false, 2), (false, 0)]);
 }

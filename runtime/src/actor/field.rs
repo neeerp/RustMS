@@ -2561,6 +2561,9 @@ impl FieldActor {
         if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
             self.broadcast(None, packet);
         }
+        for occupant in self.occupants.values() {
+            occupant.handle.send(ServerMessage::BossSummoned);
+        }
     }
 
     /// Send what `message` gives for the `nth` player a mob's cast

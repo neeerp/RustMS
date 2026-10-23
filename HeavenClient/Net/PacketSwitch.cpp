@@ -223,6 +223,8 @@ namespace ms
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
+		HORNTAIL_CAVE = 302,
+		ZAKUM_SHRINE = 303,
 
 		/// NPC Interaction
 		NPC_DIALOGUE = 304,
@@ -315,6 +317,8 @@ namespace ms
 		emplace<CONTI_MOVE, ContiMoveHandler>();
 		emplace<CONTI_STATE, ContiStateHandler>();
 		emplace<STOP_CLOCK, StopClockHandler>();
+		emplace<HORNTAIL_CAVE, HorntailCaveHandler>();
+		emplace<ZAKUM_SHRINE, ZakumShrineHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
 		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
