@@ -310,9 +310,10 @@ impl LiveMob {
             .is_some_and(|destruct| destruct.hp >= 0 && self.hp <= i64::from(destruct.hp))
     }
 
-    /// Mob stances are even facing right, odd facing left.
+    /// Mob stances are even facing right, odd facing left; one that never
+    /// turns (`noFlip`) faces left whatever its controller reports.
     pub fn facing_left(&self) -> bool {
-        self.stance & 1 == 1
+        self.info.no_flip || self.stance & 1 == 1
     }
 
     /// Whether the mob can't use its skills: a player's Seal or its own
@@ -1973,6 +1974,10 @@ mod tests {
         // Facing right it is mirrored to 50..200.
         mobs.live.get_mut(&caster).unwrap().stance = 4;
         assert_eq!(mobs.reached_by(&heal), [caster, ahead]);
+        // One that never turns keeps facing left.
+        mobs.live.get_mut(&caster).unwrap().info.no_flip = true;
+        assert_eq!(mobs.reached_by(&heal), [caster, ahead, behind]);
+        mobs.live.get_mut(&caster).unwrap().info.no_flip = false;
 
         mobs.live.get_mut(&caster).unwrap().hp = 600;
         assert_eq!(mobs.heal(caster, 700, 3), Some((400, 1000, 1000)));
