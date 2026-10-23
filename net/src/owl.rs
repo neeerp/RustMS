@@ -99,6 +99,9 @@ pub mod go_result {
     pub const DEAD: u8 = 4;
     /// "You may not enter this store."
     pub const BARRED: u8 = 0x11;
+    /// "The owner of the store is currently undergoing store maintenance.
+    /// ..." (c024).
+    pub const MAINTENANCE: u8 = 0x12;
 }
 
 /// How often each item was searched for in the world since it started.

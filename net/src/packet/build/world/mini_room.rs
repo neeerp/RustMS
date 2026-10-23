@@ -60,6 +60,9 @@ pub mod enter_error {
     pub const NOT_FREE_MARKET: u8 = 0x0f;
     /// "You may not enter this store."
     pub const BANNED: u8 = 0x11;
+    /// "The owner of the store is currently undergoing store maintenance.
+    /// ..." (a hired merchant).
+    pub const MAINTENANCE: u8 = 0x12;
 }
 
 /// How a trade ended, shown to the member who stays (LEAVE).
