@@ -36,8 +36,10 @@
 #include "Handlers/PlayerInteractionHandlers.h"
 #include "Handlers/SetFieldHandlers.h"
 #include "Handlers/TestingHandlers.h"
+#include "Handlers/UiControlHandlers.h"
 
 #include "../Configuration.h"
+#include "../IO/UiControl.h"
 
 namespace ms
 {
@@ -85,6 +87,12 @@ namespace ms
 		CHECK_AUTO_HP = 212,
 		ITEM_EMOTION = 226,
 		PLAYER_HINT = 214,
+
+		/// The server's hold on the UI
+		OPEN_UI = 220,
+		LOCK_UI = 221,
+		DISABLE_UI = 222,
+		MESSAGE_BOX = 232,
 
 		/// Inventory 2
 		GATHER_RESULT = 52,
@@ -525,6 +533,11 @@ namespace ms
 		// TODO: New handlers, they need coded and moved to a proper file.
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();
 		emplace<FIELD_EFFECT, FieldEffectHandler>();
+
+		emplace<OPEN_UI, OpenUiHandler>();
+		emplace<LOCK_UI, LockUiHandler>();
+		emplace<DISABLE_UI, DisableUiHandler>();
+		emplace<MESSAGE_BOX, MessageBoxHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const
@@ -542,6 +555,10 @@ namespace ms
 			else
 				std::cout << "Received Packet: " << std::to_string(opcode) << std::endl;
 		}
+
+		// DISABLE_UI leaves other players out (FUN_00972100, FUN_009724f9).
+		if (ui_control::state().disabled && ui_control::dropped_when_disabled(opcode))
+			return;
 
 		if (opcode < NUM_HANDLERS)
 		{
