@@ -220,6 +220,11 @@ pub enum SendOpcode {
     OpenNpcShop = 0x131,
     ConfirmShopTransaction = 0x132,
     TrunkResult = 0x135,
+    /// What came of taking everything from Fredrick's Store Bank (310).
+    StoreBankMessage = 0x136,
+    /// Fredrick's Store Bank: the window, the fee, or where the merchant
+    /// is (311).
+    StoreBank = 0x137,
 
     KeyMap = 0x14F,
     AutoHpPot = 0x150,

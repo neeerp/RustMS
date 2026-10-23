@@ -1609,8 +1609,36 @@ The flow:
 After 24 hours open, the field closes the merchant: visitors get LEAVE
 `0x12`, and what it holds stays in the database for Fredrick.
 
-Not done yet: Fredrick and the items and mesos he keeps (a closed merchant
-answers `0xf` until then), the blacklist's
+### Fredrick
+
+Fredrick (`9030000`, Free Market Entrance) keeps what a closed merchant
+holds, and what a crash left in one in setup. The check answers `0xf`
+for such a merchant, which sends the player to him
+(`client/store_bank.rs`, `net::store_bank`):
+
+- **Talk.** STORE_BANK (`0x137`) mode `0x23` opens the Store Bank:
+  `i32 npc`, then storage's contents (slots, flags, mesos, the bags).
+  With nothing kept, mode `0x25` carries `{i32 npc, i32 999999999, u8
+  0xff}`. If the merchant is open, `0x25` carries its map and its 0-based
+  channel instead, and the client says where.
+- **Get All** (STORE_BANK_REQUEST `0x40` mode `0x1a`). The server reads
+  the merchant again and answers `{0x24, i32 days, i32 fee}`. The fee is
+  1% a day of the merchant's mesos and the listed price of its unsold
+  bundles, up to all of it (the contract, StringPool `0xdaa`). The days
+  are the whole days since it closed; a merchant left in setup has none.
+- **Yes** (mode `0x1b`). Everything comes back at once, less the fee, or
+  nothing does. STORE_BANK_MESSAGE (`0x136`) answers `0x1e` (retrieved),
+  `0x1f` (too many mesos), `0x20` (one-of-a-kind item), `0x21` (can't
+  pay; the player's mesos and the merchant's together pay the fee) or
+  `0x22` (no room). `db::merchant::retrieve` drops the merchant and saves
+  the player in one transaction. It gives up if the merchant changed since
+  Get All; the client then gets mode `0x26` ("currently unavailable").
+- **Close** (mode `0x1c`) forgets the window.
+
+GMS gave away what was kept past 100 days; here the fee just stops at
+100%.
+
+Not done yet: the blacklist's
 storage (it lasts as long as the merchant stays in memory), the `0x0e`
 cash check the client sends instead of `0xb` when a cash item is listed,
 permits in the Cash Shop, and HeavenClient's merchant window.
@@ -1727,6 +1755,12 @@ has two tests:
   are saved after a relogin.
 - The second bans a visitor, who can't come back. The owner gets the stock
   back on leaving and on logging out.
+
+Fredrick: `net::store_bank` covers the days and the fee, and the build
+tests cover the packets. `fredrick` (integration) is told he keeps
+nothing, then where an open merchant stands. It takes a closed merchant's
+items and mesos back less three days' fee, and is refused when the owner
+can't pay the fee or carry the mesos, with the merchant still kept.
 
 The Owl of Minerva: `net::owl` covers the market maps, the order and cap of
 the rows, and the most searched list; the build tests cover the packets;

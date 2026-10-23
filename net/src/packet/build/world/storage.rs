@@ -46,7 +46,12 @@ pub fn build_storage_contents(
     Ok(packet)
 }
 
-fn write_contents(packet: &mut Packet, storage: &Storage, tabs: Tabs) -> Result<(), NetworkError> {
+/// The contents format the trunk shares with Fredrick's Store Bank.
+pub(crate) fn write_contents(
+    packet: &mut Packet,
+    storage: &Storage,
+    tabs: Tabs,
+) -> Result<(), NetworkError> {
     let flags = tabs.flags();
     packet.write_byte(storage.slots)?;
     packet.write_long(flags as i64)?;
