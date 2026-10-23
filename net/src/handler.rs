@@ -509,6 +509,11 @@ pub enum WorldAction {
     MiuMiu {
         slot: i16,
     },
+    /// Run a scripted item's `script` where the player stands
+    /// (`scripts::item`).
+    ScriptedItem {
+        script: String,
+    },
     /// Take out of, store in, sort, or close the storage the player has open.
     Storage(crate::storage::StorageRequest),
     /// Open Duey's window, send, claim, or delete a parcel, or close it.
@@ -1071,6 +1076,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::PetCommand, InGame(&world::PetCommandHandler)),
             (Op::PetFood, InGame(&world::PetFoodHandler)),
             (Op::UseMountFood, InGame(&world::MountFoodHandler)),
+            (Op::UseScriptedItem, InGame(&world::ScriptedItemHandler)),
             (Op::PetLoot, InGame(&world::PetLootHandler)),
             (Op::PetAutoPot, InGame(&world::PetAutoPotHandler)),
             (Op::PetExcludeItems, InGame(&world::PetExcludeItemsHandler)),

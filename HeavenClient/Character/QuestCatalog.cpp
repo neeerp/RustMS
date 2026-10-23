@@ -75,6 +75,11 @@ namespace ms
 			info.end_script = end["endscript"].data_type() == nl::node::type::string;
 
 			info.end_meso = static_cast<int32_t>(end["endmeso"].get_integer());
+			info.end_info_record = static_cast<int16_t>(end["infoNumber"].get_integer());
+
+			for (auto entry : end["infoex"])
+				info.end_info.emplace_back(static_cast<int32_t>(entry["cond"].get_integer()),
+					entry["value"].get_string());
 
 			for (auto map : start["fieldEnter"])
 				info.field_enter.push_back(static_cast<int32_t>(map.get_integer()));

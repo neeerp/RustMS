@@ -504,6 +504,11 @@ pub mod keys {
     pub const MC_OBSTACLE_BLOCKED: &str = "portal.mc_obstacle.blocked";
     pub const MC_OBSTACLE_USED: &str = "portal.mc_obstacle.used";
     pub const MC_CASTLE_BLOCKED: &str = "portal.mc_castle.blocked";
+    /// Told (in pink) as the Killer Mushroom Spore (2430014) opens the
+    /// `obstacle` portal's way, and as the Thorn Remover (2430015) clears
+    /// the way to the castle.
+    pub const MC_SPORE_USED: &str = "item.mc_spore.used";
+    pub const MC_THORNS_REMOVED: &str = "item.mc_thorns.removed";
     /// Gated portals of a004's section 3: the Temple of Time's lanes
     /// (`timeQuest`), Ereve's Training Forest (`enterDisguise0`), Magatia's
     /// secret doors (`secretDoor`), Ariant's palace (`ariant_castle`)
@@ -2029,6 +2034,8 @@ mod tests {
             keys::MC_OBSTACLE_BLOCKED,
             keys::MC_OBSTACLE_USED,
             keys::MC_CASTLE_BLOCKED,
+            keys::MC_SPORE_USED,
+            keys::MC_THORNS_REMOVED,
             keys::TIME_LANE_LOST,
             keys::DISGUISE_NO_PERMIT,
             keys::SECRET_DOOR_LOCKED,

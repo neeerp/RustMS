@@ -60,4 +60,19 @@ impl ClientActor {
         let mut enable = stat::build_stat_update(true, &[])?;
         self.send(&mut enable).await
     }
+
+    /// The player used a scripted item whose script is `script`, where
+    /// they stand.
+    pub(super) async fn use_scripted_item(&mut self, script: &str) -> Result<(), RuntimeError> {
+        let game = self.in_game()?;
+        match scripts::item(script, &game.player, game.position) {
+            Some(effects) => {
+                self.apply_effects(&effects).await?;
+            }
+            None => debug!(script, "No native item script"),
+        }
+        // The client waits for this before it uses another item.
+        let mut enable = stat::build_stat_update(true, &[])?;
+        self.send(&mut enable).await
+    }
 }

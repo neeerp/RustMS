@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,6 +39,35 @@ namespace ms
 		return true;
 	}
 
+	// Whether a quest's Check/1/infoex holds for `record`, the data string
+	// of its infoNumber quest, or nullptr if that quest isn't started
+	// (FUN_00721d2c). One entry must hold: cond 0 compares the strings, 1
+	// needs at least the value and 2 at most, as numbers. Entries without
+	// an infoNumber (Meren's 6029) are left to the server, which keeps no
+	// such string.
+	inline bool end_info_met(const QuestInfo& quest, const std::string* record)
+	{
+		if (quest.end_info_record == 0 || quest.end_info.empty())
+			return true;
+
+		if (record == nullptr)
+			return false;
+
+		int32_t number = std::atoi(record->c_str());
+
+		return std::any_of(quest.end_info.begin(), quest.end_info.end(), [&](const auto& entry)
+		{
+			int32_t value = std::atoi(entry.second.c_str());
+
+			switch (entry.first)
+			{
+				case 1: return value <= number;
+				case 2: return number <= value;
+				default: return *record == entry.second;
+			}
+		});
+	}
+
 	// Whether the player's items satisfy a quest's completion requirements.
 	// `count` gives how many of an item the player holds.
 	template<class Count>
@@ -55,7 +85,7 @@ namespace ms
 	// pages they show.
 	// MESO has no stop key of its own, so it shows stop/default. NO_PET and
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, MOB, MESO, NO_PET, WRONG_PET };
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET };
 
 	// Whether the first pet out, `first_pet` (0 for none), meets a quest's
 	// pet requirement: v83 looks at no other pet (FUN_00721163,
@@ -78,16 +108,19 @@ namespace ms
 			case QuestStop::NPC: return "npc";
 			case QuestStop::ITEM: return "item";
 			case QuestStop::QUEST: return "quest";
+			case QuestStop::INFO: return "info";
 			case QuestStop::MOB: return "mob";
 			default: return "default";
 		}
 	}
 
-	// `progress` is the quest's progress string (its kill counts), and
-	// `first_pet` the item of the first pet out.
+	// `progress` is the quest's progress string (its kill counts),
+	// `first_pet` the item of the first pet out, and `info_record` the data
+	// string of the quest's infoNumber quest (see end_info_met).
 	template<class Status, class Count>
 	QuestStop completion_stop(const QuestInfo& quest, int32_t npc_id, Status status, Count count,
-		const std::string& progress, int64_t meso, int32_t first_pet = 0)
+		const std::string& progress, int64_t meso, int32_t first_pet = 0,
+		const std::string* info_record = nullptr)
 	{
 		if (quest.end_npc != npc_id)
 			return QuestStop::NPC;
@@ -98,6 +131,9 @@ namespace ms
 		for (const auto& requirement : quest.end_prerequisites)
 			if (status(requirement.first) != requirement.second)
 				return QuestStop::QUEST;
+
+		if (!end_info_met(quest, info_record))
+			return QuestStop::INFO;
 
 		if (!end_mobs_met(quest, progress))
 			return QuestStop::MOB;
@@ -220,7 +256,12 @@ namespace ms
 			{
 				if ((quest.end_npc == 0 || quest.end_npc == npc_id) &&
 					end_items_met(quest, count) && end_mobs_met(quest, progress(quest.id)))
-					return QuestMarker::READY;
+				{
+					std::string record = progress(quest.end_info_record);
+
+					if (end_info_met(quest, &record))
+						return QuestMarker::READY;
+				}
 
 				in_progress = true;
 			}

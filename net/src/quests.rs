@@ -73,6 +73,8 @@ pub enum QuestRejection {
     Mesos,
     /// Fewer maps visited than an explorer medal needs.
     Explored,
+    /// The quest's own record short of its count (`end_record`).
+    Record,
     /// No pet out, or the first pet out isn't one the quest lists.
     Pet,
     /// The item rewards don't fit.
@@ -239,6 +241,11 @@ pub fn check_complete(
     if let Some(explored) = quest.explored {
         if (player.quests.explored(explored.record) as u64) < u64::from(explored.needed) {
             return Err(QuestRejection::Explored);
+        }
+    }
+    if let Some(needed) = quest.end_record {
+        if player.quests.kills(quest.id).first().copied().unwrap_or(0) < needed {
+            return Err(QuestRejection::Record);
         }
     }
     Ok(())
@@ -445,6 +452,7 @@ mod tests {
             auto_start: false,
             auto_complete: false,
             explored: None,
+            end_record: None,
         }
     }
 
@@ -535,6 +543,17 @@ mod tests {
         p.quests.explore(27010, 100000000);
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Explored));
         p.quests.explore(27010, 101000000);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn an_own_record_quest_needs_its_count() {
+        let mut q = quest();
+        q.end_record = Some(1);
+        let mut p = player(30, 0);
+        set(&mut p, q.id, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Record));
+        *p.quests.kills_mut(q.id).unwrap() = vec![1];
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 

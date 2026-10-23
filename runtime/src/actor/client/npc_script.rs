@@ -376,6 +376,15 @@ impl ClientActor {
                     next.quests.mark(*marker);
                     changed = true;
                 }
+                Effect::QuestRecord { quest_id, count } => {
+                    let Some(kills) = next.quests.kills_mut(*quest_id) else {
+                        continue;
+                    };
+                    *kills = vec![*count];
+                    changed = true;
+                    let status = next.quests.status(*quest_id);
+                    packets.push(quest::build_quest_progress(*quest_id, status)?);
+                }
                 Effect::Unmark(marker) => {
                     next.quests.remove(*marker);
                     changed = true;
