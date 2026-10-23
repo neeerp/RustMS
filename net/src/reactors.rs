@@ -94,6 +94,11 @@ pub enum Action {
     /// Zakum's music plays, its body comes out on the ground below, not yet
     /// real, then its eight arms, with a pink line to everyone there.
     Zakum,
+    /// The stone on Horntail's Cave (Cosmic `2401000`), which breaks on its
+    /// sixth hit: Horntail's music plays, Horntail comes out unless it is
+    /// already coming (`crate::mobs::HORNTAIL_INTRO`), and the expedition's
+    /// clock starts over; then a line to everyone there.
+    Horntail,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -289,6 +294,7 @@ pub fn action(reactor_id: i32) -> Action {
         ZPQ_TRAP => Action::Warp(Warp(crate::events::ZPQ_HUB, "sp")),
         ZPQ_MIMIC_BOX => Action::BringOut(ZPQ_MIMIC, 3),
         ZAKUM_ALTAR => Action::Zakum,
+        HORNTAIL_STONE => Action::Horntail,
         _ => Action::Drops,
     }
 }
@@ -305,6 +311,10 @@ pub const PAPULATUS_CRACK: i32 = 2201004;
 /// Zakum's altar, and the music it plays as it brings Zakum out.
 pub const ZAKUM_ALTAR: i32 = 2111001;
 pub const ZAKUM_MUSIC: &str = "Bgm06/FinalFight";
+
+/// The stone on Horntail's Cave (`boss`), and the music it plays.
+pub const HORNTAIL_STONE: i32 = 2401000;
+pub const HORNTAIL_MUSIC: &str = "Bgm14/HonTale";
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
@@ -537,5 +547,16 @@ mod tests {
     fn zakums_altar_brings_zakum_out() {
         assert_eq!(action(ZAKUM_ALTAR), Action::Zakum);
         assert_eq!(breaker_notice(ZAKUM_ALTAR), None);
+    }
+
+    #[test]
+    fn horntails_stone_breaks_on_its_sixth_hit() {
+        assert_eq!(action(HORNTAIL_STONE), Action::Horntail);
+        assert_eq!(breaker_notice(HORNTAIL_STONE), None);
+        let Ok(data) = data() else { return };
+        let stone = data.template(HORNTAIL_STONE).unwrap().unwrap();
+        assert_eq!(stone.states.len(), 7);
+        assert!((0..6).all(|state| !stone.is_last(state)));
+        assert!(stone.is_last(6));
     }
 }

@@ -46,6 +46,19 @@ pub const PAPULATUS_LAST: i32 = 8500002;
 pub const HIGH_DARKSTAR: i32 = 8500003;
 pub const LOW_DARKSTAR: i32 = 8500004;
 
+/// What brings Horntail out on its cave (Cosmic `spawnHorntailOnGroundBelow`):
+/// the intro, which leaves at once (`removeAfter`), its fall turning into
+/// Horntail; then Horntail itself, `HORNTAIL`, whose HP is the boss bar
+/// and takes no hits of its own; then its eight parts, `HORNTAIL_PARTS`,
+/// heads, hands, legs, wings and tail, each hit on which comes off
+/// Horntail's HP as well (`MobSet::link`). Each part's death lets out its
+/// dead part (Mob.nx `revive`), 8810010 to 8810017.
+pub const HORNTAIL_INTRO: i32 = 8810026;
+pub const HORNTAIL: i32 = 8810018;
+pub const HORNTAIL_PARTS: RangeInclusive<i32> = 8810002..=8810009;
+/// The ground below which Horntail and its parts come out.
+pub const HORNTAIL_AT: (i16, i16) = (71, 260);
+
 /// The mobs that keep `mob_id` from harm while any of them is out: Zakum's
 /// arms its body (Cosmic `MapleMap.damageMonster`). Until then it has no
 /// controller either; the last arm to die makes it real.

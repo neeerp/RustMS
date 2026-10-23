@@ -357,6 +357,14 @@ pub enum ServerMessage {
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,
+    /// The player's field brought out a boss whose event's clock starts
+    /// over, as Horntail on its cave: tell the event.
+    RestartEventClock,
+    /// Event `id`'s time left is now `clock`.
+    EventClock {
+        id: u32,
+        clock: tokio::time::Instant,
+    },
     /// The party in event `id` cleared `stage`.
     StageCleared {
         id: u32,

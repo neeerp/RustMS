@@ -651,6 +651,10 @@ impl EventActor {
                 self.win();
             }
             EventCommand::WinWithDocuments => debug!(client_id, "Win not taken"),
+            EventCommand::RestartClock if self.kind == EventKind::Horntail && !won => {
+                self.restart_clock(net::events::HORNTAIL_FIGHT_MINUTES);
+            }
+            EventCommand::RestartClock => debug!(client_id, "Restart not taken"),
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
         }
@@ -667,6 +671,22 @@ impl EventActor {
         self.ends = Some(ends);
         self.move_team(None, bonus.map, Some(ends));
         info!(kind = ?self.kind, id = self.id, "Bonus started");
+    }
+
+    /// The clock starts over with `minutes` left (scaled for testing), on
+    /// every member's ticket and screen.
+    fn restart_clock(&mut self, minutes: u64) {
+        let ends = Instant::now() + net::events::scaled(Duration::from_secs(minutes * 60));
+        self.ends = Some(ends);
+        info!(kind = ?self.kind, id = self.id, minutes, "Clock restarted");
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventClock {
+                    id: self.id,
+                    clock: ends,
+                });
+            }
+        }
     }
 
     /// The time ran out. A bonus's ends, taking whoever is still on its map

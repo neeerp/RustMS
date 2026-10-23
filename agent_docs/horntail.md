@@ -1,8 +1,9 @@
 # Horntail
 
 The way to Horntail in Leafre's Cave of Life, after Cosmic. Built so far:
-the quests, the doors, the ways out, the expedition into the cave, and its
-two trials. The fight and the Horntail party quest are still to come. The slice
+the quests, the doors, the ways out, the expedition into the cave, its
+two trials, and the start of the fight. Its win and the Horntail party
+quest are still to come. The slice
 plan and its open questions are in v83ref's `reports/a115-horntail.md`; the
 defaults shipped are under "a115" in `lanes/QUESTIONS.md`.
 
@@ -52,7 +53,7 @@ those on its roster may go back in at the Mark, and others are turned away.
 Leaving the cave's maps, by the Crystal of Roots or otherwise, leaves it.
 
 Not yet: Cosmic's `[Expedition]` entered and left lines (Zakum has none
-either), and the fight.
+either).
 
 ## The trials
 
@@ -79,6 +80,45 @@ Not in:
   Zakum body (8800000) and a second head.
 - The `hontale_boss1/2` touch portals, which have no source script.
 
+## The fight
+
+Horntail's Cave holds a stone (reactor 2401000, `reactors::HORNTAIL_STONE`)
+at (598,-91), which never comes back once broken. Its sixth hit
+(`Action::Horntail`, `bring_out_horntail` in the field) does what Cosmic's
+`2401000.js` does:
+
+- plays `Bgm14/HonTale` (`HORNTAIL_MUSIC`);
+- unless his summoning is already out, puts on the ground below (71,260)
+  (`mobs::HORNTAIL_AT`) the summoning (8810026, `HORNTAIL_INTRO`), which
+  leaves after a second, then the body (8810018, `HORNTAIL`) and its eight
+  parts (8810002-09, `HORNTAIL_PARTS`), each spawned as out of the
+  summoning (appearance -3 with its object id, `MobView::parent`), and
+  shows the body's HP bar. The summoning's own `revive` lists the nine
+  again; it is placed without it, so that killing it (it has 40,000 HP)
+  brings out no second Horntail;
+- in the expedition's copy, restarts its clock at 60 minutes
+  (`EventCommand::RestartClock`, `HORNTAIL_FIGHT_MINUTES`; Cosmic's
+  `restartEventTimer`), shown to each member as a new countdown;
+- says a line to the map (`horntail.summoned`, BROADCAST_MSG type 6).
+
+The parts share the body's HP (`Link` in `field_mobs`, after Cosmic's
+`spawnHorntailOnGroundBelow`):
+
+- What a part takes, from hits or from poison and other statuses, it also
+  takes off the body, credited to the attacker, but the body keeps at
+  least 1 HP. What a part heals or recovers, the body heals too.
+- The body itself loses no HP to hits or statuses and gains none from
+  heals.
+- Hitting a part shows the body's HP bar (`MobSet::bar_for`), not the
+  part's.
+- A part's death lets out its dead part (8810010-17, its `revive`).
+
+Not in yet:
+
+- The win: Cosmic kills the body once all eight dead parts are on the map.
+- HeavenClient shows the -3 children at once, rather than once their
+  parent leaves as the original client does.
+
 ## Tests
 
 `net`'s `keroben_and_the_slate_let_the_dragon_squad_on_toward_horntail`
@@ -91,4 +131,9 @@ through the shop, the slate and both ways out;
 `tests/horntail_squad.rs` gathers an expedition, takes it in, turns another
 away, lets its leader step out and back, and frees the channel once the last
 has left; `tests/horntail_trials.rs` beats both heads and walks through
-the sealed and then open doors into Horntail's Cave.
+the sealed and then open doors into Horntail's Cave; `tests/horntail_boss.rs`
+breaks the stone, checks the summoning, the body, the parts and the clock,
+and beats the tail, which lowers the body's bar but leaves it alive.
+`field_mobs`'s `horntails_parts_share_its_hp_but_never_kill_it` and
+`net`'s `horntails_stone_breaks_on_its_sixth_hit` and
+`a_mob_out_of_another_names_it` cover the rest.
