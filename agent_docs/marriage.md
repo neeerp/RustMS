@@ -256,7 +256,8 @@ Slices 7a to 7f of report b071 marry a couple at the Chapel or the
 Cathedral before their guests, with the priest's lines over the altar, the
 Cathedral guests' blessings and their reward, the news to the couple's
 guild and family, and a premium wedding's party room and hunting grounds.
-The Giant Cake and the onyx chests are left for later.
+The Giant Cake comes out in the hunting ground, and the onyx chests are
+left for later.
 
 Wayne (9201012) in Amoria starts a booked Chapel wedding, and High Priest
 John (9201002) in Amoria a booked Cathedral one
@@ -412,6 +413,15 @@ their loot with piles of 100-399 mesos, at least 15 drops in all
 (`net::reactors`, Cosmic `sprayItems(true, 1, 100, 400, 15)`). Most of
 them come back a second after breaking (`reactorTime 1`), so one entry
 lets a player break boxes until the clock runs out (review b083).
+
+The wedding's copy of the hunting ground opens with one Giant Cake
+(`GIANT_CAKE`, 9400606) on the ground below `GIANT_CAKE_AT` (777,-177),
+as Cosmic's `spawnCakeBoss` does (`FieldActor::new`). The copy lasts the
+wedding, so there is one cake per wedding, and the public map has none.
+Killing it leaves the clock running: Cosmic's kill clears the event and
+stops the clock, and an instance with no time limit would never close
+(QUESTIONS Q3). It drops nothing yet: the content pack has no row for
+it, and Cosmic's mesos and equips would need one.
 
 ### The wishlist and gifts
 
@@ -666,9 +676,9 @@ For crush and friendship rings:
 ## Not done yet
 
 - Taking the wedding rings when a married couple breaks up.
-- The rest of the wedding: in the hunting ground the Giant Cake 9400606 (Cosmic spawns it once per wedding
-  and its kill stops the clock) and the onyx chests 4031423/4 that Pila
-  9201014 opens (report b082). The content pack gives the keys and the
+- The rest of the wedding: the onyx chests 4031423/4 that Pila 9201014
+  opens (report b082), and the Giant Cake's drops (the content pack
+  has none). The content pack gives the keys and the
   chests a `period`, which RustMS ignores: the chests it grants don't
   expire (review b083).
 - A hint, after booking, about the couple's wedding clothes. Report b066

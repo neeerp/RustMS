@@ -51,6 +51,8 @@ const INVITATION: i32 = 4031407;
 const HEART_KEY: i32 = 4031409;
 /// The hunting ground's Cake Monster.
 const CAKE: i32 = 9400507;
+/// Its Giant Cake, one to each wedding.
+const GIANT_CAKE: i32 = 9400606;
 /// A box of the box room.
 const BOX: i32 = 6802000;
 /// The assistants' menu choice for guests.
@@ -403,13 +405,19 @@ async fn a_premium_wedding_goes_on_to_the_party_room() {
     let t = arrive(&mut guest, HUNTING_GROUND, t).await;
     let cakes = t.field.mobs.iter().filter(|&&(_, mob)| mob == CAKE);
     assert!(cakes.count() > 0, "{:?}", t.field.mobs);
+    // The wedding's copy opened with its one Giant Cake.
+    let giant = t.field.mobs.iter().filter(|&&(_, mob)| mob == GIANT_CAKE);
+    assert_eq!(giant.count(), 1, "{:?}", t.field.mobs);
     let t = robin(&mut guest, HUNTING_GROUND, 0).await;
     let t = arrive(&mut guest, BOX_ROOM, t).await;
     assert_eq!(t.items, [(HEART_KEY, -7)]);
     let boxes = t.field.reactors.iter().filter(|r| r.reactor_id == BOX);
     assert!(boxes.count() > 0, "{:?}", t.field.reactors);
     let t = say_yes(&mut guest, BOX_ROOM, ROBIN).await;
-    arrive(&mut guest, HUNTING_GROUND, t).await;
+    let t = arrive(&mut guest, HUNTING_GROUND, t).await;
+    // It is still the one: coming back brings no second.
+    let giant = t.field.mobs.iter().filter(|&&(_, mob)| mob == GIANT_CAKE);
+    assert_eq!(giant.count(), 1, "{:?}", t.field.mobs);
     // Two keys open nothing; leaving takes them.
     let t = robin(&mut guest, HUNTING_GROUND, 0).await;
     assert_eq!(t.prompts, [(ROBIN, 0)], "{:?}", t.prompt_texts);
