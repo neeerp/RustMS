@@ -275,6 +275,9 @@ namespace ms
 		// PLAY_JUKEBOX: a song plays until the player leaves the field (v83 CField+0x20).
 		void start_jukebox();
 
+		// LOCK_UI 0: the field's BGM fades out and starts again, ending a jukebox song (FUN_00644482).
+		void restart_bgm();
+
 		// Whether a weather item or a jukebox has to wait: a jukebox song plays, or the field's weather isn't over
 		// (FUN_00a0ec80, FUN_00a0ec3b).
 		bool effect_busy() const;

@@ -299,6 +299,16 @@ namespace ms
 			Music(bgm_override).play(1000, 0, 1000);
 	}
 
+	void MapWeather::restart_bgm() const
+	{
+		// After the fade and the wait the old track stops, and the one restore_bgm picks starts: a field effect's
+		// rising over 1 s, the map's at once (FUN_00642214, FUN_0064211e).
+		if (bgm_override.empty())
+			Music(bgm).restart(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, 0);
+		else
+			Music(bgm_override).restart(field_effect::JUKEBOX_FADE, field_effect::JUKEBOX_DELAY, 1000);
+	}
+
 	void MapWeather::update()
 	{
 		now += Constants::TIMESTEP;

@@ -42,6 +42,7 @@ namespace ms
 	alure::Source Music::music_src;
 	alure::Buffer Music::music_buff;
 	float Music::volume = 1.0f;
+	std::string Music::current;
 	std::string Music::pending;
 	std::chrono::steady_clock::time_point Music::fade_start;
 	int32_t Music::fade_length = 0;
@@ -313,11 +314,19 @@ namespace ms
 
 	void Music::play(int32_t fadeout, int32_t delay, int32_t fadein, bool loop) const
 	{
-		static std::string bgmpath = "";
-
-		if (path == bgmpath)
+		if (path == current)
 			return;
 
+		queue(fadeout, delay, fadein, loop, false);
+	}
+
+	void Music::restart(int32_t fadeout, int32_t delay, int32_t fadein) const
+	{
+		queue(fadeout, delay, fadein, true, true);
+	}
+
+	void Music::queue(int32_t fadeout, int32_t delay, int32_t fadein, bool loop, bool again) const
+	{
 		/* will throw std::out:of:range if not used before. */
 		try
 		{
@@ -334,14 +343,14 @@ namespace ms
 			audiodb[path] = new membuf(data + 82, ad.length() - 82);
 		}
 
-		bgmpath = path;
+		current = path;
 		fadein_length = fadein;
 		looping = loop;
 
 		// v83 fades the old track out and then starts the new one (PlayBGM 0x43f301).
 		if ((fadeout > 0 && music_src.isPlaying()) || delay > 0)
 		{
-			if (pending.empty())
+			if (pending.empty() || again)
 			{
 				fade_start = std::chrono::steady_clock::now();
 				fade_length = fadeout;

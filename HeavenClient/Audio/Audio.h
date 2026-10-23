@@ -178,6 +178,10 @@ namespace ms
 		// that many ms.
 		void play(int32_t fadeout = 0, int32_t delay = 0, int32_t fadein = 0, bool loop = true) const;
 
+		// Play this track from its start, as play does, even when it is the one playing, and restart the fade-out
+		// and the delay from now.
+		void restart(int32_t fadeout, int32_t delay, int32_t fadein) const;
+
 		void play_once() const;
 
 		static Error init();
@@ -193,6 +197,8 @@ namespace ms
 	private:
 		std::string path;
 
+		void queue(int32_t fadeout, int32_t delay, int32_t fadein, bool loop, bool again) const;
+
 		static void start(const std::string &path);
 
 		static std::unordered_map<std::string, membuf *> audiodb;
@@ -202,6 +208,8 @@ namespace ms
 		static alure::Source music_src;
 		static alure::Buffer music_buff;
 		static float volume;
+		// The track last asked for, playing or pending.
+		static std::string current;
 		// The track to start once the one playing has faded out.
 		static std::string pending;
 		static std::chrono::steady_clock::time_point fade_start;
