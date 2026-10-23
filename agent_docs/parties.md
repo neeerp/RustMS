@@ -70,8 +70,8 @@ reply. The server answers only with invitations.
   are RustMS's own: Cosmic searches the whole world, and v83's server rules
   are unknown.
 - The invitation is the ordinary one with its last byte set to 1. v83 then
-  joins without asking if the player allows party searches. Otherwise it
-  drops the invitation silently. A search's invitation never makes anyone
+  joins without asking if the player allows party searches and the leader
+  isn't on the Blacklist. Otherwise it drops the invitation silently. A search's invitation never makes anyone
   busy, and an ordinary invitation replaces it.
 - A search ends on 0xDF, when the leader goes offline or changes channel,
   and at a tick where the party is gone, has a new leader, or has reached the

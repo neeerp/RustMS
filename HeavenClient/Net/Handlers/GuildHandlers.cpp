@@ -6,6 +6,7 @@
 
 #include "../Packets/GameplayPackets.h"
 
+#include "../../Character/Blacklist.h"
 #include "../../Character/Job.h"
 #include "../../Configuration.h"
 #include "../../Data/CurseData.h"
@@ -167,8 +168,9 @@ namespace ms
 		}
 
 		// An invitation (FUN_00a37490): a card, unless one is up already, the
-		// Game Option blocks it or the player is busy with a window, when the
-		// client turns it down itself. The card's X declines; letting it fade
+		// Game Option blocks it, the inviter is on the Blacklist (report b091)
+		// or the player is busy with a window, when the client turns it down
+		// itself. The card's X declines; letting it fade
 		// says nothing.
 		void invited(int32_t guild_id, const std::string& inviter)
 		{
@@ -178,7 +180,7 @@ namespace ms
 			if (cards && cards->showing(UIInviteCard::GUILD))
 				return DenyGuildRequestPacket(DenyGuildRequestPacket::ANOTHER, inviter, self).dispatch();
 
-			if (!cards || !Setting<AllowGuildInvite>::get().load() || UI::get().modal_open())
+			if (!cards || !Setting<AllowGuildInvite>::get().load() || Blacklist::listed(inviter) || UI::get().modal_open())
 				return DenyGuildRequestPacket(DenyGuildRequestPacket::BUSY, inviter, self).dispatch();
 
 			cards->add(UIInviteCard::GUILD, inviter, [guild_id, inviter, self](bool yes)

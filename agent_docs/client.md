@@ -159,9 +159,9 @@ from `UI.nx`. Moved so far:
   pile up too, and O opens the Quest Log's Available tab on the quest
   (`UIQuestLog::show_quest`); neither sends a packet. Each
   card, quest completions included, sits 5 px above the one before it
-  (`FadeNotice::raised`), and only the newest can be clicked. Not done: the
-  cash trade card, holding cards back while the UI is locked, and the Game
-  Option and blacklist refusals.
+  (`FadeNotice::raised`), and only the newest can be clicked. The Game
+  Option and the Blacklist turn invitations away before a card shows. Not
+  done: the cash trade card, and holding cards back while the UI is locked.
 - **Minimap** (`UIMiniMap`, `UIWindow.img/MiniMap`): folded to its title bar,
   the map alone (`MinMap`), or the map under the map's mark, street, and name
   (`MaxMap`), laid out from period footage. M or the `Basic.img` minus and
@@ -305,8 +305,8 @@ from `UI.nx`. Moved so far:
     the server doesn't send it.
 - **Game Option** (`UIGameOption`, `UIWindow.img/GameOpt`), from MENU: a
   `Basic.img/CheckBox` right of each row's ALLOW, laid out from the
-  background. OK saves the boxes as the `Allow*` settings; the client doesn't
-  act on them yet.
+  background. OK saves the boxes as the `Allow*` settings, which the
+  handlers for whispers, group chat and invitations check.
 - **System Option** (`UISystemOption`, `UIWindow.img/SysOpt`), from MENU:
   `Basic.img/Slider` sliders (`ClassicSlider`) between each row's end labels,
   mute, screen shake, and WINDOW / FULL SCREEN boxes, laid out from the
@@ -602,7 +602,7 @@ side yet.
 | Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
 | Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
 | Alliance (`Character/Alliance`, invitation and login cards, alliance chat) | State, cards, chat and the Alliance tab with its rank panel implemented; see `guilds.md` |
-| Blacklist tab (`UIUserList`) | Implemented: Add and Delete, kept in the `BlackList` setting and sent with a shop's opening; see "Personal shops" in `inventory.md`. Whisper and invitation refusals are not done |
+| Blacklist tab (`UIUserList`) | Implemented: Add and Delete, kept in the `BlackList` setting and sent with a shop's opening; whispers, chat and invitations from its names are turned away. See "Personal shops" in `inventory.md` |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
 | Cash shop (`UICashShop`) | Enter/exit, catalog, buying, gifts, Cash Inventory, wish list, and moving items to and from the bags |
 | Maple Messenger (`UIMessenger`) | Implemented |

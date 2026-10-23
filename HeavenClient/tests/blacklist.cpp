@@ -42,6 +42,11 @@ int main()
 		require(check(listed, "Bob1", "Bob1", false) == Refusal::SELF, "yourself is checked first");
 		require(check(parse(many), "Carl", "Self", false) == Refusal::FULL, "no 27th");
 
+		require(ms::Blacklist::listed(listed, "Bob1") && ms::Blacklist::listed(listed, "alice"), "a sender listed");
+		require(!ms::Blacklist::listed(listed, "BOB1") && !ms::Blacklist::listed(listed, "Alice"),
+				"a sender is looked up letter for letter");
+		require(!ms::Blacklist::listed(Names(), "Bob1"), "nothing listed");
+
 		remove(listed, "Bob1");
 		require(listed == Names({ "alice" }), "deleted");
 		remove(listed, "Nobody");

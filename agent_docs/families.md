@@ -245,7 +245,8 @@ b045 (how they open).
 - **Adding a junior:** the name prompt, or the avatar menu's Family row
   (shown once INFO says there is room), sends `ADD_FAMILY`.
 - **Being asked:** `FAMILY_JOIN_REQUEST` shows a Family card, unless one is
-  up or the Game Option blocks it, when the client declines by itself. The
+  up, the Game Option blocks it, or the inviter is on the Blacklist, when
+  the client declines by itself. The
   card's X declines, and fading sends nothing. O asks once more with a
   Yes/No before answering.
 - **Login notices:** a relative logging in shows a card, and the open tree

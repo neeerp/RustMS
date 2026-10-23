@@ -4,6 +4,7 @@
 
 #include "../Packets/FamilyPackets.h"
 
+#include "../../Character/Blacklist.h"
 #include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/FamilyActions.h"
@@ -145,8 +146,9 @@ namespace ms
 			ok(with_number(text, arg));
 	}
 
-	// A card, unless one is up already or the Game Option blocks it, when
-	// the client says no itself (report b039 1.4). Its X says no; letting it fade
+	// A card, unless one is up already, the Game Option blocks it or the
+	// inviter is on the Blacklist, when the client says no itself (reports
+	// b039 1.4, b091). Its X says no; letting it fade
 	// says nothing. O asks once more before saying yes.
 	void FamilyJoinRequestHandler::handle(InPacket& recv) const
 	{
@@ -155,7 +157,7 @@ namespace ms
 
 		auto cards = UI::get().get_element<UIInviteCard>();
 
-		if (!cards || cards->showing(UIInviteCard::FAMILY) || !Setting<AllowFamilyInvite>::get().load())
+		if (!cards || cards->showing(UIInviteCard::FAMILY) || !Setting<AllowFamilyInvite>::get().load() || Blacklist::listed(name))
 			return AcceptFamilyPacket(inviter, name, false).dispatch();
 
 		cards->add(UIInviteCard::FAMILY, name, [inviter, name](bool yes)

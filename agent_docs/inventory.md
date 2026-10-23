@@ -1534,6 +1534,18 @@ It holds 26, two to a row in byte order, and Delete removes the picked
 name with no confirmation. While the player's own shop is open, adding
 and deleting also send `0x1f` and `0x20`; a hired merchant's never do.
 
+The client also turns away what a listed name sends it (report b091),
+matching the name letter for letter, as the Game Option does when it
+blocks the same thing; the player who listed the name sees nothing, and
+the sender hears what the server makes of the refusal. A whisper gets
+`0x78 {0x22, sender}` unless it is from an admin. Buddy, guild and
+alliance chat is dropped; party chat is not. Invitations are declined: a
+trade (`MiniRoomDeclinePacket` reason 4), a party (`0x15`, or `0x16`
+while a party card shows), a guild (`0x35`, or `0x36`), a family, and a
+messenger. A party search's invitation is
+dropped without an answer. v83 doesn't check a shop's visitors against
+the list; the server does that with the copy the shop got at its opening.
+
 When the last bundle sells, the shop closes: the visitors get LEAVE reason
 `0xe` and the owner `{0xa, 0, 0xe}`. The owner leaving (`0xa`), changing
 maps or channels, entering the Cash Shop, or logging out also closes it.

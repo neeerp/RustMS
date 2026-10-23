@@ -502,8 +502,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
 
 ## Not implemented
 
-- The card's option to refuse all invitations, and the blacklist, which
-  v83 also checks before showing one.
 - The rank panel's slide in and out. v83 keeps the panel's edits if it is
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt

@@ -71,6 +71,11 @@ namespace ms
 		}
 	}
 
+	bool Blacklist::listed(const std::string& name)
+	{
+		return listed(saved_blacklist(), name);
+	}
+
 	void UIUserList::init_blacklist()
 	{
 		nl::node BlackList = NxFiles::ui_classic["UIWindow.img"]["UserList"]["BlackList"];
