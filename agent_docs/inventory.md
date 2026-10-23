@@ -1040,26 +1040,36 @@ place, and is dragged by its top 20 px, a height not checked against v83.
 
 ### NPC item makers
 
-Three NPCs make equipment from materials and mesos: Serryl (1091003, in
-the Nautilus's hallway) makes pirates' knucklers, guns and gloves, Neve
-(2010003, Orbis Park) makes and upgrades gloves for each class, and Mos
-(2080000, Leafre) forges the Dragon weapons. `net::item_makers` keeps
-their recipes, with items, materials and prices taken from Cosmic's
-scripts. The conversation is a menu of kinds, then a menu of items, then a
-yes/no question that lists each material and the price. A yes is one
-transactional step: `SpendMeso`, a `TakeItem` for each material, then the
-item. If anything is missing the maker says `maker.short` and takes
-nothing; if the item doesn't fit, `maker.full`. Upgrades take the glove
-they upgrade as a material.
+Nine NPCs make equipment from materials and mesos: Serryl (1091003, in the
+Nautilus's hallway) makes pirates' knucklers, guns and gloves, Neve
+(2010003, Orbis Park) makes and upgrades gloves for each class, Mos
+(2080000, Leafre) forges the Dragon weapons, Francois (1032002, Ellinia)
+makes magicians' gloves, wands and staffs and upgrades their gloves and
+the Bronze Pride, Chrishrama (1061000, Sleepywood) and Gordon (2020002, El
+Nath Market) make shoes for each class, Sarah (2040020) and Tara
+(2040021), in their house in Ludibrium (220000303), make gloves and shoes,
+and Rydole (2040022, the Toy Factory's Aparatus Room) makes weapons from
+their manuals. `net::item_makers` keeps their recipes, with items,
+materials and prices taken from Cosmic's scripts. The conversation is a
+menu of kinds, then a menu of items, then a yes/no question that lists
+each material and the price. A yes is one transactional step: `SpendMeso`,
+a `TakeItem` for each material, then the item. If anything is missing the
+maker says `maker.short` and takes nothing; if the item doesn't fit,
+`maker.full`. Upgrades take the glove they upgrade as a material.
 
-Mos also offers each class "with a stimulator": it takes the weapon kind's
-stimulator (`item_makers::stimulator`, 4130002-4130017) as well, and gives
-the weapon through `Effect::GiveVariedItem`, with its stats varied like a
-drop's (`items::give_dropped`). One time in ten (`STIMULATOR_LOSS`) the
-weapon is lost and only the materials are taken. The roll is made when the
-conversation opens. While quest 7301 or 7303 is started, Mos also makes
-Cornian's Dagger (4001078). No sourced text exists for these NPCs, so all
-of it is placeholder (`maker.*`).
+Mos, Sarah, Tara and Rydole also offer each class "with a stimulator"
+(`stimulator_choices`): it takes the item kind's stimulator
+(`item_makers::stimulator`: 4130000 for gloves, 4130001 for shoes,
+4130002-4130017 for weapons) as well, and gives the item through
+`Effect::GiveVariedItem`, with its stats varied like a drop's
+(`items::give_dropped`). One time in ten (`STIMULATOR_LOSS`) the item is
+lost and only the materials are taken. The roll is made when the
+conversation opens. Tara's and Rydole's stimulated items are their plain
+ones, except that Rydole's thieves' menu also upgrades claws; Sarah's are
+upgrades of her plain gloves, and only made with a stimulator. Sarah's and
+Tara's prices are a tenth below the other makers'. While quest 7301 or
+7303 is started, Mos also makes Cornian's Dagger (4001078). No sourced
+text exists for these NPCs, so all of it is placeholder (`maker.*`).
 
 ### Refiners
 
@@ -1701,7 +1711,9 @@ grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
 and checks both are saved. `net::npc_scripts` covers the item makers'
 menus, questions and trades, and `item_makers` (integration) makes Leather
 Arms at Serryl, is refused without the Leather, and forges a stimulated
-Dragon Carabella at Mos. `skill_books` (integration) refuses a mastery
+Dragon Carabella at Mos; `makers_of_ellinia_and_ludibrium` (integration)
+upgrades a Bronze Pride at Francois and a Bronze Missel with a stimulator
+at Sarah. `skill_books` (integration) refuses a mastery
 book for another job and teaches Fire Demon to an Arch Mage.
 `game::scroll` covers the fit, the slot checks and each kind's roll;
 `net`'s scroll handler covers the packets, the White Scroll, the curse and

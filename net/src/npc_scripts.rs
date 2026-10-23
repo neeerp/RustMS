@@ -356,6 +356,12 @@ const SITE_EXIT: i32 = 1052011;
 const SERRYL: i32 = 1091003;
 const NEVE: i32 = 2010003;
 const MOS: i32 = 2080000;
+const FRANCOIS: i32 = 1032002;
+const CHRISHRAMA: i32 = 1061000;
+const GORDON: i32 = 2020002;
+const SARAH: i32 = 2040020;
+const TARA: i32 = 2040021;
+const RYDOLE: i32 = 2040022;
 /// Mos makes Cornian's Dagger while either of these quests is under way.
 const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
 /// The money sack drawn beside a price.
@@ -1416,6 +1422,136 @@ impl NpcScript {
                 ))
             }
             MOS => return Some(mos(player, &mut rand::thread_rng())),
+            FRANCOIS => {
+                return Some(item_maker(
+                    FRANCOIS,
+                    keys::MAKER_FRANCOIS_HELLO,
+                    &[
+                        (keys::REFINER_MAKE_GLOVE, item_makers::FRANCOIS_GLOVES),
+                        (
+                            keys::REFINER_UPGRADE_GLOVE,
+                            item_makers::FRANCOIS_GLOVE_UPGRADES,
+                        ),
+                        (keys::MAKER_UPGRADE_HAT, item_makers::FRANCOIS_HATS),
+                        (keys::MAKER_MAKE_WAND, item_makers::FRANCOIS_WANDS),
+                        (keys::MAKER_MAKE_STAFF, item_makers::FRANCOIS_STAFFS),
+                    ],
+                ))
+            }
+            CHRISHRAMA => {
+                return Some(item_maker(
+                    CHRISHRAMA,
+                    keys::MAKER_CHRISHRAMA_HELLO,
+                    &[
+                        (keys::MAKER_SHOES_WARRIOR, item_makers::CHRISHRAMA_WARRIOR),
+                        (keys::MAKER_SHOES_BOWMAN, item_makers::CHRISHRAMA_BOWMAN),
+                        (keys::MAKER_SHOES_MAGICIAN, item_makers::CHRISHRAMA_MAGICIAN),
+                        (keys::MAKER_SHOES_THIEF, item_makers::CHRISHRAMA_THIEF),
+                    ],
+                ))
+            }
+            GORDON => {
+                return Some(item_maker(
+                    GORDON,
+                    keys::MAKER_GORDON_HELLO,
+                    &[
+                        (keys::MAKER_SHOES_WARRIOR, item_makers::GORDON_WARRIOR),
+                        (keys::MAKER_SHOES_BOWMAN, item_makers::GORDON_BOWMAN),
+                        (keys::MAKER_SHOES_MAGICIAN, item_makers::GORDON_MAGICIAN),
+                        (keys::MAKER_SHOES_THIEF, item_makers::GORDON_THIEF),
+                    ],
+                ))
+            }
+            SARAH => {
+                return Some(stimulating_maker(
+                    SARAH,
+                    keys::MAKER_SARAH_HELLO,
+                    &[
+                        (keys::MAKER_GLOVES_WARRIOR, item_makers::SARAH_WARRIOR),
+                        (keys::MAKER_GLOVES_BOWMAN, item_makers::SARAH_BOWMAN),
+                        (keys::MAKER_GLOVES_MAGICIAN, item_makers::SARAH_MAGICIAN),
+                        (keys::MAKER_GLOVES_THIEF, item_makers::SARAH_THIEF),
+                    ],
+                    &[
+                        (
+                            keys::MAKER_GLOVES_WARRIOR_UPGRADED,
+                            item_makers::SARAH_WARRIOR_UPGRADES,
+                        ),
+                        (
+                            keys::MAKER_GLOVES_BOWMAN_UPGRADED,
+                            item_makers::SARAH_BOWMAN_UPGRADES,
+                        ),
+                        (
+                            keys::MAKER_GLOVES_MAGICIAN_UPGRADED,
+                            item_makers::SARAH_MAGICIAN_UPGRADES,
+                        ),
+                        (
+                            keys::MAKER_GLOVES_THIEF_UPGRADED,
+                            item_makers::SARAH_THIEF_UPGRADES,
+                        ),
+                    ],
+                    &mut rand::thread_rng(),
+                ))
+            }
+            TARA => {
+                return Some(stimulating_maker(
+                    TARA,
+                    keys::MAKER_TARA_HELLO,
+                    &[
+                        (keys::MAKER_SHOES_WARRIOR, item_makers::TARA_WARRIOR),
+                        (keys::MAKER_SHOES_BOWMAN, item_makers::TARA_BOWMAN),
+                        (keys::MAKER_SHOES_MAGICIAN, item_makers::TARA_MAGICIAN),
+                        (keys::MAKER_SHOES_THIEF, item_makers::TARA_THIEF),
+                    ],
+                    &[
+                        (
+                            keys::MAKER_SHOES_WARRIOR_STIMULATED,
+                            item_makers::TARA_WARRIOR,
+                        ),
+                        (
+                            keys::MAKER_SHOES_BOWMAN_STIMULATED,
+                            item_makers::TARA_BOWMAN,
+                        ),
+                        (
+                            keys::MAKER_SHOES_MAGICIAN_STIMULATED,
+                            item_makers::TARA_MAGICIAN,
+                        ),
+                        (keys::MAKER_SHOES_THIEF_STIMULATED, item_makers::TARA_THIEF),
+                    ],
+                    &mut rand::thread_rng(),
+                ))
+            }
+            RYDOLE => {
+                return Some(stimulating_maker(
+                    RYDOLE,
+                    keys::MAKER_RYDOLE_HELLO,
+                    &[
+                        (keys::MAKER_MOS_WARRIOR, item_makers::RYDOLE_WARRIOR),
+                        (keys::MAKER_MOS_BOWMAN, item_makers::RYDOLE_BOWMAN),
+                        (keys::MAKER_MOS_MAGICIAN, item_makers::RYDOLE_MAGICIAN),
+                        (keys::MAKER_MOS_THIEF, item_makers::RYDOLE_THIEF),
+                    ],
+                    &[
+                        (
+                            keys::MAKER_MOS_WARRIOR_STIMULATED,
+                            item_makers::RYDOLE_WARRIOR,
+                        ),
+                        (
+                            keys::MAKER_MOS_BOWMAN_STIMULATED,
+                            item_makers::RYDOLE_BOWMAN,
+                        ),
+                        (
+                            keys::MAKER_MOS_MAGICIAN_STIMULATED,
+                            item_makers::RYDOLE_MAGICIAN,
+                        ),
+                        (
+                            keys::MAKER_MOS_THIEF_STIMULATED,
+                            item_makers::RYDOLE_THIEF_STIMULATED,
+                        ),
+                    ],
+                    &mut rand::thread_rng(),
+                ))
+            }
             _ => {}
         }
         // These fall through when silent, so the same NPCs can say more.
@@ -2614,57 +2750,88 @@ fn item_maker(npc_id: i32, hello: &str, kinds: &[(&str, &[Recipe])]) -> NpcScrip
     with_maker_words(NpcScript::new(npc_id, vec![menu]))
 }
 
-/// Mos: a weapon of each class, or the same with a stimulator, which takes
-/// one of the weapon's kind and varies its stats as a drop's are, or loses
-/// it one time in `STIMULATOR_LOSS` (rolled as the conversation opens). He
-/// also makes Cornian's Dagger for the way to Moira.
-fn mos(player: &Player, rng: &mut impl Rng) -> NpcScript {
-    let classes = [
-        (
-            keys::MAKER_MOS_WARRIOR,
-            keys::MAKER_MOS_WARRIOR_STIMULATED,
-            item_makers::MOS_WARRIOR,
-        ),
-        (
-            keys::MAKER_MOS_BOWMAN,
-            keys::MAKER_MOS_BOWMAN_STIMULATED,
-            item_makers::MOS_BOWMAN,
-        ),
-        (
-            keys::MAKER_MOS_MAGICIAN,
-            keys::MAKER_MOS_MAGICIAN_STIMULATED,
-            item_makers::MOS_MAGICIAN,
-        ),
-        (
-            keys::MAKER_MOS_THIEF,
-            keys::MAKER_MOS_THIEF_STIMULATED,
-            item_makers::MOS_THIEF,
-        ),
-        (
-            keys::MAKER_MOS_PIRATE,
-            keys::MAKER_MOS_PIRATE_STIMULATED,
-            item_makers::MOS_PIRATE,
-        ),
-    ];
-    let mut choices = vec![(
-        text(keys::MAKER_MOS_WHAT),
-        vec![Page::Say(text(keys::MAKER_MOS_STIMULATOR))],
-    )];
-    for (label, _, recipes) in classes {
+/// The shoes, gloves and weapons makers who take a stimulator too: what
+/// one is, then each kind of `plain` items, then each kind of `stimulated`
+/// ones. A stimulator of the item's kind varies its stats as a drop's are,
+/// or loses everything one time in `STIMULATOR_LOSS` (rolled as the
+/// conversation opens), when the maker says `lost`.
+fn stimulator_choices(
+    explained: &str,
+    lost: &'static str,
+    plain: &[(&str, &[Recipe])],
+    stimulated: &[(&str, &[Recipe])],
+    rng: &mut impl Rng,
+) -> Vec<(String, Vec<Page>)> {
+    let mut choices = vec![(text(keys::MAKER_MOS_WHAT), vec![Page::Say(text(explained))])];
+    for &(label, recipes) in plain {
         let pages = recipes.iter().map(|recipe| make(recipe, None)).collect();
         choices.push((text(label), vec![recipe_menu(recipes, pages)]));
     }
-    for (_, label, recipes) in classes {
+    for &(label, recipes) in stimulated {
         let pages = recipes
             .iter()
             .map(|recipe| {
-                let stimulator = item_makers::stimulator(recipe.item)
-                    .map(|item| (item, rng.gen_range(0, item_makers::STIMULATOR_LOSS) == 0));
+                let stimulator = item_makers::stimulator(recipe.item).map(|item| {
+                    let loses = rng.gen_range(0, item_makers::STIMULATOR_LOSS) == 0;
+                    (item, loses.then_some(lost))
+                });
                 make(recipe, stimulator)
             })
             .collect();
         choices.push((text(label), vec![recipe_menu(recipes, pages)]));
     }
+    choices
+}
+
+/// Sarah, Tara or Rydole: a maker with stimulators (`stimulator_choices`).
+fn stimulating_maker(
+    npc_id: i32,
+    hello: &str,
+    plain: &[(&str, &[Recipe])],
+    stimulated: &[(&str, &[Recipe])],
+    rng: &mut impl Rng,
+) -> NpcScript {
+    let menu = Page::Menu {
+        text: text(hello),
+        choices: stimulator_choices(
+            keys::MAKER_STIMULATOR,
+            keys::MAKER_STIMULATOR_LOST,
+            plain,
+            stimulated,
+            rng,
+        ),
+    };
+    with_maker_words(NpcScript::new(npc_id, vec![menu]))
+}
+
+/// Mos: a weapon of each class, or the same with a stimulator
+/// (`stimulator_choices`). He also makes Cornian's Dagger for the way to
+/// Moira.
+fn mos(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let plain = [
+        (keys::MAKER_MOS_WARRIOR, item_makers::MOS_WARRIOR),
+        (keys::MAKER_MOS_BOWMAN, item_makers::MOS_BOWMAN),
+        (keys::MAKER_MOS_MAGICIAN, item_makers::MOS_MAGICIAN),
+        (keys::MAKER_MOS_THIEF, item_makers::MOS_THIEF),
+        (keys::MAKER_MOS_PIRATE, item_makers::MOS_PIRATE),
+    ];
+    let stimulated = [
+        (keys::MAKER_MOS_WARRIOR_STIMULATED, item_makers::MOS_WARRIOR),
+        (keys::MAKER_MOS_BOWMAN_STIMULATED, item_makers::MOS_BOWMAN),
+        (
+            keys::MAKER_MOS_MAGICIAN_STIMULATED,
+            item_makers::MOS_MAGICIAN,
+        ),
+        (keys::MAKER_MOS_THIEF_STIMULATED, item_makers::MOS_THIEF),
+        (keys::MAKER_MOS_PIRATE_STIMULATED, item_makers::MOS_PIRATE),
+    ];
+    let mut choices = stimulator_choices(
+        keys::MAKER_MOS_STIMULATOR,
+        keys::MAKER_MOS_LOST,
+        &plain,
+        &stimulated,
+        rng,
+    );
     if CORNIAN_QUESTS
         .iter()
         .any(|&quest| player.quests.state(quest) == QuestState::Started)
@@ -2694,9 +2861,9 @@ fn recipe_menu(recipes: &[Recipe], pages: Vec<Vec<Page>>) -> Page {
 }
 
 /// Ask to make `recipe`, listing what it takes, then say it is done. With
-/// a `stimulator` (its item, and whether the weapon is lost), it takes the
-/// stimulator too.
-fn make(recipe: &Recipe, stimulator: Option<(i32, bool)>) -> Vec<Page> {
+/// a `stimulator` (its item, and what the maker says if the item is lost),
+/// it takes the stimulator too.
+fn make(recipe: &Recipe, stimulator: Option<(i32, Option<&'static str>)>) -> Vec<Page> {
     let materials: Vec<(i32, i16)> = recipe
         .materials
         .iter()
@@ -2718,8 +2885,8 @@ fn make(recipe: &Recipe, stimulator: Option<(i32, bool)>) -> Vec<Page> {
             .map(|&(item_id, quantity)| Effect::TakeItem { item_id, quantity }),
     );
     let done = match stimulator {
-        Some((_, true)) => keys::MAKER_MOS_LOST,
-        Some((_, false)) => {
+        Some((_, Some(lost))) => lost,
+        Some((_, None)) => {
             on_yes.push(Effect::GiveVariedItem(recipe.item));
             keys::MAKER_DONE
         }
@@ -10922,5 +11089,103 @@ mod tests {
             .find(|step| step.effects.contains(&Effect::GiveVariedItem(1302059)))
             .unwrap();
         assert_eq!(page_text(&made), text(keys::MAKER_DONE));
+    }
+
+    #[test]
+    fn victoria_el_nath_and_ludibrium_makers_make_their_items() {
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let ask = |step: Step| match step.prompt {
+            Some(Prompt::YesNo { text, .. }) => text,
+            other => panic!("question expected, got {other:?}"),
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let player = traveller(30, 0, false);
+        // Francois upgrades a Bronze Pride to a Steel Pride.
+        let mut francois = NpcScript::for_npc(FRANCOIS, &player).unwrap();
+        assert_eq!(menu(francois.begin()).matches("#L").count(), 5);
+        francois.respond(ScriptInput::Select(2));
+        let made = francois.respond(ScriptInput::Select(0)).unwrap();
+        assert!(ask(made).contains("#i1002064# 1 #t1002064#"));
+        let made = francois.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(40000),
+                take(1002064, 1),
+                take(4011001, 3),
+                Effect::GiveItem {
+                    item_id: 1002065,
+                    quantity: 1
+                }
+            ]
+        );
+        for npc in [CHRISHRAMA, GORDON] {
+            let mut maker = NpcScript::for_npc(npc, &player).unwrap();
+            assert_eq!(menu(maker.begin()).matches("#L").count(), 4);
+            assert!(maker.refused().is_some());
+        }
+
+        // Sarah, Tara and Rydole: what a stimulator is, four classes, and
+        // four with a stimulator.
+        let mut sarah = NpcScript::for_npc(SARAH, &player).unwrap();
+        assert_eq!(menu(sarah.begin()).matches("#L").count(), 9);
+        assert_eq!(
+            page_text(&sarah.respond(ScriptInput::Select(0)).unwrap()),
+            text(keys::MAKER_STIMULATOR)
+        );
+        // Her stimulator upgrades a Bronze Missel to a Steel Missel.
+        let mut sarah = NpcScript::for_npc(SARAH, &player).unwrap();
+        sarah.begin();
+        sarah.respond(ScriptInput::Select(5));
+        let asked = ask(sarah.respond(ScriptInput::Select(0)).unwrap());
+        assert!(asked.contains("#t1082005#") && asked.contains("#i1082007# 1 "));
+        assert!(asked.contains("#i4130000# 1 ") && asked.contains("18000"));
+        // Tara's shoes take a shoes stimulator.
+        let mut tara = NpcScript::for_npc(TARA, &player).unwrap();
+        tara.begin();
+        tara.respond(ScriptInput::Select(5));
+        assert!(ask(tara.respond(ScriptInput::Select(0)).unwrap()).contains("#i4130001# 1 "));
+        // Rydole's thieves' stimulator menu also upgrades claws.
+        let mut rydole = NpcScript::for_npc(RYDOLE, &player).unwrap();
+        rydole.begin();
+        assert_eq!(
+            menu(rydole.respond(ScriptInput::Select(8)).unwrap())
+                .matches("#L")
+                .count(),
+            16
+        );
+        let asked = ask(rydole.respond(ScriptInput::Select(6)).unwrap());
+        assert!(asked.contains("#t1472009#") && asked.contains("#i1472008# 1 "));
+        assert!(asked.contains("#i4131013# 1 ") && asked.contains("#i4130015# 1 "));
+        // A lost item takes everything, the stimulator too, and gives nothing.
+        let mut lost = stimulating_maker(
+            TARA,
+            keys::MAKER_TARA_HELLO,
+            &[],
+            &[(
+                keys::MAKER_SHOES_WARRIOR_STIMULATED,
+                item_makers::TARA_WARRIOR,
+            )],
+            &mut rand::rngs::mock::StepRng::new(0, 0),
+        );
+        lost.begin();
+        lost.respond(ScriptInput::Select(1));
+        lost.respond(ScriptInput::Select(0));
+        let lost = lost.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            lost.effects,
+            [
+                Effect::SpendMeso(18000),
+                take(4021003, 4),
+                take(4011001, 2),
+                take(4000021, 45),
+                take(4003000, 15),
+                take(4130001, 1)
+            ]
+        );
+        assert_eq!(page_text(&lost), text(keys::MAKER_STIMULATOR_LOST));
     }
 }
