@@ -733,6 +733,13 @@ force-and-friction model (`move_normal`).
   next move then lifts the player off the ground and truncates both speeds to
   whole pixels per second. A knock from standing rises about 18 px and lands
   about 73 px away.
+  A mob attack with `info/knockback` (Horntail's parts, the Pink Bean
+  family, Gatekeeper Nex and others) instead throws the player flat, away
+  from the mob whichever way it faced: left when the mob is further right,
+  else right (`mob_damage::thrown`, 0x958b0d). The throw goes at 1900 px/s
+  from a foothold and 900 px/s from the air, a ladder or a rope, and the
+  move path marks it as element 12. On the ground the walk drag slows it at
+  1600 px/s², so a throw from standing slides about 1100 px.
 - **Walls.** A wall linked to the floor's end, or the foothold after it,
   blocks if it reaches between 1 and 50 px above the feet
   (`FootholdTree::get_wall`). Maps draw walls both top to bottom and bottom
@@ -755,10 +762,6 @@ force-and-friction model (`move_normal`).
   about 110 px (v83 sets this up in `FUN_0042935a` as a Shape2D vector with
   looseness 100). The followed point isn't held inside the view range; only
   the view is.
-- **Not ported yet:**
-  - Mob attacks' own knockback speeds (900 or 1900 px/s, flat).
-  - Swimming knockback: impacts remain queued until normal movement resumes;
-    tracked in [#341](https://github.com/neeerp/RustMS/issues/341).
 
 ## Cash Shop
 

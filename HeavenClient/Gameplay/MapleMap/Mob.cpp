@@ -181,6 +181,7 @@ namespace ms
 			attack.tremble = attackinfo["tremble"].get_bool();
 			attack.deadly = attackinfo["deadlyAttack"].get_bool();
 			attack.mpburn = attackinfo["mpBurn"].get_bool();
+			attack.knockback = attackinfo["knockback"].get_bool();
 			attack.range = box;
 			attack.sp = range["sp"];
 			attack.r = range["r"];
@@ -1100,6 +1101,7 @@ namespace ms
 		attack.element = info.element;
 		attack.deadly = info.deadly;
 		attack.mpburn = info.mpburn;
+		attack.knockback = info.knockback;
 		attack.pushleft = left;
 
 		return attack;
