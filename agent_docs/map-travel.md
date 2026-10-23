@@ -108,6 +108,22 @@ level 50 and Step 3 from it, arriving at portal 0. Louis (`1032004`,
 keys (`shane.*`, `louis.ask`) are `unsourced`. `forest_of_patience.rs` checks
 them through the network harness.
 
+At the end of each forest a pile (`PATIENCE_PILES`) hands something out and
+sends the player out at once, without a word:
+- The pile of flowers (`1043000`, Step 2) and the pile of herbs (`1043001`,
+  Step 5) give Sabitrama's quest item (`4031020`, `4031032`) to a player on
+  quest 2050 or 2051 who lacks it. Everyone also gets a random piece of
+  clothing, weighted, for their gender or for both, some of them NX. They
+  return the player to Ellinia.
+- The pink, blue and white flowers (`1063000`-`1063002`) at the ends of the
+  Deep Forest's steps give John's 10, 20 or 30 flowers to a player on
+  quest 2052, 2053 or 2054 who has fewer. Everyone else gets a few ores.
+  They return the player to the Mysterious Statue's forest (`105040300`).
+
+The prize lists and weights come from Cosmic's scripts, and the shipped default is
+recorded in `v83ref/lanes/QUESTIONS.md`. With no room, `patience.full`
+replaces the visit and the player stays.
+
 ### Stunned and seduced players
 
 A Stun or Seduce takes the client's input (HeavenClient's `disease::steer`),

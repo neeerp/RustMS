@@ -1325,6 +1325,9 @@ pub mod keys {
     pub const TOWER_ROCK_NONE: &str = "tower_rock.none";
     pub const TOWER_ROCK_MENU: &str = "tower_rock.menu";
     pub const TOWER_ROCK_ASK: &str = "tower_rock.ask";
+    /// The piles at the end of the Forests of Patience, with no room for
+    /// what they give.
+    pub const PATIENCE_FULL: &str = "patience.full";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2182,6 +2185,7 @@ mod tests {
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,
+                keys::PATIENCE_FULL,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");
