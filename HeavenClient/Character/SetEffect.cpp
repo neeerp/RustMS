@@ -2,6 +2,7 @@
 
 #include "../Constants.h"
 #include "../Util/Misc.h"
+#include "../Util/Randomizer.h"
 
 #include <nlnx/nx.hpp>
 
@@ -61,15 +62,26 @@ namespace ms
 
 			return loaded;
 		}
+
+		std::array<int32_t, 3> roll_variants(int32_t count)
+		{
+			Randomizer random;
+
+			return set_effect::roll(count, [&](size_t left) { return random.next_int<size_t>(left); });
+		}
 	}
 
-	void SetEffect::set(int32_t set_id)
+	void SetEffect::set(int32_t set_id, bool facing_right)
 	{
 		id = set_id;
 		effect.reset();
 		background.reset();
 		shown = {};
 		opacity = 1.0f;
+		variants = 1;
+
+		for (auto &layer : pet_layers)
+			layer.reset();
 
 		if (id < 0)
 			return;
@@ -78,6 +90,29 @@ namespace ms
 		effect = load(src["effect"]);
 		// It is seen at once, and fades at the next update if the character doesn't stand.
 		background = load(src["backgrnd"]);
+
+		if (src["petBackgrnd"].size() > 0)
+			variants = static_cast<int32_t>(src["petBackgrnd"].size());
+
+		std::array<int32_t, 3> rolled = roll_variants(variants);
+
+		for (size_t i = 0; i < pet_layers.size(); i++)
+			if (worn.pets[i] != 0)
+				pet_layers[i] = load_pet(rolled[i], worn.pets[i], facing_right);
+	}
+
+	std::optional<SetEffect::PetLayer> SetEffect::load_pet(int32_t variant, int32_t pet, bool facing_right) const
+	{
+		nl::node src = nl::nx::effect["SetEff.img"][std::to_string(id)]["petBackgrnd"][std::to_string(variant)];
+
+		if (!src || src.size() == 0)
+			return std::nullopt;
+
+		// Its node has no `fixed`, so it mirrors.
+		PetLayer layer{ src, facing_right, pet };
+		layer.animation.play(Animation::End::LOOP);
+
+		return layer;
 	}
 
 	int32_t SetEffect::get() const
@@ -98,7 +133,8 @@ namespace ms
 		return layer;
 	}
 
-	void SetEffect::update(const CharLook &look, const std::array<int32_t, 3> &pets, bool standing)
+	void SetEffect::update(const CharLook &look, const std::array<int32_t, 3> &pets, bool standing,
+						   bool facing_right)
 	{
 		now += Constants::TIMESTEP;
 
@@ -124,13 +160,20 @@ namespace ms
 
 			int32_t now_id = worn.morphed ? -1 : set_effect::match(sets(), worn.parts, worn.cash_weapon, worn.pets);
 
-			// The set already shown goes on.
+			// The set already shown goes on, and a pet who came for another of its kind has no background
+			// (FUN_009393fc returns at 0x939496).
 			if (now_id != id)
-				set(now_id);
+				set(now_id, facing_right);
+			else
+				for (size_t i = 0; i < pet_layers.size(); i++)
+					if (pet_layers[i] && pet_layers[i]->pet != worn.pets[i])
+						pet_layers[i].reset();
 		}
 
 		if (effect)
 			effect->animation.update();
+
+		update_pets(standing, facing_right);
 
 		if (!background)
 			return;
@@ -143,6 +186,41 @@ namespace ms
 		background->animation.update();
 	}
 
+	void SetEffect::update_pets(bool standing, bool facing_right)
+	{
+		// v83 rolls every frame, but only a background that comes back takes its variant.
+		std::optional<std::array<int32_t, 3>> rolled;
+
+		for (auto &layer : pet_layers)
+		{
+			if (!layer)
+				continue;
+
+			// It comes back as another of the set's, from its first frame, facing as the character does.
+			if (set_effect::step(layer->shown, standing, now))
+			{
+				if (!rolled)
+					rolled = roll_variants(variants);
+
+				size_t i = &layer - pet_layers.data();
+				std::optional<PetLayer> again = load_pet((*rolled)[i], layer->pet, facing_right);
+
+				if (!again)
+				{
+					layer.reset();
+					continue;
+				}
+
+				again->shown = layer->shown;
+				again->opacity = layer->opacity;
+				layer = again;
+			}
+
+			layer->opacity = set_effect::fade(layer->opacity, layer->shown.shown, Constants::TIMESTEP);
+			layer->animation.update();
+		}
+	}
+
 	void SetEffect::draw(bool in_front, Point<int16_t> feet, Point<int16_t> face, bool facing_right,
 						 float alpha) const
 	{
@@ -153,5 +231,13 @@ namespace ms
 		if (background && background->in_front == in_front && opacity > 0.0f)
 			background->animation.draw(
 				DrawArgument(background->at_face ? face : feet, !background->fixed && facing_right, opacity), alpha);
+	}
+
+	void SetEffect::draw_pets(const std::array<Point<int16_t>, 3> &feet, float alpha) const
+	{
+		for (size_t i = 0; i < pet_layers.size(); i++)
+			if (pet_layers[i] && pet_layers[i]->opacity > 0.0f)
+				pet_layers[i]->animation.draw(DrawArgument(feet[i], pet_layers[i]->flip, pet_layers[i]->opacity),
+											  alpha);
 	}
 }

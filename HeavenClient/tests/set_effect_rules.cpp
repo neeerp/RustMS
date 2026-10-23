@@ -96,6 +96,15 @@ int main()
 		require(fade(1.0f, false, 250) == 0.5f && fade(0.1f, false, 250) == 0.0f, "fades out over 500 ms");
 		require(fade(0.0f, true, 250) == 0.5f && fade(0.9f, true, 250) == 1.0f, "and in");
 
+		// Three variants go one to each pet; two go to the first two, and the third has either again.
+		auto first = [](size_t) { return size_t{ 0 }; };
+		auto last = [](size_t left) { return left - 1; };
+		require(roll(3, first) == std::array<int32_t, 3>{ 0, 2, 1 }, "three, each once");
+		require(roll(3, last) == std::array<int32_t, 3>{ 2, 1, 0 }, "three, the other way");
+		require(roll(2, first) == std::array<int32_t, 3>{ 0, 1, 0 }, "two, then again");
+		require(roll(2, last) == std::array<int32_t, 3>{ 1, 0, 1 }, "two, the other way");
+		require(roll(1, last) == std::array<int32_t, 3>{ 0, 0, 0 } && roll(0, last) == roll(1, last), "one");
+
 		std::cout << "Set effect rules passed\n";
 		return 0;
 	}

@@ -201,5 +201,28 @@ namespace ms
 
 			return opacity - delta > 0.0f ? opacity - delta : 0.0f;
 		}
+
+		// The variants of a set's `petBackgrnd` its three pets show (FUN_0066aebf): each of the `count` once, in
+		// a random order, and again from all of them once they run out. `next(m)` is a random number below m.
+		template<class Random>
+		std::array<int32_t, 3> roll(int32_t count, Random &&next)
+		{
+			std::array<int32_t, 3> variants = {};
+			std::vector<int32_t> left;
+
+			for (int32_t &variant : variants)
+			{
+				if (left.empty())
+					for (int32_t i = 0; i < (count > 0 ? count : 1); i++)
+						left.push_back(i);
+
+				size_t pick = next(left.size());
+				variant = left[pick];
+				left[pick] = left.back();
+				left.pop_back();
+			}
+
+			return variants;
+		}
 	}
 }
