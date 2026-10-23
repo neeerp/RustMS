@@ -857,6 +857,7 @@ unsourced = [
     "zakum.mine.unknown_force",
     "zakum.mine.mimics",
     "zakum.ali.bye",
+    "zakum.altar.summoned",
     "tower_rock.none",
     "tower_rock.menu",
     "tower_rock.ask",

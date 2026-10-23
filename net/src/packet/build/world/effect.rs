@@ -31,6 +31,16 @@ pub fn build_field_sound(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// FIELD_EFFECT mode 6: play `Sound.nx/<path>` as the field's music
+/// instead of its own, e.g. Zakum's (`Bgm06/FinalFight`).
+pub fn build_field_music(path: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldEffect as i16)?;
+    p.write_byte(6)?;
+    p.write_str_with_length(path)?;
+    Ok(p)
+}
+
 /// FIELD_EFFECT mode 5 (v83 0x5336ca): the boss HP bar across the top of
 /// the screen for the mob template `mob_id`, in the colours of its
 /// `hpTagColor` and `hpTagBgcolor`. An `hp` below 1 takes the bar down.
@@ -255,6 +265,15 @@ pub fn build_hint(text: &str, width: i16, height: i16) -> Result<Packet, Network
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn field_music_names_its_track() {
+        let packet = build_field_music("Bgm06/FinalFight").unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::FieldEffect as i16).byte(6);
+        expect.string("Bgm06/FinalFight");
+        expect.end();
+    }
 
     #[test]
     fn a_cash_mist_puffs_on_its_user() {

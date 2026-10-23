@@ -37,6 +37,9 @@ pub struct MobView {
     /// A mob just summoned by another appears with this
     /// `Effect/Summon.img` entry rather than fading in.
     pub summon_effect: Option<u8>,
+    /// A mob not yet real comes out trembling (-4), as Zakum's body does
+    /// before its arms (the v83 client shakes the screen for 8800000).
+    pub fake: bool,
 }
 
 /// The statuses as the client reads them (FUN_0078b0b1): their flags, then
@@ -77,12 +80,15 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_short(mob.foothold)?;
     p.write_short(mob.home_foothold)?;
     // How it appears (FUN_00662884): a summon effect of its own, with an
-    // int the client waits in ms before playing it, -2 fading in, or -1
-    // just there.
+    // int the client waits in ms before playing it, -4 not yet real, -2
+    // fading in, or -1 just there.
     match mob.summon_effect {
         Some(effect) => {
             p.write_byte(effect)?;
             p.write_int(0)?;
+        }
+        None if mob.fake => {
+            p.write_byte(-4i8 as u8)?;
         }
         None => {
             p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
@@ -111,6 +117,7 @@ pub fn build_control_mob(mob: &MobView, aggro: bool) -> Result<Packet, NetworkEr
         &mut p,
         &MobView {
             controlled: true,
+            fake: false,
             ..mob.clone()
         },
     )?;
@@ -384,6 +391,7 @@ mod tests {
             controlled: false,
             statuses: Vec::new(),
             summon_effect: None,
+            fake: false,
         }
     }
 
@@ -496,6 +504,20 @@ mod tests {
         expect.bytes(&[0; 16]);
         expect.short(147).short(-25).byte(5).short(45).short(44);
         expect.byte(2).int(0).byte(-1i8 as u8).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_mob_not_yet_real_trembles_in_with_no_delay() {
+        let mut mob = snail();
+        mob.fake = true;
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.bytes(&[0; 16]);
+        expect.short(147).short(-25).byte(5).short(45).short(44);
+        expect.byte(-4i8 as u8).byte(-1i8 as u8).int(0);
         expect.end();
     }
 

@@ -3,10 +3,10 @@
 The way to Zakum in El Nath's Dead Mine, after Cosmic. Built so far: the
 chiefs' approval, the Dead Mine party quest (stage 1, in
 [party-quests](./party-quests.md)), the Breath of Lava (stage 2), the
-forging of the Eyes of Fire (stage 3), and the gate. Not yet: the fight
-itself, the altar, and the expedition squad. The slice plan and its open
-questions are in v83ref's `reports/a097-zakum.md` and
-`reports/a105-zakum-dead-mine.md`.
+forging of the Eyes of Fire (stage 3), the gate, and the boss on its altar.
+Not yet: the win and the expedition squad. The slice plan and its open
+questions are in v83ref's `reports/a097-zakum.md`,
+`reports/a105-zakum-dead-mine.md` and `reports/a106-zakum-boss.md`.
 
 All dialogue is placeholder text (`zakum.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -76,11 +76,56 @@ three it plays the portal sound and leads to the Entrance to Zakum's
 `west00`. Upstream also keeps it shut while the gate reactor (2118002) is
 closed after a win; nothing closes it yet.
 
+## The boss
+
+An Eye of Fire dropped on the altar's reactor (2111001, at the Zakum altar
+280030000) breaks it (`reactors::Action::Zakum`, Cosmic's `2111001`
+script). The field (`bring_out_zakum`) then does the following, in order:
+
+- It plays Zakum's music to the map (FIELD_EFFECT 6, `Bgm06/FinalFight`).
+- It brings out the body (8800000) on the ground below the altar. The body
+  trembles in (SPAWN_MONSTER appearance -4, `MobView::fake`), and the v83
+  client shakes the screen for it.
+- It brings out the eight arms (8800003-8800010) on the same spot, under the
+  first player.
+- It sends a pink line to the map (placeholder `zakum.altar.summoned`).
+
+While any arm is on the map, the body is shielded
+(`net::mobs::shielded_by`, `MobSet::shielded`, Cosmic's
+`MapleMap.damageMonster`):
+
+- It has no controller, however near a player comes (MOB_DISTANCE) or
+  hits it.
+- Attacks on it are dropped whole: no HP, no HP bar, no aggro and no
+  statuses. Skills that only put statuses on it (mists, debuffs) put none,
+  and poison already on it takes no HP. Its arms' own buffs still reach it,
+  as in Cosmic.
+- Dazzled mobs can't hurt it either.
+
+When the last arm dies, `make_real` makes the body real. It sends the body
+again to everyone, just there (-1), and gives control of it to the first
+player. Cosmic's `makeMonsterReal` does the same. From there Mob.nx's
+`revive` chain does the rest: the body dies into 8800001, and that into
+8800002, which alone has drops and EXP.
+
+Players who come in while an arm lives see the body plainly (-1). Mobs, and
+Zakum's summons among them, summon nothing on a field that already holds 80
+mobs.
+
+Not yet built: the expedition that brings players to the altar, closing it
+after the summoning, and the win (clear effect, the gate reactor 2118002,
+the world notice, quest 100200).
+
 ## Tests
 
 - `npc_scripts::tests::a_chief_approves_zakum_and_adobis_holds_its_trials`
 - `integration-harness/tests/zpq_dead_mine.rs`: the Dead Mine, in
   [party-quests](./party-quests.md).
+- `field_mobs::tests::zakums_arms_shield_its_body_until_the_last_dies`
+- `integration-harness/tests/zakum_boss.rs`: an Eye of Fire dropped on the
+  altar brings out the music, the trembling body and its arms. Hits on the
+  body do nothing, and no one moves it, until all eight arms are dead. Then
+  it comes back plainly under control, and dies through 8800001 to 8800002.
 - `integration-harness/tests/zakum_trials.rs`: a level-50 Fighter, unapproved
   and then without the trials, is turned back at the gate. They are approved
   by Tylus, cross the Breath of Lava, get the Breath of Fire from Lira, have
