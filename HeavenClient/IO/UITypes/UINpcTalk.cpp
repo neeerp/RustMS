@@ -495,6 +495,11 @@ namespace ms
 		return local_tag;
 	}
 
+	bool UINpcTalk::is_local() const
+	{
+		return static_cast<bool>(local_responder);
+	}
+
 	Cursor::State UINpcTalk::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor_relative = cursorpos - position;

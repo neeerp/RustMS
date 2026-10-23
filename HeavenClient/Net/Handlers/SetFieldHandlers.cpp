@@ -28,6 +28,7 @@
 #include "../../Configuration.h"
 
 #include "../../Gameplay/FieldEffectRules.h"
+#include "../../Gameplay/OxQuizRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
 #include "../../IO/MarriageActions.h"
@@ -382,6 +383,51 @@ namespace ms
 			default:
 				break;
 		}
+	}
+
+	void OxQuizHandler::handle(InPacket& recv) const
+	{
+		uint8_t flag = recv.read_byte();
+		uint8_t set = recv.read_byte();
+		uint16_t number = recv.read_short();
+
+		nl::node quiz = nl::nx::etc["OXQuiz.img"];
+		nl::node questions = quiz[std::to_string(set)];
+		nl::node question = questions[std::to_string(number)];
+
+		ox_quiz::Show show =
+			ox_quiz::show(flag, number, static_cast<bool>(quiz), static_cast<bool>(questions), static_cast<bool>(question));
+
+		switch (show)
+		{
+			case ox_quiz::Show::CLEAR:
+				Stage::get().set_notice("");
+				break;
+			case ox_quiz::Show::KEEP:
+				break;
+			case ox_quiz::Show::QUESTION:
+			{
+				Stage::get().set_notice(question["q"].get_string());
+
+				auto event_clock = shown_clock<UIEventClock>();
+
+				if (!event_clock)
+					event_clock = UI::get().emplace<UIEventClock>(ox_quiz::CLOCK_SECONDS);
+
+				if (event_clock)
+					event_clock->start();
+
+				break;
+			}
+			case ox_quiz::Show::ANSWER:
+				Stage::get().set_notice(ox_quiz::answer_line(question["d"].get_string(), static_cast<int32_t>(question["a"].get_integer())));
+				break;
+		}
+	}
+
+	void GmEventInstructionsHandler::handle(InPacket& recv) const
+	{
+		Stage::get().show_event_help(recv.read_byte());
 	}
 
 	void StopClockHandler::handle(InPacket&) const

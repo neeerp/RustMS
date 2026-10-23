@@ -269,6 +269,14 @@ namespace ms
 		// blowing with item 0. One from the map or a whisper stops itself after 22 s.
 		void blow_weather(int32_t item_id, const std::string &msg, bool from_map);
 
+		// OX_QUIZ's line on the status bar's second float notice, above the weather's bar. It stays up, from map to
+		// map, until another replaces it or an empty one takes it down (FUN_008d5b2b).
+		void set_notice(const std::string &msg);
+
+		// GMEVENT_INSTRUCTIONS: the map's help line in a dialog with the Maple Administrator. One that comes
+		// before its map has loaded waits for it.
+		void show_event_help(uint8_t index);
+
 		// BLOW_WEATHER's flag, which keeps the message bar up through a stop.
 		void set_weather_flag(uint8_t flag);
 
@@ -450,6 +458,7 @@ namespace ms
 		MapWedding wedding;
 		MapClouds clouds;
 		MapWeather weather;
+		FloatNotice ox_notice;
 		bool jukebox = false;
 		MapTooltips tooltips;
 		MapClock clock;
@@ -462,6 +471,8 @@ namespace ms
 		};
 
 		std::optional<ClockTime> pending_clock;
+		// An event help line that came before its map loaded.
+		std::optional<uint8_t> pending_help;
 		// The priest's packets that came before their altar loaded: a
 		// step, or the hearts.
 		struct WeddingNews

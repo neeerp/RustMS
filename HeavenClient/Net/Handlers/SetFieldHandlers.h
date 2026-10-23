@@ -134,6 +134,20 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The OX quiz's question or answer on the status bar (v83 FUN_00535a57).
+	class OxQuizHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// One of the map's help lines in the Maple Administrator's dialog (v83 FUN_005360c0).
+	class GmEventInstructionsHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
 	// Someone used a jukebox: its song replaces the map's BGM (v83 FUN_00535224).
 	class PlayJukeboxHandler : public PacketHandler
 	{

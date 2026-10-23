@@ -136,6 +136,8 @@ namespace ms
 		FIELD_OBSTACLE_ALL_RESET = 141,
 		BLOW_WEATHER = 142,
 		PLAY_JUKEBOX = 143,
+		OX_QUIZ = 145,
+		GMEVENT_INSTRUCTIONS = 146,
 		CLOCK = 147,
 		CONTI_MOVE = 148,
 		CONTI_STATE = 149,
@@ -336,6 +338,8 @@ namespace ms
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
 		emplace<FIELD_OBSTACLE_ALL_RESET, ObstacleResetHandler>();
 		emplace<BLOW_WEATHER, BlowWeatherHandler>();
+		emplace<OX_QUIZ, OxQuizHandler>();
+		emplace<GMEVENT_INSTRUCTIONS, GmEventInstructionsHandler>();
 		emplace<PLAY_JUKEBOX, PlayJukeboxHandler>();
 		emplace<SET_BACK_EFFECT, BackEffectHandler>();
 		emplace<SET_MAP_OBJECT_VISIBLE, MapObjectVisibleHandler>();

@@ -64,9 +64,6 @@ namespace ms
 		{
 			return std::rand() & 0x7FFF;
 		}
-
-		// How far below the bar's text line our text's top sits.
-		constexpr int16_t TEXT_TOP = -6;
 	}
 
 	MapWeather::MapWeather(nl::node src, std::string map_bgm) : bgm(std::move(map_bgm))
@@ -277,17 +274,8 @@ namespace ms
 
 	void MapWeather::show_bar(const std::string &msg, int32_t float_type)
 	{
-		nl::node src = NxFiles::ui_classic["UIWindow.img"]["FloatNotice"][std::to_string(float_type)];
-
-		if (!src)
-			return;
-
-		bar_left = src["0"];
-		bar_tile = src["1"];
-		bar_right = src["2"];
-		bar_y = src["y"];
-		bar_text = Text(Text::Font::A14B, Text::Alignment::LEFT, Color::Name::WHITE, msg);
-		bar_until = now + weather::BAR_TIME;
+		if (bar.show(msg, float_type))
+			bar_until = now + weather::BAR_TIME;
 	}
 
 	void MapWeather::restore_bgm() const
@@ -483,28 +471,8 @@ namespace ms
 
 	void MapWeather::draw_bar() const
 	{
-		if (!bar_until)
-			return;
-
-		int16_t view_width = Constants::Constants::get().get_viewwidth();
-		weather::Bar bar = weather::bar(view_width, bar_left.width(), bar_tile.width(), bar_right.width(),
-										bar_text.width());
-
-		// The art's origins are ignored: each piece's top left goes at its spot.
-		auto piece = [&](const Texture &texture, int16_t x) {
-			Point<int16_t> left_top(static_cast<int16_t>(bar.left + x), weather::BAR_TOP);
-			texture.draw(DrawArgument(left_top + texture.get_origin(), weather::BAR_ALPHA));
-		};
-
-		piece(bar_left, 0);
-
-		for (int16_t i = 0; i < bar.tiles; i++)
-			piece(bar_tile, static_cast<int16_t>(bar_left.width() + i * bar_tile.width()));
-
-		piece(bar_right, static_cast<int16_t>(bar_left.width() + bar.tiles * bar_tile.width()));
-
-		bar_text.draw(Point<int16_t>(static_cast<int16_t>(bar.left + bar.text_x),
-									 static_cast<int16_t>(weather::BAR_TOP + bar_y + TEXT_TOP)));
+		if (bar_until)
+			bar.draw();
 	}
 
 	void MapWeather::stop_sounds()

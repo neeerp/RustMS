@@ -225,6 +225,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME no_skill COMMAND no_skill_tests)
     add_executable(swim_area_tests tests/swim_area.cpp)
     add_test(NAME swim_area COMMAND swim_area_tests)
+    add_executable(ox_quiz_tests tests/ox_quiz.cpp)
+    add_test(NAME ox_quiz COMMAND ox_quiz_tests)
     add_executable(teleport_tests tests/teleport.cpp)
     target_include_directories(teleport_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME teleport COMMAND teleport_tests)
@@ -648,9 +650,12 @@ add_executable(HeavenClient
     Gameplay/MapleMap/ObjFlow.h
     Gameplay/MapleMap/MapClouds.cpp
     Gameplay/MapleMap/MapClouds.h
+    Gameplay/MapleMap/FloatNotice.cpp
+    Gameplay/MapleMap/FloatNotice.h
     Gameplay/MapleMap/MapWeather.cpp
     Gameplay/MapleMap/MapWeather.h
     Gameplay/WeatherRules.h
+    Gameplay/OxQuizRules.h
     Gameplay/MapleMap/MapKites.cpp
     Gameplay/MapleMap/MapKites.h
     Gameplay/MapleMap/MapMerchants.cpp
