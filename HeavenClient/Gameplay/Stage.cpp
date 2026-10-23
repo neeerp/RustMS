@@ -26,6 +26,7 @@
 #include "Combat/FlashJump.h"
 #include "Combat/Wings.h"
 #include "FieldEffectRules.h"
+#include "OxQuizRules.h"
 #include "MapleMap/DoorRules.h"
 #include "MapleMap/FieldLimit.h"
 #include "MapleMap/FriendlyRules.h"
@@ -164,6 +165,11 @@ namespace ms
 
 				pending_clock.reset();
 
+				if (pending_help)
+					show_event_help(*pending_help);
+
+				pending_help.reset();
+
 				// The priest welcomes the couple as they come to the altar.
 				for (const WeddingNews &news : pending_wedding)
 					if (news.hearts)
@@ -207,6 +213,7 @@ namespace ms
 
 		player = entry;
 		playable = player;
+		ox_notice.clear();
 
 		start = ContinuousTimer::get().start();
 		emote_cooldown = {};
@@ -241,6 +248,7 @@ namespace ms
 		// And the aura of an item buff, as v83 makes the user anew (user+0x1f64).
 		player.show_consume_effect(0);
 		pending_clock.reset();
+		pending_help.reset();
 		pending_wedding.clear();
 	}
 
@@ -388,6 +396,8 @@ namespace ms
 		field_effects.drawabove(viewpos, alpha);
 		// The weather's message bar is above the field effects (z 0xc00616fc).
 		weather.draw_bar();
+		// OX_QUIZ's notice is one above it (z 0xc00616fd).
+		ox_notice.draw();
 		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
@@ -1758,6 +1768,46 @@ namespace ms
 	void Stage::answer_priest(uint32_t page, int8_t response)
 	{
 		wedding.answered(page, response);
+	}
+
+	void Stage::set_notice(const std::string &msg)
+	{
+		if (msg.empty())
+			ox_notice.clear();
+		else
+			ox_notice.show(msg, ox_quiz::FLOAT_TYPE);
+	}
+
+	void Stage::show_event_help(uint8_t index)
+	{
+		if (state != State::ACTIVE)
+		{
+			pending_help = index;
+			return;
+		}
+
+		nl::node strings = nl::nx::string["Map.img"][NxHelper::Map::get_map_category(mapid)][std::to_string(mapid)];
+		std::string text = gm_event::help_line(index, [&strings](uint8_t i)
+		{
+			return strings["help" + std::to_string(i)].get_string();
+		});
+
+		if (text.empty())
+			return;
+
+		// Not over an NPC's conversation with the server.
+		if (auto talk = UI::get().get_element<UINpcTalk>(); talk && talk->is_active() && !talk->is_local())
+			return;
+
+		UI::get().emplace<UINpcTalk>();
+		UI::get().enable();
+
+		if (auto talk = UI::get().get_element<UINpcTalk>())
+		{
+			talk->change_text(gm_event::NPC, UINpcTalk::SENDOK, 0, 0, text);
+			// Only the dialog closes; nothing goes back to the server.
+			talk->set_local_responder([](int8_t, int32_t) {});
+		}
 	}
 
 	void Stage::blow_weather(int32_t item_id, const std::string &msg, bool from_map)

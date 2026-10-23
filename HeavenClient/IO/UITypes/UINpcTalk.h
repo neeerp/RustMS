@@ -112,6 +112,9 @@ namespace ms
 
 		uint32_t get_local_tag() const;
 
+		// Whether the client answers the dialogue shown, not the server.
+		bool is_local() const;
+
 		// What the text markup names: the player, NPCs, items, mobs and maps.
 		static NpcTextMarkup::Lookups markup_lookups();
 

@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
+#include "FloatNotice.h"
+
 #include "../WeatherRules.h"
 
 #include "../../Audio/Audio.h"
@@ -137,11 +139,7 @@ namespace ms
 		EffectLayer shots;
 		Sound effect;
 
-		Texture bar_left;
-		Texture bar_tile;
-		Texture bar_right;
-		int16_t bar_y = 0;
-		Text bar_text;
+		FloatNotice bar;
 		int64_t bar_until = 0;
 	};
 }
