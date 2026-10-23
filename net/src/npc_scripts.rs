@@ -2893,9 +2893,26 @@ fn opq_eak(map_id: i32, leader: bool, cleared: bool) -> Option<NpcScript> {
             Page::Say(text(keys::OPQ_EAK_CLOUD)),
             Page::Done(vec![Effect::EventCommand(EventCommand::ClearStage(1))]),
         ],
-        events::OPQ_HUB if !leader => vec![Page::Say(text(keys::OPQ_EAK_LEADER_ONLY))],
+        events::OPQ_HUB | events::OPQ_STORAGE if !leader => {
+            vec![Page::Say(text(keys::OPQ_EAK_LEADER_ONLY))]
+        }
         events::OPQ_HUB => vec![Page::Say(text(keys::OPQ_EAK_GATHER))],
         events::OPQ_GARDEN => vec![Page::Say(text(keys::OPQ_EAK_GARDEN))],
+        // With every guard gone he takes the leader alone on to the
+        // treasure room, without a word; until then he says what to do.
+        events::OPQ_STORAGE => {
+            let to = events::OPQ_BONUS;
+            let portal = crate::scripts::named(to, "st00");
+            let mut script = NpcScript::new(
+                EAK,
+                vec![Page::Done(vec![
+                    Effect::RequireNoMobs,
+                    Effect::WarpToPortal(to, portal),
+                ])],
+            );
+            script.refused = Some(text(keys::OPQ_EAK_STORAGE));
+            return Some(script);
+        }
         _ => return None,
     };
     Some(NpcScript::new(EAK, pages))
@@ -3037,6 +3054,12 @@ fn minerva(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
     let pages = match player.stats.map_id {
         events::OPQ_HUB => vec![Page::Ask {
             text: text(keys::OPQ_MINERVA_ASK),
+            on_yes: vec![Effect::WarpToPortal(events::OPQ_PRIZE_ROOM, 0)],
+            on_no: None,
+        }],
+        // The leader, in the treasure room she came out in.
+        events::OPQ_BONUS => vec![Page::Ask {
+            text: text(keys::OPQ_MINERVA_BONUS_ASK),
             on_yes: vec![Effect::WarpToPortal(events::OPQ_PRIZE_ROOM, 0)],
             on_no: None,
         }],
@@ -6493,6 +6516,27 @@ mod tests {
     }
 
     #[test]
+    fn eak_takes_the_leader_alone_on_from_the_storage_once_its_guards_are_gone() {
+        let storage = |leader| NpcScript::opq_eak(events::OPQ_STORAGE, leader, true).unwrap();
+        let other = storage(false).begin();
+        assert_eq!(page_text(&other), text(keys::OPQ_EAK_LEADER_ONLY));
+        let mut leader = storage(true);
+        let step = leader.begin();
+        assert!(step.prompt.is_none());
+        let st00 = crate::scripts::named(events::OPQ_BONUS, "st00");
+        assert_eq!(
+            step.effects,
+            [
+                Effect::RequireNoMobs,
+                Effect::WarpToPortal(events::OPQ_BONUS, st00)
+            ]
+        );
+        // While a guard is left he says so instead.
+        let said = leader.refused().unwrap();
+        assert_eq!(page_text(&said), text(keys::OPQ_EAK_STORAGE));
+    }
+
+    #[test]
     fn eak_takes_the_team_to_the_garden_once_the_statue_has_its_pieces() {
         let hub = |statue| NpcScript::opq_hub(statue).begin();
         assert_eq!(
@@ -6672,6 +6716,14 @@ mod tests {
         let mut ask = NpcScript::in_event(MINERVA, &player, false, true).unwrap();
         ask.begin();
         assert!(ask.respond(ScriptInput::No).unwrap().effects.is_empty());
+
+        // In the treasure room she sends the leader on there too.
+        player.stats.map_id = events::OPQ_BONUS;
+        let mut ask = NpcScript::in_event(MINERVA, &player, true, true).unwrap();
+        let asked = ask.begin();
+        assert_eq!(question(&asked), text(keys::OPQ_MINERVA_BONUS_ASK));
+        let went = ask.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(went, [Effect::WarpToPortal(to, 0)]);
 
         player.stats.map_id = to;
         use rand::SeedableRng;

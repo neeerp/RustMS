@@ -156,6 +156,9 @@ pub const OPQ_LOUNGE_CLIMB: &str = "party3_r4pt";
 pub const OPQ_TOWER_CLIMB: &str = "party3_r6pt";
 /// The Orbis party quest's way out of the garden, back to the hub.
 pub const OPQ_GARDEN_OUT: &str = "party3_gardenin";
+/// The hub's door to the hidden storage (`in06`), open once the event is
+/// won.
+pub const OPQ_STORAGE_IN: &str = "party3_room8";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.
@@ -866,8 +869,9 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 out.map_or(0, |&(_, portal)| portal),
             ))
         }
-        // The hub's storage stays shut until Minerva's garden is played.
-        "party3_room8" => refused(keys::OPQ_NOTICE_STORAGE_CLOSED),
+        // The hub's storage stays shut until Minerva is free; the event
+        // opens it for a team that freed her.
+        OPQ_STORAGE_IN => refused(keys::OPQ_NOTICE_STORAGE_CLOSED),
         "OutPerrion_1" => ScriptOutcome {
             effects: vec![
                 Effect::Pink(content::text().get(keys::TEMPLE_SHORTCUT, &[])),

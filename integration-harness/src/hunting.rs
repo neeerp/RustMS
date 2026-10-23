@@ -424,6 +424,8 @@ pub struct Field {
     pub reactors_removed: Vec<(i32, u8)>,
     /// (object id, NPC id)
     pub npcs: Vec<(i32, i32)>,
+    /// Where each NPC spawned.
+    pub npc_positions: BTreeMap<i32, (i16, i16)>,
     /// Where each mob spawned.
     pub mob_positions: BTreeMap<i32, (i16, i16)>,
     /// Statuses put on mobs: (object id, stats, first one's value, first
@@ -705,8 +707,10 @@ impl Field {
                     .push((oid, (mode >= 2).then(|| r.read_int().unwrap())));
             }
         } else if op == SendOpcode::SpawnNpc as i16 {
-            self.npcs
-                .push((r.read_int().unwrap(), r.read_int().unwrap()));
+            let (object_id, npc_id) = (r.read_int().unwrap(), r.read_int().unwrap());
+            self.npcs.push((object_id, npc_id));
+            let at = (r.read_short().unwrap(), r.read_short().unwrap());
+            self.npc_positions.insert(object_id, at);
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

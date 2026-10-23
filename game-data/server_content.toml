@@ -800,6 +800,8 @@ unsourced = [
     "opq.minerva.ask",
     "opq.minerva.thanks",
     "opq.minerva.full",
+    "opq.eak.storage",
+    "opq.minerva.bonus_ask",
 ]
 
 [text."glTutoMsg0.message"]
