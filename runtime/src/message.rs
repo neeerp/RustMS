@@ -652,6 +652,9 @@ pub enum FieldMessage {
     Levers {
         reply: tokio::sync::oneshot::Sender<[bool; 5]>,
     },
+    /// Show everyone on the field a packet, as an event's line to a map
+    /// of its copy.
+    Show(Packet),
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

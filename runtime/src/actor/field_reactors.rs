@@ -268,7 +268,8 @@ impl ReactorSet {
         quantity: i16,
         (x, y): (i16, i16),
     ) -> Option<(u8, u8)> {
-        if !net::reactors::takes(reactor.reactor_id, item_id, self.day) {
+        let name = &self.spots[reactor.spot].template.name;
+        if !net::reactors::takes(reactor.reactor_id, name, item_id, self.day) {
             return None;
         }
         let from = (x.checked_sub(reactor.x)?, y.checked_sub(reactor.y)?);

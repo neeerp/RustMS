@@ -110,10 +110,11 @@ impl ClientActor {
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
             .await?;
         // The last Cellion's spot clears the Salion stage, the Grass of
-        // Life's pot the garden, and Minerva's statue wins the event.
+        // Life's pot the garden, a Trial Grounds seal its room, and
+        // Minerva's statue wins the event.
         if matches!(
             net::reactors::action(reactor_id),
-            Action::Salion | Action::DropsAndClears | Action::AppearAndClears(_)
+            Action::Salion | Action::DropsAndClears | Action::AppearAndClears(_) | Action::PassKey
         ) {
             let map_id = self.in_game()?.player.stats.map_id;
             let stage = self
