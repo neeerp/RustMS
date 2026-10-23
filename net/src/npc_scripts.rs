@@ -4633,7 +4633,7 @@ fn chief(line: &ThirdJob, player: &Player) -> NpcScript {
     // Past the Holy Stone, the chief only speaks of the advance; before,
     // a second job may pick the test or Zakum.
     let advancing = marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM);
-    let pages = if marked(player, HOLY_STONE_ASSIGNED) && holds(player, NECKLACE_OF_WISDOM) {
+    let pages = if advancing {
         if !player.can_take_third_job(job) {
             vec![Page::Say(say("chief.sp"))]
         } else {
@@ -4708,8 +4708,9 @@ pub(crate) const EYE_OF_FIRE: i32 = 4001017;
 /// Where Adobis stands, and the gate to Zakum.
 const DOOR_TO_ZAKUM: i32 = 211042300;
 const BREATH_OF_LAVA: i32 = 280020000;
-/// Amon's way out of Zakum's altar (upstream sends ZakumBattle there).
 const ZAKUM_ALTAR: i32 = 280030000;
+/// Where Amon takes players off the altar: the expedition's exit in
+/// upstream's ZakumBattle event (its Amon script says the Door to Zakum).
 pub(crate) const ENTRANCE_TO_ZAKUM: i32 = 211042400;
 
 pub(crate) fn zakum_approved(player: &Player) -> bool {
@@ -8116,6 +8117,13 @@ mod tests {
         const RENE: i32 = 2020010;
         // The chief's second choice approves, once.
         let mut rene = NpcScript::for_npc(RENE, &hunter(&[], &[])).unwrap();
+        assert_eq!(
+            rene.respond(ScriptInput::Select(1)).unwrap().effects,
+            [Effect::Mark(ZAKUM_APPROVED)]
+        );
+        // Holding the Necklace of Strength, the Zakum choice keeps it.
+        let mut rene =
+            NpcScript::for_npc(RENE, &hunter(&[(NECKLACE_OF_STRENGTH, 1)], &[])).unwrap();
         assert_eq!(
             rene.respond(ScriptInput::Select(1)).unwrap().effects,
             [Effect::Mark(ZAKUM_APPROVED)]

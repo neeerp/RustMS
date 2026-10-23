@@ -52,6 +52,18 @@ Zakum. Amon (2030010) asks before taking players out: to the Door to Zakum
 from the Breath of Lava, and to the Entrance to Zakum (211042400) from the
 altar (280030000).
 
+Where this differs from Cosmic:
+
+- Amon's own script sends players to the Door to Zakum from every map,
+  the altar included. Here the altar leads to the Entrance to Zakum, the
+  exit of Cosmic's ZakumBattle event.
+- The chief skips the menu once the player holds the Necklace of Wisdom.
+  Choosing Zakum never takes the Necklace of Strength; in Cosmic, any choice
+  takes it.
+- Lira's 10,000 EXP is not multiplied by the server's EXP rate.
+- Adobis doesn't warp holders of item 4001109 to 921100000, a Cosmic
+  custom.
+
 ## The gate
 
 The Door to Zakum's portal `ps00` (script `Zakum05`, in `scripts::portal`)
