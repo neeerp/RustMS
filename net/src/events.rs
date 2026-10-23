@@ -1210,9 +1210,9 @@ impl Team {
     /// on. Returns whether that ends the event: it does if `to` is not in
     /// its maps, unless it is won (Cosmic `changedLeader`). A squad isn't
     /// a party, so a party's hand-over changes nothing for it, and one that
-    /// lasts until empty only follows the new leader.
+    /// lasts until empty only follows a new leader who is in it.
     pub fn hand_over(&mut self, to: ClientId) -> bool {
-        if self.roster.is_some() {
+        if self.roster.is_some() || self.until_empty && !self.has(to) {
             return false;
         }
         self.leader = to;
@@ -2029,9 +2029,12 @@ mod tests {
     #[test]
     fn papulatus_ends_only_when_its_last_member_leaves() {
         let mut team = Team::new(&PAPULATUS, 1, vec![1, 2, 3]);
-        // A hand-over moves the lead, even to one outside, and ends nothing.
+        // A hand-over to one outside ends nothing and keeps the lead; to
+        // one inside, it moves it.
         assert!(!team.hand_over(9));
-        assert_eq!(team.leader(), 9);
+        assert_eq!(team.leader(), 1);
+        assert!(!team.hand_over(2));
+        assert_eq!(team.leader(), 2);
         assert!(!team.leave(1));
         assert!(!team.leave(2));
         assert!(!team.rejoin(1), "a party's team takes no one back");

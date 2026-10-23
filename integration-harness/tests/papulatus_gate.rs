@@ -3,7 +3,8 @@
 //! of Clocktower, one party a channel at a time. While it is in there the
 //! three gates before the portal are shut and the next party is turned
 //! away; the fight lasts until its last member leaves by the Machine
-//! Apparatus, when the gates open again.
+//! Apparatus, or its 45 minutes are up, when the gates open again. The
+//! harness world runs events 60 times as fast.
 
 use game_data::server_content::keys;
 use integration_harness::events::{leave_party, party, talk, told, waiting_in};
@@ -14,6 +15,7 @@ use net::events::{CLOCKTOWER_DEPTHS, ORIGIN_OF_CLOCKTOWER};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
+use tokio::time::Duration;
 
 const MACHINE_APPARATUS: i32 = 2041025;
 const GATES: [i32; 3] = [2208001, 2208002, 2208003];
@@ -39,14 +41,16 @@ async fn turned_away(player: &mut WorldSession, key: &str) {
     );
 }
 
-/// Every player in `team` arrives at the Origin of Clocktower.
+/// Every player in `team` arrives at the Origin of Clocktower, on its
+/// 45-minute clock.
 async fn all_arrive(team: &mut [WorldSession]) {
     for player in team {
         let mut t = Trace::default();
         until(&mut player.connection, &mut t, |t| {
-            t.arrivals.iter().any(|a| a.0 == ORIGIN_OF_CLOCKTOWER)
+            t.arrivals.iter().any(|a| a.0 == ORIGIN_OF_CLOCKTOWER) && !t.countdowns.is_empty()
         })
         .await;
+        assert!((40..=45).contains(&t.countdowns[0]), "{t:?}");
     }
 }
 
@@ -73,7 +77,7 @@ async fn gates_go(watcher: &mut WorldSession, seen: &mut Trace, gates: &[i32], s
 }
 
 #[tokio::test]
-async fn one_party_at_a_time_goes_to_papulatus_until_its_last_member_leaves() {
+async fn one_party_at_a_time_goes_to_papulatus_until_it_is_empty_or_out_of_time() {
     let mut watcher = waiting_in(CLOCKTOWER_DEPTHS, 50, &[]).await;
     let mut first = Vec::new();
     let mut second = Vec::new();
@@ -119,6 +123,19 @@ async fn one_party_at_a_time_goes_to_papulatus_until_its_last_member_leaves() {
     turned_away(&mut second[0], keys::PAPULATUS_BUSY).await;
     leave(&mut first[1]).await;
     gates_go(&mut watcher, &mut seen, &gates, 0).await;
+    let mut seen = Trace::default();
     send(&mut second[0].connection, enter()).await;
     all_arrive(&mut second).await;
+    gates_go(&mut watcher, &mut seen, &gates, 1).await;
+
+    // Its time up, the next party is sent back, and the gates open.
+    tokio::time::sleep(Duration::from_secs(38)).await;
+    for player in &mut second {
+        let mut t = Trace::default();
+        until(&mut player.connection, &mut t, |t| {
+            t.arrivals.iter().any(|a| a.0 == CLOCKTOWER_DEPTHS)
+        })
+        .await;
+    }
+    gates_go(&mut watcher, &mut seen, &gates, 0).await;
 }
