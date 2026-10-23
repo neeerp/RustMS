@@ -376,9 +376,10 @@ fn unsupported(keys: &[String], allowed: &[&str], node: &str) -> Result<(), Stri
 }
 
 /// `Act` nodes may repeat conversation text under numbered keys and `yes`/
-/// `no`; that is speech, not an action.
+/// `no`, and an offer's questions (`ask`) with their right answers
+/// (`stop`), as an old copy of `Say.img`; that is speech, not an action.
 fn is_speech(key: &str) -> bool {
-    key.bytes().all(|b| b.is_ascii_digit()) || key == "yes" || key == "no"
+    key.bytes().all(|b| b.is_ascii_digit()) || ["yes", "no", "ask", "stop"].contains(&key)
 }
 
 #[derive(Debug, Default)]
@@ -923,6 +924,9 @@ mod tests {
             &["exp"],
         );
         assert_eq!(classify(&contact), Ok(()));
+        // Or its questions, and the answers that are right.
+        let quiz = keys(&["npc"], &["npc"], &["0", "1", "ask", "stop"], &["exp"]);
+        assert_eq!(classify(&quiz), Ok(()));
     }
 
     #[test]
@@ -1074,6 +1078,8 @@ mod tests {
         assert_eq!(catalog.quest(2029).unwrap().start_money, -1000);
         assert_eq!(catalog.quest(3406).unwrap().start_exp, 1600);
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
+        // Its first step's offer asks questions (`Act/0/ask`, `stop`).
+        assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
         // numeric order.
         let rewards = &catalog.quest(3379).unwrap().end_rewards;
