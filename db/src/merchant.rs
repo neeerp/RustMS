@@ -483,6 +483,43 @@ pub fn close(
     })?)
 }
 
+/// Give `player` everything their closed merchant `seen` kept, from
+/// Fredrick: the merchant goes, and they are saved with what they took
+/// and the fee paid, in one transaction. Whether it still held what `seen`
+/// holds; one that opened again, or changed, is left as it is.
+pub fn retrieve(player: &Player, seen: &HiredMerchant) -> crate::Result<bool> {
+    let mut conn = crate::connection()?;
+    let owner = player.id();
+    let mut expected: Vec<(i64, i16)> = seen
+        .stock
+        .iter()
+        .map(|stock| (stock.id, stock.listing.bundles))
+        .collect();
+    expected.sort_unstable();
+    Ok(conn.transaction(|conn| -> QueryResult<bool> {
+        let row: Option<(i16, i32)> = hired_merchants::table
+            .find(owner)
+            .select((hired_merchants::state, hired_merchants::meso))
+            .for_update()
+            .first(conn)
+            .optional()?;
+        let held: Vec<(i64, i16)> = hired_merchant_items::table
+            .filter(hired_merchant_items::owner_id.eq(owner))
+            .select((hired_merchant_items::id, hired_merchant_items::bundles))
+            .order(hired_merchant_items::id)
+            .load(conn)?;
+        let kept = row
+            .is_some_and(|(state, meso)| state != MerchantState::Open as i16 && meso == seen.meso);
+        if !kept || held != expected {
+            return Ok(false);
+        }
+        // Stock, stats and sales cascade.
+        diesel::delete(hired_merchants::table.find(owner)).execute(conn)?;
+        write_player(conn, player)?;
+        Ok(true)
+    })?)
+}
+
 /// Close `owner`'s open merchant whose time ran out at `now`, keeping what
 /// it holds for Fredrick; one with nothing left goes. Whether it was open.
 pub fn expire(owner: i32, now: SystemTime) -> crate::Result<bool> {

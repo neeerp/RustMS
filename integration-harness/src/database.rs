@@ -773,6 +773,99 @@ pub async fn gift_cash_item(
     Ok(serial.id)
 }
 
+/// One row of a hired merchant: `bundles` of `quantity` of `item_id`, at
+/// `price` a bundle.
+pub struct MerchantRow {
+    pub item_id: i32,
+    pub bundles: i16,
+    pub quantity: i16,
+    pub price: i32,
+}
+
+/// Give the character `owner_id` a hired merchant on channel `channel_id`
+/// (0-based) of `map_id`, in `state` (1 open, 2 closed `days_closed` days
+/// ago), holding `meso` and `rows`, in place of any they had.
+pub async fn place_merchant(
+    owner_id: i32,
+    channel_id: i16,
+    map_id: i32,
+    state: i16,
+    days_closed: i32,
+    meso: i32,
+    rows: Vec<MerchantRow>,
+) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "place a merchant",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        conn.transaction(|conn| {
+            diesel::sql_query("DELETE FROM hired_merchants WHERE owner_id = $1")
+                .bind::<Integer, _>(owner_id)
+                .execute(conn)?;
+            // An hour past the whole days, so they count as whole.
+            diesel::sql_query(
+                "INSERT INTO hired_merchants \
+                 (owner_id, channel_id, map_id, x, y, foothold, item_id, title, state, opened_at, closed_at, meso) \
+                 VALUES ($1, $2, $3, 0, 0, 0, 5030000, 'Kept', $4, \
+                 now() AT TIME ZONE 'utc' - make_interval(days => CASE WHEN $4 = 2 THEN $5 + 1 ELSE 0 END), \
+                 CASE WHEN $4 = 2 THEN now() AT TIME ZONE 'utc' - make_interval(days => $5, hours => 1) END, $6)",
+            )
+            .bind::<Integer, _>(owner_id)
+            .bind::<SmallInt, _>(channel_id)
+            .bind::<Integer, _>(map_id)
+            .bind::<SmallInt, _>(state)
+            .bind::<Integer, _>(days_closed)
+            .bind::<Integer, _>(meso)
+            .execute(conn)?;
+            for row in rows {
+                diesel::sql_query(
+                    "INSERT INTO hired_merchant_items (owner_id, bundles, price, item_id, quantity) \
+                     VALUES ($1, $2, $3, $4, $5)",
+                )
+                .bind::<Integer, _>(owner_id)
+                .bind::<SmallInt, _>(row.bundles)
+                .bind::<Integer, _>(row.price)
+                .bind::<Integer, _>(row.item_id)
+                .bind::<SmallInt, _>(row.quantity)
+                .execute(conn)?;
+            }
+            QueryResult::Ok(())
+        })
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)
+}
+
+/// Whether the character `owner_id` has a hired merchant.
+pub async fn has_merchant(owner_id: i32) -> Result<bool, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = Bool)]
+        found: bool,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "look for a merchant",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT EXISTS (SELECT 1 FROM hired_merchants WHERE owner_id = $1) AS found",
+        )
+        .bind::<Integer, _>(owner_id)
+        .get_result::<Row>(&mut conn)
+        .map(|row| row.found)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)
+}
+
 async fn change_one_row(
     phase: &'static str,
     query: impl FnOnce(&mut PgConnection) -> QueryResult<usize> + Send + 'static,

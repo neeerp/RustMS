@@ -112,7 +112,7 @@ pub use self::family::{
 pub use self::guild::{DenyGuildRequestHandler, GuildOperationHandler};
 pub use self::guild_bbs::GuildBbsHandler;
 pub use self::hammer::UseHammerHandler;
-pub use self::hired_merchant::EntrustedShopRequestHandler;
+pub use self::hired_merchant::{EntrustedShopRequestHandler, StoreBankRequestHandler};
 pub use self::item_effect::UseItemEffectHandler;
 pub use self::item_move::ItemMoveHandler;
 pub use self::keybinds::ChangeKeybindsHandler;

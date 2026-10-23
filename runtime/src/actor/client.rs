@@ -29,6 +29,7 @@ mod script;
 mod ships;
 mod shop;
 mod storage;
+mod store_bank;
 mod time_limit;
 mod trade;
 mod wedding;
@@ -131,6 +132,8 @@ pub struct ClientActor {
     storage: Option<net::storage::OpenStorage>,
     /// The Duey window, while the player has it open.
     duey: Option<duey::DueyWindow>,
+    /// Fredrick's Store Bank, while the player has it open.
+    store_bank: Option<store_bank::StoreBankWindow>,
     /// The wedding registry window open, if any.
     gift_window: Option<wedding_gift::GiftWindow>,
     /// The Rock, Paper, Scissors game, while its window is open.
@@ -221,6 +224,7 @@ impl ClientActor {
             shop: None,
             storage: None,
             duey: None,
+            store_bank: None,
             gift_window: None,
             rps: None,
             last_heal: (None, None),
@@ -435,6 +439,7 @@ impl ClientActor {
                 self.script = None;
                 self.shop = None;
                 self.storage = None;
+                self.store_bank = None;
                 self.npc_request_id = self.npc_request_id.wrapping_add(1);
                 self.send_to_field(FieldMessage::NpcInteraction {
                     from: self.client_id,
@@ -498,6 +503,8 @@ impl ClientActor {
             WorldAction::PersonalShop(request) => self.personal_shop_request(request).await?,
             WorldAction::HiredMerchant(_) if self.in_cash_shop => {}
             WorldAction::HiredMerchant(request) => self.hired_merchant_request(request).await?,
+            WorldAction::StoreBank(_) if self.in_cash_shop => {}
+            WorldAction::StoreBank(request) => self.store_bank_request(request).await?,
             WorldAction::ScriptPortal { portal } => self.touch_script_portal(&portal).await?,
             WorldAction::LookChanged(announce) => {
                 let player = &self.in_game()?.player;
@@ -804,6 +811,7 @@ impl ClientActor {
         self.script = None;
         self.shop = None;
         self.storage = None;
+        self.store_bank = None;
         // A new field takes the Duey window with it, and the client doesn't
         // say so (report b029).
         self.duey = None;
@@ -914,6 +922,7 @@ impl ClientActor {
         // The shop is a stage of its own, and takes the Duey window with it
         // (report b029).
         self.duey = None;
+        self.store_bank = None;
         self.gift_window = None;
         self.rps = None;
         self.npc_request_id = self.npc_request_id.wrapping_add(1);

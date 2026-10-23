@@ -223,6 +223,10 @@ pub struct Trace {
     pub char_boxes: Vec<Vec<u8>>,
     /// ENTRUSTED_SHOP_CHECK_RESULT bodies (code first), in order.
     pub merchant_checks: Vec<Vec<u8>>,
+    /// STORE_BANK (Fredrick): its mode and the rest.
+    pub store_bank: Vec<(u8, Vec<u8>)>,
+    /// STORE_BANK_MESSAGE codes.
+    pub store_bank_messages: Vec<u8>,
     /// SPAWN, DESTROY and UPDATE_HIRED_MERCHANT: (opcode, body), in order.
     pub merchants: Vec<(i16, Vec<u8>)>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
@@ -288,6 +292,15 @@ pub struct StorageResult {
 }
 
 impl StorageResult {
+    /// What Fredrick's Store Bank holds, from its opening (STORE_BANK mode
+    /// 0x23): the same contents as storage's.
+    pub fn store_bank(body: &[u8]) -> Self {
+        Self {
+            mode: 0x23,
+            ..Self::read(0x16, body)
+        }
+    }
+
     fn read(mode: u8, body: &[u8]) -> Self {
         let mut r = Cursor::new(body);
         let mut result = Self {
@@ -652,6 +665,10 @@ impl Trace {
             self.char_boxes.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::EntrustedShopCheckResult as i16 {
             self.merchant_checks.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::StoreBank as i16 {
+            self.store_bank.push((p.bytes[2], p.bytes[3..].to_vec()));
+        } else if op == SendOpcode::StoreBankMessage as i16 {
+            self.store_bank_messages.push(p.bytes[2]);
         } else if op == SendOpcode::SpawnHiredMerchant as i16
             || op == SendOpcode::DestroyHiredMerchant as i16
             || op == SendOpcode::UpdateHiredMerchant as i16

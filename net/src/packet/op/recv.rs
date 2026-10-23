@@ -103,6 +103,8 @@ pub enum RecvOpcode {
     /// A hired merchant permit was used; the client waits for
     /// ENTRUSTED_SHOP_CHECK_RESULT.
     EntrustedShopRequest = 0x3F,
+    /// The Store Bank window's Get All, its confirm, or its closing.
+    StoreBankRequest = 0x40,
     DueyAction = 0x41,
     /// The Owl of Minerva's search window opened (`u8 5`): it wants the
     /// most searched items.

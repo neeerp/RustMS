@@ -81,6 +81,7 @@ impl ClientActor {
         if self.open_shop(npc_id).await?
             || self.open_storage(npc_id).await?
             || self.open_duey(npc_id).await?
+            || self.open_store_bank(npc_id).await?
             || self.open_rps(npc_id).await?
         {
             return Ok(());

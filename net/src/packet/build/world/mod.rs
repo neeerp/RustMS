@@ -45,5 +45,6 @@ pub mod skill;
 pub mod skill_macro;
 pub mod stat;
 pub mod storage;
+pub mod store_bank;
 pub mod summon;
 pub mod vega;

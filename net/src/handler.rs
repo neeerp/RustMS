@@ -529,6 +529,8 @@ pub enum WorldAction {
     PersonalShop(crate::personal_shop::PersonalShopRequest),
     /// Hire, stock, keep, close, or buy from a hired merchant.
     HiredMerchant(crate::hired_merchant::HiredMerchantRequest),
+    /// Take everything from Fredrick's Store Bank, or close it.
+    StoreBank(crate::store_bank::StoreBankRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -1004,6 +1006,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (
                 Op::EntrustedShopRequest,
                 InGame(&world::EntrustedShopRequestHandler),
+            ),
+            (
+                Op::StoreBankRequest,
+                InGame(&world::StoreBankRequestHandler),
             ),
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
