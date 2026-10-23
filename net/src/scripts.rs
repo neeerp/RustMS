@@ -129,7 +129,7 @@ const RANK_ROOMS: [(i32, i32, &str); 8] = [
     (140010100, 140010110, "out00"),
 ];
 /// Portals that just let the player through, and where to (Cosmic's).
-const PLAIN_WARPS: [(&str, i32, Portal); 16] = [
+const PLAIN_WARPS: [(&str, i32, Portal); 17] = [
     // Two of the Bottom of the Temple's ways back up the stairway; the
     // other (`OutPerrion_1`) says it's a shortcut.
     ("OutPerrion_2", UNDERGROUND_TEMPLE_STAIRS, Portal::Id(0)),
@@ -141,6 +141,8 @@ const PLAIN_WARPS: [(&str, i32, Portal); 16] = [
     // Out of the Horntail cave's entrance, back to the Peak of the Big
     // Nest.
     ("hontale_morph2", 240040600, Portal::Id(4)),
+    // The Road in Between, back to the Entrance to Horntail's Cave.
+    ("hontale_out1", 240050400, Portal::Id(0)),
     ("eliza_Garden", 920020000, Portal::Id(2)),
     ("catPriest_map", 925000000, Portal::Id(2)),
     // Lith Harbor's Info Shop. Cosmic also brings out an Aran quest's
