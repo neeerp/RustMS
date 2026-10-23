@@ -3,6 +3,7 @@
 #include "../Packets/PlayerInteractionPackets.h"
 
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/GuideRules.h"
 #include "../../IO/FamilyActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UiControl.h"
@@ -152,5 +153,46 @@ namespace ms
 		// The modal dialog takes the keys from a chat line being typed (FUN_004edba1).
 		UI::get().remove_textfield();
 		UI::get().emplace<UIImageSlides>(paths);
+	}
+
+	void SpawnGuideHandler::handle(InPacket& recv) const
+	{
+		bool shown = recv.read_bool();
+
+		Player& player = Stage::get().get_player();
+		Guide& guide = Stage::get().get_guide();
+
+		// The old one goes either way; a new one starts over at the
+		// player's feet (0x960111).
+		guide.remove();
+
+		if (shown)
+			guide.spawn(guide_rules::skill_for(player.get_stats().get_job().get_id()), player.get_position());
+	}
+
+	void TalkGuideHandler::handle(InPacket& recv) const
+	{
+		Guide& guide = Stage::get().get_guide();
+
+		if (!guide.is_present())
+			return;
+
+		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
+
+		if (mode == 0)
+		{
+			std::string text = recv.read_string();
+			int32_t width = recv.read_int();
+			int32_t duration = recv.read_int();
+
+			guide.say(text, width, duration);
+		} else
+		{
+			int32_t hint = recv.read_int();
+			int32_t duration = recv.read_int();
+			int32_t job = Stage::get().get_player().get_stats().get_job().get_id();
+
+			guide.hint(hint, duration, guide_rules::says_after_hint(job));
+		}
 	}
 }

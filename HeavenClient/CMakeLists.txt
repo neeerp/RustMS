@@ -383,6 +383,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(summon_rules_tests tests/summon_rules.cpp)
     target_include_directories(summon_rules_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME summon_rules COMMAND summon_rules_tests)
+    add_executable(guide_rules_tests tests/guide_rules.cpp)
+    target_include_directories(guide_rules_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guide_rules COMMAND guide_rules_tests)
     add_executable(berserk_tests tests/berserk.cpp)
     add_test(NAME berserk COMMAND berserk_tests)
     add_executable(beacon_tests tests/beacon.cpp)
@@ -653,6 +656,9 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapSummons.cpp
     Gameplay/MapleMap/MapSummons.h
     Gameplay/MapleMap/SummonRules.h
+    Gameplay/MapleMap/Guide.cpp
+    Gameplay/MapleMap/Guide.h
+    Gameplay/MapleMap/GuideRules.h
     Gameplay/MapleMap/MapMobs.cpp
     Gameplay/MapleMap/MapMobs.h
     Gameplay/MapleMap/MapNpcs.cpp

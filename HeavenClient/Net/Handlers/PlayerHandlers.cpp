@@ -31,6 +31,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
 #include "../../Gameplay/Stage.h"
+#include "../../Gameplay/MapleMap/GuideRules.h"
 #include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/Window.h"
@@ -154,6 +155,10 @@ namespace ms
 						if (auto opened = UI::get().get_element<UIQuestLog>())
 							opened->show_quest(id, 0);
 					});
+
+		// The tutorial guide leaves at level 11 (FUN_00a1fb52).
+		if (guide_rules::leaves(oldlevel, player.get_level()))
+			Stage::get().get_guide().remove();
 
 		// v83 checks the alert's quests again on any stat change (FUN_00a0843c).
 		Stage::get().get_quest_alert().stats_changed();

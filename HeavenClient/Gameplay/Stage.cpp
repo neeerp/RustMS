@@ -152,6 +152,7 @@ namespace ms
 			case State::INACTIVE:
 				load_map(mapid);
 				respawn(portalid, chase);
+				guide.respawn(player.get_position());
 				show_quest_tags();
 
 				if (mapid != -1)
@@ -199,6 +200,10 @@ namespace ms
 
 	void Stage::loadplayer(const CharEntry &entry)
 	{
+		// Another character starts without the last one's guide.
+		if (entry.id != player.get_oid())
+			guide.remove();
+
 		player = entry;
 		playable = player;
 
@@ -228,6 +233,7 @@ namespace ms
 		merchants.clear();
 		doors.clear();
 		summons.clear();
+		guide.hush();
 		// The server brings the player's pets out again on the new field.
 		player.clear_pets();
 		player.glide(false, false);
@@ -342,6 +348,7 @@ namespace ms
 		}
 
 		summons.draw(-1, viewx, viewy, alpha);
+		guide.draw(viewx, viewy, alpha);
 		clock.draw(viewx, viewy);
 		ship.draw_above(viewx, viewy, alpha);
 
@@ -482,6 +489,7 @@ namespace ms
 
 		// The player's summons follow where the player now is.
 		summons.update(physics, player.get_position(), player.is_climbing());
+		guide.update(physics, player.get_position(), player.is_climbing());
 		check_pet_loot();
 		show_rings();
 
@@ -1532,6 +1540,11 @@ namespace ms
 	MapSummons &Stage::get_summons()
 	{
 		return summons;
+	}
+
+	Guide &Stage::get_guide()
+	{
+		return guide;
 	}
 
 	MapMerchants &Stage::get_merchants()
