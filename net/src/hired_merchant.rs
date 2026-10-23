@@ -39,6 +39,48 @@ pub fn balloon_counts(open: bool, visitors: u8) -> (u8, u8) {
     }
 }
 
+/// What a hired merchant's owner or visitor asks: a permit's use
+/// (ENTRUSTED_SHOP_REQUEST) or PLAYER_INTERACTION in a type 5 room, whose
+/// modes are the personal shop's plus 0xb. Opening (0xb) and the blacklist
+/// sent just before (0x1e) are the same for both kinds of room, so those
+/// come as `PersonalShopRequest`; the runtime knows which room it is.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HiredMerchantRequest {
+    /// A permit was used: may the player hire a merchant here?
+    Check,
+    Create {
+        title: String,
+        permit_slot: i16,
+        permit_id: i32,
+    },
+    PutItem {
+        kind: i16,
+        slot: i16,
+        bundles: i16,
+        per_bundle: i16,
+        price: i32,
+    },
+    Buy {
+        index: u8,
+        bundles: i16,
+    },
+    TakeBack {
+        index: i16,
+    },
+    /// The owner is done with maintenance; the merchant opens again.
+    EndMaintenance,
+    /// Strike the sold-out rows and take the mesos.
+    Organize,
+    /// Close the merchant, taking back what it holds.
+    Close,
+    TakeMeso,
+    /// Who visited, and the blacklist, for the owner's dialogs.
+    Visitors,
+    Blacklist,
+    BlacklistAdd(String),
+    BlacklistRemove(String),
+}
+
 /// The answers to a permit's use (ENTRUSTED_SHOP_CHECK_RESULT).
 pub mod check_result {
     /// The client asks for a title and opens the room.

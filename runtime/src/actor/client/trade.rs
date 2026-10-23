@@ -85,6 +85,11 @@ impl ClientActor {
                 if trading.is_some() || self.personal_shop.is_some() {
                     return Ok(());
                 }
+                if let Some(owner) = crate::actor::field_merchants::owner_of(sn) {
+                    if !self.merchant_visits.contains(&owner) {
+                        self.merchant_visits.push(owner);
+                    }
+                }
                 self.to_room(RoomRequest::Visit { room: sn }).await
             }
             TradeRequest::Chat { text } => {

@@ -11,7 +11,7 @@
 
 use crate::actor::field_trades::Outbox;
 use crate::message::ServerMessage;
-use game::hired_merchant::{HiredMerchant, Sale, Stock};
+use game::hired_merchant::{HiredMerchant, Sale, Stand, Stock};
 use game::mini_room::Listing;
 use game::AvatarLook;
 use net::error::NetworkError;
@@ -47,16 +47,32 @@ const CHAT_KEPT: usize = 50;
 const VISITS_KEPT: usize = 50;
 /// The most names a blacklist holds (0x519611).
 const BLACKLIST_MAX: usize = 20;
+/// How close to another merchant or a personal shop a merchant may be
+/// set up: a server rule, as the client doesn't check (report 165 §5).
+pub const SPACING: i32 = 150;
 
 /// The room of `owner_id`'s merchant.
 pub fn sn(owner_id: i32) -> i32 {
     SN_BASE | owner_id
 }
 
+/// The owner of the merchant whose room is `sn`, if it is a merchant's.
+pub fn owner_of(sn: i32) -> Option<i32> {
+    (sn & SN_BASE != 0).then_some(sn & !SN_BASE)
+}
+
 /// What a client asks of a hired merchant on its field. Visits come as
 /// `RoomRequest::Visit`, the same as for other rooms.
 #[derive(Debug)]
 pub enum MerchantRequest {
+    /// Where the sender would set up a merchant: on the ground under them,
+    /// if this map has merchants and none stands or sells too close.
+    Stand {
+        reply: oneshot::Sender<Option<Stand>>,
+        /// Keep the spot for the sender while they set up, until they
+        /// place the merchant or leave.
+        hold: bool,
+    },
     /// The sender opened their merchant, already saved as open: it stands
     /// here now, keeping out `blacklist`.
     Place {
@@ -74,10 +90,13 @@ pub enum MerchantRequest {
     },
     /// The buyer's client actor wrote the purchase it reserved, the sale,
     /// or found it couldn't. Taken from anyone: the buyer may have left.
+    /// `refused`: the database wouldn't have it, so the copy here is out
+    /// of date.
     Settle {
         owner: i32,
         id: u64,
         sale: Option<Sale>,
+        refused: bool,
     },
     /// The owner, in for maintenance, changed what the merchant holds.
     Restock {
@@ -92,11 +111,15 @@ pub enum MerchantRequest {
     /// The owner is done with maintenance: the merchant opens again.
     Reopen,
     /// The owner closes the merchant from maintenance: it goes from the
-    /// map, and the reply has what it held.
+    /// map, and the reply has what it held and its blacklist.
     Close {
-        reply: oneshot::Sender<Box<HiredMerchant>>,
+        reply: oneshot::Sender<(Box<HiredMerchant>, Vec<String>)>,
     },
     Leave,
+    /// Out of `owner`'s merchant only: the player didn't want the seat.
+    Unseat {
+        owner: i32,
+    },
 }
 
 /// A purchase held for a buyer while they write it.
@@ -111,13 +134,17 @@ pub struct Reservation {
     pub listing: Listing,
 }
 
-/// What a merchant tells a client actor.
+/// What a merchant tells a client actor. The room's packet comes with
+/// the news, for the client actor to send only if it still expects it.
 #[derive(Debug)]
 pub enum MerchantEvent {
     /// The player sits in `slot` of the merchant's room now.
-    Entered { slot: u8 },
+    Entered { slot: u8, room: Option<Packet> },
     /// The owner is in for maintenance, with the merchant as it stands.
-    Maintenance(Box<HiredMerchant>),
+    Maintenance(Box<HiredMerchant>, Option<Packet>),
+    /// The merchant as the database has it now, for the owner in for
+    /// maintenance, whose copy is out of date.
+    Refreshed(Box<HiredMerchant>),
     /// The player is out of the room; send the packet, if any.
     Left(Option<Packet>),
 }
@@ -236,20 +263,18 @@ impl Merchant {
             open_for: self.data.open_for(now),
             setup: false,
         };
-        let to = owner.client_id;
-        let me = self.data.owner_id;
-        // Before the packet, so a request made on seeing it finds the
-        // owner in.
+        let room = built(build_merchant_room(
+            &self.data,
+            0,
+            Some(view),
+            &[],
+            &self.chat,
+        ));
         event(
             out,
-            to,
-            me,
-            MerchantEvent::Maintenance(Box::new(self.data.clone())),
-        );
-        packet(
-            out,
-            to,
-            build_merchant_room(&self.data, 0, Some(view), &[], &self.chat),
+            owner.client_id,
+            self.data.owner_id,
+            MerchantEvent::Maintenance(Box::new(self.data.clone()), room),
         );
         self.owner = Some(owner);
     }
@@ -262,6 +287,9 @@ pub struct Merchants {
     next_reservation: u64,
     shown: Vec<Shown>,
     rereads: Vec<i32>,
+    /// The spots kept for players setting up a merchant, which stands
+    /// nowhere yet.
+    held_stands: HashMap<ClientId, (i16, i16)>,
 }
 
 fn packet(out: &mut Outbox, to: ClientId, packet: Result<Packet, NetworkError>) {
@@ -275,7 +303,7 @@ fn event(out: &mut Outbox, to: ClientId, owner: i32, event: MerchantEvent) {
     out.push((to, ServerMessage::HiredMerchant { owner, event }));
 }
 
-fn leave_packet(packet: Result<Packet, NetworkError>) -> Option<Packet> {
+fn built(packet: Result<Packet, NetworkError>) -> Option<Packet> {
     packet
         .map_err(|e| error!(error = %e, "Failed to build a merchant packet"))
         .ok()
@@ -288,9 +316,7 @@ impl Merchants {
     }
 
     fn by_sn(&self, sn: i32) -> Option<i32> {
-        (sn & SN_BASE != 0)
-            .then_some(sn & !SN_BASE)
-            .filter(|owner| self.merchants.contains_key(owner))
+        owner_of(sn).filter(|owner| self.merchants.contains_key(owner))
     }
 
     pub fn is_member(&self, client_id: ClientId) -> bool {
@@ -343,11 +369,40 @@ impl Merchants {
             .collect()
     }
 
-    /// Where the merchants stand, to keep new ones apart.
-    pub fn stands(&self) -> impl Iterator<Item = (i16, i16)> + '_ {
+    /// Where the merchants stand, and those being set up but `from`'s, to
+    /// keep new ones apart.
+    fn stands(&self, from: ClientId) -> impl Iterator<Item = (i16, i16)> + '_ {
+        let held = self
+            .held_stands
+            .iter()
+            .filter(move |(&id, _)| id != from)
+            .map(|(_, &at)| at);
         self.merchants
             .values()
             .map(|m| (m.data.stand.x, m.data.stand.y))
+            .chain(held)
+    }
+
+    /// Whether a merchant `from` sets up at (x, y) would stand clear of
+    /// the merchants here and of the shops at `shops`.
+    pub fn clear_of(
+        &self,
+        from: ClientId,
+        x: i16,
+        y: i16,
+        shops: impl IntoIterator<Item = (i16, i16)>,
+    ) -> bool {
+        let near = |(other_x, other_y): (i16, i16)| {
+            let dx = i32::from(x) - i32::from(other_x);
+            let dy = i32::from(y) - i32::from(other_y);
+            dx * dx + dy * dy < SPACING * SPACING
+        };
+        !self.stands(from).chain(shops).any(near)
+    }
+
+    /// Keep (x, y) for `from`, who sets up a merchant there.
+    pub fn hold_stand(&mut self, from: ClientId, x: i16, y: i16) {
+        self.held_stands.insert(from, (x, y));
     }
 
     /// The merchants read from the database when the field started. One
@@ -363,8 +418,9 @@ impl Merchants {
         }
     }
 
-    /// `merchant`'s owner opened it; it stands here from now on.
-    pub fn place(&mut self, merchant: HiredMerchant, names: Vec<String>) {
+    /// `merchant`'s owner, `from`, opened it; it stands here from now on.
+    pub fn place(&mut self, from: ClientId, merchant: HiredMerchant, names: Vec<String>) {
+        self.held_stands.remove(&from);
         let owner = merchant.owner_id;
         if self.merchants.contains_key(&owner) {
             return;
@@ -427,7 +483,7 @@ impl Merchants {
                     continue;
                 };
                 let slot = seat as u8 + 1;
-                let leave = leave_packet(build_room_leave(slot, leave_reason::MAINTENANCE));
+                let leave = built(build_room_leave(slot, leave_reason::MAINTENANCE));
                 self.member_of.remove(&visitor.client_id);
                 event(
                     &mut out,
@@ -466,15 +522,22 @@ impl Merchants {
             .expect("checked above");
         let slot = free as u8 + 1;
         merchant.visitors[free] = Some(member);
-        event(&mut out, from, owner_id, MerchantEvent::Entered { slot });
         let visitors: Vec<_> = merchant
             .members()
             .map(|(slot, m)| (slot, &m.look, m.name.as_str()))
             .collect();
-        packet(
+        let room = built(build_merchant_room(
+            &merchant.data,
+            slot,
+            None,
+            &visitors,
+            &merchant.chat,
+        ));
+        event(
             &mut out,
             from,
-            build_merchant_room(&merchant.data, slot, None, &visitors, &merchant.chat),
+            owner_id,
+            MerchantEvent::Entered { slot, room },
         );
         for (_, member) in merchant.members().filter(|(s, _)| *s != slot) {
             packet(
@@ -575,28 +638,37 @@ impl Merchants {
             bundles,
             at: now,
         });
-        let mut out = Outbox::new();
-        for (_, member) in merchant.members() {
-            packet(&mut out, member.client_id, merchant.items_packet());
-        }
-        out
+        // The room sees the purchase once it is settled.
+        Outbox::new()
     }
 
     /// The buyer wrote reservation `id` of `owner`'s merchant, or didn't:
     /// credit the mesos or put the bundles back. One the merchant let go
     /// of, as after a timeout, is in the database alone; if it sold, the
-    /// merchant is read again.
-    pub fn settle(&mut self, owner: i32, id: u64, sold: Option<Sale>, now: SystemTime) -> Outbox {
+    /// merchant is read again, as it is when the database `refused` the
+    /// purchase.
+    pub fn settle(
+        &mut self,
+        owner: i32,
+        id: u64,
+        sold: Option<Sale>,
+        refused: bool,
+        now: SystemTime,
+    ) -> Outbox {
         let mut out = Outbox::new();
         let Some(merchant) = self.merchants.get_mut(&owner) else {
             return out;
         };
         let Some(at) = merchant.held.iter().position(|held| held.id == id) else {
-            if sold.is_some() {
+            if sold.is_some() || refused {
                 self.reread(owner);
             }
             return out;
         };
+        if refused {
+            self.reread(owner);
+            return out;
+        }
         let held = merchant.held.remove(at);
         let row = merchant
             .data
@@ -648,6 +720,15 @@ impl Merchants {
             Some(data) if data.state == game::hired_merchant::MerchantState::Open => {
                 merchant.data = data;
                 let mut out = Outbox::new();
+                if let Some(owner) = &merchant.owner {
+                    let data = Box::new(merchant.data.clone());
+                    event(
+                        &mut out,
+                        owner.client_id,
+                        merchant.data.owner_id,
+                        MerchantEvent::Refreshed(data),
+                    );
+                }
                 for (_, member) in merchant.members() {
                     packet(&mut out, member.client_id, merchant.items_packet());
                 }
@@ -714,7 +795,11 @@ impl Merchants {
 
     /// The owner, in for maintenance, closes the merchant: it goes, and
     /// they get what it held.
-    pub fn close(&mut self, from: ClientId, reply: oneshot::Sender<Box<HiredMerchant>>) -> Outbox {
+    pub fn close(
+        &mut self,
+        from: ClientId,
+        reply: oneshot::Sender<(Box<HiredMerchant>, Vec<String>)>,
+    ) -> Outbox {
         let Some(owner) = self
             .maintained(from)
             .filter(|m| m.rereading == 0)
@@ -725,13 +810,27 @@ impl Merchants {
         let merchant = self.merchants.remove(&owner).expect("maintained");
         self.member_of.remove(&from);
         self.shown.push(Shown::Destroy(owner));
-        let _ = reply.send(Box::new(merchant.data));
+        let _ = reply.send((Box::new(merchant.data), merchant.blacklist));
         Outbox::new()
     }
 
     /// `client_id` left the room or the field. An owner leaving
     /// maintenance opens the merchant again.
     pub fn leave(&mut self, client_id: ClientId, now: Instant) -> Outbox {
+        self.held_stands.remove(&client_id);
+        self.leave_room(client_id, now)
+    }
+
+    /// `client_id` is out of `owner`'s room, if they are in it, and keeps
+    /// any spot they hold.
+    pub fn unseat(&mut self, client_id: ClientId, owner: i32, now: Instant) -> Outbox {
+        if self.member_of.get(&client_id) != Some(&owner) {
+            return Outbox::new();
+        }
+        self.leave_room(client_id, now)
+    }
+
+    fn leave_room(&mut self, client_id: ClientId, now: Instant) -> Outbox {
         let mut out = Outbox::new();
         let Some(&owner) = self.member_of.get(&client_id) else {
             return out;
@@ -791,7 +890,7 @@ impl Merchants {
         };
         for (slot, member) in merchant.members() {
             self.member_of.remove(&member.client_id);
-            let leave = leave_packet(build_room_leave(slot, reason));
+            let leave = built(build_room_leave(slot, reason));
             event(
                 &mut out,
                 member.client_id,
@@ -914,7 +1013,11 @@ mod tests {
 
     fn placed() -> Merchants {
         let mut merchants = Merchants::default();
-        merchants.place(merchant(SystemTime::now()), vec!["Mallory".to_string()]);
+        merchants.place(
+            ALICE,
+            merchant(SystemTime::now()),
+            vec!["Mallory".to_string()],
+        );
         assert_eq!(merchants.take_shown(), vec![Shown::Spawn(OWNER)]);
         merchants
     }
@@ -925,20 +1028,28 @@ mod tests {
 
     /// The mode byte of a packet (and the slot and reason of a LEAVE), or
     /// what kind of event it is.
+    /// An event's room packet follows it.
     fn summary(out: &Outbox) -> Vec<(ClientId, String)> {
         out.iter()
-            .map(|(to, message)| {
-                let what = match message {
-                    ServerMessage::SendPacket(packet) => describe(packet),
+            .flat_map(|(to, message)| {
+                let (what, room) = match message {
+                    ServerMessage::SendPacket(packet) => (describe(packet), None),
                     ServerMessage::HiredMerchant { event, .. } => match event {
-                        MerchantEvent::Entered { slot } => format!("entered {slot}"),
-                        MerchantEvent::Maintenance(m) => format!("maintenance {}", m.meso),
-                        MerchantEvent::Left(Some(packet)) => format!("left {}", describe(packet)),
-                        MerchantEvent::Left(None) => "left".to_string(),
+                        MerchantEvent::Entered { slot, room } => {
+                            (format!("entered {slot}"), room.as_ref())
+                        }
+                        MerchantEvent::Maintenance(m, room) => {
+                            (format!("maintenance {}", m.meso), room.as_ref())
+                        }
+                        MerchantEvent::Left(Some(packet)) => {
+                            (format!("left {}", describe(packet)), None)
+                        }
+                        MerchantEvent::Left(None) => ("left".to_string(), None),
+                        MerchantEvent::Refreshed(m) => (format!("refreshed {}", m.meso), None),
                     },
-                    other => format!("{other:?}"),
+                    other => (format!("{other:?}"), None),
                 };
-                (*to, what)
+                std::iter::once((*to, what)).chain(room.map(|room| (*to, describe(room))))
             })
             .collect()
     }
@@ -1002,7 +1113,7 @@ mod tests {
         let mut merchants = Merchants::default();
         let names = ["Mallory", "MALLORY"].map(String::from).into_iter();
         let names = names.chain((0..30).map(|i| format!("Name{i}")));
-        merchants.place(merchant(SystemTime::now()), names.collect());
+        merchants.place(ALICE, merchant(SystemTime::now()), names.collect());
         assert_eq!(merchants.merchants[&OWNER].blacklist.len(), BLACKLIST_MAX);
         let out = visit(&mut merchants, BOB, 2, "mallory");
         assert_eq!(summary(&out), vec![(BOB, "0x5 [0, 17]".into())]);
@@ -1021,7 +1132,13 @@ mod tests {
             buy_result::NO_STOCK,
             "two of the five are held"
         );
-        let out = merchants.settle(OWNER, held.id, Some(sale(2_000_000)), SystemTime::now());
+        let out = merchants.settle(
+            OWNER,
+            held.id,
+            Some(sale(2_000_000)),
+            false,
+            SystemTime::now(),
+        );
         assert_eq!(summary(&out), vec![(BOB, "0x19".into())]);
         assert!(merchants.take_rereads().is_empty());
         let m = &merchants.merchants[&OWNER];
@@ -1039,10 +1156,10 @@ mod tests {
         let held = reserve(&mut merchants, BOB, 5).expect("in stock");
         merchants.leave(BOB, Instant::now());
         // The buyer settles after leaving.
-        merchants.settle(OWNER, held.id, None, SystemTime::now());
+        merchants.settle(OWNER, held.id, None, false, SystemTime::now());
         let m = &merchants.merchants[&OWNER];
         assert_eq!((m.data.stock[0].listing.bundles, m.data.meso), (5, 0));
-        merchants.settle(OWNER, held.id, None, SystemTime::now());
+        merchants.settle(OWNER, held.id, None, false, SystemTime::now());
         let m = &merchants.merchants[&OWNER];
         assert_eq!(m.data.stock[0].listing.bundles, 5, "settled once");
         assert!(merchants.take_rereads().is_empty());
@@ -1077,7 +1194,13 @@ mod tests {
             vec![(BOB, "0x5 [0, 18]".into())],
             "maintenance"
         );
-        let out = merchants.settle(OWNER, held.id, Some(sale(1_000_000)), SystemTime::now());
+        let out = merchants.settle(
+            OWNER,
+            held.id,
+            Some(sale(1_000_000)),
+            false,
+            SystemTime::now(),
+        );
         assert_eq!(
             summary(&out),
             vec![
@@ -1099,8 +1222,9 @@ mod tests {
         merchants.restock(ALICE, Vec::new(), 300);
         let (reply, mut closed) = oneshot::channel();
         merchants.close(ALICE, reply);
-        let closed = closed.try_recv().expect("closed");
+        let (closed, blacklist) = closed.try_recv().expect("closed");
         assert_eq!((closed.meso, closed.stock.len()), (300, 0));
+        assert_eq!(blacklist, vec!["Mallory".to_string()]);
         assert_eq!(merchants.take_shown(), vec![Shown::Destroy(OWNER)]);
         assert!(!merchants.contains(sn(OWNER)) && !merchants.is_member(ALICE));
     }
@@ -1126,7 +1250,7 @@ mod tests {
         assert_eq!(merchants.stale(later), vec![OWNER]);
         assert_eq!(merchants.take_rereads(), vec![OWNER]);
         // The sale lands meanwhile: read once more.
-        merchants.settle(OWNER, held.id, Some(sale(1)), SystemTime::now());
+        merchants.settle(OWNER, held.id, Some(sale(1)), false, SystemTime::now());
         assert_eq!(merchants.take_rereads(), vec![OWNER]);
         assert_eq!(merchants.merchants[&OWNER].data.meso, 0, "not counted here");
         let mut sold = merchant(SystemTime::now());
@@ -1142,6 +1266,24 @@ mod tests {
     }
 
     #[test]
+    fn the_owner_in_maintenance_hears_of_a_late_sale() {
+        let mut merchants = placed();
+        visit(&mut merchants, BOB, 2, "Bob");
+        let held = reserve(&mut merchants, BOB, 1).expect("in stock");
+        merchants.stale(Instant::now() + RESERVATION_TIMEOUT);
+        merchants.take_rereads();
+        merchants.reload(OWNER, Some(merchant(SystemTime::now())), SystemTime::now());
+        let out = visit(&mut merchants, ALICE, OWNER, "Owner");
+        assert!(summary(&out).contains(&(ALICE, "maintenance 0".into())));
+        merchants.settle(OWNER, held.id, Some(sale(1)), false, SystemTime::now());
+        assert_eq!(merchants.take_rereads(), vec![OWNER]);
+        let mut sold = merchant(SystemTime::now());
+        sold.meso = 1;
+        let out = merchants.reload(OWNER, Some(sold), SystemTime::now());
+        assert_eq!(summary(&out)[0], (ALICE, "refreshed 1".into()));
+    }
+
+    #[test]
     fn nothing_sells_while_the_merchant_is_read_again() {
         let mut merchants = placed();
         visit(&mut merchants, BOB, 2, "Bob");
@@ -1152,7 +1294,7 @@ mod tests {
             buy_result::NO_STOCK
         );
         // Let go of and not written: the database is right as it is.
-        merchants.settle(OWNER, first.id, None, SystemTime::now());
+        merchants.settle(OWNER, first.id, None, false, SystemTime::now());
         assert_eq!(merchants.take_rereads(), vec![OWNER]);
         merchants.reload(OWNER, Some(merchant(SystemTime::now())), SystemTime::now());
         assert!(reserve(&mut merchants, BOB, 1).is_ok());
@@ -1189,5 +1331,64 @@ mod tests {
         assert_eq!((hits[0].room, hits[0].bundles), (sn(OWNER), 5));
         visit(&mut merchants, ALICE, OWNER, "Owner");
         assert!(merchants.search(2000000, 910000001, 0).is_empty());
+    }
+
+    #[test]
+    fn a_new_merchant_stands_clear_of_merchants_and_shops() {
+        let merchants = placed();
+        // The placed merchant stands at (100, 34).
+        assert!(!merchants.clear_of(BOB, 100 + 149, 34, []));
+        assert!(merchants.clear_of(BOB, 100 + 150, 34, []));
+        assert!(!merchants.clear_of(BOB, 100 + 106, 34 + 106, []));
+        assert!(!merchants.clear_of(BOB, -500, 34, [(-400, 34)]));
+        assert!(merchants.clear_of(BOB, -500, 34, [(-200, 34)]));
+    }
+
+    #[test]
+    fn a_spot_is_kept_while_its_merchant_is_set_up() {
+        let mut merchants = placed();
+        merchants.hold_stand(CAROL, -500, 34);
+        assert!(!merchants.clear_of(BOB, -400, 34, []));
+        assert!(merchants.clear_of(CAROL, -400, 34, []), "their own spot");
+        merchants.leave(CAROL, Instant::now());
+        assert!(merchants.clear_of(BOB, -400, 34, []));
+        merchants.hold_stand(CAROL, -500, 34);
+        let mut theirs = merchant(SystemTime::now());
+        theirs.owner_id = OWNER + 1;
+        theirs.stand.x = -500;
+        merchants.place(CAROL, theirs, Vec::new());
+        assert!(
+            !merchants.clear_of(BOB, -400, 34, []),
+            "placed where it was kept"
+        );
+        merchants.hold_stand(CAROL, 800, 34);
+        merchants.place(CAROL, merchant(SystemTime::now()), Vec::new());
+        assert!(merchants.clear_of(BOB, 800, 34, []), "let go once placed");
+    }
+
+    #[test]
+    fn a_purchase_the_database_refused_reads_the_merchant_again() {
+        let mut merchants = placed();
+        visit(&mut merchants, BOB, 2, "Bob");
+        let held = reserve(&mut merchants, BOB, 1).expect("reserved");
+        let out = merchants.settle(OWNER, held.id, None, true, SystemTime::now());
+        assert!(out.is_empty());
+        assert_eq!(merchants.take_rereads(), vec![OWNER]);
+        assert_eq!(
+            reserve(&mut merchants, BOB, 1).unwrap_err(),
+            buy_result::NO_STOCK
+        );
+    }
+
+    #[test]
+    fn an_unwanted_seat_is_given_up_only_in_its_own_room() {
+        let mut merchants = placed();
+        visit(&mut merchants, BOB, 2, "Bob");
+        merchants.hold_stand(BOB, 800, 34);
+        merchants.unseat(BOB, OWNER + 1, Instant::now());
+        assert!(merchants.is_member(BOB), "another merchant's seat");
+        merchants.unseat(BOB, OWNER, Instant::now());
+        assert!(!merchants.is_member(BOB));
+        assert!(!merchants.clear_of(CAROL, 800, 34, []), "the spot stays");
     }
 }

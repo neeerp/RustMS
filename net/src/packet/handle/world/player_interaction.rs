@@ -1,4 +1,5 @@
 use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
+use crate::hired_merchant::{HiredMerchantRequest, ROOM_TYPE as HIRED_MERCHANT};
 use crate::packet::build::world::mini_room::{PERSONAL_SHOP, TRADE_ROOM};
 use crate::personal_shop::PersonalShopRequest;
 use crate::trade::TradeRequest;
@@ -12,8 +13,10 @@ use tracing::debug;
 /// declines, 0xf puts up an item, 0x10 mesos, and 0x11 presses Trade. For
 /// shops, 0x16 lists an item, 0x1e sends the blacklist and 0x1f/0x20 change
 /// it, 0xb opens the shop, 0x17 buys, 0x1b takes a listing back, and
-/// 0x1c/0x1d ban a visitor. The runtime holds the goods and the field the
-/// room.
+/// 0x1c/0x1d ban a visitor. A hired merchant's modes are the shop's plus
+/// 0xb (0x21 lists, 0x22 buys, 0x26 takes back), and its owner's buttons
+/// send 0x27 to 0x31 (report 165 §3). The runtime holds the goods and the
+/// field the room.
 pub struct PlayerInteractionHandler;
 
 impl WorldHandler for PlayerInteractionHandler {
@@ -21,6 +24,8 @@ impl WorldHandler for PlayerInteractionHandler {
         let mut reader = Cursor::new(&packet.bytes);
         reader.read_short()?;
         let shop = |request| Ok(HandlerResult::empty().with(WorldAction::PersonalShop(request)));
+        let merchant =
+            |request| Ok(HandlerResult::empty().with(WorldAction::HiredMerchant(request)));
         let request = match reader.read_byte()? {
             0x00 => match reader.read_byte()? {
                 TRADE_ROOM => TradeRequest::Create,
@@ -28,6 +33,15 @@ impl WorldHandler for PlayerInteractionHandler {
                     let title = reader.read_str_with_length()?;
                     reader.read_byte()?;
                     return shop(PersonalShopRequest::Create {
+                        title,
+                        permit_slot: reader.read_short()?,
+                        permit_id: reader.read_int()?,
+                    });
+                }
+                HIRED_MERCHANT => {
+                    let title = reader.read_str_with_length()?;
+                    reader.read_byte()?;
+                    return merchant(HiredMerchantRequest::Create {
                         title,
                         permit_slot: reader.read_short()?,
                         permit_id: reader.read_int()?,
@@ -106,8 +120,46 @@ impl WorldHandler for PlayerInteractionHandler {
                     reader.read_str_with_length()?,
                 ))
             }
+            0x21 => {
+                return merchant(HiredMerchantRequest::PutItem {
+                    kind: i16::from(reader.read_byte()?),
+                    slot: reader.read_short()?,
+                    bundles: reader.read_short()?,
+                    per_bundle: reader.read_short()?,
+                    price: reader.read_int()?,
+                })
+            }
+            // The item's data checksum follows.
+            0x22 => {
+                return merchant(HiredMerchantRequest::Buy {
+                    index: reader.read_byte()?,
+                    bundles: reader.read_short()?,
+                })
+            }
+            0x26 => {
+                return merchant(HiredMerchantRequest::TakeBack {
+                    index: reader.read_short()?,
+                })
+            }
+            0x27 => return merchant(HiredMerchantRequest::EndMaintenance),
+            0x28 => return merchant(HiredMerchantRequest::Organize),
+            0x29 => return merchant(HiredMerchantRequest::Close),
+            0x2b => return merchant(HiredMerchantRequest::TakeMeso),
+            0x2e => return merchant(HiredMerchantRequest::Visitors),
+            0x2f => return merchant(HiredMerchantRequest::Blacklist),
+            0x30 => {
+                return merchant(HiredMerchantRequest::BlacklistAdd(
+                    reader.read_str_with_length()?,
+                ))
+            }
+            0x31 => {
+                return merchant(HiredMerchantRequest::BlacklistRemove(
+                    reader.read_str_with_length()?,
+                ))
+            }
             other => {
-                // 0x14 answers the partner's Trade press with item CRCs.
+                // 0x14 answers the partner's Trade press with item CRCs;
+                // 0x2d renames a merchant, for GMs.
                 debug!(mode = other, "Ignoring player interaction");
                 return Ok(HandlerResult::empty());
             }
@@ -318,8 +370,95 @@ mod tests {
     }
 
     #[test]
+    fn reads_the_merchant_modes() {
+        let parse_merchant = |build: &dyn Fn(&mut Packet)| match action(build) {
+            Some(WorldAction::HiredMerchant(request)) => Some(request),
+            None => None,
+            Some(other) => panic!("unexpected {other:?}"),
+        };
+        let create = parse_merchant(&|p| {
+            p.write_bytes(&[0, 5]).unwrap();
+            p.write_str_with_length("Scrolls").unwrap();
+            p.write_byte(0).unwrap();
+            p.write_short(2).unwrap();
+            p.write_int(5030000).unwrap();
+        });
+        assert_eq!(
+            create,
+            Some(HiredMerchantRequest::Create {
+                title: "Scrolls".into(),
+                permit_slot: 2,
+                permit_id: 5030000
+            })
+        );
+        let put = parse_merchant(&|p| {
+            p.write_bytes(&[0x21, 4]).unwrap();
+            p.write_short(7).unwrap();
+            p.write_short(2).unwrap();
+            p.write_short(50).unwrap();
+            p.write_int(900).unwrap();
+        });
+        assert_eq!(
+            put,
+            Some(HiredMerchantRequest::PutItem {
+                kind: 4,
+                slot: 7,
+                bundles: 2,
+                per_bundle: 50,
+                price: 900
+            })
+        );
+        let buy = parse_merchant(&|p| {
+            p.write_bytes(&[0x22, 1]).unwrap();
+            p.write_short(3).unwrap();
+            p.write_int(0x1234).unwrap();
+        });
+        assert_eq!(
+            buy,
+            Some(HiredMerchantRequest::Buy {
+                index: 1,
+                bundles: 3
+            })
+        );
+        let take = parse_merchant(&|p| {
+            p.write_byte(0x26).unwrap();
+            p.write_short(4).unwrap();
+        });
+        assert_eq!(take, Some(HiredMerchantRequest::TakeBack { index: 4 }));
+        for (mode, request) in [
+            (0x27, HiredMerchantRequest::EndMaintenance),
+            (0x28, HiredMerchantRequest::Organize),
+            (0x29, HiredMerchantRequest::Close),
+            (0x2b, HiredMerchantRequest::TakeMeso),
+            (0x2e, HiredMerchantRequest::Visitors),
+            (0x2f, HiredMerchantRequest::Blacklist),
+        ] {
+            assert_eq!(
+                parse_merchant(&|p| {
+                    p.write_byte(mode).unwrap();
+                }),
+                Some(request)
+            );
+        }
+        let add = parse_merchant(&|p| {
+            p.write_byte(0x30).unwrap();
+            p.write_str_with_length("Dave").unwrap();
+        });
+        assert_eq!(add, Some(HiredMerchantRequest::BlacklistAdd("Dave".into())));
+        let remove = parse_merchant(&|p| {
+            p.write_byte(0x31).unwrap();
+            p.write_str_with_length("Dave").unwrap();
+        });
+        assert_eq!(
+            remove,
+            Some(HiredMerchantRequest::BlacklistRemove("Dave".into()))
+        );
+    }
+
+    #[test]
     fn ignores_other_rooms_and_the_crc_answer() {
         assert_eq!(parse(|p| p.write_bytes(&[0, 1, 0])), None);
         assert_eq!(parse(|p| p.write_bytes(&[0x14, 0])), None);
+        assert_eq!(parse(|p| p.write_byte(0x2d)), None);
     }
 }

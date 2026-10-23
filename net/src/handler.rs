@@ -527,6 +527,8 @@ pub enum WorldAction {
     Owl(crate::owl::OwlRequest),
     /// Open, stock, visit, or buy from a personal shop.
     PersonalShop(crate::personal_shop::PersonalShopRequest),
+    /// Hire, stock, keep, close, or buy from a hired merchant.
+    HiredMerchant(crate::hired_merchant::HiredMerchantRequest),
     /// The player touched the named script portal on their map.
     ScriptPortal {
         portal: String,
@@ -999,6 +1001,10 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::QuestAction, InGame(&world::QuestActionHandler)),
             (Op::NpcShopAction, InGame(&world::NpcShopActionHandler)),
             (Op::TrunkRequest, InGame(&world::TrunkRequestHandler)),
+            (
+                Op::EntrustedShopRequest,
+                InGame(&world::EntrustedShopRequestHandler),
+            ),
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
@@ -1127,7 +1133,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 121);
+        assert_eq!(world_routes().len(), 122);
     }
 
     #[test]

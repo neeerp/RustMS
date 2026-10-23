@@ -219,6 +219,10 @@ pub struct Trace {
     pub rooms: Vec<Vec<u8>>,
     /// Every UPDATE_CHAR_BOX body (character id first), in order.
     pub char_boxes: Vec<Vec<u8>>,
+    /// ENTRUSTED_SHOP_CHECK_RESULT bodies (code first), in order.
+    pub merchant_checks: Vec<Vec<u8>>,
+    /// SPAWN, DESTROY and UPDATE_HIRED_MERCHANT: (opcode, body), in order.
+    pub merchants: Vec<(i16, Vec<u8>)>,
     /// GIVE_BUFF: (skill id, value, duration in ms).
     pub buffs: Vec<(i32, i16, i32)>,
     /// CANCEL_BUFF: the second mask of each.
@@ -644,6 +648,13 @@ impl Trace {
             self.rooms.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::UpdateCharBox as i16 {
             self.char_boxes.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::EntrustedShopCheckResult as i16 {
+            self.merchant_checks.push(p.bytes[2..].to_vec());
+        } else if op == SendOpcode::SpawnHiredMerchant as i16
+            || op == SendOpcode::DestroyHiredMerchant as i16
+            || op == SendOpcode::UpdateHiredMerchant as i16
+        {
+            self.merchants.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::GuildOperation as i16 {
             self.guild_ops.push(p.bytes[2..].to_vec());
         } else if op == SendOpcode::AllianceOperation as i16 {

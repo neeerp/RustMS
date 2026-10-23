@@ -1543,7 +1543,77 @@ not decoded (all black, the status red). Equip tooltips show the listed
 equip's own stats. GO after leaving the Free Market gets
 answer 1 from the server, so the row shows "Store Closed".
 
-Hired merchants are not supported yet.
+## Hired merchants
+
+A player over level 15 with a hired merchant permit (`503xxxx`, in the
+cash bag) can set up a merchant (mini room type 5) on a Free Market map.
+It stays and sells after they leave the room, the map or the game. The
+wire facts are in v83ref report 165. Unlike a personal shop, the
+database holds the merchant (`db::merchant`), and the field never touches
+the database itself:
+
+- `runtime::actor::field_merchants::Merchants` is the field's copy, to
+  show and sell from. Fields read their merchants back when they start.
+  Merchants stand only on the main copy of a map (`instance_id == 0`) and
+  only where Map.nx allows shops. A merchant's room id is
+  `0x4000_0000 | owner id`.
+- The owner's `ClientActor` (`client/hired_merchant.rs`) holds the
+  merchant while setting it up, or in for maintenance
+  (`MerchantRoom::Setup` and `Maintenance`), and writes every change.
+
+The flow:
+
+1. **Check** (ENTRUSTED_SHOP_REQUEST `0x3F`). The client asks before it
+   asks for a title. The answer is ENTRUSTED_SHOP_CHECK_RESULT (`0x32`):
+   7 to go on; 8 with `{i32 map, u8 channel}` (0-based) if the player's
+   merchant is open; `0xf` if one is closed or left in setup with items
+   (Fredrick holds it); `0xb` otherwise. Reasons for `0xb` are: in a room,
+   no permit, level 15 or below, not a Free Market map, or too close
+   (150 px) to another merchant or a personal shop. A merchant left empty
+   in setup by a crash is dropped.
+2. **Create** (mode 0, type 5: title, a byte, permit slot, permit id).
+   The same checks run again, then the owner gets the empty room
+   (`{5, 5, 4, 0, …}`). Nobody else sees it yet, but the field keeps its
+   spot, so no other merchant or shop goes up there meanwhile.
+3. **Put item** (`0x21`, as `0x16`) and **take back** (`0x26`: index).
+   Each change is written, then the owner gets the inventory operation
+   and the item list (`0x19`: the merchant's mesos, then the rows).
+4. **Open**: the blacklist (`0x1e`), then `{0xb, 1}`, as for a shop. The
+   client leaves the room by itself. The merchant shows as
+   SPAWN_HIRED_MERCHANT (`0x109`), and UPDATE (`0x10B`) changes its
+   balloon. Leaving the room (`0xa`) with something listed also opens
+   it; leaving it empty drops it. The permit is not used up
+   (`v83ref/lanes/QUESTIONS.md`).
+5. **Visit** (4: room id) and **buy** (`0x22`: index, bundles). The field
+   reserves the bundles; the buyer's actor checks and writes the sale
+   (`db::merchant::sell`) and tells the field, which then credits the
+   merchant with the price less the personal shop tax. A reservation not
+   settled within 30 seconds is dropped, and the field reads the merchant
+   again.
+6. **Maintenance**: the owner visits their own merchant. Visitors get
+   LEAVE `0x11`, and the owner comes in once every purchase is settled,
+   with the sales and the takings. In maintenance the owner can add items,
+   take mesos (`0x2b`, answered `0x2c`), organize (`0x28`: strike the
+   sold-out rows and take the mesos, answered `{0x28, i32 meso}`), see
+   the visitors (`0x2e`) and the blacklist (`0x2f`, `0x30` adds, `0x31`
+   removes). `0x27` or leaving opens the merchant again; leaving with
+   nothing left in it (the client sends `0xa`, not `0x29`) closes it.
+   A sale settled while the owner is inside updates their copy.
+7. **Close** (`0x29`): the merchant goes, and the owner gets its items and
+   mesos. `0x2a` answers 0 for everything back, 1 if the mesos won't fit
+   (nothing comes back), 2 for a one-of-a-kind item they have, or 3 for no
+   room (only the mesos come back in both cases). `db::merchant::close`
+   locks the merchant's row and gives up if it no longer matches the
+   owner's copy; the merchant then opens again as it was.
+
+After 24 hours open, the field closes the merchant: visitors get LEAVE
+`0x12`, and what it holds stays in the database for Fredrick.
+
+Not done yet: Fredrick and the items and mesos he keeps (a closed merchant
+answers `0xf` until then), the blacklist's
+storage (it lasts as long as the merchant stays in memory), the `0x0e`
+cash check the client sends instead of `0xb` when a cash item is listed,
+permits in the Cash Shop, and HeavenClient's merchant window.
 
 ## Tests
 
