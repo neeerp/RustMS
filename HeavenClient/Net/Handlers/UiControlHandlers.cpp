@@ -121,7 +121,13 @@ namespace ms
 
 	void LockUiHandler::handle(InPacket& recv) const
 	{
-		UI::get().lock(recv.read_byte() != 0);
+		bool locked = recv.read_byte() != 0;
+
+		UI::get().lock(locked);
+
+		// Every unlock starts the field's BGM again, locked before or not (FUN_0095ff5a).
+		if (!locked)
+			Stage::get().restart_bgm();
 	}
 
 	void DisableUiHandler::handle(InPacket& recv) const

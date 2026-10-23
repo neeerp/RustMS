@@ -33,6 +33,7 @@
 #include "MapleMap/Npc.h"
 
 #include "../IO/UI.h"
+#include "../IO/UiControl.h"
 #include "../Util/Misc.h"
 #include "../Util/NxFiles.h"
 #include "../Util/Randomizer.h"
@@ -281,9 +282,10 @@ namespace ms
 		// v83's Cash Shop stage has no music of its own; the Cash Shop plays
 		// its theme. A map's BGM fades the last one out, as PlayFieldBGM does
 		// (FUN_0064211e).
+		// A locked UI holds the map's back until it is unlocked (CField::Init).
 		if (mapid == -1)
 			Music("BgmUI.img/ShopBgm").play();
-		else
+		else if (!ui_control::state().locked)
 			Music(mapinfo.get_bgm()).play(field_effect::BGM_FADE);
 
 		// A chased point is on the ground already, as a door is; look from
@@ -1768,6 +1770,15 @@ namespace ms
 	void Stage::start_jukebox()
 	{
 		jukebox = true;
+	}
+
+	void Stage::restart_bgm()
+	{
+		if (state != State::ACTIVE || mapid == -1)
+			return;
+
+		jukebox = false;
+		weather.restart_bgm();
 	}
 
 	bool Stage::effect_busy() const

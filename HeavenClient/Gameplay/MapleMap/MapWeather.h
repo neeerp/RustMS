@@ -54,6 +54,10 @@ namespace ms
 		// The BGM a field effect switched to, which a stopping weather plays again instead of the map's.
 		void set_bgm_override(std::string path);
 
+		// The field's BGM fades out and starts again from the top, as a jukebox song would (FUN_00641ecc,
+		// FUN_00641db2 with -1).
+		void restart_bgm() const;
+
 		void update();
 
 		// The bursts and fireworks, under the particles.
