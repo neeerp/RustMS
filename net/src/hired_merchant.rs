@@ -1,0 +1,99 @@
+//! Hired merchants (report 165, plan c007; `game::hired_merchant`): mini
+//! room type 5, the personal shop's room with a merchant in the owner's
+//! seat. Listing and buying follow the personal shop's rules
+//! (`personal_shop`); these are the merchant's own.
+
+use crate::items;
+
+/// The mini room type of a hired merchant.
+pub const ROOM_TYPE: u8 = 5;
+/// The merchant and three visitors.
+pub const ROOM_USERS: u8 = 4;
+/// How many rows a merchant lists at most.
+pub const MAX_ITEMS: u8 = 16;
+/// Characters of this level and below can't hire one (FUN_00a27b7d).
+pub const MAX_LEVEL_REFUSED: u8 = 15;
+/// The longest title the client lets one type (0xa1dee7).
+pub const MAX_TITLE: usize = 50;
+
+/// Whether `item_id` is a hired merchant permit (503xxxx) that exists.
+/// The client takes any 503 item for one, but there is no 5030007.
+pub fn is_permit(item_id: i32) -> bool {
+    item_id / 10_000 == 503 && items::info(item_id).is_some()
+}
+
+/// The merchant and balloon a permit gives (`Item/Cash/0503.img/050300NN`).
+pub fn skin(item_id: i32) -> u8 {
+    (item_id % 100) as u8
+}
+
+/// The counts in a merchant's balloon. The client draws it "Able" while
+/// the first is under the second less one (0x48c788), so an open merchant
+/// counts its visitors out of four and shows full at three; one in
+/// maintenance shows 0 of 1, which is never able.
+pub fn balloon_counts(open: bool, visitors: u8) -> (u8, u8) {
+    if open {
+        (visitors, ROOM_USERS)
+    } else {
+        (0, 1)
+    }
+}
+
+/// The answers to a permit's use (ENTRUSTED_SHOP_CHECK_RESULT).
+pub mod check_result {
+    /// The client asks for a title and opens the room.
+    pub const OK: u8 = 7;
+    /// "Your store is currently open in Channel %s, Free Market %d. ..."
+    pub const OPEN_ELSEWHERE: u8 = 8;
+    /// "Another character is currently using the item. ..."
+    pub const IN_USE: u8 = 0x0a;
+    /// "You are currently unable to open the store."
+    pub const UNAVAILABLE: u8 = 0x0b;
+    /// "Please retrieve your items from Fredrick."
+    pub const AT_FREDRICK: u8 = 0x0f;
+}
+
+/// What closing a merchant in its room brought back (mode 0x2a).
+pub mod close_result {
+    /// "Both the items and mesos are successfully retrieved."
+    pub const RETRIEVED: u8 = 0;
+    /// Too many mesos to carry; Fredrick keeps it all.
+    pub const TOO_MUCH_MESO: u8 = 1;
+    /// A one-of-a-kind item the owner has; only the mesos came back.
+    pub const ONE_OF_A_KIND: u8 = 2;
+    /// No room for the items; only the mesos came back.
+    pub const INVENTORY_FULL: u8 = 3;
+}
+
+/// Why a merchant's room closed for the one in it (LEAVE, type 5).
+pub mod leave_reason {
+    /// "The owner of the store is currently undergoing store
+    /// maintenance. ..."
+    pub const MAINTENANCE: u8 = 0x11;
+    /// "It is past the working hours, so the store will close."
+    pub const CLOSED: u8 = 0x12;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn permits_are_the_503_items_that_exist() {
+        if items::data().is_err() {
+            return;
+        }
+        assert!(is_permit(5030000) && is_permit(5030012));
+        assert!(!is_permit(5030007), "no such item");
+        assert!(!is_permit(5140000) && !is_permit(2000000));
+        assert_eq!((skin(5030000), skin(5030012)), (0, 12));
+    }
+
+    #[test]
+    fn the_balloon_shows_full_at_three_and_in_maintenance() {
+        let able = |(cur, max): (u8, u8)| cur < max - 1;
+        assert!((0..3).all(|visitors| able(balloon_counts(true, visitors))));
+        assert!(!able(balloon_counts(true, 3)));
+        assert!(!able(balloon_counts(false, 0)));
+    }
+}

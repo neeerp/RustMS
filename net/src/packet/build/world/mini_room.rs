@@ -98,7 +98,7 @@ pub mod buy_result {
     pub const LOW_LEVEL_LIMIT: u8 = 0x0e;
 }
 
-fn room_packet(mode: u8) -> Result<Packet, NetworkError> {
+pub(super) fn room_packet(mode: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::PlayerInteraction as i16)?;
     packet.write_byte(mode)?;

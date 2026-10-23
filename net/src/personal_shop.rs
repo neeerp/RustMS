@@ -9,6 +9,7 @@ use crate::items;
 use crate::packet::build::world::mini_room::{buy_result, SHOP_ITEMS};
 use crate::shop::is_rechargeable;
 use crate::trade::{self, Offer, TradeFailure, LOW_LEVEL_MAX, LOW_LEVEL_MESO_LIMIT};
+pub use game::mini_room::Listing;
 use game::{InventoryChange, InventoryType, Item, Player};
 
 /// What the owner or a visitor asked of a personal shop. Visiting,
@@ -76,27 +77,6 @@ pub fn allowed_on(map_id: i32) -> bool {
         .ok()
         .and_then(|data| data.field(map_id))
         .is_some_and(|field| field.personal_shop)
-}
-
-/// What a shop lists in one row.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Listing {
-    /// One bundle.
-    pub item: Item,
-    /// Bundles left; 0 once sold out.
-    pub bundles: i16,
-    /// The price of a bundle.
-    pub price: i32,
-}
-
-impl Listing {
-    /// `bundles` bundles as one item.
-    pub fn take(&self, bundles: i16) -> Item {
-        Item {
-            quantity: self.item.quantity * bundles,
-            ..self.item.clone()
-        }
-    }
 }
 
 /// The tax on a sale of `gross`, which the owner pays: as the v83 client

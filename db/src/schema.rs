@@ -670,6 +670,79 @@ diesel::table! {
     }
 }
 diesel::joinable!(name_changes -> characters (character_id));
+diesel::table! {
+    hired_merchants (owner_id) {
+        owner_id -> Int4,
+        channel_id -> Int2,
+        map_id -> Int4,
+        x -> Int2,
+        y -> Int2,
+        foothold -> Int2,
+        item_id -> Int4,
+        #[max_length = 50]
+        title -> Varchar,
+        state -> Int2,
+        opened_at -> Nullable<Timestamp>,
+        closed_at -> Nullable<Timestamp>,
+        meso -> Int4,
+    }
+}
+diesel::joinable!(hired_merchants -> characters (owner_id));
+diesel::table! {
+    hired_merchant_items (id) {
+        id -> Int8,
+        owner_id -> Int4,
+        bundles -> Int2,
+        price -> Int4,
+        item_id -> Int4,
+        quantity -> Int2,
+        #[max_length = 13]
+        owner -> Varchar,
+        flags -> Int2,
+        expires_at -> Nullable<Timestamp>,
+        cash_serial -> Nullable<Int8>,
+    }
+}
+diesel::joinable!(hired_merchant_items -> hired_merchants (owner_id));
+diesel::table! {
+    hired_merchant_equipment_stats (merchant_item_id) {
+        merchant_item_id -> Int8,
+        upgrade_slots -> Int2,
+        level -> Int2,
+        stre -> Int2,
+        dex -> Int2,
+        int -> Int2,
+        luk -> Int2,
+        hp -> Int2,
+        mp -> Int2,
+        watk -> Int2,
+        matk -> Int2,
+        wdef -> Int2,
+        mdef -> Int2,
+        acc -> Int2,
+        avoid -> Int2,
+        hands -> Int2,
+        speed -> Int2,
+        jump -> Int2,
+        vicious -> Int4,
+        item_level -> Int2,
+        item_exp -> Int4,
+    }
+}
+diesel::joinable!(hired_merchant_equipment_stats -> hired_merchant_items (merchant_item_id));
+diesel::table! {
+    hired_merchant_sales (id) {
+        id -> Int8,
+        owner_id -> Int4,
+        item_id -> Int4,
+        quantity -> Int2,
+        mesos -> Int4,
+        #[max_length = 13]
+        buyer -> Varchar,
+        sold_at -> Timestamp,
+    }
+}
+diesel::joinable!(hired_merchant_sales -> hired_merchants (owner_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -718,4 +791,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     coupons,
     coupon_rewards,
     name_changes,
+    hired_merchants,
+    hired_merchant_items,
+    hired_merchant_equipment_stats,
+    hired_merchant_sales,
 );
