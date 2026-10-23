@@ -1267,6 +1267,58 @@ pub mod keys {
         WEDDING_VICTORIA,
     ];
 
+    pub const ZAKUM_CHIEF_MENU: &str = "zakum.chief.menu";
+    pub const ZAKUM_CHIEF_THIRD_JOB: &str = "zakum.chief.third_job";
+    pub const ZAKUM_CHIEF_ZAKUM: &str = "zakum.chief.zakum";
+    pub const ZAKUM_CHIEF_APPROVED: &str = "zakum.chief.approved";
+    pub const ZAKUM_ADOBIS_UNAPPROVED: &str = "zakum.adobis.unapproved";
+    pub const ZAKUM_ADOBIS_WARNING: &str = "zakum.adobis.warning";
+    pub const ZAKUM_ADOBIS_MENU: &str = "zakum.adobis.menu";
+    pub const ZAKUM_ADOBIS_LAVA_CHOICE: &str = "zakum.adobis.lava.choice";
+    pub const ZAKUM_ADOBIS_LAVA_ASK: &str = "zakum.adobis.lava.ask";
+    pub const ZAKUM_ADOBIS_LAVA_HAVE: &str = "zakum.adobis.lava.have";
+    pub const ZAKUM_ADOBIS_LAVA_EARLIER: &str = "zakum.adobis.lava.earlier";
+    pub const ZAKUM_ADOBIS_FORGE_CHOICE: &str = "zakum.adobis.forge.choice";
+    pub const ZAKUM_ADOBIS_FORGE_LACK: &str = "zakum.adobis.forge.lack";
+    pub const ZAKUM_ADOBIS_FORGE_SHORT: &str = "zakum.adobis.forge.short";
+    pub const ZAKUM_ADOBIS_FORGE_DONE: &str = "zakum.adobis.forge.done";
+    pub const ZAKUM_ADOBIS_FORGE_FULL: &str = "zakum.adobis.forge.full";
+    pub const ZAKUM_LIRA_REWARD: &str = "zakum.lira.reward";
+    pub const ZAKUM_LIRA_GO: &str = "zakum.lira.go";
+    pub const ZAKUM_LIRA_FULL: &str = "zakum.lira.full";
+    pub const ZAKUM_AMON_LEAVE: &str = "zakum.amon.leave";
+    pub const ZAKUM_GATE_UNAPPROVED: &str = "zakum.gate.unapproved";
+    pub const ZAKUM_GATE_TRIALS: &str = "zakum.gate.trials";
+    pub const ZAKUM_GATE_NO_EYE: &str = "zakum.gate.no_eye";
+
+    /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
+    /// the gate to Zakum.
+    pub const ZAKUM: [&str; 23] = [
+        ZAKUM_CHIEF_MENU,
+        ZAKUM_CHIEF_THIRD_JOB,
+        ZAKUM_CHIEF_ZAKUM,
+        ZAKUM_CHIEF_APPROVED,
+        ZAKUM_ADOBIS_UNAPPROVED,
+        ZAKUM_ADOBIS_WARNING,
+        ZAKUM_ADOBIS_MENU,
+        ZAKUM_ADOBIS_LAVA_CHOICE,
+        ZAKUM_ADOBIS_LAVA_ASK,
+        ZAKUM_ADOBIS_LAVA_HAVE,
+        ZAKUM_ADOBIS_LAVA_EARLIER,
+        ZAKUM_ADOBIS_FORGE_CHOICE,
+        ZAKUM_ADOBIS_FORGE_LACK,
+        ZAKUM_ADOBIS_FORGE_SHORT,
+        ZAKUM_ADOBIS_FORGE_DONE,
+        ZAKUM_ADOBIS_FORGE_FULL,
+        ZAKUM_LIRA_REWARD,
+        ZAKUM_LIRA_GO,
+        ZAKUM_LIRA_FULL,
+        ZAKUM_AMON_LEAVE,
+        ZAKUM_GATE_UNAPPROVED,
+        ZAKUM_GATE_TRIALS,
+        ZAKUM_GATE_NO_EYE,
+    ];
+
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
         super::parse_text(super::PLACEHOLDER_TEXT, "placeholder_text.toml")
@@ -2102,6 +2154,7 @@ mod tests {
             .chain(&keys::INVITATIONS)
             .chain(&keys::CEREMONY)
             .chain(&keys::GIFTS)
+            .chain(&keys::ZAKUM)
         {
             assert!(text.contains(key), "{key} has no placeholder");
         }

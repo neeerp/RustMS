@@ -132,7 +132,9 @@ again) once the player has no more SP left than 3 for each level past 70.
 Upstream tracks the steps in quest records the client data lacks; here
 they are script markers (`Effect::Mark`/`Unmark`), Started records at
 `quest::SCRIPT_MARKERS` (32000) and up that are saved with the quests but
-never sent to the client.
+never sent to the client. The chiefs also approve players for Zakum: a
+second job of 70 picks the test or Zakum from a menu (see
+[zakum](./zakum.md)).
 
 The fourth job (`FOURTH_JOBS`) is one talk with the line's instructor in
 Leafre's 240010501 (Harmonia 2081100, Gritto 2081200, Legor 2081300, Hellin
