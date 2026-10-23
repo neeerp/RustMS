@@ -199,7 +199,9 @@ namespace ms
 			// The hired merchant's own
 			ORGANIZED = 0x28,
 			STORE_CLOSED = 0x2A,
-			MESO_TAKEN = 0x2C
+			MESO_TAKEN = 0x2C,
+			VISITORS = 0x2E,
+			BLACKLIST = 0x2F
 		};
 
 		// The chat line of a notice by code rather than a member
@@ -372,6 +374,22 @@ namespace ms
 						shop->meso_taken();
 
 					break;
+				case Mode::VISITORS:
+					if (shop->is_merchant())
+					{
+						UI::get().emplace<UIMerchantVisitors>(hired_merchant::read_visitors(recv));
+						shop->list_shown(UIElement::Type::MERCHANTVISITORS, true);
+					}
+
+					break;
+				case Mode::BLACKLIST:
+					if (shop->is_merchant())
+					{
+						UI::get().emplace<UIMerchantBlacklist>(hired_merchant::read_blacklist(recv));
+						shop->list_shown(UIElement::Type::MERCHANTBLACKLIST, true);
+					}
+
+					break;
 				default:
 					break;
 			}
@@ -432,5 +450,47 @@ namespace ms
 			default:
 				break;
 		}
+	}
+
+	void EntrustedShopCheckResultHandler::handle(InPacket& recv) const
+	{
+		int8_t code = recv.read_byte();
+		std::string text;
+
+		switch (code)
+		{
+			case hired_merchant::Check::CHECK_OK:
+				UIPersonalShop::hire_approved();
+				return;
+			case hired_merchant::Check::OPEN_ELSEWHERE:
+			{
+				int32_t mapid = recv.read_int();
+				auto channel = static_cast<uint8_t>(recv.read_byte());
+				Configuration& config = Configuration::get();
+
+				text = hired_merchant::open_elsewhere_text(config.get_channel_name(config.get_worldid(), channel), mapid);
+				break;
+			}
+			case hired_merchant::Check::UNKNOWN_INT:
+				recv.skip_int();
+				return;
+			case hired_merchant::Check::RENAMED:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(hired_merchant::rename_text(recv.read_bool()), UIChatBar::LineType::SKILL);
+
+				return;
+			case hired_merchant::Check::MESSAGE:
+				if (recv.read_bool())
+					text = recv.read_string();
+
+				break;
+			default:
+				// The Remote Controller's answers (0x10, 0x11) aren't supported.
+				text = hired_merchant::check_text(code);
+				break;
+		}
+
+		if (!text.empty())
+			UI::get().emplace<UIOk>(text, [](bool) {});
 	}
 }

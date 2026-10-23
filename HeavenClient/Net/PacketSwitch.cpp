@@ -76,6 +76,7 @@ namespace ms
 		SKILL_USE_RESULT = 37,
 		FAME_RESPONSE = 38,
 		MAP_TRANSFER_RESULT = 42,
+		ENTRUSTED_SHOP_CHECK_RESULT = 50,
 		SKILL_LEARN_ITEM_RESULT = 51,
 
 		/// Messaging 1
@@ -464,6 +465,7 @@ namespace ms
 		emplace<CHAR_INFO, CharInfoHandler>();
 		emplace<FAME_RESPONSE, FameResponseHandler>();
 		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
+		emplace<ENTRUSTED_SHOP_CHECK_RESULT, EntrustedShopCheckResultHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();

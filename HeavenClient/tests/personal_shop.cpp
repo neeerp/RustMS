@@ -200,6 +200,54 @@ int main()
 		require(books.sold.size() == 2 && books.sold[1].units == 1 && books.sold[1].buyer == "Amy", "a record a sale");
 		require(books.total == 1300 && books.received == 1261, "the totals");
 
+		// Hired merchant permits are the 503 items, apart from the shop's 514.
+		require(hired_merchant::is_permit(5030000) && hired_merchant::is_permit(5030006)
+			&& !hired_merchant::is_permit(5140000) && !personal_shop::is_permit(5030000), "a merchant's permit");
+
+		// What the server says about a permit.
+		require(hired_merchant::open_elsewhere_text("Scania-2", 910000005)
+				== "Your store is currently open\\nin Channel Scania-2, Free Market 5.\\nPlease use this after closing the store.",
+			"a store open elsewhere names its channel and room");
+		require(hired_merchant::check_text(0xf) == "Please retrieve your items from Fredrick."
+				&& hired_merchant::check_text(0xb) == "You are currently unable to open the store.",
+			"the notices of a refused permit");
+		require(hired_merchant::check_text(0xc).empty() && hired_merchant::check_text(7).empty(), "answers with no notice");
+		require(hired_merchant::rename_text(false) == "Renaming Failed - Can't find the Hired Merchant.", "a failed rename");
+
+		// The contract keeps v83's line ends for the NPC dialog.
+		require(hired_merchant::CONTRACT.find("Hired Merchant Contract\r\n1) ") != std::string::npos
+				&& hired_merchant::CONTRACT.find("\\") == std::string::npos,
+			"the contract's lines");
+
+		// The visitor list: names and how long ago, unsigned.
+		Writer visits;
+		visits.put<int16_t>(2).string("Amy").put<int32_t>(3 * 3600000 + 25 * 60000 + 59999).string("Bob").put<uint32_t>(4000000000u);
+		InPacket visits_recv(visits.bytes.data(), visits.bytes.size());
+		std::vector<hired_merchant::Visitor> visitors = hired_merchant::read_visitors(visits_recv);
+
+		require(visitors.size() == 2 && !visits_recv.available(), "the visitors are read up to the end");
+		require(visitors[0].name == "Amy" && hired_merchant::visit_time_text(visitors[0].ms) == " 3hrs 25min", "a visit's time");
+		require(hired_merchant::visit_time_text(visitors[1].ms) == " 1111hrs 6min", "a long visit's time is unsigned");
+
+		Writer banned;
+		banned.put<int16_t>(1).string("Cindy");
+		InPacket banned_recv(banned.bytes.data(), banned.bytes.size());
+		std::vector<std::string> blacklist = hired_merchant::read_blacklist(banned_recv);
+
+		require(blacklist == std::vector<std::string>{ "Cindy" } && !banned_recv.available(), "the blacklist is read");
+
+		// Adding a name to it: spelling, myself, then a name already there.
+		require(hired_merchant::trimmed("  Danny ") == "Danny" && hired_merchant::trimmed("   ").empty(), "a typed name is trimmed");
+		require(hired_merchant::blacklist_problem("D@n", "Me", blacklist)
+				== "This character name does not exist\\nPlease check again",
+			"a misspelt name");
+		require(hired_merchant::blacklist_problem("Mine", "Mine", blacklist) == "You may not enter yourself in the Blacklist",
+			"myself");
+		require(hired_merchant::blacklist_problem("cINDY", "Me", blacklist)
+				== "This name has already been registered\\nPlease check again",
+			"a listed name in another case");
+		require(hired_merchant::blacklist_problem("Danny", "Me", blacklist).empty(), "a new name");
+
 		std::cout << "Personal shop passed\n";
 		return 0;
 	}

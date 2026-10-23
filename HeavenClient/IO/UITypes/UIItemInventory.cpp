@@ -1427,6 +1427,8 @@ namespace ms
 							Stage::get().send_key(KeyType::Id::FACE, 99 + item_id % 100 + 8, true);
 						else if (personal_shop::is_permit(item_id))
 							UIPersonalShop::create(slot, item_id);
+						else if (hired_merchant::is_permit(item_id))
+							UIPersonalShop::hire(slot, item_id, inventory.get_cash_id(tab, slot));
 						else if (item_id / 10000 == 500)
 							summon_pet(slot, inventory.get_cash_id(tab, slot));
 						else if (pets::is_cash_food(item_id))
