@@ -117,6 +117,7 @@ pub fn build_control_mob(mob: &MobView, aggro: bool) -> Result<Packet, NetworkEr
         &mut p,
         &MobView {
             controlled: true,
+            fake: false,
             ..mob.clone()
         },
     )?;

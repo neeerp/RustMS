@@ -819,6 +819,9 @@ impl MobSet {
         object_id: i32,
         now: Instant,
     ) -> Option<Option<ClientId>> {
+        if self.shielded(object_id) {
+            return None;
+        }
         let mob = self.live.get_mut(&object_id)?;
         if mob.controller == Some(attacker) && mob.aggro_until.is_some_and(|until| until > now) {
             return None;
@@ -835,7 +838,8 @@ impl MobSet {
     /// `from` is `distance` from a firstAttack mob (|dx| / 10 + |dy| / 3,
     /// 100 more while dead). Unless a chase is on, the closest player
     /// controls it, so their client starts one once they come near. Returns
-    /// the previous controller when control moves to `from`.
+    /// the previous controller when control moves to `from`. No one
+    /// controls a shielded mob, however near.
     pub fn report_distance(
         &mut self,
         from: ClientId,
@@ -843,6 +847,9 @@ impl MobSet {
         distance: i32,
         now: Instant,
     ) -> Option<Option<ClientId>> {
+        if self.shielded(object_id) {
+            return None;
+        }
         let mob = self.live.get_mut(&object_id)?;
         if !mob.info.first_attack || mob.aggro_until.is_some_and(|until| until > now) {
             return None;
@@ -1221,10 +1228,21 @@ impl MobSet {
     /// value in HP (its `fixedDamage` instead, if it has one, and nothing if
     /// the status's skill can't hurt it), as its
     /// clients show, but never its last HP (inferred, as OdinMS-family
-    /// servers do). The damage counts as the player's who put it on.
+    /// servers do). The damage counts as the player's who put it on. A
+    /// shielded mob takes none.
     pub fn hurt_by_statuses(&mut self, now: Instant) -> Vec<Hurt> {
+        let shielded: Vec<i32> = self
+            .live
+            .values()
+            .filter(|mob| self.shields(mob))
+            .map(|mob| mob.object_id)
+            .collect();
         let mut hurt = Vec::new();
-        for mob in self.live.values_mut() {
+        for mob in self
+            .live
+            .values_mut()
+            .filter(|mob| !shielded.contains(&mob.object_id))
+        {
             for (_, status) in mob.statuses.iter_mut().filter(|(stat, _)| stat.hurts()) {
                 if status.next_hurt > now {
                     continue;
@@ -2094,12 +2112,21 @@ mod tests {
         let mob = |mob_id| MobInfo {
             mob_id,
             max_hp: 100,
+            first_attack: true,
             ..MobInfo::default()
         };
         let body = mobs.place(mob(net::mobs::ZAKUM_BODY), (0, 0), 5, None, now);
         let arms = [8800003, 8800010].map(|arm| mobs.place(mob(arm), (0, 0), 5, None, now));
-        // Only the arms get a controller, and the body takes no harm.
+        // Only the arms get a controller, near or hitting it, and the body
+        // takes no harm, not even from poison.
         assert_eq!(mobs.assign_uncontrolled(1), arms);
+        assert_eq!(mobs.report_distance(1, body, 0, now), None);
+        assert_eq!(mobs.provoke(1, body, now), None);
+        assert_eq!(mobs.get(body).unwrap().controller, None);
+        let until = now + Duration::from_secs(10);
+        let poison = [(MobStat::Poison, 3)];
+        mobs.add_statuses(body, &poison, 2101005, 1, now, until);
+        assert!(mobs.hurt_by_statuses(now + HURT_INTERVAL).is_empty());
         assert_eq!(mobs.damage(1, body, 60, now), Some(Ok(100)));
         assert!(mobs.get(body).unwrap().damage_by.is_empty());
         assert!(mobs.damage(1, arms[0], 100, now).unwrap().is_err());

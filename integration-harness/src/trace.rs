@@ -238,7 +238,7 @@ pub struct Trace {
     /// BLOCKED_MAP and BLOCKED_SERVER: (opcode, reason).
     pub blocked: Vec<(i16, u8)>,
     /// FIELD_EFFECT modes naming something: (mode, name), for 2 a map
-    /// object, 3 a screen effect and 4 a sound.
+    /// object, 3 a screen effect, 4 a sound and 6 the music.
     pub field_effects: Vec<(u8, String)>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,

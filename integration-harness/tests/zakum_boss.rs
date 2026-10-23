@@ -103,13 +103,28 @@ async fn the_eye_of_fire_brings_out_zakum_whose_arms_shield_its_body() {
     );
 
     // The last arm's death makes it real: it is just there, and moved.
-    for &arm in &arms {
-        assert!(!ht.field.controlled.contains(&body), "{:?}", ht.field);
+    let (last, others) = arms.split_last().unwrap();
+    for &arm in others {
         beat(h, &mut ht, arm).await;
     }
+    read_for(w, &mut wt, 300).await;
     assert_eq!(wt.field.appearances[&body], -4);
+    assert!(
+        !ht.field.controlled.contains(&body) && !wt.field.controlled.contains(&body),
+        "{:?} {:?}",
+        ht.field,
+        wt.field
+    );
+    beat(h, &mut ht, *last).await;
     until(w, &mut wt, |t| t.field.appearances[&body] == -1).await;
-    until(h, &mut ht, |t| t.field.controlled.contains(&body)).await;
+    read_for(h, &mut ht, 300).await;
+    read_for(w, &mut wt, 300).await;
+    assert!(
+        ht.field.controlled.contains(&body) || wt.field.controlled.contains(&body),
+        "{:?} {:?}",
+        ht.field,
+        wt.field
+    );
 
     // It takes harm now, and dies into its second body, and that into its
     // third.

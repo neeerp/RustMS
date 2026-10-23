@@ -2501,12 +2501,15 @@ impl FieldActor {
         }
     }
 
-    /// Put `inflict`'s statuses on a mob for `from`, and show everyone the
-    /// ones it got.
+    /// Put `inflict`'s statuses on a mob for `from`, unless it is shielded,
+    /// and show everyone the ones it got.
     fn put_on(&mut self, from: ClientId, object_id: i32, inflict: &Inflict, now: Instant) {
         let Some(mob) = self.mobs.get(object_id) else {
             return;
         };
+        if self.mobs.shielded(object_id) {
+            return;
+        }
         let statuses: Vec<_> = inflict
             .statuses
             .iter()

@@ -94,9 +94,12 @@ While any arm is on the map, the body is shielded
 (`net::mobs::shielded_by`, `MobSet::shielded`, Cosmic's
 `MapleMap.damageMonster`):
 
-- It has no controller.
+- It has no controller, however near a player comes (MOB_DISTANCE) or
+  hits it.
 - Attacks on it are dropped whole: no HP, no HP bar, no aggro and no
-  statuses.
+  statuses. Skills that only put statuses on it (mists, debuffs) put none,
+  and poison already on it takes no HP. Its arms' own buffs still reach it,
+  as in Cosmic.
 - Dazzled mobs can't hurt it either.
 
 When the last arm dies, `make_real` makes the body real. It sends the body
