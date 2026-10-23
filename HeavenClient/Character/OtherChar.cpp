@@ -45,6 +45,10 @@ namespace ms
 
 		attackspeed = 6;
 		attacking = false;
+
+		// Someone already dead when they appear is not heard dying.
+		if (by_value(static_cast<int8_t>(st & ~1)) == State::DIED)
+			lie_dead();
 	}
 
 	OtherChar::~OtherChar()
