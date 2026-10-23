@@ -7,17 +7,35 @@ use net::packet::handle::world::{warp, warp_to_spawn_point};
 
 /// A player who logs in on a map nobody stays on, such as a ship under way,
 /// starts on the map's `forcedReturn` instead (Cosmic applies it on save).
+/// One that is an event's map, which nobody logs in to either, sends them
+/// on by its own: Orbis's treasure room returns to Minerva's prize room,
+/// and that to the tower's exit; Pig Town and Ludibrium's bonus map pass
+/// on the same way.
 pub(super) fn leave_forced_return_map(player: &mut Player) {
     let Ok(data) = net::get_game_data() else {
         return;
     };
-    let to = data
-        .field(player.stats.map_id)
-        .and_then(|field| field.forced_return)
-        .filter(|&to| to != player.stats.map_id && data.field_exists(to));
-    if let Some(to) = to {
+    let forced_return = |map_id: i32| {
+        data.field(map_id)
+            .and_then(|field| field.forced_return)
+            .filter(|&to| to != map_id && data.field_exists(to))
+    };
+    if let Some(to) = login_map(player.stats.map_id, forced_return) {
         player.move_to(to, 0);
     }
+}
+
+/// Where a player logging in on `map_id` starts instead, given each map's
+/// `forced_return`, if anywhere.
+fn login_map(map_id: i32, forced_return: impl Fn(i32) -> Option<i32>) -> Option<i32> {
+    let mut to = forced_return(map_id)?;
+    for _ in 0..3 {
+        match forced_return(to) {
+            Some(next) if net::events::event_map(to) => to = next,
+            _ => break,
+        }
+    }
+    Some(to)
 }
 
 impl ClientActor {
@@ -62,5 +80,28 @@ impl ClientActor {
             self.apply(action).await?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_login_passes_on_through_event_maps_to_their_way_out() {
+        let forced_return = |map_id| match map_id {
+            // A ship under way returns to its station, which keeps players.
+            200_090_000 => Some(101_000_300),
+            101_000_300 => Some(101_000_000),
+            // Orbis's treasure room, Minerva's prize room, the tower's exit.
+            920_011_100 => Some(920_011_300),
+            920_011_300 => Some(920_011_200),
+            920_011_200 => Some(200_080_101),
+            _ => None,
+        };
+        assert_eq!(login_map(200_090_000, forced_return), Some(101_000_300));
+        assert_eq!(login_map(920_011_100, forced_return), Some(920_011_200));
+        assert_eq!(login_map(920_011_300, forced_return), Some(920_011_200));
+        assert_eq!(login_map(100_000_000, forced_return), None);
     }
 }

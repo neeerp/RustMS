@@ -12,9 +12,10 @@ bonus (`v83ref/reports/a058-henesys-pq.md`). Ludibrium's party quest (LPQ)
 is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
 its entry and exit, its cloud stage, the hub's ways into its rooms, the
-six rooms, the garden, Minerva's statue and the win, and her prizes; its
-bonus and the storage come in a later slice
-(`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`).
+six rooms, the garden, Minerva's statue and the win, her prizes, and the
+storage and treasure room the win opens; its jails come in a later slice
+(`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`,
+`a091-opq-bonus-jail-re.md`).
 
 ## Rules
 
@@ -119,8 +120,12 @@ bonus and the storage come in a later slice
    (`EventClosed`), which frees the lobby, about two seconds after the
    event ended. A won event frees it at the win (below).
 
-A player saved on an event map logs back in at its `forcedReturn`,
-the event's exit (103000890, 910010300), outside the copy. A player without a ticket who warps onto an
+A player saved on an event map logs back in at its `forcedReturn`, the
+event's exit (103000890, 910010300), outside the copy. Where that
+`forcedReturn` is itself one of the event's maps, `leave_forced_return_map`
+follows on by that map's own `forcedReturn`, so a player saved in Pig Town
+(910010200) starts on 910010300 and one saved in Ludibrium's bonus map
+(922011000) on 922010000. A player without a ticket who warps onto an
 event map by a debug warp lands on the channel's own copy of it, which the
 harness uses to check that copies are apart.
 
@@ -440,8 +445,9 @@ only with the leader (`opq.eak.leader_only`).
 The hub's portals `party3_room1` to `party3_room6` lead into the rooms
 (`PLAIN_WARPS`, Cosmic's portal ids), and each room's `party3_roomout`
 leads back to its own portal on the hub (`OPQ_ROOMS_OUT`). The storage's
-`party3_room8` stays shut with a pink line (`opq.notice.storage_closed`)
-even after the quest is won, until the bonus is played.
+`party3_room8` (`in06`) stays shut with a pink line
+(`opq.notice.storage_closed`) until the quest is won (see "Orbis's
+storage and treasure room").
 
 ## Orbis's walkway and lounge
 
@@ -612,6 +618,35 @@ items and counts, all equally likely, Cosmic `OrbisPQ`
 without a free slot in each of the Equip, Use and Etc tabs gets
 `opq.minerva.full` and nothing yet.
 
+## Orbis's storage and treasure room
+
+Once the quest is won the hub's `in06` (`scripts::OPQ_STORAGE_IN`,
+Cosmic `party3_room8`) takes any member, with the portal's sound, to the
+hidden storage 920011000 (`OPQ_STORAGE`, portal 0); the runtime opens it
+in `opq_portal`, and outside a won event the pure script keeps it shut.
+The storage's 19 guards (9300051-9300053, which never come back) drop
+the pack's diary pages, and its `st00` leads back to the hub's portal 16.
+There Eak (Cosmic `2013001`) answers only the leader
+(`opq.eak.leader_only`): while a guard is left he says to clear them
+(`opq.eak.storage`, through `Effect::RequireNoMobs` and the script's
+refused line), and then he takes the leader alone, without a word, to
+the treasure room 920011100 (`OPQ_BONUS`, `st00`), as Cosmic warps only
+the player who asked. There is no clock, as the win stopped it.
+
+The treasure room's 16 boxes (reactor 2002014, an ordinary box
+`0002000` underneath) each break on the fourth hit and spray at least 15 drops with mesos of 100 to 399 (Cosmic
+`dropItems(true, 1, 100, 400, 15)`, `Action::SprayAndAppear`). The
+first to break also brings Minerva out at (46, 840)
+(`OPQ_BONUS_MINERVA_AT`, the floor there, as Cosmic's `spawnNpc`); the
+field brings no second one while she is out. She asks the leader whether
+to leave (`opq.minerva.bonus_ask`) and sends them to her prize room,
+920011300, portal 0, for their prize like everyone else.
+
+A player who logs in on the treasure room would land on its
+`forcedReturn`, the prize room, where nobody outside the event may be;
+`leave_forced_return_map` goes on past any event's map by that map's own
+`forcedReturn`, so they start on the tower's exit 920011200.
+
 ## Ludibrium's balloons
 
 Stages 1 to 5, 7 and the boss's 9 are cleared by handing their balloon
@@ -712,6 +747,8 @@ EXP at the reward.
 | Eak 2013001 | 920010400, 920010500, 920010700 | Runtime (`opq_eak`): the music box, the head count, the levers; brings out the room's stone box and clears it |
 | Eak 2013001 | 920010800 | Runtime (`opq_eak`): Papa Pixie |
 | Minerva 2013002 | 920010100 | Once won, alone to 920011300 |
+| Eak 2013001 | 920011000 | Runtime (`opq_eak`): to the leader only; once the guards are gone, the leader alone to 920011100 `st00` |
+| Minerva 2013002 | 920011100 | Out of the first box broken; alone to 920011300 |
 | Minerva 2013002 | 920011300 | The prize once won, and home to 200080101 |
 | Eak 2013001 | 920011200 | Home to 200080101 |
 

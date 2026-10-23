@@ -474,6 +474,10 @@ pub mod keys {
     pub const OPQ_MINERVA_THANKS: &str = "opq.minerva.thanks";
     /// Minerva to a player without room for any of her prizes.
     pub const OPQ_MINERVA_FULL: &str = "opq.minerva.full";
+    /// Eak in the hidden storage while its guards are left.
+    pub const OPQ_EAK_STORAGE: &str = "opq.eak.storage";
+    /// Minerva in the treasure room, asking whether to leave it.
+    pub const OPQ_MINERVA_BONUS_ASK: &str = "opq.minerva.bonus_ask";
     /// Told on Primrose Hill as the Moon Bunny comes out (a light-blue line).
     pub const HPQ_MOON_BUNNY_OUT: &str = "hpq.moon.bunny_out";
     /// The weather that blows then, telling the party what to do.
@@ -2069,6 +2073,8 @@ mod tests {
             keys::OPQ_MINERVA_ASK,
             keys::OPQ_MINERVA_THANKS,
             keys::OPQ_MINERVA_FULL,
+            keys::OPQ_EAK_STORAGE,
+            keys::OPQ_MINERVA_BONUS_ASK,
         ];
         for key in named
             .iter()

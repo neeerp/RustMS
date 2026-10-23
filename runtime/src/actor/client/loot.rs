@@ -100,7 +100,10 @@ impl ClientActor {
             let rng = &mut rand::thread_rng();
             let loot = loot::roll_reactor(reactor_id, player, in_party, rng);
             match net::reactors::action(reactor_id) {
-                Action::Spray { at_least, mesos } => loot::spray(loot, at_least, mesos, rng),
+                Action::Spray { at_least, mesos }
+                | Action::SprayAndAppear {
+                    at_least, mesos, ..
+                } => loot::spray(loot, at_least, mesos, rng),
                 _ => loot,
             }
         };

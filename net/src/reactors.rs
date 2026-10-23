@@ -78,6 +78,16 @@ pub enum Action {
     /// on its map for whoever broke it: Minerva's statue on the Tower of
     /// Goddess's hub (Cosmic `2006001`), whose stage wins the event.
     AppearAndClears(i32),
+    /// Drop its loot as `Spray` does, and bring out an NPC on the ground
+    /// below `at`, a fixed point on its map, unless it is already out: the
+    /// boxes of Orbis's treasure room (Cosmic `2002014`), the first of which
+    /// brings out Minerva.
+    SprayAndAppear {
+        at_least: usize,
+        mesos: (i32, i32),
+        npc_id: i32,
+        at: (i16, i16),
+    },
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -250,6 +260,14 @@ pub fn action(reactor_id: i32) -> Action {
         2001000 | 2001001 => Action::Pot,
         2001016 => Action::PapaPixie,
         2002003 => Action::DropsAndClears,
+        // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
+        // 400, 15)`, then Minerva, once).
+        2002014 => Action::SprayAndAppear {
+            at_least: 15,
+            mesos: (100, 400),
+            npc_id: crate::npc_scripts::MINERVA,
+            at: crate::events::OPQ_BONUS_MINERVA_AT,
+        },
         _ => Action::Drops,
     }
 }
@@ -334,6 +352,21 @@ mod tests {
         let grass = crate::events::GRASS_OF_LIFE;
         assert_eq!(statue.item_dropped(6, grass, 1, (0, 0)), Some((0, 7)));
         assert!(statue.is_last(7));
+    }
+
+    #[test]
+    fn the_treasure_rooms_boxes_spray_loot_and_bring_out_minerva() {
+        let Action::SprayAndAppear {
+            at_least,
+            mesos,
+            npc_id,
+            at,
+        } = action(2002014)
+        else {
+            panic!("{:?}", action(2002014));
+        };
+        assert_eq!((at_least, mesos), (15, (100, 400)));
+        assert_eq!((npc_id, at), (crate::npc_scripts::MINERVA, (46, 840)));
     }
 
     #[test]

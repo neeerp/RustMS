@@ -235,8 +235,9 @@ impl ClientActor {
     /// does for the player: a climb pad sends them on up the lounge or the
     /// tall room, or down, with a sound; the garden's way out takes the
     /// whole team back to the hub, for a leader holding the Grass of Life
-    /// (Cosmic `party3_gardenin`), else the player hears what it needs.
-    /// `None` for any other portal.
+    /// (Cosmic `party3_gardenin`), else the player hears what it needs;
+    /// and the hub's storage door opens once the event is won (Cosmic
+    /// `party3_room8`). `None` for any other portal.
     pub(super) async fn opq_portal(
         &mut self,
         script: &str,
@@ -266,6 +267,12 @@ impl ClientActor {
                 let line = net::content::text().get(keys::OPQ_NOTICE_GARDEN_OUT, &[]);
                 vec![Effect::Pink(line)]
             }));
+        }
+        if script == scripts::OPQ_STORAGE_IN && ticket.won() {
+            return Ok(Some(vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(events::OPQ_STORAGE, 0),
+            ]));
         }
         if ![scripts::OPQ_LOUNGE_CLIMB, scripts::OPQ_TOWER_CLIMB].contains(&script) {
             return Ok(None);

@@ -2563,14 +2563,24 @@ impl FieldActor {
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out
-            // first (Cosmic `spawnNpc`).
+            // first (Cosmic `spawnNpc`), as does the treasure room's first
+            // box.
             action => {
-                if let reactors::Action::AppearAndClears(npc_id) = action {
-                    self.appear(npc_id, (view.x, view.y));
+                match action {
+                    reactors::Action::AppearAndClears(npc_id) => {
+                        self.appear(npc_id, (view.x, view.y));
+                    }
+                    reactors::Action::SprayAndAppear { npc_id, at, .. }
+                        if !self.map_npcs.iter().any(|npc| npc.npc_id == npc_id) =>
+                    {
+                        self.appear(npc_id, at);
+                    }
+                    _ => {}
                 }
                 let occupant = match action {
                     reactors::Action::Drops
                     | reactors::Action::Spray { .. }
+                    | reactors::Action::SprayAndAppear { .. }
                     | reactors::Action::DropsAndClears
                     | reactors::Action::AppearAndClears(_) => self
                         .occupants

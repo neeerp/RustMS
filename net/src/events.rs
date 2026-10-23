@@ -540,6 +540,16 @@ pub const OPQ_WIN_STAGE: u8 = 9;
 /// Where Minerva gives each member of the team that won one of
 /// `OPQ_REWARDS`, sent there by her on the hub (Cosmic `2013002`).
 pub const OPQ_PRIZE_ROOM: i32 = 920_011_300;
+/// The tower's hidden storage, open off the hub (`in06`) once the event is
+/// won, whose guards the leader must clear before Eak lets them on.
+pub const OPQ_STORAGE: i32 = 920_011_000;
+/// Eak's treasure room beyond it, for the leader alone: its boxes spray
+/// loot, and the first to break brings out Minerva (`OPQ_BONUS_MINERVA_AT`),
+/// who sends the leader on to `OPQ_PRIZE_ROOM`.
+pub const OPQ_BONUS: i32 = 920_011_100;
+/// Where Minerva comes out there (Cosmic `2002014`'s `spawnNpc`), on the
+/// floor at y 840.
+pub const OPQ_BONUS_MINERVA_AT: (i16, i16) = (46, 840);
 
 /// What Minerva may give each member of a team that won Orbis's party
 /// quest: one of these items, and how many, all equally likely (Cosmic
@@ -675,6 +685,13 @@ pub const RICE_CAKE: i32 = 4001101;
 pub const HPQ_REWARD: i32 = 4001158;
 
 impl EventKind {
+    pub const ALL: [EventKind; 4] = [
+        EventKind::Kpq,
+        EventKind::Hpq,
+        EventKind::Lpq,
+        EventKind::Opq,
+    ];
+
     pub fn event(self) -> &'static Event {
         match self {
             EventKind::Kpq => &KPQ,
@@ -683,6 +700,12 @@ impl EventKind {
             EventKind::Opq => &OPQ,
         }
     }
+}
+
+/// Whether `map_id` is one of any event's maps (never an exit), which
+/// only a member of a running event may be on.
+pub fn event_map(map_id: i32) -> bool {
+    EventKind::ALL.iter().any(|kind| kind.event().holds(map_id))
 }
 
 /// A party member who might come along.

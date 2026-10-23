@@ -5,21 +5,26 @@
 //! blows, grows the Grass and clears the garden. Only the leader holding
 //! it takes the team back to the hub, where the Grass set at the foot of
 //! Minerva's statue brings her out and wins the quest; she sends each
-//! member to her prize room for a prize, then home to Orbis. The harness
-//! world pins the pots to
-//! one Nependeath then Royals (`RUSTMS_OPQ_POTS`), and runs events 60
-//! times as fast, so the quest lasts a minute.
+//! member to her prize room for a prize, then home to Orbis. The win also
+//! opens the hub's storage: once its guards are gone Eak takes the leader
+//! alone on to the treasure room, whose first box broken brings Minerva
+//! out there too. The harness world pins the pots to one Nependeath then
+//! Royals (`RUSTMS_OPQ_POTS`), and runs events 60 times as fast, so the
+//! quest lasts a minute (the clock stops on the win).
 
 use game_data::server_content::keys;
 use integration_harness::events::{
     armed_in, break_open, cleared, enter_opq, maps, party, said, talk, talk_to, throw_down, told,
     waiting_in, EAK,
 };
-use integration_harness::hunting::{attack, pickup, walk_to, Field, MapReactor};
+use integration_harness::hunting::{attack, hit_reactor, pickup, walk_to, Field, MapReactor};
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
-use net::events::{GRASS_OF_LIFE, OPQ, OPQ_GARDEN, OPQ_HUB, OPQ_PRIZE_ROOM, OPQ_REWARDS};
+use net::events::{
+    GRASS_OF_LIFE, OPQ, OPQ_BONUS, OPQ_BONUS_MINERVA_AT, OPQ_GARDEN, OPQ_HUB, OPQ_PRIZE_ROOM,
+    OPQ_REWARDS, OPQ_STORAGE,
+};
 use net::npc_scripts::MINERVA;
 use net::packet::op::RecvOpcode;
 use net::reactors::{NEPENDEATH, OPQ_STATUE, PAPA_PIXIE, ROYAL_NEPENDEATH};
@@ -33,6 +38,10 @@ const GRASS_POT: i32 = 2002003;
 const SEED: i32 = 4001053;
 const ROYAL_SEED: i32 = 4001074;
 const PIXIE_SEED: i32 = 4001054;
+const TREASURE_BOX: i32 = 2002014;
+/// The hub's door to the storage, and the storage's way back.
+const STORAGE_DOOR: &str = "in06";
+const STORAGE_OUT: &str = "st00";
 /// The hub's scars and the piece each takes, as the pieces sit in the
 /// holder's Etc slots 1 to 6 (4001044 to 4001049).
 const SCARS: [(i32, i16); 6] = [
@@ -291,6 +300,10 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
     .await;
     let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
     assert!(said(&trace, keys::OPQ_EAK_GRASS), "{trace:?}");
+    // The storage stays shut until Minerva is free.
+    let trace = told(&mut a[1], enter(STORAGE_DOOR)).await;
+    assert!(trace.arrivals.is_empty(), "{trace:?}");
+    assert!(pink(&trace, keys::OPQ_NOTICE_STORAGE_CLOSED), "{trace:?}");
 
     // The Grass at the statue's foot brings Minerva out and wins: 3500 EXP
     // and the clear for everyone, who stay on the hub. (The others have
@@ -315,17 +328,99 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
     let trace = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
     assert!(said(&trace, keys::OPQ_EAK_MINERVA), "{trace:?}");
 
-    // She sends each member who will to her prize room, and there gives
-    // each a prize and sends them home to Orbis.
+    // Now the storage opens to anyone, but Eak there answers only the
+    // leader, and only once its guards are gone.
     let minerva = hub[0].field.npc(MINERVA).unwrap();
-    for player in &mut a {
-        let mut trace = told(player, talk_to(minerva)).await;
-        assert!(said(&trace, keys::OPQ_MINERVA_ASK), "{trace:?}");
-        send(&mut player.connection, answer(1, 1, None)).await;
+    let mut storage = Vec::new();
+    for player in a.iter_mut().take(2) {
+        let mut trace = told(player, enter(STORAGE_DOOR)).await;
         until(&mut player.connection, &mut trace, |t| {
-            t.warps.contains(&OPQ_PRIZE_ROOM)
+            t.warps.contains(&OPQ_STORAGE) && t.field.mobs.len() == 19
         })
         .await;
+        assert_eq!(trace.portal_sounds, 1, "{trace:?}");
+        storage.push(trace);
+    }
+    let trace = told(&mut a[1], talk(OPQ_STORAGE, EAK)).await;
+    assert!(said(&trace, keys::OPQ_EAK_LEADER_ONLY), "{trace:?}");
+    let trace = told(&mut a[0], talk(OPQ_STORAGE, EAK)).await;
+    assert!(said(&trace, keys::OPQ_EAK_STORAGE), "{trace:?}");
+    assert!(trace.warps.is_empty(), "{trace:?}");
+    let guards: Vec<_> = storage[0].field.mobs.iter().map(|&(oid, _)| oid).collect();
+    for oid in guards {
+        kill(&mut a[0], &mut storage[0], oid, 6400).await;
+    }
+    let mut bonus = told(&mut a[0], talk(OPQ_STORAGE, EAK)).await;
+    until(&mut a[0].connection, &mut bonus, |t| {
+        t.warps.contains(&OPQ_BONUS) && t.field.reactors.len() == 16
+    })
+    .await;
+    // The other goes back to the hub the way they came.
+    let mut trace = told(&mut a[1], enter(STORAGE_OUT)).await;
+    until(&mut a[1].connection, &mut trace, |t| {
+        t.warps.contains(&OPQ_HUB)
+    })
+    .await;
+
+    // Each box sprays at least 15 drops; the first brings Minerva out at
+    // her point, and no other brings out another.
+    let boxes: Vec<_> = bonus.field.reactors.clone();
+    assert!(
+        boxes.iter().all(|r| r.reactor_id == TREASURE_BOX),
+        "{bonus:?}"
+    );
+    for treasure in &boxes[..2] {
+        let before = bonus.field.drops.len();
+        let oid = treasure.object_id;
+        send(&mut a[0].connection, walk_to(treasure.x, treasure.y)).await;
+        // An ordinary box (`0002000`): three hits move it, the fourth
+        // breaks it.
+        for state in 1..=3u8 {
+            send(&mut a[0].connection, hit_reactor(oid)).await;
+            until(&mut a[0].connection, &mut bonus, |t| {
+                t.field.reactor_hits.contains(&(oid, state))
+            })
+            .await;
+        }
+        send(&mut a[0].connection, hit_reactor(oid)).await;
+        until(&mut a[0].connection, &mut bonus, |t| {
+            t.field
+                .reactors_removed
+                .iter()
+                .any(|&(removed, _)| removed == oid)
+                && t.field.drops.len() >= before + 15
+                && t.field.npc(MINERVA).is_some()
+        })
+        .await;
+    }
+    let out: Vec<_> = bonus.field.npcs.iter().filter(|n| n.1 == MINERVA).collect();
+    assert_eq!(out.len(), 1, "{bonus:?}");
+    let in_bonus = out[0].0;
+    assert_eq!(
+        bonus.field.npc_positions.get(&in_bonus),
+        Some(&OPQ_BONUS_MINERVA_AT)
+    );
+    let mut trace = told(&mut a[0], talk_to(in_bonus)).await;
+    assert!(said(&trace, keys::OPQ_MINERVA_BONUS_ASK), "{trace:?}");
+    send(&mut a[0].connection, answer(1, 1, None)).await;
+    until(&mut a[0].connection, &mut trace, |t| {
+        t.warps.contains(&OPQ_PRIZE_ROOM)
+    })
+    .await;
+
+    // She sends each member who will to her prize room, and there gives
+    // each a prize and sends them home to Orbis; the leader is there
+    // already.
+    for (i, player) in a.iter_mut().enumerate() {
+        if i > 0 {
+            let mut trace = told(player, talk_to(minerva)).await;
+            assert!(said(&trace, keys::OPQ_MINERVA_ASK), "{trace:?}");
+            send(&mut player.connection, answer(1, 1, None)).await;
+            until(&mut player.connection, &mut trace, |t| {
+                t.warps.contains(&OPQ_PRIZE_ROOM)
+            })
+            .await;
+        }
         let trace = told(player, talk(OPQ_PRIZE_ROOM, MINERVA)).await;
         assert!(said(&trace, keys::OPQ_MINERVA_THANKS), "{trace:?}");
         let mut trace = told(player, answer(0, 1, None)).await;
