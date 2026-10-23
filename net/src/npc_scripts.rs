@@ -1298,6 +1298,9 @@ impl NpcScript {
             AMON => return Some(amon(player)),
             _ => {}
         }
+        if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
+            return Some(tower_rock(rock, player));
+        }
         if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
             return Some(ticket_seller(npc_id, route, player));
         }
@@ -4827,6 +4830,91 @@ fn amon(player: &Player) -> NpcScript {
     )
 }
 
+/// A magic rock in Orbis Tower or Eos Tower: one of its scroll takes the
+/// player to another rock of the tower, by the `go00` portal beside it in
+/// Eos Tower.
+struct TowerRock {
+    npc: i32,
+    scroll: i32,
+    to: &'static [(i32, &'static str)],
+}
+
+/// From the quests 3038 (Orbis) and 3205 (Eos).
+const ORBIS_ROCK_SCROLL: i32 = 4001019;
+const EOS_ROCK_SCROLL: i32 = 4001020;
+const TOWER_ROCKS: [TowerRock; 6] = [
+    // Orbis Magic Spot, at the top of Orbis Tower; El Nath Magic Spot, at
+    // its foot.
+    TowerRock {
+        npc: 2012014,
+        scroll: ORBIS_ROCK_SCROLL,
+        to: &[(200082100, "sp")],
+    },
+    TowerRock {
+        npc: 2012015,
+        scroll: ORBIS_ROCK_SCROLL,
+        to: &[(200080200, "sp")],
+    },
+    // The First to Fourth Eos Rocks, on the 100th, 71st, 41st and 1st
+    // floors.
+    TowerRock {
+        npc: 2040024,
+        scroll: EOS_ROCK_SCROLL,
+        to: &[(221022900, "go00")],
+    },
+    TowerRock {
+        npc: 2040025,
+        scroll: EOS_ROCK_SCROLL,
+        to: &[(221024400, "go00"), (221021700, "go00")],
+    },
+    TowerRock {
+        npc: 2040026,
+        scroll: EOS_ROCK_SCROLL,
+        to: &[(221022900, "go00"), (221020000, "go00")],
+    },
+    TowerRock {
+        npc: 2040027,
+        scroll: EOS_ROCK_SCROLL,
+        to: &[(221021700, "go00")],
+    },
+];
+
+/// Nothing without the scroll; with it, a choice of floors where there
+/// are two, and a yes or no.
+fn tower_rock(rock: &TowerRock, player: &Player) -> NpcScript {
+    let item = rock.scroll.to_string();
+    let item = ("item", item.as_str());
+    if !holds(player, rock.scroll) {
+        let none = content::text().get(keys::TOWER_ROCK_NONE, &[item]);
+        return NpcScript::new(rock.npc, vec![Page::Say(none)]);
+    }
+    let go = |&(map, portal): &(i32, &str)| {
+        let floor = map.to_string();
+        Page::Ask {
+            text: content::text().get(keys::TOWER_ROCK_ASK, &[item, ("map", &floor)]),
+            on_yes: vec![
+                Effect::TakeItem {
+                    item_id: rock.scroll,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(map, crate::scripts::named(map, portal)),
+            ],
+            on_no: None,
+        }
+    };
+    let page = match rock.to {
+        [only] => go(only),
+        floors => Page::Menu {
+            text: content::text().get(keys::TOWER_ROCK_MENU, &[item]),
+            choices: floors
+                .iter()
+                .map(|floor| (format!("#m{}#", floor.0), vec![go(floor)]))
+                .collect(),
+        },
+    };
+    NpcScript::new(rock.npc, vec![page])
+}
+
 /// A fourth-job instructor in Leafre and a third job of their line: the
 /// advancement once the player is level 120 and has finished the line's
 /// last quest.
@@ -8110,6 +8198,62 @@ mod tests {
         // Unsent, Athena talks as she does to any second job.
         let athena = NpcScript::for_npc(ATHENA, &hunter(&[], &[])).unwrap();
         assert_eq!(athena, first_job(&INSTRUCTORS[2], &hunter(&[], &[])));
+    }
+
+    #[test]
+    fn tower_rocks_take_a_scroll_to_another_floor() {
+        const FIRST_EOS_ROCK: i32 = 2040024;
+        const THIRD_EOS_ROCK: i32 = 2040026;
+        let none = NpcScript::for_npc(FIRST_EOS_ROCK, &hunter(&[], &[])).unwrap();
+        assert_eq!(
+            page_text(&none.begin()),
+            text(keys::TOWER_ROCK_NONE).replace("{item}", "4001020")
+        );
+        let scroll = hunter(&[(EOS_ROCK_SCROLL, 1)], &[]);
+        let take = Effect::TakeItem {
+            item_id: EOS_ROCK_SCROLL,
+            quantity: 1,
+        };
+        // One way down from the top, by the go00 portal beside the rock.
+        let mut first = NpcScript::for_npc(FIRST_EOS_ROCK, &scroll).unwrap();
+        assert_eq!(kind(&first.begin()), Some(1));
+        assert_eq!(
+            first.respond(ScriptInput::Yes).unwrap().effects,
+            [take.clone(), Effect::WarpToPortal(221022900, 3)]
+        );
+        // Two ways from the middle: up or down.
+        let mut third = NpcScript::for_npc(THIRD_EOS_ROCK, &scroll).unwrap();
+        assert_eq!(kind(&third.begin()), Some(4));
+        assert_eq!(
+            kind(&third.respond(ScriptInput::Select(1)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            third.respond(ScriptInput::Yes).unwrap().effects,
+            [take, Effect::WarpToPortal(221020000, 4)]
+        );
+        let mut third = NpcScript::for_npc(THIRD_EOS_ROCK, &scroll).unwrap();
+        third.begin();
+        third.respond(ScriptInput::Select(0)).unwrap();
+        assert!(third
+            .respond(ScriptInput::No)
+            .is_none_or(|step| step.effects.is_empty()));
+        // Orbis Tower's rocks want the Orbis scroll.
+        let orbis = hunter(&[(ORBIS_ROCK_SCROLL, 1)], &[]);
+        let mut spot = NpcScript::for_npc(2012015, &orbis).unwrap();
+        spot.begin();
+        assert_eq!(
+            spot.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: ORBIS_ROCK_SCROLL,
+                    quantity: 1
+                },
+                Effect::WarpToPortal(200080200, 0)
+            ]
+        );
+        let eos_at_orbis = NpcScript::for_npc(2012015, &scroll).unwrap();
+        assert_eq!(kind(&eos_at_orbis.begin()), Some(0));
     }
 
     #[test]

@@ -159,6 +159,27 @@ Their keys (`statue.*`, `crumbling.ask`, `time_gate.*`) are `unsourced`;
 menu labels are map names (`#m<map id>#`). `statues_and_time_gate.rs` checks
 them through the network harness.
 
+## Tower rocks
+
+Magic rocks in two towers move the player between floors, and each move
+uses up one rock scroll. The scrolls are quest rewards: quest 3038 gives
+the Orbis Rock Scroll (`4001019`) and quest 3205 the Eos Rock Scroll
+(`4001020`).
+
+- **Orbis Tower:** the Orbis Magic Spot (`2012014`, `200080200`) and the
+  El Nath Magic Spot (`2012015`, `200082100`) lead to each other, arriving
+  at portal 0.
+- **Eos Tower:** there are four Eos Rocks. The First (`2040024`, 100th
+  floor) goes down to the 71st, and the Fourth (`2040027`, 1st floor) up to
+  the 41st. The Second (`2040025`, 71st floor) offers a menu with the 100th
+  and the 41st. The Third (`2040026`, 41st floor) offers the 71st and the
+  1st. Players arrive by the `go00` portal beside the target rock.
+
+Without its scroll, a rock only speaks. Otherwise it asks before the move,
+and a No keeps the scroll. The `tower_rock.*` keys are `unsourced`, and the
+ids and targets come from Cosmic's scripts. `TOWER_ROCKS` in
+`net/src/npc_scripts.rs` holds the table.
+
 ## Map and portal scripts
 
 Map entry (`info/onUserEnter`, `scripts::map_enter`, which sees the
