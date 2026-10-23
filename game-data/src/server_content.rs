@@ -1458,8 +1458,10 @@ pub mod keys {
     pub const HTPQ_SEAL_LIFTED: &str = "htpq.seal.lifted";
     pub const HTPQ_KEY_SENT: &str = "htpq.key.sent";
     pub const HTPQ_KEY_APPEARED: &str = "htpq.key.appeared";
+    pub const HTPQ_LAMP_HIT: &str = "htpq.lamp.hit";
+    pub const HTPQ_LAMP_LEADER_ONLY: &str = "htpq.lamp.leader_only";
     /// The gatekeeper and the ways through Horntail's Trial Grounds.
-    pub const HTPQ: [&str; 18] = [
+    pub const HTPQ: [&str; 20] = [
         HTPQ_KEEPER_MENU,
         HTPQ_KEEPER_ENTER,
         HTPQ_KEEPER_ABOUT,
@@ -1478,6 +1480,8 @@ pub mod keys {
         HTPQ_SEAL_LIFTED,
         HTPQ_KEY_SENT,
         HTPQ_KEY_APPEARED,
+        HTPQ_LAMP_HIT,
+        HTPQ_LAMP_LEADER_ONLY,
     ];
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and

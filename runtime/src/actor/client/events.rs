@@ -397,6 +397,14 @@ impl ClientActor {
             let effects = scripts::htpq_last_seal(ticket.cleared(5), ticket.leader() && has_key);
             return Ok(Some(effects));
         }
+        // The lamp's room's way on, as the lamp stands.
+        if script == scripts::HTPQ_LAMP_DOOR && map_id == events::HTPQ_LAMP {
+            let leader = ticket.leader();
+            let [lamp] = self.reactor_states(&[scripts::HTPQ_LAMP_NAME]).await?[..] else {
+                return Ok(None);
+            };
+            return Ok(Some(scripts::htpq_lamp_door(leader, lamp)));
+        }
         if script != scripts::HTPQ_INTO_ROOMS {
             return Ok(None);
         }

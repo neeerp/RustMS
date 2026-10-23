@@ -335,6 +335,10 @@ pub const HORNTAIL_MUSIC: &str = "Bgm14/HonTale";
 
 /// The seals of the Trial Grounds' rooms 1 to 4 (`passKey1` to `passKey4`).
 pub const HTPQ_PASS_KEY: i32 = 2408002;
+/// The lamp of the Trial Grounds' lamp room: each hit moves it on, from
+/// dark through lit and back (0, 1, 2, 3, then 0), and it never breaks; the
+/// room's way on reads it (`scripts::htpq_lamp_door`).
+pub const HTPQ_LAMP: i32 = 2408001;
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
@@ -536,6 +540,16 @@ mod tests {
             assert_eq!(seal.item_dropped(0, key, 1, (0, 0)), Some((event, 1)));
         }
         assert!(seal.is_last(1));
+    }
+
+    #[test]
+    fn the_trial_grounds_lamp_turns_on_every_hit_and_never_breaks() {
+        let Ok(data) = data() else { return };
+        let lamp = data.template(HTPQ_LAMP).unwrap().unwrap();
+        for (state, next) in [(0, 1), (1, 2), (2, 3), (3, 0)] {
+            assert_eq!(lamp.swing(state, 2).map(|(_, to)| to), Some(next));
+            assert!(!lamp.is_last(next));
+        }
     }
 
     #[test]
