@@ -1653,12 +1653,12 @@ impl FieldActor {
             }
         }
         self.make_real(kill.mob_id);
-        if kill.mob_id == net::mobs::ZAKUM_LAST {
+        if kill.mob_id == net::mobs::ZAKUM_LAST && self.key.map_id == net::mobs::ZAKUM_ALTAR_MAP {
             self.zakum_falls();
         }
     }
 
-    /// Zakum's last body died: the map sees the party quests' clear effect
+    /// Zakum's last body died on its altar: the map sees the party quests' clear effect
     /// and hears their jingle, and the world reads of it (Cosmic
     /// `ZakumBattle.monsterKilled`, `broadcastZakumVictory`).
     fn zakum_falls(&mut self) {
@@ -1672,11 +1672,15 @@ impl FieldActor {
             self.broadcast(None, packet);
         }
         let line = net::content::text().get(keys::ZAKUM_VICTORY, &[]);
-        if let (Some(occupant), Ok(packet)) =
-            (self.occupants.values().next(), build_item_line(&line, 0))
-        {
-            occupant.handle.send(ServerMessage::Announce(packet));
-        }
+        let Ok(packet) = build_item_line(&line, 0) else {
+            return;
+        };
+        // Through the first client that takes it.
+        self.occupants.values().any(|occupant| {
+            occupant
+                .handle
+                .send(ServerMessage::Announce(packet.clone()))
+        });
     }
 
     /// The mobs the death of a `mob_id` left unshielded become real: their

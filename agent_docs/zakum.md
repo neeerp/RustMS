@@ -112,9 +112,10 @@ Players who come in while an arm lives see the body plainly (-1). Mobs, and
 Zakum's summons among them, summon nothing on a field that already holds 80
 mobs.
 
-When 8800002 dies, `zakum_falls` shows the map the party quests' clear
+When 8800002 dies on the altar map (anywhere else it is just a mob),
+`zakum_falls` shows the map the party quests' clear
 effect (`quest/party/clear`) and plays their jingle (`Party1/Clear`). It
-also has the first player's client tell the whole world (a chat line that
+also has the first player's client that takes the message tell the whole world (a chat line that
 links no item, BROADCAST_MSG 6; placeholder `zakum.victory`), through
 `ServerMessage::Announce`, since a field has no way to the directory. This
 is Cosmic's `ZakumBattle.monsterKilled` and `broadcastZakumVictory`.
