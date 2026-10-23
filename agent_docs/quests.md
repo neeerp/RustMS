@@ -73,8 +73,8 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `pet`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax` |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
@@ -111,10 +111,12 @@ compares it with its clock set to the server's, which for RustMS is UTC
 first summon slot must be one of them; another pet out doesn't count, as in
 v83's checks (FUN_00721163, FUN_00721d2c). Without a pet out v83 doesn't
 offer the quest, and at completion shows "lack of pet" (no pet) or "with the
-current pet" (another pet). v83 also reads `pettamenessmin`/`pettamenessmax`
-(closeness), which stay unsupported, so the quests with a `pet` list that
-qualify (2103 Nella's Dream and Bartos's 4646/4647) accept any closeness;
-Nella's next quest, 2104, needs closeness and stays out.
+current pet" (another pet). `pettamenessmin`/`pettamenessmax` (0 and 30000
+when unset) bound the closeness of that first pet out; v83 reads them only
+inside the `pet` check, and a pet outside the range counts as the wrong pet.
+HeavenClient checks them too. Garnox's 8184 (a Baby Dragon
+at 1642) and the pet medal quest 29507 (any pet at 1400) qualify through
+them.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
@@ -154,8 +156,9 @@ unsupported. If the gifts don't fit, nothing changes and the client gets
 UPDATE_QUEST_INFO mode 10 with the quest id; it names the full inventories
 itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
-(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, and Meren's Maker
-lessons below); those steps go through
+(`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
+`q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
+[Pets](./pets.md)), and Meren's Maker lessons below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -176,7 +179,7 @@ without a `skillLevel`, which already raise only the master level (Bahamut,
 6121–6124); `acquire` stays unsupported there. `npcAct` (always "quest") names an NPC animation that neither
 side plays; it is ignored. A quest with
 any other key (`infoex`,
-`pettamenessmin`, ...) is **unsupported**: it is
+`petRecallLimit`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
 
@@ -212,7 +215,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1393 quests qualify
+changing the server's allowlist and regenerating the list. 1396 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |

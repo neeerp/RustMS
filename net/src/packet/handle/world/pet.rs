@@ -71,11 +71,7 @@ fn hatches_into(player: &Player, slot: i16) -> Option<i32> {
     if info.pet_evolve_item != 0 {
         return None;
     }
-    let total: i32 = info.pet_evolutions.iter().map(|&(_, weight)| weight).sum();
-    pick(
-        &info.pet_evolutions,
-        rand::thread_rng().gen_range(0, total.max(1)),
-    )
+    roll_evolution(&info.pet_evolutions, &mut rand::thread_rng())
 }
 
 /// The evolution `roll` (below the weights' total) lands on.
@@ -110,6 +106,67 @@ fn hatch(
     }
     item.item_id = baby;
     put_back(player, slot, item)
+}
+
+/// The Rock of Evolution, which Garnox (9102001) evolves pets with.
+pub const ROCK_OF_EVOLUTION: i32 = 5_380_000;
+
+/// The pets that need the rock to grow (`info/evolReqItemID`): the Baby
+/// Dragon and the Baby Robo.
+const ROCK_BABIES: [i32; 2] = [5_000_029, 5_000_048];
+
+/// What the Rock of Evolution can turn a pet of kind `item_id` into, with
+/// their weights (`info/evolProb*`): a baby grows into one of its kinds,
+/// and a grown pet becomes another of its baby's kinds. Empty if it
+/// doesn't evolve.
+pub fn rock_evolutions(item_id: i32) -> Vec<(i32, i32)> {
+    let baby = if ROCK_BABIES.contains(&item_id) {
+        item_id
+    } else {
+        let Some(baby) = ROCK_BABIES.into_iter().find(|&baby| {
+            items::info(baby).is_some_and(|info| {
+                info.pet_evolutions
+                    .iter()
+                    .any(|&(grown, _)| grown == item_id)
+            })
+        }) else {
+            return Vec::new();
+        };
+        baby
+    };
+    items::info(baby)
+        .filter(|info| info.pet_evolve_item == ROCK_OF_EVOLUTION)
+        .map(|info| info.pet_evolutions)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|&(grown, _)| grown != item_id)
+        .collect()
+}
+
+/// One of `evolutions`, picked by weight.
+pub fn roll_evolution(evolutions: &[(i32, i32)], rng: &mut impl Rng) -> Option<i32> {
+    let total: i32 = evolutions.iter().map(|&(_, weight)| weight).sum();
+    pick(evolutions, rng.gen_range(0, total.max(1)))
+}
+
+/// Evolve the pet `serial` into `into` in place, as an egg hatches, with
+/// new days until `until`; the item re-sent, or `None` if the player has
+/// no such pet.
+pub fn evolve_pet(
+    player: &mut Player,
+    serial: i64,
+    into: i32,
+    until: SystemTime,
+) -> Option<Vec<InventoryChange>> {
+    let slot = player
+        .inventory
+        .items(InventoryType::Cash)
+        .find(|(_, item)| item.cash_serial == Some(serial) && item.pet.is_some())
+        .map(|(slot, _)| slot)?;
+    hatch(player, slot, into, items::pet_name);
+    let mut item = player.inventory.get(InventoryType::Cash, slot)?.clone();
+    item.expiration = Some(until);
+    Some(put_back(player, slot, item).into())
 }
 
 /// DEAD_PET (0x50, FUN_00a240a2): the tick and the cash serial of a doll

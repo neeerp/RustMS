@@ -3,6 +3,7 @@ use super::ClientActor;
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
+use game::pet::PetChange;
 use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
@@ -10,6 +11,7 @@ use net::handler::BroadcastScope;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
 use net::packet::build::world::messaging::{build_broadcast, build_gachapon_message, Broadcast};
+use net::packet::build::world::pet::PetGone;
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{
     drop, effect, guild, inventory, marriage, npc, quest, skill, stat,
@@ -117,6 +119,7 @@ impl ClientActor {
         let mut restyled = false;
         let mut command = None;
         let mut gachapon_win = None;
+        let mut evolved = Vec::new();
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
@@ -289,6 +292,30 @@ impl ClientActor {
                     };
                     changed = true;
                     packets.push(inventory::build_inventory_operation(false, &changes)?);
+                }
+                Effect::EvolvePet { serial, into, days } => {
+                    // Only the pet that leads, as the quest checked.
+                    if next.pets.first() != Some(serial) {
+                        warn!(serial, "Script pet no longer leads; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                    let until = SystemTime::now() + Duration::from_secs(*days as u64 * 86_400);
+                    let Some(changes) =
+                        net::packet::handle::world::evolve_pet(&mut next, *serial, *into, until)
+                    else {
+                        warn!(serial, "Script pet no longer held; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    changed = true;
+                    packets.push(inventory::build_inventory_operation(false, &changes)?);
+                    if let Some(index) = next.pets.iter().position(|out| out == serial) {
+                        let index = index as u8;
+                        evolved.push(PetChange::Dismissed { index });
+                        evolved.push(PetChange::Summoned {
+                            index,
+                            serial: *serial,
+                        });
+                    }
                 }
                 Effect::SpendMeso(amount) => {
                     if next.meso < *amount {
@@ -543,6 +570,9 @@ impl ClientActor {
                 packet,
             }))
             .await?;
+        }
+        if !evolved.is_empty() {
+            Box::pin(self.pets_changed(evolved, PetGone::Dismissed)).await?;
         }
         if restyled {
             let announce = inventory::build_char_look(&self.in_game()?.player)?;

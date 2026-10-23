@@ -167,12 +167,12 @@ pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopF
 
 /// The classes (`item_id / 10_000`) of cash items on sale that do nothing
 /// here yet: hired merchants (503) and their Store Remote Controller (547),
-/// the Rock of Evolution (538), Character Transfer (540, all but Name
-/// Change), Maple Life (543, all but the Extra Character Slot Coupon), and
-/// Remote Gachapon (545, all but Miu Miu).
+/// Character Transfer (540, all but Name Change), Maple Life (543, all but
+/// the Extra Character Slot Coupon), and Remote Gachapon (545, all but Miu
+/// Miu).
 /// The shop calls them sold out rather than take NX for nothing (report
 /// c046). Take a class out once its items work.
-const INERT_CLASSES: [i32; 6] = [503, 538, 540, 543, 545, 547];
+const INERT_CLASSES: [i32; 5] = [503, 540, 543, 545, 547];
 
 fn inert(item_id: i32) -> bool {
     ![NAME_CHANGE, MIU_MIU, CHARACTER_SLOT].contains(&item_id)
@@ -440,9 +440,9 @@ mod tests {
                 .iter()
                 .any(|c| c.item_id == item_id && c.on_sale)
         };
-        // A hired merchant, the Rock of Evolution, Character Transfer,
-        // Maple Life, Remote Gachapon, the Store Remote Controller.
-        for item_id in [5030000, 5380000, 5401000, 5431000, 5451000, 5470000] {
+        // A hired merchant, Character Transfer, Maple Life, Remote
+        // Gachapon, the Store Remote Controller.
+        for item_id in [5030000, 5401000, 5431000, 5451000, 5470000] {
             assert!(on_sale(item_id), "{item_id}");
             let sn = commodity_sn(item_id, 1);
             assert_eq!(
@@ -451,9 +451,9 @@ mod tests {
                 "{item_id}"
             );
         }
-        // Gachapon Tickets, Pet Snacks, guild emoticons, Name Change and
-        // Miu Miu still sell.
-        for item_id in [5220000, 5460000, 5290000, NAME_CHANGE, MIU_MIU] {
+        // Gachapon Tickets, Pet Snacks, guild emoticons, Name Change, Miu
+        // Miu and the Rock of Evolution still sell.
+        for item_id in [5220000, 5460000, 5290000, NAME_CHANGE, MIU_MIU, 5380000] {
             let sn = commodity_sn(item_id, 1);
             assert!(check_purchase(commodity(sn), 0).is_ok(), "{item_id}");
         }

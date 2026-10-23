@@ -14,6 +14,7 @@ use crate::events::{
 use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
 use crate::items;
+use crate::packet::handle::world;
 use crate::rides;
 use crate::scripts::Effect;
 use game::alliance::{self, Alliance};
@@ -50,6 +51,13 @@ const PET_TEST_QUEST: i16 = 4646;
 const PET_SECRET_QUEST: i16 = 4647;
 const HIDDEN_NOTE: i32 = 4031921;
 const PET_SNACK: i32 = 5460000;
+/// Garnox in New Leaf City and Singapore, who evolves pets with the Rock of Evolution
+/// for a fee (Cosmic's 10,000 mesos): the Baby Dragon (quest 8185), the
+/// Baby Robo with 50 Cheap Batteries (4659), and a grown pet again (8189).
+const GARNOX: i32 = 9102001;
+const EVOLUTION_FEE: i32 = 10_000;
+const CHEAP_BATTERY: i32 = 4000111;
+const ROBO_UPGRADE_QUEST: i16 = 4659;
 /// Heracle, at the guild headquarters. The runtime loads the player's
 /// guild for his script (`NpcScript::heracle`).
 pub const HERACLE: i32 = 2010007;
@@ -1526,6 +1534,9 @@ impl NpcScript {
             "q6033e" => Some(maker_lesson(player, keys::MAKER_CRYSTAL_TEST, 6033)),
             "q6036e" => Some(maker_lesson(player, keys::MAKER_GOLD_ANVIL, 6036)),
             "q4647e" => Some(pet_secret(player)),
+            "q8185e" => Some(pet_evolution(player, 8185)),
+            "q4659e" => Some(pet_evolution(player, ROBO_UPGRADE_QUEST)),
+            "q8189e" => Some(pet_evolution(player, 8189)),
             _ => None,
         }
     }
@@ -1831,6 +1842,65 @@ fn pet_secret(player: &Player) -> NpcScript {
             master_level: 1,
         },
     ];
+    script
+}
+
+/// `q8185e`, `q4659e` and `q8189e`: Garnox spends a Rock of Evolution and
+/// his fee to evolve the first pet out (the one the quest checked) into a
+/// kind picked by weight, and the quest completes; 4659 also takes its
+/// Cheap Batteries.
+fn pet_evolution(player: &Player, quest: i16) -> NpcScript {
+    let say = |key| NpcScript::new(GARNOX, vec![Page::Say(text(key))]);
+    let Some(item) = player.summoned_pet(0) else {
+        return say(keys::PET_EVOLUTION_NO_PET);
+    };
+    let (Some(serial), Some(pet)) = (item.cash_serial, item.pet.as_ref()) else {
+        return say(keys::PET_EVOLUTION_NO_PET);
+    };
+    let evolutions = world::rock_evolutions(item.item_id);
+    let Some(into) = world::roll_evolution(&evolutions, &mut rand::thread_rng()) else {
+        return say(keys::PET_EVOLUTION_NO_PET);
+    };
+    let days = items::info(into).map_or(0, |info| info.pet_life);
+    if days <= 0 {
+        return say(keys::PET_EVOLUTION_NO_PET);
+    }
+    if player.meso < EVOLUTION_FEE {
+        return say(keys::PET_EVOLUTION_NO_MESOS);
+    }
+    let name = if pet.name == items::pet_name(item.item_id) {
+        items::pet_name(into)
+    } else {
+        pet.name.clone()
+    };
+    let says = |key| content::text().get(key, &[("name", &name), ("kind", &items::pet_name(into))]);
+    let mut on_yes = vec![
+        Effect::TakeItem {
+            item_id: world::ROCK_OF_EVOLUTION,
+            quantity: 1,
+        },
+        Effect::SpendMeso(EVOLUTION_FEE),
+    ];
+    if quest == ROBO_UPGRADE_QUEST {
+        on_yes.push(Effect::TakeItem {
+            item_id: CHEAP_BATTERY,
+            quantity: 50,
+        });
+    }
+    on_yes.push(Effect::EvolvePet { serial, into, days });
+    on_yes.push(Effect::CompleteQuest(quest));
+    let mut script = NpcScript::new(
+        GARNOX,
+        vec![
+            Page::Ask {
+                text: content::text().get(keys::PET_EVOLUTION_ASK, &[("name", &pet.name)]),
+                on_yes,
+                on_no: Some(text(keys::PET_EVOLUTION_DECLINE)),
+            },
+            Page::Say(says(keys::PET_EVOLUTION_DONE)),
+        ],
+    );
+    script.refused = Some(text(keys::PET_EVOLUTION_REFUSED));
     script
 }
 
@@ -8566,6 +8636,79 @@ mod tests {
             ]
         );
         assert_eq!(kind(&woken), Some(0));
+    }
+
+    #[test]
+    fn garnox_evolves_the_first_pet_out_with_a_rock() {
+        if crate::items::data().is_err() {
+            return;
+        }
+        let mut owner = player(50);
+        owner.meso = EVOLUTION_FEE;
+        let evolve = |owner: &Player, script| {
+            let mut garnox = NpcScript::for_quest(script, owner).unwrap();
+            assert_eq!(garnox.npc_id(), GARNOX);
+            let step = garnox.begin();
+            if kind(&step) != Some(1) {
+                return None;
+            }
+            let done = garnox.respond(ScriptInput::Yes).unwrap();
+            Some(done.effects)
+        };
+        assert_eq!(evolve(&owner, "q8185e"), None, "no pet out");
+
+        let mut dragon = game::Item::stack(5000029, 1);
+        dragon.cash_serial = Some(80);
+        dragon.pet = Some(game::pet::PetData::new("Baby Dragon"));
+        owner.inventory.insert(InventoryType::Cash, 1, dragon);
+        owner.pets = vec![80];
+        let effects = evolve(&owner, "q8185e").unwrap();
+        let [Effect::TakeItem {
+            item_id: world::ROCK_OF_EVOLUTION,
+            quantity: 1,
+        }, Effect::SpendMeso(EVOLUTION_FEE), Effect::EvolvePet {
+            serial: 80,
+            into,
+            days: 90,
+        }, Effect::CompleteQuest(8185)] = effects[..]
+        else {
+            panic!("{effects:?}");
+        };
+        assert!((5000030..=5000033).contains(&into), "{into}");
+
+        // A grown dragon becomes another one.
+        let grown = |owner: &mut Player, item_id| {
+            let mut item = owner.inventory.get(InventoryType::Cash, 1).unwrap().clone();
+            item.item_id = item_id;
+            owner.inventory.insert(InventoryType::Cash, 1, item);
+        };
+        for _ in 0..20 {
+            grown(&mut owner, 5000031);
+            let effects = evolve(&owner, "q8189e").unwrap();
+            let Some(Effect::EvolvePet { into, .. }) = effects.get(2) else {
+                panic!("{effects:?}");
+            };
+            assert!([5000030, 5000032, 5000033].contains(into), "{into}");
+            assert_eq!(effects[3], Effect::CompleteQuest(8189));
+        }
+
+        // The Baby Robo's upgrade takes its batteries too.
+        grown(&mut owner, 5000048);
+        let effects = evolve(&owner, "q4659e").unwrap();
+        assert_eq!(
+            effects[2],
+            Effect::TakeItem {
+                item_id: CHEAP_BATTERY,
+                quantity: 50
+            }
+        );
+        let Effect::EvolvePet { into, .. } = effects[3] else {
+            panic!("{effects:?}");
+        };
+        assert!((5000049..=5000053).contains(&into), "{into}");
+
+        owner.meso = EVOLUTION_FEE - 1;
+        assert_eq!(evolve(&owner, "q4659e"), None, "the fee is short");
     }
 
     /// A level-70 Hunter holding `items` in the Etc bag, with `markers`.

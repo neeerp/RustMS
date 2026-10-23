@@ -96,6 +96,11 @@ namespace ms
 			for (auto pet : end["pet"])
 				info.end_pets.push_back(static_cast<int32_t>(pet["id"].get_integer()));
 
+			info.pet_closeness = { static_cast<int32_t>(start["pettamenessmin"].get_integer(0)),
+				static_cast<int32_t>(start["pettamenessmax"].get_integer(30000)) };
+			info.end_pet_closeness = { static_cast<int32_t>(end["pettamenessmin"].get_integer(0)),
+				static_cast<int32_t>(end["pettamenessmax"].get_integer(30000)) };
+
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));
 
