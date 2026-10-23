@@ -202,7 +202,11 @@ impl Service {
         };
         styles
             .into_iter()
-            .filter_map(|(style, lens)| Some((style_or_base(style)?, lens)))
+            // A one-time lens pays for its own colour only.
+            .filter_map(|(style, lens)| match lens {
+                Some(_) => crate::items::has_style(style).then_some((style, lens)),
+                None => Some((style_or_base(style)?, lens)),
+            })
             .filter(|&(style, _)| style != hair && style != face)
             .collect()
     }
