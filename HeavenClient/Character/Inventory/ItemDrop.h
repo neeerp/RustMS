@@ -171,5 +171,12 @@ namespace ms
 		{
 			return !item.cash && (!item.quest || item.karma) && (!item.untradeable || item.karma);
 		}
+
+		// Whether the Wedding Registry lists an item to give (0x9d877b):
+		// what storage takes, less account items.
+		inline bool giftable(const Traits &item)
+		{
+			return storable(item) && !item.account;
+		}
 	}
 }

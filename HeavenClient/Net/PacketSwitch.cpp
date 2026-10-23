@@ -153,6 +153,7 @@ namespace ms
 		OWL_GO_RESULT = 71,
 		MARRIAGE_REQUEST = 72,
 		MARRIAGE_RESULT = 73,
+		WEDDING_GIFT_RESULT = 74,
 		NOTIFY_MARRIED_PARTNER_MAP_TRANSFER = 75,
 		CHAR_MOVED = 185,
 		SPAWN_SUMMON = 175,
@@ -337,6 +338,7 @@ namespace ms
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
 		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();
 		emplace<MARRIAGE_RESULT, MarriageResultHandler>();
+		emplace<WEDDING_GIFT_RESULT, WeddingGiftResultHandler>();
 		emplace<WEDDING_PROGRESS, WeddingProgressHandler>();
 		emplace<WEDDING_CEREMONY_END, WeddingCeremonyEndHandler>();
 		emplace<NOTIFY_MARRIED_PARTNER_MAP_TRANSFER, PartnerMapHandler>();

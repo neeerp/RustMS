@@ -248,6 +248,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(storage_contents_tests tests/storage_contents.cpp Net/InPacket.cpp)
     target_include_directories(storage_contents_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME storage_contents COMMAND storage_contents_tests)
+    add_executable(wedding_gifts_tests tests/wedding_gifts.cpp Net/InPacket.cpp)
+    target_include_directories(wedding_gifts_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME wedding_gifts COMMAND wedding_gifts_tests)
     add_executable(mini_room_tests tests/mini_room.cpp Net/InPacket.cpp)
     target_include_directories(mini_room_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME mini_room COMMAND mini_room_tests)
@@ -802,6 +805,10 @@ add_executable(HeavenClient
     IO/UITypes/UIGiftNotice.h
     IO/UITypes/UIInvitation.cpp
     IO/UITypes/UIInvitation.h
+    IO/UITypes/UIWeddingRegistry.cpp
+    IO/UITypes/UIWeddingRegistry.h
+    IO/UITypes/UIWishlistInput.cpp
+    IO/UITypes/UIWishlistInput.h
     IO/UITypes/UICashShop.cpp
     IO/UITypes/UICashShop.h
     IO/UITypes/UIChannel.cpp
@@ -1051,6 +1058,7 @@ add_executable(HeavenClient
     Net/Handlers/FamilyHandlers.h
     Net/Handlers/MarriageHandlers.cpp
     Net/Handlers/MarriageHandlers.h
+    Net/Handlers/WeddingGifts.h
     Net/Handlers/InventoryHandlers.cpp
     Net/Handlers/InventoryHandlers.h
     Net/Handlers/LoginHandlers.cpp

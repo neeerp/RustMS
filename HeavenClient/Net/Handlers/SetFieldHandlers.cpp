@@ -148,6 +148,11 @@ namespace ms
 		// So does Duey's window, and the server isn't told (report b029).
 		UI::get().remove(UIElement::Type::DUEY);
 
+		// And the wedding's wishlist and gift windows: the server forgets the
+		// open window when we leave the field.
+		UI::get().remove(UIElement::Type::WISHLISTINPUT);
+		UI::get().remove(UIElement::Type::WEDDINGREGISTRY);
+
 		if (auto gage = UI::get().get_element<UIMobGage>())
 			gage->hide();
 

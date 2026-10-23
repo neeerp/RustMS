@@ -51,6 +51,8 @@
 #include "UITypes/UISystemOption.h"
 #include "UITypes/UITradingRoom.h"
 #include "UITypes/UIVegaSpell.h"
+#include "UITypes/UIWeddingRegistry.h"
+#include "UITypes/UIWishlistInput.h"
 #include "UITypes/UIEnchantSkill.h"
 #include "UITypes/UIViciousHammer.h"
 #include "UITypes/UIWorldMap.h"
@@ -144,7 +146,8 @@ namespace ms
 			|| open(get_element<UIViciousHammer>())
 			|| open(get_element<UIVegaSpell>()) || open(get_element<UIKiteWrite>())
 			|| open(get_element<UITransform>())
-			|| open(get_element<UIEnchantSkill>());
+			|| open(get_element<UIEnchantSkill>())
+			|| open(get_element<UIWishlistInput>()) || open(get_element<UIWeddingRegistry>());
 	}
 
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
