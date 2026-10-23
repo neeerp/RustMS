@@ -14,6 +14,7 @@ pub mod field;
 pub mod guild;
 pub mod guild_bbs;
 pub mod hammer;
+pub mod hired_merchant;
 pub mod info;
 pub mod inventory;
 pub mod keymap;

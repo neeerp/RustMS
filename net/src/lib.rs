@@ -24,6 +24,7 @@ pub mod gachapon;
 mod game_data;
 pub mod handler;
 mod helpers;
+pub mod hired_merchant;
 mod io;
 pub mod items;
 mod load;

@@ -31,6 +31,9 @@ pub enum SendOpcode {
     SkillBookResult = 0x33,
     GatherItemResult = 0x34,
     SortItemResult = 0x35,
+    /// Whether a hired merchant permit may be used, by code (50,
+    /// FUN_00a27d75; report 165 §5).
+    EntrustedShopCheckResult = 0x32,
     /// What a Pigmy Egg held, or 0 for a full inventory (FUN_00a28298).
     IncubatorResult = 0x45,
     /// The Owl of Minerva's answers by mode: 6 a search's results, 7 the
@@ -179,6 +182,12 @@ pub enum SendOpcode {
     SpawnNpc = 0x101,
     SpawnNpcRequestController = 0x103,
     NpcAction = 0x104,
+    /// A hired merchant stands on the map (265; report 165 §1).
+    SpawnHiredMerchant = 0x109,
+    /// A hired merchant left the map (266).
+    DestroyHiredMerchant = 0x10A,
+    /// A hired merchant's balloon changed (267).
+    UpdateHiredMerchant = 0x10B,
     DropItemFromMapObject = 0x10C,
     RemoveItemFromMap = 0x10D,
     CannotSpawnKite = 0x10E,
