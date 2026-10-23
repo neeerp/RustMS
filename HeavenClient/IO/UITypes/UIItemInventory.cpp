@@ -119,6 +119,10 @@ namespace ms
 		constexpr const char *DEAD = "You can't do it once you're dead.";
 		// StringPool 0x129.
 		constexpr const char *REQUEST_BUSY = "Other requests are in process.\\nPlease try again in a little bit.";
+		// Miu Miu the Traveling Merchant, whose shop the server opens.
+		constexpr int32_t MIU_MIU = 5450000;
+		// StringPool 0x114.
+		constexpr const char *NOT_HERE = "You can't use it here in this map.";
 		// StringPool 0x180 and 0x181.
 		constexpr const char *TOO_MANY_PETS = "You have exceeded the maximum number\\n of pets that can accompany you.\\nPlease try again after \\nyou change the living pet back into a doll.";
 		// StringPool 0xed8.
@@ -358,7 +362,7 @@ namespace ms
 
 			if (Stage::get().get_mapinfo().allows_personal_shop())
 			{
-				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				UI::get().emplace<UIOk>(NOT_HERE, [](bool)
 				{});
 				return;
 			}
@@ -501,6 +505,23 @@ namespace ms
 				if (may_use_cash_item())
 					Stage::get().get_player().request(UseResetPacket(slot, item_id, to, from), ExclRequest::WAIT);
 			});
+		}
+
+		// v83 FUN_00a0a63f, type 0x25: Miu Miu says so in the chat log where
+		// the map keeps him away or while a dialog is open, and otherwise
+		// waits as a cash item does.
+		void use_miu_miu(int16_t slot, int32_t item_id)
+		{
+			if (!field_limit::may_call_merchant(Stage::get().get_mapinfo().get_fieldlimit()))
+			{
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+					chatbar->send_chatline(NOT_HERE, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			if (!in_dialog() && may_use_cash_item())
+				Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
 		}
 
 		// v83 FUN_00a0a63f type 0x22: a cash mist (528xxxx) is sent at once,
@@ -886,7 +907,7 @@ namespace ms
 					move_to, ignore_continent, area_codes))
 			{
 				case field_limit::ScrollRefusal::HERE:
-					UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+					UI::get().emplace<UIOk>(NOT_HERE, [](bool)
 					{});
 					break;
 				case field_limit::ScrollRefusal::THERE:
@@ -911,7 +932,7 @@ namespace ms
 
 			if (!Stage::get().get_mapinfo().can_summon(item_id))
 			{
-				UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool)
+				UI::get().emplace<UIOk>(NOT_HERE, [](bool)
 				{});
 				return;
 			}
@@ -1417,6 +1438,8 @@ namespace ms
 							cancel_name_change(slot, item_id);
 						else if (item_id / 10000 == 528)
 							use_cash_mist(slot, item_id);
+						else if (item_id == MIU_MIU)
+							use_miu_miu(slot, item_id);
 						else if (item_id / 10000 == 553)
 							use_cash_bag(slot, item_id);
 						else if (item_id / 10000 == 533)

@@ -503,6 +503,12 @@ pub enum WorldAction {
     Quest(crate::quests::QuestRequest),
     /// Buy, sell, recharge at, or leave the shop the player has open.
     Shop(crate::shop::ShopRequest),
+    /// Open Mu Mu's shop for the Miu Miu in Cash `slot`, unless the player
+    /// is trading, keeps a shop or has an NPC window open, and take the Miu
+    /// Miu.
+    MiuMiu {
+        slot: i16,
+    },
     /// Take out of, store in, sort, or close the storage the player has open.
     Storage(crate::storage::StorageRequest),
     /// Open Duey's window, send, claim, or delete a parcel, or close it.

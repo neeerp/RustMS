@@ -513,6 +513,25 @@ STAT_CHANGED with the mesos, INVENTORY_OPERATION, and SHOW_STATUS_INFO
 mode 5 ("You have gained mesos"). A sack that would pass 2^31 - 1 mesos
 stays shut with only the unlock.
 
+### Miu Miu
+
+Miu Miu the Traveling Merchant (5450000, sold in fives) brings Mu Mu's
+shop (NPC 9090000) to the player. In the Cash tab the client (v83
+FUN_00a0a63f, type 0x25) refuses it with the chat line "You can't use it
+here in this map." where the map's `fieldLimit` has bit 0x40000 (the mini
+dungeons, the party quest maps and many more), and with "Not available"
+while a dialog is open; otherwise it waits for the last request and sends
+USE_CASH_ITEM with no body. The server checks the same bit and the item,
+and, unless the player is trading, keeps a shop or has an NPC window
+open (a conversation, a shop, storage or Duey), takes one Miu Miu
+(INVENTORY_OPERATION) and opens the shop as an NPC would (OPEN_NPC_SHOP).
+Anything else gets only the unlock. Mu Mu's list is Cosmic's shop 1338, in
+`game-data/shop_additions.toml`; the pack has no shop for him.
+
+The Use tab's own path for classes 545 and 239 (FUN_00a10075, op 0x6F)
+checks the same bit and sends the slot and item. No Use item of either
+class exists in our data, so 0x6F is not routed.
+
 ### Cash mists
 
 Passed Gas (5281000) and Floral Scent (5281001) leave a cloud around their
@@ -1528,6 +1547,9 @@ be taken, and the tooltip.
 mobs a catch takes; `catch_items` (integration) throws the perfume at a Hog
 out of reach, then beside it, and finds the Hog mount in its place. The
 client's `catch_items` test covers the lines.
+`net`'s Miu Miu handler covers the item and map checks, one taken a call
+and Mu Mu's list; `miu_miu` (integration) calls him in Henesys, buys an
+apple, is refused in the Pig Farm mini dungeon, and finds one Miu Miu left.
 `net::storage` covers each request and its refusals. `storage` (integration)
 opens Mr. Lee's storage, stores part of a stack and a whole one for the fee,
 is refused too many and too many mesos, moves mesos in, sorts, takes items

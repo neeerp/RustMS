@@ -466,6 +466,7 @@ impl ClientActor {
             WorldAction::GainExp(amount) => self.gained_exp(amount).await?,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
+            WorldAction::MiuMiu { slot } => self.miu_miu(slot).await?,
             WorldAction::Storage(request) => self.storage_request(request).await?,
             WorldAction::Duey(_) if self.in_cash_shop => {}
             WorldAction::Duey(request) => self.duey_request(request).await?,

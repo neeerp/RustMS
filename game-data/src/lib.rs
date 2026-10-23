@@ -55,6 +55,9 @@ pub const FIELD_LIMIT_CONSUMABLES: i32 = 0x400;
 /// `info/fieldLimit` bit forbidding weather items (v83 FUN_00a0a63f, type
 /// 0x10).
 pub const FIELD_LIMIT_WEATHER_ITEMS: i32 = 0x4000;
+/// `info/fieldLimit` bit keeping Miu Miu's merchant away (v83 FUN_00a0a63f,
+/// type 0x25, and FUN_00a0ecab).
+pub const FIELD_LIMIT_MIU_MIU: i32 = 0x40000;
 /// `info/fieldLimit` bit sparing whoever dies there their EXP (Cosmic's
 /// NO_EXP_DECREASE; v83 never reads it). The Dojo and most event maps.
 pub const FIELD_LIMIT_NO_EXP_LOSS: i32 = 0x80000;
@@ -392,6 +395,11 @@ impl FieldTemplate {
     /// them out of the wedding halls (fieldType 60).
     pub fn may_blow_weather(&self) -> bool {
         self.field_limit & FIELD_LIMIT_WEATHER_ITEMS == 0
+    }
+
+    /// Whether Miu Miu's merchant comes here.
+    pub fn may_call_merchant(&self) -> bool {
+        self.field_limit & FIELD_LIMIT_MIU_MIU == 0
     }
 
     /// Whether players may drop items and mesos here.

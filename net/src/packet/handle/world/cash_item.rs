@@ -6,8 +6,8 @@
 //! jukebox, meso sacks, avatar megaphones, AP Reset, SP Reset, the Vicious'
 //! Hammer, Vega's Spell, the cash mists, the Item Tag, the Magical
 //! Sandglasses, the Item Guards, the Scissors of Karma, the cash morphs,
-//! the kites, the Cash Owl, the Incubator, the cash bags, Maple TV and the
-//! Name Change receipt (to cancel the request) are used so far.
+//! the kites, the Cash Owl, the Incubator, the cash bags, Maple TV, the
+//! Name Change receipt (to cancel the request) and Miu Miu are used so far.
 
 use super::cash_mist::cash_mist;
 use super::chalkboard::chalkboard;
@@ -21,6 +21,7 @@ use super::kite::kite;
 use super::maple_tv::maple_tv;
 use super::megaphone::{avatar_megaphone, megaphone};
 use super::meso_sack::meso_sack;
+use super::miu_miu::miu_miu;
 use super::name_change::cancel_name_change;
 use super::note::note;
 use super::owl::cash_owl;
@@ -80,6 +81,7 @@ impl WorldHandler for UseCashItemHandler {
             540 if held && item_id == crate::cash_shop::NAME_CHANGE => {
                 cancel_name_change(&mut r, slot)
             }
+            545 if held && item_id == crate::cash_shop::MIU_MIU => miu_miu(ctx, slot, item_id),
             550 if held => sandglass(ctx, &mut r, slot, item_id),
             552 if held && item_id == KARMA_SCISSORS => karma_scissors(ctx, &mut r, slot),
             553 if held => open_box(ctx, InventoryType::Cash, slot, item_id),
