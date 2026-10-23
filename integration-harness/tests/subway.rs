@@ -1,4 +1,5 @@
-//! The subway from Kerning City to New Leaf City: Bell sells the ticket,
+//! The subway from Kerning City to New Leaf City: Bell sells a new
+//! character the Basic ticket,
 //! the gate takes it while the train boards, and the waiting room rides to
 //! New Leaf City, all without a ship on the platforms. Then back the same
 //! way, leaving the waiting room once by Bell, who keeps the ticket that
@@ -28,6 +29,9 @@ const MINUTE: i64 = 60_000;
 const BELL: i32 = 9201057;
 const KERNING_CITY_GATE: i32 = 1052007;
 const NLC_GATE: i32 = 9201068;
+// The tickets Bell sells to level 10 and under, for 1000 mesos.
+const BASIC_TO_NLC: i32 = 4031710;
+const BASIC_TO_KERNING_CITY: i32 = 4031712;
 const NLC: i32 = 600_000_000;
 const NLC_TAXI: i32 = 9201056;
 const HAUNTED_HOUSE_GROUNDS: i32 = 682_000_000;
@@ -107,7 +111,7 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     let character_id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    set_meso(character_id, 30000).await.unwrap();
+    set_meso(character_id, 18000).await.unwrap();
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
     let mut trace = Trace::default();
@@ -116,14 +120,14 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
         route.platform
     );
 
-    // Bell sells the ticket to New Leaf City.
+    // Bell sells a new character the Basic ticket to New Leaf City.
     let t = step(c, &m, buy).await;
     assert_eq!(t.prompts, [(BELL, 4)]);
     let t = step(c, &m, answer(4, 1, Some(0))).await;
     assert_eq!(t.prompts, [(BELL, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
-    assert_eq!(t.items, [(route.ticket, 1)]);
-    assert_eq!(t.stat(stat::MESO), Some(25000));
+    assert_eq!(t.items, [(BASIC_TO_NLC, 1)]);
+    assert_eq!(t.stat(stat::MESO), Some(17000));
 
     // The platform has no ship to ask about.
     let t = step(c, &m, ship_state(route.platform)).await;
@@ -134,7 +138,7 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     assert_eq!(t.prompts, [(KERNING_CITY_GATE, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.warps, [route.waiting_room]);
-    assert_eq!(t.items, [(route.ticket, -1)]);
+    assert_eq!(t.items, [(BASIC_TO_NLC, -1)]);
 
     // The train leaves and arrives, and no ship is shown on the way.
     let mut trace = Trace::default();
@@ -156,8 +160,8 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     assert_eq!(step(c, &m, menu).await.prompts, [(BELL, 4)]);
     assert_eq!(step(c, &m, choice).await.prompts, [(BELL, 1)]);
     let t = step(c, &m, yes).await;
-    assert_eq!(t.items, [(back.ticket, 1)]);
-    assert_eq!(t.stat(stat::MESO), Some(20000));
+    assert_eq!(t.items, [(BASIC_TO_KERNING_CITY, 1)]);
+    assert_eq!(t.stat(stat::MESO), Some(16000));
 
     // Its gate takes it; Bell in the waiting room lets the player out
     // again, without it.
@@ -166,7 +170,7 @@ async fn the_subway_takes_a_ticket_holder_to_new_leaf_city() {
     assert_eq!(t.prompts, [(NLC_GATE, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
     assert_eq!(t.warps, [back.waiting_room]);
-    assert_eq!(t.items, [(back.ticket, -1)]);
+    assert_eq!(t.items, [(BASIC_TO_KERNING_CITY, -1)]);
     let t = step(c, &m, talk(back.waiting_room, BELL)).await;
     assert_eq!(t.prompts, [(BELL, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;

@@ -59,8 +59,10 @@ riders set down at the far station's first `sp`.
 | `TO_NLC` | 103000100 | 600010004 | 600010005 | 600010001 | 4031711 | 5,000 |
 | `TO_KERNING_CITY` | 600010001 | 600010002 | 600010003 | 103000100 | 4031713 | 5,000 |
 
-The fare is Cosmic's. The Basic tickets (4031710, 4031712) that Edelstein
-sells to level 10 and under are not sold or accepted.
+The fare is Cosmic's. To level 10 and under Bell sells the Basic tickets
+instead (4031710 to New Leaf City, 4031712 to Kerning City) for 1,000, as
+Edelstein's `NLC_ticketing` does (`SubwayLine::fare`; Cosmic sells only the
+Regular ones). Either line's gate takes either ticket, the Basic one first.
 
 ### The plane
 
@@ -175,7 +177,8 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
   tickets to Orbis. Agatha sells Orbis's four from one menu.
 - Each platform's usher (`USHERS`) takes a ticket and shows the holder to
   the waiting room while the ship boards. A yes that comes after boarding
-  closed is refused by the `RequireBoarding` effect.
+  closed is refused by the `RequireBoarding` effect, and the usher says
+  boarding has closed (`NpcScript::refused`).
 - The waiting-room guides take people back to the platform of the room they
   are in (`conti::waiting_in`). The ticket is not returned.
 - Isa points the way to Orbis Station's six platforms, the crane's and
@@ -183,8 +186,9 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 - Leafre Station's `dracoout` portal leads back into Leafre.
 - The subway's ticket gates (`SUBWAY_GATES`: 1052007 in Kerning City,
   9201068 in New Leaf City) ask first, as `NLC_Move` does, and only then
-  look for the ticket. Kerning City's gate only serves the subway; its
-  original menu also offered Kerning Square and the Construction Site.
+  look for the ticket; a late yes is refused as at the ushers. Kerning
+  City's gate only serves the subway; its original menu also offered Kerning
+  Square and the Construction Site.
 - Bell (9201057, `NLC_ticketing`) sells the ticket for the line leaving her
   platform from a one-choice menu, and in a waiting room lets the rider back
   out to its platform. The text is under the `subway.*` keys, from
@@ -270,8 +274,7 @@ again before it has finished docking.
 
 ## Not yet
 
-- The subway's Basic tickets, and Kerning City gate's Kerning Square and
-  Construction Site choices.
+- Kerning City gate's Kerning Square and Construction Site choices.
 
 - 8150000's drops, which belong in the content pack.
 - Corba's dragon flight to Leafre.
