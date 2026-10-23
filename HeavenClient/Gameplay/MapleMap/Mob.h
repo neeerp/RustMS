@@ -471,6 +471,7 @@ namespace ms
 			bool tremble;
 			bool deadly;
 			bool mpburn;
+			bool knockback;
 			mob_attack::Box range;
 			Point<int16_t> sp;
 			int32_t r;

@@ -137,6 +137,8 @@ namespace ms
 		// A deadly attack leaves 1 HP, and an MP burn takes 1.
 		bool deadly = false;
 		bool mpburn = false;
+		// An attack with info/knockback throws the player flat, away from the mob.
+		bool knockback = false;
 		// An attack knocks the player the way the mob faced; a touch, away
 		// from its body.
 		std::optional<bool> pushleft;

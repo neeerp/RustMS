@@ -421,5 +421,15 @@ namespace ms
 
 			return reflected;
 		}
+
+		// An attack with info/knockback throws the player flat, at 1900 pixels per second from a foothold and 900
+		// from the air, a ladder or a rope, away from the mob: left when the mob is further right, else right
+		// (0x958b0d). The sideways speed; the throw has none upwards.
+		inline double thrown(bool grounded, int32_t mob_x, int32_t player_x)
+		{
+			double power = grounded ? 1900.0 : 900.0;
+
+			return mob_x > player_x ? -power : power;
+		}
 	}
 }

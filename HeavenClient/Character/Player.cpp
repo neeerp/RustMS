@@ -1258,8 +1258,11 @@ namespace ms
 		// ladders and ropes too (FUN_007ad352, 0x9588cd).
 		if (knockback && !stance)
 		{
-			bool guarded = attack.index < 0 && has_buff(Buffstat::Id::POWERGUARD);
-			double power = guarded ? 200.0 : 270.0;
+			// An attack with info/knockback instead throws the player flat
+			// and away from the mob, whichever way it faced. The path marks
+			// the throw as element 12 (0x958b52).
+			bool thrown = attack.knockback && attack.index >= 0;
+			bool grounded = phobj.onground && !ladder;
 
 			if (ladder)
 			{
@@ -1267,7 +1270,18 @@ namespace ms
 				set_ladder(nullptr);
 			}
 
-			Physics::knockback(phobj, fromleft ? -power : power, -power);
+			if (thrown)
+			{
+				record_move(12);
+				Physics::knockback(phobj, mob_damage::thrown(grounded, attack.origin.x(), phobj.get_x()), 0.0);
+			}
+			else
+			{
+				bool guarded = attack.index < 0 && has_buff(Buffstat::Id::POWERGUARD);
+				double power = guarded ? 200.0 : 270.0;
+
+				Physics::knockback(phobj, fromleft ? -power : power, -power);
+			}
 		}
 
 		uint8_t direction = fromleft ? 0 : 1;

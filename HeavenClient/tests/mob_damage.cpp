@@ -146,6 +146,12 @@ int main()
 				"second job and other jobs resist nothing");
 		require(resistance_skill(131, 0) == 0 && resistance_skill(131, 8) == 0, "nor a hit without an element");
 
+		// A knockback attack's throw (0x958b0d).
+		require(thrown(true, 100, 0) == -1900.0, "from a foothold, away from a mob on the right");
+		require(thrown(true, -100, 0) == 1900.0, "and from one on the left");
+		require(thrown(false, 100, 0) == -900.0, "from the air or a rope");
+		require(thrown(false, 0, 0) == 900.0, "a mob right above throws to the right");
+
 		std::cout << "Mob damage passed\n";
 		return 0;
 	}
