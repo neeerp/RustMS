@@ -300,8 +300,6 @@ namespace ms
 
 	void UICharCreation::send_created()
 	{
-		Sound(Sound::Name::SCROLLUP).play();
-
 		UI::get().remove(UIElement::Type::CLASSCREATION);
 		UI::get().remove(UIElement::Type::RACESELECT);
 
@@ -405,8 +403,6 @@ namespace ms
 
 	void UICharCreation::show_raceselect()
 	{
-		Sound(Sound::Name::SCROLLUP).play();
-
 		if (auto raceselect = UI::get().get_element<UIRaceSelect>())
 		{
 			raceselect->makeactive();

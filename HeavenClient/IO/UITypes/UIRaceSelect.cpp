@@ -141,8 +141,6 @@ namespace ms
 
 	void UIRaceSelect::make_character()
 	{
-		Sound(Sound::Name::SCROLLUP).play();
-
 		deactivate();
 
 		UI::get().emplace<UICharCreation>(selected);
@@ -150,8 +148,6 @@ namespace ms
 
 	void UIRaceSelect::show_charselect()
 	{
-		Sound(Sound::Name::SCROLLUP).play();
-
 		deactivate();
 
 		if (auto charselect = UI::get().get_element<UICharSelect>())
