@@ -524,6 +524,19 @@ namespace ms
 				Stage::get().get_player().request(UseCashItemPacket(slot, item_id), ExclRequest::WAIT);
 		}
 
+		// v83 0xa24606: the Store Remote Controller asks where the player's
+		// merchant is open, unless they are in a mini room. The item stays.
+		void use_remote_controller(int16_t slot)
+		{
+			auto room = UI::get().get_element<UITradingRoom>();
+			auto shop = UI::get().get_element<UIPersonalShop>();
+
+			if ((room && room->is_active()) || (shop && shop->is_active()))
+				return;
+
+			RemoteShopRequestPacket(slot).dispatch();
+		}
+
 		// v83 FUN_00a0a63f type 0x22: a cash mist (528xxxx) is sent at once,
 		// unless the user's own cloud of it lasts or they stand in anyone's
 		// (FUN_00431866).
@@ -1429,6 +1442,8 @@ namespace ms
 							UIPersonalShop::create(slot, item_id);
 						else if (hired_merchant::is_permit(item_id))
 							UIPersonalShop::hire(slot, item_id, inventory.get_cash_id(tab, slot));
+						else if (hired_merchant::is_remote_controller(item_id))
+							use_remote_controller(slot);
 						else if (item_id / 10000 == 500)
 							summon_pet(slot, inventory.get_cash_id(tab, slot));
 						else if (pets::is_cash_food(item_id))

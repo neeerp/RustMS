@@ -1,20 +1,23 @@
 use super::ClientActor;
-use crate::actor::field_merchants::{MerchantEvent, MerchantRequest, Reservation};
+use crate::actor::field_merchants::{self, MerchantEvent, MerchantRequest, Reservation};
 use crate::db::spawn_db;
 use crate::error::RuntimeError;
-use crate::message::FieldMessage;
+use crate::message::{FieldKey, FieldMessage};
 use game::hired_merchant::{HiredMerchant, MerchantState, Sale, Stand, Stock};
 use game::InventoryType;
 use net::hired_merchant::leave_reason;
 use net::hired_merchant::{
-    check_result, close_result, is_permit, HiredMerchantRequest, MAX_LEVEL_REFUSED, MAX_TITLE,
+    check_result, close_result, is_permit, is_remote_controller, HiredMerchantRequest,
+    MAX_LEVEL_REFUSED, MAX_TITLE,
 };
 use net::packet::build::world::hired_merchant::{
     build_blacklist, build_check_result, build_close_result, build_merchant_items,
     build_merchant_room, build_meso_taken, build_open_elsewhere, build_organized,
-    build_visitor_list, OwnerView,
+    build_remote_elsewhere, build_remote_here, build_visitor_list, OwnerView,
 };
-use net::packet::build::world::mini_room::{build_room_leave, buy_result};
+use net::packet::build::world::mini_room::{
+    build_enter_error, build_room_leave, buy_result, enter_error,
+};
 use net::packet::build::world::stat::StatUpdate;
 use net::packet::build::world::{inventory, stat};
 use net::personal_shop::{self as rules, tax};
@@ -72,6 +75,10 @@ impl ClientActor {
     ) -> Result<(), RuntimeError> {
         match request {
             HiredMerchantRequest::Check => self.check_merchant().await,
+            HiredMerchantRequest::Remote { slot } => self.use_remote_controller(slot).await,
+            HiredMerchantRequest::RemoteVisit { sn, slot, cash_sn } => {
+                self.remote_visit(sn, slot, cash_sn).await
+            }
             HiredMerchantRequest::Create {
                 title,
                 permit_slot,
@@ -214,7 +221,7 @@ impl ClientActor {
         hold: bool,
     ) -> Result<Result<Stand, Packet>, RuntimeError> {
         let unavailable = || build_check_result(check_result::UNAVAILABLE);
-        if self.in_a_room() {
+        if self.in_a_room() || self.merchant_field.is_some() {
             return Ok(Err(unavailable()?));
         }
         let player = &self.in_game()?.player;
@@ -252,6 +259,109 @@ impl ClientActor {
             Some(stand) => Ok(Ok(stand)),
             None => Ok(Err(unavailable()?)),
         }
+    }
+
+    /// The serial of the Store Remote Controller in cash slot `slot`, and
+    /// whether its time is up.
+    fn remote_controller(&self, slot: i16) -> Result<Option<(i64, bool)>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        Ok(player
+            .inventory
+            .get(InventoryType::Cash, slot)
+            .filter(|item| is_remote_controller(item.item_id))
+            .map(|item| {
+                let expired = item.expiration.is_some_and(|e| e <= SystemTime::now());
+                (item.cash_serial.unwrap_or(0), expired)
+            }))
+    }
+
+    /// The player used a Store Remote Controller: the client asks to come
+    /// into their merchant open on this channel, or offers to go to its
+    /// channel (report b088 §2). The item stays.
+    async fn use_remote_controller(&mut self, slot: i16) -> Result<(), RuntimeError> {
+        if self.in_a_room() || self.merchant_field.is_some() {
+            return Ok(());
+        }
+        let Some((cash_sn, expired)) = self.remote_controller(slot)? else {
+            return Ok(());
+        };
+        if expired {
+            return self
+                .send(&mut build_enter_error(enter_error::EXPIRED)?)
+                .await;
+        }
+        let game = self.in_game()?;
+        let (owner, channel) = (game.player.id(), game.field.key.channel_id);
+        let placed = spawn_db(move || db::merchant::find(owner)).await?;
+        let mut packet = match placed.filter(|p| p.state == MerchantState::Open) {
+            Some(p) if p.channel_id == channel => {
+                build_remote_here(field_merchants::sn(owner), slot, cash_sn)?
+            }
+            Some(p) => build_remote_elsewhere(p.map_id, p.channel_id)?,
+            None => build_remote_elsewhere(0, check_result::NO_CHANNEL)?,
+        };
+        self.send(&mut packet).await
+    }
+
+    /// The owner, sure with their birthday, comes into their merchant `sn`
+    /// from wherever they are on its channel, as for maintenance there.
+    async fn remote_visit(&mut self, sn: i32, slot: i16, cash_sn: i64) -> Result<(), RuntimeError> {
+        if self.in_a_room() || self.merchant_field.is_some() {
+            return Ok(());
+        }
+        match self.remote_controller(slot)? {
+            Some((serial, false)) if serial == cash_sn => {}
+            Some((serial, true)) if serial == cash_sn => {
+                return self
+                    .send(&mut build_enter_error(enter_error::EXPIRED)?)
+                    .await;
+            }
+            _ => {
+                debug!(self.client_id, slot, "Remote visit without the controller");
+                return Ok(());
+            }
+        }
+        let game = self.in_game()?;
+        let owner = game.player.id();
+        let channel = game.field.key.channel_id;
+        let open_here =
+            |p: &db::merchant::Placement| p.state == MerchantState::Open && p.channel_id == channel;
+        let placed = spawn_db(move || db::merchant::find(owner)).await?;
+        let Some(map_id) = placed
+            .filter(|p| open_here(p) && field_merchants::owner_of(sn) == Some(owner))
+            .map(|p| p.map_id)
+        else {
+            return self
+                .send(&mut build_enter_error(enter_error::CLOSED)?)
+                .await;
+        };
+        let player = &self.in_game()?.player;
+        let (name, look) = (player.stats.name.clone(), player.look());
+        self.merchant_visits.push(owner);
+        let field = self.services.fields.field(FieldKey::new(channel, map_id));
+        self.merchant_field = Some(field);
+        let handle = self.handle();
+        self.to_merchant(MerchantRequest::RemoteVisit {
+            sn,
+            character_id: owner,
+            name,
+            look,
+            handle,
+        })
+        .await
+    }
+
+    /// A map change ends a remote visit, before the client leaves the
+    /// map, and the client says so (SP 0xd8d, report b088 §5).
+    pub(super) async fn stop_remote_merchant(&mut self) -> Result<(), RuntimeError> {
+        if self.merchant_field.is_none() {
+            return Ok(());
+        }
+        if let Some(room) = &self.hired_merchant {
+            let mut packet = build_room_leave(room.slot(), leave_reason::REMOTE_MOVED)?;
+            self.send(&mut packet).await?;
+        }
+        self.leave_hired_merchant().await
     }
 
     /// Set the merchant up where the player stands, empty, and seat them in
@@ -590,6 +700,7 @@ impl ClientActor {
                     Ok(Some(merchant)) => Box::new(merchant),
                     Ok(None) => {
                         self.hired_merchant = None;
+                        self.merchant_field = None;
                         if !notify {
                             return Ok(());
                         }
@@ -827,6 +938,9 @@ impl ClientActor {
                 if self.hired_merchant.as_ref().map(MerchantRoom::owner) == Some(owner) {
                     self.hired_merchant = None;
                 }
+                if self.hired_merchant.is_none() {
+                    self.merchant_field = None;
+                }
                 if let Some(mut packet) = packet {
                     self.send(&mut packet).await?;
                 }
@@ -867,6 +981,8 @@ impl ClientActor {
     pub(super) async fn leave_hired_merchant(&mut self) -> Result<(), RuntimeError> {
         self.merchant_visits.clear();
         match &self.hired_merchant {
+            // Still waiting to come in from elsewhere.
+            None if self.merchant_field.is_some() => self.to_merchant(MerchantRequest::Leave).await,
             None => Ok(()),
             Some(MerchantRoom::Setup { merchant, .. }) if !merchant.stock.is_empty() => {
                 if let Err(error) = self.open_merchant().await {
@@ -897,6 +1013,7 @@ impl ClientActor {
     /// back.
     pub(super) async fn abandon_hired_merchant(&mut self) -> Result<(), RuntimeError> {
         self.merchant_visits.clear();
+        self.merchant_field = None;
         let slot = match &self.hired_merchant {
             None | Some(MerchantRoom::Setup { .. }) => return Ok(()),
             Some(room) => room.slot(),
@@ -906,11 +1023,28 @@ impl ClientActor {
             .await
     }
 
+    /// Send to the merchant's field: the player's own, or the one they
+    /// came into from elsewhere, which they are done with once out of its
+    /// room.
     async fn to_merchant(&mut self, request: MerchantRequest) -> Result<(), RuntimeError> {
-        self.send_to_field(FieldMessage::Merchant {
+        let remote = matches!(request, MerchantRequest::RemoteVisit { .. });
+        let message = FieldMessage::Merchant {
             from: self.client_id,
             request,
-        })
-        .await
+        };
+        let Some(tx) = self.merchant_field.as_ref().map(|f| f.tx.clone()) else {
+            return self.send_to_field(message).await;
+        };
+        if tx.send(message).await.is_err() {
+            warn!(
+                self.client_id,
+                "Merchant's field gone during a remote visit"
+            );
+            return self.abandon_hired_merchant().await;
+        }
+        if self.hired_merchant.is_none() && !remote {
+            self.merchant_field = None;
+        }
+        Ok(())
     }
 }

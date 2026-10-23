@@ -10,7 +10,7 @@
 //! on is what the database holds.
 
 use crate::actor::field_trades::Outbox;
-use crate::message::ServerMessage;
+use crate::message::{ClientHandle, ServerMessage};
 use game::hired_merchant::{HiredMerchant, Sale, Stand, Stock};
 use game::mini_room::Listing;
 use game::AvatarLook;
@@ -61,7 +61,8 @@ pub fn owner_of(sn: i32) -> Option<i32> {
     (sn & SN_BASE != 0).then_some(sn & !SN_BASE)
 }
 
-/// What a client asks of a hired merchant on its field. Visits come as
+/// What a client asks of a hired merchant on its field, or on the field
+/// of the merchant it came into from elsewhere. Visits come as
 /// `RoomRequest::Visit`, the same as for other rooms.
 #[derive(Debug)]
 pub enum MerchantRequest {
@@ -116,6 +117,16 @@ pub enum MerchantRequest {
         reply: oneshot::Sender<(Box<HiredMerchant>, Vec<String>)>,
     },
     Leave,
+    /// The owner, elsewhere on the channel, comes in for maintenance with a
+    /// Store Remote Controller; the field reaches them through `handle`
+    /// while they are in (report b088 §5).
+    RemoteVisit {
+        sn: i32,
+        character_id: i32,
+        name: String,
+        look: AvatarLook,
+        handle: ClientHandle,
+    },
     /// Out of `owner`'s merchant only: the player didn't want the seat.
     Unseat {
         owner: i32,
@@ -403,6 +414,31 @@ impl Merchants {
     /// Keep (x, y) for `from`, who sets up a merchant there.
     pub fn hold_stand(&mut self, from: ClientId, x: i16, y: i16) {
         self.held_stands.insert(from, (x, y));
+    }
+
+    /// `character_id` comes into their merchant `sn` from another map, as
+    /// for maintenance here. A refusal tells their client actor too, which
+    /// sends here until it hears.
+    pub fn remote_visit(
+        &mut self,
+        from: ClientId,
+        character_id: i32,
+        sn: i32,
+        name: &str,
+        look: &AvatarLook,
+        now: (Instant, SystemTime),
+    ) -> Outbox {
+        let mut out = if owner_of(sn) == Some(character_id) {
+            self.visit(from, character_id, sn, name, look, false, now)
+        } else {
+            let mut out = Outbox::new();
+            packet(&mut out, from, build_enter_error(enter_error::CLOSED));
+            out
+        };
+        if !self.is_member(from) {
+            event(&mut out, from, character_id, MerchantEvent::Left(None));
+        }
+        out
     }
 
     /// The merchants read from the database when the field started. One
@@ -1227,6 +1263,22 @@ mod tests {
         assert_eq!(blacklist, vec!["Mallory".to_string()]);
         assert_eq!(merchants.take_shown(), vec![Shown::Destroy(OWNER)]);
         assert!(!merchants.contains(sn(OWNER)) && !merchants.is_member(ALICE));
+    }
+
+    #[test]
+    fn only_the_owner_comes_in_from_elsewhere() {
+        let mut merchants = placed();
+        let out = merchants.remote_visit(BOB, 2, sn(OWNER), "Bob", &look(), now());
+        assert_eq!(
+            summary(&out),
+            vec![(BOB, "0x5 [0, 1]".into()), (BOB, "left".into())],
+            "not his"
+        );
+        let out = merchants.remote_visit(CAROL, OWNER, sn(OWNER + 1), "Owner", &look(), now());
+        assert_eq!(summary(&out).last(), Some(&(CAROL, "left".into())), "none");
+        let out = merchants.remote_visit(CAROL, OWNER, sn(OWNER), "Owner", &look(), now());
+        assert_eq!(summary(&out)[0], (CAROL, "maintenance 0".into()));
+        assert!(merchants.is_member(CAROL));
     }
 
     #[test]

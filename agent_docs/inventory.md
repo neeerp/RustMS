@@ -1696,10 +1696,42 @@ nothing (`0xd9f`). Mode `0x26` is a notice, and it also lets a waiting
 Get All go; v83 leaves one waiting. Esc and Exit send mode `0x1c`
 (`Net/Handlers/StoreBank.h`, `StoreBankHandler`).
 
-Not done yet: the blacklist's
-storage (it lasts as long as the merchant stays in memory), the `0x0e`
-cash check the client sends instead of `0xb` when a cash item is listed,
-and permits in the Cash Shop.
+### Store Remote Controller
+
+The Store Remote Controller (`547xxxx`, in the cash bag) lets the owner
+manage their merchant from anywhere on its channel (report b088). The
+item stays, and an expired one gets enter error `0x18`.
+
+- **Use** (REMOTE_SHOP_REQUEST `0x3B`: `i16 slot`). The client sends it
+  only when no mini room is open. The answer is ENTRUSTED_SHOP_CHECK_RESULT:
+  - `0x11 {i32 room, i16 slot, 8 bytes cash serial}` if the merchant is
+    open on this channel;
+  - `0x10 {i32 map, u8 channel}` if it is open on another one (the
+    client offers to change channel);
+  - `0x10` with channel `0xff` if there is none (StringPool `0xd89`).
+- **Visit** (PLAYER_INTERACTION `0xe`: `{4, 5, i32 birthday, i32 room,
+  u8 1, i16 slot, 8 bytes cash serial}`). Mode `0xe` wraps a request in
+  the birthday code (any real date, `cash_shop::birthday_code`); a bad
+  code is dropped. The server checks the controller and the merchant
+  again, then lets the owner in for maintenance as if they stood by it.
+  The owner's actor sends its merchant requests to the merchant's field
+  (`ClientActor::merchant_field`), and the field answers through the
+  handle it was given (`remote_owners`).
+- **Leaving the map** closes the window with LEAVE `0x13` (StringPool
+  `0xd8d`); the merchant opens again as usual.
+
+HeavenClient asks before it visits: StringPool `0xd8b` (Yes/No), then
+`0x33a` for the birthday code. Code `0x10` shows `0xd90` with the
+channel's name, and Yes changes channel; v83 names the channel from a
+table by the byte, while HeavenClient reads the world's channel name.
+While the player is in alert stance, `0x11` says to catch their breath.
+
+Permits and controllers are sold in the Cash Shop.
+
+Not done yet: the blacklist's storage (it lasts as long as the merchant
+stays in memory). The server takes a `0xe`
+open, which v83 sends instead of `0xb` when a cash item is listed;
+HeavenClient sends `0xb`.
 
 ## Tests
 

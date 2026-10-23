@@ -185,6 +185,12 @@ pub struct FieldActor {
     trades: Trades,
     shops: Shops,
     merchants: Merchants,
+    /// Owners in their merchant's room here from elsewhere on the channel,
+    /// with a Store Remote Controller, and how to reach them.
+    remote_owners: HashMap<ClientId, ClientHandle>,
+    /// Remote visits that came before the merchants were read, if they are
+    /// being read.
+    remote_waiting: Option<Vec<(ClientId, MerchantRequest)>>,
     /// Merchants read from the database come back here; the sender is the
     /// field's own, so that a copy of a map still stops when its last
     /// outside sender goes.
@@ -260,6 +266,8 @@ impl FieldActor {
             trades: Trades::default(),
             shops: Shops::default(),
             merchants: Merchants::default(),
+            remote_owners: HashMap::new(),
+            remote_waiting: None,
             loaded_tx,
             loaded_rx,
             trips: conti::has_trips(key.map_id).then_some(route_time),
@@ -941,20 +949,67 @@ impl FieldActor {
         }
     }
 
-    fn deliver_trade(&self, out: Outbox) {
+    /// Send what the rooms say, to occupants and to owners here from
+    /// elsewhere; those no longer in their merchant are forgotten after.
+    fn deliver_trade(&mut self, out: Outbox) {
         for (to, message) in out {
             if let Some(occupant) = self.occupants.get(&to) {
                 occupant.handle.send(message);
+            } else if let Some(handle) = self.remote_owners.get(&to) {
+                handle.send(message);
             }
         }
+        let merchants = &self.merchants;
+        self.remote_owners.retain(|&id, _| merchants.is_member(id));
     }
 
-    /// A hired merchant request from an occupant; anyone else's is dropped,
-    /// with any oneshot it carries, but for a buyer's settling, which may
-    /// come after they left.
+    /// A hired merchant request from an occupant, or from an owner in
+    /// their merchant from elsewhere; anyone else's is dropped, with any
+    /// oneshot it carries, but for a buyer's settling, which may come
+    /// after they left, and an owner's merchant standing again after a
+    /// failed close, as they are no longer in it.
     fn handle_merchant(&mut self, from: ClientId, request: MerchantRequest) {
         let now = Instant::now();
         let wall = SystemTime::now();
+        if let Some(waiting) = &mut self.remote_waiting {
+            // A remote visit waits for the merchants, and so does whatever
+            // its owner sends next; leaving drops the visit.
+            let visiting = waiting.iter().any(|(id, _)| *id == from);
+            match request {
+                MerchantRequest::RemoteVisit { .. } => {
+                    waiting.push((from, request));
+                    return;
+                }
+                MerchantRequest::Leave if visiting => {
+                    waiting.retain(|(id, _)| *id != from);
+                    return;
+                }
+                _ if visiting => {
+                    waiting.push((from, request));
+                    return;
+                }
+                _ => {}
+            }
+        }
+        if let MerchantRequest::RemoteVisit { .. } = request {
+            let MerchantRequest::RemoteVisit {
+                sn,
+                character_id,
+                name,
+                look,
+                handle,
+            } = request
+            else {
+                unreachable!("matched above")
+            };
+            self.remote_owners.insert(from, handle);
+            let out =
+                self.merchants
+                    .remote_visit(from, character_id, sn, &name, &look, (now, wall));
+            self.deliver_trade(out);
+            self.show_merchants();
+            return;
+        }
         if let MerchantRequest::Settle {
             owner,
             id,
@@ -967,12 +1022,21 @@ impl FieldActor {
             self.show_merchants();
             return;
         }
-        let Some(occupant) = self.occupants.get(&from) else {
+        if let MerchantRequest::Place {
+            merchant,
+            blacklist,
+        } = request
+        {
+            self.merchants.place(from, *merchant, blacklist);
+            self.show_merchants();
             return;
-        };
+        }
+        let at = self.occupants.get(&from).map(|o| (o.avatar.x, o.avatar.y));
+        if at.is_none() && !self.remote_owners.contains_key(&from) {
+            return;
+        }
         if let MerchantRequest::Stand { reply, hold } = request {
-            let (x, y) = (occupant.avatar.x, occupant.avatar.y);
-            let stand = self.merchant_stand(from, x, y);
+            let stand = at.and_then(|(x, y)| self.merchant_stand(from, x, y));
             if let Some(stand) = stand.as_ref().filter(|_| hold) {
                 self.merchants.hold_stand(from, stand.x, stand.y);
             }
@@ -981,22 +1045,16 @@ impl FieldActor {
         }
         let merchants = &mut self.merchants;
         let out = match request {
-            MerchantRequest::Place {
-                merchant,
-                blacklist,
-            } => {
-                merchants.place(from, *merchant, blacklist);
-                Outbox::new()
-            }
             MerchantRequest::Chat { text } => merchants.chat(from, &text),
             MerchantRequest::Buy {
                 index,
                 bundles,
                 reply,
             } => merchants.buy(from, index, bundles, reply, now),
-            MerchantRequest::Settle { .. } | MerchantRequest::Stand { .. } => {
-                unreachable!("answered above")
-            }
+            MerchantRequest::Settle { .. }
+            | MerchantRequest::Place { .. }
+            | MerchantRequest::Stand { .. }
+            | MerchantRequest::RemoteVisit { .. } => unreachable!("answered above"),
             MerchantRequest::Restock { stock, meso } => {
                 merchants.restock(from, stock, meso);
                 Outbox::new()
@@ -1059,10 +1117,11 @@ impl FieldActor {
     }
 
     /// Read the merchants open here, on a map that has them.
-    fn load_merchants(&self) {
+    fn load_merchants(&mut self) {
         if self.key.instance_id != 0 || !net::personal_shop::allowed_on(self.key.map_id) {
             return;
         }
+        self.remote_waiting = Some(Vec::new());
         let (channel_id, map_id) = (self.key.channel_id, self.key.map_id);
         let loaded = self.loaded_tx.clone();
         tokio::spawn(async move {
@@ -1100,7 +1159,12 @@ impl FieldActor {
 
     fn merchants_loaded(&mut self, loaded: Loaded) {
         match loaded {
-            Loaded::All(merchants) => self.merchants.load(merchants),
+            Loaded::All(merchants) => {
+                self.merchants.load(merchants);
+                for (from, visit) in self.remote_waiting.take().unwrap_or_default() {
+                    self.handle_merchant(from, visit);
+                }
+            }
             Loaded::One(owner, merchant) => {
                 let out = self.merchants.reload(owner, merchant, SystemTime::now());
                 self.deliver_trade(out);

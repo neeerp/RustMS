@@ -63,6 +63,8 @@ pub mod enter_error {
     /// "The owner of the store is currently undergoing store maintenance.
     /// ..." (a hired merchant).
     pub const MAINTENANCE: u8 = 0x12;
+    /// "This item has expired." (a Store Remote Controller's period).
+    pub const EXPIRED: u8 = 0x18;
 }
 
 /// How a trade ended, shown to the member who stays (LEAVE).

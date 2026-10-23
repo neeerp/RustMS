@@ -82,7 +82,10 @@ impl ClientActor {
             // The room may be a trading room or a personal shop: it says
             // which by starting a trade or seating the player.
             TradeRequest::Visit { sn } => {
-                if trading.is_some() || self.personal_shop.is_some() {
+                if trading.is_some()
+                    || self.personal_shop.is_some()
+                    || self.merchant_field.is_some()
+                {
                     return Ok(());
                 }
                 if let Some(owner) = crate::actor::field_merchants::owner_of(sn) {

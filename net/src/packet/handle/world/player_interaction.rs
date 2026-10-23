@@ -15,8 +15,9 @@ use tracing::debug;
 /// it, 0xb opens the shop, 0x17 buys, 0x1b takes a listing back, and
 /// 0x1c/0x1d ban a visitor. A hired merchant's modes are the shop's plus
 /// 0xb (0x21 lists, 0x22 buys, 0x26 takes back), and its owner's buttons
-/// send 0x27 to 0x31 (report 165 §3). The runtime holds the goods and the
-/// field the room.
+/// send 0x27 to 0x31 (report 165 §3). Mode 0xe wraps an open or a visit
+/// with the birthday, when a cash item is involved. The runtime holds the
+/// goods and the field the room.
 pub struct PlayerInteractionHandler;
 
 impl WorldHandler for PlayerInteractionHandler {
@@ -75,6 +76,37 @@ impl WorldHandler for PlayerInteractionHandler {
             0x10 => TradeRequest::Meso(reader.read_int()?),
             0x11 => TradeRequest::Confirm,
             0x0b => return shop(PersonalShopRequest::Open),
+            // The client asks for the birthday first when a cash item is
+            // involved: opening with one listed, or a remote visit
+            // (0x6fcb17, 0xa28074).
+            0x0e => {
+                let mode = reader.read_byte()?;
+                reader.read_byte()?;
+                let birthday = reader.read_int()?;
+                if !crate::cash_shop::birthday_code(birthday) {
+                    debug!(birthday, "Ignoring a room request with a bad birthday");
+                    return Ok(HandlerResult::empty());
+                }
+                match mode {
+                    0x0b => return shop(PersonalShopRequest::Open),
+                    0x04 => {
+                        let sn = reader.read_int()?;
+                        if reader.read_byte()? == 0 {
+                            TradeRequest::Visit { sn }
+                        } else {
+                            return merchant(HiredMerchantRequest::RemoteVisit {
+                                sn,
+                                slot: reader.read_short()?,
+                                cash_sn: reader.read_long()?,
+                            });
+                        }
+                    }
+                    mode => {
+                        debug!(mode, "Ignoring a birthday-checked room request");
+                        return Ok(HandlerResult::empty());
+                    }
+                }
+            }
             0x16 => {
                 return shop(PersonalShopRequest::PutItem {
                     kind: i16::from(reader.read_byte()?),
@@ -185,6 +217,14 @@ mod tests {
     fn parse_shop<T>(build: impl FnOnce(&mut Packet) -> T) -> Option<PersonalShopRequest> {
         match action(build) {
             Some(WorldAction::PersonalShop(request)) => Some(request),
+            None => None,
+            Some(other) => panic!("unexpected {other:?}"),
+        }
+    }
+
+    fn parse_merchant(build: &dyn Fn(&mut Packet)) -> Option<HiredMerchantRequest> {
+        match action(build) {
+            Some(WorldAction::HiredMerchant(request)) => Some(request),
             None => None,
             Some(other) => panic!("unexpected {other:?}"),
         }
@@ -371,11 +411,6 @@ mod tests {
 
     #[test]
     fn reads_the_merchant_modes() {
-        let parse_merchant = |build: &dyn Fn(&mut Packet)| match action(build) {
-            Some(WorldAction::HiredMerchant(request)) => Some(request),
-            None => None,
-            Some(other) => panic!("unexpected {other:?}"),
-        };
         let create = parse_merchant(&|p| {
             p.write_bytes(&[0, 5]).unwrap();
             p.write_str_with_length("Scrolls").unwrap();
@@ -453,6 +488,36 @@ mod tests {
             remove,
             Some(HiredMerchantRequest::BlacklistRemove("Dave".into()))
         );
+    }
+
+    #[test]
+    fn reads_the_birthday_checked_open_and_remote_visit() {
+        let open = parse_shop(|p| {
+            p.write_bytes(&[0x0e, 0x0b, 5]).unwrap();
+            p.write_int(19830113).unwrap();
+        });
+        assert_eq!(open, Some(PersonalShopRequest::Open));
+        let remote = parse_merchant(&|p| {
+            p.write_bytes(&[0x0e, 0x04, 5]).unwrap();
+            p.write_int(19830113).unwrap();
+            p.write_int(0x4000_0001).unwrap();
+            p.write_byte(1).unwrap();
+            p.write_short(3).unwrap();
+            p.write_long(77).unwrap();
+        });
+        assert_eq!(
+            remote,
+            Some(HiredMerchantRequest::RemoteVisit {
+                sn: 0x4000_0001,
+                slot: 3,
+                cash_sn: 77
+            })
+        );
+        let bad_birthday = action(|p| {
+            p.write_bytes(&[0x0e, 0x0b, 5]).unwrap();
+            p.write_int(0).unwrap();
+        });
+        assert!(bad_birthday.is_none());
     }
 
     #[test]

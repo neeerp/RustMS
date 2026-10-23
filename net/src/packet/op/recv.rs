@@ -97,6 +97,9 @@ pub enum RecvOpcode {
     PlayerInteraction = 0x7B,
     MonsterBookCover = 0x39,
     TalkToNpc = 0x3A,
+    /// A Store Remote Controller was used; the client waits for
+    /// ENTRUSTED_SHOP_CHECK_RESULT.
+    RemoteShopRequest = 0x3B,
     NpcTalkMore = 0x3C,
     NpcShopAction = 0x3D,
     TrunkRequest = 0x3E,
