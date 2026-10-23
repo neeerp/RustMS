@@ -12,6 +12,7 @@ use crate::events::{
     Statue,
 };
 use crate::gachapon::{self, Prize};
+use crate::item_makers::{self, Recipe};
 use crate::items;
 use crate::rides;
 use crate::scripts::Effect;
@@ -341,6 +342,14 @@ const KERNING_CITY_GATE: i32 = 1052007;
 /// box at each site's end is a pile (`PATIENCE_PILES`).
 const JAKE: i32 = 1052006;
 const SITE_EXIT: i32 = 1052011;
+/// The item makers (`item_makers`).
+const SERRYL: i32 = 1091003;
+const NEVE: i32 = 2010003;
+const MOS: i32 = 2080000;
+/// Mos makes Cornian's Dagger while either of these quests is under way.
+const CORNIAN_QUESTS: [i16; 2] = [7301, 7303];
+/// The money sack drawn beside a price.
+const MESO_ICON: i32 = 4031138;
 const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
 const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
 const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
@@ -1311,6 +1320,30 @@ impl NpcScript {
             AMON => return Some(amon(player)),
             JAKE => return Some(jake(player)),
             SITE_EXIT => return Some(site_exit()),
+            SERRYL => {
+                return Some(item_maker(
+                    SERRYL,
+                    keys::MAKER_SERRYL_HELLO,
+                    &[
+                        (keys::MAKER_SERRYL_KNUCKLERS, item_makers::SERRYL_KNUCKLER),
+                        (keys::MAKER_SERRYL_GUNS, item_makers::SERRYL_GUN),
+                        (keys::MAKER_SERRYL_GLOVES, item_makers::SERRYL_GLOVES),
+                    ],
+                ))
+            }
+            NEVE => {
+                return Some(item_maker(
+                    NEVE,
+                    keys::MAKER_NEVE_HELLO,
+                    &[
+                        (keys::MAKER_NEVE_WARRIOR, item_makers::NEVE_WARRIOR),
+                        (keys::MAKER_NEVE_BOWMAN, item_makers::NEVE_BOWMAN),
+                        (keys::MAKER_NEVE_MAGICIAN, item_makers::NEVE_MAGICIAN),
+                        (keys::MAKER_NEVE_THIEF, item_makers::NEVE_THIEF),
+                    ],
+                ))
+            }
+            MOS => return Some(mos(player, &mut rand::thread_rng())),
             _ => {}
         }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
@@ -2314,6 +2347,158 @@ fn site_exit() -> NpcScript {
             },
         ],
     )
+}
+
+/// An item maker: pick a kind, then an item of it; the maker lists what it
+/// takes, and a yes trades all of it for the item at once.
+fn item_maker(npc_id: i32, hello: &str, kinds: &[(&str, &[Recipe])]) -> NpcScript {
+    let choices = kinds
+        .iter()
+        .map(|&(label, recipes)| {
+            let pages = recipes.iter().map(|recipe| make(recipe, None)).collect();
+            (text(label), vec![recipe_menu(recipes, pages)])
+        })
+        .collect();
+    let menu = Page::Menu {
+        text: text(hello),
+        choices,
+    };
+    with_maker_words(NpcScript::new(npc_id, vec![menu]))
+}
+
+/// Mos: a weapon of each class, or the same with a stimulator, which takes
+/// one of the weapon's kind and varies its stats as a drop's are, or loses
+/// it one time in `STIMULATOR_LOSS` (rolled as the conversation opens). He
+/// also makes Cornian's Dagger for the way to Moira.
+fn mos(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let classes = [
+        (
+            keys::MAKER_MOS_WARRIOR,
+            keys::MAKER_MOS_WARRIOR_STIMULATED,
+            item_makers::MOS_WARRIOR,
+        ),
+        (
+            keys::MAKER_MOS_BOWMAN,
+            keys::MAKER_MOS_BOWMAN_STIMULATED,
+            item_makers::MOS_BOWMAN,
+        ),
+        (
+            keys::MAKER_MOS_MAGICIAN,
+            keys::MAKER_MOS_MAGICIAN_STIMULATED,
+            item_makers::MOS_MAGICIAN,
+        ),
+        (
+            keys::MAKER_MOS_THIEF,
+            keys::MAKER_MOS_THIEF_STIMULATED,
+            item_makers::MOS_THIEF,
+        ),
+        (
+            keys::MAKER_MOS_PIRATE,
+            keys::MAKER_MOS_PIRATE_STIMULATED,
+            item_makers::MOS_PIRATE,
+        ),
+    ];
+    let mut choices = vec![(
+        text(keys::MAKER_MOS_WHAT),
+        vec![Page::Say(text(keys::MAKER_MOS_STIMULATOR))],
+    )];
+    for (label, _, recipes) in classes {
+        let pages = recipes.iter().map(|recipe| make(recipe, None)).collect();
+        choices.push((text(label), vec![recipe_menu(recipes, pages)]));
+    }
+    for (_, label, recipes) in classes {
+        let pages = recipes
+            .iter()
+            .map(|recipe| {
+                let stimulator = item_makers::stimulator(recipe.item)
+                    .map(|item| (item, rng.gen_range(0, item_makers::STIMULATOR_LOSS) == 0));
+                make(recipe, stimulator)
+            })
+            .collect();
+        choices.push((text(label), vec![recipe_menu(recipes, pages)]));
+    }
+    if CORNIAN_QUESTS
+        .iter()
+        .any(|&quest| player.quests.state(quest) == QuestState::Started)
+    {
+        let dagger = item_makers::CORNIANS_DAGGER;
+        let mut pages = vec![Page::Say(text(keys::MAKER_MOS_DAGGER))];
+        pages.extend(make(&dagger, None));
+        choices.push((format!("#t{}#", dagger.item), pages));
+    }
+    let menu = Page::Menu {
+        text: text(keys::MAKER_MOS_HELLO),
+        choices,
+    };
+    with_maker_words(NpcScript::new(MOS, vec![menu]))
+}
+
+/// The menu of one kind's items, each leading to its `pages`.
+fn recipe_menu(recipes: &[Recipe], pages: Vec<Vec<Page>>) -> Page {
+    Page::Menu {
+        text: text(keys::MAKER_PICK),
+        choices: recipes
+            .iter()
+            .map(|recipe| format!("#t{}#", recipe.item))
+            .zip(pages)
+            .collect(),
+    }
+}
+
+/// Ask to make `recipe`, listing what it takes, then say it is done. With
+/// a `stimulator` (its item, and whether the weapon is lost), it takes the
+/// stimulator too.
+fn make(recipe: &Recipe, stimulator: Option<(i32, bool)>) -> Vec<Page> {
+    let materials: Vec<(i32, i16)> = recipe
+        .materials
+        .iter()
+        .copied()
+        .chain(stimulator.map(|(item, _)| (item, 1)))
+        .collect();
+    let item = recipe.item.to_string();
+    let mut ask = content::text().get(keys::MAKER_ASK, &[("item", item.as_str())]);
+    for (item, quantity) in &materials {
+        ask.push_str(&format!("\r\n#i{item}# {quantity} #t{item}#"));
+    }
+    let meso = recipe.cost.to_string();
+    let meso = content::text().get(keys::MAKER_MESO, &[("meso", meso.as_str())]);
+    ask.push_str(&format!("\r\n#i{MESO_ICON}# {meso}"));
+    let mut on_yes = vec![Effect::SpendMeso(recipe.cost)];
+    on_yes.extend(
+        materials
+            .iter()
+            .map(|&(item_id, quantity)| Effect::TakeItem { item_id, quantity }),
+    );
+    let done = match stimulator {
+        Some((_, true)) => keys::MAKER_MOS_LOST,
+        Some((_, false)) => {
+            on_yes.push(Effect::GiveVariedItem(recipe.item));
+            keys::MAKER_DONE
+        }
+        None => {
+            on_yes.push(Effect::GiveItem {
+                item_id: recipe.item,
+                quantity: 1,
+            });
+            keys::MAKER_DONE
+        }
+    };
+    vec![
+        Page::Ask {
+            text: ask,
+            on_yes,
+            on_no: None,
+        },
+        Page::Say(text(done)),
+    ]
+}
+
+/// What a maker says when the materials or mesos are short, or the item
+/// doesn't fit.
+fn with_maker_words(mut script: NpcScript) -> NpcScript {
+    script.refused = Some(text(keys::MAKER_SHORT));
+    script.inventory_full = Some(text(keys::MAKER_FULL));
+    script
 }
 
 /// What a gate says: before boarding, after a no, without a ticket, once
@@ -9601,5 +9786,86 @@ mod tests {
         // A Nana in a town without a task keeps her own lines.
         let elsewhere = sought(&[], 260000000, &[]);
         assert!(NpcScript::for_npc(NANAS[1], &elsewhere).is_none());
+    }
+
+    #[test]
+    fn item_makers_trade_materials_and_mesos_for_their_items() {
+        use rand::SeedableRng;
+        let menu = |step: Step| match step.prompt {
+            Some(Prompt::Selection { text, .. }) => text,
+            other => panic!("menu expected, got {other:?}"),
+        };
+        let ask = |step: Step| match step.prompt {
+            Some(Prompt::YesNo { text, .. }) => text,
+            other => panic!("question expected, got {other:?}"),
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        // Serryl's first knuckler: 20 Leather and 1,000 mesos.
+        let player = traveller(30, 0, false);
+        let mut serryl = NpcScript::for_npc(SERRYL, &player).unwrap();
+        assert_eq!(menu(serryl.begin()).matches("#L").count(), 3);
+        assert!(menu(serryl.respond(ScriptInput::Select(0)).unwrap()).contains("#t1482007#"));
+        let asked = ask(serryl.respond(ScriptInput::Select(0)).unwrap());
+        assert!(asked.contains("#t1482001#") && asked.contains("#i4000021# 20 #t4000021#"));
+        assert!(asked.contains("#i4031138# ") && asked.contains("1000"));
+        let made = serryl.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects,
+            [
+                Effect::SpendMeso(1000),
+                take(4000021, 20),
+                Effect::GiveItem {
+                    item_id: 1482001,
+                    quantity: 1
+                }
+            ]
+        );
+        assert_eq!(kind(&made), Some(0));
+        assert!(serryl.refused().is_some());
+        // Neve upgrades a Bronze Husk to a Mithril Husk.
+        let mut neve = NpcScript::for_npc(NEVE, &player).unwrap();
+        assert_eq!(menu(neve.begin()).matches("#L").count(), 4);
+        neve.respond(ScriptInput::Select(0));
+        neve.respond(ScriptInput::Select(1));
+        let made = neve.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            made.effects[..2],
+            [Effect::SpendMeso(90000), take(1082103, 1)]
+        );
+        assert!(neve.inventory_full().is_some());
+
+        // Mos: what a stimulator is, five classes, the same with one, and
+        // the dagger only on the way to Moira.
+        let mos = NpcScript::for_npc(MOS, &player).unwrap();
+        assert_eq!(menu(mos.begin()).matches("#L").count(), 11);
+        let rescuer = with_quests(&[(7301, false)]);
+        let mut mos = NpcScript::for_npc(MOS, &rescuer).unwrap();
+        assert!(menu(mos.begin()).contains("#L11##b#t4001078#"));
+        assert_eq!(
+            kind(&mos.respond(ScriptInput::Select(11)).unwrap()),
+            Some(0)
+        );
+        assert!(ask(mos.respond(ScriptInput::Next).unwrap()).contains("#i4001079# 1 "));
+        // A stimulated Dragon Carabella takes a one-handed sword stimulator
+        // and is lost, or made with its stats varied.
+        let stimulated = |mut rng: &mut dyn rand::RngCore| {
+            let mut mos = super::mos(&player, &mut rng);
+            mos.begin();
+            mos.respond(ScriptInput::Select(6));
+            assert!(ask(mos.respond(ScriptInput::Select(0)).unwrap()).contains("#i4130002# 1 "));
+            mos.respond(ScriptInput::Yes).unwrap()
+        };
+        let lost = stimulated(&mut rand::rngs::mock::StepRng::new(0, 0));
+        assert!(lost.effects.contains(&take(4130002, 1)));
+        assert!(!lost
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::GiveItem { .. } | Effect::GiveVariedItem(_))));
+        assert_eq!(page_text(&lost), text(keys::MAKER_MOS_LOST));
+        let made = (0..100)
+            .map(|seed| stimulated(&mut rand::rngs::StdRng::seed_from_u64(seed)))
+            .find(|step| step.effects.contains(&Effect::GiveVariedItem(1302059)))
+            .unwrap();
+        assert_eq!(page_text(&made), text(keys::MAKER_DONE));
     }
 }

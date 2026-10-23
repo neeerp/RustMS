@@ -1017,6 +1017,33 @@ the gauge fills, which v83 allows, and they don't take the arrow keys and
 Enter, which HC sends to the player. The window opens centred, where v83 remembers its
 place, and is dragged by its top 20 px, a height not checked against v83.
 
+### NPC item makers
+
+Three NPCs make equipment from materials and mesos: Serryl (1091003, in
+the Nautilus's hallway) makes pirates' knucklers, guns and gloves, Neve
+(2010003, Orbis Park) makes and upgrades gloves for each class, and Mos
+(2080000, Leafre) forges the Dragon weapons. `net::item_makers` keeps
+their recipes, with items, materials and prices taken from Cosmic's
+scripts. The conversation is a menu of kinds, then a menu of items, then a
+yes/no question that lists each material and the price. A yes is one
+transactional step: `SpendMeso`, a `TakeItem` for each material, then the
+item. If anything is missing the maker says `maker.short` and takes
+nothing; if the item doesn't fit, `maker.full`. Upgrades take the glove
+they upgrade as a material.
+
+Mos also offers each class "with a stimulator": it takes the weapon kind's
+stimulator (`item_makers::stimulator`, 4130002-4130017) as well, and gives
+the weapon through `Effect::GiveVariedItem`, with its stats varied like a
+drop's (`items::give_dropped`). One time in ten (`STIMULATOR_LOSS`) the
+weapon is lost and only the materials are taken. The roll is made when the
+conversation opens. While quest 7301 or 7303 is started, Mos also makes
+Cornian's Dagger (4001078). No sourced text exists for these NPCs, so all
+of it is placeholder (`maker.*`).
+
+Not done: the refiners and makers of Victoria Island and elsewhere (Mr.
+Thunder, JM, Vogen and others), which need a quantity prompt (NPC talk
+type 3) on the server.
+
 ## NPC shops
 
 Clicking an NPC that keeps a shop (`content::shops()`, from the pack's
@@ -1518,7 +1545,10 @@ finds the flag saved; the client's `karma_scissors` test covers the checks.
 `net::shop` covers buying, selling, recharging, and their refusals, and
 `npc_shops` (integration, needs the pack's `shops.json`) opens the Henesys
 grocer, is refused for want of mesos, sells a sword, buys an arrow with it,
-and checks both are saved. `skill_books` (integration) refuses a mastery
+and checks both are saved. `net::npc_scripts` covers the item makers'
+menus, questions and trades, and `item_makers` (integration) makes Leather
+Arms at Serryl, is refused without the Leather, and forges a stimulated
+Dragon Carabella at Mos. `skill_books` (integration) refuses a mastery
 book for another job and teaches Fire Demon to an Arch Mage.
 `game::scroll` covers the fit, the slot checks and each kind's roll;
 `net`'s scroll handler covers the packets, the White Scroll, the curse and

@@ -26,6 +26,7 @@ pub mod handler;
 mod helpers;
 pub mod hired_merchant;
 mod io;
+pub mod item_makers;
 pub mod items;
 mod load;
 pub mod login_world;
