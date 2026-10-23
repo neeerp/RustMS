@@ -140,7 +140,7 @@ fn drop_item(
     let vanish = !item.has_karma()
         && (items::info(item.item_id).is_some_and(|info| info.quest || info.trade_block)
             || item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0)
-        || cash_shop::pair_ring(item.item_id);
+        || cash_shop::own_request(item.item_id);
     // A Karma item lands, its Karma used up: "Once dropped, the item cannot
     // be traded." (0x1232)
     let mut thrown = Item { quantity, ..item };

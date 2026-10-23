@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 const DIRECTORY_QUEUE_CAPACITY: usize = 1024;
 /// How often fields advance time-driven state.
@@ -56,6 +56,21 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
     drop_stale_logout_items(cleared).await?;
     let passed = spawn_db(|| db::wedding::drop_over(std::time::SystemTime::now())).await?;
     info!(passed, "Dropped weddings booked for before the restart");
+    // Name Changes left waiting by characters offline when the world stopped;
+    // one that fails waits for the character's next logout.
+    match spawn_db(|| db::name_change::apply_all(std::time::SystemTime::now())).await {
+        Ok(renamed) => {
+            for (character_id, applied) in renamed {
+                match applied {
+                    Ok(applied) => {
+                        crate::actor::client::name_change::log_applied(character_id, &applied)
+                    }
+                    Err(error) => warn!(character_id, %error, "Failed to apply a Name Change"),
+                }
+            }
+        }
+        Err(error) => warn!(%error, "Failed to apply the waiting Name Changes"),
+    }
 
     let (directory_tx, directory_rx) = mpsc::channel(DIRECTORY_QUEUE_CAPACITY);
     spawn_supervised(

@@ -654,6 +654,22 @@ diesel::table! {
     }
 }
 diesel::joinable!(coupon_rewards -> coupons (coupon_id));
+diesel::table! {
+    name_changes (id) {
+        id -> Int4,
+        character_id -> Int4,
+        cash_id -> Int8,
+        price -> Int4,
+        #[max_length = 13]
+        old_name -> Varchar,
+        #[max_length = 13]
+        new_name -> Varchar,
+        requested_at -> Timestamp,
+        completed_at -> Nullable<Timestamp>,
+        failed -> Bool,
+    }
+}
+diesel::joinable!(name_changes -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -701,4 +717,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     wedding_gift_equipment_stats,
     coupons,
     coupon_rewards,
+    name_changes,
 );

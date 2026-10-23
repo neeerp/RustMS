@@ -39,7 +39,9 @@ impl WorldHandler for EnterCashShopHandler {
 /// bag and the slot the client chose; putting one back (0x0E) sends its cash
 /// serial and bag. Expanding a bag (0x06) or the storage (0x07) sends a byte,
 /// the balance, and either 0 and (for a bag) the bag, from the slot buttons,
-/// or 1 and an expansion commodity's serial number.
+/// or 1 and an expansion commodity's serial number. Name Change (0x2E),
+/// after its own checks (op 0x10, op 0x15), sends the serial number, the
+/// old name and the new.
 pub struct CashShopOperationHandler;
 
 const BUY: u8 = 0x03;
@@ -52,6 +54,7 @@ const EXPAND_STORAGE: u8 = 0x07;
 const BUY_PACKAGE: u8 = 0x1E;
 const BUY_CRUSH_RING: u8 = 0x1D;
 const BUY_FRIENDSHIP_RING: u8 = 0x23;
+const BUY_NAME_CHANGE: u8 = 0x2E;
 /// Sent unasked by v83: a query for each commodity it has not cached, and
 /// 0x21, whose purpose is unknown. A failure would show a notice for each.
 const UNRESOLVED: u8 = 0x21;
@@ -94,7 +97,7 @@ impl WorldHandler for CashShopOperationHandler {
                     ctx.player.stats.gender.into(),
                 );
                 match (cash_type, commodity) {
-                    (_, Ok(commodity)) if cash_shop::pair_ring(commodity.item_id) => {
+                    (_, Ok(commodity)) if cash_shop::own_request(commodity.item_id) => {
                         return fail(CashShopFailure::Unknown)
                     }
                     (Some(cash_type), Ok(commodity)) => CashShopRequest::Buy {
@@ -111,7 +114,7 @@ impl WorldHandler for CashShopOperationHandler {
                 let to = reader.read_str_with_length()?;
                 let message = reader.read_str_with_length()?;
                 let commodity = match cash_shop::check_gift(cash_shop::commodity(sn)) {
-                    Ok(commodity) if cash_shop::pair_ring(commodity.item_id) => {
+                    Ok(commodity) if cash_shop::own_request(commodity.item_id) => {
                         return fail(CashShopFailure::Unknown)
                     }
                     Ok(commodity) => commodity,
@@ -164,6 +167,28 @@ impl WorldHandler for CashShopOperationHandler {
                     commodity: commodity.clone(),
                     to,
                     message,
+                }
+            }
+            BUY_NAME_CHANGE => {
+                let sn = reader.read_int()?;
+                reader.read_str_with_length()?;
+                let new_name = reader.read_str_with_length()?;
+                let commodity = match cash_shop::check_purchase(
+                    cash_shop::commodity(sn),
+                    ctx.player.stats.gender.into(),
+                ) {
+                    Ok(commodity) if commodity.item_id == cash_shop::NAME_CHANGE => commodity,
+                    Ok(_) => return fail(CashShopFailure::Unknown),
+                    Err(failure) => return fail(failure),
+                };
+                if ctx.player.stats.level < cash_shop::NAME_CHANGE_LEVEL
+                    || !super::name_change::allowed(&new_name, ctx)?
+                {
+                    return fail(CashShopFailure::Unknown);
+                }
+                CashShopRequest::RequestNameChange {
+                    commodity: commodity.clone(),
+                    new_name,
                 }
             }
             SET_WISH_LIST => {
@@ -388,6 +413,57 @@ mod tests {
             p.write_byte(0xFF).unwrap();
         });
         assert!(matches!(result.actions.as_slice(), [WorldAction::Reply(_)]));
+    }
+
+    #[test]
+    fn name_change_is_bought_only_with_its_own_request() {
+        if crate::names::forbidden_names().is_err()
+            || cash_shop::commodity(cash_shop::commodity_sn(cash_shop::NAME_CHANGE, 1)).is_none()
+        {
+            return;
+        }
+        let sn = cash_shop::commodity_sn(cash_shop::NAME_CHANGE, 1);
+        let buy = handle(|p| {
+            p.write_byte(BUY).unwrap();
+            p.write_byte(0).unwrap();
+            p.write_int(4).unwrap();
+            p.write_int(sn).unwrap();
+        });
+        assert!(matches!(buy.actions.as_slice(), [WorldAction::Reply(_)]));
+        let request = |level: u8, name: &str| {
+            let mut packet = Packet::new_empty();
+            packet
+                .write_short(RecvOpcode::CashShopOperation as i16)
+                .unwrap();
+            packet.write_byte(BUY_NAME_CHANGE).unwrap();
+            packet.write_int(sn).unwrap();
+            packet.write_str_with_length("Old").unwrap();
+            packet.write_str_with_length(name).unwrap();
+            let mut player = crate::codec::stats::sample_player();
+            player.stats.level = level;
+            player.stats.name = "Current".into();
+            let mut ctx = WorldContext {
+                client_id: 1,
+                channel_id: 0,
+                player: &mut player,
+            };
+            CashShopOperationHandler
+                .handle(&mut packet, &mut ctx)
+                .unwrap()
+                .actions
+        };
+        assert!(matches!(
+            request(10, "Newname").as_slice(),
+            [WorldAction::CashShop(CashShopRequest::RequestNameChange { new_name, .. })]
+                if new_name == "Newname"
+        ));
+        // Under level 10, a bad name, or the same name in another case.
+        for (level, name) in [(9, "Newname"), (30, "new name"), (30, "current")] {
+            assert!(
+                matches!(request(level, name).as_slice(), [WorldAction::Reply(_)]),
+                "{level} {name}"
+            );
+        }
     }
 
     #[test]

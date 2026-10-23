@@ -30,6 +30,7 @@ pub mod guild;
 pub mod guild_bbs;
 pub mod keybinding;
 pub mod marriage;
+pub mod name_change;
 pub mod note;
 pub mod parcel;
 pub mod pet;

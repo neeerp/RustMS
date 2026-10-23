@@ -16,6 +16,7 @@ mod hazard;
 mod later;
 mod loot;
 mod marriage;
+pub(crate) mod name_change;
 mod notes;
 mod npc_script;
 mod owl;
@@ -340,13 +341,16 @@ impl ClientActor {
             return Ok(());
         };
         // In the Cash Shop the player is off the map; only leaving, the shop
-        // itself, its coupons and thanking for gifts count.
+        // itself, its coupons, Name Change's checks and thanking for gifts
+        // count.
         if self.in_cash_shop
             && opcode != RecvOpcode::ChangeMap as i16
             && opcode != RecvOpcode::CashShopOperation as i16
             && opcode != RecvOpcode::CheckCash as i16
             && opcode != RecvOpcode::CouponCode as i16
             && opcode != RecvOpcode::NoteAction as i16
+            && opcode != RecvOpcode::NameChangeRules as i16
+            && opcode != RecvOpcode::CheckCharName as i16
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
@@ -646,6 +650,7 @@ impl ClientActor {
                     self.cash_shop(request).await?
                 }
             }
+            WorldAction::CancelNameChange { slot } => self.cancel_name_change(slot).await?,
             WorldAction::Disconnect => return Err(RuntimeError::ClientDisconnected),
         }
         Ok(())
@@ -1039,6 +1044,12 @@ impl ClientActor {
                     .await?
             }
             CashShopRequest::Coupon(code) => self.redeem_coupon(code).await?,
+            CashShopRequest::NameChangeRules => self.name_change_rules().await?,
+            CashShopRequest::CheckNewName(name) => self.check_new_name(name).await?,
+            CashShopRequest::RequestNameChange {
+                commodity,
+                new_name,
+            } => self.request_name_change(commodity, new_name).await?,
             CashShopRequest::Balance => {
                 let balance = spawn_db(move || db::cash_shop::balance(account_id)).await?;
                 vec![cs::build_cash_balance(
@@ -1788,6 +1799,8 @@ impl ClientActor {
             }
             if let Err(error) = self.flush().await {
                 error!(self.client_id, %error, "Failed to save player on disconnect");
+            } else if !self.changing_channel {
+                self.apply_name_change().await;
             }
         }
 

@@ -128,8 +128,8 @@ sends `SET_CASH_SHOP` (character data plus the shop's lists) followed by the
 cash inventory, gifts, wish list and NX balance
 (`net/src/packet/build/world/cash_shop.rs`). The session stays on the channel
 and in the world directory, so whispers still arrive, but the client actor
-ignores every other opcode but `CHECK_CASH`, `COUPON_CODE` and `NOTE_ACTION`
-until the player leaves. Leaving sends a `CHANGE_MAP` with no body; the actor
+ignores every other opcode but `CHECK_CASH`, `COUPON_CODE`, `NOTE_ACTION` and
+the Name Change checks (0x10 and 0x15) until the player leaves. Leaving sends a `CHANGE_MAP` with no body; the actor
 answers it like a channel change to its own channel, and the client reconnects
 and enters the map it left.
 
@@ -138,7 +138,7 @@ list (`net/src/packet/handle/world/cash_shop.rs`). A purchase is checked against
 `Etc.nx` `Commodity.img` (`net::cash_shop`): the item must be on sale and allowed
 for the character's gender. Cash items that don't work here yet count as sold
 out, alone or in a package: hired merchants and their remote controller, the
-Rock of Evolution, Name Change, Character Transfer, Maple Life, Miu Miu and
+Rock of Evolution, Character Transfer, Maple Life, Miu Miu and
 Remote Gachapon (`INERT_CLASSES`). `db::cash_shop::buy` then takes the price from the
 chosen balance and adds the item to the Cash Inventory in one transaction. The
 client gets the item (0x57) and its new balance, or a failure code (0x5C): 0xA5
@@ -232,6 +232,41 @@ so two accounts can't both have it. 0x59 lists the cash items, the Maple Points,
 each bag item `(short quantity, short 0, int item id)` and the mesos for the
 client's notice (report b072); NX Credit and Prepaid show only in the
 balances.
+
+#### Name Change
+
+Name Change (5400000, commodity 50600000, 10,000 NX) asks for a new name that
+takes effect at the next logout (report c060; `db::name_change`,
+`runtime/src/actor/client/name_change.rs`). The shop's button sends op 0x10
+(character id, birthday code). A bad birthday code fails with 0xC4, and a
+character below level 10 gets `0x149` result 4. Otherwise `0x149` says 0
+(the rules sheet, then the name dialog), 1 (a request waits), or 3 (a name
+changed less than 30 days ago). The name dialog checks with op 0x15, the
+login server's name check opcode, which in the shop answers `0x148` (name,
+taken): taken when the name breaks the creation rules, is the character's
+own, or belongs to a character or a waiting request, ignoring case. The
+login server's check also counts waiting requests.
+
+The purchase is CASHSHOP_OPERATION 0x2E (SN, old name, new name). It is paid
+from NX Prepaid only, at the commodity's price, and gifting it fails.
+`db::name_change::request` re-checks everything, pays, and puts a receipt in
+the Cash Inventory, in one transaction; unique indexes on `name_changes`
+allow one waiting request per character and per name. The client gets the
+receipt in `0x9E` (the cash item record, as in 0x57) and the balances.
+
+Using the receipt from the Cash bag (USE_CASH_ITEM with `u8 1`) cancels the
+request it stands for, with no refund, and takes the receipt: `0x71` 0. A
+receipt that stands for no waiting request of the character's answers
+`0x78`. Dropped, the receipt vanishes like a pair ring; the request stays.
+When the player logs out (not on a channel change), after the save,
+`db::name_change::apply` renames the character, or, if another character
+took the name meanwhile, marks the request failed and refunds the NX
+Prepaid, with no month to wait; either way the receipt goes from the Cash
+Inventory and the bags. The world applies every waiting request when it
+starts; one that fails waits for the next logout. Deleting the character
+refunds its request. Gifts not yet thanked for (`cash_items.gift_from`)
+follow the new name; notes, owner tags and the like keep the old one. Name
+Change Coupons (5401000) stay sold out.
 
 ## Packets
 

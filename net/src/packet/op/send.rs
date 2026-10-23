@@ -68,6 +68,11 @@ pub enum SendOpcode {
     AvatarMegaphone = 0x6F,
     /// Hide the avatar megaphone's banner (0xa2a65b).
     ClearAvatarMegaphone = 0x70,
+    /// The answer to cancelling a Name Change request from the bag
+    /// (0xa2a677; report c060).
+    CancelNameChangeResult = 0x71,
+    /// The character has no Name Change request to cancel (0xa2a7e6).
+    NoNameChange = 0x78,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
     /// The Family Tree (report b039).
@@ -195,6 +200,10 @@ pub enum SendOpcode {
     Parcel = 0x142,
     QueryCashResult = 0x144,
     CashShopOperation = 0x145,
+    /// Whether the name typed for a Name Change is free (0x47baea).
+    CheckNewNameResult = 0x148,
+    /// Whether the character may ask for a new name (0x47bbb6).
+    NameChangeRulesResult = 0x149,
     /// The Rock, Paper, Scissors window (312; report b038).
     RpsGame = 0x138,
     Messenger = 0x139,
