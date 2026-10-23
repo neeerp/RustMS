@@ -23,7 +23,8 @@ use std::time::SystemTime;
 /// SPAWN_PET (0x62, FUN_00a240a2): the tick, the pet's Cash Inventory
 /// slot, and whether it should lead the others. The same request sends a
 /// pet out back. The client waits for the stat change before asking again,
-/// and doesn't ask for a doll.
+/// and doesn't ask for a doll. An egg (the Dragon Egg 5000028 and the Robo
+/// Egg 5000047) hatches instead of coming out, as Cosmic has it.
 pub struct SpawnPetHandler;
 
 impl WorldHandler for SpawnPetHandler {
@@ -44,6 +45,15 @@ impl WorldHandler for SpawnPetHandler {
                 HandlerResult::empty().with(WorldAction::Reply(build_stat_update(true, &[])?))
             );
         };
+        if !player.pets.contains(&serial) {
+            if let Some(baby) = hatches_into(player, slot) {
+                let changes = hatch(player, slot, baby, items::pet_name);
+                return Ok(
+                    HandlerResult::reply(build_inventory_operation(false, &changes)?)
+                        .with_reply(build_stat_update(true, &[])?),
+                );
+            }
+        }
         let lead = player.follows_the_lead();
         let changes = pet::toggle(player.pets_mut(), serial, lead, boss);
         let done = build_stat_update(true, &[StatUpdate::Pets(player.pet_serials())])?;
@@ -51,6 +61,55 @@ impl WorldHandler for SpawnPetHandler {
             .with(WorldAction::PetsChanged(changes))
             .with(WorldAction::Reply(done)))
     }
+}
+
+/// What the egg in Cash `slot` hatches into, if it is one: a pet that
+/// evolves without an item (`info/evolReqItemID` 0), picked by weight.
+fn hatches_into(player: &Player, slot: i16) -> Option<i32> {
+    let egg = player.inventory.get(InventoryType::Cash, slot)?;
+    let info = items::info(egg.item_id)?;
+    if info.pet_evolve_item != 0 {
+        return None;
+    }
+    let total: i32 = info.pet_evolutions.iter().map(|&(_, weight)| weight).sum();
+    pick(
+        &info.pet_evolutions,
+        rand::thread_rng().gen_range(0, total.max(1)),
+    )
+}
+
+/// The evolution `roll` (below the weights' total) lands on.
+fn pick(evolutions: &[(i32, i32)], mut roll: i32) -> Option<i32> {
+    for &(item_id, weight) in evolutions {
+        if roll < weight {
+            return Some(item_id);
+        }
+        roll -= weight;
+    }
+    evolutions.last().map(|&(item_id, _)| item_id)
+}
+
+/// Hatch the egg in Cash `slot` into `baby`: the same pet, with its serial,
+/// level, closeness and days left, of the new kind. A pet still called what
+/// its egg is called takes the name of its new kind (`name_of`).
+fn hatch(
+    player: &mut Player,
+    slot: i16,
+    baby: i32,
+    name_of: impl Fn(i32) -> String,
+) -> [InventoryChange; 2] {
+    let mut item = player
+        .inventory
+        .get(InventoryType::Cash, slot)
+        .cloned()
+        .expect("an egg in the slot");
+    if let Some(pet) = item.pet.as_mut() {
+        if pet.name == name_of(item.item_id) {
+            pet.name = name_of(baby);
+        }
+    }
+    item.item_id = baby;
+    put_back(player, slot, item)
 }
 
 /// DEAD_PET (0x50, FUN_00a240a2): the tick and the cash serial of a doll
@@ -925,6 +984,55 @@ mod tests {
         let refused = SpawnPetHandler.handle(&mut p, &mut ctx).unwrap();
         assert!(matches!(refused.actions[..], [WorldAction::Reply(_)]));
         assert_eq!(player.pets, [77]);
+    }
+
+    #[test]
+    fn an_evolution_is_picked_by_weight() {
+        let robo = [(49, 330), (50, 330), (51, 330), (52, 9), (53, 1)];
+        assert_eq!(pick(&robo, 0), Some(49));
+        assert_eq!(pick(&robo, 329), Some(49));
+        assert_eq!(pick(&robo, 330), Some(50));
+        assert_eq!(pick(&robo, 998), Some(52));
+        assert_eq!(pick(&robo, 999), Some(53));
+        assert_eq!(pick(&[], 0), None);
+    }
+
+    #[test]
+    fn an_egg_hatches_into_the_same_pet() {
+        let mut player = owner();
+        let mut egg = Item::stack(5000028, 1);
+        egg.cash_serial = Some(80);
+        egg.pet = Some(PetData::new("Dragon"));
+        egg.expiration = Some(SystemTime::UNIX_EPOCH);
+        player.inventory.insert(InventoryType::Cash, 4, egg.clone());
+        let name_of = |item_id| {
+            if item_id == 5000028 {
+                "Dragon"
+            } else {
+                "Baby Dragon"
+            }
+            .to_string()
+        };
+        let changes = hatch(&mut player, 4, 5000029, name_of);
+        assert!(matches!(
+            changes[0],
+            InventoryChange::Remove { slot: 4, .. }
+        ));
+        let baby = player.inventory.get(InventoryType::Cash, 4).unwrap();
+        assert_eq!(baby.item_id, 5000029);
+        assert_eq!(baby.cash_serial, Some(80));
+        assert_eq!(baby.expiration, egg.expiration);
+        assert_eq!(baby.pet.as_ref().unwrap().name, "Baby Dragon");
+
+        egg.pet = Some(PetData::new("Puff"));
+        player.inventory.insert(InventoryType::Cash, 4, egg);
+        hatch(&mut player, 4, 5000029, name_of);
+        let baby = player.inventory.get(InventoryType::Cash, 4).unwrap();
+        assert_eq!(
+            baby.pet.as_ref().unwrap().name,
+            "Puff",
+            "a name given stays"
+        );
     }
 
     #[test]

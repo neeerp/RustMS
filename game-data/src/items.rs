@@ -80,6 +80,14 @@ pub struct ItemInfo {
     /// Whether a pet has a chat balloon style (`info/chatBalloon`), which
     /// lets it wear a quote ring.
     pub pet_chat_balloon: bool,
+    /// What a pet evolves into (`info/evol1`, `evol2`, ...), each with its
+    /// weight (`evolProb1`, ...). An egg hatches into its one.
+    pub pet_evolutions: Vec<(i32, i32)>,
+    /// The item an evolution takes (`info/evolReqItemID`); 0 for an egg,
+    /// which hatches without one.
+    pub pet_evolve_item: i32,
+    /// The level a pet evolves at (`info/evolReqPetLvl`).
+    pub pet_evolve_level: i32,
     /// What a 2x EXP (521xxxx) or drop (536xxxx) card multiplies, and when.
     pub rate_card: Option<RateCard>,
     /// The cloud a cash mist item (528xxxx) leaves.
@@ -486,6 +494,14 @@ impl ItemData {
                 }
                 info.pet_name_tag = nx.int_child(meta, "nameTag")?.unwrap_or(0) != 0;
                 info.pet_chat_balloon = nx.int_child(meta, "chatBalloon")?.unwrap_or(0) != 0;
+                let mut n = 1;
+                while let Some(evolved) = nx.int_child(meta, &format!("evol{n}"))? {
+                    let weight = nx.int_child(meta, &format!("evolProb{n}"))?.unwrap_or(0);
+                    info.pet_evolutions.push((evolved, weight));
+                    n += 1;
+                }
+                info.pet_evolve_item = nx.int_child(meta, "evolReqItemID")?.unwrap_or(0);
+                info.pet_evolve_level = nx.int_child(meta, "evolReqPetLvl")?.unwrap_or(0);
             }
             if game::pet::is_water_of_life(item_id) {
                 info.pet_life = nx.int_child(meta, "life")?.unwrap_or(0);
@@ -760,6 +776,9 @@ impl ItemData {
             pet_life: 0,
             pet_name_tag: false,
             pet_chat_balloon: false,
+            pet_evolutions: Vec::new(),
+            pet_evolve_item: 0,
+            pet_evolve_level: 0,
             rate_card: None,
             mist: None,
             sandglass: None,
@@ -1164,6 +1183,16 @@ mod tests {
         assert_eq!(data.info(5000000).unwrap().unwrap().pet_life, 90);
         assert_eq!(data.info(5000060).unwrap().unwrap().pet_life, 0);
         assert_eq!(data.info(5180000).unwrap().unwrap().pet_life, 90);
+        let egg = data.info(5000028).unwrap().unwrap();
+        assert_eq!(
+            (egg.pet_evolutions, egg.pet_evolve_item),
+            (vec![(5000029, 100)], 0)
+        );
+        let baby = data.info(5000048).unwrap().unwrap();
+        assert_eq!(baby.pet_evolutions.len(), 5);
+        assert_eq!(baby.pet_evolutions[4], (5000053, 1));
+        assert_eq!((baby.pet_evolve_item, baby.pet_evolve_level), (5380000, 15));
+        assert!(kitty.pet_evolutions.is_empty());
         let food = data.info(2120000).unwrap().unwrap().spec.unwrap();
         assert_eq!(food.inc, 30);
         let drumstick = data.info(5240027).unwrap().unwrap().spec.unwrap();
