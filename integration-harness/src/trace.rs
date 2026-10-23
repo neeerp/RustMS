@@ -266,6 +266,8 @@ pub struct Trace {
     /// ZAKUM_SHRINE: (whether Zakum is out, minutes left) of each line on
     /// when the shrine closes.
     pub shrine_closings: Vec<(bool, i32)>,
+    /// HORNTAIL_CAVE: the same for Horntail's Cave.
+    pub cave_closings: Vec<(bool, i32)>,
     /// CONTI_MOVE: (target, state) of each ship shown leaving or docking.
     pub ship_moves: Vec<(u8, u8)>,
     /// CONTI_STATE: the ship's state, as answered...
@@ -779,6 +781,9 @@ impl Trace {
             self.clocks_stopped += 1;
         } else if op == SendOpcode::ZakumShrine as i16 {
             self.shrine_closings
+                .push((r.read_byte().unwrap() == 1, r.read_int().unwrap()));
+        } else if op == SendOpcode::HorntailCave as i16 {
+            self.cave_closings
                 .push((r.read_byte().unwrap() == 1, r.read_int().unwrap()));
         } else if op == SendOpcode::ContiMove as i16 {
             self.ship_moves
