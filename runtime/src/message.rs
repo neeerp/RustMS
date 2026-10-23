@@ -326,6 +326,11 @@ pub enum ServerMessage {
         room: i32,
         event: crate::actor::field_shops::ShopEvent,
     },
+    /// News from `owner`'s hired merchant on this player's field.
+    HiredMerchant {
+        owner: i32,
+        event: crate::actor::field_merchants::MerchantEvent,
+    },
     /// The player's party went into an event; this is their ticket.
     EventStarted(crate::actor::event::EventTicket),
     /// Event `id` ended; out of its maps.
@@ -560,6 +565,12 @@ pub enum FieldMessage {
     PersonalShop {
         from: ClientId,
         request: crate::actor::field_shops::ShopRoomRequest,
+    },
+    /// A player's request of a hired merchant; purchases and closing carry
+    /// oneshots.
+    Merchant {
+        from: ClientId,
+        request: crate::actor::field_merchants::MerchantRequest,
     },
     /// Where everyone on the map stands, as of their last move.
     Positions {

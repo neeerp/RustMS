@@ -1573,6 +1573,12 @@ impl ClientActor {
             } => self.ship_warp(from_map, map_id, portal).await?,
             ServerMessage::Trade { room, event } => self.trade_event(room, event).await?,
             ServerMessage::PersonalShop { room, event } => self.shop_event(room, event).await?,
+            ServerMessage::HiredMerchant { event, .. } => {
+                if let crate::actor::field_merchants::MerchantEvent::Left(Some(mut packet)) = event
+                {
+                    self.send(&mut packet).await?;
+                }
+            }
             ServerMessage::SendPacket(mut packet) => self.send(&mut packet).await?,
             ServerMessage::QuestDrop {
                 quest,

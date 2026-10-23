@@ -1,5 +1,6 @@
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_kites::KiteSet;
+use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{
     split_exp, BossBar, Cast, CastArea, Catch, Kill, LiveMob, MobSet, Sharer,
@@ -9,7 +10,9 @@ use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
 use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::actor::registry::MAP_NPC_OBJECT_ID_BASE;
+use crate::db::spawn_db;
 use crate::message::{ClientHandle, FieldKey, FieldMessage, ServerMessage};
+use game::hired_merchant::HiredMerchant;
 use game::mob_skill::{self, MobSkillEffect};
 use game::{wedding, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
@@ -57,10 +60,18 @@ use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest};
 use packet::Packet;
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio::time::{interval, Instant, MissedTickBehavior};
 use tracing::{debug, info, warn};
+
+/// Hired merchants read from the database for the field.
+enum Loaded {
+    /// The merchants open here, as the field starts.
+    All(Vec<HiredMerchant>),
+    /// One merchant read again.
+    One(i32, Option<HiredMerchant>),
+}
 
 struct Occupant {
     handle: ClientHandle,
@@ -110,6 +121,13 @@ const MOON_WEATHER_TIME: Duration = Duration::from_secs(7);
 /// How long after a friendly mob in an event's copy goes the party is
 /// sent off (Cosmic's `bunnyDefeated`, 5 s), shortened like events' time.
 const FRIENDLY_LOST_AFTER: Duration = Duration::from_secs(5);
+
+/// How long to wait before reading or writing hired merchants again after
+/// the database failed.
+const MERCHANT_RETRY: Duration = Duration::from_secs(5);
+/// How often an expired merchant's closing is tried before giving up; the
+/// next start of the field closes it then.
+const EXPIRE_TRIES: u32 = 12;
 
 /// The Moon Bunny's guards are told it is being hurt on every sixth hit
 /// (Cosmic's script means to, but a bug there keeps the line from showing;
@@ -165,6 +183,12 @@ pub struct FieldActor {
     doors: HashMap<ClientId, (i16, i16)>,
     trades: Trades,
     shops: Shops,
+    merchants: Merchants,
+    /// Merchants read from the database come back here; the sender is the
+    /// field's own, so that a copy of a map still stops when its last
+    /// outside sender goes.
+    loaded_tx: mpsc::UnboundedSender<Loaded>,
+    loaded_rx: mpsc::UnboundedReceiver<Loaded>,
     /// On a ship route's maps, the route time trips were last checked at.
     trips: Option<i64>,
     /// The weather item blowing here, its message, and when it stops.
@@ -217,6 +241,7 @@ impl FieldActor {
         if let Some((name, state)) = conti::car_state(key.map_id, route_time) {
             reactors.set_state(name, state);
         }
+        let (loaded_tx, loaded_rx) = mpsc::unbounded_channel();
         let mut field = Self {
             key,
             rx,
@@ -233,6 +258,9 @@ impl FieldActor {
             doors: HashMap::new(),
             trades: Trades::default(),
             shops: Shops::default(),
+            merchants: Merchants::default(),
+            loaded_tx,
+            loaded_rx,
             trips: conti::has_trips(key.map_id).then_some(route_time),
             weather: None,
             bunny_hits: 0,
@@ -259,6 +287,7 @@ impl FieldActor {
         info!(field = ?self.key, "FieldActor started");
         let mut ticker = interval(self.tick);
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        self.load_merchants();
 
         loop {
             tokio::select! {
@@ -266,6 +295,7 @@ impl FieldActor {
                     Some(FieldMessage::Close) | None => break,
                     Some(message) => self.handle_message(message),
                 },
+                Some(loaded) = self.loaded_rx.recv() => self.merchants_loaded(loaded),
                 now = ticker.tick() => self.on_tick(now),
             }
         }
@@ -275,6 +305,7 @@ impl FieldActor {
     /// out of dead ones, and mob and reactor respawns.
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
+        self.tick_merchants(now);
         self.friendly_drops(now);
         if self.lost_at.is_some_and(|at| at <= now) {
             self.lost_at = None;
@@ -507,11 +538,13 @@ impl FieldActor {
                 let _ = reply.send(positions);
             }
             FieldMessage::ShopSearch { item_id, reply } => {
-                let _ = reply.send(self.shops.search(
-                    item_id,
-                    self.key.map_id,
-                    self.key.channel_id,
-                ));
+                let (map_id, channel_id) = (self.key.map_id, self.key.channel_id);
+                let mut hits = self.shops.search(item_id, map_id, channel_id);
+                hits.extend(self.merchants.search(item_id, map_id, channel_id));
+                let _ = reply.send(hits);
+            }
+            FieldMessage::ShopGo { room, name, reply } if self.merchants.contains(room) => {
+                let _ = reply.send(self.merchants.go_result(room, &name));
             }
             FieldMessage::ShopGo { room, name, reply } => {
                 let _ = reply.send(self.shops.go_result(room, &name));
@@ -801,6 +834,7 @@ impl FieldActor {
             }
             FieldMessage::Trade { from, request } => self.handle_trade(from, request),
             FieldMessage::PersonalShop { from, request } => self.handle_shop(from, request),
+            FieldMessage::Merchant { from, request } => self.handle_merchant(from, request),
         }
     }
 
@@ -811,25 +845,27 @@ impl FieldActor {
             return;
         };
         let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
+        let in_shop = self.shops.is_member(from);
+        let in_trade = self.trades.is_member(from);
+        let busy = in_shop || self.merchants.is_member(from);
         let out = match request {
-            RoomRequest::Create { room } => {
-                self.trades
-                    .create(room, from, name, look, self.shops.is_member(from))
-            }
+            RoomRequest::Create { room } => self.trades.create(room, from, name, look, busy),
             RoomRequest::Invite { target } => {
                 let target_name = self.occupants.get(&target).map(|o| o.avatar.name.as_str());
                 self.trades.invite(from, target, target_name)
             }
             RoomRequest::Decline { room, reason } => self.trades.decline(from, room, reason, name),
-            // Shops and trading rooms share the visit.
+            // Merchants, shops and trading rooms share the visit.
+            RoomRequest::Visit { room } if self.merchants.contains(room) => {
+                let now = (Instant::now(), SystemTime::now());
+                let (id, busy) = (occupant.avatar.id, in_shop || in_trade);
+                self.merchants.visit(from, id, room, name, look, busy, now)
+            }
             RoomRequest::Visit { room } if self.shops.contains(room) => {
-                self.shops
-                    .visit(from, room, name, look, self.trades.is_member(from))
+                let busy = in_trade || self.merchants.is_member(from);
+                self.shops.visit(from, room, name, look, busy)
             }
-            RoomRequest::Visit { room } => {
-                self.trades
-                    .visit(from, room, name, look, self.shops.is_member(from))
-            }
+            RoomRequest::Visit { room } => self.trades.visit(from, room, name, look, busy),
             RoomRequest::Chat { text } => self.trades.chat(from, &text),
             RoomRequest::PutItem { slot, item } => self.trades.put_item(from, slot, item),
             RoomRequest::Meso { total } => self.trades.meso(from, total),
@@ -839,6 +875,7 @@ impl FieldActor {
         };
         self.deliver_trade(out);
         self.show_balloons();
+        self.show_merchants();
     }
 
     /// A personal shop request from an occupant; anyone else's is dropped,
@@ -851,7 +888,7 @@ impl FieldActor {
         let shops = &mut self.shops;
         let out = match request {
             ShopRoomRequest::Create { room, title, skin } => {
-                let busy = self.trades.is_member(from);
+                let busy = self.trades.is_member(from) || self.merchants.is_member(from);
                 shops.create(room, from, name, look, title, skin, busy)
             }
             ShopRoomRequest::Listings(listings) => shops.listings(from, listings),
@@ -909,6 +946,153 @@ impl FieldActor {
                 occupant.handle.send(message);
             }
         }
+    }
+
+    /// A hired merchant request from an occupant; anyone else's is dropped,
+    /// with any oneshot it carries, but for a buyer's settling, which may
+    /// come after they left.
+    fn handle_merchant(&mut self, from: ClientId, request: MerchantRequest) {
+        let now = Instant::now();
+        let wall = SystemTime::now();
+        if let MerchantRequest::Settle { owner, id, sale } = request {
+            let out = self.merchants.settle(owner, id, sale, wall);
+            self.deliver_trade(out);
+            self.show_merchants();
+            return;
+        }
+        if !self.occupants.contains_key(&from) {
+            return;
+        }
+        let merchants = &mut self.merchants;
+        let out = match request {
+            MerchantRequest::Place {
+                merchant,
+                blacklist,
+            } => {
+                merchants.place(*merchant, blacklist);
+                Outbox::new()
+            }
+            MerchantRequest::Chat { text } => merchants.chat(from, &text),
+            MerchantRequest::Buy {
+                index,
+                bundles,
+                reply,
+            } => merchants.buy(from, index, bundles, reply, now),
+            MerchantRequest::Settle { .. } => unreachable!("settled above"),
+            MerchantRequest::Restock { stock, meso } => {
+                merchants.restock(from, stock, meso);
+                Outbox::new()
+            }
+            MerchantRequest::Visitors => merchants.visitors(from),
+            MerchantRequest::Blacklist => merchants.blacklist(from),
+            MerchantRequest::BlacklistAdd(name) => {
+                merchants.blacklist_add(from, name);
+                Outbox::new()
+            }
+            MerchantRequest::BlacklistRemove(name) => {
+                merchants.blacklist_remove(from, &name);
+                Outbox::new()
+            }
+            MerchantRequest::Reopen | MerchantRequest::Leave => merchants.leave(from, now),
+            MerchantRequest::Close { reply } => merchants.close(from, reply),
+        };
+        self.deliver_trade(out);
+        self.show_merchants();
+    }
+
+    /// Show everyone the merchants that came, changed or went, and read
+    /// again those that may be out of date.
+    fn show_merchants(&mut self) {
+        for owner in self.merchants.take_rereads() {
+            self.reload_merchant(owner);
+        }
+        for shown in self.merchants.take_shown() {
+            match self.merchants.show(shown) {
+                Some(Ok(packet)) => self.broadcast(None, packet),
+                Some(Err(error)) => warn!(?shown, %error, "Failed to build a merchant packet"),
+                None => {}
+            }
+        }
+    }
+
+    /// Read the merchants open here, on a map that has them.
+    fn load_merchants(&self) {
+        if self.key.instance_id != 0 || !net::personal_shop::allowed_on(self.key.map_id) {
+            return;
+        }
+        let (channel_id, map_id) = (self.key.channel_id, self.key.map_id);
+        let loaded = self.loaded_tx.clone();
+        tokio::spawn(async move {
+            // Until the field closes.
+            while !loaded.is_closed() {
+                match spawn_db(move || db::merchant::load_map(channel_id, map_id)).await {
+                    Ok(merchants) => {
+                        let _ = loaded.send(Loaded::All(merchants));
+                        return;
+                    }
+                    Err(error) => warn!(channel_id, map_id, %error, "Failed to load merchants"),
+                }
+                tokio::time::sleep(MERCHANT_RETRY).await;
+            }
+        });
+    }
+
+    /// Read `owner`'s merchant again; the merchant sells nothing until
+    /// this is back.
+    fn reload_merchant(&self, owner: i32) {
+        let loaded = self.loaded_tx.clone();
+        tokio::spawn(async move {
+            while !loaded.is_closed() {
+                match spawn_db(move || db::merchant::load(owner)).await {
+                    Ok(merchant) => {
+                        let _ = loaded.send(Loaded::One(owner, merchant));
+                        return;
+                    }
+                    Err(error) => warn!(owner, %error, "Failed to reload a merchant"),
+                }
+                tokio::time::sleep(MERCHANT_RETRY).await;
+            }
+        });
+    }
+
+    fn merchants_loaded(&mut self, loaded: Loaded) {
+        match loaded {
+            Loaded::All(merchants) => self.merchants.load(merchants),
+            Loaded::One(owner, merchant) => {
+                let out = self.merchants.reload(owner, merchant, SystemTime::now());
+                self.deliver_trade(out);
+            }
+        }
+        self.show_merchants();
+    }
+
+    /// Close the merchants whose time is up, and stop waiting on purchases
+    /// held too long.
+    fn tick_merchants(&mut self, now: Instant) {
+        let wall = SystemTime::now();
+        for owner in self.merchants.stale(now) {
+            warn!(
+                owner,
+                "Purchases from a merchant held too long; reading it again"
+            );
+        }
+        let (out, due) = self.merchants.expire(wall);
+        self.deliver_trade(out);
+        for owner in due {
+            tokio::spawn(async move {
+                for _ in 0..EXPIRE_TRIES {
+                    match spawn_db(move || db::merchant::expire(owner, wall)).await {
+                        Ok(_) => {
+                            info!(owner, "Hired merchant closed: its time is up");
+                            return;
+                        }
+                        Err(error) => warn!(owner, %error, "Failed to close an expired merchant"),
+                    }
+                    tokio::time::sleep(MERCHANT_RETRY).await;
+                }
+            });
+        }
+        self.show_merchants();
     }
 
     fn spawn_loot(
@@ -2620,6 +2804,9 @@ impl FieldActor {
         let out = self.shops.leave(client_id);
         self.deliver_trade(out);
         self.show_balloons();
+        let out = self.merchants.leave(client_id, Instant::now());
+        self.deliver_trade(out);
+        self.show_merchants();
         // Its summons come back with it.
         for summon in self.summons.remove_owned(client_id, None) {
             self.remove_summon(&summon.view, Gone::Silently);
@@ -2706,6 +2893,15 @@ impl FieldActor {
         for kite in self.kites.views() {
             if let Ok(packet) = build_spawn_kite(kite) {
                 handle.send_packet(packet);
+            }
+        }
+
+        for packet in self.merchants.spawns() {
+            match packet {
+                Ok(packet) => {
+                    handle.send_packet(packet);
+                }
+                Err(error) => warn!(client_id, %error, "Failed to build a merchant spawn"),
             }
         }
 
@@ -2804,6 +3000,9 @@ impl FieldActor {
         let out = self.shops.leave(client_id);
         self.deliver_trade(out);
         self.show_balloons();
+        let out = self.merchants.leave(client_id, Instant::now());
+        self.deliver_trade(out);
+        self.show_merchants();
         // The others drop a player's summons with the player.
         self.summons.remove_owned(client_id, None);
         // Everyone sees the player go before control passes on.
