@@ -412,7 +412,10 @@ mod tests {
         assert!(roll_entries(&shellpiece, &player, &mut rng).is_empty());
         player.quests.upsert(QuestRecord {
             quest_id: 1035,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert_eq!(
             roll_entries(&shellpiece, &player, &mut rng),
@@ -454,7 +457,10 @@ mod tests {
         assert!(!agree(&player));
         player.quests.upsert(QuestRecord {
             quest_id: 1035,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert!(agree(&player));
         player
@@ -474,7 +480,10 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         player.quests.upsert(QuestRecord {
             quest_id: 1034,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         player
             .inventory
@@ -497,7 +506,10 @@ mod tests {
         assert!(roll_entries(&drop, &player, &mut rng).is_empty());
         player.quests.upsert(QuestRecord {
             quest_id: 1034,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert_eq!(
             roll_entries(&drop, &player, &mut rng),

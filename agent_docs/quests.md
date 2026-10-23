@@ -183,8 +183,9 @@ any other key (`infoex`,
 never offered, and actions for it are refused. A prerequisite without a
 `state` means "not started" (mutually exclusive quests).
 
-Meren's Maker lessons in Magatia are the one exception to the info keys
-(`game_data::quests::MEREN_INFO_QUESTS`). "Meren's Lessons" (6029, level
+The info quests (`game::quest::INFO_QUESTS`, below) and Meren's Maker
+lessons in Magatia are the exceptions to the info keys. Meren's are
+`game_data::quests::MEREN_INFO_QUESTS`: "Meren's Lessons" (6029, level
 45) and its three classes (6030 Carson's alchemy, 6031 Hughes's science,
 6032 Meren's practice, each 10,000 mesos to start) share 6029's quest-info
 string, one digit per class (`info`, `infoNumber`, `infoex`). Each class
@@ -215,7 +216,7 @@ The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:
 the build copies that list next to the executable, and the client offers
 only those quests (`Character/QuestCatalog.cpp`). Supporting a new key means
-changing the server's allowlist and regenerating the list. 1396 quests qualify
+changing the server's allowlist and regenerating the list. 1401 quests qualify
 with the current rules, including the beginner ones:
 
 | Quest | Start → Finish | EXP |
@@ -243,6 +244,39 @@ that mob, up to the required count (`net::quests::count_kill`), and sends the
 quest record again with the new string. Counts live in the quest's
 `QuestStatus::Started { kills }` and are saved with the player. Completion
 requires every count.
+
+## Info strings
+
+Some quests keep a string of their own instead of kill counts: `Act/0/info`
+sets it on starting and `Check/1/infoex` says what it must read to complete
+(`QuestTemplate::start_info`, `end_info`). v83's completion check passes
+when any entry matches: cond 0 (or none) is string equality, cond 1 and 2
+compare the numbers at the start of both strings (at least, at most), and
+a quest without a string fails (`game_data::quests::info_met`,
+`QuestRejection::Info`). HeavenClient doesn't check it, so its quest marker
+may call such a quest completable early; the server just refuses.
+
+Only the quests whose strings the server's NPCs can set are supported
+(`game::quest::INFO_QUESTS`), because no other could ever complete. A
+string kept in another quest's record (`infoNumber`) stays unsupported.
+They are `QuestStatus::Started { info: Some(..) }`, stored in
+`character_quests.progress` as is and sent wherever kill counts would be
+(`QuestStatus::record_string`). `Effect::SetQuestChar` changes one
+character if it reads what it should, sending the quest record again;
+otherwise nothing in its script applies.
+
+| Quest | String | Set by |
+| --- | --- | --- |
+| 3926 Screwing the Red Scorpions | "2222" to "3333" | four cupboards in Ariant's houses (2103009-2103012), each taking one Jewel (4031579) |
+| 3929 Sejan's Test | "2222" to "3333" | four houses (2103003-2103006), each taking one parcel of food (4031580) |
+| 3900 Learning the Culture of Ariant | "4" to "5" | the Palace Oasis (2103000) |
+| 3927 Existence of the Secret Organization | "0" to "1" | the secret wall (2103001) |
+| 3311 Clue | "4" to "5" | the wall in the missing alchemist's home (2111011), after a yes |
+
+Cosmic's scripts gave the slots and digits. The houses are silent, as
+there; the walls' and the oasis's words are placeholders (`quest_info.*`).
+Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
+2236 and other quests reading another record.
 
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with
@@ -397,4 +431,6 @@ copied into the source.
   results), and `quest_objectives` (1034's candy errand, Todd's hunt and
   random hat, Sam's snails persisting across relog and capped at ten, Maria's
   letter to Lucas, refusals before requirements are met), and
-  `quest_reward_choice` (Hongbu's shoes, refusing a choice not offered).
+  `quest_reward_choice` (Hongbu's shoes, refusing a choice not offered),
+  and `quest_info` (Sejan's Test through Ariant's four houses, kept across
+  a relogin, and a string one delivery short refused).

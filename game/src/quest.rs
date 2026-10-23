@@ -7,6 +7,13 @@ use std::time::SystemTime;
 /// servers keep job advancement steps.
 pub const SCRIPT_MARKERS: i16 = 32000;
 
+/// Quests whose record is an info string rather than kill counts: their
+/// start sets it (`Act/0/info`), NPCs change one character at a time, and
+/// completion needs it to read a given value (`Check/1/infoex`). Only quests
+/// whose characters the server's scripts can set are listed, as others could
+/// never be completed.
+pub const INFO_QUESTS: &[i16] = &[3311, 3900, 3926, 3927, 3929];
+
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestState {
@@ -28,13 +35,29 @@ impl QuestState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum QuestStatus {
-    /// Kill counts of the quest's required mobs, in `Check/1/mob` order.
+    /// Kill counts of the quest's required mobs, in `Check/1/mob` order,
+    /// or, for `INFO_QUESTS`, the info string (`kills` is then empty).
     Started {
         kills: Vec<u16>,
+        info: Option<String>,
     },
     Completed {
         at: SystemTime,
     },
+}
+
+impl QuestStatus {
+    /// A started quest's record as the client and the database hold it: the
+    /// info string, or the kill counts; `None` once completed.
+    pub fn record_string(&self) -> Option<String> {
+        match self {
+            QuestStatus::Started {
+                info: Some(info), ..
+            } => Some(info.clone()),
+            QuestStatus::Started { kills, .. } => Some(encode_kills(kills)),
+            QuestStatus::Completed { .. } => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -107,7 +130,10 @@ impl QuestLog {
         debug_assert!(marker >= SCRIPT_MARKERS);
         self.upsert(QuestRecord {
             quest_id: marker,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
     }
 
@@ -118,7 +144,7 @@ impl QuestLog {
     /// Kill counts for a started quest's required mobs.
     pub fn kills(&self, quest_id: i16) -> &[u16] {
         match self.status(quest_id) {
-            Some(QuestStatus::Started { kills }) => kills,
+            Some(QuestStatus::Started { kills, .. }) => kills,
             _ => &[],
         }
     }
@@ -126,9 +152,36 @@ impl QuestLog {
     /// The kill counts of a started quest, to count kills into.
     pub fn kills_mut(&mut self, quest_id: i16) -> Option<&mut Vec<u16>> {
         match &mut self.records.get_mut(&quest_id)?.status {
-            QuestStatus::Started { kills } => Some(kills),
+            QuestStatus::Started { kills, .. } => Some(kills),
             QuestStatus::Completed { .. } => None,
         }
+    }
+
+    /// A started info quest's string (`INFO_QUESTS`).
+    pub fn info(&self, quest_id: i16) -> Option<&str> {
+        match self.status(quest_id) {
+            Some(QuestStatus::Started { info, .. }) => info.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Set character `slot` of a started quest's info string to `to` if it
+    /// is `from`; `false`, changing nothing, otherwise.
+    pub fn set_info_char(&mut self, quest_id: i16, slot: usize, from: u8, to: u8) -> bool {
+        let Some(QuestRecord {
+            status: QuestStatus::Started {
+                info: Some(info), ..
+            },
+            ..
+        }) = self.records.get_mut(&quest_id)
+        else {
+            return false;
+        };
+        if info.as_bytes().get(slot) != Some(&from) || !from.is_ascii() || !to.is_ascii() {
+            return false;
+        }
+        info.replace_range(slot..=slot, &char::from(to).to_string());
+        true
     }
 
     /// A started or completed quest's status; `None` if not started.
@@ -190,7 +243,10 @@ mod tests {
         assert_eq!(log.state(1031), QuestState::NotStarted);
         log.upsert(QuestRecord {
             quest_id: 1031,
-            status: QuestStatus::Started { kills: Vec::new() },
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
         });
         assert_eq!(log.state(1031), QuestState::Started);
         let at = SystemTime::UNIX_EPOCH;
@@ -211,7 +267,10 @@ mod tests {
         let mut log = QuestLog::default();
         log.upsert(QuestRecord {
             quest_id: 1037,
-            status: QuestStatus::Started { kills: vec![0] },
+            status: QuestStatus::Started {
+                kills: vec![0],
+                info: None,
+            },
         });
         log.kills_mut(1037).unwrap()[0] = 4;
         assert_eq!(encode_kills(log.kills(1037)), "004");
@@ -223,6 +282,30 @@ mod tests {
         });
         assert_eq!(log.kills(1037), []);
         assert_eq!(log.kills_mut(1037), None);
+    }
+
+    #[test]
+    fn info_strings_change_one_character_at_a_time() {
+        let mut log = QuestLog::default();
+        log.upsert(QuestRecord {
+            quest_id: 3926,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some("2222".into()),
+            },
+        });
+        assert!(log.set_info_char(3926, 1, b'2', b'3'));
+        assert!(!log.set_info_char(3926, 1, b'2', b'3'));
+        assert!(!log.set_info_char(3926, 4, b'2', b'3'));
+        assert!(!log.set_info_char(3927, 0, b'2', b'3'));
+        assert_eq!(log.info(3926), Some("2322"));
+        let status = log.status(3926).unwrap();
+        assert_eq!(status.record_string().as_deref(), Some("2322"));
+        let kills = QuestStatus::Started {
+            kills: vec![3, 12],
+            info: None,
+        };
+        assert_eq!(kills.record_string().as_deref(), Some("003012"));
     }
 
     #[test]

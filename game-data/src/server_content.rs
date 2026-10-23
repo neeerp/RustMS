@@ -1387,6 +1387,10 @@ pub mod keys {
     pub const MAKER_MOS_PIRATE_STIMULATED: &str = "maker.mos.pirate_stimulated";
     pub const MAKER_MOS_DAGGER: &str = "maker.mos.dagger";
     pub const MAKER_MOS_LOST: &str = "maker.mos.lost";
+    pub const QUEST_INFO_OASIS: &str = "quest_info.oasis";
+    pub const QUEST_INFO_SECRET_WALL: &str = "quest_info.secret_wall";
+    pub const QUEST_INFO_WALL_ASK: &str = "quest_info.wall_ask";
+    pub const QUEST_INFO_WALL_READ: &str = "quest_info.wall_read";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2296,6 +2300,10 @@ mod tests {
                 keys::MAKER_MOS_PIRATE_STIMULATED,
                 keys::MAKER_MOS_DAGGER,
                 keys::MAKER_MOS_LOST,
+                keys::QUEST_INFO_OASIS,
+                keys::QUEST_INFO_SECRET_WALL,
+                keys::QUEST_INFO_WALL_ASK,
+                keys::QUEST_INFO_WALL_READ,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");

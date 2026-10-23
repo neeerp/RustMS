@@ -4,8 +4,7 @@ use crate::{
     schema::{character_quests, characters},
 };
 use diesel::prelude::*;
-use game::quest::encode_kills;
-use game::{Player, QuestState};
+use game::{Player, QuestState, QuestStatus};
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, Queryable, Identifiable)]
@@ -15,7 +14,8 @@ pub struct QuestProgress {
     pub quest_id: i16,
     pub status: i16,
     pub completed_at: Option<SystemTime>,
-    /// Mob kill counts, three digits per required mob (v83 format).
+    /// Mob kill counts, three digits per required mob (v83 format), or the
+    /// info string of a quest in `game::quest::INFO_QUESTS`.
     pub progress: String,
 }
 
@@ -71,7 +71,9 @@ pub fn start(
             Some(2) if repeatable => {}
             Some(_) => return Err(rejected()),
         }
-        let progress = encode_kills(player.quests.kills(qid));
+        let progress = (player.quests.status(qid))
+            .and_then(QuestStatus::record_string)
+            .unwrap_or_default();
         let progress = diesel::insert_into(character_quests::table)
             .values((
                 character_quests::character_id.eq(cid),

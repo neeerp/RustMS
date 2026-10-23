@@ -1032,3 +1032,7 @@
 "maker.mos.pirate_stimulated" = "[placeholder] A pirate's weapon, with a stimulator"
 "maker.mos.dagger" = "[placeholder] You're going among the Cornians to save Moira? Bring me what I need and I'll make you a dagger just like theirs."
 "maker.mos.lost" = "[placeholder] The dragon's power was too much for the weapon, and it is lost. I'm sorry."
+"quest_info.oasis" = "[placeholder] (You drink from the oasis. The water is cool and clear.)"
+"quest_info.secret_wall" = "[placeholder] (Words are scratched into the wall, naming weapons. A message, perhaps?)"
+"quest_info.wall_ask" = "[placeholder] (Behind the cobwebs, something is written on the wall. Look closer?)"
+"quest_info.wall_read" = "[placeholder] (Among the scribbles, one line stands out: something about a pendant.)"
