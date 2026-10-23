@@ -99,7 +99,7 @@ namespace ms
 		return true;
 	}
 
-	void ItemTooltip::set_commodity(int32_t iid, int32_t period)
+	void ItemTooltip::set_commodity(int32_t iid, int32_t period, const std::string &descstr)
 	{
 		itemid = iid;
 		expiration = 0;
@@ -111,7 +111,7 @@ namespace ms
 
 		bool pet = itemid / 10000 == 500;
 		build(pet ? item_expiry::commodity_pet_line(ItemData::get(itemid).get_pet_life())
-				  : item_expiry::commodity_line(itemid, period), "");
+				  : item_expiry::commodity_line(itemid, period), "", descstr);
 	}
 
 	void ItemTooltip::set_cash_item(int32_t iid, int64_t expire, const std::string &gift_from)
@@ -128,7 +128,7 @@ namespace ms
 		build(pet ? "" : item_expiry::line(expiration, true, false), gift_from.empty() ? "" : "A GIFT FROM '" + gift_from + "'");
 	}
 
-	void ItemTooltip::build(const std::string &expirystr, const std::string &giftstr)
+	void ItemTooltip::build(const std::string &expirystr, const std::string &giftstr, const std::string &own_desc)
 	{
 		const ItemData &idata = ItemData::get(itemid);
 
@@ -142,7 +142,7 @@ namespace ms
 		marriage_height = marriage::is_token(itemid) ? TOKEN_HEIGHT : 0;
 
 		// One the player has, and could trade with Scissors of Karma, says so.
-		std::string descstr = idata.get_desc();
+		std::string descstr = own_desc.empty() ? idata.get_desc() : own_desc;
 
 		if (owned && info.trade_available && !(flags & item_properties::BUNDLE_KARMA))
 			descstr = item_properties::with_karma_hint(descstr);

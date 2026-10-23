@@ -39,7 +39,9 @@ impl WorldHandler for EnterCashShopHandler {
 /// bag and the slot the client chose; putting one back (0x0E) sends its cash
 /// serial and bag. Expanding a bag (0x06) or the storage (0x07) sends a byte,
 /// the balance, and either 0 and (for a bag) the bag, from the slot buttons,
-/// or 1 and an expansion commodity's serial number. Name Change (0x2E),
+/// or 1 and an expansion commodity's serial number. The Extra Character Slot
+/// Coupon (0x08) sends a byte, the balance and its serial number, as a
+/// purchase does. Name Change (0x2E),
 /// after its own checks (op 0x10, op 0x15), sends the serial number, the
 /// old name and the new.
 pub struct CashShopOperationHandler;
@@ -51,6 +53,7 @@ const TAKE_OUT: u8 = 0x0D;
 const PUT_BACK: u8 = 0x0E;
 const EXPAND_BAG: u8 = 0x06;
 const EXPAND_STORAGE: u8 = 0x07;
+const BUY_CHARACTER_SLOT: u8 = 0x08;
 const BUY_PACKAGE: u8 = 0x1E;
 const BUY_CRUSH_RING: u8 = 0x1D;
 const BUY_FRIENDSHIP_RING: u8 = 0x23;
@@ -167,6 +170,26 @@ impl WorldHandler for CashShopOperationHandler {
                     commodity: commodity.clone(),
                     to,
                     message,
+                }
+            }
+            BUY_CHARACTER_SLOT => {
+                reader.read_byte()?;
+                let cash_type = cash_shop::cash_type(reader.read_int()?);
+                let commodity = cash_shop::check_purchase(
+                    cash_shop::commodity(reader.read_int()?),
+                    ctx.player.stats.gender.into(),
+                );
+                match (cash_type, commodity) {
+                    (Some(cash_type), Ok(commodity))
+                        if commodity.item_id == cash_shop::CHARACTER_SLOT =>
+                    {
+                        CashShopRequest::BuyCharacterSlot {
+                            cash_type,
+                            commodity: commodity.clone(),
+                        }
+                    }
+                    (_, Err(failure)) => return fail(failure),
+                    _ => return fail(CashShopFailure::Unknown),
                 }
             }
             BUY_NAME_CHANGE => {
@@ -463,6 +486,38 @@ mod tests {
                 matches!(request(level, name).as_slice(), [WorldAction::Reply(_)]),
                 "{level} {name}"
             );
+        }
+    }
+
+    #[test]
+    fn a_character_slot_is_bought_only_with_its_own_request() {
+        if cash_shop::commodity(cash_shop::commodity_sn(cash_shop::CHARACTER_SLOT, 1)).is_none() {
+            return;
+        }
+        let sn = cash_shop::commodity_sn(cash_shop::CHARACTER_SLOT, 1);
+        let request = |action: u8, sn: i32| {
+            handle(|p| {
+                p.write_byte(action).unwrap();
+                p.write_byte(0).unwrap();
+                p.write_int(1).unwrap();
+                p.write_int(sn).unwrap();
+            })
+            .actions
+        };
+        assert!(matches!(
+            request(BUY_CHARACTER_SLOT, sn).as_slice(),
+            [WorldAction::CashShop(CashShopRequest::BuyCharacterSlot {
+                cash_type: CashType::Credit,
+                commodity,
+            })] if commodity.sn == sn
+        ));
+        // Not as an ordinary purchase, and no other commodity through 0x08.
+        for (action, sn) in [(BUY, sn), (BUY_CHARACTER_SLOT, 50200005)] {
+            let actions = request(action, sn);
+            let [WorldAction::Reply(reply)] = actions.as_slice() else {
+                panic!("expected a failure reply: {actions:?}");
+            };
+            assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
         }
     }
 

@@ -168,6 +168,16 @@ wrong bag, the reply is 0x00. A bag's slots are saved with the character
 are saved on the account (`accounts.storage_slots`, sent in 0x4B) and answer
 0x62. There is no storage window yet.
 
+The Extra Character Slot Coupon (5430000, commodity 50200083, 6,900 NX) is
+not an item: it adds a character slot to the account at once (report c085).
+Only its own request sells it, op 0x08 (a byte, the cash type, the SN); BUY and
+gifts refuse it. `db::cash_shop::buy_character_slot` raises
+`accounts.character_slots` and pays in one transaction, up to 15 slots; at 15
+the reply is 0x00 and nothing is paid. Success answers 0x64 (the new count),
+then the balance, which unlocks the shop. 0x4B ends with the count, and the
+login server's character list shows it. The Maple Life items (5431000 and
+5432000) are still sold out.
+
 Each sale and gift adds one to its SN in `cash_sales`. The shop's Best Items
 are the five best-selling SNs a character of each gender may buy
 (`net::cash_shop::best_items`), the same five on every tab.

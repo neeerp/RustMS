@@ -42,15 +42,15 @@ namespace ms
 		bool set_item(int32_t itemid, int64_t expiration = 0, int16_t flags = 0, bool owned = false,
 					  int32_t remain_life = 0, const std::string &owner = {});
 		// A Cash Shop commodity lasting `period` days, 0 for ever, as Item.nx makes it: the period for a date, and
-		// a pet's whole life (FUN_004baf1a).
-		void set_commodity(int32_t itemid, int32_t period);
+		// a pet's whole life (FUN_004baf1a). A `desc` replaces Item.nx's description.
+		void set_commodity(int32_t itemid, int32_t period, const std::string &desc = {});
 		// An item in the Cash Inventory, as Item.nx makes it, with its date and who sent it (FUN_004b0764). A pet
 		// has no line for its life.
 		void set_cash_item(int32_t itemid, int64_t expiration, const std::string &gift_from);
 
 	private:
-		// Lays the tooltip out for `itemid` with these lines under the name.
-		void build(const std::string &expiry, const std::string &gift);
+		// Lays the tooltip out for `itemid` with these lines under the name, and `desc` if not Item.nx's.
+		void build(const std::string &expiry, const std::string &gift, const std::string &desc = {});
 
 		int32_t itemid;
 		int64_t expiration;

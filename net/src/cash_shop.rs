@@ -24,6 +24,9 @@ pub fn commodity(sn: i32) -> Option<&'static Commodity> {
 pub const MAX_BAG_SLOTS: u8 = 96;
 /// The most slots an account's storage can have.
 pub const MAX_STORAGE_SLOTS: i16 = 48;
+/// The most character slots an account can have: v83's shop refuses a
+/// sixteenth (0x1ed) and its character list holds 15.
+pub const MAX_CHARACTER_SLOTS: i16 = 15;
 /// What the slot buttons charge, and how many slots they add.
 pub const EXPANSION_PRICE: i32 = 4_000;
 pub const EXPANSION_SLOTS: u8 = 4;
@@ -89,6 +92,11 @@ pub enum CashShopRequest {
     /// Whether the name typed in the Name Change dialog is free (op 0x15 in
     /// the shop): CS 0x148.
     CheckNewName(String),
+    /// Pay for the Extra Character Slot Coupon `commodity` and add a slot.
+    BuyCharacterSlot {
+        cash_type: CashType,
+        commodity: Commodity,
+    },
     /// Pay for Name Change `commodity` from the NX Prepaid and ask for
     /// `new_name`, already checked against the name rules.
     RequestNameChange {
@@ -119,10 +127,14 @@ pub fn pair_ring(item_id: i32) -> bool {
 /// Name Change, whose receipt is a request for a new name (report c060).
 pub const NAME_CHANGE: i32 = 5_400_000;
 
-/// Whether `item_id` is bought only with its own request: the pair rings
-/// and Name Change. Neither can be a gift.
+/// The Extra Character Slot Coupon: buying it adds a character slot to the
+/// account at once (report c085).
+pub const CHARACTER_SLOT: i32 = 5_430_000;
+
+/// Whether `item_id` is bought only with its own request: the pair rings,
+/// Name Change and the Extra Character Slot Coupon. None can be a gift.
 pub fn own_request(item_id: i32) -> bool {
-    pair_ring(item_id) || item_id == NAME_CHANGE
+    pair_ring(item_id) || [NAME_CHANGE, CHARACTER_SLOT].contains(&item_id)
 }
 
 /// The lowest level that may ask for a new name (the rules sheet, Text02).
@@ -156,13 +168,15 @@ pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopF
 /// The classes (`item_id / 10_000`) of cash items on sale that do nothing
 /// here yet: hired merchants (503) and their Store Remote Controller (547),
 /// the Rock of Evolution (538), Character Transfer (540, all but Name
-/// Change), Maple Life (543), and Remote Gachapon (545, all but Miu Miu).
+/// Change), Maple Life (543, all but the Extra Character Slot Coupon), and
+/// Remote Gachapon (545, all but Miu Miu).
 /// The shop calls them sold out rather than take NX for nothing (report
 /// c046). Take a class out once its items work.
 const INERT_CLASSES: [i32; 6] = [503, 538, 540, 543, 545, 547];
 
 fn inert(item_id: i32) -> bool {
-    ![NAME_CHANGE, MIU_MIU].contains(&item_id) && INERT_CLASSES.contains(&(item_id / 10_000))
+    ![NAME_CHANGE, MIU_MIU, CHARACTER_SLOT].contains(&item_id)
+        && INERT_CLASSES.contains(&(item_id / 10_000))
 }
 
 /// Whether `commodity` is for sale as an item or a package. The other
@@ -410,6 +424,13 @@ mod tests {
         };
         assert!(check_purchase(Some(&name_change), 0).is_ok());
         assert!(own_request(NAME_CHANGE) && !own_request(5401000));
+        // The coupon is sold, with its own request; Maple Life is not.
+        let coupon = Commodity {
+            item_id: CHARACTER_SLOT,
+            ..ticket()
+        };
+        assert!(check_purchase(Some(&coupon), 1).is_ok());
+        assert!(own_request(CHARACTER_SLOT) && !own_request(5431000));
         if commodities().is_err() {
             return;
         }

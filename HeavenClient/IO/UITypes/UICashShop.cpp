@@ -115,7 +115,7 @@ namespace ms
 		}
 	}
 
-	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), name_change_sn(0), storage_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
+	UICashShop::UICashShop() : tab(EVENT_TAB), subtab(0), page(0), preview_index(0), female(false), credit(0), points(0), prepaid(0), pending(false), wish_added(false), name_change_sn(0), storage_slots(0), character_slots(0), cash_row(0), item_tab(InventoryType::Id::EQUIP), item_row(0)
 	{
 		nl::node CashShop = NxFiles::ui_classic["CashShop.img"];
 		nl::node Base = CashShop["Base"];
@@ -667,6 +667,14 @@ namespace ms
 					tooltip = &packagetooltip;
 					tooltip_pos = cursorpos + PACKAGE_TOOLTIP;
 				}
+				else if (is_character_slot(item_id))
+				{
+					// StringPool 0x245 (FUN_008f19a8).
+					ittooltip.set_commodity(item_id, commodity.period, "Add a character slot (Current : " +
+						std::to_string(character_slots) + " slots)\\nYou may have up to " +
+						std::to_string(MAX_CHARACTER_SLOTS) + " slots.");
+					tooltip = &ittooltip;
+				}
 				else
 				{
 					ittooltip.set_commodity(item_id, commodity.period);
@@ -965,6 +973,18 @@ namespace ms
 	int16_t UICashShop::get_storage_slots() const
 	{
 		return storage_slots;
+	}
+
+	void UICashShop::set_character_slots(int16_t slots)
+	{
+		character_slots = slots;
+		// The coupon's tooltip shows the count.
+		clear_tooltip();
+	}
+
+	int16_t UICashShop::get_character_slots() const
+	{
+		return character_slots;
 	}
 
 	void UICashShop::refresh_slots()

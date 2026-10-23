@@ -282,6 +282,21 @@ namespace ms
 		constexpr int32_t MAX_BAG_SLOTS = 96;
 		constexpr int32_t MAX_STORAGE_SLOTS = 48;
 
+		// The Extra Character Slot Coupon (5430xxx) adds a slot to the
+		// account at once, up to 15 (v83 46c6f8 and 8f1b3d).
+		constexpr int16_t MAX_CHARACTER_SLOTS = 15;
+
+		inline bool is_character_slot(int32_t item_id)
+		{
+			return item_id / 1000 == 5430;
+		}
+
+		// v83 47ac0a takes a new count only above the last and at most 15.
+		inline bool added_character_slot(int16_t before, int16_t after)
+		{
+			return after > before && after <= MAX_CHARACTER_SLOTS;
+		}
+
 		// The slots a coming job advancement adds to a bag (1 Equip to 4
 		// Etc) that adding `added` now would leave no room for, or 0 (v83
 		// 46c38f). v83 asks before such a purchase.

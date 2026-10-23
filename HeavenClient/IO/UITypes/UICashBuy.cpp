@@ -77,6 +77,8 @@ namespace ms
 		constexpr const char* NOT_ENOUGH_CASH = "You don't have enough cash.";
 		constexpr const char* BAG_FULL = "The requested number of slots\\ncan't be added.";
 		constexpr const char* STORAGE_FULL = "The storage slots can't be extended.";
+		// StringPool 0x1ed.
+		constexpr const char* NO_MORE_CHARACTERS = "You may not add any more character slots.";
 
 		// StringPool 0x1f9.
 		constexpr const char* NO_RIDING = "This is an item that cannot be used\\nif you do not have the Monster\\nRiding skill. Would you\\nstill like to purchase it?";
@@ -100,6 +102,13 @@ namespace ms
 			auto cashshop = UI::get().get_element<UICashShop>();
 
 			return cashshop ? cashshop->get_storage_slots() : 0;
+		}
+
+		int16_t character_slots()
+		{
+			auto cashshop = UI::get().get_element<UICashShop>();
+
+			return cashshop ? cashshop->get_character_slots() : 0;
 		}
 
 		// Whether the bag or the storage an expansion widens has room for it.
@@ -131,6 +140,18 @@ namespace ms
 			UI::get().emplace<UINameChangeBirthday>(commodity.sn, commodity.price, prepaid);
 
 			return;
+		}
+
+		// v83 46c6f8: a character slot, while the account has fewer than 15.
+		if (is_character_slot(commodity.item_id))
+		{
+			if (!affordable(commodity.price, credit, points, prepaid))
+				return notice(NOT_ENOUGH_CASH);
+
+			if (character_slots() >= MAX_CHARACTER_SLOTS)
+				return notice(NO_MORE_CHARACTERS);
+
+			return buy();
 		}
 
 		// v83 4731a9: a crush or friendship ring is bought for two.
@@ -214,6 +235,15 @@ namespace ms
 		name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, ItemData::get(item_id).get_name(), 200);
 		price = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, price_text);
 		question = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "Are you sure you want to buy this item?");
+
+		// StringPool 0x1e9 asks for a character slot instead.
+		if (is_character_slot(item_id))
+		{
+			name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "Add a character slot (" + std::to_string(commodity.price) +
+				" NX)\\nAre you sure you want to add another\\ncharacter slot?", 200);
+			price = Text();
+			question = Text();
+		}
 	}
 
 	void UICashBuy::draw(float inter) const
@@ -302,6 +332,8 @@ namespace ms
 				BuyCoupleRingPacket(ring->friendship, ring->birthday, cash_type, sn, ring->to, ring->message).dispatch();
 			else if (is_package(item_id))
 				BuyCashPackagePacket(cash_type, sn).dispatch();
+			else if (is_character_slot(item_id))
+				BuyCharacterSlotPacket(cash_type, sn).dispatch();
 			else if (is_expansion(item_id) && sn == 0)
 				ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();
 			else if (is_expansion(item_id))

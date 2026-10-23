@@ -773,7 +773,8 @@ the screen size.
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
   Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
   0x57 (a bought item), 0x59 (a redeemed coupon), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
-  new slot count), 0x62 (the storage's), 0x68 (an item taken out), 0x6A (an
+  new slot count), 0x62 (the storage's), 0x64 (the account's character
+  slots), 0x68 (an item taken out), 0x6A (an
   item put back) and 0x89 (a bought package) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
@@ -781,7 +782,8 @@ the screen size.
   that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
   Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
-  0x06/0x07 mode 1 for an expansion commodity (911x000). As in v83, each
+  0x06/0x07 mode 1 for an expansion commodity (911x000), or 0x08 for the
+  Extra Character Slot Coupon (5430xxx). As in v83, each
   mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
   a zero (no free trial). The result is a "successful purchase" or a failure
   notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
@@ -804,6 +806,15 @@ the screen size.
   slots for a beginner, and four of the job's bags for a first or second job.
   v83's slot buttons show a text-only dialog where HC shows the item, and
   HC has no character-slot button.
+- **Character slots:** the count comes from 0x4B and 0x64. As in v83
+  (`FUN_0046c6f8`), the coupon says "You don't have enough cash." without a
+  balance that covers it, then "You may not add any more character slots." at
+  15; otherwise the dialog asks "Add a character slot (6900 NX) Are you sure
+  you want to add another character slot?" in place of the item's name. 0x64
+  says "You have added a new character slot." and is ignored unless the count
+  grew and is at most 15 (v83 `0x47ac0a` drops it as a bad packet). The
+  coupon's tooltip says "Add a character slot (Current : N slots) You may
+  have up to 15 slots." in place of its description (`FUN_008f19a8`).
 - **Item data:** packages and expansions take their name and icon from
   `Item.nx` `Special`, pets from `Item.nx` `Pet`, and pet equipment from
   `Character.nx` `PetEquip`.

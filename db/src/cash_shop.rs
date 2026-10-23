@@ -266,6 +266,51 @@ pub fn expand_storage(
     })?)
 }
 
+/// What buying a character slot came to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotPurchase {
+    /// The account now has `slots` character slots, and `balance` left.
+    Bought { slots: i16, balance: Balance },
+    /// The account already had the most slots; nothing was paid.
+    Full,
+    /// The balance was short; nothing changed.
+    Short,
+}
+
+/// Pay `price` for commodity `sn` from the account's `cash_type` balance and
+/// give the account one more character slot, up to `max`, in one
+/// transaction.
+pub fn buy_character_slot(
+    account_id: i32,
+    cash_type: CashType,
+    sn: i32,
+    price: i32,
+    max: i16,
+) -> crate::Result<SlotPurchase> {
+    let mut conn = crate::connection()?;
+    let bought = conn.transaction(|conn| -> diesel::QueryResult<_> {
+        let account = accounts::table.find(account_id);
+        let slots = diesel::update(account.filter(accounts::character_slots.lt(max)))
+            .set(accounts::character_slots.eq(accounts::character_slots + 1))
+            .returning(accounts::character_slots)
+            .get_result::<i16>(conn)
+            .optional()?;
+        let Some(slots) = slots else {
+            return Ok(SlotPurchase::Full);
+        };
+        if !pay(conn, account_id, cash_type, price)? {
+            return Err(diesel::result::Error::RollbackTransaction);
+        }
+        record_sale(conn, sn)?;
+        let balance = balance_of(conn, account_id)?;
+        Ok(SlotPurchase::Bought { slots, balance })
+    });
+    match bought {
+        Err(diesel::result::Error::RollbackTransaction) => Ok(SlotPurchase::Short),
+        bought => Ok(bought?),
+    }
+}
+
 /// The serial numbers of the commodities sold most, best first.
 pub fn best_sellers(limit: i64) -> crate::Result<Vec<i32>> {
     Ok(cash_sales::table

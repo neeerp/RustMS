@@ -739,9 +739,9 @@ on a rested mount, as in Cosmic. CHAR_INFO shows the worn mount's state.
 The ride ends on death, a mob's Dispel, logout, and entering a map with
 field limit 0x200 (`keep_mounts_off`). The mount and saddle, and their
 cash covers, can't be moved while riding. Not done: Cosmic's explorer and
-Cygnus restrictions on who may equip which mount, getting the skill and
-the Hog (quest 6002's `skill` act and the Tame Pig maps), and event
-mounts. HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
+Cygnus restrictions on who may equip which mount, and event mounts. The
+skill comes with quest 6002 (its `skill` act, `agent_docs/quests.md`),
+and the Hog from catching a Tamable Hog (`agent_docs/inventory.md`). HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
 report 201).
 
 Battleship (5221006, report 228) is a ride too, on the vehicle 1932000

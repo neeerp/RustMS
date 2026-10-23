@@ -1045,6 +1045,13 @@ impl ClientActor {
                 self.expand_storage(account_id, cash_type, slots, price)
                     .await?
             }
+            CashShopRequest::BuyCharacterSlot {
+                cash_type,
+                commodity,
+            } => {
+                self.buy_character_slot(account_id, cash_type, commodity)
+                    .await?
+            }
             CashShopRequest::Coupon(code) => self.redeem_coupon(code).await?,
             CashShopRequest::NameChangeRules => self.name_change_rules().await?,
             CashShopRequest::CheckNewName(name) => self.check_new_name(name).await?,
@@ -1253,6 +1260,37 @@ impl ClientActor {
             cs::build_storage_slots(limit)?,
             cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
         ])
+    }
+
+    /// Pay for the Extra Character Slot Coupon `commodity` and give the
+    /// account a character slot, which its next character list shows.
+    async fn buy_character_slot(
+        &mut self,
+        account_id: i32,
+        cash_type: CashType,
+        commodity: Commodity,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        use db::cash_shop::SlotPurchase;
+        let (sn, price) = (commodity.sn, commodity.price);
+        let max = net::cash_shop::MAX_CHARACTER_SLOTS;
+        let bought = spawn_db(move || {
+            db::cash_shop::buy_character_slot(account_id, cash_type, sn, price, max)
+        })
+        .await?;
+        let failure = match bought {
+            SlotPurchase::Bought { slots, balance } => {
+                info!(self.client_id, slots, price, "Bought a character slot");
+                return Ok(vec![
+                    cs::build_character_slots(slots)?,
+                    cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+                ]);
+            }
+            // v83 asks for none past 15 (0x1ed), so this one is stale.
+            SlotPurchase::Full => cs::CashShopFailure::Unknown,
+            SlotPurchase::Short => cs::CashShopFailure::NotEnoughCash,
+        };
+        Ok(vec![cs::build_cash_shop_failure(failure)?])
     }
 
     /// Move a Cash Inventory item into its bag, at `slot` if that is free.

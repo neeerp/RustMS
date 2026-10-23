@@ -68,6 +68,7 @@ const FAILED: u8 = 0x5C;
 const GIFT_SENT: u8 = 0x5E;
 const INVENTORY_SLOTS: u8 = 0x60;
 const STORAGE_SLOTS: u8 = 0x62;
+const CHARACTER_SLOTS: u8 = 0x64;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
 const BOUGHT_RING: u8 = 0x87;
@@ -205,6 +206,17 @@ pub fn build_storage_slots(slots: i16) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(STORAGE_SLOTS)?;
+    packet.write_short(slots)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: the account now has `slots` character slots. v83
+/// takes only a count above the one it knows, up to 15, and leaves the shop
+/// locked until the balance follows.
+pub fn build_character_slots(slots: i16) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(CHARACTER_SLOTS)?;
     packet.write_short(slots)?;
     Ok(packet)
 }
@@ -505,6 +517,14 @@ mod tests {
             .short(SendOpcode::CashShopOperation as i16)
             .byte(0x62)
             .short(12);
+        expect.end();
+
+        let packet = build_character_slots(4).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x64)
+            .short(4);
         expect.end();
     }
 
