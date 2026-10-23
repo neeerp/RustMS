@@ -1769,7 +1769,10 @@ Guardian's (9400594; `field_limit::may_touch`, FUN_00678c77).
 
 HeavenClient's `Player::update_death` notices HP reaching 0: the player
 becomes a ghost (`Char::State::DIED`), the tombstone from `Effect.nx/Tomb.img`
-drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays,
+drops behind them (drawn by `Char`) as `Sound.nx/Game.img/Tombstone` plays
+(from `Char::set_state`, so other players' deaths are heard too, quieter the
+farther they are; someone already dead when they appear lies under a landed
+tombstone, unheard),
 keys are ignored, and the death window (`UIRevive`) opens. The ghost is the body's `dead` frame, which fades in. Head, hair
 and equips have no `dead` frames, so `CharLook` puts the standing ones on the
 ghost's neck, as the original client does. The ghost and its name tag circle

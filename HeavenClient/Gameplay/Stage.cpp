@@ -216,6 +216,7 @@ namespace ms
 	void Stage::clear()
 	{
 		state = State::INACTIVE;
+		Sound::clear_listener();
 
 		chars.clear();
 		npcs.clear();
@@ -419,6 +420,8 @@ namespace ms
 			return;
 
 		combat.update();
+
+		Sound::set_listener(player.get_position());
 
 		if (auto step = macro_runner.due(Constants::TIMESTEP))
 			macro_runner.tried(try_macro_step(*step));
@@ -937,7 +940,8 @@ namespace ms
 			return nl::node();
 
 		std::string file = path.substr(0, slash);
-		nl::node root = file == "UI" ? nl::nx::ui : file == "Effect" ? nl::nx::effect : file == "Map" ? nl::nx::map : nl::node();
+		nl::node root = file == "UI" ? nl::nx::ui : file == "Effect" ? nl::nx::effect : file == "Map" ? nl::nx::map
+			: file == "Sound" ? nl::nx::sound : nl::node();
 
 		if (!root)
 			return root;
@@ -950,6 +954,11 @@ namespace ms
 		std::string image = field_effect::with_image(node);
 
 		return image.empty() ? nl::node() : root.resolve(image);
+	}
+
+	void Stage::show_ground_effect(nl::node effect, Point<int16_t> position)
+	{
+		ground_effects.add(effect, DrawArgument(position));
 	}
 
 	void Stage::show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path)

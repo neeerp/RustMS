@@ -16,6 +16,7 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "Audio.h"
+#include "SoundDistance.h"
 
 #include "../Configuration.h"
 #include "../Gameplay/FieldEffectRules.h"
@@ -52,6 +53,8 @@ namespace ms
 	std::unordered_map<std::string, membuf *> Music::audiodb;
 	std::vector<alure::Source> Sound::sources;
 	float Sound::gain = 1.0f;
+	Point<int16_t> Sound::listener;
+	bool Sound::has_listener = false;
 
 	alure::Source Sound::free_source()
 	{
@@ -127,6 +130,26 @@ namespace ms
 		}
 	}
 
+	void Sound::play_from(Point<int16_t> source)
+	{
+		// v83 plays at 40 when there is no player to measure from.
+		if (!has_listener)
+			return play(40);
+
+		play(sound_distance::volume(listener.x() - source.x(), listener.y() - source.y()));
+	}
+
+	void Sound::set_listener(Point<int16_t> position)
+	{
+		listener = position;
+		has_listener = true;
+	}
+
+	void Sound::clear_listener()
+	{
+		has_listener = false;
+	}
+
 	void Sound::play_loop()
 	{
 		stop();
@@ -197,6 +220,8 @@ namespace ms
 		add_sound(Sound::Name::ENCHANTSUCCESS, gamesrc["EnchantSuccess"]);
 		add_sound(Sound::Name::ENCHANTFAILURE, gamesrc["EnchantFailure"]);
 		add_sound(Sound::Name::MCARDGET, gamesrc["mCardGet"]);
+		add_sound(Sound::Name::ITEMLEVELUP, gamesrc["ItemLevelUp"]);
+		add_sound(Sound::Name::INCEXP, gamesrc["IncEXP"]);
 
 		nl::node itemsrc = nl::nx::sound["Item.img"];
 

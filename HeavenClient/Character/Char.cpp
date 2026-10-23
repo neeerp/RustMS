@@ -967,6 +967,16 @@ namespace ms
 		set_state(newstate);
 	}
 
+	void Char::lie_dead()
+	{
+		tomb = tomb_land;
+		tomb_tick = TOMB_FALL;
+		tomb_landed = true;
+		ghost_opacity.set(1.0f);
+		ghost_tick = 0;
+		state = State::DIED;
+	}
+
 	void Char::set_expression(int32_t expid)
 	{
 		Expression::Id expression = Expression::byaction(expid);
@@ -1080,6 +1090,8 @@ namespace ms
 			tomb = tomb_fall;
 			tomb_tick = 0;
 			tomb_landed = false;
+			// Anyone's tomb is heard, the farther the quieter (FUN_0092fd5a).
+			Sound(Sound::Name::TOMBSTONE).play_from(get_position());
 			ghost_opacity.set(0.0f);
 			ghost_tick = 0;
 		}

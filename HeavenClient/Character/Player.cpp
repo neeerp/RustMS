@@ -610,7 +610,6 @@ namespace ms
 				phobj.hspeed = 0.0;
 				phobj.type = PhysicsObject::Type::NORMAL;
 				set_state(Char::State::DIED);
-				Sound(Sound::Name::TOMBSTONE).play();
 				death_ticks = 0;
 			} else
 			{

@@ -254,6 +254,9 @@ namespace ms
 		// then the node in it, also tried with the image's ".img" put back; null if there is none.
 		static nl::node effect_node(const std::string &path);
 
+		// Play `effect` once at `position` in the field, following no one.
+		void show_ground_effect(nl::node effect, Point<int16_t> position);
+
 		// User effect 14, a reward box's prize (0x9382b0): the prize's use sound, and the box's `path` played once
 		// where the opener stands, not following them.
 		void show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path);

@@ -78,7 +78,7 @@ namespace ms
 			return static_cast<int32_t>(std::min(time, longest));
 		}
 
-		void play_dropsound()
+		void play_dropsound(Point<int16_t> position)
 		{
 			using Clock = std::chrono::steady_clock;
 			static Clock::time_point last;
@@ -88,7 +88,7 @@ namespace ms
 			if (now - last > std::chrono::milliseconds(DROPSOUNDGAP))
 			{
 				last = now;
-				Sound(Sound::Name::DROP).play();
+				Sound(Sound::Name::DROP).play_from(position);
 			}
 		}
 	}
@@ -149,7 +149,7 @@ namespace ms
 			opacity.set(1.0f);
 
 			if (mode == 1)
-				play_dropsound();
+				play_dropsound(get_position());
 		}
 
 		// These drops only show their flight, fading out as they go.

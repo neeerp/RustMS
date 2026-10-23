@@ -22,6 +22,7 @@
 #include "../Error.h"
 
 #include "../Template/EnumMap.h"
+#include "../Template/Point.h"
 
 #include <unordered_map>
 #include <cstdint>
@@ -97,6 +98,8 @@ namespace ms
 			ENCHANTSUCCESS,
 			ENCHANTFAILURE,
 			MCARDGET,
+			ITEMLEVELUP,
+			INCEXP,
 			LENGTH
 		};
 
@@ -113,6 +116,14 @@ namespace ms
 
 		// Play at `volume` percent of the sound effects' volume.
 		void play(uint8_t volume);
+
+		// Play a sound made at `source` in the field, quieter the farther it
+		// is from the player (FUN_009894f3).
+		void play_from(Point<int16_t> source);
+
+		// Where the player stands, for play_from; none while there is no player.
+		static void set_listener(Point<int16_t> position);
+		static void clear_listener();
 
 		// Play the sound over and over until stop.
 		void play_loop();
@@ -150,6 +161,8 @@ namespace ms
 		static constexpr size_t MAX_SOURCES = 100;
 		static std::vector<alure::Source> sources;
 		static float gain;
+		static Point<int16_t> listener;
+		static bool has_listener;
 	};
 
 	class Music

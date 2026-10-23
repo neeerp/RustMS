@@ -29,6 +29,8 @@ namespace ms
 					"QuestClear",
 					"Teleport",
 					"Transform",
-					"TransformOnLadder"
+					"TransformOnLadder",
+					"ItemLevelUp",
+					"IncEXP"
 			};
 }

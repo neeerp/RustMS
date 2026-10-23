@@ -409,6 +409,10 @@ namespace ms
 	protected:
 		Char(int32_t oid, const CharLook &look, const std::string &name);
 
+		// Lie dead under a tombstone that has already landed, without its drop or
+		// sound, as v83 sets up someone already dead (SetMoveAction flag != 0).
+		void lie_dead();
+
 		// Update the character's animation with the given speed.
 		bool update(const Physics &physics, float speed);
 

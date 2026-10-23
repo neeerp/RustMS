@@ -23,6 +23,7 @@
 #include "Helpers/MobStatParser.h"
 #include "Helpers/MovementParser.h"
 #include "Helpers/PetParser.h"
+#include "Helpers/UserEffect.h"
 #include "MiniRoom.h"
 
 #include "../../Character/CatchItemRules.h"
@@ -457,12 +458,10 @@ namespace ms
 		int32_t cid = recv.read_int();
 		int8_t effect = recv.read_byte();
 
-		// v83 special effects: 0 level up, 8 job change, 9 quest complete.
-		if (effect == 0 && !recv.available())
-		{
-			show_effect_with_sound(cid, CharEffect::LEVELUP, Sound::Name::LEVELUP);
-		}
-		else if (effect == 7) // a scripted portal's sound
+		if (user_effect::show_shared(cid, effect, recv))
+			return;
+
+		if (effect == 7) // a scripted portal's sound
 		{
 			Sound(Sound::Name::PORTAL).play();
 		}
@@ -473,10 +472,6 @@ namespace ms
 		else if (effect == 9 && !recv.available())
 		{
 			show_effect_with_sound(cid, CharEffect::QUEST_CLEAR, Sound::Name::QUESTCLEAR);
-		}
-		else if (effect == 10) // recovery
-		{
-			recv.read_byte(); // 'amount'
 		}
 		else if (effect == 13) // card effect
 		{
@@ -517,7 +512,7 @@ namespace ms
 			if (Optional<Char> character = Stage::get().get_character(cid))
 				Stage::get().show_reward_effect(character->get_position(), itemid, path);
 		}
-		else if (recv.available()) // skill
+		else if (effect == 1) // a skill's use effect
 		{
 			int32_t skillid = recv.read_int();
 
@@ -533,14 +528,10 @@ namespace ms
 				return;
 			}
 
-			recv.read_byte(); // 'direction'
-			// 9 more bytes after this
+			recv.read_byte(); // the user's level
+			int8_t level = recv.read_byte();
 
-			Stage::get().get_combat().show_buff(cid, skillid, effect);
-		}
-		else
-		{
-			// TODO: Blank
+			Stage::get().get_combat().show_buff(cid, skillid, level);
 		}
 	}
 

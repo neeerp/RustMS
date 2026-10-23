@@ -18,6 +18,7 @@
 #include "MessagingHandlers.h"
 
 #include "Helpers/LoginParser.h"
+#include "Helpers/UserEffect.h"
 
 #include "../../Configuration.h"
 #include "../../Audio/Audio.h"
@@ -903,6 +904,9 @@ namespace ms
 	{
 		int8_t mode1 = recv.read_byte();
 
+		if (user_effect::show_shared(Stage::get().get_player().get_oid(), mode1, recv))
+			return;
+
 		if (mode1 == 4)
 		{
 			// A pet effect on one of the player's pets, such as its level-up.
@@ -986,47 +990,6 @@ namespace ms
 		{
 			Stage::get().get_player().show_mist_puff(recv.read_int());
 		}
-		else if (mode1 == 18) // intro effect
-		{
-			recv.read_string(); // path
-		}
-		else if (mode1 == 6 || mode1 == 0x15 || mode1 == 0x1a)
-		{
-			// A charm kept the player's EXP when they died, or they revived where
-			// they fell: grey lines (chat type 7, v83 9377d9).
-			std::string line;
-
-			if (mode1 == 6)
-			{
-				bool safety_charm = recv.read_byte() != 0;
-				uint8_t times = recv.read_byte();
-				uint8_t days = recv.read_byte();
-
-				if (safety_charm)
-					line = "The EXP did not drop after using the Safety Charm once.(" + std::to_string(days) + " days/" + std::to_string(times) + " times left)";
-				else
-					line = "The EXP did not drop after using " + ItemData::get(recv.read_int()).get_name() + " item.";
-			}
-			else if (mode1 == 0x15)
-			{
-				line = "You have used 1 Wheel of Destiny in order to revive at the current map. (" + std::to_string(static_cast<uint8_t>(recv.read_byte())) + " left)";
-			}
-			else
-			{
-				line = "You have revived on the current map through the effect of the Spirit Stone.";
-			}
-
-			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline(line, UIChatBar::LineType::GREY);
-		}
-		else if (mode1 == 23) // info: a UI image anchored to the player (tutorial hints)
-		{
-			std::string path = recv.read_string();
-			recv.read_int();
-
-			if (nl::node effect = Stage::effect_node(path))
-				Stage::get().get_player().show_effect(Animation(effect));
-		}
 		else if (mode1 == 14) // a reward box's prize: its sound, and the box's animation where the player stands
 		{
 			int32_t itemid = recv.read_int();
@@ -1034,21 +997,7 @@ namespace ms
 
 			Stage::get().show_reward_effect(Stage::get().get_player().get_position(), itemid, path);
 		}
-		else if (mode1 == 0x10)
-		{
-			// The Item Maker's glow and sound on the maker: 0 made it, 1 failed, anything else nothing (FUN_009377d9).
-			int32_t result = recv.read_int();
-
-			if (result != 0 && result != 1)
-				return;
-
-			bool made = result == 0;
-			nl::node effect = nl::nx::effect["BasicEff.img"]["ItemMake"][made ? "Success" : "Failure"];
-
-			Stage::get().get_player().show_effect(Animation(effect));
-			Sound(made ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
-		}
-		else // Buff effect
+		else if (mode1 == 1) // a skill's use effect
 		{
 			int32_t skillid = recv.read_int();
 

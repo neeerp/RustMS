@@ -126,6 +126,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME npc_idle COMMAND npc_idle_tests)
     add_executable(npc_scripts_tests tests/npc_scripts.cpp)
     add_test(NAME npc_scripts COMMAND npc_scripts_tests)
+    add_executable(sound_distance_tests tests/sound_distance.cpp)
+    add_test(NAME sound_distance COMMAND sound_distance_tests)
     add_executable(monster_book_tests tests/monster_book.cpp Character/MonsterBook.cpp)
     add_test(NAME monster_book COMMAND monster_book_tests)
     add_executable(enter_number_tests tests/enter_number.cpp)
@@ -440,6 +442,7 @@ include_directories(Util)
 add_executable(HeavenClient
     Audio/Audio.cpp
     Audio/Audio.h
+    Audio/SoundDistance.h
     Character/Inventory/Equip.cpp
     Character/Inventory/Equip.h
     Character/Inventory/EquipQuality.cpp
@@ -1046,6 +1049,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/LoginParser.h
     Net/Handlers/Helpers/MovementParser.cpp
     Net/Handlers/Helpers/MovementParser.h
+    Net/Handlers/Helpers/UserEffect.cpp
+    Net/Handlers/Helpers/UserEffect.h
     Net/Handlers/Helpers/PetParser.h
     Net/Handlers/Helpers/BuffParser.cpp
     Net/Handlers/Helpers/BuffParser.h
