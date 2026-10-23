@@ -661,6 +661,13 @@ namespace ms
 		{}
 	};
 
+	// The default position of UIStoreBank: centred, like the v83 dialog
+	struct PosSTOREBANK : public Configuration::PointEntry
+	{
+		PosSTOREBANK() : PointEntry("PosSTOREBANK", "(283, 141)")
+		{}
+	};
+
 	// The default position of UIDuey, where v83 makes it (FUN_006f3e94)
 	struct PosDUEY : public Configuration::PointEntry
 	{

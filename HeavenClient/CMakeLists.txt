@@ -257,6 +257,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(personal_shop_tests tests/personal_shop.cpp Net/InPacket.cpp)
     target_include_directories(personal_shop_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME personal_shop COMMAND personal_shop_tests)
+    add_executable(store_bank_tests tests/store_bank.cpp Net/InPacket.cpp)
+    target_include_directories(store_bank_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME store_bank COMMAND store_bank_tests)
     add_executable(owl_tests tests/owl.cpp Net/InPacket.cpp)
     target_include_directories(owl_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME owl COMMAND owl_tests)
@@ -908,6 +911,8 @@ add_executable(HeavenClient
     IO/UITypes/UISlideMenu.h
     IO/UITypes/UIStorage.cpp
     IO/UITypes/UIStorage.h
+    IO/UITypes/UIStoreBank.cpp
+    IO/UITypes/UIStoreBank.h
     IO/UITypes/UIDuey.cpp
     IO/UITypes/UIDuey.h
     IO/UITypes/UITeleportRock.cpp

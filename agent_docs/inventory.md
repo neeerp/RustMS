@@ -1682,10 +1682,24 @@ for such a merchant, which sends the player to him
 GMS gave away what was kept past 100 days; here the fee just stops at
 100%.
 
+HeavenClient's `UIStoreBank` is v83's dialog (`UIWindow.img/StoreBank`,
+centred). It lists the kept items in the order the server sent them,
+equips first and cash last, five rows at a time. Each row shows the
+item's name, its count (use, setup and etc items only) and the cash
+mark. The mesos show at the bottom. There is no tooltip. Get All waits
+for its answer before it can be pressed again. The fee question is
+StringPool `0xda2`, or `0xda3` when the fee is nothing. After `0x1e` the
+list empties and Get All is disabled until the window opens again. Mode
+`0x25` opens an NPC talk window: Fredrick says where the merchant is open
+(`0xda0`, the channel's name and the Free Market room), or that he keeps
+nothing (`0xd9f`). Mode `0x26` is a notice, and it also lets a waiting
+Get All go; v83 leaves one waiting. Esc and Exit send mode `0x1c`
+(`Net/Handlers/StoreBank.h`, `StoreBankHandler`).
+
 Not done yet: the blacklist's
 storage (it lasts as long as the merchant stays in memory), the `0x0e`
 cash check the client sends instead of `0xb` when a cash item is listed,
-permits in the Cash Shop, and HeavenClient's merchant window.
+and permits in the Cash Shop.
 
 ## Tests
 
@@ -1806,7 +1820,9 @@ Fredrick: `net::store_bank` covers the days and the fee, and the build
 tests cover the packets. `fredrick` (integration) is told he keeps
 nothing, then where an open merchant stands. It takes a closed merchant's
 items and mesos back less three days' fee, and is refused when the owner
-can't pay the fee or carry the mesos, with the merchant still kept.
+can't pay the fee or carry the mesos, with the merchant still kept. The
+client's `store_bank` test reads the kept items into one list and covers
+the counts, the scrolling and the texts.
 
 The Owl of Minerva: `net::owl` covers the market maps, the order and cap of
 the rows, and the most searched list; the build tests cover the packets;

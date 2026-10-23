@@ -226,6 +226,8 @@ namespace ms
 		OPEN_NPC_SHOP = 305,
 		CONFIRM_SHOP_TRANSACTION = 306,
 		TRUNK_RESULT = 309,
+		STORE_BANK_MESSAGE = 310,
+		STORE_BANK = 311,
 		RPS_GAME = 312,
 		WEDDING_PROGRESS = 320,
 		WEDDING_CEREMONY_END = 321,
@@ -458,6 +460,8 @@ namespace ms
 		emplace<OPEN_NPC_SHOP, OpenNpcShopHandler>();
 		emplace<CONFIRM_SHOP_TRANSACTION, ConfirmShopTransactionHandler>();
 		emplace<TRUNK_RESULT, TrunkResultHandler>();
+		emplace<STORE_BANK_MESSAGE, StoreBankMessageHandler>();
+		emplace<STORE_BANK, StoreBankHandler>();
 		emplace<RPS_GAME, RpsGameHandler>();
 		emplace<PARCEL, ParcelHandler>();
 

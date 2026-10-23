@@ -57,6 +57,22 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The answer to a Store Bank's Get All confirmed (report 165 section 4)
+	// Opcode: STORE_BANK_MESSAGE(310)
+	class StoreBankMessageHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Opens Fredrick's Store Bank, quotes its fee, or has Fredrick say
+	// where the merchant is open or that he keeps nothing (report 165
+	// section 4)
+	// Opcode: STORE_BANK(311)
+	class StoreBankHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Opens the Rock, Paper, Scissors window, or plays it (report b038)
 	// Opcode: RPS_GAME(312)
 	class RpsGameHandler : public PacketHandler
