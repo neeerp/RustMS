@@ -25,15 +25,19 @@
 //! the ticket, and a new leader ends nothing. One with a gate keeps it shut
 //! until it is won or over.
 
+use crate::actor::field_drops::Ownership;
 use crate::actor::registry::FieldRegistry;
 use crate::message::{
     ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage, SquadAnswer,
 };
 use crate::supervisor::spawn_supervised;
+use game_data::server_content::keys;
 use net::events::{
-    draw_combo, draw_question, Balloon, Cloto, Event, EventCommand, EventKind, Puzzles, Stage1,
-    Team, ZPQ_DOCUMENTS,
+    draw_combo, draw_question, htpq_room_key, Balloon, Cloto, Event, EventCommand, EventKind,
+    Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, ZPQ_DOCUMENTS,
 };
+use net::loot::Loot;
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicU16, Ordering};
@@ -607,8 +611,8 @@ impl EventActor {
             EventCommand::ClearStage(stage) if event.member_clears.contains(&stage) => {
                 if stage == event.last_stage() {
                     self.win();
-                } else {
-                    self.clear(stage);
+                } else if self.clear(stage) {
+                    self.send_room_key(stage);
                 }
             }
             EventCommand::ClearStage(1) if leader => {
@@ -748,6 +752,41 @@ impl EventActor {
         if event.bonus.as_ref().is_some_and(|bonus| bonus.on_win) {
             self.start_bonus();
         }
+    }
+
+    /// A Trial Grounds room's seal took its key: the same key falls on the
+    /// copy's first map, free for anyone, and everyone there is told
+    /// (Cosmic `2408002`, at the reactor `keyDrop1`).
+    fn send_room_key(&self, stage: u8) {
+        let Some(item_id) = htpq_room_key(stage).filter(|_| self.kind == EventKind::Htpq) else {
+            return;
+        };
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: HTPQ_ENTRY,
+            instance_id: self.id,
+        });
+        let (x, y) = HTPQ_KEY_AT;
+        let key = FieldMessage::SpawnLoot {
+            owner: self.team.leader(),
+            ownership: Ownership::FreeForAll,
+            loot: vec![Loot::Item {
+                item_id,
+                quantity: 1,
+                quest: None,
+            }],
+            x,
+            y,
+            dropper: 0,
+        };
+        let notice = net::content::text().get(keys::HTPQ_KEY_APPEARED, &[]);
+        let notice = build_broadcast(Broadcast::Pink, &notice).ok();
+        tokio::spawn(async move {
+            let _ = field.tx.send(key).await;
+            if let Some(notice) = notice {
+                let _ = field.tx.send(FieldMessage::Show(notice)).await;
+            }
+        });
     }
 
     /// The way on from `stage` opens before anyone hears of the clear, so a

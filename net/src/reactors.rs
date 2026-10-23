@@ -99,6 +99,12 @@ pub enum Action {
     /// already coming (`crate::mobs::HORNTAIL_INTRO`), and the expedition's
     /// clock starts over; then a line to everyone there.
     Horntail,
+    /// The seal of one of the Trial Grounds' rooms (Cosmic `2408002`),
+    /// which breaks on the room's key: a pink line to everyone in the room,
+    /// the room's stage clears for whoever threw it or someone still
+    /// there, and the event sends the same key to the first map (the event
+    /// actor's `send_room_key`).
+    PassKey,
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -200,11 +206,21 @@ pub fn music_day(now: std::time::SystemTime) -> u8 {
     pinned.unwrap_or_else(|| (crate::rates::weekday(now) + 1) % 7)
 }
 
-/// Whether reactor `reactor_id` takes `item_id` on `day` (Sunday 0): the
-/// music box only that day's record, every other reactor whatever its
-/// events take.
-pub fn takes(reactor_id: i32, item_id: i32, day: u8) -> bool {
-    reactor_id != MUSIC || item_id == SUNDAY_RECORD + i32::from(day)
+/// Whether reactor `reactor_id`, named `name` on its map, takes `item_id`
+/// on `day` (Sunday 0): the music box only that day's record, a Trial
+/// Grounds room's seal (`passKey1` to `passKey4`) only that room's key, as
+/// Cosmic pins its event, and every other reactor whatever its events take.
+pub fn takes(reactor_id: i32, name: &str, item_id: i32, day: u8) -> bool {
+    match reactor_id {
+        MUSIC => item_id == SUNDAY_RECORD + i32::from(day),
+        HTPQ_PASS_KEY => {
+            name.strip_prefix("passKey")
+                .and_then(|room| room.parse::<u8>().ok())
+                .and_then(crate::events::htpq_room_key)
+                == Some(item_id)
+        }
+        _ => true,
+    }
 }
 
 pub fn action(reactor_id: i32) -> Action {
@@ -295,6 +311,7 @@ pub fn action(reactor_id: i32) -> Action {
         ZPQ_MIMIC_BOX => Action::BringOut(ZPQ_MIMIC, 3),
         ZAKUM_ALTAR => Action::Zakum,
         HORNTAIL_STONE => Action::Horntail,
+        HTPQ_PASS_KEY => Action::PassKey,
         _ => Action::Drops,
     }
 }
@@ -315,6 +332,9 @@ pub const ZAKUM_MUSIC: &str = "Bgm06/FinalFight";
 /// The stone on Horntail's Cave (`boss`), and the music it plays.
 pub const HORNTAIL_STONE: i32 = 2401000;
 pub const HORNTAIL_MUSIC: &str = "Bgm14/HonTale";
+
+/// The seals of the Trial Grounds' rooms 1 to 4 (`passKey1` to `passKey4`).
+pub const HTPQ_PASS_KEY: i32 = 2408002;
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
@@ -479,10 +499,43 @@ mod tests {
         // 1 January 1970 was a Thursday.
         assert_eq!(music_day(std::time::SystemTime::UNIX_EPOCH), 4);
         for day in 0..7 {
-            let records = (0..7).filter(|d| takes(MUSIC, SUNDAY_RECORD + d, day));
+            let records = (0..7).filter(|d| takes(MUSIC, "", SUNDAY_RECORD + d, day));
             assert_eq!(records.collect::<Vec<_>>(), [i32::from(day)]);
         }
-        assert!(takes(2001002, 4001074, 3));
+        assert!(takes(2001002, "", 4001074, 3));
+    }
+
+    #[test]
+    fn each_trial_grounds_seal_takes_only_its_rooms_key() {
+        use crate::events::CRYSTAL_KEYS;
+        assert_eq!(action(HTPQ_PASS_KEY), Action::PassKey);
+        for room in 1..=4 {
+            let name = format!("passKey{room}");
+            let keys = CRYSTAL_KEYS
+                .iter()
+                .filter(|&&key| takes(HTPQ_PASS_KEY, &name, key, 0));
+            assert_eq!(keys.collect::<Vec<_>>(), [&CRYSTAL_KEYS[room]]);
+        }
+        assert!(!takes(HTPQ_PASS_KEY, "", CRYSTAL_KEYS[1], 0));
+        assert!(!takes(HTPQ_PASS_KEY, "passKey5", CRYSTAL_KEYS[1], 0));
+        if let Ok(maps) = crate::get_game_data() {
+            for room in 1..=4 {
+                let field = maps.field(crate::events::HTPQ.stage_map(room)).unwrap();
+                let seals: Vec<_> = field
+                    .reactors
+                    .iter()
+                    .filter(|reactor| reactor.reactor_id == HTPQ_PASS_KEY)
+                    .map(|reactor| reactor.name.clone())
+                    .collect();
+                assert_eq!(seals, [format!("passKey{room}")]);
+            }
+        }
+        let Ok(data) = data() else { return };
+        let seal = data.template(HTPQ_PASS_KEY).unwrap().unwrap();
+        for (event, &key) in (0..).zip(&CRYSTAL_KEYS[1..]) {
+            assert_eq!(seal.item_dropped(0, key, 1, (0, 0)), Some((event, 1)));
+        }
+        assert!(seal.is_last(1));
     }
 
     #[test]

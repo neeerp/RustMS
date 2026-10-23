@@ -1030,6 +1030,17 @@ pub const CRYSTAL_KEYS: [i32; 5] = [4_001_087, 4_001_088, 4_001_089, 4_001_090, 
 pub const BLUE_CRYSTAL_KEY: i32 = 4_001_092;
 pub const RED_CRYSTAL_KEY: i32 = 4_001_093;
 pub const RED_KEYS_WANTED: i16 = 6;
+/// Where on the first map a room's key lands once its seal takes it: the
+/// spot of the reactor `keyDrop1` there (Cosmic `2408002`).
+pub const HTPQ_KEY_AT: (i16, i16) = (874, -55);
+
+/// The Crystal Key that the seal of the room of `stage` (1 to 4) sends to
+/// the first map once it takes the key thrown on it: the same key.
+pub fn htpq_room_key(stage: u8) -> Option<i32> {
+    (1..=4)
+        .contains(&stage)
+        .then(|| CRYSTAL_KEYS[usize::from(stage)])
+}
 
 impl EventKind {
     pub const ALL: [EventKind; 9] = [

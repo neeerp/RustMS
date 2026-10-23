@@ -381,12 +381,23 @@ impl ClientActor {
         &mut self,
         script: &str,
     ) -> Result<Option<Vec<Effect>>, RuntimeError> {
-        let map_id = self.in_game()?.player.stats.map_id;
-        let in_htpq = self
+        let player = &self.in_game()?.player;
+        let map_id = player.stats.map_id;
+        let Some(ticket) = self
             .event
             .as_ref()
-            .is_some_and(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Htpq);
-        if !in_htpq || script != scripts::HTPQ_INTO_ROOMS {
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Htpq)
+        else {
+            return Ok(None);
+        };
+        // The last room's door: the leader with the Blue Crystal Key lifts
+        // its seal.
+        if script == scripts::HTPQ_SEAL && map_id == events::HTPQ.stage_map(5) {
+            let has_key = player.inventory.count(events::BLUE_CRYSTAL_KEY) > 0;
+            let effects = scripts::htpq_last_seal(ticket.cleared(5), ticket.leader() && has_key);
+            return Ok(Some(effects));
+        }
+        if script != scripts::HTPQ_INTO_ROOMS {
             return Ok(None);
         }
         let holding_key = self

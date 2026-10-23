@@ -811,9 +811,21 @@ leader short of a key, is told so. On the light or dark map (240050300,
 240050310) the same hand-in takes the Blue Key and six Red Keys and wins
 the quest (`ClearStage` of the last stage).
 
-Not yet: the five rooms' keys and doors (the `passKey` reactor 2408002 and
-`hontale_Bopen`), the lamp (2408001, `hontale_C`), the Party Search entry
-and the stump (2083003).
+The rooms 240050101-240050104 each have a seal (the `passKey` reactor
+2408002, `Action::PassKey`) that takes only the room's own Crystal Key,
+the 2nd to the 5th (`reactors::takes`, `events::htpq_room_key`); any other
+item thrown on it stays on the ground. Taking it clears the room's stage
+(`member_clears`): the room sees the clear effect and a pink line, and the
+event drops the key free-for-all on 240050100 at keyDrop1 (`HTPQ_KEY_AT`,
+`send_room_key`) with a pink line to that map, for the hand-in. Each
+room's door (`hontale_Bopen`) refuses with a line until its stage is
+cleared, then leads on to the next room. The last room's (240050105,
+`htpq_last_seal`) holds for anyone but the leader holding the Blue Crystal
+Key, who lifts it (`ClearStage(5)`, pink lines) and goes back to
+240050100's `st00`, keeping the key; after that anyone goes through.
+
+Not yet: the lamp (2408001, `hontale_C`), the Party Search entry and the
+stump (2083003).
 
 ## NPCs
 
@@ -859,4 +871,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `hpq.tommy.*`, `lpq.sign.*`, `lpq.balloon.*`, `lpq.pink.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
-`zakum.ali.*`, `htpq.keeper.*` and `htpq.rooms.*`.
+`zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*` and
+`htpq.key.*`.

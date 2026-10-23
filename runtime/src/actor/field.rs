@@ -512,6 +512,7 @@ impl FieldActor {
             } => self.handle_join(handle, avatar, party),
             FieldMessage::Leave { client_id, staying } => self.handle_leave(client_id, staying),
             FieldMessage::Close => {}
+            FieldMessage::Show(packet) => self.broadcast(None, packet),
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;
@@ -3212,9 +3213,16 @@ impl FieldActor {
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out
             // first (Cosmic `spawnNpc`), as does the treasure room's first
-            // box.
+            // box; a Trial Grounds room's seal tells the room its key has
+            // gone (Cosmic `mapMessage(6, ..)`).
             action => {
                 match action {
+                    reactors::Action::PassKey => {
+                        let notice = net::content::text().get(keys::HTPQ_KEY_SENT, &[]);
+                        if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                            self.broadcast(None, packet);
+                        }
+                    }
                     reactors::Action::AppearAndClears(npc_id) => {
                         self.appear(npc_id, (view.x, view.y));
                     }
@@ -3230,7 +3238,8 @@ impl FieldActor {
                     | reactors::Action::Spray { .. }
                     | reactors::Action::SprayAndAppear { .. }
                     | reactors::Action::DropsAndClears
-                    | reactors::Action::AppearAndClears(_) => self
+                    | reactors::Action::AppearAndClears(_)
+                    | reactors::Action::PassKey => self
                         .occupants
                         .get(&by)
                         .or_else(|| self.occupants.values().next()),

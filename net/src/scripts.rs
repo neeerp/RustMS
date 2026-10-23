@@ -190,6 +190,10 @@ pub const PAPULATUS_IN: &str = "Populatus00";
 /// which the client actor answers once it knows who else is on the map
 /// (`htpq_into_rooms`).
 pub const HTPQ_INTO_ROOMS: &str = "hontale_BtoB1";
+/// The doors out of the Trial Grounds' rooms (`hontale_Bopen`): rooms 1 to
+/// 4's open once their seals take their keys; the last room's the leader
+/// lifts with the Blue Crystal Key (`htpq_last_seal`).
+pub const HTPQ_SEAL: &str = "hontale_Bopen";
 /// The Dangerous Forest's ways out: back to Rien (`enterRienFirst`) and on
 /// to the second forest (`rienTutor7`). An Aran beginner who hasn't finished
 /// the tutorial (21014) yet is put at Rien's start and kept from going on.
@@ -973,6 +977,27 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 occupied: None,
             }
         }
+        // The doors of the Trial Grounds' first four rooms, sealed until
+        // the room's key is in its seal (`reactors::HTPQ_PASS_KEY`). The
+        // last room's is the client actor's (`htpq_last_seal`).
+        HTPQ_SEAL => {
+            use crate::events::HTPQ;
+            let stage = HTPQ
+                .stage_on(player.stats.map_id)
+                .filter(|&stage| stage < 5)?;
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireStage {
+                        stage,
+                        refused: keys::HTPQ_SEALED,
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(HTPQ.stage_map(stage + 1), 0),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
         // The gate to Zakum: a chief's approval, the trials, an Eye of
         // Fire, and the gate reactor open, as no expedition is under way
         // (`events::ZAKUM`'s `gate`).
@@ -1533,6 +1558,30 @@ pub fn htpq_into_rooms(alone: bool, holding_key: bool) -> Vec<Effect> {
     }
 }
 
+/// The door out of the Trial Grounds' last room, back to the first map's
+/// `st00`: open once its seal is `lifted` (stage 5); until then only the
+/// leader holding the Blue Crystal Key goes through, which lifts it (Cosmic
+/// `hontale_Bopen`).
+pub fn htpq_last_seal(lifted: bool, leader_with_key: bool) -> Vec<Effect> {
+    use crate::events::{EventCommand, HTPQ_ENTRY};
+    let pink = |key| Effect::Pink(content::text().get(key, &[]));
+    let out = [
+        Effect::PortalSound,
+        Effect::WarpToPortal(HTPQ_ENTRY, named(HTPQ_ENTRY, "st00")),
+    ];
+    if lifted {
+        out.into()
+    } else if leader_with_key {
+        let lift = [
+            Effect::EventCommand(EventCommand::ClearStage(5)),
+            pink(keys::HTPQ_SEAL_LIFTED),
+        ];
+        lift.into_iter().chain(out).collect()
+    } else {
+        vec![pink(keys::HTPQ_SEAL_LEADER_ONLY)]
+    }
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2046,6 +2095,53 @@ mod tests {
             htpq_into_rooms(false, false),
             [Effect::PortalSound, Effect::WarpToPortal(240_050_101, 0)]
         );
+    }
+
+    #[test]
+    fn the_trial_grounds_rooms_open_on_their_keys_and_the_leader_lifts_the_last_seal() {
+        use crate::events::{EventCommand, HTPQ_ENTRY};
+        let mut player = player_with(&[]);
+        for room in 1..=4 {
+            player.stats.map_id = HTPQ_ENTRY + room;
+            let door = portal(HTPQ_SEAL, &player).unwrap();
+            assert_eq!(
+                door.effects,
+                [
+                    Effect::RequireStage {
+                        stage: room as u8,
+                        refused: keys::HTPQ_SEALED,
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(HTPQ_ENTRY + room + 1, 0),
+                ]
+            );
+        }
+        player.stats.map_id = HTPQ_ENTRY + 5;
+        assert_eq!(portal(HTPQ_SEAL, &player), None);
+
+        let pink = |key| Effect::Pink(content::text().get(key, &[]));
+        let out = [
+            Effect::PortalSound,
+            Effect::WarpToPortal(HTPQ_ENTRY, named(HTPQ_ENTRY, "st00")),
+        ];
+        assert_eq!(htpq_last_seal(true, false), out);
+        assert_eq!(htpq_last_seal(true, true), out);
+        assert_eq!(
+            htpq_last_seal(false, false),
+            [pink(keys::HTPQ_SEAL_LEADER_ONLY)]
+        );
+        let lift = htpq_last_seal(false, true);
+        assert_eq!(
+            lift[..2],
+            [
+                Effect::EventCommand(EventCommand::ClearStage(5)),
+                pink(keys::HTPQ_SEAL_LIFTED),
+            ]
+        );
+        assert_eq!(lift[2..], out);
+        if crate::get_game_data().is_ok() {
+            assert_eq!(named(HTPQ_ENTRY, "st00"), 1);
+        }
     }
 
     #[test]
