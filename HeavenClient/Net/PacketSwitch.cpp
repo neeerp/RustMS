@@ -272,7 +272,13 @@ namespace ms
 		/// Cash Shop
 		SET_CASH_SHOP = 127,
 		QUERY_CASH_RESULT = 324,
-		CASHSHOP_OPERATION = 325
+		CASHSHOP_OPERATION = 325,
+		CHECK_NEW_NAME_RESULT = 328,
+		NAME_CHANGE_RULES_RESULT = 329,
+
+		/// Name Change, cancelled with its receipt
+		CANCEL_NAME_CHANGE_RESULT = 113,
+		NO_NAME_CHANGE = 120
 	};
 
 	PacketSwitch::PacketSwitch()
@@ -489,6 +495,10 @@ namespace ms
 		emplace<SET_CASH_SHOP, SetCashShopHandler>();
 		emplace<QUERY_CASH_RESULT, QueryCashResultHandler>();
 		emplace<CASHSHOP_OPERATION, CashShopOperationHandler>();
+		emplace<CHECK_NEW_NAME_RESULT, CheckNewNameResultHandler>();
+		emplace<NAME_CHANGE_RULES_RESULT, NameChangeRulesResultHandler>();
+		emplace<CANCEL_NAME_CHANGE_RESULT, CancelNameChangeResultHandler>();
+		emplace<NO_NAME_CHANGE, NoNameChangeHandler>();
 
 		// TODO: New handlers, they need coded and moved to a proper file.
 		emplace<CHECK_SPW_RESULT, CheckSpwResultHandler>();

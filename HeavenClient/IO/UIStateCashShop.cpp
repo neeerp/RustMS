@@ -32,8 +32,10 @@ namespace ms
 
 	void UIStateCashShop::draw(float inter, Point<int16_t> cursor) const
 	{
-		// The shop fills the screen, so its dialogs go on top.
+		// The shop fills the screen, so its dialogs go on top, and the
+		// dialog with the focus over the others.
 		UIElement* shop = elements[UIElement::Type::CASHSHOP].get();
+		UIElement* front = elements[focused].get();
 
 		if (shop && shop->is_active())
 			shop->draw(inter);
@@ -42,9 +44,12 @@ namespace ms
 		{
 			UIElement* element = iter.second.get();
 
-			if (element && element != shop && element->is_active())
+			if (element && element != shop && element != front && element->is_active())
 				element->draw(inter);
 		}
+
+		if (front && front != shop && front->is_active())
+			front->draw(inter);
 
 		if (help_owner != UIElement::Type::NONE)
 			help.draw(cursor + Point<int16_t>(0, 22));
@@ -64,10 +69,10 @@ namespace ms
 	void UIStateCashShop::doubleclick(Point<int16_t> pos)
 	{
 		UIElement* shop = get(UIElement::Type::CASHSHOP);
-		UIElement* dialog = get(focused);
+		UIElement* front = dialog();
 
 		// Not while a dialog is over the shop.
-		if (dialog && dialog != shop && dialog->is_active())
+		if (front && front != shop)
 			return;
 
 		if (shop && shop->is_active())
@@ -77,7 +82,7 @@ namespace ms
 	void UIStateCashShop::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)
 	{
 		// Only a dialog over the shop takes keys, but Esc offers to leave.
-		dispatch_focused_key(get(focused), action, pressed, escape, [&]
+		dispatch_focused_key(dialog(), action, pressed, escape, [&]
 		{
 			if (escape && pressed)
 				if (auto shop = static_cast<UICashShop*>(get(UIElement::Type::CASHSHOP)))
@@ -85,24 +90,27 @@ namespace ms
 		});
 	}
 
+	void UIStateCashShop::send_scroll(double yoffset, Point<int16_t>)
+	{
+		if (auto front = dialog())
+			front->send_scroll(yoffset);
+	}
+
 	Cursor::State UIStateCashShop::send_cursor(Cursor::State cursorstate, Point<int16_t> cursorpos)
 	{
 		bool clicked = cursorstate == Cursor::State::CLICKING || cursorstate == Cursor::State::VSCROLLIDLE
 			|| cursorstate == Cursor::State::HSCROLLIDLE;
 
-		if (auto focusedelement = get(focused))
+		if (auto front = dialog())
 		{
-			if (focusedelement->is_active())
-			{
-				remove_cursor(focusedelement->get_type());
+			remove_cursor(front->get_type());
 
-				return focusedelement->send_cursor(clicked, cursorpos);
-			}
-
-			// A closed dialog lets the window under it have the cursor at
-			// once, or the first click after it would find no button hovered.
-			focused = UIElement::NONE;
+			return front->send_cursor(clicked, cursorpos);
 		}
+
+		// A closed dialog lets the window under it have the cursor at once,
+		// or the first click after it would find no button hovered.
+		focused = UIElement::NONE;
 
 		if (auto front = get_front())
 		{
@@ -150,6 +158,23 @@ namespace ms
 			element->deactivate();
 			element.release();
 		}
+	}
+
+	UIElement* UIStateCashShop::dialog()
+	{
+		if (auto element = get(focused); element && element->is_active())
+			return element;
+
+		// Once a notice over the name dialog closes, the name dialog has the
+		// keys again.
+		if (auto entry = get(UIElement::Type::NAMECHANGE); entry && entry->is_active())
+		{
+			focused = UIElement::Type::NAMECHANGE;
+
+			return entry;
+		}
+
+		return nullptr;
 	}
 
 	UIElement* UIStateCashShop::get(UIElement::Type type)

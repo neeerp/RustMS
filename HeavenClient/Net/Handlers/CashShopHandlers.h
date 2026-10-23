@@ -44,4 +44,32 @@ namespace ms
 	public:
 		void handle(InPacket& recv) const override;
 	};
+
+	// Handler for whether a name is free for a Name Change (0x148)
+	class CheckNewNameResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handler for whether the character may ask for a Name Change (0x149)
+	class NameChangeRulesResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handler for cancelling a Name Change with its receipt (0x71)
+	class CancelNameChangeResultHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
+
+	// Handler for a receipt that stands for no Name Change (0x78)
+	class NoNameChangeHandler : public PacketHandler
+	{
+	public:
+		void handle(InPacket& recv) const override;
+	};
 }

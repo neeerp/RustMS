@@ -229,6 +229,34 @@ namespace ms
 		}
 	};
 
+	// Opcode: NAME_CHANGE_RULES(16)
+	class NameChangeRulesPacket : public OutPacket
+	{
+	public:
+		// Name Change's BUY: may the character ask for a new name (v83
+		// 4733ca)? The birthday code is the date as YYYYMMDD.
+		NameChangeRulesPacket(int32_t charid, int32_t birthday) : OutPacket(OutPacket::Opcode::NAME_CHANGE_RULES)
+		{
+			write_int(charid);
+			write_int(birthday);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyNameChangePacket : public OutPacket
+	{
+	public:
+		// Ask for the name to change from old to name, paid with NX
+		// Prepaid: the commodity sn (v83 47342f)
+		BuyNameChangePacket(int32_t sn, const std::string& old, const std::string& name) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(0x2E);
+			write_int(sn);
+			write_string(old);
+			write_string(name);
+		}
+	};
+
 	// Opcode: CASHSHOP_OPERATION(229)
 	class BuyCoupleRingPacket : public OutPacket
 	{

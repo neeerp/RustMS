@@ -98,6 +98,11 @@ namespace ms
 		// A balance or an operation result came.
 		void answered();
 
+		// The Name Change commodity whose rules were asked for (v83
+		// CCashShop+0x4e4).
+		void set_name_change(int32_t sn);
+		int32_t get_name_change() const;
+
 		// Back to the map the player came from.
 		void leave();
 
@@ -200,6 +205,7 @@ namespace ms
 		int32_t prepaid;
 		bool pending;
 		bool wish_added;
+		int32_t name_change_sn;
 		int16_t storage_slots;
 
 		std::vector<CashItem> cash_items;

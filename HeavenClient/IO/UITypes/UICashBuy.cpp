@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "UICashBuy.h"
 #include "UICashGift.h"
+#include "UINameChange.h"
 #include "UICashShop.h"
 #include "UINotice.h"
 
@@ -29,6 +30,7 @@
 #include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/NameChange.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/NxFiles.h"
 
@@ -121,6 +123,15 @@ namespace ms
 	void UICashBuy::open(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid)
 	{
 		auto buy = [=]() { UI::get().emplace<UICashBuy>(commodity, credit, points, prepaid); };
+
+		// v83 47326d: Name Change asks for the birthday code, and is paid
+		// with NX Prepaid alone.
+		if (commodity.item_id == name_change::ITEM)
+		{
+			UI::get().emplace<UINameChangeBirthday>(commodity.sn, commodity.price, prepaid);
+
+			return;
+		}
 
 		// v83 4731a9: a crush or friendship ring is bought for two.
 		if (marriage::is_pair_ring(commodity.item_id))

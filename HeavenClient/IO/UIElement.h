@@ -135,6 +135,7 @@ namespace ms
 			MAPLETV,
 			WISHLISTINPUT,
 			WEDDINGREGISTRY,
+			NAMECHANGE,
 			NUM_TYPES
 		};
 

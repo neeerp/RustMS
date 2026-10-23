@@ -22,11 +22,13 @@
 
 #include "../../Data/CashCoupon.h"
 #include "../../Data/ItemData.h"
+#include "../../Data/NameChange.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UICashShop.h"
 #include "../../IO/UITypes/UIGiftNotice.h"
+#include "../../IO/UITypes/UINameChange.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
 
@@ -278,7 +280,9 @@ namespace ms
 
 			break;
 		case 0x57:
-			// A purchase is in the Cash Inventory; the balance follows.
+		case 0x9E:
+			// A purchase, or Name Change's receipt (v83 47bccb), is in the
+			// Cash Inventory; the balance follows.
 			cashshop->add_cash_items({ read_cash_item(recv) });
 			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
 			break;
@@ -437,5 +441,64 @@ namespace ms
 		default:
 			break;
 		}
+	}
+
+	void CheckNewNameResultHandler::handle(InPacket& recv) const
+	{
+		std::string name = recv.read_string();
+		int8_t taken = recv.read_byte();
+
+		if (auto cashshop = UI::get().get_element<UICashShop>())
+			cashshop->answered();
+
+		if (auto entry = UI::get().get_element<UINameChangeEntry>(); entry && entry->is_active())
+			entry->checked(name, taken);
+	}
+
+	void NameChangeRulesResultHandler::handle(InPacket& recv) const
+	{
+		recv.skip_int();
+		uint8_t result = static_cast<uint8_t>(recv.read_byte());
+
+		auto cashshop = UI::get().get_element<UICashShop>();
+
+		if (!cashshop)
+			return;
+
+		cashshop->answered();
+
+		if (const char* refusal = name_change::rules_refusal(result))
+			UI::get().emplace<UIOk>(refusal, [](bool) {});
+		else
+			UI::get().emplace<UINameChangeRules>(cashshop->get_name_change());
+	}
+
+	void CancelNameChangeResultHandler::handle(InPacket& recv) const
+	{
+		name_change::CancelAnswer answer = name_change::read_cancel_answer(recv);
+
+		// The server's other answers to the receipt never come with this one.
+		Stage::get().get_player().request_answered();
+
+		switch (answer.kind)
+		{
+		case name_change::CancelAnswer::DONE:
+			UI::get().emplace<UICancelNameChange>(UICancelNameChange::CANCELLED, [](bool) {});
+			break;
+		case name_change::CancelAnswer::FAILED:
+			UI::get().emplace<UICancelNameChange>(UICancelNameChange::FAILED, [](bool) {});
+			break;
+		case name_change::CancelAnswer::MESSAGE:
+			UI::get().emplace<UIOk>(answer.message, [](bool) {});
+			break;
+		}
+	}
+
+	void NoNameChangeHandler::handle(InPacket&) const
+	{
+		// v83 a2a7e6 lets the next request go too.
+		Stage::get().get_player().request_answered();
+
+		UI::get().emplace<UIOk>(name_change::NOT_REQUESTED, [](bool) {});
 	}
 }
