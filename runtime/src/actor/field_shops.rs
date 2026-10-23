@@ -130,6 +130,8 @@ impl Shop {
             skin: self.skin,
             users: self.members().count() as u8,
             max_users: SHOP_USERS,
+            private: false,
+            in_progress: false,
         }
     }
 }

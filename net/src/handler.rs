@@ -527,6 +527,7 @@ pub enum WorldAction {
     Owl(crate::owl::OwlRequest),
     /// Open, stock, visit, or buy from a personal shop.
     PersonalShop(crate::personal_shop::PersonalShopRequest),
+    MiniGame(crate::mini_game::MiniGameRequest),
     /// Hire, stock, keep, close, or buy from a hired merchant.
     HiredMerchant(crate::hired_merchant::HiredMerchantRequest),
     /// Take everything from Fredrick's Store Bank, or close it.

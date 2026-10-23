@@ -190,14 +190,19 @@ pub struct Ride {
 /// double-click to visit it (v83 UPDATE_CHAR_BOX).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MiniRoomBox {
-    /// The room type; 4 is a personal shop.
+    /// The room type: 1 Omok, 2 match cards, 4 a personal shop.
     pub kind: u8,
     pub sn: i32,
     pub title: String,
-    /// The art: for a shop, its permit's skin.
+    /// The art: for a shop, its permit's skin; for Omok, the stones; for
+    /// match cards, the size of the board.
     pub skin: u8,
     pub users: u8,
     pub max_users: u8,
+    /// A game asks for a password to visit.
+    pub private: bool,
+    /// A game is being played.
+    pub in_progress: bool,
 }
 
 /// A character that is logged in. The owning client actor holds the only

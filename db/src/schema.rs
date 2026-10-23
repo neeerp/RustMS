@@ -743,6 +743,16 @@ diesel::table! {
     }
 }
 diesel::joinable!(hired_merchant_sales -> hired_merchants (owner_id));
+diesel::table! {
+    minigame_records (character_id, game) {
+        character_id -> Int4,
+        game -> Int2,
+        wins -> Int4,
+        ties -> Int4,
+        losses -> Int4,
+    }
+}
+diesel::joinable!(minigame_records -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -795,4 +805,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     hired_merchant_items,
     hired_merchant_equipment_stats,
     hired_merchant_sales,
+    minigame_records,
 );

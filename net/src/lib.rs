@@ -35,6 +35,7 @@ pub mod map_rules;
 pub mod maple_tv;
 pub mod medals;
 pub mod meso_explosion;
+pub mod mini_game;
 pub mod mobs;
 pub mod monster_book;
 pub mod morph;

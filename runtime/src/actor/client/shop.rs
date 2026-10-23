@@ -24,6 +24,7 @@ impl ClientActor {
         // As the client refuses while any dialog is open.
         let busy = self.trade.is_some()
             || self.personal_shop.is_some()
+            || self.mini_game.is_some()
             || self.conversation.is_some()
             || self.script.is_some()
             || self.shop.is_some()

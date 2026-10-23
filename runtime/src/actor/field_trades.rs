@@ -39,9 +39,12 @@ pub enum RoomRequest {
         room: i32,
         reason: u8,
     },
-    /// Accept `room`'s invitation.
+    /// Accept `room`'s invitation, or go into a shop or game; a game
+    /// may want `password`, and shows the visitor's `records` there.
     Visit {
         room: i32,
+        password: Option<String>,
+        records: [game::GameRecord; 2],
     },
     Chat {
         text: String,

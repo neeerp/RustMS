@@ -1,4 +1,5 @@
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
+use crate::actor::field_games::{GameRoomRequest, Games};
 use crate::actor::field_kites::KiteSet;
 use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
@@ -185,6 +186,7 @@ pub struct FieldActor {
     doors: HashMap<ClientId, (i16, i16)>,
     trades: Trades,
     shops: Shops,
+    games: Games,
     merchants: Merchants,
     /// Owners in their merchant's room here from elsewhere on the channel,
     /// with a Store Remote Controller, and how to reach them.
@@ -266,6 +268,7 @@ impl FieldActor {
             doors: HashMap::new(),
             trades: Trades::default(),
             shops: Shops::default(),
+            games: Games::default(),
             merchants: Merchants::default(),
             remote_owners: HashMap::new(),
             remote_waiting: None,
@@ -857,6 +860,7 @@ impl FieldActor {
             }
             FieldMessage::Trade { from, request } => self.handle_trade(from, request),
             FieldMessage::PersonalShop { from, request } => self.handle_shop(from, request),
+            FieldMessage::MiniGame { from, request } => self.handle_game(from, request),
             FieldMessage::Merchant { from, request } => self.handle_merchant(from, request),
         }
     }
@@ -868,7 +872,7 @@ impl FieldActor {
             return;
         };
         let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
-        let in_shop = self.shops.is_member(from);
+        let in_shop = self.shops.is_member(from) || self.games.is_member(from);
         let in_trade = self.trades.is_member(from);
         let busy = in_shop || self.merchants.is_member(from);
         let out = match request {
@@ -878,17 +882,27 @@ impl FieldActor {
                 self.trades.invite(from, target, target_name)
             }
             RoomRequest::Decline { room, reason } => self.trades.decline(from, room, reason, name),
-            // Merchants, shops and trading rooms share the visit.
-            RoomRequest::Visit { room } if self.merchants.contains(room) => {
+            // Merchants, shops, games and trading rooms share the visit.
+            RoomRequest::Visit { room, .. } if self.merchants.contains(room) => {
                 let now = (Instant::now(), SystemTime::now());
                 let (id, busy) = (occupant.avatar.id, in_shop || in_trade);
                 self.merchants.visit(from, id, room, name, look, busy, now)
             }
-            RoomRequest::Visit { room } if self.shops.contains(room) => {
-                let busy = in_trade || self.merchants.is_member(from);
+            RoomRequest::Visit { room, .. } if self.shops.contains(room) => {
+                let busy = in_trade || self.games.is_member(from) || self.merchants.is_member(from);
                 self.shops.visit(from, room, name, look, busy)
             }
-            RoomRequest::Visit { room } => self.trades.visit(from, room, name, look, busy),
+            RoomRequest::Visit {
+                room,
+                password,
+                records,
+            } if self.games.contains(room) => {
+                let busy = in_trade || self.shops.is_member(from) || self.merchants.is_member(from);
+                let password = password.as_deref();
+                self.games
+                    .visit(from, room, name, look, password, records, busy)
+            }
+            RoomRequest::Visit { room, .. } => self.trades.visit(from, room, name, look, busy),
             RoomRequest::Chat { text } => self.trades.chat(from, &text),
             RoomRequest::PutItem { slot, item } => self.trades.put_item(from, slot, item),
             RoomRequest::Meso { total } => self.trades.meso(from, total),
@@ -911,7 +925,9 @@ impl FieldActor {
         let shops = &mut self.shops;
         let out = match request {
             ShopRoomRequest::Create { room, title, skin } => {
-                let busy = self.trades.is_member(from) || self.merchants.is_member(from);
+                let busy = self.trades.is_member(from)
+                    || self.games.is_member(from)
+                    || self.merchants.is_member(from);
                 shops.create(room, from, name, look, title, skin, busy)
             }
             ShopRoomRequest::Listings(listings) => shops.listings(from, listings),
@@ -949,16 +965,49 @@ impl FieldActor {
         self.show_balloons();
     }
 
-    /// Put up, change, or take down the balloons over shop owners.
+    /// An Omok or match cards request from an occupant; anyone else's is
+    /// dropped.
+    fn handle_game(&mut self, from: ClientId, request: GameRoomRequest) {
+        let Some(occupant) = self.occupants.get(&from) else {
+            return;
+        };
+        let (name, look) = (&occupant.avatar.name, &occupant.avatar.look);
+        let out = match request {
+            GameRoomRequest::Create {
+                room,
+                kind,
+                title,
+                password,
+                piece,
+                record,
+            } => {
+                let busy = self.trades.is_member(from)
+                    || self.shops.is_member(from)
+                    || self.merchants.is_member(from);
+                self.games.create(
+                    room, from, name, look, kind, title, password, piece, record, busy,
+                )
+            }
+            GameRoomRequest::Play(request) => self.games.play(from, request),
+            GameRoomRequest::Chat { text } => self.games.chat(from, &text),
+            GameRoomRequest::Leave => self.games.leave(from),
+        };
+        self.deliver_trade(out);
+        self.show_balloons();
+    }
+
+    /// Put up, change, or take down the balloons over shop and game owners.
     fn show_balloons(&mut self) {
-        for (owner, balloon) in self.shops.take_balloons() {
+        let mut balloons = self.shops.take_balloons();
+        balloons.extend(self.games.take_balloons());
+        for (owner, balloon) in balloons {
             let Some(occupant) = self.occupants.get_mut(&owner) else {
                 continue;
             };
             occupant.avatar.mini_room = balloon;
             match build_char_box(owner, occupant.avatar.mini_room.as_ref()) {
                 Ok(packet) => self.broadcast(None, packet),
-                Err(error) => warn!(owner, %error, "Failed to build a shop balloon"),
+                Err(error) => warn!(owner, %error, "Failed to build a room balloon"),
             }
         }
     }
@@ -3075,6 +3124,8 @@ impl FieldActor {
         self.deliver_trade(out);
         let out = self.shops.leave(client_id);
         self.deliver_trade(out);
+        let out = self.games.leave(client_id);
+        self.deliver_trade(out);
         self.show_balloons();
         let out = self.merchants.leave(client_id, Instant::now());
         self.deliver_trade(out);
@@ -3270,6 +3321,8 @@ impl FieldActor {
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
         let out = self.shops.leave(client_id);
+        self.deliver_trade(out);
+        let out = self.games.leave(client_id);
         self.deliver_trade(out);
         self.show_balloons();
         let out = self.merchants.leave(client_id, Instant::now());
