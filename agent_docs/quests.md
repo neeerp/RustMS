@@ -204,6 +204,15 @@ record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
 so it is saved and sent as its progress string ("001"). The Thorn Remover the
 quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
 items"), and the Secretary of Magic (1300004) then completes the quest.
+"Find Fresh Milk" (2180) uses the same one-"kill" record only to remember
+the last cow milked; its completion needs just the full bottle. While it is started, Tangyoon (1092000) gives an empty bottle
+(4031847) and sends the player to the stable (912000100). Each mother cow
+(1092090 records 1, 1092091 records 2) fills the first bottle held by a
+third (4031848, 4031849, 4031850), but not twice running; a calf (1092094,
+1092095) drinks any milk in it, back to empty. The stable's way out
+(`end_cow`) keeps a player with a bottle that isn't full, and leads to
+Tangyoon's kitchen (120000103), where the full bottle completes the quest.
+The cows' and Tangyoon's text is unsourced and stays placeholder.
 Meren's crystal test (6033, level 75, a level 75 crystal shown) and the
 Gold Anvil (6036, level 105, after the paper 6035; the anvil is taken)
 carry no rewards in the data; their scripts (`q6033e`, `q6036e`) teach

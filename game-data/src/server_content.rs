@@ -1453,6 +1453,17 @@ pub mod keys {
     pub const MAKER_GLOVES_BOWMAN_UPGRADED: &str = "maker.gloves.bowman_upgraded";
     pub const MAKER_GLOVES_MAGICIAN_UPGRADED: &str = "maker.gloves.magician_upgraded";
     pub const MAKER_GLOVES_THIEF_UPGRADED: &str = "maker.gloves.thief_upgraded";
+    pub const MILK_TANGYOON_FULL: &str = "milk.tangyoon.full";
+    pub const MILK_COW_LAST: &str = "milk.cow.last";
+    pub const MILK_COW_NO_BOTTLE: &str = "milk.cow.no_bottle";
+    pub const MILK_COW_FULL: &str = "milk.cow.full";
+    pub const MILK_CALF_EMPTY: &str = "milk.calf.empty";
+    pub const MILK_CALF_DRINKS: &str = "milk.calf.drinks";
+    pub const MILK_CALF_NO_BOTTLE: &str = "milk.calf.no_bottle";
+    pub const MILK_JUG_NOT_FULL: &str = "milk.jug_not_full";
+    pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
+    pub const MILK_COW_FILLS: [&str; 3] =
+        ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2313,6 +2324,8 @@ mod tests {
             .chain(&keys::MAKER_PRACTICE)
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
+            .chain(&keys::MILK_TANGYOON)
+            .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
             .chain(&keys::HPQ_GROWLIE_ABOUT_PAGES)
@@ -2435,6 +2448,14 @@ mod tests {
                 keys::MAKER_GLOVES_BOWMAN_UPGRADED,
                 keys::MAKER_GLOVES_MAGICIAN_UPGRADED,
                 keys::MAKER_GLOVES_THIEF_UPGRADED,
+                keys::MILK_TANGYOON_FULL,
+                keys::MILK_COW_LAST,
+                keys::MILK_COW_NO_BOTTLE,
+                keys::MILK_COW_FULL,
+                keys::MILK_CALF_EMPTY,
+                keys::MILK_CALF_DRINKS,
+                keys::MILK_CALF_NO_BOTTLE,
+                keys::MILK_JUG_NOT_FULL,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");

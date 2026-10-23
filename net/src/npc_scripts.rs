@@ -17,7 +17,7 @@ use crate::items;
 use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
-use crate::scripts::Effect;
+use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
@@ -389,6 +389,15 @@ const ARIANT_DELIVERIES: [(i32, i16, i32, u8); 8] = [
     (2103010, 3926, 4031579, 2),
     (2103012, 3926, 4031579, 3),
 ];
+/// Find Fresh Milk (2180): Tangyoon (1092000) hands over an empty bottle
+/// and sends the player to his stable, where each mother cow fills a third
+/// of it, but not twice running (the quest's record holds the last one),
+/// and a calf drinks it all.
+const TANGYOON: i32 = 1092000;
+const STABLE: i32 = 912000100;
+/// The mother cows, each with the number the quest's record keeps for it.
+const MOTHER_COWS: [(i32, u16); 2] = [(1092090, 1), (1092091, 2)];
+const CALVES: [i32; 2] = [1092094, 1092095];
 const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
 const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
 const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
@@ -1569,6 +1578,15 @@ impl NpcScript {
         {
             return Some(script);
         }
+        if npc_id == TANGYOON && player.quests.state(FRESH_MILK) == QuestState::Started {
+            return Some(tangyoon());
+        }
+        if let Some(&(_, cow)) = MOTHER_COWS.iter().find(|cow| cow.0 == npc_id) {
+            return Some(mother_cow(npc_id, cow, player));
+        }
+        if CALVES.contains(&npc_id) {
+            return Some(calf(npc_id, player));
+        }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
             return Some(tower_rock(rock, player));
         }
@@ -2705,6 +2723,85 @@ fn info_setter(
         }],
     };
     Some(NpcScript::new(npc, pages))
+}
+
+/// Tangyoon, while Find Fresh Milk is under way: an empty bottle, and off
+/// to the stable.
+fn tangyoon() -> NpcScript {
+    let mut script = NpcScript::new(
+        TANGYOON,
+        vec![
+            Page::Say(text(keys::MILK_TANGYOON[0])),
+            Page::Say(text(keys::MILK_TANGYOON[1])),
+            Page::Done(vec![
+                Effect::GiveItem {
+                    item_id: MILK_BOTTLES[0],
+                    quantity: 1,
+                },
+                Effect::Warp(STABLE),
+            ]),
+        ],
+    );
+    script.inventory_full = Some(text(keys::MILK_TANGYOON_FULL));
+    script
+}
+
+/// A mother cow fills the first bottle held that isn't full by a third,
+/// unless she was the last to be milked.
+fn mother_cow(npc: i32, cow: u16, player: &Player) -> NpcScript {
+    let last = player.quests.kills(FRESH_MILK).first() == Some(&cow);
+    let held = MILK_BOTTLES[..3]
+        .iter()
+        .position(|&bottle| player.inventory.count(bottle) > 0);
+    let page = match held {
+        _ if last => Page::Say(text(keys::MILK_COW_LAST)),
+        Some(stage) => Page::Act {
+            text: text(keys::MILK_COW_FILLS[stage]),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: MILK_BOTTLES[stage],
+                    quantity: 1,
+                },
+                Effect::GiveItem {
+                    item_id: MILK_BOTTLES[stage + 1],
+                    quantity: 1,
+                },
+                Effect::QuestRecord {
+                    quest_id: FRESH_MILK,
+                    count: cow,
+                },
+            ],
+        },
+        None => Page::Say(text(keys::MILK_COW_NO_BOTTLE)),
+    };
+    let mut script = NpcScript::new(npc, vec![page]);
+    script.inventory_full = Some(text(keys::MILK_COW_FULL));
+    script
+}
+
+/// A calf drinks a bottle with any milk in it back to empty.
+fn calf(npc: i32, player: &Player) -> NpcScript {
+    let held = |bottle: &i32| player.inventory.count(*bottle) > 0;
+    let page = if held(&MILK_BOTTLES[0]) {
+        Page::Say(text(keys::MILK_CALF_EMPTY))
+    } else if let Some(&bottle) = MILK_BOTTLES[1..].iter().find(|bottle| held(bottle)) {
+        Page::Act {
+            text: text(keys::MILK_CALF_DRINKS),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: bottle,
+                    quantity: 1,
+                },
+                Effect::GiveItem {
+                    item_id: MILK_BOTTLES[0],
+                    quantity: 1,
+                },
+            ],
+        }
+    } else {
+        Page::Say(text(keys::MILK_CALF_NO_BOTTLE))
+    };
+    NpcScript::new(npc, vec![page])
 }
 
 /// A house in Ariant takes its delivery without a word, if it is still
@@ -11089,6 +11186,95 @@ mod tests {
             .find(|step| step.effects.contains(&Effect::GiveVariedItem(1302059)))
             .unwrap();
         assert_eq!(page_text(&made), text(keys::MAKER_DONE));
+    }
+
+    #[test]
+    fn tangyoons_cows_fill_a_bottle_a_third_at_a_time() {
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+        // Tangyoon gives an empty bottle and sends the player to the
+        // stable, only while Find Fresh Milk is under way.
+        let mut player = with_quests(&[(FRESH_MILK, false)]);
+        let mut tangyoon = NpcScript::for_npc(TANGYOON, &player).unwrap();
+        assert_eq!(page_text(&tangyoon.begin()), text(keys::MILK_TANGYOON[0]));
+        tangyoon.respond(ScriptInput::Next).unwrap();
+        let sent = tangyoon.respond(ScriptInput::Next).unwrap();
+        assert_eq!(sent.effects, [give(MILK_BOTTLES[0]), Effect::Warp(STABLE)]);
+        let idle = NpcScript::for_npc(TANGYOON, &traveller(70, 0, false));
+        assert!(idle.is_none_or(
+            |other| !other.begin().effects.contains(&give(MILK_BOTTLES[0]))
+                && other.begin().prompt.is_none_or(|prompt| !matches!(
+                    prompt,
+                    Prompt::Text(page) if page.text == text(keys::MILK_TANGYOON[0])
+                ))
+        ));
+
+        // With no bottle, the cows and calves have nothing to say about it.
+        let (first, second) = (MOTHER_COWS[0], MOTHER_COWS[1]);
+        let said = |npc, player: &Player| {
+            let script = NpcScript::for_npc(npc, player).unwrap();
+            let step = script.begin();
+            (page_text(&step), step.effects)
+        };
+        assert_eq!(said(first.0, &player).0, text(keys::MILK_COW_NO_BOTTLE));
+        assert_eq!(said(CALVES[0], &player).0, text(keys::MILK_CALF_NO_BOTTLE));
+
+        // A cow fills the empty bottle by a third and is remembered.
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MILK_BOTTLES[0], 1));
+        assert_eq!(said(CALVES[1], &player).0, text(keys::MILK_CALF_EMPTY));
+        let (page, effects) = said(first.0, &player);
+        assert_eq!(page, text(keys::MILK_COW_FILLS[0]));
+        assert_eq!(
+            effects,
+            [
+                take(MILK_BOTTLES[0]),
+                give(MILK_BOTTLES[1]),
+                Effect::QuestRecord {
+                    quest_id: FRESH_MILK,
+                    count: first.1,
+                },
+            ]
+        );
+        // The same cow twice running gives nothing; the other one fills on.
+        player.quests.upsert(game::QuestRecord {
+            quest_id: FRESH_MILK,
+            status: QuestStatus::Started {
+                kills: vec![first.1],
+                info: None,
+            },
+        });
+        player.inventory = traveller(70, 0, false).inventory;
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MILK_BOTTLES[2], 1));
+        let (page, effects) = said(first.0, &player);
+        assert_eq!(page, text(keys::MILK_COW_LAST));
+        assert!(effects.is_empty());
+        let (page, effects) = said(second.0, &player);
+        assert_eq!(page, text(keys::MILK_COW_FILLS[2]));
+        assert_eq!(
+            effects,
+            [
+                take(MILK_BOTTLES[2]),
+                give(MILK_BOTTLES[3]),
+                Effect::QuestRecord {
+                    quest_id: FRESH_MILK,
+                    count: second.1,
+                },
+            ]
+        );
+        // A calf drinks it all.
+        let (page, effects) = said(CALVES[0], &player);
+        assert_eq!(page, text(keys::MILK_CALF_DRINKS));
+        assert_eq!(effects, [take(MILK_BOTTLES[2]), give(MILK_BOTTLES[0])]);
     }
 
     #[test]
