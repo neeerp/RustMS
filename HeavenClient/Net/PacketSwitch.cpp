@@ -93,6 +93,7 @@ namespace ms
 		LOCK_UI = 221,
 		DISABLE_UI = 222,
 		MESSAGE_BOX = 232,
+		OPEN_UI_STRING_LIST = 233,
 
 		/// Inventory 2
 		GATHER_RESULT = 52,
@@ -538,6 +539,7 @@ namespace ms
 		emplace<LOCK_UI, LockUiHandler>();
 		emplace<DISABLE_UI, DisableUiHandler>();
 		emplace<MESSAGE_BOX, MessageBoxHandler>();
+		emplace<OPEN_UI_STRING_LIST, OpenUiStringListHandler>();
 	}
 
 	void PacketSwitch::forward(const int8_t* bytes, size_t length) const

@@ -327,6 +327,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME sp_reset_rules COMMAND sp_reset_rules_tests)
     add_executable(ui_control_tests tests/ui_control.cpp)
     add_test(NAME ui_control COMMAND ui_control_tests)
+    add_executable(image_slides_tests tests/image_slides.cpp)
+    add_test(NAME image_slides COMMAND image_slides_tests)
     add_executable(item_expiry_tests tests/item_expiry.cpp)
     add_test(NAME item_expiry COMMAND item_expiry_tests)
     add_executable(skill_macros_tests tests/skill_macros.cpp)
@@ -926,6 +928,8 @@ add_executable(HeavenClient
     IO/UITypes/UIDuey.h
     IO/UITypes/UITeleportRock.cpp
     IO/UITypes/UITeleportRock.h
+    IO/UITypes/UIImageSlides.cpp
+    IO/UITypes/UIImageSlides.h
     IO/UITypes/UIKite.cpp
     IO/UITypes/UIKite.h
     IO/UITypes/UITransform.cpp
@@ -1164,6 +1168,8 @@ add_executable(HeavenClient
     Util/SwindleWords.h
     Util/NxFiles.cpp
     Util/NxFiles.h
+    Util/PathImage.cpp
+    Util/PathImage.h
     Util/QuadTree.h
     Util/Randomizer.h
     Util/ScreenResolution.h

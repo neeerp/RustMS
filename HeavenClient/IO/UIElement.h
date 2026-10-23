@@ -139,6 +139,7 @@ namespace ms
 			WEDDINGREGISTRY,
 			NAMECHANGE,
 			STOREBANK,
+			IMAGESLIDES,
 			NUM_TYPES
 		};
 
