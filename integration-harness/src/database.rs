@@ -60,6 +60,30 @@ pub async fn set_nx_prepaid(user_name: &str, prepaid: i32) -> Result<(), Harness
     Ok(())
 }
 
+/// Give the account named `user_name` `slots` character slots.
+pub async fn set_character_slots(user_name: &str, slots: i16) -> Result<(), HarnessError> {
+    let user_name = user_name.to_string();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "set character slots",
+        message,
+    };
+    let updated = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query("UPDATE accounts SET character_slots = $1 WHERE user_name = $2")
+            .bind::<SmallInt, _>(slots)
+            .bind::<Text, _>(user_name)
+            .execute(&mut conn)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    if updated == 0 {
+        return Err(fixture("no such account".to_string()));
+    }
+    Ok(())
+}
+
 /// Make the account named `user_name` a GM of `level`, or not with 0.
 pub async fn set_gm_level(user_name: &str, level: i16) -> Result<(), HarnessError> {
     let user_name = user_name.to_string();

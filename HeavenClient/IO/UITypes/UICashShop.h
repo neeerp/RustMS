@@ -85,6 +85,9 @@ namespace ms
 		void refresh_slots();
 		void set_storage_slots(int16_t slots);
 		int16_t get_storage_slots() const;
+		// The account's character slots (v83 CCashShop+0x490).
+		void set_character_slots(int16_t slots);
+		int16_t get_character_slots() const;
 		void remove_cash_item(int64_t cash_id);
 		void set_wish_list(const std::vector<int32_t>& sns);
 		// Whether the last change to the wish list added a wish (v83 CCashShop+0x4c8 clear), which
@@ -207,6 +210,7 @@ namespace ms
 		bool wish_added;
 		int32_t name_change_sn;
 		int16_t storage_slots;
+		int16_t character_slots;
 
 		std::vector<CashItem> cash_items;
 		Slider cash_slider;

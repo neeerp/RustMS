@@ -586,6 +586,22 @@ pub fn build_cash_shop_expand(cash_type: i32, bag: Option<u8>) -> Result<Packet,
     Ok(packet)
 }
 
+/// CASHSHOP_OPERATION 0x08: buy the Extra Character Slot Coupon `sn` with
+/// `cash_type` (1 Credit, 2 Maple Points, 4 Prepaid).
+pub fn build_cash_shop_buy_character_slot(cash_type: i32, sn: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_bytes(&[0x08, u8::from(cash_type == 2)])
+        .map_err(|e| format!("failed to write character slot action: {e}"))?;
+    packet
+        .write_int(cash_type)
+        .map_err(|e| format!("failed to write character slot cash type: {e}"))?;
+    packet
+        .write_int(sn)
+        .map_err(|e| format!("failed to write character slot serial number: {e}"))?;
+    Ok(packet)
+}
+
 /// CASHSHOP_OPERATION gift: the birthday code, the serial number, and the
 /// receiver's name and message.
 pub fn build_cash_shop_gift(

@@ -242,7 +242,7 @@ namespace ms
 				items.push_back(read_cash_item(recv));
 
 			cashshop->set_storage_slots(recv.read_short());
-			recv.skip_short();	// character slots
+			cashshop->set_character_slots(recv.read_short());
 
 			cashshop->set_cash_items(items);
 			break;
@@ -336,6 +336,19 @@ namespace ms
 			cashshop->set_storage_slots(recv.read_short());
 			UI::get().emplace<UIOk>("You have added slots to your item inventory.", [](bool) {});
 			break;
+		case 0x64:
+		{
+			// The account has another character slot; the balance follows.
+			// v83 (47ac0a) takes no count but a higher one, up to 15.
+			int16_t slots = recv.read_short();
+
+			if (!cash_catalog::added_character_slot(cashshop->get_character_slots(), slots))
+				break;
+
+			cashshop->set_character_slots(slots);
+			UI::get().emplace<UIOk>("You have added a new character slot.", [](bool) {});	// StringPool 0x214
+			break;
+		}
 		case 0x5E:
 		{
 			// A gift is on its way; the balance follows.

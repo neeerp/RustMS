@@ -214,6 +214,20 @@ namespace ms
 	};
 
 	// Opcode: CASHSHOP_OPERATION(229)
+	class BuyCharacterSlotPacket : public OutPacket
+	{
+	public:
+		// The Extra Character Slot Coupon's commodity sn (v83 46c6f8)
+		BuyCharacterSlotPacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(8);
+			write_byte(cash_type == 2);
+			write_int(cash_type);
+			write_int(sn);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
 	class GiftCashItemPacket : public OutPacket
 	{
 	public:

@@ -83,6 +83,12 @@ int main()
 		require(advancement_slots(500, 2, 92, 4) == 4 && advancement_slots(1100, 4, 92, 4) == 4, "pirates and Cygnus warriors as warriors");
 		require(advancement_slots(900, 2, 92, 4) == 0, "GMs aren't asked");
 
+		require(is_character_slot(5430000) && !is_character_slot(5431000) && !is_character_slot(9110000),
+			"only 5430xxx adds a character slot");
+		require(added_character_slot(3, 4) && added_character_slot(14, 15), "a slot more, up to 15");
+		require(!added_character_slot(4, 4) && !added_character_slot(5, 4) && !added_character_slot(15, 16),
+			"never fewer, the same, or past 15");
+
 		require(!best_item_refusal(5072000, 11) && best_item_refusal(5072000, 10), "megaphones from level 11");
 		require(best_item_refusal(5030000, 15) && best_item_refusal(5140000, 15) && !best_item_refusal(5030000, 16),
 			"shops from level 16");
