@@ -219,6 +219,8 @@ namespace ms
 		add_sound(Sound::Name::TOMBSTONE, gamesrc["Tombstone"]);
 		add_sound(Sound::Name::ENCHANTSUCCESS, gamesrc["EnchantSuccess"]);
 		add_sound(Sound::Name::ENCHANTFAILURE, gamesrc["EnchantFailure"]);
+		add_sound(Sound::Name::ENCHANTSUCCESS_DELAY, gamesrc["EnchantSuccess_Delay"]);
+		add_sound(Sound::Name::ENCHANTFAILURE_DELAY, gamesrc["EnchantFailure_Delay"]);
 		add_sound(Sound::Name::MCARDGET, gamesrc["mCardGet"]);
 		add_sound(Sound::Name::ITEMLEVELUP, gamesrc["ItemLevelUp"]);
 		add_sound(Sound::Name::INCEXP, gamesrc["IncEXP"]);

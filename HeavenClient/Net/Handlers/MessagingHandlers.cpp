@@ -882,7 +882,12 @@ namespace ms
 			return;
 		}
 
-		Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+		// Others watching a Legendary Spirit hear its _Delay sounds.
+		if (legendary)
+			Sound(success ? Sound::Name::ENCHANTSUCCESS_DELAY : Sound::Name::ENCHANTFAILURE_DELAY).play();
+		else
+			Sound(success ? Sound::Name::ENCHANTSUCCESS : Sound::Name::ENCHANTFAILURE).play();
+
 		Stage::get().show_character_effect(cid, success ? CharEffect::Id::SCROLL_SUCCESS : CharEffect::Id::SCROLL_FAILURE);
 
 		if (own)
