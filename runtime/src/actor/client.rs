@@ -1559,6 +1559,11 @@ impl ClientActor {
                     .await
             }
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
+            ServerMessage::RestartEventClock => {
+                self.tell_event(net::events::EventCommand::RestartClock)
+                    .await
+            }
+            ServerMessage::EventClock { id, clock } => self.event_clock(id, clock).await?,
             ServerMessage::EventMoved {
                 id,
                 from,

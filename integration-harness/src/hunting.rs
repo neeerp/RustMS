@@ -388,8 +388,8 @@ pub struct Field {
     pub heals: Vec<(i32, i32)>,
     /// Mobs another mob hurt: (object id, damage, HP left).
     pub mobs_hurt: Vec<(i32, i32, i32)>,
-    /// How each mob appeared: a summon effect, -2 fading in, or -1 just
-    /// there.
+    /// How each mob appeared: a summon effect, -2 fading in, -1 just
+    /// there, or -3 out of another mob.
     pub appearances: BTreeMap<i32, i8>,
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,

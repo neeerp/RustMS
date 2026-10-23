@@ -919,6 +919,7 @@ unsourced = [
     "horntail.squad.notice.opened",
     "horntail.squad.notice.started",
     "horntail.trial.sealed",
+    "horntail.summoned",
     "tower_rock.none",
     "tower_rock.menu",
     "tower_rock.ask",

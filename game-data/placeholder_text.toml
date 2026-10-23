@@ -1069,6 +1069,7 @@
 "horntail.squad.notice.opened" = "[placeholder] {name} is gathering an expedition against Horntail at the Entrance to Horntail's Cave."
 "horntail.squad.notice.started" = "[placeholder] {name}'s expedition has set out into Horntail's cave."
 "horntail.trial.sealed" = "[placeholder] A seal holds this door shut while the trial's head lives."
+"horntail.summoned" = "[placeholder] The cave shakes: Horntail rises from the deep!"
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"

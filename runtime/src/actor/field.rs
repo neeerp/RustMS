@@ -3,9 +3,7 @@ use crate::actor::field_games::{GameRoomRequest, Games};
 use crate::actor::field_kites::KiteSet;
 use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
-use crate::actor::field_mobs::{
-    split_exp, BossBar, Cast, CastArea, Catch, Kill, LiveMob, MobSet, Sharer,
-};
+use crate::actor::field_mobs::{split_exp, BossBar, Cast, CastArea, Catch, Kill, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_summons::SummonSet;
@@ -396,7 +394,7 @@ impl FieldActor {
             ) {
                 occupant.handle.send_packet(packet);
             }
-            self.show_boss_bar(self.mobs.get(hurt.object_id).and_then(LiveMob::boss_bar));
+            self.show_boss_bar(self.mobs.bar_for(hurt.object_id));
         }
         self.mobs.recover(now);
         for (object_id, lost) in self.mobs.expire_statuses(now) {
@@ -1643,7 +1641,7 @@ impl FieldActor {
                         attacker.send_packet(packet);
                     }
                     if damage > 0 {
-                        self.show_boss_bar(self.mobs.get(object_id).and_then(LiveMob::boss_bar));
+                        self.show_boss_bar(self.mobs.bar_for(object_id));
                     }
                     let eater = takes
                         .mp
@@ -1823,7 +1821,7 @@ impl FieldActor {
                 };
                 let hp = i32::try_from(mob.hp).unwrap_or(i32::MAX);
                 let packet = build_damage_mob(victim, damage as i32, hp, mob.info.max_hp);
-                let bar = mob.boss_bar();
+                let bar = self.mobs.bar_for(victim);
                 if let Ok(packet) = packet {
                     self.broadcast(Some(from), packet);
                 }
@@ -2395,7 +2393,7 @@ impl FieldActor {
                     if let Ok(packet) = build_heal_mob(object_id, healed, hp, max_hp) {
                         self.broadcast(None, packet);
                     }
-                    self.show_boss_bar(self.mobs.get(object_id).and_then(LiveMob::boss_bar));
+                    self.show_boss_bar(self.mobs.bar_for(object_id));
                 }
             }
             Some(MobSkillEffect::Summon) => {
@@ -2655,6 +2653,78 @@ impl FieldActor {
         }
         for occupant in self.occupants.values() {
             occupant.handle.send(ServerMessage::BossSummoned);
+        }
+    }
+
+    /// Horntail's stone broke: its music plays, and unless Horntail is
+    /// already coming, it comes out on the ground below `HORNTAIL_AT`: the
+    /// intro, then its body and eight parts out of it, sharing the body's
+    /// HP, and the expedition's clock starts over (through whoever broke
+    /// the stone, or someone still here). Then everyone here reads that it
+    /// comes.
+    fn bring_out_horntail(&mut self, by: ClientId) {
+        use net::mobs::{HORNTAIL, HORNTAIL_AT, HORNTAIL_INTRO, HORNTAIL_PARTS};
+        if let Ok(packet) = build_field_music(reactors::HORNTAIL_MUSIC) {
+            self.broadcast(None, packet);
+        }
+        let coming = self
+            .mobs
+            .live()
+            .any(|mob| mob.info.mob_id == HORNTAIL_INTRO);
+        // The nine come out here, so the summoning, which one hit kills,
+        // lets out nothing more (its `revive` lists them all).
+        let intro = net::mobs::info(HORNTAIL_INTRO)
+            .filter(|_| !coming)
+            .map(|info| game_data::mobs::MobInfo {
+                revive: Vec::new(),
+                ..info
+            });
+        let body = net::mobs::info(HORNTAIL);
+        if let (Some(intro), Some(body)) = (intro, body) {
+            let (x, y) = HORNTAIL_AT;
+            let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+            let at = (x, ground.saturating_sub(1));
+            let now = Instant::now();
+            let intro = self.mobs.place(intro, at, 5, None, now);
+            if let Some(Ok(packet)) = self
+                .mobs
+                .get(intro)
+                .map(|mob| build_spawn_mob(&mob.view(true)))
+            {
+                self.broadcast(None, packet);
+            }
+            let body = self.mobs.place(body, at, 5, None, now);
+            let parts: Vec<i32> = HORNTAIL_PARTS
+                .filter_map(net::mobs::info)
+                .map(|part| self.mobs.place(part, at, 5, None, now))
+                .collect();
+            self.mobs.link(body, &parts);
+            // As Cosmic's updateBossSpawn, his bar shows as he comes out.
+            self.show_boss_bar(self.mobs.bar_for(body));
+            for object_id in std::iter::once(body).chain(parts.iter().copied()) {
+                let view = self.mobs.get(object_id).map(|mob| MobView {
+                    parent: Some(intro),
+                    ..mob.view(false)
+                });
+                if let Some(Ok(packet)) = view.as_ref().map(build_spawn_mob) {
+                    self.broadcast(None, packet);
+                }
+            }
+            if let Some(controller) = self.occupants.keys().next().copied() {
+                let controlled = self.mobs.assign_uncontrolled(controller);
+                self.send_control(controller, &controlled);
+            }
+            let teller = self
+                .occupants
+                .get(&by)
+                .or_else(|| self.occupants.values().next());
+            if let Some(occupant) = teller.filter(|_| self.key.instance_id != 0) {
+                occupant.handle.send(ServerMessage::RestartEventClock);
+            }
+        }
+        let line = net::content::text().get(keys::HORNTAIL_SUMMONED, &[]);
+        if let Ok(packet) = build_item_line(&line, 0) {
+            self.broadcast(None, packet);
         }
     }
 
@@ -3074,6 +3144,10 @@ impl FieldActor {
             // Cosmic `changeMusic`, `spawnFakeMonster` (the body first),
             // `spawnMonster` for each arm, then `mapMessage(5, ..)`.
             reactors::Action::Zakum => self.bring_out_zakum((view.x, view.y)),
+            // Cosmic `changeMusic`, `spawnHorntailOnGroundBelow` and
+            // `restartEventTimer` unless the intro is out, then
+            // `mapMessage(6, ..)`.
+            reactors::Action::Horntail => self.bring_out_horntail(by),
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out

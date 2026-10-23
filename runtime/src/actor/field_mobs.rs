@@ -84,6 +84,20 @@ pub struct LiveMob {
     pub mob_hit_at: Option<Instant>,
     /// When a friendly mob next drops what it makes (`dropItemPeriod`).
     pub next_drop: Option<Instant>,
+    /// Its HP shared with another mob's (`MobSet::link`).
+    pub link: Option<Link>,
+}
+
+/// How a mob's HP is tied to another's: Horntail's (Cosmic
+/// `spawnHorntailOnGroundBelow`, whose listeners do it).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Link {
+    /// The body, whose HP only its parts' hits take and their heals give
+    /// back. Hits and heals of its own come to nothing.
+    Body,
+    /// A part of the body with this object id: each hit on it, and each
+    /// heal, is the body's as well, but never kills the body.
+    Part(i32),
 }
 
 /// What a mob touching a friendly mob did to it.
@@ -292,6 +306,7 @@ impl LiveMob {
             stolen: false,
             mob_hit_at: None,
             next_drop,
+            link: None,
         }
     }
 
@@ -439,6 +454,7 @@ impl LiveMob {
             statuses: self.status_views(Instant::now()),
             summon_effect: None,
             fake: false,
+            parent: None,
         }
     }
 
@@ -459,6 +475,14 @@ impl LiveMob {
     pub fn hp_percent(&self) -> u8 {
         let max = i64::from(self.info.max_hp.max(1));
         ((self.hp.max(0) * 100 + max - 1) / max).clamp(0, 100) as u8
+    }
+
+    /// The body whose HP it shares, if it is a part of one.
+    pub fn body(&self) -> Option<i32> {
+        match self.link {
+            Some(Link::Part(body)) => Some(body),
+            _ => None,
+        }
     }
 
     /// Its boss HP bar as it stands, if the field's clients are shown one.
@@ -990,15 +1014,60 @@ impl MobSet {
         })
     }
 
-    /// A mob regains `hp` and `mp`, up to its maxima. Returns the HP it
-    /// gained, its HP, and its max HP.
+    /// A mob regains `hp` and `mp`, up to its maxima, and a part's body the
+    /// HP it gained; a body none. Returns the HP it gained, its HP, and its
+    /// max HP.
     pub fn heal(&mut self, object_id: i32, hp: i32, mp: i32) -> Option<(i32, i32, i32)> {
         let mob = self.live.get_mut(&object_id)?;
         let max_hp = i64::from(mob.info.max_hp);
+        let hp = if mob.link == Some(Link::Body) { 0 } else { hp };
         let healed = i64::from(hp.max(0)).min((max_hp - mob.hp).max(0));
         mob.hp += healed;
         mob.mp = (mob.mp + mp.max(0)).min(mob.info.max_mp.max(mob.mp));
-        Some((healed as i32, mob.hp as i32, mob.info.max_hp))
+        let healed_mob = (healed as i32, mob.hp as i32, mob.info.max_hp);
+        let body = mob.body();
+        self.mend_body(body, healed);
+        Some(healed_mob)
+    }
+
+    /// Make `parts` (by object id) parts of the body `body`, sharing its HP
+    /// (`Link`).
+    pub fn link(&mut self, body: i32, parts: &[i32]) {
+        if let Some(mob) = self.live.get_mut(&body) {
+            mob.link = Some(Link::Body);
+        }
+        for part in parts {
+            if let Some(mob) = self.live.get_mut(part) {
+                mob.link = Some(Link::Part(body));
+            }
+        }
+    }
+
+    /// What `from` dealt a part its body takes too, down to 1 HP, in their
+    /// name (Cosmic `applyFakeDamage`, `stayAlive`).
+    fn hurt_body(&mut self, body: Option<i32>, from: ClientId, dealt: i64) {
+        if let Some(body) = body.and_then(|body| self.live.get_mut(&body)) {
+            let taken = dealt.min(body.hp - 1).max(0);
+            body.hp -= taken;
+            *body.damage_by.entry(from).or_default() += taken;
+        }
+    }
+
+    /// A part's body, if it is out, regains `hp`, up to its max.
+    fn mend_body(&mut self, body: Option<i32>, hp: i64) {
+        if let Some(body) = body.and_then(|body| self.live.get_mut(&body)) {
+            body.hp = (body.hp + hp.max(0)).min(i64::from(body.info.max_hp));
+        }
+    }
+
+    /// The boss HP bar a hit on `object_id` shows: its own, or its body's.
+    pub fn bar_for(&self, object_id: i32) -> Option<BossBar> {
+        let mob = self.live.get(&object_id)?;
+        mob.boss_bar().or_else(|| {
+            mob.body()
+                .and_then(|body| self.live.get(&body))
+                .and_then(LiveMob::boss_bar)
+        })
     }
 
     /// MP Eater: a mob, not a boss, loses `percent` of its max MP, as much
@@ -1187,6 +1256,7 @@ impl MobSet {
     /// `mpRecovery`, up to its maxima. Nothing is sent: the next HP the
     /// clients see has it.
     pub fn recover(&mut self, now: Instant) {
+        let mut mended = Vec::new();
         for mob in self.live.values_mut() {
             if mob.hp <= 0 || mob.next_recovery > now {
                 continue;
@@ -1194,8 +1264,12 @@ impl MobSet {
             mob.next_recovery = now + RECOVERY;
             let info = &mob.info;
             let max_hp = i64::from(info.max_hp);
-            if mob.hp < max_hp {
-                mob.hp = (mob.hp + i64::from(info.hp_recovery.max(0))).min(max_hp);
+            if mob.hp < max_hp && mob.link != Some(Link::Body) {
+                let hp = (mob.hp + i64::from(info.hp_recovery.max(0))).min(max_hp);
+                if let Some(body) = mob.body() {
+                    mended.push((body, hp - mob.hp));
+                }
+                mob.hp = hp;
             }
             if mob.mp < info.max_mp {
                 mob.mp = mob
@@ -1203,6 +1277,9 @@ impl MobSet {
                     .saturating_add(info.mp_recovery.max(0))
                     .min(info.max_mp);
             }
+        }
+        for (body, hp) in mended {
+            self.mend_body(Some(body), hp);
         }
     }
 
@@ -1238,15 +1315,17 @@ impl MobSet {
         let shielded: Vec<i32> = self
             .live
             .values()
-            .filter(|mob| self.shields(mob))
+            .filter(|mob| self.shields(mob) || mob.link == Some(Link::Body))
             .map(|mob| mob.object_id)
             .collect();
         let mut hurt = Vec::new();
+        let mut to_bodies = Vec::new();
         for mob in self
             .live
             .values_mut()
             .filter(|mob| !shielded.contains(&mob.object_id))
         {
+            let body = mob.body();
             for (_, status) in mob.statuses.iter_mut().filter(|(stat, _)| stat.hurts()) {
                 if status.next_hurt > now {
                     continue;
@@ -1268,6 +1347,7 @@ impl MobSet {
                 }
                 mob.hp -= dealt;
                 *mob.damage_by.entry(status.from).or_default() += dealt;
+                to_bodies.extend(body.map(|body| (body, status.from, dealt)));
                 hurt.push(Hurt {
                     object_id: mob.object_id,
                     from: status.from,
@@ -1278,6 +1358,9 @@ impl MobSet {
             for entry in hurt.iter_mut().filter(|h| h.object_id == mob.object_id) {
                 entry.percent = percent;
             }
+        }
+        for (body, from, dealt) in to_bodies {
+            self.hurt_body(Some(body), from, dealt);
         }
         hurt
     }
@@ -1290,13 +1373,17 @@ impl MobSet {
         damage: i64,
         now: Instant,
     ) -> Option<Result<u8, Kill>> {
-        if self.shielded(object_id) {
+        let body = self.live.get(&object_id)?.link == Some(Link::Body);
+        if body || self.shielded(object_id) {
             return self.live.get(&object_id).map(|mob| Ok(mob.hp_percent()));
         }
         let mob = self.live.get_mut(&object_id)?;
         let dealt = damage.clamp(0, mob.hp);
         mob.hp -= dealt;
         *mob.damage_by.entry(from).or_default() += dealt;
+        let body = mob.body();
+        self.hurt_body(body, from, dealt);
+        let mob = self.live.get_mut(&object_id)?;
         // One that destroys itself does so once a hit leaves it at its `hp`,
         // and counts as killed, as in Cosmic.
         let destructs = mob.destructs();
@@ -1332,7 +1419,11 @@ impl MobSet {
             damage_by: ranked_damage(&mob.damage_by),
             showdown,
             leave,
-            boss_bar: mob.boss_bar_gone(),
+            boss_bar: mob.boss_bar_gone().or_else(|| {
+                mob.body()
+                    .and_then(|body| self.live.get(&body))
+                    .and_then(LiveMob::boss_bar)
+            }),
         }))
     }
 
@@ -2150,6 +2241,52 @@ mod tests {
         assert!(!mobs.shielded(body));
         assert_eq!(mobs.assign_uncontrolled(2), [body]);
         assert_eq!(mobs.damage(2, body, 60, now), Some(Ok(40)));
+    }
+
+    #[test]
+    fn horntails_parts_share_its_hp_but_never_kill_it() {
+        let now = Instant::now();
+        let mut mobs = MobSet::default();
+        let mob = |mob_id, max_hp| MobInfo {
+            mob_id,
+            max_hp,
+            ..MobInfo::default()
+        };
+        let barred = MobInfo {
+            hp_tag_color: 3,
+            hp_tag_bg_color: 5,
+            ..mob(net::mobs::HORNTAIL, 1000)
+        };
+        let body = mobs.place(barred, (0, 0), 5, None, now);
+        let head = mobs.place(mob(8810002, 300), (0, 0), 5, None, now);
+        let tail = mobs.place(mob(8810009, 900), (0, 0), 5, None, now);
+        mobs.link(body, &[head, tail]);
+        // Hits of its own, and heals, come to nothing.
+        assert_eq!(mobs.damage(1, body, 60, now), Some(Ok(100)));
+        assert_eq!(mobs.heal(body, 50, 0), Some((0, 1000, 1000)));
+        // A part's hit is the body's too, in the hitter's name, and shows
+        // the body's bar.
+        assert!(mobs.damage(1, head, 100, now).unwrap().is_ok());
+        assert_eq!(mobs.get(body).unwrap().hp, 900);
+        assert_eq!(mobs.get(body).unwrap().damage_by[&1], 100);
+        assert_eq!(mobs.bar_for(head).map(|bar| bar.hp), Some(900));
+        // Its heal gives back as much; poison takes from both.
+        assert_eq!(mobs.heal(head, 40, 0), Some((40, 240, 300)));
+        assert_eq!(mobs.get(body).unwrap().hp, 940);
+        let until = now + Duration::from_secs(10);
+        mobs.add_statuses(tail, &[(MobStat::Poison, 30)], 2101005, 1, now, until);
+        mobs.add_statuses(body, &[(MobStat::Poison, 30)], 2101005, 1, now, until);
+        let hurt = mobs.hurt_by_statuses(now + HURT_INTERVAL);
+        assert_eq!(hurt.iter().map(|h| h.object_id).collect::<Vec<_>>(), [tail]);
+        assert_eq!(mobs.get(body).unwrap().hp, 910);
+        // A part's death takes what it had left, and the kill shows the
+        // body's bar, the body still out.
+        let kill = mobs.damage(2, head, 1000, now).unwrap().unwrap_err();
+        assert_eq!(mobs.get(body).unwrap().hp, 670);
+        assert_eq!(kill.boss_bar.map(|bar| bar.hp), Some(670));
+        // However hard the rest is hit, the body keeps 1 HP.
+        assert!(mobs.damage(2, tail, 900, now).unwrap().is_err());
+        assert_eq!(mobs.get(body).unwrap().hp, 1);
     }
 
     #[test]

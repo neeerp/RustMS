@@ -915,6 +915,9 @@ pub const HORNTAIL: Event = Event {
     until_empty: false,
 };
 
+/// The time Horntail's expedition has left once Horntail comes out.
+pub const HORNTAIL_FIGHT_MINUTES: u64 = 60;
+
 /// The Cave of Life's two trials, the first where Horntail's expedition
 /// comes in, and Horntail's Cave, the last of its maps.
 pub const HORNTAIL_TRIAL_I: i32 = 240_060_000;
@@ -1321,6 +1324,10 @@ pub enum EventCommand {
     /// The leader handed Aura the Fire Ore and the documents: the Dead
     /// Mine is won, with `ZPQ_DOCUMENTS` set first.
     WinWithDocuments,
+    /// The member's field brought out the event's boss, whose clock then
+    /// starts over: Horntail's (`HORNTAIL_FIGHT_MINUTES`, Cosmic
+    /// `restartEventTimer`).
+    RestartClock,
     /// The member took their share of the won event's prize from Aura,
     /// once each (Cosmic's `gridInsert`): only their own ticket keeps it,
     /// so it goes when they leave.

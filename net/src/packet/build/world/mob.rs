@@ -40,6 +40,9 @@ pub struct MobView {
     /// A mob not yet real comes out trembling (-4), as Zakum's body does
     /// before its arms (the v83 client shakes the screen for 8800000).
     pub fake: bool,
+    /// The object id of the mob it comes out of as that one dies (-3), as
+    /// Horntail and its parts do out of the intro (Cosmic `setParentMobOid`).
+    pub parent: Option<i32>,
 }
 
 /// The statuses as the client reads them (FUN_0078b0b1): their flags, then
@@ -80,17 +83,21 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
     p.write_short(mob.foothold)?;
     p.write_short(mob.home_foothold)?;
     // How it appears (FUN_00662884): a summon effect of its own, with an
-    // int the client waits in ms before playing it, -4 not yet real, -2
-    // fading in, or -1 just there.
-    match mob.summon_effect {
-        Some(effect) => {
+    // int the client waits in ms before playing it, -4 not yet real, -3
+    // out of the dying mob an int names, -2 fading in, or -1 just there.
+    match (mob.summon_effect, mob.parent) {
+        (Some(effect), _) => {
             p.write_byte(effect)?;
             p.write_int(0)?;
         }
-        None if mob.fake => {
+        (None, Some(parent)) => {
+            p.write_byte(-3i8 as u8)?;
+            p.write_int(parent)?;
+        }
+        (None, None) if mob.fake => {
             p.write_byte(-4i8 as u8)?;
         }
-        None => {
+        (None, None) => {
             p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
         }
     }
@@ -392,6 +399,7 @@ mod tests {
             statuses: Vec::new(),
             summon_effect: None,
             fake: false,
+            parent: None,
         }
     }
 
@@ -518,6 +526,21 @@ mod tests {
         expect.bytes(&[0; 16]);
         expect.short(147).short(-25).byte(5).short(45).short(44);
         expect.byte(-4i8 as u8).byte(-1i8 as u8).int(0);
+        expect.end();
+    }
+
+    #[test]
+    fn a_mob_out_of_another_names_it() {
+        let mut mob = snail();
+        mob.parent = Some(2_000_000_000);
+        let packet = build_spawn_mob(&mob).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::SpawnMonster as i16);
+        expect.int(2_000_000_001).byte(5).int(100100);
+        expect.bytes(&[0; 16]);
+        expect.short(147).short(-25).byte(5).short(45).short(44);
+        expect.byte(-3i8 as u8).int(2_000_000_000);
+        expect.byte(-1i8 as u8).int(0);
         expect.end();
     }
 

@@ -716,6 +716,23 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Event `id`'s clock started over, to run out at `clock`: shown at
+    /// once on its maps.
+    pub(super) async fn event_clock(
+        &mut self,
+        id: u32,
+        clock: Instant,
+    ) -> Result<(), RuntimeError> {
+        let Some(ticket) = self.event.as_mut().filter(|ticket| ticket.id == id) else {
+            return Ok(());
+        };
+        ticket.clock = Some(clock);
+        if self.in_cash_shop || self.game.is_none() {
+            return Ok(());
+        }
+        self.show_event_clock().await
+    }
+
     /// A cleared stage's gate stays open for whoever comes onto its map.
     pub(super) async fn show_event_gate(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
