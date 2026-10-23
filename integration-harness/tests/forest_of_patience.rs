@@ -1,5 +1,6 @@
 //! Shane, in Ellinia, lets players from level 25 into the Forest of
-//! Patience for 5000 mesos, and Louis inside sees them back to town.
+//! Patience for 5000 mesos, and Louis inside sees them back to town, as
+//! does the pile of flowers at the end, with a prize.
 
 use game_data::GameData;
 use integration_harness::database::{set_job, set_meso};
@@ -18,6 +19,8 @@ const ELLINIA: i32 = 101000000;
 const STEP_1: i32 = 101000100;
 const SHANE: i32 = 1032003;
 const LOUIS: i32 = 1032004;
+const STEP_2: i32 = 101000101;
+const PILE_OF_FLOWERS: i32 = 1043000;
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -80,5 +83,18 @@ async fn shane_lets_players_into_the_forest_of_patience_and_louis_out() {
     let t = step(c, &m, talk(STEP_1, LOUIS)).await;
     assert_eq!(t.prompts, [(LOUIS, 1)]);
     let t = step(c, &m, answer(1, 1, None)).await;
+    assert_eq!(t.arrivals, [(ELLINIA, 0, None)]);
+
+    // The pile of flowers gives a piece of clothing and sends the player
+    // out, without a word.
+    assert_eq!(warp(c, STEP_2, "", &mut trace).await, STEP_2);
+    barrier(c, &m, &mut trace).await;
+    let t = step(c, &m, talk(STEP_2, PILE_OF_FLOWERS)).await;
+    assert!(t.prompts.is_empty());
+    assert!(
+        matches!(t.added[..], [(1, _, item)] if item / 10_000 == 104 || item / 10_000 == 170),
+        "{:?}",
+        t.added
+    );
     assert_eq!(t.arrivals, [(ELLINIA, 0, None)]);
 }

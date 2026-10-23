@@ -980,3 +980,4 @@
 "tower_rock.none" = "[placeholder] A magic rock. Nothing happens without #b#t{item}##k."
 "tower_rock.menu" = "[placeholder] The rock answers #b#t{item}##k. Where to?"
 "tower_rock.ask" = "[placeholder] Use one #b#t{item}##k and go to #m{map}#?"
+"patience.full" = "[placeholder] You have no room for what lies in the pile. Make some room in your inventory first."

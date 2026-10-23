@@ -1301,6 +1301,9 @@ impl NpcScript {
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
             return Some(tower_rock(rock, player));
         }
+        if let Some(pile) = PATIENCE_PILES.iter().find(|pile| pile.npc == npc_id) {
+            return Some(patience_pile(pile, player, &mut rand::thread_rng()));
+        }
         if let Some((_, route)) = SELLERS.iter().find(|(seller, _)| *seller == npc_id) {
             return Some(ticket_seller(npc_id, route, player));
         }
@@ -4915,6 +4918,142 @@ fn tower_rock(rock: &TowerRock, player: &Player) -> NpcScript {
     NpcScript::new(rock.npc, vec![page])
 }
 
+/// A pile at the end of a Forest of Patience. A player on its quest who
+/// lacks the quest's items finds them there; anyone else finds a prize,
+/// and in Ellinia's forest everyone does. Then it sends the player out,
+/// with no words.
+struct PatiencePile {
+    npc: i32,
+    quest: i16,
+    item: i32,
+    count: i16,
+    always_prize: bool,
+    /// Item, quantity and weight. Clothes for the other gender are left
+    /// out.
+    prizes: &'static [(i32, i16, u32)],
+    out: i32,
+}
+
+/// The piles, from Cosmic's scripts (ids, quantities, weights).
+const PATIENCE_PILES: [PatiencePile; 5] = [
+    // The pile of flowers and the pile of herbs in Ellinia's forest, for
+    // Sabitrama's quests 2050 and 2051.
+    PatiencePile {
+        npc: 1043000,
+        quest: 2050,
+        item: 4031020,
+        count: 1,
+        always_prize: true,
+        prizes: &[
+            (1040052, 1, 10),
+            (1040054, 1, 10),
+            (1040130, 1, 10),
+            (1041143, 1, 15),
+            (1042013, 1, 10),
+            (1042022, 1, 10),
+            (1042034, 1, 10),
+            (1042084, 1, 10),
+            (1042098, 1, 10),
+            (1042117, 1, 10),
+            (1702002, 1, 5),
+            (1702015, 1, 5),
+        ],
+        out: ELLINIA,
+    },
+    PatiencePile {
+        npc: 1043001,
+        quest: 2051,
+        item: 4031032,
+        count: 1,
+        always_prize: true,
+        prizes: &[
+            (1060041, 1, 10),
+            (1060048, 1, 10),
+            (1060116, 1, 10),
+            (1061113, 1, 10),
+            (1061130, 1, 10),
+            (1061139, 1, 10),
+            (1062009, 1, 10),
+            (1062017, 1, 10),
+            (1062024, 1, 10),
+            (1062056, 1, 10),
+            (1062061, 1, 10),
+            (1702045, 1, 5),
+            (1702114, 1, 5),
+        ],
+        out: ELLINIA,
+    },
+    // The pink, blue and white flowers at the ends of the Deep Forest's
+    // steps, for John's quests 2052 to 2054.
+    PatiencePile {
+        npc: 1063000,
+        quest: 2052,
+        item: 4031025,
+        count: 10,
+        always_prize: false,
+        prizes: &[
+            (4010000, 3, 1),
+            (4010001, 3, 1),
+            (4010002, 3, 1),
+            (4010003, 3, 1),
+            (4010004, 3, 1),
+            (4010005, 3, 1),
+        ],
+        out: STATUE_FOREST,
+    },
+    PatiencePile {
+        npc: 1063001,
+        quest: 2053,
+        item: 4031026,
+        count: 20,
+        always_prize: false,
+        prizes: &[(4020000, 4, 1), (4020002, 4, 1), (4020006, 4, 1)],
+        out: STATUE_FOREST,
+    },
+    PatiencePile {
+        npc: 1063002,
+        quest: 2054,
+        item: 4031028,
+        count: 30,
+        always_prize: false,
+        prizes: &[(4010006, 4, 1), (4010007, 4, 1), (4020007, 4, 1)],
+        out: STATUE_FOREST,
+    },
+];
+
+fn patience_pile(pile: &PatiencePile, player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let on_quest = player.quests.state(pile.quest) == QuestState::Started
+        && player.inventory.count(pile.item) < i32::from(pile.count);
+    let mut effects = Vec::new();
+    if on_quest {
+        effects.push(Effect::GiveItem {
+            item_id: pile.item,
+            quantity: pile.count,
+        });
+    }
+    if pile.always_prize || !on_quest {
+        // An equip's thousands digit is its gender: 0, 1, or 2 for both.
+        let fits = |item: i32| {
+            let gender = item / 1000 % 10;
+            item / 1_000_000 != 1 || gender == 2 || gender == i32::from(player.stats.gender)
+        };
+        let prizes: Vec<_> = pile.prizes.iter().filter(|prize| fits(prize.0)).collect();
+        let total: u32 = prizes.iter().map(|prize| prize.2).sum();
+        let mut pick = rng.gen_range(0, total.max(1));
+        for &&(item_id, quantity, weight) in &prizes {
+            if pick < weight {
+                effects.push(Effect::GiveItem { item_id, quantity });
+                break;
+            }
+            pick -= weight;
+        }
+    }
+    effects.push(Effect::WarpToPortal(pile.out, 0));
+    let mut script = NpcScript::new(pile.npc, vec![Page::Done(effects)]);
+    script.inventory_full = Some(text(keys::PATIENCE_FULL));
+    script
+}
+
 /// A fourth-job instructor in Leafre and a third job of their line: the
 /// advancement once the player is level 120 and has finished the line's
 /// last quest.
@@ -8254,6 +8393,53 @@ mod tests {
         );
         let eos_at_orbis = NpcScript::for_npc(2012015, &scroll).unwrap();
         assert_eq!(kind(&eos_at_orbis.begin()), Some(0));
+    }
+
+    #[test]
+    fn patience_piles_give_the_quest_items_or_a_prize_and_send_the_player_out() {
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let [flowers, _, pink, ..] = &PATIENCE_PILES;
+        let found = |pile, player: &Player, rng: &mut _| {
+            let script = patience_pile(pile, player, rng);
+            assert_eq!(script.npc_id, pile.npc);
+            script.begin().effects
+        };
+        let gift = |item_id, quantity| Effect::GiveItem { item_id, quantity };
+        // On John's quest, the pink flowers' ten instead of a prize.
+        let on_quest = with_quests(&[(2052, false)]);
+        assert_eq!(
+            found(pink, &on_quest, rng),
+            [gift(4031025, 10), Effect::WarpToPortal(105040300, 0)]
+        );
+        let mut done = on_quest.clone();
+        done.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4031025, 10));
+        let prize = found(pink, &done, rng);
+        assert!(
+            matches!(prize[..], [Effect::GiveItem { item_id, quantity: 3 }, _]
+            if (4010000..=4010005).contains(&item_id))
+        );
+        // In Ellinia's forest, the quest item and a prize too.
+        let effects = found(flowers, &with_quests(&[(2050, false)]), rng);
+        assert_eq!(effects[0], gift(4031020, 1));
+        assert_eq!(effects[2], Effect::WarpToPortal(ELLINIA, 0));
+        // Clothes come for the player's gender, or for both.
+        let mut woman = with_quests(&[]);
+        woman.stats.gender = 1;
+        for _ in 0..100 {
+            let effects = found(flowers, &woman, rng);
+            let [Effect::GiveItem { item_id, .. }, _] = effects[..] else {
+                panic!("{effects:?}");
+            };
+            assert_ne!(item_id / 1000 % 10, 0, "{item_id}");
+        }
+        // Every prize is an item we know.
+        for pile in &PATIENCE_PILES {
+            for &(item_id, ..) in pile.prizes {
+                assert!(crate::items::info(item_id).is_some(), "{item_id}");
+            }
+        }
     }
 
     #[test]

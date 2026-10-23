@@ -830,6 +830,7 @@ unsourced = [
     "tower_rock.none",
     "tower_rock.menu",
     "tower_rock.ask",
+    "patience.full",
 ]
 
 [text."glTutoMsg0.message"]
