@@ -1092,9 +1092,12 @@ mesos or materials (`maker.short`). Nothing is taken unless all of it applies.
   2131007) each take 100 of one item for a Perfect Pitch (4310000). The
   number prompt offers as many as the player's items buy, at most 300.
 
-All of their text is placeholder (`refiner.*`, `altaire.*`). Not done:
-the equipment makers Mr. Smith (1022004), Vicious (1012002) and JM
-(1052002), whose material rows also ask how many.
+- Mr. Smith (1022004, Perion) makes and upgrades warriors' gloves, Vicious
+  (1012002, Henesys) bows, crossbows and bowmen's gloves, and JM (1052002,
+  Kerning City) thieves' gloves and claws, all one at a time; all three
+  make materials in batches, and Vicious arrow bundles too.
+
+All of their text is placeholder (`refiner.*`, `altaire.*`).
 
 ## NPC shops
 

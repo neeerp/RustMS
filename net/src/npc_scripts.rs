@@ -1496,6 +1496,9 @@ impl NpcScript {
             VOGEN => Some(refiner(&VOGEN_REFINER)),
             PI => Some(refiner(&PI_REFINER)),
             MUHAMAD => Some(refiner(&MUHAMAD_REFINER)),
+            MR_SMITH => Some(refiner(&SMITH_REFINER)),
+            VICIOUS => Some(refiner(&VICIOUS_REFINER)),
+            JM => Some(refiner(&JM_REFINER)),
             id if refiners::PITCH_TRADERS.iter().any(|&(npc, _)| npc == id) => {
                 Some(pitch_trader(id, player))
             }
@@ -5926,6 +5929,9 @@ const CHRIS: i32 = 1052003;
 const VOGEN: i32 = 2020000;
 const PI: i32 = 2040016;
 const MUHAMAD: i32 = 2100001;
+const MR_SMITH: i32 = 1022004;
+const VICIOUS: i32 = 1012002;
+const JM: i32 = 1052002;
 
 const THUNDER: Refiner = Refiner {
     npc: MR_THUNDER,
@@ -5949,7 +5955,7 @@ const CHRIS_REFINER: Refiner = Refiner {
         Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS),
         Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
         Offer::MetalHoof,
-        Offer::Equips(keys::REFINER_CHRIS_CLAWS, refiners::CHRIS_CLAWS),
+        Offer::Equips(keys::REFINER_UPGRADE_CLAW, refiners::CHRIS_CLAWS),
     ],
 };
 
@@ -5993,6 +5999,50 @@ const MUHAMAD_REFINER: Refiner = Refiner {
         Offer::Batches(keys::REFINER_MINERAL, refiners::MINERALS_AND_LIDIUM),
         Offer::Batches(keys::REFINER_JEWEL, refiners::JEWELS),
         Offer::Batches(keys::REFINER_CRYSTAL, refiners::CRYSTALS),
+    ],
+};
+
+const SMITH_REFINER: Refiner = Refiner {
+    npc: MR_SMITH,
+    hello: keys::REFINER_SMITH_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Equips(keys::REFINER_MAKE_GLOVE, refiners::SMITH_GLOVES),
+        Offer::Equips(keys::REFINER_UPGRADE_GLOVE, refiners::SMITH_GLOVE_UPGRADES),
+        Offer::Batches(keys::REFINER_MATERIALS, refiners::MATERIALS),
+    ],
+};
+
+const VICIOUS_REFINER: Refiner = Refiner {
+    npc: VICIOUS,
+    hello: keys::REFINER_VICIOUS_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Equips(keys::REFINER_BOW, refiners::VICIOUS_BOWS),
+        Offer::Equips(keys::REFINER_CROSSBOW, refiners::VICIOUS_CROSSBOWS),
+        Offer::Equips(keys::REFINER_MAKE_GLOVE, refiners::VICIOUS_GLOVES),
+        Offer::Equips(
+            keys::REFINER_UPGRADE_GLOVE,
+            refiners::VICIOUS_GLOVE_UPGRADES,
+        ),
+        Offer::Batches(keys::REFINER_MATERIALS, refiners::MATERIALS),
+        Offer::Bundles(keys::REFINER_ARROWS, refiners::ARROWS),
+    ],
+};
+
+const JM_REFINER: Refiner = Refiner {
+    npc: JM,
+    hello: keys::REFINER_JM_HELLO,
+    goodbye: None,
+    percent: 100,
+    offers: &[
+        Offer::Equips(keys::REFINER_MAKE_GLOVE, refiners::JM_GLOVES),
+        Offer::Equips(keys::REFINER_UPGRADE_GLOVE, refiners::JM_GLOVE_UPGRADES),
+        Offer::Equips(keys::REFINER_MAKE_CLAW, refiners::JM_CLAWS),
+        Offer::Equips(keys::REFINER_UPGRADE_CLAW, refiners::JM_CLAW_UPGRADES),
+        Offer::Batches(keys::REFINER_MATERIALS, refiners::MATERIALS),
     ],
 };
 
@@ -10034,6 +10084,75 @@ mod tests {
                     quantity: 200
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn smith_vicious_and_jm_make_equipment_and_materials() {
+        // Vicious: a War Bow from Processed Wood and Snail Shells.
+        let mut vicious = NpcScript::for_npc(VICIOUS, &player(30)).unwrap();
+        assert!(menu_text(&vicious.begin()).contains("#L5#"));
+        vicious.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(
+            kind(&vicious.respond(ScriptInput::Select(0)).unwrap()),
+            Some(1)
+        );
+        assert_eq!(
+            vicious.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SpendMeso(800),
+                Effect::TakeItem {
+                    item_id: 4003001,
+                    quantity: 5
+                },
+                Effect::TakeItem {
+                    item_id: 4000000,
+                    quantity: 30
+                },
+                Effect::GiveItem {
+                    item_id: 1452002,
+                    quantity: 1
+                },
+            ]
+        );
+
+        // Mr. Smith: Processed Wood from Firewood, in batches.
+        let mut smith = NpcScript::for_npc(MR_SMITH, &player(30)).unwrap();
+        smith.respond(ScriptInput::Select(2)).unwrap();
+        smith.respond(ScriptInput::Select(1)).unwrap();
+        smith.respond(ScriptInput::Number(4)).unwrap();
+        assert_eq!(
+            smith.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: 4003001,
+                    quantity: 4
+                },
+                Effect::TakeItem {
+                    item_id: 4000018,
+                    quantity: 20
+                },
+            ]
+        );
+
+        // JM: the Meba takes a Garnier.
+        let mut jm = NpcScript::for_npc(JM, &player(30)).unwrap();
+        jm.respond(ScriptInput::Select(2)).unwrap();
+        jm.respond(ScriptInput::Select(2)).unwrap();
+        let effects = jm.respond(ScriptInput::Yes).unwrap().effects;
+        assert_eq!(
+            effects[1],
+            Effect::TakeItem {
+                item_id: 1472000,
+                quantity: 1
+            }
+        );
+        assert_eq!(
+            effects.last(),
+            Some(&Effect::GiveItem {
+                item_id: 1472007,
+                quantity: 1
+            })
         );
     }
 

@@ -1407,7 +1407,6 @@ pub mod keys {
     pub const REFINER_CHRIS_HELLO: &str = "refiner.chris.hello";
     pub const REFINER_CHRIS_HOOF: &str = "refiner.chris.hoof";
     pub const REFINER_CHRIS_HOOF_ASK: &str = "refiner.chris.hoof_ask";
-    pub const REFINER_CHRIS_CLAWS: &str = "refiner.chris.claws";
     pub const REFINER_VOGEN_HELLO: &str = "refiner.vogen.hello";
     pub const REFINER_PI_HELLO: &str = "refiner.pi.hello";
     pub const REFINER_MUHAMAD_HELLO: &str = "refiner.muhamad.hello";
@@ -1418,6 +1417,15 @@ pub mod keys {
     pub const ALTAIRE_HOW_MANY: &str = "altaire.how_many";
     pub const ALTAIRE_DONE: &str = "altaire.done";
     pub const ALTAIRE_FULL: &str = "altaire.full";
+    pub const REFINER_UPGRADE_CLAW: &str = "refiner.upgrade_claw";
+    pub const REFINER_MAKE_CLAW: &str = "refiner.make_claw";
+    pub const REFINER_MAKE_GLOVE: &str = "refiner.make_glove";
+    pub const REFINER_UPGRADE_GLOVE: &str = "refiner.upgrade_glove";
+    pub const REFINER_BOW: &str = "refiner.bow";
+    pub const REFINER_CROSSBOW: &str = "refiner.crossbow";
+    pub const REFINER_SMITH_HELLO: &str = "refiner.smith.hello";
+    pub const REFINER_VICIOUS_HELLO: &str = "refiner.vicious.hello";
+    pub const REFINER_JM_HELLO: &str = "refiner.jm.hello";
 
     /// Every key: one per placeholder.
     pub fn all() -> Vec<String> {
@@ -2354,7 +2362,6 @@ mod tests {
                 keys::REFINER_CHRIS_HELLO,
                 keys::REFINER_CHRIS_HOOF,
                 keys::REFINER_CHRIS_HOOF_ASK,
-                keys::REFINER_CHRIS_CLAWS,
                 keys::REFINER_VOGEN_HELLO,
                 keys::REFINER_PI_HELLO,
                 keys::REFINER_MUHAMAD_HELLO,
@@ -2365,6 +2372,15 @@ mod tests {
                 keys::ALTAIRE_HOW_MANY,
                 keys::ALTAIRE_DONE,
                 keys::ALTAIRE_FULL,
+                keys::REFINER_UPGRADE_CLAW,
+                keys::REFINER_MAKE_CLAW,
+                keys::REFINER_MAKE_GLOVE,
+                keys::REFINER_UPGRADE_GLOVE,
+                keys::REFINER_BOW,
+                keys::REFINER_CROSSBOW,
+                keys::REFINER_SMITH_HELLO,
+                keys::REFINER_VICIOUS_HELLO,
+                keys::REFINER_JM_HELLO,
             ])
         {
             assert!(text.contains(key), "{key} has no placeholder");
