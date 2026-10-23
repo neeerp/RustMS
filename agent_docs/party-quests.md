@@ -21,7 +21,8 @@ trials before Zakum ([zakum](./zakum.md)), is played through too
 too, but of an expedition squad gathered across parties (`Event::squad`,
 `net/src/squads.rs`): its team comes from the squad's roster rather than a
 party, may come back in while it runs, and ends only when its last member
-leaves (see the expedition in [zakum](./zakum.md)). The fight with
+leaves (see the expedition in [zakum](./zakum.md)); Horntail's cave is
+another ([horntail](./horntail.md)). The fight with
 Papulatus is a party's event that ends that way too (`Event::until_empty`),
 started by a portal rather than an NPC ([papulatus](./papulatus.md)).
 

@@ -137,7 +137,7 @@ async fn an_expedition_shuts_the_gate_takes_its_own_back_and_opens_it_after_zaku
     let t = told(&mut leader, recruiter()).await;
     assert_eq!(t.prompts, [(RECRUITER, 1)]);
     let mut lt = told(&mut leader, answer(1, 1, None)).await;
-    assert!(said(&lt, keys::ZAKUM_SQUAD_OPENED), "{lt:?}");
+    assert!(said(&lt, keys::SQUAD_OPENED), "{lt:?}");
     until(&mut leader.connection, &mut lt, |t| {
         !t.countdowns.is_empty()
     })
@@ -156,14 +156,13 @@ async fn an_expedition_shuts_the_gate_takes_its_own_back_and_opens_it_after_zaku
     assert_eq!(t.prompts, [(RECRUITER, 1)]);
     assert!(said(&t, keys::ZAKUM_SQUAD_JOIN_ASK), "{t:?}");
     let mut mt = told(&mut member, answer(1, 1, None)).await;
-    assert!(said(&mt, keys::ZAKUM_SQUAD_JOINED), "{mt:?}");
+    assert!(said(&mt, keys::SQUAD_JOINED), "{mt:?}");
     until(&mut member.connection, &mut mt, |t| {
         !t.countdowns.is_empty()
     })
     .await;
     told(&mut member, answer(0, 1, None)).await;
-    let joined =
-        net::content::text().get(keys::ZAKUM_SQUAD_NOTICE_JOINED, &[("name", &member_name)]);
+    let joined = net::content::text().get(keys::SQUAD_NOTICE_JOINED, &[("name", &member_name)]);
     let mut lt = Trace::default();
     until(&mut leader.connection, &mut lt, |t| {
         t.item_lines.contains(&(joined.clone(), 0))

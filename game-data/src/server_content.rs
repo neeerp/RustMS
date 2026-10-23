@@ -1334,34 +1334,37 @@ pub mod keys {
     /// The line to the whole world as Zakum's last body dies.
     pub const ZAKUM_VICTORY: &str = "zakum.victory";
     /// Adobis's expeditions at the Entrance to Zakum (`{name}` is a
-    /// member), their notices, and the gate shut behind one.
+    /// member), the notices only Zakum's have, and the gate shut behind
+    /// one; the rest is every squad's (`SQUAD_*`).
     pub const ZAKUM_SQUAD_LEVEL: &str = "zakum.squad.level";
     pub const ZAKUM_SQUAD_NO_EYE: &str = "zakum.squad.no_eye";
     pub const ZAKUM_SQUAD_ASK: &str = "zakum.squad.ask";
-    pub const ZAKUM_SQUAD_OPENED: &str = "zakum.squad.opened";
-    pub const ZAKUM_SQUAD_MENU: &str = "zakum.squad.menu";
-    pub const ZAKUM_SQUAD_EXPEL_CHOICE: &str = "zakum.squad.expel_choice";
-    pub const ZAKUM_SQUAD_ALONE: &str = "zakum.squad.alone";
-    pub const ZAKUM_SQUAD_LIST: &str = "zakum.squad.list";
-    pub const ZAKUM_SQUAD_EXPELLED: &str = "zakum.squad.expelled";
     pub const ZAKUM_SQUAD_START_CHOICE: &str = "zakum.squad.start_choice";
-    pub const ZAKUM_SQUAD_TOO_FEW: &str = "zakum.squad.too_few";
-    pub const ZAKUM_SQUAD_STOP_CHOICE: &str = "zakum.squad.stop_choice";
-    pub const ZAKUM_SQUAD_STOPPED: &str = "zakum.squad.stopped";
-    pub const ZAKUM_SQUAD_REGISTERED: &str = "zakum.squad.registered";
     pub const ZAKUM_SQUAD_JOIN_ASK: &str = "zakum.squad.join_ask";
-    pub const ZAKUM_SQUAD_JOINED: &str = "zakum.squad.joined";
-    pub const ZAKUM_SQUAD_BANNED: &str = "zakum.squad.banned";
-    pub const ZAKUM_SQUAD_FULL: &str = "zakum.squad.full";
     pub const ZAKUM_SQUAD_REJOIN_ASK: &str = "zakum.squad.rejoin_ask";
     pub const ZAKUM_SQUAD_TAKEN: &str = "zakum.squad.taken";
-    pub const ZAKUM_SQUAD_REFUSED: &str = "zakum.squad.refused";
     pub const ZAKUM_SQUAD_NOTICE_OPENED: &str = "zakum.squad.notice.opened";
-    pub const ZAKUM_SQUAD_NOTICE_JOINED: &str = "zakum.squad.notice.joined";
-    pub const ZAKUM_SQUAD_NOTICE_EXPELLED: &str = "zakum.squad.notice.expelled";
-    pub const ZAKUM_SQUAD_NOTICE_STOPPED: &str = "zakum.squad.notice.stopped";
     pub const ZAKUM_SQUAD_NOTICE_STARTED: &str = "zakum.squad.notice.started";
     pub const ZAKUM_GATE_BLOCKED: &str = "zakum.gate.blocked";
+    /// What every squad's NPC says whatever its kind, and its notices
+    /// (`{name}` is a member).
+    pub const SQUAD_OPENED: &str = "squad.opened";
+    pub const SQUAD_MENU: &str = "squad.menu";
+    pub const SQUAD_EXPEL_CHOICE: &str = "squad.expel_choice";
+    pub const SQUAD_ALONE: &str = "squad.alone";
+    pub const SQUAD_LIST: &str = "squad.list";
+    pub const SQUAD_EXPELLED: &str = "squad.expelled";
+    pub const SQUAD_TOO_FEW: &str = "squad.too_few";
+    pub const SQUAD_STOP_CHOICE: &str = "squad.stop_choice";
+    pub const SQUAD_STOPPED: &str = "squad.stopped";
+    pub const SQUAD_REGISTERED: &str = "squad.registered";
+    pub const SQUAD_JOINED: &str = "squad.joined";
+    pub const SQUAD_BANNED: &str = "squad.banned";
+    pub const SQUAD_FULL: &str = "squad.full";
+    pub const SQUAD_REFUSED: &str = "squad.refused";
+    pub const SQUAD_NOTICE_JOINED: &str = "squad.notice.joined";
+    pub const SQUAD_NOTICE_EXPELLED: &str = "squad.notice.expelled";
+    pub const SQUAD_NOTICE_STOPPED: &str = "squad.notice.stopped";
 
     /// The way to Papulatus: the portal at Deep Inside the Clocktower
     /// that takes a party in (`{least}`/`{most}` are the team's size), the
@@ -1395,9 +1398,20 @@ pub mod keys {
     pub const HORNTAIL_SLATE_ASK: &str = "horntail.slate.ask";
     pub const HORNTAIL_SLATE_SEALED: &str = "horntail.slate.sealed";
     pub const HORNTAIL_CRYSTAL_LEAVE: &str = "horntail.crystal.leave";
+    /// The Mark of the Squad's expeditions at the Entrance to Horntail's
+    /// Cave, and the notices only Horntail's have; the rest is every
+    /// squad's (`SQUAD_*`).
+    pub const HORNTAIL_SQUAD_LEVEL: &str = "horntail.squad.level";
+    pub const HORNTAIL_SQUAD_ASK: &str = "horntail.squad.ask";
+    pub const HORNTAIL_SQUAD_START_CHOICE: &str = "horntail.squad.start_choice";
+    pub const HORNTAIL_SQUAD_JOIN_ASK: &str = "horntail.squad.join_ask";
+    pub const HORNTAIL_SQUAD_REJOIN_ASK: &str = "horntail.squad.rejoin_ask";
+    pub const HORNTAIL_SQUAD_TAKEN: &str = "horntail.squad.taken";
+    pub const HORNTAIL_SQUAD_NOTICE_OPENED: &str = "horntail.squad.notice.opened";
+    pub const HORNTAIL_SQUAD_NOTICE_STARTED: &str = "horntail.squad.notice.started";
     /// Keroben, the Encrypted Slate of the Squad, and the Crystal of
     /// Roots: the way to Horntail.
-    pub const HORNTAIL: [&str; 11] = [
+    pub const HORNTAIL: [&str; 19] = [
         HORNTAIL_KEROBEN_AWAY,
         HORNTAIL_KEROBEN_MENU,
         HORNTAIL_KEROBEN_BUY_CHOICE,
@@ -1409,11 +1423,19 @@ pub mod keys {
         HORNTAIL_SLATE_ASK,
         HORNTAIL_SLATE_SEALED,
         HORNTAIL_CRYSTAL_LEAVE,
+        HORNTAIL_SQUAD_LEVEL,
+        HORNTAIL_SQUAD_ASK,
+        HORNTAIL_SQUAD_START_CHOICE,
+        HORNTAIL_SQUAD_JOIN_ASK,
+        HORNTAIL_SQUAD_REJOIN_ASK,
+        HORNTAIL_SQUAD_TAKEN,
+        HORNTAIL_SQUAD_NOTICE_OPENED,
+        HORNTAIL_SQUAD_NOTICE_STARTED,
     ];
 
     /// The Chief's Residence approval, Adobis's trials, Lira, Amon, and
     /// the gate to Zakum.
-    pub const ZAKUM: [&str; 76] = [
+    pub const ZAKUM: [&str; 59] = [
         ZAKUM_CHIEF_MENU,
         ZAKUM_CHIEF_THIRD_JOB,
         ZAKUM_CHIEF_ZAKUM,
@@ -1466,30 +1488,34 @@ pub mod keys {
         ZAKUM_SQUAD_LEVEL,
         ZAKUM_SQUAD_NO_EYE,
         ZAKUM_SQUAD_ASK,
-        ZAKUM_SQUAD_OPENED,
-        ZAKUM_SQUAD_MENU,
-        ZAKUM_SQUAD_EXPEL_CHOICE,
-        ZAKUM_SQUAD_ALONE,
-        ZAKUM_SQUAD_LIST,
-        ZAKUM_SQUAD_EXPELLED,
         ZAKUM_SQUAD_START_CHOICE,
-        ZAKUM_SQUAD_TOO_FEW,
-        ZAKUM_SQUAD_STOP_CHOICE,
-        ZAKUM_SQUAD_STOPPED,
-        ZAKUM_SQUAD_REGISTERED,
         ZAKUM_SQUAD_JOIN_ASK,
-        ZAKUM_SQUAD_JOINED,
-        ZAKUM_SQUAD_BANNED,
-        ZAKUM_SQUAD_FULL,
         ZAKUM_SQUAD_REJOIN_ASK,
         ZAKUM_SQUAD_TAKEN,
-        ZAKUM_SQUAD_REFUSED,
         ZAKUM_SQUAD_NOTICE_OPENED,
-        ZAKUM_SQUAD_NOTICE_JOINED,
-        ZAKUM_SQUAD_NOTICE_EXPELLED,
-        ZAKUM_SQUAD_NOTICE_STOPPED,
         ZAKUM_SQUAD_NOTICE_STARTED,
         ZAKUM_GATE_BLOCKED,
+    ];
+
+    /// What every squad's NPC and notices say, whatever its kind.
+    pub const SQUAD: [&str; 17] = [
+        SQUAD_OPENED,
+        SQUAD_MENU,
+        SQUAD_EXPEL_CHOICE,
+        SQUAD_ALONE,
+        SQUAD_LIST,
+        SQUAD_EXPELLED,
+        SQUAD_TOO_FEW,
+        SQUAD_STOP_CHOICE,
+        SQUAD_STOPPED,
+        SQUAD_REGISTERED,
+        SQUAD_JOINED,
+        SQUAD_BANNED,
+        SQUAD_FULL,
+        SQUAD_REFUSED,
+        SQUAD_NOTICE_JOINED,
+        SQUAD_NOTICE_EXPELLED,
+        SQUAD_NOTICE_STOPPED,
     ];
 
     /// The magic rocks of Orbis Tower and Eos Tower; `{item}` is the
@@ -2493,6 +2519,7 @@ mod tests {
             .chain(&keys::CEREMONY)
             .chain(&keys::GIFTS)
             .chain(&keys::ZAKUM)
+            .chain(&keys::SQUAD)
             .chain(&keys::PAPULATUS)
             .chain(&keys::HORNTAIL)
             .chain(&[

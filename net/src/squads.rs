@@ -6,6 +6,7 @@
 
 use crate::events::EventKind;
 use crate::ClientId;
+use game_data::server_content::keys;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 
@@ -13,6 +14,57 @@ use std::time::{Duration, Instant};
 /// registration minutes). Not shortened for testing, so a test has time
 /// to gather one.
 pub const REGISTRATION: Duration = Duration::from_secs(5 * 60);
+
+/// What a kind of squad's NPC and notices say that names its foe or its
+/// place (`keys`); the rest is the same for every kind (`keys::SQUAD_*`).
+#[derive(Debug)]
+pub struct SquadText {
+    /// The player isn't of the event's levels (`{low}`, `{high}`).
+    pub level: &'static str,
+    /// Lead one? (`events`' terms: `{least}`, `{most}`, `{low}`, `{high}`)
+    pub ask: &'static str,
+    pub start_choice: &'static str,
+    pub join_ask: &'static str,
+    /// Go back into it, while it runs?
+    pub rejoin_ask: &'static str,
+    /// Another is under way.
+    pub taken: &'static str,
+    /// To those on the lobby as `{name}` gathers one.
+    pub notice_opened: &'static str,
+    /// To its roster as its leader, `{name}`, takes it in.
+    pub notice_started: &'static str,
+}
+
+const ZAKUM: SquadText = SquadText {
+    level: keys::ZAKUM_SQUAD_LEVEL,
+    ask: keys::ZAKUM_SQUAD_ASK,
+    start_choice: keys::ZAKUM_SQUAD_START_CHOICE,
+    join_ask: keys::ZAKUM_SQUAD_JOIN_ASK,
+    rejoin_ask: keys::ZAKUM_SQUAD_REJOIN_ASK,
+    taken: keys::ZAKUM_SQUAD_TAKEN,
+    notice_opened: keys::ZAKUM_SQUAD_NOTICE_OPENED,
+    notice_started: keys::ZAKUM_SQUAD_NOTICE_STARTED,
+};
+
+const HORNTAIL: SquadText = SquadText {
+    level: keys::HORNTAIL_SQUAD_LEVEL,
+    ask: keys::HORNTAIL_SQUAD_ASK,
+    start_choice: keys::HORNTAIL_SQUAD_START_CHOICE,
+    join_ask: keys::HORNTAIL_SQUAD_JOIN_ASK,
+    rejoin_ask: keys::HORNTAIL_SQUAD_REJOIN_ASK,
+    taken: keys::HORNTAIL_SQUAD_TAKEN,
+    notice_opened: keys::HORNTAIL_SQUAD_NOTICE_OPENED,
+    notice_started: keys::HORNTAIL_SQUAD_NOTICE_STARTED,
+};
+
+/// What `kind`'s squad says, if its event is gathered by one.
+pub fn text(kind: EventKind) -> Option<&'static SquadText> {
+    match kind {
+        EventKind::Zakum => Some(&ZAKUM),
+        EventKind::Horntail => Some(&HORNTAIL),
+        _ => None,
+    }
+}
 
 /// What a squad's NPC finds for a player.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -238,5 +290,12 @@ mod tests {
             !squad.lapsed(now + REGISTRATION),
             "started, it no longer lapses"
         );
+    }
+
+    #[test]
+    fn every_squads_event_has_its_texts() {
+        for kind in EventKind::ALL {
+            assert_eq!(kind.event().squad, text(kind).is_some(), "{kind:?}");
+        }
     }
 }

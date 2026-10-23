@@ -71,7 +71,7 @@ impl ClientActor {
             EventKind::Opq => NpcScript::wonky(entry),
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
             // A squad's, above; Papulatus's has a portal, not an NPC.
-            EventKind::Zakum | EventKind::Papulatus => return Ok(()),
+            EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -89,7 +89,9 @@ impl ClientActor {
         let Ok(view) = view.await else {
             return Ok(());
         };
-        let script = NpcScript::zakum_squad(view, &self.in_game()?.player);
+        let Some(script) = NpcScript::squad(kind, view, &self.in_game()?.player) else {
+            return Ok(());
+        };
         self.start_script(script).await
     }
 

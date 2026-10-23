@@ -1,10 +1,10 @@
 # Horntail
 
 The way to Horntail in Leafre's Cave of Life, after Cosmic. Built so far:
-the quests, the doors, and the ways out. The expedition, its trials, the
-fight and the Horntail party quest are still to come. The slice plan and its
-open questions are in v83ref's `reports/a115-horntail.md`; the defaults
-shipped are under "a115" in `lanes/QUESTIONS.md`.
+the quests, the doors, the ways out, and the expedition into the cave. Its
+trials, the fight and the Horntail party quest are still to come. The slice
+plan and its open questions are in v83ref's `reports/a115-horntail.md`; the
+defaults shipped are under "a115" in `lanes/QUESTIONS.md`.
 
 All dialogue is placeholder text (`horntail.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -36,9 +36,33 @@ The road's `next00` portal (`hontale_out1`) leads back to 240050400, and
 plain warps in `net/src/scripts.rs`. Cosmic also lets in, with solo
 expeditions turned on, those holding the three proofs; that is not in.
 
+## The expedition
+
+The Mark of the Squad (2083004) on the Entrance to Horntail's Cave gathers
+it like Adobis gathers Zakum's ([zakum](./zakum.md), "The expedition"):
+anyone of level 100 or more leads one, with no item, others of those levels
+join, up to 30, and with at least 6 (`RUSTMS_EXPEDITION_MIN`; 2 in the
+harness) its leader takes it in. It is the event `events::HORNTAIL`
+(`EventKind::Horntail`): a copy of the cave's maps from the first trial
+(240060000) to Horntail's Cave (240060200), entered on the first trial, for
+120 minutes, after which everyone goes to the Road in Between (240050600).
+As in Cosmic (`isExpeditionTeamLackingNow`), neither the leader's leaving
+nor falling below six ends it, only the last member's leaving; until then
+those on its roster may go back in at the Mark, and others are turned away.
+Leaving the cave's maps, by the Crystal of Roots or otherwise, leaves it.
+
+Not yet: the trials' heads and the way between the maps (`hontale_BR`, a
+script not yet in, so for now no one gets past the first trial); Cosmic's
+`[Expedition]` entered and left lines (Zakum has none either); and the
+fight.
+
 ## Tests
 
 `net`'s `keroben_and_the_slate_let_the_dragon_squad_on_toward_horntail`
-covers the three NPCs, and `game-data` checks that 7300 is supported. The
-harness's `tests/horntail_way.rs` walks a level-100 character from
-Keroben's refusal through the shop, the slate and both ways out.
+covers the three NPCs, `the_mark_of_the_squad_gathers_horntails_expeditions`
+the Mark, `events::tests` its end rule, and `game-data` checks that 7300 is
+supported. The harness's `tests/horntail_way.rs` walks a level-100 character
+from Keroben's refusal through the shop, the slate and both ways out;
+`tests/horntail_squad.rs` gathers an expedition, takes it in, turns another
+away, lets its leader step out and back, and frees the channel once the last
+has left.
