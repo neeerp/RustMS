@@ -1,5 +1,6 @@
 //! Meso sacks (520xxxx): opening one turns it into the mesos its data
-//! holds; one that would pass the most mesos anyone holds stays shut.
+//! holds, told in an OK box; one that would pass the most mesos anyone
+//! holds stays shut, and its box says so.
 
 use integration_harness::database::{grant_stack, set_meso};
 use integration_harness::preconditions::load_harness_config_or_fail;
@@ -38,7 +39,8 @@ async fn a_meso_sack_turns_into_its_mesos() {
     let t = step(&mut session.connection, &m, open_sack()).await;
     assert_eq!(t.stat(stat::MESO), Some(1_000_100));
     assert_eq!(t.quantities, [(CASH as u8, 1, 1)]);
-    assert_eq!(t.meso_gains, [1_000_000]);
+    assert_eq!(t.meso_bags, [Some(1_000_000)]);
+    assert!(t.meso_gains.is_empty(), "no chat line besides the box");
     drop(session);
 
     let session = relogin(&config).await;
@@ -62,7 +64,7 @@ async fn a_sack_past_the_meso_cap_stays_shut() {
     let t = step(&mut session.connection, &m, open_sack()).await;
     assert_eq!(t.stat_updates, [Default::default()], "only the unlock");
     assert!(t.quantities.is_empty() && t.removed.is_empty());
-    assert!(t.meso_gains.is_empty());
+    assert_eq!(t.meso_bags, [None]);
     drop(session);
 
     let session = relogin(&config).await;

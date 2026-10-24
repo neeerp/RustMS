@@ -1,13 +1,14 @@
 //! Meso sacks (520xxxx), used through USE_CASH_ITEM with nothing after the
 //! item (v83 FUN_00a0a63f, type 0x13). The client has asked "Will you use
 //! the meso bag to receive %d mesos?" with the item's `info/meso`; the sack
-//! goes and its mesos land, with the chat line quest rewards print
-//! (report c005).
+//! goes and its mesos land, and an OK box says how many (report c005,
+//! b137). A sack that stays shut says so in its own box.
 
 use crate::handler::{HandlerResult, WorldContext, WorldResult};
 use crate::items;
-use crate::packet::build::world::drop::build_meso_gain_in_chat;
-use crate::packet::build::world::inventory::build_inventory_operation;
+use crate::packet::build::world::inventory::{
+    build_inventory_operation, build_meso_bag_failed, build_meso_bag_used,
+};
 use crate::packet::build::world::stat::{build_stat_update, StatUpdate};
 use game::InventoryType;
 
@@ -16,22 +17,27 @@ use game::InventoryType;
 pub fn meso_sack(ctx: &mut WorldContext, slot: i16, item_id: i32) -> WorldResult {
     let gain = items::info(item_id).map_or(0, |info| info.meso);
     let Some(meso) = ctx.player.meso.checked_add(gain).filter(|_| gain > 0) else {
-        return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
+        return shut();
     };
     let Ok(changes) = ctx
         .player
         .inventory_mut()
         .take(InventoryType::Cash, slot, 1)
     else {
-        return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
+        return shut();
     };
     ctx.player.meso = meso;
     ctx.player.mark_dirty();
     Ok(
         HandlerResult::reply(build_stat_update(true, &[StatUpdate::Meso(meso)])?)
             .with_reply(build_inventory_operation(true, &changes)?)
-            .with_reply(build_meso_gain_in_chat(gain)?),
+            .with_reply(build_meso_bag_used(gain)?),
     )
+}
+
+/// The unlock, and the box saying the sack stayed shut.
+fn shut() -> WorldResult {
+    Ok(HandlerResult::reply(build_stat_update(true, &[])?).with_reply(build_meso_bag_failed()?))
 }
 
 #[cfg(test)]
@@ -58,6 +64,13 @@ mod tests {
         UseCashItemHandler.handle(&mut p, &mut ctx).unwrap().actions
     }
 
+    fn last_bytes(actions: &[WorldAction]) -> Vec<u8> {
+        match actions.last() {
+            Some(WorldAction::Reply(packet)) => packet.bytes.clone(),
+            other => panic!("no reply last: {other:?}"),
+        }
+    }
+
     fn with_sacks(meso: i32) -> Player {
         let mut player = crate::codec::stats::sample_player();
         player.meso = meso;
@@ -80,7 +93,8 @@ mod tests {
     fn a_sack_turns_into_its_mesos() {
         let mut player = with_sacks(100);
         let actions = open(&mut player, 1);
-        assert_eq!(actions.len(), 3, "mesos, the sack, the chat line");
+        assert_eq!(actions.len(), 3, "mesos, the sack, the OK box");
+        assert_eq!(last_bytes(&actions), [0xD1, 0, 0x40, 0x42, 0x0F, 0]);
         assert_eq!(player.meso, 1_000_100);
         let left = player.inventory.get(InventoryType::Cash, 1).unwrap();
         assert_eq!(left.quantity, 1);
@@ -90,7 +104,8 @@ mod tests {
     fn a_sack_past_the_meso_cap_stays_shut() {
         let mut player = with_sacks(i32::MAX - 10);
         let actions = open(&mut player, 1);
-        assert_eq!(actions.len(), 1, "only the unlock");
+        assert_eq!(actions.len(), 2, "the unlock and the failure box");
+        assert_eq!(last_bytes(&actions), [0xD2, 0]);
         assert_eq!(player.meso, i32::MAX - 10);
         let left = player.inventory.get(InventoryType::Cash, 1).unwrap();
         assert_eq!(left.quantity, 2);
@@ -100,7 +115,11 @@ mod tests {
     fn no_sack_in_the_slot_opens_nothing() {
         let mut player = with_sacks(100);
         let actions = open(&mut player, 2);
-        assert_eq!(actions.len(), 1, "only the unlock");
+        assert_eq!(
+            actions.len(),
+            1,
+            "only the unlock, before any sack is looked at"
+        );
         assert_eq!(player.meso, 100);
     }
 }
