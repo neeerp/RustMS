@@ -29,6 +29,7 @@
 
 #include "../Messages.h"
 #include "../UIElement.h"
+#include "ChatLogLayout.h"
 
 #include "../Components/ChatFloodGuard.h"
 #include "../Components/ChatTarget.h"
@@ -189,6 +190,7 @@ namespace ms
 		int16_t get_logrows() const;
 		int16_t get_logheight() const;
 		int16_t get_logtop() const;
+		chat_log::Mode get_logmode() const;
 
 		// The scroll bar beside the log: its top and its length.
 		Point<int16_t> get_scrollbar_pos() const;
@@ -236,8 +238,6 @@ namespace ms
 		static constexpr int16_t LOG_HEIGHT = 70;
 		static constexpr int16_t MIN_LOG_HEIGHT = 26;
 		static constexpr int16_t MAX_LOG_HEIGHT = 507;
-		// The original's edge is five pixels below the log's drawn top.
-		static constexpr int16_t EDGE_OFFSET = 5;
 		static constexpr int16_t LINE_LOG_HEIGHT = 24;
 		static constexpr time_t MESSAGE_COOLDOWN = 1'000;
 		// The original repeats the missing weapon notice at most every two

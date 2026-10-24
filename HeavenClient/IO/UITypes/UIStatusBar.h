@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <map>
 
+#include "GaugeSlide.h"
 #include "../UIElement.h"
 
 #include "../Components/Charset.h"
@@ -103,10 +104,6 @@ namespace ms
 
 		float getexppercent() const;
 
-		float gethppercent() const;
-
-		float getmppercent() const;
-
 		// A gauge's warning flash. v83 (FUN_008d850b) plays it once each
 		// time the value falls while under the warning level.
 		struct GaugeFlash
@@ -126,7 +123,8 @@ namespace ms
 
 		void set_menu(Menu menu);
 
-		void draw_gauge(int16_t left, int16_t width, float percent) const;
+		// Draws the gray over the `gray` pixels at a gauge's right end.
+		void draw_gauge(int16_t left, int16_t width, double gray) const;
 
 		void draw_number(const std::string &text, Point<int16_t> pos) const;
 
@@ -172,6 +170,8 @@ namespace ms
 		Texture gaugebar;
 		Texture gaugegray;
 		Texture graduation;
+		gauge_slide::Slide hpslide;
+		gauge_slide::Slide mpslide;
 		GaugeFlash hpflash;
 		GaugeFlash mpflash;
 		Texture quickslot;

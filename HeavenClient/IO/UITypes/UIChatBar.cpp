@@ -487,6 +487,7 @@ namespace ms
 		}
 
 		int16_t sbwidth = arrows[Arrow::PREV][0].width();
+		chat_log::Mode mode = get_logmode();
 		int16_t logtop = get_logtop();
 		int16_t logheight = get_logheight();
 		int16_t logbottom = logtop + logheight;
@@ -501,14 +502,18 @@ namespace ms
 			if (row < 0 || row > rowmax)
 				break;
 
-			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
+			int16_t top = logbottom - CHATROWHEIGHT * (i + 1) - chat_log::lift(mode);
 
 			const ChatRow& shown = rowtexts[row];
 			const Color& strip = shown.strip;
 
 			if (!strip.invisible())
-				graphics.drawrectangle(position.x(), position.y() + top, LOG_WIDTH - sbwidth, CHATROWHEIGHT, strip.r(),
-									   strip.g(), strip.b(), strip.a());
+			{
+				chat_log::Strip area = chat_log::strip(mode, logheight, i);
+
+				graphics.drawrectangle(position.x(), position.y() + logtop + area.top, chat_log::strip_width(sbwidth),
+									   area.height, strip.r(), strip.g(), strip.b(), strip.a());
+			}
 
 			int16_t indent = 0;
 
@@ -1362,7 +1367,7 @@ namespace ms
 	void UIChatBar::drag_log_edge(int16_t y)
 	{
 		int16_t anchor = edge_anchor.value_or(y);
-		bool shrinking = y >= get_logtop() + EDGE_OFFSET;
+		bool shrinking = y >= get_logtop();
 		int16_t distance = shrinking ? y - anchor : anchor - y;
 
 		if (distance <= CHATROWHEIGHT)
@@ -1372,7 +1377,7 @@ namespace ms
 			return;
 
 		set_log_height(log_height + (anchor - y) / CHATROWHEIGHT * CHATROWHEIGHT);
-		edge_anchor = get_logtop() + EDGE_OFFSET;
+		edge_anchor = get_logtop();
 		rowpos = rowmax;
 
 		Setting<ChatHeight>::get().save(log_height);
@@ -1382,7 +1387,7 @@ namespace ms
 	{
 		Point<int16_t> pos = cursorpos - position;
 
-		return chatopen && pos.x() < LOG_WIDTH && std::abs(pos.y() - (get_logtop() + EDGE_OFFSET)) < 5;
+		return chatopen && pos.x() < LOG_WIDTH && std::abs(pos.y() - get_logtop()) < 5;
 	}
 
 	void UIChatBar::set_log_height(int16_t height)
@@ -1459,15 +1464,17 @@ namespace ms
 		return chatopen ? log_height : LINE_LOG_HEIGHT;
 	}
 
-	// The original lays the chat out in a window 22 pixels below the top of
-	// the screen, which puts the status bar 507 below that window's top. Its
-	// log sits five pixels above where its mode says.
 	int16_t UIChatBar::get_logtop() const
 	{
-		if (chatopen)
-			return -3 - log_height;
+		return chat_log::top(get_logmode(), get_logheight());
+	}
 
-		return chatfieldopen ? -26 : 1;
+	chat_log::Mode UIChatBar::get_logmode() const
+	{
+		if (chatopen)
+			return chat_log::Mode::EXPANDED;
+
+		return chatfieldopen ? chat_log::Mode::TYPING : chat_log::Mode::LINE;
 	}
 
 	Point<int16_t> UIChatBar::get_scrollbar_pos() const
