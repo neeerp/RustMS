@@ -477,10 +477,13 @@ As in the original's font choice (`FUN_00704c2c`), the count you have is red
 under a third of the way, pink under two thirds, orange until done, then
 green; the rest of the line is black. As in the original's layout
 (`FUN_007052e6`), a blank 18-pixel row separates one quest from the next.
-The original also lists a quest's `endmeso` as a "Meso" row, which
-HeavenClient doesn't show yet. Starting a quest with kills or items to bring
+A quest's `endmeso` is its last row, "Meso", with the amount needed in
+red or green. Starting a quest with kills or items to bring
 tracks it unless AUTO was switched off; the quest window's helper button
-tracks and untracks open quests. Each quest's ⓧ untracks it, the minimize
+tracks and untracks open quests. Each quest's ⓧ untracks it and puts
+v83's grey line in the chat log: "[name] It has been excluded from the auto
+alarm and it will not be automatically reigstered until you re log-on"
+(0x1047, FUN_00887ee8). The minimize
 button or the Quest Helper key (L) folds the helper to its title bar. The key
 unfolds it again, and so does a change to what it shows. Close hides it until the
 quest window tracks a quest again. Footage doesn't show what AUTO and close

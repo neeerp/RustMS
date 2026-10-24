@@ -1,5 +1,8 @@
 #include "UIQuestHelper.h"
+#include "UIChatBar.h"
 #include "UIPartyHP.h"
+
+#include "../UI.h"
 
 #include "../Components/MapleButton.h"
 
@@ -26,6 +29,10 @@ namespace ms
 		constexpr int16_t COUNT_GAP = 12;
 		// The original's windows drag by their top 25 pixels.
 		constexpr int16_t DRAG_HEIGHT = 25;
+		// What a quest's untrack button says in the chat log (0x1047, the
+		// original's spelling; FUN_00887ee8).
+		constexpr const char* UNTRACKED = "] It has been excluded from the auto alarm and it will not be "
+										  "automatically reigstered until you re log-on";
 		// The saved position before the helper is first moved
 		constexpr Point<int16_t> UNSET = Point<int16_t>(-1, -1);
 
@@ -330,7 +337,19 @@ namespace ms
 				// The buttons are rebuilt on the next update, not while the
 				// caller walks them.
 				if (buttonid >= UNTRACK && buttonid - UNTRACK < static_cast<int>(entries.size()))
-					quests.untrack(entries[buttonid - UNTRACK].id);
+				{
+					int16_t id = entries[buttonid - UNTRACK].id;
+
+					// A grey line names the quest left out (chat type 7).
+					if (auto chatbar = UI::get().get_element<UIChatBar>())
+					{
+						const QuestInfo* quest = QuestCatalog::get().find(id);
+						chatbar->send_chatline("[" + (quest ? quest->name : std::to_string(id)) + UNTRACKED,
+							UIChatBar::LineType::GREY);
+					}
+
+					quests.untrack(id);
+				}
 
 				break;
 		}
