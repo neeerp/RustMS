@@ -75,6 +75,10 @@ namespace ms
 		if (tracking.size() >= MAX_TRACKED || started.count(id) == 0)
 			return false;
 
+		// The quest helper leaves titles to the title window.
+		if (QuestCatalog::get().is_title(id))
+			return false;
+
 		tracking.push_back(id);
 		dismissed.erase(std::remove(dismissed.begin(), dismissed.end(), id), dismissed.end());
 		++marker_revision;

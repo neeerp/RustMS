@@ -228,6 +228,11 @@ namespace ms
 		return party;
 	}
 
+	bool QuestCatalog::is_title(int16_t id) const
+	{
+		return root["QuestInfo.img"][std::to_string(id)]["area"].get_integer() == TITLE_AREA;
+	}
+
 	QuestScript QuestCatalog::script(int16_t id, bool completion) const
 	{
 		nl::node say = root["Say.img"][std::to_string(id)][completion ? "1" : "0"];

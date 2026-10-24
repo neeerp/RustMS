@@ -153,6 +153,13 @@ int main()
 		return 1;
 	}
 
+	// One Who's Touched the Sky is a title; Borrowing Sera's Mirror is not.
+	if (!catalog.is_title(29004) || catalog.is_title(1000))
+	{
+		std::cerr << "Only quests in the Title area are titles\n";
+		return 1;
+	}
+
 	std::cout << "All " << catalog.quests().size() << " supported quests load\n";
 	return 0;
 }

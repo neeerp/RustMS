@@ -16,8 +16,10 @@ namespace ms
 {
 	// v83's red "Quest Complete!" notice (UIWindow.img/FadeYesNo/backgrnd4)
 	// above the status bar, shown when a quest's last objective is met, or
-	// when the server says so (QUEST_CLEAR, as for an explorer title). O
-	// opens the quest in the quest log and X dismisses it. Each notice stays
+	// when the server says so (QUEST_CLEAR, as for an explorer title). A
+	// title's notice says "You got a title!" (FUN_0052065d). O opens the
+	// quest in the quest log, or a title in the title window, and X
+	// dismisses it. Each notice stays
 	// until then, or until the quest is no longer in progress; newer notices
 	// stack above older ones, invitations included.
 	class UIQuestComplete : public UIElement
@@ -49,6 +51,7 @@ namespace ms
 		struct Notice
 		{
 			int16_t id;
+			bool title;
 			Text name;
 			FadeNotice life;
 		};
@@ -62,7 +65,7 @@ namespace ms
 		const Inventory& inventory;
 		QuestCompletion completion;
 		Texture background, icon;
-		Text heading;
+		Text heading, title_heading;
 		// Oldest first; the newest is drawn last, over the others.
 		std::vector<Notice> notices;
 		// How high the buttons sit, to move them when the stack shifts.

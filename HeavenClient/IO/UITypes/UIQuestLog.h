@@ -31,6 +31,12 @@
 
 namespace ms
 {
+	// A quest's text with the quest-only placeholders filled in, which
+	// NpcTextMarkup leaves: #c how many of an item the player holds, #a a
+	// kill count and #R a quest's record. Line breaks become the renderer's
+	// escapes.
+	std::string quest_text(const std::string& text, int16_t quest_id);
+
 	// The v83 quest log (UIClassic.nx, UIWindow.img/Quest): the list of
 	// quests by area, and beside it the selected quest's details.
 	class UIQuestLog : public UIDragElement<PosQUEST>

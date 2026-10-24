@@ -206,6 +206,11 @@ namespace ms
 		}
 	}
 
+	std::string quest_text(const std::string& text, int16_t quest_id)
+	{
+		return quest_counts(text, quest_id);
+	}
+
 	UIQuestLog::UIQuestLog(const QuestLog& ql) : UIDragElement<PosQUEST>(), questlog(ql)
 	{
 		nl::node Quest = NxFiles::ui_classic["UIWindow.img"]["Quest"];
@@ -351,7 +356,8 @@ namespace ms
 			nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(id)];
 			std::string name = info["name"];
 
-			if (!name.empty())
+			// Titles (area 51) are listed in the title window instead.
+			if (!name.empty() && info["area"].get_integer() != QuestCatalog::TITLE_AREA)
 				areas[static_cast<int16_t>(info["area"].get_integer())].emplace_back(id, name);
 		}
 
