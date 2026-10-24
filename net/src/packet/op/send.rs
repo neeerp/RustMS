@@ -150,6 +150,9 @@ pub enum SendOpcode {
     SummonSkill = 0xB3,
     DamageSummon = 0xB4,
     ShowItemGainInChat = 0xCE,
+    /// Up a Mu Lung Dojo floor to its portal by index (r25 0x959727: a byte
+    /// that, if set, lets the client ask again; then the portal's).
+    DojoWarpUp = 0xCF,
     /// "You have used the meso bag to receive %d mesos." (FUN_009599bb;
     /// LUCKSACK_FAIL in other servers, though it is the good news).
     MesoBagUsed = 0xD1,

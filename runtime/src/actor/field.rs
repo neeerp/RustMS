@@ -224,6 +224,9 @@ pub struct FieldActor {
     /// In the tall room, the two levers Eak wants up, once he has been
     /// asked.
     levers: Option<[bool; 5]>,
+    /// On a copy of a Mu Lung Dojo floor, its boss until its challenger
+    /// first arrives and it comes out (Cosmic `dojang_1st`).
+    dojo_boss: Option<i32>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -283,6 +286,7 @@ impl FieldActor {
             split: None,
             climb: None,
             levers: None,
+            dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             kites: KiteSet::default(),
             tick,
         };
@@ -3551,6 +3555,42 @@ impl FieldActor {
         // A rejoining controller has forgotten it controls them.
         if self.npc_controller.is_none() || self.npc_controller == Some(client_id) {
             self.send_npc_control(client_id);
+        }
+        if let Some(boss) = self.dojo_boss.take() {
+            self.bring_out_dojo_boss(boss);
+        }
+    }
+
+    /// A Dojo floor's boss comes out where it may, drawn at random, in a
+    /// puff of smoke (Cosmic `spawnDojoMonster`'s summon effect 15). Its
+    /// data marks it a boss, but it fights as an ordinary mob.
+    fn bring_out_dojo_boss(&mut self, mob_id: i32) {
+        let spots = &net::events::DOJO_BOSS_AT;
+        let (x, y) = spots[rand::thread_rng().gen_range(0, spots.len())];
+        let Some(mut info) = net::mobs::info(mob_id) else {
+            warn!(
+                mob_id,
+                map_id = self.key.map_id,
+                "No Dojo boss to bring out"
+            );
+            return;
+        };
+        // Not a boss to skills and statuses (Cosmic `setBoss(false)`).
+        info.boss = false;
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let object_id =
+            self.mobs
+                .place(info, (x, ground.saturating_sub(1)), 5, None, Instant::now());
+        let view = self.mobs.get(object_id).map(|mob| MobView {
+            summon_effect: Some(net::events::DOJO_BOSS_EFFECT),
+            ..mob.view(true)
+        });
+        if let Some(Ok(packet)) = view.as_ref().map(build_spawn_mob) {
+            self.broadcast(None, packet);
+        }
+        if let Some(controller) = self.occupants.keys().next().copied() {
+            let controlled = self.mobs.assign_uncontrolled(controller);
+            self.send_control(controller, &controlled);
         }
     }
 

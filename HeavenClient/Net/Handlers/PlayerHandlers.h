@@ -177,6 +177,15 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Takes the player up to a Mu Lung Dojo floor's door: a flag that, set,
+	// frees the client for its next request, then the portal to go to
+	// (0x959727)
+	// Opcode: DOJO_WARP_UP(207)
+	class DojoWarpUpHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Shows a card on the Monster Book's cover
 	// Opcode: MONSTER_BOOK_SET_COVER(84)
 	class MonsterBookSetCoverHandler : public PacketHandler

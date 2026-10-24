@@ -91,7 +91,7 @@ namespace ms
 				return iter->second;
 
 			std::string strid = string_format::extend_id(mobid, 7);
-			nl::node hit = nl::nx::mob[strid + ".img"]["attack" + std::to_string(index + 1)]["info"]["hit"];
+			nl::node hit = Mob::look_of(mobid)["attack" + std::to_string(index + 1)]["info"]["hit"];
 
 			// Nothing shows for a hit without frames (info+0x78 empty).
 			bool shown = false;
@@ -99,10 +99,17 @@ namespace ms
 			for (nl::node frame : hit)
 				shown = shown || frame.data_type() == nl::node::type::bitmap;
 
+			// Its own sounds, or the linked mob's when it has none, as Mob's constructor takes them.
+			nl::node sounds = nl::nx::sound["Mob.img"][strid];
+
+			if (!sounds)
+				if (nl::node link = nl::nx::mob[strid + ".img"]["info"]["link"])
+					sounds = nl::nx::sound["Mob.img"][string_format::extend_id(link, 7)];
+
 			Sound sound;
 
 			if (const char *name = mob_attack::char_dam_sound(index))
-				if (nl::node src = nl::nx::sound["Mob.img"][strid][name])
+				if (nl::node src = sounds[name])
 					sound = Sound(src);
 
 			return loaded.emplace(key, MobHit{ Animation(hit), shown, hit["attach"].get_bool(), sound }).first->second;
@@ -816,6 +823,17 @@ namespace ms
 
 			Sound(Sound::Name::PORTAL).play();
 		}
+	}
+
+	void Stage::teleport_to_portal(uint8_t id)
+	{
+		if (!portals.has_portal(id))
+			return;
+
+		pending_teleport = Teleport{ physics.get_y_below(portals.get_portal_by_id(id)), std::nullopt };
+
+		player.show_effect_id(CharEffect::Id::TELEPORT);
+		Sound(Sound::Name::PORTAL).play();
 	}
 
 	// v83 throws a player standing on a jump pad into the air and leaves a

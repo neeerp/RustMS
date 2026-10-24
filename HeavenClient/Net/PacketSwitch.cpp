@@ -203,6 +203,7 @@ namespace ms
 		GIVE_FOREIGN_BUFF = 199,
 		CANCEL_FOREIGN_BUFF = 200,
 		SHOW_ITEM_GAIN_INCHAT = 206, // TODO: Rename this (Terribly named)
+		DOJO_WARP_UP = 207,
 
 		/// Player
 		ADD_COOLDOWN = 234,
@@ -485,6 +486,7 @@ namespace ms
 		emplace<QUEST_CLEAR, QuestClearHandler>();
 		emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
+		emplace<DOJO_WARP_UP, DojoWarpUpHandler>();
 
 		// Inventory Handlers
 		emplace<MODIFY_INVENTORY, ModifyInventoryHandler>();

@@ -13,6 +13,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/zakum.md`: the way to Zakum: the chiefs' approval, Adobis's trials, the Breath of Lava, and the gate
 - `agent_docs/papulatus.md`: the fight with Papulatus in Ludibrium's Clocktower: the party's portal, the gates, the way out, the summon, and the win
 - `agent_docs/pianus.md`: Pianus in Aqua Road's Cave of Pianus: the two spawn points, their skills and Bloody Booms, and the drops
+- `agent_docs/dojo.md`: the Mu Lung Dojo: the notice board, So Gong's solo run, its floors and bosses, the door's warp up (0xCF), and the ways on and out
 - `agent_docs/horntail.md`: the way to Horntail in Leafre's Cave of Life: the Dragon Squad's quests, the doors at Keroben and the slate, the ways out, the expedition, its trials, the fight, and the win
 - `agent_docs/ships.md`: the Ellinia–Orbis ship's timetable, boarding NPCs, CONTI packets, and the station wall clock
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death

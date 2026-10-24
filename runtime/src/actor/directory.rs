@@ -140,8 +140,9 @@ pub struct WorldDirectory {
     family_summons: HashMap<ClientId, family::Summons>,
     /// Proposals waiting for their answer, by the partner asked.
     proposals: HashMap<ClientId, marriage::Proposal>,
-    /// The event each channel is playing of each kind, by id.
-    events: HashMap<(u8, EventKind), u32>,
+    /// The events each channel is playing of each kind, by id: as many as
+    /// the kind's `runs`.
+    events: HashMap<(u8, EventKind), Vec<u32>>,
     /// The squad each channel gathers, or sent out, of each kind.
     squads: HashMap<(u8, EventKind), squad::SquadEntry>,
     next_event: u32,
@@ -304,7 +305,7 @@ impl WorldDirectory {
             DirectoryMessage::StartEvent { from, kind, reply } => {
                 // A leader who can't take the reply can't start it.
                 if let Err(Some(start)) = reply.send(self.start_event(from, kind)) {
-                    self.events.remove(&(start.channel_id, kind));
+                    self.event_gone(start.channel_id, kind, start.id);
                 }
             }
             DirectoryMessage::EventClosed {
@@ -312,9 +313,7 @@ impl WorldDirectory {
                 kind,
                 id,
             } => {
-                if self.events.get(&(channel_id, kind)) == Some(&id) {
-                    self.events.remove(&(channel_id, kind));
-                }
+                self.event_gone(channel_id, kind, id);
                 self.squad_closed(channel_id, kind, id);
             }
             DirectoryMessage::SquadTalk { from, kind, reply } => {
@@ -532,38 +531,68 @@ impl WorldDirectory {
         }
     }
 
-    /// Whether `from`'s party may go into an event of `kind` on their
-    /// channel, and who would go.
+    /// Whether `from`'s party, or `from` alone for an event taken alone,
+    /// may go into an event of `kind` on their channel, and who would go.
     fn event_entry(&self, from: ClientId, kind: EventKind) -> (events::Entry, Vec<ClientId>) {
         let Some(asker) = self.clients.get(&from) else {
             return (events::Entry::NoParty, Vec::new());
         };
-        let Some(party) = self.parties.of(from) else {
-            return (events::Entry::NoParty, Vec::new());
+        let candidate = |entry: &Entry| Candidate {
+            id: entry.handle.client_id,
+            level: entry.presence.level,
+            map_id: entry.presence.map_id,
         };
-        if party.leader != from {
-            return (events::Entry::NotLeader, Vec::new());
-        }
-        let candidates: Vec<_> = party
-            .members
-            .iter()
-            .filter_map(|member| self.clients.get(&member.id))
-            // Those in the Cash Shop are on no map (Cosmic's
-            // `isLoggedinWorld`).
-            .filter(|entry| entry.channel_id == asker.channel_id && !entry.in_cash_shop)
-            .map(|entry| Candidate {
-                id: entry.handle.client_id,
-                level: entry.presence.level,
-                map_id: entry.presence.map_id,
-            })
-            .collect();
+        let candidates: Vec<_> = if kind.event().solo() {
+            // Party or not (Cosmic `2091005`'s solo run).
+            vec![candidate(asker)]
+        } else {
+            let Some(party) = self.parties.of(from) else {
+                return (events::Entry::NoParty, Vec::new());
+            };
+            if party.leader != from {
+                return (events::Entry::NotLeader, Vec::new());
+            }
+            party
+                .members
+                .iter()
+                .filter_map(|member| self.clients.get(&member.id))
+                // Those in the Cash Shop are on no map (Cosmic's
+                // `isLoggedinWorld`).
+                .filter(|entry| entry.channel_id == asker.channel_id && !entry.in_cash_shop)
+                .map(candidate)
+                .collect()
+        };
         let Some(team) = kind.event().team(from, &candidates) else {
             return (events::Entry::NotEligible, Vec::new());
         };
-        if self.events.contains_key(&(asker.channel_id, kind)) {
+        if self.event_busy(asker.channel_id, kind) {
             return (events::Entry::Busy, Vec::new());
         }
         (events::Entry::Ready, team)
+    }
+
+    /// Whether `channel_id` already runs as many events of `kind` as may
+    /// run at once.
+    fn event_busy(&self, channel_id: u8, kind: EventKind) -> bool {
+        self.events
+            .get(&(channel_id, kind))
+            .is_some_and(|ids| ids.len() >= kind.event().runs)
+    }
+
+    /// Note that `channel_id` runs event `id` of `kind`.
+    fn event_opened(&mut self, channel_id: u8, kind: EventKind, id: u32) {
+        self.events.entry((channel_id, kind)).or_default().push(id);
+    }
+
+    /// Note that event `id` of `kind` on `channel_id` is over, or never
+    /// started.
+    fn event_gone(&mut self, channel_id: u8, kind: EventKind, id: u32) {
+        if let Some(ids) = self.events.get_mut(&(channel_id, kind)) {
+            ids.retain(|&running| running != id);
+            if ids.is_empty() {
+                self.events.remove(&(channel_id, kind));
+            }
+        }
     }
 
     /// Reserve an event of `kind` on `from`'s channel for their party, if
@@ -575,7 +604,7 @@ impl WorldDirectory {
         let channel_id = self.clients.get(&from)?.channel_id;
         let id = self.next_event;
         self.next_event = self.next_event.wrapping_add(1).max(1);
-        self.events.insert((channel_id, kind), id);
+        self.event_opened(channel_id, kind, id);
         info!(
             ?kind,
             id,
@@ -2188,6 +2217,55 @@ mod tests {
         // Leaving the shop registers her again, on the map.
         let _carol = online(&mut directory, 3, "Carol", lobby);
         assert_eq!(entry(&directory).0, events::Entry::Ready);
+    }
+
+    #[test]
+    fn the_dojo_is_taken_alone_fifteen_at_a_time_per_channel() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let hall = events::DOJO.lobby;
+        let _seen: Vec<_> = [(1, "Alice"), (2, "Bobby"), (3, "Carol")]
+            .into_iter()
+            .map(|(id, name)| online(&mut directory, id, name, hall))
+            .collect();
+        for id in [1, 2] {
+            directory.clients.get_mut(&id).unwrap().presence.level = 25;
+        }
+        let entry = |directory: &WorldDirectory, id| directory.event_entry(id, EventKind::Dojo);
+
+        // Alone, without a party; Carol, at level 10, may not.
+        assert_eq!(entry(&directory, 1), (events::Entry::Ready, vec![1]));
+        assert_eq!(entry(&directory, 3).0, events::Entry::NotEligible);
+
+        // A member who leads no party goes alone too.
+        let now = Instant::now();
+        directory.party_request(1, PartyRequest::Create, now);
+        let invite = PartyRequest::Invite {
+            name: "Bobby".into(),
+        };
+        directory.party_request(1, invite, now);
+        directory.party_request(2, PartyRequest::Accept { party_id: 1 }, now);
+        assert_eq!(entry(&directory, 2), (events::Entry::Ready, vec![2]));
+
+        // Fifteen runs fill the channel; the next waits for one to close.
+        for id in 0..15 {
+            assert_eq!(entry(&directory, 1).0, events::Entry::Ready, "run {id}");
+            directory.event_opened(0, EventKind::Dojo, id);
+        }
+        assert_eq!(entry(&directory, 1).0, events::Entry::Busy);
+        directory.handle(DirectoryMessage::EventClosed {
+            channel_id: 0,
+            kind: EventKind::Dojo,
+            id: 7,
+        });
+        assert_eq!(entry(&directory, 1).0, events::Entry::Ready);
+        assert_eq!(directory.events[&(0, EventKind::Dojo)].len(), 14);
+
+        // A party event still runs one at a time.
+        directory.event_opened(0, EventKind::Hpq, 20);
+        assert!(directory.event_busy(0, EventKind::Hpq));
+        directory.event_gone(0, EventKind::Hpq, 20);
+        assert!(!directory.events.contains_key(&(0, EventKind::Hpq)));
     }
 
     #[test]

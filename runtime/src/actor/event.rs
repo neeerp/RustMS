@@ -41,7 +41,7 @@ use net::loot::Loot;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicI32, AtomicU16, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -91,7 +91,7 @@ pub enum EventMessage {
 /// the event writes it.
 #[derive(Debug, Default)]
 pub struct Cleared {
-    stages: AtomicU16,
+    stages: AtomicU64,
     marks: AtomicU8,
     chests: AtomicU8,
 }
@@ -115,10 +115,10 @@ impl Cleared {
     }
 }
 
-fn bit(stage: u8) -> Option<u16> {
+fn bit(stage: u8) -> Option<u64> {
     stage
         .checked_sub(1)
-        .and_then(|shift| 1u16.checked_shl(shift.into()))
+        .and_then(|shift| 1u64.checked_shl(shift.into()))
 }
 
 /// A way to reach one running event.
@@ -695,9 +695,12 @@ impl EventActor {
             }
             EventCommand::StartBonus => debug!(client_id, "Bonus not taken"),
             // Told by the old leader or the new one, whichever is first.
-            // A squad's lead stays its own, whatever the parties; an event
-            // that lasts until it is empty doesn't end with a lead outside.
-            EventCommand::HandOver(to) if !event.squad && (leader || client_id == to) => {
+            // A squad's lead stays its own, whatever the parties, and so
+            // does one taken alone; an event that lasts until it is empty
+            // doesn't end with a lead outside.
+            EventCommand::HandOver(to)
+                if !event.squad && !event.solo() && (leader || client_id == to) =>
+            {
                 self.leader.store(to, Ordering::Relaxed);
                 if self.team.hand_over(to) {
                     info!(kind = ?self.kind, id = self.id, to, "Event's lead left it");
@@ -1012,11 +1015,12 @@ mod tests {
         let cleared = Cleared::default();
         assert!(cleared.set(1) && cleared.set(3) && !cleared.set(1));
         assert!(cleared.has(1) && !cleared.has(2) && cleared.has(3));
-        // Stages are counted from 1, and sixteen fit.
-        assert!(!cleared.set(0) && !cleared.set(17));
-        assert!(!cleared.has(0) && !cleared.has(17) && !cleared.has(9));
-        assert!(cleared.set(9) && cleared.set(16));
-        assert!(cleared.has(9) && cleared.has(16));
+        // Stages are counted from 1, and sixty-four fit, the Dojo's 38
+        // among them.
+        assert!(!cleared.set(0) && !cleared.set(65));
+        assert!(!cleared.has(0) && !cleared.has(65) && !cleared.has(9));
+        assert!(cleared.set(9) && cleared.set(38) && cleared.set(64));
+        assert!(cleared.has(9) && cleared.has(38) && cleared.has(64));
         assert_eq!((cleared.marks(), cleared.chests()), (0, 0));
     }
 }

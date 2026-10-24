@@ -53,6 +53,16 @@
 
 namespace ms
 {
+	nl::node Mob::look_of(int32_t mobid)
+	{
+		nl::node src = nl::nx::mob[string_format::extend_id(mobid, 7) + ".img"];
+
+		if (nl::node link = src["info"]["link"])
+			return nl::nx::mob[string_format::extend_id(link, 7) + ".img"];
+
+		return src;
+	}
+
 	Mob::Mob(int32_t oi, int32_t mid, int8_t mode, int8_t st, uint16_t fh, uint16_t homefh, bool newspawn, int8_t tm,
 			 Point<int16_t> position, const std::vector<MobStatParser::Status> &spawnstatuses,
 			 const Physics &physics) : MapObject(oi), shown(move_path::Player::State{})
@@ -61,6 +71,11 @@ namespace ms
 		nl::node src = nl::nx::mob[strid + ".img"];
 
 		nl::node info = src["info"];
+
+		// A linked mob keeps its own info but takes the other's actions,
+		// and its sounds when it has none.
+		std::string lookid = info["link"] ? string_format::extend_id(info["link"], 7) : strid;
+		src = look_of(mid);
 
 		level = info["level"];
 		watk = info["PADamage"];
@@ -230,6 +245,9 @@ namespace ms
 		name = std::string(nl::nx::string["Mob.img"][std::to_string(mid)]["name"]);
 
 		nl::node sndsrc = nl::nx::sound["Mob.img"][strid];
+
+		if (!sndsrc)
+			sndsrc = nl::nx::sound["Mob.img"][lookid];
 
 		hitsound = sndsrc["Damage"];
 		diesound = sndsrc["Die"];
@@ -2291,7 +2309,7 @@ namespace ms
 		if (ownlook)
 			return;
 
-		nl::node src = nl::nx::mob[string_format::extend_id(mobid, 7) + ".img"];
+		nl::node src = look_of(mobid);
 		std::map<Stance, Animation> look;
 
 		// Every stance the mob takes needs a frame; what the other lacks it
