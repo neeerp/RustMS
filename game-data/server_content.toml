@@ -1145,6 +1145,16 @@ unsourced = [
     "ellin.altar.golem",
     "ellin.stage6.shut",
     "ellin.stage6.wait",
+    "ellin.home.no_room",
+    "ellin.prize",
+    "ellin.prize.menu",
+    "ellin.prize.altaire",
+    "ellin.prize.glittering",
+    "ellin.prize.brilliant",
+    "ellin.prize.no_fragments",
+    "ellin.prize.no_altaire",
+    "ellin.prize.no_glittering",
+    "ellin.prize.no_room",
 ]
 
 [text."glTutoMsg0.message"]

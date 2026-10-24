@@ -118,6 +118,10 @@ pub enum Action {
     /// and `8098000`): two lots of mobs (`maze_box`) come out where it was,
     /// with a pink line to everyone there.
     MazeBox,
+    /// Give everyone on its map this much EXP as it takes an item, and
+    /// stay: the Forest of Poison Haze's fountain (Cosmic `3008000`, whose
+    /// `hit` gives 52,000), which its states' timeouts empty again.
+    ExpToAll(i32),
 }
 
 /// The maze's boxes that bring out the same mobs in every room, from
@@ -354,6 +358,7 @@ pub fn action(reactor_id: i32) -> Action {
             notice: keys::ELLIN_ALTAR_GOLEM,
             music: None,
         },
+        ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
         2002014 => Action::SprayAndAppear {
@@ -425,6 +430,10 @@ pub const ELLIN_SPINE: i32 = 3009000;
 /// ones, and its sixth's altar, which brings out the Poison Golem.
 pub const ELLIN_STONE_BOX: i32 = 3002001;
 pub const ELLIN_ALTAR: i32 = 3001000;
+/// The prize map's fountain, which takes a Golem's Marble; its map names
+/// it "", and the way home asks its state.
+pub const ELLIN_FOUNTAIN: i32 = 3008000;
+pub const ELLIN_FOUNTAIN_NAME: &str = "";
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
@@ -602,6 +611,8 @@ mod tests {
         assert!(stays(ELLIN_SPINE) && acts_staying(ELLIN_SPINE));
         assert_eq!(action(ELLIN_STONE_BOX), Action::DropsAndClears);
         assert_eq!(action(3002002), Action::Drops);
+        assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
+        assert!(!stays(ELLIN_FOUNTAIN) && !acts_staying(ELLIN_FOUNTAIN));
         assert!(!stays(ELLIN_STONE_BOX) && !acts_staying(ELLIN_STONE_BOX));
         assert!(matches!(
             action(ELLIN_ALTAR),

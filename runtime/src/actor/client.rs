@@ -1556,6 +1556,7 @@ impl ClientActor {
             ServerMessage::StageCleared { id, stage, exp } => {
                 self.stage_cleared(id, stage, exp).await?
             }
+            ServerMessage::GainExp(exp) => self.reactor_exp(exp).await?,
             ServerMessage::ClearEventStage(stage) => {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await

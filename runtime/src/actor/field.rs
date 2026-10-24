@@ -3157,8 +3157,16 @@ impl FieldActor {
                 if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }
-                if reactors::action(view.reactor_id) == reactors::Action::Bloom {
-                    self.bloom();
+                match reactors::action(view.reactor_id) {
+                    reactors::Action::Bloom => self.bloom(),
+                    // Cosmic `3008000`'s `hit`: everyone here, as it takes
+                    // the item.
+                    reactors::Action::ExpToAll(exp) => {
+                        for occupant in self.occupants.values() {
+                            occupant.handle.send(ServerMessage::GainExp(exp));
+                        }
+                    }
+                    _ => {}
                 }
                 return;
             }

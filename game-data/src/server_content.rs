@@ -1793,6 +1793,16 @@ pub mod keys {
     pub const ELLIN_ALTAR_GOLEM: &str = "ellin.altar.golem";
     pub const ELLIN_STAGE6_SHUT: &str = "ellin.stage6.shut";
     pub const ELLIN_STAGE6_WAIT: &str = "ellin.stage6.wait";
+    pub const ELLIN_HOME_NO_ROOM: &str = "ellin.home.no_room";
+    pub const ELLIN_PRIZE: &str = "ellin.prize";
+    pub const ELLIN_PRIZE_MENU: &str = "ellin.prize.menu";
+    pub const ELLIN_PRIZE_ALTAIRE: &str = "ellin.prize.altaire";
+    pub const ELLIN_PRIZE_GLITTERING: &str = "ellin.prize.glittering";
+    pub const ELLIN_PRIZE_BRILLIANT: &str = "ellin.prize.brilliant";
+    pub const ELLIN_PRIZE_NO_FRAGMENTS: &str = "ellin.prize.no_fragments";
+    pub const ELLIN_PRIZE_NO_ALTAIRE: &str = "ellin.prize.no_altaire";
+    pub const ELLIN_PRIZE_NO_GLITTERING: &str = "ellin.prize.no_glittering";
+    pub const ELLIN_PRIZE_NO_ROOM: &str = "ellin.prize.no_room";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2751,6 +2761,16 @@ mod tests {
                 keys::ELLIN_ALTAR_GOLEM,
                 keys::ELLIN_STAGE6_SHUT,
                 keys::ELLIN_STAGE6_WAIT,
+                keys::ELLIN_HOME_NO_ROOM,
+                keys::ELLIN_PRIZE,
+                keys::ELLIN_PRIZE_MENU,
+                keys::ELLIN_PRIZE_ALTAIRE,
+                keys::ELLIN_PRIZE_GLITTERING,
+                keys::ELLIN_PRIZE_BRILLIANT,
+                keys::ELLIN_PRIZE_NO_FRAGMENTS,
+                keys::ELLIN_PRIZE_NO_ALTAIRE,
+                keys::ELLIN_PRIZE_NO_GLITTERING,
+                keys::ELLIN_PRIZE_NO_ROOM,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

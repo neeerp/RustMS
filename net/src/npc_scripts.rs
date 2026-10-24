@@ -1331,10 +1331,10 @@ impl NpcScript {
         tylus(entry)
     }
 
-    /// Ellin in the Deep Fairy Forest, for a player whose party may or may
-    /// not go into the Forest of Poison Haze.
-    pub fn ellin(entry: Entry) -> Self {
-        ellin(entry)
+    /// Ellin in the Deep Fairy Forest, for `player`, whose party may or
+    /// may not go into the Forest of Poison Haze.
+    pub fn ellin(entry: Entry, player: &Player) -> Self {
+        ellin(entry, player)
     }
 
     /// Pietri in the maze's goal room, to a member who may be its
@@ -6872,8 +6872,9 @@ fn tylus(entry: Entry) -> NpcScript {
 }
 
 /// Ellin (Cosmic `2133000`) in the Deep Fairy Forest: the leader takes the
-/// party into the Forest of Poison Haze, and anyone may hear what it holds.
-fn ellin(entry: Entry) -> NpcScript {
+/// party into the Forest of Poison Haze, anyone may hear what it holds,
+/// and `player` may trade Altaire Fragments for earrings.
+fn ellin(entry: Entry, player: &Player) -> NpcScript {
     let enter = match entry {
         Entry::NoParty => Page::Say(text(keys::ELLIN_NO_PARTY)),
         Entry::NotLeader => Page::Say(text(keys::ELLIN_NOT_LEADER)),
@@ -6891,12 +6892,75 @@ fn ellin(entry: Entry) -> NpcScript {
                     text(keys::ELLIN_ABOUT),
                     vec![Page::Say(text(keys::ELLIN_INFO))],
                 ),
+                (text(keys::ELLIN_PRIZE), vec![ellin_prizes(player)]),
             ],
         }],
     );
     // Someone left or moved since Ellin checked, or another party went in.
     script.refused = Some(event_terms(&events::ELLIN, keys::ELLIN_NOT_ELIGIBLE));
+    script.inventory_full = Some(text(keys::ELLIN_PRIZE_NO_ROOM));
     script
+}
+
+/// The Altaire Earrings, then Glittering, then Brilliant (Character.nx
+/// Accessory).
+const ALTAIRE_EARRINGS: [i32; 3] = [1_032_060, 1_032_061, 1_032_072];
+
+/// Ellin's prizes (Cosmic `2133000`, "reclaim a prize"): ten Altaire
+/// Fragments make Altaire Earrings, and ten more each make a pair in
+/// `player`'s bag the next, while they hold none of that pair yet; the
+/// worn ones don't count (Cosmic `haveItem`). Cosmic's rule: Quest.nx has
+/// no such trade (`v83ref/lanes/QUESTIONS.md` a125 5).
+fn ellin_prizes(player: &Player) -> Page {
+    let has = |item_id| player.inventory.count(item_id) > 0;
+    let fragments = player.inventory.count(events::ALTAIRE_FRAGMENT) >= 10;
+    let steps = [
+        (
+            keys::ELLIN_PRIZE_ALTAIRE,
+            None,
+            keys::ELLIN_PRIZE_NO_FRAGMENTS,
+        ),
+        (
+            keys::ELLIN_PRIZE_GLITTERING,
+            Some(ALTAIRE_EARRINGS[0]),
+            keys::ELLIN_PRIZE_NO_ALTAIRE,
+        ),
+        (
+            keys::ELLIN_PRIZE_BRILLIANT,
+            Some(ALTAIRE_EARRINGS[1]),
+            keys::ELLIN_PRIZE_NO_GLITTERING,
+        ),
+    ];
+    let choices = (steps.into_iter().zip(ALTAIRE_EARRINGS))
+        .map(|((label, from, refusal), to)| {
+            let page = if fragments && from.map_or(true, has) && !has(to) {
+                let mut effects: Vec<Effect> = (from.into_iter())
+                    .map(|item_id| Effect::TakeItem {
+                        item_id,
+                        quantity: 1,
+                    })
+                    .collect();
+                effects.extend([
+                    Effect::TakeItem {
+                        item_id: events::ALTAIRE_FRAGMENT,
+                        quantity: 10,
+                    },
+                    Effect::GiveItem {
+                        item_id: to,
+                        quantity: 1,
+                    },
+                ]);
+                Page::Done(effects)
+            } else {
+                Page::Say(text(refusal))
+            };
+            (text(label), vec![page])
+        })
+        .collect();
+    Page::Menu {
+        text: text(keys::ELLIN_PRIZE_MENU),
+        choices,
+    }
 }
 
 /// Rolly (Cosmic `9103001`) in Ludibrium: the leader takes the party into
@@ -12996,7 +13060,7 @@ mod tests {
 
     #[test]
     fn ellin_takes_the_party_into_the_forest_and_lets_a_member_out() {
-        let mut ready = NpcScript::ellin(Entry::Ready);
+        let mut ready = NpcScript::ellin(Entry::Ready, &player(50));
         assert_eq!(kind(&ready.begin()), Some(4));
         let step = ready.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(step.effects, [Effect::StartEvent(EventKind::Ellin)]);
@@ -13006,16 +13070,16 @@ mod tests {
             (Entry::NotLeader, keys::ELLIN_NOT_LEADER),
             (Entry::Busy, keys::ELLIN_BUSY),
         ] {
-            let mut ellin = NpcScript::ellin(entry);
+            let mut ellin = NpcScript::ellin(entry, &player(50));
             ellin.begin();
             let step = ellin.respond(ScriptInput::Select(0)).unwrap();
             assert_eq!(page_text(&step), text(key));
         }
-        let mut ellin = NpcScript::ellin(Entry::NotEligible);
+        let mut ellin = NpcScript::ellin(Entry::NotEligible, &player(50));
         ellin.begin();
         let step = ellin.respond(ScriptInput::Select(0)).unwrap();
         assert!(page_text(&step).contains("55"), "{step:?}");
-        let mut ellin = NpcScript::ellin(Entry::Ready);
+        let mut ellin = NpcScript::ellin(Entry::Ready, &player(50));
         ellin.begin();
         let step = ellin.respond(ScriptInput::Select(1)).unwrap();
         assert_eq!(page_text(&step), text(keys::ELLIN_INFO));
@@ -13051,6 +13115,78 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn ellin_trades_ten_fragments_for_each_pair_of_earrings_in_turn() {
+        let prize = |player: &Player, choice| {
+            let mut ellin = NpcScript::ellin(Entry::Ready, player);
+            ellin.begin();
+            let menu = ellin.respond(ScriptInput::Select(2)).unwrap();
+            assert_eq!(kind(&menu), Some(4));
+            ellin.respond(ScriptInput::Select(choice)).unwrap()
+        };
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let mut player = player(50);
+        for (choice, key) in [
+            (0, keys::ELLIN_PRIZE_NO_FRAGMENTS),
+            (1, keys::ELLIN_PRIZE_NO_ALTAIRE),
+            (2, keys::ELLIN_PRIZE_NO_GLITTERING),
+        ] {
+            assert_eq!(page_text(&prize(&player, choice)), text(key));
+        }
+        player.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(events::ALTAIRE_FRAGMENT, 10),
+        );
+        let fragments = take(events::ALTAIRE_FRAGMENT, 10);
+        assert_eq!(
+            prize(&player, 0).effects,
+            [fragments.clone(), give(ALTAIRE_EARRINGS[0])]
+        );
+        assert_eq!(
+            page_text(&prize(&player, 1)),
+            text(keys::ELLIN_PRIZE_NO_ALTAIRE)
+        );
+        // With the first pair in the bag, the next step, but not the first.
+        let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
+        player
+            .inventory
+            .insert(InventoryType::Equip, 1, equip(ALTAIRE_EARRINGS[0]));
+        assert_eq!(
+            page_text(&prize(&player, 0)),
+            text(keys::ELLIN_PRIZE_NO_FRAGMENTS)
+        );
+        assert_eq!(
+            prize(&player, 1).effects,
+            [
+                take(ALTAIRE_EARRINGS[0], 1),
+                fragments.clone(),
+                give(ALTAIRE_EARRINGS[1])
+            ]
+        );
+        player
+            .inventory
+            .insert(InventoryType::Equip, 2, equip(ALTAIRE_EARRINGS[1]));
+        assert_eq!(
+            page_text(&prize(&player, 1)),
+            text(keys::ELLIN_PRIZE_NO_ALTAIRE)
+        );
+        assert_eq!(
+            prize(&player, 2).effects,
+            [
+                take(ALTAIRE_EARRINGS[1], 1),
+                fragments,
+                give(ALTAIRE_EARRINGS[2])
+            ]
+        );
+        let ellin = NpcScript::ellin(Entry::Ready, &player);
+        assert_eq!(ellin.inventory_full, Some(text(keys::ELLIN_PRIZE_NO_ROOM)));
     }
 
     #[test]

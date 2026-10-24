@@ -942,9 +942,6 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             refused(keys::MILK_JUG_NOT_FULL)
         }
         "end_cow" => through(Effect::Warp(TANGYOONS_KITCHEN)),
-        // The Forest of Poison Haze's prize map, home to the Deep Fairy
-        // Forest.
-        "party6_stage800" => through(Effect::WarpToPortal(crate::events::ELLIN_LOBBY, 0)),
         "inERShip" => through(Effect::WarpToPortal(
             ELLINIA_SKY_FERRY,
             named(ELLINIA_SKY_FERRY, "out00"),
@@ -1813,6 +1810,37 @@ pub fn ellin_maze_way(script: &str, lucky: bool) -> Option<Vec<Effect>> {
 
 /// The way out of the forest's last stage (Cosmic `party6_out`).
 pub const ELLIN_OUT: &str = "party6_out";
+/// The prize map's way home (Cosmic `party6_stage800`).
+pub const ELLIN_HOME: &str = "party6_stage800";
+
+/// What the prize map's way home does for `player`: it takes all the
+/// forest's items and its Golem's Marbles, and while the `fountain` has
+/// taken a marble (its state above 0) gives an Altaire Fragment, or with
+/// no room for it, after those are gone, stays shut with a pink line; then
+/// home to the Deep Fairy Forest (Cosmic `party6_stage800`).
+pub fn ellin_home(player: &Player, fountain: bool) -> Vec<Effect> {
+    use crate::events::{ALTAIRE_FRAGMENT, ELLIN_ITEMS, ELLIN_LOBBY, GOLEMS_MARBLE};
+    let mut left = player.inventory.clone();
+    let mut effects = Vec::new();
+    for item_id in ELLIN_ITEMS.into_iter().chain([GOLEMS_MARBLE]) {
+        let quantity = i16::try_from(player.inventory.count(item_id)).unwrap_or(i16::MAX);
+        if quantity > 0 && left.remove(item_id, quantity).is_ok() {
+            effects.push(Effect::TakeItem { item_id, quantity });
+        }
+    }
+    if fountain {
+        if !crate::items::fits_until(&left, ALTAIRE_FRAGMENT, 1, None) {
+            let shut = content::text().get(keys::ELLIN_HOME_NO_ROOM, &[]);
+            return vec![Effect::Pink(shut)];
+        }
+        effects.push(Effect::GiveItem {
+            item_id: ALTAIRE_FRAGMENT,
+            quantity: 1,
+        });
+    }
+    effects.extend([Effect::PortalSound, Effect::WarpToPortal(ELLIN_LOBBY, 0)]);
+    effects
+}
 
 /// What the way out of the Poison Golem's stage does for a member: shut,
 /// with a pink line why, until the golem is dead and the forest `won`;
@@ -2829,7 +2857,7 @@ mod tests {
 
     #[test]
     fn the_forests_way_on_opens_stage_by_stage_and_its_prize_map_leads_home() {
-        use crate::events::{ELLIN, ELLIN_EXIT, ELLIN_LOBBY, ELLIN_STAGES};
+        use crate::events::{ELLIN, ELLIN_EXIT, ELLIN_STAGES};
         let on = |map| vec![Effect::PortalSound, Effect::WarpToPortal(map, 0)];
         assert_eq!(ellin_way_on(ELLIN.entry, |_| false), on(ELLIN_STAGES[0]));
         let shut = content::text().get(keys::ELLIN_STAGE1_SHUT, &[]);
@@ -2852,8 +2880,7 @@ mod tests {
         );
         assert!(ellin_way_on(ELLIN_STAGES[2], |_| true).is_empty());
         assert!(ellin_way_on(ELLIN_EXIT, |_| true).is_empty());
-        let home = portal("party6_stage800", &player_with(&[])).unwrap();
-        assert_eq!(home.effects, on(ELLIN_LOBBY));
+        assert!(portal(ELLIN_HOME, &player_with(&[])).is_none());
     }
 
     #[test]
@@ -2873,6 +2900,50 @@ mod tests {
             assert_eq!(ellin_maze_way(script, false), None, "{script}");
         }
         assert_eq!(ellin_maze_way(ELLIN_STAGE, true), None);
+    }
+
+    #[test]
+    fn the_way_home_takes_the_forests_items_and_gives_a_fragment_after_the_fountain() {
+        use crate::events::{ALTAIRE_FRAGMENT, ELLIN_LOBBY, GOLEMS_MARBLE, MONSTER_MARBLE};
+        let home = [Effect::PortalSound, Effect::WarpToPortal(ELLIN_LOBBY, 0)];
+        let mut player = player_with(&[]);
+        assert_eq!(ellin_home(&player, false), home);
+        player.inventory.set_slot_limit(InventoryType::Etc, 2);
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MONSTER_MARBLE, 20));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 2, game::Item::stack(GOLEMS_MARBLE, 1));
+        let taken = [
+            Effect::TakeItem {
+                item_id: MONSTER_MARBLE,
+                quantity: 20,
+            },
+            Effect::TakeItem {
+                item_id: GOLEMS_MARBLE,
+                quantity: 1,
+            },
+        ];
+        assert_eq!(ellin_home(&player, false), [&taken[..], &home].concat());
+        // With the fountain used, a fragment, in the room the marbles leave.
+        let fragment = Effect::GiveItem {
+            item_id: ALTAIRE_FRAGMENT,
+            quantity: 1,
+        };
+        assert_eq!(
+            ellin_home(&player, true),
+            [&taken[..], &[fragment], &home].concat()
+        );
+        // With no room even then, the way stays shut.
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4_000_000, 1));
+        player
+            .inventory
+            .insert(InventoryType::Etc, 2, game::Item::stack(4_000_001, 1));
+        let shut = content::text().get(keys::ELLIN_HOME_NO_ROOM, &[]);
+        assert_eq!(ellin_home(&player, true), [Effect::Pink(shut)]);
     }
 
     #[test]

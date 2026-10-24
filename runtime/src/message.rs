@@ -368,6 +368,8 @@ pub enum ServerMessage {
         id: u32,
         clock: tokio::time::Instant,
     },
+    /// A reactor on the player's map gave everyone there `0` EXP.
+    GainExp(i32),
     /// The party in event `id` cleared `stage`, for `exp` rather than the
     /// stage's own EXP if given.
     StageCleared {
