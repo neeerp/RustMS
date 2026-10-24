@@ -1002,6 +1002,27 @@ A member holding 20 Monster Marbles is sent to the leader
 (`ellin.guide.to_leader`); the leader hands them in
 (`ellin.guide.hand_in`), which moves the team to the fifth stage.
 
+The fifth stage (930000500) holds nine stone boxes, which change places
+each time the party's copy starts (`reactors::shuffled`): eight empty ones
+(3002002) and one (`reactors::ELLIN_STONE_BOX`, 3002001) that breaks on
+the fourth hit and drops the Purple Stone of Magic (4001163,
+`reward_overrides.toml`), clearing the stage for whoever broke it. The
+Sprite (2133004, `npc_scripts::ellin_sprite`) takes a leader holding the
+stone, with the whole team, on to the sixth stage
+(`ellin.sprite.to_altar`), and asks anyone else whether to leave
+(`ellin.sprite.leave`).
+
+On the sixth stage (930000600) the stone thrown on the altar
+(`reactors::ELLIN_ALTAR`, an item reactor) brings out the Poison Golem
+(9300180) at the altar, with a pink line (`ellin.altar.golem`). It dies
+into its Charged form (9300181), and that into its Super-Charged one
+(9300182), by their `revive`; that one's death clears the stage and wins
+the forest (`events::cleared_by_boss`). The stage's way out (`out00`,
+script `party6_out`, `scripts::ellin_way_out`) stays shut until then
+(`ellin.stage6.shut`), then tells a member to wait for the leader
+(`ellin.stage6.wait`) and takes the leader, with the team, to the prize
+map.
+
 The prize map, 930000800, is the event's exit and every party's own map
 alike, not a copy: the time running out, leaving, and dying (the maps'
 `returnMap`) all land there, and its way out (`party6_stage800`) leads home
@@ -1012,9 +1033,8 @@ leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
 event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
 leaves. Its lines are placeholders (`ellin.*`).
 
-Not yet: the fifth and sixth stages, the Poison Golem's win, the
-fountain's EXP, the Altaire Fragment and the earrings (slices S4 and S5
-of a125), and the Party Search toggle.
+Not yet: the fountain's EXP, the Altaire Fragment and the earrings (slice
+S5 of a125), and the Party Search toggle.
 
 ## NPCs
 
@@ -1068,6 +1088,7 @@ of a125), and the Party Search toggle.
 | Ellin 2133001 | 930000400 | Runtime (`ellin_flowers`): Purification Marbles, the leader's hand-in, or out |
 | Ellin 2133001 | 930000100-600, others | Out to 930000800 |
 | Milepost 2133002 | 930000300 | Out to 930000800 |
+| Sprite 2133004 | 930000500 | Runtime (`ellin_sprite`): the leader with the stone on to the altar, or out |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,

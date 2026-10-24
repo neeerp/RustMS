@@ -1811,6 +1811,26 @@ pub fn ellin_maze_way(script: &str, lucky: bool) -> Option<Vec<Effect>> {
     Some(vec![Effect::PortalSound, Effect::WarpToPortal(maze, to)])
 }
 
+/// The way out of the forest's last stage (Cosmic `party6_out`).
+pub const ELLIN_OUT: &str = "party6_out";
+
+/// What the way out of the Poison Golem's stage does for a member: shut,
+/// with a pink line why, until the golem is dead and the forest `won`;
+/// then the leader takes the whole team out to the prize map, and anyone
+/// else is told to wait for them.
+pub fn ellin_way_out(won: bool, leader: bool) -> Vec<Effect> {
+    use crate::events::{EventCommand, ELLIN};
+    let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+    match (won, leader) {
+        (false, _) => pink(keys::ELLIN_STAGE6_SHUT),
+        (true, false) => pink(keys::ELLIN_STAGE6_WAIT),
+        (true, true) => vec![
+            Effect::PortalSound,
+            Effect::EventCommand(EventCommand::MoveTeam(ELLIN.exit)),
+        ],
+    }
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2853,6 +2873,22 @@ mod tests {
             assert_eq!(ellin_maze_way(script, false), None, "{script}");
         }
         assert_eq!(ellin_maze_way(ELLIN_STAGE, true), None);
+    }
+
+    #[test]
+    fn the_last_stages_way_out_waits_for_the_golem_and_the_leader() {
+        use crate::events::{EventCommand, ELLIN};
+        let pink = |key| vec![Effect::Pink(content::text().get(key, &[]))];
+        assert_eq!(ellin_way_out(false, true), pink(keys::ELLIN_STAGE6_SHUT));
+        assert_eq!(ellin_way_out(false, false), pink(keys::ELLIN_STAGE6_SHUT));
+        assert_eq!(ellin_way_out(true, false), pink(keys::ELLIN_STAGE6_WAIT));
+        assert_eq!(
+            ellin_way_out(true, true),
+            [
+                Effect::PortalSound,
+                Effect::EventCommand(EventCommand::MoveTeam(ELLIN.exit))
+            ]
+        );
     }
 
     #[test]

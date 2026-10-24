@@ -1140,6 +1140,11 @@ unsourced = [
     "ellin.guide.hand_in",
     "ellin.guide.to_leader",
     "ellin.milepost.leave",
+    "ellin.sprite.to_altar",
+    "ellin.sprite.leave",
+    "ellin.altar.golem",
+    "ellin.stage6.shut",
+    "ellin.stage6.wait",
 ]
 
 [text."glTutoMsg0.message"]

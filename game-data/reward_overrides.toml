@@ -220,3 +220,10 @@ add = [{ item = 4001161, prob = 0.2 }]
 # The pond (`dropItems`) gives back a Diluted Poison 4001162 for each, which
 # the stage's spine takes four of (Reactor.nx 3009000); every time.
 add = [{ item = 4001162, prob = 1.0 }]
+
+[reactors.3002001]
+# The fifth stage's box with the Purple Stone of Magic 4001163 (Reactor.nx
+# 3002001, `dropItems`), which the Sprite is shown and the sixth stage's
+# altar takes (Reactor.nx 3001000, item event); every time. Its eight empty
+# boxes (3002002) drop nothing.
+add = [{ item = 4001163, prob = 1.0 }]

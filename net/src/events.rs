@@ -1308,9 +1308,19 @@ pub const PURIFICATION_MARBLE: i32 = 2_270_004;
 pub const PURIFICATION_MARBLES_GIVEN: i16 = 10;
 pub const MONSTER_MARBLE: i32 = 4_001_169;
 pub const MONSTER_MARBLES_WANTED: i16 = 20;
+/// The Purple Stone of Magic, which one of the fifth stage's boxes holds,
+/// the leader shows the Sprite, and the sixth stage's altar takes; the
+/// Poison Golem the altar brings out, and the last of the forms it dies
+/// into, whose death wins the forest (Cosmic `EllinPQ.monsterKilled`).
+pub const PURPLE_STONE: i32 = 4_001_163;
+pub const ELLIN_GOLEM: i32 = 9_300_180;
+pub const ELLIN_GOLEM_LAST: i32 = 9_300_182;
+/// The altar's place on the sixth stage (Map.nx 930000600), where the
+/// golem comes out (Cosmic `spawnMonster`, at the reactor).
+pub const ELLIN_ALTAR_AT: (i16, i16) = (392, -73);
 /// Diluted Poison, the Purple Stone of Magic, Monster Marbles and
 /// Purification Marbles: of use only in the forest.
-const ELLIN_ITEMS: [i32; 4] = [4_001_162, 4_001_163, 4_001_169, 2_270_004];
+const ELLIN_ITEMS: [i32; 4] = [4_001_162, PURPLE_STONE, MONSTER_MARBLE, PURIFICATION_MARBLE];
 
 /// The Forest of Poison Haze (Cosmic `EllinPQ`): four to six of a party,
 /// all of levels 44 to 55, in the Deep Fairy Forest with their leader, go
@@ -1332,8 +1342,9 @@ pub const ELLIN: Event = Event {
     stage_maps: &ELLIN_STAGES,
     talk_clears: &[],
     // The first by killing, the second by its spine, the maze by Ellin at
-    // its end, the fourth by catching the last of its flowers.
-    member_clears: &[1, 2, 3, 4],
+    // its end, the fourth by catching the last of its flowers, the fifth
+    // by its box, the last by the golem's death.
+    member_clears: &[1, 2, 3, 4, 5, 6],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -1357,6 +1368,13 @@ pub const ELLIN: Event = Event {
 /// `EllinPQ.monsterKilled` without a killer).
 pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
     (map_id == ELLIN_STAGES[3]).then_some(4)
+}
+
+/// The stage cleared once `mob_id` dies on `map_id`, in an event's copy of
+/// it: the Forest of Poison Haze's last, by its Super-Charged Poison Golem
+/// (Cosmic `EllinPQ.monsterKilled`).
+pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
+    (map_id == ELLIN_STAGES[5] && mob_id == ELLIN_GOLEM_LAST).then_some(6)
 }
 
 /// The stage cleared once every mob on `map_id`, in an event's copy of
@@ -2698,6 +2716,9 @@ mod tests {
         assert_eq!(ELLIN.duration(), scaled(Duration::from_secs(30 * 60)));
         assert_eq!(cleared_by_killing(ELLIN_STAGES[0]), Some(1));
         assert_eq!(cleared_by_killing(ELLIN_STAGES[1]), None);
+        assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM_LAST), Some(6));
+        assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM), None);
+        assert_eq!(cleared_by_boss(ELLIN_STAGES[4], ELLIN_GOLEM_LAST), None);
     }
 
     #[test]

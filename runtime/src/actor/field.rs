@@ -1767,9 +1767,12 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
-        // A stage cleared by killing all its mobs clears with the last.
+        // A stage cleared by killing all its mobs clears with the last, and
+        // one cleared by its boss with the boss.
         let cleared = net::events::cleared_by_killing(self.key.map_id)
-            .filter(|_| self.key.instance_id != 0 && self.mobs.live().next().is_none());
+            .filter(|_| self.mobs.live().next().is_none())
+            .or(net::events::cleared_by_boss(self.key.map_id, kill.mob_id))
+            .filter(|_| self.key.instance_id != 0);
         if let Some(stage) = cleared {
             for occupant in self.occupants.values() {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
