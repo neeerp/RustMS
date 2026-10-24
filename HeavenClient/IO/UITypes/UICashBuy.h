@@ -81,6 +81,8 @@ namespace ms
 		Text name;
 		Text price;
 		Text question;
+		// A slot's question, in place of the item.
+		Text words;
 		int32_t sn;
 		int32_t item_id;
 		std::array<bool, cash_catalog::NUM_PAYMENTS> offered;

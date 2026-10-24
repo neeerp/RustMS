@@ -49,6 +49,8 @@ namespace ms
 		const Point<int16_t> NAME_POS = Point<int16_t>(59, 25);
 		const Point<int16_t> PRICE_POS = Point<int16_t>(59, 42);
 		const Point<int16_t> QUESTION_POS = Point<int16_t>(24, 69);
+		// A question in words takes the icon's place too.
+		const Point<int16_t> WORDS_POS = Point<int16_t>(21, 25);
 		// The checkboxes sit left of the payment labels baked into the art.
 		const Point<int16_t> CHECKBOX_POS = Point<int16_t>(28, 102);
 		constexpr int16_t CHECKBOX_STEP = 14;
@@ -90,6 +92,29 @@ namespace ms
 		std::string advancement_question(int32_t slots)
 		{
 			return "You can expand " + std::to_string(slots) + " slots when\\nyou change occupations.\\nWould you really like to\\nexpand now even at a cost?";
+		}
+
+		// The question a character slot or a slot button asks in place of
+		// the item, or nothing. v83 names the bags from a table of its own
+		// (StringPool 0xa, 0x15dc, 0xb, 0x15a2 and 0x15b5).
+		constexpr const char* BAG_NAMES[InventoryType::Id::EQUIPPED] = { "", "Eqp", "Use", "Setup", "Etc", "Pet" };
+
+		std::string slots_question(const Commodity& commodity)
+		{
+			std::string price = std::to_string(commodity.price);
+
+			if (is_character_slot(commodity.item_id))
+				return "Add a character slot (" + price + " NX)\\nAre you sure you want to add another\\ncharacter slot?";
+
+			if (!is_expansion(commodity.item_id) || commodity.sn != 0)
+				return "";
+
+			InventoryType::Id bag = expanded(commodity.item_id);
+
+			if (bag == InventoryType::Id::NONE)
+				return "Adding slots to the storage (" + price + " NX)\\nAre you sure you want to add slots\\nto your storage?";
+
+			return std::string(BAG_NAMES[bag]) + " adding inventory slots. (" + price + " NX)\\nConfirm inventory slot purchase?";
 		}
 
 		// A slot button adds four slots, a commodity its item's delta.
@@ -291,11 +316,13 @@ namespace ms
 		price = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, price_text);
 		question = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "Are you sure you want to buy this item?");
 
-		// StringPool 0x1e9 asks for a character slot instead.
-		if (is_character_slot(item_id))
+		// StringPool 0x1e9 asks for a character slot instead, and 0x1e7 and
+		// 0x1e8 for a slot button's slots (v83 46c6f8, 46c036 and 46c55b),
+		// in a dialog without the item (46c4d5).
+		if (std::string text = slots_question(commodity); !text.empty())
 		{
-			name = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, "Add a character slot (" + std::to_string(commodity.price) +
-				" NX)\\nAre you sure you want to add another\\ncharacter slot?", 200);
+			words = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, text, dimension.x() - 2 * WORDS_POS.x());
+			name = Text();
 			price = Text();
 			question = Text();
 		}
@@ -311,7 +338,10 @@ namespace ms
 			pos.shift_y(part.height());
 		}
 
-		ItemData::get(item_id).get_icon(false).draw(position + ICON_POS);
+		if (words.empty())
+			ItemData::get(item_id).get_icon(false).draw(position + ICON_POS);
+
+		words.draw(position + WORDS_POS);
 		name.draw(position + NAME_POS);
 		price.draw(position + PRICE_POS);
 		question.draw(position + QUESTION_POS);

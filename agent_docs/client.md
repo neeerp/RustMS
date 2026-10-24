@@ -856,8 +856,11 @@ the screen size.
   that the player's next job advancement would widen past 96 asks first
   whether to buy anyway (`FUN_0046c38f`): four Equip, or eight Use or Etc,
   slots for a beginner, and four of the job's bags for a first or second job.
-  v83's slot buttons show a text-only dialog where HC shows the item, and
-  HC has no character-slot button.
+  As in v83 (`0x46c036`, `0x46c55b`), a slot button's dialog asks in words
+  instead of naming the item: "Eqp adding inventory slots. (4000 NX) Confirm
+  inventory slot purchase?" (Use, Setup and Etc likewise), or "Adding slots
+  to the storage (4000 NX) Are you sure you want to add slots to your
+  storage?". HC has no character-slot button.
 - **Character slots:** the count comes from 0x4B and 0x64. As in v83
   (`FUN_0046c6f8`), the coupon says "You don't have enough cash." without a
   balance that covers it, then "You may not add any more character slots." at
