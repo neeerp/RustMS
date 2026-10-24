@@ -65,6 +65,8 @@ namespace ms
 			// Getting on a tamed monster without one or a saddle, or one that can't be ridden (0x968b9d)
 			RIDE_NO_SADDLE,
 			RIDE_REFUSED,
+			// A cash tamed monster without a cash saddle that fits it (0xeea)
+			RIDE_CASH_SADDLE,
 			// Battleship Cannon or Torpedo off the ship (0xdd3)
 			SHIP_ONLY,
 			// A chair in a field of type 61 (0x10ad)

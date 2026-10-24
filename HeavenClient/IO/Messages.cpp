@@ -52,6 +52,7 @@ namespace ms
 					"Not available during the ride.",
 					"This skill requires a tamed monster and a saddle.",
 					"You cannot ride on this tamed monster.",
+					"You can ride the tamed cash monster when it is equipped with a Cash Saddle.",
 					"This skill is available only when you are riding the Battleship.",
 					"It is not appropriate to use it here.",
 					"Unavailable while transforming.",
