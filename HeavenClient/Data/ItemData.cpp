@@ -29,6 +29,7 @@ namespace ms
 		cashitem = false;
 		questitem = false;
 		pickupblock = false;
+		lockerblock = false;
 		reward = false;
 		gender = 0;
 
@@ -99,6 +100,7 @@ namespace ms
 			cashitem = src["cash"].get_bool();
 			questitem = src["quest"].get_bool();
 			pickupblock = src["pickUpBlock"].get_bool();
+			lockerblock = src["noMoveToLocker"].get_bool();
 			properties.only = unique;
 			properties.quest = questitem;
 			properties.pquest = src["pquest"].get_bool();
@@ -215,6 +217,11 @@ namespace ms
 	bool ItemData::is_pickup_blocked() const
 	{
 		return pickupblock;
+	}
+
+	bool ItemData::is_locker_blocked() const
+	{
+		return lockerblock;
 	}
 
 	bool ItemData::has_reward() const

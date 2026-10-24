@@ -55,7 +55,7 @@ namespace ms
 		const Point<int16_t> CANCEL_FROM_CORNER = Point<int16_t>(73, 31);
 	}
 
-	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), credit(0), points(0), prepaid(0)
+	UICashGift::UICashGift(const cash_catalog::Commodity& commodity) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), asking_birthday(false), sn(commodity.sn), period(commodity.period), credit(0), points(0), prepaid(0)
 	{
 		background = NxFiles::ui_classic["CashShop.img"]["CSGift"]["backgrnd"];
 
@@ -195,11 +195,22 @@ namespace ms
 		{
 			// The server answers a wrong code with its own notice. v83
 			// (FUN_007e47ef) stars out curse words in both lines first.
-			if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
-				GiftCashItemPacket(cash_catalog::birthday_code(birthday.get_text()), sn, CurseData::filter(to.get_text()),
-								   CurseData::filter(message.get_text())).dispatch();
+			auto send = [code = cash_catalog::birthday_code(birthday.get_text()), sn = sn, receiver = CurseData::filter(to.get_text()),
+						 note = CurseData::filter(message.get_text())]()
+			{
+				if (auto cashshop = UI::get().get_element<UICashShop>(); cashshop && cashshop->request())
+					GiftCashItemPacket(code, sn, receiver, note).dispatch();
+			};
 
 			close();
+
+			// An item that expires asks first (v83 46ec85, StringPool
+			// 0x155f). The question replaces this dialog.
+			if (period != 0)
+				UI::get().emplace<UIYesNo>("This contains an item that will disappear once \\nthe expiration date has passed. Do you want to give it as a gift?",
+										   [send](bool yes) { if (yes) send(); });
+			else
+				send();
 
 			return;
 		}

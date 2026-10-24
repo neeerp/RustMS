@@ -80,6 +80,10 @@ namespace ms
 		// StringPool 0x1ed.
 		constexpr const char* NO_MORE_CHARACTERS = "You may not add any more character slots.";
 
+		// StringPool 0xb94 and 0x1f2.
+		constexpr const char* ALREADY_HAVE = "You may not purchase the item\\nsince you already have it.";
+		constexpr const char* BUY_AGAIN = "You already have the item(s) selected. Are\\nyou sure you want to buy the item(s) again?";
+
 		// StringPool 0x1f9.
 		constexpr const char* NO_RIDING = "This is an item that cannot be used\\nif you do not have the Monster\\nRiding skill. Would you\\nstill like to purchase it?";
 
@@ -127,6 +131,21 @@ namespace ms
 		{
 			UI::get().emplace<UIOk>(text, [](bool) {});
 		}
+
+		// Whether the character already has the item, or one of a
+		// package's (v83 4729b5 with flag 0, and 46e121).
+		bool owned(const Commodity& commodity)
+		{
+			auto cashshop = UI::get().get_element<UICashShop>();
+
+			if (!cashshop)
+				return false;
+
+			if (is_package(commodity.item_id))
+				return cashshop->owns_package(commodity.item_id);
+
+			return cashshop->owns(commodity.item_id, true);
+		}
 	}
 
 	void UICashBuy::open(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid)
@@ -164,15 +183,35 @@ namespace ms
 
 		if (!is_expansion(commodity.item_id))
 		{
+			// v83 46dadd: some balance must pay, NX Prepaid alone for some
+			// items (0x251).
+			if (commodity.price > 0 && !affordable(commodity.price, credit, points, prepaid))
+				return notice(NOT_ENOUGH_CASH);
+
+			if (prepaid_only(commodity.item_id) && prepaid < commodity.price)
+				return notice(name_change::NO_PREPAID);
+
 			// v83 46d211: a mount or saddle, for a job without Monster Rider.
 			Player& player = Stage::get().get_player();
 			int32_t rider = mount::rider_skill(player.get_stats().get_job().get_id());
 			int32_t prefix = commodity.item_id / 10000;
 
-			if ((prefix == 190 || prefix == 191) && player.get_skills().get_level(rider) <= 0)
-				UI::get().emplace<UIYesNo>(NO_RIDING, [buy](bool yes) { if (yes) buy(); });
+			auto ask_riding = [buy, prefix, rider]()
+			{
+				if ((prefix == 190 || prefix == 191) && Stage::get().get_player().get_skills().get_level(rider) <= 0)
+					UI::get().emplace<UIYesNo>(NO_RIDING, [buy](bool yes) { if (yes) buy(); });
+				else
+					buy();
+			};
+
+			// An item the character has: a free one can't be bought again,
+			// another asks first.
+			if (!owned(commodity))
+				ask_riding();
+			else if (commodity.price <= 0)
+				notice(ALREADY_HAVE);
 			else
-				buy();
+				UI::get().emplace<UIYesNo>(BUY_AGAIN, [ask_riding](bool yes) { if (yes) ask_riding(); });
 
 			return;
 		}
@@ -202,9 +241,25 @@ namespace ms
 	}
 
 	// v83's ring dialogs offer NX Credit and NX Prepaid (46e08e with flags
-	// 1 and 4), so the Maple Points' option is never checked.
-	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), payment(default_payment(commodity.price, credit, ring ? 0 : points, prepaid)), ring(std::move(ring))
+	// 1 and 4), so the Maple Points' option is never checked; the items
+	// NX Prepaid alone pays for offer it alone (46dc4d).
+	UICashBuy::UICashBuy(const Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring) : UIElement(Point<int16_t>(0, 0), Point<int16_t>(0, 0)), sn(commodity.sn), item_id(commodity.item_id), ring(std::move(ring))
 	{
+		if (this->ring)
+			offered = { false, true, true };
+		else if (prepaid_only(item_id))
+			offered = { false, true, false };
+		else
+			offered = payment_options(commodity.price, credit, points, prepaid);
+
+		// Checked first: an offered balance that pays.
+		std::array<bool, NUM_PAYMENTS> pays = payment_options(commodity.price, credit, this->ring ? 0 : points, prepaid);
+
+		for (size_t i = 0; i < NUM_PAYMENTS; i++)
+			pays[i] = pays[i] && offered[i];
+
+		payment = default_payment(pays);
+
 		nl::node Basic = NxFiles::ui_classic["Basic.img"];
 
 		int16_t height = 0;
@@ -275,7 +330,7 @@ namespace ms
 		{
 			size_t option = cursor.y() / CHECKBOX_STEP;
 
-			if (ring && PAYMENTS[option] == MAPLE_POINTS)
+			if (!offered[option])
 				return UIElement::send_cursor(clicked, cursorpos);
 
 			if (clicked)

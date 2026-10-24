@@ -38,7 +38,8 @@ namespace ms
 
 	// The Cash Shop's BUY dialog (UIClassic.nx CashShop.img/CSNotice/0): the
 	// item, its price, and which balance pays for it. A commodity with sn 0
-	// is a slot button's four slots. For a ring, Maple Points can't pay.
+	// is a slot button's four slots. Only a balance that covers the price
+	// can be checked, and for a ring, Maple Points can't pay.
 	class UICashBuy : public UIElement
 	{
 	public:
@@ -48,8 +49,9 @@ namespace ms
 
 		UICashBuy(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring = {});
 
-		// Opens the dialog, after v83's checks for a slot expansion: some
-		// balance must cover the price, a slot button must find room in the
+		// Opens the dialog, after v83's checks: some balance must cover the
+		// price, NX Prepaid alone pays for some items, an item the character
+		// already has asks first, a slot button must find room in the
 		// storage, and a bag a job advancement would widen past its last
 		// slot asks first.
 		static void open(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid);
@@ -81,6 +83,7 @@ namespace ms
 		Text question;
 		int32_t sn;
 		int32_t item_id;
+		std::array<bool, cash_catalog::NUM_PAYMENTS> offered;
 		size_t payment;
 		std::optional<RingOrder> ring;
 	};

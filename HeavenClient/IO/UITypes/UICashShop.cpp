@@ -500,7 +500,7 @@ namespace ms
 				else if (list_button % 3 == 0 || (list_button % 3 == 1 && marriage::is_pair_ring(commodity.item_id)))
 					UICashBuy::open(commodity, credit, points, prepaid);
 				else if (list_button % 3 == 1)
-					UI::get().emplace<UICashGift>(commodity);
+					gift(commodity);
 				else if (list_button % 3 == 2)
 					reserve(commodity.sn);
 			}
@@ -794,19 +794,14 @@ namespace ms
 	void UICashShop::doubleclick(Point<int16_t> cursorpos)
 	{
 		Point<int16_t> cursor = cursorpos - position;
-		const Inventory& inventory = Stage::get().get_player().get_inventory();
 
 		int16_t cash_cell = grid_cell(cursor, CASH_GRID_POS, CASH_COLUMNS, CASH_ROWS);
 		size_t index = cash_row * CASH_COLUMNS + cash_cell;
 
 		if (cash_cell >= 0 && index < cash_items.size())
 		{
-			const CashItem& item = cash_items[index];
-			InventoryType::Id type = InventoryType::by_item_id(item.item_id);
+			take_out(cash_items[index]);
 
-			// The server picks another slot, or refuses, if this one is taken.
-			if (request())
-				TakeOutCashItemPacket(item.cash_id, type, inventory.find_free_slot(type)).dispatch();
 			return;
 		}
 
@@ -814,10 +809,7 @@ namespace ms
 
 		if (item_cell >= 0)
 		{
-			int16_t slot = static_cast<int16_t>(item_row * ITEM_COLUMNS + item_cell + 1);
-
-			if (int64_t cash_id = inventory.get_cash_id(item_tab, slot); cash_id && request())
-				PutBackCashItemPacket(cash_id, item_tab).dispatch();
+			put_back(static_cast<int16_t>(item_row * ITEM_COLUMNS + item_cell + 1));
 
 			return;
 		}
@@ -1053,6 +1045,12 @@ namespace ms
 
 	void UICashShop::buy_with_mesos(const Commodity& commodity)
 	{
+		if (owns(commodity.item_id, true))
+		{
+			UI::get().emplace<UIOk>("You may not purchase the item\\nsince you already have it.", [](bool) {});
+			return;
+		}
+
 		if (Stage::get().get_player().get_inventory().get_meso() < commodity.price)
 		{
 			UI::get().emplace<UIOk>("You do not have enough mesos.", [](bool) {});
@@ -1067,6 +1065,85 @@ namespace ms
 					BuyWithMesosPacket(sn).dispatch();
 			}
 		);
+	}
+
+	void UICashShop::gift(const Commodity& commodity)
+	{
+		// Gifts are paid with NX Prepaid (StringPool 0x251 and 0xf97).
+		if (commodity.price != 0 && prepaid < commodity.price)
+		{
+			UI::get().emplace<UIOk>("You don't have enough NX Prepaid", [](bool) {});
+			return;
+		}
+
+		UI::get().emplace<UIYesNo>("Would you like to gift this item to someone?\\n[ " + ItemData::get(commodity.item_id).get_name() + " ]", [commodity](bool yes)
+			{
+				if (yes)
+					UI::get().emplace<UICashGift>(commodity);
+			}
+		);
+	}
+
+	void UICashShop::take_out(const CashItem& item)
+	{
+		// A free item the character already has stays (StringPool 0xb95).
+		auto commodity = std::find_if(catalog.begin(), catalog.end(), [&item](const Commodity& c) { return c.sn == item.sn; });
+
+		if (item.sn != 0 && commodity != catalog.end() && commodity->price == 0 && owns(item.item_id, false))
+		{
+			UI::get().emplace<UIOk>("This item cannot be transfered because\\nyou already own this item.", [](bool) {});
+			return;
+		}
+
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		InventoryType::Id type = InventoryType::by_item_id(item.item_id);
+
+		// The server picks another slot, or refuses, if this one is taken.
+		if (request())
+			TakeOutCashItemPacket(item.cash_id, type, inventory.find_free_slot(type)).dispatch();
+	}
+
+	void UICashShop::put_back(int16_t slot)
+	{
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+		int64_t cash_id = inventory.get_cash_id(item_tab, slot);
+
+		if (!cash_id)
+			return;
+
+		// StringPool 0x9cb, for an item marked noMoveToLocker.
+		if (ItemData::get(inventory.get_item_id(item_tab, slot)).is_locker_blocked())
+		{
+			UI::get().emplace<UIOk>("This item cannot be moved.", [](bool) {});
+			return;
+		}
+
+		if (request())
+			PutBackCashItemPacket(cash_id, item_tab).dispatch();
+	}
+
+	bool UICashShop::owns(int32_t item_id, bool locker) const
+	{
+		if (locker && std::any_of(cash_items.begin(), cash_items.end(), [item_id](const CashItem& item) { return item.item_id == item_id; }))
+			return true;
+
+		const Inventory& inventory = Stage::get().get_player().get_inventory();
+
+		return inventory.find_item(InventoryType::by_item_id(item_id), item_id) != 0 || inventory.find_item(InventoryType::Id::EQUIPPED, item_id) != 0;
+	}
+
+	bool UICashShop::owns_package(int32_t item_id) const
+	{
+		for (nl::node sn : nl::nx::etc["CashPackage.img"][std::to_string(item_id)]["SN"])
+		{
+			int32_t serial = static_cast<int32_t>(sn.get_integer());
+			auto commodity = std::find_if(catalog.begin(), catalog.end(), [serial](const Commodity& c) { return c.sn == serial; });
+
+			if (commodity != catalog.end() && owns(commodity->item_id, true))
+				return true;
+		}
+
+		return false;
 	}
 
 	void UICashShop::bought_with_mesos(int32_t item_id, int16_t slot)

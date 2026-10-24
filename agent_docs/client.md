@@ -805,8 +805,12 @@ the screen size.
   item put back), 0x89 (a bought package) and 0x8D (bought with mesos) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
-  price and period, and a checkbox per balance. It checks the first balance
-  that covers the price, trying NX Prepaid, NX Credit, then Maple Points. OK
+  price and period, and a checkbox per balance. Only a balance that covers
+  the price can be checked, and Maple Points alone for a free item (v83
+  `0x46dbe5`); a ring offers NX Credit and NX Prepaid, and Name Change,
+  World Transfer, 520000x, 549xxxx, 5221001 and 5222000 NX Prepaid alone
+  (`0x46dc4d`). It checks the first balance that pays, trying NX Prepaid,
+  NX Credit, then Maple Points. OK
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
   Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
   0x06/0x07 mode 1 for an expansion commodity (911x000), or 0x08 for the
@@ -815,13 +819,24 @@ the screen size.
   a zero (no free trial). The result is a "successful purchase" or a failure
   notice. Failure notices use v83's text for each code (`FUN_0047c17a`),
   except gift-token and character-transfer codes, which get the default.
+- **Purchase checks:** before the dialog, as in v83 (`0x46dadd`), BUY says
+  "You don't have enough cash." when no balance covers the price, and "You
+  don't have enough NX Prepaid" for an item NX Prepaid alone pays for. An item
+  the character already has, in the Cash Inventory, its bag or worn
+  (`0x4729b5`), can't be bought again when it is free ("You may not purchase
+  the item since you already have it."); otherwise BUY asks "You already have
+  the item(s) selected. Are you sure you want to buy the item(s) again?". A
+  package asks when any of its items (`Etc.nx` `CashPackage.img`) is had
+  (`0x46e121`). Buying with mesos refuses an item the character has.
 - **Buying with mesos:** v83 has no tab for the commodities that cost mesos
   (SN 80000000-89999999). When the shop opens, each one on sale goes into a
   random sub-tab that has items, at a random place (v83 `0x471f37`;
   `cash_catalog::scatter`). Its price reads "N mesos", and it has no GIFT or
   RESERVE, like anything free (`0x4baa51`). BUY says "You do not have enough
   mesos." when the purse is short, or else asks "Are you sure you want to buy
-  this item?" and sends 0x20 with the SN (`0x46e5c5`). On 0x8D the Item
+  this item?" and sends 0x20 with the SN (`0x46e5c5`); an item the character
+  has comes first, with "You may not purchase the item since you already have
+  it." On 0x8D the Item
   Inventory turns to the item's tab and scrolls to its row, then says "You
   have successfully made the purchase." (`0x47b603`). v83 also selects the
   slot; HC doesn't.
@@ -864,13 +879,21 @@ the screen size.
   sends 0x0D with its serial, bag and the bag's first free slot; the server
   answers with the slot and the item (0x68), or 0xBB if the bag is full.
   Double-clicking a cash item in the Item Inventory sends 0x0E, and the server
-  answers with the Cash Inventory item (0x6A). The footage doesn't show
+  answers with the Cash Inventory item (0x6A). As in v83 (`0x472632`,
+  `0x472820`), a free commodity's item stays in the Cash Inventory while the
+  character has one ("This item cannot be transfered because you already own
+  this item."; the Cash Inventory item carries its SN), and an item marked
+  `noMoveToLocker` stays out ("This item cannot be moved."). The footage doesn't show
   whether v83 used double-clicks or dragging; dragging isn't supported.
-- **Gifts:** GIFT opens `UICashGift` on `CashShop.img/CSGift/backgrnd`, with
+- **Gifts:** as in v83 (`0x46e822`), GIFT says "You don't have enough NX
+  Prepaid" when NX Prepaid doesn't cover the price, or else asks "Would you
+  like to gift this item to someone? [ ITEM ]". Yes opens `UICashGift` on `CashShop.img/CSGift/backgrnd`, with
   a To field and a message box that wraps over its two ruled rows (73
   characters). OK, once both are filled, swaps the art for `CSNotice/1` and asks
   for the birthday code (YYYYMMDD). Its OK sends 0x04 with the code, SN, name
-  and message. On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
+  and message, after asking "This contains an item that will disappear once
+  the expiration date has passed. Do you want to give it as a gift?" for an
+  item with a period (`0x46ec85`). On 0x5E the sender sees v83's "COUNT [ ITEM ] was sent to
   NAME. PRICE NX Prepaid were spent in the process.", or a failure notice (0xA8 own account, 0xA9 unknown name, 0xC4 birthday code).
   For each gift in 0x4D the receiver gets v83's dialog (`UIGiftNotice`,
   `CSNotice/3`, FUN_0047959e): the item's icon and name, the sender, their
