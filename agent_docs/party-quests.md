@@ -34,8 +34,12 @@ warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
-Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)), all
-but its Party Search toggle.
+Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
+
+No event NPC offers Cosmic's "enable/disable Party Search" line. That
+opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
+Game Option, which the server never sees
+([parties](./parties.md#party-search)).
 
 ## Rules
 
@@ -392,8 +396,7 @@ check is the runtime's (`talk_about_event`); the party's leader takes the
 party in at once, without being asked again, as in Cosmic. Those who go
 are the party's members on 221024500 at levels 35 to 50, so a member of a
 higher level, or elsewhere, stays behind, and there must still be five.
-Everyone starts on 922010100. Cosmic's party-search toggle is left out,
-as with Tory.
+Everyone starts on 922010100.
 
 Sgt. Anderson (2040047) is on every stage map: he asks before letting a
 player out to 922010000, as they can't come back. On 922010000 he sends
@@ -415,8 +418,8 @@ leads on to stage 7 unshut, as stage 5's gate already held the party back.
 On 200080101 Wonky (2013000) has a menu like the Red Sign's: taking the
 party in, or what the quest is (`talk_about_event`). Those who go are the
 party's members on 200080101 at levels 51 to 70, five at least, and
-everyone starts on 920010000. Cosmic's party search and Wristband
-exchange are left out. On 920010000 Wonky asks before letting a player
+everyone starts on 920010000. Cosmic's Wristband exchange is left out.
+On 920010000 Wonky asks before letting a player
 out to 920011200, from where Eak (2013001) sends them back to 200080101.
 Leaving takes the quest's items, 4001044 to 4001063 (Cosmic
 `setExclusiveItems`), and five players are the fewest, as in Ludibrium.
@@ -844,7 +847,7 @@ anyone else that only the leader may choose. On the light map the
 T-Skelegons (9300077) drop the Red Keys; on the dark one the six crates
 (2402006) do, each breaking in four hits (both from the content pack).
 
-Not yet: the Party Search entry and the stump (2083003).
+Not yet: the stump (2083003).
 
 ## Delli's rescue
 
@@ -872,8 +875,8 @@ and stop coming (`FieldMessage::ClearMobs`, `MobSet::clear_hostile`, Cosmic
 (925010400), where Delli completes 6410 and asks whether to go home to
 120000104. Its lines are placeholders (`delli.*`).
 
-Not yet: the Party Search entry. The mobs come back on the field's usual
-seven seconds (Cosmic forces fifteen).
+The mobs come back on the field's usual seven seconds (Cosmic forces
+fifteen).
 
 ## The Ludibrium Maze
 
@@ -915,8 +918,6 @@ each member whether to take their present, gives one of
 sends them to the way out, which leaves the event. A member without a free
 Equip, Use and Etc slot (`has_reward_slot`) is told so and stays.
 
-Not yet: the Party Search entry.
-
 ## Protecting Tylus
 
 El Nath's party quest, for the warriors' 6192
@@ -941,8 +942,6 @@ El Nath (211000000, portal `in01`). The leader leaving the room, by either
 way, ends the event for everyone (`Team::leave`), as in Cosmic. Tylus in
 the Residence completes 6192 on the Trust; while 6192 is started he
 doesn't offer the chief's other choices. Its lines are placeholders (`tylus.*`).
-
-Not yet: the Party Search entry.
 
 ## The Forest of Poison Haze
 
@@ -1046,8 +1045,6 @@ fourth, lets a member out to it (`ellin.guide.leave`); a member leaving, if fewe
 leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
 event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
 leaves. Its lines are placeholders (`ellin.*`).
-
-Not yet: the Party Search toggle.
 
 ## The Pirate Ship
 
@@ -1178,8 +1175,6 @@ feathers and the hat before for the next of the Lord Pirate's Hats
 not in our Character.nx): `pirate.wu.hat_given` as it is made,
 `pirate.wu.need_feathers` when short, `pirate.wu.room_equip` with no Equip
 room, and `pirate.wu.best` to whoever holds the last one.
-
-Not yet: the Party Search toggle.
 
 ## NPCs
 

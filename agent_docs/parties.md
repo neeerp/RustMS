@@ -73,6 +73,10 @@ reply. The server answers only with invitations.
   joins without asking if the player allows party searches and the leader
   isn't on the Blacklist. Otherwise it drops the invitation silently. A search's invitation never makes anyone
   busy, and an ordinary invitation replaces it.
+- That Game Option is the only opt-out, and the server never sees it: a
+  character who turned it off is still asked, and that tick's ask is spent
+  on them. Cosmic adds a server-side opt-out, an "enable/disable Party
+  Search" line on its party quest NPCs; it is not v83's and is left out.
 - A search ends on 0xDF, when the leader goes offline or changes channel,
   and at a tick where the party is gone, has a new leader, or has reached the
   size wanted. The client starts it again after a channel change.
