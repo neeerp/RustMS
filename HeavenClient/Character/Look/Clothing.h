@@ -72,6 +72,9 @@ namespace ms
 		// Construct a new equip.
 		Clothing(int32_t itemid, const BodyDrawInfo &drawinfo);
 
+		// Construct a cash weapon as drawn over the covered regular weapon.
+		Clothing(int32_t itemid, int32_t covered, const BodyDrawInfo &drawinfo);
+
 		// Draw the equip.
 		void draw(Stance::Id stance, Layer layer, uint8_t frame, const DrawArgument &args) const;
 

@@ -350,8 +350,8 @@ namespace ms
 			return;
 		}
 
-		// The look wears a cash item over the regular one, but has no cash
-		// weapons (v83 draws them over the regular weapon's stances).
+		// The look wears a cash item over the regular one. A cash weapon is
+		// worn beside the regular weapon, whose stances it is drawn with.
 		int16_t shown = part == EquipSlot::Id::WEAPON ? part : inventory.shown_equip(part);
 
 		if (part == EquipSlot::Id::WEAPON)

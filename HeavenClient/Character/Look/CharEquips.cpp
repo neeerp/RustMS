@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "CharEquips.h"
 
+#include "CashWeapon.h"
+
 namespace ms
 {
 	CharEquips::CharEquips()
@@ -29,6 +31,15 @@ namespace ms
 	{
 		if (riding && (slot == EquipSlot::Id::WEAPON || slot == EquipSlot::Id::SHIELD))
 			return;
+
+		// A cash weapon takes the weapon's place, even with no art for it.
+		if (slot == EquipSlot::Id::WEAPON && cash_weapon)
+		{
+			if (sticker)
+				sticker->draw(stance, layer, frame, args);
+
+			return;
+		}
 
 		if (const Clothing* cloth = clothes[slot])
 			cloth->draw(stance, layer, frame, args);
@@ -54,11 +65,53 @@ namespace ms
 
 		EquipSlot::Id slot = cloth.get_eqslot();
 		clothes[slot] = &cloth;
+
+		if (slot == EquipSlot::Id::WEAPON)
+			update_sticker(drawinfo);
 	}
 
 	void CharEquips::remove_equip(EquipSlot::Id slot)
 	{
 		clothes[slot] = nullptr;
+
+		if (slot == EquipSlot::Id::WEAPON)
+			sticker = nullptr;
+	}
+
+	void CharEquips::set_cash_weapon(int32_t itemid, const BodyDrawInfo& drawinfo)
+	{
+		cash_weapon = itemid > 0 ? itemid : 0;
+		update_sticker(drawinfo);
+	}
+
+	int32_t CharEquips::get_cash_weapon() const
+	{
+		return cash_weapon;
+	}
+
+	void CharEquips::update_sticker(const BodyDrawInfo& drawinfo)
+	{
+		sticker = nullptr;
+
+		int32_t weapon = get_weapon();
+		int32_t type = cash_weapon::type(weapon);
+
+		if (!cash_weapon || !type)
+			return;
+
+		auto key = std::make_pair(cash_weapon, type);
+		auto iter = sticker_cache.find(key);
+
+		if (iter == sticker_cache.end())
+		{
+			iter = sticker_cache.emplace(
+					std::piecewise_construct,
+					std::forward_as_tuple(key),
+					std::forward_as_tuple(cash_weapon, weapon, drawinfo)
+			).first;
+		}
+
+		sticker = &iter->second;
 	}
 
 	bool CharEquips::is_visible(EquipSlot::Id slot) const
@@ -154,4 +207,5 @@ namespace ms
 	}
 
 	std::unordered_map<int32_t, Clothing> CharEquips::cloth_cache;
+	std::map<std::pair<int32_t, int32_t>, Clothing> CharEquips::sticker_cache;
 }

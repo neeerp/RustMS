@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Clothing.h"
 
+#include "CashWeapon.h"
+
 #include "../../Data/WeaponData.h"
 
 #include <unordered_set>
@@ -25,14 +27,18 @@
 
 namespace ms
 {
-	Clothing::Clothing(int32_t id, const BodyDrawInfo &drawinfo) : itemid(id)
+	Clothing::Clothing(int32_t id, const BodyDrawInfo &drawinfo) : Clothing(id, 0, drawinfo) {}
+
+	Clothing::Clothing(int32_t id, int32_t covered, const BodyDrawInfo &drawinfo) : itemid(id)
 	{
 		const EquipData &equipdata = EquipData::get(itemid);
 
-		eqslot = equipdata.get_eqslot();
+		// A cash weapon is drawn in the covered weapon's place, with its art
+		// for that weapon's type (v83 0x41272c, 0x412929).
+		eqslot = covered ? EquipSlot::Id::WEAPON : equipdata.get_eqslot();
 
 		if (eqslot == EquipSlot::Id::WEAPON)
-			twohanded = WeaponData::get(itemid).is_twohanded();
+			twohanded = WeaponData::get(covered ? covered : itemid).is_twohanded();
 		else
 			twohanded = false;
 
@@ -64,7 +70,7 @@ namespace ms
 
 		if (index < NON_WEAPON_TYPES)
 			chlayer = layers[index];
-		else if (index >= WEAPON_OFFSET && index < WEAPON_OFFSET + WEAPON_TYPES)
+		else if (covered || index >= WEAPON_OFFSET && index < WEAPON_OFFSET + WEAPON_TYPES)
 			chlayer = Clothing::Layer::WEAPON;
 		else
 			chlayer = Clothing::Layer::CAPE;
@@ -73,6 +79,9 @@ namespace ms
 		std::string category = equipdata.get_itemdata().get_category();
 		nl::node src = nl::nx::character[category][strid + ".img"];
 		nl::node info = src["info"];
+
+		if (covered)
+			src = src[std::to_string(cash_weapon::type(covered))];
 
 		vslot = std::string(info["vslot"]);
 
