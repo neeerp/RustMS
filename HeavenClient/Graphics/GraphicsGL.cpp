@@ -330,6 +330,7 @@ namespace ms
 			codepoints.push_back(c);
 
 		codepoints.insert(codepoints.end(), Utf8::CP1252_EXTRAS.begin(), Utf8::CP1252_EXTRAS.end());
+		codepoints.insert(codepoints.end(), Utf8::SYMBOLS.begin(), Utf8::SYMBOLS.end());
 
 		auto load = [&](char32_t c)
 		{
