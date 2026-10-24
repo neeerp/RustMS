@@ -1172,6 +1172,10 @@ unsourced = [
     "pirate.guon.doors",
     "pirate.guon.boss",
     "pirate.portal_shut",
+    "pirate.guon.rising",
+    "pirate.guon.veteran",
+    "pirate.guon.marks_in",
+    "pirate.marks_shut",
 ]
 
 [text."glTutoMsg0.message"]

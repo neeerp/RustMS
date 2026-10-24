@@ -535,6 +535,7 @@ impl FieldActor {
             FieldMessage::Close => {}
             FieldMessage::Show(packet) => self.broadcast(None, packet),
             FieldMessage::ClearMobs => self.clear_mobs(),
+            FieldMessage::SwapMobs { only } => self.swap_mobs(only),
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;
@@ -2974,6 +2975,16 @@ impl FieldActor {
     /// come: the event this copy is of was won.
     fn clear_mobs(&mut self) {
         for object_id in self.mobs.clear_hostile() {
+            if let Ok(packet) = build_kill_mob(object_id, 1) {
+                self.broadcast(None, packet);
+            }
+        }
+    }
+
+    /// The mobs here that aren't friendly go, as if they left, and `only`
+    /// these come in their place, from the next spawn pass, or none.
+    fn swap_mobs(&mut self, only: Option<i32>) {
+        for object_id in self.mobs.swap_hostile(only) {
             if let Ok(packet) = build_kill_mob(object_id, 1) {
                 self.broadcast(None, packet);
             }

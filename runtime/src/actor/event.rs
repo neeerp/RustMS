@@ -41,7 +41,7 @@ use net::loot::Loot;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicI32, AtomicU16, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -85,19 +85,27 @@ pub enum EventMessage {
     TeamSize { reply: oneshot::Sender<usize> },
 }
 
-/// The stages an event's party has cleared, one bit each. Only the event
-/// writes it.
+/// The stages an event's party has cleared, one bit each, and how many of
+/// the Pirate Ship's Marks it has handed in (`EventCommand::HandInMarks`).
+/// Only the event writes it.
 #[derive(Debug, Default)]
-pub struct Cleared(AtomicU16);
+pub struct Cleared {
+    stages: AtomicU16,
+    marks: AtomicU8,
+}
 
 impl Cleared {
     pub fn has(&self, stage: u8) -> bool {
-        bit(stage).is_some_and(|bit| self.0.load(Ordering::Acquire) & bit != 0)
+        bit(stage).is_some_and(|bit| self.stages.load(Ordering::Acquire) & bit != 0)
     }
 
     /// Returns whether `stage` was not cleared before.
     fn set(&self, stage: u8) -> bool {
-        bit(stage).is_some_and(|bit| self.0.fetch_or(bit, Ordering::Release) & bit == 0)
+        bit(stage).is_some_and(|bit| self.stages.fetch_or(bit, Ordering::Release) & bit == 0)
+    }
+
+    pub fn marks(&self) -> u8 {
+        self.marks.load(Ordering::Acquire)
     }
 }
 
@@ -170,6 +178,11 @@ impl EventTicket {
     /// Whether the party has cleared `stage`.
     pub fn cleared(&self, stage: u8) -> bool {
         self.cleared.has(stage)
+    }
+
+    /// How many of the Pirate Ship's Marks the party has handed Guon.
+    pub fn marks(&self) -> u8 {
+        self.cleared.marks()
     }
 
     /// Whether the party has cleared the last stage, so has no time limit.
@@ -716,6 +729,22 @@ impl EventActor {
             EventCommand::Reached(_) => {}
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
+            // Each in turn, by the leader (Cosmic `2094002`).
+            EventCommand::HandInMarks(n)
+                if leader
+                    && self.kind == EventKind::Pirate
+                    && !won
+                    && usize::from(n) <= net::events::PIRATE_MARKS.len()
+                    && n == self.cleared.marks() + 1 =>
+            {
+                self.cleared.marks.store(n, Ordering::Release);
+                let next = net::events::PIRATE_MARKS.get(usize::from(n));
+                self.swap_mobs(event.stage_map(2), next.map(|&(_, mob_id)| mob_id));
+                if next.is_none() {
+                    self.clear(2);
+                }
+            }
+            EventCommand::HandInMarks(n) => debug!(n, client_id, "Marks not taken"),
         }
     }
 
@@ -792,6 +821,19 @@ impl EventActor {
         });
         tokio::spawn(async move {
             let _ = field.tx.send(FieldMessage::ClearMobs).await;
+        });
+    }
+
+    /// The mobs on the copy of `map_id` go, giving nothing, and `only`
+    /// these come in their place, or none.
+    fn swap_mobs(&self, map_id: i32, only: Option<i32>) {
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            let _ = field.tx.send(FieldMessage::SwapMobs { only }).await;
         });
     }
 
@@ -927,5 +969,6 @@ mod tests {
         assert!(!cleared.has(0) && !cleared.has(17) && !cleared.has(9));
         assert!(cleared.set(9) && cleared.set(16));
         assert!(cleared.has(9) && cleared.has(16));
+        assert_eq!(cleared.marks(), 0);
     }
 }

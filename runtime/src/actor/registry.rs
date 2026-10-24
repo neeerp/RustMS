@@ -165,10 +165,10 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
         field.footholds.bounds_within(field.view_limit),
         field.mob_rate,
     ));
-    if full_spawn() {
-        mobs.filling_every_point()
-    } else {
-        mobs
+    match net::events::only_mobs(field_key.map_id) {
+        Some(mob_id) if field_key.instance_id != 0 => mobs.only(mob_id),
+        _ if full_spawn() => mobs.filling_every_point(),
+        _ => mobs,
     }
 }
 

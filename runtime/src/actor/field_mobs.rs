@@ -554,6 +554,8 @@ pub struct MobSet {
     last_pass: Option<Instant>,
     /// No more mobs come (`clear_hostile`).
     closed: bool,
+    /// Only this mob comes, filling every point of its own (`only`).
+    only: Option<i32>,
     rng: StdRng,
 }
 
@@ -595,6 +597,7 @@ impl MobSet {
             full: false,
             last_pass: None,
             closed: false,
+            only: None,
             rng: StdRng::from_entropy(),
         }
     }
@@ -607,6 +610,15 @@ impl MobSet {
 
     /// Every spawn point keeps a mob of its own (`full_spawn`).
     pub fn filling_every_point(mut self) -> Self {
+        self.full = true;
+        self
+    }
+
+    /// Only `mob_id` comes, and every spawn point of it keeps one, the
+    /// others staying empty: an event's stage that brings out one kind at
+    /// a time (`net::events::only_mobs`).
+    pub fn only(mut self, mob_id: i32) -> Self {
+        self.only = Some(mob_id);
         self.full = true;
         self
     }
@@ -727,6 +739,7 @@ impl MobSet {
             .filter(|&index| {
                 let spawn = &self.spawns[index];
                 (spawn.template.mob_time >= 0 || reset)
+                    && self.only.is_none_or(|mob_id| spawn.info.mob_id == mob_id)
                     && spawn.alive.is_none()
                     && spawn.regen_after.is_none_or(|after| after <= now)
             })
@@ -1628,6 +1641,30 @@ impl MobSet {
             .collect();
         for object_id in &gone {
             self.live.remove(object_id);
+        }
+        gone
+    }
+
+    /// Every mob that isn't friendly goes without a trace, nothing comes
+    /// out of those dying, and from the next pass `only` that mob comes
+    /// (see `only`), or none (Cosmic `killAllMonsters`, then the Pirate
+    /// Ship's `respawnStages` with the next Mark's pirates). Returns the
+    /// object ids of those gone.
+    pub fn swap_hostile(&mut self, only: Option<i32>) -> Vec<i32> {
+        let gone = self.clear_hostile();
+        for spawn in &mut self.spawns {
+            if spawn
+                .alive
+                .is_some_and(|object_id| gone.contains(&object_id))
+            {
+                spawn.alive = None;
+            }
+            spawn.regen_after = None;
+        }
+        if let Some(mob_id) = only {
+            self.closed = false;
+            self.only = Some(mob_id);
+            self.full = true;
         }
         gone
     }
@@ -2967,6 +3004,36 @@ mod tests {
             .is_empty());
         assert_eq!(mobs.respawn(now + SPAWN_INTERVAL, 0).len(), 2);
         assert_eq!(mobs.respawn(now + Duration::from_secs(100), 0).len(), 1);
+        assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
+    }
+
+    #[test]
+    fn a_stage_of_one_kind_at_a_time_fills_its_points_and_swaps_them() {
+        let now = Instant::now();
+        let of = |mob_id, x| {
+            let (mut template, mut info) = snail_spawn(x);
+            (template.mob_id, info.mob_id) = (mob_id, mob_id);
+            (template, info)
+        };
+        let mut mobs = MobSet::new([of(1, 0), of(1, 300), of(2, 600), of(3, 900)]).only(1);
+        let kinds = |mobs: &MobSet| {
+            let mut kinds: Vec<i32> = mobs.live().map(|mob| mob.info.mob_id).collect();
+            kinds.sort();
+            kinds
+        };
+        let first = mobs.start(now);
+        assert_eq!(kinds(&mobs), [1, 1]);
+        // One killed comes back at its point.
+        kill(&mut mobs, first[0], now);
+        assert_eq!(mobs.respawn(now + SPAWN_INTERVAL, 0).len(), 1);
+        // Swapped, they go at once, and the next kind comes on the next pass.
+        let gone = mobs.swap_hostile(Some(2));
+        assert_eq!(gone.len(), 2);
+        assert_eq!(mobs.live().count(), 0);
+        assert_eq!(mobs.respawn(now + SPAWN_INTERVAL, 0).len(), 1);
+        assert_eq!(kinds(&mobs), [2]);
+        // And at last none do.
+        assert_eq!(mobs.swap_hostile(None).len(), 1);
         assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
     }
 
