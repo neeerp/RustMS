@@ -1015,7 +1015,6 @@ namespace ms
 			dragged = nullptr;
 		}
 
-		// The fading notices stay, and hide themselves (FUN_0051fb72).
 		constexpr UIElement::Type HUD[] = {
 				UIElement::Type::STATUSMESSENGER,
 				UIElement::Type::STATUSBAR,
@@ -1023,6 +1022,7 @@ namespace ms
 				UIElement::Type::MINIMAP,
 				UIElement::Type::BUFFLIST,
 				UIElement::Type::QUESTHELPER,
+				UIElement::Type::QUESTCOMPLETE,
 				UIElement::Type::PARTYHP
 		};
 		constexpr UIElement::Type WINDOWS[] = {

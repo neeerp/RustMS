@@ -90,7 +90,13 @@ pub const OWN_RECORD_QUESTS: &[i16] = &[2324];
 /// (`Check/1 infoNumber` names it, `infoex` the value), which a script sets
 /// (`game::quest::RECORDS`): `(quest, record)`. See
 /// [`QuestTemplate::end_info_record`].
-pub const RECORD_QUESTS: &[(i16, i16)] = &[(6330, 6331), (6363, 6364), (6370, 6371), (6400, 6401)];
+pub const RECORD_QUESTS: &[(i16, i16)] = &[
+    (6330, 6331),
+    (6363, 6364),
+    (6370, 6371),
+    (6400, 6401),
+    (6410, 6411),
+];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -1063,6 +1069,9 @@ mod tests {
             assert_eq!(test.end_info_record, Some(record));
             assert_eq!(test.end_info[0].value, "2");
         }
+        let delli = catalog.quest(6410).unwrap();
+        assert_eq!(delli.end_info_record, Some(6411));
+        assert_eq!(delli.end_info[0].value, "p2");
     }
 
     #[test]

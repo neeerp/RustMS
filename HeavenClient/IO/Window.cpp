@@ -25,7 +25,6 @@
 #include "ScreenshotRules.h"
 #include "UiControl.h"
 
-#include <cmath>
 #include <fstream>
 #include <vector>
 
@@ -69,11 +68,8 @@ namespace ms
 	}
 
 	std::chrono::time_point<std::chrono::steady_clock> start = ContinuousTimer::get().start();
-	// Where the last click came up; a double click is two in one place, as
-	// Windows counts it (SM_CXDOUBLECLK, 4 pixels).
-	double last_x = -100.0, last_y = -100.0;
 
-	void mousekey_callback(GLFWwindow *window, int button, int action, int)
+	void mousekey_callback(GLFWwindow *, int button, int action, int)
 	{
 		switch (button)
 		{
@@ -88,13 +84,7 @@ namespace ms
 						auto diff_ms = ContinuousTimer::get().stop(start) / 1000;
 						start = ContinuousTimer::get().start();
 
-						double x, y;
-						glfwGetCursorPos(window, &x, &y);
-						bool same_place = std::abs(x - last_x) <= 2.0 && std::abs(y - last_y) <= 2.0;
-						last_x = x;
-						last_y = y;
-
-						if (diff_ms > 10 && diff_ms < 200 && same_place)
+						if (diff_ms > 10 && diff_ms < 200)
 							UI::get().doubleclick();
 
 						UI::get().send_cursor(false);

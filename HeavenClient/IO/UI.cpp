@@ -707,10 +707,7 @@ namespace ms
 
 	void UI::remove(UIElement::Type type)
 	{
-		// Only a window that is there can hold the focused field; removing one
-		// that isn't, as every map change does, leaves the chat being typed in.
-		if (state->get(type))
-			remove_textfield();
+		focusedtextfield = {};
 
 		state->remove(type);
 	}

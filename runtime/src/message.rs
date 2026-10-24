@@ -655,6 +655,10 @@ pub enum FieldMessage {
     /// Show everyone on the field a packet, as an event's line to a map
     /// of its copy.
     Show(Packet),
+    /// Every mob here that isn't friendly goes, giving nothing, and no more
+    /// come: an event won on this copy of the map (Cosmic
+    /// `killAllMonstersNotFriendly`).
+    ClearMobs,
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

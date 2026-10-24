@@ -1705,6 +1705,36 @@ pub fn time_leap(player: &Player) -> Option<Vec<Effect>> {
     })
 }
 
+/// The way out of Save Delli!, which the client actor answers from the
+/// player's ticket (`delli_way_out`).
+pub const DELLI_OUT: &str = "s4mind_end";
+pub const DELLI_QUEST: i16 = 6410;
+/// The record "Mission Free the Monsters" (6410) completes on, and what
+/// the way out past a won rescue sets it to.
+pub const DELLI_RECORD: i16 = 6411;
+pub const DELLI_SAVED: &str = "p2";
+
+/// The way out of Save Delli!: shut, with a pink line, until the party has
+/// won; then it leads on to the Nautilus Hideout Room, marking the record
+/// of a Corsair on 6410 (Cosmic `s4mind_end`).
+pub fn delli_way_out(won: bool, player: &Player) -> Vec<Effect> {
+    if !won {
+        return vec![Effect::Pink(content::text().get(keys::DELLI_NOT_WON, &[]))];
+    }
+    let on_quest = player.quests.state(DELLI_QUEST) == QuestState::Started;
+    let record = on_quest.then_some(Effect::SetRecord {
+        record: DELLI_RECORD,
+        value: DELLI_SAVED,
+    });
+    record
+        .into_iter()
+        .chain([
+            Effect::PortalSound,
+            Effect::WarpToPortal(crate::events::NAUTILUS_HIDEOUT, 0),
+        ])
+        .collect()
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2661,6 +2691,27 @@ mod tests {
             .inventory
             .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
         player
+    }
+
+    #[test]
+    fn the_way_out_of_save_delli_opens_on_the_win_and_marks_the_record() {
+        let player = player_with(&[]);
+        assert!(matches!(
+            &delli_way_out(false, &player)[..],
+            [Effect::Pink(_)]
+        ));
+        let on = [
+            Effect::PortalSound,
+            Effect::WarpToPortal(crate::events::NAUTILUS_HIDEOUT, 0),
+        ];
+        assert_eq!(delli_way_out(true, &player), on);
+        let player = player_with(&[(DELLI_QUEST, QuestState::Started)]);
+        let mut marked = vec![Effect::SetRecord {
+            record: DELLI_RECORD,
+            value: DELLI_SAVED,
+        }];
+        marked.extend(on);
+        assert_eq!(delli_way_out(true, &player), marked);
     }
 
     #[test]

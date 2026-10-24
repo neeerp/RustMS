@@ -22,7 +22,6 @@
 #include "UITypes/UILogin.h"
 #include "UITypes/UILoginNotice.h"
 #include "UITypes/UILogo.h"
-#include "UITypes/UIWorldSelect.h"
 
 #include "../Configuration.h"
 
@@ -104,16 +103,6 @@ namespace ms
 
 		if (auto charselect = UI::get().get_element<UICharSelect>())
 			charselect->doubleclick(pos);
-
-		// Only while nothing stands in front of it, as the wait for the
-		// character list does once the first double click enters.
-		UIElement *target = get(focused);
-
-		if (!target || !target->is_active())
-			target = get_front();
-
-		if (target && target->get_type() == UIElement::Type::WORLDSELECT)
-			target->doubleclick(pos);
 	}
 
 	void UIStateLogin::send_key(KeyType::Id type, int32_t action, bool pressed, bool escape)

@@ -858,6 +858,15 @@ const LORD_JONATHAN: i32 = 1092019;
 const BART_TIME_LIMIT: u32 = 2 * 60;
 const INSIGNIFICANT_BEING: i32 = 1061012;
 const PAST_PAPULATUS: i32 = 2043000;
+/// Shulynch in the Nautilus's Training Room, who sends a Corsair on
+/// "Mission Free the Monsters" (6410) to look for Delli; Shulynch on
+/// Looking for Delli 1, who offers the way back; and Delli.
+const SHULYNCH: i32 = 1092008;
+const SHULYNCH_ON_THE_WAY: i32 = 1095000;
+pub const DELLI: i32 = 2095000;
+const DELLI_QUEST: i16 = 6410;
+const TRAINING_ROOM: i32 = 120_000_104;
+const LOOKING_FOR_DELLI: i32 = 925_010_000;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
 /// Bowmaster, Marksman and GM, as in Cosmic.
@@ -1288,6 +1297,12 @@ impl NpcScript {
         htpq_gatekeeper(entry)
     }
 
+    /// Delli on Looking for Delli 3, for a player whose party may or may
+    /// not go in to protect Willi.
+    pub fn delli(entry: Entry) -> Self {
+        delli(entry)
+    }
+
     /// Aura on the Dead Mine's hub, to `player`, who stands with her as
     /// `view`.
     pub fn aura(view: Aura, player: &Player) -> Self {
@@ -1463,6 +1478,23 @@ impl NpcScript {
             LORD_JONATHAN => return Some(lord_jonathan(player)),
             INSIGNIFICANT_BEING => return Some(insignificant_being(player)),
             PAST_PAPULATUS => return Some(past_papulatus(player)),
+            SHULYNCH if player.quests.state(DELLI_QUEST) == QuestState::Started => {
+                return Some(ask_warp(
+                    SHULYNCH,
+                    keys::DELLI_SHULYNCH_ASK,
+                    LOOKING_FOR_DELLI,
+                ))
+            }
+            SHULYNCH_ON_THE_WAY => {
+                return Some(ask_warp(
+                    SHULYNCH_ON_THE_WAY,
+                    keys::DELLI_SHULYNCH_LEAVE,
+                    TRAINING_ROOM,
+                ))
+            }
+            DELLI if player.stats.map_id == events::NAUTILUS_HIDEOUT => {
+                return Some(ask_warp(DELLI, keys::DELLI_HOME_ASK, TRAINING_ROOM))
+            }
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
                 return Some(item_maker(
@@ -6561,6 +6593,47 @@ fn insignificant_being(player: &Player) -> NpcScript {
         ])],
     );
     script.refused = Some(text(keys::BALROG_WORLD_BUSY));
+    script
+}
+
+/// `npc` asks `key`, and a yes takes the player to `to`'s first spawn point
+/// (Cosmic `1092008`, `1095000`, and `2095000` past Save Delli!).
+fn ask_warp(npc: i32, key: &str, to: i32) -> NpcScript {
+    NpcScript::new(
+        npc,
+        vec![Page::Ask {
+            text: text(key),
+            on_yes: vec![Effect::WarpToPortal(to, 0)],
+            on_no: None,
+        }],
+    )
+}
+
+/// Delli (Cosmic `2095000`) where the party gathers: the leader takes the
+/// party in to protect Willi, and anyone may hear what they must do.
+fn delli(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::DELLI_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::DELLI_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::DELLI, keys::DELLI_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::DELLI_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Delli)]),
+    };
+    let mut script = NpcScript::new(
+        DELLI,
+        vec![Page::Menu {
+            text: text(keys::DELLI_MENU),
+            choices: vec![
+                (text(keys::DELLI_ENTER), vec![enter]),
+                (
+                    text(keys::DELLI_ABOUT),
+                    vec![Page::Say(text(keys::DELLI_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Delli checked, or another party went in.
+    script.refused = Some(event_terms(&events::DELLI, keys::DELLI_NOT_ELIGIBLE));
     script
 }
 
@@ -12493,5 +12566,67 @@ mod tests {
         );
         assert!(buccaneer.quests.set_record(SENT_BACK_RECORD, SENT_BACK));
         assert_eq!(ends(&buccaneer), [Effect::Warp(CLOCKTOWER_DEPTHS)]);
+    }
+
+    #[test]
+    fn shulynch_sends_a_corsair_after_delli_who_takes_the_party_in_and_home() {
+        use crate::events::{DELLI_LOBBY, NAUTILUS_HIDEOUT};
+        let asks = |npc: i32, player: &Player, key: &str, to: i32| {
+            let mut script = NpcScript::for_npc(npc, player).unwrap();
+            assert_eq!(question(&script.begin()), text(key));
+            let step = script.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(step.effects, [Effect::WarpToPortal(to, 0)]);
+        };
+        let mut corsair = player(50);
+        (corsair.stats.job, corsair.stats.level) = (522, 120);
+        // Without the quest Shulynch says only its own lines.
+        assert!(NpcScript::for_npc(SHULYNCH, &corsair).is_none());
+        corsair.quests.upsert(game::QuestRecord {
+            quest_id: DELLI_QUEST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        asks(
+            SHULYNCH,
+            &corsair,
+            keys::DELLI_SHULYNCH_ASK,
+            LOOKING_FOR_DELLI,
+        );
+        asks(
+            SHULYNCH_ON_THE_WAY,
+            &corsair,
+            keys::DELLI_SHULYNCH_LEAVE,
+            TRAINING_ROOM,
+        );
+        corsair.stats.map_id = NAUTILUS_HIDEOUT;
+        asks(DELLI, &corsair, keys::DELLI_HOME_ASK, TRAINING_ROOM);
+
+        // In the lobby, the leader takes the party in.
+        corsair.stats.map_id = DELLI_LOBBY;
+        let mut ready = NpcScript::delli(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Delli)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::DELLI_NO_PARTY),
+            (Entry::NotLeader, keys::DELLI_NOT_LEADER),
+            (Entry::Busy, keys::DELLI_BUSY),
+        ] {
+            let mut delli = NpcScript::delli(entry);
+            delli.begin();
+            let step = delli.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut delli = NpcScript::delli(Entry::NotEligible);
+        delli.begin();
+        let step = delli.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("120"), "{step:?}");
+        let mut delli = NpcScript::delli(Entry::Ready);
+        delli.begin();
+        let step = delli.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::DELLI_INFO));
     }
 }

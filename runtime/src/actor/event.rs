@@ -694,18 +694,39 @@ impl EventActor {
     }
 
     /// The time ran out. A bonus's ends, taking whoever is still on its map
-    /// to its exit (Cosmic `scheduledTimeout`); otherwise the event ends.
+    /// to its exit (Cosmic `scheduledTimeout`); a team that protects a
+    /// friendly mob, which would have lost already without it, wins, and
+    /// the other mobs go (Cosmic DelliBattle's `scheduledTimeout`);
+    /// otherwise the event ends.
     fn time_up(&mut self) -> bool {
-        let bonus = self.kind.event().bonus.as_ref();
-        match bonus {
+        let event = self.kind.event();
+        match &event.bonus {
             Some(bonus) if self.bonus_taken => {
                 self.ends = None;
                 self.move_team(Some(bonus.map), bonus.exit, None);
                 info!(kind = ?self.kind, id = self.id, "Bonus over");
                 false
             }
+            _ if event.survive.is_some() && !self.cleared.has(event.last_stage()) => {
+                self.clear_mobs(event.stage_map(event.last_stage()));
+                self.win();
+                false
+            }
             _ => true,
         }
+    }
+
+    /// The mobs that aren't friendly on the copy of `map_id` go, and no
+    /// more come.
+    fn clear_mobs(&self, map_id: i32) {
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id,
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            let _ = field.tx.send(FieldMessage::ClearMobs).await;
+        });
     }
 
     /// Take the members on `from`, or everyone, to `to`, with the time

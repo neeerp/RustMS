@@ -34,7 +34,6 @@
 #include "../../IO/MarriageActions.h"
 #include "../../IO/PartySearchActions.h"
 #include "../../IO/UI.h"
-#include "../../IO/UiControl.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
@@ -159,12 +158,6 @@ namespace ms
 		// open window when we leave the field.
 		UI::get().remove(UIElement::Type::WISHLISTINPUT);
 		UI::get().remove(UIElement::Type::WEDDINGREGISTRY);
-
-		// A line being typed in the strip is dropped with its field; the
-		// expanded log keeps both, and LOCK_UI leaves the bar be (0xa04156).
-		if (auto chatbar = UI::get().get_element<UIChatBar>())
-			if (!ui_control::state().locked && !chatbar->is_chatopen() && chatbar->is_chatfieldopen())
-				chatbar->toggle_chatfield(false);
 
 		if (auto gage = UI::get().get_element<UIMobGage>())
 			gage->hide();

@@ -35,6 +35,9 @@ pub enum EventKind {
     /// Horntail's party quest on the Trial Grounds, started at the
     /// gatekeeper (2083001) at the Cave Entrance.
     Htpq,
+    /// Delli's rescue (the Corsairs' 6410), started at Delli (2095000) on
+    /// Looking for Delli 3.
+    Delli,
 }
 
 /// An event's maps and terms.
@@ -112,6 +115,10 @@ pub struct Event {
     /// whoever leads and whatever becomes of the party (Cosmic
     /// PapulatusBattle, whose `leftParty` and `changedLeader` do nothing).
     pub until_empty: bool,
+    /// The friendly mob the team protects, if any: its going loses the
+    /// event at once, and the time running out with it still there wins
+    /// it (Cosmic DelliBattle's `friendlyKilled` and `scheduledTimeout`).
+    pub survive: Option<i32>,
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -209,6 +216,7 @@ pub const KPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -304,6 +312,7 @@ pub const HPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -364,6 +373,7 @@ pub const LPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -554,6 +564,7 @@ pub const OPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -774,6 +785,7 @@ pub const ZPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// The Dead Mine's hub, where Aura stands and its way out is.
@@ -834,6 +846,7 @@ pub const ZAKUM: Event = Event {
     squad: true,
     gate: &[ZAKUM_GATE],
     until_empty: false,
+    survive: None,
 };
 
 /// Deep Inside the Clocktower, the way to Papulatus, and the Origin of
@@ -878,6 +891,7 @@ pub const PAPULATUS: Event = Event {
         (CLOCKTOWER_DEPTHS, "ludigate3"),
     ],
     until_empty: true,
+    survive: None,
 };
 
 /// The expedition to Horntail (Cosmic `HorntailBattle`): like Zakum's, the
@@ -917,6 +931,7 @@ pub const HORNTAIL: Event = Event {
     squad: true,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// The time Horntail's expedition has left once Horntail comes out.
@@ -1012,6 +1027,7 @@ pub const HTPQ: Event = Event {
     squad: false,
     gate: &[],
     until_empty: false,
+    survive: None,
 };
 
 /// The Trial Grounds' first map, where the team comes in and the leader
@@ -1042,8 +1058,60 @@ pub fn htpq_room_key(stage: u8) -> Option<i32> {
         .then(|| CRYSTAL_KEYS[usize::from(stage)])
 }
 
+/// Looking for Delli 3, where the party gathers; Save Delli!, where it
+/// protects Willi; and the Nautilus Hideout Room past it.
+pub const DELLI_LOBBY: i32 = 925_010_200;
+pub const SAVE_DELLI: i32 = 925_010_300;
+pub const NAUTILUS_HIDEOUT: i32 = 925_010_400;
+/// Willi, the friendly mob on Save Delli! that the monsters there go for.
+pub const WILLI: i32 = 9_300_162;
+
+/// Delli's rescue (Cosmic `DelliBattle`): one or two of a party, all of
+/// level 120 or more, on Looking for Delli 3 with their leader, go to their
+/// own copy of Save Delli! for six minutes. Willi's going there loses it,
+/// sending them back; the time running out with Willi still there wins it,
+/// and every other monster there goes (Cosmic `killAllMonstersNotFriendly`).
+/// Its one stage gives no EXP; the way out past it (`s4mind_end`) marks the
+/// quest's record.
+pub const DELLI: Event = Event {
+    lobby: DELLI_LOBBY,
+    maps: SAVE_DELLI..=SAVE_DELLI,
+    entry: SAVE_DELLI,
+    exit: DELLI_LOBBY,
+    levels: 120..=u8::MAX,
+    team: 1..=2,
+    minutes: 6,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: Some(WILLI),
+};
+
+/// Whether `mob_id` is the friendly mob some event's team protects.
+pub fn protected(mob_id: i32) -> bool {
+    EventKind::ALL
+        .iter()
+        .any(|kind| kind.event().survive == Some(mob_id))
+}
+
 impl EventKind {
-    pub const ALL: [EventKind; 9] = [
+    pub const ALL: [EventKind; 10] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1053,6 +1121,7 @@ impl EventKind {
         EventKind::Papulatus,
         EventKind::Horntail,
         EventKind::Htpq,
+        EventKind::Delli,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1066,6 +1135,7 @@ impl EventKind {
             EventKind::Papulatus => &PAPULATUS,
             EventKind::Horntail => &HORNTAIL,
             EventKind::Htpq => &HTPQ,
+            EventKind::Delli => &DELLI,
         }
     }
 }
@@ -2276,6 +2346,28 @@ mod tests {
         assert!(PAPULATUS.holds(ORIGIN_OF_CLOCKTOWER));
         assert!(!PAPULATUS.holds(CLOCKTOWER_DEPTHS));
         assert_eq!(PAPULATUS.gate.len(), 3);
+    }
+
+    #[test]
+    fn delli_takes_one_or_two_and_protects_willi() {
+        let two = [at(1, 120, DELLI_LOBBY), at(2, 200, DELLI_LOBBY)];
+        assert!(DELLI.team(1, &two[..1]).is_some());
+        assert!(DELLI.team(1, &two).is_some());
+        let low = [at(1, 120, DELLI_LOBBY), at(2, 119, DELLI_LOBBY)];
+        assert_eq!(DELLI.team(1, &low), Some(vec![1]));
+        let three = [two[0], two[1], at(3, 120, DELLI_LOBBY)];
+        assert!(DELLI.team(1, &three).is_none());
+        // Only Save Delli! is its own; the room past it is not.
+        assert!(event_map(SAVE_DELLI));
+        assert!(!event_map(DELLI_LOBBY) && !event_map(NAUTILUS_HIDEOUT));
+        assert_eq!(DELLI.duration(), scaled(Duration::from_secs(6 * 60)));
+        assert_eq!(DELLI.stage_on(SAVE_DELLI), Some(DELLI.last_stage()));
+        // Willi is the one mob any event protects.
+        assert!(protected(WILLI));
+        assert!(!protected(crate::reactors::MOON_BUNNY));
+        // Its leader's leaving ends it, as for any party's.
+        let mut team = Team::new(&DELLI, 1, vec![1, 2]);
+        assert!(team.leave(1));
     }
 
     #[test]

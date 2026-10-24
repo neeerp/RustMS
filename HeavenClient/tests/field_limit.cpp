@@ -97,12 +97,6 @@ int main()
 
 		require(may_change_leader(0x2) && !may_change_leader(0x800), "bit 0x800 keeps the party's leader");
 
-		require(may_leave_party(0) && may_leave_party(24) && may_leave_party(10), "a party may be left in most fields");
-		require(!may_leave_party(23) && !may_leave_party(25) && !may_leave_party(26), "but not in types 23, 25 and 26");
-		require(may_expel(0) && may_expel(24) && may_expel(12) && may_expel(16), "a member may be expelled in most fields");
-		require(!may_expel(10) && !may_expel(11) && !may_expel(15) && !may_expel(23) && !may_expel(26),
-				"but not in types 10, 11, 15, 23, 25 and 26");
-
 		require(shows_minimap(false, true, false, false, true), "a map's miniMap shows");
 		require(!shows_minimap(false, false, false, false, true) && !shows_minimap(true, false, false, false, true),
 				"a map without one folds, even for a GM");

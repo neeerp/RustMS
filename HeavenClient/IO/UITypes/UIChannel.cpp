@@ -159,26 +159,42 @@ namespace ms
 		if (dragged)
 			return dstate;
 
-		// Change and Cancel click as the mouse comes back up over them, and
-		// the one held keeps the cursor till then.
-		if (is_holding_button())
-			return dstate;
+		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
 
-		Cursor::State ret = dstate;
-
-		// A channel is picked as the mouse goes down on it (FUN_009957f7).
-		for (size_t i = Buttons::CH; i < channel_count + Buttons::CH; i++)
+		for (size_t i = 0; i < channel_count + Buttons::CH; i++)
 		{
 			if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
 			{
 				if (buttons[i]->get_state() == Button::State::NORMAL)
 				{
-					buttons[i]->set_state(Button::State::MOUSEOVER);
-				} else if (buttons[i]->get_state() == Button::State::MOUSEOVER && clicked)
-				{
-					buttons[i]->set_state(button_pressed(static_cast<uint16_t>(i)));
+					if (i < Buttons::CH)
+					{
+						Sound(Sound::Name::BUTTONOVER).play();
 
-					ret = Cursor::State::IDLE;
+						buttons[i]->set_state(Button::State::MOUSEOVER);
+						ret = Cursor::State::CANCLICK;
+					} else
+					{
+						buttons[i]->set_state(Button::State::MOUSEOVER);
+						ret = Cursor::State::IDLE;
+					}
+				} else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
+				{
+					if (clicked)
+					{
+						if (i < Buttons::CH)
+							Sound(Sound::Name::BUTTONCLICK).play();
+
+						buttons[i]->set_state(button_pressed(i));
+
+						ret = Cursor::State::IDLE;
+					} else
+					{
+						if (i < Buttons::CH)
+							ret = Cursor::State::CANCLICK;
+						else
+							ret = Cursor::State::IDLE;
+					}
 				}
 			} else if (buttons[i]->get_state() == Button::State::MOUSEOVER)
 			{
@@ -187,21 +203,6 @@ namespace ms
 		}
 
 		return ret;
-	}
-
-	// A double click on a channel changes to it.
-	void UIChannel::doubleclick(Point<int16_t> cursorpos)
-	{
-		for (size_t i = Buttons::CH; i < channel_count + Buttons::CH; i++)
-		{
-			if (buttons[i]->is_active() && buttons[i]->bounds(position).contains(cursorpos))
-			{
-				select(static_cast<uint8_t>(i - Buttons::CH));
-				change_channel();
-
-				return;
-			}
-		}
 	}
 
 	UIElement::Type UIChannel::get_type() const

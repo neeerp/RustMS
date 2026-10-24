@@ -299,6 +299,7 @@ Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
 | 6330 How to Improve Your Strength (Marauder) | 6331 to "2" | Kyrin (1090000) past the test room 912010000 |
 | 6370 How to Improve Your Strength (Outlaw) | 6371 to "2" | Kyrin past the test room 912010100 |
 | 6363 A New Revelation | 6364 to "2" | the past Papulatus (2043000) sending the Buccaneer back from 922020300 |
+| 6410 Mission Free the Monsters | 6411 to "p2" | the way out of Save Delli! (925010300) once Willi is saved |
 
 Lord Jonathan (1092019, in the Navigation Room 120000102) asks a Corsair on
 6400 without the record whether to take his test, then sends them into the
@@ -339,6 +340,11 @@ Papulatus leads to the past Origin of the Clocktower (922020300; see
 Clocktower (220080000, as Cosmic), and with 6363 started sets its record
 too, so Rolonay (1092012) completes it with Time Leap. No source says where
 v83 set the record; his line is a placeholder (`papulatus.past.send_back`).
+
+The Corsairs' "Mission Free the Monsters" (6410) is Delli's rescue, a
+party event (see `party-quests.md`): won, the way out of Save Delli! sets
+6411 to "p2" for a player on the quest and leads to Delli (2095000), who
+completes it there (925010400).
 
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with

@@ -520,6 +520,7 @@ impl FieldActor {
             FieldMessage::Leave { client_id, staying } => self.handle_leave(client_id, staying),
             FieldMessage::Close => {}
             FieldMessage::Show(packet) => self.broadcast(None, packet),
+            FieldMessage::ClearMobs => self.clear_mobs(),
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;
@@ -2903,7 +2904,9 @@ impl FieldActor {
     /// A client says mob `attacker` touched the friendly mob `victim`:
     /// everyone sees what it lost and its HP. The Moon Bunny's guards hear
     /// of every sixth hit and of its going home, and its going in an
-    /// event's copy loses its party the event (Cosmic's script).
+    /// event's copy loses its party the event (Cosmic's script); so does
+    /// Willi's on Save Delli!, at once and without a word (Cosmic
+    /// DelliBattle's `friendlyKilled`).
     fn handle_friendly_hit(&mut self, attacker: i32, victim: i32) {
         let now = Instant::now();
         let mut rng = rand::thread_rng();
@@ -2932,6 +2935,19 @@ impl FieldActor {
         }
         if bunny && self.key.instance_id != 0 {
             self.lost_at = Some(now + net::events::scaled(FRIENDLY_LOST_AFTER));
+        }
+        if net::events::protected(hit.mob_id) && self.key.instance_id != 0 {
+            self.fail_event();
+        }
+    }
+
+    /// Every mob here that isn't friendly goes, as if it left, and no more
+    /// come: the event this copy is of was won.
+    fn clear_mobs(&mut self) {
+        for object_id in self.mobs.clear_hostile() {
+            if let Ok(packet) = build_kill_mob(object_id, 1) {
+                self.broadcast(None, packet);
+            }
         }
     }
 
@@ -2962,6 +2978,11 @@ impl FieldActor {
         if let Ok(packet) = build_broadcast(Broadcast::Pink, &line) {
             self.broadcast(None, packet);
         }
+        self.fail_event();
+    }
+
+    /// Everyone here is told their event failed, which ends it.
+    fn fail_event(&self) {
         let id = self.key.instance_id;
         for occupant in self.occupants.values() {
             occupant.handle.send(ServerMessage::EventFailed { id });

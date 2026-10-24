@@ -208,12 +208,16 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
     })
     .await;
 
-    // Now the leader's word takes everyone to the garden.
-    let mut seen = told(&mut a[0], talk(OPQ_HUB, EAK)).await;
+    // Now the leader's word takes everyone to the garden. Read up to the
+    // warp a packet at a time and forget the hub's mobs and reactors right
+    // there: the garden's own come straight after it.
+    let mut seen = Trace::default();
+    send(&mut a[0].connection, talk(OPQ_HUB, EAK)).await;
     until(&mut a[0].connection, &mut seen, |t| {
         t.warps.contains(&OPQ_GARDEN)
     })
     .await;
+    seen.field = Field::default();
     for player in &mut a[1..] {
         let mut trace = Trace::default();
         until(&mut player.connection, &mut trace, |t| {
@@ -221,7 +225,6 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
         })
         .await;
     }
-    seen.field = Field::default();
     until(&mut a[0].connection, &mut seen, |t| {
         t.field.reactors.len() == 18 && !t.field.alive(NEPENDEATH).is_empty()
     })

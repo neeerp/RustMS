@@ -552,6 +552,8 @@ pub struct MobSet {
     full: bool,
     /// The last spawn pass that had room.
     last_pass: Option<Instant>,
+    /// No more mobs come (`clear_hostile`).
+    closed: bool,
     rng: StdRng,
 }
 
@@ -592,6 +594,7 @@ impl MobSet {
             capacity: MAX_CAPACITY,
             full: false,
             last_pass: None,
+            closed: false,
             rng: StdRng::from_entropy(),
         }
     }
@@ -651,6 +654,7 @@ impl MobSet {
             spawn.regen_after = None;
         }
         self.last_pass = None;
+        self.closed = false;
         self.create(now, 0, true)
     }
 
@@ -667,6 +671,9 @@ impl MobSet {
     /// gone and its wait is over. `reset` (the first pass) also takes the
     /// points with a negative `mobTime`.
     fn create(&mut self, now: Instant, users: usize, reset: bool) -> Vec<i32> {
+        if self.closed {
+            return Vec::new();
+        }
         if self.full {
             return self.fill(now, reset);
         }
@@ -1592,6 +1599,25 @@ impl MobSet {
         true
     }
 
+    /// Every mob that isn't friendly goes without a trace, nothing comes
+    /// out of those dying, and no more come (Cosmic
+    /// `killAllMonstersNotFriendly`, which closes the spawn points). Returns
+    /// the object ids of those gone.
+    pub fn clear_hostile(&mut self) -> Vec<i32> {
+        self.closed = true;
+        self.revivals.clear();
+        let gone: Vec<i32> = self
+            .live
+            .values()
+            .filter(|mob| !mob.info.damaged_by_mob)
+            .map(|mob| mob.object_id)
+            .collect();
+        for object_id in &gone {
+            self.live.remove(object_id);
+        }
+        gone
+    }
+
     /// Throw a catch item at the mob `object_id`, which catches a `mob_id`
     /// in `reach` with less than `mob_hp` percent of its HP (any HP at
     /// 100), `prop` percent of the time. Its spawn point waits as if it
@@ -2447,6 +2473,23 @@ mod tests {
             at += FRIENDLY_HIT_INTERVAL;
         }
         assert!(mobs.get(bunny).is_none());
+    }
+
+    #[test]
+    fn clearing_the_hostile_mobs_spares_the_friendly_and_closes_the_field() {
+        let now = Instant::now();
+        let (template, mut info) = snail_spawn(150);
+        info.damaged_by_mob = true;
+        let mut mobs = MobSet::new([snail_spawn(100), (template, info), snail_spawn(900)]);
+        let [near, willi, far] = mobs.spawn_all(now)[..] else {
+            panic!("three mobs");
+        };
+        assert_eq!(mobs.clear_hostile(), [near, far]);
+        assert!(mobs.get(near).is_none() && mobs.get(far).is_none());
+        assert!(mobs.get(willi).is_some());
+        // Their points stay empty, however long anyone waits.
+        assert!(mobs.respawn(now + SPAWN_INTERVAL * 10, 1).is_empty());
+        assert!(mobs.clear_hostile().is_empty());
     }
 
     #[test]

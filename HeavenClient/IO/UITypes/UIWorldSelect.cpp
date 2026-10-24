@@ -193,7 +193,7 @@ namespace ms
 
 			const Plank &plank = planks[i];
 
-			if (static_cast<int16_t>(i) == pressed || (static_cast<int16_t>(i) == held_plank && plank.hovered))
+			if (static_cast<int16_t>(i) == pressed)
 				plank.pressed.draw(pos);
 			else if (plank.hovered && plank.hover_done)
 				plank.mouseover_end.draw(pos);
@@ -234,30 +234,16 @@ namespace ms
 
 	Cursor::State UIWorldSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		// A button held keeps the cursor until the mouse comes back up.
-		if (is_holding_button())
-			return UIElement::send_cursor(clicked, cursorpos);
+		Cursor::State ret = Cursor::State::IDLE;
 
 		int16_t hovered = plank_at(cursorpos);
-		bool capturing = held_plank >= 0 && clicked;
-
-		// A world's plank is a button too (0x62506c): it is picked as the
-		// mouse comes back up over the one it went down on.
-		if (held_plank >= 0)
-		{
-			if (clicked)
-				hovered = hovered == held_plank ? hovered : -1;
-			else if (hovered == held_plank)
-				select_world(static_cast<uint8_t>(hovered));
-		}
 
 		for (size_t i = 0; i < planks.size(); i++)
 		{
 			Plank &plank = planks[i];
 			bool over = static_cast<int16_t>(i) == hovered;
 
-			// No over sound while a plank holds the mouse.
-			if (over && !plank.hovered && !capturing)
+			if (over && !plank.hovered)
 			{
 				Sound(Sound::Name::BUTTONOVER).play();
 
@@ -268,35 +254,11 @@ namespace ms
 			plank.hovered = over;
 		}
 
-		if (held_plank >= 0)
-		{
-			if (clicked)
-				return Cursor::State::CLICKING;
-
-			held_plank = -1;
-		}
-
 		if (hovered >= 0)
 		{
 			if (clicked)
 			{
-				held_plank = hovered;
-
-				return Cursor::State::CLICKING;
-			}
-
-			return Cursor::State::CANCLICK;
-		}
-
-		// A channel is picked as the mouse goes down on it, and entered with
-		// a double click (FUN_006289a4).
-		int16_t channel = channel_at(cursorpos);
-
-		if (channel >= 0)
-		{
-			if (clicked)
-			{
-				select_channel(static_cast<uint8_t>(channel));
+				select_world(static_cast<uint8_t>(hovered));
 
 				return Cursor::State::IDLE;
 			}
@@ -304,23 +266,59 @@ namespace ms
 			return Cursor::State::CANCLICK;
 		}
 
-		return UIElement::send_cursor(clicked, cursorpos);
-	}
-
-	void UIWorldSelect::remove_cursor()
-	{
-		UIElement::remove_cursor();
-
-		// A plank held as another window takes the mouse is let go.
-		held_plank = -1;
-	}
-
-	void UIWorldSelect::doubleclick(Point<int16_t> cursorpos)
-	{
 		int16_t channel = channel_at(cursorpos);
 
-		if (channel >= 0 && channel == channelid)
-			enter_world();
+		if (channel >= 0)
+		{
+			if (clicked)
+			{
+				if (channel == channelid)
+				{
+					enter_world();
+				} else
+				{
+					Sound(Sound::Name::BUTTONCLICK).play();
+					select_channel(static_cast<uint8_t>(channel));
+				}
+
+				return Cursor::State::IDLE;
+			}
+
+			return Cursor::State::CANCLICK;
+		}
+
+		for (auto &btit : buttons)
+		{
+			Button *button = btit.second.get();
+
+			if (button->is_active() && button->bounds(position).contains(cursorpos))
+			{
+				Button::State state = button->get_state();
+
+				if (state == Button::State::DISABLED)
+					continue;
+
+				if (state == Button::State::NORMAL)
+				{
+					Sound(Sound::Name::BUTTONOVER).play();
+					button->set_state(Button::State::MOUSEOVER);
+				}
+
+				if (clicked)
+				{
+					Sound(Sound::Name::BUTTONCLICK).play();
+					button->set_state(button_pressed(btit.first));
+				} else
+				{
+					ret = Cursor::State::CANCLICK;
+				}
+			} else if (button->get_state() == Button::State::MOUSEOVER)
+			{
+				button->set_state(Button::State::NORMAL);
+			}
+		}
+
+		return ret;
 	}
 
 	void UIWorldSelect::send_key(int32_t keycode, bool pressed, bool escape)
@@ -530,7 +528,7 @@ namespace ms
 		if (status_pending || index >= worlds.size() || index == selected)
 			return;
 
-		Sound(Sound::Name::BUTTONCLICK).play();
+		Sound(Sound::Name::WORLDSELECT).play();
 
 		requested = index;
 		focused = index;
@@ -543,9 +541,6 @@ namespace ms
 	{
 		if (status_pending)
 			return;
-
-		// The one sound of its own the window has (0x629cd2).
-		Sound(Sound::Name::WORLDSELECT).play();
 
 		channelid = channel;
 		channel_select.reset();

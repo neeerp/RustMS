@@ -71,10 +71,7 @@ namespace ms
 	// The life of one of v83's fading Yes/No notices (FUN_0051fb72): it fades
 	// in over a second, stays until its time from being made runs out or a
 	// button closes it, then fades out over a second and is gone. A close asked
-	// for while it is still fading in waits for that to finish. LOCK_UI holds
-	// it back: one made while the UI is locked waits to fade in, and one shown
-	// fades out, waits, and comes back with its whole time again from the lock
-	// (FUN_0051fb31).
+	// for while it is still fading in waits for that to finish.
 	class FadeNotice
 	{
 	public:
@@ -82,7 +79,7 @@ namespace ms
 		// How far each notice sits above the one made before it.
 		static constexpr int16_t CASCADE = 5;
 
-		explicit FadeNotice(uint32_t lifetime) : lifetime(lifetime), deadline(lifetime) {}
+		explicit FadeNotice(uint32_t lifetime) : lifetime(lifetime) {}
 
 		// How far above the first notice's place this one sits.
 		int16_t raised() const
@@ -90,33 +87,18 @@ namespace ms
 			return static_cast<int16_t>(place.index() * CASCADE);
 		}
 
-		// `locked`: whether LOCK_UI is on (ctx+0x30b0).
-		void update(uint32_t elapsed, bool locked = false)
+		void update(uint32_t elapsed)
 		{
-			if (phase == Phase::WAITING && !locked)
-			{
-				// The layer's alpha moves on from where the lock's fade-out left it.
-				fade_from = opacity();
-				phase = Phase::FADING_IN;
-				fade_start = age;
-			}
-
 			age += elapsed;
 
 			switch (phase)
 			{
 				case Phase::FADING_IN:
-					if (age - fade_start > FADE_IN)
+					if (age > FADE_IN)
 						phase = Phase::SHOWN;
 					break;
 				case Phase::SHOWN:
-					if (locked)
-					{
-						phase = Phase::WAITING;
-						fade_start = age;
-						hiding = true;
-						deadline = static_cast<uint64_t>(age) + lifetime;
-					} else if (closing || age > deadline)
+					if (closing || age > lifetime)
 					{
 						phase = Phase::FADING_OUT;
 						fade_start = age;
@@ -147,20 +129,12 @@ namespace ms
 			return phase == Phase::GONE;
 		}
 
-		// Held back by LOCK_UI, out of sight.
-		bool waiting() const
-		{
-			return phase == Phase::WAITING;
-		}
-
 		float opacity() const
 		{
 			switch (phase)
 			{
-				case Phase::WAITING:
-					return hiding ? std::max(0.0f, 1.0f - static_cast<float>(age - fade_start) / FADE_OUT) : 0.0f;
 				case Phase::FADING_IN:
-					return std::min(1.0f, fade_from + (1.0f - fade_from) * static_cast<float>(age - fade_start) / FADE_IN);
+					return std::min(1.0f, static_cast<float>(age) / FADE_IN);
 				case Phase::SHOWN:
 					return 1.0f;
 				case Phase::FADING_OUT:
@@ -171,17 +145,12 @@ namespace ms
 		}
 
 	private:
-		enum class Phase { WAITING, FADING_IN, SHOWN, FADING_OUT, GONE };
+		enum class Phase { FADING_IN, SHOWN, FADING_OUT, GONE };
 
 		uint32_t lifetime;
-		// When it fades out by itself, from being made.
-		uint64_t deadline;
 		uint32_t age = 0, fade_start = 0;
-		float fade_from = 0.0f;
-		Phase phase = Phase::WAITING;
+		Phase phase = Phase::FADING_IN;
 		bool closing = false;
-		// Fading out for a lock, from when it was shown.
-		bool hiding = false;
 		FadePlace place;
 	};
 }
