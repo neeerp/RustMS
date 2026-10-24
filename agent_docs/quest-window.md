@@ -56,10 +56,18 @@ text's own colour, black here. `Basic.img/BtHide` closes the panel. The buttons
 along the bottom depend on the tab:
 
 - Available has FIND NPC (`BtMarkNpc`), which opens the world map with the
-  giver's map marked. NPC maps come from walking the portal graph out from
-  the Explorer start (`0`) and each continent's towns, which skips the disconnected
-  legacy map variants. When no world map lists the NPC's map, it says so
-  instead, as v83 does.
+  giver's maps marked, as does double-clicking the portrait on Available and
+  In Progress. Both look for the quest's start NPC (Maple Administrator,
+  9010000, when `Check.img` names none). Its maps are its
+  `Etc/NpcLocation.img` list. The world map is the deepest one under
+  `WorldMap.img`, following `MapLink`s, that has all of them
+  (`world_map::find_npc`). It falls back to the top `WorldMap.img` when they
+  are on different continents. Every spot holding one of them gets the
+  `npcPos` glow. The button is never disabled. When the NPC has no maps, or
+  no world map has them, it says so instead, as v83 does. v83 runs this world
+  map as a modal window; HeavenClient's is not modal. Double-clicking a map
+  or NPC in the quest's details, which also finds it in v83, is not
+  implemented.
 - In Progress has QUEST HELPER (`BtAlert`), which tracks or untracks the
   quest in the Quest Helper, and FORFEIT (`BtGiveup`). FORFEIT asks "Are you
   sure you want to quit?", then untracks the quest and sends the forfeit, as

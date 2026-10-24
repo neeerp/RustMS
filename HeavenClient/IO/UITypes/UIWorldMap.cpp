@@ -50,8 +50,8 @@ namespace ms
 		constexpr const char *UNAVAILABLE_HERE = "You are currently at a place where\\nthe world map is not available.";
 		constexpr const char *NPC_UNAVAILABLE = "This NPC is located at a spot not\\navailable through the World Map.";
 
-		// The world map v83 shows a field on, or "" when there is none.
-		std::string find_world(int32_t field)
+		// The maps each world map's MapList has.
+		const std::map<std::string, std::set<int32_t>>& world_lists()
 		{
 			static const auto lists = [] {
 				std::map<std::string, std::set<int32_t>> result;
@@ -65,10 +65,19 @@ namespace ms
 				}
 				return result;
 			}();
-			return world_map::find([&](const std::string& name) {
-				auto found = lists.find(name);
-				return found != lists.end() && found->second.count(field) > 0;
-			});
+			return lists;
+		}
+
+		bool lists(const std::string& world, int32_t field)
+		{
+			auto found = world_lists().find(world);
+			return found != world_lists().end() && found->second.count(field) > 0;
+		}
+
+		// The world map v83 shows a field on, or "" when there is none.
+		std::string find_world(int32_t field)
+		{
+			return world_map::find([&](const std::string& name) { return lists(name, field); });
 		}
 
 		std::string world_for_map(int32_t field)
@@ -149,7 +158,8 @@ namespace ms
 		for (auto spot : map_spots)
 		{
 			spot.second.marker.draw(spot.first + position + base_position);
-			if (std::find(spot.second.map_ids.begin(), spot.second.map_ids.end(), target_map) != spot.second.map_ids.end())
+			if (std::find_first_of(spot.second.map_ids.begin(), spot.second.map_ids.end(), target_maps.begin(),
+					target_maps.end()) != spot.second.map_ids.end())
 				npc_pos[std::min<uint8_t>(spot.second.type, MAPSPOT_TYPE_MAX - 1)].draw(spot.first + position + base_position, alpha);
 		}
 
@@ -177,25 +187,44 @@ namespace ms
 	{
 		if (find_world(Stage::get().get_mapid()).empty())
 			UI::get().emplace<UIOk>(UNAVAILABLE_HERE, [](bool) {});
-		else
-			UI::get().emplace<UIWorldMap>();
+		else if (auto map = UI::get().emplace<UIWorldMap>())
+			map->target_maps.clear();
 	}
 
-	void UIWorldMap::find(int32_t target)
+	void UIWorldMap::find_npc(int32_t npc)
 	{
-		if (find_world(target).empty())
+		// The NPC's maps, or -1 for one the data doesn't place (6de85d).
+		std::vector<int32_t> maps;
+
+		for (auto map : nl::nx::etc["NpcLocation.img"][std::to_string(npc)])
+			maps.push_back(map.get_integer());
+
+		if (maps.empty())
+			maps.push_back(-1);
+
+		std::string world = world_map::find_npc(maps,
+			[](const std::string& name) {
+				std::vector<std::string> links;
+				for (auto link : nl::nx::map["WorldMap"][name + ".img"]["MapLink"])
+					if (auto to = link["link"]["linkMap"])
+						links.push_back(to.get_string());
+				return links;
+			},
+			lists);
+
+		if (world.empty())
 			UI::get().emplace<UIOk>(NPC_UNAVAILABLE, [](bool) {});
 		else if (auto map = UI::get().emplace<UIWorldMap>())
-			map->show_location(target);
+			map->show_npc(maps, world);
 	}
 
-	void UIWorldMap::show_location(int32_t target)
+	void UIWorldMap::show_npc(const std::vector<int32_t>& maps, const std::string& world)
 	{
 		makeactive();
 		mapid = Stage::get().get_mapid();
-		target_map = target;
+		target_maps = maps;
 		user_map = world_for_map(mapid);
-		update_world(world_for_map(target));
+		update_world(world);
 	}
 
 	void UIWorldMap::update()

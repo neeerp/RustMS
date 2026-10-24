@@ -1,8 +1,11 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace ms
 {
@@ -43,6 +46,53 @@ namespace ms
 					return name(extra);
 
 			return found;
+		}
+
+		// The world map v83 opens to find an NPC (9ea1e1), given its maps
+		// (Etc/NpcLocation.img), the world maps each one's MapLink leads to,
+		// and whether a world map's MapList has a map. From WorldMap.img it
+		// goes down into the first link whose world map has all of the hits
+		// its level had, counted at the top, until a world map has no links
+		// or none of them has all. Empty when no world map below the top
+		// has any of the maps.
+		inline std::string find_npc(const std::vector<int32_t> &maps,
+			const std::function<std::vector<std::string>(const std::string&)> &links,
+			const std::function<bool(const std::string&, int32_t)> &lists)
+		{
+			std::string current = "WorldMap";
+			int32_t total = 0;
+
+			for (int depth = 0; depth < 8; depth++)
+			{
+				std::vector<std::string> children = links(current);
+
+				if (children.empty())
+					break;
+
+				std::vector<int32_t> hits(children.size());
+
+				for (size_t i = 0; i < children.size(); i++)
+					for (int32_t map : maps)
+						if (lists(children[i], map))
+						{
+							hits[i]++;
+
+							if (depth == 0)
+								total++;
+						}
+
+				if (total == 0)
+					return "";
+
+				auto all = std::find(hits.begin(), hits.end(), total);
+
+				if (all == hits.end())
+					break;
+
+				current = children[all - hits.begin()];
+			}
+
+			return current;
 		}
 	}
 }
