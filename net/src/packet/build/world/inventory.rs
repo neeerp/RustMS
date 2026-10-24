@@ -194,6 +194,16 @@ pub fn build_meso_bag_failed() -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// A summoning sack this map won't let the player open (`SUMMON_ITEM_INAVAILABLE`):
+/// the client's 0 shows "You can't use it here in this map." (0x114) in an
+/// OK box (FUN_00532fcf). It does not unlock the client.
+pub fn build_summon_item_unavailable() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::SummonItemUnavailable as i16)?;
+    p.write_byte(0)?;
+    Ok(p)
+}
+
 /// How a Party Potion used on someone went (report c041).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RandomMorphRes {
@@ -252,6 +262,11 @@ mod tests {
         expect.short(SendOpcode::MesoBagUsed as i16).int(1_000_000);
         expect.end();
         assert_eq!(build_meso_bag_failed().unwrap().bytes, [0xD2, 0]);
+    }
+
+    #[test]
+    fn a_sack_refused_here_says_so() {
+        assert_eq!(build_summon_item_unavailable().unwrap().bytes, [0x89, 0, 0]);
     }
 
     #[test]

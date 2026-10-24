@@ -121,6 +121,8 @@ pub enum SendOpcode {
     Whisper = 0x87,
     /// Spouse chat: the sender's echo or the partner's line (FUN_00532087).
     SpouseChat = 0x88,
+    /// A summoning sack refused on this map (FUN_00532fcf).
+    SummonItemUnavailable = 0x89,
     SpawnPlayer = 0xA0,
     RemovePlayerFromMap = 0xA1,
     ChatText = 0xA2,

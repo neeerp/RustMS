@@ -538,15 +538,34 @@ impl WorldHandler for UseSummonSackHandler {
         let opened = open_sack(ctx.player, slot, item_id, |prob| {
             rng.gen_range(0, 100) < prob
         });
-        let Some((changes, mobs)) = opened else {
-            debug!(slot, item_id, "Summoning sack refused");
-            return Ok(HandlerResult::reply(stat::build_stat_update(true, &[])?));
+        let (changes, mobs) = match opened {
+            Ok(opened) => opened,
+            Err(refused) => {
+                debug!(slot, item_id, ?refused, "Summoning sack refused");
+                let unlock = stat::build_stat_update(true, &[])?;
+                return Ok(match refused {
+                    SackRefused::NotHere => {
+                        HandlerResult::reply(inventory::build_summon_item_unavailable()?)
+                            .with(WorldAction::Reply(unlock))
+                    }
+                    SackRefused::Invalid => HandlerResult::reply(unlock),
+                });
+            }
         };
         Ok(
             HandlerResult::reply(inventory::build_inventory_operation(true, &changes)?)
                 .with(WorldAction::Field(FieldRequest::SummonMobs(mobs))),
         )
     }
+}
+
+/// Why a summoning sack stayed shut.
+#[derive(Debug, PartialEq, Eq)]
+enum SackRefused {
+    /// Not a sack the player has, or no one to open it.
+    Invalid,
+    /// The map forbids it (fieldLimit 0x4, not in `allowedItem`).
+    NotHere,
 }
 
 /// Use up the summoning sack in `slot`, if the player may open it here;
@@ -557,28 +576,35 @@ fn open_sack(
     slot: i16,
     item_id: i32,
     mut roll: impl FnMut(i32) -> bool,
-) -> Option<(Vec<InventoryChange>, Vec<i32>)> {
+) -> Result<(Vec<InventoryChange>, Vec<i32>), SackRefused> {
+    let held = player.inventory.get(InventoryType::Use, slot);
     if player.stats.hp <= 0
         || item_id / 10_000 != 210
-        || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id
+        || held.map(|item| item.item_id) != Some(item_id)
     {
-        return None;
+        return Err(SackRefused::Invalid);
     }
-    let sack = items::info(item_id)?.sack;
-    let field = crate::get_game_data().ok()?.field(player.stats.map_id)?;
-    if sack.is_empty() || (player.gm_level <= 0 && !field.may_summon(item_id)) {
-        return None;
+    let sack = items::info(item_id).ok_or(SackRefused::Invalid)?.sack;
+    let field = crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(player.stats.map_id))
+        .ok_or(SackRefused::Invalid)?;
+    if sack.is_empty() {
+        return Err(SackRefused::Invalid);
+    }
+    if player.gm_level <= 0 && !field.may_summon(item_id) {
+        return Err(SackRefused::NotHere);
     }
     let changes = player
         .inventory_mut()
         .take(InventoryType::Use, slot, 1)
-        .ok()?;
+        .map_err(|_| SackRefused::Invalid)?;
     let mobs = sack
         .into_iter()
         .filter(|&(_, prob)| roll(prob))
         .map(|(mob_id, _)| mob_id)
         .collect();
-    Some((changes, mobs))
+    Ok((changes, mobs))
 }
 
 /// `USE_SKILL_BOOK` (0x52, v83 FUN_00a0a1b2): tick, slot in the USE bag,
@@ -1351,8 +1377,8 @@ mod tests {
             [100100, 100101, 120100, 130101, 210100, 1210100, 1210102, 100100]
         );
         assert_eq!(player.inventory.count(2100001), 1);
-        assert!(open_sack(&mut player, 1, 2000000, |_| true).is_none());
-        assert!(open_sack(&mut player, 2, 2100001, |_| true).is_none());
+        assert!(open_sack(&mut player, 1, 2000000, |_| true).is_err());
+        assert!(open_sack(&mut player, 2, 2100001, |_| true).is_err());
     }
 
     #[test]
@@ -1370,15 +1396,20 @@ mod tests {
         // Maple Island forbids them; the event map 109090300 forbids them
         // too but lists 2109004 in its allowedItem.
         player.stats.map_id = 10_000;
-        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_none());
+        let refused = open_sack(&mut player, 1, 2100001, |_| true);
+        assert_eq!(refused.unwrap_err(), SackRefused::NotHere);
         player.stats.map_id = 109_090_300;
-        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_none());
+        let refused = open_sack(&mut player, 1, 2100001, |_| true);
+        assert_eq!(refused.unwrap_err(), SackRefused::NotHere);
         let (_, mobs) = open_sack(&mut player, 2, 2109004, |_| true).unwrap();
         assert_eq!(mobs, [9300329]);
+        // The sack must be in the slot named.
+        let refused = open_sack(&mut player, 2, 2109004, |_| true);
+        assert_eq!(refused.unwrap_err(), SackRefused::Invalid);
         // The client lets a GM open one anywhere.
         player.gm_level = 1;
         player.stats.map_id = 10_000;
-        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_some());
+        assert!(open_sack(&mut player, 1, 2100001, |_| true).is_ok());
     }
 
     fn scroll_request(slot: i16, item_id: i32) -> Packet {
