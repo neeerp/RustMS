@@ -45,7 +45,7 @@ async fn so_gong_sells_a_belt_resets_the_points_and_takes_a_medal_try() {
     let mut player = in_the_hall(&config).await;
 
     // The white belt costs 200 of the 250 points.
-    let belts = pick(&mut player, 1).await;
+    let belts = pick(&mut player, 2).await;
     assert!(
         shows(&belts, keys::DOJO_SO_GONG_BELTS, &[("points", "250")]),
         "{belts:?}"
@@ -58,7 +58,7 @@ async fn so_gong_sells_a_belt_resets_the_points_and_takes_a_medal_try() {
     );
     assert!(white.items.contains(&(WHITE_BELT, 1)), "{white:?}");
     send(&mut player.connection, answer(0, -1, None)).await;
-    let belts = pick(&mut player, 1).await;
+    let belts = pick(&mut player, 2).await;
     assert!(
         shows(&belts, keys::DOJO_SO_GONG_BELTS, &[("points", "50")]),
         "{belts:?}"
@@ -70,12 +70,12 @@ async fn so_gong_sells_a_belt_resets_the_points_and_takes_a_medal_try() {
     send(&mut player.connection, answer(0, -1, None)).await;
 
     // Resetting them leaves none, and the medal is tried for.
-    let reset = pick(&mut player, 2).await;
+    let reset = pick(&mut player, 3).await;
     assert!(said(&reset, keys::DOJO_SO_GONG_RESET_ASK), "{reset:?}");
     let done = told(&mut player, answer(1, 1, None)).await;
     assert!(said(&done, keys::DOJO_SO_GONG_RESET_DONE), "{done:?}");
     send(&mut player.connection, answer(0, -1, None)).await;
-    let medal = pick(&mut player, 3).await;
+    let medal = pick(&mut player, 4).await;
     let mano = [("medal", "1142033")];
     assert!(
         shows(&medal, keys::DOJO_SO_GONG_MEDAL_TRY, &mano),
@@ -87,13 +87,13 @@ async fn so_gong_sells_a_belt_resets_the_points_and_takes_a_medal_try() {
 
     // All of it is still so after logging out.
     let mut player = in_the_hall(&config).await;
-    let belts = pick(&mut player, 1).await;
+    let belts = pick(&mut player, 2).await;
     assert!(
         shows(&belts, keys::DOJO_SO_GONG_BELTS, &[("points", "0")]),
         "{belts:?}"
     );
     send(&mut player.connection, answer(0, -1, None)).await;
-    let medal = pick(&mut player, 3).await;
+    let medal = pick(&mut player, 4).await;
     let more = [("medal", "1142033"), ("kills", "100")];
     assert!(
         shows(&medal, keys::DOJO_SO_GONG_MEDAL_MORE, &more),

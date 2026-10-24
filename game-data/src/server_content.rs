@@ -1839,6 +1839,9 @@ pub mod keys {
     pub const PIRATE_GUON_SAVED: &str = "pirate.guon.saved";
     pub const DOJO_SO_GONG_MENU: &str = "dojo.so_gong.menu";
     pub const DOJO_SO_GONG_ALONE: &str = "dojo.so_gong.alone";
+    pub const DOJO_SO_GONG_PARTY: &str = "dojo.so_gong.party";
+    pub const DOJO_SO_GONG_PARTY_LEADER: &str = "dojo.so_gong.party_leader";
+    pub const DOJO_SO_GONG_PARTY_SPREAD: &str = "dojo.so_gong.party_spread";
     pub const DOJO_SO_GONG_ABOUT: &str = "dojo.so_gong.about";
     pub const DOJO_SO_GONG_INFO: &str = "dojo.so_gong.info";
     pub const DOJO_SO_GONG_LOW_LEVEL: &str = "dojo.so_gong.low_level";
@@ -2899,6 +2902,9 @@ mod tests {
                 keys::PIRATE_GUON_SAVED,
                 keys::DOJO_SO_GONG_MENU,
                 keys::DOJO_SO_GONG_ALONE,
+                keys::DOJO_SO_GONG_PARTY,
+                keys::DOJO_SO_GONG_PARTY_LEADER,
+                keys::DOJO_SO_GONG_PARTY_SPREAD,
                 keys::DOJO_SO_GONG_ABOUT,
                 keys::DOJO_SO_GONG_INFO,
                 keys::DOJO_SO_GONG_LOW_LEVEL,

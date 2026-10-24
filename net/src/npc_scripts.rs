@@ -1363,8 +1363,8 @@ impl NpcScript {
     }
 
     /// So Gong in the Dojo's hall, for `player`, who may or may not go in.
-    pub fn so_gong(entry: Entry, player: &Player) -> Self {
-        so_gong(entry, player)
+    pub fn so_gong(entry: Entry, party: Entry, player: &Player) -> Self {
+        so_gong(entry, party, player)
     }
 
     /// Pietri in the maze's goal room, to a member who may be its
@@ -1435,7 +1435,9 @@ impl NpcScript {
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
             }
-            SO_GONG if events::DOJO.holds(player.stats.map_id) => Some(so_gong_on_floor(player)),
+            SO_GONG if events::dojo_floor(player.stats.map_id).is_some() => {
+                Some(so_gong_on_floor(player, leader))
+            }
             WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
                 Some(wu_yang_freed(leader))
             }
@@ -7004,10 +7006,10 @@ fn guon(entry: Entry) -> NpcScript {
 }
 
 /// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
-/// or more may take it on alone, once past his trial, buy a belt, reset their training points
-/// or try for a medal, and anyone may hear what it is. Its party Dojo is
-/// yet to come (`agent_docs/dojo.md`).
-fn so_gong(entry: Entry, player: &Player) -> NpcScript {
+/// or more may take it on alone, once past his trial, or as the leader of
+/// a party whose `party` entry it is, buy a belt, reset their training
+/// points or try for a medal, and anyone may hear what it is.
+fn so_gong(entry: Entry, party: Entry, player: &Player) -> NpcScript {
     if player.stats.level < *events::DOJO.levels.start() {
         return NpcScript::new(SO_GONG, vec![Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL))]);
     }
@@ -7034,6 +7036,14 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
         Entry::Busy => Page::Say(text(keys::DOJO_SO_GONG_BUSY)),
         _ => Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL)),
     };
+    // Those of the party in the hall come along; a team too far apart in
+    // levels isn't eligible (`DOJO_PARTY.spread`).
+    let party = match party {
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::DojoParty)]),
+        Entry::Busy => Page::Say(text(keys::DOJO_SO_GONG_BUSY)),
+        Entry::NotEligible => Page::Say(text(keys::DOJO_SO_GONG_PARTY_SPREAD)),
+        Entry::NoParty | Entry::NotLeader => Page::Say(text(keys::DOJO_SO_GONG_PARTY_LEADER)),
+    };
     let points = player.dojo.points;
     let reset = Page::Decide {
         text: text(keys::DOJO_SO_GONG_RESET_ASK),
@@ -7049,6 +7059,7 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
             text: text(keys::DOJO_SO_GONG_MENU),
             choices: vec![
                 (text(keys::DOJO_SO_GONG_ALONE), vec![alone]),
+                (text(keys::DOJO_SO_GONG_PARTY), vec![party]),
                 (text(keys::DOJO_SO_GONG_BELT), vec![so_gong_belts(player)]),
                 (text(keys::DOJO_SO_GONG_RESET), vec![reset]),
                 (text(keys::DOJO_SO_GONG_MEDAL), vec![so_gong_medal(player)]),
@@ -7205,10 +7216,19 @@ fn so_gong_medal(player: &Player) -> Page {
 /// the challenger may go on to the next, which erases a recorded score,
 /// leave by the exit's `st00`, or record their score there; on a fighting
 /// floor they may give up, out to the exit with a pink line.
-fn so_gong_on_floor(player: &Player) -> NpcScript {
-    let floor = events::DOJO.stage_on(player.stats.map_id).unwrap_or(1);
+///
+/// On the party Dojo's there is no record, and the `leader` going on
+/// takes everyone on the rest floor along; anyone else goes alone.
+fn so_gong_on_floor(player: &Player, leader: bool) -> NpcScript {
+    let map_id = player.stats.map_id;
+    let party = events::DOJO_PARTY.holds(map_id);
+    let floor = events::dojo_floor(map_id).unwrap_or(1);
     if events::rest_floor(floor) {
-        let next = events::DOJO.stage_map(floor + 1);
+        let on = match party {
+            true if leader => Effect::EventCommand(EventCommand::DojoOn(floor)),
+            true => Effect::WarpToPortal(events::DOJO_PARTY.stage_map(floor + 1), 0),
+            false => Effect::WarpToPortal(events::DOJO.stage_map(floor + 1), 0),
+        };
         let record = if player.dojo.stage == floor {
             Page::Say(text(keys::DOJO_SO_GONG_RECORD_KEPT))
         } else {
@@ -7217,35 +7237,35 @@ fn so_gong_on_floor(player: &Player) -> NpcScript {
                 effects: vec![Effect::DojoStage(floor)],
             }
         };
+        let mut choices = vec![
+            (
+                text(keys::DOJO_SO_GONG_CONTINUE),
+                vec![Page::Done(vec![Effect::DojoStage(0), on])],
+            ),
+            (
+                text(keys::DOJO_SO_GONG_LEAVE),
+                vec![Page::Ask {
+                    text: text(keys::DOJO_SO_GONG_LEAVE_ASK),
+                    on_yes: vec![Effect::WarpToPortal(events::DOJO_EXIT, 1)],
+                    on_no: None,
+                }],
+            ),
+        ];
+        if !party {
+            choices.push((
+                text(keys::DOJO_SO_GONG_RECORD),
+                vec![Page::Decide {
+                    text: text(keys::DOJO_SO_GONG_RECORD_ASK),
+                    on_yes: vec![record],
+                    on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_RECORD_NO))],
+                }],
+            ));
+        }
         return NpcScript::new(
             SO_GONG,
             vec![Page::Menu {
                 text: text(keys::DOJO_SO_GONG_REST),
-                choices: vec![
-                    (
-                        text(keys::DOJO_SO_GONG_CONTINUE),
-                        vec![Page::Done(vec![
-                            Effect::DojoStage(0),
-                            Effect::WarpToPortal(next, 0),
-                        ])],
-                    ),
-                    (
-                        text(keys::DOJO_SO_GONG_LEAVE),
-                        vec![Page::Ask {
-                            text: text(keys::DOJO_SO_GONG_LEAVE_ASK),
-                            on_yes: vec![Effect::WarpToPortal(events::DOJO_EXIT, 1)],
-                            on_no: None,
-                        }],
-                    ),
-                    (
-                        text(keys::DOJO_SO_GONG_RECORD),
-                        vec![Page::Decide {
-                            text: text(keys::DOJO_SO_GONG_RECORD_ASK),
-                            on_yes: vec![record],
-                            on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_RECORD_NO))],
-                        }],
-                    ),
-                ],
+                choices,
             }],
         );
     }
@@ -13666,14 +13686,14 @@ mod tests {
         let mut first = player(50);
         first.stats.level = 25;
         for entry in [Entry::Ready, Entry::Busy] {
-            let mut hall = NpcScript::so_gong(entry, &first);
+            let mut hall = NpcScript::so_gong(entry, Entry::NoParty, &first);
             hall.begin();
             let step = hall.respond(ScriptInput::Select(0)).unwrap();
             assert_eq!(question(&step), text(keys::DOJO_SO_GONG_TRIAL_ASK));
             let step = hall.respond(ScriptInput::Yes).unwrap();
             assert_eq!(step.effects, [Effect::StartEvent(EventKind::DojoTrial)]);
         }
-        let mut wary = NpcScript::so_gong(Entry::Ready, &first);
+        let mut wary = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &first);
         wary.begin();
         wary.respond(ScriptInput::Select(0)).unwrap();
         let step = wary.respond(ScriptInput::No).unwrap();
@@ -13689,21 +13709,21 @@ mod tests {
             player.dojo.tutorial_done = true;
             player
         };
-        let mut low = NpcScript::so_gong(Entry::Ready, &at(24));
+        let mut low = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &at(24));
         assert_eq!(page_text(&low.begin()), text(keys::DOJO_SO_GONG_LOW_LEVEL));
-        let mut ready = NpcScript::so_gong(Entry::Ready, &at(25));
+        let mut ready = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &at(25));
         assert_eq!(kind(&ready.begin()), Some(4));
         let step = ready.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(step.effects, [Effect::StartEvent(EventKind::Dojo)]);
         let refused = ready.refused().unwrap();
         assert_eq!(page_text(&refused), text(keys::DOJO_SO_GONG_BUSY));
-        let mut busy = NpcScript::so_gong(Entry::Busy, &at(25));
+        let mut busy = NpcScript::so_gong(Entry::Busy, Entry::NoParty, &at(25));
         busy.begin();
         let step = busy.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_BUSY));
-        let mut about = NpcScript::so_gong(Entry::Ready, &at(25));
+        let mut about = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &at(25));
         about.begin();
-        let step = about.respond(ScriptInput::Select(4)).unwrap();
+        let step = about.respond(ScriptInput::Select(5)).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_INFO));
 
         // On a fighting floor he lets them give up.
@@ -13744,6 +13764,62 @@ mod tests {
     }
 
     #[test]
+    fn so_gong_takes_a_party_in_with_its_leader_and_moves_it_on_together() {
+        let mut leader = player(50);
+        leader.stats.level = 30;
+        leader.dojo.tutorial_done = true;
+        let party = |entry| {
+            let mut gong = NpcScript::so_gong(Entry::Ready, entry, &leader);
+            gong.begin();
+            gong.respond(ScriptInput::Select(1)).unwrap()
+        };
+        assert_eq!(
+            party(Entry::Ready).effects,
+            [Effect::StartEvent(EventKind::DojoParty)]
+        );
+        let spread = text(keys::DOJO_SO_GONG_PARTY_SPREAD);
+        assert_eq!(page_text(&party(Entry::NotEligible)), spread);
+        let lead = text(keys::DOJO_SO_GONG_PARTY_LEADER);
+        assert_eq!(page_text(&party(Entry::NoParty)), lead);
+        assert_eq!(page_text(&party(Entry::NotLeader)), lead);
+        let busy = text(keys::DOJO_SO_GONG_BUSY);
+        assert_eq!(page_text(&party(Entry::Busy)), busy);
+
+        // On a party rest floor the leader takes everyone on; a member goes
+        // alone, and there is no score to record.
+        leader.stats.map_id = events::DOJO_PARTY.stage_map(6);
+        let on = |leads| {
+            let mut rest = NpcScript::in_event(SO_GONG, &leader, leads, false).unwrap();
+            rest.begin();
+            rest.respond(ScriptInput::Select(0)).unwrap().effects
+        };
+        assert_eq!(
+            on(true),
+            [
+                Effect::DojoStage(0),
+                Effect::EventCommand(EventCommand::DojoOn(6))
+            ]
+        );
+        assert_eq!(
+            on(false),
+            [
+                Effect::DojoStage(0),
+                Effect::WarpToPortal(events::DOJO_PARTY.stage_map(7), 0)
+            ]
+        );
+        let rest = NpcScript::in_event(SO_GONG, &leader, true, false).unwrap();
+        let Some(Prompt::Selection { text: menu, .. }) = rest.begin().prompt else {
+            panic!("a menu expected");
+        };
+        assert!(!menu.contains(&text(keys::DOJO_SO_GONG_RECORD)), "{menu}");
+
+        // On a party fighting floor he lets them give up, as alone.
+        leader.stats.map_id = events::DOJO_PARTY.stage_map(2);
+        let quit = NpcScript::in_event(SO_GONG, &leader, true, false).unwrap();
+        assert_eq!(question(&quit.begin()), text(keys::DOJO_SO_GONG_QUIT));
+    }
+
+    #[test]
     fn so_gong_records_a_rest_floors_score_and_starts_after_it_next_time() {
         let mut challenger = player(50);
         challenger.stats.level = 30;
@@ -13772,7 +13848,7 @@ mod tests {
 
         // In the hall he offers the round reached, or erases it.
         challenger.stats.map_id = events::DOJO.lobby;
-        let mut hall = NpcScript::so_gong(Entry::Ready, &challenger);
+        let mut hall = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &challenger);
         hall.begin();
         let step = hall.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(
@@ -13781,7 +13857,7 @@ mod tests {
         );
         let step = hall.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::StartEvent(EventKind::Dojo)]);
-        let mut erase = NpcScript::so_gong(Entry::Ready, &challenger);
+        let mut erase = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &challenger);
         erase.begin();
         erase.respond(ScriptInput::Select(0)).unwrap();
         let step = erase.respond(ScriptInput::No).unwrap();
@@ -13797,7 +13873,7 @@ mod tests {
         challenger.dojo.points = 2_500;
         let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
         let choose = |player: &Player, choice: i32, belt: i32| {
-            let mut gong = NpcScript::so_gong(Entry::Ready, player);
+            let mut gong = NpcScript::so_gong(Entry::Ready, Entry::NoParty, player);
             gong.begin();
             gong.respond(ScriptInput::Select(choice)).unwrap();
             gong.respond(ScriptInput::Select(belt)).unwrap()
@@ -13810,15 +13886,15 @@ mod tests {
             item_id,
             quantity: 1,
         };
-        let mut gong = NpcScript::so_gong(Entry::Ready, &challenger);
+        let mut gong = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &challenger);
         gong.begin();
-        let menu = gong.respond(ScriptInput::Select(1)).unwrap();
+        let menu = gong.respond(ScriptInput::Select(2)).unwrap();
         let Some(Prompt::Selection { text: menu, .. }) = menu.prompt else {
             panic!("belts expected, got {menu:?}");
         };
         let points = content::text().get(keys::DOJO_SO_GONG_BELTS, &[("points", "2500")]);
         assert!(menu.starts_with(&points), "{menu}");
-        let white = choose(&challenger, 1, 0);
+        let white = choose(&challenger, 2, 0);
         assert_eq!(white.effects, [give(BELTS[0]), Effect::DojoPoints(-200)]);
 
         // The yellow belt takes the white one, unequipped.
@@ -13840,16 +13916,16 @@ mod tests {
             keys::DOJO_SO_GONG_BELT_LACKING,
             &[("lacking", &text(keys::DOJO_SO_GONG_BELT_LACKS_BELT))],
         );
-        assert_eq!(page_text(&choose(&challenger, 1, 1)), needs(&lacks));
+        assert_eq!(page_text(&choose(&challenger, 2, 1)), needs(&lacks));
         let mut wearing = challenger.clone();
         wearing
             .inventory
             .insert(InventoryType::Equipped, -50, equip(BELTS[0]));
-        assert_eq!(page_text(&choose(&wearing, 1, 1)), needs(&lacks));
+        assert_eq!(page_text(&choose(&wearing, 2, 1)), needs(&lacks));
         challenger
             .inventory
             .insert(InventoryType::Equip, 1, equip(BELTS[0]));
-        let yellow = choose(&challenger, 1, 1);
+        let yellow = choose(&challenger, 2, 1);
         assert_eq!(
             page_text(&yellow),
             content::text().get(keys::DOJO_SO_GONG_BELT_GIVEN, &[("belt", "1132001")])
@@ -13859,7 +13935,7 @@ mod tests {
             [take(BELTS[0]), give(BELTS[1]), Effect::DojoPoints(-1800)]
         );
         challenger.stats.level = 35;
-        assert_eq!(page_text(&choose(&challenger, 1, 1)), needs(""));
+        assert_eq!(page_text(&choose(&challenger, 2, 1)), needs(""));
 
         // A full EQUIP inventory shows no belts.
         let mut full = challenger.clone();
@@ -13868,15 +13944,15 @@ mod tests {
             full.inventory
                 .insert(InventoryType::Equip, slot, equip(1_002_000));
         }
-        let mut gong = NpcScript::so_gong(Entry::Ready, &full);
+        let mut gong = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &full);
         gong.begin();
-        let step = gong.respond(ScriptInput::Select(1)).unwrap();
+        let step = gong.respond(ScriptInput::Select(2)).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_ROOM));
 
         // The points can be reset.
-        let mut reset = NpcScript::so_gong(Entry::Ready, &challenger);
+        let mut reset = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &challenger);
         reset.begin();
-        let step = reset.respond(ScriptInput::Select(2)).unwrap();
+        let step = reset.respond(ScriptInput::Select(3)).unwrap();
         assert_eq!(question(&step), text(keys::DOJO_SO_GONG_RESET_ASK));
         let step = reset.respond(ScriptInput::Yes).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_RESET_DONE));
@@ -13884,9 +13960,9 @@ mod tests {
 
         // A first medal is tried for, then handed over after 100 wins.
         let medal = |player: &Player| {
-            let mut gong = NpcScript::so_gong(Entry::Ready, player);
+            let mut gong = NpcScript::so_gong(Entry::Ready, Entry::NoParty, player);
             gong.begin();
-            gong.respond(ScriptInput::Select(3)).unwrap()
+            gong.respond(ScriptInput::Select(4)).unwrap()
         };
         let mano = [("medal", "1142033")];
         let step = medal(&challenger);
@@ -13894,9 +13970,9 @@ mod tests {
             question(&step),
             content::text().get(keys::DOJO_SO_GONG_MEDAL_TRY, &mano)
         );
-        let mut gong = NpcScript::so_gong(Entry::Ready, &challenger);
+        let mut gong = NpcScript::so_gong(Entry::Ready, Entry::NoParty, &challenger);
         gong.begin();
-        gong.respond(ScriptInput::Select(3)).unwrap();
+        gong.respond(ScriptInput::Select(4)).unwrap();
         let step = gong.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::DojoMedal { stage: 1, kills: 0 }]);
         challenger.dojo.vanquisher_stage = 1;

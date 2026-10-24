@@ -10,8 +10,8 @@ use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::events::{
-    self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, EventCommand, EventKind, HeadCount,
-    LeverCheck, Standing, Statue,
+    self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, Entry, EventCommand, EventKind,
+    HeadCount, LeverCheck, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -56,14 +56,7 @@ impl ClientActor {
         if kind.event().squad {
             return self.talk_about_squad(kind).await;
         }
-        let (reply, entry) = oneshot::channel();
-        self.send_to_directory(DirectoryMessage::EventEntry {
-            from: self.client_id,
-            kind,
-            reply,
-        })
-        .await?;
-        let Ok(entry) = entry.await else {
+        let Some(entry) = self.event_entry(kind).await? else {
             return Ok(());
         };
         let script = match kind {
@@ -78,13 +71,33 @@ impl ClientActor {
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
-            EventKind::Dojo => NpcScript::so_gong(entry, &self.in_game()?.player),
+            EventKind::Dojo => {
+                // He offers the run with a party too.
+                let Some(party) = self.event_entry(EventKind::DojoParty).await? else {
+                    return Ok(());
+                };
+                NpcScript::so_gong(entry, party, &self.in_game()?.player)
+            }
             // A squad's, above; Papulatus's has a portal, not an NPC; So
-            // Gong starts his trial from the Dojo's own talk.
+            // Gong starts his trial and the party run from the Dojo's own
+            // talk.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
-            EventKind::DojoTrial => return Ok(()),
+            EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
         };
         self.start_script(script).await
+    }
+
+    /// Whether the player's party may go into an event of `kind` now; `None`
+    /// if the directory dropped the question.
+    async fn event_entry(&mut self, kind: EventKind) -> Result<Option<Entry>, RuntimeError> {
+        let (reply, entry) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::EventEntry {
+            from: self.client_id,
+            kind,
+            reply,
+        })
+        .await?;
+        Ok(entry.await.ok())
     }
 
     /// The NPC who gathers a squad tells the player where they stand with
@@ -524,14 +537,13 @@ impl ClientActor {
                 .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::DojoTrial);
             return Ok(trial.map(|ticket| scripts::dojo_tuto(ticket.won())));
         }
-        let Some(ticket) = self
-            .event
-            .as_ref()
-            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Dojo)
-        else {
+        let Some(ticket) = self.event.as_ref().filter(|ticket| {
+            ticket.holds(map_id) && matches!(ticket.kind, EventKind::Dojo | EventKind::DojoParty)
+        }) else {
             return Ok(None);
         };
-        let Some(floor) = events::DOJO.stage_on(map_id) else {
+        let party = ticket.kind == EventKind::DojoParty;
+        let Some(floor) = ticket.kind.event().stage_on(map_id) else {
             return Ok(None);
         };
         let cleared = ticket.cleared(floor);
@@ -551,7 +563,7 @@ impl ClientActor {
             scripts::DOJO_NEXT if !cleared => Ok(Some(pink(keys::DOJO_NEXT_SHUT))),
             scripts::DOJO_NEXT => {
                 let record = self.in_game()?.player.dojo;
-                Ok(Some(scripts::dojo_next(floor, &record)))
+                Ok(Some(scripts::dojo_next(floor, &record, party)))
             }
             _ => Ok(None),
         }
@@ -914,7 +926,10 @@ impl ClientActor {
             return Ok(());
         }
         let event = ticket.kind.event();
-        let dojo = matches!(ticket.kind, EventKind::Dojo | EventKind::DojoTrial);
+        let dojo = matches!(
+            ticket.kind,
+            EventKind::Dojo | EventKind::DojoTrial | EventKind::DojoParty
+        );
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
         let no_exp = zakum
@@ -993,9 +1008,24 @@ impl ClientActor {
         if !ticket.holds(map_id) || from.is_some_and(|from| from != map_id) {
             return Ok(());
         }
+        // A party gathered on a Dojo rest floor earns each floor's points
+        // from the one it was on (Cosmic `dojang_next`).
+        let dojo_floors = (ticket.kind == EventKind::DojoParty)
+            .then(|| {
+                events::DOJO_PARTY
+                    .stage_on(map_id)
+                    .zip(events::DOJO_PARTY.stage_on(to))
+            })
+            .flatten()
+            .filter(|&(_, rest)| events::rest_floor(rest));
         // The clock shows on arriving; the client keeps one already shown.
         let shown = ticket.clock.is_some();
         ticket.clock = clock;
+        if let Some((floor, rest)) = dojo_floors.filter(|&(floor, rest)| floor < rest) {
+            let record = self.in_game()?.player.dojo;
+            self.apply_effects(&scripts::dojo_points(floor..=rest - 1, &record, false))
+                .await?;
+        }
         self.warp_within_event(to).await?;
         if shown && clock.is_none() {
             self.send(&mut build_stop_clock()?).await?;
@@ -1051,8 +1081,11 @@ impl ClientActor {
         let floor = self
             .event
             .as_ref()
-            .filter(|ticket| ticket.kind == EventKind::Dojo && ticket.holds(map_id))
-            .and_then(|_| events::DOJO.stage_on(map_id))
+            .filter(|ticket| {
+                matches!(ticket.kind, EventKind::Dojo | EventKind::DojoParty)
+                    && ticket.holds(map_id)
+            })
+            .and_then(|_| events::dojo_floor(map_id))
             .filter(|&floor| !events::rest_floor(floor));
         let Some(floor) = floor else {
             return Ok(());
