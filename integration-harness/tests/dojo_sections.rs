@@ -5,7 +5,7 @@
 //! harness world runs events 60 times as fast, so minutes read as seconds.
 
 use game_data::server_content::keys;
-use integration_harness::events::{armed_in, talk, told};
+use integration_harness::events::{dojo_challenger, talk, told};
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use net::events::{DOJO, DOJO_ENTRANCE, DOJO_EXIT, DOJO_FIRST, DOJO_TAUNT_WEATHER};
@@ -13,7 +13,7 @@ use net::npc_scripts::SO_GONG;
 
 #[tokio::test]
 async fn a_rest_floor_stops_the_clock_and_the_next_section_starts_it_over() {
-    let mut player = armed_in(DOJO.lobby, 30).await;
+    let mut player = dojo_challenger(30).await;
     told(&mut player, talk(DOJO.lobby, SO_GONG)).await;
     let mut seen = Trace::default();
     send(&mut player.connection, answer(4, 1, Some(0))).await;
@@ -48,7 +48,7 @@ async fn a_rest_floor_stops_the_clock_and_the_next_section_starts_it_over() {
 
 #[tokio::test]
 async fn the_entrance_taunts_whoever_arrives() {
-    let mut player = armed_in(DOJO.lobby, 30).await;
+    let mut player = dojo_challenger(30).await;
     let mut seen = Trace::default();
     let c = &mut player.connection;
     assert_eq!(warp(c, DOJO_ENTRANCE, "", &mut seen).await, DOJO_ENTRANCE);

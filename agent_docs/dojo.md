@@ -6,8 +6,8 @@ in. Slice 1 is: the way in and out, the floors and their bosses, the
 door, and So Gong's solo run. Slice 2 is the section timers and the
 entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
 score So Gong records. Slice 3b is the belts, the points reset and the
-medals. The first-time tutorial, the party Dojo, energy and the
-`muruengRaid` HUD come later.
+medals. Slice 3c is So Gong's first-time trial. The party Dojo, energy and
+the `muruengRaid` HUD come later.
 
 ## The way in
 
@@ -18,6 +18,7 @@ medals. The first-time tutorial, the party Dojo, energy and the
 | Hall | 925020001 | So Gong 2091005, the event's lobby |
 | Exit | 925020002 | where a challenger who gives up or runs out of time lands |
 | Rooftop | 925020003 | after the 38th floor |
+| Trial room | 925020010 | So Gong as monster 9300269, and `out000` (`dojang_tuto`) back to the hall |
 | Floor n | 925020100 + (n - 1) * 100 | So Gong again, and on a fighting floor a boss |
 
 - **The board** (`npc_scripts::dojo_board`, Cosmic `2091006`) has two
@@ -45,8 +46,10 @@ medals. The first-time tutorial, the party Dojo, energy and the
   alone first asks whether to go back to its round. Yes starts the run
   after the recorded floor; no erases the record and ends the talk.
 
-  The party run is not in his menu yet, and the first-time tutorial is
-  skipped.
+  A challenger who has not beaten his trial (see "The first-time trial")
+  is offered that instead of the Dojo, with a record or without.
+
+  The party run is not in his menu yet.
 
 ## The event
 
@@ -142,8 +145,8 @@ Every sixth floor (6, 12, ..., 36) is a rest floor: no boss, no door, no
 ## Points and the record
 
 `game::DojoRecord` is a player's `dojo`: training points, the recorded
-rest floor (`stage`, 0 for none), the medal's stage and wins, and, for a
-later slice, the first-time trial. It is saved with the player, in
+rest floor (`stage`, 0 for none), the medal's stage and wins, and whether
+the first-time trial is beaten (`tutorial_done`). It is saved with the player, in
 `dojo_records`, one row per character once it differs from a new one's
 (`save_dojo`). Cosmic keeps these as `dojoPoints`, `lastDojoStage`,
 `finishedDojoTutorial`, `vanquisherStage` and `vanquisherKills`.
@@ -205,6 +208,35 @@ So Gong's hall menu (`so_gong_belts`, `so_gong_medal`) follows Cosmic's
   recorded floor for "every medal". RustMS counts the round's own boss,
   on the way on, as the medal text says, and checks the stage. When the
   party Dojo comes in, its wins must not count, as in Cosmic.
+
+## The first-time trial
+
+Cosmic's `2091005` asks a challenger going alone for the first time
+whether they would take So Gong on himself (`dojo.so_gong.trial_ask`).
+No ends the talk (`dojo.so_gong.trial_no`); yes starts
+`EventKind::DojoTrial` (`events::DOJO_TRIAL`), a solo event like the Dojo:
+
+- its one map is the trial room, 925020010, with 5 copies (Cosmic's
+  925020010 to 925020014), and its exit is the Dojo's;
+- it has no clock: `minutes` is 0, and the event actor sets no end
+  (Cosmic's `ingressDojo` gives it none either);
+- arriving, the challenger sees `dojo.trial.taunt` on weather 5120024
+  (`taunt_challenger`, Cosmic `dojang_Msg`);
+- So Gong is the room's only monster, 9300269. His death is the stage's
+  clear (`cleared_by_boss`), with the Dojo's clear effects;
+- his `revive` is 9300216, the map's `info/timeMob`. When a monster that
+  revives into a map's `timeMob` dies, the field sends the map's
+  `timeMob` message ("So Gong ran away crying...") as a yellow notice
+  (`build_item_line`, Cosmic's `killBy` serverNotice 6). The text is the
+  client's own data, so it is not a placeholder.
+
+The room's `out000` (`dojang_tuto`, at the top of the ladder) gives
+`dojo.trial.stay` while he stands. Once the run is won it sets
+`tutorial_done` (`Effect::DojoTrialDone`), plays the portal sound and
+warps to the hall's portal 0. Cosmic's script checks for 9300216 on the
+map; RustMS checks that the run is won. Cosmic also skips the trial for
+anyone who has been on the entrance (`hasEntered("dojang_Msg")`); RustMS
+asks everyone until they beat it.
 
 ## The client
 

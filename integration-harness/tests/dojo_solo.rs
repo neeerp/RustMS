@@ -7,7 +7,7 @@
 //! the exit.
 
 use game_data::server_content::keys;
-use integration_harness::events::{armed_in, maps, talk, told};
+use integration_harness::events::{dojo_challenger, maps, talk, told};
 use integration_harness::hunting::{attack, walk_to};
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, Trace};
@@ -30,7 +30,7 @@ fn pink(key: &str) -> (u8, String) {
 /// A level-30 challenger takes So Gong on alone and lands on the first
 /// floor.
 async fn challenger() -> (WorldSession, Trace) {
-    let mut player = armed_in(DOJO.lobby, 30).await;
+    let mut player = dojo_challenger(30).await;
     let seen = start(&mut player).await;
     (player, seen)
 }
@@ -160,8 +160,8 @@ async fn the_first_floors_boss_opens_the_door_up_to_the_second() {
 async fn two_challengers_on_a_channel_each_fight_their_own_boss() {
     // Both are in the hall before either starts, so neither run's clock
     // runs out while the other logs in.
-    let mut first = armed_in(DOJO.lobby, 30).await;
-    let mut second = armed_in(DOJO.lobby, 30).await;
+    let mut first = dojo_challenger(30).await;
+    let mut second = dojo_challenger(30).await;
     let mut first_seen = start(&mut first).await;
     let mut second_seen = start(&mut second).await;
 

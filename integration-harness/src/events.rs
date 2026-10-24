@@ -3,7 +3,9 @@
 //! gathered in the event's lobby, NPC talk on the event's maps, and getting
 //! the party in.
 
-use crate::database::{grant_stack, replace_item, set_job, set_str, set_weapon_attack};
+use crate::database::{
+    grant_stack, replace_item, set_dojo_trial_done, set_job, set_str, set_weapon_attack,
+};
 use crate::hunting::{hit_reactor, walk_to, MapReactor};
 use crate::preconditions::load_harness_config_or_fail;
 use crate::quests::answer;
@@ -118,24 +120,30 @@ pub async fn in_lobby(level: i16, items: &[(i32, i16)]) -> WorldSession {
 /// A new character at `level`, holding `items` in their Etc tab, logged in
 /// and waiting on `lobby`.
 pub async fn waiting_in(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSession {
-    waiting_with(lobby, level, 0, items, false).await
+    waiting_with(lobby, level, 0, items, false, false).await
 }
 
 /// A new character at `level` with `job`, logged in and waiting on
 /// `lobby`.
 pub async fn waiting_as(lobby: i32, level: i16, job: i16) -> WorldSession {
-    waiting_with(lobby, level, job, &[], false).await
+    waiting_with(lobby, level, job, &[], false, false).await
 }
 
 /// A new character at `level`, as `waiting_in`, with a sword and the
 /// strength to kill the event's monsters in a blow or two.
 pub async fn armed_in(lobby: i32, level: i16) -> WorldSession {
-    waiting_with(lobby, level, 0, &[], true).await
+    waiting_with(lobby, level, 0, &[], true, false).await
+}
+
+/// A new character at `level`, as `armed_in`, waiting in the Mu Lung
+/// Dojo's hall, past So Gong's first-time trial.
+pub async fn dojo_challenger(level: i16) -> WorldSession {
+    waiting_with(net::events::DOJO_HALL, level, 0, &[], true, true).await
 }
 
 /// `armed_in`, holding `items` as `waiting_in` does.
 pub async fn armed_with(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSession {
-    waiting_with(lobby, level, 0, items, true).await
+    waiting_with(lobby, level, 0, items, true, false).await
 }
 
 async fn waiting_with(
@@ -144,6 +152,7 @@ async fn waiting_with(
     job: i16,
     items: &[(i32, i16)],
     armed: bool,
+    dojo_trial_done: bool,
 ) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
@@ -157,6 +166,9 @@ async fn waiting_with(
         replace_item(id, -1, -11, 1302000).await.unwrap();
         set_weapon_attack(id, 500).await.unwrap();
         set_str(id, 999).await.unwrap();
+    }
+    if dojo_trial_done {
+        set_dojo_trial_done(id).await.unwrap();
     }
     let mut session = relogin(&config).await;
     let mut trace = Trace::default();

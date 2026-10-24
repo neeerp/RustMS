@@ -584,6 +584,8 @@ pub enum Effect {
         stage: i32,
         kills: i32,
     },
+    /// Mark So Gong's first-time trial beaten, for the Dojo itself to open.
+    DojoTrialDone,
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
@@ -1957,6 +1959,25 @@ pub const DOJO_UP: &str = "dojang_up";
 /// The Dojo's way on, behind a floor's door (Cosmic `dojang_next`).
 pub const DOJO_NEXT: &str = "dojang_next";
 
+/// The way out of So Gong's trial, up its ladder (Cosmic `dojang_tuto`).
+pub const DOJO_TUTO: &str = "dojang_tuto";
+
+/// What the way out of So Gong's trial does: once So Gong is `beaten`, it
+/// marks the trial done and takes the challenger back to the hall;
+/// before, a pink line says he won't let them go.
+pub fn dojo_tuto(beaten: bool) -> Vec<Effect> {
+    if !beaten {
+        return vec![Effect::Pink(
+            content::text().get(keys::DOJO_TRIAL_STAY, &[]),
+        )];
+    }
+    vec![
+        Effect::DojoTrialDone,
+        Effect::PortalSound,
+        Effect::WarpToPortal(crate::events::DOJO_HALL, 0),
+    ]
+}
+
 /// What the way on from the Dojo's `floor`, once cleared, does for a
 /// challenger with `record`: the floor's training points and a pink line
 /// of them, then the next floor; from the last, the rooftop and 2,000 EXP
@@ -2497,6 +2518,24 @@ mod tests {
             [Effect::PortalSound, Effect::WarpToPortal(map, portal)] => Some((*map, *portal)),
             _ => None,
         }
+    }
+
+    #[test]
+    fn so_gongs_trial_lets_the_challenger_out_only_once_he_is_beaten() {
+        let stay = content::text().get(keys::DOJO_TRIAL_STAY, &[]);
+        assert_eq!(dojo_tuto(false), [Effect::Pink(stay)]);
+        assert_eq!(
+            dojo_tuto(true),
+            [
+                Effect::DojoTrialDone,
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::DOJO_HALL, 0),
+            ]
+        );
+        let data = crate::get_game_data().unwrap();
+        let room = data.field(crate::events::DOJO_TRIAL_MAP).unwrap();
+        let out = room.portal_by_name("out000").unwrap();
+        assert_eq!(out.script.as_deref(), Some(DOJO_TUTO));
     }
 
     #[test]

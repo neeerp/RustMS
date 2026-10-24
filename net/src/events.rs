@@ -52,6 +52,9 @@ pub enum EventKind {
     /// The Mu Lung Dojo's 38 floors, taken alone, started at So Gong
     /// (2091005) in the Dojo's hall.
     Dojo,
+    /// So Gong's trial for a first-time challenger, taken alone from the
+    /// Dojo's hall: beat him to go on to the Dojo itself.
+    DojoTrial,
 }
 
 /// An event's maps and terms.
@@ -73,6 +76,7 @@ pub struct Event {
     pub levels: RangeInclusive<u8>,
     /// How many may play, the leader included.
     pub team: RangeInclusive<usize>,
+    /// Its time limit; 0 for none.
     pub minutes: u64,
     /// The EXP every member gets for clearing each stage, in order. Stage n
     /// is played on `entry + (n - 1) * stride`, unless `stage_maps` says.
@@ -1402,10 +1406,14 @@ pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
 
 /// The stage cleared once `mob_id` dies on `map_id`, in an event's copy of
 /// it: the Forest of Poison Haze's last, by its Super-Charged Poison Golem
-/// (Cosmic `EllinPQ.monsterKilled`), and each Dojo floor by its boss.
+/// (Cosmic `EllinPQ.monsterKilled`), each Dojo floor by its boss, and So
+/// Gong's trial by So Gong.
 pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
     if dojo_boss(map_id) == Some(mob_id) {
         return DOJO.stage_on(map_id);
+    }
+    if map_id == DOJO_TRIAL_MAP && mob_id == DOJO_TRIAL_MOB {
+        return Some(1);
     }
     (map_id == ELLIN_STAGES[5] && mob_id == ELLIN_GOLEM_LAST).then_some(6)
 }
@@ -1662,6 +1670,48 @@ pub const DOJO: Event = Event {
     runs: 15,
 };
 
+/// So Gong's trial room (Cosmic's first of five, 925020010-14).
+pub const DOJO_TRIAL_MAP: i32 = 925020010;
+/// So Gong himself, as the trial's monster; beaten, he lets out the
+/// room's `timeMob` and runs away.
+pub const DOJO_TRIAL_MOB: i32 = 9300269;
+
+/// So Gong's trial (Cosmic `2091005`, `dojang_tuto`): one room, taken
+/// alone, with no time limit, won by beating So Gong. Its way out up the
+/// ladder then takes the challenger back to the hall, done with it. Five
+/// may run at once on a channel, as Cosmic has five rooms.
+pub const DOJO_TRIAL: Event = Event {
+    lobby: DOJO_HALL,
+    maps: DOJO_TRIAL_MAP..=DOJO_TRIAL_MAP,
+    entry: DOJO_TRIAL_MAP,
+    entries: 1,
+    exit: DOJO_EXIT,
+    levels: 25..=u8::MAX,
+    team: 1..=1,
+    minutes: 0,
+    exp_per_stage: &[0],
+    stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: true,
+    survive: None,
+    runs: 5,
+};
+
 /// Whether Dojo floor `floor` is a rest floor, with no boss: every sixth.
 pub fn rest_floor(floor: u8) -> bool {
     floor % 6 == 0
@@ -1728,7 +1778,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 15] = [
+    pub const ALL: [EventKind; 16] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1744,6 +1794,7 @@ impl EventKind {
         EventKind::Ellin,
         EventKind::Pirate,
         EventKind::Dojo,
+        EventKind::DojoTrial,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1763,6 +1814,7 @@ impl EventKind {
             EventKind::Ellin => &ELLIN,
             EventKind::Pirate => &PIRATE,
             EventKind::Dojo => &DOJO,
+            EventKind::DojoTrial => &DOJO_TRIAL,
         }
     }
 }
@@ -2589,6 +2641,24 @@ mod tests {
         assert_eq!(DOJO.last_stage(), 38);
         assert!(DOJO.solo() && !HPQ.solo());
         assert_eq!(DOJO.runs, 15);
+    }
+
+    #[test]
+    fn so_gongs_trial_is_won_by_beating_him_with_no_time_limit() {
+        assert_eq!(DOJO_TRIAL.stage_on(DOJO_TRIAL_MAP), Some(1));
+        assert_eq!(DOJO_TRIAL.last_stage(), 1);
+        assert!(DOJO_TRIAL.solo() && DOJO_TRIAL.until_empty);
+        assert_eq!(DOJO_TRIAL.minutes, 0);
+        assert_eq!(cleared_by_boss(DOJO_TRIAL_MAP, DOJO_TRIAL_MOB), Some(1));
+        assert_eq!(cleared_by_boss(DOJO_FIRST, DOJO_TRIAL_MOB), None);
+        // The room lets out its time mob once So Gong is beaten.
+        let data = crate::get_game_data().unwrap();
+        let room = data.field(DOJO_TRIAL_MAP).unwrap();
+        let (time_mob, message) = room.time_mob.clone().unwrap();
+        assert!(!message.is_empty());
+        let so_gong = crate::mobs::info(DOJO_TRIAL_MOB).unwrap();
+        assert_eq!(so_gong.revive, [time_mob]);
+        assert!(room.portal_by_name("out000").is_some());
     }
 
     #[test]

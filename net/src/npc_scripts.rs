@@ -7004,7 +7004,7 @@ fn guon(entry: Entry) -> NpcScript {
 }
 
 /// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
-/// or more may take it on alone, buy a belt, reset their training points
+/// or more may take it on alone, once past his trial, buy a belt, reset their training points
 /// or try for a medal, and anyone may hear what it is. Its party Dojo is
 /// yet to come (`agent_docs/dojo.md`).
 fn so_gong(entry: Entry, player: &Player) -> NpcScript {
@@ -7012,6 +7012,14 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
         return NpcScript::new(SO_GONG, vec![Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL))]);
     }
     let alone = match entry {
+        // A first-timer must beat So Gong himself first, in his trial
+        // (Cosmic's `getFinishedDojoTutorial`), whose own start finds
+        // whether a room is free.
+        Entry::Ready | Entry::Busy if !player.dojo.tutorial_done => Page::Decide {
+            text: text(keys::DOJO_SO_GONG_TRIAL_ASK),
+            on_yes: vec![Page::Done(vec![Effect::StartEvent(EventKind::DojoTrial)])],
+            on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_TRIAL_NO))],
+        },
         // The run starts after a recorded floor (`event_started`), and a
         // no erases the record.
         Entry::Ready if player.dojo.stage > 0 => {
@@ -13654,10 +13662,31 @@ mod tests {
     }
 
     #[test]
+    fn so_gong_tries_a_first_timer_himself_before_the_dojo() {
+        let mut first = player(50);
+        first.stats.level = 25;
+        for entry in [Entry::Ready, Entry::Busy] {
+            let mut hall = NpcScript::so_gong(entry, &first);
+            hall.begin();
+            let step = hall.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(question(&step), text(keys::DOJO_SO_GONG_TRIAL_ASK));
+            let step = hall.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(step.effects, [Effect::StartEvent(EventKind::DojoTrial)]);
+        }
+        let mut wary = NpcScript::so_gong(Entry::Ready, &first);
+        wary.begin();
+        wary.respond(ScriptInput::Select(0)).unwrap();
+        let step = wary.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_TRIAL_NO));
+        assert!(step.effects.is_empty());
+    }
+
+    #[test]
     fn so_gong_takes_a_challenger_in_alone_and_lets_them_give_up() {
         let at = |level| {
             let mut player = player(50);
             player.stats.level = level;
+            player.dojo.tutorial_done = true;
             player
         };
         let mut low = NpcScript::so_gong(Entry::Ready, &at(24));
@@ -13719,6 +13748,7 @@ mod tests {
         let mut challenger = player(50);
         challenger.stats.level = 30;
         challenger.stats.map_id = events::DOJO.stage_map(12);
+        challenger.dojo.tutorial_done = true;
         let mut rest = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
         rest.begin();
         let step = rest.respond(ScriptInput::Select(2)).unwrap();
