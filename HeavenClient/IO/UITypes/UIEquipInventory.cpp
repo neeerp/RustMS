@@ -23,6 +23,7 @@
 #include "../UITypes/UIItemInventory.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/MountRules.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -461,12 +462,19 @@ namespace ms
 			return;
 
 		int16_t shown = inventory.shown_equip(slot);
+		int32_t item_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, shown);
 
-		if (Stage::get().get_player().ride_keeps(inventory.get_item_id(InventoryType::Id::EQUIPPED, shown)))
+		if (slot == EquipSlot::Id::TAMEDMOB && mount::stays_on(item_id))
 			return;
 
-		if (int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP))
-			Stage::get().get_player().request(UnequipItemPacket(shown, freeslot), ExclRequest::WAIT);
+		// v83 counts the free slots first, then gets off a tamed monster
+		// instead of taking its mount or saddle off (0x4f0e97).
+		int16_t freeslot = inventory.find_free_slot(InventoryType::Id::EQUIP);
+
+		if (!freeslot || Stage::get().get_player().ride_keeps(item_id))
+			return;
+
+		Stage::get().get_player().request(UnequipItemPacket(shown, freeslot), ExclRequest::WAIT);
 	}
 
 	bool UIEquipInventory::is_in_range(Point<int16_t> cursorpos) const
@@ -601,12 +609,13 @@ namespace ms
 			}
 		}
 
-		if (equip && !can_swap(slot))
-			return true;
-
 		Player &player = Stage::get().get_player();
 
+		// Off a tamed monster first, before the swap is weighed (0x4f11b4).
 		if (player.ride_keeps(player.get_inventory().get_item_id(InventoryType::Id::EQUIPPED, source)))
+			return true;
+
+		if (equip && !can_swap(slot))
 			return true;
 
 		// Onto equipment, the server swaps the two (FUN_004f11b4).

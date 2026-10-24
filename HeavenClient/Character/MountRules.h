@@ -147,6 +147,12 @@ namespace ms::mount
 		return base * 10000 + 1004;
 	}
 
+	// The mounts a double-click in the Equip window leaves on, without a word (0x4f0c10).
+	inline bool stays_on(int32_t mount)
+	{
+		return mount >= 1902040 && mount <= 1902042;
+	}
+
 	// The skill whose effect plays as `mount` is got on or off (FUN_00936859): the rider's Monster
 	// Rider for a tamed monster, the Battleship for the ship, none for anything else.
 	inline int32_t ride_effect_skill(int32_t mount, int32_t job)
