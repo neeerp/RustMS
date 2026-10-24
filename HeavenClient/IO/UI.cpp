@@ -490,6 +490,8 @@ namespace ms
 					types.emplace_back(UIElement::Type::FAMILYTREE);
 					types.emplace_back(UIElement::Type::MINIGAME);
 					types.emplace_back(UIElement::Type::MINIGAMECREATE);
+					types.emplace_back(UIElement::Type::CLAIMNOTICE);
+					types.emplace_back(UIElement::Type::CLAIM);
 				}
 				else if (enter)
 				{

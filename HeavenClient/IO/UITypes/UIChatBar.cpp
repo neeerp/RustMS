@@ -832,6 +832,17 @@ namespace ms
 		add_line(line, type, -1, false);
 	}
 
+	std::vector<std::string> UIChatBar::claim_rows() const
+	{
+		std::vector<std::string> rows;
+
+		for (const auto& row : rowtexts)
+			if (row.claimable)
+				rows.push_back(row.line);
+
+		return rows;
+	}
+
 	void UIChatBar::send_megaphone(const std::string &line, LineType type, int8_t channel, bool ear)
 	{
 		add_line(line, type, channel, ear);
@@ -938,9 +949,15 @@ namespace ms
 			return count;
 		};
 
+		bool claimable = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
+						 type == LineType::BUDDY || type == LineType::GUILD || type == LineType::WHISPER || type == LineType::MEGAPHONE ||
+						 type == LineType::SUPER_MEGAPHONE || type == LineType::ITEM_MEGAPHONE ||
+						 type == LineType::MEGAPHONE_PREVIEW || type == LineType::GACHAPON;
+
 		for (const auto& row : ChatWrap::wrap(line, indent, fit))
 		{
-			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), strip, channel, ear });
+			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), strip, channel, ear, row,
+								 claimable });
 			channel = -1;
 		}
 

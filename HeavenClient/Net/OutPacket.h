@@ -146,6 +146,7 @@ namespace ms
 			/// Gameplay 2
 			CHANGE_MAP_SPECIAL = 100,
 			TELEPORT_ROCK_LIST = 102,
+			CLAIM = 106,
 			QUEST_ACTION = 107,
 			CALC_DAMAGE_STAT = 108,
 			THROW_GRENADE = 109,

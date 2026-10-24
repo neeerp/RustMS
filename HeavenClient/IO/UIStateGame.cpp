@@ -981,6 +981,8 @@ namespace ms
 				case UIElement::Type::MERCHANTBLACKLIST:
 				case UIElement::Type::MINIGAME:
 				case UIElement::Type::MINIGAMECREATE:
+				case UIElement::Type::CLAIMNOTICE:
+				case UIElement::Type::CLAIM:
 					return true;
 				default:
 					return false;

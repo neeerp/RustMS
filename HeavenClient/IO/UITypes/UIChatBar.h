@@ -118,6 +118,12 @@ namespace ms
 		// and whether they can be whispered back.
 		void send_megaphone(const std::string &line, LineType type, int8_t channel, bool ear);
 
+		// The log's rows a report can quote, oldest first: v83 takes the
+		// rows of its chat kinds 0 to 4, 0xd to 0xf and 0x12 to 0x16
+		// (0x8d468d), which leaves out alliance, spouse and GM chat and the
+		// notices.
+		std::vector<std::string> claim_rows() const;
+
 		// item: the name the line gives in place of %s
 		void display_message(Messages::Type line, UIChatBar::LineType type, const std::string &item = "");
 
@@ -320,6 +326,9 @@ namespace ms
 			// A megaphone's first row is tagged with the channel, or -1
 			int8_t channel;
 			bool ear;
+			// The row as written, and whether a report can quote it
+			std::string line;
+			bool claimable;
 		};
 		// Oldest first; a wrapped row keeps its strip when old rows leave.
 		std::deque<ChatRow> rowtexts;

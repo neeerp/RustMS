@@ -46,4 +46,23 @@ namespace ms
 			write_byte(up);
 		}
 	};
+
+	// Report a character to a GM (v83 FUN_00a2719c): 1 for a conversation,
+	// with the lines of the chat log, or 0 for an illegal program.
+	// Opcode: CLAIM(106)
+	class ClaimPacket : public OutPacket
+	{
+	public:
+		ClaimPacket(bool conversation, const std::string &name, uint8_t reason, const std::string &description,
+					const std::string &chat_log) : OutPacket(OutPacket::Opcode::CLAIM)
+		{
+			write_byte(conversation);
+			write_string(name);
+			write_byte(reason);
+			write_string(description);
+
+			if (conversation)
+				write_string(chat_log);
+		}
+	};
 }

@@ -268,6 +268,9 @@ namespace ms
 
 		/// Player Interaction
 		CHAR_INFO = 61,
+		CLAIM_RESULT = 45,
+		CLAIM_AVAILABLE_TIME = 46,
+		CLAIM_STATUS_CHANGED = 47,
 
 		/// Party
 		PARTY_OPERATION = 62,
@@ -505,6 +508,9 @@ namespace ms
 		emplace<FAME_RESPONSE, FameResponseHandler>();
 		emplace<PLAYER_INTERACTION, PlayerInteractionHandler>();
 		emplace<ENTRUSTED_SHOP_CHECK_RESULT, EntrustedShopCheckResultHandler>();
+		emplace<CLAIM_RESULT, ClaimResultHandler>();
+		emplace<CLAIM_AVAILABLE_TIME, ClaimAvailableTimeHandler>();
+		emplace<CLAIM_STATUS_CHANGED, ClaimStatusChangedHandler>();
 
 		// Party handlers
 		emplace<PARTY_OPERATION, PartyOperationHandler>();
