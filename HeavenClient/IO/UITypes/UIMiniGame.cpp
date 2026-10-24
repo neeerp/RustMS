@@ -287,6 +287,7 @@ namespace ms
 
 		slider.remove_cursor();
 		mouse_down = false;
+		leave_board();
 	}
 
 	Cursor::State UIMiniGame::send_cursor(bool clicked, Point<int16_t> cursorpos)
@@ -296,6 +297,7 @@ namespace ms
 		// v83 places a stone or turns a card when the mouse comes up over the
 		// board, wherever it went down (0x6e4d1f, 0x64ece1).
 		bool released = mouse_down && !clicked;
+		bool went_down = clicked && !mouse_down;
 		mouse_down = clicked;
 
 		if (Cursor::State sstate = slider.send_cursor(at, clicked))
@@ -308,13 +310,19 @@ namespace ms
 
 		if (board().contains(at))
 		{
+			hover_board(at, went_down);
+
 			if (released)
 				click_board(at);
 
 			UIElement::remove_cursor();
 
-			return Cursor::State::IDLE;
+			// A held button stays held while the mouse moves, so the turn
+			// waits for the release.
+			return clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
 		}
+
+		leave_board();
 
 		return UIElement::send_cursor(clicked, cursorpos);
 	}

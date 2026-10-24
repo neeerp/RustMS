@@ -39,6 +39,10 @@ namespace ms
 
 		void click_board(Point<int16_t> at) override;
 
+		void hover_board(Point<int16_t> at, bool went_down) override;
+
+		void leave_board() override;
+
 		Rectangle<int16_t> board() const override;
 
 		void refresh_buttons() override;
@@ -66,5 +70,7 @@ namespace ms
 		std::vector<bool> was_up;
 		// The seconds last shown, for the ticking.
 		int32_t last_seconds;
+		// The card the mouse went down on, drawn pressed in, or -1.
+		int32_t pressed = -1;
 	};
 }
