@@ -321,6 +321,15 @@ as there, run at the event pace (`RUSTMS_EVENT_SCALE`), measured from
 entering the room (`MapTimer::started`). Her lines are placeholders
 (`kyrin.test.*`).
 
+"Junior Balrog in a Different World" (6108) counts 300 kills of the
+Junior Balrog (9300085) in the other world (910500000). The Insignificant
+Being (1061012, at the Sleepywood Dungeon's Another Entrance 105090200)
+takes a Bowmaster or Marksman (or GM) of level 120 on 6107 or 6108 straight
+in, one at a time (`scripts::SOLO_MAPS`), for twenty minutes, after which
+the map's `forcedReturn` brings them back; its way out does too. Cosmic lets
+in the leader's whole party standing by; here each Bowman goes alone, and
+needs no party. Its lines are placeholders (`balrog_world.*`).
+
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with
 `CharEffect::QuestClear`).

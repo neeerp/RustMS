@@ -856,6 +856,13 @@ const DOOR_OF_DIMENSION: i32 = 1061009;
 const LORD_JONATHAN: i32 = 1092019;
 /// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
 const BART_TIME_LIMIT: u32 = 2 * 60;
+const INSIGNIFICANT_BEING: i32 = 1061012;
+/// The Bowmen's 4th-job quests on the Junior Balrog in another world.
+const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
+/// Bowmaster, Marksman and GM, as in Cosmic.
+const BALROG_WORLD_JOBS: [i16; 3] = [312, 322, 900];
+/// How long a Bowman has in the other world (Cosmic's `s4aWorld`).
+const BALROG_WORLD_TIME_LIMIT: u32 = 20 * 60;
 const SPARKLING_CRYSTAL: i32 = 1061010;
 const HOLY_STONE: i32 = 2030006;
 const SPIRUNA: i32 = 2032001;
@@ -1453,6 +1460,7 @@ impl NpcScript {
             CRYSTAL_OF_ROOTS => return Some(crystal_of_roots(player)),
             JAKE => return Some(jake(player)),
             LORD_JONATHAN => return Some(lord_jonathan(player)),
+            INSIGNIFICANT_BEING => return Some(insignificant_being(player)),
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
                 return Some(item_maker(
@@ -6525,6 +6533,35 @@ fn lord_jonathan(player: &Player) -> NpcScript {
     script
 }
 
+/// The Insignificant Being takes a Bowmaster or Marksman of level 120 on
+/// 6107 or 6108 straight into the Junior Balrog's other world, one at a
+/// time, where 6108 counts the kills.
+fn insignificant_being(player: &Player) -> NpcScript {
+    use crate::scripts::BALROG_WORLD;
+    let say = |key| NpcScript::new(INSIGNIFICANT_BEING, vec![Page::Say(text(key))]);
+    let on_quest = BALROG_WORLD_QUESTS
+        .iter()
+        .any(|&quest| player.quests.state(quest) == QuestState::Started);
+    if !on_quest {
+        return say(keys::BALROG_WORLD_NOT_ALLOWED);
+    }
+    if !BALROG_WORLD_JOBS.contains(&player.stats.job) {
+        return say(keys::BALROG_WORLD_JOB);
+    }
+    if player.stats.level < 120 {
+        return say(keys::BALROG_WORLD_LEVEL);
+    }
+    let mut script = NpcScript::new(
+        INSIGNIFICANT_BEING,
+        vec![Page::Done(vec![
+            Effect::RequireEmptyMap(BALROG_WORLD),
+            Effect::WarpToPortal(BALROG_WORLD, 0),
+        ])],
+    );
+    script.refused = Some(text(keys::BALROG_WORLD_BUSY));
+    script
+}
+
 /// Kyrin's 4th-job tests (`scripts::KYRIN_TESTS`). In town she offers a
 /// Pirate on one, its record not yet set, the way into its room, one at a
 /// time; past it, she marks the test passed and sends them back to town,
@@ -6563,9 +6600,13 @@ fn kyrin_fourth_job_test(player: &Player) -> Option<NpcScript> {
     Some(script)
 }
 
-/// The clone's room, Lord Jonathan's test and Kyrin's: the time a
-/// challenger has in it, which the map itself doesn't set.
+/// The clone's room, Lord Jonathan's test, Kyrin's and the Junior
+/// Balrog's other world: the time a challenger has in it, which the map
+/// itself doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
+    if map_id == crate::scripts::BALROG_WORLD {
+        return Some(BALROG_WORLD_TIME_LIMIT);
+    }
     if map_id == crate::reactors::BART_ROOM {
         return Some(BART_TIME_LIMIT);
     }
@@ -12344,5 +12385,52 @@ mod tests {
         assert!(outlaw.quests.set_record(test.record, KYRIN_PASSED));
         outlaw.stats.map_id = KYRIN_MAP;
         assert!(kyrin_fourth_job_test(&outlaw).is_none());
+    }
+
+    #[test]
+    fn the_insignificant_being_takes_a_bowman_on_the_quest_into_the_other_world() {
+        use crate::scripts::BALROG_WORLD;
+        let says = |player: &Player| {
+            page_text(
+                &NpcScript::for_npc(INSIGNIFICANT_BEING, player)
+                    .unwrap()
+                    .begin(),
+            )
+        };
+        let mut bowman = player(50);
+        (bowman.stats.job, bowman.stats.level) = (322, 120);
+        assert_eq!(says(&bowman), text(keys::BALROG_WORLD_NOT_ALLOWED));
+
+        bowman.quests.upsert(game::QuestRecord {
+            quest_id: 6108,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let mut warrior = bowman.clone();
+        warrior.stats.job = 112;
+        assert_eq!(says(&warrior), text(keys::BALROG_WORLD_JOB));
+        let mut low = bowman.clone();
+        low.stats.level = 119;
+        assert_eq!(says(&low), text(keys::BALROG_WORLD_LEVEL));
+
+        // In at once, one at a time.
+        let mut script = NpcScript::for_npc(INSIGNIFICANT_BEING, &bowman).unwrap();
+        let step = script.begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(
+            step.effects,
+            [
+                Effect::RequireEmptyMap(BALROG_WORLD),
+                Effect::WarpToPortal(BALROG_WORLD, 0),
+            ]
+        );
+        assert_eq!(
+            page_text(&script.refused().unwrap()),
+            text(keys::BALROG_WORLD_BUSY)
+        );
+        assert_eq!(time_limit(BALROG_WORLD), Some(20 * 60));
+        assert!(resets_when_empty(BALROG_WORLD));
     }
 }
