@@ -1075,6 +1075,10 @@ unsourced = [
     "kyrin.test.busy",
     "kyrin.test.wait",
     "kyrin.test.passed",
+    "balrog_world.not_allowed",
+    "balrog_world.job",
+    "balrog_world.level",
+    "balrog_world.busy",
 ]
 
 [text."glTutoMsg0.message"]

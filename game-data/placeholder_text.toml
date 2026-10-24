@@ -1225,3 +1225,7 @@
 "kyrin.test.busy" = "[placeholder] Someone is taking the test already. Come back later."
 "kyrin.test.wait" = "[placeholder] It's too soon to leave. Hold out a little longer."
 "kyrin.test.passed" = "[placeholder] You held out. You have passed my test."
+"balrog_world.not_allowed" = "[placeholder] I can take nobody into the other world for no reason."
+"balrog_world.job" = "[placeholder] Only a Bowmaster or a Marksman may enter the other world."
+"balrog_world.level" = "[placeholder] You must be at least level 120 to enter the other world."
+"balrog_world.busy" = "[placeholder] Someone else is already fighting the Junior Balrog in the other world."
