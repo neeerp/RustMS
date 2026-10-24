@@ -304,7 +304,11 @@ namespace ms
 
 	void UIStateGame::doubleclick(Point<int16_t> pos)
 	{
-		if (UIElement *front = get_front(pos))
+		// A window holding the mouse, such as a dialog, hears it alone, so the
+		// windows behind it take no double-click (FUN_009e42b2).
+		if (UIElement *focusedelement = get_focused())
+			focusedelement->doubleclick(pos);
+		else if (UIElement *front = get_front(pos))
 			front->doubleclick(pos);
 		// While a dialog is open the field takes no click (FUN_005299de).
 		else if (UI::get().dialog_open())
