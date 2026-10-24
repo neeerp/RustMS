@@ -135,14 +135,14 @@ namespace ms
 
 		virtual int32_t seconds_left() const = 0;
 
-		// A press on the board at `at`, window-local.
+		// A click on the board, released at `at`, window-local.
 		virtual void click_board(Point<int16_t> at) = 0;
 
 		virtual Rectangle<int16_t> board() const = 0;
 
-		// Asks `question`, and if the answer is yes while the room is
+		// Asks `question`, and if the answer is yes while this room is
 		// still open, does `yes`.
-		static void ask(const std::string &question, std::function<void()> yes);
+		void ask(const std::string &question, std::function<void()> yes) const;
 
 		void add_line(const std::string &line, Color::Name color);
 
@@ -185,6 +185,10 @@ namespace ms
 
 		int8_t game_type;
 		Layout layout;
+		// Tells this room from one opened after it, for a question asked here.
+		uint32_t serial;
+		// Whether the mouse was down at the last cursor event: the board acts on a release.
+		bool mouse_down = false;
 
 		Texture backgrnd;
 		Texture name_bar;
