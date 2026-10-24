@@ -38,6 +38,8 @@ pub enum EventKind {
     /// Delli's rescue (the Corsairs' 6410), started at Delli (2095000) on
     /// Looking for Delli 3.
     Delli,
+    /// The Ludibrium Maze, started at Rolly (9103001) in Ludibrium.
+    LudiMaze,
 }
 
 /// An event's maps and terms.
@@ -49,6 +51,10 @@ pub struct Event {
     pub maps: RangeInclusive<i32>,
     /// Where everyone starts.
     pub entry: i32,
+    /// How many maps from `entry` on the members start on, each on one
+    /// drawn for them (the Ludibrium Maze's rooms, Cosmic `playerEntry`);
+    /// 1 for an event everyone starts on `entry`.
+    pub entries: i32,
     /// Where everyone goes when they leave or the event ends. Never one of
     /// the event's maps, even within `maps`.
     pub exit: i32,
@@ -193,6 +199,7 @@ pub const KPQ: Event = Event {
     lobby: 103_000_000,
     maps: 103_000_800..=103_000_805,
     entry: 103_000_800,
+    entries: 1,
     exit: 103_000_890,
     levels: 21..=30,
     team: 3..=4,
@@ -282,6 +289,7 @@ pub const HPQ: Event = Event {
     lobby: 100_000_200,
     maps: 910_010_000..=910_010_400,
     entry: 910_010_000,
+    entries: 1,
     exit: 910_010_300,
     levels: 10..=u8::MAX,
     team: 3..=6,
@@ -329,6 +337,7 @@ pub const LPQ: Event = Event {
     lobby: 221_024_500,
     maps: 922_010_000..=922_011_100,
     entry: 922_010_100,
+    entries: 1,
     exit: 922_010_000,
     levels: 35..=50,
     team: 5..=6,
@@ -517,6 +526,7 @@ pub const OPQ: Event = Event {
     lobby: 200_080_101,
     maps: 920_010_000..=920_011_300,
     entry: 920_010_000,
+    entries: 1,
     exit: 920_011_200,
     levels: 51..=70,
     team: 5..=6,
@@ -762,6 +772,7 @@ pub const ZPQ: Event = Event {
     lobby: 211_042_300,
     maps: 280_010_000..=280_011_006,
     entry: ZPQ_HUB,
+    entries: 1,
     exit: 211_042_300,
     levels: 50..=u8::MAX,
     team: 1..=6,
@@ -823,6 +834,7 @@ pub const ZAKUM: Event = Event {
     lobby: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
     maps: crate::mobs::ZAKUM_ALTAR_MAP..=crate::mobs::ZAKUM_ALTAR_MAP,
     entry: crate::mobs::ZAKUM_ALTAR_MAP,
+    entries: 1,
     exit: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
     levels: 50..=u8::MAX,
     team: 6..=30,
@@ -864,6 +876,7 @@ pub const PAPULATUS: Event = Event {
     lobby: CLOCKTOWER_DEPTHS,
     maps: ORIGIN_OF_CLOCKTOWER..=ORIGIN_OF_CLOCKTOWER,
     entry: ORIGIN_OF_CLOCKTOWER,
+    entries: 1,
     exit: CLOCKTOWER_DEPTHS,
     levels: 1..=u8::MAX,
     team: 1..=6,
@@ -908,6 +921,7 @@ pub const HORNTAIL: Event = Event {
     lobby: crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE,
     maps: HORNTAIL_TRIAL_I..=HORNTAILS_CAVE,
     entry: HORNTAIL_TRIAL_I,
+    entries: 1,
     exit: crate::npc_scripts::ROAD_IN_BETWEEN,
     levels: 100..=u8::MAX,
     team: 6..=30,
@@ -990,6 +1004,7 @@ pub const HTPQ: Event = Event {
     lobby: crate::npc_scripts::CAVE_ENTRANCE,
     maps: HTPQ_ENTRY..=HTPQ_DARK,
     entry: HTPQ_ENTRY,
+    entries: 1,
     exit: crate::npc_scripts::CAVE_ENTRANCE,
     levels: 120..=u8::MAX,
     team: 6..=6,
@@ -1077,6 +1092,7 @@ pub const DELLI: Event = Event {
     lobby: DELLI_LOBBY,
     maps: SAVE_DELLI..=SAVE_DELLI,
     entry: SAVE_DELLI,
+    entries: 1,
     exit: DELLI_LOBBY,
     levels: 120..=u8::MAX,
     team: 1..=2,
@@ -1103,6 +1119,57 @@ pub const DELLI: Event = Event {
     survive: Some(WILLI),
 };
 
+/// Ludibrium, where the Ludibrium Maze's party gathers.
+pub const LUDIBRIUM: i32 = 220_000_000;
+/// The Ludibrium Maze's first room.
+pub const MAZE_ROOM: i32 = 809_050_000;
+/// The goal room, reached only from room 8, where Pietri takes the coupons.
+pub const MAZE_GOAL: i32 = 809_050_015;
+/// Where the team goes once Pietri has them.
+pub const MAZE_CLEAR: i32 = 809_050_016;
+/// The way out, where Rolly sends everyone back to Ludibrium.
+pub const MAZE_EXIT: i32 = 809_050_017;
+/// The Ludibrium Maze's coupons, from its monsters.
+pub const MAZE_COUPON: i32 = 4_001_106;
+
+/// The Ludibrium Maze (Cosmic `LudiMazePQ`): three to six of a party, all
+/// of level 51 to 70, in Ludibrium with their leader, go into their own
+/// copy of the maze for 15 minutes, each on a room of the first 15 drawn
+/// for them. Its rooms' portals lead from room to room, and only one leads
+/// on to the goal room. There the leader hands Pietri (9103000) the
+/// coupons, which wins it and takes the team to the clear room. A member
+/// who dies lands on the way out, the maps' forcedReturn.
+pub const LUDIMAZE: Event = Event {
+    lobby: LUDIBRIUM,
+    maps: MAZE_ROOM..=MAZE_CLEAR,
+    entry: MAZE_ROOM,
+    entries: 15,
+    exit: MAZE_EXIT,
+    levels: 51..=70,
+    team: 3..=6,
+    minutes: 15,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[MAZE_GOAL],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[MAZE_COUPON],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: Some(MAZE_CLEAR),
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+};
+
 /// Whether `mob_id` is the friendly mob some event's team protects.
 pub fn protected(mob_id: i32) -> bool {
     EventKind::ALL
@@ -1111,7 +1178,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 10] = [
+    pub const ALL: [EventKind; 11] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1122,6 +1189,7 @@ impl EventKind {
         EventKind::Horntail,
         EventKind::Htpq,
         EventKind::Delli,
+        EventKind::LudiMaze,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1136,6 +1204,7 @@ impl EventKind {
             EventKind::Horntail => &HORNTAIL,
             EventKind::Htpq => &HTPQ,
             EventKind::Delli => &DELLI,
+            EventKind::LudiMaze => &LUDIMAZE,
         }
     }
 }
@@ -1194,6 +1263,12 @@ impl Event {
     /// that says so (`until_empty`).
     pub fn lasts_until_empty(&self) -> bool {
         self.squad || self.until_empty
+    }
+
+    /// The map a member starts on: `entry`, or one of the `entries` maps
+    /// from it.
+    pub fn draw_entry(&self, rng: &mut impl rand::Rng) -> i32 {
+        self.entry + rng.gen_range(0, self.entries.max(1))
     }
 
     /// Whether `map_id` is one of the event's maps; its exit never is.
@@ -2368,6 +2443,48 @@ mod tests {
         // Its leader's leaving ends it, as for any party's.
         let mut team = Team::new(&DELLI, 1, vec![1, 2]);
         assert!(team.leave(1));
+    }
+
+    #[test]
+    fn the_maze_takes_three_to_six_and_starts_each_on_one_of_its_first_rooms() {
+        let four: Vec<_> = (1..=4).map(|id| at(id, 51, LUDIBRIUM)).collect();
+        assert_eq!(LUDIMAZE.team(1, &four), Some(vec![1, 2, 3, 4]));
+        assert!(LUDIMAZE.team(1, &four[..2]).is_none());
+        let high = [four[0], four[1], at(3, 71, LUDIBRIUM)];
+        assert!(LUDIMAZE.team(1, &high).is_none());
+        let seven: Vec<_> = (1..=7).map(|id| at(id, 70, LUDIBRIUM)).collect();
+        assert!(LUDIMAZE.team(1, &seven).is_none());
+        // Its rooms and the clear room are its own; the way out is not.
+        assert!(event_map(MAZE_ROOM) && event_map(MAZE_GOAL) && event_map(MAZE_CLEAR));
+        assert!(!event_map(MAZE_EXIT) && !event_map(LUDIBRIUM));
+        assert_eq!(
+            (LUDIMAZE.stage_on(MAZE_GOAL), LUDIMAZE.last_stage()),
+            (Some(1), 1)
+        );
+        assert_eq!(LUDIMAZE.duration(), scaled(Duration::from_secs(15 * 60)));
+        // Each member starts on one of the first 15 rooms, the goal never;
+        // any other event's on its entry.
+        let mut rng = rand::thread_rng();
+        let drawn: HashSet<i32> = (0..600).map(|_| LUDIMAZE.draw_entry(&mut rng)).collect();
+        assert_eq!(drawn, (MAZE_ROOM..MAZE_GOAL).collect());
+        assert_eq!(KPQ.draw_entry(&mut rng), KPQ.entry);
+        // Dying in the maze lands on its way out, where Rolly sends
+        // everyone home; only room 8 leads to Pietri's.
+        let data = crate::game_data::get().unwrap();
+        for room in MAZE_ROOM..=MAZE_GOAL {
+            let field = data.field(room).unwrap();
+            assert_eq!(field.forced_return, Some(MAZE_EXIT), "{room}");
+            assert_eq!(field.return_map, Some(MAZE_EXIT), "{room}");
+            let to_goal = field.portals().any(|p| p.to_map == Some(MAZE_GOAL));
+            assert_eq!(to_goal, room == MAZE_ROOM + 8, "{room}");
+        }
+        let npcs = |map_id| -> Vec<i32> {
+            let field = data.field(map_id).unwrap();
+            field.map_npcs.iter().map(|npc| npc.npc_id).collect()
+        };
+        assert!(npcs(LUDIBRIUM).contains(&crate::npc_scripts::ROLLY));
+        assert!(npcs(MAZE_GOAL).contains(&9103000));
+        assert!(npcs(MAZE_EXIT).contains(&9103003));
     }
 
     #[test]

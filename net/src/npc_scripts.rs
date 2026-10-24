@@ -867,6 +867,10 @@ pub const DELLI: i32 = 2095000;
 const DELLI_QUEST: i16 = 6410;
 const TRAINING_ROOM: i32 = 120_000_104;
 const LOOKING_FOR_DELLI: i32 = 925_010_000;
+/// Rolly in Ludibrium, who takes a party into the Ludibrium Maze, and
+/// Rolly on its way out, who sends everyone back to Ludibrium.
+pub const ROLLY: i32 = 9103001;
+const ROLLY_HOME: i32 = 9103003;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
 /// Bowmaster, Marksman and GM, as in Cosmic.
@@ -1303,6 +1307,12 @@ impl NpcScript {
         delli(entry)
     }
 
+    /// Rolly in Ludibrium, for a player whose party may or may not go into
+    /// the Ludibrium Maze.
+    pub fn rolly(entry: Entry) -> Self {
+        rolly(entry)
+    }
+
     /// Aura on the Dead Mine's hub, to `player`, who stands with her as
     /// `view`.
     pub fn aura(view: Aura, player: &Player) -> Self {
@@ -1494,6 +1504,15 @@ impl NpcScript {
             }
             DELLI if player.stats.map_id == events::NAUTILUS_HIDEOUT => {
                 return Some(ask_warp(DELLI, keys::DELLI_HOME_ASK, TRAINING_ROOM))
+            }
+            ROLLY_HOME if player.stats.map_id == events::MAZE_EXIT => {
+                return Some(NpcScript::new(
+                    ROLLY_HOME,
+                    vec![
+                        Page::Say(text(keys::LUDIMAZE_HOME)),
+                        Page::Done(vec![Effect::WarpToPortal(events::LUDIBRIUM, 0)]),
+                    ],
+                ))
             }
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
@@ -6634,6 +6653,36 @@ fn delli(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Delli checked, or another party went in.
     script.refused = Some(event_terms(&events::DELLI, keys::DELLI_NOT_ELIGIBLE));
+    script
+}
+
+/// Rolly (Cosmic `9103001`) in Ludibrium: the leader takes the party into
+/// the Ludibrium Maze, and anyone may hear its rules. Cosmic's Party
+/// Search toggle is left out.
+fn rolly(entry: Entry) -> NpcScript {
+    let maze = &events::LUDIMAZE;
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::LUDIMAZE_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::LUDIMAZE_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(maze, keys::LUDIMAZE_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::LUDIMAZE_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::LudiMaze)]),
+    };
+    let mut script = NpcScript::new(
+        ROLLY,
+        vec![Page::Menu {
+            text: event_terms(maze, keys::LUDIMAZE_MENU),
+            choices: vec![
+                (text(keys::LUDIMAZE_ENTER), vec![enter]),
+                (
+                    text(keys::LUDIMAZE_ABOUT),
+                    vec![Page::Say(text(keys::LUDIMAZE_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Rolly checked, or another party went in.
+    script.refused = Some(event_terms(maze, keys::LUDIMAZE_NOT_ELIGIBLE));
     script
 }
 
@@ -12628,5 +12677,42 @@ mod tests {
         delli.begin();
         let step = delli.respond(ScriptInput::Select(1)).unwrap();
         assert_eq!(page_text(&step), text(keys::DELLI_INFO));
+    }
+
+    #[test]
+    fn rolly_takes_the_party_into_the_maze_and_everyone_home() {
+        let mut ready = NpcScript::rolly(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::LudiMaze)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::LUDIMAZE_NO_PARTY),
+            (Entry::NotLeader, keys::LUDIMAZE_NOT_LEADER),
+            (Entry::Busy, keys::LUDIMAZE_BUSY),
+        ] {
+            let mut rolly = NpcScript::rolly(entry);
+            rolly.begin();
+            let step = rolly.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut rolly = NpcScript::rolly(Entry::NotEligible);
+        rolly.begin();
+        let step = rolly.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("51 to 70"), "{step:?}");
+        let mut rolly = NpcScript::rolly(Entry::Ready);
+        rolly.begin();
+        let step = rolly.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::LUDIMAZE_INFO));
+
+        // On the way out Rolly sends everyone back to Ludibrium; anywhere
+        // else he has only his own lines.
+        let mut out = player(50);
+        assert!(NpcScript::for_npc(ROLLY_HOME, &out).is_none());
+        out.stats.map_id = events::MAZE_EXIT;
+        let mut home = NpcScript::for_npc(ROLLY_HOME, &out).unwrap();
+        assert_eq!(page_text(&home.begin()), text(keys::LUDIMAZE_HOME));
+        let step = home.respond(ScriptInput::Next).unwrap();
+        assert_eq!(step.effects, [Effect::WarpToPortal(events::LUDIBRIUM, 0)]);
     }
 }
