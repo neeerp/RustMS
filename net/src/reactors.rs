@@ -114,6 +114,43 @@ pub enum Action {
         value: &'static str,
         notice: &'static str,
     },
+    /// One of the Ludibrium Maze's boxes (Cosmic `8091000` to `8091004`
+    /// and `8098000`): two lots of mobs (`maze_box`) come out where it was,
+    /// with a pink line to everyone there.
+    MazeBox,
+}
+
+/// The maze's boxes that bring out the same mobs in every room, from
+/// `8091000` on: two each of the two mobs.
+const MAZE_BOXES: [[i32; 2]; 5] = [
+    [9400210, 9400209],
+    [9400211, 9400212],
+    [9400213, 9400214],
+    [9400215, 9400216],
+    [9400217, 9400218],
+];
+/// The maze's box that brings out mobs by the room it is in.
+const MAZE_ROOM_BOX: i32 = 8098000;
+
+/// The mobs one of the maze's boxes (`Action::MazeBox`) brings out on map
+/// `map_id`, and how many of each. The room box brings out six Miner
+/// Zombies and nine Coolie Zombies on the first, eleventh and fifteenth
+/// rooms, and elsewhere two and three of the pair of mobs as far down from
+/// the Flyeye and Tauromacis as the room is from the sixth (Cosmic
+/// `8098000`).
+pub fn maze_box(reactor_id: i32, map_id: i32) -> [(i32, usize); 2] {
+    use crate::events::MAZE_ROOM;
+    if reactor_id != MAZE_ROOM_BOX {
+        let [a, b] = MAZE_BOXES[(reactor_id - 8091000).clamp(0, 4) as usize];
+        return [(a, 2), (b, 2)];
+    }
+    match map_id - MAZE_ROOM {
+        0 | 10 | 14 => [(9400209, 6), (9400210, 9)],
+        room => {
+            let b = (room - 5).abs();
+            [(9400217 - b, 2), (9400218 - b, 3)]
+        }
+    }
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -297,6 +334,7 @@ pub fn action(reactor_id: i32) -> Action {
             npc_id: crate::npc_scripts::EAK,
             notice: keys::OPQ_NOTICE_LIGHT,
         },
+        8091000..=8091004 | MAZE_ROOM_BOX => Action::MazeBox,
         2008000..=2008005 => Action::Hold,
         // The statue (`2006001`): the Grass of Life brings Minerva out, and
         // wins the event.
@@ -408,9 +446,11 @@ pub fn stays(reactor_id: i32) -> bool {
 
 /// Whether a map's reactors change places each time it starts afresh: the
 /// Berserk room's statues and Lord Jonathan's gulls, so the true one is
-/// somewhere new.
+/// somewhere new, and the boxes of the Ludibrium Maze's rooms (Cosmic
+/// `LudiMazePQ` `shuffleReactors`).
 pub fn shuffled(map_id: i32) -> bool {
-    matches!(map_id, BERSERK_ROOM | BART_ROOM)
+    use crate::events::{MAZE_GOAL, MAZE_ROOM};
+    matches!(map_id, BERSERK_ROOM | BART_ROOM) || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
 }
 
 #[cfg(test)]
@@ -610,6 +650,46 @@ mod tests {
         };
         assert_eq!(spot.item_dropped(0, 4001074, 1, (0, 0)), Some((0, 1)));
         assert!(spot.is_last(1));
+    }
+
+    #[test]
+    fn the_mazes_boxes_bring_out_pairs_of_mobs_by_box_and_room() {
+        use crate::events::{MAZE_GOAL, MAZE_ROOM};
+        assert_eq!(action(8091000), Action::MazeBox);
+        assert_eq!(action(8091004), Action::MazeBox);
+        assert_eq!(action(MAZE_ROOM_BOX), Action::MazeBox);
+        assert_eq!(maze_box(8091000, MAZE_ROOM), [(9400210, 2), (9400209, 2)]);
+        assert_eq!(
+            maze_box(8091003, MAZE_ROOM + 7),
+            [(9400215, 2), (9400216, 2)]
+        );
+        for room in [0, 10, 14] {
+            assert_eq!(
+                maze_box(MAZE_ROOM_BOX, MAZE_ROOM + room),
+                [(9400209, 6), (9400210, 9)]
+            );
+        }
+        assert_eq!(
+            maze_box(MAZE_ROOM_BOX, MAZE_ROOM + 5),
+            [(9400217, 2), (9400218, 3)]
+        );
+        assert_eq!(
+            maze_box(MAZE_ROOM_BOX, MAZE_ROOM + 1),
+            [(9400213, 2), (9400214, 3)]
+        );
+        assert_eq!(
+            maze_box(MAZE_ROOM_BOX, MAZE_ROOM + 13),
+            [(9400209, 2), (9400210, 3)]
+        );
+        for room in MAZE_ROOM..MAZE_GOAL {
+            assert!(shuffled(room));
+            for id in [8091000, 8091001, 8091002, 8091003, 8091004, MAZE_ROOM_BOX] {
+                for (mob, _) in maze_box(id, room) {
+                    assert!((9400209..=9400218).contains(&mob), "{id} {room}");
+                }
+            }
+        }
+        assert!(!shuffled(MAZE_GOAL));
     }
 
     #[test]

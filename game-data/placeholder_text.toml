@@ -1251,3 +1251,4 @@
 "ludimaze.not_eligible" = "[placeholder] Your party can't go yet. {least} to {most} of you, all of level {low} to {high}, must be here with your leader."
 "ludimaze.busy" = "[placeholder] Another party is in the maze already. Try another channel."
 "ludimaze.home" = "[placeholder] I'll take you back to Ludibrium now."
+"ludimaze.summoned" = "[placeholder] The box breaks open, and monsters spill out of it!"
