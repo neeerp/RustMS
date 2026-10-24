@@ -670,6 +670,13 @@ pub enum FieldMessage {
     SwapMobs {
         only: Option<i32>,
     },
+    /// Bring out one `mob_id` on the ground below `at`: the Lord Pirate,
+    /// as the first member goes past the Pirate Ship's doors
+    /// (`EventCommand::PastTheDoors`).
+    BringOut {
+        mob_id: i32,
+        at: (i16, i16),
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

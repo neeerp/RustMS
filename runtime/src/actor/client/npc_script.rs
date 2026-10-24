@@ -617,6 +617,17 @@ impl ClientActor {
                         return Ok(Applied::Refused);
                     }
                 }
+                Effect::RequireReactorsSet(names) => {
+                    let states = self.reactor_states(names).await?;
+                    let set = states.len() == names.len()
+                        && states
+                            .iter()
+                            .all(|state| state.is_some_and(|state| state > 0));
+                    if !set {
+                        debug!(?names, ?states, "Reactors not set; nothing applied");
+                        return Ok(Applied::Refused);
+                    }
+                }
                 Effect::RequireBoarding(platform) => {
                     let boarding = conti::departing_from(*platform)
                         .is_some_and(|route| route.timetable.state(conti::now()) == State::Wait);

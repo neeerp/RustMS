@@ -34,7 +34,7 @@ warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
-Pirate Ship is begun: its entry, exit, clocks and first four stages
+Pirate Ship is begun: its entry, exit, clocks and first five stages
 ([the Pirate Ship](#the-pirate-ship)).
 
 ## Rules
@@ -1136,8 +1136,25 @@ at least fifteen drops, 50-100 mesos each besides the pack's list
 (`EventCommand::ChestOpened`, `Cleared::chests`), whoever opened it. The
 count will pick the Lord Pirate and the clear's EXP.
 
-Not yet: the doors, the Lord Pirate, Wu Yang and the rewards, and the
-Party Search toggle.
+The fifth stage (925100400) is the doors: its Map.nx spawns come back as
+any field's, and its four seals (2519000-3, named `sMob1`-`sMob4`,
+`reactors::PIRATE_SEAL`) each take an Old Metal Key (4001117, 6% from
+the pirates in the pack) dropped on them and stay set in state 1
+(`reactors::Action::Seal`, `acts_staying`). A set seal stops the spawn
+points in its box, 160 across and 75 down either way from it, as Cosmic's
+`setAllowSpawnPointInBox` (`MobSet::deny_box`, kept until the field
+renews); the monsters already out stay. The stage clears when all four
+are set and no monster is left, whichever comes last (the seal's arm in
+`show_reactor_hit`, and `killed` through `Field::sealed`). The way on
+(`davy_next4`) waits for both, saying `pirate.portal_shut` in pink
+(`Effect::RequireReactorsSet`, `RequireNoMobs`), and leads to the last
+stage, where the first member through brings out the Lord Pirate once
+(`EventCommand::PastTheDoors`, `FieldMessage::BringOut`) at (777, 140):
+9300119 with no chest opened, 9300105 with one, 9300106 with two
+(`events::lord_pirate`). Cosmic's `changeDifficulty` is not followed.
+
+Not yet: the Lord Pirate's fight and its win, Wu Yang and the rewards,
+and the Party Search toggle.
 
 ## NPCs
 

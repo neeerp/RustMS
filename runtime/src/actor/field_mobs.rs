@@ -43,6 +43,8 @@ pub struct SpawnPoint {
     alive: Option<i32>,
     /// The soonest a point with a `mobTime` spawns again.
     regen_after: Option<Instant>,
+    /// It spawns no more until the field starts afresh (`deny_box`).
+    denied: bool,
 }
 
 pub struct LiveMob {
@@ -588,6 +590,7 @@ impl MobSet {
                     info,
                     alive: None,
                     regen_after: None,
+                    denied: false,
                 })
                 .collect(),
             live: BTreeMap::new(),
@@ -621,6 +624,18 @@ impl MobSet {
         self.only = Some(mob_id);
         self.full = true;
         self
+    }
+
+    /// The spawn points within `left..right` and `top..bottom` spawn no
+    /// more until the field starts afresh; their mobs alive stay (Cosmic
+    /// `setAllowSpawnPointInBox(false, ..)`, a Pirate Ship door's seal).
+    pub fn deny_box(&mut self, (left, top): (i16, i16), (right, bottom): (i16, i16)) {
+        for spawn in &mut self.spawns {
+            let (x, y) = (spawn.template.x, spawn.template.y);
+            if (left..right).contains(&x) && (top..bottom).contains(&y) {
+                spawn.denied = true;
+            }
+        }
     }
 
     pub fn live(&self) -> impl Iterator<Item = &LiveMob> {
@@ -664,6 +679,7 @@ impl MobSet {
         for spawn in &mut self.spawns {
             spawn.alive = None;
             spawn.regen_after = None;
+            spawn.denied = false;
         }
         self.last_pass = None;
         self.closed = false;
@@ -697,7 +713,7 @@ impl MobSet {
         if reset {
             for index in 0..self.spawns.len() {
                 let spawn = &self.spawns[index];
-                if spawn.template.mob_time < 0 && spawn.alive.is_none() {
+                if spawn.template.mob_time < 0 && spawn.alive.is_none() && !spawn.denied {
                     spawned.push(self.spawn_at(index, now));
                 }
             }
@@ -711,7 +727,9 @@ impl MobSet {
         for (index, spawn) in self.spawns.iter().enumerate() {
             let at = (spawn.template.x, spawn.template.y);
             let time = spawn.template.mob_time;
-            let room = if time == 0 {
+            let room = if spawn.denied {
+                false
+            } else if time == 0 {
                 !taken.iter().any(|&mob| near(mob, at))
             } else {
                 time > 0
@@ -741,6 +759,7 @@ impl MobSet {
                 (spawn.template.mob_time >= 0 || reset)
                     && self.only.is_none_or(|mob_id| spawn.info.mob_id == mob_id)
                     && spawn.alive.is_none()
+                    && !spawn.denied
                     && spawn.regen_after.is_none_or(|after| after <= now)
             })
             .collect();
@@ -1936,6 +1955,27 @@ mod tests {
                 ..MobInfo::default()
             },
         )
+    }
+
+    #[test]
+    fn a_denied_box_spawns_no_more_while_its_mobs_alive_stay() {
+        let now = Instant::now();
+        let mut mobs =
+            MobSet::new([snail_spawn(0), snail_spawn(100), snail_spawn(300)]).filling_every_point();
+        let snails = mobs.spawn_all(now);
+        assert_eq!(snails.len(), 3);
+        // The box holds the first two (its right and bottom edges left out).
+        mobs.deny_box((-50, -100), (300, 0));
+        assert_eq!(mobs.live().count(), 3);
+        for &snail in &snails {
+            assert!(matches!(mobs.damage(1, snail, 8, now), Some(Err(_))));
+        }
+        let later = now + Duration::from_secs(60);
+        let again = mobs.respawn(later, 1);
+        assert_eq!(again.len(), 1);
+        assert_eq!(mobs.get(again[0]).map(|mob| mob.x), Some(300));
+        // Starting afresh opens it again.
+        assert_eq!(mobs.renew(later).len(), 3);
     }
 
     #[test]

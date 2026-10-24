@@ -542,6 +542,9 @@ impl FieldActor {
             FieldMessage::Show(packet) => self.broadcast(None, packet),
             FieldMessage::ClearMobs => self.clear_mobs(),
             FieldMessage::SwapMobs { only } => self.swap_mobs(only),
+            FieldMessage::BringOut { mob_id, at } => {
+                self.board(mob_id, 1, at);
+            }
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;
@@ -1777,7 +1780,7 @@ impl FieldActor {
         // A stage cleared by killing all its mobs clears with the last, and
         // one cleared by its boss with the boss.
         let cleared = net::events::cleared_by_killing(self.key.map_id)
-            .filter(|_| self.mobs.live().next().is_none())
+            .filter(|_| self.mobs.live().next().is_none() && self.sealed())
             .or(net::events::cleared_by_boss(self.key.map_id, kill.mob_id))
             .filter(|_| self.key.instance_id != 0);
         if let Some(stage) = cleared {
@@ -1785,6 +1788,16 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
+    }
+
+    /// Whether every reactor here that must be set before the stage clears
+    /// is (`net::events::seals`).
+    fn sealed(&self) -> bool {
+        net::events::seals(self.key.map_id).iter().all(|name| {
+            self.reactors
+                .named(name)
+                .is_some_and(|reactor| reactor.state > reactors::first_state(reactor.reactor_id))
+        })
     }
 
     /// Put `head` on the ground below its place, for whoever comes in to
@@ -3323,6 +3336,25 @@ impl FieldActor {
             // `restartEventTimer` unless the intro is out, then
             // `mapMessage(6, ..)`.
             reactors::Action::Horntail => self.bring_out_horntail(by),
+            // Cosmic `2519000`'s `act`: `setAllowSpawnPointInBox(false,
+            // ..)` around it, then the clear if the other seals are set and
+            // no monster is left (as the last kill's, `killed`).
+            reactors::Action::Seal {
+                half: (across, down),
+            } => {
+                self.mobs.deny_box(
+                    (view.x.saturating_sub(across), view.y.saturating_sub(down)),
+                    (view.x.saturating_add(across), view.y.saturating_add(down)),
+                );
+                let cleared = net::events::cleared_by_killing(self.key.map_id).filter(|_| {
+                    self.key.instance_id != 0 && self.mobs.live().next().is_none() && self.sealed()
+                });
+                if let Some(stage) = cleared {
+                    for occupant in self.occupants.values() {
+                        occupant.handle.send(ServerMessage::ClearEventStage(stage));
+                    }
+                }
+            }
             // Whoever broke it drops its loot or goes where it sends them.
             // Whoever put the last item on it may have gone; the loot then
             // falls to someone still here. Minerva's statue brings her out

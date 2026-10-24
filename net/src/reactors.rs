@@ -121,6 +121,11 @@ pub enum Action {
     /// and `8098000`): two lots of mobs (`maze_box`) come out where it was,
     /// with a pink line to everyone there.
     MazeBox,
+    /// One of the seals on the Pirate Ship's doors (Cosmic `2519000` to
+    /// `2519003`), which takes an Old Metal Key and stays: the spawn points
+    /// within `half` of it each way spawn no more, and if the other seals
+    /// are set and no monster is left, the stage clears.
+    Seal { half: (i16, i16) },
     /// Give everyone on its map this much EXP as it takes an item, and
     /// stay: the Forest of Poison Haze's fountain (Cosmic `3008000`, whose
     /// `hit` gives 52,000), which its states' timeouts empty again.
@@ -361,6 +366,9 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (30, 60),
         },
+        // A door's seal: `setAllowSpawnPointInBox(false, ..)` over
+        // `Rectangle(x - 160, y - 75, 320, 150)`.
+        PIRATE_SEAL..=PIRATE_LAST_SEAL => Action::Seal { half: (160, 75) },
         2008000..=2008005 => Action::Hold,
         // The statue (`2006001`): the Grass of Life brings Minerva out, and
         // wins the event.
@@ -467,6 +475,11 @@ pub const PIRATE_DECK_BOX: i32 = 2511001;
 /// on it, and the rooms' names for it, in order.
 pub const PIRATE_CHEST: i32 = 2512001;
 pub const PIRATE_CHEST_NAMES: [&str; 2] = ["treasure1", "treasure2"];
+/// The seals on the doors of the Pirate Ship's fifth stage (2519000 to
+/// 2519003), each taking an Old Metal Key (4001117), and their names.
+pub const PIRATE_SEAL: i32 = 2519000;
+pub const PIRATE_LAST_SEAL: i32 = 2519003;
+pub const PIRATE_SEAL_NAMES: [&str; 4] = ["sMob1", "sMob2", "sMob3", "sMob4"];
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
@@ -511,11 +524,14 @@ pub fn stays(reactor_id: i32) -> bool {
 /// event of the index it came by leads back:
 /// `ReactorTemplate::acts_in`), does what breaking would and stays: the
 /// item-triggered ones Cosmic's `hitReactor` triggers rather than destroys
-/// and whose script acts there, the Forest of Poison Haze's pond and spine.
-/// Other reactors with such end states (in NX many, with no action here)
-/// only move.
+/// and whose script acts there, the Forest of Poison Haze's pond and spine
+/// and the Pirate Ship's seals. Other reactors with such end states (in NX
+/// many, with no action here) only move.
 pub fn acts_staying(reactor_id: i32) -> bool {
-    matches!(reactor_id, ELLIN_POND | ELLIN_SPINE)
+    matches!(
+        reactor_id,
+        ELLIN_POND | ELLIN_SPINE | PIRATE_SEAL..=PIRATE_LAST_SEAL
+    )
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
@@ -903,11 +919,20 @@ mod tests {
         for (stage, map) in PIRATE_STAGES.into_iter().enumerate() {
             assert_eq!(shuffled(map), [0, 2, 3].contains(&stage), "{map}");
         }
+        // The seals take a key each, and stay, set.
+        for seal in PIRATE_SEAL..=PIRATE_LAST_SEAL {
+            assert_eq!(action(seal), Action::Seal { half: (160, 75) });
+            assert!(acts_staying(seal) && stays(seal), "{seal}");
+        }
         let Ok(data) = data() else { return };
         for box_id in [PIRATE_MOB_BOX, PIRATE_ITEM_BOX, PIRATE_DECK_BOX] {
             let reactor = data.template(box_id).unwrap().unwrap();
             assert!((0..4).all(|state| !reactor.is_last(state)), "{box_id}");
             assert!(reactor.is_last(4), "{box_id}");
+        }
+        for seal in PIRATE_SEAL..=PIRATE_LAST_SEAL {
+            let reactor = data.template(seal).unwrap().unwrap();
+            assert!(!reactor.is_last(0) && reactor.is_last(1), "{seal}");
         }
     }
 }

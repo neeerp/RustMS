@@ -1388,18 +1388,45 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 }
 
 /// The stage cleared once every mob on `map_id`, in an event's copy of
-/// it, is dead: the first of the Forest of Poison Haze and of the Pirate
-/// Ship (Cosmic `EllinPQ.monsterKilled`, `PiratePQ.monsterKilled`).
+/// it, is dead, and every reactor `seals` names there set: the first of
+/// the Forest of Poison Haze and the Pirate Ship's first, decks and doors
+/// (Cosmic `EllinPQ.monsterKilled`, `PiratePQ.monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
     [
         (ELLIN_STAGES[0], 1),
         (PIRATE_ENTRY, 1),
         (PIRATE_STAGES[2], 3),
         (PIRATE_STAGES[3], 4),
+        (PIRATE_STAGES[4], 5),
     ]
     .into_iter()
     .find_map(|(map, stage)| (map == map_id).then_some(stage))
 }
+
+/// The reactors on `map_id` that must all be set (past their first state)
+/// before killing its last mob clears it, or the last of them set clears
+/// it once no mob is left: the Pirate Ship's doors' seals (Cosmic
+/// `2519000`, `PiratePQ.monsterKilled`).
+pub fn seals(map_id: i32) -> &'static [&'static str] {
+    if map_id == PIRATE_STAGES[4] {
+        &crate::reactors::PIRATE_SEAL_NAMES
+    } else {
+        &[]
+    }
+}
+
+/// The Lord Pirate the first member past the doors finds on the last
+/// stage, by how many of the bellflower rooms' chests the team opened
+/// (Cosmic `davy_next4`), and the point above the ground below which he
+/// comes out.
+pub fn lord_pirate(chests: u8) -> i32 {
+    match chests {
+        0 => 9_300_119,
+        1 => 9_300_105,
+        _ => 9_300_106,
+    }
+}
+pub const LORD_PIRATE_AT: (i16, i16) = (777, 140);
 
 /// Over the Pirate Ship, in Herb Town, where the party gathers at Guon;
 /// the ship's stages' maps, in order, the first its entry; the map the
@@ -1487,7 +1514,7 @@ pub const PIRATE: Event = Event {
     stride: 1,
     stage_maps: &PIRATE_STAGES,
     talk_clears: &[],
-    member_clears: &[1, 3, 4],
+    member_clears: &[1, 3, 4, 5],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -1936,6 +1963,9 @@ pub enum EventCommand {
     HandInMarks(u8),
     /// A member opened one of the Pirate Ship's bellflower rooms' chests.
     ChestOpened,
+    /// A member went past the Pirate Ship's doors: the first brings out the
+    /// Lord Pirate on the last stage (`lord_pirate`).
+    PastTheDoors,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -2897,7 +2927,11 @@ mod tests {
         assert_eq!(cleared_by_killing(PIRATE_STAGES[1]), None);
         assert_eq!(cleared_by_killing(PIRATE_STAGES[2]), Some(3));
         assert_eq!(cleared_by_killing(PIRATE_STAGES[3]), Some(4));
-        assert_eq!(cleared_by_killing(PIRATE_STAGES[4]), None);
+        assert_eq!(cleared_by_killing(PIRATE_STAGES[4]), Some(5));
+        assert_eq!(seals(PIRATE_STAGES[4]).len(), 4);
+        assert!(PIRATE_STAGES[..4].iter().all(|&map| seals(map).is_empty()));
+        let bosses: Vec<_> = (0..=3).map(lord_pirate).collect();
+        assert_eq!(bosses, [9_300_119, 9_300_105, 9_300_106, 9_300_106]);
         // The decks open with twenty of the Lord Pirate's crew each, and
         // no other map with any.
         for map in &PIRATE_STAGES[2..4] {
@@ -2914,7 +2948,7 @@ mod tests {
                 .collect();
             assert_eq!(more, [(9_300_112, 10), (9_300_113, 10)], "{map}");
         }
-        assert_eq!(PIRATE.member_clears, [1, 3, 4]);
+        assert_eq!(PIRATE.member_clears, [1, 3, 4, 5]);
     }
 
     #[test]
