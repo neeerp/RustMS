@@ -1825,6 +1825,18 @@ pub mod keys {
     pub const PIRATE_GUON_MARKS_IN: &str = "pirate.guon.marks_in";
     pub const PIRATE_MARKS_SHUT: &str = "pirate.marks_shut";
     pub const PIRATE_GUON_CHEST: &str = "pirate.guon.chest";
+    pub const PIRATE_WU_FREED: &str = "pirate.wu.freed";
+    pub const PIRATE_WU_WAIT: &str = "pirate.wu.wait";
+    pub const PIRATE_WU_THANKS: &str = "pirate.wu.thanks";
+    pub const PIRATE_WU_MENU: &str = "pirate.wu.menu";
+    pub const PIRATE_WU_OUT: &str = "pirate.wu.out";
+    pub const PIRATE_WU_HAT: &str = "pirate.wu.hat";
+    pub const PIRATE_WU_ROOM_ETC: &str = "pirate.wu.room_etc";
+    pub const PIRATE_WU_ROOM_EQUIP: &str = "pirate.wu.room_equip";
+    pub const PIRATE_WU_HAT_GIVEN: &str = "pirate.wu.hat_given";
+    pub const PIRATE_WU_NEED_FEATHERS: &str = "pirate.wu.need_feathers";
+    pub const PIRATE_WU_BEST: &str = "pirate.wu.best";
+    pub const PIRATE_GUON_SAVED: &str = "pirate.guon.saved";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2815,6 +2827,18 @@ mod tests {
                 keys::PIRATE_GUON_MARKS_IN,
                 keys::PIRATE_MARKS_SHUT,
                 keys::PIRATE_GUON_CHEST,
+                keys::PIRATE_WU_FREED,
+                keys::PIRATE_WU_WAIT,
+                keys::PIRATE_WU_THANKS,
+                keys::PIRATE_WU_MENU,
+                keys::PIRATE_WU_OUT,
+                keys::PIRATE_WU_HAT,
+                keys::PIRATE_WU_ROOM_ETC,
+                keys::PIRATE_WU_ROOM_EQUIP,
+                keys::PIRATE_WU_HAT_GIVEN,
+                keys::PIRATE_WU_NEED_FEATHERS,
+                keys::PIRATE_WU_BEST,
+                keys::PIRATE_GUON_SAVED,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

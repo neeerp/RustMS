@@ -901,6 +901,10 @@ impl EventActor {
     /// of their own (Cosmic `clearPQ`, whose `setEventCleared` frees the
     /// lobby).
     fn win(&mut self) {
+        // The Pirate Ship's pays by the chests the team opened.
+        if self.kind == EventKind::Pirate {
+            self.win_exp = Some(net::events::pirate_win_exp(self.cleared.chests()));
+        }
         if !self.clear(self.kind.event().last_stage()) {
             return;
         }

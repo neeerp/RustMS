@@ -1177,6 +1177,18 @@ unsourced = [
     "pirate.guon.marks_in",
     "pirate.marks_shut",
     "pirate.guon.chest",
+    "pirate.wu.freed",
+    "pirate.wu.wait",
+    "pirate.wu.thanks",
+    "pirate.wu.menu",
+    "pirate.wu.out",
+    "pirate.wu.hat",
+    "pirate.wu.room_etc",
+    "pirate.wu.room_equip",
+    "pirate.wu.hat_given",
+    "pirate.wu.need_feathers",
+    "pirate.wu.best",
+    "pirate.guon.saved",
 ]
 
 [text."glTutoMsg0.message"]

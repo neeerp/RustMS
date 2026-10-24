@@ -854,9 +854,13 @@ impl ClientActor {
                 ticket.kind,
                 EventKind::Horntail | EventKind::Htpq | EventKind::Delli
             );
-        // The maze's win has no effect or sound (Cosmic `clearPQ`), only
-        // its coupons' EXP.
-        let quiet = zpq || zakum || ticket.kind == EventKind::LudiMaze;
+        // The maze's win and the Pirate Ship's have no effect or sound
+        // (Cosmic `clearPQ`), only their EXP.
+        let won = stage == event.last_stage();
+        let quiet = zpq
+            || zakum
+            || ticket.kind == EventKind::LudiMaze
+            || (ticket.kind == EventKind::Pirate && won);
         let exp = if let Some(exp) = exp {
             exp
         } else if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
