@@ -39,6 +39,12 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
+		void doubleclick(Point<int16_t> cursorpos) override;
+
+		// The channels.
+		bool own_cursor(uint16_t buttonid) const override
+		{ return buttonid >= Buttons::CH; }
+
 		UIElement::Type get_type() const override;
 
 	protected:
