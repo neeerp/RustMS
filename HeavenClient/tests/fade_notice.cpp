@@ -61,5 +61,40 @@ int main()
 	early.update(1001);
 	assert(early.gone());
 
+	// Made while LOCK_UI is on: waits unseen, then fades in.
+	ms::FadeNotice held(30000);
+	held.update(5000, true);
+	assert(held.waiting() && held.opacity() == 0.0f);
+	held.update(500, false);
+	assert(!held.waiting() && held.opacity() == 0.5f);
+
+	// Locked while shown: fades out, waits, and on unlock fades in with its
+	// whole time again from the lock.
+	ms::FadeNotice shown(30000);
+	shown.update(20000);
+	shown.update(10, true);
+	assert(shown.waiting() && shown.opacity() == 1.0f);
+	shown.update(500, true);
+	assert(shown.opacity() == 0.5f);
+	shown.update(60000, true);
+	assert(shown.waiting() && shown.opacity() == 0.0f && !shown.gone());
+	shown.update(1001, false);
+	assert(shown.opacity() == 1.0f && !shown.closed());
+	// Its time ran out 30 s after the lock, while it waited.
+	shown.update(8, false);
+	assert(shown.closed());
+
+	// A short lock: the 30 s count from the lock at 20010.
+	ms::FadeNotice brief(30000);
+	brief.update(20000);
+	brief.update(10, true);
+	brief.update(2000, true);
+	brief.update(1001, false);
+	assert(brief.opacity() == 1.0f);
+	brief.update(50010 - 23011, false);
+	assert(!brief.closed());
+	brief.update(1, false);
+	assert(brief.closed());
+
 	return 0;
 }
