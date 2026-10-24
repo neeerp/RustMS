@@ -2487,11 +2487,16 @@ namespace ms
 			keyconfig->stage_mapping(cursorposition, mapping);
 	}
 
-	// Only use and set-up items go on keys.
+	// Use and set-up items go on keys, and so do the items with an effect
+	// (v83 FUN_004f38f4).
 	Keyboard::Mapping UIItemInventory::ItemIcon::get_mapping() const
 	{
 		if (sourcetab == InventoryType::Id::USE || sourcetab == InventoryType::Id::SETUP)
 			return Keyboard::Mapping(KeyType::ITEM, item_id);
+
+		if ((sourcetab == InventoryType::Id::CASH && item_id / 10000 == 501)
+			|| (sourcetab == InventoryType::Id::ETC && item_id / 10000 == 429))
+			return Keyboard::Mapping(KeyType::EFFECT, item_id);
 
 		return {};
 	}

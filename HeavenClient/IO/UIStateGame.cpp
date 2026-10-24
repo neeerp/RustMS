@@ -576,6 +576,7 @@ namespace ms
 				case KeyType::Id::FACE:
 				case KeyType::Id::ITEM:
 				case KeyType::Id::SKILL:
+				case KeyType::Id::EFFECT:
 				case KeyType::Id::MACRO:
 					Stage::get().send_key(type, action, pressed);
 					break;

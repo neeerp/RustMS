@@ -491,6 +491,10 @@ namespace ms
 					itemnumber.draw(std::to_string(count), cellpos + Point<int16_t>(0, 20));
 					break;
 				}
+				// An item effect's icon has no count.
+				case KeyType::Id::EFFECT:
+					ItemData::get(mapping.action).get_icon(false).draw(iconpos);
+					break;
 				case KeyType::Id::MACRO:
 					// v83 FUN_008d66be.
 					if (mapping.action >= 0 && mapping.action < static_cast<int32_t>(SkillMacros::MAX_MACROS))
@@ -811,6 +815,7 @@ namespace ms
 				break;
 			}
 			case KeyType::Id::ITEM:
+			case KeyType::Id::EFFECT:
 				UI::get().show_item(Tooltip::Parent::QUICKSLOT, mapping.action);
 				break;
 			case KeyType::Id::MACRO:
