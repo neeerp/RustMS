@@ -131,7 +131,7 @@ namespace ms
 		std::vector<QuestObjective> shown_goals;
 		bool details_open = false;
 		int16_t selected = -1, list_offset = 0, detail_offset = 0;
-		int32_t target_npc = 0, start_npc = 0;
+		int32_t start_npc = 0;
 		Point<int16_t> cursor_relative;
 		uint64_t seen_revision = 0;
 		int16_t seen_job = -1, seen_level = -1;

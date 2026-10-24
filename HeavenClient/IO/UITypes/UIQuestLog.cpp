@@ -393,7 +393,6 @@ namespace ms
 
 		if (selected < 0)
 		{
-			target_npc = 0;
 			start_npc = 0;
 			show_details(false);
 			return;
@@ -403,17 +402,16 @@ namespace ms
 		nl::node info = nl::nx::quest["QuestInfo.img"][name];
 		nl::node start = nl::nx::quest["Check.img"][name]["0"];
 
-		// Available quests point at the NPC who gives them, the rest at the
-		// one who takes them back.
-		target_npc = nl::nx::quest["Check.img"][name][tab == TAB0 ? "0" : "1"]["npc"];
-		// FIND NPC looks for the one who gives it on every tab, or Maple
-		// Administrator when the data names none (v83 FUN_0087c5e1).
+		// The portrait and FIND NPC show the one who gives it on every tab,
+		// or Maple Administrator when the data names none (v83 FUN_0087c5e1).
 		start_npc = start["npc"];
 
 		if (start_npc == 0)
 			start_npc = 9010000;
 
-		portrait = NxHelper::Npc::get_npc_node(target_npc)["stand"];
+		// Its own portrait image when it has one, else it standing.
+		nl::node face = nl::nx::npc[string_format::extend_id(start_npc, 7) + ".img"]["info"]["default"];
+		portrait = face.data_type() == nl::node::type::bitmap ? face : NxHelper::Npc::get_npc_node(start_npc)["stand"];
 
 		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE,
 			fit(Text::Font::A12B, info["name"], TITLE_WIDTH, ".."), 0, false);
