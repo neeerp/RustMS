@@ -33,6 +33,8 @@ pub struct LiveReactor {
     pub x: i16,
     pub y: i16,
     pub flip: bool,
+    /// When it goes back on its own, and to which state (`event/timeOut`).
+    revert: Option<(Instant, u8)>,
 }
 
 impl LiveReactor {
@@ -57,6 +59,11 @@ pub enum Hit {
     /// It broke: it is gone (the view has the state it reached) and drops
     /// its loot.
     Broke(ReactorView),
+    /// It moved as `Moved` does but does what breaking would, staying
+    /// (`net::reactors::acts_staying`): the Forest of Poison Haze's pond,
+    /// which drops its loot as it takes the poison and fills again on its
+    /// own (`ReactorTemplate::acts_in`), and its spine.
+    Acted { view: ReactorView, event: u8 },
 }
 
 pub struct ReactorSet {
@@ -128,6 +135,7 @@ impl ReactorSet {
                     x: spot.template.x,
                     y: spot.template.y,
                     flip: spot.template.flip,
+                    revert: None,
                 },
             );
             spawned.push(object_id);
@@ -181,6 +189,26 @@ impl ReactorSet {
             .filter(|reactor| spots[reactor.spot].template.name == name && moves(reactor.state))
             .map(|reactor| {
                 reactor.state = state;
+                reactor.revert = None;
+                reactor.view()
+            })
+            .collect()
+    }
+
+    /// Put back every reactor whose time in its state is up (Cosmic
+    /// `refreshReactorTimeout`); returns their views.
+    pub fn revert(&mut self, now: Instant) -> Vec<ReactorView> {
+        let spots = &self.spots;
+        self.live
+            .values_mut()
+            .filter(|reactor| reactor.revert.is_some_and(|(at, _)| at <= now))
+            .map(|reactor| {
+                let (at, state) = reactor.revert.take().unwrap_or((now, reactor.state));
+                reactor.state = state;
+                reactor.revert = spots[reactor.spot]
+                    .data
+                    .time_out(state)
+                    .map(|(ms, to)| (at + Duration::from_millis(ms.into()), to));
                 reactor.view()
             })
             .collect()
@@ -280,11 +308,27 @@ impl ReactorSet {
 
     /// Move `object_id` to `next` through `event`, breaking it if that is
     /// its last state, unless it is one that stays (`net::reactors::stays`).
+    /// If `next` waits to go back on its own, it will, unless it is an
+    /// end state (`ReactorTemplate::acts_in`), as Cosmic's `hitReactor`
+    /// refreshes no timeout there; but one that acts staying
+    /// (`net::reactors::acts_staying`, the forest's pond) does go back.
     fn advance(&mut self, object_id: i32, event: u8, next: u8, now: Instant) -> Option<Hit> {
         let reactor = self.live.get_mut(&object_id)?;
         let spot = &mut self.spots[reactor.spot];
         reactor.state = next;
-        if !spot.data.is_last(next) || net::reactors::stays(reactor.reactor_id) {
+        let last = spot.data.is_last(next);
+        let ends = spot.data.acts_in(next, event);
+        let acts = net::reactors::acts_staying(reactor.reactor_id) && (ends || last);
+        reactor.revert = (spot.data.time_out(next))
+            .filter(|_| acts || !ends)
+            .map(|(ms, to)| (now + Duration::from_millis(ms.into()), to));
+        if acts {
+            return Some(Hit::Acted {
+                view: reactor.view(),
+                event,
+            });
+        }
+        if !last || net::reactors::stays(reactor.reactor_id) {
             return Some(Hit::Moved {
                 view: reactor.view(),
                 event,
@@ -316,6 +360,7 @@ mod tests {
                 next: Some(next),
                 ..ReactorEvent::default()
             }],
+            ..ReactorState::default()
         };
         (
             MapReactorTemplate {
@@ -450,6 +495,7 @@ mod tests {
                 item: Some((item_id, 1)),
                 area: Some(((-40, -40), (40, 0))),
             }],
+            ..ReactorState::default()
         };
         (
             MapReactorTemplate {
@@ -505,6 +551,149 @@ mod tests {
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
     }
 
+    /// The Forest of Poison Haze's pond as its NX has it: it takes one
+    /// Concentrated Poison, then two seconds on goes back through its own
+    /// event 0 (type 101); and its spine, which takes four Diluted Poisons.
+    fn pond_and_spine() -> [(MapReactorTemplate, ReactorTemplate); 2] {
+        let takes = |item_id, next| ReactorEvent {
+            kind: ITEM_DROPPED,
+            next: Some(next),
+            item: Some((item_id, 1)),
+            area: Some(((-100, -50), (100, 30))),
+        };
+        let spot = |reactor_id, x, name: &str| MapReactorTemplate {
+            reactor_id,
+            x,
+            y: 188,
+            flip: false,
+            reactor_time: 0,
+            name: name.into(),
+        };
+        let pond = ReactorTemplate {
+            reactor_id: 3002000,
+            states: vec![
+                ReactorState {
+                    events: vec![takes(4001161, 1)],
+                    ..ReactorState::default()
+                },
+                ReactorState {
+                    events: vec![ReactorEvent {
+                        kind: 101,
+                        next: Some(0),
+                        ..ReactorEvent::default()
+                    }],
+                    time_out: Some(2000),
+                },
+            ],
+            action: Some("pFItem0".into()),
+        };
+        let spine = ReactorTemplate {
+            reactor_id: net::reactors::ELLIN_SPINE,
+            states: (1..=4)
+                .map(|next| ReactorState {
+                    events: vec![takes(4001162, next)],
+                    ..ReactorState::default()
+                })
+                .chain([ReactorState::default()])
+                .collect(),
+            action: None,
+        };
+        [
+            (spot(3002000, 1057, ""), pond),
+            (spot(net::reactors::ELLIN_SPINE, 2331, "spine"), spine),
+        ]
+    }
+
+    #[test]
+    fn the_pond_acts_on_its_poison_and_fills_again_on_its_own() {
+        let mut reactors = ReactorSet::new(pond_and_spine());
+        let now = Instant::now();
+        let [pond, _] = reactors.respawn(now)[..] else {
+            panic!("two reactors");
+        };
+        assert!(reactors.revert(now + Duration::from_secs(60)).is_empty());
+        for round in 0..2u64 {
+            let at = now + Duration::from_secs(10 * round);
+            match reactors.take_item(pond, 4001161, 1, (1057, 180), at) {
+                Some(Hit::Acted { view, event: 0 }) => {
+                    assert_eq!((view.object_id, view.state), (pond, 1))
+                }
+                other => panic!("round {round}: {other:?}"),
+            }
+            // Full, it takes no more until it has gone back.
+            assert!(!reactors.takes_items(pond));
+            assert!(reactors.revert(at + Duration::from_millis(1999)).is_empty());
+            let back = reactors.revert(at + Duration::from_millis(2000));
+            assert_eq!(back.len(), 1);
+            assert_eq!((back[0].object_id, back[0].state), (pond, 0));
+            assert!(reactors.takes_items(pond));
+            assert!(reactors.revert(at + Duration::from_secs(5)).is_empty());
+        }
+    }
+
+    #[test]
+    fn another_reactor_reaching_a_state_with_a_time_out_only_moves() {
+        let [(mut spot, mut pond), _] = pond_and_spine();
+        spot.reactor_id = 3002001;
+        pond.reactor_id = 3002001;
+        // Into the timed state through an event that leads on there: it
+        // goes back on its own.
+        pond.states[1].events.insert(
+            0,
+            ReactorEvent {
+                kind: 0,
+                next: Some(1),
+                ..ReactorEvent::default()
+            },
+        );
+        let mut reactors = ReactorSet::new([(spot.clone(), pond.clone())]);
+        let now = Instant::now();
+        let [id] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        match reactors.take_item(id, 4001161, 1, (1057, 180), now) {
+            Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, 1),
+            other => panic!("{other:?}"),
+        }
+        let back = reactors.revert(now + Duration::from_secs(2));
+        assert_eq!(back.iter().map(|view| view.state).collect::<Vec<_>>(), [0]);
+
+        // Into its end state (its own event 0 leads back): it neither acts
+        // nor goes back, as in Cosmic.
+        pond.states[1].events.remove(0);
+        let mut reactors = ReactorSet::new([(spot, pond)]);
+        let [id] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        match reactors.take_item(id, 4001161, 1, (1057, 180), now) {
+            Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, 1),
+            other => panic!("{other:?}"),
+        }
+        assert!(reactors.revert(now + Duration::from_secs(60)).is_empty());
+    }
+
+    #[test]
+    fn the_spine_stays_and_acts_on_its_fourth_poison() {
+        let mut reactors = ReactorSet::new(pond_and_spine());
+        let now = Instant::now();
+        let [_, spine] = reactors.respawn(now)[..] else {
+            panic!("two reactors");
+        };
+        for state in 1..=3 {
+            match reactors.take_item(spine, 4001162, 1, (2331, 180), now) {
+                Some(Hit::Moved { view, event: 0 }) => assert_eq!(view.state, state),
+                other => panic!("{state}: {other:?}"),
+            }
+        }
+        match reactors.take_item(spine, 4001162, 1, (2331, 180), now) {
+            Some(Hit::Acted { view, event: 0 }) => assert_eq!(view.state, 4),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(reactors.get(spine).map(|reactor| reactor.state), Some(4));
+        assert!(!reactors.takes_items(spine));
+        assert!(reactors.revert(now + Duration::from_secs(60)).is_empty());
+    }
+
     #[test]
     fn the_music_box_takes_only_the_days_record() {
         let records = || ReactorState {
@@ -516,6 +705,7 @@ mod tests {
                     area: Some(((-52, -64), (40, 79))),
                 })
                 .collect(),
+            ..ReactorState::default()
         };
         let music = (
             MapReactorTemplate {

@@ -208,3 +208,15 @@ replace = [{ item = 4001015, prob = 1.0 }]
 
 [reactors.2112014]
 replace = [{ item = 4001018, prob = 1.0 }]
+
+[mobs.9300173]
+# The Forest of Poison Haze's second stage (Map.nx 930000200): its Poisoned
+# Stone Bugs drop the Concentrated Poison 4001161 that its pond takes
+# (Reactor.nx 3002000, item event). The pack has no drops for them; one in
+# five, as on the community servers (Cosmic's drop data).
+add = [{ item = 4001161, prob = 0.2 }]
+
+[reactors.3002000]
+# The pond (`dropItems`) gives back a Diluted Poison 4001162 for each, which
+# the stage's spine takes four of (Reactor.nx 3009000); every time.
+add = [{ item = 4001162, prob = 1.0 }]

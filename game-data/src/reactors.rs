@@ -27,6 +27,9 @@ pub const ITEM_DROPPED: i32 = 100;
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ReactorState {
     pub events: Vec<ReactorEvent>,
+    /// How long it stays in this state before going back on its own, in
+    /// milliseconds (`event/timeOut`), through its last event (type 101).
+    pub time_out: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -105,6 +108,26 @@ impl ReactorTemplate {
             .is_some_and(|state| state.events.iter().any(|event| event.kind == ITEM_DROPPED))
     }
 
+    /// How long it waits in `state` before it goes back on its own, and the
+    /// state it goes to (Cosmic `getTimeoutState`: its last event's).
+    pub fn time_out(&self, state: u8) -> Option<(u32, u8)> {
+        let state = self.states.get(usize::from(state))?;
+        Some((state.time_out?, state.events.last()?.next?))
+    }
+
+    /// Whether moving to `next` through event `event` acts as breaking does
+    /// though the reactor stays (Cosmic `hitReactor`'s end state): `next`
+    /// waits to go back on its own, and its own event of that index leads
+    /// back, as the Forest of Poison Haze's pond does after it takes the
+    /// poison.
+    pub fn acts_in(&self, next: u8, event: u8) -> bool {
+        self.time_out(next).is_some()
+            && self.states[usize::from(next)]
+                .events
+                .get(usize::from(event))
+                .is_none_or(|event| event.next.is_none_or(|after| after < next))
+    }
+
     /// Whether `state` ends the reactor (it breaks on reaching it).
     pub fn is_last(&self, state: u8) -> bool {
         self.states
@@ -147,6 +170,9 @@ impl ReactorData {
         while let Some(node) = nx.child_by_name(image, &states.len().to_string())? {
             let mut state = ReactorState::default();
             if let Some(events) = nx.child_by_name(node, "event")? {
+                state.time_out = nx
+                    .int_child(events, "timeOut")?
+                    .and_then(|ms| u32::try_from(ms).ok());
                 while let Some(event) = nx.child_by_name(events, &state.events.len().to_string())? {
                     let kind = nx.int_child(event, "type")?.unwrap_or(0);
                     let mut item = None;
@@ -258,9 +284,11 @@ mod tests {
             states: vec![
                 ReactorState {
                     events: vec![event(101, 9), event(0, 1), event(2, 2)],
+                    ..ReactorState::default()
                 },
                 ReactorState {
                     events: vec![event(1, 3)],
+                    ..ReactorState::default()
                 },
             ],
             ..ReactorTemplate::default()
@@ -269,6 +297,28 @@ mod tests {
         assert_eq!(reactor.swing(0, 3), Some((2, 2)));
         assert_eq!(reactor.swing(1, 3), None);
         assert_eq!(reactor.swing(2, 2), None);
+    }
+
+    #[test]
+    fn the_forests_pond_acts_on_its_poison_and_fills_again_and_the_spine_takes_four() {
+        let Some(path) = crate::test_assets::path("Reactor.nx") else {
+            return;
+        };
+        let data = ReactorData::load(path).unwrap();
+        let pond = data.template(3002000).unwrap().unwrap();
+        assert_eq!(pond.item_dropped(0, 4001161, 1, (0, 0)), Some((0, 1)));
+        assert_eq!(pond.time_out(1), Some((2000, 0)));
+        assert!(pond.acts_in(1, 0) && !pond.is_last(1));
+        assert_eq!(pond.time_out(0), None);
+
+        let spine = data.template(3009000).unwrap().unwrap();
+        let mut state = 0;
+        while let Some((_, next)) = spine.item_dropped(state, 4001162, 1, (0, 0)) {
+            assert!(!spine.acts_in(next, 0));
+            state = next;
+        }
+        assert_eq!(state, 4);
+        assert!(spine.is_last(4));
     }
 
     #[test]

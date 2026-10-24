@@ -192,33 +192,56 @@ async fn willi_still_there_when_the_time_runs_out_wins_and_opens_the_way_to_dell
 #[tokio::test]
 async fn willi_going_loses_the_fight_at_once_and_sends_the_party_back() {
     let _fight = FIGHT.lock().await;
+    // Willi takes a mob's hit at most every 1/60 s here and has 95,000 HP,
+    // so a busy machine can run out the six seconds first: the party has
+    // won then, and another goes in.
+    for _ in 0..3 {
+        if willi_goes().await {
+            return;
+        }
+    }
+    panic!("the time ran out before Willi went, three times");
+}
+
+/// A party goes in and walks a mob into Willi until it goes, and then all
+/// go back; false if the time ran out first.
+async fn willi_goes() -> bool {
     let (mut team, mut traces) = in_the_fight().await;
     let willi = willi(&traces[0]);
     let at = traces[0].field.mob_positions[&willi];
 
-    // A mob its controller walks into Willi hurts it until it goes.
-    let (controller, attacker) = traces
-        .iter()
-        .enumerate()
-        .find_map(|(i, t)| {
-            let (oid, _) = t
-                .field
-                .mobs
-                .iter()
-                .find(|&&(oid, mob)| mob != WILLI && t.field.controlled.contains(&oid))?;
-            Some((i, *oid))
-        })
-        .expect("a player controls a mob");
+    // A mob its controller walks into Willi hurts it until it goes. Its
+    // controller is the one whose move the server answers: control can pass
+    // on before a trace has read it.
+    let (attacker, _) = *(traces[0].field.mobs.iter())
+        .find(|&&(_, mob)| mob != WILLI)
+        .unwrap();
+    let mut controller = None;
+    for _ in 0..10 {
+        for (i, (player, trace)) in team.iter_mut().zip(traces.iter_mut()).enumerate() {
+            send(&mut player.connection, move_mob(attacker, at, false, 0, 0)).await;
+            read_for(&mut player.connection, trace, 100).await;
+            if trace.field.move_responses.contains(&attacker) {
+                controller = Some(i);
+            }
+        }
+        if controller.is_some() {
+            break;
+        }
+    }
+    let controller = controller.expect("a player controls the mob");
     let character_id = team[controller].character_id;
     let c = &mut team[controller].connection;
-    send(c, move_mob(attacker, at, false, 0, 0)).await;
     let t = &mut traces[controller];
     for _ in 0..1000 {
-        if t.field.killed.contains(&willi) || t.warps.contains(&DELLI.exit) {
+        if t.field.killed.contains(&willi) || t.warps.contains(&DELLI.exit) || cleared(t) {
             break;
         }
         send(c, mob_damage_friendly(attacker, character_id, willi)).await;
         read_for(c, t, 20).await;
+    }
+    if !t.field.killed.contains(&willi) && cleared(t) {
+        return false;
     }
     assert!(t.field.killed.contains(&willi), "{t:?}");
     assert_eq!(t.field.leave_types[&willi], 0);
@@ -231,4 +254,5 @@ async fn willi_going_loses_the_fight_at_once_and_sends_the_party_back() {
         .await;
         assert!(!cleared(trace));
     }
+    true
 }
