@@ -4,8 +4,9 @@ The Mu Lung Dojo's 38 floors, taken alone. The survey is v83ref's
 `reports/b158-dojo.md`; it plans six slices, and this page says which are
 in. Slice 1 is: the way in and out, the floors and their bosses, the
 door, and So Gong's solo run. Slice 2 is the section timers and the
-entrance's taunt. Points, the rooftop's EXP, belts, the party Dojo, energy
-and the `muruengRaid` HUD come later.
+entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
+score So Gong records. Belts, the points reset, the medal, the first-time
+tutorial, the party Dojo, energy and the `muruengRaid` HUD come later.
 
 ## The way in
 
@@ -36,6 +37,10 @@ and the `muruengRaid` HUD come later.
   that the challenger is too weak. Otherwise he offers two choices:
   - taking him on alone, which is `EventKind::Dojo`;
   - what the Dojo is.
+
+  With a score recorded (see "Points and the record"), taking him on
+  alone first asks whether to go back to its round. Yes starts the run
+  after the recorded floor; no erases the record and ends the talk.
 
   The party run, belts, the points reset and the medal are not in his menu
   yet, and the first-time tutorial is skipped.
@@ -128,8 +133,39 @@ Every sixth floor (6, 12, ..., 36) is a rest floor: no boss, no door, no
   - On a fighting floor he asks whether the challenger gives up. Yes goes
     to the exit's portal 0 with a pink line.
   - On a rest floor he offers going on to the next floor, or leaving after
-    a yes to the exit's `st00` (portal 1). Recording the score is not in
-    yet.
+    a yes to the exit's `st00` (portal 1), or recording the score (see
+    "Points and the record"). Going on erases a recorded score.
+
+## Points and the record
+
+`game::DojoRecord` is a player's `dojo`: training points, the recorded
+rest floor (`stage`, 0 for none), and, for later slices, the first-time
+trial and the medal's stage and kills. It is saved with the player, in
+`dojo_records`, one row per character once it differs from a new one's
+(`save_dojo`). Cosmic keeps these as `dojoPoints`, `lastDojoStage`,
+`finishedDojoTutorial`, `vanquisherStage` and `vanquisherKills`.
+
+- **Points.** Leaving floor n (1 to 37) by `dojang_next` earns
+  `2 + n / 6` (`DojoRecord::floor_points`, Cosmic `addDojoPointsByMap`
+  with one for going alone): 2 on floors 1 to 5, up to 8 on 36 and 37.
+  None are earned once the points reach 17,000 (`MOST_POINTS`). A pink
+  line says how many, and the total (`dojo.points`), even when that is 0.
+  - Cosmic's formula reads the map id, whose last two digits are the
+    copy; RustMS's copies are instances of one map id, so the floor
+    number is used directly.
+- **The rooftop.** From the 38th floor `dojang_next` goes to the rooftop
+  and gives 2,000 EXP for each point held, with no points for the floor.
+- **The record.** On a rest floor So Gong's third choice asks a yes or
+  no (`Page::Decide`):
+  - yes records the floor (`Effect::DojoStage`), or says it is already
+    recorded;
+  - no wishes the challenger luck.
+
+  In the hall he then offers round `stage / 6 * 5` (5 for floor 6). On
+  yes the event starts as usual, and `event_started` enters it on the
+  floor after the recorded one and erases the record. That floor always
+  starts a section, so its clock starts over there. If the Dojo is full,
+  nothing is applied and the record stays, as Cosmic restores it.
 
 ## The client
 

@@ -540,7 +540,10 @@ impl ClientActor {
             }
             scripts::DOJO_NEXT if events::rest_floor(floor) => Ok(Some(Vec::new())),
             scripts::DOJO_NEXT if !cleared => Ok(Some(pink(keys::DOJO_NEXT_SHUT))),
-            scripts::DOJO_NEXT => Ok(Some(scripts::dojo_next(floor))),
+            scripts::DOJO_NEXT => {
+                let record = self.in_game()?.player.dojo;
+                Ok(Some(scripts::dojo_next(floor, &record)))
+            }
             _ => Ok(None),
         }
     }
@@ -695,7 +698,14 @@ impl ClientActor {
             return Ok(());
         }
         let (kind, blessing) = (ticket.kind, ticket.blessing);
-        let entry = kind.event().draw_entry(&mut rand::thread_rng());
+        let mut entry = kind.event().draw_entry(&mut rand::thread_rng());
+        // A run alone starts after the floor So Gong recorded, erasing it.
+        let player = &mut self.in_game_mut()?.player;
+        if kind == EventKind::Dojo && player.dojo.stage > 0 {
+            entry = events::DOJO.stage_map(player.dojo.stage + 1);
+            player.dojo.stage = 0;
+            player.mark_dirty();
+        }
         self.event = Some(ticket);
         self.warp_within_event(entry).await?;
         if kind == EventKind::Opq {

@@ -136,6 +136,14 @@ impl ClientActor {
                     };
                     changed = true;
                 }
+                Effect::DojoPoints(points) => {
+                    next.dojo.points += points;
+                    changed = true;
+                }
+                Effect::DojoStage(stage) => {
+                    next.dojo.stage = *stage;
+                    changed = true;
+                }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
                 Effect::InfoText(text) => afterwards.push(quest::build_info_text(text)?),

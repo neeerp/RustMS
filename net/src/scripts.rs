@@ -572,6 +572,12 @@ pub enum Effect {
     /// Set or clear where the player goes back to after a trip
     /// (`Player::saved_locations`).
     SaveLocation(i16, Option<i32>),
+    /// Add to the player's Mu Lung Dojo training points
+    /// (`DojoRecord::floor_points`).
+    DojoPoints(i32),
+    /// Record the Dojo's rest floor `stage` for the player to start after
+    /// next time (So Gong), or erase the record with 0.
+    DojoStage(u8),
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
@@ -1945,16 +1951,31 @@ pub const DOJO_UP: &str = "dojang_up";
 /// The Dojo's way on, behind a floor's door (Cosmic `dojang_next`).
 pub const DOJO_NEXT: &str = "dojang_next";
 
-/// Where the way on from the Dojo's `floor` leads once it is cleared: the
-/// next floor, or from the last the rooftop (Cosmic `dojang_next`).
-pub fn dojo_next(floor: u8) -> Vec<Effect> {
+/// What the way on from the Dojo's `floor`, once cleared, does for a
+/// challenger with `record`: the floor's training points and a pink line
+/// of them, then the next floor; from the last, the rooftop and 2,000 EXP
+/// for each point held (Cosmic `dojang_next`).
+pub fn dojo_next(floor: u8, record: &game::DojoRecord) -> Vec<Effect> {
     use crate::events::{DOJO, DOJO_FLOORS, DOJO_ROOFTOP};
-    let to = if floor >= DOJO_FLOORS {
-        DOJO_ROOFTOP
-    } else {
-        DOJO.stage_map(floor + 1)
-    };
-    vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)]
+    if floor >= DOJO_FLOORS {
+        return vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(DOJO_ROOFTOP, 0),
+            Effect::GainExp(record.points.saturating_mul(2000)),
+        ];
+    }
+    let points = record.floor_points(floor);
+    let (earned, total) = (points.to_string(), (record.points + points).to_string());
+    let line = content::text().get(
+        keys::DOJO_POINTS,
+        &[("points", earned.as_str()), ("total", total.as_str())],
+    );
+    vec![
+        Effect::DojoPoints(points),
+        Effect::Pink(line),
+        Effect::PortalSound,
+        Effect::WarpToPortal(DOJO.stage_map(floor + 1), 0),
+    ]
 }
 
 /// The way to Papulatus, for a player whose party stands as `entry`: the
@@ -3606,10 +3627,33 @@ mod tests {
     #[test]
     fn the_dojo_leads_on_floor_by_floor_and_out_to_the_board() {
         use crate::events::{DOJO_BOARD_MAP, DOJO_FIRST, DOJO_ROOFTOP};
-        let on = |to| vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)];
-        assert_eq!(dojo_next(1), on(DOJO_FIRST + 100));
-        assert_eq!(dojo_next(37), on(DOJO_FIRST + 3700));
-        assert_eq!(dojo_next(38), on(DOJO_ROOFTOP));
+        let record = game::DojoRecord {
+            points: 40,
+            ..Default::default()
+        };
+        let on = |points: i32, total: i32, to| {
+            let (points_s, total_s) = (points.to_string(), total.to_string());
+            vec![
+                Effect::DojoPoints(points),
+                Effect::Pink(content::text().get(
+                    keys::DOJO_POINTS,
+                    &[("points", points_s.as_str()), ("total", total_s.as_str())],
+                )),
+                Effect::PortalSound,
+                Effect::WarpToPortal(to, 0),
+            ]
+        };
+        assert_eq!(dojo_next(1, &record), on(2, 42, DOJO_FIRST + 100));
+        assert_eq!(dojo_next(37, &record), on(8, 48, DOJO_FIRST + 3700));
+        // The last floor earns none, but pays for every point held.
+        assert_eq!(
+            dojo_next(38, &record),
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(DOJO_ROOFTOP, 0),
+                Effect::GainExp(80_000)
+            ]
+        );
 
         // Out to where the board was touched, or to the board.
         let out = |to| {

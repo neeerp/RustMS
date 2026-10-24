@@ -765,6 +765,17 @@ diesel::table! {
         reported_at -> Timestamp,
     }
 }
+diesel::table! {
+    dojo_records (character_id) {
+        character_id -> Int4,
+        points -> Int4,
+        stage -> Int2,
+        tutorial_done -> Bool,
+        vanquisher_stage -> Int4,
+        vanquisher_kills -> Int4,
+    }
+}
+diesel::joinable!(dojo_records -> characters (character_id));
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -819,4 +830,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     hired_merchant_sales,
     minigame_records,
     reports,
+    dojo_records,
 );
