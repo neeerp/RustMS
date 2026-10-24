@@ -239,6 +239,10 @@ namespace ms
 			Text label;
 			Texture header;
 			int16_t header_y = 0;
+			// The label's images, and how far the tallest lifts the label
+			// above the baseline
+			std::vector<InlineImage> images;
+			int16_t rise = 0;
 		};
 
 		std::vector<Choice> choices;
