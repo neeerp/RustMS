@@ -328,6 +328,18 @@ namespace ms
 		}
 	}
 
+	UICashBuy::UICashBuy(const std::vector<int32_t>& avatar, int32_t total, const std::array<bool, NUM_PAYMENTS>& offered) : UICashBuy(Commodity{ 0, 0, total }, 0, 0, 0)
+	{
+		this->avatar = avatar;
+		this->offered = offered;
+		payment = default_payment(offered);
+
+		words = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, avatar_question(total), dimension.x() - 2 * WORDS_POS.x());
+		name = Text();
+		price = Text();
+		question = Text();
+	}
+
 	void UICashBuy::draw(float inter) const
 	{
 		Point<int16_t> pos = position;
@@ -402,6 +414,16 @@ namespace ms
 	{
 		CashType cash_type = PAYMENTS[payment];
 		auto cashshop = UI::get().get_element<UICashShop>();
+
+		if (!avatar.empty())
+		{
+			if (cashshop)
+				cashshop->buy_avatar(avatar, cash_type);
+
+			deactivate();
+
+			return;
+		}
 
 		if (is_expansion(item_id) && !has_room({ sn, item_id }))
 		{

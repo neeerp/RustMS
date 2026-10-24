@@ -48,6 +48,9 @@ namespace ms
 		static constexpr bool TOGGLED = false;
 
 		UICashBuy(const cash_catalog::Commodity& commodity, int32_t credit, int32_t points, int32_t prepaid, std::optional<RingOrder> ring = {});
+		// Buy Avatar's total, in words, for the balances offered (v83
+		// 469d40).
+		UICashBuy(const std::vector<int32_t>& avatar, int32_t total, const std::array<bool, cash_catalog::NUM_PAYMENTS>& offered);
 
 		// Opens the dialog, after v83's checks: some balance must cover the
 		// price, NX Prepaid alone pays for some items, an item the character
@@ -88,5 +91,7 @@ namespace ms
 		std::array<bool, cash_catalog::NUM_PAYMENTS> offered;
 		size_t payment;
 		std::optional<RingOrder> ring;
+		// Buy Avatar's commodities.
+		std::vector<int32_t> avatar;
 	};
 }

@@ -106,50 +106,53 @@ async fn a_crush_ring_pair_is_bought_for_two_and_shows_when_worn() {
     let cases = [
         (
             build_cash_shop_buy(1, CRUSH_RING_SN).unwrap(),
-            0x00,
+            [0x58, 0x00],
             "a crush ring bought alone",
         ),
         (
             build_cash_shop_gift(19830113, CRUSH_RING_SN, &b_name, "be mine").unwrap(),
-            0x00,
+            [0x5C, 0x00],
             "a crush ring as a gift",
         ),
         (
             build_cash_shop_buy_ring(false, 19830113, 2, CRUSH_RING_SN, &b_name, "be mine")
                 .unwrap(),
-            0x00,
+            [0x5C, 0x00],
             "Maple Points",
         ),
         (
             buy(true, 19830113, CRUSH_RING_SN, &b_name),
-            0x00,
+            [0x5C, 0x00],
             "a crush ring as a friendship ring",
         ),
         (
             buy(false, 19830113, FRIENDSHIP_RING_SN, &b_name),
-            0x00,
+            [0x5C, 0x00],
             "a friendship ring as a crush ring",
         ),
         (
             buy(false, 0, CRUSH_RING_SN, &b_name),
-            0xC4,
+            [0x5C, 0xC4],
             "no birthday code",
         ),
         (
             buy(false, 19830113, CRUSH_RING_SN, "NoSuchName"),
-            0xA9,
+            [0x5C, 0xA9],
             "an unknown partner",
         ),
         (
             buy(false, 19830113, CRUSH_RING_SN, &a_config.character_name),
-            0xA8,
+            [0x5C, 0xA8],
             "the buyer's account",
         ),
     ];
-    for (packet, code, phase) in cases {
+    for (packet, reply, phase) in cases {
         send(c, packet).await;
-        let reply = next(c, &mut t, SendOpcode::CashShopOperation).await;
-        assert_eq!(reply, [0x5C, code], "{phase}");
+        assert_eq!(
+            next(c, &mut t, SendOpcode::CashShopOperation).await,
+            reply,
+            "{phase}"
+        );
     }
 
     send(c, buy(false, 19830113, CRUSH_RING_SN, &b_name)).await;

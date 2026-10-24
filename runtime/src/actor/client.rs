@@ -1055,8 +1055,9 @@ impl ClientActor {
                             )?,
                         ]
                     }
-                    None => vec![cs::build_cash_shop_failure(
+                    None => vec![cs::build_buy_failure(
                         cs::CashShopFailure::NotEnoughCash,
+                        sn,
                     )?],
                 }
             }

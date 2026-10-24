@@ -110,6 +110,18 @@ int main()
 		require(!birthday_date(19831301) && !birthday_date(19830100) && !birthday_date(19830431), "no month or day past its end");
 		require(!birthday_date(0) && !birthday_date(-19830113), "nothing before 1900");
 
+		require(avatar_payment_options(3000, false, 3000, 2999, 5000) == std::array<bool, NUM_PAYMENTS>({ false, true, true }),
+			"Buy Avatar offers each balance that covers the total");
+		require(avatar_payment_options(3000, true, 9000, 9000, 9000) == std::array<bool, NUM_PAYMENTS>({ true, true, false }),
+			"but not NX Credit with a free item");
+		require(avatar_question(12000) == "Total 12000 NX.Make purchase?", "the total, unsplit, and the question");
+
+		require(fits_mannequin(1002357, false) && fits_mannequin(1002357, true), "a 2 in the thousands is for both");
+		require(fits_mannequin(1040010, false) && !fits_mannequin(1040010, true), "a 0 for men");
+		require(fits_mannequin(1041010, true) && !fits_mannequin(1041010, false), "a 1 for women");
+		require(fits_mannequin(1003027, false) && fits_mannequin(1003027, true), "any other digit for both");
+		require(!fits_mannequin(1602000, false) && !fits_mannequin(5000000, false), "no 16xxxxx and no other items");
+
 		require(for_mesos(80000001) && for_mesos(89999999) && !for_mesos(79999999) && !for_mesos(90000000), "SNs 80000000 on cost mesos");
 
 		std::vector<Commodity> shop = {
