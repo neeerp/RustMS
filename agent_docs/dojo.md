@@ -3,8 +3,9 @@
 The Mu Lung Dojo's 38 floors, taken alone. The survey is v83ref's
 `reports/b158-dojo.md`; it plans six slices, and this page says which are
 in. Slice 1 is: the way in and out, the floors and their bosses, the
-door, and So Gong's solo run. Section timers, points, the rooftop's EXP,
-belts, the party Dojo, energy and the `muruengRaid` HUD come later.
+door, and So Gong's solo run. Slice 2 is the section timers and the
+entrance's taunt. Points, the rooftop's EXP, belts, the party Dojo, energy
+and the `muruengRaid` HUD come later.
 
 ## The way in
 
@@ -23,6 +24,11 @@ belts, the party Dojo, energy and the `muruengRaid` HUD come later.
     `DOJO_RETURN` (Cosmic's `MIRROR`), then warps to the entrance's
     portal 4.
   - Its notice is two pages.
+- **The taunt.** Arriving on the entrance, the player sees one of three
+  taunts (`dojo.taunt.*`) on weather 5120024's message bar, for them
+  alone, taken down 30 s later (`taunt_challenger`, Cosmic `dojang_Msg`'s
+  `startMapEffect`). Cosmic shows it only when the closest spawn point is
+  portal 0, but the entrance's only one is, so it shows on every arrival.
 - **The way out** is the entrance's `dojang_exit` (`scripts::portal`). It
   goes back to the saved map and clears it. With nothing saved it goes to
   the board's map, not Cosmic's Henesys.
@@ -49,10 +55,40 @@ belts, the party Dojo, energy and the `muruengRaid` HUD come later.
 - `stride` is 100, so `stage_on` gives each floor its number. All 38
   stages clear one by one (`member_clears`).
 - `Cleared` keeps 64 bits, for the 38 floors.
-- `minutes` is 5, the first section's limit. The whole run shares it until
-  slice 2 brings the per-section timers (`(floor > 36 ? 15 : floor / 6 + 5)`
-  minutes, plus 3 seconds), so after 5 minutes the challenger is sent to
-  the exit.
+- `minutes` is 5, the first section's limit.
+
+## The clock
+
+The run goes by sections: floors 1 to 5, then each rest floor's next five,
+and the last 37 and 38. Each has its own time (Cosmic
+`Channel.startDojoSchedule`), and the time running out ends the run, at
+the exit.
+
+| Section | Floors | Minutes |
+| --- | --- | --- |
+| 1 | 1–5 | 5 |
+| 2 | 7–11 | 6 |
+| 3 | 13–17 | 7 |
+| 4 | 19–23 | 8 |
+| 5 | 25–29 | 9 |
+| 6 | 31–35 | 10 |
+| 7 | 37–38 | 15 |
+
+- Reaching a section's first floor after the first starts the clock over
+  with its minutes (`events::clock_on` gives `ClockOn::Restart`). The
+  client tells the event on the way there (`EventCommand::Reached`), as
+  for the Pirate Ship, and the event shows the new clock to its member
+  (`restart_clock`).
+- A rest floor stops the clock (`ClockOn::Stop`, `stop_clock`). The event's
+  `ends` is `None`, the ticket's clock too, and the client takes the
+  countdown down (STOP_CLOCK) and shows none there. The challenger may
+  stay as long as they like.
+- The challenger is sent out 3 seconds after the clock shows 0
+  (`DOJO_OVERTIME`, `EventActor::overtime`), as Cosmic's task runs 3000 ms
+  after the time it shows.
+- Cosmic frees the run's slot on a rest floor (`dismissDojoSchedule`) and
+  takes one again for the next section. Here the run keeps its slot
+  throughout, so a challenger on a rest floor always finds room to go on.
 
 ## A floor
 
@@ -111,6 +147,14 @@ The bosses' Mob.img entries hold only `info`: `info/link` names the mob
 they copy (9300184 links to Mano, 2220000), and its img has the actions.
 HeavenClient's `Mob::look_of` follows the link, so a boss keeps its own
 stats and takes the linked mob's look, and its sounds when it has none.
+
+The taunt's weather comes right after the entrance's SET_FIELD.
+HeavenClient loads a map after the packets that follow it, and loading
+resets the weather, so `Stage::blow_weather` and `set_weather_flag` hold
+one that comes before the map has loaded (`pending_weather`), as
+`pending_clock` does for clocks. v83 builds the field in SET_FIELD's
+handler itself, so nothing waits there. Weather 5120024 has no particles
+(`path` is `weather/none`), only its message bar (`floatType` 33).
 
 ## Text
 

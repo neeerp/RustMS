@@ -1361,3 +1361,6 @@
 "dojo.board.decline" = "[placeholder] (As you take your hand off the notice, the force fades.)"
 "dojo.up.monsters" = "[placeholder] There are still some monsters remaining."
 "dojo.next.shut" = "[placeholder] The door is not open yet."
+"dojo.taunt.0" = "[placeholder] It takes courage to climb the Mu Lung Dojo. Good."
+"dojo.taunt.1" = "[placeholder] Come in, if you are ready to lose!"
+"dojo.taunt.2" = "[placeholder] You will be sorry you came to the Mu Lung Dojo. Get moving!"

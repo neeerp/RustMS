@@ -363,10 +363,10 @@ pub enum ServerMessage {
     /// A mob that leaves a buff (Mob.nx `buff`) was killed on the player's
     /// field: if alive, the player takes this item's effect.
     MobBuff(i32),
-    /// Event `id`'s time left is now `clock`.
+    /// Event `id`'s time left is now `clock`, or it has no time limit.
     EventClock {
         id: u32,
-        clock: tokio::time::Instant,
+        clock: Option<tokio::time::Instant>,
     },
     /// A reactor on the player's map gave everyone there `0` EXP.
     GainExp(i32),

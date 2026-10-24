@@ -1859,6 +1859,7 @@ pub mod keys {
     pub const DOJO_BOARD_DECLINE: &str = "dojo.board.decline";
     pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
     pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
+    pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2723,6 +2724,7 @@ mod tests {
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
             .chain(&keys::MILK_TANGYOON)
+            .chain(&keys::DOJO_TAUNT)
             .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
