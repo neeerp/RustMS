@@ -188,7 +188,8 @@ from `UI.nx`. Moved so far:
   `010` to `100` listing it, unless one of the ten after it or `WorldMap140`
   to `142` does too. On a field none of them lists, such as the Free Market,
   the world map key and the minimap's button say the world map is not
-  available there instead, and FIND NPC says the NPC can't be shown.
+  available there instead. FIND NPC picks its world map differently (see
+  `quest-window.md`).
 - **Map tooltips** (`MapTooltip`, `TooltipBox`): the World Map's spots and the
   minimap's NPCs and portals show the name, plus the map's description for
   World Map spots, in the v83 box. `UIClassic.nx` has no bitmaps for it (the

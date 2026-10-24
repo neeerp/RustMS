@@ -20,6 +20,7 @@
 #include <string>
 
 #include <cstdint>
+#include <vector>
 
 #include "../UIDragElement.h"
 
@@ -41,11 +42,11 @@ namespace ms
 		// Opens on the player's field, as the world map key and the
 		// minimap's button do, or says the world map isn't available there.
 		static void open();
-		// Opens with a field marked, as FIND NPC does, or says no world map
-		// shows it.
-		static void find(int32_t target_map);
+		// Opens with the NPC's fields marked, as FIND NPC does, or says no
+		// world map shows them (v83 FUN_0087e769).
+		static void find_npc(int32_t npc);
 
-		void show_location(int32_t target_map);
+		void show_npc(const std::vector<int32_t>& maps, const std::string& world);
 
 		void draw(float inter) const override;
 
@@ -103,7 +104,7 @@ namespace ms
 		bool show_path_img;
 
 		int32_t mapid = -1;
-		int32_t target_map = -1;
+		std::vector<int32_t> target_maps;
 
 		std::string parent_map;
 		std::string user_map;

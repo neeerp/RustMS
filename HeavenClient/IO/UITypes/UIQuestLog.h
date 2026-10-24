@@ -51,6 +51,7 @@ namespace ms
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		Cursor::State send_cursor(bool clicking, Point<int16_t> cursorpos) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		// Open tab `tab` (0 Available, 1 In Progress, 2 Completed) and select
 		// quest `id` there, unfolding its area, if listed (FUN_00882b2e).
@@ -130,7 +131,7 @@ namespace ms
 		std::vector<QuestObjective> shown_goals;
 		bool details_open = false;
 		int16_t selected = -1, list_offset = 0, detail_offset = 0;
-		int32_t target_npc = 0, target_map = -1;
+		int32_t target_npc = 0, start_npc = 0;
 		Point<int16_t> cursor_relative;
 		uint64_t seen_revision = 0;
 		int16_t seen_job = -1, seen_level = -1;

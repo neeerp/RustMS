@@ -41,7 +41,6 @@
 #include <algorithm>
 #include <limits>
 #include <map>
-#include <queue>
 
 namespace ms
 {
@@ -143,44 +142,6 @@ namespace ms
 			}
 
 			return cut + tail;
-		}
-
-		// Walk the portal graph out from Maple Island and each continent's
-		// towns (ships between them are scripted, not portals), avoiding old
-		// disconnected map variants that contain duplicates of these NPCs.
-		int32_t npc_map(int32_t npc)
-		{
-			static const auto locations = [] {
-				constexpr int32_t TOWNS[] = {
-					0, 100000000, 130000000, 140000000, 200000000, 211000000, 220000000, 221000000,
-					222000000, 230000000, 240000000, 250000000, 251000000, 260000000, 261000000, 800000000
-				};
-
-				std::map<int32_t, int32_t> result;
-				std::queue<int32_t> pending;
-				std::set<int32_t> visited;
-
-				for (int32_t town : TOWNS)
-					pending.push(town);
-
-				while (!pending.empty())
-				{
-					int32_t id = pending.front(); pending.pop();
-					if (!visited.insert(id).second) continue;
-					auto map = nl::nx::map["Map"]["Map" + std::to_string(id / 100000000)][string_format::extend_id(id, 9) + ".img"];
-					for (auto life : map["life"])
-						if (life["type"].get_string() == "n")
-							result.emplace(string_conversion::or_default<int32_t>(life["id"].get_string(), 0), id);
-					for (auto portal : map["portal"])
-					{
-						int32_t to = portal["tm"];
-						if (to > 0 && to < 999999999 && to != id) pending.push(to);
-					}
-				}
-				return result;
-			}();
-			auto found = locations.find(npc);
-			return found == locations.end() ? -1 : found->second;
 		}
 
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
@@ -433,7 +394,7 @@ namespace ms
 		if (selected < 0)
 		{
 			target_npc = 0;
-			target_map = -1;
+			start_npc = 0;
 			show_details(false);
 			return;
 		}
@@ -445,7 +406,13 @@ namespace ms
 		// Available quests point at the NPC who gives them, the rest at the
 		// one who takes them back.
 		target_npc = nl::nx::quest["Check.img"][name][tab == TAB0 ? "0" : "1"]["npc"];
-		target_map = npc_map(target_npc);
+		// FIND NPC looks for the one who gives it on every tab, or Maple
+		// Administrator when the data names none (v83 FUN_0087c5e1).
+		start_npc = start["npc"];
+
+		if (start_npc == 0)
+			start_npc = 9010000;
+
 		portrait = NxHelper::Npc::get_npc_node(target_npc)["stand"];
 
 		title = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE,
@@ -526,7 +493,6 @@ namespace ms
 		buttons[FIND_NPC]->set_active(details_open && tab == TAB0);
 		buttons[HELPER]->set_active(details_open && tab == TAB1);
 		buttons[FORFEIT]->set_active(details_open && tab == TAB1);
-		buttons[FIND_NPC]->set_state(target_map >= 0 ? Button::NORMAL : Button::DISABLED);
 
 		if (tab == TAB1 && selected >= 0)
 			buttons[HELPER]->set_state(questlog.is_tracked(selected) || questlog.tracked().size() < QuestLog::MAX_TRACKED
@@ -634,8 +600,20 @@ namespace ms
 
 	void UIQuestLog::find_npc()
 	{
-		if (target_map >= 0)
-			UIWorldMap::find(target_map);
+		UIWorldMap::find_npc(start_npc);
+	}
+
+	void UIQuestLog::doubleclick(Point<int16_t> cursorpos)
+	{
+		// The portrait finds the NPC on the first two tabs (FUN_0087e5d0).
+		if (!details_open || tab == TAB2)
+			return;
+
+		Point<int16_t> feet = position + Point<int16_t>(DETAIL_X, 0) + PORTRAIT_POS;
+		Point<int16_t> corner = feet - portrait.get_origin();
+
+		if (Rectangle<int16_t>(corner, corner + portrait.get_dimensions()).contains(cursorpos))
+			find_npc();
 	}
 
 	void UIQuestLog::close()
