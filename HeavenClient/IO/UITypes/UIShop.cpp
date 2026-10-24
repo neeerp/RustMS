@@ -332,7 +332,8 @@ namespace ms
 			return ret;
 
 		// Tabs and rows are areas, with no sound or hand of their own, that
-		// v83 picks as the mouse goes down.
+		// v83 picks as the mouse goes down, not as it moves held down. A tab
+		// clicked again rebuilds its list.
 		for (size_t i = Buttons::EQUIP; i < Buttons::NUM_BUTTONS; i++)
 		{
 			Button &button = *buttons[i];
@@ -340,9 +341,9 @@ namespace ms
 			if (button.is_active() && button.bounds(position).contains(cursorpos))
 			{
 				if (button.get_state() == Button::State::NORMAL)
-				{
 					button.set_state(Button::State::MOUSEOVER);
-				} else if (button.get_state() == Button::State::MOUSEOVER && clicked)
+
+				if (button.get_state() == Button::State::MOUSEOVER && clicked && UI::get().is_cursor_press())
 				{
 					if (i <= Buttons::CASH)
 						Sound(Sound::Name::TAB).play();
@@ -445,6 +446,10 @@ namespace ms
 
 	void UIShop::changeselltab(InventoryType::Id type)
 	{
+		// The tab shown, clicked again, rebuilds its list where it was.
+		if (type == sellstate.tab)
+			return modify(type);
+
 		sellstate.change_tab(inventory, type, meso);
 
 		sellslider.setrows(ROWS, std::max<int16_t>(sellstate.lastslot, ROWS));

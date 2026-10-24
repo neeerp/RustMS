@@ -803,12 +803,16 @@ namespace ms
 
 	void UIQuestLog::change_tab(uint16_t tabid)
 	{
+		// The tab shown, clicked again, drops the pick but keeps its place
+		// in the list (0x87fd57, 0x4d7dac).
+		if (tabid != tab)
+			list_offset = 0;
+
 		buttons[TAB0 + tab]->set_state(Button::State::NORMAL);
 		tab = tabid;
 		buttons[TAB0 + tab]->set_state(Button::State::PRESSED);
 
 		selected = -1;
-		list_offset = 0;
 		refresh_list();
 	}
 

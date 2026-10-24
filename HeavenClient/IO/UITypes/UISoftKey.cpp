@@ -156,6 +156,10 @@ namespace ms
 				entered.append(std::to_string(buttonid - Buttons::NUM0));
 				entry.change_text(entered);
 			}
+		} else if (buttonid >= Buttons::TAB0 && buttonid <= Buttons::TAB2)
+		{
+			// The tab shown, clicked again, plays Tab and stays shown (76fde7).
+			return Button::State::PRESSED;
 		}
 
 		return Button::State::NORMAL;
