@@ -96,5 +96,16 @@ int main()
 	brief.update(1, false);
 	assert(brief.closed());
 
+	// Unlocked halfway through the lock's fade-out: fades back in from there.
+	ms::FadeNotice half(30000);
+	half.update(20000);
+	half.update(10, true);
+	half.update(500, true);
+	assert(half.opacity() == 0.5f);
+	half.update(500, false);
+	assert(half.opacity() == 0.75f);
+	half.update(501, false);
+	assert(half.opacity() == 1.0f);
+
 	return 0;
 }

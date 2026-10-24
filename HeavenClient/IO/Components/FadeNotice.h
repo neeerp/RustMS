@@ -95,6 +95,8 @@ namespace ms
 		{
 			if (phase == Phase::WAITING && !locked)
 			{
+				// The layer's alpha moves on from where the lock's fade-out left it.
+				fade_from = opacity();
 				phase = Phase::FADING_IN;
 				fade_start = age;
 			}
@@ -158,7 +160,7 @@ namespace ms
 				case Phase::WAITING:
 					return hiding ? std::max(0.0f, 1.0f - static_cast<float>(age - fade_start) / FADE_OUT) : 0.0f;
 				case Phase::FADING_IN:
-					return std::min(1.0f, static_cast<float>(age - fade_start) / FADE_IN);
+					return std::min(1.0f, fade_from + (1.0f - fade_from) * static_cast<float>(age - fade_start) / FADE_IN);
 				case Phase::SHOWN:
 					return 1.0f;
 				case Phase::FADING_OUT:
@@ -175,6 +177,7 @@ namespace ms
 		// When it fades out by itself, from being made.
 		uint64_t deadline;
 		uint32_t age = 0, fade_start = 0;
+		float fade_from = 0.0f;
 		Phase phase = Phase::WAITING;
 		bool closing = false;
 		// Fading out for a lock, from when it was shown.
