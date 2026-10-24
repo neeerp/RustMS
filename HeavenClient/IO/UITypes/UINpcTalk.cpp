@@ -200,11 +200,17 @@ namespace ms
 
 			Point<int16_t> start = origin + choice.start;
 
-			if (!visible(start.y() - LINE + 4, start.y() + 4))
+			if (!visible(start.y() - LINE - choice.rise + 4, start.y() + 4))
 				continue;
 
+			Point<int16_t> label_pos = start + Point<int16_t>(LABEL_X, -LINE - choice.rise);
+
 			(i == selected ? dot_selected : dot).draw(start + Point<int16_t>(DOT_X, -8));
-			choice.label.draw(start + Point<int16_t>(LABEL_X, -LINE));
+
+			for (const auto &image : choice.images)
+				image.texture.draw(label_pos + choice.label.box_position(image.box) + image.anchor);
+
+			choice.label.draw(label_pos);
 
 			if (i != selected)
 				continue;
@@ -272,7 +278,7 @@ namespace ms
 			Point<int16_t> end = origin + choice.end;
 			int16_t right = end.y() == start.y() ? end.x() : origin.x() + text.width();
 
-			if (Rectangle<int16_t>(start.x(), right, start.y() - LINE + 4, start.y() + 4).contains(cursor))
+			if (Rectangle<int16_t>(start.x(), right, start.y() - LINE - choice.rise + 4, start.y() + 4).contains(cursor))
 				return static_cast<int16_t>(i);
 
 			if (end.y() != start.y()
@@ -464,7 +470,7 @@ namespace ms
 			return;
 
 		// The lines the choice's label takes up.
-		int16_t first = (choices[choice].start.y() - LINE) / LINE;
+		int16_t first = (choices[choice].start.y() - LINE - choices[choice].rise) / LINE;
 		int16_t last = (choices[choice].end.y() - LINE) / LINE;
 
 		if (first < offset)
@@ -766,6 +772,9 @@ namespace ms
 			size_t first_link = formatted_text.find("#L");
 			size_t link = first_link;
 			int16_t space = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, " ").width();
+			// The images after the question belong to the labels, in turn.
+			size_t next_image = first_link == std::string::npos ? images.size()
+				: std::count(formatted_text.begin(), formatted_text.begin() + first_link, Text::BOX);
 
 			for (auto [id, label] : NpcTextMarkup::choices(formatted_text))
 			{
@@ -779,12 +788,32 @@ namespace ms
 				std::string colour = NpcTextMarkup::colour_at(formatted_text, link);
 				link = formatted_text.find("#L", link + 2);
 
-				// Listed choices are drawn without their images for now.
-				label.erase(std::remove(label.begin(), label.end(), Text::BOX), label.end());
-				label = colour + label;
+				// A label keeps its images, each as wide and tall as it is and
+				// standing on the text's baseline (FUN_0099dd54).
+				std::string plain = label;
+				plain.erase(std::remove(plain.begin(), plain.end(), Text::BOX), plain.end());
+				auto text_of = [&](const std::string &s)
+				{
+					return Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, colour + s, TEXT_WIDTH - LABEL_X);
+				};
 				auto header = headers.find(id);
-				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {},
-					Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::DUSKBLUE, label, TEXT_WIDTH - LABEL_X) };
+				Choice choice { id, Point<int16_t>(static_cast<int16_t>(indent * space), 0), {}, text_of(label) };
+				std::vector<Point<int16_t>> boxes;
+
+				for (char c : label)
+				{
+					if (c != Text::BOX || next_image >= images.size())
+						continue;
+
+					InlineImage image = images[next_image++];
+					image.box = boxes.size();
+					boxes.push_back(image.size);
+					choice.images.push_back(image);
+				}
+
+				choice.label.set_boxes(boxes);
+				// What a tall image adds to the row, above the text
+				choice.rise = std::max<int16_t>(0, choice.label.height() - text_of(plain).height());
 
 				if (header != headers.end())
 					choice.header = header->second;
@@ -877,9 +906,9 @@ namespace ms
 					y = choice.header_y + choice.header.height() + HEADER_ROW;
 				}
 
-				choice.start.set_y(y + LINE);
+				choice.start.set_y(y + LINE + choice.rise);
 				choice.end = choice.start + Point<int16_t>(LABEL_X + choice.label.width(), 0);
-				y += ROW;
+				y += ROW + choice.rise;
 			}
 
 			block = y;
