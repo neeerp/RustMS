@@ -8,9 +8,9 @@ use crate::character::Character;
 use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
-    accounts, auto_potions, character_mounts, character_quests, characters, equipment_stats,
-    explored_maps, gacha_exp, inventory_items, keybindings, monster_book_cards, quick_slots,
-    saved_locations, skill_macros, skills, teleport_rocks,
+    accounts, auto_potions, character_mounts, character_quests, characters, dojo_records,
+    equipment_stats, explored_maps, gacha_exp, inventory_items, keybindings, monster_book_cards,
+    quick_slots, saved_locations, skill_macros, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -18,9 +18,9 @@ use diesel::upsert::excluded;
 use game::inventory::DEFAULT_SLOT_LIMIT;
 use game::quest::{decode_kills, INFO_QUESTS, RECORDS, SCRIPT_MARKERS};
 use game::{
-    AutoPotions, AvatarLook, CharacterStats, EquipStats, Inventory, InventoryType, Item,
-    KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus, QuickSlots,
-    SkillBook, SkillMacro, SkillMacros, SkillRecord, TeleportRocks,
+    AutoPotions, AvatarLook, CharacterStats, DojoRecord, EquipStats, Inventory, InventoryType,
+    Item, KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus,
+    QuickSlots, SkillBook, SkillMacro, SkillMacros, SkillRecord, TeleportRocks,
 };
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -275,6 +275,27 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
             tiredness,
         };
     }
+    if let Some((points, stage, tutorial_done, vanquisher_stage, vanquisher_kills)) =
+        dojo_records::table
+            .find(character_id)
+            .select((
+                dojo_records::points,
+                dojo_records::stage,
+                dojo_records::tutorial_done,
+                dojo_records::vanquisher_stage,
+                dojo_records::vanquisher_kills,
+            ))
+            .first::<(i32, i16, bool, i32, i32)>(&mut conn)
+            .optional()?
+    {
+        player.dojo = DojoRecord {
+            points,
+            stage: u8::try_from(stage).unwrap_or(0),
+            tutorial_done,
+            vanquisher_stage,
+            vanquisher_kills,
+        };
+    }
     Ok(player)
 }
 
@@ -323,6 +344,28 @@ fn save_mount(conn: &mut PgConnection, id: i32, mount: &Mount) -> QueryResult<()
     diesel::insert_into(character_mounts::table)
         .values((character_mounts::character_id.eq(id), values))
         .on_conflict(character_mounts::character_id)
+        .do_update()
+        .set(values)
+        .execute(conn)?;
+    Ok(())
+}
+
+/// Keep a row for a Dojo record only once it differs from a new one.
+fn save_dojo(conn: &mut PgConnection, id: i32, dojo: &DojoRecord) -> QueryResult<()> {
+    if *dojo == DojoRecord::default() {
+        diesel::delete(dojo_records::table.find(id)).execute(conn)?;
+        return Ok(());
+    }
+    let values = (
+        dojo_records::points.eq(dojo.points),
+        dojo_records::stage.eq(i16::from(dojo.stage)),
+        dojo_records::tutorial_done.eq(dojo.tutorial_done),
+        dojo_records::vanquisher_stage.eq(dojo.vanquisher_stage),
+        dojo_records::vanquisher_kills.eq(dojo.vanquisher_kills),
+    );
+    diesel::insert_into(dojo_records::table)
+        .values((dojo_records::character_id.eq(id), values))
+        .on_conflict(dojo_records::character_id)
         .do_update()
         .set(values)
         .execute(conn)?;
@@ -440,6 +483,7 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
             save_quick_slots(conn, id, slots)?;
         }
         save_mount(conn, id, &player.mount)?;
+        save_dojo(conn, id, &player.dojo)?;
         save_inventory(conn, id, &player.inventory)?;
         crate::pet::save(conn, &player.inventory, &player.pets)?;
         // Script markers are whatever the player holds now.

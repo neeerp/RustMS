@@ -1,4 +1,5 @@
 use crate::buff::{BuffStat, Buffs, ShownBuff};
+use crate::dojo::DojoRecord;
 use crate::guild::GuildTag;
 use crate::inventory::{equip_slot, EquipStats, Inventory, InventoryType, Item};
 use crate::keymap::Keymap;
@@ -278,6 +279,8 @@ pub struct Player {
     pub skill_macros: SkillMacros,
     /// The tamed monster's level, EXP and tiredness.
     pub mount: Mount,
+    /// Training points and the score recorded at the Mu Lung Dojo.
+    pub dojo: DojoRecord,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -344,6 +347,7 @@ impl Player {
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
+            dojo: DojoRecord::default(),
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,

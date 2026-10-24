@@ -64,8 +64,8 @@ Three more packets change NPCs, though no RustMS content sends them yet
 ## Scripted NPCs
 
 `net::npc_scripts::NpcScript` holds native scripts (Lua is deferred) as a
-list of pages: `Say`, `Ask` (effects on yes), `Menu` (each choice its
-own pages), `Style` (each style its own effects), `End` (a failing
+list of pages: `Say`, `Ask` (effects on yes), `Decide` (a yes/no whose
+answers each have their own pages), `Menu` (each choice its own pages), `Style` (each style its own effects), `End` (a failing
 choice's last page), `Done` (no page: the conversation ends there with
 its effects, as when a menu choice warps at once) and `Act` (a page whose
 effects apply as it is shown, as when Cloto hands over a pass while

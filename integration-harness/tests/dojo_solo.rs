@@ -140,10 +140,12 @@ async fn the_first_floors_boss_opens_the_door_up_to_the_second() {
     })
     .await;
 
-    // The way behind it leads to the second floor's start.
+    // The way behind it leads to the second floor's start, with the
+    // first floor's 2 training points.
     through(&mut player, NEXT).await;
+    let points = net::content::text().get(keys::DOJO_POINTS, &[("points", "2"), ("total", "2")]);
     until(&mut player.connection, &mut seen, |t| {
-        t.warps.contains(&(DOJO_FIRST + 100))
+        t.warps.contains(&(DOJO_FIRST + 100)) && t.broadcasts.contains(&(PINK, points.clone()))
     })
     .await;
 

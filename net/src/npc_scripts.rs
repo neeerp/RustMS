@@ -1002,6 +1002,13 @@ pub enum Page {
         on_yes: Vec<Effect>,
         on_no: Option<String>,
     },
+    /// A yes or no whose answer's pages replace the rest of the script, as
+    /// a menu choice's do.
+    Decide {
+        text: String,
+        on_yes: Vec<Page>,
+        on_no: Vec<Page>,
+    },
     /// Each choice, a label and its pages, replaces the menu.
     Menu {
         text: String,
@@ -1428,9 +1435,7 @@ impl NpcScript {
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
             }
-            SO_GONG if events::DOJO.holds(player.stats.map_id) => {
-                Some(so_gong_on_floor(player.stats.map_id))
-            }
+            SO_GONG if events::DOJO.holds(player.stats.map_id) => Some(so_gong_on_floor(player)),
             WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
                 Some(wu_yang_freed(leader))
             }
@@ -2061,6 +2066,21 @@ impl NpcScript {
                 Some(text) => self.replace(text),
                 None => Step::default(),
             }),
+            (Page::Decide { on_yes, on_no, .. }, input @ (ScriptInput::Yes | ScriptInput::No)) => {
+                self.pages = if input == ScriptInput::Yes {
+                    on_yes.clone()
+                } else {
+                    on_no.clone()
+                };
+                self.page = 0;
+                if self.pages.is_empty() {
+                    return Some(Step::default());
+                }
+                if matches!(self.pages.last(), Some(Page::End(_))) {
+                    self.on_end.clear();
+                }
+                Some(self.begin())
+            }
             (Page::Menu { choices, .. }, ScriptInput::Select(choice)) => {
                 let (_, pages) = choices.get(usize::try_from(choice).ok()?)?;
                 self.pages = pages.clone();
@@ -2159,7 +2179,7 @@ impl NpcScript {
                 has_previous: false,
                 has_next: false,
             }),
-            Page::Ask { text, .. } => Prompt::YesNo {
+            Page::Ask { text, .. } | Page::Decide { text, .. } => Prompt::YesNo {
                 npc_id,
                 text: text.clone(),
             },
@@ -6991,6 +7011,16 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
         return NpcScript::new(SO_GONG, vec![Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL))]);
     }
     let alone = match entry {
+        // The run starts after a recorded floor (`event_started`), and a
+        // no erases the record.
+        Entry::Ready if player.dojo.stage > 0 => {
+            let round = (player.dojo.stage / 6 * 5).to_string();
+            Page::Decide {
+                text: content::text().get(keys::DOJO_SO_GONG_RESUME, &[("round", &round)]),
+                on_yes: vec![Page::Done(vec![Effect::StartEvent(EventKind::Dojo)])],
+                on_no: vec![Page::Done(vec![Effect::DojoStage(0)])],
+            }
+        }
         Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Dojo)]),
         Entry::Busy => Page::Say(text(keys::DOJO_SO_GONG_BUSY)),
         _ => Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL)),
@@ -7013,13 +7043,22 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
     script
 }
 
-/// So Gong (Cosmic `2091005`) on the Dojo's floor `map_id`. On a rest floor
-/// the challenger may go on to the next or leave by the exit's `st00`; on
-/// a fighting floor they may give up, out to the exit with a pink line.
-fn so_gong_on_floor(map_id: i32) -> NpcScript {
-    let floor = events::DOJO.stage_on(map_id).unwrap_or(1);
+/// So Gong (Cosmic `2091005`) to `player` on a Dojo floor. On a rest floor
+/// the challenger may go on to the next, which erases a recorded score,
+/// leave by the exit's `st00`, or record their score there; on a fighting
+/// floor they may give up, out to the exit with a pink line.
+fn so_gong_on_floor(player: &Player) -> NpcScript {
+    let floor = events::DOJO.stage_on(player.stats.map_id).unwrap_or(1);
     if events::rest_floor(floor) {
         let next = events::DOJO.stage_map(floor + 1);
+        let record = if player.dojo.stage == floor {
+            Page::Say(text(keys::DOJO_SO_GONG_RECORD_KEPT))
+        } else {
+            Page::Act {
+                text: text(keys::DOJO_SO_GONG_RECORDED),
+                effects: vec![Effect::DojoStage(floor)],
+            }
+        };
         return NpcScript::new(
             SO_GONG,
             vec![Page::Menu {
@@ -7027,7 +7066,10 @@ fn so_gong_on_floor(map_id: i32) -> NpcScript {
                 choices: vec![
                     (
                         text(keys::DOJO_SO_GONG_CONTINUE),
-                        vec![Page::Done(vec![Effect::WarpToPortal(next, 0)])],
+                        vec![Page::Done(vec![
+                            Effect::DojoStage(0),
+                            Effect::WarpToPortal(next, 0),
+                        ])],
                     ),
                     (
                         text(keys::DOJO_SO_GONG_LEAVE),
@@ -7035,6 +7077,14 @@ fn so_gong_on_floor(map_id: i32) -> NpcScript {
                             text: text(keys::DOJO_SO_GONG_LEAVE_ASK),
                             on_yes: vec![Effect::WarpToPortal(events::DOJO_EXIT, 1)],
                             on_no: None,
+                        }],
+                    ),
+                    (
+                        text(keys::DOJO_SO_GONG_RECORD),
+                        vec![Page::Decide {
+                            text: text(keys::DOJO_SO_GONG_RECORD_ASK),
+                            on_yes: vec![record],
+                            on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_RECORD_NO))],
                         }],
                     ),
                 ],
@@ -13502,13 +13552,61 @@ mod tests {
         let step = rest.respond(ScriptInput::Select(0)).unwrap();
         assert_eq!(
             step.effects,
-            [Effect::WarpToPortal(events::DOJO_FIRST + 600, 0)]
+            [
+                Effect::DojoStage(0),
+                Effect::WarpToPortal(events::DOJO_FIRST + 600, 0)
+            ]
         );
         let mut leave = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
         leave.begin();
         leave.respond(ScriptInput::Select(1)).unwrap();
         let step = leave.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::DOJO_EXIT, 1)]);
+    }
+
+    #[test]
+    fn so_gong_records_a_rest_floors_score_and_starts_after_it_next_time() {
+        let mut challenger = player(50);
+        challenger.stats.level = 30;
+        challenger.stats.map_id = events::DOJO.stage_map(12);
+        let mut rest = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        rest.begin();
+        let step = rest.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(question(&step), text(keys::DOJO_SO_GONG_RECORD_ASK));
+        let step = rest.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_RECORDED));
+        assert_eq!(step.effects, [Effect::DojoStage(12)]);
+        let mut wavers = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        wavers.begin();
+        wavers.respond(ScriptInput::Select(2)).unwrap();
+        let step = wavers.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_RECORD_NO));
+        assert!(step.effects.is_empty());
+        challenger.dojo.stage = 12;
+        let mut again = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        again.begin();
+        again.respond(ScriptInput::Select(2)).unwrap();
+        let step = again.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_RECORD_KEPT));
+        assert!(step.effects.is_empty());
+
+        // In the hall he offers the round reached, or erases it.
+        challenger.stats.map_id = events::DOJO.lobby;
+        let mut hall = NpcScript::so_gong(Entry::Ready, &challenger);
+        hall.begin();
+        let step = hall.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(
+            question(&step),
+            content::text().get(keys::DOJO_SO_GONG_RESUME, &[("round", "10")])
+        );
+        let step = hall.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Dojo)]);
+        let mut erase = NpcScript::so_gong(Entry::Ready, &challenger);
+        erase.begin();
+        erase.respond(ScriptInput::Select(0)).unwrap();
+        let step = erase.respond(ScriptInput::No).unwrap();
+        assert_eq!(step.effects, [Effect::DojoStage(0)]);
+        assert!(step.prompt.is_none());
     }
 
     #[test]

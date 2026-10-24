@@ -8,6 +8,7 @@ pub mod alliance;
 pub mod ap_reset;
 pub mod buff;
 pub mod character;
+pub mod dojo;
 pub mod exp;
 pub mod family;
 pub mod guild;
@@ -38,6 +39,7 @@ pub use buff::{Beacon, Buff, BuffStat, Buffs, Disease, ShownBuff};
 pub use character::{
     ApStat, AutoPotions, AvatarLook, CharacterStats, FieldAvatar, MiniRoomBox, Player, Ride,
 };
+pub use dojo::DojoRecord;
 pub use guild::{Guild, GuildMember, GuildTag};
 pub use inventory::{EquipStats, Inventory, InventoryChange, InventoryError, InventoryType, Item};
 pub use keymap::{KeyBinding, Keymap};
