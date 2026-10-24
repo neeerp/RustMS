@@ -903,8 +903,13 @@ in `ServerMessage::StageCleared`'s `exp` in place of the stage's, and takes
 the team to the clear room 809050016 off the clock. The maze's win has no
 clear effect or sound (Cosmic `clearPQ`). The maze has no `hand_ins`.
 
-Not yet: the clear room's present (Rolly 9103002) and the Party Search
-entry.
+In the clear room, Rolly (9103002, `NpcScript::in_event` once won) asks
+each member whether to take their present, gives one of
+`events::MAZE_REWARDS` (Cosmic `setEventRewards`, all equally likely) and
+sends them to the way out, which leaves the event. A member without a free
+Equip, Use and Etc slot (`has_reward_slot`) is told so and stays.
+
+Not yet: the Party Search entry.
 
 ## NPCs
 

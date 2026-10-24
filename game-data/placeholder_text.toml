@@ -1257,3 +1257,5 @@
 "ludimaze.pietri.short" = "[placeholder] You'll need at least {n} #b#t{item}##k to leave the maze with a gift. Find more of them!"
 "ludimaze.pietri.ask" = "[placeholder] So you've brought #b{n} #t{item}##k. Shall I take them all? Each of you will earn {exp} EXP."
 "ludimaze.pietri.done" = "[placeholder] Well done, all of you! You have found your way through the maze."
+"ludimaze.present.ask" = "[placeholder] You made it through the maze with coupons to spare. There is a present here for each of you, and then it is back to Ludibrium. Will you take yours now?"
+"ludimaze.present.full" = "[placeholder] Make room in your Equip, Use and Etc tabs first, then come back."

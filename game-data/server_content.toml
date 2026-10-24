@@ -1107,6 +1107,8 @@ unsourced = [
     "ludimaze.pietri.short",
     "ludimaze.pietri.ask",
     "ludimaze.pietri.done",
+    "ludimaze.present.ask",
+    "ludimaze.present.full",
 ]
 
 [text."glTutoMsg0.message"]
