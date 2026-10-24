@@ -855,7 +855,8 @@ impl ClientActor {
                 packets.push(build_field_object("gate")?);
             }
         }
-        if !no_exp {
+        // A stage worth no EXP shows no "+0" line.
+        if !no_exp && exp != 0 {
             gain_exp(&mut next, exp, &mut packets)?;
         }
         self.commit_player(next, None, &mut packets).await?;

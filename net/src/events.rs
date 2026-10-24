@@ -1388,10 +1388,10 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 }
 
 /// The stage cleared once every mob on `map_id`, in an event's copy of
-/// it, is dead: the Forest of Poison Haze's first (Cosmic
-/// `EllinPQ.monsterKilled`).
+/// it, is dead: the first of the Forest of Poison Haze and of the Pirate
+/// Ship (Cosmic `EllinPQ.monsterKilled`, `PiratePQ.monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
-    (map_id == ELLIN_STAGES[0]).then_some(1)
+    (map_id == ELLIN_STAGES[0] || map_id == PIRATE_ENTRY).then_some(1)
 }
 
 /// Over the Pirate Ship, in Herb Town, where the party gathers at Guon;
@@ -1435,7 +1435,7 @@ pub const PIRATE: Event = Event {
     stride: 1,
     stage_maps: &PIRATE_STAGES,
     talk_clears: &[],
-    member_clears: &[],
+    member_clears: &[1],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -2833,6 +2833,11 @@ mod tests {
         assert_eq!(clocks, [None, Some(6), Some(6), Some(6), Some(6), Some(8)]);
         assert!(rooms.iter().all(|&map| clock_on(map).is_none()));
         assert_eq!(clock_on(PIRATE_CLEAR), None);
+        // Its first stage clears with the last monster on it, for whoever
+        // is there.
+        assert_eq!(cleared_by_killing(PIRATE_ENTRY), Some(1));
+        assert_eq!(cleared_by_killing(PIRATE_STAGES[1]), None);
+        assert_eq!(PIRATE.member_clears, [1]);
     }
 
     #[test]

@@ -1077,9 +1077,23 @@ Guon (2094002) aboard lets anyone but the leader give up and go back to
 (the Old Metal Keys 4001117 and the Marks 4001120-4001122) are taken from
 whoever leaves. Its lines are placeholders (`pirate.*`).
 
-Not yet: the stages themselves (the boxes, the Marks, the decks and their
-chests, the doors, the Lord Pirate), Wu Yang and the rewards, and the
-Party Search toggle.
+The first stage holds 26 monsters (Map.nx, mobTime -1, so none come back)
+and thirteen boxes, whose places are shuffled for each copy
+(`reactors::shuffled`, also on the third and fourth stages): six invisible
+ones (2518000) only hold places. Each of the five mob boxes (2511000)
+breaks on the fourth hit into three Ginseng Jars (9300109) and five
+Bellflowers (9300110) (`Action::BringOutLots`); each of the two item boxes
+(2512000, which links to it) into a spray of at least fifteen drops, its
+loot topped up with piles of 30 to 59 mesos (`Action::Spray`). The last
+monster aboard clears the stage for everyone (`cleared_by_killing`,
+`member_clears`), with its effect and sound; stage clears give no EXP.
+The way on (`next00`, script `davy_next0`) stays shut with a pink line
+(`pirate.portal_shut`) while any monster is left, so the boxes' too, and
+then leads to the second stage.
+
+Not yet: the later stages (the Marks, the decks and their chests, the
+doors, the Lord Pirate), Wu Yang and the rewards, and the Party Search
+toggle.
 
 ## NPCs
 

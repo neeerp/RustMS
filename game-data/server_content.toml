@@ -1171,6 +1171,7 @@ unsourced = [
     "pirate.guon.crew",
     "pirate.guon.doors",
     "pirate.guon.boss",
+    "pirate.portal_shut",
 ]
 
 [text."glTutoMsg0.message"]

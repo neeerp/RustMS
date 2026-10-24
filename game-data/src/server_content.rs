@@ -1819,6 +1819,7 @@ pub mod keys {
     pub const PIRATE_GUON_CREW: &str = "pirate.guon.crew";
     pub const PIRATE_GUON_DOORS: &str = "pirate.guon.doors";
     pub const PIRATE_GUON_BOSS: &str = "pirate.guon.boss";
+    pub const PIRATE_PORTAL_SHUT: &str = "pirate.portal_shut";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2803,6 +2804,7 @@ mod tests {
                 keys::PIRATE_GUON_CREW,
                 keys::PIRATE_GUON_DOORS,
                 keys::PIRATE_GUON_BOSS,
+                keys::PIRATE_PORTAL_SHUT,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

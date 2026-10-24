@@ -3197,6 +3197,11 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
+            reactors::Action::BringOutLots(lots) => {
+                for (mob_id, count) in lots {
+                    self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
+                }
+            }
             // Cosmic `spawnMonster(..)` twice, then `mapMessage(5, ..)`.
             reactors::Action::MazeBox => {
                 for (mob_id, count) in reactors::maze_box(view.reactor_id, self.key.map_id) {
