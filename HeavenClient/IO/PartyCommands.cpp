@@ -6,6 +6,7 @@
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIPartySearch.h"
 
+#include "../Gameplay/MapleMap/FieldLimit.h"
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
 
@@ -17,6 +18,8 @@ namespace ms
 		{
 			constexpr char NO_PARTY[] = "You have yet to join a party.";
 			constexpr char NOT_LEADER[] = "You are not the master of the party.";
+			// v83 says this for leaving too.
+			constexpr char NOT_HERE[] = "Cannot kick another user in this map";
 			constexpr char TOO_LOW[] = "Characters whose level is below Lv. 10, such as Beginners, Noblesses, and Legends cannot form a party.";
 			// The party holds six.
 			constexpr size_t CAPACITY = 6;
@@ -99,6 +102,8 @@ namespace ms
 		{
 			if (!Stage::get().get_player().get_party().exists())
 				notice(NO_PARTY);
+			else if (!field_limit::may_leave_party(Stage::get().get_mapinfo().get_fieldtype()))
+				notice(NOT_HERE);
 			else
 				LeavePartyPacket().dispatch();
 		}
@@ -128,6 +133,9 @@ namespace ms
 
 			if (!party.exists() || !party.is_leader(player.get_oid()))
 				return notice(NOT_LEADER);
+
+			if (!field_limit::may_expel(Stage::get().get_mapinfo().get_fieldtype()))
+				return notice(NOT_HERE);
 
 			if (const PartyMember* member = party.find(name))
 				ExpelFromPartyPacket(member->id).dispatch();
