@@ -209,6 +209,20 @@ pub async fn set_dojo_points(character_id: i32, points: i32) -> Result<(), Harne
     .await
 }
 
+/// Mark So Gong's first-time trial beaten for the logged-out character
+/// `character_id`, so he takes them on into the Dojo.
+pub async fn set_dojo_trial_done(character_id: i32) -> Result<(), HarnessError> {
+    change_one_row("set Dojo trial done", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO dojo_records (character_id, tutorial_done) VALUES ($1, TRUE) \
+             ON CONFLICT (character_id) DO UPDATE SET tutorial_done = TRUE",
+        )
+        .bind::<Integer, _>(character_id)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Put the pet `item_id` named `name`, with cash serial `serial`, in slot
 /// `slot` of the logged-out character `character_id`'s Cash inventory.
 pub async fn grant_pet(

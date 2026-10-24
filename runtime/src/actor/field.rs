@@ -1764,6 +1764,20 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::MobBuff(buff));
             }
         }
+        // A kill that lets out the map's time mob tells everyone here, as So
+        // Gong runs away from his trial (Cosmic `Monster.killBy`).
+        let time_mob = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(self.key.map_id)?.time_mob.clone());
+        if let Some((mob_id, message)) = time_mob {
+            let lets_out =
+                net::mobs::info(kill.mob_id).is_some_and(|info| info.revive.contains(&mob_id));
+            if lets_out {
+                if let Ok(packet) = build_item_line(&message, 0) {
+                    self.broadcast(None, packet);
+                }
+            }
+        }
         self.make_real(kill.mob_id);
         match (kill.mob_id, self.key.map_id) {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),

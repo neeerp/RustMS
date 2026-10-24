@@ -79,8 +79,10 @@ impl ClientActor {
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
             EventKind::Dojo => NpcScript::so_gong(entry, &self.in_game()?.player),
-            // A squad's, above; Papulatus's has a portal, not an NPC.
+            // A squad's, above; Papulatus's has a portal, not an NPC; So
+            // Gong starts his trial from the Dojo's own talk.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
+            EventKind::DojoTrial => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -515,6 +517,13 @@ impl ClientActor {
         script: &str,
     ) -> Result<Option<Vec<Effect>>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
+        if script == scripts::DOJO_TUTO {
+            let trial = self
+                .event
+                .as_ref()
+                .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::DojoTrial);
+            return Ok(trial.map(|ticket| scripts::dojo_tuto(ticket.won())));
+        }
         let Some(ticket) = self
             .event
             .as_ref()
@@ -905,7 +914,7 @@ impl ClientActor {
             return Ok(());
         }
         let event = ticket.kind.event();
-        let dojo = ticket.kind == EventKind::Dojo;
+        let dojo = matches!(ticket.kind, EventKind::Dojo | EventKind::DojoTrial);
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
         let no_exp = zakum
@@ -953,12 +962,14 @@ impl ClientActor {
             gain_exp(&mut next, exp, &mut packets)?;
         }
         self.commit_player(next, None, &mut packets).await?;
-        // The EXP comes before the clock stops, as in Cosmic's `clearPQ`.
+        // The EXP comes before the clock stops, as in Cosmic's `clearPQ`;
+        // So Gong's trial has none.
         if stage == event.last_stage() {
             if let Some(ticket) = self.event.as_mut() {
-                ticket.clock = None;
+                if ticket.clock.take().is_some() {
+                    packets.push(build_stop_clock()?);
+                }
             }
-            packets.push(build_stop_clock()?);
         }
         self.send_all(&mut packets).await
     }
@@ -1058,12 +1069,16 @@ impl ClientActor {
     /// Arriving on the Dojo's entrance, the player alone sees one of three
     /// taunts on a weather's message bar, taken down after 30 s (Cosmic
     /// `dojang_Msg`'s `startMapEffect`; its spawn-point check always holds,
-    /// as the entrance's only spawn point is the one it asks for).
+    /// as the entrance's only spawn point is the one it asks for). So
+    /// Gong's trial room has its own.
     pub(super) async fn taunt_challenger(&mut self) -> Result<(), RuntimeError> {
-        if self.in_game()?.player.stats.map_id != events::DOJO_ENTRANCE {
-            return Ok(());
-        }
-        let key = keys::DOJO_TAUNT[rand::thread_rng().gen_range(0, keys::DOJO_TAUNT.len())];
+        let key = match self.in_game()?.player.stats.map_id {
+            events::DOJO_ENTRANCE => {
+                keys::DOJO_TAUNT[rand::thread_rng().gen_range(0, keys::DOJO_TAUNT.len())]
+            }
+            events::DOJO_TRIAL_MAP => keys::DOJO_TRIAL_TAUNT,
+            _ => return Ok(()),
+        };
         let taunt = net::content::text().get(key, &[]);
         let weather = (events::DOJO_TAUNT_WEATHER, taunt.as_str());
         self.send(&mut build_blow_weather(Some(weather))?).await?;

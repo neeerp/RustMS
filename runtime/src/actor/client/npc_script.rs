@@ -154,6 +154,10 @@ impl ClientActor {
                     next.dojo.vanquisher_kills = *kills;
                     changed = true;
                 }
+                Effect::DojoTrialDone => {
+                    next.dojo.tutorial_done = true;
+                    changed = true;
+                }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
                 Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
                 Effect::InfoText(text) => afterwards.push(quest::build_info_text(text)?),

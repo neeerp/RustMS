@@ -343,7 +343,8 @@ pub fn spawn(
         id,
         kind,
         channel_id,
-        ends: Some(Instant::now() + kind.event().duration()),
+        // So Gong's trial has no time limit.
+        ends: (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
         joiner: tx.downgrade(),
         event: Some(EventHandle { tx }),
         rx,

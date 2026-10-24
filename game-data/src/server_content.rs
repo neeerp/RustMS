@@ -1889,6 +1889,10 @@ pub mod keys {
     pub const DOJO_SO_GONG_MEDAL_MORE: &str = "dojo.so_gong.medal_more";
     pub const DOJO_SO_GONG_MEDAL_GIVEN: &str = "dojo.so_gong.medal_given";
     pub const DOJO_SO_GONG_MEDAL_ROOM: &str = "dojo.so_gong.medal_room";
+    pub const DOJO_SO_GONG_TRIAL_ASK: &str = "dojo.so_gong.trial_ask";
+    pub const DOJO_SO_GONG_TRIAL_NO: &str = "dojo.so_gong.trial_no";
+    pub const DOJO_TRIAL_TAUNT: &str = "dojo.trial.taunt";
+    pub const DOJO_TRIAL_STAY: &str = "dojo.trial.stay";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2945,6 +2949,10 @@ mod tests {
                 keys::DOJO_SO_GONG_MEDAL_MORE,
                 keys::DOJO_SO_GONG_MEDAL_GIVEN,
                 keys::DOJO_SO_GONG_MEDAL_ROOM,
+                keys::DOJO_SO_GONG_TRIAL_ASK,
+                keys::DOJO_SO_GONG_TRIAL_NO,
+                keys::DOJO_TRIAL_TAUNT,
+                keys::DOJO_TRIAL_STAY,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

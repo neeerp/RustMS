@@ -4,7 +4,7 @@
 //! seconds.
 
 use game_data::server_content::keys;
-use integration_harness::database::set_job;
+use integration_harness::database::{set_dojo_trial_done, set_job};
 use integration_harness::events::{said, talk, told};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
@@ -21,6 +21,7 @@ async fn a_recorded_score_starts_the_next_run_after_its_rest_floor() {
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_job(id, 0, 30, 50).await.unwrap();
+    set_dojo_trial_done(id).await.unwrap();
     let mut player = relogin(&config).await;
     let mut seen = Trace::default();
     let c = &mut player.connection;

@@ -279,6 +279,9 @@ pub struct FieldTemplate {
     /// sent to `forced_return`. The client never reads it; the server shows
     /// the countdown.
     pub time_limit: Option<u32>,
+    /// `info/timeMob`: a mob that a kill here lets out, and the notice
+    /// everyone here then reads (So Gong's trial, where he runs away).
+    pub time_mob: Option<(i32, String)>,
     /// `info/decHP`: the cold, water or curse that hurts players here.
     pub hazard: Option<Hazard>,
     /// What the map's traps may do to a player who touches one.
@@ -629,6 +632,15 @@ fn build_field_template(
         .flatten()
         .and_then(|seconds| u32::try_from(seconds).ok())
         .filter(|&seconds| seconds > 0);
+    let time_mob = match nx.child_by_name(map_node_idx, "info")? {
+        Some(info) => match nx.child_by_name(info, "timeMob")? {
+            Some(time_mob) => nx
+                .int_child(time_mob, "id")?
+                .zip(nx.string_child(time_mob, "message")?),
+            None => None,
+        },
+        None => None,
+    };
     let (town, field_limit, field_type, allowed_items, personal_shop, everlast, hazard) =
         match nx.child_by_name(map_node_idx, "info")? {
             Some(info) => (
@@ -736,6 +748,7 @@ fn build_field_template(
         everlast,
         clock,
         time_limit,
+        time_mob,
         hazard,
         traps,
         footholds,
@@ -1354,6 +1367,7 @@ mod tests {
             everlast: false,
             clock: false,
             time_limit: None,
+            time_mob: None,
             hazard: None,
             traps: Traps::default(),
             footholds: footholds::Footholds::default(),
@@ -1432,6 +1446,7 @@ mod tests {
             everlast: false,
             clock: false,
             time_limit: None,
+            time_mob: None,
             hazard: None,
             traps: Traps::default(),
             reactors: Vec::new(),
