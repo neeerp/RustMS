@@ -39,6 +39,8 @@ namespace ms
 			SHADE,
 			BACK,
 			BELOWCAP,
+			BELOWCAP_NARROW,
+			BELOWCAP_WIDE,
 			NUM_LAYERS
 		};
 

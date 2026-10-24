@@ -97,11 +97,13 @@ namespace ms
 
 	const std::unordered_map<std::string, Hair::Layer> Hair::layers_by_name =
 			{
-					{"hair",             Hair::Layer::DEFAULT},
-					{"hairBelowBody",    Hair::Layer::BELOWBODY},
-					{"hairOverHead",     Hair::Layer::OVERHEAD},
-					{"hairShade",        Hair::Layer::SHADE},
-					{"backHair",         Hair::Layer::BACK},
-					{"backHairBelowCap", Hair::Layer::BELOWCAP}
+					{"hair",                   Hair::Layer::DEFAULT},
+					{"hairBelowBody",          Hair::Layer::BELOWBODY},
+					{"hairOverHead",           Hair::Layer::OVERHEAD},
+					{"hairShade",              Hair::Layer::SHADE},
+					{"backHair",               Hair::Layer::BACK},
+					{"backHairBelowCap",       Hair::Layer::BELOWCAP},
+					{"backHairBelowCapNarrow", Hair::Layer::BELOWCAP_NARROW},
+					{"backHairBelowCapWide",   Hair::Layer::BELOWCAP_WIDE}
 			};
 }

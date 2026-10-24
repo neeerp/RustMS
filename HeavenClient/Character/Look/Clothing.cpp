@@ -277,6 +277,8 @@ namespace ms
 					{"gloveWristOverBody",   Clothing::Layer::WRIST_OVER_BODY},
 					// CAP
 					{"capOverHair",          Clothing::Layer::CAP_OVER_HAIR},
+					{"backCap",              Clothing::Layer::BACK_CAP},
+					{"backCapOverHair",      Clothing::Layer::BACK_CAP_OVER_HAIR},
 					{"capBelowBody",         Clothing::Layer::CAP_BELOW_BODY},
 			};
 }

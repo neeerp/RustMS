@@ -49,6 +49,8 @@ namespace ms
 			CAP,
 			CAP_BELOW_BODY,
 			CAP_OVER_HAIR,
+			BACK_CAP,
+			BACK_CAP_OVER_HAIR,
 			GLOVE,
 			WRIST,
 			GLOVE_OVER_HAIR,

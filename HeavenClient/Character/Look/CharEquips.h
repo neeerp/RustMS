@@ -29,16 +29,6 @@ namespace ms
 	class CharEquips
 	{
 	public:
-		// Cap types (vslot)
-		enum CapType
-		{
-			NONE,
-			HEADBAND,
-			HAIRPIN,
-			HALFCOVER,
-			FULLCOVER
-		};
-
 		// Initialize pointers with zero
 		CharEquips();
 
@@ -67,8 +57,8 @@ namespace ms
 		// Return whether the equipped weapon is twohanded.
 		bool is_twohanded() const;
 
-		// Return the cap type (vslot).
-		CapType getcaptype() const;
+		// Whether the hat's vslot hides a hair layer's smap slot.
+		bool covers(const char* slot) const;
 
 		// Return a stance which has been adjusted to the equipped weapon type.
 		Stance::Id adjust_stance(Stance::Id stance) const;
