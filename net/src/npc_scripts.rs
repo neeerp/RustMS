@@ -873,6 +873,8 @@ pub const ROLLY: i32 = 9103001;
 /// Pietri, in the Ludibrium Maze's goal room.
 pub const PIETRI: i32 = 9103000;
 const ROLLY_HOME: i32 = 9103003;
+/// Rolly in the Ludibrium Maze's clear room, with the presents.
+pub const ROLLY_PRESENT: i32 = 9103002;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
 /// Bowmaster, Marksman and GM, as in Cosmic.
@@ -1362,7 +1364,8 @@ impl NpcScript {
     /// A script on an event's maps, for a player in the event, who may be
     /// its `leader`, and whose party may have `won` it: Growlie's, Tommy's
     /// or Tory's on Primrose Hill, the Pink Balloon's or Arturo's in
-    /// Ludibrium, Minerva's in the Tower of Goddess.
+    /// Ludibrium, Minerva's in the Tower of Goddess, Rolly's in the
+    /// Ludibrium Maze's clear room.
     pub fn in_event(npc_id: i32, player: &Player, leader: bool, won: bool) -> Option<Self> {
         match npc_id {
             GROWLIE => growlie(player, leader, won),
@@ -1371,6 +1374,7 @@ impl NpcScript {
             PINK_BALLOON => pink_balloon(player),
             ARTURO if won => arturo(player, &mut rand::thread_rng()),
             MINERVA if won => minerva(player, &mut rand::thread_rng()),
+            ROLLY_PRESENT if won => maze_present(player, &mut rand::thread_rng()),
             HTPQ_KEEPER if !won => htpq_keeper(player, leader),
             _ => None,
         }
@@ -6737,6 +6741,34 @@ fn pietri(leader: bool, won: bool, together: bool, player: &Player) -> NpcScript
     // The coupons went before the yes.
     script.refused = Some(short());
     script
+}
+
+/// Rolly (Cosmic `9103002`, `giveEventReward`) in the clear room asks each
+/// member of the team that won the Ludibrium Maze whether to take their
+/// present, gives them one of `MAZE_REWARDS` and sends them to the way
+/// out, so nobody gets it twice. A member without room for any of the
+/// rewards (`has_reward_slot`) gets nothing yet, and stays.
+fn maze_present(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    if player.stats.map_id != events::MAZE_CLEAR {
+        return None;
+    }
+    let last = if has_reward_slot(&player.inventory) {
+        let &(item_id, quantity) = events::MAZE_REWARDS.choose(rng)?;
+        Page::Done(vec![
+            Effect::GiveItem { item_id, quantity },
+            Effect::Warp(events::MAZE_EXIT),
+        ])
+    } else {
+        Page::Say(text(keys::LUDIMAZE_PRESENT_FULL))
+    };
+    let ask = Page::Ask {
+        text: text(keys::LUDIMAZE_PRESENT_ASK),
+        on_yes: Vec::new(),
+        on_no: None,
+    };
+    let mut script = NpcScript::new(ROLLY_PRESENT, vec![ask, last]);
+    script.inventory_full = Some(text(keys::LUDIMAZE_PRESENT_FULL));
+    Some(script)
 }
 
 /// Papulatus in the past sends a visitor back to their own time. A
@@ -12800,5 +12832,36 @@ mod tests {
             ]
         );
         assert!(page_text(&pietri.refused().unwrap()).contains("30"));
+    }
+
+    #[test]
+    fn rolly_gives_each_winner_a_present_with_room_for_any_of_them() {
+        let mut player = rider(100, 0, events::MAZE_CLEAR);
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let mut script = NpcScript::in_event(ROLLY_PRESENT, &player, false, true).unwrap();
+        assert_eq!(kind(&script.begin()), Some(1));
+        let effects = script.respond(ScriptInput::Yes).unwrap().effects;
+        let [Effect::GiveItem { item_id, quantity }, Effect::Warp(out)] = effects[..] else {
+            panic!("{effects:?}");
+        };
+        assert!(events::MAZE_REWARDS.contains(&(item_id, quantity)));
+        assert_eq!(out, events::MAZE_EXIT);
+        // Should the give fail all the same, he says so and keeps them.
+        let refused = script.inventory_full().unwrap();
+        assert!(page_text(&refused).contains(&text(keys::LUDIMAZE_PRESENT_FULL)));
+        assert!(NpcScript::in_event(ROLLY_PRESENT, &player, false, false).is_none());
+        let goal = rider(100, 0, events::MAZE_GOAL);
+        assert!(maze_present(&goal, rng).is_none());
+
+        // A full Etc tab: nothing yet, whatever the present would be.
+        let inventory = &mut player.inventory;
+        inventory.set_slot_limit(InventoryType::Etc, 1);
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(4000000, 1));
+        let mut script = maze_present(&player, rng).unwrap();
+        script.begin();
+        let full = script.respond(ScriptInput::Yes).unwrap();
+        assert!(full.effects.is_empty());
+        assert_eq!(page_text(&full), text(keys::LUDIMAZE_PRESENT_FULL));
     }
 }

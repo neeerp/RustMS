@@ -1,7 +1,8 @@
 //! The Ludibrium Maze's goal: Pietri there serves only the leader, and
 //! only once the whole team has found its way to him; then he takes all
 //! the leader's coupons, every member earns 50 EXP for each, and the team
-//! goes on to the clear room, off the clock. The maze lasts 15 seconds here
+//! goes on to the clear room, off the clock, where Rolly gives each a
+//! present and sends them out. The maze lasts 15 seconds here
 //! (`RUSTMS_EVENT_SCALE`).
 
 use game_data::server_content::keys;
@@ -9,8 +10,11 @@ use integration_harness::events::{party, talk, told, waiting_in};
 use integration_harness::quests::answer;
 use integration_harness::trace::{until, warp, Trace};
 use integration_harness::WorldSession;
-use net::events::{LUDIBRIUM, MAZE_CLEAR, MAZE_COUPON, MAZE_COUPON_EXP, MAZE_GOAL, MAZE_ROOM};
-use net::npc_scripts::{PIETRI, ROLLY};
+use net::events::{
+    LUDIBRIUM, MAZE_CLEAR, MAZE_COUPON, MAZE_COUPON_EXP, MAZE_EXIT, MAZE_GOAL, MAZE_REWARDS,
+    MAZE_ROOM,
+};
+use net::npc_scripts::{PIETRI, ROLLY, ROLLY_PRESENT};
 use tokio::time::Duration;
 
 const COUPONS: i16 = 35;
@@ -89,5 +93,17 @@ async fn pietri_takes_the_leaders_coupons_once_the_team_is_all_there() {
             t.gains.contains(&exp) && t.clocks_stopped > 0 && t.warps.contains(&MAZE_CLEAR)
         })
         .await;
+    }
+
+    // Rolly there gives each who asks one present and sends them out.
+    for player in team.iter_mut() {
+        let trace = told(player, talk(MAZE_CLEAR, ROLLY_PRESENT)).await;
+        assert_eq!(trace.prompts, [(ROLLY_PRESENT, 1)], "{trace:?}");
+        let trace = told(player, answer(1, 1, None)).await;
+        assert_eq!(trace.warps, [MAZE_EXIT], "{trace:?}");
+        assert!(
+            (trace.items.iter()).any(|&(id, n)| MAZE_REWARDS.contains(&(id, n as i16))),
+            "{trace:?}"
+        );
     }
 }

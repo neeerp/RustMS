@@ -1135,6 +1135,58 @@ pub const MAZE_COUPON: i32 = 4_001_106;
 pub const MAZE_COUPONS_WANTED: i32 = 30;
 /// The EXP every member gets for each coupon handed in.
 pub const MAZE_COUPON_EXP: i32 = 50;
+/// What Rolly in the clear room gives each member of a team that won the
+/// Ludibrium Maze: one of these items, and how many, all equally likely
+/// (Cosmic `LudiMazePQ` `setEventRewards`).
+pub const MAZE_REWARDS: [(i32, i16); 47] = [
+    (1442017, 1),
+    (1322025, 1),
+    (1032013, 1),
+    (1302016, 1),
+    (1072263, 1),
+    (1032043, 1),
+    (2000005, 1),
+    (2000004, 5),
+    (2001001, 5),
+    (2001002, 5),
+    (2020008, 20),
+    (2020010, 20),
+    (2030008, 20),
+    (2030010, 20),
+    (2030009, 20),
+    (2022000, 50),
+    (2001000, 50),
+    (2022019, 50),
+    (2020007, 100),
+    (2020006, 100),
+    (2020009, 100),
+    (2000006, 100),
+    (2040601, 1),
+    (2040605, 1),
+    (2040602, 1),
+    (2041027, 1),
+    (2041028, 1),
+    (2041004, 1),
+    (2041029, 1),
+    (2041017, 1),
+    (2041020, 1),
+    (2040008, 1),
+    (2040001, 1),
+    (2040009, 1),
+    (2040002, 1),
+    (2040504, 1),
+    (2040511, 1),
+    (2040505, 1),
+    (2040501, 1),
+    (2040904, 1),
+    (2040901, 1),
+    (2040905, 1),
+    (2040902, 1),
+    (2040404, 1),
+    (2040401, 1),
+    (2040405, 1),
+    (2040402, 1),
+];
 
 /// The Ludibrium Maze (Cosmic `LudiMazePQ`): three to six of a party, all
 /// of level 51 to 70, in Ludibrium with their leader, go into their own
