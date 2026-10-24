@@ -513,6 +513,17 @@ STAT_CHANGED with the mesos, INVENTORY_OPERATION, and SHOW_STATUS_INFO
 mode 5 ("You have gained mesos"). A sack that would pass 2^31 - 1 mesos
 stays shut with only the unlock.
 
+### Summoning sacks
+
+A summoning sack (210xxxx) is opened from the USE tab with USE_SUMMON_BAG
+(0x4B; `UseSummonSackHandler`). The server takes one and brings out each
+of its mobs at its percent chance, below the player. Where the map's
+fieldLimit has 0x4 and its `allowedItem` doesn't list the sack, the client
+shows "You can't use it here in this map." itself, unless the player is
+a GM (v83 FUN_00a0977b). A sack the server refuses for the map gets
+SUMMON_ITEM_INAVAILABLE (0x89) with a 0, which the client shows in the
+same OK box (FUN_00532fcf), and then the unlock.
+
 ### Miu Miu
 
 Miu Miu the Traveling Merchant (5450000, sold in fives) brings Mu Mu's

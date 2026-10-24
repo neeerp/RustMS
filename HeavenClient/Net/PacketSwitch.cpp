@@ -129,6 +129,7 @@ namespace ms
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
 		SPOUSE_CHAT = 136,
+		SUMMON_ITEM_INAVAILABLE = 137,
 		MESSENGER = 313,
 		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
@@ -469,6 +470,7 @@ namespace ms
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<WHISPER, WhisperHandler>();
 		emplace<SPOUSE_CHAT, SpouseChatHandler>();
+		emplace<SUMMON_ITEM_INAVAILABLE, SummonItemUnavailableHandler>();
 		emplace<MESSENGER, MessengerHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();

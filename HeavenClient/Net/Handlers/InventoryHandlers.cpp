@@ -60,6 +60,12 @@ namespace ms
 		UI::get().emplace<UIOk>("You have failed to use the meso bag.", [](bool) {});
 	}
 
+	void SummonItemUnavailableHandler::handle(InPacket& recv) const
+	{
+		if (!recv.read_bool())
+			UI::get().emplace<UIOk>("You can't use it here in this map.", [](bool) {});
+	}
+
 	void IncubatorResultHandler::handle(InPacket& recv) const
 	{
 		int32_t item_id = recv.read_int();

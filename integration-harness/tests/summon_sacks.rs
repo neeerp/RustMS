@@ -43,16 +43,26 @@ async fn a_summoning_sack_brings_out_its_mobs_where_the_map_allows() {
     let mut player = relogin(&config).await;
     let (c, mut t) = (&mut player.connection, Trace::default());
 
-    // Maple Island forbids them: the client is unlocked and keeps its sack.
+    // Maple Island forbids them: the client is told so, is unlocked, and
+    // keeps its sack.
     assert_eq!(warp(c, MUSHROOM_TOWN, "", &mut t).await, MUSHROOM_TOWN);
     send(c, open_sack(1, SACK)).await;
     let op = SendOpcode::StatChange as i16;
+    let mut refused = None;
     let unlock = loop {
         let p = read(c, &mut t).await;
-        if p.opcode() == op {
+        if p.opcode() == SendOpcode::SummonItemUnavailable as i16 {
+            refused = Some(p.bytes[2..].to_vec());
+        }
+        if p.opcode() == op && refused.is_some() {
             break p;
         }
     };
+    assert_eq!(
+        refused.as_deref(),
+        Some(&[0u8][..]),
+        "told before the unlock"
+    );
     assert_eq!(
         unlock.bytes[2], 1,
         "an empty stat change unlocks the client"

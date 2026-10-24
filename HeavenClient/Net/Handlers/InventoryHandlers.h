@@ -97,6 +97,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A summoning sack the server won't let open on this map: a 0 says so
+	// in an OK box (v83 FUN_00532fcf).
+	// Opcode: SUMMON_ITEM_INAVAILABLE(137)
+	class SummonItemUnavailableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// The Owl of Minerva's answers: the items searched for most, for its
 	// search window, or a search's rows (FUN_00a28c29).
 	// Opcode: OWL_RESULT(70)
