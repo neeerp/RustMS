@@ -1071,6 +1071,10 @@ unsourced = [
     "jonathan.test.ask",
     "jonathan.test.busy",
     "jonathan.bart_found",
+    "kyrin.test.ask",
+    "kyrin.test.busy",
+    "kyrin.test.wait",
+    "kyrin.test.passed",
 ]
 
 [text."glTutoMsg0.message"]

@@ -1704,6 +1704,12 @@ pub mod keys {
     pub const JONATHAN_TEST_BUSY: &str = "jonathan.test.busy";
     /// Pink, to whoever hit the real Bart.
     pub const JONATHAN_BART_FOUND: &str = "jonathan.bart_found";
+    /// Kyrin's 4th-job tests (6330, 6370): her offer, a taken room, the
+    /// room's way out too soon (pink), and her word to one who held out.
+    pub const KYRIN_TEST_ASK: &str = "kyrin.test.ask";
+    pub const KYRIN_TEST_BUSY: &str = "kyrin.test.busy";
+    pub const KYRIN_TEST_WAIT: &str = "kyrin.test.wait";
+    pub const KYRIN_TEST_PASSED: &str = "kyrin.test.passed";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2588,6 +2594,10 @@ mod tests {
                 keys::JONATHAN_TEST_ASK,
                 keys::JONATHAN_TEST_BUSY,
                 keys::JONATHAN_BART_FOUND,
+                keys::KYRIN_TEST_ASK,
+                keys::KYRIN_TEST_BUSY,
+                keys::KYRIN_TEST_WAIT,
+                keys::KYRIN_TEST_PASSED,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

@@ -296,6 +296,8 @@ Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
 | Quest | Record | Set by |
 | --- | --- | --- |
 | 6400 Jonathan's Court | 6401 to "q3" | hitting the real Bart (reactor 1209000) in Lord Jonathan's test room (912020000), with a pink line |
+| 6330 How to Improve Your Strength (Marauder) | 6331 to "2" | Kyrin (1090000) past the test room 912010000 |
+| 6370 How to Improve Your Strength (Outlaw) | 6371 to "2" | Kyrin past the test room 912010100 |
 
 Lord Jonathan (1092019, in the Navigation Room 120000102) asks a Corsair on
 6400 without the record whether to take his test, then sends them into the
@@ -307,6 +309,17 @@ the Navigation Room lacks, so `reactors::lost_link` sends it to the map's
 default spawn instead of closing it. Cosmic asks a riddle before the test;
 its text has no source, so it is left out. His lines are placeholders
 (`jonathan.*`).
+
+Kyrin, in her room by the Nautilus (120000101), asks a Pirate on 6330 or
+6370 without its record whether to take her test, and sends them into its
+room if nobody is in it (`scripts::KYRIN_TESTS`) for four minutes. The room's
+way out (`s4super_out`, `s4ship_out`) holds them for the first minute with a
+pink line, takes them back to her room before two, and after two leads past
+the room (912010200), where Kyrin sets the record (`Effect::SetRecord`) and
+sends them back to complete the quest with her. The times are Cosmic's and,
+as there, run at the event pace (`RUSTMS_EVENT_SCALE`), measured from
+entering the room (`MapTimer::started`). Her lines are placeholders
+(`kyrin.test.*`).
 
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with

@@ -1221,3 +1221,7 @@
 "jonathan.test.ask" = "[placeholder] To pass my test, find the real Bart among my gulls within two minutes. Will you go in?"
 "jonathan.test.busy" = "[placeholder] Someone is taking my test already. Come back later."
 "jonathan.bart_found" = "[placeholder] You found the real Bart. Go back to Lord Jonathan."
+"kyrin.test.ask" = "[placeholder] Hold out against my test's monster for two minutes, and you'll have proved your strength. Will you go in?"
+"kyrin.test.busy" = "[placeholder] Someone is taking the test already. Come back later."
+"kyrin.test.wait" = "[placeholder] It's too soon to leave. Hold out a little longer."
+"kyrin.test.passed" = "[placeholder] You held out. You have passed my test."

@@ -36,6 +36,10 @@ impl ClientActor {
             .cloned();
         let script = template.as_ref().and_then(|portal| portal.script.clone());
         let in_event = match (&script, &template) {
+            (Some(script), Some(_)) if scripts::KYRIN_TEST_OUT.contains(&script.as_str()) => {
+                let elapsed = self.time_on_map().unwrap_or_default();
+                Some(scripts::kyrin_test_out(elapsed))
+            }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 Some(self.papulatus_portal().await?)
             }
