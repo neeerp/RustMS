@@ -435,6 +435,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME wings COMMAND wings_tests)
     add_executable(cash_weapon_tests tests/cash_weapon.cpp)
     add_test(NAME cash_weapon COMMAND cash_weapon_tests)
+    add_executable(block_reason_tests tests/block_reason.cpp)
+    add_test(NAME block_reason COMMAND block_reason_tests)
 endif()
 
 include_directories(.)

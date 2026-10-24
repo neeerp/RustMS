@@ -25,8 +25,6 @@ namespace ms
 	{
 		Account account;
 
-		recv.skip_short();
-
 		account.accid = recv.read_int();
 		account.female = recv.read_byte();
 		account.admin = recv.read_bool();

@@ -30,8 +30,12 @@
 #include "../../IO/UITypes/UIGender.h"
 #include "../../IO/UITypes/UILoginNotice.h"
 #include "../../IO/UITypes/UILoginWait.h"
+#include "../../IO/UITypes/UINotice.h"
 #include "../../IO/UITypes/UITermsOfService.h"
 #include "../../IO/UITypes/UIWorldSelect.h"
+#include "../../Util/BlockReason.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -49,16 +53,39 @@ namespace ms
 
 			std::function<void()> okhandler = loginwait->get_handler();
 
-			// The packet should contain a 'reason' integer which can signify various things
-			if (int32_t reason = recv.read_int())
+			// As v83 (0x5f83ee): the result, a byte and an int.
+			int8_t reason = recv.read_byte();
+			recv.skip_byte();
+			recv.skip_int();
+
+			if (reason)
 			{
 				// Login unsuccessful
 				// The LoginNotice displayed will contain the specific information
 				switch (reason)
 				{
 				case 2:
-					UI::get().emplace<UILoginNotice>(UILoginNotice::Message::BLOCKED_ID, okhandler);
+				{
+					// The block's reason and end, which our server doesn't send yet. Reasons
+					// BlockReason.img has no text for get the plain notice.
+					std::string text;
+
+					if (recv.length() >= 9)
+					{
+						uint8_t block = recv.read_byte();
+						int64_t until = recv.read_long();
+						std::string msg = nl::nx::etc["BlockReason.img"][std::to_string(block_reason::node(block))]["msg"].get_string();
+
+						text = block_reason::text(block, until, item_expiry::utc(item_expiry::now()).year, msg);
+					}
+
+					if (text.empty())
+						UI::get().emplace<UILoginNotice>(UILoginNotice::Message::BLOCKED_ID, okhandler);
+					else
+						UI::get().emplace<UIOk>(text, [okhandler](bool) { okhandler(); });
+
 					break;
+				}
 				case 5:
 					UI::get().emplace<UILoginNotice>(UILoginNotice::Message::NOT_REGISTERED, okhandler);
 					break;

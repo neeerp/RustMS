@@ -503,7 +503,14 @@ from `UI.nx`. Moved so far:
   per state over a box in the parent's background. No footage shows these
   two, since they appear once per account. `UISoftKey` reads the v83
   `Common/SoftKey`, whose `Tab` and `BtNext` the modern file lacks. It only
-  opens for a PIC, and RustMS disables PICs, so it is untested.
+  opens for a PIC, and RustMS disables PICs, so it is untested. A blocked
+  account's notice (`Util/BlockReason.h`) follows v83's 0x5f83ee: a reason
+  byte and the block's end (a FILETIME) after the result, `Etc/BlockReason.img`'s
+  `msg` for the reason (21 to 40 use 12's), then "You can login after
+  Oct/25/2026  3:07 pm", or the permanent-block text when the end is three
+  or more years away. Reason 99 has its own text. The text shows in a
+  `UIOk`; reason 0, a reason without text, or a packet without those bytes
+  (RustMS doesn't send them yet) get the `BLOCKED_ID` notice.
 - **Shared art**: the cursor (`Basic.img/Cursor`), item counts
   (`Basic.img/ItemNo`), and chat balloons (`ChatBalloon.img`) read
   `UIClassic.nx`. States and styles added after v83 fall back to `UI.nx`:
