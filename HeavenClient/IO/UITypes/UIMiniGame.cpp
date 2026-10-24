@@ -77,10 +77,17 @@ namespace ms
 
 			return text;
 		}
+
+		uint32_t next_serial()
+		{
+			static uint32_t serial = 0;
+
+			return ++serial;
+		}
 	}
 
 	UIMiniGame::UIMiniGame(const mini_room::Enter &enter, nl::node background, const Layout &layout) :
-			UIElement(POSITION, Point<int16_t>(0, 0)), game_type(enter.type), layout(layout),
+			UIElement(POSITION, Point<int16_t>(0, 0)), game_type(enter.type), layout(layout), serial(next_serial()),
 			tournament(enter.tournament), result_ms(0), log_rows(0), log_row(0)
 	{
 		nl::node Common = NxFiles::ui_classic["UIWindow.img"]["Minigame"]["Common"];
@@ -279,11 +286,17 @@ namespace ms
 		UIElement::remove_cursor();
 
 		slider.remove_cursor();
+		mouse_down = false;
 	}
 
 	Cursor::State UIMiniGame::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
 		Point<int16_t> at = cursorpos - position;
+
+		// v83 places a stone or turns a card when the mouse comes up over the
+		// board, wherever it went down (0x6e4d1f, 0x64ece1).
+		bool released = mouse_down && !clicked;
+		mouse_down = clicked;
 
 		if (Cursor::State sstate = slider.send_cursor(at, clicked))
 			return sstate;
@@ -295,8 +308,10 @@ namespace ms
 
 		if (board().contains(at))
 		{
-			if (clicked)
+			if (released)
 				click_board(at);
+
+			UIElement::remove_cursor();
 
 			return Cursor::State::IDLE;
 		}
@@ -519,13 +534,13 @@ namespace ms
 		return Button::State::NORMAL;
 	}
 
-	void UIMiniGame::ask(const std::string &question, std::function<void()> yes)
+	void UIMiniGame::ask(const std::string &question, std::function<void()> yes) const
 	{
-		UI::get().emplace<UIYesNo>(question, [yes](bool answer)
+		UI::get().emplace<UIYesNo>(question, [yes, serial = serial](bool answer)
 			{
 				auto room = UI::get().get_element<UIMiniGame>();
 
-				if (answer && room && room->is_active())
+				if (answer && room && room->is_active() && room->serial == serial)
 					yes();
 			});
 	}
