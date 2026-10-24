@@ -882,9 +882,17 @@ the time running out, lands on the way out (809050017, the rooms'
 returnMap and forcedReturn, and the event's exit), where Rolly (9103003) sends everyone
 back to Ludibrium. Its lines are placeholders (`ludimaze.*`).
 
-Not yet: the rooms' boxes and their monsters, Pietri's (9103000) coupon
-hand-in in the goal room, the clear room's (809050016) present, and the
-Party Search entry.
+Each of the first 15 rooms has three boxes, which never come back and
+change places each time the maze starts (`reactors::shuffled`, Cosmic
+`shuffleReactors`). Four hits break one (`Action::MazeBox`): two lots of
+mobs come out where it was, with a pink line to everyone in the room
+(`ludimaze.summoned`). Boxes 8091000-4 bring out two each of their own
+pair; box 8098000 brings out by the room it is in (`reactors::maze_box`,
+Cosmic `8098000`). They drop nothing themselves; the mobs drop the coupons
+(4001106) from the content pack's drops (`rewards.json`).
+
+Not yet: Pietri's (9103000) coupon hand-in in the goal room, the clear
+room's (809050016) present, and the Party Search entry.
 
 ## NPCs
 

@@ -3143,6 +3143,16 @@ impl FieldActor {
             reactors::Action::BringOut(mob_id, count) => {
                 self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
             }
+            // Cosmic `spawnMonster(..)` twice, then `mapMessage(5, ..)`.
+            reactors::Action::MazeBox => {
+                for (mob_id, count) in reactors::maze_box(view.reactor_id, self.key.map_id) {
+                    self.board(mob_id, count, (view.x, view.y.saturating_sub(10)));
+                }
+                let notice = net::content::text().get(keys::LUDIMAZE_SUMMONED, &[]);
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    self.broadcast(None, packet);
+                }
+            }
             // Cosmic `mapMessage(5, ..)`, `changeMusic(..)`, then
             // `spawnMonster(.., x, y)`.
             reactors::Action::SpawnAt {
