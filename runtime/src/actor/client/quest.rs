@@ -424,13 +424,24 @@ impl ClientActor {
             return Ok(());
         }
         let cid = self.client_id;
-        match spawn_db(move || db::quest::forfeit(cid, quest_id)).await {
+        // The records it reads go with it, or a new start would find them set.
+        let records: Vec<i16> = game_data::quests::RECORD_QUESTS
+            .iter()
+            .filter(|&&(quest, _)| quest == quest_id)
+            .map(|&(_, record)| record)
+            .collect();
+        let deleted = records.clone();
+        match spawn_db(move || db::quest::forfeit(cid, quest_id, &deleted)).await {
             Ok(()) => {}
             Err(RuntimeError::Database(db::Error::NotFound)) => return Ok(()),
             Err(error) => return Err(error),
         }
-        self.in_game_mut()?.player.quests.remove(quest_id);
-        let mut packets = vec![quest::build_quest_progress(quest_id, None)?];
+        let player = &mut self.in_game_mut()?.player;
+        let mut packets = Vec::new();
+        for id in std::iter::once(quest_id).chain(records) {
+            player.quests.remove(id);
+            packets.push(quest::build_quest_progress(id, None)?);
+        }
         self.send_all(&mut packets).await
     }
 

@@ -70,13 +70,16 @@ impl WorldHandler for ChangeMapHandler {
                 .portal_by_name(portal_name.as_str())
                 .ok_or(NetworkError::PacketHandlerError("Source portal not found"))?;
             // A portal to a map or spawn portal this server lacks is closed,
-            // and the client may try again.
+            // and the client may try again, unless its link is known lost.
+            let lost = crate::reactors::lost_link(player.stats.map_id, &portal_name);
             let Some((destination_map, spawn_portal)) = source_portal.to_map.and_then(|map_id| {
                 let field = game_data.field(map_id)?;
-                Some((
-                    map_id,
-                    field.resolve_spawn_portal(source_portal.to_name.as_str())?,
-                ))
+                let to = if lost {
+                    ""
+                } else {
+                    source_portal.to_name.as_str()
+                };
+                Some((map_id, field.resolve_spawn_portal(to)?))
             }) else {
                 return Ok(HandlerResult::reply(build::world::map::build_blocked_map(
                     BlockedMap::PortalClosed,

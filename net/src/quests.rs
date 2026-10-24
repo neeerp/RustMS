@@ -236,7 +236,12 @@ pub fn check_complete(
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
     }
     if !quest.end_info.is_empty()
-        && !game_data::quests::info_met(player.quests.info(quest.id), &quest.end_info)
+        && !game_data::quests::info_met(
+            player
+                .quests
+                .info(quest.end_info_record.unwrap_or(quest.id)),
+            &quest.end_info,
+        )
     {
         return Err(QuestRejection::Info);
     }
@@ -473,6 +478,7 @@ mod tests {
             end_record: None,
             start_info: None,
             end_info: Vec::new(),
+            end_info_record: None,
         }
     }
 
@@ -667,6 +673,22 @@ mod tests {
         assert_eq!(started(Some("3323")), Err(QuestRejection::Info));
         assert_eq!(started(None), Err(QuestRejection::Info));
         assert_eq!(started(Some("3333")), Ok(()));
+    }
+
+    #[test]
+    fn complete_reads_another_record_when_the_data_names_one() {
+        let mut q = quest();
+        q.end_info = vec![game_data::quests::InfoCheck {
+            cond: 0,
+            value: "q3".into(),
+        }];
+        q.end_info_record = Some(6401);
+        let mut p = player(120, 0);
+        set(&mut p, q.id, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Info));
+        assert!(p.quests.set_record(6401, "q3"));
+        assert!(!p.quests.set_record(6401, "q3"));
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]

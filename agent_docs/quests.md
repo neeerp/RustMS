@@ -269,8 +269,12 @@ may call such a quest completable early; the server just refuses.
 
 Only the quests whose strings the server's NPCs can set are supported
 (`game::quest::INFO_QUESTS`), because no other could ever complete. A
-string kept in another quest's record (`infoNumber`) stays unsupported.
-They are `QuestStatus::Started { info: Some(..) }`, stored in
+string kept in another record (`infoNumber`) is supported only where a
+script sets that record (`game_data::quests::RECORD_QUESTS`, read through
+`QuestTemplate::end_info_record`). Such records are no quest of their own:
+`game::quest::RECORDS` lists them, `QuestLog::set_record` sets them whole,
+and they are saved as started rows like any other info string; forfeiting
+the quest deletes them with it (`db::quest::forfeit`). They are `QuestStatus::Started { info: Some(..) }`, stored in
 `character_quests.progress` as is and sent wherever kill counts would be
 (`QuestStatus::record_string`). `Effect::SetQuestChar` changes one
 character if it reads what it should, sending the quest record again;
@@ -287,7 +291,22 @@ otherwise nothing in its script applies.
 Cosmic's scripts gave the slots and digits. The houses are silent, as
 there; the walls' and the oasis's words are placeholders (`quest_info.*`).
 Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
-2236 and other quests reading another record.
+2236 and the other quests reading another record that no script sets.
+
+| Quest | Record | Set by |
+| --- | --- | --- |
+| 6400 Jonathan's Court | 6401 to "q3" | hitting the real Bart (reactor 1209000) in Lord Jonathan's test room (912020000), with a pink line |
+
+Lord Jonathan (1092019, in the Navigation Room 120000102) asks a Corsair on
+6400 without the record whether to take his test, then sends them into the
+room if nobody is in it (`scripts::SOLO_MAPS`) for two minutes
+(`npc_scripts::time_limit`), after which the map's `forcedReturn` takes them
+back. Bart and his nine look-alikes (1200000, which do nothing) break in one
+hit and are shuffled on each fill. The room's way out names a spawn portal
+the Navigation Room lacks, so `reactors::lost_link` sends it to the map's
+default spawn instead of closing it. Cosmic asks a riddle before the test;
+its text has no source, so it is left out. His lines are placeholders
+(`jonathan.*`).
 
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with

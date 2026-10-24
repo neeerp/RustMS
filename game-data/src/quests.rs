@@ -86,6 +86,11 @@ pub const EXPLORER_QUESTS: &[i16] = &[
 /// server keeps the count as the record's only "kill"; see
 /// [`QuestTemplate::end_record`].
 pub const OWN_RECORD_QUESTS: &[i16] = &[2324];
+/// Quests that complete once a record that is no quest reads a value
+/// (`Check/1 infoNumber` names it, `infoex` the value), which a script sets
+/// (`game::quest::RECORDS`): `(quest, record)`. See
+/// [`QuestTemplate::end_info_record`].
+pub const RECORD_QUESTS: &[(i16, i16)] = &[(6400, 6401)];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -211,6 +216,9 @@ pub struct QuestTemplate {
     /// (`Act/0/info`) and what it must read to complete (`Check/1/infoex`).
     pub start_info: Option<String>,
     pub end_info: Vec<InfoCheck>,
+    /// The record `end_info` reads when it is not the quest's own
+    /// (`RECORD_QUESTS`).
+    pub end_info_record: Option<i16>,
 }
 
 /// One `Check/1/infoex` entry on the quest's own info string.
@@ -417,7 +425,10 @@ impl QuestCatalog {
                     keys.skill_keys.extend(child_names(&nx, skill)?);
                 }
             }
-            if EXPLORER_QUESTS.contains(&id) || OWN_RECORD_QUESTS.contains(&id) {
+            if EXPLORER_QUESTS.contains(&id)
+                || OWN_RECORD_QUESTS.contains(&id)
+                || RECORD_QUESTS.iter().any(|&(quest, _)| quest == id)
+            {
                 if let Some(keys) = &mut keys.end_check {
                     keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
                 }
@@ -573,12 +584,21 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     } else {
         None
     };
+    let end_info_record = RECORD_QUESTS
+        .iter()
+        .find(|&&(quest, _)| quest == id)
+        .map(|&(_, record)| record);
     let (start_info, end_info) = if INFO_QUESTS.contains(&id) {
         let start_info = match start_actions {
             Some(index) => text_child(nx, index, "info")?,
             None => None,
         };
         (start_info, info_checks(nx, end)?)
+    } else if let Some(record) = end_info_record {
+        if nx.int_child(end, "infoNumber")? != Some(i32::from(record)) {
+            return Err(invalid("record quest with another record"));
+        }
+        (None, info_checks(nx, end)?)
     } else {
         (None, Vec::new())
     };
@@ -620,6 +640,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_record,
         start_info,
         end_info,
+        end_info_record,
     })
 }
 
@@ -1025,6 +1046,17 @@ mod tests {
         }
         // Quests outside the list keep infoex unsupported.
         assert!(catalog.quest(3114).is_none());
+        // "Jonathan's Court" reads Lord Jonathan's test's record.
+        let court = catalog.quest(6400).unwrap();
+        assert_eq!(court.end_info_record, Some(6401));
+        assert_eq!(
+            court.end_info,
+            [InfoCheck {
+                cond: 0,
+                value: "q3".into()
+            }]
+        );
+        assert!(court.start_info.is_none());
     }
 
     #[test]

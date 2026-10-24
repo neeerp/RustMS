@@ -66,9 +66,6 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  A change of HP or MP slides its gauge to the new width over 700 ms, from
-  where it is shown, for a gain or a loss alike (`GaugeSlide.h`); the numbers
-  and the EXP gauge change at once.
   Esc opens the Game Menu; the MENU key action opens ShortCut, whose buttons
   run in v83's order: Item, Equip, Stat, Skill, Community, Quest, Monster
   Book, Messenger. Dropping a

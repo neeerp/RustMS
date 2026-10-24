@@ -105,6 +105,15 @@ pub enum Action {
     /// there, and the event sends the same key to the first map (the event
     /// actor's `send_room_key`).
     PassKey,
+    /// Set a record (`game::quest::RECORDS`) to `value` for whoever broke
+    /// it while `quest` is started, with a pink line (the text key
+    /// `notice`): the real Bart of Lord Jonathan's test (Cosmic `1209000`).
+    Record {
+        quest: i16,
+        record: i16,
+        value: &'static str,
+        notice: &'static str,
+    },
 }
 
 /// The name of the reactor the moonflowers wax.
@@ -312,6 +321,14 @@ pub fn action(reactor_id: i32) -> Action {
         ZAKUM_ALTAR => Action::Zakum,
         HORNTAIL_STONE => Action::Horntail,
         HTPQ_PASS_KEY => Action::PassKey,
+        // The real Bart among Lord Jonathan's gulls; the false ones
+        // (1200000) drop nothing.
+        REAL_BART => Action::Record {
+            quest: JONATHANS_COURT,
+            record: BART_RECORD,
+            value: BART_FOUND,
+            notice: keys::JONATHAN_BART_FOUND,
+        },
         _ => Action::Drops,
     }
 }
@@ -339,6 +356,26 @@ pub const HTPQ_PASS_KEY: i32 = 2408002;
 /// dark through lit and back (0, 1, 2, 3, then 0), and it never breaks; the
 /// room's way on reads it (`scripts::htpq_lamp_door`).
 pub const HTPQ_LAMP: i32 = 2408001;
+
+/// Lord Jonathan's test, a room of ten gulls, one of them the real Bart,
+/// for "Jonathan's Court" (6400), which reads the record he sets.
+pub const BART_ROOM: i32 = 912020000;
+pub const REAL_BART: i32 = 1209000;
+pub const JONATHANS_COURT: i16 = 6400;
+/// The record the real Bart sets (`game::quest::RECORDS`), and what it
+/// reads once he is found (6400's `Check/1 infoex`).
+pub const BART_RECORD: i16 = 6401;
+pub const BART_FOUND: &str = "q3";
+
+/// Portals whose target spawn portal the target map lacks, so the target's
+/// default spawn stands in: the Bart room's way out names "ao00", which
+/// Nautilus' Navigation Room (120000102) has no portal by.
+const LOST_LINKS: [(i32, &str); 1] = [(BART_ROOM, "ntq00")];
+
+/// Whether `map_id`'s `portal` leads to the target map's default spawn.
+pub fn lost_link(map_id: i32, portal: &str) -> bool {
+    LOST_LINKS.contains(&(map_id, portal))
+}
 
 /// The pink line whoever broke reactor `reactor_id` reads first, if any
 /// (Cosmic `playerMessage(5, ..)`): the Dead Mine's.
@@ -370,9 +407,10 @@ pub fn stays(reactor_id: i32) -> bool {
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
-/// Berserk room's statues, so the true one is somewhere new.
+/// Berserk room's statues and Lord Jonathan's gulls, so the true one is
+/// somewhere new.
 pub fn shuffled(map_id: i32) -> bool {
-    map_id == BERSERK_ROOM
+    matches!(map_id, BERSERK_ROOM | BART_ROOM)
 }
 
 #[cfg(test)]
@@ -608,6 +646,30 @@ mod tests {
             return;
         }
         assert_eq!(back.to(), (crate::events::ZPQ_HUB, 0));
+    }
+
+    #[test]
+    fn the_real_bart_sets_jonathans_record_and_the_way_out_finds_a_spawn() {
+        assert_eq!(
+            action(REAL_BART),
+            Action::Record {
+                quest: JONATHANS_COURT,
+                record: BART_RECORD,
+                value: BART_FOUND,
+                notice: keys::JONATHAN_BART_FOUND,
+            }
+        );
+        assert_eq!(action(1200000), Action::Drops);
+        assert!(shuffled(BART_ROOM));
+        assert!(lost_link(BART_ROOM, "ntq00") && !lost_link(BART_ROOM, "sp"));
+        let Ok(maps) = crate::game_data::get() else {
+            return;
+        };
+        let room = maps.field(BART_ROOM).unwrap();
+        let out = room.portal_by_name("ntq00").unwrap();
+        let to = maps.field(out.to_map.unwrap()).unwrap();
+        assert!(to.resolve_spawn_portal(&out.to_name).is_none());
+        assert!(to.resolve_spawn_portal("").is_some());
     }
 
     #[test]

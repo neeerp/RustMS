@@ -853,6 +853,9 @@ pub(crate) const ZAKUM_APPROVED: i16 = 32400;
 /// quest 100201).
 pub(crate) const ZAKUM_TRIALS_DONE: i16 = 32401;
 const DOOR_OF_DIMENSION: i32 = 1061009;
+const LORD_JONATHAN: i32 = 1092019;
+/// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
+const BART_TIME_LIMIT: u32 = 2 * 60;
 const SPARKLING_CRYSTAL: i32 = 1061010;
 const HOLY_STONE: i32 = 2030006;
 const SPIRUNA: i32 = 2032001;
@@ -1444,6 +1447,7 @@ impl NpcScript {
             SQUAD_SLATE => return Some(squad_slate(player)),
             CRYSTAL_OF_ROOTS => return Some(crystal_of_roots(player)),
             JAKE => return Some(jake(player)),
+            LORD_JONATHAN => return Some(lord_jonathan(player)),
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
                 return Some(item_maker(
@@ -6490,9 +6494,38 @@ fn sparkling_crystal(player: &Player) -> Option<NpcScript> {
     ))
 }
 
-/// The clone's room: the time a challenger has in it, which the map itself
-/// doesn't set.
+/// Lord Jonathan lets a Corsair with "Jonathan's Court" started into his
+/// test, one at a time, until the real Bart is found; then the quest
+/// completes with him. Cosmic asks a riddle first, whose text no source
+/// gives (QUESTIONS a118).
+fn lord_jonathan(player: &Player) -> NpcScript {
+    use crate::reactors::{BART_FOUND, BART_RECORD, BART_ROOM, JONATHANS_COURT};
+    let testing = player.quests.state(JONATHANS_COURT) == QuestState::Started
+        && player.quests.info(BART_RECORD) != Some(BART_FOUND);
+    if !testing {
+        return NpcScript::new(LORD_JONATHAN, vec![Page::Say(text(keys::JONATHAN_HELLO))]);
+    }
+    let mut script = NpcScript::new(
+        LORD_JONATHAN,
+        vec![Page::Ask {
+            text: text(keys::JONATHAN_TEST_ASK),
+            on_yes: vec![
+                Effect::RequireEmptyMap(BART_ROOM),
+                Effect::WarpToPortal(BART_ROOM, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::JONATHAN_TEST_BUSY));
+    script
+}
+
+/// The clone's room and Lord Jonathan's test: the time a challenger has in
+/// it, which the map itself doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
+    if map_id == crate::reactors::BART_ROOM {
+        return Some(BART_TIME_LIMIT);
+    }
     is_clone_room(map_id).then_some(CLONE_TIME_LIMIT)
 }
 
@@ -12175,5 +12208,42 @@ mod tests {
             ]
         );
         assert_eq!(page_text(&lost), text(keys::MAKER_STIMULATOR_LOST));
+    }
+
+    #[test]
+    fn lord_jonathan_sends_a_corsair_on_his_test_until_bart_is_found() {
+        use crate::reactors::{BART_FOUND, BART_RECORD, BART_ROOM, JONATHANS_COURT};
+        let mut corsair = player(50);
+        let first = |player: &Player| {
+            let script = NpcScript::for_npc(LORD_JONATHAN, player).unwrap();
+            let step = script.begin();
+            (kind(&step), script)
+        };
+        // Off the quest he only greets.
+        assert_eq!(first(&corsair).0, Some(0));
+
+        corsair.quests.upsert(game::QuestRecord {
+            quest_id: JONATHANS_COURT,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let (kind_on_test, mut script) = first(&corsair);
+        assert_eq!(kind_on_test, Some(1));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireEmptyMap(BART_ROOM),
+                Effect::WarpToPortal(BART_ROOM, 0),
+            ]
+        );
+        assert_eq!(kind(&script.refused().unwrap()), Some(0));
+        assert_eq!(time_limit(BART_ROOM), Some(2 * 60));
+        assert!(crate::scripts::SOLO_MAPS.contains(&BART_ROOM));
+
+        // Once Bart is found, the test is over.
+        assert!(corsair.quests.set_record(BART_RECORD, BART_FOUND));
+        assert_eq!(first(&corsair).0, Some(0));
     }
 }

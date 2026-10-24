@@ -268,7 +268,7 @@ const RESURRECTION_ROOM: i32 = 923000100;
 const EGG_NEST: i32 = 924000100;
 const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
-pub const SOLO_MAPS: [i32; 7] = [
+pub const SOLO_MAPS: [i32; 8] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -276,6 +276,7 @@ pub const SOLO_MAPS: [i32; 7] = [
     EGG_NEST,
     HITMAN_HIDEOUT,
     BERSERK_ROOM,
+    crate::reactors::BART_ROOM,
 ];
 /// The key that opens the Berserk room.
 const BERSERK_KEY: i32 = 4031475;

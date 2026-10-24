@@ -124,17 +124,27 @@ pub fn complete(player: &Player, qid: i16) -> crate::Result<QuestProgress> {
     .map_err(Into::into)
 }
 
-/// Give up a started quest. Completed quests cannot be forfeited.
-pub fn forfeit(cid: i32, qid: i16) -> crate::Result<()> {
+/// Give up a started quest, with the `records` it reads that are no quest
+/// (`game::quest::RECORDS`). Completed quests cannot be forfeited.
+pub fn forfeit(cid: i32, qid: i16, records: &[i16]) -> crate::Result<()> {
     let mut conn = crate::connection()?;
-    let deleted = diesel::delete(
-        character_quests::table
-            .find((cid, qid))
-            .filter(character_quests::status.eq(1)),
-    )
-    .execute(&mut conn)?;
-    if deleted == 0 {
-        return Err(rejected().into());
-    }
-    Ok(())
+    conn.transaction(|conn| -> diesel::QueryResult<()> {
+        let deleted = diesel::delete(
+            character_quests::table
+                .find((cid, qid))
+                .filter(character_quests::status.eq(1)),
+        )
+        .execute(conn)?;
+        if deleted == 0 {
+            return Err(rejected());
+        }
+        diesel::delete(
+            character_quests::table
+                .filter(character_quests::character_id.eq(cid))
+                .filter(character_quests::quest_id.eq_any(records)),
+        )
+        .execute(conn)?;
+        Ok(())
+    })
+    .map_err(Into::into)
 }

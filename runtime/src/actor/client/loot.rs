@@ -3,11 +3,13 @@ use crate::actor::field_drops::{Drop, Ownership};
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
 use game::monster_book::{self, MAX_CARD_LEVEL};
+use game::QuestState;
 use net::events::EventCommand;
 use net::loot::{self, Loot};
 use net::packet::build::world::effect::{self, CharEffect};
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::{self, StatUpdate};
-use net::packet::build::world::{drop, inventory, monster_book as book};
+use net::packet::build::world::{drop, inventory, monster_book as book, quest};
 use net::packet::handle::world::{apply_item_effect, item_effect_packets, trade_catch};
 use net::reactors::Action;
 use net::FieldRequest;
@@ -75,6 +77,27 @@ impl ClientActor {
         x: i16,
         y: i16,
     ) -> Result<(), RuntimeError> {
+        if let Action::Record {
+            quest,
+            record,
+            value,
+            notice,
+        } = net::reactors::action(reactor_id)
+        {
+            let player = &mut self.in_game_mut()?.player;
+            if player.quests.state(quest) != QuestState::Started
+                || !player.quests.set_record(record, value)
+            {
+                return Ok(());
+            }
+            player.mark_dirty();
+            let notice = net::content::text().get(notice, &[]);
+            let mut packets = [
+                quest::build_quest_record(record, value)?,
+                build_broadcast(Broadcast::Pink, &notice)?,
+            ];
+            return self.send_all(&mut packets).await;
+        }
         let warp = match net::reactors::action(reactor_id) {
             Action::Warp(warp) | Action::WarpMap { warp, .. } => Some(warp),
             Action::DropsOrWarp { percent, warp } => {
