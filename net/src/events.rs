@@ -1428,6 +1428,30 @@ pub fn lord_pirate(chests: u8) -> i32 {
 }
 pub const LORD_PIRATE_AT: (i16, i16) = (777, 140);
 
+/// Whether `mob_id` is a Lord Pirate, whose fall frees Wu Yang (Cosmic
+/// `PiratePQ`'s `isLordPirate`, which names a fourth, 9300107, that no
+/// script brings out).
+pub fn is_lord_pirate(mob_id: i32) -> bool {
+    matches!(mob_id, 9_300_105 | 9_300_106 | 9_300_107 | 9_300_119)
+}
+
+/// The Lord Pirate's Hats Wu Yang makes in the clear room, each for so
+/// many feathers (`HPQ_REWARD`) and the one before, in turn (Cosmic
+/// `2094001`). His third, 1003267, is not in v83's Character.wz, so the
+/// ladder stops here (`v83ref/lanes/QUESTIONS.md` a132).
+pub const PIRATE_HATS: [i32; 2] = [1_002_572, 1_002_573];
+pub const PIRATE_HAT_FEATHERS: i16 = 20;
+
+/// The EXP each member gets for beating the Lord Pirate, by how many of the
+/// chests the team opened (Cosmic `PiratePQ`'s `clearPQ`).
+pub fn pirate_win_exp(chests: u8) -> i32 {
+    match chests {
+        0 => 28_000,
+        1 => 35_000,
+        _ => 42_000,
+    }
+}
+
 /// Over the Pirate Ship, in Herb Town, where the party gathers at Guon;
 /// the ship's stages' maps, in order, the first its entry; the map the
 /// team that beats the Lord Pirate goes to; and the way out, which every
@@ -2932,6 +2956,10 @@ mod tests {
         assert!(PIRATE_STAGES[..4].iter().all(|&map| seals(map).is_empty()));
         let bosses: Vec<_> = (0..=3).map(lord_pirate).collect();
         assert_eq!(bosses, [9_300_119, 9_300_105, 9_300_106, 9_300_106]);
+        assert!(bosses.iter().all(|&boss| is_lord_pirate(boss)));
+        assert!(!is_lord_pirate(9_300_124));
+        let exp: Vec<_> = (0..=3).map(pirate_win_exp).collect();
+        assert_eq!(exp, [28_000, 35_000, 42_000, 42_000]);
         // The decks open with twenty of the Lord Pirate's crew each, and
         // no other map with any.
         for map in &PIRATE_STAGES[2..4] {

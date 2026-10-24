@@ -34,8 +34,8 @@ warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
-Pirate Ship is begun: its entry, exit, clocks and first five stages
-([the Pirate Ship](#the-pirate-ship)).
+Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)), all
+but its Party Search toggle.
 
 ## Rules
 
@@ -1153,8 +1153,33 @@ stage, where the first member through brings out the Lord Pirate once
 9300119 with no chest opened, 9300105 with one, 9300106 with two
 (`events::lord_pirate`). Cosmic's `changeDifficulty` is not followed.
 
-Not yet: the Lord Pirate's fight and its win, Wu Yang and the rewards,
-and the Party Search toggle.
+The Lord Pirate (420,000 HP as 9300119, 480,000 and 540,000 as the others)
+keeps Mob.nx's stats at every party level. His death on a copy's last
+stage frees Wu Yang (2094001): a pink `pirate.wu.freed` to the map, and Wu
+Yang comes out where the Lord Pirate did (`Field::lord_pirate_falls`, from
+`killed`; Cosmic `PiratePQ.monsterKilled`), once. The stage's reactor
+2516000 is left unmapped (`v83ref/reports/a132-pirate-boss.md`; defaults
+in `v83ref/lanes/QUESTIONS.md` a132). The monsters he called stay; Guon
+says `pirate.guon.saved` once the map is bare. Wu Yang tells a member to
+send the leader (`pirate.wu.wait`); the leader is thanked
+(`pirate.wu.thanks`), and the OK clears the last stage
+(`EventCommand::ClearStage`), which wins the ship: every member, wherever
+they are aboard, earns 28,000 EXP with no chest opened, 35,000 with one
+and 42,000 with two (`events::pirate_win_exp`, set by `EventActor::win`
+and riding `StageCleared`), with no clear effect or sound (`quiet`, as
+Cosmic's `clearPQ` there), and the team goes on to 925100600.
+
+There, Wu Yang (Map.nx's) asks what they want (`pirate.wu.menu`, with
+`pirate.wu.out` and `pirate.wu.hat`). Going out gives a Feather of Goddess
+(4001158, `events::HPQ_REWARD`) and sends them to 251010404; with no Etc
+room he says `pirate.wu.room_etc` and keeps them. The hat takes twenty
+feathers and the hat before for the next of the Lord Pirate's Hats
+(`events::PIRATE_HATS`: 1002572, then 1002573; Cosmic's third, 1003267, is
+not in our Character.nx): `pirate.wu.hat_given` as it is made,
+`pirate.wu.need_feathers` when short, `pirate.wu.room_equip` with no Equip
+room, and `pirate.wu.best` to whoever holds the last one.
+
+Not yet: the Party Search toggle.
 
 ## NPCs
 
@@ -1211,6 +1236,8 @@ and the Party Search toggle.
 | Sprite 2133004 | 930000500 | Runtime (`ellin_sprite`): the leader with the stone on to the altar, or out |
 | Guon 2094000 | 251010404 | Runtime (`talk_about_event`): a menu of boarding and what waits aboard |
 | Guon 2094002 | 925100000-500 | The leader hears what the map asks, on 925100100 hands in the Marks, and in a bare bellflower room shows its chest; anyone else may go back to 251010404 |
+| Wu Yang 2094001 | 925100500 | Out at the Lord Pirate's death; a member is sent to the leader, whose OK wins the ship |
+| Wu Yang 2094001 | 925100600 | A menu: a feather and the way to 251010404, or the next hat for twenty feathers |
 | Guon 2094002 | 925100700 | At once to 251010404 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

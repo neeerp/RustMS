@@ -1765,6 +1765,13 @@ impl FieldActor {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            (mob_id, map_id)
+                if net::events::is_lord_pirate(mob_id)
+                    && map_id == net::events::PIRATE_STAGES[5]
+                    && self.key.instance_id != 0 =>
+            {
+                self.lord_pirate_falls()
+            }
             _ => {}
         }
         // A trial's head clears its stage, which unseals its door; each
@@ -1788,6 +1795,20 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
+    }
+
+    /// The Lord Pirate is beaten: everyone here is told, and Wu Yang comes
+    /// out where he stood, once (Cosmic `PiratePQ`'s `monsterKilled`).
+    fn lord_pirate_falls(&mut self) {
+        let wu_yang = net::npc_scripts::WU_YANG;
+        if self.map_npcs.iter().any(|npc| npc.npc_id == wu_yang) {
+            return;
+        }
+        let notice = net::content::text().get(keys::PIRATE_WU_FREED, &[]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+            self.broadcast(None, packet);
+        }
+        self.appear(wu_yang, net::events::LORD_PIRATE_AT);
     }
 
     /// Whether every reactor here that must be set before the stage clears

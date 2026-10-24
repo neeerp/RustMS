@@ -890,6 +890,9 @@ pub const ELLIN_SPRITE: i32 = 2133004;
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
 pub const GUON_ABOARD: i32 = 2094002;
+/// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
+/// again in its clear room.
+pub const WU_YANG: i32 = 2094001;
 /// El Nath, and its portal from the Chief's Residence.
 const EL_NATH: i32 = 211_000_000;
 const EL_NATH_FROM_RESIDENCE: u8 = 14;
@@ -1414,6 +1417,12 @@ impl NpcScript {
             HTPQ_KEEPER if !won => htpq_keeper(player, leader),
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
+            }
+            WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
+                Some(wu_yang_freed(leader))
+            }
+            WU_YANG if won && player.stats.map_id == events::PIRATE_CLEAR => {
+                Some(wu_yang_clear(player))
             }
             _ => None,
         }
@@ -6983,10 +6992,101 @@ fn guon_aboard(player: &Player, leader: bool, marks: u8, bare: bool) -> NpcScrip
         _ if map_id == stage(2) + 1 || map_id == stage(3) + 1 => keys::PIRATE_GUON_BONUS,
         _ if map_id == stage(2) + 2 || map_id == stage(3) + 2 => keys::PIRATE_GUON_CREW,
         _ if map_id == stage(4) => keys::PIRATE_GUON_DOORS,
+        _ if map_id == stage(5) && bare => keys::PIRATE_GUON_SAVED,
         _ if map_id == stage(5) => keys::PIRATE_GUON_BOSS,
         _ => keys::PIRATE_GUON_BOXES,
     };
     NpcScript::new(GUON_ABOARD, vec![Page::Say(text(key))])
+}
+
+/// Wu Yang, freed on the Pirate Ship's last stage: the leader hearing him
+/// out wins the run, which takes the team to the clear room; anyone else
+/// is sent to the leader (Cosmic `2094001`). Monsters may still be about.
+fn wu_yang_freed(leader: bool) -> NpcScript {
+    if !leader {
+        return NpcScript::new(WU_YANG, vec![Page::Say(text(keys::PIRATE_WU_WAIT))]);
+    }
+    let stage = events::PIRATE.last_stage();
+    NpcScript::new(
+        WU_YANG,
+        vec![
+            Page::Say(text(keys::PIRATE_WU_THANKS)),
+            Page::Done(vec![Effect::EventCommand(EventCommand::ClearStage(stage))]),
+        ],
+    )
+}
+
+/// Wu Yang in the Pirate Ship's clear room (Cosmic `2094001`): a feather
+/// (`HPQ_REWARD`) and the way back to Herb Town, or the next of the Lord
+/// Pirate's Hats for twenty feathers and the hat before.
+fn wu_yang_clear(player: &Player) -> NpcScript {
+    use events::{HPQ_REWARD, PIRATE_HATS, PIRATE_HAT_FEATHERS};
+    let room = |kind: InventoryType| {
+        player.inventory.items(kind).count() < usize::from(player.inventory.slot_limit(kind))
+    };
+    let out = if items::fits_until(&player.inventory, HPQ_REWARD, 1, None) {
+        Page::Done(vec![
+            Effect::GiveItem {
+                item_id: HPQ_REWARD,
+                quantity: 1,
+            },
+            Effect::WarpToPortal(events::PIRATE_LOBBY, 0),
+        ])
+    } else {
+        Page::Say(text(keys::PIRATE_WU_ROOM_ETC))
+    };
+    let need = content::text().get(
+        keys::PIRATE_WU_NEED_FEATHERS,
+        &[
+            ("n", &PIRATE_HAT_FEATHERS.to_string()),
+            ("item", &HPQ_REWARD.to_string()),
+        ],
+    );
+    let held = PIRATE_HATS
+        .iter()
+        .rposition(|&hat| player.inventory.count(hat) > 0);
+    let hat = match held {
+        Some(n) if n + 1 == PIRATE_HATS.len() => Page::Say(text(keys::PIRATE_WU_BEST)),
+        _ if player.inventory.count(HPQ_REWARD) < i32::from(PIRATE_HAT_FEATHERS) => {
+            Page::Say(need.clone())
+        }
+        _ if !room(InventoryType::Equip) => Page::Say(text(keys::PIRATE_WU_ROOM_EQUIP)),
+        _ => {
+            let next = held.map_or(0, |n| n + 1);
+            let old = held.map(|n| Effect::TakeItem {
+                item_id: PIRATE_HATS[n],
+                quantity: 1,
+            });
+            let effects = old
+                .into_iter()
+                .chain([
+                    Effect::TakeItem {
+                        item_id: HPQ_REWARD,
+                        quantity: PIRATE_HAT_FEATHERS,
+                    },
+                    Effect::GiveItem {
+                        item_id: PIRATE_HATS[next],
+                        quantity: 1,
+                    },
+                ])
+                .collect();
+            Page::Act {
+                text: text(keys::PIRATE_WU_HAT_GIVEN),
+                effects,
+            }
+        }
+    };
+    let menu = Page::Menu {
+        text: text(keys::PIRATE_WU_MENU),
+        choices: vec![
+            (text(keys::PIRATE_WU_OUT), vec![out]),
+            (text(keys::PIRATE_WU_HAT), vec![hat]),
+        ],
+    };
+    let mut script = NpcScript::new(WU_YANG, vec![menu]);
+    script.inventory_full = Some(text(keys::PIRATE_WU_ROOM_ETC));
+    script.refused = Some(need);
+    script
 }
 
 /// Guon to the leader on the second stage, whose team has handed him
@@ -13304,6 +13404,104 @@ mod tests {
             step.effects,
             [Effect::WarpToPortal(events::PIRATE_LOBBY, 0)]
         );
+    }
+
+    #[test]
+    fn wu_yang_wins_the_ship_for_its_leader_and_makes_hats_after() {
+        use events::{HPQ_REWARD, PIRATE_HATS};
+        // Freed, he sends a member to the leader, and the leader's hearing
+        // him out wins the run.
+        let mut member = player(60);
+        member.stats.map_id = events::PIRATE_STAGES[5];
+        let mut freed = NpcScript::in_event(WU_YANG, &member, false, false).unwrap();
+        let step = freed.begin();
+        assert_eq!(page_text(&step), text(keys::PIRATE_WU_WAIT));
+        assert!(freed.respond(ScriptInput::Next).unwrap().effects.is_empty());
+        let mut freed = NpcScript::in_event(WU_YANG, &member, true, false).unwrap();
+        assert_eq!(page_text(&freed.begin()), text(keys::PIRATE_WU_THANKS));
+        let step = freed.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::EventCommand(EventCommand::ClearStage(6))]
+        );
+        assert!(NpcScript::in_event(WU_YANG, &member, true, true).is_none());
+        // Guon, with the ship bare, thanks the leader.
+        let guon = NpcScript::guon_aboard(&member, true, 0, true).begin();
+        assert_eq!(page_text(&guon), text(keys::PIRATE_GUON_SAVED));
+
+        // In the clear room: a feather and the way home.
+        member.stats.map_id = events::PIRATE_CLEAR;
+        assert!(NpcScript::in_event(WU_YANG, &member, true, false).is_none());
+        let choose = |player: &Player, choice| {
+            let mut script = NpcScript::in_event(WU_YANG, player, false, true).unwrap();
+            assert_eq!(kind(&script.begin()), Some(4));
+            script.respond(ScriptInput::Select(choice)).unwrap()
+        };
+        assert_eq!(
+            choose(&member, 0).effects,
+            [
+                Effect::GiveItem {
+                    item_id: HPQ_REWARD,
+                    quantity: 1
+                },
+                Effect::WarpToPortal(events::PIRATE_LOBBY, 0)
+            ]
+        );
+        // Too few feathers for a hat.
+        let need = choose(&member, 1);
+        assert!(need.effects.is_empty());
+        assert!(page_text(&need).contains("20"), "{need:?}");
+        // Twenty make the first hat, and twenty more and it the second.
+        let feathers = game::Item::stack(HPQ_REWARD, 20);
+        member.inventory.insert(InventoryType::Etc, 1, feathers);
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let first = choose(&member, 1);
+        assert_eq!(page_text(&first), text(keys::PIRATE_WU_HAT_GIVEN));
+        assert_eq!(first.effects, [take(HPQ_REWARD, 20), give(PIRATE_HATS[0])]);
+        let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
+        member
+            .inventory
+            .insert(InventoryType::Equip, 1, equip(PIRATE_HATS[0]));
+        assert_eq!(
+            choose(&member, 1).effects,
+            [
+                take(PIRATE_HATS[0], 1),
+                take(HPQ_REWARD, 20),
+                give(PIRATE_HATS[1])
+            ]
+        );
+        // With the second, there is no better.
+        member
+            .inventory
+            .insert(InventoryType::Equip, 2, equip(PIRATE_HATS[1]));
+        let best = choose(&member, 1);
+        assert_eq!(page_text(&best), text(keys::PIRATE_WU_BEST));
+        assert!(best.effects.is_empty());
+
+        // A full Etc tab still takes a feather on its stack.
+        let mut full = player(60);
+        full.stats.map_id = events::PIRATE_CLEAR;
+        let inventory = &mut full.inventory;
+        inventory.set_slot_limit(InventoryType::Etc, 1);
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(HPQ_REWARD, 20));
+        assert_eq!(choose(&full, 0).effects.len(), 2);
+        // Full tabs: he says so and gives nothing.
+        let inventory = &mut full.inventory;
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(4_000_000, 1));
+        inventory.set_slot_limit(InventoryType::Equip, 1);
+        inventory.insert(InventoryType::Equip, 1, equip(1_002_000));
+        let out = choose(&full, 0);
+        assert_eq!(page_text(&out), text(keys::PIRATE_WU_ROOM_ETC));
+        assert!(out.effects.is_empty());
+        let inventory = &mut full.inventory;
+        inventory.insert(InventoryType::Etc, 1, game::Item::stack(HPQ_REWARD, 20));
+        let hat = choose(&full, 1);
+        assert_eq!(page_text(&hat), text(keys::PIRATE_WU_ROOM_EQUIP));
+        assert!(hat.effects.is_empty());
     }
 
     #[test]
