@@ -12,6 +12,7 @@ mod change_channel;
 mod change_map;
 mod char_info;
 mod chat;
+mod claim;
 mod combat;
 mod conti;
 mod door;
@@ -95,6 +96,7 @@ pub use self::change_map::{
 };
 pub use self::char_info::CharInfoRequestHandler;
 pub use self::chat::AllChatHandler;
+pub use self::claim::{ClaimHandler, CLAIM_FEE};
 pub use self::combat::{
     absorbed, catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler,
     MobBombHandler, MobDamageMobFriendlyHandler, MobDamageMobHandler, MobDistanceHandler,

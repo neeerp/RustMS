@@ -753,6 +753,18 @@ diesel::table! {
     }
 }
 diesel::joinable!(minigame_records -> characters (character_id));
+diesel::table! {
+    reports (id) {
+        id -> Int4,
+        reporter_id -> Int4,
+        victim_id -> Int4,
+        kind -> Int2,
+        reason -> Int2,
+        description -> Text,
+        chat_log -> Text,
+        reported_at -> Timestamp,
+    }
+}
 diesel::allow_tables_to_appear_in_same_query!(
     accounts,
     buddies,
@@ -806,4 +818,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     hired_merchant_equipment_stats,
     hired_merchant_sales,
     minigame_records,
+    reports,
 );

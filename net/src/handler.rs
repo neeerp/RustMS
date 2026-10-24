@@ -609,6 +609,15 @@ pub enum WorldAction {
         owner: i32,
         from_town: bool,
     },
+    /// Report `victim` to the GMs: a conversation (with `chat_log`) or an
+    /// illegal program.
+    Claim {
+        conversation: bool,
+        victim: String,
+        reason: u8,
+        description: String,
+        chat_log: String,
+    },
     /// Raise (or drop) the fame of `target`, who must be on the player's map.
     GiveFame {
         target: i32,
@@ -1108,6 +1117,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
                 InGame(&world::TeleportRockListHandler),
             ),
             (Op::GiveFame, InGame(&world::GiveFameHandler)),
+            (Op::Claim, InGame(&world::ClaimHandler)),
             (Op::MoveSummon, InGame(&world::MoveSummonHandler)),
             (Op::SummonAttack, InGame(&world::SummonAttackHandler)),
             (Op::DamageSummon, InGame(&world::DamageSummonHandler)),
@@ -1145,7 +1155,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 125);
+        assert_eq!(world_routes().len(), 127);
     }
 
     #[test]

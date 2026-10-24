@@ -25,6 +25,12 @@ pub enum SendOpcode {
     ShowStatusInfo = 0x27,
     MemoResult = 0x29,
     MapTransferResult = 0x2A,
+    /// What became of a report of a player (FUN_00a27891).
+    ClaimResult = 0x2D,
+    /// The hours reports are taken, start and end (FUN_00a27b38).
+    ClaimAvailableTime = 0x2E,
+    /// Whether reports are taken at all (FUN_00a27b61).
+    ClaimStatusChanged = 0x2F,
     SetTamingMobInfo = 0x30,
     /// A quest's title is earned (`u16` quest id) (0xa26d44).
     QuestClear = 0x31,
