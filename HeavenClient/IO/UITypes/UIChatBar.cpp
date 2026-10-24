@@ -956,8 +956,10 @@ namespace ms
 
 			if (quiet)
 				return;
-		} else
+		} else if (line != Messages::SKILL_COOLDOWN)
 		{
+			// v83 says a skill is still cooling down on every try, with no
+			// throttle (FUN_00966f7a).
 			if (message_cooldowns[line] > 0)
 				return;
 
