@@ -6,6 +6,25 @@
 /// No floor earns more once the points reach this, the last belt's price.
 pub const MOST_POINTS: i32 = 17_000;
 
+/// So Gong's belts, white to black, each for a challenger over its level
+/// with its price in training points, and the belt before it to hand in
+/// (Cosmic `2091005`).
+pub const BELTS: [i32; 5] = [1132000, 1132001, 1132002, 1132003, 1132004];
+pub const BELT_LEVELS: [u8; 5] = [25, 35, 45, 60, 75];
+pub const BELT_PRICES: [i32; 5] = [200, 1800, 4000, 9200, 17000];
+
+/// The Dojo's rounds, one boss each; medal `n` (from 1) is for beating
+/// round `n`'s boss this many times, and the last, for Mu Gong's, is the
+/// Mu Lung Dojo Vanquisher Medal.
+pub const ROUNDS: i32 = 32;
+pub const MEDAL_KILLS: i32 = 100;
+const FIRST_MEDAL: i32 = 1142033;
+
+/// The medal for round `stage`'s boss (Mano's for 1).
+pub fn medal(stage: i32) -> i32 {
+    FIRST_MEDAL + stage - 1
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DojoRecord {
     /// Training points, spent on belts.
@@ -48,5 +67,11 @@ mod tests {
             ..record
         };
         assert_eq!(full.floor_points(1), 0);
+    }
+
+    #[test]
+    fn a_medal_for_each_rounds_boss_ending_with_the_dojos_own() {
+        assert_eq!(medal(1), 1142033);
+        assert_eq!(medal(ROUNDS), 1142064);
     }
 }

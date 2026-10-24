@@ -5,8 +5,9 @@ The Mu Lung Dojo's 38 floors, taken alone. The survey is v83ref's
 in. Slice 1 is: the way in and out, the floors and their bosses, the
 door, and So Gong's solo run. Slice 2 is the section timers and the
 entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
-score So Gong records. Belts, the points reset, the medal, the first-time
-tutorial, the party Dojo, energy and the `muruengRaid` HUD come later.
+score So Gong records. Slice 3b is the belts, the points reset and the
+medals. The first-time tutorial, the party Dojo, energy and the
+`muruengRaid` HUD come later.
 
 ## The way in
 
@@ -34,16 +35,18 @@ tutorial, the party Dojo, energy and the `muruengRaid` HUD come later.
   goes back to the saved map and clears it. With nothing saved it goes to
   the board's map, not Cosmic's Henesys.
 - **So Gong in the hall** (`npc_scripts::so_gong`) says below level 25
-  that the challenger is too weak. Otherwise he offers two choices:
+  that the challenger is too weak. Otherwise he offers five choices, in
+  Cosmic's order without its party run:
   - taking him on alone, which is `EventKind::Dojo`;
+  - a belt, the points reset and a medal (see "Belts and medals");
   - what the Dojo is.
 
   With a score recorded (see "Points and the record"), taking him on
   alone first asks whether to go back to its round. Yes starts the run
   after the recorded floor; no erases the record and ends the talk.
 
-  The party run, belts, the points reset and the medal are not in his menu
-  yet, and the first-time tutorial is skipped.
+  The party run is not in his menu yet, and the first-time tutorial is
+  skipped.
 
 ## The event
 
@@ -139,8 +142,8 @@ Every sixth floor (6, 12, ..., 36) is a rest floor: no boss, no door, no
 ## Points and the record
 
 `game::DojoRecord` is a player's `dojo`: training points, the recorded
-rest floor (`stage`, 0 for none), and, for later slices, the first-time
-trial and the medal's stage and kills. It is saved with the player, in
+rest floor (`stage`, 0 for none), the medal's stage and wins, and, for a
+later slice, the first-time trial. It is saved with the player, in
 `dojo_records`, one row per character once it differs from a new one's
 (`save_dojo`). Cosmic keeps these as `dojoPoints`, `lastDojoStage`,
 `finishedDojoTutorial`, `vanquisherStage` and `vanquisherKills`.
@@ -166,6 +169,42 @@ trial and the medal's stage and kills. It is saved with the player, in
   floor after the recorded one and erases the record. That floor always
   starts a section, so its clock starts over there. If the Dojo is full,
   nothing is applied and the record stays, as Cosmic restores it.
+
+## Belts and medals
+
+So Gong's hall menu (`so_gong_belts`, `so_gong_medal`) follows Cosmic's
+`2091005`, with the real belt prices, not its fast-upgrade option.
+
+- **Belts.** With no free slot in the EQUIP inventory he says to make
+  room. Otherwise he lists the five belts (`game::dojo::BELTS`), marking
+  those held, worn or not. A belt needs:
+  - a level over its own (25, 35, 45, 60, 75);
+  - its price in points (200, 1,800, 4,000, 9,200, 17,000);
+  - from the yellow on, the belt before it, unequipped in the EQUIP
+    inventory. It is taken in.
+
+  He hands it over and takes the price (`Effect::DojoPoints` with a
+  negative amount, refused if the points are no longer there). Otherwise
+  he says what it takes and what is missing, as Cosmic's
+  `sendBeltRequirements`.
+- **The points reset.** A yes or no; yes sets the points to 0.
+- **Medals.** Medal n, from Mano's (1142033) to the Mu Lung Dojo
+  Vanquisher's (1142064), is for round n's boss (`game::dojo::medal`).
+  - With none tried for, he asks whether to try for Mano's. Yes sets
+    the stage to 1 (`Effect::DojoMedal`) and ends the talk.
+  - Going on by `dojang_next` from the floor whose round is the stage
+    counts a win (`scripts::dojo_next`).
+  - With fewer than 100 wins he says how many are left. With 100, and room
+    in the EQUIP inventory, he hands the medal over and sets the next
+    stage with no wins. Past the 32nd he
+    says every medal is won.
+
+  Cosmic's version is off by one: it counts wins on the round after the
+  stage, names one medal and hands over the next. It also counts a win at
+  `dojang_up`, which can be taken again and again, and checks the
+  recorded floor for "every medal". RustMS counts the round's own boss,
+  on the way on, as the medal text says, and checks the stage. When the
+  party Dojo comes in, its wins must not count, as in Cosmic.
 
 ## The client
 
