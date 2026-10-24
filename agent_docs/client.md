@@ -66,9 +66,6 @@ from `UI.nx`. Moved so far:
 
 - **Status bar** (`UIStatusBar`, `StatusBar.img`): gauges, menu buttons, the
   quick slot panel, and the Game Menu and ShortCut popups (`UIWindow.img`).
-  A change of HP or MP slides its gauge to the new width over 700 ms, from
-  where it is shown, for a gain or a loss alike (`GaugeSlide.h`); the numbers
-  and the EXP gauge change at once.
   Esc opens the Game Menu; the MENU key action opens ShortCut, whose buttons
   run in v83's order: Item, Equip, Stat, Skill, Community, Quest, Monster
   Book, Messenger. Dropping a
@@ -101,10 +98,7 @@ from `UI.nx`. Moved so far:
   layouts: collapsed, the latest line sits in the strip; collapsed while
   typing, it moves just above the strip; expanded, five lines sit above the
   strip and the input field stays shown. Each is a uniform half-black panel
-  with a `Basic.img/VScr5` scroll bar, laid out as v83 lays it out
-  (`ChatLogLayout.h`). The expanded log ends 2 pixels into the status bar.
-  The one-line layouts draw their text 5 pixels above its row, and a
-  highlighted row's strip stops 14 pixels short of the scroll bar. Its thumb is placed as the original
+  with a `Basic.img/VScr5` scroll bar. Its thumb is placed as the original
   places it, which hit-tests only an arrow's height of it. As in the original
   (`FUN_0073ecb5`), dragging the expanded log's top edge resizes it a 13-pixel
   row at a time, from 2 to 39 rows, once the cursor is more than a row from

@@ -1401,6 +1401,11 @@ impl NpcScript {
     /// The script an NPC runs when clicked (`Npc.nx info/script`), as it
     /// plays for `player`. Heracle, Lea and Lakelis are not among them.
     pub fn for_npc(npc_id: i32, player: &Player) -> Option<Self> {
+        if npc_id == KYRIN {
+            if let Some(script) = kyrin_fourth_job_test(player) {
+                return Some(script);
+            }
+        }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
             let sent = marked(player, CHIEF_ASSIGNED) || marked(player, INSTRUCTOR_ASSIGNED);
@@ -6520,11 +6525,55 @@ fn lord_jonathan(player: &Player) -> NpcScript {
     script
 }
 
-/// The clone's room and Lord Jonathan's test: the time a challenger has in
-/// it, which the map itself doesn't set.
+/// Kyrin's 4th-job tests (`scripts::KYRIN_TESTS`). In town she offers a
+/// Pirate on one, its record not yet set, the way into its room, one at a
+/// time; past it, she marks the test passed and sends them back to town,
+/// where the client completes the quest with her. `None` otherwise.
+fn kyrin_fourth_job_test(player: &Player) -> Option<NpcScript> {
+    use crate::scripts::{KYRIN_PASSED, KYRIN_PASSED_ROOM, KYRIN_TESTS};
+    let on_test = KYRIN_TESTS.iter().find(|test| {
+        player.quests.state(test.quest) == QuestState::Started
+            && player.quests.info(test.record) != Some(KYRIN_PASSED)
+    });
+    if player.stats.map_id == KYRIN_PASSED_ROOM {
+        let mut script = NpcScript::new(KYRIN, vec![Page::Say(text(keys::KYRIN_TEST_PASSED))]);
+        script.on_end = on_test
+            .map(|test| Effect::SetRecord {
+                record: test.record,
+                value: KYRIN_PASSED,
+            })
+            .into_iter()
+            .chain([Effect::WarpToPortal(KYRIN_MAP, 0)])
+            .collect();
+        return Some(script);
+    }
+    let test = on_test.filter(|_| player.stats.map_id == KYRIN_MAP)?;
+    let mut script = NpcScript::new(
+        KYRIN,
+        vec![Page::Ask {
+            text: text(keys::KYRIN_TEST_ASK),
+            on_yes: vec![
+                Effect::RequireEmptyMap(test.room),
+                Effect::WarpToPortal(test.room, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::KYRIN_TEST_BUSY));
+    Some(script)
+}
+
+/// The clone's room, Lord Jonathan's test and Kyrin's: the time a
+/// challenger has in it, which the map itself doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
     if map_id == crate::reactors::BART_ROOM {
         return Some(BART_TIME_LIMIT);
+    }
+    if crate::scripts::KYRIN_TESTS
+        .iter()
+        .any(|test| test.room == map_id)
+    {
+        return Some(crate::scripts::kyrin_time_limit());
     }
     is_clone_room(map_id).then_some(CLONE_TIME_LIMIT)
 }
@@ -12245,5 +12294,55 @@ mod tests {
         // Once Bart is found, the test is over.
         assert!(corsair.quests.set_record(BART_RECORD, BART_FOUND));
         assert_eq!(first(&corsair).0, Some(0));
+    }
+
+    #[test]
+    fn kyrin_sends_a_pirate_on_her_test_and_marks_it_passed_past_it() {
+        use crate::scripts::{KYRIN_PASSED, KYRIN_PASSED_ROOM, KYRIN_TESTS};
+        let test = &KYRIN_TESTS[1];
+        let mut outlaw = player(50);
+        (outlaw.stats.job, outlaw.stats.level, outlaw.stats.map_id) = (522, 120, KYRIN_MAP);
+        // Off the quest, her other scripts answer.
+        assert!(kyrin_fourth_job_test(&outlaw).is_none());
+
+        outlaw.quests.upsert(game::QuestRecord {
+            quest_id: test.quest,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let mut script = NpcScript::for_npc(KYRIN, &outlaw).unwrap();
+        assert_eq!(kind(&script.begin()), Some(1));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireEmptyMap(test.room),
+                Effect::WarpToPortal(test.room, 0),
+            ]
+        );
+        assert_eq!(kind(&script.refused().unwrap()), Some(0));
+        assert_eq!(time_limit(test.room), Some(4 * 60));
+        assert!(resets_when_empty(test.room));
+
+        // Past the room she marks it passed and sends the Pirate to town.
+        outlaw.stats.map_id = KYRIN_PASSED_ROOM;
+        let mut script = NpcScript::for_npc(KYRIN, &outlaw).unwrap();
+        assert_eq!(kind(&script.begin()), Some(0));
+        assert_eq!(
+            script.respond(ScriptInput::Next).unwrap().effects,
+            [
+                Effect::SetRecord {
+                    record: test.record,
+                    value: KYRIN_PASSED,
+                },
+                Effect::WarpToPortal(KYRIN_MAP, 0),
+            ]
+        );
+
+        // Passed, she has no test to give.
+        assert!(outlaw.quests.set_record(test.record, KYRIN_PASSED));
+        outlaw.stats.map_id = KYRIN_MAP;
+        assert!(kyrin_fourth_job_test(&outlaw).is_none());
     }
 }

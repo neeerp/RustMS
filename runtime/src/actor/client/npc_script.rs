@@ -485,6 +485,12 @@ impl ClientActor {
                     changed = true;
                     packets.push(quest::build_quest_progress(*id, next.quests.status(*id))?);
                 }
+                Effect::SetRecord { record, value } => {
+                    if next.quests.set_record(*record, value) {
+                        changed = true;
+                        packets.push(quest::build_quest_record(*record, value)?);
+                    }
+                }
                 Effect::Explore { medal, map_id } => {
                     let title = template(*medal)?;
                     let Some(explored) = title.explored else {

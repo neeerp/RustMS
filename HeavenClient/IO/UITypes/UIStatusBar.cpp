@@ -53,8 +53,6 @@
 #include "../../Net/Packets/PlayerPackets.h"
 #include "../../Util/NxFiles.h"
 
-#include <chrono>
-
 namespace ms
 {
 	namespace
@@ -116,14 +114,6 @@ namespace ms
 		constexpr int16_t EXP_WIDTH = 115;
 
 		const Point<int16_t> GAUGE_POS = Point<int16_t>(218, 38);
-
-		// The clock the HP and MP gauges slide by, in ms.
-		int64_t gauge_now()
-		{
-			using namespace std::chrono;
-
-			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
-		}
 
 		// The EXP numbers over the gauge, (442, 560) to (555, 573) on v83's
 		// 800x600 screen: hovering shows the EXP and any gacha EXP, and
@@ -348,12 +338,9 @@ namespace ms
 		UIElement::draw_sprites(alpha);
 
 		gaugebar.draw(position + GAUGE_POS);
-		int64_t now = gauge_now();
-		float exppercent = std::max(0.0f, std::min(1.0f, getexppercent()));
-
-		draw_gauge(HP_LEFT, HPMP_WIDTH, hpslide.at(now));
-		draw_gauge(MP_LEFT, HPMP_WIDTH, mpslide.at(now));
-		draw_gauge(EXP_LEFT, EXP_WIDTH, EXP_WIDTH - static_cast<int16_t>(EXP_WIDTH * exppercent));
+		draw_gauge(HP_LEFT, HPMP_WIDTH, gethppercent());
+		draw_gauge(MP_LEFT, HPMP_WIDTH, getmppercent());
+		draw_gauge(EXP_LEFT, EXP_WIDTH, getexppercent());
 		graduation.draw(position + GAUGE_POS);
 		hpflash.draw(position);
 		mpflash.draw(position);
@@ -405,9 +392,11 @@ namespace ms
 				iter.second->draw(position);
 	}
 
-	void UIStatusBar::draw_gauge(int16_t left, int16_t width, double gray) const
+	void UIStatusBar::draw_gauge(int16_t left, int16_t width, float percent) const
 	{
-		auto filled = static_cast<int16_t>(width - std::max(0.0, std::min(static_cast<double>(width), gray)));
+		percent = std::max(0.0f, std::min(1.0f, percent));
+
+		auto filled = static_cast<int16_t>(width * percent);
 
 		if (filled >= width)
 			return;
@@ -543,12 +532,6 @@ namespace ms
 				key_hint_left[i]--;
 			}
 		}
-		int64_t now = gauge_now();
-		hpslide.aim(gauge_slide::gray(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP), HPMP_WIDTH),
-					now);
-		mpslide.aim(gauge_slide::gray(stats.get_stat(MapleStat::Id::MP), stats.get_total(EquipStat::Id::MP), HPMP_WIDTH),
-					now);
-
 		hpflash.check(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP));
 		mpflash.check(stats.get_stat(MapleStat::Id::MP), stats.get_total(EquipStat::Id::MP));
 		hpflash.update();
@@ -1001,5 +984,21 @@ namespace ms
 	{
 		if (active)
 			animation.draw(parent + pos, 1.0f);
+	}
+
+	float UIStatusBar::gethppercent() const
+	{
+		int16_t hp = stats.get_stat(MapleStat::Id::HP);
+		int32_t maxhp = stats.get_total(EquipStat::Id::HP);
+
+		return static_cast<float>(hp) / maxhp;
+	}
+
+	float UIStatusBar::getmppercent() const
+	{
+		int16_t mp = stats.get_stat(MapleStat::Id::MP);
+		int32_t maxmp = stats.get_total(EquipStat::Id::MP);
+
+		return static_cast<float>(mp) / maxmp;
 	}
 }

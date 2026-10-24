@@ -9,6 +9,7 @@ use tokio::time::Instant;
 /// where they go then, at which spawn point.
 pub(super) struct MapTimer {
     map_id: i32,
+    started: Instant,
     ends: Instant,
     to: (i32, u8),
 }
@@ -36,6 +37,7 @@ impl ClientActor {
         {
             self.map_timer = Some(MapTimer {
                 map_id,
+                started: Instant::now(),
                 ends: Instant::now(),
                 to: (to, 0),
             });
@@ -54,12 +56,20 @@ impl ClientActor {
         if to.0 == map_id || !data.field_exists(to.0) {
             return Ok(());
         }
+        let started = Instant::now();
         self.map_timer = Some(MapTimer {
             map_id,
-            ends: Instant::now() + Duration::from_secs(u64::from(seconds)),
+            started,
+            ends: started + Duration::from_secs(u64::from(seconds)),
             to,
         });
         self.send(&mut build_countdown(seconds)?).await
+    }
+
+    /// How long the player has been on their timed map, as its timer
+    /// counts.
+    pub(super) fn time_on_map(&self) -> Option<Duration> {
+        self.map_timer.as_ref().map(|timer| timer.started.elapsed())
     }
 
     /// When the player's time on their map is up.

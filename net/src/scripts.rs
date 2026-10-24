@@ -10,6 +10,7 @@ use game::character::{FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
+use std::time::Duration;
 
 const FREE_MARKET: i32 = 910000000;
 const HENESYS: i32 = 100000000;
@@ -268,7 +269,7 @@ const RESURRECTION_ROOM: i32 = 923000100;
 const EGG_NEST: i32 = 924000100;
 const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
-pub const SOLO_MAPS: [i32; 8] = [
+pub const SOLO_MAPS: [i32; 10] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -277,7 +278,69 @@ pub const SOLO_MAPS: [i32; 8] = [
     HITMAN_HIDEOUT,
     BERSERK_ROOM,
     crate::reactors::BART_ROOM,
+    KYRIN_TESTS[0].room,
+    KYRIN_TESTS[1].room,
 ];
+
+/// One of Kyrin's 4th-job tests: a Pirate on `quest` holds out in `room`
+/// against its boss for two minutes, then tells Kyrin in
+/// `KYRIN_PASSED_ROOM`, who sets `record` to `KYRIN_PASSED`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct KyrinTest {
+    pub quest: i16,
+    pub record: i16,
+    pub room: i32,
+}
+
+/// Super Transformation (6330, a Marauder's) and Battleship (6370, an
+/// Outlaw's).
+pub const KYRIN_TESTS: [KyrinTest; 2] = [
+    KyrinTest {
+        quest: 6330,
+        record: 6331,
+        room: 912010000,
+    },
+    KyrinTest {
+        quest: 6370,
+        record: 6371,
+        room: 912010100,
+    },
+];
+pub const KYRIN_PASSED_ROOM: i32 = 912010200;
+/// What a test's record reads once passed (`Check/1 infoex`).
+pub const KYRIN_PASSED: &str = "2";
+/// How long a test lasts (Cosmic's `4jship`), and when its room's way out
+/// leads where: before `KYRIN_MAY_LEAVE` nowhere, then back to Kyrin with
+/// nothing, and from `KYRIN_HELD_OUT` to her, passed. Being an event's
+/// times, they are shortened by `RUSTMS_EVENT_SCALE` for testing.
+const KYRIN_TIME_LIMIT: Duration = Duration::from_secs(4 * 60);
+const KYRIN_MAY_LEAVE: Duration = Duration::from_secs(60);
+const KYRIN_HELD_OUT: Duration = Duration::from_secs(2 * 60);
+/// The ways out of the two rooms (the scripts' names are crossed with the
+/// rooms' event names, but both do the same).
+pub const KYRIN_TEST_OUT: [&str; 2] = ["s4super_out", "s4ship_out"];
+const KYRIN_MAP: i32 = 120000101;
+
+/// A Kyrin test's time limit, in seconds.
+pub fn kyrin_time_limit() -> u32 {
+    let limit = crate::events::scaled(KYRIN_TIME_LIMIT).as_secs();
+    u32::try_from(limit).unwrap_or(u32::MAX).max(1)
+}
+
+/// A Kyrin test's way out, `elapsed` after the Pirate came in.
+pub fn kyrin_test_out(elapsed: Duration) -> Vec<Effect> {
+    use crate::events::scaled;
+    if elapsed < scaled(KYRIN_MAY_LEAVE) {
+        let wait = crate::content::text().get(keys::KYRIN_TEST_WAIT, &[]);
+        return vec![Effect::Pink(wait)];
+    }
+    let to = if elapsed < scaled(KYRIN_HELD_OUT) {
+        KYRIN_MAP
+    } else {
+        KYRIN_PASSED_ROOM
+    };
+    vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)]
+}
 /// The key that opens the Berserk room.
 const BERSERK_KEY: i32 = 4031475;
 /// The Cold Flame, which opens the way to the resurrection mound.
@@ -537,6 +600,12 @@ pub enum Effect {
         slot: u8,
         from: u8,
         to: u8,
+    },
+    /// Set a record that is no quest (`game::quest::RECORDS`) to `value`,
+    /// as Kyrin marks a test passed; nothing if it already reads so.
+    SetRecord {
+        record: i16,
+        value: &'static str,
     },
     /// Count `map_id` toward an explorer medal (`crate::medals`), starting
     /// it on the first.
@@ -1668,6 +1737,35 @@ mod tests {
             player.quests.upsert(QuestRecord { quest_id, status });
         }
         player
+    }
+
+    #[test]
+    fn kyrins_rooms_let_out_after_a_minute_and_pass_after_two() {
+        let wait = crate::content::text().get(keys::KYRIN_TEST_WAIT, &[]);
+        let at = Duration::from_secs;
+        assert_eq!(kyrin_test_out(at(59)), [Effect::Pink(wait)]);
+        assert_eq!(
+            kyrin_test_out(at(60)),
+            [Effect::PortalSound, Effect::WarpToPortal(KYRIN_MAP, 0)]
+        );
+        assert_eq!(
+            kyrin_test_out(at(120)),
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(KYRIN_PASSED_ROOM, 0)
+            ]
+        );
+        assert!(KYRIN_TESTS
+            .iter()
+            .all(|test| SOLO_MAPS.contains(&test.room)));
+        let Ok(maps) = crate::game_data::get() else {
+            return;
+        };
+        for (test, out) in KYRIN_TESTS.iter().zip(["s4super_out", "s4ship_out"]) {
+            let room = maps.field(test.room).unwrap();
+            assert!(room.portals().any(|p| p.script.as_deref() == Some(out)));
+            assert_eq!(room.forced_return, Some(KYRIN_MAP));
+        }
     }
 
     #[test]
