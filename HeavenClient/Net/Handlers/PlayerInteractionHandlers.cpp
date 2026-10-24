@@ -21,6 +21,7 @@
 #include "Helpers/LoginParser.h"
 
 #include "../../Character/Blacklist.h"
+#include "../../Character/Claim.h"
 #include "../../Configuration.h"
 #include "../../Data/CashCatalog.h"
 #include "../../IO/UI.h"
@@ -707,5 +708,32 @@ namespace ms
 
 		if (!text.empty())
 			UI::get().emplace<UIOk>(text, [](bool) {});
+	}
+
+	void ClaimResultHandler::handle(InPacket& recv) const
+	{
+		uint8_t mode = static_cast<uint8_t>(recv.read_byte());
+		bool today = false;
+		int32_t left = 0;
+
+		if (mode == 2)
+		{
+			today = recv.read_bool();
+			left = recv.read_int();
+		}
+
+		if (auto message = Claim::result_message(mode, today, left))
+			UI::get().emplace<UIOk>(*message, [](bool) {});
+	}
+
+	void ClaimAvailableTimeHandler::handle(InPacket& recv) const
+	{
+		Claim::start_hour = static_cast<uint8_t>(recv.read_byte());
+		Claim::end_hour = static_cast<uint8_t>(recv.read_byte());
+	}
+
+	void ClaimStatusChangedHandler::handle(InPacket& recv) const
+	{
+		Claim::open = recv.read_bool();
 	}
 }

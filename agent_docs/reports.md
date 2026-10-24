@@ -48,6 +48,38 @@ The server always sends `today` as 1, because there is no daily limit.
 The client also knows modes 3, `0x44`, `0x47` and `0x48`; the server
 never sends them. Mode 3 tells the reported player they were reported.
 
+## The client
+
+`HeavenClient` follows v83's `CWvsContext::SendClaim` (`FUN_00a2719c`):
+
+- `Character/Claim.h` keeps what entry said (`Claim::open`, the hours)
+  and the rules that need no UI: the hours check, the reasons and their
+  codes, the speakers and chat lines a report quotes, the description, and
+  the text of each `CLAIM_RESULT` mode. `tests/claim.cpp` covers them.
+- The status bar's report button opens it with no name; a character's
+  menu with theirs. If reports aren't open, or the two hours are the
+  same but not 0, an OK box says the system is down; outside the hours,
+  it gives them.
+- `UIClaimNotice` (`UIWindow.img/Claim/notice`) asks for a conversation
+  or an illegal program. `UIClaim` (`Claim/backgrnd`) then has a
+  character list, starting at "Please select.", the reasons, and four
+  lines of 24 characters for the description. Enter and the arrow keys
+  move between the lines. Both combos are built with `cut`, so, as in
+  v83, an item wider than the box less its arrow ends in "..": the long
+  reasons read "Curse/Inappropriate Co..". Other combos leave `cut` off,
+  because Arimo runs wider than v83's Arial and would cut items that fit
+  there.
+- A conversation report may name only someone who spoke in the chat log,
+  latest first; a program report anyone on the map, sorted. With a name,
+  the list is just that name, and if they didn't speak, "This character
+  is unable to report others."
+- The chat log is the bar's rows of v83's chat kinds (general, party,
+  buddy, guild, whisper, megaphones, gachapon; not alliance, spouse, GM
+  chat or notices), as `UIChatBar::claim_rows` gives them. The report
+  sends the latest of the lines the two spoke, at most 1,600 characters,
+  the reporter's own through the curse filter.
+- Both windows need `UIClassic.nx`; the stock `UI.nx` lacks `Claim`.
+
 ## Not modelled
 
 - No report hours: the window is always all day.

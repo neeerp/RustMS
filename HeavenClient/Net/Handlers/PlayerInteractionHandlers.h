@@ -48,4 +48,25 @@ namespace ms
 	{
 		void handle(InPacket& recv) const override;
 	};
+
+	// What came of a report (0xa27891), in an OK box.
+	// Opcode: CLAIM_RESULT(45)
+	class ClaimResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// The hours of the day in which reports are taken, sent on entry.
+	// Opcode: CLAIM_AVAILABLE_TIME(46)
+	class ClaimAvailableTimeHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// Whether reports are taken at all, sent on entry.
+	// Opcode: CLAIM_STATUS_CHANGED(47)
+	class ClaimStatusChangedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
 }

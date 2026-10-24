@@ -19,6 +19,7 @@
 
 #include "UIChannel.h"
 #include "UIChatBar.h"
+#include "UIClaim.h"
 #include "UIEquipInventory.h"
 #include "UIGameOption.h"
 #include "UIItemInventory.h"
@@ -564,6 +565,8 @@ namespace ms
 		switch (id)
 		{
 			case Buttons::BT_CLAIM:
+				UIClaimNotice::open("");
+				break;
 			case Buttons::BT_TRADE:
 				break;
 			case Buttons::BT_EQUIP:

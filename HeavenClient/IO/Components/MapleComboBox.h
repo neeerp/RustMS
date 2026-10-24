@@ -47,8 +47,12 @@ namespace ms
 			GREENNEG
 		};
 
+		// With `cut`, an item wider than the box less its arrow ends in "..",
+		// as in every v83 combo box (b155-combo-font). It is off by default:
+		// Arimo runs wider than v83's Arial, so items that just fit there
+		// would be cut here.
 		MapleComboBox(Type type, std::vector<std::string> options, uint16_t default_option, Point<int16_t> parentpos,
-					  Point<int16_t> position, int64_t width);
+					  Point<int16_t> position, int64_t width, bool cut = false);
 
 		// A v83 drop box, whose box is part of its parent's background: src
 		// has one image for each state but normal, drawn over a box of size box.
@@ -79,6 +83,8 @@ namespace ms
 		void init(Text::Font selected_font, Color::Name selected_color, Point<int16_t> parentpos, Point<int16_t> position);
 
 		int16_t box_height() const;
+		// How wide an item's text may be before it is cut, or 0 for no limit.
+		int16_t text_width() const;
 
 		enum Buttons : uint16_t
 		{
@@ -98,6 +104,8 @@ namespace ms
 		std::vector<std::string> options;
 		std::vector<Text> option_text;
 		Text selected;
+		Text::Font selected_font;
+		bool cut = false;
 		ColorBox background;
 		ColorBox rect;
 		ColorBox current_rect;

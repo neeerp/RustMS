@@ -23,10 +23,36 @@
 
 #include <nlnx/nx.hpp>
 
+namespace
+{
+	// `text` cut with ".." to `width`, if it is wider.
+	std::string fit(ms::Text::Font font, const std::string &text, int16_t width)
+	{
+		ms::Text measure(font, ms::Text::Alignment::LEFT, ms::Color::Name::BLACK, text, 0, false);
+
+		if (width <= 0 || measure.width() <= width)
+			return text;
+
+		std::string cut = text;
+
+		while (!cut.empty())
+		{
+			cut.pop_back();
+			measure.change_text(cut + "..");
+
+			if (measure.width() <= width)
+				break;
+		}
+
+		return cut + "..";
+	}
+}
+
 namespace ms
 {
 	MapleComboBox::MapleComboBox(Type type, std::vector<std::string> o, uint16_t default_option, Point<int16_t> ppos,
-								 Point<int16_t> pos, int64_t w) : options(o), rwidth(w), selected_index(default_option)
+								 Point<int16_t> pos, int64_t w, bool c) : options(o), cut(c), rwidth(w),
+																		  selected_index(default_option)
 	{
 		std::string combobox = "ComboBox";
 
@@ -86,11 +112,14 @@ namespace ms
 							 Point<int16_t> pos)
 	{
 		parentpos = ppos;
+		this->selected_font = selected_font;
 
 		for (auto &option : options)
-			option_text.push_back(Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, option));
+			option_text.push_back(Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
+					fit(Text::Font::A12M, option, text_width())));
 
-		selected = Text(selected_font, Text::Alignment::LEFT, selected_color, options[selected_index]);
+		selected = Text(selected_font, Text::Alignment::LEFT, selected_color,
+				fit(selected_font, options[selected_index], text_width()));
 
 		state = Button::State::NORMAL;
 		background = ColorBox(width(), options.size() * HEIGHT, Color::Name::DUSTYGRAY, 1.0f);
@@ -176,6 +205,16 @@ namespace ms
 		return textures[state][0].width() + textures[state][2].width() + rwidth;
 	}
 
+	int16_t MapleComboBox::text_width() const
+	{
+		if (!cut || box.x() > 0)
+			return 0;
+
+		const auto &normal = textures[Button::State::NORMAL];
+
+		return normal[0].width() + rwidth;
+	}
+
 	int16_t MapleComboBox::box_height() const
 	{
 		if (box.y() > 0)
@@ -251,7 +290,7 @@ namespace ms
 	{
 		selected_index = buttonid;
 
-		selected.change_text(options[selected_index]);
+		selected.change_text(fit(selected_font, options[selected_index], text_width()));
 
 		toggle_pressed();
 

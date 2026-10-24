@@ -2,7 +2,7 @@
 
 #include "UIChatBar.h"
 #include "UICharInfo.h"
-#include "UINotice.h"
+#include "UIClaim.h"
 #include "UITradingRoom.h"
 
 #include "../FamilyActions.h"
@@ -159,9 +159,7 @@ namespace ms
 				FamilyActions::add_junior(name);
 				break;
 			case context_menu::CLAIM:
-				// The server never opens reports, so v83 says they're down
-				// (FUN_00a2719c).
-				UI::get().emplace<UIOk>("The reporting system is currently undergoing maintenence check.", [](bool) {});
+				UIClaimNotice::open(name);
 				break;
 			default:
 				break;

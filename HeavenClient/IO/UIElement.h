@@ -144,6 +144,8 @@ namespace ms
 			MINIGAMECREATE,
 			MEDALS,
 			TIMEDQUESTS,
+			CLAIMNOTICE,
+			CLAIM,
 			NUM_TYPES
 		};
 

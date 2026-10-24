@@ -74,6 +74,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME character_name COMMAND character_name_tests)
     add_executable(blacklist_tests tests/blacklist.cpp)
     add_test(NAME blacklist COMMAND blacklist_tests)
+    add_executable(claim_tests tests/claim.cpp)
+    add_test(NAME claim COMMAND claim_tests)
     add_executable(quest_result_tests tests/quest_result.cpp)
     add_test(NAME quest_result COMMAND quest_result_tests)
     add_executable(map_tooltip_tests tests/map_tooltip.cpp)
@@ -1021,6 +1023,8 @@ add_executable(HeavenClient
     IO/UITypes/UIOmok.h
     IO/UITypes/UIMiniGameCreate.cpp
     IO/UITypes/UIMiniGameCreate.h
+    IO/UITypes/UIClaim.cpp
+    IO/UITypes/UIClaim.h
     IO/UITypes/UIPersonalShop.cpp
     IO/UITypes/UIPersonalShop.h
     IO/UITypes/UIMonsterBook.cpp
