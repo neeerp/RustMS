@@ -1445,8 +1445,10 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
 /// spawn points, as (mob, the point they come out on the ground below, how
 /// many): each of the Pirate Ship's decks has none of its own, and opens
 /// with five of the Lord Pirate's Krus (9300124) and five of his Captains
-/// (9300125) at each end of each of its two floors (Cosmic `PiratePQ`'s
-/// `setup`). None come back.
+/// (9300125) at each end of each of its two floors; each of its bellflower
+/// rooms with ten more of each of its two kinds of Bellflower (9300112,
+/// 9300113), one kind at each end (Cosmic `PiratePQ`'s `setup`). None come
+/// back.
 pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     const DECK: [(i32, (i16, i16), usize); 4] = [
         (9_300_124, (430, 75), 5),
@@ -1454,10 +1456,15 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
         (9_300_124, (430, 238), 5),
         (9_300_125, (1600, 238), 5),
     ];
-    if PIRATE_STAGES[2..4].contains(&map_id) {
-        &DECK
-    } else {
-        &[]
+    const BELLFLOWERS: [(i32, (i16, i16), usize); 2] =
+        [(9_300_112, (0, 238), 10), (9_300_113, (1700, 238), 10)];
+    match PIRATE_STAGES[2..4]
+        .iter()
+        .find(|&&deck| deck == map_id || deck + 1 == map_id)
+    {
+        Some(&deck) if deck == map_id => &DECK,
+        Some(_) => &BELLFLOWERS,
+        None => &[],
     }
 }
 
@@ -1927,6 +1934,8 @@ pub enum EventCommand {
     /// turn: the pirates of that Mark go, giving nothing, the next Mark's
     /// come, and the third clears the second stage.
     HandInMarks(u8),
+    /// A member opened one of the Pirate Ship's bellflower rooms' chests.
+    ChestOpened,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -2896,7 +2905,15 @@ mod tests {
             assert_eq!(crew, 20, "{map}");
         }
         assert!(opening_mobs(PIRATE_STAGES[1]).is_empty());
-        assert!(opening_mobs(PIRATE_STAGES[2] + 1).is_empty());
+        assert!(opening_mobs(PIRATE_STAGES[2] + 2).is_empty());
+        // Their bellflower rooms with twenty Bellflowers more.
+        for map in [PIRATE_STAGES[2] + 1, PIRATE_STAGES[3] + 1] {
+            let more: Vec<_> = opening_mobs(map)
+                .iter()
+                .map(|&(id, _, n)| (id, n))
+                .collect();
+            assert_eq!(more, [(9_300_112, 10), (9_300_113, 10)], "{map}");
+        }
         assert_eq!(PIRATE.member_clears, [1, 3, 4]);
     }
 

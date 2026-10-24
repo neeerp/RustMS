@@ -1176,6 +1176,7 @@ unsourced = [
     "pirate.guon.veteran",
     "pirate.guon.marks_in",
     "pirate.marks_shut",
+    "pirate.guon.chest",
 ]
 
 [text."glTutoMsg0.message"]

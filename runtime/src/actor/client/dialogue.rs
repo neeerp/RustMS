@@ -113,17 +113,16 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::npc_scripts::GUON_ABOARD {
+            if let Some(script) = self.guon_aboard().await? {
+                return self.start_script(script).await;
+            }
+        }
         let player = &self.in_game()?.player;
         if let Some(ticket) = self.event.as_ref().filter(|t| t.holds(player.stats.map_id)) {
             let (leader, won) = (ticket.leader(), ticket.won());
-            let script =
-                match npc_id {
-                    net::npc_scripts::GUON_ABOARD => Some(
-                        net::npc_scripts::NpcScript::guon_aboard(player, leader, ticket.marks()),
-                    ),
-                    _ => net::npc_scripts::NpcScript::in_event(npc_id, player, leader, won),
-                };
-            if let Some(script) = script {
+            if let Some(script) = net::npc_scripts::NpcScript::in_event(npc_id, player, leader, won)
+            {
                 return self.start_script(script).await;
             }
         }

@@ -132,6 +132,10 @@ impl ClientActor {
         };
         self.spawn_loot(loot, self.ownership(), object_id, x, y)
             .await?;
+        // The Pirate Ship counts the chests its team opens.
+        if reactor_id == net::reactors::PIRATE_CHEST {
+            self.tell_event(EventCommand::ChestOpened).await;
+        }
         // The last Cellion's spot clears the Salion stage, the Grass of
         // Life's pot the garden, a Trial Grounds seal its room, and
         // Minerva's statue wins the event.

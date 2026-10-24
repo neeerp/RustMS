@@ -350,6 +350,13 @@ pub fn action(reactor_id: i32) -> Action {
         // Six of his Krus and six of his Captains out of a mob box on a
         // deck (Cosmic `2511001`).
         PIRATE_DECK_BOX => Action::BringOutLots([(9300124, 6), (9300125, 6)]),
+        // A bellflower room's chest, opened with the Lord Pirate's key: its
+        // loot topped up with piles of 50 to 99 mesos (Cosmic `2512001`,
+        // `sprayItems(true, 1, 50, 100, 15)`).
+        PIRATE_CHEST => Action::Spray {
+            at_least: 15,
+            mesos: (50, 100),
+        },
         PIRATE_ITEM_BOX => Action::Spray {
             at_least: 15,
             mesos: (30, 60),
@@ -455,6 +462,11 @@ pub const ELLIN_FOUNTAIN_NAME: &str = "";
 pub const PIRATE_MOB_BOX: i32 = 2511000;
 pub const PIRATE_ITEM_BOX: i32 = 2512000;
 pub const PIRATE_DECK_BOX: i32 = 2511001;
+/// The chest in each of the Pirate Ship's bellflower rooms, hidden until
+/// Guon shows it, then opened by dropping the Lord Pirate's key (4031437)
+/// on it, and the rooms' names for it, in order.
+pub const PIRATE_CHEST: i32 = 2512001;
+pub const PIRATE_CHEST_NAMES: [&str; 2] = ["treasure1", "treasure2"];
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
@@ -876,6 +888,13 @@ mod tests {
             Action::Spray {
                 at_least: 15,
                 mesos: (30, 60)
+            }
+        );
+        assert_eq!(
+            action(PIRATE_CHEST),
+            Action::Spray {
+                at_least: 15,
+                mesos: (50, 100)
             }
         );
         // The invisible ones hold places, and are what the shuffle moves
