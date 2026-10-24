@@ -83,6 +83,7 @@ namespace ms
 			FACE_EXPRESSION = 51,
 			USE_ITEMEFFECT = 52,
 			WHISPER = 120,
+			SPOUSE_CHAT = 121,
 			MESSENGER = 122,
 
 			/// Monster Book

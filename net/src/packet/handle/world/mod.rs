@@ -66,6 +66,7 @@ mod scroll;
 mod skill_macro;
 mod solomon;
 mod spend_points;
+mod spouse_chat;
 mod stat_reset;
 mod storage;
 mod summon;
@@ -158,6 +159,7 @@ pub use self::scroll::UseUpgradeScrollHandler;
 pub use self::skill_macro::SkillMacroHandler;
 pub use self::solomon::{UseGachaExpHandler, UseSolomonItemHandler};
 pub use self::spend_points::{SpendApHandler, SpendSpHandler};
+pub use self::spouse_chat::SpouseChatHandler;
 pub use self::storage::TrunkRequestHandler;
 pub use self::summon::{
     BeholderHandler, DamageSummonHandler, MoveSummonHandler, SummonAttackHandler,

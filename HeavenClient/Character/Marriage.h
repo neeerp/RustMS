@@ -148,6 +148,8 @@ namespace ms
 		// The empty boxes and rings a couple holds (4031357 to 4031364), which
 		// the player drops to break off (0x4f33ee).
 		bool is_token(int32_t item_id);
+		// Spouse chat with no partner, or none who heard (0x9f).
+		constexpr const char* NO_SPOUSE = "You are not married or your spouse is currently offline.";
 		// A couple's wedding invitations, which they send to guests (4031377
 		// the Chapel's, 4031395 the Cathedral's; 0x4eff9d).
 		bool is_invitation(int32_t item_id);

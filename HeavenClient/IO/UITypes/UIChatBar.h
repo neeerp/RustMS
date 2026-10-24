@@ -73,6 +73,8 @@ namespace ms
 			GUILD,
 			// Alliance chat
 			ALLIANCE,
+			// Spouse chat (v83 chat type 6)
+			SPOUSE,
 			// A jukebox's song (v83 chat type 9)
 			LIGHT_YELLOW,
 			// Megaphones (v83 chat types 0xd to 0xf)
@@ -209,6 +211,7 @@ namespace ms
 		void send_buddy_chat(const std::string& message, const std::string* group = nullptr);
 		void send_guild_chat(const std::string& message);
 		void send_alliance_chat(const std::string& message);
+		void send_spouse_chat(const std::string& message);
 		// What a line goes to by the target, once a whisper has been ruled
 		// out (FUN_008d536c).
 		void send_to_target(const std::string& message);

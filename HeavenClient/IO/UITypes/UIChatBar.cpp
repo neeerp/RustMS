@@ -881,6 +881,9 @@ namespace ms
 			case LineType::ALLIANCE:
 				color = Color::Name::ALLIANCEGREEN;
 				break;
+			case LineType::SPOUSE:
+				color = Color::Name::SPOUSEPINK;
+				break;
 			case LineType::LIGHT_YELLOW:
 				color = Color::Name::LIGHTYELLOW;
 				break;
@@ -916,7 +919,8 @@ namespace ms
 		// notice and error colours.
 		bool indent = type == LineType::UNK0 || type == LineType::WHITE || type == LineType::PARTY ||
 					  type == LineType::BUDDY || type == LineType::WHISPER || type == LineType::GM ||
-					  type == LineType::GUILD || type == LineType::ALLIANCE || type >= LineType::MEGAPHONE;
+					  type == LineType::GUILD || type == LineType::ALLIANCE || type == LineType::SPOUSE ||
+					  type >= LineType::MEGAPHONE;
 		int16_t width = WRAP_WIDTH - arrows[Arrow::PREV][0].width();
 		// The first row makes room for a channel tag.
 		int16_t room = channel >= 0 ? width - TAG_WIDTH : width;
@@ -1313,6 +1317,22 @@ namespace ms
 		send_chatline(player.get_stats().get_name() + " : " + message, LineType::GUILD);
 	}
 
+	void UIChatBar::send_spouse_chat(const std::string& message)
+	{
+		const Player& player = Stage::get().get_player();
+		const std::optional<MarriageRecord>& record = player.get_marriage();
+
+		// Without a couple's record, engaged or married, v83 says so and
+		// sends nothing; the server echoes a line that went (FUN_008defff).
+		if (!record)
+		{
+			send_chatline(marriage::NO_SPOUSE, LineType::SKILL);
+			return;
+		}
+
+		SpouseChatPacket(record->partner(player.get_stats().get_female()), message).dispatch();
+	}
+
 	void UIChatBar::send_alliance_chat(const std::string& message)
 	{
 		Player& player = Stage::get().get_player();
@@ -1350,9 +1370,7 @@ namespace ms
 				send_alliance_chat(message);
 				break;
 			case Target::SPOUSE:
-				// Nor of marriages: v83 says this without a wedding ring
-				// (FUN_008defff).
-				send_chatline("You are not married or your spouse is currently offline.", LineType::SKILL);
+				send_spouse_chat(message);
 				break;
 			case Target::WHISPER:
 				// No one to whisper to, as the player has been told.

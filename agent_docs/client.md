@@ -111,7 +111,7 @@ from `UI.nx`. Moved so far:
   typed line then goes to that name until another target is picked; the
   name prompt, `/w NAME`, and incoming whispers feed the history `/w` alone
   uses. To Alliance goes to the alliance's members online (`guilds.md`);
-  To Spouse gives v83's notice, since HC has no marriage. Picking To Group opens v83's group dialog
+  To Spouse goes to the partner (`marriage.md`, "Spouse chat"). Picking To Group opens v83's group dialog
   (`UIGroupPicker`, FUN_008d500b): a combo box of the Default Group,
   which it starts on, and the buddies' other groups, which can also be
   typed in. OK sends lines to that group's online buddies. It does so
