@@ -82,6 +82,10 @@ namespace ms
 		// Whether the left button is held down.
 		bool is_cursor_pressed() const;
 
+		// Whether the cursor sent now is the mouse going down, not a move
+		// with it held.
+		bool is_cursor_press() const;
+
 		void send_focus(int focused);
 
 		void send_scroll(double yoffset);
@@ -179,6 +183,7 @@ namespace ms
 		std::unordered_map<int32_t, bool> is_key_down;
 
 		bool enabled;
+		bool pressing = false;
 		bool quitted;
 		bool caps_lock_enabled = false;
 		Screenshot::Throttle screenshots;

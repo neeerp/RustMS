@@ -1270,8 +1270,13 @@ namespace ms
 				}
 				else if (buttonid >= Buttons::BT_TAB0 && buttonid < Buttons::BT_TAB0 + Tab::NUM_TABS)
 				{
-					// Clicking a tab drops the guild pick, even the tab
-					// already shown (FUN_0091d99d), and the alliance's.
+					// Clicking a tab drops the pick, even on the tab
+					// already shown: v83 keeps one for the Friend, Party
+					// and Guild panels (FUN_0091d99d, [+0x87c]). The
+					// alliance's goes too.
+					picked_buddy = 0;
+					picked_group.clear();
+					selected = 0;
 					guild_picked = 0;
 					alliance_picked = 0;
 					change_tab(buttonid - Buttons::BT_TAB0);

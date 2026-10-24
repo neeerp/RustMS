@@ -207,7 +207,12 @@ namespace ms
 		// A click that opens a window can focus that window's field, such as the number entry. Only a field that
 		// was focused before the click loses focus to it.
 		Textfield *focused_before = focusedtextfield.get();
+		// A window opened or closed by the press sends a release of its
+		// own inside this one.
+		bool was_pressing = pressing;
+		pressing = cursorstate == Cursor::State::CLICKING;
 		send_cursor(cursorpos, cursorstate);
+		pressing = was_pressing;
 
 		// A release over a window never reaches the stage.
 		if (!pressed)
@@ -242,6 +247,11 @@ namespace ms
 	bool UI::is_cursor_pressed() const
 	{
 		return cursor.is_pressed();
+	}
+
+	bool UI::is_cursor_press() const
+	{
+		return pressing;
 	}
 
 	void UI::rightclick()

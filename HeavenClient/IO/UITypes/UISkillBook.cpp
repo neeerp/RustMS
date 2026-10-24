@@ -475,12 +475,18 @@ namespace ms
 	{
 		buttons[Buttons::BT_TAB0 + tab]->set_state(Button::NORMAL);
 		buttons[Buttons::BT_TAB0 + new_tab]->set_state(Button::PRESSED);
+		// The tab shown, clicked again, keeps its place in the list (v83
+		// only clamps the scroll, 0x4d7dac).
+		uint16_t new_offset = new_tab == tab ? offset : 0;
 		tab = new_tab;
 
 		load_skills();
 
-		slider.setrows(ROWS, skills.size());
-		change_offset(0);
+		if (new_offset + ROWS > skills.size())
+			new_offset = skills.size() > ROWS ? static_cast<uint16_t>(skills.size() - ROWS) : 0;
+
+		slider.setrows(new_offset, ROWS, skills.size());
+		change_offset(new_offset);
 		change_sp();
 	}
 

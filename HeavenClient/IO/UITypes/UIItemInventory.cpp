@@ -1282,10 +1282,12 @@ namespace ms
 			{
 				auto type = static_cast<InventoryType::Id>(InventoryType::Id::EQUIP + buttonid - Buttons::BT_TAB0);
 
+				// The tab shown, clicked again, only hides the tooltip
+				// (0x81d2b6).
+				clear_tooltip();
+
 				if (type != tab)
 				{
-					clear_tooltip();
-
 					tab = type;
 
 					update_slider();

@@ -164,6 +164,17 @@ namespace ms
 
 			if (button_under(btit.first, pos))
 			{
+				// v83's tab strips have no "already selected" check: a click
+				// on the tab shown plays Tab and selects it again
+				// (FUN_004dd822), once as the mouse goes down.
+				if (down && !holding && btit.second->is_tab() && btit.second->get_state() == Button::State::PRESSED
+					&& UI::get().is_cursor_press())
+				{
+					ret = click_button(btit.first);
+
+					continue;
+				}
+
 				// v83 presses the button the mouse goes down on whether or not
 				// it was hovered, such as one that opened under a still cursor.
 				if (down && !holding && btit.second->get_state() == Button::State::NORMAL)
@@ -179,9 +190,14 @@ namespace ms
 					ret = Cursor::State::CANCLICK;
 				} else if (btit.second->get_state() == Button::State::MOUSEOVER)
 				{
-					if (down && !holding && btit.second->is_tab())
+					if (btit.second->is_tab())
 					{
-						ret = click_button(btit.first);
+						// A tab only acts as the mouse goes down on it, never
+						// as it comes over it held down.
+						if (down && !holding && UI::get().is_cursor_press())
+							ret = click_button(btit.first);
+						else if (!down)
+							ret = Cursor::State::CANCLICK;
 					} else if (down && !holding)
 					{
 						// v83 only presses a button as the mouse goes down
