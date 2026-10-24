@@ -128,6 +128,7 @@ namespace ms
 		BLOCKED_MAP = 131,
 		BLOCKED_SERVER = 132,
 		WHISPER = 135,
+		SPOUSE_CHAT = 136,
 		MESSENGER = 313,
 		PLAYER_INTERACTION = 314,
 		FIELD_EFFECT = 138,
@@ -467,6 +468,7 @@ namespace ms
 		emplace<PLAYER_HINT, PlayerHintHandler>();
 		emplace<CHAT_RECEIVED, ChatReceivedHandler>();
 		emplace<WHISPER, WhisperHandler>();
+		emplace<SPOUSE_CHAT, SpouseChatHandler>();
 		emplace<MESSENGER, MessengerHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();

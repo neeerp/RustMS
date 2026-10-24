@@ -79,6 +79,19 @@ namespace ms
 		}
 	};
 
+	// A line to the player's partner, named from the couple's record
+	// (FUN_008defff).
+	// Opcode: SPOUSE_CHAT(121)
+	class SpouseChatPacket : public OutPacket
+	{
+	public:
+		SpouseChatPacket(const std::string& partner, const std::string& message) : OutPacket(OutPacket::Opcode::SPOUSE_CHAT)
+		{
+			write_string(partner);
+			write_string(message);
+		}
+	};
+
 	// Turns away a whisper from `sender` while the Game Option blocks them,
 	// for the server to tell them (FUN_0053228e).
 	// Opcode: WHISPER(120)

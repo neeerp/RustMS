@@ -74,6 +74,15 @@ impl MarriageRecord {
             self.groom_id
         }
     }
+
+    /// The other one's name, for one of the couple, `id`.
+    pub fn partner_name_of(&self, id: i32) -> &str {
+        if self.groom_id == id {
+            &self.bride_name
+        } else {
+            &self.groom_name
+        }
+    }
 }
 
 /// The marriage block of a player's look: the player, the partner and the

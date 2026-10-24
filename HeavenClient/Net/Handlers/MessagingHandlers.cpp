@@ -731,6 +731,40 @@ namespace ms
 		}
 	}
 
+	void SpouseChatHandler::handle(InPacket& recv) const
+	{
+		// 4 answers the sender, 5 brings the partner's line (FUN_00532087).
+		constexpr int8_t RESULT_MODE = 4;
+		constexpr int8_t RECEIVE_MODE = 5;
+
+		int8_t mode = recv.read_byte();
+		auto chatbar = UI::get().get_element<UIChatBar>();
+
+		if (!chatbar)
+			return;
+
+		if (mode == RESULT_MODE)
+		{
+			if (!recv.read_bool())
+			{
+				chatbar->send_chatline(marriage::NO_SPOUSE, UIChatBar::LineType::SKILL);
+
+				return;
+			}
+
+			std::string text = recv.read_string();
+			chatbar->send_chatline(Stage::get().get_player().get_stats().get_name() + " : " + text, UIChatBar::LineType::SPOUSE);
+		}
+		else if (mode == RECEIVE_MODE)
+		{
+			std::string name = recv.read_string();
+			recv.skip_byte();
+			// Curse words starred out, as in nearby chat.
+			std::string text = CurseWords::printable(CurseData::filter(recv.read_string()));
+			chatbar->send_chatline(name + " : " + text, UIChatBar::LineType::SPOUSE);
+		}
+	}
+
 	void MessengerHandler::handle(InPacket& recv) const
 	{
 		// Canonical v83 MESSENGER modes

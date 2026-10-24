@@ -948,6 +948,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::UseChair, InGame(&world::UseChairHandler)),
             (Op::CancelChair, InGame(&world::CancelChairHandler)),
             (Op::Whisper, InGame(&world::WhisperHandler)),
+            (Op::SpouseChat, InGame(&world::SpouseChatHandler)),
             (Op::PartyOperation, InGame(&world::PartyOperationHandler)),
             (
                 Op::DenyPartyRequest,

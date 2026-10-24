@@ -477,6 +477,22 @@ Engaged couples are told as well as married ones. The client doesn't
 tell the two apart, and whether v83's server told engaged couples is
 inferred (report b057 §6).
 
+## Spouse chat
+
+The chat bar's To Spouse target sends `SPOUSE_CHAT` (0x79): the partner's
+name, then the line (FUN_008defff). The client takes the name from its
+marriage record, so an engaged couple can talk too. Without a record it
+prints "You are not married or your spouse is currently offline." (0x9f)
+and sends nothing.
+
+The server ignores the name the client sent and uses its own record
+(`SpouseChatHandler`). The line travels like a whisper (`WorldAction::Whisper`),
+so it reaches the partner on any channel. `SPOUSE_CHAT` (0x88) mode 5 gives
+the partner the sender's name and the line. Mode 4 tells the sender
+whether the line went: if it did, the client prints the line with the
+player's own name, and if not, it prints the 0x9f notice (FUN_00532087).
+Lines print in chat type 6's pink (#FF71BF).
+
 ## The ring look
 
 A couple wearing their wedding rings show it to the map (report b059).

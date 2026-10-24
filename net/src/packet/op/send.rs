@@ -119,6 +119,8 @@ pub enum SendOpcode {
     QuickSlotInit = 0x9F,
     MultiChat = 0x86,
     Whisper = 0x87,
+    /// Spouse chat: the sender's echo or the partner's line (FUN_00532087).
+    SpouseChat = 0x88,
     SpawnPlayer = 0xA0,
     RemovePlayerFromMap = 0xA1,
     ChatText = 0xA2,

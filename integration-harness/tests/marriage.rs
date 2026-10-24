@@ -334,3 +334,82 @@ async fn a_wedding_ring_worn_shows_the_couple_to_the_map() {
     until(&mut a.connection, &mut at, |t| !t.looks.is_empty()).await;
     assert_eq!(marriages(&at.looks), [(b_id, None)]);
 }
+
+fn spouse_chat(text: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::SpouseChat as i16).unwrap();
+    // The client's name for the partner; the server goes by its record.
+    p.write_str_with_length("Anyone").unwrap();
+    p.write_str_with_length(text).unwrap();
+    p
+}
+
+/// The next SPOUSE_CHAT `session` gets, past its opcode.
+async fn spouse_line(session: &mut WorldSession) -> Vec<u8> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let envelope = tokio::time::timeout_at(deadline, session.connection.read_packet("spouse"))
+            .await
+            .expect("a spouse chat packet")
+            .expect("read");
+        if envelope.opcode() == SendOpcode::SpouseChat as i16 {
+            return envelope.packet.bytes[2..].to_vec();
+        }
+    }
+}
+
+fn string_bytes(s: &str) -> Vec<u8> {
+    let mut bytes = (s.len() as u16).to_le_bytes().to_vec();
+    bytes.extend_from_slice(s.as_bytes());
+    bytes
+}
+
+/// Spouse chat (FUN_008defff, FUN_00532087): a line goes to the partner on
+/// the server's record wherever they are, mode 5 with the sender's name, and
+/// the sender gets mode 4 with the text; with the partner away, or without
+/// a partner, mode 4 says no one heard.
+#[tokio::test]
+async fn spouse_chat_reaches_the_partner() {
+    let configs = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    let [a_config, b_config] = &configs;
+    let a_id = new_character(a_config, 0, 50, 0).await;
+    let b_id = new_character(b_config, 1, 50, 0).await;
+
+    // Not married yet.
+    let mut a = enter(a_config, HENESYS).await;
+    send(&mut a.connection, spouse_chat("anyone?")).await;
+    assert_eq!(spouse_line(&mut a).await, [4, 0]);
+    drop(a);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    marry(a_id, b_id, MOONSTONE_BOX).await.expect("marry");
+    let mut a = enter(a_config, HENESYS).await;
+    let mut b = enter(b_config, PERION).await;
+
+    send(&mut a.connection, spouse_chat("hello dear")).await;
+    let mut heard = vec![5];
+    heard.extend(string_bytes(&a.character_name));
+    heard.push(5);
+    heard.extend(string_bytes("hello dear"));
+    assert_eq!(spouse_line(&mut b).await, heard);
+    let mut echo = vec![4, 1];
+    echo.extend(string_bytes("hello dear"));
+    assert_eq!(spouse_line(&mut a).await, echo);
+
+    // The partner gone, no one hears.
+    // The partner's logout reaches the directory a little later.
+    drop(b);
+    let mut heard = Vec::new();
+    for _ in 0..20 {
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        send(&mut a.connection, spouse_chat("still there?")).await;
+        heard = spouse_line(&mut a).await;
+        if heard == [4, 0] {
+            break;
+        }
+    }
+    assert_eq!(heard, [4, 0]);
+}

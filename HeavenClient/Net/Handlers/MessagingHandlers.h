@@ -137,6 +137,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Spouse chat: the sender's own line, or no one there to hear it, and
+	// the partner's lines
+	// Opcode: SPOUSE_CHAT(136)
+	class SpouseChatHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Maple Messenger: members joining, leaving and talking, and invitations
 	// Opcode: MESSENGER(313)
 	class MessengerHandler : public PacketHandler

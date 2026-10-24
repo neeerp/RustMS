@@ -19,6 +19,10 @@ pub const WHISPER_BLOCKED_MODE: u8 = 0x22;
 pub const FIND_REQUEST_MODE: u8 = 0x05;
 /// Server → client: where the character the client looked for is.
 pub const FIND_RESULT_MODE: u8 = 0x09;
+/// Server → client: spouse chat's answer to the sender.
+const SPOUSE_CHAT_RESULT_MODE: u8 = 4;
+/// Server → client: the partner's spouse chat line.
+const SPOUSE_CHAT_RECEIVE_MODE: u8 = 5;
 
 /// Where a found character is, as the asker may learn it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,6 +219,32 @@ pub fn build_whisper_result(target_name: &str, success: bool) -> Result<Packet, 
     Ok(packet)
 }
 
+/// Spouse chat's answer to its sender: `Some(text)` puts "name : text" in
+/// their log, `None` says the partner isn't there (0x9f, FUN_00532087).
+pub fn build_spouse_chat_result(text: Option<&str>) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SpouseChat as i16)?;
+    packet.write_byte(SPOUSE_CHAT_RESULT_MODE)?;
+    packet.write_byte(text.is_some() as u8)?;
+    if let Some(text) = text {
+        packet.write_str_with_length(text)?;
+    }
+    Ok(packet)
+}
+
+/// `from`'s line to their partner, which the partner's client prints as
+/// "from : text" in spouse chat's colour (FUN_00532087).
+pub fn build_spouse_chat(from: &str, text: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SpouseChat as i16)?;
+    packet.write_byte(SPOUSE_CHAT_RECEIVE_MODE)?;
+    packet.write_str_with_length(from)?;
+    // Skipped by the client; Cosmic sends the mode again.
+    packet.write_byte(SPOUSE_CHAT_RECEIVE_MODE)?;
+    packet.write_str_with_length(text)?;
+    Ok(packet)
+}
+
 /// `target` blocks whispers, so the receiver's last one went unseen.
 pub fn build_whisper_blocked(target: &str) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
@@ -256,6 +286,31 @@ pub fn build_find_result(
 mod tests {
     use super::*;
     use crate::codec::testing::Expect;
+
+    #[test]
+    fn spouse_chat_echoes_the_text_or_says_no_one_heard() {
+        let packet = build_spouse_chat_result(Some("hi")).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x88)
+            .byte(4)
+            .byte(1)
+            .string("hi")
+            .end();
+        let packet = build_spouse_chat_result(None).unwrap();
+        Expect::new(&packet.bytes).short(0x88).byte(4).byte(0).end();
+    }
+
+    #[test]
+    fn a_spouse_chat_line_names_its_sender() {
+        let packet = build_spouse_chat("Romeo", "hi").unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x88)
+            .byte(5)
+            .string("Romeo")
+            .byte(5)
+            .string("hi")
+            .end();
+    }
 
     #[test]
     fn a_broadcast_is_its_kind_and_message() {

@@ -93,6 +93,8 @@ pub enum RecvOpcode {
     FaceExpression = 0x33,
     UseItemEffect = 0x34,
     Whisper = 0x78,
+    /// A line to the player's spouse (FUN_008defff).
+    SpouseChat = 0x79,
     Messenger = 0x7A,
     PlayerInteraction = 0x7B,
     MonsterBookCover = 0x39,

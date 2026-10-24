@@ -152,6 +152,7 @@ namespace ms
 			SCRIPTGOLD,
 			FAMILYBLUE,
 			MEDALTEAL,
+			SPOUSEPINK,
 			NUM_COLORS
 		};
 
@@ -253,7 +254,8 @@ namespace ms
 						{0.55f, 0.54f, 0.55f}, // Job disabled (#8C8A8C, a greyed box's label there)
 						{1.00f, 0.78f, 0.00f}, // Script gold (#FFC600, the floating script lines)
 						{0.64f, 0.94f, 1.00f}, // Family blue (#A4F0FF, v83 font 0x10: an empty junior's box in the Family Tree)
-						{0.20f, 0.43f, 0.50f}  // Medal teal (#346E80, a title's name in v83's title window)
+						{0.20f, 0.43f, 0.50f}, // Medal teal (#346E80, a title's name in v83's title window)
+						{1.00f, 0.44f, 0.75f}  // Spouse pink (#FF71BF, v83 chat font 6: spouse chat)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]
