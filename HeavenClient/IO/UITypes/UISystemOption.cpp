@@ -26,10 +26,11 @@ namespace ms
 		constexpr SliderPlace BGM_SLIDER = { Point<int16_t>(91, 69), 118, 10 };
 		constexpr SliderPlace SFX_SLIDER = { Point<int16_t>(91, 99), 118, 10 };
 		constexpr SliderPlace MOUSE_SLIDER = { Point<int16_t>(91, 159), 157, 10 };
-		constexpr SliderPlace HP_SLIDER = { Point<int16_t>(94, 189), 155, 10 };
-		constexpr SliderPlace MP_SLIDER = { Point<int16_t>(94, 219), 155, 10 };
+		// The alerts have 20 places, 0 to 19, each 5% (0x994163).
+		constexpr SliderPlace HP_SLIDER = { Point<int16_t>(94, 189), 155, 19 };
+		constexpr SliderPlace MP_SLIDER = { Point<int16_t>(94, 219), 155, 19 };
 
-		// Each volume and alert step is 10 of 100.
+		// Each volume step is 10 of 100.
 		constexpr int16_t PERCENT_STEP = 10;
 
 		// The mute boxes stand right of the divider, before MUTE. The other
@@ -81,15 +82,20 @@ namespace ms
 		sliders[Sliders::BGM] = slider(BGM_SLIDER, volume_moved);
 		sliders[Sliders::SFX] = slider(SFX_SLIDER, volume_moved);
 		sliders[Sliders::MOUSE] = slider(MOUSE_SLIDER);
-		sliders[Sliders::HP_ALERT] = slider(HP_SLIDER);
-		sliders[Sliders::MP_ALERT] = slider(MP_SLIDER);
+		// The alerts take effect while dragged (0x9948ec); Cancel puts
+		// back these (0x9949e1).
+		hp_alert = Setting<HPAlert>::get().load();
+		mp_alert = Setting<MPAlert>::get().load();
+
+		sliders[Sliders::HP_ALERT] = slider(HP_SLIDER, [](int16_t step) { Setting<HPAlert>::get().save(static_cast<uint8_t>(step)); });
+		sliders[Sliders::MP_ALERT] = slider(MP_SLIDER, [](int16_t step) { Setting<MPAlert>::get().save(static_cast<uint8_t>(step)); });
 
 		sliders[Sliders::QUALITY].set_step(Setting<PictureQuality>::get().load());
 		sliders[Sliders::BGM].set_step((Setting<BGMVolume>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
 		sliders[Sliders::SFX].set_step((Setting<SFXVolume>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
 		sliders[Sliders::MOUSE].set_step(Setting<MouseSpeed>::get().load());
-		sliders[Sliders::HP_ALERT].set_step((Setting<HPAlert>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
-		sliders[Sliders::MP_ALERT].set_step((Setting<MPAlert>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
+		sliders[Sliders::HP_ALERT].set_step(hp_alert);
+		sliders[Sliders::MP_ALERT].set_step(mp_alert);
 
 		bgm_mute = Setting<BGMMute>::get().load();
 		sfx_mute = Setting<SFXMute>::get().load();
@@ -200,8 +206,8 @@ namespace ms
 		Setting<BGMVolume>::get().save(sliders[Sliders::BGM].get_step() * PERCENT_STEP);
 		Setting<SFXVolume>::get().save(sliders[Sliders::SFX].get_step() * PERCENT_STEP);
 		Setting<MouseSpeed>::get().save(sliders[Sliders::MOUSE].get_step());
-		Setting<HPAlert>::get().save(sliders[Sliders::HP_ALERT].get_step() * PERCENT_STEP);
-		Setting<MPAlert>::get().save(sliders[Sliders::MP_ALERT].get_step() * PERCENT_STEP);
+		Setting<HPAlert>::get().save(static_cast<uint8_t>(sliders[Sliders::HP_ALERT].get_step()));
+		Setting<MPAlert>::get().save(static_cast<uint8_t>(sliders[Sliders::MP_ALERT].get_step()));
 		Setting<BGMMute>::get().save(bgm_mute);
 		Setting<SFXMute>::get().save(sfx_mute);
 		Setting<ShakeScreen>::get().save(shake);
@@ -215,6 +221,8 @@ namespace ms
 	{
 		Music::set_bgmvolume(Music::configured_volume());
 		Sound::set_sfxvolume(Sound::configured_volume());
+		Setting<HPAlert>::get().save(hp_alert);
+		Setting<MPAlert>::get().save(mp_alert);
 
 		deactivate();
 	}

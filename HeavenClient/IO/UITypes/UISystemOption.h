@@ -67,6 +67,9 @@ namespace ms
 		bool sfx_mute;
 		bool shake;
 		bool fullscreen;
+		// The alerts as they were when the window opened
+		uint8_t hp_alert = 0;
+		uint8_t mp_alert = 0;
 		Texture box[2];
 	};
 }
