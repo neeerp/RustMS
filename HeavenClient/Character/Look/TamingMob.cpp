@@ -55,6 +55,18 @@ namespace ms
 		return iter->second;
 	}
 
+	bool TamingMob::saddle_fits(int32_t saddle, int32_t monster)
+	{
+		// The saddle's img lists the monsters it fits, beside its info.
+		std::vector<int32_t> listed;
+
+		for (const nl::node &child : nl::nx::character["TamingMob"][string_format::extend_id(saddle, 8) + ".img"])
+			if (child.name() != "info")
+				listed.push_back(std::atoi(child.name().c_str()));
+
+		return mount::saddle_fits(saddle, monster, listed);
+	}
+
 	std::optional<TamingMob::Ability> TamingMob::ability(int32_t mount, int32_t saddle)
 	{
 		nl::node items = nl::nx::character["TamingMob"];

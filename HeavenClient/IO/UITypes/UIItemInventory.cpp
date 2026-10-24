@@ -52,6 +52,7 @@
 #include "../../Character/GachaExp.h"
 #include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
+#include "../../Character/Look/TamingMob.h"
 #include "../../Character/MorphRules.h"
 #include "../../Character/Pets.h"
 #include "../../Character/Inventory/CashUpgrades.h"
@@ -1901,7 +1902,7 @@ namespace ms
 			int16_t other = (saddle ? EquipSlot::Id::TAMEDMOB : EquipSlot::Id::SADDLE) + layer;
 			int32_t other_id = inventory.get_item_id(InventoryType::Id::EQUIPPED, other);
 
-			if (other_id != 0 && !saddle_fits(saddle ? item_id : other_id, saddle ? other_id : item_id))
+			if (other_id != 0 && !TamingMob::saddle_fits(saddle ? item_id : other_id, saddle ? other_id : item_id))
 				return false;
 		}
 
@@ -1925,18 +1926,6 @@ namespace ms
 		}
 
 		return true;
-	}
-
-	bool UIItemInventory::saddle_fits(int32_t saddle, int32_t monster)
-	{
-		// The saddle's img lists the monsters it fits, beside its info.
-		std::vector<int32_t> listed;
-
-		for (const nl::node &child : nl::nx::character["TamingMob"][string_format::extend_id(saddle, 8) + ".img"])
-			if (child.name() != "info")
-				listed.push_back(std::atoi(child.name().c_str()));
-
-		return mount::saddle_fits(saddle, monster, listed);
 	}
 
 	bool UIItemInventory::can_wear_pet_equip(int16_t slot, int16_t part) const

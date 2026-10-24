@@ -27,6 +27,7 @@
 #include "SkillId.h"
 #include "Inventory/ItemExpiry.h"
 #include "Inventory/ItemProperties.h"
+#include "Look/TamingMob.h"
 
 #include "../Audio/Audio.h"
 #include "../Configuration.h"
@@ -1753,6 +1754,18 @@ namespace ms
 		if (mob == 0 || saddle == 0)
 		{
 			InChatMessage(Messages::Type::RIDE_NO_SADDLE).drop();
+			return false;
+		}
+
+		// A cash tamed monster rides only under a cash saddle that fits it.
+		int32_t mob_cover = inventory.get_item_id(InventoryType::Id::EQUIPPED,
+			EquipSlot::Id::TAMEDMOB + Inventory::CASH_EQUIP);
+		int32_t saddle_cover = inventory.get_item_id(InventoryType::Id::EQUIPPED,
+			EquipSlot::Id::SADDLE + Inventory::CASH_EQUIP);
+
+		if ((mob_cover != 0 || saddle_cover != 0) && !TamingMob::saddle_fits(saddle_cover, mob_cover))
+		{
+			InChatMessage(Messages::Type::RIDE_CASH_SADDLE).drop();
 			return false;
 		}
 

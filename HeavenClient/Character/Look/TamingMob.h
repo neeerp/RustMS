@@ -34,6 +34,9 @@ namespace ms
 		// How riding `mount` with `saddle` moves, or nothing if the mount has no template.
 		static std::optional<Ability> ability(int32_t mount, int32_t saddle);
 
+		// Whether the saddle fits the tamed monster, as the saddle's img lists (FUN_004b1113).
+		static bool saddle_fits(int32_t saddle, int32_t monster);
+
 		TamingMob(nl::node src);
 
 		// Draw an action's frame's parts at place `z` of mount::ZMAP.

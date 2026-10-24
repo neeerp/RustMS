@@ -21,6 +21,7 @@
 
 #include "../../Character/Job.h"
 #include "../../Character/MountRules.h"
+#include "../../Character/Look/TamingMob.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -588,10 +589,7 @@ namespace ms
 		if (mountid <= 0 || saddleid <= 0)
 			return true;
 
-		// A saddle lists the mounts it fits.
-		nl::node saddle = nl::nx::character["TamingMob"][string_format::extend_id(saddleid, 8) + ".img"];
-
-		return static_cast<bool>(saddle[std::to_string(mountid)]);
+		return TamingMob::saddle_fits(saddleid, mountid);
 	}
 
 	void UICharInfo::change_fame(int16_t f)
