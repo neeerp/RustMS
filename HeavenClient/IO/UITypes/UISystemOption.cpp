@@ -9,6 +9,8 @@
 #include "../../Audio/Audio.h"
 #include "../../Util/NxFiles.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace
@@ -22,16 +24,26 @@ namespace ms
 			int16_t steps;
 		};
 
-		constexpr SliderPlace QUALITY_SLIDER = { Point<int16_t>(97, 39), 152, 2 };
-		constexpr SliderPlace BGM_SLIDER = { Point<int16_t>(91, 69), 118, 10 };
-		constexpr SliderPlace SFX_SLIDER = { Point<int16_t>(91, 99), 118, 10 };
-		constexpr SliderPlace MOUSE_SLIDER = { Point<int16_t>(91, 159), 157, 10 };
-		// The alerts have 20 places, 0 to 19, each 5% (0x994163).
+		// Picture quality has 4 places and the rest 20, 0 to 19 (0x994163).
+		constexpr SliderPlace QUALITY_SLIDER = { Point<int16_t>(97, 39), 152, 3 };
+		constexpr SliderPlace BGM_SLIDER = { Point<int16_t>(91, 69), 118, 19 };
+		constexpr SliderPlace SFX_SLIDER = { Point<int16_t>(91, 99), 118, 19 };
+		constexpr SliderPlace MOUSE_SLIDER = { Point<int16_t>(91, 159), 157, 19 };
 		constexpr SliderPlace HP_SLIDER = { Point<int16_t>(94, 189), 155, 19 };
 		constexpr SliderPlace MP_SLIDER = { Point<int16_t>(94, 219), 155, 19 };
 
-		// Each volume step is 10 of 100.
-		constexpr int16_t PERCENT_STEP = 10;
+		// A volume place is 5 of 100, from 5 at the left to 100 (0x49ead3).
+		constexpr int16_t PERCENT_STEP = 5;
+
+		int16_t volume_place(uint8_t volume)
+		{
+			return std::clamp<int16_t>((volume + PERCENT_STEP / 2) / PERCENT_STEP - 1, 0, BGM_SLIDER.steps);
+		}
+
+		uint8_t place_volume(int16_t place)
+		{
+			return static_cast<uint8_t>((place + 1) * PERCENT_STEP);
+		}
 
 		// The mute boxes stand right of the divider, before MUTE. The other
 		// boxes stand before their text.
@@ -91,8 +103,8 @@ namespace ms
 		sliders[Sliders::MP_ALERT] = slider(MP_SLIDER, [](int16_t step) { Setting<MPAlert>::get().save(static_cast<uint8_t>(step)); });
 
 		sliders[Sliders::QUALITY].set_step(Setting<PictureQuality>::get().load());
-		sliders[Sliders::BGM].set_step((Setting<BGMVolume>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
-		sliders[Sliders::SFX].set_step((Setting<SFXVolume>::get().load() + PERCENT_STEP / 2) / PERCENT_STEP);
+		sliders[Sliders::BGM].set_step(volume_place(Setting<BGMVolume>::get().load()));
+		sliders[Sliders::SFX].set_step(volume_place(Setting<SFXVolume>::get().load()));
 		sliders[Sliders::MOUSE].set_step(Setting<MouseSpeed>::get().load());
 		sliders[Sliders::HP_ALERT].set_step(hp_alert);
 		sliders[Sliders::MP_ALERT].set_step(mp_alert);
@@ -203,8 +215,8 @@ namespace ms
 	void UISystemOption::save()
 	{
 		Setting<PictureQuality>::get().save(sliders[Sliders::QUALITY].get_step());
-		Setting<BGMVolume>::get().save(sliders[Sliders::BGM].get_step() * PERCENT_STEP);
-		Setting<SFXVolume>::get().save(sliders[Sliders::SFX].get_step() * PERCENT_STEP);
+		Setting<BGMVolume>::get().save(place_volume(sliders[Sliders::BGM].get_step()));
+		Setting<SFXVolume>::get().save(place_volume(sliders[Sliders::SFX].get_step()));
 		Setting<MouseSpeed>::get().save(sliders[Sliders::MOUSE].get_step());
 		Setting<HPAlert>::get().save(static_cast<uint8_t>(sliders[Sliders::HP_ALERT].get_step()));
 		Setting<MPAlert>::get().save(static_cast<uint8_t>(sliders[Sliders::MP_ALERT].get_step()));
@@ -229,7 +241,7 @@ namespace ms
 
 	void UISystemOption::preview_volume()
 	{
-		Music::set_bgmvolume(bgm_mute ? 0 : sliders[Sliders::BGM].get_step() * PERCENT_STEP);
-		Sound::set_sfxvolume(sfx_mute ? 0 : sliders[Sliders::SFX].get_step() * PERCENT_STEP);
+		Music::set_bgmvolume(bgm_mute ? 0 : place_volume(sliders[Sliders::BGM].get_step()));
+		Sound::set_sfxvolume(sfx_mute ? 0 : place_volume(sliders[Sliders::SFX].get_step()));
 	}
 }
