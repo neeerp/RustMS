@@ -14,7 +14,7 @@ use net::events::{
     Standing, Statue,
 };
 use net::handler::FieldRequest;
-use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON};
+use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
 use net::packet::build::world::conti::{
     build_boss_site_closing, build_countdown, build_stop_clock, BossSite,
 };
@@ -131,7 +131,8 @@ impl ClientActor {
     }
 
     /// A balloon on one of the event's stages: the stage's hand-in, the
-    /// crates' puzzle, or the maze's one line. Returns whether it spoke;
+    /// crates' puzzle, or the maze's one line; or Pietri at the end of the
+    /// Ludibrium Maze, who takes its coupons. Returns whether it spoke;
     /// elsewhere it has nothing to say.
     pub(super) async fn talk_to_balloon(&mut self, npc_id: i32) -> Result<bool, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
@@ -144,6 +145,17 @@ impl ClientActor {
                 return Ok(false);
             };
             NpcScript::balloon(hand_in, view, &self.in_game()?.player)
+        } else if npc_id == PIETRI
+            && ticket.kind == EventKind::LudiMaze
+            && map_id == events::MAZE_GOAL
+        {
+            // Cosmic `isEventTeamTogether`: only the team can be on the
+            // copy, so all of it is here when as many are.
+            let (leader, won) = (ticket.leader(), ticket.won());
+            let team = ticket.team_size().await;
+            let here = self.standing_on(map_id, |_, at| at.len()).await?;
+            let together = matches!((team, here), (Some(team), Some(here)) if here >= team);
+            NpcScript::pietri(leader, won, together, &self.in_game()?.player)
         } else if npc_id == AQUA_BALLOON && ticket.kind == EventKind::Lpq {
             NpcScript::aqua_balloon()
         } else if npc_id == BLUE_BALLOON && ticket.kind == EventKind::Lpq {
@@ -706,10 +718,17 @@ impl ClientActor {
     /// last stage wins the event, and everyone's clock stops. A stage with a
     /// `clear_portal` first takes those on its map there (Cosmic's Eak warps
     /// the team before the clear effect). The Dead Mine's win shows nothing,
-    /// and gives more EXP with the documents (Cosmic's Aura). Zakum's fall
+    /// and gives more EXP with the documents (Cosmic's Aura); the maze's win
+    /// shows nothing either, and gives `exp`, by the coupons handed in
+    /// (Cosmic's Pietri). Zakum's fall
     /// showed itself on the altar already (the field's `zakum_falls`), and
     /// gives none; nor do Horntail's stages, nor Delli's rescue.
-    pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
+    pub(super) async fn stage_cleared(
+        &mut self,
+        id: u32,
+        stage: u8,
+        exp: Option<i32>,
+    ) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
         };
@@ -724,7 +743,12 @@ impl ClientActor {
                 ticket.kind,
                 EventKind::Horntail | EventKind::Htpq | EventKind::Delli
             );
-        let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
+        // The maze's win has no effect or sound (Cosmic `clearPQ`), only
+        // its coupons' EXP.
+        let quiet = zpq || zakum || ticket.kind == EventKind::LudiMaze;
+        let exp = if let Some(exp) = exp {
+            exp
+        } else if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
             events::ZPQ_DOCUMENTS_EXP
         } else {
             event.stage_exp(stage)
@@ -738,7 +762,7 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if next.stats.map_id == map_id && !zpq && !zakum {
+        if next.stats.map_id == map_id && !quiet {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             if event.gates {

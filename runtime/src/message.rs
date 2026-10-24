@@ -368,10 +368,12 @@ pub enum ServerMessage {
         id: u32,
         clock: tokio::time::Instant,
     },
-    /// The party in event `id` cleared `stage`.
+    /// The party in event `id` cleared `stage`, for `exp` rather than the
+    /// stage's own EXP if given.
     StageCleared {
         id: u32,
         stage: u8,
+        exp: Option<i32>,
     },
     /// Event `id` takes its members on `from`, or all of them, to `to`,
     /// where the time left is `clock`.

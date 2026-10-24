@@ -274,7 +274,8 @@ leader, goes like this (`EventActor::clear`):
 
 1. The event sets the stage's bit in `Cleared` before telling anyone, so a
    member who sees the clear can go on.
-2. Every member gets `ServerMessage::StageCleared{id, stage}`. Those on
+2. Every member gets `ServerMessage::StageCleared{id, stage, exp}`
+   (`exp` replaces the stage's EXP when given: the maze's coupons). Those on
    the stage's map are shown FIELD_EFFECT 3 `quest/party/clear`, 4
    `Party1/Clear` (the sound), and 2 `gate` for an event whose stage maps
    have one (`Event::gates`: KPQ's do, HPQ's doesn't).
@@ -891,8 +892,19 @@ pair; box 8098000 brings out by the room it is in (`reactors::maze_box`,
 Cosmic `8098000`). They drop nothing themselves; the mobs drop the coupons
 (4001106) from the content pack's drops (`rewards.json`).
 
-Not yet: Pietri's (9103000) coupon hand-in in the goal room, the clear
-room's (809050016) present, and the Party Search entry.
+Pietri (9103000) in the goal room (`NpcScript::pietri`, routed by
+`talk_to_balloon`) serves only the leader, and only once the whole team is
+there (Cosmic `isEventTeamTogether`: as many on the copy's goal room as the
+team has, `EventTicket::team_size`). Below 30 coupons he refuses (Cosmic's
+hard floor; `events::MAZE_COUPONS_WANTED`). From 30 on he asks, takes all
+the leader's coupons, and sends `EventCommand::WinWithCoupons(n)`: the
+event wins with `MAZE_COUPON_EXP` (50) times `n` for every member, carried
+in `ServerMessage::StageCleared`'s `exp` in place of the stage's, and takes
+the team to the clear room 809050016 off the clock. The maze's win has no
+clear effect or sound (Cosmic `clearPQ`). The maze has no `hand_ins`.
+
+Not yet: the clear room's present (Rolly 9103002) and the Party Search
+entry.
 
 ## NPCs
 

@@ -1553,7 +1553,9 @@ impl ClientActor {
             ServerMessage::EventEnded { id } => self.event_ended(id).await?,
             ServerMessage::EventFailed { id } => self.event_failed(id).await,
             ServerMessage::LeaderHandedOver { to } => self.handed_over(to).await,
-            ServerMessage::StageCleared { id, stage } => self.stage_cleared(id, stage).await?,
+            ServerMessage::StageCleared { id, stage, exp } => {
+                self.stage_cleared(id, stage, exp).await?
+            }
             ServerMessage::ClearEventStage(stage) => {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await

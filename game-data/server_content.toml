@@ -1102,6 +1102,11 @@ unsourced = [
     "ludimaze.busy",
     "ludimaze.home",
     "ludimaze.summoned",
+    "ludimaze.pietri.not_leader",
+    "ludimaze.pietri.wait",
+    "ludimaze.pietri.short",
+    "ludimaze.pietri.ask",
+    "ludimaze.pietri.done",
 ]
 
 [text."glTutoMsg0.message"]
