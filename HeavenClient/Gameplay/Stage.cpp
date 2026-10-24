@@ -186,6 +186,14 @@ namespace ms
 
 				pending_wedding.clear();
 
+				if (pending_weather)
+				{
+					weather.set_packet_flag(pending_weather->flag);
+					weather.blow(pending_weather->item_id, pending_weather->msg, pending_weather->from_map);
+				}
+
+				pending_weather.reset();
+
 				// The player's effect item goes along, starting over where they arrive.
 				player.restart_item_effect();
 
@@ -257,6 +265,8 @@ namespace ms
 		pending_clock.reset();
 		pending_help.reset();
 		pending_wedding.clear();
+		pending_weather.reset();
+		pending_weather_flag = 0;
 	}
 
 	void Stage::load_map(int32_t mapid)
@@ -1837,12 +1847,18 @@ namespace ms
 
 	void Stage::blow_weather(int32_t item_id, const std::string &msg, bool from_map)
 	{
-		weather.blow(item_id, msg, from_map);
+		if (state != State::ACTIVE)
+			pending_weather = WeatherNews{ item_id, msg, from_map, pending_weather_flag };
+		else
+			weather.blow(item_id, msg, from_map);
 	}
 
 	void Stage::set_weather_flag(uint8_t flag)
 	{
-		weather.set_packet_flag(flag);
+		if (state != State::ACTIVE)
+			pending_weather_flag = flag;
+		else
+			weather.set_packet_flag(flag);
 	}
 
 	void Stage::start_jukebox()

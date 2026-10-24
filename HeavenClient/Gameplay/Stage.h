@@ -270,7 +270,8 @@ namespace ms
 		void show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path);
 
 		// BLOW_WEATHER and a map's own weathers: start a 512xxxx item's weather with its message, or stop the one
-		// blowing with item 0. One from the map or a whisper stops itself after 22 s.
+		// blowing with item 0. One from the map or a whisper stops itself after 22 s. One that comes before its
+		// map has loaded waits for it.
 		void blow_weather(int32_t item_id, const std::string &msg, bool from_map);
 
 		// OX_QUIZ's line on the status bar's second float notice, above the weather's bar. It stays up, from map to
@@ -488,6 +489,18 @@ namespace ms
 		};
 
 		std::vector<WeddingNews> pending_wedding;
+		// The last BLOW_WEATHER that came before its map loaded, such as the Dojo entrance's taunt sent on
+		// arrival, with the flag that came with it.
+		struct WeatherNews
+		{
+			int32_t item_id;
+			std::string msg;
+			bool from_map;
+			uint8_t flag;
+		};
+
+		std::optional<WeatherNews> pending_weather;
+		uint8_t pending_weather_flag = 0;
 		// Effects left where they started, such as a jump pad's burst.
 		EffectLayer ground_effects;
 		// One-time FIELD_EFFECT effects: on the map, on the screen, and on the screen above the UI.

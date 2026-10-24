@@ -10,8 +10,8 @@ use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::events::{
-    self, on_areas, standing, Aura, Balloon, Cloto, EventCommand, EventKind, HeadCount, LeverCheck,
-    Standing, Statue,
+    self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, EventCommand, EventKind, HeadCount,
+    LeverCheck, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -19,7 +19,7 @@ use net::packet::build::world::conti::{
     build_boss_site_closing, build_countdown, build_stop_clock, BossSite,
 };
 use net::packet::build::world::effect::{
-    build_field_effect, build_field_object, build_field_sound,
+    build_blow_weather, build_field_effect, build_field_object, build_field_sound,
 };
 use net::packet::build::world::field::build_dojo_warp_up;
 use net::packet::build::world::inventory::build_inventory_operation;
@@ -789,11 +789,16 @@ impl ClientActor {
 
     /// The player is going to `map_id`: off the event's maps, they hand
     /// their ticket back; onto one whose first arrival starts its clock
-    /// over, they tell it.
+    /// over or stops it, they tell it. One that stops it takes the clock
+    /// down at once, so it doesn't show there before the event answers.
     pub(super) async fn leaving_for(&mut self, map_id: i32) -> Result<(), RuntimeError> {
-        match &self.event {
+        let clock = events::clock_on(map_id);
+        match &mut self.event {
             Some(ticket) if !ticket.holds(map_id) => self.drop_event_ticket().await?,
-            Some(_) if events::clock_on(map_id).is_some() => {
+            Some(ticket) if clock.is_some() => {
+                if clock == Some(ClockOn::Stop) && ticket.clock.take().is_some() {
+                    self.send(&mut build_stop_clock()?).await?;
+                }
                 self.tell_event(EventCommand::Reached(map_id)).await
             }
             _ => {}
@@ -977,21 +982,26 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Event `id`'s clock started over, to run out at `clock`: shown at
-    /// once on its maps.
+    /// Event `id`'s clock started over, to run out at `clock`, or stopped:
+    /// shown or taken down at once on its maps.
     pub(super) async fn event_clock(
         &mut self,
         id: u32,
-        clock: Instant,
+        clock: Option<Instant>,
     ) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_mut().filter(|ticket| ticket.id == id) else {
             return Ok(());
         };
-        ticket.clock = Some(clock);
+        let shown = ticket.clock.is_some();
+        ticket.clock = clock;
         if self.in_cash_shop || self.game.is_none() {
             return Ok(());
         }
-        self.show_event_clock().await
+        match clock {
+            Some(_) => self.show_event_clock().await,
+            None if shown => self.send(&mut build_stop_clock()?).await,
+            None => Ok(()),
+        }
     }
 
     /// A cleared stage's gate stays open for whoever comes onto its map.
@@ -1033,6 +1043,22 @@ impl ClientActor {
             build_field_effect(&number)?,
         ])
         .await
+    }
+
+    /// Arriving on the Dojo's entrance, the player alone sees one of three
+    /// taunts on a weather's message bar, taken down after 30 s (Cosmic
+    /// `dojang_Msg`'s `startMapEffect`; its spawn-point check always holds,
+    /// as the entrance's only spawn point is the one it asks for).
+    pub(super) async fn taunt_challenger(&mut self) -> Result<(), RuntimeError> {
+        if self.in_game()?.player.stats.map_id != events::DOJO_ENTRANCE {
+            return Ok(());
+        }
+        let key = keys::DOJO_TAUNT[rand::thread_rng().gen_range(0, keys::DOJO_TAUNT.len())];
+        let taunt = net::content::text().get(key, &[]);
+        let weather = (events::DOJO_TAUNT_WEATHER, taunt.as_str());
+        self.send(&mut build_blow_weather(Some(weather))?).await?;
+        self.reply_later(events::DOJO_TAUNT_TIME, build_blow_weather(None)?);
+        Ok(())
     }
 
     /// On one of the event's maps the client shows the time left, until the

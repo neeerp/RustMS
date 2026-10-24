@@ -1610,6 +1610,11 @@ pub const DOJO_BOSS_EFFECT: u8 = 15;
 pub const DOJO_UP_PORTAL: u8 = 6;
 /// The reactor that is each fighting floor's door to its way on.
 pub const DOJO_DOOR: &str = "door";
+/// The weather whose message bar taunts a challenger on the entrance
+/// (Cosmic `dojang_Msg`).
+pub const DOJO_TAUNT_WEATHER: i32 = 5120024;
+/// How long the taunt stays (Cosmic `startMapEffect`'s 30000 ms).
+pub const DOJO_TAUNT_TIME: Duration = Duration::from_secs(30);
 
 /// Every floor: whoever kills a floor's boss clears it.
 const DOJO_CLEARS: [u8; DOJO_FLOORS as usize] = {
@@ -1675,15 +1680,45 @@ pub fn dojo_boss(map_id: i32) -> Option<i32> {
     (!rest_floor(floor)).then(|| DOJO_BOSS_BASE + i32::from(dojo_round(floor)))
 }
 
-/// The minutes an event's clock starts over with the first time any member
-/// reaches `map_id`, in its copy: the Pirate Ship's second to fifth stages
-/// give 6, the Lord Pirate's 8 (Cosmic `PiratePQ.changedMapInside`).
-pub fn clock_on(map_id: i32) -> Option<u64> {
+/// What the first time any member reaches one of an event's maps does to
+/// its clock (`clock_on`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockOn {
+    /// It starts over with this many minutes.
+    Restart(u64),
+    /// It stops, with no time limit until it starts over again.
+    Stop,
+}
+
+/// What an event's clock does the first time any member reaches `map_id`,
+/// in its copy:
+/// - the Pirate Ship's second to fifth stages give 6 minutes, the Lord
+///   Pirate's 8 (Cosmic `PiratePQ.changedMapInside`);
+/// - the Dojo's first floor after each rest floor starts a section of six,
+///   with `(floor > 36 ? 15 : floor / 6 + 5)` minutes, and a rest floor
+///   stops the clock (Cosmic `Channel.startDojoSchedule`, which a rest
+///   floor's `dojang_1st` dismisses). Its first section's 5 are the
+///   event's own `minutes`.
+pub fn clock_on(map_id: i32) -> Option<ClockOn> {
+    if let Some(floor) = DOJO.stage_on(map_id) {
+        return match floor {
+            _ if rest_floor(floor) => Some(ClockOn::Stop),
+            _ if floor > 1 && (floor - 1) % 6 == 0 => {
+                let minutes = if floor > 36 { 15 } else { floor / 6 + 5 };
+                Some(ClockOn::Restart(u64::from(minutes)))
+            }
+            _ => None,
+        };
+    }
     match PIRATE_STAGES[1..].iter().position(|&map| map == map_id)? {
-        4 => Some(8),
-        _ => Some(6),
+        4 => Some(ClockOn::Restart(8)),
+        _ => Some(ClockOn::Restart(6)),
     }
 }
+
+/// How long after a Dojo section's clock shows 0 its challenger is sent
+/// out (Cosmic `startDojoSchedule`'s 3000 ms on top of the clock).
+pub const DOJO_OVERTIME: Duration = Duration::from_secs(3);
 
 /// Whether `mob_id` is the friendly mob some event's team protects.
 pub fn protected(mob_id: i32) -> bool {
@@ -2523,6 +2558,27 @@ mod tests {
         assert_eq!(dojo_boss(DOJO_FIRST), Some(9300184));
         assert_eq!(dojo_boss(DOJO_FIRST + 3700), Some(9300215));
         assert_eq!(dojo_boss(DOJO_FIRST + 500), None);
+    }
+
+    #[test]
+    fn dojo_sections_have_their_own_clocks() {
+        let floor = |n: u8| clock_on(DOJO.stage_map(n));
+        let restarts: Vec<_> = (1..=DOJO_FLOORS)
+            .filter_map(|n| match floor(n) {
+                Some(ClockOn::Restart(minutes)) => Some((n, minutes)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            restarts,
+            [(7, 6), (13, 7), (19, 8), (25, 9), (31, 10), (37, 15)]
+        );
+        for n in [6, 12, 18, 24, 30, 36] {
+            assert_eq!(floor(n), Some(ClockOn::Stop));
+        }
+        assert_eq!(floor(1), None);
+        assert_eq!(floor(38), None);
+        assert_eq!(DOJO.minutes, 5);
         let bosses: std::collections::BTreeSet<_> = (0..38)
             .filter_map(|floor| dojo_boss(DOJO_FIRST + floor * 100))
             .collect();
@@ -3093,7 +3149,11 @@ mod tests {
         assert_eq!(PIRATE.duration(), scaled(Duration::from_secs(4 * 60)));
         // Cosmic `changedMapInside`: 6 minutes from the second stage on,
         // 8 for the Lord Pirate's; none on the first or off the stages.
-        let clocks: Vec<_> = PIRATE_STAGES.iter().map(|&map| clock_on(map)).collect();
+        let minutes = |map| match clock_on(map) {
+            Some(ClockOn::Restart(minutes)) => Some(minutes),
+            _ => None,
+        };
+        let clocks: Vec<_> = PIRATE_STAGES.iter().map(|&map| minutes(map)).collect();
         assert_eq!(clocks, [None, Some(6), Some(6), Some(6), Some(6), Some(8)]);
         assert!(rooms.iter().all(|&map| clock_on(map).is_none()));
         assert_eq!(clock_on(PIRATE_CLEAR), None);

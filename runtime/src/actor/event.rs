@@ -33,9 +33,9 @@ use crate::message::{
 use crate::supervisor::spawn_supervised;
 use game_data::server_content::keys;
 use net::events::{
-    draw_combo, draw_question, htpq_room_key, Balloon, Cloto, Event, EventCommand, EventKind,
-    Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, MAZE_COUPONS_WANTED, MAZE_COUPON_EXP,
-    ZPQ_DOCUMENTS,
+    draw_combo, draw_question, htpq_room_key, Balloon, ClockOn, Cloto, Event, EventCommand,
+    EventKind, Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, MAZE_COUPONS_WANTED,
+    MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
@@ -507,7 +507,7 @@ impl EventActor {
         }
         let mut over = false;
         while !over {
-            let ends = self.ends;
+            let ends = self.ends.map(|ends| ends + self.overtime());
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
@@ -737,9 +737,12 @@ impl EventActor {
             }
             EventCommand::RestartClock => debug!(client_id, "Restart not taken"),
             EventCommand::Reached(map) if event.holds(map) && !won => {
-                if let Some(minutes) = net::events::clock_on(map) {
+                if let Some(clock) = net::events::clock_on(map) {
                     if self.reached.insert(map) {
-                        self.restart_clock(minutes);
+                        match clock {
+                            ClockOn::Restart(minutes) => self.restart_clock(minutes),
+                            ClockOn::Stop => self.stop_clock(),
+                        }
                     }
                 }
             }
@@ -825,13 +828,35 @@ impl EventActor {
         let ends = Instant::now() + net::events::scaled(Duration::from_secs(minutes * 60));
         self.ends = Some(ends);
         info!(kind = ?self.kind, id = self.id, minutes, "Clock restarted");
+        self.tell_clock();
+    }
+
+    /// The clock stops, and the time no longer runs out, as on a Dojo rest
+    /// floor until the next section starts it over.
+    fn stop_clock(&mut self) {
+        self.ends = None;
+        info!(kind = ?self.kind, id = self.id, "Clock stopped");
+        self.tell_clock();
+    }
+
+    /// Every member's ticket and screen take the clock as it now is.
+    fn tell_clock(&self) {
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::EventClock {
                     id: self.id,
-                    clock: ends,
+                    clock: self.ends,
                 });
             }
+        }
+    }
+
+    /// How long after the clock shows 0 the time is up: a Dojo section
+    /// gives its challenger a moment more.
+    fn overtime(&self) -> Duration {
+        match self.kind {
+            EventKind::Dojo => net::events::scaled(net::events::DOJO_OVERTIME),
+            _ => Duration::ZERO,
         }
     }
 

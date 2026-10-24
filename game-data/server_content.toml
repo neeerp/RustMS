@@ -1211,6 +1211,9 @@ unsourced = [
     "dojo.board.decline",
     "dojo.up.monsters",
     "dojo.next.shut",
+    "dojo.taunt.0",
+    "dojo.taunt.1",
+    "dojo.taunt.2",
 ]
 
 [text."glTutoMsg0.message"]
