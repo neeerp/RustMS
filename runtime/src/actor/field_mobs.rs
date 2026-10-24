@@ -828,6 +828,11 @@ impl MobSet {
             .collect()
     }
 
+    /// Whether no mob is left, nor any to come out of one that died.
+    pub fn all_gone(&self) -> bool {
+        self.live.is_empty() && self.revivals.is_empty()
+    }
+
     /// `leaving` stopped controlling its mobs; hand them to `next` if any.
     /// Returns the mobs that changed hands.
     pub fn release(&mut self, leaving: ClientId, next: Option<ClientId>) -> Vec<i32> {

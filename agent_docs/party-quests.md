@@ -971,20 +971,50 @@ again 2 seconds on (see "timeOut" in `combat.md`). The spine
 at a time, each 5 seconds after it lands on it; on the fourth it stays,
 in its last state, and clears the stage for whoever threw it.
 
+The third stage (930000300) is a maze of sixteen rooms, the party
+arriving in the first. Each of the first fifteen has one script for all
+its ways out (`party6_stage501` to `party6_stage515`,
+`scripts::ellin_maze_way`): one time in ten it leads to the sixteenth
+room's spot (`16st`, portal 16), and otherwise to the next room's (the
+fifteenth's to the first's), with the portal sound. Ellin (2133001) in the
+sixteenth room clears the maze for whichever member talks to her
+(`ellin.guide.maze_end`, `npc_scripts::ellin_maze_end`), and her next
+page moves the whole team to the fourth stage: the event lets any member
+move the team to a stage that follows one any member clears, once it is
+and only if the team hasn't been taken there yet, so a second member's
+talk left open doesn't take it back (`member_moves_to`). The sixteen mileposts (2133002) let a
+member out (`ellin.milepost.leave`).
+
+The fourth stage (930000400) holds 20 Poison Flowers (9300175, spawned
+once; one killed comes back, as its `revive` is itself). Ellin there
+(`ClientActor::ellin_flowers`, `NpcScript::ellin_flowers`) first tells
+each member what to do (`ellin.guide.flowers`, once per member: the
+ticket's `hint_heard`, Cosmic `gridInsert`), then, while flowers are left,
+gives a member with no Purification Marbles (2270004) ten of them
+(`ellin.guide.no_room` if they don't fit), and asks one who has some
+whether to leave (`ellin.guide.flowers.leave`), as she asks everyone once
+all are caught (`ellin.guide.all_caught`). A marble catches a flower
+below 40% of its HP within its reach and makes a Monster Marble (4001169,
+the item's `info`, see the catch items in `inventory.md`); the last flower
+caught, none being left to come back, clears the stage
+(`events::cleared_by_catching`, Cosmic `monsterKilled` without a killer).
+A member holding 20 Monster Marbles is sent to the leader
+(`ellin.guide.to_leader`); the leader hands them in
+(`ellin.guide.hand_in`), which moves the team to the fifth stage.
+
 The prize map, 930000800, is the event's exit and every party's own map
 alike, not a copy: the time running out, leaving, and dying (the maps'
 `returnMap`) all land there, and its way out (`party6_stage800`) leads home
 to 300030100. Ellin (2133001) welcomes the party at the entrance
 (`ellin.guide.welcome`) and, on the stages other than the third and
-fourth, lets a member out to it; a member leaving, if fewer than four stay, or the leader
+fourth, lets a member out to it (`ellin.guide.leave`); a member leaving, if fewer than four stay, or the leader
 leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
 event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
 leaves. Its lines are placeholders (`ellin.*`).
 
-Not yet: the stages after the second, the Poison
-Golem's win, the fountain's EXP, the Altaire Fragment and the earrings
-(slices S3 to S5 of a125), Ellin's lines on the third and fourth stages,
-and the Party Search toggle.
+Not yet: the fifth and sixth stages, the Poison Golem's win, the
+fountain's EXP, the Altaire Fragment and the earrings (slices S4 and S5
+of a125), and the Party Search toggle.
 
 ## NPCs
 
@@ -1033,7 +1063,11 @@ and the Party Search toggle.
 | Tylus 2020008 | 211000001 | On 6192, runtime (`talk_about_event`): a menu of going in and what to do |
 | Tylus 2022004 | 921100301 | Thanks, and on to El Nath 211000000 |
 | Ellin 2133000 | 300030100 | Runtime (`talk_about_event`): a menu of going into the forest and what it holds |
-| Ellin 2133001 | 930000000-700 | Out to 930000800 |
+| Ellin 2133001 | 930000000 | Welcome |
+| Ellin 2133001 | 930000300 | Clears the maze and moves the team on |
+| Ellin 2133001 | 930000400 | Runtime (`ellin_flowers`): Purification Marbles, the leader's hand-in, or out |
+| Ellin 2133001 | 930000100-600, others | Out to 930000800 |
+| Milepost 2133002 | 930000300 | Out to 930000800 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,

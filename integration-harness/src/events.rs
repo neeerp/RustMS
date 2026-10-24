@@ -10,7 +10,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, HPQ, HTPQ, KPQ, LPQ, OPQ, ZPQ};
+use net::events::{Event, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -239,13 +239,13 @@ pub async fn enter_hpq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// Red Sign, once the party before them is out, and everyone arrives there;
 /// returns what each saw up to their arrival.
 pub async fn enter_lpq(team: &mut [WorldSession]) -> Vec<Trace> {
-    enter_from_menu(team, &LPQ, RED_SIGN).await
+    enter_from_menu(team, &LPQ, RED_SIGN, 5).await
 }
 
 /// The party's leader, first, takes it into the Tower of Goddess from
 /// Wonky, as `enter_lpq` does.
 pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
-    let mut traces = enter_from_menu(team, &OPQ, WONKY).await;
+    let mut traces = enter_from_menu(team, &OPQ, WONKY, 5).await;
     // Eak tells each of them what to bring him.
     for (player, trace) in team.iter_mut().zip(&mut traces) {
         until(&mut player.connection, trace, |t| {
@@ -259,21 +259,34 @@ pub async fn enter_opq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// The party's leader, first, takes it into the Dead Mine from Adobis, as
 /// `enter_lpq` does; each needs a chief's approval for Zakum.
 pub async fn enter_zpq(team: &mut [WorldSession]) -> Vec<Trace> {
-    enter_from_menu(team, &ZPQ, ADOBIS).await
+    enter_from_menu(team, &ZPQ, ADOBIS, 5).await
 }
 
 /// The party's leader, first, takes it into Horntail's Trial Grounds from
 /// the gatekeeper, as `enter_lpq` does.
 pub async fn enter_htpq(team: &mut [WorldSession]) -> Vec<Trace> {
-    enter_from_menu(team, &HTPQ, HTPQ_KEEPER).await
+    enter_from_menu(team, &HTPQ, HTPQ_KEEPER, 5).await
 }
 
-/// The leader picks the first choice of `npc`'s menu in `event`'s lobby
-/// until it takes the party in, and everyone arrives at its entry.
-async fn enter_from_menu(team: &mut [WorldSession], event: &Event, npc: i32) -> Vec<Trace> {
+/// The party's leader, first, takes it into the Forest of Poison Haze from
+/// Ellin, as `enter_lpq` does, once any party before it is out (in the
+/// harness its forest lasts 30 seconds).
+pub async fn enter_ellin(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &ELLIN, net::npc_scripts::ELLIN, 40).await
+}
+
+/// The leader picks the first choice of `npc`'s menu in `event`'s lobby,
+/// a second apart, until it takes the party in (at most `tries` times),
+/// and everyone arrives at its entry.
+async fn enter_from_menu(
+    team: &mut [WorldSession],
+    event: &Event,
+    npc: i32,
+    tries: usize,
+) -> Vec<Trace> {
     let name = team[0].character_name.clone();
     let mut seen = None;
-    for _ in 0..5 {
+    for _ in 0..tries {
         step(&mut team[0].connection, &name, talk(event.lobby, npc)).await;
         let trace = step(&mut team[0].connection, &name, answer(4, 1, Some(0))).await;
         if !trace.prompts.iter().any(|&(from, _)| from == npc) {

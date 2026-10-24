@@ -26,6 +26,7 @@ use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
 use net::ClientId;
 use packet::Packet;
+use rand::Rng;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
 
@@ -190,6 +191,33 @@ impl ClientActor {
         };
         self.start_script(script).await?;
         Ok(true)
+    }
+
+    /// What Ellin says to a member on the Forest of Poison Haze's fourth
+    /// stage, as the Poison Flowers left there stand
+    /// (`NpcScript::ellin_flowers`); one not holding the Monster Marbles
+    /// has heard her out after. `None` anywhere else.
+    pub(super) async fn ellin_flowers(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| {
+            ticket.kind == EventKind::Ellin
+                && ticket.holds(map_id)
+                && map_id == events::ELLIN_STAGES[3]
+        }) else {
+            return Ok(None);
+        };
+        let (leads, heard) = (ticket.leader(), ticket.hint_heard);
+        let (reply, mobs) = oneshot::channel();
+        self.send_to_field(FieldMessage::MobCount { reply }).await?;
+        let flowers = mobs.await.unwrap_or(1);
+        let player = &self.in_game()?.player;
+        let script = NpcScript::ellin_flowers(leads, heard, flowers, player);
+        let wanted = i32::from(events::MONSTER_MARBLES_WANTED);
+        let holds = player.inventory.count(events::MONSTER_MARBLE) >= wanted;
+        if let Some(ticket) = self.event.as_mut() {
+            ticket.hint_heard |= !holds;
+        }
+        Ok(Some(script))
     }
 
     /// What Eak says to the player in the Orbis party quest, if anything:
@@ -421,7 +449,9 @@ impl ClientActor {
     }
 
     /// What the Forest of Poison Haze's way on does for a member there
-    /// (`scripts::ellin_way_on`). `None` for any other portal.
+    /// (`scripts::ellin_way_on`), and the ways out of its maze's rooms
+    /// (`scripts::ellin_maze_way`), which lead to its end one time in ten.
+    /// `None` for any other portal.
     pub(super) fn ellin_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let ticket = self
@@ -433,6 +463,10 @@ impl ClientActor {
                 Ok(Some(scripts::ellin_way_on(map_id, |stage| {
                     ticket.cleared(stage)
                 })))
+            }
+            Some(_) if map_id == events::ELLIN_STAGES[2] => {
+                let lucky = rand::thread_rng().gen_bool(0.1);
+                Ok(scripts::ellin_maze_way(script, lucky))
             }
             _ => Ok(None),
         }

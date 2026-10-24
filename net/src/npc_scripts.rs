@@ -880,9 +880,11 @@ pub const ROLLY_PRESENT: i32 = 9103002;
 pub const TYLUS: i32 = 2020008;
 const TYLUS_GRATEFUL: i32 = 2022004;
 /// Ellin in the Deep Fairy Forest, who takes a party into the Forest of
-/// Poison Haze, and Ellin on each of its maps, who lets a member out.
+/// Poison Haze, and Ellin on each of its maps, who lets a member out; and
+/// the mileposts in its maze, who do too.
 pub const ELLIN: i32 = 2133000;
-const ELLIN_GUIDE: i32 = 2133001;
+pub const ELLIN_GUIDE: i32 = 2133001;
+pub const ELLIN_MILEPOST: i32 = 2133002;
 /// El Nath, and its portal from the Chief's Residence.
 const EL_NATH: i32 = 211_000_000;
 const EL_NATH_FROM_RESIDENCE: u8 = 14;
@@ -1410,6 +1412,13 @@ impl NpcScript {
         opq_eak(map_id, leader, cleared)
     }
 
+    /// Ellin on the forest's fourth stage (Cosmic `2133001`), to `player`,
+    /// who `leads` the team or not and has `heard` her out there or not,
+    /// with `flowers` Poison Flowers left (see `ellin_flowers`).
+    pub fn ellin_flowers(leads: bool, heard: bool, flowers: usize, player: &Player) -> Self {
+        ellin_flowers(leads, heard, flowers, player)
+    }
+
     /// Eak in the Tower of Goddess's storage room, once it is `bare` of
     /// monsters and drops or was `cleared`.
     pub fn opq_salion(bare: bool, cleared: bool) -> Self {
@@ -1550,21 +1559,32 @@ impl NpcScript {
                     ],
                 ))
             }
-            // She welcomes the party at the entrance, and has stages 3
-            // and 4 of her own; elsewhere she lets a member out.
+            // She welcomes the party at the entrance, takes it on from the
+            // maze's end, and has the fourth stage's marbles (see
+            // `ellin_flowers`); elsewhere she lets a member out.
             ELLIN_GUIDE if player.stats.map_id == events::ELLIN_ENTRY => {
                 return Some(NpcScript::new(
                     ELLIN_GUIDE,
                     vec![Page::Say(text(keys::ELLIN_GUIDE_WELCOME))],
                 ))
             }
+            ELLIN_GUIDE if player.stats.map_id == events::ELLIN_STAGES[2] => {
+                return Some(ellin_maze_end())
+            }
             ELLIN_GUIDE
                 if events::ELLIN.holds(player.stats.map_id)
-                    && !events::ELLIN_STAGES[2..4].contains(&player.stats.map_id) =>
+                    && player.stats.map_id != events::ELLIN_STAGES[3] =>
             {
                 return Some(ask_warp(
                     ELLIN_GUIDE,
                     keys::ELLIN_GUIDE_LEAVE,
+                    events::ELLIN.exit,
+                ))
+            }
+            ELLIN_MILEPOST if events::ELLIN.holds(player.stats.map_id) => {
+                return Some(ask_warp(
+                    ELLIN_MILEPOST,
+                    keys::ELLIN_MILEPOST_LEAVE,
                     events::ELLIN.exit,
                 ))
             }
@@ -3858,6 +3878,87 @@ fn eak_hand_in(hand_in: &HandIn, view: Balloon, player: &Player) -> NpcScript {
     let mut script = NpcScript::new(EAK, vec![page]);
     script.refused = Some(short);
     script.inventory_full = Some(text(keys::OPQ_EAK_FULL));
+    script
+}
+
+/// Ellin at the maze's end (Cosmic `2133001`): whoever finds her clears
+/// the maze, and she takes the team on to the fourth stage.
+fn ellin_maze_end() -> NpcScript {
+    NpcScript::new(
+        ELLIN_GUIDE,
+        vec![
+            Page::Act {
+                text: text(keys::ELLIN_GUIDE_MAZE_END),
+                effects: vec![Effect::EventCommand(EventCommand::ClearStage(3))],
+            },
+            Page::Done(vec![Effect::EventCommand(EventCommand::MoveTeam(
+                events::ELLIN_STAGES[3],
+            ))]),
+        ],
+    )
+}
+
+/// Ellin on the forest's fourth stage: the leader with the Monster Marbles
+/// hands them over, which takes the team on; anyone else holding them is
+/// sent to the leader. Otherwise she first tells a member what to do (if
+/// they haven't `heard` her), then, while Poison Flowers are left, gives
+/// one with no Purification Marbles ten, and asks one with some whether to
+/// leave, as she does once all are caught.
+fn ellin_flowers(leads: bool, heard: bool, flowers: usize, player: &Player) -> NpcScript {
+    use events::{
+        MONSTER_MARBLE, MONSTER_MARBLES_WANTED, PURIFICATION_MARBLE, PURIFICATION_MARBLES_GIVEN,
+    };
+    let counted = |key, n: i16| content::text().get(key, &[("n", &n.to_string())]);
+    let leave = |key| Page::Ask {
+        text: counted(key, MONSTER_MARBLES_WANTED),
+        on_yes: vec![Effect::WarpToPortal(events::ELLIN.exit, 0)],
+        on_no: None,
+    };
+    if player.inventory.count(MONSTER_MARBLE) >= i32::from(MONSTER_MARBLES_WANTED) {
+        if !leads {
+            return NpcScript::new(
+                ELLIN_GUIDE,
+                vec![Page::Say(text(keys::ELLIN_GUIDE_TO_LEADER))],
+            );
+        }
+        let hand_in = vec![
+            Effect::TakeItem {
+                item_id: MONSTER_MARBLE,
+                quantity: MONSTER_MARBLES_WANTED,
+            },
+            Effect::EventCommand(EventCommand::MoveTeam(events::ELLIN_STAGES[4])),
+        ];
+        let pages = vec![
+            Page::Say(text(keys::ELLIN_GUIDE_HAND_IN)),
+            Page::Done(hand_in),
+        ];
+        let mut script = NpcScript::new(ELLIN_GUIDE, pages);
+        // The marbles dropped since the page opened.
+        script.refused = Some(counted(keys::ELLIN_GUIDE_FLOWERS, MONSTER_MARBLES_WANTED));
+        return script;
+    }
+    let mut pages = Vec::new();
+    if !heard {
+        pages.push(Page::Say(counted(
+            keys::ELLIN_GUIDE_FLOWERS,
+            MONSTER_MARBLES_WANTED,
+        )));
+    }
+    pages.push(if flowers == 0 {
+        leave(keys::ELLIN_GUIDE_ALL_CAUGHT)
+    } else if player.inventory.count(PURIFICATION_MARBLE) > 0 {
+        leave(keys::ELLIN_GUIDE_FLOWERS_LEAVE)
+    } else {
+        Page::Act {
+            text: counted(keys::ELLIN_GUIDE_MARBLES, PURIFICATION_MARBLES_GIVEN),
+            effects: vec![Effect::GiveItem {
+                item_id: PURIFICATION_MARBLE,
+                quantity: PURIFICATION_MARBLES_GIVEN,
+            }],
+        }
+    });
+    let mut script = NpcScript::new(ELLIN_GUIDE, pages);
+    script.inventory_full = Some(text(keys::ELLIN_GUIDE_NO_ROOM));
     script
 }
 
@@ -12905,15 +13006,100 @@ mod tests {
         assert_eq!(question(&guide.begin()), text(keys::ELLIN_GUIDE_LEAVE));
         let step = guide.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
-        // At the entrance she only welcomes them; on stages 3 and 4 she
-        // has other things to say.
+        // At the entrance she only welcomes them; at the maze's end she
+        // clears it and takes the team on; on the fourth stage she has the
+        // flowers' marbles.
         member.stats.map_id = events::ELLIN_ENTRY;
         let guide = NpcScript::for_npc(ELLIN_GUIDE, &member).unwrap();
         assert_eq!(page_text(&guide.begin()), text(keys::ELLIN_GUIDE_WELCOME));
-        for map in &events::ELLIN_STAGES[2..4] {
-            member.stats.map_id = *map;
-            assert!(NpcScript::for_npc(ELLIN_GUIDE, &member).is_none());
-        }
+        member.stats.map_id = events::ELLIN_STAGES[2];
+        let mut guide = NpcScript::for_npc(ELLIN_GUIDE, &member).unwrap();
+        let step = guide.begin();
+        assert_eq!(page_text(&step), text(keys::ELLIN_GUIDE_MAZE_END));
+        let command = |command| Effect::EventCommand(command);
+        assert_eq!(step.effects, [command(EventCommand::ClearStage(3))]);
+        let step = guide.respond(ScriptInput::Next).unwrap();
+        let on = command(EventCommand::MoveTeam(events::ELLIN_STAGES[3]));
+        assert_eq!((step.effects, step.prompt), (vec![on], None));
+        member.stats.map_id = events::ELLIN_STAGES[3];
+        assert!(NpcScript::for_npc(ELLIN_GUIDE, &member).is_none());
+        // So do the maze's mileposts.
+        member.stats.map_id = events::ELLIN_STAGES[2];
+        let mut post = NpcScript::for_npc(ELLIN_MILEPOST, &member).unwrap();
+        assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
+        let step = post.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn ellin_gives_out_purification_marbles_and_takes_the_leaders_monster_marbles() {
+        use events::{MONSTER_MARBLE, PURIFICATION_MARBLE};
+        let counted = |key, n: &str| content::text().get(key, &[("n", n)]);
+        let leave = Effect::WarpToPortal(events::ELLIN_EXIT, 0);
+        // First she tells a member what to do, then gives them ten marbles.
+        let mut member = player(50);
+        let mut ellin = NpcScript::ellin_flowers(false, false, 20, &member);
+        let step = ellin.begin();
+        assert_eq!(page_text(&step), counted(keys::ELLIN_GUIDE_FLOWERS, "20"));
+        assert!(step.effects.is_empty());
+        let step = ellin.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&step), counted(keys::ELLIN_GUIDE_MARBLES, "10"));
+        let give = Effect::GiveItem {
+            item_id: PURIFICATION_MARBLE,
+            quantity: 10,
+        };
+        assert_eq!(step.effects, [give]);
+        let full = ellin.inventory_full().unwrap();
+        assert_eq!(page_text(&full), text(keys::ELLIN_GUIDE_NO_ROOM));
+        // Once heard, one with marbles may leave instead.
+        let ellin = NpcScript::ellin_flowers(true, true, 20, &member);
+        assert_eq!(
+            page_text(&ellin.begin()),
+            counted(keys::ELLIN_GUIDE_MARBLES, "10")
+        );
+        member.inventory.insert(
+            InventoryType::Use,
+            1,
+            game::Item::stack(PURIFICATION_MARBLE, 3),
+        );
+        let mut ellin = NpcScript::ellin_flowers(true, true, 20, &member);
+        let ask = counted(keys::ELLIN_GUIDE_FLOWERS_LEAVE, "20");
+        assert_eq!(question(&ellin.begin()), ask);
+        assert_eq!(
+            ellin.respond(ScriptInput::Yes).unwrap().effects,
+            [leave.clone()]
+        );
+        // With every flower caught, she only asks.
+        let mut ellin = NpcScript::ellin_flowers(false, true, 0, &player(50));
+        let ask = counted(keys::ELLIN_GUIDE_ALL_CAUGHT, "20");
+        assert_eq!(question(&ellin.begin()), ask);
+        assert_eq!(ellin.respond(ScriptInput::Yes).unwrap().effects, [leave]);
+        // Nineteen Monster Marbles aren't enough; twenty are the leader's to
+        // hand in.
+        member
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MONSTER_MARBLE, 19));
+        let ellin = NpcScript::ellin_flowers(true, true, 0, &member);
+        let ask = counted(keys::ELLIN_GUIDE_ALL_CAUGHT, "20");
+        assert_eq!(question(&ellin.begin()), ask);
+        member
+            .inventory
+            .insert(InventoryType::Etc, 2, game::Item::stack(MONSTER_MARBLE, 1));
+        let ellin = NpcScript::ellin_flowers(false, false, 0, &member);
+        assert_eq!(page_text(&ellin.begin()), text(keys::ELLIN_GUIDE_TO_LEADER));
+        let mut ellin = NpcScript::ellin_flowers(true, false, 0, &member);
+        let step = ellin.begin();
+        assert_eq!(page_text(&step), text(keys::ELLIN_GUIDE_HAND_IN));
+        assert!(step.effects.is_empty());
+        let step = ellin.respond(ScriptInput::Next).unwrap();
+        let take = Effect::TakeItem {
+            item_id: MONSTER_MARBLE,
+            quantity: 20,
+        };
+        let on = Effect::EventCommand(EventCommand::MoveTeam(events::ELLIN_STAGES[4]));
+        assert_eq!((step.effects, step.prompt), (vec![take, on], None));
+        let short = ellin.refused().unwrap();
+        assert_eq!(page_text(&short), counted(keys::ELLIN_GUIDE_FLOWERS, "20"));
     }
 
     #[test]

@@ -1301,6 +1301,13 @@ pub const ELLIN_STAGES: [i32; 6] = [
     930_000_600,
 ];
 pub const ELLIN_EXIT: i32 = 930_000_800;
+/// The Purification Marbles Ellin hands out on the forest's fourth stage,
+/// so many at a time, to catch its Poison Flowers with; and the Monster
+/// Marbles a catch makes, so many of which the leader brings her.
+pub const PURIFICATION_MARBLE: i32 = 2_270_004;
+pub const PURIFICATION_MARBLES_GIVEN: i16 = 10;
+pub const MONSTER_MARBLE: i32 = 4_001_169;
+pub const MONSTER_MARBLES_WANTED: i16 = 20;
 /// Diluted Poison, the Purple Stone of Magic, Monster Marbles and
 /// Purification Marbles: of use only in the forest.
 const ELLIN_ITEMS: [i32; 4] = [4_001_162, 4_001_163, 4_001_169, 2_270_004];
@@ -1324,8 +1331,9 @@ pub const ELLIN: Event = Event {
     stride: 1,
     stage_maps: &ELLIN_STAGES,
     talk_clears: &[],
-    // The first by killing, the second by its spine.
-    member_clears: &[1, 2],
+    // The first by killing, the second by its spine, the maze by Ellin at
+    // its end, the fourth by catching the last of its flowers.
+    member_clears: &[1, 2, 3, 4],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -1342,6 +1350,14 @@ pub const ELLIN: Event = Event {
     until_empty: false,
     survive: None,
 };
+
+/// The stage cleared once the last mob on `map_id`, in an event's copy of
+/// it, is caught, none being left to come back: the Forest of Poison
+/// Haze's fourth, whose Poison Flowers grow again when killed (Cosmic
+/// `EllinPQ.monsterKilled` without a killer).
+pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
+    (map_id == ELLIN_STAGES[3]).then_some(4)
+}
 
 /// The stage cleared once every mob on `map_id`, in an event's copy of
 /// it, is dead: the Forest of Poison Haze's first (Cosmic

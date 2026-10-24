@@ -3078,6 +3078,14 @@ impl FieldActor {
                     item_id,
                     create: catch.create,
                 });
+                // A stage cleared by catching its mobs clears with the last.
+                let cleared = net::events::cleared_by_catching(self.key.map_id)
+                    .filter(|_| self.key.instance_id != 0 && self.mobs.all_gone());
+                if let Some(stage) = cleared {
+                    for occupant in self.occupants.values() {
+                        occupant.handle.send(ServerMessage::ClearEventStage(stage));
+                    }
+                }
                 return;
             }
             Catch::TooStrong => {

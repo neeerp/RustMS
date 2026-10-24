@@ -1779,6 +1779,15 @@ pub mod keys {
     pub const ELLIN_STAGE2_SHUT: &str = "ellin.stage2.shut";
     pub const ELLIN_GUIDE_LEAVE: &str = "ellin.guide.leave";
     pub const ELLIN_GUIDE_WELCOME: &str = "ellin.guide.welcome";
+    pub const ELLIN_GUIDE_MAZE_END: &str = "ellin.guide.maze_end";
+    pub const ELLIN_GUIDE_FLOWERS: &str = "ellin.guide.flowers";
+    pub const ELLIN_GUIDE_MARBLES: &str = "ellin.guide.marbles";
+    pub const ELLIN_GUIDE_NO_ROOM: &str = "ellin.guide.no_room";
+    pub const ELLIN_GUIDE_FLOWERS_LEAVE: &str = "ellin.guide.flowers.leave";
+    pub const ELLIN_GUIDE_ALL_CAUGHT: &str = "ellin.guide.all_caught";
+    pub const ELLIN_GUIDE_HAND_IN: &str = "ellin.guide.hand_in";
+    pub const ELLIN_GUIDE_TO_LEADER: &str = "ellin.guide.to_leader";
+    pub const ELLIN_MILEPOST_LEAVE: &str = "ellin.milepost.leave";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2723,6 +2732,15 @@ mod tests {
                 keys::ELLIN_STAGE2_SHUT,
                 keys::ELLIN_GUIDE_LEAVE,
                 keys::ELLIN_GUIDE_WELCOME,
+                keys::ELLIN_GUIDE_MAZE_END,
+                keys::ELLIN_GUIDE_FLOWERS,
+                keys::ELLIN_GUIDE_MARBLES,
+                keys::ELLIN_GUIDE_NO_ROOM,
+                keys::ELLIN_GUIDE_FLOWERS_LEAVE,
+                keys::ELLIN_GUIDE_ALL_CAUGHT,
+                keys::ELLIN_GUIDE_HAND_IN,
+                keys::ELLIN_GUIDE_TO_LEADER,
+                keys::ELLIN_MILEPOST_LEAVE,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

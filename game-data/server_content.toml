@@ -1131,6 +1131,15 @@ unsourced = [
     "ellin.stage2.shut",
     "ellin.guide.leave",
     "ellin.guide.welcome",
+    "ellin.guide.maze_end",
+    "ellin.guide.flowers",
+    "ellin.guide.marbles",
+    "ellin.guide.no_room",
+    "ellin.guide.flowers.leave",
+    "ellin.guide.all_caught",
+    "ellin.guide.hand_in",
+    "ellin.guide.to_leader",
+    "ellin.milepost.leave",
 ]
 
 [text."glTutoMsg0.message"]
