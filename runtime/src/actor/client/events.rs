@@ -21,6 +21,7 @@ use net::packet::build::world::conti::{
 use net::packet::build::world::effect::{
     build_field_effect, build_field_object, build_field_sound,
 };
+use net::packet::build::world::field::build_dojo_warp_up;
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
@@ -77,6 +78,7 @@ impl ClientActor {
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
+            EventKind::Dojo => NpcScript::so_gong(entry, &self.in_game()?.player),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -502,6 +504,47 @@ impl ClientActor {
         }
     }
 
+    /// What the Dojo's two portals do for a challenger on a floor. Its
+    /// `dojang_up`, by the door, takes them up to the upper tier once the
+    /// floor's boss is beaten (the client moves them, on 0xCF) and opens
+    /// the door; its `dojang_next`, behind the door, leads to the next
+    /// floor, or from the 38th to the rooftop. A rest floor has no door, so
+    /// So Gong takes them on from there. `None` for any other portal.
+    pub(super) async fn dojo_portal(
+        &mut self,
+        script: &str,
+    ) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Dojo)
+        else {
+            return Ok(None);
+        };
+        let Some(floor) = events::DOJO.stage_on(map_id) else {
+            return Ok(None);
+        };
+        let cleared = ticket.cleared(floor);
+        let pink = |key| vec![Effect::Pink(net::content::text().get(key, &[]))];
+        match script {
+            scripts::DOJO_UP if events::rest_floor(floor) => Ok(Some(Vec::new())),
+            scripts::DOJO_UP if !cleared => Ok(Some(pink(keys::DOJO_UP_MONSTERS))),
+            scripts::DOJO_UP => {
+                self.send(&mut build_dojo_warp_up(events::DOJO_UP_PORTAL)?)
+                    .await?;
+                Ok(Some(vec![Effect::SetReactorState {
+                    name: events::DOJO_DOOR,
+                    state: 1,
+                }]))
+            }
+            scripts::DOJO_NEXT if events::rest_floor(floor) => Ok(Some(Vec::new())),
+            scripts::DOJO_NEXT if !cleared => Ok(Some(pink(keys::DOJO_NEXT_SHUT))),
+            scripts::DOJO_NEXT => Ok(Some(scripts::dojo_next(floor))),
+            _ => Ok(None),
+        }
+    }
+
     /// What the way into the Trial Grounds' rooms does for a member on
     /// their first map (`scripts::htpq_into_rooms`). `None` for any other
     /// portal.
@@ -635,12 +678,12 @@ impl ClientActor {
     }
 
     /// The party went in: the player takes their ticket to the event's
-    /// first map, unless they have since left the party (a squad's needs
-    /// none) or the lobby, or are in the Cash Shop or another event.
+    /// first map, unless they have since left the party (a squad's, or one
+    /// taken alone, needs none) or the lobby, or are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
         let event = ticket.kind.event();
         let lobby = event.lobby;
-        let waiting = (self.party_id.is_some() || event.squad)
+        let waiting = (self.party_id.is_some() || event.squad || event.solo())
             && !self.in_cash_shop
             && self.event.is_none()
             && self
@@ -847,6 +890,7 @@ impl ClientActor {
             return Ok(());
         }
         let event = ticket.kind.event();
+        let dojo = ticket.kind == EventKind::Dojo;
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
         let no_exp = zakum
@@ -877,7 +921,12 @@ impl ClientActor {
         }
         let mut next = self.in_game()?.player.clone();
         let mut packets = Vec::new();
-        if next.stats.map_id == map_id && !quiet {
+        if next.stats.map_id == map_id && dojo {
+            // A Dojo floor's own (Cosmic `Monster.killBy`, as its clear
+            // marker comes out).
+            packets.push(build_field_sound("Dojang/clear")?);
+            packets.push(build_field_effect("dojang/end/clear")?);
+        } else if next.stats.map_id == map_id && !quiet {
             packets.push(build_field_effect("quest/party/clear")?);
             packets.push(build_field_sound("Party1/Clear")?);
             if event.gates {
@@ -962,6 +1011,28 @@ impl ClientActor {
             return Ok(());
         }
         self.send(&mut build_field_object("gate")?).await
+    }
+
+    /// On a Dojo boss floor, the challenger hears the gong and sees the
+    /// floor's number as they arrive (Cosmic `dojang_Eff`).
+    pub(super) async fn show_dojo_floor(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let floor = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.kind == EventKind::Dojo && ticket.holds(map_id))
+            .and_then(|_| events::DOJO.stage_on(map_id))
+            .filter(|&floor| !events::rest_floor(floor));
+        let Some(floor) = floor else {
+            return Ok(());
+        };
+        let number = format!("dojang/start/number/{}", events::dojo_round(floor));
+        self.send_all(&mut vec![
+            build_field_sound("Dojang/start")?,
+            build_field_effect("dojang/start/stage")?,
+            build_field_effect(&number)?,
+        ])
+        .await
     }
 
     /// On one of the event's maps the client shows the time left, until the

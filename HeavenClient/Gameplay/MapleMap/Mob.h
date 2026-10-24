@@ -84,6 +84,10 @@ namespace ms
 			return flip ? stance : stance + 1;
 		}
 
+		// The Mob.img a mob's actions come from: its own, or the one its
+		// info/link names (the Dojo's bosses link to the mobs they copy).
+		static nl::node look_of(int32_t mobid);
+
 		// Construct a mob by combining data from game files with data sent by the server.
 		Mob(int32_t oid, int32_t mobid, int8_t mode, int8_t stance, uint16_t fhid, uint16_t homefh, bool newspawn,
 			int8_t team, Point<int16_t> position, const std::vector<MobStatParser::Status> &statuses,

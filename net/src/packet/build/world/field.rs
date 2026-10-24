@@ -267,6 +267,16 @@ pub fn parse_movement(
     Some((x, y, stance, foothold))
 }
 
+/// DOJO_WARP_UP: the player goes up to portal `portal` on the Mu Lung
+/// Dojo floor they are on (Cosmic `goDojoUp`, which sends 0 and 6).
+pub fn build_dojo_warp_up(portal: u8) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::DojoWarpUp as i16)?;
+    packet.write_byte(0)?;
+    packet.write_byte(portal)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,6 +430,12 @@ mod tests {
         }
         expect.byte(0); // end of pets
         expect.int(1).long(0);
+    }
+
+    #[test]
+    fn the_dojo_warp_up_names_the_portal() {
+        let packet = build_dojo_warp_up(6).unwrap();
+        Expect::new(&packet.bytes).short(0xCF).byte(0).byte(6).end();
     }
 
     #[test]

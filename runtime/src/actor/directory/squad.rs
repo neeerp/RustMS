@@ -73,7 +73,7 @@ impl WorldDirectory {
         let answer = answer.unwrap_or(SquadAnswer::Refused);
         // A leader who can't take the reply can't start it.
         if let Err(SquadAnswer::Start(start)) = reply.send(answer) {
-            self.events.remove(&(start.channel_id, kind));
+            self.event_gone(start.channel_id, kind, start.id);
             self.squads.remove(&(start.channel_id, kind));
         }
     }
@@ -170,7 +170,7 @@ impl WorldDirectory {
     fn start_squad(&mut self, from: ClientId, kind: EventKind) -> Option<SquadAnswer> {
         let says = net::squads::text(kind)?;
         let (channel_id, _, name) = self.squad_asker(from, kind)?;
-        if self.events.contains_key(&(channel_id, kind)) {
+        if self.event_busy(channel_id, kind) {
             return None;
         }
         let event = kind.event();
@@ -201,7 +201,7 @@ impl WorldDirectory {
         let queue = EventQueue::default();
         entry.squad.start(id);
         entry.event = Some(queue.joiner());
-        self.events.insert((channel_id, kind), id);
+        self.event_opened(channel_id, kind, id);
         info!(?kind, id, channel_id, leader = from, team = ?ids, "Squad set out");
         self.tell_squad(&roster, says.notice_started, &name);
         for &member in &roster {

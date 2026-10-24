@@ -648,4 +648,12 @@ namespace ms
 		if (auto monsterbook = UI::get().get_element<UIMonsterBook>())
 			monsterbook->update_cards();
 	}
+
+	void DojoWarpUpHandler::handle(InPacket& recv) const
+	{
+		if (recv.read_byte() != 0)
+			Stage::get().get_player().clear_request();
+
+		Stage::get().teleport_to_portal(recv.read_byte());
+	}
 }

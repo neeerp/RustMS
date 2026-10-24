@@ -1837,6 +1837,28 @@ pub mod keys {
     pub const PIRATE_WU_NEED_FEATHERS: &str = "pirate.wu.need_feathers";
     pub const PIRATE_WU_BEST: &str = "pirate.wu.best";
     pub const PIRATE_GUON_SAVED: &str = "pirate.guon.saved";
+    pub const DOJO_SO_GONG_MENU: &str = "dojo.so_gong.menu";
+    pub const DOJO_SO_GONG_ALONE: &str = "dojo.so_gong.alone";
+    pub const DOJO_SO_GONG_ABOUT: &str = "dojo.so_gong.about";
+    pub const DOJO_SO_GONG_INFO: &str = "dojo.so_gong.info";
+    pub const DOJO_SO_GONG_LOW_LEVEL: &str = "dojo.so_gong.low_level";
+    pub const DOJO_SO_GONG_BUSY: &str = "dojo.so_gong.busy";
+    pub const DOJO_SO_GONG_QUIT: &str = "dojo.so_gong.quit";
+    pub const DOJO_SO_GONG_QUIT_NO: &str = "dojo.so_gong.quit_no";
+    pub const DOJO_SO_GONG_QUIT_DONE: &str = "dojo.so_gong.quit_done";
+    pub const DOJO_SO_GONG_REST: &str = "dojo.so_gong.rest";
+    pub const DOJO_SO_GONG_CONTINUE: &str = "dojo.so_gong.continue";
+    pub const DOJO_SO_GONG_LEAVE: &str = "dojo.so_gong.leave";
+    pub const DOJO_SO_GONG_LEAVE_ASK: &str = "dojo.so_gong.leave_ask";
+    pub const DOJO_BOARD_MENU: &str = "dojo.board.menu";
+    pub const DOJO_BOARD_CHALLENGE: &str = "dojo.board.challenge";
+    pub const DOJO_BOARD_READ: &str = "dojo.board.read";
+    pub const DOJO_BOARD_NOTICE_0: &str = "dojo.board.notice.0";
+    pub const DOJO_BOARD_NOTICE_1: &str = "dojo.board.notice.1";
+    pub const DOJO_BOARD_ASK: &str = "dojo.board.ask";
+    pub const DOJO_BOARD_DECLINE: &str = "dojo.board.decline";
+    pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
+    pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2839,6 +2861,28 @@ mod tests {
                 keys::PIRATE_WU_NEED_FEATHERS,
                 keys::PIRATE_WU_BEST,
                 keys::PIRATE_GUON_SAVED,
+                keys::DOJO_SO_GONG_MENU,
+                keys::DOJO_SO_GONG_ALONE,
+                keys::DOJO_SO_GONG_ABOUT,
+                keys::DOJO_SO_GONG_INFO,
+                keys::DOJO_SO_GONG_LOW_LEVEL,
+                keys::DOJO_SO_GONG_BUSY,
+                keys::DOJO_SO_GONG_QUIT,
+                keys::DOJO_SO_GONG_QUIT_NO,
+                keys::DOJO_SO_GONG_QUIT_DONE,
+                keys::DOJO_SO_GONG_REST,
+                keys::DOJO_SO_GONG_CONTINUE,
+                keys::DOJO_SO_GONG_LEAVE,
+                keys::DOJO_SO_GONG_LEAVE_ASK,
+                keys::DOJO_BOARD_MENU,
+                keys::DOJO_BOARD_CHALLENGE,
+                keys::DOJO_BOARD_READ,
+                keys::DOJO_BOARD_NOTICE_0,
+                keys::DOJO_BOARD_NOTICE_1,
+                keys::DOJO_BOARD_ASK,
+                keys::DOJO_BOARD_DECLINE,
+                keys::DOJO_UP_MONSTERS,
+                keys::DOJO_NEXT_SHUT,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

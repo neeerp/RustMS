@@ -173,6 +173,10 @@ namespace ms
 		bool may_dash() const;
 		// Whether a field is up, rather than being left or still fading in.
 		bool is_active() const;
+		// Move the player to this map's portal `id`, as the Mu Lung Dojo's
+		// door takes them up (0x959727, by the teleport a portal within the
+		// map uses, 0x957b74). Nothing if the map has no such portal.
+		void teleport_to_portal(uint8_t id);
 		// Move the player onto `spot` on the next update, as Assassinate's
 		// second strike does (0x952d7b).
 		void dash(teleport::Spot spot);

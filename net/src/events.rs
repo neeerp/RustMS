@@ -49,6 +49,9 @@ pub enum EventKind {
     /// The Pirate Ship, Herb Town's party quest against the Lord Pirate,
     /// started at Guon (2094000) Over the Pirate Ship.
     Pirate,
+    /// The Mu Lung Dojo's 38 floors, taken alone, started at So Gong
+    /// (2091005) in the Dojo's hall.
+    Dojo,
 }
 
 /// An event's maps and terms.
@@ -134,6 +137,10 @@ pub struct Event {
     /// event at once, and the time running out with it still there wins
     /// it (Cosmic DelliBattle's `friendlyKilled` and `scheduledTimeout`).
     pub survive: Option<i32>,
+    /// How many may run at once on a channel, each team in its own copies
+    /// of the maps: 1 for most, 15 for the Mu Lung Dojo's solo runs
+    /// (Cosmic `Channel.ingressDojo`'s solo slots).
+    pub runs: usize,
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -233,6 +240,7 @@ pub const KPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -330,6 +338,7 @@ pub const HPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -392,6 +401,7 @@ pub const LPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -584,6 +594,7 @@ pub const OPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -806,6 +817,7 @@ pub const ZPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The Dead Mine's hub, where Aura stands and its way out is.
@@ -868,6 +880,7 @@ pub const ZAKUM: Event = Event {
     gate: &[ZAKUM_GATE],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// Deep Inside the Clocktower, the way to Papulatus, and the Origin of
@@ -914,6 +927,7 @@ pub const PAPULATUS: Event = Event {
     ],
     until_empty: true,
     survive: None,
+    runs: 1,
 };
 
 /// The expedition to Horntail (Cosmic `HorntailBattle`): like Zakum's, the
@@ -955,6 +969,7 @@ pub const HORNTAIL: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The time Horntail's expedition has left once Horntail comes out.
@@ -1052,6 +1067,7 @@ pub const HTPQ: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The Trial Grounds' first map, where the team comes in and the leader
@@ -1126,6 +1142,7 @@ pub const DELLI: Event = Event {
     gate: &[],
     until_empty: false,
     survive: Some(WILLI),
+    runs: 1,
 };
 
 /// Ludibrium, where the Ludibrium Maze's party gathers.
@@ -1233,6 +1250,7 @@ pub const LUDIMAZE: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The Chief's Residence in El Nath, where the party gathers; the room
@@ -1287,6 +1305,7 @@ pub const TYLUS: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The Deep Fairy Forest, where the party gathers; the Forest of Poison
@@ -1370,6 +1389,7 @@ pub const ELLIN: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
 
 /// The stage cleared once the last mob on `map_id`, in an event's copy of
@@ -1382,8 +1402,11 @@ pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
 
 /// The stage cleared once `mob_id` dies on `map_id`, in an event's copy of
 /// it: the Forest of Poison Haze's last, by its Super-Charged Poison Golem
-/// (Cosmic `EllinPQ.monsterKilled`).
+/// (Cosmic `EllinPQ.monsterKilled`), and each Dojo floor by its boss.
 pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
+    if dojo_boss(map_id) == Some(mob_id) {
+        return DOJO.stage_on(map_id);
+    }
     (map_id == ELLIN_STAGES[5] && mob_id == ELLIN_GOLEM_LAST).then_some(6)
 }
 
@@ -1554,7 +1577,103 @@ pub const PIRATE: Event = Event {
     gate: &[],
     until_empty: false,
     survive: None,
+    runs: 1,
 };
+
+/// The Mu Lung Dojo's entrance, where the notice board sends a challenger
+/// and its `dojang_exit` portal leads out (Cosmic's
+/// `MapId.MU_LUNG_DOJO_EXIT`, which is not `DOJO_EXIT`).
+pub const DOJO_ENTRANCE: i32 = 925020000;
+/// The hall where So Gong (2091005) starts a run.
+pub const DOJO_HALL: i32 = 925020001;
+/// Where a run's time running out leaves its challenger.
+pub const DOJO_EXIT: i32 = 925020002;
+/// The rooftop a challenger who beats the 38th floor goes to.
+pub const DOJO_ROOFTOP: i32 = 925020003;
+/// The first floor; floor n is `DOJO_FIRST + (n - 1) * 100`.
+pub const DOJO_FIRST: i32 = 925020100;
+/// How many floors there are.
+pub const DOJO_FLOORS: u8 = 38;
+/// Mu Lung's Dojo, where the notice board (2091006) stands.
+pub const DOJO_BOARD_MAP: i32 = 250000100;
+/// The board's portal on the entrance a challenger arrives by (`out00`).
+pub const DOJO_BOARD_PORTAL: u8 = 4;
+/// The floor-n boss is `DOJO_BOSS_BASE` plus its round (`dojo_round`).
+pub const DOJO_BOSS_BASE: i32 = 9300183;
+/// Where a floor's boss may come out, one drawn at random, on the ground
+/// below (Cosmic `dojang_1st`).
+pub const DOJO_BOSS_AT: [(i16, i16); 3] = [(140, 0), (190, 7), (187, 7)];
+/// The `Effect/Summon.img` entry a floor's boss comes out with.
+pub const DOJO_BOSS_EFFECT: u8 = 15;
+/// The way up a floor's upper tier: `dojang_up`'s portal (Cosmic
+/// `goDojoUp`).
+pub const DOJO_UP_PORTAL: u8 = 6;
+/// The reactor that is each fighting floor's door to its way on.
+pub const DOJO_DOOR: &str = "door";
+
+/// Every floor: whoever kills a floor's boss clears it.
+const DOJO_CLEARS: [u8; DOJO_FLOORS as usize] = {
+    let mut floors = [0; DOJO_FLOORS as usize];
+    let mut i = 0;
+    while i < floors.len() {
+        floors[i] = i as u8 + 1;
+        i += 1;
+    }
+    floors
+};
+
+/// The Mu Lung Dojo, taken alone (Cosmic `2091005`, `dojang_*`): 38
+/// floors, one boss each but on every sixth, a rest floor. 15 may run at
+/// once on a channel, each in its own copies.
+pub const DOJO: Event = Event {
+    lobby: DOJO_HALL,
+    maps: DOJO_FIRST..=DOJO_FIRST + (DOJO_FLOORS as i32 - 1) * 100,
+    entry: DOJO_FIRST,
+    entries: 1,
+    exit: DOJO_EXIT,
+    levels: 25..=u8::MAX,
+    team: 1..=1,
+    minutes: 5,
+    exp_per_stage: &[0; DOJO_FLOORS as usize],
+    stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &DOJO_CLEARS,
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: true,
+    survive: None,
+    runs: 15,
+};
+
+/// Whether Dojo floor `floor` is a rest floor, with no boss: every sixth.
+pub fn rest_floor(floor: u8) -> bool {
+    floor % 6 == 0
+}
+
+/// Which boss floor `floor` is, counting only those (Cosmic
+/// `realstage`): the number it shows on arrival.
+pub fn dojo_round(floor: u8) -> u8 {
+    floor - floor / 6
+}
+
+/// The boss that comes out the first time its challenger reaches
+/// `map_id`, if it is a Dojo boss floor.
+pub fn dojo_boss(map_id: i32) -> Option<i32> {
+    let floor = DOJO.stage_on(map_id)?;
+    (!rest_floor(floor)).then(|| DOJO_BOSS_BASE + i32::from(dojo_round(floor)))
+}
 
 /// The minutes an event's clock starts over with the first time any member
 /// reaches `map_id`, in its copy: the Pirate Ship's second to fifth stages
@@ -1574,7 +1693,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 14] = [
+    pub const ALL: [EventKind; 15] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1589,6 +1708,7 @@ impl EventKind {
         EventKind::Tylus,
         EventKind::Ellin,
         EventKind::Pirate,
+        EventKind::Dojo,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1607,6 +1727,7 @@ impl EventKind {
             EventKind::Tylus => &TYLUS,
             EventKind::Ellin => &ELLIN,
             EventKind::Pirate => &PIRATE,
+            EventKind::Dojo => &DOJO,
         }
     }
 }
@@ -1665,6 +1786,11 @@ impl Event {
     /// that says so (`until_empty`).
     pub fn lasts_until_empty(&self) -> bool {
         self.squad || self.until_empty
+    }
+
+    /// Whether it is taken alone, without a party: a team of one.
+    pub fn solo(&self) -> bool {
+        *self.team.end() == 1
     }
 
     /// The map a member starts on: `entry`, or one of the `entries` maps
@@ -2381,6 +2507,32 @@ mod tests {
 
     fn at(id: ClientId, level: u8, map_id: i32) -> Candidate {
         Candidate { id, level, map_id }
+    }
+
+    #[test]
+    fn the_dojo_has_thirty_two_bosses_and_a_rest_every_sixth_floor() {
+        assert_eq!(DOJO.stage_on(DOJO_FIRST), Some(1));
+        assert_eq!(DOJO.stage_on(DOJO_FIRST + 3700), Some(38));
+        assert_eq!(DOJO.stage_on(DOJO_FIRST + 3800), None);
+        assert_eq!(DOJO.stage_on(DOJO_FIRST + 1), None);
+        assert!(!DOJO.holds(DOJO_HALL) && !DOJO.holds(DOJO_EXIT));
+        assert!(rest_floor(6) && rest_floor(36) && !rest_floor(1) && !rest_floor(38));
+        assert_eq!(dojo_round(5), 5);
+        assert_eq!(dojo_round(7), 6);
+        // Mano on the first floor, and the last boss on the 38th.
+        assert_eq!(dojo_boss(DOJO_FIRST), Some(9300184));
+        assert_eq!(dojo_boss(DOJO_FIRST + 3700), Some(9300215));
+        assert_eq!(dojo_boss(DOJO_FIRST + 500), None);
+        let bosses: std::collections::BTreeSet<_> = (0..38)
+            .filter_map(|floor| dojo_boss(DOJO_FIRST + floor * 100))
+            .collect();
+        assert_eq!(bosses.len(), 32);
+        // Beating the floor's boss clears it, and only it.
+        assert_eq!(cleared_by_boss(DOJO_FIRST + 600, 9300189), Some(7));
+        assert_eq!(cleared_by_boss(DOJO_FIRST + 600, 9300190), None);
+        assert_eq!(DOJO.last_stage(), 38);
+        assert!(DOJO.solo() && !HPQ.solo());
+        assert_eq!(DOJO.runs, 15);
     }
 
     #[test]

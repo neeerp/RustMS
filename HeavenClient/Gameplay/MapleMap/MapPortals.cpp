@@ -185,6 +185,11 @@ namespace ms
 		}
 	}
 
+	bool MapPortals::has_portal(uint8_t portal_id) const
+	{
+		return portals_by_id.count(portal_id) > 0;
+	}
+
 	Point<int16_t> MapPortals::get_portal_by_name(const std::string &portal_name) const
 	{
 		auto iter = portal_ids_by_name.find(portal_name);

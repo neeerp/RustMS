@@ -6,7 +6,7 @@
 use crate::content;
 use crate::conti::Portal;
 use crate::npc_scripts;
-use game::character::{FREE_MARKET_RETURN, PYRAMID_RETURN};
+use game::character::{DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
@@ -1387,6 +1387,16 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 },
             )
         }
+        // Out of the Mu Lung Dojo, back to where its notice board was
+        // taken from (Cosmic `dojang_exit`).
+        "dojang_exit" => {
+            let back = player
+                .saved_locations
+                .get(&DOJO_RETURN)
+                .copied()
+                .unwrap_or(crate::events::DOJO_BOARD_MAP);
+            go_back(DOJO_RETURN, Effect::Warp(back))
+        }
         script if script.starts_with("MD_") => {
             let dungeon = crate::dungeons::by_script(script)?;
             if player.stats.map_id != dungeon.base {
@@ -1927,6 +1937,24 @@ pub fn ellin_way_out(won: bool, leader: bool) -> Vec<Effect> {
             Effect::EventCommand(EventCommand::MoveTeam(ELLIN.exit)),
         ],
     }
+}
+
+/// The Dojo's way up to a floor's upper tier, by its door (Cosmic
+/// `dojang_up`).
+pub const DOJO_UP: &str = "dojang_up";
+/// The Dojo's way on, behind a floor's door (Cosmic `dojang_next`).
+pub const DOJO_NEXT: &str = "dojang_next";
+
+/// Where the way on from the Dojo's `floor` leads once it is cleared: the
+/// next floor, or from the last the rooftop (Cosmic `dojang_next`).
+pub fn dojo_next(floor: u8) -> Vec<Effect> {
+    use crate::events::{DOJO, DOJO_FLOORS, DOJO_ROOFTOP};
+    let to = if floor >= DOJO_FLOORS {
+        DOJO_ROOFTOP
+    } else {
+        DOJO.stage_map(floor + 1)
+    };
+    vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)]
 }
 
 /// The way to Papulatus, for a player whose party stands as `entry`: the
@@ -3572,6 +3600,34 @@ mod tests {
         assert_eq!(
             portal("nets_out", &player).unwrap().effects[2],
             Effect::Warp(HENESYS)
+        );
+    }
+
+    #[test]
+    fn the_dojo_leads_on_floor_by_floor_and_out_to_the_board() {
+        use crate::events::{DOJO_BOARD_MAP, DOJO_FIRST, DOJO_ROOFTOP};
+        let on = |to| vec![Effect::PortalSound, Effect::WarpToPortal(to, 0)];
+        assert_eq!(dojo_next(1), on(DOJO_FIRST + 100));
+        assert_eq!(dojo_next(37), on(DOJO_FIRST + 3700));
+        assert_eq!(dojo_next(38), on(DOJO_ROOFTOP));
+
+        // Out to where the board was touched, or to the board.
+        let out = |to| {
+            vec![
+                Effect::SaveLocation(DOJO_RETURN, None),
+                Effect::PortalSound,
+                Effect::Warp(to),
+            ]
+        };
+        let mut player = player_with(&[]);
+        assert_eq!(
+            portal("dojang_exit", &player).unwrap().effects,
+            out(DOJO_BOARD_MAP)
+        );
+        player.saved_locations.insert(DOJO_RETURN, 250000000);
+        assert_eq!(
+            portal("dojang_exit", &player).unwrap().effects,
+            out(250000000)
         );
     }
 }

@@ -246,6 +246,8 @@ pub struct Trace {
     /// FIELD_EFFECT modes naming something: (mode, name), for 2 a map
     /// object, 3 a screen effect, 4 a sound and 6 the music.
     pub field_effects: Vec<(u8, String)>,
+    /// DOJO_WARP_UP: the portal each names.
+    pub dojo_warps: Vec<u8>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,
     /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
@@ -437,6 +439,9 @@ impl Trace {
             self.stat_updates.push(values);
         } else if op == SendOpcode::HpTaken as i16 {
             self.hp_taken.push(r.read_int().unwrap());
+        } else if op == SendOpcode::DojoWarpUp as i16 {
+            r.read_byte().unwrap();
+            self.dojo_warps.push(r.read_byte().unwrap());
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
         } else if op == SendOpcode::FieldEffect as i16 {

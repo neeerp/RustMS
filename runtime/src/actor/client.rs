@@ -915,6 +915,7 @@ impl ClientActor {
         self.start_map_timer().await?;
         self.show_event_clock().await?;
         self.show_event_gate().await?;
+        self.show_dojo_floor().await?;
         self.start_hazard()?;
         self.bring_summons(spawn).await?;
         self.bring_pets(&avatar).await?;

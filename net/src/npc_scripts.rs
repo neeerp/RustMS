@@ -21,7 +21,7 @@ use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
 use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
-use game::character::{FLORINA_RETURN, WORLD_TOUR_RETURN};
+use game::character::{DOJO_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
 use game::marriage;
 use game::wedding::{self, GuestRefusal, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
@@ -890,6 +890,11 @@ pub const ELLIN_SPRITE: i32 = 2133004;
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
 pub const GUON_ABOARD: i32 = 2094002;
+/// So Gong, who takes a challenger into the Mu Lung Dojo from its hall and
+/// stands on each of its floors, and the notice board in Mu Lung that
+/// leads to the Dojo.
+pub const SO_GONG: i32 = 2091005;
+pub const DOJO_BOARD: i32 = 2091006;
 /// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
 /// again in its clear room.
 pub const WU_YANG: i32 = 2094001;
@@ -1350,6 +1355,11 @@ impl NpcScript {
         guon(entry)
     }
 
+    /// So Gong in the Dojo's hall, for `player`, who may or may not go in.
+    pub fn so_gong(entry: Entry, player: &Player) -> Self {
+        so_gong(entry, player)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1417,6 +1427,9 @@ impl NpcScript {
             HTPQ_KEEPER if !won => htpq_keeper(player, leader),
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
+            }
+            SO_GONG if events::DOJO.holds(player.stats.map_id) => {
+                Some(so_gong_on_floor(player.stats.map_id))
             }
             WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
                 Some(wu_yang_freed(leader))
@@ -1513,6 +1526,9 @@ impl NpcScript {
             if let Some(script) = kyrin_fourth_job_test(player) {
                 return Some(script);
             }
+        }
+        if npc_id == DOJO_BOARD {
+            return Some(dojo_board(player));
         }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -6965,6 +6981,109 @@ fn guon(entry: Entry) -> NpcScript {
     // Someone left or moved since Guon checked, or another party went in.
     script.refused = Some(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE));
     script
+}
+
+/// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
+/// or more may take it on alone, and anyone may hear what it is. Its party
+/// Dojo, belts, points and medals are yet to come (`agent_docs/dojo.md`).
+fn so_gong(entry: Entry, player: &Player) -> NpcScript {
+    if player.stats.level < *events::DOJO.levels.start() {
+        return NpcScript::new(SO_GONG, vec![Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL))]);
+    }
+    let alone = match entry {
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Dojo)]),
+        Entry::Busy => Page::Say(text(keys::DOJO_SO_GONG_BUSY)),
+        _ => Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL)),
+    };
+    let mut script = NpcScript::new(
+        SO_GONG,
+        vec![Page::Menu {
+            text: text(keys::DOJO_SO_GONG_MENU),
+            choices: vec![
+                (text(keys::DOJO_SO_GONG_ALONE), vec![alone]),
+                (
+                    text(keys::DOJO_SO_GONG_ABOUT),
+                    vec![Page::Say(text(keys::DOJO_SO_GONG_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Every Dojo filled since So Gong checked.
+    script.refused = Some(text(keys::DOJO_SO_GONG_BUSY));
+    script
+}
+
+/// So Gong (Cosmic `2091005`) on the Dojo's floor `map_id`. On a rest floor
+/// the challenger may go on to the next or leave by the exit's `st00`; on
+/// a fighting floor they may give up, out to the exit with a pink line.
+fn so_gong_on_floor(map_id: i32) -> NpcScript {
+    let floor = events::DOJO.stage_on(map_id).unwrap_or(1);
+    if events::rest_floor(floor) {
+        let next = events::DOJO.stage_map(floor + 1);
+        return NpcScript::new(
+            SO_GONG,
+            vec![Page::Menu {
+                text: text(keys::DOJO_SO_GONG_REST),
+                choices: vec![
+                    (
+                        text(keys::DOJO_SO_GONG_CONTINUE),
+                        vec![Page::Done(vec![Effect::WarpToPortal(next, 0)])],
+                    ),
+                    (
+                        text(keys::DOJO_SO_GONG_LEAVE),
+                        vec![Page::Ask {
+                            text: text(keys::DOJO_SO_GONG_LEAVE_ASK),
+                            on_yes: vec![Effect::WarpToPortal(events::DOJO_EXIT, 1)],
+                            on_no: None,
+                        }],
+                    ),
+                ],
+            }],
+        );
+    }
+    NpcScript::new(
+        SO_GONG,
+        vec![Page::Ask {
+            text: text(keys::DOJO_SO_GONG_QUIT),
+            on_yes: vec![
+                Effect::WarpToPortal(events::DOJO_EXIT, 0),
+                Effect::Pink(text(keys::DOJO_SO_GONG_QUIT_DONE)),
+            ],
+            on_no: Some(text(keys::DOJO_SO_GONG_QUIT_NO)),
+        }],
+    )
+}
+
+/// The notice board in Mu Lung (Cosmic `2091006`): touching it takes the
+/// player to the Dojo's entrance, saving where they were for its way out
+/// (`scripts::portal`'s `dojang_exit`), and reading it shows its notice.
+fn dojo_board(player: &Player) -> NpcScript {
+    NpcScript::new(
+        DOJO_BOARD,
+        vec![Page::Menu {
+            text: text(keys::DOJO_BOARD_MENU),
+            choices: vec![
+                (
+                    text(keys::DOJO_BOARD_CHALLENGE),
+                    vec![Page::Ask {
+                        text: text(keys::DOJO_BOARD_ASK),
+                        on_yes: vec![
+                            Effect::SaveLocation(DOJO_RETURN, Some(player.stats.map_id)),
+                            Effect::WarpToPortal(events::DOJO_ENTRANCE, events::DOJO_BOARD_PORTAL),
+                        ],
+                        on_no: Some(text(keys::DOJO_BOARD_DECLINE)),
+                    }],
+                ),
+                (
+                    text(keys::DOJO_BOARD_READ),
+                    vec![
+                        Page::Say(text(keys::DOJO_BOARD_NOTICE_0)),
+                        Page::Say(text(keys::DOJO_BOARD_NOTICE_1)),
+                    ],
+                ),
+            ],
+        }],
+    )
 }
 
 /// Guon (Cosmic `2094002`) on the ship's map `map_id`: anyone but the
@@ -13332,6 +13451,88 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn so_gong_takes_a_challenger_in_alone_and_lets_them_give_up() {
+        let at = |level| {
+            let mut player = player(50);
+            player.stats.level = level;
+            player
+        };
+        let mut low = NpcScript::so_gong(Entry::Ready, &at(24));
+        assert_eq!(page_text(&low.begin()), text(keys::DOJO_SO_GONG_LOW_LEVEL));
+        let mut ready = NpcScript::so_gong(Entry::Ready, &at(25));
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Dojo)]);
+        let refused = ready.refused().unwrap();
+        assert_eq!(page_text(&refused), text(keys::DOJO_SO_GONG_BUSY));
+        let mut busy = NpcScript::so_gong(Entry::Busy, &at(25));
+        busy.begin();
+        let step = busy.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_BUSY));
+        let mut about = NpcScript::so_gong(Entry::Ready, &at(25));
+        about.begin();
+        let step = about.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_INFO));
+
+        // On a fighting floor he lets them give up.
+        let mut challenger = at(30);
+        challenger.stats.map_id = events::DOJO_FIRST + 200;
+        let mut quit = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        assert_eq!(question(&quit.begin()), text(keys::DOJO_SO_GONG_QUIT));
+        let step = quit.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            step.effects,
+            [
+                Effect::WarpToPortal(events::DOJO_EXIT, 0),
+                Effect::Pink(text(keys::DOJO_SO_GONG_QUIT_DONE)),
+            ]
+        );
+        let mut stay = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        stay.begin();
+        let step = stay.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_QUIT_NO));
+
+        // On a rest floor they go on to the next, or out by the exit's st00.
+        challenger.stats.map_id = events::DOJO_FIRST + 500;
+        let mut rest = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        assert_eq!(kind(&rest.begin()), Some(4));
+        let step = rest.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::WarpToPortal(events::DOJO_FIRST + 600, 0)]
+        );
+        let mut leave = NpcScript::in_event(SO_GONG, &challenger, true, false).unwrap();
+        leave.begin();
+        leave.respond(ScriptInput::Select(1)).unwrap();
+        let step = leave.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::WarpToPortal(events::DOJO_EXIT, 1)]);
+    }
+
+    #[test]
+    fn the_dojo_board_saves_where_it_was_touched() {
+        let mut reader = player(50);
+        reader.stats.map_id = events::DOJO_BOARD_MAP;
+        let mut board = NpcScript::for_npc(DOJO_BOARD, &reader).unwrap();
+        assert_eq!(kind(&board.begin()), Some(4));
+        let step = board.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(question(&step), text(keys::DOJO_BOARD_ASK));
+        let step = board.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            step.effects,
+            [
+                Effect::SaveLocation(DOJO_RETURN, Some(events::DOJO_BOARD_MAP)),
+                Effect::WarpToPortal(events::DOJO_ENTRANCE, events::DOJO_BOARD_PORTAL),
+            ]
+        );
+        let mut read = NpcScript::for_npc(DOJO_BOARD, &reader).unwrap();
+        read.begin();
+        let step = read.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_BOARD_NOTICE_0));
+        let step = read.respond(ScriptInput::Next).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_BOARD_NOTICE_1));
     }
 
     #[test]

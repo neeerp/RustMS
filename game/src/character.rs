@@ -29,6 +29,9 @@ pub const FLORINA_RETURN: i16 = 2;
 /// The `saved_locations` key of the map the player entered Nett's Pyramid's
 /// Pyramid Dunes from.
 pub const PYRAMID_RETURN: i16 = 3;
+/// The `saved_locations` key of the map the player took the Mu Lung
+/// Dojo's notice board from (Cosmic `MIRROR`).
+pub const DOJO_RETURN: i16 = 4;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1003,7 +1006,13 @@ mod tests {
 
     #[test]
     fn the_scripts_saved_location_kinds_are_apart_and_below_the_invitations() {
-        let kinds = [FREE_MARKET_RETURN, WORLD_TOUR_RETURN, FLORINA_RETURN];
+        let kinds = [
+            FREE_MARKET_RETURN,
+            WORLD_TOUR_RETURN,
+            FLORINA_RETURN,
+            PYRAMID_RETURN,
+            DOJO_RETURN,
+        ];
         for (i, kind) in kinds.iter().enumerate() {
             assert!(!kinds[..i].contains(kind));
             assert!((0..1000).contains(kind));

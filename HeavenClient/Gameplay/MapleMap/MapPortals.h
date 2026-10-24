@@ -59,6 +59,8 @@ namespace ms
 
 		Point<int16_t> get_portal_by_id(uint8_t id) const;
 
+		bool has_portal(uint8_t id) const;
+
 		// Where the `i`th of the town's door portals (type 6) stands, in id
 		// order, or the first if there are fewer (FUN_005377fa).
 		std::optional<Point<int16_t>> get_door_portal(size_t i) const;

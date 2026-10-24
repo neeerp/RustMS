@@ -64,7 +64,10 @@ impl ClientActor {
                     .or(self.tylus_portal(script)?)
                     .or(self.ellin_portal(script)?)
                 {
-                    None => self.htpq_portal(script).await?,
+                    None => match self.htpq_portal(script).await? {
+                        None => self.dojo_portal(script).await?,
+                        effects => effects,
+                    },
                     effects => effects,
                 },
                 effects => effects,
