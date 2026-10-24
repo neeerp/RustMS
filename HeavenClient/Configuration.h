@@ -380,19 +380,18 @@ namespace ms
 		{}
 	};
 
-	// Music Volume
-	// Number from 0 to 100
+	// Music volume from 0 to 100; System Option sets it in fives from 5,
+	// at first 80 (0x994163)
 	struct BGMVolume : public Configuration::ByteEntry
 	{
-		BGMVolume() : ByteEntry("BGMVolume", "50")
+		BGMVolume() : ByteEntry("BGMVolume", "80")
 		{}
 	};
 
-	// Sound Volume
-	// Number from 0 to 100
+	// Sound volume, as the music's
 	struct SFXVolume : public Configuration::ByteEntry
 	{
-		SFXVolume() : ByteEntry("SFXVolume", "50")
+		SFXVolume() : ByteEntry("SFXVolume", "80")
 		{}
 	};
 
@@ -411,17 +410,17 @@ namespace ms
 	};
 
 	// The System Option settings the client stores but doesn't apply yet.
-	// Picture quality from 0 (normal) to 2 (best)
+	// Picture quality from 0 (normal) to 3 (best)
 	struct PictureQuality : public Configuration::ByteEntry
 	{
-		PictureQuality() : ByteEntry("PictureQuality", "2")
+		PictureQuality() : ByteEntry("PictureQuality", "3")
 		{}
 	};
 
-	// Mouse cursor speed from 0 (slow) to 10 (fast)
+	// Mouse cursor speed from 0 (slow) to 19 (fast)
 	struct MouseSpeed : public Configuration::ByteEntry
 	{
-		MouseSpeed() : ByteEntry("MouseSpeed", "5")
+		MouseSpeed() : ByteEntry("MouseSpeed", "10")
 		{}
 	};
 
