@@ -227,3 +227,10 @@ add = [{ item = 4001162, prob = 1.0 }]
 # altar takes (Reactor.nx 3001000, item event); every time. Its eight empty
 # boxes (3002002) drop nothing.
 add = [{ item = 4001163, prob = 1.0 }]
+
+[mobs.9300182]
+# The Forest of Poison Haze's Poison Golem (Map.nx 930000600) drops the
+# Golem's Marble 4001164 that the prize map's fountain takes (Reactor.nx
+# 3008000, item event). The pack has none; three in five, as on the community
+# servers (Cosmic's drop data).
+add = [{ item = 4001164, prob = 0.6 }]

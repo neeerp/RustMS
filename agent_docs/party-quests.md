@@ -1025,16 +1025,27 @@ map.
 
 The prize map, 930000800, is the event's exit and every party's own map
 alike, not a copy: the time running out, leaving, and dying (the maps'
-`returnMap`) all land there, and its way out (`party6_stage800`) leads home
-to 300030100. Ellin (2133001) welcomes the party at the entrance
+`returnMap`) all land there. The Super-Charged golem drops the Golem's
+Marble (4001164) three times in five (`reward_overrides.toml`); thrown on
+the map's fountain (`reactors::ELLIN_FOUNTAIN`, Reactor.nx 3008000, an item
+reactor that stays used for about five minutes), it gives everyone on the
+map 52,000 EXP (`reactors::Action::ExpToAll`, the field sending
+`ServerMessage::GainExp`; no EXP rate applies). The way home
+(`party6_stage800`, `scripts::ellin_home`) takes the forest's items and the
+marble, gives an Altaire Fragment (4001198) while the fountain is used, or
+refuses without room for one (`ellin.home.no_room`), and leads to
+300030100. There Ellin (2133000) trades ten fragments for the Altaire
+Earrings (1032060), and ten more each for the Glittering (1032061) and then
+the Brilliant (1032072) pair, taking the pair before; only the bag counts,
+not what is worn (`ellin.prize.*`). The numbers and the trades are
+Cosmic's (QUESTIONS a125 4-5). Ellin (2133001) welcomes the party at the entrance
 (`ellin.guide.welcome`) and, on the stages other than the third and
 fourth, lets a member out to it (`ellin.guide.leave`); a member leaving, if fewer than four stay, or the leader
 leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
 event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
 leaves. Its lines are placeholders (`ellin.*`).
 
-Not yet: the fountain's EXP, the Altaire Fragment and the earrings (slice
-S5 of a125), and the Party Search toggle.
+Not yet: the Party Search toggle.
 
 ## NPCs
 
@@ -1082,7 +1093,7 @@ S5 of a125), and the Party Search toggle.
 | Gatekeeper 2083001 | 240050100, 240050300, 240050310 | Runtime (`htpq_keeper`): the leader's hand-in of the keys |
 | Tylus 2020008 | 211000001 | On 6192, runtime (`talk_about_event`): a menu of going in and what to do |
 | Tylus 2022004 | 921100301 | Thanks, and on to El Nath 211000000 |
-| Ellin 2133000 | 300030100 | Runtime (`talk_about_event`): a menu of going into the forest and what it holds |
+| Ellin 2133000 | 300030100 | Runtime (`talk_about_event`): a menu of going into the forest, what it holds, and the earrings for Altaire Fragments |
 | Ellin 2133001 | 930000000 | Welcome |
 | Ellin 2133001 | 930000300 | Clears the maze and moves the team on |
 | Ellin 2133001 | 930000400 | Runtime (`ellin_flowers`): Purification Marbles, the leader's hand-in, or out |

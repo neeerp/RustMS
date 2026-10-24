@@ -75,7 +75,7 @@ impl ClientActor {
             EventKind::Delli => NpcScript::delli(entry),
             EventKind::LudiMaze => NpcScript::rolly(entry),
             EventKind::Tylus => NpcScript::tylus(entry),
-            EventKind::Ellin => NpcScript::ellin(entry),
+            EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -782,6 +782,19 @@ impl ClientActor {
         portal_name(packet)
             .and_then(|portal| ticket.kind.event().gate_stage(map_id, &portal))
             .is_some_and(|stage| !ticket.cleared(stage))
+    }
+
+    /// A reactor on the player's map gave everyone there `exp`, such as
+    /// the Forest of Poison Haze's fountain (Cosmic `giveCharacterExp`).
+    pub(super) async fn reactor_exp(&mut self, exp: i32) -> Result<(), RuntimeError> {
+        if self.in_cash_shop || self.game.is_none() {
+            return Ok(());
+        }
+        let mut next = self.in_game()?.player.clone();
+        let mut packets = Vec::new();
+        gain_exp(&mut next, exp, &mut packets)?;
+        self.commit_player(next, None, &mut packets).await?;
+        self.send_all(&mut packets).await
     }
 
     /// The party cleared `stage` of event `id`: those on its map see and

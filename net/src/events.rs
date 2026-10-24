@@ -1320,7 +1320,14 @@ pub const ELLIN_GOLEM_LAST: i32 = 9_300_182;
 pub const ELLIN_ALTAR_AT: (i16, i16) = (392, -73);
 /// Diluted Poison, the Purple Stone of Magic, Monster Marbles and
 /// Purification Marbles: of use only in the forest.
-const ELLIN_ITEMS: [i32; 4] = [4_001_162, PURPLE_STONE, MONSTER_MARBLE, PURIFICATION_MARBLE];
+pub const ELLIN_ITEMS: [i32; 4] = [4_001_162, PURPLE_STONE, MONSTER_MARBLE, PURIFICATION_MARBLE];
+/// The Golem's Marble the golem's last form may drop, which the prize
+/// map's fountain takes for 52,000 EXP to everyone there; and the Altaire
+/// Fragment its way home then gives, ten of which Ellin trades for
+/// earrings (Cosmic `3008000`, `party6_stage800`, `2133000`).
+pub const GOLEMS_MARBLE: i32 = 4_001_164;
+pub const ELLIN_FOUNTAIN_EXP: i32 = 52_000;
+pub const ALTAIRE_FRAGMENT: i32 = 4_001_198;
 
 /// The Forest of Poison Haze (Cosmic `EllinPQ`): four to six of a party,
 /// all of levels 44 to 55, in the Deep Fairy Forest with their leader, go

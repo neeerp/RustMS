@@ -40,6 +40,17 @@ impl ClientActor {
                 let elapsed = self.time_on_map().unwrap_or_default();
                 Some(scripts::kyrin_test_out(elapsed))
             }
+            // The Forest of Poison Haze's way home, by its fountain's state.
+            (Some(script), Some(_)) if script == scripts::ELLIN_HOME => {
+                let [fountain] = self
+                    .reactor_states(&[net::reactors::ELLIN_FOUNTAIN_NAME])
+                    .await?[..]
+                else {
+                    return Ok(());
+                };
+                let used = fountain.is_some_and(|state| state > 0);
+                Some(scripts::ellin_home(&self.in_game()?.player, used))
+            }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 match scripts::time_leap(&self.in_game()?.player) {
                     Some(effects) => Some(effects),
