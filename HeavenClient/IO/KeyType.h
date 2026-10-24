@@ -33,6 +33,8 @@ namespace ms
 			MENU = 4,
 			ACTION = 5,
 			FACE = 6,
+			// A cash 501xxxx or etc 429xxxx item's effect, such as Sunny Day.
+			EFFECT = 7,
 			MACRO = 8,
 			TEXT = 9,
 			LENGTH

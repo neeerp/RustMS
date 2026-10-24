@@ -96,6 +96,7 @@ namespace ms
 		void reset();
 
 		Icon* mapping_icon(Keyboard::Mapping mapping) const;
+		std::unique_ptr<Icon> item_icon(Keyboard::Mapping mapping) const;
 		Texture get_item_texture(int32_t item_id) const;
 		Texture get_skill_texture(int32_t skill_id) const;
 		int32_t key_by_position(Point<int16_t> position) const;

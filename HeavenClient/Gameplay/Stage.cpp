@@ -1270,6 +1270,12 @@ namespace ms
 					player.use_item(action);
 
 				break;
+			// An item effect, while the player has the item (FUN_00a246e0).
+			case KeyType::Id::EFFECT:
+				if (down && player.get_inventory().get_total_item_count(action) > 0)
+					use_item_effect(action);
+
+				break;
 			// The macro at the key's place in the list, unless a skill is held
 			// down (FUN_0094f2ed).
 			case KeyType::Id::MACRO:

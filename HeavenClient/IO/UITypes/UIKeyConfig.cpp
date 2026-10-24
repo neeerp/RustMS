@@ -304,14 +304,8 @@ namespace ms
 		{
 			Keyboard::Mapping mapping = it.second;
 
-			if (mapping.type == KeyType::Id::ITEM)
-			{
-				int32_t item_id = mapping.action;
-				int16_t count = inventory.get_total_item_count(item_id);
-				Texture tx = get_item_texture(item_id);
-
-				item_icons[item_id] = std::make_unique<Icon>(std::make_unique<CountableMappingIcon>(mapping, count), tx, count);
-			}
+			if (mapping.type == KeyType::Id::ITEM || mapping.type == KeyType::Id::EFFECT)
+				item_icons[mapping.action] = item_icon(mapping);
 		}
 	}
 
@@ -448,7 +442,7 @@ namespace ms
 					return Cursor::State::GRABBING;
 				}
 
-				if (mapping.type == KeyType::Id::ITEM)
+				if (mapping.type == KeyType::Id::ITEM || mapping.type == KeyType::Id::EFFECT)
 					show_item(mapping.action);
 				else if (mapping.type == KeyType::Id::SKILL)
 					show_skill(mapping.action);
@@ -674,16 +668,10 @@ namespace ms
 
 		staged_mappings[key] = mapping;
 
-		if (mapping.type == KeyType::Id::ITEM)
+		if (mapping.type == KeyType::Id::ITEM || mapping.type == KeyType::Id::EFFECT)
 		{
-			int32_t item_id = mapping.action;
-
-			if (item_icons.find(item_id) == item_icons.end())
-			{
-				int16_t count = inventory.get_total_item_count(item_id);
-				Texture tx = get_item_texture(item_id);
-				item_icons[item_id] = std::make_unique<Icon>(std::make_unique<CountableMappingIcon>(mapping, count), tx, count);
-			}
+			if (item_icons.find(mapping.action) == item_icons.end())
+				item_icons[mapping.action] = item_icon(mapping);
 		}
 		else if (mapping.type == KeyType::Id::SKILL)
 		{
@@ -705,7 +693,7 @@ namespace ms
 		if (!unbind(staged_mappings, mapping))
 			return;
 
-		if (mapping.type == KeyType::Id::ITEM)
+		if (mapping.type == KeyType::Id::ITEM || mapping.type == KeyType::Id::EFFECT)
 			item_icons.erase(mapping.action);
 		else if (mapping.type == KeyType::Id::SKILL)
 			skill_icons.erase(mapping.action);
@@ -797,9 +785,23 @@ namespace ms
 	}
 
 	/// Helpers
+	// An item's icon, with the count of a use or set-up item but not of an
+	// item effect's, as v83 draws them.
+	std::unique_ptr<Icon> UIKeyConfig::item_icon(Keyboard::Mapping mapping) const
+	{
+		Texture tx = get_item_texture(mapping.action);
+
+		if (mapping.type == KeyType::Id::EFFECT)
+			return std::make_unique<Icon>(std::make_unique<MappingIcon>(mapping), tx, -1);
+
+		int16_t count = inventory.get_total_item_count(mapping.action);
+
+		return std::make_unique<Icon>(std::make_unique<CountableMappingIcon>(mapping, count), tx, count);
+	}
+
 	Icon* UIKeyConfig::mapping_icon(Keyboard::Mapping mapping) const
 	{
-		if (mapping.type == KeyType::Id::ITEM)
+		if (mapping.type == KeyType::Id::ITEM || mapping.type == KeyType::Id::EFFECT)
 		{
 			auto iter = item_icons.find(mapping.action);
 

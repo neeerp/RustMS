@@ -268,6 +268,10 @@ from `UI.nx`. Moved so far:
   functions (`icon/N`, by v83 function id), laid out from the background and
   period footage. Drag an icon between keys or onto the palette to unbind it.
   It shows the keys as they are each time it opens, as v83 builds it anew.
+  An effect item (cash 501xxxx such as Sunny Day, or etc 429xxxx) dragged
+  from the inventory binds key type 7. It is drawn without a count, here and
+  on the quick slots, and the key turns the item's effect on or off while the
+  player has the item, as v83 does (0x94f2ed, 0xa24530).
   Esc, Tab, and the other keys printed on the background are fixed. DEFAULT
   restores the server's defaults; DEFAULT and CLEAR ALL ask through the
   in-window `notice` bitmaps. Cancel, X, Esc, the hotkey, and the status bar's
