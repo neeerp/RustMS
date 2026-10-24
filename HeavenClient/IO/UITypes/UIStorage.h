@@ -37,6 +37,10 @@ namespace ms
 		Cursor::State send_cursor(bool clicked, Point<int16_t> position) override;
 		void doubleclick(Point<int16_t> cursorpos) override;
 
+		// Tabs and rows.
+		bool own_cursor(uint16_t buttonid) const override
+		{ return buttonid >= Buttons::TAB0; }
+
 		void send_scroll(double yoffset) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
