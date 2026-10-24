@@ -65,7 +65,7 @@ namespace ms
 
 	void ClassicTabs::draw_label(Point<int16_t> position, uint16_t index, bool selected) const
 	{
-		const std::vector<Texture> &labels = selected ? enabled : disabled;
+		const std::vector<Texture> &labels = selected ? disabled : enabled;
 
 		if (index >= labels.size())
 			return;
