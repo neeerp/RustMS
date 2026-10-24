@@ -76,6 +76,9 @@ pub struct Trace {
     /// Other UPDATE_QUEST_INFO results: mode, and the quest for those
     /// that name one (else 0).
     pub quest_refusals: Vec<(u8, i16)>,
+    /// Timed quests' clocks (UPDATE_QUEST_INFO 6, 7 and 15): mode, quest,
+    /// the ms shown (else 0), and `progress.len()` when it came.
+    pub quest_clocks: Vec<(u8, i16, i32, usize)>,
     /// Latest progress string (kill counts) per started quest.
     pub kills: BTreeMap<i16, String>,
     /// EXP gains from SHOW_STATUS_INFO mode 3.
@@ -540,6 +543,18 @@ impl Trace {
                     r.read_int().unwrap(),
                     r.read_short().unwrap(),
                 )),
+                mode @ (6 | 7) => {
+                    for _ in 0..r.read_short().unwrap() {
+                        let quest = r.read_short().unwrap();
+                        let ms = if mode == 6 { r.read_int().unwrap() } else { 0 };
+                        self.quest_clocks
+                            .push((mode, quest, ms, self.progress.len()));
+                    }
+                }
+                15 => {
+                    let quest = r.read_short().unwrap();
+                    self.quest_clocks.push((15, quest, 0, self.progress.len()));
+                }
                 mode => self
                     .quest_refusals
                     .push((mode, r.read_short().unwrap_or(0))),

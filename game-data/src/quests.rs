@@ -225,6 +225,9 @@ pub struct QuestTemplate {
     /// The record `end_info` reads when it is not the quest's own
     /// (`RECORD_QUESTS`).
     pub end_info_record: Option<i16>,
+    /// `QuestInfo` `timeLimit`: the seconds the player has once started,
+    /// shown as the client's timed-quest clock; then the quest is forfeited.
+    pub time_limit: Option<u32>,
 }
 
 /// One `Check/1/infoex` entry on the quest's own info string.
@@ -647,6 +650,14 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         start_info,
         end_info,
         end_info_record,
+        time_limit: match info {
+            Some(info) => nx
+                .int_child(info, "timeLimit")?
+                .filter(|&seconds| seconds > 0)
+                .map(|seconds| u32::try_from(seconds).map_err(|_| invalid("timeLimit")))
+                .transpose()?,
+            None => None,
+        },
     })
 }
 
@@ -1099,6 +1110,9 @@ mod tests {
             (&[1002140][..], &[180000000][..])
         );
         assert_eq!(catalog.quest(3300).unwrap().end_meso, 10000);
+        // Jr. Officer Medin's plan gives half an hour; Sera's Mirror has no clock.
+        assert_eq!(catalog.quest(3458).unwrap().time_limit, Some(1800));
+        assert_eq!(mirror.time_limit, None);
         assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
         // Bartos's test: any of the 45 pets out, to start and to finish.
         let test = catalog.quest(4646).unwrap();

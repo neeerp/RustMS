@@ -32,6 +32,7 @@ mod shop;
 mod storage;
 mod store_bank;
 mod time_limit;
+mod timed_quest;
 mod trade;
 mod wedding;
 mod wedding_day;
@@ -98,6 +99,8 @@ static NEXT_CONNECTION_ID: AtomicU64 = AtomicU64::new(1);
 pub struct WorldServices {
     pub directory: mpsc::Sender<DirectoryMessage>,
     pub fields: Arc<FieldRegistry>,
+    /// The timed quests' clocks of players changing channel.
+    pub quest_clocks: Arc<timed_quest::QuestClocks>,
 }
 
 /// State that exists only after the client entered the game.
@@ -165,6 +168,8 @@ pub struct ClientActor {
     /// The player's open Mystic Door.
     door: Option<door::OpenDoor>,
     map_timer: Option<time_limit::MapTimer>,
+    /// The clocks of the player's started timed quests.
+    quest_clocks: Vec<timed_quest::QuestClock>,
     /// The map that hurts the player now and then.
     hazard: Option<hazard::HazardTimer>,
     /// Packets to send later, soonest first.
@@ -249,6 +254,7 @@ impl ClientActor {
             presence: None,
             door: None,
             map_timer: None,
+            quest_clocks: Vec::new(),
             hazard: None,
             later: Vec::new(),
             trade: None,
@@ -282,6 +288,7 @@ impl ClientActor {
             let items_due = self.items_due();
             let later_due = self.later_due();
             let family_buff_due = self.family_buff_due();
+            let quests_due = self.quest_clocks_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -315,6 +322,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(family_buff_due.unwrap_or_else(Instant::now)), if family_buff_due.is_some() => {
                     self.end_family_buff().await
+                }
+                _ = sleep_until(quests_due.unwrap_or_else(Instant::now)), if quests_due.is_some() => {
+                    self.expire_quests().await
                 }
             };
             if let Err(error) = step {
@@ -745,6 +755,7 @@ impl ClientActor {
         // gone: HP and MP come back within the maximum without them.
         player.fit_hp_mp();
         self.client_id = character_id;
+        let quests_ran_out = self.resume_timed_quests(&mut player).await?;
 
         let mut char_info = build::world::char::build_char_info(&player, self.channel_id)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -786,6 +797,9 @@ impl ClientActor {
             let mut lines = build::world::inventory::build_seals_expired(&expired.released)
                 .map_err(|e| RuntimeError::Handler(e.to_string()))?;
             self.send(&mut lines).await?;
+        }
+        for mut packet in quests_ran_out {
+            self.send(&mut packet).await?;
         }
 
         let presence = Presence::of(&player);
@@ -928,6 +942,7 @@ impl ClientActor {
         spawn_db(move || db::session::begin_channel_transition(session_id, i16::from(channel_id)))
             .await?;
         self.changing_channel = true;
+        self.hand_over_quest_clocks(session_id);
 
         let mut redirect = build::world::channel::build_channel_change(channel.host, channel.port)
             .map_err(|e| RuntimeError::Handler(e.to_string()))?;
@@ -956,6 +971,7 @@ impl ClientActor {
         self.leave_personal_shop().await?;
         self.leave_mini_game().await?;
         self.leave_hired_merchant().await?;
+        self.give_up_timed_quests().await?;
         // The shop can't answer a proposal (report b053).
         self.send_to_directory(DirectoryMessage::EnteredCashShop {
             from: self.client_id,
@@ -1987,6 +2003,7 @@ impl ClientActor {
                 })
                 .await;
             self.remember_spawn_point();
+            self.leave_timed_quests().await;
             // A channel change keeps them: they go only when the player
             // leaves the game.
             if let (Some(game), false) = (self.game.as_mut(), self.changing_channel) {
@@ -2057,6 +2074,7 @@ mod tests {
         let services = WorldServices {
             directory,
             fields: FieldRegistry::new(Duration::from_millis(100)),
+            quest_clocks: Arc::default(),
         };
         let actor = ClientActor::new(stream, addr.ip(), 0, services)
             .await

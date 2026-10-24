@@ -73,7 +73,8 @@ namespace ms
 			ITEMSEARCHRESULT,
 			WEDDINGREGISTRY,
 			USERLIST,
-			MEDALS
+			MEDALS,
+			TIMEDQUESTS
 		};
 
 		virtual ~Tooltip()

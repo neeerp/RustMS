@@ -120,6 +120,8 @@ namespace ms
 					return Tooltip::Parent::WORLDMAP;
 				case UIElement::Type::MEDALS:
 					return Tooltip::Parent::MEDALS;
+				case UIElement::Type::TIMEDQUESTS:
+					return Tooltip::Parent::TIMEDQUESTS;
 				case UIElement::Type::MINIMAP:
 					return Tooltip::Parent::MINIMAP;
 				case UIElement::Type::MONSTERBOOK:
@@ -874,6 +876,7 @@ namespace ms
 					UIElement::Type::REVIVE,
 					UIElement::Type::FIELDCLOCK,
 					UIElement::Type::EVENTCLOCK,
+					UIElement::Type::TIMEDQUESTS,
 					UIElement::Type::MOBGAGE,
 					UIElement::Type::ENERGYBAR,
 					UIElement::Type::AVATARMEGAPHONE,

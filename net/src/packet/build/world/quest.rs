@@ -76,6 +76,40 @@ pub fn build_quest_action_result(
     Ok(p)
 }
 
+/// `UPDATE_QUEST_INFO` mode 6: the clock of a timed quest (`QuestInfo`
+/// `timeLimit`) with `ms` left. v83 (FUN_00959a73) adds one for each quest
+/// it reads without looking for one already shown, so it is sent once.
+pub fn build_quest_timer(quest_id: i16, ms: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(6)?;
+    p.write_short(1)?;
+    p.write_short(quest_id)?;
+    p.write_int(ms)?;
+    Ok(p)
+}
+
+/// `UPDATE_QUEST_INFO` mode 7: the quest's clock goes, as the quest is done
+/// or given up.
+pub fn build_quest_timer_end(quest_id: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(7)?;
+    p.write_short(1)?;
+    p.write_short(quest_id)?;
+    Ok(p)
+}
+
+/// `UPDATE_QUEST_INFO` mode 15: "The [name] quest expired because the time
+/// limit ended" in the chat log.
+pub fn build_quest_expired(quest_id: i16) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::UpdateQuestInfo as i16)?;
+    p.write_byte(15)?;
+    p.write_short(quest_id)?;
+    Ok(p)
+}
+
 /// `UPDATE_QUEST_INFO` mode 10: the items of the quest's step don't fit.
 /// The client names the inventories from the step's own items.
 pub fn build_quest_items_full(quest_id: i16) -> Result<Packet, NetworkError> {
@@ -234,6 +268,27 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::UpdateQuestInfo as i16).byte(8);
         expect.short(1032).int(2001).short(1033);
+        expect.end();
+    }
+
+    #[test]
+    fn a_quest_clock_is_a_list_of_one() {
+        let packet = build_quest_timer(3458, 1_800_000).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(6);
+        expect.short(1).short(3458).int(1_800_000);
+        expect.end();
+
+        let packet = build_quest_timer_end(3458).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(7);
+        expect.short(1).short(3458);
+        expect.end();
+
+        let packet = build_quest_expired(3458).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::UpdateQuestInfo as i16).byte(15);
+        expect.short(3458);
         expect.end();
     }
 
