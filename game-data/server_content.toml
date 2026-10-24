@@ -1155,6 +1155,22 @@ unsourced = [
     "ellin.prize.no_altaire",
     "ellin.prize.no_glittering",
     "ellin.prize.no_room",
+    "pirate.menu",
+    "pirate.enter",
+    "pirate.about",
+    "pirate.info",
+    "pirate.no_party",
+    "pirate.not_leader",
+    "pirate.not_eligible",
+    "pirate.busy",
+    "pirate.guon.leave",
+    "pirate.guon.boxes",
+    "pirate.guon.marks",
+    "pirate.guon.deck",
+    "pirate.guon.bonus",
+    "pirate.guon.crew",
+    "pirate.guon.doors",
+    "pirate.guon.boss",
 ]
 
 [text."glTutoMsg0.message"]

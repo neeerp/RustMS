@@ -76,6 +76,7 @@ impl ClientActor {
             EventKind::LudiMaze => NpcScript::rolly(entry),
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
+            EventKind::Pirate => NpcScript::guon(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -719,14 +720,15 @@ impl ClientActor {
     }
 
     /// The player is going to `map_id`: off the event's maps, they hand
-    /// their ticket back.
+    /// their ticket back; onto one whose first arrival starts its clock
+    /// over, they tell it.
     pub(super) async fn leaving_for(&mut self, map_id: i32) -> Result<(), RuntimeError> {
-        if self
-            .event
-            .as_ref()
-            .is_some_and(|ticket| !ticket.holds(map_id))
-        {
-            self.drop_event_ticket().await?;
+        match &self.event {
+            Some(ticket) if !ticket.holds(map_id) => self.drop_event_ticket().await?,
+            Some(_) if events::clock_on(map_id).is_some() => {
+                self.tell_event(EventCommand::Reached(map_id)).await
+            }
+            _ => {}
         }
         if self
             .wedding

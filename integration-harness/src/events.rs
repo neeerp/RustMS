@@ -10,7 +10,7 @@ use crate::quests::answer;
 use crate::trace::{send, step, until, warp, Trace};
 use crate::{login_to_world_session, relogin, WorldSession};
 use game_data::GameData;
-use net::events::{Event, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, ZPQ};
+use net::events::{Event, ELLIN, HPQ, HTPQ, KPQ, LPQ, OPQ, PIRATE, ZPQ};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -278,6 +278,12 @@ pub async fn enter_htpq(team: &mut [WorldSession]) -> Vec<Trace> {
 /// harness its forest lasts 30 seconds).
 pub async fn enter_ellin(team: &mut [WorldSession]) -> Vec<Trace> {
     enter_from_menu(team, &ELLIN, net::npc_scripts::ELLIN, 40).await
+}
+
+/// The party's leader, first, takes it aboard the Pirate Ship from Guon,
+/// as `enter_lpq` does, once any party before it is off.
+pub async fn enter_pirate(team: &mut [WorldSession]) -> Vec<Trace> {
+    enter_from_menu(team, &PIRATE, net::npc_scripts::GUON, 20).await
 }
 
 /// The leader picks the first choice of `npc`'s menu in `event`'s lobby,

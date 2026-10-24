@@ -46,6 +46,9 @@ pub enum EventKind {
     /// The Forest of Poison Haze, Ellin Forest's party quest, started at
     /// Ellin (2133000) in the Deep Fairy Forest.
     Ellin,
+    /// The Pirate Ship, Herb Town's party quest against the Lord Pirate,
+    /// started at Guon (2094000) Over the Pirate Ship.
+    Pirate,
 }
 
 /// An event's maps and terms.
@@ -1391,6 +1394,75 @@ pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
     (map_id == ELLIN_STAGES[0]).then_some(1)
 }
 
+/// Over the Pirate Ship, in Herb Town, where the party gathers at Guon;
+/// the ship's stages' maps, in order, the first its entry; the map the
+/// team that beats the Lord Pirate goes to; and the way out, which every
+/// map of the ship returns to (Map.nx `returnMap`, Cosmic `PiratePQ`'s
+/// `exitMap`).
+pub const PIRATE_LOBBY: i32 = 251_010_404;
+pub const PIRATE_ENTRY: i32 = 925_100_000;
+pub const PIRATE_STAGES: [i32; 6] = [
+    PIRATE_ENTRY,
+    925_100_100,
+    925_100_200,
+    925_100_300,
+    925_100_400,
+    925_100_500,
+];
+pub const PIRATE_CLEAR: i32 = 925_100_600;
+pub const PIRATE_EXIT: i32 = 925_100_700;
+/// The Old Metal Keys the fifth stage's doors take, and the three Marks of
+/// the second, which the leader hands Guon in turn: of use only on the
+/// ship.
+pub const PIRATE_ITEMS: [i32; 4] = [4_001_117, 4_001_120, 4_001_121, 4_001_122];
+
+/// The Pirate Ship (Cosmic `PiratePQ`): three to six of a party, all of
+/// levels 55 to 100, Over the Pirate Ship with their leader, board their
+/// own copy of the ship with 4 minutes on the clock, which starts over the
+/// first time any of them reaches a later stage (`clock_on`). Six stages,
+/// the last the Lord Pirate's; beating him takes the team to
+/// `PIRATE_CLEAR`. The defaults are in `v83ref/lanes/QUESTIONS.md` a128.
+pub const PIRATE: Event = Event {
+    lobby: PIRATE_LOBBY,
+    maps: PIRATE_ENTRY..=PIRATE_EXIT,
+    entry: PIRATE_ENTRY,
+    entries: 1,
+    exit: PIRATE_EXIT,
+    levels: 55..=100,
+    team: 3..=6,
+    minutes: 4,
+    exp_per_stage: &[0; 6],
+    stride: 1,
+    stage_maps: &PIRATE_STAGES,
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &PIRATE_ITEMS,
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: Some(PIRATE_CLEAR),
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+};
+
+/// The minutes an event's clock starts over with the first time any member
+/// reaches `map_id`, in its copy: the Pirate Ship's second to fifth stages
+/// give 6, the Lord Pirate's 8 (Cosmic `PiratePQ.changedMapInside`).
+pub fn clock_on(map_id: i32) -> Option<u64> {
+    match PIRATE_STAGES[1..].iter().position(|&map| map == map_id)? {
+        4 => Some(8),
+        _ => Some(6),
+    }
+}
+
 /// Whether `mob_id` is the friendly mob some event's team protects.
 pub fn protected(mob_id: i32) -> bool {
     EventKind::ALL
@@ -1399,7 +1471,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 13] = [
+    pub const ALL: [EventKind; 14] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1413,6 +1485,7 @@ impl EventKind {
         EventKind::LudiMaze,
         EventKind::Tylus,
         EventKind::Ellin,
+        EventKind::Pirate,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1430,6 +1503,7 @@ impl EventKind {
             EventKind::LudiMaze => &LUDIMAZE,
             EventKind::Tylus => &TYLUS,
             EventKind::Ellin => &ELLIN,
+            EventKind::Pirate => &PIRATE,
         }
     }
 }
@@ -1797,6 +1871,9 @@ pub enum EventCommand {
     /// starts over: Horntail's (`HORNTAIL_FIGHT_MINUTES`, Cosmic
     /// `restartEventTimer`).
     RestartClock,
+    /// The member reached this map of the event's, whose clock may start
+    /// over the first time anyone does (`clock_on`).
+    Reached(i32),
     /// The member took their share of the won event's prize from Aura,
     /// once each (Cosmic's `gridInsert`): only their own ticket keeps it,
     /// so it goes when they leave.
@@ -2726,6 +2803,36 @@ mod tests {
         assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM_LAST), Some(6));
         assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM), None);
         assert_eq!(cleared_by_boss(ELLIN_STAGES[4], ELLIN_GOLEM_LAST), None);
+    }
+
+    #[test]
+    fn the_ship_takes_three_to_six_of_55_to_100_and_gives_more_time_at_each_stage() {
+        let three: Vec<_> = (1..=3).map(|id| at(id, 55, PIRATE_LOBBY)).collect();
+        assert_eq!(PIRATE.team(1, &three), Some(vec![1, 2, 3]));
+        assert!(PIRATE.team(1, &three[..2]).is_none());
+        let seven: Vec<_> = (1..=7).map(|id| at(id, 70, PIRATE_LOBBY)).collect();
+        assert!(PIRATE.team(1, &seven).is_none());
+        for level in [54, 101] {
+            let off = [&three[..2], &[at(3, level, PIRATE_LOBBY)]].concat();
+            assert!(PIRATE.team(1, &off).is_none(), "{level}");
+        }
+        // The bonus rooms and the clear room are its own; the way out isn't.
+        let rooms = [925_100_201, 925_100_202, 925_100_301, 925_100_302];
+        assert!(PIRATE_STAGES
+            .iter()
+            .chain(&rooms)
+            .all(|&map| event_map(map)));
+        assert!(event_map(PIRATE_CLEAR));
+        assert!(!event_map(PIRATE_LOBBY) && !event_map(PIRATE_EXIT));
+        assert_eq!(PIRATE.last_stage(), 6);
+        assert_eq!(PIRATE.stage_on(PIRATE_STAGES[5]), Some(6));
+        assert_eq!(PIRATE.duration(), scaled(Duration::from_secs(4 * 60)));
+        // Cosmic `changedMapInside`: 6 minutes from the second stage on,
+        // 8 for the Lord Pirate's; none on the first or off the stages.
+        let clocks: Vec<_> = PIRATE_STAGES.iter().map(|&map| clock_on(map)).collect();
+        assert_eq!(clocks, [None, Some(6), Some(6), Some(6), Some(6), Some(8)]);
+        assert!(rooms.iter().all(|&map| clock_on(map).is_none()));
+        assert_eq!(clock_on(PIRATE_CLEAR), None);
     }
 
     #[test]
