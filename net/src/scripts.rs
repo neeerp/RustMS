@@ -1452,6 +1452,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::MONSTERS_LEFT, &[])),
         },
+        // The Pirate Ship's way on from its first stage, once the stage's
+        // monsters are all gone (Cosmic `davy_next0`).
+        "davy_next0" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::PIRATE_STAGES[1], 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::PIRATE_PORTAL_SHUT, &[])),
+        },
         // Closed, it says nothing, as in Cosmic.
         "s4tornado_enter"
             if [6230, 6231]
@@ -3197,6 +3208,20 @@ mod tests {
             outcome.effects[2],
             Effect::WarpToPortal(BERSERK_ROOM, _)
         ));
+    }
+
+    #[test]
+    fn the_pirate_ships_first_way_on_waits_for_its_monsters() {
+        let outcome = portal("davy_next0", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::PIRATE_STAGES[1], 0)
+            ]
+        );
+        assert!(outcome.occupied.is_some());
     }
 
     #[test]
