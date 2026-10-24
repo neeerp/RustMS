@@ -11,8 +11,9 @@ namespace ms
 {
 	// A v83 tab strip from Basic.img: tabs of one width side by side, the
 	// selected one pink. Neighbouring tabs share a middle piece, so tab i
-	// starts at i * pitch(). Each tab's label (enabled when selected) is
-	// centred over its fill.
+	// starts at i * pitch(). Each tab's label is centred over its fill: the
+	// selected tab takes the `disabled` art (bolder, as the tab can't be
+	// clicked), the others the `enabled` art, as v83's tab control does.
 	class ClassicTabs
 	{
 	public:
