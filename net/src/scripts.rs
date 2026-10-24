@@ -1679,6 +1679,32 @@ pub fn htpq_lamp_door(leader: bool, lamp: Option<u8>) -> Vec<Effect> {
     ]
 }
 
+/// The Origin of the Clocktower in the past, where Papulatus (2043000)
+/// stands for a Buccaneer on the Time Leap quests (6361-6363).
+pub const PAST_CLOCKTOWER: i32 = 922020300;
+/// Papulatus's Key (4031870), which 6361 takes to the past.
+const PAPULATUS_KEY: i32 = 4031870;
+/// "A New Revelation" (6363) and the record it completes on.
+pub const NEW_REVELATION: i16 = 6363;
+pub const SENT_BACK_RECORD: i16 = 6364;
+pub const SENT_BACK: &str = "2";
+
+/// The way to Papulatus as it leads into the past instead, for a player
+/// carrying the key on 6361 or on the quests after it (Cosmic
+/// `Populatus00`); `None` leads to the fight.
+pub fn time_leap(player: &Player) -> Option<Vec<Effect>> {
+    let quest = |id| player.quests.state(id);
+    let into_past = (quest(6361) == QuestState::Started
+        && player.inventory.count(PAPULATUS_KEY) > 0)
+        || (quest(6361) == QuestState::Completed && quest(NEW_REVELATION) != QuestState::Completed);
+    into_past.then(|| {
+        vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(PAST_CLOCKTOWER, 0),
+        ]
+    })
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2635,6 +2661,25 @@ mod tests {
             .inventory
             .insert(InventoryType::Etc, 1, game::Item::stack(item, 1));
         player
+    }
+
+    #[test]
+    fn the_way_to_papulatus_leads_into_the_past_for_time_leap() {
+        use QuestState::{Completed, Started};
+        let past = Some(vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(PAST_CLOCKTOWER, 0),
+        ]);
+        // On 6361 with the key, and on the quests after it, into the past.
+        assert_eq!(time_leap(&holding(&[(6361, Started)], PAPULATUS_KEY)), past);
+        assert_eq!(time_leap(&player_with(&[(6361, Completed)])), past);
+        let revealing = [(6361, Completed), (NEW_REVELATION, Started)];
+        assert_eq!(time_leap(&player_with(&revealing)), past);
+        // Else to the fight.
+        assert_eq!(time_leap(&player_with(&[(6361, Started)])), None);
+        assert_eq!(time_leap(&player_with(&[])), None);
+        let done = [(6361, Completed), (NEW_REVELATION, Completed)];
+        assert_eq!(time_leap(&player_with(&done)), None);
     }
 
     #[test]

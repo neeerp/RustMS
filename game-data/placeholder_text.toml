@@ -1228,4 +1228,5 @@
 "balrog_world.not_allowed" = "[placeholder] I can take nobody into the other world for no reason."
 "balrog_world.job" = "[placeholder] Only a Bowmaster or a Marksman may enter the other world."
 "balrog_world.level" = "[placeholder] You must be at least level 120 to enter the other world."
+"papulatus.past.send_back" = "[placeholder] You are not of this time. I will send you back to your own."
 "balrog_world.busy" = "[placeholder] Someone else is already fighting the Junior Balrog in the other world."

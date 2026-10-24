@@ -1079,6 +1079,7 @@ unsourced = [
     "balrog_world.job",
     "balrog_world.level",
     "balrog_world.busy",
+    "papulatus.past.send_back",
 ]
 
 [text."glTutoMsg0.message"]

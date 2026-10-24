@@ -41,7 +41,10 @@ impl ClientActor {
                 Some(scripts::kyrin_test_out(elapsed))
             }
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
-                Some(self.papulatus_portal().await?)
+                match scripts::time_leap(&self.in_game()?.player) {
+                    Some(effects) => Some(effects),
+                    None => Some(self.papulatus_portal().await?),
+                }
             }
             (Some(script), Some(portal)) => match self.opq_portal(script, portal).await? {
                 None => match self.zpq_portal(script)? {

@@ -857,6 +857,7 @@ const LORD_JONATHAN: i32 = 1092019;
 /// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
 const BART_TIME_LIMIT: u32 = 2 * 60;
 const INSIGNIFICANT_BEING: i32 = 1061012;
+const PAST_PAPULATUS: i32 = 2043000;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
 /// Bowmaster, Marksman and GM, as in Cosmic.
@@ -1461,6 +1462,7 @@ impl NpcScript {
             JAKE => return Some(jake(player)),
             LORD_JONATHAN => return Some(lord_jonathan(player)),
             INSIGNIFICANT_BEING => return Some(insignificant_being(player)),
+            PAST_PAPULATUS => return Some(past_papulatus(player)),
             SITE_EXIT => return Some(site_exit()),
             SERRYL => {
                 return Some(item_maker(
@@ -6559,6 +6561,28 @@ fn insignificant_being(player: &Player) -> NpcScript {
         ])],
     );
     script.refused = Some(text(keys::BALROG_WORLD_BUSY));
+    script
+}
+
+/// Papulatus in the past sends a visitor back to their own time. A
+/// Buccaneer he has taken up on "A New Revelation" (6363) goes back with
+/// the record its completion reads.
+fn past_papulatus(player: &Player) -> NpcScript {
+    use crate::scripts::{NEW_REVELATION, SENT_BACK, SENT_BACK_RECORD};
+    let mut script = NpcScript::new(
+        PAST_PAPULATUS,
+        vec![Page::Say(text(keys::PAST_PAPULATUS_SEND_BACK))],
+    );
+    let sending = player.quests.state(NEW_REVELATION) == QuestState::Started
+        && player.quests.info(SENT_BACK_RECORD) != Some(SENT_BACK);
+    script.on_end = sending
+        .then_some(Effect::SetRecord {
+            record: SENT_BACK_RECORD,
+            value: SENT_BACK,
+        })
+        .into_iter()
+        .chain([Effect::Warp(crate::events::CLOCKTOWER_DEPTHS)])
+        .collect();
     script
 }
 
@@ -12432,5 +12456,42 @@ mod tests {
         );
         assert_eq!(time_limit(BALROG_WORLD), Some(20 * 60));
         assert!(resets_when_empty(BALROG_WORLD));
+    }
+
+    #[test]
+    fn the_past_papulatus_sends_a_buccaneer_on_the_revelation_back_with_its_record() {
+        use crate::events::CLOCKTOWER_DEPTHS;
+        use crate::scripts::{NEW_REVELATION, SENT_BACK, SENT_BACK_RECORD};
+        let ends = |player: &Player| {
+            let mut script = NpcScript::for_npc(PAST_PAPULATUS, player).unwrap();
+            assert_eq!(
+                page_text(&script.begin()),
+                text(keys::PAST_PAPULATUS_SEND_BACK)
+            );
+            script.respond(ScriptInput::Next).unwrap().effects
+        };
+        let mut buccaneer = player(50);
+        (buccaneer.stats.job, buccaneer.stats.level) = (512, 120);
+        assert_eq!(ends(&buccaneer), [Effect::Warp(CLOCKTOWER_DEPTHS)]);
+
+        buccaneer.quests.upsert(game::QuestRecord {
+            quest_id: NEW_REVELATION,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        assert_eq!(
+            ends(&buccaneer),
+            [
+                Effect::SetRecord {
+                    record: SENT_BACK_RECORD,
+                    value: SENT_BACK,
+                },
+                Effect::Warp(CLOCKTOWER_DEPTHS),
+            ]
+        );
+        assert!(buccaneer.quests.set_record(SENT_BACK_RECORD, SENT_BACK));
+        assert_eq!(ends(&buccaneer), [Effect::Warp(CLOCKTOWER_DEPTHS)]);
     }
 }
