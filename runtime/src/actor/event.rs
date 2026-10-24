@@ -718,6 +718,30 @@ impl EventActor {
                 self.move_team(None, map, self.ends);
             }
             EventCommand::MoveTeam(map) => debug!(map, client_id, "Move not taken"),
+            // Out of the floor before a party Dojo's rest floor, once its
+            // boss is beaten, everyone on the section's floors gathers on
+            // the rest floor, each time anyone goes that way (Cosmic
+            // `dojang_next`), so whoever comes after is taken too.
+            EventCommand::DojoRest(rest)
+                if self.kind == EventKind::DojoParty
+                    && net::events::rest_floor(rest)
+                    && self.cleared.has(rest - 1) =>
+            {
+                let to = event.stage_map(rest);
+                for floor in rest.saturating_sub(5)..rest {
+                    self.move_team(Some(event.stage_map(floor)), to, self.ends);
+                }
+            }
+            EventCommand::DojoRest(rest) => debug!(rest, client_id, "Rest not taken"),
+            // The leader takes whoever is on the rest floor on with them
+            // (Cosmic `2091005`'s `warpParty`).
+            EventCommand::DojoOn(rest)
+                if leader && self.kind == EventKind::DojoParty && net::events::rest_floor(rest) =>
+            {
+                let from = event.stage_map(rest);
+                self.move_team(Some(from), event.stage_map(rest + 1), self.ends);
+            }
+            EventCommand::DojoOn(rest) => debug!(rest, client_id, "Dojo move not taken"),
             EventCommand::WinWithDocuments if leader && self.kind == EventKind::Zpq && !won => {
                 self.cleared.set(ZPQ_DOCUMENTS);
                 self.win();
@@ -856,7 +880,9 @@ impl EventActor {
     /// gives its challenger a moment more.
     fn overtime(&self) -> Duration {
         match self.kind {
-            EventKind::Dojo => net::events::scaled(net::events::DOJO_OVERTIME),
+            EventKind::Dojo | EventKind::DojoParty => {
+                net::events::scaled(net::events::DOJO_OVERTIME)
+            }
             _ => Duration::ZERO,
         }
     }

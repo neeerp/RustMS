@@ -1984,13 +1984,20 @@ pub fn dojo_tuto(beaten: bool) -> Vec<Effect> {
 /// for each point held (Cosmic `dojang_next`). Going on from the boss of
 /// the medal tried for counts one more win toward it (Cosmic `dojang_up`,
 /// whose door counts it).
-pub fn dojo_next(floor: u8, record: &game::DojoRecord) -> Vec<Effect> {
-    use crate::events::{dojo_round, DOJO, DOJO_FLOORS, DOJO_ROOFTOP};
-    let win =
-        (i32::from(dojo_round(floor)) == record.vanquisher_stage).then(|| Effect::DojoMedal {
+///
+/// With a `party` there is no point for going alone and no medal win, and
+/// the way on to a rest floor takes everyone on the five floors before it
+/// there (`EventCommand::DojoRest`), each with their points then.
+pub fn dojo_next(floor: u8, record: &game::DojoRecord, party: bool) -> Vec<Effect> {
+    use crate::events::{
+        dojo_round, rest_floor, EventCommand, DOJO, DOJO_FLOORS, DOJO_PARTY, DOJO_ROOFTOP,
+    };
+    let win = (!party && i32::from(dojo_round(floor)) == record.vanquisher_stage).then(|| {
+        Effect::DojoMedal {
             stage: record.vanquisher_stage,
             kills: record.vanquisher_kills + 1,
-        });
+        }
+    });
     if floor >= DOJO_FLOORS {
         return win
             .into_iter()
@@ -2001,19 +2008,39 @@ pub fn dojo_next(floor: u8, record: &game::DojoRecord) -> Vec<Effect> {
             ])
             .collect();
     }
-    let points = record.floor_points(floor);
-    let (earned, total) = (points.to_string(), (record.points + points).to_string());
-    let line = content::text().get(
-        keys::DOJO_POINTS,
-        &[("points", earned.as_str()), ("total", total.as_str())],
-    );
+    if party && rest_floor(floor + 1) {
+        return vec![Effect::EventCommand(EventCommand::DojoRest(floor + 1))];
+    }
+    let event = if party { &DOJO_PARTY } else { &DOJO };
     win.into_iter()
+        .chain(dojo_points(floor..=floor, record, !party))
         .chain([
-            Effect::DojoPoints(points),
-            Effect::Pink(line),
             Effect::PortalSound,
-            Effect::WarpToPortal(DOJO.stage_map(floor + 1), 0),
+            Effect::WarpToPortal(event.stage_map(floor + 1), 0),
         ])
+        .collect()
+}
+
+/// The training points for leaving the Dojo's `floors`, one after
+/// another, for a challenger with `record`, each with a pink line of them
+/// and the new total (Cosmic `dojang_next`'s messages).
+pub fn dojo_points(
+    floors: std::ops::RangeInclusive<u8>,
+    record: &game::DojoRecord,
+    alone: bool,
+) -> Vec<Effect> {
+    let mut held = *record;
+    floors
+        .flat_map(|floor| {
+            let points = held.floor_points(floor, alone);
+            held.points += points;
+            let (earned, total) = (points.to_string(), held.points.to_string());
+            let line = content::text().get(
+                keys::DOJO_POINTS,
+                &[("points", earned.as_str()), ("total", total.as_str())],
+            );
+            [Effect::DojoPoints(points), Effect::Pink(line)]
+        })
         .collect()
 }
 
@@ -3700,11 +3727,11 @@ mod tests {
                 Effect::WarpToPortal(to, 0),
             ]
         };
-        assert_eq!(dojo_next(1, &record), on(2, 42, DOJO_FIRST + 100));
-        assert_eq!(dojo_next(37, &record), on(8, 48, DOJO_FIRST + 3700));
+        assert_eq!(dojo_next(1, &record, false), on(2, 42, DOJO_FIRST + 100));
+        assert_eq!(dojo_next(37, &record, false), on(8, 48, DOJO_FIRST + 3700));
         // The last floor earns none, but pays for every point held.
         assert_eq!(
-            dojo_next(38, &record),
+            dojo_next(38, &record, false),
             [
                 Effect::PortalSound,
                 Effect::WarpToPortal(DOJO_ROOFTOP, 0),
@@ -3721,9 +3748,32 @@ mod tests {
             stage: 5,
             kills: 10,
         };
-        assert_eq!(dojo_next(5, &trying)[0], win);
-        assert_eq!(dojo_next(4, &trying), on(2, 42, DOJO_FIRST + 400));
-        assert!(!dojo_next(7, &trying).contains(&win));
+        assert_eq!(dojo_next(5, &trying, false)[0], win);
+        assert_eq!(dojo_next(4, &trying, false), on(2, 42, DOJO_FIRST + 400));
+        assert!(!dojo_next(7, &trying, false).contains(&win));
+
+        // With a party: no point for going alone and no medal win, and the
+        // way on to a rest floor gathers everyone there instead.
+        use crate::events::{EventCommand, DOJO_PARTY_FIRST};
+        assert_eq!(
+            dojo_next(4, &trying, true),
+            on(1, 41, DOJO_PARTY_FIRST + 400)
+        );
+        assert_eq!(
+            dojo_next(5, &trying, true),
+            [Effect::EventCommand(EventCommand::DojoRest(6))]
+        );
+        assert_eq!(dojo_next(38, &record, true), dojo_next(38, &record, false));
+        // Those gathered from floor 3 earn floors 3 to 5's in turn.
+        let gathered = dojo_points(3..=5, &record, false);
+        assert_eq!(gathered.len(), 6);
+        assert_eq!(gathered[4], Effect::DojoPoints(1));
+        assert_eq!(
+            gathered[5],
+            Effect::Pink(
+                content::text().get(keys::DOJO_POINTS, &[("points", "1"), ("total", "43")])
+            )
+        );
 
         // Out to where the board was touched, or to the board.
         let out = |to| {

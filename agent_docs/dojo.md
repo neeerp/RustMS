@@ -1,13 +1,13 @@
 # Mu Lung Dojo
 
-The Mu Lung Dojo's 38 floors, taken alone. The survey is v83ref's
+The Mu Lung Dojo's 38 floors, taken alone or with a party. The survey is v83ref's
 `reports/b158-dojo.md`; it plans six slices, and this page says which are
 in. Slice 1 is: the way in and out, the floors and their bosses, the
 door, and So Gong's solo run. Slice 2 is the section timers and the
 entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
 score So Gong records. Slice 3b is the belts, the points reset and the
-medals. Slice 3c is So Gong's first-time trial. The party Dojo, energy and
-the `muruengRaid` HUD come later.
+medals. Slice 3c is So Gong's first-time trial. Slice 4 is the party
+Dojo. Energy and the `muruengRaid` HUD come later.
 
 ## The way in
 
@@ -20,6 +20,7 @@ the `muruengRaid` HUD come later.
 | Rooftop | 925020003 | after the 38th floor |
 | Trial room | 925020010 | So Gong as monster 9300269, and `out000` (`dojang_tuto`) back to the hall |
 | Floor n | 925020100 + (n - 1) * 100 | So Gong again, and on a fighting floor a boss |
+| Party floor n | 925030100 + (n - 1) * 100 | the same as floor n, by its `info/link` |
 
 - **The board** (`npc_scripts::dojo_board`, Cosmic `2091006`) has two
   choices.
@@ -36,9 +37,10 @@ the `muruengRaid` HUD come later.
   goes back to the saved map and clears it. With nothing saved it goes to
   the board's map, not Cosmic's Henesys.
 - **So Gong in the hall** (`npc_scripts::so_gong`) says below level 25
-  that the challenger is too weak. Otherwise he offers five choices, in
-  Cosmic's order without its party run:
+  that the challenger is too weak. Otherwise he offers six choices, in
+  Cosmic's order:
   - taking him on alone, which is `EventKind::Dojo`;
+  - taking him on with a party (see "The party Dojo");
   - a belt, the points reset and a medal (see "Belts and medals");
   - what the Dojo is.
 
@@ -48,8 +50,6 @@ the `muruengRaid` HUD come later.
 
   A challenger who has not beaten his trial (see "The first-time trial")
   is offered that instead of the Dojo, with a record or without.
-
-  The party run is not in his menu yet.
 
 ## The event
 
@@ -154,6 +154,7 @@ the first-time trial is beaten (`tutorial_done`). It is saved with the player, i
 - **Points.** Leaving floor n (1 to 37) by `dojang_next` earns
   `2 + n / 6` (`DojoRecord::floor_points`, Cosmic `addDojoPointsByMap`
   with one for going alone): 2 on floors 1 to 5, up to 8 on 36 and 37.
+  With a party it is `1 + n / 6`.
   None are earned once the points reach 17,000 (`MOST_POINTS`). A pink
   line says how many, and the total (`dojo.points`), even when that is 0.
   - Cosmic's formula reads the map id, whose last two digits are the
@@ -206,8 +207,43 @@ So Gong's hall menu (`so_gong_belts`, `so_gong_medal`) follows Cosmic's
   stage, names one medal and hands over the next. It also counts a win at
   `dojang_up`, which can be taken again and again, and checks the
   recorded floor for "every medal". RustMS counts the round's own boss,
-  on the way on, as the medal text says, and checks the stage. When the
-  party Dojo comes in, its wins must not count, as in Cosmic.
+  on the way on, as the medal text says, and checks the stage. A party
+  run's wins don't count, as in Cosmic.
+
+## The party Dojo
+
+So Gong's second choice is `EventKind::DojoParty` (`events::DOJO_PARTY`,
+Cosmic `2091005`'s party run). It is `DOJO` on the party floors, with
+these differences:
+
+- **Who goes.** `team` is `1..=6`, so it is not solo. The asker must lead
+  a party (`dojo.so_gong.party_leader` otherwise), and the levels of the
+  members going, those in the hall, must be within 30 of each other
+  (`Event::spread`, Cosmic `isBetween(party, 30)`;
+  `dojo.so_gong.party_spread` otherwise). There is no trial check.
+- **Copies.** `runs` is 5, Cosmic's 925030100 to 925030104 copies.
+- **The floors.** Each party floor links to its solo floor (`info/link`),
+  which `game-data` resolves, so the portals, So Gong, the boss and the
+  clock are the same. `events::dojo_floor` gives a solo or party map's
+  floor; `dojo_boss`, `cleared_by_boss` and `clock_on` use it.
+- **Points.** One less per floor than alone (`floor_points(n, false)`), and
+  no medal wins (`scripts::dojo_next` with `party`).
+- **Gathering.** Going on by `dojang_next` to a rest floor sends
+  `EventCommand::DojoRest(rest)`, taken when the floor before it is
+  cleared, each time anyone goes that way, so whoever comes later is taken
+  too.
+  The event moves the members on each of the section's five floors before
+  it (`move_team` from each). Each member's client (`event_moved`) applies
+  the points of every floor from their own up to the one before the rest
+  floor, a pink line each (`scripts::dojo_points`), then warps. Cosmic's
+  `dojang_next` does the same for the players on those maps.
+- **The rest floor.** So Gong offers going on or leaving, and no record
+  (Cosmic hides it for a party). Going on as the leader sends
+  `EventCommand::DojoOn(rest)`, which moves everyone on the rest floor to
+  the next. A member who isn't the leader goes on alone, as Cosmic's
+  `warp`.
+- Any other floor goes on by `dojang_next` with the portal sound, as
+  alone, and the 38th to the rooftop.
 
 ## The first-time trial
 

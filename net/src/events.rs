@@ -55,6 +55,9 @@ pub enum EventKind {
     /// So Gong's trial for a first-time challenger, taken alone from the
     /// Dojo's hall: beat him to go on to the Dojo itself.
     DojoTrial,
+    /// The Mu Lung Dojo taken by a party, started by its leader at So Gong
+    /// in the hall: the same floors in copies of their own.
+    DojoParty,
 }
 
 /// An event's maps and terms.
@@ -74,6 +77,9 @@ pub struct Event {
     /// the event's maps, even within `maps`.
     pub exit: i32,
     pub levels: RangeInclusive<u8>,
+    /// How far apart the team's levels may be, if that matters (the party
+    /// Dojo's 30, Cosmic `2091005`'s `isBetween`).
+    pub spread: Option<u8>,
     /// How many may play, the leader included.
     pub team: RangeInclusive<usize>,
     /// Its time limit; 0 for none.
@@ -222,6 +228,7 @@ pub const KPQ: Event = Event {
     entries: 1,
     exit: 103_000_890,
     levels: 21..=30,
+    spread: None,
     team: 3..=4,
     minutes: 30,
     exp_per_stage: &[100, 200, 400, 800, 1500],
@@ -313,6 +320,7 @@ pub const HPQ: Event = Event {
     entries: 1,
     exit: 910_010_300,
     levels: 10..=u8::MAX,
+    spread: None,
     team: 3..=6,
     minutes: 10,
     exp_per_stage: &[1600],
@@ -362,6 +370,7 @@ pub const LPQ: Event = Event {
     entries: 1,
     exit: 922_010_000,
     levels: 35..=50,
+    spread: None,
     team: 5..=6,
     minutes: 45,
     exp_per_stage: &[210, 2520, 2940, 3360, 3770, 0, 4620, 5040, 5950],
@@ -552,6 +561,7 @@ pub const OPQ: Event = Event {
     entries: 1,
     exit: 920_011_200,
     levels: 51..=70,
+    spread: None,
     team: 5..=6,
     minutes: 60,
     exp_per_stage: &[3500, 3500, 3500, 3500, 3500, 3500, 3500, 0, 3500],
@@ -799,6 +809,7 @@ pub const ZPQ: Event = Event {
     entries: 1,
     exit: 211_042_300,
     levels: 50..=u8::MAX,
+    spread: None,
     team: 1..=6,
     minutes: 30,
     exp_per_stage: &[12_000],
@@ -862,6 +873,7 @@ pub const ZAKUM: Event = Event {
     entries: 1,
     exit: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
     levels: 50..=u8::MAX,
+    spread: None,
     team: 6..=30,
     minutes: 120,
     exp_per_stage: &[0],
@@ -905,6 +917,7 @@ pub const PAPULATUS: Event = Event {
     entries: 1,
     exit: CLOCKTOWER_DEPTHS,
     levels: 1..=u8::MAX,
+    spread: None,
     team: 1..=6,
     minutes: 45,
     exp_per_stage: &[0],
@@ -951,6 +964,7 @@ pub const HORNTAIL: Event = Event {
     entries: 1,
     exit: crate::npc_scripts::ROAD_IN_BETWEEN,
     levels: 100..=u8::MAX,
+    spread: None,
     team: 6..=30,
     minutes: 120,
     exp_per_stage: &[0, 0, 0],
@@ -1035,6 +1049,7 @@ pub const HTPQ: Event = Event {
     entries: 1,
     exit: crate::npc_scripts::CAVE_ENTRANCE,
     levels: 120..=u8::MAX,
+    spread: None,
     team: 6..=6,
     minutes: 25,
     exp_per_stage: &[0; 6],
@@ -1124,6 +1139,7 @@ pub const DELLI: Event = Event {
     entries: 1,
     exit: DELLI_LOBBY,
     levels: 120..=u8::MAX,
+    spread: None,
     team: 1..=2,
     minutes: 6,
     exp_per_stage: &[0],
@@ -1232,6 +1248,7 @@ pub const LUDIMAZE: Event = Event {
     entries: 15,
     exit: MAZE_EXIT,
     levels: 51..=70,
+    spread: None,
     team: 3..=6,
     minutes: 15,
     exp_per_stage: &[0],
@@ -1287,6 +1304,7 @@ pub const TYLUS: Event = Event {
     entries: 1,
     exit: TYLUS_EXIT,
     levels: 80..=u8::MAX,
+    spread: None,
     team: 1..=4,
     minutes: 10,
     exp_per_stage: &[0],
@@ -1368,6 +1386,7 @@ pub const ELLIN: Event = Event {
     entries: 1,
     exit: ELLIN_EXIT,
     levels: 44..=55,
+    spread: None,
     team: 4..=6,
     minutes: 30,
     exp_per_stage: &[0; 6],
@@ -1410,7 +1429,7 @@ pub fn cleared_by_catching(map_id: i32) -> Option<u8> {
 /// Gong's trial by So Gong.
 pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
     if dojo_boss(map_id) == Some(mob_id) {
-        return DOJO.stage_on(map_id);
+        return dojo_floor(map_id);
     }
     if map_id == DOJO_TRIAL_MAP && mob_id == DOJO_TRIAL_MOB {
         return Some(1);
@@ -1563,6 +1582,7 @@ pub const PIRATE: Event = Event {
     entries: 1,
     exit: PIRATE_EXIT,
     levels: 55..=100,
+    spread: None,
     team: 3..=6,
     minutes: 4,
     exp_per_stage: &[0; 6],
@@ -1645,6 +1665,7 @@ pub const DOJO: Event = Event {
     entries: 1,
     exit: DOJO_EXIT,
     levels: 25..=u8::MAX,
+    spread: None,
     team: 1..=1,
     minutes: 5,
     exp_per_stage: &[0; DOJO_FLOORS as usize],
@@ -1687,6 +1708,7 @@ pub const DOJO_TRIAL: Event = Event {
     entries: 1,
     exit: DOJO_EXIT,
     levels: 25..=u8::MAX,
+    spread: None,
     team: 1..=1,
     minutes: 0,
     exp_per_stage: &[0],
@@ -1712,9 +1734,34 @@ pub const DOJO_TRIAL: Event = Event {
     runs: 5,
 };
 
+/// The party Dojo's first floor; floor n is `DOJO_PARTY_FIRST + (n - 1) *
+/// 100`, each a copy of the solo floor (`info/link`).
+pub const DOJO_PARTY_FIRST: i32 = 925030100;
+
+/// The Mu Lung Dojo taken by a party (Cosmic `2091005`'s second choice):
+/// the leader takes in those of the party in the hall, at levels within
+/// 30 of each other, to the same 38 floors, with the same clock. Only its
+/// leader may take those on a rest floor on, and going on to one takes
+/// everyone on the five floors before it there (`EventCommand::DojoRest`).
+/// Five may run at once on a channel (Cosmic's party slots).
+pub const DOJO_PARTY: Event = Event {
+    maps: DOJO_PARTY_FIRST..=DOJO_PARTY_FIRST + (DOJO_FLOORS as i32 - 1) * 100,
+    entry: DOJO_PARTY_FIRST,
+    team: 1..=6,
+    spread: Some(30),
+    runs: 5,
+    ..DOJO
+};
+
 /// Whether Dojo floor `floor` is a rest floor, with no boss: every sixth.
 pub fn rest_floor(floor: u8) -> bool {
     floor % 6 == 0
+}
+
+/// The Dojo floor `map_id` is, alone or with a party.
+pub fn dojo_floor(map_id: i32) -> Option<u8> {
+    DOJO.stage_on(map_id)
+        .or_else(|| DOJO_PARTY.stage_on(map_id))
 }
 
 /// Which boss floor `floor` is, counting only those (Cosmic
@@ -1726,7 +1773,7 @@ pub fn dojo_round(floor: u8) -> u8 {
 /// The boss that comes out the first time its challenger reaches
 /// `map_id`, if it is a Dojo boss floor.
 pub fn dojo_boss(map_id: i32) -> Option<i32> {
-    let floor = DOJO.stage_on(map_id)?;
+    let floor = dojo_floor(map_id)?;
     (!rest_floor(floor)).then(|| DOJO_BOSS_BASE + i32::from(dojo_round(floor)))
 }
 
@@ -1750,7 +1797,7 @@ pub enum ClockOn {
 ///   floor's `dojang_1st` dismisses). Its first section's 5 are the
 ///   event's own `minutes`.
 pub fn clock_on(map_id: i32) -> Option<ClockOn> {
-    if let Some(floor) = DOJO.stage_on(map_id) {
+    if let Some(floor) = dojo_floor(map_id) {
         return match floor {
             _ if rest_floor(floor) => Some(ClockOn::Stop),
             _ if floor > 1 && (floor - 1) % 6 == 0 => {
@@ -1778,7 +1825,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 16] = [
+    pub const ALL: [EventKind; 17] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1795,6 +1842,7 @@ impl EventKind {
         EventKind::Pirate,
         EventKind::Dojo,
         EventKind::DojoTrial,
+        EventKind::DojoParty,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1815,6 +1863,7 @@ impl EventKind {
             EventKind::Pirate => &PIRATE,
             EventKind::Dojo => &DOJO,
             EventKind::DojoTrial => &DOJO_TRIAL,
+            EventKind::DojoParty => &DOJO_PARTY,
         }
     }
 }
@@ -2000,9 +2049,14 @@ impl Event {
         let team: Vec<_> = candidates
             .iter()
             .filter(|c| c.map_id == self.lobby && self.levels.contains(&c.level))
-            .map(|c| c.id)
             .collect();
-        (team.contains(&leader) && self.team.contains(&team.len())).then_some(team)
+        let levels = team.iter().map(|c| c.level);
+        let apart = levels.clone().max().unwrap_or(0) - levels.min().unwrap_or(0);
+        let team: Vec<_> = team.iter().map(|c| c.id).collect();
+        (team.contains(&leader)
+            && self.team.contains(&team.len())
+            && self.spread.is_none_or(|spread| apart <= spread))
+        .then_some(team)
     }
 
     /// The blessing a team of these `jobs` gets, if any: one of
@@ -2203,6 +2257,13 @@ pub enum EventCommand {
     /// A member went past the Pirate Ship's doors: the first brings out the
     /// Lord Pirate on the last stage (`lord_pirate`).
     PastTheDoors,
+    /// A member took the party Dojo's way on to rest floor `n`, the floor
+    /// before it cleared: everyone on the five floors before it goes there
+    /// too, with those floors' points (Cosmic `dojang_next`).
+    DojoRest(u8),
+    /// The leader takes those on the party Dojo's rest floor `n` on to the
+    /// next (Cosmic `2091005`'s `warpParty`).
+    DojoOn(u8),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -2610,6 +2671,27 @@ mod tests {
         assert_eq!(dojo_boss(DOJO_FIRST), Some(9300184));
         assert_eq!(dojo_boss(DOJO_FIRST + 3700), Some(9300215));
         assert_eq!(dojo_boss(DOJO_FIRST + 500), None);
+    }
+
+    #[test]
+    fn a_party_takes_on_the_dojo_on_its_own_floors_within_thirty_levels() {
+        assert_eq!(DOJO_PARTY.stage_on(DOJO_PARTY_FIRST), Some(1));
+        assert_eq!(DOJO_PARTY.stage_on(DOJO_PARTY_FIRST + 3700), Some(38));
+        assert_eq!(dojo_floor(DOJO_PARTY_FIRST + 500), Some(6));
+        assert_eq!(dojo_floor(DOJO_FIRST + 500), Some(6));
+        assert_eq!(dojo_floor(DOJO_HALL), None);
+        assert_eq!(dojo_boss(DOJO_PARTY_FIRST), Some(9300184));
+        assert_eq!(dojo_boss(DOJO_PARTY_FIRST + 500), None);
+        assert_eq!(cleared_by_boss(DOJO_PARTY_FIRST + 600, 9300189), Some(7));
+        assert_eq!(clock_on(DOJO_PARTY.stage_map(6)), Some(ClockOn::Stop));
+        assert_eq!(clock_on(DOJO_PARTY.stage_map(7)), Some(ClockOn::Restart(6)));
+        assert_eq!(DOJO_PARTY.runs, 5);
+        let lobby = DOJO_PARTY.lobby;
+        let team = DOJO_PARTY.team(1, &[at(1, 30, lobby), at(2, 60, lobby)]);
+        assert_eq!(team, Some(vec![1, 2]));
+        let broad = DOJO_PARTY.team(1, &[at(1, 30, lobby), at(2, 61, lobby)]);
+        assert_eq!(broad, None);
+        assert_eq!(DOJO_PARTY.team(1, &[at(1, 30, lobby)]), Some(vec![1]));
     }
 
     #[test]
