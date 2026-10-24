@@ -72,6 +72,7 @@ impl ClientActor {
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
             EventKind::Htpq => NpcScript::htpq_gatekeeper(entry),
             EventKind::Delli => NpcScript::delli(entry),
+            EventKind::LudiMaze => NpcScript::rolly(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -542,7 +543,7 @@ impl ClientActor {
             return Ok(());
         }
         let (kind, blessing) = (ticket.kind, ticket.blessing);
-        let entry = kind.event().entry;
+        let entry = kind.event().draw_entry(&mut rand::thread_rng());
         self.event = Some(ticket);
         self.warp_within_event(entry).await?;
         if kind == EventKind::Opq {

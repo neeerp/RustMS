@@ -1092,6 +1092,15 @@ unsourced = [
     "delli.busy",
     "delli.not_won",
     "delli.home.ask",
+    "ludimaze.menu",
+    "ludimaze.enter",
+    "ludimaze.about",
+    "ludimaze.info",
+    "ludimaze.no_party",
+    "ludimaze.not_leader",
+    "ludimaze.not_eligible",
+    "ludimaze.busy",
+    "ludimaze.home",
 ]
 
 [text."glTutoMsg0.message"]

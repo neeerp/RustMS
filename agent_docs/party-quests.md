@@ -28,7 +28,8 @@ another ([horntail](./horntail.md)). The fight with
 Papulatus is a party's event that ends that way too (`Event::until_empty`),
 started by a portal rather than an NPC ([papulatus](./papulatus.md)).
 Delli's rescue, for the Corsairs' 6410, is a party's event won by holding
-out ([Delli's rescue](#dellis-rescue)).
+out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is coming in
+slices ([the Ludibrium Maze](#the-ludibrium-maze)).
 
 ## Rules
 
@@ -867,6 +868,24 @@ and stop coming (`FieldMessage::ClearMobs`, `MobSet::clear_hostile`, Cosmic
 Not yet: the Party Search entry. The mobs come back on the field's usual
 seven seconds (Cosmic forces fifteen).
 
+## The Ludibrium Maze
+
+Cosmic `LudiMazePQ` (`v83ref/reports/a119-ludimaze.md`; defaults in
+`v83ref/lanes/QUESTIONS.md` a119). Rolly (9103001) in Ludibrium (220000000)
+takes a party of three to six, all there at levels 51 to 70, into the maze
+for 15 minutes (`events::LUDIMAZE`, `EventKind::LudiMaze`, a menu of going
+in and the rules). Each member starts on a room of their own drawn from the
+first 15 (809050000-014, `Event::entries`, `Event::draw_entry`), not one
+for the whole party. The rooms' portals are plain ones leading from room to
+room; only room 8 (809050008) leads to the goal room 809050015. Dying, or
+the time running out, lands on the way out (809050017, the rooms'
+returnMap and forcedReturn, and the event's exit), where Rolly (9103003) sends everyone
+back to Ludibrium. Its lines are placeholders (`ludimaze.*`).
+
+Not yet: the rooms' boxes and their monsters, Pietri's (9103000) coupon
+hand-in in the goal room, the clear room's (809050016) present, and the
+Party Search entry.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -904,6 +923,8 @@ seven seconds (Cosmic forces fifteen).
 | Shulynch 1095000 | 925010000 | Home to 120000104 |
 | Delli 2095000 | 925010200 | Runtime (`talk_about_event`): a menu of going in and what to do |
 | Delli 2095000 | 925010400 | Completes 6410; home to 120000104 |
+| Rolly 9103001 | 220000000 | Runtime (`talk_about_event`): a menu of going into the maze and its rules |
+| Rolly 9103003 | 809050017 | Home to 220000000 |
 | Adobis 2030008 | 211042300 | Runtime (`talk_about_event`): the Dead Mine, the Breath of Lava, the Eyes of Fire |
 | Aura 2032002 | 280010000 | Runtime (`zpq_aura`): what it is, the leader's hand-in, out to 211042300; the prize once won |
 | Ali 2030011 | 280090000 | Home to 211042300 |
@@ -916,4 +937,4 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
 `zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*`,
-`htpq.key.*` and `htpq.lamp.*`.
+`htpq.key.*`, `htpq.lamp.*`, `delli.*` and `ludimaze.*`.

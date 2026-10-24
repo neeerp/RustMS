@@ -1737,6 +1737,18 @@ pub mod keys {
     pub const DELLI_BUSY: &str = "delli.busy";
     pub const DELLI_NOT_WON: &str = "delli.not_won";
     pub const DELLI_HOME_ASK: &str = "delli.home.ask";
+    /// The Ludibrium Maze: Rolly (9103001) in Ludibrium, the menu, its
+    /// lines, the rules, and why a party can't go; and Rolly (9103003) on
+    /// the way out, sending everyone back to Ludibrium.
+    pub const LUDIMAZE_MENU: &str = "ludimaze.menu";
+    pub const LUDIMAZE_ENTER: &str = "ludimaze.enter";
+    pub const LUDIMAZE_ABOUT: &str = "ludimaze.about";
+    pub const LUDIMAZE_INFO: &str = "ludimaze.info";
+    pub const LUDIMAZE_NO_PARTY: &str = "ludimaze.no_party";
+    pub const LUDIMAZE_NOT_LEADER: &str = "ludimaze.not_leader";
+    pub const LUDIMAZE_NOT_ELIGIBLE: &str = "ludimaze.not_eligible";
+    pub const LUDIMAZE_BUSY: &str = "ludimaze.busy";
+    pub const LUDIMAZE_HOME: &str = "ludimaze.home";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2642,6 +2654,15 @@ mod tests {
                 keys::DELLI_BUSY,
                 keys::DELLI_NOT_WON,
                 keys::DELLI_HOME_ASK,
+                keys::LUDIMAZE_MENU,
+                keys::LUDIMAZE_ENTER,
+                keys::LUDIMAZE_ABOUT,
+                keys::LUDIMAZE_INFO,
+                keys::LUDIMAZE_NO_PARTY,
+                keys::LUDIMAZE_NOT_LEADER,
+                keys::LUDIMAZE_NOT_ELIGIBLE,
+                keys::LUDIMAZE_BUSY,
+                keys::LUDIMAZE_HOME,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,
