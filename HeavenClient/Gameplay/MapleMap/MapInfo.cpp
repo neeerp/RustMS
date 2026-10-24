@@ -97,11 +97,6 @@ namespace ms
 	MapInfo::MapInfo()
 	{}
 
-	bool MapInfo::is_underwater() const
-	{
-		return swim;
-	}
-
 	bool MapInfo::is_flying() const
 	{
 		return fly && !swim;
