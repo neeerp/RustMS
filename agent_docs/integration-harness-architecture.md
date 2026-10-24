@@ -120,8 +120,10 @@ end-to-end suite for integration boundaries.
 
 Current limitations worth improving next:
 
-- `drain_spawn_npcs` still relies on a 100 ms quiet interval. Prefer explicit
-  packet expectations/readiness barriers to infer completion from silence.
+- `drain_spawn_npcs` waits for entry's last packet, `CLAIM_STATUS_CHANGED`,
+  but then still relies on a 100 ms quiet interval for packets that follow.
+  Prefer explicit packet expectations/readiness barriers to infer completion
+  from silence.
 - Random identities isolate accounts, but tests within one executable can
   share maps and channels. Scope fixtures to dedicated locations or route
   background packets through a matcher instead of assuming the next packet

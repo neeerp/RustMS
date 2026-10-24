@@ -79,6 +79,9 @@ pub struct WorldSession {
     /// the entitlements, and a working entitlement's icon), as (opcode,
     /// body). Any that came after another packet are still to be read.
     pub family: Vec<(i16, Vec<u8>)>,
+    /// The bodies of entering the game's CLAIM_AVAILABLE_TIME (the hours
+    /// reports are taken) and CLAIM_STATUS_CHANGED (whether they are).
+    pub claims: (Vec<u8>, Vec<u8>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,7 +267,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     };
 
-    let family = drain_spawn_npcs(&mut world_conn).await;
+    let (family, claims) = drain_spawn_npcs(&mut world_conn).await;
 
     Ok(WorldSession {
         connection: world_conn,
@@ -299,6 +302,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         login_addr: config.login_addr.to_string(),
         world_addr: format!("{}:{}", redirect.redirect_ip, redirect.redirect_port),
         family,
+        claims,
     })
 }
 
@@ -500,12 +504,15 @@ async fn login_until_char_select(
     Ok((login_conn, selected))
 }
 
-/// Reads past map setup and returns the family packets of entering the
-/// game. Every entry ends with the Family window's INFO and entitlements,
-/// so this waits for those; anything else that comes first is left to read,
-/// in order.
-async fn drain_spawn_npcs(connection: &mut MapleTestConnection) -> Vec<(i16, Vec<u8>)> {
+/// Reads past map setup and returns the family and claim packets of
+/// entering the game. Every entry ends with the Family window's INFO and
+/// entitlements and then the claim hours and status, so this waits for
+/// those; anything else that comes first is left to read, in order.
+async fn drain_spawn_npcs(
+    connection: &mut MapleTestConnection,
+) -> (Vec<(i16, Vec<u8>)>, (Vec<u8>, Vec<u8>)) {
     let mut family = Vec::new();
+    let mut claims = (Vec::new(), None);
     let mut held = Vec::new();
     let mut listed = false;
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -520,6 +527,17 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) -> Vec<(i16, Vec
             break;
         };
         let opcode = envelope.opcode();
+        // Whether reports are taken, and when: the last of entering the
+        // game, so the family list came first.
+        if opcode == SendOpcode::ClaimAvailableTime as i16 {
+            claims.0 = envelope.packet.bytes[2..].to_vec();
+            continue;
+        }
+        if opcode == SendOpcode::ClaimStatusChanged as i16 {
+            claims.1 = Some(envelope.packet.bytes[2..].to_vec());
+            listed = true;
+            continue;
+        }
         // The Family window's INFO and entitlements, and a working
         // entitlement's icon.
         if [
@@ -529,7 +547,6 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) -> Vec<(i16, Vec
         ]
         .contains(&opcode)
         {
-            listed |= opcode == SendOpcode::FamilyPrivilegeList as i16;
             family.push((opcode, envelope.packet.bytes[2..].to_vec()));
             continue;
         }
@@ -559,7 +576,7 @@ async fn drain_spawn_npcs(connection: &mut MapleTestConnection) -> Vec<(i16, Vec
     for envelope in held.into_iter().rev() {
         connection.push_back_packet(envelope);
     }
-    family
+    (family, (claims.0, claims.1.unwrap_or_default()))
 }
 
 /// Log in again right after dropping a session. The server closes the old

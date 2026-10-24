@@ -38,6 +38,7 @@ pub mod parcel;
 pub mod pet;
 pub mod player;
 pub mod quest;
+pub mod report;
 pub mod ring;
 pub mod session;
 pub mod storage;

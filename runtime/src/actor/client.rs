@@ -1,6 +1,7 @@
 mod alliances;
 mod buddies;
 mod buff;
+mod claim;
 mod combat;
 mod coupon;
 mod dialogue;
@@ -611,6 +612,16 @@ impl ClientActor {
             WorldAction::WeddingBless => self.bless_couple().await?,
             WorldAction::Alliance(request) => self.alliance_request(request).await?,
             WorldAction::GiveFame { target, up } => self.give_fame(target, up).await?,
+            WorldAction::Claim {
+                conversation,
+                victim,
+                reason,
+                description,
+                chat_log,
+            } => {
+                self.claim(conversation, victim, reason, description, chat_log)
+                    .await?
+            }
             WorldAction::OpenDoor { town, at, lasts } => self.open_door(town, at, lasts).await?,
             WorldAction::UseDoor { owner, from_town } => self.use_door(owner, from_town).await?,
             WorldAction::RockToCharacter { name, rock } => {
@@ -830,6 +841,7 @@ impl ClientActor {
         }
         self.load_notes().await?;
         self.announce_parcels().await?;
+        self.open_claims().await?;
         info!(
             character_id,
             channel_id = self.channel_id,

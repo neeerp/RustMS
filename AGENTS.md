@@ -19,6 +19,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/parties.md`: party state and flows, EXP sharing, party chat, and the client's party window and HP displays
 - `agent_docs/buddies.md`: buddy list storage, requests, channel visibility, buddy chat, and the client's Friend tab
 - `agent_docs/notes.md`: notes (memos) left for offline characters, gift thank-yous, and the client's inbox and send dialog
+- `agent_docs/reports.md`: reporting a player to a GM (CLAIM): the hours and status sent on entry, the fee, the weekly limit, the `reports` table, and the result modes
 - `agent_docs/families.md`: family storage, juniors and seniors, the Family window's numbers, the Family Tree, and login notices
 - `agent_docs/marriage.md`: engagement with a ring box, the marriages table, proposals and their refusals, the wedding ring look, crush and friendship rings, and the client's dialogs
 - `agent_docs/guilds.md`: guild storage, founding at Heracle, invitations, leaving and expelling, ranks, titles and the notice, guild chat, name tags, and the client's Guild tab
