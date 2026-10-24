@@ -153,8 +153,9 @@ namespace ms
 				ride(value, init);
 			}
 
+			// Whether it swims where it stands, as for the player (FUN_00941d4b, FUN_007046ac).
 			if (stat == Buffstat::Id::MORPH)
-				transform(value, init, Stage::get().get_mapinfo().is_underwater());
+				transform(value, init, Stage::get().get_mapinfo().is_swimming(get_position()));
 
 			if (stat == Buffstat::Id::GHOST_MORPH)
 				haunt(static_cast<int16_t>(value), init);

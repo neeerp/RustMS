@@ -78,9 +78,6 @@ namespace ms
 
 		MapInfo();
 
-		// Whether the whole map is under water (info/swim).
-		bool is_underwater() const;
-
 		// Whether the map is one to fly through (info/fly, CField+0x15c): a user
 		// in the air there neither falls nor swims, but floats (r25 0x9b2ef8).
 		// A map under water swims instead (0xa45c03).
