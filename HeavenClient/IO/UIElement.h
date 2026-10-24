@@ -215,13 +215,6 @@ namespace ms
 		virtual bool button_covered(uint16_t buttonid, Point<int16_t> cursorpos) const
 		{ return false; }
 
-		// Whether the window's own cursor loop handles this button, as for a
-		// list row or a tab standing in as one, which v83 selects as the mouse
-		// goes down; UIElement's loop, which clicks as it comes back up, leaves
-		// it alone.
-		virtual bool own_cursor(uint16_t buttonid) const
-		{ return false; }
-
 		// Whether a button pressed here waits for the mouse to come back up.
 		bool is_holding_button() const
 		{ return holding; }

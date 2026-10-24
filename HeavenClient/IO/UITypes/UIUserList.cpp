@@ -1630,9 +1630,8 @@ namespace ms
 		enable(Buttons::BT_CHAT, in_party);
 		enable(Buttons::BT_SEARCH, true);
 		enable(Buttons::BT_CREATE, !in_party);
-		int32_t fieldtype = Stage::get().get_mapinfo().get_fieldtype();
-		enable(Buttons::BT_LEAVE, in_party && field_limit::may_leave_party(fieldtype));
-		enable(Buttons::BT_EXPEL, leader && member && field_limit::may_expel(fieldtype));
+		enable(Buttons::BT_LEAVE, in_party);
+		enable(Buttons::BT_EXPEL, leader && member);
 		enable(Buttons::BT_INVITE, leader && party.get_members().size() < PARTY_CAPACITY);
 
 		// v83's rules (FUN_0091dba9); with nothing picked, only those that

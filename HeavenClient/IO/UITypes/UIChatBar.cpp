@@ -36,7 +36,6 @@
 
 #include "../../Configuration.h"
 #include "../../Data/CurseData.h"
-#include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
@@ -125,32 +124,6 @@ namespace ms
 		{
 			return input.size() == command.size() && std::equal(input.begin(), input.end(), command.begin(),
 				[](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
-		}
-
-		// A command that is "/" and the name of a face item (5160000-5160014)
-		// makes its emote if the player has the item in the cash inventory, as
-		// using it would; the first name that matches, compared as commands
-		// are, decides (FUN_0052c40c, after /pet).
-		void face_word(const std::string& input)
-		{
-			if (input.size() <= 1)
-				return;
-
-			std::string word = input.substr(1);
-
-			for (int32_t index = 0; index < 15; index++)
-			{
-				int32_t item_id = 5160000 + index;
-				const ItemData& item = ItemData::get(item_id);
-
-				if (!item.is_valid() || !is_command(word, item.get_name()))
-					continue;
-
-				if (Stage::get().get_player().get_inventory().find_item(InventoryType::Id::CASH, item_id) != 0)
-					Stage::get().send_key(KeyType::Id::FACE, 99 + index + 8, true);
-
-				return;
-			}
 		}
 
 		// v83's /? and /Help (StringPool 0x39a-0x3ac and 0x14c4).
@@ -404,7 +377,6 @@ namespace ms
 							// the target; v83 sends them only for GMs.
 							else if (msg[0] == '/')
 							{
-								face_word(msg);
 							}
 							else if (!flood_guard_allows(msg))
 							{

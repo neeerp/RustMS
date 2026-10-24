@@ -159,9 +159,6 @@ namespace ms
 
 		for (auto &btit : buttons)
 		{
-			if (own_cursor(btit.first))
-				continue;
-
 			if (button_under(btit.first, pos))
 			{
 				// v83 presses the button the mouse goes down on whether or not

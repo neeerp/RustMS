@@ -1719,6 +1719,24 @@ pub mod keys {
     pub const BALROG_WORLD_BUSY: &str = "balrog_world.busy";
     /// Papulatus in the past (2043000), sending a visitor back to their time.
     pub const PAST_PAPULATUS_SEND_BACK: &str = "papulatus.past.send_back";
+    /// Delli's rescue (6410): Shulynch (1092008) in the Nautilus's Training
+    /// Room sending a Corsair on the quest to look for Delli, and Shulynch
+    /// (1095000) on the way offering the way back.
+    pub const DELLI_SHULYNCH_ASK: &str = "delli.shulynch.ask";
+    pub const DELLI_SHULYNCH_LEAVE: &str = "delli.shulynch.leave";
+    /// Delli (2095000) where the party gathers: the menu, its lines, what
+    /// Delli asks, and why a party can't go; the pink line at the way out
+    /// before Delli is safe; and the offer of the way back after.
+    pub const DELLI_MENU: &str = "delli.menu";
+    pub const DELLI_ENTER: &str = "delli.enter";
+    pub const DELLI_ABOUT: &str = "delli.about";
+    pub const DELLI_INFO: &str = "delli.info";
+    pub const DELLI_NO_PARTY: &str = "delli.no_party";
+    pub const DELLI_NOT_LEADER: &str = "delli.not_leader";
+    pub const DELLI_NOT_ELIGIBLE: &str = "delli.not_eligible";
+    pub const DELLI_BUSY: &str = "delli.busy";
+    pub const DELLI_NOT_WON: &str = "delli.not_won";
+    pub const DELLI_HOME_ASK: &str = "delli.home.ask";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2612,6 +2630,18 @@ mod tests {
                 keys::BALROG_WORLD_LEVEL,
                 keys::BALROG_WORLD_BUSY,
                 keys::PAST_PAPULATUS_SEND_BACK,
+                keys::DELLI_SHULYNCH_ASK,
+                keys::DELLI_SHULYNCH_LEAVE,
+                keys::DELLI_MENU,
+                keys::DELLI_ENTER,
+                keys::DELLI_ABOUT,
+                keys::DELLI_INFO,
+                keys::DELLI_NO_PARTY,
+                keys::DELLI_NOT_LEADER,
+                keys::DELLI_NOT_ELIGIBLE,
+                keys::DELLI_BUSY,
+                keys::DELLI_NOT_WON,
+                keys::DELLI_HOME_ASK,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

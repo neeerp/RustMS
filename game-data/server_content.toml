@@ -1080,6 +1080,18 @@ unsourced = [
     "balrog_world.level",
     "balrog_world.busy",
     "papulatus.past.send_back",
+    "delli.shulynch.ask",
+    "delli.shulynch.leave",
+    "delli.menu",
+    "delli.enter",
+    "delli.about",
+    "delli.info",
+    "delli.no_party",
+    "delli.not_leader",
+    "delli.not_eligible",
+    "delli.busy",
+    "delli.not_won",
+    "delli.home.ask",
 ]
 
 [text."glTutoMsg0.message"]

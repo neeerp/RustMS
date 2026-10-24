@@ -71,6 +71,7 @@ impl ClientActor {
             EventKind::Opq => NpcScript::wonky(entry),
             EventKind::Zpq => NpcScript::adobis(entry, &self.in_game()?.player),
             EventKind::Htpq => NpcScript::htpq_gatekeeper(entry),
+            EventKind::Delli => NpcScript::delli(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -372,6 +373,23 @@ impl ClientActor {
         } else {
             vec![Effect::PortalSound, Effect::Warp(events::ZPQ.exit)]
         }))
+    }
+
+    /// What the way out of Save Delli! does for a member there
+    /// (`scripts::delli_way_out`). `None` for any other portal.
+    pub(super) fn delli_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(player.stats.map_id) && ticket.kind == EventKind::Delli)
+        else {
+            return Ok(None);
+        };
+        if script != scripts::DELLI_OUT {
+            return Ok(None);
+        }
+        Ok(Some(scripts::delli_way_out(ticket.won(), player)))
     }
 
     /// What the way into the Trial Grounds' rooms does for a member on
@@ -689,7 +707,7 @@ impl ClientActor {
     /// the team before the clear effect). The Dead Mine's win shows nothing,
     /// and gives more EXP with the documents (Cosmic's Aura). Zakum's fall
     /// showed itself on the altar already (the field's `zakum_falls`), and
-    /// gives none; nor do Horntail's stages.
+    /// gives none; nor do Horntail's stages, nor Delli's rescue.
     pub(super) async fn stage_cleared(&mut self, id: u32, stage: u8) -> Result<(), RuntimeError> {
         let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.id == id) else {
             return Ok(());
@@ -700,7 +718,11 @@ impl ClientActor {
         let event = ticket.kind.event();
         let zpq = ticket.kind == EventKind::Zpq;
         let zakum = ticket.kind == EventKind::Zakum;
-        let no_exp = zakum || matches!(ticket.kind, EventKind::Horntail | EventKind::Htpq);
+        let no_exp = zakum
+            || matches!(
+                ticket.kind,
+                EventKind::Horntail | EventKind::Htpq | EventKind::Delli
+            );
         let exp = if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {
             events::ZPQ_DOCUMENTS_EXP
         } else {

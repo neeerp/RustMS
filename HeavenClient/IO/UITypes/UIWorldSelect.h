@@ -45,9 +45,6 @@ namespace ms
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
-		void doubleclick(Point<int16_t> cursorpos) override;
-		void remove_cursor() override;
-
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 
 		UIElement::Type get_type() const override;
@@ -136,8 +133,6 @@ namespace ms
 		// The world picked last, whose status is awaited. v83 takes no
 		// world or channel clicks until it comes (CLogin+0x170).
 		int16_t requested = -1;
-		// The plank the mouse went down on, until it comes back up.
-		int16_t held_plank = -1;
 		bool status_pending = false;
 		uint8_t channelid = 0;
 	};

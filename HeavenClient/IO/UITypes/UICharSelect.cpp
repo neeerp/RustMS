@@ -394,10 +394,6 @@ namespace ms
 
 	Cursor::State UICharSelect::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		// A button held keeps the cursor until the mouse comes back up.
-		if (is_holding_button())
-			return UIElement::send_cursor(clicked, cursorpos);
-
 		int16_t slot = slot_at(cursorpos);
 
 		if (slot >= 0)
@@ -446,8 +442,40 @@ namespace ms
 				return clicked ? Cursor::State::IDLE : Cursor::State::CANCLICK;
 		}
 
-		// The buttons click as the mouse comes back up over them.
-		return UIElement::send_cursor(clicked, cursorpos);
+		Cursor::State ret = Cursor::State::IDLE;
+
+		for (auto &btit : buttons)
+		{
+			Button *button = btit.second.get();
+
+			if (button->is_active() && button->bounds(position).contains(cursorpos))
+			{
+				Button::State state = button->get_state();
+
+				if (state == Button::State::DISABLED)
+					continue;
+
+				if (state == Button::State::NORMAL)
+				{
+					Sound(Sound::Name::BUTTONOVER).play();
+					button->set_state(Button::State::MOUSEOVER);
+				}
+
+				if (clicked)
+				{
+					Sound(Sound::Name::BUTTONCLICK).play();
+					button->set_state(button_pressed(btit.first));
+				} else
+				{
+					ret = Cursor::State::CANCLICK;
+				}
+			} else if (button->get_state() == Button::State::MOUSEOVER)
+			{
+				button->set_state(Button::State::NORMAL);
+			}
+		}
+
+		return ret;
 	}
 
 	void UICharSelect::send_key(int32_t keycode, bool pressed, bool escape)

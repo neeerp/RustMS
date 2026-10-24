@@ -27,6 +27,8 @@ leaves (see the expedition in [zakum](./zakum.md)); Horntail's cave is
 another ([horntail](./horntail.md)). The fight with
 Papulatus is a party's event that ends that way too (`Event::until_empty`),
 started by a portal rather than an NPC ([papulatus](./papulatus.md)).
+Delli's rescue, for the Corsairs' 6410, is a party's event won by holding
+out ([Delli's rescue](#dellis-rescue)).
 
 ## Rules
 
@@ -836,6 +838,35 @@ T-Skelegons (9300077) drop the Red Keys; on the dark one the six crates
 
 Not yet: the Party Search entry and the stump (2083003).
 
+## Delli's rescue
+
+For the Corsairs' 6410 (`v83ref/reports/a118-delli.md`). Shulynch (1092008,
+in the Nautilus's Training Room 120000104) asks a player on 6410 whether to
+go after Delli and sends them to Looking for Delli 1 (925010000); without
+the quest it says only its NX lines. The three Looking for Delli maps are
+plain hunting maps leading on one to the next; Shulynch (1095000) on the
+first takes anyone back to 120000104. On the third (925010200) Delli
+(2095000) takes a party of one or two, all there at level 120 and up, into
+Save Delli! (925010300) for six minutes (`events::DELLI`,
+`EventKind::Delli`, a menu of going in and what to do). Delli doesn't ask
+for the quest, as in Cosmic; only a player on it gets the record.
+
+On Save Delli! the party protects Willi (9300162), a friendly mob
+(`damagedByMob`) the other mobs hurt by running into it (`MobDamageMobFriendly`,
+as the Moon Bunny). Its going loses the event at once and without a word
+(`Event::survive`, `FieldActor::fail_event`): everyone goes back to
+925010200. The time running out with it still there wins it instead
+(`EventActor::time_up`): the clear effect, no EXP, and the other mobs leave
+and stop coming (`FieldMessage::ClearMobs`, `MobSet::clear_hostile`, Cosmic
+`killAllMonstersNotFriendly`). The way out (`s4mpt`, script `s4mind_end`,
+`delli_portal`) holds with a pink line until the win, then sets 6411 to
+"p2" for a player on 6410 and leads to the Nautilus Hideout Room
+(925010400), where Delli completes 6410 and asks whether to go home to
+120000104. Its lines are placeholders (`delli.*`).
+
+Not yet: the Party Search entry. The mobs come back on the field's usual
+seven seconds (Cosmic forces fifteen).
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -869,6 +900,10 @@ Not yet: the Party Search entry and the stump (2083003).
 | Minerva 2013002 | 920011100 | Out of the first box broken; alone to 920011300 |
 | Minerva 2013002 | 920011300 | The prize once won, and home to 200080101 |
 | Eak 2013001 | 920011200 | Home to 200080101 |
+| Shulynch 1092008 | 120000104 | On 6410, to 925010000 |
+| Shulynch 1095000 | 925010000 | Home to 120000104 |
+| Delli 2095000 | 925010200 | Runtime (`talk_about_event`): a menu of going in and what to do |
+| Delli 2095000 | 925010400 | Completes 6410; home to 120000104 |
 | Adobis 2030008 | 211042300 | Runtime (`talk_about_event`): the Dead Mine, the Breath of Lava, the Eyes of Fire |
 | Aura 2032002 | 280010000 | Runtime (`zpq_aura`): what it is, the leader's hand-in, out to 211042300; the prize once won |
 | Ali 2030011 | 280090000 | Home to 211042300 |

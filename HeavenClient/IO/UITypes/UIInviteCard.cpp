@@ -2,8 +2,6 @@
 
 #include "../Components/MapleButton.h"
 
-#include "../UiControl.h"
-
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 #include "../../Net/Handlers/Parcels.h"
@@ -144,7 +142,7 @@ namespace ms
 
 		for (auto it = notices.begin(); it != notices.end();)
 		{
-			it->life.update(Constants::TIMESTEP, ui_control::state().locked);
+			it->life.update(Constants::TIMESTEP);
 
 			if (it->life.gone())
 			{
@@ -327,8 +325,8 @@ namespace ms
 	Button::State UIInviteCard::button_pressed(uint16_t buttonid)
 	{
 		// One press can arrive twice, and a notice fading out ignores more;
-		// act on the first. One LOCK_UI holds back is out of reach.
-		if (notices.empty() || notices.back().life.closed() || notices.back().life.waiting())
+		// act on the first.
+		if (notices.empty() || notices.back().life.closed())
 			return Button::State::NORMAL;
 
 		Notice& notice = notices.back();
