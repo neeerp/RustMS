@@ -1131,6 +1131,10 @@ pub const MAZE_CLEAR: i32 = 809_050_016;
 pub const MAZE_EXIT: i32 = 809_050_017;
 /// The Ludibrium Maze's coupons, from its monsters.
 pub const MAZE_COUPON: i32 = 4_001_106;
+/// How many coupons Pietri wants at the least for the win.
+pub const MAZE_COUPONS_WANTED: i32 = 30;
+/// The EXP every member gets for each coupon handed in.
+pub const MAZE_COUPON_EXP: i32 = 50;
 
 /// The Ludibrium Maze (Cosmic `LudiMazePQ`): three to six of a party, all
 /// of level 51 to 70, in Ludibrium with their leader, go into their own
@@ -1558,6 +1562,11 @@ pub enum EventCommand {
     /// The leader handed Aura the Fire Ore and the documents: the Dead
     /// Mine is won, with `ZPQ_DOCUMENTS` set first.
     WinWithDocuments,
+    /// The leader handed Pietri this many coupons, at least
+    /// `MAZE_COUPONS_WANTED`: the Ludibrium Maze is won, with
+    /// `MAZE_COUPON_EXP` for each to every member (Cosmic
+    /// `giveEventPlayersExp`, then `clearPQ`).
+    WinWithCoupons(i32),
     /// The member's field brought out the event's boss, whose clock then
     /// starts over: Horntail's (`HORNTAIL_FIGHT_MINUTES`, Cosmic
     /// `restartEventTimer`).

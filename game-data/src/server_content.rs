@@ -1750,6 +1750,11 @@ pub mod keys {
     pub const LUDIMAZE_BUSY: &str = "ludimaze.busy";
     pub const LUDIMAZE_HOME: &str = "ludimaze.home";
     pub const LUDIMAZE_SUMMONED: &str = "ludimaze.summoned";
+    pub const LUDIMAZE_PIETRI_NOT_LEADER: &str = "ludimaze.pietri.not_leader";
+    pub const LUDIMAZE_PIETRI_WAIT: &str = "ludimaze.pietri.wait";
+    pub const LUDIMAZE_PIETRI_SHORT: &str = "ludimaze.pietri.short";
+    pub const LUDIMAZE_PIETRI_ASK: &str = "ludimaze.pietri.ask";
+    pub const LUDIMAZE_PIETRI_DONE: &str = "ludimaze.pietri.done";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2665,6 +2670,11 @@ mod tests {
                 keys::LUDIMAZE_BUSY,
                 keys::LUDIMAZE_HOME,
                 keys::LUDIMAZE_SUMMONED,
+                keys::LUDIMAZE_PIETRI_NOT_LEADER,
+                keys::LUDIMAZE_PIETRI_WAIT,
+                keys::LUDIMAZE_PIETRI_SHORT,
+                keys::LUDIMAZE_PIETRI_ASK,
+                keys::LUDIMAZE_PIETRI_DONE,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

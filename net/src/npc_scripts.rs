@@ -870,6 +870,8 @@ const LOOKING_FOR_DELLI: i32 = 925_010_000;
 /// Rolly in Ludibrium, who takes a party into the Ludibrium Maze, and
 /// Rolly on its way out, who sends everyone back to Ludibrium.
 pub const ROLLY: i32 = 9103001;
+/// Pietri, in the Ludibrium Maze's goal room.
+pub const PIETRI: i32 = 9103000;
 const ROLLY_HOME: i32 = 9103003;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
@@ -1305,6 +1307,13 @@ impl NpcScript {
     /// not go in to protect Willi.
     pub fn delli(entry: Entry) -> Self {
         delli(entry)
+    }
+
+    /// Pietri in the maze's goal room, to a member who may be its
+    /// `leader`, whose team may have `won` it and may all be there
+    /// (`together`).
+    pub fn pietri(leader: bool, won: bool, together: bool, player: &Player) -> Self {
+        pietri(leader, won, together, player)
     }
 
     /// Rolly in Ludibrium, for a player whose party may or may not go into
@@ -6683,6 +6692,50 @@ fn rolly(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Rolly checked, or another party went in.
     script.refused = Some(event_terms(maze, keys::LUDIMAZE_NOT_ELIGIBLE));
+    script
+}
+
+/// Pietri (Cosmic `9103000`) in the maze's goal room: only the leader,
+/// with the whole team there and at least `MAZE_COUPONS_WANTED` coupons,
+/// hands them all in, which wins the maze for `MAZE_COUPON_EXP` each to
+/// every member (`EventCommand::WinWithCoupons`).
+fn pietri(leader: bool, won: bool, together: bool, player: &Player) -> NpcScript {
+    let coupons = player.inventory.count(events::MAZE_COUPON);
+    let short = || {
+        let n = events::MAZE_COUPONS_WANTED.to_string();
+        let item = events::MAZE_COUPON.to_string();
+        content::text().get(keys::LUDIMAZE_PIETRI_SHORT, &[("n", &n), ("item", &item)])
+    };
+    let page = if won {
+        Page::Say(text(keys::LUDIMAZE_PIETRI_DONE))
+    } else if !leader {
+        Page::Say(text(keys::LUDIMAZE_PIETRI_NOT_LEADER))
+    } else if !together {
+        Page::Say(text(keys::LUDIMAZE_PIETRI_WAIT))
+    } else if coupons < events::MAZE_COUPONS_WANTED {
+        Page::Say(short())
+    } else {
+        let quantity = i16::try_from(coupons).unwrap_or(i16::MAX);
+        let (n, item) = (quantity.to_string(), events::MAZE_COUPON.to_string());
+        let each = (i32::from(quantity) * events::MAZE_COUPON_EXP).to_string();
+        Page::Ask {
+            text: content::text().get(
+                keys::LUDIMAZE_PIETRI_ASK,
+                &[("n", &n), ("item", &item), ("exp", &each)],
+            ),
+            on_yes: vec![
+                Effect::TakeItem {
+                    item_id: events::MAZE_COUPON,
+                    quantity,
+                },
+                Effect::EventCommand(EventCommand::WinWithCoupons(i32::from(quantity))),
+            ],
+            on_no: None,
+        }
+    };
+    let mut script = NpcScript::new(PIETRI, vec![page]);
+    // The coupons went before the yes.
+    script.refused = Some(short());
     script
 }
 
@@ -12714,5 +12767,38 @@ mod tests {
         assert_eq!(page_text(&home.begin()), text(keys::LUDIMAZE_HOME));
         let step = home.respond(ScriptInput::Next).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::LUDIBRIUM, 0)]);
+    }
+
+    #[test]
+    fn pietri_takes_all_of_the_leaders_coupons_from_thirty_with_everyone_there() {
+        let coupons = |n| hunter(&[(events::MAZE_COUPON, n)], &[]);
+        let says = |leader, won, together, n| {
+            page_text(&NpcScript::pietri(leader, won, together, &coupons(n)).begin())
+        };
+        assert_eq!(
+            says(false, false, true, 40),
+            text(keys::LUDIMAZE_PIETRI_NOT_LEADER)
+        );
+        assert_eq!(
+            says(true, false, false, 40),
+            text(keys::LUDIMAZE_PIETRI_WAIT)
+        );
+        assert_eq!(says(true, true, true, 40), text(keys::LUDIMAZE_PIETRI_DONE));
+        assert!(says(true, false, true, 29).contains("30"));
+        let mut pietri = NpcScript::pietri(true, false, true, &coupons(42));
+        let ask = pietri.begin();
+        assert_eq!(kind(&ask), Some(1));
+        assert!(question(&ask).contains("42") && question(&ask).contains("2100"));
+        assert_eq!(
+            pietri.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::MAZE_COUPON,
+                    quantity: 42
+                },
+                Effect::EventCommand(EventCommand::WinWithCoupons(42))
+            ]
+        );
+        assert!(page_text(&pietri.refused().unwrap()).contains("30"));
     }
 }

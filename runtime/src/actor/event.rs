@@ -34,7 +34,8 @@ use crate::supervisor::spawn_supervised;
 use game_data::server_content::keys;
 use net::events::{
     draw_combo, draw_question, htpq_room_key, Balloon, Cloto, Event, EventCommand, EventKind,
-    Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, ZPQ_DOCUMENTS,
+    Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, MAZE_COUPONS_WANTED, MAZE_COUPON_EXP,
+    ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
@@ -80,6 +81,8 @@ pub enum EventMessage {
         member: ClientHandle,
         reply: oneshot::Sender<SquadAnswer>,
     },
+    /// How many are in the team now.
+    TeamSize { reply: oneshot::Sender<usize> },
 }
 
 /// The stages an event's party has cleared, one bit each. Only the event
@@ -201,6 +204,17 @@ impl EventTicket {
             .await
             .ok()?;
         view.await.ok().flatten()
+    }
+
+    /// How many are in the team now, or `None` if the event is over.
+    pub async fn team_size(&self) -> Option<usize> {
+        let (reply, size) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::TeamSize { reply })
+            .await
+            .ok()?;
+        size.await.ok()
     }
 
     /// Tell the event what the member's script did.
@@ -330,6 +344,7 @@ pub fn spawn(
         everyone: everyone.clone(),
         failed: false,
         bonus_taken: false,
+        win_exp: None,
         blessing: start.blessing,
     };
     // However it ends, even by a panic, its members are sent out, the copy
@@ -437,6 +452,9 @@ struct EventActor {
     /// The leader took the team to the bonus.
     bonus_taken: bool,
     blessing: Option<i32>,
+    /// The EXP every member gets for the win rather than the last stage's
+    /// (`EventCommand::WinWithCoupons`).
+    win_exp: Option<i32>,
 }
 
 impl EventActor {
@@ -468,6 +486,9 @@ impl EventActor {
                     }
                     Some(EventMessage::Join { member, reply }) => {
                         let _ = reply.send(self.join(member));
+                    }
+                    Some(EventMessage::TeamSize { reply }) => {
+                        let _ = reply.send(self.team.members().len());
                     }
                     None => over = true,
                 },
@@ -655,6 +676,16 @@ impl EventActor {
                 self.win();
             }
             EventCommand::WinWithDocuments => debug!(client_id, "Win not taken"),
+            EventCommand::WinWithCoupons(coupons)
+                if leader
+                    && self.kind == EventKind::LudiMaze
+                    && !won
+                    && coupons >= MAZE_COUPONS_WANTED =>
+            {
+                self.win_exp = Some(coupons.saturating_mul(MAZE_COUPON_EXP));
+                self.win();
+            }
+            EventCommand::WinWithCoupons(_) => debug!(client_id, "Win not taken"),
             EventCommand::RestartClock if self.kind == EventKind::Horntail && !won => {
                 self.restart_clock(net::events::HORNTAIL_FIGHT_MINUTES);
             }
@@ -820,7 +851,13 @@ impl EventActor {
         info!(kind = ?self.kind, id = self.id, stage, "Stage cleared");
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
-                handle.send(ServerMessage::StageCleared { id: self.id, stage });
+                handle.send(ServerMessage::StageCleared {
+                    id: self.id,
+                    stage,
+                    exp: self
+                        .win_exp
+                        .filter(|_| stage == self.kind.event().last_stage()),
+                });
             }
         }
         true
