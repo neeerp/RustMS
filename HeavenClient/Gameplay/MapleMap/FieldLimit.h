@@ -261,6 +261,20 @@ namespace ms
 			return !(fieldlimit & PARTY_LEADER);
 		}
 
+		// v83 FUN_00537cc1: no one leaves a party in fields of type 23 to
+		// 26 but 24.
+		inline bool may_leave_party(int32_t fieldtype)
+		{
+			return fieldtype != 23 && fieldtype != 25 && fieldtype != 26;
+		}
+
+		// v83 FUN_00537c97: nor is anyone expelled there, nor in fields of
+		// type 10, 11 or 15.
+		inline bool may_expel(int32_t fieldtype)
+		{
+			return may_leave_party(fieldtype) && fieldtype != 10 && fieldtype != 11 && fieldtype != 15;
+		}
+
 		// v83 FUN_00858603: the minimap folds to its title bar in a map
 		// without a miniMap, where hideMinimap is set, and in the
 		// miniMapOnOff maps once the server has switched them off
