@@ -138,6 +138,12 @@ namespace ms
 		// A click on the board, released at `at`, window-local.
 		virtual void click_board(Point<int16_t> at) = 0;
 
+		// The mouse over the board at `at`, window-local, and whether it
+		// has just gone down there; or the mouse leaving the board.
+		virtual void hover_board(Point<int16_t> at, bool went_down) {}
+
+		virtual void leave_board() {}
+
 		virtual Rectangle<int16_t> board() const = 0;
 
 		// Asks `question`, and if the answer is yes while this room is

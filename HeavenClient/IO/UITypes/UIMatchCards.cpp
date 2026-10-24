@@ -39,6 +39,9 @@ namespace ms
 		// The art is one image; the client shows it as 5 frames of 300 ms (65103f).
 		constexpr int32_t GLOW_MS = 5 * 300;
 
+		// How far a pressed card sinks (0x6558ec).
+		constexpr Point<int16_t> PRESSED = Point<int16_t>(2, 2);
+
 		nl::node memory_node()
 		{
 			return NxFiles::ui_classic["UIWindow.img"]["Minigame"]["MemoryGame"];
@@ -70,6 +73,7 @@ namespace ms
 		was_up.assign(cards.deck.size(), false);
 		glows.clear();
 		last_seconds = 0;
+		pressed = -1;
 
 		refresh_buttons();
 	}
@@ -129,7 +133,7 @@ namespace ms
 			if (cards.face_up(i) && value < FACES)
 				faces[value].draw(place);
 			else
-				back.draw(place);
+				back.draw(i == pressed ? place + PRESSED : place);
 		}
 
 		for (const Glow &glow : glows)
@@ -199,12 +203,31 @@ namespace ms
 		// server says how it went (0x64ece1).
 		int32_t index = mini_game::card_at(cards.size, at.x(), at.y());
 
+		pressed = -1;
+
 		if (!cards.can_flip(index))
 			return;
 
 		bool first = cards.flip(index);
 
 		MatchCardsFlipPacket(first, static_cast<uint8_t>(index)).dispatch();
+	}
+
+	void UIMatchCards::hover_board(Point<int16_t> at, bool went_down)
+	{
+		// A card the mouse goes down on sinks in until the mouse comes up
+		// or leaves it (0x6558ec, 0x655a39, 0x64edf6).
+		int32_t index = mini_game::card_at(cards.size, at.x(), at.y());
+
+		if (went_down && pressed < 0 && cards.can_flip(index))
+			pressed = index;
+		else if (index != pressed)
+			pressed = -1;
+	}
+
+	void UIMatchCards::leave_board()
+	{
+		pressed = -1;
 	}
 
 	Rectangle<int16_t> UIMatchCards::board() const
