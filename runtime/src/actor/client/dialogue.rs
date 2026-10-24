@@ -72,6 +72,14 @@ impl ClientActor {
         if npc_id == net::npc_scripts::DELLI && player.stats.map_id == net::events::DELLI.lobby {
             return self.talk_about_event(net::events::EventKind::Delli).await;
         }
+        // Tylus is the warriors' third-job chief too: his party's menu is
+        // only for one on "Protecting Tylus".
+        if npc_id == net::npc_scripts::TYLUS
+            && player.stats.map_id == net::events::TYLUS.lobby
+            && player.quests.state(net::events::TYLUS_QUEST) == game::QuestState::Started
+        {
+            return self.talk_about_event(net::events::EventKind::Tylus).await;
+        }
         if npc_id == net::npc_scripts::ROLLY && player.stats.map_id == net::events::LUDIMAZE.lobby {
             return self
                 .talk_about_event(net::events::EventKind::LudiMaze)

@@ -1109,6 +1109,16 @@ unsourced = [
     "ludimaze.pietri.done",
     "ludimaze.present.ask",
     "ludimaze.present.full",
+    "tylus.menu",
+    "tylus.enter",
+    "tylus.about",
+    "tylus.info",
+    "tylus.no_party",
+    "tylus.not_leader",
+    "tylus.not_eligible",
+    "tylus.busy",
+    "tylus.fallen",
+    "tylus.thanks",
 ]
 
 [text."glTutoMsg0.message"]

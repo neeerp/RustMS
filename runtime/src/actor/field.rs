@@ -2933,6 +2933,10 @@ impl FieldActor {
         if bunny {
             self.item_line(&text.get(keys::HPQ_BUNNY_GONE, &[]));
         }
+        // Tylus's going only takes his Trust with him (Cosmic).
+        if hit.mob_id == net::events::TYLUS_MOB {
+            self.item_line(&text.get(keys::TYLUS_FALLEN, &[]));
+        }
         if bunny && self.key.instance_id != 0 {
             self.lost_at = Some(now + net::events::scaled(FRIENDLY_LOST_AFTER));
         }

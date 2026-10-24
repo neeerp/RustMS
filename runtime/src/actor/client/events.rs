@@ -73,6 +73,7 @@ impl ClientActor {
             EventKind::Htpq => NpcScript::htpq_gatekeeper(entry),
             EventKind::Delli => NpcScript::delli(entry),
             EventKind::LudiMaze => NpcScript::rolly(entry),
+            EventKind::Tylus => NpcScript::tylus(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -403,6 +404,19 @@ impl ClientActor {
             return Ok(None);
         }
         Ok(Some(scripts::delli_way_out(ticket.won(), player)))
+    }
+
+    /// What the way out of Tylus's room does for a member there
+    /// (`scripts::tylus_way_out`). `None` for any other portal.
+    pub(super) fn tylus_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let player = &self.in_game()?.player;
+        let here = self.event.as_ref().is_some_and(|ticket| {
+            ticket.holds(player.stats.map_id) && ticket.kind == EventKind::Tylus
+        });
+        if !here || script != scripts::TYLUS_OUT {
+            return Ok(None);
+        }
+        Ok(Some(scripts::tylus_way_out(player)))
     }
 
     /// What the way into the Trial Grounds' rooms does for a member on

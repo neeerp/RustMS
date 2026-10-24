@@ -40,6 +40,9 @@ pub enum EventKind {
     Delli,
     /// The Ludibrium Maze, started at Rolly (9103001) in Ludibrium.
     LudiMaze,
+    /// Protecting Tylus (the warriors' 6192), started at Tylus (2020008)
+    /// in El Nath's Chief's Residence.
+    Tylus,
 }
 
 /// An event's maps and terms.
@@ -1226,6 +1229,60 @@ pub const LUDIMAZE: Event = Event {
     survive: None,
 };
 
+/// The Chief's Residence in El Nath, where the party gathers; the room
+/// where it protects Tylus; the room past it, where he thanks them; and
+/// where everyone else goes.
+pub const TYLUS_LOBBY: i32 = 211_000_001;
+pub const TYLUS_ROOM: i32 = 921_100_300;
+pub const TYLUS_THANKS: i32 = 921_100_301;
+pub const TYLUS_EXIT: i32 = 211_040_100;
+/// Tylus, the friendly mob in the room, who now and then drops his Trust
+/// (4031495), which "Protecting Tylus" (6192) wants.
+pub const TYLUS_MOB: i32 = 9_300_093;
+pub const TYLUS_TRUST: i32 = 4_031_495;
+pub const TYLUS_QUEST: i16 = 6192;
+/// How often Tylus drops his Trust, in tens of seconds: Cosmic's
+/// `dropItemPeriod`, which our Mob.nx lacks for him (the default in
+/// `v83ref/lanes/QUESTIONS.md` a123).
+const TYLUS_DROP_PERIOD: i32 = 10;
+
+/// Protecting Tylus (Cosmic `ElnathPQ`): one to four of a party, all of
+/// level 80 or more, in the Chief's Residence with their leader, go to
+/// their own copy of the room for ten minutes, where kidnappers come for
+/// Tylus and he drops his Trust now and then. Nobody wins it: its way out
+/// leads on to Tylus's thanks with the Trust, and out without; the time
+/// running out sends everyone out. Tylus's going loses nothing.
+pub const TYLUS: Event = Event {
+    lobby: TYLUS_LOBBY,
+    maps: TYLUS_ROOM..=TYLUS_ROOM,
+    entry: TYLUS_ROOM,
+    entries: 1,
+    exit: TYLUS_EXIT,
+    levels: 80..=u8::MAX,
+    team: 1..=4,
+    minutes: 10,
+    exp_per_stage: &[0],
+    stride: 1,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+};
+
 /// Whether `mob_id` is the friendly mob some event's team protects.
 pub fn protected(mob_id: i32) -> bool {
     EventKind::ALL
@@ -1234,7 +1291,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 11] = [
+    pub const ALL: [EventKind; 12] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1246,6 +1303,7 @@ impl EventKind {
         EventKind::Htpq,
         EventKind::Delli,
         EventKind::LudiMaze,
+        EventKind::Tylus,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1261,6 +1319,7 @@ impl EventKind {
             EventKind::Htpq => &HTPQ,
             EventKind::Delli => &DELLI,
             EventKind::LudiMaze => &LUDIMAZE,
+            EventKind::Tylus => &TYLUS,
         }
     }
 }
@@ -1470,9 +1529,14 @@ const ALL_JOB_LINES: u16 = 0b11_1110;
 /// tens of seconds, and a third of that for the Moon Bunny (Cosmic's, as
 /// a whole period of 60 s would leave no time for 10 rice cakes; the
 /// default in `v83ref/lanes/QUESTIONS.md`, 2026-10-22, row 180), shortened
-/// like the events' time (`scaled`). None for a mob that makes
-/// nothing.
+/// like the events' time (`scaled`); Tylus's is Cosmic's. None for a mob
+/// that makes nothing.
 pub fn friendly_drop_period(mob_id: i32, period: i32) -> Option<Duration> {
+    let period = if mob_id == TYLUS_MOB {
+        TYLUS_DROP_PERIOD
+    } else {
+        period
+    };
     let period = Duration::from_secs(u64::try_from(period).ok().filter(|&p| p > 0)? * 10);
     let period = if mob_id == crate::reactors::MOON_BUNNY {
         period / 3
@@ -2504,6 +2568,28 @@ mod tests {
         // Its leader's leaving ends it, as for any party's.
         let mut team = Team::new(&DELLI, 1, vec![1, 2]);
         assert!(team.leave(1));
+    }
+
+    #[test]
+    fn tylus_takes_one_to_four_and_drops_his_trust_every_hundred_seconds() {
+        let four: Vec<_> = (1..=4).map(|id| at(id, 80, TYLUS_LOBBY)).collect();
+        assert_eq!(TYLUS.team(1, &four[..1]), Some(vec![1]));
+        assert_eq!(TYLUS.team(1, &four), Some(vec![1, 2, 3, 4]));
+        let five = [&four[..], &[at(5, 80, TYLUS_LOBBY)]].concat();
+        assert!(TYLUS.team(1, &five).is_none());
+        let low = [four[0], at(2, 79, TYLUS_LOBBY)];
+        assert_eq!(TYLUS.team(1, &low), Some(vec![1]));
+        // Only the room is its own; the thanks past it and the town are not.
+        assert!(event_map(TYLUS_ROOM));
+        assert!(!event_map(TYLUS_LOBBY) && !event_map(TYLUS_THANKS) && !event_map(TYLUS_EXIT));
+        assert_eq!(TYLUS.duration(), scaled(Duration::from_secs(10 * 60)));
+        assert_eq!(
+            friendly_drop_period(TYLUS_MOB, 0),
+            Some(scaled(Duration::from_secs(100)))
+        );
+        assert_eq!(friendly_drop_period(TYLUS_MOB + 1, 0), None);
+        // His going loses nothing.
+        assert!(!protected(TYLUS_MOB));
     }
 
     #[test]

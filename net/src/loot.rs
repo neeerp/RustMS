@@ -117,17 +117,18 @@ pub fn spray(
 }
 
 /// Roll what a friendly mob (`dropItemPeriod`) makes from its drops, for
-/// no one in particular: the Moon Bunny's rice cakes. Quest drops are left
-/// out.
+/// no one in particular: the Moon Bunny's rice cakes, Tylus's Trust. A
+/// quest drop is marked so, for only those here who need it to see it.
 pub fn roll_friendly(mob_id: i32, rng: &mut impl Rng) -> Vec<Loot> {
     friendly_from(crate::content::rewards().drops(mob_id), rng)
 }
 
 fn friendly_from(entries: &[RewardEntry], rng: &mut impl Rng) -> Vec<Loot> {
     let mut loot = Vec::new();
-    for entry in entries.iter().filter(|entry| entry.quest.is_none()) {
+    for entry in entries {
         if rng.gen_bool(entry.prob.clamp(0.0, 1.0)) {
-            loot.extend(loot_of(entry, None, 1.0, rng));
+            let quest = entry.quest.or_else(|| entry.item.and_then(quest_for));
+            loot.extend(loot_of(entry, quest, 1.0, rng));
         }
     }
     loot
@@ -389,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    fn a_friendly_mob_makes_its_items_but_no_quest_items() {
+    fn a_friendly_mob_makes_its_items_and_marks_its_quest_items() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
         let table = [
             entry(Some(4001101), None, 1.0, None),
@@ -401,7 +402,12 @@ mod tests {
             quantity: 1,
             quest: None,
         };
-        assert_eq!(friendly_from(&table, &mut rng), [cake]);
+        let shellpiece = Loot::Item {
+            item_id: 4031802,
+            quantity: 1,
+            quest: Some(1035),
+        };
+        assert_eq!(friendly_from(&table, &mut rng), [cake, shellpiece]);
     }
 
     #[test]
