@@ -85,13 +85,15 @@ pub enum EventMessage {
     TeamSize { reply: oneshot::Sender<usize> },
 }
 
-/// The stages an event's party has cleared, one bit each, and how many of
-/// the Pirate Ship's Marks it has handed in (`EventCommand::HandInMarks`).
-/// Only the event writes it.
+/// The stages an event's party has cleared, one bit each, how many of the
+/// Pirate Ship's Marks it has handed in (`EventCommand::HandInMarks`), and
+/// how many of its chests it has opened (`EventCommand::ChestOpened`). Only
+/// the event writes it.
 #[derive(Debug, Default)]
 pub struct Cleared {
     stages: AtomicU16,
     marks: AtomicU8,
+    chests: AtomicU8,
 }
 
 impl Cleared {
@@ -106,6 +108,10 @@ impl Cleared {
 
     pub fn marks(&self) -> u8 {
         self.marks.load(Ordering::Acquire)
+    }
+
+    pub fn chests(&self) -> u8 {
+        self.chests.load(Ordering::Acquire)
     }
 }
 
@@ -183,6 +189,11 @@ impl EventTicket {
     /// How many of the Pirate Ship's Marks the party has handed Guon.
     pub fn marks(&self) -> u8 {
         self.cleared.marks()
+    }
+
+    /// How many of the Pirate Ship's chests the party has opened.
+    pub fn chests(&self) -> u8 {
+        self.cleared.chests()
     }
 
     /// Whether the party has cleared the last stage, so has no time limit.
@@ -745,6 +756,16 @@ impl EventActor {
                 }
             }
             EventCommand::HandInMarks(n) => debug!(n, client_id, "Marks not taken"),
+            // One a room, so two at most.
+            EventCommand::ChestOpened
+                if self.kind == EventKind::Pirate
+                    && !won
+                    && usize::from(self.cleared.chests())
+                        < net::reactors::PIRATE_CHEST_NAMES.len() =>
+            {
+                self.cleared.chests.fetch_add(1, Ordering::Release);
+            }
+            EventCommand::ChestOpened => debug!(client_id, "Chest not counted"),
         }
     }
 
@@ -969,6 +990,6 @@ mod tests {
         assert!(!cleared.has(0) && !cleared.has(17) && !cleared.has(9));
         assert!(cleared.set(9) && cleared.set(16));
         assert!(cleared.has(9) && cleared.has(16));
-        assert_eq!(cleared.marks(), 0);
+        assert_eq!((cleared.marks(), cleared.chests()), (0, 0));
     }
 }

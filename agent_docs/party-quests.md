@@ -1122,10 +1122,22 @@ scripts `davy2_hd1` and `davy3_hd1`) leads down to its crew's room
 (925100202, 925100302) whatever is left aboard; that room's Devoted Krus
 and Captains are its own Map.nx spawns, kept coming while anyone is there
 (Cosmic brings them out once). The bellflower rooms (925100201, 925100301)
-are plain links from each deck's `in00`.
+are plain links from each deck's `in00`, and their `out00` leads back.
+Each copy opens with ten Bellflowers (9300112) at its left end and ten
+Bloody Bellflowers (9300113) at its right, on top of its own Map.nx
+Bellflowers, which come out once. Its chest (2512001, `treasure1` and
+`treasure2`, `reactors::PIRATE_CHEST`) starts hidden in state 0; once
+no monster is left, the leader talking to Guon shows it
+(`pirate.guon.chest`, an effect setting the named reactor to state 1,
+which does nothing more if it is already shown). The Lord Pirate's key
+(4031437, from the bosses only) dropped on it opens it into a spray of
+at least fifteen drops, 50-100 mesos each besides the pack's list
+(Cosmic `2512001`), and counts it for the run, two at most
+(`EventCommand::ChestOpened`, `Cleared::chests`), whoever opened it. The
+count will pick the Lord Pirate and the clear's EXP.
 
-Not yet: the bellflower rooms' chests, the doors, the Lord Pirate, Wu
-Yang and the rewards, and the Party Search toggle.
+Not yet: the doors, the Lord Pirate, Wu Yang and the rewards, and the
+Party Search toggle.
 
 ## NPCs
 
@@ -1181,7 +1193,7 @@ Yang and the rewards, and the Party Search toggle.
 | Milepost 2133002 | 930000300 | Out to 930000800 |
 | Sprite 2133004 | 930000500 | Runtime (`ellin_sprite`): the leader with the stone on to the altar, or out |
 | Guon 2094000 | 251010404 | Runtime (`talk_about_event`): a menu of boarding and what waits aboard |
-| Guon 2094002 | 925100000-500 | The leader hears what the map asks, and on 925100100 hands in the Marks; anyone else may go back to 251010404 |
+| Guon 2094002 | 925100000-500 | The leader hears what the map asks, on 925100100 hands in the Marks, and in a bare bellflower room shows its chest; anyone else may go back to 251010404 |
 | Guon 2094002 | 925100700 | At once to 251010404 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

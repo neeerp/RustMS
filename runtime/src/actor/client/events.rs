@@ -221,6 +221,31 @@ impl ClientActor {
         Ok(Some(script))
     }
 
+    /// What Guon says to a member aboard the Pirate Ship
+    /// (`NpcScript::guon_aboard`): to the leader in a bellflower room, as
+    /// its monsters stand. `None` off the ship.
+    pub(super) async fn guon_aboard(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.kind == EventKind::Pirate && ticket.holds(map_id))
+        else {
+            return Ok(None);
+        };
+        let (leader, marks) = (ticket.leader(), ticket.marks());
+        let bellflowers = (events::PIRATE_STAGES[2..4].iter()).any(|&deck| deck + 1 == map_id);
+        let bare = if leader && bellflowers {
+            let (reply, mobs) = oneshot::channel();
+            self.send_to_field(FieldMessage::MobCount { reply }).await?;
+            mobs.await.unwrap_or(1) == 0
+        } else {
+            false
+        };
+        let player = &self.in_game()?.player;
+        Ok(Some(NpcScript::guon_aboard(player, leader, marks, bare)))
+    }
+
     /// What Eak says to the player in the Orbis party quest, if anything:
     /// in the music room whether its music box plays, in the sealed room
     /// how the team stands on its platforms (a wrong count shows as a

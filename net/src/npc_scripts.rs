@@ -1420,9 +1420,10 @@ impl NpcScript {
     }
 
     /// Guon aboard the Pirate Ship (Cosmic `2094002`), to `player`, who
-    /// may be its `leader`, whose team has handed him `marks` Marks.
-    pub fn guon_aboard(player: &Player, leader: bool, marks: u8) -> Self {
-        guon_aboard(player, leader, marks)
+    /// may be its `leader`, whose team has handed him `marks` Marks, on a
+    /// map that may be `bare` of monsters.
+    pub fn guon_aboard(player: &Player, leader: bool, marks: u8, bare: bool) -> Self {
+        guon_aboard(player, leader, marks, bare)
     }
 
     /// Eak (Cosmic `2013001`) to a player in the Orbis party quest on
@@ -6960,7 +6961,7 @@ fn guon(entry: Entry) -> NpcScript {
 /// Guon (Cosmic `2094002`) on the ship's map `map_id`: anyone but the
 /// leader may give up and go back Over the Pirate Ship; the leader hears
 /// what the map asks.
-fn guon_aboard(player: &Player, leader: bool, marks: u8) -> NpcScript {
+fn guon_aboard(player: &Player, leader: bool, marks: u8, bare: bool) -> NpcScript {
     if !leader {
         return ask_warp(GUON_ABOARD, keys::PIRATE_GUON_LEAVE, events::PIRATE_LOBBY);
     }
@@ -6968,6 +6969,16 @@ fn guon_aboard(player: &Player, leader: bool, marks: u8) -> NpcScript {
     let stage = |n: usize| events::PIRATE_STAGES[n];
     let key = match map_id {
         _ if map_id == stage(1) => return guon_marks(player, marks),
+        // In a bellflower room beaten bare, he shows its chest (Cosmic
+        // `setReactorState`); again is no matter.
+        _ if bare && (map_id == stage(2) + 1 || map_id == stage(3) + 1) => {
+            let name = crate::reactors::PIRATE_CHEST_NAMES[usize::from(map_id == stage(3) + 1)];
+            let page = Page::Act {
+                text: text(keys::PIRATE_GUON_CHEST),
+                effects: vec![Effect::SetReactorState { name, state: 1 }],
+            };
+            return NpcScript::new(GUON_ABOARD, vec![page]);
+        }
         _ if map_id == stage(2) || map_id == stage(3) => keys::PIRATE_GUON_DECK,
         _ if map_id == stage(2) + 1 || map_id == stage(3) + 1 => keys::PIRATE_GUON_BONUS,
         _ if map_id == stage(2) + 2 || map_id == stage(3) + 2 => keys::PIRATE_GUON_CREW,
@@ -13252,7 +13263,7 @@ mod tests {
         // Aboard, a member may go back; the leader hears what the map asks.
         let mut member = player(60);
         member.stats.map_id = events::PIRATE_STAGES[2];
-        let mut aboard = NpcScript::guon_aboard(&member, false, 0);
+        let mut aboard = NpcScript::guon_aboard(&member, false, 0, false);
         assert_eq!(question(&aboard.begin()), text(keys::PIRATE_GUON_LEAVE));
         let step = aboard.respond(ScriptInput::Yes).unwrap();
         assert_eq!(
@@ -13269,9 +13280,21 @@ mod tests {
             (events::PIRATE_STAGES[5], keys::PIRATE_GUON_BOSS),
         ] {
             member.stats.map_id = map;
-            let aboard = NpcScript::guon_aboard(&member, true, 0);
+            let aboard = NpcScript::guon_aboard(&member, true, 0, false);
             assert_eq!(page_text(&aboard.begin()), text(key), "{map}");
         }
+        // Beaten bare, a bellflower room shows its chest; a deck doesn't.
+        for (map, name) in [(925_100_201, "treasure1"), (925_100_301, "treasure2")] {
+            member.stats.map_id = map;
+            let step = NpcScript::guon_aboard(&member, true, 0, true).begin();
+            assert_eq!(page_text(&step), text(keys::PIRATE_GUON_CHEST), "{map}");
+            assert_eq!(step.effects, [Effect::SetReactorState { name, state: 1 }]);
+            let member_asked = NpcScript::guon_aboard(&member, false, 0, true).begin();
+            assert!(member_asked.effects.is_empty());
+        }
+        member.stats.map_id = events::PIRATE_STAGES[2];
+        let deck = NpcScript::guon_aboard(&member, true, 0, true).begin();
+        assert_eq!(page_text(&deck), text(keys::PIRATE_GUON_DECK));
         // On the way out, he sends anyone back at once.
         assert!(NpcScript::for_npc(GUON_ABOARD, &member).is_none());
         member.stats.map_id = events::PIRATE_EXIT;
@@ -13303,7 +13326,7 @@ mod tests {
             );
         }
         for (marks, key) in wants.into_iter().enumerate() {
-            let guon = NpcScript::guon_aboard(&leader, true, marks as u8);
+            let guon = NpcScript::guon_aboard(&leader, true, marks as u8, false);
             let step = guon.begin();
             assert_eq!(page_text(&step), text(key), "{marks}");
             assert!(step.effects.is_empty(), "{marks}");
@@ -13317,7 +13340,7 @@ mod tests {
             );
         }
         for (n, &(mark, _)) in events::PIRATE_MARKS.iter().enumerate() {
-            let step = NpcScript::guon_aboard(&leader, true, n as u8).begin();
+            let step = NpcScript::guon_aboard(&leader, true, n as u8, false).begin();
             assert_eq!(page_text(&step), text(wants[n + 1]), "{n}");
             assert_eq!(
                 step.effects,
@@ -13330,11 +13353,11 @@ mod tests {
                 ]
             );
         }
-        let done = NpcScript::guon_aboard(&leader, true, 3).begin();
+        let done = NpcScript::guon_aboard(&leader, true, 3, false).begin();
         assert_eq!(page_text(&done), text(keys::PIRATE_GUON_MARKS_IN));
         assert!(done.effects.is_empty());
         // A member is only asked whether to leave.
-        let member = NpcScript::guon_aboard(&leader, false, 0);
+        let member = NpcScript::guon_aboard(&leader, false, 0, false);
         assert_eq!(question(&member.begin()), text(keys::PIRATE_GUON_LEAVE));
     }
 
