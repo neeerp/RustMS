@@ -98,23 +98,7 @@ namespace ms
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
 
-			switch (equips.getcaptype())
-			{
-			case CharEquips::CapType::NONE:
-				hair->draw(interstance, Hair::Layer::BACK, interframe, args);
-				break;
-			case CharEquips::CapType::HEADBAND:
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				hair->draw(interstance, Hair::Layer::BACK, interframe, args);
-				break;
-			case CharEquips::CapType::HALFCOVER:
-				hair->draw(interstance, Hair::Layer::BELOWCAP, interframe, args);
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				break;
-			case CharEquips::CapType::FULLCOVER:
-				equips.draw(EquipSlot::Id::HAT, interstance, Clothing::Layer::CAP, interframe, args);
-				break;
-			}
+			draw_back_cap(args, interstance, interframe);
 
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::BACKSHIELD, interframe, args);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::BACKWEAPON, interframe, args);
@@ -127,12 +111,15 @@ namespace ms
 									   drawinfo.get_head_position(standing, 0);
 			DrawArgument headargs = args + DrawArgument{neckshift, false, Point<int16_t>{}};
 
-			hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
+			draw_cap_behind(headargs, standing, 0);
+			if (!equips.covers("Hb"))
+				hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
 			equips.draw(EquipSlot::Id::HAT, standing, Clothing::Layer::CAP_BELOW_BODY, 0, headargs);
 			body->draw(interstance, Body::Layer::BODY, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, standing, Clothing::Layer::EARRINGS, 0, headargs);
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
-			hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
+			if (!equips.covers("Hs"))
+				hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
 			face->draw(interexpression, interexpframe, faceargs);
 			equips.draw(EquipSlot::Id::FACE, standing, Clothing::Layer::FACEACC, 0, faceargs);
 			equips.draw(EquipSlot::Id::EYEACC, standing, Clothing::Layer::EYEACC, 0, headargs);
@@ -140,7 +127,9 @@ namespace ms
 		}
 		else
 		{
-			hair->draw(interstance, Hair::Layer::BELOWBODY, interframe, args);
+			draw_cap_behind(args, interstance, interframe);
+			if (!equips.covers("Hb"))
+				hair->draw(interstance, Hair::Layer::BELOWBODY, interframe, args);
 			equips.draw(EquipSlot::Id::CAPE, interstance, Clothing::Layer::CAPE, interframe, args);
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_BELOW_BODY, interframe, args);
 			equips.draw(EquipSlot::Id::WEAPON, interstance, Clothing::Layer::WEAPON_BELOW_BODY, interframe, args);
@@ -165,7 +154,8 @@ namespace ms
 			equips.draw(EquipSlot::Id::SHIELD, interstance, Clothing::Layer::SHIELD_OVER_HAIR, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, interstance, Clothing::Layer::EARRINGS, interframe, args);
 			body->draw(interstance, Body::Layer::HEAD, interframe, args);
-			hair->draw(interstance, Hair::Layer::SHADE, interframe, args);
+			if (!equips.covers("Hs"))
+				hair->draw(interstance, Hair::Layer::SHADE, interframe, args);
 			face->draw(interexpression, interexpframe, faceargs);
 			equips.draw(EquipSlot::Id::FACE, interstance, Clothing::Layer::FACEACC, 0, faceargs);
 			equips.draw(EquipSlot::Id::EYEACC, interstance, Clothing::Layer::EYEACC, interframe, args);
@@ -207,27 +197,48 @@ namespace ms
 
 	void CharLook::draw_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const
 	{
-		switch (equips.getcaptype())
-		{
-		case CharEquips::CapType::NONE:
-			// The hair covers the scalp, so it goes over the head and the face.
+		// v83's zmap, back to front: hair, cap, hairOverHead, capOverHair.
+		// The hat hides the hair layers its vslot names.
+		if (!equips.covers("H2"))
 			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
+
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
+
+		if (!equips.covers("H1"))
 			hair->draw(stance, Hair::Layer::OVERHEAD, frame, args);
-			break;
-		case CharEquips::CapType::HEADBAND:
-			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
-			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
-			hair->draw(stance, Hair::Layer::OVERHEAD, frame, args);
-			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP_OVER_HAIR, frame, args);
-			break;
-		case CharEquips::CapType::HALFCOVER:
-			hair->draw(stance, Hair::Layer::DEFAULT, frame, args);
-			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
-			break;
-		case CharEquips::CapType::FULLCOVER:
-			equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
-			break;
-		}
+
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP_OVER_HAIR, frame, args);
+	}
+
+	void CharLook::draw_back_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const
+	{
+		// From behind, back to front: backHairBelowCap, backHairBelowCapNarrow,
+		// backHairBelowCapWide, backCap, backHair, backCapOverHair, then the
+		// front cap layers, which some hats also have on a ladder.
+		if (!equips.covers("H6"))
+			hair->draw(stance, Hair::Layer::BELOWCAP, frame, args);
+
+		if (!equips.covers("H5"))
+			hair->draw(stance, Hair::Layer::BELOWCAP_NARROW, frame, args);
+
+		if (!equips.covers("H4"))
+			hair->draw(stance, Hair::Layer::BELOWCAP_WIDE, frame, args);
+
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::BACK_CAP, frame, args);
+
+		if (!equips.covers("H1"))
+			hair->draw(stance, Hair::Layer::BACK, frame, args);
+
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::BACK_CAP_OVER_HAIR, frame, args);
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP, frame, args);
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::CAP_OVER_HAIR, frame, args);
+	}
+
+	void CharLook::draw_cap_behind(const DrawArgument &args, Stance::Id stance, uint8_t frame) const
+	{
+		// Facing front, a hat's back layers are behind everything else.
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::BACK_CAP, frame, args);
+		equips.draw(EquipSlot::Id::HAT, stance, Clothing::Layer::BACK_CAP_OVER_HAIR, frame, args);
 	}
 
 	void CharLook::draw(const DrawArgument &args, float alpha) const
@@ -326,12 +337,15 @@ namespace ms
 			Stance::Id standing = Stance::Id::STAND1;
 			DrawArgument faceargs = headargs + DrawArgument{drawinfo.getfacepos(standing, 0), false, Point<int16_t>{}};
 
-			hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
+			draw_cap_behind(headargs, standing, 0);
+			if (!equips.covers("Hb"))
+				hair->draw(standing, Hair::Layer::BELOWBODY, 0, headargs);
 			equips.draw(EquipSlot::Id::HAT, standing, Clothing::Layer::CAP_BELOW_BODY, 0, headargs);
 			look.draw(ghostaction, interframe, args);
 			equips.draw(EquipSlot::Id::EARACC, standing, Clothing::Layer::EARRINGS, 0, headargs);
 			body->draw(standing, Body::Layer::HEAD, 0, headargs);
-			hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
+			if (!equips.covers("Hs"))
+				hair->draw(standing, Hair::Layer::SHADE, 0, headargs);
 			face->draw(interexp, interexpframe, faceargs);
 			equips.draw(EquipSlot::Id::EYEACC, standing, Clothing::Layer::EYEACC, 0, headargs);
 			draw_cap(headargs, standing, 0);
@@ -346,23 +360,7 @@ namespace ms
 			body->draw(climbing, Body::Layer::HEAD, 0, headargs);
 			equips.draw(EquipSlot::Id::EARACC, climbing, Clothing::Layer::EARRINGS, 0, headargs);
 
-			switch (equips.getcaptype())
-			{
-			case CharEquips::CapType::NONE:
-				hair->draw(climbing, Hair::Layer::BACK, 0, headargs);
-				break;
-			case CharEquips::CapType::HEADBAND:
-				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
-				hair->draw(climbing, Hair::Layer::BACK, 0, headargs);
-				break;
-			case CharEquips::CapType::HALFCOVER:
-				hair->draw(climbing, Hair::Layer::BELOWCAP, 0, headargs);
-				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
-				break;
-			case CharEquips::CapType::FULLCOVER:
-				equips.draw(EquipSlot::Id::HAT, climbing, Clothing::Layer::CAP, 0, headargs);
-				break;
-			}
+			draw_back_cap(headargs, climbing, 0);
 		}
 	}
 

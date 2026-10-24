@@ -225,8 +225,11 @@ namespace ms
 		uint8_t rider_frame(Stance::Id pose, uint8_t frame) const;
 		Point<int16_t> rider_shift(Stance::Id stance, uint8_t frame) const;
 
-		// Draw the hair over the head and the cap, which covers some of it.
+		// Draw the hair over the head and the cap, which covers some of it,
+		// from the front and from behind.
 		void draw_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const;
+		void draw_back_cap(const DrawArgument &args, Stance::Id stance, uint8_t frame) const;
+		void draw_cap_behind(const DrawArgument &args, Stance::Id stance, uint8_t frame) const;
 
 		uint16_t get_delay(Stance::Id stance, uint8_t frame) const;
 

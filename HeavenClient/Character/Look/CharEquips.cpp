@@ -18,6 +18,7 @@
 #include "CharEquips.h"
 
 #include "CashWeapon.h"
+#include "HatSlots.h"
 
 namespace ms
 {
@@ -148,23 +149,11 @@ namespace ms
 			return false;
 	}
 
-	CharEquips::CapType CharEquips::getcaptype() const
+	bool CharEquips::covers(const char* slot) const
 	{
-		if (const Clothing* cap = clothes[EquipSlot::Id::HAT])
-		{
-			const std::string &vslot = cap->get_vslot();
-			if (vslot == "CpH1H5")
-				return CharEquips::CapType::HALFCOVER;
-			else if (vslot == "CpH1H5AyAs")
-				return CharEquips::CapType::FULLCOVER;
-			else if (vslot == "CpH5")
-				return CharEquips::CapType::HEADBAND;
-			else
-				return CharEquips::CapType::NONE;
-		} else
-		{
-			return CharEquips::CapType::NONE;
-		}
+		const Clothing* cap = clothes[EquipSlot::Id::HAT];
+
+		return cap && hat_slots::covers(cap->get_vslot(), slot);
 	}
 
 	Stance::Id CharEquips::adjust_stance(Stance::Id stance) const
