@@ -1119,6 +1119,18 @@ unsourced = [
     "tylus.busy",
     "tylus.fallen",
     "tylus.thanks",
+    "ellin.menu",
+    "ellin.enter",
+    "ellin.about",
+    "ellin.info",
+    "ellin.no_party",
+    "ellin.not_leader",
+    "ellin.not_eligible",
+    "ellin.busy",
+    "ellin.stage1.shut",
+    "ellin.stage2.shut",
+    "ellin.guide.leave",
+    "ellin.guide.welcome",
 ]
 
 [text."glTutoMsg0.message"]

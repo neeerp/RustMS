@@ -942,6 +942,9 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             refused(keys::MILK_JUG_NOT_FULL)
         }
         "end_cow" => through(Effect::Warp(TANGYOONS_KITCHEN)),
+        // The Forest of Poison Haze's prize map, home to the Deep Fairy
+        // Forest.
+        "party6_stage800" => through(Effect::WarpToPortal(crate::events::ELLIN_LOBBY, 0)),
         "inERShip" => through(Effect::WarpToPortal(
             ELLINIA_SKY_FERRY,
             named(ELLINIA_SKY_FERRY, "out00"),
@@ -1750,6 +1753,36 @@ pub fn tylus_way_out(player: &Player) -> Vec<Effect> {
         Effect::Warp(TYLUS_EXIT)
     };
     vec![Effect::PortalSound, to]
+}
+
+/// The way on from the Forest of Poison Haze's entrance and its first two
+/// stages (Cosmic `party6_stage`).
+pub const ELLIN_STAGE: &str = "party6_stage";
+
+/// Where the forest's way on takes a member on `map_id`: from the entrance
+/// into the first stage, and from a stage the party has `cleared` into
+/// the next; a stage not yet cleared keeps it shut, with a pink line why.
+pub fn ellin_way_on(map_id: i32, cleared: impl Fn(u8) -> bool) -> Vec<Effect> {
+    use crate::events::ELLIN;
+    let on = |stage| {
+        vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(ELLIN.stage_map(stage), 0),
+        ]
+    };
+    if map_id == ELLIN.entry {
+        return on(1);
+    }
+    let (stage, shut) = match ELLIN.stage_on(map_id) {
+        Some(1) => (1, keys::ELLIN_STAGE1_SHUT),
+        Some(2) => (2, keys::ELLIN_STAGE2_SHUT),
+        _ => return Vec::new(),
+    };
+    if cleared(stage) {
+        on(stage + 1)
+    } else {
+        vec![Effect::Pink(content::text().get(shut, &[]))]
+    }
 }
 
 /// The way to Papulatus, for a player whose party stands as `entry`: the
@@ -2746,6 +2779,35 @@ mod tests {
             tylus_way_out(&player),
             [Effect::PortalSound, Effect::WarpToPortal(TYLUS_THANKS, 0)]
         );
+    }
+
+    #[test]
+    fn the_forests_way_on_opens_stage_by_stage_and_its_prize_map_leads_home() {
+        use crate::events::{ELLIN, ELLIN_EXIT, ELLIN_LOBBY, ELLIN_STAGES};
+        let on = |map| vec![Effect::PortalSound, Effect::WarpToPortal(map, 0)];
+        assert_eq!(ellin_way_on(ELLIN.entry, |_| false), on(ELLIN_STAGES[0]));
+        let shut = content::text().get(keys::ELLIN_STAGE1_SHUT, &[]);
+        assert_eq!(
+            ellin_way_on(ELLIN_STAGES[0], |_| false),
+            [Effect::Pink(shut)]
+        );
+        assert_eq!(
+            ellin_way_on(ELLIN_STAGES[0], |s| s == 1),
+            on(ELLIN_STAGES[1])
+        );
+        let shut = content::text().get(keys::ELLIN_STAGE2_SHUT, &[]);
+        assert_eq!(
+            ellin_way_on(ELLIN_STAGES[1], |s| s == 1),
+            [Effect::Pink(shut)]
+        );
+        assert_eq!(
+            ellin_way_on(ELLIN_STAGES[1], |s| s == 2),
+            on(ELLIN_STAGES[2])
+        );
+        assert!(ellin_way_on(ELLIN_STAGES[2], |_| true).is_empty());
+        assert!(ellin_way_on(ELLIN_EXIT, |_| true).is_empty());
+        let home = portal("party6_stage800", &player_with(&[])).unwrap();
+        assert_eq!(home.effects, on(ELLIN_LOBBY));
     }
 
     #[test]

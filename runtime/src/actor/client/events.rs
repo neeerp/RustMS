@@ -74,6 +74,7 @@ impl ClientActor {
             EventKind::Delli => NpcScript::delli(entry),
             EventKind::LudiMaze => NpcScript::rolly(entry),
             EventKind::Tylus => NpcScript::tylus(entry),
+            EventKind::Ellin => NpcScript::ellin(entry),
             // A squad's, above; Papulatus's has a portal, not an NPC.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
         };
@@ -417,6 +418,24 @@ impl ClientActor {
             return Ok(None);
         }
         Ok(Some(scripts::tylus_way_out(player)))
+    }
+
+    /// What the Forest of Poison Haze's way on does for a member there
+    /// (`scripts::ellin_way_on`). `None` for any other portal.
+    pub(super) fn ellin_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let ticket = self
+            .event
+            .as_ref()
+            .filter(|ticket| ticket.holds(map_id) && ticket.kind == EventKind::Ellin);
+        match ticket {
+            Some(ticket) if script == scripts::ELLIN_STAGE => {
+                Ok(Some(scripts::ellin_way_on(map_id, |stage| {
+                    ticket.cleared(stage)
+                })))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// What the way into the Trial Grounds' rooms does for a member on

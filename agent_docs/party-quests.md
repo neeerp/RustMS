@@ -31,7 +31,9 @@ Delli's rescue, for the Corsairs' 6410, is a party's event won by holding
 out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is played through
 ([the Ludibrium Maze](#the-ludibrium-maze)). Protecting Tylus, for the
 warriors' 6192, is a party's event with nothing to win
-([Protecting Tylus](#protecting-tylus)).
+([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
+Haze is begun: its entry, exit, timer and first stage
+([the Forest of Poison Haze](#the-forest-of-poison-haze)).
 
 ## Rules
 
@@ -940,6 +942,40 @@ doesn't offer the chief's other choices. Its lines are placeholders (`tylus.*`).
 
 Not yet: the Party Search entry.
 
+## The Forest of Poison Haze
+
+Ellin Forest's party quest (`v83ref/reports/a125-ellin-pq.md`; defaults in
+`v83ref/lanes/QUESTIONS.md` a125). Ellin (2133000) in the Deep Fairy
+Forest (300030100) answers with a menu of going in and what the forest
+holds. The leader takes a party of four to six, all there at levels 44 to
+55, into its own copy of the forest for 30 minutes (`events::ELLIN`,
+`EventKind::Ellin`), onto its entrance, 930000000. Its six stages are
+930000100 to 930000600 (`stage_maps`); no stage gives EXP.
+
+The entrance's way on (`east00`, script `party6_stage`, `ellin_portal`,
+`scripts::ellin_way_on`) leads to the first stage. A stage's way on stays
+shut, with a pink line (`ellin.stage1.shut`, `ellin.stage2.shut`), until
+the party has cleared it. The first stage holds 50 Poisoned Lord Trees
+(9300172, spawned once: `mobTime` -1, and a field's first spawn pass
+fills every such point whatever its capacity); the death of the last in the
+party's copy clears it (`events::cleared_by_killing`, the field's
+`killed`, Cosmic `EllinPQ.monsterKilled`), with the clear effect.
+
+The prize map, 930000800, is the event's exit and every party's own map
+alike, not a copy: the time running out, leaving, and dying (the maps'
+`returnMap`) all land there, and its way out (`party6_stage800`) leads home
+to 300030100. Ellin (2133001) welcomes the party at the entrance
+(`ellin.guide.welcome`) and, on the stages other than the third and
+fourth, lets a member out to it; a member leaving, if fewer than four stay, or the leader
+leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
+event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
+leaves. Its lines are placeholders (`ellin.*`).
+
+Not yet: the second stage's pond and the stages after it, the Poison
+Golem's win, the fountain's EXP, the Altaire Fragment and the earrings
+(slices S2 to S5 of a125), Ellin's lines on the third and fourth stages,
+and the Party Search toggle.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -986,6 +1022,8 @@ Not yet: the Party Search entry.
 | Gatekeeper 2083001 | 240050100, 240050300, 240050310 | Runtime (`htpq_keeper`): the leader's hand-in of the keys |
 | Tylus 2020008 | 211000001 | On 6192, runtime (`talk_about_event`): a menu of going in and what to do |
 | Tylus 2022004 | 921100301 | Thanks, and on to El Nath 211000000 |
+| Ellin 2133000 | 300030100 | Runtime (`talk_about_event`): a menu of going into the forest and what it holds |
+| Ellin 2133001 | 930000000-700 | Out to 930000800 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
@@ -993,4 +1031,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
 `zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*`,
-`htpq.key.*`, `htpq.lamp.*`, `delli.*`, `ludimaze.*` and `tylus.*`.
+`htpq.key.*`, `htpq.lamp.*`, `delli.*`, `ludimaze.*`, `tylus.*` and
+`ellin.*`.
