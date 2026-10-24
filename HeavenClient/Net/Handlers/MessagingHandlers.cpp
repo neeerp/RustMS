@@ -478,6 +478,14 @@ namespace ms
 		if (megaphone && !Megaphones::heard_on(Stage::get().get_mapid()))
 			return;
 
+		// After a megaphone or gachapon line, a scam word in it brings a
+		// warning in yellow (0xa22cf5, 0xa2318e, 0xa23477).
+		auto warn = [&chatbar](const std::string& line)
+		{
+			if (auto warning = SwindleData::warning(line); warning && chatbar)
+				chatbar->send_chatline(*warning, UIChatBar::LineType::YELLOW);
+		};
+
 		switch (type)
 		{
 			case 0:
@@ -491,6 +499,8 @@ namespace ms
 			case 2:
 				if (chatbar)
 					chatbar->send_megaphone(message, UIChatBar::LineType::MEGAPHONE, -1, false);
+
+				warn(message);
 				break;
 			case 3:
 			{
@@ -499,6 +509,8 @@ namespace ms
 
 				if (chatbar)
 					chatbar->send_megaphone(message, UIChatBar::LineType::SUPER_MEGAPHONE, channel, ear);
+
+				warn(message);
 				break;
 			}
 			case 4:
@@ -545,6 +557,8 @@ namespace ms
 
 				if (chatbar)
 					chatbar->send_megaphone(message, UIChatBar::LineType::ITEM_MEGAPHONE, channel, ear);
+
+				warn(message);
 				break;
 			}
 			case 11:
@@ -556,9 +570,12 @@ namespace ms
 				std::string town = recv.read_string();
 				recv.read_byte();
 				std::string item = ItemData::get(recv.read_int()).get_name();
+				std::string line = Megaphones::gachapon(message, item, town);
 
 				if (chatbar)
-					chatbar->send_chatline(Megaphones::gachapon(message, item, town), UIChatBar::LineType::GACHAPON);
+					chatbar->send_chatline(line, UIChatBar::LineType::GACHAPON);
+
+				warn(line);
 				break;
 			}
 			case 10:
@@ -574,6 +591,9 @@ namespace ms
 				if (chatbar)
 					for (const auto& line : lines)
 						chatbar->send_megaphone(line, UIChatBar::LineType::SUPER_MEGAPHONE, channel, ear);
+
+				// Only the first line is looked at.
+				warn(lines[0]);
 				break;
 			}
 		}
