@@ -2246,6 +2246,11 @@ namespace ms
 			return;
 		}
 
+		// Riding a tamed monster, a mount or saddle gets the rider off
+		// instead (0x4f3287).
+		if (Stage::get().get_player().ride_keeps(item_id))
+			return;
+
 		if (item_drop::kept(item_id))
 			return;
 

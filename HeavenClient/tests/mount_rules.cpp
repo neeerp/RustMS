@@ -68,6 +68,8 @@ int main()
 		require(hog && hog->scale == 70 && hog->x == -25 && hog->y == -25, "the big ones shrink");
 		require(fixed_info_portrait(1902017)->y == -15 && !fixed_info_portrait(1902000), "the rest use data");
 
+		require(stays_on(1902040) && stays_on(1902042) && !stays_on(1902039) && !stays_on(1902043), "three stay on");
+
 		Pending pending;
 		require(!pending.waiting(0), "nothing asked");
 		pending.asked(100);

@@ -768,7 +768,12 @@ on a rested mount, as in Cosmic. CHAR_INFO shows the worn mount's state.
 
 The ride ends on death, a mob's Dispel, logout, and entering a map with
 field limit 0x200 (`keep_mounts_off`). The mount and saddle, and their
-cash covers, can't be moved while riding. Not done: Cosmic's explorer and
+cash covers, can't be moved while riding. HeavenClient, as v83 does, gets
+off instead (CANCEL_BUFF for the job's rider skill, `Player::ride_keeps`)
+when a 190xxxx or 191xxxx item is worn, taken off, or dropped on the
+field while riding a tamed monster (0x4f1c2d, 0x4f0e97, 0x4f11b4,
+0x4f3287; report b150). A double-click in the Equip window never takes
+off 1902040 to 1902042 (`mount::stays_on`). Not done: Cosmic's explorer and
 Cygnus restrictions on who may equip which mount, and event mounts. The
 skill comes with quest 6002 (its `skill` act, `agent_docs/quests.md`),
 and the Hog from catching a Tamable Hog (`agent_docs/inventory.md`). HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
