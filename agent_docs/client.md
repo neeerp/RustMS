@@ -812,7 +812,8 @@ the screen size.
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
   Inventory), 0x4D (gifts received since the last visit), 0x4F and 0x55 (wish list),
-  0x57 (a bought item), 0x59 (a redeemed coupon), 0x5C (a failure), 0x5E (a gift sent), 0x60 (a bag's
+  0x57 (a bought item), 0x58 (a failed purchase, with the SN when it is sold
+  out), 0x59 (a redeemed coupon), 0x5C (another failure), 0x5E (a gift sent), 0x60 (a bag's
   new slot count), 0x62 (the storage's), 0x64 (the account's character
   slots), 0x68 (an item taken out), 0x6A (an
   item put back), 0x89 (a bought package) and 0x8D (bought with mesos) are read. Inventory slots keep the item's cash serial,
@@ -841,6 +842,33 @@ the screen size.
   the item(s) selected. Are you sure you want to buy the item(s) again?". A
   package asks when any of its items (`Etc.nx` `CashPackage.img`) is had
   (`0x46e121`). Buying with mesos refuses an item the character has.
+- **Mannequin:** the avatar preview starts as a copy of the player's look.
+  Double-clicking a commodity's icon tries it on (v83 `0x4bb37c`,
+  `0x4ac3de`): equips only, silently not one whose id's thousands digit is
+  the other gender's (0 male, 1 female), nor 16xxxxx. The same item again
+  takes it off. An overall takes the pants off, a coat or pants an overall, a
+  two-handed weapon the shield and a shield a two-handed weapon; a cash
+  weapon (170xxxx) is worn over the weapon in its slot, and a weapon replaces
+  it. Rings fill the free ring slots. A package (910xxxx) puts its items on,
+  mounts and saddles included, if it is for the player's gender, or for
+  either and its first gendered equip is; after its first item anything
+  more disables Buy Avatar. Default Avatar goes back to the player's look
+  and Take Off takes everything off; both enable Buy Avatar. Tabs don't
+  change it. v83 also tries pets and some other cash items on, and tries a
+  package on when its row is selected or with Enter; HC doesn't.
+- **Buy Avatar:** with a package on, "The option is not available for that
+  package."; otherwise the commodities tried on that the player isn't
+  wearing (`0x4696b1`). The first one the character has stops the checks:
+  a free one can't be bought again, another asks "You already have the
+  item(s) selected...". The dialog says "Total N NX.Make purchase?" and offers
+  each balance that covers the total, NX Credit only when nothing is free,
+  or says "You don't have enough cash.". OK buys them one at a time, the
+  last first (`0x46ba55`): each 0x57's balance sends the next, and a 0x58
+  goes on to the next unless its code is 0xA2-0xA4. Nothing else can be
+  sent meanwhile. At the end it says "You have successfully made the
+  purchase.", "The purchase has failed." or names the items bought, "You
+  have purchased the following items. (Some items weren't purchased)". v83
+  leaves the queue waiting after 0x5C or those codes; HC ends it.
 - **Buying with mesos:** v83 has no tab for the commodities that cost mesos
   (SN 80000000-89999999). When the shop opens, each one on sale goes into a
   random sub-tab that has items, at a random place (v83 `0x471f37`;

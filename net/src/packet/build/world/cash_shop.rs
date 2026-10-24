@@ -63,6 +63,7 @@ const GIFTS: u8 = 0x4D;
 const WISH_LIST: u8 = 0x4F;
 const WISH_LIST_UPDATED: u8 = 0x55;
 const BOUGHT: u8 = 0x57;
+const BUY_FAILED: u8 = 0x58;
 const COUPON_REDEEMED: u8 = 0x59;
 const FAILED: u8 = 0x5C;
 const GIFT_SENT: u8 = 0x5E;
@@ -281,6 +282,21 @@ pub fn build_cash_shop_failure(failure: CashShopFailure) -> Result<Packet, Netwo
     Ok(packet)
 }
 
+/// CASHSHOP_OPERATION: a buy of `sn` that failed. v83's Buy Avatar queue
+/// goes on to its next SN after this one (0x479985), where the general
+/// failure would stall it, and a lone buy shows the same notice. A sold-out
+/// answer names the SN, which the catalog then shows as sold out.
+pub fn build_buy_failure(failure: CashShopFailure, sn: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(BUY_FAILED)?;
+    packet.write_byte(failure as u8)?;
+    if failure == CashShopFailure::SoldOut {
+        packet.write_int(sn)?;
+    }
+    Ok(packet)
+}
+
 /// One Cash Inventory item: 55 bytes.
 fn encode_cash_item(packet: &mut Packet, item: &CashItem) -> Result<(), NetworkError> {
     packet.write_long(item.id)?;
@@ -455,6 +471,23 @@ mod tests {
             .short(SendOpcode::CashShopOperation as i16)
             .byte(0x5C)
             .byte(0xA5);
+        expect.end();
+
+        let packet = build_buy_failure(CashShopFailure::NotEnoughCash, 10000000).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x58)
+            .byte(0xA5);
+        expect.end();
+
+        let packet = build_buy_failure(CashShopFailure::SoldOut, 10000000).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::CashShopOperation as i16)
+            .byte(0x58)
+            .byte(0xC0)
+            .int(10000000);
         expect.end();
     }
 

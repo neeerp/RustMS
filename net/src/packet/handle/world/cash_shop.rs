@@ -103,14 +103,14 @@ impl WorldHandler for CashShopOperationHandler {
                 );
                 match (cash_type, commodity) {
                     (_, Ok(commodity)) if cash_shop::own_request(commodity.item_id) => {
-                        return fail(CashShopFailure::Unknown)
+                        return fail_buy(CashShopFailure::Unknown, sn)
                     }
                     (Some(cash_type), Ok(commodity)) => CashShopRequest::Buy {
                         cash_type,
                         commodity: commodity.clone(),
                     },
-                    (None, _) => return fail(CashShopFailure::Unknown),
-                    (_, Err(failure)) => return fail(failure),
+                    (None, _) => return fail_buy(CashShopFailure::Unknown, sn),
+                    (_, Err(failure)) => return fail_buy(failure, sn),
                 }
             }
             BUY_WITH_MESOS => {
@@ -315,6 +315,12 @@ fn fail(failure: CashShopFailure) -> WorldResult {
     ))
 }
 
+fn fail_buy(failure: CashShopFailure, sn: i32) -> WorldResult {
+    Ok(HandlerResult::reply(
+        build::world::cash_shop::build_buy_failure(failure, sn)?,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,7 +396,8 @@ mod tests {
         let [WorldAction::Reply(reply)] = result.actions.as_slice() else {
             panic!("expected a failure reply: {:?}", result.actions);
         };
-        assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+        // A failed buy is mode 0x58, which lets a Buy Avatar queue go on.
+        assert_eq!(reply.bytes[2..], [0x58, CashShopFailure::Unknown as u8]);
     }
 
     #[test]
@@ -535,7 +542,7 @@ mod tests {
         let [WorldAction::Reply(reply)] = actions.as_slice() else {
             panic!("expected a failure reply: {actions:?}");
         };
-        assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+        assert_eq!(reply.bytes[2..], [0x58, CashShopFailure::Unknown as u8]);
     }
 
     #[test]
@@ -561,12 +568,12 @@ mod tests {
             })] if commodity.sn == sn
         ));
         // Not as an ordinary purchase, and no other commodity through 0x08.
-        for (action, sn) in [(BUY, sn), (BUY_CHARACTER_SLOT, 50200005)] {
+        for (action, sn, mode) in [(BUY, sn, 0x58), (BUY_CHARACTER_SLOT, 50200005, 0x5C)] {
             let actions = request(action, sn);
             let [WorldAction::Reply(reply)] = actions.as_slice() else {
                 panic!("expected a failure reply: {actions:?}");
             };
-            assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+            assert_eq!(reply.bytes[2..], [mode, CashShopFailure::Unknown as u8]);
         }
     }
 

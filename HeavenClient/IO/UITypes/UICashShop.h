@@ -25,12 +25,14 @@
 #include "../Components/Slider.h"
 
 #include "../../Character/Inventory/InventoryType.h"
+#include "../../Character/Look/CharLook.h"
 #include "../../Data/CashCatalog.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
 
 #include <array>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -119,6 +121,18 @@ namespace ms
 		// Back to the map the player came from.
 		void leave();
 
+		// Buy Avatar buys the mannequin's commodities one at a time, the last
+		// first, then sums up (v83 46ba55, CCashShop+0x4cc to +0x4d8).
+		bool buying_avatar() const;
+		// One of them is bought; the next waits for the balance.
+		void avatar_item_bought();
+		// Buy the next one, or say how it went.
+		void buy_next_avatar_item();
+		// Start buying these, paid with the balance.
+		void buy_avatar(const std::vector<int32_t>& sns, int32_t payment);
+		// A failure that ends the purchases early.
+		void stop_buying_avatar();
+
 	private:
 		void change_tab(cash_catalog::Tab tab);
 		// Add a wish, or say why not.
@@ -139,6 +153,17 @@ namespace ms
 		void update_item_slider();
 
 		void draw_item_inventory() const;
+
+		// The fitting-room mannequin (v83 CCashShop+0x554): a copy of the
+		// player's look that tries commodities on (4bb37c, 4ac3de), and
+		// Buy Avatar's checks before it buys them (4696b1).
+		void try_on(const cash_catalog::Commodity& commodity);
+		// Whether the item went on, or came off when it was on already.
+		bool try_on_item(int32_t item_id, int32_t sn, bool packaged);
+		void take_off(int16_t slot);
+		void default_avatar();
+		void take_off_avatar();
+		void buy_avatar();
 
 		// The tooltip of the commodity, Cash Inventory item or cash item under the cursor (report 202).
 		void update_tooltip(Point<int16_t> cursor, Point<int16_t> cursorpos);
@@ -252,5 +277,24 @@ namespace ms
 		int16_t hovered = -1;
 		// The Cash Inventory item whose tooltip is shown.
 		int64_t hovered_cash = 0;
+
+		// The mannequin's look and what it tried on: the item and commodity
+		// in each slot, a cash weapon in the weapon's. A package on it (v83
+		// CCashShop+0x4dc) can't be bought this way.
+		struct Tried
+		{
+			int32_t item_id;
+			int32_t sn;
+		};
+		CharLook preview_look;
+		std::map<int16_t, Tried> tried;
+		bool package_on = false;
+
+		// Buy Avatar's commodities, those bought (as indices), how many are
+		// left, and the balance paying (0 when nothing is being bought).
+		std::vector<int32_t> avatar_sns;
+		std::vector<size_t> avatar_bought;
+		size_t avatar_left = 0;
+		int32_t avatar_payment = 0;
 	};
 }

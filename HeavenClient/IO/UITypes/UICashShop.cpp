@@ -29,6 +29,7 @@
 #include "../Components/TwoSpriteButton.h"
 
 #include "../../Character/Marriage.h"
+#include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Util/Misc.h"
@@ -103,6 +104,20 @@ namespace ms
 			return tab == EVENT_TAB ? Color::Name::BLACK : Color::Name::WHITE;
 		}
 
+		// The mannequin's ring slots, in the order they fill.
+		constexpr EquipSlot::Id RINGS[4] = { EquipSlot::Id::RING1, EquipSlot::Id::RING2, EquipSlot::Id::RING3, EquipSlot::Id::RING4 };
+
+		// The mannequin is the player's look, on foot and as themselves.
+		CharLook mannequin()
+		{
+			CharLook look = Stage::get().get_player().get_look();
+			look.set_vehicle(0);
+			look.set_morph(0);
+			look.set_ghost(0);
+
+			return look;
+		}
+
 		std::string price_text(const Commodity& commodity)
 		{
 			// StringPool 0x24c, unsplit.
@@ -135,6 +150,7 @@ namespace ms
 		const CharStats& stats = Stage::get().get_player().get_stats();
 		uint16_t job = stats.get_job().get_id();
 		female = stats.get_female();
+		preview_look = mannequin();
 
 		// Cygnus Knights and Aran each have their own background.
 		if (job / 1000 == 1)
@@ -308,7 +324,7 @@ namespace ms
 		preview_frame.draw(position + PREVIEW_FRAME_POS);
 
 		const Player& player = Stage::get().get_player();
-		player.get_look().draw(position + AVATAR_POS, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
+		preview_look.draw(position + AVATAR_POS, false, Stance::Id::STAND1, Expression::Id::DEFAULT);
 
 		Text nametag(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, player.get_stats().get_name());
 		nametag.draw(position + AVATAR_POS + Point<int16_t>(0, 4));
@@ -456,6 +472,18 @@ namespace ms
 			preview_index = static_cast<uint8_t>(buttonid - Buttons::BT_PREVIEW1);
 
 			return Button::State::PRESSED;
+		case Buttons::BT_BUY_AVATAR:
+			buy_avatar();
+
+			return Button::State::NORMAL;
+		case Buttons::BT_DEFAULT_AVATAR:
+			default_avatar();
+
+			return Button::State::NORMAL;
+		case Buttons::BT_TAKEOFF_AVATAR:
+			take_off_avatar();
+
+			return Button::State::NORMAL;
 		case Buttons::BT_EXIT:
 			leave();
 
@@ -814,6 +842,20 @@ namespace ms
 			return;
 		}
 
+		// A commodity's icon tries it on.
+		for (size_t i = 0; tab != MAIN && i < PAGE_SIZE && page * PAGE_SIZE + i < listed.size(); i++)
+		{
+			Point<int16_t> in_icon = cursor - LIST_POS - LIST_ICON
+				- Point<int16_t>(CELL_STEP.x() * (i % LIST_COLUMNS), CELL_STEP.y() * (i / LIST_COLUMNS));
+
+			if (in_icon.x() >= 0 && in_icon.y() >= 0 && in_icon.x() < LIST_ICON_SIZE && in_icon.y() < LIST_ICON_SIZE)
+			{
+				try_on(listed[page * PAGE_SIZE + i]);
+
+				return;
+			}
+		}
+
 		// A Best Item buys on a double-click, after the level gates its BUY button lacks
 		// (FUN_004bb884).
 		Point<int16_t> in_best = cursor - BEST_WINDOW;
@@ -834,7 +876,9 @@ namespace ms
 
 	bool UICashShop::request()
 	{
-		if (pending)
+		// Buy Avatar's purchases count as one request, from the first to
+		// the last.
+		if (pending || buying_avatar())
 			return false;
 
 		pending = true;
@@ -906,6 +950,326 @@ namespace ms
 		GraphicsGL::get().lock();
 		Stage::get().clear();
 		Timer::get().start();
+	}
+
+	bool UICashShop::buying_avatar() const
+	{
+		return avatar_payment != 0;
+	}
+
+	void UICashShop::avatar_item_bought()
+	{
+		avatar_bought.push_back(avatar_left);
+	}
+
+	void UICashShop::try_on(const Commodity& commodity)
+	{
+		if (commodity.item_id / 10000 != 910)
+		{
+			try_on_item(commodity.item_id, commodity.sn, false);
+
+			return;
+		}
+
+		std::vector<Commodity> contents;
+
+		for (nl::node sn : nl::nx::etc["CashPackage.img"][std::to_string(commodity.item_id)]["SN"])
+		{
+			int32_t serial = static_cast<int32_t>(sn.get_integer());
+			auto content = std::find_if(catalog.begin(), catalog.end(), [serial](const Commodity& c) { return c.sn == serial; });
+
+			if (content != catalog.end())
+				contents.push_back(*content);
+		}
+
+		// A package for either gender is its first gendered equip's (4bb716).
+		Commodity gendered = commodity;
+
+		for (const Commodity& content : contents)
+		{
+			if (gendered.gender == 2 && content.item_id / 1000000 == 1 && content.item_id / 1000 % 10 < 2)
+				gendered.gender = static_cast<int8_t>(content.item_id / 1000 % 10);
+		}
+
+		if (!for_gender(gendered, female))
+			return;
+
+		// Each item that goes on marks the package (4bb5ef), so the next
+		// disables Buy Avatar.
+		for (const Commodity& content : contents)
+			if (try_on_item(content.item_id, content.sn, true))
+				package_on = true;
+	}
+
+	bool UICashShop::try_on_item(int32_t item_id, int32_t sn, bool packaged)
+	{
+		if (!fits_mannequin(item_id, female))
+			return false;
+
+		// A cash weapon is worn over the weapon, in the weapon's slot.
+		bool cash_weapon = item_id / 10000 == 170;
+		EquipSlot::Id slot = cash_weapon ? EquipSlot::Id::WEAPON : EquipData::get(item_id).get_eqslot();
+
+		// The slots 4ac676 allows; a mount or saddle only in a package
+		// (4aceb6).
+		bool mount = slot == EquipSlot::Id::TAMEDMOB || slot == EquipSlot::Id::SADDLE;
+
+		if (slot < EquipSlot::Id::HAT || (slot > EquipSlot::Id::RING4 && !mount) || (mount && !packaged))
+			return false;
+
+		// v83 disables Buy Avatar for anything tried on over a package.
+		if (package_on)
+			buttons[Buttons::BT_BUY_AVATAR]->set_state(Button::State::DISABLED);
+
+		// The item already in its slot comes off, unless a package puts it
+		// on.
+		if (slot == EquipSlot::Id::RING1)
+		{
+			for (EquipSlot::Id ring : RINGS)
+			{
+				if (preview_look.get_ring(ring) == item_id && !packaged)
+				{
+					take_off(ring);
+
+					return true;
+				}
+			}
+
+			// The first free ring slot, or the first.
+			for (EquipSlot::Id ring : RINGS)
+			{
+				if (preview_look.get_ring(ring) == 0)
+				{
+					slot = ring;
+					break;
+				}
+			}
+
+			preview_look.set_ring(slot, item_id);
+			tried[slot] = { item_id, sn };
+
+			return true;
+		}
+
+		int32_t worn = cash_weapon ? preview_look.get_cash_weapon() : preview_look.get_equips().get_equip(slot);
+
+		if (worn == item_id && !packaged)
+		{
+			if (cash_weapon)
+				preview_look.set_cash_weapon(0);
+			else
+				preview_look.remove_equip(slot);
+
+			tried.erase(slot);
+
+			return true;
+		}
+
+		if (cash_weapon)
+		{
+			tried[slot] = { item_id, sn };
+			preview_look.set_cash_weapon(item_id);
+
+			return true;
+		}
+
+		// An overall takes the pants off, a coat or pants an overall, a
+		// shield a two-handed weapon, and a weapon the cash weapon.
+		int32_t kind = item_id / 10000;
+
+		if (kind == 105)
+			take_off(EquipSlot::Id::BOTTOM);
+		else if ((kind == 104 || kind == 106) && preview_look.get_equips().has_overall())
+			take_off(EquipSlot::Id::TOP);
+		else if (slot == EquipSlot::Id::SHIELD && preview_look.get_equips().is_twohanded())
+			take_off(EquipSlot::Id::WEAPON);
+		else if (slot == EquipSlot::Id::WEAPON)
+			preview_look.set_cash_weapon(0);
+
+		// After the replacements, which may clear this slot's entry.
+		tried[slot] = { item_id, sn };
+		preview_look.add_equip(item_id);
+
+		// A two-handed weapon takes the shield off.
+		if (slot == EquipSlot::Id::WEAPON && preview_look.get_equips().is_twohanded())
+			take_off(EquipSlot::Id::SHIELD);
+
+		return true;
+	}
+
+	void UICashShop::take_off(int16_t slot)
+	{
+		preview_look.remove_equip(static_cast<EquipSlot::Id>(slot));
+		preview_look.set_ring(slot, 0);
+		tried.erase(slot);
+	}
+
+	void UICashShop::default_avatar()
+	{
+		preview_look = mannequin();
+		tried.clear();
+		package_on = false;
+		buttons[Buttons::BT_BUY_AVATAR]->set_state(Button::State::NORMAL);
+	}
+
+	void UICashShop::take_off_avatar()
+	{
+		for (int16_t slot = EquipSlot::Id::HAT; slot < EquipSlot::Id::LENGTH; slot++)
+			take_off(slot);
+
+		preview_look.set_cash_weapon(0);
+		tried.clear();
+		package_on = false;
+		buttons[Buttons::BT_BUY_AVATAR]->set_state(Button::State::NORMAL);
+	}
+
+	void UICashShop::buy_avatar()
+	{
+		if (pending || buying_avatar())
+			return;
+
+		if (package_on)
+		{
+			UI::get().emplace<UIOk>("The option is not available for that package.", [](bool) {});
+
+			return;
+		}
+
+		// What was tried on, but not what the character wears, a ring in
+		// any of its slots (4ac852).
+		const CharLook& own = Stage::get().get_player().get_look();
+		std::vector<int32_t> sns;
+
+		for (const auto& [slot, item] : tried)
+		{
+			bool worn = false;
+
+			if (slot == EquipSlot::Id::WEAPON && item.item_id / 10000 == 170)
+				worn = own.get_cash_weapon() == item.item_id;
+			else if (std::find(std::begin(RINGS), std::end(RINGS), slot) != std::end(RINGS))
+				worn = std::any_of(std::begin(RINGS), std::end(RINGS), [&](EquipSlot::Id ring) { return own.get_ring(ring) == item.item_id; });
+			else
+				worn = own.get_equips().get_equip(static_cast<EquipSlot::Id>(slot)) == item.item_id;
+
+			if (item.sn != 0 && !worn)
+				sns.push_back(item.sn);
+		}
+
+		if (sns.empty())
+			return;
+
+		// The first item the character has: a free one can't be bought
+		// again (0xb94), another asks first (0x1f2), and v83 checks the rest
+		// no more, nor whether they're free.
+		int32_t total = 0;
+		bool any_free = false;
+		bool asked = false;
+
+		for (int32_t sn : sns)
+		{
+			auto commodity = std::find_if(catalog.begin(), catalog.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+			if (commodity == catalog.end())
+				continue;
+
+			total += commodity->price;
+
+			if (asked)
+				continue;
+
+			any_free = any_free || commodity->price == 0;
+
+			if (!owns(commodity->item_id, true))
+				continue;
+
+			if (commodity->price == 0)
+			{
+				UI::get().emplace<UIOk>("You may not purchase the item\\nsince you already have it.", [](bool) {});
+
+				return;
+			}
+
+			asked = true;
+		}
+
+		std::array<bool, NUM_PAYMENTS> offered = avatar_payment_options(total, any_free, credit, points, prepaid);
+
+		auto confirm = [sns, total, offered]()
+		{
+			if (std::none_of(offered.begin(), offered.end(), [](bool option) { return option; }))
+				UI::get().emplace<UIOk>("You don't have enough cash.", [](bool) {});
+			else
+				UI::get().emplace<UICashBuy>(sns, total, offered);
+		};
+
+		if (asked)
+			UI::get().emplace<UIYesNo>("You already have the item(s) selected. Are\\nyou sure you want to buy the item(s) again?", [confirm](bool yes) { if (yes) confirm(); });
+		else
+			confirm();
+	}
+
+	void UICashShop::buy_avatar(const std::vector<int32_t>& sns, int32_t payment)
+	{
+		if (pending || buying_avatar() || sns.empty())
+			return;
+
+		avatar_sns = sns;
+		avatar_bought.clear();
+		avatar_left = sns.size();
+		avatar_payment = payment;
+
+		buy_next_avatar_item();
+	}
+
+	void UICashShop::stop_buying_avatar()
+	{
+		avatar_sns.clear();
+		avatar_bought.clear();
+		avatar_left = 0;
+		avatar_payment = 0;
+	}
+
+	void UICashShop::buy_next_avatar_item()
+	{
+		if (avatar_left > 0)
+		{
+			avatar_left--;
+			pending = true;
+			BuyCashItemPacket(avatar_payment, avatar_sns[avatar_left]).dispatch();
+
+			return;
+		}
+
+		// StringPool 0x211, 0x1fd, or the items bought and 0x1fe.
+		std::string notice;
+
+		if (avatar_bought.size() == avatar_sns.size())
+		{
+			notice = "You have successfully made the purchase.";
+		}
+		else if (avatar_bought.empty())
+		{
+			notice = "The purchase has failed.";
+		}
+		else
+		{
+			for (size_t index : avatar_bought)
+			{
+				int32_t sn = avatar_sns[index];
+				auto commodity = std::find_if(catalog.begin(), catalog.end(), [sn](const Commodity& c) { return c.sn == sn; });
+
+				if (commodity != catalog.end())
+					notice += ItemData::get(commodity->item_id).get_name();
+
+				notice += "\\n";
+			}
+
+			notice += "\\nYou have purchased the following items.\\n(Some items weren't purchased)";
+		}
+
+		stop_buying_avatar();
+
+		UI::get().emplace<UIOk>(notice, [](bool) {});
 	}
 
 	void UICashShop::confirm_exit()

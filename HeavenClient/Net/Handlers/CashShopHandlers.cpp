@@ -122,6 +122,11 @@ namespace ms
 		{
 			cashshop->answered();
 			cashshop->set_balance(credit, points, prepaid);
+
+			// The balance after a Buy Avatar purchase sends the next (v83
+			// 479000).
+			if (cashshop->buying_avatar())
+				cashshop->buy_next_avatar_item();
 		}
 	}
 
@@ -282,10 +287,37 @@ namespace ms
 		case 0x57:
 		case 0x9E:
 			// A purchase, or Name Change's receipt (v83 47bccb), is in the
-			// Cash Inventory; the balance follows.
+			// Cash Inventory; the balance follows. Buy Avatar's purchases are
+			// summed up at the end (v83 4798c6).
 			cashshop->add_cash_items({ read_cash_item(recv) });
-			UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
+
+			if (mode == 0x57 && cashshop->buying_avatar())
+				cashshop->avatar_item_bought();
+			else
+				UI::get().emplace<UIOk>("You have successfully made the purchase.", [](bool) {}, Sound::Name::BUYSHOPITEM);
+
 			break;
+		case 0x58:
+		{
+			// A purchase failed (v83 479985). Sold out names the commodity,
+			// whose stock v83 marks. Buy Avatar goes on to its next item.
+			uint8_t code = static_cast<uint8_t>(recv.read_byte());
+
+			if (code == 0xBF || code == 0xC0)
+				recv.skip_int();
+
+			if (cashshop->buying_avatar() && code != 0xA2 && code != 0xA3 && code != 0xA4)
+			{
+				cashshop->buy_next_avatar_item();
+			}
+			else
+			{
+				cashshop->stop_buying_avatar();
+				UI::get().emplace<UIOk>(failure_message(code), [](bool) {});
+			}
+
+			break;
+		}
 		case 0x8D:
 		{
 			// Items bought with mesos are in the inventory already, and the
@@ -466,6 +498,8 @@ namespace ms
 				break;
 			}
 
+			// Buy Avatar stops here too.
+			cashshop->stop_buying_avatar();
 			UI::get().emplace<UIOk>(failure_message(code), [](bool) {});
 			break;
 		}

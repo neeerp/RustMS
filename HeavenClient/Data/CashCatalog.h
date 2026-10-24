@@ -315,6 +315,33 @@ namespace ms
 			return { points >= price, prepaid >= price, credit >= price };
 		}
 
+		// The options Buy Avatar's dialog offers for its total (v83 4696b1):
+		// each balance that covers it, but not NX Credit when any of the
+		// items is free.
+		inline std::array<bool, NUM_PAYMENTS> avatar_payment_options(int32_t total, bool any_free, int32_t credit, int32_t points, int32_t prepaid)
+		{
+			return { total <= points, total <= prepaid, !any_free && total <= credit };
+		}
+
+		// StringPool 0x1fb then 0x1fc, as v83 joins them.
+		inline std::string avatar_question(int32_t total)
+		{
+			return "Total " + std::to_string(total) + " NX.Make purchase?";
+		}
+
+		// Whether the mannequin tries the item on (v83 4ac3de, 460adc and
+		// 4606a0): an equip, not 16xxxxx, unless its id's thousands digit
+		// is the other gender's (0 male, 1 female; any other is for both).
+		inline bool fits_mannequin(int32_t item_id, bool female)
+		{
+			if (item_id / 1000000 != 1 || item_id / 100000 == 16)
+				return false;
+
+			int32_t gender = item_id / 1000 % 10;
+
+			return gender > 1 || gender == (female ? 1 : 0);
+		}
+
 		// The option checked when the BUY dialog opens: NX Prepaid, as in
 		// period footage, unless only another offered balance pays.
 		inline size_t default_payment(const std::array<bool, NUM_PAYMENTS>& offered)

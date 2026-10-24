@@ -102,7 +102,7 @@ async fn nx_buys_character_slots_up_to_fifteen() {
     // Not as an item for the Cash Inventory.
     let buy = build_cash_shop_buy(1, CHARACTER_SLOT).unwrap();
     let failed = request(connection, buy, "buy the coupon as an item").await;
-    assert_eq!(failed, [0x5C, 0x00]);
+    assert_eq!(failed, [0x58, 0x00]);
     drop(session);
 
     // The slot stays; at 15, a purchase fails and costs nothing.

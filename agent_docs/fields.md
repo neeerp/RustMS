@@ -140,8 +140,10 @@ for the character's gender. Cash items that don't work here yet count as sold
 out, alone or in a package: Character Transfer, Maple Life and Remote Gachapon
 (`INERT_CLASSES`). `db::cash_shop::buy` then takes the price from the
 chosen balance and adds the item to the Cash Inventory in one transaction. The
-client gets the item (0x57) and its new balance, or a failure code (0x5C): 0xA5
-not enough cash, 0xAA gender, 0xC0 sold out, 0x00 anything else. The wish list
+client gets the item (0x57) and its new balance, or a failed purchase (0x58,
+which v83's Buy Avatar goes on after) with its code: 0xA5 not enough cash, 0xAA
+gender, 0xC0 sold out (followed by the SN), 0x00 anything else. Other requests
+fail with 0x5C. The wish list
 keeps up to ten commodities that are on sale and answers with 0x55. Balances
 are only granted through SQL for now.
 

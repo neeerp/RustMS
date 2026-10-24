@@ -73,6 +73,20 @@ async fn failure(connection: &mut MapleTestConnection, phase: &'static str) -> u
     reply.packet.bytes[3]
 }
 
+/// The code of a failed buy (0x58), which a sold-out answer follows with the
+/// commodity's SN.
+async fn buy_failure(connection: &mut MapleTestConnection, phase: &'static str, sn: i32) -> u8 {
+    let reply = read_until(connection, phase, SendOpcode::CashShopOperation).await;
+    let bytes = &reply.packet.bytes[2..];
+    assert_eq!(bytes[0], 0x58, "{phase}: expected a failed buy");
+    if bytes[1] == 0xC0 {
+        assert_eq!(&bytes[2..], &sn.to_le_bytes(), "{phase}: the SN");
+    } else {
+        assert_eq!(bytes.len(), 2, "{phase}");
+    }
+    bytes[1]
+}
+
 #[tokio::test]
 async fn purchases_need_cash_and_the_wish_list_is_kept() {
     let config = load_harness_config_or_fail().await;
@@ -88,7 +102,7 @@ async fn purchases_need_cash_and_the_wish_list_is_kept() {
         .await
         .expect("send purchase");
     assert_eq!(
-        failure(&mut session.connection, "buy without NX").await,
+        buy_failure(&mut session.connection, "buy without NX", TICKET).await,
         0xA5
     );
 
@@ -98,7 +112,7 @@ async fn purchases_need_cash_and_the_wish_list_is_kept() {
         .await
         .expect("send purchase");
     assert_eq!(
-        failure(&mut session.connection, "buy a retired item").await,
+        buy_failure(&mut session.connection, "buy a retired item", RETIRED_HAT).await,
         0xC0
     );
 
@@ -260,7 +274,10 @@ async fn wedding_tickets_are_on_sale() {
         .send_packet(buy, "buy")
         .await
         .expect("send purchase");
-    assert_eq!(failure(connection, "buy an old ticket").await, 0xC0);
+    assert_eq!(
+        buy_failure(connection, "buy an old ticket", OLD_CATHEDRAL_TICKET).await,
+        0xC0
+    );
 
     let buy = build_cash_shop_buy(1, CATHEDRAL_TICKET).unwrap();
     let bought = request(connection, buy, "buy a ticket").await;
@@ -418,7 +435,10 @@ async fn quest_items_are_bought_with_mesos() {
     assert_eq!(failure(connection, "buy one off sale").await, 0xC0);
     let buy = build_cash_shop_buy(1, GOLDEN_BELL).unwrap();
     connection.send_packet(buy, "buy").await.expect("send buy");
-    assert_eq!(failure(connection, "buy with NX").await, 0x00);
+    assert_eq!(
+        buy_failure(connection, "buy with NX", GOLDEN_BELL).await,
+        0x00
+    );
     drop(session);
 
     tokio::time::sleep(Duration::from_millis(500)).await;
