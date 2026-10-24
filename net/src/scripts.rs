@@ -578,6 +578,12 @@ pub enum Effect {
     /// Record the Dojo's rest floor `stage` for the player to start after
     /// next time (So Gong), or erase the record with 0.
     DojoStage(u8),
+    /// Set the Dojo medal the player tries for (from 1; 0 for none) and the
+    /// times its boss has been beaten toward it.
+    DojoMedal {
+        stage: i32,
+        kills: i32,
+    },
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
@@ -1954,15 +1960,25 @@ pub const DOJO_NEXT: &str = "dojang_next";
 /// What the way on from the Dojo's `floor`, once cleared, does for a
 /// challenger with `record`: the floor's training points and a pink line
 /// of them, then the next floor; from the last, the rooftop and 2,000 EXP
-/// for each point held (Cosmic `dojang_next`).
+/// for each point held (Cosmic `dojang_next`). Going on from the boss of
+/// the medal tried for counts one more win toward it (Cosmic `dojang_up`,
+/// whose door counts it).
 pub fn dojo_next(floor: u8, record: &game::DojoRecord) -> Vec<Effect> {
-    use crate::events::{DOJO, DOJO_FLOORS, DOJO_ROOFTOP};
+    use crate::events::{dojo_round, DOJO, DOJO_FLOORS, DOJO_ROOFTOP};
+    let win =
+        (i32::from(dojo_round(floor)) == record.vanquisher_stage).then(|| Effect::DojoMedal {
+            stage: record.vanquisher_stage,
+            kills: record.vanquisher_kills + 1,
+        });
     if floor >= DOJO_FLOORS {
-        return vec![
-            Effect::PortalSound,
-            Effect::WarpToPortal(DOJO_ROOFTOP, 0),
-            Effect::GainExp(record.points.saturating_mul(2000)),
-        ];
+        return win
+            .into_iter()
+            .chain([
+                Effect::PortalSound,
+                Effect::WarpToPortal(DOJO_ROOFTOP, 0),
+                Effect::GainExp(record.points.saturating_mul(2000)),
+            ])
+            .collect();
     }
     let points = record.floor_points(floor);
     let (earned, total) = (points.to_string(), (record.points + points).to_string());
@@ -1970,12 +1986,14 @@ pub fn dojo_next(floor: u8, record: &game::DojoRecord) -> Vec<Effect> {
         keys::DOJO_POINTS,
         &[("points", earned.as_str()), ("total", total.as_str())],
     );
-    vec![
-        Effect::DojoPoints(points),
-        Effect::Pink(line),
-        Effect::PortalSound,
-        Effect::WarpToPortal(DOJO.stage_map(floor + 1), 0),
-    ]
+    win.into_iter()
+        .chain([
+            Effect::DojoPoints(points),
+            Effect::Pink(line),
+            Effect::PortalSound,
+            Effect::WarpToPortal(DOJO.stage_map(floor + 1), 0),
+        ])
+        .collect()
 }
 
 /// The way to Papulatus, for a player whose party stands as `entry`: the
@@ -3654,6 +3672,19 @@ mod tests {
                 Effect::GainExp(80_000)
             ]
         );
+        // Going on from the medal's boss, round 5 on floor 5, wins toward it.
+        let trying = game::DojoRecord {
+            vanquisher_stage: 5,
+            vanquisher_kills: 9,
+            ..record
+        };
+        let win = Effect::DojoMedal {
+            stage: 5,
+            kills: 10,
+        };
+        assert_eq!(dojo_next(5, &trying)[0], win);
+        assert_eq!(dojo_next(4, &trying), on(2, 42, DOJO_FIRST + 400));
+        assert!(!dojo_next(7, &trying).contains(&win));
 
         // Out to where the board was touched, or to the board.
         let out = |to| {

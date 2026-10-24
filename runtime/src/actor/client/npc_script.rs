@@ -137,11 +137,21 @@ impl ClientActor {
                     changed = true;
                 }
                 Effect::DojoPoints(points) => {
-                    next.dojo.points += points;
+                    let Some(total) = next.dojo.points.checked_add(*points).filter(|t| *t >= 0)
+                    else {
+                        warn!(points, "Dojo points no longer held; nothing applied");
+                        return Ok(Applied::Refused);
+                    };
+                    next.dojo.points = total;
                     changed = true;
                 }
                 Effect::DojoStage(stage) => {
                     next.dojo.stage = *stage;
+                    changed = true;
+                }
+                Effect::DojoMedal { stage, kills } => {
+                    next.dojo.vanquisher_stage = *stage;
+                    next.dojo.vanquisher_kills = *kills;
                     changed = true;
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),

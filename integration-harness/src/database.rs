@@ -194,6 +194,21 @@ pub async fn set_job(character_id: i32, job: i16, level: i16, mp: i16) -> Result
     .await
 }
 
+/// Give the logged-out character `character_id` `points` Mu Lung Dojo
+/// training points.
+pub async fn set_dojo_points(character_id: i32, points: i32) -> Result<(), HarnessError> {
+    change_one_row("set Dojo points", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO dojo_records (character_id, points) VALUES ($1, $2) \
+             ON CONFLICT (character_id) DO UPDATE SET points = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(points)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Put the pet `item_id` named `name`, with cash serial `serial`, in slot
 /// `slot` of the logged-out character `character_id`'s Cash inventory.
 pub async fn grant_pet(

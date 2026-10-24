@@ -1866,6 +1866,29 @@ pub mod keys {
     pub const DOJO_SO_GONG_RECORDED: &str = "dojo.so_gong.recorded";
     pub const DOJO_SO_GONG_RECORD_KEPT: &str = "dojo.so_gong.record_kept";
     pub const DOJO_SO_GONG_RESUME: &str = "dojo.so_gong.resume";
+    pub const DOJO_SO_GONG_BELT: &str = "dojo.so_gong.belt";
+    pub const DOJO_SO_GONG_RESET: &str = "dojo.so_gong.reset";
+    pub const DOJO_SO_GONG_MEDAL: &str = "dojo.so_gong.medal";
+    pub const DOJO_SO_GONG_ROOM: &str = "dojo.so_gong.room";
+    pub const DOJO_SO_GONG_RESET_ASK: &str = "dojo.so_gong.reset_ask";
+    pub const DOJO_SO_GONG_RESET_DONE: &str = "dojo.so_gong.reset_done";
+    pub const DOJO_SO_GONG_RESET_NO: &str = "dojo.so_gong.reset_no";
+    pub const DOJO_SO_GONG_BELTS: &str = "dojo.so_gong.belts";
+    pub const DOJO_SO_GONG_BELT_CHOICE: &str = "dojo.so_gong.belt_choice";
+    pub const DOJO_SO_GONG_BELT_HELD: &str = "dojo.so_gong.belt_held";
+    pub const DOJO_SO_GONG_BELT_GIVEN: &str = "dojo.so_gong.belt_given";
+    pub const DOJO_SO_GONG_BELT_NEEDS: &str = "dojo.so_gong.belt_needs";
+    pub const DOJO_SO_GONG_BELT_BEFORE: &str = "dojo.so_gong.belt_before";
+    pub const DOJO_SO_GONG_BELT_LACKING: &str = "dojo.so_gong.belt_lacking";
+    pub const DOJO_SO_GONG_BELT_LACKS_BELT: &str = "dojo.so_gong.belt_lacks_belt";
+    pub const DOJO_SO_GONG_BELT_LACKS_POINTS: &str = "dojo.so_gong.belt_lacks_points";
+    pub const DOJO_SO_GONG_BELT_AND: &str = "dojo.so_gong.belt_and";
+    pub const DOJO_SO_GONG_MEDAL_TRY: &str = "dojo.so_gong.medal_try";
+    pub const DOJO_SO_GONG_MEDAL_NO: &str = "dojo.so_gong.medal_no";
+    pub const DOJO_SO_GONG_MEDAL_ALL: &str = "dojo.so_gong.medal_all";
+    pub const DOJO_SO_GONG_MEDAL_MORE: &str = "dojo.so_gong.medal_more";
+    pub const DOJO_SO_GONG_MEDAL_GIVEN: &str = "dojo.so_gong.medal_given";
+    pub const DOJO_SO_GONG_MEDAL_ROOM: &str = "dojo.so_gong.medal_room";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2899,6 +2922,29 @@ mod tests {
                 keys::DOJO_SO_GONG_RECORDED,
                 keys::DOJO_SO_GONG_RECORD_KEPT,
                 keys::DOJO_SO_GONG_RESUME,
+                keys::DOJO_SO_GONG_BELT,
+                keys::DOJO_SO_GONG_RESET,
+                keys::DOJO_SO_GONG_MEDAL,
+                keys::DOJO_SO_GONG_ROOM,
+                keys::DOJO_SO_GONG_RESET_ASK,
+                keys::DOJO_SO_GONG_RESET_DONE,
+                keys::DOJO_SO_GONG_RESET_NO,
+                keys::DOJO_SO_GONG_BELTS,
+                keys::DOJO_SO_GONG_BELT_CHOICE,
+                keys::DOJO_SO_GONG_BELT_HELD,
+                keys::DOJO_SO_GONG_BELT_GIVEN,
+                keys::DOJO_SO_GONG_BELT_NEEDS,
+                keys::DOJO_SO_GONG_BELT_BEFORE,
+                keys::DOJO_SO_GONG_BELT_LACKING,
+                keys::DOJO_SO_GONG_BELT_LACKS_BELT,
+                keys::DOJO_SO_GONG_BELT_LACKS_POINTS,
+                keys::DOJO_SO_GONG_BELT_AND,
+                keys::DOJO_SO_GONG_MEDAL_TRY,
+                keys::DOJO_SO_GONG_MEDAL_NO,
+                keys::DOJO_SO_GONG_MEDAL_ALL,
+                keys::DOJO_SO_GONG_MEDAL_MORE,
+                keys::DOJO_SO_GONG_MEDAL_GIVEN,
+                keys::DOJO_SO_GONG_MEDAL_ROOM,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

@@ -7004,8 +7004,9 @@ fn guon(entry: Entry) -> NpcScript {
 }
 
 /// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
-/// or more may take it on alone, and anyone may hear what it is. Its party
-/// Dojo, belts, points and medals are yet to come (`agent_docs/dojo.md`).
+/// or more may take it on alone, buy a belt, reset their training points
+/// or try for a medal, and anyone may hear what it is. Its party Dojo is
+/// yet to come (`agent_docs/dojo.md`).
 fn so_gong(entry: Entry, player: &Player) -> NpcScript {
     if player.stats.level < *events::DOJO.levels.start() {
         return NpcScript::new(SO_GONG, vec![Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL))]);
@@ -7025,12 +7026,24 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
         Entry::Busy => Page::Say(text(keys::DOJO_SO_GONG_BUSY)),
         _ => Page::Say(text(keys::DOJO_SO_GONG_LOW_LEVEL)),
     };
+    let points = player.dojo.points;
+    let reset = Page::Decide {
+        text: text(keys::DOJO_SO_GONG_RESET_ASK),
+        on_yes: vec![Page::Act {
+            text: text(keys::DOJO_SO_GONG_RESET_DONE),
+            effects: vec![Effect::DojoPoints(-points)],
+        }],
+        on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_RESET_NO))],
+    };
     let mut script = NpcScript::new(
         SO_GONG,
         vec![Page::Menu {
             text: text(keys::DOJO_SO_GONG_MENU),
             choices: vec![
                 (text(keys::DOJO_SO_GONG_ALONE), vec![alone]),
+                (text(keys::DOJO_SO_GONG_BELT), vec![so_gong_belts(player)]),
+                (text(keys::DOJO_SO_GONG_RESET), vec![reset]),
+                (text(keys::DOJO_SO_GONG_MEDAL), vec![so_gong_medal(player)]),
                 (
                     text(keys::DOJO_SO_GONG_ABOUT),
                     vec![Page::Say(text(keys::DOJO_SO_GONG_INFO))],
@@ -7040,7 +7053,144 @@ fn so_gong(entry: Entry, player: &Player) -> NpcScript {
     );
     // Every Dojo filled since So Gong checked.
     script.refused = Some(text(keys::DOJO_SO_GONG_BUSY));
+    script.inventory_full = Some(text(keys::DOJO_SO_GONG_ROOM));
     script
+}
+
+/// So Gong's belts (Cosmic `2091005`), for `player`, who needs room in
+/// their EQUIP inventory to be shown them. Each is for a challenger over
+/// its level with its price in training points, who hands in the belt
+/// before it, unequipped; otherwise he says what it takes.
+fn so_gong_belts(player: &Player) -> Page {
+    use game::dojo::{BELTS, BELT_LEVELS, BELT_PRICES};
+    if player.inventory.free(InventoryType::Equip) == 0 {
+        return Page::Say(text(keys::DOJO_SO_GONG_ROOM));
+    }
+    let item = |key, id: i32| content::text().get(key, &[("belt", &id.to_string())]);
+    let in_bag = |id| player.inventory.count(id) > 0;
+    let owns = |id| in_bag(id) || player.inventory.equipped_ids().any(|(_, held)| held == id);
+    let points = player.dojo.points;
+    let choices = (0..BELTS.len())
+        .map(|i| {
+            let belt = BELTS[i];
+            let label = item(
+                if owns(belt) {
+                    keys::DOJO_SO_GONG_BELT_HELD
+                } else {
+                    keys::DOJO_SO_GONG_BELT_CHOICE
+                },
+                belt,
+            );
+            let before = i.checked_sub(1).map(|j| BELTS[j]);
+            let (level, price) = (BELT_LEVELS[i], BELT_PRICES[i]);
+            let handed = before.is_none_or(in_bag);
+            let page = if before.is_none_or(owns)
+                && handed
+                && points >= price
+                && player.stats.level > level
+            {
+                let mut effects: Vec<_> = before
+                    .map(|item_id| Effect::TakeItem {
+                        item_id,
+                        quantity: 1,
+                    })
+                    .into_iter()
+                    .collect();
+                effects.extend([
+                    Effect::GiveItem {
+                        item_id: belt,
+                        quantity: 1,
+                    },
+                    Effect::DojoPoints(-price),
+                ]);
+                Page::Act {
+                    text: item(keys::DOJO_SO_GONG_BELT_GIVEN, belt),
+                    effects,
+                }
+            } else {
+                let mut lacking = Vec::new();
+                if !handed {
+                    lacking.push(text(keys::DOJO_SO_GONG_BELT_LACKS_BELT));
+                }
+                if price > points {
+                    let more = (price - points).to_string();
+                    lacking.push(
+                        content::text()
+                            .get(keys::DOJO_SO_GONG_BELT_LACKS_POINTS, &[("points", &more)]),
+                    );
+                }
+                let lacking = match lacking.join(&text(keys::DOJO_SO_GONG_BELT_AND)) {
+                    lacking if lacking.is_empty() => lacking,
+                    lacking => content::text()
+                        .get(keys::DOJO_SO_GONG_BELT_LACKING, &[("lacking", &lacking)]),
+                };
+                let before =
+                    before.map_or(String::new(), |id| item(keys::DOJO_SO_GONG_BELT_BEFORE, id));
+                let (belt, level, price) = (belt.to_string(), level.to_string(), price.to_string());
+                Page::Say(content::text().get(
+                    keys::DOJO_SO_GONG_BELT_NEEDS,
+                    &[
+                        ("belt", &belt),
+                        ("before", &before),
+                        ("level", &level),
+                        ("points", &price),
+                        ("lacking", &lacking),
+                    ],
+                ))
+            };
+            (label, vec![page])
+        })
+        .collect();
+    let points = points.to_string();
+    Page::Menu {
+        text: content::text().get(keys::DOJO_SO_GONG_BELTS, &[("points", &points)]),
+        choices,
+    }
+}
+
+/// So Gong's medals (Cosmic `2091005`), for `player`. Medal `n` is for
+/// beating round `n`'s boss 100 times and going on from its floor
+/// (`scripts::dojo_next`); he takes a first try-out, then hands each over
+/// once won and sets the next.
+fn so_gong_medal(player: &Player) -> Page {
+    use game::dojo::{medal, MEDAL_KILLS, ROUNDS};
+    let (stage, kills) = (player.dojo.vanquisher_stage, player.dojo.vanquisher_kills);
+    let named = |key, extra: &[(&str, &str)]| {
+        let medal = medal(stage.max(1)).to_string();
+        let mut params = vec![("medal", medal.as_str())];
+        params.extend_from_slice(extra);
+        content::text().get(key, &params)
+    };
+    if stage <= 0 {
+        return Page::Decide {
+            text: named(keys::DOJO_SO_GONG_MEDAL_TRY, &[]),
+            on_yes: vec![Page::Done(vec![Effect::DojoMedal { stage: 1, kills: 0 }])],
+            on_no: vec![Page::Say(text(keys::DOJO_SO_GONG_MEDAL_NO))],
+        };
+    }
+    if stage > ROUNDS {
+        return Page::Say(text(keys::DOJO_SO_GONG_MEDAL_ALL));
+    }
+    if kills < MEDAL_KILLS {
+        let left = (MEDAL_KILLS - kills).to_string();
+        return Page::Say(named(keys::DOJO_SO_GONG_MEDAL_MORE, &[("kills", &left)]));
+    }
+    if player.inventory.free(InventoryType::Equip) == 0 {
+        return Page::Say(text(keys::DOJO_SO_GONG_MEDAL_ROOM));
+    }
+    Page::Act {
+        text: named(keys::DOJO_SO_GONG_MEDAL_GIVEN, &[]),
+        effects: vec![
+            Effect::GiveItem {
+                item_id: medal(stage),
+                quantity: 1,
+            },
+            Effect::DojoMedal {
+                stage: stage + 1,
+                kills: 0,
+            },
+        ],
+    }
 }
 
 /// So Gong (Cosmic `2091005`) to `player` on a Dojo floor. On a rest floor
@@ -13524,7 +13674,7 @@ mod tests {
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_BUSY));
         let mut about = NpcScript::so_gong(Entry::Ready, &at(25));
         about.begin();
-        let step = about.respond(ScriptInput::Select(1)).unwrap();
+        let step = about.respond(ScriptInput::Select(4)).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_INFO));
 
         // On a fighting floor he lets them give up.
@@ -13607,6 +13757,147 @@ mod tests {
         let step = erase.respond(ScriptInput::No).unwrap();
         assert_eq!(step.effects, [Effect::DojoStage(0)]);
         assert!(step.prompt.is_none());
+    }
+
+    #[test]
+    fn so_gong_sells_belts_for_training_points_resets_them_and_hands_out_medals() {
+        use game::dojo::{BELTS, MEDAL_KILLS};
+        let mut challenger = player(50);
+        challenger.stats.level = 40;
+        challenger.dojo.points = 2_500;
+        let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
+        let choose = |player: &Player, choice: i32, belt: i32| {
+            let mut gong = NpcScript::so_gong(Entry::Ready, player);
+            gong.begin();
+            gong.respond(ScriptInput::Select(choice)).unwrap();
+            gong.respond(ScriptInput::Select(belt)).unwrap()
+        };
+        let give = |item_id| Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        };
+        let take = |item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        };
+        let mut gong = NpcScript::so_gong(Entry::Ready, &challenger);
+        gong.begin();
+        let menu = gong.respond(ScriptInput::Select(1)).unwrap();
+        let Some(Prompt::Selection { text: menu, .. }) = menu.prompt else {
+            panic!("belts expected, got {menu:?}");
+        };
+        let points = content::text().get(keys::DOJO_SO_GONG_BELTS, &[("points", "2500")]);
+        assert!(menu.starts_with(&points), "{menu}");
+        let white = choose(&challenger, 1, 0);
+        assert_eq!(white.effects, [give(BELTS[0]), Effect::DojoPoints(-200)]);
+
+        // The yellow belt takes the white one, unequipped.
+        let needs = |lacking: &str| {
+            let (belt, before) = (BELTS[1].to_string(), BELTS[0].to_string());
+            let before = content::text().get(keys::DOJO_SO_GONG_BELT_BEFORE, &[("belt", &before)]);
+            content::text().get(
+                keys::DOJO_SO_GONG_BELT_NEEDS,
+                &[
+                    ("belt", &belt),
+                    ("before", &before),
+                    ("level", "35"),
+                    ("points", "1800"),
+                    ("lacking", lacking),
+                ],
+            )
+        };
+        let lacks = content::text().get(
+            keys::DOJO_SO_GONG_BELT_LACKING,
+            &[("lacking", &text(keys::DOJO_SO_GONG_BELT_LACKS_BELT))],
+        );
+        assert_eq!(page_text(&choose(&challenger, 1, 1)), needs(&lacks));
+        let mut wearing = challenger.clone();
+        wearing
+            .inventory
+            .insert(InventoryType::Equipped, -50, equip(BELTS[0]));
+        assert_eq!(page_text(&choose(&wearing, 1, 1)), needs(&lacks));
+        challenger
+            .inventory
+            .insert(InventoryType::Equip, 1, equip(BELTS[0]));
+        let yellow = choose(&challenger, 1, 1);
+        assert_eq!(
+            page_text(&yellow),
+            content::text().get(keys::DOJO_SO_GONG_BELT_GIVEN, &[("belt", "1132001")])
+        );
+        assert_eq!(
+            yellow.effects,
+            [take(BELTS[0]), give(BELTS[1]), Effect::DojoPoints(-1800)]
+        );
+        challenger.stats.level = 35;
+        assert_eq!(page_text(&choose(&challenger, 1, 1)), needs(""));
+
+        // A full EQUIP inventory shows no belts.
+        let mut full = challenger.clone();
+        let room = full.inventory.free(InventoryType::Equip);
+        for slot in 2..=(room as i16 + 1) {
+            full.inventory
+                .insert(InventoryType::Equip, slot, equip(1_002_000));
+        }
+        let mut gong = NpcScript::so_gong(Entry::Ready, &full);
+        gong.begin();
+        let step = gong.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_ROOM));
+
+        // The points can be reset.
+        let mut reset = NpcScript::so_gong(Entry::Ready, &challenger);
+        reset.begin();
+        let step = reset.respond(ScriptInput::Select(2)).unwrap();
+        assert_eq!(question(&step), text(keys::DOJO_SO_GONG_RESET_ASK));
+        let step = reset.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(page_text(&step), text(keys::DOJO_SO_GONG_RESET_DONE));
+        assert_eq!(step.effects, [Effect::DojoPoints(-2_500)]);
+
+        // A first medal is tried for, then handed over after 100 wins.
+        let medal = |player: &Player| {
+            let mut gong = NpcScript::so_gong(Entry::Ready, player);
+            gong.begin();
+            gong.respond(ScriptInput::Select(3)).unwrap()
+        };
+        let mano = [("medal", "1142033")];
+        let step = medal(&challenger);
+        assert_eq!(
+            question(&step),
+            content::text().get(keys::DOJO_SO_GONG_MEDAL_TRY, &mano)
+        );
+        let mut gong = NpcScript::so_gong(Entry::Ready, &challenger);
+        gong.begin();
+        gong.respond(ScriptInput::Select(3)).unwrap();
+        let step = gong.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::DojoMedal { stage: 1, kills: 0 }]);
+        challenger.dojo.vanquisher_stage = 1;
+        challenger.dojo.vanquisher_kills = MEDAL_KILLS - 1;
+        assert_eq!(
+            page_text(&medal(&challenger)),
+            content::text().get(
+                keys::DOJO_SO_GONG_MEDAL_MORE,
+                &[("medal", "1142033"), ("kills", "1")]
+            )
+        );
+        challenger.dojo.vanquisher_kills = MEDAL_KILLS;
+        full.dojo = challenger.dojo;
+        assert_eq!(
+            page_text(&medal(&full)),
+            text(keys::DOJO_SO_GONG_MEDAL_ROOM)
+        );
+        let step = medal(&challenger);
+        assert_eq!(
+            page_text(&step),
+            content::text().get(keys::DOJO_SO_GONG_MEDAL_GIVEN, &mano)
+        );
+        assert_eq!(
+            step.effects,
+            [give(1142033), Effect::DojoMedal { stage: 2, kills: 0 }]
+        );
+        challenger.dojo.vanquisher_stage = game::dojo::ROUNDS + 1;
+        assert_eq!(
+            page_text(&medal(&challenger)),
+            text(keys::DOJO_SO_GONG_MEDAL_ALL)
+        );
     }
 
     #[test]
