@@ -449,9 +449,10 @@ impl ClientActor {
     }
 
     /// What the Forest of Poison Haze's way on does for a member there
-    /// (`scripts::ellin_way_on`), and the ways out of its maze's rooms
-    /// (`scripts::ellin_maze_way`), which lead to its end one time in ten.
-    /// `None` for any other portal.
+    /// (`scripts::ellin_way_on`), the ways out of its maze's rooms
+    /// (`scripts::ellin_maze_way`), which lead to its end one time in ten,
+    /// and the way out of its last stage (`scripts::ellin_way_out`). `None`
+    /// for any other portal.
     pub(super) fn ellin_portal(&self, script: &str) -> Result<Option<Vec<Effect>>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let ticket = self
@@ -467,6 +468,9 @@ impl ClientActor {
             Some(_) if map_id == events::ELLIN_STAGES[2] => {
                 let lucky = rand::thread_rng().gen_bool(0.1);
                 Ok(scripts::ellin_maze_way(script, lucky))
+            }
+            Some(ticket) if script == scripts::ELLIN_OUT => {
+                Ok(Some(scripts::ellin_way_out(ticket.won(), ticket.leader())))
             }
             _ => Ok(None),
         }

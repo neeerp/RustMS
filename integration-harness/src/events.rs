@@ -133,6 +133,11 @@ pub async fn armed_in(lobby: i32, level: i16) -> WorldSession {
     waiting_with(lobby, level, 0, &[], true).await
 }
 
+/// `armed_in`, holding `items` as `waiting_in` does.
+pub async fn armed_with(lobby: i32, level: i16, items: &[(i32, i16)]) -> WorldSession {
+    waiting_with(lobby, level, 0, items, true).await
+}
+
 async fn waiting_with(
     lobby: i32,
     level: i16,

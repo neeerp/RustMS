@@ -1788,6 +1788,11 @@ pub mod keys {
     pub const ELLIN_GUIDE_HAND_IN: &str = "ellin.guide.hand_in";
     pub const ELLIN_GUIDE_TO_LEADER: &str = "ellin.guide.to_leader";
     pub const ELLIN_MILEPOST_LEAVE: &str = "ellin.milepost.leave";
+    pub const ELLIN_SPRITE_TO_ALTAR: &str = "ellin.sprite.to_altar";
+    pub const ELLIN_SPRITE_LEAVE: &str = "ellin.sprite.leave";
+    pub const ELLIN_ALTAR_GOLEM: &str = "ellin.altar.golem";
+    pub const ELLIN_STAGE6_SHUT: &str = "ellin.stage6.shut";
+    pub const ELLIN_STAGE6_WAIT: &str = "ellin.stage6.wait";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2741,6 +2746,11 @@ mod tests {
                 keys::ELLIN_GUIDE_HAND_IN,
                 keys::ELLIN_GUIDE_TO_LEADER,
                 keys::ELLIN_MILEPOST_LEAVE,
+                keys::ELLIN_SPRITE_TO_ALTAR,
+                keys::ELLIN_SPRITE_LEAVE,
+                keys::ELLIN_ALTAR_GOLEM,
+                keys::ELLIN_STAGE6_SHUT,
+                keys::ELLIN_STAGE6_WAIT,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

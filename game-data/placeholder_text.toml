@@ -1290,3 +1290,8 @@
 "ellin.guide.hand_in" = "[placeholder] You brought them all! Let's go on."
 "ellin.guide.to_leader" = "[placeholder] You have the Monster Marbles, but only your leader can hand them to me."
 "ellin.milepost.leave" = "[placeholder] Do you want to leave the forest? Your party may have to give up too."
+"ellin.sprite.to_altar" = "[placeholder] You have the Purple Stone of Magic. I will show your party the way to the altar."
+"ellin.sprite.leave" = "[placeholder] Only your leader can show me the Purple Stone of Magic. Or do you want to leave the forest? Your party may have to give up."
+"ellin.altar.golem" = "[placeholder] The Poison Golem has appeared."
+"ellin.stage6.shut" = "[placeholder] Defeat the Poison Golem first."
+"ellin.stage6.wait" = "[placeholder] Wait for your party leader to go through the portal."

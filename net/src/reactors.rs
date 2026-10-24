@@ -343,7 +343,17 @@ pub fn action(reactor_id: i32) -> Action {
         // The garden's pots, the spots under them, and the Grass of Life.
         2001000 | 2001001 => Action::Pot,
         2001016 => Action::PapaPixie,
-        2002003 | ELLIN_SPINE => Action::DropsAndClears,
+        // The Forest of Poison Haze's spine, and the fifth stage's box that
+        // holds the Purple Stone of Magic (Cosmic `3002001`); its eight
+        // empty ones (3002002) drop nothing.
+        2002003 | ELLIN_SPINE | ELLIN_STONE_BOX => Action::DropsAndClears,
+        // The sixth stage's altar (Cosmic `3001000`), which takes the stone.
+        ELLIN_ALTAR => Action::SpawnAt {
+            mob_id: crate::events::ELLIN_GOLEM,
+            at: crate::events::ELLIN_ALTAR_AT,
+            notice: keys::ELLIN_ALTAR_GOLEM,
+            music: None,
+        },
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
         2002014 => Action::SprayAndAppear {
@@ -411,6 +421,10 @@ pub const BART_FOUND: &str = "q3";
 /// the stage (`3009000`, `showClearEffect` in state 4).
 pub const ELLIN_POND: i32 = 3002000;
 pub const ELLIN_SPINE: i32 = 3009000;
+/// Its fifth stage's box with the Purple Stone of Magic, among eight empty
+/// ones, and its sixth's altar, which brings out the Poison Golem.
+pub const ELLIN_STONE_BOX: i32 = 3002001;
+pub const ELLIN_ALTAR: i32 = 3001000;
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
@@ -464,11 +478,14 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 
 /// Whether a map's reactors change places each time it starts afresh: the
 /// Berserk room's statues and Lord Jonathan's gulls, so the true one is
-/// somewhere new, and the boxes of the Ludibrium Maze's rooms (Cosmic
-/// `LudiMazePQ` `shuffleReactors`).
+/// somewhere new, the boxes of the Ludibrium Maze's rooms (Cosmic
+/// `LudiMazePQ` `shuffleReactors`), and the Forest of Poison Haze's fifth
+/// stage's (`EllinPQ`).
 pub fn shuffled(map_id: i32) -> bool {
-    use crate::events::{MAZE_GOAL, MAZE_ROOM};
-    matches!(map_id, BERSERK_ROOM | BART_ROOM) || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
+    use crate::events::{ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM};
+    matches!(map_id, BERSERK_ROOM | BART_ROOM)
+        || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
+        || map_id == ELLIN_STAGES[4]
 }
 
 #[cfg(test)]
@@ -583,6 +600,18 @@ mod tests {
         assert!(acts_staying(ELLIN_POND));
         assert_eq!(action(ELLIN_SPINE), Action::DropsAndClears);
         assert!(stays(ELLIN_SPINE) && acts_staying(ELLIN_SPINE));
+        assert_eq!(action(ELLIN_STONE_BOX), Action::DropsAndClears);
+        assert_eq!(action(3002002), Action::Drops);
+        assert!(!stays(ELLIN_STONE_BOX) && !acts_staying(ELLIN_STONE_BOX));
+        assert!(matches!(
+            action(ELLIN_ALTAR),
+            Action::SpawnAt {
+                mob_id: crate::events::ELLIN_GOLEM,
+                ..
+            }
+        ));
+        assert!(shuffled(crate::events::ELLIN_STAGES[4]));
+        assert!(!shuffled(crate::events::ELLIN_STAGES[5]));
     }
 
     #[test]

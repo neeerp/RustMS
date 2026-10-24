@@ -880,11 +880,12 @@ pub const ROLLY_PRESENT: i32 = 9103002;
 pub const TYLUS: i32 = 2020008;
 const TYLUS_GRATEFUL: i32 = 2022004;
 /// Ellin in the Deep Fairy Forest, who takes a party into the Forest of
-/// Poison Haze, and Ellin on each of its maps, who lets a member out; and
-/// the mileposts in its maze, who do too.
+/// Poison Haze, and Ellin on each of its maps, who lets a member out; the
+/// mileposts in its maze, who do too; and the Sprite on its fifth stage.
 pub const ELLIN: i32 = 2133000;
 pub const ELLIN_GUIDE: i32 = 2133001;
 pub const ELLIN_MILEPOST: i32 = 2133002;
+pub const ELLIN_SPRITE: i32 = 2133004;
 /// El Nath, and its portal from the Chief's Residence.
 const EL_NATH: i32 = 211_000_000;
 const EL_NATH_FROM_RESIDENCE: u8 = 14;
@@ -1401,6 +1402,9 @@ impl NpcScript {
             MINERVA if won => minerva(player, &mut rand::thread_rng()),
             ROLLY_PRESENT if won => maze_present(player, &mut rand::thread_rng()),
             HTPQ_KEEPER if !won => htpq_keeper(player, leader),
+            ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
+                Some(ellin_sprite(player, leader))
+            }
             _ => None,
         }
     }
@@ -3893,6 +3897,24 @@ fn ellin_maze_end() -> NpcScript {
             },
             Page::Done(vec![Effect::EventCommand(EventCommand::MoveTeam(
                 events::ELLIN_STAGES[3],
+            ))]),
+        ],
+    )
+}
+
+/// The Sprite on the forest's fifth stage (Cosmic `2133004`): the leader
+/// showing it the Purple Stone of Magic, which they keep for the altar, is
+/// taken on with the whole team to the last stage; anyone else may leave.
+fn ellin_sprite(player: &Player, leader: bool) -> NpcScript {
+    if !leader || player.inventory.count(events::PURPLE_STONE) == 0 {
+        return ask_warp(ELLIN_SPRITE, keys::ELLIN_SPRITE_LEAVE, events::ELLIN.exit);
+    }
+    NpcScript::new(
+        ELLIN_SPRITE,
+        vec![
+            Page::Say(text(keys::ELLIN_SPRITE_TO_ALTAR)),
+            Page::Done(vec![Effect::EventCommand(EventCommand::MoveTeam(
+                events::ELLIN_STAGES[5],
             ))]),
         ],
     )
@@ -13029,6 +13051,38 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn the_sprite_takes_the_leader_with_the_stone_on_to_the_altar() {
+        let leave = Effect::WarpToPortal(events::ELLIN_EXIT, 0);
+        let mut member = player(50);
+        member.stats.map_id = events::ELLIN_STAGES[4];
+        // Without the stone, or not leading, a member may only leave.
+        for leader in [true, false] {
+            let mut sprite = NpcScript::in_event(ELLIN_SPRITE, &member, leader, false).unwrap();
+            assert_eq!(question(&sprite.begin()), text(keys::ELLIN_SPRITE_LEAVE));
+            let step = sprite.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(step.effects, [leave.clone()]);
+        }
+        member.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(events::PURPLE_STONE, 1),
+        );
+        let mut sprite = NpcScript::in_event(ELLIN_SPRITE, &member, false, false).unwrap();
+        assert_eq!(question(&sprite.begin()), text(keys::ELLIN_SPRITE_LEAVE));
+        // The leader with it is taken on, keeping it.
+        let mut sprite = NpcScript::in_event(ELLIN_SPRITE, &member, true, false).unwrap();
+        let step = sprite.begin();
+        assert_eq!(page_text(&step), text(keys::ELLIN_SPRITE_TO_ALTAR));
+        assert!(step.effects.is_empty());
+        let step = sprite.respond(ScriptInput::Next).unwrap();
+        let on = Effect::EventCommand(EventCommand::MoveTeam(events::ELLIN_STAGES[5]));
+        assert_eq!((step.effects, step.prompt), (vec![on], None));
+        // Elsewhere it has nothing to say.
+        member.stats.map_id = events::ELLIN_STAGES[5];
+        assert!(NpcScript::in_event(ELLIN_SPRITE, &member, true, false).is_none());
     }
 
     #[test]
