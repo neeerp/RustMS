@@ -1477,6 +1477,33 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::PIRATE_MARKS_SHUT, &[])),
         },
+        // The decks' ways on, once their crews are all gone, as the first
+        // stage's (Cosmic `davy_next2`, `davy_next3`).
+        "davy_next2" | "davy_next3" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    crate::events::PIRATE_STAGES[if script == "davy_next2" { 3 } else { 4 }],
+                    0,
+                ),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::PIRATE_PORTAL_SHUT, &[])),
+        },
+        // Each deck's hidden way down to its crew's room, open whatever is
+        // left aboard (Cosmic `davy2_hd1`, `davy3_hd1`).
+        "davy2_hd1" | "davy3_hd1" => ScriptOutcome {
+            effects: vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    crate::events::PIRATE_STAGES[if script == "davy2_hd1" { 2 } else { 3 }] + 2,
+                    0,
+                ),
+            ],
+            block: false,
+            occupied: None,
+        },
         // Closed, it says nothing, as in Cosmic.
         "s4tornado_enter"
             if [6230, 6231]
@@ -3252,6 +3279,33 @@ mod tests {
         );
         let shut = content::text().get(keys::PIRATE_MARKS_SHUT, &[]);
         assert_eq!(outcome.occupied, Some(shut));
+        // The decks' wait for their crews, and their hidden ways down to
+        // the crews' rooms for nothing.
+        use crate::events::PIRATE_STAGES;
+        for (script, to) in [
+            ("davy_next2", PIRATE_STAGES[3]),
+            ("davy_next3", PIRATE_STAGES[4]),
+        ] {
+            let outcome = portal(script, &player_with(&[])).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [
+                    Effect::RequireNoMobs,
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(to, 0)
+                ],
+                "{script}"
+            );
+            assert!(outcome.occupied.is_some());
+        }
+        for (script, to) in [("davy2_hd1", 925_100_202), ("davy3_hd1", 925_100_302)] {
+            let outcome = portal(script, &player_with(&[])).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [Effect::PortalSound, Effect::WarpToPortal(to, 0)],
+                "{script}"
+            );
+        }
     }
 
     #[test]

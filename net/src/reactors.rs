@@ -347,6 +347,9 @@ pub fn action(reactor_id: i32) -> Action {
         // (9300110) out of a mob box, and
         // items out of an item box (`dropItems(true, 1, 30, 60, 15)`).
         PIRATE_MOB_BOX => Action::BringOutLots([(9300109, 3), (9300110, 5)]),
+        // Six of his Krus and six of his Captains out of a mob box on a
+        // deck (Cosmic `2511001`).
+        PIRATE_DECK_BOX => Action::BringOutLots([(9300124, 6), (9300125, 6)]),
         PIRATE_ITEM_BOX => Action::Spray {
             at_least: 15,
             mesos: (30, 60),
@@ -447,10 +450,11 @@ pub const ELLIN_ALTAR: i32 = 3001000;
 pub const ELLIN_FOUNTAIN: i32 = 3008000;
 pub const ELLIN_FOUNTAIN_NAME: &str = "";
 
-/// The Pirate Ship's mob box, which takes four hits, and its item box,
-/// which links to it.
+/// The Pirate Ship's mob box, which takes four hits, and its item box and
+/// the decks' mob box, which link to it.
 pub const PIRATE_MOB_BOX: i32 = 2511000;
 pub const PIRATE_ITEM_BOX: i32 = 2512000;
+pub const PIRATE_DECK_BOX: i32 = 2511001;
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
@@ -864,6 +868,10 @@ mod tests {
             Action::BringOutLots([(9300109, 3), (9300110, 5)])
         );
         assert_eq!(
+            action(PIRATE_DECK_BOX),
+            Action::BringOutLots([(9300124, 6), (9300125, 6)])
+        );
+        assert_eq!(
             action(PIRATE_ITEM_BOX),
             Action::Spray {
                 at_least: 15,
@@ -877,7 +885,7 @@ mod tests {
             assert_eq!(shuffled(map), [0, 2, 3].contains(&stage), "{map}");
         }
         let Ok(data) = data() else { return };
-        for box_id in [PIRATE_MOB_BOX, PIRATE_ITEM_BOX] {
+        for box_id in [PIRATE_MOB_BOX, PIRATE_ITEM_BOX, PIRATE_DECK_BOX] {
             let reactor = data.template(box_id).unwrap().unwrap();
             assert!((0..4).all(|state| !reactor.is_last(state)), "{box_id}");
             assert!(reactor.is_last(4), "{box_id}");

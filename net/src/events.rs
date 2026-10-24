@@ -1391,7 +1391,14 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 /// it, is dead: the first of the Forest of Poison Haze and of the Pirate
 /// Ship (Cosmic `EllinPQ.monsterKilled`, `PiratePQ.monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
-    (map_id == ELLIN_STAGES[0] || map_id == PIRATE_ENTRY).then_some(1)
+    [
+        (ELLIN_STAGES[0], 1),
+        (PIRATE_ENTRY, 1),
+        (PIRATE_STAGES[2], 3),
+        (PIRATE_STAGES[3], 4),
+    ]
+    .into_iter()
+    .find_map(|(map, stage)| (map == map_id).then_some(stage))
 }
 
 /// Over the Pirate Ship, in Herb Town, where the party gathers at Guon;
@@ -1434,6 +1441,26 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
     (map_id == PIRATE_STAGES[1]).then_some(PIRATE_MARKS[0].1)
 }
 
+/// The mobs a copy of `map_id` made for an event opens with, beyond its own
+/// spawn points, as (mob, the point they come out on the ground below, how
+/// many): each of the Pirate Ship's decks has none of its own, and opens
+/// with five of the Lord Pirate's Krus (9300124) and five of his Captains
+/// (9300125) at each end of each of its two floors (Cosmic `PiratePQ`'s
+/// `setup`). None come back.
+pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
+    const DECK: [(i32, (i16, i16), usize); 4] = [
+        (9_300_124, (430, 75), 5),
+        (9_300_125, (1600, 75), 5),
+        (9_300_124, (430, 238), 5),
+        (9_300_125, (1600, 238), 5),
+    ];
+    if PIRATE_STAGES[2..4].contains(&map_id) {
+        &DECK
+    } else {
+        &[]
+    }
+}
+
 /// The Pirate Ship (Cosmic `PiratePQ`): three to six of a party, all of
 /// levels 55 to 100, Over the Pirate Ship with their leader, board their
 /// own copy of the ship with 4 minutes on the clock, which starts over the
@@ -1453,7 +1480,7 @@ pub const PIRATE: Event = Event {
     stride: 1,
     stage_maps: &PIRATE_STAGES,
     talk_clears: &[],
-    member_clears: &[1],
+    member_clears: &[1, 3, 4],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -2859,7 +2886,18 @@ mod tests {
         // is there.
         assert_eq!(cleared_by_killing(PIRATE_ENTRY), Some(1));
         assert_eq!(cleared_by_killing(PIRATE_STAGES[1]), None);
-        assert_eq!(PIRATE.member_clears, [1]);
+        assert_eq!(cleared_by_killing(PIRATE_STAGES[2]), Some(3));
+        assert_eq!(cleared_by_killing(PIRATE_STAGES[3]), Some(4));
+        assert_eq!(cleared_by_killing(PIRATE_STAGES[4]), None);
+        // The decks open with twenty of the Lord Pirate's crew each, and
+        // no other map with any.
+        for map in &PIRATE_STAGES[2..4] {
+            let crew: usize = opening_mobs(*map).iter().map(|&(_, _, n)| n).sum();
+            assert_eq!(crew, 20, "{map}");
+        }
+        assert!(opening_mobs(PIRATE_STAGES[1]).is_empty());
+        assert!(opening_mobs(PIRATE_STAGES[2] + 1).is_empty());
+        assert_eq!(PIRATE.member_clears, [1, 3, 4]);
     }
 
     #[test]

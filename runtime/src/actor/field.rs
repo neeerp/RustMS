@@ -297,6 +297,12 @@ impl FieldActor {
                 field.bring_out_head(head);
             }
         }
+        // And a copy of one of the Pirate Ship's decks with its crew.
+        if key.instance_id != 0 {
+            for &(mob_id, at, count) in net::events::opening_mobs(key.map_id) {
+                field.board(mob_id, count, at);
+            }
+        }
         field
     }
 
