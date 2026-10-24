@@ -394,6 +394,35 @@ namespace ms
 		}
 	}
 
+	// A click picks a row; a double click on it, which its first click
+	// picked, buys or sells (FUN_00427a29, FUN_007561c1).
+	void UIShop::doubleclick(Point<int16_t> cursorpos)
+	{
+		Point<int16_t> cursoroffset = cursorpos - position;
+
+		int16_t xoff = cursoroffset.x();
+		int16_t slot = slot_by_position(cursoroffset.y());
+
+		if (slot < 0)
+			return;
+
+		if (xoff >= ROW.x() && xoff < ROW.x() + ROW_SIZE.x())
+		{
+			if (slot + buystate.offset == buystate.selection)
+			{
+				clear_tooltip();
+				buystate.buy();
+			}
+		} else if (xoff >= ROW.x() + HALF && xoff < ROW.x() + HALF + ROW_SIZE.x())
+		{
+			if (slot + sellstate.offset == sellstate.selection)
+			{
+				clear_tooltip();
+				sellstate.sell(false);
+			}
+		}
+	}
+
 	void UIShop::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
@@ -735,12 +764,7 @@ namespace ms
 
 	void UIShop::BuyState::select(int16_t selected)
 	{
-		int16_t slot = selected + offset;
-
-		if (slot == selection)
-			buy();
-		else
-			selection = slot;
+		selection = selected + offset;
 	}
 
 	void UIShop::SellState::reset()
@@ -881,11 +905,6 @@ namespace ms
 
 	void UIShop::SellState::select(int16_t selected)
 	{
-		int16_t slot = selected + offset;
-
-		if (slot == selection)
-			sell(false);
-		else
-			selection = slot;
+		selection = selected + offset;
 	}
 }
