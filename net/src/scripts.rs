@@ -1735,6 +1735,23 @@ pub fn delli_way_out(won: bool, player: &Player) -> Vec<Effect> {
         .collect()
 }
 
+/// The way out of the room Tylus is protected in (our Map.nx's
+/// `s4common1_clear`; Cosmic's `s4common1_exit`).
+pub const TYLUS_OUT: &str = "s4common1_clear";
+
+/// The way out of Tylus's room: on to his thanks for one holding his Trust,
+/// and out of El Nath's valley for anyone else, which leaves the event
+/// (Cosmic `s4common1_exit`).
+pub fn tylus_way_out(player: &Player) -> Vec<Effect> {
+    use crate::events::{TYLUS_EXIT, TYLUS_THANKS, TYLUS_TRUST};
+    let to = if player.inventory.count(TYLUS_TRUST) > 0 {
+        Effect::WarpToPortal(TYLUS_THANKS, 0)
+    } else {
+        Effect::Warp(TYLUS_EXIT)
+    };
+    vec![Effect::PortalSound, to]
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2712,6 +2729,23 @@ mod tests {
         }];
         marked.extend(on);
         assert_eq!(delli_way_out(true, &player), marked);
+    }
+
+    #[test]
+    fn the_way_out_of_tyluss_room_leads_on_only_with_his_trust() {
+        use crate::events::{TYLUS_EXIT, TYLUS_THANKS, TYLUS_TRUST};
+        assert_eq!(
+            tylus_way_out(&player_with(&[])),
+            [Effect::PortalSound, Effect::Warp(TYLUS_EXIT)]
+        );
+        let mut player = player_with(&[]);
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(TYLUS_TRUST, 1));
+        assert_eq!(
+            tylus_way_out(&player),
+            [Effect::PortalSound, Effect::WarpToPortal(TYLUS_THANKS, 0)]
+        );
     }
 
     #[test]

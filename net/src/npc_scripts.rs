@@ -875,6 +875,13 @@ pub const PIETRI: i32 = 9103000;
 const ROLLY_HOME: i32 = 9103003;
 /// Rolly in the Ludibrium Maze's clear room, with the presents.
 pub const ROLLY_PRESENT: i32 = 9103002;
+/// Tylus in the Chief's Residence, who takes a party in to protect him on
+/// "Protecting Tylus" (6192), and Tylus past the room, who thanks them.
+pub const TYLUS: i32 = 2020008;
+const TYLUS_GRATEFUL: i32 = 2022004;
+/// El Nath, and its portal from the Chief's Residence.
+const EL_NATH: i32 = 211_000_000;
+const EL_NATH_FROM_RESIDENCE: u8 = 14;
 /// The Bowmen's 4th-job quests on the Junior Balrog in another world.
 const BALROG_WORLD_QUESTS: [i16; 2] = [6107, 6108];
 /// Bowmaster, Marksman and GM, as in Cosmic.
@@ -1311,6 +1318,12 @@ impl NpcScript {
         delli(entry)
     }
 
+    /// Tylus in the Chief's Residence, to a warrior on "Protecting Tylus"
+    /// whose party may or may not go in to protect him.
+    pub fn tylus(entry: Entry) -> Self {
+        tylus(entry)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1517,6 +1530,15 @@ impl NpcScript {
             }
             DELLI if player.stats.map_id == events::NAUTILUS_HIDEOUT => {
                 return Some(ask_warp(DELLI, keys::DELLI_HOME_ASK, TRAINING_ROOM))
+            }
+            TYLUS_GRATEFUL if player.stats.map_id == events::TYLUS_THANKS => {
+                return Some(NpcScript::new(
+                    TYLUS_GRATEFUL,
+                    vec![
+                        Page::Say(text(keys::TYLUS_THANKS)),
+                        Page::Done(vec![Effect::WarpToPortal(EL_NATH, EL_NATH_FROM_RESIDENCE)]),
+                    ],
+                ))
             }
             ROLLY_HOME if player.stats.map_id == events::MAZE_EXIT => {
                 return Some(NpcScript::new(
@@ -6666,6 +6688,35 @@ fn delli(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Delli checked, or another party went in.
     script.refused = Some(event_terms(&events::DELLI, keys::DELLI_NOT_ELIGIBLE));
+    script
+}
+
+/// Tylus (Cosmic `2020008`, while "Protecting Tylus" is started) in the
+/// Chief's Residence: the leader takes the party in to protect him, and
+/// anyone may hear what they must do.
+fn tylus(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::TYLUS_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::TYLUS_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::TYLUS, keys::TYLUS_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::TYLUS_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Tylus)]),
+    };
+    let mut script = NpcScript::new(
+        TYLUS,
+        vec![Page::Menu {
+            text: text(keys::TYLUS_MENU),
+            choices: vec![
+                (text(keys::TYLUS_ENTER), vec![enter]),
+                (
+                    text(keys::TYLUS_ABOUT),
+                    vec![Page::Say(text(keys::TYLUS_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Tylus checked, or another party went in.
+    script.refused = Some(event_terms(&events::TYLUS, keys::TYLUS_NOT_ELIGIBLE));
     script
 }
 
@@ -12762,6 +12813,45 @@ mod tests {
         delli.begin();
         let step = delli.respond(ScriptInput::Select(1)).unwrap();
         assert_eq!(page_text(&step), text(keys::DELLI_INFO));
+    }
+
+    #[test]
+    fn tylus_takes_the_party_in_and_thanks_them_past_the_room() {
+        let mut ready = NpcScript::tylus(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Tylus)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::TYLUS_NO_PARTY),
+            (Entry::NotLeader, keys::TYLUS_NOT_LEADER),
+            (Entry::Busy, keys::TYLUS_BUSY),
+        ] {
+            let mut tylus = NpcScript::tylus(entry);
+            tylus.begin();
+            let step = tylus.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut tylus = NpcScript::tylus(Entry::NotEligible);
+        tylus.begin();
+        let step = tylus.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("80"), "{step:?}");
+        let mut tylus = NpcScript::tylus(Entry::Ready);
+        tylus.begin();
+        let step = tylus.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::TYLUS_INFO));
+
+        // Past the room, he thanks them and sends them to El Nath.
+        let mut warrior = player(50);
+        assert!(NpcScript::for_npc(TYLUS_GRATEFUL, &warrior).is_none());
+        warrior.stats.map_id = events::TYLUS_THANKS;
+        let mut thanks = NpcScript::for_npc(TYLUS_GRATEFUL, &warrior).unwrap();
+        assert_eq!(page_text(&thanks.begin()), text(keys::TYLUS_THANKS));
+        let step = thanks.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::WarpToPortal(EL_NATH, EL_NATH_FROM_RESIDENCE)]
+        );
     }
 
     #[test]

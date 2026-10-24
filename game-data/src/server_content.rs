@@ -1757,6 +1757,16 @@ pub mod keys {
     pub const LUDIMAZE_PIETRI_DONE: &str = "ludimaze.pietri.done";
     pub const LUDIMAZE_PRESENT_ASK: &str = "ludimaze.present.ask";
     pub const LUDIMAZE_PRESENT_FULL: &str = "ludimaze.present.full";
+    pub const TYLUS_MENU: &str = "tylus.menu";
+    pub const TYLUS_ENTER: &str = "tylus.enter";
+    pub const TYLUS_ABOUT: &str = "tylus.about";
+    pub const TYLUS_INFO: &str = "tylus.info";
+    pub const TYLUS_NO_PARTY: &str = "tylus.no_party";
+    pub const TYLUS_NOT_LEADER: &str = "tylus.not_leader";
+    pub const TYLUS_NOT_ELIGIBLE: &str = "tylus.not_eligible";
+    pub const TYLUS_BUSY: &str = "tylus.busy";
+    pub const TYLUS_FALLEN: &str = "tylus.fallen";
+    pub const TYLUS_THANKS: &str = "tylus.thanks";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2679,6 +2689,16 @@ mod tests {
                 keys::LUDIMAZE_PIETRI_DONE,
                 keys::LUDIMAZE_PRESENT_ASK,
                 keys::LUDIMAZE_PRESENT_FULL,
+                keys::TYLUS_MENU,
+                keys::TYLUS_ENTER,
+                keys::TYLUS_ABOUT,
+                keys::TYLUS_INFO,
+                keys::TYLUS_NO_PARTY,
+                keys::TYLUS_NOT_LEADER,
+                keys::TYLUS_NOT_ELIGIBLE,
+                keys::TYLUS_BUSY,
+                keys::TYLUS_FALLEN,
+                keys::TYLUS_THANKS,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

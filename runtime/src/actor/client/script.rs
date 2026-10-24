@@ -47,7 +47,11 @@ impl ClientActor {
                 }
             }
             (Some(script), Some(portal)) => match self.opq_portal(script, portal).await? {
-                None => match self.zpq_portal(script)?.or(self.delli_portal(script)?) {
+                None => match self
+                    .zpq_portal(script)?
+                    .or(self.delli_portal(script)?)
+                    .or(self.tylus_portal(script)?)
+                {
                     None => self.htpq_portal(script).await?,
                     effects => effects,
                 },

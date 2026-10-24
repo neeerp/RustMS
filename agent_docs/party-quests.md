@@ -28,8 +28,10 @@ another ([horntail](./horntail.md)). The fight with
 Papulatus is a party's event that ends that way too (`Event::until_empty`),
 started by a portal rather than an NPC ([papulatus](./papulatus.md)).
 Delli's rescue, for the Corsairs' 6410, is a party's event won by holding
-out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is coming in
-slices ([the Ludibrium Maze](#the-ludibrium-maze)).
+out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is played through
+([the Ludibrium Maze](#the-ludibrium-maze)). Protecting Tylus, for the
+warriors' 6192, is a party's event with nothing to win
+([Protecting Tylus](#protecting-tylus)).
 
 ## Rules
 
@@ -911,6 +913,33 @@ Equip, Use and Etc slot (`has_reward_slot`) is told so and stays.
 
 Not yet: the Party Search entry.
 
+## Protecting Tylus
+
+El Nath's party quest, for the warriors' 6192
+(`v83ref/reports/a123-elnath-pq.md`; defaults in
+`v83ref/lanes/QUESTIONS.md` a123). Tylus (2020008) in the Chief's
+Residence (211000001) answers a player on 6192 with a menu of going in and
+what to do (`dialogue.rs`; otherwise the third-job chief's script). The
+leader takes a party of one to four, all there at level 80 and up, into his
+room (921100300) for ten minutes (`events::TYLUS`, `EventKind::Tylus`).
+
+There the party protects Tylus (9300093), a friendly mob the other mobs
+hurt by running into him, as Willi. Every 100 seconds he drops his Trust
+(4031495; `friendly_drop_period`, Cosmic's `dropItemPeriod 10`, which our
+Mob.nx lacks; the item is a quest drop for 6192 from
+`reward_overrides.toml`, so `friendly_from` keeps quest items now). His
+going says a line to the room (`tylus.fallen`) and nothing more: the event
+goes on, and it never wins (`survive` is unset). The time running out
+sends everyone to 211040100, as does the room's way out (`out01`, script
+`s4common1_clear`, `tylus_portal`) for one without the Trust; with it, the
+way leads to 921100301, where Tylus (2022004) thanks them and sends them to
+El Nath (211000000, portal `in01`). The leader leaving the room, by either
+way, ends the event for everyone (`Team::leave`), as in Cosmic. Tylus in
+the Residence completes 6192 on the Trust; while 6192 is started he
+doesn't offer the chief's other choices. Its lines are placeholders (`tylus.*`).
+
+Not yet: the Party Search entry.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -955,6 +984,8 @@ Not yet: the Party Search entry.
 | Ali 2030011 | 280090000 | Home to 211042300 |
 | Gatekeeper 2083001 | 240050000 | Runtime (`talk_about_event`): a menu of going in and what the quest is |
 | Gatekeeper 2083001 | 240050100, 240050300, 240050310 | Runtime (`htpq_keeper`): the leader's hand-in of the keys |
+| Tylus 2020008 | 211000001 | On 6192, runtime (`talk_about_event`): a menu of going in and what to do |
+| Tylus 2022004 | 921100301 | Thanks, and on to El Nath 211000000 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
@@ -962,4 +993,4 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
 `zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*`,
-`htpq.key.*`, `htpq.lamp.*`, `delli.*` and `ludimaze.*`.
+`htpq.key.*`, `htpq.lamp.*`, `delli.*`, `ludimaze.*` and `tylus.*`.
