@@ -37,6 +37,7 @@
 #include "../IO/UITypes/UISlideMenu.h"
 #include "../IO/UITypes/UIStorage.h"
 #include "../IO/UITypes/UIStoreBank.h"
+#include "../IO/UITypes/UITimedQuests.h"
 #include "../Gameplay/QuestConversation.h"
 #include "../Net/Packets/NpcInteractionPackets.h"
 
@@ -259,12 +260,56 @@ namespace ms
 		}
 	}
 
+	namespace
+	{
+		// Mode 6: put up the clocks, each with its time left of the quest's timeLimit (FUN_00a24d5d).
+		void put_up_clocks(InPacket& recv)
+		{
+			int16_t count = recv.read_short();
+
+			for (int16_t i = 0; i < count; i++)
+			{
+				int16_t quest = recv.read_short();
+				int32_t ms = recv.read_int();
+				auto total = static_cast<int32_t>(
+					nl::nx::quest["QuestInfo.img"][std::to_string(quest)]["timeLimit"].get_integer() * 1000);
+
+				timed_quests::add(timed_quests::shown(), quest, total > 0 ? total : ms, ms);
+			}
+
+			// One widget shows all of shown(); a second would leak with its alarms ringing.
+			if (!UI::get().get_element<UITimedQuests>())
+				UI::get().emplace<UITimedQuests>();
+		}
+
+		void take_down_clock(int16_t quest)
+		{
+			if (auto clocks = UI::get().get_element<UITimedQuests>())
+				clocks->taken_down(quest);
+			else
+				timed_quests::remove(timed_quests::shown(), quest);
+		}
+	}
+
 	void UpdateQuestInfoHandler::handle(InPacket& recv) const
 	{
 		std::string notice;
 
 		switch (recv.read_byte())
 		{
+		case 6:
+			put_up_clocks(recv);
+
+			return;
+		case 7:
+		{
+			int16_t count = recv.read_short();
+
+			for (int16_t i = 0; i < count; i++)
+				take_down_clock(recv.read_short());
+
+			return;
+		}
 		case 8:
 		{
 			int16_t quest_id = recv.read_short();
@@ -292,7 +337,10 @@ namespace ms
 			break;
 		case 15:
 		{
-			std::string quest_id = std::to_string(recv.read_short());
+			int16_t quest = recv.read_short();
+			take_down_clock(quest);
+
+			std::string quest_id = std::to_string(quest);
 			std::string name = nl::nx::quest["QuestInfo.img"][quest_id]["name"].get_string();
 
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
@@ -301,9 +349,12 @@ namespace ms
 
 			return;
 		}
+		case 16:
+			timed_quests::reset(timed_quests::shown(), recv.read_short());
+
+			return;
 		default:
-			// 6, 7, 12 and 16 keep quest timers, which the server doesn't
-			// have.
+			// 12 keeps a quest timer, which the server doesn't have.
 			return;
 		}
 

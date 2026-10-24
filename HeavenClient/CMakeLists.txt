@@ -431,6 +431,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME quest_catalog COMMAND quest_catalog_tests)
     add_executable(medal_list_tests tests/medal_list.cpp)
     add_test(NAME medal_list COMMAND medal_list_tests)
+    add_executable(timed_quests_tests tests/timed_quests.cpp)
+    add_test(NAME timed_quests COMMAND timed_quests_tests)
     add_executable(skill_weapon_tests tests/skill_weapon.cpp)
     add_test(NAME skill_weapon COMMAND skill_weapon_tests)
     add_executable(dash_tests tests/dash.cpp)
@@ -527,6 +529,7 @@ add_executable(HeavenClient
     Character/Char.h
     Character/MedalTag.cpp
     Character/MedalList.h
+    Character/TimedQuests.h
     Character/MedalTag.h
     Character/MedalTagLayout.h
     Character/StyledTag.cpp
@@ -931,6 +934,8 @@ add_executable(HeavenClient
     IO/UITypes/UIQuestLog.h
     IO/UITypes/UIMedals.cpp
     IO/UITypes/UIMedals.h
+    IO/UITypes/UITimedQuests.cpp
+    IO/UITypes/UITimedQuests.h
     IO/UITypes/UIQuiz.cpp
     IO/UITypes/UIQuiz.h
     IO/UITypes/UIRpsGame.cpp

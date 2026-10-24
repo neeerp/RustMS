@@ -379,6 +379,10 @@ impl ClientActor {
             );
             next.quests.upsert(record);
             next.mark_saved();
+            match change {
+                QuestChange::Start(template) => self.start_quest_clock(template.id, packets)?,
+                QuestChange::Complete(template) => self.end_quest_clock(template.id, packets)?,
+            }
         } else {
             next.mark_dirty();
         }
@@ -420,29 +424,18 @@ impl ClientActor {
     }
 
     async fn forfeit_quest(&mut self, quest_id: i16) -> Result<(), RuntimeError> {
-        if self.in_game()?.player.quests.state(quest_id) != QuestState::Started {
-            return Ok(());
-        }
-        let cid = self.client_id;
-        // The records it reads go with it, or a new start would find them set.
-        let records: Vec<i16> = game_data::quests::RECORD_QUESTS
-            .iter()
-            .filter(|&&(quest, _)| quest == quest_id)
-            .map(|&(_, record)| record)
-            .collect();
-        let deleted = records.clone();
-        match spawn_db(move || db::quest::forfeit(cid, quest_id, &deleted)).await {
-            Ok(()) => {}
-            Err(RuntimeError::Database(db::Error::NotFound)) => return Ok(()),
-            Err(error) => return Err(error),
-        }
-        let player = &mut self.in_game_mut()?.player;
-        let mut packets = Vec::new();
-        for id in std::iter::once(quest_id).chain(records) {
-            player.quests.remove(id);
-            packets.push(quest::build_quest_progress(id, None)?);
-        }
+        let mut packets = self.drop_quest(quest_id).await?;
+        self.end_quest_clock(quest_id, &mut packets)?;
         self.send_all(&mut packets).await
+    }
+
+    /// Forfeit `quest_id` if started; the packets that show it.
+    pub(super) async fn drop_quest(&mut self, quest_id: i16) -> Result<Vec<Packet>, RuntimeError> {
+        let dropped = forfeit(&mut self.in_game_mut()?.player, quest_id).await?;
+        dropped
+            .into_iter()
+            .map(|id| Ok(quest::build_quest_progress(id, None)?))
+            .collect()
     }
 
     pub(super) async fn send_all(&mut self, packets: &mut [Packet]) -> Result<(), RuntimeError> {
@@ -451,6 +444,31 @@ impl ClientActor {
         }
         Ok(())
     }
+}
+
+/// Forfeit `player`'s `quest_id` if started, and the records it reads, or
+/// a new start would find them set. The quests that went, the quest first.
+pub(super) async fn forfeit(player: &mut Player, quest_id: i16) -> Result<Vec<i16>, RuntimeError> {
+    if player.quests.state(quest_id) != QuestState::Started {
+        return Ok(Vec::new());
+    }
+    let cid = player.id();
+    let records: Vec<i16> = game_data::quests::RECORD_QUESTS
+        .iter()
+        .filter(|&&(quest, _)| quest == quest_id)
+        .map(|&(_, record)| record)
+        .collect();
+    let deleted = records.clone();
+    match spawn_db(move || db::quest::forfeit(cid, quest_id, &deleted)).await {
+        // Already gone from the database: it goes from the player too.
+        Ok(()) | Err(RuntimeError::Database(db::Error::NotFound)) => {}
+        Err(error) => return Err(error),
+    }
+    let dropped: Vec<i16> = std::iter::once(quest_id).chain(records).collect();
+    for &id in &dropped {
+        player.quests.remove(id);
+    }
+    Ok(dropped)
 }
 
 /// Give `next` the effect of a quest step's `buffItemID`, if any.

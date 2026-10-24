@@ -48,6 +48,7 @@
 #include "../../IO/UITypes/UIStatsInfo.h"
 #include "../../IO/UITypes/UITradingRoom.h"
 #include "../../IO/UITypes/UIMiniGame.h"
+#include "../../IO/UITypes/UITimedQuests.h"
 
 #include <nlnx/nx.hpp>
 
@@ -192,6 +193,9 @@ namespace ms
 
 			cached_player_entry = selected;
 			playerentry = &*cached_player_entry;
+
+			// A new login has no quest clocks up; a channel change keeps them (FUN_00777347).
+			timed_quests::shown().clear();
 		}
 		else if (cached_player_entry && cached_player_entry->id == cid)
 		{
@@ -251,6 +255,9 @@ namespace ms
 		transition(mapid, portalid);
 
 		UI::get().change_state(UI::State::GAME);
+
+		if (!timed_quests::shown().empty())
+			UI::get().emplace<UITimedQuests>();
 
 		// After a channel change or the Cash Shop, a search goes on. Its
 		// indicator belongs to the new game state.

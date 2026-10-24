@@ -143,6 +143,7 @@ namespace ms
 			MINIGAME,
 			MINIGAMECREATE,
 			MEDALS,
+			TIMEDQUESTS,
 			NUM_TYPES
 		};
 

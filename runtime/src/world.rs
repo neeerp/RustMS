@@ -81,6 +81,7 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
     let services = WorldServices {
         directory: directory_tx,
         fields: FieldRegistry::new(FIELD_TICK),
+        quest_clocks: Default::default(),
     };
 
     let mut listeners = JoinSet::new();

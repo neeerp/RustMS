@@ -256,6 +256,43 @@ quest record again with the new string. Counts live in the quest's
 `QuestStatus::Started { kills }` and are saved with the player. Completion
 requires every count.
 
+## Timed quests
+
+A quest whose `QuestInfo` has a `timeLimit` (3458, Jr. Officer Medin's wall plan, 2262,
+3951, 9999, ...) gives that many seconds once started
+(`QuestTemplate::time_limit`). The server keeps one clock per started timed
+quest in the `ClientActor` (`runtime/src/actor/client/timed_quest.rs`) and
+tells the client with `UPDATE_QUEST_INFO`:
+
+- starting it sends mode 6 (`u16 1, u16 quest, i32 ms`) before the quest
+  record;
+- completing or forfeiting it sends mode 7 (`u16 1, u16 quest`) first;
+- when the time is up the quest is forfeited: mode 7, the record back to 0,
+  then mode 15 (`u16 quest`), on which the client writes "The [name] quest
+  expired because the time limit ended" in the chat log.
+
+The clock goes with the player to another channel: `change_channel` hands
+the remaining time over in `WorldServices::quest_clocks`, keyed by the
+session, before it sends the redirect, and only the login that carries that
+session on picks it up. Mode 6 is not sent again, as the client keeps its
+clocks. Logging out, disconnecting and going to the
+Cash Shop forfeit the quest, as Cosmic does; a started timed quest found at
+login without a handed-over clock is forfeited silently. Deviations: the
+clock's length is shortened with `RUSTMS_EVENT_SCALE` like the events', and a
+forfeit deletes the row (no forfeited count).
+
+The client (`IO/UITypes/UITimedQuests`, logic in
+`Character/TimedQuests.h`, CTest `timed_quests`) draws v83's widgets from
+`UIWindow.img/Quest/TimeQuest`: a 52x12 bar at (700, 50) of the 800 px
+screen, each later one 50 px under the last, whose 48-step gauge empties
+from the left, and an alarm clock to its right whose ring frames spread over
+the whole time. Only a `timerUI` of "default" plays `questCount` over the last
+frame and `clockBoom` when taken down. Hovering over a bar shows the
+quest's name over "Time Left h:m:s". Mode 16 resets a clock to its whole
+time. The clocks stay up across map and channel changes, and a new login
+clears them. The gauge measures against `timeLimit`, so with
+`RUSTMS_EVENT_SCALE` the harness's clocks start nearly empty.
+
 ## Info strings
 
 Some quests keep a string of their own instead of kill counts: `Act/0/info`
@@ -490,7 +527,7 @@ copied into the source.
   (classification, golden list, eligibility, packet parsing and building,
   NPC reach). Set `RUSTMS_REQUIRE_ASSETS=1` so asset tests cannot skip.
 - Client: build with `-DHEAVENCLIENT_BUILD_TESTS=ON` and run CTest
-  (`quest_dialogue`, `quest_catalog`, `quest_markers`).
+  (`quest_dialogue`, `quest_catalog`, `quest_markers`, `timed_quests`).
 - Integration: `maker_quests` (Meren's lessons to the Maker's level 2),
   `scripted_npcs` (Roger's Apple end to end, Robin, the
   Shanks refusing a new beginner, natural recovery limits), `rain_quizzes` (all seven quizzes, rewards once, prerequisites,
@@ -501,4 +538,6 @@ copied into the source.
   letter to Lucas, refusals before requirements are met), and
   `quest_reward_choice` (Hongbu's shoes, refusing a choice not offered),
   and `quest_info` (Sejan's Test through Ariant's four houses, kept across
-  a relogin, and a string one delivery short refused).
+  a relogin, and a string one delivery short refused),
+  and `timed_quests` (Medin's clock: shown on start, taken down on
+  forfeit, running out, kept through a channel change, given up on logout).
