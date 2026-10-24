@@ -140,6 +140,11 @@ pub enum SendOpcode {
     SummonSkill = 0xB3,
     DamageSummon = 0xB4,
     ShowItemGainInChat = 0xCE,
+    /// "You have used the meso bag to receive %d mesos." (FUN_009599bb;
+    /// LUCKSACK_FAIL in other servers, though it is the good news).
+    MesoBagUsed = 0xD1,
+    /// "You have failed to use the meso bag." (FUN_00959a47).
+    MesoBagFailed = 0xD2,
     UpdateQuestInfo = 0xD3,
     HpTaken = 0xD4,
     /// What the Item Maker made (FUN_0095dad3).

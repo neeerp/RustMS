@@ -48,6 +48,18 @@
 
 namespace ms
 {
+	void MesoBagUsedHandler::handle(InPacket& recv) const
+	{
+		int32_t mesos = recv.read_int();
+
+		UI::get().emplace<UIOk>("You have used the meso bag\\nto receive " + std::to_string(mesos) + " mesos.", [](bool) {});
+	}
+
+	void MesoBagFailedHandler::handle(InPacket&) const
+	{
+		UI::get().emplace<UIOk>("You have failed to use the meso bag.", [](bool) {});
+	}
+
 	void IncubatorResultHandler::handle(InPacket& recv) const
 	{
 		int32_t item_id = recv.read_int();

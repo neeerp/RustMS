@@ -177,6 +177,23 @@ pub fn build_incubator_result(item_id: i32, count: i16) -> Result<Packet, Networ
     Ok(p)
 }
 
+/// The meso bag's `mesos` arrived, told in an OK box (FUN_009599bb). It
+/// does not unlock the client.
+pub fn build_meso_bag_used(mesos: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MesoBagUsed as i16)?;
+    p.write_int(mesos)?;
+    Ok(p)
+}
+
+/// The meso bag stayed shut, told in an OK box (FUN_00959a47). It does not
+/// unlock the client.
+pub fn build_meso_bag_failed() -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::MesoBagFailed as i16)?;
+    Ok(p)
+}
+
 /// How a Party Potion used on someone went (report c041).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RandomMorphRes {
@@ -227,6 +244,15 @@ mod tests {
     use super::*;
     use crate::codec::testing::Expect;
     use game::Item;
+
+    #[test]
+    fn the_meso_bag_answers_carry_the_mesos_or_nothing() {
+        let used = build_meso_bag_used(1_000_000).unwrap();
+        let mut expect = Expect::new(&used.bytes);
+        expect.short(SendOpcode::MesoBagUsed as i16).int(1_000_000);
+        expect.end();
+        assert_eq!(build_meso_bag_failed().unwrap().bytes, [0xD2, 0]);
+    }
 
     #[test]
     fn a_random_morph_answer_unlocks_or_names_its_notice() {

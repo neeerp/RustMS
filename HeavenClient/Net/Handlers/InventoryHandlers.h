@@ -82,6 +82,21 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// The mesos a meso bag gave, in an OK box (v83 FUN_009599bb). It does
+	// not unlock the client.
+	// Opcode: MESO_BAG_USED(209)
+	class MesoBagUsedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A meso bag that would not open, in an OK box (v83 FUN_00959a47).
+	// Opcode: MESO_BAG_FAILED(210)
+	class MesoBagFailedHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// The Owl of Minerva's answers: the items searched for most, for its
 	// search window, or a search's rows (FUN_00a28c29).
 	// Opcode: OWL_RESULT(70)

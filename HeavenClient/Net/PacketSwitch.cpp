@@ -165,6 +165,8 @@ namespace ms
 		PET_COMMAND = 174,
 		CASH_PET_FOOD_RESULT = 76,
 		INCUBATOR_RESULT = 69,
+		MESO_BAG_USED = 209,
+		MESO_BAG_FAILED = 210,
 		OWL_RESULT = 70,
 		OWL_GO_RESULT = 71,
 		MARRIAGE_REQUEST = 72,
@@ -370,6 +372,8 @@ namespace ms
 		emplace<PET_COMMAND, PetCommandHandler>();
 		emplace<CASH_PET_FOOD_RESULT, CashPetFoodResultHandler>();
 		emplace<INCUBATOR_RESULT, IncubatorResultHandler>();
+		emplace<MESO_BAG_USED, MesoBagUsedHandler>();
+		emplace<MESO_BAG_FAILED, MesoBagFailedHandler>();
 		emplace<OWL_RESULT, OwlResultHandler>();
 		emplace<OWL_GO_RESULT, OwlGoResultHandler>();
 		emplace<MARRIAGE_REQUEST, MarriageRequestHandler>();

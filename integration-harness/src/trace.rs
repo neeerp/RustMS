@@ -84,6 +84,9 @@ pub struct Trace {
     pub fame_gains: Vec<i32>,
     /// Mesos gained without a pickup, shown in chat (SHOW_STATUS_INFO 5).
     pub meso_gains: Vec<i32>,
+    /// Meso bag answers: the mesos it gave (0xD1), or None when it stayed
+    /// shut (0xD2).
+    pub meso_bags: Vec<Option<i32>>,
     /// Every STAT_CHANGED, as values by mask bit.
     pub stat_updates: Vec<BTreeMap<i32, i64>>,
     /// HP_TAKEN (0xD4): HP about to go without a hit, in order.
@@ -395,6 +398,10 @@ impl Trace {
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::MesoBagUsed as i16 {
+            self.meso_bags.push(Some(r.read_int().unwrap()));
+        } else if op == SendOpcode::MesoBagFailed as i16 {
+            self.meso_bags.push(None);
         } else if op == SendOpcode::ItemEmotion as i16 {
             self.item_emotions.push(r.read_int().unwrap());
         } else if op == SendOpcode::MonsterBookSetCard as i16 {
