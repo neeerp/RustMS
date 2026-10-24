@@ -1698,6 +1698,12 @@ pub mod keys {
     pub const MILK_JUG_NOT_FULL: &str = "milk.jug_not_full";
     /// An area boss came out, to its map; `{mob}` is its name.
     pub const AREA_BOSS_APPEARED: &str = "area_boss.appeared";
+    /// Lord Jonathan (1092019) and his test for "Jonathan's Court".
+    pub const JONATHAN_HELLO: &str = "jonathan.hello";
+    pub const JONATHAN_TEST_ASK: &str = "jonathan.test.ask";
+    pub const JONATHAN_TEST_BUSY: &str = "jonathan.test.busy";
+    /// Pink, to whoever hit the real Bart.
+    pub const JONATHAN_BART_FOUND: &str = "jonathan.bart_found";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2578,6 +2584,10 @@ mod tests {
             .chain(&keys::HTPQ)
             .chain(&[
                 keys::AREA_BOSS_APPEARED,
+                keys::JONATHAN_HELLO,
+                keys::JONATHAN_TEST_ASK,
+                keys::JONATHAN_TEST_BUSY,
+                keys::JONATHAN_BART_FOUND,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

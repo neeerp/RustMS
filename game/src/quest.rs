@@ -14,6 +14,13 @@ pub const SCRIPT_MARKERS: i16 = 32000;
 /// never be completed.
 pub const INFO_QUESTS: &[i16] = &[3311, 3900, 3926, 3927, 3929];
 
+/// Records that are no quest (Quest.nx has no such id) but that another
+/// quest's completion reads (`Check/1 infoNumber`): an info string a
+/// script sets whole, kept as a started record. Only records the server's
+/// scripts set are listed: Lord Jonathan's test's (6401, for "Jonathan's
+/// Court", 6400).
+pub const RECORDS: &[i16] = &[6401];
+
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestState {
@@ -163,6 +170,22 @@ impl QuestLog {
             Some(QuestStatus::Started { info, .. }) => info.as_deref(),
             _ => None,
         }
+    }
+
+    /// Set a record (`RECORDS`) to `value`; `false` if it already reads so.
+    pub fn set_record(&mut self, record: i16, value: &str) -> bool {
+        debug_assert!(RECORDS.contains(&record));
+        if self.info(record) == Some(value) {
+            return false;
+        }
+        self.upsert(QuestRecord {
+            quest_id: record,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(value.to_owned()),
+            },
+        });
+        true
     }
 
     /// Set character `slot` of a started quest's info string to `to` if it
