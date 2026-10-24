@@ -638,10 +638,11 @@ pub enum Effect {
         state: u8,
     },
     /// Nothing after it is applied unless the player's event has cleared
-    /// `stage`; they hear `refused` (a key) instead, as an item line.
+    /// `stage`; they hear `refused` (a key) instead, as an item line, or
+    /// without it a portal's `occupied` line.
     RequireStage {
         stage: u8,
-        refused: &'static str,
+        refused: Option<&'static str>,
     },
     /// Take the player, or the party they lead with the members on their
     /// map, to `portal` on the first free copy of a mini-dungeon
@@ -659,8 +660,8 @@ pub struct ScriptOutcome {
     pub effects: Vec<Effect>,
     /// Don't run this portal's script again this session.
     pub block: bool,
-    /// Said in pink when a `RequireEmptyMap`, `RequireNoMobs` or
-    /// `ShutByReactor` keeps the player back.
+    /// Said in pink when a `RequireEmptyMap`, `RequireNoMobs`,
+    /// `ShutByReactor` or `RequireStage` keeps the player back.
     pub occupied: Option<String>,
 }
 
@@ -1046,7 +1047,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 effects: vec![
                     Effect::RequireStage {
                         stage,
-                        refused: keys::HORNTAIL_TRIAL_SEALED,
+                        refused: Some(keys::HORNTAIL_TRIAL_SEALED),
                     },
                     Effect::PortalSound,
                     Effect::WarpToPortal(next, 0),
@@ -1067,7 +1068,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 effects: vec![
                     Effect::RequireStage {
                         stage,
-                        refused: keys::HTPQ_SEALED,
+                        refused: Some(keys::HTPQ_SEALED),
                     },
                     Effect::PortalSound,
                     Effect::WarpToPortal(HTPQ.stage_map(stage + 1), 0),
@@ -1462,6 +1463,19 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ],
             block: false,
             occupied: Some(content::text().get(keys::PIRATE_PORTAL_SHUT, &[])),
+        },
+        // Once Guon has every Mark, which clears the stage.
+        "davy_next1" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireStage {
+                    stage: 2,
+                    refused: None,
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::PIRATE_STAGES[2], 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::PIRATE_MARKS_SHUT, &[])),
         },
         // Closed, it says nothing, as in Cosmic.
         "s4tornado_enter"
@@ -2388,7 +2402,7 @@ mod tests {
                 [
                     Effect::RequireStage {
                         stage,
-                        refused: keys::HORNTAIL_TRIAL_SEALED
+                        refused: Some(keys::HORNTAIL_TRIAL_SEALED)
                     },
                     Effect::PortalSound,
                     Effect::WarpToPortal(next, 0),
@@ -2426,7 +2440,7 @@ mod tests {
                 [
                     Effect::RequireStage {
                         stage: room as u8,
-                        refused: keys::HTPQ_SEALED,
+                        refused: Some(keys::HTPQ_SEALED),
                     },
                     Effect::PortalSound,
                     Effect::WarpToPortal(HTPQ_ENTRY + room + 1, 0),
@@ -3222,6 +3236,22 @@ mod tests {
             ]
         );
         assert!(outcome.occupied.is_some());
+        // The second stage's waits for Guon to have every Mark, and says
+        // so in pink only.
+        let outcome = portal("davy_next1", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireStage {
+                    stage: 2,
+                    refused: None
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::PIRATE_STAGES[2], 0)
+            ]
+        );
+        let shut = content::text().get(keys::PIRATE_MARKS_SHUT, &[]);
+        assert_eq!(outcome.occupied, Some(shut));
     }
 
     #[test]

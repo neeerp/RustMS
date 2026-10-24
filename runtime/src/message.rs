@@ -663,6 +663,13 @@ pub enum FieldMessage {
     /// come: an event won on this copy of the map (Cosmic
     /// `killAllMonstersNotFriendly`).
     ClearMobs,
+    /// Every mob here that isn't friendly goes, giving nothing, and from
+    /// now on `only` this mob comes, at every point of its own, or none:
+    /// Guon took a Mark on the Pirate Ship's second stage
+    /// (`EventCommand::HandInMarks`).
+    SwapMobs {
+        only: Option<i32>,
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

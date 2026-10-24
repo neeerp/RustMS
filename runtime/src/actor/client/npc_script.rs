@@ -603,8 +603,10 @@ impl ClientActor {
                         .as_ref()
                         .is_some_and(|ticket| ticket.holds(map_id) && ticket.cleared(*stage));
                     if !cleared {
-                        let text = net::content::text().get(refused, &[]);
-                        self.send(&mut build_item_line(&text, 0)?).await?;
+                        if let Some(refused) = refused {
+                            let text = net::content::text().get(refused, &[]);
+                            self.send(&mut build_item_line(&text, 0)?).await?;
+                        }
                         return Ok(Applied::Refused);
                     }
                 }

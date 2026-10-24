@@ -1322,3 +1322,7 @@
 "pirate.guon.doors" = "[placeholder] Lock the four doors the pirates come through with the Old Metal Keys they carry, and beat the rest."
 "pirate.guon.boss" = "[placeholder] Beat the Lord Pirate and save my son!"
 "pirate.portal_shut" = "[placeholder] The way on stays shut while monsters are left aboard."
+"pirate.guon.rising" = "[placeholder] Now bring me twenty Marks of the Rising Pirate."
+"pirate.guon.veteran" = "[placeholder] Now bring me twenty Marks of the Veteran Pirate."
+"pirate.guon.marks_in" = "[placeholder] That is every mark. The way on is open: go!"
+"pirate.marks_shut" = "[placeholder] The way on opens once Guon has every mark."

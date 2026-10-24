@@ -1415,6 +1415,24 @@ pub const PIRATE_EXIT: i32 = 925_100_700;
 /// the second, which the leader hands Guon in turn: of use only on the
 /// ship.
 pub const PIRATE_ITEMS: [i32; 4] = [4_001_117, 4_001_120, 4_001_121, 4_001_122];
+/// The second stage's Marks, in the order the leader hands Guon
+/// `PIRATE_MARKS_WANTED` of each, with the pirates that drop them: the
+/// stage's only mobs until their Mark is in (Cosmic `PiratePQ`'s
+/// `respawnStages`; String.nx: the Lord Pirate's Enraged Mr. Allis, Krus
+/// and Captains).
+pub const PIRATE_MARKS: [(i32, i32); 3] = [
+    (4_001_120, 9_300_114),
+    (4_001_121, 9_300_115),
+    (4_001_122, 9_300_116),
+];
+pub const PIRATE_MARKS_WANTED: i16 = 20;
+
+/// The only mob a copy of `map_id` made for an event brings out, at every
+/// spawn point of it, kept filled: on the Pirate Ship's second stage, the
+/// first Mark's pirates, until Guon swaps them (`EventCommand::HandInMarks`).
+pub fn only_mobs(map_id: i32) -> Option<i32> {
+    (map_id == PIRATE_STAGES[1]).then_some(PIRATE_MARKS[0].1)
+}
 
 /// The Pirate Ship (Cosmic `PiratePQ`): three to six of a party, all of
 /// levels 55 to 100, Over the Pirate Ship with their leader, board their
@@ -1878,6 +1896,10 @@ pub enum EventCommand {
     /// once each (Cosmic's `gridInsert`): only their own ticket keeps it,
     /// so it goes when they leave.
     PrizeTaken,
+    /// The leader handed Guon the Pirate Ship's `n`th Mark (from 1), in
+    /// turn: the pirates of that Mark go, giving nothing, the next Mark's
+    /// come, and the third clears the second stage.
+    HandInMarks(u8),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

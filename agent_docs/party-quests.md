@@ -34,7 +34,7 @@ warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
-Pirate Ship is begun: its entry, exit and clocks
+Pirate Ship is begun: its entry, exit, clocks and first two stages
 ([the Pirate Ship](#the-pirate-ship)).
 
 ## Rules
@@ -1091,9 +1091,26 @@ The way on (`next00`, script `davy_next0`) stays shut with a pink line
 (`pirate.portal_shut`) while any monster is left, so the boxes' too, and
 then leads to the second stage.
 
-Not yet: the later stages (the Marks, the decks and their chests, the
-doors, the Lord Pirate), Wu Yang and the rewards, and the Party Search
-toggle.
+On the second stage the leader hands Guon twenty of each pirates' Mark in
+turn: the Rookie's (4001120), then the Rising's (4001121), then the
+Veteran's (4001122) (Cosmic `2094002`; `events::PIRATE_MARKS`). Only the
+pirates of the Mark in turn come out, the Lord Pirate's Enraged Mr. Allis
+(9300114), then Krus (9300115), then Captains (9300116), each kind at all
+31 or 33 of its own points, kept filled (`events::only_mobs`,
+`MobSet::only`, as Cosmic's `respawnStages`); their drops are the content
+pack's (the Marks at 20%). Guon checks the bag for the Mark in turn
+(`guon_marks`, with the team's count from `EventTicket::marks`), takes
+twenty and tells the event (`EventCommand::HandInMarks`), which checks the
+turn again, counts it (`Cleared::marks`) and has the copy swap its
+pirates for the next Mark's (`FieldMessage::SwapMobs`,
+`MobSet::swap_hostile`): those out go, giving nothing, and the others
+come on the next spawn pass. The third clears the stage, with its effect,
+and leaves it empty. The way on (`davy_next1`) opens only then
+(`Effect::RequireStage`, with no item line of its own), saying so in pink
+until it does (`pirate.marks_shut`).
+
+Not yet: the later stages (the decks and their chests, the doors, the
+Lord Pirate), Wu Yang and the rewards, and the Party Search toggle.
 
 ## NPCs
 
@@ -1149,7 +1166,7 @@ toggle.
 | Milepost 2133002 | 930000300 | Out to 930000800 |
 | Sprite 2133004 | 930000500 | Runtime (`ellin_sprite`): the leader with the stone on to the altar, or out |
 | Guon 2094000 | 251010404 | Runtime (`talk_about_event`): a menu of boarding and what waits aboard |
-| Guon 2094002 | 925100000-500 | The leader hears what the map asks; anyone else may go back to 251010404 |
+| Guon 2094002 | 925100000-500 | The leader hears what the map asks, and on 925100100 hands in the Marks; anyone else may go back to 251010404 |
 | Guon 2094002 | 925100700 | At once to 251010404 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,

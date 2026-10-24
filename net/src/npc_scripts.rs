@@ -1415,9 +1415,14 @@ impl NpcScript {
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
             }
-            GUON_ABOARD => Some(guon_aboard(player.stats.map_id, leader)),
             _ => None,
         }
+    }
+
+    /// Guon aboard the Pirate Ship (Cosmic `2094002`), to `player`, who
+    /// may be its `leader`, whose team has handed him `marks` Marks.
+    pub fn guon_aboard(player: &Player, leader: bool, marks: u8) -> Self {
+        guon_aboard(player, leader, marks)
     }
 
     /// Eak (Cosmic `2013001`) to a player in the Orbis party quest on
@@ -6955,13 +6960,14 @@ fn guon(entry: Entry) -> NpcScript {
 /// Guon (Cosmic `2094002`) on the ship's map `map_id`: anyone but the
 /// leader may give up and go back Over the Pirate Ship; the leader hears
 /// what the map asks.
-fn guon_aboard(map_id: i32, leader: bool) -> NpcScript {
+fn guon_aboard(player: &Player, leader: bool, marks: u8) -> NpcScript {
     if !leader {
         return ask_warp(GUON_ABOARD, keys::PIRATE_GUON_LEAVE, events::PIRATE_LOBBY);
     }
+    let map_id = player.stats.map_id;
     let stage = |n: usize| events::PIRATE_STAGES[n];
     let key = match map_id {
-        _ if map_id == stage(1) => keys::PIRATE_GUON_MARKS,
+        _ if map_id == stage(1) => return guon_marks(player, marks),
         _ if map_id == stage(2) || map_id == stage(3) => keys::PIRATE_GUON_DECK,
         _ if map_id == stage(2) + 1 || map_id == stage(3) + 1 => keys::PIRATE_GUON_BONUS,
         _ if map_id == stage(2) + 2 || map_id == stage(3) + 2 => keys::PIRATE_GUON_CREW,
@@ -6970,6 +6976,36 @@ fn guon_aboard(map_id: i32, leader: bool) -> NpcScript {
         _ => keys::PIRATE_GUON_BOXES,
     };
     NpcScript::new(GUON_ABOARD, vec![Page::Say(text(key))])
+}
+
+/// Guon to the leader on the second stage, whose team has handed him
+/// `marks` Marks: he takes twenty of the next in turn, if they hold them,
+/// and asks for the one after, or says what he wants (Cosmic `2094002`,
+/// `stage2`). The event checks the turn again (`HandInMarks`).
+fn guon_marks(player: &Player, marks: u8) -> NpcScript {
+    // What he wants with `n` Marks in.
+    const WANTS: [&str; 4] = [
+        keys::PIRATE_GUON_MARKS,
+        keys::PIRATE_GUON_RISING,
+        keys::PIRATE_GUON_VETERAN,
+        keys::PIRATE_GUON_MARKS_IN,
+    ];
+    let n = usize::from(marks).min(events::PIRATE_MARKS.len());
+    let wanted = events::PIRATE_MARKS_WANTED;
+    let page = match events::PIRATE_MARKS.get(n) {
+        Some(&(mark, _)) if player.inventory.count(mark) >= i32::from(wanted) => Page::Act {
+            text: text(WANTS[n + 1]),
+            effects: vec![
+                Effect::TakeItem {
+                    item_id: mark,
+                    quantity: wanted,
+                },
+                Effect::EventCommand(EventCommand::HandInMarks(marks + 1)),
+            ],
+        },
+        _ => Page::Say(text(WANTS[n])),
+    };
+    NpcScript::new(GUON_ABOARD, vec![page])
 }
 
 /// The Altaire Earrings, then Glittering, then Brilliant (Character.nx
@@ -13216,7 +13252,7 @@ mod tests {
         // Aboard, a member may go back; the leader hears what the map asks.
         let mut member = player(60);
         member.stats.map_id = events::PIRATE_STAGES[2];
-        let mut aboard = NpcScript::in_event(GUON_ABOARD, &member, false, false).unwrap();
+        let mut aboard = NpcScript::guon_aboard(&member, false, 0);
         assert_eq!(question(&aboard.begin()), text(keys::PIRATE_GUON_LEAVE));
         let step = aboard.respond(ScriptInput::Yes).unwrap();
         assert_eq!(
@@ -13233,7 +13269,7 @@ mod tests {
             (events::PIRATE_STAGES[5], keys::PIRATE_GUON_BOSS),
         ] {
             member.stats.map_id = map;
-            let aboard = NpcScript::in_event(GUON_ABOARD, &member, true, false).unwrap();
+            let aboard = NpcScript::guon_aboard(&member, true, 0);
             assert_eq!(page_text(&aboard.begin()), text(key), "{map}");
         }
         // On the way out, he sends anyone back at once.
@@ -13245,6 +13281,61 @@ mod tests {
             step.effects,
             [Effect::WarpToPortal(events::PIRATE_LOBBY, 0)]
         );
+    }
+
+    #[test]
+    fn guon_takes_twenty_of_each_mark_in_turn_from_the_leader() {
+        let mut leader = player(60);
+        leader.stats.map_id = events::PIRATE_STAGES[1];
+        let wants = [
+            keys::PIRATE_GUON_MARKS,
+            keys::PIRATE_GUON_RISING,
+            keys::PIRATE_GUON_VETERAN,
+            keys::PIRATE_GUON_MARKS_IN,
+        ];
+        // Short of the Mark in turn, he says which he wants; others
+        // don't count.
+        for (slot, &(mark, _)) in events::PIRATE_MARKS.iter().enumerate() {
+            leader.inventory.insert(
+                InventoryType::Etc,
+                slot as i16 + 1,
+                game::Item::stack(mark, 19),
+            );
+        }
+        for (marks, key) in wants.into_iter().enumerate() {
+            let guon = NpcScript::guon_aboard(&leader, true, marks as u8);
+            let step = guon.begin();
+            assert_eq!(page_text(&step), text(key), "{marks}");
+            assert!(step.effects.is_empty(), "{marks}");
+        }
+        // With twenty, he takes them and asks for the next.
+        for (slot, &(mark, _)) in events::PIRATE_MARKS.iter().enumerate() {
+            leader.inventory.insert(
+                InventoryType::Etc,
+                slot as i16 + 1,
+                game::Item::stack(mark, 20),
+            );
+        }
+        for (n, &(mark, _)) in events::PIRATE_MARKS.iter().enumerate() {
+            let step = NpcScript::guon_aboard(&leader, true, n as u8).begin();
+            assert_eq!(page_text(&step), text(wants[n + 1]), "{n}");
+            assert_eq!(
+                step.effects,
+                [
+                    Effect::TakeItem {
+                        item_id: mark,
+                        quantity: 20
+                    },
+                    Effect::EventCommand(EventCommand::HandInMarks(n as u8 + 1)),
+                ]
+            );
+        }
+        let done = NpcScript::guon_aboard(&leader, true, 3).begin();
+        assert_eq!(page_text(&done), text(keys::PIRATE_GUON_MARKS_IN));
+        assert!(done.effects.is_empty());
+        // A member is only asked whether to leave.
+        let member = NpcScript::guon_aboard(&leader, false, 0);
+        assert_eq!(question(&member.begin()), text(keys::PIRATE_GUON_LEAVE));
     }
 
     #[test]
