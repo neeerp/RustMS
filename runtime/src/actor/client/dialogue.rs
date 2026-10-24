@@ -105,6 +105,11 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::npc_scripts::ELLIN_GUIDE {
+            if let Some(script) = self.ellin_flowers().await? {
+                return self.start_script(script).await;
+            }
+        }
         let player = &self.in_game()?.player;
         if let Some(ticket) = self.event.as_ref().filter(|t| t.holds(player.stats.map_id)) {
             let (leader, won) = (ticket.leader(), ticket.won());

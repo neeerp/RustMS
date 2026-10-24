@@ -133,6 +133,9 @@ pub struct EventTicket {
     /// Whether the member took their share of the prize
     /// (`EventCommand::PrizeTaken`).
     pub prize_taken: bool,
+    /// Whether the member heard Ellin out on the forest's fourth stage
+    /// (Cosmic `gridInsert`).
+    pub hint_heard: bool,
 }
 
 impl Drop for EventTicket {
@@ -344,6 +347,7 @@ pub fn spawn(
         everyone: everyone.clone(),
         failed: false,
         bonus_taken: false,
+        moved_to: Vec::new(),
         win_exp: None,
         blessing: start.blessing,
     };
@@ -451,6 +455,8 @@ struct EventActor {
     failed: bool,
     /// The leader took the team to the bonus.
     bonus_taken: bool,
+    /// The maps the team has been moved to (`EventCommand::MoveTeam`).
+    moved_to: Vec<i32>,
     blessing: Option<i32>,
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
@@ -519,6 +525,7 @@ impl EventActor {
             leader: self.leader.clone(),
             blessing: self.blessing,
             prize_taken: false,
+            hint_heard: false,
         }
     }
 
@@ -667,7 +674,12 @@ impl EventActor {
                 }
             }
             EventCommand::HandOver(_) => {}
-            EventCommand::MoveTeam(map) if leader && event.maps.contains(&map) => {
+            // The leader's; or, once any member has cleared the stage
+            // before it, theirs (Ellin at the maze's end).
+            EventCommand::MoveTeam(map)
+                if event.maps.contains(&map) && (leader || self.member_moves_to(map)) =>
+            {
+                self.moved_to.push(map);
                 self.move_team(None, map, self.ends);
             }
             EventCommand::MoveTeam(map) => debug!(map, client_id, "Move not taken"),
@@ -693,6 +705,17 @@ impl EventActor {
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
         }
+    }
+
+    /// Whether any member may move the team to `map`: its stage follows
+    /// one that any member clears, which is, and the team hasn't been taken
+    /// there yet (a second member's talk, left open, would take it back).
+    fn member_moves_to(&self, map: i32) -> bool {
+        let event = self.kind.event();
+        let before = event.stage_on(map).and_then(|stage| stage.checked_sub(1));
+        let cleared = before
+            .is_some_and(|stage| event.member_clears.contains(&stage) && self.cleared.has(stage));
+        cleared && !self.moved_to.contains(&map)
     }
 
     /// The leader takes the team to the bonus, on a clock of its own

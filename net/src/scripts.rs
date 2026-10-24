@@ -1785,6 +1785,32 @@ pub fn ellin_way_on(map_id: i32, cleared: impl Fn(u8) -> bool) -> Vec<Effect> {
     }
 }
 
+/// The ways out of the forest's maze, its third stage (Cosmic
+/// `party6_stage501` to `party6_stage515`): each of its first fifteen
+/// rooms has one script for all its ways out.
+const ELLIN_MAZE_ROOM: &str = "party6_stage5";
+
+/// The maze's room `16st`, at its end, where Ellin is.
+pub const ELLIN_MAZE_END: u8 = 16;
+
+/// Where a way out of a maze room takes a member when `lucky` (one time
+/// in ten): to the maze's end, and otherwise to the next room's spot (the
+/// fifteenth's back to the first's). `None` for any other portal.
+pub fn ellin_maze_way(script: &str, lucky: bool) -> Option<Vec<Effect>> {
+    let room = script.strip_prefix(ELLIN_MAZE_ROOM)?;
+    let room: u8 = room.parse().ok().filter(|_| room.len() == 2)?;
+    if !(1..ELLIN_MAZE_END).contains(&room) {
+        return None;
+    }
+    let to = if lucky {
+        ELLIN_MAZE_END
+    } else {
+        room % (ELLIN_MAZE_END - 1) + 1
+    };
+    let maze = crate::events::ELLIN_STAGES[2];
+    Some(vec![Effect::PortalSound, Effect::WarpToPortal(maze, to)])
+}
+
 /// The way to Papulatus, for a player whose party stands as `entry`: the
 /// leader takes it in, or is told in pink why not (Cosmic `Populatus00`).
 pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
@@ -2808,6 +2834,25 @@ mod tests {
         assert!(ellin_way_on(ELLIN_EXIT, |_| true).is_empty());
         let home = portal("party6_stage800", &player_with(&[])).unwrap();
         assert_eq!(home.effects, on(ELLIN_LOBBY));
+    }
+
+    #[test]
+    fn the_mazes_rooms_lead_on_in_turn_or_now_and_then_to_its_end() {
+        let maze = crate::events::ELLIN_STAGES[2];
+        let to = |spot| Some(vec![Effect::PortalSound, Effect::WarpToPortal(maze, spot)]);
+        assert_eq!(ellin_maze_way("party6_stage501", false), to(2));
+        assert_eq!(ellin_maze_way("party6_stage514", false), to(15));
+        assert_eq!(ellin_maze_way("party6_stage515", false), to(1));
+        assert_eq!(ellin_maze_way("party6_stage507", true), to(ELLIN_MAZE_END));
+        for script in [
+            "party6_stage500",
+            "party6_stage516",
+            "party6_stage5",
+            "party6_stage800",
+        ] {
+            assert_eq!(ellin_maze_way(script, false), None, "{script}");
+        }
+        assert_eq!(ellin_maze_way(ELLIN_STAGE, true), None);
     }
 
     #[test]
