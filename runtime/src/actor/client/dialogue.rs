@@ -83,6 +83,9 @@ impl ClientActor {
         if npc_id == net::npc_scripts::ELLIN && player.stats.map_id == net::events::ELLIN.lobby {
             return self.talk_about_event(net::events::EventKind::Ellin).await;
         }
+        if npc_id == net::npc_scripts::GUON && player.stats.map_id == net::events::PIRATE.lobby {
+            return self.talk_about_event(net::events::EventKind::Pirate).await;
+        }
         if npc_id == net::npc_scripts::ROLLY && player.stats.map_id == net::events::LUDIMAZE.lobby {
             return self
                 .talk_about_event(net::events::EventKind::LudiMaze)

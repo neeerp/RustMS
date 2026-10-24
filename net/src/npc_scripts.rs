@@ -886,6 +886,10 @@ pub const ELLIN: i32 = 2133000;
 pub const ELLIN_GUIDE: i32 = 2133001;
 pub const ELLIN_MILEPOST: i32 = 2133002;
 pub const ELLIN_SPRITE: i32 = 2133004;
+/// Guon Over the Pirate Ship, who sends a party aboard against the Lord
+/// Pirate, and Guon on each of the ship's maps and its way out.
+pub const GUON: i32 = 2094000;
+pub const GUON_ABOARD: i32 = 2094002;
 /// El Nath, and its portal from the Chief's Residence.
 const EL_NATH: i32 = 211_000_000;
 const EL_NATH_FROM_RESIDENCE: u8 = 14;
@@ -1337,6 +1341,12 @@ impl NpcScript {
         ellin(entry, player)
     }
 
+    /// Guon Over the Pirate Ship, for a player whose party may or may not
+    /// board it.
+    pub fn guon(entry: Entry) -> Self {
+        guon(entry)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1405,6 +1415,7 @@ impl NpcScript {
             ELLIN_SPRITE if player.stats.map_id == events::ELLIN_STAGES[4] => {
                 Some(ellin_sprite(player, leader))
             }
+            GUON_ABOARD => Some(guon_aboard(player.stats.map_id, leader)),
             _ => None,
         }
     }
@@ -1590,6 +1601,15 @@ impl NpcScript {
                     ELLIN_MILEPOST,
                     keys::ELLIN_MILEPOST_LEAVE,
                     events::ELLIN.exit,
+                ))
+            }
+            GUON_ABOARD if player.stats.map_id == events::PIRATE_EXIT => {
+                return Some(NpcScript::new(
+                    GUON_ABOARD,
+                    vec![Page::Done(vec![Effect::WarpToPortal(
+                        events::PIRATE_LOBBY,
+                        0,
+                    )])],
                 ))
             }
             ROLLY_HOME if player.stats.map_id == events::MAZE_EXIT => {
@@ -6900,6 +6920,56 @@ fn ellin(entry: Entry, player: &Player) -> NpcScript {
     script.refused = Some(event_terms(&events::ELLIN, keys::ELLIN_NOT_ELIGIBLE));
     script.inventory_full = Some(text(keys::ELLIN_PRIZE_NO_ROOM));
     script
+}
+
+/// Guon (Cosmic `2094000`) Over the Pirate Ship: the leader takes the
+/// party aboard, and anyone may hear what waits there. Cosmic's Party
+/// Search toggle has no counterpart here (`v83ref/lanes/QUESTIONS.md`
+/// a128 6).
+fn guon(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::PIRATE_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::PIRATE_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::PIRATE_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Pirate)]),
+    };
+    let mut script = NpcScript::new(
+        GUON,
+        vec![Page::Menu {
+            text: text(keys::PIRATE_MENU),
+            choices: vec![
+                (text(keys::PIRATE_ENTER), vec![enter]),
+                (
+                    text(keys::PIRATE_ABOUT),
+                    vec![Page::Say(text(keys::PIRATE_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Guon checked, or another party went in.
+    script.refused = Some(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE));
+    script
+}
+
+/// Guon (Cosmic `2094002`) on the ship's map `map_id`: anyone but the
+/// leader may give up and go back Over the Pirate Ship; the leader hears
+/// what the map asks.
+fn guon_aboard(map_id: i32, leader: bool) -> NpcScript {
+    if !leader {
+        return ask_warp(GUON_ABOARD, keys::PIRATE_GUON_LEAVE, events::PIRATE_LOBBY);
+    }
+    let stage = |n: usize| events::PIRATE_STAGES[n];
+    let key = match map_id {
+        _ if map_id == stage(1) => keys::PIRATE_GUON_MARKS,
+        _ if map_id == stage(2) || map_id == stage(3) => keys::PIRATE_GUON_DECK,
+        _ if map_id == stage(2) + 1 || map_id == stage(3) + 1 => keys::PIRATE_GUON_BONUS,
+        _ if map_id == stage(2) + 2 || map_id == stage(3) + 2 => keys::PIRATE_GUON_CREW,
+        _ if map_id == stage(4) => keys::PIRATE_GUON_DOORS,
+        _ if map_id == stage(5) => keys::PIRATE_GUON_BOSS,
+        _ => keys::PIRATE_GUON_BOXES,
+    };
+    NpcScript::new(GUON_ABOARD, vec![Page::Say(text(key))])
 }
 
 /// The Altaire Earrings, then Glittering, then Brilliant (Character.nx
@@ -13115,6 +13185,66 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn guon_takes_the_party_aboard_and_lets_a_member_off() {
+        let mut ready = NpcScript::guon(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Pirate)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::PIRATE_NO_PARTY),
+            (Entry::NotLeader, keys::PIRATE_NOT_LEADER),
+            (Entry::Busy, keys::PIRATE_BUSY),
+        ] {
+            let mut guon = NpcScript::guon(entry);
+            guon.begin();
+            let step = guon.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut guon = NpcScript::guon(Entry::NotEligible);
+        guon.begin();
+        let step = guon.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("100"), "{step:?}");
+        let mut guon = NpcScript::guon(Entry::Ready);
+        guon.begin();
+        let step = guon.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::PIRATE_INFO));
+
+        // Aboard, a member may go back; the leader hears what the map asks.
+        let mut member = player(60);
+        member.stats.map_id = events::PIRATE_STAGES[2];
+        let mut aboard = NpcScript::in_event(GUON_ABOARD, &member, false, false).unwrap();
+        assert_eq!(question(&aboard.begin()), text(keys::PIRATE_GUON_LEAVE));
+        let step = aboard.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            step.effects,
+            [Effect::WarpToPortal(events::PIRATE_LOBBY, 0)]
+        );
+        for (map, key) in [
+            (events::PIRATE_STAGES[0], keys::PIRATE_GUON_BOXES),
+            (events::PIRATE_STAGES[1], keys::PIRATE_GUON_MARKS),
+            (events::PIRATE_STAGES[3], keys::PIRATE_GUON_DECK),
+            (925_100_201, keys::PIRATE_GUON_BONUS),
+            (925_100_302, keys::PIRATE_GUON_CREW),
+            (events::PIRATE_STAGES[4], keys::PIRATE_GUON_DOORS),
+            (events::PIRATE_STAGES[5], keys::PIRATE_GUON_BOSS),
+        ] {
+            member.stats.map_id = map;
+            let aboard = NpcScript::in_event(GUON_ABOARD, &member, true, false).unwrap();
+            assert_eq!(page_text(&aboard.begin()), text(key), "{map}");
+        }
+        // On the way out, he sends anyone back at once.
+        assert!(NpcScript::for_npc(GUON_ABOARD, &member).is_none());
+        member.stats.map_id = events::PIRATE_EXIT;
+        let out = NpcScript::for_npc(GUON_ABOARD, &member).unwrap();
+        let step = out.begin();
+        assert_eq!(
+            step.effects,
+            [Effect::WarpToPortal(events::PIRATE_LOBBY, 0)]
+        );
     }
 
     #[test]

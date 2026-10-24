@@ -32,8 +32,10 @@ out ([Delli's rescue](#dellis-rescue)). The Ludibrium Maze is played through
 ([the Ludibrium Maze](#the-ludibrium-maze)). Protecting Tylus, for the
 warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
-Haze is begun: its entry, exit, timer and first stage
-([the Forest of Poison Haze](#the-forest-of-poison-haze)).
+Haze is played through
+([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
+Pirate Ship is begun: its entry, exit and clocks
+([the Pirate Ship](#the-pirate-ship)).
 
 ## Rules
 
@@ -1047,6 +1049,38 @@ leaves. Its lines are placeholders (`ellin.*`).
 
 Not yet: the Party Search toggle.
 
+## The Pirate Ship
+
+Herb Town's party quest against the Lord Pirate
+(`v83ref/reports/a128-pirate-pq.md`; defaults in
+`v83ref/lanes/QUESTIONS.md` a128). Guon (2094000) Over the Pirate Ship
+(251010404) answers with a menu of boarding and what waits aboard. The
+leader takes those of the party there at levels 55 to 100, three to six of
+them, the leader among them, into their own copy of the ship
+(925100000-600; `events::PIRATE`, `EventKind::Pirate`); a member of
+another level stays behind, as in Cosmic. Its six stages are 925100000,
+100, 200, 300, 400 and 500, the last the Lord Pirate's; 201/202 and
+301/302 are rooms off the third and fourth; beating him will take the team
+to 925100600 (`clear_map`).
+
+The clock starts at 4 minutes. The first time any member reaches the
+second, third, fourth or fifth stage, it starts over at 6, and at the Lord
+Pirate's at 8 (`events::clock_on`, Cosmic `changedMapInside`): the client
+tells the event on the way there (`leaving_for`, `EventCommand::Reached`),
+and the event restarts it once per map (`restart_clock`). Time running
+out, the leader leaving, or fewer than three staying ends it for
+everyone, who land on 925100700 (`exit`, every map's `returnMap`).
+
+Guon (2094002) aboard lets anyone but the leader give up and go back to
+251010404; the leader hears what the map asks (`pirate.guon.*`). On
+925100700 he sends anyone back to 251010404 at once. The event's items
+(the Old Metal Keys 4001117 and the Marks 4001120-4001122) are taken from
+whoever leaves. Its lines are placeholders (`pirate.*`).
+
+Not yet: the stages themselves (the boxes, the Marks, the decks and their
+chests, the doors, the Lord Pirate), Wu Yang and the rewards, and the
+Party Search toggle.
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -1100,6 +1134,9 @@ Not yet: the Party Search toggle.
 | Ellin 2133001 | 930000100-600, others | Out to 930000800 |
 | Milepost 2133002 | 930000300 | Out to 930000800 |
 | Sprite 2133004 | 930000500 | Runtime (`ellin_sprite`): the leader with the stone on to the altar, or out |
+| Guon 2094000 | 251010404 | Runtime (`talk_about_event`): a menu of boarding and what waits aboard |
+| Guon 2094002 | 925100000-500 | The leader hears what the map asks; anyone else may go back to 251010404 |
+| Guon 2094002 | 925100700 | At once to 251010404 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
@@ -1107,5 +1144,5 @@ Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `lpq.arturo.*`, `lpq.anderson.*`, `opq.wonky.*`, `opq.eak.*`,
 `opq.minerva.*`, `zakum.adobis.mine.*`, `zakum.aura.*`, `zakum.mine.*`,
 `zakum.ali.*`, `htpq.keeper.*`, `htpq.rooms.*`, `htpq.seal.*`,
-`htpq.key.*`, `htpq.lamp.*`, `delli.*`, `ludimaze.*`, `tylus.*` and
-`ellin.*`.
+`htpq.key.*`, `htpq.lamp.*`, `delli.*`, `ludimaze.*`, `tylus.*`,
+`ellin.*` and `pirate.*`.

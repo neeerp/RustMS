@@ -1803,6 +1803,22 @@ pub mod keys {
     pub const ELLIN_PRIZE_NO_ALTAIRE: &str = "ellin.prize.no_altaire";
     pub const ELLIN_PRIZE_NO_GLITTERING: &str = "ellin.prize.no_glittering";
     pub const ELLIN_PRIZE_NO_ROOM: &str = "ellin.prize.no_room";
+    pub const PIRATE_MENU: &str = "pirate.menu";
+    pub const PIRATE_ENTER: &str = "pirate.enter";
+    pub const PIRATE_ABOUT: &str = "pirate.about";
+    pub const PIRATE_INFO: &str = "pirate.info";
+    pub const PIRATE_NO_PARTY: &str = "pirate.no_party";
+    pub const PIRATE_NOT_LEADER: &str = "pirate.not_leader";
+    pub const PIRATE_NOT_ELIGIBLE: &str = "pirate.not_eligible";
+    pub const PIRATE_BUSY: &str = "pirate.busy";
+    pub const PIRATE_GUON_LEAVE: &str = "pirate.guon.leave";
+    pub const PIRATE_GUON_BOXES: &str = "pirate.guon.boxes";
+    pub const PIRATE_GUON_MARKS: &str = "pirate.guon.marks";
+    pub const PIRATE_GUON_DECK: &str = "pirate.guon.deck";
+    pub const PIRATE_GUON_BONUS: &str = "pirate.guon.bonus";
+    pub const PIRATE_GUON_CREW: &str = "pirate.guon.crew";
+    pub const PIRATE_GUON_DOORS: &str = "pirate.guon.doors";
+    pub const PIRATE_GUON_BOSS: &str = "pirate.guon.boss";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2771,6 +2787,22 @@ mod tests {
                 keys::ELLIN_PRIZE_NO_ALTAIRE,
                 keys::ELLIN_PRIZE_NO_GLITTERING,
                 keys::ELLIN_PRIZE_NO_ROOM,
+                keys::PIRATE_MENU,
+                keys::PIRATE_ENTER,
+                keys::PIRATE_ABOUT,
+                keys::PIRATE_INFO,
+                keys::PIRATE_NO_PARTY,
+                keys::PIRATE_NOT_LEADER,
+                keys::PIRATE_NOT_ELIGIBLE,
+                keys::PIRATE_BUSY,
+                keys::PIRATE_GUON_LEAVE,
+                keys::PIRATE_GUON_BOXES,
+                keys::PIRATE_GUON_MARKS,
+                keys::PIRATE_GUON_DECK,
+                keys::PIRATE_GUON_BONUS,
+                keys::PIRATE_GUON_CREW,
+                keys::PIRATE_GUON_DOORS,
+                keys::PIRATE_GUON_BOSS,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

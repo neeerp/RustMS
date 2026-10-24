@@ -348,6 +348,7 @@ pub fn spawn(
         failed: false,
         bonus_taken: false,
         moved_to: Vec::new(),
+        reached: HashSet::new(),
         win_exp: None,
         blessing: start.blessing,
     };
@@ -457,6 +458,9 @@ struct EventActor {
     bonus_taken: bool,
     /// The maps the team has been moved to (`EventCommand::MoveTeam`).
     moved_to: Vec<i32>,
+    /// The maps whose first arrival has started the clock over
+    /// (`EventCommand::Reached`).
+    reached: HashSet<i32>,
     blessing: Option<i32>,
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
@@ -702,6 +706,14 @@ impl EventActor {
                 self.restart_clock(net::events::HORNTAIL_FIGHT_MINUTES);
             }
             EventCommand::RestartClock => debug!(client_id, "Restart not taken"),
+            EventCommand::Reached(map) if event.holds(map) && !won => {
+                if let Some(minutes) = net::events::clock_on(map) {
+                    if self.reached.insert(map) {
+                        self.restart_clock(minutes);
+                    }
+                }
+            }
+            EventCommand::Reached(_) => {}
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
         }
