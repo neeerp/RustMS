@@ -277,6 +277,11 @@ namespace ms
 		Point<int16_t> cursoroffset = cursorpos - position;
 		lastcursorpos = cursoroffset;
 
+		// A button held keeps the cursor, sliders and all, until the mouse
+		// comes back up.
+		if (is_holding_button())
+			return UIElement::send_cursor(clicked, cursorpos);
+
 		if (buyslider.isenabled())
 		{
 			Cursor::State bstate = buyslider.send_cursor(cursoroffset, clicked);
@@ -317,43 +322,34 @@ namespace ms
 			clear_tooltip();
 		}
 
-		Cursor::State ret = clicked ? Cursor::State::CLICKING : Cursor::State::IDLE;
-		bool handled = false;
+		// Buy, Sell, Exit and Rech. click as the mouse comes back up over
+		// them.
+		Cursor::State ret = UIElement::send_cursor(clicked, cursorpos);
 
-		for (size_t i = 0; i < Buttons::NUM_BUTTONS; i++)
+		// The one held keeps the cursor until the mouse comes back up, and
+		// a press on Rech. isn't also one on its row.
+		if (is_holding_button())
+			return ret;
+
+		// Tabs and rows are areas, with no sound or hand of their own, that
+		// v83 picks as the mouse goes down.
+		for (size_t i = Buttons::EQUIP; i < Buttons::NUM_BUTTONS; i++)
 		{
 			Button &button = *buttons[i];
-			bool real = i <= Buttons::RECHARGE4;
 
-			if (button.is_active() && button.bounds(position).contains(cursorpos) && !handled)
+			if (button.is_active() && button.bounds(position).contains(cursorpos))
 			{
 				if (button.get_state() == Button::State::NORMAL)
 				{
-					if (real)
-					{
-						Sound(Sound::Name::BUTTONOVER).play();
-						ret = Cursor::State::CANCLICK;
-					}
-
 					button.set_state(Button::State::MOUSEOVER);
-				} else if (button.get_state() == Button::State::MOUSEOVER)
+				} else if (button.get_state() == Button::State::MOUSEOVER && clicked)
 				{
-					if (clicked)
-					{
-						if (i >= Buttons::EQUIP && i <= Buttons::CASH)
-							Sound(Sound::Name::TAB).play();
-						else if (real)
-							Sound(Sound::Name::BUTTONCLICK).play();
+					if (i <= Buttons::CASH)
+						Sound(Sound::Name::TAB).play();
 
-						button.set_state(button_pressed(i));
+					button.set_state(button_pressed(static_cast<uint16_t>(i)));
 
-						ret = Cursor::State::IDLE;
-						// A click on Rech. isn't also one on its row.
-						handled = true;
-					} else if (real)
-					{
-						ret = Cursor::State::CANCLICK;
-					}
+					ret = Cursor::State::IDLE;
 				}
 			} else if (button.get_state() == Button::State::MOUSEOVER)
 			{
