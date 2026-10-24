@@ -117,7 +117,8 @@ namespace ms
 			// The value at the last check; -1 until the first.
 			int32_t last = -1;
 
-			void check(int32_t value, int32_t max);
+			// The level is a percentage; 0 never flashes.
+			void check(int32_t value, int32_t max, int32_t level);
 			void update();
 			void draw(Point<int16_t> parent) const;
 		};

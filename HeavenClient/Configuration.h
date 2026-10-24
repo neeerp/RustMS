@@ -425,18 +425,34 @@ namespace ms
 		{}
 	};
 
-	// Warn when HP falls to this percentage; 0 never warns
+	// Warn when HP falls below this many 5% steps, 0 to 19; 0 never warns
+	// (v83 soHPFlash). Its key is new, as the old one held a percentage.
 	struct HPAlert : public Configuration::ByteEntry
 	{
-		HPAlert() : ByteEntry("HPAlert", "20")
+		HPAlert() : ByteEntry("HPFlash", "10")
 		{}
+
+		// The level in percent, reading past 19 as 19
+		int32_t percent() const
+		{
+			uint8_t steps = load();
+			return 5 * (steps > 19 ? 19 : steps);
+		}
 	};
 
-	// Warn when MP falls to this percentage; 0 never warns
+	// Warn when MP falls below this many 5% steps, 0 to 19; 0 never warns
+	// (v83 soMPFlash)
 	struct MPAlert : public Configuration::ByteEntry
 	{
-		MPAlert() : ByteEntry("MPAlert", "20")
+		MPAlert() : ByteEntry("MPFlash", "10")
 		{}
+
+		// The level in percent, reading past 19 as 19
+		int32_t percent() const
+		{
+			uint8_t steps = load();
+			return 5 * (steps > 19 ? 19 : steps);
+		}
 	};
 
 	// Whether skills shake the screen

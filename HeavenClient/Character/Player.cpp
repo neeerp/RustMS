@@ -2192,7 +2192,7 @@ namespace ms
 
 		if (itemid && wears_pouch(false) && !get_diseases().seduced &&
 			auto_potion::below(stats.get_stat(MapleStat::Id::HP), hp_loss, stats.get_total(EquipStat::Id::HP),
-							   Setting<HPAlert>::get().load()))
+							   Setting<HPAlert>::get().percent()))
 		{
 			// The misses start over even if the request can't go yet.
 			if (int16_t slot = inventory.find_item(InventoryType::Id::USE, itemid))
@@ -2224,7 +2224,7 @@ namespace ms
 
 		if (!auto_mp_armed || !itemid || !wears_pouch(true) || get_diseases().seduced ||
 			!auto_potion::below(stats.get_stat(MapleStat::Id::MP), 0, stats.get_total(EquipStat::Id::MP),
-								Setting<MPAlert>::get().load()))
+								Setting<MPAlert>::get().percent()))
 			return;
 
 		if (int16_t slot = inventory.find_item(InventoryType::Id::USE, itemid))

@@ -131,9 +131,6 @@ namespace ms
 		const Point<int16_t> HPFLASH_POS = Point<int16_t>(218, 51);
 		const Point<int16_t> MPFLASH_POS = Point<int16_t>(326, 51);
 
-		// The soHPFlash and soMPFlash options, in 5% steps. v83 reads them
-		// from the registry, 10 (50%) unless set in the options.
-		constexpr int32_t FLASH_LEVEL = 10;
 		// Quick slot cells are 32 x 32 at (7, 8) + (35, 33) per column and row (0xbe2db0).
 		const Point<int16_t> CELL_PITCH = Point<int16_t>(35, 33);
 		constexpr int16_t CELL_SIZE = 32;
@@ -536,8 +533,10 @@ namespace ms
 				key_hint_left[i]--;
 			}
 		}
-		hpflash.check(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP));
-		mpflash.check(stats.get_stat(MapleStat::Id::MP), stats.get_total(EquipStat::Id::MP));
+		// The alert options are read on every check, so a slider being
+		// dragged moves them at once (0x8d850b).
+		hpflash.check(stats.get_stat(MapleStat::Id::HP), stats.get_total(EquipStat::Id::HP), Setting<HPAlert>::get().percent());
+		mpflash.check(stats.get_stat(MapleStat::Id::MP), stats.get_total(EquipStat::Id::MP), Setting<MPAlert>::get().percent());
 		hpflash.update();
 		mpflash.update();
 
@@ -959,10 +958,8 @@ namespace ms
 		);
 	}
 
-	void UIStatusBar::GaugeFlash::check(int32_t value, int32_t max)
+	void UIStatusBar::GaugeFlash::check(int32_t value, int32_t max, int32_t level)
 	{
-		int32_t level = 5 * FLASH_LEVEL;
-
 		if (level != 0 && max > 0 && value * 100 / max < level)
 		{
 			if (last > value)
