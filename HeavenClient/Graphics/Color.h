@@ -151,6 +151,7 @@ namespace ms
 			JOBDISABLED,
 			SCRIPTGOLD,
 			FAMILYBLUE,
+			MEDALTEAL,
 			NUM_COLORS
 		};
 
@@ -251,7 +252,8 @@ namespace ms
 						{0.47f, 0.50f, 0.53f}, // Job head (#777F88, a class's box in the Party Search window)
 						{0.55f, 0.54f, 0.55f}, // Job disabled (#8C8A8C, a greyed box's label there)
 						{1.00f, 0.78f, 0.00f}, // Script gold (#FFC600, the floating script lines)
-						{0.64f, 0.94f, 1.00f}  // Family blue (#A4F0FF, v83 font 0x10: an empty junior's box in the Family Tree)
+						{0.64f, 0.94f, 1.00f}, // Family blue (#A4F0FF, v83 font 0x10: an empty junior's box in the Family Tree)
+						{0.20f, 0.43f, 0.50f}  // Medal teal (#346E80, a title's name in v83's title window)
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

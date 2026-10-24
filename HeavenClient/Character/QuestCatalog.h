@@ -32,6 +32,13 @@ namespace ms
 		// Say.img/<id>/0 (offer) or /1 (completion and reminders).
 		QuestScript script(int16_t id, bool completion) const;
 
+		// A title (medal) quest, in QuestInfo.img's area 51: v83 lists it in
+		// the title window, not the quest log or the quest helper
+		// (FUN_00a26faa, FUN_00721126).
+		bool is_title(int16_t id) const;
+
+		static constexpr int16_t TITLE_AREA = 51;
+
 	private:
 		nl::node root;
 		std::vector<QuestInfo> supported;

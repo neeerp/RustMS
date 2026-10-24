@@ -142,6 +142,7 @@ namespace ms
 			IMAGESLIDES,
 			MINIGAME,
 			MINIGAMECREATE,
+			MEDALS,
 			NUM_TYPES
 		};
 

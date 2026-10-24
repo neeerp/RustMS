@@ -1,5 +1,6 @@
 #include "UIQuestComplete.h"
 
+#include "UIMedals.h"
 #include "UIQuestLog.h"
 
 #include "../UI.h"
@@ -38,6 +39,7 @@ namespace ms
 		background = fade["backgrnd4"];
 		icon = fade["icon7"];
 		heading = Text(Text::A12M, Text::LEFT, Color::Name::WHITE, "Quest Complete!");
+		title_heading = Text(Text::A12M, Text::LEFT, Color::Name::WHITE, "You got a title!");
 
 		update_screen(Constants::Constants::get().get_viewwidth(), Constants::Constants::get().get_viewheight());
 	}
@@ -51,7 +53,7 @@ namespace ms
 
 			background.draw(DrawArgument(at, opacity));
 			icon.draw(DrawArgument(at + ICON, opacity));
-			heading.draw(DrawArgument(at + HEADING, opacity));
+			(notice.title ? title_heading : heading).draw(DrawArgument(at + HEADING, opacity));
 			notice.name.draw(DrawArgument(at + NAME, opacity));
 		}
 
@@ -123,7 +125,7 @@ namespace ms
 
 		notices.erase(std::remove_if(notices.begin(), notices.end(), [&](const Notice& n) { return n.id == id; }),
 			notices.end());
-		notices.push_back({ id, std::move(name), FadeNotice(LIFETIME) });
+		notices.push_back({ id, QuestCatalog::get().is_title(id), std::move(name), FadeNotice(LIFETIME) });
 		Sound(Sound::Name::INVITE).play();
 	}
 
@@ -174,7 +176,17 @@ namespace ms
 		Notice& notice = notices.back();
 		notice.life.close();
 
-		if (buttonid == OK)
+		if (buttonid == OK && notice.title)
+		{
+			auto medals = UI::get().get_element<UIMedals>();
+
+			if (!medals || !medals->is_active())
+				UI::get().emplace<UIMedals>(quests);
+
+			if (auto opened = UI::get().get_element<UIMedals>())
+				opened->show_title(notice.id);
+		}
+		else if (buttonid == OK)
 		{
 			auto log = UI::get().get_element<UIQuestLog>();
 

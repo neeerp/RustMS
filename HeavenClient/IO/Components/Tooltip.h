@@ -72,7 +72,8 @@ namespace ms
 			// The Owl of Minerva's results, whose tooltips go below and right of the cursor.
 			ITEMSEARCHRESULT,
 			WEDDINGREGISTRY,
-			USERLIST
+			USERLIST,
+			MEDALS
 		};
 
 		virtual ~Tooltip()

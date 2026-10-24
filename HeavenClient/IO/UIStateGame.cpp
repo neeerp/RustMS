@@ -42,6 +42,7 @@
 #include "UITypes/UIQuestComplete.h"
 #include "UITypes/UIScriptMessage.h"
 #include "UITypes/UIQuestLog.h"
+#include "UITypes/UIMedals.h"
 #include "UITypes/UIQuit.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIMonsterBook.h"
@@ -117,6 +118,8 @@ namespace ms
 					return Tooltip::Parent::KEYCONFIG;
 				case UIElement::Type::WORLDMAP:
 					return Tooltip::Parent::WORLDMAP;
+				case UIElement::Type::MEDALS:
+					return Tooltip::Parent::MEDALS;
 				case UIElement::Type::MINIMAP:
 					return Tooltip::Parent::MINIMAP;
 				case UIElement::Type::MONSTERBOOK:
@@ -478,6 +481,9 @@ namespace ms
 								emplace<UIQuestLog>(
 										Stage::get().get_player().get_quests()
 								);
+								break;
+							case KeyAction::Id::MEDALS:
+								emplace<UIMedals>(Stage::get().get_player().get_quests());
 								break;
 							case KeyAction::Id::NOTIFIER:
 								if (auto helper = UI::get().get_element<UIQuestHelper>())
@@ -1037,6 +1043,7 @@ namespace ms
 				UIElement::Type::SKILLBOOK,
 				UIElement::Type::KEYCONFIG,
 				UIElement::Type::QUESTLOG,
+				UIElement::Type::MEDALS,
 				UIElement::Type::MONSTERBOOK,
 				UIElement::Type::CHARINFO,
 				UIElement::Type::GUILDBBS,

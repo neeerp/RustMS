@@ -781,6 +781,12 @@ namespace ms
 		PosQUESTHELPER() : PointEntry("PosQUESTHELPER", "(-1,-1)") {}
 	};
 
+	// The default position of UIMedals; v83's is not known.
+	struct PosMEDALS : public Configuration::PointEntry
+	{
+		PosMEDALS() : PointEntry("PosMEDALS", "(200,100)") {}
+	};
+
 	// Where v83 first puts the Energy Charge gauge isn't known; this is above the status bar's middle.
 	struct PosENERGYBAR : public Configuration::PointEntry
 	{

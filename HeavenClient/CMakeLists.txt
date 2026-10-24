@@ -429,6 +429,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
         SUPPORTED_QUESTS="${PROJECT_SOURCE_DIR}/../game-data/supported_quests.txt"
         DEFAULT_QUEST_NX="${PROJECT_SOURCE_DIR}/../assets/game-data/Quest.nx")
     add_test(NAME quest_catalog COMMAND quest_catalog_tests)
+    add_executable(medal_list_tests tests/medal_list.cpp)
+    add_test(NAME medal_list COMMAND medal_list_tests)
     add_executable(skill_weapon_tests tests/skill_weapon.cpp)
     add_test(NAME skill_weapon COMMAND skill_weapon_tests)
     add_executable(dash_tests tests/dash.cpp)
@@ -524,6 +526,7 @@ add_executable(HeavenClient
     Character/Char.cpp
     Character/Char.h
     Character/MedalTag.cpp
+    Character/MedalList.h
     Character/MedalTag.h
     Character/MedalTagLayout.h
     Character/StyledTag.cpp
@@ -926,6 +929,8 @@ add_executable(HeavenClient
     IO/UITypes/Quiz.h
     IO/UITypes/UIQuestLog.cpp
     IO/UITypes/UIQuestLog.h
+    IO/UITypes/UIMedals.cpp
+    IO/UITypes/UIMedals.h
     IO/UITypes/UIQuiz.cpp
     IO/UITypes/UIQuiz.h
     IO/UITypes/UIRpsGame.cpp
