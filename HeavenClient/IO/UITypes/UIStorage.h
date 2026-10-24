@@ -35,6 +35,7 @@ namespace ms
 		void remove_cursor() override;
 
 		Cursor::State send_cursor(bool clicked, Point<int16_t> position) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		// Tabs and rows.
 		bool own_cursor(uint16_t buttonid) const override

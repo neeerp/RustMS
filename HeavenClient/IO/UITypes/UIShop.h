@@ -55,6 +55,7 @@ namespace ms
 		void send_scroll(double yoffset) override;
 
 		void rightclick(Point<int16_t> cursorpos) override;
+		void doubleclick(Point<int16_t> cursorpos) override;
 
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
 

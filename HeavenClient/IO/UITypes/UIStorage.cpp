@@ -242,9 +242,7 @@ namespace ms
 		{
 			int16_t index = stored.offset + buttonid - Buttons::STORED0;
 
-			if (index == stored.selection)
-				take_out();
-			else if (index < static_cast<int16_t>(stored.rows.size()))
+			if (index < static_cast<int16_t>(stored.rows.size()))
 				stored.selection = index;
 
 			return Button::State::NORMAL;
@@ -254,9 +252,7 @@ namespace ms
 		{
 			int16_t index = carried.offset + buttonid - Buttons::CARRIED0;
 
-			if (index == carried.selection)
-				store();
-			else if (index < static_cast<int16_t>(carried.rows.size()))
+			if (index < static_cast<int16_t>(carried.rows.size()))
 				carried.selection = index;
 
 			return Button::State::NORMAL;
@@ -361,6 +357,33 @@ namespace ms
 		}
 
 		return ret;
+	}
+
+	// A click picks a row; a double click on it, which its first click
+	// picked, moves the item (FUN_007c83af, FUN_007c858c).
+	void UIStorage::doubleclick(Point<int16_t> cursorpos)
+	{
+		for (uint16_t id = Buttons::STORED0; id <= Buttons::CARRIED3; id++)
+		{
+			auto button = buttons.find(id);
+
+			if (button == buttons.end() || !button->second->is_active()
+				|| !button->second->bounds(position).contains(cursorpos))
+				continue;
+
+			clear_tooltip();
+
+			if (id <= Buttons::STORED4)
+			{
+				if (stored.offset + id - Buttons::STORED0 == stored.selection)
+					take_out();
+			} else if (carried.offset + id - Buttons::CARRIED0 == carried.selection)
+			{
+				store();
+			}
+
+			return;
+		}
 	}
 
 	void UIStorage::send_scroll(double yoffset)
