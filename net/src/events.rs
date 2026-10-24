@@ -43,6 +43,9 @@ pub enum EventKind {
     /// Protecting Tylus (the warriors' 6192), started at Tylus (2020008)
     /// in El Nath's Chief's Residence.
     Tylus,
+    /// The Forest of Poison Haze, Ellin Forest's party quest, started at
+    /// Ellin (2133000) in the Deep Fairy Forest.
+    Ellin,
 }
 
 /// An event's maps and terms.
@@ -1283,6 +1286,69 @@ pub const TYLUS: Event = Event {
     survive: None,
 };
 
+/// The Deep Fairy Forest, where the party gathers; the Forest of Poison
+/// Haze's entrance; its stages' maps, in order; and the prize map, which
+/// every party shares and everyone who leaves lands on (Cosmic's
+/// `exitMap`, and the maps' `returnMap`).
+pub const ELLIN_LOBBY: i32 = 300_030_100;
+pub const ELLIN_ENTRY: i32 = 930_000_000;
+pub const ELLIN_STAGES: [i32; 6] = [
+    930_000_100,
+    930_000_200,
+    930_000_300,
+    930_000_400,
+    930_000_500,
+    930_000_600,
+];
+pub const ELLIN_EXIT: i32 = 930_000_800;
+/// Diluted Poison, the Purple Stone of Magic, Monster Marbles and
+/// Purification Marbles: of use only in the forest.
+const ELLIN_ITEMS: [i32; 4] = [4_001_162, 4_001_163, 4_001_169, 2_270_004];
+
+/// The Forest of Poison Haze (Cosmic `EllinPQ`): four to six of a party,
+/// all of levels 44 to 55, in the Deep Fairy Forest with their leader, go
+/// into their own copy of the forest for 30 minutes. From its entrance
+/// they clear six stages in turn, the first by killing all its Poisoned
+/// Lord Trees; the last, the Poison Golem's, wins it. No stage gives EXP.
+/// The defaults are in `v83ref/lanes/QUESTIONS.md` a125.
+pub const ELLIN: Event = Event {
+    lobby: ELLIN_LOBBY,
+    maps: ELLIN_ENTRY..=ELLIN_EXIT,
+    entry: ELLIN_ENTRY,
+    entries: 1,
+    exit: ELLIN_EXIT,
+    levels: 44..=55,
+    team: 4..=6,
+    minutes: 30,
+    exp_per_stage: &[0; 6],
+    stride: 1,
+    stage_maps: &ELLIN_STAGES,
+    talk_clears: &[],
+    member_clears: &[1],
+    clear_portals: &[],
+    gated: &[],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &ELLIN_ITEMS,
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: false,
+    survive: None,
+};
+
+/// The stage cleared once every mob on `map_id`, in an event's copy of
+/// it, is dead: the Forest of Poison Haze's first (Cosmic
+/// `EllinPQ.monsterKilled`).
+pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
+    (map_id == ELLIN_STAGES[0]).then_some(1)
+}
+
 /// Whether `mob_id` is the friendly mob some event's team protects.
 pub fn protected(mob_id: i32) -> bool {
     EventKind::ALL
@@ -1291,7 +1357,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 12] = [
+    pub const ALL: [EventKind; 13] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1304,6 +1370,7 @@ impl EventKind {
         EventKind::Delli,
         EventKind::LudiMaze,
         EventKind::Tylus,
+        EventKind::Ellin,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1320,6 +1387,7 @@ impl EventKind {
             EventKind::Delli => &DELLI,
             EventKind::LudiMaze => &LUDIMAZE,
             EventKind::Tylus => &TYLUS,
+            EventKind::Ellin => &ELLIN,
         }
     }
 }
@@ -2590,6 +2658,27 @@ mod tests {
         assert_eq!(friendly_drop_period(TYLUS_MOB + 1, 0), None);
         // His going loses nothing.
         assert!(!protected(TYLUS_MOB));
+    }
+
+    #[test]
+    fn the_forest_takes_four_to_six_of_44_to_55_and_clears_its_first_stage_by_killing() {
+        let four: Vec<_> = (1..=4).map(|id| at(id, 50, ELLIN_LOBBY)).collect();
+        assert_eq!(ELLIN.team(1, &four), Some(vec![1, 2, 3, 4]));
+        assert!(ELLIN.team(1, &four[..3]).is_none());
+        let seven: Vec<_> = (1..=7).map(|id| at(id, 50, ELLIN_LOBBY)).collect();
+        assert!(ELLIN.team(1, &seven).is_none());
+        for level in [43, 56] {
+            let off = [&four[..3], &[at(4, level, ELLIN_LOBBY)]].concat();
+            assert!(ELLIN.team(1, &off).is_none(), "{level}");
+        }
+        // Its entrance and stages are its own; the prize map is everyone's.
+        assert!(event_map(ELLIN_ENTRY) && ELLIN_STAGES.iter().all(|&map| event_map(map)));
+        assert!(!event_map(ELLIN_LOBBY) && !event_map(ELLIN_EXIT));
+        assert_eq!(ELLIN.last_stage(), 6);
+        assert_eq!(ELLIN.stage_on(ELLIN_STAGES[3]), Some(4));
+        assert_eq!(ELLIN.duration(), scaled(Duration::from_secs(30 * 60)));
+        assert_eq!(cleared_by_killing(ELLIN_STAGES[0]), Some(1));
+        assert_eq!(cleared_by_killing(ELLIN_STAGES[1]), None);
     }
 
     #[test]

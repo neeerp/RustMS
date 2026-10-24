@@ -668,8 +668,9 @@ impl MobSet {
     /// holds fewer mobs than its capacity for `users`, fill spawn points
     /// picked at random from those with room. A point without a `mobTime`
     /// has room when no mob is near it; one with a `mobTime` when its mob is
-    /// gone and its wait is over. `reset` (the first pass) also takes the
-    /// points with a negative `mobTime`.
+    /// gone and its wait is over. `reset` (the first pass) first fills every
+    /// point with a negative `mobTime`, whatever the capacity, as a party
+    /// quest stage holding more such mobs than that needs.
     fn create(&mut self, now: Instant, users: usize, reset: bool) -> Vec<i32> {
         if self.closed {
             return Vec::new();
@@ -680,9 +681,18 @@ impl MobSet {
         if !reset && self.last_pass.is_some_and(|at| now < at + SPAWN_INTERVAL) {
             return Vec::new();
         }
+        let mut spawned = Vec::new();
+        if reset {
+            for index in 0..self.spawns.len() {
+                let spawn = &self.spawns[index];
+                if spawn.template.mob_time < 0 && spawn.alive.is_none() {
+                    spawned.push(self.spawn_at(index, now));
+                }
+            }
+        }
         let mut shortfall = self.capacity_for(users).saturating_sub(self.live.len());
         if shortfall == 0 {
-            return Vec::new();
+            return spawned;
         }
         let mut taken: Vec<(i16, i16)> = self.live.values().map(|mob| (mob.x, mob.y)).collect();
         let mut open = Vec::new();
@@ -692,7 +702,7 @@ impl MobSet {
             let room = if time == 0 {
                 !taken.iter().any(|&mob| near(mob, at))
             } else {
-                (time > 0 || reset)
+                time > 0
                     && spawn.alive.is_none()
                     && spawn.regen_after.is_none_or(|after| after <= now)
             };
@@ -701,7 +711,6 @@ impl MobSet {
                 taken.push(at);
             }
         }
-        let mut spawned = Vec::new();
         while shortfall > 0 && !open.is_empty() {
             let index = open.swap_remove(self.rng.gen_range(0, open.len()));
             spawned.push(self.spawn_at(index, now));
@@ -2801,6 +2810,19 @@ mod tests {
         let Some(Err(_)) = mobs.damage(1, mob, 100, now) else {
             panic!("the snail should die");
         };
+        assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
+    }
+
+    #[test]
+    fn negative_mob_times_all_spawn_on_the_first_pass_whatever_the_capacity() {
+        let now = Instant::now();
+        let points = (0..3).map(|i| {
+            let (mut once, info) = snail_spawn(i * 1000);
+            once.mob_time = -1;
+            (once, info)
+        });
+        let mut mobs = MobSet::new(points.chain([snail_spawn(5000)])).with_capacity(1);
+        assert_eq!(mobs.start(now).len(), 3);
         assert!(mobs.respawn(now + Duration::from_secs(3600), 0).is_empty());
     }
 

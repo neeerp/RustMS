@@ -51,6 +51,7 @@ impl ClientActor {
                     .zpq_portal(script)?
                     .or(self.delli_portal(script)?)
                     .or(self.tylus_portal(script)?)
+                    .or(self.ellin_portal(script)?)
                 {
                     None => self.htpq_portal(script).await?,
                     effects => effects,

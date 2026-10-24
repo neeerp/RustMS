@@ -1753,6 +1753,14 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
+        // A stage cleared by killing all its mobs clears with the last.
+        let cleared = net::events::cleared_by_killing(self.key.map_id)
+            .filter(|_| self.key.instance_id != 0 && self.mobs.live().next().is_none());
+        if let Some(stage) = cleared {
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::ClearEventStage(stage));
+            }
+        }
     }
 
     /// Put `head` on the ground below its place, for whoever comes in to

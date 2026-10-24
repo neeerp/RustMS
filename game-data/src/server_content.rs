@@ -1767,6 +1767,18 @@ pub mod keys {
     pub const TYLUS_BUSY: &str = "tylus.busy";
     pub const TYLUS_FALLEN: &str = "tylus.fallen";
     pub const TYLUS_THANKS: &str = "tylus.thanks";
+    pub const ELLIN_MENU: &str = "ellin.menu";
+    pub const ELLIN_ENTER: &str = "ellin.enter";
+    pub const ELLIN_ABOUT: &str = "ellin.about";
+    pub const ELLIN_INFO: &str = "ellin.info";
+    pub const ELLIN_NO_PARTY: &str = "ellin.no_party";
+    pub const ELLIN_NOT_LEADER: &str = "ellin.not_leader";
+    pub const ELLIN_NOT_ELIGIBLE: &str = "ellin.not_eligible";
+    pub const ELLIN_BUSY: &str = "ellin.busy";
+    pub const ELLIN_STAGE1_SHUT: &str = "ellin.stage1.shut";
+    pub const ELLIN_STAGE2_SHUT: &str = "ellin.stage2.shut";
+    pub const ELLIN_GUIDE_LEAVE: &str = "ellin.guide.leave";
+    pub const ELLIN_GUIDE_WELCOME: &str = "ellin.guide.welcome";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2699,6 +2711,18 @@ mod tests {
                 keys::TYLUS_BUSY,
                 keys::TYLUS_FALLEN,
                 keys::TYLUS_THANKS,
+                keys::ELLIN_MENU,
+                keys::ELLIN_ENTER,
+                keys::ELLIN_ABOUT,
+                keys::ELLIN_INFO,
+                keys::ELLIN_NO_PARTY,
+                keys::ELLIN_NOT_LEADER,
+                keys::ELLIN_NOT_ELIGIBLE,
+                keys::ELLIN_BUSY,
+                keys::ELLIN_STAGE1_SHUT,
+                keys::ELLIN_STAGE2_SHUT,
+                keys::ELLIN_GUIDE_LEAVE,
+                keys::ELLIN_GUIDE_WELCOME,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

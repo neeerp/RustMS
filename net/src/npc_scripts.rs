@@ -879,6 +879,10 @@ pub const ROLLY_PRESENT: i32 = 9103002;
 /// "Protecting Tylus" (6192), and Tylus past the room, who thanks them.
 pub const TYLUS: i32 = 2020008;
 const TYLUS_GRATEFUL: i32 = 2022004;
+/// Ellin in the Deep Fairy Forest, who takes a party into the Forest of
+/// Poison Haze, and Ellin on each of its maps, who lets a member out.
+pub const ELLIN: i32 = 2133000;
+const ELLIN_GUIDE: i32 = 2133001;
 /// El Nath, and its portal from the Chief's Residence.
 const EL_NATH: i32 = 211_000_000;
 const EL_NATH_FROM_RESIDENCE: u8 = 14;
@@ -1324,6 +1328,12 @@ impl NpcScript {
         tylus(entry)
     }
 
+    /// Ellin in the Deep Fairy Forest, for a player whose party may or may
+    /// not go into the Forest of Poison Haze.
+    pub fn ellin(entry: Entry) -> Self {
+        ellin(entry)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1538,6 +1548,24 @@ impl NpcScript {
                         Page::Say(text(keys::TYLUS_THANKS)),
                         Page::Done(vec![Effect::WarpToPortal(EL_NATH, EL_NATH_FROM_RESIDENCE)]),
                     ],
+                ))
+            }
+            // She welcomes the party at the entrance, and has stages 3
+            // and 4 of her own; elsewhere she lets a member out.
+            ELLIN_GUIDE if player.stats.map_id == events::ELLIN_ENTRY => {
+                return Some(NpcScript::new(
+                    ELLIN_GUIDE,
+                    vec![Page::Say(text(keys::ELLIN_GUIDE_WELCOME))],
+                ))
+            }
+            ELLIN_GUIDE
+                if events::ELLIN.holds(player.stats.map_id)
+                    && !events::ELLIN_STAGES[2..4].contains(&player.stats.map_id) =>
+            {
+                return Some(ask_warp(
+                    ELLIN_GUIDE,
+                    keys::ELLIN_GUIDE_LEAVE,
+                    events::ELLIN.exit,
                 ))
             }
             ROLLY_HOME if player.stats.map_id == events::MAZE_EXIT => {
@@ -6717,6 +6745,34 @@ fn tylus(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Tylus checked, or another party went in.
     script.refused = Some(event_terms(&events::TYLUS, keys::TYLUS_NOT_ELIGIBLE));
+    script
+}
+
+/// Ellin (Cosmic `2133000`) in the Deep Fairy Forest: the leader takes the
+/// party into the Forest of Poison Haze, and anyone may hear what it holds.
+fn ellin(entry: Entry) -> NpcScript {
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::ELLIN_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::ELLIN_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(&events::ELLIN, keys::ELLIN_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::ELLIN_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Ellin)]),
+    };
+    let mut script = NpcScript::new(
+        ELLIN,
+        vec![Page::Menu {
+            text: text(keys::ELLIN_MENU),
+            choices: vec![
+                (text(keys::ELLIN_ENTER), vec![enter]),
+                (
+                    text(keys::ELLIN_ABOUT),
+                    vec![Page::Say(text(keys::ELLIN_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Ellin checked, or another party went in.
+    script.refused = Some(event_terms(&events::ELLIN, keys::ELLIN_NOT_ELIGIBLE));
     script
 }
 
@@ -12813,6 +12869,51 @@ mod tests {
         delli.begin();
         let step = delli.respond(ScriptInput::Select(1)).unwrap();
         assert_eq!(page_text(&step), text(keys::DELLI_INFO));
+    }
+
+    #[test]
+    fn ellin_takes_the_party_into_the_forest_and_lets_a_member_out() {
+        let mut ready = NpcScript::ellin(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::Ellin)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NoParty, keys::ELLIN_NO_PARTY),
+            (Entry::NotLeader, keys::ELLIN_NOT_LEADER),
+            (Entry::Busy, keys::ELLIN_BUSY),
+        ] {
+            let mut ellin = NpcScript::ellin(entry);
+            ellin.begin();
+            let step = ellin.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut ellin = NpcScript::ellin(Entry::NotEligible);
+        ellin.begin();
+        let step = ellin.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("55"), "{step:?}");
+        let mut ellin = NpcScript::ellin(Entry::Ready);
+        ellin.begin();
+        let step = ellin.respond(ScriptInput::Select(1)).unwrap();
+        assert_eq!(page_text(&step), text(keys::ELLIN_INFO));
+
+        // In the forest, the other Ellin lets one out to the prize map.
+        let mut member = player(50);
+        assert!(NpcScript::for_npc(ELLIN_GUIDE, &member).is_none());
+        member.stats.map_id = events::ELLIN_STAGES[0];
+        let mut guide = NpcScript::for_npc(ELLIN_GUIDE, &member).unwrap();
+        assert_eq!(question(&guide.begin()), text(keys::ELLIN_GUIDE_LEAVE));
+        let step = guide.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+        // At the entrance she only welcomes them; on stages 3 and 4 she
+        // has other things to say.
+        member.stats.map_id = events::ELLIN_ENTRY;
+        let guide = NpcScript::for_npc(ELLIN_GUIDE, &member).unwrap();
+        assert_eq!(page_text(&guide.begin()), text(keys::ELLIN_GUIDE_WELCOME));
+        for map in &events::ELLIN_STAGES[2..4] {
+            member.stats.map_id = *map;
+            assert!(NpcScript::for_npc(ELLIN_GUIDE, &member).is_none());
+        }
     }
 
     #[test]
