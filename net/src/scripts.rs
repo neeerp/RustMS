@@ -637,6 +637,10 @@ pub enum Effect {
         name: &'static str,
         state: u8,
     },
+    /// Nothing after it is applied unless every reactor named here on the
+    /// player's map has left state 0 (a missing one hasn't); the portal
+    /// says its `occupied` line instead.
+    RequireReactorsSet(&'static [&'static str]),
     /// Nothing after it is applied unless the player's event has cleared
     /// `stage`; they hear `refused` (a key) instead, as an item line, or
     /// without it a portal's `occupied` line.
@@ -1487,6 +1491,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                     crate::events::PIRATE_STAGES[if script == "davy_next2" { 3 } else { 4 }],
                     0,
                 ),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::PIRATE_PORTAL_SHUT, &[])),
+        },
+        // The way past the doors, once all four are sealed and no monster
+        // is left; the first member through finds the Lord Pirate (Cosmic
+        // `davy_next4`).
+        "davy_next4" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&crate::reactors::PIRATE_SEAL_NAMES),
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::events::PIRATE_STAGES[5], 0),
+                Effect::EventCommand(crate::events::EventCommand::PastTheDoors),
             ],
             block: false,
             occupied: Some(content::text().get(keys::PIRATE_PORTAL_SHUT, &[])),
@@ -3298,6 +3316,18 @@ mod tests {
             );
             assert!(outcome.occupied.is_some());
         }
+        let outcome = portal("davy_next4", &player_with(&[])).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireReactorsSet(&["sMob1", "sMob2", "sMob3", "sMob4"]),
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(PIRATE_STAGES[5], 0),
+                Effect::EventCommand(crate::events::EventCommand::PastTheDoors),
+            ]
+        );
+        assert!(outcome.occupied.is_some());
         for (script, to) in [("davy2_hd1", 925_100_202), ("davy3_hd1", 925_100_302)] {
             let outcome = portal(script, &player_with(&[])).unwrap();
             assert_eq!(

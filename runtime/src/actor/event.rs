@@ -373,6 +373,7 @@ pub fn spawn(
         bonus_taken: false,
         moved_to: Vec::new(),
         reached: HashSet::new(),
+        lord_pirate_out: false,
         win_exp: None,
         blessing: start.blessing,
     };
@@ -485,6 +486,8 @@ struct EventActor {
     /// The maps whose first arrival has started the clock over
     /// (`EventCommand::Reached`).
     reached: HashSet<i32>,
+    /// The Lord Pirate is out (`EventCommand::PastTheDoors`).
+    lord_pirate_out: bool,
     blessing: Option<i32>,
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
@@ -766,6 +769,26 @@ impl EventActor {
                 self.cleared.chests.fetch_add(1, Ordering::Release);
             }
             EventCommand::ChestOpened => debug!(client_id, "Chest not counted"),
+            // The first member past the doors finds him, picked by the
+            // chests opened (Cosmic `davy_next4`, `spawnedBoss`).
+            EventCommand::PastTheDoors
+                if self.kind == EventKind::Pirate && !won && !self.lord_pirate_out =>
+            {
+                self.lord_pirate_out = true;
+                let field = self.fields.field(FieldKey {
+                    channel_id: self.channel_id,
+                    map_id: net::events::PIRATE_STAGES[5],
+                    instance_id: self.id,
+                });
+                let message = FieldMessage::BringOut {
+                    mob_id: net::events::lord_pirate(self.cleared.chests()),
+                    at: net::events::LORD_PIRATE_AT,
+                };
+                tokio::spawn(async move {
+                    let _ = field.tx.send(message).await;
+                });
+            }
+            EventCommand::PastTheDoors => debug!(client_id, "Lord Pirate already out"),
         }
     }
 
