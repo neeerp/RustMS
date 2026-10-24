@@ -363,6 +363,20 @@ impl FieldActor {
                 }
             }
         }
+        // Those whose time in their state is up go back (the forest's pond
+        // filling again), and look at what lies on them.
+        let reverted = self.reactors.revert(now);
+        for view in &reverted {
+            if let Ok(packet) = build_hit_reactor(view, 0, 0) {
+                self.broadcast(None, packet);
+            }
+        }
+        if !reverted.is_empty() {
+            let lying: Vec<Drop> = self.drops.all().cloned().collect();
+            for drop in lying {
+                self.put_on_reactor(&drop, now);
+            }
+        }
         for object_id in self.mists.expire(now) {
             if let Ok(packet) = build_remove_mist(object_id) {
                 self.broadcast(None, packet);
@@ -3137,13 +3151,22 @@ impl FieldActor {
                 }
                 return;
             }
-            Hit::Broke(view) => view,
+            // It stays, in its new state, and does what it does.
+            Hit::Acted { view, event } => {
+                if let Ok(packet) = build_hit_reactor(&view, delay, event) {
+                    self.broadcast(None, packet);
+                }
+                view
+            }
+            // The client plays the hit animation of the state it broke from
+            // as it removes the reactor.
+            Hit::Broke(view) => {
+                if let Ok(packet) = build_remove_reactor(&view) {
+                    self.broadcast(None, packet);
+                }
+                view
+            }
         };
-        // The client plays the hit animation of the state it broke from as
-        // it removes the reactor.
-        if let Ok(packet) = build_remove_reactor(&view) {
-            self.broadcast(None, packet);
-        }
         if let Some(notice) = reactors::breaker_notice(view.reactor_id) {
             let notice = net::content::text().get(notice, &[]);
             let packet = build_broadcast(Broadcast::Pink, &notice);

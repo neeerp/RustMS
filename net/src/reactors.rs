@@ -343,7 +343,7 @@ pub fn action(reactor_id: i32) -> Action {
         // The garden's pots, the spots under them, and the Grass of Life.
         2001000 | 2001001 => Action::Pot,
         2001016 => Action::PapaPixie,
-        2002003 => Action::DropsAndClears,
+        2002003 | ELLIN_SPINE => Action::DropsAndClears,
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
         2002014 => Action::SprayAndAppear {
@@ -405,6 +405,13 @@ pub const JONATHANS_COURT: i16 = 6400;
 pub const BART_RECORD: i16 = 6401;
 pub const BART_FOUND: &str = "q3";
 
+/// The Forest of Poison Haze's second stage: its pond (Cosmic `3002000`,
+/// `dropItems`) takes a Concentrated Poison, drops a Diluted Poison, and
+/// fills again; its spine takes four Diluted Poisons and, staying, clears
+/// the stage (`3009000`, `showClearEffect` in state 4).
+pub const ELLIN_POND: i32 = 3002000;
+pub const ELLIN_SPINE: i32 = 3009000;
+
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
 /// Nautilus' Navigation Room (120000102) has no portal by.
@@ -441,7 +448,18 @@ pub fn first_state(reactor_id: i32) -> u8 {
 /// Whether a reactor stays when it reaches its last state, rather than
 /// going away: a moonflower stays in bloom, a scar keeps its piece.
 pub fn stays(reactor_id: i32) -> bool {
-    matches!(action(reactor_id), Action::Bloom | Action::Hold)
+    matches!(action(reactor_id), Action::Bloom | Action::Hold) || acts_staying(reactor_id)
+}
+
+/// Whether a reactor, reaching its end state (its last, or one whose own
+/// event of the index it came by leads back:
+/// `ReactorTemplate::acts_in`), does what breaking would and stays: the
+/// item-triggered ones Cosmic's `hitReactor` triggers rather than destroys
+/// and whose script acts there, the Forest of Poison Haze's pond and spine.
+/// Other reactors with such end states (in NX many, with no action here)
+/// only move.
+pub fn acts_staying(reactor_id: i32) -> bool {
+    matches!(reactor_id, ELLIN_POND | ELLIN_SPINE)
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
@@ -560,11 +578,20 @@ mod tests {
     }
 
     #[test]
+    fn the_forests_pond_drops_and_its_spine_stays_and_clears() {
+        assert_eq!(action(ELLIN_POND), Action::Drops);
+        assert!(acts_staying(ELLIN_POND));
+        assert_eq!(action(ELLIN_SPINE), Action::DropsAndClears);
+        assert!(stays(ELLIN_SPINE) && acts_staying(ELLIN_SPINE));
+    }
+
+    #[test]
     fn the_gardens_pots_grow_royals_now_and_then_and_always_after_the_seventh() {
         assert_eq!(action(2001000), Action::Pot);
         assert_eq!(action(2001001), Action::Pot);
         assert_eq!(action(2001016), Action::PapaPixie);
         assert_eq!(action(2002003), Action::DropsAndClears);
+        assert!(!acts_staying(2002003));
         let rng = &mut rand::thread_rng();
         let first: Vec<i32> = (0..400).map(|_| pot_mob(1, rng)).collect();
         assert!(first.contains(&NEPENDEATH) && first.contains(&ROYAL_NEPENDEATH));

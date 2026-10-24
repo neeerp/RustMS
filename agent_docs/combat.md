@@ -1397,6 +1397,22 @@ for another item looks at what already lies on it. The resurrection mound
 fourth job's eggs (`2401001`, `2401002`, `924000100`) take their egg, then
 three hits.
 
+A state whose events have a `timeOut` (in ms) goes back on its own that
+long after the reactor reaches it, through its last event's `next` (Cosmic
+`refreshReactorTimeout`): the field's tick (`ReactorSet::revert`) shows it
+with HIT_REACTOR event 0 and looks again at what lies on it. A state
+reached through an event whose index in the new state leads back, or is
+missing, is an end state (Cosmic `hitReactor`, `ReactorTemplate::acts_in`):
+there it waits out no timeout and only moves, as in Cosmic, unless
+`reactors::acts_staying` names it. Those do what breaking would, yet stay
+(`Hit::Acted`): the Forest of Poison Haze's pond (`3002000`) takes a
+Concentrated Poison, drops a Diluted Poison, and two seconds on takes
+poison again (Cosmic refreshes no timeout in its end state, so its pond
+would stay full; the NX's 2-second `timeOut` back to state 0 is followed
+here). The forest's spine (`3009000`) stays in its last state and clears
+the stage there (`Action::DropsAndClears`), as Cosmic triggers an
+item-triggered reactor's last step rather than destroying it.
+
 What a broken reactor does is `net::reactors::action`, keyed by reactor id
 as Cosmic's scripts are: by default the breaker rolls its drops; the eggs
 bring out the Fire Hawk or Ice Eagle (`9300089`, `9300090`), the

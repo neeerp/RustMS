@@ -1324,7 +1324,8 @@ pub const ELLIN: Event = Event {
     stride: 1,
     stage_maps: &ELLIN_STAGES,
     talk_clears: &[],
-    member_clears: &[1],
+    // The first by killing, the second by its spine.
+    member_clears: &[1, 2],
     clear_portals: &[],
     gated: &[],
     puzzles: 1..=0,
@@ -2675,6 +2676,8 @@ mod tests {
         assert!(event_map(ELLIN_ENTRY) && ELLIN_STAGES.iter().all(|&map| event_map(map)));
         assert!(!event_map(ELLIN_LOBBY) && !event_map(ELLIN_EXIT));
         assert_eq!(ELLIN.last_stage(), 6);
+        assert_eq!(ELLIN.stage_on(ELLIN_STAGES[1]), Some(2));
+        assert!(ELLIN.member_clears.contains(&2));
         assert_eq!(ELLIN.stage_on(ELLIN_STAGES[3]), Some(4));
         assert_eq!(ELLIN.duration(), scaled(Duration::from_secs(30 * 60)));
         assert_eq!(cleared_by_killing(ELLIN_STAGES[0]), Some(1));

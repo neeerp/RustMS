@@ -961,6 +961,16 @@ fills every such point whatever its capacity); the death of the last in the
 party's copy clears it (`events::cleared_by_killing`, the field's
 `killed`, Cosmic `EllinPQ.monsterKilled`), with the clear effect.
 
+On the second stage (930000200) the Poisoned Stone Bugs (9300173) drop a
+Concentrated Poison (4001161) one time in five (`reward_overrides.toml`).
+Nobody can pick it up, and one a player throws would vanish, so only a
+bug's drop that lands on the pond (`reactors::ELLIN_POND`) works: the pond
+takes it after 5 seconds, gives back a Diluted Poison (4001162) and fills
+again 2 seconds on (see "timeOut" in `combat.md`). The spine
+(`reactors::ELLIN_SPINE`, named `spine`) takes four Diluted Poisons, one
+at a time, each 5 seconds after it lands on it; on the fourth it stays,
+in its last state, and clears the stage for whoever threw it.
+
 The prize map, 930000800, is the event's exit and every party's own map
 alike, not a copy: the time running out, leaving, and dying (the maps'
 `returnMap`) all land there, and its way out (`party6_stage800`) leads home
@@ -971,9 +981,9 @@ leaving, ends the event for everyone (`Team::leave`), as in Cosmic. The
 event's items (4001162, 4001163, 4001169, 2270004) are taken from whoever
 leaves. Its lines are placeholders (`ellin.*`).
 
-Not yet: the second stage's pond and the stages after it, the Poison
+Not yet: the stages after the second, the Poison
 Golem's win, the fountain's EXP, the Altaire Fragment and the earrings
-(slices S2 to S5 of a125), Ellin's lines on the third and fourth stages,
+(slices S3 to S5 of a125), Ellin's lines on the third and fourth stages,
 and the Party Search toggle.
 
 ## NPCs
