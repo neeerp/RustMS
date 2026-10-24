@@ -432,6 +432,14 @@ namespace ms
 	{
 		// Up and Down together cancel out.
 		int8_t dir = player.is_key_down(KeyAction::Id::DOWN) - player.is_key_down(KeyAction::Id::UP);
+
+		// Up at the top of a rope with nothing above goes nowhere, so the
+		// frame holds as it does whenever the position stays (FUN_004522a6).
+		auto ladder = player.get_ladder();
+
+		if (dir < 0 && ladder && !ladder->leads_up() && player.get_phobj().crnt_y() <= ladder->get_top())
+			dir = 0;
+
 		player.get_phobj().vspeed = dir * CLIMBSPEED;
 	}
 
