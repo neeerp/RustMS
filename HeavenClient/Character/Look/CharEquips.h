@@ -18,6 +18,8 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
+#include <utility>
 
 #include "Clothing.h"
 
@@ -80,10 +82,23 @@ namespace ms
 		// A rider shows neither weapon nor shield (FUN_00407757).
 		void set_riding(bool riding);
 
+		// Wear a cash weapon over the regular one, or none with 0.
+		void set_cash_weapon(int32_t itemid, const BodyDrawInfo &drawinfo);
+
+		// Return the item id of the worn cash weapon.
+		int32_t get_cash_weapon() const;
+
 	private:
+		void update_sticker(const BodyDrawInfo &drawinfo);
+
 		EnumMap<EquipSlot::Id, const Clothing *> clothes;
 		bool riding = false;
+		int32_t cash_weapon = 0;
+		// The cash weapon's art for the regular weapon's type, if it has any.
+		const Clothing *sticker = nullptr;
 
 		static std::unordered_map<int32_t, Clothing> cloth_cache;
+		// Keyed by cash weapon and weapon type.
+		static std::map<std::pair<int32_t, int32_t>, Clothing> sticker_cache;
 	};
 }
