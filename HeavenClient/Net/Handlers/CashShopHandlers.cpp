@@ -134,13 +134,13 @@ namespace ms
 			recv.skip_int();	// account id
 			recv.skip_int();	// character id
 			int32_t item_id = recv.read_int();
-			recv.skip_int();	// sn
+			int32_t sn = recv.read_int();
 			int16_t quantity = recv.read_short();
 			std::string gift_from = recv.read_padded_string(13);
 			int64_t expiration = recv.read_long();
 			recv.skip_long();
 
-			return { cash_id, item_id, quantity, gift_from, expiration };
+			return { cash_id, item_id, quantity, gift_from, expiration, sn };
 		}
 
 		std::vector<int32_t> read_wish_list(InPacket& recv)

@@ -18,6 +18,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -303,17 +304,34 @@ namespace ms
 		constexpr size_t NUM_PAYMENTS = 3;
 		constexpr CashType PAYMENTS[NUM_PAYMENTS] = { MAPLE_POINTS, PREPAID, CREDIT };
 
-		// The option checked when the BUY dialog opens: NX Prepaid, as in
-		// period footage, unless only another balance covers the price.
-		inline size_t default_payment(int32_t price, int32_t credit, int32_t points, int32_t prepaid)
+		// The options the BUY dialog offers, in its order: each balance
+		// that covers the price, and Maple Points alone for a free item
+		// (v83 46dbe5).
+		inline std::array<bool, NUM_PAYMENTS> payment_options(int32_t price, int32_t credit, int32_t points, int32_t prepaid)
 		{
-			const int32_t balances[NUM_PAYMENTS] = { points, prepaid, credit };
+			if (price <= 0)
+				return { true, false, false };
 
+			return { points >= price, prepaid >= price, credit >= price };
+		}
+
+		// The option checked when the BUY dialog opens: NX Prepaid, as in
+		// period footage, unless only another offered balance pays.
+		inline size_t default_payment(const std::array<bool, NUM_PAYMENTS>& offered)
+		{
 			for (size_t option : { 1, 2, 0 })
-				if (balances[option] >= price)
+				if (offered[option])
 					return option;
 
 			return 1;
+		}
+
+		// Items only NX Prepaid pays for: Name Change, World Transfer,
+		// 520000x, 549xxxx, 5221001 and 5222000 (v83 46dc4d).
+		inline bool prepaid_only(int32_t item_id)
+		{
+			return item_id == 5400000 || item_id == 5401000 || item_id / 10 == 520000 || item_id / 10000 == 549
+				|| item_id == 5221001 || item_id == 5222000;
 		}
 
 		// The birthday code that confirms a gift or a Name Change, typed

@@ -56,6 +56,10 @@ namespace ms
 		// with the invisible items party quests drop (FUN_005d5224).
 		bool is_pickup_blocked() const;
 
+		// Returns whether the Cash Shop keeps it out of the Cash Inventory
+		// (`noMoveToLocker`, v83 5d31c5).
+		bool is_locker_blocked() const;
+
 		// Returns whether the item has a `reward` node beside its info, as
 		// the boxes the server opens into one of its entries (0x4f2ed6).
 		bool has_reward() const;
@@ -120,6 +124,7 @@ namespace ms
 		bool cashitem;
 		bool questitem;
 		bool pickupblock;
+		bool lockerblock;
 		bool reward;
 		item_properties::Info properties;
 		item_expiry::PetLife pet_life;

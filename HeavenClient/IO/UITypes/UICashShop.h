@@ -55,6 +55,8 @@ namespace ms
 			// Who sent it, if it was a present.
 			std::string gift_from;
 			int64_t expiration = 0;
+			// The commodity it was bought as.
+			int32_t sn = 0;
 		};
 
 		UICashShop();
@@ -109,6 +111,11 @@ namespace ms
 		void set_name_change(int32_t sn);
 		int32_t get_name_change() const;
 
+		// Whether the character has the item, counting the Cash Inventory
+		// with `locker` (v83 4729b5), or any of a package's items.
+		bool owns(int32_t item_id, bool locker) const;
+		bool owns_package(int32_t item_id) const;
+
 		// Back to the map the player came from.
 		void leave();
 
@@ -118,6 +125,12 @@ namespace ms
 		void reserve(int32_t sn);
 		// Buy a commodity that costs mesos, after asking (v83 46e5c5).
 		void buy_with_mesos(const cash_catalog::Commodity& commodity);
+		// Gift a commodity, after asking (v83 46e822).
+		void gift(const cash_catalog::Commodity& commodity);
+		// Move an item between the Cash and Item Inventories, unless v83
+		// (472632 and 472820) keeps it where it is.
+		void take_out(const CashItem& item);
+		void put_back(int16_t slot);
 		void change_subtab(size_t subtab);
 		void change_page(size_t page);
 		void update_list();

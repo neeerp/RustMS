@@ -80,6 +80,8 @@ namespace ms
 		Textfield birthday;
 		bool asking_birthday;
 		int32_t sn;
+		// Days the item lasts, or 0.
+		int32_t period;
 		std::optional<cash_catalog::Commodity> ring;
 		int32_t credit;
 		int32_t points;

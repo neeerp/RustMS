@@ -63,10 +63,16 @@ int main()
 		require(std::string(wish_refusal({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, 10)) == "Your wish list is full.",
 			"a full list is refused before a listed wish");
 
-		require(PAYMENTS[default_payment(1000, 5000, 5000, 5000)] == PREPAID, "NX Prepaid is checked first");
-		require(PAYMENTS[default_payment(1000, 5000, 0, 0)] == CREDIT, "then whatever covers the price");
-		require(PAYMENTS[default_payment(1000, 0, 1000, 0)] == MAPLE_POINTS, "Maple Points cover it exactly");
-		require(PAYMENTS[default_payment(1000, 0, 0, 0)] == PREPAID, "nothing covers it");
+		require(PAYMENTS[default_payment(payment_options(1000, 5000, 5000, 5000))] == PREPAID, "NX Prepaid is checked first");
+		require(PAYMENTS[default_payment(payment_options(1000, 5000, 0, 0))] == CREDIT, "then whatever covers the price");
+		require(PAYMENTS[default_payment(payment_options(1000, 0, 1000, 0))] == MAPLE_POINTS, "Maple Points cover it exactly");
+		require(PAYMENTS[default_payment(payment_options(1000, 0, 0, 0))] == PREPAID, "nothing covers it");
+		require(payment_options(1000, 999, 1000, 5000) == std::array<bool, NUM_PAYMENTS>({ true, true, false }),
+			"only the balances covering the price are offered");
+		require(payment_options(0, 0, 0, 5000) == std::array<bool, NUM_PAYMENTS>({ true, false, false }),
+			"a free item is offered for Maple Points alone");
+		require(prepaid_only(5401000) && prepaid_only(5200002) && prepaid_only(5490000) && prepaid_only(5222000)
+			&& !prepaid_only(5221000) && !prepaid_only(5210000), "some items are paid with NX Prepaid alone");
 
 		require(affordable(4000, 0, 4000, 0) && !affordable(4000, 3999, 3999, 3999), "any balance covering the price will do");
 
