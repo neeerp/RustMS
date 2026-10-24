@@ -34,7 +34,7 @@ warriors' 6192, is a party's event with nothing to win
 ([Protecting Tylus](#protecting-tylus)). Ellin Forest's Forest of Poison
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
-Pirate Ship is begun: its entry, exit, clocks and first two stages
+Pirate Ship is begun: its entry, exit, clocks and first four stages
 ([the Pirate Ship](#the-pirate-ship)).
 
 ## Rules
@@ -1109,8 +1109,23 @@ and leaves it empty. The way on (`davy_next1`) opens only then
 (`Effect::RequireStage`, with no item line of its own), saying so in pink
 until it does (`pirate.marks_shut`).
 
-Not yet: the later stages (the decks and their chests, the doors, the
-Lord Pirate), Wu Yang and the rewards, and the Party Search toggle.
+The third and fourth stages are decks, with no monsters of their own in
+Map.nx: each copy opens with twenty of the Lord Pirate's crew, five Krus
+(9300124) and five Captains (9300125) at each end of each of its two
+floors (`events::opening_mobs`, boarded as its field starts, as Cosmic's
+`setup`), and none come back. Their boxes are shuffled as the first
+stage's; each of the six mob boxes (2511001, which links to 2511000)
+breaks into six Krus and six Captains more. The last monster aboard
+clears the stage, and the way on (`davy_next2`, `davy_next3`) waits for
+it as the first stage's does. Each deck's hidden portal (`in01`, type 8,
+scripts `davy2_hd1` and `davy3_hd1`) leads down to its crew's room
+(925100202, 925100302) whatever is left aboard; that room's Devoted Krus
+and Captains are its own Map.nx spawns, kept coming while anyone is there
+(Cosmic brings them out once). The bellflower rooms (925100201, 925100301)
+are plain links from each deck's `in00`.
+
+Not yet: the bellflower rooms' chests, the doors, the Lord Pirate, Wu
+Yang and the rewards, and the Party Search toggle.
 
 ## NPCs
 
