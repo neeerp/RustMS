@@ -1717,6 +1717,8 @@ pub mod keys {
     pub const BALROG_WORLD_JOB: &str = "balrog_world.job";
     pub const BALROG_WORLD_LEVEL: &str = "balrog_world.level";
     pub const BALROG_WORLD_BUSY: &str = "balrog_world.busy";
+    /// Papulatus in the past (2043000), sending a visitor back to their time.
+    pub const PAST_PAPULATUS_SEND_BACK: &str = "papulatus.past.send_back";
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
         ["milk.cow.fills.0", "milk.cow.fills.1", "milk.cow.fills.2"];
@@ -2609,6 +2611,7 @@ mod tests {
                 keys::BALROG_WORLD_JOB,
                 keys::BALROG_WORLD_LEVEL,
                 keys::BALROG_WORLD_BUSY,
+                keys::PAST_PAPULATUS_SEND_BACK,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

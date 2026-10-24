@@ -27,6 +27,12 @@ actor asks the directory (`papulatus_portal` in
 refusal (no party, not the leader, too few or too many there, another party
 inside) or the start.
 
+A Buccaneer carrying Papulatus's Key on 6361, or past it and not yet done
+with 6363, goes by that portal into the past instead, alone and without a
+party (`scripts::time_leap`, as Cosmic's `Populatus00`): to the past Origin
+of the Clocktower (922020300), where the past Papulatus (2043000) stands for
+the Time Leap quests (see `quests.md`).
+
 It ends only when its last member leaves (`Event::until_empty`, as an
 expedition's), or when its 45 minutes are up and everyone left is sent
 back to 220080000; not when its leader does. A member who leaves the party

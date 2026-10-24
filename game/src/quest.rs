@@ -18,8 +18,9 @@ pub const INFO_QUESTS: &[i16] = &[3311, 3900, 3926, 3927, 3929];
 /// quest's completion reads (`Check/1 infoNumber`): an info string a
 /// script sets whole, kept as a started record. Only records the server's
 /// scripts set are listed: Kyrin's tests' (6331 and 6371, for 6330 and
-/// 6370) and Lord Jonathan's (6401, for "Jonathan's Court", 6400).
-pub const RECORDS: &[i16] = &[6331, 6371, 6401];
+/// 6370), the past Papulatus's (6364, for "A New Revelation", 6363) and
+/// Lord Jonathan's (6401, for "Jonathan's Court", 6400).
+pub const RECORDS: &[i16] = &[6331, 6364, 6371, 6401];
 
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

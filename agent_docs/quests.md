@@ -298,6 +298,7 @@ Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
 | 6400 Jonathan's Court | 6401 to "q3" | hitting the real Bart (reactor 1209000) in Lord Jonathan's test room (912020000), with a pink line |
 | 6330 How to Improve Your Strength (Marauder) | 6331 to "2" | Kyrin (1090000) past the test room 912010000 |
 | 6370 How to Improve Your Strength (Outlaw) | 6371 to "2" | Kyrin past the test room 912010100 |
+| 6363 A New Revelation | 6364 to "2" | the past Papulatus (2043000) sending the Buccaneer back from 922020300 |
 
 Lord Jonathan (1092019, in the Navigation Room 120000102) asks a Corsair on
 6400 without the record whether to take his test, then sends them into the
@@ -329,6 +330,15 @@ in, one at a time (`scripts::SOLO_MAPS`), for twenty minutes, after which
 the map's `forcedReturn` brings them back; its way out does too. Cosmic lets
 in the leader's whole party standing by; here each Bowman goes alone, and
 needs no party. Its lines are placeholders (`balrog_world.*`).
+
+The Buccaneers' Time Leap quests (6360-6363) go into the past: with
+Papulatus's Key (4031870) on 6361, and until 6363 is done, the way to
+Papulatus leads to the past Origin of the Clocktower (922020300; see
+`papulatus.md`). There the past Papulatus takes the key (6361), and gives
+6362 and 6363; talking to him sends the Buccaneer back to Deep Inside the
+Clocktower (220080000, as Cosmic), and with 6363 started sets its record
+too, so Rolonay (1092012) completes it with Time Leap. No source says where
+v83 set the record; his line is a placeholder (`papulatus.past.send_back`).
 
 Completing a quest also plays the v83 "Quest Clear" effect
 (`effect::build_own_effect` and `effect::build_foreign_effect` with
