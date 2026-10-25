@@ -3,6 +3,7 @@
 //! lane to stop the other team's ball for a while. Pure state;
 //! `FieldActor` sends the packets.
 
+use crate::actor::field_coconut;
 pub use crate::actor::field_coconut::{EXIT_MAP, WINNERS_MAP};
 use game_data::Snowball;
 use net::packet::build::world::snowball::BallState;
@@ -111,6 +112,9 @@ pub struct SnowballGame {
     next_recovery: Option<Instant>,
     last_hit: HashMap<ClientId, Instant>,
     last_knock: HashMap<ClientId, Instant>,
+    /// When each player sent here by an event NPC was given their team,
+    /// until they arrive.
+    reserved: HashMap<ClientId, Instant>,
 }
 
 impl SnowballGame {
@@ -129,6 +133,7 @@ impl SnowballGame {
             next_recovery: None,
             last_hit: HashMap::new(),
             last_knock: HashMap::new(),
+            reserved: HashMap::new(),
         }
     }
 
@@ -139,6 +144,7 @@ impl SnowballGame {
     /// A player arriving joins the team with fewer players, Story on a tie,
     /// and keeps it until they leave.
     pub fn join(&mut self, client_id: ClientId) -> u8 {
+        self.reserved.remove(&client_id);
         if let Some(team) = self.team(client_id) {
             return team;
         }
@@ -152,7 +158,30 @@ impl SnowballGame {
         team
     }
 
+    /// The team a player on their way here joins, kept for them as they
+    /// arrive. A team kept for anyone who hasn't come for a while is let
+    /// go first.
+    pub fn reserve(&mut self, client_id: ClientId, now: Instant) -> u8 {
+        let teams = &mut self.teams;
+        self.reserved.retain(|id, at| {
+            let keep = now < *at + field_coconut::RESERVE_TIME;
+            if !keep {
+                teams.remove(id);
+            }
+            keep
+        });
+        // One already on the field keeps their team, with nothing to expire.
+        if let (Some(team), false) = (self.team(client_id), self.reserved.contains_key(&client_id))
+        {
+            return team;
+        }
+        let team = self.join(client_id);
+        self.reserved.insert(client_id, now);
+        team
+    }
+
     pub fn leave(&mut self, client_id: ClientId) {
+        self.reserved.remove(&client_id);
         self.teams.remove(&client_id);
         self.last_hit.remove(&client_id);
         self.last_knock.remove(&client_id);
@@ -495,6 +524,27 @@ mod tests {
 
     fn at(now: Instant, ms: u64) -> Instant {
         now + Duration::from_millis(ms)
+    }
+
+    #[test]
+    fn a_team_is_kept_for_a_player_on_their_way_for_a_while() {
+        let mut game = SnowballGame::new(rules(), Duration::from_secs(10));
+        let now = Instant::now();
+        assert_eq!(game.reserve(1, now), STORY);
+        assert_eq!(game.reserve(2, now), MAPLE);
+        // Arriving keeps it, and asking again gives the same.
+        assert_eq!(game.reserve(1, at(now, 1)), STORY);
+        assert_eq!(game.join(1), STORY);
+        // 2 never came: after 30 s their place goes to the next.
+        let later = now + field_coconut::RESERVE_TIME;
+        assert_eq!(game.reserve(3, later), MAPLE);
+        assert_eq!(game.team(2), None);
+        // One who arrived keeps their team however long it was, even if
+        // they ask again from the field.
+        assert_eq!(game.team(1), Some(STORY));
+        assert_eq!(game.reserve(1, later), STORY);
+        game.reserve(4, later + field_coconut::RESERVE_TIME);
+        assert_eq!(game.team(1), Some(STORY));
     }
 
     #[test]

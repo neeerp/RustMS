@@ -715,6 +715,15 @@ impl FieldActor {
             FieldMessage::ShopGo { room, name, reply } => {
                 let _ = reply.send(self.shops.go_result(room, &name));
             }
+            FieldMessage::ReserveTeam { client_id, reply } => {
+                let now = Instant::now();
+                let team = match (&mut self.coconut, &mut self.snowball) {
+                    (Some(game), _) => Some(game.reserve(client_id, now)),
+                    (_, Some(game)) => Some(game.reserve(client_id, now)),
+                    _ => None,
+                };
+                let _ = reply.send(team);
+            }
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }

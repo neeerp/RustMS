@@ -23,6 +23,7 @@ pub mod energy;
 pub mod events;
 pub mod gachapon;
 mod game_data;
+pub mod gm_event;
 pub mod handler;
 mod helpers;
 pub mod hired_merchant;
@@ -69,10 +70,10 @@ pub mod wedding_gift;
 pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{
     login_route, world_route, AllianceRequest, BbsRequest, BroadcastScope, BuddyRequest, ClientId,
-    FamilyRequest, FieldRequest, GmEvent, GuildRequest, HandlerResult, LoginAction, LoginContext,
-    LoginHandler, LoginStage, MessengerRequest, NoteRequest, PartyRequest, PartySkill,
-    PreGameHandler, RingRequest, SpawnPosition, WhisperDelivery, WorldAction, WorldContext,
-    WorldHandler, WorldRoute,
+    FamilyRequest, FieldRequest, GmEntry, GmEvent, GuildRequest, HandlerResult, LoginAction,
+    LoginContext, LoginHandler, LoginStage, MessengerRequest, NoteRequest, PartyRequest,
+    PartySkill, PreGameHandler, RingRequest, SpawnPosition, WhisperDelivery, WorldAction,
+    WorldContext, WorldHandler, WorldRoute,
 };
 pub use self::io::error;
 pub use self::npc_data::extra_npcs;

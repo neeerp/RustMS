@@ -157,6 +157,9 @@ pub struct WorldDirectory {
     dungeons: HashMap<(u8, i32), Run>,
     /// What the Owl of Minerva was asked to find.
     owl_searches: Searches,
+    /// The event a GM opened on each channel: its map, and the places
+    /// left.
+    gm_events: HashMap<u8, (i32, u16)>,
 }
 
 impl WorldDirectory {
@@ -185,6 +188,7 @@ impl WorldDirectory {
             maple_tv: MapleTvLine::default(),
             dungeons: HashMap::new(),
             owl_searches: Searches::default(),
+            gm_events: HashMap::new(),
         }
     }
 
@@ -320,6 +324,27 @@ impl WorldDirectory {
                 self.event_gone(channel_id, kind, id);
                 self.squad_closed(channel_id, kind, id);
                 self.carnival_closed(channel_id, kind, id);
+            }
+            DirectoryMessage::OpenGmEvent {
+                channel_id,
+                map_id,
+                limit,
+            } => {
+                self.gm_events.insert(channel_id, (map_id, limit));
+            }
+            DirectoryMessage::CloseGmEvent { channel_id } => {
+                self.gm_events.remove(&channel_id);
+            }
+            DirectoryMessage::GmEventOpen { channel_id, reply } => {
+                let open = self.gm_events.get(&channel_id);
+                let _ = reply.send(open.filter(|(_, left)| *left > 0).map(|(map, _)| *map));
+            }
+            DirectoryMessage::JoinGmEvent { channel_id, reply } => {
+                let place = self.gm_events.get_mut(&channel_id).and_then(|(map, left)| {
+                    *left = left.checked_sub(1)?;
+                    Some(*map)
+                });
+                let _ = reply.send(place);
             }
             DirectoryMessage::CarnivalRooms { from, reply } => {
                 let _ = reply.send(self.carnival_rooms(from));
@@ -2218,6 +2243,40 @@ mod tests {
         assert_eq!(directory.party_searches.all().len(), 1);
         directory.party_request(1, PartyRequest::SearchStop, now);
         assert!(directory.party_searches.all().is_empty());
+    }
+
+    #[test]
+    fn a_gms_event_takes_players_on_its_channel_until_it_is_full_or_closed() {
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let ask = |directory: &mut WorldDirectory, channel_id, join: bool| {
+            let (reply, mut answer) = oneshot::channel();
+            directory.handle(if join {
+                DirectoryMessage::JoinGmEvent { channel_id, reply }
+            } else {
+                DirectoryMessage::GmEventOpen { channel_id, reply }
+            });
+            answer.try_recv().unwrap()
+        };
+        let snowball = 109_060_000;
+        directory.handle(DirectoryMessage::OpenGmEvent {
+            channel_id: 1,
+            map_id: snowball,
+            limit: 2,
+        });
+        assert_eq!(ask(&mut directory, 0, false), None, "another channel's");
+        assert_eq!(ask(&mut directory, 1, false), Some(snowball));
+        assert_eq!(ask(&mut directory, 1, true), Some(snowball));
+        assert_eq!(ask(&mut directory, 1, true), Some(snowball));
+        assert_eq!(ask(&mut directory, 1, false), None, "full");
+        assert_eq!(ask(&mut directory, 1, true), None);
+        directory.handle(DirectoryMessage::OpenGmEvent {
+            channel_id: 1,
+            map_id: snowball,
+            limit: 5,
+        });
+        directory.handle(DirectoryMessage::CloseGmEvent { channel_id: 1 });
+        assert_eq!(ask(&mut directory, 1, true), None, "closed");
     }
 
     #[test]

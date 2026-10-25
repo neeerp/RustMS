@@ -1324,6 +1324,12 @@ unsourced = [
     "coconut.fell.story",
     "coconut.overtime",
     "snowball.ended",
+    "gm_event.opened",
+    "gm_event.menu",
+    "gm_event.about",
+    "gm_event.info",
+    "gm_event.go",
+    "gm_event.not_open",
 ]
 
 [text."glTutoMsg0.message"]

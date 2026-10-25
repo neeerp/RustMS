@@ -119,6 +119,7 @@ impl ClientActor {
         let mut disband_guild = false;
         let mut alliance = None;
         let mut carnival = None;
+        let mut gm_event = None;
         let mut wedding = None;
         let mut restyled = false;
         let mut command = None;
@@ -193,6 +194,7 @@ impl ClientActor {
                 Effect::CarnivalRoom(_) | Effect::CarnivalAnswer { .. } => {
                     carnival = Some(effect.clone())
                 }
+                Effect::JoinGmEvent { npc } => gm_event = Some(*npc),
                 Effect::BookWedding { .. }
                 | Effect::ExtraInvitations { .. }
                 | Effect::StartWedding { .. }
@@ -733,6 +735,9 @@ impl ClientActor {
                 self.answer_carnival(challenger, accept).await?
             }
             _ => {}
+        }
+        if let Some(npc) = gm_event {
+            Box::pin(self.join_gm_event(npc)).await?;
         }
         match wedding {
             Some(Effect::BookWedding { venue, premium }) => {

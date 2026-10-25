@@ -200,6 +200,12 @@ script of their own (`NpcScript::wedding_assistant_says`). Their
 guest's choice, and a Wedding Invitation Ticket adds a choice ending with
 `Effect::ExtraInvitations`, handled the same way.
 
+The Event Assistants (`EVENT_ASSISTANTS`: Paul, Jean, Martin and Tony, script
+`Event00`) take players to the event a GM opened on their channel. The client
+actor asks the directory whether one is open before it builds their menu, and
+their "go" choice ends with `Effect::JoinGmEvent`. See
+[Coconut Season](./coconut.md), "Opening an event to players".
+
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:
 `#h`, `#p`, `#t`/`#z`, `#o`, `#m`). The text layout (`Graphics/TextLayout.cpp`)

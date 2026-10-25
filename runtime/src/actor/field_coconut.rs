@@ -4,7 +4,7 @@
 
 use game_data::Coconut;
 use net::ClientId;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use tokio::time::{Duration, Instant};
 
 /// Team Maple, on the scoreboard's left.
@@ -16,6 +16,9 @@ pub const STORY: u8 = 1;
 pub const WINNERS_MAP: i32 = 109_050_000;
 /// Where everyone else goes (the fields' forcedReturn).
 pub const EXIT_MAP: i32 = 109_050_001;
+
+/// How long a team is kept for a player an event NPC sends to the field.
+pub const RESERVE_TIME: Duration = Duration::from_secs(30);
 
 /// How long after the start the nuts show (Cosmic's -1/5000/0).
 pub const SHOW_DELAY: u16 = 5000;
@@ -84,6 +87,9 @@ pub struct CoconutGame {
     falling: u32,
     bombing: u32,
     stopped: u32,
+    /// When each player sent here by an event NPC was given their team,
+    /// until they arrive.
+    reserved: HashMap<ClientId, Instant>,
 }
 
 impl CoconutGame {
@@ -97,6 +103,7 @@ impl CoconutGame {
             falling: 0,
             bombing: 0,
             stopped: 0,
+            reserved: HashMap::new(),
         }
     }
 
@@ -116,6 +123,7 @@ impl CoconutGame {
     /// A player arriving joins the team with fewer players, Maple on a tie,
     /// and keeps it until they leave.
     pub fn join(&mut self, client_id: ClientId) -> u8 {
+        self.reserved.remove(&client_id);
         if let Some(team) = self.team(client_id) {
             return team;
         }
@@ -129,7 +137,30 @@ impl CoconutGame {
         team
     }
 
+    /// The team a player on their way here joins, kept for them as they
+    /// arrive. A team kept for anyone who hasn't come for a while is let
+    /// go first.
+    pub fn reserve(&mut self, client_id: ClientId, now: Instant) -> u8 {
+        let teams = &mut self.teams;
+        self.reserved.retain(|id, at| {
+            let keep = now < *at + RESERVE_TIME;
+            if !keep {
+                teams.remove(id);
+            }
+            keep
+        });
+        // One already on the field keeps their team, with nothing to expire.
+        if let (Some(team), false) = (self.team(client_id), self.reserved.contains_key(&client_id))
+        {
+            return team;
+        }
+        let team = self.join(client_id);
+        self.reserved.insert(client_id, now);
+        team
+    }
+
     pub fn leave(&mut self, client_id: ClientId) {
+        self.reserved.remove(&client_id);
         self.teams.remove(&client_id);
     }
 

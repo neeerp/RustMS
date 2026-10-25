@@ -55,6 +55,43 @@ every `/` line from chat. A GM's `/start` and `/reset` go to the field as
 `FieldRequest::GmEvent` (`net::GmEvent`), in any case; on a field with
 no event they do nothing.
 
+## Opening an event to players
+
+The v83 client has the words `/coconut1` to `/coconut3`, `/snowball` and
+`/snowball1` to `/snowball3` too (report b170), and RustMS gives them
+these meanings; `/coconut` and `/endevent` are our own. A GM types them on any map, and
+they go to the client actor as `WorldAction::GmEntry` (`net::GmEntry`):
+
+- `/coconut`, `/coconut1`, `/coconut2` and `/coconut3` open Coconut Season
+  on 109080000, 109080000, 109080001 and 109080002 to the GM's channel;
+  `/snowball`, `/snowball1`, `/snowball2` and `/snowball3` open Snowball on
+  109060000, 109060000, 109060002 and 109060004. A number after the word
+  is the most players it takes, 50 if none is given. The directory keeps
+  one open event per channel (`DirectoryMessage::OpenGmEvent`), in place
+  of any open there, and the channel is told (`gm_event.opened`).
+- `/endevent` closes entry (`CloseGmEvent`). Players already there stay.
+
+The Event Assistants in town (Paul 9000000, Jean 9000001, Martin 9000011,
+Tony 9000013, `NpcScript::event_assistant`) have a menu: what the event
+is, and "go", which says nothing is open while no event is open with
+places left (`gm_event.not_open`). Going (`Effect::JoinGmEvent`, in
+`runtime/src/actor/client/gm_event.rs`):
+
+1. takes a place from the directory (`JoinGmEvent`), or says the event
+   closed or filled up meanwhile;
+2. asks the game's field for a team (`FieldMessage::ReserveTeam`). The
+   game gives the one it would give the player on arriving, and keeps it
+   for them for 30 s (`RESERVE_TIME`), so two players on their way don't
+   get the same place;
+3. saves the map left as `EVENT_RETURN`, and warps the player to the
+   team's spot (`net::gm_event::spot`). On Snowball that is their ball's
+   portal, `st00` for Story and `st01` for Maple; Coconut Season's teams
+   have no side, so any of its four `sp` portals.
+
+A player warped in any other way still joins the smaller team, at the
+field's first `sp`. The places aren't given back yet, and nobody takes
+players back to `EVENT_RETURN` yet.
+
 ## Packets
 
 - `COCONUT_HIT` (0x11D, `build_coconut_hit`): a short nut index, -1 for

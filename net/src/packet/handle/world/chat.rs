@@ -1,5 +1,6 @@
 use crate::handler::{
-    FieldRequest, GmEvent, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
+    FieldRequest, GmEntry, GmEvent, HandlerResult, WorldAction, WorldContext, WorldHandler,
+    WorldResult,
 };
 use crate::packet::build::world::field::build_local_chat;
 use packet::{io::read::PktRead, Packet};
@@ -27,9 +28,12 @@ impl WorldHandler for AllChatHandler {
         // The client sends a '/' line only for a GM, as a command it does
         // not know itself (report b169): never as chat.
         if msg.starts_with('/') {
-            let event = GmEvent::parse(&msg).filter(|_| gm);
-            return Ok(event.map_or_else(HandlerResult::empty, |event| {
-                HandlerResult::empty().with(WorldAction::Field(FieldRequest::GmEvent(event)))
+            let event = GmEvent::parse(&msg)
+                .map(|event| WorldAction::Field(FieldRequest::GmEvent(event)))
+                .or_else(|| GmEntry::parse(&msg).map(WorldAction::GmEntry))
+                .filter(|_| gm);
+            return Ok(event.map_or_else(HandlerResult::empty, |action| {
+                HandlerResult::empty().with(action)
             }));
         }
         let chat_packet = build_local_chat(ctx.client_id, &msg, gm, show)?;
@@ -97,5 +101,22 @@ mod tests {
         assert_eq!(event(1, "/divideteam"), None);
         assert_eq!(event(0, "/start"), None);
         assert_eq!(gm_byte(0, "/hello"), None);
+    }
+
+    #[test]
+    fn a_gms_entry_commands_go_to_the_channel() {
+        let entry = |gm_level, msg| match chat(gm_level, msg).as_slice() {
+            [WorldAction::GmEntry(entry)] => Some(*entry),
+            [] => None,
+            _ => panic!("unexpected actions"),
+        };
+        let open = |map_id, limit| Some(GmEntry::Open { map_id, limit });
+        assert_eq!(entry(1, "/snowball"), open(109_060_000, 50));
+        assert_eq!(entry(1, "/snowball3 20"), open(109_060_004, 20));
+        assert_eq!(entry(1, "/Coconut2"), open(109_080_001, 50));
+        assert_eq!(entry(1, "/endevent"), Some(GmEntry::Close));
+        assert_eq!(entry(1, "/snowball 0"), None);
+        assert_eq!(entry(1, "/snowball4"), None);
+        assert_eq!(entry(0, "/snowball"), None);
     }
 }

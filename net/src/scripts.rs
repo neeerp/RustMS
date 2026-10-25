@@ -637,6 +637,14 @@ pub enum Effect {
     /// Take Monster Carnival room `0` for the player's party, or challenge
     /// the party waiting there. Says how it went in a script of its own.
     CarnivalRoom(u8),
+    /// Take a place at the event a GM opened on the player's channel, keep
+    /// a team there, and go to the team's spot on its field, to come back
+    /// to the map they left (`EVENT_RETURN`). Says so in a script of its
+    /// own, by the Event Assistant `npc`, if it closed or filled up
+    /// meanwhile.
+    JoinGmEvent {
+        npc: i32,
+    },
     /// The leader of a party waiting in a Monster Carnival room accepts
     /// or declines the challenge put to them by `challenger`'s party.
     CarnivalAnswer {

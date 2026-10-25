@@ -36,6 +36,9 @@ pub const DOJO_RETURN: i16 = 4;
 /// The `saved_locations` key of the map the player went to the Monster
 /// Carnival's Carnival Field from (Cosmic `MONSTER_CARNIVAL`).
 pub const CARNIVAL_RETURN: i16 = 5;
+/// The `saved_locations` key of the map an Event Assistant took the player
+/// to a GM's event from (Cosmic `EVENT`).
+pub const EVENT_RETURN: i16 = 6;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1043,6 +1046,7 @@ mod tests {
             PYRAMID_RETURN,
             DOJO_RETURN,
             CARNIVAL_RETURN,
+            EVENT_RETURN,
         ];
         for (i, kind) in kinds.iter().enumerate() {
             assert!(!kinds[..i].contains(kind));
