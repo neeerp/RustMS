@@ -1332,6 +1332,19 @@ namespace ms
 		PartySearchStopPacket() : OutPacket(OutPacket::Opcode::PARTY_SEARCH_STOP) {}
 	};
 
+	// A swing on the Coconut Season field hit nut `index`, `delay` ms into
+	// the attack (v83 FUN_00549902)
+	// Opcode: COCONUT(213)
+	class CoconutPacket : public OutPacket
+	{
+	public:
+		CoconutPacket(int16_t index, uint16_t delay) : OutPacket(OutPacket::Opcode::COCONUT)
+		{
+			write_short(index);
+			write_short(static_cast<int16_t>(delay));
+		}
+	};
+
 	// Spends CP on the Carnival window's row `index` (from 0) of tab `tab`:
 	// 0 a mob, 1 a skill, 2 a guardian (v83 FUN_008706d3)
 	// Opcode: MONSTER_CARNIVAL(218)

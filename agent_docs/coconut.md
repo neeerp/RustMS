@@ -5,9 +5,8 @@ hanging over the field, and whichever team brings down more of them wins.
 The RE is in v83ref `reports/b167-coconut.md` (the v83 client's field and
 packets, and the rules after Cosmic's `MapleCoconut.java`).
 
-Status: the server runs the game, started and reset by a GM. HeavenClient
-doesn't read the packets yet, so it shows neither the nuts nor the
-scoreboard.
+Status: the server runs the game, started and reset by a GM, and
+HeavenClient plays it (see "The client" below).
 
 ## Maps
 
@@ -68,3 +67,36 @@ no event they do nothing.
 - The clock is `CLOCK` type 2 (`conti::build_countdown`).
 - `COCONUT` (recv 0xD5, `CoconutHandler`): a u16 nut index and a u16 delay,
   which the server ignores.
+
+## The client
+
+HeavenClient follows v83's `CField_Coconut` (`Character/Coconut`,
+`Net/Handlers/CoconutHandlers`, `IO/UITypes/UICoconut`).
+
+- The coconut packets come before the new field loads, so
+  `enter_coconut_field` keeps the new map's field type, its count of nuts
+  and its uniforms (`coconut/avatar/<team>/<gender>`) from the moment the
+  server moves the player, and forgets the last game.
+- `COCONUT_HIT` queues a state for one nut, or for each of them on -1,
+  due after its delay. `Stage::update` shows those due on the map objs
+  named `%03d` of the index, in the order they came. The objs are named
+  001 to 501, so nut 0 has no obj and obj 501 is never shown, as in v83.
+- `FIELD_SPECIFIC_DATA` puts the team's cap and overall on the player's own
+  look, for their gender; leaving the field puts their own back.
+- `CLOCK` of any kind sets the scoreboard's time instead of a clock window.
+- The scoreboard sits at (535, 8) on the screen: the scores as three digits
+  (Maple's left, Story's right) and, once a `CLOCK` has come, the time left
+  as mm:ss, which stays at 00:00 after the end. Each glyph is followed by
+  a gap, 4 pixels in the scores and 1 in the time, as v83 draws them. v83
+  draws the time at (60, 83), over the end of the backdrop's own "Time
+  Remaining"; that is kept.
+- On the field a basic attack (not a skill) is the field's own: the player
+  swings whether or not anything is in reach, the server is sent the swing
+  with no mobs, and `COCONUT` names the lowest-numbered nut whose box the
+  swing's range meets, with the attack's delay. The nuts hang well above
+  the platforms, so a standing swing rarely reaches one; jump and swing.
+- A GM's chat line starting with `/` that the client doesn't know (and
+  isn't a face item's name) is sent as chat, so `/start` and `/reset`
+  reach the server; a player's isn't.
+- Not done: v83 keeps the uniform over equips changed on the field; here
+  changing the cap or overall there shows the real one.

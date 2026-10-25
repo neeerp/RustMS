@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "SetFieldHandlers.h"
 
+#include "CoconutHandlers.h"
 #include "Timer.h"
 
 #include "Helpers/CharacterParser.h"
@@ -26,6 +27,7 @@
 
 #include "../../Audio/Audio.h"
 #include "../../Character/Carnival.h"
+#include "../../Character/Coconut.h"
 #include "../../Configuration.h"
 
 #include "../../Gameplay/FieldEffectRules.h"
@@ -44,6 +46,7 @@
 #include "../../Util/Misc.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/UITypes/UICoconut.h"
 #include "../../IO/UITypes/UIDojoHud.h"
 #include "../../IO/UITypes/UIFieldClock.h"
 #include "../../IO/UITypes/UIMemoNotice.h"
@@ -68,8 +71,11 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
 	{
-		carnival::enter_field(mapid, NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"]);
+		int32_t fieldtype = NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"];
+		carnival::enter_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
+		enter_coconut_field(mapid, fieldtype);
+		UI::get().remove(UIElement::Type::COCONUT);
 
 		Window::get().fadeout(
 			[mapid, portalid, chase]()
@@ -80,6 +86,8 @@ namespace ms
 
 				// The Dojo's HUD is up only where its secret skills may be used.
 				UIDojoHud::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				// And Coconut Season's scoreboard on its own.
+				UICoconut::show_on(Stage::get().get_mapinfo().get_fieldtype());
 
 				UI::get().enable();
 				Timer::get().start();
@@ -369,6 +377,14 @@ namespace ms
 	void ClockHandler::handle(InPacket& recv) const
 	{
 		int8_t kind = recv.read_byte();
+
+		// Coconut Season's clock is its scoreboard's, whatever the kind (0x5498c6).
+		if (coconut::on_field())
+		{
+			coconut::state().end = coconut::clock_end(coconut::now(), recv.read_int());
+
+			return;
+		}
 
 		// A Dojo field heeds only kind 2, which sets its HUD's clock (0x55522b).
 		if (UI::get().get_element<UIDojoHud>())

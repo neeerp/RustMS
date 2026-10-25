@@ -148,6 +148,7 @@ namespace ms
 			CLAIM,
 			DOJOHUD,
 			MONSTERCARNIVAL,
+			COCONUT,
 			NUM_TYPES
 		};
 

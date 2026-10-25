@@ -473,6 +473,12 @@ namespace ms
 		field_effects.update();
 		screen_effects.update();
 		overlay_effects.update();
+
+		// Coconut Season's nuts take their states as they come due (FUN_005496c7).
+		if (coconut::on_field())
+			for (const coconut::Hit &hit : coconut::state().hits.take_due(coconut::now()))
+				tilesobjs.set_state(coconut::object_name(hit.index), hit.state, player.get_position());
+
 		tilesobjs.update();
 
 		// Every 5 s, and whenever a quest record changes (FUN_00a20f4c).
@@ -1721,6 +1727,24 @@ namespace ms
 	void Stage::set_object_state(const std::string &name, int32_t state)
 	{
 		tilesobjs.set_state(name, state, player.get_position());
+	}
+
+	std::vector<coconut::Box> Stage::coconut_boxes() const
+	{
+		std::unordered_map<std::string, Rectangle<int16_t>> named = tilesobjs.named_boxes();
+		std::vector<coconut::Box> boxes;
+
+		for (int16_t i = 0; i < coconut::count(); i++)
+		{
+			auto iter = named.find(coconut::object_name(i));
+
+			if (iter == named.end())
+				boxes.push_back({ 0, 0, 0, 0 });
+			else
+				boxes.push_back({ iter->second.left(), iter->second.top(), iter->second.right(), iter->second.bottom() });
+		}
+
+		return boxes;
 	}
 
 	void Stage::reset_obstacles()

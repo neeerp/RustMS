@@ -130,11 +130,11 @@ namespace ms
 		// A command that is "/" and the name of a face item (5160000-5160014)
 		// makes its emote if the player has the item in the cash inventory, as
 		// using it would; the first name that matches, compared as commands
-		// are, decides (FUN_0052c40c, after /pet).
-		void face_word(const std::string& input)
+		// are, decides (FUN_0052c40c, after /pet). Whether one matched.
+		bool face_word(const std::string& input)
 		{
 			if (input.size() <= 1)
-				return;
+				return false;
 
 			std::string word = input.substr(1);
 
@@ -149,8 +149,10 @@ namespace ms
 				if (Stage::get().get_player().get_inventory().find_item(InventoryType::Id::CASH, item_id) != 0)
 					Stage::get().send_key(KeyType::Id::FACE, 99 + index + 8, true);
 
-				return;
+				return true;
 			}
+
+			return false;
 		}
 
 		// v83's /? and /Help (StringPool 0x39a-0x3ac and 0x14c4).
@@ -401,10 +403,12 @@ namespace ms
 								}
 							}
 							// Commands the client doesn't know aren't chat, whatever
-							// the target; v83 sends them only for GMs.
+							// the target; v83 sends them only for GMs, as the
+							// server's commands (such as Coconut Season's /start).
 							else if (msg[0] == '/')
 							{
-								face_word(msg);
+								if (!face_word(msg) && Configuration::get().get_admin())
+									GeneralChatPacket(msg, false).dispatch();
 							}
 							else if (!flood_guard_allows(msg))
 							{

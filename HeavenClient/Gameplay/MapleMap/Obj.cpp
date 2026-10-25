@@ -260,6 +260,15 @@ namespace ms
 		return obstacle::box(static_cast<int32_t>(x), static_cast<int32_t>(y), { lt.x(), lt.y() }, { rb.x(), rb.y() }, flip, out);
 	}
 
+	Rectangle<int16_t> Obj::get_box() const
+	{
+		Rectangle<int16_t> bounds = states[current].animation.get_bounds();
+		int16_t left = flip ? -bounds.right() : bounds.left();
+		int16_t right = flip ? -bounds.left() : bounds.right();
+
+		return Rectangle<int16_t>(pos.x() + left, pos.x() + right, pos.y() + bounds.top(), pos.y() + bounds.bottom());
+	}
+
 	obstacle::Vec Obj::get_push() const
 	{
 		const State &state = states[current];

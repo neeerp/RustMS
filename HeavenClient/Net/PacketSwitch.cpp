@@ -22,6 +22,7 @@
 #include "Handlers/GuildHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CarnivalHandlers.h"
+#include "Handlers/CoconutHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
 #include "Handlers/FamilyHandlers.h"
@@ -130,6 +131,7 @@ namespace ms
 		CLEAR_BACK_EFFECT = 130,
 		BLOCKED_MAP = 131,
 		BLOCKED_SERVER = 132,
+		FIELD_SPECIFIC_DATA = 133,
 		WHISPER = 135,
 		SPOUSE_CHAT = 136,
 		SUMMON_ITEM_INAVAILABLE = 137,
@@ -246,6 +248,8 @@ namespace ms
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
+		COCONUT_HIT = 285,
+		COCONUT_SCORE = 286,
 		MONSTER_CARNIVAL_START = 289,
 		MONSTER_CARNIVAL_OBTAINED_CP = 290,
 		MONSTER_CARNIVAL_PARTY_CP = 291,
@@ -352,6 +356,9 @@ namespace ms
 		emplace<CONTI_STATE, ContiStateHandler>();
 		emplace<STOP_CLOCK, StopClockHandler>();
 		emplace<HORNTAIL_CAVE, HorntailCaveHandler>();
+		emplace<FIELD_SPECIFIC_DATA, FieldSpecificDataHandler>();
+		emplace<COCONUT_HIT, CoconutHitHandler>();
+		emplace<COCONUT_SCORE, CoconutScoreHandler>();
 		emplace<MONSTER_CARNIVAL_START, CarnivalStartHandler>();
 		emplace<MONSTER_CARNIVAL_OBTAINED_CP, CarnivalObtainedCpHandler>();
 		emplace<MONSTER_CARNIVAL_PARTY_CP, CarnivalPartyCpHandler>();
