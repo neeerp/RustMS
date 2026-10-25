@@ -354,6 +354,15 @@ pub enum ServerMessage {
     /// The player's field saw what clears `stage` of the event they are
     /// in, as Zakum's last body dying on its altar: tell the event.
     ClearEventStage(u8),
+    /// This player's attack on a copy of a Nett's Pyramid stage did this to
+    /// its mobs, for their run's tally.
+    Massacre(net::pyramid::Hits),
+    /// Packets from event `id` for its members on its maps: a member not
+    /// let in, or since gone, doesn't get them.
+    EventPackets {
+        id: u32,
+        packets: Vec<Packet>,
+    },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,

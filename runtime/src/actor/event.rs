@@ -38,6 +38,7 @@ use net::events::{
     MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
+use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
@@ -378,6 +379,10 @@ pub fn spawn(
         win_exp: None,
         blessing: start.blessing,
         pyramid_stage: 1,
+        tally: net::pyramid::Tally::default(),
+        stage_started: Instant::now(),
+        gauge: None,
+        gauge_out: None,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -496,6 +501,14 @@ struct EventActor {
     win_exp: Option<i32>,
     /// The stage a Nett's Pyramid run is on, which its clock moves on.
     pyramid_stage: u8,
+    /// A Nett's Pyramid run's kills, cool kills and misses, and the
+    /// stage's gauge (`EventCommand::Massacre`).
+    tally: net::pyramid::Tally,
+    stage_started: Instant,
+    /// The stage's gauge rules (`mobMassacre/gauge`).
+    gauge: Option<game_data::Massacre>,
+    /// When the stage's gauge runs out, as the tally stands.
+    gauge_out: Option<Instant>,
 }
 
 impl EventActor {
@@ -508,6 +521,9 @@ impl EventActor {
                 let ticket = self.ticket(member.client_id, event.clone());
                 member.send(ServerMessage::EventStarted(ticket));
             }
+        }
+        if self.kind.pyramid_mode().is_some() {
+            self.start_pyramid_stage();
         }
         let mut over = false;
         while !over {
@@ -534,6 +550,7 @@ impl EventActor {
                     None => over = true,
                 },
                 _ = until(ends) => over = self.time_up(),
+                _ = until(self.gauge_out) => over = self.gauge_ran_out(),
             }
         }
         info!(?kind, id, "Event ended");
@@ -823,6 +840,14 @@ impl EventActor {
                 });
             }
             EventCommand::PastTheDoors => debug!(client_id, "Lord Pirate already out"),
+            EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
+                let seconds = self.stage_seconds();
+                if let Some(gauge) = &self.gauge {
+                    self.tally.add(hits, gauge, seconds);
+                }
+                self.tell_tally(Some(hits));
+            }
+            EventCommand::Massacre(_) => debug!(client_id, "Massacre not counted"),
         }
     }
 
@@ -927,7 +952,70 @@ impl EventActor {
         self.ends = Some(ends);
         let to = self.kind.event().stage_map(self.pyramid_stage);
         self.move_team(None, to, Some(ends));
+        self.start_pyramid_stage();
         info!(kind = ?self.kind, id = self.id, stage = self.pyramid_stage, "Pyramid stage");
+    }
+
+    /// A Nett's Pyramid stage starts with its gauge full, and the team's
+    /// screens show the run's tally so far (Cosmic `Pyramid.timer`). After
+    /// the move, so that the gauge reaches the stage's map.
+    fn start_pyramid_stage(&mut self) {
+        let map = self.kind.event().stage_map(self.pyramid_stage);
+        self.gauge = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(map)?.massacre.clone());
+        self.stage_started = Instant::now();
+        self.tally.new_stage();
+        self.tell_tally(None);
+    }
+
+    /// The whole seconds the Nett's Pyramid stage has run. They aren't
+    /// scaled as its clock is, since the client's gauge goes down with the
+    /// seconds the clock shows.
+    fn stage_seconds(&self) -> i32 {
+        i32::try_from(self.stage_started.elapsed().as_secs()).unwrap_or(i32::MAX)
+    }
+
+    /// Every member's screen takes the tallies `hits` changed, or all of
+    /// them, and the gauge (Cosmic `broadcastInfo`); and the gauge's run
+    /// out is timed again.
+    fn tell_tally(&mut self, hits: Option<net::pyramid::Hits>) {
+        let mut packets: Vec<_> = self
+            .tally
+            .values(hits)
+            .into_iter()
+            .filter_map(|(key, value)| build_session_value(key, &value.to_string()).ok())
+            .collect();
+        packets.extend(build_pyramid_gauge(self.tally.count).ok());
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: packets.clone(),
+                });
+            }
+        }
+        let started = self.stage_started;
+        self.gauge_out = self
+            .gauge
+            .as_ref()
+            .and_then(|gauge| self.tally.runs_out(gauge))
+            .map(|seconds| started + Duration::from_secs(seconds.max(0) as u64));
+    }
+
+    /// The Nett's Pyramid stage's gauge ran out, which ends the run
+    /// (Cosmic `startGaugeSchedule`), sending everyone to its result map.
+    fn gauge_ran_out(&mut self) -> bool {
+        self.gauge_out = None;
+        let seconds = self.stage_seconds();
+        let out = self
+            .gauge
+            .as_ref()
+            .is_some_and(|gauge| self.tally.lost(gauge, seconds) >= gauge.total);
+        if out {
+            info!(kind = ?self.kind, id = self.id, stage = self.pyramid_stage, tally = ?self.tally, "Pyramid gauge ran out");
+        }
+        out
     }
 
     /// The mobs that aren't friendly on the copy of `map_id` go, and no

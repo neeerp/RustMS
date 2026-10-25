@@ -1592,6 +1592,11 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await
             }
+            ServerMessage::Massacre(hits) => {
+                self.tell_event(net::events::EventCommand::Massacre(hits))
+                    .await
+            }
+            ServerMessage::EventPackets { id, packets } => self.event_packets(id, packets).await?,
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::MobBuff(item_id) => {
                 let alive = self

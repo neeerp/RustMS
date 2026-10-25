@@ -2388,6 +2388,9 @@ pub enum EventCommand {
     /// The leader takes those on the party Dojo's rest floor `n` on to the
     /// next (Cosmic `2091005`'s `warpParty`).
     DojoOn(u8),
+    /// An attack on a Nett's Pyramid stage killed, cool-killed or missed
+    /// its mobs (Cosmic `Pyramid.kill`, `cool`, `miss`).
+    Massacre(crate::pyramid::Hits),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

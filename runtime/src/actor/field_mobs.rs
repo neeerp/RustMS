@@ -1525,6 +1525,16 @@ impl MobSet {
         self.take_away(now, |mob| mob.leaves_at.is_some_and(|at| at <= now))
     }
 
+    /// A hit for nothing takes a mob that goes on a miss (`removeOnMiss`,
+    /// Nett's Pyramid's) away, giving nothing, and its spawn point fills
+    /// again as after a kill. Returns its leave type.
+    pub fn missed(&mut self, object_id: i32, now: Instant) -> Option<u8> {
+        let gone = self.take_away(now, |mob| {
+            mob.object_id == object_id && mob.info.remove_on_miss
+        });
+        gone.first().map(|&(_, leave, _)| leave)
+    }
+
     /// Take away every mob, as if its time were up.
     pub fn leave_all(&mut self, now: Instant) -> Vec<(i32, u8, Option<BossBar>)> {
         self.take_away(now, |_| true)

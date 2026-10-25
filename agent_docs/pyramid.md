@@ -6,9 +6,9 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 `Pyramid.java`; Cosmic's own Pyramid is a stub) and
 `reports/b160-pyramid-client.md` (the v83 client's fields and packets).
 
-Status: the map and mob data, the packet builders, and the run's entry,
-stages and clocks are in. The gauge and tally, the blessings and Rage
-charges, the score, and the Tomb are still to come.
+Status: the map and mob data, the packet builders, the run's entry, stages
+and clocks, and its tally and gauge are in. The blessings and Rage charges,
+the score, and the Tomb are still to come.
 
 ## Maps
 
@@ -56,6 +56,39 @@ mode on a channel, as many as the maps have copies.
   (`duarte_after`).
 - The lobby's `piramid_in00` portal (a script portal) isn't modelled;
   Duarte is the only way in.
+
+## The tally and the gauge (`net::pyramid`)
+
+- On a copy of a stage (`FieldActor::massacre`), each attack's kills, cool
+  kills and misses go to the attacker's client as
+  `ServerMessage::Massacre`, and from there to the run as
+  `EventCommand::Massacre`, whoever made them.
+  - A kill is cool when the hit was as hard as the mob's `coolDamage`,
+    `coolDamageProb` percent of the time (`pyramid::cool`).
+  - A hit for 0 on a `removeOnMiss` mob is a miss: the mob goes, giving
+    nothing, and its spawn point fills again (`MobSet::missed`). This
+    holds on any map, though only the Pyramid's mobs have the flag.
+- The run keeps a `Tally` (Cosmic `Pyramid.kill`, `cool`, `miss`): the
+  counts, and `count`, what the stage's kills and cool kills have put back
+  on the gauge less what its misses took off.
+  - A kill puts back `hitAdd` and a cool kill `coolAdd`, each at most what
+    the gauge has lost; a miss always takes `missSub`.
+  - The gauge has lost the stage's whole seconds times `decrease`, less
+    `count`. Once that reaches `total` the run ends, which sends everyone to
+    its result map. The event actor times this (`gauge_out`), and times it
+    again after each change.
+  - The seconds aren't scaled as the event clocks are. The client's gauge
+    goes down with the seconds its clock shows, so at the harness's 60x
+    speed a stage's gauge loses at most 2 or 3 seconds' worth.
+- After each attack the team's clients get the counts it changed and the
+  gauge: SESSION_VALUE `massacre_hit`, `massacre_cool` or `massacre_miss`,
+  then PYRAMID_GAUGE with `count`. At each stage's start `count` goes back to
+  0, and they get all four counts (with `massacre_skill`) and the gauge, sent
+  after the move so that the gauge reaches the new stage. They go as
+  `ServerMessage::EventPackets`, which a client sends on only while its
+  player holds the run's ticket and is on one of its maps.
+- Cosmic also sends `massacre_party` and `massacre_laststage`. The v83
+  client's Pyramid fields read only the four counts, so these aren't sent.
 
 ## Stage rules (`FieldTemplate::massacre`)
 
