@@ -763,6 +763,26 @@ impl ClientActor {
         Ok(())
     }
 
+    /// Event `id`'s packets, sent if the player holds its ticket and is on
+    /// one of its maps.
+    pub(super) async fn event_packets(
+        &mut self,
+        id: u32,
+        packets: Vec<Packet>,
+    ) -> Result<(), RuntimeError> {
+        let Some(map_id) = self.game.as_ref().map(|game| game.player.stats.map_id) else {
+            return Ok(());
+        };
+        let here =
+            (self.event.as_ref()).is_some_and(|ticket| ticket.id == id && ticket.holds(map_id));
+        if here && !self.in_cash_shop {
+            for mut packet in packets {
+                self.send(&mut packet).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Event `id` ended: out of its maps, if the player still holds its
     /// ticket.
     pub(super) async fn event_ended(&mut self, id: u32) -> Result<(), RuntimeError> {

@@ -4,10 +4,12 @@
 //! then the run goes on to the next; after the fifth it ends on the mode's
 //! result map. The harness world runs events 60 times as fast, so a run
 //! takes 14 seconds. Duarte on a stage lets a player give up, back to the
-//! lobby.
+//! lobby. The run counts its kills and misses, which keep its gauge up or
+//! pull it down; once it runs out the run ends.
 
 use game_data::server_content::keys;
 use integration_harness::events::{party, said, talk, told, waiting_in};
+use integration_harness::hunting::attack;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, Trace};
 use integration_harness::WorldSession;
@@ -59,6 +61,62 @@ async fn a_run_alone_goes_through_five_timed_stages_to_its_result_map() {
     // The later stages' clocks give 3 minutes (3 s).
     assert_eq!(seen.countdowns.len(), 5, "{:?}", seen.countdowns);
     assert!(seen.countdowns[1..].iter().all(|&s| (2..=3).contains(&s)));
+}
+
+/// Whether the run's tally `key` was last told as `value`.
+fn told_value(seen: &Trace, key: &str, value: i32) -> bool {
+    let last = seen.session_values.iter().rev().find(|(k, _)| k == key);
+    last.is_some_and(|(_, v)| *v == value.to_string())
+}
+
+#[tokio::test]
+async fn kills_and_misses_are_counted_and_enough_misses_end_the_run() {
+    let mut player = waiting_in(PYRAMID_LOBBY, 45, &[]).await;
+    let run = EventKind::Pyramid(PyramidMode::Hell).event();
+    let mut seen = choose(&mut player, 0, PyramidMode::Hell).await;
+
+    // The stage starts with nothing counted and its gauge full.
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&run.entry)
+            && told_value(t, "massacre_miss", 0)
+            && t.pyramid_gauges == [0]
+            && t.field.mobs.len() >= 16
+    })
+    .await;
+    let mobs: Vec<i32> = seen.field.mobs.iter().map(|&(id, _)| id).collect();
+
+    // A kill counts. It puts back Hell's 1 once the gauge has lost
+    // anything, a second into the stage, and nothing before.
+    send(&mut player.connection, attack(mobs[0], 1)).await;
+    until(&mut player.connection, &mut seen, |t| {
+        told_value(t, "massacre_hit", 1) && t.pyramid_gauges.len() == 2
+    })
+    .await;
+    let after_kill = seen.pyramid_gauges[1];
+    assert!((0..=1).contains(&after_kill), "{:?}", seen.pyramid_gauges);
+
+    // A miss takes the mob away and Hell's 7 off the gauge.
+    send(&mut player.connection, attack(mobs[1], 0)).await;
+    until(&mut player.connection, &mut seen, |t| {
+        told_value(t, "massacre_miss", 1)
+            && t.field.killed.contains(&mobs[1])
+            && t.pyramid_gauges.len() == 3
+    })
+    .await;
+    assert_eq!(seen.pyramid_gauges.last(), Some(&(after_kill - 7)));
+
+    // Fourteen more take all its 100 (13 do once a second has gone), and
+    // the run ends on its result map.
+    for &mob in &mobs[2..16] {
+        send(&mut player.connection, attack(mob, 0)).await;
+    }
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&run.exit)
+    })
+    .await;
+    let misses = |n| told_value(&seen, "massacre_miss", n);
+    assert!(misses(14) || misses(15), "{:?}", seen.session_values);
+    assert!(!seen.warps.contains(&run.stage_map(3)), "{:?}", seen.warps);
 }
 
 #[tokio::test]

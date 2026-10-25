@@ -227,6 +227,9 @@ pub struct FieldActor {
     /// On a copy of a Mu Lung Dojo floor, its boss until its challenger
     /// first arrives and it comes out (Cosmic `dojang_1st`).
     dojo_boss: Option<i32>,
+    /// A copy of a Nett's Pyramid stage, whose kills, cool kills and
+    /// misses its run counts.
+    massacre: bool,
     kites: KiteSet,
     tick: Duration,
 }
@@ -287,6 +290,7 @@ impl FieldActor {
             climb: None,
             levers: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
+            massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
             kites: KiteSet::default(),
             tick,
         };
@@ -1599,7 +1603,8 @@ impl FieldActor {
     /// roll). A mob that only some skills hurt takes nothing from the others,
     /// as their v83 clients count it a miss (FUN_0068146c); a reflection
     /// (no skill) isn't judged. What it `takes` from them goes back to
-    /// `from` as one message.
+    /// `from` as one message, and on a Nett's Pyramid stage what it did to
+    /// the mobs goes to their run.
     #[allow(clippy::too_many_arguments)]
     fn handle_attack(
         &mut self,
@@ -1644,6 +1649,7 @@ impl FieldActor {
             });
         }
         let (mut hp_taken, mut mp_taken) = (0, 0);
+        let mut massacre = net::pyramid::Hits::default();
         for (object_id, damage) in hits {
             // Steal rolls on every mob hit, until one gives (Cosmic's rule).
             if takes.steal > 0 && rand::random::<f64>() * 100.0 < f64::from(takes.steal) {
@@ -1678,7 +1684,22 @@ impl FieldActor {
             if damage > 0 {
                 hp_taken += (damage * i64::from(takes.hp) / 100).min(max_hp);
             }
+            let cool = net::pyramid::cool(&mob.info, damage, rand::random::<u32>() % 100);
             match self.mobs.damage(from, object_id, damage, now) {
+                Some(Ok(_))
+                    if damage == 0
+                        && self
+                            .mobs
+                            .get(object_id)
+                            .is_some_and(|mob| mob.info.remove_on_miss) =>
+                {
+                    if let Some(leave) = self.mobs.missed(object_id, now) {
+                        if let Ok(packet) = build_kill_mob(object_id, leave) {
+                            self.broadcast(None, packet);
+                        }
+                    }
+                    massacre.misses += 1;
+                }
                 Some(Ok(percent)) => {
                     if let Ok(packet) = build_mob_hp(object_id, percent) {
                         attacker.send_packet(packet);
@@ -1702,9 +1723,19 @@ impl FieldActor {
                         }
                     }
                 }
-                Some(Err(kill)) => self.killed(&kill),
+                Some(Err(kill)) => {
+                    if cool {
+                        massacre.cools += 1;
+                    } else {
+                        massacre.kills += 1;
+                    }
+                    self.killed(&kill);
+                }
                 None => {}
             }
+        }
+        if self.massacre && massacre.any() {
+            attacker.send(ServerMessage::Massacre(massacre));
         }
         // MP Eater shows when it ate, once for the attack.
         if let Some(eater) = takes.mp.filter(|_| mp_taken > 0) {

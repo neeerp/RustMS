@@ -46,6 +46,7 @@ pub mod owl;
 pub mod packet;
 pub mod personal_shop;
 pub mod policy;
+pub mod pyramid;
 pub mod quests;
 pub mod rates;
 pub mod reactors;

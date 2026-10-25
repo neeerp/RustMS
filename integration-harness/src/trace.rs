@@ -271,6 +271,9 @@ pub struct Trace {
     pub clocks: Vec<(u8, u8, u8)>,
     /// CLOCK kind 2, the field's countdown: its seconds.
     pub countdowns: Vec<i32>,
+    /// PYRAMID_GAUGE: what a Nett's Pyramid stage's kills have put back on
+    /// its gauge, less its misses.
+    pub pyramid_gauges: Vec<i32>,
     /// STOP_CLOCK: the countdown taken down.
     pub clocks_stopped: usize,
     /// ZAKUM_SHRINE: (whether Zakum is out, minutes left) of each line on
@@ -444,6 +447,8 @@ impl Trace {
         } else if op == SendOpcode::DojoWarpUp as i16 {
             r.read_byte().unwrap();
             self.dojo_warps.push(r.read_byte().unwrap());
+        } else if op == SendOpcode::PyramidGauge as i16 {
+            self.pyramid_gauges.push(r.read_int().unwrap());
         } else if op == SendOpcode::SessionValue as i16 {
             let key = r.read_str_with_length().unwrap();
             self.session_values
