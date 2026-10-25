@@ -69,7 +69,7 @@ pub mod wedding_gift;
 pub use self::game_data::{closest_spawn_point, get as get_game_data, spawn_position};
 pub use self::handler::{
     login_route, world_route, AllianceRequest, BbsRequest, BroadcastScope, BuddyRequest, ClientId,
-    FamilyRequest, FieldRequest, GuildRequest, HandlerResult, LoginAction, LoginContext,
+    FamilyRequest, FieldRequest, GmEvent, GuildRequest, HandlerResult, LoginAction, LoginContext,
     LoginHandler, LoginStage, MessengerRequest, NoteRequest, PartyRequest, PartySkill,
     PreGameHandler, RingRequest, SpawnPosition, WhisperDelivery, WorldAction, WorldContext,
     WorldHandler, WorldRoute,

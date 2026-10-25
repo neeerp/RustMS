@@ -51,9 +51,11 @@ pub fn build_successful_login_packet(
     packet.write_int(account_id)?;
     packet.write_byte(gender as u8)?;
 
-    packet.write_byte(0)?;
-    packet.write_byte(0)?;
-    packet.write_byte(0)?;
+    // The grade: bit 0 makes the client a GM's, which sends the '/' lines
+    // it doesn't know as chat (report b169).
+    packet.write_byte(u8::from(acc.gm_level > 0))?;
+    packet.write_byte(0)?; // admin
+    packet.write_byte(0)?; // country
 
     packet.write_str_with_length(account_name)?;
     packet.write_byte(0)?;
@@ -131,10 +133,14 @@ mod tests {
     }
 
     fn expect_successful_login(packet: &Packet, pin_flag: u8) {
+        expect_login(packet, pin_flag, 0);
+    }
+
+    fn expect_login(packet: &Packet, pin_flag: u8, grade: u8) {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::LoginStatus as i16).int(0).short(0);
         expect.int(4242).byte(1); // account id, gender
-        expect.byte(0).byte(0).byte(0); // GM flag, admin byte, country code
+        expect.byte(grade).byte(0).byte(0); // grade, admin byte, country code
         expect.string("admin").byte(0);
         expect.byte(0).long(0).long(0); // not quiet-banned, ban time, creation time
         expect.int(1); // skip the "select the world" prompt
@@ -148,6 +154,11 @@ mod tests {
         let account = account();
         expect_successful_login(&build_successful_login_packet(&account, false).unwrap(), 1);
         expect_successful_login(&build_successful_login_packet(&account, true).unwrap(), 0);
+        let gm = Account {
+            gm_level: 3,
+            ..account
+        };
+        expect_login(&build_successful_login_packet(&gm, false).unwrap(), 1, 1);
     }
 
     #[test]

@@ -688,6 +688,26 @@ pub struct PartySkill {
     pub heal: i32,
 }
 
+/// What a GM's `/start` or `/reset` chat line asks of the event on their
+/// field (report b169).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GmEvent {
+    Start,
+    Reset,
+}
+
+impl GmEvent {
+    /// The event command a GM's '/' line names, if any.
+    pub fn parse(line: &str) -> Option<Self> {
+        let command = line.split_whitespace().next()?.to_ascii_lowercase();
+        match command.as_str() {
+            "/start" => Some(Self::Start),
+            "/reset" => Some(Self::Reset),
+            _ => None,
+        }
+    }
+}
+
 /// A request a player makes of their field, which owns its mobs.
 #[derive(Debug)]
 pub enum FieldRequest {
@@ -785,6 +805,10 @@ pub enum FieldRequest {
     /// Fly the kite (508xxxx) `item_id` with the player's `message` above
     /// where they stand, for an hour.
     Kite { item_id: i32, message: String },
+    /// The player's attack hit Coconut Season nut `index` (b167).
+    CoconutHit { index: u16 },
+    /// A GM runs the field's event (QUESTIONS b169 #1).
+    GmEvent(GmEvent),
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
     /// the player stands at (x, y).
     Pickup {
@@ -1036,6 +1060,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (Op::MonsterCarnival, InGame(&world::MonsterCarnivalHandler)),
+            (Op::Coconut, InGame(&world::CoconutHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
             (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
             (Op::WeddingBless, InGame(&world::WeddingBlessHandler)),
@@ -1163,7 +1188,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 127);
+        assert_eq!(world_routes().len(), 129);
     }
 
     #[test]

@@ -1470,3 +1470,6 @@
 "carnival.overtime" = "[placeholder] The two sides are tied! The battle goes on for a little longer."
 "carnival.guide.won" = "[placeholder] Well fought, and well won! Your result: #r{grade}#k"
 "carnival.guide.lost" = "[placeholder] Not a win this time, but there is always the next battle. Your result: #r{grade}#k"
+"coconut.fell.maple" = "[placeholder] {name} of Team Maple brings down a coconut."
+"coconut.fell.story" = "[placeholder] {name} of Team Story brings down a coconut."
+"coconut.overtime" = "[placeholder] The teams are tied! The game goes on for a little longer."
