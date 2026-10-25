@@ -1288,6 +1288,20 @@ unsourced = [
     "dojo.taunt.0",
     "dojo.taunt.1",
     "dojo.taunt.2",
+    "carnival.spiegelmann.menu",
+    "carnival.spiegelmann.enter",
+    "carnival.spiegelmann.about",
+    "carnival.spiegelmann.info",
+    "carnival.spiegelmann.rules",
+    "carnival.spiegelmann.rooms",
+    "carnival.spiegelmann.room",
+    "carnival.spiegelmann.levels",
+    "carnival.spiegelmann.no_party",
+    "carnival.spiegelmann.not_leader",
+    "carnival.spiegelmann.terms",
+    "carnival.spiegelmann.busy",
+    "carnival.spiegelmann.go",
+    "carnival.guide.back",
 ]
 
 [text."glTutoMsg0.message"]

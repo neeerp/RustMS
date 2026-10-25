@@ -4,6 +4,7 @@
 //! pack (`crate::content`), with committed placeholders. Lua is deferred;
 //! these keep the effect-returning shape a scripting runtime would have.
 
+use crate::carnival;
 use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
@@ -21,7 +22,7 @@ use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
 use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
-use game::character::{DOJO_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN};
+use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN};
 use game::guild::{self, Guild};
 use game::marriage;
 use game::wedding::{self, GuestRefusal, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
@@ -898,6 +899,12 @@ pub const DOJO_BOARD: i32 = 2091006;
 /// Duarte, who takes players into Nett's Pyramid from its lobby and
 /// stands on each of its stages, its result maps and the Shades.
 pub const DUARTE: i32 = 2103013;
+/// Spiegelmann, who sends players to the Monster Carnival's Carnival
+/// Field from Kerning City, Ludibrium and Orbis, and there gives out its
+/// rooms.
+pub const SPIEGELMANN: i32 = 2042000;
+/// Spiegelmann again, in the Monster Carnival's exit room.
+pub const CARNIVAL_GUIDE: i32 = 2042002;
 /// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
 /// again in its clear room.
 pub const WU_YANG: i32 = 2094001;
@@ -1376,6 +1383,12 @@ impl NpcScript {
         duarte(entries, player)
     }
 
+    /// Spiegelmann on the Carnival Field, for a player whose party may or
+    /// may not take each of the Monster Carnival's rooms (`entries`).
+    pub fn spiegelmann(entries: &[(EventKind, Entry)], player: &Player) -> Self {
+        spiegelmann(entries, player)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1548,6 +1561,13 @@ impl NpcScript {
         }
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
+        }
+        if npc_id == SPIEGELMANN && player.stats.map_id != carnival::CARNIVAL_LOBBY {
+            return Some(spiegelmann_away(player));
+        }
+        if npc_id == CARNIVAL_GUIDE && player.stats.map_id == carnival::CARNIVAL_EXIT {
+            let back = carnival::CARNIVAL_LOBBY;
+            return Some(ask_warp(CARNIVAL_GUIDE, keys::CARNIVAL_GUIDE_BACK, back));
         }
         if npc_id == DUARTE {
             if let Some(script) = duarte_after(player) {
@@ -7100,6 +7120,93 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
     // Someone left or moved since Duarte checked, or the last room went.
     script.refused = Some(text(keys::PYRAMID_DUARTE_REFUSED));
     script
+}
+
+/// Spiegelmann on the Carnival Field (Cosmic `2042000`): what the Monster
+/// Carnival is, and for a party's leader of the right level, its rooms,
+/// each with how many it takes. Picking one the party may take sends it
+/// in. Cosmic's Carnival 2 and Maple Coin trades aren't in.
+fn spiegelmann(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
+    let entry = |kind: EventKind| {
+        entries
+            .iter()
+            .find(|(of, _)| *of == kind)
+            .map_or(Entry::Busy, |(_, entry)| *entry)
+    };
+    let room = |room: u8| {
+        let kind = EventKind::Carnival(room);
+        let page = match entry(kind) {
+            Entry::Ready => Page::Done(vec![Effect::StartEvent(kind)]),
+            Entry::Busy => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_BUSY)),
+            Entry::NoParty => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY)),
+            Entry::NotLeader => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER)),
+            Entry::NotEligible => {
+                Page::Say(event_terms(kind.event(), keys::CARNIVAL_SPIEGELMANN_TERMS))
+            }
+        };
+        let label = content::text().get(
+            keys::CARNIVAL_SPIEGELMANN_ROOM,
+            &[
+                ("room", &room.to_string()),
+                ("least", &kind.event().least().to_string()),
+                ("most", &kind.event().team.end().to_string()),
+            ],
+        );
+        (label, vec![page])
+    };
+    let first = entry(EventKind::Carnival(1));
+    let enter = match first {
+        _ if !carnival::CARNIVAL_LEVELS.contains(&player.stats.level) => Page::Say(event_terms(
+            &events::CARNIVAL[0],
+            keys::CARNIVAL_SPIEGELMANN_LEVELS,
+        )),
+        Entry::NoParty => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER)),
+        _ => Page::Menu {
+            text: text(keys::CARNIVAL_SPIEGELMANN_ROOMS),
+            choices: (1..=carnival::CARNIVAL_ROOMS).map(room).collect(),
+        },
+    };
+    let mut script = NpcScript::new(
+        SPIEGELMANN,
+        vec![Page::Menu {
+            text: text(keys::CARNIVAL_SPIEGELMANN_MENU),
+            choices: vec![
+                (text(keys::CARNIVAL_SPIEGELMANN_ENTER), vec![enter]),
+                (
+                    text(keys::CARNIVAL_SPIEGELMANN_ABOUT),
+                    vec![
+                        Page::Say(text(keys::CARNIVAL_SPIEGELMANN_INFO)),
+                        Page::Say(text(keys::CARNIVAL_SPIEGELMANN_RULES)),
+                    ],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since he checked, or the room was taken.
+    script.refused = Some(text(keys::CARNIVAL_SPIEGELMANN_BUSY));
+    script
+}
+
+/// Spiegelmann in town (Cosmic `2042000`): he takes a player of levels 30
+/// to 50 to the Carnival Field, keeping where they were for its way out.
+fn spiegelmann_away(player: &Player) -> NpcScript {
+    let page = if carnival::CARNIVAL_LEVELS.contains(&player.stats.level) {
+        Page::Ask {
+            text: text(keys::CARNIVAL_SPIEGELMANN_GO),
+            on_yes: vec![
+                Effect::SaveLocation(CARNIVAL_RETURN, Some(player.stats.map_id)),
+                Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0),
+            ],
+            on_no: None,
+        }
+    } else {
+        Page::Say(event_terms(
+            &events::CARNIVAL[0],
+            keys::CARNIVAL_SPIEGELMANN_LEVELS,
+        ))
+    };
+    NpcScript::new(SPIEGELMANN, vec![page])
 }
 
 /// Duarte's way into Pharaoh Yeti's Tomb (Cosmic's menu item 3, unfinished
@@ -13924,6 +14031,69 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn spiegelmann_sends_a_leader_to_a_room_and_others_to_the_field() {
+        let entries = |entry| {
+            (1..=6)
+                .map(|room| (EventKind::Carnival(room), entry))
+                .collect::<Vec<_>>()
+        };
+        let at = |level, map_id| {
+            let mut player = player(50);
+            player.stats.level = level;
+            player.stats.map_id = map_id;
+            player
+        };
+        let lobby = carnival::CARNIVAL_LOBBY;
+        // Join, then the room.
+        let enter = |entry, level| {
+            let mut script = NpcScript::spiegelmann(&entries(entry), &at(level, lobby));
+            assert_eq!(kind(&script.begin()), Some(4));
+            script.respond(ScriptInput::Select(0)).unwrap()
+        };
+        let mut script = NpcScript::spiegelmann(&entries(Entry::Ready), &at(35, lobby));
+        script.begin();
+        assert_eq!(
+            kind(&script.respond(ScriptInput::Select(0)).unwrap()),
+            Some(4)
+        );
+        assert_eq!(
+            script.respond(ScriptInput::Select(4)).unwrap().effects,
+            [Effect::StartEvent(EventKind::Carnival(5))]
+        );
+        let levels = event_terms(&events::CARNIVAL[0], keys::CARNIVAL_SPIEGELMANN_LEVELS);
+        assert_eq!(page_text(&enter(Entry::Ready, 51)), levels);
+        assert_eq!(page_text(&enter(Entry::Ready, 29)), levels);
+        let no_party = text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY);
+        assert_eq!(page_text(&enter(Entry::NoParty, 40)), no_party);
+        let not_leader = text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER);
+        assert_eq!(page_text(&enter(Entry::NotLeader, 40)), not_leader);
+        let mut script = NpcScript::spiegelmann(&entries(Entry::NotEligible), &at(40, lobby));
+        script.begin();
+        script.respond(ScriptInput::Select(0)).unwrap();
+        let terms = event_terms(
+            EventKind::Carnival(6).event(),
+            keys::CARNIVAL_SPIEGELMANN_TERMS,
+        );
+        assert_eq!(
+            page_text(&script.respond(ScriptInput::Select(5)).unwrap()),
+            terms
+        );
+
+        // In town, he offers the way to the field and keeps the way back.
+        let mut script = NpcScript::for_npc(SPIEGELMANN, &at(30, 220000000)).unwrap();
+        assert_eq!(kind(&script.begin()), Some(1));
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::SaveLocation(CARNIVAL_RETURN, Some(220000000)),
+                Effect::WarpToPortal(lobby, 0),
+            ]
+        );
+        let mut script = NpcScript::for_npc(SPIEGELMANN, &at(60, 220000000)).unwrap();
+        assert_eq!(page_text(&script.begin()), levels);
     }
 
     #[test]

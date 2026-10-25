@@ -917,6 +917,7 @@ impl ClientActor {
         self.show_event_clock().await?;
         self.show_event_gate().await?;
         self.show_dojo_floor().await?;
+        self.show_carnival().await?;
         self.taunt_challenger().await?;
         self.start_hazard()?;
         self.bring_summons(spawn).await?;
@@ -1596,6 +1597,10 @@ impl ClientActor {
             ServerMessage::Massacre(hits) => {
                 self.count_protector_kills(hits).await?;
                 self.tell_event(net::events::EventCommand::Massacre(hits))
+                    .await
+            }
+            ServerMessage::CarnivalCp(cp) => {
+                self.tell_event(net::events::EventCommand::CarnivalCp(cp))
                     .await
             }
             ServerMessage::EventPackets { id, packets } => self.event_packets(id, packets).await?,

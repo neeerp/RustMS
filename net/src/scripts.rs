@@ -6,7 +6,7 @@
 use crate::content;
 use crate::conti::Portal;
 use crate::npc_scripts;
-use game::character::{DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
+use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
 use game_data::server_content::keys;
 use game_data::PortalTemplate;
@@ -1400,6 +1400,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                     Effect::Warp(back)
                 },
             )
+        }
+        // Out of the Carnival Field, back to where Spiegelmann sent the
+        // player from (Cosmic `mc_out`).
+        "mc_out" => {
+            let back = player
+                .saved_locations
+                .get(&CARNIVAL_RETURN)
+                .copied()
+                .unwrap_or(crate::carnival::CARNIVAL_FALLBACK);
+            go_back(CARNIVAL_RETURN, Effect::Warp(back))
+        }
+        // A Monster Carnival room's revive room, back into its battle
+        // (Cosmic `MCrevive1` to `MCrevive6`).
+        script if script.starts_with("MCrevive") => {
+            let room = script["MCrevive".len()..].parse::<u8>().ok()?;
+            let battle = crate::carnival::battle_map(room);
+            (crate::carnival::battle_room(battle) == Some(room))
+                .then(|| through(Effect::WarpToPortal(battle, 0)))?
         }
         // Out of the Mu Lung Dojo, back to where its notice board was
         // taken from (Cosmic `dojang_exit`).
@@ -3706,6 +3724,26 @@ mod tests {
             portal("nets_out", &player).unwrap().effects[2],
             Effect::Warp(HENESYS)
         );
+    }
+
+    #[test]
+    fn the_carnival_field_leads_back_and_the_revive_rooms_to_battle() {
+        let mut player = player_with(&[]);
+        let out = |to| {
+            vec![
+                Effect::SaveLocation(CARNIVAL_RETURN, None),
+                Effect::PortalSound,
+                Effect::Warp(to),
+            ]
+        };
+        assert_eq!(portal("mc_out", &player).unwrap().effects, out(102000000));
+        player.saved_locations.insert(CARNIVAL_RETURN, 220000000);
+        assert_eq!(portal("mc_out", &player).unwrap().effects, out(220000000));
+        assert_eq!(
+            portal("MCrevive3", &player).unwrap().effects,
+            [Effect::PortalSound, Effect::WarpToPortal(980000301, 0)]
+        );
+        assert_eq!(portal("MCrevive7", &player), None);
     }
 
     #[test]

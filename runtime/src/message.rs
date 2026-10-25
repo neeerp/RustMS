@@ -357,6 +357,9 @@ pub enum ServerMessage {
     /// This player's attack on a copy of a Nett's Pyramid stage did this to
     /// its mobs, for their run's tally.
     Massacre(net::pyramid::Hits),
+    /// This player's attack on a copy of a Monster Carnival battle field
+    /// killed mobs worth this many CP.
+    CarnivalCp(i32),
     /// Packets from event `id` for its members on its maps: a member not
     /// let in, or since gone, doesn't get them.
     EventPackets {

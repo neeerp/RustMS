@@ -391,6 +391,8 @@ pub struct Field {
     /// How each mob appeared: a summon effect, -2 fading in, -1 just
     /// there, or -3 out of another mob.
     pub appearances: BTreeMap<i32, i8>,
+    /// Each mob's Monster Carnival side, -1 for none.
+    pub teams: BTreeMap<i32, i8>,
     /// (object id, HP percentage)
     pub hp_bars: Vec<(i32, u8)>,
     /// FIELD_EFFECT 5, a boss's HP bar: (mob id, HP, max HP, colours).
@@ -533,7 +535,12 @@ impl Field {
             r.read_byte().unwrap();
             r.read_short().unwrap();
             r.read_short().unwrap();
-            self.appearances.insert(oid, r.read_byte().unwrap() as i8);
+            let appearance = r.read_byte().unwrap() as i8;
+            self.appearances.insert(oid, appearance);
+            if appearance >= 0 || appearance == -3 {
+                r.read_int().unwrap();
+            }
+            self.teams.insert(oid, r.read_byte().unwrap() as i8);
         } else if op == SendOpcode::MobStatSet as i16 {
             let oid = r.read_int().unwrap();
             let stats = read_mob_stats(&mut r);

@@ -92,6 +92,11 @@ impl ClientActor {
         if npc_id == net::npc_scripts::DUARTE && player.stats.map_id == net::events::PYRAMID_LOBBY {
             return self.talk_to_duarte().await;
         }
+        if npc_id == net::npc_scripts::SPIEGELMANN
+            && player.stats.map_id == net::carnival::CARNIVAL_LOBBY
+        {
+            return self.talk_to_spiegelmann().await;
+        }
         if npc_id == net::npc_scripts::ROLLY && player.stats.map_id == net::events::LUDIMAZE.lobby {
             return self
                 .talk_about_event(net::events::EventKind::LudiMaze)

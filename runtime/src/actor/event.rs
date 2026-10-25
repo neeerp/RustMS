@@ -38,6 +38,9 @@ use net::events::{
     MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
+use net::packet::build::world::carnival::{
+    build_carnival_start, build_obtained_cp, build_party_cp,
+};
 use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::ClientId;
@@ -344,8 +347,12 @@ pub fn spawn(
         id,
         kind,
         channel_id,
-        // So Gong's trial has no time limit.
-        ends: (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
+        // So Gong's trial has no time limit; a Monster Carnival battle
+        // lasts as long as its field says.
+        ends: match kind {
+            EventKind::Carnival(room) => Some(Instant::now() + net::carnival::battle_length(room)),
+            _ => (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
+        },
         joiner: tx.downgrade(),
         event: Some(EventHandle { tx }),
         rx,
@@ -357,6 +364,14 @@ pub fn spawn(
             );
             team.enlist(&start.roster);
             team
+        },
+        // One party alone plays Maple Red.
+        carnival: {
+            let mut score = net::carnival::Score::default();
+            for member in &start.team {
+                score.join(member.client_id, 0);
+            }
+            score
         },
         members: start
             .team
@@ -513,6 +528,8 @@ struct EventActor {
     /// How a Nett's Pyramid run ended, for its score: outlasting the last
     /// stage's clock (true) or with its gauge run out (false).
     pyramid_end: Option<bool>,
+    /// A Monster Carnival battle's sides and CP.
+    carnival: net::carnival::Score,
 }
 
 impl EventActor {
@@ -880,6 +897,61 @@ impl EventActor {
                 self.tell_tally(Some(net::pyramid::Hits::default()), true);
             }
             EventCommand::Rage => debug!(client_id, "Rage of Pharaoh outside the Pyramid"),
+            EventCommand::CarnivalCp(cp) if matches!(self.kind, EventKind::Carnival(_)) => {
+                self.carnival_cp(client_id, cp);
+            }
+            EventCommand::CarnivalArrived if matches!(self.kind, EventKind::Carnival(_)) => {
+                self.carnival_start(client_id);
+            }
+            EventCommand::CarnivalCp(_) | EventCommand::CarnivalArrived => {
+                debug!(client_id, "Not in a Monster Carnival");
+            }
+        }
+    }
+
+    /// A member's kill in a Monster Carnival battle earned `cp`: their
+    /// screen shows their own CP, and everyone's their side's (Cosmic
+    /// `gainCP`).
+    fn carnival_cp(&mut self, client_id: ClientId, cp: i32) {
+        let Some(gain) = self.carnival.gain(client_id, cp) else {
+            return;
+        };
+        let side: Vec<_> = build_party_cp(gain.side, gain.ours)
+            .ok()
+            .into_iter()
+            .collect();
+        for member in self.team.members() {
+            let Some(handle) = self.members.get(member) else {
+                continue;
+            };
+            let mut packets = side.clone();
+            if *member == client_id {
+                packets.splice(0..0, build_obtained_cp(gain.mine).ok());
+            }
+            handle.send(ServerMessage::EventPackets {
+                id: self.id,
+                packets,
+            });
+        }
+    }
+
+    /// A member arrived on the Monster Carnival battle field: their screen
+    /// takes their side and the score, with none of the field's mobs
+    /// summoned yet.
+    fn carnival_start(&self, client_id: ClientId) {
+        let (EventKind::Carnival(room), Some(start), Some(handle)) = (
+            self.kind,
+            self.carnival.start(client_id),
+            self.members.get(&client_id),
+        ) else {
+            return;
+        };
+        let summoned = vec![0; net::carnival::summonable(room)];
+        if let Ok(packet) = build_carnival_start(start, &summoned) {
+            handle.send(ServerMessage::EventPackets {
+                id: self.id,
+                packets: vec![packet],
+            });
         }
     }
 

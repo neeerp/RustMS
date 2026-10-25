@@ -90,6 +90,8 @@ impl ClientActor {
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
             // Duarte takes the gem, or sends the player in from the Shades.
             EventKind::PyramidTomb(_) => return Ok(()),
+            // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
+            EventKind::Carnival(_) => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -105,6 +107,21 @@ impl ClientActor {
             entries.push((kind, entry));
         }
         let script = NpcScript::duarte(&entries, &self.in_game()?.player);
+        self.start_script(script).await
+    }
+
+    /// Spiegelmann on the Carnival Field tells the player which of the
+    /// Monster Carnival's rooms their party may take.
+    pub(super) async fn talk_to_spiegelmann(&mut self) -> Result<(), RuntimeError> {
+        let mut entries = Vec::new();
+        for room in 1..=net::carnival::CARNIVAL_ROOMS {
+            let kind = EventKind::Carnival(room);
+            let Some(entry) = self.event_entry(kind).await? else {
+                return Ok(());
+            };
+            entries.push((kind, entry));
+        }
+        let script = NpcScript::spiegelmann(&entries, &self.in_game()?.player);
         self.start_script(script).await
     }
 
@@ -1233,6 +1250,22 @@ impl ClientActor {
             build_dojo_energy(energy)?,
         ])
         .await
+    }
+
+    /// Arriving on a Monster Carnival battle field, the player's screen
+    /// takes the battle's score from the event (Cosmic
+    /// `startMonsterCarnival`).
+    pub(super) async fn show_carnival(&mut self) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let arrived = self.event.as_ref().is_some_and(|ticket| {
+            matches!(ticket.kind, EventKind::Carnival(_))
+                && ticket.holds(map_id)
+                && net::carnival::battle_room(map_id).is_some()
+        });
+        if arrived {
+            self.tell_event(EventCommand::CarnivalArrived).await;
+        }
+        Ok(())
     }
 
     /// Arriving on the Dojo's entrance, the player alone sees one of three

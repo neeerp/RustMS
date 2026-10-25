@@ -1,6 +1,7 @@
 pub mod alliance;
 pub mod buddy;
 pub mod buff;
+pub mod carnival;
 pub mod cash_shop;
 pub mod channel;
 pub mod char;
