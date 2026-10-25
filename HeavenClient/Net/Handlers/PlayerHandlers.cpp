@@ -23,6 +23,7 @@
 #include "../../Character/Diseases.h"
 #include "../../Character/QuestCatalog.h"
 #include "../../Character/MountRules.h"
+#include "../../Gameplay/Combat/DojoEnergy.h"
 
 #include "../Packets/LoginPackets.h"
 #include "../Packets/PlayerPackets.h"
@@ -655,5 +656,23 @@ namespace ms
 			Stage::get().get_player().clear_request();
 
 		Stage::get().teleport_to_portal(recv.read_byte());
+	}
+
+	void SessionValueHandler::handle(InPacket& recv) const
+	{
+		std::string key = recv.read_string();
+		std::string value = recv.read_string();
+
+		if (key == "energy")
+			dojo_energy::session().energy = std::atoi(value.c_str());
+	}
+
+	void FieldSetVariableHandler::handle(InPacket& recv) const
+	{
+		std::string key = recv.read_string();
+		std::string value = recv.read_string();
+
+		if (key == "Bamboo_Used")
+			dojo_energy::session().bamboo_used = !value.empty() && value != "0";
 	}
 }

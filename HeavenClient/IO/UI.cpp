@@ -296,6 +296,9 @@ namespace ms
 			return;
 		}
 
+		if (!letting_through && secret_skill_key(keycode, pressed))
+			return;
+
 		if ((is_key_down[GLFW_KEY_LEFT_ALT] || is_key_down[GLFW_KEY_RIGHT_ALT]) &&
 			(is_key_down[GLFW_KEY_ENTER] || is_key_down[GLFW_KEY_KP_ENTER]))
 		{
@@ -580,6 +583,101 @@ namespace ms
 		}
 
 		is_key_down[keycode] = pressed;
+	}
+
+	bool UI::secret_skill_key(int32_t keycode, bool pressed)
+	{
+		using Chord = dojo_energy::Chord;
+
+		bool ready = get_element<UIStatusBar>() && !focusedtextfield && !dialog_open()
+					 && pq_skills::allowed(pq_skills::Kind::DOJO_BUFF, Stage::get().get_mapinfo().get_fieldtype())
+					 && dojo_energy::session().energy >= dojo_energy::FULL;
+
+		// Only keys going down count, and a key going up lets the held one through first (FUN_0094c79c).
+		if (!ready || !pressed)
+		{
+			let_held_through();
+			secret_chord.reset();
+
+			return false;
+		}
+
+		// A key already down repeating isn't a key going down: it goes on as before.
+		auto down = is_key_down.find(keycode);
+
+		if (down != is_key_down.end() && down->second)
+			return false;
+
+		Chord::Modifier modifier = Chord::Modifier::NONE;
+
+		if (keycode == GLFW_KEY_LEFT_CONTROL || keycode == GLFW_KEY_RIGHT_CONTROL)
+			modifier = Chord::Modifier::CTRL;
+		else if (keycode == GLFW_KEY_LEFT_ALT || keycode == GLFW_KEY_RIGHT_ALT)
+			modifier = Chord::Modifier::ALT;
+
+		switch (secret_chord.press(modifier))
+		{
+			case Chord::Result::HOLD:
+				if (held_key != keycode)
+					let_held_through();
+
+				held_key = keycode;
+
+				return true;
+			case Chord::Result::CHORD:
+				break;
+			default:
+				let_held_through();
+
+				return false;
+		}
+
+		// The arrow held picks the skill (FUN_0094ce06); with none, both keys go on as usual.
+		dojo_energy::Arrow arrow = dojo_energy::Arrow::NONE;
+
+		if (is_key_down[GLFW_KEY_UP])
+			arrow = dojo_energy::Arrow::UP;
+		else if (is_key_down[GLFW_KEY_LEFT])
+			arrow = dojo_energy::Arrow::LEFT;
+		else if (is_key_down[GLFW_KEY_RIGHT])
+			arrow = dojo_energy::Arrow::RIGHT;
+
+		if (arrow == dojo_energy::Arrow::NONE)
+		{
+			let_held_through();
+
+			return false;
+		}
+
+		held_key = GLFW_KEY_UNKNOWN;
+
+		bool bamboo_used = dojo_energy::session().bamboo_used;
+
+		if (arrow == dojo_energy::Arrow::UP && bamboo_used)
+		{
+			if (auto chatbar = get_element<UIChatBar>())
+				chatbar->send_chatline("Bamboo Rain can be used only once per stage.", UIChatBar::LineType::SKILL);
+
+			return true;
+		}
+
+		int32_t job = Stage::get().get_player().get_stats().get_job().get_id();
+		Stage::get().get_combat().use_move(dojo_energy::secret_skill(job, arrow, bamboo_used));
+
+		return true;
+	}
+
+	void UI::let_held_through()
+	{
+		if (held_key == GLFW_KEY_UNKNOWN)
+			return;
+
+		int32_t key = held_key;
+		held_key = GLFW_KEY_UNKNOWN;
+
+		letting_through = true;
+		send_key(key, true);
+		letting_through = false;
 	}
 
 	void UI::set_scrollnotice(const std::string &notice)

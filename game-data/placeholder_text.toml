@@ -1365,6 +1365,7 @@
 "dojo.up.monsters" = "[placeholder] There are still some monsters remaining."
 "dojo.next.shut" = "[placeholder] The door is not open yet."
 "dojo.points" = "[placeholder] You received {points} training points. Your total training points score is now {total}."
+"dojo.energy_reset" = "[placeholder] You used a secret skill, so your energy bar is empty again."
 "dojo.so_gong.record" = "[placeholder] I want to record my score up to this point."
 "dojo.so_gong.record_ask" = "[placeholder] If you record your score, you can start where you left off next time. Do you want to record your current score?"
 "dojo.so_gong.record_no" = "[placeholder] You think you can go even higher? Good luck!"

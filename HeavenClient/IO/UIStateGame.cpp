@@ -879,6 +879,7 @@ namespace ms
 					UIElement::Type::TIMEDQUESTS,
 					UIElement::Type::MOBGAGE,
 					UIElement::Type::ENERGYBAR,
+					UIElement::Type::DOJOENERGY,
 					UIElement::Type::AVATARMEGAPHONE,
 					UIElement::Type::PARTYSEARCHICON
 			};

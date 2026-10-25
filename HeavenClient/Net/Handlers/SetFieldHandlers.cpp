@@ -28,6 +28,7 @@
 #include "../../Configuration.h"
 
 #include "../../Gameplay/FieldEffectRules.h"
+#include "../../Gameplay/Combat/DojoEnergy.h"
 #include "../../Gameplay/OxQuizRules.h"
 #include "../../Gameplay/Stage.h"
 #include "../../IO/BuddyCommands.h"
@@ -41,6 +42,7 @@
 #include "../../Util/Memos.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
+#include "../../IO/UITypes/UIDojoEnergy.h"
 #include "../../IO/UITypes/UIFieldClock.h"
 #include "../../IO/UITypes/UIMemoNotice.h"
 #include "../../IO/UITypes/UIMiniMap.h"
@@ -71,6 +73,9 @@ namespace ms
 
 				Stage::get().load(mapid, portalid, chase);
 
+				// The Dojo's energy bar is up only where its secret skills may be used.
+				UIDojoEnergy::show_on(Stage::get().get_mapinfo().get_fieldtype());
+
 				UI::get().enable();
 				Timer::get().start();
 				GraphicsGL::get().unlock();
@@ -84,6 +89,9 @@ namespace ms
 				if (!Memos::Inbox::get().empty() && !UIMemoNotice::showing())
 					UI::get().emplace<UIMemoNotice>();
 			});
+
+		// Bamboo Rain is once a stage.
+		dojo_energy::session().bamboo_used = false;
 
 		GraphicsGL::get().lock();
 		Stage::get().clear();
@@ -221,6 +229,9 @@ namespace ms
 		cached_player_entry = entry;
 
 		Stage::get().loadplayer(entry);
+
+		// The Dojo's energy starts over with the character.
+		dojo_energy::session() = {};
 
 		// The server lists this character's notes, if it has any.
 		Memos::Inbox::get().listed({});

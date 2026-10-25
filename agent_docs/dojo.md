@@ -7,7 +7,8 @@ door, and So Gong's solo run. Slice 2 is the section timers and the
 entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
 score So Gong records. Slice 3b is the belts, the points reset and the
 medals. Slice 3c is So Gong's first-time trial. Slice 4 is the party
-Dojo. Energy and the `muruengRaid` HUD come later.
+Dojo. Slice 5 is the energy bar and its secret skills. The `muruengRaid`
+HUD's clock and gauges come later.
 
 ## The way in
 
@@ -274,6 +275,36 @@ map; RustMS checks that the run is won. Cosmic also skips the trial for
 anyone who has been on the entrance (`hasEntered("dojang_Msg")`); RustMS
 asks everyone until they beat it.
 
+## Energy and the secret skills
+
+`Character::dojo_energy` (0 to `dojo::FULL_ENERGY`, 10000) is not saved.
+On the Dojo's maps (`dojo::in_dojo`, 925020000 to 925033804), an attack
+that hits a mob adds 100 once it passes validation, and every hit taken
+(TAKE_DAMAGE, before the death check) adds 20; mists and map hazards add
+nothing. Each change, and every arrival on a fighting floor, sends the
+whole value as SESSION_VALUE (`0x5A`, `energy` and the number as text).
+So Gong's new runs, resumed runs and party runs, and the entrance, empty
+it, and tell the client so.
+
+Two gaps are left open. A hit that does no damage (dodged, or under
+Invincibility) still adds 20; whether v83's servers counted those is not
+known. And character data, as on the way back from the Cash Shop, empties
+the client's bar while the server keeps its count, until the next change
+or floor sends it again.
+
+The secret skills (`skills::pq_skill`) take a full bar:
+
+| Skill | Keys | Server |
+|---|---|---|
+| Bamboo Rain (1009) | Up + Ctrl + Alt | an attack; dropped if the bar isn't full |
+| Invincibility (1010) | Left + Ctrl + Alt | the `DivineBody` buff; refused (`Refusal::NoEnergy`) if it isn't |
+| Power Explosion (1011) | Right + Ctrl + Alt | not yet: it has no buff, so it is refused and the bar stays full (slice 5b; v83ref `reports/b158-power-explosion.md`) |
+
+Each copy (10001009 and so on) works the same. Using one empties the bar,
+sends `energy` 0, and the pink notice `dojo.energy_reset`. As in Cosmic,
+the server never sends FIELD_SET_VARIABLE `Bamboo_Used`, so Bamboo Rain
+may be used again on the same floor once the bar is full again.
+
 ## The client
 
 `DOJO_WARP_UP` (207) is handled by `DojoWarpUpHandler`. v83's handler
@@ -298,6 +329,25 @@ one that comes before the map has loaded (`pending_weather`), as
 `pending_clock` does for clocks. v83 builds the field in SET_FIELD's
 handler itself, so nothing waits there. Weather 5120024 has no particles
 (`path` is `weather/none`), only its message bar (`floatType` 33).
+
+The energy bar (`UIDojoEnergy`, v83 0x554005) is up on the fields where
+the secret skills may be used (field types 14 and 18): `muruengRaid/energy`
+from UIWindow.img, its frame at (20, 130) with the dark `Gage` strip
+stretched over the unfilled part of the 77-pixel strip
+(`dojo_energy::cover`), or, once full, the flashing `full` animation with
+the keys' legend at (9, 80). `SessionValueHandler` (90) keeps `energy` and
+`FieldSetVariableHandler` (92) keeps `Bamboo_Used` in
+`dojo_energy::session()`. The character's data resets both, and every map
+change resets `Bamboo_Used`.
+
+With the bar full, on such a field, with no dialog or text field open,
+`UI::secret_skill_key` runs v83's chord (FUN_0094c79c,
+`dojo_energy::Chord`): a Ctrl or Alt going down is held back; the other
+one next completes the chord, and anything else, or a key going up, lets
+the held one through first. On a chord the arrow held picks the skill
+(FUN_0094ce06), cast through `Combat::use_move`. Up after `Bamboo_Used`
+shows "Bamboo Rain can be used only once per stage." in chat type 0xc
+(v83's line is Korean). With no arrow held, both keys go on as usual.
 
 ## Text
 

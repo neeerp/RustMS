@@ -118,6 +118,8 @@ namespace ms
 		MONSTER_BOOK_SET_CARD = 83,
 		MONSTER_BOOK_SET_COVER = 84,
 		MINIMAP_ON_OFF = 86,
+		SESSION_VALUE = 90,
+		FIELD_SET_VARIABLE = 92,
 
 		SCRIPT_PROGRESS_MESSAGE = 122,
 		SKILL_MACROS = 124,
@@ -466,6 +468,8 @@ namespace ms
 		emplace<ADD_COOLDOWN, AddCooldownHandler>();
 		emplace<MONSTER_BOOK_SET_CARD, MonsterBookSetCardHandler>();
 		emplace<MONSTER_BOOK_SET_COVER, MonsterBookSetCoverHandler>();
+		emplace<SESSION_VALUE, SessionValueHandler>();
+		emplace<FIELD_SET_VARIABLE, FieldSetVariableHandler>();
 
 		// Messaging handlers
 		emplace<SHOW_STATUS_INFO, ShowStatusInfoHandler>();

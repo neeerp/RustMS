@@ -28,6 +28,7 @@
 #include "Components/Textfield.h"
 
 #include "../Character/SkillMacros.h"
+#include "../Gameplay/Combat/DojoEnergy.h"
 #include "QuickSlots.h"
 
 namespace ms
@@ -172,6 +173,13 @@ namespace ms
 		void lock(bool locked);
 
 	private:
+		// Ctrl and Alt with an arrow held cast a Dojo secret skill once the energy bar is full (FUN_00529968);
+		// whether the key was taken for it.
+		bool secret_skill_key(int32_t keycode, bool pressed);
+
+		// Lets through the modifier the chord held back.
+		void let_held_through();
+
 		std::unique_ptr<UIState> state;
 		Keyboard keyboard;
 		SkillMacros skill_macros;
@@ -187,6 +195,10 @@ namespace ms
 		bool quitted;
 		bool caps_lock_enabled = false;
 		Screenshot::Throttle screenshots;
+		dojo_energy::Chord secret_chord;
+		// GLFW_KEY_UNKNOWN for none.
+		int32_t held_key = -1;
+		bool letting_through = false;
 	};
 
 	template<class T, typename...Args>

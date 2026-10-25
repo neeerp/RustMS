@@ -7,12 +7,15 @@ use crate::error::NetworkError;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
+use crate::packet::build::world::messaging::{self, Broadcast};
 use crate::packet::build::world::mob::{self, FROM_MIST, FROM_OBSTACLE, FROM_TOUCH};
 use crate::packet::build::world::stat::{self, StatUpdate};
-use crate::packet::build::world::{buff, effect, inventory};
+use crate::packet::build::world::{buff, effect, field, inventory};
 use crate::skills;
 use game::buff::BuffStat;
+use game::dojo;
 use game::{Buff, Disease, InventoryType, MobStat, Player, ShownBuff};
+use game_data::server_content::keys;
 use game_data::FIELD_LIMIT_NO_EXP_LOSS;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
@@ -205,6 +208,16 @@ impl WorldHandler for AttackHandler {
             debug!(display = attack.display, "Assassinate refused");
             return Ok(HandlerResult::empty());
         }
+        // Bamboo Rain takes a full energy bar (Cosmic's
+        // CloseRangeDamageHandler).
+        let bamboo = skills::pq_skill(attack.skill) == Some(skills::PqSkill::BambooRain);
+        if bamboo && ctx.player.dojo_energy < dojo::FULL_ENERGY {
+            debug!(
+                skill = attack.skill,
+                "Bamboo Rain refused without full energy"
+            );
+            return Ok(HandlerResult::empty());
+        }
         let uses = match combat::validate(&attack, ctx.player) {
             Ok(uses) => uses,
             Err(rejection) => {
@@ -212,6 +225,7 @@ impl WorldHandler for AttackHandler {
                 return Ok(HandlerResult::empty());
             }
         };
+        let fills = attack.mob_count > 0 && dojo::in_dojo(ctx.player.stats.map_id);
         let mut result = HandlerResult::empty();
         let mut skill_level = 0;
         let ranged = attack.kind == AttackKind::Ranged;
@@ -322,8 +336,38 @@ impl WorldHandler for AttackHandler {
             let stunned = catch_disease(ctx.player, stun, now)?;
             result.actions.extend(stunned.actions);
         }
+        if bamboo {
+            result = spend_dojo_energy(ctx.player, result)?;
+        } else if fills {
+            result = fill_dojo_energy(ctx.player, dojo::ATTACK_ENERGY, result)?;
+        }
         Ok(result)
     }
+}
+
+/// On the Dojo's maps an attack that reaches a monster, or a hit taken,
+/// fills the energy bar. The client hears the new value even when the bar
+/// was already full (Cosmic).
+pub(super) fn fill_dojo_energy(
+    player: &mut Player,
+    more: i32,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    player.dojo_energy = dojo::charged(player.dojo_energy, more);
+    Ok(result.with_reply(field::build_dojo_energy(player.dojo_energy)?))
+}
+
+/// A secret skill used with a full energy bar empties it, with a pink
+/// notice.
+pub(super) fn spend_dojo_energy(
+    player: &mut Player,
+    result: HandlerResult<WorldAction>,
+) -> WorldResult {
+    player.dojo_energy = 0;
+    let notice = crate::content::text().get(keys::DOJO_ENERGY_RESET, &[]);
+    Ok(result
+        .with_reply(field::build_dojo_energy(0)?)
+        .with_reply(messaging::build_broadcast(Broadcast::Pink, &notice)?))
 }
 
 /// Combo Attack's new value, for what is left of it: the player hears it
@@ -523,6 +567,9 @@ impl WorldHandler for TakeDamageHandler {
                 mob_id,
                 damage: reflected.into(),
             }));
+        }
+        if dojo::in_dojo(player.stats.map_id) {
+            actions = fill_dojo_energy(player, dojo::HIT_ENERGY, actions)?;
         }
         if hp == 0 {
             return Ok(actions.with(WorldAction::Died));
