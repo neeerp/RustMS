@@ -144,6 +144,7 @@ namespace ms
 		FIELD_OBSTACLE_ALL_RESET = 141,
 		BLOW_WEATHER = 142,
 		PLAY_JUKEBOX = 143,
+		ADMIN_RESULT = 144,
 		OX_QUIZ = 145,
 		GMEVENT_INSTRUCTIONS = 146,
 		CLOCK = 147,
@@ -515,6 +516,7 @@ namespace ms
 		emplace<MESSENGER, MessengerHandler>();
 		emplace<SCROLL_RESULT, ScrollResultHandler>();
 		emplace<SERVER_MESSAGE, ServerMessageHandler>();
+		emplace<ADMIN_RESULT, AdminResultHandler>();
 		emplace<WEEK_EVENT_MESSAGE, WeekEventMessageHandler>();
 		emplace<AVATAR_MEGAPHONE_RESULT, AvatarMegaphoneResultHandler>();
 		emplace<AVATAR_MEGAPHONE, AvatarMegaphoneHandler>();

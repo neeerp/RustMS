@@ -19,6 +19,14 @@ int main()
 		require(AccountGrade{ 0x11, 0 }.gm() && AccountGrade{ 0x11, 0 }.admin(), "0x11 is the admin account, a GM's too");
 		require(!AccountGrade{ 0x01, 0x40 }.alerts_admins(), "the sub-grade's 0x40 doesn't tell the server");
 		require(AccountGrade{ 0, 0x80 }.alerts_admins() && !AccountGrade{ 0, 0x80 }.gm(), "its 0x80 does, without the GM bit");
+
+		require(AccountGrade{}.rank() == 5 && !AccountGrade{}.slash_commands(), "a player has no GM commands");
+		require(AccountGrade{ 0x21, 0x80 }.rank() == 0, "grade 0x20 ranks first");
+		require(AccountGrade{ 0x01, 0x80 }.rank() == 1 && AccountGrade{ 0x11, 0 }.rank() == 1, "then the GM bit");
+		require(AccountGrade{ 0, 0x60 }.rank() == 2 && AccountGrade{ 0, 0x40 }.rank() == 3, "then sub 0x20, then 0x40");
+		require(AccountGrade{ 0, 0x80 }.rank() == 4 && AccountGrade{ 0, 0x80 }.slash_commands(), "then sub 0x80");
+		require(AccountGrade{ 0x20, 0 }.rank() == 0 && !AccountGrade{ 0x20, 0 }.slash_commands(),
+			"grade 0x20 alone ranks first but can't use the commands");
 	}
 	catch (const std::exception& e)
 	{

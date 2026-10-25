@@ -31,6 +31,7 @@
 #include "../Components/MapleButton.h"
 
 #include "../BuddyCommands.h"
+#include "../GmCommands.h"
 #include "../GuildCommands.h"
 #include "../PartyCommands.h"
 
@@ -335,8 +336,13 @@ namespace ms
 							if (msg[0] != '/' && chat_target == Target::WHISPER && whisper_name.empty())
 								send_chatline("There is no one to whisper to.", LineType::SKILL);
 
+							// A GM's commands come first, so a GM's /w warns
+							// (0x52c9cd).
+							if (msg[0] == '/' && GmCommands::run(msg))
+							{
+							}
 							// HC's own: v83 has no command to whisper one line.
-							if (whisper_result == WhisperParseResult::ValidWhisper
+							else if (whisper_result == WhisperParseResult::ValidWhisper
 								&& same_name(target, Stage::get().get_player().get_stats().get_name()))
 							{
 								send_chatline("You can't whisper to yourself.", LineType::SKILL);
