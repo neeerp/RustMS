@@ -550,6 +550,10 @@ pub struct MobSet {
     revivals: Vec<Revival>,
     /// How many mobs the field holds with few users on it.
     capacity: usize,
+    /// The capacity holds whoever is on the field (`with_fixed_capacity`).
+    fixed: bool,
+    /// How often the field makes mobs.
+    interval: Duration,
     /// Fill every spawn point instead (see `full_spawn`).
     full: bool,
     /// The last spawn pass that had room.
@@ -597,6 +601,8 @@ impl MobSet {
             object_ids: ObjectIds::new(object_ids::MOBS),
             revivals: Vec::new(),
             capacity: MAX_CAPACITY,
+            fixed: false,
+            interval: SPAWN_INTERVAL,
             full: false,
             last_pass: None,
             closed: false,
@@ -608,6 +614,22 @@ impl MobSet {
     /// The field holds `capacity` mobs with few users on it (`mob_capacity`).
     pub fn with_capacity(mut self, capacity: usize) -> Self {
         self.capacity = capacity.clamp(1, MAX_CAPACITY);
+        self
+    }
+
+    /// The field holds `capacity` mobs, however many users are on it: a
+    /// map's `fixedMobCapacity`, which may pass `MAX_CAPACITY` (70 on Nett's
+    /// Pyramid's stages).
+    pub fn with_fixed_capacity(mut self, capacity: usize) -> Self {
+        self.capacity = capacity.max(1);
+        self.fixed = true;
+        self
+    }
+
+    /// The field makes mobs every `interval` instead of `SPAWN_INTERVAL`: a
+    /// map's `createMobInterval`.
+    pub fn with_interval(mut self, interval: Duration) -> Self {
+        self.interval = interval;
         self
     }
 
@@ -692,7 +714,8 @@ impl MobSet {
         self.create(now, users, false)
     }
 
-    /// CField::TryCreateMob: at most every `SPAWN_INTERVAL`, while the field
+    /// CField::TryCreateMob: at most every `SPAWN_INTERVAL` (or the map's
+    /// interval), while the field
     /// holds fewer mobs than its capacity for `users`, fill spawn points
     /// picked at random from those with room. A point without a `mobTime`
     /// has room when no mob is near it; one with a `mobTime` when its mob is
@@ -706,7 +729,7 @@ impl MobSet {
         if self.full {
             return self.fill(now, reset);
         }
-        if !reset && self.last_pass.is_some_and(|at| now < at + SPAWN_INTERVAL) {
+        if !reset && self.last_pass.is_some_and(|at| now < at + self.interval) {
             return Vec::new();
         }
         let mut spawned = Vec::new();
@@ -776,9 +799,10 @@ impl MobSet {
 
     /// The field's capacity with `users` on it: from its capacity with up
     /// to half that many users, up to twice it with as many users as that.
+    /// A fixed capacity stays as it is.
     fn capacity_for(&self, users: usize) -> usize {
         let (min, max) = (self.capacity, self.capacity * 2);
-        if users <= min / 2 {
+        if self.fixed || users <= min / 2 {
             min
         } else if users < max {
             min + (max - min) * (2 * users - min) / (3 * min)
@@ -2973,6 +2997,24 @@ mod tests {
         assert_eq!(mobs.respawn(later + SPAWN_INTERVAL, 0).len(), 1);
         // Six users make room for six mobs: five points.
         assert_eq!(mobs.respawn(later + SPAWN_INTERVAL * 2, 6).len(), 2);
+    }
+
+    #[test]
+    fn a_fixed_capacity_and_interval_hold_whoever_is_on() {
+        let now = Instant::now();
+        let xs: Vec<_> = (0..60).map(|i| (i * 300, -25)).collect();
+        let mut mobs = snails(&xs)
+            .with_fixed_capacity(50)
+            .with_interval(Duration::from_secs(3));
+        assert_eq!(mobs.start(now).len(), 50);
+        let first: Vec<_> = mobs.live().map(|mob| mob.object_id).take(2).collect();
+        kill(&mut mobs, first[0], now);
+        kill(&mut mobs, first[1], now);
+        // Six users raise nothing, and it comes back after 3 s.
+        let soon = now + Duration::from_secs(3) - Duration::from_millis(1);
+        assert!(mobs.respawn(soon, 6).is_empty());
+        assert_eq!(mobs.respawn(now + Duration::from_secs(3), 6).len(), 2);
+        assert_eq!(mobs.live().count(), 50);
     }
 
     #[test]

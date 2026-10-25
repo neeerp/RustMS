@@ -292,6 +292,24 @@ pub fn build_dojo_energy(energy: i32) -> Result<Packet, NetworkError> {
     build_session_value("energy", &energy.to_string())
 }
 
+/// PYRAMID_GAUGE: Nett's Pyramid's gauge, as the run's HUD shows it.
+pub fn build_pyramid_gauge(value: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::PyramidGauge as i16)?;
+    packet.write_int(value)?;
+    Ok(packet)
+}
+
+/// PYRAMID_SCORE: a Nett's Pyramid run's rank, 0 for S to 4 for D, and
+/// the EXP it gives, for its result screen.
+pub fn build_pyramid_score(rank: u8, exp: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::PyramidScore as i16)?;
+    packet.write_byte(rank)?;
+    packet.write_int(exp)?;
+    Ok(packet)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,6 +478,18 @@ mod tests {
             .short(0x5A)
             .string("energy")
             .string("2500")
+            .end();
+    }
+
+    #[test]
+    fn the_pyramid_sends_its_gauge_and_score() {
+        let packet = build_pyramid_gauge(73).unwrap();
+        Expect::new(&packet.bytes).short(0x9D).int(73).end();
+        let packet = build_pyramid_score(1, 60_000).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x9E)
+            .byte(1)
+            .int(60_000)
             .end();
     }
 

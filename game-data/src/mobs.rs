@@ -86,6 +86,15 @@ pub struct MobInfo {
     /// The item whose effect each living player on its map takes when it
     /// is killed (`buff`), as Horntail gives 2022108, or 0 for none.
     pub buff: i32,
+    /// Nett's Pyramid's mobs: a hit of at least this much (`coolDamage`)
+    /// may count as a cool kill, or 0 for none.
+    pub cool_damage: i32,
+    /// The chance in percent that such a hit counts as one
+    /// (`coolDamageProb`).
+    pub cool_damage_prob: i32,
+    /// A hit that does no damage takes it off the map (`removeOnMiss`), as
+    /// in Nett's Pyramid.
+    pub remove_on_miss: bool,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -260,6 +269,9 @@ impl MobData {
             drop_item_period: int("dropItemPeriod")?,
             no_flip: int("noFlip")? != 0,
             buff: int("buff")?,
+            cool_damage: int("coolDamage")?,
+            cool_damage_prob: int("coolDamageProb")?,
+            remove_on_miss: int("removeOnMiss")? != 0,
         }))
     }
 
@@ -449,6 +461,14 @@ mod tests {
         // Pianus, and his Bloody Booms, never turn.
         assert!(mob(8510000).no_flip && mob(8520000).no_flip && mob(8510100).no_flip);
         assert!(!mob(100100).no_flip);
+        // Nett's Pyramid: a hit of 200 may be cool, 9 times in 100.
+        let pyramid = mob(9700001);
+        assert_eq!((pyramid.cool_damage, pyramid.cool_damage_prob), (200, 9));
+        assert!(pyramid.remove_on_miss && !mob(100100).remove_on_miss);
+        assert_eq!(
+            (mob(100100).cool_damage, mob(100100).cool_damage_prob),
+            (0, 0)
+        );
     }
 
     #[test]
