@@ -62,7 +62,7 @@ Jewel run. Those who reach 109050000 get Pietro's prize there
 
 ## Find the Jewel (`net::gm_event::JEWEL`)
 
-- Its maps (FieldSet `Event3`) are the lobby 109010000, hall A 109010100
+- Its maps (FieldSet `Event8`) are the lobby 109010000, hall A 109010100
   with its rooms 109010101 to 109010110, and hall B 109010200 with its
   rooms 109010201 to 109010206. The lobby's `in00` leads to hall A and
   `in01` to hall B; each room's `out00` leads back to its hall. Every
@@ -86,10 +86,13 @@ Jewel run. Those who reach 109050000 get Pietro's prize there
 - The clock is 600 s (`jewel.notice.0` at 1 s, `jewel.notice.1` at the
   end; placeholders), and those still inside go out at 601 s. No way from
   the Jewel's maps leads to 109050000.
-- Not done (QUESTIONS b172 #9): Geanie (9000014, Ludibrium), whose line
-  speaks of a Scroll of Secrets, the Vikings in the lobby and halls
-  (Vikan 9000003, Vikon 9000004, Vikone 9000005), and Tamis (9000015) in
-  the lobby, who only talk.
+- Tamis (9000015) in the lobby sells short-range weapons for the boxes,
+  from the content pack's shop for him (Server.NX `NpcShop.img`).
+- Not done (QUESTIONS b172 #9, #10): what Geanie (9000014, Ludibrium),
+  whose line asks for the Scroll of Secrets, gives for it, and so whether
+  the Event Assistants turn away those who hold one; what the Treasure
+  Scroll is for; and the Vikings in the lobby and halls (Vikan 9000003,
+  Vikon 9000004, Vikone 9000005), who only talk.
 
 ## The gate
 

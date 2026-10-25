@@ -180,9 +180,15 @@ pub fn timed_event(map_id: i32) -> Option<&'static TimedEvent> {
 /// through a portal of its type (4) all the same (report b173).
 pub const GATE: &str = "join00";
 
-/// Whether `portal` on `map_id` is a timed event's gate.
+/// The OX Quiz's map. Its `join00` leads to the winners' map, and since
+/// the quiz sends its winners there itself, it is a gate that never opens:
+/// no timed event runs there.
+const OX_MAP: i32 = 109_020_001;
+
+/// Whether `portal` on `map_id` is a timed event's gate, or the OX Quiz's.
 pub fn is_gate(map_id: i32, portal: &str) -> bool {
-    portal == GATE && timed_event(map_id).is_some_and(|event| event.maps[0] == map_id)
+    portal == GATE
+        && (map_id == OX_MAP || timed_event(map_id).is_some_and(|event| event.maps[0] == map_id))
 }
 
 /// Where those still inside a timed event go when its time is up: its
@@ -231,7 +237,8 @@ mod tests {
         assert!(is_gate(109_040_000, "join00"));
         assert!(!is_gate(109_040_000, "in00"));
         assert!(!is_gate(109_040_001, "join00"));
-        assert!(!is_gate(109_020_001, "join00"));
+        assert!(is_gate(109_020_001, "join00"));
+        assert!(!is_gate(109_020_001, "start00"));
         assert_eq!(FITNESS.end(), Duration::from_secs(901));
         assert!(FITNESS.notices.windows(2).all(|w| w[0].0 < w[1].0));
         assert!(FITNESS.notices.iter().all(|(at, _)| *at < FITNESS.length));
