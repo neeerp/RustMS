@@ -1603,9 +1603,12 @@ impl ClientActor {
                 self.pyramid_blessing(id, item_id).await?
             }
             ServerMessage::PyramidRage { id, left } => self.pyramid_rage(id, left)?,
-            ServerMessage::PyramidScore { exit, rank, exp } => {
-                self.pyramid_score(exit, rank, exp).await?
-            }
+            ServerMessage::PyramidScore {
+                exit,
+                rank,
+                exp,
+                cleared,
+            } => self.pyramid_score(exit, rank, exp, cleared).await?,
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::MobBuff(item_id) => {
                 let alive = self

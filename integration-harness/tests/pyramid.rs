@@ -7,15 +7,19 @@
 //! lobby. The run counts its kills and misses, which keep its gauge up or
 //! pull it down; once it runs out the run ends. Its kill counts give uses
 //! of Rage of Pharaoh, which can't be used without one. On the result map
-//! the run's kills give its rank and EXP.
+//! the run's kills give its rank and EXP. A run through all five stages
+//! earns a room of Pharaoh Yeti's Tomb, now or with a gem for later.
 
 use game_data::server_content::keys;
 use integration_harness::events::{party, said, talk, told, waiting_in};
 use integration_harness::hunting::{attack, skill_attack};
 use integration_harness::quests::answer;
-use integration_harness::trace::{send, until, Trace};
+use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::WorldSession;
-use net::events::{EventKind, PyramidMode, PYRAMID_LOBBY, PYRAMID_RESULT, PYRAMID_STAGES};
+use net::events::{
+    EventKind, PyramidMode, PYRAMID_GEM, PYRAMID_LOBBY, PYRAMID_RESULT, PYRAMID_SHADES,
+    PYRAMID_STAGES, PYRAMID_YETI,
+};
 use net::npc_scripts::DUARTE;
 
 /// The lobby menu's Enter, then alone (0) or with a party (1), then the
@@ -182,3 +186,74 @@ async fn a_party_goes_in_together_and_a_member_may_give_up() {
     .await;
     assert!(!member_seen.warps.contains(&run.stage_map(2)));
 }
+
+#[tokio::test]
+async fn a_run_through_every_stage_gives_a_gem_for_pharaoh_yetis_tomb() {
+    let mut player = waiting_in(PYRAMID_LOBBY, 45, &[]).await;
+    let run = EventKind::Pyramid(PyramidMode::Normal).event();
+    let tomb = EventKind::PyramidTomb(PyramidMode::Normal).event();
+    let gem = PYRAMID_GEM + PyramidMode::Normal.index();
+    let mut seen = choose(&mut player, 0, PyramidMode::Normal).await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&run.exit) && !t.pyramid_scores.is_empty()
+    })
+    .await;
+
+    // Duarte sends the player on to the Shades, where, after all five
+    // stages, he offers the Tomb now or its gem for later.
+    told(&mut player, talk(run.exit, DUARTE)).await;
+    send(&mut player.connection, answer(1, 1, None)).await;
+    let shades = PYRAMID_SHADES + PyramidMode::Normal.index();
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&shades)
+    })
+    .await;
+    let offer = told(&mut player, talk(shades, DUARTE)).await;
+    assert!(
+        said(&offer, keys::PYRAMID_DUARTE_SHADES_PASSED),
+        "{:?} {:?}",
+        offer.prompt_texts,
+        seen.warps
+    );
+    send(&mut player.connection, answer(4, 1, Some(1))).await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&PYRAMID_LOBBY) && t.added.iter().any(|&(_, _, id)| id == gem)
+    })
+    .await;
+
+    // In the lobby he takes the gem for a room of the mode's Tomb, alone
+    // with Pharaoh Yeti, whose chest is the player's.
+    told(&mut player, talk(PYRAMID_LOBBY, DUARTE)).await;
+    told(&mut player, answer(4, 1, Some(2))).await;
+    send(
+        &mut player.connection,
+        answer(4, 1, Some(PyramidMode::Normal.index())),
+    )
+    .await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.warps.contains(&tomb.entry) && !t.field.alive(PYRAMID_YETI).is_empty()
+    })
+    .await;
+    assert!(
+        seen.removed.iter().any(|&(kind, _)| kind == 4),
+        "{:?}",
+        seen.removed
+    );
+    let yeti = seen.field.alive(PYRAMID_YETI)[0];
+    send(&mut player.connection, attack(yeti, 1)).await;
+    until(&mut player.connection, &mut seen, |t| {
+        t.field.item_drop(PYRAMID_YETI_CHEST).is_some()
+    })
+    .await;
+    let chest = seen.field.item_drop(PYRAMID_YETI_CHEST).unwrap();
+    assert_eq!(chest.owner, player.character_id);
+
+    // Its way out goes back to the lobby.
+    assert_eq!(
+        warp(&mut player.connection, -1, "out00", &mut seen).await,
+        PYRAMID_LOBBY
+    );
+}
+
+/// What Pharaoh Yeti drops on Easy to Hard.
+const PYRAMID_YETI_CHEST: i32 = 2022613;

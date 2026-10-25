@@ -64,6 +64,10 @@ pub enum EventKind {
     /// Nett's Pyramid in one of its modes, taken by a party of two or more,
     /// started by its leader at Duarte.
     PyramidParty(PyramidMode),
+    /// Pharaoh Yeti's Tomb for one of the Pyramid's modes, taken alone,
+    /// with that mode's gem at Duarte in the lobby or straight from its
+    /// room in the Shades after a run.
+    PyramidTomb(PyramidMode),
 }
 
 /// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
@@ -95,6 +99,9 @@ impl PyramidMode {
 pub struct Event {
     /// Where the party gathers and its leader starts the event.
     pub lobby: i32,
+    /// Other maps it may be started on, by a team there (Pharaoh Yeti's
+    /// Tomb from its mode's room in the Shades).
+    pub entrances: &'static [i32],
     /// The maps the party plays in its own copies of.
     pub maps: RangeInclusive<i32>,
     /// Where everyone starts.
@@ -253,6 +260,7 @@ pub enum Aura {
 /// and sends them to `KPQ_BONUS`, which has no time limit.
 pub const KPQ: Event = Event {
     lobby: 103_000_000,
+    entrances: &[],
     maps: 103_000_800..=103_000_805,
     entry: 103_000_800,
     entries: 1,
@@ -345,6 +353,7 @@ pub const KPQ_REWARDS: [(i32, i16); 42] = [
 /// `1012113`, `scheduledTimeout`).
 pub const HPQ: Event = Event {
     lobby: 100_000_200,
+    entrances: &[],
     maps: 910_010_000..=910_010_400,
     entry: 910_010_000,
     entries: 1,
@@ -395,6 +404,7 @@ pub const HPQ: Event = Event {
 /// `v83ref/lanes/QUESTIONS.md`, 2026-10-22, LPQ).
 pub const LPQ: Event = Event {
     lobby: 221_024_500,
+    entrances: &[],
     maps: 922_010_000..=922_011_100,
     entry: 922_010_100,
     entries: 1,
@@ -586,6 +596,7 @@ const fn opq_hand_in(stage: u8, item: i32, count: i16, piece: i32) -> HandIn {
 /// her prize room, 920011300, alone (`OPQ_PRIZE_ROOM`).
 pub const OPQ: Event = Event {
     lobby: 200_080_101,
+    entrances: &[],
     maps: 920_010_000..=920_011_300,
     entry: 920_010_000,
     entries: 1,
@@ -834,6 +845,7 @@ pub const HPQ_REWARD: i32 = 4001158;
 /// or come back to the game inside land, is outside it.
 pub const ZPQ: Event = Event {
     lobby: 211_042_300,
+    entrances: &[],
     maps: 280_010_000..=280_011_006,
     entry: ZPQ_HUB,
     entries: 1,
@@ -898,6 +910,7 @@ pub const ZAKUM_GATE: (i32, &str) = (211_042_300, "gate");
 /// shut until then, or until it ends.
 pub const ZAKUM: Event = Event {
     lobby: crate::npc_scripts::ENTRANCE_TO_ZAKUM,
+    entrances: &[],
     maps: crate::mobs::ZAKUM_ALTAR_MAP..=crate::mobs::ZAKUM_ALTAR_MAP,
     entry: crate::mobs::ZAKUM_ALTAR_MAP,
     entries: 1,
@@ -942,6 +955,7 @@ pub const ORIGIN_OF_CLOCKTOWER: i32 = 220_080_001;
 /// leaves. Papulatus's death on the copy wins it.
 pub const PAPULATUS: Event = Event {
     lobby: CLOCKTOWER_DEPTHS,
+    entrances: &[],
     maps: ORIGIN_OF_CLOCKTOWER..=ORIGIN_OF_CLOCKTOWER,
     entry: ORIGIN_OF_CLOCKTOWER,
     entries: 1,
@@ -989,6 +1003,7 @@ pub const PAPULATUS: Event = Event {
 /// No stage gives EXP.
 pub const HORNTAIL: Event = Event {
     lobby: crate::npc_scripts::HORNTAIL_CAVE_ENTRANCE,
+    entrances: &[],
     maps: HORNTAIL_TRIAL_I..=HORNTAILS_CAVE,
     entry: HORNTAIL_TRIAL_I,
     entries: 1,
@@ -1074,6 +1089,7 @@ pub fn trial_head(map_id: i32) -> Option<(u8, &'static TrialHead)> {
 /// six the least).
 pub const HTPQ: Event = Event {
     lobby: crate::npc_scripts::CAVE_ENTRANCE,
+    entrances: &[],
     maps: HTPQ_ENTRY..=HTPQ_DARK,
     entry: HTPQ_ENTRY,
     entries: 1,
@@ -1164,6 +1180,7 @@ pub const WILLI: i32 = 9_300_162;
 /// quest's record.
 pub const DELLI: Event = Event {
     lobby: DELLI_LOBBY,
+    entrances: &[],
     maps: SAVE_DELLI..=SAVE_DELLI,
     entry: SAVE_DELLI,
     entries: 1,
@@ -1273,6 +1290,7 @@ pub const MAZE_REWARDS: [(i32, i16); 47] = [
 /// who dies lands on the way out, the maps' forcedReturn.
 pub const LUDIMAZE: Event = Event {
     lobby: LUDIBRIUM,
+    entrances: &[],
     maps: MAZE_ROOM..=MAZE_CLEAR,
     entry: MAZE_ROOM,
     entries: 15,
@@ -1329,6 +1347,7 @@ const TYLUS_DROP_PERIOD: i32 = 10;
 /// running out sends everyone out. Tylus's going loses nothing.
 pub const TYLUS: Event = Event {
     lobby: TYLUS_LOBBY,
+    entrances: &[],
     maps: TYLUS_ROOM..=TYLUS_ROOM,
     entry: TYLUS_ROOM,
     entries: 1,
@@ -1411,6 +1430,7 @@ pub const ALTAIRE_FRAGMENT: i32 = 4_001_198;
 /// The defaults are in `v83ref/lanes/QUESTIONS.md` a125.
 pub const ELLIN: Event = Event {
     lobby: ELLIN_LOBBY,
+    entrances: &[],
     maps: ELLIN_ENTRY..=ELLIN_EXIT,
     entry: ELLIN_ENTRY,
     entries: 1,
@@ -1578,9 +1598,20 @@ pub fn only_mobs(map_id: i32) -> Option<i32> {
 /// with five of the Lord Pirate's Krus (9300124) and five of his Captains
 /// (9300125) at each end of each of its two floors; each of its bellflower
 /// rooms with ten more of each of its two kinds of Bellflower (9300112,
-/// 9300113), one kind at each end (Cosmic `PiratePQ`'s `setup`). None come
-/// back.
+/// 9300113), one kind at each end (Cosmic `PiratePQ`'s `setup`). A room of
+/// Pharaoh Yeti's Tomb opens with its Pharaoh Jr. Yeti, at its spawn. None
+/// come back.
 pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
+    const YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_YETI, (0, 0), 1)];
+    const HELL_YETI: [(i32, (i16, i16), usize); 1] = [(PYRAMID_HELL_YETI, (0, 0), 1)];
+    let tomb = PYRAMID_TOMB_RUNS
+        .iter()
+        .position(|tomb| tomb.entry == map_id);
+    match tomb {
+        Some(3) => return &HELL_YETI,
+        Some(_) => return &YETI,
+        None => {}
+    }
     const DECK: [(i32, (i16, i16), usize); 4] = [
         (9_300_124, (430, 75), 5),
         (9_300_125, (1600, 75), 5),
@@ -1607,6 +1638,7 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
 /// `PIRATE_CLEAR`. The defaults are in `v83ref/lanes/QUESTIONS.md` a128.
 pub const PIRATE: Event = Event {
     lobby: PIRATE_LOBBY,
+    entrances: &[],
     maps: PIRATE_ENTRY..=PIRATE_EXIT,
     entry: PIRATE_ENTRY,
     entries: 1,
@@ -1690,6 +1722,7 @@ const DOJO_CLEARS: [u8; DOJO_FLOORS as usize] = {
 /// once on a channel, each in its own copies.
 pub const DOJO: Event = Event {
     lobby: DOJO_HALL,
+    entrances: &[],
     maps: DOJO_FIRST..=DOJO_FIRST + (DOJO_FLOORS as i32 - 1) * 100,
     entry: DOJO_FIRST,
     entries: 1,
@@ -1733,6 +1766,7 @@ pub const DOJO_TRIAL_MOB: i32 = 9300269;
 /// may run at once on a channel, as Cosmic has five rooms.
 pub const DOJO_TRIAL: Event = Event {
     lobby: DOJO_HALL,
+    entrances: &[],
     maps: DOJO_TRIAL_MAP..=DOJO_TRIAL_MAP,
     entry: DOJO_TRIAL_MAP,
     entries: 1,
@@ -1845,6 +1879,47 @@ pub const PYRAMID_PARTY: [Event; 4] = [
     pyramid(true, PyramidMode::Hell),
 ];
 
+/// The easy mode's first room of Pharaoh Yeti's Tomb; mode m's is
+/// `PYRAMID_TOMB + 20 * m`, the first of its 20 (Map.nx: 926010010 to 89,
+/// two bodies, the last 20 Hell's).
+pub const PYRAMID_TOMB: i32 = 926010010;
+/// The easy mode's gem for the Tomb; mode m's is `PYRAMID_GEM + m`
+/// (Sapphire to Topaz, in Cosmic `2103013`'s order).
+pub const PYRAMID_GEM: i32 = 4001322;
+/// Pharaoh Jr. Yeti (9700019, and 9700029 for Hell), alone in the Tomb.
+pub const PYRAMID_YETI: i32 = 9700019;
+pub const PYRAMID_HELL_YETI: i32 = 9700029;
+
+/// Pharaoh Yeti's Tomb in `mode`, taken alone from level 40 with the
+/// mode's gem in the lobby, or from `shades` after a run through all five
+/// stages: one room, with no time limit, left by its `out00` to the lobby.
+/// Twenty may go at once on a channel in each mode, as it has 20 rooms.
+const fn pyramid_tomb(mode: PyramidMode, shades: &'static [i32]) -> Event {
+    let room = PYRAMID_TOMB + mode.index() * 20;
+    Event {
+        lobby: PYRAMID_LOBBY,
+        entrances: shades,
+        maps: room..=room,
+        entry: room,
+        exit: PYRAMID_LOBBY,
+        levels: *PYRAMID_LEVELS.start()..=u8::MAX,
+        team: 1..=1,
+        minutes: 0,
+        exp_per_stage: &[],
+        member_clears: &[],
+        runs: 20,
+        ..DOJO
+    }
+}
+
+/// Pharaoh Yeti's Tomb, by mode.
+pub const PYRAMID_TOMB_RUNS: [Event; 4] = [
+    pyramid_tomb(PyramidMode::Easy, &[PYRAMID_SHADES]),
+    pyramid_tomb(PyramidMode::Normal, &[PYRAMID_SHADES + 1]),
+    pyramid_tomb(PyramidMode::Hard, &[PYRAMID_SHADES + 2]),
+    pyramid_tomb(PyramidMode::Hell, &[PYRAMID_SHADES + 3]),
+];
+
 /// Every run of Nett's Pyramid Duarte offers, alone first, then with a
 /// party, each by mode.
 pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
@@ -1931,7 +2006,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 25] = [
+    pub const ALL: [EventKind; 29] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1957,6 +2032,10 @@ impl EventKind {
         EventKind::PyramidParty(PyramidMode::Normal),
         EventKind::PyramidParty(PyramidMode::Hard),
         EventKind::PyramidParty(PyramidMode::Hell),
+        EventKind::PyramidTomb(PyramidMode::Easy),
+        EventKind::PyramidTomb(PyramidMode::Normal),
+        EventKind::PyramidTomb(PyramidMode::Hard),
+        EventKind::PyramidTomb(PyramidMode::Hell),
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1980,6 +2059,7 @@ impl EventKind {
             EventKind::DojoParty => &DOJO_PARTY,
             EventKind::Pyramid(mode) => &PYRAMID[mode as usize],
             EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
+            EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
         }
     }
 
@@ -2057,6 +2137,12 @@ impl Event {
     /// from it.
     pub fn draw_entry(&self, rng: &mut impl rand::Rng) -> i32 {
         self.entry + rng.gen_range(0, self.entries.max(1))
+    }
+
+    /// Whether a team may start it on `map_id`: its lobby or one of its
+    /// `entrances`.
+    pub fn starts_on(&self, map_id: i32) -> bool {
+        map_id == self.lobby || self.entrances.contains(&map_id)
     }
 
     /// Whether `map_id` is one of the event's maps; its exit never is.
@@ -2172,7 +2258,7 @@ impl Event {
     pub fn team(&self, leader: ClientId, candidates: &[Candidate]) -> Option<Vec<ClientId>> {
         let team: Vec<_> = candidates
             .iter()
-            .filter(|c| c.map_id == self.lobby && self.levels.contains(&c.level))
+            .filter(|c| self.starts_on(c.map_id) && self.levels.contains(&c.level))
             .collect();
         let levels = team.iter().map(|c| c.level);
         let apart = levels.clone().max().unwrap_or(0) - levels.min().unwrap_or(0);
@@ -2857,6 +2943,29 @@ mod tests {
         let team = hell.team(1, &[at(1, 70, lobby), at(2, 45, lobby)]);
         assert_eq!(team, Some(vec![1, 2]));
         assert_eq!(clock_on(normal.stage_map(2)), None);
+    }
+
+    #[test]
+    fn pharaoh_yetis_tomb_is_one_room_alone_from_the_lobby_or_the_shades() {
+        let hard = EventKind::PyramidTomb(PyramidMode::Hard).event();
+        assert_eq!((hard.entry, hard.exit), (926010050, PYRAMID_LOBBY));
+        assert!(hard.holds(926010050) && !hard.holds(926010051));
+        assert!(hard.solo() && hard.lasts_until_empty());
+        assert_eq!((hard.minutes, hard.last_stage(), hard.runs), (0, 0, 20));
+        assert!(hard.starts_on(PYRAMID_LOBBY) && hard.starts_on(PYRAMID_SHADES + 2));
+        assert!(!hard.starts_on(PYRAMID_SHADES + 3));
+        assert!(hard.team(1, &[at(1, 120, PYRAMID_SHADES + 2)]).is_some());
+        assert_eq!(hard.team(1, &[at(1, 39, PYRAMID_LOBBY)]), None);
+        assert_eq!(pyramid_stage(926010050), None);
+        assert_eq!(
+            EventKind::PyramidTomb(PyramidMode::Hard).pyramid_mode(),
+            None
+        );
+        let hell = EventKind::PyramidTomb(PyramidMode::Hell).event();
+        assert_eq!(hell.entry, 926010070);
+        assert_eq!(opening_mobs(hell.entry), [(PYRAMID_HELL_YETI, (0, 0), 1)]);
+        assert_eq!(opening_mobs(hard.entry), [(PYRAMID_YETI, (0, 0), 1)]);
+        assert!(event_map(926010010) && !event_map(PYRAMID_LOBBY));
     }
 
     #[test]
