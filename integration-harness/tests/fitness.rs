@@ -13,7 +13,7 @@ use integration_harness::database::set_gm_level;
 use integration_harness::packets::{build_all_chat, build_change_map};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{barrier, send, step, until, warp, Trace};
+use integration_harness::trace::{barrier, send, step, until, until_within, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -135,8 +135,15 @@ async fn the_gate_opens_at_the_start_and_the_time_up_sends_everyone_out() {
     assert!((1..=15).contains(&rt.countdowns[0]), "the clock left");
 
     // The time is up: the runner on stage 1 and the stayer in the lobby
-    // go out, and each heard the notices on the way.
-    until(&mut runner.connection, &mut rt, |t| t.warps.len() == 2).await;
+    // go out, and each heard the notices on the way. The 15 s run from the
+    // GM's `/start`, so the wait for them is longer.
+    until_within(
+        &mut runner.connection,
+        &mut rt,
+        Duration::from_secs(30),
+        |t| t.warps.len() == 2,
+    )
+    .await;
     assert_eq!(rt.warps, [STAGE_1, EXIT], "out of stage 1");
     until(&mut stayer.connection, &mut st, |t| !t.warps.is_empty()).await;
     assert_eq!(st.warps, [EXIT], "out of the lobby");
