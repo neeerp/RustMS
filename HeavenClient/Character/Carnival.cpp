@@ -7,6 +7,7 @@ namespace ms
 		namespace
 		{
 			int32_t entered = 0;
+			int32_t entered_map = 0;
 
 			bool has_side(int8_t team)
 			{
@@ -24,8 +25,9 @@ namespace ms
 			return fieldtype == 10 || fieldtype == 15;
 		}
 
-		void enter_field(int32_t fieldtype)
+		void enter_field(int32_t mapid, int32_t fieldtype)
 		{
+			entered_map = mapid;
 			entered = fieldtype;
 			reset();
 		}
@@ -33,6 +35,11 @@ namespace ms
 		int32_t field_type()
 		{
 			return entered;
+		}
+
+		int32_t field_map()
+		{
+			return entered_map;
 		}
 
 		std::string team_name(int8_t team)
@@ -181,6 +188,185 @@ namespace ms
 					wait;
 			default:
 				return std::nullopt;
+			}
+		}
+
+		namespace window
+		{
+			size_t shown(size_t rows)
+			{
+				return rows < MAX_ROWS ? rows : MAX_ROWS;
+			}
+
+			int16_t height(bool open, size_t rows)
+			{
+				if (!open)
+					return FOLDED_HEIGHT;
+
+				return static_cast<int16_t>(ROW_HEIGHT * (14 + shown(rows)));
+			}
+
+			int16_t cost_x(int32_t cost)
+			{
+				return static_cast<int16_t>(101 - 5 * std::to_string(cost).size());
+			}
+
+			std::optional<size_t> row_at(Point<int16_t> pos, size_t shown)
+			{
+				// The rows' rects are x 0..138 and y 19 + 13i .. 32 + 13i of
+				// the list, tested at (x - 6, y - 128) (A 86fe80).
+				if (pos.x() < 6 || pos.x() >= 6 + 138 || pos.y() < ROWS_Y)
+					return std::nullopt;
+
+				size_t row = static_cast<size_t>((pos.y() - ROWS_Y) / ROW_HEIGHT);
+
+				if (row >= shown)
+					return std::nullopt;
+
+				return row;
+			}
+
+			std::optional<uint8_t> tab_at(Point<int16_t> pos)
+			{
+				// The strip is at (4, 107), 21 high; the tabs span 3..20,
+				// 28..57 and 65..106 of it, and take a click 2 px either side
+				// from 4 px down (style 5).
+				constexpr int16_t STRIP_X = 4, STRIP_Y = 107, STRIP_HEIGHT = 21;
+				constexpr int16_t STARTS[TABS] = { 3, 28, 65 };
+				constexpr int16_t ENDS[TABS] = { 20, 57, 106 };
+
+				int16_t x = pos.x() - STRIP_X;
+				int16_t y = pos.y() - STRIP_Y;
+
+				if (y < 4 || y >= STRIP_HEIGHT)
+					return std::nullopt;
+
+				for (uint8_t tab = 0; tab < TABS; tab++)
+					if (x >= STARTS[tab] - 2 && x <= ENDS[tab] + 2)
+						return tab;
+
+				return std::nullopt;
+			}
+
+			bool on_lock(Point<int16_t> pos, size_t shown)
+			{
+				int16_t top = static_cast<int16_t>(ROW_HEIGHT * shown + 162);
+
+				return pos.x() >= 9 && pos.x() < 18 && pos.y() >= top && pos.y() < top + 12;
+			}
+
+			State::State(const std::array<size_t, TABS>& r) : rows(r)
+			{}
+
+			uint8_t State::tab() const
+			{
+				return current;
+			}
+
+			size_t State::selected() const
+			{
+				return chosen;
+			}
+
+			bool State::open() const
+			{
+				return is_open;
+			}
+
+			bool State::locked() const
+			{
+				return is_locked;
+			}
+
+			size_t State::shown() const
+			{
+				return window::shown(rows[current]);
+			}
+
+			int16_t State::height() const
+			{
+				return window::height(is_open, rows[current]);
+			}
+
+			bool State::deciding() const
+			{
+				return is_open && shown() > 0 && chosen != 0;
+			}
+
+			void State::choose_tab(uint8_t tab)
+			{
+				if (tab >= TABS)
+					return;
+
+				if (tab != current)
+					chosen = 0;
+
+				current = tab;
+				open_up();
+			}
+
+			void State::tab_key()
+			{
+				choose_tab(is_open ? static_cast<uint8_t>((current + 1) % TABS) : current);
+			}
+
+			std::optional<size_t> State::hotkey(size_t key)
+			{
+				if (key >= MAX_ROWS || key >= rows[current])
+					return std::nullopt;
+
+				chosen = key + 1;
+				choose_tab(current);
+
+				return key;
+			}
+
+			bool State::click(std::optional<size_t> row)
+			{
+				size_t before = chosen;
+				chosen = row ? *row + 1 : 0;
+
+				if (row)
+					touch();
+
+				return chosen != before;
+			}
+
+			void State::toggle_lock()
+			{
+				is_locked = !is_locked;
+				touch();
+			}
+
+			void State::open_up()
+			{
+				is_open = true;
+				touch();
+			}
+
+			void State::fold()
+			{
+				is_open = false;
+			}
+
+			void State::touch()
+			{
+				timer = FOLD_DELAY;
+			}
+
+			bool State::pass(int32_t ms)
+			{
+				if (is_locked || !is_open)
+					return false;
+
+				timer -= ms;
+
+				if (timer >= 0)
+					return false;
+
+				fold();
+
+				return true;
 			}
 		}
 	}

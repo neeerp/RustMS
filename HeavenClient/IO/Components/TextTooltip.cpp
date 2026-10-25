@@ -25,7 +25,6 @@ namespace ms
 	{
 		// Where the text starts in the box, as in the map tooltips.
 		const Point<int16_t> TEXT_POS = { map_tooltip::PADDING_X, 2 };
-		constexpr int16_t MAX_WIDTH = 340;
 	}
 
 	TextTooltip::TextTooltip()
@@ -43,12 +42,13 @@ namespace ms
 		text_label.draw(pos + TEXT_POS);
 	}
 
-	bool TextTooltip::set_text(std::string t)
+	bool TextTooltip::set_text(std::string t, int16_t max_width)
 	{
-		if (text == t)
+		if (text == t && width == max_width)
 			return false;
 
 		text = t;
+		width = max_width;
 
 		if (text.empty())
 		{
@@ -56,7 +56,7 @@ namespace ms
 			return false;
 		}
 
-		text_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, text, MAX_WIDTH, true, tooltip::LINE_ADJ);
+		text_label = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, text, max_width, true, tooltip::LINE_ADJ);
 
 		map_tooltip::Size s = map_tooltip::size(text_label.width(), text_label.height(), 0, 0);
 		size = Point<int16_t>(s.width, s.height);

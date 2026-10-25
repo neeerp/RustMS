@@ -4,6 +4,7 @@
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
 #include "../../IO/UITypes/UIChatBar.h"
+#include "../../IO/UITypes/UIMonsterCarnival.h"
 #include "../../Util/Misc.h"
 
 #include <nlnx/nx.hpp>
@@ -65,6 +66,7 @@ namespace ms
 		if (carnival::battle_field(carnival::field_type()))
 		{
 			carnival::start(carnival::read_start(recv));
+			UIMonsterCarnival::show();
 		}
 		else
 		{

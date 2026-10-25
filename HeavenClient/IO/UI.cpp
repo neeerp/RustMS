@@ -45,6 +45,7 @@
 #include "UITypes/UITransform.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIPersonalShop.h"
+#include "UITypes/UIMonsterCarnival.h"
 #include "UITypes/UIQuickSlotConfig.h"
 #include "UITypes/UIShop.h"
 #include "UITypes/UIStorage.h"
@@ -154,6 +155,20 @@ namespace ms
 			|| open(get_element<UITransform>())
 			|| open(get_element<UIEnchantSkill>())
 			|| open(get_element<UIWishlistInput>()) || open(get_element<UIWeddingRegistry>());
+	}
+
+	bool UI::talking() const
+	{
+		for (auto type : { UIElement::Type::NPCTALK, UIElement::Type::NOTICE, UIElement::Type::ENTERNUMBER,
+						   UIElement::Type::IMAGESLIDES })
+		{
+			UIElement* element = state->get(type);
+
+			if (element && element->is_active())
+				return true;
+		}
+
+		return false;
 	}
 
 	void UI::send_cursor(Point<int16_t> cursorpos, Cursor::State cursorstate)
@@ -350,6 +365,11 @@ namespace ms
 				Keyboard::Mapping mapping = keyboard.get_text_mapping(keycode, shift);
 				focusedtextfield->send_key(mapping.type, mapping.action, pressed);
 			}
+		} else if (auto carnival = get_element<UIMonsterCarnival>();
+				   carnival && !dialog_open() && !talking() && carnival->send_hotkey(keycode, pressed))
+		{
+			// The Carnival's window takes Tab and F1 to F12 while it is up (A
+			// a12355), though not from an NPC's talk or a notice over it.
 		} else
 		{
 			Keyboard::Mapping mapping = keyboard.get_mapping(keycode);
