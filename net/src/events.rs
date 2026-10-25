@@ -58,6 +58,36 @@ pub enum EventKind {
     /// The Mu Lung Dojo taken by a party, started by its leader at So Gong
     /// in the hall: the same floors in copies of their own.
     DojoParty,
+    /// Nett's Pyramid in one of its modes, taken alone, started at Duarte
+    /// (2103013) in its lobby.
+    Pyramid(PyramidMode),
+    /// Nett's Pyramid in one of its modes, taken by a party of two or more,
+    /// started by its leader at Duarte.
+    PyramidParty(PyramidMode),
+}
+
+/// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
+/// has stage maps of its own, a run alone and with a party.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PyramidMode {
+    Easy,
+    Normal,
+    Hard,
+    Hell,
+}
+
+impl PyramidMode {
+    pub const ALL: [PyramidMode; 4] = [
+        PyramidMode::Easy,
+        PyramidMode::Normal,
+        PyramidMode::Hard,
+        PyramidMode::Hell,
+    ];
+
+    /// Its digit in its maps' ids, 0 to 3.
+    pub const fn index(self) -> i32 {
+        self as i32
+    }
 }
 
 /// An event's maps and terms.
@@ -1753,6 +1783,82 @@ pub const DOJO_PARTY: Event = Event {
     ..DOJO
 };
 
+/// Nett's Pyramid's lobby, where Duarte (2103013) stands.
+pub const PYRAMID_LOBBY: i32 = 926010000;
+/// The easy mode's result map (field type 24), which its runs end on;
+/// mode m's is `PYRAMID_RESULT + m`, for runs alone or with a party.
+pub const PYRAMID_RESULT: i32 = 926010001;
+/// The easy mode's room in the Shades, where its result map leads; mode
+/// m's is `PYRAMID_SHADES + m`.
+pub const PYRAMID_SHADES: i32 = 926020001;
+/// How many stages a run has.
+pub const PYRAMID_STAGES: u8 = 5;
+/// How long each stage after the first lasts (Cosmic `Pyramid.timer`'s
+/// 180 s); the first's 120 are the event's `minutes`.
+pub const PYRAMID_STAGE_TIME: Duration = Duration::from_secs(180);
+/// The levels below which no mode is open, and above which only Hell is
+/// (Cosmic `2103013`).
+pub const PYRAMID_LEVELS: RangeInclusive<u8> = 40..=60;
+/// The mode icons Duarte offers, easy's first (Cosmic `2103013`).
+pub const PYRAMID_MODE_ICON: i32 = 3994115;
+
+/// A run of Nett's Pyramid in `mode`, alone or with a `party` (Cosmic
+/// `NPCConversationManager.createPyramid`, `Pyramid`): five stages, on
+/// `926010000 + party * 10000 + mode * 1000 + stage * 100`, each played
+/// to its clock's end, the first for 2 minutes and the rest for 3, then
+/// the mode's result map. A party needs two or more in the lobby. Five
+/// runs alone and ten with a party may go at once on a channel in each
+/// mode, as the stage maps have that many copies (Map.nx).
+const fn pyramid(party: bool, mode: PyramidMode) -> Event {
+    let base = PYRAMID_LOBBY + if party { 10000 } else { 0 } + mode.index() * 1000;
+    Event {
+        lobby: PYRAMID_LOBBY,
+        maps: base + 100..=base + PYRAMID_STAGES as i32 * 100,
+        entry: base + 100,
+        exit: PYRAMID_RESULT + mode.index(),
+        levels: match mode {
+            PyramidMode::Hell => *PYRAMID_LEVELS.start()..=u8::MAX,
+            _ => PYRAMID_LEVELS,
+        },
+        team: if party { 2..=6 } else { 1..=1 },
+        minutes: 2,
+        exp_per_stage: &[0; PYRAMID_STAGES as usize],
+        member_clears: &[],
+        runs: if party { 10 } else { 5 },
+        ..DOJO
+    }
+}
+
+/// Nett's Pyramid taken alone, by mode.
+pub const PYRAMID: [Event; 4] = [
+    pyramid(false, PyramidMode::Easy),
+    pyramid(false, PyramidMode::Normal),
+    pyramid(false, PyramidMode::Hard),
+    pyramid(false, PyramidMode::Hell),
+];
+
+/// Nett's Pyramid taken by a party, by mode.
+pub const PYRAMID_PARTY: [Event; 4] = [
+    pyramid(true, PyramidMode::Easy),
+    pyramid(true, PyramidMode::Normal),
+    pyramid(true, PyramidMode::Hard),
+    pyramid(true, PyramidMode::Hell),
+];
+
+/// Every run of Nett's Pyramid Duarte offers, alone first, then with a
+/// party, each by mode.
+pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
+    let alone = PyramidMode::ALL.map(EventKind::Pyramid);
+    let party = PyramidMode::ALL.map(EventKind::PyramidParty);
+    alone.into_iter().chain(party)
+}
+
+/// The Pyramid run and stage played on `map_id`, if it is one of its
+/// stage maps.
+pub fn pyramid_stage(map_id: i32) -> Option<(EventKind, u8)> {
+    pyramid_kinds().find_map(|kind| Some((kind, kind.event().stage_on(map_id)?)))
+}
+
 /// Whether Dojo floor `floor` is a rest floor, with no boss: every sixth.
 pub fn rest_floor(floor: u8) -> bool {
     floor % 6 == 0
@@ -1825,7 +1931,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 17] = [
+    pub const ALL: [EventKind; 25] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -1843,6 +1949,14 @@ impl EventKind {
         EventKind::Dojo,
         EventKind::DojoTrial,
         EventKind::DojoParty,
+        EventKind::Pyramid(PyramidMode::Easy),
+        EventKind::Pyramid(PyramidMode::Normal),
+        EventKind::Pyramid(PyramidMode::Hard),
+        EventKind::Pyramid(PyramidMode::Hell),
+        EventKind::PyramidParty(PyramidMode::Easy),
+        EventKind::PyramidParty(PyramidMode::Normal),
+        EventKind::PyramidParty(PyramidMode::Hard),
+        EventKind::PyramidParty(PyramidMode::Hell),
     ];
 
     pub fn event(self) -> &'static Event {
@@ -1864,6 +1978,16 @@ impl EventKind {
             EventKind::Dojo => &DOJO,
             EventKind::DojoTrial => &DOJO_TRIAL,
             EventKind::DojoParty => &DOJO_PARTY,
+            EventKind::Pyramid(mode) => &PYRAMID[mode as usize],
+            EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
+        }
+    }
+
+    /// The mode of a Nett's Pyramid run, alone or with a party.
+    pub fn pyramid_mode(self) -> Option<PyramidMode> {
+        match self {
+            EventKind::Pyramid(mode) | EventKind::PyramidParty(mode) => Some(mode),
+            _ => None,
         }
     }
 }
@@ -2692,6 +2816,41 @@ mod tests {
         let broad = DOJO_PARTY.team(1, &[at(1, 30, lobby), at(2, 61, lobby)]);
         assert_eq!(broad, None);
         assert_eq!(DOJO_PARTY.team(1, &[at(1, 30, lobby)]), Some(vec![1]));
+    }
+
+    #[test]
+    fn the_pyramid_runs_five_stages_in_each_mode_alone_or_with_a_party() {
+        let normal = EventKind::Pyramid(PyramidMode::Normal).event();
+        assert_eq!(normal.entry, 926011100);
+        assert_eq!(normal.stage_map(5), 926011500);
+        assert_eq!(normal.stage_on(926011300), Some(3));
+        // Its copies are the instances', not the map ids' last digit.
+        assert_eq!(normal.stage_on(926011301), None);
+        assert_eq!(normal.exit, 926010002);
+        assert!(!event_map(normal.exit) && !event_map(PYRAMID_LOBBY));
+        assert!(!event_map(PYRAMID_SHADES));
+        let hell = EventKind::PyramidParty(PyramidMode::Hell).event();
+        assert_eq!((hell.entry, hell.stage_map(5)), (926023100, 926023500));
+        assert_eq!(hell.exit, 926010004);
+        assert_eq!(
+            pyramid_stage(926021300),
+            Some((EventKind::PyramidParty(PyramidMode::Normal), 3))
+        );
+        assert_eq!(pyramid_stage(PYRAMID_RESULT), None);
+        assert_eq!(pyramid_kinds().count(), 8);
+        // Two minutes for the first stage; the event's clock gives the rest.
+        assert_eq!(normal.minutes, 2);
+        assert_eq!(normal.last_stage(), PYRAMID_STAGES);
+        assert!(normal.solo() && normal.lasts_until_empty());
+        assert_eq!((normal.runs, hell.runs), (5, 10));
+        // Only Hell is open above level 60, and a party needs two.
+        assert!(normal.levels.contains(&60) && !normal.levels.contains(&61));
+        assert!(hell.levels.contains(&120) && !hell.levels.contains(&39));
+        let lobby = PYRAMID_LOBBY;
+        assert_eq!(hell.team(1, &[at(1, 70, lobby)]), None);
+        let team = hell.team(1, &[at(1, 70, lobby), at(2, 45, lobby)]);
+        assert_eq!(team, Some(vec![1, 2]));
+        assert_eq!(clock_on(normal.stage_map(2)), None);
     }
 
     #[test]

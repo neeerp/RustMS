@@ -83,7 +83,23 @@ impl ClientActor {
             // talk.
             EventKind::Zakum | EventKind::Horntail | EventKind::Papulatus => return Ok(()),
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
+            // Duarte asks after every run at once (`talk_to_duarte`).
+            EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
         };
+        self.start_script(script).await
+    }
+
+    /// Duarte in Nett's Pyramid's lobby tells the player which of its runs,
+    /// alone or with their party, they may go on.
+    pub(super) async fn talk_to_duarte(&mut self) -> Result<(), RuntimeError> {
+        let mut entries = Vec::new();
+        for kind in events::pyramid_kinds() {
+            let Some(entry) = self.event_entry(kind).await? else {
+                return Ok(());
+            };
+            entries.push((kind, entry));
+        }
+        let script = NpcScript::duarte(&entries, &self.in_game()?.player);
         self.start_script(script).await
     }
 

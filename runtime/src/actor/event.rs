@@ -377,6 +377,7 @@ pub fn spawn(
         lord_pirate_out: false,
         win_exp: None,
         blessing: start.blessing,
+        pyramid_stage: 1,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -493,6 +494,8 @@ struct EventActor {
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
     win_exp: Option<i32>,
+    /// The stage a Nett's Pyramid run is on, which its clock moves on.
+    pyramid_stage: u8,
 }
 
 impl EventActor {
@@ -890,8 +893,9 @@ impl EventActor {
     /// The time ran out. A bonus's ends, taking whoever is still on its map
     /// to its exit (Cosmic `scheduledTimeout`); a team that protects a
     /// friendly mob, which would have lost already without it, wins, and
-    /// the other mobs go (Cosmic DelliBattle's `scheduledTimeout`);
-    /// otherwise the event ends.
+    /// the other mobs go (Cosmic DelliBattle's `scheduledTimeout`); a
+    /// Nett's Pyramid run goes on to its next stage; otherwise the event
+    /// ends.
     fn time_up(&mut self) -> bool {
         let event = self.kind.event();
         match &event.bonus {
@@ -906,8 +910,24 @@ impl EventActor {
                 self.win();
                 false
             }
+            _ if self.kind.pyramid_mode().is_some() && self.pyramid_stage < event.last_stage() => {
+                self.next_pyramid_stage();
+                false
+            }
             _ => true,
         }
+    }
+
+    /// A Nett's Pyramid stage's time ran out: the team goes on to the next
+    /// stage, whose clock gives 3 minutes (Cosmic `Pyramid.timer`). The
+    /// last stage's ends the run, which sends everyone to its result map.
+    fn next_pyramid_stage(&mut self) {
+        self.pyramid_stage += 1;
+        let ends = Instant::now() + net::events::scaled(net::events::PYRAMID_STAGE_TIME);
+        self.ends = Some(ends);
+        let to = self.kind.event().stage_map(self.pyramid_stage);
+        self.move_team(None, to, Some(ends));
+        info!(kind = ?self.kind, id = self.id, stage = self.pyramid_stage, "Pyramid stage");
     }
 
     /// The mobs that aren't friendly on the copy of `map_id` go, and no

@@ -6,8 +6,9 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 `Pyramid.java`; Cosmic's own Pyramid is a stub) and
 `reports/b160-pyramid-client.md` (the v83 client's fields and packets).
 
-Status: the map and mob data and the packet builders are in. The run itself
-(Duarte, the stages, the gauge, the result room) is still to come.
+Status: the map and mob data, the packet builders, and the run's entry,
+stages and clocks are in. The gauge and tally, the blessings and Rage
+charges, the score, and the Tomb are still to come.
 
 ## Maps
 
@@ -23,6 +24,38 @@ Status: the map and mob data and the packet builders are in. The run itself
   70 mobs whoever is on it and refills every 3 s (`combat.md`, Spawning).
 - The result maps 926010001 to 4 have field type 24
   (`CField_MassacreResult`) and send players on to 926020001 to 4.
+
+## The run (`net::events`, `EventKind::Pyramid`)
+
+Each mode has two event kinds, `EventKind::Pyramid(mode)` alone and
+`EventKind::PyramidParty(mode)` with a party (`PYRAMID`, `PYRAMID_PARTY`,
+built by `pyramid()`). Their maps are the stage maps' copy 0, played in the
+event's own instance (see `party-quests.md`), so the copy digit in the ids
+is unused. Five runs alone and ten with a party may go at once in each
+mode on a channel, as many as the maps have copies.
+
+- Duarte (2103013) in the lobby (`NpcScript::duarte`, after Cosmic's
+  commented-out `2103013.js`): About (three pages), Enter, and the
+  treasures. Enter asks alone or with a party, then the mode by its icon
+  (3994115 to 3994118). Under level 40 he turns the player away; above 60
+  only Hell is open. A party run needs its leader and one or more others,
+  all at the mode's levels, in the lobby; the others stay behind. He asks
+  the directory about all eight runs before he speaks
+  (`ClientActor::talk_to_duarte`). Cosmic's Find a Party, the Tomb and the
+  medal are not offered yet.
+- The first stage lasts 2 minutes (the event's `minutes`), the others 3
+  (`PYRAMID_STAGE_TIME`; Cosmic `Pyramid.timer`). When a stage's clock
+  runs out the event actor moves everyone on to the next one, with the new
+  clock (`EventActor::next_pyramid_stage`). The fifth's ends the run, which
+  sends everyone to its exit, the mode's result map. CLOCK kind 2 shows
+  each stage's time.
+- The run lasts until its last player leaves, whoever leads.
+- Duarte on a stage lets a player give up (`duarte_forfeit`): they go back
+  to the lobby and leave the run. On a result map he sends them on to the
+  mode's room in the Shades, and from there back to the lobby
+  (`duarte_after`).
+- The lobby's `piramid_in00` portal (a script portal) isn't modelled;
+  Duarte is the only way in.
 
 ## Stage rules (`FieldTemplate::massacre`)
 
