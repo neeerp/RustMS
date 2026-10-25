@@ -1897,6 +1897,28 @@ pub mod keys {
     pub const DOJO_SO_GONG_TRIAL_NO: &str = "dojo.so_gong.trial_no";
     pub const DOJO_TRIAL_TAUNT: &str = "dojo.trial.taunt";
     pub const DOJO_TRIAL_STAY: &str = "dojo.trial.stay";
+    pub const PYRAMID_DUARTE_MENU: &str = "pyramid.duarte.menu";
+    pub const PYRAMID_DUARTE_ABOUT: &str = "pyramid.duarte.about";
+    pub const PYRAMID_DUARTE_ENTER: &str = "pyramid.duarte.enter";
+    pub const PYRAMID_DUARTE_TREASURES: &str = "pyramid.duarte.treasures";
+    pub const PYRAMID_DUARTE_INFO: &str = "pyramid.duarte.info";
+    pub const PYRAMID_DUARTE_RULES: &str = "pyramid.duarte.rules";
+    pub const PYRAMID_DUARTE_LUCK: &str = "pyramid.duarte.luck";
+    pub const PYRAMID_DUARTE_TREASURES_INFO: &str = "pyramid.duarte.treasures_info";
+    pub const PYRAMID_DUARTE_HOW: &str = "pyramid.duarte.how";
+    pub const PYRAMID_DUARTE_ALONE: &str = "pyramid.duarte.alone";
+    pub const PYRAMID_DUARTE_PARTY: &str = "pyramid.duarte.party";
+    pub const PYRAMID_DUARTE_MODE: &str = "pyramid.duarte.mode";
+    pub const PYRAMID_DUARTE_LOW_LEVEL: &str = "pyramid.duarte.low_level";
+    pub const PYRAMID_DUARTE_ONLY_HELL: &str = "pyramid.duarte.only_hell";
+    pub const PYRAMID_DUARTE_NO_PARTY: &str = "pyramid.duarte.no_party";
+    pub const PYRAMID_DUARTE_NOT_LEADER: &str = "pyramid.duarte.not_leader";
+    pub const PYRAMID_DUARTE_PARTY_TERMS: &str = "pyramid.duarte.party_terms";
+    pub const PYRAMID_DUARTE_BUSY: &str = "pyramid.duarte.busy";
+    pub const PYRAMID_DUARTE_REFUSED: &str = "pyramid.duarte.refused";
+    pub const PYRAMID_DUARTE_FORFEIT_ASK: &str = "pyramid.duarte.forfeit_ask";
+    pub const PYRAMID_DUARTE_RESULT_ASK: &str = "pyramid.duarte.result_ask";
+    pub const PYRAMID_DUARTE_SHADES_ASK: &str = "pyramid.duarte.shades_ask";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2961,6 +2983,28 @@ mod tests {
                 keys::DOJO_SO_GONG_TRIAL_NO,
                 keys::DOJO_TRIAL_TAUNT,
                 keys::DOJO_TRIAL_STAY,
+                keys::PYRAMID_DUARTE_MENU,
+                keys::PYRAMID_DUARTE_ABOUT,
+                keys::PYRAMID_DUARTE_ENTER,
+                keys::PYRAMID_DUARTE_TREASURES,
+                keys::PYRAMID_DUARTE_INFO,
+                keys::PYRAMID_DUARTE_RULES,
+                keys::PYRAMID_DUARTE_LUCK,
+                keys::PYRAMID_DUARTE_TREASURES_INFO,
+                keys::PYRAMID_DUARTE_HOW,
+                keys::PYRAMID_DUARTE_ALONE,
+                keys::PYRAMID_DUARTE_PARTY,
+                keys::PYRAMID_DUARTE_MODE,
+                keys::PYRAMID_DUARTE_LOW_LEVEL,
+                keys::PYRAMID_DUARTE_ONLY_HELL,
+                keys::PYRAMID_DUARTE_NO_PARTY,
+                keys::PYRAMID_DUARTE_NOT_LEADER,
+                keys::PYRAMID_DUARTE_PARTY_TERMS,
+                keys::PYRAMID_DUARTE_BUSY,
+                keys::PYRAMID_DUARTE_REFUSED,
+                keys::PYRAMID_DUARTE_FORFEIT_ASK,
+                keys::PYRAMID_DUARTE_RESULT_ASK,
+                keys::PYRAMID_DUARTE_SHADES_ASK,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

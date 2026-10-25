@@ -9,7 +9,7 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck,
-    Standing, Statue,
+    PyramidMode, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
@@ -895,6 +895,9 @@ pub const GUON_ABOARD: i32 = 2094002;
 /// leads to the Dojo.
 pub const SO_GONG: i32 = 2091005;
 pub const DOJO_BOARD: i32 = 2091006;
+/// Duarte, who takes players into Nett's Pyramid from its lobby and
+/// stands on each of its stages, its result maps and the Shades.
+pub const DUARTE: i32 = 2103013;
 /// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
 /// again in its clear room.
 pub const WU_YANG: i32 = 2094001;
@@ -1367,6 +1370,12 @@ impl NpcScript {
         so_gong(entry, party, player)
     }
 
+    /// Duarte in Nett's Pyramid's lobby, for `player`, whose `entries` say
+    /// which runs they may go on.
+    pub fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> Self {
+        duarte(entries, player)
+    }
+
     /// Pietri in the maze's goal room, to a member who may be its
     /// `leader`, whose team may have `won` it and may all be there
     /// (`together`).
@@ -1437,6 +1446,9 @@ impl NpcScript {
             }
             SO_GONG if events::dojo_floor(player.stats.map_id).is_some() => {
                 Some(so_gong_on_floor(player, leader))
+            }
+            DUARTE if events::pyramid_stage(player.stats.map_id).is_some() => {
+                Some(duarte_forfeit())
             }
             WU_YANG if !won && player.stats.map_id == events::PIRATE_STAGES[5] => {
                 Some(wu_yang_freed(leader))
@@ -1536,6 +1548,11 @@ impl NpcScript {
         }
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
+        }
+        if npc_id == DUARTE {
+            if let Some(script) = duarte_after(player) {
+                return Some(script);
+            }
         }
         if let Some(instructor) = INSTRUCTORS.iter().find(|i| i.npc_id == npc_id) {
             let stats = &player.stats;
@@ -7003,6 +7020,127 @@ fn guon(entry: Entry) -> NpcScript {
     // Someone left or moved since Guon checked, or another party went in.
     script.refused = Some(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE));
     script
+}
+
+/// Duarte (Cosmic `2103013`'s commented-out script) in Nett's Pyramid's
+/// lobby: anyone may hear about the Pyramid and the treasures in Pharaoh
+/// Yeti's Tomb, and a player of level 40 or more may go in alone or as the
+/// leader of a party, in a mode of their choice, Hell's alone above level
+/// 60. Cosmic's Find a Party, the Tomb and the medal are left out for now.
+fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
+    let level = player.stats.level;
+    let run = |kind: EventKind| {
+        let event = kind.event();
+        let entry = entries
+            .iter()
+            .find(|(of, _)| *of == kind)
+            .map_or(Entry::Busy, |(_, entry)| *entry);
+        let page = match entry {
+            _ if level < *events::PYRAMID_LEVELS.start() => {
+                event_terms(event, keys::PYRAMID_DUARTE_LOW_LEVEL)
+            }
+            _ if !event.levels.contains(&level) => {
+                event_terms(&events::PYRAMID[0], keys::PYRAMID_DUARTE_ONLY_HELL)
+            }
+            Entry::Ready => return Page::Done(vec![Effect::StartEvent(kind)]),
+            Entry::Busy => text(keys::PYRAMID_DUARTE_BUSY),
+            Entry::NoParty => text(keys::PYRAMID_DUARTE_NO_PARTY),
+            Entry::NotLeader => text(keys::PYRAMID_DUARTE_NOT_LEADER),
+            Entry::NotEligible => event_terms(event, keys::PYRAMID_DUARTE_PARTY_TERMS),
+        };
+        Page::Say(page)
+    };
+    let modes = |kind: fn(PyramidMode) -> EventKind| Page::Menu {
+        text: text(keys::PYRAMID_DUARTE_MODE),
+        choices: PyramidMode::ALL
+            .iter()
+            .map(|&mode| {
+                let icon = format!("#i{}#", events::PYRAMID_MODE_ICON + mode.index());
+                (icon, vec![run(kind(mode))])
+            })
+            .collect(),
+    };
+    let enter = Page::Menu {
+        text: text(keys::PYRAMID_DUARTE_HOW),
+        choices: vec![
+            (
+                text(keys::PYRAMID_DUARTE_ALONE),
+                vec![modes(EventKind::Pyramid)],
+            ),
+            (
+                text(keys::PYRAMID_DUARTE_PARTY),
+                vec![modes(EventKind::PyramidParty)],
+            ),
+        ],
+    };
+    let mut script = NpcScript::new(
+        DUARTE,
+        vec![Page::Menu {
+            text: text(keys::PYRAMID_DUARTE_MENU),
+            choices: vec![
+                (
+                    text(keys::PYRAMID_DUARTE_ABOUT),
+                    vec![
+                        Page::Say(text(keys::PYRAMID_DUARTE_INFO)),
+                        Page::Say(text(keys::PYRAMID_DUARTE_RULES)),
+                        Page::Say(text(keys::PYRAMID_DUARTE_LUCK)),
+                    ],
+                ),
+                (text(keys::PYRAMID_DUARTE_ENTER), vec![enter]),
+                (
+                    text(keys::PYRAMID_DUARTE_TREASURES),
+                    vec![Page::Say(text(keys::PYRAMID_DUARTE_TREASURES_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Duarte checked, or the last room went.
+    script.refused = Some(text(keys::PYRAMID_DUARTE_REFUSED));
+    script
+}
+
+/// Duarte on a Pyramid stage: the player may give the run up and go back
+/// to the lobby (Cosmic `2103013`).
+fn duarte_forfeit() -> NpcScript {
+    NpcScript::new(
+        DUARTE,
+        vec![Page::Ask {
+            text: text(keys::PYRAMID_DUARTE_FORFEIT_ASK),
+            on_yes: vec![Effect::Warp(events::PYRAMID_LOBBY)],
+            on_no: None,
+        }],
+    )
+}
+
+/// Duarte after a run: on a result map he sends the player on to the
+/// mode's room in the Shades, and there back to the lobby (Cosmic
+/// `2103013`, whose gem for the Tomb is still to come). None elsewhere.
+fn duarte_after(player: &Player) -> Option<NpcScript> {
+    let map_id = player.stats.map_id;
+    let mode = |first: i32| {
+        let mode = map_id - first;
+        (0..PyramidMode::ALL.len() as i32)
+            .contains(&mode)
+            .then_some(mode)
+    };
+    let (ask, to) = if let Some(mode) = mode(events::PYRAMID_RESULT) {
+        (
+            keys::PYRAMID_DUARTE_RESULT_ASK,
+            events::PYRAMID_SHADES + mode,
+        )
+    } else if mode(events::PYRAMID_SHADES).is_some() {
+        (keys::PYRAMID_DUARTE_SHADES_ASK, events::PYRAMID_LOBBY)
+    } else {
+        return None;
+    };
+    Some(NpcScript::new(
+        DUARTE,
+        vec![Page::Ask {
+            text: text(ask),
+            on_yes: vec![Effect::Warp(to)],
+            on_no: None,
+        }],
+    ))
 }
 
 /// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
@@ -13679,6 +13817,91 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn duarte_takes_a_player_into_the_pyramid_in_the_mode_they_choose() {
+        let entries = |entry| {
+            events::pyramid_kinds()
+                .map(|kind| (kind, entry))
+                .collect::<Vec<_>>()
+        };
+        let at = |level| {
+            let mut player = player(50);
+            player.stats.level = level;
+            player.stats.map_id = events::PYRAMID_LOBBY;
+            player
+        };
+        // Lobby menu, alone or with a party, then the mode.
+        let choose = |entry, level, party: i32, mode: i32| {
+            let mut duarte = NpcScript::duarte(&entries(entry), &at(level));
+            assert_eq!(kind(&duarte.begin()), Some(4));
+            duarte.respond(ScriptInput::Select(1)).unwrap();
+            duarte.respond(ScriptInput::Select(party)).unwrap();
+            duarte.respond(ScriptInput::Select(mode)).unwrap()
+        };
+        let hard = EventKind::Pyramid(PyramidMode::Hard);
+        assert_eq!(
+            choose(Entry::Ready, 45, 0, 2).effects,
+            [Effect::StartEvent(hard)]
+        );
+        let hell = EventKind::PyramidParty(PyramidMode::Hell);
+        assert_eq!(
+            choose(Entry::Ready, 70, 1, 3).effects,
+            [Effect::StartEvent(hell)]
+        );
+        let low = content::text().get(keys::PYRAMID_DUARTE_LOW_LEVEL, &[("low", "40")]);
+        assert_eq!(page_text(&choose(Entry::Ready, 39, 0, 3)), low);
+        let only_hell = content::text().get(keys::PYRAMID_DUARTE_ONLY_HELL, &[("high", "60")]);
+        assert_eq!(page_text(&choose(Entry::Ready, 61, 0, 0)), only_hell);
+        let busy = text(keys::PYRAMID_DUARTE_BUSY);
+        assert_eq!(page_text(&choose(Entry::Busy, 45, 0, 0)), busy);
+        let no_party = text(keys::PYRAMID_DUARTE_NO_PARTY);
+        assert_eq!(page_text(&choose(Entry::NoParty, 45, 1, 0)), no_party);
+        let not_leader = text(keys::PYRAMID_DUARTE_NOT_LEADER);
+        assert_eq!(page_text(&choose(Entry::NotLeader, 45, 1, 0)), not_leader);
+        let terms = event_terms(
+            EventKind::PyramidParty(PyramidMode::Easy).event(),
+            keys::PYRAMID_DUARTE_PARTY_TERMS,
+        );
+        assert_eq!(page_text(&choose(Entry::NotEligible, 45, 1, 0)), terms);
+        let mut ready = NpcScript::duarte(&entries(Entry::Ready), &at(45));
+        let refused = ready.refused().unwrap();
+        assert_eq!(page_text(&refused), text(keys::PYRAMID_DUARTE_REFUSED));
+        // The about pages.
+        let mut about = NpcScript::duarte(&entries(Entry::Ready), &at(45));
+        about.begin();
+        let step = about.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&step), text(keys::PYRAMID_DUARTE_INFO));
+
+        // On a stage he lets the player give up, back to the lobby.
+        let mut player = at(45);
+        player.stats.map_id = EventKind::Pyramid(PyramidMode::Easy).event().stage_map(3);
+        let mut forfeit = NpcScript::in_event(DUARTE, &player, true, false).unwrap();
+        assert_eq!(
+            question(&forfeit.begin()),
+            text(keys::PYRAMID_DUARTE_FORFEIT_ASK)
+        );
+        let step = forfeit.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::Warp(events::PYRAMID_LOBBY)]);
+        // After the run: from the mode's result map on to its room in the
+        // Shades, and from there back to the lobby.
+        player.stats.map_id = events::PYRAMID_RESULT + 2;
+        let mut result = NpcScript::for_npc(DUARTE, &player).unwrap();
+        assert_eq!(
+            question(&result.begin()),
+            text(keys::PYRAMID_DUARTE_RESULT_ASK)
+        );
+        let step = result.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::Warp(events::PYRAMID_SHADES + 2)]);
+        player.stats.map_id = events::PYRAMID_SHADES + 2;
+        let mut shades = NpcScript::for_npc(DUARTE, &player).unwrap();
+        assert_eq!(
+            question(&shades.begin()),
+            text(keys::PYRAMID_DUARTE_SHADES_ASK)
+        );
+        let step = shades.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(step.effects, [Effect::Warp(events::PYRAMID_LOBBY)]);
     }
 
     #[test]
