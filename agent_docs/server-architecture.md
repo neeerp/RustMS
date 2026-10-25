@@ -190,6 +190,12 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   sender (`broadcast_by`, `broadcast_about`; report b177). The map's own
   packets still reach everyone: mobs, drops, mists, doors, notices and a
   jukebox's song (`FieldRequest::BroadcastAll`). GMs see hidden GMs.
+  Mobs pass a hidden GM by: they don't take the GM as their controller,
+  hiding hands the GM's mobs to someone else (`FieldActor::mob_candidate`),
+  and nothing hurts the GM. To those not GMs, a hidden GM isn't online for
+  `/find`, whispers, the Teleport Rock, the Party Potion or the family's
+  teleport (`Presence::hidden`). Buddy lists, guilds and parties still
+  show the GM.
 - `!level` and `!job` set only the level or job. Others see the level-up or
   job-change effect (`WorldAction::AvatarChanged`). `!exp` gains EXP as a
   kill does.

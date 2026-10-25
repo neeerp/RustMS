@@ -535,7 +535,7 @@ impl FieldActor {
         if spawned.is_empty() {
             return;
         }
-        let controller = self.occupants.keys().next().copied();
+        let controller = self.mob_candidate();
         for object_id in spawned {
             self.guard_new(object_id, now);
             let Some(mob) = self.mobs.get(object_id) else {
@@ -579,6 +579,23 @@ impl FieldActor {
                     occupant.handle.send_packet(packet);
                 }
             }
+        }
+    }
+
+    /// Who should move the map's mobs: anyone here but a hidden GM, whom
+    /// they don't see (Cosmic's controller search skips one).
+    fn mob_candidate(&self) -> Option<ClientId> {
+        self.occupants
+            .iter()
+            .find(|(_, occupant)| !occupant.avatar.hidden)
+            .map(|(&client_id, _)| client_id)
+    }
+
+    /// Who moves the mobs `from` brings out: `from`, unless hidden.
+    fn mover_for(&self, from: ClientId) -> Option<ClientId> {
+        match self.occupants.get(&from) {
+            Some(occupant) if !occupant.avatar.hidden => Some(from),
+            _ => self.mob_candidate(),
         }
     }
 
@@ -710,6 +727,7 @@ impl FieldActor {
                     };
                     if hid {
                         self.show_hidden(client_id);
+                        self.hide_from_mobs(client_id);
                     }
                 }
             }
@@ -2155,7 +2173,7 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
-        if let Some(controller) = self.occupants.keys().next().copied() {
+        if let Some(controller) = self.mob_candidate() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
         }
@@ -2472,9 +2490,10 @@ impl FieldActor {
         let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
         let now = Instant::now();
+        let mover = self.mover_for(from);
         let mut placed = Vec::new();
         for info in mobs.into_iter().filter_map(net::mobs::info) {
-            let object_id = self.mobs.place(info, at, stance, Some(from), now);
+            let object_id = self.mobs.place(info, at, stance, mover, now);
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
@@ -2483,7 +2502,9 @@ impl FieldActor {
             }
             placed.push(object_id);
         }
-        self.send_control(from, &placed);
+        if let Some(mover) = mover {
+            self.send_control(mover, &placed);
+        }
     }
 
     /// Bring out the mob a script calls for on the ground below `(x, y)`
@@ -2498,14 +2519,17 @@ impl FieldActor {
         };
         let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
-        let object_id = self.mobs.place(info, at, 4, Some(from), Instant::now());
+        let mover = self.mover_for(from);
+        let object_id = self.mobs.place(info, at, 4, mover, Instant::now());
         let Some(mob) = self.mobs.get(object_id) else {
             return;
         };
         if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
             self.broadcast(None, packet);
         }
-        self.send_control(from, &[object_id]);
+        if let Some(mover) = mover {
+            self.send_control(mover, &[object_id]);
+        }
     }
 
     fn handle_unsummon(&mut self, from: ClientId, skill_id: Option<i32>, why: Gone) {
@@ -2971,7 +2995,7 @@ impl FieldActor {
             }
             came += 1;
         }
-        if let Some(controller) = self.occupants.keys().next().copied() {
+        if let Some(controller) = self.mob_candidate() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
         }
@@ -3031,7 +3055,7 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
-        if let Some(controller) = self.occupants.keys().next().copied() {
+        if let Some(controller) = self.mob_candidate() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
         }
@@ -3295,7 +3319,7 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
-            if let Some(controller) = self.occupants.keys().next().copied() {
+            if let Some(controller) = self.mob_candidate() {
                 let controlled = self.mobs.assign_uncontrolled(controller);
                 self.send_control(controller, &controlled);
             }
@@ -3383,6 +3407,9 @@ impl FieldActor {
     /// Give the mob `from` hit to its client with aggro, taking it from
     /// whoever moved it before.
     fn provoke(&mut self, from: ClientId, attacker: &ClientHandle, object_id: i32, now: Instant) {
+        if self.occupants.get(&from).is_some_and(|o| o.avatar.hidden) {
+            return;
+        }
         let Some(previous) = self.mobs.provoke(from, object_id, now) else {
             return;
         };
@@ -3392,7 +3419,7 @@ impl FieldActor {
     /// `from` reported how far it is from a firstAttack mob; the closest
     /// player moves it.
     fn handle_mob_distance(&mut self, from: ClientId, object_id: i32, distance: i32) {
-        let Some(occupant) = self.occupants.get(&from) else {
+        let Some(occupant) = self.occupants.get(&from).filter(|o| !o.avatar.hidden) else {
             return;
         };
         let handle = occupant.handle.clone();
@@ -4045,6 +4072,7 @@ impl FieldActor {
             }
         }
 
+        let hidden = avatar.hidden;
         self.occupants.insert(
             client_id,
             Occupant {
@@ -4054,8 +4082,10 @@ impl FieldActor {
                 foothold: 0,
             },
         );
-        let controlled = self.mobs.assign_uncontrolled(client_id);
-        self.send_control(client_id, &controlled);
+        if !hidden {
+            let controlled = self.mobs.assign_uncontrolled(client_id);
+            self.send_control(client_id, &controlled);
+        }
         // A rejoining controller has forgotten it controls them.
         if self.npc_controller.is_none() || self.npc_controller == Some(client_id) {
             self.send_npc_control(client_id);
@@ -4092,7 +4122,7 @@ impl FieldActor {
         if let Some(Ok(packet)) = view.as_ref().map(build_spawn_mob) {
             self.broadcast(None, packet);
         }
-        if let Some(controller) = self.occupants.keys().next().copied() {
+        if let Some(controller) = self.mob_candidate() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
         }
@@ -4658,9 +4688,10 @@ impl FieldActor {
             Err(error) => warn!(client_id, %error, "Failed to build leave packet"),
         }
         let next = self.occupants.keys().next().copied();
-        let handed = self.mobs.release(client_id, next);
-        if let Some(next) = next {
-            self.send_control(next, &handed);
+        let mover = self.mob_candidate();
+        let handed = self.mobs.release(client_id, mover);
+        if let Some(mover) = mover {
+            self.send_control(mover, &handed);
         }
         if self.npc_controller == Some(client_id) {
             self.npc_controller = None;
@@ -4761,6 +4792,28 @@ impl FieldActor {
             if sees(&occupant.avatar, avatar) {
                 occupant.handle.send_packet(packet.clone());
             }
+        }
+    }
+
+    /// A GM hid, so their mobs go to someone the mobs see, or came out of
+    /// hiding and moves those no one does (Cosmic's `hide`).
+    fn hide_from_mobs(&mut self, client_id: ClientId) {
+        let Some(gm) = self.occupants.get(&client_id) else {
+            return;
+        };
+        if !gm.avatar.hidden {
+            let controlled = self.mobs.assign_uncontrolled(client_id);
+            return self.send_control(client_id, &controlled);
+        }
+        let mover = self.mob_candidate();
+        let handed = self.mobs.hand_off(client_id, mover);
+        for &object_id in &handed {
+            if let Ok(packet) = build_stop_controlling_mob(object_id) {
+                gm.handle.send_packet(packet);
+            }
+        }
+        if let Some(mover) = mover {
+            self.send_control(mover, &handed);
         }
     }
 
@@ -5938,6 +5991,82 @@ mod tests {
         });
         assert!(players(sent(&mut late_rx)).is_empty());
         assert_eq!(players(sent(&mut other_gm_rx)), [remove]);
+    }
+
+    #[test]
+    fn mobs_pass_by_a_hidden_gm() {
+        let mut mobs = MobSet::new([mob(100, false)]);
+        let snail = mobs.spawn_all(Instant::now())[0];
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            mobs,
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_secs(60),
+        );
+        let gm = |hidden| FieldAvatar {
+            gm: true,
+            hidden,
+            ..avatar(1, 0, 0)
+        };
+        let hide = |hidden| FieldMessage::UpdateAvatar {
+            client_id: 1,
+            avatar: gm(hidden),
+            announce: Vec::new(),
+        };
+        // Whether each control packet gives the mob or takes it.
+        let control = |rx: &mut _| -> Vec<bool> {
+            sent(rx)
+                .iter()
+                .filter(|p| p.opcode() == SendOpcode::SpawnMonsterControl as i16)
+                .map(|p| p.bytes[2] != 0)
+                .collect()
+        };
+        let controller = |actor: &FieldActor| actor.mobs.get(snail).unwrap().controller;
+        let (hider, mut hider_rx) = client(1);
+        actor.handle_message(FieldMessage::Join {
+            handle: hider.clone(),
+            avatar: gm(true),
+            party: None,
+        });
+        // Alone and hidden, the GM moves nothing, even what they hit.
+        actor.provoke(1, &hider, snail, Instant::now());
+        assert_eq!(controller(&actor), None);
+        assert!(control(&mut hider_rx).is_empty());
+
+        actor.handle_message(hide(false));
+        assert_eq!(controller(&actor), Some(1));
+        assert_eq!(control(&mut hider_rx), [true]);
+        let (player, mut player_rx) = client(2);
+        actor.handle_message(FieldMessage::Join {
+            handle: player,
+            avatar: avatar(2, 0, 0),
+            party: None,
+        });
+        assert!(control(&mut player_rx).is_empty());
+
+        // Hiding hands the GM's mobs on.
+        actor.handle_message(hide(true));
+        assert_eq!(controller(&actor), Some(2));
+        assert_eq!(control(&mut hider_rx), [false]);
+        assert_eq!(control(&mut player_rx), [true]);
+        actor.handle_message(FieldMessage::Leave {
+            client_id: 2,
+            staying: false,
+        });
+        assert_eq!(controller(&actor), None);
+        assert!(control(&mut hider_rx).is_empty());
+
+        // Nor what the GM brings out.
+        if net::mobs::info(100100).is_none() {
+            return;
+        }
+        actor.handle_summon_mobs(1, vec![100100]);
+        assert!(control(&mut hider_rx).is_empty());
+        assert!(actor.mobs.live().all(|mob| mob.controller.is_none()));
     }
 
     #[tokio::test]

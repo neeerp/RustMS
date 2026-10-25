@@ -900,20 +900,32 @@ impl MobSet {
     /// `leaving` stopped controlling its mobs; hand them to `next` if any.
     /// Returns the mobs that changed hands.
     pub fn release(&mut self, leaving: ClientId, next: Option<ClientId>) -> Vec<i32> {
+        let handed = self.hand_off(leaving, next);
+        for &object_id in &handed {
+            if let Some(mob) = self.live.get_mut(&object_id) {
+                mob.damage_by.remove(&leaving);
+            }
+        }
+        handed
+    }
+
+    /// `from`, still here, stops controlling its mobs, which go to `next`
+    /// if any; what `from` did to them still counts. Returns the mobs that
+    /// changed hands.
+    pub fn hand_off(&mut self, from: ClientId, next: Option<ClientId>) -> Vec<i32> {
         for revival in &mut self.revivals {
-            if revival.controller == Some(leaving) {
+            if revival.controller == Some(from) {
                 revival.controller = next;
             }
         }
         self.live
             .values_mut()
-            .filter(|mob| mob.controller == Some(leaving))
+            .filter(|mob| mob.controller == Some(from))
             .map(|mob| {
                 mob.controller = next;
                 mob.granted = None;
                 mob.aggro_until = None;
                 mob.controller_distance = None;
-                mob.damage_by.remove(&leaving);
                 mob.object_id
             })
             .collect()

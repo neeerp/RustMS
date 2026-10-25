@@ -124,7 +124,7 @@ impl WorldDirectory {
         match self
             .clients
             .get(&target)
-            .filter(|entry| entry.channel_id == asker.channel_id)
+            .filter(|entry| entry.channel_id == asker.channel_id && entry.found_by(asker))
         {
             Some(entry) => entry.handle.send(ServerMessage::FamilyLocate {
                 reply_to: asker.handle.clone(),

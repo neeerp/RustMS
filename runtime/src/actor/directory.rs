@@ -84,6 +84,12 @@ impl Entry {
         }
     }
 
+    /// Whether `asker` can find them: not if they're a hidden GM, unless
+    /// `asker` is a GM too.
+    fn found_by(&self, asker: &Entry) -> bool {
+        !self.presence.hidden || asker.presence.gm
+    }
+
     fn shares_map_with(&self, other: &Entry) -> bool {
         self.channel_id == other.channel_id && self.presence.map_id == other.presence.map_id
     }
@@ -1012,6 +1018,7 @@ impl WorldDirectory {
             .names
             .get(&delivery.target_name)
             .and_then(|id| self.clients.get(id))
+            .filter(|target| target.found_by(sender))
             .is_some_and(|target| target.handle.send_packet(delivery.recipient_packet));
         let answer = if delivered {
             delivery.sender_success_packet
@@ -1032,7 +1039,8 @@ impl WorldDirectory {
         let target = self
             .names
             .get(target_name)
-            .and_then(|id| self.clients.get(id));
+            .and_then(|id| self.clients.get(id))
+            .filter(|target| target.found_by(asker));
         let packet = match target {
             Some(target) if target.channel_id == asker.channel_id => {
                 target.handle.send(ServerMessage::Locate {
@@ -1064,7 +1072,7 @@ impl WorldDirectory {
             .names
             .get(name)
             .and_then(|id| self.clients.get(id))
-            .filter(|target| target.channel_id == asker.channel_id);
+            .filter(|target| target.channel_id == asker.channel_id && target.found_by(asker));
         match target {
             Some(target) => target.handle.send(ServerMessage::RockLocate {
                 reply_to: asker.handle.clone(),
@@ -1086,7 +1094,7 @@ impl WorldDirectory {
             .names
             .get(&potion.name)
             .and_then(|id| self.clients.get(id))
-            .filter(|target| target.channel_id == user.channel_id);
+            .filter(|target| target.channel_id == user.channel_id && target.found_by(user));
         // A target that has just gone counts as not found, so the user's
         // client is always unlocked.
         let reached = target.is_some_and(|target| {
@@ -2097,6 +2105,8 @@ mod tests {
             alliance_id: None,
             family: Default::default(),
             partner: None,
+            gm: false,
+            hidden: false,
         }
     }
 
@@ -3147,6 +3157,65 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[test]
+    fn only_gms_find_or_whisper_a_hidden_gm() {
+        const HENESYS: i32 = 100000000;
+        let (_tx, rx) = mpsc::channel(1);
+        let mut directory = WorldDirectory::new(rx);
+        let mut player = online(&mut directory, 1, "Alice", HENESYS);
+        let mut gm = online(&mut directory, 2, "Bobby", HENESYS);
+        let mut hider = online(&mut directory, 3, "Hider", HENESYS);
+        let gm_presence = |name, hidden| Presence {
+            gm: true,
+            hidden,
+            ..presence(name, HENESYS)
+        };
+        directory.update_presence(2, gm_presence("Bobby", false));
+        directory.update_presence(3, gm_presence("Hider", true));
+        let received = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            std::iter::from_fn(|| rx.try_recv().ok()).collect::<Vec<_>>()
+        };
+        let whisper = |answer: u8| WhisperDelivery {
+            target_name: "Hider".into(),
+            recipient_packet: Packet::new(&[0x87, 0x00]),
+            sender_success_packet: Some(Packet::new(&[0x87, answer, 1])),
+            sender_failure_packet: Some(Packet::new(&[0x87, answer, 0])),
+        };
+        let answers = |rx: &mut mpsc::Receiver<ServerMessage>| -> Vec<u8> {
+            received(rx)
+                .into_iter()
+                .filter_map(|message| match message {
+                    ServerMessage::SendPacket(packet) => packet.bytes.last().copied(),
+                    _ => None,
+                })
+                .collect()
+        };
+        received(&mut player);
+        received(&mut gm);
+        received(&mut hider);
+
+        // To a player, the GM isn't on.
+        directory.find(1, "Hider");
+        directory.whisper(1, whisper(1));
+        let told = answers(&mut player);
+        assert_eq!(
+            (told.len(), told.last()),
+            (2, Some(&0)),
+            "not found, not sent"
+        );
+        assert!(received(&mut hider).is_empty());
+
+        // Another GM finds and whispers them.
+        directory.find(2, "Hider");
+        directory.whisper(2, whisper(2));
+        assert_eq!(answers(&mut gm), [1]);
+        let heard = received(&mut hider);
+        assert!(matches!(
+            heard.as_slice(),
+            [ServerMessage::Locate { .. }, ServerMessage::SendPacket(_)]
+        ));
     }
 
     #[test]
