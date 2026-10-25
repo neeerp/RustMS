@@ -767,6 +767,15 @@ diesel::table! {
     }
 }
 diesel::table! {
+    votes (id) {
+        id -> Int4,
+        account_id -> Int4,
+        amount -> Int4,
+        voted_at -> Timestamp,
+    }
+}
+diesel::joinable!(votes -> accounts (account_id));
+diesel::table! {
     dojo_records (character_id) {
         character_id -> Int4,
         points -> Int4,
@@ -832,4 +841,5 @@ diesel::allow_tables_to_appear_in_same_query!(
     minigame_records,
     reports,
     dojo_records,
+    votes,
 );

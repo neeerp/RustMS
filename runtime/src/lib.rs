@@ -4,6 +4,7 @@ pub mod error;
 pub mod io;
 pub mod message;
 pub mod supervisor;
+pub mod vote_hook;
 pub mod world;
 
 pub use actor::{ClientActor, LoginServerActor};

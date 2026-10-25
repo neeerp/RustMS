@@ -42,6 +42,7 @@ pub mod report;
 pub mod ring;
 pub mod session;
 pub mod storage;
+pub mod vote;
 pub mod wedding;
 pub mod wedding_gift;
 

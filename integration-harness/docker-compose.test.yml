@@ -50,6 +50,11 @@ services:
       RUSTMS_CARD_DROP_RATE: "1"
       # Each kill a player loots earns 1 NX Credit (see tests/earned_nx.rs).
       RUSTMS_NX_PER_KILL: "1"
+      # The vote hook, on the port after the channels' (see
+      # tests/vote_hook.rs).
+      RUSTMS_VOTE_HOOK_ADDR: 0.0.0.0:8090
+      RUSTMS_VOTE_HOOK_SECRET: harness-vote-secret
+      RUSTMS_VOTE_NX: "250"
       # Ships sail 60 times as fast: a trip takes 15 seconds (see
       # tests/ships.rs).
       RUSTMS_CONTI_SCALE: "60"
@@ -97,4 +102,5 @@ services:
       - "${HARNESS_WORLD_PORT:-18485}:${HARNESS_WORLD_PORT:-18485}"
       - "${HARNESS_WORLD_PORT_2:-18486}:${HARNESS_WORLD_PORT_2:-18486}"
       - "${HARNESS_WORLD_PORT_3:-18487}:${HARNESS_WORLD_PORT_3:-18487}"
+      - "${HARNESS_VOTE_PORT:-18488}:8090"
     command: ["/usr/local/bin/world"]
