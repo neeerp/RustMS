@@ -58,6 +58,15 @@ namespace ms
 			return static_cast<Type>(id);
 		}
 
+		// Whether Up on a portal of `type` to `tomap` moves the player
+		// within `mapid` without asking the server. v83 asks for types 4
+		// and 5 even within the map (FUN_0094df9b), so that the server can
+		// keep an event's gate closed.
+		static bool is_intramap(Type type, int32_t tomap, int32_t mapid)
+		{
+			return tomap == mapid && type != TYPE4 && type != TYPE5;
+		}
+
 		struct WarpInfo
 		{
 			int32_t mapid;

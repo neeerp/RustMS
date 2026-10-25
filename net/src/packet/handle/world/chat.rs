@@ -115,6 +115,9 @@ mod tests {
         assert_eq!(entry(1, "/snowball3 20"), open(109_060_004, 20));
         assert_eq!(entry(1, "/Coconut2"), open(109_080_001, 50));
         assert_eq!(entry(1, "/ox 30"), open(109_020_001, 30));
+        assert_eq!(entry(1, "/fitness1"), open(109_040_000, 50));
+        assert_eq!(entry(1, "/fitness4 20"), open(109_040_000, 20));
+        assert_eq!(entry(1, "/fitness"), None);
         assert_eq!(entry(1, "/endevent"), Some(GmEntry::Close));
         assert_eq!(entry(1, "/snowball 0"), None);
         assert_eq!(entry(1, "/snowball4"), None);

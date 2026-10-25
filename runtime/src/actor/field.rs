@@ -6,6 +6,7 @@ use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, BossBar, Cast, CastArea, Catch, Kill, MobSet, Sharer};
 use crate::actor::field_ox::{self, OxGame};
+use crate::actor::field_race::{self, Race};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_snowball::{self, SnowballGame};
@@ -283,6 +284,8 @@ pub struct FieldActor {
     snowball: Option<SnowballGame>,
     /// On the OX Quiz's field (field type 5), its game.
     ox: Option<OxGame>,
+    /// On one of a timed GM event's maps, the event while it is on.
+    race: Option<Race>,
     tick: Duration,
 }
 
@@ -371,6 +374,7 @@ impl FieldActor {
                     ];
                     OxGame::new(times.map(net::events::scaled))
                 }),
+            race: None,
             tick,
         };
         // A wedding's copy of the hunting ground opens with its one Giant
@@ -483,6 +487,7 @@ impl FieldActor {
         self.tick_coconut(now);
         self.tick_snowball(now);
         self.tick_ox(now);
+        self.tick_race(now);
         self.reach_from_mists(now);
         for summon in self.summons.expire(now) {
             let view = summon.view;
@@ -747,6 +752,10 @@ impl FieldActor {
                     _ => None,
                 };
                 let _ = reply.send(team);
+            }
+            FieldMessage::RunTimedEvent { started } => self.run_timed_event(started),
+            FieldMessage::TimedEventOn { reply } => {
+                let _ = reply.send(self.race.is_some());
             }
             FieldMessage::SendToGmEvent { from, map_id } => {
                 for (&client_id, occupant) in &self.occupants {
@@ -4006,6 +4015,23 @@ impl FieldActor {
                 handle.send_packet(packet);
             }
         }
+        if let Some(race) = &self.race {
+            if let Ok(packet) = build_countdown(field_coconut::seconds(race.left(now))) {
+                handle.send_packet(packet);
+            }
+        } else if net::gm_event::timed_event(self.key.map_id)
+            .is_some_and(|event| event.maps[0] != self.key.map_id)
+            && !avatar.gm
+        {
+            // The way past the lobby is only open while the event is on.
+            // One who comes in after the time is up here, from a map whose
+            // time came a tick later, goes out too.
+            handle.send(ServerMessage::ShipWarp {
+                from_map: self.key.map_id,
+                map_id: net::gm_event::EXIT_MAP,
+                portal: conti::Portal::Id(0),
+            });
+        }
 
         for packet in self.merchants.spawns() {
             match packet {
@@ -4448,6 +4474,65 @@ impl FieldActor {
                     self.broadcast(None, packet);
                 }
             }
+        }
+    }
+
+    /// A GM's `/start` (at `started`) or `/reset` (None) of the timed event
+    /// on this map: its clock and notices start, or everyone still inside
+    /// goes out at once.
+    fn run_timed_event(&mut self, started: Option<Instant>) {
+        let Some(event) = net::gm_event::timed_event(self.key.map_id) else {
+            return;
+        };
+        match started {
+            Some(started) if self.race.is_none() => {
+                info!(field = ?self.key, "Timed GM event started");
+                let race = Race::new(event, started, net::events::scaled);
+                let clock = field_coconut::seconds(race.left(Instant::now()));
+                self.race = Some(race);
+                if let Ok(packet) = build_countdown(clock) {
+                    self.broadcast(None, packet);
+                }
+            }
+            None if self.race.is_some() => {
+                info!(field = ?self.key, "Timed GM event reset");
+                self.end_race();
+            }
+            _ => {}
+        }
+    }
+
+    /// The timed event's notices as they come due, and its end.
+    fn tick_race(&mut self, now: Instant) {
+        while let Some(turn) = self.race.as_mut().and_then(|race| race.tick(now)) {
+            match turn {
+                field_race::Turn::Notice(key) => {
+                    let line = net::content::text().get(key, &[]);
+                    if let Ok(packet) = build_broadcast(Broadcast::Notice, &line) {
+                        self.broadcast(None, packet);
+                    }
+                }
+                field_race::Turn::Over => {
+                    info!(field = ?self.key, "Timed GM event over");
+                    self.end_race();
+                }
+            }
+        }
+    }
+
+    /// The timed event ends: its clock goes, and everyone still on the map
+    /// but GMs goes out.
+    fn end_race(&mut self) {
+        self.race = None;
+        if let Ok(packet) = build_countdown(0) {
+            self.broadcast(None, packet);
+        }
+        for occupant in self.occupants.values().filter(|o| !o.avatar.gm) {
+            occupant.handle.send(ServerMessage::ShipWarp {
+                from_map: self.key.map_id,
+                map_id: net::gm_event::EXIT_MAP,
+                portal: conti::Portal::Id(0),
+            });
         }
     }
 

@@ -1980,6 +1980,22 @@ pub mod keys {
     pub const GM_EVENT_HARRY_ASK: &str = "gm_event.harry_ask";
     pub const OX_WRONG: &str = "ox.wrong";
     pub const OX_WON: &str = "ox.won";
+    /// The Physical Fitness Test's notices, in the order they go out.
+    pub const FITNESS_NOTICE: [&str; 13] = [
+        "fitness.notice.0",
+        "fitness.notice.1",
+        "fitness.notice.2",
+        "fitness.notice.3",
+        "fitness.notice.4",
+        "fitness.notice.5",
+        "fitness.notice.6",
+        "fitness.notice.7",
+        "fitness.notice.8",
+        "fitness.notice.9",
+        "fitness.notice.10",
+        "fitness.notice.11",
+        "fitness.notice.12",
+    ];
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2846,6 +2862,7 @@ mod tests {
             .chain(&keys::MAKER_GOLD_ANVIL)
             .chain(&keys::MILK_TANGYOON)
             .chain(&keys::DOJO_TAUNT)
+            .chain(&keys::FITNESS_NOTICE)
             .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)

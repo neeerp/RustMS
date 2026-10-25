@@ -392,7 +392,9 @@ impl ClientActor {
             return Ok(());
         }
         // Checked before the handler moves the player.
-        if opcode == RecvOpcode::ChangeMap as i16 && self.gate_closed(&packet) {
+        if opcode == RecvOpcode::ChangeMap as i16
+            && (self.gate_closed(&packet) || self.gm_gate_closed(&packet).await?)
+        {
             return self
                 .send(&mut build_blocked_map(BlockedMap::PortalClosed)?)
                 .await;

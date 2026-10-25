@@ -710,8 +710,9 @@ impl GmEvent {
     }
 }
 
-/// What a GM's `/snowball`, `/coconut`, `/ox` or `/endevent` chat line asks of
-/// their channel's event: open it to players, or close it (report b170).
+/// What a GM's `/snowball`, `/coconut`, `/ox`, `/fitness` or `/endevent`
+/// chat line asks of their channel's event: open it to players, or close it
+/// (report b170).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GmEntry {
     /// Event NPCs take up to `limit` players to the game field `map_id`.
@@ -740,6 +741,8 @@ impl GmEntry {
             "/coconut2" => 109_080_001,
             "/coconut3" => 109_080_002,
             "/ox" => 109_020_001,
+            // Four words, one test (report b172).
+            "/fitness1" | "/fitness2" | "/fitness3" | "/fitness4" => 109_040_000,
             _ => return None,
         };
         let limit = match words.next() {

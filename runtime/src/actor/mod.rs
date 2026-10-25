@@ -11,6 +11,7 @@ pub mod field_merchants;
 pub mod field_mists;
 pub mod field_mobs;
 pub mod field_ox;
+pub mod field_race;
 pub mod field_reactors;
 pub mod field_shops;
 pub mod field_snowball;
