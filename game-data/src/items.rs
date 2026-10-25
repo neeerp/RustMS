@@ -279,6 +279,12 @@ pub struct ConsumeSpec {
     /// the map too (`party`): the Carnival and Dojo party potions
     /// 2022160-63 and 2022430-33.
     pub party: bool,
+    /// The Carnival Points a Monster Carnival item gives on pickup (`cp`):
+    /// 2022157-59.
+    pub cp: i32,
+    /// The Monster Carnival skill (`MCSkill.img`) an item casts on the
+    /// other side on pickup (`nuffSkill`): 2022164-66.
+    pub nuff_skill: Option<i32>,
     /// The script a scripted item (243xxxx) runs where it is used
     /// (`script`): `killarmush` for the Killer Mushroom Spore 2430014,
     /// `removethorns` for the Thorn Remover 2430015.
@@ -617,6 +623,8 @@ impl ItemData {
                 morph_random,
                 consume_on_pickup: nx.int_child(spec, "consumeOnPickup")?.unwrap_or(0) != 0,
                 party: nx.int_child(spec, "party")?.unwrap_or(0) != 0,
+                cp: nx.int_child(spec, "cp")?.unwrap_or(0),
+                nuff_skill: nx.int_child(spec, "nuffSkill")?,
                 script: nx.string_child(spec, "script")?,
             });
         }
@@ -1045,6 +1053,11 @@ mod tests {
         assert!(!red_fruit.party);
         let party_elixir = data.info(2022160).unwrap().unwrap().spec.unwrap();
         assert!(party_elixir.consume_on_pickup && party_elixir.party);
+        let cp = data.info(2022159).unwrap().unwrap().spec.unwrap();
+        assert!(cp.consume_on_pickup && !cp.has_effect());
+        assert_eq!((cp.cp, cp.nuff_skill), (3, None));
+        let stun = data.info(2022166).unwrap().unwrap().spec.unwrap();
+        assert_eq!((stun.cp, stun.nuff_skill), (0, Some(3)));
         assert_eq!(party_elixir.mp, 300);
         let air_bubble = data.info(2022040).unwrap().unwrap().spec.unwrap();
         assert_eq!(

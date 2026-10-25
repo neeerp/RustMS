@@ -324,6 +324,18 @@ impl ClientActor {
         else {
             return Ok(false);
         };
+        if spec.cp != 0 || spec.nuff_skill.is_some() {
+            // A Monster Carnival item works only in a battle, but goes all
+            // the same (Cosmic `StatEffect.applyTo`).
+            if spec.cp != 0 {
+                self.tell_event(EventCommand::CarnivalCp(spec.cp)).await;
+            }
+            if let Some(skill) = spec.nuff_skill {
+                self.tell_event(EventCommand::CarnivalCast(skill)).await;
+            }
+            self.send(&mut stat::build_stat_update(true, &[])?).await?;
+            return Ok(true);
+        }
         if !self.take_item_effect(item_id, true).await? {
             return Ok(false);
         }

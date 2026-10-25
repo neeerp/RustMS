@@ -4,6 +4,7 @@
 //! Pure rules; the event actor keeps a battle's score.
 
 use crate::ClientId;
+use game_data::skills::CarnivalSkill;
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 use std::time::Duration;
@@ -130,6 +131,49 @@ pub fn summon(room: u8, index: u8) -> Option<(i32, i32, usize)> {
     let &(mob_id, cost) = rules.mobs.get(usize::from(index))?;
     let cap = rules.mob_gen_max.unwrap_or(MOB_GEN_MAX).max(0) as usize;
     Some((mob_id, cost, cap))
+}
+
+/// The Monster Carnival skill `id` (`MCSkill.img`).
+pub fn carnival_skill(id: i32) -> Option<CarnivalSkill> {
+    carnival_skills().get(usize::try_from(id).ok()?).copied()
+}
+
+fn carnival_skills() -> &'static [CarnivalSkill] {
+    static SKILLS: std::sync::OnceLock<Vec<CarnivalSkill>> = std::sync::OnceLock::new();
+    SKILLS.get_or_init(|| {
+        crate::skills::data()
+            .ok()
+            .and_then(|data| data.carnival_skills().ok())
+            .unwrap_or_default()
+    })
+}
+
+/// What room `room`'s battle field sells at `index` of its skill list.
+pub fn skill(room: u8, index: u8) -> Option<CarnivalSkill> {
+    let data = crate::get_game_data().ok()?;
+    let rules = data.field(battle_map(room))?.carnival.as_ref()?;
+    carnival_skill(*rules.skills.get(usize::from(index))?)
+}
+
+/// The skill `skill` casts: itself, or for a Random one (no mob skill),
+/// the `roll`th of the others that reach as many (Cosmic
+/// `MCSkill.getSkill`'s `randomizeSkill`).
+pub fn cast(skill: CarnivalSkill, roll: usize) -> Option<CarnivalSkill> {
+    if skill.mob_skill != 0 {
+        return Some(skill);
+    }
+    let pool: Vec<_> = carnival_skills()
+        .iter()
+        .filter(|other| other.mob_skill != 0 && other.all == skill.all)
+        .collect();
+    pool.get(roll % pool.len().max(1)).copied().copied()
+}
+
+/// Whether mob skill `mob_skill` cast with a Carnival skill takes hold,
+/// for `roll` in 0..1: darkness, weakness, poison and slow only do 80% of
+/// the time, as their descriptions say (Cosmic `MonsterCarnivalHandler`).
+pub fn takes_hold(mob_skill: i32, roll: f64) -> bool {
+    !matches!(mob_skill, 121 | 122 | 125 | 126) || roll < 0.8
 }
 
 /// Why CP couldn't be spent, MONSTER_CARNIVAL_MESSAGE's code (v83ref
@@ -294,6 +338,20 @@ mod tests {
         assert_eq!(battle_room(CARNIVAL_LOBBY), None);
         assert_eq!(waiting_room(980000300), Some(3));
         assert_eq!(waiting_room(980000301), None);
+    }
+
+    #[test]
+    fn some_skills_take_hold_four_times_in_five() {
+        assert!(takes_hold(124, 0.99) && takes_hold(127, 0.99));
+        assert!(takes_hold(121, 0.79) && !takes_hold(121, 0.8));
+        assert!(!takes_hold(126, 0.9));
+        let curse = CarnivalSkill {
+            cost: 12,
+            mob_skill: 124,
+            level: 7,
+            all: true,
+        };
+        assert_eq!(cast(curse, 5), Some(curse));
     }
 
     #[test]

@@ -715,6 +715,13 @@ pub enum FieldMessage {
         mob_id: i32,
         at: (i16, i16),
     },
+    /// `summoner` spent CP on `index` of the Monster Carnival window's tab
+    /// `tab`, which everyone on the field hears of.
+    CarnivalAnnounce {
+        summoner: ClientId,
+        tab: u8,
+        index: u8,
+    },
     /// `summoner` spent CP on a `mob_id`, `index` of the Monster Carnival
     /// field's list, for their side `side`: whether it came out, or why
     /// not, such as `cap` of the side's summons already out.

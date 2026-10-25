@@ -2543,6 +2543,9 @@ pub enum EventCommand {
     CarnivalArrived,
     /// A member spends CP on `index` of the Carnival window's tab `tab`.
     CarnivalSpend { tab: u8, index: u8 },
+    /// A member picked up an item that casts the Monster Carnival skill
+    /// with this id (`MCSkill.img`) on the other side (`nuffSkill`).
+    CarnivalCast(i32),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

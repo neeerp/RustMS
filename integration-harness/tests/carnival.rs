@@ -52,6 +52,12 @@ fn since(seen: &Trace, op: SendOpcode, from: usize) -> Vec<Vec<u8>> {
     carnival(seen, op).split_off(from)
 }
 
+/// SUMMON's body: `name` spent CP on `index` of tab `tab`.
+fn summoned(tab: u8, index: u8, name: &str) -> Vec<u8> {
+    let length = (name.len() as u16).to_le_bytes();
+    [vec![tab, index], length.to_vec(), name.as_bytes().to_vec()].concat()
+}
+
 /// Little-endian shorts.
 fn shorts(values: &[i16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_le_bytes()).collect()
@@ -231,8 +237,8 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     assert_eq!(carnival(&theirs, SendOpcode::CarnivalPartyCp), [red_cp]);
     assert!(carnival(&theirs, SendOpcode::CarnivalObtainedCp).is_empty());
 
-    // The field's first mob costs 7 CP: with 1 the window hears there isn't
-    // enough, and skills aren't sold yet.
+    // The field's first mob costs 7 CP and its first skill 17: with 1 the
+    // window hears there isn't enough, and guardians aren't sold yet.
     let (mob_id, cost) = integration_harness::events::maps()
         .field(field)
         .and_then(|f| f.carnival.as_ref())
@@ -243,8 +249,9 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     send(&mut red.connection, spend(0, 0)).await;
     until(&mut red.connection, &mut seen, |t| !messages(t).is_empty()).await;
     send(&mut red.connection, spend(1, 0)).await;
-    until(&mut red.connection, &mut seen, |t| messages(t).len() == 2).await;
-    assert_eq!(messages(&seen), [vec![1], vec![5]]);
+    send(&mut red.connection, spend(2, 0)).await;
+    until(&mut red.connection, &mut seen, |t| messages(t).len() == 3).await;
+    assert_eq!(messages(&seen), [vec![1], vec![1], vec![5]]);
 
     // Red hunts the rest of Maple Blue's mobs for enough CP.
     let theirs_left: Vec<i32> = seen
@@ -335,4 +342,73 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
         t.warps.contains(&CARNIVAL_EXIT)
     })
     .await;
+}
+
+#[tokio::test]
+async fn a_carnival_skill_falls_on_the_other_side() {
+    let red = &mut leader().await;
+    let blue = &mut leader().await;
+    take(red, 5).await;
+    challenge(red, blue, 5).await;
+    let mut seen = Trace::default();
+    send(&mut red.connection, answer(1, 1, None)).await;
+    let mut theirs = Trace::default();
+    let field = battle_map(5);
+    let started =
+        |t: &Trace| t.warps.contains(&field) && !carnival(t, SendOpcode::CarnivalStart).is_empty();
+    until(&mut blue.connection, &mut theirs, |t| started(t)).await;
+    until(&mut red.connection, &mut seen, |t| {
+        started(t) && !t.field.mobs.is_empty()
+    })
+    .await;
+
+    // Room five's third skill is Curse, on all of the other side for 12 CP.
+    let rules = integration_harness::events::maps()
+        .field(field)
+        .and_then(|f| f.carnival.clone())
+        .unwrap();
+    assert_eq!(rules.skills.get(2), Some(&4));
+
+    // Red hunts the mobs not on their side for it.
+    let earned = |t: &Trace| {
+        let last = carnival(t, SendOpcode::CarnivalObtainedCp).pop();
+        last.map_or(0, |body| i16::from_le_bytes([body[0], body[1]]))
+    };
+    let hunted: Vec<i32> = seen
+        .field
+        .mobs
+        .iter()
+        .filter(|(oid, _)| seen.field.teams.get(oid) != Some(&0))
+        .map(|&(oid, _)| oid)
+        .collect();
+    for &oid in &hunted {
+        send(&mut red.connection, attack(oid, 30_000)).await;
+    }
+    until(&mut red.connection, &mut seen, |t| {
+        hunted.iter().all(|oid| t.field.killed.contains(oid))
+    })
+    .await;
+    // The kills' CP follows them from the event.
+    read_for(&mut red.connection, &mut seen, 500).await;
+    let total = earned(&seen);
+    assert!(total >= 12, "{total}");
+
+    // Casting it curses Blue, everyone hears Red cast it, and Red and
+    // their side keep the rest.
+    let rest = shorts(&[total - 12, total]);
+    send(&mut red.connection, spend(1, 2)).await;
+    let cast = summoned(1, 2, &red.character_name);
+    until(&mut red.connection, &mut seen, |t| {
+        carnival(t, SendOpcode::CarnivalSummon).contains(&cast)
+            && carnival(t, SendOpcode::CarnivalObtainedCp).last() == Some(&rest)
+    })
+    .await;
+    let curse = 124 | 7 << 16;
+    until(&mut blue.connection, &mut theirs, |t| {
+        carnival(t, SendOpcode::CarnivalSummon).contains(&cast)
+            && t.buffs.iter().any(|&(skill, _, _)| skill == curse)
+    })
+    .await;
+    assert!(!seen.buffs.iter().any(|&(skill, _, _)| skill == curse));
+    assert!(carnival(&seen, SendOpcode::CarnivalMessage).is_empty());
 }
