@@ -153,6 +153,9 @@ pub struct ClientActor {
     pending_quest: Option<(u64, QuestRequest)>,
     /// Portal scripts that already ran and won't run again this session.
     blocked_scripts: HashSet<String>,
+    /// Picks which of each Ola Ola level's portals leads on for this
+    /// player (`scripts::rand_ola`).
+    ola_seed: u64,
     npc_request_id: u64,
     changing_channel: bool,
     /// The player left their field for the Cash Shop.
@@ -247,6 +250,7 @@ impl ClientActor {
             last_moved: None,
             pending_quest: None,
             blocked_scripts: HashSet::new(),
+            ola_seed: thread_rng().gen(),
             npc_request_id: 0,
             changing_channel: false,
             in_cash_shop: false,

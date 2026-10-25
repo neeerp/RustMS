@@ -120,8 +120,8 @@ mod tests {
         assert_eq!(entry(1, "/fitness"), None);
         assert_eq!(entry(1, "/ola20"), open(109_030_101, 50));
         assert_eq!(entry(1, "/ola52"), open(109_030_401, 50));
-        // Variant 1 isn't done, and there is no third level digit.
-        assert_eq!(entry(1, "/ola10"), None);
+        assert_eq!(entry(1, "/ola11 30"), open(109_030_001, 30));
+        // There is no third level digit.
         assert_eq!(entry(1, "/ola23"), None);
         assert_eq!(entry(1, "/endevent"), Some(GmEntry::Close));
         assert_eq!(entry(1, "/snowball 0"), None);

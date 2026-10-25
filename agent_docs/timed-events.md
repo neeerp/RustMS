@@ -8,9 +8,8 @@ which the server kept. The RE is in v83ref `reports/b172-gm-events-rest.md`
 (how the client goes through the lobby's gate). The rules the client
 doesn't fix are listed under b172 in v83ref `lanes/QUESTIONS.md`.
 
-Status: the Physical Fitness Test and Ola Ola's variants 2 to 5 run.
-Ola Ola's variant 1 and Find the Jewel are the same kind of event and not
-done yet. Those who reach 109050000 get Pietro's prize there
+Status: the Physical Fitness Test and Ola Ola's five variants run. Find
+the Jewel is the same kind of event and not done yet. Those who reach 109050000 get Pietro's prize there
 (`agent_docs/coconut.md`, "Opening an event to players").
 
 ## The Physical Fitness Test (`net::gm_event::FITNESS`)
@@ -36,15 +35,22 @@ done yet. Those who reach 109050000 get Pietro's prize there
 
 - Each variant has three levels, from FieldSets `Event1` to `Event5`:
   variant 1 is 109030001 to 109030003, variant 2 109030101 to 109030103,
-  and so on to variant 5, 109030401 to 109030403. Only variants 2 to 5 are
-  here; variant 1's portals are scripted (`rand_ola`).
+  and so on to variant 5, 109030401 to 109030403.
 - The first level is also where players wait. Its gate, `join00`, leads
   to the level's start (`start00`) in the same map.
 - Each level has a row of portals (`ch00` and on). On variants 2 to 5
   they are ordinary portals: some lead on to the next level's `start00`,
   some back to this level's start, and some nowhere. Two of the third
   level's lead to 109050000.
-- A GM's `/ola20` to `/ola52` open it: the first digit is the variant, and
+- On variant 1 the row's portals (5, 8 and 16 of them) all have the script
+  `rand_ola` and lead nowhere in Map.nx, so the server decides
+  (`net::scripts::rand_ola`): one portal on each level leads on to the next
+  level's `start00`, or to 109050000's from the third, and the rest back
+  to this level's `start00`. Which one is drawn for each player and level
+  from a number the client actor picks when they connect, so it stays the
+  same while they are online and differs between players. How v83 chose
+  is unknown; this is our rule (QUESTIONS b172 #5).
+- A GM's `/ola10` to `/ola52` open it: the first digit is the variant, and
   the second, whose meaning isn't known, is ignored (QUESTIONS b172).
 - The clock is 360 s for each variant, with the same 9 notices
   (`ola.notice.0` to `ola.notice.8`, placeholders), and those still inside
