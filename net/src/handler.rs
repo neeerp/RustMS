@@ -710,7 +710,7 @@ impl GmEvent {
     }
 }
 
-/// What a GM's `/snowball`, `/coconut`, `/ox`, `/fitness` or `/endevent`
+/// What a GM's `/snowball`, `/coconut`, `/ox`, `/fitness`, `/ola` or `/endevent`
 /// chat line asks of their channel's event: open it to players, or close it
 /// (report b170).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -743,6 +743,12 @@ impl GmEntry {
             "/ox" => 109_020_001,
             // Four words, one test (report b172).
             "/fitness1" | "/fitness2" | "/fitness3" | "/fitness4" => 109_040_000,
+            // The first digit is the variant (report b172); what the second
+            // means isn't known, so each opens the variant's first level.
+            "/ola20" | "/ola21" | "/ola22" => 109_030_101,
+            "/ola30" | "/ola31" | "/ola32" => 109_030_201,
+            "/ola40" | "/ola41" | "/ola42" => 109_030_301,
+            "/ola50" | "/ola51" | "/ola52" => 109_030_401,
             _ => return None,
         };
         let limit = match words.next() {

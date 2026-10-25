@@ -8,8 +8,9 @@ which the server kept. The RE is in v83ref `reports/b172-gm-events-rest.md`
 (how the client goes through the lobby's gate). The rules the client
 doesn't fix are listed under b172 in v83ref `lanes/QUESTIONS.md`.
 
-Status: the Physical Fitness Test runs. Ola Ola and Find the Jewel are
-the same kind of event and not done yet; neither are the prizes.
+Status: the Physical Fitness Test and Ola Ola's variants 2 to 5 run.
+Ola Ola's variant 1 and Find the Jewel are the same kind of event and not
+done yet; neither are the prizes.
 
 ## The Physical Fitness Test (`net::gm_event::FITNESS`)
 
@@ -30,6 +31,28 @@ the same kind of event and not done yet; neither are the prizes.
 - Dying puts a player out: like every event map, the test's maps return
   the dead to 109050001.
 
+## Ola Ola (`net::gm_event::OLA`)
+
+- Each variant has three levels, from FieldSets `Event1` to `Event5`:
+  variant 1 is 109030001 to 109030003, variant 2 109030101 to 109030103,
+  and so on to variant 5, 109030401 to 109030403. Only variants 2 to 5 are
+  here; variant 1's portals are scripted (`rand_ola`).
+- The first level is also where players wait. Its gate, `join00`, leads
+  to the level's start (`start00`) in the same map.
+- Each level has a row of portals (`ch00` and on). On variants 2 to 5
+  they are ordinary portals: some lead on to the next level's `start00`,
+  some back to this level's start, and some nowhere. Two of the third
+  level's lead to 109050000.
+- A GM's `/ola20` to `/ola52` open it: the first digit is the variant, and
+  the second, whose meaning isn't known, is ignored (QUESTIONS b172).
+- The clock is 360 s for each variant, with the same 9 notices
+  (`ola.notice.0` to `ola.notice.8`, placeholders), and those still inside
+  go out at 361 s.
+- The maps' field limit is 467711, one bit more than the Fitness Test's
+  (bit 0). The Event Assistants' help says Ola Ola allows no jumping,
+  teleporting or speed-ups; that bit 0 is the jump is a guess (report
+  b172), and the server checks none of it.
+
 ## The gate
 
 - v83 asks the server to go through a portal of type 4 or 5 even when it
@@ -46,7 +69,7 @@ the same kind of event and not done yet; neither are the prizes.
 
 ## The game (`runtime/src/actor/field_race.rs`)
 
-- A GM's `/start` or `/reset` on any of the test's maps goes to all five
+- A GM's `/start` or `/reset` on any of an event's maps goes to all of them
   (`ClientActor::run_gm_event`, `FieldMessage::RunTimedEvent`). Each map
   keeps the event as a `Race`, all from the same start, and each sends its
   own players the clock and notices.
@@ -56,7 +79,8 @@ the same kind of event and not done yet; neither are the prizes.
 - When the time is up, or on `/reset`, the clock is set to 0 (`CLOCK`
   kind 2), the gate closes, and every player still on the maps but GMs
   goes to 109050001. Those already on 109050000 stay there.
-- A player who isn't a GM and comes to one of the stages while the event
-  is off goes out as well. That catches anyone who crosses at the time up
-  into a stage whose time came a tick earlier.
+- A player who isn't a GM and comes to one of the maps past the first (the
+  Fitness Test's stages, Ola Ola's levels 2 and 3) while the event is off
+  goes out as well. That catches anyone who crosses at the time up into a
+  map whose time came a tick earlier.
 - The times are scaled by `RUSTMS_EVENT_SCALE` (`net::events::scaled`).

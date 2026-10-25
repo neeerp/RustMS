@@ -1348,6 +1348,15 @@ unsourced = [
     "fitness.notice.10",
     "fitness.notice.11",
     "fitness.notice.12",
+    "ola.notice.0",
+    "ola.notice.1",
+    "ola.notice.2",
+    "ola.notice.3",
+    "ola.notice.4",
+    "ola.notice.5",
+    "ola.notice.6",
+    "ola.notice.7",
+    "ola.notice.8",
 ]
 
 [text."glTutoMsg0.message"]

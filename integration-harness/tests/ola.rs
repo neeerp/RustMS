@@ -1,0 +1,150 @@
+//! Ola Ola's variant 2 (report b172): a GM's `/ola21` opens it, Paul takes
+//! players to its first level, and its gate (`join00`) stays closed until
+//! the GM's `/start`. Then a player goes through the gate and the right
+//! portal on each of the three levels to 109050000, and stays there when
+//! the time is up, while one who stayed on the first level goes out to
+//! 109050001. The harness runs events 60 times as fast
+//! (`RUSTMS_EVENT_SCALE`), so its 360 s are 6.
+
+use game_data::GameData;
+use integration_harness::connection::MapleTestConnection;
+use integration_harness::database::set_gm_level;
+use integration_harness::packets::{build_all_chat, build_change_map};
+use integration_harness::preconditions::load_harness_config_or_fail;
+use integration_harness::quests::answer;
+use integration_harness::trace::{barrier, send, step, until, warp, Trace};
+use integration_harness::{login_to_world_session, relogin};
+use net::packet::op::{RecvOpcode, SendOpcode};
+use packet::io::write::PktWrite;
+use packet::Packet;
+use std::path::Path;
+use tokio::time::Duration;
+
+const SOUTHPERRY: i32 = 60000;
+const PAUL: i32 = 9000000;
+const LEVEL_1: i32 = 109_030_101;
+const LEVEL_2: i32 = 109_030_102;
+const LEVEL_3: i32 = 109_030_103;
+const WON: i32 = 109_050_000;
+const EXIT: i32 = 109_050_001;
+/// Where the gate leads: the first level's start (`start00`).
+const START: u8 = 13;
+const NOTICE: u8 = 0;
+const CLOSED: (i16, u8) = (SendOpcode::BlockedMap as i16, 1);
+
+fn talk_to_paul() -> Packet {
+    let maps = GameData::load_from_nx_map(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
+    )
+    .unwrap();
+    let index = maps
+        .field(SOUTHPERRY)
+        .unwrap()
+        .map_npcs
+        .iter()
+        .position(|n| n.npc_id == PAUL)
+        .unwrap();
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
+    p.write_int(1_000_000_000 + index as i32).unwrap();
+    p
+}
+
+/// Through the gate, from where players wait.
+async fn gate(c: &mut MapleTestConnection, m: &str) -> Trace {
+    let mut t = Trace::default();
+    send(c, build_change_map(-1, "join00").unwrap()).await;
+    until(c, &mut t, |t| !t.blocked.is_empty() || !t.warps.is_empty()).await;
+    barrier(c, m, &mut t).await;
+    t
+}
+
+#[tokio::test]
+async fn the_gate_opens_at_the_start_and_the_right_portals_lead_out_of_the_third_level() {
+    let paul = talk_to_paul();
+    let config = load_harness_config_or_fail().await;
+    login_to_world_session(&config).await.expect("GM login");
+    let configs = [
+        load_harness_config_or_fail().await,
+        load_harness_config_or_fail().await,
+    ];
+    for config in &configs {
+        login_to_world_session(config).await.expect("player login");
+    }
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&config.username, 1).await.expect("make a GM");
+
+    let mut gm = relogin(&config).await;
+    let g = &mut gm.connection;
+    let mut gt = Trace::default();
+    send(g, build_all_chat("/ola21", 0).unwrap()).await;
+    barrier(g, "opened", &mut gt).await;
+
+    // Paul takes both to the first level, where they wait.
+    let mut players = Vec::new();
+    for config in &configs {
+        let mut session = relogin(config).await;
+        let (c, m) = (&mut session.connection, config.character_name.as_str());
+        let mut t = Trace::default();
+        assert_eq!(warp(c, SOUTHPERRY, "", &mut t).await, SOUTHPERRY);
+        barrier(c, m, &mut t).await;
+        let t = step(c, m, paul.clone()).await;
+        assert_eq!(t.prompts, [(PAUL, 4)], "his menu");
+        let t = step(c, m, answer(4, 1, Some(1))).await;
+        assert_eq!(t.warps, [LEVEL_1], "in");
+        assert!(t.countdowns.is_empty(), "no clock yet");
+        players.push((session, config.character_name.clone()));
+    }
+    let [(runner, rm), (stayer, _)] = &mut players[..] else {
+        unreachable!()
+    };
+
+    let t = gate(&mut runner.connection, rm).await;
+    assert_eq!(t.blocked, [CLOSED], "closed");
+    assert!(t.warps.is_empty());
+
+    // The GM starts it from the second level; it starts on all three.
+    assert_eq!(warp(g, LEVEL_2, "", &mut gt).await, LEVEL_2);
+    barrier(g, "on level 2", &mut gt).await;
+    send(g, build_all_chat("/start", 0).unwrap()).await;
+    let mut st = Trace::default();
+    until(&mut stayer.connection, &mut st, |t| {
+        !t.countdowns.is_empty()
+    })
+    .await;
+    assert_eq!(st.countdowns, [6], "the clock");
+
+    // Through the gate to the start, then the right portal on each level.
+    let mut rt = Trace::default();
+    until(&mut runner.connection, &mut rt, |t| {
+        !t.countdowns.is_empty()
+    })
+    .await;
+    let t = gate(&mut runner.connection, rm).await;
+    assert!(t.blocked.is_empty(), "open");
+    assert_eq!(t.warps, [LEVEL_1]);
+    assert_eq!(t.arrivals[0].1, START);
+    let mut rt = Trace::default();
+    let c = &mut runner.connection;
+    assert_eq!(warp(c, -1, "ch00", &mut rt).await, LEVEL_2);
+    assert_eq!(warp(c, -1, "ch01", &mut rt).await, LEVEL_3);
+    assert_eq!(warp(c, -1, "ch03", &mut rt).await, WON);
+
+    // The time is up: the stayer goes out with every notice heard, and the
+    // winner stays where they are.
+    until(&mut stayer.connection, &mut st, |t| !t.warps.is_empty()).await;
+    assert_eq!(st.warps, [EXIT], "out of level 1");
+    let notices = st.broadcasts.iter().filter(|(k, _)| *k == NOTICE).count();
+    assert_eq!(notices, 9, "every notice");
+    barrier(&mut runner.connection, rm, &mut rt).await;
+    assert_eq!(rt.warps, [LEVEL_2, LEVEL_3, WON], "the winner stays");
+
+    // The GM stays, and the gate is closed again.
+    barrier(g, "over", &mut gt).await;
+    assert_eq!(gt.warps, [LEVEL_2]);
+    assert_eq!(warp(g, LEVEL_1, "", &mut gt).await, LEVEL_1);
+    let t = gate(g, "closed again").await;
+    assert_eq!(t.blocked, [CLOSED]);
+    send(g, build_all_chat("/endevent", 0).unwrap()).await;
+    barrier(g, "closed", &mut gt).await;
+}

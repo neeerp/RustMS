@@ -1996,6 +1996,17 @@ pub mod keys {
         "fitness.notice.11",
         "fitness.notice.12",
     ];
+    pub const OLA_NOTICE: [&str; 9] = [
+        "ola.notice.0",
+        "ola.notice.1",
+        "ola.notice.2",
+        "ola.notice.3",
+        "ola.notice.4",
+        "ola.notice.5",
+        "ola.notice.6",
+        "ola.notice.7",
+        "ola.notice.8",
+    ];
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2863,6 +2874,7 @@ mod tests {
             .chain(&keys::MILK_TANGYOON)
             .chain(&keys::DOJO_TAUNT)
             .chain(&keys::FITNESS_NOTICE)
+            .chain(&keys::OLA_NOTICE)
             .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)
