@@ -23,3 +23,42 @@ pub fn spot(field: &FieldTemplate, team: u8, roll: usize) -> u8 {
     };
     id.and_then(|id| u8::try_from(id).ok()).unwrap_or(0)
 }
+
+/// The Snowball fields, each with its entrance map ("Event Map Entrance",
+/// fieldType 7) just after it.
+const SNOWBALL_FIELDS: [i32; 3] = [109_060_000, 109_060_002, 109_060_004];
+
+/// Where the Event Assistants take players to the event on `map_id`: a
+/// Snowball field's entrance, where they wait for the GM's `/start`.
+pub fn lobby(map_id: i32) -> Option<i32> {
+    SNOWBALL_FIELDS.contains(&map_id).then_some(map_id + 1)
+}
+
+/// The game field a GM's `/start` in the lobby `map_id` sends its players
+/// to.
+pub fn lobby_field(map_id: i32) -> Option<i32> {
+    SNOWBALL_FIELDS
+        .iter()
+        .copied()
+        .find(|&field| field + 1 == map_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_snowball_field_has_its_lobby_and_coconut_season_none() {
+        for (field, entrance) in [
+            (109_060_000, 109_060_001),
+            (109_060_002, 109_060_003),
+            (109_060_004, 109_060_005),
+        ] {
+            assert_eq!(lobby(field), Some(entrance));
+            assert_eq!(lobby_field(entrance), Some(field));
+        }
+        assert_eq!(lobby(109_080_000), None);
+        assert_eq!(lobby_field(109_060_000), None);
+        assert_eq!(lobby_field(109_080_001), None);
+    }
+}

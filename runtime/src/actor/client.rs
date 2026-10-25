@@ -499,6 +499,9 @@ impl ClientActor {
             }
             WorldAction::NaturalHeal { hp, mp } => self.natural_heal(hp, mp).await?,
             WorldAction::GmEntry(entry) => self.gm_entry(entry).await?,
+            WorldAction::Field(net::FieldRequest::GmEvent(event)) => {
+                self.run_gm_event(event).await?
+            }
             WorldAction::Field(request) => {
                 self.send_to_field(FieldMessage::FromClient {
                     from: self.client_id,
@@ -1790,6 +1793,9 @@ impl ClientActor {
                 map_id,
                 exit,
             } => self.door_warp(from_map, map_id, exit).await?,
+            ServerMessage::GoToGmEvent { from_map, map_id } => {
+                self.go_to_gm_event(from_map, map_id).await?
+            }
             ServerMessage::ShipWarp {
                 from_map,
                 map_id,

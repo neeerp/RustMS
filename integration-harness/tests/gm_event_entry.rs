@@ -1,8 +1,9 @@
 //! A GM's event on their channel (report b170): until a GM opens one an
 //! Event Assistant has nothing to take players to; a GM's `/snowball`
-//! opens one and tells the channel, and Paul then takes each player to
-//! their team's lane on the Snowball field, Story's `st00` and Maple's
-//! `st01`; past the GM's limit, or after `/endevent`, he takes no more.
+//! opens one and tells the channel, and Paul then takes players to the
+//! Snowball field's entrance, where the GM's `/start` sends each to their
+//! team's lane, Story's `st00` and Maple's `st01`; past the GM's limit,
+//! or after `/endevent`, he takes no more.
 
 use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
@@ -22,6 +23,7 @@ use tokio::time::Duration;
 const SOUTHPERRY: i32 = 60000;
 const PAUL: i32 = 9000000;
 const FIELD: i32 = 109_060_000;
+const LOBBY: i32 = 109_060_001;
 /// `st00` and `st01` on the Snowball fields.
 const LANES: [u8; 2] = [2, 3];
 const NOTICE: u8 = 0;
@@ -105,21 +107,45 @@ async fn paul_takes_players_to_their_lane_while_a_gms_event_is_open() {
     .await;
     barrier(g, "opened", &mut gt).await;
 
-    // The first goes to Story's lane, the second to Maple's, and the
-    // field puts each on the team whose lane they stand in.
+    // Both wait at the field's entrance until the GM's /start there,
+    // which sends one to Story's lane and the other to Maple's, each on
+    // the team whose lane they stand in. The GM stays.
     let mut ids = Vec::new();
-    for (i, (session, m)) in players.iter_mut().take(2).enumerate() {
+    for (session, m) in players.iter_mut().take(2) {
         let t = ask_paul(&mut session.connection, m).await;
-        assert_eq!(t.arrivals, [(FIELD, LANES[i], None)], "player {i}");
+        assert_eq!(t.arrivals, [(LOBBY, 0, None)]);
         ids.push(session.character_id);
     }
-    let (first, _) = &mut players[0];
-    until(&mut first.connection, &mut pt, |t| {
-        t.players.iter().any(|s| s.character_id == ids[1])
-    })
-    .await;
-    let seen = pt.players.iter().find(|s| s.character_id == ids[1]);
-    assert_eq!(seen.unwrap().team, 1, "Maple");
+    // What they saw of each other in the lobby is read and set aside.
+    for (session, m) in players.iter_mut().take(2) {
+        barrier(&mut session.connection, m, &mut Trace::default()).await;
+    }
+    assert_eq!(warp(g, LOBBY, "", &mut gt).await, LOBBY);
+    barrier(g, "in the lobby", &mut gt).await;
+    send(g, build_all_chat("/start", 0).unwrap()).await;
+    let mut traces = [Trace::default(), Trace::default()];
+    let mut lanes = Vec::new();
+    for ((session, _), t) in players.iter_mut().zip(&mut traces) {
+        until(&mut session.connection, t, |t| !t.arrivals.is_empty()).await;
+        let (map, lane, _) = t.arrivals[0];
+        assert_eq!(map, FIELD);
+        lanes.push(lane);
+    }
+    let mut sorted = lanes.clone();
+    sorted.sort();
+    assert_eq!(sorted, LANES, "one on each lane");
+    for (i, t) in traces.iter_mut().enumerate() {
+        let (other, lane) = (ids[1 - i], lanes[1 - i]);
+        until(&mut players[i].0.connection, t, |t| {
+            t.players.iter().any(|s| s.character_id == other)
+        })
+        .await;
+        let seen = t.players.iter().find(|s| s.character_id == other);
+        let team = LANES.iter().position(|&l| l == lane).unwrap() as u8;
+        assert_eq!(seen.unwrap().team, team, "player {i} sees the other's");
+    }
+    barrier(g, "started", &mut gt).await;
+    assert_eq!(gt.warps, [LOBBY], "the GM stays");
 
     // The third finds it full.
     let (third, m) = &mut players[2];
@@ -134,6 +160,11 @@ async fn paul_takes_players_to_their_lane_while_a_gms_event_is_open() {
     let t = ask_paul(&mut third.connection, m).await;
     assert!(t.warps.is_empty());
     assert_eq!(t.prompts, [(PAUL, 0)], "closed");
+
+    // Call the game off for the field's other tests.
+    assert_eq!(warp(g, FIELD, "", &mut gt).await, FIELD);
+    send(g, build_all_chat("/reset", 0).unwrap()).await;
+    barrier(g, "reset", &mut gt).await;
 }
 
 const COCONUT: i32 = 109_080_000;

@@ -724,6 +724,16 @@ impl FieldActor {
                 };
                 let _ = reply.send(team);
             }
+            FieldMessage::SendToGmEvent { from, map_id } => {
+                for (&client_id, occupant) in &self.occupants {
+                    if client_id != from {
+                        occupant.handle.send(ServerMessage::GoToGmEvent {
+                            from_map: self.key.map_id,
+                            map_id,
+                        });
+                    }
+                }
+            }
             FieldMessage::MobCount { reply } => {
                 let _ = reply.send(self.mobs.live().count());
             }

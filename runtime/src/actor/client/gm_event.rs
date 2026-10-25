@@ -6,10 +6,11 @@ use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage};
 use game::character::EVENT_RETURN;
 use game_data::server_content::keys;
+use net::conti::Portal;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::scripts::Effect;
-use net::GmEntry;
+use net::{FieldRequest, GmEntry, GmEvent};
 use rand::Rng;
 use tokio::sync::oneshot;
 
@@ -56,7 +57,8 @@ impl ClientActor {
     }
 
     /// The player takes a place at the channel's event (`npc_id` sent
-    /// them), keeps a team on its field, and goes to the team's spot.
+    /// them) and goes to its lobby, or keeps a team on its field and goes
+    /// to the team's spot.
     pub(super) async fn join_gm_event(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
         let (reply, place) = oneshot::channel();
         self.send_to_directory(DirectoryMessage::JoinGmEvent {
@@ -67,6 +69,61 @@ impl ClientActor {
         let Some(map_id) = place.await.ok().flatten() else {
             return Box::pin(self.start_script(NpcScript::event_assistant_refused(npc_id))).await;
         };
+        let from = self.in_game()?.player.stats.map_id;
+        let (to, spot) = match net::gm_event::lobby(map_id) {
+            Some(lobby) => (lobby, 0),
+            None => (map_id, self.team_spot(map_id).await?),
+        };
+        Box::pin(self.apply_effects(&[
+            Effect::SaveLocation(EVENT_RETURN, Some(from)),
+            Effect::WarpToPortal(to, spot),
+        ]))
+        .await?;
+        Ok(())
+    }
+
+    /// A GM's `/start` or `/reset`. In a Snowball lobby, `/start` starts the
+    /// game on its field, if it isn't on yet, and sends everyone else
+    /// there; again later, it sends whoever came since.
+    pub(super) async fn run_gm_event(&mut self, event: GmEvent) -> Result<(), RuntimeError> {
+        let from = self.client_id;
+        let lobby = self.in_game()?.player.stats.map_id;
+        let field = net::gm_event::lobby_field(lobby).filter(|_| event == GmEvent::Start);
+        let Some(map_id) = field else {
+            let request = FieldRequest::GmEvent(event);
+            return self
+                .send_to_field(FieldMessage::FromClient { from, request })
+                .await;
+        };
+        let request = FieldRequest::GmEvent(GmEvent::Start);
+        self.services
+            .fields
+            .field(self.field_key(map_id))
+            .tx
+            .send(FieldMessage::FromClient { from, request })
+            .await
+            .map_err(|_| RuntimeError::ChannelSend)?;
+        self.send_to_field(FieldMessage::SendToGmEvent { from, map_id })
+            .await
+    }
+
+    /// The GM's `/start` in the lobby `from_map` sends the player on to
+    /// their team's spot on the game field `map_id`.
+    pub(super) async fn go_to_gm_event(
+        &mut self,
+        from_map: i32,
+        map_id: i32,
+    ) -> Result<(), RuntimeError> {
+        let here = self.game.as_ref().map(|game| game.player.stats.map_id);
+        if self.in_cash_shop || here != Some(from_map) {
+            return Ok(());
+        }
+        let spot = self.team_spot(map_id).await?;
+        self.ship_warp(from_map, map_id, Portal::Id(spot)).await
+    }
+
+    /// A team kept for the player on the game field `map_id`, and its spot.
+    async fn team_spot(&mut self, map_id: i32) -> Result<u8, RuntimeError> {
         let (reply, team) = oneshot::channel();
         let field = self.services.fields.field(self.field_key(map_id));
         field
@@ -78,16 +135,9 @@ impl ClientActor {
             .await
             .map_err(|_| RuntimeError::ChannelSend)?;
         let team = team.await.ok().flatten().unwrap_or(0);
-        let spot = match net::get_game_data()?.field(map_id) {
+        Ok(match net::get_game_data()?.field(map_id) {
             Some(field) => net::gm_event::spot(field, team, rand::thread_rng().gen()),
             None => 0,
-        };
-        let from = self.in_game()?.player.stats.map_id;
-        Box::pin(self.apply_effects(&[
-            Effect::SaveLocation(EVENT_RETURN, Some(from)),
-            Effect::WarpToPortal(map_id, spot),
-        ]))
-        .await?;
-        Ok(())
+        })
     }
 }
