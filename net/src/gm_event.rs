@@ -100,9 +100,43 @@ pub const FITNESS: TimedEvent = TimedEvent {
     ],
 };
 
+/// Ola Ola's notices, the same in each of its FieldSets.
+const OLA_NOTICES: &[(Duration, &str)] = &[
+    (secs(1), keys::OLA_NOTICE[0]),
+    (secs(30), keys::OLA_NOTICE[1]),
+    (secs(60), keys::OLA_NOTICE[2]),
+    (secs(90), keys::OLA_NOTICE[3]),
+    (secs(120), keys::OLA_NOTICE[4]),
+    (secs(180), keys::OLA_NOTICE[5]),
+    (secs(240), keys::OLA_NOTICE[6]),
+    (secs(300), keys::OLA_NOTICE[7]),
+    (secs(350), keys::OLA_NOTICE[8]),
+];
+
+const fn ola(maps: &'static [i32]) -> TimedEvent {
+    TimedEvent {
+        maps,
+        length: secs(360),
+        notices: OLA_NOTICES,
+    }
+}
+
+/// Ola Ola's variants 2 to 5 (FieldSets `Event2` to `Event5`): three
+/// levels each, the first also where players wait, on to 109050000 in
+/// 360 s. Variant 1 (109030001-003) has scripted portals and isn't here
+/// yet.
+pub const OLA: [TimedEvent; 4] = [
+    ola(&[109_030_101, 109_030_102, 109_030_103]),
+    ola(&[109_030_201, 109_030_202, 109_030_203]),
+    ola(&[109_030_301, 109_030_302, 109_030_303]),
+    ola(&[109_030_401, 109_030_402, 109_030_403]),
+];
+
 /// The timed event `map_id` is one of the maps of.
 pub fn timed_event(map_id: i32) -> Option<&'static TimedEvent> {
-    FITNESS.maps.contains(&map_id).then_some(&FITNESS)
+    std::iter::once(&FITNESS)
+        .chain(&OLA)
+        .find(|event| event.maps.contains(&map_id))
 }
 
 /// The portal of a timed event's lobby that stays closed until the GM
@@ -161,5 +195,23 @@ mod tests {
         assert_eq!(FITNESS.end(), Duration::from_secs(901));
         assert!(FITNESS.notices.windows(2).all(|w| w[0].0 < w[1].0));
         assert!(FITNESS.notices.iter().all(|(at, _)| *at < FITNESS.length));
+    }
+
+    #[test]
+    fn each_ola_variant_runs_on_its_three_levels_and_its_gate_is_on_the_first() {
+        for first in [109_030_101, 109_030_201, 109_030_301, 109_030_401] {
+            for level in first..first + 3 {
+                let event = timed_event(level).unwrap();
+                assert_eq!(event.maps, [first, first + 1, first + 2]);
+                assert_eq!(event.length, Duration::from_secs(360));
+            }
+            assert!(is_gate(first, "join00"));
+            assert!(!is_gate(first + 1, "join00"));
+        }
+        // Variant 1's scripted portals aren't done.
+        assert!(timed_event(109_030_001).is_none());
+        assert_eq!(OLA[0].end(), Duration::from_secs(361));
+        assert!(OLA_NOTICES.windows(2).all(|w| w[0].0 < w[1].0));
+        assert!(OLA_NOTICES.iter().all(|(at, _)| *at < OLA[0].length));
     }
 }

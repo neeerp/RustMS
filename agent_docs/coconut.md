@@ -58,7 +58,8 @@ no event they do nothing.
 ## Opening an event to players
 
 The v83 client has the words `/coconut1` to `/coconut3`, `/snowball`,
-`/snowball1` to `/snowball3`, `/ox` and `/fitness1` to `/fitness4` too
+`/snowball1` to `/snowball3`, `/ox`, `/fitness1` to `/fitness4` and
+`/ola10` to `/ola52` too
 (reports b170, b171, b172), and RustMS
 gives them these meanings; `/coconut` and `/endevent` are our own. A GM
 types them on any map, and
@@ -70,7 +71,10 @@ they go to the client actor as `WorldAction::GmEntry` (`net::GmEntry`):
   109060000, 109060000, 109060002 and 109060004; `/ox` opens the OX
   Quiz on 109020001 (`agent_docs/ox-quiz.md`); `/fitness1` to `/fitness4`
   all open the Physical Fitness Test, whose lobby is 109040000
-  (`agent_docs/timed-events.md`). A number after the word
+  (`agent_docs/timed-events.md`); `/ola20` to `/ola22` open Ola Ola's
+  variant 2 on 109030101, and so on to `/ola50` to `/ola52` for variant 5
+  on 109030401. `/ola10` to `/ola12` (variant 1) open nothing yet. A
+  number after the word
   is the most players it takes, 50 if none is given. The directory keeps
   one open event per channel (`DirectoryMessage::OpenGmEvent`), in place
   of any open there, and the channel is told (`gm_event.opened`).
