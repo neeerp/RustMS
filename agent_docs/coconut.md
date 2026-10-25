@@ -114,6 +114,11 @@ was saved, and forget it (`gm_event_exit` in `net/src/npc_scripts.rs`):
 
 - Pietro (9000002) in 109050000, where the winners go, and Pietra
   (9000010) in 109050001, where the others go: a line, then the warp.
+  Pietro also gives each winner a Scroll of Secrets (4031019) with the
+  warp. If it doesn't fit, he says so (`gm_event.pietro_full`) and keeps
+  them there. Every event whose winners go to 109050000 gives this one
+  prize: Coconut Season, Snowball, the OX Quiz, the Fitness Test and Ola
+  Ola (report b172).
 - Harry (9000012) on the Coconut Season fields, during the game: a yes or
   no to leaving. Yes also gives the player's place back
   (`Effect::LeaveGmEvent`, then `DirectoryMessage::LeaveGmEvent`), if

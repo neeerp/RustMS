@@ -1976,6 +1976,7 @@ pub mod keys {
     pub const GM_EVENT_GO: &str = "gm_event.go";
     pub const GM_EVENT_NOT_OPEN: &str = "gm_event.not_open";
     pub const GM_EVENT_PIETRO: &str = "gm_event.pietro";
+    pub const GM_EVENT_PIETRO_FULL: &str = "gm_event.pietro_full";
     pub const GM_EVENT_PIETRA: &str = "gm_event.pietra";
     pub const GM_EVENT_HARRY_ASK: &str = "gm_event.harry_ask";
     pub const OX_WRONG: &str = "ox.wrong";
@@ -3152,6 +3153,7 @@ mod tests {
                 keys::GM_EVENT_GO,
                 keys::GM_EVENT_NOT_OPEN,
                 keys::GM_EVENT_PIETRO,
+                keys::GM_EVENT_PIETRO_FULL,
                 keys::GM_EVENT_PIETRA,
                 keys::GM_EVENT_HARRY_ASK,
                 keys::OX_WRONG,

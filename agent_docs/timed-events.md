@@ -10,7 +10,8 @@ doesn't fix are listed under b172 in v83ref `lanes/QUESTIONS.md`.
 
 Status: the Physical Fitness Test and Ola Ola's variants 2 to 5 run.
 Ola Ola's variant 1 and Find the Jewel are the same kind of event and not
-done yet; neither are the prizes.
+done yet. Those who reach 109050000 get Pietro's prize there
+(`agent_docs/coconut.md`, "Opening an event to players").
 
 ## The Physical Fitness Test (`net::gm_event::FITNESS`)
 
