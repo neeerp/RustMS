@@ -88,6 +88,8 @@ impl ClientActor {
             EventKind::DojoTrial | EventKind::DojoParty => return Ok(()),
             // Duarte asks after every run at once (`talk_to_duarte`).
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
+            // Duarte takes the gem, or sends the player in from the Shades.
+            EventKind::PyramidTomb(_) => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -725,14 +727,13 @@ impl ClientActor {
     /// taken alone, needs none) or the lobby, or are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
         let event = ticket.kind.event();
-        let lobby = event.lobby;
         let waiting = (self.party_id.is_some() || event.squad || event.solo())
             && !self.in_cash_shop
             && self.event.is_none()
             && self
                 .game
                 .as_ref()
-                .is_some_and(|game| game.player.stats.map_id == lobby);
+                .is_some_and(|game| event.starts_on(game.player.stats.map_id));
         if !waiting {
             // Dropping the ticket hands it back.
             return Ok(());
@@ -842,9 +843,13 @@ impl ClientActor {
         exit: i32,
         rank: u8,
         exp: i32,
+        cleared: bool,
     ) -> Result<(), RuntimeError> {
         if self.in_cash_shop || self.in_game()?.player.stats.map_id != exit {
             return Ok(());
+        }
+        if cleared {
+            self.in_game_mut()?.player.pyramid_gem = Some(exit - events::PYRAMID_RESULT);
         }
         let mut packets = vec![build_pyramid_score(rank, exp)?];
         if exp > 0 {
@@ -939,6 +944,17 @@ impl ClientActor {
     /// over or stops it, they tell it. One that stops it takes the clock
     /// down at once, so it doesn't show there before the event answers.
     pub(super) async fn leaving_for(&mut self, map_id: i32) -> Result<(), RuntimeError> {
+        // The Shades' gem is offered only on the way from the result map
+        // to its room there. The field is the one being left: a warp may
+        // have moved the player's map id already.
+        let game = self.in_game_mut()?;
+        let from = game.field.key.map_id;
+        let player = &mut game.player;
+        if let Some(mode) = player.pyramid_gem {
+            if !(from == events::PYRAMID_RESULT + mode && map_id == events::PYRAMID_SHADES + mode) {
+                player.pyramid_gem = None;
+            }
+        }
         let clock = events::clock_on(map_id);
         match &mut self.event {
             Some(ticket) if !ticket.holds(map_id) => self.drop_event_ticket().await?,

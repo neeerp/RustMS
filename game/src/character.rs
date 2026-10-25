@@ -287,6 +287,11 @@ pub struct Player {
     /// The uses of Rage of Pharaoh the player's Nett's Pyramid run has
     /// left, as the run last told; not saved.
     pub pyramid_rage: i32,
+    /// The mode (0 to 3) of the Nett's Pyramid run the player just went
+    /// all the way through, whose gem for Pharaoh Yeti's Tomb Duarte offers
+    /// in its room in the Shades; kept from its result map to that room,
+    /// and gone on any other way out of either. Not saved.
+    pub pyramid_gem: Option<i32>,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -356,6 +361,7 @@ impl Player {
             dojo: DojoRecord::default(),
             dojo_energy: 0,
             pyramid_rage: 0,
+            pyramid_gem: None,
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,

@@ -7026,7 +7026,8 @@ fn guon(entry: Entry) -> NpcScript {
 /// lobby: anyone may hear about the Pyramid and the treasures in Pharaoh
 /// Yeti's Tomb, and a player of level 40 or more may go in alone or as the
 /// leader of a party, in a mode of their choice, Hell's alone above level
-/// 60. Cosmic's Find a Party, the Tomb and the medal are left out for now.
+/// 60, or into the Tomb with a gem, or have the medal. Cosmic's Find a
+/// Party is left out.
 fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
     let level = player.stats.level;
     let run = |kind: EventKind| {
@@ -7087,6 +7088,7 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
                     ],
                 ),
                 (text(keys::PYRAMID_DUARTE_ENTER), vec![enter]),
+                (text(keys::PYRAMID_DUARTE_TOMB), vec![duarte_tomb(player)]),
                 (
                     text(keys::PYRAMID_DUARTE_TREASURES),
                     vec![Page::Say(text(keys::PYRAMID_DUARTE_TREASURES_INFO))],
@@ -7098,6 +7100,35 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
     // Someone left or moved since Duarte checked, or the last room went.
     script.refused = Some(text(keys::PYRAMID_DUARTE_REFUSED));
     script
+}
+
+/// Duarte's way into Pharaoh Yeti's Tomb (Cosmic's menu item 3, unfinished
+/// there): the player picks a mode's gem, which he takes for a room of that
+/// mode's Tomb, from level 40.
+fn duarte_tomb(player: &Player) -> Page {
+    let choices = PyramidMode::ALL
+        .iter()
+        .map(|&mode| {
+            let gem = events::PYRAMID_GEM + mode.index();
+            let kind = EventKind::PyramidTomb(mode);
+            let page = if player.stats.level < *events::PYRAMID_LEVELS.start() {
+                Page::Say(event_terms(kind.event(), keys::PYRAMID_DUARTE_LOW_LEVEL))
+            } else if player.inventory.count(gem) == 0 {
+                Page::Say(text(keys::PYRAMID_DUARTE_TOMB_NO_GEM))
+            } else {
+                let take = Effect::TakeItem {
+                    item_id: gem,
+                    quantity: 1,
+                };
+                Page::Done(vec![take, Effect::StartEvent(kind)])
+            };
+            (format!("#i{gem}# #t{gem}#"), vec![page])
+        })
+        .collect();
+    Page::Menu {
+        text: text(keys::PYRAMID_DUARTE_TOMB_GEM),
+        choices,
+    }
 }
 
 /// Duarte's Protector of Pharaoh medal, for 50,000 kills in the Pyramid
@@ -7148,7 +7179,8 @@ fn duarte_forfeit() -> NpcScript {
 
 /// Duarte after a run: on a result map he sends the player on to the
 /// mode's room in the Shades, and there back to the lobby (Cosmic
-/// `2103013`, whose gem for the Tomb is still to come). None elsewhere.
+/// `2103013`). There, after a run through all five stages, he offers the
+/// mode's Tomb now or its gem for later. None elsewhere.
 fn duarte_after(player: &Player) -> Option<NpcScript> {
     let map_id = player.stats.map_id;
     let mode = |first: i32| {
@@ -7162,7 +7194,10 @@ fn duarte_after(player: &Player) -> Option<NpcScript> {
             keys::PYRAMID_DUARTE_RESULT_ASK,
             events::PYRAMID_SHADES + mode,
         )
-    } else if mode(events::PYRAMID_SHADES).is_some() {
+    } else if let Some(mode) = mode(events::PYRAMID_SHADES) {
+        if player.pyramid_gem == Some(mode) {
+            return Some(duarte_shades(player, mode));
+        }
         (keys::PYRAMID_DUARTE_SHADES_ASK, events::PYRAMID_LOBBY)
     } else {
         return None;
@@ -7175,6 +7210,44 @@ fn duarte_after(player: &Player) -> Option<NpcScript> {
             on_no: None,
         }],
     ))
+}
+
+/// Duarte in mode `mode`'s room in the Shades, after a run through all its
+/// stages: into a room of its Tomb at once, or its gem, which needs a free
+/// Etc slot, and back to the lobby.
+fn duarte_shades(player: &Player, mode: i32) -> NpcScript {
+    let gem = events::PYRAMID_GEM + mode;
+    let kind = EventKind::PyramidTomb(PyramidMode::ALL[mode as usize]);
+    let later = if player.inventory.free(InventoryType::Etc) == 0 {
+        Page::Say(text(keys::PYRAMID_DUARTE_SHADES_NO_ROOM))
+    } else {
+        Page::Act {
+            text: text(keys::PYRAMID_DUARTE_SHADES_GEM),
+            effects: vec![
+                Effect::GiveItem {
+                    item_id: gem,
+                    quantity: 1,
+                },
+                Effect::Warp(events::PYRAMID_LOBBY),
+            ],
+        }
+    };
+    let mut script = NpcScript::new(
+        DUARTE,
+        vec![Page::Menu {
+            text: text(keys::PYRAMID_DUARTE_SHADES_PASSED),
+            choices: vec![
+                (
+                    text(keys::PYRAMID_DUARTE_SHADES_NOW),
+                    vec![Page::Done(vec![Effect::StartEvent(kind)])],
+                ),
+                (text(keys::PYRAMID_DUARTE_SHADES_LATER), vec![later]),
+            ],
+        }],
+    );
+    // Every room of the mode's Tomb is taken.
+    script.refused = Some(text(keys::PYRAMID_DUARTE_TOMB_FULL));
+    script
 }
 
 /// So Gong (Cosmic `2091005`) in the Dojo's hall: a challenger of level 25
@@ -13939,6 +14012,76 @@ mod tests {
     }
 
     #[test]
+    fn duarte_gives_a_gem_for_pharaoh_yetis_tomb_and_takes_it_back() {
+        let hard = EventKind::PyramidTomb(PyramidMode::Hard);
+        let sapphire = events::PYRAMID_GEM;
+        let topaz = events::PYRAMID_GEM + 3;
+        // In the lobby: the gem chosen, if held, for a room of its mode.
+        let tomb = |player: &Player, gem: i32| {
+            let mut duarte = NpcScript::duarte(&[], player);
+            duarte.begin();
+            duarte.respond(ScriptInput::Select(2)).unwrap();
+            duarte.respond(ScriptInput::Select(gem - sapphire)).unwrap()
+        };
+        let mut player = player(50);
+        player.stats.level = 45;
+        player.stats.map_id = events::PYRAMID_LOBBY;
+        assert_eq!(
+            page_text(&tomb(&player, topaz)),
+            text(keys::PYRAMID_DUARTE_TOMB_NO_GEM)
+        );
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(topaz, 2));
+        let take = Effect::TakeItem {
+            item_id: topaz,
+            quantity: 1,
+        };
+        let hell = Effect::StartEvent(EventKind::PyramidTomb(PyramidMode::Hell));
+        assert_eq!(tomb(&player, topaz).effects, [take, hell]);
+        let mut low = player.clone();
+        low.stats.level = 39;
+        let terms = event_terms(hard.event(), keys::PYRAMID_DUARTE_LOW_LEVEL);
+        assert_eq!(page_text(&tomb(&low, topaz)), terms);
+
+        // In Hard's room of the Shades after a run through it: the Tomb at
+        // once, or its gem and the lobby.
+        player.stats.map_id = events::PYRAMID_SHADES + 2;
+        player.pyramid_gem = Some(2);
+        let shades = |player: &Player, choice: i32| {
+            let mut duarte = NpcScript::for_npc(DUARTE, player).unwrap();
+            duarte.begin();
+            (duarte.respond(ScriptInput::Select(choice)).unwrap(), duarte)
+        };
+        let (now, mut script) = shades(&player, 0);
+        assert_eq!(now.effects, [Effect::StartEvent(hard)]);
+        let refused = script.refused().unwrap();
+        assert_eq!(page_text(&refused), text(keys::PYRAMID_DUARTE_TOMB_FULL));
+        let (later, _) = shades(&player, 1);
+        assert_eq!(page_text(&later), text(keys::PYRAMID_DUARTE_SHADES_GEM));
+        let gem = Effect::GiveItem {
+            item_id: sapphire + 2,
+            quantity: 1,
+        };
+        assert_eq!(later.effects, [gem, Effect::Warp(events::PYRAMID_LOBBY)]);
+        let mut full = player.clone();
+        let room = full.inventory.free(InventoryType::Etc);
+        for slot in 1..=(room as i16 + 1) {
+            full.inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(4_000_000, 1));
+        }
+        let (later, _) = shades(&full, 1);
+        assert_eq!(page_text(&later), text(keys::PYRAMID_DUARTE_SHADES_NO_ROOM));
+        // Another mode's run, or none, gives nothing here.
+        player.pyramid_gem = Some(1);
+        let mut back = NpcScript::for_npc(DUARTE, &player).unwrap();
+        assert_eq!(
+            question(&back.begin()),
+            text(keys::PYRAMID_DUARTE_SHADES_ASK)
+        );
+    }
+
+    #[test]
     fn duarte_gives_the_protector_of_pharaoh_medal_for_50000_pyramid_kills() {
         use crate::pyramid::{PROTECTOR_KILLS, PROTECTOR_MEDAL, PROTECTOR_QUEST};
         let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
@@ -13948,7 +14091,7 @@ mod tests {
                 .collect();
             let mut duarte = NpcScript::duarte(&entries, player);
             duarte.begin();
-            duarte.respond(ScriptInput::Select(3)).unwrap()
+            duarte.respond(ScriptInput::Select(4)).unwrap()
         };
         let mut hunter = player(50);
         hunter.stats.map_id = events::PYRAMID_LOBBY;

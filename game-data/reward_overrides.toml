@@ -234,3 +234,14 @@ add = [{ item = 4001163, prob = 1.0 }]
 # 3008000, item event). The pack has none; three in five, as on the community
 # servers (Cosmic's drop data).
 add = [{ item = 4001164, prob = 0.6 }]
+
+[mobs.9700019]
+# Pharaoh Jr. Yeti, alone in Pharaoh Yeti's Tomb (926010010-69): Duarte
+# (2103013) says beating him wins Pharaoh's Treasure Chest 2022613, a reward
+# box (Item.nx Consume/0202.img). No source drops it; one, always.
+replace = [{ item = 2022613, prob = 1.0 }]
+
+[mobs.9700029]
+# Hell's Pharaoh Jr. Yeti (926010070-89, info/link 9700019): the Hell chest
+# 2022618, the one with The Immortal Pharaoh Belt.
+replace = [{ item = 2022618, prob = 1.0 }]

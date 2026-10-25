@@ -1924,6 +1924,15 @@ pub mod keys {
     pub const PYRAMID_DUARTE_MEDAL_MORE: &str = "pyramid.duarte.medal_more";
     pub const PYRAMID_DUARTE_MEDAL_ROOM: &str = "pyramid.duarte.medal_room";
     pub const PYRAMID_DUARTE_MEDAL_GIVEN: &str = "pyramid.duarte.medal_given";
+    pub const PYRAMID_DUARTE_TOMB: &str = "pyramid.duarte.tomb";
+    pub const PYRAMID_DUARTE_TOMB_GEM: &str = "pyramid.duarte.tomb_gem";
+    pub const PYRAMID_DUARTE_TOMB_NO_GEM: &str = "pyramid.duarte.tomb_no_gem";
+    pub const PYRAMID_DUARTE_TOMB_FULL: &str = "pyramid.duarte.tomb_full";
+    pub const PYRAMID_DUARTE_SHADES_PASSED: &str = "pyramid.duarte.shades_passed";
+    pub const PYRAMID_DUARTE_SHADES_NOW: &str = "pyramid.duarte.shades_now";
+    pub const PYRAMID_DUARTE_SHADES_LATER: &str = "pyramid.duarte.shades_later";
+    pub const PYRAMID_DUARTE_SHADES_GEM: &str = "pyramid.duarte.shades_gem";
+    pub const PYRAMID_DUARTE_SHADES_NO_ROOM: &str = "pyramid.duarte.shades_no_room";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3015,6 +3024,15 @@ mod tests {
                 keys::PYRAMID_DUARTE_MEDAL_MORE,
                 keys::PYRAMID_DUARTE_MEDAL_ROOM,
                 keys::PYRAMID_DUARTE_MEDAL_GIVEN,
+                keys::PYRAMID_DUARTE_TOMB,
+                keys::PYRAMID_DUARTE_TOMB_GEM,
+                keys::PYRAMID_DUARTE_TOMB_NO_GEM,
+                keys::PYRAMID_DUARTE_TOMB_FULL,
+                keys::PYRAMID_DUARTE_SHADES_PASSED,
+                keys::PYRAMID_DUARTE_SHADES_NOW,
+                keys::PYRAMID_DUARTE_SHADES_LATER,
+                keys::PYRAMID_DUARTE_SHADES_GEM,
+                keys::PYRAMID_DUARTE_SHADES_NO_ROOM,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

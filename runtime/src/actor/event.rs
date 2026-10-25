@@ -569,8 +569,15 @@ impl EventActor {
         }
         // After `EventEnded`, which takes them to the result map.
         for member in self.team.members() {
-            if let (Some(handle), Some((exit, rank, exp))) = (self.members.get(member), score) {
-                handle.send(ServerMessage::PyramidScore { exit, rank, exp });
+            if let (Some(handle), Some((exit, rank, exp, cleared))) =
+                (self.members.get(member), score)
+            {
+                handle.send(ServerMessage::PyramidScore {
+                    exit,
+                    rank,
+                    exp,
+                    cleared,
+                });
             }
         }
         // Give them time to get out before the copy closes.
@@ -1067,12 +1074,12 @@ impl EventActor {
     /// gauge, for its members on its result map (Cosmic `sendScore`,
     /// computed once for the run).
     /// Its result map, rank and EXP.
-    fn pyramid_score(&self) -> Option<(i32, u8, i32)> {
+    fn pyramid_score(&self) -> Option<(i32, u8, i32, bool)> {
         let finished = self.pyramid_end?;
         let mode = self.kind.pyramid_mode()?;
         let (rank, exp) = net::pyramid::score(&self.tally, mode.index(), finished);
         info!(kind = ?self.kind, id = self.id, rank, exp, "Pyramid score");
-        Some((self.kind.event().exit, rank, exp))
+        Some((self.kind.event().exit, rank, exp, finished))
     }
 
     /// The mobs that aren't friendly on the copy of `map_id` go, and no

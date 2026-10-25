@@ -375,11 +375,13 @@ pub enum ServerMessage {
         left: i32,
     },
     /// A Nett's Pyramid run ended with `rank` and `exp`: the player gets
-    /// them if they reached its result map, `exit`.
+    /// them if they reached its result map, `exit`, and if it went through
+    /// all five stages (`cleared`), the offer of its gem in the Shades.
     PyramidScore {
         exit: i32,
         rank: u8,
         exp: i32,
+        cleared: bool,
     },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.

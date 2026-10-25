@@ -8,8 +8,8 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 
 Status: the map and mob data, the packet builders, the run's entry, stages
 and clocks, its tally and gauge, its blessings and uses of Rage of Pharaoh,
-its score, and Duarte's medal are in. The Shades' gems and the Tomb are
-still to come.
+its score, Duarte's medal, the Shades' gems and Pharaoh Yeti's Tomb are
+in.
 
 ## Maps
 
@@ -36,14 +36,13 @@ is unused. Five runs alone and ten with a party may go at once in each
 mode on a channel, as many as the maps have copies.
 
 - Duarte (2103013) in the lobby (`NpcScript::duarte`, after Cosmic's
-  commented-out `2103013.js`): About (three pages), Enter, and the
-  treasures. Enter asks alone or with a party, then the mode by its icon
+  commented-out `2103013.js`): About (three pages), Enter, the Tomb (below),
+  the treasures and the medal. Enter asks alone or with a party, then the mode by its icon
   (3994115 to 3994118). Under level 40 he turns the player away; above 60
   only Hell is open. A party run needs its leader and one or more others,
   all at the mode's levels, in the lobby; the others stay behind. He asks
   the directory about all eight runs before he speaks
-  (`ClientActor::talk_to_duarte`). The fourth choice is the medal (below).
-  Cosmic's Find a Party and the Tomb are not offered yet.
+  (`ClientActor::talk_to_duarte`). Cosmic's Find a Party is not offered.
 - The first stage lasts 2 minutes (the event's `minutes`), the others 3
   (`PYRAMID_STAGE_TIME`; Cosmic `Pyramid.timer`). When a stage's clock
   runs out the event actor moves everyone on to the next one, with the new
@@ -136,11 +135,38 @@ mode on a channel, as many as the maps have copies.
   (`ClientActor::count_protector_kills`, before the run hears of it), saved
   with the player and sent as a quest record. Misses don't count, and the
   count goes on after 50000.
-- Duarte's fourth choice gives the medal, 1142142
+- Duarte's fifth choice gives the medal, 1142142
   (`npc_scripts::duarte_medal`): not to a player who holds or wears it, nor
   under 50000 (he says how many are left), nor with a full Equip bag.
   Giving it ends 29932 too for a player on it. The words are placeholders
   (`pyramid.duarte.medal*`).
+
+## The Shades' gems and Pharaoh Yeti's Tomb (`EventKind::PyramidTomb`)
+
+The defaults chosen here, where Cosmic has nothing, are in lanes/QUESTIONS.md
+b161.
+
+- A run whose fifth stage's clock ran out, rather than its gauge, marks
+  each player it took to the result map (`PyramidScore.cleared`, kept in
+  `Player::pyramid_gem` as the mode, not saved). The mark lasts from the
+  result map to the mode's room in the Shades; any other move clears it
+  (`ClientActor::leaving_for`).
+- Duarte in the Shades, to a marked player (`npc_scripts::duarte_shades`):
+  the mode's Tomb now, or its gem, 4001322 + mode, and back to the lobby.
+  The gem needs a free Etc slot. To anyone else he only offers the lobby.
+- Duarte's Tomb choice in the lobby (`duarte_tomb`) lists the four gems.
+  From level 40 he takes the one picked and sends the player in.
+- The Tomb's rooms are 926010010 + 20·mode, one map each, played alone in
+  the event's own instance. Up to 20 may go at once in each mode on a
+  channel. Its event kind has no clock and lasts until the player leaves;
+  it starts on the lobby or the mode's room in the Shades (`Event.entrances`,
+  `Event::starts_on`).
+- Each room opens with one Pharaoh Jr. Yeti at (0, 0) (`opening_mobs`): 9700019,
+  or 9700029 on Hell. Both have 1 HP. 9700019 always drops Pharaoh's
+  Treasure Chest 2022613 and 9700029 drops 2022618
+  (`reward_overrides.toml`).
+- The room's `out00` portal goes back to the lobby, which ends the event.
+- The words are placeholders (`pyramid.duarte.tomb*`, `shades_*`).
 
 ## Stage rules (`FieldTemplate::massacre`)
 
