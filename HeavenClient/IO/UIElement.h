@@ -146,7 +146,7 @@ namespace ms
 			TIMEDQUESTS,
 			CLAIMNOTICE,
 			CLAIM,
-			DOJOENERGY,
+			DOJOHUD,
 			NUM_TYPES
 		};
 

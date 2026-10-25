@@ -8,7 +8,8 @@ entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
 score So Gong records. Slice 3b is the belts, the points reset and the
 medals. Slice 3c is So Gong's first-time trial. Slice 4 is the party
 Dojo. Slice 5 is the energy bar and its secret skills, and slice 5b Power
-Explosion's buff. The `muruengRaid` HUD's clock and gauges come later.
+Explosion's buff. Slice 6 is the rest of the client's `muruengRaid` HUD:
+its clock and the two HP gauges.
 
 ## The way in
 
@@ -339,12 +340,45 @@ one that comes before the map has loaded (`pending_weather`), as
 handler itself, so nothing waits there. Weather 5120024 has no particles
 (`path` is `weather/none`), only its message bar (`floatType` 33).
 
-The energy bar (`UIDojoEnergy`, v83 0x554005) is up on the fields where
-the secret skills may be used (field types 14 and 18): `muruengRaid/energy`
-from UIWindow.img, its frame at (20, 130) with the dark `Gage` strip
-stretched over the unfilled part of the 77-pixel strip
-(`dojo_energy::cover`), or, once full, the flashing `full` animation with
-the keys' legend at (9, 80). `SessionValueHandler` (90) keeps `energy` and
+The Dojo's HUD (`UIDojoHud`, v83 0x554005, updated by 0x554792; RE in
+v83ref `reports/b159-dojo-hud.md`) is up on the fields where the secret
+skills may be used (field types 14 and 18), rest floors and the trial
+included. It comes down at every map change and up again once a map of
+those types has loaded. From `UIWindow.img/muruengRaid`, at fixed screen
+points:
+
+- The `player`, `clock` and `monster` frames at (169, 50), (400, 26) and
+  (631, 50), always shown. There are no names, levels or floor numbers.
+- The player's gauge, `player/Gage` stretched to `hp * 305 / maxhp` and
+  ending at x 318 (it loses HP from its left), at y 32. It is hidden with
+  no maximum HP.
+- The monster's gauge, from the same `player/Gage` (v83 never loads
+  `monster/Gage`), starting at x 482: `percent * 305 / 100`, with the
+  percent kept to 100. It follows the first boss-flagged mob to have
+  entered the map, apart from 9300216 and 9999999
+  (`MapMobs::dojo_boss_percent`, 0x679025), and its last SHOW_MOB_HP
+  percent (`Mob::get_last_percent`, 100 before any, kept for every mob,
+  0x66d64c). With no such mob the gauge is hidden and the frame stays.
+- The clock, its digits drawn from `number/0`..`9` with `number/bar`
+  between them: MM:SS, the minutes' last two digits only
+  (`dojo_energy::clock_digits`). The Dojo's field handles only CLOCK kind
+  2 (0x55522b); `ClockHandler` gives it to `dojo_energy::Countdown` and
+  drops kinds 0, 1 and 3 while the HUD is up. It shows whole seconds
+  left, truncated (600 first shows 09:59), stops at 00:00, and plays
+  `dojang/timeOver` and its sound once there; the server sends no such
+  effect. Until a clock comes only the frame shows, as on rest floors,
+  since the clock goes with its map. A kind 2 that comes while the map
+  loads starts both the field clock and the HUD's; the HUD then takes the
+  field clock down. STOP_CLOCK leaves the HUD's clock be (v83 0x53184a
+  only closes the field clock's window).
+
+The server sends SHOW_MOB_HP only to the player who hit the mob, so in
+the party Dojo a member's monster gauge moves only with their own hits.
+
+The energy bar sits at the left: `muruengRaid/energy`, its frame at
+(20, 130) with the dark `Gage` strip stretched over the unfilled part of
+the 77-pixel strip (`dojo_energy::cover`), or, once full, the flashing
+`full` animation with the keys' legend at (9, 80). `SessionValueHandler` (90) keeps `energy` and
 `FieldSetVariableHandler` (92) keeps `Bamboo_Used` in
 `dojo_energy::session()`. The character's data resets both, and every map
 change resets `Bamboo_Used`.

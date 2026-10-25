@@ -143,6 +143,10 @@ namespace ms
 		// A mob's template id, or 0 if there is no such mob.
 		int32_t get_mob_id(int32_t oid) const;
 
+		// The last HP percent of the first boss to have entered the map, but for the Dojo's 9300216 and
+		// 9999999, which the Dojo's monster gauge shows (0x679025); -1 for none.
+		int16_t dojo_boss_percent() const;
+
 		// The numbers Poison, Venom and Ambush showed on each mob since last
 		// asked, with where its head is.
 		std::vector<std::pair<Point<int16_t>, int32_t>> take_hurts();

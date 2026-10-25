@@ -268,6 +268,9 @@ namespace ms
 		// Whether Monster Magnet can't catch the mob.
 		bool is_boss() const;
 
+		// The last HP percent the server sent, 100 before any (CMob+0x520).
+		uint8_t get_last_percent() const;
+
 		// Whether Heal hurts the mob.
 		bool is_undead() const;
 
@@ -760,6 +763,7 @@ namespace ms
 		int8_t flyy;
 		float walkforce;
 		int8_t hppercent;
+		uint8_t lastpercent;
 		bool fadein;
 		Linear<float> opacity;
 
