@@ -21,7 +21,9 @@ use net::packet::build::world::conti::{
 use net::packet::build::world::effect::{
     build_blow_weather, build_field_effect, build_field_object, build_field_sound,
 };
-use net::packet::build::world::field::{build_dojo_energy, build_dojo_warp_up};
+use net::packet::build::world::field::{
+    build_dojo_energy, build_dojo_warp_up, build_pyramid_score,
+};
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
@@ -807,6 +809,27 @@ impl ClientActor {
             self.in_game_mut()?.player.pyramid_rage = left;
         }
         Ok(())
+    }
+
+    /// A Nett's Pyramid run ended with `rank` and `exp`: a player its end
+    /// took to its result map, `exit`, sees them on the result screen and
+    /// gets the EXP (Cosmic `sendScore`, with no rates).
+    pub(super) async fn pyramid_score(
+        &mut self,
+        exit: i32,
+        rank: u8,
+        exp: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.in_cash_shop || self.in_game()?.player.stats.map_id != exit {
+            return Ok(());
+        }
+        let mut packets = vec![build_pyramid_score(rank, exp)?];
+        if exp > 0 {
+            let mut next = self.in_game()?.player.clone();
+            gain_exp(&mut next, exp, &mut packets)?;
+            self.commit_player(next, None, &mut packets).await?;
+        }
+        self.send_all(&mut packets).await
     }
 
     /// Event `id` ended: out of its maps, if the player still holds its

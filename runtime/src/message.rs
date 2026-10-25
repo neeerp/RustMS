@@ -374,6 +374,13 @@ pub enum ServerMessage {
         id: u32,
         left: i32,
     },
+    /// A Nett's Pyramid run ended with `rank` and `exp`: the player gets
+    /// them if they reached its result map, `exit`.
+    PyramidScore {
+        exit: i32,
+        rank: u8,
+        exp: i32,
+    },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,
