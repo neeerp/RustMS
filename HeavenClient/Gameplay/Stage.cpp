@@ -290,6 +290,7 @@ namespace ms
 		tooltips = mapid == -1 ? MapTooltips() : MapTooltips(mapid, src);
 		UI::get().clear_tooltip(Tooltip::Parent::FIELD);
 		ship = MapShip(src);
+		snowfield = MapSnowball(src);
 		wedding = mapid == -1 ? MapWedding() : MapWedding(mapid);
 		clock = MapClock(src);
 		ground_effects = EffectLayer();
@@ -351,6 +352,7 @@ namespace ms
 
 		for (auto id : Layer::IDs)
 		{
+			snowfield.draw(id, viewx, viewy, alpha);
 			tilesobjs.draw(id, viewpos, alpha);
 			doors.draw(id, town_doors, viewpos, alpha);
 			reactors.draw(id, viewx, viewy, alpha);
@@ -399,6 +401,7 @@ namespace ms
 		weather.draw_shows(alpha);
 		drops.draw_explosions(viewpos, alpha);
 		combat.draw(viewx, viewy, alpha);
+		snowfield.draw_front(viewx, viewy, alpha);
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
@@ -479,6 +482,11 @@ namespace ms
 			for (const coconut::Hit &hit : coconut::state().hits.take_due(coconut::now()))
 				tilesobjs.set_state(coconut::object_name(hit.index), hit.state, player.get_position());
 
+		// Not on the last map while it fades out.
+		if (snowfield.is_active())
+			touch_snowball();
+
+		snowfield.update();
 		tilesobjs.update();
 
 		// Every 5 s, and whenever a quest record changes (FUN_00a20f4c).
@@ -696,6 +704,50 @@ namespace ms
 		// Witch Tower's snacks send the player back to its entrance, hurting or not (0x94b767).
 		if (data.target_field != 0)
 			player.request(ChangeMapPacket(field_key, data.target_field, "", false), ExclRequest::WAIT, true);
+	}
+
+	void Stage::touch_snowball()
+	{
+		const snowball::Rules &rules = snowball::rules();
+		const snowball::State &game = snowball::state();
+		Point<int16_t> position = player.get_position();
+
+		if (snowball_knock_wait > 0)
+			snowball_knock_wait -= Constants::TIMESTEP;
+
+		// In the first ball the player stands in, unless it is fading out
+		// or they are stunned (FUN_0057502e).
+		for (int32_t lane = 0; lane < 2; lane++)
+		{
+			if (!rules.ball(lane, game.balls[lane].step).contains(position.x(), position.y()))
+				continue;
+
+			if (game.state != lane + 2 && !player.has_buff(Buffstat::Id::STUN) && snowball_knock_wait <= 0)
+			{
+				LeftKnockbackPacket().dispatch();
+				snowball_knock_wait = snowball::TICK;
+			}
+
+			break;
+		}
+
+		// A snowman hurts as a trap would, and pushes the player right and
+		// up (user vtable +0x48 with code 0).
+		for (size_t lane = 0; lane < 2; lane++)
+		{
+			if (!rules.snowman(lane).contains(position.x(), position.y()))
+				continue;
+
+			if (!player.is_dead() && !player.Char::is_invincible())
+			{
+				int32_t damage = snowball::touch_damage(std::rand());
+				auto [hp_loss, guarded] = player.damage_by_obstacle(damage, 270, -270);
+				TakeDamagePacket(TakeDamagePacket::Obstacle{ damage, 0 }).dispatch();
+				player.check_auto_hp(hp_loss, guarded);
+			}
+
+			break;
+		}
 	}
 
 	void Stage::show_character_effect(int32_t cid, CharEffect::Id effect)

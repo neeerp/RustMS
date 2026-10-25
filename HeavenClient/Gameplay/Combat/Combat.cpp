@@ -1141,6 +1141,14 @@ namespace ms
 				return true;
 			}
 
+			// So does Snowball's (A 575387).
+			if (!move.is_skill() && snowball::on_field())
+			{
+				swing_at_snowballs();
+
+				return true;
+			}
+
 			if (!move.is_skill() && swing_at_reactor())
 				return true;
 
@@ -1779,6 +1787,29 @@ namespace ms
 
 		if (index >= 0)
 			CoconutPacket(index, player.get_attackdelay(0)).dispatch();
+	}
+
+	void Combat::swing_at_snowballs()
+	{
+		std::optional<Swing> swing = aim_swing();
+
+		if (!swing)
+			return;
+
+		const snowball::State &game = snowball::state();
+		const Rectangle<int16_t> &range = swing->range;
+		int16_t target = snowball::first_hit(snowball::rules(), { game.balls[0].step, game.balls[1].step },
+											 { range.left(), range.top(), range.right(), range.bottom() });
+
+		take_swing(*swing);
+
+		// Only while the game runs.
+		if (target < 0 || game.state != 1)
+			return;
+
+		uint8_t what = static_cast<uint8_t>(target);
+		uint16_t damage = snowball::damage(what, game.damages, std::rand() % 100);
+		SnowballPacket(what, damage, player.get_attackdelay(0)).dispatch();
 	}
 
 	Stance::Id Combat::find_whack(const Attack &attack, int16_t &reach) const

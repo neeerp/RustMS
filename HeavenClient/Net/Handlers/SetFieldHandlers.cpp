@@ -18,6 +18,7 @@
 #include "SetFieldHandlers.h"
 
 #include "CoconutHandlers.h"
+#include "SnowballHandlers.h"
 #include "Timer.h"
 
 #include "Helpers/CharacterParser.h"
@@ -75,6 +76,7 @@ namespace ms
 		carnival::enter_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
 		enter_coconut_field(mapid, fieldtype);
+		enter_snowball_field(mapid, fieldtype);
 		UI::get().remove(UIElement::Type::COCONUT);
 
 		Window::get().fadeout(
