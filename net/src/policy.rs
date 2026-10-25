@@ -20,6 +20,13 @@ pub fn client_gm(gm_level: i16) -> bool {
     gm_level >= CLIENT_GM_LEVEL
 }
 
+/// Chat commands (`net::gm_commands`) are on unless
+/// `RUSTMS_GM_COMMANDS=0`.
+pub fn gm_commands_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| std::env::var("RUSTMS_GM_COMMANDS").map_or(true, |value| value != "0"))
+}
+
 /// Whether `player` may warp straight to an arbitrary map.
 pub fn may_warp_anywhere(player: &Player) -> bool {
     player.gm_level > 0 || debug_warps_enabled()

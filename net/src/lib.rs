@@ -23,6 +23,7 @@ pub mod energy;
 pub mod events;
 pub mod gachapon;
 mod game_data;
+pub mod gm_commands;
 pub mod gm_event;
 pub mod handler;
 mod helpers;

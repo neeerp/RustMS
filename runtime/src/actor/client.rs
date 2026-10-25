@@ -590,6 +590,22 @@ impl ClientActor {
                 })
                 .await?
             }
+            WorldAction::CloseDialogs => {
+                self.conversation = None;
+                self.script = None;
+                self.shop = None;
+                self.storage = None;
+                self.store_bank = None;
+            }
+            WorldAction::AvatarChanged(announce) => {
+                let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
+                self.send_to_field(FieldMessage::UpdateAvatar {
+                    client_id: self.client_id,
+                    avatar,
+                    announce,
+                })
+                .await?
+            }
             WorldAction::PetsChanged(changes) => {
                 self.pets_changed(changes, PetGone::Dismissed).await?
             }

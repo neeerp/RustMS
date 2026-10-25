@@ -6,7 +6,9 @@ use tracing_subscriber::EnvFilter;
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::from_default_env().add_directive("runtime=info".parse().unwrap()),
+            EnvFilter::from_default_env()
+                .add_directive("runtime=info".parse().unwrap())
+                .add_directive("gm_audit=info".parse().unwrap()),
         )
         .init();
 

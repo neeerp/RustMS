@@ -567,6 +567,12 @@ pub enum WorldAction {
     /// The GM hid or came out of hiding (`player.hidden` already changed);
     /// the field takes the GM from, or shows the GM to, those not GMs.
     HiddenChanged,
+    /// Close the NPC dialog, shop or storage the player has open, as a new
+    /// NPC click would.
+    CloseDialogs,
+    /// The player's level or job changed (`player.stats` already did);
+    /// refresh their field avatar and show the others these packets.
+    AvatarChanged(Vec<Packet>),
     /// Look on the channel for the character named `name`, to take the
     /// player to them with `rock`.
     RockToCharacter {
