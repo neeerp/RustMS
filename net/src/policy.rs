@@ -11,6 +11,15 @@ pub fn debug_warps_enabled() -> bool {
         .get_or_init(|| std::env::var("RUSTMS_ALLOW_DEBUG_WARPS").is_ok_and(|value| value == "1"))
 }
 
+/// The GM level from which the client is told the account is a GM's (row
+/// 205): it then sends the GM's '/' lines, and refuses trades and stores.
+pub const CLIENT_GM_LEVEL: i16 = 3;
+
+/// Whether an account of `gm_level` logs in with the client's GM grade.
+pub fn client_gm(gm_level: i16) -> bool {
+    gm_level >= CLIENT_GM_LEVEL
+}
+
 /// Whether `player` may warp straight to an arbitrary map.
 pub fn may_warp_anywhere(player: &Player) -> bool {
     player.gm_level > 0 || debug_warps_enabled()

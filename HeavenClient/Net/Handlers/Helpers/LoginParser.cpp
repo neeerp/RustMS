@@ -27,9 +27,8 @@ namespace ms
 
 		account.accid = recv.read_int();
 		account.female = recv.read_byte();
-		account.admin = recv.read_bool();
-
-		recv.skip_byte(); // Admin
+		account.grade.grade = static_cast<uint8_t>(recv.read_byte());
+		account.grade.subgrade = static_cast<uint8_t>(recv.read_byte());
 		recv.skip_byte(); // Country Code
 
 		account.name = recv.read_string();

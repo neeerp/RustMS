@@ -50,7 +50,10 @@ HeavenClient plays it (see "The client" below).
 
 The v83 client sends a chat line starting with `/` that it doesn't know
 itself as ordinary chat, but only for a GM: the login packet's grade byte
-is 1 when the account's `gm_level` is above 0. The chat handler drops
+has bit 0 when the account's `gm_level` is 3 or more
+(`net::policy::CLIENT_GM_LEVEL`; see "The client's grade" in
+`server-architecture.md`). Lower GMs' clients send no such line, though
+the server takes one from any GM. The chat handler drops
 every `/` line from chat. A GM's `/start` and `/reset` go to the field as
 `FieldRequest::GmEvent` (`net::GmEvent`), in any case; on a field with
 no event they do nothing.

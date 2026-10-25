@@ -26,6 +26,8 @@ pub struct LoginStatusPacket {
     pub status: i32,
     pub account_id: Option<i32>,
     pub gender: Option<u8>,
+    /// The grade and sub-grade bytes the client keeps for the session.
+    pub grade: Option<(u8, u8)>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -740,6 +742,7 @@ pub fn decode_login_status(packet: &Packet) -> Result<LoginStatusPacket, String>
             status,
             account_id: None,
             gender: None,
+            grade: None,
         });
     }
 
@@ -752,11 +755,18 @@ pub fn decode_login_status(packet: &Packet) -> Result<LoginStatusPacket, String>
     let gender = cursor
         .read_byte()
         .map_err(|e| format!("failed to read login gender: {e}"))?;
+    let mut grade = [0; 2];
+    for byte in &mut grade {
+        *byte = cursor
+            .read_byte()
+            .map_err(|e| format!("failed to read login grade: {e}"))?;
+    }
 
     Ok(LoginStatusPacket {
         status,
         account_id: Some(account_id),
         gender: Some(gender),
+        grade: Some((grade[0], grade[1])),
     })
 }
 

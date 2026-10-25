@@ -34,6 +34,10 @@ pub struct Account {
     /// Mesos in the account's storage; only `crate::storage` changes them.
     #[diesel(skip_update)]
     pub storage_meso: i32,
+    /// Whether the client treats the account as v83's admin account (set by
+    /// SQL only; `gm_level` never implies it).
+    #[diesel(skip_update)]
+    pub test_admin: bool,
 }
 
 impl Debug for Account {

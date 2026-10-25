@@ -116,7 +116,7 @@ namespace ms
 				// The packet contains information on the account, so we initialize the account with it.
 				Account account = LoginParser::parse_account(recv);
 
-				Configuration::get().set_admin(account.admin);
+				Configuration::get().set_grade(account.grade);
 
 				if (account.female == 10)
 				{

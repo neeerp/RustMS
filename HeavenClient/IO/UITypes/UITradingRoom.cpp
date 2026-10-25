@@ -8,6 +8,7 @@
 #include "../Components/Charset.h"
 #include "../Components/MapleButton.h"
 
+#include "../../Configuration.h"
 #include "../../Character/ExclRequest.h"
 #include "../../Constants.h"
 #include "../../Data/CurseData.h"
@@ -402,9 +403,11 @@ namespace ms
 
 		const char *refusal = nullptr;
 
-		// Nor while a dialog is open.
+		// Nor while a dialog is open, nor from a GM's account.
 		if (UI::get().dialog_open())
 			refusal = "Not available";
+		else if (Configuration::get().get_grade().gm())
+			refusal = account_grade::NOT_FOR_ADMIN;
 		else if (Stage::get().is_player(cid) || !Stage::get().get_character(cid))
 			refusal = "Unable to find the character.";
 

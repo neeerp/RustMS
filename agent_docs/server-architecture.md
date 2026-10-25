@@ -142,6 +142,25 @@ Map-id warps (`CHANGE_MAP` with a target) are accepted only for dead players
 `RUSTMS_ALLOW_DEBUG_WARPS=1` (development and the harness). Portal warps are
 resolved from map data.
 
+### The client's grade
+
+The login result carries two grade bytes, which v83 keeps for the session
+(`build_successful_login_packet`, reports b156 and a006b):
+
+- The grade has bit 0 (a GM's account) when `gm_level` is 3 or more
+  (`policy::client_gm`). The client then sends the `/` lines it doesn't know
+  as chat (GM events' `/start`), and refuses to trade or open a store ("Not
+  available with an Admin account.").
+- With `accounts.test_admin` the grade is 0x11 as well: v83's admin account,
+  which can't drop items ("The admin can't drop items.") or mesos either.
+  Only SQL sets it (`UPDATE accounts SET test_admin = true WHERE ...`);
+  `gm_level` never does.
+- The sub-grade stays 0. Its 0x80 would refuse every attack ("Not available
+  with an MWLB account.") and its 0x20 and 0x40 only rank a GM the grade
+  already ranks.
+
+`gm_level` is set by SQL only, as `test_admin` is.
+
 ## Packet encoding
 
 Structures that recur across packets are encoded once in `net/src/codec/`,

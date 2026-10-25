@@ -433,11 +433,16 @@ namespace ms
 
 	bool Configuration::get_admin()
 	{
-		return admin;
+		return grade.gm();
 	}
 
-	void Configuration::set_admin(bool value)
+	const AccountGrade& Configuration::get_grade() const
 	{
-		admin = value;
+		return grade;
+	}
+
+	void Configuration::set_grade(AccountGrade value)
+	{
+		grade = value;
 	}
 }

@@ -37,6 +37,7 @@ diesel::table! {
         nx_prepaid -> Int4,
         storage_slots -> Int2,
         storage_meso -> Int4,
+        test_admin -> Bool,
     }
 }
 
