@@ -903,6 +903,11 @@ pub const DUARTE: i32 = 2103013;
 /// Field from Kerning City, Ludibrium and Orbis, and there gives out its
 /// rooms.
 pub const SPIEGELMANN: i32 = 2042000;
+/// The Event Assistants (script `Event00`), who take players to the event
+/// a GM opened on their channel: Paul in Southperry and Magatia, Jean in
+/// Lith Harbor, Singapore and Kampung, Martin in Orbis and Tony in
+/// Ludibrium (report b170).
+pub const EVENT_ASSISTANTS: [i32; 4] = [9000000, 9000001, 9000011, 9000013];
 /// Spiegelmann again, in the Monster Carnival's exit room.
 pub const CARNIVAL_GUIDE: i32 = 2042002;
 /// Spiegelmann in a Monster Carnival waiting room, who puts challenges to
@@ -1386,6 +1391,33 @@ impl NpcScript {
     /// which runs they may go on.
     pub fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> Self {
         duarte(entries, player)
+    }
+
+    /// An Event Assistant (`EVENT_ASSISTANTS`), while a GM's event is
+    /// `open` on the player's channel or not.
+    pub fn event_assistant(npc_id: i32, open: bool) -> Self {
+        let go = match open {
+            true => Page::Done(vec![Effect::JoinGmEvent { npc: npc_id }]),
+            false => Page::Say(text(keys::GM_EVENT_NOT_OPEN)),
+        };
+        NpcScript::new(
+            npc_id,
+            vec![Page::Menu {
+                text: text(keys::GM_EVENT_MENU),
+                choices: vec![
+                    (
+                        text(keys::GM_EVENT_ABOUT),
+                        vec![Page::Say(text(keys::GM_EVENT_INFO))],
+                    ),
+                    (text(keys::GM_EVENT_GO), vec![go]),
+                ],
+            }],
+        )
+    }
+
+    /// An Event Assistant on a player who couldn't join after all.
+    pub fn event_assistant_refused(npc_id: i32) -> Self {
+        NpcScript::new(npc_id, vec![Page::Say(text(keys::GM_EVENT_NOT_OPEN))])
     }
 
     /// Spiegelmann on the Carnival Field, for a player whose party may or

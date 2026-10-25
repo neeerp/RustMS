@@ -667,6 +667,12 @@ pub enum FieldMessage {
         name: String,
         reply: tokio::sync::oneshot::Sender<u8>,
     },
+    /// Keep a team on the field's Coconut or Snowball game for a player an
+    /// event NPC is sending there; None if it has no game.
+    ReserveTeam {
+        client_id: ClientId,
+        reply: tokio::sync::oneshot::Sender<Option<u8>>,
+    },
     /// How many monsters are alive on the map.
     MobCount {
         reply: tokio::sync::oneshot::Sender<usize>,
@@ -961,6 +967,28 @@ pub enum DirectoryMessage {
         from: ClientId,
         kind: EventKind,
         reply: tokio::sync::oneshot::Sender<Option<crate::actor::event::EventStart>>,
+    },
+    /// A GM opened the event on `map_id` to `limit` players on their
+    /// channel, in place of any open there.
+    OpenGmEvent {
+        channel_id: u8,
+        map_id: i32,
+        limit: u16,
+    },
+    /// A GM closed entry to their channel's event.
+    CloseGmEvent {
+        channel_id: u8,
+    },
+    /// The map of the event open on the channel with places left, if any.
+    GmEventOpen {
+        channel_id: u8,
+        reply: tokio::sync::oneshot::Sender<Option<i32>>,
+    },
+    /// Take a place at the event open on the channel: its map, or None if
+    /// it closed or filled up.
+    JoinGmEvent {
+        channel_id: u8,
+        reply: tokio::sync::oneshot::Sender<Option<i32>>,
     },
     /// What `from` finds of the Monster Carnival's rooms on their channel.
     CarnivalRooms {

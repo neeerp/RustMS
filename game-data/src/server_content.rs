@@ -1969,6 +1969,12 @@ pub mod keys {
     pub const COCONUT_FELL_STORY: &str = "coconut.fell.story";
     pub const COCONUT_OVERTIME: &str = "coconut.overtime";
     pub const SNOWBALL_ENDED: &str = "snowball.ended";
+    pub const GM_EVENT_OPENED: &str = "gm_event.opened";
+    pub const GM_EVENT_MENU: &str = "gm_event.menu";
+    pub const GM_EVENT_ABOUT: &str = "gm_event.about";
+    pub const GM_EVENT_INFO: &str = "gm_event.info";
+    pub const GM_EVENT_GO: &str = "gm_event.go";
+    pub const GM_EVENT_NOT_OPEN: &str = "gm_event.not_open";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3105,6 +3111,12 @@ mod tests {
                 keys::COCONUT_FELL_STORY,
                 keys::COCONUT_OVERTIME,
                 keys::SNOWBALL_ENDED,
+                keys::GM_EVENT_OPENED,
+                keys::GM_EVENT_MENU,
+                keys::GM_EVENT_ABOUT,
+                keys::GM_EVENT_INFO,
+                keys::GM_EVENT_GO,
+                keys::GM_EVENT_NOT_OPEN,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

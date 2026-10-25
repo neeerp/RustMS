@@ -11,6 +11,7 @@ mod events;
 mod expiry;
 mod fame;
 mod family;
+mod gm_event;
 mod guild_bbs;
 mod guilds;
 mod hazard;
@@ -497,6 +498,7 @@ impl ClientActor {
                 }
             }
             WorldAction::NaturalHeal { hp, mp } => self.natural_heal(hp, mp).await?,
+            WorldAction::GmEntry(entry) => self.gm_entry(entry).await?,
             WorldAction::Field(request) => {
                 self.send_to_field(FieldMessage::FromClient {
                     from: self.client_id,

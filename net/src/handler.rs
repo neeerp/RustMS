@@ -481,6 +481,8 @@ pub enum WorldAction {
         after: std::time::Duration,
         packet: Packet,
     },
+    /// A GM opens or closes their channel's event (report b170).
+    GmEntry(GmEntry),
     /// Enter the game with the character named in PLAYER_LOGGEDIN.
     EnterGame {
         character_id: i32,
@@ -705,6 +707,45 @@ impl GmEvent {
             "/reset" => Some(Self::Reset),
             _ => None,
         }
+    }
+}
+
+/// What a GM's `/snowball`, `/coconut` or `/endevent` chat line asks of
+/// their channel's event: open it to players, or close it (report b170).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GmEntry {
+    /// Event NPCs take up to `limit` players to the game field `map_id`.
+    Open {
+        map_id: i32,
+        limit: u16,
+    },
+    Close,
+}
+
+impl GmEntry {
+    /// How many players an event takes unless the GM says (Cosmic).
+    pub const LIMIT: u16 = 50;
+
+    /// The entry command a GM's '/' line names, if any: the game and its
+    /// field, then a limit if they give one.
+    pub fn parse(line: &str) -> Option<Self> {
+        let mut words = line.split_whitespace();
+        let command = words.next()?.to_ascii_lowercase();
+        let map_id = match command.as_str() {
+            "/endevent" => return Some(Self::Close),
+            "/snowball" | "/snowball1" => 109_060_000,
+            "/snowball2" => 109_060_002,
+            "/snowball3" => 109_060_004,
+            "/coconut" | "/coconut1" => 109_080_000,
+            "/coconut2" => 109_080_001,
+            "/coconut3" => 109_080_002,
+            _ => return None,
+        };
+        let limit = match words.next() {
+            Some(word) => word.parse().ok().filter(|limit| *limit > 0)?,
+            None => Self::LIMIT,
+        };
+        Some(Self::Open { map_id, limit })
     }
 }
 

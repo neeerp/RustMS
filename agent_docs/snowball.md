@@ -39,7 +39,9 @@ HeavenClient shows it (see "The client").
 - **Teams.** A player entering joins the smaller team, Story on a tie, and
   keeps it while they stay in the field. Team 0, Story, has the lower lane
   and team 1, Maple, the upper one. The team is the avatar's `team`,
-  written in its spawn packet.
+  written in its spawn packet. A player an Event Assistant sends here gets
+  their team before the warp and lands on its lane, at `st00` or `st01`
+  (see `agent_docs/coconut.md`, "Opening an event to players").
 - **Entering.** The player is sent the field's state with the three
   damages (the client reads them from the first state only), and the
   clock if a game is on.
