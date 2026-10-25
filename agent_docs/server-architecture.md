@@ -174,7 +174,7 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 |---|---|
 | 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
 | 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
-| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!notice <text>` |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!notice <text>` |
 | 3, admin | none yet |
 
 - A GM's `!` line never reaches the map. A player's `!` line is ordinary
@@ -185,9 +185,16 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 - `!level` and `!job` set only the level or job. Others see the level-up or
   job-change effect (`WorldAction::AvatarChanged`). `!exp` gains EXP as a
   kill does.
+- `!givenx` adds to an account's NX Credit, or its Maple Points (`mp`) or
+  NX Prepaid (`np`), within 0..=i32::MAX; a negative amount takes NX away.
+  It goes to the account of the character named, online or not, or else
+  the GM's own (`db::cash_shop::grant`, from the runtime's
+  `WorldAction::GiveCash`). The Cash Shop reads the balances on entry and
+  on every Check, so nothing is pushed. Tests can use it instead of setting
+  `nx_credit` by SQL.
 - Every `!` line from a GM is logged at info under the `gm_audit` target,
   with the character, the line, and whether it ran. The world server always
-  shows that target.
+  shows that target. `!givenx` logs its result there too.
 - `RUSTMS_GM_COMMANDS=0` turns every command off, so each line is chat.
 
 ## Packet encoding

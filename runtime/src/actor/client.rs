@@ -11,6 +11,7 @@ mod events;
 mod expiry;
 mod fame;
 mod family;
+mod gm;
 mod gm_event;
 mod guild_bbs;
 mod guilds;
@@ -597,6 +598,11 @@ impl ClientActor {
                 self.storage = None;
                 self.store_bank = None;
             }
+            WorldAction::GiveCash {
+                target,
+                cash_type,
+                amount,
+            } => self.give_cash(target, cash_type, amount).await?,
             WorldAction::AvatarChanged(announce) => {
                 let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
                 self.send_to_field(FieldMessage::UpdateAvatar {

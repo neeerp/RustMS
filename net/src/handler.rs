@@ -570,6 +570,14 @@ pub enum WorldAction {
     /// Close the NPC dialog, shop or storage the player has open, as a new
     /// NPC click would.
     CloseDialogs,
+    /// A GM's `!givenx`: add `amount` to the `cash_type` balance of the
+    /// account of the character named `target` (online or not), or of the
+    /// GM's own account, and tell the GM the new balance.
+    GiveCash {
+        target: Option<String>,
+        cash_type: db::cash_shop::CashType,
+        amount: i32,
+    },
     /// The player's level or job changed (`player.stats` already did);
     /// refresh their field avatar and show the others these packets.
     AvatarChanged(Vec<Packet>),
