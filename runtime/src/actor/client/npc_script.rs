@@ -118,6 +118,7 @@ impl ClientActor {
         let mut grow_guild = None;
         let mut disband_guild = false;
         let mut alliance = None;
+        let mut carnival = None;
         let mut wedding = None;
         let mut restyled = false;
         let mut command = None;
@@ -189,6 +190,9 @@ impl ClientActor {
                 Effect::CreateAlliance { .. }
                 | Effect::GrowAlliance { .. }
                 | Effect::DisbandAlliance => alliance = Some(effect.clone()),
+                Effect::CarnivalRoom(_) | Effect::CarnivalAnswer { .. } => {
+                    carnival = Some(effect.clone())
+                }
                 Effect::BookWedding { .. }
                 | Effect::ExtraInvitations { .. }
                 | Effect::StartWedding { .. }
@@ -721,6 +725,13 @@ impl ClientActor {
             Some(Effect::CreateAlliance { name }) => Box::pin(self.create_alliance(name)).await?,
             Some(Effect::GrowAlliance { from }) => Box::pin(self.grow_alliance(from)).await?,
             Some(Effect::DisbandAlliance) => Box::pin(self.disband_alliance()).await?,
+            _ => {}
+        }
+        match carnival {
+            Some(Effect::CarnivalRoom(room)) => Box::pin(self.pick_carnival_room(room)).await?,
+            Some(Effect::CarnivalAnswer { challenger, accept }) => {
+                self.answer_carnival(challenger, accept).await?
+            }
             _ => {}
         }
         match wedding {

@@ -141,6 +141,8 @@ pub struct SpawnPlayerPacket {
     pub berserk: bool,
     /// Their ring blocks.
     pub rings: RingLooks,
+    /// Their side in an event field (a Monster Carnival's).
+    pub team: u8,
 }
 
 /// The ring blocks that end a look: the crush and friendship rings'
@@ -1285,6 +1287,10 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         .read_byte()
         .map_err(|e| format!("failed to read spawn-player berserk: {e}"))?
         != 0;
+    skip(&mut cursor, 1)?; // no Dragon Fury
+    let team = cursor
+        .read_byte()
+        .map_err(|e| format!("failed to read spawn-player team: {e}"))?;
 
     Ok(SpawnPlayerPacket {
         character_id,
@@ -1300,6 +1306,7 @@ pub fn decode_spawn_player(packet: &Packet) -> Result<SpawnPlayerPacket, String>
         chalkboard,
         berserk,
         rings,
+        team,
     })
 }
 

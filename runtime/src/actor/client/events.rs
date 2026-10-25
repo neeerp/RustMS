@@ -6,7 +6,7 @@ use super::quest::gain_exp;
 use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
-use crate::message::{DirectoryMessage, FieldKey, FieldMessage};
+use crate::message::{CarnivalPick, DirectoryMessage, FieldKey, FieldMessage};
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::events::{
@@ -25,6 +25,7 @@ use net::packet::build::world::field::{
     build_dojo_energy, build_dojo_warp_up, build_pyramid_score,
 };
 use net::packet::build::world::inventory::build_inventory_operation;
+use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::quest::build_quest_record;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
@@ -121,8 +122,87 @@ impl ClientActor {
             };
             entries.push((kind, entry));
         }
-        let script = NpcScript::spiegelmann(&entries, &self.in_game()?.player);
+        let (reply, rooms) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::CarnivalRooms {
+            from: self.client_id,
+            reply,
+        })
+        .await?;
+        let Ok(rooms) = rooms.await else {
+            return Ok(());
+        };
+        let script = NpcScript::spiegelmann(&entries, &rooms, &self.in_game()?.player);
         self.start_script(script).await
+    }
+
+    /// The player, a party's leader, picked Monster Carnival room `room`:
+    /// a free one their party takes, and one where a party waits they
+    /// challenge. Spiegelmann says how it went.
+    pub(super) async fn pick_carnival_room(&mut self, room: u8) -> Result<(), RuntimeError> {
+        let (reply, picked) = oneshot::channel();
+        self.send_to_directory(DirectoryMessage::CarnivalPick {
+            from: self.client_id,
+            room,
+            reply,
+        })
+        .await?;
+        let refusal = match picked.await {
+            Ok(CarnivalPick::Start(start)) => {
+                crate::actor::event::spawn(
+                    start,
+                    self.services.fields.clone(),
+                    self.services.directory.clone(),
+                );
+                return Ok(());
+            }
+            Ok(CarnivalPick::Sent) => None,
+            Ok(CarnivalPick::Refused(refusal)) => Some(refusal),
+            Err(_) => return Ok(()),
+        };
+        self.start_script(NpcScript::spiegelmann_picked(room, refusal))
+            .await
+    }
+
+    /// The player, leading the party waiting in a Monster Carnival room,
+    /// answered the challenge `challenger` put to them.
+    pub(super) async fn answer_carnival(
+        &mut self,
+        challenger: ClientId,
+        accept: bool,
+    ) -> Result<(), RuntimeError> {
+        self.send_to_directory(DirectoryMessage::CarnivalAnswer {
+            from: self.client_id,
+            challenger,
+            accept,
+        })
+        .await
+    }
+
+    /// Another party's leader challenged the player's, waiting in a
+    /// Monster Carnival room: the player is asked, if still there.
+    pub(super) async fn carnival_challenged(
+        &mut self,
+        challenger: ClientId,
+        challengers: Vec<net::carnival::Challenger>,
+    ) -> Result<(), RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let waiting = self.event.as_ref().is_some_and(|ticket| {
+            matches!(ticket.kind, EventKind::Carnival(_)) && ticket.holds(map_id)
+        });
+        if !waiting || self.in_cash_shop {
+            return self.answer_carnival(challenger, false).await;
+        }
+        self.start_script(NpcScript::carnival_challenge(challenger, &challengers))
+            .await
+    }
+
+    /// The player's side in the event whose field they are on, which
+    /// others see: a Monster Carnival's, or 0.
+    pub(super) fn event_side(&self) -> u8 {
+        self.event
+            .as_ref()
+            .filter(|ticket| matches!(ticket.kind, EventKind::Carnival(_)))
+            .map_or(0, |ticket| ticket.side)
     }
 
     /// Whether the player's party may go into an event of `kind` now; `None`
@@ -1255,15 +1335,23 @@ impl ClientActor {
     /// Arriving on a Monster Carnival battle field, the player's screen
     /// takes the battle's score from the event (Cosmic
     /// `startMonsterCarnival`).
+    /// The party taking a room sees, in its waiting room, that it waits
+    /// for a challenge.
     pub(super) async fn show_carnival(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
-        let arrived = self.event.as_ref().is_some_and(|ticket| {
-            matches!(ticket.kind, EventKind::Carnival(_))
-                && ticket.holds(map_id)
-                && net::carnival::battle_room(map_id).is_some()
-        });
-        if arrived {
+        let Some(side) = self
+            .event
+            .as_ref()
+            .filter(|ticket| matches!(ticket.kind, EventKind::Carnival(_)) && ticket.holds(map_id))
+            .map(|ticket| ticket.side)
+        else {
+            return Ok(());
+        };
+        if net::carnival::battle_room(map_id).is_some() {
             self.tell_event(EventCommand::CarnivalArrived).await;
+        } else if net::carnival::waiting_room(map_id).is_some() && side == 0 {
+            let text = net::content::text().get(keys::CARNIVAL_WAITING, &[]);
+            self.send(&mut build_item_line(&text, 0)?).await?;
         }
         Ok(())
     }

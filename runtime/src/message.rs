@@ -395,6 +395,12 @@ pub enum ServerMessage {
     /// A mob that leaves a buff (Mob.nx `buff`) was killed on the player's
     /// field: if alive, the player takes this item's effect.
     MobBuff(i32),
+    /// A party challenges the one the player leads in a Monster Carnival
+    /// waiting room: ask them.
+    CarnivalChallenge {
+        challenger: ClientId,
+        challengers: Vec<net::carnival::Challenger>,
+    },
     /// Event `id`'s time left is now `clock`, or it has no time limit.
     EventClock {
         id: u32,
@@ -788,6 +794,17 @@ pub enum SquadAnswer {
     Rejoin(crate::actor::event::EventTicket),
 }
 
+/// What came of a leader's pick of a Monster Carnival room
+/// (`DirectoryMessage::CarnivalPick`).
+#[derive(Debug)]
+pub enum CarnivalPick {
+    /// The room was free: the party takes it, waiting for a challenge.
+    Start(crate::actor::event::EventStart),
+    /// The challenge was put to the party waiting there.
+    Sent,
+    Refused(net::carnival::Refusal),
+}
+
 /// Messages to the world directory.
 #[derive(Debug)]
 pub enum DirectoryMessage {
@@ -900,6 +917,25 @@ pub enum DirectoryMessage {
         from: ClientId,
         kind: EventKind,
         reply: tokio::sync::oneshot::Sender<Option<crate::actor::event::EventStart>>,
+    },
+    /// What `from` finds of the Monster Carnival's rooms on their channel.
+    CarnivalRooms {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<Vec<net::carnival::Room>>,
+    },
+    /// `from`, a party leader, picks Monster Carnival room `room`: their
+    /// party takes it if free, or challenges the party waiting there.
+    CarnivalPick {
+        from: ClientId,
+        room: u8,
+        reply: tokio::sync::oneshot::Sender<CarnivalPick>,
+    },
+    /// `from`, leading the party waiting in a Monster Carnival room,
+    /// accepts or declines the challenge `challenger` put to them.
+    CarnivalAnswer {
+        from: ClientId,
+        challenger: ClientId,
+        accept: bool,
     },
     /// What `from` finds of the squad of `kind` on their channel, at its
     /// NPC (`net::squads`).

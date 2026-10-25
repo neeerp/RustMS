@@ -905,6 +905,11 @@ pub const DUARTE: i32 = 2103013;
 pub const SPIEGELMANN: i32 = 2042000;
 /// Spiegelmann again, in the Monster Carnival's exit room.
 pub const CARNIVAL_GUIDE: i32 = 2042002;
+/// Spiegelmann in a Monster Carnival waiting room, who puts challenges to
+/// the party waiting there.
+pub const CARNIVAL_ROOM_NPC: i32 = 2042001;
+/// The waiting room's way back to the Carnival Field.
+pub const CARNIVAL_ROOM_EXIT: i32 = 2042003;
 /// Wu Yang, Guon's son, freed on the Pirate Ship's last stage and met
 /// again in its clear room.
 pub const WU_YANG: i32 = 2094001;
@@ -1385,8 +1390,62 @@ impl NpcScript {
 
     /// Spiegelmann on the Carnival Field, for a player whose party may or
     /// may not take each of the Monster Carnival's rooms (`entries`).
-    pub fn spiegelmann(entries: &[(EventKind, Entry)], player: &Player) -> Self {
-        spiegelmann(entries, player)
+    pub fn spiegelmann(
+        entries: &[(EventKind, Entry)],
+        rooms: &[carnival::Room],
+        player: &Player,
+    ) -> Self {
+        spiegelmann(entries, rooms, player)
+    }
+
+    /// Spiegelmann on a pick of Monster Carnival room `room` that didn't
+    /// take it: the challenge was put to the party waiting there (`None`),
+    /// or why not.
+    pub fn spiegelmann_picked(room: u8, refused: Option<carnival::Refusal>) -> Self {
+        use carnival::Refusal;
+        let text = match refused {
+            None => text(keys::CARNIVAL_SPIEGELMANN_SENT),
+            Some(Refusal::NoParty) => text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY),
+            Some(Refusal::NotLeader) => text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER),
+            Some(Refusal::NotEligible) => event_terms(
+                EventKind::Carnival(room).event(),
+                keys::CARNIVAL_SPIEGELMANN_TERMS,
+            ),
+            Some(Refusal::Unequal) => text(keys::CARNIVAL_SPIEGELMANN_UNEQUAL),
+            Some(Refusal::Facing) => text(keys::CARNIVAL_SPIEGELMANN_FACING),
+            Some(Refusal::Full) => text(keys::CARNIVAL_SPIEGELMANN_FULL),
+        };
+        NpcScript::new(SPIEGELMANN, vec![Page::Say(text)])
+    }
+
+    /// `challenger`'s party challenges the one the player leads in a
+    /// Monster Carnival waiting room: will they fight (Cosmic
+    /// `cpqchallenge`)?
+    pub fn carnival_challenge(
+        challenger: crate::ClientId,
+        challengers: &[carnival::Challenger],
+    ) -> Self {
+        let party: Vec<_> = challengers
+            .iter()
+            .map(|c| {
+                let level = c.level.to_string();
+                let params = [("name", c.name.as_str()), ("level", level.as_str())];
+                content::text().get(keys::CARNIVAL_CHALLENGE_MEMBER, &params)
+            })
+            .collect();
+        let party = party.join("\r\n");
+        let answer = |accept| {
+            let effect = Effect::CarnivalAnswer { challenger, accept };
+            vec![Page::Done(vec![effect])]
+        };
+        NpcScript::new(
+            CARNIVAL_ROOM_NPC,
+            vec![Page::Decide {
+                text: content::text().get(keys::CARNIVAL_CHALLENGE_ASK, &[("party", &party)]),
+                on_yes: answer(true),
+                on_no: answer(false),
+            }],
+        )
     }
 
     /// Pietri in the maze's goal room, to a member who may be its
@@ -1568,6 +1627,24 @@ impl NpcScript {
         if npc_id == CARNIVAL_GUIDE && player.stats.map_id == carnival::CARNIVAL_EXIT {
             let back = carnival::CARNIVAL_LOBBY;
             return Some(ask_warp(CARNIVAL_GUIDE, keys::CARNIVAL_GUIDE_BACK, back));
+        }
+        if carnival::waiting_room(player.stats.map_id).is_some() {
+            // The leader's leaving gives the room up (`EventActor`).
+            let back = carnival::CARNIVAL_LOBBY;
+            match npc_id {
+                CARNIVAL_ROOM_NPC => {
+                    let page = Page::Say(text(keys::CARNIVAL_ROOM_WAIT));
+                    return Some(NpcScript::new(CARNIVAL_ROOM_NPC, vec![page]));
+                }
+                CARNIVAL_ROOM_EXIT => {
+                    return Some(ask_warp(
+                        CARNIVAL_ROOM_EXIT,
+                        keys::CARNIVAL_ROOM_LEAVE,
+                        back,
+                    ));
+                }
+                _ => {}
+            }
         }
         if npc_id == DUARTE {
             if let Some(script) = duarte_after(player) {
@@ -7126,7 +7203,11 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
 /// Carnival is, and for a party's leader of the right level, its rooms,
 /// each with how many it takes. Picking one the party may take sends it
 /// in. Cosmic's Carnival 2 and Maple Coin trades aren't in.
-fn spiegelmann(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
+fn spiegelmann(
+    entries: &[(EventKind, Entry)],
+    rooms: &[carnival::Room],
+    player: &Player,
+) -> NpcScript {
     let entry = |kind: EventKind| {
         entries
             .iter()
@@ -7135,23 +7216,39 @@ fn spiegelmann(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
     };
     let room = |room: u8| {
         let kind = EventKind::Carnival(room);
+        // A room in use may be waiting for a challenge: the directory
+        // decides when the leader picks it.
         let page = match entry(kind) {
-            Entry::Ready => Page::Done(vec![Effect::StartEvent(kind)]),
-            Entry::Busy => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_BUSY)),
+            Entry::Ready | Entry::Busy => Page::Done(vec![Effect::CarnivalRoom(room)]),
             Entry::NoParty => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NO_PARTY)),
             Entry::NotLeader => Page::Say(text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER)),
             Entry::NotEligible => {
                 Page::Say(event_terms(kind.event(), keys::CARNIVAL_SPIEGELMANN_TERMS))
             }
         };
-        let label = content::text().get(
-            keys::CARNIVAL_SPIEGELMANN_ROOM,
-            &[
-                ("room", &room.to_string()),
-                ("least", &kind.event().least().to_string()),
-                ("most", &kind.event().team.end().to_string()),
-            ],
-        );
+        let number = room.to_string();
+        let view = rooms.get(usize::from(room) - 1);
+        let label = match view.copied().unwrap_or(carnival::Room::Free) {
+            carnival::Room::Free => content::text().get(
+                keys::CARNIVAL_SPIEGELMANN_ROOM,
+                &[
+                    ("room", &number),
+                    ("least", &kind.event().least().to_string()),
+                    ("most", &kind.event().team.end().to_string()),
+                ],
+            ),
+            carnival::Room::Waiting { size, level } => content::text().get(
+                keys::CARNIVAL_SPIEGELMANN_WAITING,
+                &[
+                    ("room", &number),
+                    ("size", &size.to_string()),
+                    ("level", &level.to_string()),
+                ],
+            ),
+            carnival::Room::Battle => {
+                content::text().get(keys::CARNIVAL_SPIEGELMANN_TAKEN, &[("room", &number)])
+            }
+        };
         (label, vec![page])
     };
     let first = entry(EventKind::Carnival(1));
@@ -14034,6 +14131,77 @@ mod tests {
     }
 
     #[test]
+    fn spiegelmann_shows_the_rooms_and_puts_challenges() {
+        let entries: Vec<_> = (1..=6)
+            .map(|room| (EventKind::Carnival(room), Entry::Busy))
+            .collect();
+        let mut leader = player(50);
+        leader.stats.level = 40;
+        leader.stats.map_id = carnival::CARNIVAL_LOBBY;
+        let rooms = [
+            carnival::Room::Waiting { size: 2, level: 41 },
+            carnival::Room::Battle,
+        ];
+        let mut script = NpcScript::spiegelmann(&entries, &rooms, &leader);
+        script.begin();
+        let Some(Prompt::Selection { text: menu, .. }) =
+            script.respond(ScriptInput::Select(0)).unwrap().prompt
+        else {
+            panic!("room list expected");
+        };
+        let label = |key, params: &[(&str, &str)]| content::text().get(key, params);
+        let waiting = [("room", "1"), ("size", "2"), ("level", "41")];
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_WAITING, &waiting)));
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_TAKEN, &[("room", "2")])));
+        let free = [("room", "3"), ("least", "2"), ("most", "4")];
+        assert!(menu.contains(&label(keys::CARNIVAL_SPIEGELMANN_ROOM, &free)));
+        // A room in use is picked like a free one; the directory decides.
+        assert_eq!(
+            script.respond(ScriptInput::Select(0)).unwrap().effects,
+            [Effect::CarnivalRoom(1)]
+        );
+        let said = |refused| page_text(&NpcScript::spiegelmann_picked(1, refused).begin());
+        assert_eq!(said(None), text(keys::CARNIVAL_SPIEGELMANN_SENT));
+        let unequal = Some(carnival::Refusal::Unequal);
+        assert_eq!(said(unequal), text(keys::CARNIVAL_SPIEGELMANN_UNEQUAL));
+
+        // The waiting leader decides.
+        let challengers = [carnival::Challenger {
+            name: "Blue".into(),
+            level: 33,
+        }];
+        let ask = |accept| {
+            let mut script = NpcScript::carnival_challenge(7, &challengers);
+            let asked = question(&script.begin());
+            let input = if accept {
+                ScriptInput::Yes
+            } else {
+                ScriptInput::No
+            };
+            (asked, script.respond(input).unwrap().effects)
+        };
+        let (asked, effects) = ask(true);
+        assert!(asked.contains("#bBlue#k, level 33"), "{asked}");
+        let answered = |accept| Effect::CarnivalAnswer {
+            challenger: 7,
+            accept,
+        };
+        assert_eq!(effects, [answered(true)]);
+        assert_eq!(ask(false).1, [answered(false)]);
+
+        // In the waiting room, one waits or goes back to the field.
+        leader.stats.map_id = carnival::room_map(4);
+        let mut wait = NpcScript::for_npc(CARNIVAL_ROOM_NPC, &leader).unwrap();
+        assert_eq!(page_text(&wait.begin()), text(keys::CARNIVAL_ROOM_WAIT));
+        let mut leave = NpcScript::for_npc(CARNIVAL_ROOM_EXIT, &leader).unwrap();
+        assert_eq!(question(&leave.begin()), text(keys::CARNIVAL_ROOM_LEAVE));
+        assert_eq!(
+            leave.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0)]
+        );
+    }
+
+    #[test]
     fn spiegelmann_sends_a_leader_to_a_room_and_others_to_the_field() {
         let entries = |entry| {
             (1..=6)
@@ -14049,11 +14217,11 @@ mod tests {
         let lobby = carnival::CARNIVAL_LOBBY;
         // Join, then the room.
         let enter = |entry, level| {
-            let mut script = NpcScript::spiegelmann(&entries(entry), &at(level, lobby));
+            let mut script = NpcScript::spiegelmann(&entries(entry), &[], &at(level, lobby));
             assert_eq!(kind(&script.begin()), Some(4));
             script.respond(ScriptInput::Select(0)).unwrap()
         };
-        let mut script = NpcScript::spiegelmann(&entries(Entry::Ready), &at(35, lobby));
+        let mut script = NpcScript::spiegelmann(&entries(Entry::Ready), &[], &at(35, lobby));
         script.begin();
         assert_eq!(
             kind(&script.respond(ScriptInput::Select(0)).unwrap()),
@@ -14061,7 +14229,7 @@ mod tests {
         );
         assert_eq!(
             script.respond(ScriptInput::Select(4)).unwrap().effects,
-            [Effect::StartEvent(EventKind::Carnival(5))]
+            [Effect::CarnivalRoom(5)]
         );
         let levels = event_terms(&events::CARNIVAL[0], keys::CARNIVAL_SPIEGELMANN_LEVELS);
         assert_eq!(page_text(&enter(Entry::Ready, 51)), levels);
@@ -14070,7 +14238,7 @@ mod tests {
         assert_eq!(page_text(&enter(Entry::NoParty, 40)), no_party);
         let not_leader = text(keys::CARNIVAL_SPIEGELMANN_NOT_LEADER);
         assert_eq!(page_text(&enter(Entry::NotLeader, 40)), not_leader);
-        let mut script = NpcScript::spiegelmann(&entries(Entry::NotEligible), &at(40, lobby));
+        let mut script = NpcScript::spiegelmann(&entries(Entry::NotEligible), &[], &at(40, lobby));
         script.begin();
         script.respond(ScriptInput::Select(0)).unwrap();
         let terms = event_terms(

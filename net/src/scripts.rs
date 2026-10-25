@@ -634,6 +634,15 @@ pub enum Effect {
     /// (`events::Event::team`). Nothing is applied unless the party still
     /// may go; the script says its `refused` text instead.
     StartEvent(crate::events::EventKind),
+    /// Take Monster Carnival room `0` for the player's party, or challenge
+    /// the party waiting there. Says how it went in a script of its own.
+    CarnivalRoom(u8),
+    /// The leader of a party waiting in a Monster Carnival room accepts
+    /// or declines the challenge put to them by `challenger`'s party.
+    CarnivalAnswer {
+        challenger: crate::ClientId,
+        accept: bool,
+    },
     /// Tell the player's event something happened, once the effects before
     /// it have applied. Scripts end on it.
     EventCommand(crate::events::EventCommand),

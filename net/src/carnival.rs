@@ -21,6 +21,14 @@ pub const CARNIVAL_LEVELS: RangeInclusive<u8> = 30..=50;
 pub const CARNIVAL_FALLBACK: i32 = 102000000;
 /// A battle's length when its field's data has none (`timeDefault`).
 const BATTLE_SECONDS: u64 = 610;
+/// How long a party waits in its room for a challenge before it is sent
+/// back to the Carnival Field (Cosmic's lobby timer).
+pub const WAITING: Duration = Duration::from_secs(180);
+/// How long both parties stand in the waiting room once a challenge is
+/// accepted, before the battle (Cosmic `startCPQ`'s clock).
+pub const READY: Duration = Duration::from_secs(10);
+/// How long a challenge waits for the waiting leader's answer.
+pub const CHALLENGE: Duration = Duration::from_secs(30);
 
 /// Room `room`'s waiting room (980000n00). The battle is the next map,
 /// then the revive room, the winners' room and the losers'.
@@ -31,6 +39,11 @@ pub const fn room_map(room: u8) -> i32 {
 /// Room `room`'s battle field (980000n01).
 pub const fn battle_map(room: u8) -> i32 {
     room_map(room) + 1
+}
+
+/// The room whose waiting room `map_id` is.
+pub fn waiting_room(map_id: i32) -> Option<u8> {
+    (1..=CARNIVAL_ROOMS).find(|&room| room_map(room) == map_id)
 }
 
 /// The room whose battle field `map_id` is.
@@ -48,6 +61,53 @@ pub fn battle_length(room: u8) -> Duration {
         .filter(|&seconds| seconds > 0)
         .unwrap_or(BATTLE_SECONDS);
     crate::events::scaled(Duration::from_secs(seconds))
+}
+
+/// What Spiegelmann shows of a room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Room {
+    Free,
+    /// A party of `size`, of average level `level`, waits for a challenge.
+    Waiting {
+        size: usize,
+        level: u8,
+    },
+    /// Two parties are in battle, or about to be.
+    Battle,
+}
+
+/// Why a party's leader may not take or challenge a room.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    NoParty,
+    NotLeader,
+    /// Too few or too many of the party on the Carnival Field at the right
+    /// levels.
+    NotEligible,
+    /// The party isn't the size of the one waiting.
+    Unequal,
+    /// The party waiting is already answering another challenge.
+    Facing,
+    /// The room is in battle.
+    Full,
+}
+
+/// Where a room's event stands.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Stage {
+    /// One party waits in the room for a challenge.
+    #[default]
+    Waiting,
+    /// A challenge was accepted: both parties gather before the battle.
+    Ready,
+    Battle,
+}
+
+/// One of a challenging party, as the waiting leader is shown them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Challenger {
+    pub name: String,
+    pub level: u8,
 }
 
 /// How many mobs room `room`'s battle field lists to summon.
@@ -110,6 +170,12 @@ impl Score {
         self.sides.get(&member).copied()
     }
 
+    /// Whether both sides still have one of `members` playing.
+    pub fn both_sides(&self, members: &[ClientId]) -> bool {
+        let plays = |side| members.iter().any(|&m| self.side(m) == Some(side));
+        plays(0) && plays(1)
+    }
+
     /// `member` earned `cp` with a kill, and so did their side (Cosmic
     /// `gainCP`). None for one not playing.
     pub fn gain(&mut self, member: ClientId, cp: i32) -> Option<Gain> {
@@ -150,6 +216,8 @@ mod tests {
         assert_eq!(battle_room(980000400), None);
         assert_eq!(battle_room(980000701), None);
         assert_eq!(battle_room(CARNIVAL_LOBBY), None);
+        assert_eq!(waiting_room(980000300), Some(3));
+        assert_eq!(waiting_room(980000301), None);
     }
 
     #[test]
@@ -171,5 +239,8 @@ mod tests {
         assert_eq!(start.theirs, Points { cp: 1, total: 1 });
         assert_eq!(score.start(3).unwrap().theirs, start.ours);
         assert_eq!(score.start(9), None);
+        assert!(score.both_sides(&[1, 3]));
+        assert!(!score.both_sides(&[1, 2]));
+        assert!(!score.both_sides(&[3, 9]));
     }
 }

@@ -52,7 +52,7 @@ pub fn build_player_enter_field(avatar: &FieldAvatar) -> Result<Packet, NetworkE
     packet.write_byte(0)?; // new year cards
     packet.write_byte(u8::from(avatar.berserk))?; // the aura (0x97fc24)
     packet.write_byte(0)?; // an Evan's Dragon Fury
-    packet.write_byte(0)?; // team (only used in event fields)
+    packet.write_byte(avatar.team)?; // team (only used in event fields)
     Ok(packet)
 }
 
@@ -353,6 +353,7 @@ mod tests {
             mount: game::Mount::default(),
             gm: false,
             hidden: false,
+            team: 0,
         }
     }
 

@@ -1947,6 +1947,21 @@ pub mod keys {
     pub const CARNIVAL_SPIEGELMANN_BUSY: &str = "carnival.spiegelmann.busy";
     pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
     pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
+    pub const CARNIVAL_SPIEGELMANN_WAITING: &str = "carnival.spiegelmann.waiting";
+    pub const CARNIVAL_SPIEGELMANN_TAKEN: &str = "carnival.spiegelmann.taken";
+    pub const CARNIVAL_SPIEGELMANN_SENT: &str = "carnival.spiegelmann.sent";
+    pub const CARNIVAL_SPIEGELMANN_UNEQUAL: &str = "carnival.spiegelmann.unequal";
+    pub const CARNIVAL_SPIEGELMANN_FACING: &str = "carnival.spiegelmann.facing";
+    pub const CARNIVAL_SPIEGELMANN_FULL: &str = "carnival.spiegelmann.full";
+    pub const CARNIVAL_CHALLENGE_ASK: &str = "carnival.challenge.ask";
+    pub const CARNIVAL_CHALLENGE_MEMBER: &str = "carnival.challenge.member";
+    pub const CARNIVAL_CHALLENGE_DECLINED: &str = "carnival.challenge.declined";
+    pub const CARNIVAL_CHALLENGE_UNEQUAL: &str = "carnival.challenge.unequal";
+    pub const CARNIVAL_WAITING: &str = "carnival.waiting";
+    pub const CARNIVAL_TEAM_RED: &str = "carnival.team.red";
+    pub const CARNIVAL_TEAM_BLUE: &str = "carnival.team.blue";
+    pub const CARNIVAL_ROOM_WAIT: &str = "carnival.room.wait";
+    pub const CARNIVAL_ROOM_LEAVE: &str = "carnival.room.leave";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3061,6 +3076,21 @@ mod tests {
                 keys::CARNIVAL_SPIEGELMANN_BUSY,
                 keys::CARNIVAL_SPIEGELMANN_GO,
                 keys::CARNIVAL_GUIDE_BACK,
+                keys::CARNIVAL_SPIEGELMANN_WAITING,
+                keys::CARNIVAL_SPIEGELMANN_TAKEN,
+                keys::CARNIVAL_SPIEGELMANN_SENT,
+                keys::CARNIVAL_SPIEGELMANN_UNEQUAL,
+                keys::CARNIVAL_SPIEGELMANN_FACING,
+                keys::CARNIVAL_SPIEGELMANN_FULL,
+                keys::CARNIVAL_CHALLENGE_ASK,
+                keys::CARNIVAL_CHALLENGE_MEMBER,
+                keys::CARNIVAL_CHALLENGE_DECLINED,
+                keys::CARNIVAL_CHALLENGE_UNEQUAL,
+                keys::CARNIVAL_WAITING,
+                keys::CARNIVAL_TEAM_RED,
+                keys::CARNIVAL_TEAM_BLUE,
+                keys::CARNIVAL_ROOM_WAIT,
+                keys::CARNIVAL_ROOM_LEAVE,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

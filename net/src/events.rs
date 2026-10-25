@@ -1773,11 +1773,11 @@ pub const CARNIVAL: [Event; CARNIVAL_ROOMS as usize] = [
 ];
 
 const fn carnival(room: u8) -> Event {
-    let battle = crate::carnival::battle_map(room);
+    let waiting = crate::carnival::room_map(room);
     Event {
         lobby: CARNIVAL_LOBBY,
-        maps: battle..=battle + 3,
-        entry: battle,
+        maps: waiting..=waiting + 4,
+        entry: waiting,
         exit: crate::carnival::CARNIVAL_EXIT,
         levels: crate::carnival::CARNIVAL_LEVELS,
         team: if room <= 4 { 2..=4 } else { 3..=6 },
@@ -2421,6 +2421,14 @@ impl Team {
         }
         self.members.push(member);
         true
+    }
+
+    /// `member` comes in with another party, as a Monster Carnival's
+    /// challengers do.
+    pub fn admit(&mut self, member: ClientId) {
+        if !self.has(member) {
+            self.members.push(member);
+        }
     }
 
     /// The team won the event: from now on only the last member's leaving
