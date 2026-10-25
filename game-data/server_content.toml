@@ -1331,6 +1331,7 @@ unsourced = [
     "gm_event.go",
     "gm_event.not_open",
     "gm_event.pietro",
+    "gm_event.pietro_full",
     "gm_event.pietra",
     "gm_event.harry_ask",
     "ox.wrong",

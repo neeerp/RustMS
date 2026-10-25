@@ -912,6 +912,8 @@ pub const SPIEGELMANN: i32 = 2042000;
 pub const EVENT_ASSISTANTS: [i32; 4] = [9000000, 9000001, 9000011, 9000013];
 /// Pietro, where a GM's event sends its winners (109050000, `Event02`).
 const PIETRO: i32 = 9000002;
+/// What Pietro gives each winner: the Scroll of Secrets (report b172).
+const SCROLL_OF_SECRETS: i32 = 4031019;
 /// Pietra, where it sends the others (109050001, `Event06`).
 const PIETRA: i32 = 9000010;
 /// Harry, on the Coconut Season fields (`Event09`).
@@ -4929,12 +4931,23 @@ fn saved_location(player: &Player, kind: i16, fallback: i32) -> i32 {
 
 /// Out of a GM's event, back to where an Event Assistant took the player
 /// from (`EVENT_RETURN`, else Henesys): Pietro and Pietra after the game,
-/// and Harry during it, who gives the player's place back.
+/// and Harry during it, who gives the player's place back. Pietro gives
+/// the winner a Scroll of Secrets on the way, and keeps them until it fits.
 fn gm_event_exit(npc_id: i32, player: &Player) -> Option<NpcScript> {
     let back = saved_location(player, EVENT_RETURN, HENESYS.0);
     let go = vec![Effect::SaveLocation(EVENT_RETURN, None), Effect::Warp(back)];
     let page = match npc_id {
-        PIETRO => Page::Say(text(keys::GM_EVENT_PIETRO)),
+        PIETRO => {
+            let mut prize = vec![Effect::GiveItem {
+                item_id: SCROLL_OF_SECRETS,
+                quantity: 1,
+            }];
+            prize.extend(go);
+            let pages = vec![Page::Say(text(keys::GM_EVENT_PIETRO)), Page::Done(prize)];
+            let mut script = NpcScript::new(PIETRO, pages);
+            script.inventory_full = Some(text(keys::GM_EVENT_PIETRO_FULL));
+            return Some(script);
+        }
         PIETRA => Page::Say(text(keys::GM_EVENT_PIETRA)),
         HARRY => {
             let mut leave = vec![Effect::LeaveGmEvent {
@@ -9996,7 +10009,13 @@ mod tests {
         let go = |to| vec![Effect::SaveLocation(EVENT_RETURN, None), Effect::Warp(to)];
         let mut came = rider(100, 0, 109050000);
         came.saved_locations.insert(EVENT_RETURN, 60000);
-        assert_eq!(back(&came, PIETRO), go(60000));
+        // Pietro gives the winner the prize on the way.
+        let mut prize = vec![Effect::GiveItem {
+            item_id: SCROLL_OF_SECRETS,
+            quantity: 1,
+        }];
+        prize.extend(go(60000));
+        assert_eq!(back(&came, PIETRO), prize);
         came.stats.map_id = 109050001;
         assert_eq!(back(&came, PIETRA), go(60000));
         // Without a saved map, Henesys.

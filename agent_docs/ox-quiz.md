@@ -59,7 +59,8 @@ Sets 8 and 9 have none.
   The client's clock for a question is its own 30 s, so under scaling it
   runs slow. Nothing takes the client's clock down on `/reset`, so a GM
   who stays may see it run on.
-- No prizes yet.
+- The winners' prize is Pietro's, on 109050000 (`agent_docs/coconut.md`,
+  "Opening an event to players").
 
 ## Packets
 

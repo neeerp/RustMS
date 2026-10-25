@@ -3,7 +3,7 @@
 //! the GM's `/start`. Then a player goes through the gate and the right
 //! portal on each of the three levels to 109050000, and stays there when
 //! the time is up, while one who stayed on the first level goes out to
-//! 109050001. The harness runs events 60 times as fast
+//! 109050001. Pietro there gives the winner the Scroll of Secrets. The harness runs events 60 times as fast
 //! (`RUSTMS_EVENT_SCALE`), so its 360 s are 6.
 
 use game_data::GameData;
@@ -22,6 +22,8 @@ use tokio::time::Duration;
 
 const SOUTHPERRY: i32 = 60000;
 const PAUL: i32 = 9000000;
+const PIETRO: i32 = 9000002;
+const SCROLL_OF_SECRETS: i32 = 4031019;
 const LEVEL_1: i32 = 109_030_101;
 const LEVEL_2: i32 = 109_030_102;
 const LEVEL_3: i32 = 109_030_103;
@@ -32,17 +34,18 @@ const START: u8 = 13;
 const NOTICE: u8 = 0;
 const CLOSED: (i16, u8) = (SendOpcode::BlockedMap as i16, 1);
 
-fn talk_to_paul() -> Packet {
+/// Talking to `npc` on `map`.
+fn talk_to(map: i32, npc: i32) -> Packet {
     let maps = GameData::load_from_nx_map(
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/game-data/Map.nx"),
     )
     .unwrap();
     let index = maps
-        .field(SOUTHPERRY)
+        .field(map)
         .unwrap()
         .map_npcs
         .iter()
-        .position(|n| n.npc_id == PAUL)
+        .position(|n| n.npc_id == npc)
         .unwrap();
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
@@ -61,7 +64,7 @@ async fn gate(c: &mut MapleTestConnection, m: &str) -> Trace {
 
 #[tokio::test]
 async fn the_gate_opens_at_the_start_and_the_right_portals_lead_out_of_the_third_level() {
-    let paul = talk_to_paul();
+    let paul = talk_to(SOUTHPERRY, PAUL);
     let config = load_harness_config_or_fail().await;
     login_to_world_session(&config).await.expect("GM login");
     let configs = [
@@ -138,6 +141,14 @@ async fn the_gate_opens_at_the_start_and_the_right_portals_lead_out_of_the_third
     assert_eq!(notices, 9, "every notice");
     barrier(&mut runner.connection, rm, &mut rt).await;
     assert_eq!(rt.warps, [LEVEL_2, LEVEL_3, WON], "the winner stays");
+
+    // Pietro gives the winner the prize and sends them back.
+    let c = &mut runner.connection;
+    let t = step(c, rm, talk_to(WON, PIETRO)).await;
+    assert_eq!(t.prompts, [(PIETRO, 0)]);
+    let t = step(c, rm, answer(0, 1, None)).await;
+    assert_eq!(t.items, [(SCROLL_OF_SECRETS, 1)], "the prize");
+    assert_eq!(t.warps, [SOUTHPERRY], "back");
 
     // The GM stays, and the gate is closed again.
     barrier(g, "over", &mut gt).await;
