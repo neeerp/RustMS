@@ -7,6 +7,7 @@ use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, BossBar, Cast, CastArea, Catch, Kill, MobSet, Sharer};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
+use crate::actor::field_snowball::{self, SnowballGame};
 use crate::actor::field_summons::SummonSet;
 use crate::actor::field_trades::{Outbox, RoomRequest, Trades};
 use crate::actor::registry::MAP_NPC_OBJECT_ID_BASE;
@@ -56,6 +57,9 @@ use net::packet::build::world::npc::{
 use net::packet::build::world::pet::build_move_pet;
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
+};
+use net::packet::build::world::snowball::{
+    build_hit_snowball, build_left_knock_back, build_snowball_message, build_snowball_state,
 };
 use net::packet::build::world::summon::{
     build_damage_summon, build_move_summon, build_remove_summon, build_spawn_summon,
@@ -271,6 +275,8 @@ pub struct FieldActor {
     kites: KiteSet,
     /// On a Coconut Season field (field type 4), its game.
     coconut: Option<CoconutGame>,
+    /// On a Snowball field (field type 1), its game.
+    snowball: Option<SnowballGame>,
     tick: Duration,
 }
 
@@ -339,6 +345,14 @@ impl FieldActor {
                 .and_then(|data| data.field(key.map_id))
                 .and_then(|field| field.coconut.clone())
                 .map(CoconutGame::new),
+            snowball: net::get_game_data()
+                .ok()
+                .and_then(|data| data.field(key.map_id))
+                .and_then(|field| field.snowball.clone())
+                .map(|rules| {
+                    let wait = Duration::from_millis(rules.snowman_wait.into());
+                    SnowballGame::new(rules, net::events::scaled(wait))
+                }),
             tick,
         };
         // A wedding's copy of the hunting ground opens with its one Giant
@@ -449,6 +463,7 @@ impl FieldActor {
             }
         }
         self.tick_coconut(now);
+        self.tick_snowball(now);
         self.reach_from_mists(now);
         for summon in self.summons.expire(now) {
             let view = summon.view;
@@ -853,6 +868,10 @@ impl FieldActor {
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
                 FieldRequest::CoconutHit { index } => self.hit_coconut(from, index),
+                FieldRequest::SnowballHit { target, delay } => {
+                    self.hit_snowball(from, target, delay)
+                }
+                FieldRequest::IntoSnowball => self.knock_back(from),
                 FieldRequest::GmEvent(event) => self.run_gm_event(event),
                 FieldRequest::Pickup {
                     object_id,
@@ -3822,6 +3841,10 @@ impl FieldActor {
         if let Some(game) = &mut self.coconut {
             avatar.team = game.join(client_id);
         }
+        // So on a Snowball field.
+        if let Some(game) = &mut self.snowball {
+            avatar.team = game.join(client_id);
+        }
         // It also ends any trade or shop the player had here.
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
@@ -3924,6 +3947,11 @@ impl FieldActor {
 
         if let Some(game) = &self.coconut {
             for packet in coconut_entry(game, client_id, now) {
+                handle.send_packet(packet);
+            }
+        }
+        if let Some(game) = &self.snowball {
+            for packet in snowball_entry(game, now) {
                 handle.send_packet(packet);
             }
         }
@@ -4096,6 +4124,9 @@ impl FieldActor {
 
     /// A GM's `/start` or `/reset` for the event on this field.
     fn run_gm_event(&mut self, event: GmEvent) {
+        if self.snowball.is_some() {
+            return self.run_snowball_event(event);
+        }
         let Some(game) = &mut self.coconut else {
             return;
         };
@@ -4189,6 +4220,123 @@ impl FieldActor {
         }
     }
 
+    /// `from` hits `what` on the Snowball field; everyone sees the hit,
+    /// and what it moved.
+    fn hit_snowball(&mut self, from: ClientId, what: u8, delay: u16) {
+        let Some(game) = &mut self.snowball else {
+            return;
+        };
+        let mut rng = rand::thread_rng();
+        let Some(hit) = game.hit(from, what, Instant::now(), &mut || rng.gen()) else {
+            return;
+        };
+        // The state first: the client draws a snowman's HP bar from it as
+        // the hit shows. A hit's delay is the hitter's swing, a moment.
+        let mut packets = Vec::new();
+        if hit.changed {
+            packets.push(snowball_state(game));
+        }
+        packets.push(build_hit_snowball(
+            hit.what,
+            hit.damage,
+            delay.min(field_snowball::MAX_HIT_DELAY),
+        ));
+        for (team, message) in hit.messages {
+            packets.push(build_snowball_message(team, message));
+        }
+        for packet in packets.into_iter().flatten() {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// `from` walked into a ball, and is thrown back.
+    fn knock_back(&mut self, from: ClientId) {
+        let Some(game) = &mut self.snowball else {
+            return;
+        };
+        if !game.knock(from, Instant::now()) {
+            return;
+        }
+        if let (Some(occupant), Ok(packet)) = (self.occupants.get(&from), build_left_knock_back()) {
+            occupant.handle.send_packet(packet);
+        }
+    }
+
+    /// A GM's `/start` or `/reset` on a Snowball field.
+    fn run_snowball_event(&mut self, event: GmEvent) {
+        let Some(game) = &mut self.snowball else {
+            return;
+        };
+        let now = Instant::now();
+        let clock = match event {
+            GmEvent::Start => {
+                let length = net::events::scaled(field_snowball::LENGTH);
+                if !game.start(now, length) {
+                    return;
+                }
+                info!(field = ?self.key, "Snowball game started");
+                field_snowball::seconds(length)
+            }
+            GmEvent::Reset => {
+                if !game.reset() {
+                    return;
+                }
+                info!(field = ?self.key, "Snowball game reset");
+                0
+            }
+        };
+        for packet in [snowball_state(game), build_countdown(clock)]
+            .into_iter()
+            .flatten()
+        {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// The Snowball game's time: snowmen back up, the balls' pace, the end,
+    /// and everyone sent off when it has been shown.
+    fn tick_snowball(&mut self, now: Instant) {
+        let Some(game) = &mut self.snowball else {
+            return;
+        };
+        let finish = net::events::scaled(field_snowball::FINISH);
+        let turns = game.tick(now, finish);
+        let game = &*game;
+        let mut packets = Vec::new();
+        for turn in turns {
+            match turn {
+                field_snowball::Turn::Changed => packets.push(snowball_state(game)),
+                field_snowball::Turn::Message { team, message } => {
+                    packets.push(build_snowball_message(team, message));
+                }
+                field_snowball::Turn::Ended { winner } => {
+                    info!(field = ?self.key, ?winner, "Snowball game over");
+                    let line = net::content::text().get(keys::SNOWBALL_ENDED, &[]);
+                    packets.push(snowball_state(game));
+                    packets.push(build_countdown(0));
+                    packets.push(build_broadcast(Broadcast::Pink, &line));
+                }
+                field_snowball::Turn::WarpOut { winner } => {
+                    for (&client_id, occupant) in &self.occupants {
+                        let won = winner.is_some() && game.team(client_id) == winner;
+                        occupant.handle.send(ServerMessage::ShipWarp {
+                            from_map: self.key.map_id,
+                            map_id: if won {
+                                field_snowball::WINNERS_MAP
+                            } else {
+                                field_snowball::EXIT_MAP
+                            },
+                            portal: conti::Portal::Id(0),
+                        });
+                    }
+                }
+            }
+        }
+        for packet in packets.into_iter().flatten() {
+            self.broadcast(None, packet);
+        }
+    }
+
     fn handle_leave(&mut self, client_id: ClientId, staying: bool) {
         let Some(left) = self.occupants.remove(&client_id) else {
             return;
@@ -4206,6 +4354,9 @@ impl FieldActor {
         // The others drop a player's summons with the player.
         self.summons.remove_owned(client_id, None);
         if let Some(game) = &mut self.coconut {
+            game.leave(client_id);
+        }
+        if let Some(game) = &mut self.snowball {
             game.leave(client_id);
         }
         // Everyone sees the player go before control passes on.
@@ -4336,6 +4487,29 @@ fn coconut_entry(game: &CoconutGame, client_id: ClientId, now: Instant) -> Vec<P
         packets.push(build_countdown(seconds));
     }
     packets.into_iter().flatten().collect()
+}
+
+/// The Snowball field's state, as everyone on it is sent it.
+fn snowball_state(game: &SnowballGame) -> Result<Packet, net::error::NetworkError> {
+    build_snowball_state(game.state(), game.snowmen(), game.balls(), None)
+}
+
+/// What a player arriving on a Snowball field is told: the field's state,
+/// with the damages its hits show, and the clock if a game is on
+/// (report b168).
+fn snowball_entry(game: &SnowballGame, now: Instant) -> Vec<Packet> {
+    let state = build_snowball_state(
+        game.state(),
+        game.snowmen(),
+        game.balls(),
+        Some(game.damages()),
+    );
+    let clock = game.remaining(now).map(build_countdown);
+    [Some(state), clock]
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect()
 }
 
 fn player_spawn(avatar: &FieldAvatar) -> Result<Vec<Packet>, net::error::NetworkError> {
@@ -4685,6 +4859,124 @@ mod tests {
         };
         assert_eq!(warps(&mut first_rx), [field_coconut::EXIT_MAP]);
         assert_eq!(warps(&mut second_rx), [field_coconut::EXIT_MAP]);
+    }
+
+    #[tokio::test]
+    async fn a_snowball_game_runs_from_the_gms_start_to_the_warp_out() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 109060000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        actor.snowball = Some(SnowballGame::new(
+            game_data::Snowball {
+                x_max: 2,
+                damage_ball: 10,
+                damage_snowman: 15,
+                damage_snowman_strong: 45,
+                snowman_hp: 7500,
+                sections: [1, 5, 6],
+                ..Default::default()
+            },
+            Duration::from_secs(10),
+        ));
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        let of = |packets: &[Packet], op: SendOpcode| -> Vec<Vec<u8>> {
+            let op = op as i16;
+            packets
+                .iter()
+                .filter(|packet| packet.opcode() == op)
+                .map(|packet| packet.bytes[2..].to_vec())
+                .collect()
+        };
+        for (handle, id) in [(first, 1), (second, 2)] {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 0, 0),
+                party: None,
+            });
+        }
+        // Each is told the field's state with its damages, and no clock.
+        let idle = [0, 100, 0, 0, 0, 100, 0, 0, 0, 0, 0, 8, 0, 0, 8];
+        let joined = sent(&mut first_rx);
+        let mut entry = idle.to_vec();
+        entry.extend([10, 0, 15, 0, 45, 0]);
+        assert_eq!(of(&joined, SendOpcode::SnowballState), [entry]);
+        assert!(of(&joined, SendOpcode::Clock).is_empty());
+        sent(&mut second_rx);
+        assert_eq!(actor.occupants[&2].avatar.team, field_snowball::MAPLE);
+
+        let start = Instant::now();
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::GmEvent(GmEvent::Start),
+        });
+        let started = sent(&mut second_rx);
+        let mut running = idle.to_vec();
+        running[0] = 1;
+        assert_eq!(of(&started, SendOpcode::SnowballState), [running]);
+        assert_eq!(of(&started, SendOpcode::Clock), [vec![2, 0x58, 2, 0, 0]]);
+
+        // Story's three hits on its ball roll it one step, past section 1.
+        let hit = |actor: &mut FieldActor, from, target| {
+            actor.handle_message(FieldMessage::FromClient {
+                from,
+                request: FieldRequest::SnowballHit { target, delay: 300 },
+            });
+        };
+        hit(&mut actor, 1, 0);
+        assert_eq!(
+            of(&sent(&mut second_rx), SendOpcode::HitSnowball),
+            [vec![0, 10, 0, 0x2C, 1]]
+        );
+        // Story can't hit Maple's ball.
+        hit(&mut actor, 1, 1);
+        assert!(sent(&mut second_rx).is_empty());
+        for _ in 0..2 {
+            actor.snowball.as_mut().unwrap().forget_hits();
+            hit(&mut actor, 1, 0);
+        }
+        let rolled = sent(&mut second_rx);
+        assert_eq!(of(&rolled, SendOpcode::HitSnowball).len(), 2);
+        assert_eq!(of(&rolled, SendOpcode::SnowballState)[0][9..11], [1, 0]);
+        assert_eq!(of(&rolled, SendOpcode::SnowballMessage), [vec![0, 1]]);
+        sent(&mut first_rx);
+
+        // Walking into a ball throws the walker back, and only them.
+        actor.handle_message(FieldMessage::FromClient {
+            from: 2,
+            request: FieldRequest::IntoSnowball,
+        });
+        assert_eq!(
+            of(&sent(&mut second_rx), SendOpcode::LeftKnockBack).len(),
+            1
+        );
+        assert!(sent(&mut first_rx).is_empty());
+
+        // Story's ball is further on when the time runs out: Maple's fades.
+        actor.on_tick(start + Duration::from_secs(601));
+        let ended = sent(&mut second_rx);
+        assert_eq!(of(&ended, SendOpcode::SnowballState)[0][0], 3);
+        assert_eq!(of(&ended, SendOpcode::Clock), [vec![2, 0, 0, 0, 0]]);
+        assert_eq!(of(&ended, SendOpcode::BroadcastMsg).len(), 1);
+        actor.on_tick(start + Duration::from_secs(611));
+        let warps = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut maps = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::ShipWarp { map_id, .. } = message {
+                    maps.push(map_id);
+                }
+            }
+            maps
+        };
+        assert_eq!(warps(&mut first_rx), [field_snowball::WINNERS_MAP]);
+        assert_eq!(warps(&mut second_rx), [field_snowball::EXIT_MAP]);
     }
 
     #[test]

@@ -46,6 +46,7 @@ pub mod rps;
 pub mod shop;
 pub mod skill;
 pub mod skill_macro;
+pub mod snowball;
 pub mod stat;
 pub mod storage;
 pub mod store_bank;

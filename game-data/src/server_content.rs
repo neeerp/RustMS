@@ -1968,6 +1968,7 @@ pub mod keys {
     pub const COCONUT_FELL_MAPLE: &str = "coconut.fell.maple";
     pub const COCONUT_FELL_STORY: &str = "coconut.fell.story";
     pub const COCONUT_OVERTIME: &str = "coconut.overtime";
+    pub const SNOWBALL_ENDED: &str = "snowball.ended";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3103,6 +3104,7 @@ mod tests {
                 keys::COCONUT_FELL_MAPLE,
                 keys::COCONUT_FELL_STORY,
                 keys::COCONUT_OVERTIME,
+                keys::SNOWBALL_ENDED,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

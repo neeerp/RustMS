@@ -331,6 +331,33 @@ impl Coconut {
     }
 }
 
+/// `snowBall`: the rules of a Snowball field (field type 1, b168). The
+/// client reads the lanes and the clamps; the server reads the rest.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Snowball {
+    /// `dx`: the pixels a ball rolls each step.
+    pub dx: i32,
+    /// `xMin` and `xMax`: the steps a ball may be at.
+    pub x_min: i32,
+    pub x_max: i32,
+    /// `damageSnowBall`: what a hit on a ball shows.
+    pub damage_ball: u16,
+    /// `damageSnowMan0` and `damageSnowMan1`: a hit on a snowman, and a
+    /// strong one.
+    pub damage_snowman: u16,
+    pub damage_snowman_strong: u16,
+    /// `snowManHP`: a snowman's HP.
+    pub snowman_hp: u32,
+    /// `snowManWait`: how long, in ms, a snowman brought down stops the
+    /// other team's ball.
+    pub snowman_wait: u32,
+    /// `speed` and `recoveryAmount`.
+    pub speed: u32,
+    pub recovery: u32,
+    /// `section1` to `section3`: the steps whose passing is announced.
+    pub sections: [i32; 3],
+}
+
 /// A spot in a Monster Carnival field: `x`, `y` (`cy` for mobs), `fh`,
 /// `f`, and the side it is for (`team`), if any.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -365,6 +392,8 @@ pub struct FieldTemplate {
     pub carnival: Option<Carnival>,
     /// `coconut`, on the Coconut Season fields.
     pub coconut: Option<Coconut>,
+    /// `snowBall`, on the Snowball fields.
+    pub snowball: Option<Snowball>,
     /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
@@ -734,6 +763,7 @@ fn build_field_template(
     let massacre = build_massacre(nx, body_idx)?;
     let carnival = build_carnival(nx, body_idx)?;
     let coconut = build_coconut(nx, body_idx)?;
+    let snowball = build_snowball(nx, body_idx)?;
     let recovery = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "recovery"))
@@ -879,6 +909,7 @@ fn build_field_template(
         massacre,
         carnival,
         coconut,
+        snowball,
         view_limit,
         level_limit,
         level_force_move,
@@ -1094,6 +1125,28 @@ fn build_coconut(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Coconut>, 
         effect_lose: string("effectLose")?,
         sound_win: string("soundWin")?,
         sound_lose: string("soundLose")?,
+    }))
+}
+
+fn build_snowball(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Snowball>, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "snowBall")? else {
+        return Ok(None);
+    };
+    let int = |key| -> Result<i32, GameDataError> { Ok(nx.int_child(root, key)?.unwrap_or(0)) };
+    let amount = |key| -> Result<u32, GameDataError> { Ok(u32::try_from(int(key)?).unwrap_or(0)) };
+    let damage = |key| -> Result<u16, GameDataError> { Ok(u16::try_from(int(key)?).unwrap_or(0)) };
+    Ok(Some(Snowball {
+        dx: int("dx")?,
+        x_min: int("xMin")?,
+        x_max: int("xMax")?,
+        damage_ball: damage("damageSnowBall")?,
+        damage_snowman: damage("damageSnowMan0")?,
+        damage_snowman_strong: damage("damageSnowMan1")?,
+        snowman_hp: amount("snowManHP")?,
+        snowman_wait: amount("snowManWait")?,
+        speed: amount("speed")?,
+        recovery: amount("recoveryAmount")?,
+        sections: [int("section1")?, int("section2")?, int("section3")?],
     }))
 }
 
@@ -1645,6 +1698,7 @@ mod tests {
             massacre: None,
             carnival: None,
             coconut: None,
+            snowball: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1729,6 +1783,7 @@ mod tests {
             massacre: None,
             carnival: None,
             coconut: None,
+            snowball: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1916,6 +1971,37 @@ mod tests {
             .field(100_000_000)
             .expect("Henesys")
             .coconut
+            .is_none());
+    }
+
+    #[test]
+    fn snowball_fields_have_their_rules() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(109_060_000).expect("Snowball");
+        assert_eq!(field.field_type, 1);
+        let snowball = field.snowball.as_ref().expect("snowBall");
+        assert_eq!((snowball.dx, snowball.x_min, snowball.x_max), (3, -60, 900));
+        assert_eq!(
+            (
+                snowball.damage_ball,
+                snowball.damage_snowman,
+                snowball.damage_snowman_strong
+            ),
+            (10, 15, 45)
+        );
+        assert_eq!((snowball.snowman_hp, snowball.snowman_wait), (7500, 10000));
+        assert_eq!((snowball.speed, snowball.recovery), (150, 400));
+        assert_eq!(snowball.sections, [45, 290, 560]);
+        let other = game_data.field(109_060_002).expect("the second field");
+        assert_eq!(other.snowball.as_ref().expect("snowBall").snowman_hp, 3000);
+        // The entrances have none.
+        assert!(game_data
+            .field(109_060_001)
+            .expect("the entrance")
+            .snowball
             .is_none());
     }
 

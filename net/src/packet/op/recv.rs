@@ -188,6 +188,10 @@ pub enum RecvOpcode {
     DamageReactor = 0xCD,
 
     PlayerMapTransfer = 0xCF,
+    /// An attack hit a Snowball field's ball or snowman (b168).
+    Snowball = 0xD3,
+    /// The player walked into a ball (b168).
+    LeftKnockback = 0xD4,
     /// An attack hit a Coconut Season nut (b167).
     Coconut = 0xD5,
     /// The Monster Carnival window spends CP (v83ref b163).

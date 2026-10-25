@@ -807,6 +807,10 @@ pub enum FieldRequest {
     Kite { item_id: i32, message: String },
     /// The player's attack hit Coconut Season nut `index` (b167).
     CoconutHit { index: u16 },
+    /// The player's attack hit a Snowball field's `target` (b168).
+    SnowballHit { target: u8, delay: u16 },
+    /// The player walked into a Snowball field's ball (b168).
+    IntoSnowball,
     /// A GM runs the field's event (QUESTIONS b169 #1).
     GmEvent(GmEvent),
     /// Pick up the drop `object_id`, answered with `ServerMessage::PickedUp`;
@@ -1061,6 +1065,8 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
             (Op::MonsterCarnival, InGame(&world::MonsterCarnivalHandler)),
             (Op::Coconut, InGame(&world::CoconutHandler)),
+            (Op::Snowball, InGame(&world::SnowballHandler)),
+            (Op::LeftKnockback, InGame(&world::LeftKnockbackHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
             (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
             (Op::WeddingBless, InGame(&world::WeddingBlessHandler)),
@@ -1188,7 +1194,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 129);
+        assert_eq!(world_routes().len(), 131);
     }
 
     #[test]
