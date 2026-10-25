@@ -578,6 +578,13 @@ pub enum WorldAction {
         cash_type: db::cash_shop::CashType,
         amount: i32,
     },
+    /// A GM's `!coupon`: make a Cash Shop coupon giving `rewards`, with
+    /// `code` or else a new random one, good for `days` days or forever.
+    MakeCoupon {
+        code: Option<String>,
+        days: Option<u32>,
+        rewards: Vec<db::coupon::Reward>,
+    },
     /// The player's level or job changed (`player.stats` already did);
     /// refresh their field avatar and show the others these packets.
     AvatarChanged(Vec<Packet>),
