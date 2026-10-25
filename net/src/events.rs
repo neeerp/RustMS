@@ -2546,6 +2546,8 @@ pub enum EventCommand {
     /// A member picked up an item that casts the Monster Carnival skill
     /// with this id (`MCSkill.img`) on the other side (`nuffSkill`).
     CarnivalCast(i32),
+    /// A member died on the Monster Carnival battle field.
+    CarnivalDied,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

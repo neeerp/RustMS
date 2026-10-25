@@ -10,9 +10,9 @@ Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
 Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
 clock, the sides' look, CP from kills, spending CP on mobs, skills and
-guardians, the CP and skill items, and the exit room are in. Not yet: CP
-lost on death and the revive room, results and their effects, and the client's
-Carnival UI.
+guardians, the CP and skill items, CP lost on death and the revive room,
+and the exit room are in. Not yet: results and their effects, and the
+client's Carnival UI.
 
 ## Maps
 
@@ -118,6 +118,15 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   (`EventCommand::CarnivalCast`). Out of a battle they go and do nothing.
 - A member's side is on their ticket (`EventTicket::side`), and from there
   in their look (`FieldAvatar::team`, SPAWN_PLAYER's last byte).
+- A death on the battle field (`ClientActor::died`) costs no EXP and
+  keeps the buffs (Cosmic `playerDead`). In the battle the event takes up
+  to the field's `deathCP` (10) of the player's own CP, from them and their
+  side (`Score::lose`; the totals stay), and the battle field tells
+  everyone there through DIED (`FieldMessage::CarnivalDied`). Reviving
+  takes the player to the field's `returnMap`, the room's revive room
+  (980000n02, `net::carnival::revive_map`), whose screen takes their side
+  from START. Its `pt00` portal (`MCrevive<n>`) leads back to the battle
+  field's portal 0, where START gives the score again.
 
 ## Packets (`net::packet::build::world::carnival`)
 
@@ -134,3 +143,6 @@ CP is sent as two shorts, the CP left to spend and the total ever earned.
   (`SpendRefusal`): 1 not enough CP, 2 the side's limit, 3 no spot for a
   guardian, 4 that guardian is out, 5 anything else. The client's window
   waits for one or the other after each request.
+- MONSTER_CARNIVAL_DIED (0x126): the side, the name of who died, and the
+  CP their side lost, a byte, to the whole battle field, which the
+  client's chat log shows.

@@ -15,8 +15,8 @@ use integration_harness::events::{armed_in, party_of_one, talk, told};
 use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
-use integration_harness::trace::{read_for, send, until, Trace};
-use net::carnival::{battle_map, room_map, CARNIVAL_EXIT, CARNIVAL_LOBBY};
+use integration_harness::trace::{read_for, send, until, warp, Trace};
+use net::carnival::{battle_map, revive_map, room_map, CARNIVAL_EXIT, CARNIVAL_LOBBY};
 use net::npc_scripts::{CARNIVAL_ROOM_NPC, SPIEGELMANN};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -58,6 +58,37 @@ fn since(seen: &Trace, op: SendOpcode, from: usize) -> Vec<Vec<u8>> {
 fn summoned(tab: u8, index: u8, name: &str) -> Vec<u8> {
     let length = (name.len() as u16).to_le_bytes();
     [vec![tab, index], length.to_vec(), name.as_bytes().to_vec()].concat()
+}
+
+/// A touch of `mob_id`'s for `damage` (TAKE_DAMAGE from its body).
+fn touched(damage: i32, mob_id: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(-1i8 as u8).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_int(mob_id).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(0).unwrap();
+    p
+}
+
+/// The player walks to `map_id`'s portal `name` and enters its script.
+async fn enter_script_portal(player: &mut WorldSession, map_id: i32, name: &str) {
+    let maps = integration_harness::events::maps();
+    let portal = maps.field(map_id).unwrap().portal_by_name(name).unwrap();
+    send(
+        &mut player.connection,
+        walk_to(portal.x as i16, portal.y as i16),
+    )
+    .await;
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_str_with_length(name).unwrap();
+    p.write_short(0).unwrap();
+    send(&mut player.connection, p).await;
 }
 
 /// Little-endian shorts.
@@ -508,4 +539,79 @@ async fn a_guardian_strengthens_its_side_until_the_other_breaks_it() {
             (reactor.object_id, 4)
         ]
     );
+}
+
+#[tokio::test]
+async fn a_death_costs_cp_and_the_revive_room_leads_back() {
+    const HP: i32 = 0x400;
+    const EXP: i32 = 0x10000;
+    let red = &mut leader().await;
+    let blue = &mut leader().await;
+    let (mut seen, mut theirs, total) = hunted(red, blue, 4).await;
+    let &(_, mob_id) = seen.field.mobs.first().unwrap();
+    let updates = seen.stat_updates.len();
+
+    // Red is touched to death on the battle field.
+    for _ in 0..40 {
+        send(&mut red.connection, touched(20, mob_id)).await;
+        read_for(&mut red.connection, &mut seen, 150).await;
+        if seen.stat(HP) == Some(0) {
+            break;
+        }
+    }
+    assert_eq!(seen.stat(HP), Some(0));
+    // Both sides hear Red died and their side lost 10 CP; Red's own and
+    // their side's CP fall by as much, and the totals stay.
+    let length = (red.character_name.len() as u16).to_le_bytes();
+    let died = [
+        vec![0],
+        length.to_vec(),
+        red.character_name.as_bytes().to_vec(),
+        vec![10],
+    ]
+    .concat();
+    let rest = shorts(&[total - 10, total]);
+    let side = [vec![0], rest.clone()].concat();
+    until(&mut red.connection, &mut seen, |t| {
+        carnival(t, SendOpcode::CarnivalDied) == [died.clone()]
+            && carnival(t, SendOpcode::CarnivalObtainedCp).last() == Some(&rest)
+            && carnival(t, SendOpcode::CarnivalPartyCp).last() == Some(&side)
+    })
+    .await;
+    until(&mut blue.connection, &mut theirs, |t| {
+        carnival(t, SendOpcode::CarnivalDied) == [died.clone()]
+            && carnival(t, SendOpcode::CarnivalPartyCp).last() == Some(&side)
+    })
+    .await;
+    // The death took no EXP.
+    assert!(
+        seen.stat_updates[updates..]
+            .iter()
+            .all(|update| !update.contains_key(&EXP)),
+        "{:?}",
+        &seen.stat_updates[updates..]
+    );
+
+    // Reviving takes Red to the revive room, whose screen takes their side.
+    let starts = carnival(&seen, SendOpcode::CarnivalStart).len();
+    assert_eq!(
+        warp(&mut red.connection, battle_map(4), "", &mut seen).await,
+        revive_map(4)
+    );
+    until(&mut red.connection, &mut seen, |t| {
+        carnival(t, SendOpcode::CarnivalStart).len() > starts
+    })
+    .await;
+    assert_eq!(carnival(&seen, SendOpcode::CarnivalStart)[starts][0], 0);
+
+    // Its portal leads back to the battle field, with Red's CP as it was.
+    let starts = carnival(&seen, SendOpcode::CarnivalStart).len();
+    enter_script_portal(red, revive_map(4), "pt00").await;
+    until(&mut red.connection, &mut seen, |t| {
+        t.warps.last() == Some(&battle_map(4))
+            && carnival(t, SendOpcode::CarnivalStart).len() > starts
+    })
+    .await;
+    let start = &carnival(&seen, SendOpcode::CarnivalStart)[starts];
+    assert_eq!(start[..5], [vec![0], rest].concat()[..]);
 }

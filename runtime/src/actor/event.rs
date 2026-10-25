@@ -1046,10 +1046,14 @@ impl EventActor {
             EventCommand::CarnivalCast(id) if matches!(self.kind, EventKind::Carnival(_)) => {
                 self.carnival_cast(client_id, id);
             }
+            EventCommand::CarnivalDied if matches!(self.kind, EventKind::Carnival(_)) => {
+                self.carnival_died(client_id);
+            }
             EventCommand::CarnivalCp(_)
             | EventCommand::CarnivalArrived
             | EventCommand::CarnivalSpend { .. }
-            | EventCommand::CarnivalCast(_) => {
+            | EventCommand::CarnivalCast(_)
+            | EventCommand::CarnivalDied => {
                 debug!(client_id, "Not in a Monster Carnival");
             }
         }
@@ -1065,6 +1069,36 @@ impl EventActor {
         if let Some(gain) = self.carnival.gain(client_id, cp) {
             self.tell_cp(client_id, gain);
         }
+    }
+
+    /// A member died on the battle field: they and their side lose up to
+    /// its `deathCP` of their CP, and everyone there hears of it (Cosmic
+    /// `playerDead`).
+    fn carnival_died(&mut self, client_id: ClientId) {
+        let EventKind::Carnival(room) = self.kind else {
+            return;
+        };
+        if self.carnival_stage != net::carnival::Stage::Battle {
+            return;
+        }
+        let Some((lost, standing)) = self.carnival.lose(client_id, net::carnival::death_cp(room))
+        else {
+            return;
+        };
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::carnival::battle_map(room),
+            instance_id: self.id,
+        });
+        let died = FieldMessage::CarnivalDied {
+            died: client_id,
+            side: standing.side,
+            lost: u8::try_from(lost).unwrap_or(u8::MAX),
+        };
+        tokio::spawn(async move {
+            let _ = field.tx.send(died).await;
+        });
+        self.tell_cp(client_id, standing);
     }
 
     /// `client_id`'s CP changed: their screen shows their own, and

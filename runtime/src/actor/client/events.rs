@@ -1370,7 +1370,10 @@ impl ClientActor {
         else {
             return Ok(());
         };
-        if net::carnival::battle_room(map_id).is_some() {
+        // The revive room's screen takes the side from START too (b163).
+        if net::carnival::battle_room(map_id).is_some()
+            || net::carnival::revive_room(map_id).is_some()
+        {
             self.tell_event(EventCommand::CarnivalArrived).await;
         } else if net::carnival::waiting_room(map_id).is_some() && side == 0 {
             let text = net::content::text().get(keys::CARNIVAL_WAITING, &[]);

@@ -68,6 +68,17 @@ pub fn build_carnival_message(why: SpendRefusal) -> Result<Packet, NetworkError>
     Ok(p)
 }
 
+/// MONSTER_CARNIVAL_DIED: `name` of side `side` died, and their side lost
+/// `lost` CP, which the client's chat log shows.
+pub fn build_carnival_died(side: u8, name: &str, lost: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CarnivalDied as i16)?;
+    p.write_byte(side)?;
+    p.write_str_with_length(name)?;
+    p.write_byte(lost)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,5 +137,15 @@ mod tests {
             .end();
         let limit = build_carnival_message(SpendRefusal::Limit).unwrap();
         Expect::new(&limit.bytes).short(0x125).byte(2).end();
+    }
+
+    #[test]
+    fn a_death_names_the_dead_and_the_cp_lost() {
+        Expect::new(&build_carnival_died(1, "Blue", 10).unwrap().bytes)
+            .short(0x126)
+            .byte(1)
+            .string("Blue")
+            .byte(10)
+            .end();
     }
 }
