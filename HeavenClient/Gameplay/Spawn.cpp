@@ -24,6 +24,7 @@
 #include "MapleMap/ItemDrop.h"
 #include "MapleMap/MesoDrop.h"
 
+#include "../Character/Carnival.h"
 #include "../Character/OtherChar.h"
 
 namespace ms
@@ -126,11 +127,11 @@ namespace ms
 						 Point<int16_t> p, int32_t ch, std::vector<std::pair<Buffstat::Id, int32_t>> bf,
 						 const std::string &gd, const GuildEmblem &em, std::optional<MiniRoomBox> rm,
 						 std::vector<PetEntry> pt, std::optional<std::string> cb, int32_t ie, int32_t ml, int32_t me,
-						 int32_t mf, bool bs, RingLooks rl) : cid(c), look(lk), level(l),
+						 int32_t mf, bool bs, RingLooks rl, int8_t tm) : cid(c), look(lk), level(l),
 						 job(j), name(nm), stance(st), position(p), chair(ch), buffs(std::move(bf)), guild(gd), emblem(em),
 						 room(std::move(rm)), pets(std::move(pt)), chalkboard(std::move(cb)), item_effect(ie),
 						 mount_level(ml), mount_exp(me), mount_fatigue(mf), berserk(bs),
-						 ring_looks(rl)
+						 ring_looks(rl), team(tm)
 	{}
 
 	int32_t CharSpawn::get_cid() const
@@ -151,6 +152,11 @@ namespace ms
 		otherchar->set_item_effect(item_effect);
 		otherchar->show_berserk(berserk);
 		otherchar->set_ring_looks(ring_looks);
+
+		// Only the Monster Carnival's fields read the team (their vtable
+		// slot 5); anywhere else the byte means nothing.
+		if (carnival::reads_team(carnival::field_type()))
+			otherchar->set_team(team);
 
 		for (size_t i = 0; i < pets.size(); i++)
 			otherchar->add_pet(static_cast<uint8_t>(i), false, pets[i], false);

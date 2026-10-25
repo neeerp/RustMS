@@ -17,6 +17,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "Char.h"
 
+#include "Carnival.h"
+
 #include "MountRules.h"
 
 #include "Pets.h"
@@ -51,6 +53,8 @@ namespace ms
 	Char::Char(int32_t o, const CharLook &lk, const std::string &name) : MapObject(o), look(lk), look_preview(lk), namelabel(
 			Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG, name)),
 			guildlabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG)),
+			team(carnival::NO_TEAM),
+			teamlabel(Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE, Text::Background::NAMETAG)),
 			medaltag(lk.get_equips().get_equip(EquipSlot::Id::MEDAL))
 	{}
 
@@ -160,7 +164,14 @@ namespace ms
 		// The medal hangs 1 px under the lowest tag above it (0x5f1979).
 		int16_t medal_top = namepos.y() + namelabel.height() + 5;
 
-		if (!guildlabel.empty())
+		if (!teamlabel.empty())
+		{
+			Point<int16_t> teampos = namepos + Point<int16_t>(0, namelabel.height() - 2 + GUILD_TAG_GAP);
+
+			teamlabel.draw(teampos);
+			medal_top = teampos.y() + teamlabel.height() + 5;
+		}
+		else if (!guildlabel.empty())
 		{
 			Point<int16_t> guildpos = namepos + Point<int16_t>(0, namelabel.height() - 2 + GUILD_TAG_GAP);
 
@@ -1282,6 +1293,19 @@ namespace ms
 	void Char::set_guild_emblem(const GuildEmblem &emblem)
 	{
 		guildmark = GuildMark(emblem);
+	}
+
+	void Char::set_team(int8_t t)
+	{
+		team = t;
+		teamlabel.change_text(carnival::team_name(team));
+		// The tag's style (0x3ed) takes the side; the colours are a guess.
+		teamlabel.change_color(team == 0 ? Color::Name::TORCHRED : Color::Name::CORNFLOWERBLUE);
+	}
+
+	int8_t Char::get_team() const
+	{
+		return team;
 	}
 
 	void Char::set_mini_room(const std::optional<MiniRoomBox> &box)

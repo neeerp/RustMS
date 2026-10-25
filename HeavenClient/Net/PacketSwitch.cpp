@@ -21,6 +21,7 @@
 #include "Handlers/BuddyHandlers.h"
 #include "Handlers/GuildHandlers.h"
 #include "Handlers/MapObjectHandlers.h"
+#include "Handlers/CarnivalHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
 #include "Handlers/FamilyHandlers.h"
@@ -245,6 +246,14 @@ namespace ms
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
+		MONSTER_CARNIVAL_START = 289,
+		MONSTER_CARNIVAL_OBTAINED_CP = 290,
+		MONSTER_CARNIVAL_PARTY_CP = 291,
+		MONSTER_CARNIVAL_SUMMON = 292,
+		MONSTER_CARNIVAL_MESSAGE = 293,
+		MONSTER_CARNIVAL_DIED = 294,
+		MONSTER_CARNIVAL_LEAVE = 295,
+		MONSTER_CARNIVAL_RESULT = 296,
 		HORNTAIL_CAVE = 302,
 		ZAKUM_SHRINE = 303,
 
@@ -343,6 +352,14 @@ namespace ms
 		emplace<CONTI_STATE, ContiStateHandler>();
 		emplace<STOP_CLOCK, StopClockHandler>();
 		emplace<HORNTAIL_CAVE, HorntailCaveHandler>();
+		emplace<MONSTER_CARNIVAL_START, CarnivalStartHandler>();
+		emplace<MONSTER_CARNIVAL_OBTAINED_CP, CarnivalObtainedCpHandler>();
+		emplace<MONSTER_CARNIVAL_PARTY_CP, CarnivalPartyCpHandler>();
+		emplace<MONSTER_CARNIVAL_SUMMON, CarnivalSummonHandler>();
+		emplace<MONSTER_CARNIVAL_MESSAGE, CarnivalMessageHandler>();
+		emplace<MONSTER_CARNIVAL_DIED, CarnivalDiedHandler>();
+		emplace<MONSTER_CARNIVAL_LEAVE, CarnivalLeaveHandler>();
+		emplace<MONSTER_CARNIVAL_RESULT, CarnivalResultHandler>();
 		emplace<ZAKUM_SHRINE, ZakumShrineHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF, ObjectStateHandler>();
 		emplace<FIELD_OBSTACLE_ONOFF_LIST, ObjectStateListHandler>();
