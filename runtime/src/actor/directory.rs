@@ -246,6 +246,14 @@ impl WorldDirectory {
                 scope,
                 packet,
             } => self.broadcast(from, scope, packet),
+            DirectoryMessage::Kick { client_ids, reply } => {
+                let online = client_ids
+                    .iter()
+                    .filter_map(|id| self.clients.get(id))
+                    .inspect(|entry| entry.handle.kick())
+                    .count();
+                let _ = reply.send(online);
+            }
             DirectoryMessage::AvatarBanner { banner, reply } => {
                 let queued = match self.avatar_banners.queue(banner, Instant::now()) {
                     Queued::Now(banner) => {

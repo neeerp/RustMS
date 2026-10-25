@@ -42,7 +42,7 @@ impl LoginCredentialsHandler {
     }
 
     fn account_status(acc: &Account) -> LoginStatusCode {
-        if acc.banned {
+        if acc.blocked_at(std::time::SystemTime::now()) {
             LoginStatusCode::Banned
         } else if !acc.accepted_tos {
             LoginStatusCode::LicenseAgreement
@@ -95,6 +95,14 @@ impl LoginHandler for LoginCredentialsHandler {
                 SessionState::BeforeLogin,
                 build::login::status::build_login_status_packet(LoginStatusCode::LicenseAgreement)?,
             ),
+            LoginStatusCode::Banned => {
+                return Ok(HandlerResult::reply(
+                    build::login::status::build_blocked_packet(
+                        u8::try_from(acc.ban_reason).unwrap_or(0),
+                        acc.ban_until,
+                    )?,
+                ))
+            }
             rejected => {
                 return Ok(HandlerResult::reply(
                     build::login::status::build_login_status_packet(rejected)?,

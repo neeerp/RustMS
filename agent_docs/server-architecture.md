@@ -175,8 +175,8 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 |---|---|
 | 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
 | 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
-| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>` |
-| 3, admin | none yet |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>` |
+| 3, admin | `!ban <name> [days] [reason] [note]`, `!unban <name>` |
 
 - A GM's `!` line never reaches the map. A player's `!` line is ordinary
   chat, as is an `@` line that names no command (`@_@`). A command the sender may not run gets the same "Unknown command"
@@ -198,6 +198,20 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   items included, which nothing else gives. Without `code=` the code is 16
   random letters and digits (no 0, O, 1 or I). Without `days=` it never
   expires. The reply names the code; a code already made is refused.
+- `!ban` blocks the account of the character named, for good unless a
+  number of days comes first (at most 36,500). The reason is a type from
+  Etc/BlockReason.img (`hack`, `bot`, `ad`, `harass`, `curse`, `scam`,
+  `misconduct`, `sell`, `icash`, `temp`, `gm`, `iprogram`, `megaphone`) or
+  its number 1..=13; the rest is a note kept in `accounts.ban_msg`. Every
+  character of the account that is online is disconnected
+  (`DirectoryMessage::Kick`), and a login is refused with result 2, the
+  reason and the end (`build_blocked_packet`), which the client shows as
+  BlockReason.img's text and the date; with no reason it shows its plain
+  notice. A block that has ended no longer counts (`Account::blocked_at`).
+  The world refuses an entry by a blocked account too, from the character
+  select or a channel change. `!unban` lifts it, and `!dc` only
+  disconnects. None of them may touch a GM of the sender's level or
+  higher (`ClientActor::discipline`).
 - Every `!` line from a GM is logged at info under the `gm_audit` target,
   with the character, the line, and whether it ran. The world server always
   shows that target. `!givenx` and `!coupon` log their results there too.
@@ -218,14 +232,15 @@ with the line as typed, which the server logs under `gm_audit`.
 | `/h N` | ADMIN_COMMAND 0x10, hidden when N isn't 0 | helpers: hides or shows the GM, ADMIN_RESULT 0x10 |
 | `/w NAME MSG` | ADMIN_COMMAND 0x1E | helpers: an alert (BROADCAST_MSG 1) to NAME, wherever they are; ADMIN_RESULT 0x1E 1, or 0 for no one by that name |
 | `/u`, `/uclip` | ADMIN_COMMAND 0x11 0 and 0x0C | nothing yet |
-| `/ban NAME` | ADMIN_COMMAND 0x03 | nothing yet |
+| `/ban NAME` | ADMIN_COMMAND 0x03 | admins: `!ban NAME`, for good and with no reason; ADMIN_RESULT 4 0 ("You have successfully blocked access."), or 6 1 ("invalid character name") for no one by that name or a GM of the sender's level or higher |
+| `/block NAME`, then its dialog | ADMIN_COMMAND 0x04: name, reason (1..=13), days, note | admins: `!ban NAME DAYS REASON NOTE`, with the same replies; the client never sends no days, and the server ignores it |
 | `/alertall`, `/alertch`, `/alertmap`, `/noticeall`, `/noticech`, `/noticemap`, `/slideall`, `/slidech`, `/slidemap` TEXT | ADMIN_BROADCAST (0x76): scope (0 world, 1 channel, 2 map), type (0 notice, 1 alert, 4 slide), text | GMs: BROADCAST_MSG of that type to that scope |
 | `/slideallx`, `/slidechx`, `/slidemapx` | ADMIN_BROADCAST with no text | GMs: takes the slide down |
 | `/slideax` | 0x86 | nothing |
 | `/ch N` | the channel menu's request | |
 
-`/flag` (0x72, rank 4 only), `/block` (ADMIN_COMMAND 0x04, through a
-dialog), `/c` and `/clip` aren't in HeavenClient.
+`/flag` (0x72, rank 4 only), `/block` (its dialog), `/c` and `/clip`
+aren't in HeavenClient.
 
 ## Packet encoding
 

@@ -17,7 +17,11 @@ pub struct Account {
     pub character_slots: i16,
     pub gender: i16,
     pub accepted_tos: bool,
+    /// Whether a GM blocked the account (`crate::account::block`), which
+    /// only that and an unblock change.
+    #[diesel(skip_update)]
     pub banned: bool,
+    #[diesel(skip_update)]
     pub ban_msg: Option<String>,
     pub gm_level: i16,
     // Only purchases change the balances (`crate::cash_shop`), so saving a
@@ -38,6 +42,21 @@ pub struct Account {
     /// SQL only; `gm_level` never implies it).
     #[diesel(skip_update)]
     pub test_admin: bool,
+    /// Why the account is blocked, as Etc/BlockReason.img's number; 0 is
+    /// none given.
+    #[diesel(skip_update)]
+    pub ban_reason: i16,
+    /// When the block ends; none is never.
+    #[diesel(skip_update)]
+    pub ban_until: Option<SystemTime>,
+}
+
+impl Account {
+    /// Whether the account is blocked at `now`; a block that has run out
+    /// no longer counts.
+    pub fn blocked_at(&self, now: SystemTime) -> bool {
+        self.banned && self.ban_until.map_or(true, |until| until > now)
+    }
 }
 
 impl Debug for Account {

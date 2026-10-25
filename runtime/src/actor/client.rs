@@ -611,6 +611,7 @@ impl ClientActor {
                 cash_type,
                 amount,
             } => self.give_cash(target, cash_type, amount).await?,
+            WorldAction::Discipline(discipline) => self.discipline(discipline).await?,
             WorldAction::MakeCoupon {
                 code,
                 days,
@@ -795,8 +796,20 @@ impl ClientActor {
             };
         self.session_id = Some(session.id);
 
-        let mut player = spawn_db(move || db::player::load_player(character_id)).await?;
-        if player.account_id != session.account_id {
+        let account_id = session.account_id;
+        let (mut player, account) = spawn_db(move || {
+            Ok((
+                db::player::load_player(character_id)?,
+                db::account::get_account_by_id(account_id)?,
+            ))
+        })
+        .await?;
+        if player.account_id != account_id {
+            return Err(RuntimeError::NotLoggedIn);
+        }
+        // Blocked at the character select, or while changing channel.
+        if account.blocked_at(SystemTime::now()) {
+            warn!(character_id, "World entry by a blocked account");
             return Err(RuntimeError::NotLoggedIn);
         }
         // Heart Keys are a wedding's own, and nobody logs in to one: a

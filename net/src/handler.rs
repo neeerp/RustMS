@@ -177,6 +177,26 @@ pub struct WorldContext<'a> {
     pub player: &'a mut Player,
 }
 
+/// A GM's hand on another character's account (row 205 S6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Discipline {
+    /// Block the account for `days` days, or for good, and disconnect it,
+    /// giving `reason` (Etc/BlockReason.img's number, 0 for none). `slash`
+    /// is v83's `/ban` or `/block`, whose GM hears ADMIN_RESULT 4 or 6
+    /// rather than a line.
+    Block {
+        target: String,
+        reason: u8,
+        days: Option<u32>,
+        note: String,
+        slash: bool,
+    },
+    /// Lift the account's block.
+    Unblock { target: String },
+    /// Disconnect the character if they are online.
+    Disconnect { target: String },
+}
+
 /// A whisper ready for delivery; the world directory picks which packet the
 /// sender gets back, if any.
 #[derive(Debug)]
@@ -578,6 +598,8 @@ pub enum WorldAction {
         cash_type: db::cash_shop::CashType,
         amount: i32,
     },
+    /// A GM's block, unblock or disconnect of another account.
+    Discipline(Discipline),
     /// A GM's `!coupon`: make a Cash Shop coupon giving `rewards`, with
     /// `code` or else a new random one, good for `days` days or forever.
     MakeCoupon {
