@@ -125,6 +125,8 @@ pub enum SendOpcode {
     ContiMove = 0x94,
     ContiState = 0x95,
     StopClock = 0x9A,
+    PyramidGauge = 0x9D,
+    PyramidScore = 0x9E,
     QuickSlotInit = 0x9F,
     MultiChat = 0x86,
     Whisper = 0x87,

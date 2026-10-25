@@ -165,6 +165,14 @@ fn load_field_mobs(field_key: FieldKey) -> MobSet {
         field.footholds.bounds_within(field.view_limit),
         field.mob_rate,
     ));
+    let mobs = match field.fixed_mob_capacity {
+        Some(capacity) => mobs.with_fixed_capacity(capacity as usize),
+        None => mobs,
+    };
+    let mobs = match field.create_mob_interval {
+        Some(ms) => mobs.with_interval(Duration::from_millis(u64::from(ms))),
+        None => mobs,
+    };
     match net::events::only_mobs(field_key.map_id) {
         Some(mob_id) if field_key.instance_id != 0 => mobs.only(mob_id),
         _ if full_spawn() => mobs.filling_every_point(),

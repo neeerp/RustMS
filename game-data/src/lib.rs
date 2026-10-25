@@ -232,6 +232,37 @@ pub fn is_use_item(item_id: i32) -> bool {
     )
 }
 
+/// `mobMassacre`: the rules of a Nett's Pyramid stage (and of the Kerning
+/// City event rooms 910320xxx and 910330xxx).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Massacre {
+    /// `disableSkill`: no skills may be used on it (some of the event rooms).
+    pub disable_skill: bool,
+    /// `gauge/total`: how much the gauge holds.
+    pub total: i32,
+    /// `gauge/decrease`: how much it loses each second.
+    pub decrease: i32,
+    /// `gauge/hitAdd`: how much a kill puts back.
+    pub hit_add: i32,
+    /// `gauge/missSub`: how much a miss takes off.
+    pub miss_sub: i32,
+    /// `gauge/coolAdd`: how much a cool kill puts back.
+    pub cool_add: i32,
+    /// `countEffect`, by the kill count each is reached at, lowest first.
+    pub count_effects: Vec<CountEffect>,
+}
+
+/// What a player gets on reaching a Nett's Pyramid kill count
+/// (`mobMassacre/countEffect/<count>`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CountEffect {
+    pub count: i32,
+    /// `buff`: the item whose effect they take, or 0 for none.
+    pub buff: i32,
+    /// `skillUse`: a use of Rage of Pharaoh.
+    pub skill_use: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldTemplate {
     pub map_id: i32,
@@ -243,6 +274,14 @@ pub struct FieldTemplate {
     pub mob_spawns: Vec<MapMobTemplate>,
     pub reactors: Vec<MapReactorTemplate>,
     pub mob_rate: f64,
+    /// `info/fixedMobCapacity`: how many mobs the map holds, whoever is on
+    /// it (Nett's Pyramid and the Kerning City event rooms, 365 maps).
+    pub fixed_mob_capacity: Option<u32>,
+    /// `info/createMobInterval`: how often, in milliseconds, the map makes
+    /// mobs (the same maps).
+    pub create_mob_interval: Option<u32>,
+    /// `mobMassacre`, on the 50 maps that have it.
+    pub massacre: Option<Massacre>,
     /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
@@ -596,6 +635,20 @@ fn build_field_template(
         .transpose()?
         .flatten()
         .unwrap_or(1.0);
+    let positive_key = |key| -> Result<Option<u32>, GameDataError> {
+        Ok(match nx.child_by_name(map_node_idx, "info")? {
+            Some(info) => nx
+                .int_child(info, key)?
+                .and_then(|value| u32::try_from(value).ok())
+                .filter(|&value| value > 0),
+            None => None,
+        })
+    };
+    let (fixed_mob_capacity, create_mob_interval) = (
+        positive_key("fixedMobCapacity")?,
+        positive_key("createMobInterval")?,
+    );
+    let massacre = build_massacre(nx, body_idx)?;
     let recovery = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "recovery"))
@@ -736,6 +789,9 @@ fn build_field_template(
         mob_spawns,
         reactors,
         mob_rate,
+        fixed_mob_capacity,
+        create_mob_interval,
+        massacre,
         view_limit,
         level_limit,
         level_force_move,
@@ -892,6 +948,39 @@ fn allowed_items(nx: &NxDataFile, info: u32) -> Result<Vec<i32>, GameDataError> 
         }
     }
     Ok(items)
+}
+
+fn build_massacre(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Massacre>, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "mobMassacre")? else {
+        return Ok(None);
+    };
+    let int =
+        |node, key| -> Result<i32, GameDataError> { Ok(nx.int_child(node, key)?.unwrap_or(0)) };
+    let mut massacre = Massacre {
+        disable_skill: int(root, "disableSkill")? != 0,
+        ..Massacre::default()
+    };
+    if let Some(gauge) = nx.child_by_name(root, "gauge")? {
+        massacre.total = int(gauge, "total")?;
+        massacre.decrease = int(gauge, "decrease")?;
+        massacre.hit_add = int(gauge, "hitAdd")?;
+        massacre.miss_sub = int(gauge, "missSub")?;
+        massacre.cool_add = int(gauge, "coolAdd")?;
+    }
+    if let Some(effects) = nx.child_by_name(root, "countEffect")? {
+        for node in nx.child_indices(effects)? {
+            let Ok(count) = nx.node_name(node)?.parse() else {
+                continue;
+            };
+            massacre.count_effects.push(CountEffect {
+                count,
+                buff: int(node, "buff")?,
+                skill_use: int(node, "skillUse")? != 0,
+            });
+        }
+        massacre.count_effects.sort_by_key(|effect| effect.count);
+    }
+    Ok(Some(massacre))
 }
 
 fn build_footholds(
@@ -1355,6 +1444,9 @@ mod tests {
             mob_spawns: Vec::new(),
             reactors: Vec::new(),
             mob_rate: 1.0,
+            fixed_mob_capacity: None,
+            create_mob_interval: None,
+            massacre: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1434,6 +1526,9 @@ mod tests {
             map_npcs: Vec::new(),
             mob_spawns: Vec::new(),
             mob_rate: 1.0,
+            fixed_mob_capacity: None,
+            create_mob_interval: None,
+            massacre: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1649,6 +1744,91 @@ mod tests {
             game_data.field(100_000_000).expect("Henesys").time_limit,
             None
         );
+    }
+
+    #[test]
+    fn pyramid_stages_fix_their_mob_count_and_spawn_interval() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        for map_id in [926_010_100, 926_010_101, 926_023_500] {
+            let stage = game_data.field(map_id).expect("a Pyramid stage");
+            assert_eq!(stage.field_type, FIELD_TYPE_PYRAMID, "{map_id}");
+            assert_eq!(stage.fixed_mob_capacity, Some(70), "{map_id}");
+            assert_eq!(stage.create_mob_interval, Some(3000), "{map_id}");
+        }
+        let henesys = game_data.field(100_000_000).expect("Henesys");
+        assert_eq!(henesys.fixed_mob_capacity, None);
+        assert_eq!(henesys.create_mob_interval, None);
+        assert_eq!(henesys.massacre, None);
+    }
+
+    #[test]
+    fn pyramid_stages_set_their_gauge_and_kill_rewards() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let massacre = |map_id| {
+            game_data
+                .field(map_id)
+                .and_then(|field| field.massacre.clone())
+                .expect("a Pyramid stage")
+        };
+        // Solo easy, through a copy's link to its first room.
+        let easy = massacre(926_010_101);
+        assert_eq!(
+            (
+                easy.total,
+                easy.decrease,
+                easy.hit_add,
+                easy.miss_sub,
+                easy.cool_add
+            ),
+            (100, 1, 1, 4, 5)
+        );
+        assert!(!easy.disable_skill);
+        let counts: Vec<_> = easy.count_effects.iter().map(|e| e.count).collect();
+        assert_eq!(counts, [250, 500, 1000, 1500, 2000, 2500, 3000]);
+        assert_eq!(
+            easy.count_effects[0],
+            CountEffect {
+                count: 250,
+                buff: 2022585,
+                skill_use: false
+            }
+        );
+        assert_eq!(
+            easy.count_effects[1],
+            CountEffect {
+                count: 500,
+                buff: 2022586,
+                skill_use: true
+            }
+        );
+        assert_eq!(
+            easy.count_effects[3],
+            CountEffect {
+                count: 1500,
+                buff: 0,
+                skill_use: true
+            }
+        );
+        // Party hell.
+        let hell = massacre(926_023_500);
+        assert_eq!(
+            (
+                hell.total,
+                hell.decrease,
+                hell.hit_add,
+                hell.miss_sub,
+                hell.cool_add
+            ),
+            (200, 8, 1, 15, 7)
+        );
+        // A Kerning City event room bars skills.
+        assert!(massacre(910_320_100).disable_skill);
     }
 
     #[test]

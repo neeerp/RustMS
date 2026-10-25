@@ -19,6 +19,12 @@ templates from `Mob.nx` (`maxHP`, `exp`, `PADamage`, `bodyAttack`,
     off the height, times `info/mobRate`, from 1 to 40. With more than half
     that many users on the field it grows, up to twice as many at twice as
     many users.
+  - A map with `info/fixedMobCapacity` (Nett's Pyramid's stages and the
+    Kerning City event rooms, 365 maps) holds that many, past 40 and
+    whoever is on it (`MobSet::with_fixed_capacity`). Its
+    `info/createMobInterval` (3 s on all of them) replaces the 7 s below
+    (`MobSet::with_interval`). Neither OrionAlpha nor Kinoko reads these
+    keys; this follows Cosmic, without its scaling by users.
   - At most every 7 s, while the field holds fewer mobs than that, a pass
     fills spawn points picked at random from those with room, as many as
     are missing. A pass with nothing missing doesn't count. A point without
