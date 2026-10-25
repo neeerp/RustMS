@@ -986,6 +986,7 @@ namespace ms
 				case UIElement::Type::MINIGAMECREATE:
 				case UIElement::Type::CLAIMNOTICE:
 				case UIElement::Type::CLAIM:
+				case UIElement::Type::GMBLOCK:
 					return true;
 				default:
 					return false;

@@ -1081,6 +1081,7 @@ namespace ms
 		enum Mode : int8_t
 		{
 			BAN = 0x03,
+			BLOCK = 0x04,
 			HIDE = 0x10,
 			ENTER_MAP = 0x11,
 			WARN = 0x1E
@@ -1137,6 +1138,21 @@ namespace ms
 		AdminBanPacket(const std::string& name) : AdminCommandPacket(AdminCommandPacket::Mode::BAN)
 		{
 			write_string(name);
+		}
+	};
+
+	// /block, from its dialog: the reason is Etc/BlockReason.img's number
+	// (0x52dcef)
+	class AdminBlockPacket : public AdminCommandPacket
+	{
+	public:
+		AdminBlockPacket(const std::string& name, uint8_t reason, int32_t days, const std::string& description)
+			: AdminCommandPacket(AdminCommandPacket::Mode::BLOCK)
+		{
+			write_string(name);
+			write_byte(reason);
+			write_int(days);
+			write_string(description);
 		}
 	};
 

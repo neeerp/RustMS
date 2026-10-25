@@ -39,6 +39,17 @@ int main()
 		GmCommand ban = GmCommand::parse("/ban Bob", 1);
 		require(ban.kind == Kind::BAN && ban.name == "Bob", "a ban");
 
+		GmCommand block = GmCommand::parse("/block Bob 7 BOT", 1);
+		require(block.kind == Kind::BLOCK && block.name == "Bob" && block.days == 7 && block.text == "BOT", "a block");
+		require(GmCommand::parse("/block Bob 7", 1).kind == Kind::NONE, "a block needs its reason");
+		require(GmCommand::parse("/block Bob 7 BOT now", 1).kind == Kind::NONE, "and nothing more");
+		require(GmCommand::parse("/Block Bob 7 BOT", 1).kind == Kind::NONE, "/block is matched as typed");
+		require(GmCommand::parse("/block Bob x BOT", 1).days == 0, "days that aren't a number are 0");
+		require(GmCommand::parse("/block Bob 7 BOT", 4).kind == Kind::NONE, "rank 4 can't block");
+		const std::vector<std::string> reasons = { "HACK", "BOT", "AD" };
+		require(block.block_reason(reasons) == 2, "BOT is the second reason");
+		require(GmCommand::parse("/block Bob 7 bot", 1).block_reason(reasons) == 0, "reasons are matched as typed");
+
 		GmCommand notice = GmCommand::parse("/noticeall hello there", 2);
 		require(notice.kind == Kind::BROADCAST && notice.scope == GmCommand::WORLD
 			&& notice.type == GmCommand::NOTICE && notice.text == "hello there", "a notice to the world");

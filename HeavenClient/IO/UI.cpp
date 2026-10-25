@@ -515,6 +515,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MINIGAMECREATE);
 					types.emplace_back(UIElement::Type::CLAIMNOTICE);
 					types.emplace_back(UIElement::Type::CLAIM);
+					types.emplace_back(UIElement::Type::GMBLOCK);
 				}
 				else if (enter)
 				{
@@ -544,9 +545,11 @@ namespace ms
 					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
 					types.emplace_back(UIElement::Type::IMAGESLIDES);
+					types.emplace_back(UIElement::Type::GMBLOCK);
 				} else if (tab)
 				{
 					// Game
+					types.emplace_back(UIElement::Type::GMBLOCK);
 					types.emplace_back(UIElement::Type::ITEMINVENTORY);
 					types.emplace_back(UIElement::Type::EQUIPINVENTORY);
 					types.emplace_back(UIElement::Type::SKILLBOOK);

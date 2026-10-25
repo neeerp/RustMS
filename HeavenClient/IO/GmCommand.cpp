@@ -3,6 +3,7 @@
 #include "ChatCommand.h"
 
 #include <cstdlib>
+#include <vector>
 
 namespace ms
 {
@@ -93,6 +94,28 @@ namespace ms
 				return command;
 			}
 
+			// StringPool 0x6e1: exactly three words after it, the command
+			// itself matched as typed (0x4a91b0).
+			if (input.compare(0, 7, "/block ") == 0)
+			{
+				std::vector<std::string> words;
+				size_t start = 7;
+
+				for (size_t space; (space = input.find(' ', start)) != std::string::npos; start = space + 1)
+					words.push_back(input.substr(start, space - start));
+
+				words.push_back(input.substr(start));
+
+				if (words.size() == 3)
+				{
+					GmCommand command = of(Kind::BLOCK);
+					command.name = words[0];
+					command.days = std::atoi(words[1].c_str());
+					command.text = words[2];
+					return command;
+				}
+			}
+
 			// StringPool 0x6df
 			if (ChatCommand::same_text(input, "/uclip"))
 				return of(Kind::UCLIP);
@@ -122,5 +145,14 @@ namespace ms
 		}
 
 		return GmCommand();
+	}
+
+	int32_t GmCommand::block_reason(const std::vector<std::string>& types) const
+	{
+		for (size_t i = 0; i < types.size(); i++)
+			if (types[i] == text)
+				return static_cast<int32_t>(i + 1);
+
+		return 0;
 	}
 }
