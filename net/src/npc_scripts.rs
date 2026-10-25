@@ -1628,6 +1628,9 @@ impl NpcScript {
             let back = carnival::CARNIVAL_LOBBY;
             return Some(ask_warp(CARNIVAL_GUIDE, keys::CARNIVAL_GUIDE_BACK, back));
         }
+        if npc_id == CARNIVAL_GUIDE && carnival::result_room(player.stats.map_id).is_some() {
+            return Some(carnival_grade(player));
+        }
         if carnival::waiting_room(player.stats.map_id).is_some() {
             // The leader's leaving gives the room up (`EventActor`).
             let back = carnival::CARNIVAL_LOBBY;
@@ -6990,6 +6993,30 @@ fn insignificant_being(player: &Player) -> NpcScript {
 
 /// `npc` asks `key`, and a yes takes the player to `to`'s first spawn point
 /// (Cosmic `1092008`, `1095000`, and `2095000` past Save Delli!).
+/// 2042002 in a Monster Carnival result room (Cosmic `2042002`): the
+/// battle just fought, graded by the player's side's CP in all, and its
+/// EXP on the way back to the Carnival Field. With no battle to grade, as
+/// after a reconnect, the player just goes back.
+fn carnival_grade(player: &Player) -> NpcScript {
+    let back = Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0);
+    let Some((won, points)) = player.carnival_result else {
+        return NpcScript::new(CARNIVAL_GUIDE, vec![Page::Done(vec![back])]);
+    };
+    let grade = carnival::grade(points);
+    let key = if won {
+        keys::CARNIVAL_GUIDE_WON
+    } else {
+        keys::CARNIVAL_GUIDE_LOST
+    };
+    let letter = carnival::grade_letter(grade).to_string();
+    let said = content::text().get(key, &[("grade", &letter)]);
+    let mut script = NpcScript::new(CARNIVAL_GUIDE, vec![Page::Say(said)]);
+    script
+        .on_end
+        .extend([Effect::GainExp(carnival::result_exp(won, grade)), back]);
+    script
+}
+
 fn ask_warp(npc: i32, key: &str, to: i32) -> NpcScript {
     NpcScript::new(
         npc,
@@ -14128,6 +14155,30 @@ mod tests {
         assert_eq!(question(&post.begin()), text(keys::ELLIN_MILEPOST_LEAVE));
         let step = post.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::WarpToPortal(events::ELLIN_EXIT, 0)]);
+    }
+
+    #[test]
+    fn the_carnival_guide_grades_the_battle_and_pays_its_exp() {
+        let mut member = player(50);
+        member.stats.map_id = carnival::win_map(1);
+        let back = Effect::WarpToPortal(carnival::CARNIVAL_LOBBY, 0);
+        // With no battle to grade, straight back.
+        let mut guide = NpcScript::for_npc(CARNIVAL_GUIDE, &member).unwrap();
+        assert_eq!(guide.begin().effects, [back.clone()]);
+        member.carnival_result = Some((true, 120));
+        let mut guide = NpcScript::for_npc(CARNIVAL_GUIDE, &member).unwrap();
+        let said = content::text().get(keys::CARNIVAL_GUIDE_WON, &[("grade", "B")]);
+        assert_eq!(page_text(&guide.begin()), said);
+        let step = guide.respond(ScriptInput::Next).unwrap();
+        assert_eq!(step.effects, [Effect::GainExp(25_500), back.clone()]);
+        // A draw or a loss grades in the losers' room.
+        member.stats.map_id = carnival::lose_map(1);
+        member.carnival_result = Some((false, 0));
+        let mut guide = NpcScript::for_npc(CARNIVAL_GUIDE, &member).unwrap();
+        let said = content::text().get(keys::CARNIVAL_GUIDE_LOST, &[("grade", "D")]);
+        assert_eq!(page_text(&guide.begin()), said);
+        let step = guide.respond(ScriptInput::Next).unwrap();
+        assert_eq!(step.effects, [Effect::GainExp(2_500), back]);
     }
 
     #[test]

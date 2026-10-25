@@ -237,6 +237,8 @@ pub enum SendOpcode {
     CarnivalSummon = 0x124,
     CarnivalMessage = 0x125,
     CarnivalDied = 0x126,
+    /// How a battle ended, for the chat log (296; Cosmic never sends it).
+    CarnivalResult = 0x128,
     /// How long Horntail's Cave stays open (302; v83 FUN_005335a3).
     HorntailCave = 0x12E,
     /// How long the Zakum Shrine stays open (303; v83 FUN_0053347c).

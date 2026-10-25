@@ -22,6 +22,10 @@ pub const CARNIVAL_LEVELS: RangeInclusive<u8> = 30..=50;
 pub const CARNIVAL_FALLBACK: i32 = 102000000;
 /// A battle's length when its field's data has none (`timeDefault`).
 const BATTLE_SECONDS: u64 = 610;
+/// What a tie adds when its field's data doesn't say (`timeExpand`).
+const OVERTIME_SECONDS: u64 = 120;
+/// How long before the end a battle's result is known.
+const RESULT_LEAD: Duration = Duration::from_secs(10);
 /// How long a party waits in its room for a challenge before it is sent
 /// back to the Carnival Field (Cosmic's lobby timer).
 pub const WAITING: Duration = Duration::from_secs(180);
@@ -63,25 +67,147 @@ pub fn revive_room(map_id: i32) -> Option<u8> {
     (1..=CARNIVAL_ROOMS).find(|&room| revive_map(room) == map_id)
 }
 
+/// Room `room`'s winners' room (980000n03, its battle field's
+/// `rewardMapWin`), where 2042002 grades them.
+pub const fn win_map(room: u8) -> i32 {
+    room_map(room) + 3
+}
+
+/// Room `room`'s losers' room (980000n04, `rewardMapLose`), where a draw
+/// sends both sides too.
+pub const fn lose_map(room: u8) -> i32 {
+    room_map(room) + 4
+}
+
+/// The room whose winners' or losers' room `map_id` is.
+pub fn result_room(map_id: i32) -> Option<u8> {
+    (1..=CARNIVAL_ROOMS).find(|&room| win_map(room) == map_id || lose_map(room) == map_id)
+}
+
+fn rules(room: u8) -> Option<&'static game_data::Carnival> {
+    crate::get_game_data()
+        .ok()?
+        .field(battle_map(room))?
+        .carnival
+        .as_ref()
+}
+
 /// The most CP a death on room `room`'s battle field costs (its
 /// `deathCP`).
 pub fn death_cp(room: u8) -> i32 {
-    crate::get_game_data()
-        .ok()
-        .and_then(|data| data.field(battle_map(room))?.carnival.as_ref())
-        .map_or(0, |rules| rules.death_cp.max(0))
+    rules(room).map_or(0, |rules| rules.death_cp.max(0))
 }
 
 /// How long room `room`'s battle lasts: its field's `timeDefault`,
 /// shortened like the events' time (`crate::events::scaled`).
 pub fn battle_length(room: u8) -> Duration {
-    let seconds = crate::get_game_data()
-        .ok()
-        .and_then(|data| data.field(battle_map(room))?.carnival.as_ref())
+    let seconds = rules(room)
         .and_then(|rules| u64::try_from(rules.time_default).ok())
         .filter(|&seconds| seconds > 0)
         .unwrap_or(BATTLE_SECONDS);
     crate::events::scaled(Duration::from_secs(seconds))
+}
+
+/// How long a tied battle goes on: its field's `timeExpand`, shortened
+/// like the battle.
+pub fn overtime_length(room: u8) -> Duration {
+    let seconds = rules(room)
+        .and_then(|rules| u64::try_from(rules.time_expand).ok())
+        .filter(|&seconds| seconds > 0)
+        .unwrap_or(OVERTIME_SECONDS);
+    crate::events::scaled(Duration::from_secs(seconds))
+}
+
+/// How long before a battle's end its result is known (Cosmic's
+/// `effectTimer`, 10 seconds before its `timer`), shortened like the
+/// battle.
+pub fn result_lead() -> Duration {
+    crate::events::scaled(RESULT_LEAD)
+}
+
+/// The screen effect and sound side `side` gets for `outcome`: its
+/// field's `effectWin` and `soundWin`, or `effectLose` and `soundLose`.
+pub fn result_effects(room: u8, outcome: Outcome, side: u8) -> (String, String) {
+    let won = outcome == Outcome::Won(side);
+    let (effect, sound) = match rules(room) {
+        Some(rules) if won => (rules.effect_win.clone(), rules.sound_win.clone()),
+        Some(rules) => (rules.effect_lose.clone(), rules.sound_lose.clone()),
+        None => (String::new(), String::new()),
+    };
+    let or = |value: String, default: &str| {
+        if value.is_empty() {
+            default.to_string()
+        } else {
+            value
+        }
+    };
+    let ending = if won { "Win" } else { "Lose" };
+    (
+        or(effect, &format!("quest/carnival/{}", ending.to_lowercase())),
+        or(sound, &format!("MobCarnival/{ending}")),
+    )
+}
+
+/// How a battle ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    /// This side earned more CP in all.
+    Won(u8),
+    /// Still tied after the overtime.
+    Draw,
+}
+
+impl Outcome {
+    /// MONSTER_CARNIVAL_RESULT's code for side `side`'s screen.
+    pub fn code(self, side: u8) -> u8 {
+        match self {
+            Self::Won(winner) if winner == side => RESULT_WON,
+            Self::Won(_) => RESULT_LOST,
+            Self::Draw => RESULT_DRAW,
+        }
+    }
+
+    /// Where side `side` goes once it is over.
+    pub fn room(self, room: u8, side: u8) -> i32 {
+        if self == Self::Won(side) {
+            win_map(room)
+        } else {
+            lose_map(room)
+        }
+    }
+}
+
+/// MONSTER_CARNIVAL_RESULT's codes, which the battle field and the revive
+/// room print (SP 0xff7 to 0xffa); any other prints nothing.
+pub const RESULT_WON: u8 = 8;
+pub const RESULT_LOST: u8 = 9;
+pub const RESULT_DRAW: u8 = 10;
+/// The other side left before the end.
+pub const RESULT_LEFT: u8 = 11;
+
+/// What 2042002 grades a member by: their side's CP in all, the most
+/// first (Cosmic's `FestivalPoints`).
+const GRADES: [i32; 3] = [300, 100, 50];
+
+/// The grade, A (0) to D (3), of `points`.
+pub fn grade(points: i32) -> u8 {
+    GRADES.iter().take_while(|&&least| points < least).count() as u8
+}
+
+/// The grade's letter.
+pub fn grade_letter(grade: u8) -> char {
+    char::from(b'A' + grade.min(3))
+}
+
+/// The EXP 2042002 pays for `grade`, won or not (Cosmic `2042002`; the
+/// losers' B there is 1200, below C's 5000, taken for 12000).
+pub fn result_exp(won: bool, grade: u8) -> i32 {
+    let table = if won {
+        [50_000, 25_500, 21_000, 19_505]
+    } else {
+        [17_500, 12_000, 5_000, 2_500]
+    };
+    table[usize::from(grade.min(3))]
 }
 
 /// What Spiegelmann shows of a room.
@@ -122,6 +248,11 @@ pub enum Stage {
     /// A challenge was accepted: both parties gather before the battle.
     Ready,
     Battle,
+    /// The battle's last seconds, its result known (or a tie, which goes
+    /// on to overtime): nothing more is earned, spent or lost.
+    Closing,
+    /// Each side is in its result room.
+    Over,
 }
 
 /// One of a challenging party, as the waiting leader is shown them.
@@ -415,6 +546,22 @@ impl Score {
         })
     }
 
+    /// The side that earned more CP in all, or None on a tie (Cosmic
+    /// `complete`'s snapshot).
+    pub fn leader(&self) -> Option<u8> {
+        let [red, blue] = self.teams.map(|team| team.total);
+        match red.cmp(&blue) {
+            std::cmp::Ordering::Greater => Some(0),
+            std::cmp::Ordering::Less => Some(1),
+            std::cmp::Ordering::Equal => None,
+        }
+    }
+
+    /// Side `side`'s CP in all.
+    pub fn total(&self, side: u8) -> i32 {
+        self.teams[usize::from(side.min(1))].total
+    }
+
     /// What `member`'s screen shows on arrival. None for one not playing.
     pub fn start(&self, member: ClientId) -> Option<Start> {
         let side = self.side(member)?;
@@ -430,6 +577,35 @@ impl Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_side_with_more_cp_in_all_wins_and_is_graded_by_it() {
+        let mut score = Score::default();
+        score.join(1, 0);
+        score.join(2, 1);
+        score.gain(1, 40);
+        score.gain(2, 40);
+        assert_eq!(score.leader(), None);
+        // Spending doesn't lower the total that decides it.
+        score.spend(1, 30);
+        score.gain(1, 1);
+        assert_eq!(score.leader(), Some(0));
+        assert_eq!((score.total(0), score.total(1)), (41, 40));
+
+        let won = Outcome::Won(0);
+        assert_eq!((won.code(0), won.code(1)), (RESULT_WON, RESULT_LOST));
+        assert_eq!((won.room(3, 0), won.room(3, 1)), (980000303, 980000304));
+        assert_eq!(Outcome::Draw.code(0), RESULT_DRAW);
+        assert_eq!(Outcome::Draw.room(3, 0), lose_map(3));
+        assert_eq!(result_room(980000303), Some(3));
+        assert_eq!(result_room(980000302), None);
+
+        let grades: Vec<u8> = [300, 299, 100, 50, 49, 0].map(grade).to_vec();
+        assert_eq!(grades, [0, 1, 1, 2, 3, 3]);
+        assert_eq!(grade_letter(2), 'C');
+        assert_eq!(result_exp(true, 0), 50_000);
+        assert_eq!(result_exp(false, 3), 2_500);
+    }
 
     #[test]
     fn a_guardian_takes_a_free_spot_of_its_side() {

@@ -11,8 +11,9 @@ Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
 clock, the sides' look, CP from kills, spending CP on mobs, skills and
 guardians, the CP and skill items, CP lost on death and the revive room,
-and the exit room are in. Not yet: results and their effects, and the
-client's Carnival UI.
+the results with their effects, overtime and draws, the result rooms'
+grades and EXP, and the exit room are in. Not yet: the client's Carnival
+UI.
 
 ## Maps
 
@@ -25,7 +26,9 @@ client's Carnival UI.
   then the revive room (n02), the winners' (n03) and the losers' (n04). The
   revive rooms' `MCrevive<n>` portals go back to the battle field.
 - The exit room, 980000010 (`CARNIVAL_EXIT`), has 2042002, who sends
-  players back to the Carnival Field.
+  players back to the Carnival Field. 2042002 also stands in each room's
+  winners' and losers' rooms (`win_map`, `lose_map`, `result_room`), whose
+  `returnMap` is the exit room.
 - A battle field is field type 10 (the client's `CField_MonsterCarnival`).
   Its `monsterCarnival` node (`FieldTemplate::carnival`, `Carnival`) holds
   the battle's length (`timeDefault`, 610 s), the mobs each side may summon
@@ -67,8 +70,10 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   waiting leader leaving, sends the party back to the Carnival Field. After
   the 10 s, everyone goes to the battle field, each side told theirs
   (`carnival.team.red`/`blue`), and the battle's clock starts, the field's
-  `timeDefault` scaled by `RUSTMS_EVENT_SCALE` (`battle_length`). When it
-  runs out, or a side has nobody left, everyone goes to the exit room.
+  `timeDefault` scaled by `RUSTMS_EVENT_SCALE` (`battle_length`). From
+  then on the leader leaving doesn't end the event: if a side has nobody
+  left before the result is known, the other is told (RESULT 11) and
+  everyone goes to the exit room. The end is under "Results".
 - The event keeps the score (`net::carnival::Score`): each member's side and
   CP, and each side's. A kill on the battle field
   (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
@@ -128,6 +133,29 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   from START. Its `pt00` portal (`MCrevive<n>`) leads back to the battle
   field's portal 0, where START gives the score again.
 
+## Results
+
+- Ten seconds before the clock runs out (`result_lead`, scaled) the battle
+  closes (`Stage::Closing`): the side with more CP in all
+  (`Score::leader`) wins, and from then on no CP is earned, spent or lost
+  to deaths. A side leaving now lets the battle play out. With a
+  winner, the field's mobs are cleared and each side is shown its effect
+  and sound (`result_effects`: `quest/carnival/win` or `lose`, and
+  `MobCarnival/Win` or `Lose`) and RESULT 8 (won) or 9 (lost).
+- A tie plays on once: the field's `timeExpand` (120 s, scaled,
+  `overtime_length`) on a new clock, told so (`carnival.overtime`, since
+  the client doesn't print its own line). A second tie is a draw
+  (`Outcome::Draw`): RESULT 10, and both sides get the lose effect.
+- At the end (`Stage::Over`) the room is freed and each member is told
+  their result (`ServerMessage::CarnivalResult`, which keeps it in
+  `Player::carnival_result` and cures their diseases) and goes to the
+  winners' room (980000n03) or, on a loss or draw, the losers' (n04).
+- 2042002 there (`npc_scripts::carnival_grade`) grades the side's CP in all
+  (`grade`: A from 300, B from 100, C from 50, else D), pays its EXP
+  (`result_exp`: a win 50000, 25500, 21000 or 19505, a loss 17500, 12000,
+  5000 or 2500) and sends the player to the Carnival Field. Without a
+  result kept it just sends them there; leaving a result room forgets it.
+
 ## Packets (`net::packet::build::world::carnival`)
 
 CP is sent as two shorts, the CP left to spend and the total ever earned.
@@ -146,3 +174,6 @@ CP is sent as two shorts, the CP left to spend and the total ever earned.
 - MONSTER_CARNIVAL_DIED (0x126): the side, the name of who died, and the
   CP their side lost, a byte, to the whole battle field, which the
   client's chat log shows.
+- MONSTER_CARNIVAL_RESULT (0x128): a byte, 8 won, 9 lost, 10 a draw, 11
+  the other side left, which the client prints only on a battle field or
+  revive room. MONSTER_CARNIVAL_LEAVE (0x127), who left, isn't sent.

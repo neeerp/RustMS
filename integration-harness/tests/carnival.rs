@@ -8,16 +8,21 @@
 //! screen is told their side and the score, and a kill earns its mob's CP
 //! for the killer and their side, which they spend on mobs that hunt the
 //! other side, skills that fall on it, and guardians that strengthen their
-//! own side's mobs until the other side breaks them. When time runs out
-//! everyone goes to the exit room.
+//! own side's mobs until the other side breaks them. Ten seconds before
+//! the end the side with more CP is shown the win and the other the loss;
+//! a tie plays two more minutes, and a second tie is a draw. At the end
+//! each side goes to its result room, where the guide grades them.
 
 use integration_harness::events::{armed_in, party_of_one, talk, told};
 use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
-use net::carnival::{battle_map, revive_map, room_map, CARNIVAL_EXIT, CARNIVAL_LOBBY};
-use net::npc_scripts::{CARNIVAL_ROOM_NPC, SPIEGELMANN};
+use net::carnival::{
+    battle_map, grade, grade_letter, lose_map, result_exp, revive_map, room_map, win_map,
+    CARNIVAL_EXIT, CARNIVAL_LOBBY,
+};
+use net::npc_scripts::{CARNIVAL_GUIDE, CARNIVAL_ROOM_NPC, SPIEGELMANN};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -168,6 +173,31 @@ async fn a_party_not_challenged_goes_back_to_the_carnival_field() {
     .await;
     assert!(!seen.countdowns.is_empty());
     assert!(!seen.warps.contains(&CARNIVAL_EXIT));
+
+    // Taken again and challenged, the room's battle ends with no CP on
+    // either side: a tie plays on, told so with a new clock, and a second
+    // tie is a draw, which sends both sides to the losers' room.
+    let blue = &mut leader().await;
+    take(player, 3).await;
+    challenge(player, blue, 3).await;
+    send(&mut player.connection, answer(1, 1, None)).await;
+    let mut tied = Trace::default();
+    let overtime = text("carnival.overtime");
+    until(&mut player.connection, &mut tied, |t| {
+        t.warps.contains(&battle_map(3)) && t.item_lines.iter().any(|(line, _)| *line == overtime)
+    })
+    .await;
+    assert!(carnival(&tied, SendOpcode::CarnivalResult).is_empty());
+    let clocks = tied.countdowns.len();
+    assert!(clocks >= 2, "{:?}", tied.countdowns);
+    for side in [&mut *player, &mut *blue] {
+        let mut drawn = Trace::default();
+        until(&mut side.connection, &mut drawn, |t| {
+            t.warps.contains(&lose_map(3))
+        })
+        .await;
+        assert_eq!(carnival(&drawn, SendOpcode::CarnivalResult), [vec![10]]);
+    }
 }
 
 #[tokio::test]
@@ -366,15 +396,45 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
         points
     );
 
-    // Time runs out, and both go to the exit room.
+    // Ten seconds before the end Red, ahead on CP, is shown the win and
+    // Blue the loss; at the end each goes to their side's room.
+    let won = |t: &Trace, effect: &str, sound: &str| {
+        t.field_effects.contains(&(3, effect.to_string()))
+            && t.field_effects.contains(&(4, sound.to_string()))
+    };
     until(&mut red.connection, &mut seen, |t| {
-        t.warps.contains(&CARNIVAL_EXIT)
+        t.warps.contains(&win_map(1))
     })
     .await;
+    assert!(won(&seen, "quest/carnival/win", "MobCarnival/Win"));
+    assert_eq!(carnival(&seen, SendOpcode::CarnivalResult), [vec![8]]);
     until(&mut blue.connection, &mut theirs, |t| {
-        t.warps.contains(&CARNIVAL_EXIT)
+        t.warps.contains(&lose_map(1))
     })
     .await;
+    assert!(won(&theirs, "quest/carnival/lose", "MobCarnival/Lose"));
+    assert_eq!(carnival(&theirs, SendOpcode::CarnivalResult), [vec![9]]);
+
+    // The guide there grades Red by their side's CP, pays its EXP and
+    // sends Red back to the Carnival Field.
+    let graded = told(red, talk(win_map(1), CARNIVAL_GUIDE)).await;
+    let letter = grade_letter(grade(i32::from(total)));
+    assert!(
+        graded
+            .prompt_texts
+            .iter()
+            .any(|said| said.contains(&format!("#r{letter}#k"))),
+        "{:?}",
+        graded.prompt_texts
+    );
+    let mut back = Trace::default();
+    send(&mut red.connection, answer(0, 1, None)).await;
+    until(&mut red.connection, &mut back, |t| {
+        t.warps.contains(&CARNIVAL_LOBBY)
+    })
+    .await;
+    let exp = result_exp(true, grade(i32::from(total)));
+    assert!(back.gains.contains(&exp), "{:?}", back.gains);
 }
 
 /// Red's party battles Blue's in room `room`, and Red hunts the mobs not

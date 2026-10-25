@@ -980,6 +980,23 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
+    /// The Monster Carnival battle `id` is over, as the player's side
+    /// `won` or not with `points` CP in all: kept for 2042002 in their
+    /// result room, where the event takes them next, and their diseases
+    /// end (Cosmic `finish`'s `dispelDebuffs`).
+    pub(super) async fn carnival_result(
+        &mut self,
+        id: u32,
+        won: bool,
+        points: i32,
+    ) -> Result<(), RuntimeError> {
+        if !self.on_event_maps(id) {
+            return Ok(());
+        }
+        self.in_game_mut()?.player.carnival_result = Some((won, points));
+        self.cure_diseases().await
+    }
+
     /// Event `id` ended: out of its maps, if the player still holds its
     /// ticket.
     pub(super) async fn event_ended(&mut self, id: u32) -> Result<(), RuntimeError> {
@@ -1074,6 +1091,9 @@ impl ClientActor {
             if !(from == events::PYRAMID_RESULT + mode && map_id == events::PYRAMID_SHADES + mode) {
                 player.pyramid_gem = None;
             }
+        }
+        if net::carnival::result_room(from).is_some() {
+            player.carnival_result = None;
         }
         let clock = events::clock_on(map_id);
         match &mut self.event {

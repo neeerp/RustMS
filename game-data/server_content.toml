@@ -1317,6 +1317,9 @@ unsourced = [
     "carnival.team.blue",
     "carnival.room.wait",
     "carnival.room.leave",
+    "carnival.overtime",
+    "carnival.guide.won",
+    "carnival.guide.lost",
 ]
 
 [text."glTutoMsg0.message"]
