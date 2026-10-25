@@ -5,8 +5,9 @@
 
 use integration_harness::database::{grant_skill, set_gm_level};
 use integration_harness::hunting::use_skill;
+use integration_harness::packets::{build_all_chat, decode_chat_text};
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{read_for, send, until, warp, Trace};
+use integration_harness::trace::{barrier, read, read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -109,6 +110,18 @@ async fn a_gms_holy_symbol_reaches_strangers_and_no_one_else_casts_it() {
     until(g, &mut gt, |t| t.hidden.len() == 3).await;
     assert_eq!(gt.hidden[2..], [true]);
     until(s, &mut st, |t| t.gone.contains(&gm_id)).await;
+    // Nor does the stranger hear the hidden GM, who still hears it.
+    barrier(g, "unheard", &mut gt).await;
+    send(s, build_all_chat("heard", 0).unwrap()).await;
+    loop {
+        let Ok(line) = decode_chat_text(&read(s, &mut st).await) else {
+            continue;
+        };
+        assert_ne!(line.character_id, gm_id, "the stranger heard the hidden GM");
+        if line.message == "heard" {
+            break;
+        }
+    }
     let shown = st.players.len();
     send(g, slash_h(false)).await;
     until(g, &mut gt, |t| t.hidden.len() == 4).await;

@@ -823,7 +823,7 @@ impl ClientActor {
         for packet in &packets {
             self.send_to_field(FieldMessage::FromClient {
                 from: self.client_id,
-                request: FieldRequest::Broadcast(packet.clone()),
+                request: FieldRequest::BroadcastAll(packet.clone()),
             })
             .await?;
         }

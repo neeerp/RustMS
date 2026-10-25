@@ -670,11 +670,15 @@ namespace ms
 
 		message = CurseWords::printable(message);
 
-		if (auto character = Stage::get().get_character(charid))
-		{
-			message = character->get_name() + " : " + message;
-			character->speak(message);
-		}
+		// v83 drops a line from a character it doesn't know, such as a
+		// hidden GM (FUN_00972401).
+		auto character = Stage::get().get_character(charid);
+
+		if (!character)
+			return;
+
+		message = character->get_name() + " : " + message;
+		character->speak(message);
 
 		// As in v83 (FUN_00937138), a balloon-only line stays out of the log.
 		if (balloon_only)
