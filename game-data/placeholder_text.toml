@@ -1467,3 +1467,6 @@
 "carnival.team.blue" = "[placeholder] You play for Maple Blue."
 "carnival.room.wait" = "[placeholder] Wait here for another party to challenge yours."
 "carnival.room.leave" = "[placeholder] Do you want to leave this room for the Carnival Field?"
+"carnival.overtime" = "[placeholder] The two sides are tied! The battle goes on for a little longer."
+"carnival.guide.won" = "[placeholder] Well fought, and well won! Your result: #r{grade}#k"
+"carnival.guide.lost" = "[placeholder] Not a win this time, but there is always the next battle. Your result: #r{grade}#k"

@@ -307,6 +307,12 @@ impl ClientActor {
         self.end_buffs(Buffs::dispel).await
     }
 
+    /// End the player's diseases, as a Monster Carnival battle's end does.
+    pub(super) async fn cure_diseases(&mut self) -> Result<(), RuntimeError> {
+        self.end_buffs(|buffs| buffs.cure(&BuffStat::DISEASES))
+            .await
+    }
+
     /// End the buffs `end` ends, the summons with theirs.
     async fn end_buffs(
         &mut self,

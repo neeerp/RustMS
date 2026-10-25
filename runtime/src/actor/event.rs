@@ -40,8 +40,10 @@ use net::events::{
 };
 use net::loot::Loot;
 use net::packet::build::world::carnival::{
-    build_carnival_message, build_carnival_start, build_obtained_cp, build_party_cp,
+    build_carnival_message, build_carnival_result, build_carnival_start, build_obtained_cp,
+    build_party_cp,
 };
+use net::packet::build::world::effect::{build_field_effect, build_field_sound};
 use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
@@ -397,6 +399,9 @@ pub fn spawn(
         },
         carnival_stage: net::carnival::Stage::default(),
         carnival_summoned: Vec::new(),
+        carnival_end: None,
+        carnival_outcome: None,
+        carnival_overtime: false,
         // The party waiting plays Maple Red.
         carnival: {
             let mut score = net::carnival::Score::default();
@@ -565,6 +570,13 @@ struct EventActor {
     carnival_stage: net::carnival::Stage,
     /// How many of each mob of the battle field's list were summoned.
     carnival_summoned: Vec<u8>,
+    /// When the battle's clock runs out; `ends` is its result's time, a
+    /// little before.
+    carnival_end: Option<Instant>,
+    /// How the battle ends, once its last seconds come; None for a tie.
+    carnival_outcome: Option<net::carnival::Outcome>,
+    /// Whether a tie already gave the battle its overtime.
+    carnival_overtime: bool,
 }
 
 impl EventActor {
@@ -587,7 +599,8 @@ impl EventActor {
             tokio::select! {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => {
-                        over = self.team.leave(client_id) || self.carnival_left(client_id);
+                        let left = self.team.leave(client_id);
+                        over = self.carnival_left(client_id).unwrap_or(left);
                     }
                     Some(EventMessage::Challengers { members }) => self.challengers(members),
                     Some(EventMessage::Summoned { client_id, tab, index, cost, summoned }) => {
@@ -704,13 +717,16 @@ impl EventActor {
         match self.carnival_stage {
             Stage::Waiting => {
                 info!(id = self.id, room, "Carnival room not challenged");
+                // Free before they arrive, so they may take it again.
+                free_lobby(&self.directory, None, self.channel_id, self.kind, self.id);
                 self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
                 true
             }
             Stage::Ready => {
                 self.carnival_stage = Stage::Battle;
                 let ends = Instant::now() + net::carnival::battle_length(room);
-                self.ends = Some(ends);
+                self.carnival_end = Some(ends);
+                self.ends = Some(closing_at(ends));
                 self.move_team(None, net::carnival::battle_map(room), Some(ends));
                 let text = net::content::text();
                 for member in self.team.members() {
@@ -729,25 +745,154 @@ impl EventActor {
                 info!(id = self.id, room, "Carnival battle started");
                 false
             }
-            Stage::Battle => true,
+            Stage::Battle => self.carnival_close(room),
+            Stage::Closing => self.carnival_closed(room),
+            Stage::Over => false,
         }
+    }
+
+    /// A battle's last seconds came: the side that earned more CP in all
+    /// has won, and a tie after the overtime is a draw. Unless it is a tie
+    /// still to be played out, the mobs go, and each side sees and hears
+    /// how it did and is told in the chat log (Cosmic `complete`, which
+    /// sends no MONSTER_CARNIVAL_RESULT).
+    fn carnival_close(&mut self, room: u8) -> bool {
+        use net::carnival::Outcome;
+        self.carnival_stage = net::carnival::Stage::Closing;
+        self.ends = self.carnival_end;
+        let outcome = match self.carnival.leader() {
+            Some(side) => Some(Outcome::Won(side)),
+            None if self.carnival_overtime => Some(Outcome::Draw),
+            None => None,
+        };
+        self.carnival_outcome = outcome;
+        let Some(outcome) = outcome else {
+            return false;
+        };
+        info!(id = self.id, room, ?outcome, "Carnival decided");
+        self.clear_mobs(net::carnival::battle_map(room));
+        for member in self.team.members() {
+            let (Some(handle), Some(side)) =
+                (self.members.get(member), self.carnival.side(*member))
+            else {
+                continue;
+            };
+            let (effect, sound) = net::carnival::result_effects(room, outcome, side);
+            let packets = [
+                build_field_effect(&effect),
+                build_field_sound(&sound),
+                build_carnival_result(outcome.code(side)),
+            ];
+            if let Ok(packets) = packets.into_iter().collect() {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets,
+                });
+            }
+        }
+        false
+    }
+
+    /// A battle's clock ran out. A tie goes on for the field's
+    /// `timeExpand`, the clock shown again (Cosmic `extendTime`); otherwise
+    /// each side goes to its result room with its CP in all, cured, and the
+    /// room is free for the next parties (Cosmic `finish`). The event goes
+    /// on until the last of them leaves the result rooms.
+    fn carnival_closed(&mut self, room: u8) -> bool {
+        let Some(outcome) = self.carnival_outcome else {
+            self.carnival_overtime = true;
+            self.carnival_stage = net::carnival::Stage::Battle;
+            let ends = Instant::now() + net::carnival::overtime_length(room);
+            self.carnival_end = Some(ends);
+            self.ends = Some(closing_at(ends));
+            let text = net::content::text().get(keys::CARNIVAL_OVERTIME, &[]);
+            let line = build_item_line(&text, 0);
+            for member in self.team.members() {
+                if let Some(handle) = self.members.get(member) {
+                    handle.send(ServerMessage::EventClock {
+                        id: self.id,
+                        clock: Some(ends),
+                    });
+                    if let Ok(line) = &line {
+                        handle.send(ServerMessage::EventPackets {
+                            id: self.id,
+                            packets: vec![line.clone()],
+                        });
+                    }
+                }
+            }
+            info!(id = self.id, room, "Carnival overtime");
+            return false;
+        };
+        self.carnival_stage = net::carnival::Stage::Over;
+        self.ends = None;
+        self.team.win();
+        self.cleared.set(self.kind.event().last_stage());
+        free_lobby(&self.directory, None, self.channel_id, self.kind, self.id);
+        for member in self.team.members() {
+            let (Some(handle), Some(side)) =
+                (self.members.get(member), self.carnival.side(*member))
+            else {
+                continue;
+            };
+            handle.send(ServerMessage::CarnivalResult {
+                id: self.id,
+                won: outcome == net::carnival::Outcome::Won(side),
+                points: self.carnival.total(side),
+            });
+            handle.send(ServerMessage::EventMoved {
+                id: self.id,
+                from: None,
+                to: outcome.room(room, side),
+                clock: None,
+            });
+        }
+        info!(id = self.id, room, "Carnival over");
+        false
     }
 
     /// `member` left a Monster Carnival room: the waiting party's leader
     /// takes it back to the Carnival Field, and once challenged, a side
-    /// with nobody left ends it. Whether that ends the event.
-    fn carnival_left(&mut self, member: ClientId) -> bool {
+    /// with nobody left ends it, not its leader leaving; once the result
+    /// is known it plays out. Whether that ends the event, or None to go
+    /// by the team's own rule.
+    fn carnival_left(&mut self, member: ClientId) -> Option<bool> {
         use net::carnival::Stage;
         if !matches!(self.kind, EventKind::Carnival(_)) {
-            return false;
+            return None;
         }
+        let members = self.team.members();
         match self.carnival_stage {
             Stage::Waiting if member == self.team.leader() => {
                 self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
-                true
+                Some(true)
             }
-            Stage::Waiting => false,
-            Stage::Ready | Stage::Battle => !self.carnival.both_sides(self.team.members()),
+            Stage::Waiting | Stage::Over => None,
+            Stage::Closing if self.carnival_outcome.is_some() => Some(members.is_empty()),
+            Stage::Ready => Some(!self.carnival.both_sides(members)),
+            Stage::Battle | Stage::Closing => {
+                let over = !self.carnival.both_sides(members);
+                if over {
+                    self.carnival_deserted();
+                }
+                Some(over)
+            }
+        }
+    }
+
+    /// The other side left the battle field before the end: those still
+    /// in the battle are told in the chat log, on their way out.
+    fn carnival_deserted(&self) {
+        let Ok(result) = build_carnival_result(net::carnival::RESULT_LEFT) else {
+            return;
+        };
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventPackets {
+                    id: self.id,
+                    packets: vec![result.clone()],
+                });
+            }
         }
     }
 
@@ -1708,6 +1853,14 @@ impl EventActor {
 fn draw_stage_combo(event: &Event, stage: u8) -> Option<u32> {
     let field = net::get_game_data().ok()?.field(event.stage_map(stage))?;
     draw_combo(field.areas.len(), event.areas_taken)
+}
+
+/// When a Monster Carnival battle whose clock runs out at `ends` is
+/// decided: a little before, but not before now.
+fn closing_at(ends: Instant) -> Instant {
+    ends.checked_sub(net::carnival::result_lead())
+        .unwrap_or(ends)
+        .max(Instant::now())
 }
 
 /// Wait until `ends`, or forever without it.

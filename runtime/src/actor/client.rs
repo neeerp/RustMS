@@ -1620,6 +1620,9 @@ impl ClientActor {
                 exp,
                 cleared,
             } => self.pyramid_score(exit, rank, exp, cleared).await?,
+            ServerMessage::CarnivalResult { id, won, points } => {
+                self.carnival_result(id, won, points).await?
+            }
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::MobBuff(item_id) => {
                 let alive = self

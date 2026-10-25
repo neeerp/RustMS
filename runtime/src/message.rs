@@ -386,6 +386,14 @@ pub enum ServerMessage {
         exp: i32,
         cleared: bool,
     },
+    /// The Monster Carnival battle `id` is over: the player's side `won` or
+    /// not, with `points` CP in all, and their diseases end. 2042002
+    /// grades them by it in the result room they go to next.
+    CarnivalResult {
+        id: u32,
+        won: bool,
+        points: i32,
+    },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,

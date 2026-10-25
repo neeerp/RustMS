@@ -1962,6 +1962,9 @@ pub mod keys {
     pub const CARNIVAL_TEAM_BLUE: &str = "carnival.team.blue";
     pub const CARNIVAL_ROOM_WAIT: &str = "carnival.room.wait";
     pub const CARNIVAL_ROOM_LEAVE: &str = "carnival.room.leave";
+    pub const CARNIVAL_OVERTIME: &str = "carnival.overtime";
+    pub const CARNIVAL_GUIDE_WON: &str = "carnival.guide.won";
+    pub const CARNIVAL_GUIDE_LOST: &str = "carnival.guide.lost";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3091,6 +3094,9 @@ mod tests {
                 keys::CARNIVAL_TEAM_BLUE,
                 keys::CARNIVAL_ROOM_WAIT,
                 keys::CARNIVAL_ROOM_LEAVE,
+                keys::CARNIVAL_OVERTIME,
+                keys::CARNIVAL_GUIDE_WON,
+                keys::CARNIVAL_GUIDE_LOST,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

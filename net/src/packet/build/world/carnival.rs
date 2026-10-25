@@ -79,6 +79,16 @@ pub fn build_carnival_died(side: u8, name: &str, lost: u8) -> Result<Packet, Net
     Ok(p)
 }
 
+/// MONSTER_CARNIVAL_RESULT: how the battle ended for the player's side
+/// (`crate::carnival::RESULT_WON` to `RESULT_LEFT`), which the battle field
+/// and the revive room print in the chat log.
+pub fn build_carnival_result(code: u8) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CarnivalResult as i16)?;
+    p.write_byte(code)?;
+    Ok(p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +156,10 @@ mod tests {
             .byte(1)
             .string("Blue")
             .byte(10)
+            .end();
+        Expect::new(&build_carnival_result(8).unwrap().bytes)
+            .short(0x128)
+            .byte(8)
             .end();
     }
 }

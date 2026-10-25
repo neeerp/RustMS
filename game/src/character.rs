@@ -298,6 +298,10 @@ pub struct Player {
     /// in its room in the Shades; kept from its result map to that room,
     /// and gone on any other way out of either. Not saved.
     pub pyramid_gem: Option<i32>,
+    /// How the Monster Carnival battle the player just fought ended for
+    /// them: whether their side won, and its CP in all, which 2042002
+    /// grades in their result room. Gone on the way out of it. Not saved.
+    pub carnival_result: Option<(bool, i32)>,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -368,6 +372,7 @@ impl Player {
             dojo_energy: 0,
             pyramid_rage: 0,
             pyramid_gem: None,
+            carnival_result: None,
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,
