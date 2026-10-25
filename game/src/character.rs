@@ -284,6 +284,9 @@ pub struct Player {
     /// The energy built on the Dojo's maps, up to `dojo::FULL_ENERGY`;
     /// not saved.
     pub dojo_energy: i32,
+    /// The uses of Rage of Pharaoh the player's Nett's Pyramid run has
+    /// left, as the run last told; not saved.
+    pub pyramid_rage: i32,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -352,6 +355,7 @@ impl Player {
             mount: Mount::default(),
             dojo: DojoRecord::default(),
             dojo_energy: 0,
+            pyramid_rage: 0,
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,

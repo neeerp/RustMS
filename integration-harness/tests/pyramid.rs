@@ -5,11 +5,12 @@
 //! result map. The harness world runs events 60 times as fast, so a run
 //! takes 14 seconds. Duarte on a stage lets a player give up, back to the
 //! lobby. The run counts its kills and misses, which keep its gauge up or
-//! pull it down; once it runs out the run ends.
+//! pull it down; once it runs out the run ends. Its kill counts give uses
+//! of Rage of Pharaoh, which can't be used without one.
 
 use game_data::server_content::keys;
 use integration_harness::events::{party, said, talk, told, waiting_in};
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, skill_attack};
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, Trace};
 use integration_harness::WorldSession;
@@ -63,6 +64,8 @@ async fn a_run_alone_goes_through_five_timed_stages_to_its_result_map() {
     assert!(seen.countdowns[1..].iter().all(|&s| (2..=3).contains(&s)));
 }
 
+const RAGE_OF_PHARAOH: i32 = 1020;
+
 /// Whether the run's tally `key` was last told as `value`.
 fn told_value(seen: &Trace, key: &str, value: i32) -> bool {
     let last = seen.session_values.iter().rev().find(|(k, _)| k == key);
@@ -80,18 +83,26 @@ async fn kills_and_misses_are_counted_and_enough_misses_end_the_run() {
         t.warps.contains(&run.entry)
             && told_value(t, "massacre_miss", 0)
             && t.pyramid_gauges == [0]
-            && t.field.mobs.len() >= 16
+            && t.field.mobs.len() >= 17
+            && told_value(t, "massacre_skill", 0)
     })
     .await;
     let mobs: Vec<i32> = seen.field.mobs.iter().map(|&(id, _)| id).collect();
 
-    // A kill counts. It puts back Hell's 1 once the gauge has lost
-    // anything, a second into the stage, and nothing before.
+    // Rage of Pharaoh needs a use, and the run has given none yet. A kill
+    // counts. It puts back Hell's 1 once the gauge has lost anything, a
+    // second into the stage, and nothing before.
+    send(
+        &mut player.connection,
+        skill_attack(RAGE_OF_PHARAOH, mobs[16], 1),
+    )
+    .await;
     send(&mut player.connection, attack(mobs[0], 1)).await;
     until(&mut player.connection, &mut seen, |t| {
         told_value(t, "massacre_hit", 1) && t.pyramid_gauges.len() == 2
     })
     .await;
+    assert!(!seen.field.killed.contains(&mobs[16]));
     let after_kill = seen.pyramid_gauges[1];
     assert!((0..=1).contains(&after_kill), "{:?}", seen.pyramid_gauges);
 

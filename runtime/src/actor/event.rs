@@ -842,12 +842,26 @@ impl EventActor {
             EventCommand::PastTheDoors => debug!(client_id, "Lord Pirate already out"),
             EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
                 let seconds = self.stage_seconds();
+                let mut reached = Vec::new();
                 if let Some(gauge) = &self.gauge {
                     self.tally.add(hits, gauge, seconds);
+                    reached = self.tally.reached(gauge);
                 }
-                self.tell_tally(Some(hits));
+                for effect in reached.iter().filter(|effect| effect.buff > 0) {
+                    self.bless(effect.buff);
+                }
+                let rage = reached.iter().any(|effect| effect.skill_use);
+                self.tell_tally(Some(hits), rage);
             }
             EventCommand::Massacre(_) => debug!(client_id, "Massacre not counted"),
+            EventCommand::Rage if self.kind.pyramid_mode().is_some() => {
+                if !self.tally.spend_rage() {
+                    debug!(client_id, "Rage of Pharaoh with no uses left");
+                }
+                // Even with none spent, the members hear how many are left.
+                self.tell_tally(Some(net::pyramid::Hits::default()), true);
+            }
+            EventCommand::Rage => debug!(client_id, "Rage of Pharaoh outside the Pyramid"),
         }
     }
 
@@ -966,7 +980,7 @@ impl EventActor {
             .and_then(|data| data.field(map)?.massacre.clone());
         self.stage_started = Instant::now();
         self.tally.new_stage();
-        self.tell_tally(None);
+        self.tell_tally(None, true);
     }
 
     /// The whole seconds the Nett's Pyramid stage has run. They aren't
@@ -976,13 +990,24 @@ impl EventActor {
         i32::try_from(self.stage_started.elapsed().as_secs()).unwrap_or(i32::MAX)
     }
 
-    /// Every member's screen takes the tallies `hits` changed, or all of
-    /// them, and the gauge (Cosmic `broadcastInfo`); and the gauge's run
-    /// out is timed again.
-    fn tell_tally(&mut self, hits: Option<net::pyramid::Hits>) {
+    /// Every member on the run's maps takes item `item_id`'s effect.
+    fn bless(&self, item_id: i32) {
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                let id = self.id;
+                handle.send(ServerMessage::PyramidBlessing { id, item_id });
+            }
+        }
+    }
+
+    /// Every member's screen takes the tallies `hits` changed, with the
+    /// uses of Rage of Pharaoh if `rage`, or all of them, and the gauge
+    /// (Cosmic `broadcastInfo`); and the gauge's run out is timed again.
+    fn tell_tally(&mut self, hits: Option<net::pyramid::Hits>, rage: bool) {
+        let left = self.tally.skill;
         let mut packets: Vec<_> = self
             .tally
-            .values(hits)
+            .values(hits, rage)
             .into_iter()
             .filter_map(|(key, value)| build_session_value(key, &value.to_string()).ok())
             .collect();
@@ -993,6 +1018,10 @@ impl EventActor {
                     id: self.id,
                     packets: packets.clone(),
                 });
+                if rage || hits.is_none() {
+                    let id = self.id;
+                    handle.send(ServerMessage::PyramidRage { id, left });
+                }
             }
         }
         let started = self.stage_started;

@@ -3,7 +3,7 @@
 //! `Pyramid.java`).
 
 use game_data::mobs::MobInfo;
-use game_data::Massacre;
+use game_data::{CountEffect, Massacre};
 
 /// SESSION_VALUE keys for the run's tallies, which the client draws on its
 /// Count panel and its result screen.
@@ -48,6 +48,9 @@ pub struct Tally {
     /// draws the gauge as the stage's elapsed seconds times `decrease`,
     /// less this.
     pub count: i32,
+    /// How many of the stage's `countEffect`s the run has reached (Cosmic
+    /// `buffcount`).
+    pub effects: usize,
 }
 
 impl Tally {
@@ -79,6 +82,30 @@ impl Tally {
         }
     }
 
+    /// The `countEffect`s the run's kills and cool kills have newly
+    /// reached, from any stage; each with `skillUse` gives a use of Rage of
+    /// Pharaoh (Cosmic `checkBuffs`, which reads the same counts from code).
+    pub fn reached(&mut self, gauge: &Massacre) -> Vec<CountEffect> {
+        let kills = self.hit + self.cool;
+        let new: Vec<_> = (gauge.count_effects.iter().skip(self.effects))
+            .take_while(|effect| effect.count <= kills)
+            .copied()
+            .collect();
+        self.effects += new.len();
+        let uses = new.iter().filter(|effect| effect.skill_use).count();
+        self.skill += i32::try_from(uses).unwrap_or(0);
+        new
+    }
+
+    /// Spends a use of Rage of Pharaoh, if one is left (Cosmic `useSkill`).
+    pub fn spend_rage(&mut self) -> bool {
+        let left = self.skill > 0;
+        if left {
+            self.skill -= 1;
+        }
+        left
+    }
+
     /// The whole seconds into the stage at which the gauge runs out, as
     /// things stand; never on a gauge that doesn't go down.
     pub fn runs_out(&self, gauge: &Massacre) -> Option<i32> {
@@ -88,13 +115,14 @@ impl Tally {
         })
     }
 
-    /// The session values for what `hits` changed, or for all four.
-    pub fn values(&self, hits: Option<Hits>) -> Vec<(&'static str, i32)> {
+    /// The session values for what `hits` changed, with the uses of Rage
+    /// of Pharaoh if `rage`, or for all four.
+    pub fn values(&self, hits: Option<Hits>, rage: bool) -> Vec<(&'static str, i32)> {
         let all = [
             (HIT, self.hit, hits.is_none_or(|h| h.kills > 0)),
             (MISS, self.miss, hits.is_none_or(|h| h.misses > 0)),
             (COOL, self.cool, hits.is_none_or(|h| h.cools > 0)),
-            (SKILL, self.skill, hits.is_none()),
+            (SKILL, self.skill, rage || hits.is_none()),
         ];
         all.into_iter()
             .filter(|&(_, _, changed)| changed)
@@ -200,16 +228,60 @@ mod tests {
             miss: 2,
             cool: 1,
             skill: 1,
-            count: 0,
+            ..Tally::default()
         };
         let misses = Hits {
             misses: 1,
             ..Hits::default()
         };
-        assert_eq!(tally.values(Some(misses)), [(MISS, 2)]);
+        assert_eq!(tally.values(Some(misses), false), [(MISS, 2)]);
+        assert_eq!(tally.values(Some(misses), true), [(MISS, 2), (SKILL, 1)]);
         assert_eq!(
-            tally.values(None),
+            tally.values(None, false),
             [(HIT, 4), (MISS, 2), (COOL, 1), (SKILL, 1)]
         );
+    }
+
+    fn effect(count: i32, buff: i32, skill_use: bool) -> CountEffect {
+        CountEffect {
+            count,
+            buff,
+            skill_use,
+        }
+    }
+
+    #[test]
+    fn kills_and_cool_kills_reach_the_count_effects_once_each() {
+        let gauge = Massacre {
+            count_effects: vec![
+                effect(250, 2022585, false),
+                effect(500, 2022586, true),
+                effect(1000, 2022587, true),
+                effect(1500, 0, true),
+            ],
+            ..solo_normal()
+        };
+        let mut tally = Tally {
+            hit: 249,
+            ..Tally::default()
+        };
+        assert!(tally.reached(&gauge).is_empty());
+        tally.cool = 1;
+        assert_eq!(tally.reached(&gauge), [effect(250, 2022585, false)]);
+        assert!(tally.reached(&gauge).is_empty());
+        assert_eq!(tally.skill, 0);
+        // One attack may pass more than one.
+        tally.hit = 1499;
+        let reached = tally.reached(&gauge);
+        assert_eq!(reached.len(), 3, "{reached:?}");
+        assert_eq!((tally.effects, tally.skill), (4, 3));
+        // A new stage keeps them.
+        tally.new_stage();
+        assert!(tally.reached(&gauge).is_empty());
+        assert!(tally.spend_rage());
+        assert_eq!(tally.skill, 2);
+        tally.skill = 0;
+        assert!(!tally.spend_rage());
+        assert_eq!(tally.skill, 0);
     }
 }

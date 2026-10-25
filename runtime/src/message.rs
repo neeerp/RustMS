@@ -363,6 +363,17 @@ pub enum ServerMessage {
         id: u32,
         packets: Vec<Packet>,
     },
+    /// The Nett's Pyramid run `id` reached a Pharaoh's Blessing: the
+    /// player takes item `item_id`'s effect, if on its maps.
+    PyramidBlessing {
+        id: u32,
+        item_id: i32,
+    },
+    /// The Nett's Pyramid run `id` has `left` uses of Rage of Pharaoh.
+    PyramidRage {
+        id: u32,
+        left: i32,
+    },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,

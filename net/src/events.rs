@@ -2391,6 +2391,9 @@ pub enum EventCommand {
     /// An attack on a Nett's Pyramid stage killed, cool-killed or missed
     /// its mobs (Cosmic `Pyramid.kill`, `cool`, `miss`).
     Massacre(crate::pyramid::Hits),
+    /// A member used Rage of Pharaoh, spending one of the Nett's Pyramid
+    /// run's uses.
+    Rage,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
