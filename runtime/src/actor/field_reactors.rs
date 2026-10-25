@@ -23,6 +23,8 @@ struct Spot {
     next_spawn: Option<Instant>,
     /// Broken for good: it has no positive `reactorTime`.
     spent: bool,
+    /// Placed while the field ran (`ReactorSet::place`), not the map's.
+    placed: bool,
 }
 
 pub struct LiveReactor {
@@ -92,6 +94,7 @@ impl ReactorSet {
                     live: None,
                     next_spawn: None,
                     spent: false,
+                    placed: false,
                 })
                 .collect(),
             live: BTreeMap::new(),
@@ -149,12 +152,50 @@ impl ReactorSet {
     /// ids.
     pub fn renew(&mut self, now: Instant) -> Vec<i32> {
         self.live.clear();
+        self.spots.retain(|spot| !spot.placed);
         for spot in &mut self.spots {
             spot.live = None;
             spot.next_spawn = None;
             spot.spent = false;
         }
         self.respawn(now)
+    }
+
+    /// Place `data`'s reactor, which the map hasn't, at `(x, y)` in
+    /// `state`: once broken it never comes back, nor when the field starts
+    /// afresh. Returns its object id.
+    pub fn place(&mut self, data: ReactorTemplate, (x, y): (i16, i16), state: u8) -> i32 {
+        let object_id = self.object_ids.next();
+        let reactor_id = data.reactor_id;
+        self.spots.push(Spot {
+            template: MapReactorTemplate {
+                reactor_id,
+                x,
+                y,
+                flip: false,
+                reactor_time: -1,
+                name: String::new(),
+            },
+            data,
+            live: Some(object_id),
+            next_spawn: None,
+            spent: false,
+            placed: true,
+        });
+        self.live.insert(
+            object_id,
+            LiveReactor {
+                object_id,
+                spot: self.spots.len() - 1,
+                reactor_id,
+                state,
+                x,
+                y,
+                flip: false,
+                revert: None,
+            },
+        );
+        object_id
     }
 
     /// Deal the live reactors' places out among them afresh, so that one
@@ -404,6 +445,29 @@ mod tests {
         assert_eq!(respawned.len(), 1);
         assert_ne!(respawned[0], id);
         assert_eq!(reactors.get(respawned[0]).unwrap().state, 0);
+    }
+
+    #[test]
+    fn a_placed_reactor_breaks_for_good() {
+        let (_, data) = scrap_box(0, 90);
+        let mut reactors = ReactorSet::new([]);
+        let start = Instant::now();
+        let id = reactors.place(data, (100, 254), 1);
+        assert_eq!(reactors.get(id).map(|r| (r.state, r.x)), Some((1, 100)));
+        for state in 2..=3 {
+            match reactors.hit(id, SWING, (100, 254), start) {
+                Some(Hit::Moved { view, .. }) => assert_eq!(view.state, state),
+                other => panic!("hit to {state}: {other:?}"),
+            }
+        }
+        assert!(matches!(
+            reactors.hit(id, SWING, (100, 254), start),
+            Some(Hit::Broke(_))
+        ));
+        assert!(reactors
+            .respawn(start + Duration::from_secs(900))
+            .is_empty());
+        assert!(reactors.renew(start).is_empty());
     }
 
     #[test]

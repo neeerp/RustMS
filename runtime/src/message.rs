@@ -733,6 +733,17 @@ pub enum FieldMessage {
         cap: usize,
         reply: tokio::sync::oneshot::Sender<Result<(), net::carnival::SpendRefusal>>,
     },
+    /// `summoner` spent CP on `guardian`, `index` of the Monster Carnival
+    /// field's guardian list, for their side `side`: whether it stands, or
+    /// why not, such as `cap` of the side's already standing.
+    CarnivalGuard {
+        summoner: ClientId,
+        index: u8,
+        guardian: game_data::skills::CarnivalSkill,
+        side: u8,
+        cap: usize,
+        reply: tokio::sync::oneshot::Sender<Result<(), net::carnival::SpendRefusal>>,
+    },
     /// The event whose copy of the map this is ended: stop.
     Close,
 }

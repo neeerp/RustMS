@@ -16,6 +16,7 @@ use game::mob_skill::{self, MobSkillEffect};
 use game::{wedding, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
 use game_data::server_content::keys;
+use game_data::skills::CarnivalSkill;
 use net::carnival::SpendRefusal;
 use net::conti::{self, Happening, State, Target};
 use net::loot::Loot;
@@ -124,6 +125,33 @@ const MOON_WEATHER_TIME: Duration = Duration::from_secs(7);
 /// How long after a friendly mob in an event's copy goes the party is
 /// sent off (Cosmic's `bunnyDefeated`, 5 s), shortened like events' time.
 const FRIENDLY_LOST_AFTER: Duration = Duration::from_secs(5);
+
+/// How long a Monster Carnival guardian's statuses last: for as long as it
+/// stands, which outlasts any battle.
+const GUARDED_FOR: Duration = Duration::from_secs(60 * 60);
+
+/// A Monster Carnival guardian standing on its battle field: its reactor,
+/// the side it guards, the `guardianGenPos` spot it took, and the statuses
+/// its mob skill gives the side's mobs while it stands (Cosmic
+/// `MapleMap.spawnGuardian`).
+struct Guardian {
+    object_id: i32,
+    side: u8,
+    spot: usize,
+    mob_skill: i32,
+    skill_id: i32,
+    statuses: Vec<(MobStat, i16)>,
+}
+
+/// The immunity a mob can't have with `stat`: physical and magic immunity
+/// don't go together.
+fn other_immunity(stat: MobStat) -> Option<MobStat> {
+    match stat {
+        MobStat::PImmune => Some(MobStat::MImmune),
+        MobStat::MImmune => Some(MobStat::PImmune),
+        _ => None,
+    }
+}
 
 /// How long to wait before reading or writing hired merchants again after
 /// the database failed.
@@ -234,6 +262,8 @@ pub struct FieldActor {
     massacre: bool,
     /// A copy of a Monster Carnival battle field, whose kills earn CP.
     carnival: bool,
+    /// Its guardians standing.
+    guardians: Vec<Guardian>,
     kites: KiteSet,
     tick: Duration,
 }
@@ -296,6 +326,7 @@ impl FieldActor {
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
             carnival: net::carnival::battle_room(key.map_id).is_some() && key.instance_id != 0,
+            guardians: Vec::new(),
             kites: KiteSet::default(),
             tick,
         };
@@ -460,6 +491,7 @@ impl FieldActor {
         }
         let controller = self.occupants.keys().next().copied();
         for object_id in spawned {
+            self.guard_new(object_id, now);
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
@@ -567,6 +599,16 @@ impl FieldActor {
                 reply,
             } => {
                 let _ = reply.send(self.carnival_summon(summoner, index, mob_id, side, cap));
+            }
+            FieldMessage::CarnivalGuard {
+                summoner,
+                index,
+                guardian,
+                side,
+                cap,
+                reply,
+            } => {
+                let _ = reply.send(self.carnival_guard(summoner, index, guardian, side, cap));
             }
             FieldMessage::CarnivalAnnounce {
                 summoner,
@@ -2569,19 +2611,13 @@ impl FieldActor {
         let until = now + Duration::from_secs(effect.duration.max(0) as u64);
         let skill_id = cast.skill | cast.level << 16;
         for object_id in self.mobs.reached_by(cast) {
-            // Physical and magic immunity don't go together.
-            let blocked = |stat| match stat {
-                MobStat::PImmune => Some(MobStat::MImmune),
-                MobStat::MImmune => Some(MobStat::PImmune),
-                _ => None,
-            };
             let Some(mob) = self.mobs.get(object_id) else {
                 continue;
             };
             let statuses: Vec<_> = statuses
                 .iter()
                 .filter(|(stat, _)| {
-                    blocked(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
+                    other_immunity(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
                 })
                 .copied()
                 .collect();
@@ -2896,7 +2932,9 @@ impl FieldActor {
         let name = occupant.avatar.name.clone();
         let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
         let at = (x, ground.saturating_sub(1));
-        let object_id = self.mobs.buy(info, at, foothold, side, Instant::now());
+        let now = Instant::now();
+        let object_id = self.mobs.buy(info, at, foothold, side, now);
+        self.guard_new(object_id, now);
         if let Some(mob) = self.mobs.get(object_id) {
             if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
                 self.broadcast(None, packet);
@@ -2910,6 +2948,175 @@ impl FieldActor {
             self.broadcast(None, packet);
         }
         Ok(())
+    }
+
+    /// `summoner` spent CP on `guardian`, `index` of the field's guardian
+    /// list, for their side `side`: unless the side has `cap` standing or
+    /// that one, it stands at a free `guardianGenPos` spot as the side's
+    /// guardian reactor, the side's mobs get its mob skill's statuses, and
+    /// everyone hears who placed it (Cosmic `MonsterCarnivalHandler`,
+    /// `spawnGuardian`). Otherwise, why not.
+    fn carnival_guard(
+        &mut self,
+        summoner: ClientId,
+        index: u8,
+        guardian: CarnivalSkill,
+        side: u8,
+        cap: usize,
+    ) -> Result<(), SpendRefusal> {
+        let level = net::mobs::skill_level(guardian.mob_skill, guardian.level);
+        let statuses = match level.and_then(|level| mob_skill::effect(guardian.mob_skill, level.x))
+        {
+            Some(MobSkillEffect::Statuses(statuses)) => statuses,
+            _ => Vec::new(),
+        };
+        let (Some(occupant), true, Some(reactor), false) = (
+            self.occupants.get(&summoner),
+            self.carnival,
+            net::reactors::template(net::carnival::guardian_reactor(side)),
+            statuses.is_empty(),
+        ) else {
+            return Err(SpendRefusal::Failed);
+        };
+        let spots = net::get_game_data()
+            .ok()
+            .and_then(|data| {
+                Some(
+                    data.field(self.key.map_id)?
+                        .carnival
+                        .as_ref()?
+                        .guardian_spots
+                        .clone(),
+                )
+            })
+            .unwrap_or_default();
+        let standing: Vec<_> = self
+            .guardians
+            .iter()
+            .map(|guardian| (guardian.side, guardian.mob_skill, guardian.spot))
+            .collect();
+        let spot = net::carnival::guardian_spot(
+            &spots,
+            &standing,
+            side,
+            guardian.mob_skill,
+            cap,
+            rand::random(),
+        )?;
+        let name = occupant.avatar.name.clone();
+        let at = (spots[spot].x, spots[spot].y);
+        let object_id = self
+            .reactors
+            .place(reactor, at, net::carnival::GUARDIAN_STATE);
+        if let Some(Ok(packet)) = self
+            .reactors
+            .get(object_id)
+            .map(|r| build_spawn_reactor(&r.view()))
+        {
+            self.broadcast(None, packet);
+        }
+        self.guardians.push(Guardian {
+            object_id,
+            side,
+            spot,
+            mob_skill: guardian.mob_skill,
+            skill_id: guardian.mob_skill | guardian.level << 16,
+            statuses,
+        });
+        let now = Instant::now();
+        let guarded: Vec<i32> = self
+            .mobs
+            .live()
+            .filter(|mob| mob.team == Some(side) && mob.hp > 0)
+            .map(|mob| mob.object_id)
+            .collect();
+        for object_id in guarded {
+            let given = self.guard(object_id, self.guardians.len() - 1, now);
+            self.show_statuses(object_id, &given, now);
+        }
+        if let Ok(packet) = build_carnival_summon(2, index, &name) {
+            self.broadcast(None, packet);
+        }
+        Ok(())
+    }
+
+    /// Give a mob of its side the statuses of the `index`th guardian
+    /// standing; returns those it got.
+    fn guard(&mut self, object_id: i32, index: usize, now: Instant) -> Vec<MobStat> {
+        let (Some(guardian), Some(mob)) = (self.guardians.get(index), self.mobs.get(object_id))
+        else {
+            return Vec::new();
+        };
+        if mob.team != Some(guardian.side) {
+            return Vec::new();
+        }
+        let statuses: Vec<_> = guardian
+            .statuses
+            .iter()
+            .filter(|(stat, _)| {
+                other_immunity(*stat).is_none_or(|other| !mob.statuses.contains_key(&other))
+            })
+            .copied()
+            .collect();
+        let skill_id = guardian.skill_id;
+        self.mobs.add_statuses(
+            object_id,
+            &statuses,
+            skill_id,
+            ClientId::default(),
+            now,
+            now + GUARDED_FOR,
+        )
+    }
+
+    /// A mob that just came out has its side's guardians' statuses (Cosmic
+    /// `spawnMonster`'s team buffs), which its spawn shows.
+    fn guard_new(&mut self, object_id: i32, now: Instant) {
+        for index in 0..self.guardians.len() {
+            self.guard(object_id, index, now);
+        }
+    }
+
+    /// A guardian broke: its spot is free again, and its side's mobs lose
+    /// what it gave them (Cosmic `mcGuardian0`'s `dispelAllMonsters`). An
+    /// immunity it held back from them is theirs again.
+    fn guardian_broke(&mut self, object_id: i32) {
+        let Some(at) = self
+            .guardians
+            .iter()
+            .position(|guardian| guardian.object_id == object_id)
+        else {
+            return;
+        };
+        let guardian = self.guardians.remove(at);
+        let stats: Vec<MobStat> = guardian.statuses.iter().map(|&(stat, _)| stat).collect();
+        let held: Vec<i32> = self
+            .mobs
+            .live()
+            .filter(|mob| {
+                mob.team == Some(guardian.side)
+                    && stats.iter().any(|stat| {
+                        mob.statuses
+                            .get(stat)
+                            .is_some_and(|status| status.skill_id == guardian.skill_id)
+                    })
+            })
+            .map(|mob| mob.object_id)
+            .collect();
+        let now = Instant::now();
+        for object_id in held {
+            let lost = self.mobs.remove_statuses(object_id, &stats);
+            if let Ok(packet) = build_mob_stat_reset(object_id, &lost) {
+                self.broadcast(None, packet);
+            }
+            let mut given = Vec::new();
+            for index in 0..self.guardians.len() {
+                given.extend(self.guard(object_id, index, now));
+            }
+            if !given.is_empty() {
+                self.show_statuses(object_id, &given, now);
+            }
+        }
     }
 
     /// Zakum's altar took the Eye of Fire: its music plays, and its body
@@ -3342,6 +3549,15 @@ impl FieldActor {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
+        // A side's own guardians stand up to it.
+        let side = occupant.avatar.team;
+        if self
+            .guardians
+            .iter()
+            .any(|guardian| guardian.object_id == object_id && guardian.side == side)
+        {
+            return;
+        }
         let position = (occupant.avatar.x, occupant.avatar.y);
         if let Some(hit) = self
             .reactors
@@ -3482,6 +3698,7 @@ impl FieldActor {
                     });
                 }
             }
+            reactors::Action::Guardian => self.guardian_broke(view.object_id),
             // A Nependeath grows out of it, or a Royal (Cosmic `2001000`).
             reactors::Action::Pot => {
                 if !self.papa_pixie {
@@ -3850,6 +4067,7 @@ impl FieldActor {
             let now = Instant::now();
             self.mobs.renew(now);
             self.reactors.renew(now);
+            self.guardians.clear();
             self.salion = None;
             self.pots = 0;
             self.papa_pixie = false;

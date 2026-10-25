@@ -7,10 +7,12 @@
 //! accepted, both parties go to the battle field, where each member's
 //! screen is told their side and the score, and a kill earns its mob's CP
 //! for the killer and their side, which they spend on mobs that hunt the
-//! other side. When time runs out everyone goes to the exit room.
+//! other side, skills that fall on it, and guardians that strengthen their
+//! own side's mobs until the other side breaks them. When time runs out
+//! everyone goes to the exit room.
 
 use integration_harness::events::{armed_in, party_of_one, talk, told};
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, Trace};
@@ -237,8 +239,8 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     assert_eq!(carnival(&theirs, SendOpcode::CarnivalPartyCp), [red_cp]);
     assert!(carnival(&theirs, SendOpcode::CarnivalObtainedCp).is_empty());
 
-    // The field's first mob costs 7 CP and its first skill 17: with 1 the
-    // window hears there isn't enough, and guardians aren't sold yet.
+    // The field's first mob costs 7 CP, its first skill 17 and its first
+    // guardian too: with 1 the window hears there isn't enough of any.
     let (mob_id, cost) = integration_harness::events::maps()
         .field(field)
         .and_then(|f| f.carnival.as_ref())
@@ -251,7 +253,7 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     send(&mut red.connection, spend(1, 0)).await;
     send(&mut red.connection, spend(2, 0)).await;
     until(&mut red.connection, &mut seen, |t| messages(t).len() == 3).await;
-    assert_eq!(messages(&seen), [vec![1], vec![1], vec![5]]);
+    assert_eq!(messages(&seen), [vec![1], vec![1], vec![1]]);
 
     // Red hunts the rest of Maple Blue's mobs for enough CP.
     let theirs_left: Vec<i32> = seen
@@ -344,16 +346,15 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     .await;
 }
 
-#[tokio::test]
-async fn a_carnival_skill_falls_on_the_other_side() {
-    let red = &mut leader().await;
-    let blue = &mut leader().await;
-    take(red, 5).await;
-    challenge(red, blue, 5).await;
+/// Red's party battles Blue's in room `room`, and Red hunts the mobs not
+/// on their side: what each has seen, and the CP Red earned, at least 12.
+async fn hunted(red: &mut WorldSession, blue: &mut WorldSession, room: u8) -> (Trace, Trace, i16) {
+    take(red, room).await;
+    challenge(red, blue, room).await;
     let mut seen = Trace::default();
     send(&mut red.connection, answer(1, 1, None)).await;
     let mut theirs = Trace::default();
-    let field = battle_map(5);
+    let field = battle_map(room);
     let started =
         |t: &Trace| t.warps.contains(&field) && !carnival(t, SendOpcode::CarnivalStart).is_empty();
     until(&mut blue.connection, &mut theirs, |t| started(t)).await;
@@ -361,37 +362,51 @@ async fn a_carnival_skill_falls_on_the_other_side() {
         started(t) && !t.field.mobs.is_empty()
     })
     .await;
-
-    // Room five's third skill is Curse, on all of the other side for 12 CP.
-    let rules = integration_harness::events::maps()
-        .field(field)
-        .and_then(|f| f.carnival.clone())
-        .unwrap();
-    assert_eq!(rules.skills.get(2), Some(&4));
-
-    // Red hunts the mobs not on their side for it.
     let earned = |t: &Trace| {
         let last = carnival(t, SendOpcode::CarnivalObtainedCp).pop();
         last.map_or(0, |body| i16::from_le_bytes([body[0], body[1]]))
     };
-    let hunted: Vec<i32> = seen
-        .field
-        .mobs
-        .iter()
-        .filter(|(oid, _)| seen.field.teams.get(oid) != Some(&0))
-        .map(|&(oid, _)| oid)
-        .collect();
-    for &oid in &hunted {
-        send(&mut red.connection, attack(oid, 30_000)).await;
+    // The rest of the field's mobs come out over the next packets, and the
+    // killed ones respawn, so hunt in rounds until the CP is in.
+    for _ in 0..6 {
+        read_for(&mut red.connection, &mut seen, 500).await;
+        if earned(&seen) >= 12 {
+            break;
+        }
+        let prey: Vec<i32> = seen
+            .field
+            .mobs
+            .iter()
+            .filter(|(oid, _)| seen.field.teams.get(oid) != Some(&0))
+            .map(|&(oid, _)| oid)
+            .filter(|oid| !seen.field.killed.contains(oid))
+            .collect();
+        for &oid in &prey {
+            send(&mut red.connection, attack(oid, 30_000)).await;
+        }
+        until(&mut red.connection, &mut seen, |t| {
+            prey.iter().all(|oid| t.field.killed.contains(oid))
+        })
+        .await;
     }
-    until(&mut red.connection, &mut seen, |t| {
-        hunted.iter().all(|oid| t.field.killed.contains(oid))
-    })
-    .await;
     // The kills' CP follows them from the event.
     read_for(&mut red.connection, &mut seen, 500).await;
     let total = earned(&seen);
     assert!(total >= 12, "{total}");
+    (seen, theirs, total)
+}
+
+#[tokio::test]
+async fn a_carnival_skill_falls_on_the_other_side() {
+    let red = &mut leader().await;
+    let blue = &mut leader().await;
+    // Room five's third skill is Curse, on all of the other side for 12 CP.
+    let rules = integration_harness::events::maps()
+        .field(battle_map(5))
+        .and_then(|f| f.carnival.clone())
+        .unwrap();
+    assert_eq!(rules.skills.get(2), Some(&4));
+    let (mut seen, mut theirs, total) = hunted(red, blue, 5).await;
 
     // Casting it curses Blue, everyone hears Red cast it, and Red and
     // their side keep the rest.
@@ -411,4 +426,86 @@ async fn a_carnival_skill_falls_on_the_other_side() {
     .await;
     assert!(!seen.buffs.iter().any(|&(skill, _, _)| skill == curse));
     assert!(carnival(&seen, SendOpcode::CarnivalMessage).is_empty());
+}
+
+#[tokio::test]
+async fn a_guardian_strengthens_its_side_until_the_other_breaks_it() {
+    let red = &mut leader().await;
+    let blue = &mut leader().await;
+    // Room six's seventh guardian is Speed UP, for 12 CP.
+    let rules = integration_harness::events::maps()
+        .field(battle_map(6))
+        .and_then(|f| f.carnival.clone())
+        .unwrap();
+    assert_eq!(rules.guardians.get(6), Some(&6));
+    let (mut seen, mut theirs, total) = hunted(red, blue, 6).await;
+    let ours: Vec<i32> = seen
+        .field
+        .mobs
+        .iter()
+        .filter(|(oid, _)| seen.field.teams.get(oid) == Some(&0))
+        .map(|&(oid, _)| oid)
+        .collect();
+    assert!(!ours.is_empty());
+
+    // Placing it stands Maple Red's guardian on the field, everyone hears
+    // Red placed it, and Red's side's mobs speed up.
+    let speed_up = 156 | 1 << 16;
+    let rest = shorts(&[total - 12, total]);
+    send(&mut red.connection, spend(2, 6)).await;
+    let placed = summoned(2, 6, &red.character_name);
+    let guardian = |t: &Trace| {
+        t.field
+            .reactors
+            .iter()
+            .find(|reactor| reactor.reactor_id == 9_980_000)
+            .copied()
+    };
+    until(&mut red.connection, &mut seen, |t| {
+        carnival(t, SendOpcode::CarnivalSummon).contains(&placed)
+            && carnival(t, SendOpcode::CarnivalObtainedCp).last() == Some(&rest)
+            && guardian(t).is_some()
+            && ours.iter().all(|oid| {
+                t.field
+                    .stat_sets
+                    .iter()
+                    .any(|&(of, _, _, skill)| of == *oid && skill == speed_up)
+            })
+    })
+    .await;
+    let reactor = guardian(&seen).unwrap();
+    assert_eq!(reactor.state, 1);
+    until(&mut blue.connection, &mut theirs, |t| {
+        carnival(t, SendOpcode::CarnivalSummon).contains(&placed) && guardian(t).is_some()
+    })
+    .await;
+
+    // Red's own side can't break it; Blue does, in four hits, and Red's
+    // mobs slow down again.
+    send(&mut red.connection, walk_to(reactor.x, reactor.y)).await;
+    send(&mut red.connection, hit_reactor(reactor.object_id)).await;
+    read_for(&mut red.connection, &mut seen, 500).await;
+    assert!(seen.field.reactor_hits.is_empty());
+    send(&mut blue.connection, walk_to(reactor.x, reactor.y)).await;
+    for _ in 0..4 {
+        send(&mut blue.connection, hit_reactor(reactor.object_id)).await;
+    }
+    until(&mut red.connection, &mut seen, |t| {
+        t.field
+            .reactors_removed
+            .iter()
+            .any(|&(oid, _)| oid == reactor.object_id)
+            && ours
+                .iter()
+                .all(|oid| t.field.stat_resets.iter().any(|&(of, _)| of == *oid))
+    })
+    .await;
+    assert_eq!(
+        seen.field.reactor_hits,
+        [
+            (reactor.object_id, 2),
+            (reactor.object_id, 3),
+            (reactor.object_id, 4)
+        ]
+    );
 }
