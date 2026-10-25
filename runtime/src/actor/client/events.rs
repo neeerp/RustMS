@@ -21,7 +21,7 @@ use net::packet::build::world::conti::{
 use net::packet::build::world::effect::{
     build_blow_weather, build_field_effect, build_field_object, build_field_sound,
 };
-use net::packet::build::world::field::build_dojo_warp_up;
+use net::packet::build::world::field::{build_dojo_energy, build_dojo_warp_up};
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
@@ -720,14 +720,22 @@ impl ClientActor {
         }
         let (kind, blessing) = (ticket.kind, ticket.blessing);
         let mut entry = kind.event().draw_entry(&mut rand::thread_rng());
-        // A run alone starts after the floor So Gong recorded, erasing it.
+        // A Dojo run starts with no energy (Cosmic `resetDojoEnergy`), and
+        // a run alone after the floor So Gong recorded, erasing it.
+        let dojo = matches!(kind, EventKind::Dojo | EventKind::DojoParty);
         let player = &mut self.in_game_mut()?.player;
+        if dojo {
+            player.dojo_energy = 0;
+        }
         if kind == EventKind::Dojo && player.dojo.stage > 0 {
             entry = events::DOJO.stage_map(player.dojo.stage + 1);
             player.dojo.stage = 0;
             player.mark_dirty();
         }
         self.event = Some(ticket);
+        if dojo {
+            self.send(&mut build_dojo_energy(0)?).await?;
+        }
         self.warp_within_event(entry).await?;
         if kind == EventKind::Opq {
             self.start_script(NpcScript::opq_arrival()).await?;
@@ -1074,8 +1082,9 @@ impl ClientActor {
         self.send(&mut build_field_object("gate")?).await
     }
 
-    /// On a Dojo boss floor, the challenger hears the gong and sees the
-    /// floor's number as they arrive (Cosmic `dojang_Eff`).
+    /// On a Dojo boss floor, the challenger hears the gong, sees the
+    /// floor's number as they arrive, and has their energy bar refilled to
+    /// what they have built (Cosmic `dojang_Eff`).
     pub(super) async fn show_dojo_floor(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let floor = self
@@ -1091,10 +1100,12 @@ impl ClientActor {
             return Ok(());
         };
         let number = format!("dojang/start/number/{}", events::dojo_round(floor));
+        let energy = self.in_game()?.player.dojo_energy;
         self.send_all(&mut vec![
             build_field_sound("Dojang/start")?,
             build_field_effect("dojang/start/stage")?,
             build_field_effect(&number)?,
+            build_dojo_energy(energy)?,
         ])
         .await
     }
@@ -1102,11 +1113,13 @@ impl ClientActor {
     /// Arriving on the Dojo's entrance, the player alone sees one of three
     /// taunts on a weather's message bar, taken down after 30 s (Cosmic
     /// `dojang_Msg`'s `startMapEffect`; its spawn-point check always holds,
-    /// as the entrance's only spawn point is the one it asks for). So
-    /// Gong's trial room has its own.
+    /// as the entrance's only spawn point is the one it asks for). Their
+    /// energy empties there too. So Gong's trial room has its own taunt.
     pub(super) async fn taunt_challenger(&mut self) -> Result<(), RuntimeError> {
         let key = match self.in_game()?.player.stats.map_id {
             events::DOJO_ENTRANCE => {
+                self.in_game_mut()?.player.dojo_energy = 0;
+                self.send(&mut build_dojo_energy(0)?).await?;
                 keys::DOJO_TAUNT[rand::thread_rng().gen_range(0, keys::DOJO_TAUNT.len())]
             }
             events::DOJO_TRIAL_MAP => keys::DOJO_TRIAL_TAUNT,

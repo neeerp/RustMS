@@ -25,6 +25,26 @@ pub fn medal(stage: i32) -> i32 {
     FIRST_MEDAL + stage - 1
 }
 
+/// The energy a challenger builds on the Dojo's maps (Cosmic's
+/// `dojoEnergy`). Once it is full, it pays for one of the Beginner's secret
+/// skills, which empties it.
+pub const FULL_ENERGY: i32 = 10_000;
+/// What each attack that reaches a monster adds, and what each hit taken
+/// adds (Cosmic's `DOJO_ENERGY_ATK` and `DOJO_ENERGY_DMG`).
+pub const ATTACK_ENERGY: i32 = 100;
+pub const HIT_ENERGY: i32 = 20;
+
+/// Whether `map_id` is one of the Dojo's maps, from its entrance to the
+/// last party floor (Cosmic `MapId.isDojo`).
+pub fn in_dojo(map_id: i32) -> bool {
+    (925_020_000..=925_033_804).contains(&map_id)
+}
+
+/// The energy after `more` is added to `energy`, capped at `FULL_ENERGY`.
+pub fn charged(energy: i32, more: i32) -> i32 {
+    (energy + more).min(FULL_ENERGY)
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DojoRecord {
     /// Training points, spent on belts.
@@ -68,6 +88,15 @@ mod tests {
             ..record
         };
         assert_eq!(full.floor_points(1, true), 0);
+    }
+
+    #[test]
+    fn energy_fills_on_the_dojos_maps_up_to_full() {
+        assert!(in_dojo(925020000) && in_dojo(925020010) && in_dojo(925033804));
+        assert!(!in_dojo(925010000) && !in_dojo(925033805));
+        assert_eq!(charged(0, ATTACK_ENERGY), 100);
+        assert_eq!(charged(9_990, HIT_ENERGY), FULL_ENERGY);
+        assert_eq!(charged(FULL_ENERGY, ATTACK_ENERGY), FULL_ENERGY);
     }
 
     #[test]

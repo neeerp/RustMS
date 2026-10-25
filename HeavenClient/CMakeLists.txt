@@ -225,6 +225,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME assassinate COMMAND assassinate_tests)
     add_executable(pq_skills_tests tests/pq_skills.cpp)
     add_test(NAME pq_skills COMMAND pq_skills_tests)
+    add_executable(dojo_energy_tests tests/dojo_energy.cpp)
+    add_test(NAME dojo_energy COMMAND dojo_energy_tests)
     add_executable(no_skill_tests tests/no_skill.cpp)
     add_test(NAME no_skill COMMAND no_skill_tests)
     add_executable(swim_area_tests tests/swim_area.cpp)
@@ -946,6 +948,8 @@ add_executable(HeavenClient
     IO/UITypes/UIScriptMessage.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
+    IO/UITypes/UIDojoEnergy.cpp
+    IO/UITypes/UIDojoEnergy.h
     IO/UITypes/UIAvatarMegaphone.cpp
     IO/UITypes/UIAvatarMegaphone.h
     IO/UITypes/UIQuickSlotConfig.cpp

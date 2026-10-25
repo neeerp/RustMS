@@ -281,6 +281,9 @@ pub struct Player {
     pub mount: Mount,
     /// Training points and the score recorded at the Mu Lung Dojo.
     pub dojo: DojoRecord,
+    /// The energy built on the Dojo's maps, up to `dojo::FULL_ENERGY`;
+    /// not saved.
+    pub dojo_energy: i32,
     /// Where the player came from before a trip, to go back to when it
     /// ends: the town they entered the Free Market from
     /// (`FREE_MARKET_RETURN`), the map a world tour or a trip to Florina
@@ -348,6 +351,7 @@ impl Player {
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
             dojo: DojoRecord::default(),
+            dojo_energy: 0,
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,

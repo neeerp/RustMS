@@ -186,6 +186,22 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// A value kept for the session, by key: of these the client keeps only
+	// the Mu Lung Dojo's `energy` (0xa12bd6)
+	// Opcode: SESSION_VALUE(90)
+	class SessionValueHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
+	// A value kept for the field, by key: of these the client keeps only
+	// the Mu Lung Dojo's `Bamboo_Used` (0xa13081)
+	// Opcode: FIELD_SET_VARIABLE(92)
+	class FieldSetVariableHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Shows a card on the Monster Book's cover
 	// Opcode: MONSTER_BOOK_SET_COVER(84)
 	class MonsterBookSetCoverHandler : public PacketHandler

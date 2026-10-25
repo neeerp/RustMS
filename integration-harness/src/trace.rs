@@ -248,6 +248,8 @@ pub struct Trace {
     pub field_effects: Vec<(u8, String)>,
     /// DOJO_WARP_UP: the portal each names.
     pub dojo_warps: Vec<u8>,
+    /// SESSION_VALUE: (key, value), as the Dojo's `energy`.
+    pub session_values: Vec<(String, String)>,
     /// SKILL_LEARN_ITEM_RESULT: (reader, skill, master level, used, success).
     pub books: Vec<(i32, i32, i32, bool, bool)>,
     /// FAME_RESPONSE: (mode, name, up, new fame); the name, up and fame are
@@ -442,6 +444,10 @@ impl Trace {
         } else if op == SendOpcode::DojoWarpUp as i16 {
             r.read_byte().unwrap();
             self.dojo_warps.push(r.read_byte().unwrap());
+        } else if op == SendOpcode::SessionValue as i16 {
+            let key = r.read_str_with_length().unwrap();
+            self.session_values
+                .push((key, r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::BlockedMap as i16 || op == SendOpcode::BlockedServer as i16 {
             self.blocked.push((op, r.read_byte().unwrap()));
         } else if op == SendOpcode::FieldEffect as i16 {

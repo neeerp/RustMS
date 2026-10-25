@@ -1863,6 +1863,7 @@ pub mod keys {
     pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
     pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
     pub const DOJO_POINTS: &str = "dojo.points";
+    pub const DOJO_ENERGY_RESET: &str = "dojo.energy_reset";
     pub const DOJO_SO_GONG_RECORD: &str = "dojo.so_gong.record";
     pub const DOJO_SO_GONG_RECORD_ASK: &str = "dojo.so_gong.record_ask";
     pub const DOJO_SO_GONG_RECORD_NO: &str = "dojo.so_gong.record_no";
@@ -2926,6 +2927,7 @@ mod tests {
                 keys::DOJO_UP_MONSTERS,
                 keys::DOJO_NEXT_SHUT,
                 keys::DOJO_POINTS,
+                keys::DOJO_ENERGY_RESET,
                 keys::DOJO_SO_GONG_RECORD,
                 keys::DOJO_SO_GONG_RECORD_ASK,
                 keys::DOJO_SO_GONG_RECORD_NO,

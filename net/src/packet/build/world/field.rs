@@ -277,6 +277,21 @@ pub fn build_dojo_warp_up(portal: u8) -> Result<Packet, NetworkError> {
     Ok(packet)
 }
 
+/// SESSION_VALUE: the client keeps `value` under `key` (Cosmic
+/// `getEnergy`).
+pub fn build_session_value(key: &str, value: &str) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::SessionValue as i16)?;
+    packet.write_str_with_length(key)?;
+    packet.write_str_with_length(value)?;
+    Ok(packet)
+}
+
+/// The player's Dojo energy, which fills the energy bar.
+pub fn build_dojo_energy(energy: i32) -> Result<Packet, NetworkError> {
+    build_session_value("energy", &energy.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -436,6 +451,16 @@ mod tests {
     fn the_dojo_warp_up_names_the_portal() {
         let packet = build_dojo_warp_up(6).unwrap();
         Expect::new(&packet.bytes).short(0xCF).byte(0).byte(6).end();
+    }
+
+    #[test]
+    fn the_dojo_energy_is_a_session_value() {
+        let packet = build_dojo_energy(2_500).unwrap();
+        Expect::new(&packet.bytes)
+            .short(0x5A)
+            .string("energy")
+            .string("2500")
+            .end();
     }
 
     #[test]

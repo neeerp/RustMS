@@ -1,4 +1,4 @@
-use super::combat::set_combo;
+use super::combat::{set_combo, spend_dojo_energy};
 use super::mount::dismount;
 use crate::combo;
 use crate::consume_effect;
@@ -204,10 +204,15 @@ impl WorldHandler for UseSkillHandler {
             .field(ctx.player.stats.map_id)
             .map_or(0, |field| field.field_limit);
         let transforms = [morph::TRANSFORMATION, morph::SUPER_TRANSFORMATION];
+        // Invincibility and Power Explosion take a full energy bar (Cosmic's
+        // SpecialMoveHandler).
+        let secret = skills::pq_skill(skill_id) == Some(skills::PqSkill::DojoBuff);
         let used = if transforms.contains(&skill_id)
             && field_limit & game_data::FIELD_LIMIT_MOVEMENT_SKILLS != 0
         {
             Err(Refusal::NoMovementSkillsHere)
+        } else if secret && ctx.player.dojo_energy < game::dojo::FULL_ENERGY {
+            Err(Refusal::NoEnergy)
         } else {
             use_skill(ctx.player, skill_id, level, now)
         };
@@ -236,6 +241,9 @@ impl WorldHandler for UseSkillHandler {
                 }
                 if skill_id == combo::ENRAGE {
                     result = set_combo(ctx.player, 1, now, result)?;
+                }
+                if secret {
+                    result = spend_dojo_energy(ctx.player, result)?;
                 }
                 // Echo of Hero and the GM's skills send the players they
                 // reached rather than the party's bits; the server finds
@@ -409,6 +417,8 @@ enum Refusal {
     Morphed,
     /// Not from the Battleship, or only from it.
     Ship,
+    /// A Dojo secret skill without a full energy bar.
+    NoEnergy,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for

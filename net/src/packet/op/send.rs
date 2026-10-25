@@ -84,6 +84,9 @@ pub enum SendOpcode {
     NoNameChange = 0x78,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
+    /// A named value the client keeps for the session, as the Dojo's
+    /// `energy` (FUN_00a12bd6).
+    SessionValue = 0x5A,
     /// The Family Tree (report b039).
     FamilyChart = 0x5E,
     FamilyInfo = 0x5F,

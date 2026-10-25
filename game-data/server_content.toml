@@ -1215,6 +1215,7 @@ unsourced = [
     "dojo.up.monsters",
     "dojo.next.shut",
     "dojo.points",
+    "dojo.energy_reset",
     "dojo.so_gong.record",
     "dojo.so_gong.record_ask",
     "dojo.so_gong.record_no",
