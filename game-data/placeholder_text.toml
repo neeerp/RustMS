@@ -1480,3 +1480,6 @@
 "gm_event.info" = "[placeholder] Now and then a GM holds a game, such as Snowball or Coconut Season. While one is open, I can take you there."
 "gm_event.go" = "[placeholder] Take me to the event."
 "gm_event.not_open" = "[placeholder] No event is open on this channel right now, or it is full. Please try again later!"
+"gm_event.pietro" = "[placeholder] Well played! Your team won. I'll send you back to where you were."
+"gm_event.pietra" = "[placeholder] Better luck next time! I'll send you back to where you were."
+"gm_event.harry_ask" = "[placeholder] Do you want to leave the event? Your place will go to someone else."

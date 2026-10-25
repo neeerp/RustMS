@@ -645,6 +645,11 @@ pub enum Effect {
     JoinGmEvent {
         npc: i32,
     },
+    /// The player gives back their place at the event on `map_id`, if it
+    /// is still open on their channel.
+    LeaveGmEvent {
+        map_id: i32,
+    },
     /// The leader of a party waiting in a Monster Carnival room accepts
     /// or declines the challenge put to them by `challenger`'s party.
     CarnivalAnswer {

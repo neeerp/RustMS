@@ -157,9 +157,9 @@ pub struct WorldDirectory {
     dungeons: HashMap<(u8, i32), Run>,
     /// What the Owl of Minerva was asked to find.
     owl_searches: Searches,
-    /// The event a GM opened on each channel: its map, and the places
-    /// left.
-    gm_events: HashMap<u8, (i32, u16)>,
+    /// The event a GM opened on each channel: its map, the places left,
+    /// and how many it had.
+    gm_events: HashMap<u8, (i32, u16, u16)>,
 }
 
 impl WorldDirectory {
@@ -330,21 +330,31 @@ impl WorldDirectory {
                 map_id,
                 limit,
             } => {
-                self.gm_events.insert(channel_id, (map_id, limit));
+                self.gm_events.insert(channel_id, (map_id, limit, limit));
             }
             DirectoryMessage::CloseGmEvent { channel_id } => {
                 self.gm_events.remove(&channel_id);
             }
             DirectoryMessage::GmEventOpen { channel_id, reply } => {
                 let open = self.gm_events.get(&channel_id);
-                let _ = reply.send(open.filter(|(_, left)| *left > 0).map(|(map, _)| *map));
+                let _ = reply.send(open.filter(|(_, left, _)| *left > 0).map(|(map, ..)| *map));
             }
             DirectoryMessage::JoinGmEvent { channel_id, reply } => {
-                let place = self.gm_events.get_mut(&channel_id).and_then(|(map, left)| {
-                    *left = left.checked_sub(1)?;
-                    Some(*map)
-                });
+                let place = self
+                    .gm_events
+                    .get_mut(&channel_id)
+                    .and_then(|(map, left, _)| {
+                        *left = left.checked_sub(1)?;
+                        Some(*map)
+                    });
                 let _ = reply.send(place);
+            }
+            DirectoryMessage::LeaveGmEvent { channel_id, map_id } => {
+                if let Some((map, left, limit)) = self.gm_events.get_mut(&channel_id) {
+                    if *map == map_id && left < limit {
+                        *left += 1;
+                    }
+                }
             }
             DirectoryMessage::CarnivalRooms { from, reply } => {
                 let _ = reply.send(self.carnival_rooms(from));
@@ -2270,6 +2280,22 @@ mod tests {
         assert_eq!(ask(&mut directory, 1, true), Some(snowball));
         assert_eq!(ask(&mut directory, 1, false), None, "full");
         assert_eq!(ask(&mut directory, 1, true), None);
+        // One leaving gives their place back, but only to that event, and
+        // never past its limit.
+        let leave = |directory: &mut WorldDirectory, map_id| {
+            directory.handle(DirectoryMessage::LeaveGmEvent {
+                channel_id: 1,
+                map_id,
+            })
+        };
+        leave(&mut directory, 109_080_000);
+        assert_eq!(ask(&mut directory, 1, false), None, "another event");
+        leave(&mut directory, snowball);
+        leave(&mut directory, snowball);
+        leave(&mut directory, snowball);
+        assert_eq!(ask(&mut directory, 1, true), Some(snowball));
+        assert_eq!(ask(&mut directory, 1, true), Some(snowball));
+        assert_eq!(ask(&mut directory, 1, true), None, "two at most");
         directory.handle(DirectoryMessage::OpenGmEvent {
             channel_id: 1,
             map_id: snowball,

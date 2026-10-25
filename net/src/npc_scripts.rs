@@ -22,7 +22,9 @@ use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
 use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
-use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN};
+use game::character::{
+    CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN,
+};
 use game::guild::{self, Guild};
 use game::marriage;
 use game::wedding::{self, GuestRefusal, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
@@ -908,6 +910,12 @@ pub const SPIEGELMANN: i32 = 2042000;
 /// Lith Harbor, Singapore and Kampung, Martin in Orbis and Tony in
 /// Ludibrium (report b170).
 pub const EVENT_ASSISTANTS: [i32; 4] = [9000000, 9000001, 9000011, 9000013];
+/// Pietro, where a GM's event sends its winners (109050000, `Event02`).
+const PIETRO: i32 = 9000002;
+/// Pietra, where it sends the others (109050001, `Event06`).
+const PIETRA: i32 = 9000010;
+/// Harry, on the Coconut Season fields (`Event09`).
+const HARRY: i32 = 9000012;
 /// Spiegelmann again, in the Monster Carnival's exit room.
 pub const CARNIVAL_GUIDE: i32 = 2042002;
 /// Spiegelmann in a Monster Carnival waiting room, who puts challenges to
@@ -1680,6 +1688,9 @@ impl NpcScript {
                 }
                 _ => {}
             }
+        }
+        if let Some(script) = gm_event_exit(npc_id, player) {
+            return Some(script);
         }
         if npc_id == DUARTE {
             if let Some(script) = duarte_after(player) {
@@ -4914,6 +4925,32 @@ fn saved_location(player: &Player, kind: i16, fallback: i32) -> i32 {
         .get(&kind)
         .copied()
         .unwrap_or(fallback)
+}
+
+/// Out of a GM's event, back to where an Event Assistant took the player
+/// from (`EVENT_RETURN`, else Henesys): Pietro and Pietra after the game,
+/// and Harry during it, who gives the player's place back.
+fn gm_event_exit(npc_id: i32, player: &Player) -> Option<NpcScript> {
+    let back = saved_location(player, EVENT_RETURN, HENESYS.0);
+    let go = vec![Effect::SaveLocation(EVENT_RETURN, None), Effect::Warp(back)];
+    let page = match npc_id {
+        PIETRO => Page::Say(text(keys::GM_EVENT_PIETRO)),
+        PIETRA => Page::Say(text(keys::GM_EVENT_PIETRA)),
+        HARRY => {
+            let mut leave = vec![Effect::LeaveGmEvent {
+                map_id: player.stats.map_id,
+            }];
+            leave.extend(go);
+            let ask = Page::Ask {
+                text: text(keys::GM_EVENT_HARRY_ASK),
+                on_yes: leave,
+                on_no: None,
+            };
+            return Some(NpcScript::new(HARRY, vec![ask]));
+        }
+        _ => return None,
+    };
+    Some(NpcScript::new(npc_id, vec![page, Page::Done(go)]))
 }
 
 /// `florina2`: to Florina Beach for `fare` or the VIP ticket, saving where
@@ -9942,6 +9979,33 @@ mod tests {
                 ]
             );
         }
+    }
+
+    #[test]
+    fn pietro_pietra_and_harry_send_players_back_from_a_gms_event() {
+        let back = |player: &Player, npc| {
+            let mut exit = NpcScript::for_npc(npc, player).unwrap();
+            exit.begin();
+            exit.respond(match npc {
+                HARRY => ScriptInput::Yes,
+                _ => ScriptInput::Next,
+            })
+            .unwrap()
+            .effects
+        };
+        let go = |to| vec![Effect::SaveLocation(EVENT_RETURN, None), Effect::Warp(to)];
+        let mut came = rider(100, 0, 109050000);
+        came.saved_locations.insert(EVENT_RETURN, 60000);
+        assert_eq!(back(&came, PIETRO), go(60000));
+        came.stats.map_id = 109050001;
+        assert_eq!(back(&came, PIETRA), go(60000));
+        // Without a saved map, Henesys.
+        assert_eq!(back(&rider(100, 0, 109050001), PIETRA), go(HENESYS.0));
+        // Harry, during the game, gives the place back first.
+        came.stats.map_id = 109080000;
+        let mut leave = vec![Effect::LeaveGmEvent { map_id: 109080000 }];
+        leave.extend(go(60000));
+        assert_eq!(back(&came, HARRY), leave);
     }
 
     #[test]

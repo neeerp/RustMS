@@ -120,6 +120,7 @@ impl ClientActor {
         let mut alliance = None;
         let mut carnival = None;
         let mut gm_event = None;
+        let mut left_gm_event = None;
         let mut wedding = None;
         let mut restyled = false;
         let mut command = None;
@@ -195,6 +196,7 @@ impl ClientActor {
                     carnival = Some(effect.clone())
                 }
                 Effect::JoinGmEvent { npc } => gm_event = Some(*npc),
+                Effect::LeaveGmEvent { map_id } => left_gm_event = Some(*map_id),
                 Effect::BookWedding { .. }
                 | Effect::ExtraInvitations { .. }
                 | Effect::StartWedding { .. }
@@ -738,6 +740,13 @@ impl ClientActor {
         }
         if let Some(npc) = gm_event {
             Box::pin(self.join_gm_event(npc)).await?;
+        }
+        if let Some(map_id) = left_gm_event {
+            self.send_to_directory(DirectoryMessage::LeaveGmEvent {
+                channel_id: self.channel_id,
+                map_id,
+            })
+            .await?;
         }
         match wedding {
             Some(Effect::BookWedding { venue, premium }) => {

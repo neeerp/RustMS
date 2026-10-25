@@ -1330,6 +1330,9 @@ unsourced = [
     "gm_event.info",
     "gm_event.go",
     "gm_event.not_open",
+    "gm_event.pietro",
+    "gm_event.pietra",
+    "gm_event.harry_ask",
 ]
 
 [text."glTutoMsg0.message"]

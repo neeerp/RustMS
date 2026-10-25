@@ -203,8 +203,9 @@ guest's choice, and a Wedding Invitation Ticket adds a choice ending with
 The Event Assistants (`EVENT_ASSISTANTS`: Paul, Jean, Martin and Tony, script
 `Event00`) take players to the event a GM opened on their channel. The client
 actor asks the directory whether one is open before it builds their menu, and
-their "go" choice ends with `Effect::JoinGmEvent`. See
-[Coconut Season](./coconut.md), "Opening an event to players".
+their "go" choice ends with `Effect::JoinGmEvent`. Pietro, Pietra and Harry
+take players back out. See [Coconut Season](./coconut.md), "Opening an event
+to players".
 
 Text comes from the [server content pack](./server-content.md) with
 placeholders. HeavenClient expands NPC text markup (`Util/NpcTextMarkup.h`:

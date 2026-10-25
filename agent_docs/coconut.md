@@ -89,8 +89,17 @@ places left (`gm_event.not_open`). Going (`Effect::JoinGmEvent`, in
    have no side, so any of its four `sp` portals.
 
 A player warped in any other way still joins the smaller team, at the
-field's first `sp`. The places aren't given back yet, and nobody takes
-players back to `EVENT_RETURN` yet.
+field's first `sp`.
+
+Three NPCs take players back to `EVENT_RETURN`, or to Henesys if nothing
+was saved, and forget it (`gm_event_exit` in `net/src/npc_scripts.rs`):
+
+- Pietro (9000002) in 109050000, where the winners go, and Pietra
+  (9000010) in 109050001, where the others go: a line, then the warp.
+- Harry (9000012) on the Coconut Season fields, during the game: a yes or
+  no to leaving. Yes also gives the player's place back
+  (`Effect::LeaveGmEvent`, then `DirectoryMessage::LeaveGmEvent`), if
+  that event is still the one open on the channel, up to its limit.
 
 ## Packets
 
