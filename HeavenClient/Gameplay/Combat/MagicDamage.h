@@ -185,6 +185,12 @@ namespace ms
 		}
 
 		// Weakness makes the hit n% harder.
+		// Power Explosion doubles a spell, whatever its percent (0x791f26).
+		inline double exploded(double damage, int32_t explosion)
+		{
+			return explosion ? damage + damage : damage;
+		}
+
 		inline double weakened(double damage, int32_t weakness)
 		{
 			return weakness ? percent(damage, weakness + 100) : damage;

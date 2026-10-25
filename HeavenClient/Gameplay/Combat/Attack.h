@@ -75,6 +75,8 @@ namespace ms
 		int32_t healed = 0;
 		// What a weapon's blow or shot does, rolled for each monster.
 		physical_damage::Blow blow;
+		// Power Explosion's percent, or 0.
+		int32_t explosion = 0;
 		// The mob Homing Beacon marked, and Bullseye's `x` on it or 0.
 		int32_t marked = 0;
 		int32_t bullseye = 0;

@@ -209,6 +209,8 @@ namespace ms
 		// Loop Invincibility's `repeat` at the feet while its Divine Body lasts (FUN_0093e344), or take it away
 		// with a skill of 0.
 		void show_divine_body(int32_t skill);
+		// The same for Power Explosion's (FUN_00943085).
+		void show_power_explosion(int32_t skill);
 		// Loop an item buff's aura, `Effect/ItemEff.img/<item>` above or behind the body by its `z`, until the
 		// item is 0 (FUN_0093abe2). It isn't drawn while the character is morphed.
 		void show_consume_effect(int32_t item);
@@ -445,6 +447,9 @@ namespace ms
 		int32_t mount_fatigue = 0;
 
 	private:
+		// Loop the skill's `repeat` on `layer`, unless it already does, or take it away with a skill of 0.
+		void show_repeat(EffectLayer &layer, int32_t &shown, int32_t skill);
+
 		Text namelabel;
 		Text guildlabel;
 		GuildMark guildmark;
@@ -458,6 +463,7 @@ namespace ms
 		EffectLayer energy_glow;
 		EffectLayer berserk_aura;
 		EffectLayer divine_body;
+		EffectLayer power_explosion;
 		EffectLayer consume_aura;
 		struct RingDisplay
 		{
@@ -469,6 +475,7 @@ namespace ms
 		// By RingKind.
 		std::array<RingDisplay, 3> rings;
 		int32_t divine_body_skill = 0;
+		int32_t power_explosion_skill = 0;
 		// The full gauge's effect, and how long until it loops; -1 once it does.
 		std::vector<Animation> energy_effect;
 		int16_t energy_wait = -1;

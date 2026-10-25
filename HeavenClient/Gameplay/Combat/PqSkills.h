@@ -18,6 +18,7 @@ namespace ms
 		};
 
 		constexpr int32_t INVINCIBILITY = 1010;
+		constexpr int32_t POWER_EXPLOSION = 1011;
 
 		// The field types they need (FUN_00587f5f).
 		constexpr int32_t FIELD_DOJO = 14;

@@ -146,6 +146,8 @@ int main()
 		require(critical({ 50, 200, true }, 4221001, 0.0, true), "Assassinate's second strike crits");
 
 		require(near(barrage(100, 5121007, 4), 200) && near(barrage(100, 15111004, 5), 400) && near(barrage(100, 5121007, 3), 100), "Barrage");
+		require(near(exploded(100, 200), 200) && near(exploded(100, 150), 150) && near(exploded(100, 0), 100),
+				"Power Explosion's percent");
 
 		require(near(scaled(100, 100, 1.0, 0, false, 0), 100), "nothing");
 		require(near(scaled(100, 100, 1.5, 120, false, 0), 180), "a skill and combo");

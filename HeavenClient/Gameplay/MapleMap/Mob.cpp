@@ -2541,6 +2541,7 @@ namespace ms
 		damage = beacon::bullseye(damage, attack.bullseye, attack.marked, oid);
 
 		damage = barrage(damage, attack.skill, index);
+		damage = physical_damage::exploded(damage, attack.explosion);
 
 		return std::pair<int32_t, bool>(finish(damage), iscritical);
 	}
@@ -2578,6 +2579,7 @@ namespace ms
 			return 0;
 
 		damage = percent(damage, attack.elemboost);
+		damage = magic_damage::exploded(damage, attack.explosion);
 		damage = weakened(damage, status_value(MobStatParser::WEAKNESS));
 		damage = beacon::bullseye(damage, attack.bullseye, attack.marked, oid);
 

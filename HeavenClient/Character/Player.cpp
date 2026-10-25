@@ -1118,6 +1118,9 @@ namespace ms
 		// Berserk, as the player last turned it on.
 		blow.berserk = berserk;
 
+		// Power Explosion's percent, for spells too (FUN_0078df87, FUN_00791617).
+		attack.explosion = get_buff_value(Buffstat::Id::BERSERK_FURY);
+
 		// Bullseye on the mob Homing Beacon marked, for any attack (FUN_0078dea6).
 		attack.marked = guided.mob;
 
@@ -1361,6 +1364,9 @@ namespace ms
 		if (buff.stat == Buffstat::Id::DIVINE_BODY)
 			show_divine_body(pq_skills::family(stats.get_stat(MapleStat::Id::JOB), pq_skills::INVINCIBILITY));
 
+		if (buff.stat == Buffstat::Id::BERSERK_FURY)
+			show_power_explosion(pq_skills::family(stats.get_stat(MapleStat::Id::JOB), pq_skills::POWER_EXPLOSION));
+
 		show_diseases();
 	}
 
@@ -1384,6 +1390,9 @@ namespace ms
 
 		if (stat == Buffstat::Id::DIVINE_BODY)
 			show_divine_body(0);
+
+		if (stat == Buffstat::Id::BERSERK_FURY)
+			show_power_explosion(0);
 
 		show_diseases();
 	}
