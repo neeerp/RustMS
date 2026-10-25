@@ -466,6 +466,10 @@ impl WorldHandler for TakeDamageHandler {
         r.read_byte()?; // element
         let damage = r.read_int()?;
         let player = &mut *ctx.player;
+        // Nothing hurts a hidden GM, as in Cosmic's TakeDamageHandler.
+        if player.hidden {
+            return Ok(HandlerResult::empty());
+        }
         if from == FROM_MIST && player.stats.hp > 0 {
             let code = r.read_short()? as u16;
             let kind = r.read_byte()?;
@@ -1441,6 +1445,12 @@ mod tests {
         let most = game::mob_damage::most_physical(&sample_defender(), 12);
         assert!(most > 2);
         player.stats.hp = (2 * most) as i16;
+        // Not while the player is a hidden GM, mist or no mist.
+        player.hidden = true;
+        assert!(handle(&mut player, touch(most, 100100)).is_empty());
+        assert!(handle(&mut player, mist(1, 131, 2)).is_empty());
+        assert_eq!(i32::from(player.stats.hp), 2 * most);
+        player.hidden = false;
         handle(&mut player, touch(most, 100100));
         assert_eq!(i32::from(player.stats.hp), most);
         // More than the bound is refused.
