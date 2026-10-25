@@ -36,6 +36,7 @@ pub mod name_change;
 pub mod note;
 pub mod npc;
 pub mod owl;
+pub mod ox_quiz;
 pub mod parcel;
 pub mod party;
 pub mod pet;

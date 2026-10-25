@@ -14,6 +14,7 @@ pub mod lua_strings;
 pub mod make_char_info;
 pub mod maker;
 pub mod mobs;
+pub mod ox_quiz;
 pub mod quests;
 pub mod reactors;
 pub mod server_content;

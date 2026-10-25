@@ -5,6 +5,7 @@ use crate::actor::field_kites::KiteSet;
 use crate::actor::field_merchants::{MerchantRequest, Merchants};
 use crate::actor::field_mists::MistSet;
 use crate::actor::field_mobs::{split_exp, BossBar, Cast, CastArea, Catch, Kill, MobSet, Sharer};
+use crate::actor::field_ox::{self, OxGame};
 use crate::actor::field_reactors::{Hit, ReactorSet};
 use crate::actor::field_shops::{ShopRoomRequest, Shops};
 use crate::actor::field_snowball::{self, SnowballGame};
@@ -28,7 +29,7 @@ use net::packet::build::world::carnival::{build_carnival_died, build_carnival_su
 use net::packet::build::world::coconut::{
     build_coconut_hit, build_coconut_score, build_field_team,
 };
-use net::packet::build::world::conti::{build_conti_move, build_countdown};
+use net::packet::build::world::conti::{build_conti_move, build_countdown, build_event_clock};
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
@@ -54,6 +55,7 @@ use net::packet::build::world::mob::{
 use net::packet::build::world::npc::{
     build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
 };
+use net::packet::build::world::ox_quiz::{build_gm_event_instructions, build_ox_quiz};
 use net::packet::build::world::pet::build_move_pet;
 use net::packet::build::world::reactor::{
     build_hit_reactor, build_remove_reactor, build_spawn_reactor,
@@ -89,6 +91,8 @@ struct Occupant {
     handle: ClientHandle,
     avatar: FieldAvatar,
     party: Option<i32>,
+    /// The foothold they last moved onto, below 0 for a ladder or rope's.
+    foothold: i16,
 }
 
 #[derive(Clone, Debug)]
@@ -277,6 +281,8 @@ pub struct FieldActor {
     coconut: Option<CoconutGame>,
     /// On a Snowball field (field type 1), its game.
     snowball: Option<SnowballGame>,
+    /// On the OX Quiz's field (field type 5), its game.
+    ox: Option<OxGame>,
     tick: Duration,
 }
 
@@ -352,6 +358,18 @@ impl FieldActor {
                 .map(|rules| {
                     let wait = Duration::from_millis(rules.snowman_wait.into());
                     SnowballGame::new(rules, net::events::scaled(wait))
+                }),
+            ox: net::get_game_data()
+                .ok()
+                .and_then(|data| data.field(key.map_id))
+                .filter(|field| field.field_type == 5 && field.areas.len() >= 2)
+                .map(|_| {
+                    let times = [
+                        field_ox::QUESTION_TIME,
+                        field_ox::ANSWER_TIME,
+                        field_ox::PAUSE_TIME,
+                    ];
+                    OxGame::new(times.map(net::events::scaled))
                 }),
             tick,
         };
@@ -464,6 +482,7 @@ impl FieldActor {
         }
         self.tick_coconut(now);
         self.tick_snowball(now);
+        self.tick_ox(now);
         self.reach_from_mists(now);
         for summon in self.summons.expire(now) {
             let view = summon.view;
@@ -694,6 +713,11 @@ impl FieldActor {
                     }
                 }
             }
+            // Chat is off on the OX Quiz's field while a game is on, but
+            // for GMs.
+            FieldMessage::Chat { from, .. }
+                if self.ox.as_ref().is_some_and(OxGame::on)
+                    && self.occupants.get(&from).is_some_and(|o| !o.avatar.gm) => {}
             FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
             FieldMessage::Positions { reply } => {
                 let positions = self
@@ -780,12 +804,15 @@ impl FieldActor {
             } => {
                 if let Some(occupant) = self.occupants.get_mut(&from) {
                     let avatar = &mut occupant.avatar;
-                    if let Some((x, y, stance)) =
-                        parse_movement_state(&movement_bytes, (start.0, start.1, avatar.stance))
+                    if let Some((x, y, stance, foothold)) =
+                        parse_movement(&movement_bytes, (start.0, start.1, avatar.stance))
                     {
                         avatar.x = x;
                         avatar.y = y;
                         avatar.stance = stance;
+                        if let Some(foothold) = foothold {
+                            occupant.foothold = foothold;
+                        }
                     }
                 }
                 self.broadcast(Some(from), packet);
@@ -3974,6 +4001,11 @@ impl FieldActor {
                 handle.send_packet(packet);
             }
         }
+        if let Some(game) = &self.ox {
+            for packet in ox_entry(game, now) {
+                handle.send_packet(packet);
+            }
+        }
 
         for packet in self.merchants.spawns() {
             match packet {
@@ -3990,6 +4022,7 @@ impl FieldActor {
                 handle,
                 avatar,
                 party,
+                foothold: 0,
             },
         );
         let controlled = self.mobs.assign_uncontrolled(client_id);
@@ -4146,6 +4179,9 @@ impl FieldActor {
         if self.snowball.is_some() {
             return self.run_snowball_event(event);
         }
+        if self.ox.is_some() {
+            return self.run_ox_event(event);
+        }
         let Some(game) = &mut self.coconut else {
             return;
         };
@@ -4278,6 +4314,140 @@ impl FieldActor {
         }
         if let (Some(occupant), Ok(packet)) = (self.occupants.get(&from), build_left_knock_back()) {
             occupant.handle.send_packet(packet);
+        }
+    }
+
+    /// A GM's `/start` or `/reset` on the OX Quiz field: ten questions
+    /// drawn from one set, or the game stopped (report b171).
+    fn run_ox_event(&mut self, event: GmEvent) {
+        let Some(game) = &mut self.ox else {
+            return;
+        };
+        let packet = match event {
+            GmEvent::Start => {
+                let Some(quiz) = net::gm_event::ox_quiz() else {
+                    return warn!(field = ?self.key, "No OX Quiz questions to ask");
+                };
+                let questions = field_ox::draw(quiz, &mut rand::thread_rng());
+                if questions.is_empty() {
+                    return warn!(field = ?self.key, "No OX Quiz set has enough questions");
+                }
+                let Some(first) = game.start(questions, Instant::now()) else {
+                    return;
+                };
+                info!(field = ?self.key, set = first.set, "OX Quiz started");
+                build_ox_quiz(true, first.set, first.number)
+            }
+            GmEvent::Reset => {
+                let Some(set) = game.reset() else {
+                    return;
+                };
+                info!(field = ?self.key, "OX Quiz reset");
+                // The field has no way out but its exit's.
+                for occupant in self.occupants.values().filter(|o| !o.avatar.gm) {
+                    occupant.handle.send(ServerMessage::ShipWarp {
+                        from_map: self.key.map_id,
+                        map_id: field_ox::EXIT_MAP,
+                        portal: conti::Portal::Id(0),
+                    });
+                }
+                build_ox_quiz(false, set, 0)
+            }
+        };
+        if let Ok(packet) = packet {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// The OX Quiz's time: the next question, its answer and who got it
+    /// wrong, and those sent off; after the last, everyone left won.
+    fn tick_ox(&mut self, now: Instant) {
+        let Some(turn) = self.ox.as_mut().and_then(|game| game.tick(now)) else {
+            return;
+        };
+        match turn {
+            field_ox::Turn::Ask(question) => {
+                if let Ok(packet) = build_ox_quiz(true, question.set, question.number) {
+                    self.broadcast(None, packet);
+                }
+            }
+            field_ox::Turn::Answer(question) => {
+                let data = net::get_game_data().ok();
+                let areas = data
+                    .and_then(|data| data.field(self.key.map_id))
+                    .map_or(&[][..], |field| field.areas.as_slice());
+                let (right, wrong) = self
+                    .occupants
+                    .iter()
+                    .filter(|(_, occupant)| !occupant.avatar.gm)
+                    .map(|(&client_id, occupant)| {
+                        let avatar = &occupant.avatar;
+                        let given = field_ox::answer(areas, avatar.x, avatar.y, occupant.foothold);
+                        (client_id, given == Some(question.o))
+                    })
+                    .partition::<Vec<_>, _>(|&(_, right)| right);
+                let ids =
+                    |judged: Vec<(ClientId, bool)>| judged.into_iter().map(|(id, _)| id).collect();
+                if let Some(game) = &mut self.ox {
+                    game.judged(ids(wrong), ids(right));
+                }
+                if let Ok(packet) = build_ox_quiz(false, question.set, question.number) {
+                    self.broadcast(None, packet);
+                }
+            }
+            field_ox::Turn::SendOff {
+                set,
+                wrong,
+                right,
+                last,
+            } => self.send_off_ox(set, &wrong, &right, last),
+        }
+    }
+
+    /// Those who answered wrong leave for the exit; on the last question
+    /// those who answered right leave for the winners' map, and anyone who
+    /// came in too late to answer it for the exit. A game nobody is left to
+    /// play stops.
+    fn send_off_ox(&mut self, set: u8, wrong: &[ClientId], right: &[ClientId], last: bool) {
+        let wrong_line = net::content::text().get(keys::OX_WRONG, &[]);
+        let won_line = net::content::text().get(keys::OX_WON, &[]);
+        let clear = build_ox_quiz(false, set, 0).ok();
+        let mut playing = false;
+        for (client_id, occupant) in &self.occupants {
+            let out = wrong.contains(client_id) || (last && !right.contains(client_id));
+            if !out && !last {
+                playing |= !occupant.avatar.gm;
+                continue;
+            }
+            if let Some(packet) = &clear {
+                occupant.handle.send_packet(packet.clone());
+            }
+            if occupant.avatar.gm {
+                continue;
+            }
+            let (line, map_id) = if out {
+                (&wrong_line, field_ox::EXIT_MAP)
+            } else {
+                (&won_line, field_ox::WINNERS_MAP)
+            };
+            if let Ok(packet) = build_broadcast(Broadcast::Pink, line) {
+                occupant.handle.send_packet(packet);
+            }
+            occupant.handle.send(ServerMessage::ShipWarp {
+                from_map: self.key.map_id,
+                map_id,
+                portal: conti::Portal::Id(0),
+            });
+        }
+        if last {
+            info!(field = ?self.key, "OX Quiz over");
+        } else if !playing {
+            info!(field = ?self.key, "OX Quiz has nobody left");
+            if self.ox.as_mut().and_then(OxGame::reset).is_some() {
+                if let Some(packet) = clear {
+                    self.broadcast(None, packet);
+                }
+            }
         }
     }
 
@@ -4529,6 +4699,22 @@ fn snowball_entry(game: &SnowballGame, now: Instant) -> Vec<Packet> {
         .flatten()
         .flatten()
         .collect()
+}
+
+/// What a player arriving on the OX Quiz field is told: the map's help,
+/// and the question up with the event clock at its time left, or the one
+/// whose answer shows (report b171).
+fn ox_entry(game: &OxGame, now: Instant) -> Vec<Packet> {
+    let mut packets = vec![build_gm_event_instructions(0)];
+    if let Some((question, left)) = game.showing(now) {
+        if let Some(left) = left {
+            // Below 0 the client puts up a running clock, if none is.
+            let seconds = field_coconut::seconds(left) as i32;
+            packets.push(build_event_clock(-seconds));
+        }
+        packets.push(build_ox_quiz(left.is_some(), question.set, question.number));
+    }
+    packets.into_iter().flatten().collect()
 }
 
 fn player_spawn(avatar: &FieldAvatar) -> Result<Vec<Packet>, net::error::NetworkError> {

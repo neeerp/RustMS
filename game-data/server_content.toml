@@ -1333,6 +1333,8 @@ unsourced = [
     "gm_event.pietro",
     "gm_event.pietra",
     "gm_event.harry_ask",
+    "ox.wrong",
+    "ox.won",
 ]
 
 [text."glTutoMsg0.message"]

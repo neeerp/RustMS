@@ -710,7 +710,7 @@ impl GmEvent {
     }
 }
 
-/// What a GM's `/snowball`, `/coconut` or `/endevent` chat line asks of
+/// What a GM's `/snowball`, `/coconut`, `/ox` or `/endevent` chat line asks of
 /// their channel's event: open it to players, or close it (report b170).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GmEntry {
@@ -739,6 +739,7 @@ impl GmEntry {
             "/coconut" | "/coconut1" => 109_080_000,
             "/coconut2" => 109_080_001,
             "/coconut3" => 109_080_002,
+            "/ox" => 109_020_001,
             _ => return None,
         };
         let limit = match words.next() {

@@ -123,6 +123,9 @@ pub enum SendOpcode {
     BlowWeather = 0x8E,
     PlayJukebox = 0x8F,
     AdminResult = 0x90,
+    /// The OX Quiz's question or answer (b171).
+    OxQuiz = 0x91,
+    GmEventInstructions = 0x92,
     Clock = 0x93,
     ContiMove = 0x94,
     ContiState = 0x95,
