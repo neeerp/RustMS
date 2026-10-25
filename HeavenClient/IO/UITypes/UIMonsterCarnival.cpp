@@ -49,6 +49,19 @@ namespace ms
 		constexpr Color SELECTED = Color(0x244768FFu);
 
 		constexpr int16_t SLIDER_X = 142;
+
+		// The side panel (backgrnd2), 157 right of the window (A 86fb8a), and
+		// its rows' texts and highlight (FUN_0086d733).
+		constexpr Point<int16_t> SIDE = Point<int16_t>(157, 0);
+		constexpr Point<int16_t> SIDE_SIZE = Point<int16_t>(127, 107);
+		constexpr int16_t SIDE_ROWS_Y = 27;
+		constexpr int16_t SIDE_NAME_X = 14;
+		constexpr int16_t SIDE_COUNT_X = 90;
+		constexpr Point<int16_t> SIDE_FILL = Point<int16_t>(9, -1);
+		constexpr Point<int16_t> SIDE_FILL_SIZE = Point<int16_t>(95, ROW_HEIGHT);
+		constexpr int16_t SIDE_SLIDER_X = 107;
+		constexpr int16_t SIDE_SLIDER_Y = 8;
+		constexpr int16_t SIDE_SLIDER_LENGTH = 92;
 		constexpr int16_t LOCK_X = 9;
 		constexpr int16_t DECIDE_X = 110;
 
@@ -105,12 +118,13 @@ namespace ms
 
 	UIMonsterCarnival::UIMonsterCarnival()
 			: UIDragElement<PosMONSTERCARNIVAL>(Point<int16_t>(WIDTH, 20)), shown_team(carnival::NO_TEAM),
-			  hovered(false)
+			  side_open(false), hovered(false)
 	{
 		nl::node src = NxFiles::ui_classic["UIWindow.img"]["MonsterCarnival"];
 		nl::node basic = NxFiles::ui_classic["Basic.img"];
 
 		background = src["backgrnd"];
+		side_background = src["backgrnd2"];
 		top = src["backgrnd3"]["top"]["0"];
 		header = src["backgrnd3"]["middle0"]["0"];
 		middle = src["backgrnd3"]["middle1"]["0"];
@@ -154,6 +168,15 @@ namespace ms
 
 		state = State({ rows[0].size(), rows[1].size(), rows[2].size() });
 
+		// START's counts of the mobs already out start the side panel's rows.
+		const std::vector<uint8_t>& out = carnival::state().summoned;
+
+		for (size_t i = 0; i < out.size() && i < rows[0].size(); i++)
+			if (out[i] > 0 && !rows[0][i].label.empty())
+				tally.add(rows[0][i].label, out[i]);
+
+		refresh_side();
+
 		my_cp = black("");
 		our_cp = black("");
 		their_cp = black("");
@@ -180,6 +203,7 @@ namespace ms
 		row.cost = { black(shown_cost), white(shown_cost) };
 		row.key = { black(key), white(key) };
 		row.cost_x = cost_x(cost);
+		row.label = shown_name;
 		row.desc = desc;
 
 		list.push_back(std::move(row));
@@ -202,6 +226,57 @@ namespace ms
 		int16_t arrow = 13;
 		slider = Slider(Slider::Type::CLASSIC, Range<int16_t>(LIST_Y, LIST_Y + list_height - arrow), SLIDER_X,
 						static_cast<int16_t>(MAX_ROWS), static_cast<int16_t>(shown), [](bool) {});
+	}
+
+	void UIMonsterCarnival::refresh_side()
+	{
+		counts.clear();
+
+		for (const Tally::Entry& entry : tally.entries())
+		{
+			std::string count = std::to_string(entry.count);
+			counts.push_back(
+				{ { black(entry.name), white(entry.name) }, { black(count), white(count) }, entry.name == tally.latest() });
+		}
+
+		if (!side_open)
+			return;
+
+		// v83 makes the bar anew each time, for the rows past the first 5.
+		int16_t arrow = 13;
+		int16_t rowmax = static_cast<int16_t>(tally.range() + SIDE_ROWS);
+		side_slider = Slider(Slider::Type::CLASSIC,
+							 Range<int16_t>(SIDE_SLIDER_Y, SIDE_SLIDER_Y + SIDE_SLIDER_LENGTH - arrow),
+							 SIDE.x() + SIDE_SLIDER_X, static_cast<int16_t>(SIDE_ROWS), rowmax, [this](bool upwards) {
+								 size_t top = tally.top();
+								 tally.scroll(upwards ? (top > 0 ? top - 1 : 0) : top + 1);
+							 });
+		side_slider.setrows(static_cast<int16_t>(tally.top()), static_cast<int16_t>(SIDE_ROWS), rowmax);
+	}
+
+	bool UIMonsterCarnival::on_side(Point<int16_t> relative) const
+	{
+		return side_open && Rectangle<int16_t>(SIDE, SIDE + SIDE_SIZE).contains(relative);
+	}
+
+	bool UIMonsterCarnival::is_in_range(Point<int16_t> cursorpos) const
+	{
+		return UIElement::is_in_range(cursorpos) || on_side(cursorpos - position);
+	}
+
+	void UIMonsterCarnival::summoned(const std::string& name)
+	{
+		if (name.empty())
+			return;
+
+		size_t row = tally.summon(name);
+
+		// With the panel up v83 makes its bar anew, at the top, then scrolls
+		// it down by the row: as far as the row, or a new one at the end.
+		if (side_open)
+			tally.scroll(row);
+
+		refresh_side();
 	}
 
 	void UIMonsterCarnival::refresh_points()
@@ -289,6 +364,37 @@ namespace ms
 		}
 
 		UIElement::draw(alpha);
+
+		if (side_open)
+		{
+			Point<int16_t> side = position + SIDE;
+			size_t top = tally.top();
+
+			draw_at(side_background, side);
+
+			for (size_t i = 0; i < SIDE_ROWS && top + i < counts.size(); i++)
+			{
+				const Count& row = counts[top + i];
+				Point<int16_t> line = side + Point<int16_t>(0, static_cast<int16_t>(SIDE_ROWS_Y + ROW_HEIGHT * i));
+
+				// The name last summoned is the highlighted one (A 86d876).
+				if (row.latest)
+				{
+					Point<int16_t> fill = line + SIDE_FILL;
+					GraphicsGL::get().drawrectangle(fill.x(), fill.y(), SIDE_FILL_SIZE.x(), SIDE_FILL_SIZE.y(),
+													SELECTED.r(), SELECTED.g(), SELECTED.b(), SELECTED.a());
+				}
+
+				Point<int16_t> text = line + TEXT_Y;
+				int16_t name_x = text.x() + SIDE_NAME_X;
+
+				row.name[row.latest].draw_between(DrawArgument(Point<int16_t>(name_x, text.y())),
+												  Range<int16_t>(name_x, name_x + NAME_WIDTH));
+				row.count[row.latest].draw(text + Point<int16_t>(SIDE_COUNT_X, 0));
+			}
+
+			side_slider.draw(position);
+		}
 
 		if (hovered)
 			tip.draw(cursor + TIP_OFFSET);
@@ -378,6 +484,16 @@ namespace ms
 			if (Cursor::State slid = slider.send_cursor(relative, clicked))
 				return slid;
 
+		// The side panel, a window over this one in v83, has only its bar
+		// to use.
+		if (on_side(relative))
+		{
+			if (Cursor::State slid = side_slider.send_cursor(relative, clicked))
+				return slid;
+
+			return UIDragElement::send_cursor(false, cursorpos);
+		}
+
 		if (on_button(cursorpos))
 			return UIDragElement::send_cursor(clicked, cursorpos);
 
@@ -416,6 +532,7 @@ namespace ms
 		hovered = false;
 		tip.set_text("");
 		slider.remove_cursor();
+		side_slider.remove_cursor();
 
 		UIDragElement::remove_cursor();
 	}
@@ -498,8 +615,13 @@ namespace ms
 			state.touch();
 			spend();
 			break;
+		case BT_SIDE:
+			// The side panel comes up at its top (FUN_0086fb8a).
+			side_open = !side_open;
+			tally.scroll(0);
+			refresh_side();
+			break;
 		default:
-			// BtSide's summon list isn't in yet.
 			break;
 		}
 

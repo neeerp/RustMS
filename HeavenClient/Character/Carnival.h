@@ -181,6 +181,45 @@ namespace ms
 				bool is_locked = false;
 				int32_t timer = FOLD_DELAY;
 			};
+
+			// The rows the side panel shows at once.
+			constexpr size_t SIDE_ROWS = 5;
+
+			// The side panel's count of each mob summoned (FUN_0086deda,
+			// FUN_0086df54): a row a name, in the order they first came out.
+			class Tally
+			{
+			public:
+				struct Entry
+				{
+					std::string name;
+					uint32_t count;
+				};
+
+				// One of START's mobs already out: a row of its own, which
+				// isn't the latest.
+				void add(const std::string& name, uint32_t count);
+				// A mob summoned: its row counted up, or a new one at the end,
+				// and it is the latest. Its row.
+				size_t summon(const std::string& name);
+
+				const std::vector<Entry>& entries() const;
+				// The name last summoned, whose rows are highlighted.
+				const std::string& latest() const;
+
+				// The first row shown, and the furthest it goes: v83's bar
+				// goes to the count less 4, a row past the last full page
+				// (FUN_0086d6ae).
+				size_t top() const;
+				size_t range() const;
+				// Clamped to the range.
+				void scroll(size_t top);
+
+			private:
+				std::vector<Entry> rows;
+				std::string last;
+				size_t first = 0;
+			};
 		}
 	}
 }

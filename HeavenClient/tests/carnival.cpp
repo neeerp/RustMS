@@ -208,6 +208,42 @@ int main()
 			window.pass(7000);
 			window.touch();
 			require(!window.pass(7000) && window.open(), "a touch puts the fold off");
+
+			// The side panel's counts: START's mobs out, then each summon.
+			Tally tally;
+			tally.add("Brown Teddy", 2);
+			require(tally.entries().size() == 1 && tally.entries()[0].count == 2 && tally.latest().empty(),
+				"START's mobs are rows, none the latest");
+			require(tally.summon("Brown Teddy") == 0 && tally.entries()[0].count == 3 && tally.latest() == "Brown Teddy",
+				"a summon counts its row up");
+			require(tally.summon("Bloctopus") == 1 && tally.entries()[1].count == 1 && tally.latest() == "Bloctopus",
+				"a new name, a new row at the end");
+			require(tally.range() == 0, "no scrolling for 5 rows or fewer");
+			tally.scroll(3);
+			require(tally.top() == 0, "nor any scrolling");
+
+			for (const char* name : { "A", "B", "C", "D" })
+				tally.summon(name);
+			require(tally.entries().size() == 6 && tally.range() == 2, "6 rows scroll to the count less 4");
+			tally.scroll(tally.summon("E"));
+			require(tally.top() == 3, "a new row scrolls to the end");
+			tally.scroll(tally.summon("Bloctopus"));
+			require(tally.top() == 1 && tally.entries()[1].count == 2, "an old one as far as its row");
+			tally.scroll(0);
+			require(tally.top() == 0, "back to the top");
+			tally.scroll(100);
+			require(tally.top() == tally.range(), "no further than the range");
+			tally.add("Brown Teddy", 1);
+			require(tally.latest() == "Bloctopus" && tally.top() == 3 && tally.entries().size() == 8,
+				"an added row leaves the latest and the scroll be");
+			require(tally.summon("Brown Teddy") == 0 && tally.entries()[0].count == 4 && tally.entries()[7].count == 1,
+				"a summon counts the first row of its name");
+
+			Tally few;
+			require(few.range() == 0 && few.entries().empty(), "an empty panel");
+			for (const char* name : { "A", "B", "C", "D", "E" })
+				few.summon(name);
+			require(few.range() == 0, "5 rows don't scroll");
 		}
 	}
 	catch (const std::exception& e)

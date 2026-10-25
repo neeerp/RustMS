@@ -97,8 +97,15 @@ namespace ms
 		uint8_t index = static_cast<uint8_t>(recv.read_byte());
 		std::string who = recv.read_string();
 
+		std::string what = item_name(tab, index);
+
 		Stage::get().get_player().request_answered();
-		chat_line(carnival::summon_line(tab, who, item_name(tab, index)), UIChatBar::LineType::GREY);
+		chat_line(carnival::summon_line(tab, who, what), UIChatBar::LineType::GREY);
+
+		// A mob counts on the window's side panel too.
+		if (tab == 0)
+			if (auto window = UI::get().get_element<UIMonsterCarnival>())
+				window->summoned(what);
 	}
 
 	void CarnivalMessageHandler::handle(InPacket& recv) const
