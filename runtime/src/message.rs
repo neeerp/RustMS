@@ -310,6 +310,12 @@ pub enum ServerMessage {
         map_id: i32,
         exit: net::packet::handle::world::DoorExit,
     },
+    /// A GM's `/start` in the lobby `from_map` sends the player to their
+    /// team's spot on the game field `map_id`.
+    GoToGmEvent {
+        from_map: i32,
+        map_id: i32,
+    },
     /// A ship's trip moves everyone on `from_map` to `map_id`, at `portal`.
     ShipWarp {
         from_map: i32,
@@ -672,6 +678,12 @@ pub enum FieldMessage {
     ReserveTeam {
         client_id: ClientId,
         reply: tokio::sync::oneshot::Sender<Option<u8>>,
+    },
+    /// A GM's `/start` in this lobby: everyone but the GM `from` goes on
+    /// to the game field `map_id`.
+    SendToGmEvent {
+        from: ClientId,
+        map_id: i32,
     },
     /// How many monsters are alive on the map.
     MobCount {

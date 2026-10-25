@@ -79,14 +79,23 @@ places left (`gm_event.not_open`). Going (`Effect::JoinGmEvent`, in
 
 1. takes a place from the directory (`JoinGmEvent`), or says the event
    closed or filled up meanwhile;
-2. asks the game's field for a team (`FieldMessage::ReserveTeam`). The
-   game gives the one it would give the player on arriving, and keeps it
-   for them for 30 s (`RESERVE_TIME`), so two players on their way don't
-   get the same place;
-3. saves the map left as `EVENT_RETURN`, and warps the player to the
-   team's spot (`net::gm_event::spot`). On Snowball that is their ball's
-   portal, `st00` for Story and `st01` for Maple; Coconut Season's teams
-   have no side, so any of its four `sp` portals.
+2. saves the map left as `EVENT_RETURN`;
+3. on Snowball, warps the player to the field's entrance
+   (`net::gm_event::lobby`: 109060001, 3 or 5) to wait for the GM;
+4. on Coconut Season, asks the game's field for a team
+   (`FieldMessage::ReserveTeam`) and warps the player to the team's spot
+   (`net::gm_event::spot`). The game gives the team it would give the
+   player on arriving, and keeps it for them for 30 s (`RESERVE_TIME`),
+   so two players on their way don't get the same place. Its teams have
+   no side, so the spot is any of its four `sp` portals.
+
+A GM's `/start` in a Snowball entrance (`ClientActor::run_gm_event`)
+starts the game on its field, if it isn't on yet, and the entrance's field
+actor sends everyone there but the GM on (`FieldMessage::SendToGmEvent`,
+then `ServerMessage::GoToGmEvent`). Each reserves a team the same way and
+lands on their ball's portal, `st00` for Story and `st01` for Maple. The GM
+stays, so a second `/start` sends whoever came since. Every other `/start`
+and `/reset` goes to the GM's own field.
 
 A player warped in any other way still joins the smaller team, at the
 field's first `sp`.
