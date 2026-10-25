@@ -128,6 +128,20 @@ pub struct SkillData {
     nx: NxDataFile,
 }
 
+/// A Monster Carnival skill (`MCSkill.img/<id>`), which the Carnival
+/// window's second tab sells.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CarnivalSkill {
+    /// `spendCP`: its price.
+    pub cost: i32,
+    /// `mobSkillID` and `level`: the mob skill it casts on the other side,
+    /// or 0 for one that casts another at random (`type` 8).
+    pub mob_skill: i32,
+    pub level: i32,
+    /// `target` 2: it reaches everyone of the other side, not one of them.
+    pub all: bool,
+}
+
 impl SkillData {
     pub fn load(path: impl AsRef<Path>) -> Result<Self, GameDataError> {
         Ok(Self {
@@ -211,6 +225,26 @@ impl SkillData {
             requirements,
             levels,
         }))
+    }
+
+    /// The Monster Carnival skills (`MCSkill.img`), by id.
+    pub fn carnival_skills(&self) -> Result<Vec<CarnivalSkill>, GameDataError> {
+        let nx = &self.nx;
+        let Some(image) = nx.child_by_name(0, "MCSkill.img")? else {
+            return Ok(Vec::new());
+        };
+        let mut skills = Vec::new();
+        while let Some(node) = nx.child_by_name(image, &skills.len().to_string())? {
+            let int =
+                |key| -> Result<i32, GameDataError> { Ok(nx.int_child(node, key)?.unwrap_or(0)) };
+            skills.push(CarnivalSkill {
+                cost: int("spendCP")?,
+                mob_skill: int("mobSkillID")?,
+                level: int("level")?,
+                all: int("target")? == 2,
+            });
+        }
+        Ok(skills)
     }
 
     /// The ids of a job's skills (`<job>.img/skill`).
@@ -379,6 +413,18 @@ mod tests {
         assert_eq!(summon.summons, [7130200]);
         assert_eq!((summon.limit, summon.summon_effect, summon.hp), (5, 2, 75));
         assert!(data.mob_skill(100, 99).unwrap().is_none());
+        let carnival = data.carnival_skills().unwrap();
+        assert_eq!(carnival.len(), 10);
+        let curse = CarnivalSkill {
+            cost: 12,
+            mob_skill: 124,
+            level: 7,
+            all: true,
+        };
+        assert_eq!(carnival[4], curse);
+        assert_eq!((carnival[7].mob_skill, carnival[7].all), (127, false));
+        assert_eq!((carnival[9].mob_skill, carnival[9].cost), (0, 10));
+        assert!(carnival[9].all && !carnival[8].all);
         let mist = data.mob_skill(131, 5).unwrap().unwrap();
         assert_eq!((mist.x, mist.duration, mist.element), (200, 15, 4));
         assert_eq!(power_up.element, 0);

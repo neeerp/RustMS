@@ -32,6 +32,7 @@ use crate::message::{
 };
 use crate::supervisor::spawn_supervised;
 use game_data::server_content::keys;
+use game_data::skills::CarnivalSkill;
 use net::events::{
     draw_combo, draw_question, htpq_room_key, Balloon, ClockOn, Cloto, Event, EventCommand,
     EventKind, Puzzles, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT, MAZE_COUPONS_WANTED,
@@ -1040,18 +1041,25 @@ impl EventActor {
             {
                 self.carnival_spend(client_id, tab, index);
             }
+            EventCommand::CarnivalCast(id) if matches!(self.kind, EventKind::Carnival(_)) => {
+                self.carnival_cast(client_id, id);
+            }
             EventCommand::CarnivalCp(_)
             | EventCommand::CarnivalArrived
-            | EventCommand::CarnivalSpend { .. } => {
+            | EventCommand::CarnivalSpend { .. }
+            | EventCommand::CarnivalCast(_) => {
                 debug!(client_id, "Not in a Monster Carnival");
             }
         }
     }
 
-    /// A member's kill in a Monster Carnival battle earned `cp`: their
-    /// screen shows their own CP, and everyone's their side's (Cosmic
-    /// `gainCP`).
+    /// A member's kill or item in a Monster Carnival battle earned `cp`:
+    /// their screen shows their own CP, and everyone's their side's (Cosmic
+    /// `gainCP`). Nothing is earned outside the battle.
     fn carnival_cp(&mut self, client_id: ClientId, cp: i32) {
+        if self.carnival_stage != net::carnival::Stage::Battle {
+            return;
+        }
         if let Some(gain) = self.carnival.gain(client_id, cp) {
             self.tell_cp(client_id, gain);
         }
@@ -1079,18 +1087,21 @@ impl EventActor {
         }
     }
 
-    /// A member spends CP on `index` of the Carnival window's tab `tab`.
-    /// Only mobs are sold yet. The CP is set aside while the battle field
-    /// brings the mob out, and given back if it can't (Cosmic
-    /// `MonsterCarnivalHandler`). Every request is answered, as the
-    /// client's window waits for it.
+    /// A member spends CP on `index` of the Carnival window's tab `tab`:
+    /// mobs or skills; guardians aren't sold yet. For a mob the CP is set
+    /// aside while the battle field brings it out, and given back if it
+    /// can't (Cosmic `MonsterCarnivalHandler`). Every request is answered,
+    /// as the client's window waits for it.
     fn carnival_spend(&mut self, client_id: ClientId, tab: u8, index: u8) {
         use net::carnival::SpendRefusal;
         let EventKind::Carnival(room) = self.kind else {
             return;
         };
-        if self.carnival_stage != net::carnival::Stage::Battle || tab != 0 {
+        if self.carnival_stage != net::carnival::Stage::Battle || tab > 1 {
             return self.refuse_spend(client_id, SpendRefusal::Failed);
+        }
+        if tab == 1 {
+            return self.carnival_skill(client_id, room, index);
         }
         let (Some(side), Some((mob_id, cost, cap))) = (
             self.carnival.side(client_id),
@@ -1158,6 +1169,111 @@ impl EventActor {
         self.carnival_summoned[index] = self.carnival_summoned[index].saturating_add(1);
         if let Some(standing) = self.carnival.standing(client_id) {
             self.tell_cp(client_id, standing);
+        }
+    }
+
+    /// A member spends CP on `index` of room `room`'s skill list: it falls
+    /// on the other side, and everyone on the battle field hears who cast
+    /// it (Cosmic `MonsterCarnivalHandler`).
+    fn carnival_skill(&mut self, client_id: ClientId, room: u8, index: u8) {
+        use net::carnival::SpendRefusal;
+        let (Some(side), Some(listed)) = (
+            self.carnival.side(client_id),
+            net::carnival::skill(room, index),
+        ) else {
+            return self.refuse_spend(client_id, SpendRefusal::NotEnoughCp);
+        };
+        let Some(skill) = net::carnival::cast(listed, rand::random()) else {
+            return self.refuse_spend(client_id, SpendRefusal::Failed);
+        };
+        let Some(standing) = self.carnival.spend(client_id, listed.cost) else {
+            return self.refuse_spend(client_id, SpendRefusal::NotEnoughCp);
+        };
+        self.cast_on_rivals(side, skill, true);
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::carnival::battle_map(room),
+            instance_id: self.id,
+        });
+        let announce = FieldMessage::CarnivalAnnounce {
+            summoner: client_id,
+            tab: 1,
+            index,
+        };
+        // With the field gone the window still hears its spend went.
+        let handle = self.members.get(&client_id).cloned();
+        let id = self.id;
+        tokio::spawn(async move {
+            if field.tx.send(announce).await.is_err() {
+                let message = build_carnival_message(net::carnival::SpendRefusal::Failed);
+                if let (Some(handle), Ok(packet)) = (handle, message) {
+                    let packets = vec![packet];
+                    handle.send(ServerMessage::EventPackets { id, packets });
+                }
+            }
+        });
+        self.tell_cp(client_id, standing);
+    }
+
+    /// A member picked up an item that casts Monster Carnival skill `id`
+    /// on the other side. It always takes hold, and nobody hears of it
+    /// (Cosmic `StatEffect`'s `nuffSkill`).
+    fn carnival_cast(&self, client_id: ClientId, id: i32) {
+        if self.carnival_stage != net::carnival::Stage::Battle {
+            return;
+        }
+        let skill = net::carnival::carnival_skill(id)
+            .and_then(|skill| net::carnival::cast(skill, rand::random()));
+        if let (Some(side), Some(skill)) = (self.carnival.side(client_id), skill) {
+            self.cast_on_rivals(side, skill, false);
+        }
+    }
+
+    /// Carnival skill `skill`, cast by side `side`, falls on one of the
+    /// other side's members at random, or on each of them, if it takes
+    /// hold (always, unless `rolled`). It works on those on the battle
+    /// field: a disease, or Cancel Buff's dispel.
+    fn cast_on_rivals(&self, side: u8, skill: CarnivalSkill, rolled: bool) {
+        let EventKind::Carnival(room) = self.kind else {
+            return;
+        };
+        if rolled && !net::carnival::takes_hold(skill.mob_skill, rand::random()) {
+            return;
+        }
+        let map_id = net::carnival::battle_map(room);
+        let rivals: Vec<ClientId> = self
+            .team
+            .members()
+            .iter()
+            .copied()
+            .filter(|member| {
+                self.carnival
+                    .side(*member)
+                    .is_some_and(|theirs| theirs != side)
+            })
+            .collect();
+        let struck = if skill.all {
+            rivals
+        } else {
+            let one = rand::random::<usize>() % rivals.len().max(1);
+            rivals.get(one).copied().into_iter().collect()
+        };
+        let dispel = matches!(
+            game::mob_skill::effect(skill.mob_skill, 0),
+            Some(game::mob_skill::MobSkillEffect::Dispel)
+        );
+        let disease = net::mobs::skill_level(skill.mob_skill, skill.level).and_then(|level| {
+            game::mob_skill::inflicted(skill.mob_skill, skill.level, level.x, level.duration)
+        });
+        for member in struck {
+            let Some(handle) = self.members.get(&member) else {
+                continue;
+            };
+            if dispel {
+                handle.send(ServerMessage::Dispelled { map_id });
+            } else if let Some(disease) = disease {
+                handle.send(ServerMessage::Diseased { disease, map_id });
+            }
         }
     }
 

@@ -9,9 +9,10 @@ Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
 
 Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
-clock, the sides' look, CP from kills, spending CP on mobs, and the exit
-room are in. Not yet: skills and guardians, CP lost on death and the
-revive room, results and their effects, and the client's Carnival UI.
+clock, the sides' look, CP from kills, spending CP on mobs and skills, the
+CP and skill items, and the exit room are in. Not yet: guardians, CP lost
+on death and the revive room, results and their effects, and the client's
+Carnival UI.
 
 ## Maps
 
@@ -73,8 +74,9 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
   side.
 - Spending CP (MONSTER_CARNIVAL, 0xDA, `MonsterCarnivalHandler`) names a
-  tab and a place in it. Only tab 0, the battle field's mob list
-  (`Carnival::mobs`, `net::carnival::summon`), is sold yet. The event
+  tab and a place in it. Tabs 0 and 1 are sold yet; guardians (tab 2)
+  answer code 5. Tab 0 is the battle field's mob list
+  (`Carnival::mobs`, `net::carnival::summon`). The event
   (`carnival_spend`) checks the stage and the price and sets the CP aside
   (`Score::spend`, which leaves the totals), then asks the battle field
   (`FieldMessage::CarnivalSummon`). The field brings the mob out for the
@@ -85,6 +87,23 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   tells the spender and their side their CP, or gives it back
   (`Score::refund`). Each mob summoned counts in MONSTER_CARNIVAL_START for
   those arriving later.
+- Tab 1 is the battle field's skill list (`Carnival::skills`), ids into
+  Skill.nx `MCSkill.img` (`SkillData::carnival_skills`,
+  `net::carnival::skill`): a price, a mob skill and its level, and whether
+  it reaches one of the other side (`target` 1) or all of it (2). The
+  event (`carnival_skill`) takes the CP and casts it on the other side's
+  members (`cast_on_rivals`): a disease (`ServerMessage::Diseased`), or
+  Cancel Buff's dispel, which works on those on the battle field. A
+  one-target skill picks among all of the other side. Darkness, Weakness,
+  Poison and Slow take hold 80% of the time, one roll a cast
+  (`takes_hold`). The two Random skills, 8 and 9, cast one of the others
+  that reach as many, at the Random's price (`net::carnival::cast`). The
+  battle field then tells everyone who cast it
+  (`FieldMessage::CarnivalAnnounce`), as only it knows the names.
+- Mobs drop items used on pickup (`ConsumeSpec::consume_on_pickup`): CP
+  (`cp`, 2022157-59) for the picker and their side, and skills
+  (`nuffSkill`, 2022164-66), which always take hold and nobody hears of
+  (`EventCommand::CarnivalCast`). Out of a battle they go and do nothing.
 - A member's side is on their ticket (`EventTicket::side`), and from there
   in their look (`FieldAvatar::team`, SPAWN_PLAYER's last byte).
 

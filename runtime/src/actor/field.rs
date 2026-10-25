@@ -568,6 +568,17 @@ impl FieldActor {
             } => {
                 let _ = reply.send(self.carnival_summon(summoner, index, mob_id, side, cap));
             }
+            FieldMessage::CarnivalAnnounce {
+                summoner,
+                tab,
+                index,
+            } => {
+                let name = self.occupants.get(&summoner).map(|o| o.avatar.name.clone());
+                if let Some(Ok(packet)) = name.map(|name| build_carnival_summon(tab, index, &name))
+                {
+                    self.broadcast(None, packet);
+                }
+            }
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     occupant.party = party;
