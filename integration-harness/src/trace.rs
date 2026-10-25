@@ -691,8 +691,7 @@ impl Trace {
             .contains(&op)
         {
             self.family.push((op, p.bytes[2..].to_vec()));
-        } else if (SendOpcode::CarnivalStart as i16..=SendOpcode::CarnivalMessage as i16)
-            .contains(&op)
+        } else if (SendOpcode::CarnivalStart as i16..=SendOpcode::CarnivalDied as i16).contains(&op)
         {
             self.carnival.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::MarriageRequest as i16

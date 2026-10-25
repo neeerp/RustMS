@@ -22,7 +22,7 @@ use net::conti::{self, Happening, State, Target};
 use net::loot::Loot;
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
-use net::packet::build::world::carnival::build_carnival_summon;
+use net::packet::build::world::carnival::{build_carnival_died, build_carnival_summon};
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
@@ -618,6 +618,12 @@ impl FieldActor {
                 let name = self.occupants.get(&summoner).map(|o| o.avatar.name.clone());
                 if let Some(Ok(packet)) = name.map(|name| build_carnival_summon(tab, index, &name))
                 {
+                    self.broadcast(None, packet);
+                }
+            }
+            FieldMessage::CarnivalDied { died, side, lost } => {
+                let name = self.occupants.get(&died).map(|o| o.avatar.name.clone());
+                if let Some(Ok(packet)) = name.map(|name| build_carnival_died(side, &name, lost)) {
                     self.broadcast(None, packet);
                 }
             }

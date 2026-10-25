@@ -722,6 +722,13 @@ pub enum FieldMessage {
         tab: u8,
         index: u8,
     },
+    /// `died` of side `side` died, which cost their side `lost` CP: everyone
+    /// on the Monster Carnival field hears of it.
+    CarnivalDied {
+        died: ClientId,
+        side: u8,
+        lost: u8,
+    },
     /// `summoner` spent CP on a `mob_id`, `index` of the Monster Carnival
     /// field's list, for their side `side`: whether it came out, or why
     /// not, such as `cap` of the side's summons already out.

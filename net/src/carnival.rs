@@ -52,6 +52,26 @@ pub fn battle_room(map_id: i32) -> Option<u8> {
     (1..=CARNIVAL_ROOMS).find(|&room| battle_map(room) == map_id)
 }
 
+/// Room `room`'s revive room, where its battle field's dead go back to
+/// life (the field's `returnMap`, fieldType 11).
+pub const fn revive_map(room: u8) -> i32 {
+    room_map(room) + 2
+}
+
+/// The room whose revive room `map_id` is.
+pub fn revive_room(map_id: i32) -> Option<u8> {
+    (1..=CARNIVAL_ROOMS).find(|&room| revive_map(room) == map_id)
+}
+
+/// The most CP a death on room `room`'s battle field costs (its
+/// `deathCP`).
+pub fn death_cp(room: u8) -> i32 {
+    crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(battle_map(room))?.carnival.as_ref())
+        .map_or(0, |rules| rules.death_cp.max(0))
+}
+
 /// How long room `room`'s battle lasts: its field's `timeDefault`,
 /// shortened like the events' time (`crate::events::scaled`).
 pub fn battle_length(room: u8) -> Duration {
@@ -353,6 +373,27 @@ impl Score {
         })
     }
 
+    /// `member` died, and loses up to `most` of their CP, as does their
+    /// side; the totals stay (Cosmic `playerDead`'s `gainCP(-losing)`).
+    /// The CP lost, and the points now. None for one not playing.
+    pub fn lose(&mut self, member: ClientId, most: i32) -> Option<(i32, Gain)> {
+        let side = self.side(member)?;
+        let mine = self.members.entry(member).or_default();
+        let lost = most.clamp(0, mine.cp.max(0));
+        mine.spend(lost);
+        let mine = *mine;
+        let ours = &mut self.teams[usize::from(side)];
+        ours.spend(lost);
+        Some((
+            lost,
+            Gain {
+                side,
+                mine,
+                ours: *ours,
+            },
+        ))
+    }
+
     /// `member` gets back `cp` they spent on what didn't come about.
     pub fn refund(&mut self, member: ClientId, cp: i32) {
         let Some(side) = self.side(member) else {
@@ -434,6 +475,29 @@ mod tests {
         assert_eq!(battle_room(CARNIVAL_LOBBY), None);
         assert_eq!(waiting_room(980000300), Some(3));
         assert_eq!(waiting_room(980000301), None);
+        assert_eq!(revive_map(4), 980000402);
+        assert_eq!(revive_room(980000602), Some(6));
+        assert_eq!(revive_room(980000601), None);
+        assert_eq!(death_cp(1), 10);
+    }
+
+    #[test]
+    fn a_death_costs_cp_the_member_has() {
+        let mut score = Score::default();
+        score.join(1, 0);
+        score.join(2, 0);
+        assert_eq!(score.lose(3, 10), None);
+        score.gain(1, 12);
+        score.gain(2, 4);
+        let (lost, gain) = score.lose(1, 10).unwrap();
+        assert_eq!(lost, 10);
+        assert_eq!(gain.mine, Points { cp: 2, total: 12 });
+        assert_eq!(gain.ours, Points { cp: 6, total: 16 });
+        // One with less loses what they have; one with none, nothing.
+        assert_eq!(score.lose(1, 10).unwrap().0, 2);
+        let (lost, gain) = score.lose(1, 10).unwrap();
+        assert_eq!(lost, 0);
+        assert_eq!(gain.ours, Points { cp: 4, total: 16 });
     }
 
     #[test]
