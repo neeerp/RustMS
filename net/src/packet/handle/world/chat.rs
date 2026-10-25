@@ -23,6 +23,9 @@ impl WorldHandler for AllChatHandler {
             return Ok(HandlerResult::empty());
         }
 
+        if let Some(actions) = crate::gm_commands::run(ctx, &msg) {
+            return Ok(HandlerResult { actions: actions? });
+        }
         // A GM's lines show on the white strip.
         let gm = ctx.player.gm_level > 0;
         // The client sends a '/' line only for a GM, as a command it does
@@ -79,6 +82,15 @@ mod tests {
     fn a_gms_lines_carry_the_gm_flag() {
         assert_eq!(gm_byte(0, "hi"), Some(0));
         assert_eq!(gm_byte(1, "hi"), Some(1));
+    }
+
+    #[test]
+    fn a_gms_bang_lines_are_commands_and_a_players_chat() {
+        assert_eq!(gm_byte(0, "!heal"), Some(0));
+        let actions = chat(1, "!heal");
+        assert!(!actions
+            .iter()
+            .any(|action| matches!(action, WorldAction::FieldChat(_))));
     }
 
     #[test]

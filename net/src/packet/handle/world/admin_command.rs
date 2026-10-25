@@ -36,8 +36,8 @@ impl WorldHandler for AdminCommandHandler {
 }
 
 /// Hide the GM from those who are not GMs, or show them again; tells the
-/// GM either way. Shared by the Hide skill and `/h`.
-pub(super) fn set_hidden(player: &mut game::Player, hidden: bool) -> WorldResult {
+/// GM either way. Shared by the Hide skill, `/h` and `!hide`.
+pub fn set_hidden(player: &mut game::Player, hidden: bool) -> WorldResult {
     let changed = player.hidden != hidden;
     player.hidden = hidden;
     let result = HandlerResult::reply(skill::build_hidden(hidden)?)

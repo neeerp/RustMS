@@ -159,7 +159,36 @@ The login result carries two grade bytes, which v83 keeps for the session
   with an MWLB account.") and its 0x20 and 0x40 only rank a GM the grade
   already ranks.
 
-`gm_level` is set by SQL only, as `test_admin` is.
+`gm_level` is set by SQL only, as `test_admin` is:
+`UPDATE accounts SET gm_level = 2 WHERE user_name = '...'`, then log in
+again.
+
+### Chat commands
+
+A chat line starting with `!` is a GM's command and one starting with `@`
+is anyone's (`net::gm_commands`, run from `AllChatHandler` before chat).
+v83 has neither, so the commands and their text are ours. A command needs a
+tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
+
+| Tier | Commands |
+|---|---|
+| 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
+| 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!notice <text>` |
+| 3, admin | none yet |
+
+- A GM's `!` line never reaches the map. A player's `!` line is ordinary
+  chat, as is an `@` line that names no command (`@_@`). A command the sender may not run gets the same "Unknown command"
+  line as one that doesn't exist.
+- Replies are pink lines in the sender's chat.
+- `!warp` and `!heal` refuse the dead, who revive through the client.
+- `!level` and `!job` set only the level or job. Others see the level-up or
+  job-change effect (`WorldAction::AvatarChanged`). `!exp` gains EXP as a
+  kill does.
+- Every `!` line from a GM is logged at info under the `gm_audit` target,
+  with the character, the line, and whether it ran. The world server always
+  shows that target.
+- `RUSTMS_GM_COMMANDS=0` turns every command off, so each line is chat.
 
 ## Packet encoding
 
