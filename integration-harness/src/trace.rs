@@ -213,6 +213,9 @@ pub struct Trace {
     /// Every Coconut Season packet (FIELD_SPECIFIC_DATA, COCONUT_HIT and
     /// COCONUT_SCORE): (opcode, body), in order.
     pub coconut: Vec<(i16, Vec<u8>)>,
+    /// Every Snowball packet (SNOWBALL_STATE to LEFT_KNOCK_BACK): (opcode,
+    /// body), in order.
+    pub snowball: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST, MARRIAGE_RESULT and WEDDING_GIFT_RESULT:
     /// (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
@@ -703,6 +706,10 @@ impl Trace {
             || op == SendOpcode::CoconutScore as i16
         {
             self.coconut.push((op, p.bytes[2..].to_vec()));
+        } else if (SendOpcode::SnowballState as i16..=SendOpcode::LeftKnockBack as i16)
+            .contains(&op)
+        {
+            self.snowball.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::MarriageRequest as i16
             || op == SendOpcode::MarriageResult as i16
             || op == SendOpcode::WeddingGiftResult as i16

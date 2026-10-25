@@ -231,6 +231,12 @@ pub enum SendOpcode {
     HitReactor = 0x115,
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
+    /// A Snowball field's balls and snowmen (b168).
+    SnowballState = 0x119,
+    HitSnowball = 0x11A,
+    SnowballMessage = 0x11B,
+    /// A ball pushes the player back (b168).
+    LeftKnockBack = 0x11C,
     /// A Coconut Season nut shows, shakes, bursts or falls (b167).
     CoconutHit = 0x11D,
     CoconutScore = 0x11E,
