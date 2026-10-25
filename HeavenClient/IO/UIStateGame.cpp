@@ -881,6 +881,7 @@ namespace ms
 					UIElement::Type::ENERGYBAR,
 					UIElement::Type::DOJOHUD,
 					UIElement::Type::MONSTERCARNIVAL,
+					UIElement::Type::COCONUT,
 					UIElement::Type::AVATARMEGAPHONE,
 					UIElement::Type::PARTYSEARCHICON
 			};

@@ -73,6 +73,9 @@ namespace ms
 		// The box of the trap's current frame on the map (v83 FUN_00642264), or false when the frame has none.
 		bool obstacle_box(obstacle::Box &out) const;
 
+		// The box of its current frame on the map, which a coconut is hit by (v83 FUN_00642e87).
+		Rectangle<int16_t> get_box() const;
+
 		// The push of the trap, where it has a direction.
 		obstacle::Vec get_push() const;
 

@@ -311,6 +311,10 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(carnival_tests tests/carnival.cpp Character/Carnival.cpp Net/InPacket.cpp)
     target_include_directories(carnival_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME carnival COMMAND carnival_tests)
+
+    add_executable(coconut_tests tests/coconut.cpp Character/Coconut.cpp Net/InPacket.cpp)
+    target_include_directories(coconut_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME coconut COMMAND coconut_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -583,6 +587,8 @@ add_executable(HeavenClient
     Character/RpsGame.h
     Character/Carnival.cpp
     Character/Carnival.h
+    Character/Coconut.cpp
+    Character/Coconut.h
     Character/Family.cpp
     Character/Marriage.cpp
     Character/Family.h
@@ -1040,6 +1046,8 @@ add_executable(HeavenClient
     IO/UITypes/UIMonsterBook.h
     IO/UITypes/UIMonsterCarnival.cpp
     IO/UITypes/UIMonsterCarnival.h
+    IO/UITypes/UICoconut.cpp
+    IO/UITypes/UICoconut.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
     IO/UITypes/SkillMacroLayout.h
@@ -1148,6 +1156,8 @@ add_executable(HeavenClient
     Net/Handlers/GuildHandlers.h
     Net/Handlers/CarnivalHandlers.cpp
     Net/Handlers/CarnivalHandlers.h
+    Net/Handlers/CoconutHandlers.cpp
+    Net/Handlers/CoconutHandlers.h
     Net/Handlers/FamilyHandlers.cpp
     Net/Handlers/FamilyHandlers.h
     Net/Handlers/MarriageHandlers.cpp

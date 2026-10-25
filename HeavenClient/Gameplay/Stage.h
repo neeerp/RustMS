@@ -54,6 +54,7 @@
 #include "MapleMap/MapWedding.h"
 #include "Physics/Physics.h"
 
+#include "../Character/Coconut.h"
 #include "../Character/Player.h"
 #include "../Graphics/EffectLayer.h"
 #include "../IO/KeyType.h"
@@ -211,6 +212,9 @@ namespace ms
 
 		// Show a named map obj, such as a party quest's gate, in `state`, or in its current one again for -1.
 		void set_object_state(const std::string &name, int32_t state);
+
+		// The box of each of Coconut Season's nuts, by index; empty where the field has no such nut.
+		std::vector<coconut::Box> coconut_boxes() const;
 
 		// Put every named trap back in its first state.
 		void reset_obstacles();

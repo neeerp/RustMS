@@ -75,6 +75,13 @@ namespace ms
 		return nullptr;
 	}
 
+	void TilesObjs::add_boxes(std::unordered_map<std::string, Rectangle<int16_t>> &boxes) const
+	{
+		for (auto &iter : objs)
+			if (!iter.second.get_name().empty())
+				boxes.emplace(iter.second.get_name(), iter.second.get_box());
+	}
+
 	void TilesObjs::reset_obstacles(Point<int16_t> listener)
 	{
 		for (auto &iter : objs)
@@ -136,6 +143,16 @@ namespace ms
 				return obj->set_state(state, listener);
 
 		return false;
+	}
+
+	std::unordered_map<std::string, Rectangle<int16_t>> MapTilesObjs::named_boxes() const
+	{
+		std::unordered_map<std::string, Rectangle<int16_t>> boxes;
+
+		for (auto iter : layers)
+			iter.second.add_boxes(boxes);
+
+		return boxes;
 	}
 
 	void MapTilesObjs::reset_obstacles(Point<int16_t> listener)

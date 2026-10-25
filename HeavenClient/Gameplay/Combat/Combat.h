@@ -332,9 +332,30 @@ namespace ms
 
 		void draw_rains(double viewx, double viewy, float alpha) const;
 
+		// A basic swing at what isn't a mob (FUN_0095719b): its stance and
+		// what it reaches.
+		struct Swing
+		{
+			bool degenerate;
+			Stance::Id stance;
+			Attack attack;
+			Rectangle<int16_t> range;
+		};
+
+		// The swing the player can take now, or nothing.
+		std::optional<Swing> aim_swing();
+
+		// Takes it, telling the server of an attack on no mob.
+		void take_swing(const Swing &swing);
+
 		// Swing a basic attack at a reactor in reach instead, if there is
 		// one. Returns whether it did.
 		bool swing_at_reactor();
+
+		// On Coconut Season's field a basic attack swings whatever is in
+		// reach, and tells the server of the first nut it hits
+		// (FUN_00549902).
+		void swing_at_coconuts();
 
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is

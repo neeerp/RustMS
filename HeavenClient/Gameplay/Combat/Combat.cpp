@@ -1132,6 +1132,15 @@ namespace ms
 				healed = request_heal();
 			}
 
+			// Coconut Season's field takes a basic attack whatever it hits
+			// (its attack hook, A 94e30c).
+			if (!move.is_skill() && coconut::on_field())
+			{
+				swing_at_coconuts();
+
+				return true;
+			}
+
 			if (!move.is_skill() && swing_at_reactor())
 				return true;
 
@@ -1668,14 +1677,12 @@ namespace ms
 		Stage::get().dash(*spot);
 	}
 
-	bool Combat::swing_at_reactor()
+	std::optional<Combat::Swing> Combat::aim_swing()
 	{
-		// v83 swings a basic attack at a reactor in reach instead of the
-		// mobs, at one reactor at most, and sends the swing with no mobs
-		// (FUN_007356c7, FUN_0095719b). It waits as an item use does; here
-		// only the reactor swing waits, not the whole attack.
+		// It waits as an item use does; here only these swings wait, not
+		// the whole attack.
 		if (!player.can_request(ExclRequest::USE_WAIT))
-			return false;
+			return std::nullopt;
 
 		Weapon::Type weapon = player.get_stats().get_weapontype();
 		bool degenerate =
@@ -1683,7 +1690,7 @@ namespace ms
 		Stance::Id stance = player.get_look().get_attackstance(degenerate);
 
 		if (stance == Stance::Id::NONE)
-			return false;
+			return std::nullopt;
 
 		Rectangle<int16_t> reach = player.get_afterimage_range(stance);
 
@@ -1692,6 +1699,35 @@ namespace ms
 
 		Attack attack = player.prepare_attack(0, degenerate);
 		Rectangle<int16_t> range = place_range(attack.origin, reach, 1.0f, attack.toleft);
+
+		return Swing{ degenerate, stance, attack, range };
+	}
+
+	void Combat::take_swing(const Swing &swing)
+	{
+		player.attack(swing.degenerate, swing.stance);
+		player.set_afterimage(0);
+
+		Attack attack = swing.attack;
+		regularattack.apply_stats(player, attack);
+
+		AttackResult result = attack;
+		result.attacker = player.get_oid();
+		AttackPacket(result, player.get_position()).dispatch();
+	}
+
+	bool Combat::swing_at_reactor()
+	{
+		// v83 swings a basic attack at a reactor in reach instead of the
+		// mobs, at one reactor at most, and sends the swing with no mobs
+		// (FUN_007356c7, FUN_0095719b).
+		std::optional<Swing> swing = aim_swing();
+
+		if (!swing)
+			return false;
+
+		const Attack &attack = swing->attack;
+		const Rectangle<int16_t> &range = swing->range;
 
 		// The reactors in the order they entered the map.
 		MapObjects *objs = reactors.get_reactors();
@@ -1714,13 +1750,7 @@ namespace ms
 		if (index < 0)
 			return false;
 
-		player.attack(degenerate, stance);
-		player.set_afterimage(0);
-		regularattack.apply_stats(player, attack);
-
-		AttackResult result = attack;
-		result.attacker = player.get_oid();
-		AttackPacket(result, player.get_position()).dispatch();
+		take_swing(*swing);
 
 		// The hit lands as the swing does.
 		int32_t flags = reactor_rules::flags(attack.toleft, player.get_phobj().onground);
@@ -1731,6 +1761,24 @@ namespace ms
 		DamageReactorPacket(reactor->get_oid(), 0, flags, static_cast<int16_t>(delay), 0).dispatch();
 
 		return true;
+	}
+
+	void Combat::swing_at_coconuts()
+	{
+		// Unlike at a reactor, the swing is taken whether or not it hits.
+		std::optional<Swing> swing = aim_swing();
+
+		if (!swing)
+			return;
+
+		const Rectangle<int16_t> &range = swing->range;
+		int16_t index = coconut::first_hit(Stage::get().coconut_boxes(),
+										   { range.left(), range.top(), range.right(), range.bottom() });
+
+		take_swing(*swing);
+
+		if (index >= 0)
+			CoconutPacket(index, player.get_attackdelay(0)).dispatch();
 	}
 
 	Stance::Id Combat::find_whack(const Attack &attack, int16_t &reach) const

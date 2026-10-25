@@ -29,6 +29,7 @@
 #include <map>
 #include <functional>
 #include <optional>
+#include <unordered_map>
 
 namespace ms
 {
@@ -49,6 +50,9 @@ namespace ms
 
 		// The obj with this name, or null.
 		Obj *find(const std::string &name);
+
+		// Adds the box of each named obj, by its name.
+		void add_boxes(std::unordered_map<std::string, Rectangle<int16_t>> &boxes) const;
 
 		// Puts every named trap back in its first state.
 		void reset_obstacles(Point<int16_t> listener);
@@ -79,6 +83,9 @@ namespace ms
 		// Show the named obj in `state`, or in its current one again for -1 (FUN_00642aca). False if there's no
 		// such obj or state. Names are unique in each map.
 		bool set_state(const std::string &name, int32_t state, Point<int16_t> listener);
+
+		// The box of each named obj, by its name.
+		std::unordered_map<std::string, Rectangle<int16_t>> named_boxes() const;
 
 		// Puts every named trap back in its first state (FIELD_OBSTACLE_ALL_RESET 0x8D).
 		void reset_obstacles(Point<int16_t> listener);
