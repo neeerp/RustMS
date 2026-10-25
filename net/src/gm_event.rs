@@ -121,11 +121,12 @@ const fn ola(maps: &'static [i32]) -> TimedEvent {
     }
 }
 
-/// Ola Ola's variants 2 to 5 (FieldSets `Event2` to `Event5`): three
-/// levels each, the first also where players wait, on to 109050000 in
-/// 360 s. Variant 1 (109030001-003) has scripted portals and isn't here
-/// yet.
-pub const OLA: [TimedEvent; 4] = [
+/// Ola Ola's five variants (FieldSets `Event1` to `Event5`): three levels
+/// each, the first also where players wait, on to [`WON_MAP`] in 360 s.
+/// Variant 1's levels end in a row of `rand_ola` portals
+/// (`scripts::rand_ola`); the others' lead on by Map.nx.
+pub const OLA: [TimedEvent; 5] = [
+    ola(&[109_030_001, 109_030_002, 109_030_003]),
     ola(&[109_030_101, 109_030_102, 109_030_103]),
     ola(&[109_030_201, 109_030_202, 109_030_203]),
     ola(&[109_030_301, 109_030_302, 109_030_303]),
@@ -152,6 +153,10 @@ pub fn is_gate(map_id: i32, portal: &str) -> bool {
 /// Where those still inside a timed event go when its time is up: its
 /// maps' return map.
 pub const EXIT_MAP: i32 = 109_050_001;
+
+/// Where a timed event's winners come out, as Ola Ola's last portals
+/// lead.
+pub const WON_MAP: i32 = 109_050_000;
 
 /// The OX Quiz's questions (`Etc.nx`), loaded on first use.
 pub fn ox_quiz() -> Option<&'static OxQuiz> {
@@ -199,7 +204,13 @@ mod tests {
 
     #[test]
     fn each_ola_variant_runs_on_its_three_levels_and_its_gate_is_on_the_first() {
-        for first in [109_030_101, 109_030_201, 109_030_301, 109_030_401] {
+        for first in [
+            109_030_001,
+            109_030_101,
+            109_030_201,
+            109_030_301,
+            109_030_401,
+        ] {
             for level in first..first + 3 {
                 let event = timed_event(level).unwrap();
                 assert_eq!(event.maps, [first, first + 1, first + 2]);
@@ -208,8 +219,6 @@ mod tests {
             assert!(is_gate(first, "join00"));
             assert!(!is_gate(first + 1, "join00"));
         }
-        // Variant 1's scripted portals aren't done.
-        assert!(timed_event(109_030_001).is_none());
         assert_eq!(OLA[0].end(), Duration::from_secs(361));
         assert!(OLA_NOTICES.windows(2).all(|w| w[0].0 < w[1].0));
         assert!(OLA_NOTICES.iter().all(|(at, _)| *at < OLA[0].length));

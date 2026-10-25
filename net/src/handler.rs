@@ -745,6 +745,7 @@ impl GmEntry {
             "/fitness1" | "/fitness2" | "/fitness3" | "/fitness4" => 109_040_000,
             // The first digit is the variant (report b172); what the second
             // means isn't known, so each opens the variant's first level.
+            "/ola10" | "/ola11" | "/ola12" => 109_030_001,
             "/ola20" | "/ola21" | "/ola22" => 109_030_101,
             "/ola30" | "/ola31" | "/ola32" => 109_030_201,
             "/ola40" | "/ola41" | "/ola42" => 109_030_301,

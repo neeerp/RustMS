@@ -1,10 +1,12 @@
-//! Ola Ola's variant 2 (report b172): a GM's `/ola21` opens it, Paul takes
+//! Ola Ola (report b172). Variant 2: a GM's `/ola21` opens it, Paul takes
 //! players to its first level, and its gate (`join00`) stays closed until
 //! the GM's `/start`. Then a player goes through the gate and the right
 //! portal on each of the three levels to 109050000, and stays there when
 //! the time is up, while one who stayed on the first level goes out to
-//! 109050001. Pietro there gives the winner the Scroll of Secrets. The harness runs events 60 times as fast
-//! (`RUSTMS_EVENT_SCALE`), so its 360 s are 6.
+//! 109050001. Pietro there gives the winner the Scroll of Secrets.
+//! Variant 1 (`/ola11`): of each level's `rand_ola` portals one leads on
+//! and the rest back to the level's start. The harness runs events 60
+//! times as fast (`RUSTMS_EVENT_SCALE`), so their 360 s are 6.
 
 use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
@@ -33,6 +35,19 @@ const EXIT: i32 = 109_050_001;
 const START: u8 = 13;
 const NOTICE: u8 = 0;
 const CLOSED: (i16, u8) = (SendOpcode::BlockedMap as i16, 1);
+
+/// The tests share the channel's one event, so they take turns.
+static EVENT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Going through a scripted portal.
+fn touch(portal: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_str_with_length(portal).unwrap();
+    p.write_short(0).unwrap();
+    p
+}
 
 /// Talking to `npc` on `map`.
 fn talk_to(map: i32, npc: i32) -> Packet {
@@ -64,6 +79,7 @@ async fn gate(c: &mut MapleTestConnection, m: &str) -> Trace {
 
 #[tokio::test]
 async fn the_gate_opens_at_the_start_and_the_right_portals_lead_out_of_the_third_level() {
+    let _turn = EVENT.lock().await;
     let paul = talk_to(SOUTHPERRY, PAUL);
     let config = load_harness_config_or_fail().await;
     login_to_world_session(&config).await.expect("GM login");
@@ -156,6 +172,68 @@ async fn the_gate_opens_at_the_start_and_the_right_portals_lead_out_of_the_third
     assert_eq!(warp(g, LEVEL_1, "", &mut gt).await, LEVEL_1);
     let t = gate(g, "closed again").await;
     assert_eq!(t.blocked, [CLOSED]);
+    send(g, build_all_chat("/endevent", 0).unwrap()).await;
+    barrier(g, "closed", &mut gt).await;
+}
+
+#[tokio::test]
+async fn one_of_each_rand_ola_level_s_portals_leads_on_and_the_rest_back() {
+    let _turn = EVENT.lock().await;
+    const LEVELS: [(i32, u8, usize); 3] = [
+        (109_030_001, 13, 5),
+        (109_030_002, 1, 8),
+        (109_030_003, 1, 16),
+    ];
+    let paul = talk_to(SOUTHPERRY, PAUL);
+    let config = load_harness_config_or_fail().await;
+    login_to_world_session(&config).await.expect("GM login");
+    let player = load_harness_config_or_fail().await;
+    login_to_world_session(&player).await.expect("player login");
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&config.username, 1).await.expect("make a GM");
+
+    let mut gm = relogin(&config).await;
+    let g = &mut gm.connection;
+    let mut gt = Trace::default();
+    send(g, build_all_chat("/ola11", 0).unwrap()).await;
+    barrier(g, "opened", &mut gt).await;
+
+    let mut session = relogin(&player).await;
+    let (c, m) = (&mut session.connection, player.character_name.as_str());
+    let mut t = Trace::default();
+    assert_eq!(warp(c, SOUTHPERRY, "", &mut t).await, SOUTHPERRY);
+    barrier(c, m, &mut t).await;
+    step(c, m, paul).await;
+    let t = step(c, m, answer(4, 1, Some(1))).await;
+    assert_eq!(t.warps, [LEVELS[0].0], "in");
+
+    assert_eq!(warp(g, LEVELS[0].0, "", &mut gt).await, LEVELS[0].0);
+    barrier(g, "on level 1", &mut gt).await;
+    send(g, build_all_chat("/start", 0).unwrap()).await;
+    let mut t = Trace::default();
+    until(c, &mut t, |t| !t.countdowns.is_empty()).await;
+    let t = gate(c, m).await;
+    assert_eq!(t.warps, [LEVELS[0].0], "through the gate");
+
+    // Try each level's portals in turn until one leads on.
+    for (level, &(map_id, start, ways)) in LEVELS.iter().enumerate() {
+        let next = LEVELS
+            .get(level + 1)
+            .map_or((WON, 2), |&(map, start, _)| (map, start));
+        let mut on = None;
+        for way in 0..ways {
+            let t = step(c, m, touch(&format!("ch{way:02}"))).await;
+            assert_eq!(t.arrivals.len(), 1, "level {level} ch{way:02}");
+            let arrival = (t.arrivals[0].0, t.arrivals[0].1);
+            if arrival == next {
+                on = Some(way);
+                break;
+            }
+            assert_eq!(arrival, (map_id, start), "back to the start");
+        }
+        assert!(on.is_some(), "a way on from level {level}");
+    }
+
     send(g, build_all_chat("/endevent", 0).unwrap()).await;
     barrier(g, "closed", &mut gt).await;
 }

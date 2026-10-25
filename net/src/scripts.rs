@@ -2110,6 +2110,39 @@ pub fn papulatus_portal(entry: crate::events::Entry) -> Vec<Effect> {
     }
 }
 
+/// The portals along the top of each level of Ola Ola's variant 1.
+pub const RAND_OLA: &str = "rand_ola";
+
+/// Where `portal`, one of the `rand_ola` portals on `map_id`, takes a
+/// player: one of a level's portals leads on to the next level's start, or
+/// out to [`gm_event::WON_MAP`] from the last, and the rest back to this
+/// level's start. Which one leads on is the same for a player all session,
+/// `seed` being theirs, and differs from level to level (QUESTIONS b172
+/// #5). `None` off Ola Ola's maps.
+pub fn rand_ola(map_id: i32, portal: &str, seed: u64) -> Option<Vec<Effect>> {
+    use std::hash::{Hash, Hasher};
+    let maps = crate::gm_event::timed_event(map_id)?.maps;
+    let level = maps.iter().position(|map| *map == map_id)?;
+    let field = crate::game_data::get().ok()?.field(map_id)?;
+    let ways: Vec<&str> = field
+        .portals()
+        .filter(|portal| portal.script.as_deref() == Some(RAND_OLA))
+        .map(|portal| portal.name.as_str())
+        .collect();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (seed, map_id).hash(&mut hasher);
+    let on = *ways.get(usize::try_from(hasher.finish() % ways.len().max(1) as u64).ok()?)?;
+    let to = match maps.get(level + 1) {
+        _ if portal != on => map_id,
+        Some(next) => *next,
+        None => crate::gm_event::WON_MAP,
+    };
+    Some(vec![
+        Effect::PortalSound,
+        Effect::WarpToPortal(to, named(to, "start00")),
+    ])
+}
+
 /// The id of `map_id`'s portal called `name`, else 0.
 pub fn named(map_id: i32, name: &str) -> u8 {
     portal_id(map_id, |portal| portal.name == name)
@@ -3853,5 +3886,34 @@ mod tests {
             portal("dojang_exit", &player).unwrap().effects,
             out(250000000)
         );
+    }
+
+    #[test]
+    fn one_rand_ola_portal_a_level_leads_on_and_the_rest_back() {
+        if crate::get_game_data().is_err() {
+            return;
+        }
+        let warp = |to, start| Some(vec![Effect::PortalSound, Effect::WarpToPortal(to, start)]);
+        let mut picks = std::collections::HashSet::new();
+        for seed in 0..20 {
+            for (map_id, start, ways, next) in [
+                (109_030_001, 13, 5, (109_030_002, 1)),
+                (109_030_002, 1, 8, (109_030_003, 1)),
+                (109_030_003, 1, 16, (crate::gm_event::WON_MAP, 2)),
+            ] {
+                let names = (0..ways).map(|n| format!("ch{n:02}"));
+                let on: Vec<_> = names
+                    .filter(|name| rand_ola(map_id, name, seed) == warp(next.0, next.1))
+                    .collect();
+                assert_eq!(on.len(), 1, "{map_id} {seed}");
+                let back = format!("ch{:02}", (on[0][2..].parse::<u8>().unwrap() + 1) % ways);
+                assert_eq!(rand_ola(map_id, &back, seed), warp(map_id, start));
+                assert_eq!(rand_ola(map_id, &on[0], seed), warp(next.0, next.1));
+                picks.insert((map_id, on[0].clone()));
+            }
+        }
+        // The portal that leads on isn't the same for everyone.
+        assert!(picks.len() > 3);
+        assert_eq!(rand_ola(109_040_000, "ch00", 0), None);
     }
 }
