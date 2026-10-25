@@ -1919,6 +1919,11 @@ pub mod keys {
     pub const PYRAMID_DUARTE_FORFEIT_ASK: &str = "pyramid.duarte.forfeit_ask";
     pub const PYRAMID_DUARTE_RESULT_ASK: &str = "pyramid.duarte.result_ask";
     pub const PYRAMID_DUARTE_SHADES_ASK: &str = "pyramid.duarte.shades_ask";
+    pub const PYRAMID_DUARTE_MEDAL: &str = "pyramid.duarte.medal";
+    pub const PYRAMID_DUARTE_MEDAL_HAVE: &str = "pyramid.duarte.medal_have";
+    pub const PYRAMID_DUARTE_MEDAL_MORE: &str = "pyramid.duarte.medal_more";
+    pub const PYRAMID_DUARTE_MEDAL_ROOM: &str = "pyramid.duarte.medal_room";
+    pub const PYRAMID_DUARTE_MEDAL_GIVEN: &str = "pyramid.duarte.medal_given";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3005,6 +3010,11 @@ mod tests {
                 keys::PYRAMID_DUARTE_FORFEIT_ASK,
                 keys::PYRAMID_DUARTE_RESULT_ASK,
                 keys::PYRAMID_DUARTE_SHADES_ASK,
+                keys::PYRAMID_DUARTE_MEDAL,
+                keys::PYRAMID_DUARTE_MEDAL_HAVE,
+                keys::PYRAMID_DUARTE_MEDAL_MORE,
+                keys::PYRAMID_DUARTE_MEDAL_ROOM,
+                keys::PYRAMID_DUARTE_MEDAL_GIVEN,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

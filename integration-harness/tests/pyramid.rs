@@ -93,8 +93,9 @@ async fn kills_and_misses_are_counted_and_enough_misses_end_the_run() {
     let mobs: Vec<i32> = seen.field.mobs.iter().map(|&(id, _)| id).collect();
 
     // Rage of Pharaoh needs a use, and the run has given none yet. A kill
-    // counts. It puts back Hell's 1 once the gauge has lost anything, a
-    // second into the stage, and nothing before.
+    // counts, toward the run and toward Protector of Pharaoh's 7760. It puts
+    // back Hell's 1 once the gauge has lost anything, a second into the
+    // stage, and nothing before.
     send(
         &mut player.connection,
         skill_attack(RAGE_OF_PHARAOH, mobs[16], 1),
@@ -106,6 +107,7 @@ async fn kills_and_misses_are_counted_and_enough_misses_end_the_run() {
     })
     .await;
     assert!(!seen.field.killed.contains(&mobs[16]));
+    assert_eq!(seen.kills.get(&7760).map(String::as_str), Some("1"));
     let after_kill = seen.pyramid_gauges[1];
     assert!((0..=1).contains(&after_kill), "{:?}", seen.pyramid_gauges);
 

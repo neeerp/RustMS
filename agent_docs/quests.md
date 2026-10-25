@@ -337,6 +337,7 @@ Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
 | 6370 How to Improve Your Strength (Outlaw) | 6371 to "2" | Kyrin past the test room 912010100 |
 | 6363 A New Revelation | 6364 to "2" | the past Papulatus (2043000) sending the Buccaneer back from 922020300 |
 | 6410 Mission Free the Monsters | 6411 to "p2" | the way out of Save Delli! (925010300) once Willi is saved |
+| 29932 Protector of Pharaoh | 7760, a count | each of the player's own kills and cool kills in Nett's Pyramid; Duarte (2103013) gives medal 1142142 at 50000 |
 
 Lord Jonathan (1092019, in the Navigation Room 120000102) asks a Corsair on
 6400 without the record whether to take his test, then sends them into the
