@@ -8,7 +8,8 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 
 Status: the map and mob data, the packet builders, the run's entry, stages
 and clocks, its tally and gauge, its blessings and uses of Rage of Pharaoh,
-and its score are in. The Tomb and the medal are still to come.
+its score, and Duarte's medal are in. The Shades' gems and the Tomb are
+still to come.
 
 ## Maps
 
@@ -41,8 +42,8 @@ mode on a channel, as many as the maps have copies.
   only Hell is open. A party run needs its leader and one or more others,
   all at the mode's levels, in the lobby; the others stay behind. He asks
   the directory about all eight runs before he speaks
-  (`ClientActor::talk_to_duarte`). Cosmic's Find a Party, the Tomb and the
-  medal are not offered yet.
+  (`ClientActor::talk_to_duarte`). The fourth choice is the medal (below).
+  Cosmic's Find a Party and the Tomb are not offered yet.
 - The first stage lasts 2 minutes (the event's `minutes`), the others 3
   (`PYRAMID_STAGE_TIME`; Cosmic `Pyramid.timer`). When a stage's clock
   runs out the event actor moves everyone on to the next one, with the new
@@ -126,8 +127,20 @@ mode on a channel, as many as the maps have copies.
   each member after `EventEnded` (`ServerMessage::PyramidScore`). A
   member that the end took to the result map gets PYRAMID_SCORE and the
   EXP, without the server's rates, as Cosmic's `gainExp` does.
-- Quest 29932 (Protector of Pharaoh), which counts the run's kills toward
-  Duarte's medal, isn't kept yet.
+
+## Protector of Pharaoh (quest 29932)
+
+- Dalair (9000066) starts 29932 from level 40 and ends it when record 7760
+  is 50000 or more (`RECORD_QUESTS`). The quest's own Act gives nothing.
+- Every kill and cool kill a player makes in a run adds to their own 7760
+  (`ClientActor::count_protector_kills`, before the run hears of it), saved
+  with the player and sent as a quest record. Misses don't count, and the
+  count goes on after 50000.
+- Duarte's fourth choice gives the medal, 1142142
+  (`npc_scripts::duarte_medal`): not to a player who holds or wears it, nor
+  under 50000 (he says how many are left), nor with a full Equip bag.
+  Giving it ends 29932 too for a player on it. The words are placeholders
+  (`pyramid.duarte.medal*`).
 
 ## Stage rules (`FieldTemplate::massacre`)
 

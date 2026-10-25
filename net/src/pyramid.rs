@@ -2,6 +2,7 @@
 //! gauge they keep up on each stage (`agent_docs/pyramid.md`; Cosmic
 //! `Pyramid.java`).
 
+use game::Player;
 use game_data::mobs::MobInfo;
 use game_data::{CountEffect, Massacre};
 
@@ -12,6 +13,20 @@ pub const MISS: &str = "massacre_miss";
 pub const COOL: &str = "massacre_cool";
 /// Uses of Rage of Pharaoh left; the client allows 1020 only above 0.
 pub const SKILL: &str = "massacre_skill";
+
+/// Protector of Pharaoh (29932): Dalair's medal quest for 50,000 kills in
+/// the Pyramid. Record 7760 counts each player's own kills and cool kills
+/// (`Check/1 infoNumber`), and Duarte gives the medal (`QuestInfo` 1; the
+/// quest's `Act/1` gives nothing).
+pub const PROTECTOR_QUEST: i16 = 29932;
+pub const PROTECTOR_KILLS: i16 = 7760;
+pub const PROTECTOR_NEEDED: i32 = 50_000;
+pub const PROTECTOR_MEDAL: i32 = 1142142;
+
+/// The player's kills counted toward Protector of Pharaoh.
+pub fn protector_kills(player: &Player) -> i32 {
+    (player.quests.info(PROTECTOR_KILLS)).map_or(0, |count| count.parse().unwrap_or(0))
+}
 
 /// What one attack did to a stage's mobs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

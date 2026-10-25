@@ -25,6 +25,7 @@ use net::packet::build::world::field::{
     build_dojo_energy, build_dojo_warp_up, build_pyramid_score,
 };
 use net::packet::build::world::inventory::build_inventory_operation;
+use net::packet::build::world::quest::build_quest_record;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
 use net::ClientId;
@@ -809,6 +810,28 @@ impl ClientActor {
             self.in_game_mut()?.player.pyramid_rage = left;
         }
         Ok(())
+    }
+
+    /// The player's own kills and cool kills on a Nett's Pyramid stage
+    /// count toward Protector of Pharaoh (record 7760), whether or not its
+    /// quest has started.
+    pub(super) async fn count_protector_kills(
+        &mut self,
+        hits: net::pyramid::Hits,
+    ) -> Result<(), RuntimeError> {
+        let kills = i32::from(hits.kills) + i32::from(hits.cools);
+        if kills == 0 || self.game.is_none() {
+            return Ok(());
+        }
+        let player = &mut self.in_game_mut()?.player;
+        let count = net::pyramid::protector_kills(player).saturating_add(kills);
+        let count = count.to_string();
+        player
+            .quests
+            .set_record(net::pyramid::PROTECTOR_KILLS, &count);
+        player.mark_dirty();
+        let mut packet = build_quest_record(net::pyramid::PROTECTOR_KILLS, &count)?;
+        self.send(&mut packet).await
     }
 
     /// A Nett's Pyramid run ended with `rank` and `exp`: a player its end

@@ -96,6 +96,7 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
     (6370, 6371),
     (6400, 6401),
     (6410, 6411),
+    (29932, 7760),
 ];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
@@ -1083,6 +1084,16 @@ mod tests {
         let delli = catalog.quest(6410).unwrap();
         assert_eq!(delli.end_info_record, Some(6411));
         assert_eq!(delli.end_info[0].value, "p2");
+        // Protector of Pharaoh's count of Pyramid kills, at least 50,000.
+        let pharaoh = catalog.quest(29932).unwrap();
+        assert_eq!(pharaoh.end_info_record, Some(7760));
+        assert_eq!(
+            pharaoh.end_info,
+            [InfoCheck {
+                cond: 1,
+                value: "50000".into()
+            }]
+        );
     }
 
     #[test]

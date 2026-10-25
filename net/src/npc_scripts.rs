@@ -7091,12 +7091,46 @@ fn duarte(entries: &[(EventKind, Entry)], player: &Player) -> NpcScript {
                     text(keys::PYRAMID_DUARTE_TREASURES),
                     vec![Page::Say(text(keys::PYRAMID_DUARTE_TREASURES_INFO))],
                 ),
+                (text(keys::PYRAMID_DUARTE_MEDAL), vec![duarte_medal(player)]),
             ],
         }],
     );
     // Someone left or moved since Duarte checked, or the last room went.
     script.refused = Some(text(keys::PYRAMID_DUARTE_REFUSED));
     script
+}
+
+/// Duarte's Protector of Pharaoh medal, for 50,000 kills in the Pyramid
+/// (Cosmic's menu item 5, a stub there): one each, which completes quest
+/// 29932 if it was started. A medal lost may be had again.
+fn duarte_medal(player: &Player) -> Page {
+    use crate::pyramid::{protector_kills, PROTECTOR_MEDAL, PROTECTOR_NEEDED, PROTECTOR_QUEST};
+    let kills = protector_kills(player);
+    let held = player.inventory.count(PROTECTOR_MEDAL) > 0
+        || (player.inventory.items(InventoryType::Equipped))
+            .any(|(_, item)| item.item_id == PROTECTOR_MEDAL);
+    if held {
+        return Page::Say(text(keys::PYRAMID_DUARTE_MEDAL_HAVE));
+    }
+    if kills < PROTECTOR_NEEDED {
+        let (kills, left) = (kills.to_string(), (PROTECTOR_NEEDED - kills).to_string());
+        let params = [("kills", kills.as_str()), ("left", left.as_str())];
+        return Page::Say(content::text().get(keys::PYRAMID_DUARTE_MEDAL_MORE, &params));
+    }
+    if player.inventory.free(InventoryType::Equip) == 0 {
+        return Page::Say(text(keys::PYRAMID_DUARTE_MEDAL_ROOM));
+    }
+    let mut effects = vec![Effect::GiveItem {
+        item_id: PROTECTOR_MEDAL,
+        quantity: 1,
+    }];
+    if player.quests.state(PROTECTOR_QUEST) == QuestState::Started {
+        effects.push(Effect::CompleteQuest(PROTECTOR_QUEST));
+    }
+    Page::Act {
+        text: text(keys::PYRAMID_DUARTE_MEDAL_GIVEN),
+        effects,
+    }
 }
 
 /// Duarte on a Pyramid stage: the player may give the run up and go back
@@ -13902,6 +13936,64 @@ mod tests {
         );
         let step = shades.respond(ScriptInput::Yes).unwrap();
         assert_eq!(step.effects, [Effect::Warp(events::PYRAMID_LOBBY)]);
+    }
+
+    #[test]
+    fn duarte_gives_the_protector_of_pharaoh_medal_for_50000_pyramid_kills() {
+        use crate::pyramid::{PROTECTOR_KILLS, PROTECTOR_MEDAL, PROTECTOR_QUEST};
+        let equip = |item_id| game::Item::equipment(item_id, game::EquipStats::default());
+        let medal = |player: &Player| {
+            let entries: Vec<_> = events::pyramid_kinds()
+                .map(|kind| (kind, Entry::Ready))
+                .collect();
+            let mut duarte = NpcScript::duarte(&entries, player);
+            duarte.begin();
+            duarte.respond(ScriptInput::Select(3)).unwrap()
+        };
+        let mut hunter = player(50);
+        hunter.stats.map_id = events::PYRAMID_LOBBY;
+        hunter.quests.set_record(PROTECTOR_KILLS, "49999");
+        let more = [("kills", "49999"), ("left", "1")];
+        assert_eq!(
+            page_text(&medal(&hunter)),
+            content::text().get(keys::PYRAMID_DUARTE_MEDAL_MORE, &more)
+        );
+        hunter.quests.set_record(PROTECTOR_KILLS, "50000");
+        let mut full = hunter.clone();
+        let room = full.inventory.free(InventoryType::Equip);
+        for slot in 1..=(room as i16 + 1) {
+            full.inventory
+                .insert(InventoryType::Equip, slot, equip(1_002_000));
+        }
+        assert_eq!(
+            page_text(&medal(&full)),
+            text(keys::PYRAMID_DUARTE_MEDAL_ROOM)
+        );
+        let give = Effect::GiveItem {
+            item_id: PROTECTOR_MEDAL,
+            quantity: 1,
+        };
+        let step = medal(&hunter);
+        assert_eq!(page_text(&step), text(keys::PYRAMID_DUARTE_MEDAL_GIVEN));
+        assert_eq!(step.effects, [give.clone()]);
+        // Started at Dalair, the quest completes with it.
+        hunter.quests.upsert(game::QuestRecord {
+            quest_id: PROTECTOR_QUEST,
+            status: game::QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let step = medal(&hunter);
+        assert_eq!(step.effects, [give, Effect::CompleteQuest(PROTECTOR_QUEST)]);
+        // One each.
+        hunter
+            .inventory
+            .insert(InventoryType::Equip, 1, equip(PROTECTOR_MEDAL));
+        assert_eq!(
+            page_text(&medal(&hunter)),
+            text(keys::PYRAMID_DUARTE_MEDAL_HAVE)
+        );
     }
 
     #[test]
