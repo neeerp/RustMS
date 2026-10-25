@@ -233,14 +233,13 @@ with the line as typed, which the server logs under `gm_audit`.
 | `/w NAME MSG` | ADMIN_COMMAND 0x1E | helpers: an alert (BROADCAST_MSG 1) to NAME, wherever they are; ADMIN_RESULT 0x1E 1, or 0 for no one by that name |
 | `/u`, `/uclip` | ADMIN_COMMAND 0x11 0 and 0x0C | nothing yet |
 | `/ban NAME` | ADMIN_COMMAND 0x03 | admins: `!ban NAME`, for good and with no reason; ADMIN_RESULT 4 0 ("You have successfully blocked access."), or 6 1 ("invalid character name") for no one by that name or a GM of the sender's level or higher |
-| `/block NAME`, then its dialog | ADMIN_COMMAND 0x04: name, reason (1..=13), days, note | admins: `!ban NAME DAYS REASON NOTE`, with the same replies; the client never sends no days, and the server ignores it |
+| `/block NAME DAYS REASON`, then its dialog (Admin/Block: the days, the reason by BlockReason.img `type`, as typed, and a note; no days or no such reason opens nothing) | ADMIN_COMMAND 0x04: name, reason (1..=13), days, note | admins: `!ban NAME DAYS REASON NOTE`, with the same replies; the client never sends no days, and the server ignores it |
 | `/alertall`, `/alertch`, `/alertmap`, `/noticeall`, `/noticech`, `/noticemap`, `/slideall`, `/slidech`, `/slidemap` TEXT | ADMIN_BROADCAST (0x76): scope (0 world, 1 channel, 2 map), type (0 notice, 1 alert, 4 slide), text | GMs: BROADCAST_MSG of that type to that scope |
 | `/slideallx`, `/slidechx`, `/slidemapx` | ADMIN_BROADCAST with no text | GMs: takes the slide down |
 | `/slideax` | 0x86 | nothing |
 | `/ch N` | the channel menu's request | |
 
-`/flag` (0x72, rank 4 only), `/block` (its dialog), `/c` and `/clip`
-aren't in HeavenClient.
+`/flag` (0x72, rank 4 only), `/c` and `/clip` aren't in HeavenClient.
 
 ## Packet encoding
 

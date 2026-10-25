@@ -1054,6 +1054,8 @@ add_executable(HeavenClient
     IO/UITypes/UIMiniGameCreate.h
     IO/UITypes/UIClaim.cpp
     IO/UITypes/UIClaim.h
+    IO/UITypes/UIGmBlock.cpp
+    IO/UITypes/UIGmBlock.h
     IO/UITypes/UIPersonalShop.cpp
     IO/UITypes/UIPersonalShop.h
     IO/UITypes/UIMonsterBook.cpp

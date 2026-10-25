@@ -2,6 +2,10 @@
 
 #include "GmCommand.h"
 
+#include "UI.h"
+
+#include "UITypes/UIGmBlock.h"
+
 #include "../Configuration.h"
 #include "../Gameplay/Stage.h"
 #include "../Net/Packets/GameplayPackets.h"
@@ -41,6 +45,19 @@ namespace ms
 				case GmCommand::Kind::BAN:
 					AdminBanPacket(command.name).dispatch();
 					break;
+				case GmCommand::Kind::BLOCK:
+				{
+					// With no days or no such reason, only the log goes
+					// (0x52dc30). v83's dialog is modal, so its 0x04 goes
+					// before the log; here it goes when OK is pressed.
+					std::vector<std::string> reasons = UIGmBlock::reasons();
+					int32_t reason = command.block_reason(reasons);
+
+					if (command.days != 0 && reason != 0)
+						UI::get().emplace<UIGmBlock>(command.name, command.days, reason, reasons);
+
+					break;
+				}
 				case GmCommand::Kind::UCLIP:
 					AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
 					break;
