@@ -95,6 +95,9 @@ pub struct MobInfo {
     /// A hit that does no damage takes it off the map (`removeOnMiss`), as
     /// in Nett's Pyramid.
     pub remove_on_miss: bool,
+    /// The Carnival Points its killer gets in the Monster Carnival
+    /// (`getCP`), or 0.
+    pub cp: i32,
 }
 
 /// How a mob destroys itself (`selfDestruction`).
@@ -272,6 +275,7 @@ impl MobData {
             cool_damage: int("coolDamage")?,
             cool_damage_prob: int("coolDamageProb")?,
             remove_on_miss: int("removeOnMiss")? != 0,
+            cp: int("getCP")?,
         }))
     }
 
@@ -468,6 +472,11 @@ mod tests {
         assert_eq!(
             (mob(100100).cool_damage, mob(100100).cool_damage_prob),
             (0, 0)
+        );
+        // The Monster Carnival's Brown Teddy gives 1 CP, Rombot 6.
+        assert_eq!(
+            (mob(9300127).cp, mob(9300136).cp, mob(100100).cp),
+            (1, 6, 0)
         );
     }
 

@@ -33,6 +33,9 @@ pub const PYRAMID_RETURN: i16 = 3;
 /// The `saved_locations` key of the map the player took the Mu Lung
 /// Dojo's notice board from (Cosmic `MIRROR`).
 pub const DOJO_RETURN: i16 = 4;
+/// The `saved_locations` key of the map the player went to the Monster
+/// Carnival's Carnival Field from (Cosmic `MONSTER_CARNIVAL`).
+pub const CARNIVAL_RETURN: i16 = 5;
 
 /// A stat `SPEND_AP` can raise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1030,6 +1033,7 @@ mod tests {
             FLORINA_RETURN,
             PYRAMID_RETURN,
             DOJO_RETURN,
+            CARNIVAL_RETURN,
         ];
         for (i, kind) in kinds.iter().enumerate() {
             assert!(!kinds[..i].contains(kind));

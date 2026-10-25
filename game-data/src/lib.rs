@@ -103,6 +103,9 @@ pub struct MapMobTemplate {
     /// Seconds before the mob respawns; negative means never.
     pub mob_time: i32,
     pub hide: bool,
+    /// `team`: on a Monster Carnival field, the side (0 red, 1 blue) whose
+    /// mob it is.
+    pub team: Option<u8>,
 }
 
 /// A reactor (a breakable box and the like) from a map's `reactor` nodes.
@@ -263,6 +266,53 @@ pub struct CountEffect {
     pub skill_use: bool,
 }
 
+/// `monsterCarnival`: the rules of a Monster Carnival battle field.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Carnival {
+    /// `timeDefault`: the battle's length in seconds.
+    pub time_default: i32,
+    /// `timeExpand`: how many seconds a tie adds.
+    pub time_expand: i32,
+    /// `deathCP`: the most CP a player loses on dying.
+    pub death_cp: i32,
+    /// `mobGenMax`: how many mobs a side may summon, if set.
+    pub mob_gen_max: Option<i32>,
+    /// `guardianGenMax`: how many guardians a side may place, if set.
+    pub guardian_gen_max: Option<i32>,
+    /// `mapDivided`: the field is split in two halves, one for each side.
+    pub map_divided: bool,
+    /// `rewardMapWin` and `rewardMapLose`.
+    pub reward_map_win: i32,
+    pub reward_map_lose: i32,
+    /// `effectWin`, `effectLose`, `soundWin` and `soundLose`.
+    pub effect_win: String,
+    pub effect_lose: String,
+    pub sound_win: String,
+    pub sound_lose: String,
+    /// `mob`: the mobs that may be summoned, as (mob id, `spendCP`), in the
+    /// order of the client's list.
+    pub mobs: Vec<(i32, i32)>,
+    /// `skill`: the MCSkill ids in the client's list.
+    pub skills: Vec<i32>,
+    /// `guardian`: the MCGuardian ids in the client's list.
+    pub guardians: Vec<i32>,
+    /// `guardianGenPos`: where guardians may stand.
+    pub guardian_spots: Vec<CarnivalSpot>,
+    /// `mobGenPos`: where summoned mobs may appear.
+    pub mob_spots: Vec<CarnivalSpot>,
+}
+
+/// A spot in a Monster Carnival field: `x`, `y` (`cy` for mobs), `fh`,
+/// `f`, and the side it is for (`team`), if any.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CarnivalSpot {
+    pub x: i16,
+    pub y: i16,
+    pub foothold: i16,
+    pub flip: bool,
+    pub team: Option<u8>,
+}
+
 #[derive(Clone, Debug)]
 pub struct FieldTemplate {
     pub map_id: i32,
@@ -282,6 +332,8 @@ pub struct FieldTemplate {
     pub create_mob_interval: Option<u32>,
     /// `mobMassacre`, on the 50 maps that have it.
     pub massacre: Option<Massacre>,
+    /// `monsterCarnival`, on the Monster Carnival battle fields.
+    pub carnival: Option<Carnival>,
     /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
@@ -649,6 +701,7 @@ fn build_field_template(
         positive_key("createMobInterval")?,
     );
     let massacre = build_massacre(nx, body_idx)?;
+    let carnival = build_carnival(nx, body_idx)?;
     let recovery = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "recovery"))
@@ -792,6 +845,7 @@ fn build_field_template(
         fixed_mob_capacity,
         create_mob_interval,
         massacre,
+        carnival,
         view_limit,
         level_limit,
         level_force_move,
@@ -983,6 +1037,85 @@ fn build_massacre(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Massacre>
     Ok(Some(massacre))
 }
 
+fn build_carnival(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Carnival>, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "monsterCarnival")? else {
+        return Ok(None);
+    };
+    let int = |key| -> Result<i32, GameDataError> { Ok(nx.int_child(root, key)?.unwrap_or(0)) };
+    let string = |key| -> Result<String, GameDataError> {
+        Ok(nx.string_child(root, key)?.unwrap_or_default())
+    };
+    // A list's entries are named 0, 1, 2 ..., which the file sorts as text
+    // (10 before 2); the client takes them by number.
+    let ordered = |list| -> Result<Vec<u32>, GameDataError> {
+        let mut children = Vec::new();
+        for child in nx.child_indices(list)? {
+            if let Ok(order) = nx.node_name(child)?.parse::<u32>() {
+                children.push((order, child));
+            }
+        }
+        children.sort_by_key(|&(order, _)| order);
+        Ok(children.into_iter().map(|(_, child)| child).collect())
+    };
+    let ints = |key| -> Result<Vec<i32>, GameDataError> {
+        let Some(list) = nx.child_by_name(root, key)? else {
+            return Ok(Vec::new());
+        };
+        let mut values = Vec::new();
+        for child in ordered(list)? {
+            if let Some(value) = nx.int_child(list, &nx.node_name(child)?)? {
+                values.push(value);
+            }
+        }
+        Ok(values)
+    };
+    let spots = |key, y_key| -> Result<Vec<CarnivalSpot>, GameDataError> {
+        let Some(list) = nx.child_by_name(root, key)? else {
+            return Ok(Vec::new());
+        };
+        let mut spots = Vec::new();
+        for node in ordered(list)? {
+            let y = read_i16_child(nx, node, "y", 0)?;
+            spots.push(CarnivalSpot {
+                x: read_i16_child(nx, node, "x", 0)?,
+                y: read_i16_child(nx, node, y_key, i32::from(y))?,
+                foothold: read_i16_child(nx, node, "fh", 0)?,
+                flip: nx.int_child(node, "f")?.unwrap_or(0) != 0,
+                team: nx
+                    .int_child(node, "team")?
+                    .and_then(|team| u8::try_from(team).ok()),
+            });
+        }
+        Ok(spots)
+    };
+    let mut mobs = Vec::new();
+    if let Some(list) = nx.child_by_name(root, "mob")? {
+        for node in ordered(list)? {
+            let id = nx.int_child(node, "id")?.unwrap_or(0);
+            mobs.push((id, nx.int_child(node, "spendCP")?.unwrap_or(0)));
+        }
+    }
+    Ok(Some(Carnival {
+        time_default: int("timeDefault")?,
+        time_expand: int("timeExpand")?,
+        death_cp: int("deathCP")?,
+        mob_gen_max: nx.int_child(root, "mobGenMax")?,
+        guardian_gen_max: nx.int_child(root, "guardianGenMax")?,
+        map_divided: int("mapDivided")? != 0,
+        reward_map_win: int("rewardMapWin")?,
+        reward_map_lose: int("rewardMapLose")?,
+        effect_win: string("effectWin")?,
+        effect_lose: string("effectLose")?,
+        sound_win: string("soundWin")?,
+        sound_lose: string("soundLose")?,
+        mobs,
+        skills: ints("skill")?,
+        guardians: ints("guardian")?,
+        guardian_spots: spots("guardianGenPos", "y")?,
+        mob_spots: spots("mobGenPos", "cy")?,
+    }))
+}
+
 fn build_footholds(
     nx: &NxDataFile,
     map_node_idx: u32,
@@ -1050,6 +1183,9 @@ fn build_mob_spawns_from_life(
             flip: nx.int_child(life, "f")?.unwrap_or(0) != 0,
             mob_time: nx.int_child(life, "mobTime")?.unwrap_or(0),
             hide: nx.int_child(life, "hide")?.unwrap_or(0) != 0,
+            team: nx
+                .int_child(life, "team")?
+                .and_then(|team| u8::try_from(team).ok()),
         });
     }
     Ok(spawns)
@@ -1447,6 +1583,7 @@ mod tests {
             fixed_mob_capacity: None,
             create_mob_interval: None,
             massacre: None,
+            carnival: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1529,6 +1666,7 @@ mod tests {
             fixed_mob_capacity: None,
             create_mob_interval: None,
             massacre: None,
+            carnival: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1679,6 +1817,61 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn monster_carnival_fields_have_their_rules_and_sides() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data
+            .field(980_000_101)
+            .expect("Monster Carnival field 1");
+        let carnival = field.carnival.as_ref().expect("monsterCarnival");
+        assert_eq!((carnival.time_default, carnival.time_expand), (610, 120));
+        assert_eq!(carnival.death_cp, 10);
+        assert_eq!(
+            (carnival.mob_gen_max, carnival.guardian_gen_max),
+            (Some(10), Some(8))
+        );
+        assert!(!carnival.map_divided);
+        assert_eq!(
+            (carnival.reward_map_win, carnival.reward_map_lose),
+            (980_000_103, 980_000_104)
+        );
+        assert_eq!(carnival.effect_win, "quest/carnival/win");
+        assert_eq!(carnival.sound_lose, "MobCarnival/Lose");
+        assert_eq!(carnival.mobs.len(), 10);
+        assert_eq!(carnival.mobs[0], (9_300_127, 7));
+        assert_eq!(carnival.mobs[9], (9_300_136, 30));
+        assert_eq!(carnival.skills, [1, 2, 4, 5, 6, 0, 3, 7]);
+        assert_eq!(carnival.guardians, (0..=8).collect::<Vec<_>>());
+        assert_eq!(carnival.mob_spots.len(), 15);
+        assert_eq!(carnival.mob_spots[0].x, -988);
+        assert_eq!(carnival.mob_spots[0].y, 162);
+        // The fifteenth spot is the last, not the third.
+        assert_eq!(
+            (carnival.mob_spots[14].x, carnival.mob_spots[2].x),
+            (622, -777)
+        );
+        assert_eq!(carnival.guardian_spots[0].y, -135);
+        // Its own mobs are on one side or the other.
+        let teams: Vec<_> = field.mob_spawns.iter().map(|spawn| spawn.team).collect();
+        assert!(teams.contains(&Some(0)) && teams.contains(&Some(1)));
+        // The divided fields mark the sides of their guardians' spots.
+        let divided = game_data.field(980_000_301).expect("field 3");
+        let carnival = divided.carnival.as_ref().expect("monsterCarnival");
+        assert!(carnival.map_divided);
+        assert!(carnival
+            .guardian_spots
+            .iter()
+            .all(|spot| spot.team.is_some()));
+        assert!(game_data
+            .field(980_000_100)
+            .expect("waiting room")
+            .carnival
+            .is_none());
     }
 
     #[test]

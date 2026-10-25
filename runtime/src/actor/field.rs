@@ -230,6 +230,8 @@ pub struct FieldActor {
     /// A copy of a Nett's Pyramid stage, whose kills, cool kills and
     /// misses its run counts.
     massacre: bool,
+    /// A copy of a Monster Carnival battle field, whose kills earn CP.
+    carnival: bool,
     kites: KiteSet,
     tick: Duration,
 }
@@ -291,6 +293,7 @@ impl FieldActor {
             levers: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
+            carnival: net::carnival::battle_room(key.map_id).is_some() && key.instance_id != 0,
             kites: KiteSet::default(),
             tick,
         };
@@ -1650,6 +1653,7 @@ impl FieldActor {
         }
         let (mut hp_taken, mut mp_taken) = (0, 0);
         let mut massacre = net::pyramid::Hits::default();
+        let mut carnival_cp = 0;
         for (object_id, damage) in hits {
             // Steal rolls on every mob hit, until one gives (Cosmic's rule).
             if takes.steal > 0 && rand::random::<f64>() * 100.0 < f64::from(takes.steal) {
@@ -1666,6 +1670,7 @@ impl FieldActor {
                 continue;
             };
             let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
+            let cp = mob.info.cp;
             let mut damage = if hurts { damage } else { 0 };
             let max_hp = i64::from(mob.info.max_hp);
             if let Some(cap) =
@@ -1729,6 +1734,7 @@ impl FieldActor {
                     } else {
                         massacre.kills += 1;
                     }
+                    carnival_cp += cp;
                     self.killed(&kill);
                 }
                 None => {}
@@ -1736,6 +1742,9 @@ impl FieldActor {
         }
         if self.massacre && massacre.any() {
             attacker.send(ServerMessage::Massacre(massacre));
+        }
+        if self.carnival && carnival_cp > 0 {
+            attacker.send(ServerMessage::CarnivalCp(carnival_cp));
         }
         // MP Eater shows when it ate, once for the attack.
         if let Some(eater) = takes.mp.filter(|_| mp_taken > 0) {
@@ -4143,6 +4152,7 @@ mod tests {
             flip: false,
             mob_time: net::mobs::AREA_BOSS_TIME,
             hide: false,
+            team: None,
         };
         let info = game_data::mobs::MobInfo {
             mob_id: mano.mob,
@@ -4274,6 +4284,7 @@ mod tests {
                 flip: false,
                 mob_time: 0,
                 hide: false,
+                team: None,
             },
             game_data::mobs::MobInfo {
                 mob_id: 100100,

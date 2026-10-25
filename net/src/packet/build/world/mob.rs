@@ -43,6 +43,10 @@ pub struct MobView {
     /// The object id of the mob it comes out of as that one dies (-3), as
     /// Horntail and its parts do out of the intro (Cosmic `setParentMobOid`).
     pub parent: Option<i32>,
+    /// On a Monster Carnival field, the side whose mob it is (the map's
+    /// `team`): the client of a player on that side neither hits it nor
+    /// is hurt by it.
+    pub team: Option<u8>,
 }
 
 /// The statuses as the client reads them (FUN_0078b0b1): their flags, then
@@ -101,7 +105,7 @@ fn write_mob(p: &mut Packet, mob: &MobView) -> Result<(), NetworkError> {
             p.write_byte(if mob.fade_in { -2i8 as u8 } else { -1i8 as u8 })?;
         }
     }
-    p.write_byte(-1i8 as u8)?; // team
+    p.write_byte(mob.team.unwrap_or(-1i8 as u8))?;
     p.write_int(0)?; // item effect
     Ok(())
 }
@@ -400,6 +404,7 @@ mod tests {
             summon_effect: None,
             fake: false,
             parent: None,
+            team: None,
         }
     }
 

@@ -1933,6 +1933,20 @@ pub mod keys {
     pub const PYRAMID_DUARTE_SHADES_LATER: &str = "pyramid.duarte.shades_later";
     pub const PYRAMID_DUARTE_SHADES_GEM: &str = "pyramid.duarte.shades_gem";
     pub const PYRAMID_DUARTE_SHADES_NO_ROOM: &str = "pyramid.duarte.shades_no_room";
+    pub const CARNIVAL_SPIEGELMANN_MENU: &str = "carnival.spiegelmann.menu";
+    pub const CARNIVAL_SPIEGELMANN_ENTER: &str = "carnival.spiegelmann.enter";
+    pub const CARNIVAL_SPIEGELMANN_ABOUT: &str = "carnival.spiegelmann.about";
+    pub const CARNIVAL_SPIEGELMANN_INFO: &str = "carnival.spiegelmann.info";
+    pub const CARNIVAL_SPIEGELMANN_RULES: &str = "carnival.spiegelmann.rules";
+    pub const CARNIVAL_SPIEGELMANN_ROOMS: &str = "carnival.spiegelmann.rooms";
+    pub const CARNIVAL_SPIEGELMANN_ROOM: &str = "carnival.spiegelmann.room";
+    pub const CARNIVAL_SPIEGELMANN_LEVELS: &str = "carnival.spiegelmann.levels";
+    pub const CARNIVAL_SPIEGELMANN_NO_PARTY: &str = "carnival.spiegelmann.no_party";
+    pub const CARNIVAL_SPIEGELMANN_NOT_LEADER: &str = "carnival.spiegelmann.not_leader";
+    pub const CARNIVAL_SPIEGELMANN_TERMS: &str = "carnival.spiegelmann.terms";
+    pub const CARNIVAL_SPIEGELMANN_BUSY: &str = "carnival.spiegelmann.busy";
+    pub const CARNIVAL_SPIEGELMANN_GO: &str = "carnival.spiegelmann.go";
+    pub const CARNIVAL_GUIDE_BACK: &str = "carnival.guide.back";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3033,6 +3047,20 @@ mod tests {
                 keys::PYRAMID_DUARTE_SHADES_LATER,
                 keys::PYRAMID_DUARTE_SHADES_GEM,
                 keys::PYRAMID_DUARTE_SHADES_NO_ROOM,
+                keys::CARNIVAL_SPIEGELMANN_MENU,
+                keys::CARNIVAL_SPIEGELMANN_ENTER,
+                keys::CARNIVAL_SPIEGELMANN_ABOUT,
+                keys::CARNIVAL_SPIEGELMANN_INFO,
+                keys::CARNIVAL_SPIEGELMANN_RULES,
+                keys::CARNIVAL_SPIEGELMANN_ROOMS,
+                keys::CARNIVAL_SPIEGELMANN_ROOM,
+                keys::CARNIVAL_SPIEGELMANN_LEVELS,
+                keys::CARNIVAL_SPIEGELMANN_NO_PARTY,
+                keys::CARNIVAL_SPIEGELMANN_NOT_LEADER,
+                keys::CARNIVAL_SPIEGELMANN_TERMS,
+                keys::CARNIVAL_SPIEGELMANN_BUSY,
+                keys::CARNIVAL_SPIEGELMANN_GO,
+                keys::CARNIVAL_GUIDE_BACK,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

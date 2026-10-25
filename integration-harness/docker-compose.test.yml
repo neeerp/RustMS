@@ -56,6 +56,9 @@ services:
       RUSTMS_EVENT_SCALE: "60"
       # Two may set out against Zakum, not six (see tests/zakum_squad.rs).
       RUSTMS_EXPEDITION_MIN: "2"
+      # A party of one may take a Monster Carnival room (see
+      # tests/carnival.rs).
+      RUSTMS_CARNIVAL_SOLO: "1"
       # Cloto asks every member of Kerning City's party quest her last
       # question, whose answer is 8 coupons (see tests/kpq_stage1.rs).
       RUSTMS_KPQ_QUESTION: "7"

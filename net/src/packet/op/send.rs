@@ -229,6 +229,10 @@ pub enum SendOpcode {
     HitReactor = 0x115,
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
+    /// The Monster Carnival's sides and CP on arrival (v83ref b163).
+    CarnivalStart = 0x121,
+    CarnivalObtainedCp = 0x122,
+    CarnivalPartyCp = 0x123,
     /// How long Horntail's Cave stays open (302; v83 FUN_005335a3).
     HorntailCave = 0x12E,
     /// How long the Zakum Shrine stays open (303; v83 FUN_0053347c).

@@ -2,6 +2,7 @@
 //! who may start one, where it is played, and when it ends. Pure rules;
 //! the runtime's event actor keeps the time and moves the players.
 
+use crate::carnival::{CARNIVAL_LOBBY, CARNIVAL_ROOMS};
 use crate::ClientId;
 use game::{InventoryChange, Player};
 use game_data::Area;
@@ -68,6 +69,9 @@ pub enum EventKind {
     /// with that mode's gem at Duarte in the lobby or straight from its
     /// room in the Shades after a run.
     PyramidTomb(PyramidMode),
+    /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
+    /// (2042000) on the Carnival Field (`crate::carnival`).
+    Carnival(u8),
 }
 
 /// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
@@ -1754,6 +1758,37 @@ pub const DOJO: Event = Event {
     runs: 15,
 };
 
+/// The Monster Carnival's rooms, 1 to 6 (Cosmic `2042000`,
+/// `MonsterCarnival`): a party goes from the Carnival Field straight to
+/// the room's battle field, which lasts as long as its `timeDefault` says
+/// (`crate::carnival::battle_length`), and then to the exit room. Rooms 1
+/// to 4 take two to four, 5 and 6 three to six.
+pub const CARNIVAL: [Event; CARNIVAL_ROOMS as usize] = [
+    carnival(1),
+    carnival(2),
+    carnival(3),
+    carnival(4),
+    carnival(5),
+    carnival(6),
+];
+
+const fn carnival(room: u8) -> Event {
+    let battle = crate::carnival::battle_map(room);
+    Event {
+        lobby: CARNIVAL_LOBBY,
+        maps: battle..=battle + 3,
+        entry: battle,
+        exit: crate::carnival::CARNIVAL_EXIT,
+        levels: crate::carnival::CARNIVAL_LEVELS,
+        team: if room <= 4 { 2..=4 } else { 3..=6 },
+        minutes: 0,
+        exp_per_stage: &[0],
+        member_clears: &[],
+        runs: 1,
+        ..DOJO
+    }
+}
+
 /// So Gong's trial room (Cosmic's first of five, 925020010-14).
 pub const DOJO_TRIAL_MAP: i32 = 925020010;
 /// So Gong himself, as the trial's monster; beaten, he lets out the
@@ -2006,7 +2041,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 29] = [
+    pub const ALL: [EventKind; 35] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2036,6 +2071,12 @@ impl EventKind {
         EventKind::PyramidTomb(PyramidMode::Normal),
         EventKind::PyramidTomb(PyramidMode::Hard),
         EventKind::PyramidTomb(PyramidMode::Hell),
+        EventKind::Carnival(1),
+        EventKind::Carnival(2),
+        EventKind::Carnival(3),
+        EventKind::Carnival(4),
+        EventKind::Carnival(5),
+        EventKind::Carnival(6),
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2060,6 +2101,7 @@ impl EventKind {
             EventKind::Pyramid(mode) => &PYRAMID[mode as usize],
             EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
+            EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
         }
     }
 
@@ -2107,7 +2149,8 @@ impl Event {
     }
 
     /// How many must go for the event to start: the start of `team`, or
-    /// for a squad `RUSTMS_EXPEDITION_MIN` if set, for testing.
+    /// for a squad `RUSTMS_EXPEDITION_MIN` if set, and for a Monster
+    /// Carnival room one with `RUSTMS_CARNIVAL_SOLO=1`, for testing.
     pub fn least(&self) -> usize {
         let fewer = || {
             std::env::var("RUSTMS_EXPEDITION_MIN")
@@ -2116,6 +2159,10 @@ impl Event {
                 .ok()
                 .filter(|least| *least >= 1)
         };
+        let solo = || std::env::var("RUSTMS_CARNIVAL_SOLO").is_ok_and(|solo| solo == "1");
+        if self.lobby == CARNIVAL_LOBBY && solo() {
+            return 1;
+        }
         self.squad
             .then(fewer)
             .flatten()
@@ -2264,7 +2311,7 @@ impl Event {
         let apart = levels.clone().max().unwrap_or(0) - levels.min().unwrap_or(0);
         let team: Vec<_> = team.iter().map(|c| c.id).collect();
         (team.contains(&leader)
-            && self.team.contains(&team.len())
+            && (self.least()..=*self.team.end()).contains(&team.len())
             && self.spread.is_none_or(|spread| apart <= spread))
         .then_some(team)
     }
@@ -2480,6 +2527,12 @@ pub enum EventCommand {
     /// A member used Rage of Pharaoh, spending one of the Nett's Pyramid
     /// run's uses.
     Rage,
+    /// A member's attack in a Monster Carnival battle killed mobs worth
+    /// this many CP (their `getCP`).
+    CarnivalCp(i32),
+    /// A member arrived on the Monster Carnival battle field, whose screen
+    /// takes the score.
+    CarnivalArrived,
 }
 
 /// The coupons Kerning City's party quest's first stage has its members

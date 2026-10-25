@@ -140,6 +140,7 @@ pub fn area_boss_spawns(map: i32, footholds: &Footholds) -> Vec<MapMobTemplate> 
                 flip: false,
                 mob_time: AREA_BOSS_TIME,
                 hide: false,
+                team: None,
             })
         })
         .collect()

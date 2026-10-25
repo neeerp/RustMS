@@ -88,6 +88,8 @@ pub struct LiveMob {
     pub next_drop: Option<Instant>,
     /// Its HP shared with another mob's (`MobSet::link`).
     pub link: Option<Link>,
+    /// Its side on a Monster Carnival field (`MapMobTemplate::team`).
+    pub team: Option<u8>,
 }
 
 /// How a mob's HP is tied to another's: Horntail's (Cosmic
@@ -309,6 +311,7 @@ impl LiveMob {
             mob_hit_at: None,
             next_drop,
             link: None,
+            team: None,
         }
     }
 
@@ -457,6 +460,7 @@ impl LiveMob {
             summon_effect: None,
             fake: false,
             parent: None,
+            team: self.team,
         }
     }
 
@@ -828,6 +832,7 @@ impl MobSet {
             now,
         );
         mob.spawn = Some(index);
+        mob.team = template.team;
         self.live.insert(object_id, mob);
         object_id
     }
@@ -1978,6 +1983,7 @@ mod tests {
                 flip: false,
                 mob_time: 0,
                 hide: false,
+                team: None,
             },
             MobInfo {
                 mob_id: 100100,

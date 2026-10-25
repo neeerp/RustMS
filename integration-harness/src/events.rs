@@ -34,6 +34,7 @@ pub const ADOBIS: i32 = 2030008;
 pub const AURA: i32 = 2032002;
 pub const HTPQ_KEEPER: i32 = 2083001;
 pub const CRYSTAL_OF_ROOTS: i32 = 2083002;
+const OP_CREATED: u8 = 0x08;
 const OP_JOIN: u8 = 0x0F;
 
 /// The maps, from the Map.nx the server reads.
@@ -177,6 +178,16 @@ async fn waiting_with(
         lobby
     );
     session
+}
+
+/// The player founds a party of their own.
+pub async fn party_of_one(player: &mut WorldSession) {
+    send(&mut player.connection, party_operation(1)).await;
+    let mut trace = Trace::default();
+    until(&mut player.connection, &mut trace, |t| {
+        t.party_ops.contains(&OP_CREATED)
+    })
+    .await;
 }
 
 /// The first player invites the rest into a party.
