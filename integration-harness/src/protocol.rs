@@ -594,6 +594,36 @@ pub async fn relogin(config: &HarnessConfig) -> WorldSession {
     panic!("relogin failed: {last_error:?}");
 }
 
+/// The grade and sub-grade bytes of logging `config`'s account in, retried
+/// while its last session is still closing.
+pub async fn login_grade(config: &HarnessConfig) -> (u8, u8) {
+    let mut last_error = None;
+    for _ in 0..20 {
+        match login_status(config).await {
+            Ok(status) => return status.grade.expect("a successful login's grade"),
+            Err(error) => last_error = Some(error),
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    panic!("login failed: {last_error:?}");
+}
+
+async fn login_status(config: &HarnessConfig) -> Result<LoginStatusPacket, HarnessError> {
+    let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake").await?;
+    login_conn
+        .send_packet(build_login_started(), "login start")
+        .await?;
+    login_conn
+        .send_packet(
+            build_login_credentials(&config.username, &config.password).map_err(|message| {
+                HarnessError::protocol("login credentials", config.login_addr, message)
+            })?,
+            "login credentials",
+        )
+        .await?;
+    resolve_login_prompts(&mut login_conn, config).await
+}
+
 pub async fn login_two_players_to_world(
     config: &MultiHarnessConfig,
 ) -> Result<(WorldSession, WorldSession), HarnessError> {

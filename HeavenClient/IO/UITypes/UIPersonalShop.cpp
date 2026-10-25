@@ -746,10 +746,18 @@ namespace ms
 		if (player.ride_refuses() || player.shape_refuses() || player.ghost_refuses())
 			return;
 
+		// Nor while a dialog is open, nor from a GM's account.
+		const char *refusal = nullptr;
+
 		if (UI::get().dialog_open())
+			refusal = "Not available";
+		else if (Configuration::get().get_grade().gm())
+			refusal = account_grade::NOT_FOR_ADMIN;
+
+		if (refusal)
 		{
 			if (auto chatbar = UI::get().get_element<UIChatBar>())
-				chatbar->send_chatline("Not available", UIChatBar::LineType::SKILL);
+				chatbar->send_chatline(refusal, UIChatBar::LineType::SKILL);
 
 			return;
 		}

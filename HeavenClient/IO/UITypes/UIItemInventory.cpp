@@ -49,6 +49,7 @@
 #include "../Components/MapleButton.h"
 #include "../UITypes/UIKeyConfig.h"
 
+#include "../../Configuration.h"
 #include "../../Character/GachaExp.h"
 #include "../../Character/Marriage.h"
 #include "../../Character/MountRules.h"
@@ -1325,6 +1326,13 @@ namespace ms
 				break;
 			case Buttons::BT_COIN:
 			{
+				if (Configuration::get().get_grade().admin())
+				{
+					UI::get().emplace<UIOk>(account_grade::NO_MESO_DROP, [](bool) {});
+
+					break;
+				}
+
 				// One drop holds 10 to 50,000 mesos, and the box starts at 10.
 				constexpr int32_t MESO_DROP_MIN = 10;
 				constexpr int32_t MESO_DROP_MAX = 50000;
@@ -2227,6 +2235,14 @@ namespace ms
 		// other test (FUN_004f31a5).
 		if (UI::get().dialog_open())
 			return;
+
+		if (Configuration::get().get_grade().admin())
+		{
+			UI::get().emplace<UIOk>(account_grade::NO_ITEM_DROP, [](bool)
+			{});
+
+			return;
+		}
 
 		const Player &player = Stage::get().get_player();
 

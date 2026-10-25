@@ -108,6 +108,30 @@ pub async fn set_gm_level(user_name: &str, level: i16) -> Result<(), HarnessErro
     Ok(())
 }
 
+/// Flag `user_name`'s account as the client's admin account, or not.
+pub async fn set_test_admin(user_name: &str, on: bool) -> Result<(), HarnessError> {
+    let user_name = user_name.to_string();
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "set test admin",
+        message,
+    };
+    let updated = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query("UPDATE accounts SET test_admin = $1 WHERE user_name = $2")
+            .bind::<Bool, _>(on)
+            .bind::<Text, _>(user_name)
+            .execute(&mut conn)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    if updated == 0 {
+        return Err(fixture("no such account".to_string()));
+    }
+    Ok(())
+}
+
 /// Put `item_id` in slot `slot` of the logged-out character `character_id`'s
 /// inventory `inventory_type`.
 pub async fn grant_item(

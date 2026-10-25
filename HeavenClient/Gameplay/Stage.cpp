@@ -2055,7 +2055,8 @@ namespace ms
 	{
 		PlayerMapTransferPacket().dispatch();
 
-		if (Configuration::get().get_admin())
+		// v83 tells the server only for the sub-grade's 0x80 (report a006b).
+		if (Configuration::get().get_grade().alerts_admins())
 			AdminEnterMapPacket(AdminEnterMapPacket::Operation::ALERT_ADMINS).dispatch();
 	}
 

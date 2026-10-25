@@ -22,6 +22,7 @@
 #include <cstdint>
 
 #include "../Character/MapleStat.h"
+#include "../Util/AccountGrade.h"
 
 #include <map>
 #include <vector>
@@ -32,7 +33,7 @@ namespace ms
 	{
 		int32_t accid;
 		int8_t female;
-		bool admin;
+		AccountGrade grade;
 		std::string name;
 		bool muted;
 		bool pin;

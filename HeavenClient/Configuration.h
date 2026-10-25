@@ -25,6 +25,7 @@
 
 #include "Template/Singleton.h"
 #include "Template/TypeMap.h"
+#include "Util/AccountGrade.h"
 #include "Util/Misc.h"
 
 namespace ms
@@ -170,10 +171,11 @@ namespace ms
 
 		// Update the channel names the server list gave a world.
 		void set_world_channel_names(uint8_t world_id, const std::vector<std::string>& names);
-		// Check if the current account is an admin account
+		// Whether the current account is a GM's (the login grade's bit 0)
 		bool get_admin();
-		// Check whether the current account is an admin account
-		void set_admin(bool value);
+		// The current account's login grade
+		const AccountGrade& get_grade() const;
+		void set_grade(AccountGrade value);
 
 		// Base class for an entry in the settings file
 		class Entry
@@ -312,7 +314,7 @@ namespace ms
 		std::string login_id;
 		std::map<uint8_t, uint8_t> world_channel_counts;
 		std::map<uint8_t, std::vector<std::string>> world_channel_names;
-		bool admin;
+		AccountGrade grade;
 		TypeMap<Entry> settings;
 	};
 

@@ -34,6 +34,26 @@ pub fn build_login_status_packet(status: LoginStatusCode) -> Result<Packet, Netw
     Ok(packet)
 }
 
+/// The grade's GM bit: the client sends the '/' lines it doesn't know as
+/// chat (report b169), and refuses trades and stores.
+const GRADE_GM: u8 = 0x01;
+/// With the GM bit, v83's admin account, which can't drop items or mesos
+/// either (report b156).
+const GRADE_ADMIN: u8 = 0x11;
+
+/// The client's grade for `acc`: an admin GM's (row 205), or the admin
+/// account the account is flagged as.
+fn grade(acc: &Account) -> u8 {
+    let mut grade = 0;
+    if crate::policy::client_gm(acc.gm_level) {
+        grade |= GRADE_GM;
+    }
+    if acc.test_admin {
+        grade |= GRADE_ADMIN;
+    }
+    grade
+}
+
 pub fn build_successful_login_packet(
     acc: &Account,
     pin_required: bool,
@@ -51,10 +71,11 @@ pub fn build_successful_login_packet(
     packet.write_int(account_id)?;
     packet.write_byte(gender as u8)?;
 
-    // The grade: bit 0 makes the client a GM's, which sends the '/' lines
-    // it doesn't know as chat (report b169).
-    packet.write_byte(u8::from(acc.gm_level > 0))?;
-    packet.write_byte(0)?; // admin
+    packet.write_byte(grade(acc))?;
+    // The sub-grade stays 0: its 0x80 bit refuses every attack ("Not
+    // available with an MWLB account"), and its 0x20/0x40 only rank a GM
+    // the grade's bit 0 already ranks.
+    packet.write_byte(0)?;
     packet.write_byte(0)?; // country
 
     packet.write_str_with_length(account_name)?;
@@ -117,6 +138,7 @@ mod tests {
             nx_prepaid: 0,
             storage_slots: 4,
             storage_meso: 0,
+            test_admin: false,
         }
     }
 
@@ -151,14 +173,32 @@ mod tests {
 
     #[test]
     fn successful_login_matches_reference() {
-        let account = account();
-        expect_successful_login(&build_successful_login_packet(&account, false).unwrap(), 1);
-        expect_successful_login(&build_successful_login_packet(&account, true).unwrap(), 0);
+        let player = account();
+        expect_successful_login(&build_successful_login_packet(&player, false).unwrap(), 1);
+        expect_successful_login(&build_successful_login_packet(&player, true).unwrap(), 0);
+        let helper = Account {
+            gm_level: 2,
+            ..account()
+        };
+        expect_login(
+            &build_successful_login_packet(&helper, false).unwrap(),
+            1,
+            0,
+        );
         let gm = Account {
             gm_level: 3,
-            ..account
+            ..account()
         };
         expect_login(&build_successful_login_packet(&gm, false).unwrap(), 1, 1);
+        let admin = Account {
+            test_admin: true,
+            ..player
+        };
+        expect_login(
+            &build_successful_login_packet(&admin, false).unwrap(),
+            1,
+            0x11,
+        );
     }
 
     #[test]
