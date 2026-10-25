@@ -948,8 +948,8 @@ add_executable(HeavenClient
     IO/UITypes/UIScriptMessage.h
     IO/UITypes/UIFieldClock.cpp
     IO/UITypes/UIFieldClock.h
-    IO/UITypes/UIDojoEnergy.cpp
-    IO/UITypes/UIDojoEnergy.h
+    IO/UITypes/UIDojoHud.cpp
+    IO/UITypes/UIDojoHud.h
     IO/UITypes/UIAvatarMegaphone.cpp
     IO/UITypes/UIAvatarMegaphone.h
     IO/UITypes/UIQuickSlotConfig.cpp

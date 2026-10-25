@@ -432,6 +432,30 @@ namespace ms
 		return 0;
 	}
 
+	int16_t MapMobs::dojo_boss_percent() const
+	{
+		const Mob *first = nullptr;
+		uint32_t first_entry = 0;
+
+		for (auto &mmo : mobs)
+		{
+			auto mob = static_cast<const Mob *>(mmo.second.get());
+
+			if (!mob || !mob->is_boss() || mob->get_id() == 9300216 || mob->get_id() == 9999999)
+				continue;
+
+			uint32_t entry = mobs.entry_order(mmo.first);
+
+			if (!first || entry < first_entry)
+			{
+				first = mob;
+				first_entry = entry;
+			}
+		}
+
+		return first ? first->get_last_percent() : -1;
+	}
+
 	std::vector<std::pair<Point<int16_t>, int32_t>> MapMobs::take_hurts()
 	{
 		std::vector<std::pair<Point<int16_t>, int32_t>> hurts;

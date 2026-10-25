@@ -300,6 +300,7 @@ namespace ms
 		}
 
 		hppercent = 0;
+		lastpercent = 100;
 		targetdead = false;
 		reporttime = 0;
 		dying = false;
@@ -2089,6 +2090,9 @@ namespace ms
 
 	void Mob::show_hp(int8_t percent, uint16_t playerlevel)
 	{
+		// Kept whatever the mob, for the Dojo's monster gauge (0x66d64c).
+		lastpercent = static_cast<uint8_t>(percent);
+
 		// A friendly has only its own gauge (0x668748).
 		if (friendly)
 			return;
@@ -2718,6 +2722,11 @@ namespace ms
 	bool Mob::is_boss() const
 	{
 		return boss;
+	}
+
+	uint8_t Mob::get_last_percent() const
+	{
+		return lastpercent;
 	}
 
 	bool Mob::can_move() const

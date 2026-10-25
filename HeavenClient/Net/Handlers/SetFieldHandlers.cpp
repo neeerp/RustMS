@@ -42,7 +42,7 @@
 #include "../../Util/Memos.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
-#include "../../IO/UITypes/UIDojoEnergy.h"
+#include "../../IO/UITypes/UIDojoHud.h"
 #include "../../IO/UITypes/UIFieldClock.h"
 #include "../../IO/UITypes/UIMemoNotice.h"
 #include "../../IO/UITypes/UIMiniMap.h"
@@ -73,8 +73,8 @@ namespace ms
 
 				Stage::get().load(mapid, portalid, chase);
 
-				// The Dojo's energy bar is up only where its secret skills may be used.
-				UIDojoEnergy::show_on(Stage::get().get_mapinfo().get_fieldtype());
+				// The Dojo's HUD is up only where its secret skills may be used.
+				UIDojoHud::show_on(Stage::get().get_mapinfo().get_fieldtype());
 
 				UI::get().enable();
 				Timer::get().start();
@@ -90,8 +90,10 @@ namespace ms
 					UI::get().emplace<UIMemoNotice>();
 			});
 
-		// Bamboo Rain is once a stage.
+		// Bamboo Rain is once a stage, and the Dojo's HUD and its clock go with their field.
 		dojo_energy::session().bamboo_used = false;
+		dojo_energy::session().clock = {};
+		UI::get().remove(UIElement::Type::DOJOHUD);
 
 		GraphicsGL::get().lock();
 		Stage::get().clear();
@@ -358,6 +360,16 @@ namespace ms
 	void ClockHandler::handle(InPacket& recv) const
 	{
 		int8_t kind = recv.read_byte();
+
+		// A Dojo field heeds only kind 2, which sets its HUD's clock (0x55522b).
+		if (UI::get().get_element<UIDojoHud>())
+		{
+			if (kind == 2)
+				dojo_energy::session().clock.start(UIDojoHud::now(), recv.read_int());
+
+			return;
+		}
+
 		auto field_clock = shown_clock<UIFieldClock>();
 
 		// Only kind 3 keeps the field's clock its own.
@@ -390,8 +402,14 @@ namespace ms
 				break;
 			}
 			case 2:
-				UI::get().emplace<UIFieldClock>(recv.read_int(), false);
+			{
+				int32_t seconds = recv.read_int();
+
+				// Kept for the Dojo's HUD as well, in case the field loading turns out to be one of its own.
+				dojo_energy::session().clock.start(UIDojoHud::now(), seconds);
+				UI::get().emplace<UIFieldClock>(seconds, false);
 				break;
+			}
 			case 3:
 				// Takes down a clock it put up, and puts one up if asked and
 				// there is none.
