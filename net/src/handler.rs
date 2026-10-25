@@ -520,6 +520,11 @@ pub enum WorldAction {
     Duey(crate::duey::DueyRequest),
     /// A button of the Rock, Paper, Scissors window.
     Rps(crate::rps::RpsRequest),
+    /// The Monster Carnival window spends CP on `index` of tab `tab`.
+    CarnivalSpend {
+        tab: u8,
+        index: u8,
+    },
     /// Open, join, or act in a trading room.
     Trade(crate::trade::TradeRequest),
     /// Search the Free Market's shops with the Owl of Minerva, or go to
@@ -1030,6 +1035,7 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
             ),
             (Op::DueyAction, InGame(&world::DueyActionHandler)),
             (Op::RpsAction, InGame(&world::RpsActionHandler)),
+            (Op::MonsterCarnival, InGame(&world::MonsterCarnivalHandler)),
             (Op::RingAction, InGame(&world::RingActionHandler)),
             (Op::WeddingTalk, InGame(&world::WeddingTalkHandler)),
             (Op::WeddingBless, InGame(&world::WeddingBlessHandler)),

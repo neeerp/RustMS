@@ -118,6 +118,36 @@ pub fn summonable(room: u8) -> usize {
         .unwrap_or(0)
 }
 
+/// How many of its summons a side may have out at once where the field
+/// doesn't say (`mobGenMax`; Cosmic's default).
+pub const MOB_GEN_MAX: i32 = 20;
+
+/// What room `room`'s battle field sells at `index` of its mob list: the
+/// mob, its CP price, and how many of a side's summons may be out at once.
+pub fn summon(room: u8, index: u8) -> Option<(i32, i32, usize)> {
+    let data = crate::get_game_data().ok()?;
+    let rules = data.field(battle_map(room))?.carnival.as_ref()?;
+    let &(mob_id, cost) = rules.mobs.get(usize::from(index))?;
+    let cap = rules.mob_gen_max.unwrap_or(MOB_GEN_MAX).max(0) as usize;
+    Some((mob_id, cost, cap))
+}
+
+/// Why CP couldn't be spent, MONSTER_CARNIVAL_MESSAGE's code (v83ref
+/// b163): the client says so in its chat log.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpendRefusal {
+    /// Not enough CP, or nothing at that place in the list.
+    NotEnoughCp = 1,
+    /// The side has as many summons out as it may.
+    Limit = 2,
+    /// No spot is free for a guardian.
+    NoSpot = 3,
+    /// That guardian is already out.
+    Active = 4,
+    /// Anything else.
+    Failed = 5,
+}
+
 /// Carnival Points: those left to spend, and all ever earned, which
 /// decide the battle.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -130,6 +160,11 @@ impl Points {
     fn gain(&mut self, cp: i32) {
         self.cp = self.cp.saturating_add(cp);
         self.total = self.total.saturating_add(cp);
+    }
+
+    /// Spending takes from what is left, never from the total.
+    fn spend(&mut self, cp: i32) {
+        self.cp = self.cp.saturating_sub(cp);
     }
 }
 
@@ -191,6 +226,47 @@ impl Score {
         })
     }
 
+    /// `member` spends `cp`, and so does their side; the totals stay
+    /// (Cosmic `gainCP(-cost)`). None for one not playing or without as
+    /// much left.
+    pub fn spend(&mut self, member: ClientId, cp: i32) -> Option<Gain> {
+        let side = self.side(member)?;
+        let mine = self.members.entry(member).or_default();
+        if mine.cp < cp {
+            return None;
+        }
+        mine.spend(cp);
+        let mine = *mine;
+        let ours = &mut self.teams[usize::from(side)];
+        ours.spend(cp);
+        Some(Gain {
+            side,
+            mine,
+            ours: *ours,
+        })
+    }
+
+    /// `member` gets back `cp` they spent on what didn't come about.
+    pub fn refund(&mut self, member: ClientId, cp: i32) {
+        let Some(side) = self.side(member) else {
+            return;
+        };
+        let mine = self.members.entry(member).or_default();
+        mine.cp = mine.cp.saturating_add(cp);
+        let ours = &mut self.teams[usize::from(side)];
+        ours.cp = ours.cp.saturating_add(cp);
+    }
+
+    /// `member`'s points and their side's now. None for one not playing.
+    pub fn standing(&self, member: ClientId) -> Option<Gain> {
+        let side = self.side(member)?;
+        Some(Gain {
+            side,
+            mine: self.members.get(&member).copied().unwrap_or_default(),
+            ours: self.teams[usize::from(side)],
+        })
+    }
+
     /// What `member`'s screen shows on arrival. None for one not playing.
     pub fn start(&self, member: ClientId) -> Option<Start> {
         let side = self.side(member)?;
@@ -239,6 +315,17 @@ mod tests {
         assert_eq!(start.theirs, Points { cp: 1, total: 1 });
         assert_eq!(score.start(3).unwrap().theirs, start.ours);
         assert_eq!(score.start(9), None);
+
+        // Spending takes from what is left, the member's and their side's.
+        assert_eq!(score.spend(2, 4), None);
+        let spent = score.spend(2, 3).unwrap();
+        assert_eq!(spent.mine, Points { cp: 0, total: 3 });
+        assert_eq!(spent.ours, Points { cp: 2, total: 5 });
+        assert_eq!(score.spend(9, 0), None);
+        score.refund(2, 3);
+        let back = score.standing(2).unwrap();
+        assert_eq!(back.mine, Points { cp: 3, total: 3 });
+        assert_eq!(back.ours, Points { cp: 5, total: 5 });
         assert!(score.both_sides(&[1, 3]));
         assert!(!score.both_sides(&[1, 2]));
         assert!(!score.both_sides(&[3, 9]));

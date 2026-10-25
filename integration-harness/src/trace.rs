@@ -208,7 +208,7 @@ pub struct Trace {
     /// FAMILY_NOTIFY_LOGIN_OR_LOGOUT): (opcode, body), in order.
     pub family: Vec<(i16, Vec<u8>)>,
     /// Every Monster Carnival packet (MONSTER_CARNIVAL_START to
-    /// MONSTER_CARNIVAL_PARTY_CP): (opcode, body), in order.
+    /// MONSTER_CARNIVAL_MESSAGE): (opcode, body), in order.
     pub carnival: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST, MARRIAGE_RESULT and WEDDING_GIFT_RESULT:
     /// (opcode, body), in order.
@@ -691,7 +691,7 @@ impl Trace {
             .contains(&op)
         {
             self.family.push((op, p.bytes[2..].to_vec()));
-        } else if (SendOpcode::CarnivalStart as i16..=SendOpcode::CarnivalPartyCp as i16)
+        } else if (SendOpcode::CarnivalStart as i16..=SendOpcode::CarnivalMessage as i16)
             .contains(&op)
         {
             self.carnival.push((op, p.bytes[2..].to_vec()));

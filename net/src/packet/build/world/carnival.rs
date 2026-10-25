@@ -1,7 +1,7 @@
 //! The Monster Carnival's packets (`net::carnival`; v83ref b163, the
 //! client's `CField_MonsterCarnival::OnPacket`, FUN_005652ee).
 
-use crate::carnival::{Points, Start};
+use crate::carnival::{Points, SpendRefusal, Start};
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use packet::{io::write::PktWrite, Packet};
 
@@ -44,6 +44,27 @@ pub fn build_party_cp(side: u8, team: Points) -> Result<Packet, NetworkError> {
     p.write_short(SendOpcode::CarnivalPartyCp as i16)?;
     p.write_byte(side)?;
     points(&mut p, team)?;
+    Ok(p)
+}
+
+/// MONSTER_CARNIVAL_SUMMON: `name` spent CP on `index` of the window's
+/// tab `tab` (0 mobs, 1 skills, 2 guardians), which the client's chat log
+/// shows. It frees the window for the next request.
+pub fn build_carnival_summon(tab: u8, index: u8, name: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CarnivalSummon as i16)?;
+    p.write_byte(tab)?;
+    p.write_byte(index)?;
+    p.write_str_with_length(name)?;
+    Ok(p)
+}
+
+/// MONSTER_CARNIVAL_MESSAGE: why the player's spend failed. It frees the
+/// window for the next request.
+pub fn build_carnival_message(why: SpendRefusal) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::CarnivalMessage as i16)?;
+    p.write_byte(why as u8)?;
     Ok(p)
 }
 
@@ -93,5 +114,17 @@ mod tests {
             .short(4)
             .short(6)
             .end();
+    }
+
+    #[test]
+    fn spending_is_answered_with_a_summon_or_a_message() {
+        Expect::new(&build_carnival_summon(0, 3, "Red").unwrap().bytes)
+            .short(0x124)
+            .byte(0)
+            .byte(3)
+            .string("Red")
+            .end();
+        let limit = build_carnival_message(SpendRefusal::Limit).unwrap();
+        Expect::new(&limit.bytes).short(0x125).byte(2).end();
     }
 }

@@ -516,6 +516,7 @@ impl ClientActor {
             WorldAction::Duey(request) => self.duey_request(request).await?,
             WorldAction::WeddingGift(request) => self.gift_request(request).await?,
             WorldAction::Rps(request) => self.rps_request(request).await?,
+            WorldAction::CarnivalSpend { tab, index } => self.spend_carnival_cp(tab, index).await?,
             WorldAction::Trade(_) if self.in_cash_shop => {}
             WorldAction::Trade(request) if self.hired_merchant.is_some() => {
                 self.merchant_room_request(request).await?

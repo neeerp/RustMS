@@ -2541,6 +2541,8 @@ pub enum EventCommand {
     /// A member arrived on the Monster Carnival battle field, whose screen
     /// takes the score.
     CarnivalArrived,
+    /// A member spends CP on `index` of the Carnival window's tab `tab`.
+    CarnivalSpend { tab: u8, index: u8 },
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
