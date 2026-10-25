@@ -102,6 +102,10 @@ pub enum BuffStat {
     Ghost = 49,
     /// The arrow keys are swapped (the client's ReverseInput).
     Confuse = 51,
+    /// The Dojo's Power Explosion (1011): the client's weapon hits are
+    /// `value` percent and its spells twice, and it plays the skill's
+    /// `repeat` loop (FUN_0078df87, FUN_00791617; others see only the loop).
+    DojangBerserk = 59,
     /// No mob can hurt the player: the client dodges every hit
     /// (Invincibility, 1010).
     DivineBody = 60,
@@ -148,7 +152,7 @@ impl BuffStat {
 
     /// Stats the rest of the map is told about, in the order the client
     /// reads them (FUN_00788156); the others only matter to the player.
-    pub const SHOWN: [BuffStat; 22] = [
+    pub const SHOWN: [BuffStat; 23] = [
         BuffStat::Speed,
         BuffStat::Combo,
         BuffStat::WeaponCharge,
@@ -170,6 +174,7 @@ impl BuffStat {
         BuffStat::StopPotion,
         BuffStat::StopMotion,
         BuffStat::Fear,
+        BuffStat::DojangBerserk,
         BuffStat::DivineBody,
     ];
 

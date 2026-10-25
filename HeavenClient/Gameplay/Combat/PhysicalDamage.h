@@ -720,6 +720,12 @@ namespace ms
 			return damage;
 		}
 
+		// Power Explosion's percent of a hit, after all else (0x79053b); 0 when it is off.
+		inline double exploded(double damage, int32_t explosion)
+		{
+			return explosion ? damage * explosion * 0.01 : damage;
+		}
+
 		// The number shown: between 1 and 199999, rounded down.
 		inline int32_t finish(double damage)
 		{

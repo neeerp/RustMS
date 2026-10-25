@@ -1212,6 +1212,9 @@ pub fn buffs(skill: &Learned) -> Option<Vec<(BuffStat, i32)>> {
         1001 | 10001001 | 20001001 => vec![(BuffStat::Recovery, effect.x)],
         // Invincibility: no mob can hurt the player (FUN_00959708).
         1010 | 10001010 | 20001010 | 20011010 => vec![(BuffStat::DivineBody, effect.x)],
+        // Power Explosion: weapon hits by `x` percent, spells twice
+        // (v83ref reports/b158-power-explosion.md; not Cosmic's Booster).
+        1011 | 10001011 | 20001011 | 20011011 => vec![(BuffStat::DojangBerserk, effect.x)],
         1002 | 10001002 | 20001002 => vec![],
         // Iron Body, Rage, Iron Will, Magic Armor, Meditation, Bless,
         // Focus, Haste, Enrage.
@@ -1349,6 +1352,12 @@ mod tests {
         let invincibility = learned(&player, 1010).unwrap();
         assert_eq!(buffs(&invincibility), Some(vec![(BuffStat::DivineBody, 1)]));
         assert_eq!(invincibility.effect.duration, 30);
+        let explosion = learned(&player, 1011).unwrap();
+        assert_eq!(
+            buffs(&explosion),
+            Some(vec![(BuffStat::DojangBerserk, 200)])
+        );
+        assert_eq!(explosion.effect.duration, 30);
         // Transformed, the attack is refused but the buff isn't.
         let now = std::time::Instant::now();
         let morph = game::Buff::new(-2210000, BuffStat::Morph, 1, now, Duration::from_secs(60));

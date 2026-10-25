@@ -65,6 +65,8 @@ int main()
 		require(near(guarded(200.0, 0), 200.0), "no guard leaves it whole");
 		require(near(weakened(200.0, 20), 240.0), "Weakness 20 adds 20%");
 		require(near(weakened(200.0, 0), 200.0), "no weakness adds nothing");
+		require(near(exploded(200.0, 150), 400.0), "Power Explosion doubles a spell, whatever its percent");
+		require(near(exploded(200.0, 0), 200.0), "and without it nothing changes");
 		require(near(percent(200.0, 125), 250.0) && near(percent(200.0, 75), 150.0),
 				"a staff's element percent");
 		require(pierces(0, 0) && !pierces(1, 0), "only a roll of 0 pierces immunity with no chance");

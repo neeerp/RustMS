@@ -18,6 +18,7 @@ use tokio::time::Duration;
 
 const BAMBOO_RAIN: i32 = 1009;
 const INVINCIBILITY: i32 = 1010;
+const POWER_EXPLOSION: i32 = 1011;
 const PINK: u8 = 5;
 const DOJO: i32 = 925_020_100;
 const ENTRANCE: i32 = 925_020_000;
@@ -145,6 +146,12 @@ async fn the_dojos_secret_skills_take_a_full_energy_bar_and_empty_it() {
     assert_eq!(t.buffs, [DIVINE_BODY]);
     assert_eq!(t.session_values, [energy("0")]);
     assert!(t.broadcasts.contains(&reset), "{t:?}");
+
+    // And so does Power Explosion, whose buff is its `x`, 200 percent.
+    charge(c, &m).await;
+    let t = step(c, &m, use_skill(POWER_EXPLOSION, 1)).await;
+    assert_eq!(t.buffs, [(POWER_EXPLOSION, 200, 30_000)]);
+    assert_eq!(t.session_values, [energy("0")]);
 
     // Back at the entrance, a full bar empties too, and the client hears it.
     charge(c, &m).await;

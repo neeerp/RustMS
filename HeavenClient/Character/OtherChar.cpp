@@ -169,6 +169,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::DIVINE_BODY)
 				show_divine_body(pq_skills::family(job, pq_skills::INVINCIBILITY));
+
+			if (stat == Buffstat::Id::BERSERK_FURY)
+				show_power_explosion(pq_skills::family(job, pq_skills::POWER_EXPLOSION));
 		}
 
 		show_diseases();
@@ -218,6 +221,9 @@ namespace ms
 
 			if (stat == Buffstat::Id::DIVINE_BODY)
 				show_divine_body(0);
+
+			if (stat == Buffstat::Id::BERSERK_FURY)
+				show_power_explosion(0);
 		}
 
 		show_diseases();

@@ -65,6 +65,7 @@ namespace ms
 		energy_glow.drawbelow(absp, alpha);
 		berserk_aura.drawbelow(absp, alpha);
 		divine_body.drawbelow(absp, alpha);
+		power_explosion.drawbelow(absp, alpha);
 
 		if (!look.get_morph())
 			consume_aura.drawbelow(absp, alpha);
@@ -185,6 +186,7 @@ namespace ms
 		energy_glow.drawabove(absp, alpha);
 		berserk_aura.drawabove(absp, alpha);
 		divine_body.drawabove(absp, alpha);
+		power_explosion.drawabove(absp, alpha);
 
 		if (!look.get_morph())
 			consume_aura.drawabove(absp, alpha);
@@ -268,6 +270,7 @@ namespace ms
 		energy_glow.update();
 		berserk_aura.update();
 		divine_body.update();
+		power_explosion.update();
 		consume_aura.update();
 
 		for (RingDisplay &ring : rings)
@@ -657,16 +660,26 @@ namespace ms
 
 	void Char::show_divine_body(int32_t skill)
 	{
+		show_repeat(divine_body, divine_body_skill, skill);
+	}
+
+	void Char::show_power_explosion(int32_t skill)
+	{
+		show_repeat(power_explosion, power_explosion_skill, skill);
+	}
+
+	void Char::show_repeat(EffectLayer &layer, int32_t &shown, int32_t skill)
+	{
 		// Once on, it keeps looping (FUN_0094314d).
-		if (skill != 0 && divine_body_skill == skill)
+		if (skill != 0 && shown == skill)
 			return;
 
-		divine_body.clear();
-		divine_body_skill = skill;
+		layer.clear();
+		shown = skill;
 
 		if (skill != 0)
-			divine_body.add_looping(nl::nx::skill[string_format::skill_img(skill)]["skill"][string_format::extend_id(skill, 7)]
-									["repeat"], DrawArgument(facing_right), 0, 1.0f);
+			layer.add_looping(nl::nx::skill[string_format::skill_img(skill)]["skill"][string_format::extend_id(skill, 7)]
+							  ["repeat"], DrawArgument(facing_right), 0, 1.0f);
 	}
 
 	void Char::show_consume_effect(int32_t item)

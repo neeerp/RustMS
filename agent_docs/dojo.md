@@ -7,8 +7,8 @@ door, and So Gong's solo run. Slice 2 is the section timers and the
 entrance's taunt. Slice 3a is training points, the rooftop's EXP, and the
 score So Gong records. Slice 3b is the belts, the points reset and the
 medals. Slice 3c is So Gong's first-time trial. Slice 4 is the party
-Dojo. Slice 5 is the energy bar and its secret skills. The `muruengRaid`
-HUD's clock and gauges come later.
+Dojo. Slice 5 is the energy bar and its secret skills, and slice 5b Power
+Explosion's buff. The `muruengRaid` HUD's clock and gauges come later.
 
 ## The way in
 
@@ -298,12 +298,21 @@ The secret skills (`skills::pq_skill`) take a full bar:
 |---|---|---|
 | Bamboo Rain (1009) | Up + Ctrl + Alt | an attack; dropped if the bar isn't full |
 | Invincibility (1010) | Left + Ctrl + Alt | the `DivineBody` buff; refused (`Refusal::NoEnergy`) if it isn't |
-| Power Explosion (1011) | Right + Ctrl + Alt | not yet: it has no buff, so it is refused and the bar stays full (slice 5b; v83ref `reports/b158-power-explosion.md`) |
+| Power Explosion (1011) | Right + Ctrl + Alt | the `DojangBerserk` buff (bit 59) at its `x`, 200, for 30 s; refused if it isn't |
 
 Each copy (10001009 and so on) works the same. Using one empties the bar,
 sends `energy` 0, and the pink notice `dojo.energy_reset`. As in Cosmic,
 the server never sends FIELD_SET_VARIABLE `Bamboo_Used`, so Bamboo Rain
 may be used again on the same floor once the bar is full again.
+
+Power Explosion is not Cosmic's (which gives Booster and leaves out Evan's
+20011011). v83's client reads bit 59's value n and makes every weapon hit
+n percent, after all else and before the 199999 clamp (PDamage, 0x79053b),
+and every spell twice whatever n is (MDamage, 0x791f26); nothing there
+checks the map (v83ref `reports/b158-power-explosion.md`). The server's
+damage caps allow the same (`combat::explosion_percent`,
+`explosion_magic`). Others see the stat with no data: their client plays
+the skill's `repeat` loop on the player.
 
 ## The client
 
@@ -348,6 +357,14 @@ the held one through first. On a chord the arrow held picks the skill
 (FUN_0094ce06), cast through `Combat::use_move`. Up after `Bamboo_Used`
 shows "Bamboo Rain can be used only once per stage." in chat type 0xc
 (v83's line is Korean). With no arrow held, both keys go on as usual.
+
+Bit 59 is HeavenClient's `BERSERK_FURY`. `Player::prepare_attack` copies
+its value into `Attack::explosion`, which `physical_damage::exploded` and
+`magic_damage::exploded` apply. While it lasts the player, and others who
+see them, loop `Skill/<job>.img/skill/<X>1011/repeat`
+(`Char::show_power_explosion`, FUN_00943085), as Invincibility's loop is
+drawn for bit 60. v83 also skips the loop while another stat it keeps at
++0xb50 is on; which stat that is isn't known, so HeavenClient doesn't.
 
 ## Text
 

@@ -251,6 +251,25 @@ fn buff(player: &Player, stat: BuffStat) -> i32 {
     energy::raise(player, stat, player.buffs.value(stat).map_or(0, i32::from))
 }
 
+/// Power Explosion's percent for every weapon hit, after all else and
+/// before the 199999 clamp (PDamage, 0x79053b); 100 when it is off.
+fn explosion_percent(player: &Player) -> i64 {
+    match buff(player, BuffStat::DojangBerserk) {
+        0 => 100,
+        percent => i64::from(percent),
+    }
+}
+
+/// Power Explosion doubles every spell, whatever its value (MDamage,
+/// 0x791f26).
+fn explosion_magic(player: &Player) -> i32 {
+    if player.buffs.has(BuffStat::DojangBerserk) {
+        2
+    } else {
+        1
+    }
+}
+
 /// What Echo of Hero adds to a whole attack or magic: its percent, rounded
 /// down (0x77e01c, 0x79167b).
 fn echo_bonus(player: &Player, total: i32) -> i32 {
@@ -617,11 +636,14 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
         0 => 100,
         percent => i64::from(percent),
     };
-    // A charge and Berserk raise every weapon hit.
+    // A charge, Berserk and Power Explosion raise every weapon hit.
     let charged = i64::from(charge::damage_percent(player));
     let berserk = i64::from(berserk::damage_percent(player));
+    let explosion = explosion_percent(player);
     let cap_for = |percent: i32| {
         (2 * base * (i64::from(percent) * combo / 100 + critical) / 100 * charged / 100 * berserk
+            / 100
+            * explosion
             / 100)
             .clamp(10, i64::from(i32::MAX)) as i32
     };
@@ -642,14 +664,14 @@ pub fn validate(attack: &Attack, player: &Player) -> Result<Uses, AttackRejectio
             // Twice the formula for the roll, Element Amplification, and half
             // again for a monster weak to the spell's element (FUN_00790782).
             let max = max_magic_damage(player, effect.magic) * skills::amplification(player) / 100;
-            (max * 3).max(10)
+            (max * 3 * explosion_magic(player)).max(10)
         } else if skill.skill_id == skills::HEAL {
             // Heal hurts the undead most when it reaches only one, by the
             // highest roll, and half again on one weak to it.
             let max = skills::heal_amount(player, effect.hp, 1, 1.0)
                 * f64::from(skills::amplification(player))
                 / 100.0;
-            ((max * 1.5).ceil() as i32).max(10)
+            ((max * 1.5).ceil() as i32 * explosion_magic(player)).max(10)
         } else if skill.skill_id == SHADOW_MESO {
             // Ten times between half and one and a half its `moneyCon`,
             // raised by its `x` percent on a critical (FUN_0078df87).
@@ -1040,6 +1062,7 @@ mod tests {
     use super::*;
     use crate::codec::testing::Expect;
     use game::{EquipStats, Item};
+    use std::time::{Duration, Instant};
 
     fn attack_packet(object_id: i32, damage: i32) -> Packet {
         skill_attack_packet(0, object_id, damage)
@@ -1147,6 +1170,22 @@ mod tests {
         assert!(validate(&swing(20), &player).is_ok());
         assert_eq!(validate(&swing(21), &player), Err(AttackRejection::Damage));
         player.stats.hp = 500;
+        assert!(validate(&swing(40), &player).is_ok());
+        assert_eq!(validate(&swing(41), &player), Err(AttackRejection::Damage));
+    }
+
+    #[test]
+    fn power_explosion_raises_weapon_hits_by_its_percent() {
+        let mut player = beginner_with_sword();
+        let swing = |damage| parse_close_attack(&attack_packet(1, damage)).unwrap();
+        let start = Instant::now();
+        player.buffs.give(game::Buff::new(
+            1011,
+            BuffStat::DojangBerserk,
+            200,
+            start,
+            Duration::from_secs(30),
+        ));
         assert!(validate(&swing(40), &player).is_ok());
         assert_eq!(validate(&swing(41), &player), Err(AttackRejection::Damage));
     }
@@ -1489,6 +1528,20 @@ mod tests {
         assert!(validate(&bolt(1485), &player).is_ok());
         assert_eq!(
             validate(&bolt(1486), &player).unwrap_err(),
+            AttackRejection::Damage
+        );
+        // Power Explosion doubles a spell, whatever its percent.
+        let mut exploding = player.clone();
+        exploding.buffs.give(game::Buff::new(
+            1011,
+            BuffStat::DojangBerserk,
+            150,
+            Instant::now(),
+            Duration::from_secs(30),
+        ));
+        assert!(validate(&bolt(2970), &exploding).is_ok());
+        assert_eq!(
+            validate(&bolt(2971), &exploding).unwrap_err(),
             AttackRejection::Damage
         );
         // Element Amplification at level 30 makes spells 140%, for a fire
