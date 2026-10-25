@@ -183,6 +183,9 @@ pub struct FieldAvatar {
     pub gm: bool,
     /// Whether the player is a GM hidden by Hide.
     pub hidden: bool,
+    /// The player's side in an event field, Monster Carnival's 0 Maple Red
+    /// or 1 Maple Blue. The client sets it.
+    pub team: u8,
 }
 
 /// What a player rides (the client's RideVehicle data): the mount item and
@@ -586,6 +589,7 @@ impl Player {
             mount: self.mount,
             gm: self.gm_level > 0,
             hidden: self.hidden,
+            team: 0,
         }
     }
 

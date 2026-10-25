@@ -1302,6 +1302,21 @@ unsourced = [
     "carnival.spiegelmann.busy",
     "carnival.spiegelmann.go",
     "carnival.guide.back",
+    "carnival.spiegelmann.waiting",
+    "carnival.spiegelmann.taken",
+    "carnival.spiegelmann.sent",
+    "carnival.spiegelmann.unequal",
+    "carnival.spiegelmann.facing",
+    "carnival.spiegelmann.full",
+    "carnival.challenge.ask",
+    "carnival.challenge.member",
+    "carnival.challenge.declined",
+    "carnival.challenge.unequal",
+    "carnival.waiting",
+    "carnival.team.red",
+    "carnival.team.blue",
+    "carnival.room.wait",
+    "carnival.room.leave",
 ]
 
 [text."glTutoMsg0.message"]

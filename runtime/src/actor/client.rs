@@ -904,7 +904,8 @@ impl ClientActor {
         if net::personal_shop::allowed_on(game.player.stats.map_id) {
             game.player.chalkboard = None;
         }
-        let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+        let mut avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+        avatar.team = self.event_side();
         let party = self.party_id;
         self.send_to_field(FieldMessage::Join {
             handle,
@@ -1584,6 +1585,10 @@ impl ClientActor {
             }
             ServerMessage::EventStarted(ticket) => self.event_started(ticket).await?,
             ServerMessage::EventEnded { id } => self.event_ended(id).await?,
+            ServerMessage::CarnivalChallenge {
+                challenger,
+                challengers,
+            } => self.carnival_challenged(challenger, challengers).await?,
             ServerMessage::EventFailed { id } => self.event_failed(id).await,
             ServerMessage::LeaderHandedOver { to } => self.handed_over(to).await,
             ServerMessage::StageCleared { id, stage, exp } => {
@@ -1868,7 +1873,8 @@ impl ClientActor {
                 let key = game.field.key;
                 let spawn = net::spawn_position(key.map_id, game.player.stats.spawn_point)
                     .unwrap_or(FALLBACK_SPAWN);
-                let avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+                let mut avatar = game.player.field_avatar(spawn.x, spawn.y, spawn.stance);
+                avatar.team = self.event_side();
                 let field = self.services.fields.field(key);
                 self.in_game_mut()?.field = field.clone();
                 let rejoin = FieldMessage::Join {

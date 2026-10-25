@@ -588,6 +588,7 @@ impl FieldActor {
                         stance: live.stance,
                         chair: live.chair,
                         mini_room: live.mini_room.take(),
+                        team: live.team,
                         ..avatar
                     };
                     if hid {
@@ -3987,6 +3988,7 @@ mod tests {
             mount: game::Mount::default(),
             gm: false,
             hidden: false,
+            team: 0,
         }
     }
 

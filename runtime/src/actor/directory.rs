@@ -1,3 +1,4 @@
+mod carnival;
 mod family;
 mod marriage;
 mod squad;
@@ -145,6 +146,8 @@ pub struct WorldDirectory {
     events: HashMap<(u8, EventKind), Vec<u32>>,
     /// The squad each channel gathers, or sent out, of each kind.
     squads: HashMap<(u8, EventKind), squad::SquadEntry>,
+    /// The Monster Carnival rooms taken on each channel.
+    carnival_rooms: HashMap<(u8, u8), carnival::CarnivalRoom>,
     next_event: u32,
     /// The wedding under way at each channel's venues.
     weddings: HashMap<(u8, game::wedding::Venue), marriage::Wedding>,
@@ -175,6 +178,7 @@ impl WorldDirectory {
             proposals: HashMap::new(),
             events: HashMap::new(),
             squads: HashMap::new(),
+            carnival_rooms: HashMap::new(),
             next_event: 1,
             weddings: HashMap::new(),
             avatar_banners: AvatarBanners::default(),
@@ -315,7 +319,19 @@ impl WorldDirectory {
             } => {
                 self.event_gone(channel_id, kind, id);
                 self.squad_closed(channel_id, kind, id);
+                self.carnival_closed(channel_id, kind, id);
             }
+            DirectoryMessage::CarnivalRooms { from, reply } => {
+                let _ = reply.send(self.carnival_rooms(from));
+            }
+            DirectoryMessage::CarnivalPick { from, room, reply } => {
+                self.carnival_pick(from, room, reply);
+            }
+            DirectoryMessage::CarnivalAnswer {
+                from,
+                challenger,
+                accept,
+            } => self.carnival_answer(from, challenger, accept),
             DirectoryMessage::SquadTalk { from, kind, reply } => {
                 let _ = reply.send(self.squad_view(from, kind));
             }
@@ -534,8 +550,25 @@ impl WorldDirectory {
     /// Whether `from`'s party, or `from` alone for an event taken alone,
     /// may go into an event of `kind` on their channel, and who would go.
     fn event_entry(&self, from: ClientId, kind: EventKind) -> (events::Entry, Vec<ClientId>) {
+        let team = match self.event_team(from, kind) {
+            Ok(team) => team,
+            Err(entry) => return (entry, Vec::new()),
+        };
+        let busy = self
+            .clients
+            .get(&from)
+            .is_none_or(|asker| self.event_busy(asker.channel_id, kind));
+        if busy {
+            return (events::Entry::Busy, Vec::new());
+        }
+        (events::Entry::Ready, team)
+    }
+
+    /// Who of `from`'s party, or `from` alone for an event taken alone,
+    /// would go into an event of `kind`, however many already run.
+    fn event_team(&self, from: ClientId, kind: EventKind) -> Result<Vec<ClientId>, events::Entry> {
         let Some(asker) = self.clients.get(&from) else {
-            return (events::Entry::NoParty, Vec::new());
+            return Err(events::Entry::NoParty);
         };
         let candidate = |entry: &Entry| Candidate {
             id: entry.handle.client_id,
@@ -547,10 +580,10 @@ impl WorldDirectory {
             vec![candidate(asker)]
         } else {
             let Some(party) = self.parties.of(from) else {
-                return (events::Entry::NoParty, Vec::new());
+                return Err(events::Entry::NoParty);
             };
             if party.leader != from {
-                return (events::Entry::NotLeader, Vec::new());
+                return Err(events::Entry::NotLeader);
             }
             party
                 .members
@@ -562,13 +595,9 @@ impl WorldDirectory {
                 .map(candidate)
                 .collect()
         };
-        let Some(team) = kind.event().team(from, &candidates) else {
-            return (events::Entry::NotEligible, Vec::new());
-        };
-        if self.event_busy(asker.channel_id, kind) {
-            return (events::Entry::Busy, Vec::new());
-        }
-        (events::Entry::Ready, team)
+        kind.event()
+            .team(from, &candidates)
+            .ok_or(events::Entry::NotEligible)
     }
 
     /// Whether `channel_id` already runs as many events of `kind` as may

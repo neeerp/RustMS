@@ -7,21 +7,22 @@ RE is in v83ref `reports/b163-carnival-client.md` (the v83 client's fields
 and packets) and `reports/b165-carnival-server.md` (the rules, after
 Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
 
-Status: the field data, the Carnival Field and Spiegelmann, one party alone
-on a room's battle field with its clock, CP from kills, and the exit room
-are in. Not yet: a second party and the waiting room's challenge, spending
-CP (0xDA), summons, skills and guardians, CP lost on death and the revive
-room, results and their effects, and the client's Carnival UI.
+Status: the field data, the Carnival Field and Spiegelmann, the waiting
+rooms and their challenges, two parties on a room's battle field with its
+clock, the sides' look, CP from kills, and the exit room are in. Not yet:
+spending CP (0xDA), summons, skills and guardians, CP lost on death and the
+revive room, results and their effects, and the client's Carnival UI.
 
 ## Maps
 
 - The Carnival Field, 980000000 (`CARNIVAL_LOBBY`), has Spiegelmann
   (2042000). Its `mc_out` portal leads back to the map kept in
   `CARNIVAL_RETURN` (5), or Kerning City.
-- Room n (1 to 6) is 980000n00, its waiting room. Its battle field is
-  980000n01 (`battle_map`), then the revive room (n02), the winners' (n03)
-  and the losers' (n04). The revive rooms' `MCrevive<n>` portals go back to
-  the battle field.
+- Room n (1 to 6) is 980000n00 (`room_map`), its waiting room, with
+  2042001, who tells the party to wait, and 2042003, who takes a member
+  back to the Carnival Field. Its battle field is 980000n01 (`battle_map`),
+  then the revive room (n02), the winners' (n03) and the losers' (n04). The
+  revive rooms' `MCrevive<n>` portals go back to the battle field.
 - The exit room, 980000010 (`CARNIVAL_EXIT`), has 2042002, who sends
   players back to the Carnival Field.
 - A battle field is field type 10 (the client's `CField_MonsterCarnival`).
@@ -36,22 +37,43 @@ room, results and their effects, and the client's Carnival UI.
 ## The battle (`net::events`, `EventKind::Carnival`)
 
 Each room is an event, `EventKind::Carnival(room)` (`CARNIVAL`, built by
-`carnival()`), whose maps are the room's battle field to its losers' room,
+`carnival()`), whose maps are the room's waiting room to its losers' room,
 played on the event's own instance (see `party-quests.md`). Rooms 1 to 4
 take two to four a side and rooms 5 and 6 three to six. The harness world
 sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
 
 - Spiegelmann on the Carnival Field (`NpcScript::spiegelmann`): Join, for
-  levels 30 to 50, lists the rooms with their sizes, and a party's leader
-  takes the party into a free one. About explains the battle. Elsewhere he
-  offers the way to the Carnival Field, saving the way back.
-- The battle starts with its clock, the field's `timeDefault` scaled by
-  `RUSTMS_EVENT_SCALE` (`battle_length`). When it runs out, everyone goes to
-  the exit room.
+  levels 30 to 50, lists the rooms: free with its sizes, a party of so many
+  of such a level waiting, or taken. About explains the battle. Elsewhere
+  he offers the way to the Carnival Field, saving the way back.
+- The directory keeps each channel's rooms (`directory/carnival.rs`,
+  `DirectoryMessage::CarnivalRooms`, `CarnivalPick` and `CarnivalAnswer`).
+  A party's leader picking a free room takes it: the room's event starts,
+  and the party waits in the waiting room for 3 minutes (`WAITING`), told
+  so (`carnival.waiting`). Picking a room where a party waits challenges
+  them, if the party is as big, and the waiting leader is asked
+  (`ServerMessage::CarnivalChallenge`, `NpcScript::carnival_challenge`,
+  with the challengers' names and levels). A challenge waits 30 s for its
+  answer (`CHALLENGE`), and one at a time; a room in battle is taken.
+  A leader has one challenge out at a time (a new pick takes the last
+  back), an answer counts only for the challenge asked about, and a room's
+  size is its waiting party's members there now.
+  Spiegelmann says how a pick went (`NpcScript::spiegelmann_picked`).
+- No tells the challenger's leader (a pink line). Yes brings the
+  challengers into the event (`EventMessage::Challengers`) as Maple Blue:
+  they join the waiting room, and both sides see a 10 s clock (`READY`).
+- The stages are `net::carnival::Stage`. Waiting's time running out, or the
+  waiting leader leaving, sends the party back to the Carnival Field. After
+  the 10 s, everyone goes to the battle field, each side told theirs
+  (`carnival.team.red`/`blue`), and the battle's clock starts, the field's
+  `timeDefault` scaled by `RUSTMS_EVENT_SCALE` (`battle_length`). When it
+  runs out, or a side has nobody left, everyone goes to the exit room.
 - The event keeps the score (`net::carnival::Score`): each member's side and
-  CP, and each side's. A party alone plays Maple Red. A kill on the battle
-  field (`FieldActor::handle_attack`) earns the mob's CP for the killer and
-  their side.
+  CP, and each side's. A kill on the battle field
+  (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
+  side.
+- A member's side is on their ticket (`EventTicket::side`), and from there
+  in their look (`FieldAvatar::team`, SPAWN_PLAYER's last byte).
 
 ## Packets (`net::packet::build::world::carnival`)
 

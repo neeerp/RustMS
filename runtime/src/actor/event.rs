@@ -42,7 +42,7 @@ use net::packet::build::world::carnival::{
     build_carnival_start, build_obtained_cp, build_party_cp,
 };
 use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
-use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicI32, AtomicU64, AtomicU8, Ordering};
@@ -87,6 +87,9 @@ pub enum EventMessage {
     },
     /// How many are in the team now.
     TeamSize { reply: oneshot::Sender<usize> },
+    /// A Monster Carnival room's waiting party accepted the challenge of
+    /// `members`, who come in as Maple Blue.
+    Challengers { members: Vec<ClientHandle> },
 }
 
 /// The stages an event's party has cleared, one bit each, how many of the
@@ -154,6 +157,9 @@ pub struct EventTicket {
     /// Whether the member heard Ellin out on the forest's fourth stage
     /// (Cosmic `gridInsert`).
     pub hint_heard: bool,
+    /// The member's side in a Monster Carnival, 0 Maple Red or 1 Maple
+    /// Blue, which their look shows others.
+    pub side: u8,
 }
 
 impl Drop for EventTicket {
@@ -323,6 +329,17 @@ impl EventJoiner {
     }
 }
 
+impl EventJoiner {
+    /// Bring the party of `members` into a Monster Carnival room's event
+    /// as the challengers. False if the event is over or busy.
+    pub fn challengers(&self, members: Vec<ClientHandle>) -> bool {
+        let message = EventMessage::Challengers { members };
+        self.0
+            .upgrade()
+            .is_some_and(|tx| tx.try_send(message).is_ok())
+    }
+}
+
 fn taken_back(message: EventMessage) -> Option<oneshot::Sender<SquadAnswer>> {
     match message {
         EventMessage::Join { reply, .. } => Some(reply),
@@ -347,10 +364,12 @@ pub fn spawn(
         id,
         kind,
         channel_id,
-        // So Gong's trial has no time limit; a Monster Carnival battle
-        // lasts as long as its field says.
+        // So Gong's trial has no time limit; a Monster Carnival room is
+        // waited in for a challenge for so long.
         ends: match kind {
-            EventKind::Carnival(room) => Some(Instant::now() + net::carnival::battle_length(room)),
+            EventKind::Carnival(_) => {
+                Some(Instant::now() + net::events::scaled(net::carnival::WAITING))
+            }
             _ => (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
         },
         joiner: tx.downgrade(),
@@ -365,7 +384,8 @@ pub fn spawn(
             team.enlist(&start.roster);
             team
         },
-        // One party alone plays Maple Red.
+        carnival_stage: net::carnival::Stage::default(),
+        // The party waiting plays Maple Red.
         carnival: {
             let mut score = net::carnival::Score::default();
             for member in &start.team {
@@ -530,6 +550,7 @@ struct EventActor {
     pyramid_end: Option<bool>,
     /// A Monster Carnival battle's sides and CP.
     carnival: net::carnival::Score,
+    carnival_stage: net::carnival::Stage,
 }
 
 impl EventActor {
@@ -551,7 +572,10 @@ impl EventActor {
             let ends = self.ends.map(|ends| ends + self.overtime());
             tokio::select! {
                 message = self.rx.recv() => match message {
-                    Some(EventMessage::Left { client_id }) => over = self.team.leave(client_id),
+                    Some(EventMessage::Left { client_id }) => {
+                        over = self.team.leave(client_id) || self.carnival_left(client_id);
+                    }
+                    Some(EventMessage::Challengers { members }) => self.challengers(members),
                     Some(EventMessage::Cloto { client_id, stage, reply }) => {
                         let _ = reply.send(self.cloto(client_id, stage));
                     }
@@ -613,6 +637,100 @@ impl EventActor {
             blessing: self.blessing,
             prize_taken: false,
             hint_heard: false,
+            side: self.carnival.side(member).unwrap_or(0),
+        }
+    }
+
+    /// A Monster Carnival room's waiting party accepted the challenge of
+    /// `members`' party, who come in as Maple Blue. Both stand in the
+    /// waiting room until the battle, the waiting side seeing the new
+    /// clock (Cosmic `startCPQ`). Tickets that don't arrive hand
+    /// themselves back.
+    fn challengers(&mut self, members: Vec<ClientHandle>) {
+        let Some(tx) = self.joiner.upgrade() else {
+            return;
+        };
+        if self.carnival_stage != net::carnival::Stage::Waiting {
+            return;
+        }
+        self.carnival_stage = net::carnival::Stage::Ready;
+        let ends = Instant::now() + net::events::scaled(net::carnival::READY);
+        self.ends = Some(ends);
+        for member in self.team.members() {
+            if let Some(handle) = self.members.get(member) {
+                handle.send(ServerMessage::EventClock {
+                    id: self.id,
+                    clock: Some(ends),
+                });
+            }
+        }
+        info!(kind = ?self.kind, id = self.id, ?members, "Carnival challengers");
+        for member in members {
+            let id = member.client_id;
+            self.team.admit(id);
+            self.carnival.join(id, 1);
+            let ticket = self.ticket(id, EventHandle { tx: tx.clone() });
+            self.everyone
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(member.clone());
+            member.send(ServerMessage::EventStarted(ticket));
+            self.members.insert(id, member);
+        }
+    }
+
+    /// A Monster Carnival room's time ran out. Waiting, the party goes back
+    /// to the Carnival Field; ready, the battle starts, each side told
+    /// theirs; in battle, it is over (Cosmic `MonsterCarnival`'s timers).
+    fn carnival_time_up(&mut self, room: u8) -> bool {
+        use net::carnival::Stage;
+        match self.carnival_stage {
+            Stage::Waiting => {
+                info!(id = self.id, room, "Carnival room not challenged");
+                self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
+                true
+            }
+            Stage::Ready => {
+                self.carnival_stage = Stage::Battle;
+                let ends = Instant::now() + net::carnival::battle_length(room);
+                self.ends = Some(ends);
+                self.move_team(None, net::carnival::battle_map(room), Some(ends));
+                let text = net::content::text();
+                for member in self.team.members() {
+                    let key = match self.carnival.side(*member) {
+                        Some(1) => keys::CARNIVAL_TEAM_BLUE,
+                        _ => keys::CARNIVAL_TEAM_RED,
+                    };
+                    let line = build_item_line(&text.get(key, &[]), 0);
+                    if let (Some(handle), Ok(line)) = (self.members.get(member), line) {
+                        handle.send(ServerMessage::EventPackets {
+                            id: self.id,
+                            packets: vec![line],
+                        });
+                    }
+                }
+                info!(id = self.id, room, "Carnival battle started");
+                false
+            }
+            Stage::Battle => true,
+        }
+    }
+
+    /// `member` left a Monster Carnival room: the waiting party's leader
+    /// takes it back to the Carnival Field, and once challenged, a side
+    /// with nobody left ends it. Whether that ends the event.
+    fn carnival_left(&mut self, member: ClientId) -> bool {
+        use net::carnival::Stage;
+        if !matches!(self.kind, EventKind::Carnival(_)) {
+            return false;
+        }
+        match self.carnival_stage {
+            Stage::Waiting if member == self.team.leader() => {
+                self.move_team(None, net::carnival::CARNIVAL_LOBBY, None);
+                true
+            }
+            Stage::Waiting => false,
+            Stage::Ready | Stage::Battle => !self.carnival.both_sides(self.team.members()),
         }
     }
 
@@ -1026,6 +1144,9 @@ impl EventActor {
     /// Nett's Pyramid run goes on to its next stage; otherwise the event
     /// ends.
     fn time_up(&mut self) -> bool {
+        if let EventKind::Carnival(room) = self.kind {
+            return self.carnival_time_up(room);
+        }
         let event = self.kind.event();
         match &event.bonus {
             Some(bonus) if self.bonus_taken => {
