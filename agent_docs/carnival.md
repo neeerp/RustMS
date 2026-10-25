@@ -14,9 +14,8 @@ guardians, the CP and skill items, CP lost on death and the revive room,
 the results with their effects, overtime and draws, the result rooms'
 grades and EXP, and the exit room are in. HeavenClient reads the carnival's
 packets, shows the sides' tags, spares a side its own mobs, and has the
-CP window for spending CP (see `client.md`; the window's RE is
-`reports/b166-carnival-window.md`). Not yet: the window's side panel of
-summoned counts.
+CP window for spending CP, with its side panel counting the mobs summoned
+(see `client.md`; the window's RE is `reports/b166-carnival-window.md`).
 
 ## Maps
 

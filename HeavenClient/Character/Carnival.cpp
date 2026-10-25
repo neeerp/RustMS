@@ -1,5 +1,7 @@
 #include "Carnival.h"
 
+#include <algorithm>
+
 namespace ms
 {
 	namespace carnival
@@ -367,6 +369,56 @@ namespace ms
 				fold();
 
 				return true;
+			}
+
+			void Tally::add(const std::string& name, uint32_t count)
+			{
+				rows.push_back({ name, count });
+			}
+
+			size_t Tally::summon(const std::string& name)
+			{
+				last = name;
+
+				for (size_t i = 0; i < rows.size(); i++)
+				{
+					if (rows[i].name == name)
+					{
+						rows[i].count++;
+
+						return i;
+					}
+				}
+
+				rows.push_back({ name, 1 });
+
+				return rows.size() - 1;
+			}
+
+			const std::vector<Tally::Entry>& Tally::entries() const
+			{
+				return rows;
+			}
+
+			const std::string& Tally::latest() const
+			{
+				return last;
+			}
+
+			size_t Tally::top() const
+			{
+				return first;
+			}
+
+			size_t Tally::range() const
+			{
+				// v83's count less 4, not 5: a row past the last full page.
+				return rows.size() > SIDE_ROWS ? rows.size() - (SIDE_ROWS - 1) : 0;
+			}
+
+			void Tally::scroll(size_t top)
+			{
+				first = std::min(top, range());
 			}
 		}
 	}

@@ -41,6 +41,11 @@ namespace ms
 		// a12355). Whether it took the key.
 		bool send_hotkey(int32_t keycode, bool pressed);
 
+		// A mob summoned, by its name, for the side panel (FUN_0086df54).
+		void summoned(const std::string& name);
+
+		bool is_in_range(Point<int16_t> cursorpos) const override;
+
 		UIElement::Type get_type() const override;
 
 	protected:
@@ -54,7 +59,16 @@ namespace ms
 			std::array<Text, 2> cost;
 			std::array<Text, 2> key;
 			int16_t cost_x;
+			std::string label;
 			std::string desc;
+		};
+
+		// A side panel row's texts, the same way.
+		struct Count
+		{
+			std::array<Text, 2> name;
+			std::array<Text, 2> count;
+			bool latest;
 		};
 
 		void add_row(uint8_t tab, const std::string& name, int32_t cost, const std::string& desc);
@@ -64,6 +78,10 @@ namespace ms
 		// Spends CP on the selected row (FUN_008706d3).
 		void spend() const;
 		void show_tip(Point<int16_t> relative);
+		// The side panel's texts and bar, after a change (FUN_0086d6ae).
+		void refresh_side();
+		// Whether `relative` is on the side panel.
+		bool on_side(Point<int16_t> relative) const;
 		bool on_button(Point<int16_t> cursorpos) const;
 
 		enum Buttons : uint16_t
@@ -88,6 +106,12 @@ namespace ms
 		int8_t shown_team;
 
 		Slider slider;
+
+		carnival::window::Tally tally;
+		std::vector<Count> counts;
+		Texture side_background;
+		Slider side_slider;
+		bool side_open;
 		TextTooltip tip;
 		Point<int16_t> cursor;
 		bool hovered;
