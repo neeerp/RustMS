@@ -1,7 +1,10 @@
 //! The events a GM opens to a channel's players, who come by an Event
 //! Assistant (report b170).
 
+use crate::load::{self, asset_path};
+use game_data::ox_quiz::OxQuiz;
 use game_data::FieldTemplate;
+use std::sync::OnceLock;
 
 /// The portals of a Snowball field's balls, Story's on the lower lane and
 /// Maple's on the upper (`snowBall/<team>/portal`).
@@ -41,6 +44,15 @@ pub fn lobby_field(map_id: i32) -> Option<i32> {
         .iter()
         .copied()
         .find(|&field| field + 1 == map_id)
+}
+
+/// The OX Quiz's questions (`Etc.nx`), loaded on first use.
+pub fn ox_quiz() -> Option<&'static OxQuiz> {
+    static QUIZ: OnceLock<Result<OxQuiz, String>> = OnceLock::new();
+    load::once(&QUIZ, || {
+        OxQuiz::load(asset_path("RUSTMS_ETC_NX_PATH", "assets/game-data/Etc.nx"))
+    })
+    .ok()
 }
 
 #[cfg(test)]

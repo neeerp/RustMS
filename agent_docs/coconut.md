@@ -57,15 +57,17 @@ no event they do nothing.
 
 ## Opening an event to players
 
-The v83 client has the words `/coconut1` to `/coconut3`, `/snowball` and
-`/snowball1` to `/snowball3` too (report b170), and RustMS gives them
-these meanings; `/coconut` and `/endevent` are our own. A GM types them on any map, and
+The v83 client has the words `/coconut1` to `/coconut3`, `/snowball`,
+`/snowball1` to `/snowball3` and `/ox` too (reports b170, b171), and RustMS
+gives them these meanings; `/coconut` and `/endevent` are our own. A GM
+types them on any map, and
 they go to the client actor as `WorldAction::GmEntry` (`net::GmEntry`):
 
 - `/coconut`, `/coconut1`, `/coconut2` and `/coconut3` open Coconut Season
   on 109080000, 109080000, 109080001 and 109080002 to the GM's channel;
   `/snowball`, `/snowball1`, `/snowball2` and `/snowball3` open Snowball on
-  109060000, 109060000, 109060002 and 109060004. A number after the word
+  109060000, 109060000, 109060002 and 109060004; `/ox` opens the OX
+  Quiz on 109020001 (`agent_docs/ox-quiz.md`). A number after the word
   is the most players it takes, 50 if none is given. The directory keeps
   one open event per channel (`DirectoryMessage::OpenGmEvent`), in place
   of any open there, and the channel is told (`gm_event.opened`).

@@ -47,6 +47,18 @@ pub fn build_countdown(seconds: u32) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// CLOCK kind 0: the event clock, which lives on the event maps (109...,
+/// not 10905...) and goes at 0. With none up, one of |`seconds`| is put up,
+/// running if `seconds` is below 0; one up is never reset, and 0 or less
+/// starts it (v83 FUN_00a24c82, report 196).
+pub fn build_event_clock(seconds: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::Clock as i16)?;
+    p.write_byte(0)?;
+    p.write_int(seconds)?;
+    Ok(p)
+}
+
 /// STOP_CLOCK: takes the field's countdown down (v83 FUN_0053184a).
 pub fn build_stop_clock() -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -134,6 +146,14 @@ mod tests {
             [0x93, 0, 2, 0x20, 0x1c, 0, 0]
         );
         assert_eq!(build_stop_clock().unwrap().bytes, [0x9a, 0]);
+    }
+
+    #[test]
+    fn the_event_clock_is_kind_zero_running_below_zero() {
+        assert_eq!(
+            build_event_clock(-12).unwrap().bytes,
+            [0x93, 0, 0, 0xf4, 0xff, 0xff, 0xff]
+        );
     }
 
     #[test]

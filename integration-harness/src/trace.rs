@@ -216,6 +216,8 @@ pub struct Trace {
     /// Every Snowball packet (SNOWBALL_STATE to LEFT_KNOCK_BACK): (opcode,
     /// body), in order.
     pub snowball: Vec<(i16, Vec<u8>)>,
+    /// Every OX_QUIZ and GMEVENT_INSTRUCTIONS: (opcode, body), in order.
+    pub ox: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST, MARRIAGE_RESULT and WEDDING_GIFT_RESULT:
     /// (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
@@ -710,6 +712,8 @@ impl Trace {
             .contains(&op)
         {
             self.snowball.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::OxQuiz as i16 || op == SendOpcode::GmEventInstructions as i16 {
+            self.ox.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::MarriageRequest as i16
             || op == SendOpcode::MarriageResult as i16
             || op == SendOpcode::WeddingGiftResult as i16

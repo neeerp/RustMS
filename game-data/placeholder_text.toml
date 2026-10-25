@@ -1483,3 +1483,5 @@
 "gm_event.pietro" = "[placeholder] Well played! Your team won. I'll send you back to where you were."
 "gm_event.pietra" = "[placeholder] Better luck next time! I'll send you back to where you were."
 "gm_event.harry_ask" = "[placeholder] Do you want to leave the event? Your place will go to someone else."
+"ox.wrong" = "[placeholder] Wrong answer! You are out of the OX Quiz."
+"ox.won" = "[placeholder] You answered every question right! Off to receive your reward."
