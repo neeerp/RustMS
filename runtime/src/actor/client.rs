@@ -603,6 +603,11 @@ impl ClientActor {
                 cash_type,
                 amount,
             } => self.give_cash(target, cash_type, amount).await?,
+            WorldAction::MakeCoupon {
+                code,
+                days,
+                rewards,
+            } => self.make_coupon(code, days, rewards).await?,
             WorldAction::AvatarChanged(announce) => {
                 let avatar = self.in_game()?.player.field_avatar(0, 0, 0);
                 self.send_to_field(FieldMessage::UpdateAvatar {

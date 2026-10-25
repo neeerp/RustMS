@@ -231,8 +231,9 @@ client to announce; v83's handler adds nothing to the list. Notes sent back
 The Coupon button's dialog sends `COUPON_CODE` (0xE6): an empty string, then
 the code. Coupons live in `coupons` (the code in upper case, an optional
 expiry, and who redeemed it when) and `coupon_rewards` (kind 0 an item, 1 NX
-Credit, 2 Maple Points, 3 NX Prepaid, 4 mesos); there is no way to make one
-in the game, only SQL or `db::coupon::create`. A code is redeemed once, by one
+Credit, 2 Maple Points, 3 NX Prepaid, 4 mesos). They are made by a GM's
+`!coupon` (see "Chat commands" in `server-architecture.md`), by SQL, or by
+`db::coupon::create`. A code is redeemed once, by one
 account. The server trims the typed code and upper-cases it, then answers with
 a failure (0x5C) or what the coupon gave (0x59), always followed by the
 balances, which is what lets v83 take the next request:

@@ -22,6 +22,7 @@ use crate::packet::build::world::{
 };
 use crate::packet::handle::world::{set_hidden, warp_to_spawn_point};
 use db::cash_shop::CashType;
+use db::coupon::Reward;
 use tracing::info;
 
 /// Anyone.
@@ -163,6 +164,13 @@ const COMMANDS: &[Command] = &[
         tier: GM,
         usage: "[nx|mp|np] [name] <amount>",
         run: give_nx,
+    },
+    Command {
+        prefix: '!',
+        name: "coupon",
+        tier: GM,
+        usage: "<nx=N|mp=N|np=N|meso=N|item id[xN]>... [days=N] [code=CODE]",
+        run: coupon,
     },
     Command {
         prefix: '!',
@@ -505,6 +513,67 @@ fn give_nx(_: &mut WorldContext, args: &[&str]) -> Outcome {
     }
 }
 
+/// The longest a coupon may last.
+const COUPON_DAYS: u32 = 3650;
+
+/// A Cash Shop coupon (`net::coupon`) for players to redeem once: NX,
+/// mesos, and items, cash ones included, which only a coupon can give.
+fn coupon(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    let (mut code, mut days, mut rewards) = (None, None, Vec::new());
+    for arg in args {
+        let arg = arg.to_ascii_lowercase();
+        let amount = |value: &str| value.parse::<i32>().ok().filter(|&n| n > 0);
+        let reward = match arg.split_once('=') {
+            Some(("code", value)) => match crate::coupon::normalize(value) {
+                Some(value) => {
+                    code = Some(value);
+                    continue;
+                }
+                None => None,
+            },
+            Some(("days", value)) => match value.parse() {
+                Ok(value @ 1..=COUPON_DAYS) => {
+                    days = Some(value);
+                    continue;
+                }
+                _ => None,
+            },
+            Some(("nx", value)) => amount(value).map(Reward::Credit),
+            Some(("mp", value)) => amount(value).map(Reward::MaplePoints),
+            Some(("np", value)) => amount(value).map(Reward::Prepaid),
+            Some(("meso", value)) => amount(value).map(Reward::Mesos),
+            Some(_) => None,
+            None => {
+                let (item_id, quantity) = arg.split_once('x').unwrap_or((&arg, "1"));
+                match (item_id.parse::<i32>(), quantity.parse::<i16>()) {
+                    (Ok(item_id), Ok(quantity @ 1..)) => {
+                        if items::info(item_id).is_none() {
+                            return Ok(Err(format!("There is no item {item_id}.")));
+                        }
+                        Some(Reward::Item {
+                            item_id,
+                            quantity: quantity.into(),
+                        })
+                    }
+                    _ => None,
+                }
+            }
+        };
+        match reward {
+            Some(reward) => rewards.push(reward),
+            None => return Ok(Err(usage("coupon"))),
+        }
+    }
+    if rewards.is_empty() {
+        return Ok(Err(usage("coupon")));
+    }
+    Ok(Ok(vec![WorldAction::MakeCoupon {
+        code,
+        days,
+        rewards,
+    }]))
+}
+
 fn notice(_: &mut WorldContext, args: &[&str]) -> Outcome {
     if args.is_empty() {
         return Ok(Err(usage("notice")));
@@ -668,6 +737,58 @@ mod tests {
         assert_eq!(
             lines(&run_as(&mut helper, "!givenx 5000").unwrap()),
             ["Unknown command. Type !help for a list."]
+        );
+    }
+
+    #[test]
+    fn coupons_take_rewards_an_expiry_and_a_code() {
+        let mut gm = player(GM);
+        let actions = run_as(
+            &mut gm,
+            "!coupon NX=5000 meso=100 2000000x5 1002140 days=7 code=Spring1",
+        )
+        .unwrap();
+        let [WorldAction::MakeCoupon {
+            code,
+            days,
+            rewards,
+        }] = actions.as_slice()
+        else {
+            panic!("{actions:?}");
+        };
+        assert_eq!((code.as_deref(), *days), (Some("SPRING1"), Some(7)));
+        assert_eq!(
+            rewards,
+            &[
+                Reward::Credit(5000),
+                Reward::Mesos(100),
+                Reward::Item {
+                    item_id: 2_000_000,
+                    quantity: 5
+                },
+                Reward::Item {
+                    item_id: 1_002_140,
+                    quantity: 1
+                },
+            ]
+        );
+        let usage = "Usage: !coupon <nx=N|mp=N|np=N|meso=N|item id[xN]>... [days=N] [code=CODE]";
+        for line in [
+            "!coupon",
+            "!coupon days=7",
+            "!coupon nx=0",
+            "!coupon nx=-5",
+            "!coupon 2000000x0",
+            "!coupon nx=1 days=0",
+            "!coupon nx=1 days=99999",
+            "!coupon nx=1 code=",
+            "!coupon nx=1 color=red",
+        ] {
+            assert_eq!(lines(&run_as(&mut gm, line).unwrap()), [usage], "{line}");
+        }
+        assert_eq!(
+            lines(&run_as(&mut gm, "!coupon 1").unwrap()),
+            ["There is no item 1."]
         );
     }
 

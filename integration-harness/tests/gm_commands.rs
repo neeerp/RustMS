@@ -1,10 +1,11 @@
 //! Chat commands (`net::gm_commands`): a GM's `!` line runs and nobody
 //! else sees it; a player's is ordinary chat and gives nothing. `!givenx`
-//! adds to an account's NX, which the Cash Shop shows.
+//! adds to an account's NX, which the Cash Shop shows, and `!coupon` makes
+//! codes it redeems.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::set_gm_level;
-use integration_harness::packets::{build_all_chat, build_enter_cash_shop};
+use integration_harness::packets::{build_all_chat, build_coupon_code, build_enter_cash_shop};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, read, send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -154,4 +155,72 @@ async fn givenx_adds_to_an_accounts_nx() {
 
     let mut player = relogin(&other_config).await;
     assert_eq!(cash_shop_balances(&mut player.connection).await, (0, 20, 0));
+}
+
+/// Redeem `code` in the Cash Shop: the CASHSHOP_OPERATION mode it gets,
+/// and the balances after.
+async fn redeem(c: &mut MapleTestConnection, code: &str) -> (u8, (i32, i32, i32)) {
+    send(c, build_coupon_code(code).unwrap()).await;
+    let mut trace = Trace::default();
+    let mut mode = None;
+    loop {
+        let p = read(c, &mut trace).await;
+        if p.opcode() == SendOpcode::CashShopOperation as i16 {
+            mode = Some(p.bytes[2]);
+        } else if p.opcode() == SendOpcode::QueryCashResult as i16 {
+            let mut r = Cursor::new(&p.bytes[2..]);
+            let balances = (
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+            );
+            return (mode.expect("no reply before the balances"), balances);
+        }
+    }
+}
+
+#[tokio::test]
+async fn coupons_a_gm_makes_are_redeemed() {
+    let config = load_harness_config_or_fail().await;
+    login_to_world_session(&config).await.expect("login failed");
+    drop(relogin(&config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&config.username, 2).await.expect("make a GM");
+
+    let mut gm = relogin(&config).await;
+    let g = &mut gm.connection;
+    let code = format!("GM{}", config.character_name.to_uppercase());
+    let mut gt = Trace::default();
+    send(
+        g,
+        build_all_chat(&format!("!coupon nx=700 code={code}"), 0).unwrap(),
+    )
+    .await;
+    send(
+        g,
+        build_all_chat(&format!("!coupon nx=1 code={code}"), 0).unwrap(),
+    )
+    .await;
+    send(g, build_all_chat("!coupon mp=5 days=3", 0).unwrap()).await;
+    barrier(g, "gm done", &mut gt).await;
+    let lines: Vec<&str> = gt
+        .broadcasts
+        .iter()
+        .map(|(_, line)| line.as_str())
+        .collect();
+    let [made, taken, random] = lines.as_slice() else {
+        panic!("{lines:?}");
+    };
+    assert_eq!(*made, format!("Made coupon {code}."));
+    assert_eq!(*taken, "That code is taken.");
+    let random = random
+        .strip_prefix("Made coupon ")
+        .and_then(|rest| rest.strip_suffix(", good for 3 days."))
+        .unwrap_or_else(|| panic!("{random}"));
+    assert_eq!(random.len(), 16);
+
+    assert_eq!(cash_shop_balances(g).await, (0, 0, 0));
+    // 0x59: what the coupon gave.
+    assert_eq!(redeem(g, &code.to_lowercase()).await, (0x59, (700, 0, 0)));
+    assert_eq!(redeem(g, random).await, (0x59, (700, 5, 0)));
 }
