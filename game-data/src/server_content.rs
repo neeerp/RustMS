@@ -2008,6 +2008,7 @@ pub mod keys {
         "ola.notice.7",
         "ola.notice.8",
     ];
+    pub const JEWEL_NOTICE: [&str; 2] = ["jewel.notice.0", "jewel.notice.1"];
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -2876,6 +2877,7 @@ mod tests {
             .chain(&keys::DOJO_TAUNT)
             .chain(&keys::FITNESS_NOTICE)
             .chain(&keys::OLA_NOTICE)
+            .chain(&keys::JEWEL_NOTICE)
             .chain(&keys::MILK_COW_FILLS)
             .chain(&keys::PET_SECRET)
             .chain(&keys::HPQ_TORY_ABOUT_PAGES)

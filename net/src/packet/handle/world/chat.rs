@@ -121,6 +121,7 @@ mod tests {
         assert_eq!(entry(1, "/ola20"), open(109_030_101, 50));
         assert_eq!(entry(1, "/ola52"), open(109_030_401, 50));
         assert_eq!(entry(1, "/ola11 30"), open(109_030_001, 30));
+        assert_eq!(entry(1, "/jewel"), open(109_010_000, 50));
         // There is no third level digit.
         assert_eq!(entry(1, "/ola23"), None);
         assert_eq!(entry(1, "/endevent"), Some(GmEntry::Close));

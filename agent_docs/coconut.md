@@ -61,7 +61,7 @@ The v83 client has the words `/coconut1` to `/coconut3`, `/snowball`,
 `/snowball1` to `/snowball3`, `/ox`, `/fitness1` to `/fitness4` and
 `/ola10` to `/ola52` too
 (reports b170, b171, b172), and RustMS
-gives them these meanings; `/coconut` and `/endevent` are our own. A GM
+gives them these meanings; `/coconut`, `/jewel` and `/endevent` are our own. A GM
 types them on any map, and
 they go to the client actor as `WorldAction::GmEntry` (`net::GmEntry`):
 
@@ -73,7 +73,8 @@ they go to the client actor as `WorldAction::GmEntry` (`net::GmEntry`):
   all open the Physical Fitness Test, whose lobby is 109040000
   (`agent_docs/timed-events.md`); `/ola10` to `/ola12` open Ola Ola's
   variant 1 on 109030001, `/ola20` to `/ola22` variant 2 on 109030101, and
-  so on to `/ola50` to `/ola52` for variant 5 on 109030401. A
+  so on to `/ola50` to `/ola52` for variant 5 on 109030401; `/jewel` opens
+  Find the Jewel on 109010000. A
   number after the word
   is the most players it takes, 50 if none is given. The directory keeps
   one open event per channel (`DirectoryMessage::OpenGmEvent`), in place

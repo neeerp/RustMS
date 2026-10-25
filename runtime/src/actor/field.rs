@@ -453,13 +453,8 @@ impl FieldActor {
                 took.push(reactor);
             }
         }
-        for object_id in self.reactors.respawn(now) {
-            if let Some(reactor) = self.reactors.get(object_id) {
-                if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
-                    self.broadcast(None, packet);
-                }
-            }
-        }
+        let spawned = self.reactors.respawn(now);
+        self.show_reactors(&spawned);
         // Those whose time in their state is up go back (the forest's pond
         // filling again), and look at what lies on them.
         let reverted = self.reactors.revert(now);
@@ -4488,8 +4483,13 @@ impl FieldActor {
             Some(started) if self.race.is_none() => {
                 info!(field = ?self.key, "Timed GM event started");
                 let race = Race::new(event, started, net::events::scaled);
-                let clock = field_coconut::seconds(race.left(Instant::now()));
+                let now = Instant::now();
+                let clock = field_coconut::seconds(race.left(now));
                 self.race = Some(race);
+                // Find the Jewel's halls start full, whatever the last run
+                // broke there.
+                let refilled = self.reactors.refill(now);
+                self.show_reactors(&refilled);
                 if let Ok(packet) = build_countdown(clock) {
                     self.broadcast(None, packet);
                 }
@@ -4499,6 +4499,17 @@ impl FieldActor {
                 self.end_race();
             }
             _ => {}
+        }
+    }
+
+    /// Show everyone on the map the reactors just spawned.
+    fn show_reactors(&self, object_ids: &[i32]) {
+        for &object_id in object_ids {
+            if let Some(reactor) = self.reactors.get(object_id) {
+                if let Ok(packet) = build_spawn_reactor(&reactor.view()) {
+                    self.broadcast(None, packet);
+                }
+            }
         }
     }
 

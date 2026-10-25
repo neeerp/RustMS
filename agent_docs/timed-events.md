@@ -8,8 +8,8 @@ which the server kept. The RE is in v83ref `reports/b172-gm-events-rest.md`
 (how the client goes through the lobby's gate). The rules the client
 doesn't fix are listed under b172 in v83ref `lanes/QUESTIONS.md`.
 
-Status: the Physical Fitness Test and Ola Ola's five variants run. Find
-the Jewel is the same kind of event and not done yet. Those who reach 109050000 get Pietro's prize there
+Status: the Physical Fitness Test, Ola Ola's five variants and Find the
+Jewel run. Those who reach 109050000 get Pietro's prize there
 (`agent_docs/coconut.md`, "Opening an event to players").
 
 ## The Physical Fitness Test (`net::gm_event::FITNESS`)
@@ -60,6 +60,37 @@ the Jewel is the same kind of event and not done yet. Those who reach 109050000 
   teleporting or speed-ups; that bit 0 is the jump is a guess (report
   b172), and the server checks none of it.
 
+## Find the Jewel (`net::gm_event::JEWEL`)
+
+- Its maps (FieldSet `Event3`) are the lobby 109010000, hall A 109010100
+  with its rooms 109010101 to 109010110, and hall B 109010200 with its
+  rooms 109010201 to 109010206. The lobby's `in00` leads to hall A and
+  `in01` to hall B; each room's `out00` leads back to its hall. Every
+  map's return map is 109050001, so dying puts a player out.
+- Its gate, `join00`, leads to the lobby's `up00` in the same map, by the
+  ways on.
+- A GM's `/jewel` opens it. v83 has no word for it that we know of
+  (report b172); this one is ours.
+- The halls are full of boxes (reactors) whose reactor time is -1, so a
+  broken one stays broken. The GM's `/start` puts every box of every
+  event map back (`FieldReactors::refill`) before the clock starts, so
+  each run starts full.
+- Most boxes (9002000 to 9002002, in the halls and rooms) drop items from
+  the content pack; 9002002's include the Treasure Scroll 4031018. Some do
+  something else (`net::reactors::action`):
+  - 9000000 in hall A sends the one who breaks it to one of the rooms its
+    `info` names, 109010104 to 109010108, at random; 9000001 to 109010109
+    or 109010110; 9000002 in hall B to one of 109010201 to 109010206
+    (`Action::WarpAnyOf`). They arrive at the room's `sp`.
+  - 9001000 brings out a monster, 9100001 (`Action::BringOut`).
+- The clock is 600 s (`jewel.notice.0` at 1 s, `jewel.notice.1` at the
+  end; placeholders), and those still inside go out at 601 s. No way from
+  the Jewel's maps leads to 109050000.
+- Not done (QUESTIONS b172 #9): Geanie (9000014, Ludibrium), whose line
+  speaks of a Scroll of Secrets, the Vikings in the lobby and halls
+  (Vikan 9000003, Vikon 9000004, Vikone 9000005), and Tamis (9000015) in
+  the lobby, who only talk.
+
 ## The gate
 
 - v83 asks the server to go through a portal of type 4 or 5 even when it
@@ -87,7 +118,8 @@ the Jewel is the same kind of event and not done yet. Those who reach 109050000 
   kind 2), the gate closes, and every player still on the maps but GMs
   goes to 109050001. Those already on 109050000 stay there.
 - A player who isn't a GM and comes to one of the maps past the first (the
-  Fitness Test's stages, Ola Ola's levels 2 and 3) while the event is off
+  Fitness Test's stages, Ola Ola's levels 2 and 3, the Jewel's halls and
+  rooms) while the event is off
   goes out as well. That catches anyone who crosses at the time up into a
   map whose time came a tick earlier.
 - The times are scaled by `RUSTMS_EVENT_SCALE` (`net::events::scaled`).
