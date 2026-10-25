@@ -7,8 +7,8 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 `reports/b160-pyramid-client.md` (the v83 client's fields and packets).
 
 Status: the map and mob data, the packet builders, the run's entry, stages
-and clocks, its tally and gauge, and its blessings and uses of Rage of
-Pharaoh are in. The score and the Tomb are still to come.
+and clocks, its tally and gauge, its blessings and uses of Rage of Pharaoh,
+and its score are in. The Tomb and the medal are still to come.
 
 ## Maps
 
@@ -110,6 +110,24 @@ mode on a channel, as many as the maps have copies.
   attack takes it and tells the run (`EventCommand::Rage`). The run spends
   one if any are left and tells everyone how many remain. Two members who
   use the last one at once both get their attack.
+
+## The score (`pyramid::score`)
+
+- A run that ends by its last stage's clock or its gauge has a rank, 0
+  for S to 4 for D, and EXP, from its kills and cool kills together
+  (Cosmic `sendScore`). A run whose players all left has none.
+  - Outlasting the fifth stage's clock: S at 3000, A at 2000, B at 1500,
+    C at 500, else D.
+  - With the gauge run out: C at 2000, else D.
+  - EXP by rank, with the mode's index m (0 to 3): S 60500 + 5500m,
+    A 55000 + 5000m, B 46750 + 4250m, C 22000 + 2000m, D 0. Then 2 more for
+    each kill and 10 for each cool kill.
+- The event actor works it out once, when the run ends, and sends it to
+  each member after `EventEnded` (`ServerMessage::PyramidScore`). A
+  member that the end took to the result map gets PYRAMID_SCORE and the
+  EXP, without the server's rates, as Cosmic's `gainExp` does.
+- Quest 29932 (Protector of Pharaoh), which counts the run's kills toward
+  Duarte's medal, isn't kept yet.
 
 ## Stage rules (`FieldTemplate::massacre`)
 

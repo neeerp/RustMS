@@ -274,6 +274,8 @@ pub struct Trace {
     /// PYRAMID_GAUGE: what a Nett's Pyramid stage's kills have put back on
     /// its gauge, less its misses.
     pub pyramid_gauges: Vec<i32>,
+    /// PYRAMID_SCORE: a Nett's Pyramid run's (rank, EXP).
+    pub pyramid_scores: Vec<(u8, i32)>,
     /// STOP_CLOCK: the countdown taken down.
     pub clocks_stopped: usize,
     /// ZAKUM_SHRINE: (whether Zakum is out, minutes left) of each line on
@@ -449,6 +451,9 @@ impl Trace {
             self.dojo_warps.push(r.read_byte().unwrap());
         } else if op == SendOpcode::PyramidGauge as i16 {
             self.pyramid_gauges.push(r.read_int().unwrap());
+        } else if op == SendOpcode::PyramidScore as i16 {
+            let rank = r.read_byte().unwrap();
+            self.pyramid_scores.push((rank, r.read_int().unwrap()));
         } else if op == SendOpcode::SessionValue as i16 {
             let key = r.read_str_with_length().unwrap();
             self.session_values

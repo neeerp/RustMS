@@ -383,6 +383,7 @@ pub fn spawn(
         stage_started: Instant::now(),
         gauge: None,
         gauge_out: None,
+        pyramid_end: None,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -509,6 +510,9 @@ struct EventActor {
     gauge: Option<game_data::Massacre>,
     /// When the stage's gauge runs out, as the tally stands.
     gauge_out: Option<Instant>,
+    /// How a Nett's Pyramid run ended, for its score: outlasting the last
+    /// stage's clock (true) or with its gauge run out (false).
+    pyramid_end: Option<bool>,
 }
 
 impl EventActor {
@@ -554,12 +558,19 @@ impl EventActor {
             }
         }
         info!(?kind, id, "Event ended");
+        let score = self.pyramid_score();
         // Nothing is answered from here on: a member asking Cloto hears
         // nothing at once rather than after the grace.
         drop(self.rx);
         for member in self.team.members() {
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::EventEnded { id });
+            }
+        }
+        // After `EventEnded`, which takes them to the result map.
+        for member in self.team.members() {
+            if let (Some(handle), Some((exit, rank, exp))) = (self.members.get(member), score) {
+                handle.send(ServerMessage::PyramidScore { exit, rank, exp });
             }
         }
         // Give them time to get out before the copy closes.
@@ -953,6 +964,10 @@ impl EventActor {
                 self.next_pyramid_stage();
                 false
             }
+            _ if self.kind.pyramid_mode().is_some() => {
+                self.pyramid_end = Some(true);
+                true
+            }
             _ => true,
         }
     }
@@ -1043,8 +1058,21 @@ impl EventActor {
             .is_some_and(|gauge| self.tally.lost(gauge, seconds) >= gauge.total);
         if out {
             info!(kind = ?self.kind, id = self.id, stage = self.pyramid_stage, tally = ?self.tally, "Pyramid gauge ran out");
+            self.pyramid_end = Some(false);
         }
         out
+    }
+
+    /// The score of a Nett's Pyramid run that ended by its clock or its
+    /// gauge, for its members on its result map (Cosmic `sendScore`,
+    /// computed once for the run).
+    /// Its result map, rank and EXP.
+    fn pyramid_score(&self) -> Option<(i32, u8, i32)> {
+        let finished = self.pyramid_end?;
+        let mode = self.kind.pyramid_mode()?;
+        let (rank, exp) = net::pyramid::score(&self.tally, mode.index(), finished);
+        info!(kind = ?self.kind, id = self.id, rank, exp, "Pyramid score");
+        Some((self.kind.event().exit, rank, exp))
     }
 
     /// The mobs that aren't friendly on the copy of `map_id` go, and no

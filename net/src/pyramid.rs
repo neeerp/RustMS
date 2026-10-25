@@ -131,9 +131,59 @@ impl Tally {
     }
 }
 
+/// A run's rank, 0 for S to 4 for D, and the EXP it gives, by its kills and
+/// cool kills and its mode's index (Cosmic `sendScore`). A run that
+/// `finished`, outlasting the last stage's clock, ranks from S at 3000 down;
+/// one whose gauge ran out gets C at 2000 or D.
+pub fn score(tally: &Tally, mode: i32, finished: bool) -> (u8, i32) {
+    let kills = tally.hit + tally.cool;
+    let rank = match kills {
+        _ if !finished => {
+            if kills >= 2000 {
+                3
+            } else {
+                4
+            }
+        }
+        3000.. => 0,
+        2000.. => 1,
+        1500.. => 2,
+        500.. => 3,
+        _ => 4,
+    };
+    let base = match rank {
+        0 => 60_500 + 5_500 * mode,
+        1 => 55_000 + 5_000 * mode,
+        2 => 46_750 + 4_250 * mode,
+        3 => 22_000 + 2_000 * mode,
+        _ => 0,
+    };
+    (rank, base + tally.hit * 2 + tally.cool * 10)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_score_ranks_the_runs_kills_and_gives_its_modes_exp() {
+        let tally = |hit, cool| Tally {
+            hit,
+            cool,
+            ..Tally::default()
+        };
+        assert_eq!(
+            score(&tally(2900, 100), 0, true),
+            (0, 60_500 + 5_800 + 1_000)
+        );
+        assert_eq!(score(&tally(2000, 0), 3, true), (1, 70_000 + 4_000));
+        assert_eq!(score(&tally(1499, 1), 1, true), (2, 51_000 + 2_998 + 10));
+        assert_eq!(score(&tally(500, 0), 2, true), (3, 26_000 + 1_000));
+        assert_eq!(score(&tally(499, 0), 3, true), (4, 998));
+        // A gauge that ran out gives C at most.
+        assert_eq!(score(&tally(3000, 0), 0, false), (3, 22_000 + 6_000));
+        assert_eq!(score(&tally(1, 0), 3, false), (4, 2));
+    }
 
     fn solo_normal() -> Massacre {
         Massacre {

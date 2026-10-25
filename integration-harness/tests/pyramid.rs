@@ -6,7 +6,8 @@
 //! takes 14 seconds. Duarte on a stage lets a player give up, back to the
 //! lobby. The run counts its kills and misses, which keep its gauge up or
 //! pull it down; once it runs out the run ends. Its kill counts give uses
-//! of Rage of Pharaoh, which can't be used without one.
+//! of Rage of Pharaoh, which can't be used without one. On the result map
+//! the run's kills give its rank and EXP.
 
 use game_data::server_content::keys;
 use integration_harness::events::{party, said, talk, told, waiting_in};
@@ -52,11 +53,13 @@ async fn a_run_alone_goes_through_five_timed_stages_to_its_result_map() {
     .await;
     assert!(seen.countdowns[0] <= 2, "{:?}", seen.countdowns);
 
-    // Each stage's time running out takes the player on to the next.
+    // Each stage's time running out takes the player on to the next. After
+    // the fifth, without a kill, the result map gives D and no EXP.
     until(&mut player.connection, &mut seen, |t| {
-        t.warps.contains(&run.exit)
+        t.warps.contains(&run.exit) && !t.pyramid_scores.is_empty()
     })
     .await;
+    assert_eq!(seen.pyramid_scores, [(4, 0)]);
     let stages: Vec<i32> = (1..=PYRAMID_STAGES).map(|n| run.stage_map(n)).collect();
     assert_eq!(seen.warps, [stages, vec![PYRAMID_RESULT + 1]].concat());
     // The later stages' clocks give 3 minutes (3 s).
@@ -117,14 +120,15 @@ async fn kills_and_misses_are_counted_and_enough_misses_end_the_run() {
     assert_eq!(seen.pyramid_gauges.last(), Some(&(after_kill - 7)));
 
     // Fourteen more take all its 100 (13 do once a second has gone), and
-    // the run ends on its result map.
+    // the run ends on its result map: D, with 2 EXP for the kill.
     for &mob in &mobs[2..16] {
         send(&mut player.connection, attack(mob, 0)).await;
     }
     until(&mut player.connection, &mut seen, |t| {
-        t.warps.contains(&run.exit)
+        t.warps.contains(&run.exit) && !t.pyramid_scores.is_empty()
     })
     .await;
+    assert_eq!(seen.pyramid_scores, [(4, 2)]);
     let misses = |n| told_value(&seen, "massacre_miss", n);
     assert!(misses(14) || misses(15), "{:?}", seen.session_values);
     assert!(!seen.warps.contains(&run.stage_map(3)), "{:?}", seen.warps);
