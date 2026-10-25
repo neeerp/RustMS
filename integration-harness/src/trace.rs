@@ -907,7 +907,17 @@ pub async fn read(c: &mut MapleTestConnection, trace: &mut Trace) -> Packet {
 
 /// Read until `done` holds, failing after 15 seconds.
 pub async fn until(c: &mut MapleTestConnection, trace: &mut Trace, done: impl Fn(&Trace) -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(15);
+    until_within(c, trace, Duration::from_secs(15), done).await
+}
+
+/// Read until `done` holds, failing after `wait`.
+pub async fn until_within(
+    c: &mut MapleTestConnection,
+    trace: &mut Trace,
+    wait: Duration,
+    done: impl Fn(&Trace) -> bool,
+) {
+    let deadline = Instant::now() + wait;
     while !done(trace) {
         let envelope = timeout(
             deadline.saturating_duration_since(Instant::now()),
