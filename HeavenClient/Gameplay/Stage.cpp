@@ -172,11 +172,6 @@ namespace ms
 
 				pending_clock.reset();
 
-				if (pending_help)
-					show_event_help(*pending_help);
-
-				pending_help.reset();
-
 				// The priest welcomes the couple as they come to the altar.
 				for (const WeddingNews &news : pending_wedding)
 					if (news.hearts)
@@ -218,6 +213,15 @@ namespace ms
 		}
 
 		state = State::ACTIVE;
+
+		// The map's help, sent as the player arrives, waits until now: it
+		// shows only on an active field.
+		if (pending_help)
+		{
+			uint8_t help = *pending_help;
+			pending_help.reset();
+			show_event_help(help);
+		}
 	}
 
 	void Stage::loadplayer(const CharEntry &entry)
