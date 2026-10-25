@@ -198,7 +198,7 @@ impl WorldHandler for AdminBroadcastHandler {
             0 => HandlerResult::empty().with(action(BroadcastScope::World)),
             1 => HandlerResult::empty().with(action(BroadcastScope::Channel(ctx.channel_id))),
             2 => HandlerResult::reply(packet.clone())
-                .with(WorldAction::Field(FieldRequest::Broadcast(packet))),
+                .with(WorldAction::Field(FieldRequest::BroadcastAll(packet))),
             _ => HandlerResult::empty(),
         })
     }
@@ -353,7 +353,7 @@ mod tests {
         // The map: the GM, and the others through the field.
         let result = broadcast(&mut player, 2, 4, "");
         let slide_off = build_slide(None).unwrap();
-        let [WorldAction::Reply(own), WorldAction::Field(FieldRequest::Broadcast(theirs))] =
+        let [WorldAction::Reply(own), WorldAction::Field(FieldRequest::BroadcastAll(theirs))] =
             &result.actions[..]
         else {
             panic!("{:?}", result.actions);

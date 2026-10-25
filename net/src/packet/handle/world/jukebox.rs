@@ -2,7 +2,7 @@
 //! in ms, which nothing reads (v83 FUN_00a0a63f, type 0x14). Everyone on the
 //! map hears the song, under a line with the player's name (report 201).
 
-use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldResult};
+use crate::handler::{FieldRequest, HandlerResult, WorldAction, WorldContext, WorldResult};
 use crate::packet::build::world::effect::build_play_jukebox;
 use crate::packet::build::world::inventory::build_inventory_operation;
 use crate::packet::build::world::stat::build_stat_update;
@@ -17,10 +17,12 @@ pub fn jukebox(ctx: &mut WorldContext, slot: i16, item_id: i32) -> WorldResult {
     else {
         return Ok(HandlerResult::reply(build_stat_update(true, &[])?));
     };
+    // The song is the map's, so a hidden GM's plays for everyone too.
     let song = build_play_jukebox(item_id, ctx.player.name())?;
     Ok(
         HandlerResult::reply(build_inventory_operation(true, &changes)?)
-            .with(WorldAction::FieldChat(song)),
+            .with(WorldAction::Reply(song.clone()))
+            .with(WorldAction::Field(FieldRequest::BroadcastAll(song))),
     )
 }
 
@@ -57,10 +59,13 @@ mod tests {
             .inventory
             .insert(InventoryType::Cash, 3, Item::stack(SONG, 2));
         let actions = use_jukebox(&mut player, 3);
-        let [WorldAction::Reply(used), WorldAction::FieldChat(song)] = &actions[..] else {
+        let [WorldAction::Reply(used), WorldAction::Reply(own), WorldAction::Field(FieldRequest::BroadcastAll(song))] =
+            &actions[..]
+        else {
             panic!("expected a reply and a song: {actions:?}");
         };
         assert_eq!(used.bytes[..2], [0x1D, 0], "an inventory operation");
+        assert_eq!(own.bytes, song.bytes);
         assert_eq!(
             song.bytes,
             build_play_jukebox(SONG, "Tester").unwrap().bytes

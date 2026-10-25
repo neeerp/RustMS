@@ -876,8 +876,12 @@ pub enum FieldRequest {
         area: (i32, i32, i32, i32),
         lasts: std::time::Duration,
     },
-    /// Show everyone else on the map this packet.
+    /// Show everyone else on the map who sees the player this packet,
+    /// about them: a hidden GM's goes only to GMs.
     Broadcast(Packet),
+    /// Show everyone else on the map this packet, which is about the map,
+    /// whoever sees the player.
+    BroadcastAll(Packet),
     /// The player used Monster Magnet: show the others `effect`, and each
     /// mob it reached, caught or not; the caught ones chase the player.
     Magnet {

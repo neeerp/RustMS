@@ -183,6 +183,13 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   line as one that doesn't exist.
 - Replies are pink lines in the sender's chat.
 - `!warp` and `!heal` refuse the dead, who revive through the client.
+- `!hide` (or `/h 1`) lasts the session. Those not GMs lose the GM, with
+  the GM's pets and summons, and everything the GM does: chat, moves,
+  attacks, chairs, effects and buffs. v83 drops a packet about a character
+  it doesn't know, so the field sends these only to those who see the
+  sender (`broadcast_by`, `broadcast_about`; report b177). The map's own
+  packets still reach everyone: mobs, drops, mists, doors, notices and a
+  jukebox's song (`FieldRequest::BroadcastAll`). GMs see hidden GMs.
 - `!level` and `!job` set only the level or job. Others see the level-up or
   job-change effect (`WorldAction::AvatarChanged`). `!exp` gains EXP as a
   kill does.

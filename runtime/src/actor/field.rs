@@ -487,7 +487,7 @@ impl FieldActor {
         for summon in self.summons.expire(now) {
             let view = summon.view;
             if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, Gone::Expired) {
-                self.broadcast(None, packet);
+                self.broadcast_about(view.owner_id, None, packet);
             }
         }
         let (due, waiting) = std::mem::take(&mut self.casts)
@@ -617,7 +617,7 @@ impl FieldActor {
         }
         occupant.avatar.chair = item_id;
         if let Ok(packet) = build_show_chair(occupant.avatar.id, item_id) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
     }
 
@@ -684,7 +684,7 @@ impl FieldActor {
                 announce,
             } => {
                 for packet in announce {
-                    self.broadcast(Some(client_id), packet);
+                    self.broadcast_by(client_id, packet);
                 }
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
                     // Keep the live position, chair and balloon, and where
@@ -718,7 +718,7 @@ impl FieldActor {
             FieldMessage::Chat { from, .. }
                 if self.ox.as_ref().is_some_and(OxGame::on)
                     && self.occupants.get(&from).is_some_and(|o| !o.avatar.gm) => {}
-            FieldMessage::Chat { packet, .. } => self.broadcast(None, packet),
+            FieldMessage::Chat { from, packet } => self.broadcast_seen_by(from, None, packet),
             FieldMessage::Positions { reply } => {
                 let positions = self
                     .occupants
@@ -819,7 +819,7 @@ impl FieldActor {
                         }
                     }
                 }
-                self.broadcast(Some(from), packet);
+                self.broadcast_by(from, packet);
             }
             FieldMessage::NpcInteraction {
                 from,
@@ -905,7 +905,8 @@ impl FieldActor {
                     area,
                     lasts,
                 } => self.handle_item_mist(from, item_id, area, lasts),
-                FieldRequest::Broadcast(packet) => self.broadcast(Some(from), packet),
+                FieldRequest::Broadcast(packet) => self.broadcast_by(from, packet),
+                FieldRequest::BroadcastAll(packet) => self.broadcast(Some(from), packet),
                 FieldRequest::Magnet { effect, caught } => self.handle_magnet(from, effect, caught),
                 FieldRequest::MobDebuff {
                     skill_id,
@@ -1209,7 +1210,7 @@ impl FieldActor {
             };
             occupant.avatar.mini_room = balloon;
             match build_char_box(owner, occupant.avatar.mini_room.as_ref()) {
-                Ok(packet) => self.broadcast(None, packet),
+                Ok(packet) => self.broadcast_seen_by(owner, None, packet),
                 Err(error) => warn!(owner, %error, "Failed to build a room balloon"),
             }
         }
@@ -1784,7 +1785,7 @@ impl FieldActor {
         );
         let attacker = attacker.handle.clone();
         if let Some(broadcast) = broadcast {
-            self.broadcast(Some(from), broadcast);
+            self.broadcast_by(from, broadcast);
         }
         // Players can't hurt a friendly mob (`damagedByMob`), only mobs can,
         // and no one a shielded one: their hits do nothing to it at all.
@@ -1916,7 +1917,7 @@ impl FieldActor {
                 attacker.send_packet(packet);
             }
             if let Ok(packet) = build_skill_effect(id, eater.skill_id, level, eater.level) {
-                self.broadcast(Some(from), packet);
+                self.broadcast_by(from, packet);
             }
         }
         if hp_taken > 0 || mp_taken > 0 {
@@ -2256,6 +2257,7 @@ impl FieldActor {
                 continue;
             };
             let success = success && !mob.info.boss;
+            // The mob's, so everyone sees it pulled.
             if let Ok(packet) = build_show_magnet(object_id, success) {
                 self.broadcast(Some(from), packet);
             }
@@ -2263,7 +2265,7 @@ impl FieldActor {
                 self.provoke(from, &user, object_id, now);
             }
         }
-        self.broadcast(Some(from), effect);
+        self.broadcast_by(from, effect);
     }
 
     /// `from` used a skill that reaches mobs on these, as their client saw
@@ -2407,7 +2409,7 @@ impl FieldActor {
             }
         }
         if let Ok(packet) = build_mist_item_effect(Some(owner_id), item_id) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
     }
 
@@ -2454,7 +2456,7 @@ impl FieldActor {
             self.remove_summon(&old.view, Gone::Dismissed);
         }
         if let Ok(packet) = build_spawn_summon(&view, appear) {
-            self.broadcast(None, packet);
+            self.broadcast_about(view.owner_id, None, packet);
         }
     }
 
@@ -2514,7 +2516,7 @@ impl FieldActor {
 
     fn remove_summon(&self, view: &SummonView, why: Gone) {
         if let Ok(packet) = build_remove_summon(view.owner_id, view.object_id, why) {
-            self.broadcast(None, packet);
+            self.broadcast_about(view.owner_id, None, packet);
         }
     }
 
@@ -2536,7 +2538,7 @@ impl FieldActor {
         }
         let owner_id = view.owner_id;
         if let Ok(packet) = build_move_summon(owner_id, object_id, start, &movement) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
     }
 
@@ -2555,7 +2557,7 @@ impl FieldActor {
             pet.foothold = foothold.unwrap_or(pet.foothold);
         }
         if let Ok(packet) = build_move_pet(owner_id, index, start, &movement) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
     }
 
@@ -2632,7 +2634,7 @@ impl FieldActor {
         *hp -= damage.damage;
         let (broken, view) = (*hp <= 0, summon.view);
         if let Ok(packet) = build_damage_summon(view.owner_id, &damage) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
         if !broken {
             return;
@@ -2658,7 +2660,7 @@ impl FieldActor {
         }
         let owner_id = summon.view.owner_id;
         if let Ok(packet) = build_summon_skill(owner_id, object_id, action) {
-            self.broadcast(Some(from), packet);
+            self.broadcast_by(from, packet);
         }
         if let Some(owner) = self.occupants.get(&from) {
             owner.handle.send(ServerMessage::Beholder(support));
@@ -3969,8 +3971,14 @@ impl FieldActor {
             }
         }
 
-        // After their owners, whose summons they are.
-        for summon in self.summons.views() {
+        // After their owners, whose summons they are; a hidden GM's only
+        // to GMs.
+        for summon in self.summons.views().filter(|summon| {
+            self.occupants
+                .values()
+                .find(|occupant| occupant.avatar.id == summon.owner_id)
+                .is_none_or(|owner| sees(&avatar, &owner.avatar))
+        }) {
             if let Ok(packet) = build_spawn_summon(summon, false) {
                 handle.send_packet(packet);
             }
@@ -4716,6 +4724,37 @@ impl FieldActor {
         }
     }
 
+    /// Send what `from` did to the others here who see them.
+    fn broadcast_by(&self, from: ClientId, packet: Packet) {
+        self.broadcast_seen_by(from, Some(from), packet);
+    }
+
+    /// Send `packet`, about `from`, to those here but `except` who see them.
+    fn broadcast_seen_by(&self, from: ClientId, except: Option<ClientId>, packet: Packet) {
+        match self.occupants.get(&from) {
+            Some(occupant) => self.broadcast_about(occupant.avatar.id, except, packet),
+            None => self.broadcast(except, packet),
+        }
+    }
+
+    /// Send `packet`, about the character `owner_id` or what is theirs, to
+    /// those here but `except` who see them: a hidden GM's shows only to
+    /// GMs, as v83 drops what is about a character it doesn't know
+    /// (report b177).
+    fn broadcast_about(&self, owner_id: i32, except: Option<ClientId>, packet: Packet) {
+        let owner = self
+            .occupants
+            .values()
+            .find(|occupant| occupant.avatar.id == owner_id);
+        for (&client_id, occupant) in &self.occupants {
+            if Some(client_id) != except
+                && owner.is_none_or(|owner| sees(&occupant.avatar, &owner.avatar))
+            {
+                occupant.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
     /// Send a player's coming or going to those here who see the player.
     fn broadcast_seen(&self, avatar: &FieldAvatar, packet: Packet) {
         for occupant in self.occupants.values() {
@@ -4725,15 +4764,30 @@ impl FieldActor {
         }
     }
 
-    /// A GM hid or came out of hiding: those not GMs lose or see the GM.
+    /// A GM hid or came out of hiding: those not GMs lose or see the GM,
+    /// and the GM's summons.
     fn show_hidden(&self, client_id: ClientId) {
         let Some(gm) = self.occupants.get(&client_id) else {
             return;
         };
-        let packets = if gm.avatar.hidden {
-            build_player_leave_field(client_id).map(|packet| vec![packet])
+        let summons = self
+            .summons
+            .views()
+            .filter(|summon| summon.owner_id == gm.avatar.id);
+        let packets: Result<Vec<Packet>, _> = if gm.avatar.hidden {
+            summons
+                .map(|summon| {
+                    build_remove_summon(summon.owner_id, summon.object_id, Gone::Silently)
+                })
+                .chain([build_player_leave_field(client_id)])
+                .collect()
         } else {
-            player_spawn(&gm.avatar)
+            player_spawn(&gm.avatar).and_then(|mut packets| {
+                for summon in summons {
+                    packets.push(build_spawn_summon(summon, false)?);
+                }
+                Ok(packets)
+            })
         };
         let packets = match packets {
             Ok(packets) => packets,
@@ -5884,6 +5938,104 @@ mod tests {
         });
         assert!(players(sent(&mut late_rx)).is_empty());
         assert_eq!(players(sent(&mut other_gm_rx)), [remove]);
+    }
+
+    #[tokio::test]
+    async fn what_a_hidden_gm_does_shows_only_to_gms() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let gm = |id, hidden| FieldAvatar {
+            gm: true,
+            hidden,
+            ..avatar(id, 0, 0)
+        };
+        let (hider, mut hider_rx) = client(1);
+        let (other_gm, mut other_gm_rx) = client(2);
+        let (player, mut player_rx) = client(3);
+        let joining = [
+            (hider, gm(1, true)),
+            (other_gm, gm(2, false)),
+            (player, avatar(3, 0, 0)),
+        ];
+        for (handle, avatar) in joining {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar,
+                party: None,
+            });
+        }
+        sent(&mut hider_rx);
+        sent(&mut other_gm_rx);
+        sent(&mut player_rx);
+        let opcodes =
+            |rx: &mut _| -> Vec<i16> { sent(rx).iter().map(Packet::opcode).collect::<Vec<_>>() };
+        let request = |request| FieldMessage::FromClient { from: 1, request };
+
+        // The line goes to the GM too; the rest to the others.
+        actor.handle_message(FieldMessage::Chat {
+            from: 1,
+            packet: Packet::new(&[0xA2, 0x00]),
+        });
+        actor.handle_message(FieldMessage::Move {
+            from: 1,
+            packet: Packet::new(&[0xB9, 0x00]),
+            start: (0, 0),
+            movement_bytes: Vec::new(),
+        });
+        actor.handle_message(request(FieldRequest::Chair(3010000)));
+        actor.handle_message(request(FieldRequest::Broadcast(Packet::new(&[0xC6, 0x00]))));
+        actor.handle_message(request(FieldRequest::BroadcastAll(Packet::new(&[
+            0x8A, 0x00,
+        ]))));
+        let chair = SendOpcode::ShowChair as i16;
+        assert_eq!(opcodes(&mut other_gm_rx), [0xA2, 0xB9, chair, 0xC6, 0x8A]);
+        assert_eq!(opcodes(&mut hider_rx), [0xA2]);
+        assert_eq!(
+            opcodes(&mut player_rx),
+            [0x8A],
+            "only what is about the map"
+        );
+
+        // The GM's summons come and go with the GM.
+        if skills::data().is_err() {
+            return;
+        }
+        let (spawn, remove) = (
+            SendOpcode::SpawnSummon as i16,
+            SendOpcode::RemoveSummon as i16,
+        );
+        actor.handle_message(summon(3111005, (0, 0), Duration::from_secs(60)));
+        assert!(opcodes(&mut other_gm_rx).contains(&spawn));
+        assert!(!opcodes(&mut player_rx).contains(&spawn));
+        let (late, mut late_rx) = client(4);
+        actor.handle_message(FieldMessage::Join {
+            handle: late,
+            avatar: avatar(4, 0, 0),
+            party: None,
+        });
+        assert!(!opcodes(&mut late_rx).contains(&spawn));
+        let hide = |hidden| FieldMessage::UpdateAvatar {
+            client_id: 1,
+            avatar: gm(1, hidden),
+            announce: Vec::new(),
+        };
+        actor.handle_message(hide(false));
+        assert!(opcodes(&mut player_rx).contains(&spawn));
+        assert!(opcodes(&mut late_rx).contains(&spawn));
+        actor.handle_message(hide(true));
+        assert!(opcodes(&mut player_rx).contains(&remove));
+        assert!(
+            !opcodes(&mut other_gm_rx).contains(&remove),
+            "a GM still sees"
+        );
     }
 
     #[tokio::test]
