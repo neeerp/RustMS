@@ -150,6 +150,17 @@ impl ReactorSet {
     /// trace and every spot gets one again, the broken ones that never come
     /// back too. For a field nobody is on. Returns the new reactors' object
     /// ids.
+    /// Bring back every reactor that has broken, now, whether or not it
+    /// was due to come back; those standing stay. Returns the new
+    /// reactors' object ids.
+    pub fn refill(&mut self, now: Instant) -> Vec<i32> {
+        for spot in &mut self.spots {
+            spot.spent = false;
+            spot.next_spawn = None;
+        }
+        self.respawn(now)
+    }
+
     pub fn renew(&mut self, now: Instant) -> Vec<i32> {
         self.live.clear();
         self.spots.retain(|spot| !spot.placed);
@@ -515,6 +526,23 @@ mod tests {
             reactors.hit(id, SWING, (610, 254), now).unwrap();
         }
         assert!(reactors.respawn(now + Duration::from_secs(3600)).is_empty());
+    }
+
+    #[test]
+    fn a_refilled_field_brings_its_broken_boxes_back_and_keeps_the_rest() {
+        let mut reactors = ReactorSet::new([scrap_box(610, 0), scrap_box(700, 30)]);
+        let now = Instant::now();
+        let ids = reactors.respawn(now);
+        for _ in 0..4 {
+            reactors.hit(ids[0], SWING, (610, 254), now).unwrap();
+        }
+        reactors.hit(ids[1], SWING, (700, 254), now).unwrap();
+        let refilled = reactors.refill(now);
+        assert_eq!(refilled.len(), 1);
+        assert!(!ids.contains(&refilled[0]));
+        assert_eq!(reactors.get(refilled[0]).unwrap().state, 0);
+        assert_eq!(reactors.get(ids[1]).unwrap().state, 1, "still hit");
+        assert!(reactors.refill(now).is_empty());
     }
 
     #[test]

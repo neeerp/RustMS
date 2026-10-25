@@ -1358,6 +1358,8 @@ unsourced = [
     "ola.notice.6",
     "ola.notice.7",
     "ola.notice.8",
+    "jewel.notice.0",
+    "jewel.notice.1",
 ]
 
 [text."glTutoMsg0.message"]

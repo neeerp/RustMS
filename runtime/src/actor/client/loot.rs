@@ -11,8 +11,9 @@ use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::{drop, inventory, monster_book as book, quest};
 use net::packet::handle::world::{apply_item_effect, item_effect_packets, trade_catch};
-use net::reactors::Action;
+use net::reactors::{Action, Warp};
 use net::FieldRequest;
+use rand::seq::SliceRandom;
 use std::time::Instant;
 use tracing::debug;
 
@@ -105,8 +106,13 @@ impl ClientActor {
             }
             _ => None,
         };
-        if let Some(warp) = warp {
-            let (map_id, portal) = warp.to();
+        let warp = match net::reactors::action(reactor_id) {
+            Action::WarpAnyOf(maps) => maps
+                .choose(&mut rand::thread_rng())
+                .map(|&map_id| (map_id, 0)),
+            _ => warp.map(Warp::to),
+        };
+        if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;
             let player = &mut self.in_game_mut()?.player;
             let actions = net::packet::handle::world::warp_to_spawn_point(

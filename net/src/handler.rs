@@ -746,6 +746,8 @@ impl GmEntry {
             // The first digit is the variant (report b172); what the second
             // means isn't known, so each opens the variant's first level.
             "/ola10" | "/ola11" | "/ola12" => 109_030_001,
+            // v83 has no word for it (report b172); this one is ours.
+            "/jewel" => 109_010_000,
             "/ola20" | "/ola21" | "/ola22" => 109_030_101,
             "/ola30" | "/ola31" | "/ola32" => 109_030_201,
             "/ola40" | "/ola41" | "/ola42" => 109_030_301,

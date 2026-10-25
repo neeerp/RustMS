@@ -133,9 +133,44 @@ pub const OLA: [TimedEvent; 5] = [
     ola(&[109_030_401, 109_030_402, 109_030_403]),
 ];
 
+/// Find the Jewel (FieldSet `Event8`, the Treasure Hunt): the lobby
+/// 109010000, where players wait, its halls 109010100 and 109010200, and
+/// the rooms off them, 109010101-110 and 109010201-206, in 600 s. The
+/// halls' boxes (`net::reactors`) send players to the rooms, bring out
+/// monsters, or drop loot, the Treasure Scroll among it.
+pub const JEWEL: TimedEvent = TimedEvent {
+    maps: &[
+        109_010_000,
+        109_010_100,
+        109_010_101,
+        109_010_102,
+        109_010_103,
+        109_010_104,
+        109_010_105,
+        109_010_106,
+        109_010_107,
+        109_010_108,
+        109_010_109,
+        109_010_110,
+        109_010_200,
+        109_010_201,
+        109_010_202,
+        109_010_203,
+        109_010_204,
+        109_010_205,
+        109_010_206,
+    ],
+    length: secs(600),
+    notices: &[
+        (secs(1), keys::JEWEL_NOTICE[0]),
+        (secs(600), keys::JEWEL_NOTICE[1]),
+    ],
+};
+
 /// The timed event `map_id` is one of the maps of.
 pub fn timed_event(map_id: i32) -> Option<&'static TimedEvent> {
-    std::iter::once(&FITNESS)
+    [&FITNESS, &JEWEL]
+        .into_iter()
         .chain(&OLA)
         .find(|event| event.maps.contains(&map_id))
 }
@@ -200,6 +235,24 @@ mod tests {
         assert_eq!(FITNESS.end(), Duration::from_secs(901));
         assert!(FITNESS.notices.windows(2).all(|w| w[0].0 < w[1].0));
         assert!(FITNESS.notices.iter().all(|(at, _)| *at < FITNESS.length));
+    }
+
+    #[test]
+    fn find_the_jewel_runs_on_its_lobby_halls_and_rooms() {
+        for map_id in (109_010_000..=109_010_000)
+            .chain(109_010_100..=109_010_110)
+            .chain(109_010_200..=109_010_206)
+        {
+            assert_eq!(
+                timed_event(map_id).map(|event| event.maps),
+                Some(JEWEL.maps)
+            );
+        }
+        assert!(timed_event(109_010_111).is_none());
+        assert!(is_gate(109_010_000, "join00"));
+        assert!(!is_gate(109_010_100, "join00"));
+        assert_eq!(JEWEL.end(), Duration::from_secs(601));
+        assert!(JEWEL.notices.windows(2).all(|w| w[0].0 < w[1].0));
     }
 
     #[test]

@@ -39,6 +39,9 @@ pub enum Action {
     BringOutLots([(i32, usize); 2]),
     /// Send whoever broke it to a map's portal.
     Warp(Warp),
+    /// Send whoever broke it to one of these maps, at random: Find the
+    /// Jewel's boxes (`eventMap0` to `eventMap2`, whose `info` names them).
+    WarpAnyOf(&'static [i32]),
     /// Drop its loot `percent` times in a hundred, else send whoever broke
     /// it away.
     DropsOrWarp { percent: u32, warp: Warp },
@@ -185,6 +188,8 @@ impl Warp {
 }
 
 const HITMAN_HIDEOUT: i32 = 910200000;
+/// Find the Jewel's monster, which its `eventMob0` boxes bring out.
+const JEWEL_MOB: i32 = 9100001;
 const BERSERK_ROOM: i32 = 910500200;
 const LPQ_TRAP_ROOM: i32 = 922010201;
 const LPQ_BLOCTOPUS: i32 = 9300007;
@@ -286,6 +291,14 @@ pub fn takes(reactor_id: i32, name: &str, item_id: i32, day: u8) -> bool {
 
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
+        // Find the Jewel's boxes, by their `action` in Reactor.nx; its
+        // `eventItem` boxes drop their loot.
+        9000000 => Action::WarpAnyOf(&[109010104, 109010105, 109010106, 109010107, 109010108]),
+        9000001 => Action::WarpAnyOf(&[109010109, 109010110]),
+        9000002 => Action::WarpAnyOf(&[
+            109010201, 109010202, 109010203, 109010204, 109010205, 109010206,
+        ]),
+        9001000 => Action::BringOut(JEWEL_MOB, 1),
         // The boxes in the Hitman's hideout: those that lead up the floors,
         // and those he hides in.
         1020000 => Action::Warp(Warp(HITMAN_HIDEOUT, "pt00")),
@@ -556,6 +569,36 @@ pub fn shuffled(map_id: i32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_the_jewels_boxes_send_players_to_the_rooms_their_info_names() {
+        assert_eq!(
+            action(9000000),
+            Action::WarpAnyOf(&[109010104, 109010105, 109010106, 109010107, 109010108])
+        );
+        assert_eq!(action(9000001), Action::WarpAnyOf(&[109010109, 109010110]));
+        let Action::WarpAnyOf(rooms) = action(9000002) else {
+            panic!("{:?}", action(9000002));
+        };
+        assert_eq!(rooms, (109010201..=109010206).collect::<Vec<_>>());
+        assert_eq!(action(9001000), Action::BringOut(JEWEL_MOB, 1));
+        for item_box in 9002000..=9002002 {
+            assert_eq!(action(item_box), Action::Drops);
+        }
+        if data().is_err() {
+            return;
+        }
+        for (reactor_id, name) in [
+            (9000000, "eventMap0"),
+            (9000001, "eventMap1"),
+            (9000002, "eventMap2"),
+            (9001000, "eventMob0"),
+            (9002002, "eventItem2"),
+        ] {
+            let template = template(reactor_id).unwrap();
+            assert_eq!(template.action.as_deref(), Some(name));
+        }
+    }
 
     #[test]
     fn eggs_hatch_and_other_reactors_drop_their_loot() {
