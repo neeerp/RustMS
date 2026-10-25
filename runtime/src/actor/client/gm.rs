@@ -1,10 +1,13 @@
 //! The chat commands (`net::gm_commands`) that need the database.
 
 use super::ClientActor;
+use crate::message::DirectoryMessage;
 use crate::{db::spawn_db, error::RuntimeError};
 use db::cash_shop::CashType;
 use db::coupon::Reward;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::build::world::skill::build_admin_result;
+use net::Discipline;
 use rand::{thread_rng, Rng};
 use std::time::{Duration, SystemTime};
 use tracing::info;
@@ -81,6 +84,100 @@ impl ClientActor {
         info!(target: "gm_audit", character = %gm, result = %line, "GM command");
         self.send(&mut build_broadcast(Broadcast::Pink, &line)?)
             .await
+    }
+
+    /// `!ban`, `!unban`, `!dc`, and the client's `/ban` and `/block`: block
+    /// or unblock the account of the character named in `discipline`, or
+    /// disconnect them. A block disconnects every character of the account
+    /// that is online. Nobody may discipline a GM of their own rank or
+    /// higher. The slash commands hear ADMIN_RESULT, the chat commands a
+    /// line.
+    pub(super) async fn discipline(&mut self, discipline: Discipline) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        let (gm, gm_level) = (player.stats.name.clone(), player.gm_level);
+        let (target, slash) = match &discipline {
+            Discipline::Block { target, slash, .. } => (target.clone(), *slash),
+            Discipline::Unblock { target } | Discipline::Disconnect { target } => {
+                (target.clone(), false)
+            }
+        };
+        let lookup = target.clone();
+        let found = spawn_db(move || {
+            let Some(receiver) = db::cash_shop::gift_receiver(&lookup)? else {
+                return Ok(None);
+            };
+            let account = db::account::get_account_by_id(receiver.account_id)?;
+            let characters = db::account::character_ids(receiver.account_id)?;
+            Ok(Some((receiver, account.gm_level, characters)))
+        })
+        .await?;
+        let outcome = match found {
+            None => Err(format!("There is no character named {target}.")),
+            Some((receiver, level, _)) if level >= gm_level => {
+                Err(format!("{} is your rank or higher.", receiver.name))
+            }
+            Some((receiver, _, characters)) => {
+                let (account_id, name) = (receiver.account_id, receiver.name);
+                Ok(match discipline {
+                    Discipline::Block {
+                        reason, days, note, ..
+                    } => {
+                        let until = days.map(|days| {
+                            SystemTime::now() + Duration::from_secs(u64::from(days) * 86_400)
+                        });
+                        let note = (!note.is_empty()).then_some(note);
+                        spawn_db(move || {
+                            db::account::block(
+                                account_id,
+                                i16::from(reason),
+                                until,
+                                note.as_deref(),
+                            )
+                        })
+                        .await?;
+                        self.kick(characters).await?;
+                        match days {
+                            Some(days) => format!("Blocked {name}'s account for {days} days."),
+                            None => format!("Blocked {name}'s account for good."),
+                        }
+                    }
+                    Discipline::Unblock { .. } => {
+                        if spawn_db(move || db::account::unblock(account_id)).await? {
+                            format!("Unblocked {name}'s account.")
+                        } else {
+                            format!("{name}'s account is not blocked.")
+                        }
+                    }
+                    Discipline::Disconnect { .. } => {
+                        if self.kick(vec![receiver.id]).await? > 0 {
+                            format!("Disconnected {name}.")
+                        } else {
+                            format!("{name} is not online.")
+                        }
+                    }
+                })
+            }
+        };
+        let line = match &outcome {
+            Ok(line) | Err(line) => line,
+        };
+        info!(target: "gm_audit", character = %gm, result = %line, "GM command");
+        let mut reply = match (slash, &outcome) {
+            // "You have successfully blocked access."
+            (true, Ok(_)) => build_admin_result(4, 0)?,
+            // "You have entered an invalid character name."
+            (true, Err(_)) => build_admin_result(6, 1)?,
+            (false, _) => build_broadcast(Broadcast::Pink, line)?,
+        };
+        self.send(&mut reply).await
+    }
+
+    /// Disconnect whichever of `client_ids` are online: how many were.
+    async fn kick(&mut self, client_ids: Vec<i32>) -> Result<usize, RuntimeError> {
+        let (reply, online) = tokio::sync::oneshot::channel();
+        self.send_to_directory(DirectoryMessage::Kick { client_ids, reply })
+            .await?;
+        Ok(online.await.unwrap_or(0))
     }
 
     async fn grant(

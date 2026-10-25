@@ -608,6 +608,36 @@ pub async fn login_grade(config: &HarnessConfig) -> (u8, u8) {
     panic!("login failed: {last_error:?}");
 }
 
+/// The bytes after the opcode of the login result refusing `config`'s
+/// account, retried while its last session is still closing (status 7).
+pub async fn login_refusal(config: &HarnessConfig) -> Vec<u8> {
+    for _ in 0..20 {
+        let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake")
+            .await
+            .expect("login handshake");
+        login_conn
+            .send_packet(build_login_started(), "login start")
+            .await
+            .expect("login start");
+        login_conn
+            .send_packet(
+                build_login_credentials(&config.username, &config.password).unwrap(),
+                "login credentials",
+            )
+            .await
+            .expect("login credentials");
+        let reply = read_packet(&mut login_conn, "login credentials")
+            .await
+            .expect("a login result");
+        let bytes = reply.packet.bytes[2..].to_vec();
+        if bytes[0] != 7 {
+            return bytes;
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    panic!("the last session never closed");
+}
+
 async fn login_status(config: &HarnessConfig) -> Result<LoginStatusPacket, HarnessError> {
     let mut login_conn = MapleTestConnection::connect(config.login_addr, "login handshake").await?;
     login_conn

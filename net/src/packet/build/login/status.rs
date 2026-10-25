@@ -1,4 +1,4 @@
-use crate::codec::time::{filetime, ZERO_TIME};
+use crate::codec::time::{expiration, filetime, ZERO_TIME};
 use crate::{
     error::NetworkError,
     packet::op::SendOpcode::{GuestIdLogin, LoginStatus},
@@ -31,6 +31,17 @@ pub fn build_login_status_packet(status: LoginStatusCode) -> Result<Packet, Netw
     packet.write_byte(0)?;
     packet.write_int(0)?;
 
+    Ok(packet)
+}
+
+/// The refusal for a blocked account: v83 reads the reason (BlockReason.img's
+/// number, whose `msg` it shows) and the end after the usual padding, and
+/// takes an end three or more years away for good (FUN_005f83ee, report
+/// b003).
+pub fn build_blocked_packet(reason: u8, until: Option<SystemTime>) -> Result<Packet, NetworkError> {
+    let mut packet = build_login_status_packet(LoginStatusCode::Banned)?;
+    packet.write_byte(reason)?;
+    packet.write_long(expiration(until))?;
     Ok(packet)
 }
 
@@ -139,7 +150,33 @@ mod tests {
             storage_slots: 4,
             storage_meso: 0,
             test_admin: false,
+            ban_reason: 0,
+            ban_until: None,
         }
+    }
+
+    #[test]
+    fn a_blocked_account_hears_why_and_until_when() {
+        let until = UNIX_EPOCH + Duration::from_secs(1_000);
+        let packet = build_blocked_packet(3, Some(until)).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::LoginStatus as i16)
+            .byte(2)
+            .byte(0)
+            .int(0);
+        expect.byte(3).long(filetime(until));
+        expect.end();
+
+        let packet = build_blocked_packet(0, None).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::LoginStatus as i16)
+            .byte(2)
+            .byte(0)
+            .int(0);
+        expect.byte(0).long(crate::codec::time::DEFAULT_TIME);
+        expect.end();
     }
 
     #[test]

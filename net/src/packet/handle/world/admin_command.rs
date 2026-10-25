@@ -1,7 +1,7 @@
-use crate::gm_commands::{tier, GM, HELPER};
+use crate::gm_commands::{tier, ADMIN, GM, HELPER};
 use crate::handler::{
-    BroadcastScope, FieldRequest, HandlerResult, WhisperDelivery, WorldAction, WorldContext,
-    WorldHandler, WorldResult,
+    BroadcastScope, Discipline, FieldRequest, HandlerResult, WhisperDelivery, WorldAction,
+    WorldContext, WorldHandler, WorldResult,
 };
 use crate::packet::build::world::messaging::{build_broadcast, build_slide, Broadcast};
 use crate::packet::build::world::{skill, stat};
@@ -9,6 +9,14 @@ use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use tracing::{debug, info};
 
+/// `/ban NAME`: block the account for good.
+const BAN: u8 = 0x03;
+/// `/block NAME DAYS REASON`: block it for some days, with the reason and
+/// a note from the client's dialog (report b175 s4).
+const BLOCK: u8 = 0x04;
+/// The longest `/block` the server keeps; the client shows any end three or
+/// more years away as for good.
+pub const BLOCK_DAYS: u32 = 36_500;
 /// `/h`: hide (1) or show (0) the GM.
 const HIDE: u8 = 0x10;
 /// `/u` (0) lists the map's users; the client also sends 12 on every map
@@ -34,6 +42,24 @@ impl WorldHandler for AdminCommandHandler {
         match mode {
             HIDE => set_hidden(ctx.player, reader.read_byte()? == 1),
             USERS | ARTIFACT_RANKING => Ok(HandlerResult::empty()),
+            BAN if gated(ctx, ADMIN) => {
+                let target = reader.read_str_with_length()?;
+                block(ctx, target, 0, None, String::new())
+            }
+            BLOCK if gated(ctx, ADMIN) => {
+                let target = reader.read_str_with_length()?;
+                let reason = reader.read_byte()?;
+                let days = reader.read_int()?;
+                let note = reader.read_str_with_length()?;
+                // v83 sends no 0 days but lets a negative number through,
+                // and only the reasons Etc/BlockReason.img has.
+                match (u32::try_from(days), reason) {
+                    (Ok(days @ 1..), 1..=13) => {
+                        block(ctx, target, reason, Some(days.min(BLOCK_DAYS)), note)
+                    }
+                    _ => Ok(HandlerResult::empty()),
+                }
+            }
             WARN if gated(ctx, HELPER) => {
                 let name = reader.read_str_with_length()?;
                 let text = reader.read_str_with_length()?;
@@ -52,6 +78,36 @@ impl WorldHandler for AdminCommandHandler {
 /// are.
 fn gated(ctx: &WorldContext, needs: i16) -> bool {
     crate::policy::gm_commands_enabled() && tier(ctx.player.gm_level) >= needs
+}
+
+/// `/ban` and `/block`; the GM hears ADMIN_RESULT 4 (SP 0xa2, blocked) or
+/// 6 with 1 (SP 0xa8, no such character).
+fn block(
+    ctx: &WorldContext,
+    target: String,
+    reason: u8,
+    days: Option<u32>,
+    note: String,
+) -> WorldResult {
+    info!(
+        target: "gm_audit",
+        character = %ctx.player.stats.name,
+        gm_level = ctx.player.gm_level,
+        command = if days.is_some() { "/block" } else { "/ban" },
+        target,
+        reason,
+        days,
+        note,
+    );
+    Ok(
+        HandlerResult::empty().with(WorldAction::Discipline(Discipline::Block {
+            target,
+            reason,
+            days,
+            note,
+            slash: true,
+        })),
+    )
 }
 
 /// `/w`: `text` in a dialog for the player named `name`, wherever they
@@ -310,6 +366,46 @@ mod tests {
         assert!(broadcast(&mut player, 0, 0, "").actions.is_empty());
         player.gm_level = 1;
         assert!(broadcast(&mut player, 0, 0, "hi").actions.is_empty());
+    }
+
+    #[test]
+    fn ban_and_block_need_an_admin() {
+        let mut player = crate::codec::stats::sample_player();
+        player.gm_level = 3;
+        let block_for = |reason: u8, days: i32| {
+            let mut bytes = vec![BLOCK, 3, 0];
+            bytes.extend(b"Bob");
+            bytes.push(reason);
+            bytes.extend(days.to_le_bytes());
+            bytes.extend([2, 0]);
+            bytes.extend(b"ad");
+            bytes
+        };
+        let block = |days| block_for(4, days);
+        let result = handle(&mut player, &block(7));
+        assert!(matches!(
+            &result.actions[..],
+            [WorldAction::Discipline(Discipline::Block { target, reason: 4, days: Some(7), note, slash: true })]
+                if target == "Bob" && note == "ad"
+        ));
+        assert!(handle(&mut player, &block(-1)).actions.is_empty());
+        assert!(handle(&mut player, &block_for(0, 7)).actions.is_empty());
+        assert!(handle(&mut player, &block_for(14, 7)).actions.is_empty());
+        let result = handle(&mut player, &[BAN, 3, 0, b'B', b'o', b'b']);
+        assert!(matches!(
+            &result.actions[..],
+            [WorldAction::Discipline(Discipline::Block {
+                reason: 0,
+                days: None,
+                ..
+            })]
+        ));
+
+        player.gm_level = 2;
+        assert!(handle(&mut player, &block(7)).actions.is_empty());
+        assert!(handle(&mut player, &[BAN, 3, 0, b'B', b'o', b'b'])
+            .actions
+            .is_empty());
     }
 
     #[test]

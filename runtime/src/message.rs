@@ -953,6 +953,12 @@ pub enum DirectoryMessage {
         partner: Option<AvatarLook>,
         reply: tokio::sync::oneshot::Sender<Result<(), TvRefusal>>,
     },
+    /// Disconnect whichever of `client_ids` are online; `reply` gets how
+    /// many were.
+    Kick {
+        client_ids: Vec<ClientId>,
+        reply: tokio::sync::oneshot::Sender<usize>,
+    },
     /// Someone searched for `item_id` with the Owl of Minerva.
     OwlSearched {
         item_id: i32,

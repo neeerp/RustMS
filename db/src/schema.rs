@@ -38,6 +38,8 @@ diesel::table! {
         storage_slots -> Int2,
         storage_meso -> Int4,
         test_admin -> Bool,
+        ban_reason -> Int2,
+        ban_until -> Nullable<Timestamp>,
     }
 }
 

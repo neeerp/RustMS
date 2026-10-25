@@ -11,7 +11,7 @@
 //! `RUSTMS_GM_COMMANDS=0` turns all of them off, so every line is chat.
 
 use crate::error::NetworkError;
-use crate::handler::{BroadcastScope, WorldAction, WorldContext};
+use crate::handler::{BroadcastScope, Discipline, WorldAction, WorldContext};
 use crate::items;
 use crate::packet::build::world::{
     drop::build_meso_gain_in_chat,
@@ -20,7 +20,7 @@ use crate::packet::build::world::{
     messaging::{build_broadcast, Broadcast},
     stat::{self, StatUpdate},
 };
-use crate::packet::handle::world::{set_hidden, warp_to_spawn_point};
+use crate::packet::handle::world::{set_hidden, warp_to_spawn_point, BLOCK_DAYS};
 use db::cash_shop::CashType;
 use db::coupon::Reward;
 use tracing::info;
@@ -178,6 +178,27 @@ const COMMANDS: &[Command] = &[
         tier: GM,
         usage: "<text>",
         run: notice,
+    },
+    Command {
+        prefix: '!',
+        name: "dc",
+        tier: GM,
+        usage: "<name>",
+        run: disconnect,
+    },
+    Command {
+        prefix: '!',
+        name: "ban",
+        tier: ADMIN,
+        usage: "<name> [days] [reason] [note]",
+        run: ban,
+    },
+    Command {
+        prefix: '!',
+        name: "unban",
+        tier: ADMIN,
+        usage: "<name>",
+        run: unban,
     },
 ];
 
@@ -585,6 +606,85 @@ fn notice(_: &mut WorldContext, args: &[&str]) -> Outcome {
     }]))
 }
 
+/// `!dc`: disconnect a character.
+fn disconnect(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    match args {
+        [name] => Ok(Ok(vec![WorldAction::Discipline(Discipline::Disconnect {
+            target: name.to_string(),
+        })])),
+        _ => Ok(Err(usage("dc"))),
+    }
+}
+
+/// The reasons a block may give, by the `type` of their Etc/BlockReason.img
+/// node, whose number is the place here plus one (as v83's `/block` finds
+/// them, report b175 s4).
+const BLOCK_REASONS: [&str; 13] = [
+    "HACK",
+    "BOT",
+    "AD",
+    "HARASS",
+    "CURSE",
+    "SCAM",
+    "MISCONDUCT",
+    "SELL",
+    "ICASH",
+    "TEMP",
+    "GM",
+    "IPROGRAM",
+    "MEGAPHONE",
+];
+
+/// `!ban`: block a character's account, for good unless a number of days
+/// comes first, giving a reason (a BlockReason.img type or number) and a
+/// note for the record if they follow.
+fn ban(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    let Some((name, mut rest)) = args.split_first() else {
+        return Ok(Err(usage("ban")));
+    };
+    let mut days = None;
+    if let Some((first, after)) = rest.split_first() {
+        if let Ok(n) = first.parse::<u32>() {
+            if n == 0 {
+                return Ok(Err(usage("ban")));
+            }
+            days = Some(n.min(BLOCK_DAYS));
+            rest = after;
+        }
+    }
+    let mut reason = 0;
+    if let Some((first, after)) = rest.split_first() {
+        let found = match first.parse::<u8>() {
+            Ok(n @ 1..=13) => Some(n),
+            _ => BLOCK_REASONS
+                .iter()
+                .position(|r| r.eq_ignore_ascii_case(first))
+                .map(|i| i as u8 + 1),
+        };
+        if let Some(found) = found {
+            reason = found;
+            rest = after;
+        }
+    }
+    Ok(Ok(vec![WorldAction::Discipline(Discipline::Block {
+        target: name.to_string(),
+        reason,
+        days,
+        note: rest.join(" "),
+        slash: false,
+    })]))
+}
+
+/// `!unban`: lift a character's account's block.
+fn unban(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    match args {
+        [name] => Ok(Ok(vec![WorldAction::Discipline(Discipline::Unblock {
+            target: name.to_string(),
+        })])),
+        _ => Ok(Err(usage("unban"))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -652,6 +752,61 @@ mod tests {
             .iter()
             .any(|line| line == "!item <item id> [quantity]"));
         assert_eq!(tier(7), ADMIN);
+    }
+
+    #[test]
+    fn ban_reads_its_days_reason_and_note() {
+        let discipline = |gm_level, line| {
+            run_as(&mut player(gm_level), line)
+                .unwrap()
+                .into_iter()
+                .find_map(|action| match action {
+                    WorldAction::Discipline(d) => Some(d),
+                    _ => None,
+                })
+        };
+        let block = |target: &str, reason, days, note: &str| {
+            Some(Discipline::Block {
+                target: target.into(),
+                reason,
+                days,
+                note: note.into(),
+                slash: false,
+            })
+        };
+        assert_eq!(discipline(ADMIN, "!ban Bob"), block("Bob", 0, None, ""));
+        assert_eq!(
+            discipline(ADMIN, "!ban Bob 7 bot farming slimes"),
+            block("Bob", 2, Some(7), "farming slimes")
+        );
+        assert_eq!(
+            discipline(ADMIN, "!ban Bob 3 13 left"),
+            block("Bob", 13, Some(3), "left")
+        );
+        assert_eq!(
+            discipline(ADMIN, "!ban Bob 99999 hack"),
+            block("Bob", 1, Some(BLOCK_DAYS), "")
+        );
+        assert_eq!(
+            discipline(ADMIN, "!ban Bob spam"),
+            block("Bob", 0, None, "spam")
+        );
+        assert_eq!(discipline(ADMIN, "!ban Bob 0"), None);
+        assert_eq!(discipline(GM, "!ban Bob"), None);
+        assert_eq!(
+            discipline(ADMIN, "!unban Bob"),
+            Some(Discipline::Unblock {
+                target: "Bob".into()
+            })
+        );
+        assert_eq!(discipline(GM, "!unban Bob"), None);
+        assert_eq!(
+            discipline(GM, "!dc Bob"),
+            Some(Discipline::Disconnect {
+                target: "Bob".into()
+            })
+        );
+        assert_eq!(discipline(HELPER, "!dc Bob"), None);
     }
 
     #[test]
