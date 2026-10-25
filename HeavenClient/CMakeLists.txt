@@ -1038,6 +1038,8 @@ add_executable(HeavenClient
     IO/UITypes/UIPersonalShop.h
     IO/UITypes/UIMonsterBook.cpp
     IO/UITypes/UIMonsterBook.h
+    IO/UITypes/UIMonsterCarnival.cpp
+    IO/UITypes/UIMonsterCarnival.h
     IO/UITypes/UISkillBook.cpp
     IO/UITypes/UISkillBook.h
     IO/UITypes/SkillMacroLayout.h

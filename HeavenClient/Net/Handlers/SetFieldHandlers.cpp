@@ -68,7 +68,8 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
 	{
-		carnival::enter_field(NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"]);
+		carnival::enter_field(mapid, NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"]);
+		UI::get().remove(UIElement::Type::MONSTERCARNIVAL);
 
 		Window::get().fadeout(
 			[mapid, portalid, chase]()

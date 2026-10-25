@@ -147,6 +147,7 @@ namespace ms
 			CLAIMNOTICE,
 			CLAIM,
 			DOJOHUD,
+			MONSTERCARNIVAL,
 			NUM_TYPES
 		};
 

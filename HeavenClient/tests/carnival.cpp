@@ -83,15 +83,15 @@ int main()
 		require(!carnival::ally(0), "Red's don't");
 		require(!carnival::ally(carnival::NO_TEAM), "nor the field's mobs of no side");
 
-		carnival::enter_field(11);
-		require(carnival::field_type() == 11, "the field being entered");
+		carnival::enter_field(980000102, 11);
+		require(carnival::field_type() == 11 && carnival::field_map() == 980000102, "the field being entered");
 		require(carnival::state().team == carnival::NO_TEAM && !carnival::ally(1), "a new field forgets the battle");
 
 		// The revive room's START is the side alone; no mob there is an ally.
 		carnival::state().team = 1;
 		require(!carnival::state().battle && !carnival::ally(1), "the revive room has no battle");
 
-		carnival::enter_field(0);
+		carnival::enter_field(100000000, 0);
 		require(carnival::field_type() == 0 && carnival::state().team == carnival::NO_TEAM, "leaving forgets the side");
 
 		require(carnival::summon_line(0, "Ann", "Brown Teddy") == "[Ann] has summoned a being. [Brown Teddy]",
@@ -123,6 +123,92 @@ int main()
 		require(carnival::result_line(10)->rfind("Despite the Overtime", 0) == 0, "a draw");
 		require(carnival::result_line(11)->find("opposing team") != std::string::npos, "the other side left");
 		require(!carnival::result_line(7) && !carnival::result_line(12), "other codes say nothing");
+
+		// The CP window's geometry (b166).
+		{
+			using namespace carnival::window;
+
+			require(height(false, 10) == 128 && height(true, 10) == 13 * 24 && height(true, 0) == 13 * 14,
+				"folded 128, open 13 * (14 + rows)");
+			require(height(true, 20) == 13 * 26 && shown(20) == 12, "at most 12 rows");
+			require(cost_x(7) == 96 && cost_x(17) == 91 && cost_x(150) == 86, "costs end at 101, 5 px a digit");
+
+			require(row_at(Point<int16_t>(6, 147), 3) == std::optional<size_t>(0), "the first row's corner");
+			require(row_at(Point<int16_t>(143, 159), 3) == std::optional<size_t>(0), "its far corner");
+			require(row_at(Point<int16_t>(50, 160), 3) == std::optional<size_t>(1), "the second row");
+			require(!row_at(Point<int16_t>(5, 150), 3) && !row_at(Point<int16_t>(144, 150), 3),
+				"6 px right of where they're drawn");
+			require(!row_at(Point<int16_t>(50, 146), 3) && !row_at(Point<int16_t>(50, 147 + 39), 3),
+				"nothing above the rows or past them");
+
+			require(tab_at(Point<int16_t>(5, 111)) == std::optional<uint8_t>(0), "the first tab");
+			require(tab_at(Point<int16_t>(30, 120)) == std::optional<uint8_t>(1), "the second");
+			require(tab_at(Point<int16_t>(112, 127)) == std::optional<uint8_t>(2), "the third, 2 px past its end");
+			require(!tab_at(Point<int16_t>(28, 120)) && !tab_at(Point<int16_t>(30, 110)) &&
+				!tab_at(Point<int16_t>(30, 128)), "between tabs, above the click line, under the strip");
+
+			require(on_lock(Point<int16_t>(9, 13 * 3 + 162), 3) && on_lock(Point<int16_t>(17, 13 * 3 + 173), 3),
+				"the lock under three rows");
+			require(!on_lock(Point<int16_t>(18, 13 * 3 + 162), 3) && !on_lock(Point<int16_t>(9, 162), 3),
+				"and nowhere else");
+
+			State window({ 10, 8, 9 });
+			require(!window.open() && window.tab() == 0 && window.height() == 128, "it starts folded on mobs");
+			require(!window.deciding(), "nothing to decide");
+
+			// The Tab key opens a folded window on its tab, then goes round.
+			window.tab_key();
+			require(window.open() && window.tab() == 0 && window.height() == 13 * 24, "Tab opens it");
+			window.tab_key();
+			window.tab_key();
+			require(window.tab() == 2 && window.shown() == 9, "and then cycles");
+			window.tab_key();
+			require(window.tab() == 0, "back to mobs");
+
+			require(window.click(2) && window.selected() == 3 && window.deciding(), "a click picks a row");
+			require(!window.click(2), "the same row again changes nothing");
+			window.choose_tab(0);
+			require(window.selected() == 3, "the same tab keeps it");
+			window.choose_tab(1);
+			require(window.selected() == 0 && window.tab() == 1, "another tab drops it");
+			window.click(1);
+			require(window.click(std::nullopt) && window.selected() == 0, "a miss drops it");
+
+			// F-keys pick the current tab's rows and open the window.
+			window.fold();
+			require(window.hotkey(7) == std::optional<size_t>(7) && window.selected() == 8 && window.open(),
+				"F8 on skills");
+			require(!window.hotkey(8) && window.selected() == 8, "skills have no ninth");
+			require(!window.hotkey(12), "only F1 to F12");
+			window.fold();
+			require(!window.hotkey(9) && !window.open() && window.selected() == 8,
+				"a key with no row leaves the window be");
+			window.choose_tab(2);
+			window.fold();
+			window.tab_key();
+			require(window.open() && window.tab() == 2, "Tab opens a folded window on its own tab");
+			require(!window.click(std::nullopt), "a miss with nothing selected changes nothing");
+			window.fold();
+			window.click(0);
+			require(!window.deciding(), "nothing to decide while folded");
+			window.open_up();
+			State empty({ 0, 0, 0 });
+			require(!empty.hotkey(0) && !empty.deciding(), "an empty tab has no rows to pick");
+			require(cost_x(0) == 96 && cost_x(1000) == 81, "one digit, four digits");
+			require(row_at(Point<int16_t>(50, 185), 3) == std::optional<size_t>(2), "the last row's bottom");
+
+			// Left alone, an open window folds after 8 seconds unless locked.
+			require(!window.pass(8000), "not yet");
+			require(window.pass(1) && !window.open(), "folded");
+			require(!window.pass(10000), "a folded window stays so");
+			window.open_up();
+			window.toggle_lock();
+			require(window.locked() && !window.pass(10000) && window.open(), "the lock keeps it open");
+			window.toggle_lock();
+			window.pass(7000);
+			window.touch();
+			require(!window.pass(7000) && window.open(), "a touch puts the fold off");
+		}
 	}
 	catch (const std::exception& e)
 	{

@@ -73,6 +73,9 @@ namespace ms
 		// shop, an NPC shop, storage, Duey, the item megaphone's window, the Item Guard's, Karma's, the hammer's,
 		// Vega's or the kite's (reports c013, c015).
 		bool dialog_open();
+		// Whether an NPC's talk, a notice, a number prompt or a slideshow is
+		// up, which hear the keys before the windows behind them.
+		bool talking() const;
 
 		void send_cursor(Point<int16_t> pos);
 

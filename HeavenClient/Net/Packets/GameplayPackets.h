@@ -1331,4 +1331,17 @@ namespace ms
 	public:
 		PartySearchStopPacket() : OutPacket(OutPacket::Opcode::PARTY_SEARCH_STOP) {}
 	};
+
+	// Spends CP on the Carnival window's row `index` (from 0) of tab `tab`:
+	// 0 a mob, 1 a skill, 2 a guardian (v83 FUN_008706d3)
+	// Opcode: MONSTER_CARNIVAL(218)
+	class MonsterCarnivalPacket : public OutPacket
+	{
+	public:
+		MonsterCarnivalPacket(uint8_t tab, uint8_t index) : OutPacket(OutPacket::Opcode::MONSTER_CARNIVAL)
+		{
+			write_byte(static_cast<int8_t>(tab));
+			write_byte(static_cast<int8_t>(index));
+		}
+	};
 }

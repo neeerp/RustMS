@@ -90,6 +90,7 @@ namespace ms
 		settings.emplace<PosQUESTHELPER>();
 		settings.emplace<PosENERGYBAR>();
 		settings.emplace<PosMEDALS>();
+		settings.emplace<PosMONSTERCARNIVAL>();
 		settings.emplace<MiniMapType>();
 		settings.emplace<MiniMapSimpleMode>();
 		settings.emplace<MiniMapDefaultHelpers>();

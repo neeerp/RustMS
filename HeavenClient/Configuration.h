@@ -793,6 +793,13 @@ namespace ms
 		PosENERGYBAR() : PointEntry("PosENERGYBAR", "(359,500)") {}
 	};
 
+	// Where v83 first puts the Monster Carnival's CP window isn't known
+	// (a saved place, b166); this is the screen's top right.
+	struct PosMONSTERCARNIVAL : public Configuration::PointEntry
+	{
+		PosMONSTERCARNIVAL() : PointEntry("PosMONSTERCARNIVAL", "(630,100)") {}
+	};
+
 	// The type of UIMiniMap on maps that aren't towns: 0 folded, 1 the map
 	// alone, 2 the map under its names
 	struct MiniMapType : public Configuration::ByteEntry

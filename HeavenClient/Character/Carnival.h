@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Net/InPacket.h"
+#include "../Template/Point.h"
 
 #include <array>
 #include <cstdint>
@@ -28,8 +29,10 @@ namespace ms
 		// SPAWN_CHAR and START come before the fade-out loads the field, so
 		// the map's own type is still the old one when they are read.
 		// Entering a field forgets the battle.
-		void enter_field(int32_t fieldtype);
+		void enter_field(int32_t mapid, int32_t fieldtype);
 		int32_t field_type();
+		// That field's map, whose monsterCarnival lists name the window's rows.
+		int32_t field_map();
 
 		// "Maple Red", "Maple Blue", or "" for no side (FUN_00941f10): the
 		// tag drawn instead of the guild's.
@@ -93,5 +96,91 @@ namespace ms
 		// RESULT (0x128, chat type 0xc): 8 won, 9 lost, 10 a draw, 11 the
 		// other side left. Other codes say nothing.
 		std::optional<std::string> result_line(uint8_t code);
+
+		// The CP window (CUIMonsterCarnival, b166): what it shows and how it
+		// folds, without its art. Its tabs are 0 mobs, 1 skills, 2 guardians.
+		namespace window
+		{
+			constexpr int16_t WIDTH = 162;
+			constexpr int16_t FOLDED_HEIGHT = 128;
+			constexpr int16_t ROW_HEIGHT = 13;
+			// The list's rows, the F-keys' too: no tab has more on a v83 field.
+			constexpr size_t MAX_ROWS = 12;
+			constexpr uint8_t TABS = 3;
+			// Milliseconds an open window stays open while nothing touches it.
+			constexpr int32_t FOLD_DELAY = 8000;
+
+			// The list's top in the window, under the tab strip.
+			constexpr int16_t LIST_Y = 128;
+			// Its first row, under the header.
+			constexpr int16_t ROWS_Y = LIST_Y + 19;
+
+			// The rows a tab of `rows` shows.
+			size_t shown(size_t rows);
+			// The window's height: 128 folded, 13 * (14 + rows shown) open (FUN_0086e047).
+			int16_t height(bool open, size_t rows);
+			// Where a row's cost starts: v83 counts 5 px a digit back from x 101.
+			int16_t cost_x(int32_t cost);
+
+			// The row (from 0) under `pos`, in the window, of `shown` rows
+			// (FUN_0086d318). v83 tests the rows 6 px right of where they're
+			// drawn.
+			std::optional<size_t> row_at(Point<int16_t> pos, size_t shown);
+			// The tab under `pos` in the tab strip (CCtrlTab, FUN_004dd827).
+			std::optional<uint8_t> tab_at(Point<int16_t> pos);
+			// Whether `pos` is on the lock under `shown` rows.
+			bool on_lock(Point<int16_t> pos, size_t shown);
+
+			// The window's own state.
+			class State
+			{
+			public:
+				// How many rows each tab has.
+				explicit State(const std::array<size_t, TABS>& rows = {});
+
+				uint8_t tab() const;
+				// The selected row from 1, or 0 for none.
+				size_t selected() const;
+				bool open() const;
+				// Whether the window stays open (icon2), else it folds by itself.
+				bool locked() const;
+				// The current tab's rows on show.
+				size_t shown() const;
+				int16_t height() const;
+				// Whether BtDecide is up: a row is selected on an open list.
+				bool deciding() const;
+
+				// A tab chosen (FUN_00870566): a new one drops the selection,
+				// and either way the window opens.
+				void choose_tab(uint8_t tab);
+				// The Tab key (FUN_008704e9(1)): the next tab on an open
+				// window; a folded one opens on its tab.
+				void tab_key();
+				// F1 to F12 as 0 to 11 (FUN_0087076c): the current tab's row,
+				// selected, and the window opens. Nothing if the tab has no
+				// such row.
+				std::optional<size_t> hotkey(size_t key);
+				// A click on the list: the row from 0, or nothing for a miss,
+				// which drops the selection. Whether the selection changed.
+				bool click(std::optional<size_t> row);
+				void toggle_lock();
+				void open_up();
+				void fold();
+				// Anything that keeps the window open a while longer: a row's
+				// description shown, say.
+				void touch();
+				// `ms` milliseconds on; whether the window folded just now
+				// (FUN_0087047b).
+				bool pass(int32_t ms);
+
+			private:
+				std::array<size_t, TABS> rows;
+				uint8_t current = 0;
+				size_t chosen = 0;
+				bool is_open = false;
+				bool is_locked = false;
+				int32_t timer = FOLD_DELAY;
+			};
+		}
 	}
 }

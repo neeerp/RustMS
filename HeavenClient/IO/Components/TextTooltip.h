@@ -36,11 +36,13 @@ namespace ms
 
 		void draw(Point<int16_t> position) const override;
 
-		bool set_text(std::string text);
+		// Text wider than `max_width` wraps.
+		bool set_text(std::string text, int16_t max_width = 340);
 
 	private:
 		TooltipBox box;
 		std::string text;
+		int16_t width = 0;
 		Text text_label;
 		Point<int16_t> size;
 	};

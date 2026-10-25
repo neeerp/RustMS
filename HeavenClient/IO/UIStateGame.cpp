@@ -880,6 +880,7 @@ namespace ms
 					UIElement::Type::MOBGAGE,
 					UIElement::Type::ENERGYBAR,
 					UIElement::Type::DOJOHUD,
+					UIElement::Type::MONSTERCARNIVAL,
 					UIElement::Type::AVATARMEGAPHONE,
 					UIElement::Type::PARTYSEARCHICON
 			};
