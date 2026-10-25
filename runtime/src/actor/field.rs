@@ -1,3 +1,4 @@
+use crate::actor::field_coconut::{self, CoconutGame, Shot, Turn};
 use crate::actor::field_drops::{Drop, DropSet, Ownership};
 use crate::actor::field_games::{GameRoomRequest, Games};
 use crate::actor::field_kites::KiteSet;
@@ -23,7 +24,10 @@ use net::loot::Loot;
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
 use net::packet::build::world::carnival::{build_carnival_died, build_carnival_summon};
-use net::packet::build::world::conti::build_conti_move;
+use net::packet::build::world::coconut::{
+    build_coconut_hit, build_coconut_score, build_field_team,
+};
+use net::packet::build::world::conti::{build_conti_move, build_countdown};
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
     build_drop, build_explode_drop, build_pet_loot_drop, build_remove_drop, DropAppearance,
@@ -60,7 +64,7 @@ use net::packet::build::world::summon::{
 use net::reactors;
 use net::skills::{self, Inflict, Takes};
 use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
-use net::{ClientId, FieldRequest};
+use net::{ClientId, FieldRequest, GmEvent};
 use packet::Packet;
 use rand::Rng;
 use std::collections::HashMap;
@@ -265,6 +269,8 @@ pub struct FieldActor {
     /// Its guardians standing.
     guardians: Vec<Guardian>,
     kites: KiteSet,
+    /// On a Coconut Season field (field type 4), its game.
+    coconut: Option<CoconutGame>,
     tick: Duration,
 }
 
@@ -328,6 +334,11 @@ impl FieldActor {
             carnival: net::carnival::battle_room(key.map_id).is_some() && key.instance_id != 0,
             guardians: Vec::new(),
             kites: KiteSet::default(),
+            coconut: net::get_game_data()
+                .ok()
+                .and_then(|data| data.field(key.map_id))
+                .and_then(|field| field.coconut.clone())
+                .map(CoconutGame::new),
             tick,
         };
         // A wedding's copy of the hunting ground opens with its one Giant
@@ -437,6 +448,7 @@ impl FieldActor {
                 self.broadcast(None, packet);
             }
         }
+        self.tick_coconut(now);
         self.reach_from_mists(now);
         for summon in self.summons.expire(now) {
             let view = summon.view;
@@ -840,6 +852,8 @@ impl FieldActor {
                 FieldRequest::Chair(item_id) => self.handle_chair(from, item_id),
                 FieldRequest::Weather { item_id, message } => self.blow_weather(item_id, message),
                 FieldRequest::Kite { item_id, message } => self.fly_kite(from, item_id, message),
+                FieldRequest::CoconutHit { index } => self.hit_coconut(from, index),
+                FieldRequest::GmEvent(event) => self.run_gm_event(event),
                 FieldRequest::Pickup {
                     object_id,
                     x,
@@ -3800,10 +3814,14 @@ impl FieldActor {
         }
     }
 
-    fn handle_join(&mut self, handle: ClientHandle, avatar: FieldAvatar, party: Option<i32>) {
+    fn handle_join(&mut self, handle: ClientHandle, mut avatar: FieldAvatar, party: Option<i32>) {
         let client_id = handle.client_id;
         // A rejoin replaces the previous entry without announcing a leave.
         self.occupants.remove(&client_id);
+        // On a Coconut Season field everyone plays, on the smaller team.
+        if let Some(game) = &mut self.coconut {
+            avatar.team = game.join(client_id);
+        }
         // It also ends any trade or shop the player had here.
         let out = self.trades.leave(client_id);
         self.deliver_trade(out);
@@ -3900,6 +3918,12 @@ impl FieldActor {
 
         for kite in self.kites.views() {
             if let Ok(packet) = build_spawn_kite(kite) {
+                handle.send_packet(packet);
+            }
+        }
+
+        if let Some(game) = &self.coconut {
+            for packet in coconut_entry(game, client_id, now) {
                 handle.send_packet(packet);
             }
         }
@@ -4035,6 +4059,136 @@ impl FieldActor {
         }
     }
 
+    /// Nut `index` takes `from`'s hit; everyone sees what it does, and a
+    /// fall scores for the hitter's team.
+    fn hit_coconut(&mut self, from: ClientId, index: u16) {
+        let Some(game) = &mut self.coconut else {
+            return;
+        };
+        let mut rng = rand::thread_rng();
+        let Some(shot) = game.hit(from, index, Instant::now(), &mut || rng.gen()) else {
+            return;
+        };
+        let [maple, story] = game.scores();
+        if let Ok(packet) = build_coconut_hit(index as i16, field_coconut::HIT_DELAY, shot.state())
+        {
+            self.broadcast(None, packet);
+        }
+        let Shot::Fell { team } = shot else {
+            return;
+        };
+        if let Ok(packet) = build_coconut_score(maple, story) {
+            self.broadcast(None, packet);
+        }
+        let Some(name) = self.occupants.get(&from).map(|o| o.avatar.name.clone()) else {
+            return;
+        };
+        let key = if team == field_coconut::MAPLE {
+            keys::COCONUT_FELL_MAPLE
+        } else {
+            keys::COCONUT_FELL_STORY
+        };
+        let line = net::content::text().get(key, &[("name", &name)]);
+        if let Ok(packet) = build_broadcast(Broadcast::Pink, &line) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// A GM's `/start` or `/reset` for the event on this field.
+    fn run_gm_event(&mut self, event: GmEvent) {
+        let Some(game) = &mut self.coconut else {
+            return;
+        };
+        let now = Instant::now();
+        let packets = match event {
+            GmEvent::Start => {
+                let length =
+                    net::events::scaled(Duration::from_secs(game.rules().time_default.into()));
+                if !game.start(now, length) {
+                    return;
+                }
+                info!(field = ?self.key, "Coconut game started");
+                [
+                    build_coconut_hit(-1, field_coconut::SHOW_DELAY, 0),
+                    build_coconut_score(0, 0),
+                    build_countdown(field_coconut::seconds(length)),
+                ]
+            }
+            GmEvent::Reset => {
+                if !game.reset() {
+                    return;
+                }
+                info!(field = ?self.key, "Coconut game reset");
+                [
+                    build_coconut_hit(-1, 0, 0),
+                    build_coconut_score(0, 0),
+                    build_countdown(0),
+                ]
+            }
+        };
+        for packet in packets.into_iter().flatten() {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// The Coconut game's clock: overtime on a tie, the result at the end,
+    /// and everyone sent off when it has been shown.
+    fn tick_coconut(&mut self, now: Instant) {
+        let Some(game) = &mut self.coconut else {
+            return;
+        };
+        let rules = game.rules();
+        let overtime = net::events::scaled(Duration::from_secs(rules.time_expand.into()));
+        let finish = net::events::scaled(Duration::from_secs(rules.time_finish.into()));
+        let Some(turn) = game.tick(now, overtime, finish) else {
+            return;
+        };
+        let game = &*game;
+        match turn {
+            Turn::Overtime(length) => {
+                let line = net::content::text().get(keys::COCONUT_OVERTIME, &[]);
+                let packets = [
+                    build_broadcast(Broadcast::Pink, &line),
+                    build_countdown(field_coconut::seconds(length)),
+                ];
+                for packet in packets.into_iter().flatten() {
+                    self.broadcast(None, packet);
+                }
+            }
+            Turn::Ended { winner } => {
+                let rules = game.rules();
+                for (&client_id, occupant) in &self.occupants {
+                    let won = winner.is_some() && game.team(client_id) == winner;
+                    let (effect, sound) = if won {
+                        (&rules.effect_win, &rules.sound_win)
+                    } else {
+                        (&rules.effect_lose, &rules.sound_lose)
+                    };
+                    for packet in [build_field_effect(effect), build_field_sound(sound)]
+                        .into_iter()
+                        .flatten()
+                    {
+                        occupant.handle.send_packet(packet);
+                    }
+                }
+            }
+            Turn::WarpOut { winner } => {
+                for (&client_id, occupant) in &self.occupants {
+                    let won = winner.is_some() && game.team(client_id) == winner;
+                    occupant.handle.send(ServerMessage::ShipWarp {
+                        from_map: self.key.map_id,
+                        map_id: if won {
+                            field_coconut::WINNERS_MAP
+                        } else {
+                            field_coconut::EXIT_MAP
+                        },
+                        portal: conti::Portal::Id(0),
+                    });
+                }
+            }
+        }
+    }
+
     fn handle_leave(&mut self, client_id: ClientId, staying: bool) {
         let Some(left) = self.occupants.remove(&client_id) else {
             return;
@@ -4051,6 +4205,9 @@ impl FieldActor {
         self.show_merchants();
         // The others drop a player's summons with the player.
         self.summons.remove_owned(client_id, None);
+        if let Some(game) = &mut self.coconut {
+            game.leave(client_id);
+        }
         // Everyone sees the player go before control passes on.
         match build_player_leave_field(client_id) {
             Ok(packet) => self.broadcast_seen(&left.avatar, packet),
@@ -4158,6 +4315,29 @@ impl FieldActor {
 
 /// SPAWN_PLAYER for `avatar`, then its item buff's aura, which v83 keeps
 /// apart from the spawn (report c029 A).
+/// What a player arriving on a Coconut Season field is told: the score,
+/// their team, and the clock if a game is on. The nuts already down stay
+/// up for them (report b167).
+fn coconut_entry(game: &CoconutGame, client_id: ClientId, now: Instant) -> Vec<Packet> {
+    let [maple, story] = game.scores();
+    let mut packets = vec![
+        build_coconut_score(maple, story),
+        build_field_team(game.team(client_id)),
+    ];
+    // The client keeps the nuts hidden until told to show them, and knows
+    // none that came down before it arrived.
+    if game.on() {
+        packets.push(build_coconut_hit(-1, 0, 0));
+        for (index, state) in game.downed() {
+            packets.push(build_coconut_hit(index as i16, 0, state));
+        }
+    }
+    if let Some(seconds) = game.remaining(now) {
+        packets.push(build_countdown(seconds));
+    }
+    packets.into_iter().flatten().collect()
+}
+
 fn player_spawn(avatar: &FieldAvatar) -> Result<Vec<Packet>, net::error::NetworkError> {
     let mut packets = vec![build_player_enter_field(avatar)?];
     if avatar.consume_effect != 0 {
@@ -4403,6 +4583,137 @@ mod tests {
             }
         }
         packets
+    }
+
+    #[tokio::test]
+    async fn a_coconut_game_runs_from_the_gms_start_to_the_warp_out() {
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 109080000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        actor.coconut = Some(CoconutGame::new(game_data::Coconut {
+            count_falling: 10,
+            time_default: 300,
+            time_expand: 120,
+            time_finish: 12,
+            effect_win: "event/coconut/victory".into(),
+            effect_lose: "event/coconut/lose".into(),
+            sound_win: "Coconut/Victory".into(),
+            sound_lose: "Coconut/Failed".into(),
+            ..Default::default()
+        }));
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        let of = |packets: &[Packet], op: SendOpcode| -> Vec<Vec<u8>> {
+            let op = op as i16;
+            packets
+                .iter()
+                .filter(|packet| packet.opcode() == op)
+                .map(|packet| packet.bytes[2..].to_vec())
+                .collect()
+        };
+        for (handle, id) in [(first, 1), (second, 2)] {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 0, 0),
+                party: None,
+            });
+        }
+        // Each is told the score and their team, and none a clock yet.
+        let joined = sent(&mut first_rx);
+        assert_eq!(of(&joined, SendOpcode::CoconutScore), [vec![0, 0, 0, 0]]);
+        assert_eq!(of(&joined, SendOpcode::FieldSpecificData), [vec![0]]);
+        assert!(of(&joined, SendOpcode::Clock).is_empty());
+        let joined = sent(&mut second_rx);
+        assert_eq!(of(&joined, SendOpcode::FieldSpecificData), [vec![1]]);
+        assert_eq!(actor.occupants[&2].avatar.team, 1);
+
+        // A hit before the start does nothing.
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::CoconutHit { index: 4 },
+        });
+        assert!(sent(&mut second_rx).is_empty());
+        let start = Instant::now();
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::GmEvent(GmEvent::Start),
+        });
+        let started = sent(&mut second_rx);
+        // -1 every nut, shown after 5000 ms.
+        assert_eq!(
+            of(&started, SendOpcode::CoconutHit),
+            [vec![0xFF, 0xFF, 0x88, 0x13, 0]]
+        );
+        assert_eq!(of(&started, SendOpcode::Clock), [vec![2, 44, 1, 0, 0]]);
+        actor.handle_message(FieldMessage::FromClient {
+            from: 1,
+            request: FieldRequest::CoconutHit { index: 4 },
+        });
+        // Nut 4 shakes for both.
+        assert_eq!(
+            of(&sent(&mut second_rx), SendOpcode::CoconutHit),
+            [vec![4, 0, 0xE8, 3, 1]]
+        );
+        sent(&mut first_rx);
+
+        // A tie plays on, then is a draw that both lose.
+        actor.on_tick(start + Duration::from_secs(301));
+        let over = sent(&mut first_rx);
+        assert_eq!(of(&over, SendOpcode::Clock), [vec![2, 120, 0, 0, 0]]);
+        actor.on_tick(start + Duration::from_secs(422));
+        let ended = sent(&mut second_rx);
+        let effects = of(&ended, SendOpcode::FieldEffect);
+        assert_eq!(effects.len(), 2);
+        assert!(effects[0].ends_with(b"event/coconut/lose"));
+        assert!(effects[1].ends_with(b"Coconut/Failed"));
+        actor.on_tick(start + Duration::from_secs(435));
+        let warps = |rx: &mut mpsc::Receiver<ServerMessage>| {
+            let mut maps = Vec::new();
+            while let Ok(message) = rx.try_recv() {
+                if let ServerMessage::ShipWarp { map_id, .. } = message {
+                    maps.push(map_id);
+                }
+            }
+            maps
+        };
+        assert_eq!(warps(&mut first_rx), [field_coconut::EXIT_MAP]);
+        assert_eq!(warps(&mut second_rx), [field_coconut::EXIT_MAP]);
+    }
+
+    #[test]
+    fn a_player_arriving_mid_game_sees_the_nuts_the_others_see() {
+        let mut game = CoconutGame::new(game_data::Coconut {
+            count_falling: 10,
+            ..Default::default()
+        });
+        let hits = |game: &CoconutGame, id| -> Vec<Vec<u8>> {
+            coconut_entry(game, id, Instant::now())
+                .iter()
+                .filter(|packet| packet.opcode() == SendOpcode::CoconutHit as i16)
+                .map(|packet| packet.bytes[2..].to_vec())
+                .collect()
+        };
+        game.join(1);
+        // Before a game the nuts stay hidden.
+        assert!(hits(&game, 1).is_empty());
+        let now = Instant::now();
+        game.start(now, Duration::from_secs(300));
+        // Three hits shake nut 2, the fourth brings it down.
+        for second in 0..4 {
+            game.hit(1, 2, now + Duration::from_secs(second), &mut || 0.0);
+        }
+        game.join(2);
+        assert_eq!(
+            hits(&game, 2),
+            [vec![0xFF, 0xFF, 0, 0, 0], vec![2, 0, 0, 0, 3]]
+        );
     }
 
     #[tokio::test]

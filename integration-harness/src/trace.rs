@@ -210,6 +210,9 @@ pub struct Trace {
     /// Every Monster Carnival packet (MONSTER_CARNIVAL_START to
     /// MONSTER_CARNIVAL_RESULT): (opcode, body), in order.
     pub carnival: Vec<(i16, Vec<u8>)>,
+    /// Every Coconut Season packet (FIELD_SPECIFIC_DATA, COCONUT_HIT and
+    /// COCONUT_SCORE): (opcode, body), in order.
+    pub coconut: Vec<(i16, Vec<u8>)>,
     /// Every MARRIAGE_REQUEST, MARRIAGE_RESULT and WEDDING_GIFT_RESULT:
     /// (opcode, body), in order.
     pub marriage: Vec<(i16, Vec<u8>)>,
@@ -695,6 +698,11 @@ impl Trace {
             .contains(&op)
         {
             self.carnival.push((op, p.bytes[2..].to_vec()));
+        } else if op == SendOpcode::FieldSpecificData as i16
+            || op == SendOpcode::CoconutHit as i16
+            || op == SendOpcode::CoconutScore as i16
+        {
+            self.coconut.push((op, p.bytes[2..].to_vec()));
         } else if op == SendOpcode::MarriageRequest as i16
             || op == SendOpcode::MarriageResult as i16
             || op == SendOpcode::WeddingGiftResult as i16

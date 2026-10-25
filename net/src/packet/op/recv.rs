@@ -188,6 +188,8 @@ pub enum RecvOpcode {
     DamageReactor = 0xCD,
 
     PlayerMapTransfer = 0xCF,
+    /// An attack hit a Coconut Season nut (b167).
+    Coconut = 0xD5,
     /// The Monster Carnival window spends CP (v83ref b163).
     MonsterCarnival = 0xDA,
     ContiStateRequest = 0xDC,

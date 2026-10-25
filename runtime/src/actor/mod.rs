@@ -3,6 +3,7 @@ pub mod client;
 pub mod directory;
 pub mod event;
 pub mod field;
+pub mod field_coconut;
 pub mod field_drops;
 pub mod field_games;
 pub mod field_kites;

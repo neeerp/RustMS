@@ -117,6 +117,8 @@ pub enum SendOpcode {
     SetCashShop = 0x7F,
     BlockedMap = 0x83,
     BlockedServer = 0x84,
+    /// An event field's word to the player: their Coconut team (b167).
+    FieldSpecificData = 0x85,
     FieldEffect = 0x8A,
     BlowWeather = 0x8E,
     PlayJukebox = 0x8F,
@@ -229,6 +231,9 @@ pub enum SendOpcode {
     HitReactor = 0x115,
     SpawnReactor = 0x117,
     RemoveReactor = 0x118,
+    /// A Coconut Season nut shows, shakes, bursts or falls (b167).
+    CoconutHit = 0x11D,
+    CoconutScore = 0x11E,
     /// The Monster Carnival's sides and CP on arrival (v83ref b163).
     CarnivalStart = 0x121,
     CarnivalObtainedCp = 0x122,

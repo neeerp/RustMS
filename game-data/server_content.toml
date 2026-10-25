@@ -1320,6 +1320,9 @@ unsourced = [
     "carnival.overtime",
     "carnival.guide.won",
     "carnival.guide.lost",
+    "coconut.fell.maple",
+    "coconut.fell.story",
+    "coconut.overtime",
 ]
 
 [text."glTutoMsg0.message"]

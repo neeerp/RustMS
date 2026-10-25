@@ -302,6 +302,35 @@ pub struct Carnival {
     pub mob_spots: Vec<CarnivalSpot>,
 }
 
+/// `coconut`: the rules of a Coconut Season field (field type 4, b167).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Coconut {
+    /// `countFalling`, `countBombing` and `countStopped`: how many nuts may
+    /// fall, burst or stick. Their sum is the number of nuts the client
+    /// knows (501).
+    pub count_falling: u32,
+    pub count_bombing: u32,
+    pub count_stopped: u32,
+    /// `timeDefault`: the game's length in seconds.
+    pub time_default: u32,
+    /// `timeExpand`: the seconds a tie adds, once.
+    pub time_expand: u32,
+    /// `timeFinish`: the seconds between the end and the warp out.
+    pub time_finish: u32,
+    /// `effectWin`, `effectLose`, `soundWin` and `soundLose`.
+    pub effect_win: String,
+    pub effect_lose: String,
+    pub sound_win: String,
+    pub sound_lose: String,
+}
+
+impl Coconut {
+    /// How many nuts there are.
+    pub fn nuts(&self) -> u32 {
+        self.count_falling + self.count_bombing + self.count_stopped
+    }
+}
+
 /// A spot in a Monster Carnival field: `x`, `y` (`cy` for mobs), `fh`,
 /// `f`, and the side it is for (`team`), if any.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -334,6 +363,8 @@ pub struct FieldTemplate {
     pub massacre: Option<Massacre>,
     /// `monsterCarnival`, on the Monster Carnival battle fields.
     pub carnival: Option<Carnival>,
+    /// `coconut`, on the Coconut Season fields.
+    pub coconut: Option<Coconut>,
     /// `info/VRLeft`, `VRTop`, `VRRight` and `VRBottom` when `info/VRLimit`
     /// is set (only Orbis Tower<B2>, 200082300): the view range that narrows
     /// the map's bounds (`Footholds::bounds_within`).
@@ -702,6 +733,7 @@ fn build_field_template(
     );
     let massacre = build_massacre(nx, body_idx)?;
     let carnival = build_carnival(nx, body_idx)?;
+    let coconut = build_coconut(nx, body_idx)?;
     let recovery = nx
         .child_by_name(map_node_idx, "info")?
         .map(|info| nx.real_child(info, "recovery"))
@@ -846,6 +878,7 @@ fn build_field_template(
         create_mob_interval,
         massacre,
         carnival,
+        coconut,
         view_limit,
         level_limit,
         level_force_move,
@@ -1035,6 +1068,33 @@ fn build_massacre(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Massacre>
         massacre.count_effects.sort_by_key(|effect| effect.count);
     }
     Ok(Some(massacre))
+}
+
+fn build_coconut(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Coconut>, GameDataError> {
+    let Some(root) = nx.child_by_name(map_node_idx, "coconut")? else {
+        return Ok(None);
+    };
+    let count = |key| -> Result<u32, GameDataError> {
+        Ok(nx
+            .int_child(root, key)?
+            .and_then(|value| u32::try_from(value).ok())
+            .unwrap_or(0))
+    };
+    let string = |key| -> Result<String, GameDataError> {
+        Ok(nx.string_child(root, key)?.unwrap_or_default())
+    };
+    Ok(Some(Coconut {
+        count_falling: count("countFalling")?,
+        count_bombing: count("countBombing")?,
+        count_stopped: count("countStopped")?,
+        time_default: count("timeDefault")?,
+        time_expand: count("timeExpand")?,
+        time_finish: count("timeFinish")?,
+        effect_win: string("effectWin")?,
+        effect_lose: string("effectLose")?,
+        sound_win: string("soundWin")?,
+        sound_lose: string("soundLose")?,
+    }))
 }
 
 fn build_carnival(nx: &NxDataFile, map_node_idx: u32) -> Result<Option<Carnival>, GameDataError> {
@@ -1584,6 +1644,7 @@ mod tests {
             create_mob_interval: None,
             massacre: None,
             carnival: None,
+            coconut: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1667,6 +1728,7 @@ mod tests {
             create_mob_interval: None,
             massacre: None,
             carnival: None,
+            coconut: None,
             view_limit: None,
             level_limit: None,
             level_force_move: None,
@@ -1817,6 +1879,44 @@ mod tests {
                 "{spawn:?}"
             );
         }
+    }
+
+    #[test]
+    fn coconut_fields_have_their_rules() {
+        let Some(path) = test_assets::path("Map.nx") else {
+            return;
+        };
+        let game_data = GameData::load_from_nx_map(&path).expect("load map nx");
+        let field = game_data.field(109_080_000).expect("Coconut Season");
+        assert_eq!(field.field_type, 4);
+        let coconut = field.coconut.as_ref().expect("coconut");
+        assert_eq!(
+            (
+                coconut.count_falling,
+                coconut.count_bombing,
+                coconut.count_stopped
+            ),
+            (401, 80, 20)
+        );
+        assert_eq!(coconut.nuts(), 501);
+        assert_eq!(
+            (
+                coconut.time_default,
+                coconut.time_expand,
+                coconut.time_finish
+            ),
+            (300, 120, 12)
+        );
+        assert_eq!(coconut.effect_win, "event/coconut/victory");
+        assert_eq!(coconut.sound_lose, "Coconut/Failed");
+        let short = game_data.field(109_080_003).expect("the G variant");
+        let short = short.coconut.as_ref().expect("coconut");
+        assert_eq!((short.time_default, short.time_expand), (180, 60));
+        assert!(game_data
+            .field(100_000_000)
+            .expect("Henesys")
+            .coconut
+            .is_none());
     }
 
     #[test]
