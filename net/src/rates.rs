@@ -42,6 +42,35 @@ fn world() -> &'static World {
     })
 }
 
+/// NX Credit for each kill a player loots (`RUSTMS_NX_PER_KILL`) and for
+/// each hour logged in (`RUSTMS_NX_PER_HOUR`): ours, not v83's, whose NX
+/// came only from buying it. Both are 0, off, when unset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NxRates {
+    pub per_kill: i32,
+    pub per_hour: i32,
+}
+
+impl NxRates {
+    fn read(var: impl Fn(&str) -> Option<String>) -> Self {
+        let rate = |key: &str| {
+            var(key)
+                .and_then(|rate| rate.trim().parse::<i32>().ok())
+                .filter(|rate| *rate > 0)
+                .unwrap_or(0)
+        };
+        NxRates {
+            per_kill: rate("RUSTMS_NX_PER_KILL"),
+            per_hour: rate("RUSTMS_NX_PER_HOUR"),
+        }
+    }
+}
+
+pub fn nx() -> NxRates {
+    static NX: OnceLock<NxRates> = OnceLock::new();
+    *NX.get_or_init(|| NxRates::read(|key| std::env::var(key).ok()))
+}
+
 /// How much more EXP `player` earns from a kill at `now`.
 pub fn exp(player: &Player, now: SystemTime) -> f64 {
     let buff = player
@@ -135,6 +164,30 @@ mod tests {
 
     fn at(seconds: u64) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(seconds)
+    }
+
+    #[test]
+    fn nx_rates_are_off_unless_set_to_a_positive_number() {
+        let rates = |kill: &str, hour: &str| {
+            let (kill, hour) = (kill.to_string(), hour.to_string());
+            NxRates::read(move |key| match key {
+                "RUSTMS_NX_PER_KILL" => Some(kill.clone()).filter(|v| !v.is_empty()),
+                _ => Some(hour.clone()).filter(|v| !v.is_empty()),
+            })
+        };
+        let off = NxRates {
+            per_kill: 0,
+            per_hour: 0,
+        };
+        assert_eq!(rates("", ""), off);
+        assert_eq!(rates("-5", "lots"), off);
+        assert_eq!(
+            rates("2", " 300 "),
+            NxRates {
+                per_kill: 2,
+                per_hour: 300
+            }
+        );
     }
 
     #[test]

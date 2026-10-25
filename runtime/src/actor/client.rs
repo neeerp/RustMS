@@ -7,6 +7,7 @@ mod coupon;
 mod dialogue;
 mod door;
 mod duey;
+mod earned_nx;
 mod events;
 mod expiry;
 mod fame;
@@ -198,6 +199,8 @@ pub struct ClientActor {
     merchant_field: Option<FieldHandle>,
     /// Heracle asked for a new guild's name; only then is one founded.
     naming_guild: bool,
+    /// NX Credit earned and not yet on the account (`earned_nx`).
+    nx_earned: i32,
     /// The player's ticket into the party event they are in.
     event: Option<crate::actor::event::EventTicket>,
     /// The player's ticket into their own wedding.
@@ -272,6 +275,7 @@ impl ClientActor {
             merchant_visits: Vec::new(),
             merchant_field: None,
             naming_guild: false,
+            nx_earned: 0,
             event: None,
             wedding: None,
         })
@@ -284,6 +288,9 @@ impl ClientActor {
         let mut hunger = interval(pets::PET_HUNGER_INTERVAL);
         hunger.set_missed_tick_behavior(MissedTickBehavior::Delay);
         hunger.reset();
+        let mut nx_hour = interval(earned_nx::HOUR);
+        nx_hour.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        nx_hour.reset();
         let kill = self.kill.clone();
 
         let outcome = loop {
@@ -306,6 +313,7 @@ impl ClientActor {
                 Some(message) = self.rx.recv() => self.handle_server_message(message).await,
                 _ = autosave.tick() => self.save_if_dirty().await,
                 _ = hunger.tick() => self.pets_grow_hungry().await,
+                _ = nx_hour.tick() => self.earn_nx_for_hour().await,
                 _ = sleep_until(pets_due.unwrap_or_else(Instant::now)), if pets_due.is_some() => {
                     self.pets_dry_up().await
                 }
@@ -1043,6 +1051,7 @@ impl ClientActor {
         // the shop closes.
         self.later.clear();
         self.flush().await?;
+        self.bank_nx().await;
 
         let player = &self.in_game()?.player;
         let (account_id, character_id) = (player.account_id, player.stats.id);
@@ -1604,6 +1613,7 @@ impl ClientActor {
                 self.mob_killed(mob_id, exp, party_bonus).await?;
                 self.count_quest_kill(mob_id).await?;
                 if looter {
+                    self.earn_nx_for_kill();
                     self.drop_loot(mob_id, showdown, object_id, x, y).await?
                 }
             }
@@ -2046,6 +2056,7 @@ impl ClientActor {
             // Keep playing; the next autosave or logout retries.
             error!(self.client_id, %error, "Autosave failed");
         }
+        self.bank_nx().await;
         Ok(())
     }
 
@@ -2098,6 +2109,7 @@ impl ClientActor {
                     game.player.fit_hp_mp();
                 }
             }
+            self.bank_nx().await;
             if let Err(error) = self.flush().await {
                 error!(self.client_id, %error, "Failed to save player on disconnect");
             } else if !self.changing_channel {
