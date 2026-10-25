@@ -343,7 +343,8 @@ namespace ms
 				[&](auto &mmo)
 				{
 					Optional<Mob> mob = mmo.second.get();
-					return mob && mob->is_alive() && mob->deals_touch_damage() && !mob->is_friendly() && mob->is_in_range(area)
+					return mob && mob->is_alive() && mob->deals_touch_damage() && !mob->is_friendly() && !mob->is_ally()
+							&& mob->is_in_range(area)
 							&& field_limit::may_touch(fieldlimit, hidden, mob->get_id());
 				}
 		);
@@ -488,7 +489,7 @@ namespace ms
 		{
 			auto mob = static_cast<const Mob *>(mmo.second.get());
 
-			if (mob && mob->is_alive() && !mob->is_friendly())
+			if (mob && mob->is_alive() && !mob->is_friendly() && !mob->is_ally())
 				found.push_back({ mobs.entry_order(mmo.first), { mmo.first, mob->get_body() } });
 		}
 

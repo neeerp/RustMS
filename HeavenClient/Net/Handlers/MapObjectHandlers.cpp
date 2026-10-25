@@ -139,11 +139,11 @@ namespace ms
 
 		bool berserk = recv.read_bool();
 		recv.read_byte(); // an Evan's Dragon Fury
-		recv.read_byte(); // team
+		int8_t team = recv.read_byte();
 
 		Stage::get().get_chars().spawn(
 			{ cid, look, level, job, name, stance, position, chair, std::move(buffs), guild, emblem, room, std::move(pets),
-			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue, berserk, ring_looks }
+			  chalkboard, item_effect, mount_level, mount_exp, mount_fatigue, berserk, ring_looks, team }
 		);
 	}
 

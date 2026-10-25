@@ -296,6 +296,11 @@ namespace ms
 		// for no tag, and its emblem.
 		void set_guild_name(const std::string &name);
 		void set_guild_emblem(const GuildEmblem &emblem);
+		// The character's side in the Monster Carnival (carnival::NO_TEAM
+		// for none). A side's tag, "Maple Red" or "Maple Blue", is drawn
+		// instead of the guild's (FUN_00942dcc).
+		void set_team(int8_t team);
+		int8_t get_team() const;
 
 		// Shows the balloon of the room the character keeps open, or takes
 		// it down.
@@ -453,6 +458,8 @@ namespace ms
 		Text namelabel;
 		Text guildlabel;
 		GuildMark guildmark;
+		int8_t team;
+		Text teamlabel;
 		MedalTag medaltag;
 		ChalkboardBalloon chalkboard;
 		ChatBalloon chatballoon;

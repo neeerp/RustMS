@@ -21,6 +21,7 @@
 #include "SummonRules.h"
 
 #include "../Combat/Assassinate.h"
+#include "../../Character/Carnival.h"
 #include "../Combat/Heal.h"
 #include "../Combat/HitPoint.h"
 #include "../Combat/MesoExplosion.h"
@@ -1054,8 +1055,9 @@ namespace ms
 		// A box hits the player where they are once due; a jump attack only
 		// one standing on a foothold. A direct shot hits regardless. A
 		// dazzled mob's attacks hit no player (0x6663d2, 0x95825c). Nor do
-		// they hurt other mobs, which the controller works out.
-		bool strikes = !targetdead && !dazzled();
+		// they hurt other mobs, which the controller works out. A Monster
+		// Carnival mob spares its own side (FUN_00670c06).
+		bool strikes = !targetdead && !dazzled() && !is_ally();
 		bool sweeping = control && !dazzled();
 
 		for (auto iter = pendinghits.begin(); iter != pendinghits.end();)
@@ -1626,6 +1628,10 @@ namespace ms
 		{
 			float interopc = opacity.get(alpha);
 
+			// The player's side's own are drawn half see-through (0x80ffffff).
+			if (is_ally())
+				interopc *= 0.5f;
+
 			if (attacking)
 				attacks[*attacking].animation.draw(DrawArgument(absp, !attackleft, interopc), alpha);
 			else if (casting)
@@ -1956,6 +1962,11 @@ namespace ms
 	bool Mob::is_friendly() const
 	{
 		return friendly;
+	}
+
+	bool Mob::is_ally() const
+	{
+		return carnival::ally(team);
 	}
 
 	bool Mob::is_hurt_by_mob(int32_t mobid) const

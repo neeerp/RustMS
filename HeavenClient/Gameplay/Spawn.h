@@ -145,7 +145,7 @@ namespace ms
 				  std::vector<PetEntry> pets = {}, std::optional<std::string> chalkboard = std::nullopt,
 				  int32_t item_effect = 0, int32_t mount_level = 0, int32_t mount_exp = 0,
 				  int32_t mount_fatigue = 0, bool berserk = false,
-				  RingLooks ring_looks = {});
+				  RingLooks ring_looks = {}, int8_t team = -1);
 
 		int32_t get_cid() const;
 
@@ -172,5 +172,6 @@ namespace ms
 		int32_t mount_fatigue;
 		bool berserk;
 		RingLooks ring_looks;
+		int8_t team;
 	};
 }

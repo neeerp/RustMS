@@ -12,8 +12,9 @@ rooms and their challenges, two parties on a room's battle field with its
 clock, the sides' look, CP from kills, spending CP on mobs, skills and
 guardians, the CP and skill items, CP lost on death and the revive room,
 the results with their effects, overtime and draws, the result rooms'
-grades and EXP, and the exit room are in. Not yet: the client's Carnival
-UI.
+grades and EXP, and the exit room are in. HeavenClient reads the carnival's
+packets, shows the sides' tags and spares a side its own mobs (see
+`client.md`). Not yet: the client's Carnival window.
 
 ## Maps
 
@@ -35,7 +36,8 @@ UI.
   with their CP prices, the skills, the guardians and the spots they take.
 - The battle field's own mobs carry a `team` (0 Maple Red, 1 Maple Blue),
   written in their spawn packets. The client lets a side neither hit nor
-  be hurt by its own side's mobs; the server doesn't check.
+  be hurt by its own side's mobs, and draws them half see-through; the
+  server doesn't check.
 - A mob's `info/getCP` (`MobInfo::cp`) is what killing it earns.
 
 ## The battle (`net::events`, `EventKind::Carnival`)

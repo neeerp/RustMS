@@ -25,6 +25,7 @@
 #include "../Packets/GameplayPackets.h"
 
 #include "../../Audio/Audio.h"
+#include "../../Character/Carnival.h"
 #include "../../Configuration.h"
 
 #include "../../Gameplay/FieldEffectRules.h"
@@ -40,6 +41,7 @@
 #include "../../IO/UITypes/UINotice.h"
 #include "../../IO/Window.h"
 #include "../../Util/Memos.h"
+#include "../../Util/Misc.h"
 
 #include "../../IO/UITypes/UICharSelect.h"
 #include "../../IO/UITypes/UIDojoHud.h"
@@ -66,6 +68,8 @@ namespace ms
 
 	void SetFieldHandler::transition(int32_t mapid, uint8_t portalid, std::optional<Point<int16_t>> chase) const
 	{
+		carnival::enter_field(NxHelper::Map::get_map_node_name(mapid)["info"]["fieldType"]);
+
 		Window::get().fadeout(
 			[mapid, portalid, chase]()
 			{
@@ -151,6 +155,10 @@ namespace ms
 		// the potions the pets lacked (FUN_00948b7b).
 		Stage::get().get_player().clear_request();
 		Stage::get().get_player().forget_potion_misses();
+
+		// The Monster Carnival's sides are the battle's; START sets them
+		// again in its fields.
+		Stage::get().get_player().set_team(carnival::NO_TEAM);
 
 		// The server ends a trade when we leave the field.
 		if (auto room = UI::get().get_element<UITradingRoom>())

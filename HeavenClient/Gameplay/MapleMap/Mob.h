@@ -181,6 +181,10 @@ namespace ms
 		// do Henesys's Moon Bunny.
 		bool is_friendly() const;
 
+		// Whether it is on the player's side in the Monster Carnival, so the
+		// player neither hits it nor is hurt by it (FUN_00670c06).
+		bool is_ally() const;
+
 		// Whether this friendly is hurt by mob template `id` (FUN_00670bc0).
 		bool is_hurt_by_mob(int32_t id) const;
 
