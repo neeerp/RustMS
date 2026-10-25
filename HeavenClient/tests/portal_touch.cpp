@@ -74,6 +74,13 @@ int main()
 		require(ph00.reveal_bounds().contains({-1068, -2426}), "a hidden portal hid from 49 px below");
 		require(!ph00.reveal_bounds().contains({-1068, -2425}), "a hidden portal showed from 50 px below");
 
+		// Up on the Fitness lobby's gate asks the server, though it leads
+		// within the map; a plain portal within the map doesn't.
+		require(!ms::Portal::is_intramap(ms::Portal::TYPE4, 109040000, 109040000), "type 4 moved within the map");
+		require(!ms::Portal::is_intramap(ms::Portal::TYPE5, 109040000, 109040000), "type 5 moved within the map");
+		require(ms::Portal::is_intramap(ms::Portal::REGULAR, 109040000, 109040000), "a plain portal asked the server");
+		require(!ms::Portal::is_intramap(ms::Portal::REGULAR, 109040001, 109040000), "a portal out moved within the map");
+
 		std::cout << "Portal touch ranges passed\n";
 		return 0;
 	}

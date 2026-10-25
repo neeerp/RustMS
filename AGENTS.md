@@ -19,6 +19,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/coconut.md`: Coconut Season: its fields, the teams, a GM's `/start` and `/reset`, opening a GM's event to players through the Event Assistants, the nuts' hits and the score, the end, and the packets
 - `agent_docs/snowball.md`: Snowball: its fields, the teams, the balls and the snowmen, the hits, the pace, the end, and the packets
 - `agent_docs/ox-quiz.md`: the OX Quiz: its field and rooms, the questions, a GM's `/ox` and `/start`, the judging, the end, and the packets
+- `agent_docs/timed-events.md`: GM events run on a clock, starting with the Physical Fitness Test: its maps, the lobby's gate, the clock and notices, and the time up
 - `agent_docs/horntail.md`: the way to Horntail in Leafre's Cave of Life: the Dragon Squad's quests, the doors at Keroben and the slate, the ways out, the expedition, its trials, the fight, and the win
 - `agent_docs/ships.md`: the Ellinia–Orbis ship's timetable, boarding NPCs, CONTI packets, and the station wall clock
 - `agent_docs/combat.md`: mob spawning and control, melee attacks, EXP and level-ups, spending AP and SP, drops and pickup, touch damage and death

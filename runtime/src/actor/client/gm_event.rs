@@ -9,10 +9,13 @@ use game_data::server_content::keys;
 use net::conti::Portal;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
+use net::packet::handle::world::portal_name;
 use net::scripts::Effect;
 use net::{FieldRequest, GmEntry, GmEvent};
+use packet::Packet;
 use rand::Rng;
 use tokio::sync::oneshot;
+use tokio::time::Instant;
 
 impl ClientActor {
     /// A GM opens their channel's event, and tells the channel, or closes
@@ -84,10 +87,24 @@ impl ClientActor {
 
     /// A GM's `/start` or `/reset`. In a Snowball lobby, `/start` starts the
     /// game on its field, if it isn't on yet, and sends everyone else
-    /// there; again later, it sends whoever came since.
+    /// there; again later, it sends whoever came since. On any map of a
+    /// timed event, each of its maps starts or ends it, all from now.
     pub(super) async fn run_gm_event(&mut self, event: GmEvent) -> Result<(), RuntimeError> {
         let from = self.client_id;
         let lobby = self.in_game()?.player.stats.map_id;
+        if let Some(timed) = net::gm_event::timed_event(lobby) {
+            let started = (event == GmEvent::Start).then(Instant::now);
+            for &map_id in timed.maps {
+                self.services
+                    .fields
+                    .field(self.field_key(map_id))
+                    .tx
+                    .send(FieldMessage::RunTimedEvent { started })
+                    .await
+                    .map_err(|_| RuntimeError::ChannelSend)?;
+            }
+            return Ok(());
+        }
         let field = net::gm_event::lobby_field(lobby).filter(|_| event == GmEvent::Start);
         let Some(map_id) = field else {
             let request = FieldRequest::GmEvent(event);
@@ -105,6 +122,26 @@ impl ClientActor {
             .map_err(|_| RuntimeError::ChannelSend)?;
         self.send_to_field(FieldMessage::SendToGmEvent { from, map_id })
             .await
+    }
+
+    /// Whether `packet`, a walk through a portal, is through a timed
+    /// event's gate before the GM started it. The client doesn't stop the
+    /// player itself (report b173).
+    pub(super) async fn gm_gate_closed(&self, packet: &Packet) -> Result<bool, RuntimeError> {
+        let Some(game) = self.game.as_ref().filter(|_| !self.in_cash_shop) else {
+            return Ok(false);
+        };
+        let map_id = game.player.stats.map_id;
+        if !portal_name(packet).is_some_and(|portal| net::gm_event::is_gate(map_id, &portal)) {
+            return Ok(false);
+        }
+        let (reply, on) = oneshot::channel();
+        game.field
+            .tx
+            .send(FieldMessage::TimedEventOn { reply })
+            .await
+            .map_err(|_| RuntimeError::ChannelSend)?;
+        Ok(!on.await.unwrap_or(false))
     }
 
     /// The GM's `/start` in the lobby `from_map` sends the player on to

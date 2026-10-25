@@ -679,6 +679,16 @@ pub enum FieldMessage {
         client_id: ClientId,
         reply: tokio::sync::oneshot::Sender<Option<u8>>,
     },
+    /// A GM's `/start` (`started` then) or `/reset` (None) of the timed
+    /// event this field is one of the maps of.
+    RunTimedEvent {
+        started: Option<tokio::time::Instant>,
+    },
+    /// Whether the timed event this field is one of the maps of is on, so
+    /// its lobby's gate is open.
+    TimedEventOn {
+        reply: tokio::sync::oneshot::Sender<bool>,
+    },
     /// A GM's `/start` in this lobby: everyone but the GM `from` goes on
     /// to the game field `map_id`.
     SendToGmEvent {

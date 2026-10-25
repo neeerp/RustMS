@@ -55,7 +55,7 @@ namespace ms
 			// (FUN_0071165a, FUN_00712313).
 			bool visible = type == Portal::REGULAR || type == Portal::TYPE4 || type == Portal::SCRIPTED;
 			const Animation *animation = visible ? &animations[Portal::REGULAR] : nullptr;
-			bool intramap = target_id == mapid;
+			bool intramap = Portal::is_intramap(type, target_id, mapid);
 
 			portals_by_id.emplace(
 					std::piecewise_construct,

@@ -1335,6 +1335,19 @@ unsourced = [
     "gm_event.harry_ask",
     "ox.wrong",
     "ox.won",
+    "fitness.notice.0",
+    "fitness.notice.1",
+    "fitness.notice.2",
+    "fitness.notice.3",
+    "fitness.notice.4",
+    "fitness.notice.5",
+    "fitness.notice.6",
+    "fitness.notice.7",
+    "fitness.notice.8",
+    "fitness.notice.9",
+    "fitness.notice.10",
+    "fitness.notice.11",
+    "fitness.notice.12",
 ]
 
 [text."glTutoMsg0.message"]
