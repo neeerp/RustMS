@@ -79,36 +79,43 @@ pub fn balance(account_id: i32) -> crate::Result<Balance> {
 /// `None` if there is no such account.
 pub fn grant(account_id: i32, cash_type: CashType, amount: i32) -> crate::Result<Option<Balance>> {
     let mut conn = crate::connection()?;
-    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
-        let account = accounts::table.find(account_id);
-        let Some(before) = account
-            .select((
-                accounts::nx_credit,
-                accounts::maple_points,
-                accounts::nx_prepaid,
-            ))
-            .for_update()
-            .first::<Balance>(conn)
-            .optional()?
-        else {
-            return Ok(None);
-        };
-        let add = |value: i32| {
-            (i64::from(value) + i64::from(amount)).clamp(0, i64::from(i32::MAX)) as i32
-        };
-        match cash_type {
-            CashType::Credit => diesel::update(account)
-                .set(accounts::nx_credit.eq(add(before.credit)))
-                .execute(conn)?,
-            CashType::MaplePoints => diesel::update(account)
-                .set(accounts::maple_points.eq(add(before.points)))
-                .execute(conn)?,
-            CashType::Prepaid => diesel::update(account)
-                .set(accounts::nx_prepaid.eq(add(before.prepaid)))
-                .execute(conn)?,
-        };
-        Ok(Some(balance_of(conn, account_id)?))
-    })?)
+    Ok(conn.transaction(|conn| add_cash(conn, account_id, cash_type, amount))?)
+}
+
+/// `grant` within a transaction.
+pub(crate) fn add_cash(
+    conn: &mut PgConnection,
+    account_id: i32,
+    cash_type: CashType,
+    amount: i32,
+) -> diesel::QueryResult<Option<Balance>> {
+    let account = accounts::table.find(account_id);
+    let Some(before) = account
+        .select((
+            accounts::nx_credit,
+            accounts::maple_points,
+            accounts::nx_prepaid,
+        ))
+        .for_update()
+        .first::<Balance>(conn)
+        .optional()?
+    else {
+        return Ok(None);
+    };
+    let add =
+        |value: i32| (i64::from(value) + i64::from(amount)).clamp(0, i64::from(i32::MAX)) as i32;
+    match cash_type {
+        CashType::Credit => diesel::update(account)
+            .set(accounts::nx_credit.eq(add(before.credit)))
+            .execute(conn)?,
+        CashType::MaplePoints => diesel::update(account)
+            .set(accounts::maple_points.eq(add(before.points)))
+            .execute(conn)?,
+        CashType::Prepaid => diesel::update(account)
+            .set(accounts::nx_prepaid.eq(add(before.prepaid)))
+            .execute(conn)?,
+    };
+    Ok(Some(balance_of(conn, account_id)?))
 }
 
 /// The account's Cash Inventory, and the gifts in it that it hasn't been

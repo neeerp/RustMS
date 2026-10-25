@@ -232,6 +232,8 @@ fn compose_cmd<const N: usize>(stack: &StackConfig, args: [&str; N]) -> Result<(
         .env("HARNESS_WORLD_PORT", stack.world_port.to_string())
         .env("HARNESS_WORLD_PORT_2", (stack.world_port + 1).to_string())
         .env("HARNESS_WORLD_PORT_3", (stack.world_port + 2).to_string())
+        // The vote hook follows them.
+        .env("HARNESS_VOTE_PORT", (stack.world_port + 3).to_string())
         .env("HARNESS_DB_PORT", stack.db_port.to_string())
         .current_dir(workspace_root())
         .stdin(Stdio::null())

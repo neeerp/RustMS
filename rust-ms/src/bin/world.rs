@@ -19,6 +19,11 @@ async fn main() {
         std::process::exit(1);
     }
 
+    // Off unless configured (runtime::vote_hook).
+    if let Some(hook) = runtime::vote_hook::VoteHook::from_env() {
+        tokio::spawn(hook.serve());
+    }
+
     // Channels listen on the ports from the channel configuration
     // (RUSTMS_LOGIN_CHANNELS); this only picks the interface.
     let bind_host = env::var("RUSTMS_WORLD_BIND_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());

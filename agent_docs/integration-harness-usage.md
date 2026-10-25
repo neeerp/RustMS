@@ -126,7 +126,7 @@ read:
 | --- | --- |
 | `HARNESS_PROJECT_NAME` | `rustms-integration` |
 | `HARNESS_LOGIN_PORT` | `18484` |
-| `HARNESS_WORLD_PORT` | `18485` (channels use this, +1, +2) |
+| `HARNESS_WORLD_PORT` | `18485` (channels use this, +1, +2; the vote hook +3) |
 | `HARNESS_DB_PORT` | `15432` |
 | `HARNESS_IMAGE` | `rustms-server:integration` |
 | `HARNESS_ASSETS_DIR` | `../assets` (must be a real directory, not symlinks, because it is bind-mounted) |

@@ -530,6 +530,23 @@ The client actor keeps the NX it earns and puts it on the account
 leaving, so kills cost no database write of their own. The harness world
 gives 1 NX per kill (`tests/earned_nx.rs`).
 
+A vote site can also give NX Credit through the world's vote hook
+(`runtime::vote_hook`), which is off unless both `RUSTMS_VOTE_HOOK_ADDR` (the
+address it listens on, such as `0.0.0.0:8090`) and `RUSTMS_VOTE_HOOK_SECRET`
+are set. The site calls `GET` or `POST /vote` with `account` (the login name,
+matched exactly) and `secret` in the query or a form body, or the secret in
+an `X-Vote-Secret` header. A vote gives `RUSTMS_VOTE_NX` (1000 when unset)
+once per `RUSTMS_VOTE_COOLDOWN_HOURS` (12) per account. Each vote is a row in
+`votes` (`db::vote::record`), which keeps the cooldown and serves as a log. The
+answer is plain text: 200 `counted`, 429 within the cooldown, 404 `no such
+account` (or `not found` for another path), 403 for a wrong secret, 405 for
+another method, 400 for a request it can't read, and 500 if the database
+fails. A secret in the query or form must be percent-encoded. The hook answers
+64 calls at once and closes any more unanswered. The
+Cash Shop reads balances on entry, so a vote made while the player is in it
+shows once they check again. The harness world's hook is on the port after its
+channels' (`tests/vote_hook.rs`).
+
 A 2x EXP card (521xxxx) or drop card (536xxxx) in the Cash inventory
 multiplies the same numbers again while it works. A card works while it is
 unexpired and the clock is inside one of its `info/time` windows: a
