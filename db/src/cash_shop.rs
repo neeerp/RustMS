@@ -74,6 +74,43 @@ pub fn balance(account_id: i32) -> crate::Result<Balance> {
     Ok(balance_of(&mut *crate::connection()?, account_id)?)
 }
 
+/// Add `amount` (which may be negative) to the account's `cash_type`
+/// balance, keeping it within 0..=i32::MAX, and return the balances.
+/// `None` if there is no such account.
+pub fn grant(account_id: i32, cash_type: CashType, amount: i32) -> crate::Result<Option<Balance>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> diesel::QueryResult<_> {
+        let account = accounts::table.find(account_id);
+        let Some(before) = account
+            .select((
+                accounts::nx_credit,
+                accounts::maple_points,
+                accounts::nx_prepaid,
+            ))
+            .for_update()
+            .first::<Balance>(conn)
+            .optional()?
+        else {
+            return Ok(None);
+        };
+        let add = |value: i32| {
+            (i64::from(value) + i64::from(amount)).clamp(0, i64::from(i32::MAX)) as i32
+        };
+        match cash_type {
+            CashType::Credit => diesel::update(account)
+                .set(accounts::nx_credit.eq(add(before.credit)))
+                .execute(conn)?,
+            CashType::MaplePoints => diesel::update(account)
+                .set(accounts::maple_points.eq(add(before.points)))
+                .execute(conn)?,
+            CashType::Prepaid => diesel::update(account)
+                .set(accounts::nx_prepaid.eq(add(before.prepaid)))
+                .execute(conn)?,
+        };
+        Ok(Some(balance_of(conn, account_id)?))
+    })?)
+}
+
 /// The account's Cash Inventory, and the gifts in it that it hasn't been
 /// shown yet, which from now on count as shown.
 pub fn open_cash_inventory(account_id: i32) -> crate::Result<(Vec<CashItem>, Vec<CashItem>)> {

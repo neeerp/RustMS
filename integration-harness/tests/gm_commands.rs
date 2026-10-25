@@ -1,9 +1,10 @@
 //! Chat commands (`net::gm_commands`): a GM's `!` line runs and nobody
-//! else sees it; a player's is ordinary chat and gives nothing.
+//! else sees it; a player's is ordinary chat and gives nothing. `!givenx`
+//! adds to an account's NX, which the Cash Shop shows.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::set_gm_level;
-use integration_harness::packets::build_all_chat;
+use integration_harness::packets::{build_all_chat, build_enter_cash_shop};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{barrier, read, send, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
@@ -90,4 +91,67 @@ async fn a_gms_bang_lines_run_and_a_players_are_chat() {
         read(g, &mut gt).await;
     }
     assert_eq!(gt.warps.last(), Some(&HENESYS));
+}
+
+/// The balances (NX Credit, Maple Points, NX Prepaid) the Cash Shop opens
+/// with.
+async fn cash_shop_balances(c: &mut MapleTestConnection) -> (i32, i32, i32) {
+    send(c, build_enter_cash_shop()).await;
+    let mut trace = Trace::default();
+    loop {
+        let p = read(c, &mut trace).await;
+        if p.opcode() == SendOpcode::QueryCashResult as i16 {
+            let mut r = Cursor::new(&p.bytes[2..]);
+            return (
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+                r.read_int().unwrap(),
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn givenx_adds_to_an_accounts_nx() {
+    let config = load_harness_config_or_fail().await;
+    login_to_world_session(&config)
+        .await
+        .expect("first login failed");
+    drop(relogin(&config).await);
+    let other_config = load_harness_config_or_fail().await;
+    login_to_world_session(&other_config)
+        .await
+        .expect("second login failed");
+    drop(relogin(&other_config).await);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&config.username, 2).await.expect("make a GM");
+
+    // The other character's account gets Maple Points while they are away.
+    let mut gm = relogin(&config).await;
+    let g = &mut gm.connection;
+    let other = other_config.character_name.to_lowercase();
+    let mut gt = Trace::default();
+    send(g, build_all_chat("!givenx 5000", 0).unwrap()).await;
+    send(g, build_all_chat("!givenx nx -1000", 0).unwrap()).await;
+    send(
+        g,
+        build_all_chat(&format!("!givenx mp {other} 20"), 0).unwrap(),
+    )
+    .await;
+    send(g, build_all_chat("!givenx nobody_here 1", 0).unwrap()).await;
+    barrier(g, "gm done", &mut gt).await;
+    let (me, them) = (&config.character_name, &other_config.character_name);
+    assert_eq!(
+        gt.broadcasts,
+        [
+            (5, format!("{me}'s account has 5000 NX Credit (+5000).")),
+            (5, format!("{me}'s account has 4000 NX Credit (-1000).")),
+            (5, format!("{them}'s account has 20 Maple Points (+20).")),
+            (5, "There is no character named nobody_here.".to_string()),
+        ]
+    );
+    assert_eq!(cash_shop_balances(g).await, (4000, 0, 0));
+
+    let mut player = relogin(&other_config).await;
+    assert_eq!(cash_shop_balances(&mut player.connection).await, (0, 20, 0));
 }

@@ -5,7 +5,7 @@
 //! content pack.
 //!
 //! Each command needs a tier of GM (`gm_level`, set by SQL): 1 helps
-//! (warps, Hide), 2 runs the game (items, mesos, levels, notices), 3
+//! (warps, Hide), 2 runs the game (items, mesos, NX, levels, notices), 3
 //! administers. A GM's `!` line is never chat; a player's is. Every `!`
 //! line a GM sends is logged at info under the `gm_audit` target.
 //! `RUSTMS_GM_COMMANDS=0` turns all of them off, so every line is chat.
@@ -21,13 +21,14 @@ use crate::packet::build::world::{
     stat::{self, StatUpdate},
 };
 use crate::packet::handle::world::{set_hidden, warp_to_spawn_point};
+use db::cash_shop::CashType;
 use tracing::info;
 
 /// Anyone.
 pub const PLAYER: i16 = 0;
 /// Warps and Hide.
 pub const HELPER: i16 = 1;
-/// Items, mesos, levels and notices.
+/// Items, mesos, NX, levels and notices.
 pub const GM: i16 = 2;
 /// Bans and the server.
 pub const ADMIN: i16 = 3;
@@ -155,6 +156,13 @@ const COMMANDS: &[Command] = &[
         tier: GM,
         usage: "<amount>",
         run: sp,
+    },
+    Command {
+        prefix: '!',
+        name: "givenx",
+        tier: GM,
+        usage: "[nx|mp|np] [name] <amount>",
+        run: give_nx,
     },
     Command {
         prefix: '!',
@@ -469,6 +477,34 @@ fn sp(ctx: &mut WorldContext, args: &[&str]) -> Outcome {
 }
 
 /// A notice to the whole world.
+/// NX for a character's account, the GM's own if no name is given: NX
+/// Credit unless `mp` (Maple Points) or `np` (NX Prepaid) comes first. A
+/// negative amount takes it away.
+fn give_nx(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    let (cash_type, args) = match args {
+        [kind, rest @ ..] if !rest.is_empty() => match kind.to_ascii_lowercase().as_str() {
+            "nx" => (CashType::Credit, rest),
+            "mp" => (CashType::MaplePoints, rest),
+            "np" => (CashType::Prepaid, rest),
+            _ => (CashType::Credit, args),
+        },
+        _ => (CashType::Credit, args),
+    };
+    let (target, amount) = match args {
+        [amount] => (None, amount),
+        [name, amount] => (Some(name.to_string()), amount),
+        _ => return Ok(Err(usage("givenx"))),
+    };
+    match amount.parse::<i32>() {
+        Ok(amount) if amount != 0 => Ok(Ok(vec![WorldAction::GiveCash {
+            target,
+            cash_type,
+            amount,
+        }])),
+        _ => Ok(Err(usage("givenx"))),
+    }
+}
+
 fn notice(_: &mut WorldContext, args: &[&str]) -> Outcome {
     if args.is_empty() {
         return Ok(Err(usage("notice")));
@@ -585,6 +621,54 @@ mod tests {
         // A lower level is no level-up for others to see.
         let actions = run_as(&mut gm, "!level 10").unwrap();
         assert!(matches!(&actions[1], WorldAction::AvatarChanged(announce) if announce.is_empty()));
+    }
+
+    #[test]
+    fn givenx_defaults_to_nx_credit_and_the_gm() {
+        let mut gm = player(GM);
+        let give = |gm: &mut Player, line: &str| match run_as(gm, line).unwrap().as_slice() {
+            [WorldAction::GiveCash {
+                target,
+                cash_type,
+                amount,
+            }] => Some((target.clone(), *cash_type, *amount)),
+            _ => None,
+        };
+        assert_eq!(
+            give(&mut gm, "!givenx 5000"),
+            Some((None, CashType::Credit, 5000))
+        );
+        assert_eq!(
+            give(&mut gm, "!givenx MP Alice 20"),
+            Some((Some("Alice".into()), CashType::MaplePoints, 20))
+        );
+        assert_eq!(
+            give(&mut gm, "!givenx np -3"),
+            Some((None, CashType::Prepaid, -3))
+        );
+        assert_eq!(
+            give(&mut gm, "!givenx Bob 1"),
+            Some((Some("Bob".into()), CashType::Credit, 1))
+        );
+        for line in [
+            "!givenx",
+            "!givenx nx",
+            "!givenx 0",
+            "!givenx a b 1",
+            "!givenx 1e3",
+        ] {
+            assert_eq!(
+                lines(&run_as(&mut gm, line).unwrap()),
+                ["Usage: !givenx [nx|mp|np] [name] <amount>"],
+                "{line}"
+            );
+        }
+        // Not for helpers.
+        let mut helper = player(HELPER);
+        assert_eq!(
+            lines(&run_as(&mut helper, "!givenx 5000").unwrap()),
+            ["Unknown command. Type !help for a list."]
+        );
     }
 
     #[test]
