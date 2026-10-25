@@ -26,6 +26,9 @@ const FIELD: i32 = 109_060_000;
 const LANES: [u8; 2] = [2, 3];
 const NOTICE: u8 = 0;
 
+/// The tests share the channel's one event, so they take turns.
+static EVENT: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
     MAPS.get_or_init(|| {
@@ -59,6 +62,7 @@ async fn ask_paul(c: &mut MapleTestConnection, m: &str) -> Trace {
 
 #[tokio::test]
 async fn paul_takes_players_to_their_lane_while_a_gms_event_is_open() {
+    let _turn = EVENT.lock().await;
     let config = load_harness_config_or_fail().await;
     login_to_world_session(&config).await.expect("GM login");
     let configs = [
@@ -130,4 +134,61 @@ async fn paul_takes_players_to_their_lane_while_a_gms_event_is_open() {
     let t = ask_paul(&mut third.connection, m).await;
     assert!(t.warps.is_empty());
     assert_eq!(t.prompts, [(PAUL, 0)], "closed");
+}
+
+const COCONUT: i32 = 109_080_000;
+const HARRY: i32 = 9000012;
+const PIETRA: i32 = 9000010;
+const LEAVING: i32 = 109_050_001;
+
+/// Harry takes a player out of Coconut Season back to Southperry and
+/// gives their place back, so another can take it; Pietra, where the
+/// game's losers go, sends them back there too.
+#[tokio::test]
+async fn harry_and_pietra_send_players_back_where_they_came_from() {
+    let _turn = EVENT.lock().await;
+    let config = load_harness_config_or_fail().await;
+    login_to_world_session(&config).await.expect("GM login");
+    let player = load_harness_config_or_fail().await;
+    login_to_world_session(&player).await.expect("player login");
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_gm_level(&config.username, 1).await.expect("make a GM");
+
+    let mut gm = relogin(&config).await;
+    let mut session = relogin(&player).await;
+    let (g, c, m) = (
+        &mut gm.connection,
+        &mut session.connection,
+        player.character_name.as_str(),
+    );
+    let mut t = Trace::default();
+    assert_eq!(warp(c, SOUTHPERRY, "", &mut t).await, SOUTHPERRY);
+    barrier(c, m, &mut t).await;
+
+    // Room for one: in, out by Harry, and in again on the place he gave
+    // back.
+    let mut gt = Trace::default();
+    send(g, build_all_chat("/coconut 1", 0).unwrap()).await;
+    barrier(g, "opened", &mut gt).await;
+    for _ in 0..2 {
+        let t = ask_paul(c, m).await;
+        assert_eq!(t.warps, [COCONUT], "in");
+        let t = step(c, m, talk(COCONUT, HARRY)).await;
+        assert_eq!(t.prompts, [(HARRY, 1)], "leave?");
+        let t = step(c, m, answer(1, 1, None)).await;
+        assert_eq!(t.warps, [SOUTHPERRY], "out");
+    }
+
+    // After a game, Pietra sends them back from where it put them.
+    let t = ask_paul(c, m).await;
+    assert_eq!(t.warps, [COCONUT]);
+    let mut t = Trace::default();
+    assert_eq!(warp(c, LEAVING, "", &mut t).await, LEAVING);
+    barrier(c, m, &mut t).await;
+    let t = step(c, m, talk(LEAVING, PIETRA)).await;
+    assert_eq!(t.prompts, [(PIETRA, 0)]);
+    let t = step(c, m, answer(0, 1, None)).await;
+    assert_eq!(t.warps, [SOUTHPERRY], "back");
+    send(g, build_all_chat("/endevent", 0).unwrap()).await;
+    barrier(g, "closed", &mut gt).await;
 }

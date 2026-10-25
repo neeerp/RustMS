@@ -1975,6 +1975,9 @@ pub mod keys {
     pub const GM_EVENT_INFO: &str = "gm_event.info";
     pub const GM_EVENT_GO: &str = "gm_event.go";
     pub const GM_EVENT_NOT_OPEN: &str = "gm_event.not_open";
+    pub const GM_EVENT_PIETRO: &str = "gm_event.pietro";
+    pub const GM_EVENT_PIETRA: &str = "gm_event.pietra";
+    pub const GM_EVENT_HARRY_ASK: &str = "gm_event.harry_ask";
     pub const DOJO_TAUNT: [&str; 3] = ["dojo.taunt.0", "dojo.taunt.1", "dojo.taunt.2"];
     pub const MILK_TANGYOON: [&str; 2] = ["milk.tangyoon.0", "milk.tangyoon.1"];
     pub const MILK_COW_FILLS: [&str; 3] =
@@ -3117,6 +3120,9 @@ mod tests {
                 keys::GM_EVENT_INFO,
                 keys::GM_EVENT_GO,
                 keys::GM_EVENT_NOT_OPEN,
+                keys::GM_EVENT_PIETRO,
+                keys::GM_EVENT_PIETRA,
+                keys::GM_EVENT_HARRY_ASK,
                 keys::TOWER_ROCK_NONE,
                 keys::TOWER_ROCK_MENU,
                 keys::TOWER_ROCK_ASK,

@@ -990,6 +990,12 @@ pub enum DirectoryMessage {
         channel_id: u8,
         reply: tokio::sync::oneshot::Sender<Option<i32>>,
     },
+    /// A player gives back their place at the event on `map_id`, if it is
+    /// still the one open on the channel.
+    LeaveGmEvent {
+        channel_id: u8,
+        map_id: i32,
+    },
     /// What `from` finds of the Monster Carnival's rooms on their channel.
     CarnivalRooms {
         from: ClientId,
