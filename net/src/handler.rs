@@ -655,6 +655,8 @@ pub enum WorldAction {
     /// Add `amount` EXP from outside a kill or quest (gacha EXP), levelling
     /// up as far as it covers, with the stat update but no message.
     GainExp(i32),
+    /// Tell the player's event (`ClientActor::tell_event`).
+    Event(crate::events::EventCommand),
     /// Leave the field for the Cash Shop.
     EnterCashShop,
     /// Return from the Cash Shop to the map the player left.

@@ -506,6 +506,7 @@ impl ClientActor {
             }
             WorldAction::Died => self.died().await?,
             WorldAction::GainExp(amount) => self.gained_exp(amount).await?,
+            WorldAction::Event(command) => self.tell_event(command).await,
             WorldAction::Quest(request) => self.request_quest_action(request).await?,
             WorldAction::Shop(request) => self.shop_action(request).await?,
             WorldAction::MiuMiu { slot } => self.miu_miu(slot).await?,
@@ -1597,6 +1598,10 @@ impl ClientActor {
                     .await
             }
             ServerMessage::EventPackets { id, packets } => self.event_packets(id, packets).await?,
+            ServerMessage::PyramidBlessing { id, item_id } => {
+                self.pyramid_blessing(id, item_id).await?
+            }
+            ServerMessage::PyramidRage { id, left } => self.pyramid_rage(id, left)?,
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::MobBuff(item_id) => {
                 let alive = self

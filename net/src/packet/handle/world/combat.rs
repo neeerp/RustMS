@@ -4,6 +4,7 @@ use crate::combat::{self, AttackKind};
 use crate::combo;
 use crate::energy;
 use crate::error::NetworkError;
+use crate::events::EventCommand;
 use crate::handler::{
     FieldRequest, HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult,
 };
@@ -218,6 +219,13 @@ impl WorldHandler for AttackHandler {
             );
             return Ok(HandlerResult::empty());
         }
+        // Rage of Pharaoh takes one of the Pyramid run's uses (the client's
+        // `massacre_skill`; Cosmic `Pyramid.useSkill`).
+        let rage = skills::pq_skill(attack.skill) == Some(skills::PqSkill::RageOfPharaoh);
+        if rage && ctx.player.pyramid_rage <= 0 {
+            debug!(skill = attack.skill, "Rage of Pharaoh refused with no uses");
+            return Ok(HandlerResult::empty());
+        }
         let uses = match combat::validate(&attack, ctx.player) {
             Ok(uses) => uses,
             Err(rejection) => {
@@ -340,6 +348,10 @@ impl WorldHandler for AttackHandler {
             result = spend_dojo_energy(ctx.player, result)?;
         } else if fills {
             result = fill_dojo_energy(ctx.player, dojo::ATTACK_ENERGY, result)?;
+        }
+        if rage {
+            ctx.player.pyramid_rage -= 1;
+            result = result.with(WorldAction::Event(EventCommand::Rage));
         }
         Ok(result)
     }

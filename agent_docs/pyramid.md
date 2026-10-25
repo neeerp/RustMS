@@ -7,8 +7,8 @@ is in v83ref `reports/b160-pyramid-server.md` (the rules, after Cosmic's
 `reports/b160-pyramid-client.md` (the v83 client's fields and packets).
 
 Status: the map and mob data, the packet builders, the run's entry, stages
-and clocks, and its tally and gauge are in. The blessings and Rage charges,
-the score, and the Tomb are still to come.
+and clocks, its tally and gauge, and its blessings and uses of Rage of
+Pharaoh are in. The score and the Tomb are still to come.
 
 ## Maps
 
@@ -89,6 +89,27 @@ mode on a channel, as many as the maps have copies.
   player holds the run's ticket and is on one of its maps.
 - Cosmic also sends `massacre_party` and `massacre_laststage`. The v83
   client's Pyramid fields read only the four counts, so these aren't sent.
+
+## Blessings and Rage of Pharaoh
+
+- The run's kills and cool kills together, over all its stages, reach the
+  stage's `countEffect`s in turn, each once (`Tally::reached`; Cosmic
+  `checkBuffs`). One attack may pass more than one.
+  - One with a `buff` gives every living member on the run's maps that
+    item's effect, Pharaoh's Blessing 2022585 to 2022588
+    (`ServerMessage::PyramidBlessing`).
+  - One with `skillUse` gives the run a use of Rage of Pharaoh, and the
+    members hear `massacre_skill` again.
+  - Cosmic writes the counts in code, and never moves past 1500 (it adds a
+    use there on every kill). The data's seven counts are used instead.
+- The run's uses are shared by its members. Each client actor keeps the
+  last count it was told in `Player::pyramid_rage`
+  (`ServerMessage::PyramidRage`), cleared when it leaves the run.
+- Rage of Pharaoh (1020, and its Cygnus, Aran and Evan copies) is refused
+  without a use (`AttackHandler`), as the client does. With one, the
+  attack takes it and tells the run (`EventCommand::Rage`). The run spends
+  one if any are left and tells everyone how many remain. Two members who
+  use the last one at once both get their attack.
 
 ## Stage rules (`FieldTemplate::massacre`)
 

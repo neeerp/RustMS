@@ -763,22 +763,48 @@ impl ClientActor {
         Ok(())
     }
 
-    /// Event `id`'s packets, sent if the player holds its ticket and is on
-    /// one of its maps.
+    /// Whether the player holds event `id`'s ticket and is on one of its
+    /// maps.
+    fn on_event_maps(&self, id: u32) -> bool {
+        let Some(map_id) = self.game.as_ref().map(|game| game.player.stats.map_id) else {
+            return false;
+        };
+        !self.in_cash_shop
+            && (self.event.as_ref()).is_some_and(|ticket| ticket.id == id && ticket.holds(map_id))
+    }
+
+    /// Event `id`'s packets, sent if the player is on its maps.
     pub(super) async fn event_packets(
         &mut self,
         id: u32,
         packets: Vec<Packet>,
     ) -> Result<(), RuntimeError> {
-        let Some(map_id) = self.game.as_ref().map(|game| game.player.stats.map_id) else {
-            return Ok(());
-        };
-        let here =
-            (self.event.as_ref()).is_some_and(|ticket| ticket.id == id && ticket.holds(map_id));
-        if here && !self.in_cash_shop {
+        if self.on_event_maps(id) {
             for mut packet in packets {
                 self.send(&mut packet).await?;
             }
+        }
+        Ok(())
+    }
+
+    /// The Nett's Pyramid run `id` reached a Pharaoh's Blessing: a living
+    /// player on its maps takes it (Cosmic `checkBuffs`).
+    pub(super) async fn pyramid_blessing(
+        &mut self,
+        id: u32,
+        item_id: i32,
+    ) -> Result<(), RuntimeError> {
+        if self.on_event_maps(id) && self.in_game()?.player.stats.hp > 0 {
+            self.take_item_effect(item_id, false).await?;
+        }
+        Ok(())
+    }
+
+    /// The Nett's Pyramid run `id` has `left` uses of Rage of Pharaoh, which
+    /// the player's attacks check.
+    pub(super) fn pyramid_rage(&mut self, id: u32, left: i32) -> Result<(), RuntimeError> {
+        if self.event.as_ref().is_some_and(|ticket| ticket.id == id) {
+            self.in_game_mut()?.player.pyramid_rage = left;
         }
         Ok(())
     }
@@ -898,6 +924,7 @@ impl ClientActor {
             return Ok(());
         };
         let changes = ticket.kind.event().take_items(&mut game.player);
+        game.player.pyramid_rage = 0;
         // The blessing stays in the event (Cosmic `playerUnregistered`).
         // Only the player hears of it: they are leaving the map, and arrive
         // on the next without it.
