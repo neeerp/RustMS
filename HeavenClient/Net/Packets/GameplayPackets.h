@@ -1332,6 +1332,28 @@ namespace ms
 		PartySearchStopPacket() : OutPacket(OutPacket::Opcode::PARTY_SEARCH_STOP) {}
 	};
 
+	// A swing on the Snowball field hit `target` (ball 0, ball 1, snowman 0,
+	// snowman 1) for `damage`, `delay` ms into the attack (v83 A 575387)
+	// Opcode: SNOWBALL(211)
+	class SnowballPacket : public OutPacket
+	{
+	public:
+		SnowballPacket(uint8_t target, uint16_t damage, uint16_t delay) : OutPacket(OutPacket::Opcode::SNOWBALL)
+		{
+			write_byte(static_cast<int8_t>(target));
+			write_short(static_cast<int16_t>(damage));
+			write_short(static_cast<int16_t>(delay));
+		}
+	};
+
+	// The player stands in a Snowball field's ball (v83 A 574e64)
+	// Opcode: LEFT_KNOCKBACK(212)
+	class LeftKnockbackPacket : public OutPacket
+	{
+	public:
+		LeftKnockbackPacket() : OutPacket(OutPacket::Opcode::LEFT_KNOCKBACK) {}
+	};
+
 	// A swing on the Coconut Season field hit nut `index`, `delay` ms into
 	// the attack (v83 FUN_00549902)
 	// Opcode: COCONUT(213)

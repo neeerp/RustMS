@@ -8,8 +8,8 @@ the other team's ball for a while. The RE is in v83ref
 packets). The rules the client doesn't fix are Cosmic's or our own, and
 are listed under b168 in v83ref `lanes/QUESTIONS.md`.
 
-Status: the server runs the game, started and reset by a GM. HeavenClient
-doesn't show it yet.
+Status: the server runs the game, started and reset by a GM, and
+HeavenClient shows it (see "The client").
 
 ## Maps
 
@@ -77,6 +77,9 @@ doesn't show it yet.
   is over (`snowball.ended`), and 10 s later they are warped out.
 - **Walking into a ball** (`LEFT_KNOCK_BACK`). A player on a team is
   thrown back, at most twice a second.
+- **Walking into a snowman.** The client hurts the player 30 to 40 and
+  reports it as a trap's damage (`TAKE_DAMAGE` from -3). The fields' ice
+  traps do up to 55, so the server takes it as any trap's.
 - The times are scaled by `RUSTMS_EVENT_SCALE` (`net::events::scaled`).
 
 ## Packets
@@ -100,3 +103,46 @@ doesn't show it yet.
 - `SNOWBALL` (recv 0xD3, `SnowballHandler`): a u8 target, a u16 damage
   (ignored) and a u16 delay.
 - `LEFT_KNOCKBACK` (recv 0xD4, `LeftKnockbackHandler`): no body.
+
+## The client
+
+HeavenClient follows v83's `CField_SnowBall` (`Character/Snowball`,
+`Net/Handlers/SnowballHandlers`, `Gameplay/MapleMap/MapSnowball`).
+
+- The snowball packets come before the new field loads, so
+  `enter_snowball_field` keeps the map's lanes from its `snowBall` node
+  from the moment the server moves the player, and forgets the last game.
+- **The balls.** A ball's image is drawn at (`x0` + `dx` × step, lane y −
+  81), turned 4° a step. Its box is 160 × 165 around that. The balls and
+  snowmen are drawn just behind layer 3's tiles and objects, in front of
+  layers 0 to 2, and the snowmen's HP bars in front of the whole field.
+  - The first `SNOWBALL_STATE` on the field, and any that isn't a running
+    game's, puts each ball at its step at once. A running game's later ones
+    set the step the ball catches up with, three backlog per step.
+  - While the state is 1, a ball rolls on at its stage's time per step:
+    150 to 500 ms for stages 0 to 7, faster while the server's step is
+    ahead (2/3 of the time) and slower while behind (4/3). At stage 8 it
+    only catches up, a step per 500 ms, either way; stage 9 rolls back. As
+    in v83, the backlog never goes below 0.
+  - State 2 fades out ball 0 and state 3 ball 1, over 100 ms; each such
+    state fades it again.
+- **The snowmen** stand at `x` on their lanes, with a 52 × 10 HP bar below.
+  The bar shows the HP of the last state, and is redrawn only on a hit on
+  its snowman; at 0 HP it is full, as in v83.
+- **Hits** (`HIT_SNOWBALL`) show after their delay, at the top centre of
+  the target's box: the damage, or a miss for 0, with mob 0100100's Damage
+  sound. A hit on a snowman plays its two frames once, unless they are
+  still playing, and redraws its bar.
+- **Swings.** On the field a basic attack (not a skill) is the field's own,
+  as for Coconut Season. `SNOWBALL` names the first of ball 0, ball 1,
+  snowman 0 and snowman 1 whose box the swing meets, only while the state
+  is 1. It sends the ball's damage, or for a snowman a miss 2 times in 10,
+  the strong damage once and the normal one otherwise.
+- **Touching.** Each 30 ms the player stands in a ball, unless it is fading
+  out or they are stunned, `LEFT_KNOCKBACK` is sent; `LEFT_KNOCK_BACK`
+  throws them left and up (−300, −300). Walking into a snowman hurts the
+  player 30 to 40, as a trap does, and pushes them right and up (270,
+  −270), unless they are invincible.
+- `SNOWBALL_MESSAGE` adds a yellow line, with the team names in lowercase
+  as v83 has them ("story", "maple"): a section passed, a team stopping the
+  other's ball, or a ball moving again.

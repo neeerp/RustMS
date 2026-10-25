@@ -357,6 +357,10 @@ namespace ms
 		// (FUN_00549902).
 		void swing_at_coconuts();
 
+		// Snowball's too, telling the server of the first ball or snowman it
+		// hits and what it shows, while the game runs (A 575387).
+		void swing_at_snowballs();
+
 		// The melee stance a regular ranged attack whacks a mob right in
 		// front of the player with, or NONE to shoot. Either way, `reach` is
 		// how far in front of the player the whack reaches.

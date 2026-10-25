@@ -51,6 +51,7 @@
 #include "MapleMap/MapDrops.h"
 #include "MapleMap/MapClock.h"
 #include "MapleMap/MapShip.h"
+#include "MapleMap/MapSnowball.h"
 #include "MapleMap/MapWedding.h"
 #include "Physics/Physics.h"
 
@@ -352,6 +353,10 @@ namespace ms
 		// Hurts the player on a trap and takes them where it sends them.
 		void hit_obstacle();
 
+		// On a Snowball field, a ball throws back the player in it and a
+		// snowman hurts one who walks into it (A 574df1).
+		void touch_snowball();
+
 		// Go through the Mystic Door the player stands in, if any
 		// (FUN_005375ed in a town, FUN_007bd594 elsewhere).
 		void check_doors(Point<int16_t> playerpos);
@@ -464,6 +469,9 @@ namespace ms
 		// Kept from map to map.
 		Guide guide;
 		MapShip ship;
+		MapSnowball snowfield;
+		// v83 asks to be thrown back once per update, every 30 ms.
+		int32_t snowball_knock_wait = 0;
 		MapWedding wedding;
 		MapClouds clouds;
 		MapWeather weather;

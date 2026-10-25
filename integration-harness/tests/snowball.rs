@@ -2,13 +2,14 @@
 //! state, a GM's `/start` and `/reset` start and stop the game while a
 //! player's do nothing, a team's hits roll its own ball and not the
 //! other's, a player walking into a ball is thrown back, and at the end
-//! the team whose ball is further on wins and everyone is warped out.
+//! the team whose ball is further on wins and everyone is warped out. A
+//! player who walks into a snowman is hurt as by a trap.
 //! The harness world's event scale makes the 600-second game 10 seconds.
 
-use integration_harness::database::set_gm_level;
+use integration_harness::database::{set_gm_level, set_hp};
 use integration_harness::packets::build_all_chat;
 use integration_harness::preconditions::load_harness_config_or_fail;
-use integration_harness::trace::{barrier, read_for, send, until, warp, Trace};
+use integration_harness::trace::{barrier, read_for, send, stat, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin};
 use net::packet::op::{RecvOpcode, SendOpcode};
 use packet::io::write::PktWrite;
@@ -36,6 +37,19 @@ fn hit(what: u8) -> Packet {
 fn knock() -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::LeftKnockback as i16).unwrap();
+    p
+}
+
+/// TAKE_DAMAGE as a v83 client sends it from a trap, or a snowman (A 574df1).
+fn trap_damage(damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::TakeDamage as i16).unwrap();
+    p.write_int(0).unwrap();
+    p.write_byte(-3i8 as u8).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_int(damage).unwrap();
+    p.write_short(0).unwrap();
+    p.write_byte(0).unwrap();
     p
 }
 
@@ -157,4 +171,30 @@ async fn a_gm_runs_a_snowball_game_and_the_ball_further_on_wins() {
     until(p, &mut pt, |t| t.warps.contains(&WINNERS)).await;
     assert!(states(&pt).iter().any(|&(state, _, _)| state == 2));
     until(g, &mut gt, |t| t.warps.contains(&EXIT)).await;
+}
+
+#[tokio::test]
+async fn a_snowman_hurts_a_player_who_walks_into_it() {
+    let config = load_harness_config_or_fail().await;
+    let id = login_to_world_session(&config)
+        .await
+        .expect("login failed")
+        .character_id;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    set_hp(id, 1000, 1000).await.expect("set HP");
+    let mut session = relogin(&config).await;
+    let c = &mut session.connection;
+    let mut t = Trace::default();
+    assert_eq!(warp(c, FIELD, "", &mut t).await, FIELD);
+    barrier(c, "in", &mut t).await;
+
+    // A snowman's 30 to 40 is taken: the field's ice traps do up to 55.
+    send(c, trap_damage(35)).await;
+    until(c, &mut t, |t| t.stat(stat::HP) == Some(965)).await;
+
+    // More than the traps do is refused.
+    let updates = t.stat_updates.len();
+    send(c, trap_damage(56)).await;
+    barrier(c, "refused", &mut t).await;
+    assert_eq!(t.stat_updates.len(), updates);
 }

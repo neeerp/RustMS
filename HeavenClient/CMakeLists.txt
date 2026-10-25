@@ -315,6 +315,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_executable(coconut_tests tests/coconut.cpp Character/Coconut.cpp Net/InPacket.cpp)
     target_include_directories(coconut_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME coconut COMMAND coconut_tests)
+    add_executable(snowball_tests tests/snowball.cpp Character/Snowball.cpp Character/Coconut.cpp Net/InPacket.cpp)
+    target_include_directories(snowball_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME snowball COMMAND snowball_tests)
     add_executable(diseases_tests tests/diseases.cpp)
     target_include_directories(diseases_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME diseases COMMAND diseases_tests)
@@ -589,6 +592,8 @@ add_executable(HeavenClient
     Character/Carnival.h
     Character/Coconut.cpp
     Character/Coconut.h
+    Character/Snowball.cpp
+    Character/Snowball.h
     Character/Family.cpp
     Character/Marriage.cpp
     Character/Family.h
@@ -716,6 +721,8 @@ add_executable(HeavenClient
     Gameplay/MapleMap/MapReactors.h
     Gameplay/MapleMap/MapShip.cpp
     Gameplay/MapleMap/MapShip.h
+    Gameplay/MapleMap/MapSnowball.cpp
+    Gameplay/MapleMap/MapSnowball.h
     Gameplay/MapleMap/ShipRules.h
     Gameplay/MapleMap/MapWedding.cpp
     Gameplay/MapleMap/MapWedding.h
@@ -1158,6 +1165,8 @@ add_executable(HeavenClient
     Net/Handlers/CarnivalHandlers.h
     Net/Handlers/CoconutHandlers.cpp
     Net/Handlers/CoconutHandlers.h
+    Net/Handlers/SnowballHandlers.cpp
+    Net/Handlers/SnowballHandlers.h
     Net/Handlers/FamilyHandlers.cpp
     Net/Handlers/FamilyHandlers.h
     Net/Handlers/MarriageHandlers.cpp

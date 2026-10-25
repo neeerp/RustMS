@@ -23,6 +23,7 @@
 #include "Handlers/MapObjectHandlers.h"
 #include "Handlers/CarnivalHandlers.h"
 #include "Handlers/CoconutHandlers.h"
+#include "Handlers/SnowballHandlers.h"
 #include "Handlers/CashShopHandlers.h"
 #include "Handlers/CommonHandlers.h"
 #include "Handlers/FamilyHandlers.h"
@@ -248,6 +249,10 @@ namespace ms
 		HIT_REACTOR = 277,
 		SPAWN_REACTOR = 279,
 		REMOVE_REACTOR = 280,
+		SNOWBALL_STATE = 281,
+		HIT_SNOWBALL = 282,
+		SNOWBALL_MESSAGE = 283,
+		LEFT_KNOCK_BACK = 284,
 		COCONUT_HIT = 285,
 		COCONUT_SCORE = 286,
 		MONSTER_CARNIVAL_START = 289,
@@ -357,6 +362,10 @@ namespace ms
 		emplace<STOP_CLOCK, StopClockHandler>();
 		emplace<HORNTAIL_CAVE, HorntailCaveHandler>();
 		emplace<FIELD_SPECIFIC_DATA, FieldSpecificDataHandler>();
+		emplace<SNOWBALL_STATE, SnowballStateHandler>();
+		emplace<HIT_SNOWBALL, HitSnowballHandler>();
+		emplace<SNOWBALL_MESSAGE, SnowballMessageHandler>();
+		emplace<LEFT_KNOCK_BACK, LeftKnockBackHandler>();
 		emplace<COCONUT_HIT, CoconutHitHandler>();
 		emplace<COCONUT_SCORE, CoconutScoreHandler>();
 		emplace<MONSTER_CARNIVAL_START, CarnivalStartHandler>();
