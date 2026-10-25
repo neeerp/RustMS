@@ -2,6 +2,7 @@ mod admin_command;
 mod alliance;
 mod berserk;
 mod buddy;
+mod carnival;
 mod cash_item;
 mod cash_mist;
 mod cash_shop;
@@ -83,6 +84,7 @@ pub use self::admin_command::AdminCommandHandler;
 pub use self::alliance::{AllianceOperationHandler, DenyAllianceRequestHandler};
 pub use self::berserk::CalcDamageStatHandler;
 pub use self::buddy::BuddyListModifyHandler;
+pub use self::carnival::MonsterCarnivalHandler;
 pub use self::cash_item::UseCashItemHandler;
 pub use self::cash_shop::{
     CashShopOperationHandler, CheckCashHandler, CouponCodeHandler, EnterCashShopHandler,

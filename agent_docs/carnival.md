@@ -9,8 +9,8 @@ Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
 
 Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
-clock, the sides' look, CP from kills, and the exit room are in. Not yet:
-spending CP (0xDA), summons, skills and guardians, CP lost on death and the
+clock, the sides' look, CP from kills, spending CP on mobs, and the exit
+room are in. Not yet: skills and guardians, CP lost on death and the
 revive room, results and their effects, and the client's Carnival UI.
 
 ## Maps
@@ -72,6 +72,19 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   CP, and each side's. A kill on the battle field
   (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
   side.
+- Spending CP (MONSTER_CARNIVAL, 0xDA, `MonsterCarnivalHandler`) names a
+  tab and a place in it. Only tab 0, the battle field's mob list
+  (`Carnival::mobs`, `net::carnival::summon`), is sold yet. The event
+  (`carnival_spend`) checks the stage and the price and sets the CP aside
+  (`Score::spend`, which leaves the totals), then asks the battle field
+  (`FieldMessage::CarnivalSummon`). The field brings the mob out for the
+  spender's side (`MobSet::buy`, its team byte the side's) at one of the
+  side's `mobGenPos` spots, or where the spender stands, unless the side
+  has `mobGenMax` (20 by default) of its bought mobs out. A bought mob
+  hunts the other side, and the other side earns its CP. The event then
+  tells the spender and their side their CP, or gives it back
+  (`Score::refund`). Each mob summoned counts in MONSTER_CARNIVAL_START for
+  those arriving later.
 - A member's side is on their ticket (`EventTicket::side`), and from there
   in their look (`FieldAvatar::team`, SPAWN_PLAYER's last byte).
 
@@ -84,3 +97,9 @@ CP is sent as two shorts, the CP left to spend and the total ever earned.
   then a byte for each mob the field lists, how many are summoned.
 - MONSTER_CARNIVAL_OBTAINED_CP (0x122): the killer's own CP.
 - MONSTER_CARNIVAL_PARTY_CP (0x123): a side and its CP, to every member.
+- MONSTER_CARNIVAL_SUMMON (0x124): the tab, the place in it, and who spent
+  the CP, to the whole field, which the client's chat log shows.
+- MONSTER_CARNIVAL_MESSAGE (0x125): why a spend failed, a byte
+  (`SpendRefusal`): 1 not enough CP, 2 the side's limit, 3 no spot for a
+  guardian, 4 that guardian is out, 5 anything else. The client's window
+  waits for one or the other after each request.

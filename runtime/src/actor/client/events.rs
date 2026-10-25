@@ -9,12 +9,14 @@ use crate::error::RuntimeError;
 use crate::message::{CarnivalPick, DirectoryMessage, FieldKey, FieldMessage};
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
+use net::carnival::SpendRefusal;
 use net::events::{
     self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, Entry, EventCommand, EventKind,
     HeadCount, LeverCheck, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
+use net::packet::build::world::carnival::build_carnival_message;
 use net::packet::build::world::conti::{
     build_boss_site_closing, build_countdown, build_stop_clock, BossSite,
 };
@@ -194,6 +196,27 @@ impl ClientActor {
         }
         self.start_script(NpcScript::carnival_challenge(challenger, &challengers))
             .await
+    }
+
+    /// The player spends CP from the Monster Carnival window: their event
+    /// answers, or, for one not in a Carnival, the window hears it failed.
+    pub(super) async fn spend_carnival_cp(
+        &mut self,
+        tab: u8,
+        index: u8,
+    ) -> Result<(), RuntimeError> {
+        let playing = self
+            .event
+            .as_ref()
+            .is_some_and(|ticket| matches!(ticket.kind, EventKind::Carnival(_)));
+        if !playing {
+            return self
+                .send(&mut build_carnival_message(SpendRefusal::Failed)?)
+                .await;
+        }
+        self.tell_event(EventCommand::CarnivalSpend { tab, index })
+            .await;
+        Ok(())
     }
 
     /// The player's side in the event whose field they are on, which

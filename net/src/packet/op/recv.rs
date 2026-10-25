@@ -188,6 +188,8 @@ pub enum RecvOpcode {
     DamageReactor = 0xCD,
 
     PlayerMapTransfer = 0xCF,
+    /// The Monster Carnival window spends CP (v83ref b163).
+    MonsterCarnival = 0xDA,
     ContiStateRequest = 0xDC,
     PartySearchStart = 0xDE,
     PartySearchStop = 0xDF,

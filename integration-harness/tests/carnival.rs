@@ -6,17 +6,19 @@
 //! before the battle a sixth of one, and the battle's 610 about 10. Once
 //! accepted, both parties go to the battle field, where each member's
 //! screen is told their side and the score, and a kill earns its mob's CP
-//! for the killer and their side. When time runs out everyone goes to the
-//! exit room.
+//! for the killer and their side, which they spend on mobs that hunt the
+//! other side. When time runs out everyone goes to the exit room.
 
 use integration_harness::events::{armed_in, party_of_one, talk, told};
 use integration_harness::hunting::attack;
 use integration_harness::protocol::WorldSession;
 use integration_harness::quests::answer;
-use integration_harness::trace::{send, until, Trace};
+use integration_harness::trace::{read_for, send, until, Trace};
 use net::carnival::{battle_map, room_map, CARNIVAL_EXIT, CARNIVAL_LOBBY};
 use net::npc_scripts::{CARNIVAL_ROOM_NPC, SPIEGELMANN};
-use net::packet::op::SendOpcode;
+use net::packet::op::{RecvOpcode, SendOpcode};
+use packet::io::write::PktWrite;
+use packet::Packet;
 
 /// A mob worth 1 CP, which Maple Blue summons for Maple Red to hunt.
 const BLUE_MOB: i32 = 9300127;
@@ -34,6 +36,20 @@ fn blue_mob(seen: &Trace) -> Option<i32> {
     let blue = |oid: &i32| seen.field.teams.get(oid) == Some(&1);
     mobs.find(|(oid, id)| *id == BLUE_MOB && blue(oid))
         .map(|&(oid, _)| oid)
+}
+
+/// MONSTER_CARNIVAL: spend CP on `index` of the window's tab `tab`.
+fn spend(tab: u8, index: u8) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::MonsterCarnival as i16).unwrap();
+    p.write_byte(tab).unwrap();
+    p.write_byte(index).unwrap();
+    p
+}
+
+/// The bodies of the Monster Carnival packets seen since the first `from`.
+fn since(seen: &Trace, op: SendOpcode, from: usize) -> Vec<Vec<u8>> {
+    carnival(seen, op).split_off(from)
 }
 
 /// Little-endian shorts.
@@ -214,6 +230,101 @@ async fn a_challenged_party_battles_for_cp_until_its_time_runs_out() {
     .await;
     assert_eq!(carnival(&theirs, SendOpcode::CarnivalPartyCp), [red_cp]);
     assert!(carnival(&theirs, SendOpcode::CarnivalObtainedCp).is_empty());
+
+    // The field's first mob costs 7 CP: with 1 the window hears there isn't
+    // enough, and skills aren't sold yet.
+    let (mob_id, cost) = integration_harness::events::maps()
+        .field(field)
+        .and_then(|f| f.carnival.as_ref())
+        .and_then(|rules| rules.mobs.first().copied())
+        .unwrap();
+    assert_eq!((mob_id, cost), (BLUE_MOB, 7));
+    let messages = |t: &Trace| carnival(t, SendOpcode::CarnivalMessage);
+    send(&mut red.connection, spend(0, 0)).await;
+    until(&mut red.connection, &mut seen, |t| !messages(t).is_empty()).await;
+    send(&mut red.connection, spend(1, 0)).await;
+    until(&mut red.connection, &mut seen, |t| messages(t).len() == 2).await;
+    assert_eq!(messages(&seen), [vec![1], vec![5]]);
+
+    // Red hunts the rest of Maple Blue's mobs for enough CP.
+    let theirs_left: Vec<i32> = seen
+        .field
+        .teams
+        .iter()
+        .filter(|&(oid, &team)| team == 1 && !seen.field.killed.contains(oid))
+        .map(|(&oid, _)| oid)
+        .collect();
+    for &oid in &theirs_left {
+        send(&mut red.connection, attack(oid, 30_000)).await;
+    }
+    let earned = |t: &Trace| {
+        let last = carnival(t, SendOpcode::CarnivalObtainedCp).pop();
+        last.map_or(0, |body| i16::from_le_bytes([body[0], body[1]]))
+    };
+    until(&mut red.connection, &mut seen, |t| {
+        theirs_left.iter().all(|oid| t.field.killed.contains(oid))
+    })
+    .await;
+    // The kills' CP follows them from the event.
+    read_for(&mut red.connection, &mut seen, 500).await;
+    let total = earned(&seen);
+    assert!(total >= cost as i16, "{total}");
+
+    // Spending it brings out a mob for Maple Red, which everyone hears
+    // Red summoned, and leaves Red and their side the rest.
+    let theirs_from = carnival(&theirs, SendOpcode::CarnivalSummon).len();
+    let mobs_before = seen.field.mobs.len();
+    let ours_out = |t: &Trace| {
+        let mut new = t.field.mobs[mobs_before..].iter();
+        new.any(|(oid, id)| *id == BLUE_MOB && t.field.teams.get(oid) == Some(&0))
+    };
+    let rest = shorts(&[total - cost as i16, total]);
+    let red_rest = [vec![0], rest.clone()].concat();
+    send(&mut red.connection, spend(0, 0)).await;
+    until(&mut red.connection, &mut seen, |t| {
+        ours_out(t)
+            && carnival(t, SendOpcode::CarnivalObtainedCp).last() == Some(&rest)
+            && carnival(t, SendOpcode::CarnivalPartyCp).last() == Some(&red_rest)
+    })
+    .await;
+    let summon = [
+        vec![0, 0],
+        (red.character_name.len() as u16).to_le_bytes().to_vec(),
+        red.character_name.as_bytes().to_vec(),
+    ]
+    .concat();
+    assert_eq!(
+        carnival(&seen, SendOpcode::CarnivalSummon),
+        [summon.clone()]
+    );
+    until(&mut blue.connection, &mut theirs, |t| {
+        carnival(t, SendOpcode::CarnivalSummon).len() > theirs_from
+    })
+    .await;
+    assert_eq!(
+        since(&theirs, SendOpcode::CarnivalSummon, theirs_from),
+        [summon]
+    );
+
+    // Red's own side's mobs earn Red nothing.
+    let ours = seen
+        .field
+        .teams
+        .iter()
+        .find(|&(oid, &team)| team == 0 && !seen.field.killed.contains(oid))
+        .map(|(&oid, _)| oid)
+        .unwrap();
+    let points = carnival(&seen, SendOpcode::CarnivalObtainedCp).len();
+    send(&mut red.connection, attack(ours, 30_000)).await;
+    until(&mut red.connection, &mut seen, |t| {
+        t.field.killed.contains(&ours)
+    })
+    .await;
+    read_for(&mut red.connection, &mut seen, 300).await;
+    assert_eq!(
+        carnival(&seen, SendOpcode::CarnivalObtainedCp).len(),
+        points
+    );
 
     // Time runs out, and both go to the exit room.
     until(&mut red.connection, &mut seen, |t| {

@@ -90,6 +90,8 @@ pub struct LiveMob {
     pub link: Option<Link>,
     /// Its side on a Monster Carnival field (`MapMobTemplate::team`).
     pub team: Option<u8>,
+    /// Its side bought it with CP (`MobSet::buy`).
+    pub bought: bool,
 }
 
 /// How a mob's HP is tied to another's: Horntail's (Cosmic
@@ -312,6 +314,7 @@ impl LiveMob {
             next_drop,
             link: None,
             team: None,
+            bought: false,
         }
     }
 
@@ -1210,6 +1213,33 @@ impl MobSet {
         spawned
     }
 
+    /// Bring out `info` for side `side` of a Monster Carnival field, which
+    /// bought it with CP, at `at` on `foothold`; returns its object id. It
+    /// never respawns.
+    pub fn buy(
+        &mut self,
+        info: MobInfo,
+        at: (i16, i16),
+        foothold: i16,
+        side: u8,
+        now: Instant,
+    ) -> i32 {
+        let object_id = self.object_ids.next();
+        let mut mob = LiveMob::new(object_id, info, at, 5, foothold, now);
+        mob.team = Some(side);
+        mob.bought = true;
+        self.live.insert(object_id, mob);
+        object_id
+    }
+
+    /// How many of the mobs side `side` bought are still out.
+    pub fn bought(&self, side: u8) -> usize {
+        self.live
+            .values()
+            .filter(|mob| mob.bought && mob.team == Some(side))
+            .count()
+    }
+
     /// Bring out `info` at `at`, standing as `stance`, under `controller`
     /// if any; returns its object id. It never respawns.
     pub fn place(
@@ -1937,6 +1967,18 @@ mod tests {
             0.0,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_side_counts_the_mobs_it_bought() {
+        let mut mobs = MobSet::new(Vec::new());
+        let (_, info) = snail_spawn(0);
+        let now = Instant::now();
+        let first = mobs.buy(info.clone(), (0, 0), 0, 0, now);
+        mobs.buy(info.clone(), (0, 0), 0, 0, now);
+        mobs.buy(info, (0, 0), 0, 1, now);
+        assert_eq!((mobs.bought(0), mobs.bought(1)), (2, 1));
+        assert_eq!(mobs.get(first).map(|mob| mob.team), Some(Some(0)));
     }
 
     #[test]

@@ -233,6 +233,9 @@ pub enum SendOpcode {
     CarnivalStart = 0x121,
     CarnivalObtainedCp = 0x122,
     CarnivalPartyCp = 0x123,
+    /// Who summoned or cast what with their CP, and why a spend failed.
+    CarnivalSummon = 0x124,
+    CarnivalMessage = 0x125,
     /// How long Horntail's Cave stays open (302; v83 FUN_005335a3).
     HorntailCave = 0x12E,
     /// How long the Zakum Shrine stays open (303; v83 FUN_0053347c).

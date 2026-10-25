@@ -16,10 +16,12 @@ use game::mob_skill::{self, MobSkillEffect};
 use game::{wedding, FieldAvatar, MobStat};
 use game_data::items::CatchInfo;
 use game_data::server_content::keys;
+use net::carnival::SpendRefusal;
 use net::conti::{self, Happening, State, Target};
 use net::loot::Loot;
 use net::meso_explosion::{self, Blast};
 use net::packet::build::world::buff::{build_own_skill_effect, build_skill_effect};
+use net::packet::build::world::carnival::build_carnival_summon;
 use net::packet::build::world::conti::build_conti_move;
 use net::packet::build::world::door::{build_remove_door, build_spawn_door};
 use net::packet::build::world::drop::{
@@ -555,6 +557,16 @@ impl FieldActor {
             FieldMessage::SwapMobs { only } => self.swap_mobs(only),
             FieldMessage::BringOut { mob_id, at } => {
                 self.board(mob_id, 1, at);
+            }
+            FieldMessage::CarnivalSummon {
+                summoner,
+                index,
+                mob_id,
+                side,
+                cap,
+                reply,
+            } => {
+                let _ = reply.send(self.carnival_summon(summoner, index, mob_id, side, cap));
             }
             FieldMessage::SetParty { client_id, party } => {
                 if let Some(occupant) = self.occupants.get_mut(&client_id) {
@@ -1623,7 +1635,11 @@ impl FieldActor {
         let Some(attacker) = self.occupants.get(&from) else {
             return;
         };
-        let (id, level) = (attacker.avatar.id, attacker.avatar.level);
+        let (id, level, side) = (
+            attacker.avatar.id,
+            attacker.avatar.level,
+            attacker.avatar.team,
+        );
         let attacker = attacker.handle.clone();
         if let Some(broadcast) = broadcast {
             self.broadcast(Some(from), broadcast);
@@ -1671,7 +1687,12 @@ impl FieldActor {
                 continue;
             };
             let hurts = skill.is_none_or(|skill| mob.info.hurt_by(skill));
-            let cp = mob.info.cp;
+            // A Monster Carnival side earns nothing for its own mobs.
+            let cp = if mob.team == Some(side) {
+                0
+            } else {
+                mob.info.cp
+            };
             let mut damage = if hurts { damage } else { 0 };
             let max_hp = i64::from(mob.info.max_hp);
             if let Some(cap) =
@@ -2817,6 +2838,67 @@ impl FieldActor {
             self.send_control(controller, &controlled);
         }
         came
+    }
+
+    /// `summoner` spent CP on a `mob_id`, `index` of the field's list, for
+    /// their side `side`: unless the side has `cap` of its summons out, it
+    /// comes out at one of the side's `mobGenPos` spots, playing for it,
+    /// and everyone hears who summoned it (Cosmic
+    /// `MonsterCarnivalHandler`). Otherwise, why not.
+    fn carnival_summon(
+        &mut self,
+        summoner: ClientId,
+        index: u8,
+        mob_id: i32,
+        side: u8,
+        cap: usize,
+    ) -> Result<(), SpendRefusal> {
+        let (Some(occupant), true, Some(info)) = (
+            self.occupants.get(&summoner),
+            self.carnival,
+            net::mobs::info(mob_id),
+        ) else {
+            return Err(SpendRefusal::Failed);
+        };
+        if self.mobs.bought(side) >= cap {
+            return Err(SpendRefusal::Limit);
+        }
+        let spots: Vec<_> = net::get_game_data()
+            .ok()
+            .and_then(|data| {
+                Some(
+                    data.field(self.key.map_id)?
+                        .carnival
+                        .as_ref()?
+                        .mob_spots
+                        .clone(),
+                )
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|spot| spot.team.is_none_or(|team| team == side))
+            .collect();
+        let spot = spots.get(rand::random::<usize>() % spots.len().max(1));
+        let ((x, y), foothold) = spot.map_or(((occupant.avatar.x, occupant.avatar.y), 0), |spot| {
+            ((spot.x, spot.y), spot.foothold)
+        });
+        let name = occupant.avatar.name.clone();
+        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+        let at = (x, ground.saturating_sub(1));
+        let object_id = self.mobs.buy(info, at, foothold, side, Instant::now());
+        if let Some(mob) = self.mobs.get(object_id) {
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+        }
+        if let Some(controller) = self.occupants.keys().next().copied() {
+            let controlled = self.mobs.assign_uncontrolled(controller);
+            self.send_control(controller, &controlled);
+        }
+        if let Ok(packet) = build_carnival_summon(0, index, &name) {
+            self.broadcast(None, packet);
+        }
+        Ok(())
     }
 
     /// Zakum's altar took the Eye of Fire: its music plays, and its body

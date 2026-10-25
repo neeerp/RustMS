@@ -39,7 +39,7 @@ use net::events::{
 };
 use net::loot::Loot;
 use net::packet::build::world::carnival::{
-    build_carnival_start, build_obtained_cp, build_party_cp,
+    build_carnival_message, build_carnival_start, build_obtained_cp, build_party_cp,
 };
 use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
@@ -90,6 +90,14 @@ pub enum EventMessage {
     /// A Monster Carnival room's waiting party accepted the challenge of
     /// `members`, who come in as Maple Blue.
     Challengers { members: Vec<ClientHandle> },
+    /// The battle field answered `client_id`'s spend of `cost` CP on
+    /// `index` of its mob list: whether the mob came out, or why not.
+    Summoned {
+        client_id: ClientId,
+        index: u8,
+        cost: i32,
+        summoned: Result<(), net::carnival::SpendRefusal>,
+    },
 }
 
 /// The stages an event's party has cleared, one bit each, how many of the
@@ -385,6 +393,7 @@ pub fn spawn(
             team
         },
         carnival_stage: net::carnival::Stage::default(),
+        carnival_summoned: Vec::new(),
         // The party waiting plays Maple Red.
         carnival: {
             let mut score = net::carnival::Score::default();
@@ -551,6 +560,8 @@ struct EventActor {
     /// A Monster Carnival battle's sides and CP.
     carnival: net::carnival::Score,
     carnival_stage: net::carnival::Stage,
+    /// How many of each mob of the battle field's list were summoned.
+    carnival_summoned: Vec<u8>,
 }
 
 impl EventActor {
@@ -576,6 +587,9 @@ impl EventActor {
                         over = self.team.leave(client_id) || self.carnival_left(client_id);
                     }
                     Some(EventMessage::Challengers { members }) => self.challengers(members),
+                    Some(EventMessage::Summoned { client_id, index, cost, summoned }) => {
+                        self.carnival_summoned(client_id, index, cost, summoned);
+                    }
                     Some(EventMessage::Cloto { client_id, stage, reply }) => {
                         let _ = reply.send(self.cloto(client_id, stage));
                     }
@@ -1021,7 +1035,14 @@ impl EventActor {
             EventCommand::CarnivalArrived if matches!(self.kind, EventKind::Carnival(_)) => {
                 self.carnival_start(client_id);
             }
-            EventCommand::CarnivalCp(_) | EventCommand::CarnivalArrived => {
+            EventCommand::CarnivalSpend { tab, index }
+                if matches!(self.kind, EventKind::Carnival(_)) =>
+            {
+                self.carnival_spend(client_id, tab, index);
+            }
+            EventCommand::CarnivalCp(_)
+            | EventCommand::CarnivalArrived
+            | EventCommand::CarnivalSpend { .. } => {
                 debug!(client_id, "Not in a Monster Carnival");
             }
         }
@@ -1031,9 +1052,14 @@ impl EventActor {
     /// screen shows their own CP, and everyone's their side's (Cosmic
     /// `gainCP`).
     fn carnival_cp(&mut self, client_id: ClientId, cp: i32) {
-        let Some(gain) = self.carnival.gain(client_id, cp) else {
-            return;
-        };
+        if let Some(gain) = self.carnival.gain(client_id, cp) {
+            self.tell_cp(client_id, gain);
+        }
+    }
+
+    /// `client_id`'s CP changed: their screen shows their own, and
+    /// everyone's their side's.
+    fn tell_cp(&self, client_id: ClientId, gain: net::carnival::Gain) {
         let side: Vec<_> = build_party_cp(gain.side, gain.ours)
             .ok()
             .into_iter()
@@ -1053,6 +1079,101 @@ impl EventActor {
         }
     }
 
+    /// A member spends CP on `index` of the Carnival window's tab `tab`.
+    /// Only mobs are sold yet. The CP is set aside while the battle field
+    /// brings the mob out, and given back if it can't (Cosmic
+    /// `MonsterCarnivalHandler`). Every request is answered, as the
+    /// client's window waits for it.
+    fn carnival_spend(&mut self, client_id: ClientId, tab: u8, index: u8) {
+        use net::carnival::SpendRefusal;
+        let EventKind::Carnival(room) = self.kind else {
+            return;
+        };
+        if self.carnival_stage != net::carnival::Stage::Battle || tab != 0 {
+            return self.refuse_spend(client_id, SpendRefusal::Failed);
+        }
+        let (Some(side), Some((mob_id, cost, cap))) = (
+            self.carnival.side(client_id),
+            net::carnival::summon(room, index),
+        ) else {
+            return self.refuse_spend(client_id, SpendRefusal::NotEnoughCp);
+        };
+        let Some(tx) = self.joiner.upgrade() else {
+            return self.refuse_spend(client_id, SpendRefusal::Failed);
+        };
+        if self.carnival.spend(client_id, cost).is_none() {
+            return self.refuse_spend(client_id, SpendRefusal::NotEnoughCp);
+        }
+        let field = self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::carnival::battle_map(room),
+            instance_id: self.id,
+        });
+        tokio::spawn(async move {
+            let (reply, came) = oneshot::channel();
+            let summon = FieldMessage::CarnivalSummon {
+                summoner: client_id,
+                index,
+                mob_id,
+                side,
+                cap,
+                reply,
+            };
+            let summoned = match field.tx.send(summon).await {
+                Ok(()) => came.await.unwrap_or(Err(SpendRefusal::Failed)),
+                Err(_) => Err(SpendRefusal::Failed),
+            };
+            let summoned = EventMessage::Summoned {
+                client_id,
+                index,
+                cost,
+                summoned,
+            };
+            let _ = tx.send(summoned).await;
+        });
+    }
+
+    /// The battle field brought out the mob `client_id` spent `cost` CP on,
+    /// `index` of its list, and told everyone; or it didn't, say as the
+    /// side has as many out as it may, and the CP goes back.
+    fn carnival_summoned(
+        &mut self,
+        client_id: ClientId,
+        index: u8,
+        cost: i32,
+        summoned: Result<(), net::carnival::SpendRefusal>,
+    ) {
+        if let Err(why) = summoned {
+            self.carnival.refund(client_id, cost);
+            // A kill meanwhile showed the CP without what was set aside.
+            if let Some(standing) = self.carnival.standing(client_id) {
+                self.tell_cp(client_id, standing);
+            }
+            return self.refuse_spend(client_id, why);
+        }
+        let index = usize::from(index);
+        if self.carnival_summoned.len() <= index {
+            self.carnival_summoned.resize(index + 1, 0);
+        }
+        self.carnival_summoned[index] = self.carnival_summoned[index].saturating_add(1);
+        if let Some(standing) = self.carnival.standing(client_id) {
+            self.tell_cp(client_id, standing);
+        }
+    }
+
+    /// Tell `client_id`'s Carnival window why their spend failed.
+    fn refuse_spend(&self, client_id: ClientId, why: net::carnival::SpendRefusal) {
+        let (Some(handle), Ok(packet)) =
+            (self.members.get(&client_id), build_carnival_message(why))
+        else {
+            return;
+        };
+        handle.send(ServerMessage::EventPackets {
+            id: self.id,
+            packets: vec![packet],
+        });
+    }
+
     /// A member arrived on the Monster Carnival battle field: their screen
     /// takes their side and the score, with none of the field's mobs
     /// summoned yet.
@@ -1064,7 +1185,8 @@ impl EventActor {
         ) else {
             return;
         };
-        let summoned = vec![0; net::carnival::summonable(room)];
+        let mut summoned = self.carnival_summoned.clone();
+        summoned.resize(net::carnival::summonable(room), 0);
         if let Ok(packet) = build_carnival_start(start, &summoned) {
             handle.send(ServerMessage::EventPackets {
                 id: self.id,
