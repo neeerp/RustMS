@@ -25,6 +25,9 @@ pub fn template(reactor_id: i32) -> Option<ReactorTemplate> {
 pub enum Action {
     /// Drop its loot (`reactor_drops`), as every reactor not listed does.
     Drops,
+    /// A Monster Carnival guardian: its side's mobs lose what it gave them
+    /// (Cosmic `mcGuardian0`'s `dispelAllMonsters`).
+    Guardian,
     /// Drop its loot with a pile of mesos (`mesos`, from and up to but not
     /// including to, as Cosmic rolls them): one pile first, and more after
     /// it until there are `at_least` drops.
@@ -406,6 +409,7 @@ pub fn action(reactor_id: i32) -> Action {
         HTPQ_PASS_KEY => Action::PassKey,
         // The real Bart among Lord Jonathan's gulls; the false ones
         // (1200000) drop nothing.
+        9_980_000 | 9_980_001 => Action::Guardian,
         REAL_BART => Action::Record {
             quest: JONATHANS_COURT,
             record: BART_RECORD,

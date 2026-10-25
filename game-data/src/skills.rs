@@ -129,7 +129,8 @@ pub struct SkillData {
 }
 
 /// A Monster Carnival skill (`MCSkill.img/<id>`), which the Carnival
-/// window's second tab sells.
+/// window's second tab sells, or a guardian (`MCGuardian.img/<id>`), the
+/// third's, whose mob skill the side's mobs carry while it stands.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CarnivalSkill {
     /// `spendCP`: its price.
@@ -229,8 +230,17 @@ impl SkillData {
 
     /// The Monster Carnival skills (`MCSkill.img`), by id.
     pub fn carnival_skills(&self) -> Result<Vec<CarnivalSkill>, GameDataError> {
+        self.carnival_list("MCSkill.img")
+    }
+
+    /// The Monster Carnival guardians (`MCGuardian.img`), by id.
+    pub fn carnival_guardians(&self) -> Result<Vec<CarnivalSkill>, GameDataError> {
+        self.carnival_list("MCGuardian.img")
+    }
+
+    fn carnival_list(&self, name: &str) -> Result<Vec<CarnivalSkill>, GameDataError> {
         let nx = &self.nx;
-        let Some(image) = nx.child_by_name(0, "MCSkill.img")? else {
+        let Some(image) = nx.child_by_name(0, name)? else {
             return Ok(Vec::new());
         };
         let mut skills = Vec::new();
@@ -425,6 +435,10 @@ mod tests {
         assert_eq!((carnival[7].mob_skill, carnival[7].all), (127, false));
         assert_eq!((carnival[9].mob_skill, carnival[9].cost), (0, 10));
         assert!(carnival[9].all && !carnival[8].all);
+        let guardians = data.carnival_guardians().unwrap();
+        assert_eq!(guardians.len(), 9);
+        assert_eq!((guardians[0].cost, guardians[0].mob_skill), (17, 150));
+        assert_eq!((guardians[8].mob_skill, guardians[8].level), (141, 9));
         let mist = data.mob_skill(131, 5).unwrap().unwrap();
         assert_eq!((mist.x, mist.duration, mist.element), (200, 15, 4));
         assert_eq!(power_up.element, 0);

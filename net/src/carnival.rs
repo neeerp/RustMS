@@ -148,6 +148,69 @@ fn carnival_skills() -> &'static [CarnivalSkill] {
     })
 }
 
+/// How many guardians a side may have standing at once where the field
+/// doesn't say (`guardianGenMax`; Cosmic's default).
+pub const GUARDIAN_GEN_MAX: i32 = 16;
+
+/// What room `room`'s battle field sells at `index` of its guardian list:
+/// the guardian, and how many of a side's may stand at once.
+pub fn guardian(room: u8, index: u8) -> Option<(CarnivalSkill, usize)> {
+    static GUARDIANS: std::sync::OnceLock<Vec<CarnivalSkill>> = std::sync::OnceLock::new();
+    let guardians = GUARDIANS.get_or_init(|| {
+        crate::skills::data()
+            .ok()
+            .and_then(|data| data.carnival_guardians().ok())
+            .unwrap_or_default()
+    });
+    let data = crate::get_game_data().ok()?;
+    let rules = data.field(battle_map(room))?.carnival.as_ref()?;
+    let id = *rules.guardians.get(usize::from(index))?;
+    let guardian = *guardians.get(usize::try_from(id).ok()?)?;
+    let cap = rules.guardian_gen_max.unwrap_or(GUARDIAN_GEN_MAX).max(0) as usize;
+    Some((guardian, cap))
+}
+
+/// The state a guardian stands in when placed: its reactor's first state
+/// waits for nothing, so Cosmic's `spawnGuardian` hits it once. Four more
+/// hits break it.
+pub const GUARDIAN_STATE: u8 = 1;
+
+/// The `guardianGenPos` spot, of `spots`, where side `side` places a
+/// guardian with mob skill `mob_skill`, `standing` being the guardians
+/// that stand (side, mob skill, spot): the `roll`th free one of those for
+/// the side or for either. None if the side has `cap` standing (code 2)
+/// or that one (4), or no spot is free (3) (Cosmic `spawnGuardian`, whose
+/// spots stay taken after a guardian breaks; here they are freed).
+pub fn guardian_spot(
+    spots: &[game_data::CarnivalSpot],
+    standing: &[(u8, i32, usize)],
+    side: u8,
+    mob_skill: i32,
+    cap: usize,
+    roll: usize,
+) -> Result<usize, SpendRefusal> {
+    let ours: Vec<_> = standing.iter().filter(|&&(of, _, _)| of == side).collect();
+    if ours.len() >= cap {
+        return Err(SpendRefusal::Limit);
+    }
+    if ours.iter().any(|&&(_, skill, _)| skill == mob_skill) {
+        return Err(SpendRefusal::Active);
+    }
+    let free: Vec<usize> = (0..spots.len())
+        .filter(|&spot| spots[spot].team.is_none_or(|team| team == side))
+        .filter(|&spot| !standing.iter().any(|&(_, _, taken)| taken == spot))
+        .collect();
+    free.get(roll % free.len().max(1))
+        .copied()
+        .ok_or(SpendRefusal::NoSpot)
+}
+
+/// The guardian reactor a side places: Maple Red's 9980000, Maple Blue's
+/// 9980001 (Reactor.nx, "Monster Carnival Artifact").
+pub const fn guardian_reactor(side: u8) -> i32 {
+    9_980_000 + side as i32
+}
+
 /// What room `room`'s battle field sells at `index` of its skill list.
 pub fn skill(room: u8, index: u8) -> Option<CarnivalSkill> {
     let data = crate::get_game_data().ok()?;
@@ -326,6 +389,39 @@ impl Score {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_guardian_takes_a_free_spot_of_its_side() {
+        use game_data::CarnivalSpot;
+        let spot = |team| CarnivalSpot {
+            team,
+            ..CarnivalSpot::default()
+        };
+        let spots = [spot(Some(1)), spot(None), spot(Some(0)), spot(Some(0))];
+        // Red's spots are the 2nd to 4th; the 3rd is taken.
+        let standing = [(1, 150, 2)];
+        assert_eq!(guardian_spot(&spots, &standing, 0, 150, 8, 0), Ok(1));
+        assert_eq!(guardian_spot(&spots, &standing, 0, 150, 8, 1), Ok(3));
+        assert_eq!(guardian_spot(&spots, &standing, 0, 150, 8, 2), Ok(1));
+        // Blue has Power UP already, and as many as it may.
+        assert_eq!(
+            guardian_spot(&spots, &standing, 1, 150, 8, 0),
+            Err(SpendRefusal::Active)
+        );
+        assert_eq!(
+            guardian_spot(&spots, &standing, 1, 151, 1, 0),
+            Err(SpendRefusal::Limit)
+        );
+        // Blue's own spot and the shared one are taken.
+        let standing = [(1, 150, 0), (0, 151, 1)];
+        assert_eq!(
+            guardian_spot(&spots, &standing, 1, 152, 8, 0),
+            Err(SpendRefusal::NoSpot)
+        );
+        assert!(guardian(1, 6).is_some_and(|(guardian, cap)| {
+            (guardian.cost, guardian.mob_skill, cap) == (12, 156, 8)
+        }));
+    }
 
     #[test]
     fn the_rooms_battle_fields_are_their_second_maps() {

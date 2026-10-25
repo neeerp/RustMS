@@ -9,9 +9,9 @@ Cosmic's `MonsterCarnival.java` and `MonsterCarnivalParty.java`).
 
 Status: the field data, the Carnival Field and Spiegelmann, the waiting
 rooms and their challenges, two parties on a room's battle field with its
-clock, the sides' look, CP from kills, spending CP on mobs and skills, the
-CP and skill items, and the exit room are in. Not yet: guardians, CP lost
-on death and the revive room, results and their effects, and the client's
+clock, the sides' look, CP from kills, spending CP on mobs, skills and
+guardians, the CP and skill items, and the exit room are in. Not yet: CP
+lost on death and the revive room, results and their effects, and the client's
 Carnival UI.
 
 ## Maps
@@ -74,8 +74,7 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   (`FieldActor::handle_attack`) earns the mob's CP for the killer and their
   side.
 - Spending CP (MONSTER_CARNIVAL, 0xDA, `MonsterCarnivalHandler`) names a
-  tab and a place in it. Tabs 0 and 1 are sold yet; guardians (tab 2)
-  answer code 5. Tab 0 is the battle field's mob list
+  tab and a place in it. Tab 0 is the battle field's mob list
   (`Carnival::mobs`, `net::carnival::summon`). The event
   (`carnival_spend`) checks the stage and the price and sets the CP aside
   (`Score::spend`, which leaves the totals), then asks the battle field
@@ -100,6 +99,19 @@ sets `RUSTMS_CARNIVAL_SOLO=1`, which lets one play alone.
   that reach as many, at the Random's price (`net::carnival::cast`). The
   battle field then tells everyone who cast it
   (`FieldMessage::CarnivalAnnounce`), as only it knows the names.
+- Tab 2 is the battle field's guardian list (`Carnival::guardians`), ids
+  into Skill.nx `MCGuardian.img` (`SkillData::carnival_guardians`,
+  `net::carnival::guardian`): a price and a mob skill (150-156 raise a
+  stat, 140/141 make the mobs immune). The event takes the CP and asks the
+  battle field (`FieldMessage::CarnivalGuard`). The field places reactor
+  9980000 (Red) or 9980001 (Blue) in state 1 at a free `guardianGenPos`
+  spot of the side's (`net::carnival::guardian_spot`,
+  `FieldReactors::place`) and gives the skill's statuses to every mob of
+  the side, and to those that come out later, while it stands. It refuses
+  with code 2 when the side has `guardianGenMax` (16 by default) out, 3
+  when no spot is free, and 4 when that guardian already stands. Only the
+  other side can hit it; four hits break it for good (`Action::Guardian`),
+  which frees its spot and takes its statuses off the side's mobs.
 - Mobs drop items used on pickup (`ConsumeSpec::consume_on_pickup`): CP
   (`cp`, 2022157-59) for the picker and their side, and skills
   (`nuffSkill`, 2022164-66), which always take hold and nobody hears of
