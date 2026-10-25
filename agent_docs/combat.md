@@ -517,6 +517,19 @@ world's `RUSTMS_EXP_RATE`; quest and script EXP is not. Drop chances are
 multiplied by `RUSTMS_DROP_RATE` and meso amounts by `RUSTMS_MESO_RATE`;
 reactor drops are not. Each rate is 1 when unset.
 
+Play can also earn NX Credit, which v83 never did (`net::rates::nx`). Both
+rates are 0, off, when unset:
+- `RUSTMS_NX_PER_KILL` is earned for each kill the player loots (one per
+  kill, even in a party).
+- `RUSTMS_NX_PER_HOUR` is earned for each hour connected to a channel,
+  with a pink chat line outside the Cash Shop. A channel change starts the
+  hour again.
+
+The client actor keeps the NX it earns and puts it on the account
+(`db::cash_shop::grant`) at each autosave, on entering the Cash Shop, and on
+leaving, so kills cost no database write of their own. The harness world
+gives 1 NX per kill (`tests/earned_nx.rs`).
+
 A 2x EXP card (521xxxx) or drop card (536xxxx) in the Cash inventory
 multiplies the same numbers again while it works. A card works while it is
 unexpired and the clock is inside one of its `info/time` windows: a

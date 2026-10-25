@@ -48,6 +48,8 @@ services:
       RUSTMS_ALLOW_DEBUG_WARPS: "1"
       # Every kill drops its Monster Book card (see tests/monster_book.rs).
       RUSTMS_CARD_DROP_RATE: "1"
+      # Each kill a player loots earns 1 NX Credit (see tests/earned_nx.rs).
+      RUSTMS_NX_PER_KILL: "1"
       # Ships sail 60 times as fast: a trip takes 15 seconds (see
       # tests/ships.rs).
       RUSTMS_CONTI_SCALE: "60"
