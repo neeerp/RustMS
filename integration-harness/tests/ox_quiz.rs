@@ -9,7 +9,7 @@ use game_data::GameData;
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::set_gm_level;
 use integration_harness::hunting::walk_to;
-use integration_harness::packets::build_all_chat;
+use integration_harness::packets::{build_all_chat, build_change_map};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{barrier, send, step, until, warp, Trace};
@@ -120,6 +120,17 @@ async fn the_wrong_go_out_and_who_answers_all_ten_wins() {
         );
         players.push((session, config.character_name.clone()));
     }
+    // The way to the winners' map by the spawn points (`join00`) is shut.
+    let (session, m) = &mut players[0];
+    send(
+        &mut session.connection,
+        build_change_map(-1, "join00").unwrap(),
+    )
+    .await;
+    let mut t = Trace::default();
+    barrier(&mut session.connection, m, &mut t).await;
+    assert_eq!(t.blocked, [(SendOpcode::BlockedMap as i16, 1)], "shut");
+    assert!(t.warps.is_empty());
     for (session, m) in &mut players {
         barrier(&mut session.connection, m, &mut Trace::default()).await;
     }

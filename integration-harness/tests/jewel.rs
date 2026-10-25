@@ -1,7 +1,8 @@
 //! Find the Jewel (report b172): a GM's `/jewel` opens it, Paul takes a
-//! player to its lobby, and its gate (`join00`) stays closed until the
-//! GM's `/start`. Then in the first hall a box brings out a monster and
-//! another sends the player to one of the rooms its `info` names, and when
+//! player to its lobby, where Tamis sells weapons, and its gate (`join00`)
+//! stays closed until the GM's `/start`. Then in the first hall a box
+//! brings out a monster and another sends the player to one of the rooms
+//! its `info` names, and when
 //! the time is up they go out to 109050001. The harness runs events 60
 //! times as fast (`RUSTMS_EVENT_SCALE`), so its 600 s are 10.
 
@@ -22,6 +23,7 @@ use tokio::time::Duration;
 
 const SOUTHPERRY: i32 = 60000;
 const PAUL: i32 = 9000000;
+const TAMIS: i32 = 9000015;
 const LOBBY: i32 = 109_010_000;
 const HALL_A: i32 = 109_010_100;
 const EXIT: i32 = 109_050_001;
@@ -104,6 +106,9 @@ async fn the_halls_boxes_bring_out_monsters_and_lead_to_rooms_until_the_time_is_
     assert_eq!(t.warps, [LOBBY], "in");
     let t = gate(c, m).await;
     assert_eq!(t.blocked, [CLOSED], "closed");
+    // Tamis sells weapons for the boxes.
+    let t = step(c, m, talk_to(LOBBY, TAMIS)).await;
+    assert_eq!(t.shops.first().map(|s| s.0), Some(TAMIS), "Tamis's shop");
 
     assert_eq!(warp(g, LOBBY, "", &mut gt).await, LOBBY);
     barrier(g, "in the lobby", &mut gt).await;

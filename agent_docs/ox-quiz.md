@@ -19,6 +19,11 @@ shows the questions and answers (PR 885).
 - A field of type 5 with two areas gets an `OxGame` (`field.ox`).
 - Those who answer wrong go to 109050001, the field's forcedReturn, and
   the winners to 109050000, as after Coconut Season.
+- The field's `join00`, a type 4 portal at its `start00`, also leads to
+  109050000. Since the quiz sends its winners there itself, it never
+  opens: the server answers it as a closed timed-event gate
+  (`net::gm_event::is_gate`, `BLOCKED_MAP` reason 1). Cosmic opens it
+  when the quiz ends (report b171).
 - A GM's `/ox` opens it to the GM's channel, and the Event Assistants take
   players there, to one of its `sp` portals (see `agent_docs/coconut.md`,
   "Opening an event to players").
