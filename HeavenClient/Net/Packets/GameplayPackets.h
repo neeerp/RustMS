@@ -1080,7 +1080,10 @@ namespace ms
 	public:
 		enum Mode : int8_t
 		{
-			ENTER_MAP = 0x11
+			BAN = 0x03,
+			HIDE = 0x10,
+			ENTER_MAP = 0x11,
+			WARN = 0x1E
 		};
 
 	protected:
@@ -1103,6 +1106,72 @@ namespace ms
 		AdminEnterMapPacket(Operation op) : AdminCommandPacket(AdminCommandPacket::Mode::ENTER_MAP)
 		{
 			write_byte(op);
+		}
+	};
+
+	// /h N
+	class AdminHidePacket : public AdminCommandPacket
+	{
+	public:
+		AdminHidePacket(bool hidden) : AdminCommandPacket(AdminCommandPacket::Mode::HIDE)
+		{
+			write_byte(hidden);
+		}
+	};
+
+	// /w NAME MSG, a GM's warning
+	class AdminWarnPacket : public AdminCommandPacket
+	{
+	public:
+		AdminWarnPacket(const std::string& name, const std::string& message) : AdminCommandPacket(AdminCommandPacket::Mode::WARN)
+		{
+			write_string(name);
+			write_string(message);
+		}
+	};
+
+	// /ban NAME
+	class AdminBanPacket : public AdminCommandPacket
+	{
+	public:
+		AdminBanPacket(const std::string& name) : AdminCommandPacket(AdminCommandPacket::Mode::BAN)
+		{
+			write_string(name);
+		}
+	};
+
+	// A GM's notice, alert or slide to the world, the channel or the map
+	// Opcode: ADMIN_BROADCAST(118)
+	class AdminBroadcastPacket : public OutPacket
+	{
+	public:
+		AdminBroadcastPacket(uint8_t scope, uint8_t type, const std::string& text) : OutPacket(OutPacket::Opcode::ADMIN_BROADCAST)
+		{
+			write_byte(scope);
+			write_byte(type);
+			write_string(text);
+		}
+	};
+
+	// /slideax
+	// Opcode: GM_SLIDE(134)
+	class GmSlidePacket : public OutPacket
+	{
+	public:
+		GmSlidePacket() : OutPacket(OutPacket::Opcode::GM_SLIDE)
+		{
+			write_byte(0);
+		}
+	};
+
+	// A GM's slash command, as typed
+	// Opcode: ADMIN_LOG(129)
+	class AdminLogPacket : public OutPacket
+	{
+	public:
+		AdminLogPacket(const std::string& line) : OutPacket(OutPacket::Opcode::ADMIN_LOG)
+		{
+			write_string(line);
 		}
 	};
 

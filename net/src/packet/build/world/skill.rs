@@ -106,10 +106,16 @@ pub fn build_throw_grenade(
 /// ADMIN_RESULT 0x10: whether the GM is now hidden. The client keeps the
 /// byte (FUN_005352e9); others stop seeing the GM through the field.
 pub fn build_hidden(hidden: bool) -> Result<Packet, NetworkError> {
+    build_admin_result(0x10, u8::from(hidden))
+}
+
+/// ADMIN_RESULT 0x90: how a GM's slash command `mode` went, in one byte
+/// (FUN_005352e9).
+pub fn build_admin_result(mode: u8, value: u8) -> Result<Packet, NetworkError> {
     let mut packet = Packet::new_empty();
     packet.write_short(SendOpcode::AdminResult as i16)?;
-    packet.write_byte(0x10)?;
-    packet.write_byte(u8::from(hidden))?;
+    packet.write_byte(mode)?;
+    packet.write_byte(value)?;
     Ok(packet)
 }
 

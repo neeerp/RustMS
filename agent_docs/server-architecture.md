@@ -148,9 +148,10 @@ The login result carries two grade bytes, which v83 keeps for the session
 (`build_successful_login_packet`, reports b156 and a006b):
 
 - The grade has bit 0 (a GM's account) when `gm_level` is 3 or more
-  (`policy::client_gm`). The client then sends the `/` lines it doesn't know
-  as chat (GM events' `/start`), and refuses to trade or open a store ("Not
-  available with an Admin account.").
+  (`policy::client_gm`). The client then has its GM slash commands (below),
+  sends the `/` lines it doesn't know as chat (GM events' `/start`), and
+  refuses to trade or open a store ("Not available with an Admin
+  account.").
 - With `accounts.test_admin` the grade is 0x11 as well: v83's admin account,
   which can't drop items ("The admin can't drop items.") or mesos either.
   Only SQL sets it (`UPDATE accounts SET test_admin = true WHERE ...`);
@@ -201,6 +202,30 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   with the character, the line, and whether it ran. The world server always
   shows that target. `!givenx` and `!coupon` log their results there too.
 - `RUSTMS_GM_COMMANDS=0` turns every command off, so each line is chat.
+
+### The client's slash commands
+
+v83's client has GM commands of its own, read from the chat bar before the
+players' commands (report b175) and only for the grades that rank a GM:
+grade bit 0, or a sub-grade of 0x20, 0x40 or 0x80. The rank (0 may do the
+most, 5 is a player's) sets which: `/h` from 4, `/ch`, `/u`, `/w`, `/ban`
+and `/uclip` from 3, the broadcasts from 2. Our GMs, with grade bit 0, are
+rank 1 and have them all. Each sends its packet, and then ADMIN_LOG (0x81)
+with the line as typed, which the server logs under `gm_audit`.
+
+| Command | Packet | Server |
+|---|---|---|
+| `/h N` | ADMIN_COMMAND 0x10, hidden when N isn't 0 | helpers: hides or shows the GM, ADMIN_RESULT 0x10 |
+| `/w NAME MSG` | ADMIN_COMMAND 0x1E | helpers: an alert (BROADCAST_MSG 1) to NAME, wherever they are; ADMIN_RESULT 0x1E 1, or 0 for no one by that name |
+| `/u`, `/uclip` | ADMIN_COMMAND 0x11 0 and 0x0C | nothing yet |
+| `/ban NAME` | ADMIN_COMMAND 0x03 | nothing yet |
+| `/alertall`, `/alertch`, `/alertmap`, `/noticeall`, `/noticech`, `/noticemap`, `/slideall`, `/slidech`, `/slidemap` TEXT | ADMIN_BROADCAST (0x76): scope (0 world, 1 channel, 2 map), type (0 notice, 1 alert, 4 slide), text | GMs: BROADCAST_MSG of that type to that scope |
+| `/slideallx`, `/slidechx`, `/slidemapx` | ADMIN_BROADCAST with no text | GMs: takes the slide down |
+| `/slideax` | 0x86 | nothing |
+| `/ch N` | the channel menu's request | |
+
+`/flag` (0x72, rank 4 only), `/block` (ADMIN_COMMAND 0x04, through a
+dialog), `/c` and `/clip` aren't in HeavenClient.
 
 ## Packet encoding
 

@@ -82,7 +82,9 @@ mod vega;
 mod weather;
 mod whisper;
 
-pub use self::admin_command::{set_hidden, AdminCommandHandler};
+pub use self::admin_command::{
+    set_hidden, AdminBroadcastHandler, AdminCommandHandler, AdminLogHandler, GmSlideHandler,
+};
 pub use self::alliance::{AllianceOperationHandler, DenyAllianceRequestHandler};
 pub use self::berserk::CalcDamageStatHandler;
 pub use self::buddy::BuddyListModifyHandler;

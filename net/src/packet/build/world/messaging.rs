@@ -50,6 +50,8 @@ pub enum Broadcast {
 
 /// BROADCAST_MSG kinds that carry the sender's channel and ear.
 const SUPER_MEGAPHONE: u8 = 3;
+/// BROADCAST_MSG kind for the scrolling notice, with an on flag first.
+const SLIDE: u8 = 4;
 /// BROADCAST_MSG kind for a chat line that links an item.
 const ITEM_LINE: u8 = 6;
 const ITEM_MEGAPHONE: u8 = 8;
@@ -62,6 +64,20 @@ pub fn build_broadcast(kind: Broadcast, message: &str) -> Result<Packet, Network
     packet.write_short(SendOpcode::BroadcastMsg as i16)?;
     packet.write_byte(kind as u8)?;
     packet.write_str_with_length(message)?;
+    Ok(packet)
+}
+
+/// The scrolling notice along the top of the screen: `message`, or none to
+/// take it down (v83 FUN_00a22785 reads the message only when the flag is
+/// on).
+pub fn build_slide(message: Option<&str>) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::BroadcastMsg as i16)?;
+    packet.write_byte(SLIDE)?;
+    packet.write_byte(u8::from(message.is_some()))?;
+    if let Some(message) = message {
+        packet.write_str_with_length(message)?;
+    }
     Ok(packet)
 }
 

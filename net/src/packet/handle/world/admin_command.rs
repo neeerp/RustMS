@@ -1,14 +1,21 @@
-use crate::handler::{HandlerResult, WorldAction, WorldContext, WorldHandler, WorldResult};
+use crate::gm_commands::{tier, GM, HELPER};
+use crate::handler::{
+    BroadcastScope, FieldRequest, HandlerResult, WhisperDelivery, WorldAction, WorldContext,
+    WorldHandler, WorldResult,
+};
+use crate::packet::build::world::messaging::{build_broadcast, build_slide, Broadcast};
 use crate::packet::build::world::{skill, stat};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
-use tracing::debug;
+use tracing::{debug, info};
 
 /// `/h`: hide (1) or show (0) the GM.
 const HIDE: u8 = 0x10;
 /// `/u` (0) lists the map's users; the client also sends 12 on every map
 /// change.
 const USERS: u8 = 0x11;
+/// `/w NAME TEXT`: a warning, shown to the player in a dialog.
+const WARN: u8 = 0x1E;
 /// The artifact ranking, which does nothing.
 const ARTIFACT_RANKING: u8 = 0x24;
 
@@ -27,11 +34,127 @@ impl WorldHandler for AdminCommandHandler {
         match mode {
             HIDE => set_hidden(ctx.player, reader.read_byte()? == 1),
             USERS | ARTIFACT_RANKING => Ok(HandlerResult::empty()),
+            WARN if gated(ctx, HELPER) => {
+                let name = reader.read_str_with_length()?;
+                let text = reader.read_str_with_length()?;
+                warn(ctx, name, &text)
+            }
             _ => {
                 debug!(mode, "Admin command not supported");
                 Ok(HandlerResult::empty())
             }
         }
+    }
+}
+
+/// Whether the GM may use a command of `needs` tier; the commands that
+/// reach others are off with `RUSTMS_GM_COMMANDS=0`, as the chat commands
+/// are.
+fn gated(ctx: &WorldContext, needs: i16) -> bool {
+    crate::policy::gm_commands_enabled() && tier(ctx.player.gm_level) >= needs
+}
+
+/// `/w`: `text` in a dialog for the player named `name`, wherever they
+/// are; the GM hears whether it got there (SP 0xbb5 or 0xbb4).
+fn warn(ctx: &WorldContext, name: String, text: &str) -> WorldResult {
+    info!(
+        target: "gm_audit",
+        character = %ctx.player.stats.name,
+        gm_level = ctx.player.gm_level,
+        command = "/w",
+        target = name,
+        text,
+    );
+    if name.is_empty() {
+        return Ok(HandlerResult::reply(skill::build_admin_result(WARN, 0)?));
+    }
+    Ok(
+        HandlerResult::empty().with(WorldAction::Whisper(WhisperDelivery {
+            target_name: name,
+            recipient_packet: build_broadcast(Broadcast::Popup, text)?,
+            sender_success_packet: Some(skill::build_admin_result(WARN, 1)?),
+            sender_failure_packet: Some(skill::build_admin_result(WARN, 0)?),
+        })),
+    )
+}
+
+/// ADMIN_LOG 0x81: the line of every GM slash command, which the client
+/// sends after the command's own packet (0x52e28f). Logged for the audit;
+/// what the command did is logged where it is done.
+pub struct AdminLogHandler;
+
+impl WorldHandler for AdminLogHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        if ctx.player.gm_level <= 0 {
+            return Ok(HandlerResult::empty());
+        }
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let line = reader.read_str_with_length()?;
+        info!(
+            target: "gm_audit",
+            character_id = ctx.player.stats.id,
+            character = %ctx.player.stats.name,
+            gm_level = ctx.player.gm_level,
+            line,
+            "Slash command"
+        );
+        Ok(HandlerResult::empty())
+    }
+}
+
+/// ADMIN_BROADCAST 0x76: `/notice*`, `/alert*` and `/slide*` (report
+/// b175 s1): the scope (0 the world, 1 the channel, 2 the map), the kind (0
+/// a notice in chat, 1 a dialog, 4 the scrolling notice) and the text. The
+/// `x` slides send no text, which takes the scrolling notice down.
+pub struct AdminBroadcastHandler;
+
+impl WorldHandler for AdminBroadcastHandler {
+    fn handle(&self, packet: &mut Packet, ctx: &mut WorldContext) -> WorldResult {
+        if !gated(ctx, GM) {
+            return Ok(HandlerResult::empty());
+        }
+        let mut reader = Cursor::new(&packet.bytes);
+        reader.read_short()?;
+        let scope = reader.read_byte()?;
+        let kind = reader.read_byte()?;
+        let text = reader.read_str_with_length()?;
+        let packet = match kind {
+            0 if !text.is_empty() => build_broadcast(Broadcast::Notice, &text)?,
+            1 if !text.is_empty() => build_broadcast(Broadcast::Popup, &text)?,
+            4 => build_slide(Some(text.as_str()).filter(|text| !text.is_empty()))?,
+            _ => return Ok(HandlerResult::empty()),
+        };
+        info!(
+            target: "gm_audit",
+            character = %ctx.player.stats.name,
+            gm_level = ctx.player.gm_level,
+            scope,
+            kind,
+            text,
+            "Broadcast"
+        );
+        let action = |scope| WorldAction::Broadcast {
+            scope,
+            packet: packet.clone(),
+        };
+        Ok(match scope {
+            0 => HandlerResult::empty().with(action(BroadcastScope::World)),
+            1 => HandlerResult::empty().with(action(BroadcastScope::Channel(ctx.channel_id))),
+            2 => HandlerResult::reply(packet.clone())
+                .with(WorldAction::Field(FieldRequest::Broadcast(packet))),
+            _ => HandlerResult::empty(),
+        })
+    }
+}
+
+/// GM_SLIDE 0x86 (`/slideax`, report b175 s2): one byte, 0, whose meaning
+/// no server of the time gives; taken and dropped.
+pub struct GmSlideHandler;
+
+impl WorldHandler for GmSlideHandler {
+    fn handle(&self, _: &mut Packet, _: &mut WorldContext) -> WorldResult {
+        Ok(HandlerResult::empty())
     }
 }
 
@@ -93,6 +216,100 @@ mod tests {
         let mut player = crate::codec::stats::sample_player();
         let result = handle(&mut player, &[HIDE, 1]);
         assert!(!player.hidden && result.actions.is_empty());
+    }
+
+    #[test]
+    fn a_warning_goes_to_the_player_named_in_a_dialog() {
+        let mut player = crate::codec::stats::sample_player();
+        player.gm_level = 1;
+        let mut bytes = vec![WARN];
+        bytes.extend([4, 0]);
+        bytes.extend(b"Bob1");
+        bytes.extend([5, 0]);
+        bytes.extend(b"Stop!");
+        let result = handle(&mut player, &bytes);
+        let [WorldAction::Whisper(delivery)] = &result.actions[..] else {
+            panic!("{:?}", result.actions);
+        };
+        assert_eq!(delivery.target_name, "Bob1");
+        assert_eq!(
+            delivery.recipient_packet.bytes,
+            build_broadcast(Broadcast::Popup, "Stop!").unwrap().bytes
+        );
+        let answer = |delivered: &Option<Packet>| delivered.as_ref().unwrap().bytes[2..].to_vec();
+        assert_eq!(answer(&delivery.sender_success_packet), [WARN, 1]);
+        assert_eq!(answer(&delivery.sender_failure_packet), [WARN, 0]);
+        // No name: v83's "Please enter the user's name" (SP 0xbb4).
+        let result = handle(&mut player, &[WARN, 0, 0, 2, 0, b'h', b'i']);
+        assert_eq!(result.actions.len(), 1);
+
+        player.gm_level = 0;
+        assert!(handle(&mut player, &bytes).actions.is_empty());
+    }
+
+    fn broadcast(
+        player: &mut game::Player,
+        scope: u8,
+        kind: u8,
+        text: &str,
+    ) -> HandlerResult<WorldAction> {
+        let mut packet = Packet::new_empty();
+        packet
+            .write_short(RecvOpcode::AdminBroadcast as i16)
+            .unwrap();
+        packet.write_byte(scope).unwrap();
+        packet.write_byte(kind).unwrap();
+        packet.write_str_with_length(text).unwrap();
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 2,
+            player,
+        };
+        AdminBroadcastHandler.handle(&mut packet, &mut ctx).unwrap()
+    }
+
+    #[test]
+    fn broadcasts_reach_their_scope() {
+        let mut player = crate::codec::stats::sample_player();
+        player.gm_level = 3;
+        let notice = build_broadcast(Broadcast::Notice, "hi").unwrap();
+        let result = broadcast(&mut player, 0, 0, "hi");
+        let [WorldAction::Broadcast {
+            scope: BroadcastScope::World,
+            packet,
+        }] = &result.actions[..]
+        else {
+            panic!("{:?}", result.actions);
+        };
+        assert_eq!(packet.bytes, notice.bytes);
+        let result = broadcast(&mut player, 1, 1, "hi");
+        let [WorldAction::Broadcast {
+            scope: BroadcastScope::Channel(2),
+            packet,
+        }] = &result.actions[..]
+        else {
+            panic!("{:?}", result.actions);
+        };
+        assert_eq!(
+            packet.bytes,
+            build_broadcast(Broadcast::Popup, "hi").unwrap().bytes
+        );
+        // The map: the GM, and the others through the field.
+        let result = broadcast(&mut player, 2, 4, "");
+        let slide_off = build_slide(None).unwrap();
+        let [WorldAction::Reply(own), WorldAction::Field(FieldRequest::Broadcast(theirs))] =
+            &result.actions[..]
+        else {
+            panic!("{:?}", result.actions);
+        };
+        assert_eq!(
+            (&own.bytes, &theirs.bytes),
+            (&slide_off.bytes, &slide_off.bytes)
+        );
+        // An empty notice, and anyone below GM, send nothing.
+        assert!(broadcast(&mut player, 0, 0, "").actions.is_empty());
+        player.gm_level = 1;
+        assert!(broadcast(&mut player, 0, 0, "hi").actions.is_empty());
     }
 
     #[test]

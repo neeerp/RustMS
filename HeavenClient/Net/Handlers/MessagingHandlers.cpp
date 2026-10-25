@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "MessagingHandlers.h"
 
+#include "Helpers/AdminResult.h"
 #include "Helpers/LoginParser.h"
 #include "Helpers/UserEffect.h"
 
@@ -41,6 +42,7 @@
 #include "../../IO/UITypes/UIScriptMessage.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
+#include "../../IO/UITypes/UIMiniMap.h"
 #include "../../IO/UITypes/UIMessenger.h"
 #include "../../IO/UITypes/UINpcTalk.h"
 #include "../../IO/UITypes/UINotice.h"
@@ -459,14 +461,51 @@ namespace ms
 			lines->show(text);
 	}
 
+	void AdminResultHandler::handle(InPacket& recv) const
+	{
+		AdminResult result = AdminResult::read(recv);
+
+		switch (result.kind)
+		{
+			case AdminResult::Kind::MERCHANT_MAP:
+				// v83 formats the name with SP 0x6c2 (0x5cf792).
+				result.line += NxHelper::Map::get_map_info_by_id(result.map_id).name;
+				[[fallthrough]];
+			case AdminResult::Kind::LINE:
+				if (auto chatbar = UI::get().get_element<UIChatBar>())
+				{
+					// v83's chat types 9, 0xb and 0xc.
+					auto type = result.chat == 9 ? UIChatBar::LineType::LIGHT_YELLOW
+						: result.chat == 0xc ? UIChatBar::LineType::SKILL
+						: UIChatBar::LineType::BLUE;
+					chatbar->send_chatline(result.line, type);
+				}
+				break;
+			case AdminResult::Kind::MINIMAP_OFF:
+				UIMiniMap::switch_on(false);
+				break;
+			case AdminResult::Kind::MINIMAP_ON:
+				UIMiniMap::switch_on(true);
+				break;
+			default:
+				// Hide (0x10) only tells the GM what they asked for; the
+				// server hides them from the others.
+				break;
+		}
+	}
+
 	void ServerMessageHandler::handle(InPacket& recv) const
 	{
 		// v83 reads a flag first only for the scrolling notice, which has no
 		// message when it is off (FUN_00a22785).
 		int8_t type = recv.read_byte();
 
+		// A scrolling notice turned off takes the one showing down.
 		if (type == 4 && !recv.read_bool())
+		{
+			UI::get().set_scrollnotice("");
 			return;
+		}
 
 		std::string message = recv.read_string();
 		auto chatbar = UI::get().get_element<UIChatBar>();

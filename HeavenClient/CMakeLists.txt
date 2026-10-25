@@ -459,6 +459,11 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME block_reason COMMAND block_reason_tests)
     add_executable(account_grade_tests tests/account_grade.cpp)
     add_test(NAME account_grade COMMAND account_grade_tests)
+    add_executable(admin_result_tests tests/admin_result.cpp Net/InPacket.cpp Net/Handlers/Helpers/AdminResult.cpp)
+    target_include_directories(admin_result_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME admin_result COMMAND admin_result_tests)
+    add_executable(gm_command_tests tests/gm_command.cpp IO/GmCommand.cpp)
+    add_test(NAME gm_command COMMAND gm_command_tests)
 endif()
 
 include_directories(.)
@@ -1103,6 +1108,10 @@ add_executable(HeavenClient
     IO/FamilyActions.h
     IO/MarriageActions.cpp
     IO/MarriageActions.h
+    IO/GmCommand.cpp
+    IO/GmCommand.h
+    IO/GmCommands.cpp
+    IO/GmCommands.h
     IO/GuildCommands.cpp
     IO/GuildCommands.h
     IO/ChatCommand.h
@@ -1130,6 +1139,8 @@ add_executable(HeavenClient
     Net/Handlers/Helpers/CharacterParser.h
     Net/Handlers/Helpers/ItemParser.cpp
     Net/Handlers/Helpers/ItemParser.h
+    Net/Handlers/Helpers/AdminResult.cpp
+    Net/Handlers/Helpers/AdminResult.h
     Net/Handlers/Helpers/LoginParser.cpp
     Net/Handlers/Helpers/LoginParser.h
     Net/Handlers/Helpers/MovementParser.cpp

@@ -1030,6 +1030,9 @@ fn world_routes() -> &'static HashMap<i16, WorldRoute> {
         let table = [
             (Op::PlayerLoggedIn, PreGame(&world::PlayerLoggedInHandler)),
             (Op::AdminCommand, InGame(&world::AdminCommandHandler)),
+            (Op::AdminLog, InGame(&world::AdminLogHandler)),
+            (Op::AdminBroadcast, InGame(&world::AdminBroadcastHandler)),
+            (Op::GmSlide, InGame(&world::GmSlideHandler)),
             (Op::PlayerMove, InGame(&world::PlayerMoveHandler)),
             (Op::ChangeChannel, InGame(&world::ChangeChannelHandler)),
             (Op::ChangeMap, InGame(&world::ChangeMapHandler)),
@@ -1269,7 +1272,7 @@ mod tests {
     fn every_registered_opcode_is_unique_per_server() {
         // The maps would silently drop duplicates; check the table sizes match.
         assert_eq!(login_routes().len(), 13);
-        assert_eq!(world_routes().len(), 131);
+        assert_eq!(world_routes().len(), 134);
     }
 
     #[test]

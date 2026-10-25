@@ -57,6 +57,13 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// How a GM's slash command went (FUN_005352e9)
+	// Opcode: ADMIN_RESULT(144)
+	class AdminResultHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// An avatar megaphone was refused: 'S' while the line waits too long, 'T' below level 11 (v83's CWvsContext
 	// handler for 110). The megaphone is kept.
 	// Opcode: AVATAR_MEGAPHONE_RESULT(110)

@@ -45,12 +45,18 @@ pub enum RecvOpcode {
     CloseChalkboard = 0x32,
     /// A Water of Life was double-clicked (FUN_00a1dce6).
     WaterOfLife = 0x75,
+    /// A GM's `/notice*`, `/alert*` or `/slide*` (report b175).
+    AdminBroadcast = 0x76,
     MultiChat = 0x77,
     PartyOperation = 0x7C,
     AdminCommand = 0x80,
+    /// The line of each GM slash command, after its packet (0x52e28f).
+    AdminLog = 0x81,
     BuddyListModify = 0x82,
     NoteAction = 0x83,
     UseDoor = 0x85,
+    /// A GM's `/slideax` (report b175).
+    GmSlide = 0x86,
     /// The Rock, Paper, Scissors window's buttons (report b038).
     RpsAction = 0x88,
     /// Proposals with an engagement ring box, by mode (report b052).

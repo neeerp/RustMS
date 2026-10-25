@@ -31,6 +31,31 @@ namespace ms
 		{
 			return subgrade & 0x80;
 		}
+
+		// Whether the chat bar reads the GM slash commands (0x52c9cd and
+		// FUN_0052f000).
+		bool slash_commands() const
+		{
+			return gm() || (subgrade & 0xE0);
+		}
+
+		// The GM rank (FUN_0052f031): 0 may do the most, 5 is a player's.
+		int rank() const
+		{
+			if (grade & 0x20)
+				return 0;
+
+			if (grade & 0x01)
+				return 1;
+
+			if (subgrade & 0x20)
+				return 2;
+
+			if (subgrade & 0x40)
+				return 3;
+
+			return subgrade & 0x80 ? 4 : 5;
+		}
 	};
 
 	namespace account_grade
