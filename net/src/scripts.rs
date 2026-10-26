@@ -6,7 +6,8 @@
 use crate::content;
 use crate::conti::Portal;
 use crate::events::{
-    EventKind, EAST_CASTLE_TOWER, STOP_THE_WEDDING, WEDDING_HALL_KEY, YETI_BROTHERS,
+    EventKind, EAST_CASTLE_TOWER, PRIME_MINISTER, PRIME_MINISTER_AT, STOP_THE_WEDDING,
+    STORY_OF_BETRAYAL, WEDDING_HALL, WEDDING_HALL_KEY, WHERES_VIOLETTA, YETI_BROTHERS,
 };
 use crate::npc_scripts;
 use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
@@ -815,6 +816,32 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
             );
             Some(effects)
         }
+        // The Wedding Hall: Violetta is found, which 2332's own record
+        // tells (its `Check/1 infoex` asks for "1"), and the Prime Minister
+        // comes out for one on 2333 who has not beaten him (Cosmic
+        // `MK_PrimeMinister`).
+        "findvioleta" => {
+            let quests = &player.quests;
+            let mut effects = Vec::new();
+            if quests.state(WHERES_VIOLETTA) == QuestState::Started {
+                effects.push(Effect::QuestRecord {
+                    quest_id: WHERES_VIOLETTA,
+                    count: 1,
+                });
+            }
+            if quests.state(STORY_OF_BETRAYAL) == QuestState::Started
+                && quests
+                    .kills(STORY_OF_BETRAYAL)
+                    .iter()
+                    .all(|&count| count == 0)
+            {
+                effects.push(Effect::BringOutMob {
+                    mob_id: PRIME_MINISTER,
+                    at: PRIME_MINISTER_AT,
+                });
+            }
+            Some(effects)
+        }
         // go<map id>: the map's name banner. HeavenMS also unlocks the UI
         // here, which HeavenClient never locks.
         _ => {
@@ -1270,6 +1297,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             WEDDING_HALL_ENTRANCE,
             named(WEDDING_HALL_ENTRANCE, "out00"),
         )),
+        // The Wedding Hall's door (Cosmic `TD_MC_enterboss2`): straight into
+        // the hall once the Prime Minister is beaten for good; into the
+        // player's own copy of it from the key's 2332 on; locked before.
+        "TD_MC_enterboss2" => match (quest(WHERES_VIOLETTA), quest(STORY_OF_BETRAYAL)) {
+            (_, QuestState::Completed) => through(Effect::WarpToPortal(
+                WEDDING_HALL,
+                named(WEDDING_HALL, "left00"),
+            )),
+            (QuestState::NotStarted, _) => refused(keys::WEDDING_HALL_LOCKED),
+            _ => ScriptOutcome {
+                effects: vec![
+                    Effect::PortalSound,
+                    Effect::StartEvent(EventKind::WeddingHall),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::WEDDING_HALL_BUSY, &[])),
+            },
+        },
         // Out of King Pepe's room, back up the tower, with the key he drops
         // once all three brothers are beaten (Cosmic `out_pepeking`).
         "out_pepeking" => {
@@ -2571,6 +2616,65 @@ mod tests {
                 content::text().get(keys::KING_PEPE_KEY_NO_ROOM, &[])
             )]
         );
+    }
+
+    #[test]
+    fn the_wedding_hall_opens_alone_from_the_keys_quest_on() {
+        let door = |quests: &[(i16, QuestState)]| {
+            portal("TD_MC_enterboss2", &player_with(quests)).unwrap()
+        };
+        let locked = content::text().get(keys::WEDDING_HALL_LOCKED, &[]);
+        assert_eq!(door(&[]).effects, [Effect::Pink(locked)]);
+        let alone = [
+            Effect::PortalSound,
+            Effect::StartEvent(EventKind::WeddingHall),
+        ];
+        let started = QuestState::Started;
+        let done = QuestState::Completed;
+        for quests in [
+            &[(WHERES_VIOLETTA, started)][..],
+            &[(WHERES_VIOLETTA, done)],
+            &[(WHERES_VIOLETTA, done), (STORY_OF_BETRAYAL, started)],
+        ] {
+            let way = door(quests);
+            assert_eq!(way.effects, alone);
+            assert_eq!(
+                way.occupied,
+                Some(content::text().get(keys::WEDDING_HALL_BUSY, &[]))
+            );
+        }
+        assert_eq!(
+            door(&[(WHERES_VIOLETTA, done), (STORY_OF_BETRAYAL, done)]).effects,
+            [
+                Effect::PortalSound,
+                Effect::WarpToPortal(WEDDING_HALL, named(WEDDING_HALL, "left00")),
+            ]
+        );
+    }
+
+    #[test]
+    fn violetta_is_found_and_the_prime_minister_comes_out_in_the_hall() {
+        let enter = |player: &Player| map_enter("findvioleta", player).unwrap();
+        let found = Effect::QuestRecord {
+            quest_id: WHERES_VIOLETTA,
+            count: 1,
+        };
+        let prime_minister = Effect::BringOutMob {
+            mob_id: PRIME_MINISTER,
+            at: PRIME_MINISTER_AT,
+        };
+        assert!(enter(&player_with(&[])).is_empty());
+        let looking = player_with(&[(WHERES_VIOLETTA, QuestState::Started)]);
+        assert_eq!(enter(&looking), [found]);
+        let mut betrayed = player_with(&[
+            (WHERES_VIOLETTA, QuestState::Completed),
+            (STORY_OF_BETRAYAL, QuestState::Started),
+        ]);
+        assert_eq!(enter(&betrayed), [prime_minister.clone()]);
+        *betrayed.quests.kills_mut(STORY_OF_BETRAYAL).unwrap() = vec![0];
+        assert_eq!(enter(&betrayed), [prime_minister]);
+        *betrayed.quests.kills_mut(STORY_OF_BETRAYAL).unwrap() = vec![1];
+        assert!(enter(&betrayed).is_empty(), "beaten already");
     }
 
     #[test]

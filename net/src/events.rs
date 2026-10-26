@@ -76,6 +76,10 @@ pub enum EventKind {
     /// East Castle Tower's `TD_MC_enterboss1` while Stop the Wedding (2330)
     /// still wants a Yeti brother.
     KingPepe,
+    /// The Mushroom Castle's Wedding Hall, taken alone through its
+    /// entrance's `TD_MC_enterboss2` to find Violetta and face the Prime
+    /// Minister (Where's Violetta? and The Story of Betrayal, 2332-2333).
+    WeddingHall,
     /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
     /// (2042000) on the Carnival Field (`crate::carnival`).
     Carnival(u8),
@@ -2472,6 +2476,41 @@ pub const KING_PEPE: Event = Event {
     ..DOJO
 };
 
+/// The way to the Wedding Hall, 106021402, whose `TD_MC_enterboss2` opens
+/// the hall to one holding the key.
+pub const WEDDING_HALL_DOOR: i32 = 106021402;
+/// The Wedding Hall, 106021600, where Violetta waits.
+pub const WEDDING_HALL: i32 = 106021600;
+/// Where's Violetta? (2332), which the key starts, and The Story of
+/// Betrayal (2333), which wants the Prime Minister beaten.
+pub const WHERES_VIOLETTA: i16 = 2332;
+pub const STORY_OF_BETRAYAL: i16 = 2333;
+pub const PRIME_MINISTER: i32 = 3_300_008;
+/// The point above the ground below which he comes out (Cosmic
+/// `MK_PrimeMinister`).
+pub const PRIME_MINISTER_AT: (i16, i16) = (292, 143);
+
+/// The Wedding Hall: its door takes a player on 2332 or 2333 alone into
+/// their own copy for ten minutes, one at a time on a channel (Cosmic
+/// `MK_PrimeMinister`, one lobby; the quest says "Must be alone"). It is
+/// never won; it ends when they leave by `left00` or the time runs out.
+/// The Prime Minister comes out when Violetta starts 2333, or on entering
+/// with it started and him not yet beaten (`findvioleta`).
+pub const WEDDING_HALL_EVENT: Event = Event {
+    lobby: WEDDING_HALL_DOOR,
+    entrances: &[],
+    maps: WEDDING_HALL..=WEDDING_HALL,
+    entry: WEDDING_HALL,
+    exit: WEDDING_HALL_DOOR,
+    levels: 30..=u8::MAX,
+    team: 1..=1,
+    minutes: 10,
+    exp_per_stage: &[],
+    member_clears: &[],
+    runs: 1,
+    ..DOJO
+};
+
 /// Every run of Nett's Pyramid Duarte offers, alone first, then with a
 /// party, each by mode.
 pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
@@ -2558,7 +2597,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 39] = [
+    pub const ALL: [EventKind; 40] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2598,6 +2637,7 @@ impl EventKind {
         EventKind::Magatia(MagatiaSide::Alcadno),
         EventKind::Tristan,
         EventKind::KingPepe,
+        EventKind::WeddingHall,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2626,6 +2666,7 @@ impl EventKind {
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
             EventKind::KingPepe => &KING_PEPE,
+            EventKind::WeddingHall => &WEDDING_HALL_EVENT,
         }
     }
 
@@ -3700,6 +3741,18 @@ mod tests {
         assert!(pepe.team(1, &[at(1, 30, EAST_CASTLE_TOWER)]).is_some());
         assert_eq!(pepe.team(1, &[at(1, 29, EAST_CASTLE_TOWER)]), None);
         assert!(event_map(KING_PEPE_ROOM) && !event_map(EAST_CASTLE_TOWER));
+    }
+
+    #[test]
+    fn the_wedding_hall_is_taken_alone_from_its_door() {
+        let hall = EventKind::WeddingHall.event();
+        assert_eq!((hall.entry, hall.exit), (WEDDING_HALL, WEDDING_HALL_DOOR));
+        assert!(hall.solo() && hall.lasts_until_empty());
+        assert_eq!((hall.minutes, hall.last_stage(), hall.runs), (10, 0, 1));
+        assert!(hall.starts_on(WEDDING_HALL_DOOR));
+        assert!(hall.team(1, &[at(1, 30, WEDDING_HALL_DOOR)]).is_some());
+        assert_eq!(hall.team(1, &[at(1, 29, WEDDING_HALL_DOOR)]), None);
+        assert!(event_map(WEDDING_HALL) && !event_map(WEDDING_HALL_DOOR));
     }
 
     #[test]

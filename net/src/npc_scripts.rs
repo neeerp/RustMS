@@ -2347,6 +2347,17 @@ impl NpcScript {
                 vec![Page::Done(vec![Effect::StartQuest(2238)])],
             )),
             "q2245s" => Some(tristan_tomb()),
+            "q2332s" => Some(NpcScript::new(
+                VIOLETTA,
+                vec![Page::Done(vec![Effect::StartQuest(
+                    events::WHERES_VIOLETTA,
+                )])],
+            )),
+            "q2332e" => Some(violetta_found()),
+            "q2333s" => Some(violetta_betrayed()),
+            "q2333e" => Some(prime_minister_beaten()),
+            "q2334s" => Some(violettas_face()),
+            "q2342s" => Some(violettas_seal(player)),
             "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
@@ -2822,6 +2833,97 @@ fn tristan_tomb() -> NpcScript {
     script.refused = Some(text(keys::TRISTAN_ROOM_TAKEN));
     script
 }
+/// Princess Violetta, in the Wedding Hall (106021600).
+const VIOLETTA: i32 = 1300002;
+/// The Royal Seal (4001318), which The Seal of the Empire (2331) takes to
+/// the Mushking.
+const ROYAL_SEAL: i32 = 4001318;
+const SEAL_OF_THE_EMPIRE: i16 = 2331;
+
+/// `q2332e`, Where's Violetta?: found in the Wedding Hall (`findvioleta`
+/// set the record its end asks for), Violetta thanks the player, with the
+/// data's 4,400 EXP (`QuestInfo rewardSummary`; `Act` is empty, and Cosmic
+/// gives the same at the hall's door).
+fn violetta_found() -> NpcScript {
+    let mut script = NpcScript::new(VIOLETTA, vec![Page::Say(text(keys::VIOLETTA_FOUND))]);
+    script.on_end = vec![
+        Effect::CompleteQuest(events::WHERES_VIOLETTA),
+        Effect::GainExp(4400),
+    ];
+    script
+}
+
+/// `q2333s`, The Story of Betrayal: Violetta asks for help, names the
+/// Prime Minister, and he comes out (Cosmic `2333.js` and
+/// `MK_PrimeMinister`).
+fn violetta_betrayed() -> NpcScript {
+    let mut script = NpcScript::new(
+        VIOLETTA,
+        vec![
+            Page::Ask {
+                text: text(keys::VIOLETTA_HELP),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(keys::VIOLETTA_PRIME_MINISTER)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::StartQuest(events::STORY_OF_BETRAYAL),
+        Effect::BringOutMob {
+            mob_id: events::PRIME_MINISTER,
+            at: events::PRIME_MINISTER_AT,
+        },
+    ];
+    script
+}
+
+/// `q2333e`: the Prime Minister beaten, with the data's 15,000 EXP
+/// (`rewardSummary`, Cosmic's too).
+fn prime_minister_beaten() -> NpcScript {
+    let mut script = NpcScript::new(
+        VIOLETTA,
+        vec![Page::Say(text(keys::VIOLETTA_PRIME_MINISTER_BEATEN))],
+    );
+    script.on_end = vec![
+        Effect::CompleteQuest(events::STORY_OF_BETRAYAL),
+        Effect::GainExp(15_000),
+    ];
+    script
+}
+
+/// `q2334s`, The Identity of the Princess: Violetta shows her face, which
+/// completes the quest as it starts, with Cosmic's 1,000 EXP (the data has
+/// none).
+fn violettas_face() -> NpcScript {
+    let mut script = NpcScript::new(VIOLETTA, vec![Page::Say(text(keys::VIOLETTA_FACE))]);
+    script.on_end = vec![Effect::FinishQuest(2334), Effect::GainExp(1000)];
+    script
+}
+
+/// `q2342s`, The Recovered Royal Seal: for one still taking the seal to
+/// the Mushking (2331) without it (the quest asks that none be held),
+/// Violetta hands over the one the Prime Minister dropped, and the quest
+/// completes as it starts (Cosmic `2342.js`). Anyone else is only told
+/// that she keeps it.
+fn violettas_seal(player: &Player) -> NpcScript {
+    if player.quests.state(SEAL_OF_THE_EMPIRE) != QuestState::Started
+        || player.inventory.count(ROYAL_SEAL) > 0
+    {
+        return NpcScript::new(VIOLETTA, vec![Page::Say(text(keys::VIOLETTA_SEAL_KEPT))]);
+    }
+    let mut script = NpcScript::new(VIOLETTA, vec![Page::Say(text(keys::VIOLETTA_SEAL))]);
+    script.on_end = vec![
+        Effect::FinishQuest(2342),
+        Effect::GiveItem {
+            item_id: ROYAL_SEAL,
+            quantity: 1,
+        },
+    ];
+    script.inventory_full = Some(text(keys::VIOLETTA_SEAL_FULL));
+    script
+}
+
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
 const CAPTAIN_AL: i32 = 1002103;
 /// Captain Al's end scripts ([`NpcScript::for_family_quest`]).
@@ -10057,6 +10159,90 @@ mod tests {
             ]
         );
         assert!(script.refused().is_some(), "another is in the room");
+    }
+
+    #[test]
+    fn violetta_is_found_and_names_the_prime_minister() {
+        let player = with_quests(&[(2331, false)]);
+        let quest = |script| NpcScript::for_quest(script, &player).unwrap();
+        let step = quest("q2332s").begin();
+        assert!(step.prompt.is_none(), "the quest alert starts it silently");
+        assert_eq!(step.effects, [Effect::StartQuest(events::WHERES_VIOLETTA)]);
+        assert_eq!(
+            read_through(quest("q2332e")),
+            (
+                VIOLETTA,
+                vec![
+                    Effect::CompleteQuest(events::WHERES_VIOLETTA),
+                    Effect::GainExp(4400)
+                ]
+            )
+        );
+        let mut betrayed = quest("q2333s");
+        assert!(betrayed.begin().prompt.is_some());
+        let named = betrayed.respond(ScriptInput::Yes).unwrap();
+        assert!(named.prompt.is_some() && named.effects.is_empty());
+        let end = betrayed.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            end.effects,
+            [
+                Effect::StartQuest(events::STORY_OF_BETRAYAL),
+                Effect::BringOutMob {
+                    mob_id: events::PRIME_MINISTER,
+                    at: events::PRIME_MINISTER_AT,
+                },
+            ]
+        );
+        let mut declined = quest("q2333s");
+        declined.begin();
+        let no = declined.respond(ScriptInput::No);
+        assert!(no.is_none_or(|step| step.effects.is_empty()));
+        assert_eq!(
+            read_through(quest("q2333e")),
+            (
+                VIOLETTA,
+                vec![
+                    Effect::CompleteQuest(events::STORY_OF_BETRAYAL),
+                    Effect::GainExp(15_000)
+                ]
+            )
+        );
+        assert_eq!(
+            read_through(quest("q2334s")),
+            (
+                VIOLETTA,
+                vec![Effect::FinishQuest(2334), Effect::GainExp(1000)]
+            )
+        );
+    }
+
+    #[test]
+    fn violetta_keeps_the_royal_seal_for_whoever_left_it() {
+        let seal = Effect::GiveItem {
+            item_id: ROYAL_SEAL,
+            quantity: 1,
+        };
+        let taking_it = with_quests(&[(2331, false)]);
+        let script = NpcScript::for_quest("q2342s", &taking_it).unwrap();
+        assert_eq!(
+            read_through(script),
+            (VIOLETTA, vec![Effect::FinishQuest(2342), seal])
+        );
+        let mut script = NpcScript::for_quest("q2342s", &taking_it).unwrap();
+        assert!(
+            script.inventory_full().is_some(),
+            "said with no room for it"
+        );
+        let mut holding = taking_it.clone();
+        holding.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(ROYAL_SEAL, 1),
+        );
+        for player in [holding, with_quests(&[]), with_quests(&[(2331, true)])] {
+            let script = NpcScript::for_quest("q2342s", &player).unwrap();
+            assert_eq!(read_through(script), (VIOLETTA, Vec::new()), "only told");
+        }
     }
 
     #[test]

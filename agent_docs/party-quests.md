@@ -38,9 +38,10 @@ Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
 Magatia's Romeo and Juliet party quest has its entry, its way out, its
 end rules and its first four stages; its other stages come in later slices
 ([Romeo and Juliet](#romeo-and-juliet)). Jr. Balrog's room, for quest 2245,
-is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so is King
+is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so are King
 Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
-room](#king-pepes-room)).
+room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
+([the Wedding Hall](#the-wedding-hall)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1402,6 +1403,36 @@ than three times. The event is never won: it ends when the player leaves by
 out gives the Wedding Hall key (4032388), which "Where's Violetta?" (2332)
 starts with, once all three are beaten and none is held, or stays shut with
 no ETC slot for it (`king_pepe.key`, `king_pepe.key_no_room`).
+
+## The Wedding Hall
+
+The key starts "Where's Violetta?" (2332, `autoStart`, `autoAccept`): the
+quest alert opens it and the client sends its start script `q2332s`, which
+starts it without a word. The way to the hall's (106021402) door,
+`TD_MC_enterboss2`, is locked (`wedding_hall.locked`) before then. From
+2332 on, until "The Story of Betrayal" (2333) is done, it takes the player
+alone into their own copy of the hall (106021600) for ten minutes
+(`events::WEDDING_HALL_EVENT`, `EventKind::WeddingHall`; Cosmic
+`MK_PrimeMinister`, which also lets a party of three in, but the quest says
+"Must be alone"). Only one may be in it on a channel at a time; another is
+told so in pink (`wedding_hall.busy`). It is never won: it ends when the
+player leaves by `left00` or the time runs out, back to the door.
+
+- Entering the hall (`findvioleta`) sets 2332's own record to 1, which its
+  `Check/1 infoex` asks for (`OWN_RECORD_QUESTS`), so Violetta (1300002)
+  ends it through `q2332e` for the 4,400 EXP of its `rewardSummary`.
+- `q2333s` has her ask for help and name the Prime Minister (3300008), who
+  comes out at (292, 143) (`Effect::BringOutMob`). Entering with 2333 taken
+  and him not yet beaten brings him out too. His kill counts for 2333, and
+  `q2333e` ends it for 15,000 EXP. He drops the Royal Seal (4001318) for
+  those on "The Seal of the Empire" (2331; `reward_overrides.toml`).
+- Once 2333 is done, the door leads straight into the hall itself, where
+  `q2334s` (Violetta's face, Cosmic's 1,000 EXP) and `q2342s` (the seal, for
+  one still on 2331 who left it behind) complete their quests as they start
+  them (`FINISHED_BY_START_SCRIPT`). Anyone else asking for the seal is
+  only told that she keeps it.
+- Cosmic's refights through the Blocked Entrance (1300013) once 2331 is
+  done are not there.
 
 ## NPCs
 

@@ -258,3 +258,10 @@ replace = [{ item = 2022613, prob = 1.0 }]
 # Hell's Pharaoh Jr. Yeti (926010070-89, info/link 9700019): the Hell chest
 # 2022618, the one with The Immortal Pharaoh Belt.
 replace = [{ item = 2022618, prob = 1.0 }]
+
+[mobs.3300008]
+# The Prime Minister (Mushroom Castle Wedding Hall): The Seal of the Empire
+# (2331) asks for the Royal Seal 4001318 (Quest.nx Check.img/2331/1/item),
+# and The Recovered Royal Seal (2342) has Violetta keep the one he dropped
+# for whoever left it behind. The pack has no drops for him.
+add = [{ item = 4001318, prob = 1.0, quest = 2331 }]

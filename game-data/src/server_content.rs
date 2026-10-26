@@ -800,6 +800,21 @@ pub mod keys {
     pub const KING_PEPE_KEY: &str = "king_pepe.key";
     pub const KING_PEPE_KEY_NO_ROOM: &str = "king_pepe.key_no_room";
 
+    /// The Mushroom Castle's Wedding Hall: its door (`TD_MC_enterboss2`)
+    /// locked before the key's quest or taken by another player, and
+    /// Violetta's quest scripts (`q2332e`, `q2333s`, `q2333e`, `q2334s`,
+    /// `q2342s`). No licensed script has the text.
+    pub const WEDDING_HALL_LOCKED: &str = "wedding_hall.locked";
+    pub const WEDDING_HALL_BUSY: &str = "wedding_hall.busy";
+    pub const VIOLETTA_FOUND: &str = "violetta.found";
+    pub const VIOLETTA_HELP: &str = "violetta.help";
+    pub const VIOLETTA_PRIME_MINISTER: &str = "violetta.prime_minister";
+    pub const VIOLETTA_PRIME_MINISTER_BEATEN: &str = "violetta.prime_minister_beaten";
+    pub const VIOLETTA_FACE: &str = "violetta.face";
+    pub const VIOLETTA_SEAL: &str = "violetta.seal";
+    pub const VIOLETTA_SEAL_FULL: &str = "violetta.seal_full";
+    pub const VIOLETTA_SEAL_KEPT: &str = "violetta.seal_kept";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3027,6 +3042,16 @@ mod tests {
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,
+                keys::WEDDING_HALL_LOCKED,
+                keys::WEDDING_HALL_BUSY,
+                keys::VIOLETTA_FOUND,
+                keys::VIOLETTA_HELP,
+                keys::VIOLETTA_PRIME_MINISTER,
+                keys::VIOLETTA_PRIME_MINISTER_BEATEN,
+                keys::VIOLETTA_FACE,
+                keys::VIOLETTA_SEAL,
+                keys::VIOLETTA_SEAL_FULL,
+                keys::VIOLETTA_SEAL_KEPT,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,
