@@ -38,7 +38,9 @@ Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
 Magatia's Romeo and Juliet party quest has its entry, its way out, its
 end rules and its first four stages; its other stages come in later slices
 ([Romeo and Juliet](#romeo-and-juliet)). Jr. Balrog's room, for quest 2245,
-is taken alone ([Jr. Balrog's room](#jr-balrogs-room)).
+is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so is King
+Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
+room](#king-pepes-room)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1383,6 +1385,23 @@ nothing is applied. The room's `life` holds the unknown Jr. Balrog
 (0, 115) (`FieldActor::tristan_balrog_falls`), where 2238 ends. The event
 is never won: it ends when the player leaves by `out00` or the time runs
 out, back to Mu Young's map 105100100, the room's `forcedReturn`.
+
+## King Pepe's room
+
+For "Stop the Wedding" (2330), which wants one each of the three Yeti
+brothers King Pepe rides (3300005-3300007; Cosmic `KingPepeAndYetis`). The
+East Castle Tower's (106021400) `TD_MC_enterboss1` takes a player on 2330
+who has yet to beat one of them alone into their own copy of 106021500 for
+twenty minutes (`events::KING_PEPE`, `EventKind::KingPepe`). Only one may be
+in it on a channel at a time; another is told so in pink
+(`king_pepe.busy`, a placeholder). Anyone else goes on to the Wedding Hall's
+entrance (106021401). Each copy opens with one brother, drawn at random, at
+(-28, -67) (Cosmic `pepeking_effect`), so a player may have to go in more
+than three times. The event is never won: it ends when the player leaves by
+`out01` (`out_pepeking`) or the time runs out, back to the tower. The way
+out gives the Wedding Hall key (4032388), which "Where's Violetta?" (2332)
+starts with, once all three are beaten and none is held, or stays shut with
+no ETC slot for it (`king_pepe.key`, `king_pepe.key_no_room`).
 
 ## NPCs
 

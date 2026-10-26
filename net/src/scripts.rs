@@ -5,6 +5,9 @@
 
 use crate::content;
 use crate::conti::Portal;
+use crate::events::{
+    EventKind, EAST_CASTLE_TOWER, STOP_THE_WEDDING, WEDDING_HALL_KEY, YETI_BROTHERS,
+};
 use crate::npc_scripts;
 use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
 use game::{BuffStat, InventoryType, Player, QuestState};
@@ -1251,13 +1254,52 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: Some(content::text().get(keys::ZAKUM_GATE_BLOCKED, &[])),
         },
-        // Cosmic starts the fight with the Yeti brothers here while Stop the
-        // Wedding (2330) is taken and they aren't all beaten; that isn't in,
-        // so the way is open to everyone rather than shut for good.
+        // Into King Pepe's room while Stop the Wedding (2330) still wants a
+        // Yeti brother, else on to the Wedding Hall (Cosmic
+        // `TD_MC_enterboss1`).
+        "TD_MC_enterboss1"
+            if quest(STOP_THE_WEDDING) == QuestState::Started && !yeti_brothers_beaten(player) =>
+        {
+            ScriptOutcome {
+                effects: vec![Effect::PortalSound, Effect::StartEvent(EventKind::KingPepe)],
+                block: false,
+                occupied: Some(content::text().get(keys::KING_PEPE_BUSY, &[])),
+            }
+        }
         "TD_MC_enterboss1" => through(Effect::WarpToPortal(
             WEDDING_HALL_ENTRANCE,
             named(WEDDING_HALL_ENTRANCE, "out00"),
         )),
+        // Out of King Pepe's room, back up the tower, with the key he drops
+        // once all three brothers are beaten (Cosmic `out_pepeking`).
+        "out_pepeking" => {
+            let mut effects = Vec::new();
+            let inventory = &player.inventory;
+            if yeti_brothers_beaten(player) && inventory.count(WEDDING_HALL_KEY) == 0 {
+                if !crate::items::fits_until(inventory, WEDDING_HALL_KEY, 1, None) {
+                    return Some(refused(keys::KING_PEPE_KEY_NO_ROOM));
+                }
+                effects.extend([
+                    Effect::GiveItem {
+                        item_id: WEDDING_HALL_KEY,
+                        quantity: 1,
+                    },
+                    Effect::Pink(content::text().get(keys::KING_PEPE_KEY, &[])),
+                ]);
+            }
+            effects.extend([
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    EAST_CASTLE_TOWER,
+                    named(EAST_CASTLE_TOWER, "TD_MC_enterboss1"),
+                ),
+            ]);
+            ScriptOutcome {
+                effects,
+                block: false,
+                occupied: None,
+            }
+        }
         // Cosmic asks for the password while the quest is taken; its start
         // script, which sets one, isn't run, so the door just opens.
         "secretDoor" if quest(VERIFYING_THE_PASSWORD) != QuestState::NotStarted => {
@@ -1791,6 +1833,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         _ => return None,
     };
     Some(outcome)
+}
+
+/// Whether `player`, on Stop the Wedding, has beaten each Yeti brother.
+fn yeti_brothers_beaten(player: &Player) -> bool {
+    let kills = player.quests.kills(STOP_THE_WEDDING);
+    kills.len() == YETI_BROTHERS.len() && kills.iter().all(|&count| count > 0)
 }
 
 /// The Cursed Forest's way in at `hour` of the world's (UTC) day, the hour
@@ -2457,6 +2505,74 @@ mod tests {
         );
     }
 
+    /// A player on Stop the Wedding with `kills` of each Yeti brother.
+    fn stopping_the_wedding(kills: [u16; 3]) -> Player {
+        let mut player = player_with(&[(STOP_THE_WEDDING, QuestState::Started)]);
+        *player.quests.kills_mut(STOP_THE_WEDDING).unwrap() = kills.to_vec();
+        player
+    }
+
+    #[test]
+    fn king_pepes_room_is_open_until_the_three_yeti_brothers_are_beaten() {
+        let to_hall = vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(WEDDING_HALL_ENTRANCE, named(WEDDING_HALL_ENTRANCE, "out00")),
+        ];
+        let tower = |player: &Player| portal("TD_MC_enterboss1", player).unwrap();
+        for kills in [[0, 0, 0], [1, 0, 1], [1, 1, 0]] {
+            let way = tower(&stopping_the_wedding(kills));
+            assert_eq!(
+                way.effects,
+                [Effect::PortalSound, Effect::StartEvent(EventKind::KingPepe)]
+            );
+            assert_eq!(
+                way.occupied,
+                Some(content::text().get(keys::KING_PEPE_BUSY, &[]))
+            );
+        }
+        assert_eq!(tower(&stopping_the_wedding([1, 1, 1])).effects, to_hall);
+        for state in [QuestState::NotStarted, QuestState::Completed] {
+            assert_eq!(
+                tower(&player_with(&[(STOP_THE_WEDDING, state)])).effects,
+                to_hall
+            );
+        }
+
+        // Out, with the key once all three are beaten.
+        let up = [
+            Effect::PortalSound,
+            Effect::WarpToPortal(
+                EAST_CASTLE_TOWER,
+                named(EAST_CASTLE_TOWER, "TD_MC_enterboss1"),
+            ),
+        ];
+        let out = |player: &Player| portal("out_pepeking", player).unwrap().effects;
+        assert_eq!(out(&stopping_the_wedding([1, 0, 1])), up);
+        let mut player = stopping_the_wedding([1, 1, 2]);
+        let key = Effect::GiveItem {
+            item_id: WEDDING_HALL_KEY,
+            quantity: 1,
+        };
+        let found = Effect::Pink(content::text().get(keys::KING_PEPE_KEY, &[]));
+        assert_eq!(out(&player), [&[key, found][..], &up].concat());
+        player.inventory.insert(
+            InventoryType::Etc,
+            1,
+            game::Item::stack(WEDDING_HALL_KEY, 1),
+        );
+        assert_eq!(out(&player), up, "only one key");
+        let mut full = stopping_the_wedding([1, 1, 1]);
+        full.inventory.set_slot_limit(InventoryType::Etc, 1);
+        full.inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(4_000_000, 1));
+        assert_eq!(
+            out(&full),
+            [Effect::Pink(
+                content::text().get(keys::KING_PEPE_KEY_NO_ROOM, &[])
+            )]
+        );
+    }
+
     #[test]
     fn a_poison_spore_clears_the_way_through_the_mushroom_forest() {
         let mut player = player_with(&[]);
@@ -3107,10 +3223,7 @@ mod tests {
         }
 
         assert_eq!(
-            go(
-                "TD_MC_enterboss1",
-                &player_with(&[(2330, QuestState::Started)])
-            ),
+            go("TD_MC_enterboss1", &player_with(&[])),
             Some((WEDDING_HALL_ENTRANCE, 1))
         );
 
