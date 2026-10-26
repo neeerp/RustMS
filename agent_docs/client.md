@@ -489,9 +489,16 @@ from `UI.nx`. Moved so far:
   select with the new character picked. If it refuses (a non-zero result in
   `NewCharacter`), a notice says why and the window stays: 0x1E "cannot use
   this name", 0x0A "too many connection requests", anything else "unknown
-  reason" (v83 has its own text for 0x1A, a pending transfer, which the
-  server never sends). The character select's New button stays enabled and
-  answers "No more characters can be created" when every slot is taken.
+  reason", and 0x1A v83's OK box "You cannot create a new character under
+  the account that has requested for a transfer" (the server never sends
+  it). OK on `charSet` first checks the list again, and says "No more
+  characters can be created" without sending when all 15 entries are taken
+  (FUN_005f7e7a). The character select's New button stays enabled. It
+  answers "character creation has temporarily been disabled" (Notice 36,
+  on `backgrnd/0`) when the world's create-disabled byte, the last before its
+  channels in the world list, is set. It answers "No more characters can be
+  created" when every slot is taken (FUN_005f6425). The server always sends
+  the byte as 0.
   Positions are checked against v0.73 footage.
 - **Login dialogs** (`UILoginNotice`, `UIQuitConfirm`, `UILoginWait`,
   `UITermsOfService`, `UIGender`): notices are a 362x219 `Notice/backgrnd`

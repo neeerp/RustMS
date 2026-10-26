@@ -451,6 +451,15 @@ namespace ms
 		return "";
 	}
 
+	bool UIWorldSelect::creation_disabled(uint8_t worldid) const
+	{
+		for (auto &world : worlds)
+			if (world.wid == worldid)
+				return world.create_disabled;
+
+		return false;
+	}
+
 	uint8_t UIWorldSelect::get_channel_count(uint8_t worldid) const
 	{
 		for (auto &world : worlds)

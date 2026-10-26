@@ -49,6 +49,8 @@ namespace ms
 		uint8_t channelcount;
 		uint8_t flag;
 		int8_t wid;
+		// Character creation is shut on this world (Notice 36).
+		bool create_disabled = false;
 	};
 
 	struct RecommendedWorld

@@ -576,7 +576,15 @@ namespace ms
 			enter_game();
 			break;
 		case Buttons::BT_NEW:
-			// v83 (FUN_005f6425) keeps the button and says when every slot is taken
+			// v83 (FUN_005f6425) keeps the button and says when the world
+			// takes no new characters, or every slot is taken
+			if (auto worldselect = UI::get().get_element<UIWorldSelect>();
+				worldselect && worldselect->creation_disabled(Configuration::get().get_worldid()))
+			{
+				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::POPULATION_TOO_HIGH);
+				break;
+			}
+
 			if (characters_count >= slots)
 			{
 				UI::get().emplace<UILoginNotice>(UILoginNotice::Message::FULL_CHARACTER_SLOTS);
@@ -606,6 +614,11 @@ namespace ms
 		}
 
 		return Button::State::NORMAL;
+	}
+
+	bool UICharSelect::full() const
+	{
+		return characters_count >= MAX_CHARACTERS;
 	}
 
 	void UICharSelect::update_buttons()

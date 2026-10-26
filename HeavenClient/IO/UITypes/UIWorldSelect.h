@@ -70,6 +70,7 @@ namespace ms
 
 		// The v83 art for a world is keyed by the world id itself.
 		std::string get_world_name(uint8_t worldid) const;
+		bool creation_disabled(uint8_t worldid) const;
 		uint8_t get_channel_count(uint8_t worldid) const;
 
 	protected:
