@@ -786,6 +786,11 @@ pub mod keys {
     /// the player for beating Faust. No licensed script has the text.
     pub const REEF_THANKS: &str = "reef.thanks";
 
+    /// To Tristan's Tomb (quest 2245, `q2245s`): Mu Young (NPC 1061014)
+    /// turns a player away while another is in the Jr. Balrog's room. No
+    /// licensed script has the text.
+    pub const TRISTAN_ROOM_TAKEN: &str = "tristan.room_taken";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3009,6 +3014,7 @@ mod tests {
             .chain(&keys::CAPTAIN_AL_ENTITLEMENT)
             .chain(&[
                 keys::REEF_THANKS,
+                keys::TRISTAN_ROOM_TAKEN,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

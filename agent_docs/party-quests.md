@@ -37,7 +37,8 @@ Haze is played through
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
 Magatia's Romeo and Juliet party quest has its entry, its way out, its
 end rules and its first four stages; its other stages come in later slices
-([Romeo and Juliet](#romeo-and-juliet)).
+([Romeo and Juliet](#romeo-and-juliet)). Jr. Balrog's room, for quest 2245,
+is taken alone ([Jr. Balrog's room](#jr-balrogs-room)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1368,6 +1369,20 @@ our Map.nx never names) leads back to the side's room. The event's items
 (4001130-4001135) are taken from whoever leaves. The maps'
 `onFirstUserEnter` scripts (`StageMsg_romio`, `StageMsg_juliet`) do
 nothing yet. Its lines are placeholders (`magatia.*`).
+
+## Jr. Balrog's room
+
+For "To Tristan's Tomb" (2245; Cosmic `BalrogQuest`). Mu Young's start
+script `q2245s` (see [quests](./quests.md)) takes a player on 2238, at
+level 50 and up, alone into their own copy of 910520000 for ten minutes
+(`events::TRISTAN`, `EventKind::Tristan`), party or not. Only one may be in
+it on a channel at a time (`runs: 1`, Cosmic's "someone in this map"
+refusal): another is told so (`tristan.room_taken`, a placeholder) and
+nothing is applied. The room's `life` holds the unknown Jr. Balrog
+(9300326), spawned once. Its fall brings out Tristan's Spirit (1061015) at
+(0, 115) (`FieldActor::tristan_balrog_falls`), where 2238 ends. The event
+is never won: it ends when the player leaves by `out00` or the time runs
+out, back to Mu Young's map 105100100, the room's `forcedReturn`.
 
 ## NPCs
 

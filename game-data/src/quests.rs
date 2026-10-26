@@ -64,16 +64,16 @@ pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q2214e", "q2215e", "q2228s", "q2232e", "q2233e", "q2234e", "q2216s",
-    "q2217s", "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e", "q6031e", "q6032e",
-    "q6033e", "q6036e", "q8185e", "q8189e",
+    "q1021s", "q1021e", "q2214e", "q2215e", "q2228s", "q2238s", "q2245s", "q2232e", "q2233e",
+    "q2234e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e",
+    "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
 /// informants (2216-2219), each heard from once, Reef's thanks for Faust
-/// (2228), and the Remnants of Horned Tail (3714), once for each Nine
-/// Spirit's Egg.
-pub const FINISHED_BY_START_SCRIPT: &[i16] = &[2216, 2217, 2218, 2219, 2228, 3714];
+/// (2228), Mu Young's way to Tristan's Tomb (2245), each time it opens, and
+/// the Remnants of Horned Tail (3714), once for each Nine Spirit's Egg.
+pub const FINISHED_BY_START_SCRIPT: &[i16] = &[2216, 2217, 2218, 2219, 2228, 2245, 3714];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0

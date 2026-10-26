@@ -94,6 +94,8 @@ impl ClientActor {
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
             // Duarte takes the gem, or sends the player in from the Shades.
             EventKind::PyramidTomb(_) => return Ok(()),
+            // Mu Young's start script for 2245 takes the player in.
+            EventKind::Tristan => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
         };
