@@ -375,8 +375,9 @@ points:
   field clock down. STOP_CLOCK leaves the HUD's clock be (v83 0x53184a
   only closes the field clock's window).
 
-The server sends SHOW_MOB_HP only to the player who hit the mob, so in
-the party Dojo a member's monster gauge moves only with their own hits.
+The server sends SHOW_MOB_HP to the player who hit the mob and to their
+party on the map (Cosmic's rule), so in the party Dojo every member's
+monster gauge moves with anyone's hits.
 
 The energy bar sits at the left: `muruengRaid/energy`, its frame at
 (20, 130) with the dark `Gage` strip stretched over the unfilled part of
