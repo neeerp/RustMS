@@ -791,17 +791,12 @@ pub mod keys {
     /// licensed script has the text.
     pub const TRISTAN_ROOM_TAKEN: &str = "tristan.room_taken";
 
-    /// King Pepe's room in the Mushroom Castle: the tower's way in
-    /// (`TD_MC_enterboss1`) while another player is in it, and its way out
-    /// (`out_pepeking`) giving the Wedding Hall key once the three Yeti
-    /// brothers are beaten, or shut with no room for it. No licensed script
-    /// has the text.
     /// Dollhouse (quest 3230) in Eos Tower: Olson the Toy Soldier (NPC
     /// 2040002) with the hint and the way into the dollhouse room, or taken
-    /// by another player; a wrong dollhouse
-    /// (reactor 2200000) throwing the player out; and Mark the Toy Soldier
-    /// (NPC 2040028) taking the pendulum, or still waiting for it, before
-    /// the way back. No licensed script has the text.
+    /// by another player; a wrong dollhouse (reactor 2200000) throwing the
+    /// player out; and Mark the Toy Soldier (NPC 2040028) taking the
+    /// pendulum, or still waiting for it, before the way back. No licensed
+    /// script has the text.
     pub const DOLLHOUSE_HINT: &str = "dollhouse.hint";
     pub const DOLLHOUSE_ENTER: &str = "dollhouse.enter";
     pub const DOLLHOUSE_BUSY: &str = "dollhouse.busy";
@@ -810,6 +805,11 @@ pub mod keys {
     pub const DOLLHOUSE_NOT_FOUND: &str = "dollhouse.not_found";
     pub const DOLLHOUSE_BACK: &str = "dollhouse.back";
 
+    /// King Pepe's room in the Mushroom Castle: the tower's way in
+    /// (`TD_MC_enterboss1`) while another player is in it, and its way out
+    /// (`out_pepeking`) giving the Wedding Hall key once the three Yeti
+    /// brothers are beaten, or shut with no room for it. No licensed script
+    /// has the text.
     pub const KING_PEPE_BUSY: &str = "king_pepe.busy";
     pub const KING_PEPE_KEY: &str = "king_pepe.key";
     pub const KING_PEPE_KEY_NO_ROOM: &str = "king_pepe.key_no_room";
