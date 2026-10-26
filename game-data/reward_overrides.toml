@@ -120,6 +120,12 @@ quest_items = { 4031161 = 1008, 4031162 = 1008 }
 # own pendulum for the next quest (3231 Act/0) is 4031094.
 quest_items = { 4031145 = 3230 }
 
+[reactors.2202001]
+# The Toy Factory's Sector 4 (Map.nx 922000000): its ten parts boxes drop
+# the Machine Parts 4031092 Cheng the Assistant takes ten of for The Missing
+# Mechanical Parts (3239). Its two look-alikes (2208000) drop nothing.
+quest_items = { 4031092 = 3239 }
+
 [reactors.2001002]
 # The Tower of Goddess's Salion stage (Map.nx 920010300): the spot that
 # takes the last Cellion's 4001074 (Reactor.nx 2001002-15, item event)

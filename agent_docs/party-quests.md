@@ -1459,6 +1459,32 @@ may be in it on a channel at a time; another is told so
   ends the run and takes any pendulum left (`items`). The lines are
   placeholders (`dollhouse.*`).
 
+## The Toy Factory's Sector 4
+
+For "The Missing Mechanical Parts" (3239; Server.NX FieldSet `Ludi020`,
+Cosmic's script for the quest). Cheng the Assistant (2040003, in the Toy
+Factory, 220020000) asks a player on 3239 whether to go in, then takes them
+alone into their own copy of 922000000 for twenty minutes
+(`events::MECHANICAL_PARTS`, `EventKind::MechanicalParts`, levels 30 and
+up). Only one may be in it on a channel at a time; another is told so
+(`mechanical_parts.busy`). Others get his default speech.
+
+- The room holds ten parts boxes (reactor 2202001) and two look-alikes
+  (2208000) that drop nothing, shuffled on each copy (`reactors::shuffled`).
+  Each box breaks in four hits and drops a Machine Part (4031092) while 3239
+  is started (`reward_overrides.toml`).
+- Cheng, at the room's far end, takes ten parts and completes 3239, whose
+  only completion check is an `infoex` nothing sets
+  (`game_data::quests::COMPLETED_BY_NPC_SCRIPT`). He gives one of the four
+  shoe scrolls (2040704, 2040705, 2040707, 2040708) at random and 2,700
+  EXP, as in Cosmic. With no free USE slot he says so and takes nothing.
+  Either way he then offers the way out, which a player short of room can
+  turn down to make room and ask again.
+- Leaving, by Cheng or when the time runs out (the room's `forcedReturn`),
+  goes to the Secret Passage (922000009), ends the run, and takes any parts
+  left (`items`). The passage's way out (`ludi021`) takes any still held
+  and leads to 220020600. The lines are placeholders (`mechanical_parts.*`).
+
 ## NPCs
 
 | NPC | Where | Script |

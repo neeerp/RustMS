@@ -98,8 +98,11 @@ impl ClientActor {
             EventKind::Tristan => return Ok(()),
             // The East Castle Tower's portal takes the player in, and the
             // Wedding Hall's door likewise; Olson's own talk the dollhouse
-            // room's.
-            EventKind::KingPepe | EventKind::WeddingHall | EventKind::Dollhouse => return Ok(()),
+            // room's, and Cheng's the Toy Factory's Sector 4.
+            EventKind::KingPepe
+            | EventKind::WeddingHall
+            | EventKind::Dollhouse
+            | EventKind::MechanicalParts => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
         };

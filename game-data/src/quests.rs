@@ -85,8 +85,10 @@ pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
 /// `infoex` entry ("dummy") on an info string nothing sets, which v83's
 /// completion check reads, so neither the client nor the server lets it
 /// pass. An NPC's script completes them instead: Dollhouse (3230), which
-/// Mark the Toy Soldier ends for the pendulum (`net::npc_scripts`).
-pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[3230];
+/// Mark the Toy Soldier ends for the pendulum, and The Missing Mechanical
+/// Parts (3239), which Cheng the Assistant ends for ten Machine Parts
+/// (`net::npc_scripts`).
+pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[3230, 3239];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
@@ -1305,6 +1307,7 @@ mod tests {
         let dollhouse = catalog.quest(3230).unwrap();
         assert_eq!(dollhouse.end_info[0].value, "dummy");
         assert_eq!(dollhouse.start_info, None);
+        assert_eq!(catalog.quest(3239).unwrap().end_info[0].value, "dummy");
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
         // Its first step's offer asks questions (`Act/0/ask`, `stop`).
         assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));

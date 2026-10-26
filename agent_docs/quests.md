@@ -275,8 +275,10 @@ Reef (1032108, in 910100001) thanks the player through a start script
 the server completes it through the quest window. Mark the Toy Soldier's
 script does, for the pendulum (`Effect::CompleteQuest`; see
 [party quests](./party-quests.md), "Eos Tower's dollhouse room").
-`game_data::quests::COMPLETED_BY_NPC_SCRIPT` lets it through and keeps the
-`infoex`.
+"The Missing Mechanical Parts" (3239) is the same, completed by Cheng the
+Assistant for ten parts ("The Toy Factory's Sector 4").
+`game_data::quests::COMPLETED_BY_NPC_SCRIPT` lets them through and keeps
+the `infoex`.
 
 Mu Young (1061014, in 105100100) has two start scripts, both silent as in
 Cosmic. `q2238s` starts "Who is the Owner of the Mysterious Note?" (2238,

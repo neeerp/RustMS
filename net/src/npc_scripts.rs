@@ -1768,6 +1768,9 @@ impl NpcScript {
         if npc_id == MARK {
             return Some(mark(player));
         }
+        if npc_id == CHENG {
+            return cheng(player, &mut rand::thread_rng());
+        }
         if npc_id == DIMENSIONAL_MIRROR {
             return Some(dimensional_mirror(player));
         }
@@ -2988,6 +2991,69 @@ fn mark(player: &Player) -> NpcScript {
         ],
     };
     NpcScript::new(MARK, vec![thanks, ask(keys::DOLLHOUSE_BACK)])
+}
+
+/// Cheng the Assistant, in the Toy Factory (220020000) and at Sector 4's far
+/// end (922000000).
+const CHENG: i32 = 2040003;
+/// The ten Machine Parts Cheng wants, and his thanks: one of four shoe
+/// scrolls, drawn at random, and 2,700 EXP (Cosmic `3239.js`; the data gives
+/// nothing).
+const PARTS_WANTED: i16 = 10;
+const PARTS_SCROLLS: [i32; 4] = [2040704, 2040705, 2040707, 2040708];
+const PARTS_EXP: i32 = 2700;
+
+/// Cheng (Cosmic `2040003`): in the factory, he takes a player on The
+/// Missing Mechanical Parts (3239) alone into Sector 4; others get his
+/// default speech. In Sector 4, he takes ten Machine Parts from a player on
+/// it, which completes it, once they have a USE slot for the scroll, then
+/// offers the way out to the Secret Passage, which ends their run.
+fn cheng(player: &Player, rng: &mut impl Rng) -> Option<NpcScript> {
+    let started = player.quests.state(events::PARTS_QUEST) == QuestState::Started;
+    if player.stats.map_id != events::PARTS_ROOM {
+        if !started {
+            return None;
+        }
+        let mut script = NpcScript::new(
+            CHENG,
+            vec![Page::Ask {
+                text: text(keys::MECHANICAL_PARTS_ENTER),
+                on_yes: vec![Effect::StartEvent(EventKind::MechanicalParts)],
+                on_no: None,
+            }],
+        );
+        script.refused = Some(text(keys::MECHANICAL_PARTS_BUSY));
+        return Some(script);
+    }
+    let leave = Page::Ask {
+        text: text(keys::MECHANICAL_PARTS_LEAVE),
+        on_yes: vec![Effect::Warp(events::PARTS_PASSAGE)],
+        on_no: None,
+    };
+    if !started || player.inventory.count(events::MACHINE_PART) < i32::from(PARTS_WANTED) {
+        return Some(NpcScript::new(CHENG, vec![leave]));
+    }
+    let scroll = *PARTS_SCROLLS.choose(rng)?;
+    if !crate::items::fits_until(&player.inventory, scroll, 1, None) {
+        let full = Page::Say(text(keys::MECHANICAL_PARTS_NO_ROOM));
+        return Some(NpcScript::new(CHENG, vec![full, leave]));
+    }
+    let thanks = Page::Act {
+        text: text(keys::MECHANICAL_PARTS_DONE),
+        effects: vec![
+            Effect::TakeItem {
+                item_id: events::MACHINE_PART,
+                quantity: PARTS_WANTED,
+            },
+            Effect::GiveItem {
+                item_id: scroll,
+                quantity: 1,
+            },
+            Effect::GainExp(PARTS_EXP),
+            Effect::CompleteQuest(events::PARTS_QUEST),
+        ],
+    };
+    Some(NpcScript::new(CHENG, vec![thanks, leave]))
 }
 
 /// The Spirit of Snow Statue, broken, in the Valley of Snowmen (211040102).
@@ -10421,6 +10487,87 @@ mod tests {
         assert!(ask.effects.is_empty());
         let yes = script.respond(ScriptInput::Yes).unwrap();
         assert_eq!(yes.effects, [back]);
+    }
+
+    #[test]
+    fn cheng_sends_a_player_on_3239_in_and_takes_ten_parts_for_a_scroll() {
+        // In the factory, only a player on it is taken in.
+        assert!(NpcScript::for_npc(CHENG, &with_quests(&[])).is_none());
+        let mut on_it = with_quests(&[(3239, false)]);
+        on_it.stats.map_id = events::TOY_FACTORY;
+        let mut script = NpcScript::for_npc(CHENG, &on_it).unwrap();
+        assert!(script.begin().effects.is_empty());
+        let yes = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(
+            yes.effects,
+            [Effect::StartEvent(EventKind::MechanicalParts)]
+        );
+        assert_eq!(script.refused, Some(text(keys::MECHANICAL_PARTS_BUSY)));
+
+        // In Sector 4, with fewer than ten parts, only the way out.
+        let out = Effect::Warp(events::PARTS_PASSAGE);
+        on_it.stats.map_id = events::PARTS_ROOM;
+        let parts = |count| game::Item::stack(events::MACHINE_PART, count);
+        on_it
+            .inventory
+            .insert(game::InventoryType::Etc, 1, parts(9));
+        let mut script = NpcScript::for_npc(CHENG, &on_it).unwrap();
+        assert!(script.begin().effects.is_empty());
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [out.clone()]
+        );
+
+        // Ten: the parts for a scroll and 2,700 EXP, then the way out.
+        on_it
+            .inventory
+            .insert(game::InventoryType::Etc, 1, parts(10));
+        let mut script = NpcScript::for_npc(CHENG, &on_it).unwrap();
+        let effects = script.begin().effects;
+        let Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        } = effects[1]
+        else {
+            panic!("{effects:?}");
+        };
+        assert!(PARTS_SCROLLS.contains(&item_id));
+        assert_eq!(
+            effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::MACHINE_PART,
+                    quantity: 10
+                },
+                Effect::GiveItem {
+                    item_id,
+                    quantity: 1
+                },
+                Effect::GainExp(2700),
+                Effect::CompleteQuest(3239)
+            ]
+        );
+        assert!(script
+            .respond(ScriptInput::Next)
+            .unwrap()
+            .effects
+            .is_empty());
+        assert_eq!(
+            script.respond(ScriptInput::Yes).unwrap().effects,
+            [out.clone()]
+        );
+
+        // Not with a full USE inventory.
+        on_it.inventory.set_slot_limit(game::InventoryType::Use, 1);
+        on_it
+            .inventory
+            .insert(game::InventoryType::Use, 1, game::Item::stack(2_000_000, 1));
+        let mut script = NpcScript::for_npc(CHENG, &on_it).unwrap();
+        let page = script.begin();
+        assert!(page.effects.is_empty());
+        assert_eq!(page_text(&page), text(keys::MECHANICAL_PARTS_NO_ROOM));
+        script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(script.respond(ScriptInput::Yes).unwrap().effects, [out]);
     }
 
     #[test]
