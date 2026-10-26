@@ -1337,6 +1337,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 occupied: Some(content::text().get(keys::MAGATIA_PORTAL_SHUT, &[])),
             }
         }
+        // The corridor's way into the boss's room, never shut (Cosmic
+        // `rnj12_in` and `jnr12_in`).
+        "rnj12_in" | "jnr12_in" => {
+            let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
+            through(Effect::WarpToPortal(side.stages()[6], 0))
+        }
         // The hub's doors into the rooms beside it, once a Card Key opened
         // them, those rooms' ways back, once a door opened them too, and
         // the hub's way on, once Romeo or Juliet opened it for the files
@@ -3236,6 +3242,14 @@ mod tests {
                 );
                 assert_eq!(outcome.occupied.as_ref(), Some(&shut));
             }
+            // The corridor's way into the boss's room is never shut.
+            player.stats.map_id = stages[6] - 1;
+            let outcome = portal(&format!("{prefix}12_in"), &player).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [Effect::PortalSound, Effect::WarpToPortal(stages[6], 0)]
+            );
+            assert_eq!(outcome.occupied, None);
         }
         player.stats.map_id = crate::events::ZENUMIST_LOBBY;
         assert!(portal("rnj1_pt00", &player).is_none());

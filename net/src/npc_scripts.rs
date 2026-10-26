@@ -910,6 +910,11 @@ pub const ALCADNO_BOOK: i32 = 2112013;
 /// Yulete, in each side's office until he leaves it.
 pub const YULETE: i32 = 2112000;
 pub const YULETE_ALCADNO: i32 = 2112010;
+/// Yulete's traces, in each side's room of them after the win, and the
+/// one who thanks the party in the last room.
+pub const YULETE_TRACES: i32 = 2112001;
+pub const YULETE_TRACES_ALCADNO: i32 = 2112011;
+pub const MAGATIA_THANKS: i32 = 2112018;
 /// Guon Over the Pirate Ship, who sends a party aboard against the Lord
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
@@ -1645,6 +1650,29 @@ impl NpcScript {
         door_shut: bool,
     ) -> Self {
         magatia_hub(side, player, leader, cleared, door_shut)
+    }
+
+    /// Romeo or Juliet in `side`'s boss's room once it is won, by whether
+    /// the escort fainted and whether Yulete was `caught`, which made his
+    /// Frankenroid the mighty one.
+    pub fn magatia_saved(side: MagatiaSide, escort_failed: bool, caught: bool) -> Self {
+        magatia_saved(side, escort_failed, caught)
+    }
+
+    /// Yulete's traces in `side`'s room of them.
+    pub fn yulete_traces(side: MagatiaSide) -> Self {
+        yulete_traces(side)
+    }
+
+    /// The one who thanks the party in `side`'s last room, to `player`,
+    /// by whether the escort fainted.
+    pub fn magatia_thanks(
+        side: MagatiaSide,
+        player: &Player,
+        escort_failed: bool,
+        rng: &mut impl Rng,
+    ) -> Self {
+        magatia_thanks(side, player, escort_failed, rng)
     }
 
     /// Eak (Cosmic `2013001`) to a player in the Orbis party quest on
@@ -7433,6 +7461,129 @@ pub fn magatia_hub_host(side: MagatiaSide) -> i32 {
         MagatiaSide::Zenumist => ROMEO_HUB,
         MagatiaSide::Alcadno => JULIET_HUB,
     }
+}
+
+/// Who waits in `map_id` from the first arrival in a run's copy of it,
+/// and where (Cosmic `MagatiaPQ_Z.afterSetup`'s `spawnNpc`): Yulete in the
+/// boss's room, his traces in theirs, and the one who thanks the party in
+/// the last room.
+pub fn magatia_waiting(map_id: i32) -> Option<(i32, (i16, i16))> {
+    let side = MagatiaSide::of(map_id)?;
+    if map_id == side.stages()[6] {
+        Some((yulete(side), events::LAB_YULETE_AT))
+    } else if map_id == side.traces_room() {
+        Some((traces(side), events::MAGATIA_THANKS_AT))
+    } else if map_id == side.thanks_room() {
+        Some((MAGATIA_THANKS, events::MAGATIA_THANKS_AT))
+    } else {
+        None
+    }
+}
+
+/// Yulete's traces on `side`.
+pub fn traces(side: MagatiaSide) -> i32 {
+    match side {
+        MagatiaSide::Zenumist => YULETE_TRACES,
+        MagatiaSide::Alcadno => YULETE_TRACES_ALCADNO,
+    }
+}
+
+/// Romeo (Cosmic `2112006`) or Juliet (`2112005`) in the boss's room once
+/// it is won. If the escort fainted they thank the party and send each
+/// member on to the last room; otherwise they give each the side's gift
+/// (`MagatiaSide::gift`), which needs room, and send them on: to the last
+/// room if Yulete was not caught, so the Frankenroid was the plain one,
+/// or else past his traces first. Cosmic's Alcadno script never sends
+/// anyone straight on; both sides do as its Zenumist script does.
+fn magatia_saved(side: MagatiaSide, escort_failed: bool, caught: bool) -> NpcScript {
+    let npc = magatia_hub_host(side);
+    let zenumist = side == MagatiaSide::Zenumist;
+    if escort_failed {
+        let key = match zenumist {
+            true => keys::MAGATIA_ROMEO_SAVED_HURT,
+            false => keys::MAGATIA_JULIET_SAVED_HURT,
+        };
+        return NpcScript::new(
+            npc,
+            vec![
+                Page::Say(text(key)),
+                Page::Done(vec![Effect::WarpToPortal(side.thanks_room(), 0)]),
+            ],
+        );
+    }
+    let key = match zenumist {
+        true => keys::MAGATIA_ROMEO_SAVED,
+        false => keys::MAGATIA_JULIET_SAVED,
+    };
+    let next = match caught {
+        false => side.thanks_room(),
+        true => side.traces_room(),
+    };
+    let mut script = NpcScript::new(
+        npc,
+        vec![
+            Page::Say(text(key)),
+            Page::Say(text(keys::MAGATIA_GIFT)),
+            Page::Done(vec![
+                Effect::GiveItem {
+                    item_id: side.gift(),
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(next, 0),
+            ]),
+        ],
+    );
+    script.inventory_full = Some(text(keys::MAGATIA_GIFT_FULL));
+    script
+}
+
+/// Yulete's traces (Cosmic `2112001`, `2112011`): beaten, he is cheered
+/// up, says he is sorry, and sends the member on to the last room.
+fn yulete_traces(side: MagatiaSide) -> NpcScript {
+    let on = vec![
+        Page::Say(text(keys::MAGATIA_TRACES_SORRY)),
+        Page::Done(vec![Effect::WarpToPortal(side.thanks_room(), 0)]),
+    ];
+    NpcScript::new(
+        traces(side),
+        vec![Page::Menu {
+            text: text(keys::MAGATIA_TRACES_DEFEATED),
+            choices: vec![(text(keys::MAGATIA_TRACES_CHEER), on)],
+        }],
+    )
+}
+
+/// The one who thanks the party in the last room (Cosmic `2112018`,
+/// `giveEventReward`): their thanks, by whether the escort fainted, then
+/// one of `MAGATIA_REWARDS` and the way home to the side's lobby. A
+/// member without a free slot in each kind of inventory the rewards come
+/// in gets nothing yet, and stays.
+fn magatia_thanks(
+    side: MagatiaSide,
+    player: &Player,
+    escort_failed: bool,
+    rng: &mut impl Rng,
+) -> NpcScript {
+    let key = match escort_failed {
+        true => keys::MAGATIA_THANKS_JAIL,
+        false => keys::MAGATIA_THANKS_REHAB,
+    };
+    let lobby = EventKind::Magatia(side).event().lobby;
+    let room = events::MAGATIA_REWARDS.iter().all(|&(item_id, _)| {
+        InventoryType::for_item(item_id).is_none_or(|kind| {
+            player.inventory.items(kind).count() < usize::from(player.inventory.slot_limit(kind))
+        })
+    });
+    let last = match events::MAGATIA_REWARDS.choose(rng).filter(|_| room) {
+        Some(&(item_id, quantity)) => Page::Done(vec![
+            Effect::GiveItem { item_id, quantity },
+            Effect::Warp(lobby),
+        ]),
+        None => Page::Say(text(keys::MAGATIA_THANKS_FULL)),
+    };
+    let mut script = NpcScript::new(MAGATIA_THANKS, vec![Page::Say(text(key)), last]);
+    script.inventory_full = Some(text(keys::MAGATIA_THANKS_FULL));
+    script
 }
 
 /// Romeo (Cosmic `2112006`) or Juliet (`2112005`) in their side's hub of
@@ -15694,6 +15845,108 @@ mod tests {
             let open = hub(&holding(&[]), false, true, false);
             assert_eq!(page_text(&open), text(hurry));
             assert!(open.effects.is_empty());
+        }
+    }
+
+    #[test]
+    fn after_the_frankenroid_the_party_is_thanked_and_rewarded_on_the_way_home() {
+        for side in MagatiaSide::ALL {
+            let stages = side.stages();
+            let (traces_room, thanks_room) = (side.traces_room(), side.thanks_room());
+            assert_eq!(traces_room, stages[0] + 500);
+            assert_eq!(thanks_room, stages[0] + 600);
+            assert_eq!(
+                magatia_waiting(stages[6]),
+                Some((yulete(side), events::LAB_YULETE_AT))
+            );
+            assert_eq!(
+                magatia_waiting(traces_room),
+                Some((traces(side), events::MAGATIA_THANKS_AT))
+            );
+            assert_eq!(
+                magatia_waiting(thanks_room),
+                Some((MAGATIA_THANKS, events::MAGATIA_THANKS_AT))
+            );
+            assert_eq!(magatia_waiting(stages[5]), None);
+
+            // Saved, Romeo or Juliet gives the gift and sends the member
+            // on: past Yulete's traces if he was caught, the mighty one
+            // having come out.
+            for (caught, next) in [(false, thanks_room), (true, traces_room)] {
+                let mut saved = NpcScript::magatia_saved(side, false, caught);
+                assert_eq!(saved.npc_id(), magatia_hub_host(side));
+                saved.begin();
+                let gift = saved.respond(ScriptInput::Next).unwrap();
+                assert_eq!(page_text(&gift), text(keys::MAGATIA_GIFT));
+                let given = saved.respond(ScriptInput::Next).unwrap();
+                assert_eq!(
+                    given.effects,
+                    [
+                        Effect::GiveItem {
+                            item_id: side.gift(),
+                            quantity: 1
+                        },
+                        Effect::WarpToPortal(next, 0)
+                    ]
+                );
+                let full = saved.inventory_full().unwrap();
+                assert_eq!(page_text(&full), text(keys::MAGATIA_GIFT_FULL));
+                assert!(full.effects.is_empty());
+            }
+            // With the escort fainted, there is no gift.
+            let mut hurt = NpcScript::magatia_saved(side, true, true);
+            hurt.begin();
+            let on = hurt.respond(ScriptInput::Next).unwrap();
+            assert_eq!(on.effects, [Effect::WarpToPortal(thanks_room, 0)]);
+
+            let mut traced = NpcScript::yulete_traces(side);
+            let asked = traced.begin();
+            let asked = format!("{:?}", asked.prompt);
+            assert!(
+                asked.contains(&text(keys::MAGATIA_TRACES_DEFEATED)),
+                "{asked}"
+            );
+            assert!(asked.contains(&text(keys::MAGATIA_TRACES_CHEER)), "{asked}");
+            let sorry = traced.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&sorry), text(keys::MAGATIA_TRACES_SORRY));
+            let on = traced.respond(ScriptInput::Next).unwrap();
+            assert_eq!(on.effects, [Effect::WarpToPortal(thanks_room, 0)]);
+
+            // The thanks, then one of the rewards and the way home.
+            let lobby = EventKind::Magatia(side).event().lobby;
+            let mut rng = rand::thread_rng();
+            for (escort_failed, key) in [
+                (false, keys::MAGATIA_THANKS_REHAB),
+                (true, keys::MAGATIA_THANKS_JAIL),
+            ] {
+                let mut member = player(50);
+                member.stats.map_id = thanks_room;
+                let mut thanks = NpcScript::magatia_thanks(side, &member, escort_failed, &mut rng);
+                assert_eq!(thanks.npc_id(), MAGATIA_THANKS);
+                assert_eq!(page_text(&thanks.begin()), text(key));
+                let given = thanks.respond(ScriptInput::Next).unwrap();
+                let [Effect::GiveItem { item_id, quantity }, Effect::Warp(to)] = given.effects[..]
+                else {
+                    panic!("{given:?}");
+                };
+                assert!(events::MAGATIA_REWARDS.contains(&(item_id, quantity)));
+                assert_eq!(to, lobby);
+            }
+            // A full Use inventory gets nothing yet.
+            let mut member = player(50);
+            let slots = member.inventory.slot_limit(InventoryType::Use);
+            for slot in 1..=i16::from(slots) {
+                (member.inventory).insert(
+                    InventoryType::Use,
+                    slot,
+                    game::Item::stack(2_000_000, 1),
+                );
+            }
+            let mut thanks = NpcScript::magatia_thanks(side, &member, false, &mut rng);
+            thanks.begin();
+            let full = thanks.respond(ScriptInput::Next).unwrap();
+            assert_eq!(page_text(&full), text(keys::MAGATIA_THANKS_FULL));
+            assert!(full.effects.is_empty());
         }
     }
 

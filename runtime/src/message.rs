@@ -382,6 +382,13 @@ pub enum ServerMessage {
     /// Yulete left the player's field, his office, caught off guard or
     /// not (`net::events::EventCommand::YuleteLeft`): tell the event.
     YuleteLeft(bool),
+    /// Yulete brought out his Frankenroid on the player's field, the
+    /// mighty one if he was caught off guard
+    /// (`net::events::EventCommand::FrankenroidOut`): tell the event.
+    FrankenroidOut(bool),
+    /// The escort on the player's field, the Magatia boss's room, fainted
+    /// (`net::events::EventCommand::EscortFailed`): tell the event.
+    EscortFailed,
     /// This player's attack on a copy of a Nett's Pyramid stage did this to
     /// its mobs, for their run's tally.
     Massacre(net::pyramid::Hits),
@@ -753,10 +760,14 @@ pub enum FieldMessage {
         reply: tokio::sync::oneshot::Sender<Vec<u8>>,
     },
     /// Someone talked to Yulete in his office, after Romeo or Juliet read
-    /// the letter or not: what he says, as text key
-    /// (`net::events::yulete_talk`); `None` if he isn't here.
+    /// the letter or not, or in the boss's room, the run won or not and
+    /// Yulete `caught` off guard in his office or not: what he says, as
+    /// text key (`net::events::yulete_talk`, `yulete_in_lab`); `None` if
+    /// he isn't here.
     Yulete {
         shocked: bool,
+        caught: bool,
+        won: bool,
         reply: tokio::sync::oneshot::Sender<Option<&'static str>>,
     },
     /// The two of the tall room's levers Eak wants up

@@ -438,8 +438,9 @@ impl ClientActor {
 
     /// What Yulete, `npc_id`, says to the player in his office in their
     /// run of Romeo and Juliet's party quest, as the field decides by where
-    /// everyone stands and whether Romeo or Juliet read the letter; `None`
-    /// anywhere else, or once he has left.
+    /// everyone stands and whether Romeo or Juliet read the letter, or in
+    /// the boss's room, where he may bring out his Frankenroid; `None`
+    /// anywhere else, or once he has left his office.
     pub(super) async fn yulete(&mut self, npc_id: i32) -> Result<Option<NpcScript>, RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let Some(ticket) = self
@@ -449,15 +450,56 @@ impl ClientActor {
         else {
             return Ok(None);
         };
-        let shocked = ticket.shocked();
+        let (shocked, caught, won) = (ticket.shocked(), ticket.caught_yulete(), ticket.won());
         let (reply, said) = oneshot::channel();
-        self.send_to_field(FieldMessage::Yulete { shocked, reply })
-            .await?;
+        self.send_to_field(FieldMessage::Yulete {
+            shocked,
+            caught,
+            won,
+            reply,
+        })
+        .await?;
         Ok(said
             .await
             .ok()
             .flatten()
             .map(|key| NpcScript::yulete(npc_id, key)))
+    }
+
+    /// What Romeo or Juliet in the boss's room once it is won, Yulete's
+    /// traces, or the one who thanks the party, `npc_id`, says to the
+    /// player in their run of Romeo and Juliet's party quest; `None`
+    /// anywhere else.
+    pub(super) async fn magatia_after(
+        &mut self,
+        npc_id: i32,
+    ) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+            return Ok(None);
+        };
+        let EventKind::Magatia(side) = ticket.kind else {
+            return Ok(None);
+        };
+        let (escort_failed, caught) = (ticket.escort_failed(), ticket.caught_yulete());
+        let saved = net::npc_scripts::magatia_hub_host(side);
+        if npc_id == saved && map_id == side.stages()[6] && ticket.won() {
+            return Ok(Some(NpcScript::magatia_saved(side, escort_failed, caught)));
+        }
+        if npc_id == net::npc_scripts::traces(side) && map_id == side.traces_room() {
+            return Ok(Some(NpcScript::yulete_traces(side)));
+        }
+        if npc_id == net::npc_scripts::MAGATIA_THANKS && map_id == side.thanks_room() {
+            let player = &self.in_game()?.player;
+            let mut rng = rand::thread_rng();
+            return Ok(Some(NpcScript::magatia_thanks(
+                side,
+                player,
+                escort_failed,
+                &mut rng,
+            )));
+        }
+        Ok(None)
     }
 
     /// What a portal of Romeo and Juliet's party quest, `portal` running

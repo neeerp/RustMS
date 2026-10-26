@@ -165,6 +165,47 @@ impl MagatiaSide {
             MagatiaSide::Alcadno => 4_001_130,
         }
     }
+
+    /// The one the party escorts in the boss's room: Juliet for
+    /// Zenumist, Romeo for Alcadno (Mob.nx 9300137 and 9300138).
+    pub fn escort(self) -> i32 {
+        match self {
+            MagatiaSide::Zenumist => 9_300_137,
+            MagatiaSide::Alcadno => 9_300_138,
+        }
+    }
+
+    /// The Frankenroid Yulete brings out, the mighty one if he was
+    /// `caught` off guard (Cosmic `2112000` and `2112010`).
+    pub fn frankenroid(self, caught: bool) -> i32 {
+        match (self, caught) {
+            (MagatiaSide::Zenumist, false) => 9_300_139,
+            (MagatiaSide::Zenumist, true) => 9_300_140,
+            (MagatiaSide::Alcadno, false) => 9_300_151,
+            (MagatiaSide::Alcadno, true) => 9_300_152,
+        }
+    }
+
+    /// What Romeo or Juliet gives each member after the win, unless the
+    /// escort fainted (Cosmic `2112006` and `2112005`).
+    pub fn gift(self) -> i32 {
+        match self {
+            MagatiaSide::Zenumist => 4_001_159,
+            MagatiaSide::Alcadno => 4_001_160,
+        }
+    }
+
+    /// The room of Yulete's traces, where a member goes after the win
+    /// unless the plain Frankenroid was beaten without the escort
+    /// fainting.
+    pub fn traces_room(self) -> i32 {
+        self.stages()[0] + 500
+    }
+
+    /// The room where the party is thanked and rewarded, last.
+    pub fn thanks_room(self) -> i32 {
+        self.stages()[0] + 600
+    }
 }
 
 /// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
@@ -1826,7 +1867,14 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         stride: 1,
         stage_maps: stages,
         talk_clears: &[MAGATIA_FILES_STAGE],
-        member_clears: &[1, 2, 3, MAGATIA_OFFICE_STAGE, MAGATIA_ROPES_STAGE],
+        member_clears: &[
+            1,
+            2,
+            3,
+            MAGATIA_OFFICE_STAGE,
+            MAGATIA_ROPES_STAGE,
+            MAGATIA_BOSS_STAGE,
+        ],
         clear_portals: &[],
         gated: &[],
         puzzles: 1..=0,
@@ -1902,6 +1950,112 @@ pub const MAGATIA_OFFICE_STAGE: u8 = 5;
 pub const MAGATIA_ROPE_ROOMS: u8 = 4;
 pub const MAGATIA_ROPE_ROWS: usize = 10;
 pub const MAGATIA_ROPES_STAGE: u8 = 6;
+
+/// The boss's room (`stages()[6]`, Cosmic `MagatiaPQ_Z`): Yulete waits
+/// there from the first arrival, and talked to brings out his
+/// Frankenroid where it stands; its death wins the run (the last stage,
+/// which gives no EXP of its own but the run's, `magatia_win_exp`), and
+/// the side's Romeo or Juliet comes out where they stand. In the rooms
+/// after it, Yulete's traces and the one who thanks the party wait where
+/// they stand.
+pub const MAGATIA_BOSS_STAGE: u8 = 7;
+pub const LAB_YULETE_AT: (i16, i16) = (200, 100);
+pub const FRANKENROID_AT: (i16, i16) = (250, 100);
+pub const MAGATIA_SAVED_AT: (i16, i16) = (-370, -150);
+pub const MAGATIA_THANKS_AT: (i16, i16) = (200, 100);
+/// The EXP each member gets for the win (Cosmic `monsterKilled`'s
+/// `giveEventPlayersExp`): less if the escort fainted, and more for the
+/// mighty Frankenroid that a caught Yulete brings out.
+pub const MAGATIA_ESCORT_FAILED_EXP: i32 = 90_000;
+pub const MAGATIA_FRANKENROID_EXP: i32 = 105_000;
+pub const MAGATIA_MIGHTY_EXP: i32 = 140_000;
+/// What the one who thanks the party gives each member: one of these
+/// items, and how many, all equally likely (Cosmic `MagatiaPQ_Z`'s
+/// `setEventRewards`).
+pub const MAGATIA_REWARDS: [(i32, i16); 23] = [
+    (2000003, 100),
+    (2000002, 100),
+    (2000004, 20),
+    (2000005, 10),
+    (2022003, 50),
+    (1032016, 1),
+    (1032015, 1),
+    (1032014, 1),
+    (2041212, 1),
+    (2041020, 1),
+    (2040502, 1),
+    (2041016, 1),
+    (2044701, 1),
+    (2040301, 1),
+    (2043201, 1),
+    (2040501, 1),
+    (2040704, 1),
+    (2044001, 1),
+    (2043701, 1),
+    (2040803, 1),
+    (1102026, 1),
+    (1102028, 1),
+    (1102029, 1),
+];
+
+/// The run's EXP for beating the Frankenroid, by whether the escort
+/// fainted and whether Yulete was caught, which made it the mighty one.
+/// Cosmic's Alcadno script pays the mighty one's either way; both sides
+/// pay as its Zenumist script does.
+pub fn magatia_win_exp(escort_failed: bool, caught: bool) -> i32 {
+    match (escort_failed, caught) {
+        (true, _) => MAGATIA_ESCORT_FAILED_EXP,
+        (false, false) => MAGATIA_FRANKENROID_EXP,
+        (false, true) => MAGATIA_MIGHTY_EXP,
+    }
+}
+
+/// Whether `mob_id` is either side's Frankenroid, of either kind.
+pub fn is_frankenroid(mob_id: i32) -> bool {
+    MagatiaSide::ALL.into_iter().any(|side| {
+        [false, true]
+            .map(|caught| side.frankenroid(caught))
+            .contains(&mob_id)
+    })
+}
+
+/// What Yulete says in the boss's room, as text key (Cosmic `2112000`):
+/// once the run is won, that he is beaten; once he brought out his
+/// Frankenroid, to behold it; otherwise he brings it out, the mighty one
+/// if he was caught off guard in his office.
+pub fn yulete_in_lab(won: bool, called: bool, caught: bool) -> &'static str {
+    use game_data::server_content::keys;
+    match (won, called, caught) {
+        (true, ..) => keys::MAGATIA_YULETE_BEATEN,
+        (_, true, _) => keys::MAGATIA_YULETE_BEHOLD,
+        (_, _, false) => keys::MAGATIA_YULETE_PRESENTS,
+        (_, _, true) => keys::MAGATIA_YULETE_MIGHTY,
+    }
+}
+
+/// What the whole run hears as Yulete brings out his Frankenroid, as
+/// text key (Cosmic `2112000`'s `dropMessage(5, ..)`).
+pub fn frankenroid_called(caught: bool) -> &'static str {
+    use game_data::server_content::keys;
+    match caught {
+        true => keys::MAGATIA_FRANKENROID_MIGHTY,
+        false => keys::MAGATIA_FRANKENROID,
+    }
+}
+
+/// What everyone in the boss's room is told as the escort `mob_id`
+/// faints, as text key, if it is one (Cosmic
+/// `MobDamageMobFriendlyHandler`).
+pub fn magatia_fainted(mob_id: i32) -> Option<&'static str> {
+    use game_data::server_content::keys;
+    match MagatiaSide::ALL
+        .into_iter()
+        .find(|side| side.escort() == mob_id)?
+    {
+        MagatiaSide::Zenumist => Some(keys::MAGATIA_JULIET_FAINTED),
+        MagatiaSide::Alcadno => Some(keys::MAGATIA_ROMEO_FAINTED),
+    }
+}
 
 /// What Yulete in his office makes of the party (Cosmic `yuleteTalked`):
 /// no one has talked to him yet, someone caught him off guard, or he is
@@ -2835,6 +2989,12 @@ pub enum EventCommand {
     /// Yulete left his office, caught off guard or not
     /// (`yulete_leaves`): the team hears what he said, once.
     YuleteLeft(bool),
+    /// Yulete brought out his Frankenroid, the mighty one if he was
+    /// caught off guard (`frankenroid_called`): the team hears it.
+    FrankenroidOut(bool),
+    /// The escort in the boss's room fainted (Cosmic `friendlyKilled`'s
+    /// `escortFail`).
+    EscortFailed,
     /// A member's attack in a Monster Carnival battle killed mobs worth
     /// this many CP (their `getCP`).
     CarnivalCp(i32),
@@ -4152,6 +4312,57 @@ mod tests {
             assert_eq!(side.rope_room(stages[5] + 1), Some(0));
             assert_eq!(side.rope_room(stages[5] + 4), Some(3));
             assert_eq!(side.rope_room(stages[5] + 5), None);
+        }
+    }
+
+    #[test]
+    fn yulete_brings_out_his_frankenroid_whose_fall_wins_the_run() {
+        use game_data::server_content::keys;
+        assert_eq!(magatia_win_exp(false, false), 105_000);
+        assert_eq!(magatia_win_exp(false, true), 140_000);
+        assert_eq!(magatia_win_exp(true, false), 90_000);
+        assert_eq!(magatia_win_exp(true, true), 90_000);
+        assert_eq!(yulete_in_lab(true, true, true), keys::MAGATIA_YULETE_BEATEN);
+        assert_eq!(
+            yulete_in_lab(false, true, false),
+            keys::MAGATIA_YULETE_BEHOLD
+        );
+        assert_eq!(
+            yulete_in_lab(false, false, false),
+            keys::MAGATIA_YULETE_PRESENTS
+        );
+        assert_eq!(
+            yulete_in_lab(false, false, true),
+            keys::MAGATIA_YULETE_MIGHTY
+        );
+        assert_eq!(frankenroid_called(false), keys::MAGATIA_FRANKENROID);
+        assert_eq!(frankenroid_called(true), keys::MAGATIA_FRANKENROID_MIGHTY);
+        assert_eq!(magatia_fainted(9300137), Some(keys::MAGATIA_JULIET_FAINTED));
+        assert_eq!(magatia_fainted(9300138), Some(keys::MAGATIA_ROMEO_FAINTED));
+        assert_eq!(magatia_fainted(9300139), None);
+        let z = MagatiaSide::Zenumist;
+        let a = MagatiaSide::Alcadno;
+        assert_eq!(
+            [z.frankenroid(false), z.frankenroid(true)],
+            [9300139, 9300140]
+        );
+        assert_eq!(
+            [a.frankenroid(false), a.frankenroid(true)],
+            [9300151, 9300152]
+        );
+        for id in [9300139, 9300140, 9300151, 9300152] {
+            assert!(is_frankenroid(id));
+        }
+        assert!(!is_frankenroid(9300150));
+        assert_eq!([z.gift(), a.gift()], [4001159, 4001160]);
+        for side in MagatiaSide::ALL {
+            let event = EventKind::Magatia(side).event();
+            assert_eq!(event.last_stage(), MAGATIA_BOSS_STAGE);
+            assert!(event.member_clears.contains(&MAGATIA_BOSS_STAGE));
+            assert_eq!(
+                side.stages()[usize::from(MAGATIA_BOSS_STAGE) - 1] % 1000,
+                401
+            );
         }
     }
 
