@@ -1746,6 +1746,10 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await
             }
+            ServerMessage::OpenEventReactor { map_id, name } => {
+                self.tell_event(net::events::EventCommand::OpenReactor { map_id, name })
+                    .await
+            }
             ServerMessage::Massacre(hits) => {
                 self.count_protector_kills(hits).await?;
                 self.tell_event(net::events::EventCommand::Massacre(hits))

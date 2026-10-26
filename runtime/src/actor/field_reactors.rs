@@ -210,11 +210,15 @@ impl ReactorSet {
     }
 
     /// Deal the live reactors' places out among them afresh, so that one
-    /// may stand where another stood.
+    /// may stand where another stood; those that stay put
+    /// (`net::reactors::shuffles`) keep theirs.
     pub fn shuffle(&mut self, rng: &mut impl Rng) {
-        let mut places: Vec<_> = self.live.values().map(|r| (r.x, r.y)).collect();
+        let moving = |r: &&mut LiveReactor| net::reactors::shuffles(r.reactor_id);
+        let mut places: Vec<_> = (self.live.values_mut().filter(moving))
+            .map(|r| (r.x, r.y))
+            .collect();
         places.shuffle(rng);
-        for (reactor, (x, y)) in self.live.values_mut().zip(places) {
+        for (reactor, (x, y)) in self.live.values_mut().filter(moving).zip(places) {
             reactor.x = x;
             reactor.y = y;
         }
@@ -232,6 +236,23 @@ impl ReactorSet {
     /// the hits since the first.
     pub fn force_forward(&mut self, name: &str, state: u8) -> Vec<ReactorView> {
         self.move_to(name, state, |now| now < state)
+    }
+
+    /// Open every reactor named `name` that is shut (in state 0) to state
+    /// 1, as a script hits it (Cosmic `hitReactor` on a state with no
+    /// events): it shuts again when its time there is up.
+    pub fn open(&mut self, name: &str, now: Instant) -> Vec<ReactorView> {
+        let spots = &self.spots;
+        self.live
+            .values_mut()
+            .filter(|reactor| spots[reactor.spot].template.name == name && reactor.state == 0)
+            .map(|reactor| {
+                reactor.state = 1;
+                reactor.revert = (spots[reactor.spot].data.time_out(1))
+                    .map(|(ms, to)| (now + Duration::from_millis(ms.into()), to));
+                reactor.view()
+            })
+            .collect()
     }
 
     fn move_to(&mut self, name: &str, state: u8, moves: impl Fn(u8) -> bool) -> Vec<ReactorView> {
@@ -581,6 +602,94 @@ mod tests {
             assert_eq!(places, xs);
         }
         assert!(moved);
+    }
+
+    /// A Magatia side room's way back (`2618003`), shut, which opens for
+    /// two seconds.
+    fn room_exit(x: i16) -> (MapReactorTemplate, ReactorTemplate) {
+        (
+            MapReactorTemplate {
+                reactor_id: 2618003,
+                x,
+                y: 224,
+                flip: false,
+                reactor_time: 0,
+                name: "rnj31_out".into(),
+            },
+            ReactorTemplate {
+                reactor_id: 2618003,
+                states: vec![
+                    ReactorState::default(),
+                    ReactorState {
+                        events: vec![ReactorEvent {
+                            kind: 101,
+                            next: Some(0),
+                            ..ReactorEvent::default()
+                        }],
+                        time_out: Some(2000),
+                    },
+                ],
+                action: None,
+            },
+        )
+    }
+
+    #[test]
+    fn a_magatia_room_s_way_back_stays_put_as_its_boxes_move() {
+        let xs = [100, 200, 300, 400, 500];
+        let boxes = xs.map(|x| scrap_box(x, 0));
+        let mut reactors = ReactorSet::new(boxes.into_iter().chain([room_exit(1272)]));
+        reactors.respawn(Instant::now());
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut moved = false;
+        for _ in 0..8 {
+            reactors.shuffle(&mut rng);
+            let exit = reactors.named("rnj31_out").unwrap();
+            assert_eq!((exit.x, exit.y), (1272, 224));
+            let mut places: Vec<_> = (reactors.live())
+                .filter(|r| r.reactor_id != 2618003)
+                .map(|r| r.x)
+                .collect();
+            moved |= places != xs;
+            places.sort();
+            assert_eq!(places, xs);
+        }
+        assert!(moved);
+    }
+
+    #[test]
+    fn a_door_opened_as_a_script_hits_it_shuts_again_on_its_own() {
+        let mut reactors = ReactorSet::new([room_exit(1272)]);
+        let now = Instant::now();
+        let [id] = reactors.respawn(now)[..] else {
+            panic!("one reactor");
+        };
+        // No swing opens it.
+        assert!(reactors.hit(id, SWING, (1272, 224), now).is_none());
+        let opened = reactors.open("rnj31_out", now);
+        assert_eq!(
+            opened
+                .iter()
+                .map(|v| (v.object_id, v.state))
+                .collect::<Vec<_>>(),
+            [(id, 1)]
+        );
+        // Open, it doesn't open again, nor wait longer.
+        let later = now + Duration::from_millis(1500);
+        assert!(reactors.open("rnj31_out", later).is_empty());
+        assert!(reactors.open("elsewhere", now).is_empty());
+        assert!(reactors
+            .revert(now + Duration::from_millis(1999))
+            .is_empty());
+        let shut = reactors.revert(now + Duration::from_millis(2000));
+        assert_eq!(
+            shut.iter()
+                .map(|v| (v.object_id, v.state))
+                .collect::<Vec<_>>(),
+            [(id, 0)]
+        );
+        assert!(reactors.revert(now + Duration::from_secs(60)).is_empty());
+        assert_eq!(reactors.open("rnj31_out", later).len(), 1);
     }
 
     /// A mound that takes one Cold Flame, then one Black Book, landing

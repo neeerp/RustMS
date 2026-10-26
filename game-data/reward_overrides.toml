@@ -70,6 +70,13 @@ add = [{ item = 4001156, prob = 1.0 }]
 [mobs.9300171]
 add = [{ item = 4001156, prob = 1.0 }]
 
+[mobs.9300148]
+# Romeo and Juliet's hub of files (Map.nx 926100200, 926110200): its
+# monsters drop the Magic Stone 4001133 its side doors take (Reactor.nx
+# 2618001 and 2618002, item events). The pack has no drops for them;
+# Cosmic's rate.
+add = [{ item = 4001133, prob = 0.1 }]
+
 [mobs.9300147]
 # Romeo and Juliet's beaker rooms (Map.nx 926100100, 926110100): its
 # monsters drop the Magic Stone 4001132 the beakers take (Reactor.nx

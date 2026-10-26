@@ -183,6 +183,8 @@ impl ClientActor {
                         state: *state,
                     })
                 }
+                Effect::OpenReactor(name) => to_field.push(FieldRequest::OpenReactor { name }),
+                Effect::ClearMobs => to_field.push(FieldRequest::ClearMobs),
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;
                     afterwards.push(guild::build_name_prompt()?);

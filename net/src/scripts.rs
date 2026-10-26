@@ -631,6 +631,13 @@ pub enum Effect {
         name: &'static str,
         state: u8,
     },
+    /// Open the reactors named `name` on the player's map, shown to
+    /// everyone there, until their open state times out, as Cosmic's
+    /// `hitReactor` on a reactor whose first state has no events.
+    OpenReactor(&'static str),
+    /// Every mob on the player's map that isn't friendly goes, and no more
+    /// come, as Cosmic's `killAllMonsters`.
+    ClearMobs,
     /// Set character `slot` of a started info quest's string
     /// (`game::quest::INFO_QUESTS`) from `from` to `to`, as Ariant's houses
     /// mark each delivery. Nothing is applied unless it reads `from`.
@@ -854,6 +861,28 @@ pub fn item(script: &str, player: &Player, at: (i16, i16)) -> Option<Vec<Effect>
 }
 
 /// A touch portal's script. `None` if the script is unknown.
+/// Where the way of a Magatia hub's script `rest` (its name after the
+/// side's `rnj`/`jnr`) leads on `side`: the reactor it waits on, and the
+/// map and portal it leads to.
+fn magatia_hub_way(
+    side: crate::events::MagatiaSide,
+    rest: &str,
+) -> Option<(&'static [&'static str], i32, u8)> {
+    use crate::events::MagatiaSide;
+    let stages = side.stages();
+    let hub = stages[3];
+    let zenumist = side == MagatiaSide::Zenumist;
+    let pick = |rnj: &'static [&'static str], jnr| if zenumist { rnj } else { jnr };
+    Some(match rest {
+        "3_in0" => (pick(&["rnj3_out1"], &["jnr3_out1"]), hub + 1, 0),
+        "3_in1" => (pick(&["rnj3_out2"], &["jnr3_out2"]), hub + 2, 0),
+        "_201_0" => (pick(&["rnj31_out"], &["jnr31_out"]), hub, 1),
+        "_202" => (pick(&["rnj32_out"], &["jnr32_out"]), hub, 2),
+        "3_out" => (pick(&["rnj3_out3"], &["jnr3_out3"]), stages[4], 0),
+        _ => return None,
+    })
+}
+
 pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
     let quest = |id: i16| player.quests.state(id);
     // The tutorial hints show once a condition holds, then not again this
@@ -1292,6 +1321,26 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                     },
                     Effect::PortalSound,
                     Effect::WarpToPortal(side.stages()[usize::from(stage)], 0),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::MAGATIA_PORTAL_SHUT, &[])),
+            }
+        }
+        // The hub's doors into the rooms beside it, once a Card Key opened
+        // them, those rooms' ways back, once a door opened them too, and
+        // the hub's way on, once Romeo or Juliet opened it for the files
+        // (Cosmic `rnj3_in0`, `rnj3_in1`, `rnj_201_0`, `rnj_202`,
+        // `rnj3_out` and their Alcadno twins). Each stays open only a few
+        // seconds.
+        "rnj3_in0" | "jnr3_in0" | "rnj3_in1" | "jnr3_in1" | "rnj_201_0" | "jnr_201_0"
+        | "rnj_202" | "jnr_202" | "rnj3_out" | "jnr3_out" => {
+            let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
+            let (door, map, portal) = magatia_hub_way(side, &script[3..])?;
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireReactorsSet(door),
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(map, portal),
                 ],
                 block: false,
                 occupied: Some(content::text().get(keys::MAGATIA_PORTAL_SHUT, &[])),
@@ -3179,6 +3228,55 @@ mod tests {
         }
         player.stats.map_id = crate::events::ZENUMIST_LOBBY;
         assert!(portal("rnj1_pt00", &player).is_none());
+    }
+
+    #[test]
+    fn a_magatia_hubs_ways_wait_for_their_doors() {
+        use crate::events::MagatiaSide;
+        let mut player = player_with(&[]);
+        let shut = content::text().get(keys::MAGATIA_PORTAL_SHUT, &[]);
+        for (side, p) in [
+            (MagatiaSide::Zenumist, "rnj"),
+            (MagatiaSide::Alcadno, "jnr"),
+        ] {
+            let stages = side.stages();
+            let hub = stages[3];
+            for (map, script, door, to) in [
+                (hub, "3_in0", "3_out1", (hub + 1, 0)),
+                (hub, "3_in1", "3_out2", (hub + 2, 0)),
+                (hub + 1, "_201_0", "31_out", (hub, 1)),
+                (hub + 2, "_202", "32_out", (hub, 2)),
+                (hub, "3_out", "3_out3", (stages[4], 0)),
+            ] {
+                player.stats.map_id = map;
+                let outcome = portal(&format!("{p}{script}"), &player).unwrap();
+                let Effect::RequireReactorsSet(names) = outcome.effects[0] else {
+                    panic!("{outcome:?}");
+                };
+                assert_eq!(names, [format!("{p}{door}")]);
+                assert_eq!(
+                    outcome.effects[1..],
+                    [Effect::PortalSound, Effect::WarpToPortal(to.0, to.1)]
+                );
+                assert_eq!(outcome.occupied.as_ref(), Some(&shut));
+            }
+        }
+        // The doors open the rooms beside them, and their ways back.
+        for side in MagatiaSide::ALL {
+            let hub = side.stages()[3];
+            for (n, (door, room, exit)) in side.side_doors().into_iter().enumerate() {
+                assert_eq!(room, hub + 1 + n as i32);
+                assert_eq!(
+                    magatia_hub_way(side, &format!("3_in{n}")).unwrap().0,
+                    [door]
+                );
+                let back = if n == 0 { "_201_0" } else { "_202" };
+                assert_eq!(magatia_hub_way(side, back).unwrap().0, [exit]);
+            }
+            assert_eq!(magatia_hub_way(side, "3_out").unwrap().0, [side.hub_door()]);
+        }
+        player.stats.map_id = crate::events::ZENUMIST_LOBBY;
+        assert!(portal("rnj3_in0", &player).is_none());
     }
 
     #[test]

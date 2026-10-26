@@ -824,6 +824,7 @@ impl FieldActor {
                     }
                 }
             }
+            FieldMessage::OpenReactor { name } => self.open_reactor(name),
             FieldMessage::Split { reply } => {
                 let split = self
                     .split
@@ -1005,6 +1006,8 @@ impl FieldActor {
                 FieldRequest::BringOutMob { mob_id, at } => {
                     self.handle_bring_out_mob(from, mob_id, at)
                 }
+                FieldRequest::OpenReactor { name } => self.open_reactor(name),
+                FieldRequest::ClearMobs => self.clear_mobs(),
                 FieldRequest::SetReactorState { name, state } => {
                     for view in self.reactors.force_forward(name, state) {
                         if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
@@ -3630,6 +3633,41 @@ impl FieldActor {
         }
     }
 
+    /// The reactors named `name` here open, shown to everyone, and shut
+    /// again when their open state times out (Cosmic `hitReactor` on a
+    /// reactor whose first state has no events).
+    fn open_reactor(&mut self, name: &str) {
+        for view in self.reactors.open(name, Instant::now()) {
+            if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                self.broadcast(None, packet);
+            }
+        }
+    }
+
+    /// A Magatia hub's side door, `object_id`, opened with a Card Key: the
+    /// party's copy of the side room behind it opens its way back too.
+    fn open_side_room(&mut self, by: ClientId, object_id: i32) {
+        let side = net::events::MagatiaSide::of(self.key.map_id)
+            .filter(|side| self.key.instance_id != 0 && self.key.map_id == side.stages()[3]);
+        let (Some(side), Some(name)) = (side, self.reactors.name(object_id)) else {
+            return;
+        };
+        let Some(&(_, room, exit)) = side.side_doors().iter().find(|(door, ..)| *door == name)
+        else {
+            return;
+        };
+        let occupant = self
+            .occupants
+            .get(&by)
+            .or_else(|| self.occupants.values().next());
+        if let Some(occupant) = occupant {
+            occupant.handle.send(ServerMessage::OpenEventReactor {
+                map_id: room,
+                name: exit,
+            });
+        }
+    }
+
     /// Every mob here that isn't friendly goes, as if it left, and no more
     /// come: the event this copy is of was won.
     fn clear_mobs(&mut self) {
@@ -3996,6 +4034,9 @@ impl FieldActor {
             // `restartEventTimer` unless the intro is out, then
             // `mapMessage(6, ..)`.
             reactors::Action::Horntail => self.bring_out_horntail(by),
+            // Cosmic `2618001`/`2618002`'s `act`: the way back out of the
+            // side room it leads to opens too.
+            reactors::Action::SideDoor => self.open_side_room(by, view.object_id),
             // Cosmic `2519000`'s `act`: `setAllowSpawnPointInBox(false,
             // ..)` around it, then the clear if the other seals are set and
             // no monster is left (as the last kill's, `killed`).

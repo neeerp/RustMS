@@ -900,6 +900,9 @@ pub const ELLIN_SPRITE: i32 = 2133004;
 /// their side's copy of the party quest, and in its maps let a member out.
 pub const ROMEO: i32 = 2112004;
 pub const JULIET: i32 = 2112003;
+/// Romeo and Juliet in their side's hub of files, past the beaker room.
+pub const ROMEO_HUB: i32 = 2112006;
+pub const JULIET_HUB: i32 = 2112005;
 /// The books of each side's library, one of which holds the switch that
 /// clears its first stage.
 pub const ZENUMIST_BOOK: i32 = 2112007;
@@ -1620,6 +1623,19 @@ impl NpcScript {
     /// map that may be `bare` of monsters.
     pub fn guon_aboard(player: &Player, leader: bool, marks: u8, bare: bool) -> Self {
         guon_aboard(player, leader, marks, bare)
+    }
+
+    /// Romeo or Juliet in `side`'s hub of files, to `player`, who may be
+    /// the team's `leader`, once the hub's stage is `cleared` or not, and
+    /// with its way on shut (`door_shut`) or open.
+    pub fn magatia_hub(
+        side: MagatiaSide,
+        player: &Player,
+        leader: bool,
+        cleared: bool,
+        door_shut: bool,
+    ) -> Self {
+        magatia_hub(side, player, leader, cleared, door_shut)
     }
 
     /// Eak (Cosmic `2013001`) to a player in the Orbis party quest on
@@ -7392,6 +7408,82 @@ fn magatia_book(npc_id: i32, find: Option<Find>) -> NpcScript {
     let mut script = NpcScript::new(npc_id, vec![page]);
     script.inventory_full = Some(text(keys::MAGATIA_BOOK_LETTER_FULL));
     script
+}
+
+/// The hub's Romeo or Juliet on `side`.
+pub fn magatia_hub_host(side: MagatiaSide) -> i32 {
+    match side {
+        MagatiaSide::Zenumist => ROMEO_HUB,
+        MagatiaSide::Alcadno => JULIET_HUB,
+    }
+}
+
+/// Romeo (Cosmic `2112006`) or Juliet (`2112005`) in their side's hub of
+/// files: the side's letter from the library shocks them, which everyone
+/// hears; both files, from the leader, clear the stage, send the hub's
+/// monsters away and open its way on, which they open again once it shuts.
+/// Without either, they ask whether the member would rather retreat.
+fn magatia_hub(
+    side: MagatiaSide,
+    player: &Player,
+    leader: bool,
+    cleared: bool,
+    door_shut: bool,
+) -> NpcScript {
+    let npc = magatia_hub_host(side);
+    let event = EventKind::Magatia(side).event();
+    let zenumist = side == MagatiaSide::Zenumist;
+    let say = |key: &str| NpcScript::new(npc, vec![Page::Say(text(key))]);
+    let act = |key: &str, effects: Vec<Effect>| {
+        NpcScript::new(
+            npc,
+            vec![Page::Act {
+                text: text(key),
+                effects,
+            }],
+        )
+    };
+    let has = |item_id: i32| player.inventory.count(item_id) > 0;
+    if has(side.letter()) {
+        return act(
+            keys::MAGATIA_LETTER,
+            vec![
+                Effect::TakeItem {
+                    item_id: side.letter(),
+                    quantity: 1,
+                },
+                Effect::EventCommand(EventCommand::Shocked),
+            ],
+        );
+    }
+    if cleared {
+        return match door_shut {
+            true => act(
+                keys::MAGATIA_OPEN_DOOR,
+                vec![Effect::OpenReactor(side.hub_door())],
+            ),
+            false if zenumist => say(keys::MAGATIA_ROMEO_HURRY),
+            false => say(keys::MAGATIA_JULIET_HURRY),
+        };
+    }
+    if events::MAGATIA_FILES.into_iter().all(has) {
+        if !leader {
+            return say(keys::MAGATIA_FILES_LEADER);
+        }
+        let mut effects: Vec<Effect> = (events::MAGATIA_FILES.into_iter())
+            .map(|item_id| Effect::TakeItem {
+                item_id,
+                quantity: 1,
+            })
+            .collect();
+        effects.extend([
+            Effect::EventCommand(EventCommand::ClearStage(events::MAGATIA_FILES_STAGE)),
+            Effect::ClearMobs,
+            Effect::OpenReactor(side.hub_door()),
+        ]);
+        return act(keys::MAGATIA_FILES, effects);
+    }
+    ask_warp(npc, magatia_keys(side).retreat, event.exit)
 }
 
 /// The reactor on each library that the switch lights (Map.nx `d00`,
@@ -15487,6 +15579,105 @@ mod tests {
             );
         }
         assert_eq!(magatia_book_side(ROMEO), None);
+    }
+
+    #[test]
+    fn the_hubs_romeo_and_juliet_read_the_letter_and_take_the_files() {
+        for (side, host, letter, hurry, retreat) in [
+            (
+                MagatiaSide::Zenumist,
+                ROMEO_HUB,
+                4_001_131,
+                keys::MAGATIA_ROMEO_HURRY,
+                keys::MAGATIA_ROMEO_RETREAT,
+            ),
+            (
+                MagatiaSide::Alcadno,
+                JULIET_HUB,
+                4_001_130,
+                keys::MAGATIA_JULIET_HURRY,
+                keys::MAGATIA_JULIET_RETREAT,
+            ),
+        ] {
+            assert_eq!(magatia_hub_host(side), host);
+            let event = EventKind::Magatia(side).event();
+            let holding = |items: &[i32]| {
+                let mut member = player(50);
+                member.stats.map_id = side.stages()[3];
+                for (slot, &item_id) in (1..).zip(items) {
+                    (member.inventory).insert(
+                        InventoryType::Etc,
+                        slot,
+                        game::Item::stack(item_id, 1),
+                    );
+                }
+                member
+            };
+            let hub = |member: &Player, leader, cleared, shut| {
+                let script = NpcScript::magatia_hub(side, member, leader, cleared, shut);
+                assert_eq!(script.npc_id, host);
+                script.begin()
+            };
+            let door = Effect::OpenReactor(side.hub_door());
+
+            // The letter first, for anyone, once it is held.
+            let read = hub(
+                &holding(&[letter, 4_001_134, 4_001_135]),
+                false,
+                false,
+                false,
+            );
+            assert_eq!(page_text(&read), text(keys::MAGATIA_LETTER));
+            assert_eq!(
+                read.effects,
+                [
+                    Effect::TakeItem {
+                        item_id: letter,
+                        quantity: 1
+                    },
+                    Effect::EventCommand(EventCommand::Shocked)
+                ]
+            );
+
+            // Both files from the leader clear the stage; a member is sent
+            // to the leader, and one file is not enough.
+            let files = holding(&[4_001_134, 4_001_135]);
+            let taken = hub(&files, true, false, false);
+            assert_eq!(page_text(&taken), text(keys::MAGATIA_FILES));
+            assert_eq!(
+                taken.effects,
+                [
+                    Effect::TakeItem {
+                        item_id: 4_001_134,
+                        quantity: 1
+                    },
+                    Effect::TakeItem {
+                        item_id: 4_001_135,
+                        quantity: 1
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(4)),
+                    Effect::ClearMobs,
+                    door.clone()
+                ]
+            );
+            let member = hub(&files, false, false, false);
+            assert_eq!(page_text(&member), text(keys::MAGATIA_FILES_LEADER));
+            assert!(member.effects.is_empty());
+            for (items, leader) in [(&[4_001_134][..], true), (&[], false)] {
+                let mut asked = NpcScript::magatia_hub(side, &holding(items), leader, false, false);
+                assert_eq!(question(&asked.begin()), text(retreat));
+                let step = asked.respond(ScriptInput::Yes).unwrap();
+                assert_eq!(step.effects, [Effect::WarpToPortal(event.exit, 0)]);
+            }
+
+            // Once cleared, the way on opens again when it has shut.
+            let opened = hub(&holding(&[]), false, true, true);
+            assert_eq!(page_text(&opened), text(keys::MAGATIA_OPEN_DOOR));
+            assert_eq!(opened.effects, [door]);
+            let open = hub(&holding(&[]), false, true, false);
+            assert_eq!(page_text(&open), text(hurry));
+            assert!(open.effects.is_empty());
+        }
     }
 
     #[test]

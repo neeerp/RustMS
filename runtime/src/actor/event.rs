@@ -428,6 +428,7 @@ pub fn spawn(
         moved_to: Vec::new(),
         reached: HashSet::new(),
         lord_pirate_out: false,
+        shocked: false,
         win_exp: None,
         blessing: start.blessing,
         pyramid_stage: 1,
@@ -548,6 +549,9 @@ struct EventActor {
     reached: HashSet<i32>,
     /// The Lord Pirate is out (`EventCommand::PastTheDoors`).
     lord_pirate_out: bool,
+    /// Romeo or Juliet has read the other's letter
+    /// (`EventCommand::Shocked`).
+    shocked: bool,
     blessing: Option<i32>,
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
@@ -1155,6 +1159,48 @@ impl EventActor {
                 });
             }
             EventCommand::PastTheDoors => debug!(client_id, "Lord Pirate already out"),
+            // A Magatia hub's side door opened the way back out of the
+            // party's copy of the room behind it.
+            EventCommand::OpenReactor { map_id, name } if event.holds(map_id) && !won => {
+                let field = self.fields.field(FieldKey {
+                    channel_id: self.channel_id,
+                    map_id,
+                    instance_id: self.id,
+                });
+                tokio::spawn(async move {
+                    let _ = field.tx.send(FieldMessage::OpenReactor { name }).await;
+                });
+            }
+            EventCommand::OpenReactor { map_id, .. } => {
+                debug!(map_id, client_id, "Event reactor not opened")
+            }
+            // Once a run, everyone hears that Romeo or Juliet read the
+            // letter (Cosmic `2112005`/`2112006`'s `mapMessage(6, ..)` to
+            // the party's maps).
+            EventCommand::Shocked if !self.shocked && !won => {
+                let key = match self.kind {
+                    EventKind::Magatia(net::events::MagatiaSide::Zenumist) => {
+                        keys::MAGATIA_ROMEO_SHOCKED
+                    }
+                    EventKind::Magatia(net::events::MagatiaSide::Alcadno) => {
+                        keys::MAGATIA_JULIET_SHOCKED
+                    }
+                    _ => return debug!(client_id, "Shock outside Magatia"),
+                };
+                self.shocked = true;
+                let text = net::content::text().get(key, &[]);
+                if let Ok(line) = build_item_line(&text, 0) {
+                    for member in self.team.members() {
+                        if let Some(handle) = self.members.get(member) {
+                            handle.send(ServerMessage::EventPackets {
+                                id: self.id,
+                                packets: vec![line.clone()],
+                            });
+                        }
+                    }
+                }
+            }
+            EventCommand::Shocked => debug!(client_id, "Already shocked"),
             EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
                 let seconds = self.stage_seconds();
                 let mut reached = Vec::new();

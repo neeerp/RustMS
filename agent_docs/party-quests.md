@@ -36,7 +36,7 @@ Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
 Magatia's Romeo and Juliet party quest has its entry, its way out, its
-end rules and its first three stages; its other stages come in later slices
+end rules and its first four stages; its other stages come in later slices
 ([Romeo and Juliet](#romeo-and-juliet)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1261,8 +1261,37 @@ beaker to reach state 6 (`net::reactors::Action::Beaker`, the field's
 `beakers`) clears stage 3 for 20,000 EXP each, kills the room's mobs
 and opens its door (`rnj2_door`, `jnr2_door`, 2618006, state 1); only
 then does its way on (`rnj2_out`, `jnr2_out`, to x00200) open. A beaker
-counts once, the first time it fills. The other stages can't be cleared
-yet.
+counts once, the first time it fills.
+
+The hub of files (x00200) has 23 mobs (9300148, which come back) that
+drop the Card Key (4001133) at 10% (`reward_overrides.toml`, Cosmic's
+rate). A Card Key thrown at either of its side doors (`rnj3_out1` west,
+`rnj3_out2` east; Reactor.nx 2618002 and 2618001) opens it
+(`net::reactors::Action::SideDoor`), and with it the way back out of the
+room behind it (x00201 `rnj31_out`, x00202 `rnj32_out`; 2618003 and
+2618004), through the event (`ServerMessage::OpenEventReactor`,
+`FieldMessage::OpenReactor`). Each portal (`rnj3_in0`, `rnj3_in1`,
+`rnj_201_0`, `rnj_202` and their `jnr` twins) is shut, in pink, unless its
+reactor has left state 0, and the doors shut again after 2 seconds, as
+their state 1 times out in Reactor.nx. Cosmic's side doors stay open, as
+its `hitReactor` never times out a state that only leads back. The rooms'
+boxes trade places in each copy (`ReactorSet::shuffle`), but their ways
+back stay put. The west room's box 2612002 holds the first file
+(4001134) and the east room's 2612001 the second (4001135); the others
+(2612003) hold potions and mesos, and the east room's 24 decoys are
+2518000. Each box takes four hits.
+
+Romeo (2112006) or Juliet (2112005) in the hub (`NpcScript::magatia_hub`,
+the client's `magatia_hub`) takes the side's letter from anyone who
+brings it, and everyone in the run hears, as a light-blue line, that they
+were shaken (`EventCommand::Shocked`, once a run). From the leader with
+both files, they take them, clear stage 4 (`talk_clears`; no EXP), send
+the hub's mobs away (`Effect::ClearMobs`) and open its way on
+(`rnj3_out3`, `jnr3_out3`, 2618007, `Effect::OpenReactor`) for 5 seconds;
+`rnj3_out`/`jnr3_out` lead to x00203 only while it is open. After the
+clear they open it again whenever it has shut. A member holding the files
+is told to let the leader hand them in; anyone else is asked whether they
+would rather retreat. The later stages can't be cleared yet.
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the
@@ -1333,8 +1362,10 @@ nothing yet. Its lines are placeholders (`magatia.*`).
 | Guon 2094002 | 925100700 | At once to 251010404 |
 | Romeo 2112004 | 261000011 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Romeo 2112004 | 926100000-400 | Asks whether to retreat, to 926100700 |
+| Romeo 2112006 | 926100200 | Runtime (`magatia_hub`): the letter, the leader's files, the way on, or whether to retreat |
 | Juliet 2112003 | 261000021 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Juliet 2112003 | 926110000-400 | Asks whether to retreat, to 926110700 |
+| Juliet 2112005 | 926110200 | Runtime (`magatia_hub`): the same on the Alcadno side |
 | Books 2112007 | 926100000 | Runtime (`BookOpened`): mesos, EXP, the letter, the switch or nothing |
 | Books 2112013 | 926110000 | The same; in the hall (926110001) they hold nothing |
 

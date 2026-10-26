@@ -112,6 +112,33 @@ impl MagatiaSide {
         }
     }
 
+    /// The two doors of its hub (`stages()[3]`) that take a Card Key
+    /// (`MAGATIA_CARD_KEY`), each with the room beside the hub it lets in
+    /// to and that room's own way back, which opens with it (Cosmic
+    /// `2618002` and `2618001`, west and east).
+    pub fn side_doors(self) -> [(&'static str, i32, &'static str); 2] {
+        let hub = self.stages()[3];
+        match self {
+            MagatiaSide::Zenumist => [
+                ("rnj3_out1", hub + 1, "rnj31_out"),
+                ("rnj3_out2", hub + 2, "rnj32_out"),
+            ],
+            MagatiaSide::Alcadno => [
+                ("jnr3_out1", hub + 1, "jnr31_out"),
+                ("jnr3_out2", hub + 2, "jnr32_out"),
+            ],
+        }
+    }
+
+    /// The hub's way on, which its Romeo or Juliet opens once the files
+    /// are handed in (Cosmic `rnj3_out3`).
+    pub fn hub_door(self) -> &'static str {
+        match self {
+            MagatiaSide::Zenumist => "rnj3_out3",
+            MagatiaSide::Alcadno => "jnr3_out3",
+        }
+    }
+
     /// The letter one of its library's books may hide (Cosmic `2112007`
     /// and `2112013`).
     pub fn letter(self) -> i32 {
@@ -1778,7 +1805,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         exp_per_stage: &[0, 10_000, 20_000, 0, 20_000, 20_000, 0],
         stride: 1,
         stage_maps: stages,
-        talk_clears: &[],
+        talk_clears: &[MAGATIA_FILES_STAGE],
         member_clears: &[1, 2, 3],
         clear_portals: &[],
         gated: &[],
@@ -1826,6 +1853,13 @@ pub const MAGATIA_BOOK_EXP: i32 = 500;
 /// clears (Cosmic `2618000`'s `statusStg3`).
 pub const MAGATIA_BEAKERS: usize = 3;
 pub const MAGATIA_BEAKER_STAGE: u8 = 3;
+
+/// What the hub's doors to the rooms beside it take (9300148 drops it),
+/// the two files those rooms' boxes hold, and the stage their hand-in
+/// clears (Cosmic `2112006`'s `statusStg4`).
+pub const MAGATIA_CARD_KEY: i32 = 4_001_133;
+pub const MAGATIA_FILES: [i32; 2] = [4_001_134, 4_001_135];
+pub const MAGATIA_FILES_STAGE: u8 = 4;
 
 /// What each of a library's books holds, in the order of the map's books,
 /// drawn for each run (Cosmic `MagatiaPQ_Z.afterSetup`): seven of mesos,
@@ -2713,6 +2747,13 @@ pub enum EventCommand {
     /// A member used Rage of Pharaoh, spending one of the Nett's Pyramid
     /// run's uses.
     Rage,
+    /// A reactor here opened the way back from the room beside it: open
+    /// `name` on the copy of `map_id` too, until its time there is up
+    /// (Cosmic `2618001`'s `act`).
+    OpenReactor { map_id: i32, name: &'static str },
+    /// A member gave Romeo or Juliet their side's letter: the team hears
+    /// it shook them, once.
+    Shocked,
     /// A member's attack in a Monster Carnival battle killed mobs worth
     /// this many CP (their `getCP`).
     CarnivalCp(i32),
