@@ -68,6 +68,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 
 namespace ms
 {
@@ -2324,6 +2325,11 @@ namespace ms
 		int64_t now = item_expiry::now();
 
 		if (now < quest.start_time || now > quest.end_time)
+			return false;
+
+		std::time_t clock = std::time(nullptr);
+
+		if (!open_on(quest, std::localtime(&clock)->tm_wday))
 			return false;
 
 		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, now))

@@ -37,6 +37,7 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "pet",
     "pettamenessmin",
     "pettamenessmax",
+    "dayOfWeek",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -182,6 +183,9 @@ pub struct StartRequirements {
     /// its start to its end hour inclusive (FUN_00721163), so most event
     /// quests, which ended in 2005-2010, are never offered.
     pub not_after: Option<SystemTime>,
+    /// The weekdays the quest can be started on (`dayOfWeek`), a bit each
+    /// from Sunday (1) to Saturday (64); `None` means any day.
+    pub weekdays: Option<u8>,
     /// Pet items of which the first pet out must be one (`pet`); empty means
     /// no pet is needed.
     pub pets: Vec<i32>,
@@ -567,6 +571,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.maps = int_list(nx, start, "fieldEnter")?;
     requirements.not_before = nx.int_child(start, "start")?.map(date_hour).transpose()?;
     requirements.not_after = nx.int_child(start, "end")?.map(date_hour).transpose()?;
+    requirements.weekdays = weekdays(nx, start)?;
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
@@ -877,7 +882,25 @@ fn quest_skills(nx: &NxDataFile, act: &str) -> Result<Vec<QuestSkill>, GameDataE
     Ok(result)
 }
 
-/// A supported script name, if the node names one.
+/// `dayOfWeek`: the days, `sun` to `sat`, whose value isn't 0, read as v83
+/// does (FUN_0071e1d6). A day left out counts as 0, so a key with no day set
+/// opens on none.
+fn weekdays(nx: &NxDataFile, start: u32) -> Result<Option<u8>, GameDataError> {
+    let Some(days) = nx.child_by_name(start, "dayOfWeek")? else {
+        return Ok(None);
+    };
+    let mut mask = 0;
+    for (bit, day) in ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+        .iter()
+        .enumerate()
+    {
+        if nx.int_child(days, day)?.unwrap_or(0) != 0 {
+            mask |= 1 << bit;
+        }
+    }
+    Ok(Some(mask))
+}
+
 /// The hour a quest date names, read as v83 does (FUN_00720d26): the
 /// digits "yyyymmddhh" as year, month, day and hour, in UTC.
 fn date_hour(date: i32) -> Result<SystemTime, GameDataError> {
@@ -912,6 +935,7 @@ fn date_hour(date: i32) -> Result<SystemTime, GameDataError> {
     })
 }
 
+/// A supported script name, if the node names one.
 fn script(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>, GameDataError> {
     match nx.string_child(parent, key)? {
         None => Ok(None),
@@ -1207,6 +1231,16 @@ mod tests {
             catalog.quest(3600).unwrap().start.not_before,
             Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_135_382_400))
         );
+        // Saturdays only, and weekdays only (Monday to Friday).
+        assert_eq!(
+            catalog.quest(8248).unwrap().start.weekdays,
+            Some(0b100_0000)
+        );
+        assert_eq!(
+            catalog.quest(8254).unwrap().start.weekdays,
+            Some(0b011_1110)
+        );
+        assert_eq!(catalog.quest(3600).unwrap().start.weekdays, None);
         assert_eq!(catalog.quest(2029).unwrap().start_money, -1000);
         assert_eq!(catalog.quest(3406).unwrap().start_exp, 1600);
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));

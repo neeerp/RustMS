@@ -53,6 +53,9 @@ namespace ms
 		int32_t repeat_interval = -1;
 		// Without an interval, repeatable on a later day (Check/0/dayByDay).
 		bool day_by_day = false;
+		// The weekdays it can be started on (Check/0/dayOfWeek), a bit each
+		// from Sunday (1) to Saturday (64); every day without the key.
+		uint8_t weekdays = 0xFF;
 		// Items needed to complete: (item id, count); a count of 0 means none
 		// may be left.
 		std::vector<std::pair<int32_t, int32_t>> end_items;

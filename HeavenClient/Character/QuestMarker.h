@@ -201,6 +201,13 @@ namespace ms
 			[&](const auto& requirement) { return has_skill(requirement.first) == requirement.second; });
 	}
 
+	// Whether a quest can be started on `weekday`, 0 (Sunday) to 6. v83 asks
+	// the PC's own clock (GetLocalTime, FUN_00721163), not the server's.
+	inline bool open_on(const QuestInfo& quest, int weekday)
+	{
+		return (quest.weekdays >> weekday & 1) != 0;
+	}
+
 	// Whether a quest can be started again once completed.
 	inline bool repeatable(const QuestInfo& quest)
 	{

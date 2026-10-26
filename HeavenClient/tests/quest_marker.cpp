@@ -304,6 +304,13 @@ int main()
 		// 3600's Christmas Eve 2005, in FILETIME ticks.
 		require(ms::quest_date(2005122400) == 116444736000000000 + 1135382400LL * 10000000, "a start date is UTC");
 		require(ms::quest_date(2005122413) - ms::quest_date(2005122400) == 13 * 36000000000LL, "to the hour");
+		// 8254 is for weekdays, Monday to Friday.
+		ms::QuestInfo weekdays = quest(8254, 9010000, 9010000);
+		require(ms::open_on(weekdays, 0) && ms::open_on(weekdays, 6), "a quest without dayOfWeek opens every day");
+		weekdays.weekdays = 0x3E;
+		require(!ms::open_on(weekdays, 0) && ms::open_on(weekdays, 1) && ms::open_on(weekdays, 5) &&
+				!ms::open_on(weekdays, 6),
+			"one with it, only on its days");
 		std::cout << "Quest marker transitions and priority passed\n";
 		return 0;
 	}
