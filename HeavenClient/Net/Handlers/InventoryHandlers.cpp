@@ -311,6 +311,11 @@ namespace ms
 			window->receive(code);
 	}
 
+	void ExtraPendantSlotHandler::handle(InPacket& recv) const
+	{
+		Stage::get().get_player().get_inventory().set_pendant_cell(recv.read_bool());
+	}
+
 	void RandomMorphResHandler::handle(InPacket& recv) const
 	{
 		Stage::get().get_player().request_answered();

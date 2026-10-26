@@ -1861,7 +1861,7 @@ namespace ms
 		return meets_equip_reqs(Stage::get().get_player().get_stats(), EquipData::get(item_id));
 	}
 
-	bool UIItemInventory::can_wear_equip(int16_t slot) const
+	bool UIItemInventory::can_wear_equip(int16_t slot, EquipSlot::Id part) const
 	{
 		const Player &player = Stage::get().get_player();
 		const CharStats &stats = player.get_stats();
@@ -1882,7 +1882,14 @@ namespace ms
 			return false;
 		}
 
-		EquipSlot::Id part = inventory.find_equipslot(item_id);
+		if (part == EquipSlot::Id::NONE)
+			part = inventory.find_equipslot(item_id);
+
+		// The second pendant slot takes nothing while shut, and says nothing
+		// (FUN_004f1c2d, report b178).
+		if (part == EquipSlot::Id::PENDANT2 && !inventory.extra_pendant_open())
+			return false;
+
 		bool cash = inventory.get_cash_id(InventoryType::Id::EQUIP, slot) != 0;
 		int16_t layer = cash ? Inventory::CASH_EQUIP : 0;
 
@@ -2330,9 +2337,12 @@ namespace ms
 					{
 						put_on(source, Stage::get().get_player().get_inventory().equip_position(source, eqslot));
 					}
-				} else if (eqsource == eqslot)
+				} else if (eqsource == eqslot
+						   || (eqsource == EquipSlot::Id::PENDANT2 && eqslot == EquipSlot::Id::PENDANT1))
 				{
-					if (parent.can_wear_equip(source))
+					// A pendant dropped on the first pendant cell goes there
+					// though the second is free.
+					if (parent.can_wear_equip(source, eqslot))
 						put_on(source, Stage::get().get_player().get_inventory().equip_position(source, eqslot));
 				}
 

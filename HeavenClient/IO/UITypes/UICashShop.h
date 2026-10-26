@@ -80,6 +80,8 @@ namespace ms
 		// button leaves at once.
 		void confirm_exit();
 
+		// The commodities SET_CASH_SHOP changes or adds (report b179).
+		void apply_changes(const std::vector<cash_catalog::Change>& changes);
 		// The account's name and the Best Item commodities, from SET_CASH_SHOP.
 		void set_account(const std::string& account, const std::vector<int32_t>& best);
 		void set_balance(int32_t credit, int32_t points, int32_t prepaid);

@@ -150,6 +150,33 @@ int main()
 		require(use.size() == 2 && use[0].sn == 80000002, "a commodity for the other gender stays out");
 		require(scatter(std::vector<Commodity>(shop.begin() + 3, shop.end()), []() { return 0u; }).empty(), "no sub-tab, no place");
 
+		// What SET_CASH_SHOP changes or adds (report b179).
+		std::vector<Commodity> img = {
+			{ 50200003, 5076000, 300, 1, 2, NONE, 9 },
+			{ 50200004, 5077000, 900, 1, 2, NONE, 9, 0, false }
+		};
+		Change pendant = { 50200172, 0x637, 5550000, 1, 9, 2000, 30, 2, true };
+		apply_change(img, pendant);
+		require(img.size() == 3 && img[2].item_id == 5550000 && img[2].count == 1 && img[2].priority == 9 &&
+			img[2].price == 2000 && img[2].period == 30 && img[2].gender == 2 && img[2].on_sale, "an unknown SN is added");
+
+		Change off = { 50200003, Change::ON_SALE };
+		apply_change(img, off);
+		Change dearer = { 50200004, Change::PRICE | Change::ON_SALE };
+		dearer.price = 1200;
+		dearer.on_sale = true;
+		apply_change(img, dearer);
+		require(img.size() == 3 && img[0].price == 300 && !img[0].on_sale, "only the flagged fields change");
+		require(img[1].price == 1200 && img[1].item_id == 5077000, "a known SN keeps the rest");
+
+		std::vector<Commodity> sold = on_sale(img);
+		require(sold.size() == 2 && sold[0].sn == 50200004 && sold[1].sn == 50200172, "on sale, in order");
+
+		require(is_slot_extender(5550000) && is_slot_extender(5559999) && !is_slot_extender(5430000), "555xxxx");
+		require(slot_extender_question("Extra Pendant Slot", 2000, 30) ==
+			"If you purchase a Extra Pendant Slot(2000cash), you can equip \\n the item for 30 additional days. \\n "
+			"Refunds are not availabe after the purchase. \\n Do you still wish to purchase it?", "0x1458");
+
 		std::cout << "Cash catalog passed\n";
 		return 0;
 	}

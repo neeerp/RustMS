@@ -75,6 +75,17 @@ namespace ms
 		// Set the number of slots for a given inventory.
 		void set_slotmax(InventoryType::Id type, uint8_t value);
 
+		// Until when the second pendant slot is open, a FILETIME; earlier
+		// than now is shut (report b178).
+		void set_extra_pendant(int64_t until);
+		int64_t get_extra_pendant() const;
+		bool extra_pendant_open() const;
+
+		// Whether the Equip window has the second pendant cell (opcode 121),
+		// which v83 reads when it first builds the window.
+		void set_pendant_cell(bool shown);
+		bool has_pendant_cell() const;
+
 		// Modify the inventory with info from a packet
 		void modify(InventoryType::Id type, int16_t pos, int8_t mode, int16_t arg, Movement movement);
 
@@ -213,6 +224,8 @@ namespace ms
 		EnumMap<EquipStat::Id, uint16_t> totalstats;
 		EnumMap<InventoryType::Id, uint8_t> slotmaxima;
 		int64_t meso;
+		int64_t extra_pendant;
+		bool pendant_cell;
 		int16_t bulletslot;
 		int32_t bulletprefix;
 		int32_t bulletlevel;

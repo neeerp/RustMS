@@ -59,6 +59,10 @@ pub struct WorldSession {
     pub meso: i32,
     /// Slots in the Equip, Use, Set-up, Etc and Cash bags.
     pub slot_limits: [u8; 5],
+    /// Until when the second pendant slot is open (FILETIME).
+    pub extra_pendant: i64,
+    /// Whether the Equip window has the second pendant cell (opcode 121).
+    pub pendant_cell: bool,
     pub monster_book_cover: i32,
     /// Copies of each Monster Book card, by card id.
     pub monster_book: std::collections::BTreeMap<i32, u8>,
@@ -133,6 +137,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
     let mut auto_hp = None;
     let mut auto_mp = None;
     let mut quick_slots = None;
+    let mut pendant_cell = None;
     let mut world_entry = None;
 
     for _ in 0..10 {
@@ -176,6 +181,9 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
                     Some(decode_quick_slot_init(&envelope.packet).map_err(|message| {
                         HarnessError::protocol("world entry", world_conn.endpoint(), message)
                     })?);
+            }
+            x if x == SendOpcode::ExtraPendantSlot as i16 => {
+                pendant_cell = envelope.packet.bytes.get(2).map(|shown| *shown != 0);
             }
             x if x == SendOpcode::SetField as i16 => {
                 let set_field = decode_set_field(&envelope.packet).map_err(|message| {
@@ -221,6 +229,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
             && auto_hp.is_some()
             && auto_mp.is_some()
             && quick_slots.is_some()
+            && pendant_cell.is_some()
             && world_entry.is_some()
         {
             break;
@@ -267,6 +276,14 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         ));
     };
 
+    let Some(pendant_cell) = pendant_cell else {
+        return Err(HarnessError::protocol(
+            "world entry",
+            world_conn.endpoint(),
+            "did not receive ExtraPendantSlot during world entry".to_string(),
+        ));
+    };
+
     let (family, claims) = drain_spawn_npcs(&mut world_conn).await;
 
     Ok(WorldSession {
@@ -288,6 +305,8 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         items: world_entry.items,
         meso: world_entry.meso,
         slot_limits: world_entry.slot_limits,
+        extra_pendant: world_entry.extra_pendant,
+        pendant_cell,
         monster_book_cover: world_entry.monster_book_cover,
         monster_book: world_entry.monster_book,
         linked_name: world_entry.linked_name,

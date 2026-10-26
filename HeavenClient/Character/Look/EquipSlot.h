@@ -51,9 +51,10 @@ namespace ms
 			SADDLE = 19,	// TODO: Where is this now?
 			MEDAL = 49,
 			BELT = 50,
+			// The second pendant cell, open while paid for (report b144).
+			PENDANT2 = 51,
 			POCKET,		// TODO: What is the proper value for this?
 			BOOK,		// TODO: What is the proper value for this?
-			PENDANT2,	// TODO: What is the proper value for this?
 			SHOULDER,	// TODO: What is the proper value for this?
 			ANDROID,	// TODO: What is the proper value for this?
 			EMBLEM,		// TODO: What is the proper value for this?

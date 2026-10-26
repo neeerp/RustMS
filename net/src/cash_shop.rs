@@ -15,10 +15,29 @@ pub fn commodities() -> Result<&'static CommodityData, &'static str> {
     })
 }
 
-/// The commodity with serial number `sn`, if the data has it.
+/// The commodity with serial number `sn`, if the data has it or it is the
+/// second pendant slot's.
 pub fn commodity(sn: i32) -> Option<&'static Commodity> {
-    commodities().ok()?.get(sn)
+    let found = commodities().ok()?.get(sn);
+    found.or((sn == PENDANT_SLOT.sn).then_some(&PENDANT_SLOT))
 }
+
+/// The second pendant slot for 30 days (5550000), which no `Commodity.img`
+/// sells: the shop adds it to the client's list on entry (report b179), in
+/// Etc > Game beside the Extra Character Slot Coupon. Its price is a pick.
+pub const PENDANT_SLOT: Commodity = Commodity {
+    sn: 50_200_172,
+    item_id: 5_550_000,
+    count: 1,
+    price: 2_000,
+    period: PENDANT_SLOT_DAYS as i32,
+    gender: 2,
+    on_sale: true,
+};
+
+/// How long one 5550000 keeps the second pendant slot open: its `addDay` in
+/// `Item.nx`, which v83 names in its question (report b179).
+pub const PENDANT_SLOT_DAYS: u16 = 30;
 
 /// The most slots a bag can have.
 pub const MAX_BAG_SLOTS: u8 = 96;
@@ -97,6 +116,12 @@ pub enum CashShopRequest {
         cash_type: CashType,
         commodity: Commodity,
     },
+    /// Pay for `commodity` and keep the second pendant slot open its days
+    /// longer.
+    BuyPendantSlot {
+        cash_type: CashType,
+        commodity: Commodity,
+    },
     /// Pay for Name Change `commodity` from the NX Prepaid and ask for
     /// `new_name`, already checked against the name rules.
     RequestNameChange {
@@ -135,9 +160,10 @@ pub const NAME_CHANGE: i32 = 5_400_000;
 pub const CHARACTER_SLOT: i32 = 5_430_000;
 
 /// Whether `item_id` is bought only with its own request: the pair rings,
-/// Name Change and the Extra Character Slot Coupon. None can be a gift.
+/// Name Change, the Extra Character Slot Coupon and the pendant slot. None
+/// can be a gift.
 pub fn own_request(item_id: i32) -> bool {
-    pair_ring(item_id) || [NAME_CHANGE, CHARACTER_SLOT].contains(&item_id)
+    pair_ring(item_id) || [NAME_CHANGE, CHARACTER_SLOT, PENDANT_SLOT.item_id].contains(&item_id)
 }
 
 /// The lowest level that may ask for a new name (the rules sheet, Text02).

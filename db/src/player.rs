@@ -9,8 +9,8 @@ use crate::keybinding::KeybindType;
 use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, auto_potions, character_mounts, character_quests, characters, dojo_records,
-    equipment_stats, explored_maps, gacha_exp, inventory_items, keybindings, monster_book_cards,
-    quick_slots, saved_locations, skill_macros, skills, teleport_rocks,
+    equipment_stats, explored_maps, extra_pendant_slots, gacha_exp, inventory_items, keybindings,
+    monster_book_cards, quick_slots, saved_locations, skill_macros, skills, teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -241,6 +241,11 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         player.auto_potions = AutoPotions { hp, mp };
     }
     player.quick_slots = load_quick_slots(&mut conn, character_id)?;
+    player.extra_pendant = extra_pendant_slots::table
+        .find(character_id)
+        .select(extra_pendant_slots::open_until)
+        .first(&mut conn)
+        .optional()?;
     // Blessing of the Fairy follows the account's highest other character in
     // this world.
     player.link(
@@ -481,6 +486,17 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         }
         if let Some(slots) = player.quick_slots {
             save_quick_slots(conn, id, slots)?;
+        }
+        if let Some(until) = player.extra_pendant {
+            diesel::insert_into(extra_pendant_slots::table)
+                .values((
+                    extra_pendant_slots::character_id.eq(id),
+                    extra_pendant_slots::open_until.eq(until),
+                ))
+                .on_conflict(extra_pendant_slots::character_id)
+                .do_update()
+                .set(extra_pendant_slots::open_until.eq(until))
+                .execute(conn)?;
         }
         save_mount(conn, id, &player.mount)?;
         save_dojo(conn, id, &player.dojo)?;

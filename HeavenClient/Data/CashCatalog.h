@@ -51,6 +51,7 @@ namespace ms
 			int32_t priority;
 			// Days the item lasts; 0 is forever.
 			int32_t period = 0;
+			bool on_sale = true;
 		};
 
 		// Tabs in the order they're drawn. MAIN shows the how-to pages
@@ -418,6 +419,113 @@ namespace ms
 		inline bool added_character_slot(int16_t before, int16_t after)
 		{
 			return after > before && after <= MAX_CHARACTER_SLOTS;
+		}
+
+		// A commodity SET_CASH_SHOP changes, or adds if Commodity.img lacks
+		// its SN: only the fields `flags` names are sent (v83 a25db4, report
+		// b179).
+		struct Change
+		{
+			enum Field : uint32_t
+			{
+				ITEM_ID = 0x1,
+				COUNT = 0x2,
+				PRICE = 0x4,
+				BONUS = 0x8,
+				PRIORITY = 0x10,
+				PERIOD = 0x20,
+				MAPLE_POINT = 0x40,
+				MESO = 0x80,
+				PREMIUM = 0x100,
+				GENDER = 0x200,
+				ON_SALE = 0x400,
+				CLASS = 0x800,
+				LIMIT = 0x1000,
+				PB_CASH = 0x2000,
+				PB_POINT = 0x4000,
+				PB_GIFT = 0x8000,
+				PACKAGE = 0x10000
+			};
+
+			int32_t sn;
+			uint32_t flags;
+			int32_t item_id = 0;
+			int16_t count = 0;
+			int32_t priority = 0;
+			int32_t price = 0;
+			int32_t period = 0;
+			int8_t gender = 0;
+			bool on_sale = false;
+			int32_t item_class = -1;
+		};
+
+		// The commodity `change` makes of the one with its SN in `all`, or
+		// of a new one, which has only what is sent (a25f19).
+		inline void apply_change(std::vector<Commodity>& all, const Change& change)
+		{
+			auto found = std::find_if(all.begin(), all.end(),
+				[&](const Commodity& commodity) { return commodity.sn == change.sn; });
+
+			if (found == all.end())
+			{
+				Commodity added = { change.sn, 0, 0, 0, 0, NONE, 0, 0, false };
+				all.push_back(added);
+				found = all.end() - 1;
+			}
+
+			Commodity& commodity = *found;
+
+			if (change.flags & Change::ITEM_ID)
+				commodity.item_id = change.item_id;
+
+			if (change.flags & Change::COUNT)
+				commodity.count = change.count;
+
+			if (change.flags & Change::PRIORITY)
+				commodity.priority = change.priority;
+
+			if (change.flags & Change::PRICE)
+				commodity.price = change.price;
+
+			if (change.flags & Change::PERIOD)
+				commodity.period = change.period;
+
+			if (change.flags & Change::GENDER)
+				commodity.gender = change.gender;
+
+			if (change.flags & Change::ON_SALE)
+				commodity.on_sale = change.on_sale;
+
+			if (change.flags & Change::CLASS)
+				commodity.label = label(change.item_class, change.sn);
+		}
+
+		// The commodities on sale, in the order of `all`.
+		inline std::vector<Commodity> on_sale(const std::vector<Commodity>& all)
+		{
+			std::vector<Commodity> found;
+
+			for (const Commodity& commodity : all)
+				if (commodity.on_sale)
+					found.push_back(commodity);
+
+			return found;
+		}
+
+		// A slot extender (555xxxx) keeps an extra equip slot open for its
+		// `addDay`; v83 buys one with its own question and request, whatever
+		// its SN (4731a9, 46c988).
+		inline bool is_slot_extender(int32_t item_id)
+		{
+			return item_id / 10000 == 555;
+		}
+
+		// StringPool 0x1458, as v83 words it.
+		inline std::string slot_extender_question(const std::string& name, int32_t price, int32_t days)
+		{
+			return "If you purchase a " + name + "(" + std::to_string(price) + "cash), you can equip \\n the item for "
+				+ std::to_string(days) + " additional days. \\n Refunds are not availabe after the purchase. \\n "
+				"Do you still wish to purchase it?";
 		}
 
 		// The slots a coming job advancement adds to a bag (1 Equip to 4

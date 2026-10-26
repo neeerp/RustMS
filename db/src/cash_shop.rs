@@ -273,7 +273,8 @@ pub fn buy_ring(
 }
 
 /// Pay `price` from the account's `cash_type` balance and save `player`,
-/// whose bags have grown, in one transaction. `None` if the balance is short.
+/// whose bags have grown or whose second pendant slot is open longer, in one
+/// transaction. `None` if the balance is short.
 pub fn expand_inventory(
     cash_type: CashType,
     price: i32,

@@ -40,6 +40,7 @@ async fn read_world_entry(
         }
         match envelope.opcode() {
             x if x == SendOpcode::KeyMap as i16 => saw_keymap = true,
+            x if x == SendOpcode::ExtraPendantSlot as i16 => {}
             x if x == SendOpcode::MacroSysDataInit as i16 => {}
             x if x == SendOpcode::AutoHpPot as i16 => {}
             x if x == SendOpcode::AutoMpPot as i16 => {}

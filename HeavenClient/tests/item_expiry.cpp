@@ -60,6 +60,32 @@ int main()
 		require(commodity_pet_line(permanent) == "PERMANENT", "permanent for sale");
 		require(commodity_pet_line(limited) == "DAYS OF MAGIC : 5hrs. 0min.", "limited life for sale");
 
+		// The second pendant slot (report b178).
+		constexpr int64_t DAY = 86400 * TICKS_PER_SECOND;
+
+		require(open(OCT_19_2026_13_05, OCT_19_2026_13_05 - 1) && !open(OCT_19_2026_13_05, OCT_19_2026_13_05),
+			"open until its end");
+		require(!open(0, OCT_19_2026_13_05), "never bought, shut");
+		require(extended(0, OCT_19_2026_13_05, 30) == OCT_19_2026_13_05 + 30 * DAY, "shut, from now");
+		require(extended(OCT_19_2026_13_05, OCT_19_2026_13_05 - DAY, 30) == OCT_19_2026_13_05 + 30 * DAY,
+			"open, from its end");
+		require(extended(OCT_19_2026_13_05 - DAY, OCT_19_2026_13_05, 30) == OCT_19_2026_13_05 + 30 * DAY,
+			"lapsed, from now");
+
+		require(slot_notice(false, OCT_19_2026_13_05) == "You have added PENDANT slots.", "added");
+		require(slot_notice(true, OCT_19_2026_13_05) ==
+			"The time limit for the \\n PENDANT slot has been extended to 2026(month)-10(date)-19(year) at 13(hour):5(minute).",
+			"extended, year first as v83 passes it");
+		require(slot_extender_line(0, OCT_19_2026_13_05) ==
+			"If you purchase this item, you will be able to equip\\nadditional equipment items.", "an extender, shut");
+		require(slot_extender_line(OCT_19_2026_13_05, OCT_19_2026_13_05 - DAY) ==
+			"Available until 2026(month)-10(date)-0019(year) at 13(hour):05(minute)", "an extender, open");
+		require(pendant_slot_line(0, OCT_19_2026_13_05) ==
+			"The item will be equipped if you purchase a PENDANT slot extender at the #c Cash Shop.#", "worn, shut");
+		require(pendant_slot_line(OCT_19_2026_13_05, OCT_19_2026_13_05 - DAY) ==
+			"The item's effects will disappear after the #cslot expiration date of 2026(month)-10(date)-0019(year) at 13(hour):05(minute).",
+			"worn, open");
+
 		std::cout << "item expiry passed\n";
 		return 0;
 	}

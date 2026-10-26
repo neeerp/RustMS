@@ -78,6 +78,38 @@ v83 has no single code (report c005):
 - Taking it out of the Cash Shop: inventory full. The client refuses this one
   itself.
 
+## The second pendant slot
+
+A character may wear a second pendant in part 51 while the slot is paid
+for (reports b144, b178, b179). Until when is `Player::extra_pendant`,
+saved in `extra_pendant_slots` (one row per character that ever bought it).
+- **The slot's state:** the character data carries it as the FILETIME after
+  the five bag sizes (`encode_inventory`; 1900 when it was never bought), so
+  SET_FIELD, SET_CASH_SHOP and SET_ITC all bring it.
+- **The cell:** EXTRA_PENDANT_SLOT (`0x79`, one bool) tells the client the
+  Equip window has the cell. The server sends it, true, to everyone at each
+  world entry, after CHAR_INFO. v83 reads it only when it builds the Equip
+  window, so it must come before the window first opens. The window is then
+  33 px wider (`FullBackgrnd`), and the cell is red while the slot is shut.
+- **Wearing:** ITEM_MOVE refuses part 51 while the slot is shut; the client
+  refuses it first, silently. Nothing is dropped on the cell: a pendant goes
+  there only when the first pendant's cell is taken.
+- **What expiry does:** nothing is taken off when the slot shuts. The worn
+  pendant stays in part 51, and its stats stop counting. v83 also takes it
+  out of the look once a second; HeavenClient does not.
+- **Buying:** the Cash Shop sells 5550000 (30 days, 2,000 NX) as SN
+  50200172. No `Commodity.img` has it, so SET_CASH_SHOP adds it to the
+  client's list (see the Cash Shop in `client.md`). CASHSHOP_OPERATION mode 9
+  (`u8 9, u8 points, i32 SN`) buys it. The reply is mode 0x66
+  (`u16 0, u16 days`) and the balance. The days run from the slot's end
+  while it is open, else from now. The client says "You have added PENDANT
+  slots." or when the slot now ends. v83 passes that date, and the
+  tooltips' dates, year first, so it reads "2026(month)-11(date)-24(year)".
+  HeavenClient keeps that.
+- **Tooltips:** a 555xxxx item says what it would do (shut) or until when
+  the slot is open. A pendant worn in part 51 adds when its effects end, or
+  what would put it on.
+
 ## Client moves
 
 ITEM_MOVE (`0x47`: tick, type, from, to, quantity) is handled by

@@ -844,6 +844,10 @@ impl ClientActor {
         // The key map, the pet's potions and the quick slots reach only a
         // field's stage, so a v83 client drops them before SET_FIELD.
         self.send(&mut char_info).await?;
+        // Every Equip window has the second pendant cell, red until bought.
+        let mut pendant_slot = build::world::inventory::build_extra_pendant_slot(true)
+            .map_err(|e| RuntimeError::Handler(e.to_string()))?;
+        self.send(&mut pendant_slot).await?;
         self.send(&mut keymap).await?;
         self.send(&mut macros).await?;
         self.send(&mut auto_hp).await?;
@@ -1199,6 +1203,10 @@ impl ClientActor {
                 self.buy_character_slot(account_id, cash_type, commodity)
                     .await?
             }
+            CashShopRequest::BuyPendantSlot {
+                cash_type,
+                commodity,
+            } => self.buy_pendant_slot(cash_type, commodity).await?,
             CashShopRequest::Coupon(code) => self.redeem_coupon(code).await?,
             CashShopRequest::NameChangeRules => self.name_change_rules().await?,
             CashShopRequest::CheckNewName(name) => self.check_new_name(name).await?,
@@ -1485,6 +1493,45 @@ impl ClientActor {
             SlotPurchase::Short => cs::CashShopFailure::NotEnoughCash,
         };
         Ok(vec![cs::build_cash_shop_failure(failure)?])
+    }
+
+    /// Pay for `commodity` and keep the second pendant slot open its days
+    /// longer: from its expiry if still open, as v83 counts, or from now.
+    async fn buy_pendant_slot(
+        &mut self,
+        cash_type: CashType,
+        commodity: Commodity,
+    ) -> Result<Vec<Packet>, RuntimeError> {
+        use build::world::cash_shop as cs;
+        let days = net::cash_shop::PENDANT_SLOT_DAYS;
+        let price = commodity.price;
+        let now = SystemTime::now();
+        let player = &self.in_game()?.player;
+        let from = player
+            .extra_pendant
+            .filter(|until| *until > now)
+            .unwrap_or(now);
+        let until = from + Duration::from_secs(u64::from(days) * 24 * 60 * 60);
+        let mut snapshot = player.clone();
+        snapshot.extra_pendant = Some(until);
+        let paid =
+            spawn_db(move || db::cash_shop::expand_inventory(cash_type, price, &snapshot)).await?;
+        let Some(balance) = paid else {
+            return Ok(vec![cs::build_cash_shop_failure(
+                cs::CashShopFailure::NotEnoughCash,
+            )?]);
+        };
+        let player = &mut self.in_game_mut()?.player;
+        player.extra_pendant = Some(until);
+        player.mark_saved();
+        info!(
+            self.client_id,
+            days, price, "Bought the second pendant slot"
+        );
+        Ok(vec![
+            cs::build_pendant_slot_extended(days)?,
+            cs::build_cash_balance(balance.credit, balance.points, balance.prepaid)?,
+        ])
     }
 
     /// Move a Cash Inventory item into its bag, at `slot` if that is free.

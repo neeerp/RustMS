@@ -121,16 +121,14 @@ pub fn max_damage(player: &Player, skill: &Learned) -> i32 {
     ]
     .map(f64::from);
     let mut matk = 0.0;
-    for (_, item) in player.inventory.items(InventoryType::Equipped) {
-        if let Some(equip) = &item.equip {
-            for (total, add) in stat
-                .iter_mut()
-                .zip([equip.str, equip.dex, equip.int, equip.luk])
-            {
-                *total += f64::from(add);
-            }
-            matk += f64::from(equip.matk);
+    for equip in player.worn_equips() {
+        for (total, add) in stat
+            .iter_mut()
+            .zip([equip.str, equip.dex, equip.int, equip.luk])
+        {
+            *total += f64::from(add);
         }
+        matk += f64::from(equip.matk);
     }
     let [str, dex, int, luk] = stat;
     let roll = if magic(skill.skill_id) {

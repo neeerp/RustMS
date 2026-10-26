@@ -55,6 +55,7 @@ const PUT_BACK: u8 = 0x0E;
 const EXPAND_BAG: u8 = 0x06;
 const EXPAND_STORAGE: u8 = 0x07;
 const BUY_CHARACTER_SLOT: u8 = 0x08;
+const BUY_PENDANT_SLOT: u8 = 0x09;
 const BUY_PACKAGE: u8 = 0x1E;
 const BUY_CRUSH_RING: u8 = 0x1D;
 const BUY_WITH_MESOS: u8 = 0x20;
@@ -202,6 +203,28 @@ impl WorldHandler for CashShopOperationHandler {
                     }
                     (_, Err(failure)) => return fail(failure),
                     _ => return fail(CashShopFailure::Unknown),
+                }
+            }
+            // v83 asks for any 555xxxx with this short form: whether it is
+            // paid with Maple Points, and its SN (0x46c988; report b179).
+            BUY_PENDANT_SLOT => {
+                let cash_type = match reader.read_byte()? {
+                    0 => CashType::Credit,
+                    _ => CashType::MaplePoints,
+                };
+                let commodity = cash_shop::check_purchase(
+                    cash_shop::commodity(reader.read_int()?),
+                    ctx.player.stats.gender.into(),
+                );
+                match commodity {
+                    Ok(commodity) if commodity.item_id == cash_shop::PENDANT_SLOT.item_id => {
+                        CashShopRequest::BuyPendantSlot {
+                            cash_type,
+                            commodity: commodity.clone(),
+                        }
+                    }
+                    Ok(_) => return fail(CashShopFailure::Unknown),
+                    Err(failure) => return fail(failure),
                 }
             }
             BUY_NAME_CHANGE => {
@@ -575,6 +598,37 @@ mod tests {
             };
             assert_eq!(reply.bytes[2..], [mode, CashShopFailure::Unknown as u8]);
         }
+    }
+
+    #[test]
+    fn the_pendant_slot_is_bought_only_with_its_own_request() {
+        let sn = cash_shop::PENDANT_SLOT.sn;
+        let request = |points: u8, sn: i32| {
+            handle(|p| {
+                p.write_byte(BUY_PENDANT_SLOT).unwrap();
+                p.write_byte(points).unwrap();
+                p.write_int(sn).unwrap();
+            })
+            .actions
+        };
+        for (points, paid_with) in [(0, CashType::Credit), (1, CashType::MaplePoints)] {
+            assert!(matches!(
+                request(points, sn).as_slice(),
+                [WorldAction::CashShop(CashShopRequest::BuyPendantSlot {
+                    cash_type,
+                    commodity,
+                })] if *cash_type == paid_with && commodity.sn == sn
+            ));
+        }
+        // Nothing else through 0x09, and no gift of it.
+        if cash_shop::commodity(50200005).is_some() {
+            let actions = request(0, 50200005);
+            let [WorldAction::Reply(reply)] = actions.as_slice() else {
+                panic!("expected a failure reply: {actions:?}");
+            };
+            assert_eq!(reply.bytes[2..], [0x5C, CashShopFailure::Unknown as u8]);
+        }
+        assert!(cash_shop::own_request(cash_shop::PENDANT_SLOT.item_id));
     }
 
     #[test]

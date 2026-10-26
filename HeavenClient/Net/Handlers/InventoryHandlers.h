@@ -128,6 +128,14 @@ namespace ms
 		void handle(InPacket& recv) const override;
 	};
 
+	// Whether the Equip window has the second pendant cell (0xa13c7b). v83
+	// reads it only when it builds the window (report b178).
+	// Opcode: EXTRA_PENDANT_SLOT(121)
+	class ExtraPendantSlotHandler : public PacketHandler
+	{
+		void handle(InPacket& recv) const override;
+	};
+
 	// Handler for a packet which modifies the player's inventory.
 	class ModifyInventoryHandler : public PacketHandler
 	{

@@ -3,6 +3,7 @@ use super::time::{expiration, filetime, PERMANENT_TIME, ZERO_TIME};
 use crate::error::NetworkError;
 use game::{Inventory, InventoryType, Item};
 use packet::{io::write::PktWrite, Packet};
+use std::time::SystemTime;
 
 const ITEM_TYPE_EQUIP: u8 = 1;
 const ITEM_TYPE_STACK: u8 = 2;
@@ -127,12 +128,18 @@ fn is_rechargeable(item_id: i32) -> bool {
 }
 
 /// Write slot limits plus every inventory (`addInventoryInfo` in HeavenMS),
-/// including the terminator after the cash bag.
-pub fn encode_inventory(packet: &mut Packet, inventory: &Inventory) -> Result<(), NetworkError> {
+/// including the terminator after the cash bag. After the limits comes until
+/// when the second pendant slot is open, 1900 for shut (0x4e5c9c; report
+/// b178).
+pub fn encode_inventory(
+    packet: &mut Packet,
+    inventory: &Inventory,
+    extra_pendant: Option<SystemTime>,
+) -> Result<(), NetworkError> {
     for kind in InventoryType::BAGS {
         packet.write_byte(inventory.slot_limit(kind))?;
     }
-    packet.write_long(ZERO_TIME)?;
+    packet.write_long(extra_pendant.map_or(ZERO_TIME, filetime))?;
 
     for (slot, item) in inventory.equipped_regular() {
         encode_item(packet, SlotPrefix::Equip(slot), item)?;
@@ -254,7 +261,7 @@ mod tests {
     #[test]
     fn empty_inventory_layout() {
         let mut packet = Packet::new_empty();
-        encode_inventory(&mut packet, &Inventory::default()).unwrap();
+        encode_inventory(&mut packet, &Inventory::default(), None).unwrap();
 
         let mut expect = Expect::new(&packet.bytes);
         expect
