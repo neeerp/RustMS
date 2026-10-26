@@ -279,6 +279,13 @@ and takes the player alone into the unknown Jr. Balrog's room
 Jr. Balrog's fall brings out Tristan's Spirit (1061015), where 2238 ends
 for the data's 50,000 EXP; with it done, the `tristanEnter` portal opens.
 
+"Snowman's Rage - Found a clue" (3108) works the same way too: for a
+player on "Snowman's Rage" (3107), the broken Spirit of Snow Statue
+(2020012, in the Valley of Snowmen 211040102) has a start script
+(`q3108s`) that completes 3108 at once with the data's 1,000 EXP
+(`Act/1 exp`, given by the script). 3107, which asks for 3108 done, then
+ends at Scadur. Its line is a placeholder (`snow_statue.clue`).
+
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
 open once 3706 is done), has a start script (`q3714s`) and no end. It

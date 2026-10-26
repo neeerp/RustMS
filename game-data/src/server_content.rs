@@ -815,6 +815,10 @@ pub mod keys {
     pub const VIOLETTA_SEAL_FULL: &str = "violetta.seal_full";
     pub const VIOLETTA_SEAL_KEPT: &str = "violetta.seal_kept";
 
+    /// Snowman's Rage: the Spirit of Snow Statue (NPC 2020012, `q3108s`),
+    /// the broken statue where the clue is found.
+    pub const SNOW_STATUE_CLUE: &str = "snow_statue.clue";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3052,6 +3056,7 @@ mod tests {
                 keys::VIOLETTA_SEAL,
                 keys::VIOLETTA_SEAL_FULL,
                 keys::VIOLETTA_SEAL_KEPT,
+                keys::SNOW_STATUE_CLUE,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

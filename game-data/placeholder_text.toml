@@ -786,6 +786,7 @@
 "violetta.seal" = "[placeholder] Violetta hands you the Royal Seal the Prime Minister dropped, to take to her father."
 "violetta.seal_full" = "[placeholder] You need a free ETC slot for the Royal Seal."
 "violetta.seal_kept" = "[placeholder] I keep the Royal Seal safe for one who comes for it."
+"snow_statue.clue" = "[placeholder] Something in the shattered statue looks like a clue. Better tell Scadur."
 "family.captain_al.junior.done" = "[placeholder] Captain Al is pleased you have taken a Junior, and teaches you how a Senior earns Rep."
 "family.captain_al.junior.not_yet" = "[placeholder] Captain Al says you have no Junior yet. Add one from the Family window."
 "family.captain_al.rep.done" = "[placeholder] Captain Al sees you have earned 1,000 Rep, and praises how you look after your Juniors."
