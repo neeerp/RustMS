@@ -58,6 +58,14 @@ pub enum Prompt {
         min: i32,
         max: i32,
     },
+    /// A slide menu, as the Dimensional Mirror's: an icon per choice,
+    /// `UIWindow.img/SlideMenu/<set>/BtMain/<id>`, with its label under
+    /// it. `menu` holds `#<id>#<label>` pairs, and the answer is an id.
+    Slide {
+        npc_id: i32,
+        set: i32,
+        menu: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

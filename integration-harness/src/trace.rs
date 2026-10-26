@@ -132,8 +132,10 @@ pub struct Trace {
     pub unavailable: usize,
     /// NPC dialogue prompts: (npc, message type).
     pub prompts: Vec<(i32, u8)>,
-    /// Their text, in the same order.
+    /// Their text, in the same order; a slide menu's is its menu.
     pub prompt_texts: Vec<String>,
+    /// Each slide menu's art set.
+    pub slide_sets: Vec<i32>,
     /// Maps warped to.
     pub warps: Vec<i32>,
     /// Each map change: (map, spawn point, where the player appears
@@ -601,8 +603,12 @@ impl Trace {
         } else if op == SendOpcode::NpcDialogue as i16 {
             r.read_byte().unwrap();
             let npc = r.read_int().unwrap();
-            self.prompts.push((npc, r.read_byte().unwrap()));
+            let kind = r.read_byte().unwrap();
+            self.prompts.push((npc, kind));
             r.read_byte().unwrap();
+            if kind == 14 {
+                self.slide_sets.push(r.read_int().unwrap());
+            }
             self.prompt_texts.push(r.read_str_with_length().unwrap());
         } else if op == SendOpcode::PartyOperation as i16 {
             let party_op = r.read_byte().unwrap();

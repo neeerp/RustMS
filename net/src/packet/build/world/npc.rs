@@ -12,6 +12,7 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         Prompt::Style { npc_id, text, .. } => (*npc_id, 7, text),
         Prompt::AskText { npc_id, text, .. } => (*npc_id, 2, text),
         Prompt::AskNumber { npc_id, text, .. } => (*npc_id, 3, text),
+        Prompt::Slide { npc_id, set, menu } => return build_slide_menu(*npc_id, *set, menu),
     };
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::NpcDialogue as i16)?;
@@ -41,6 +42,20 @@ pub fn build_prompt(prompt: &crate::dialogue::Prompt) -> Result<Packet, NetworkE
         p.write_int(*min)?;
         p.write_int(*max)?;
     }
+    Ok(p)
+}
+
+/// Message type 14, a slide menu: the art set, then the `#<id>#<label>`
+/// pairs. The client reads the speaker and the NPC but heeds neither.
+fn build_slide_menu(npc_id: i32, set: i32, menu: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::NpcDialogue as i16)?;
+    p.write_byte(4)?;
+    p.write_int(npc_id)?;
+    p.write_byte(14)?;
+    p.write_byte(0)?;
+    p.write_int(set)?;
+    p.write_str_with_length(menu)?;
     Ok(p)
 }
 
@@ -375,6 +390,22 @@ mod tests {
         expect.short(SendOpcode::NpcDialogue as i16);
         expect.byte(4).int(1012100).byte(4).byte(0);
         expect.string("#L0#Yes#l");
+        expect.end();
+    }
+
+    #[test]
+    fn prompt_slide_sends_the_art_set_before_the_menu() {
+        let prompt = crate::dialogue::Prompt::Slide {
+            npc_id: 9010022,
+            set: 0,
+            menu: "#1#Dojo#2#Carnival".to_string(),
+        };
+        let packet = build_prompt(&prompt).unwrap();
+
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::NpcDialogue as i16);
+        expect.byte(4).int(9010022).byte(14).byte(0).int(0);
+        expect.string("#1#Dojo#2#Carnival");
         expect.end();
     }
 

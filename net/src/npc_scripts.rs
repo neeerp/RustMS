@@ -23,7 +23,7 @@ use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
 use game::character::{
-    CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, WORLD_TOUR_RETURN,
+    CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, PYRAMID_RETURN, WORLD_TOUR_RETURN,
 };
 use game::guild::{self, Guild};
 use game::marriage;
@@ -925,6 +925,13 @@ const SCROLL_OF_SECRETS: i32 = 4031019;
 const PIETRA: i32 = 9000010;
 /// Harry, on the Coconut Season fields (`Event09`).
 const HARRY: i32 = 9000012;
+/// The Dimensional Mirror, in twenty towns, which sends players to the
+/// Mu Lung Dojo, the Carnival Field and Nett's Pyramid (Cosmic `9010022`).
+pub const DIMENSIONAL_MIRROR: i32 = 9010022;
+/// Where the Mirror sets each down (Cosmic's portals).
+const MIRROR_DOJO_PORTAL: u8 = 0;
+const MIRROR_CARNIVAL_PORTAL: u8 = 3;
+const MIRROR_PYRAMID_PORTAL: u8 = 4;
 /// Spiegelmann again, in the Monster Carnival's exit room.
 pub const CARNIVAL_GUIDE: i32 = 2042002;
 /// Spiegelmann in a Monster Carnival waiting room, who puts challenges to
@@ -1067,6 +1074,13 @@ pub enum Page {
         min: i32,
         max: i32,
         on_number: OnNumber,
+    },
+    /// A slide menu (`Prompt::Slide`) of art set `set`: each choice, an
+    /// icon id, its label and its pages, replaces the menu. An id below 0
+    /// is no choice: its label says there is nowhere to go.
+    Slide {
+        set: i32,
+        choices: Vec<(i32, String, Vec<Page>)>,
     },
     /// A choice of styles (`Prompt::Style`), each with the effects picking
     /// it applies before moving on.
@@ -1670,6 +1684,9 @@ impl NpcScript {
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
         }
+        if npc_id == DIMENSIONAL_MIRROR {
+            return Some(dimensional_mirror(player));
+        }
         if npc_id == SPIEGELMANN && player.stats.map_id != carnival::CARNIVAL_LOBBY {
             return Some(spiegelmann_away(player));
         }
@@ -2262,6 +2279,15 @@ impl NpcScript {
                 }
                 Some(self.begin())
             }
+            (Page::Slide { choices, .. }, ScriptInput::Select(id)) if id >= 0 => {
+                let (_, _, pages) = choices.iter().find(|(choice, ..)| *choice == id)?;
+                self.pages = pages.clone();
+                self.page = 0;
+                if matches!(self.pages.last(), Some(Page::End(_))) {
+                    self.on_end.clear();
+                }
+                Some(self.begin())
+            }
             (Page::AskText { on_text, .. }, ScriptInput::Text(text)) => {
                 self.pages = on_text.pages(&text);
                 self.page = 0;
@@ -2365,6 +2391,16 @@ impl NpcScript {
                 }
                 Prompt::Selection { npc_id, text: menu }
             }
+            // The client splits the menu at each "#" and adds one at the
+            // end, so a label may hold none and the last ends bare.
+            Page::Slide { set, choices } => Prompt::Slide {
+                npc_id,
+                set: *set,
+                menu: choices
+                    .iter()
+                    .map(|(id, label, _)| format!("#{id}#{}", label.replace('#', "")))
+                    .collect(),
+            },
             Page::AskText { text, min, max, .. } => Prompt::AskText {
                 npc_id,
                 text: text.clone(),
@@ -7898,6 +7934,55 @@ fn dojo_board(player: &Player) -> NpcScript {
     )
 }
 
+/// The Dimensional Mirror (Cosmic `9010022`): a slide menu of the places
+/// open at the player's level, each saving the town for the way back
+/// before going. Cosmic's Ariant Coliseum (0), second Carnival (3) and
+/// Construction Site (6) have no event here, so they aren't offered; its
+/// Pyramid (5), stubbed there, is.
+fn dimensional_mirror(player: &Player) -> NpcScript {
+    let level = player.stats.level;
+    let here = player.stats.map_id;
+    let go = |kind, map, portal| {
+        vec![Page::Done(vec![
+            Effect::SaveLocation(kind, Some(here)),
+            Effect::WarpToPortal(map, portal),
+        ])]
+    };
+    let places = [
+        (
+            1,
+            level >= 25,
+            keys::MIRROR_DOJO,
+            go(DOJO_RETURN, events::DOJO_ENTRANCE, MIRROR_DOJO_PORTAL),
+        ),
+        (
+            2,
+            carnival::CARNIVAL_LEVELS.contains(&level),
+            keys::MIRROR_CARNIVAL,
+            go(
+                CARNIVAL_RETURN,
+                carnival::CARNIVAL_LOBBY,
+                MIRROR_CARNIVAL_PORTAL,
+            ),
+        ),
+        (
+            5,
+            level >= 40,
+            keys::MIRROR_PYRAMID,
+            go(PYRAMID_RETURN, events::PYRAMID_LOBBY, MIRROR_PYRAMID_PORTAL),
+        ),
+    ];
+    let mut choices: Vec<_> = places
+        .into_iter()
+        .filter(|&(_, open, ..)| open)
+        .map(|(id, _, key, pages)| (id, text(key), pages))
+        .collect();
+    if choices.is_empty() {
+        choices.push((-1, text(keys::MIRROR_NOWHERE), Vec::new()));
+    }
+    NpcScript::new(DIMENSIONAL_MIRROR, vec![Page::Slide { set: 0, choices }])
+}
+
 /// Guon (Cosmic `2094002`) on the ship's map `map_id`: anyone but the
 /// leader may give up and go back Over the Pirate Ship; the leader hears
 /// what the map asks.
@@ -8889,6 +8974,7 @@ pub fn input(
         (Prompt::YesNo { .. }, 1, 0) => Some(ScriptInput::No),
         (Prompt::Selection { .. }, 4, 1) => selection.map(ScriptInput::Select),
         (Prompt::Style { .. }, 7, 1) => selection.map(ScriptInput::Select),
+        (Prompt::Slide { .. }, 14, 1) => selection.map(ScriptInput::Select),
         (Prompt::AskText { .. }, 2, 1) => text.map(ScriptInput::Text),
         // The client checks the range too, but only as typed.
         (Prompt::AskNumber { min, max, .. }, 3, 1) => selection
@@ -8918,6 +9004,7 @@ mod tests {
             Prompt::Style { .. } => 7,
             Prompt::AskText { .. } => 2,
             Prompt::AskNumber { .. } => 3,
+            Prompt::Slide { .. } => 14,
         })
     }
 
@@ -15032,6 +15119,75 @@ mod tests {
         assert_eq!(page_text(&step), text(keys::DOJO_BOARD_NOTICE_0));
         let step = read.respond(ScriptInput::Next).unwrap();
         assert_eq!(page_text(&step), text(keys::DOJO_BOARD_NOTICE_1));
+    }
+
+    fn slide(step: &Step) -> String {
+        match &step.prompt {
+            Some(Prompt::Slide { set: 0, menu, .. }) => menu.clone(),
+            other => panic!("slide menu expected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn the_dimensional_mirror_offers_what_the_level_allows() {
+        let menu = |level: u8| {
+            let mut traveller = player(50);
+            traveller.stats.level = level;
+            let mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
+            slide(&mirror.begin())
+        };
+        let [dojo, carnival, pyramid] = [
+            keys::MIRROR_DOJO,
+            keys::MIRROR_CARNIVAL,
+            keys::MIRROR_PYRAMID,
+        ]
+        .map(text);
+        let nowhere = format!("#-1#{}", text(keys::MIRROR_NOWHERE));
+        assert_eq!(menu(19), nowhere);
+        assert_eq!(menu(24), nowhere);
+        assert_eq!(menu(25), format!("#1#{dojo}"));
+        assert_eq!(menu(30), format!("#1#{dojo}#2#{carnival}"));
+        assert_eq!(menu(40), format!("#1#{dojo}#2#{carnival}#5#{pyramid}"));
+        assert_eq!(menu(51), format!("#1#{dojo}#5#{pyramid}"));
+    }
+
+    #[test]
+    fn the_dimensional_mirror_keeps_the_town_for_the_way_back() {
+        let mut traveller = player(50);
+        traveller.stats.level = 45;
+        traveller.stats.map_id = 100000000;
+        let pick = |id| {
+            let mut mirror = NpcScript::for_npc(DIMENSIONAL_MIRROR, &traveller).unwrap();
+            assert_eq!(kind(&mirror.begin()), Some(14));
+            mirror.respond(ScriptInput::Select(id))
+        };
+        let went = |kind, map, portal| {
+            Some(Step {
+                prompt: None,
+                effects: vec![
+                    Effect::SaveLocation(kind, Some(100000000)),
+                    Effect::WarpToPortal(map, portal),
+                ],
+            })
+        };
+        assert_eq!(pick(1), went(DOJO_RETURN, events::DOJO_ENTRANCE, 0));
+        assert_eq!(pick(2), went(CARNIVAL_RETURN, carnival::CARNIVAL_LOBBY, 3));
+        assert_eq!(pick(5), went(PYRAMID_RETURN, events::PYRAMID_LOBBY, 4));
+        // Nothing else is on the menu, the nowhere entry included.
+        for id in [-1, 0, 3, 6] {
+            assert_eq!(pick(id), None);
+        }
+        let prompt = Prompt::Slide {
+            npc_id: DIMENSIONAL_MIRROR,
+            set: 0,
+            menu: String::new(),
+        };
+        assert_eq!(
+            input(&prompt, 14, 1, Some(5), None),
+            Some(ScriptInput::Select(5))
+        );
+        assert_eq!(input(&prompt, 14, 0, None, None), None);
+        assert_eq!(input(&prompt, 4, 1, Some(5), None), None);
     }
 
     #[test]
