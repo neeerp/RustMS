@@ -42,6 +42,10 @@ const THORN_REMOVER_QUEST: i16 = 2324;
 /// Set once a Killer Mushroom Spore opened the `obstacle` portal (Cosmic
 /// starts the unknown quest 100202).
 const OBSTACLE_OPENED: i16 = 32500;
+/// Yulete's lab, the dark pipe's end, and its way out to Magatia
+/// (`out00`), where the pipe leads.
+const YULETE_LAB: i32 = 926130000;
+const YULETE_LAB_WAY_OUT: u8 = 2;
 /// How near a scripted item's portal the player must stand.
 const ITEM_REACH: f64 = 210.0;
 /// Kerning City's subway: Line 1's first area, and its second, where the
@@ -1343,6 +1347,12 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
             through(Effect::WarpToPortal(side.stages()[6], 0))
         }
+        // The dark pipe off Magatia's Alcadno side, into Yulete's lab once
+        // his traces have shown the way (Cosmic `magatia_dark0`, quest 7770).
+        "magatia_dark0" if quest(npc_scripts::YULETE_LAB_OPENED) == QuestState::Started => {
+            through(Effect::WarpToPortal(YULETE_LAB, YULETE_LAB_WAY_OUT))
+        }
+        "magatia_dark0" => refused(keys::MAGATIA_PIPE_DARK),
         // The hub's doors into the rooms beside it, once a Card Key opened
         // them, those rooms' ways back, once a door opened them too, and
         // the hub's way on, once Romeo or Juliet opened it for the files
@@ -3253,6 +3263,26 @@ mod tests {
         }
         player.stats.map_id = crate::events::ZENUMIST_LOBBY;
         assert!(portal("rnj1_pt00", &player).is_none());
+    }
+
+    #[test]
+    fn the_dark_pipe_leads_into_yuletes_lab_once_his_traces_showed_the_way() {
+        let mut player = player_with(&[]);
+        player.stats.map_id = 261020600;
+        let dark = portal("magatia_dark0", &player).unwrap();
+        let line = content::text().get(keys::MAGATIA_PIPE_DARK, &[]);
+        assert_eq!(dark.effects, [Effect::Pink(line)]);
+        assert!(!dark.block);
+
+        player.quests.mark(npc_scripts::YULETE_LAB_OPENED);
+        let open = portal("magatia_dark0", &player).unwrap();
+        assert_eq!(
+            open.effects,
+            [Effect::PortalSound, Effect::WarpToPortal(926130000, 2)]
+        );
+        // `out00`, its way out to Magatia.
+        let lab = crate::game_data::get().unwrap().field(926130000).unwrap();
+        assert_eq!(lab.portal_by_name("out00").unwrap().id, 2);
     }
 
     #[test]

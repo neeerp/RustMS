@@ -1356,8 +1356,9 @@ Yulete's traces (2112001, 2112011) in x00500, who send them on in turn.
 In the last room Romeo & Juliet (2112018) thank each member and give
 one of 23 rewards (`events::MAGATIA_REWARDS`, Cosmic's
 `setEventRewards`), which needs a free slot in each of the Equip and Use
-inventories, on the way back to the side's room. Cosmic's traces also complete quest 7770; ours don't
-yet.
+inventories, on the way back to the side's room. The traces also open
+the dark pipe into Yulete's lab to the member (marker 32600, for Cosmic's
+quest 7770, which `Quest.nx` lacks; see `map-travel.md`, `magatia_dark0`).
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the

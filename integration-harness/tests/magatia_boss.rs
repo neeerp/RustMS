@@ -4,7 +4,8 @@
 //! run, paying each member by whether the escort fainted, sends the guards
 //! away, and brings out Romeo or Juliet, who give the side's gift and send
 //! each member on; in the last room each is thanked and rewarded on the
-//! way home.
+//! way home. Yulete's traces open the dark pipe off Magatia into his lab
+//! to whoever they met.
 
 use game_data::server_content::keys;
 use integration_harness::events::talk_to;
@@ -14,7 +15,7 @@ use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::WorldSession;
 use net::events::{EventKind, MagatiaSide, MAGATIA_REWARDS};
-use net::npc_scripts::{magatia_hub_host, yulete, JULIET, MAGATIA_THANKS, ROMEO};
+use net::npc_scripts::{magatia_hub_host, traces, yulete, JULIET, MAGATIA_THANKS, ROMEO};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
 use packet::Packet;
@@ -23,6 +24,10 @@ use tokio::time::Duration;
 /// The boss room's guards.
 const GUARD: i32 = 9300150;
 const PINK: u8 = 5;
+/// Where the dark pipe (`up00`, running `magatia_dark0`) is, and where it
+/// leads: Yulete's lab, by its way out (`out00`).
+const PIPE_MAP: i32 = 261020600;
+const YULETE_LAB: i32 = 926130000;
 
 fn text(key: &str) -> String {
     net::content::text().get(key, &[])
@@ -69,6 +74,37 @@ fn mob_damage_friendly(attacker: i32, character_id: i32, victim: i32) -> Packet 
     p
 }
 
+/// CHANGE_MAP_SPECIAL: press Up on the scripted portal `name`.
+fn enter(name: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_str_with_length(name).unwrap();
+    p.write_short(0).unwrap();
+    p
+}
+
+/// `player` goes to the dark pipe and presses Up on it; what came of it.
+async fn into_the_pipe(player: &mut WorldSession) -> Trace {
+    let mut seen = Trace::default();
+    let c = &mut player.connection;
+    assert_eq!(warp(c, PIPE_MAP, "", &mut seen).await, PIPE_MAP);
+    let portal = maps()
+        .field(PIPE_MAP)
+        .unwrap()
+        .portal_by_name("up00")
+        .unwrap();
+    send(c, walk_to(portal.x as i16, portal.y as i16)).await;
+    let mut seen = Trace::default();
+    send(c, enter("up00")).await;
+    until(c, &mut seen, |t| {
+        !t.warps.is_empty() || !t.broadcasts.is_empty()
+    })
+    .await;
+    read_for(c, &mut seen, 300).await;
+    seen
+}
+
 /// The leader goes from the corridor into `side`'s boss room and waits
 /// for Yulete, the escort and the guards; what was seen.
 async fn into_the_lab(leader: &mut WorldSession, side: MagatiaSide) -> Trace {
@@ -85,13 +121,8 @@ async fn into_the_lab(leader: &mut WorldSession, side: MagatiaSide) -> Trace {
         .portal_by_name(name)
         .unwrap();
     send(c, walk_to(portal.x as i16, portal.y as i16)).await;
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_str_with_length(name).unwrap();
-    p.write_short(0).unwrap();
     let mut seen = Trace::default();
-    send(c, p).await;
+    send(c, enter(name)).await;
     until(c, &mut seen, |t| {
         t.warps.contains(&lab)
             && t.field.npcs.iter().any(|&(_, id)| id == yulete(side))
@@ -227,6 +258,35 @@ async fn the_frankenroid_falls_and_romeo_sends_the_party_home_with_gifts() {
     );
     send(&mut team[0].connection, answer(0, 1, None)).await;
 
+    // Yulete's traces, met in their room, send a member on to the last
+    // room, where they are thanked on the way home; the dark pipe then
+    // leads them into his lab.
+    let member = &mut team[1];
+    let mut met = Trace::default();
+    let c = &mut member.connection;
+    let room = side.traces_room();
+    assert_eq!(warp(c, room, "", &mut met).await, room);
+    until(c, &mut met, |t| {
+        t.field.npcs.iter().any(|&(_, id)| id == traces(side))
+    })
+    .await;
+    let asked = told(member, talk_to(npc(&met, traces(side)))).await;
+    assert_eq!(asked.prompts, [(traces(side), 4)], "{asked:?}");
+    let sorry = told(member, answer(4, 1, Some(0))).await;
+    assert_eq!(
+        sorry.prompt_texts,
+        [text(keys::MAGATIA_TRACES_SORRY)],
+        "{sorry:?}"
+    );
+    let mut on = Trace::default();
+    let c = &mut member.connection;
+    send(c, answer(0, 1, None)).await;
+    until(c, &mut on, |t| t.warps.contains(&side.thanks_room())).await;
+    thanked(member, side, on, keys::MAGATIA_THANKS_REHAB).await;
+    let piped = into_the_pipe(member).await;
+    assert_eq!(piped.warps, [YULETE_LAB], "{piped:?}");
+    assert_eq!(piped.portal_sounds, 1, "{piped:?}");
+
     // Romeo gives the gift and, Yulete not having been caught, sends the
     // leader straight to the last room.
     let host = npc(&seen, magatia_hub_host(side));
@@ -247,6 +307,17 @@ async fn the_frankenroid_falls_and_romeo_sends_the_party_home_with_gifts() {
     })
     .await;
     thanked(&mut team[0], side, on, keys::MAGATIA_THANKS_REHAB).await;
+}
+
+#[tokio::test]
+async fn the_dark_pipe_is_too_dark_for_those_the_traces_never_met() {
+    let mut player = armed_in(PIPE_MAP, 75).await;
+    let dark = into_the_pipe(&mut player).await;
+    let line = (PINK, text(keys::MAGATIA_PIPE_DARK));
+    assert!(
+        dark.warps.is_empty() && dark.broadcasts.contains(&line),
+        "{dark:?}"
+    );
 }
 
 #[tokio::test]
