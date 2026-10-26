@@ -286,6 +286,15 @@ player on "Snowman's Rage" (3107), the broken Spirit of Snow Statue
 (`Act/1 exp`, given by the script). 3107, which asks for 3108 done, then
 ends at Scadur. Its line is a placeholder (`snow_statue.clue`).
 
+"In Search for the Lost Memory" (3523–3527, 3529) works the same way, one
+quest per first-job instructor: Dances with Balrog (3523), Grendel the
+Really Old (3524), Athena Pierce (3525), the Dark Lord (3526), Kyrin (3527)
+and, for the Cygnus Knights, Neinheart (3529). For a player of that class on "Memory Keeper" (3507), the
+instructor's start script (`q3523s` etc.) completes the quest at once and
+sets record 7081 to `1`. 3507 then ends at the Memory Keeper (2140001, on
+270010111), whose completion checks that record (`RECORD_QUESTS`). The line
+is a placeholder (`lost_memory.regained`).
+
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
 open once 3706 is done), has a start script (`q3714s`) and no end. It
