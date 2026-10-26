@@ -440,11 +440,12 @@ pub enum Effect {
     /// One piece of equipment with its stats varied as a drop's are
     /// (`items::give_dropped`), as Mos forges with a stimulator.
     GiveVariedItem(i32),
-    /// Trade a Gachapon Ticket for the prize rolled when the machine in
-    /// `town` was opened (`gachapon::roll`). Nothing is applied if the
-    /// ticket is gone or the prize doesn't fit; the world hears of an
-    /// `announced` prize.
+    /// Trade a `ticket` (a Gachapon Ticket or a Remote Gachapon Ticket)
+    /// for the prize rolled when the machine in `town` was opened
+    /// (`gachapon::roll`). Nothing is applied if the ticket is gone or the
+    /// prize doesn't fit; the world hears of an `announced` prize.
     Gachapon {
+        ticket: i32,
         item_id: i32,
         quantity: i16,
         town: &'static str,

@@ -2156,14 +2156,8 @@ impl NpcScript {
             if inventory.count(gachapon::TICKET) == 0 {
                 return Some(gachapon_machine(npc_id, town, None));
             }
-            // A prize may go to any bag. Rolling with one full would turn
-            // some prizes away with the ticket kept: a free roll, which
-            // also tells which bag the prize was for.
-            if gachapon::BAGS.iter().any(|&bag| inventory.free(bag) == 0) {
-                return Some(NpcScript::new(
-                    npc_id,
-                    vec![Page::Say(text(keys::GACHAPON_FULL))],
-                ));
+            if let Some(full) = gachapon_bag_full(npc_id, player) {
+                return Some(full);
             }
             let prize = gachapon::roll(npc_id, &mut gachapon::rng());
             return Some(gachapon_machine(npc_id, town, prize));
@@ -2248,6 +2242,41 @@ impl NpcScript {
             )),
             _ => None,
         }
+    }
+
+    /// Gachapon `machine` played from afar with a Remote Gachapon Ticket
+    /// (report b196). As Cosmic's `gachaponRemote` has it, there is no
+    /// yes or no: the ticket goes for the prize at once, the machine
+    /// naming it, unless a bag is full, which keeps the ticket. `None` if
+    /// the player holds no ticket, or `machine` is none.
+    pub fn remote_gachapon(machine: i32, player: &Player) -> Option<Self> {
+        let town = gachapon::town(machine)?;
+        if player.inventory.count(gachapon::REMOTE_TICKET) == 0 {
+            return None;
+        }
+        if let Some(full) = gachapon_bag_full(machine, player) {
+            return Some(full);
+        }
+        let prize = gachapon::roll(machine, &mut gachapon::rng())?;
+        let item = prize.item_id.to_string();
+        let count = prize.quantity.to_string();
+        let mut script = NpcScript::new(
+            machine,
+            vec![Page::Act {
+                text: content::text()
+                    .get(keys::GACHAPON_WON, &[("item", &item), ("count", &count)]),
+                effects: vec![Effect::Gachapon {
+                    ticket: gachapon::REMOTE_TICKET,
+                    item_id: prize.item_id,
+                    quantity: prize.quantity,
+                    town,
+                    announced: prize.announced(),
+                }],
+            }],
+        );
+        script.inventory_full = Some(text(keys::GACHAPON_FULL));
+        script.refused = Some(text(keys::GACHAPON_NO_TICKET));
+        Some(script)
     }
 
     /// Mar the Fairy's offer when a Water of Life is used: pick a doll,
@@ -8836,6 +8865,18 @@ pub fn resets_when_empty(map_id: i32) -> bool {
         || crate::scripts::SOLO_MAPS.contains(&map_id)
 }
 
+/// Gachapon machine `npc_id`'s word that a bag is full, if one is. A
+/// prize may go to any bag; rolling with one full would turn some prizes
+/// away with the ticket kept: a free roll, which also tells which bag the
+/// prize was for.
+fn gachapon_bag_full(npc_id: i32, player: &Player) -> Option<NpcScript> {
+    let inventory = &player.inventory;
+    gachapon::BAGS
+        .iter()
+        .any(|&bag| inventory.free(bag) == 0)
+        .then(|| NpcScript::new(npc_id, vec![Page::Say(text(keys::GACHAPON_FULL))]))
+}
+
 /// A Gachapon machine in `town` (report c058 Q6). To a player with a
 /// ticket it offers the `prize` already rolled, named once it is theirs;
 /// to anyone else it explains itself.
@@ -8861,6 +8902,7 @@ fn gachapon_machine(npc_id: i32, town: &'static str, prize: Option<Prize>) -> Np
             Page::Ask {
                 text: content::text().get(keys::GACHAPON_ASK, &[("town", town)]),
                 on_yes: vec![Effect::Gachapon {
+                    ticket: gachapon::TICKET,
                     item_id: prize.item_id,
                     quantity: prize.quantity,
                     town,
@@ -9529,6 +9571,7 @@ mod tests {
         let ask = script.begin();
         assert_eq!(kind(&ask), Some(1));
         let Some(Effect::Gachapon {
+            ticket,
             item_id,
             quantity,
             town,
@@ -9543,6 +9586,7 @@ mod tests {
             panic!("the yes trades the ticket");
         };
         assert_eq!(town, "Henesys");
+        assert_eq!(ticket, gachapon::TICKET);
         assert!(crate::items::item_name(item_id).is_some());
         assert!(quantity > 0);
         let _ = announced;
@@ -9558,6 +9602,7 @@ mod tests {
         assert_eq!(
             yes.effects,
             [Effect::Gachapon {
+                ticket: gachapon::TICKET,
                 item_id: 2_049_100,
                 quantity: 1,
                 town: "Ellinia",
@@ -9593,6 +9638,50 @@ mod tests {
         let mut script = NpcScript::for_npc(9100100, &player).unwrap();
         let full = script.begin();
         assert_eq!(kind(&full), Some(0));
+        assert_eq!(page_text(&full), text(keys::GACHAPON_FULL));
+        assert!(full.effects.is_empty());
+    }
+
+    #[test]
+    fn a_remote_ticket_plays_the_machine_at_once() {
+        let mut player = player(50);
+        assert!(NpcScript::remote_gachapon(9100109, &player).is_none());
+        // A Gachapon Ticket is not a remote one.
+        crate::items::give(&mut player.inventory, gachapon::TICKET, 1).unwrap();
+        assert!(NpcScript::remote_gachapon(9100109, &player).is_none());
+        crate::items::give(&mut player.inventory, gachapon::REMOTE_TICKET, 1).unwrap();
+        assert!(NpcScript::remote_gachapon(9100108, &player).is_none());
+
+        let mut script = NpcScript::remote_gachapon(9100109, &player).unwrap();
+        let won = script.begin();
+        assert_eq!(kind(&won), Some(0));
+        let [Effect::Gachapon {
+            ticket,
+            item_id,
+            town,
+            ..
+        }] = won.effects[..]
+        else {
+            panic!("{:?}", won.effects);
+        };
+        assert_eq!((ticket, town), (gachapon::REMOTE_TICKET, "New Leaf City"));
+        assert!(page_text(&won).contains(&item_id.to_string()));
+        assert_eq!(buttons(&won), (false, false));
+        assert_eq!(script.respond(ScriptInput::Next), Some(Step::default()));
+        assert_eq!(
+            page_text(&script.inventory_full().unwrap()),
+            text(keys::GACHAPON_FULL)
+        );
+
+        // A full bag keeps the ticket.
+        for slot in 1..=player.inventory.slot_limit(InventoryType::Etc) as i16 {
+            player
+                .inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(4_000_000, 1));
+        }
+        let full = NpcScript::remote_gachapon(9100109, &player)
+            .unwrap()
+            .begin();
         assert_eq!(page_text(&full), text(keys::GACHAPON_FULL));
         assert!(full.effects.is_empty());
     }

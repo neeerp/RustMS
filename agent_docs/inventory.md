@@ -980,8 +980,23 @@ and the item as in an inventory. The v83 client shows it as a chat line,
 on hover; a channel of -1 would name the Cash Shop Surprise. HeavenClient
 reads it in `MessagingHandlers.cpp` (case 11), writes the line with
 `Megaphones::gachapon` and shows it as `UIChatBar::GACHAPON`, without the
-tooltip. The Remote Gachapon (5451000, USE_REMOTE_GACHAPON `0x74`) isn't
-handled and isn't sold.
+tooltip.
+
+The Remote Gachapon Ticket (5451000, report b196) opens a window of ten town
+buttons in the v83 client; a button sends USE_REMOTE (`0x74`, 0xa14074):
+`i32` the ticket's item id, `i32` the button, 0 to 9, which are the machines
+in `MACHINES`' order (`gachapon::remote_machine`). The client closes the
+window and expects no answer of its own. `RemoteGachaponHandler` ignores
+another item or button (Cosmic disconnects), and the machine's script
+(`NpcScript::remote_gachapon`) answers as its NPC wherever the player is.
+As Cosmic's `gachaponRemote` has it, there is no yes or no: the first page
+names the prize as `Effect::Gachapon` takes the remote ticket, with the
+same full-bag check and world notice as a machine. Without the ticket
+nothing is said. HeavenClient opens the window (`UIRemoteGachapon`,
+UIClassic's `UIWindow.img/RemoteGachapon`, the buttons where the v83 client
+puts them, `remote_gachapon::TOWNS`) for any 5451xxx double-clicked in the
+Cash tab once the last request is answered, and sends `UseRemoteGachaponPacket`;
+Escape and Enter close it without sending. The Cash Shop sells the ticket.
 
 ### Item Maker
 

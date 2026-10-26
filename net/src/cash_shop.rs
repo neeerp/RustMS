@@ -197,13 +197,19 @@ pub fn check_gift(commodity: Option<&Commodity>) -> Result<&Commodity, CashShopF
 /// The classes (`item_id / 10_000`) of cash items on sale that do nothing
 /// here yet: Character Transfer (540, all but Name Change), Maple Life
 /// (543, all but the Extra Character Slot Coupon), and Remote Gachapon
-/// (545, all but Miu Miu).
+/// (545, all but Miu Miu and the Remote Gachapon Ticket).
 /// The shop calls them sold out rather than take NX for nothing (report
 /// c046). Take a class out once its items work.
 const INERT_CLASSES: [i32; 3] = [540, 543, 545];
 
 fn inert(item_id: i32) -> bool {
-    ![NAME_CHANGE, MIU_MIU, CHARACTER_SLOT].contains(&item_id)
+    ![
+        NAME_CHANGE,
+        MIU_MIU,
+        CHARACTER_SLOT,
+        crate::gachapon::REMOTE_TICKET,
+    ]
+    .contains(&item_id)
         && INERT_CLASSES.contains(&(item_id / 10_000))
 }
 
@@ -600,8 +606,8 @@ mod tests {
                 .iter()
                 .any(|c| c.item_id == item_id && c.on_sale)
         };
-        // Character Transfer, Maple Life, Remote Gachapon.
-        for item_id in [5401000, 5431000, 5451000] {
+        // Character Transfer, Maple Life.
+        for item_id in [5401000, 5431000] {
             assert!(on_sale(item_id), "{item_id}");
             let sn = commodity_sn(item_id, 1);
             assert_eq!(
@@ -611,10 +617,11 @@ mod tests {
             );
         }
         // Gachapon Tickets, Pet Snacks, guild emoticons, Name Change, Miu
-        // Miu, the Rock of Evolution, a hired merchant and the Store Remote
-        // Controller still sell.
+        // Miu, the Remote Gachapon Ticket, the Rock of Evolution, a hired
+        // merchant and the Store Remote Controller still sell.
         for item_id in [
             5220000,
+            crate::gachapon::REMOTE_TICKET,
             5460000,
             5290000,
             NAME_CHANGE,

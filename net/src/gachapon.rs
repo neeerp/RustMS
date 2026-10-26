@@ -13,6 +13,10 @@ use rand::{Rng, SeedableRng};
 /// The Gachapon Ticket, from the Cash Shop.
 pub const TICKET: i32 = 5220000;
 
+/// The Remote Gachapon Ticket, from the Cash Shop: its window plays any
+/// machine from afar (`remote_machine`).
+pub const REMOTE_TICKET: i32 = 5451000;
+
 /// The bags a prize may go to.
 pub const BAGS: [InventoryType; 4] = [
     InventoryType::Equip,
@@ -22,7 +26,8 @@ pub const BAGS: [InventoryType; 4] = [
 ];
 
 /// The machines `Map.nx` places, and the town each is named after in the
-/// world notice of a win.
+/// world notice of a win. Their order is the Remote Gachapon window's
+/// buttons' (report b196).
 const MACHINES: [(i32, &str); 10] = [
     (9100100, "Henesys"),
     (9100101, "Ellinia"),
@@ -42,6 +47,13 @@ pub fn town(npc_id: i32) -> Option<&'static str> {
         .iter()
         .find(|(machine, _)| *machine == npc_id)
         .map(|(_, town)| *town)
+}
+
+/// The machine the Remote Gachapon window's button `index` plays (0 to 9,
+/// report b196).
+pub fn remote_machine(index: i32) -> Option<i32> {
+    let index = usize::try_from(index).ok()?;
+    MACHINES.get(index).map(|&(machine, _)| machine)
 }
 
 /// What a ticket won.
@@ -183,6 +195,18 @@ mod tests {
         assert_eq!(town(9100100), Some("Henesys"));
         assert_eq!(town(9100117), Some("Nautilus Harbor"));
         assert_eq!(town(9100108), None);
+    }
+
+    #[test]
+    fn the_remote_windows_buttons_play_the_ten_machines() {
+        let machines: Vec<_> = (0..10).map(|i| remote_machine(i).unwrap()).collect();
+        assert_eq!(
+            machines[..8],
+            [9100100, 9100101, 9100102, 9100103, 9100104, 9100105, 9100106, 9100107]
+        );
+        assert_eq!(machines[8..], [9100109, 9100117]);
+        assert_eq!(remote_machine(-1), None);
+        assert_eq!(remote_machine(10), None);
     }
 
     const HARNESS_SEED: u64 = 10;

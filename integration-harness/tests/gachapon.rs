@@ -3,6 +3,7 @@
 //! every roll to the same uncommon prize, a Scroll for Bow for ATT 10%
 //! (RUSTMS_GACHAPON_SEED in docker-compose.test.yml). A full bag keeps the
 //! ticket before any roll, and without one the machine only explains itself.
+//! A Remote Gachapon Ticket's window plays any machine from afar, at once.
 
 use integration_harness::database::grant_item;
 use integration_harness::events::talk;
@@ -10,11 +11,17 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{read_for, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
+use net::packet::op::RecvOpcode;
+use packet::io::write::PktWrite;
+use packet::Packet;
 use std::time::Duration;
 
 const HENESYS: i32 = 100_000_100;
 const MACHINE: i32 = 9_100_100;
 const TICKET: i32 = 5_220_000;
+const REMOTE_TICKET: i32 = 5_451_000;
+/// The Nautilus Harbor machine, the remote window's last button.
+const NAUTILUS: (i32, i32) = (9, 9_100_117);
 /// What seed 10 wins.
 const PRIZE: i32 = 2_044_502;
 const USE: i16 = 2;
@@ -26,7 +33,7 @@ const MENU: u8 = 4;
 /// A new character, holding a ticket if `ticket`, logged in again in
 /// Henesys after `prepare` has changed it in the database.
 async fn player<F>(
-    ticket: bool,
+    ticket: Option<i32>,
     prepare: impl FnOnce(i32) -> F,
 ) -> (WorldSession, Trace, HarnessConfig)
 where
@@ -38,8 +45,8 @@ where
         .expect("first login failed")
         .character_id;
     tokio::time::sleep(Duration::from_millis(500)).await;
-    if ticket {
-        grant_item(id, CASH, 1, TICKET).await.expect("ticket");
+    if let Some(ticket) = ticket {
+        grant_item(id, CASH, 1, ticket).await.expect("ticket");
     }
     prepare(id).await;
     let mut session = relogin(&config).await;
@@ -53,15 +60,46 @@ where
 
 /// The type of the next NPC prompt, and its text.
 async fn prompt(session: &mut WorldSession, t: &mut Trace) -> (u8, String) {
+    prompt_from(MACHINE, session, t).await
+}
+
+/// The type of the next prompt, from `npc`, and its text.
+async fn prompt_from(npc: i32, session: &mut WorldSession, t: &mut Trace) -> (u8, String) {
     let seen = t.prompts.len();
     until(&mut session.connection, t, |t| t.prompts.len() > seen).await;
-    assert_eq!(t.prompts[seen].0, MACHINE);
+    assert_eq!(t.prompts[seen].0, npc);
     (t.prompts[seen].1, t.prompt_texts[seen].clone())
+}
+
+/// The town and item of `winner`'s win, as `listener` heard it. The other
+/// tests' wins may come first.
+async fn heard_win(
+    listener: &mut WorldSession,
+    heard: &mut Trace,
+    winner: &WorldSession,
+) -> (String, i32) {
+    let message = format!("{} : got a(n)", winner.character_name);
+    let mine = |t: &Trace| {
+        (t.gachapon_wins.iter())
+            .find(|(said, ..)| *said == message)
+            .map(|(_, _, town, item)| (town.clone(), *item))
+    };
+    until(&mut listener.connection, heard, |t| mine(t).is_some()).await;
+    mine(heard).unwrap()
+}
+
+/// USE_REMOTE: the Remote Gachapon window's button `index`, for `ticket`.
+fn use_remote(ticket: i32, index: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::RemoteGachapon as i16).unwrap();
+    p.write_int(ticket).unwrap();
+    p.write_int(index).unwrap();
+    p
 }
 
 #[tokio::test]
 async fn a_ticket_buys_the_prize_and_the_world_hears_of_it() {
-    let (mut session, mut t, config) = player(true, |_| async {}).await;
+    let (mut session, mut t, config) = player(Some(TICKET), |_| async {}).await;
     let mut listener = login_to_world_session(&load_harness_config_or_fail().await)
         .await
         .unwrap();
@@ -83,13 +121,8 @@ async fn a_ticket_buys_the_prize_and_the_world_hears_of_it() {
         t.added
     );
 
-    until(&mut listener.connection, &mut heard, |t| {
-        !t.gachapon_wins.is_empty()
-    })
-    .await;
-    let (message, _, town, item) = &heard.gachapon_wins[0];
-    assert_eq!(*message, format!("{} : got a(n)", session.character_name));
-    assert_eq!((town.as_str(), *item), ("Henesys", PRIZE));
+    let (town, item) = heard_win(&mut listener, &mut heard, &session).await;
+    assert_eq!((town.as_str(), item), ("Henesys", PRIZE));
     drop(listener);
     drop(session);
 
@@ -101,7 +134,7 @@ async fn a_ticket_buys_the_prize_and_the_world_hears_of_it() {
 
 #[tokio::test]
 async fn a_full_bag_keeps_the_ticket_unrolled() {
-    let (mut session, mut t, config) = player(true, |id| async move {
+    let (mut session, mut t, config) = player(Some(TICKET), |id| async move {
         for slot in 1..=24 {
             // Red Potions, which the prize can't stack with.
             grant_item(id, USE, slot, 2_000_000).await.expect("potion");
@@ -123,9 +156,70 @@ async fn a_full_bag_keeps_the_ticket_unrolled() {
 
 #[tokio::test]
 async fn without_a_ticket_the_machine_explains_itself() {
-    let (mut session, mut t, _) = player(false, |_| async {}).await;
+    let (mut session, mut t, _) = player(None, |_| async {}).await;
     send(&mut session.connection, talk(HENESYS, MACHINE)).await;
     assert_eq!(prompt(&mut session, &mut t).await.0, MENU);
     send(&mut session.connection, answer(MENU, 1, Some(0))).await;
     assert_eq!(prompt(&mut session, &mut t).await.0, SAY);
+}
+
+#[tokio::test]
+async fn a_remote_ticket_plays_a_far_machine_at_once() {
+    let (mut session, mut t, config) = player(Some(REMOTE_TICKET), |_| async {}).await;
+    let mut listener = login_to_world_session(&load_harness_config_or_fail().await)
+        .await
+        .unwrap();
+    let mut heard = Trace::default();
+    read_for(&mut listener.connection, &mut heard, 300).await;
+
+    // Another item, or a button past the last, does nothing.
+    let (index, machine) = NAUTILUS;
+    send(&mut session.connection, use_remote(TICKET, index)).await;
+    send(&mut session.connection, use_remote(REMOTE_TICKET, 10)).await;
+    read_for(&mut session.connection, &mut t, 300).await;
+    assert!(t.prompts.is_empty() && t.removed.is_empty(), "{t:?}");
+
+    // The machine names the prize as the ticket goes, with no yes or no.
+    send(&mut session.connection, use_remote(REMOTE_TICKET, index)).await;
+    let (kind, text) = prompt_from(machine, &mut session, &mut t).await;
+    assert_eq!(kind, SAY);
+    assert!(text.contains(&format!("#t{PRIZE}#")), "{text}");
+    until(&mut session.connection, &mut t, |t| !t.removed.is_empty()).await;
+    assert_eq!(t.removed, [(CASH as u8, 1)]);
+    assert!(
+        t.added
+            .iter()
+            .any(|&(kind, _, item)| (kind, item) == (USE as u8, PRIZE)),
+        "{:?}",
+        t.added
+    );
+    let (town, item) = heard_win(&mut listener, &mut heard, &session).await;
+    assert_eq!((town.as_str(), item), ("Nautilus Harbor", PRIZE));
+    drop(listener);
+    drop(session);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let back = relogin(&config).await;
+    assert_eq!(back.items.get(&PRIZE), Some(&1));
+    assert_eq!(back.items.get(&REMOTE_TICKET), None);
+}
+
+#[tokio::test]
+async fn a_full_bag_keeps_the_remote_ticket() {
+    let (mut session, mut t, config) = player(Some(REMOTE_TICKET), |id| async move {
+        for slot in 1..=24 {
+            grant_item(id, USE, slot, 2_000_000).await.expect("potion");
+        }
+    })
+    .await;
+    let (index, machine) = NAUTILUS;
+    send(&mut session.connection, use_remote(REMOTE_TICKET, index)).await;
+    assert_eq!(prompt_from(machine, &mut session, &mut t).await.0, SAY);
+    read_for(&mut session.connection, &mut t, 300).await;
+    assert!(t.removed.is_empty(), "{:?}", t.removed);
+    drop(session);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let back = relogin(&config).await;
+    assert_eq!(back.items.get(&REMOTE_TICKET), Some(&1));
 }
