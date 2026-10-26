@@ -416,9 +416,10 @@ impl Buffs {
                 match buff.stat {
                     BuffStat::Poison => tick.poison += i32::from(buff.value),
                     BuffStat::DragonBlood => tick.blood += i32::from(buff.value),
-                    // The ship wears down by its hits instead.
+                    // Only a tamed monster tires: the ship wears down by its
+                    // hits instead, and an event vehicle never does.
                     BuffStat::Riding => {
-                        tick.tire += i32::from(buff.skill_id != crate::mount::BATTLESHIP)
+                        tick.tire += i32::from(crate::mount::RIDER_SKILLS.contains(&buff.skill_id))
                     }
                     _ => tick.heal += i32::from(buff.value),
                 }

@@ -47,6 +47,40 @@ pub fn battleship_max_hp(level: i32, slv: i32) -> i32 {
     (400 * slv + 200 * (level - 120).max(0)).min(i32::from(u16::MAX))
 }
 
+/// The event skills that ride a 193xxxx vehicle with no mount worn, for
+/// each line of beginner: Spaceship, Yeti Mount, Witch's Broomstick,
+/// Balrog Mount and the Chariot (report b183). 1027-1030 have neither data
+/// nor art in v83, so they are left out.
+const EVENT_RIDES: [(&[i32], i32); 5] = [
+    (&[1013, 10001014], SPACESHIP),
+    (&[1017, 10001019, 20001019], 1932003),
+    (&[1018, 10001022, 20001022], 1932004),
+    (&[1019, 10001023, 20001023], 1932005),
+    (&[1031, 10001031, 20001031], 1932010),
+];
+
+/// The Spaceship's vehicle, and the one it rides from level 2.
+const SPACESHIP: i32 = 1932001;
+const SPACESHIP_2: i32 = 1932002;
+
+/// The vehicle an event skill at `level` rides, or `None` for any other
+/// skill.
+pub fn event_vehicle(skill_id: i32, level: i32) -> Option<i32> {
+    let &(_, vehicle) = EVENT_RIDES
+        .iter()
+        .find(|(skills, _)| skills.contains(&skill_id))?;
+    Some(if vehicle == SPACESHIP && level >= 2 {
+        SPACESHIP_2
+    } else {
+        vehicle
+    })
+}
+
+/// Whether `skill_id` rides an event vehicle.
+pub fn is_event_ride(skill_id: i32) -> bool {
+    event_vehicle(skill_id, 1).is_some()
+}
+
 /// The skills used from the ship (v83 FUN_00966f7a): the Corsair's guns,
 /// summons and buffs, the ship's own attacks, and a few other jobs'.
 /// Anything else, the basic attack too, is "Not available during the
@@ -140,6 +174,17 @@ mod tests {
         assert!(ship_refuses(false, 5221008));
         assert!(!ship_refuses(false, 0));
         assert!(!ship_refuses(false, 5221003));
+    }
+
+    #[test]
+    fn event_skills_ride_their_vehicles() {
+        assert_eq!(event_vehicle(1013, 1), Some(1932001));
+        assert_eq!(event_vehicle(10001014, 2), Some(1932002));
+        assert_eq!(event_vehicle(20001022, 1), Some(1932004));
+        assert_eq!(event_vehicle(1031, 1), Some(1932010));
+        assert_eq!(event_vehicle(1027, 1), None);
+        assert!(!is_event_ride(1004));
+        assert!(!is_event_ride(BATTLESHIP));
     }
 
     #[test]

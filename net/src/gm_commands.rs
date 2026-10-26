@@ -18,6 +18,7 @@ use crate::packet::build::world::{
     effect::{build_foreign_effect, CharEffect},
     inventory,
     messaging::{build_broadcast, Broadcast},
+    skill::build_update_skill,
     stat::{self, StatUpdate},
 };
 use crate::packet::handle::world::{set_hidden, warp_to_spawn_point, BLOCK_DAYS};
@@ -157,6 +158,13 @@ const COMMANDS: &[Command] = &[
         tier: GM,
         usage: "<amount>",
         run: sp,
+    },
+    Command {
+        prefix: '!',
+        name: "skill",
+        tier: GM,
+        usage: "<skill id> [level]",
+        run: skill,
     },
     Command {
         prefix: '!',
@@ -533,6 +541,42 @@ fn sp(ctx: &mut WorldContext, args: &[&str]) -> Outcome {
     )?)]))
 }
 
+/// A skill at `level`, its highest if none is given, whatever the job;
+/// level 0 takes it away. The only way to the event skills (1013, 1017 and
+/// the like, report b183), which nothing in v83 hands out.
+fn skill(ctx: &mut WorldContext, args: &[&str]) -> Outcome {
+    let (id, level) = match args {
+        [id] => (id.parse::<i32>().ok(), Some(None)),
+        [id, level] => (id.parse().ok(), level.parse::<i32>().ok().map(Some)),
+        _ => (None, None),
+    };
+    let (Some(info), Some(level)) = (id.and_then(crate::skills::info), level) else {
+        return Ok(Err(usage("skill")));
+    };
+    let level = level.unwrap_or(info.max_level);
+    if !(0..=info.max_level).contains(&level) {
+        return Ok(Err(format!("Levels go from 0 to {}.", info.max_level)));
+    }
+    let record = game::SkillRecord {
+        skill_id: info.skill_id,
+        level,
+        // A fourth-job skill shows only up to its master level.
+        master_level: if game::skill::is_fourth_job(info.skill_id) {
+            info.max_level
+        } else {
+            0
+        },
+        expiration: None,
+    };
+    if level == 0 {
+        ctx.player.skills.remove(record.skill_id);
+    } else {
+        ctx.player.skills.set(record.clone());
+    }
+    ctx.player.mark_dirty();
+    Ok(Ok(vec![WorldAction::Reply(build_update_skill(&record)?)]))
+}
+
 /// A notice to the whole world.
 /// NX for a character's account, the GM's own if no name is given: NX
 /// Credit unless `mp` (Maple Points) or `np` (NX Prepaid) comes first. A
@@ -868,6 +912,31 @@ mod tests {
             .iter()
             .any(|line| line == "!item <item id> [quantity]"));
         assert_eq!(tier(7), ADMIN);
+    }
+
+    #[test]
+    fn skill_teaches_any_skill_at_its_highest_level_or_the_one_given() {
+        if crate::skills::data().is_err() {
+            return;
+        }
+        let mut gm = player(GM);
+        let sent = run_as(&mut gm, "!skill 1013").unwrap();
+        assert!(
+            matches!(&sent[..], [WorldAction::Reply(p)] if p.opcode() == SendOpcode::UpdateSkills as i16)
+        );
+        assert_eq!(gm.skills.level(1013), 2);
+        run_as(&mut gm, "!skill 1013 1").unwrap();
+        assert_eq!(gm.skills.level(1013), 1);
+        run_as(&mut gm, "!skill 1013 0").unwrap();
+        assert!(gm.skills.get(1013).is_none());
+        // A fourth-job skill is mastered.
+        run_as(&mut gm, "!skill 1121000 5").unwrap();
+        assert_eq!(gm.skills.get(1121000).unwrap().master_level, 30);
+
+        let said = |line| lines(&run_as(&mut player(GM), line).unwrap());
+        assert_eq!(said("!skill 1013 3"), ["Levels go from 0 to 2."]);
+        assert_eq!(said("!skill 999"), ["Usage: !skill <skill id> [level]"]);
+        assert_eq!(said("!skill 1013 x"), ["Usage: !skill <skill id> [level]"]);
     }
 
     #[test]

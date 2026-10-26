@@ -92,11 +92,13 @@ struct FedMount {
 }
 
 /// Feed the mount the player rides the food `item_id` in USE `slot`, which
-/// takes up to `relief` tiredness off. `None` if they aren't riding or the
-/// slot holds no such food.
+/// takes up to `relief` tiredness off. `None` if they aren't riding a
+/// tamed monster or the slot holds no such food.
 fn feed_mount(player: &mut Player, slot: i16, item_id: i32, relief: i32) -> Option<FedMount> {
     if item_id / 10_000 != 226
-        || player.ride().is_none()
+        || !player
+            .ride()
+            .is_some_and(|ride| ride.item_id / 10_000 == 190)
         || player.inventory.get(InventoryType::Use, slot)?.item_id != item_id
     {
         return None;
