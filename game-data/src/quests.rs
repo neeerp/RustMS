@@ -64,13 +64,14 @@ pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q2214e", "q2215e", "q2216s", "q2217s", "q2218s", "q2219s", "q4647e",
-    "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e",
+    "q1021s", "q1021e", "q2214e", "q2215e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s",
+    "q4647e", "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
-/// script completes them as it starts them: JM's informants (2216-2219),
-/// each heard from once (`Effect::FinishQuest`).
-pub const FINISHED_BY_START_SCRIPT: &[i16] = &[2216, 2217, 2218, 2219];
+/// script completes them as it starts them (`Effect::FinishQuest`): JM's
+/// informants (2216-2219), each heard from once, and the Remnants of Horned
+/// Tail (3714), once for each Nine Spirit's Egg.
+pub const FINISHED_BY_START_SCRIPT: &[i16] = &[2216, 2217, 2218, 2219, 3714];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
@@ -133,9 +134,11 @@ pub const END_ACTIONS: &[&str] = &[
 /// `quest`, a date or an `interval`). v83's client reads only `item`,
 /// `skill`, `exp`, `money`, `pop`, `pettameness` and `nextQuest` under
 /// `Act`, and Cosmic applies none of these, so they do nothing here either;
-/// the `Check` copy is what counts.
+/// the `Check` copy is what counts. `map` (a list of maps, only 3706) and
+/// `message` (an untranslated line: 3706, 2282-2284) are read by neither
+/// the client (report b200) nor Cosmic, so they are ignored too.
 pub const INERT_ACTIONS: &[&str] = &[
-    "npc", "lvmin", "lvmax", "job", "quest", "interval", "start", "end",
+    "npc", "lvmin", "lvmax", "job", "quest", "interval", "start", "end", "map", "message",
 ];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 /// `var` (1 or 2, on equipment only) is read by neither v83's client nor

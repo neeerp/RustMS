@@ -1441,6 +1441,9 @@ unsourced = [
     "dyle.informant.1",
     "dyle.informant.2",
     "dyle.informant.3",
+    "nine_spirit.baby.hatched",
+    "nine_spirit.baby.stone_held",
+    "nine_spirit.baby.full",
 ]
 
 [text."glTutoMsg0.message"]
