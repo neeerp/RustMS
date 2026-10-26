@@ -21,6 +21,10 @@ pub enum NpcInteraction {
     },
     /// A Water of Life was used: Mar the Fairy offers to revive a doll.
     WaterOfLife,
+    /// A Remote Gachapon Ticket was used on the gachapon `machine`.
+    RemoteGachapon {
+        machine: i32,
+    },
 }
 
 /// One server-driven NPC prompt.

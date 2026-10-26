@@ -43,6 +43,8 @@ pub enum RecvOpcode {
     TakeDamage = 0x30,
     AllChat = 0x31,
     CloseChalkboard = 0x32,
+    /// A Remote Gachapon Ticket's window picked a town (0xa14074).
+    RemoteGachapon = 0x74,
     /// A Water of Life was double-clicked (FUN_00a1dce6).
     WaterOfLife = 0x75,
     /// A GM's `/notice*`, `/alert*` or `/slide*` (report b175).

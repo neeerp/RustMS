@@ -515,6 +515,13 @@ impl ClientActor {
                     self.start_script(script).await?
                 }
             }
+            WorldAction::NpcInteraction(NpcInteraction::RemoteGachapon { machine }) => {
+                let player = &self.in_game()?.player;
+                if let Some(script) = net::npc_scripts::NpcScript::remote_gachapon(machine, player)
+                {
+                    self.start_script(script).await?
+                }
+            }
             WorldAction::NpcInteraction(NpcInteraction::Respond {
                 message_type,
                 response,

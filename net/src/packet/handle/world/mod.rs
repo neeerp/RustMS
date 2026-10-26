@@ -61,6 +61,7 @@ mod quest_action;
 mod quick_slots;
 mod reactor;
 mod rearrange;
+mod remote_gachapon;
 mod ring;
 mod rps;
 mod script_portal;
@@ -159,6 +160,7 @@ pub use self::quest_action::QuestActionHandler;
 pub use self::quick_slots::QuickSlotHandler;
 pub use self::reactor::DamageReactorHandler;
 pub use self::rearrange::{GatherItemsHandler, SortItemsHandler};
+pub use self::remote_gachapon::RemoteGachaponHandler;
 pub use self::ring::{
     RingActionHandler, WeddingActionHandler, WeddingBlessHandler, WeddingTalkHandler,
 };

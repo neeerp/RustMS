@@ -487,6 +487,19 @@ namespace ms
 		}
 	};
 
+	// A Remote Gachapon Ticket's window picked town `index` (0xa14074): the
+	// ticket's item id, then the index.
+	// Opcode: REMOTE_GACHAPON(116)
+	class UseRemoteGachaponPacket : public OutPacket
+	{
+	public:
+		UseRemoteGachaponPacket(int32_t item_id, int32_t index) : OutPacket(OutPacket::Opcode::REMOTE_GACHAPON)
+		{
+			write_int(item_id);
+			write_int(index);
+		}
+	};
+
 	// Asks the server to revive a doll with the Water of Life just used
 	// (FUN_00a1dce6); it carries nothing.
 	// Opcode: WATER_OF_LIFE(117)

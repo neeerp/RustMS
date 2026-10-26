@@ -277,12 +277,13 @@ impl ClientActor {
                     )?);
                 }
                 Effect::Gachapon {
+                    ticket,
                     item_id,
                     quantity,
                     town,
                     announced,
                 } => {
-                    let Ok(mut changes) = next.inventory.remove(net::gachapon::TICKET, 1) else {
+                    let Ok(mut changes) = next.inventory.remove(*ticket, 1) else {
                         warn!("Gachapon Ticket no longer held; nothing applied");
                         return Ok(Applied::Refused);
                     };
@@ -305,10 +306,7 @@ impl ClientActor {
                     changes.extend(given);
                     changed = true;
                     packets.push(inventory::build_inventory_operation(false, &changes)?);
-                    packets.push(inventory::build_item_gain_in_chat(
-                        net::gachapon::TICKET,
-                        -1,
-                    )?);
+                    packets.push(inventory::build_item_gain_in_chat(*ticket, -1)?);
                     packets.push(inventory::build_item_gain_in_chat(
                         *item_id,
                         i32::from(*quantity),

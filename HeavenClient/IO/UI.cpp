@@ -495,6 +495,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::VEGASPELL);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
+					types.emplace_back(UIElement::Type::REMOTEGACHAPON);
 					types.emplace_back(UIElement::Type::INCUBATOR);
 					types.emplace_back(UIElement::Type::INVITATION);
 					types.emplace_back(UIElement::Type::VEGARESULT);
@@ -532,6 +533,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::MAPLETV);
 					types.emplace_back(UIElement::Type::ITEMPROTECTOR);
 					types.emplace_back(UIElement::Type::KARMASCISSORS);
+					types.emplace_back(UIElement::Type::REMOTEGACHAPON);
 					types.emplace_back(UIElement::Type::INCUBATOR);
 					types.emplace_back(UIElement::Type::INVITATION);
 					types.emplace_back(UIElement::Type::MERCHANTVISITORS);

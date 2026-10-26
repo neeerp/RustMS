@@ -25,6 +25,7 @@
 #include "UIItemProtector.h"
 #include "UIIncubator.h"
 #include "UIKarmaScissors.h"
+#include "UIRemoteGachapon.h"
 #include "UIMemoSend.h"
 #include "UINameChange.h"
 #include "UIKite.h"
@@ -59,6 +60,7 @@
 #include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Character/Inventory/EquipCash.h"
 #include "../../Character/Inventory/Incubator.h"
+#include "../../Character/Inventory/RemoteGachapon.h"
 #include "../../Character/Inventory/ItemDrop.h"
 #include "../../Character/Inventory/ScrollRules.h"
 #include "../../Data/CurseData.h"
@@ -1520,6 +1522,14 @@ namespace ms
 						{
 							if (may_use_cash_item() && !in_dialog())
 								UI::get().emplace<UIIncubator>(slot, item_id, InventoryType::Id::NONE, 0);
+						}
+						// A Remote Gachapon Ticket (type 0x3b) opens its
+						// window once the last request is answered
+						// (0x4efd25's silent wait, 0x485bf7).
+						else if (remote_gachapon::is_ticket(item_id))
+						{
+							if (Stage::get().get_player().can_request(ExclRequest::WAIT))
+								UI::get().emplace<UIRemoteGachapon>(item_id);
 						}
 						// A Water of Life (518xxxx) asks the server, which
 						// offers to revive a doll.
