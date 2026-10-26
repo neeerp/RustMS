@@ -23,5 +23,9 @@ namespace ms
 		// The ALLIANCE struct (FUN_004e475a), the guild ids before the
 		// capacity.
 		AllianceData parse_alliance(InPacket& recv);
+
+		// The ranking (FUN_00a38a98, mode 0x49) after the NPC's id: a count
+		// and the guilds, each with its emblem as four ints, the mark first.
+		std::vector<GuildStanding> parse_ranking(InPacket& recv);
 	}
 }

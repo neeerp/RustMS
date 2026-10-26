@@ -883,7 +883,8 @@ namespace ms
 					UIElement::Type::MONSTERCARNIVAL,
 					UIElement::Type::COCONUT,
 					UIElement::Type::AVATARMEGAPHONE,
-					UIElement::Type::PARTYSEARCHICON
+					UIElement::Type::PARTYSEARCHICON,
+					UIElement::Type::GUILDRANK
 			};
 
 			if (std::find(silent_types.begin(), silent_types.end(), T::TYPE) == silent_types.end())

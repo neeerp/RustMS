@@ -152,6 +152,18 @@ case (a unique index on `lower(name)`).
   client's recipient list and sends the line to every other member online
   (`DirectoryMessage::Deliver`). The speaker's client prints its own line.
 
+### Ranking
+
+- Talking to the Honorable Rock (9040004, Perion) or the Guild Rank Board
+  (9040008, the Excavation Site's camp), `npc_scripts::RANK_BOARDS`, opens
+  the ranking instead of a conversation (`show_guild_ranking` in
+  `runtime/src/actor/client/guilds.rs`).
+- `db::guild::ranking` reads the world's top 50 guilds
+  (`guild::RANKING_SIZE`, Cosmic's limit; the client has none) by points,
+  then by id. GUILD_OPERATION 0x49 (`build_guild_ranking`) carries the
+  NPC's id, the count, then for each guild its name, points and emblem as
+  four ints: mark, mark colour, background, background colour.
+
 ### Bulletin board
 
 The guild board (`GUILD_BBS`, recv 0x9B, send 0x3B; the RE notes are
@@ -501,6 +513,20 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     the guild panel's art and no GP. Only the alliance's master may
     MODIFY and SAVE (op 8); a rank anyone in any of the guilds holds
     keeps its title, and SAVE compares the titles matching case.
+- 0x49 opens the ranking (`UIGuildRank`, v83's FUN_005958c0, report b181)
+  on `UserList/Guild/GuildRank`, modal and centred, replacing one already
+  open, with no sound of its own; the NPC's id is skipped.
+  - The leader's row is on every page at y 80 under the crown (`icon0` at
+    (155, 43)), with the six-frame `IconEff` sparkle looping at (127, 23).
+    Pages hold six more each, ranks 6p-4 to 6p+1 at y 137 to 262, 25
+    apart (`Character/GuildRankRules.h`).
+  - A row is its rank ("01" to "09", then "10" on) at x 44, the emblem at
+    (65, y-4), the name at x 85 and the points, plain, ending at x 275, in
+    black Arial 12, opaque for the leader, 180 for ranks 2 and 3 and 120
+    for the rest. The emblem is drawn only if one of its four ids is set,
+    and like v83 a zero id takes the viewer's own guild's.
+  - BtLeft works off the first page and BtRight while page*6+2 <= count.
+    OK, Enter and Esc close it; nothing is sent.
 
 ## Not implemented
 
@@ -508,7 +534,7 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- Guild points and the guild quest.
+- Earning guild points, and the guild quest.
 - The alliance's rank panel slides no more than the guild's.
 - The Alliance tab's tooltips: the whole notice over its box, the online
   and total counts, "Sort thru" over the column heads, and "Unknown" over a
@@ -550,3 +576,6 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   break shows a blank last line.
 - The board's 12 px body line and 32 px page-number pitch are guesses.
 - Whether Esc closes v83's board; the spec names only QUIT.
+- The ranking's sparkle: its frames carry no delay, and HC's 100 ms default
+  stands in for v83's. Whether v83's ranking window can be dragged, and
+  what a second 0x49 does to an open one, are untraced.

@@ -58,6 +58,14 @@ namespace ms
 		bool operator==(const GuildData& other) const;
 	};
 
+	// A guild on the ranking that the Honorable Rock shows.
+	struct GuildStanding
+	{
+		std::string name;
+		int32_t points = 0;
+		GuildEmblem emblem;
+	};
+
 	// The player's guild, as the server last described it.
 	class Guild
 	{

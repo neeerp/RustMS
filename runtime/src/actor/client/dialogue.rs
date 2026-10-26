@@ -40,6 +40,9 @@ impl ClientActor {
         if net::npc_scripts::EVENT_ASSISTANTS.contains(&npc_id) {
             return self.talk_to_event_assistant(npc_id).await;
         }
+        if net::npc_scripts::RANK_BOARDS.contains(&npc_id) {
+            return self.show_guild_ranking(npc_id).await;
+        }
         if npc_id == net::npc_scripts::LENARIO {
             return self.talk_to_lenario().await;
         }
