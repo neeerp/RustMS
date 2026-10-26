@@ -177,7 +177,7 @@ itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
 `q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
-[Pets](./pets.md)), Meren's Maker lessons and Dyle's informants below); those steps go through
+[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants and the baby dragon below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -259,6 +259,16 @@ checks) and gives Cosmic's 7,000 EXP, and the last of the four takes the
 list. `game_data::quests::FINISHED_BY_START_SCRIPT` lets these four through
 without a completion NPC. The can's and the informants' lines are
 unsourced and stay placeholder (`dyle.*`).
+
+"The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
+Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
+open once 3706 is done), has a start script (`q3714s`) and no end. It
+takes a Nine Spirit's Egg (4001094) and gives a Dragon Stone (2041200) and
+Cosmic's 42,000 EXP, completing the quest at once. The quest repeats
+(`interval 0`), once for each egg, but not while a Dragon Stone is held,
+as in Cosmic. Its lines are placeholders (`nine_spirit.baby.*`). 3706's
+`Act/1/map` and `message` (and 2282-2284's `Act/0/message`) are read by
+neither v83's client nor Cosmic, so they are ignored (`INERT_ACTIONS`).
 
 The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:

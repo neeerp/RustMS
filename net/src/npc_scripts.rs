@@ -2340,6 +2340,7 @@ impl NpcScript {
             "q2217s" => informant(player, 1),
             "q2218s" => informant(player, 2),
             "q2219s" => informant(player, 3),
+            "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
             "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
@@ -2761,6 +2762,42 @@ fn trash_can(player: &Player, lost: bool, hour: u8) -> NpcScript {
 /// `q2216s`-`q2219s`: the informant at `index` tells what they know about
 /// Dyle, which completes the quest as it starts, for 7,000 EXP (Cosmic's;
 /// the data has none). The last of the four heard takes back JM's list.
+/// Nine Spirit's Baby Dragon, in its nest (240040612).
+const BABY_DRAGON: i32 = 2081011;
+const NINE_SPIRIT_EGG: i32 = 4001094;
+const DRAGON_STONE: i32 = 2041200;
+
+/// `q3714s`, the Remnants of Horned Tail: the egg from Horned Tail hatches
+/// on the nest and the baby dragon gives up a Dragon Stone, with Cosmic's
+/// 42,000 EXP (the data has no rewards). The quest repeats (`interval 0`),
+/// once for each egg, but not while a Dragon Stone is held, as Cosmic.
+fn baby_dragon(player: &Player) -> NpcScript {
+    if player.inventory.count(DRAGON_STONE) > 0 {
+        return NpcScript::new(
+            BABY_DRAGON,
+            vec![Page::Say(text(keys::NINE_SPIRIT_STONE_HELD))],
+        );
+    }
+    let mut script = NpcScript::new(
+        BABY_DRAGON,
+        vec![Page::Say(text(keys::NINE_SPIRIT_HATCHED))],
+    );
+    script.on_end = vec![
+        Effect::FinishQuest(3714),
+        Effect::TakeItem {
+            item_id: NINE_SPIRIT_EGG,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: DRAGON_STONE,
+            quantity: 1,
+        },
+        Effect::GainExp(42_000),
+    ];
+    script.inventory_full = Some(text(keys::NINE_SPIRIT_FULL));
+    script
+}
+
 fn informant(player: &Player, index: usize) -> Option<NpcScript> {
     let (quest, npc) = INFORMANTS[index];
     let mut script = NpcScript::new(npc, vec![Page::Say(text(keys::DYLE_INFORMANTS[index]))]);
@@ -9921,6 +9958,47 @@ mod tests {
         // Two still to hear: the list stays.
         let early = NpcScript::for_quest("q2219s", &holding(&[2216, 2217])).unwrap();
         assert_eq!(read_through(early), (1052006, heard(2219)));
+    }
+
+    #[test]
+    fn the_baby_dragon_trades_each_egg_for_a_dragon_stone() {
+        let mut player = with_quests(&[(3706, true)]);
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(NINE_SPIRIT_EGG, 2),
+        );
+        assert!(NpcScript::for_quest("q3714s", &player)
+            .unwrap()
+            .inventory_full()
+            .is_some());
+        let hatched = NpcScript::for_quest("q3714s", &player).unwrap();
+        assert_eq!(
+            read_through(hatched),
+            (
+                BABY_DRAGON,
+                vec![
+                    Effect::FinishQuest(3714),
+                    Effect::TakeItem {
+                        item_id: NINE_SPIRIT_EGG,
+                        quantity: 1
+                    },
+                    Effect::GiveItem {
+                        item_id: DRAGON_STONE,
+                        quantity: 1
+                    },
+                    Effect::GainExp(42_000),
+                ]
+            )
+        );
+        // Not while a stone is held.
+        player.inventory.insert(
+            game::InventoryType::Use,
+            1,
+            game::Item::stack(DRAGON_STONE, 1),
+        );
+        let held = NpcScript::for_quest("q3714s", &player).unwrap();
+        assert_eq!(read_through(held), (BABY_DRAGON, vec![]));
     }
 
     #[test]
