@@ -99,6 +99,10 @@ impl WorldHandler for UseSkillHandler {
             let now = Instant::now();
             let used = if field_limit & game_data::FIELD_LIMIT_MOVEMENT_SKILLS != 0 {
                 Err(Refusal::NoMovementSkillsHere)
+            } else if skills::SPACE_DASHES.contains(&skill_id)
+                && !ctx.player.ride_skill().is_some_and(mount::is_event_ride)
+            {
+                Err(Refusal::NotOnEventRide)
             } else {
                 use_skill(ctx.player, skill_id, level, now)
             };
@@ -424,6 +428,9 @@ enum Refusal {
     Ship,
     /// A Dojo secret skill without a full energy bar.
     NoEnergy,
+    /// Space Dash off an event ride (the client lets it through only on
+    /// one, 0x966f7a).
+    NotOnEventRide,
 }
 
 /// What USE_SKILL carries after the level (0x96d399), each part only for
@@ -2030,6 +2037,42 @@ mod tests {
             player.buffs.cancel(5001005),
             [BuffStat::DashSpeed, BuffStat::DashJump]
         );
+    }
+
+    #[test]
+    fn space_dash_dashes_only_on_an_event_ride() {
+        if skills::data().is_err() || crate::game_data::get().is_err() {
+            return;
+        }
+        // x 50, y 1, time 1, mpCon 10.
+        let mut player = beginner_with(1014, 1);
+        let actions = handle(&mut player, 1014, 1);
+        assert!(matches!(actions.as_slice(), [only] if unlocks(only)));
+        assert_eq!(player.stats.mp, 20);
+        assert!(player.buffs.active().is_empty());
+
+        // On the Spaceship it dashes for a second.
+        player.skills.set(SkillRecord {
+            skill_id: 1013,
+            level: 1,
+            master_level: 0,
+            expiration: None,
+        });
+        let start = Instant::now();
+        board(&mut player, 1013, 1, 0, start).unwrap();
+        handle(&mut player, 1014, 1);
+        assert_eq!(player.stats.mp, 20 - 10 - 10);
+        let dash: Vec<_> = player
+            .buffs
+            .active()
+            .iter()
+            .filter(|buff| buff.skill_id == 1014)
+            .map(|buff| (buff.stat, buff.value))
+            .collect();
+        assert_eq!(dash, [(BuffStat::DashSpeed, 50), (BuffStat::DashJump, 1)]);
+        let tick = player.buffs.advance(start + Duration::from_secs(2));
+        assert_eq!(tick.expired, [BuffStat::DashSpeed, BuffStat::DashJump]);
+        assert_eq!(player.ride_skill(), Some(1013));
     }
 
     #[test]

@@ -409,8 +409,12 @@ pub const TELEPORTS: [i32; 6] = [2101002, 2201002, 2301001, 12101003, 22101001, 
 pub const FLASH_JUMPS: [i32; 2] = [4111006, 14101004];
 
 /// The Dash skills (v83 FUN_009433a2): a double tap on an arrow casts them,
-/// and the handler gives their speed and jump as two-state stats.
-pub const DASHES: [i32; 2] = [5001005, 15001003];
+/// and the handler gives their speed and jump as two-state stats. Space
+/// Dash is the one on an event ride.
+pub const DASHES: [i32; 4] = [5001005, 15001003, SPACE_DASHES[0], SPACE_DASHES[1]];
+
+/// Space Dash, the Beginner's and the Noblesse's.
+pub const SPACE_DASHES: [i32; 2] = [1014, 10001015];
 
 /// Wings (v83 FUN_00930b27): the client jumps and glides down, and asks
 /// only for the MP.
