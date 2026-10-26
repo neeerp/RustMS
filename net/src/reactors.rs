@@ -610,8 +610,9 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
-/// Berserk room's statues, Lord Jonathan's gulls and Eos Tower's dollhouses
-/// (Server.NX `FieldSet.img/Ludi023`'s `shuffle`), so the true one is
+/// Berserk room's statues, Lord Jonathan's gulls, Eos Tower's dollhouses
+/// and the Toy Factory's parts boxes (Server.NX `FieldSet.img/Ludi023`'s and
+/// `Ludi020`'s `shuffle`), so the true ones are
 /// somewhere new, the boxes of the Ludibrium Maze's rooms (Cosmic
 /// `LudiMazePQ` `shuffleReactors`), and the Forest of Poison Haze's fifth
 /// stage's (`EllinPQ`), and those of the Pirate Ship's first, third and
@@ -621,14 +622,16 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// of `2518000` to `2612004`, so not their ways back: `shuffles`).
 pub fn shuffled(map_id: i32) -> bool {
     use crate::events::{
-        MagatiaSide, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PIRATE_STAGES,
+        MagatiaSide, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PARTS_ROOM, PIRATE_STAGES,
     };
     let magatia = MagatiaSide::ALL
         .iter()
         .flat_map(|side| side.side_doors())
         .any(|(_, room, _)| room == map_id);
-    matches!(map_id, BERSERK_ROOM | BART_ROOM | DOLLHOUSE_ROOM)
-        || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
+    matches!(
+        map_id,
+        BERSERK_ROOM | BART_ROOM | DOLLHOUSE_ROOM | PARTS_ROOM
+    ) || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
         || map_id == ELLIN_STAGES[4]
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
         || magatia
@@ -656,6 +659,10 @@ mod tests {
         assert_eq!(action(2202000), Action::Drops, "the odd one");
         assert!(shuffled(crate::events::DOLLHOUSE_ROOM));
         assert!(shuffles(DOLLHOUSE) && shuffles(2202000));
+        // The Toy Factory's parts boxes and their empty look-alikes.
+        assert!(shuffled(crate::events::PARTS_ROOM));
+        assert_eq!(action(2202001), Action::Drops);
+        assert_eq!(action(2208000), Action::Drops);
     }
 
     #[test]

@@ -6,8 +6,9 @@
 use crate::content;
 use crate::conti::Portal;
 use crate::events::{
-    EventKind, EAST_CASTLE_TOWER, PRIME_MINISTER, PRIME_MINISTER_AT, STOP_THE_WEDDING,
-    STORY_OF_BETRAYAL, WEDDING_HALL, WEDDING_HALL_KEY, WHERES_VIOLETTA, YETI_BROTHERS,
+    EventKind, APPARATUS_ROOM, EAST_CASTLE_TOWER, MACHINE_PART, PRIME_MINISTER, PRIME_MINISTER_AT,
+    STOP_THE_WEDDING, STORY_OF_BETRAYAL, WEDDING_HALL, WEDDING_HALL_KEY, WHERES_VIOLETTA,
+    YETI_BROTHERS,
 };
 use crate::npc_scripts;
 use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
@@ -1345,6 +1346,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 occupied: None,
             }
         }
+        // Out of the Secret Passage, back to the Toy Factory, leaving any
+        // Machine Parts behind (Cosmic `ludi021`).
+        "ludi021" => {
+            let held = player.inventory.count(MACHINE_PART);
+            let mut effects = Vec::new();
+            if held > 0 {
+                effects.push(Effect::TakeItem {
+                    item_id: MACHINE_PART,
+                    quantity: i16::try_from(held).unwrap_or(i16::MAX),
+                });
+            }
+            effects.extend([Effect::PortalSound, Effect::Warp(APPARATUS_ROOM)]);
+            ScriptOutcome {
+                effects,
+                block: false,
+                occupied: None,
+            }
+        }
         // Cosmic asks for the password while the quest is taken; its start
         // script, which sets one, isn't run, so the door just opens.
         "secretDoor" if quest(VERIFYING_THE_PASSWORD) != QuestState::NotStarted => {
@@ -2615,6 +2634,24 @@ mod tests {
             [Effect::Pink(
                 content::text().get(keys::KING_PEPE_KEY_NO_ROOM, &[])
             )]
+        );
+    }
+
+    #[test]
+    fn the_secret_passage_leads_back_to_the_factory_without_the_parts() {
+        let back = [Effect::PortalSound, Effect::Warp(APPARATUS_ROOM)];
+        let mut player = player_with(&[]);
+        assert_eq!(portal("ludi021", &player).unwrap().effects, back);
+        player
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(MACHINE_PART, 7));
+        let taken = Effect::TakeItem {
+            item_id: MACHINE_PART,
+            quantity: 7,
+        };
+        assert_eq!(
+            portal("ludi021", &player).unwrap().effects,
+            [&[taken][..], &back].concat()
         );
     }
 

@@ -75,6 +75,10 @@ pub enum EventKind {
     /// Eos Tower's dollhouse room, taken alone from Olson the Toy Soldier
     /// (2040002) to find the pendulum for Dollhouse (3230).
     Dollhouse,
+    /// The Toy Factory's Sector 4, taken alone from Cheng the Assistant
+    /// (2040003) to find the Machine Parts for The Missing Mechanical Parts
+    /// (3239).
+    MechanicalParts,
     /// King Pepe's room in the Mushroom Castle, taken alone through the
     /// East Castle Tower's `TD_MC_enterboss1` while Stop the Wedding (2330)
     /// still wants a Yeti brother.
@@ -2480,6 +2484,47 @@ pub const DOLLHOUSE: Event = Event {
     ..DOJO
 };
 
+/// Ludibrium's Toy Factory <Process 1> Zone 1, 220020000, where Cheng the
+/// Assistant keeps the way into Sector 4.
+pub const TOY_FACTORY: i32 = 220020000;
+/// The Toy Factory's Sector 4, 922000000, where the Machine Parts are hidden
+/// (Map.nx: ten reactors 2202001 and two look-alikes 2208000 that hold
+/// nothing), and Cheng waits by its far end.
+pub const PARTS_ROOM: i32 = 922000000;
+/// The Secret Passage, 922000009, where Sector 4 lets out (its
+/// `forcedReturn`); its `out00` (`ludi021`) leads back to the factory.
+pub const PARTS_PASSAGE: i32 = 922000009;
+/// The Toy Factory <Apparatus Room>, 220020600, where the Secret Passage's
+/// `out00` leads.
+pub const APPARATUS_ROOM: i32 = 220020600;
+/// The Missing Mechanical Parts (3239), which wants ten Machine Parts.
+pub const PARTS_QUEST: i16 = 3239;
+/// The Machine Parts the parts boxes drop (the pack's reactor drops for
+/// 2202001), ten of which Cheng takes.
+pub const MACHINE_PART: i32 = 4_031_092;
+
+/// Sector 4: Cheng takes a player on The Missing Mechanical Parts alone into
+/// their own copy for twenty minutes, one at a time on a channel (Server.NX
+/// `FieldSet.img/Ludi020`: `timeOut` 1200, `shuffle` 1; Cosmic `q3239`).
+/// The boxes change places in each copy (`reactors::shuffled`). It is never
+/// won; it ends when Cheng sends the player out, or the time runs out, to
+/// the Secret Passage. The parts stay behind.
+pub const MECHANICAL_PARTS: Event = Event {
+    lobby: TOY_FACTORY,
+    entrances: &[],
+    maps: PARTS_ROOM..=PARTS_ROOM,
+    entry: PARTS_ROOM,
+    exit: PARTS_PASSAGE,
+    levels: 30..=u8::MAX,
+    team: 1..=1,
+    minutes: 20,
+    exp_per_stage: &[],
+    member_clears: &[],
+    items: &[MACHINE_PART],
+    runs: 1,
+    ..DOJO
+};
+
 /// The Mushroom Castle's East Castle Tower, 106021400: the way up to King
 /// Pepe's room and the Wedding Hall (`TD_MC_enterboss1`), and back.
 pub const EAST_CASTLE_TOWER: i32 = 106021400;
@@ -2637,7 +2682,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 41] = [
+    pub const ALL: [EventKind; 42] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2677,6 +2722,7 @@ impl EventKind {
         EventKind::Magatia(MagatiaSide::Alcadno),
         EventKind::Tristan,
         EventKind::Dollhouse,
+        EventKind::MechanicalParts,
         EventKind::KingPepe,
         EventKind::WeddingHall,
     ];
@@ -2707,6 +2753,7 @@ impl EventKind {
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
             EventKind::Dollhouse => &DOLLHOUSE,
+            EventKind::MechanicalParts => &MECHANICAL_PARTS,
             EventKind::KingPepe => &KING_PEPE,
             EventKind::WeddingHall => &WEDDING_HALL_EVENT,
         }
@@ -3782,6 +3829,14 @@ mod tests {
         );
         assert!(dollhouse.solo() && dollhouse.items == [DOLLHOUSE_PENDULUM]);
         assert!(event_map(DOLLHOUSE_ROOM) && !event_map(EOS_TOWER_100));
+        let parts = EventKind::MechanicalParts.event();
+        assert_eq!(
+            (parts.entry, parts.exit, parts.minutes),
+            (PARTS_ROOM, PARTS_PASSAGE, 20)
+        );
+        assert!(parts.solo() && parts.items == [MACHINE_PART]);
+        assert!(parts.team(1, &[at(1, 29, TOY_FACTORY)]).is_none());
+        assert!(event_map(PARTS_ROOM) && !event_map(PARTS_PASSAGE));
         let pepe = EventKind::KingPepe.event();
         assert_eq!((pepe.entry, pepe.exit), (KING_PEPE_ROOM, EAST_CASTLE_TOWER));
         assert!(pepe.solo() && pepe.lasts_until_empty());

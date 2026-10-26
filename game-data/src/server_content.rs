@@ -805,6 +805,17 @@ pub mod keys {
     pub const DOLLHOUSE_NOT_FOUND: &str = "dollhouse.not_found";
     pub const DOLLHOUSE_BACK: &str = "dollhouse.back";
 
+    /// The Missing Mechanical Parts (quest 3239) in the Toy Factory: Cheng
+    /// the Assistant (NPC 2040003) with the way into Sector 4, or taken by
+    /// another player; and in it, taking ten Machine Parts for a scroll, or
+    /// asking for a free USE slot first, and the way out. No licensed script
+    /// has the text.
+    pub const MECHANICAL_PARTS_ENTER: &str = "mechanical_parts.enter";
+    pub const MECHANICAL_PARTS_BUSY: &str = "mechanical_parts.busy";
+    pub const MECHANICAL_PARTS_DONE: &str = "mechanical_parts.done";
+    pub const MECHANICAL_PARTS_NO_ROOM: &str = "mechanical_parts.no_room";
+    pub const MECHANICAL_PARTS_LEAVE: &str = "mechanical_parts.leave";
+
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
     /// (`out_pepeking`) giving the Wedding Hall key once the three Yeti
@@ -3068,6 +3079,11 @@ mod tests {
                 keys::DOLLHOUSE_FOUND,
                 keys::DOLLHOUSE_NOT_FOUND,
                 keys::DOLLHOUSE_BACK,
+                keys::MECHANICAL_PARTS_ENTER,
+                keys::MECHANICAL_PARTS_BUSY,
+                keys::MECHANICAL_PARTS_DONE,
+                keys::MECHANICAL_PARTS_NO_ROOM,
+                keys::MECHANICAL_PARTS_LEAVE,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,
