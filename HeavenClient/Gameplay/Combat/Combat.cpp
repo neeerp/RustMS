@@ -368,7 +368,7 @@ namespace ms
 	void Combat::end_dash() const
 	{
 		if (player.has_buff(Buffstat::Id::DASH_SPEED))
-			CancelBuffPacket(dash::skill(player.get_stats().get_job().get_id())).dispatch();
+			CancelBuffPacket(dash::skill(player.get_stats().get_job().get_id(), player.get_vehicle())).dispatch();
 	}
 
 	bool Combat::is_preparing() const

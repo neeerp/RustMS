@@ -1711,7 +1711,7 @@ namespace ms
 	int32_t Player::get_walk_animation_speed() const
 	{
 		if (ride_ability)
-			return ride_ability->speed;
+			return dash::ride_speed(vehicle, ride_ability->speed, get_buff_value(Buffstat::Id::DASH_SPEED));
 
 		return stats.get_total(EquipStat::Id::SPEED);
 	}
@@ -1925,11 +1925,11 @@ namespace ms
 	// CUserLocal clamps SPEED to 80-140 and JUMP to 80-123 before turning
 	// them into shoe multipliers (FUN_007a4dec). A rider moves as the mount
 	// does instead, and an item's morph or the barrel as its template
-	// (FUN_0094d3d9).
+	// (FUN_0094d3d9). Space Dash speeds an event vehicle up (0x94d7bb).
 	double Player::get_walkspeed() const
 	{
 		if (ride_ability)
-			return ride_ability->speed / 100.0;
+			return dash::ride_speed(vehicle, ride_ability->speed, get_buff_value(Buffstat::Id::DASH_SPEED)) / 100.0;
 
 		if (const MorphTemplate *morph = get_template_morph())
 			return morph::speed(morph->get_speed()) / 100.0;
@@ -1947,7 +1947,8 @@ namespace ms
 	double Player::get_jumpforce() const
 	{
 		if (ride_ability)
-			return Physics::jump_speed(ride_ability->jump / 100.0);
+			return Physics::jump_speed(
+				dash::ride_jump(vehicle, ride_ability->jump, get_buff_value(Buffstat::Id::DASH_JUMP)) / 100.0);
 
 		if (const MorphTemplate *morph = get_template_morph())
 			return Physics::jump_speed(morph::jump(morph->get_jump()) / 100.0);

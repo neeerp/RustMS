@@ -165,7 +165,7 @@ namespace ms
 				show_energy(job / 1000 == 1 ? 15100004 : 5110001, value >= energy_bar::FULL, init);
 
 			if (stat == Buffstat::Id::DASH_SPEED)
-				show_dash(dash::skill(job));
+				show_dash(dash::skill(job, vehicle));
 
 			if (stat == Buffstat::Id::DIVINE_BODY)
 				show_divine_body(pq_skills::family(job, pq_skills::INVINCIBILITY));

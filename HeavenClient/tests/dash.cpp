@@ -12,10 +12,30 @@ namespace
 
 	void test_skill()
 	{
-		assert(dash::skill(500) == dash::ID);
-		assert(dash::skill(510) == dash::ID);
-		assert(dash::skill(1500) == dash::DAWN_ID);
+		assert(dash::skill(500, 0) == dash::ID);
+		assert(dash::skill(510, 1902000) == dash::ID);
+		assert(dash::skill(1500, 0) == dash::DAWN_ID);
 		assert(dash::is_dash(5001005) && dash::is_dash(15001003) && !dash::is_dash(5001002));
+
+		// On an event vehicle it is Space Dash, the Noblesse's for the Cygnus line; the Battleship isn't one.
+		assert(dash::skill(0, 1932002) == dash::SPACE_ID);
+		assert(dash::skill(2000, 1932003) == dash::SPACE_ID);
+		assert(dash::skill(1000, 1932010) == dash::DAWN_SPACE_ID);
+		assert(dash::skill(520, 1932000) == dash::ID);
+		assert(dash::is_dash(1014) && dash::is_dash(10001015) && !dash::is_dash(1013));
+	}
+
+	void test_ride_bonus()
+	{
+		// Space Dash's 50 adds to an event vehicle's speed, up to 190, and its 1 to the jump, up to 123.
+		assert(dash::ride_speed(1932001, 100, 50) == 150);
+		assert(dash::ride_speed(1932005, 170, 50) == 190);
+		assert(dash::ride_speed(1932001, 100, 0) == 100);
+		assert(dash::ride_jump(1932003, 100, 1) == 101);
+		assert(dash::ride_jump(1932003, 123, 1) == 123);
+		// A tamed monster or the Battleship keeps its own.
+		assert(dash::ride_speed(1902000, 150, 50) == 150);
+		assert(dash::ride_jump(1932000, 100, 1) == 100);
 	}
 
 	void test_bonus()
@@ -72,6 +92,7 @@ int main()
 {
 	test_skill();
 	test_bonus();
+	test_ride_bonus();
 	test_double_tap();
 
 	return 0;

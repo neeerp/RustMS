@@ -1,6 +1,7 @@
 //! Event mounts (report b183): a GM teaches the Spaceship with `!skill`,
 //! rides it with no mount worn, gaining its defense, and the map sees the
-//! vehicle of its level. Getting off ends the defense too.
+//! vehicle of its level. Space Dash dashes on it, and getting off ends the
+//! defense too.
 
 use integration_harness::connection::MapleTestConnection;
 use integration_harness::database::{set_gm_level, set_job};
@@ -23,6 +24,9 @@ const SPACESHIP_2: i32 = 1_932_002;
 const RIDING: i64 = 1 << 53;
 /// Weapon and magic defense, in the second half.
 const DEFENSE: i64 = (1 << 33) | (1 << 35);
+const SPACE_DASH: i32 = 1014;
+/// Dash's speed and jump, in the first half.
+const DASH: i64 = (1 << 51) | (1 << 52);
 
 /// Read until `pick` takes a packet about `who`'s buffs, failing after 5
 /// seconds.
@@ -91,6 +95,27 @@ async fn a_gm_taught_spaceship_rides_its_own_vehicle() {
     })
     .await;
     assert_eq!(seen, (SPACESHIP_2, SPACESHIP));
+
+    // Space Dash, from the Spaceship, speeds it up by 50.
+    let t = step(g, &m, build_all_chat("!skill 1014", 0).unwrap()).await;
+    assert_eq!(t.skills, [(SPACE_DASH, 1)]);
+    let t = step(g, &m, use_skill(SPACE_DASH, 1)).await;
+    assert_eq!(t.stat_values(stat::MP), [90 - 10]);
+    let dash = expect(w, SendOpcode::GiveForeignBuff, id, |mut r| {
+        let mask = r.read_long().unwrap();
+        r.read_long().unwrap();
+        r.read_short().unwrap();
+        (mask, r.read_int().unwrap(), r.read_int().unwrap())
+    })
+    .await;
+    assert_eq!(dash, (DASH, 50, SPACE_DASH));
+    // Letting the arrow go ends it.
+    step(g, &m, cancel_buff(SPACE_DASH)).await;
+    let off = expect(w, SendOpcode::CancelForeignBuff, id, |mut r| {
+        r.read_long().unwrap()
+    })
+    .await;
+    assert_eq!(off, DASH);
 
     // Getting off ends the defense too, and the map sees it.
     let t = step(g, &m, cancel_buff(SPACESHIP)).await;

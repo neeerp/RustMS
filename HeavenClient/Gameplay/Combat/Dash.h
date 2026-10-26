@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../../Character/MountRules.h"
+
 #include <algorithm>
 #include <cstdint>
 
@@ -11,19 +13,39 @@ namespace ms
 	{
 		constexpr int32_t ID = 5001005;
 		constexpr int32_t DAWN_ID = 15001003;
+		// Space Dash, the Dash on an event vehicle.
+		constexpr int32_t SPACE_ID = 1014;
+		constexpr int32_t DAWN_SPACE_ID = 10001015;
 
 		// How soon after the first press the second must come (FUN_0074ab67).
 		constexpr int64_t WINDOW = 300;
 
-		// The player's Dash (FUN_009433a2).
-		inline int32_t skill(int32_t job)
+		// The Dash of a character of `job` riding `vehicle` (FUN_009433a2): Space Dash on an event vehicle.
+		inline int32_t skill(int32_t job, int32_t vehicle)
 		{
-			return job / 1000 == 1 ? DAWN_ID : ID;
+			bool cygnus = job / 1000 == 1;
+
+			if (mount::is_event_vehicle(vehicle))
+				return cygnus ? DAWN_SPACE_ID : SPACE_ID;
+
+			return cygnus ? DAWN_ID : ID;
 		}
 
 		inline bool is_dash(int32_t skill)
 		{
-			return skill == ID || skill == DAWN_ID;
+			return skill == ID || skill == DAWN_ID || mount::is_space_dash(skill);
+		}
+
+		// What an event vehicle's speed or jump comes to with the Dash's `dash` added, as `mount::speed`
+		// and `mount::jump` add a saddle's (0x94d7bb). Other mounts keep their own.
+		inline int32_t ride_speed(int32_t vehicle, int32_t speed, int32_t dash)
+		{
+			return mount::is_event_vehicle(vehicle) ? mount::speed(speed, dash) : speed;
+		}
+
+		inline int32_t ride_jump(int32_t vehicle, int32_t jump, int32_t dash)
+		{
+			return mount::is_event_vehicle(vehicle) ? mount::jump(jump, dash) : jump;
 		}
 
 		// What Dash adds to the speed a Speed buff of `buff` gives: the larger of the two counts, and a

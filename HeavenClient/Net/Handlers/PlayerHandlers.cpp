@@ -330,7 +330,8 @@ namespace ms
 			player.give_buff({ Buffstat::DASH_JUMP, static_cast<int16_t>(dash.jump), dash.skill, duration });
 			player.show_dash(dash.skill);
 
-			if (auto bufflist = UI::get().get_element<UIBuffList>())
+			// Space Dash shows no icon.
+			if (auto bufflist = UI::get().get_element<UIBuffList>(); bufflist && !mount::is_space_dash(dash.skill))
 				bufflist->add_buff(dash.skill, Buffstat::DASH_SPEED, duration);
 		}
 
@@ -355,8 +356,7 @@ namespace ms
 		BuffParser::Ride ride = state.ride;
 		Stage::get().get_player().change_ride(ride.vehicle);
 
-		// Space Dash shows no icon.
-		if (ride.skill <= 0 || ride.skill == 1014 || ride.skill == 10001015)
+		if (ride.skill <= 0)
 			return;
 
 		if (auto bufflist = UI::get().get_element<UIBuffList>())
