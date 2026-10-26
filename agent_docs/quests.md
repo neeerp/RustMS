@@ -32,7 +32,7 @@ Quests run the way the original client ran them:
    requirements and the player (`net::quests::check_start`/`check_complete`),
    asks the field whether that NPC is on the map within reach (1200×800
    around the player; not when starting a QuestInfo `autoStart` quest or
-   completing an `autoComplete` one), and commits the change and its `Act.img` rewards
+   completing an `autoComplete` or `autoPreComplete` one), and commits the change and its `Act.img` rewards
    atomically (`db::quest::start`/`complete`/`forfeit`).
 4. It answers with the quest record (`SHOW_STATUS_INFO` mode 1), EXP and
    mesos with their stats if any (both shown in the chat log, as mode 3 with
@@ -62,7 +62,7 @@ the bulb too. A new one shows the bulb's Appear animation, plays
 Clicking the bulb opens Maple Administrator (9010000) listing them under the
 NPC menu's headers. Picking one opens its conversation as its start NPC
 would, wherever the player is, so the server starts `autoStart` quests and
-completes `autoComplete` ones without the reach check. An `autoAccept` quest opens by itself and
+completes `autoComplete` and `autoPreComplete` ones without the reach check. An `autoAccept` quest opens by itself and
 starts without its offer pages. `normalAutoStart` only says when to check;
 `fieldEnter` is also a start requirement (below).
 
@@ -95,7 +95,9 @@ only once Mai's, Sam's, Rain's and Yoona's quests (1041–1044) are done.
 A quest without a `Check/1` `npc` is completed at
 its start NPC if `Check/1` asks for items or kills (Pio's 1008); one with
 neither is unsupported, which keeps out the event records that only a
-server script completes.
+server script completes. An `autoPreComplete` quest is the exception: the
+quest alert completes it (Maria's Map Reading, 1030, whose `Check/1` is
+empty, for 11 EXP).
 
 Start requirements follow v83's own check (FUN_00721163). `item` counts what
 the bag holds plus one if a copy is worn: a positive count is a minimum, 0

@@ -1,5 +1,5 @@
-# Quests the server supports (game-data/src/quests.rs) and HeavenClient offers.
 # Generated from Quest.nx and checked by the server's asset test; HeavenClient
+# Quests the server supports (game-data/src/quests.rs) and HeavenClient offers.
 # reads it at startup. One id per line.
 1000
 1001
@@ -29,6 +29,7 @@
 1026
 1027
 1029
+1030
 1031
 1032
 1033
@@ -1058,6 +1059,7 @@
 6009
 6010
 6011
+6012
 6013
 6014
 6015
@@ -1685,6 +1687,7 @@
 10007
 10021
 10035
+10051
 10056
 10060
 10062
@@ -1697,6 +1700,7 @@
 10071
 10072
 10073
+10080
 10081
 10109
 10205

@@ -505,6 +505,7 @@ mod tests {
             next_quest: None,
             auto_start: false,
             auto_complete: false,
+            auto_pre_complete: false,
             explored: None,
             end_record: None,
             start_info: None,
