@@ -119,6 +119,14 @@ pub const END_ACTIONS: &[&str] = &[
     "npcAct",
     "buffItemID",
 ];
+/// `Act` keys that copy a requirement from `Check` (`npc`, `lvmin`, `job`,
+/// `quest`, a date or an `interval`). v83's client reads only `item`,
+/// `skill`, `exp`, `money`, `pop`, `pettameness` and `nextQuest` under
+/// `Act`, and Cosmic applies none of these, so they do nothing here either;
+/// the `Check` copy is what counts.
+pub const INERT_ACTIONS: &[&str] = &[
+    "npc", "lvmin", "lvmax", "job", "quest", "interval", "start", "end",
+];
 /// Keys of an `Act/<n>/item/<k>` entry the server applies.
 /// `var` (1 or 2, on equipment only) is read by neither v83's client nor
 /// Cosmic, which give the base stats; so do we.
@@ -385,8 +393,16 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
         "Check/0",
     )?;
     unsupported(end, END_REQUIREMENTS, "Check/1")?;
-    unsupported(&keys.start_act, START_ACTIONS, "Act/0")?;
-    unsupported(&keys.end_act, END_ACTIONS, "Act/1")?;
+    unsupported(
+        &keys.start_act,
+        &[START_ACTIONS, INERT_ACTIONS].concat(),
+        "Act/0",
+    )?;
+    unsupported(
+        &keys.end_act,
+        &[END_ACTIONS, INERT_ACTIONS].concat(),
+        "Act/1",
+    )?;
     unsupported(&keys.item_keys, ITEM_ACTION_KEYS, "Act/item")?;
     unsupported(&keys.skill_keys, SKILL_ACTION_KEYS, "Act/skill")?;
     Ok(())
@@ -977,6 +993,16 @@ mod tests {
         // Or its questions, and the answers that are right.
         let quiz = keys(&["npc"], &["npc"], &["0", "1", "ask", "stop"], &["exp"]);
         assert_eq!(classify(&quiz), Ok(()));
+        // Or copies of its requirements, which nothing reads.
+        let copied = keys(
+            &["npc", "lvmin", "quest"],
+            &["npc"],
+            &[
+                "npc", "lvmin", "lvmax", "job", "quest", "interval", "start", "end",
+            ],
+            &["exp", "npc"],
+        );
+        assert_eq!(classify(&copied), Ok(()));
     }
 
     #[test]

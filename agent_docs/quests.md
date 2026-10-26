@@ -83,7 +83,11 @@ Only requirements and actions the server implements are allowed
 `Act` nodes may repeat speech under numbered keys and `yes`/`no`, and an
 offer's questions (`ask`) with their answers (`stop`), as an old copy of
 `Say.img` (Act/0 of 7300, the first of the Horntail quests, is in Korean);
-that is not an action. `item` requirements are counts the player must hold; a count of 0
+that is not an action. They may also copy requirements from `Check`
+(`npc`, `lvmin`, `lvmax`, `job`, `quest`, `interval`, `start`, `end`;
+`INERT_ACTIONS`). v83's client reads none of these under `Act`, nor does
+Cosmic, so only the `Check` copy counts: 3081 and 3082 have an `Act/0/lvmin`
+but no level requirement, and 3075's `Act/0/npc` names its completion NPC. `item` requirements are counts the player must hold; a count of 0
 means none may be left (Roger's apples must all be eaten). `mob` requirements
 are kill counts (below). `quest` requirements, on either side, name other
 quests that must be in a given state: Chief's Introduction (1040) completes
