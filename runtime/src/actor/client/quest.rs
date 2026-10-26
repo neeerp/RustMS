@@ -81,12 +81,12 @@ impl ClientActor {
         }
         self.npc_request_id = self.npc_request_id.wrapping_add(1);
         // The quest alert starts autoStart quests and completes autoComplete
-        // ones wherever the player is.
+        // and autoPreComplete ones wherever the player is.
         let anywhere = match request.kind {
             QuestActionKind::Start { .. } | QuestActionKind::ScriptStart { .. } => {
                 template.auto_start
             }
-            _ => template.auto_complete,
+            _ => template.auto_complete || template.auto_pre_complete,
         };
         self.pending_quest = Some((self.npc_request_id, request));
         if anywhere {

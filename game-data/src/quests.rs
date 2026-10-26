@@ -270,6 +270,9 @@ pub struct QuestTemplate {
     /// offers the quest wherever the player is.
     pub auto_start: bool,
     pub auto_complete: bool,
+    /// `QuestInfo` `autoPreComplete`: once started, the quest alert lists it
+    /// in progress and completes it wherever the player is.
+    pub auto_pre_complete: bool,
     /// An explorer medal's count: its info record and the maps it needs.
     pub explored: Option<Explored>,
     /// The count its own record must reach (`OWN_RECORD_QUESTS`).
@@ -410,6 +413,8 @@ pub struct QuestKeys {
     pub finished_by_start_script: bool,
     /// An NPC's script completes it ([`COMPLETED_BY_NPC_SCRIPT`]).
     pub completed_by_npc_script: bool,
+    /// `QuestInfo` `autoPreComplete`: the quest alert completes it.
+    pub pre_complete: bool,
 }
 
 /// `Ok` if every declared requirement and action is supported, otherwise the
@@ -427,9 +432,11 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     // handed in to the NPC that gave it (Pio's 1008). Without either, it is
     // a record kept by some event, not something an NPC completes.
     // Unless the start script completes it, or an end script does, at the
-    // start NPC (Captain Al's 2232-2234), or another NPC's script does.
+    // start NPC (Captain Al's 2232-2234), or another NPC's script does, or
+    // the quest alert does (autoPreComplete, Maria's Map Reading 1030).
     if !keys.finished_by_start_script
         && !keys.completed_by_npc_script
+        && !keys.pre_complete
         && !end
             .iter()
             .any(|k| k == "npc" || k == "item" || k == "mob" || k == "endscript")
@@ -550,6 +557,10 @@ impl QuestCatalog {
                     .iter()
                     .flatten()
                     .any(|k| k == "startscript");
+            keys.pre_complete = match path_index(&nx, &format!("QuestInfo.img/{id}"))? {
+                Some(info) => nx.int_child(info, "autoPreComplete")?.unwrap_or(0) != 0,
+                None => false,
+            };
             if id == REQUIREMENTS_IN_START_ACTIONS {
                 keys.start_act.clear();
             }
@@ -743,6 +754,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .transpose()?,
         auto_start: flag("autoStart")?,
         auto_complete: flag("autoComplete")?,
+        auto_pre_complete: flag("autoPreComplete")?,
         explored,
         end_record,
         start_info,
@@ -1140,6 +1152,11 @@ mod tests {
         assert!(classify(&scripted).is_err());
         scripted.completed_by_npc_script = true;
         assert_eq!(classify(&scripted), Ok(()));
+        // The quest alert completes an autoPreComplete quest.
+        let mut alert = keys(&["npc", "fieldEnter", "item", "job"], &[], &[], &["exp"]);
+        assert!(classify(&alert).is_err());
+        alert.pre_complete = true;
+        assert_eq!(classify(&alert), Ok(()));
     }
 
     /// The supported set must match `supported_quests.txt`, which HeavenClient
@@ -1251,6 +1268,11 @@ mod tests {
         );
         assert_eq!(mirror.start.repeat_interval, None);
         assert!(!mirror.start.daily);
+        // Maria's Map Reading has no completion requirements; the quest
+        // alert completes it.
+        let maria = catalog.quest(1030).unwrap();
+        assert!(maria.auto_pre_complete && !maria.auto_complete);
+        assert_eq!((maria.end_npc, maria.exp), (2103, 11));
         assert!(catalog.quest(8245).unwrap().start.daily);
         // An event quest open from 00:00 to 01:00 on 31 December 2030.
         assert_eq!(
