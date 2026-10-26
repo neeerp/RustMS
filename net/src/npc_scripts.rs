@@ -1754,6 +1754,9 @@ impl NpcScript {
         if let Some(line) = FOURTH_JOBS.iter().find(|line| line.instructor == npc_id) {
             return Some(fourth_job_instructor(line, player));
         }
+        if let Some(&(_, key)) = ONE_LINERS.iter().find(|(id, _)| *id == npc_id) {
+            return Some(NpcScript::new(npc_id, vec![Page::Say(text(key))]));
+        }
         match npc_id {
             ALI => return Some(ali()),
             LIRA => return Some(lira()),
@@ -6136,6 +6139,23 @@ pub const AURA: i32 = 2032002;
 /// In the Room of Tragedy, 280090000, where those who die or come back to
 /// the game inside the Dead Mine land.
 const ALI: i32 = 2030011;
+/// NPCs with no speech in String.nx and nothing else to do, and their one
+/// line: Wolf Spirit Ryko in the Hall of Bowmen, Adonis in El Nath, the
+/// Document Roll in Chloe's house, Mu Lung's Practice Chart, Sharenian's
+/// Knight Armor and Sharen III's Will, and the Sunstone, Moonstone, Enigma
+/// and Hollowed Ground graves.
+const ONE_LINERS: &[(i32, &str)] = &[
+    (9010021, keys::LINE_RYKO),
+    (9201106, keys::LINE_ADONIS),
+    (2040031, keys::LINE_DOCUMENT_ROLL),
+    (2096000, keys::LINE_PRACTICE_CHART),
+    (9040012, keys::LINE_KNIGHT_ARMOR),
+    (9040007, keys::LINE_SHAREN_WILL),
+    (9201071, keys::LINE_GRAVE_LIGHT),
+    (9201072, keys::LINE_GRAVE_LIGHT),
+    (9201073, keys::LINE_ENIGMA_TOMBSTONE),
+    (9201084, keys::LINE_WORN_TOMBSTONE),
+];
 const LIRA: i32 = 2032003;
 const AMON: i32 = 2030010;
 /// From the Dead Mine (stage 1), for the Breath of Lava.
@@ -12474,6 +12494,18 @@ mod tests {
             NpcScript::in_event(HTPQ_KEEPER, &last(events::HTPQ_LAMP, 6), true, false).is_none()
         );
         assert!(NpcScript::in_event(HTPQ_KEEPER, &first(&five), true, true).is_none());
+    }
+
+    #[test]
+    fn one_line_npcs_say_their_line_and_finish() {
+        for &(npc, key) in ONE_LINERS {
+            let mut script = NpcScript::for_npc(npc, &player(10)).unwrap();
+            let page = script.begin();
+            assert_eq!(kind(&page), Some(0), "{npc}");
+            assert_eq!(page_text(&page), text(key), "{npc}");
+            let after = script.respond(ScriptInput::Next).unwrap();
+            assert!(after.prompt.is_none() && after.effects.is_empty(), "{npc}");
+        }
     }
 
     #[test]
