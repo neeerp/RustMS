@@ -2066,6 +2066,11 @@ impl FieldActor {
             {
                 self.lord_pirate_falls()
             }
+            (net::events::TRISTAN_BALROG, net::events::TRISTAN_ROOM)
+                if self.key.instance_id != 0 =>
+            {
+                self.tristan_balrog_falls()
+            }
             _ => {}
         }
         // A trial's head clears its stage, which unseals its door; each
@@ -2224,6 +2229,15 @@ impl FieldActor {
             self.broadcast(None, packet);
         }
         self.appear(wu_yang, net::events::LORD_PIRATE_AT);
+    }
+
+    /// The unknown Jr. Balrog is beaten: Tristan's Spirit comes out, once,
+    /// for 2238 to end at (Cosmic `BalrogQuest.monsterKilled`).
+    fn tristan_balrog_falls(&mut self) {
+        let spirit = net::events::TRISTANS_SPIRIT;
+        if !self.map_npcs.iter().any(|npc| npc.npc_id == spirit) {
+            self.appear(spirit, net::events::TRISTANS_SPIRIT_AT);
+        }
     }
 
     /// Whether every reactor here that must be set before the stage clears

@@ -2342,6 +2342,11 @@ impl NpcScript {
             "q2218s" => informant(player, 2),
             "q2219s" => informant(player, 3),
             "q2228s" => Some(reef()),
+            "q2238s" => Some(NpcScript::new(
+                MU_YOUNG,
+                vec![Page::Done(vec![Effect::StartQuest(2238)])],
+            )),
+            "q2245s" => Some(tristan_tomb()),
             "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
@@ -2800,6 +2805,23 @@ fn reef() -> NpcScript {
 
 /// Reef, in 910100001.
 const REEF: i32 = 1032108;
+/// Mu Young, in the Sleepywood dungeon (105100100).
+const MU_YOUNG: i32 = 1061014;
+
+/// `q2245s`, To Tristan's Tomb: Mu Young sends a player on 2238 into the
+/// unknown Jr. Balrog's room at once, with no word (Cosmic `2245.js`), and
+/// 2245 completes as it starts, so that `interval 0` lets them go again.
+/// Only one may be in the room on a channel at a time; another is told so
+/// and nothing is applied.
+fn tristan_tomb() -> NpcScript {
+    let go = vec![
+        Effect::FinishQuest(2245),
+        Effect::StartEvent(EventKind::Tristan),
+    ];
+    let mut script = NpcScript::new(MU_YOUNG, vec![Page::Done(go)]);
+    script.refused = Some(text(keys::TRISTAN_ROOM_TAKEN));
+    script
+}
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
 const CAPTAIN_AL: i32 = 1002103;
 /// Captain Al's end scripts ([`NpcScript::for_family_quest`]).
@@ -10014,6 +10036,27 @@ mod tests {
             read_through(script),
             (REEF, vec![Effect::FinishQuest(2228), Effect::GainFame(8)])
         );
+    }
+
+    #[test]
+    fn mu_young_starts_2238_and_sends_the_player_to_jr_balrog() {
+        let player = with_quests(&[(2237, true)]);
+        let script = NpcScript::for_quest("q2238s", &player).unwrap();
+        let step = script.begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(step.effects, [Effect::StartQuest(2238)]);
+        let mut script = NpcScript::for_quest("q2245s", &player).unwrap();
+        assert_eq!(script.npc_id(), MU_YOUNG);
+        let step = script.begin();
+        assert!(step.prompt.is_none());
+        assert_eq!(
+            step.effects,
+            [
+                Effect::FinishQuest(2245),
+                Effect::StartEvent(EventKind::Tristan)
+            ]
+        );
+        assert!(script.refused().is_some(), "another is in the room");
     }
 
     #[test]

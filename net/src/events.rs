@@ -69,6 +69,9 @@ pub enum EventKind {
     /// with that mode's gem at Duarte in the lobby or straight from its
     /// room in the Shades after a run.
     PyramidTomb(PyramidMode),
+    /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
+    /// Mu Young (1061014) in the Sleepywood dungeon.
+    Tristan,
     /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
     /// (2042000) on the Carnival Field (`crate::carnival`).
     Carnival(u8),
@@ -2396,6 +2399,39 @@ pub const PYRAMID_TOMB_RUNS: [Event; 4] = [
     pyramid_tomb(PyramidMode::Hell, &[PYRAMID_SHADES + 3]),
 ];
 
+/// The room before Tristan's Tomb, 910520000, where the unknown Jr. Balrog
+/// waits (Map.nx `life`, spawned once).
+pub const TRISTAN_ROOM: i32 = 910520000;
+/// The Sleepywood dungeon's map where Mu Young (1061014) stands, and the way
+/// back from the room (its `forcedReturn` and its `out00`).
+pub const MU_YOUNG_MAP: i32 = 105100100;
+/// The unknown Jr. Balrog, whose fall brings out Tristan's Spirit.
+pub const TRISTAN_BALROG: i32 = 9_300_326;
+/// Tristan's Spirit (1061015), where 2238 ends, and the point above the
+/// ground below which it comes out (Cosmic `BalrogQuest.monsterKilled`).
+pub const TRISTANS_SPIRIT: i32 = 1_061_015;
+pub const TRISTANS_SPIRIT_AT: (i16, i16) = (0, 115);
+
+/// To Tristan's Tomb (2245): Mu Young's start script takes a player on 2238
+/// alone into their own copy of the room for ten minutes, one at a time on
+/// a channel (Cosmic `BalrogQuest`, whose script turns a second player
+/// away). It is never won; it ends when they leave by `out00` or the time
+/// runs out.
+pub const TRISTAN: Event = Event {
+    lobby: MU_YOUNG_MAP,
+    entrances: &[],
+    maps: TRISTAN_ROOM..=TRISTAN_ROOM,
+    entry: TRISTAN_ROOM,
+    exit: MU_YOUNG_MAP,
+    levels: 50..=u8::MAX,
+    team: 1..=1,
+    minutes: 10,
+    exp_per_stage: &[],
+    member_clears: &[],
+    runs: 1,
+    ..DOJO
+};
+
 /// Every run of Nett's Pyramid Duarte offers, alone first, then with a
 /// party, each by mode.
 pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
@@ -2482,7 +2518,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 37] = [
+    pub const ALL: [EventKind; 38] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2520,6 +2556,7 @@ impl EventKind {
         EventKind::Carnival(6),
         EventKind::Magatia(MagatiaSide::Zenumist),
         EventKind::Magatia(MagatiaSide::Alcadno),
+        EventKind::Tristan,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2546,6 +2583,7 @@ impl EventKind {
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
+            EventKind::Tristan => &TRISTAN,
         }
     }
 
@@ -3593,6 +3631,21 @@ mod tests {
         assert_eq!(opening_mobs(hell.entry), [(PYRAMID_HELL_YETI, (0, 0), 1)]);
         assert_eq!(opening_mobs(hard.entry), [(PYRAMID_YETI, (0, 0), 1)]);
         assert!(event_map(926010010) && !event_map(PYRAMID_LOBBY));
+    }
+
+    #[test]
+    fn jr_balrogs_room_is_taken_alone_from_mu_young_for_ten_minutes() {
+        let tristan = EventKind::Tristan.event();
+        assert_eq!((tristan.entry, tristan.exit), (TRISTAN_ROOM, MU_YOUNG_MAP));
+        assert!(tristan.solo() && tristan.lasts_until_empty());
+        assert_eq!(
+            (tristan.minutes, tristan.last_stage(), tristan.runs),
+            (10, 0, 1)
+        );
+        assert!(tristan.starts_on(MU_YOUNG_MAP));
+        assert!(tristan.team(1, &[at(1, 50, MU_YOUNG_MAP)]).is_some());
+        assert_eq!(tristan.team(1, &[at(1, 49, MU_YOUNG_MAP)]), None);
+        assert!(event_map(TRISTAN_ROOM) && !event_map(MU_YOUNG_MAP));
     }
 
     #[test]

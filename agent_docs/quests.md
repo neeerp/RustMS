@@ -177,7 +177,7 @@ itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
 `q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
-[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants, Reef, the baby dragon and Captain Al's family lessons below); those steps go through
+[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants, Reef, Mu Young, the baby dragon and Captain Al's family lessons below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -265,6 +265,15 @@ Reef (1032108, in 910100001) thanks the player through a start script
 (`q2228s`) that completes the quest at once and gives the data's 8 fame
 (`Act/1 pop`, through `Effect::GainFame`, since `FinishQuest` gives no
 `Act/1` rewards). Its line is a placeholder (`reef.thanks`).
+
+Mu Young (1061014, in 105100100) has two start scripts, both silent as in
+Cosmic. `q2238s` starts "Who is the Owner of the Mysterious Note?" (2238,
+once 2237 is done). `q2245s` ("To Tristan's Tomb", for a player on 2238)
+completes 2245 at once, so that its `interval 0` lets it be taken again,
+and takes the player alone into the unknown Jr. Balrog's room
+(`EventKind::Tristan`, see [party quests](./party-quests.md#jr-balrogs-room)).
+Jr. Balrog's fall brings out Tristan's Spirit (1061015), where 2238 ends
+for the data's 50,000 EXP; with it done, the `tristanEnter` portal opens.
 
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
