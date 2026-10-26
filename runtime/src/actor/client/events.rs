@@ -96,8 +96,9 @@ impl ClientActor {
             EventKind::PyramidTomb(_) => return Ok(()),
             // Mu Young's start script for 2245 takes the player in.
             EventKind::Tristan => return Ok(()),
-            // The East Castle Tower's portal takes the player in.
-            EventKind::KingPepe => return Ok(()),
+            // The East Castle Tower's portal takes the player in, and the
+            // Wedding Hall's door likewise.
+            EventKind::KingPepe | EventKind::WeddingHall => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
         };

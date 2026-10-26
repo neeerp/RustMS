@@ -228,6 +228,10 @@ record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
 so it is saved and sent as its progress string ("001"). The Thorn Remover the
 quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
 items"), and the Secretary of Magic (1300004) then completes the quest.
+"Where's Violetta?" (2332) works the same way: entering the Wedding Hall
+(`findvioleta`) sets it, and Violetta's end script `q2332e` then completes
+it (see [party quests](./party-quests.md#the-wedding-hall), with her other
+scripts `q2333s`, `q2333e`, `q2334s` and `q2342s`).
 "Find Fresh Milk" (2180) uses the same one-"kill" record only to remember
 the last cow milked; its completion needs just the full bottle. While it is started, Tangyoon (1092000) gives an empty bottle
 (4031847) and sends the player to the stable (912000100). Each mother cow
