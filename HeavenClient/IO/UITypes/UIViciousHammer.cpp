@@ -7,12 +7,15 @@
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Audio/Audio.h"
 #include "../../Character/Inventory/CashUpgrades.h"
 #include "../../Data/EquipData.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/InventoryPackets.h"
 #include "../../Util/NxFiles.h"
+
+#include <nlnx/nx.hpp>
 
 namespace ms
 {
@@ -284,6 +287,7 @@ namespace ms
 		elapsed = 0;
 		buttons[Buttons::CANCEL]->set_state(Button::State::DISABLED);
 		player.show_effect(pressed);
+		Sound(nl::nx::sound["UI.img"]["ViciousHammer"]).play();
 	}
 
 	void UIViciousHammer::arm()
