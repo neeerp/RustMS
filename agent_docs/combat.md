@@ -510,6 +510,15 @@ Improve MaxHP (5100000) and a magician's Improving MaxMP Increase (2000001)
 add their `x` to each level's growth and their `y` to an AP's
 (`net::skills::growth_bonus`). Level ups stop at 30,000 like AP.
 
+A job advance adds max HP/MP so the player stays above the client's least
+max HP/MP for the new job (`game::ap_reset::min_hp`, `min_mp`): the floor's
+rise plus 25. Pages and Spearmen get 125 MP where Fighters get 325 HP, since
+the client raises their least MP, not HP (`second_job_bonus`).
+
+Reaching level 200 sends a notice to the whole world (`level.200`, Cosmic),
+but not for a GM. It is sent from `commit_player`, so EXP from kills, quests
+and `!exp` all trigger it; `!level` sets the level directly and doesn't.
+
 ### Rates and rate cards
 
 `net::rates` scales kills for each player. Kill EXP is multiplied by the

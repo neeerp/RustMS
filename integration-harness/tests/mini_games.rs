@@ -17,6 +17,8 @@ use tokio::time::Duration;
 const MAP: i32 = 40_000;
 const OMOK_SET: i32 = 4080000;
 const ETC: u8 = 4;
+/// A map whose fieldLimit keeps games from starting (0x80).
+const NO_GAMES: i32 = 103_040_410;
 const TITLE: &str = "Omok";
 
 fn interaction(mode: u8) -> Packet {
@@ -154,6 +156,14 @@ async fn five_in_a_row_wins_and_leaving_loses() {
         .expect("give A an Omok set");
     let mut a = relogin(&a_config).await;
     let mut b = relogin(&b_config).await;
+
+    // Nor where the map's fieldLimit has 0x80.
+    let mut t = Trace::default();
+    let forbidden = warp(&mut a.connection, NO_GAMES, "", &mut t).await;
+    assert_eq!(forbidden, NO_GAMES);
+    let t = step(&mut a.connection, "no games here", create()).await;
+    assert!(t.rooms.is_empty(), "{:?}", t.rooms);
+
     meet(&mut a, &mut b).await;
 
     // Without a set, there is no game.

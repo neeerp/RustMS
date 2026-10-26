@@ -1,8 +1,14 @@
 use super::ClientActor;
-use crate::{db::spawn_db, error::RuntimeError, message::FieldMessage};
+use crate::{
+    db::spawn_db,
+    error::RuntimeError,
+    message::{DirectoryMessage, FieldMessage},
+};
 use game::{Player, QuestRecord, QuestState, QuestStatus};
+use game_data::server_content::keys;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
+use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::{drop, inventory, quest, skill, stat};
 use net::packet::handle::world::{apply_item_effect, item_effect_packets, ItemEffect};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
@@ -416,11 +422,28 @@ impl ClientActor {
             .await?;
         }
         if levelled {
+            self.announce_level_200(previous_level).await?;
             let levels = self.in_game()?.player.stats.level - previous_level;
             self.family_earn(game::family::REP_PER_LEVEL * i32::from(levels))
                 .await?;
         }
         Ok(true)
+    }
+
+    /// Everyone in the world hears of a player reaching level 200, but not
+    /// of a GM (Cosmic; OrionAlpha tells the channel).
+    async fn announce_level_200(&mut self, previous_level: u8) -> Result<(), RuntimeError> {
+        let player = &self.in_game()?.player;
+        if previous_level >= 200 || player.stats.level < 200 || player.gm_level > 0 {
+            return Ok(());
+        }
+        let text = net::content::text().get(keys::LEVEL_200, &[("name", &player.stats.name)]);
+        self.send_to_directory(DirectoryMessage::Broadcast {
+            from: self.client_id,
+            scope: net::BroadcastScope::World,
+            packet: build_broadcast(Broadcast::Notice, &text)?,
+        })
+        .await
     }
 
     async fn forfeit_quest(&mut self, quest_id: i16) -> Result<(), RuntimeError> {
