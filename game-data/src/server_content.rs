@@ -1972,6 +1972,7 @@ pub mod keys {
     pub const COCONUT_FELL_STORY: &str = "coconut.fell.story";
     pub const COCONUT_OVERTIME: &str = "coconut.overtime";
     pub const SNOWBALL_ENDED: &str = "snowball.ended";
+    pub const LEVEL_200: &str = "level.200";
     pub const GM_EVENT_OPENED: &str = "gm_event.opened";
     pub const GM_EVENT_MENU: &str = "gm_event.menu";
     pub const GM_EVENT_ABOUT: &str = "gm_event.about";
@@ -3153,6 +3154,7 @@ mod tests {
                 keys::COCONUT_FELL_STORY,
                 keys::COCONUT_OVERTIME,
                 keys::SNOWBALL_ENDED,
+                keys::LEVEL_200,
                 keys::GM_EVENT_OPENED,
                 keys::GM_EVENT_MENU,
                 keys::GM_EVENT_ABOUT,

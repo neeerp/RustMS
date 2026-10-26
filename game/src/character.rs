@@ -739,7 +739,7 @@ impl Player {
 
     /// Become a second-job `job`: 1 SP and the job's max HP/MP bonus.
     pub fn take_second_job(&mut self, job: i16) {
-        let Some((hp, mp)) = second_job_rules(job) else {
+        let Some((hp, mp)) = second_job_bonus(job) else {
             return;
         };
         let stats = &mut self.stats;
@@ -1008,8 +1008,19 @@ fn first_job_rules(job: i16) -> Option<(u8, i16, i16)> {
     }
 }
 
+/// The max HP/MP the second job `job` adds. The client's least max HP and
+/// MP (`ap_reset::min_hp`, `min_mp`) rise by 300 HP for a Fighter but by
+/// 100 MP for a Page or Spearman, so they get MP where Fighters get HP.
+fn second_job_bonus(job: i16) -> Option<(i16, i16)> {
+    match job {
+        120 | 130 => Some((0, 125)),
+        _ => second_job_rules(job),
+    }
+}
+
 /// The max HP/MP an Explorer second job adds, again the middle of the
-/// community servers' ranges (e.g. warriors 300-350 HP).
+/// community servers' ranges (e.g. warriors 300-350 HP), and each later
+/// job adds again.
 fn second_job_rules(job: i16) -> Option<(i16, i16)> {
     match job {
         110 | 120 | 130 => Some((325, 0)),
@@ -1438,6 +1449,38 @@ mod tests {
         assert_eq!(player.stats.sp, 3);
         assert_eq!((player.stats.max_hp, player.stats.max_mp), (375, 180));
         assert!(!player.can_take_second_job(310), "only once");
+    }
+
+    #[test]
+    fn a_second_job_keeps_above_the_clients_least_hp_and_mp() {
+        for (first, second) in [
+            (100, 110),
+            (100, 120),
+            (100, 130),
+            (200, 210),
+            (200, 220),
+            (200, 230),
+            (300, 310),
+            (300, 320),
+            (400, 410),
+            (400, 420),
+            (500, 510),
+            (500, 520),
+        ] {
+            let mut player = player();
+            player.stats.level = 30;
+            player.stats.job = first;
+            player.stats.max_hp = crate::ap_reset::min_hp(first, 30) as i16;
+            player.stats.max_mp = crate::ap_reset::min_mp(first, 30) as i16;
+            player.take_second_job(second);
+            let (hp, mp) = (
+                i32::from(player.stats.max_hp) - crate::ap_reset::min_hp(second, 30),
+                i32::from(player.stats.max_mp) - crate::ap_reset::min_mp(second, 30),
+            );
+            // The middle of a 50-wide range above the floor's rise.
+            assert!([0, 25].contains(&hp), "{second}: HP {hp}");
+            assert!([0, 25].contains(&mp), "{second}: MP {mp}");
+        }
     }
 
     #[test]

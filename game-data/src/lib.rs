@@ -45,6 +45,9 @@ pub const FIELD_LIMIT_RETURN_SCROLLS: i32 = 0x20;
 /// `info/fieldLimit` bit keeping teleport rocks from the map, to or from it
 /// (v83 FUN_00a0a4aa).
 pub const FIELD_LIMIT_TELEPORT_ROCK: i32 = 0x40;
+/// `info/fieldLimit` bit keeping Omok and match cards from starting (v83
+/// FUN_00a1d4d8).
+pub const FIELD_LIMIT_MINI_GAMES: i32 = 0x80;
 /// `info/fieldLimit` bit forbidding return scrolls that name a map (v83
 /// FUN_00a1e1ce).
 pub const FIELD_LIMIT_MAP_SCROLLS: i32 = 0x100;
@@ -550,6 +553,11 @@ impl FieldTemplate {
     /// them out of the wedding halls (fieldType 60).
     pub fn may_blow_weather(&self) -> bool {
         self.field_limit & FIELD_LIMIT_WEATHER_ITEMS == 0
+    }
+
+    /// Whether a player may open an Omok or match cards room here.
+    pub fn may_play_games(&self) -> bool {
+        self.field_limit & FIELD_LIMIT_MINI_GAMES == 0
     }
 
     /// Whether Miu Miu's merchant comes here.

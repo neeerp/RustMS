@@ -57,7 +57,8 @@ impl ClientActor {
         }
     }
 
-    /// Open a game with a game set from the Etc bag, which stays.
+    /// Open a game with a game set from the Etc bag, which stays, where
+    /// the map allows it.
     async fn create_game(
         &mut self,
         kind: u8,
@@ -78,6 +79,10 @@ impl ClientActor {
         };
         let player = &self.in_game()?.player;
         if player.inventory.count(set) <= 0 || title.is_empty() {
+            return Ok(());
+        }
+        // The client refuses here first (fieldLimit 0x80).
+        if !mini_game::may_play_here(player.stats.map_id) {
             return Ok(());
         }
         let record = self.game_records().await[usize::from(kind - 1)];

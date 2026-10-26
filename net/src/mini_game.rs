@@ -63,6 +63,15 @@ pub fn game_set(kind: u8, piece: u8) -> Option<i32> {
     }
 }
 
+/// Whether a game may be opened in `map_id`: not where its fieldLimit
+/// has 0x80 (v83 FUN_00a1d4d8, "You can't start the game here.").
+pub fn may_play_here(map_id: i32) -> bool {
+    crate::get_game_data()
+        .ok()
+        .and_then(|data| data.field(map_id))
+        .is_none_or(|field| field.may_play_games())
+}
+
 /// The Omok sets, 4080000 to 4080011.
 const OMOK_SETS: u8 = 12;
 
@@ -254,6 +263,18 @@ mod tests {
         assert_eq!(game_set(MATCH_CARDS, 2), Some(4080100));
         assert_eq!(game_set(MATCH_CARDS, 3), None);
         assert_eq!(game_set(3, 0), None);
+    }
+
+    #[test]
+    fn no_game_opens_where_the_map_forbids_them() {
+        let data = crate::get_game_data().unwrap();
+        let forbidden = data
+            .field_ids()
+            .filter(|&id| !data.field(id).unwrap().may_play_games())
+            .min()
+            .unwrap();
+        assert!(!may_play_here(forbidden), "{forbidden}");
+        assert!(may_play_here(100_000_000), "Henesys");
     }
 
     #[test]
