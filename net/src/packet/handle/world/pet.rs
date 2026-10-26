@@ -681,6 +681,21 @@ pub fn revive_pet(
     Some(put_back(player, slot, item).into())
 }
 
+/// A quest's closeness (`pettameness`) for the first pet out, as Cosmic
+/// gives it: the pet's item re-sent if its closeness changed, and whether
+/// it levelled, or `None` with no pet out.
+pub fn tame_first_pet(player: &mut Player, amount: i16) -> Option<(Vec<InventoryChange>, bool)> {
+    let (slot, mut item) = pet_item(player, *player.pets.first()?)?;
+    let pet = item.pet.as_mut()?;
+    let closeness = pet.closeness;
+    let levelled = pet.add_closeness(amount);
+    let mut changes = Vec::new();
+    if pet.closeness != closeness {
+        changes.extend(put_back(player, slot, item));
+    }
+    Some((changes, levelled))
+}
+
 /// When the next of the player's living pets dries up, if one ever does.
 pub fn next_dry_up(player: &Player) -> Option<SystemTime> {
     player
@@ -779,6 +794,34 @@ mod tests {
         player.pets.clear();
         assert!(!ignore_items(&mut player, 77, vec![4_000_000], known));
         assert!(tiger(&player).ignored.is_empty());
+    }
+
+    #[test]
+    fn a_quest_brings_the_first_pet_out_closer() {
+        let mut player = owner();
+        let (changes, levelled) = tame_first_pet(&mut player, 15).unwrap();
+        assert!(levelled);
+        assert_eq!((tiger(&player).closeness, tiger(&player).level), (15, 5));
+        assert!(matches!(
+            changes[..],
+            [
+                InventoryChange::Remove { slot: 3, .. },
+                InventoryChange::Add { slot: 3, .. }
+            ]
+        ));
+        assert!(player.is_dirty());
+
+        let mut tame = player
+            .inventory
+            .get(InventoryType::Cash, 3)
+            .unwrap()
+            .clone();
+        let data = tame.pet.as_mut().unwrap();
+        (data.closeness, data.level) = (pet::MAX_CLOSENESS, 30);
+        player.inventory.insert(InventoryType::Cash, 3, tame);
+        assert_eq!(tame_first_pet(&mut player, 15), Some((vec![], false)));
+        player.pets.clear();
+        assert_eq!(tame_first_pet(&mut player, 15), None);
     }
 
     #[test]

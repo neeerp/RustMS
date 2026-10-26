@@ -9,8 +9,10 @@ use game_data::server_content::keys;
 use net::npc_scripts::NpcScript;
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
-use net::packet::build::world::{drop, inventory, quest, skill, stat};
-use net::packet::handle::world::{apply_item_effect, item_effect_packets, ItemEffect};
+use net::packet::build::world::{drop, inventory, pet, quest, skill, stat};
+use net::packet::handle::world::{
+    apply_item_effect, item_effect_packets, tame_first_pet, ItemEffect,
+};
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::skills;
 use net::FieldRequest;
@@ -210,6 +212,19 @@ impl ClientActor {
         if template.exp > 0 {
             gain_exp(&mut next, template.exp, &mut packets)?;
         }
+        // With no pet out, the closeness is lost, as in Cosmic.
+        let mut tamed = false;
+        if template.pet_closeness != 0 {
+            if let Some((changes, levelled)) = tame_first_pet(&mut next, template.pet_closeness) {
+                if !changes.is_empty() {
+                    packets.push(inventory::build_inventory_operation(true, &changes)?);
+                }
+                if levelled {
+                    packets.push(pet::build_pet_level_up(None, 0)?);
+                    tamed = true;
+                }
+            }
+        }
         let taught = quests::apply_skills(&template.end_skills, &mut next);
         let buff = buff_item(&mut next, template.end_buff_item);
         if !self
@@ -236,6 +251,14 @@ impl ClientActor {
         self.send_all(&mut packets).await?;
         self.show_seen(seen).await?;
         let character_id = self.in_game()?.player.id();
+        if tamed {
+            let shown = pet::build_pet_level_up(Some(character_id), 0)?;
+            self.send_to_field(FieldMessage::FromClient {
+                from: self.client_id,
+                request: FieldRequest::Broadcast(shown),
+            })
+            .await?;
+        }
         let shown = effect::build_foreign_effect(character_id, CharEffect::QuestClear)?;
         self.send_to_field(FieldMessage::FromClient {
             from: self.client_id,

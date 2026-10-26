@@ -76,7 +76,7 @@ Only requirements and actions the server implements are allowed
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
-| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
 | `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job`, `onlyMasterLevel` |
 
@@ -182,7 +182,12 @@ takes 1,000 mesos, where Cosmic takes what the player has). `buffItemID`
 gives the named item's effect, as if the player used it (the dragon
 potion's transformation for 7301), when its step is done. `pop` gives (or
 takes) fame on completion, with a fame stat update and SHOW_STATUS_INFO
-mode 4 in the chat log ("You have gained fame. (+n)"). Skill actions
+mode 4 in the chat log ("You have gained fame. (+n)"). `pettameness`
+makes the first pet out that much closer on completion, as Cosmic does
+(Fanzy's 2104 gives 15); with no pet out it is lost. The pet's item is
+re-sent, so the client's pet says "The closeness increased (+n)", and a
+pet that levels up shows it to its owner and the map. v83 lists it last in
+the rewards, after fame, as QuestIcon 9 and the number. Skill actions
 (`net::quests::apply_skills`) teach a skill to a player whose job is exactly
 one in the entry's `job` list, as v83's reward list shows them (a 0 there is
 the beginner job, not "any"). The level and master level become the entry's

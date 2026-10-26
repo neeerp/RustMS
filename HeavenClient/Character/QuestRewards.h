@@ -7,7 +7,7 @@
 namespace ms
 {
 	// Act.img/<id>/1: what completing a quest gives, as far as the server
-	// supports it (no skills or closeness).
+	// supports it (no skills).
 	struct QuestRewards
 	{
 		struct Item
@@ -34,6 +34,8 @@ namespace ms
 		int32_t exp = 0;
 		// Fame (pop); a loss isn't listed.
 		int32_t fame = 0;
+		// Closeness for the first pet out (pettameness).
+		int32_t pet_closeness = 0;
 		std::vector<Item> items;
 
 		// The list v83 puts under the last completion page (FUN_0071808a),
@@ -64,7 +66,7 @@ namespace ms
 					given += "#v" + id + ":# #t" + id + ":# " + std::to_string(item.count) + "\r\n";
 			}
 
-			bool others = !given.empty() || random || meso > 0 || exp > 0 || fame > 0;
+			bool others = !given.empty() || random || meso > 0 || exp > 0 || fame > 0 || pet_closeness > 0;
 
 			if (choices.empty() && (next_quest || !others))
 				return {};
@@ -88,7 +90,10 @@ namespace ms
 			if (fame > 0)
 				text += "#fUI/UIWindow.img/QuestIcon/6/0# " + std::to_string(fame) + "\r\n";
 
-			if (meso > 0 || exp > 0 || fame > 0)
+			if (pet_closeness > 0)
+				text += "#fUI/UIWindow.img/QuestIcon/9/0# " + std::to_string(pet_closeness) + "\r\n";
+
+			if (meso > 0 || exp > 0 || fame > 0 || pet_closeness > 0)
 				text += "\r\n";
 
 			// Which random item is given is up to the server; v83 names none.
