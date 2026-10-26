@@ -97,8 +97,9 @@ impl ClientActor {
             // Mu Young's start script for 2245 takes the player in.
             EventKind::Tristan => return Ok(()),
             // The East Castle Tower's portal takes the player in, and the
-            // Wedding Hall's door likewise.
-            EventKind::KingPepe | EventKind::WeddingHall => return Ok(()),
+            // Wedding Hall's door likewise; Olson's own talk the dollhouse
+            // room's.
+            EventKind::KingPepe | EventKind::WeddingHall | EventKind::Dollhouse => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
         };

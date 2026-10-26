@@ -1,5 +1,6 @@
 //! Reactor templates (`Reactor.nx`), loaded once.
 
+use crate::events::{EOS_TOWER_100, EOS_TOWER_100_RETURN};
 use crate::load::{self, asset_path};
 use game_data::reactors::{ReactorData, ReactorTemplate};
 use game_data::server_content::keys;
@@ -373,6 +374,13 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (100, 400),
         },
+        // Eos Tower's dollhouse room: every dollhouse but the odd one
+        // (`go221024400`, whose `info` names the map) throws the player
+        // back out by Olson, which ends their run.
+        DOLLHOUSE => Action::WarpMap {
+            warp: Warp(EOS_TOWER_100, EOS_TOWER_100_RETURN),
+            notice: keys::DOLLHOUSE_WRONG,
+        },
         // Ludibrium's stage 2 trap box (`go922010201`).
         2200002 => Action::WarpMap {
             warp: Warp(LPQ_TRAP_ROOM, "sp"),
@@ -463,6 +471,9 @@ pub fn action(reactor_id: i32) -> Action {
         _ => Action::Drops,
     }
 }
+
+/// The dollhouses of Eos Tower's dollhouse room that are only dollhouses.
+pub const DOLLHOUSE: i32 = 2200000;
 
 /// The Dead Mine's boxes that send whoever breaks one back to the hub, and
 /// those that hold Mimics.
@@ -599,7 +610,8 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 }
 
 /// Whether a map's reactors change places each time it starts afresh: the
-/// Berserk room's statues and Lord Jonathan's gulls, so the true one is
+/// Berserk room's statues, Lord Jonathan's gulls and Eos Tower's dollhouses
+/// (Server.NX `FieldSet.img/Ludi023`'s `shuffle`), so the true one is
 /// somewhere new, the boxes of the Ludibrium Maze's rooms (Cosmic
 /// `LudiMazePQ` `shuffleReactors`), and the Forest of Poison Haze's fifth
 /// stage's (`EllinPQ`), and those of the Pirate Ship's first, third and
@@ -608,12 +620,14 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// hub, where the experiment files are (`MagatiaPQ`'s `shuffleReactors`
 /// of `2518000` to `2612004`, so not their ways back: `shuffles`).
 pub fn shuffled(map_id: i32) -> bool {
-    use crate::events::{MagatiaSide, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PIRATE_STAGES};
+    use crate::events::{
+        MagatiaSide, DOLLHOUSE_ROOM, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PIRATE_STAGES,
+    };
     let magatia = MagatiaSide::ALL
         .iter()
         .flat_map(|side| side.side_doors())
         .any(|(_, room, _)| room == map_id);
-    matches!(map_id, BERSERK_ROOM | BART_ROOM)
+    matches!(map_id, BERSERK_ROOM | BART_ROOM | DOLLHOUSE_ROOM)
         || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
         || map_id == ELLIN_STAGES[4]
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
@@ -629,6 +643,20 @@ pub fn shuffles(reactor_id: i32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_wrong_dollhouse_throws_the_player_out_and_the_room_is_shuffled() {
+        assert_eq!(
+            action(DOLLHOUSE),
+            Action::WarpMap {
+                warp: Warp(EOS_TOWER_100, "q000"),
+                notice: keys::DOLLHOUSE_WRONG,
+            }
+        );
+        assert_eq!(action(2202000), Action::Drops, "the odd one");
+        assert!(shuffled(crate::events::DOLLHOUSE_ROOM));
+        assert!(shuffles(DOLLHOUSE) && shuffles(2202000));
+    }
 
     #[test]
     fn find_the_jewels_boxes_send_players_to_the_rooms_their_info_names() {
