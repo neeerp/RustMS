@@ -536,12 +536,7 @@ impl FieldActor {
             self.apply_cast(&cast, now);
         }
         for hurt in self.mobs.hurt_by_statuses(now) {
-            if let (Some(occupant), Ok(packet)) = (
-                self.occupants.get(&hurt.from),
-                build_mob_hp(hurt.object_id, hurt.percent),
-            ) {
-                occupant.handle.send_packet(packet);
-            }
+            self.show_mob_hp(hurt.from, hurt.object_id, hurt.percent);
             self.show_boss_bar(self.mobs.bar_for(hurt.object_id));
         }
         self.mobs.recover(now);
@@ -1948,9 +1943,7 @@ impl FieldActor {
                     massacre.misses += 1;
                 }
                 Some(Ok(percent)) => {
-                    if let Ok(packet) = build_mob_hp(object_id, percent) {
-                        attacker.send_packet(packet);
-                    }
+                    self.show_mob_hp(from, object_id, percent);
                     if damage > 0 {
                         self.show_boss_bar(self.mobs.bar_for(object_id));
                     }
@@ -5157,6 +5150,22 @@ impl FieldActor {
     fn broadcast(&self, except: Option<ClientId>, packet: Packet) {
         for (&client_id, occupant) in &self.occupants {
             if Some(client_id) != except {
+                occupant.handle.send_packet(packet.clone());
+            }
+        }
+    }
+
+    /// The HP bar of a mob `from` hurt, for them and their party here
+    /// (Cosmic's rule), so a party's Dojo gauge follows every member's hits.
+    fn show_mob_hp(&self, from: ClientId, object_id: i32, percent: u8) {
+        let Some(party) = self.occupants.get(&from).map(|o| o.party) else {
+            return;
+        };
+        let Ok(packet) = build_mob_hp(object_id, percent) else {
+            return;
+        };
+        for (&client_id, occupant) in &self.occupants {
+            if client_id == from || (party.is_some() && occupant.party == party) {
                 occupant.handle.send_packet(packet.clone());
             }
         }

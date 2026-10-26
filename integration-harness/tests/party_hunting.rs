@@ -1,6 +1,6 @@
-//! Parties: inviting, joining, party HP bars, sharing a kill's EXP on
-//! Snail Hunting Ground I (40000), and its drops, party chat, and
-//! disbanding.
+//! Parties: inviting, joining, party HP bars, a mob's HP bar from a
+//! member's hit, sharing a kill's EXP on Snail Hunting Ground I (40000),
+//! and its drops, party chat, and disbanding.
 
 use integration_harness::hunting::{attack, pickup};
 use integration_harness::login_to_world_session;
@@ -103,6 +103,12 @@ async fn a_party_shares_hp_bars_exp_and_chat() {
     until(&mut leader.connection, &mut l, |t| !t.gains.is_empty()).await;
     until(&mut member.connection, &mut m, |t| !t.gains.is_empty()).await;
     assert_eq!((l.gains[0], m.gains[0]), (2, 1));
+    // The member saw the snail's HP bar from the leader's first hit.
+    assert!(
+        m.field.hp_bars.iter().any(|&(oid, _)| oid == snail),
+        "{:?}",
+        m.field.hp_bars
+    );
 
     // Its drops (in the harness, at least a card) are the party's for now:
     // the member may take one at once.

@@ -232,7 +232,7 @@ pub fn build_kill_mob(object_id: i32, animation: u8) -> Result<Packet, NetworkEr
     Ok(p)
 }
 
-/// SHOW_MONSTER_HP: the HP bar shown to the player who hit it.
+/// SHOW_MONSTER_HP: the HP bar shown to the player who hit it and their party.
 pub fn build_mob_hp(object_id: i32, percent: u8) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
     p.write_short(SendOpcode::ShowMonsterHp as i16)?;
