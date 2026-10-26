@@ -74,7 +74,9 @@ namespace ms
 			WEDDINGREGISTRY,
 			USERLIST,
 			MEDALS,
-			TIMEDQUESTS
+			TIMEDQUESTS,
+			// An item a chat log line links, shown below the click.
+			CHATBAR
 		};
 
 		virtual ~Tooltip()

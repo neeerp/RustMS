@@ -24,6 +24,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -34,6 +35,7 @@
 #include "../Components/ChatTarget.h"
 #include "../Components/Textfield.h"
 
+#include "../../Net/Handlers/StorageContents.h"
 #include "../../Template/EnumMap.h"
 
 namespace ms
@@ -117,6 +119,12 @@ namespace ms
 		// A megaphone's line, tagged with the speaker's zero-based channel
 		// and whether they can be whispered back.
 		void send_megaphone(const std::string &line, LineType type, int8_t channel, bool ear);
+
+		// A line that links an item (BROADCAST_MSG types 6, 8 and 11): a
+		// click on any of its rows shows the item. The part of `length` from
+		// `from` is the item's name, drawn violet on the first row.
+		void send_linked(const std::string &line, LineType type, int8_t channel, bool ear,
+						 const storage_contents::Stored &item, size_t from = 0, size_t length = 0);
 
 		// The log's rows a report can quote, oldest first: v83 takes the
 		// rows of its chat kinds 0 to 4, 0xd to 0xf and 0x12 to 0x16
@@ -329,6 +337,11 @@ namespace ms
 			// The row as written, and whether a report can quote it
 			std::string line;
 			bool claimable;
+			// The item the line links, if any, and the item's name drawn
+			// over the first row from link_x
+			std::shared_ptr<const storage_contents::Stored> item;
+			std::optional<Text> link;
+			int16_t link_x;
 		};
 		// Oldest first; a wrapped row keeps its strip when old rows leave.
 		std::deque<ChatRow> rowtexts;
@@ -336,6 +349,15 @@ namespace ms
 		Texture channel_tags[2];
 		Texture channel_digits[10];
 
-		void add_line(const std::string &line, LineType type, int8_t channel, bool ear);
+		// Where the item shown by a click on a row was clicked, while it
+		// shows.
+		std::optional<Point<int16_t>> link_click;
+
+		void add_line(const std::string &line, LineType type, int8_t channel, bool ear,
+					  std::shared_ptr<const storage_contents::Stored> item = nullptr, size_t from = 0,
+					  size_t length = 0);
+		// The row under the cursor, if the log shows one there.
+		std::optional<size_t> row_at(Point<int16_t> cursorpos) const;
+		void hide_link();
 	};
 }

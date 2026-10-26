@@ -560,12 +560,20 @@ namespace ms
 					chatbar->send_chatline(message, UIChatBar::LineType::SKILL);
 				break;
 			case 6:
-				// An item id, linking the item to the line when not 0
-				recv.read_int();
+			{
+				// An item id, linking the item to the line when not 0;
+				// nothing in the line's look shows it.
+				int32_t itemid = recv.read_int();
 
 				if (chatbar)
-					chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+				{
+					if (itemid)
+						chatbar->send_linked(message, UIChatBar::LineType::BLUE, -1, false, { itemid, 1 });
+					else
+						chatbar->send_chatline(message, UIChatBar::LineType::BLUE);
+				}
 				break;
+			}
 			case 7:
 			{
 				// The NPC says it in a dialog with OK, which answers
@@ -587,15 +595,23 @@ namespace ms
 				int8_t channel = recv.read_byte();
 				bool ear = type == 9 || recv.read_bool();
 
-				// The item comes last, after its kind; only its name is shown.
+				// The item comes last; its name goes before the text, and a
+				// click on the line shows it.
 				if (type == 8 && recv.read_bool())
 				{
-					recv.read_byte();
-					message = Megaphones::with_item(message, ItemData::get(recv.read_int()).get_name());
-				}
+					storage_contents::Stored item = storage_contents::read_item(recv);
+					std::string name = ItemData::get(item.itemid).get_name();
+					size_t at = Megaphones::item_at(message);
+					message = Megaphones::with_item(message, name);
 
-				if (chatbar)
+					// "[Name]", brackets and all
+					if (chatbar)
+						chatbar->send_linked(message, UIChatBar::LineType::ITEM_MEGAPHONE, channel, ear, item, at,
+											 name.size() + 2);
+				} else if (chatbar)
+				{
 					chatbar->send_megaphone(message, UIChatBar::LineType::ITEM_MEGAPHONE, channel, ear);
+				}
 
 				warn(message);
 				break;
@@ -604,15 +620,14 @@ namespace ms
 			{
 				// The winner's channel (-1 would be the Cash Shop Surprise,
 				// which RustMS doesn't send), the machine's town, then the
-				// prize after its kind; only its name is shown.
+				// prize, which a click on the line shows.
 				recv.read_int();
 				std::string town = recv.read_string();
-				recv.read_byte();
-				std::string item = ItemData::get(recv.read_int()).get_name();
-				std::string line = Megaphones::gachapon(message, item, town);
+				storage_contents::Stored item = storage_contents::read_item(recv);
+				std::string line = Megaphones::gachapon(message, ItemData::get(item.itemid).get_name(), town);
 
 				if (chatbar)
-					chatbar->send_chatline(line, UIChatBar::LineType::GACHAPON);
+					chatbar->send_linked(line, UIChatBar::LineType::GACHAPON, -1, false, item);
 
 				warn(line);
 				break;
