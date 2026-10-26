@@ -27,11 +27,13 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "skill",
     "pop",
     "interval",
+    "dayByDay",
     "startscript",
     "equipAllNeed",
     "equipSelectNeed",
     "fieldEnter",
     "start",
+    "end",
     "pet",
     "pettamenessmin",
     "pettamenessmax",
@@ -151,6 +153,9 @@ pub struct StartRequirements {
     /// Minutes after completing before the quest can be started again
     /// (`interval`); `None` means it can't be repeated.
     pub repeat_interval: Option<u32>,
+    /// Without an interval, repeatable once a day (`dayByDay`): from the
+    /// first day (UTC) after the one it was completed on.
+    pub daily: bool,
     /// Items that must all be worn (`equipAllNeed`).
     pub worn_all: Vec<i32>,
     /// Items of which one must be worn (`equipSelectNeed`), if any.
@@ -160,6 +165,10 @@ pub struct StartRequirements {
     /// The hour (UTC) before which the quest can't be started (`start`,
     /// "yyyymmddhh").
     pub not_before: Option<SystemTime>,
+    /// The hour (UTC) after which it can't (`end`). v83 offers a quest from
+    /// its start to its end hour inclusive (FUN_00721163), so most event
+    /// quests, which ended in 2005-2010, are never offered.
+    pub not_after: Option<SystemTime>,
     /// Pet items of which the first pet out must be one (`pet`); empty means
     /// no pet is needed.
     pub pets: Vec<i32>,
@@ -512,6 +521,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         repeat_interval: nx
             .int_child(start, "interval")?
             .and_then(|v| u32::try_from(v).ok()),
+        daily: nx.int_child(start, "dayByDay")?.unwrap_or(0) != 0,
         ..StartRequirements::default()
     };
     if let Some(jobs) = nx.child_by_name(start, "job")? {
@@ -528,6 +538,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.worn_any = int_list(nx, start, "equipSelectNeed")?;
     requirements.maps = int_list(nx, start, "fieldEnter")?;
     requirements.not_before = nx.int_child(start, "start")?.map(date_hour).transpose()?;
+    requirements.not_after = nx.int_child(start, "end")?.map(date_hour).transpose()?;
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
@@ -1113,6 +1124,13 @@ mod tests {
             Some(1440)
         );
         assert_eq!(mirror.start.repeat_interval, None);
+        assert!(!mirror.start.daily);
+        assert!(catalog.quest(8245).unwrap().start.daily);
+        // An event quest open from 00:00 to 01:00 on 31 December 2030.
+        assert_eq!(
+            catalog.quest(9625).unwrap().start.not_after,
+            Some(SystemTime::UNIX_EPOCH + Duration::from_secs(1_924_909_200))
+        );
         // The Magatia cape worn; Maple Administrator's hat, in his map.
         assert_eq!(catalog.quest(3307).unwrap().start.worn_all, [1102135]);
         let gm = &catalog.quest(9999).unwrap().start;

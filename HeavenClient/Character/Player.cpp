@@ -2323,7 +2323,7 @@ namespace ms
 
 		int64_t now = item_expiry::now();
 
-		if (now < quest.start_time)
+		if (now < quest.start_time || now > quest.end_time)
 			return false;
 
 		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, now))
