@@ -1273,11 +1273,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ))
         }
         // A Magatia library's way down to its hall, once one of its books
-        // held the switch, and the hall's way on, once its monsters are
-        // all gone (Cosmic `rnj1_pt00`, `rnj1_out` and their Alcadno twins).
-        "rnj1_pt00" | "jnr1_pt00" | "rnj1_out" | "jnr1_out" => {
+        // held the switch, the hall's way on, once its monsters are all
+        // gone, and the beaker room's, once its three beakers were full
+        // (Cosmic `rnj1_pt00`, `rnj1_out`, `rnj2_out` and their Alcadno
+        // twins).
+        "rnj1_pt00" | "jnr1_pt00" | "rnj1_out" | "jnr1_out" | "rnj2_out" | "jnr2_out" => {
             let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
-            let stage = if script.ends_with("pt00") { 1 } else { 2 };
+            let stage = match &script[3..] {
+                "1_pt00" => 1,
+                "1_out" => 2,
+                _ => 3,
+            };
             ScriptOutcome {
                 effects: vec![
                     Effect::RequireStage {
@@ -3145,7 +3151,7 @@ mod tests {
     }
 
     #[test]
-    fn a_magatia_librarys_ways_on_wait_for_the_switch_and_the_halls_mobs() {
+    fn a_magatia_runs_ways_on_wait_for_their_stages() {
         use crate::events::MagatiaSide;
         let mut player = player_with(&[]);
         let shut = content::text().get(keys::MAGATIA_PORTAL_SHUT, &[]);
@@ -3154,7 +3160,7 @@ mod tests {
             (MagatiaSide::Alcadno, "jnr"),
         ] {
             let stages = side.stages();
-            for (stage, script) in [(1u8, "1_pt00"), (2, "1_out")] {
+            for (stage, script) in [(1u8, "1_pt00"), (2, "1_out"), (3, "2_out")] {
                 player.stats.map_id = stages[usize::from(stage) - 1];
                 let outcome = portal(&format!("{prefix}{script}"), &player).unwrap();
                 assert_eq!(

@@ -141,6 +141,12 @@ pub enum Action {
     /// stay: the Forest of Poison Haze's fountain (Cosmic `3008000`, whose
     /// `hit` gives 52,000), which its states' timeouts empty again.
     ExpToAll(i32),
+    /// One of the three beakers of a Magatia beaker room (Cosmic
+    /// `2618000`), which takes a Magic Stone a state at a time and drains
+    /// a state back each 9.5 seconds: the first time each reaches
+    /// `BEAKER_FULL` counts, and the third counted clears the stage
+    /// (`crate::events::MAGATIA_BEAKERS`).
+    Beaker,
 }
 
 /// The maze's boxes that bring out the same mobs in every room, from
@@ -423,6 +429,7 @@ pub fn action(reactor_id: i32) -> Action {
             music: None,
         },
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
+        MAGATIA_BEAKER => Action::Beaker,
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
         2002014 => Action::SprayAndAppear {
@@ -499,6 +506,11 @@ pub const ELLIN_ALTAR: i32 = 3001000;
 /// it "", and the way home asks its state.
 pub const ELLIN_FOUNTAIN: i32 = 3008000;
 pub const ELLIN_FOUNTAIN_NAME: &str = "";
+
+/// A Magatia beaker, and the state at which it counts as full (Cosmic
+/// `2618000`'s `hit`); one Magic Stone more fills it to its last.
+pub const MAGATIA_BEAKER: i32 = 2618000;
+pub const BEAKER_FULL: u8 = 6;
 
 /// The Pirate Ship's mob box, which takes four hits, and its item box and
 /// the decks' mob box, which link to it.
@@ -750,6 +762,8 @@ mod tests {
         assert_eq!(action(ELLIN_STONE_BOX), Action::DropsAndClears);
         assert_eq!(action(3002002), Action::Drops);
         assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
+        assert_eq!(action(MAGATIA_BEAKER), Action::Beaker);
+        assert!(!stays(MAGATIA_BEAKER) && !acts_staying(MAGATIA_BEAKER));
         assert!(!stays(ELLIN_FOUNTAIN) && !acts_staying(ELLIN_FOUNTAIN));
         assert!(!stays(ELLIN_STONE_BOX) && !acts_staying(ELLIN_STONE_BOX));
         assert!(matches!(

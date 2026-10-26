@@ -75,7 +75,7 @@ use net::summons::{self, Limit, SummonAttack, SummonDamage, Support};
 use net::{ClientId, FieldRequest, GmEvent};
 use packet::Packet;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::time::{Duration, SystemTime};
 use tokio::sync::mpsc;
 use tokio::time::{interval, Instant, MissedTickBehavior};
@@ -281,6 +281,8 @@ pub struct FieldActor {
     /// In a Magatia library, what each of its books still holds
     /// (`net::events::draw_books`), once anyone has opened one.
     books: Option<[Option<net::events::Find>; net::events::MAGATIA_BOOKS]>,
+    /// In a Magatia beaker room, the beakers filled so far.
+    beakers: BTreeSet<i32>,
     /// In a jail under the sealed room, the levers that open its way on
     /// (`net::events::draw_jail`), once anyone has tried it; none once
     /// they have.
@@ -365,6 +367,7 @@ impl FieldActor {
             climb: None,
             levers: None,
             books: None,
+            beakers: BTreeSet::new(),
             jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
@@ -3602,6 +3605,31 @@ impl FieldActor {
         }
     }
 
+    /// A Magatia beaker filled for the first time (Cosmic `2618000`'s
+    /// `hit`): with the third, the stage clears, every mob goes, and the
+    /// room's door opens. A beaker that drains and fills again counts once.
+    fn fill_beaker(&mut self, object_id: i32) {
+        let side = net::events::MagatiaSide::of(self.key.map_id)
+            .filter(|side| self.key.instance_id != 0 && self.key.map_id == side.stages()[2]);
+        let Some(side) = side else {
+            return;
+        };
+        if !self.beakers.insert(object_id) || self.beakers.len() != net::events::MAGATIA_BEAKERS {
+            return;
+        }
+        for occupant in self.occupants.values() {
+            occupant.handle.send(ServerMessage::ClearEventStage(
+                net::events::MAGATIA_BEAKER_STAGE,
+            ));
+        }
+        self.clear_mobs();
+        for view in self.reactors.force_forward(side.beaker_door(), 1) {
+            if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                self.broadcast(None, packet);
+            }
+        }
+    }
+
     /// Every mob here that isn't friendly goes, as if it left, and no more
     /// come: the event this copy is of was won.
     fn clear_mobs(&mut self) {
@@ -3823,6 +3851,9 @@ impl FieldActor {
                         for occupant in self.occupants.values() {
                             occupant.handle.send(ServerMessage::GainExp(exp));
                         }
+                    }
+                    reactors::Action::Beaker if view.state == reactors::BEAKER_FULL => {
+                        self.fill_beaker(view.object_id)
                     }
                     _ => {}
                 }
