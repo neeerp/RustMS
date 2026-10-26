@@ -269,6 +269,8 @@ pub struct Trace {
     /// BROADCAST_MSG: (kind, message) of each whose kind carries only its
     /// message (0, 1, 5).
     pub broadcasts: Vec<(u8, String)>,
+    /// CHAT_TEXT: (character id, line), barrier markers included.
+    pub chats: Vec<(i32, String)>,
     /// BROADCAST_MSG kind 6: (message, linked item or 0).
     pub item_lines: Vec<(String, i32)>,
     /// BROADCAST_MSG kind 11, a Gachapon win: (message, channel, town,
@@ -477,6 +479,11 @@ impl Trace {
                 self.field_effects
                     .push((mode, r.read_str_with_length().unwrap()));
             }
+        } else if op == SendOpcode::ChatText as i16 {
+            let character_id = r.read_int().unwrap();
+            r.read_byte().unwrap();
+            self.chats
+                .push((character_id, r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::BroadcastMsg as i16 {
             let kind = r.read_byte().unwrap();
             if matches!(kind, 0 | 1 | 5) {

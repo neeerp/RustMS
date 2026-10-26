@@ -99,6 +99,9 @@ pub enum ServerMessage {
     GuildChanged,
     /// A GM jailed the player or let them out; read the time again.
     JailChanged,
+    /// A GM blocked the player's account from chatting or lifted it; read
+    /// it again.
+    ChatBlockChanged,
     /// `from` (named so) proposes; ask the player unless they can't be
     /// asked.
     Proposed {
@@ -1153,6 +1156,11 @@ pub enum DirectoryMessage {
     /// A GM jailed `client_id` or let them out.
     JailChanged {
         client_id: ClientId,
+    },
+    /// A GM blocked the account of `client_ids` from chatting, or lifted
+    /// it.
+    ChatBlockChanged {
+        client_ids: Vec<ClientId>,
     },
     /// `from` proposes to `partner` with the ring box `item_id`: ask them
     /// if they are on `from`'s map and of the level.

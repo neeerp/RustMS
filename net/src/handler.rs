@@ -199,6 +199,15 @@ pub enum Discipline {
     Jail { target: String, minutes: u32 },
     /// Let the character out of jail.
     Release { target: String },
+    /// Block the account from chatting for `minutes`, giving `reason`
+    /// (Etc/ChatBlockReason.img's number, 1..=6).
+    Mute {
+        target: String,
+        minutes: u32,
+        reason: u8,
+    },
+    /// Lift the account's chat block.
+    Unmute { target: String },
 }
 
 /// A whisper ready for delivery; the world directory picks which packet the

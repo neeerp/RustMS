@@ -49,6 +49,14 @@ pub struct Account {
     /// When the block ends; none is never.
     #[diesel(skip_update)]
     pub ban_until: Option<SystemTime>,
+    /// Why a GM blocked the account from chatting, as
+    /// Etc/ChatBlockReason.img's number; 0 is not blocked
+    /// (`crate::account::chat_block`).
+    #[diesel(skip_update)]
+    pub chat_block_reason: i16,
+    /// When the chat block ends.
+    #[diesel(skip_update)]
+    pub chat_block_until: Option<SystemTime>,
 }
 
 impl Account {
@@ -56,6 +64,16 @@ impl Account {
     /// no longer counts.
     pub fn blocked_at(&self, now: SystemTime) -> bool {
         self.banned && self.ban_until.map_or(true, |until| until > now)
+    }
+
+    /// The account's chat block at `now`, if any: its reason and end. One
+    /// that has run out no longer counts.
+    pub fn chat_blocked_at(&self, now: SystemTime) -> Option<(u8, SystemTime)> {
+        let reason = u8::try_from(self.chat_block_reason)
+            .ok()
+            .filter(|&r| r > 0)?;
+        let until = self.chat_block_until.filter(|&until| until > now)?;
+        Some((reason, until))
     }
 }
 
