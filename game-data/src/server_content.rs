@@ -596,6 +596,9 @@ pub mod keys {
     /// The Time Gate (`TD_neoCity_enter`) to Neo City's eras.
     pub const TIME_GATE_INACTIVE: &str = "time_gate.inactive";
     pub const TIME_GATE_NO_ERA: &str = "time_gate.no_era";
+    /// Corba (2082003), who makes the player a dragon for the flight.
+    pub const CORBA_MENU: &str = "corba.menu";
+    pub const CORBA_CHOICE: &str = "corba.choice";
     /// The Mysterious Statue (`flower_in`) and Crumbling Statue
     /// (`flower_out`) of the Deep Forest's jump quest.
     pub const STATUE_INTRO: &str = "statue.intro";
@@ -2719,6 +2722,8 @@ mod tests {
             keys::DUNGEON_FULL,
             keys::TIME_GATE_INACTIVE,
             keys::TIME_GATE_NO_ERA,
+            keys::CORBA_MENU,
+            keys::CORBA_CHOICE,
             keys::STATUE_INTRO,
             keys::STATUE_MENU,
             keys::CRUMBLING_ASK,

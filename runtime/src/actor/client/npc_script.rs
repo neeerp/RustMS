@@ -126,12 +126,14 @@ impl ClientActor {
         let mut command = None;
         let mut gachapon_win = None;
         let mut evolved = Vec::new();
+        let mut item_buffs = Vec::new();
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
                 Effect::PortalSound => {
                     afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
                 }
+                Effect::ApplyItemBuff(_) | Effect::CancelItemBuff(_) => item_buffs.push(effect),
                 Effect::SaveLocation(kind, location) => {
                     match location {
                         Some(map_id) => next.saved_locations.insert(*kind, *map_id),
@@ -763,6 +765,14 @@ impl ClientActor {
             Some(Effect::OpenRegistry { bride }) => Box::pin(self.open_registry(bride)).await?,
             Some(Effect::OpenGifts) => Box::pin(self.open_gifts()).await?,
             _ => {}
+        }
+        // On or off in the map being left, so its players see it.
+        for effect in item_buffs {
+            match *effect {
+                Effect::ApplyItemBuff(item_id) => self.take_item_buff(item_id).await?,
+                Effect::CancelItemBuff(item_id) => self.end_buff(-item_id).await?,
+                _ => {}
+            }
         }
         if let Some((map_id, portal)) = warp {
             let channel_id = self.channel_id;

@@ -9,12 +9,13 @@ use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::stat::{self, StatUpdate};
 use net::packet::build::world::summon::Gone;
 use net::packet::handle::world::{
-    absorbed, catch_disease, countered, item_effect_packets, morph_by_another, morphed_another,
-    party_skill_reached, PartyPotion,
+    absorbed, apply_item_effect, catch_disease, countered, item_effect_packets, morph_by_another,
+    morphed_another, party_skill_reached, PartyPotion,
 };
 use net::summons::Support;
 use net::{summons, FieldRequest, PartySkill, SpawnPosition};
 use packet::Packet;
+use tracing::warn;
 
 /// What a player is told when their mount tires them off it.
 const MOUNT_TIRED: &str =
@@ -41,6 +42,22 @@ impl ClientActor {
             self.show_buffs(packet).await?;
         }
         Ok(true)
+    }
+
+    /// A script put an item's effect on the player without taking one
+    /// (Corba's dragon).
+    pub(super) async fn take_item_buff(&mut self, item_id: i32) -> Result<(), RuntimeError> {
+        let player = &mut self.in_game_mut()?.player;
+        let Some(effect) = apply_item_effect(player, item_id, std::time::Instant::now()) else {
+            warn!(item_id, "Script buff item has no supported effect");
+            return Ok(());
+        };
+        let (mut own, seen) = item_effect_packets(player, item_id, effect, false)?;
+        self.send_all(&mut own).await?;
+        for packet in seen {
+            self.show_buffs(packet).await?;
+        }
+        Ok(())
     }
 
     /// The character this player's Party Potion named answered. In the
@@ -353,7 +370,7 @@ impl ClientActor {
     }
 
     /// End one buff, e.g. a Puppet's when a mob broke it.
-    async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
+    pub(super) async fn end_buff(&mut self, skill_id: i32) -> Result<(), RuntimeError> {
         let ended = self.in_game_mut()?.player.buffs.cancel(skill_id);
         if ended.is_empty() {
             return Ok(());
