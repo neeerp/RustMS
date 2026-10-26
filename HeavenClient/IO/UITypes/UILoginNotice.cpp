@@ -55,6 +55,8 @@ namespace ms
 			case Message::CASH_ITEMS_CONFIRM_DELETION:
 			case Message::FAMILY_CONFIRM_DELETION:
 			case Message::FAMILY_AND_CASH_ITEMS_CONFIRM_DELETION:
+			// v83 opens this one with the plain background (FUN_0060f024(0x24, 0)).
+			case Message::POPULATION_TOO_HIGH:
 				backgrnd = Notice["backgrnd"]["0"];
 				break;
 			default:

@@ -59,7 +59,9 @@ namespace ms
 		uint8_t flag = recv.read_byte();
 		std::string message = recv.read_string();
 
-		recv.skip(5);
+		// The event rates, then whether creation is shut (FUN_005f95b7)
+		recv.skip(4);
+		bool create_disabled = recv.read_bool();
 
 		std::vector<int32_t> chloads;
 		std::vector<std::string> chnames;
@@ -76,7 +78,7 @@ namespace ms
 
 		recv.skip(2);
 
-		return { name, message, chloads, chnames, channelcount, flag, wid };
+		return { name, message, chloads, chnames, channelcount, flag, wid, create_disabled };
 	}
 
 	RecommendedWorld LoginParser::parse_recommended_world(InPacket& recv)

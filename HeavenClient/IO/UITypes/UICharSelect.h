@@ -57,6 +57,9 @@ namespace ms
 
 		const CharEntry &get_character(int32_t id);
 
+		// Whether the list's 15 entries are all taken (FUN_005f7e7a).
+		bool full() const;
+
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
 
@@ -73,6 +76,9 @@ namespace ms
 
 		void request_pic();
 		void check_pic(const std::string entered_pic) const;
+
+		// The most a character list holds.
+		static constexpr int8_t MAX_CHARACTERS = 15;
 
 		enum Buttons : uint16_t
 		{

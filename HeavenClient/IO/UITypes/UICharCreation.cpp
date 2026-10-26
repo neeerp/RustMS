@@ -19,6 +19,7 @@
 
 #include "UICharSelect.h"
 #include "UILoginNotice.h"
+#include "UINotice.h"
 #include "UIRaceSelect.h"
 
 #include "../LoginScene.h"
@@ -286,8 +287,16 @@ namespace ms
 
 	void UICharCreation::send_creation_failed(uint8_t result)
 	{
-		// 0x1A, a pending world transfer, has its own text in v83; the
-		// server never sends it.
+		// 0x1A, a pending world transfer, has v83's own OK box (StringPool
+		// 0xfb0); the server never sends it.
+		if (result == 0x1A)
+		{
+			UI::get().emplace<UIOk>("You cannot create a new character \\nunder the account that \\nhas requested for a transfer.",
+				[&](bool) { enable_buttons(true); });
+
+			return;
+		}
+
 		UILoginNotice::Message message = UILoginNotice::Message::UNKNOWN_ERROR;
 
 		if (result == 0x0A)
@@ -383,6 +392,13 @@ namespace ms
 
 	void UICharCreation::create_character()
 	{
+		// v83 checks the list again before sending (FUN_005f7e7a)
+		if (auto charselect = UI::get().get_element<UICharSelect>(); charselect && charselect->full())
+		{
+			UI::get().emplace<UILoginNotice>(UILoginNotice::Message::FULL_CHARACTER_SLOTS);
+			return;
+		}
+
 		enable_buttons(false);
 
 		// The server adds the style and colour digit itself. The race is the
