@@ -425,6 +425,12 @@ impl FieldActor {
                 field.bring_out_head(head);
             }
         }
+        // A copy of King Pepe's room with one of the Yeti brothers.
+        if key.map_id == net::events::KING_PEPE_ROOM && key.instance_id != 0 {
+            let brothers = net::events::YETI_BROTHERS;
+            let brother = brothers[rand::thread_rng().gen_range(0, brothers.len())];
+            field.board(brother, 1, net::events::YETI_BROTHER_AT);
+        }
         // And a copy of one of the Pirate Ship's decks with its crew.
         if key.instance_id != 0 {
             for &(mob_id, at, count) in net::events::opening_mobs(key.map_id) {

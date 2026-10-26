@@ -72,6 +72,10 @@ pub enum EventKind {
     /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
     /// Mu Young (1061014) in the Sleepywood dungeon.
     Tristan,
+    /// King Pepe's room in the Mushroom Castle, taken alone through the
+    /// East Castle Tower's `TD_MC_enterboss1` while Stop the Wedding (2330)
+    /// still wants a Yeti brother.
+    KingPepe,
     /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
     /// (2042000) on the Carnival Field (`crate::carnival`).
     Carnival(u8),
@@ -2432,6 +2436,42 @@ pub const TRISTAN: Event = Event {
     ..DOJO
 };
 
+/// The Mushroom Castle's East Castle Tower, 106021400: the way up to King
+/// Pepe's room and the Wedding Hall (`TD_MC_enterboss1`), and back.
+pub const EAST_CASTLE_TOWER: i32 = 106021400;
+/// King Pepe's room, 106021500, where a Yeti brother rides out with him.
+pub const KING_PEPE_ROOM: i32 = 106021500;
+/// Stop the Wedding (2330), which wants one of each Yeti brother, King
+/// Pepe on his back (Quest.nx `Check.img/2330/1/mob`, in this order).
+pub const STOP_THE_WEDDING: i16 = 2330;
+pub const YETI_BROTHERS: [i32; 3] = [3_300_005, 3_300_006, 3_300_007];
+/// The point above the ground below which a brother comes out (Cosmic
+/// `pepeking_effect`).
+pub const YETI_BROTHER_AT: (i16, i16) = (-28, -67);
+/// The key to the Wedding Hall, which King Pepe drops once all three are
+/// beaten, and which Where's Violetta? (2332) starts with.
+pub const WEDDING_HALL_KEY: i32 = 4_032_388;
+
+/// King Pepe's room: the tower's portal takes a player on Stop the Wedding
+/// alone into their own copy for twenty minutes, one at a time on a channel
+/// (Cosmic `KingPepeAndYetis`, one lobby). Each copy opens with one of the
+/// brothers, drawn at random (Cosmic `pepeking_effect`). It is never won;
+/// it ends when they leave by `out01` or the time runs out.
+pub const KING_PEPE: Event = Event {
+    lobby: EAST_CASTLE_TOWER,
+    entrances: &[],
+    maps: KING_PEPE_ROOM..=KING_PEPE_ROOM,
+    entry: KING_PEPE_ROOM,
+    exit: EAST_CASTLE_TOWER,
+    levels: 30..=u8::MAX,
+    team: 1..=1,
+    minutes: 20,
+    exp_per_stage: &[],
+    member_clears: &[],
+    runs: 1,
+    ..DOJO
+};
+
 /// Every run of Nett's Pyramid Duarte offers, alone first, then with a
 /// party, each by mode.
 pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
@@ -2518,7 +2558,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 38] = [
+    pub const ALL: [EventKind; 39] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2557,6 +2597,7 @@ impl EventKind {
         EventKind::Magatia(MagatiaSide::Zenumist),
         EventKind::Magatia(MagatiaSide::Alcadno),
         EventKind::Tristan,
+        EventKind::KingPepe,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2584,6 +2625,7 @@ impl EventKind {
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
+            EventKind::KingPepe => &KING_PEPE,
         }
     }
 
@@ -3646,6 +3688,18 @@ mod tests {
         assert!(tristan.team(1, &[at(1, 50, MU_YOUNG_MAP)]).is_some());
         assert_eq!(tristan.team(1, &[at(1, 49, MU_YOUNG_MAP)]), None);
         assert!(event_map(TRISTAN_ROOM) && !event_map(MU_YOUNG_MAP));
+    }
+
+    #[test]
+    fn king_pepes_room_is_taken_alone_from_the_east_castle_tower() {
+        let pepe = EventKind::KingPepe.event();
+        assert_eq!((pepe.entry, pepe.exit), (KING_PEPE_ROOM, EAST_CASTLE_TOWER));
+        assert!(pepe.solo() && pepe.lasts_until_empty());
+        assert_eq!((pepe.minutes, pepe.last_stage(), pepe.runs), (20, 0, 1));
+        assert!(pepe.starts_on(EAST_CASTLE_TOWER));
+        assert!(pepe.team(1, &[at(1, 30, EAST_CASTLE_TOWER)]).is_some());
+        assert_eq!(pepe.team(1, &[at(1, 29, EAST_CASTLE_TOWER)]), None);
+        assert!(event_map(KING_PEPE_ROOM) && !event_map(EAST_CASTLE_TOWER));
     }
 
     #[test]
