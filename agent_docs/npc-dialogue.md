@@ -19,7 +19,11 @@ Space is already taken, and normalize it to an action binding.
 `NpcDialogueData` in `game-data` resolves the numbered references under
 `Npc.nx/<NPC ID>.img/info/speak` against `String.nx/Npc.img/<NPC ID>`.
 This uses existing asset text without copying it into the repository. NPCs
-without those references currently have no conversation.
+without those references and without a script say nothing, except a few
+that the client still lets the player click (Ryko, Adonis, Chloe's
+document roll, a practice chart, the Sharenian knight armor and Sharen
+III's will, and four grave markers). Those say one line from
+`npc_line.*` in the content pack (`ONE_LINERS` in `net::npc_scripts`).
 
 `Quest.nx` contains conversation text (`Say.img`), descriptions
 (`QuestInfo.img`), requirements (`Check.img`), and actions (`Act.img`). The

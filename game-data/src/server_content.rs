@@ -1872,6 +1872,17 @@ pub mod keys {
     pub const MIRROR_CARNIVAL: &str = "mirror.carnival";
     pub const MIRROR_PYRAMID: &str = "mirror.pyramid";
     pub const MIRROR_NOWHERE: &str = "mirror.nowhere";
+    /// One line each for NPCs that have nothing else to say: no speech in
+    /// String.nx and no script of their own.
+    pub const LINE_RYKO: &str = "npc_line.ryko";
+    pub const LINE_ADONIS: &str = "npc_line.adonis";
+    pub const LINE_DOCUMENT_ROLL: &str = "npc_line.document_roll";
+    pub const LINE_PRACTICE_CHART: &str = "npc_line.practice_chart";
+    pub const LINE_KNIGHT_ARMOR: &str = "npc_line.knight_armor";
+    pub const LINE_SHAREN_WILL: &str = "npc_line.sharen_will";
+    pub const LINE_GRAVE_LIGHT: &str = "npc_line.grave_light";
+    pub const LINE_ENIGMA_TOMBSTONE: &str = "npc_line.enigma_tombstone";
+    pub const LINE_WORN_TOMBSTONE: &str = "npc_line.worn_tombstone";
     pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
     pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
     pub const DOJO_POINTS: &str = "dojo.points";
@@ -3059,6 +3070,15 @@ mod tests {
                 keys::MIRROR_CARNIVAL,
                 keys::MIRROR_PYRAMID,
                 keys::MIRROR_NOWHERE,
+                keys::LINE_RYKO,
+                keys::LINE_ADONIS,
+                keys::LINE_DOCUMENT_ROLL,
+                keys::LINE_PRACTICE_CHART,
+                keys::LINE_KNIGHT_ARMOR,
+                keys::LINE_SHAREN_WILL,
+                keys::LINE_GRAVE_LIGHT,
+                keys::LINE_ENIGMA_TOMBSTONE,
+                keys::LINE_WORN_TOMBSTONE,
                 keys::DOJO_UP_MONSTERS,
                 keys::DOJO_NEXT_SHUT,
                 keys::DOJO_POINTS,
