@@ -284,6 +284,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::Whisper as i16 => "Whisper",
         x if x == SendOpcode::SpawnPlayer as i16 => "SpawnPlayer",
         x if x == SendOpcode::SpawnNpc as i16 => "SpawnNpc",
+        x if x == SendOpcode::RemoveNpc as i16 => "RemoveNpc",
         x if x == SendOpcode::RemovePlayerFromMap as i16 => "RemovePlayerFromMap",
         x if x == SendOpcode::ChatText as i16 => "ChatText",
         x if x == SendOpcode::MovePlayer as i16 => "MovePlayer",

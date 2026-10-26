@@ -379,6 +379,9 @@ pub enum ServerMessage {
         map_id: i32,
         name: &'static str,
     },
+    /// Yulete left the player's field, his office, caught off guard or
+    /// not (`net::events::EventCommand::YuleteLeft`): tell the event.
+    YuleteLeft(bool),
     /// This player's attack on a copy of a Nett's Pyramid stage did this to
     /// its mobs, for their run's tally.
     Massacre(net::pyramid::Hits),
@@ -748,6 +751,13 @@ pub enum FieldMessage {
     /// (`net::events::draw_climb`), drawn when first asked.
     Climb {
         reply: tokio::sync::oneshot::Sender<Vec<u8>>,
+    },
+    /// Someone talked to Yulete in his office, after Romeo or Juliet read
+    /// the letter or not: what he says, as text key
+    /// (`net::events::yulete_talk`); `None` if he isn't here.
+    Yulete {
+        shocked: bool,
+        reply: tokio::sync::oneshot::Sender<Option<&'static str>>,
     },
     /// The two of the tall room's levers Eak wants up
     /// (`net::events::draw_levers`), drawn when first asked.

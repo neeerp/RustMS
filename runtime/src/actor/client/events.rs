@@ -436,6 +436,85 @@ impl ClientActor {
         )))
     }
 
+    /// What Yulete, `npc_id`, says to the player in his office in their
+    /// run of Romeo and Juliet's party quest, as the field decides by where
+    /// everyone stands and whether Romeo or Juliet read the letter; `None`
+    /// anywhere else, or once he has left.
+    pub(super) async fn yulete(&mut self, npc_id: i32) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self
+            .event
+            .as_ref()
+            .filter(|ticket| matches!(ticket.kind, EventKind::Magatia(_)) && ticket.holds(map_id))
+        else {
+            return Ok(None);
+        };
+        let shocked = ticket.shocked();
+        let (reply, said) = oneshot::channel();
+        self.send_to_field(FieldMessage::Yulete { shocked, reply })
+            .await?;
+        Ok(said
+            .await
+            .ok()
+            .flatten()
+            .map(|key| NpcScript::yulete(npc_id, key)))
+    }
+
+    /// What a portal of Romeo and Juliet's party quest, `portal` running
+    /// `script`, does for the player: one of the landing's ways into the
+    /// rope rooms takes them in unless another member took that room
+    /// (Cosmic `rnj4_r1`), and a rope sends them a row up, or back down if
+    /// it is the wrong one; reaching the top clears the ropes' stage the
+    /// first time anyone does (Cosmic `rnj5_rp`). `None` for any other
+    /// portal.
+    pub(super) async fn magatia_portal(
+        &mut self,
+        script: &str,
+        portal: &PortalTemplate,
+    ) -> Result<Option<Vec<Effect>>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let Some(ticket) = self.event.as_ref().filter(|ticket| ticket.holds(map_id)) else {
+            return Ok(None);
+        };
+        let EventKind::Magatia(side) = ticket.kind else {
+            return Ok(None);
+        };
+        let landing = side.stages()[5];
+        let room = (scripts::MAGATIA_ROOMS_IN.iter())
+            .find_map(|ways| ways.iter().position(|&way| way == script));
+        if let Some(room) = room.filter(|_| map_id == landing) {
+            let room = room as u8;
+            return Ok(Some(if ticket.take_room(room) {
+                vec![
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(landing + 1 + i32::from(room), 0),
+                ]
+            } else {
+                let line = net::content::text().get(keys::MAGATIA_ROOM_TAKEN, &[]);
+                vec![Effect::Pink(line)]
+            }));
+        }
+        if !scripts::MAGATIA_ROPES.contains(&script) || side.rope_room(map_id).is_none() {
+            return Ok(None);
+        }
+        let (reply, combo) = oneshot::channel();
+        self.send_to_field(FieldMessage::Climb { reply }).await?;
+        let (Ok(combo), Ok(id)) = (combo.await, u8::try_from(portal.id)) else {
+            return Ok(None);
+        };
+        let Some(to) = events::climb(map_id, &combo, id, &portal.name) else {
+            return Ok(None);
+        };
+        if to == 1 {
+            self.tell_event(EventCommand::ClearStage(events::MAGATIA_ROPES_STAGE))
+                .await;
+        }
+        Ok(Some(vec![
+            Effect::PortalSound,
+            Effect::WarpToPortal(map_id, to),
+        ]))
+    }
+
     /// What Eak says to the player in the Orbis party quest, if anything:
     /// in the music room whether its music box plays, in the sealed room
     /// how the team stands on its platforms (a wrong count shows as a
@@ -1301,7 +1380,9 @@ impl ClientActor {
         let quiet = zpq
             || zakum
             || ticket.kind == EventKind::LudiMaze
-            || (ticket.kind == EventKind::Pirate && won);
+            || (ticket.kind == EventKind::Pirate && won)
+            || (matches!(ticket.kind, EventKind::Magatia(_))
+                && stage == events::MAGATIA_ROPES_STAGE);
         let exp = if let Some(exp) = exp {
             exp
         } else if zpq && ticket.cleared(events::ZPQ_DOCUMENTS) {

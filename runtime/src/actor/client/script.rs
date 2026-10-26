@@ -68,7 +68,10 @@ impl ClientActor {
                     .or(self.ellin_portal(script)?)
                 {
                     None => match self.htpq_portal(script).await? {
-                        None => self.dojo_portal(script).await?,
+                        None => match self.dojo_portal(script).await? {
+                            None => self.magatia_portal(script, portal).await?,
+                            effects => effects,
+                        },
                         effects => effects,
                     },
                     effects => effects,

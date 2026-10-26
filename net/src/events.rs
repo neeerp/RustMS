@@ -139,6 +139,24 @@ impl MagatiaSide {
         }
     }
 
+    /// The way out of Yulete's office (`stages()[4]`), which opens as its
+    /// stage clears (Cosmic `2618005`, `rnj6_out`).
+    pub fn office_door(self) -> &'static str {
+        match self {
+            MagatiaSide::Zenumist => "rnj6_out",
+            MagatiaSide::Alcadno => "jnr6_out",
+        }
+    }
+
+    /// Which of its four rope rooms, beside the landing (`stages()[5]`),
+    /// `map_id` is, from 0.
+    pub fn rope_room(self, map_id: i32) -> Option<u8> {
+        let first = self.stages()[5] + 1;
+        (first..first + MAGATIA_ROPE_ROOMS as i32)
+            .contains(&map_id)
+            .then(|| (map_id - first) as u8)
+    }
+
     /// The letter one of its library's books may hide (Cosmic `2112007`
     /// and `2112013`).
     pub fn letter(self) -> i32 {
@@ -1569,8 +1587,8 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 /// The stage cleared once every mob on `map_id`, in an event's copy of
 /// it, is dead, and every reactor `seals` names there set: the first of
 /// the Forest of Poison Haze, the Pirate Ship's first, decks and doors,
-/// and the hall below each Magatia library (Cosmic `EllinPQ`,
-/// `PiratePQ` and `MagatiaPQ_Z`'s `monsterKilled`).
+/// the hall below each Magatia library, and Yulete's office (Cosmic
+/// `EllinPQ`, `PiratePQ` and `MagatiaPQ_Z`'s `monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
     [
         (ELLIN_STAGES[0], 1),
@@ -1580,6 +1598,8 @@ pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
         (PIRATE_STAGES[4], 5),
         (ZENUMIST_STAGES[1], 2),
         (ALCADNO_STAGES[1], 2),
+        (ZENUMIST_STAGES[4], MAGATIA_OFFICE_STAGE),
+        (ALCADNO_STAGES[4], MAGATIA_OFFICE_STAGE),
     ]
     .into_iter()
     .find_map(|(map, stage)| (map == map_id).then_some(stage))
@@ -1806,7 +1826,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         stride: 1,
         stage_maps: stages,
         talk_clears: &[MAGATIA_FILES_STAGE],
-        member_clears: &[1, 2, 3],
+        member_clears: &[1, 2, 3, MAGATIA_OFFICE_STAGE, MAGATIA_ROPES_STAGE],
         clear_portals: &[],
         gated: &[],
         puzzles: 1..=0,
@@ -1860,6 +1880,64 @@ pub const MAGATIA_BEAKER_STAGE: u8 = 3;
 pub const MAGATIA_CARD_KEY: i32 = 4_001_133;
 pub const MAGATIA_FILES: [i32; 2] = [4_001_134, 4_001_135];
 pub const MAGATIA_FILES_STAGE: u8 = 4;
+
+/// Yulete's office (`stages()[4]`): where he stands until he leaves
+/// (Cosmic `MagatiaPQ_Z.afterSetup`'s `spawnNpc`), how near him anyone
+/// in the office may be when he is talked to without his having seen
+/// them coming (`2112000`'s `playersTooClose`), how long after the first
+/// member arrives he leaves (`yuleteAction`, on the clock, not the event's
+/// scale), and the mobs he leaves behind, five of each at each of three
+/// spots. Killing them all clears the stage.
+pub const YULETE_AT: (i16, i16) = (252, 243);
+pub const YULETE_SEES: i32 = 310;
+pub const YULETE_STAYS: Duration = Duration::from_secs(10);
+pub const YULETE_GUARDS: [i32; 2] = [9_300_143, 9_300_144];
+pub const YULETE_GUARD_SPOTS: [(i16, i16); 3] = [(-455, 135), (0, 135), (360, 135)];
+pub const MAGATIA_OFFICE_STAGE: u8 = 5;
+
+/// The rope rooms beside the landing, each taken by one member (Cosmic
+/// `rnj4_r1`-`rnj4_r4`'s `statusStg5`), their rows of four ropes, and the
+/// stage the first to reach a room's top clears (`rnj5_rp`'s
+/// `statusStg6`), which shows nothing but gives its EXP.
+pub const MAGATIA_ROPE_ROOMS: u8 = 4;
+pub const MAGATIA_ROPE_ROWS: usize = 10;
+pub const MAGATIA_ROPES_STAGE: u8 = 6;
+
+/// What Yulete in his office makes of the party (Cosmic `yuleteTalked`):
+/// no one has talked to him yet, someone caught him off guard, or he is
+/// leaving.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Yulete {
+    Unmet,
+    Caught,
+    Leaving,
+}
+
+/// What Yulete says to a player who talks to him, as text key, and what
+/// he makes of the party after (Cosmic `2112000`): once leaving, that he
+/// is; with anyone in the office within `YULETE_SEES` of him, or before
+/// Romeo or Juliet read the letter, that he saw the party coming, and he
+/// is leaving; otherwise he is caught off guard.
+pub fn yulete_talk(mood: Yulete, too_close: bool, shocked: bool) -> (&'static str, Yulete) {
+    use game_data::server_content::keys;
+    match mood {
+        Yulete::Leaving => (keys::MAGATIA_YULETE_LEAVING, Yulete::Leaving),
+        _ if too_close => (keys::MAGATIA_YULETE_WATCHED, Yulete::Leaving),
+        _ if !shocked => (keys::MAGATIA_YULETE_SNEAKY, Yulete::Leaving),
+        _ => (keys::MAGATIA_YULETE_CAUGHT, Yulete::Caught),
+    }
+}
+
+/// What Yulete tells the whole party as he leaves his office, as text
+/// key, by whether he was `caught` off guard (Cosmic `yuleteAction`'s
+/// `yuletePassed`, which later decides the Frankenroid the party meets).
+pub fn yulete_leaves(caught: bool) -> &'static str {
+    use game_data::server_content::keys;
+    match caught {
+        true => keys::MAGATIA_YULETE_DISGUSTED,
+        false => keys::MAGATIA_YULETE_FOOLED,
+    }
+}
 
 /// What each of a library's books holds, in the order of the map's books,
 /// drawn for each run (Cosmic `MagatiaPQ_Z.afterSetup`): seven of mesos,
@@ -2754,6 +2832,9 @@ pub enum EventCommand {
     /// A member gave Romeo or Juliet their side's letter: the team hears
     /// it shook them, once.
     Shocked,
+    /// Yulete left his office, caught off guard or not
+    /// (`yulete_leaves`): the team hears what he said, once.
+    YuleteLeft(bool),
     /// A member's attack in a Monster Carnival battle killed mobs worth
     /// this many CP (their `getCP`).
     CarnivalCp(i32),
@@ -3007,12 +3088,26 @@ fn pinned_digits<const N: usize>(var: &str, range: RangeInclusive<u8>) -> Option
 }
 
 /// The right pad of each row of a climb, drawn the first time anyone
-/// steps on one (Cosmic `party3_r4pt`, `party3_r6pt`): on the lounge two
-/// rows of three, on the tall room sixteen rows of four. For testing,
-/// `RUSTMS_OPQ_LOUNGE` (`"23"`) and `RUSTMS_OPQ_TOWER` (16 digits) pin them.
+/// steps on one (Cosmic `party3_r4pt`, `party3_r6pt`, `jnr5_rp`): on the
+/// lounge two rows of three, on the tall room sixteen rows of four, and
+/// in a Magatia rope room ten rows of four ropes, numbered from 0. For
+/// testing, `RUSTMS_OPQ_LOUNGE` (`"23"`), `RUSTMS_OPQ_TOWER` (16 digits)
+/// and `RUSTMS_MAGATIA_ROPES` (10) pin them.
 pub fn draw_climb(map_id: i32, rng: &mut impl rand::Rng) -> Vec<u8> {
     static LOUNGE: OnceLock<Option<[u8; 2]>> = OnceLock::new();
     static TOWER: OnceLock<Option<[u8; 16]>> = OnceLock::new();
+    static ROPES: OnceLock<Option<[u8; MAGATIA_ROPE_ROWS]>> = OnceLock::new();
+    if MagatiaSide::ALL
+        .iter()
+        .any(|side| side.rope_room(map_id).is_some())
+    {
+        let pinned = ROPES.get_or_init(|| pinned_digits("RUSTMS_MAGATIA_ROPES", 0..=3));
+        return pinned.map(|pin| pin.to_vec()).unwrap_or_else(|| {
+            (0..MAGATIA_ROPE_ROWS)
+                .map(|_| rng.gen_range(0, MAGATIA_ROPE_ROOMS))
+                .collect()
+        });
+    }
     let (rows, pads, pinned) = if map_id == OPQ_LOUNGE {
         let pinned = LOUNGE.get_or_init(|| pinned_digits("RUSTMS_OPQ_LOUNGE", 1..=3));
         (2, 3, pinned.map(|pin| pin.to_vec()))
@@ -3036,8 +3131,26 @@ pub fn draw_climb(map_id: i32, rng: &mut impl rand::Rng) -> Vec<u8> {
 /// of its section, the landing below it or, in the first, `r6fail` (5).
 /// Cosmic's script means that but divides as JavaScript does, so from
 /// rows 5-8, 10-12 and 14-16 its portal is a fraction or the very bottom.
+///
+/// In a Magatia rope room (`pt<row><rope>`, from 0) the right rope leads
+/// to the same rope a row up, four ids on, and that of the last row to
+/// `success` (1); a wrong one to `fail` (2), at the bottom (Cosmic
+/// `rnj5_rp`).
 pub fn climb(map_id: i32, combo: &[u8], portal_id: u8, name: &str) -> Option<u8> {
     let digits = |s: &str| s.parse::<usize>().ok();
+    if MagatiaSide::ALL
+        .iter()
+        .any(|side| side.rope_room(map_id).is_some())
+    {
+        let rest = name.strip_prefix("pt").filter(|rest| rest.len() == 2)?;
+        let (row, rope) = (digits(&rest[..1])?, digits(&rest[1..])?);
+        let right = *combo.get(row)?;
+        return Some(match (usize::from(right) == rope, row + 1 < combo.len()) {
+            (true, true) => portal_id + 4,
+            (true, false) => 1,
+            (false, _) => 2,
+        });
+    }
     if map_id == OPQ_LOUNGE {
         let rest = name.strip_prefix("r4rp").filter(|rest| rest.len() == 2)?;
         let (row, pad) = (digits(&rest[..1])?, digits(&rest[1..])?);
@@ -3999,6 +4112,68 @@ mod tests {
             assert!(event.member_clears.contains(&1) && event.member_clears.contains(&2));
         }
         assert_eq!(MagatiaSide::of(ZENUMIST_LOBBY), None);
+    }
+
+    #[test]
+    fn yulete_minds_who_is_near_and_whether_the_letter_was_read() {
+        use game_data::server_content::keys;
+        let talk = |mood, near, shocked| yulete_talk(mood, near, shocked);
+        assert_eq!(
+            talk(Yulete::Unmet, false, true),
+            (keys::MAGATIA_YULETE_CAUGHT, Yulete::Caught)
+        );
+        assert_eq!(
+            talk(Yulete::Caught, false, true),
+            (keys::MAGATIA_YULETE_CAUGHT, Yulete::Caught)
+        );
+        assert_eq!(
+            talk(Yulete::Caught, true, true),
+            (keys::MAGATIA_YULETE_WATCHED, Yulete::Leaving)
+        );
+        assert_eq!(
+            talk(Yulete::Unmet, false, false),
+            (keys::MAGATIA_YULETE_SNEAKY, Yulete::Leaving)
+        );
+        for near in [false, true] {
+            assert_eq!(
+                talk(Yulete::Leaving, near, true),
+                (keys::MAGATIA_YULETE_LEAVING, Yulete::Leaving)
+            );
+        }
+        assert_eq!(yulete_leaves(true), keys::MAGATIA_YULETE_DISGUSTED);
+        assert_eq!(yulete_leaves(false), keys::MAGATIA_YULETE_FOOLED);
+        for side in MagatiaSide::ALL {
+            let event = EventKind::Magatia(side).event();
+            let stages = side.stages();
+            assert_eq!(cleared_by_killing(stages[4]), Some(MAGATIA_OFFICE_STAGE));
+            assert!(event.member_clears.contains(&MAGATIA_OFFICE_STAGE));
+            assert!(event.member_clears.contains(&MAGATIA_ROPES_STAGE));
+            assert_eq!(side.rope_room(stages[5]), None);
+            assert_eq!(side.rope_room(stages[5] + 1), Some(0));
+            assert_eq!(side.rope_room(stages[5] + 4), Some(3));
+            assert_eq!(side.rope_room(stages[5] + 5), None);
+        }
+    }
+
+    #[test]
+    fn a_rope_room_sends_a_row_up_or_back_down() {
+        let room = MagatiaSide::Zenumist.stages()[5] + 1;
+        let mut rng = rand::thread_rng();
+        let combo = draw_climb(room, &mut rng);
+        assert_eq!(combo.len(), MAGATIA_ROPE_ROWS);
+        assert!(combo.iter().all(|&rope| rope < MAGATIA_ROPE_ROOMS));
+        let combo = [2, 0, 1, 3, 0, 1, 2, 3, 0, 1];
+        // `pt<row><rope>` is portal 15 + 4 row + rope.
+        let step =
+            |row: u8, rope: u8| climb(room, &combo, 15 + 4 * row + rope, &format!("pt{row}{rope}"));
+        assert_eq!(step(0, 2), Some(21));
+        assert_eq!(step(0, 1), Some(2));
+        assert_eq!(step(8, 0), Some(51));
+        assert_eq!(step(9, 1), Some(1));
+        assert_eq!(step(9, 0), Some(2));
+        assert_eq!(climb(room, &combo, 3, "np00"), None);
+        let alcadno = MagatiaSide::Alcadno.stages()[5] + 4;
+        assert_eq!(climb(alcadno, &combo, 19, "pt10"), Some(23));
     }
 
     #[test]
