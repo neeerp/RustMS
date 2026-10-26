@@ -1444,6 +1444,12 @@ unsourced = [
     "nine_spirit.baby.hatched",
     "nine_spirit.baby.stone_held",
     "nine_spirit.baby.full",
+    "family.captain_al.junior.done",
+    "family.captain_al.junior.not_yet",
+    "family.captain_al.rep.done",
+    "family.captain_al.rep.not_yet",
+    "family.captain_al.entitlement.done",
+    "family.captain_al.entitlement.not_yet",
 ]
 
 [text."glTutoMsg0.message"]

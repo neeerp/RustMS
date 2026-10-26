@@ -771,6 +771,12 @@
 "nine_spirit.baby.hatched" = "[placeholder] The egg hatches on the nest. The baby dragon coughs up a Dragon Stone and asks you to take it away."
 "nine_spirit.baby.stone_held" = "[placeholder] The Dragon Stone in your bag glows brighter here, and the baby dragon glares at it."
 "nine_spirit.baby.full" = "[placeholder] You need a free USE slot for the Dragon Stone."
+"family.captain_al.junior.done" = "[placeholder] Captain Al is pleased you have taken a Junior, and teaches you how a Senior earns Rep."
+"family.captain_al.junior.not_yet" = "[placeholder] Captain Al says you have no Junior yet. Add one from the Family window."
+"family.captain_al.rep.done" = "[placeholder] Captain Al sees you have earned 1,000 Rep, and praises how you look after your Juniors."
+"family.captain_al.rep.not_yet" = "[placeholder] Captain Al says you have not earned 1,000 Rep yet. Help your Juniors gain EXP."
+"family.captain_al.entitlement.done" = "[placeholder] Captain Al sees you have earned 2,000 Rep and spent it on Entitlements, and calls you a fine Senior."
+"family.captain_al.entitlement.not_yet" = "[placeholder] Captain Al asks you to earn 2,000 Rep in all, and use Entitlements until less than 500 is left."
 
 "family.entitlement.0.name" = "[placeholder] Go to a relative"
 "family.entitlement.0.description" = "[placeholder] Go to a family member of your choice."

@@ -25,6 +25,7 @@ use game::alliance::{self, Alliance};
 use game::character::{
     CARNIVAL_RETURN, DOJO_RETURN, EVENT_RETURN, FLORINA_RETURN, PYRAMID_RETURN, WORLD_TOUR_RETURN,
 };
+use game::family::FamilyInfo;
 use game::guild::{self, Guild};
 use game::marriage;
 use game::wedding::{self, GuestRefusal, PartnerRefusal, Reservation, Venue, Vows, WeddingStage};
@@ -2354,6 +2355,34 @@ impl NpcScript {
         }
     }
 
+    /// Captain Al's end scripts for his lessons in leading a family
+    /// (`q2232e`-`q2234e`, quests 2232-2234), which read the Family window's
+    /// numbers (`family`): a junior taken (2232), 1,000 Rep earned in all
+    /// (2233), then 2,000 earned with the Rep to spend used below 500
+    /// (2234). The data gives no rewards; 2232 gives Cosmic's 3,000 EXP,
+    /// and Cosmic has no script for the other two.
+    pub fn for_family_quest(script: &str, family: &FamilyInfo) -> Option<Self> {
+        let (quest, done, [done_key, not_yet_key]) = match script {
+            "q2232e" => (2232, family.juniors > 0, keys::CAPTAIN_AL_JUNIOR),
+            "q2233e" => (2233, family.total_reputation >= 1000, keys::CAPTAIN_AL_REP),
+            "q2234e" => (
+                2234,
+                family.total_reputation >= 2000 && family.reputation < 500,
+                keys::CAPTAIN_AL_ENTITLEMENT,
+            ),
+            _ => return None,
+        };
+        if !done {
+            return Some(Self::new(CAPTAIN_AL, vec![Page::Say(text(not_yet_key))]));
+        }
+        let mut script = Self::new(CAPTAIN_AL, vec![Page::Say(text(done_key))]);
+        script.on_end.push(Effect::CompleteQuest(quest));
+        if quest == 2232 {
+            script.on_end.push(Effect::GainExp(3000));
+        }
+        Some(script)
+    }
+
     pub fn npc_id(&self) -> i32 {
         self.npc_id
     }
@@ -2759,9 +2788,10 @@ fn trash_can(player: &Player, lost: bool, hour: u8) -> NpcScript {
     script
 }
 
-/// `q2216s`-`q2219s`: the informant at `index` tells what they know about
-/// Dyle, which completes the quest as it starts, for 7,000 EXP (Cosmic's;
-/// the data has none). The last of the four heard takes back JM's list.
+/// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
+const CAPTAIN_AL: i32 = 1002103;
+/// Captain Al's end scripts ([`NpcScript::for_family_quest`]).
+pub const FAMILY_QUEST_SCRIPTS: [&str; 3] = ["q2232e", "q2233e", "q2234e"];
 /// Nine Spirit's Baby Dragon, in its nest (240040612).
 const BABY_DRAGON: i32 = 2081011;
 const NINE_SPIRIT_EGG: i32 = 4001094;
@@ -2798,6 +2828,9 @@ fn baby_dragon(player: &Player) -> NpcScript {
     script
 }
 
+/// `q2216s`-`q2219s`: the informant at `index` tells what they know about
+/// Dyle, which completes the quest as it starts, for 7,000 EXP (Cosmic's;
+/// the data has none). The last of the four heard takes back JM's list.
 fn informant(player: &Player, index: usize) -> Option<NpcScript> {
     let (quest, npc) = INFORMANTS[index];
     let mut script = NpcScript::new(npc, vec![Page::Say(text(keys::DYLE_INFORMANTS[index]))]);
@@ -9851,7 +9884,9 @@ mod tests {
     fn every_quest_script_the_catalog_supports_exists() {
         for script in game_data::quests::SCRIPTS {
             assert!(
-                NpcScript::for_quest(script, &player(50)).is_some(),
+                NpcScript::for_quest(script, &player(50))
+                    .or_else(|| NpcScript::for_family_quest(script, &FamilyInfo::default()))
+                    .is_some(),
                 "{script} has no script"
             );
         }
@@ -9999,6 +10034,41 @@ mod tests {
         );
         let held = NpcScript::for_quest("q3714s", &player).unwrap();
         assert_eq!(read_through(held), (BABY_DRAGON, vec![]));
+    }
+
+    #[test]
+    fn captain_al_ends_each_lesson_by_the_family_window() {
+        let family = |juniors, reputation, total_reputation| FamilyInfo {
+            juniors,
+            reputation,
+            total_reputation,
+            ..FamilyInfo::default()
+        };
+        let ends = |script, family: &FamilyInfo| {
+            read_through(NpcScript::for_family_quest(script, family).unwrap())
+        };
+        let done = |quest| (CAPTAIN_AL, vec![Effect::CompleteQuest(quest)]);
+        let not_yet = (CAPTAIN_AL, vec![]);
+        // A junior taken, for 3,000 EXP.
+        assert_eq!(ends("q2232e", &family(0, 0, 0)), not_yet);
+        assert_eq!(
+            ends("q2232e", &family(1, 0, 0)),
+            (
+                CAPTAIN_AL,
+                vec![Effect::CompleteQuest(2232), Effect::GainExp(3000)]
+            )
+        );
+        // 1,000 Rep earned, spent or not.
+        assert_eq!(ends("q2233e", &family(1, 999, 999)), not_yet);
+        assert_eq!(ends("q2233e", &family(1, 0, 1000)), done(2233));
+        // 2,000 earned, under 500 left to spend.
+        assert_eq!(ends("q2234e", &family(1, 499, 1999)), not_yet);
+        assert_eq!(ends("q2234e", &family(1, 500, 2000)), not_yet);
+        assert_eq!(ends("q2234e", &family(1, 499, 2000)), done(2234));
+        for script in FAMILY_QUEST_SCRIPTS {
+            assert!(NpcScript::for_quest(script, &player(50)).is_none());
+        }
+        assert!(NpcScript::for_family_quest("q2214e", &family(1, 0, 0)).is_none());
     }
 
     #[test]

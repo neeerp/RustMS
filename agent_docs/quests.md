@@ -177,7 +177,7 @@ itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
 `q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
-[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants and the baby dragon below); those steps go through
+[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants, the baby dragon and Captain Al's family lessons below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -269,6 +269,18 @@ Cosmic's 42,000 EXP, completing the quest at once. The quest repeats
 as in Cosmic. Its lines are placeholders (`nine_spirit.baby.*`). 3706's
 `Act/1/map` and `message` (and 2282-2284's `Act/0/message`) are read by
 neither v83's client nor Cosmic, so they are ignored (`INERT_ACTIONS`).
+
+Captain Al's lessons in leading a family (2232-2234, "Find a Junior!",
+"Raise the Rep!" and "Enjoy the Entitlement!") start at Captain Al
+(1002103, in Lith Harbor and Orbis Park) and have an end script
+(`q2232e`-`q2234e`) and no end NPC, so they end at him too: `classify`
+lets a quest whose `Check/1` names an end script through without a
+completion NPC, and both sides default the end NPC to the start NPC. His
+scripts read the Family window's numbers (`db::family::info`, see
+[Families](./families.md)): 2232 needs a junior and gives Cosmic's 3,000
+EXP; 2233 needs 1,000 Rep earned in all; 2234 needs 2,000 earned and less
+than 500 left to spend. The data gives no rewards, and Cosmic has a
+script for 2232 only. The lines are placeholders (`family.captain_al.*`).
 
 The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:

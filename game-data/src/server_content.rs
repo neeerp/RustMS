@@ -782,6 +782,24 @@ pub mod keys {
     pub const NINE_SPIRIT_STONE_HELD: &str = "nine_spirit.baby.stone_held";
     pub const NINE_SPIRIT_FULL: &str = "nine_spirit.baby.full";
 
+    /// Captain Al's lessons in leading a family (quests 2232-2234), each
+    /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
+    /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
+    /// Rep to spend used down below 500. No licensed script has the text,
+    /// so these keep their placeholders.
+    pub const CAPTAIN_AL_JUNIOR: [&str; 2] = [
+        "family.captain_al.junior.done",
+        "family.captain_al.junior.not_yet",
+    ];
+    pub const CAPTAIN_AL_REP: [&str; 2] = [
+        "family.captain_al.rep.done",
+        "family.captain_al.rep.not_yet",
+    ];
+    pub const CAPTAIN_AL_ENTITLEMENT: [&str; 2] = [
+        "family.captain_al.entitlement.done",
+        "family.captain_al.entitlement.not_yet",
+    ];
+
     /// Trainer Bartos's Follow the Lead (quests 4646 and 4647): the hidden
     /// note of his test (NPC 9102100, `multipet_success`), then his end
     /// script `q4647e`, which takes a Pet Snack.
@@ -2982,6 +3000,9 @@ mod tests {
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
             .chain(&keys::DYLE_INFORMANTS)
+            .chain(&keys::CAPTAIN_AL_JUNIOR)
+            .chain(&keys::CAPTAIN_AL_REP)
+            .chain(&keys::CAPTAIN_AL_ENTITLEMENT)
             .chain(&[
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
