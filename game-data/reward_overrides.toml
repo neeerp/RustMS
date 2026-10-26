@@ -70,6 +70,12 @@ add = [{ item = 4001156, prob = 1.0 }]
 [mobs.9300171]
 add = [{ item = 4001156, prob = 1.0 }]
 
+[mobs.9300147]
+# Romeo and Juliet's beaker rooms (Map.nx 926100100, 926110100): its
+# monsters drop the Magic Stone 4001132 the beakers take (Reactor.nx
+# 2618000, item events). The pack has no drops for them; Cosmic's rate.
+add = [{ item = 4001132, prob = 0.4 }]
+
 [mobs.9300040]
 # The Cellion on the Tower of Goddess's Salion stage (Map.nx 920010300)
 # drops the 4001074 its spot takes (Reactor.nx 2001002-15, item event):

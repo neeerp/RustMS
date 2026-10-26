@@ -36,7 +36,7 @@ Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
 Magatia's Romeo and Juliet party quest has its entry, its way out, its
-end rules and its first two stages; its other stages come in later slices
+end rules and its first three stages; its other stages come in later slices
 ([Romeo and Juliet](#romeo-and-juliet)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1251,8 +1251,18 @@ The library's way on (`rnj1_pt00`, `jnr1_pt00`) and the hall's
 (`rnj1_out`, `jnr1_out`, to x00100) stay shut, in pink
 (`magatia.portal_shut`), until their stage is cleared. The hall's 42
 mobs (9300145 and 9300146, which don't come back) clear stage 2 with the
-last kill (`cleared_by_killing`), for 10,000 EXP each. The other stages
-can't be cleared yet.
+last kill (`cleared_by_killing`), for 10,000 EXP each.
+
+The beaker room (x00100) has three beakers (2618000), each taking a Magic
+Stone (4001132) per state up to state 6; a state left alone goes back
+one after 9.5 seconds. Its mobs (9300147, which come back) drop the
+stones at 40% (`reward_overrides.toml`; the pack has none). The third
+beaker to reach state 6 (`net::reactors::Action::Beaker`, the field's
+`beakers`) clears stage 3 for 20,000 EXP each, kills the room's mobs
+and opens its door (`rnj2_door`, `jnr2_door`, 2618006, state 1); only
+then does its way on (`rnj2_out`, `jnr2_out`, to x00200) open. A beaker
+counts once, the first time it fills. The other stages can't be cleared
+yet.
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the

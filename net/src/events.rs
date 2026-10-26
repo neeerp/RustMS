@@ -104,6 +104,14 @@ impl MagatiaSide {
         }
     }
 
+    /// The door of its beaker room, which opens as the stage clears.
+    pub fn beaker_door(self) -> &'static str {
+        match self {
+            MagatiaSide::Zenumist => "rnj2_door",
+            MagatiaSide::Alcadno => "jnr2_door",
+        }
+    }
+
     /// The letter one of its library's books may hide (Cosmic `2112007`
     /// and `2112013`).
     pub fn letter(self) -> i32 {
@@ -1771,7 +1779,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         stride: 1,
         stage_maps: stages,
         talk_clears: &[],
-        member_clears: &[1, 2],
+        member_clears: &[1, 2, 3],
         clear_portals: &[],
         gated: &[],
         puzzles: 1..=0,
@@ -1813,6 +1821,11 @@ pub enum Find {
 pub const MAGATIA_BOOKS: usize = 26;
 pub const MAGATIA_BOOK_MESOS: i32 = 500;
 pub const MAGATIA_BOOK_EXP: i32 = 500;
+
+/// How many beakers each beaker room has to fill, and the stage that
+/// clears (Cosmic `2618000`'s `statusStg3`).
+pub const MAGATIA_BEAKERS: usize = 3;
+pub const MAGATIA_BEAKER_STAGE: u8 = 3;
 
 /// What each of a library's books holds, in the order of the map's books,
 /// drawn for each run (Cosmic `MagatiaPQ_Z.afterSetup`): seven of mesos,
