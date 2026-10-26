@@ -2358,6 +2358,7 @@ impl NpcScript {
             "q2333e" => Some(prime_minister_beaten()),
             "q2334s" => Some(violettas_face()),
             "q2342s" => Some(violettas_seal(player)),
+            "q3108s" => Some(snow_statue_clue()),
             "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
@@ -2921,6 +2922,18 @@ fn violettas_seal(player: &Player) -> NpcScript {
         },
     ];
     script.inventory_full = Some(text(keys::VIOLETTA_SEAL_FULL));
+    script
+}
+
+/// The Spirit of Snow Statue, broken, in the Valley of Snowmen (211040102).
+const SNOW_STATUE: i32 = 2020012;
+
+/// `q3108s`, Snowman's Rage - Found a clue: the broken statue is the clue
+/// Scadur wants, and the quest completes as it starts (Cosmic `3108.js`),
+/// with the data's 1,000 EXP (`Act/1`).
+fn snow_statue_clue() -> NpcScript {
+    let mut script = NpcScript::new(SNOW_STATUE, vec![Page::Say(text(keys::SNOW_STATUE_CLUE))]);
+    script.on_end = vec![Effect::FinishQuest(3108), Effect::GainExp(1000)];
     script
 }
 
@@ -10243,6 +10256,18 @@ mod tests {
             let script = NpcScript::for_quest("q2342s", &player).unwrap();
             assert_eq!(read_through(script), (VIOLETTA, Vec::new()), "only told");
         }
+    }
+
+    #[test]
+    fn the_broken_snow_statue_is_the_clue() {
+        let script = NpcScript::for_quest("q3108s", &player(50)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (
+                SNOW_STATUE,
+                vec![Effect::FinishQuest(3108), Effect::GainExp(1000)]
+            )
+        );
     }
 
     #[test]
