@@ -100,7 +100,9 @@ impl ClientActor {
             Discipline::Unblock { target }
             | Discipline::Disconnect { target }
             | Discipline::Jail { target, .. }
-            | Discipline::Release { target } => (target.clone(), false),
+            | Discipline::Release { target }
+            | Discipline::Mute { target, .. }
+            | Discipline::Unmute { target } => (target.clone(), false),
         };
         let lookup = target.clone();
         let found = spawn_db(move || {
@@ -179,6 +181,27 @@ impl ClientActor {
                             format!("{name} is not in jail.")
                         }
                     }
+                    Discipline::Mute {
+                        minutes, reason, ..
+                    } => {
+                        let until =
+                            SystemTime::now() + Duration::from_secs(u64::from(minutes) * 60);
+                        spawn_db(move || {
+                            db::account::chat_block(account_id, i16::from(reason), until)
+                        })
+                        .await?;
+                        self.tell_chat_block_changed(characters).await?;
+                        format!("Blocked {name}'s account from chatting for {minutes} minutes.")
+                    }
+                    Discipline::Unmute { .. } => {
+                        let now = SystemTime::now();
+                        if spawn_db(move || db::account::chat_unblock(account_id, now)).await? {
+                            self.tell_chat_block_changed(characters).await?;
+                            format!("{name}'s account may chat again.")
+                        } else {
+                            format!("{name}'s account is not blocked from chatting.")
+                        }
+                    }
                 })
             }
         };
@@ -199,6 +222,13 @@ impl ClientActor {
     /// Have the character's client, if online, read their jail time again.
     async fn tell_jail_changed(&mut self, client_id: i32) -> Result<(), RuntimeError> {
         self.send_to_directory(DirectoryMessage::JailChanged { client_id })
+            .await
+    }
+
+    /// Have the clients of `client_ids` that are online read their
+    /// account's chat block again.
+    async fn tell_chat_block_changed(&mut self, client_ids: Vec<i32>) -> Result<(), RuntimeError> {
+        self.send_to_directory(DirectoryMessage::ChatBlockChanged { client_ids })
             .await
     }
 

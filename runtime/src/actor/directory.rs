@@ -418,6 +418,11 @@ impl WorldDirectory {
             DirectoryMessage::JailChanged { client_id } => {
                 self.tell(client_id, ServerMessage::JailChanged)
             }
+            DirectoryMessage::ChatBlockChanged { client_ids } => {
+                for client_id in client_ids {
+                    self.tell(client_id, ServerMessage::ChatBlockChanged);
+                }
+            }
             DirectoryMessage::Propose {
                 from,
                 partner,

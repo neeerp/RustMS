@@ -9,6 +9,7 @@ pub mod berserk;
 pub mod carnival;
 pub mod cash_shop;
 pub mod charge;
+pub mod chat_block;
 pub mod codec;
 pub mod combat;
 pub mod combo;

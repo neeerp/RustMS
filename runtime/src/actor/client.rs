@@ -1,6 +1,7 @@
 mod alliances;
 mod buddies;
 mod buff;
+mod chat_block;
 mod claim;
 mod combat;
 mod coupon;
@@ -165,6 +166,9 @@ pub struct ClientActor {
     in_cash_shop: bool,
     /// Until when a GM jailed the player (`jail`), if they still are.
     jailed_until: Option<SystemTime>,
+    /// Until when a GM blocked the account from chatting (`chat_block`), if
+    /// still so.
+    chat_blocked_until: Option<SystemTime>,
     /// Wrong coupon codes in a row on this connection.
     coupon_strikes: u8,
     /// A Maple TV message is waiting to hear from the world's line; the
@@ -262,6 +266,7 @@ impl ClientActor {
             changing_channel: false,
             in_cash_shop: false,
             jailed_until: None,
+            chat_blocked_until: None,
             coupon_strikes: 0,
             maple_tv_waiting: false,
             party_id: None,
@@ -411,6 +416,9 @@ impl ClientActor {
         {
             debug!(opcode, "Ignoring opcode in the Cash Shop");
             return Ok(());
+        }
+        if self.chat_blocked() && net::chat_block::is_chat(&packet) {
+            return self.refuse_chat().await;
         }
         // Checked before the handler moves the player.
         if opcode == RecvOpcode::ChangeMap as i16
@@ -830,6 +838,7 @@ impl ClientActor {
         ships::leave_forced_return_map(&mut player);
         // Nor does a logout or a channel change end a jailing.
         self.jailed_until = jailed_until;
+        self.chat_blocked_until = account.chat_blocked_at(now).map(|(_, until)| until);
         if jailed_until.is_some() {
             player.move_to(net::gm_commands::JAIL_MAP, 0);
         }
@@ -1784,6 +1793,7 @@ impl ClientActor {
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
             ServerMessage::JailChanged => self.jail_changed().await?,
+            ServerMessage::ChatBlockChanged => self.chat_block_changed().await?,
             ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,
             ServerMessage::ProposalAccepted { proposer, item_id } => {
                 self.proposal_accepted(proposer, item_id).await?

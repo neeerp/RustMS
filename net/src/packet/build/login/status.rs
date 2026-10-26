@@ -92,8 +92,19 @@ pub fn build_successful_login_packet(
     packet.write_str_with_length(account_name)?;
     packet.write_byte(0)?;
 
-    packet.write_byte(0)?; // quiet ban
-    packet.write_long(0)?; // quiet ban time
+    // A chat block: Etc/ChatBlockReason.img's number and its end, which the
+    // client shows on entering a field and keeps until the next login
+    // (report b180). It never checks the end itself.
+    match acc.chat_blocked_at(SystemTime::now()) {
+        Some((reason, until)) => {
+            packet.write_byte(reason)?;
+            packet.write_long(filetime(until))?;
+        }
+        None => {
+            packet.write_byte(0)?;
+            packet.write_long(0)?;
+        }
+    }
     packet.write_long(0)?; // creation time
 
     packet.write_int(1)?; // skip the "select a world" tutorial prompt
@@ -152,6 +163,8 @@ mod tests {
             test_admin: false,
             ban_reason: 0,
             ban_until: None,
+            chat_block_reason: 0,
+            chat_block_until: None,
         }
     }
 
@@ -206,6 +219,28 @@ mod tests {
         expect.byte(pin_flag); // 0 = PIN system enabled, 1 = disabled
         expect.byte(2); // 2 = PIC disabled
         expect.end();
+    }
+
+    #[test]
+    fn a_chat_block_reaches_the_client_until_it_ends() {
+        let until = SystemTime::now() + Duration::from_secs(600);
+        let muted = Account {
+            chat_block_reason: 2,
+            chat_block_until: Some(until),
+            ..account()
+        };
+        let packet = build_successful_login_packet(&muted, false).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::LoginStatus as i16).int(0).short(0);
+        expect.int(4242).byte(1).byte(0).byte(0).byte(0);
+        expect.string("admin").byte(0);
+        expect.byte(2).long(filetime(until)).long(0);
+
+        let ended = Account {
+            chat_block_until: Some(SystemTime::now() - Duration::from_secs(1)),
+            ..muted
+        };
+        expect_successful_login(&build_successful_login_packet(&ended, false).unwrap(), 1);
     }
 
     #[test]

@@ -74,6 +74,33 @@ pub fn unblock(account_id: i32) -> crate::Result<bool> {
     Ok(lifted > 0)
 }
 
+/// Block the account from chatting until `until`, giving `reason`
+/// (Etc/ChatBlockReason.img's number, 1..=6).
+pub fn chat_block(account_id: i32, reason: i16, until: std::time::SystemTime) -> crate::Result<()> {
+    let mut connection = crate::connection()?;
+    diesel::update(accounts.filter(id.eq(account_id)))
+        .set((chat_block_reason.eq(reason), chat_block_until.eq(until)))
+        .execute(&mut connection)?;
+    Ok(())
+}
+
+/// Lift the account's chat block at `now`. False if it had none.
+pub fn chat_unblock(account_id: i32, now: std::time::SystemTime) -> crate::Result<bool> {
+    let mut connection = crate::connection()?;
+    let lifted = diesel::update(
+        accounts
+            .filter(id.eq(account_id))
+            .filter(chat_block_reason.gt(0))
+            .filter(chat_block_until.gt(now)),
+    )
+    .set((
+        chat_block_reason.eq(0),
+        chat_block_until.eq(None::<std::time::SystemTime>),
+    ))
+    .execute(&mut connection)?;
+    Ok(lifted > 0)
+}
+
 /// The ids of the account's characters, in every world.
 pub fn character_ids(account_id: i32) -> crate::Result<Vec<i32>> {
     use schema::characters;

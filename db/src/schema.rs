@@ -40,6 +40,8 @@ diesel::table! {
         test_admin -> Bool,
         ban_reason -> Int2,
         ban_until -> Nullable<Timestamp>,
+        chat_block_reason -> Int2,
+        chat_block_until -> Nullable<Timestamp>,
     }
 }
 

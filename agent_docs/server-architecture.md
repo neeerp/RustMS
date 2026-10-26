@@ -175,7 +175,7 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 |---|---|
 | 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
 | 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
-| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>`, `!jail <name> [minutes]`, `!unjail <name>` |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>`, `!jail <name> [minutes]`, `!unjail <name>`, `!mute <name> [minutes] [reason]`, `!unmute <name>` |
 | 3, admin | `!ban <name> [days] [reason] [note]`, `!unban <name>` |
 
 - A GM's `!` line never reaches the map. A player's `!` line is ordinary
@@ -239,6 +239,25 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   300000010's `in01` (Cosmic's `jail_out.js`) and hear "You are free to
   go.". One freed while offline or in the Cash Shop logs in at 300000010,
   the jail map's `forcedReturn`. This is ours, as v83 has no jail.
+- `!mute` blocks the character's account from chatting, for an hour or
+  the minutes given, for one of Etc/ChatBlockReason.img's reasons: 1
+  `foul` (the default), 2 `advertising`, 3 `hack` (fake GM), 4
+  `account`, 5 `trading` and 6 `penalty`, by number or name. A second
+  `!mute` replaces the first. v83 keeps the block per account, and only
+  the login result sets it: the byte after the account name's flag is the
+  reason and the long after it the end (report b180). The client then
+  refuses all-chat, whispers, multi-chat, spouse chat and the Messenger's
+  and mini-rooms' chat itself, says "You are currently blocked from
+  chatting.", and shows the reason on entering a field. It never checks
+  the end, so the server sends 0 once it has passed. The columns are
+  `accounts.chat_block_reason` and `chat_block_until`. Online characters
+  of the account hear of it through `DirectoryMessage::ChatBlockChanged`.
+  Until their next login the world drops their chat
+  (`net::chat_block::is_chat`, which also covers the megaphones, Maple TV,
+  notes, weather, the chalkboard and the kites, which the client doesn't
+  refuse) with the client's own line.
+  `!unmute` lifts it; a client that logged in blocked keeps refusing
+  until it logs in again, as its line says.
 - Every `!` line from a GM is logged at info under the `gm_audit` target,
   with the character, the line, and whether it ran. The world server always
   shows that target. `!givenx` and `!coupon` log their results there too.

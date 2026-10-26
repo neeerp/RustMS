@@ -202,6 +202,20 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         prefix: '!',
+        name: "mute",
+        tier: GM,
+        usage: "<name> [minutes] [reason]",
+        run: mute,
+    },
+    Command {
+        prefix: '!',
+        name: "unmute",
+        tier: GM,
+        usage: "<name>",
+        run: unmute,
+    },
+    Command {
+        prefix: '!',
         name: "ban",
         tier: ADMIN,
         usage: "<name> [days] [reason] [note]",
@@ -667,6 +681,57 @@ fn unjail(_: &mut WorldContext, args: &[&str]) -> Outcome {
     }
 }
 
+/// How long `!mute` blocks chat by default: an hour.
+const MUTE_MINUTES: u32 = 60;
+
+/// `!mute`: block a character's account from chatting, for an hour unless
+/// a number of minutes comes first (at most a year), giving a reason (a
+/// ChatBlockReason.img type or number; "foul" if none).
+fn mute(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    let Some((name, mut rest)) = args.split_first() else {
+        return Ok(Err(usage("mute")));
+    };
+    let mut minutes = MUTE_MINUTES;
+    if let Some((first, after)) = rest.split_first() {
+        if let Ok(n) = first.parse::<u32>() {
+            if n == 0 {
+                return Ok(Err(usage("mute")));
+            }
+            minutes = n.min(JAIL_MINUTES_MAX);
+            rest = after;
+        }
+    }
+    let reason = match rest {
+        [] => 1,
+        [reason] => match reason.parse::<u8>() {
+            Ok(n @ 1..=6) => n,
+            _ => match crate::chat_block::REASONS
+                .iter()
+                .position(|r| r.eq_ignore_ascii_case(reason))
+            {
+                Some(i) => i as u8 + 1,
+                None => return Ok(Err(usage("mute"))),
+            },
+        },
+        _ => return Ok(Err(usage("mute"))),
+    };
+    Ok(Ok(vec![WorldAction::Discipline(Discipline::Mute {
+        target: name.to_string(),
+        minutes,
+        reason,
+    })]))
+}
+
+/// `!unmute`: lift a character's account's chat block.
+fn unmute(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    match args {
+        [name] => Ok(Ok(vec![WorldAction::Discipline(Discipline::Unmute {
+            target: name.to_string(),
+        })])),
+        _ => Ok(Err(usage("unmute"))),
+    }
+}
+
 /// The reasons a block may give, by the `type` of their Etc/BlockReason.img
 /// node, whose number is the place here plus one (as v83's `/block` finds
 /// them, report b175 s4).
@@ -890,6 +955,41 @@ mod tests {
             })
         );
         assert_eq!(discipline(HELPER, "!unjail Bob"), None);
+    }
+
+    #[test]
+    fn mute_reads_its_minutes_and_reason() {
+        let discipline = |gm_level, line| {
+            run_as(&mut player(gm_level), line)
+                .unwrap()
+                .into_iter()
+                .find_map(|action| match action {
+                    WorldAction::Discipline(d) => Some(d),
+                    _ => None,
+                })
+        };
+        let mute = |minutes, reason| {
+            Some(Discipline::Mute {
+                target: "Bob".into(),
+                minutes,
+                reason,
+            })
+        };
+        assert_eq!(discipline(GM, "!mute Bob"), mute(60, 1));
+        assert_eq!(discipline(GM, "!mute Bob 10"), mute(10, 1));
+        assert_eq!(discipline(GM, "!mute Bob 10 advertising"), mute(10, 2));
+        assert_eq!(discipline(GM, "!mute Bob Penalty"), mute(60, 6));
+        assert_eq!(discipline(GM, "!mute Bob 5 3"), mute(5, 3));
+        assert_eq!(discipline(GM, "!mute Bob 5 7"), None);
+        assert_eq!(discipline(GM, "!mute Bob 0"), None);
+        assert_eq!(discipline(GM, "!mute Bob spam"), None);
+        assert_eq!(discipline(HELPER, "!mute Bob"), None);
+        assert_eq!(
+            discipline(GM, "!unmute Bob"),
+            Some(Discipline::Unmute {
+                target: "Bob".into()
+            })
+        );
     }
 
     #[test]
