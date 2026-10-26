@@ -175,7 +175,7 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 |---|---|
 | 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
 | 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
-| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>` |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>`, `!jail <name> [minutes]`, `!unjail <name>` |
 | 3, admin | `!ban <name> [days] [reason] [note]`, `!unban <name>` |
 
 - A GM's `!` line never reaches the map. A player's `!` line is ordinary
@@ -225,6 +225,20 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
   select or a channel change. `!unban` lifts it, and `!dc` only
   disconnects. None of them may touch a GM of the sender's level or
   higher (`ClientActor::discipline`).
+- `!jail` puts the character named in the jail map, 300000012 ("Cellar:
+  Camp Conference Room", which has no portals out), for 5 minutes or the
+  number given (at most a year), added to any time they have left. The
+  time is kept in the `jails` table (`db::jail`), so it holds for a player
+  who is offline, and across a logout or a channel change: entering the
+  game puts a jailed player there. An online player is told through
+  `DirectoryMessage::JailChanged`. Any map change while jailed (a return
+  scroll, a warp, a revive) ends with a warp back (`hold_in_jail`): the
+  other map is joined first, since its SET_FIELD has already gone out. A
+  dead player isn't moved; their revival is a map change. When the time
+  is up (checked again in the database) or at `!unjail`, they come out at
+  300000010's `in01` (Cosmic's `jail_out.js`) and hear "You are free to
+  go.". One freed while offline or in the Cash Shop logs in at 300000010,
+  the jail map's `forcedReturn`. This is ours, as v83 has no jail.
 - Every `!` line from a GM is logged at info under the `gm_audit` target,
   with the character, the line, and whether it ran. The world server always
   shows that target. `!givenx` and `!coupon` log their results there too.

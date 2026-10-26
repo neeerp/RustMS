@@ -18,6 +18,7 @@ mod guild_bbs;
 mod guilds;
 mod hazard;
 mod hired_merchant;
+mod jail;
 mod later;
 mod loot;
 mod marriage;
@@ -162,6 +163,8 @@ pub struct ClientActor {
     changing_channel: bool,
     /// The player left their field for the Cash Shop.
     in_cash_shop: bool,
+    /// Until when a GM jailed the player (`jail`), if they still are.
+    jailed_until: Option<SystemTime>,
     /// Wrong coupon codes in a row on this connection.
     coupon_strikes: u8,
     /// A Maple TV message is waiting to hear from the world's line; the
@@ -258,6 +261,7 @@ impl ClientActor {
             npc_request_id: 0,
             changing_channel: false,
             in_cash_shop: false,
+            jailed_until: None,
             coupon_strikes: 0,
             maple_tv_waiting: false,
             party_id: None,
@@ -303,6 +307,7 @@ impl ClientActor {
             let later_due = self.later_due();
             let family_buff_due = self.family_buff_due();
             let quests_due = self.quest_clocks_due();
+            let jail_due = self.jail_due();
             let step = tokio::select! {
                 biased;
                 _ = kill.cancelled() => Err(RuntimeError::ClientDisconnected),
@@ -340,6 +345,9 @@ impl ClientActor {
                 }
                 _ = sleep_until(quests_due.unwrap_or_else(Instant::now)), if quests_due.is_some() => {
                     self.expire_quests().await
+                }
+                _ = sleep_until(jail_due.unwrap_or_else(Instant::now)), if jail_due.is_some() => {
+                    self.end_jail().await
                 }
             };
             if let Err(error) = step {
@@ -797,10 +805,12 @@ impl ClientActor {
         self.session_id = Some(session.id);
 
         let account_id = session.account_id;
-        let (mut player, account) = spawn_db(move || {
+        let now = SystemTime::now();
+        let (mut player, account, jailed_until) = spawn_db(move || {
             Ok((
                 db::player::load_player(character_id)?,
                 db::account::get_account_by_id(account_id)?,
+                db::jail::jailed_until(character_id, now)?,
             ))
         })
         .await?;
@@ -818,6 +828,11 @@ impl ClientActor {
             game::wedding::take_keys(&mut player);
         }
         ships::leave_forced_return_map(&mut player);
+        // Nor does a logout or a channel change end a jailing.
+        self.jailed_until = jailed_until;
+        if jailed_until.is_some() {
+            player.move_to(net::gm_commands::JAIL_MAP, 0);
+        }
         // The client learns of pets that dried up meanwhile with the rest.
         net::packet::handle::world::pets_dry_up(&mut player, SystemTime::now());
         // Items that expired meanwhile are gone before the client sees them;
@@ -957,7 +972,9 @@ impl ClientActor {
         let spawn = spawn
             .or_else(|| net::spawn_position(map_id, game.player.stats.spawn_point))
             .unwrap_or(FALLBACK_SPAWN);
-        self.join_current_field(spawn).await
+        self.join_current_field(spawn).await?;
+        // The warp back comes here again.
+        Box::pin(self.hold_in_jail()).await
     }
 
     async fn join_current_field(&mut self, spawn: SpawnPosition) -> Result<(), RuntimeError> {
@@ -1766,6 +1783,7 @@ impl ClientActor {
             ServerMessage::WeddingPriest { id, line } => self.wedding_priest(id, line).await?,
             ServerMessage::JoinGuild { guild_id } => self.join_guild(guild_id).await?,
             ServerMessage::GuildChanged => self.guild_changed().await?,
+            ServerMessage::JailChanged => self.jail_changed().await?,
             ServerMessage::Proposed { from, name } => self.proposed(from, name).await?,
             ServerMessage::ProposalAccepted { proposer, item_id } => {
                 self.proposal_accepted(proposer, item_id).await?

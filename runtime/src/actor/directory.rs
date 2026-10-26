@@ -415,6 +415,9 @@ impl WorldDirectory {
             DirectoryMessage::GuildChanged { client_id } => {
                 self.tell(client_id, ServerMessage::GuildChanged)
             }
+            DirectoryMessage::JailChanged { client_id } => {
+                self.tell(client_id, ServerMessage::JailChanged)
+            }
             DirectoryMessage::Propose {
                 from,
                 partner,

@@ -188,6 +188,20 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         prefix: '!',
+        name: "jail",
+        tier: GM,
+        usage: "<name> [minutes]",
+        run: jail,
+    },
+    Command {
+        prefix: '!',
+        name: "unjail",
+        tier: GM,
+        usage: "<name>",
+        run: unjail,
+    },
+    Command {
+        prefix: '!',
         name: "ban",
         tier: ADMIN,
         usage: "<name> [days] [reason] [note]",
@@ -616,6 +630,43 @@ fn disconnect(_: &mut WorldContext, args: &[&str]) -> Outcome {
     }
 }
 
+/// The jail: "Cellar: Camp Conference Room", which has no way out.
+pub const JAIL_MAP: i32 = 300000012;
+/// Where a jailed character comes out: the conference room's door, in the
+/// cellar outside (as Cosmic's `jail_out.js` lets them out).
+pub const JAIL_EXIT: (i32, &str) = (300000010, "in01");
+/// How long `!jail` keeps a character in by default (as Cosmic's).
+const JAIL_MINUTES: u32 = 5;
+/// The most `!jail` adds at once: a year.
+const JAIL_MINUTES_MAX: u32 = 365 * 24 * 60;
+
+/// `!jail`: hold a character in the jail map for some minutes more, online
+/// or not.
+fn jail(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    let (name, minutes) = match args {
+        [name] => (name, JAIL_MINUTES),
+        [name, minutes] => match minutes.parse::<u32>() {
+            Ok(minutes @ 1..) => (name, minutes.min(JAIL_MINUTES_MAX)),
+            _ => return Ok(Err(usage("jail"))),
+        },
+        _ => return Ok(Err(usage("jail"))),
+    };
+    Ok(Ok(vec![WorldAction::Discipline(Discipline::Jail {
+        target: name.to_string(),
+        minutes,
+    })]))
+}
+
+/// `!unjail`: let a character out of jail.
+fn unjail(_: &mut WorldContext, args: &[&str]) -> Outcome {
+    match args {
+        [name] => Ok(Ok(vec![WorldAction::Discipline(Discipline::Release {
+            target: name.to_string(),
+        })])),
+        _ => Ok(Err(usage("unjail"))),
+    }
+}
+
 /// The reasons a block may give, by the `type` of their Etc/BlockReason.img
 /// node, whose number is the place here plus one (as v83's `/block` finds
 /// them, report b175 s4).
@@ -807,6 +858,38 @@ mod tests {
             })
         );
         assert_eq!(discipline(HELPER, "!dc Bob"), None);
+    }
+
+    #[test]
+    fn jail_reads_its_minutes() {
+        let discipline = |gm_level, line| {
+            run_as(&mut player(gm_level), line)
+                .unwrap()
+                .into_iter()
+                .find_map(|action| match action {
+                    WorldAction::Discipline(d) => Some(d),
+                    _ => None,
+                })
+        };
+        let jail = |minutes| {
+            Some(Discipline::Jail {
+                target: "Bob".into(),
+                minutes,
+            })
+        };
+        assert_eq!(discipline(GM, "!jail Bob"), jail(5));
+        assert_eq!(discipline(GM, "!jail Bob 30"), jail(30));
+        assert_eq!(discipline(GM, "!jail Bob 99999999"), jail(JAIL_MINUTES_MAX));
+        assert_eq!(discipline(GM, "!jail Bob 0"), None);
+        assert_eq!(discipline(GM, "!jail Bob soon"), None);
+        assert_eq!(discipline(HELPER, "!jail Bob"), None);
+        assert_eq!(
+            discipline(GM, "!unjail Bob"),
+            Some(Discipline::Release {
+                target: "Bob".into()
+            })
+        );
+        assert_eq!(discipline(HELPER, "!unjail Bob"), None);
     }
 
     #[test]

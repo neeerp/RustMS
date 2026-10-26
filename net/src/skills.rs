@@ -2,7 +2,7 @@
 
 use crate::load::{self, asset_path};
 use crate::packet::build::world::mist::MistKind;
-use game::{BuffStat, Disease, InventoryType, MobStat, Player, SkillRecord};
+use game::{BuffStat, Disease, MobStat, Player, SkillRecord};
 use game_data::skills::{SkillData, SkillInfo, SkillLevel};
 use game_data::{
     FieldTemplate, FIELD_LIMIT_MYSTIC_DOOR, FIELD_TYPE_DOJO, FIELD_TYPE_DOJO_2, FIELD_TYPE_PYRAMID,
@@ -1418,7 +1418,9 @@ mod tests {
             ..Default::default()
         };
         let ring = game::Item::equipment(1112000, ring);
-        player.inventory.insert(InventoryType::Equipped, -12, ring);
+        player
+            .inventory
+            .insert(game::InventoryType::Equipped, -12, ring);
         assert_eq!(total_stats(&player), (199, 50, 4));
         let now = std::time::Instant::now();
         let long = Duration::from_secs(60);

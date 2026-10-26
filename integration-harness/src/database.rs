@@ -455,6 +455,19 @@ pub async fn date_item(
     Ok(left.minutes)
 }
 
+/// End the character `character_id`'s jailing `seconds` from now.
+pub async fn date_jail(character_id: i32, seconds: i32) -> Result<(), HarnessError> {
+    change_one_row("date jail", move |conn| {
+        diesel::sql_query(
+            "UPDATE jails SET until = now() + make_interval(secs => $2) WHERE character_id = $1",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(seconds)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the logged-out character `character_id`'s HP and max HP; 0 HP
 /// leaves them dead.
 pub async fn set_hp(character_id: i32, hp: i16, max_hp: i16) -> Result<(), HarnessError> {
