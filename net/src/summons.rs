@@ -6,7 +6,7 @@
 use crate::combat;
 use crate::error::NetworkError;
 use crate::skills::{self, Amount, Inflict, Learned};
-use game::{BuffStat, InventoryType, MobStat, Player};
+use game::{BuffStat, MobStat, Player};
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
 use std::time::Duration;

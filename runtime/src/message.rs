@@ -97,6 +97,8 @@ pub enum ServerMessage {
     /// Someone else changed the player's guild (expelled them); read it
     /// again.
     GuildChanged,
+    /// A GM jailed the player or let them out; read the time again.
+    JailChanged,
     /// `from` (named so) proposes; ask the player unless they can't be
     /// asked.
     Proposed {
@@ -1146,6 +1148,10 @@ pub enum DirectoryMessage {
     },
     /// `client_id` was put in or out of a guild by someone else.
     GuildChanged {
+        client_id: ClientId,
+    },
+    /// A GM jailed `client_id` or let them out.
+    JailChanged {
         client_id: ClientId,
     },
     /// `from` proposes to `partner` with the ring box `item_id`: ask them

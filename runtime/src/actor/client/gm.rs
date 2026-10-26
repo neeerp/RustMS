@@ -97,9 +97,10 @@ impl ClientActor {
         let (gm, gm_level) = (player.stats.name.clone(), player.gm_level);
         let (target, slash) = match &discipline {
             Discipline::Block { target, slash, .. } => (target.clone(), *slash),
-            Discipline::Unblock { target } | Discipline::Disconnect { target } => {
-                (target.clone(), false)
-            }
+            Discipline::Unblock { target }
+            | Discipline::Disconnect { target }
+            | Discipline::Jail { target, .. }
+            | Discipline::Release { target } => (target.clone(), false),
         };
         let lookup = target.clone();
         let found = spawn_db(move || {
@@ -155,6 +156,29 @@ impl ClientActor {
                             format!("{name} is not online.")
                         }
                     }
+                    Discipline::Jail { minutes, .. } => {
+                        let (character_id, now) = (receiver.id, SystemTime::now());
+                        let time = Duration::from_secs(u64::from(minutes) * 60);
+                        let until =
+                            spawn_db(move || db::jail::jail(character_id, time, now)).await?;
+                        self.tell_jail_changed(character_id).await?;
+                        let left = until
+                            .duration_since(now)
+                            .unwrap_or_default()
+                            .as_secs()
+                            .div_ceil(60);
+                        format!("Jailed {name} for {minutes} minutes ({left} in all).")
+                    }
+                    Discipline::Release { .. } => {
+                        let character_id = receiver.id;
+                        let now = SystemTime::now();
+                        if spawn_db(move || db::jail::release(character_id, now)).await? {
+                            self.tell_jail_changed(character_id).await?;
+                            format!("Let {name} out of jail.")
+                        } else {
+                            format!("{name} is not in jail.")
+                        }
+                    }
                 })
             }
         };
@@ -170,6 +194,12 @@ impl ClientActor {
             (false, _) => build_broadcast(Broadcast::Pink, line)?,
         };
         self.send(&mut reply).await
+    }
+
+    /// Have the character's client, if online, read their jail time again.
+    async fn tell_jail_changed(&mut self, client_id: i32) -> Result<(), RuntimeError> {
+        self.send_to_directory(DirectoryMessage::JailChanged { client_id })
+            .await
     }
 
     /// Disconnect whichever of `client_ids` are online: how many were.

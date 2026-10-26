@@ -195,6 +195,10 @@ pub enum Discipline {
     Unblock { target: String },
     /// Disconnect the character if they are online.
     Disconnect { target: String },
+    /// Hold the character in the jail map for `minutes` more.
+    Jail { target: String, minutes: u32 },
+    /// Let the character out of jail.
+    Release { target: String },
 }
 
 /// A whisper ready for delivery; the world directory picks which packet the

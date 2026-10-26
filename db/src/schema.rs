@@ -296,6 +296,13 @@ diesel::table! {
 }
 diesel::joinable!(extra_pendant_slots -> characters (character_id));
 diesel::table! {
+    jails (character_id) {
+        character_id -> Int4,
+        until -> Timestamp,
+    }
+}
+diesel::joinable!(jails -> characters (character_id));
+diesel::table! {
     quick_slots (character_id) {
         character_id -> Int4,
         key0 -> Int2,
@@ -817,6 +824,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     gacha_exp,
     auto_potions,
     extra_pendant_slots,
+    jails,
     quick_slots,
     character_mounts,
     fame_log,

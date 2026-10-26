@@ -28,6 +28,7 @@ pub mod fame;
 pub mod family;
 pub mod guild;
 pub mod guild_bbs;
+pub mod jail;
 pub mod keybinding;
 pub mod marriage;
 pub mod merchant;
