@@ -410,6 +410,10 @@ namespace ms
 		ground_effects.drawabove(viewpos, alpha);
 		portals.draw(viewpos, alpha);
 		backgrounds.drawforegrounds(viewx, viewy, alpha);
+		// FIELD_EFFECT's screens are at z 0xc00614a4, below the clouds, the
+		// dark of a LimitedView or Fear, the weather's bar and OX_QUIZ's
+		// notice (FUN_005330f7).
+		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
 		// v83's clouds are above the front backgrounds and below the fear
 		// overlay (z 0xc0061508).
 		clouds.draw(viewx, viewy, alpha);
@@ -430,7 +434,6 @@ namespace ms
 		weather.draw_bar();
 		// OX_QUIZ's notice is one above it (z 0xc00616fd).
 		ox_notice.draw();
-		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
 	void Stage::draw_overlay(float alpha) const
