@@ -1750,6 +1750,14 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::YuleteLeft(caught))
                     .await
             }
+            ServerMessage::FrankenroidOut(caught) => {
+                self.tell_event(net::events::EventCommand::FrankenroidOut(caught))
+                    .await
+            }
+            ServerMessage::EscortFailed => {
+                self.tell_event(net::events::EventCommand::EscortFailed)
+                    .await
+            }
             ServerMessage::OpenEventReactor { map_id, name } => {
                 self.tell_event(net::events::EventCommand::OpenReactor { map_id, name })
                     .await

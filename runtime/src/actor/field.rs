@@ -287,6 +287,11 @@ pub struct FieldActor {
     /// In a run's copy of Yulete's office, once anyone has come in, what
     /// he makes of the party and when he leaves; no time once he has.
     yulete: Option<(net::events::Yulete, Option<Instant>)>,
+    /// In a run's copy of the Magatia boss's room, whether Yulete has
+    /// brought out his Frankenroid.
+    frankenroid: bool,
+    /// In a run's copy of Magatia's boss room, whether the escort fainted.
+    escort_fainted: bool,
     /// In a jail under the sealed room, the levers that open its way on
     /// (`net::events::draw_jail`), once anyone has tried it; none once
     /// they have.
@@ -373,6 +378,8 @@ impl FieldActor {
             books: None,
             beakers: BTreeSet::new(),
             yulete: None,
+            frankenroid: false,
+            escort_fainted: false,
             jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
@@ -844,8 +851,17 @@ impl FieldActor {
                 });
                 let _ = reply.send(climb.clone());
             }
-            FieldMessage::Yulete { shocked, reply } => {
-                let _ = reply.send(self.talk_to_yulete(shocked));
+            FieldMessage::Yulete {
+                shocked,
+                caught,
+                won,
+                reply,
+            } => {
+                let said = match self.call_frankenroid(caught, won) {
+                    Some(key) => Some(key),
+                    None => self.talk_to_yulete(shocked),
+                };
+                let _ = reply.send(said);
             }
             FieldMessage::Jail { reply } => {
                 let _ = reply.send(self.check_jail());
@@ -2049,6 +2065,7 @@ impl FieldActor {
             (net::mobs::ZAKUM_LAST, net::mobs::ZAKUM_ALTAR_MAP) => self.zakum_falls(),
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
+            (mob_id, _) if net::events::is_frankenroid(mob_id) => self.frankenroid_falls(),
             (mob_id, map_id)
                 if net::events::is_lord_pirate(mob_id)
                     && map_id == net::events::PIRATE_STAGES[5]
@@ -2151,6 +2168,55 @@ impl FieldActor {
         let (key, mood) = net::events::yulete_talk(mood, too_close, shocked);
         self.yulete = Some((mood, leaves));
         Some(key)
+    }
+
+    /// What Yulete says to someone who talks to him in a run's copy of the
+    /// boss's room, as text key (`net::events::yulete_in_lab`): the first
+    /// time before the run is won, he brings out his Frankenroid on the
+    /// ground below where it stands, the mighty one if he was `caught` off
+    /// guard in his office, and the run hears of it. `None` anywhere else.
+    fn call_frankenroid(&mut self, caught: bool, won: bool) -> Option<&'static str> {
+        let map_id = self.key.map_id;
+        let side = net::events::MagatiaSide::of(map_id)
+            .filter(|side| side.stages()[6] == map_id && self.key.instance_id != 0)?;
+        let key = net::events::yulete_in_lab(won, self.frankenroid, caught);
+        if won || self.frankenroid {
+            return Some(key);
+        }
+        self.frankenroid = true;
+        self.board(side.frankenroid(caught), 1, net::events::FRANKENROID_AT);
+        if let Some(occupant) = self.occupants.values().next() {
+            occupant.handle.send(ServerMessage::FrankenroidOut(caught));
+        }
+        Some(key)
+    }
+
+    /// A Frankenroid died in a run's copy of the boss's room: every mob
+    /// but the escort goes and no more come, the side's Romeo or Juliet
+    /// comes out, and the run is won, its clear shown and paid to every
+    /// member (Cosmic `MagatiaPQ_Z.monsterKilled`).
+    fn frankenroid_falls(&mut self) {
+        let map_id = self.key.map_id;
+        let side = net::events::MagatiaSide::of(map_id)
+            .filter(|side| side.stages()[6] == map_id && self.key.instance_id != 0);
+        let Some(side) = side else {
+            return;
+        };
+        let saved = net::npc_scripts::magatia_hub_host(side);
+        if !self.map_npcs.iter().any(|npc| npc.npc_id == saved) {
+            self.appear(saved, net::events::MAGATIA_SAVED_AT);
+        }
+        self.clear_mobs();
+        // Each says again whether the escort fainted before the clear, so
+        // the run knows it whichever member's clear comes first.
+        for occupant in self.occupants.values() {
+            if self.escort_fainted {
+                occupant.handle.send(ServerMessage::EscortFailed);
+            }
+            occupant.handle.send(ServerMessage::ClearEventStage(
+                net::events::MAGATIA_BOSS_STAGE,
+            ));
+        }
     }
 
     /// The Lord Pirate is beaten: everyone here is told, and Wu Yang comes
@@ -3684,6 +3750,17 @@ impl FieldActor {
         if bunny && self.key.instance_id != 0 {
             self.lost_at = Some(now + net::events::scaled(FRIENDLY_LOST_AFTER));
         }
+        // The Magatia escort's fainting only costs the run some of its
+        // EXP and gifts (Cosmic `friendlyKilled`).
+        let fainted =
+            net::events::magatia_fainted(hit.mob_id).filter(|_| self.key.instance_id != 0);
+        if let Some(key) = fainted {
+            self.item_line(&text.get(key, &[]));
+            self.escort_fainted = true;
+            if let Some(occupant) = self.occupants.values().next() {
+                occupant.handle.send(ServerMessage::EscortFailed);
+            }
+        }
         if net::events::protected(hit.mob_id) && self.key.instance_id != 0 {
             self.fail_event();
         }
@@ -4223,6 +4300,14 @@ impl FieldActor {
             self.appear(net::npc_scripts::yulete(side), net::events::YULETE_AT);
             let leaves = Instant::now() + net::events::YULETE_STAYS;
             self.yulete = Some((net::events::Yulete::Unmet, Some(leaves)));
+        }
+        // And in the boss's room, as do his traces and the one who thanks
+        // the party in the rooms after it.
+        let waiting = net::npc_scripts::magatia_waiting(map_id).filter(|&(npc_id, _)| {
+            self.key.instance_id != 0 && !self.map_npcs.iter().any(|npc| npc.npc_id == npc_id)
+        });
+        if let Some((npc_id, at)) = waiting {
+            self.appear(npc_id, at);
         }
 
         for map_npc in &self.map_npcs {

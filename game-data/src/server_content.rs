@@ -1843,6 +1843,26 @@ pub mod keys {
     pub const MAGATIA_YULETE_DISGUSTED: &str = "magatia.yulete.disgusted";
     pub const MAGATIA_YULETE_FOOLED: &str = "magatia.yulete.fooled";
     pub const MAGATIA_ROOM_TAKEN: &str = "magatia.room_taken";
+    pub const MAGATIA_YULETE_PRESENTS: &str = "magatia.yulete.presents";
+    pub const MAGATIA_YULETE_MIGHTY: &str = "magatia.yulete.mighty";
+    pub const MAGATIA_YULETE_BEHOLD: &str = "magatia.yulete.behold";
+    pub const MAGATIA_YULETE_BEATEN: &str = "magatia.yulete.beaten";
+    pub const MAGATIA_FRANKENROID: &str = "magatia.frankenroid";
+    pub const MAGATIA_FRANKENROID_MIGHTY: &str = "magatia.frankenroid_mighty";
+    pub const MAGATIA_JULIET_FAINTED: &str = "magatia.juliet.fainted";
+    pub const MAGATIA_ROMEO_FAINTED: &str = "magatia.romeo.fainted";
+    pub const MAGATIA_ROMEO_SAVED: &str = "magatia.romeo.saved";
+    pub const MAGATIA_JULIET_SAVED: &str = "magatia.juliet.saved";
+    pub const MAGATIA_ROMEO_SAVED_HURT: &str = "magatia.romeo.saved_hurt";
+    pub const MAGATIA_JULIET_SAVED_HURT: &str = "magatia.juliet.saved_hurt";
+    pub const MAGATIA_GIFT: &str = "magatia.gift";
+    pub const MAGATIA_GIFT_FULL: &str = "magatia.gift_full";
+    pub const MAGATIA_TRACES_DEFEATED: &str = "magatia.traces.defeated";
+    pub const MAGATIA_TRACES_CHEER: &str = "magatia.traces.cheer";
+    pub const MAGATIA_TRACES_SORRY: &str = "magatia.traces.sorry";
+    pub const MAGATIA_THANKS_REHAB: &str = "magatia.thanks.rehab";
+    pub const MAGATIA_THANKS_JAIL: &str = "magatia.thanks.jail";
+    pub const MAGATIA_THANKS_FULL: &str = "magatia.thanks.full";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3077,6 +3097,26 @@ mod tests {
                 keys::MAGATIA_YULETE_DISGUSTED,
                 keys::MAGATIA_YULETE_FOOLED,
                 keys::MAGATIA_ROOM_TAKEN,
+                keys::MAGATIA_YULETE_PRESENTS,
+                keys::MAGATIA_YULETE_MIGHTY,
+                keys::MAGATIA_YULETE_BEHOLD,
+                keys::MAGATIA_YULETE_BEATEN,
+                keys::MAGATIA_FRANKENROID,
+                keys::MAGATIA_FRANKENROID_MIGHTY,
+                keys::MAGATIA_JULIET_FAINTED,
+                keys::MAGATIA_ROMEO_FAINTED,
+                keys::MAGATIA_ROMEO_SAVED,
+                keys::MAGATIA_JULIET_SAVED,
+                keys::MAGATIA_ROMEO_SAVED_HURT,
+                keys::MAGATIA_JULIET_SAVED_HURT,
+                keys::MAGATIA_GIFT,
+                keys::MAGATIA_GIFT_FULL,
+                keys::MAGATIA_TRACES_DEFEATED,
+                keys::MAGATIA_TRACES_CHEER,
+                keys::MAGATIA_TRACES_SORRY,
+                keys::MAGATIA_THANKS_REHAB,
+                keys::MAGATIA_THANKS_JAIL,
+                keys::MAGATIA_THANKS_FULL,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

@@ -1326,8 +1326,38 @@ room draws its right ropes the first time anyone climbs
 row's right rope differs in each of the four rooms; ours draws each room
 on its own, as Cosmic's Alcadno script does. The first to reach the top
 clears stage 6 for 20,000 EXP each, with no clear effect. The rooms' way
-on (`out00`, a plain portal at the top) leads to the boss's room
-(x00400), which has nothing in it yet.
+on (`out00`, a plain portal at the top) leads to the corridor (x00400),
+whose way in (`rnj12_in`, `jnr12_in`, never shut) leads to the boss's
+room (x00401).
+
+There Yulete (2112000, 2112010) comes out at (200, 100) the first time
+anyone enters (`npc_scripts::magatia_waiting`), beside the side's escort
+(Zenumist 9300137, Alcadno 9300138) and two guards (9300150), whom the
+map's spawner brings back as Cosmic's `respawnStages` does every 15 s.
+The first time he is talked to (`FieldMessage::Yulete`, the field's
+`frankenroid`, `events::yulete_in_lab`) he brings out his Frankenroid at
+(250, 100): the mighty one (Zenumist 9300140, Alcadno 9300152) if he was
+caught out in his office, otherwise the plain one (9300139, 9300151);
+everyone in the run hears of it in pink (`EventCommand::FrankenroidOut`).
+After that he bids them behold it, and once the run is won says he is
+beaten. A mob walked into the escort hurts it, and its fainting is told
+to the room (`magatia.juliet.fainted`, `magatia.romeo.fainted`) and kept
+by the run (`EventCommand::EscortFailed`). The Frankenroid's fall clears
+stage 7, which wins the run (`events::magatia_win_exp`): 90,000 EXP each
+if the escort fainted, otherwise 105,000 for the plain one and 140,000
+for the mighty one. Cosmic's Alcadno script pays 140,000 either way and
+never sends anyone straight on (below); both sides do as its Zenumist
+script does. The guards go, and Romeo (2112006) or Juliet (2112005)
+comes out at (-370, -150). If the escort fainted they send each member
+on to the last room (x00600); otherwise they give the side's gift
+(Zenumist 4001159, Alcadno 4001160, which needs room) and send the member
+on: to the last room, or, if the Frankenroid was the mighty one, first to
+Yulete's traces (2112001, 2112011) in x00500, who send them on in turn.
+In the last room Romeo & Juliet (2112018) thank each member and give
+one of 23 rewards (`events::MAGATIA_REWARDS`, Cosmic's
+`setEventRewards`), which needs a free slot in each of the Equip and Use
+inventories, on the way back to the side's room. Cosmic's traces also complete quest 7770; ours don't
+yet.
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the
@@ -1399,11 +1429,18 @@ nothing yet. Its lines are placeholders (`magatia.*`).
 | Romeo 2112004 | 261000011 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Romeo 2112004 | 926100000-400 | Asks whether to retreat, to 926100700 |
 | Romeo 2112006 | 926100200 | Runtime (`magatia_hub`): the letter, the leader's files, the way on, or whether to retreat |
+| Romeo 2112006 | 926100401 | Runtime (`magatia_saved`): once won, the gift and on to 926100600, or past 926100500 |
 | Juliet 2112003 | 261000021 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Juliet 2112003 | 926110000-400 | Asks whether to retreat, to 926110700 |
 | Juliet 2112005 | 926110200 | Runtime (`magatia_hub`): the same on the Alcadno side |
 | Yulete 2112000 | 926100203 | Runtime (`FieldMessage::Yulete`): caught out, watched, sneaky or leaving |
 | Yulete 2112010 | 926110203 | The same on the Alcadno side |
+| Yulete 2112000 | 926100401 | Runtime (`FieldMessage::Yulete`): brings out the Frankenroid, then bids them behold it, then is beaten |
+| Yulete 2112010 | 926110401 | The same on the Alcadno side |
+| Juliet 2112005 | 926110401 | Runtime (`magatia_saved`): the same on the Alcadno side |
+| Yulete's traces 2112001 | 926100500 | Runtime (`yulete_traces`): on to 926100600 |
+| Yulete's traces 2112011 | 926110500 | The same on the Alcadno side |
+| Romeo & Juliet 2112018 | 926100600, 926110600 | Runtime (`magatia_thanks`): one of the rewards, and home to the side's room |
 | Books 2112007 | 926100000 | Runtime (`BookOpened`): mesos, EXP, the letter, the switch or nothing |
 | Books 2112013 | 926110000 | The same; in the hall (926110001) they hold nothing |
 

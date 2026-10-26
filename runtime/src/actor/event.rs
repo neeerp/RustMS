@@ -120,6 +120,9 @@ pub struct Cleared {
     /// Yulete left his office caught off guard
     /// (`EventCommand::YuleteLeft`).
     caught_yulete: AtomicBool,
+    /// The escort in the Magatia boss's room fainted
+    /// (`EventCommand::EscortFailed`).
+    escort_failed: AtomicBool,
     /// The Magatia rope rooms taken, one bit each from the first.
     rooms: AtomicU8,
 }
@@ -148,6 +151,10 @@ impl Cleared {
 
     pub fn caught_yulete(&self) -> bool {
         self.caught_yulete.load(Ordering::Acquire)
+    }
+
+    pub fn escort_failed(&self) -> bool {
+        self.escort_failed.load(Ordering::Acquire)
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -251,6 +258,11 @@ impl EventTicket {
     /// Whether Yulete left his office caught off guard.
     pub fn caught_yulete(&self) -> bool {
         self.cleared.caught_yulete()
+    }
+
+    /// Whether the escort in the Magatia boss's room fainted.
+    pub fn escort_failed(&self) -> bool {
+        self.cleared.escort_failed()
     }
 
     /// Take the Magatia rope room `room`, from 0, for the member; returns
@@ -1255,6 +1267,28 @@ impl EventActor {
                 }
             }
             EventCommand::YuleteLeft(_) => debug!(client_id, "Yulete outside Magatia"),
+            // Everyone hears Yulete bring out his Frankenroid (Cosmic
+            // `2112000`'s `dropMessage(5, ..)`).
+            EventCommand::FrankenroidOut(caught) if matches!(self.kind, EventKind::Magatia(_)) => {
+                let key = net::events::frankenroid_called(caught);
+                let text = net::content::text().get(key, &[]);
+                if let Ok(line) = build_broadcast(Broadcast::Pink, &text) {
+                    for member in self.team.members() {
+                        if let Some(handle) = self.members.get(member) {
+                            handle.send(ServerMessage::EventPackets {
+                                id: self.id,
+                                packets: vec![line.clone()],
+                            });
+                        }
+                    }
+                }
+            }
+            EventCommand::FrankenroidOut(_) => debug!(client_id, "Frankenroid outside Magatia"),
+            // Whenever it happens, as Cosmic's `friendlyKilled`.
+            EventCommand::EscortFailed if matches!(self.kind, EventKind::Magatia(_)) => {
+                self.cleared.escort_failed.store(true, Ordering::Release);
+            }
+            EventCommand::EscortFailed => debug!(client_id, "Escort outside Magatia"),
             EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
                 let seconds = self.stage_seconds();
                 let mut reached = Vec::new();
@@ -1864,6 +1898,13 @@ impl EventActor {
         // The Pirate Ship's pays by the chests the team opened.
         if self.kind == EventKind::Pirate {
             self.win_exp = Some(net::events::pirate_win_exp(self.cleared.chests()));
+        }
+        // Romeo and Juliet's pays by the escort and the Frankenroid.
+        if let EventKind::Magatia(_) = self.kind {
+            self.win_exp = Some(net::events::magatia_win_exp(
+                self.cleared.escort_failed(),
+                self.cleared.caught_yulete(),
+            ));
         }
         if !self.clear(self.kind.event().last_stage()) {
             return;

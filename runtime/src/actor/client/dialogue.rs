@@ -166,6 +166,18 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if matches!(
+            npc_id,
+            net::npc_scripts::ROMEO_HUB
+                | net::npc_scripts::JULIET_HUB
+                | net::npc_scripts::YULETE_TRACES
+                | net::npc_scripts::YULETE_TRACES_ALCADNO
+                | net::npc_scripts::MAGATIA_THANKS
+        ) {
+            if let Some(script) = self.magatia_after(npc_id).await? {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::npc_scripts::GUON_ABOARD {
             if let Some(script) = self.guon_aboard().await? {
                 return self.start_script(script).await;
