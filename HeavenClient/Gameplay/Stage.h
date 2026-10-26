@@ -31,6 +31,7 @@
 #include "SkillMacroRules.h"
 #include "BlackoutRules.h"
 #include "TrembleRules.h"
+#include "SightRules.h"
 #include "MapleMap/MapInfo.h"
 #include "MapleMap/MapTilesObjs.h"
 #include "MapleMap/MapBackgrounds.h"
@@ -403,8 +404,10 @@ namespace ms
 		// 0x9717b5).
 		void show_rings();
 
-		// Fear's darkness, all but the player's narrowed sight (FUN_0053868d).
-		void draw_fear(double viewx, double viewy, float alpha) const;
+		// Black over the screen but for this sight around the player: Fear's
+		// (FUN_0053868d) or a LimitedView field's (0x55bdef).
+		void draw_sight(const Texture &sight_texture, sight::Offset offset, double viewx, double viewy,
+						float alpha) const;
 
 		// Show the map objs whose tag is a quest's showLayerTag while that quest is in progress, and hide them
 		// otherwise (FUN_00537cdc).
@@ -522,6 +525,9 @@ namespace ms
 		Animation jump_effect;
 		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
 		Texture fear_sight;
+		// What a LimitedView field (info/fieldType 9) leaves its players to
+		// see (Effect/MapEff.img/Viewrange/1).
+		Texture limited_sight;
 
 		Combat combat;
 		skill_macro::Runner macro_runner;
