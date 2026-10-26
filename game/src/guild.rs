@@ -39,6 +39,9 @@ pub const HEADQUARTERS: i32 = 200_000_301;
 /// Mesos Lea asks to make or change the guild's emblem; the HeavenMS
 /// default, not from the client.
 pub const EMBLEM_COST: i32 = 5_000_000;
+/// How many guilds the guild ranking lists, the most points first
+/// (Cosmic's `LIMIT 50`).
+pub const RANKING_SIZE: usize = 50;
 /// The emblem frames in the client's `UI/GuildMark.img/BackGround`.
 const EMBLEM_BACKGROUNDS: RangeInclusive<u16> = 1000..=1030;
 /// The marks in each of `UI/GuildMark.img/Mark`'s folders: Animal, Plant,
@@ -53,6 +56,14 @@ const EMBLEM_MARKS: [RangeInclusive<u16>; 5] = [
 ];
 /// The colours of each frame and mark.
 const EMBLEM_COLORS: RangeInclusive<u8> = 1..=16;
+
+/// A guild as the guild ranking lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Standing {
+    pub name: String,
+    pub points: i32,
+    pub emblem: Emblem,
+}
 
 /// The emblem shown beside the guild name. All zeros means none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

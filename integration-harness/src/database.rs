@@ -694,6 +694,30 @@ pub async fn found_guild(master: i32, guild: &str) -> Result<(), HarnessError> {
     .await
 }
 
+/// Give the guild named `guild` `points` and the emblem `(frame, frame
+/// colour, mark, mark colour)`.
+pub async fn rank_guild(
+    guild: &str,
+    points: i32,
+    emblem: (i16, i16, i16, i16),
+) -> Result<(), HarnessError> {
+    let guild = guild.to_owned();
+    change_one_row("rank guild", move |conn| {
+        diesel::sql_query(
+            "UPDATE guilds SET points = $2, mark_bg = $3, mark_bg_color = $4, mark = $5, \
+             mark_color = $6 WHERE name = $1",
+        )
+        .bind::<Text, _>(guild)
+        .bind::<Integer, _>(points)
+        .bind::<SmallInt, _>(emblem.0)
+        .bind::<SmallInt, _>(emblem.1)
+        .bind::<SmallInt, _>(emblem.2)
+        .bind::<SmallInt, _>(emblem.3)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Set the capacity of the guild named `guild`.
 pub async fn set_guild_capacity(guild: &str, capacity: i16) -> Result<(), HarnessError> {
     let guild = guild.to_owned();

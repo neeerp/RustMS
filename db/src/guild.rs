@@ -4,7 +4,9 @@
 use crate::schema::{characters, guild_members, guilds};
 use diesel::prelude::*;
 use diesel::result::{DatabaseErrorKind, Error as DieselError};
-use game::guild::{Emblem, Guild, GuildMember, GuildTag, CAPACITY_STEP, MASTER_RANK};
+use game::guild::{
+    Emblem, Guild, GuildMember, GuildTag, Standing, CAPACITY_STEP, MASTER_RANK, RANKING_SIZE,
+};
 
 /// Why founding a guild failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -363,4 +365,30 @@ pub fn member_ids(guild_id: i32) -> crate::Result<Vec<i32>> {
         .filter(guild_members::guild_id.eq(guild_id))
         .select(guild_members::character_id)
         .load(&mut conn)?)
+}
+
+/// The world's guilds with the most points, as many as the guild ranking
+/// lists; the older first among equals.
+pub fn ranking(world_id: u8) -> crate::Result<Vec<Standing>> {
+    let mut conn = crate::connection()?;
+    Ok(guilds::table
+        .filter(guilds::world_id.eq(i16::from(world_id)))
+        .order((guilds::points.desc(), guilds::id))
+        .limit(RANKING_SIZE as i64)
+        .select((
+            guilds::name,
+            guilds::points,
+            guilds::mark_bg,
+            guilds::mark_bg_color,
+            guilds::mark,
+            guilds::mark_color,
+        ))
+        .load::<(String, i32, i16, i16, i16, i16)>(&mut conn)?
+        .into_iter()
+        .map(|(name, points, bg, bg_color, mark, mark_color)| Standing {
+            name,
+            points,
+            emblem: emblem(bg, bg_color, mark, mark_color),
+        })
+        .collect())
 }

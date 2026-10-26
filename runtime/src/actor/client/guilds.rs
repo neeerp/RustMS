@@ -13,8 +13,8 @@ use net::npc_scripts::NpcScript;
 use net::packet::build::world::guild::{
     build_capacity_changed, build_emblem_changed, build_guild_chat, build_guild_created,
     build_guild_disbanded, build_guild_error, build_guild_info, build_guild_mark_changed,
-    build_guild_name_changed, build_member_expelled, build_member_joined, build_member_left,
-    build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
+    build_guild_name_changed, build_guild_ranking, build_member_expelled, build_member_joined,
+    build_member_left, build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
 };
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
@@ -405,6 +405,13 @@ impl ClientActor {
         ];
         self.send_all(&mut packets).await?;
         self.set_guild(Some(guild.tag())).await
+    }
+
+    /// A rank board's list of the world's guilds with the most points.
+    pub(super) async fn show_guild_ranking(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
+        let world_id = self.in_game()?.player.world_id;
+        let guilds = spawn_db(move || db::guild::ranking(world_id)).await?;
+        self.send(&mut build_guild_ranking(npc_id, &guilds)?).await
     }
 
     /// Heracle's and Lea's scripts need the player's guild as it is now.

@@ -5,7 +5,7 @@
 
 use crate::codec::stats::write_padded_name;
 use crate::{error::NetworkError, packet::op::SendOpcode};
-use game::guild::{Emblem, Guild, GuildMember};
+use game::guild::{Emblem, Guild, GuildMember, Standing};
 use packet::{io::write::PktWrite, Packet};
 
 const OP_NAME_PROMPT: u8 = 0x01;
@@ -24,6 +24,7 @@ const OP_TITLES_CHANGED: u8 = 0x3E;
 const OP_RANK_CHANGED: u8 = 0x40;
 const OP_EMBLEM_CHANGED: u8 = 0x42;
 const OP_NOTICE_CHANGED: u8 = 0x44;
+const OP_RANKING: u8 = 0x49;
 
 /// `MULTICHAT` mode for guild chat.
 pub const MULTICHAT_GUILD: u8 = 2;
@@ -273,6 +274,24 @@ pub fn build_notice_changed(guild_id: i32, notice: &str) -> Result<Packet, Netwo
     let mut packet = guild_operation(OP_NOTICE_CHANGED)?;
     packet.write_int(guild_id)?;
     packet.write_str_with_length(notice)?;
+    Ok(packet)
+}
+
+/// The guild ranking window, as the board `npc_id` shows it: each guild's
+/// name, points, and emblem, the mark before the frame, each part as an
+/// int.
+pub fn build_guild_ranking(npc_id: i32, guilds: &[Standing]) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_RANKING)?;
+    packet.write_int(npc_id)?;
+    packet.write_int(guilds.len() as i32)?;
+    for guild in guilds {
+        packet.write_str_with_length(&guild.name)?;
+        packet.write_int(guild.points)?;
+        packet.write_int(i32::from(guild.emblem.mark))?;
+        packet.write_int(i32::from(guild.emblem.mark_color))?;
+        packet.write_int(i32::from(guild.emblem.background))?;
+        packet.write_int(i32::from(guild.emblem.background_color))?;
+    }
     Ok(packet)
 }
 

@@ -246,6 +246,9 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME shadow_partner COMMAND shadow_partner_tests)
     add_executable(morph_rules_tests tests/morph_rules.cpp)
     add_test(NAME morph_rules COMMAND morph_rules_tests)
+    add_executable(guild_rank_tests tests/guild_rank.cpp Character/Guild.cpp Net/InPacket.cpp Net/Handlers/Helpers/GuildParser.cpp)
+    target_include_directories(guild_rank_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
+    add_test(NAME guild_rank COMMAND guild_rank_tests)
     add_executable(prepare_tests tests/prepare.cpp)
     target_include_directories(prepare_tests PRIVATE ${PROJECT_SOURCE_DIR}/libs/NoLifeNx)
     add_test(NAME prepare COMMAND prepare_tests)
@@ -1001,6 +1004,8 @@ add_executable(HeavenClient
     IO/UITypes/UIImageSlides.h
     IO/UITypes/UIKite.cpp
     IO/UITypes/UIKite.h
+    IO/UITypes/UIGuildRank.cpp
+    IO/UITypes/UIGuildRank.h
     IO/UITypes/UITransform.cpp
     IO/UITypes/UITransform.h
     IO/UITypes/UIMegaphone.cpp

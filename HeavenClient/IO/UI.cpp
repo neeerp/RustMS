@@ -508,6 +508,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::KITEWRITE);
 					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
+					types.emplace_back(UIElement::Type::GUILDRANK);
 					types.emplace_back(UIElement::Type::IMAGESLIDES);
 					types.emplace_back(UIElement::Type::FAMILY);
 					types.emplace_back(UIElement::Type::FAMILYTREE);
@@ -544,6 +545,7 @@ namespace ms
 					types.emplace_back(UIElement::Type::KITEWRITE);
 					types.emplace_back(UIElement::Type::TRANSFORM);
 					types.emplace_back(UIElement::Type::KITEVIEW);
+					types.emplace_back(UIElement::Type::GUILDRANK);
 					types.emplace_back(UIElement::Type::IMAGESLIDES);
 					types.emplace_back(UIElement::Type::GMBLOCK);
 				} else if (tab)

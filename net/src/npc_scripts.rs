@@ -73,6 +73,10 @@ pub const LEA: i32 = 2010008;
 /// Lenario, beside Heracle, who founds alliances; his script needs the
 /// guild, its alliance, and the party (`NpcScript::lenario`).
 pub const LENARIO: i32 = 2010009;
+/// The boards that show the guild ranking when clicked, without a word:
+/// the Honorable Rock in Perion and the Guild Rank Board at the Excavation
+/// Site's camp (Cosmic's `displayGuildRanks`).
+pub const RANK_BOARDS: [i32; 2] = [9040004, 9040008];
 /// Nicole, the Cathedral's assistant, and Bonnie, the Chapel's, who book
 /// weddings in Amoria; their script needs the couple's booking
 /// (`NpcScript::wedding_assistant`).

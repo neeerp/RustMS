@@ -85,5 +85,25 @@ namespace ms
 
 			return alliance;
 		}
+
+		std::vector<GuildStanding> parse_ranking(InPacket& recv)
+		{
+			int32_t count = recv.read_int();
+			std::vector<GuildStanding> guilds;
+
+			for (int32_t i = 0; i < count && recv.available(); i++)
+			{
+				GuildStanding guild;
+				guild.name = recv.read_string();
+				guild.points = recv.read_int();
+				guild.emblem.mark = static_cast<uint16_t>(recv.read_int());
+				guild.emblem.mark_color = static_cast<uint8_t>(recv.read_int());
+				guild.emblem.background = static_cast<uint16_t>(recv.read_int());
+				guild.emblem.background_color = static_cast<uint8_t>(recv.read_int());
+				guilds.push_back(std::move(guild));
+			}
+
+			return guilds;
+		}
 	}
 }

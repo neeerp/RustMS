@@ -15,6 +15,7 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIEnterText.h"
 #include "../../IO/UITypes/UIGuildBBS.h"
+#include "../../IO/UITypes/UIGuildRank.h"
 #include "../../IO/UITypes/UIGuildMarkMaker.h"
 #include "../../IO/UITypes/UIInviteCard.h"
 #include "../../IO/UITypes/UINpcTalk.h"
@@ -84,7 +85,9 @@ namespace ms
 			// 0xd0c for the master
 			EMBLEM_CHANGED = 0x42,
 			// 0xd15
-			NOTICE_CHANGED = 0x44
+			NOTICE_CHANGED = 0x44,
+			// The Honorable Rock's ranking window
+			RANKING = 0x49
 		};
 
 		// Heracle, at the guild headquarters, says the client's own guild
@@ -524,6 +527,15 @@ namespace ms
 
 			guild.set_notice(std::move(notice));
 			refresh();
+			break;
+		}
+		case Operation::RANKING:
+		{
+			// The NPC's id, which the window doesn't use.
+			recv.skip_int();
+			std::vector<GuildStanding> guilds = GuildParser::parse_ranking(recv);
+			GuildEmblem own = guild.exists() ? guild.get_data().emblem : GuildEmblem();
+			UI::get().emplace<UIGuildRank>(std::move(guilds), own);
 			break;
 		}
 		default:

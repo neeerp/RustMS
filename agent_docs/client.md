@@ -625,7 +625,7 @@ side yet.
 | User effects (`0xCE` own, `0xC6` others) | The modes both packets share are in `user_effect::show_shared` (FUN_009377d9): level up (0), charm lines (6), recovery numbers (10), ItemEff animations (11), path images and animations (12, 18, 22 only in field type 0x13, 23, 24), ItemLevelUp (15), the Item Maker (16), IncEXP (17, heard only by its owner), Wheel of Destiny and Spirit Stone lines (21, 26) and field sounds (25); 19 and modes past 26 do nothing, and a foreign mode 3 (only its owner gets one) is ignored. Mode 12's delay is not known, so it shows at once |
 | Party (`UIUserList` Party tab, `UIPartyHP`, party chat, Party Search) | Implemented; see `parties.md` |
 | Buddy list (`UIUserList` Friend tab, groups, blocking, buddy chat) | Implemented; see `buddies.md` |
-| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42); see `guilds.md` |
+| Guild (`UIUserList` Guild tab, name tags, guild chat) | Founding, invitations, leaving and expelling, rank changes, rank titles (the GUILD INFO panel), the notice, members' logins, levels and jobs, growing and disbanding at Heracle, Lea's emblem maker (`UIGuildMarkMaker`, opened by 65/0x11, saved with mode 0x0F, applied by 0x42), the ranking window (`UIGuildRank`, 0x49); see `guilds.md` |
 | Alliance (`Character/Alliance`, invitation and login cards, alliance chat) | State, cards, chat and the Alliance tab with its rank panel implemented; see `guilds.md` |
 | Blacklist tab (`UIUserList`) | Implemented: Add and Delete, kept in the `BlackList` setting and sent with a shop's opening; whispers, chat and invitations from its names are turned away. See "Personal shops" in `inventory.md` |
 | Monster Book (`UIMonsterBook`) | Implemented: cards, summary, monster pages, search, cover; see `combat.md` |
@@ -984,7 +984,7 @@ the screen size.
 
 | System | Client status | Effort |
 | --- | --- | --- |
-| Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting) | M |
+| Guild | Window, founding, invitations, leaving and expelling, ranks, titles, the notice, growing and disbanding, the emblem maker, the board (reading, writing, editing, the notice, replying and deleting), the ranking | M |
 | Player shops | Nothing | L |
 | Cash shop | No charging or storage window | S |
 | Quest accept/complete UI flow | Partial | S |
