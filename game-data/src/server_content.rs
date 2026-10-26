@@ -1828,6 +1828,14 @@ pub mod keys {
     pub const MAGATIA_BOOK_LETTER_FULL: &str = "magatia.book.letter_full";
     pub const MAGATIA_BOOK_PASS: &str = "magatia.book.pass";
     pub const MAGATIA_PORTAL_SHUT: &str = "magatia.portal_shut";
+    pub const MAGATIA_LETTER: &str = "magatia.letter";
+    pub const MAGATIA_ROMEO_SHOCKED: &str = "magatia.romeo.shocked";
+    pub const MAGATIA_JULIET_SHOCKED: &str = "magatia.juliet.shocked";
+    pub const MAGATIA_OPEN_DOOR: &str = "magatia.open_door";
+    pub const MAGATIA_ROMEO_HURRY: &str = "magatia.romeo.hurry";
+    pub const MAGATIA_JULIET_HURRY: &str = "magatia.juliet.hurry";
+    pub const MAGATIA_FILES: &str = "magatia.files";
+    pub const MAGATIA_FILES_LEADER: &str = "magatia.files_leader";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3047,6 +3055,14 @@ mod tests {
                 keys::MAGATIA_BOOK_LETTER_FULL,
                 keys::MAGATIA_BOOK_PASS,
                 keys::MAGATIA_PORTAL_SHUT,
+                keys::MAGATIA_LETTER,
+                keys::MAGATIA_ROMEO_SHOCKED,
+                keys::MAGATIA_JULIET_SHOCKED,
+                keys::MAGATIA_OPEN_DOOR,
+                keys::MAGATIA_ROMEO_HURRY,
+                keys::MAGATIA_JULIET_HURRY,
+                keys::MAGATIA_FILES,
+                keys::MAGATIA_FILES_LEADER,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

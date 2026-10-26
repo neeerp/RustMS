@@ -373,6 +373,12 @@ pub enum ServerMessage {
     /// The player's field saw what clears `stage` of the event they are
     /// in, as Zakum's last body dying on its altar: tell the event.
     ClearEventStage(u8),
+    /// The player's field opened a reactor that opens `name` on the
+    /// event's copy of `map_id` too (`net::events::EventCommand::OpenReactor`).
+    OpenEventReactor {
+        map_id: i32,
+        name: &'static str,
+    },
     /// This player's attack on a copy of a Nett's Pyramid stage did this to
     /// its mobs, for their run's tally.
     Massacre(net::pyramid::Hits),
@@ -727,6 +733,11 @@ pub enum FieldMessage {
     SetReactor {
         name: &'static str,
         state: u8,
+    },
+    /// Open the live reactors named `name` here that are shut, until their
+    /// time open is up (`ReactorSet::open`).
+    OpenReactor {
+        name: &'static str,
     },
     /// How many Eak wants on each of the sealed room's platforms
     /// (`net::events::draw_split`), drawn when first asked.

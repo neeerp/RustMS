@@ -147,6 +147,11 @@ pub enum Action {
     /// `BEAKER_FULL` counts, and the third counted clears the stage
     /// (`crate::events::MAGATIA_BEAKERS`).
     Beaker,
+    /// One of a Magatia hub's two doors (Cosmic `2618001`, `2618002`),
+    /// which opens for two seconds as it takes a Card Key, and opens the
+    /// way back from the room it lets in to for as long
+    /// (`crate::events::MagatiaSide::side_doors`).
+    SideDoor,
 }
 
 /// The maze's boxes that bring out the same mobs in every room, from
@@ -430,6 +435,7 @@ pub fn action(reactor_id: i32) -> Action {
         },
         ELLIN_FOUNTAIN => Action::ExpToAll(crate::events::ELLIN_FOUNTAIN_EXP),
         MAGATIA_BEAKER => Action::Beaker,
+        MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR => Action::SideDoor,
         // The treasure room's boxes (`2002014`: `dropItems(true, 1, 100,
         // 400, 15)`, then Minerva, once).
         2002014 => Action::SprayAndAppear {
@@ -512,6 +518,12 @@ pub const ELLIN_FOUNTAIN_NAME: &str = "";
 pub const MAGATIA_BEAKER: i32 = 2618000;
 pub const BEAKER_FULL: u8 = 6;
 
+/// A Magatia hub's doors to the rooms beside it, and those rooms' ways
+/// back, which stay where they are as the rooms' boxes are shuffled.
+pub const MAGATIA_SIDE_DOOR: i32 = 2618001;
+pub const MAGATIA_LAST_SIDE_DOOR: i32 = 2618002;
+pub const MAGATIA_ROOM_EXITS: std::ops::RangeInclusive<i32> = 2618003..=2618004;
+
 /// The Pirate Ship's mob box, which takes four hits, and its item box and
 /// the decks' mob box, which link to it.
 pub const PIRATE_MOB_BOX: i32 = 2511000;
@@ -582,6 +594,7 @@ pub fn acts_staying(reactor_id: i32) -> bool {
     matches!(
         reactor_id,
         ELLIN_POND | ELLIN_SPINE | PIRATE_SEAL..=PIRATE_LAST_SEAL
+            | MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR
     )
 }
 
@@ -591,13 +604,26 @@ pub fn acts_staying(reactor_id: i32) -> bool {
 /// `LudiMazePQ` `shuffleReactors`), and the Forest of Poison Haze's fifth
 /// stage's (`EllinPQ`), and those of the Pirate Ship's first, third and
 /// fourth stages, where invisible boxes (`2518000`) hold places for the
-/// real ones (`PiratePQ`).
+/// real ones (`PiratePQ`), and those of the two rooms beside a Magatia
+/// hub, where the experiment files are (`MagatiaPQ`'s `shuffleReactors`
+/// of `2518000` to `2612004`, so not their ways back: `shuffles`).
 pub fn shuffled(map_id: i32) -> bool {
-    use crate::events::{ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PIRATE_STAGES};
+    use crate::events::{MagatiaSide, ELLIN_STAGES, MAZE_GOAL, MAZE_ROOM, PIRATE_STAGES};
+    let magatia = MagatiaSide::ALL
+        .iter()
+        .flat_map(|side| side.side_doors())
+        .any(|(_, room, _)| room == map_id);
     matches!(map_id, BERSERK_ROOM | BART_ROOM)
         || (MAZE_ROOM..MAZE_GOAL).contains(&map_id)
         || map_id == ELLIN_STAGES[4]
         || [PIRATE_STAGES[0], PIRATE_STAGES[2], PIRATE_STAGES[3]].contains(&map_id)
+        || magatia
+}
+
+/// Whether reactor `reactor_id` changes places with the others on a
+/// `shuffled` map: all but a Magatia side room's way back.
+pub fn shuffles(reactor_id: i32) -> bool {
+    !MAGATIA_ROOM_EXITS.contains(&reactor_id)
 }
 
 #[cfg(test)]
@@ -764,6 +790,17 @@ mod tests {
         assert_eq!(action(ELLIN_FOUNTAIN), Action::ExpToAll(52_000));
         assert_eq!(action(MAGATIA_BEAKER), Action::Beaker);
         assert!(!stays(MAGATIA_BEAKER) && !acts_staying(MAGATIA_BEAKER));
+        for door in MAGATIA_SIDE_DOOR..=MAGATIA_LAST_SIDE_DOOR {
+            assert_eq!(action(door), Action::SideDoor);
+            assert!(acts_staying(door) && shuffles(door));
+        }
+        assert!(MAGATIA_ROOM_EXITS.all(|exit| !shuffles(exit)));
+        assert!(shuffles(2612001) && shuffles(2518000));
+        for side in crate::events::MagatiaSide::ALL {
+            let hub = side.stages()[3];
+            assert!(shuffled(hub + 1) && shuffled(hub + 2));
+            assert!(!shuffled(hub) && !shuffled(hub + 3));
+        }
         assert!(!stays(ELLIN_FOUNTAIN) && !acts_staying(ELLIN_FOUNTAIN));
         assert!(!stays(ELLIN_STONE_BOX) && !acts_staying(ELLIN_STONE_BOX));
         assert!(matches!(

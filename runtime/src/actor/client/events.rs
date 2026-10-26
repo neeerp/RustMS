@@ -405,6 +405,37 @@ impl ClientActor {
         Ok(Some(NpcScript::guon_aboard(player, leader, marks, bare)))
     }
 
+    /// What the hub's Romeo or Juliet, `npc_id`, says to the player in
+    /// the hub of their side's party quest, if anything: whether the hub's
+    /// stage is cleared and its way on shut decide it.
+    pub(super) async fn magatia_hub(
+        &mut self,
+        npc_id: i32,
+    ) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        let side = (events::MagatiaSide::ALL.into_iter()).find(|&side| {
+            net::npc_scripts::magatia_hub_host(side) == npc_id && side.stages()[3] == map_id
+        });
+        let Some(side) = side else {
+            return Ok(None);
+        };
+        let Some(ticket) = self.event.as_ref().filter(|ticket| {
+            ticket.kind == EventKind::Magatia(side) && ticket.holds(map_id) && !ticket.won()
+        }) else {
+            return Ok(None);
+        };
+        let leader = ticket.leader();
+        let cleared = ticket.cleared(events::MAGATIA_FILES_STAGE);
+        let door_shut = cleared
+            && (self.reactor_states(&[side.hub_door()]).await?)
+                .first()
+                .is_some_and(|state| *state == Some(0));
+        let player = &self.in_game()?.player;
+        Ok(Some(NpcScript::magatia_hub(
+            side, player, leader, cleared, door_shut,
+        )))
+    }
+
     /// What Eak says to the player in the Orbis party quest, if anything:
     /// in the music room whether its music box plays, in the sealed room
     /// how the team stands on its platforms (a wrong count shows as a

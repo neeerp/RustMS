@@ -981,6 +981,12 @@ pub enum FieldRequest {
     /// A script puts the reactors named `name` here in `state`
     /// (`scripts::Effect::SetReactorState`).
     SetReactorState { name: &'static str, state: u8 },
+    /// A script opens the reactors named `name` here for as long as their
+    /// open state lasts (`scripts::Effect::OpenReactor`).
+    OpenReactor { name: &'static str },
+    /// A script sends away every mob here that isn't friendly
+    /// (`scripts::Effect::ClearMobs`).
+    ClearMobs,
     /// The player threw the catch item in USE `slot` at the mob `object_id`:
     /// catch it if it is a `catch.mob` within `catch.area` of them, below
     /// `catch.mob_hp` percent of its HP. Answered with

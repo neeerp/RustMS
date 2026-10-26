@@ -156,6 +156,11 @@ impl ClientActor {
                 return self.start_script(script).await;
             }
         }
+        if npc_id == net::npc_scripts::ROMEO_HUB || npc_id == net::npc_scripts::JULIET_HUB {
+            if let Some(script) = self.magatia_hub(npc_id).await? {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::npc_scripts::GUON_ABOARD {
             if let Some(script) = self.guon_aboard().await? {
                 return self.start_script(script).await;
