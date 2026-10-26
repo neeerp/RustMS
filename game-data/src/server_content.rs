@@ -782,6 +782,10 @@ pub mod keys {
     pub const NINE_SPIRIT_STONE_HELD: &str = "nine_spirit.baby.stone_held";
     pub const NINE_SPIRIT_FULL: &str = "nine_spirit.baby.full";
 
+    /// Reef's Gratitude (quest 2228, `q2228s`): Reef (NPC 1032108) thanks
+    /// the player for beating Faust. No licensed script has the text.
+    pub const REEF_THANKS: &str = "reef.thanks";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3004,6 +3008,7 @@ mod tests {
             .chain(&keys::CAPTAIN_AL_REP)
             .chain(&keys::CAPTAIN_AL_ENTITLEMENT)
             .chain(&[
+                keys::REEF_THANKS,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

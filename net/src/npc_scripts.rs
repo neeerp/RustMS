@@ -2341,6 +2341,7 @@ impl NpcScript {
             "q2217s" => informant(player, 1),
             "q2218s" => informant(player, 2),
             "q2219s" => informant(player, 3),
+            "q2228s" => Some(reef()),
             "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
@@ -2788,6 +2789,17 @@ fn trash_can(player: &Player, lost: bool, hour: u8) -> NpcScript {
     script
 }
 
+/// `q2228s`, Reef's Gratitude: Reef's spirit, at rest once Faust is beaten
+/// (2227), thanks the player, which completes the quest as it starts, with
+/// the data's 8 fame (`Act/1 pop`, which a start does not give).
+fn reef() -> NpcScript {
+    let mut script = NpcScript::new(REEF, vec![Page::Say(text(keys::REEF_THANKS))]);
+    script.on_end = vec![Effect::FinishQuest(2228), Effect::GainFame(8)];
+    script
+}
+
+/// Reef, in 910100001.
+const REEF: i32 = 1032108;
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
 const CAPTAIN_AL: i32 = 1002103;
 /// Captain Al's end scripts ([`NpcScript::for_family_quest`]).
@@ -9993,6 +10005,15 @@ mod tests {
         // Two still to hear: the list stays.
         let early = NpcScript::for_quest("q2219s", &holding(&[2216, 2217])).unwrap();
         assert_eq!(read_through(early), (1052006, heard(2219)));
+    }
+
+    #[test]
+    fn reef_thanks_the_player_with_eight_fame() {
+        let script = NpcScript::for_quest("q2228s", &with_quests(&[(2227, true)])).unwrap();
+        assert_eq!(
+            read_through(script),
+            (REEF, vec![Effect::FinishQuest(2228), Effect::GainFame(8)])
+        );
     }
 
     #[test]
