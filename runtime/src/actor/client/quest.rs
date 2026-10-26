@@ -6,7 +6,7 @@ use crate::{
 };
 use game::{Player, QuestRecord, QuestState, QuestStatus};
 use game_data::server_content::keys;
-use net::npc_scripts::NpcScript;
+use net::npc_scripts::{NpcScript, FAMILY_QUEST_SCRIPTS};
 use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::{drop, inventory, pet, quest, skill, stat};
@@ -138,8 +138,22 @@ impl ClientActor {
     }
 
     async fn run_quest_script(&mut self, script: Option<&str>) -> Result<(), RuntimeError> {
+        let Some(script) = script else {
+            return Ok(());
+        };
+        // Captain Al's read the Family window's numbers.
+        let cid = self.client_id;
+        let family = if FAMILY_QUEST_SCRIPTS.contains(&script) {
+            Some(spawn_db(move || db::family::info(cid)).await?)
+        } else {
+            None
+        };
         let player = &self.in_game()?.player;
-        match script.and_then(|script| NpcScript::for_quest(script, player)) {
+        let script = match family {
+            Some(family) => NpcScript::for_family_quest(script, &family),
+            None => NpcScript::for_quest(script, player),
+        };
+        match script {
             Some(script) => self.start_script(script).await,
             None => Ok(()),
         }

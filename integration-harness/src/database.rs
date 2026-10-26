@@ -573,6 +573,43 @@ pub async fn set_family_reputation(character_id: i32, reputation: i32) -> Result
     .await
 }
 
+/// Make `junior` the junior of `senior`, both logged out and in no family.
+pub async fn join_family(senior: i32, junior: i32) -> Result<(), HarnessError> {
+    change_one_row("seat the senior", move |conn| {
+        diesel::sql_query("INSERT INTO family_members (character_id) VALUES ($1)")
+            .bind::<Integer, _>(senior)
+            .execute(conn)
+    })
+    .await?;
+    change_one_row("seat the junior", move |conn| {
+        diesel::sql_query("INSERT INTO family_members (character_id, senior_id) VALUES ($1, $2)")
+            .bind::<Integer, _>(junior)
+            .bind::<Integer, _>(senior)
+            .execute(conn)
+    })
+    .await
+}
+
+/// Give `character_id`, who is in a family, `reputation` Rep to spend and
+/// `total` earned in all.
+pub async fn set_family_reputations(
+    character_id: i32,
+    reputation: i32,
+    total: i32,
+) -> Result<(), HarnessError> {
+    change_one_row("set family reputations", move |conn| {
+        diesel::sql_query(
+            "UPDATE family_members SET reputation = $2, total_reputation = $3 \
+             WHERE character_id = $1",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(reputation)
+        .bind::<Integer, _>(total)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Start quest `quest_id` for the logged-out character `character_id`.
 pub async fn start_quest(character_id: i32, quest_id: i16) -> Result<(), HarnessError> {
     change_one_row("start quest", move |conn| {

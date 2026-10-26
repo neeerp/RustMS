@@ -64,8 +64,9 @@ pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q2214e", "q2215e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s",
-    "q4647e", "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e",
+    "q1021s", "q1021e", "q2214e", "q2215e", "q2232e", "q2233e", "q2234e", "q2216s", "q2217s",
+    "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e", "q6031e", "q6032e", "q6033e",
+    "q6036e", "q8185e", "q8189e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -405,9 +406,12 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     // Without a completion NPC, a quest that asks for items or kills is
     // handed in to the NPC that gave it (Pio's 1008). Without either, it is
     // a record kept by some event, not something an NPC completes.
-    // Unless the start script completes it.
+    // Unless the start script completes it, or an end script does, at the
+    // start NPC (Captain Al's 2232-2234).
     if !keys.finished_by_start_script
-        && !end.iter().any(|k| k == "npc" || k == "item" || k == "mob")
+        && !end
+            .iter()
+            .any(|k| k == "npc" || k == "item" || k == "mob" || k == "endscript")
     {
         return Err("no completion NPC".into());
     }
