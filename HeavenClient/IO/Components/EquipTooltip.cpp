@@ -431,6 +431,13 @@ namespace ms
 		if (info.trade_available && !(equip.get_flags() & item_properties::EQUIP_KARMA))
 			descstr = item_properties::with_karma_hint(descstr);
 
+		// One worn in the second pendant slot says how long the slot lasts.
+		if (parent == Tooltip::Parent::EQUIPINVENTORY && invpos == EquipSlot::Id::PENDANT2)
+		{
+			int64_t until = player.get_inventory().get_extra_pendant();
+			descstr += (descstr.empty() ? "" : "\\n") + item_expiry::pendant_slot_line(until, item_expiry::now());
+		}
+
 		if (descstr.empty())
 		{
 			desc = Text();

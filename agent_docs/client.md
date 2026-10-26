@@ -812,6 +812,13 @@ the screen size.
   no data are skipped.
 - **Background:** the preview background follows the job: Cygnus and Aran have
   their own.
+- **Changed commodities:** after the account name, SET_CASH_SHOP lists SNs
+  taken off (`i32` count, then the SNs) and commodities changed or added
+  (`u16` count). Each change is `i32 SN`, `u32 flags`, then only the fields
+  the flags name, in v83's order. That order differs from the bits'; see
+  `cash_catalog::Change`. An SN `Commodity.img` lacks becomes a new
+  commodity under the tab and sub-tab its digits name (v83 `0xa25db4`,
+  report b179). The server adds the second pendant slot (5550000) this way.
 - **Packets:** SET_CASH_SHOP gives the account name and the Best Item SNs for
   the player's gender. QUERY_CASH_RESULT (324) gives the NX Credit, Maple Point
   and NX Prepaid balances. CASHSHOP_OPERATION (325) modes 0x4B (Cash
@@ -819,7 +826,7 @@ the screen size.
   0x57 (a bought item), 0x58 (a failed purchase, with the SN when it is sold
   out), 0x59 (a redeemed coupon), 0x5C (another failure), 0x5E (a gift sent), 0x60 (a bag's
   new slot count), 0x62 (the storage's), 0x64 (the account's character
-  slots), 0x68 (an item taken out), 0x6A (an
+  slots), 0x66 (the second pendant slot's days), 0x68 (an item taken out), 0x6A (an
   item put back), 0x89 (a bought package) and 0x8D (bought with mesos) are read. Inventory slots keep the item's cash serial,
   which the item encoding carries, so a cash item can find its way back.
 - **Buying:** BUY opens `UICashBuy` (`CashShop.img/CSNotice/0`): the item, its
@@ -832,7 +839,9 @@ the screen size.
   sends CASHSHOP_OPERATION (229) 0x03 with the cash type (1 Credit, 2 Maple
   Points, 4 Prepaid) and SN, or 0x1E for a package (items 910xxxx) and
   0x06/0x07 mode 1 for an expansion commodity (911x000), or 0x08 for the
-  Extra Character Slot Coupon (5430xxx). As in v83, each
+  Extra Character Slot Coupon (5430xxx), or 0x09 with no cash type for a
+  slot extender (555xxxx), which asks v83's 0x1458 with the item's `addDay`
+  and needs NX Credit or Maple Points. As in v83, each
   mode is followed by a byte that is 1 for Maple Points, and 0x03 ends with
   a zero (no free trial). The result is a "successful purchase" or a failure
   notice. Failure notices use v83's text for each code (`FUN_0047c17a`),

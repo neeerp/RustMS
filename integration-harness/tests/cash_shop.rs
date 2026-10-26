@@ -36,6 +36,7 @@ async fn read_until(
             SendOpcode::SpawnMonsterControl as i16,
             SendOpcode::MoveMonster as i16,
             SendOpcode::StatChange as i16,
+            SendOpcode::ExtraPendantSlot as i16,
             SendOpcode::KeyMap as i16,
             SendOpcode::MacroSysDataInit as i16,
             SendOpcode::AutoHpPot as i16,

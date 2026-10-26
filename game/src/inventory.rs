@@ -83,6 +83,9 @@ pub mod equip_slot {
     pub const SHIELD: i16 = -10;
     pub const RINGS: [i16; 4] = [-12, -13, -15, -16];
     pub const PENDANT: i16 = -17;
+    /// The second pendant slot, open while the character has paid for it
+    /// (5550000; report b144).
+    pub const PENDANT2: i16 = -51;
     /// The tamed monster (190xxxx) and its saddle (191xxxx).
     pub const MOUNT: i16 = -18;
     pub const SADDLE: i16 = -19;
@@ -169,6 +172,7 @@ pub mod equip_slot {
         }
         match for_item(item_id) {
             Some(slot) if RINGS.contains(&slot) => RINGS.contains(&position),
+            Some(PENDANT) => [PENDANT, PENDANT2].contains(&position),
             Some(slot) => slot == position,
             None => false,
         }

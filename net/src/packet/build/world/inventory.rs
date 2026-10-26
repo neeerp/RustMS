@@ -101,6 +101,16 @@ pub fn build_item_gain(item_id: i32, quantity: i32) -> Result<Packet, NetworkErr
     Ok(p)
 }
 
+/// Whether the Equip window has the second pendant cell (0xa13c7b). v83
+/// reads it only when it first builds the window, so it goes out before
+/// the player can open one (report b178).
+pub fn build_extra_pendant_slot(shown: bool) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ExtraPendantSlot as i16)?;
+    packet.write_byte(u8::from(shown))?;
+    Ok(packet)
+}
+
 /// SHOW_STATUS_INFO mode 8: "The item [name] has been expired, and
 /// therefore, deleted from your inventory." for each of up to 255
 /// `item_ids` (v83 FUN_00a209d4).

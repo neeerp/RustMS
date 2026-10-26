@@ -82,6 +82,8 @@ pub enum SendOpcode {
     CancelNameChangeResult = 0x71,
     /// The character has no Name Change request to cancel (0xa2a7e6).
     NoNameChange = 0x78,
+    /// Whether the Equip window shows the second pendant cell (report b144).
+    ExtraPendantSlot = 0x79,
     MonsterBookSetCard = 0x53,
     MonsterBookSetCover = 0x54,
     /// A named value the client keeps for the session, as the Dojo's

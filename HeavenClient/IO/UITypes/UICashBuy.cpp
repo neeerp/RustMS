@@ -106,6 +106,16 @@ namespace ms
 			if (is_character_slot(commodity.item_id))
 				return "Add a character slot (" + price + " NX)\\nAre you sure you want to add another\\ncharacter slot?";
 
+			// The days are the item's addDay, not the commodity's period
+			// (46c950).
+			if (is_slot_extender(commodity.item_id))
+			{
+				std::string id = "0" + std::to_string(commodity.item_id);
+				int32_t days = static_cast<int32_t>(nl::nx::item["Cash"]["0555.img"][id]["info"]["addDay"].get_integer());
+
+				return slot_extender_question(ItemData::get(commodity.item_id).get_name(), commodity.price, days);
+			}
+
 			if (!is_expansion(commodity.item_id) || commodity.sn != 0)
 				return "";
 
@@ -194,6 +204,15 @@ namespace ms
 
 			if (character_slots() >= MAX_CHARACTER_SLOTS)
 				return notice(NO_MORE_CHARACTERS);
+
+			return buy();
+		}
+
+		// v83 46c8e1: a slot extender, paid with NX Credit or Maple Points.
+		if (is_slot_extender(commodity.item_id))
+		{
+			if (commodity.price > 0 && !affordable(commodity.price, credit, points, 0))
+				return notice(NOT_ENOUGH_CASH);
 
 			return buy();
 		}
@@ -441,6 +460,8 @@ namespace ms
 				BuyCashPackagePacket(cash_type, sn).dispatch();
 			else if (is_character_slot(item_id))
 				BuyCharacterSlotPacket(cash_type, sn).dispatch();
+			else if (is_slot_extender(item_id))
+				BuySlotExtenderPacket(cash_type, sn).dispatch();
 			else if (is_expansion(item_id) && sn == 0)
 				ExpandSlotsPacket(cash_type, expanded(item_id)).dispatch();
 			else if (is_expansion(item_id))

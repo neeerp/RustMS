@@ -33,6 +33,8 @@ namespace ms
 		bulletprefix = 0;
 		bulletlevel = 0;
 		meso = 0;
+		extra_pendant = 0;
+		pendant_cell = false;
 		running_uid = 0;
 		slotmaxima[InventoryType::Id::EQUIPPED] = EquipSlot::Id::LENGTH;
 	}
@@ -43,6 +45,10 @@ namespace ms
 
 		for (auto &iter : inventories[InventoryType::Id::EQUIPPED])
 		{
+			// A pendant in the second slot does nothing once the slot is shut.
+			if (iter.first == EquipSlot::Id::PENDANT2 && !extra_pendant_open())
+				continue;
+
 			auto equip_iter = equips.find(iter.second.unique_id);
 
 			if (equip_iter != equips.end())
@@ -246,6 +252,31 @@ namespace ms
 		return meso;
 	}
 
+	void Inventory::set_extra_pendant(int64_t until)
+	{
+		extra_pendant = until;
+	}
+
+	int64_t Inventory::get_extra_pendant() const
+	{
+		return extra_pendant;
+	}
+
+	bool Inventory::extra_pendant_open() const
+	{
+		return item_expiry::open(extra_pendant, item_expiry::now());
+	}
+
+	void Inventory::set_pendant_cell(bool shown)
+	{
+		pendant_cell = shown;
+	}
+
+	bool Inventory::has_pendant_cell() const
+	{
+		return pendant_cell;
+	}
+
 	bool Inventory::has_projectile() const
 	{
 		return bulletslot > 0;
@@ -323,6 +354,17 @@ namespace ms
 					return ring;
 
 			return EquipSlot::Id::RING1;
+		} else if (eqslot == EquipSlot::Id::PENDANT1)
+		{
+			// A pendant goes in the second slot when the first is taken, open
+			// or not (report b178).
+			int16_t layer = ItemData::get(itemid).is_cashitem() ? CASH_EQUIP : 0;
+			const auto &worn = inventories[InventoryType::Id::EQUIPPED];
+
+			if (worn.count(EquipSlot::Id::PENDANT1 + layer) && !worn.count(EquipSlot::Id::PENDANT2 + layer))
+				return EquipSlot::Id::PENDANT2;
+
+			return eqslot;
 		} else
 		{
 			return eqslot;

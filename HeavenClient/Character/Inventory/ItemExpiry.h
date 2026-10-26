@@ -33,6 +33,19 @@ namespace ms::item_expiry
 		int32_t minute;
 	};
 
+	// Whether a slot open until `until` is open at `at`.
+	inline bool open(int64_t until, int64_t at)
+	{
+		return until > at;
+	}
+
+	// The second pendant slot after `days` more, from its expiry if it is
+	// still open and from `at` if not, as v83 adds them (47acdb).
+	inline int64_t extended(int64_t until, int64_t at, int32_t days)
+	{
+		return (open(until, at) ? until : at) + static_cast<int64_t>(days) * 86400 * TICKS_PER_SECOND;
+	}
+
 	// The UTC date and time, as FileTimeToSystemTime gives it.
 	inline Time utc(int64_t filetime)
 	{
@@ -81,6 +94,53 @@ namespace ms::item_expiry
 		std::snprintf(text, sizeof(text), format, t.month, t.day, t.year, t.hour, t.minute);
 
 		return text;
+	}
+
+	// The second pendant slot's name (StringPool 0x275).
+	constexpr const char *PENDANT_SLOT = "PENDANT";
+
+	// v83 passes the extra slot's dates year first, whatever the text says
+	// the numbers are (0x47ad8f, 0x8f1fa2, 0x8e96c1; report b178).
+	inline std::string slot_date(const char *format, const std::string &prefix, int64_t until)
+	{
+		Time t = utc(until);
+		char text[160];
+		std::snprintf(text, sizeof(text), format, t.year, t.month, t.day, t.hour, t.minute);
+
+		return prefix + text;
+	}
+
+	// What the Cash Shop says when it opens the slot (0x145a) or puts its
+	// end off (0x1459).
+	inline std::string slot_notice(bool was_open, int64_t until)
+	{
+		if (!was_open)
+			return std::string("You have added ") + PENDANT_SLOT + " slots.";
+
+		return slot_date("slot has been extended to %d(month)-%d(date)-%d(year) at %d(hour):%d(minute).",
+						 std::string("The time limit for the \\n ") + PENDANT_SLOT + " ", until);
+	}
+
+	// A slot extender's (555xxxx) line: what it would do while the slot is
+	// shut (0x145b), else when the slot shuts (0x145c, 0x8f1eaa).
+	inline std::string slot_extender_line(int64_t until, int64_t at)
+	{
+		if (!open(until, at))
+			return "If you purchase this item, you will be able to equip\\nadditional equipment items.";
+
+		return slot_date("Available until %d(month)-%d(date)-%04d(year) at %02d(hour):%02d(minute)", "", until);
+	}
+
+	// What a worn second pendant's description adds: when its effects end
+	// (0x144a), or, the slot shut, what would put it on (0x144b, 0x8e9635).
+	inline std::string pendant_slot_line(int64_t until, int64_t at)
+	{
+		if (!open(until, at))
+			return std::string("The item will be equipped if you purchase a ") + PENDANT_SLOT +
+				   " slot extender at the #c Cash Shop.#";
+
+		return slot_date("#cslot expiration date of %d(month)-%d(date)-%04d(year) at %02d(hour):%02d(minute).",
+						 "The item's effects will disappear after the ", until);
 	}
 
 	// An item's flag for being sealed (GW_ItemSlotBase::IsProtectedItem).

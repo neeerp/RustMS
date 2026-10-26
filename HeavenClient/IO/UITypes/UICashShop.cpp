@@ -263,13 +263,12 @@ namespace ms
 				static_cast<int8_t>(item["Gender"].get_integer(2)),
 				label(static_cast<int32_t>(item["Class"].get_integer(-1)), sn),
 				static_cast<int32_t>(item["Priority"].get_integer()),
-				static_cast<int32_t>(item["Period"].get_integer())
+				static_cast<int32_t>(item["Period"].get_integer()),
+				item["OnSale"].get_integer() == 1
 			});
-
-			if (item["OnSale"].get_integer() == 1)
-				commodities.push_back(catalog.back());
 		}
 
+		commodities = on_sale(catalog);
 		mesos_placed = scatter(commodities, []() { return Randomizer().next_int<uint32_t>(UINT32_MAX); });
 
 		name_label = Text(Text::Font::A12M, Text::Alignment::RIGHT, Color::Name::BLACK, stats.get_name());
@@ -1279,6 +1278,20 @@ namespace ms
 			if (yes)
 				button_pressed(Buttons::BT_EXIT);
 		});
+	}
+
+	void UICashShop::apply_changes(const std::vector<Change>& changes)
+	{
+		if (changes.empty())
+			return;
+
+		for (const Change& change : changes)
+			apply_change(catalog, change);
+
+		commodities = on_sale(catalog);
+		mesos_placed = scatter(commodities, []() { return Randomizer().next_int<uint32_t>(UINT32_MAX); });
+
+		update_list();
 	}
 
 	void UICashShop::set_account(const std::string& account, const std::vector<int32_t>& best)

@@ -152,8 +152,15 @@ namespace ms
 		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, descstr, DESC_WIDTH, true, tooltip::LINE_ADJ);
 
 		bool pet = itemid / 10000 == 500;
-		expiry = expirystr.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expirystr);
-		expiry_height = expiry.empty() ? 0 : pet ? PET_LINE_HEIGHT : EXPIRY_HEIGHT;
+		// A slot extender says what it does to the slot in its place.
+		bool extender = itemid / 10000 == 555;
+		std::string expiryline = extender
+			? item_expiry::slot_extender_line(player.get_inventory().get_extra_pendant(), item_expiry::now())
+			: expirystr;
+		expiry = expiryline.empty() ? Text() : Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, expiryline);
+		expiry_height = expiry.empty() ? 0 : pet ? PET_LINE_HEIGHT
+			: extender ? std::max<int16_t>(EXPIRY_HEIGHT, expiry.height() + 6)
+			: EXPIRY_HEIGHT;
 
 		// Pets have no line for it (FUN_008ed8f5).
 		if (!pet && item_properties::shows_maker(itemid, owner))

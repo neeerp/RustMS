@@ -30,7 +30,8 @@ namespace ms
 		invent.set_slotmax(InventoryType::ETC, recv.read_byte());
 		invent.set_slotmax(InventoryType::CASH, recv.read_byte());
 
-		recv.skip(8);
+		// Until when the second pendant slot is open (report b178).
+		invent.set_extra_pendant(recv.read_long());
 
 		// Worn regular items, worn cash items, and the Equip tab. Like v83, the
 		// cash items are kept 100 above their slot.

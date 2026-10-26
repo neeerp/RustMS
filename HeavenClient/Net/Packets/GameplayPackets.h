@@ -214,6 +214,20 @@ namespace ms
 	};
 
 	// Opcode: CASHSHOP_OPERATION(229)
+	class BuySlotExtenderPacket : public OutPacket
+	{
+	public:
+		// A slot extender's (555xxxx) commodity sn; v83 sends no pay mode
+		// (46c9f5).
+		BuySlotExtenderPacket(int32_t cash_type, int32_t sn) : OutPacket(OutPacket::Opcode::CASHSHOP_OPERATION)
+		{
+			write_byte(9);
+			write_byte(cash_type == 2);
+			write_int(sn);
+		}
+	};
+
+	// Opcode: CASHSHOP_OPERATION(229)
 	class BuyCharacterSlotPacket : public OutPacket
 	{
 	public:

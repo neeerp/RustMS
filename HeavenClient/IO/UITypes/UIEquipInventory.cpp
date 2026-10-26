@@ -41,7 +41,13 @@ namespace ms
 	{
 		// The window, measured from period footage. The background labels a
 		// grid of cells; the first starts at SLOT and they are SLOT_PITCH apart.
+		// With the second pendant's column (FullBackgrnd), the columns from
+		// the fourth on and the close button are a cell to the right, and the
+		// window is that much wider (FUN_00801a29).
 		constexpr Point<int16_t> CLOSE = Point<int16_t>(155, 6);
+		constexpr int16_t HEIGHT = 304;
+		constexpr int16_t PENDANT_COLUMN = 3;
+		constexpr Point<int16_t> PENDANT2_CELL = Point<int16_t>(PENDANT_COLUMN, 3);
 		constexpr Point<int16_t> SLOT = Point<int16_t>(5, 35);
 		constexpr int16_t SLOT_PITCH = 33;
 		constexpr int16_t SLOT_SIZE = 32;
@@ -129,46 +135,61 @@ namespace ms
 			return SLOT + Point<int16_t>(column * SLOT_PITCH, row * SLOT_PITCH);
 		}
 
+		// Where a cell of the narrow window is in this one.
+		constexpr Point<int16_t> cell_position(int16_t column, int16_t row, bool wide)
+		{
+			return cell_position(wide && column >= PENDANT_COLUMN ? column + 1 : column, row);
+		}
+
 		// Monster Riding for explorers, Cygnus Knights, and Aran.
 		constexpr int32_t MONSTER_RIDING[] = { 1004, 10001004, 20001004 };
 	}
 
 	UIEquipInventory::UIEquipInventory(const Inventory &invent)
-			: UIDragElement<PosEQINV>(), inventory(invent), pet_enabled(false), pet_tab(0)
+			: UIDragElement<PosEQINV>(), inventory(invent), pet_enabled(false), wide(invent.has_pendant_cell()), pet_tab(0)
 	{
+		// v83 hangs the panel at the same place either way (0x7fe142), where
+		// the wide window would cover part of it, so here it moves too.
+		Point<int16_t> shift = Point<int16_t>(wide ? SLOT_PITCH : 0, 0);
+		pet_panel = PET_PANEL + shift;
+
 		for (auto cell : CELLS)
-			iconpositions[cell.slot] = cell_position(cell.column, cell.row);
+			iconpositions[cell.slot] = cell_position(cell.column, cell.row, wide);
+
+		if (wide)
+			iconpositions[EquipSlot::Id::PENDANT2] = cell_position(PENDANT2_CELL.x(), PENDANT2_CELL.y());
 
 		for (const PetCell &cell : PET_CELLS)
 			for (int16_t part : cell.parts)
-				iconpositions[part_slot(part)] = PET_PANEL + cell.position;
+				iconpositions[part_slot(part)] = pet_panel + cell.position;
 
 		nl::node Equip = NxFiles::ui_classic["UIWindow.img"]["Equip"];
 
-		backgrnd = Equip["backgrnd"];
+		backgrnd = Equip[wide ? "FullBackgrnd" : "backgrnd"];
 		pet = Equip["pet"];
 
 		// A cell that cannot be used is tinted red, as in period footage.
 		unavailable = ColorBox(SLOT_SIZE, SLOT_SIZE, Color::Name::RED, 0.25f);
 
-		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE);
+		buttons[Buttons::BT_CLOSE] = std::make_unique<MapleButton>(NxFiles::ui_classic["Basic.img"]["BtClose"], CLOSE + shift);
 		buttons[Buttons::BT_PET_SHOW] = std::make_unique<MapleButton>(Equip["BtPetEquipShow"], PET_SHOW);
 
 		nl::node hide = Equip["BtPetEquipHide"];
 		buttons[Buttons::BT_PET_HIDE] = std::make_unique<MapleButton>(hide,
-																	  PET_PANEL + PET_HIDE + Texture(hide["normal"]["0"]).get_origin());
+																	  pet_panel + PET_HIDE + Texture(hide["normal"]["0"]).get_origin());
 
 		// Each tab shows a pet's equipment, and is there while the pet is out.
 		for (uint16_t i = 0; i < 3; i++)
 		{
 			nl::node tab = NxFiles::ui_classic["UIWindow.img"]["UserInfo"]["BtPet" + std::to_string(i + 1)];
-			Point<int16_t> pos = PET_PANEL + PET_TAB + Point<int16_t>(PET_TAB_PITCH * i, 0);
+			Point<int16_t> pos = pet_panel + PET_TAB + Point<int16_t>(PET_TAB_PITCH * i, 0);
 
 			buttons[Buttons::BT_PET1 + i] = std::make_unique<MapleButton>(tab, pos + Texture(tab["normal"]["0"]).get_origin());
 		}
 
+		// The window keeps its height though the wide art is shorter.
 		Point<int16_t> bg_dimensions = backgrnd.get_dimensions();
-		dimension = bg_dimensions;
+		dimension = Point<int16_t>(bg_dimensions.x(), HEIGHT);
 		dragarea = Point<int16_t>(bg_dimensions.x(), 20);
 
 		load_icons();
@@ -182,7 +203,7 @@ namespace ms
 		// The panel slides out from under the window (FUN_00801474).
 		if (pet_enabled)
 		{
-			Point<int16_t> panel = position + PET_PANEL;
+			Point<int16_t> panel = position + pet_panel;
 
 			pet.draw(panel);
 
@@ -211,16 +232,16 @@ namespace ms
 
 		backgrnd.draw(position);
 
-		for (auto cell : CELLS)
-			if (is_unavailable(cell.slot))
-				unavailable.draw(position + iconpositions[cell.slot]);
+		for (EquipSlot::Id slot : cells())
+			if (is_unavailable(slot))
+				unavailable.draw(position + iconpositions[slot]);
 
 		if (is_unavailable(EquipSlot::Id::TAMEDMOB))
 			unavailable.draw(position + cell_position(MOB_EQUIP.x(), MOB_EQUIP.y()));
 
-		for (auto cell : CELLS)
-			if (auto &icon = icons[cell.slot])
-				icon->draw(position + iconpositions[cell.slot] + ICON);
+		for (EquipSlot::Id slot : cells())
+			if (auto &icon = icons[slot])
+				icon->draw(position + iconpositions[slot] + ICON);
 
 		UIElement::draw_buttons(alpha);
 	}
@@ -326,8 +347,9 @@ namespace ms
 			buttons[i]->set_active(show);
 	}
 
-	// Pants under an overall, a shield beside a two-handed weapon, and the
-	// riding cells without Monster Riding.
+	// Pants under an overall, a shield beside a two-handed weapon, the
+	// riding cells without Monster Riding, and the second pendant's while
+	// shut (0x7ff006).
 	bool UIEquipInventory::is_unavailable(EquipSlot::Id slot) const
 	{
 		switch (slot)
@@ -351,9 +373,24 @@ namespace ms
 
 				return true;
 			}
+			case EquipSlot::Id::PENDANT2:
+				return !inventory.extra_pendant_open();
 			default:
 				return false;
 		}
+	}
+
+	std::vector<EquipSlot::Id> UIEquipInventory::cells() const
+	{
+		std::vector<EquipSlot::Id> slots;
+
+		for (auto cell : CELLS)
+			slots.push_back(cell.slot);
+
+		if (wide)
+			slots.push_back(EquipSlot::Id::PENDANT2);
+
+		return slots;
 	}
 
 	void UIEquipInventory::update_slot(EquipSlot::Id slot)
@@ -381,8 +418,8 @@ namespace ms
 	{
 		icons.clear();
 
-		for (auto cell : CELLS)
-			update_slot(cell.slot);
+		for (EquipSlot::Id slot : cells())
+			update_slot(slot);
 
 		for (const PetCell &cell : PET_CELLS)
 			for (int16_t part : cell.parts)
@@ -409,7 +446,7 @@ namespace ms
 			if (!pressed)
 				return Cursor::State::CANGRAB;
 
-			potions[potion]->start_drag(cursorpos - position - PET_PANEL - POTIONS[potion] - ICON);
+			potions[potion]->start_drag(cursorpos - position - pet_panel - POTIONS[potion] - ICON);
 
 			UI::get().drag_icon(potions[potion].get());
 
@@ -487,16 +524,18 @@ namespace ms
 		if (!pet_enabled)
 			return false;
 
-		Point<int16_t> panel = position + PET_PANEL;
+		Point<int16_t> panel = position + pet_panel;
 
 		return Rectangle<int16_t>(panel, panel + pet.get_dimensions()).contains(cursorpos);
 	}
 
 	bool UIEquipInventory::send_icon(const Icon& icon, Point<int16_t> cursorpos)
 	{
+		// Nothing is dropped on the second pendant's cell; a pendant gets
+		// there only when the first is taken (report b178).
 		if (int8_t potion = potion_by_position(cursorpos); potion >= 0)
 			icon.drop_on_potion(potion);
-		else if (EquipSlot::Id slot = slot_by_position(cursorpos))
+		else if (EquipSlot::Id slot = slot_by_position(cursorpos); slot && slot != EquipSlot::Id::PENDANT2)
 			icon.drop_on_equips(slot);
 
 		return true;
@@ -539,13 +578,13 @@ namespace ms
 
 	EquipSlot::Id UIEquipInventory::slot_by_position(Point<int16_t> cursorpos) const
 	{
-		for (auto cell : CELLS)
+		for (EquipSlot::Id slot : cells())
 		{
-			Point<int16_t> cellpos = position + iconpositions[cell.slot];
+			Point<int16_t> cellpos = position + iconpositions[slot];
 			Rectangle<int16_t> cellrect = Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(SLOT_SIZE, SLOT_SIZE));
 
 			if (cellrect.contains(cursorpos))
-				return cell.slot;
+				return slot;
 		}
 
 		if (!pet_enabled)
@@ -553,7 +592,7 @@ namespace ms
 
 		for (const PetCell &cell : PET_CELLS)
 		{
-			Point<int16_t> cellpos = position + PET_PANEL + cell.position;
+			Point<int16_t> cellpos = position + pet_panel + cell.position;
 			Rectangle<int16_t> cellrect = Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(SLOT_SIZE, SLOT_SIZE));
 
 			if (cellrect.contains(cursorpos))
@@ -570,7 +609,7 @@ namespace ms
 
 		for (int8_t mp = 0; mp < 2; mp++)
 		{
-			Point<int16_t> cellpos = position + PET_PANEL + POTIONS[mp];
+			Point<int16_t> cellpos = position + pet_panel + POTIONS[mp];
 
 			if (Rectangle<int16_t>(cellpos, cellpos + Point<int16_t>(SLOT_SIZE, SLOT_SIZE)).contains(cursorpos))
 				return mp;

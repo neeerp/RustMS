@@ -20,6 +20,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include "../UIDragElement.h"
 
@@ -65,6 +66,8 @@ namespace ms
 		void load_icons();
 		void update_slot(EquipSlot::Id slot);
 		bool is_unavailable(EquipSlot::Id slot) const;
+		// The cells of worn equipment, as drawn.
+		std::vector<EquipSlot::Id> cells() const;
 		EquipSlot::Id slot_by_position(Point<int16_t> position) const;
 		void show_pet(bool show);
 		// Whether the pet at `index` in the list is out.
@@ -135,6 +138,10 @@ namespace ms
 		ColorBox unavailable;
 
 		bool pet_enabled;
+		// Whether the window has the second pendant's column (opcode 121),
+		// and where the pet panel hangs off it.
+		bool wide;
+		Point<int16_t> pet_panel;
 		// The pet whose equipment the panel shows.
 		uint8_t pet_tab;
 	};

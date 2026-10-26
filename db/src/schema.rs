@@ -287,6 +287,14 @@ diesel::table! {
     }
 }
 diesel::joinable!(auto_potions -> characters (character_id));
+
+diesel::table! {
+    extra_pendant_slots (character_id) {
+        character_id -> Int4,
+        open_until -> Timestamp,
+    }
+}
+diesel::joinable!(extra_pendant_slots -> characters (character_id));
 diesel::table! {
     quick_slots (character_id) {
         character_id -> Int4,
@@ -808,6 +816,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     saved_locations,
     gacha_exp,
     auto_potions,
+    extra_pendant_slots,
     quick_slots,
     character_mounts,
     fame_log,

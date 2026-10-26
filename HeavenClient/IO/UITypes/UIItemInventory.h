@@ -91,7 +91,7 @@ namespace ms
 		// Whether the player may change equipment now, with a notice if not.
 		bool can_change_equips() const;
 
-		bool can_wear_equip(int16_t slot) const;
+		bool can_wear_equip(int16_t slot, EquipSlot::Id part = EquipSlot::Id::NONE) const;
 
 		// Whether the pet equipment in `slot` may go on `part`, with a
 		// notice if not (FUN_004f1c2d).

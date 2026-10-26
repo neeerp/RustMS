@@ -20,6 +20,7 @@
 #include "Helpers/CashShopParser.h"
 #include "Helpers/ItemParser.h"
 
+#include "../../Character/Inventory/ItemExpiry.h"
 #include "../../Data/CashCoupon.h"
 #include "../../Data/ItemData.h"
 #include "../../Data/NameChange.h"
@@ -45,15 +46,83 @@ namespace ms
 
 		recv.skip_byte();	// Not MTS
 		std::string account = recv.read_string();
-		recv.skip_int();
 
-		int16_t specialcashitem_size = recv.read_short();
+		// The commodities taken off and those changed or added; each change
+		// sends only the fields its flags name (v83 a25db4, report b179).
+		// v83 drops those removed only from its lists of hot and new items.
+		int32_t removed = recv.read_int();
 
-		for (size_t i = 0; i < specialcashitem_size; i++)
-		{
+		for (int32_t i = 0; i < removed; i++)
 			recv.skip_int();	// sn
-			recv.skip_int();	// mod
-			recv.skip_byte();	// info
+
+		uint16_t changed = static_cast<uint16_t>(recv.read_short());
+		std::vector<cash_catalog::Change> changes;
+
+		for (uint16_t i = 0; i < changed; i++)
+		{
+			using Change = cash_catalog::Change;
+
+			Change change = {};
+			change.sn = recv.read_int();
+			change.flags = static_cast<uint32_t>(recv.read_int());
+
+			if (change.flags & Change::ITEM_ID)
+				change.item_id = recv.read_int();
+
+			if (change.flags & Change::COUNT)
+				change.count = recv.read_short();
+
+			if (change.flags & Change::PRIORITY)
+				change.priority = static_cast<uint8_t>(recv.read_byte());
+
+			if (change.flags & Change::PRICE)
+				change.price = recv.read_int();
+
+			if (change.flags & Change::BONUS)
+				recv.skip_byte();
+
+			if (change.flags & Change::PERIOD)
+				change.period = static_cast<uint16_t>(recv.read_short());
+
+			if (change.flags & Change::MAPLE_POINT)
+				recv.skip_int();
+
+			if (change.flags & Change::MESO)
+				recv.skip_int();
+
+			if (change.flags & Change::PREMIUM)
+				recv.skip_byte();
+
+			if (change.flags & Change::GENDER)
+				change.gender = recv.read_byte();
+
+			if (change.flags & Change::ON_SALE)
+				change.on_sale = recv.read_byte() == 1;
+
+			if (change.flags & Change::CLASS)
+				change.item_class = recv.read_byte();
+
+			if (change.flags & Change::LIMIT)
+				recv.skip_byte();
+
+			if (change.flags & Change::PB_CASH)
+				recv.skip_short();
+
+			if (change.flags & Change::PB_POINT)
+				recv.skip_short();
+
+			if (change.flags & Change::PB_GIFT)
+				recv.skip_short();
+
+			if (change.flags & Change::PACKAGE)
+			{
+				uint8_t contents = static_cast<uint8_t>(recv.read_byte());
+
+				for (uint8_t c = 0; c < contents; c++)
+					recv.skip_int();	// sn
+			}
+
+			changes.push_back(change);
 		}
 
 		recv.skip(121);
@@ -89,7 +158,10 @@ namespace ms
 		UI::get().change_state(UI::State::CASHSHOP);
 
 		if (auto cashshop = UI::get().get_element<UICashShop>())
+		{
+			cashshop->apply_changes(changes);
 			cashshop->set_account(account, best);
+		}
 	}
 
 	void SetCashShopHandler::transition() const
@@ -397,6 +469,22 @@ namespace ms
 
 			cashshop->set_character_slots(slots);
 			UI::get().emplace<UIOk>("You have added a new character slot.", [](bool) {});	// StringPool 0x214
+			break;
+		}
+		case 0x66:
+		{
+			// The second pendant slot is open for more days: from its end
+			// while open, else from now (0x47acdb, report b178). The balance
+			// follows.
+			recv.skip_short();	// the slot, the pendant's only
+			int16_t days = recv.read_short();
+
+			Inventory& inventory = Stage::get().get_player().get_inventory();
+			int64_t now = item_expiry::now();
+			bool was_open = item_expiry::open(inventory.get_extra_pendant(), now);
+			inventory.set_extra_pendant(item_expiry::extended(inventory.get_extra_pendant(), now, days));
+
+			UI::get().emplace<UIOk>(item_expiry::slot_notice(was_open, inventory.get_extra_pendant()), [](bool) {});
 			break;
 		}
 		case 0x5E:

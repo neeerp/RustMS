@@ -124,6 +124,7 @@ namespace ms
 		SESSION_VALUE = 90,
 		FIELD_SET_VARIABLE = 92,
 
+		EXTRA_PENDANT_SLOT = 121,
 		SCRIPT_PROGRESS_MESSAGE = 122,
 		SKILL_MACROS = 124,
 		SET_FIELD = 125,
@@ -524,6 +525,7 @@ namespace ms
 		emplace<RANDOM_MORPH_RES, RandomMorphResHandler>();
 		emplace<QUEST_CLEAR, QuestClearHandler>();
 		emplace<SCRIPT_PROGRESS_MESSAGE, ScriptProgressMessageHandler>();
+		emplace<EXTRA_PENDANT_SLOT, ExtraPendantSlotHandler>();
 		emplace<SHOW_ITEM_GAIN_INCHAT, ShowItemGainInChatHandler>();
 		emplace<DOJO_WARP_UP, DojoWarpUpHandler>();
 

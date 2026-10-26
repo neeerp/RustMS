@@ -10,6 +10,7 @@ use game::{InventoryType, Item, Player};
 use game_data::items::EquipInfo;
 use packet::{io::read::PktRead, Packet};
 use std::io::Cursor;
+use std::time::SystemTime;
 use tracing::debug;
 
 /// `ITEM_MOVE`: tick, inventory type, source slot, destination slot,
@@ -196,6 +197,11 @@ fn move_item(
         };
         if !allowed {
             return Err("requirements not met".into());
+        }
+        // The second pendant slot takes a pendant only while it is paid for
+        // (report b144).
+        if to % 100 == equip_slot::PENDANT2 && !player.extra_pendant_open(SystemTime::now()) {
+            return Err("the second pendant slot is shut".into());
         }
         let inventory = player.inventory_mut();
         let mut changes = inventory.equip(from, to).map_err(|e| e.to_string())?;
@@ -477,6 +483,33 @@ mod tests {
             .handle(&mut packet, &mut ctx)
             .unwrap()
             .actions
+    }
+
+    #[test]
+    fn the_second_pendant_slot_is_worn_only_while_paid_for() {
+        // The Horntail Necklace, a pendant.
+        if items::info(1122000).is_none() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.level = 120;
+        for slot in [1, 2] {
+            let pendant = Item::equipment(1122000, EquipStats::default());
+            player.inventory.insert(InventoryType::Equip, slot, pendant);
+        }
+        move_item(&mut player, 1, 1, equip_slot::PENDANT).unwrap();
+        assert!(move_item(&mut player, 1, 2, equip_slot::PENDANT2).is_err());
+
+        let day = std::time::Duration::from_secs(86_400);
+        player.extra_pendant = Some(SystemTime::now() - day);
+        assert!(move_item(&mut player, 1, 2, equip_slot::PENDANT2).is_err());
+
+        player.extra_pendant = Some(SystemTime::now() + day);
+        move_item(&mut player, 1, 2, equip_slot::PENDANT2).unwrap();
+        assert!(player
+            .inventory
+            .get(InventoryType::Equipped, equip_slot::PENDANT2)
+            .is_some());
     }
 
     #[test]

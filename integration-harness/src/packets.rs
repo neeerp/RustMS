@@ -94,6 +94,9 @@ pub struct SetFieldPacket {
     pub meso: i32,
     /// Slots in the Equip, Use, Set-up, Etc and Cash bags.
     pub slot_limits: [u8; 5],
+    /// Until when the second pendant slot is open, as a FILETIME; 1900 if
+    /// it never was.
+    pub extra_pendant: i64,
     /// The Monster Book's cover card and each card's copies, by card id.
     pub monster_book_cover: i32,
     pub monster_book: BTreeMap<i32, u8>,
@@ -271,6 +274,7 @@ pub fn opcode_name(opcode: i16) -> &'static str {
         x if x == SendOpcode::RecommendedWorlds as i16 => "RecommendedWorlds",
         x if x == SendOpcode::SetField as i16 => "SetField",
         x if x == SendOpcode::SetCashShop as i16 => "SetCashShop",
+        x if x == SendOpcode::ExtraPendantSlot as i16 => "ExtraPendantSlot",
         x if x == SendOpcode::QueryCashResult as i16 => "QueryCashResult",
         x if x == SendOpcode::CashShopOperation as i16 => "CashShopOperation",
         x if x == SendOpcode::CheckNewNameResult as i16 => "CheckNewNameResult",
@@ -559,6 +563,17 @@ pub fn build_coupon_code(code: &str) -> Result<Packet, String> {
         .write_str_with_length("")
         .and_then(|_| packet.write_str_with_length(code))
         .map_err(|e| e.to_string())?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION 0x09: buy the second pendant slot's commodity `sn`,
+/// with Maple Points if `points`, else NX Credit.
+pub fn build_cash_shop_buy_pendant_slot(points: bool, sn: i32) -> Result<Packet, String> {
+    let mut packet = packet_with_opcode(RecvOpcode::CashShopOperation as i16);
+    packet
+        .write_bytes(&[0x09, u8::from(points)])
+        .and_then(|_| packet.write_int(sn))
+        .map_err(|e| format!("failed to write purchase: {e}"))?;
     Ok(packet)
 }
 
@@ -935,7 +950,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
     for limit in &mut slot_limits {
         *limit = cursor.read_byte().map_err(|e| e.to_string())?;
     }
-    skip(&mut cursor, 8)?; // timestamp
+    let extra_pendant = cursor.read_long().map_err(|e| e.to_string())?;
 
     // Equipped, equipped cash, and equip bag: short slot lists ending in 0.
     let mut equipped = BTreeMap::new();
@@ -1058,6 +1073,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         items,
         meso,
         slot_limits,
+        extra_pendant,
         monster_book_cover,
         monster_book,
         linked_name,

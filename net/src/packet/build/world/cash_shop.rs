@@ -1,3 +1,4 @@
+use crate::cash_shop::PENDANT_SLOT;
 use crate::codec::encode_character_data;
 use crate::codec::item::{encode_item, SlotPrefix};
 use crate::codec::stats::write_padded_name;
@@ -5,6 +6,7 @@ use crate::codec::time::expiration;
 use crate::{error::NetworkError, packet::op::SendOpcode};
 use db::cash_shop::CashItem;
 use game::{InventoryType, Item, Player};
+use game_data::commodities::Commodity;
 use packet::{io::write::PktWrite, Packet};
 
 /// Cash Shop tabs with a best-sellers row, and how many items each shows.
@@ -17,7 +19,8 @@ pub const GIFT_MESSAGE_LEN: usize = 73;
 
 /// SET_CASH_SHOP: take the player out of the map and into the Cash Shop.
 /// `best` holds the Best Items for men and for women, up to five each; every
-/// tab gets the same. The shop has no special-priced items.
+/// tab gets the same. The shop adds the second pendant slot to the client's
+/// commodities and changes no others.
 pub fn build_open_cash_shop(
     player: &Player,
     account_name: &str,
@@ -28,8 +31,8 @@ pub fn build_open_cash_shop(
     encode_character_data(&mut packet, player)?;
     packet.write_byte(1)?; // the Cash Shop, not the MTS
     packet.write_str_with_length(account_name)?;
-    packet.write_int(0)?;
-    packet.write_short(0)?; // special-priced items
+    packet.write_int(0)?; // no commodity taken off the list
+    encode_added_commodities(&mut packet, &[PENDANT_SLOT])?;
     packet.write_bytes(&[0; 121])?;
     for tab in 1..=BEST_SELLER_TABS {
         for (gender, best) in (0..).zip(best) {
@@ -45,6 +48,35 @@ pub fn build_open_cash_shop(
     packet.write_byte(0)?;
     packet.write_int(75)?;
     Ok(packet)
+}
+
+/// Commodity fields v83 reads over its own (0xa25f19; report b179).
+const ITEM_ID: u32 = 0x1;
+const COUNT: u32 = 0x2;
+const PRICE: u32 = 0x4;
+const PRIORITY: u32 = 0x10;
+const PERIOD: u32 = 0x20;
+const GENDER: u32 = 0x200;
+const ON_SALE: u32 = 0x400;
+
+/// Commodities the client's `Commodity.img` lacks, each in full: v83 adds an
+/// unknown SN to its list, under the tab and sub-tab its digits name.
+fn encode_added_commodities(packet: &mut Packet, added: &[Commodity]) -> Result<(), NetworkError> {
+    packet.write_short(added.len() as i16)?;
+    for commodity in added {
+        packet.write_int(commodity.sn)?;
+        packet
+            .write_int((ITEM_ID | COUNT | PRICE | PRIORITY | PERIOD | GENDER | ON_SALE) as i32)?;
+        // In the order v83 reads them, not that of the bits.
+        packet.write_int(commodity.item_id)?;
+        packet.write_short(commodity.count)?;
+        packet.write_byte(9)?; // the priority most of Etc > Game has
+        packet.write_int(commodity.price)?;
+        packet.write_short(commodity.period as i16)?;
+        packet.write_byte(commodity.gender as u8)?;
+        packet.write_byte(u8::from(commodity.on_sale))?;
+    }
+    Ok(())
 }
 
 /// QUERY_CASH_RESULT: the account's NX Credit, Maple Points and NX Prepaid.
@@ -70,6 +102,7 @@ const GIFT_SENT: u8 = 0x5E;
 const INVENTORY_SLOTS: u8 = 0x60;
 const STORAGE_SLOTS: u8 = 0x62;
 const CHARACTER_SLOTS: u8 = 0x64;
+const SLOT_EXTENDED: u8 = 0x66;
 const TAKEN_OUT: u8 = 0x68;
 const PUT_BACK: u8 = 0x6A;
 const BOUGHT_RING: u8 = 0x87;
@@ -222,6 +255,18 @@ pub fn build_character_slots(slots: i16) -> Result<Packet, NetworkError> {
     packet.write_short(SendOpcode::CashShopOperation as i16)?;
     packet.write_byte(CHARACTER_SLOTS)?;
     packet.write_short(slots)?;
+    Ok(packet)
+}
+
+/// CASHSHOP_OPERATION: the second pendant slot is paid for `days` more.
+/// v83 adds them to its expiry if still open, or else to now, and says so
+/// (0x47acdb; report b178).
+pub fn build_pendant_slot_extended(days: u16) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::CashShopOperation as i16)?;
+    packet.write_byte(SLOT_EXTENDED)?;
+    packet.write_short(0)?; // the slot: 0 is the second pendant's
+    packet.write_short(days as i16)?;
     Ok(packet)
 }
 
@@ -396,7 +441,12 @@ mod tests {
         let mut expect = Expect::new(&packet.bytes);
         expect.short(SendOpcode::SetCashShop as i16);
         expect.bytes(&character.bytes);
-        expect.byte(1).string("alice").int(0).short(0);
+        expect.byte(1).string("alice").int(0);
+        // The second pendant slot, added in Etc > Game: SN, the fields sent,
+        // then item, count, priority, price, days, gender and on sale.
+        expect.short(1).int(50200172).int(0x637);
+        expect.int(5550000).short(1).byte(9).int(2000).short(30);
+        expect.byte(2).byte(1);
         expect.bytes(&[0; 121]);
         for tab in 1..=8 {
             for (gender, sns) in [

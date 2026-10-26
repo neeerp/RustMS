@@ -25,7 +25,7 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
         }
     }
     packet.write_int(player.meso)?;
-    encode_inventory(packet, &player.inventory)?;
+    encode_inventory(packet, &player.inventory, player.extra_pendant)?;
 
     packet.write_short(player.skills.len() as i16)?;
     for skill in player.skills.iter() {

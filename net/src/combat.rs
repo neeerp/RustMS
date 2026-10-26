@@ -332,9 +332,7 @@ pub fn max_base_damage(player: &Player, attack: &Attack) -> i32 {
         0
     };
     let watk: i32 = player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
+        .worn_equips()
         .map(|equip| i32::from(equip.watk))
         .sum::<i32>()
         + buff(player, BuffStat::Pad)
@@ -406,9 +404,7 @@ fn critical_bonus(player: &Player, attack: &Attack) -> i32 {
 /// player's magic, their INT plus their equipment's magic attack.
 pub fn max_magic_damage(player: &Player, spell: i32) -> i32 {
     let (int, matk) = player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
+        .worn_equips()
         .fold((i32::from(player.stats.int), 0), |(int, matk), equip| {
             (int + i32::from(equip.int), matk + i32::from(equip.matk))
         });
@@ -1035,12 +1031,7 @@ pub fn mana_reflection(player: &Player, mob: &MobInfo, damage: i32) -> i32 {
 /// that adds to it.
 fn accuracy(player: &Player) -> i32 {
     let (_, dex, luk) = skills::total_stats(player);
-    let worn: i32 = player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
-        .map(|equip| i32::from(equip.acc))
-        .sum();
+    let worn: i32 = player.worn_equips().map(|equip| i32::from(equip.acc)).sum();
     worn + (f64::from(dex) * 0.8 + f64::from(luk) * 0.5) as i32 + buff(player, BuffStat::Acc)
 }
 

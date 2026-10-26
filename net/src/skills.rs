@@ -670,20 +670,16 @@ pub(crate) fn total_stats(player: &Player) -> (i32, i32, i32) {
     let stats = &player.stats;
     let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
     let own = |stat: i16| i32::from(stat) + i32::from(stat) * warrior / 100;
-    player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
-        .fold(
-            (own(stats.str), own(stats.dex), own(stats.luk)),
-            |(str, dex, luk), equip| {
-                (
-                    str + i32::from(equip.str),
-                    dex + i32::from(equip.dex),
-                    luk + i32::from(equip.luk),
-                )
-            },
-        )
+    player.worn_equips().fold(
+        (own(stats.str), own(stats.dex), own(stats.luk)),
+        |(str, dex, luk), equip| {
+            (
+                str + i32::from(equip.str),
+                dex + i32::from(equip.dex),
+                luk + i32::from(equip.luk),
+            )
+        },
+    )
 }
 
 /// A player's INT with what they wear and Maple Warrior's percent of their
@@ -692,9 +688,7 @@ pub(crate) fn total_int(player: &Player) -> i32 {
     let int = i32::from(player.stats.int);
     let warrior = i32::from(player.buffs.value(BuffStat::MapleWarrior).unwrap_or(0));
     player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
+        .worn_equips()
         .fold(int + int * warrior / 100, |total, equip| {
             total + i32::from(equip.int)
         })
@@ -1100,20 +1094,16 @@ pub const HEAL: i32 = 2301002;
 /// What a spell's damage comes from, with the player's equipment: their INT,
 /// their LUK, and their magic, INT plus magic attack, at most 1999.
 pub fn spell_stats(player: &Player) -> (i32, i32, i32) {
-    let (int, luk, matk) = player
-        .inventory
-        .items(InventoryType::Equipped)
-        .filter_map(|(_, item)| item.equip.as_ref())
-        .fold(
-            (i32::from(player.stats.int), i32::from(player.stats.luk), 0),
-            |(int, luk, matk), equip| {
-                (
-                    int + i32::from(equip.int),
-                    luk + i32::from(equip.luk),
-                    matk + i32::from(equip.matk),
-                )
-            },
-        );
+    let (int, luk, matk) = player.worn_equips().fold(
+        (i32::from(player.stats.int), i32::from(player.stats.luk), 0),
+        |(int, luk, matk), equip| {
+            (
+                int + i32::from(equip.int),
+                luk + i32::from(equip.luk),
+                matk + i32::from(equip.matk),
+            )
+        },
+    );
     (int, luk, (int + matk).clamp(0, 1999))
 }
 

@@ -317,6 +317,9 @@ pub struct Player {
     /// The quick slot panel's keys, or None if never set, when the client
     /// is told to use its defaults.
     pub quick_slots: Option<QuickSlots>,
+    /// Until when the second pendant slot (`equip_slot::PENDANT2`) is
+    /// open, if 5550000 was ever bought for it.
+    pub extra_pendant: Option<std::time::SystemTime>,
     dirty: bool,
 }
 
@@ -379,8 +382,26 @@ impl Player {
             saved_locations: BTreeMap::new(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,
+            extra_pendant: None,
             dirty: false,
         }
+    }
+
+    /// Whether a pendant may be worn in the second pendant slot at `now`.
+    pub fn extra_pendant_open(&self, now: std::time::SystemTime) -> bool {
+        self.extra_pendant.is_some_and(|until| until > now)
+    }
+
+    /// The stats of what the player wears that count. A pendant in the
+    /// second pendant slot stops counting once the slot runs out, as v83's
+    /// BasicStat::SetFrom (0x77ec9f) skips slot 51 past its expiry; it
+    /// stays worn.
+    pub fn worn_equips(&self) -> impl Iterator<Item = &EquipStats> {
+        let shut = !self.extra_pendant_open(std::time::SystemTime::now());
+        self.inventory
+            .items(InventoryType::Equipped)
+            .filter(move |(position, _)| !(shut && *position == equip_slot::PENDANT2))
+            .filter_map(|(_, item)| item.equip.as_ref())
     }
 
     pub fn id(&self) -> i32 {
@@ -871,12 +892,7 @@ impl Player {
     }
 
     fn effective_max(&self, base: i16, gear: fn(&EquipStats) -> i16, buff: BuffStat) -> i32 {
-        let gear: i32 = self
-            .inventory
-            .items(InventoryType::Equipped)
-            .filter_map(|(_, item)| item.equip.as_ref())
-            .map(|equip| i32::from(gear(equip)))
-            .sum();
+        let gear: i32 = self.worn_equips().map(|equip| i32::from(gear(equip))).sum();
         let percent = self.buffs.value(buff).map_or(0, i32::from);
         ((i32::from(base) + gear) * (100 + percent) / 100).min(i32::from(MAX_HP_MP))
     }
@@ -1222,6 +1238,41 @@ mod tests {
         // Never more than 30000.
         player.stats.max_hp = 29_900;
         assert_eq!(player.effective_max_hp(), 30_000);
+    }
+
+    #[test]
+    fn a_pendant_in_the_second_slot_counts_only_while_the_slot_is_open() {
+        use std::time::{Duration, SystemTime};
+        let mut player = player();
+        player.stats.max_hp = 1000;
+        let stats = EquipStats {
+            hp: 100,
+            ..EquipStats::default()
+        };
+        let pendant = |item_id| Item::equipment(item_id, stats.clone());
+        (player.inventory).insert(
+            InventoryType::Equipped,
+            equip_slot::PENDANT,
+            pendant(1122000),
+        );
+        (player.inventory).insert(
+            InventoryType::Equipped,
+            equip_slot::PENDANT2,
+            pendant(1122001),
+        );
+
+        player.extra_pendant = Some(SystemTime::now() + Duration::from_secs(60));
+        assert_eq!(player.effective_max_hp(), 1200);
+
+        // Run out: it stays worn but adds nothing; the first slot still does.
+        player.extra_pendant = Some(SystemTime::now() - Duration::from_secs(60));
+        assert_eq!(player.effective_max_hp(), 1100);
+        player.extra_pendant = None;
+        assert_eq!(player.effective_max_hp(), 1100);
+        assert!(player
+            .inventory
+            .get(InventoryType::Equipped, equip_slot::PENDANT2)
+            .is_some());
     }
 
     #[test]
