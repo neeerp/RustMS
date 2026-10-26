@@ -345,8 +345,24 @@ arrows, Left and Right slide along. MOVE, Enter or the middle icon answers
 `0E 01 i32` with its id; CANCEL or Escape answers `0E 00`. An id of -1
 means nowhere to go: alone, it shows its label with no icons and MOVE
 disabled; among other choices, it leaves nothing at all. Text not
-starting with `#` hangs v83 and gives no choices in HeavenClient. The
-server sends none yet.
+starting with `#` hangs v83 and gives no choices in HeavenClient.
+
+On the server a script's `Page::Slide` becomes `Prompt::Slide`, with a
+`#` taken out of any label. Only the Dimensional Mirror (9010022,
+`npc_scripts::dimensional_mirror`, in twenty towns) sends one, with art
+set 0. Its icons are numbered as in Cosmic, and it offers only the
+places this server runs:
+
+| Id | Place | Levels | Saved for the way back | Lands on |
+|---|---|---|---|---|
+| 1 | Mu Lung Dojo | 25 and up | `DOJO_RETURN` | 925020000, portal 0 |
+| 2 | Monster Carnival | 30 to 50 | `CARNIVAL_RETURN` | 980000000, portal 3 |
+| 5 | Nett's Pyramid | 40 and up | `PYRAMID_RETURN` | 926010000, portal 4 |
+
+Each place's way out (`dojang_exit`, `mc_out`, the Pyramid lobby's
+`out00`) goes back to the saved town. A player who may go nowhere sees
+`#-1#` and the `mirror.nowhere` line. Cosmic's Ariant Coliseum (0), its
+second Carnival (3) and its Construction Site (6) have no event here.
 
 ## Assets and validation
 

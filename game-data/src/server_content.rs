@@ -1866,6 +1866,12 @@ pub mod keys {
     pub const DOJO_BOARD_NOTICE_1: &str = "dojo.board.notice.1";
     pub const DOJO_BOARD_ASK: &str = "dojo.board.ask";
     pub const DOJO_BOARD_DECLINE: &str = "dojo.board.decline";
+    /// The Dimensional Mirror's labels, under its icons, and its one line
+    /// when nothing is open to the player.
+    pub const MIRROR_DOJO: &str = "mirror.dojo";
+    pub const MIRROR_CARNIVAL: &str = "mirror.carnival";
+    pub const MIRROR_PYRAMID: &str = "mirror.pyramid";
+    pub const MIRROR_NOWHERE: &str = "mirror.nowhere";
     pub const DOJO_UP_MONSTERS: &str = "dojo.up.monsters";
     pub const DOJO_NEXT_SHUT: &str = "dojo.next.shut";
     pub const DOJO_POINTS: &str = "dojo.points";
@@ -3049,6 +3055,10 @@ mod tests {
                 keys::DOJO_BOARD_NOTICE_1,
                 keys::DOJO_BOARD_ASK,
                 keys::DOJO_BOARD_DECLINE,
+                keys::MIRROR_DOJO,
+                keys::MIRROR_CARNIVAL,
+                keys::MIRROR_PYRAMID,
+                keys::MIRROR_NOWHERE,
                 keys::DOJO_UP_MONSTERS,
                 keys::DOJO_NEXT_SHUT,
                 keys::DOJO_POINTS,

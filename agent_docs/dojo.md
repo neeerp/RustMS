@@ -30,6 +30,9 @@ its clock and the two HP gauges.
     `DOJO_RETURN` (Cosmic's `MIRROR`), then warps to the entrance's
     portal 4.
   - Its notice is two pages.
+- **The Dimensional Mirror** (9010022, `agent_docs/npc-dialogue.md`)
+  sends players of level 25 and up to the entrance's portal 0, saving
+  their town as `DOJO_RETURN` the same way.
 - **The taunt.** Arriving on the entrance, the player sees one of three
   taunts (`dojo.taunt.*`) on weather 5120024's message bar, for them
   alone, taken down 30 s later (`taunt_challenger`, Cosmic `dojang_Msg`'s
