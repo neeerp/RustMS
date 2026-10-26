@@ -873,8 +873,13 @@ namespace ms
 		barrel.stop();
 		look.set_morph(morph);
 
-		if (!at_once)
-			show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+		if (at_once)
+			return;
+
+		show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+
+		if (morph::transform_sounds(morph))
+			Sound(nl::nx::sound["Game.img"]["Transform"]).play();
 	}
 
 	const MorphTemplate *Char::get_template_morph() const
@@ -896,8 +901,11 @@ namespace ms
 
 		look.set_ghost(ghost);
 
-		if (!at_once)
-			show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+		if (at_once)
+			return;
+
+		show_effect_id(is_climbing() ? CharEffect::Id::TRANSFORM_ON_LADDER : CharEffect::Id::TRANSFORM);
+		Sound(nl::nx::sound["Game.img"]["Transform"]).play();
 	}
 
 	bool Char::is_ghost() const

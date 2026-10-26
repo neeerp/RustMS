@@ -14,6 +14,13 @@ namespace ms::morph
 	constexpr int32_t SUPER_TRANSFORMATION = 5121003;
 	constexpr int32_t ALBATROSS = 13111005;
 
+	// Whether putting on or taking off a morph plays Game.img/Transform with its puff of smoke: not for
+	// Transformation's and Super Transformation's, 1000 and 1001, whose skills sound for themselves (FUN_00941d4b).
+	inline bool transform_sounds(int32_t morph)
+	{
+		return morph != 1000 && morph != 1001;
+	}
+
 	// A cash morph: Fungus Scroll, Oinker Delight or Zeta Nightmare (530xxxx, v83 cash type 0x28, report c012).
 	inline bool is_cash_morph(int32_t item)
 	{

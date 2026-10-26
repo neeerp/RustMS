@@ -105,6 +105,9 @@ int main()
 		require(ghost_action("prone") == "ghostproneStab", "lies as its proneStab");
 		require(ghost_action("ladder") == "ghostladder" && ghost_action("rope") == "ghostrope", "climbs");
 		require(ghost_action("jump") == "ghostjump" && ghost_action("fly") == "ghostfly", "jumps and swims");
+		require(transform_sounds(1002) && transform_sounds(0) && transform_sounds(2210016), "a morph puffs with a sound");
+		require(!transform_sounds(1000) && !transform_sounds(1001), "but not Transformation's");
+
 		require(ghost_action("sit") == "ghostsit", "and sits");
 		require(ghost_action("swingO1") == "ghoststand", "anything else stands");
 		require(ghost_variant(1) == "1" && ghost_variant(2) == "2", "a ghost's value is its variant");
