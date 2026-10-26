@@ -756,6 +756,24 @@ pub mod keys {
     pub const MAKER_CRYSTAL_TEST: [&str; 2] = ["maker.crystal_test.0", "maker.crystal_test.1"];
     pub const MAKER_GOLD_ANVIL: [&str; 2] = ["maker.gold_anvil.0", "maker.gold_anvil.1"];
 
+    /// JM's list of informants (Kerning City, quests 2214-2219): the Knocked
+    /// Trash Can in the Hut in the Swamp (NPC 1052108) holds it from 5 to 8 p.m. (`q2214e`, and
+    /// `q2215e` for a lost list with its fee), then each informant tells
+    /// what they know about Dyle (`q2216s` Mr. Pickall, `q2217s` Shumi,
+    /// `q2218s` Nella, `q2219s` Jake). No licensed script has their text,
+    /// so these keep their placeholders.
+    pub const DYLE_TRASH_CAN_NOT_YET: &str = "dyle.trash_can.not_yet";
+    pub const DYLE_TRASH_CAN_FULL: &str = "dyle.trash_can.full";
+    pub const DYLE_TRASH_CAN_FOUND: &str = "dyle.trash_can.found";
+    pub const DYLE_TRASH_CAN_SHORT: &str = "dyle.trash_can.short";
+    pub const DYLE_TRASH_CAN_PAID: &str = "dyle.trash_can.paid";
+    pub const DYLE_INFORMANTS: [&str; 4] = [
+        "dyle.informant.0",
+        "dyle.informant.1",
+        "dyle.informant.2",
+        "dyle.informant.3",
+    ];
+
     /// Trainer Bartos's Follow the Lead (quests 4646 and 4647): the hidden
     /// note of his test (NPC 9102100, `multipet_success`), then his end
     /// script `q4647e`, which takes a Pet Snack.
@@ -2955,6 +2973,14 @@ mod tests {
             .chain(&keys::MAKER_PRACTICE)
             .chain(&keys::MAKER_CRYSTAL_TEST)
             .chain(&keys::MAKER_GOLD_ANVIL)
+            .chain(&keys::DYLE_INFORMANTS)
+            .chain(&[
+                keys::DYLE_TRASH_CAN_NOT_YET,
+                keys::DYLE_TRASH_CAN_FULL,
+                keys::DYLE_TRASH_CAN_FOUND,
+                keys::DYLE_TRASH_CAN_SHORT,
+                keys::DYLE_TRASH_CAN_PAID,
+            ])
             .chain(&keys::MILK_TANGYOON)
             .chain(&keys::DOJO_TAUNT)
             .chain(&keys::FITNESS_NOTICE)

@@ -1432,6 +1432,15 @@ unsourced = [
     "ola.notice.8",
     "jewel.notice.0",
     "jewel.notice.1",
+    "dyle.trash_can.not_yet",
+    "dyle.trash_can.full",
+    "dyle.trash_can.found",
+    "dyle.trash_can.short",
+    "dyle.trash_can.paid",
+    "dyle.informant.0",
+    "dyle.informant.1",
+    "dyle.informant.2",
+    "dyle.informant.3",
 ]
 
 [text."glTutoMsg0.message"]

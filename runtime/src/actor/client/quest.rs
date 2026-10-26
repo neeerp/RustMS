@@ -25,6 +25,8 @@ use tracing::{debug, warn};
 pub(super) enum QuestChange {
     Start(&'static QuestTemplate),
     Complete(&'static QuestTemplate),
+    /// Started and completed at once, by a start script.
+    Finish(&'static QuestTemplate),
 }
 
 impl ClientActor {
@@ -376,7 +378,7 @@ impl ClientActor {
         if let Some(change) = change {
             let snapshot = next.clone();
             let progress = match change {
-                QuestChange::Start(template) => {
+                QuestChange::Start(template) | QuestChange::Finish(template) => {
                     let prerequisites: Vec<_> = template
                         .start
                         .quests
@@ -384,10 +386,12 @@ impl ClientActor {
                         .map(|p| (p.quest_id, p.state))
                         .collect();
                     let repeatable = template.start.repeat_interval.is_some();
-                    spawn_db(move || {
-                        db::quest::start(&snapshot, template.id, &prerequisites, repeatable)
-                    })
-                    .await
+                    let begin = match change {
+                        QuestChange::Finish(_) => db::quest::finish,
+                        _ => db::quest::start,
+                    };
+                    spawn_db(move || begin(&snapshot, template.id, &prerequisites, repeatable))
+                        .await
                 }
                 QuestChange::Complete(template) => {
                     spawn_db(move || db::quest::complete(&snapshot, template.id)).await
@@ -410,7 +414,9 @@ impl ClientActor {
             next.mark_saved();
             match change {
                 QuestChange::Start(template) => self.start_quest_clock(template.id, packets)?,
-                QuestChange::Complete(template) => self.end_quest_clock(template.id, packets)?,
+                QuestChange::Complete(template) | QuestChange::Finish(template) => {
+                    self.end_quest_clock(template.id, packets)?
+                }
             }
         } else {
             next.mark_dirty();

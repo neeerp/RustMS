@@ -561,6 +561,7 @@ impl ClientActor {
                     }
                 }
                 Effect::CompleteQuest(id) => change = Some(QuestChange::Complete(template(*id)?)),
+                Effect::FinishQuest(id) => change = Some(QuestChange::Finish(template(*id)?)),
                 Effect::Warp(map_id) => warp = Some((*map_id, None)),
                 Effect::WarpToPortal(map_id, portal) => warp = Some((*map_id, Some(*portal))),
                 Effect::EnterDungeon {
