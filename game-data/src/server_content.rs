@@ -1821,6 +1821,13 @@ pub mod keys {
     pub const MAGATIA_JULIET_MENU: &str = "magatia.juliet.menu";
     pub const MAGATIA_JULIET_INFO: &str = "magatia.juliet.info";
     pub const MAGATIA_JULIET_RETREAT: &str = "magatia.juliet.retreat";
+    pub const MAGATIA_BOOK_NOTHING: &str = "magatia.book.nothing";
+    pub const MAGATIA_BOOK_MESOS: &str = "magatia.book.mesos";
+    pub const MAGATIA_BOOK_EXP: &str = "magatia.book.exp";
+    pub const MAGATIA_BOOK_LETTER: &str = "magatia.book.letter";
+    pub const MAGATIA_BOOK_LETTER_FULL: &str = "magatia.book.letter_full";
+    pub const MAGATIA_BOOK_PASS: &str = "magatia.book.pass";
+    pub const MAGATIA_PORTAL_SHUT: &str = "magatia.portal_shut";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3033,6 +3040,13 @@ mod tests {
                 keys::MAGATIA_JULIET_MENU,
                 keys::MAGATIA_JULIET_INFO,
                 keys::MAGATIA_JULIET_RETREAT,
+                keys::MAGATIA_BOOK_NOTHING,
+                keys::MAGATIA_BOOK_MESOS,
+                keys::MAGATIA_BOOK_EXP,
+                keys::MAGATIA_BOOK_LETTER,
+                keys::MAGATIA_BOOK_LETTER_FULL,
+                keys::MAGATIA_BOOK_PASS,
+                keys::MAGATIA_PORTAL_SHUT,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

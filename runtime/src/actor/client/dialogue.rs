@@ -21,6 +21,24 @@ impl ClientActor {
         self.talk_to(npc_id).await
     }
 
+    /// Say what a Magatia library's book held, once its field took it.
+    pub(super) async fn open_book(
+        &mut self,
+        npc_id: i32,
+        field: FieldKey,
+        find: Option<net::events::Find>,
+    ) -> Result<(), RuntimeError> {
+        if self
+            .game
+            .as_ref()
+            .is_none_or(|game| field != game.field.key)
+        {
+            return Ok(());
+        }
+        let script = net::npc_scripts::NpcScript::magatia_book(npc_id, find);
+        self.start_script(script).await
+    }
+
     /// Open `npc_id`'s conversation without a click, as a portal does, but
     /// not over one the player is in already.
     pub(super) async fn open_npc(&mut self, npc_id: i32) -> Result<(), RuntimeError> {
