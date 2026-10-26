@@ -20,7 +20,35 @@ int main()
 		require(ride_effect_skill(1902000, 112) == 1004 && ride_effect_skill(1902005, 1111) == 10001004,
 			"a tamed monster shows its rider's Monster Rider");
 		require(ride_effect_skill(BATTLESHIP_VEHICLE, 522) == BATTLESHIP, "the ship its own");
-		require(ride_effect_skill(1932003, 0) == 0 && ride_effect_skill(0, 112) == 0, "others none");
+		require(ride_effect_skill(1932002, 0) == 1013 && ride_effect_skill(1932001, 1100) == 10001014 &&
+			ride_effect_skill(1932003, 2100) == 20001019 && ride_effect_skill(1932004, 1000) == 10001022,
+			"an event vehicle its line's event skill");
+		require(ride_effect_skill(1932010, 2000) == 20001031 && ride_effect_skill(1932011, 0) == 1030 &&
+			ride_effect_skill(1932007, 2200) == 20011027, "1027 to 1031 by the line's base");
+		require(ride_effect_skill(1932006, 0) == 0 && ride_effect_skill(0, 112) == 0, "others none");
+
+		require(is_event_skill(1013) && is_event_skill(10001023) && is_event_skill(20011031) &&
+			is_event_skill(1027), "event skills");
+		require(!is_event_skill(1014) && !is_event_skill(1015) && !is_event_skill(1020) &&
+			!is_event_skill(20001014) && !is_event_skill(1004), "not Space Dash or Monster Rider");
+
+		using W = WhileRiding;
+		const int32_t pig = 1902000, spaceship = 1932001, yeti = 1932003;
+		require(while_riding(1013, spaceship) == W::GET_OFF && while_riding(1017, spaceship) == W::GET_OFF,
+			"any event skill gets off an event vehicle");
+		require(while_riding(1013, pig) == W::IGNORE && while_riding(1013, BATTLESHIP_VEHICLE) == W::IGNORE,
+			"and does nothing on another mount");
+		require(while_riding(1004, pig) == W::GET_OFF && while_riding(1004, yeti) == W::IGNORE, "Monster Rider");
+		require(while_riding(BATTLESHIP, BATTLESHIP_VEHICLE) == W::GET_OFF &&
+			while_riding(BATTLESHIP, spaceship) == W::IGNORE, "the Battleship");
+		require(while_riding(1014, spaceship) == W::USE && while_riding(10001015, yeti) == W::USE &&
+			while_riding(1014, pig) == W::IGNORE && while_riding(1014, BATTLESHIP_VEHICLE) == W::IGNORE,
+			"Space Dash only from an event vehicle");
+		require(while_riding(1015, pig) == W::USE && while_riding(10001016, spaceship) == W::USE, "1015 always");
+		require(while_riding(5221007, BATTLESHIP_VEHICLE) == W::USE && while_riding(5221007, yeti) == W::IGNORE,
+			"the ship's skills only from it");
+		require(while_riding(2001002, spaceship) == W::REFUSE && while_riding(0, pig) == W::REFUSE,
+			"anything else is refused");
 
 		require(is_ground_only(5001005) && is_ground_only(10001027) && is_ground_only(20011031),
 			"dashes and event mounts keep off ladders");

@@ -157,9 +157,13 @@ fn move_item(
     to: i16,
 ) -> Result<(Vec<game::InventoryChange>, bool), String> {
     // A rider's client gets them off before the mount or saddle (or a
-    // cover, 100 below) comes off or is swapped.
+    // cover, 100 below) comes off or is swapped. An event ride needs
+    // neither, so it leaves them free.
     let saddled = |slot: i16| [equip_slot::MOUNT, equip_slot::SADDLE].contains(&(slot % 100));
-    if player.ride_skill().is_some() && (saddled(from) || saddled(to)) {
+    let riding = player
+        .ride_skill()
+        .is_some_and(|skill| !game::mount::is_event_ride(skill));
+    if riding && (saddled(from) || saddled(to)) {
         return Err("riding".into());
     }
     if from < 0 {
@@ -696,5 +700,16 @@ mod tests {
 
         player.buffs.cancel(1004);
         assert!(move_item(&mut player, -1, equip_slot::SADDLE, 1).is_ok());
+
+        // An event ride needs no mount, so the slots stay free.
+        let spaceship = game::Buff::new(
+            1013,
+            game::BuffStat::Riding,
+            0,
+            std::time::Instant::now(),
+            game::mount::RIDE_DURATION,
+        );
+        player.buffs.give(spaceship);
+        assert!(move_item(&mut player, 1, 1, equip_slot::SADDLE).is_ok());
     }
 }

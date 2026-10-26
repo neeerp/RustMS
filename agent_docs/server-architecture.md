@@ -175,7 +175,7 @@ tier of `gm_level` (`gm_commands::tier`, levels above 3 count as 3):
 |---|---|
 | 0, anyone | `@help`, `@dispose` (closes the server's dialog, shop or storage and lets a stuck client act again) |
 | 1, helper | `!help`, `!whereami`, `!warp <map id> [portal]`, `!hide`, `!unhide`, `!heal` |
-| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>`, `!jail <name> [minutes]`, `!unjail <name>`, `!mute <name> [minutes] [reason]`, `!unmute <name>` |
+| 2, GM | `!item <item id> [quantity]` (no cash items), `!meso <amount>`, `!exp <amount>`, `!level <level>`, `!job <job id>`, `!ap <amount>`, `!sp <amount>`, `!skill <skill id> [level]` (its highest level by default; 0 removes it), `!givenx [nx\|mp\|np] [name] <amount>`, `!coupon <reward>... [days=N] [code=CODE]`, `!notice <text>`, `!dc <name>`, `!jail <name> [minutes]`, `!unjail <name>`, `!mute <name> [minutes] [reason]`, `!unmute <name>` |
 | 3, admin | `!ban <name> [days] [reason] [note]`, `!unban <name>` |
 
 - A GM's `!` line never reaches the map. A player's `!` line is ordinary

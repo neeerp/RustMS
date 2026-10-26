@@ -65,26 +65,28 @@ impl WorldHandler for UseSkillHandler {
                 }
             };
         }
-        if skill_id == mount::BATTLESHIP {
+        if skill_id == mount::BATTLESHIP || mount::is_event_ride(skill_id) {
             let field_limit = crate::game_data::get()?
                 .field(ctx.player.stats.map_id)
                 .map_or(0, |field| field.field_limit);
-            return match board(ctx.player, level, field_limit, Instant::now()) {
+            return match board(ctx.player, skill_id, level, field_limit, Instant::now()) {
                 Ok(boarded) => {
                     let mp = StatUpdate::Mp(ctx.player.stats.mp);
                     let ride = boarded.ride;
                     let shown = buff::build_give_foreign_ride(ctx.player.id(), ride)?;
                     let given = buff::build_give_ride(ride, boarded.duration_ms, &boarded.stats)?;
+                    let mut result = HandlerResult::reply(stat::build_stat_update(true, &[mp])?)
+                        .with_reply(given);
                     // The client makes the ship's icon only with the buff,
                     // so its HP comes after (FUN_00a123a4).
-                    let hp = buff::build_cooldown(mount::BATTLESHIP_HP, boarded.hp as u16 as i16)?;
-                    Ok(HandlerResult::reply(stat::build_stat_update(true, &[mp])?)
-                        .with_reply(given)
-                        .with_reply(hp)
-                        .with(WorldAction::BuffsChanged(shown)))
+                    if let Some(hp) = boarded.hp {
+                        let hp = buff::build_cooldown(mount::BATTLESHIP_HP, hp as u16 as i16)?;
+                        result = result.with_reply(hp);
+                    }
+                    Ok(result.with(WorldAction::BuffsChanged(shown)))
                 }
                 Err(refusal) => {
-                    debug!(level, ?refusal, "Battleship refused");
+                    debug!(skill_id, level, ?refusal, "Vehicle refused");
                     let unlocked = HandlerResult::reply(stat::build_stat_update(true, &[])?);
                     dismount(ctx.player, unlocked)
                 }
@@ -352,7 +354,10 @@ impl WorldHandler for CancelBuffHandler {
                 HandlerResult::empty().with(WorldAction::Field(FieldRequest::Broadcast(shown)))
             );
         }
-        if mount::RIDER_SKILLS.contains(&skill_id) || skill_id == mount::BATTLESHIP {
+        if mount::RIDER_SKILLS.contains(&skill_id)
+            || skill_id == mount::BATTLESHIP
+            || mount::is_event_ride(skill_id)
+        {
             return dismount(ctx.player, HandlerResult::empty());
         }
         let ended = ctx.player.buffs.cancel(skill_id);
@@ -687,27 +692,29 @@ fn ride(
     Ok(Ride { item_id, skill_id })
 }
 
-/// The Battleship a player boarded: what they ride, the defense it gives
-/// for how long, and the ship's HP.
+/// The vehicle a player boarded: what they ride, the defense it gives for
+/// how long, and the Battleship's HP.
 #[derive(Debug)]
 struct Boarded {
     ride: Ride,
     duration_ms: i32,
     stats: Vec<(BuffStat, i16)>,
-    hp: i32,
+    hp: Option<i32>,
 }
 
-/// Board the Battleship: a ride on its own vehicle, needing no mount, with
-/// the skill's weapon and magic defense. Its cooldown starts only when the
-/// ship is destroyed (Cosmic's SpecialMoveHandler), and a damaged ship
-/// comes back as damaged as it was.
+/// Board the Battleship, or an event skill's vehicle (report b183): a ride
+/// on a vehicle of the skill's own, needing no mount, with the skill's
+/// weapon and magic defense for its `time`. The Battleship's cooldown
+/// starts only when the ship is destroyed (Cosmic's SpecialMoveHandler),
+/// and a damaged ship comes back as damaged as it was. An event vehicle
+/// never tires.
 fn board(
     player: &mut Player,
+    skill_id: i32,
     level: i32,
     field_limit: i32,
     now: Instant,
 ) -> Result<Boarded, Refusal> {
-    let skill_id = mount::BATTLESHIP;
     if player.stats.hp <= 0 {
         return Err(Refusal::Dead);
     }
@@ -731,10 +738,13 @@ fn board(
     let effect = &skill.effect;
     let duration_ms = (i64::from(effect.duration) * 1000).clamp(0, i64::from(i32::MAX)) as i32;
     let lasts = Duration::from_millis(duration_ms as u64);
-    let stats = vec![
+    let stats: Vec<_> = [
         (BuffStat::Pdd, effect.pdd as i16),
         (BuffStat::Mdd, effect.mdd as i16),
-    ];
+    ]
+    .into_iter()
+    .filter(|&(_, value)| value != 0)
+    .collect();
     for &(stat, value) in &stats {
         player
             .buffs
@@ -742,19 +752,29 @@ fn board(
     }
     let riding = Buff::new(skill_id, BuffStat::Riding, 0, now, mount::RIDE_DURATION);
     player.buffs.give(riding);
-    let max = mount::battleship_max_hp(i32::from(player.stats.level), skill.level);
-    let hp = player
-        .buffs
-        .battleship_hp
-        .filter(|&hp| hp > 0)
-        .unwrap_or(max);
-    player.buffs.battleship_hp = Some(hp);
-    let item_id = mount::BATTLESHIP_VEHICLE;
+    let Some(item_id) = mount::event_vehicle(skill_id, skill.level) else {
+        let max = mount::battleship_max_hp(i32::from(player.stats.level), skill.level);
+        let hp = player
+            .buffs
+            .battleship_hp
+            .filter(|&hp| hp > 0)
+            .unwrap_or(max);
+        player.buffs.battleship_hp = Some(hp);
+        return Ok(Boarded {
+            ride: Ride {
+                item_id: mount::BATTLESHIP_VEHICLE,
+                skill_id,
+            },
+            duration_ms,
+            stats,
+            hp: Some(hp),
+        });
+    };
     Ok(Boarded {
         ride: Ride { item_id, skill_id },
         duration_ms,
         stats,
-        hp,
+        hp: None,
     })
 }
 
@@ -1809,10 +1829,10 @@ mod tests {
         let now = Instant::now();
         // The pdd/mdd of level 10, the HP of level 150 with it, and no
         // cooldown yet.
-        let boarded = board(&mut player, 10, 0, now).unwrap();
+        let boarded = board(&mut player, mount::BATTLESHIP, 10, 0, now).unwrap();
         assert_eq!(boarded.ride.item_id, mount::BATTLESHIP_VEHICLE);
         assert_eq!(boarded.stats, [(BuffStat::Pdd, 100), (BuffStat::Mdd, 100)]);
-        assert_eq!(boarded.hp, 10_000);
+        assert_eq!(boarded.hp, Some(10_000));
         assert_eq!(player.stats.mp, 1000 - 40);
         assert!(!player.buffs.cooling_down(mount::BATTLESHIP, now));
         assert_eq!(player.ride().unwrap().item_id, mount::BATTLESHIP_VEHICLE);
@@ -1823,7 +1843,12 @@ mod tests {
         // Off and on again, it is as damaged as it was.
         dismount(&mut player, HandlerResult::empty()).unwrap();
         assert!(player.buffs.active().is_empty());
-        assert_eq!(board(&mut player, 10, 0, now).unwrap().hp, 6000);
+        assert_eq!(
+            board(&mut player, mount::BATTLESHIP, 10, 0, now)
+                .unwrap()
+                .hp,
+            Some(6000)
+        );
 
         let sent = opcodes(hit(&mut player, 6000, HandlerResult::empty()));
         let cooldown = SendOpcode::Cooldown as i16;
@@ -1832,14 +1857,65 @@ mod tests {
         assert_eq!(sent, [cooldown, cancel, foreign]);
         assert!(player.ride().is_none());
         assert!(player.buffs.cooling_down(mount::BATTLESHIP, Instant::now()));
-        let refused = board(&mut player, 10, 0, Instant::now()).unwrap_err();
+        let refused = board(&mut player, mount::BATTLESHIP, 10, 0, Instant::now()).unwrap_err();
         assert_eq!(refused, Refusal::CoolingDown);
         let mounts_off = game_data::FIELD_LIMIT_MOUNTS;
         let mut player = beginner_with(mount::BATTLESHIP, 10);
         assert_eq!(
-            board(&mut player, 10, mounts_off, now).unwrap_err(),
+            board(&mut player, mount::BATTLESHIP, 10, mounts_off, now).unwrap_err(),
             Refusal::NoMountsHere
         );
+    }
+
+    #[test]
+    fn event_skills_ride_their_own_vehicles_untired() {
+        if skills::data().is_err() {
+            return;
+        }
+        // The Spaceship at level 2, with no mount worn.
+        let mut player = beginner_with(1013, 2);
+        let now = Instant::now();
+        let boarded = board(&mut player, 1013, 2, 0, now).unwrap();
+        let ride = Ride {
+            item_id: 1932002,
+            skill_id: 1013,
+        };
+        assert_eq!(boarded.ride, ride);
+        assert_eq!(boarded.stats, [(BuffStat::Pdd, 20), (BuffStat::Mdd, 20)]);
+        assert_eq!(boarded.duration_ms, 2_100_000_000);
+        assert_eq!(boarded.hp, None);
+        assert_eq!(player.stats.mp, 20 - 10);
+        assert_eq!(player.ride(), Some(ride));
+        assert_eq!(player.buffs.battleship_hp, None);
+        // Hours of riding tire nothing.
+        let tick = player.buffs.advance(now + Duration::from_secs(3 * 3600));
+        assert_eq!(tick.tire, 0);
+        assert_eq!(player.ride(), Some(ride));
+        // Getting off takes the defense too.
+        let sent = opcodes(dismount(&mut player, HandlerResult::empty()));
+        let cancel = SendOpcode::CancelBuff as i16;
+        assert_eq!(sent, [cancel, SendOpcode::CancelForeignBuff as i16]);
+        assert!(player.buffs.active().is_empty());
+
+        let mut player = beginner_with(10001019, 1);
+        assert_eq!(
+            board(&mut player, 10001019, 2, 0, now).unwrap_err(),
+            Refusal::NotLearned
+        );
+        let mounts_off = game_data::FIELD_LIMIT_MOUNTS;
+        assert_eq!(
+            board(&mut player, 10001019, 1, mounts_off, now).unwrap_err(),
+            Refusal::NoMountsHere
+        );
+        player.stats.mp = 9;
+        assert_eq!(
+            board(&mut player, 10001019, 1, 0, now).unwrap_err(),
+            Refusal::NotEnoughMp
+        );
+        player.stats.mp = 10;
+        let boarded = board(&mut player, 10001019, 1, 0, now).unwrap();
+        assert_eq!(boarded.ride.item_id, 1932003);
+        assert_eq!(player.stats.mp, 0);
     }
 
     #[test]
@@ -1860,7 +1936,7 @@ mod tests {
         player.stats.mp = 1000;
         player.stats.max_mp = 1000;
         let now = Instant::now();
-        board(&mut player, 10, 0, now).unwrap();
+        board(&mut player, mount::BATTLESHIP, 10, 0, now).unwrap();
         // Maple Warrior is used from the ship, Haste isn't; off it, both are.
         assert!(use_skill(&mut player, 5221000, 1, now).is_ok());
         assert_eq!(

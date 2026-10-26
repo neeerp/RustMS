@@ -550,6 +550,24 @@ namespace ms
 
 		int32_t vehicle = player.get_vehicle();
 
+		// A ride's own skill gets off it, and does nothing on another mount; the ship uses only its own
+		// skills, and an event vehicle Space Dash (FUN_00966f7a).
+		if (mount::is_tamed_monster(vehicle) || mount::is_vehicle(vehicle))
+		{
+			switch (mount::while_riding(move_id, vehicle))
+			{
+				case mount::WhileRiding::USE:
+					break;
+				case mount::WhileRiding::GET_OFF:
+					player.ask_ride(move_id);
+					return false;
+				case mount::WhileRiding::IGNORE:
+					return false;
+				default:
+					return !player.ride_refuses();
+			}
+		}
+
 		// The Battleship's Cannon and Torpedo need the ship, and fire only from the ground or water
 		// (FUN_00969a57).
 		if (mount::ship_only(move_id))
@@ -563,27 +581,7 @@ namespace ms
 			return !player.is_climbing() && (player.get_phobj().onground || player.is_underwater());
 		}
 
-		// The Battleship gets off the ship, which uses only its own skills, and does nothing on another
-		// mount (FUN_00966f7a).
-		if (move_id == mount::BATTLESHIP && vehicle > 0)
-		{
-			if (mount::is_ship(vehicle))
-				player.ask_ride(move_id);
-
-			return false;
-		}
-
-		if (mount::is_ship(vehicle) && mount::ship_allows(move_id))
-			return true;
-
-		if (!mount::is_rider_skill(move_id) || (!mount::is_tamed_monster(vehicle) && !mount::is_vehicle(vehicle)))
-			return !player.ride_refuses();
-
-		// The rider skill gets off a tamed monster, and does nothing on a vehicle.
-		if (mount::is_tamed_monster(vehicle))
-			player.ask_ride(move_id);
-
-		return false;
+		return true;
 	}
 
 	bool Combat::request_skill(const SpecialMove &move)

@@ -147,6 +147,116 @@ namespace ms::mount
 		return base * 10000 + 1004;
 	}
 
+	// The event skills that get on and off an event vehicle (FUN_00966f7a): the Spaceship, Yeti, Witch's
+	// Broomstick and Balrog of each line, and 1027 to 1031 for each of the four beginners.
+	inline bool is_event_skill(int32_t skill)
+	{
+		switch (skill)
+		{
+			case 1013:
+			case 1017:
+			case 1018:
+			case 1019:
+			case 10001014:
+			case 10001019:
+			case 10001022:
+			case 10001023:
+			case 20001019:
+			case 20001022:
+			case 20001023:
+				return true;
+			default:
+				break;
+		}
+
+		int32_t base = skill % 10000;
+		int32_t job = skill / 10000;
+
+		return base >= 1027 && base <= 1031 && (job == 0 || job == 1000 || job == 2000 || job == 2001);
+	}
+
+	// Space Dash, used only from an event vehicle (FUN_00966f7a).
+	inline bool is_space_dash(int32_t skill)
+	{
+		return skill == 1014 || skill == 10001015;
+	}
+
+	// What a skill does while the player rides `vehicle` (FUN_00966f7a): goes as usual, gets them off
+	// (a CANCEL_BUFF with the skill pressed), does nothing, or is refused with the riding chat.
+	enum class WhileRiding
+	{
+		USE,
+		GET_OFF,
+		IGNORE,
+		REFUSE
+	};
+
+	inline WhileRiding while_riding(int32_t skill, int32_t vehicle)
+	{
+		auto off_if = [](bool on) { return on ? WhileRiding::GET_OFF : WhileRiding::IGNORE; };
+		auto use_if = [](bool on) { return on ? WhileRiding::USE : WhileRiding::IGNORE; };
+
+		if (is_rider_skill(skill))
+			return off_if(is_tamed_monster(vehicle));
+
+		if (is_event_skill(skill))
+			return off_if(is_event_vehicle(vehicle));
+
+		if (skill == BATTLESHIP)
+			return off_if(is_ship(vehicle));
+
+		if (is_space_dash(skill))
+			return use_if(is_event_vehicle(vehicle));
+
+		// Space Beam (I).
+		if (skill == 1015 || skill == 10001016)
+			return WhileRiding::USE;
+
+		if (ship_allows(skill))
+			return use_if(is_ship(vehicle));
+
+		return WhileRiding::REFUSE;
+	}
+
+	// The event skill whose effect plays as an event vehicle is got on or off (FUN_00936859), by line:
+	// Cygnus Knights' and Aran's own where they have one. 1932006 has none.
+	inline int32_t event_effect_skill(int32_t vehicle, int32_t job)
+	{
+		bool knight = job / 1000 == 1;
+		bool aran = job / 100 == 21 || job == 2000;
+		bool evan = job / 100 == 22 || job == 2001;
+		int32_t base = knight ? 10000000 : aran ? 20000000 : evan ? 20010000 : 0;
+		auto by_line = [&](int32_t explorer, int32_t cygnus, int32_t aran_skill)
+		{
+			return knight ? cygnus : aran ? aran_skill : explorer;
+		};
+
+		switch (vehicle)
+		{
+			case 1932001:
+			case 1932002:
+				return by_line(1013, 10001014, 1013);
+			case 1932003:
+				return by_line(1017, 10001019, 20001019);
+			case 1932004:
+				return by_line(1018, 10001022, 20001022);
+			case 1932005:
+				return by_line(1019, 10001023, 20001023);
+			case 1932007:
+				return base + 1027;
+			case 1932008:
+				return base + 1028;
+			case 1932009:
+				return base + 1029;
+			case 1932010:
+				return base + 1031;
+			case 1932011:
+				return base + 1030;
+			default:
+				return 0;
+		}
+	}
+
 	// The mounts a double-click in the Equip window leaves on, without a word (0x4f0c10).
 	inline bool stays_on(int32_t mount)
 	{
@@ -154,11 +264,14 @@ namespace ms::mount
 	}
 
 	// The skill whose effect plays as `mount` is got on or off (FUN_00936859): the rider's Monster
-	// Rider for a tamed monster, the Battleship for the ship, none for anything else.
+	// Rider for a tamed monster, the Battleship for the ship, the event skill for an event vehicle.
 	inline int32_t ride_effect_skill(int32_t mount, int32_t job)
 	{
 		if (is_tamed_monster(mount))
 			return rider_skill(job);
+
+		if (is_event_vehicle(mount))
+			return event_effect_skill(mount, job);
 
 		return mount == BATTLESHIP_VEHICLE ? BATTLESHIP : 0;
 	}
