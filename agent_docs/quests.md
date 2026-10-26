@@ -73,7 +73,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax` |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
@@ -107,7 +107,12 @@ and at least one under `equipSelectNeed`; a copy in the bag doesn't count.
 With `fieldEnter`, the player must be on one of the listed maps. `start`
 (yyyymmddhh) is the hour before which the quest can't be started; v83
 compares it with its clock set to the server's, which for RustMS is UTC
-(the four quests with one, such as 3600, date from 2005–2007).
+(the four quests with one, such as 3600, date from 2005–2007). `end` is the
+last hour it can be (v83 offers it from `start` to `end` inclusive). Nearly
+every quest with an `end` is an event that ended in 2005–2010, so, as in the
+client, neither side offers it (9625's one hour is on 31 December 2030). v83
+lets a server move a quest's window with SET_QUEST_TIME (151), which RustMS
+doesn't send.
 
 `pet`, on either side, lists pet items (`pet/<n>/id`), and the pet in the
 first summon slot must be one of them; another pet out doesn't count, as in
@@ -132,8 +137,10 @@ completed quest stays done. Starting it again replaces its completed record,
 as in Cosmic, and completing it again sets a new completion time. v83 keeps
 both records instead, so HeavenClient counts a quest it has both as started.
 The client shows a due repeatable with the NPC's bulb and in its menu, but,
-like v83, not in the quest log's Available tab. `dayByDay` (once per calendar
-day) is a separate key and stays unsupported.
+like v83, not in the quest log's Available tab. Without an interval,
+`dayByDay` makes a quest repeatable once a day: from the day (UTC, the
+server's clock) after its completion, not 24 hours later. Every quest with
+it also has an `end` that has passed, so none repeats in practice.
 
 Item actions (`net::quests::pick_items`/`apply_items`) give positive counts
 and take negative ones (capped at what the player holds). An entry without a

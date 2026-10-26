@@ -417,8 +417,8 @@ namespace ms
 		QuestLog &get_quests();
 
 		// Whether the player's fame, items and skills meet a quest's start
-		// requirements (start_holdings_met), and a completed quest is due
-		// to repeat (repeat_due).
+		// requirements (start_holdings_met), its date window is open, and a
+		// completed quest is due to repeat (repeat_due).
 		bool quest_start_met(const QuestInfo &quest) const;
 
 		// The first pet out (item 0 if none) and its closeness: the pet a

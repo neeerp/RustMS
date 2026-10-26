@@ -201,14 +201,24 @@ namespace ms
 			[&](const auto& requirement) { return has_skill(requirement.first) == requirement.second; });
 	}
 
-	// Whether a completed quest can be started again: it is repeatable and
-	// its interval has passed since `completed_at`. Both times are FILETIMEs
-	// (FUN_00721163).
+	// Whether a quest can be started again once completed.
+	inline bool repeatable(const QuestInfo& quest)
+	{
+		return quest.repeat_interval >= 0 || quest.day_by_day;
+	}
+
+	// Whether a completed quest can be started again: its interval has passed
+	// since `completed_at`, or, with none, a dayByDay quest's day (UTC) has.
+	// Both times are FILETIMEs (FUN_00721163).
 	inline bool repeat_due(const QuestInfo& quest, int64_t completed_at, int64_t now)
 	{
 		constexpr int64_t TICKS_PER_MINUTE = 600000000;
+		constexpr int64_t TICKS_PER_DAY = 864000000000;
 
-		return quest.repeat_interval >= 0 && completed_at + quest.repeat_interval * TICKS_PER_MINUTE <= now;
+		if (quest.repeat_interval < 0)
+			return quest.day_by_day && completed_at / TICKS_PER_DAY < now / TICKS_PER_DAY;
+
+		return completed_at + quest.repeat_interval * TICKS_PER_MINUTE <= now;
 	}
 
 	// A Check.nx date, yyyymmddhh, as a FILETIME. v83 parses it to the hour
@@ -238,7 +248,7 @@ namespace ms
 	bool quest_available(const QuestInfo& quest, int16_t job, int16_t level,
 		Status status, Holds holds, bool all_levels = false)
 	{
-		return status(quest.id) != 1 && (status(quest.id) == 0 || quest.repeat_interval >= 0) &&
+		return status(quest.id) != 1 && (status(quest.id) == 0 || repeatable(quest)) &&
 			(quest.jobs.empty() || std::find(quest.jobs.begin(), quest.jobs.end(), job) != quest.jobs.end()) &&
 			(all_levels || (level >= quest.min_level && level <= quest.max_level)) &&
 			std::all_of(quest.prerequisites.begin(), quest.prerequisites.end(),

@@ -87,6 +87,21 @@ pub enum QuestRejection {
     Choice,
 }
 
+/// Whether a quest completed `at` may be started again by `now`. Without an
+/// interval, v83 restarts a `dayByDay` quest once the UTC date of `now`
+/// passes the completion's, as it reads the FILETIMEs (FUN_00721163).
+fn repeat_due(start: &StartRequirements, at: SystemTime, now: SystemTime) -> bool {
+    const DAY: u64 = 24 * 60 * 60;
+    let day = |time: SystemTime| {
+        time.duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() / DAY)
+    };
+    match start.repeat_interval {
+        Some(minutes) => at + Duration::from_secs(u64::from(minutes) * 60) <= now,
+        None => start.daily && day(at) < day(now),
+    }
+}
+
 /// Whether `player` may start `quest` with `npc_id`.
 pub fn check_start(
     quest: &QuestTemplate,
@@ -100,11 +115,8 @@ pub fn check_start(
     match player.quests.status(quest.id) {
         None => {}
         // A repeatable quest starts again `interval` minutes after it was
-        // last completed (v83 FUN_00721163).
-        Some(QuestStatus::Completed { at })
-            if start.repeat_interval.is_some_and(|minutes| {
-                *at + Duration::from_secs(u64::from(minutes) * 60) <= SystemTime::now()
-            }) => {}
+        // last completed, and a daily one on a later day (v83 FUN_00721163).
+        Some(QuestStatus::Completed { at }) if repeat_due(start, *at, SystemTime::now()) => {}
         Some(_) => return Err(QuestRejection::WrongState),
     }
     if !start.jobs.is_empty() && !start.jobs.contains(&player.stats.job) {
@@ -155,7 +167,8 @@ pub fn check_start(
     if !start.maps.is_empty() && !start.maps.contains(&player.stats.map_id) {
         return Err(QuestRejection::Map);
     }
-    if start.not_before.is_some_and(|at| SystemTime::now() < at) {
+    let now = SystemTime::now();
+    if start.not_before.is_some_and(|at| now < at) || start.not_after.is_some_and(|at| now > at) {
         return Err(QuestRejection::Date);
     }
     if !pet_met(&start.pets, start.pet_closeness, player) {
@@ -827,6 +840,21 @@ mod tests {
     }
 
     #[test]
+    fn daily_quests_restart_on_a_later_utc_day() {
+        let day = Duration::from_secs(24 * 60 * 60);
+        let midnight = SystemTime::UNIX_EPOCH + day * 20_000;
+        let at = |secs: u64| midnight + Duration::from_secs(secs);
+        let mut start = StartRequirements::default();
+        assert!(!repeat_due(&start, at(0), at(0) + day * 3));
+        start.daily = true;
+        assert!(!repeat_due(&start, at(1), at(86_399)), "the same day");
+        assert!(repeat_due(&start, at(86_399), at(86_400)), "the next");
+        // An interval, even one under a day, wins as in v83 (none has both).
+        start.repeat_interval = Some(1);
+        assert!(repeat_due(&start, at(0), at(60)));
+    }
+
+    #[test]
     fn start_fame_is_compared_unsigned() {
         let mut q = quest();
         q.start.quests.clear();
@@ -841,13 +869,17 @@ mod tests {
     }
 
     #[test]
-    fn start_waits_for_the_start_date() {
+    fn start_keeps_to_the_date_window() {
         let mut q = quest();
         q.start.quests.clear();
         let p = player(1, 0);
         q.start.not_before = Some(SystemTime::now() + Duration::from_secs(3600));
         assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
         q.start.not_before = Some(SystemTime::now() - Duration::from_secs(3600));
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        q.start.not_after = Some(SystemTime::now() - Duration::from_secs(1));
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
+        q.start.not_after = Some(SystemTime::now() + Duration::from_secs(3600));
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
     }
 

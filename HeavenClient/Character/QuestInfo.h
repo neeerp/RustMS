@@ -45,9 +45,14 @@ namespace ms
 		// Not offered before this FILETIME (Check/0/start, quest_date); 0
 		// means any time.
 		int64_t start_time = 0;
+		// Nor after this one (Check/0/end); most event quests ended in
+		// 2005-2010 and are never offered.
+		int64_t end_time = INT64_MAX;
 		// Minutes after completing before the quest can be started again
 		// (Check/0/interval); -1 means it can't be repeated.
 		int32_t repeat_interval = -1;
+		// Without an interval, repeatable on a later day (Check/0/dayByDay).
+		bool day_by_day = false;
 		// Items needed to complete: (item id, count); a count of 0 means none
 		// may be left.
 		std::vector<std::pair<int32_t, int32_t>> end_items;

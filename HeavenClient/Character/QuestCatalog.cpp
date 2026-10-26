@@ -63,9 +63,13 @@ namespace ms
 			info.max_level = static_cast<int16_t>(start["lvmax"].get_integer(32767));
 			info.min_fame = static_cast<int16_t>(start["pop"].get_integer());
 			info.repeat_interval = static_cast<int32_t>(start["interval"].get_integer(-1));
+			info.day_by_day = start["dayByDay"].get_integer() != 0;
 
 			if (start["start"].data_type() != nl::node::type::none)
 				info.start_time = quest_date(start["start"].get_integer());
+
+			if (start["end"].data_type() != nl::node::type::none)
+				info.end_time = quest_date(start["end"].get_integer());
 
 			info.rewards.meso = static_cast<int32_t>(act["money"].get_integer());
 			info.rewards.exp = static_cast<int32_t>(act["exp"].get_integer());

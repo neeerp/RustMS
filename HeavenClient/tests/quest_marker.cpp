@@ -282,6 +282,12 @@ int main()
 		require(ms::repeat_due(errand, 5, 5), "an interval of 0 repeats at once");
 		errand.repeat_interval = -1;
 		require(!ms::repeat_due(errand, 0, 365 * DAY), "a quest without an interval never repeats");
+		errand.day_by_day = true;
+		require(!ms::repeat_due(errand, 1, DAY - 1) && ms::repeat_due(errand, DAY - 1, DAY),
+			"a dayByDay one repeats on a later day, not after 24 hours");
+		require(ms::repeatable(errand), "and is repeatable");
+		errand.day_by_day = false;
+		require(!ms::repeatable(errand), "unlike one with neither");
 		auto done = [](int16_t) { return 2; };
 		auto early = [](const ms::QuestInfo&) { return false; };
 		require(!ms::quest_available(errand, 0, 30, done, anyone), "a done quest isn't offered again");
