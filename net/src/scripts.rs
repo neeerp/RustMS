@@ -475,6 +475,8 @@ pub enum Effect {
     /// Up to the most a player may hold.
     GainMeso(i32),
     GainExp(i32),
+    /// Fame, shown in the chat log as a quest's is.
+    GainFame(i16),
     StartQuest(i16),
     CompleteQuest(i16),
     /// Start a quest not yet started and complete it at once: a start script

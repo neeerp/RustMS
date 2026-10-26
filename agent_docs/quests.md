@@ -177,7 +177,7 @@ itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
 `q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
-[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants, the baby dragon and Captain Al's family lessons below); those steps go through
+[Pets](./pets.md)), Meren's Maker lessons, Dyle's informants, Reef, the baby dragon and Captain Al's family lessons below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -259,6 +259,12 @@ checks) and gives Cosmic's 7,000 EXP, and the last of the four takes the
 list. `game_data::quests::FINISHED_BY_START_SCRIPT` lets these four through
 without a completion NPC. The can's and the informants' lines are
 unsourced and stay placeholder (`dyle.*`).
+
+"Reef's Gratitude" (2228) works the same way: once Faust is beaten (2227),
+Reef (1032108, in 910100001) thanks the player through a start script
+(`q2228s`) that completes the quest at once and gives the data's 8 fame
+(`Act/1 pop`, through `Effect::GainFame`, since `FinishQuest` gives no
+`Act/1` rewards). Its line is a placeholder (`reef.thanks`).
 
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,

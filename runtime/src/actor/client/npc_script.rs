@@ -379,6 +379,15 @@ impl ClientActor {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;
                 }
+                Effect::GainFame(amount) => {
+                    next.stats.fame = next.stats.fame.saturating_add(*amount);
+                    changed = true;
+                    packets.push(stat::build_stat_update(
+                        false,
+                        &[StatUpdate::Fame(next.stats.fame)],
+                    )?);
+                    packets.push(quest::build_fame_gain_in_chat(*amount)?);
+                }
                 Effect::TakeFirstJob(job)
                 | Effect::TakeSecondJob(job)
                 | Effect::TakeThirdJob(job)
