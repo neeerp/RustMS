@@ -64,9 +64,13 @@ pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
-    "q1021s", "q1021e", "q4647e", "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e",
-    "q8185e", "q8189e",
+    "q1021s", "q1021e", "q2214e", "q2215e", "q2216s", "q2217s", "q2218s", "q2219s", "q4647e",
+    "q4659e", "q6030e", "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e",
 ];
+/// Quests with nothing to complete them by (an empty `Check/1`) whose start
+/// script completes them as it starts them: JM's informants (2216-2219),
+/// each heard from once (`Effect::FinishQuest`).
+pub const FINISHED_BY_START_SCRIPT: &[i16] = &[2216, 2217, 2218, 2219];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
@@ -380,6 +384,8 @@ pub struct QuestKeys {
     pub item_keys: Vec<String>,
     /// Keys used by any `Act/1/skill` entry.
     pub skill_keys: Vec<String>,
+    /// Its start script completes it ([`FINISHED_BY_START_SCRIPT`]).
+    pub finished_by_start_script: bool,
 }
 
 /// `Ok` if every declared requirement and action is supported, otherwise the
@@ -396,7 +402,10 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     // Without a completion NPC, a quest that asks for items or kills is
     // handed in to the NPC that gave it (Pio's 1008). Without either, it is
     // a record kept by some event, not something an NPC completes.
-    if !end.iter().any(|k| k == "npc" || k == "item" || k == "mob") {
+    // Unless the start script completes it.
+    if !keys.finished_by_start_script
+        && !end.iter().any(|k| k == "npc" || k == "item" || k == "mob")
+    {
         return Err("no completion NPC".into());
     }
     unsupported(
@@ -501,6 +510,12 @@ impl QuestCatalog {
                     keys.retain(|key| key != "infoex");
                 }
             }
+            keys.finished_by_start_script = FINISHED_BY_START_SCRIPT.contains(&id)
+                && keys
+                    .start_check
+                    .iter()
+                    .flatten()
+                    .any(|k| k == "startscript");
             if id == REQUIREMENTS_IN_START_ACTIONS {
                 keys.start_act.clear();
             }
@@ -1080,6 +1095,10 @@ mod tests {
         let mut no_end = keys(&["npc"], &[], &[], &[]);
         no_end.end_check = None;
         assert!(classify(&no_end).is_err());
+        let mut informant = keys(&["npc", "startscript"], &[], &[], &[]);
+        assert!(classify(&informant).is_err());
+        informant.finished_by_start_script = true;
+        assert_eq!(classify(&informant), Ok(()));
     }
 
     /// The supported set must match `supported_quests.txt`, which HeavenClient

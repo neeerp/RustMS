@@ -42,6 +42,33 @@ pub fn start(
     prerequisites: &[(i16, QuestState)],
     repeatable: bool,
 ) -> crate::Result<QuestProgress> {
+    begin(player, qid, prerequisites, repeatable, false)
+}
+
+/// Start a quest and complete it at once, as a start script that completes
+/// its quest does (the informants of quests 2216-2219): the checks of
+/// [`start`], then the record is saved completed.
+pub fn finish(
+    player: &Player,
+    qid: i16,
+    prerequisites: &[(i16, QuestState)],
+    repeatable: bool,
+) -> crate::Result<QuestProgress> {
+    begin(player, qid, prerequisites, repeatable, true)
+}
+
+fn begin(
+    player: &Player,
+    qid: i16,
+    prerequisites: &[(i16, QuestState)],
+    repeatable: bool,
+    finished: bool,
+) -> crate::Result<QuestProgress> {
+    let (status, completed_at) = if finished {
+        (2, Some(SystemTime::now()))
+    } else {
+        (1, None)
+    };
     let cid = player.id();
     let mut conn = crate::connection()?;
     conn.transaction(|conn| -> diesel::QueryResult<_> {
@@ -78,14 +105,15 @@ pub fn start(
             .values((
                 character_quests::character_id.eq(cid),
                 character_quests::quest_id.eq(qid),
-                character_quests::status.eq(1),
+                character_quests::status.eq(status),
+                character_quests::completed_at.eq(completed_at),
                 character_quests::progress.eq(&progress),
             ))
             .on_conflict((character_quests::character_id, character_quests::quest_id))
             .do_update()
             .set((
-                character_quests::status.eq(1),
-                character_quests::completed_at.eq(None::<SystemTime>),
+                character_quests::status.eq(status),
+                character_quests::completed_at.eq(completed_at),
                 character_quests::progress.eq(&progress),
             ))
             .get_result(conn)?;

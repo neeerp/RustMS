@@ -177,7 +177,7 @@ itself ("Etc item inventory is full."). `startscript`/
 `endscript` are allowed only for scripts the server implements
 (`game_data::quests::SCRIPTS`: `q1021s`, `q1021e`, Bartos's secret
 `q4647e`, Garnox's pet evolutions `q8185e`, `q8189e` and `q4659e` (see
-[Pets](./pets.md)), and Meren's Maker lessons below); those steps go through
+[Pets](./pets.md)), Meren's Maker lessons and Dyle's informants below); those steps go through
 QUEST_ACTION 4/5 and the server drives the dialogue (see
 [NPC dialogue](./npc-dialogue.md)). `money` pays (or, if negative, takes)
 mesos on completion; a quest that takes mesos needs them held, or the
@@ -244,6 +244,21 @@ levels 2 and 3 and give Cosmic's 230,000 and 300,000 EXP. 6034's `Act/0`
 repeats its start requirements with a `skill` entry that teaches nothing,
 so the server ignores it. The scripts' text is unsourced and stays
 placeholder.
+
+Dyle's informants in Kerning City (2214-2219, before JM's 2220). The Knocked
+Trash Can (1052108) in the Hut in the Swamp (107000301) ends 2214 only from 5 to 8 p.m. on the
+stations' wall clock (`conti::time_of_day`, as the ships keep it): its
+script (`q2214e`) gives JM's list of informants (4031894) and Cosmic's
+20,000 EXP; at other hours the can is empty. A player who lost the
+list gets another there on 2215 (`q2215e`) for 2,000 mesos. Each informant
+(Mr. Pickall 9000008, Shumi 1052102, Nella 1052103 and Jake 1052006 for
+2216-2219) has a start script and no end: talking to them through
+QUEST_ACTION 4 starts and completes their quest at once
+(`Effect::FinishQuest`, saved by `db::quest::finish` with the start's
+checks) and gives Cosmic's 7,000 EXP, and the last of the four takes the
+list. `game_data::quests::FINISHED_BY_START_SCRIPT` lets these four through
+without a completion NPC. The can's and the informants' lines are
+unsourced and stay placeholder (`dyle.*`).
 
 The `game-data` asset test compares the server's result with the committed
 list `game-data/supported_quests.txt`. HeavenClient doesn't classify quests:

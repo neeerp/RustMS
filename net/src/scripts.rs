@@ -477,6 +477,10 @@ pub enum Effect {
     GainExp(i32),
     StartQuest(i16),
     CompleteQuest(i16),
+    /// Start a quest not yet started and complete it at once: a start script
+    /// that completes its own quest (Cosmic's `forceCompleteQuest`), as the
+    /// informants of quests 2216-2219 do. Checked like a start.
+    FinishQuest(i16),
     /// Set a started quest's own record to `count`, toward its completion
     /// (`QuestTemplate::end_record`); nothing is applied unless it is started.
     QuestRecord {

@@ -2332,6 +2332,14 @@ impl NpcScript {
         match script {
             "q1021s" => Some(roger_start(player)),
             "q1021e" => Some(roger_end(player)),
+            "q2214e" | "q2215e" => {
+                let hour = conti::time_of_day(conti::now()).0;
+                Some(trash_can(player, script == "q2215e", hour))
+            }
+            "q2216s" => informant(player, 0),
+            "q2217s" => informant(player, 1),
+            "q2218s" => informant(player, 2),
+            "q2219s" => informant(player, 3),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
             "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
@@ -2699,6 +2707,75 @@ fn pet_secret(player: &Player) -> NpcScript {
         },
     ];
     script
+}
+
+/// JM's list of informants (Kerning City, quests 2214-2219).
+const INFORMANT_LIST: i32 = 4031894;
+/// The Knocked Trash Can in the Hut in the Swamp (107000301), where JM
+/// leaves it.
+const TRASH_CAN: i32 = 1052108;
+/// The fee for a lost list (`q2215e`, `Act/1 money`).
+const INFORMANT_LIST_FEE: i32 = 2000;
+/// JM's informants and their quests: Mr. Pickall, Shumi, Nella and Jake.
+const INFORMANTS: [(i16, i32); 4] = [
+    (2216, 9000008),
+    (2217, 1052102),
+    (2218, 1052103),
+    (2219, 1052006),
+];
+
+/// `q2214e`, and `q2215e` for a `lost` list: the trash can in the Hut in
+/// the Swamp holds JM's list from 5 to 8 p.m. (QuestInfo 2214), by the hour the stations'
+/// clocks show. The first list comes with 20,000 EXP (Cosmic's; the data
+/// gives only the list); a lost one costs the fee.
+fn trash_can(player: &Player, lost: bool, hour: u8) -> NpcScript {
+    let say = |key| NpcScript::new(TRASH_CAN, vec![Page::Say(text(key))]);
+    if !(17..20).contains(&hour) {
+        return say(keys::DYLE_TRASH_CAN_NOT_YET);
+    }
+    if lost && player.meso < INFORMANT_LIST_FEE {
+        return say(keys::DYLE_TRASH_CAN_SHORT);
+    }
+    let (mut script, quest) = if lost {
+        (say(keys::DYLE_TRASH_CAN_PAID), 2215)
+    } else {
+        (say(keys::DYLE_TRASH_CAN_FOUND), 2214)
+    };
+    if lost {
+        script.on_end.push(Effect::SpendMeso(INFORMANT_LIST_FEE));
+    }
+    script.on_end.extend([
+        Effect::CompleteQuest(quest),
+        Effect::GiveItem {
+            item_id: INFORMANT_LIST,
+            quantity: 1,
+        },
+    ]);
+    if !lost {
+        script.on_end.push(Effect::GainExp(20_000));
+    }
+    script.inventory_full = Some(text(keys::DYLE_TRASH_CAN_FULL));
+    script
+}
+
+/// `q2216s`-`q2219s`: the informant at `index` tells what they know about
+/// Dyle, which completes the quest as it starts, for 7,000 EXP (Cosmic's;
+/// the data has none). The last of the four heard takes back JM's list.
+fn informant(player: &Player, index: usize) -> Option<NpcScript> {
+    let (quest, npc) = INFORMANTS[index];
+    let mut script = NpcScript::new(npc, vec![Page::Say(text(keys::DYLE_INFORMANTS[index]))]);
+    script.on_end = vec![Effect::FinishQuest(quest), Effect::GainExp(7000)];
+    let rest_heard = INFORMANTS
+        .iter()
+        .filter(|&&(other, _)| other != quest)
+        .all(|&(other, _)| player.quests.state(other) == QuestState::Completed);
+    if rest_heard && player.inventory.count(INFORMANT_LIST) > 0 {
+        script.on_end.push(Effect::TakeItem {
+            item_id: INFORMANT_LIST,
+            quantity: 1,
+        });
+    }
+    Some(script)
 }
 
 /// `q8185e`, `q4659e` and `q8189e`: Garnox spends a Rock of Evolution and
@@ -9755,6 +9832,95 @@ mod tests {
         let end = script.respond(ScriptInput::Next).unwrap();
         assert_eq!(end.prompt, None);
         (npc, end.effects)
+    }
+
+    /// What a one-page script applies once read.
+    fn read_through(mut script: NpcScript) -> (i32, Vec<Effect>) {
+        let npc = script.npc_id();
+        assert!(script.begin().prompt.is_some());
+        let end = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(end.prompt, None);
+        (npc, end.effects)
+    }
+
+    #[test]
+    fn the_trash_can_holds_jms_list_from_5_to_8_pm() {
+        let list = Effect::GiveItem {
+            item_id: INFORMANT_LIST,
+            quantity: 1,
+        };
+        for hour in [16, 20, 0] {
+            for lost in [false, true] {
+                let script = trash_can(&traveller(30, 5000, false), lost, hour);
+                assert_eq!(read_through(script), (TRASH_CAN, vec![]), "{hour}h");
+            }
+        }
+        for hour in [17, 19] {
+            let found = trash_can(&traveller(30, 0, false), false, hour);
+            assert_eq!(
+                read_through(found),
+                (
+                    TRASH_CAN,
+                    vec![
+                        Effect::CompleteQuest(2214),
+                        list.clone(),
+                        Effect::GainExp(20_000)
+                    ]
+                )
+            );
+            assert!(trash_can(&traveller(30, 0, false), false, hour)
+                .inventory_full()
+                .is_some());
+        }
+        // A lost list costs the fee, which must be held.
+        let short = trash_can(&traveller(30, INFORMANT_LIST_FEE - 1, false), true, 18);
+        assert_eq!(read_through(short), (TRASH_CAN, vec![]));
+        let paid = trash_can(&traveller(30, INFORMANT_LIST_FEE, false), true, 18);
+        assert_eq!(
+            read_through(paid),
+            (
+                TRASH_CAN,
+                vec![
+                    Effect::SpendMeso(INFORMANT_LIST_FEE),
+                    Effect::CompleteQuest(2215),
+                    list
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn each_informant_completes_their_quest_and_the_last_takes_the_list() {
+        let heard = |quest: i16| vec![Effect::FinishQuest(quest), Effect::GainExp(7000)];
+        let holding = |done: &[i16]| {
+            let mut player = with_quests(&done.iter().map(|&q| (q, true)).collect::<Vec<_>>());
+            player.inventory.insert(
+                game::InventoryType::Etc,
+                1,
+                game::Item::stack(INFORMANT_LIST, 1),
+            );
+            player
+        };
+        for (script, index) in [("q2216s", 0), ("q2217s", 1), ("q2218s", 2), ("q2219s", 3)] {
+            let (quest, npc) = INFORMANTS[index];
+            let first = NpcScript::for_quest(script, &holding(&[])).unwrap();
+            assert_eq!(read_through(first), (npc, heard(quest)));
+            let others: Vec<i16> = INFORMANTS
+                .iter()
+                .map(|&(other, _)| other)
+                .filter(|&other| other != quest)
+                .collect();
+            let mut last = heard(quest);
+            last.push(Effect::TakeItem {
+                item_id: INFORMANT_LIST,
+                quantity: 1,
+            });
+            let script = NpcScript::for_quest(script, &holding(&others)).unwrap();
+            assert_eq!(read_through(script), (npc, last));
+        }
+        // Two still to hear: the list stays.
+        let early = NpcScript::for_quest("q2219s", &holding(&[2216, 2217])).unwrap();
+        assert_eq!(read_through(early), (1052006, heard(2219)));
     }
 
     #[test]
