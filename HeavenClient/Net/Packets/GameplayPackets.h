@@ -1289,6 +1289,18 @@ namespace ms
 		}
 	};
 
+	// Opcode: FIELD_DAMAGE_MOB(191)
+	class FieldDamageMobPacket : public OutPacket
+	{
+	public:
+		// Tells the server a trap hurt mob `oid` for `damage` (0x667d46).
+		FieldDamageMobPacket(int32_t oid, int32_t damage) : OutPacket(OutPacket::Opcode::FIELD_DAMAGE_MOB)
+		{
+			write_int(oid);
+			write_int(damage);
+		}
+	};
+
 	// Opcode: PICKUP_ITEM(202)
 	class PickupItemPacket : public OutPacket
 	{

@@ -13,9 +13,9 @@ is played through too: its nine stages, bonus and reward
 (`v83ref/reports/a066-ludibrium-pq.md`). Orbis's party quest (OPQ) has
 its entry and exit, its cloud stage, the hub's ways into its rooms, the
 six rooms, the garden, Minerva's statue and the win, her prizes, and the
-storage and treasure room the win opens; its jails come in a later slice
+storage, treasure room and jails the win opens
 (`v83ref/reports/a077-orbis-pq.md`, `a087-opq-garden-win-re.md`,
-`a091-opq-bonus-jail-re.md`). Zakum's Dead Mine (ZPQ), the first of the
+`a091-opq-bonus-jail-re.md`, `b185-opq-jails.md`). Zakum's Dead Mine (ZPQ), the first of the
 trials before Zakum ([zakum](./zakum.md)), is played through too
 (`v83ref/reports/a105-zakum-dead-mine.md`). Horntail's Trial Grounds
 (HTPQ) has its entry, its first hand-in and its end rules; its rooms, lamp
@@ -679,6 +679,41 @@ first to break also brings Minerva out at (46, 840)
 field brings no second one while she is out. She asks the leader whether
 to leave (`opq.minerva.bonus_ask`) and sends them to her prize room,
 920011300, portal 0, for their prize like everyone else.
+
+## Orbis's jails
+
+The sealed room under the hub (920010900, through the hub's hidden
+portals) has three doors, `in01` to `in03` (Cosmic `party3_jail1`-`3`,
+`scripts::OPQ_JAILS_IN`), to the jails 920010910, 920010920 and
+920010930 (`events::OPQ_JAILS`, portal 0). They open with the storage, in
+`opq_portal`, and say the storage's line until the quest is won.
+
+Each jail holds 8 to 10 Lucidas (9300044: 3000 HP, no EXP, no drops,
+never back) that players can't hurt, and 7, 6 and 6 levers (reactor
+2008007, `lever1`.., which go up and down for good). A lever's hit drops
+the spears of the trap of its number, `trapN` (Cosmic `2008007`,
+`reactors::Action::Lever`: FIELD_OBSTACLE_ONOFF `trapN` 1, see
+[combat](./combat.md)); the spears hurt players and Lucidas for about
+1000. The second and third jails' extra traps have no lever. The tall
+room's levers, named `1` to `5`, drop nothing.
+
+The jail's way on, `in00` (Cosmic `party3_jailin`, `OPQ_JAIL_ON`), asks
+the field (`FieldMessage::Jail`) how the levers stand against its draw,
+made the first time anyone tries it (`events::draw_jail`: each lever up
+or down by a coin, so none at all, an open way, is 1 in 128 or 64;
+`RUSTMS_OPQ_JAIL1`-`3` pin it as the names of the levers up). With any
+wrong, the whole jail sees `quest/party/wrong_kor` and hears
+`Party1/Failed`, and the player reads `opq.notice.jail_levers` with the
+count in pink. With none (`JailCheck::Solved`), the jail sees
+`quest/party/clear` and hears `Party1/Clear`, and the draw is forgotten so
+that the way stays open: through an open way (`JailCheck::Open`) no one
+cheers. Either way the player goes, with the portal's sound, to the jail's
+map + 2, portal 0.
+There the critical box (2002018) starts at state 1 (`first_state`): its
+state 0 has no event, and nothing moves it in Cosmic. It breaks on the
+fourth hit and sprays as the treasure room's boxes do; so would the plain
+box (2002017) of the jail's map + 1, which no way leads to. Their ways out
+lead back into the jail, by `in00`.
 
 A player who logs in on the treasure room would land on its
 `forcedReturn`, the prize room, where nobody outside the event may be;

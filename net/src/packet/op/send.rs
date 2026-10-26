@@ -122,6 +122,10 @@ pub enum SendOpcode {
     /// An event field's word to the player: their Coconut team (b167).
     FieldSpecificData = 0x85,
     FieldEffect = 0x8A,
+    /// A named map object, such as a trap, shown in another state (139).
+    FieldObstacleOnOff = 0x8B,
+    /// The states of a field's named map objects, for a player entering (140).
+    FieldObstacleOnOffList = 0x8C,
     BlowWeather = 0x8E,
     PlayJukebox = 0x8F,
     AdminResult = 0x90,

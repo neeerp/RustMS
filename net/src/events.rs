@@ -2866,6 +2866,73 @@ pub fn draw_levers(rng: &mut impl rand::Rng) -> [bool; 5] {
     pair
 }
 
+/// The jails under the sealed room, each with its count of levers
+/// (`lever1`.. on its map), as Cosmic's `party3_jailin` counts them.
+pub const OPQ_JAILS: [(i32, usize); 3] = [(920_010_910, 7), (920_010_920, 6), (920_010_930, 6)];
+
+/// The levers of jail `map_id`, if it is one.
+pub fn jail_levers(map_id: i32) -> Option<usize> {
+    OPQ_JAILS
+        .iter()
+        .find(|&&(jail, _)| jail == map_id)
+        .map(|&(_, levers)| levers)
+}
+
+/// The levers of jail `map_id` that open its way on, drawn the first time
+/// anyone tries it: each up or down by a coin (Cosmic `party3_jailin`; a
+/// draw of none leaves the way open). Bit `i` is lever `i`. For testing,
+/// `RUSTMS_OPQ_JAIL1`..`3` pin each jail's as the names of the levers up
+/// (`"135"`).
+pub fn draw_jail(map_id: i32, rng: &mut impl rand::Rng) -> u8 {
+    let levers = jail_levers(map_id).unwrap_or(0);
+    let jail = OPQ_JAILS.iter().position(|&(jail, _)| jail == map_id);
+    let pinned = jail
+        .and_then(|jail| std::env::var(format!("RUSTMS_OPQ_JAIL{}", jail + 1)).ok())
+        .filter(|pin| {
+            pin.bytes()
+                .all(|b| (b'1'..=b'0' + levers as u8).contains(&b))
+        });
+    match pinned {
+        Some(pin) => pin.bytes().fold(0, |mask, b| mask | 1 << (b - b'0')),
+        None => (1..=levers).fold(0, |mask, i| {
+            if rng.gen_bool(0.5) {
+                mask | 1 << i
+            } else {
+                mask
+            }
+        }),
+    }
+}
+
+/// What a jail's way on makes of its levers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JailCheck {
+    /// Its draw wanted no lever up, or it was opened before (Cosmic sets
+    /// the draw to 0): anyone goes by, however they stand.
+    Open,
+    /// They stand as drawn, which opens it.
+    Solved,
+    /// This many of them stand against the draw.
+    Misplaced(usize),
+}
+
+/// A jail's levers against its draw `mask`; `up[i]` is lever `i + 1`.
+pub fn check_jail(mask: u8, up: &[bool]) -> JailCheck {
+    if mask == 0 {
+        return JailCheck::Open;
+    }
+    let misplaced = |(i, &up): (usize, &bool)| up != (mask >> (i + 1) & 1 == 1);
+    match up
+        .iter()
+        .enumerate()
+        .filter(|&lever| misplaced(lever))
+        .count()
+    {
+        0 => JailCheck::Solved,
+        n => JailCheck::Misplaced(n),
+    }
+}
+
 /// What Eak makes of the tall room's levers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LeverCheck {
@@ -3189,6 +3256,42 @@ mod tests {
         assert_eq!(up(&[1, 2, 4]), LeverCheck::Few);
         assert_eq!(up(&[1, 2]), LeverCheck::Wrong { one_right: true });
         assert_eq!(up(&[2, 3]), LeverCheck::Wrong { one_right: false });
+    }
+
+    #[test]
+    fn a_jail_draws_each_of_its_levers_by_a_coin() {
+        let mut rng = rand::thread_rng();
+        let mut masks = HashSet::new();
+        for _ in 0..2000 {
+            let mask = draw_jail(920_010_910, &mut rng);
+            assert_eq!(mask & !0b1111_1110, 0);
+            masks.insert(mask);
+            assert_eq!(draw_jail(920_010_920, &mut rng) & !0b0111_1110, 0);
+        }
+        assert_eq!(masks.len(), 128);
+        assert_eq!(jail_levers(920_010_930), Some(6));
+        assert_eq!(jail_levers(920_010_900), None);
+    }
+
+    #[test]
+    fn a_jail_counts_its_levers_standing_wrong() {
+        // Levers 1, 3 and 5 of 6 up.
+        let mask = 0b10_1010;
+        let up = |names: &[usize]| {
+            let mut up = [false; 6];
+            for &name in names {
+                up[name - 1] = true;
+            }
+            check_jail(mask, &up)
+        };
+        assert_eq!(up(&[1, 3, 5]), JailCheck::Solved);
+        assert_eq!(up(&[]), JailCheck::Misplaced(3));
+        assert_eq!(up(&[1, 3, 5, 6]), JailCheck::Misplaced(1));
+        assert_eq!(up(&[2, 4, 6]), JailCheck::Misplaced(6));
+        // A draw of none, or an opened jail's, lets anyone by.
+        assert_eq!(check_jail(0, &[false; 7]), JailCheck::Open);
+        let up = [true, true, false, false, true, false, true];
+        assert_eq!(check_jail(0, &up), JailCheck::Open);
     }
 
     #[test]

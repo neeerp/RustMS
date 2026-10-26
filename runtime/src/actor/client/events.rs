@@ -12,7 +12,7 @@ use game_data::{Area, PortalTemplate};
 use net::carnival::SpendRefusal;
 use net::events::{
     self, on_areas, standing, Aura, Balloon, ClockOn, Cloto, Entry, EventCommand, EventKind,
-    HeadCount, LeverCheck, Standing, Statue,
+    HeadCount, JailCheck, LeverCheck, Standing, Statue,
 };
 use net::handler::FieldRequest;
 use net::npc_scripts::{NpcScript, AQUA_BALLOON, BLUE_BALLOON, PIETRI};
@@ -540,6 +540,45 @@ impl ClientActor {
                 Effect::WarpToPortal(events::OPQ_STORAGE, 0),
             ]));
         }
+        // The sealed room's doors to the jails open with the storage's
+        // (Cosmic `party3_jail1`..`3`).
+        let jail = scripts::OPQ_JAILS_IN
+            .iter()
+            .position(|&door| door == script);
+        if let (Some(jail), true) = (jail, ticket.won()) {
+            let (jail, _) = events::OPQ_JAILS[jail];
+            return Ok(Some(vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(jail, 0),
+            ]));
+        }
+        // A jail's way on to its box room, open to the right levers
+        // (Cosmic `party3_jailin`), shows the whole jail how they stand.
+        if script == scripts::OPQ_JAIL_ON {
+            let (reply, check) = oneshot::channel();
+            self.send_to_field(FieldMessage::Jail { reply }).await?;
+            let Ok(Some(check)) = check.await else {
+                return Ok(None);
+            };
+            match check {
+                JailCheck::Misplaced(n) => {
+                    self.show_wrong_answer().await?;
+                    let n = n.to_string();
+                    let line = net::content::text().get(keys::OPQ_NOTICE_JAIL_LEVERS, &[("n", &n)]);
+                    return Ok(Some(vec![Effect::Pink(line)]));
+                }
+                // Cosmic cheers only the jail's opening.
+                JailCheck::Solved => {
+                    self.show_to_field(&["quest/party/clear"], &["Party1/Clear"])
+                        .await?
+                }
+                JailCheck::Open => {}
+            }
+            return Ok(Some(vec![
+                Effect::PortalSound,
+                Effect::WarpToPortal(map_id + 2, 0),
+            ]));
+        }
         if ![scripts::OPQ_LOUNGE_CLIMB, scripts::OPQ_TOWER_CLIMB].contains(&script) {
             return Ok(None);
         }
@@ -816,10 +855,24 @@ impl ClientActor {
 
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.
     async fn show_wrong_answer(&mut self) -> Result<(), RuntimeError> {
-        let mut packets = vec![
-            build_field_effect("quest/party/wrong_kor")?,
-            build_field_sound("Party1/Failed")?,
-        ];
+        self.show_to_field(&["quest/party/wrong_kor"], &["Party1/Failed"])
+            .await
+    }
+
+    /// Show everyone on the player's map, the player too, the screen
+    /// `effects` and play them the `sounds`.
+    async fn show_to_field(
+        &mut self,
+        effects: &[&str],
+        sounds: &[&str],
+    ) -> Result<(), RuntimeError> {
+        let mut packets = Vec::new();
+        for effect in effects {
+            packets.push(build_field_effect(effect)?);
+        }
+        for sound in sounds {
+            packets.push(build_field_sound(sound)?);
+        }
         for packet in &packets {
             self.send_to_field(FieldMessage::FromClient {
                 from: self.client_id,

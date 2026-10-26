@@ -117,6 +117,24 @@ impl WorldHandler for MobDamageMobFriendlyHandler {
     }
 }
 
+/// `FIELD_DAMAGE_MOB`: a trap hurt a mob. Object id, then the damage.
+pub struct FieldDamageMobHandler;
+
+impl WorldHandler for FieldDamageMobHandler {
+    fn handle(&self, packet: &mut Packet, _ctx: &mut WorldContext) -> WorldResult {
+        let mut r = Cursor::new(&packet.bytes);
+        r.read_short()?;
+        let object_id = r.read_int()?;
+        let damage = r.read_int()?;
+        Ok(
+            HandlerResult::empty().with(WorldAction::Field(FieldRequest::FieldDamageMob {
+                object_id,
+                damage,
+            })),
+        )
+    }
+}
+
 /// `MOB_DAMAGE_MOB`: a mob's attack reached a Dazzled mob, which the client
 /// hurt with its own formula (FUN_00670c63): the attacker's object id, the
 /// character's id, the victim's, a byte for the attack, the damage, then a

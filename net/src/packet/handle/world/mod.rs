@@ -107,8 +107,8 @@ pub use self::claim::{ClaimHandler, CLAIM_FEE};
 pub use self::coconut::CoconutHandler;
 pub use self::combat::{
     absorbed, catch_disease, countered, death_penalty, hurt_by_hazard, AttackHandler,
-    MobBombHandler, MobDamageMobFriendlyHandler, MobDamageMobHandler, MobDistanceHandler,
-    MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
+    FieldDamageMobHandler, MobBombHandler, MobDamageMobFriendlyHandler, MobDamageMobHandler,
+    MobDistanceHandler, MoveLifeHandler, NpcActionHandler, TakeDamageHandler,
 };
 pub use self::conti::ContiStateRequestHandler;
 pub use self::door::UseDoorHandler;

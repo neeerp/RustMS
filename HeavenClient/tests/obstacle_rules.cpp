@@ -33,6 +33,10 @@ int main()
 		Box body{ 0, 0, 10, 10 };
 		require(body.meets(Box{ 9, 9, 20, 20 }) && !body.meets(Box{ 10, 0, 20, 10 }), "IntersectRect");
 
+		// A mob's box covers its body now and an update ago.
+		require(swept(Box{ 0, -50, 40, 0 }, -5, 3) == Box{ -5, -50, 40, 3 }, "a step left and down");
+		require(swept(Box{ 0, -50, 40, 0 }, 0, 0) == Box{ 0, -50, 40, 0 }, "standing still");
+
 		// Within a tenth either way, from rand().
 		require(roll(100, 0) == 90 && roll(100, 20) == 110 && roll(100, 21) == 90, "100 rolls 90 to 110");
 		require(roll(10, 7) == 10 && roll(1, 7) == 1 && roll(0, 7) == 0, "10 or less stays");

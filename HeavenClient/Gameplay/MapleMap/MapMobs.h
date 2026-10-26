@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "MapObjects.h"
+#include "MapTilesObjs.h"
 #include "Mob.h"
 
 #include "../Spawn.h"
@@ -43,6 +44,10 @@ namespace ms
 		// their attacks may hit. The `reporter` tells the server of mobs
 		// that run into a friendly mob.
 		void update(const Physics &physics, const Mob::Target &target, bool reporter);
+
+		// A trap that hurts mobs hurts each mob it touches, at most once a second, and the client tells the
+		// server (FUN_006675a8, 0x667ce6). Every client in the map does so.
+		void hit_traps(const MapTilesObjs &objs);
 
 		// The local player's hits from mob attacks since last asked.
 		std::vector<Mob::Landed> take_attacks();

@@ -186,6 +186,8 @@ pub enum RecvOpcode {
     QuickSlot = 0xB7,
     MoveLife = 0xBC,
     MobDistance = 0xBD,
+    /// A trap hurt a mob, as the client saw it (0x667d46).
+    FieldDamageMob = 0xBF,
     MobDamageMobFriendly = 0xC0,
     MobBomb = 0xC1,
     MobDamageMob = 0xC2,
