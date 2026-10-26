@@ -9,8 +9,8 @@ use crate::content;
 use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
-    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck,
-    MagatiaSide, PyramidMode, Standing, Statue,
+    self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, Find, HandIn, HeadCount,
+    LeverCheck, MagatiaSide, PyramidMode, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
@@ -900,6 +900,10 @@ pub const ELLIN_SPRITE: i32 = 2133004;
 /// their side's copy of the party quest, and in its maps let a member out.
 pub const ROMEO: i32 = 2112004;
 pub const JULIET: i32 = 2112003;
+/// The books of each side's library, one of which holds the switch that
+/// clears its first stage.
+pub const ZENUMIST_BOOK: i32 = 2112007;
+pub const ALCADNO_BOOK: i32 = 2112013;
 /// Guon Over the Pirate Ship, who sends a party aboard against the Lord
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
@@ -1415,6 +1419,12 @@ impl NpcScript {
     /// not go into `side`'s party quest.
     pub fn magatia(side: MagatiaSide, entry: Entry) -> Self {
         magatia(side, entry)
+    }
+
+    /// One of a Magatia library's books, `npc_id`, found to hold `find`,
+    /// or nothing (any longer).
+    pub fn magatia_book(npc_id: i32, find: Option<Find>) -> Self {
+        magatia_book(npc_id, find)
     }
 
     /// Guon Over the Pirate Ship, for a player whose party may or may not
@@ -7328,6 +7338,65 @@ pub fn magatia_host(side: MagatiaSide) -> i32 {
         MagatiaSide::Alcadno => JULIET,
     }
 }
+
+/// The side whose library `npc` is one of the books of, if it is one.
+pub fn magatia_book_side(npc: i32) -> Option<MagatiaSide> {
+    match npc {
+        ZENUMIST_BOOK => Some(MagatiaSide::Zenumist),
+        ALCADNO_BOOK => Some(MagatiaSide::Alcadno),
+        _ => None,
+    }
+}
+
+/// A Magatia library's book (Cosmic `2112007`, `2112013`), which says
+/// what it held as the player takes it. The switch clears the stage and
+/// shows the library's `d00` lit for everyone there.
+fn magatia_book(npc_id: i32, find: Option<Find>) -> NpcScript {
+    let side = magatia_book_side(npc_id).unwrap_or(MagatiaSide::Zenumist);
+    let act = |key: &str, args: &[(&str, &str)], effects| Page::Act {
+        text: content::text().get(key, args),
+        effects,
+    };
+    let page = match find {
+        None => Page::Say(text(keys::MAGATIA_BOOK_NOTHING)),
+        Some(Find::Mesos) => act(
+            keys::MAGATIA_BOOK_MESOS,
+            &[("mesos", &events::MAGATIA_BOOK_MESOS.to_string())],
+            vec![Effect::GainMeso(events::MAGATIA_BOOK_MESOS)],
+        ),
+        Some(Find::Exp) => act(
+            keys::MAGATIA_BOOK_EXP,
+            &[("exp", &events::MAGATIA_BOOK_EXP.to_string())],
+            vec![Effect::GainExp(events::MAGATIA_BOOK_EXP)],
+        ),
+        Some(Find::Letter) => act(
+            keys::MAGATIA_BOOK_LETTER,
+            &[],
+            vec![Effect::GiveItem {
+                item_id: side.letter(),
+                quantity: 1,
+            }],
+        ),
+        Some(Find::Pass) => act(
+            keys::MAGATIA_BOOK_PASS,
+            &[],
+            vec![
+                Effect::SetReactorState {
+                    name: MAGATIA_SWITCH,
+                    state: 1,
+                },
+                Effect::EventCommand(EventCommand::ClearStage(1)),
+            ],
+        ),
+    };
+    let mut script = NpcScript::new(npc_id, vec![page]);
+    script.inventory_full = Some(text(keys::MAGATIA_BOOK_LETTER_FULL));
+    script
+}
+
+/// The reactor on each library that the switch lights (Map.nx `d00`,
+/// Reactor.nx 2618005).
+const MAGATIA_SWITCH: &str = "d00";
 
 /// The side whose party quest `npc` (Romeo or Juliet) starts.
 fn magatia_side(npc: i32) -> MagatiaSide {
@@ -15372,6 +15441,52 @@ mod tests {
                 assert!(NpcScript::for_npc(host, &member).is_none(), "{map}");
             }
         }
+    }
+
+    #[test]
+    fn a_magatia_book_gives_what_it_held_and_the_switch_clears_the_stage() {
+        for (npc, side, letter) in [
+            (ZENUMIST_BOOK, MagatiaSide::Zenumist, 4_001_131),
+            (ALCADNO_BOOK, MagatiaSide::Alcadno, 4_001_130),
+        ] {
+            assert_eq!(magatia_book_side(npc), Some(side));
+            let found = |find| NpcScript::magatia_book(npc, find).begin();
+            let empty = found(None);
+            assert_eq!(page_text(&empty), text(keys::MAGATIA_BOOK_NOTHING));
+            assert!(empty.effects.is_empty());
+            let mesos = found(Some(Find::Mesos));
+            assert!(page_text(&mesos).contains("500"), "{mesos:?}");
+            assert_eq!(mesos.effects, [Effect::GainMeso(500)]);
+            let exp = found(Some(Find::Exp));
+            assert!(page_text(&exp).contains("500"), "{exp:?}");
+            assert_eq!(exp.effects, [Effect::GainExp(500)]);
+            let letter_found = found(Some(Find::Letter));
+            assert_eq!(page_text(&letter_found), text(keys::MAGATIA_BOOK_LETTER));
+            assert_eq!(
+                letter_found.effects,
+                [Effect::GiveItem {
+                    item_id: letter,
+                    quantity: 1
+                }]
+            );
+            let mut full = NpcScript::magatia_book(npc, Some(Find::Letter));
+            full.begin();
+            let step = full.inventory_full().unwrap();
+            assert_eq!(page_text(&step), text(keys::MAGATIA_BOOK_LETTER_FULL));
+            let pass = found(Some(Find::Pass));
+            assert_eq!(page_text(&pass), text(keys::MAGATIA_BOOK_PASS));
+            assert_eq!(
+                pass.effects,
+                [
+                    Effect::SetReactorState {
+                        name: "d00",
+                        state: 1
+                    },
+                    Effect::EventCommand(EventCommand::ClearStage(1))
+                ]
+            );
+        }
+        assert_eq!(magatia_book_side(ROMEO), None);
     }
 
     #[test]

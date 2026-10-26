@@ -64,6 +64,14 @@ pub enum ServerMessage {
         field: FieldKey,
         request_id: u64,
     },
+    /// One of a Magatia library's books, opened in a run's copy, and what
+    /// it held, now taken (`net::events::draw_books`). Discard if stale.
+    BookOpened {
+        npc_id: i32,
+        field: FieldKey,
+        request_id: u64,
+        find: Option<net::events::Find>,
+    },
     /// A mob this player or their party killed; `exp` is their share.
     MobKilled {
         mob_id: i32,

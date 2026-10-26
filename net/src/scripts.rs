@@ -459,6 +459,8 @@ pub enum Effect {
     },
     /// Nothing is applied if the player no longer has that much.
     SpendMeso(i32),
+    /// Up to the most a player may hold.
+    GainMeso(i32),
     GainExp(i32),
     StartQuest(i16),
     CompleteQuest(i16),
@@ -1269,6 +1271,25 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 EventKind::Magatia(side).event().lobby,
                 0,
             ))
+        }
+        // A Magatia library's way down to its hall, once one of its books
+        // held the switch, and the hall's way on, once its monsters are
+        // all gone (Cosmic `rnj1_pt00`, `rnj1_out` and their Alcadno twins).
+        "rnj1_pt00" | "jnr1_pt00" | "rnj1_out" | "jnr1_out" => {
+            let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
+            let stage = if script.ends_with("pt00") { 1 } else { 2 };
+            ScriptOutcome {
+                effects: vec![
+                    Effect::RequireStage {
+                        stage,
+                        refused: None,
+                    },
+                    Effect::PortalSound,
+                    Effect::WarpToPortal(side.stages()[usize::from(stage)], 0),
+                ],
+                block: false,
+                occupied: Some(content::text().get(keys::MAGATIA_PORTAL_SHUT, &[])),
+            }
         }
         "party3_roomout" => {
             let map = player.stats.map_id;
@@ -3121,6 +3142,37 @@ mod tests {
         }
         player.stats.map_id = ZENUMIST_LOBBY;
         assert!(portal("rnj_exit", &player).is_none());
+    }
+
+    #[test]
+    fn a_magatia_librarys_ways_on_wait_for_the_switch_and_the_halls_mobs() {
+        use crate::events::MagatiaSide;
+        let mut player = player_with(&[]);
+        let shut = content::text().get(keys::MAGATIA_PORTAL_SHUT, &[]);
+        for (side, prefix) in [
+            (MagatiaSide::Zenumist, "rnj"),
+            (MagatiaSide::Alcadno, "jnr"),
+        ] {
+            let stages = side.stages();
+            for (stage, script) in [(1u8, "1_pt00"), (2, "1_out")] {
+                player.stats.map_id = stages[usize::from(stage) - 1];
+                let outcome = portal(&format!("{prefix}{script}"), &player).unwrap();
+                assert_eq!(
+                    outcome.effects,
+                    [
+                        Effect::RequireStage {
+                            stage,
+                            refused: None
+                        },
+                        Effect::PortalSound,
+                        Effect::WarpToPortal(stages[usize::from(stage)], 0)
+                    ]
+                );
+                assert_eq!(outcome.occupied.as_ref(), Some(&shut));
+            }
+        }
+        player.stats.map_id = crate::events::ZENUMIST_LOBBY;
+        assert!(portal("rnj1_pt00", &player).is_none());
     }
 
     #[test]

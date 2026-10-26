@@ -365,6 +365,16 @@ impl ClientActor {
                     )?);
                     packets.push(drop::build_meso_gain_in_chat(-amount)?);
                 }
+                Effect::GainMeso(amount) => {
+                    let before = next.meso;
+                    next.meso = next.meso.saturating_add((*amount).max(0));
+                    changed = true;
+                    packets.push(stat::build_stat_update(
+                        false,
+                        &[StatUpdate::Meso(next.meso)],
+                    )?);
+                    packets.push(drop::build_meso_gain_in_chat(next.meso - before)?);
+                }
                 Effect::GainExp(amount) => {
                     gain_exp(&mut next, *amount, &mut packets)?;
                     changed = true;

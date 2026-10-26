@@ -278,6 +278,9 @@ pub struct FieldActor {
     /// In the tall room, the two levers Eak wants up, once he has been
     /// asked.
     levers: Option<[bool; 5]>,
+    /// In a Magatia library, what each of its books still holds
+    /// (`net::events::draw_books`), once anyone has opened one.
+    books: Option<[Option<net::events::Find>; net::events::MAGATIA_BOOKS]>,
     /// In a jail under the sealed room, the levers that open its way on
     /// (`net::events::draw_jail`), once anyone has tried it; none once
     /// they have.
@@ -361,6 +364,7 @@ impl FieldActor {
             split: None,
             climb: None,
             levers: None,
+            books: None,
             jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
@@ -4838,13 +4842,44 @@ impl FieldActor {
         }
     }
 
-    fn handle_npc_interaction(&self, from: ClientId, object_id: i32, request_id: u64) {
+    fn handle_npc_interaction(&mut self, from: ClientId, object_id: i32, request_id: u64) {
         let Some(occupant) = self.occupants.get(&from) else {
             return;
         };
-        let Some(npc) = self.map_npcs.iter().find(|npc| npc.object_id == object_id) else {
+        let Some(index) = self
+            .map_npcs
+            .iter()
+            .position(|npc| npc.object_id == object_id)
+        else {
             return;
         };
+        let npc = &self.map_npcs[index];
+        // A Magatia library's book, in a run's copy, gives up what it holds
+        // once; the hall's books below it hold nothing.
+        let book =
+            net::npc_scripts::magatia_book_side(npc.npc_id).filter(|_| self.key.instance_id != 0);
+        if let Some(side) = book {
+            let npc_id = npc.npc_id;
+            let find = if self.key.map_id == side.stages()[0] {
+                let slot = self.map_npcs[..index]
+                    .iter()
+                    .filter(|npc| npc.npc_id == npc_id)
+                    .count();
+                let books = self
+                    .books
+                    .get_or_insert_with(|| net::events::draw_books(&mut rand::thread_rng()));
+                books.get_mut(slot).and_then(Option::take)
+            } else {
+                None
+            };
+            occupant.handle.send(ServerMessage::BookOpened {
+                npc_id,
+                field: self.key,
+                request_id,
+                find,
+            });
+            return;
+        }
         // The field validates map object identity; the client actor owns the
         // conversation and serializes quest persistence with character state.
         occupant.handle.send(ServerMessage::NpcConversation {

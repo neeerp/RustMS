@@ -1683,6 +1683,18 @@ impl ClientActor {
                     self.start_npc_conversation(npc_id, field).await?;
                 }
             }
+            ServerMessage::BookOpened {
+                npc_id,
+                field,
+                request_id,
+                find,
+            } => {
+                // The field has given up what the book held: take it even
+                // if a later click made this answer stale, or it is lost.
+                if request_id == self.npc_request_id || find.is_some() {
+                    self.open_book(npc_id, field, find).await?;
+                }
+            }
             ServerMessage::QuestNpcChecked { request_id, nearby } => {
                 self.quest_npc_checked(request_id, nearby).await?
             }

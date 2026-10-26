@@ -88,6 +88,30 @@ pub enum MagatiaSide {
 
 impl MagatiaSide {
     pub const ALL: [MagatiaSide; 2] = [MagatiaSide::Zenumist, MagatiaSide::Alcadno];
+
+    /// The side whose copied maps (its exit too) hold `map_id`, if any.
+    pub fn of(map_id: i32) -> Option<MagatiaSide> {
+        Self::ALL
+            .into_iter()
+            .find(|&side| EventKind::Magatia(side).event().maps.contains(&map_id))
+    }
+
+    /// The stage maps of its run, in order.
+    pub fn stages(self) -> &'static [i32; 7] {
+        match self {
+            MagatiaSide::Zenumist => &ZENUMIST_STAGES,
+            MagatiaSide::Alcadno => &ALCADNO_STAGES,
+        }
+    }
+
+    /// The letter one of its library's books may hide (Cosmic `2112007`
+    /// and `2112013`).
+    pub fn letter(self) -> i32 {
+        match self {
+            MagatiaSide::Zenumist => 4_001_131,
+            MagatiaSide::Alcadno => 4_001_130,
+        }
+    }
 }
 
 /// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
@@ -1509,8 +1533,9 @@ pub fn cleared_by_boss(map_id: i32, mob_id: i32) -> Option<u8> {
 
 /// The stage cleared once every mob on `map_id`, in an event's copy of
 /// it, is dead, and every reactor `seals` names there set: the first of
-/// the Forest of Poison Haze and the Pirate Ship's first, decks and doors
-/// (Cosmic `EllinPQ.monsterKilled`, `PiratePQ.monsterKilled`).
+/// the Forest of Poison Haze, the Pirate Ship's first, decks and doors,
+/// and the hall below each Magatia library (Cosmic `EllinPQ`,
+/// `PiratePQ` and `MagatiaPQ_Z`'s `monsterKilled`).
 pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
     [
         (ELLIN_STAGES[0], 1),
@@ -1518,6 +1543,8 @@ pub fn cleared_by_killing(map_id: i32) -> Option<u8> {
         (PIRATE_STAGES[2], 3),
         (PIRATE_STAGES[3], 4),
         (PIRATE_STAGES[4], 5),
+        (ZENUMIST_STAGES[1], 2),
+        (ALCADNO_STAGES[1], 2),
     ]
     .into_iter()
     .find_map(|(map, stage)| (map == map_id).then_some(stage))
@@ -1744,7 +1771,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         stride: 1,
         stage_maps: stages,
         talk_clears: &[],
-        member_clears: &[],
+        member_clears: &[1, 2],
         clear_portals: &[],
         gated: &[],
         puzzles: 1..=0,
@@ -1769,6 +1796,45 @@ pub const MAGATIA: [Event; 2] = [
     magatia(ZENUMIST_LOBBY, ZENUMIST_ENTRY, &ZENUMIST_STAGES),
     magatia(ALCADNO_LOBBY, ALCADNO_ENTRY, &ALCADNO_STAGES),
 ];
+
+/// What one of the books in a Magatia library holds, each found once
+/// (Cosmic `2112007`): mesos, EXP, the side's letter, or the switch that
+/// clears the stage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Find {
+    Mesos,
+    Exp,
+    Letter,
+    Pass,
+}
+
+/// How many books each library has (Map.nx), and the mesos or EXP one
+/// gives (Cosmic's 500, there times the player's rate).
+pub const MAGATIA_BOOKS: usize = 26;
+pub const MAGATIA_BOOK_MESOS: i32 = 500;
+pub const MAGATIA_BOOK_EXP: i32 = 500;
+
+/// What each of a library's books holds, in the order of the map's books,
+/// drawn for each run (Cosmic `MagatiaPQ_Z.afterSetup`): seven of mesos,
+/// seven of EXP, the letter, the switch, and ten with nothing.
+pub fn draw_books(rng: &mut impl rand::Rng) -> [Option<Find>; MAGATIA_BOOKS] {
+    use rand::seq::SliceRandom;
+    let mut books = [None; MAGATIA_BOOKS];
+    let finds = [
+        (Find::Mesos, 7),
+        (Find::Exp, 7),
+        (Find::Letter, 1),
+        (Find::Pass, 1),
+    ];
+    let mut slots = books.iter_mut();
+    for (find, count) in finds {
+        for book in slots.by_ref().take(count) {
+            *book = Some(find);
+        }
+    }
+    books.shuffle(rng);
+    books
+}
 
 /// The Mu Lung Dojo's entrance, where the notice board sends a challenger
 /// and its `dojang_exit` portal leads out (Cosmic's
@@ -3852,6 +3918,33 @@ mod tests {
         }
         assert_eq!(ZENUMIST_STAGES[0], 926_100_000);
         assert_eq!(ALCADNO_STAGES[6], 926_110_401);
+    }
+
+    #[test]
+    fn a_magatia_library_hides_one_switch_and_one_letter_among_its_books() {
+        let mut rng = rand::thread_rng();
+        let draws: Vec<_> = (0..20).map(|_| draw_books(&mut rng)).collect();
+        for books in &draws {
+            let count = |find| books.iter().filter(|&&book| book == find).count();
+            assert_eq!(count(Some(Find::Pass)), 1);
+            assert_eq!(count(Some(Find::Letter)), 1);
+            assert_eq!(count(Some(Find::Mesos)), 7);
+            assert_eq!(count(Some(Find::Exp)), 7);
+            assert_eq!(count(None), 10);
+        }
+        let first = |books: &[Option<Find>; MAGATIA_BOOKS]| {
+            books.iter().position(|&b| b == Some(Find::Pass))
+        };
+        assert!(draws.iter().any(|books| first(books) != first(&draws[0])));
+        for side in MagatiaSide::ALL {
+            let event = EventKind::Magatia(side).event();
+            assert_eq!(cleared_by_killing(side.stages()[1]), Some(2));
+            assert_eq!(cleared_by_killing(side.stages()[0]), None);
+            assert_eq!(MagatiaSide::of(event.exit), Some(side));
+            assert_eq!(MagatiaSide::of(side.stages()[6]), Some(side));
+            assert!(event.member_clears.contains(&1) && event.member_clears.contains(&2));
+        }
+        assert_eq!(MagatiaSide::of(ZENUMIST_LOBBY), None);
     }
 
     #[test]

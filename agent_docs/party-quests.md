@@ -35,8 +35,8 @@ warriors' 6192, is a party's event with nothing to win
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
-Magatia's Romeo and Juliet party quest has its entry, its way out and its
-end rules; its stages come in later slices
+Magatia's Romeo and Juliet party quest has its entry, its way out, its
+end rules and its first two stages; its other stages come in later slices
 ([Romeo and Juliet](#romeo-and-juliet)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1233,8 +1233,26 @@ Its seven stages, as Cosmic counts them for their EXP (0, 10,000,
 20,000, 0, 20,000, 20,000, 0), are played on the library (x00000), the
 hall below it (x00001), the beakers (x00100), the hub of files (x00200),
 Yulete's room (x00203), the rope rooms' landing (x00300) and the boss's
-room (x00401), `ZENUMIST_STAGES` and `ALCADNO_STAGES`. None of them can be
-cleared yet.
+room (x00401), `ZENUMIST_STAGES` and `ALCADNO_STAGES`.
+
+The library's 26 books (Zenumist 2112007, Alcadno 2112013; Cosmic's
+scripts of the same ids) hold, drawn once per copy when one is first
+opened (`events::draw_books`, kept by the field as `books`), 7 bags of
+500 mesos, 7 lessons worth 500 EXP, the side's letter (Zenumist 4001131,
+Alcadno 4001130) and the switch; the other 10 hold nothing. Each gives
+up what it held once (`ServerMessage::BookOpened`,
+`NpcScript::magatia_book`). Cosmic multiplies the mesos and EXP by the
+server's rates; ours don't move. A letter that doesn't fit is lost, as in
+Cosmic. The switch lights the library's reactor `d00` (2618005, state 1)
+for everyone there and clears stage 1, which gives no EXP. The 10 books
+in the Alcadno hall hold nothing.
+
+The library's way on (`rnj1_pt00`, `jnr1_pt00`) and the hall's
+(`rnj1_out`, `jnr1_out`, to x00100) stay shut, in pink
+(`magatia.portal_shut`), until their stage is cleared. The hall's 42
+mobs (9300145 and 9300146, which don't come back) clear stage 2 with the
+last kill (`cleared_by_killing`), for 10,000 EXP each. The other stages
+can't be cleared yet.
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the
@@ -1307,6 +1325,8 @@ nothing yet. Its lines are placeholders (`magatia.*`).
 | Romeo 2112004 | 926100000-400 | Asks whether to retreat, to 926100700 |
 | Juliet 2112003 | 261000021 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Juliet 2112003 | 926110000-400 | Asks whether to retreat, to 926110700 |
+| Books 2112007 | 926100000 | Runtime (`BookOpened`): mesos, EXP, the letter, the switch or nothing |
+| Books 2112013 | 926110000 | The same; in the hall (926110001) they hold nothing |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,
