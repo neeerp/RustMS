@@ -9,6 +9,7 @@ use crate::items;
 use crate::packet::build::world::mini_room::{buy_result, SHOP_ITEMS};
 use crate::shop::is_rechargeable;
 use crate::trade::{self, Offer, TradeFailure, LOW_LEVEL_MAX, LOW_LEVEL_MESO_LIMIT};
+use game::inventory::FLAG_UNTRADEABLE;
 pub use game::mini_room::Listing;
 use game::{InventoryChange, InventoryType, Item, Player};
 
@@ -101,6 +102,20 @@ pub fn sold_out(listings: &[Listing]) -> bool {
     listings.iter().all(|listing| listing.bundles == 0)
 }
 
+/// Whether the item may be listed (FUN_006fd96c): not sealed, party quest
+/// or account items; a cash, quest or untradeable item only with Karma,
+/// which, unlike in a trade, lets a cash item in too.
+pub fn sellable(item: &Item) -> bool {
+    let bound = item.equip.is_some() && item.flags & FLAG_UNTRADEABLE != 0;
+    !item.sealed()
+        && items::info(item.item_id).is_some_and(|info| {
+            let cash = item.is_cash() || info.equip.is_some_and(|equip| equip.cash);
+            !info.pquest
+                && !info.account_sharable
+                && (item.has_karma() || !cash && !info.quest && !info.trade_block && !bound)
+        })
+}
+
 /// Take the item in a bag slot out of the inventory to list it. Equipment
 /// and sets of stars or bullets go whole, as one bundle. Returns the
 /// listing and the inventory changes, or why the request is refused
@@ -125,8 +140,7 @@ pub fn list_item(
         .get(kind, slot)
         .filter(|_| slot > 0)
         .ok_or("no item in that slot")?;
-    // Party quest items stay out too (FUN_006fd96c).
-    if !trade::tradeable(item) || items::info(item.item_id).is_some_and(|info| info.pquest) {
+    if !sellable(item) {
         return Err("item can't be sold");
     }
     let (bundles, per_bundle) = if is_rechargeable(item.item_id) || item.equip.is_some() {
@@ -385,6 +399,29 @@ mod tests {
         assert!(list_item(&mut player, &[], 2, 1, 1, 1, 100).is_err());
         assert!(list_item(&mut player, &[], 4, 1, 1, 1, 100).is_err());
         assert!(list_item(&mut player, &[], 2, 2, 1, 1, 100).is_ok());
+    }
+
+    #[test]
+    fn cash_items_list_only_with_karma_and_sealed_ones_never() {
+        if items::data().is_err() {
+            return;
+        }
+        let rock = Item::stack(5040000, 1);
+        let sword = Item {
+            cash_serial: Some(7),
+            ..Item::equipment(1302000, Default::default())
+        };
+        assert!(!sellable(&rock) && !sellable(&sword));
+        let (mut rock, mut sword) = (rock, sword);
+        rock.give_karma();
+        sword.give_karma();
+        assert!(sellable(&rock) && sellable(&sword));
+        rock.flags |= game::inventory::FLAG_LOCK;
+        assert!(!sellable(&rock));
+        assert!(
+            !trade::tradeable(&sword),
+            "a trade still refuses cash items"
+        );
     }
 
     #[test]

@@ -1514,6 +1514,11 @@ The work is split three ways, as for trading:
   adds the unsold stock back into the saved copy, as for a trade offer.
 - `net::personal_shop` holds the rules: tax, permit, list item, check
   purchase, check sale, sell, unsold.
+  What may be listed (`sellable`, v83 FUN_006fd96c) is not what a trade
+  takes. Sealed, party quest and account items are refused. A cash, quest
+  or untradeable item is refused unless it has Karma, so a cash item with
+  Karma can be listed but not traded. A trade refuses every cash item.
+  Hired merchants list by the same rule.
 
 A visit names only a room id, so the field sends it to the shops if one has
 that id and to the trades otherwise. Room ids come from one counter for
