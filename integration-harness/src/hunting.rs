@@ -437,6 +437,8 @@ pub struct Field {
     pub npcs: Vec<(i32, i32)>,
     /// Where each NPC spawned.
     pub npc_positions: BTreeMap<i32, (i16, i16)>,
+    /// Object ids of NPCs taken off the map.
+    pub npcs_removed: Vec<i32>,
     /// Where each mob spawned.
     pub mob_positions: BTreeMap<i32, (i16, i16)>,
     /// Statuses put on mobs: (object id, stats, first one's value, first
@@ -737,6 +739,8 @@ impl Field {
             self.npcs.push((object_id, npc_id));
             let at = (r.read_short().unwrap(), r.read_short().unwrap());
             self.npc_positions.insert(object_id, at);
+        } else if op == SendOpcode::RemoveNpc as i16 {
+            self.npcs_removed.push(r.read_int().unwrap());
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

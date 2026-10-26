@@ -214,6 +214,7 @@ pub enum SendOpcode {
     GuildNameChanged = 0xCA,
     GuildMarkChanged = 0xCB,
     SpawnNpc = 0x101,
+    RemoveNpc = 0x102,
     SpawnNpcRequestController = 0x103,
     NpcAction = 0x104,
     /// Show an NPC, or hide it, with an effect (261; report b095 §2).

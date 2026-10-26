@@ -82,6 +82,9 @@ services:
       RUSTMS_OPQ_LOUNGE: "23"
       RUSTMS_OPQ_TOWER: "1234123412341234"
       RUSTMS_OPQ_LEVERS: "14"
+      # Magatia's rope rooms want ropes 0, 1, 2, 3, 0, 1, 2, 3, 0, 1 from
+      # the bottom up (see tests/magatia_ropes.rs).
+      RUSTMS_MAGATIA_ROPES: "0123012301"
       # Its first jail opens to levers 1, 3 and 5 (see tests/opq_jails.rs).
       RUSTMS_OPQ_JAIL1: "135"
       # Every Gachapon roll is the same uncommon prize, which the world hears

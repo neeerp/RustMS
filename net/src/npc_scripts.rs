@@ -907,6 +907,9 @@ pub const JULIET_HUB: i32 = 2112005;
 /// clears its first stage.
 pub const ZENUMIST_BOOK: i32 = 2112007;
 pub const ALCADNO_BOOK: i32 = 2112013;
+/// Yulete, in each side's office until he leaves it.
+pub const YULETE: i32 = 2112000;
+pub const YULETE_ALCADNO: i32 = 2112010;
 /// Guon Over the Pirate Ship, who sends a party aboard against the Lord
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
@@ -1428,6 +1431,12 @@ impl NpcScript {
     /// or nothing (any longer).
     pub fn magatia_book(npc_id: i32, find: Option<Find>) -> Self {
         magatia_book(npc_id, find)
+    }
+
+    /// Yulete, `npc_id`, in his office, saying the line his field chose
+    /// (`events::yulete_talk`), as text key.
+    pub fn yulete(npc_id: i32, key: &str) -> Self {
+        NpcScript::new(npc_id, vec![Page::Say(text(key))])
     }
 
     /// Guon Over the Pirate Ship, for a player whose party may or may not
@@ -7408,6 +7417,14 @@ fn magatia_book(npc_id: i32, find: Option<Find>) -> NpcScript {
     let mut script = NpcScript::new(npc_id, vec![page]);
     script.inventory_full = Some(text(keys::MAGATIA_BOOK_LETTER_FULL));
     script
+}
+
+/// Yulete in `side`'s office.
+pub fn yulete(side: MagatiaSide) -> i32 {
+    match side {
+        MagatiaSide::Zenumist => YULETE,
+        MagatiaSide::Alcadno => YULETE_ALCADNO,
+    }
 }
 
 /// The hub's Romeo or Juliet on `side`.

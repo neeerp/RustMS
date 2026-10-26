@@ -55,7 +55,8 @@ use net::packet::build::world::mob::{
     CatchFail, MobMoveView, MobView,
 };
 use net::packet::build::world::npc::{
-    build_control_npc, build_npc_action, build_spawn_npc, ForeignNpc,
+    build_control_npc, build_npc_action, build_remove_npc, build_spawn_npc, build_uncontrol_npc,
+    ForeignNpc,
 };
 use net::packet::build::world::ox_quiz::{build_gm_event_instructions, build_ox_quiz};
 use net::packet::build::world::pet::build_move_pet;
@@ -283,6 +284,9 @@ pub struct FieldActor {
     books: Option<[Option<net::events::Find>; net::events::MAGATIA_BOOKS]>,
     /// In a Magatia beaker room, the beakers filled so far.
     beakers: BTreeSet<i32>,
+    /// In a run's copy of Yulete's office, once anyone has come in, what
+    /// he makes of the party and when he leaves; no time once he has.
+    yulete: Option<(net::events::Yulete, Option<Instant>)>,
     /// In a jail under the sealed room, the levers that open its way on
     /// (`net::events::draw_jail`), once anyone has tried it; none once
     /// they have.
@@ -368,6 +372,7 @@ impl FieldActor {
             levers: None,
             books: None,
             beakers: BTreeSet::new(),
+            yulete: None,
             jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
@@ -445,6 +450,7 @@ impl FieldActor {
     fn on_tick(&mut self, now: Instant) {
         self.run_trips();
         self.tick_merchants(now);
+        self.tick_yulete(now);
         self.friendly_drops(now);
         if self.lost_at.is_some_and(|at| at <= now) {
             self.lost_at = None;
@@ -837,6 +843,9 @@ impl FieldActor {
                     net::events::draw_climb(map_id, &mut rand::thread_rng())
                 });
                 let _ = reply.send(climb.clone());
+            }
+            FieldMessage::Yulete { shocked, reply } => {
+                let _ = reply.send(self.talk_to_yulete(shocked));
             }
             FieldMessage::Jail { reply } => {
                 let _ = reply.send(self.check_jail());
@@ -2069,7 +2078,79 @@ impl FieldActor {
             for occupant in self.occupants.values() {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
+            // Yulete's office's way out opens with its clear (Cosmic
+            // `MagatiaPQ_Z.monsterKilled`'s `forceHitReactor(1)`).
+            let map_id = self.key.map_id;
+            let office =
+                net::events::MagatiaSide::of(map_id).filter(|side| side.stages()[4] == map_id);
+            if let Some(side) = office {
+                for view in self.reactors.set_state(side.office_door(), 1) {
+                    if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
         }
+    }
+
+    /// Yulete, there since the first came into a run's copy of his office,
+    /// leaves once his time is up and anyone is there to see it: the run
+    /// hears what he said, by whether he was caught off guard, and five of
+    /// each of the mobs he left come out at each of their spots (Cosmic
+    /// `MagatiaPQ_Z.yuleteAction`).
+    fn tick_yulete(&mut self, now: Instant) {
+        let Some((mood, Some(leaves))) = self.yulete else {
+            return;
+        };
+        if leaves > now || self.occupants.is_empty() {
+            return;
+        }
+        self.yulete = Some((net::events::Yulete::Leaving, None));
+        let npc_id = net::events::MagatiaSide::of(self.key.map_id).map(net::npc_scripts::yulete);
+        if let Some(index) = self
+            .map_npcs
+            .iter()
+            .position(|npc| Some(npc.npc_id) == npc_id)
+        {
+            let object_id = self.map_npcs.remove(index).object_id;
+            for packet in [build_uncontrol_npc(object_id), build_remove_npc(object_id)] {
+                if let Ok(packet) = packet {
+                    self.broadcast(None, packet);
+                }
+            }
+        }
+        for at in net::events::YULETE_GUARD_SPOTS {
+            for mob_id in net::events::YULETE_GUARDS {
+                self.board(mob_id, 5, at);
+            }
+        }
+        let caught = mood == net::events::Yulete::Caught;
+        if let Some(occupant) = self.occupants.values().next() {
+            occupant.handle.send(ServerMessage::YuleteLeft(caught));
+        }
+    }
+
+    /// What Yulete says to someone who talks to him in his office, as text
+    /// key, by whether anyone here stands within `YULETE_SEES` of where he
+    /// came out and whether Romeo or Juliet read the letter
+    /// (`net::events::yulete_talk`); `None` once he has left, or anywhere
+    /// else.
+    fn talk_to_yulete(&mut self, shocked: bool) -> Option<&'static str> {
+        let (mood, leaves) = self.yulete?;
+        leaves?;
+        // Measured from where he was put, not the ground he stands on, as
+        // Cosmic's `2112000` does.
+        let (x, y) = net::events::YULETE_AT;
+        let (x, y) = (i32::from(x), i32::from(y));
+        let sees = net::events::YULETE_SEES;
+        let too_close = self.occupants.values().any(|occupant| {
+            let dx = i32::from(occupant.avatar.x) - x;
+            let dy = i32::from(occupant.avatar.y) - y;
+            dx * dx + dy * dy < sees * sees
+        });
+        let (key, mood) = net::events::yulete_talk(mood, too_close, shocked);
+        self.yulete = Some((mood, leaves));
+        Some(key)
     }
 
     /// The Lord Pirate is beaten: everyone here is told, and Wu Yang comes
@@ -4131,6 +4212,17 @@ impl FieldActor {
         // Its summons come back with it.
         for summon in self.summons.remove_owned(client_id, None) {
             self.remove_summon(&summon.view, Gone::Silently);
+        }
+
+        // Yulete waits in a run's copy of his office for the first to come
+        // in, and leaves a little after (Cosmic `MagatiaPQ_Z.changedMap`).
+        let map_id = self.key.map_id;
+        let office = net::events::MagatiaSide::of(map_id)
+            .filter(|side| side.stages()[4] == map_id && self.key.instance_id != 0);
+        if let (Some(side), None) = (office, self.yulete) {
+            self.appear(net::npc_scripts::yulete(side), net::events::YULETE_AT);
+            let leaves = Instant::now() + net::events::YULETE_STAYS;
+            self.yulete = Some((net::events::Yulete::Unmet, Some(leaves)));
         }
 
         for map_npc in &self.map_npcs {

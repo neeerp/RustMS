@@ -184,6 +184,14 @@ const OPQ_ROOMS_OUT: [(i32, u8); 7] = [
 /// the client actor answers from the field's draw (`events::climb`).
 pub const OPQ_LOUNGE_CLIMB: &str = "party3_r4pt";
 pub const OPQ_TOWER_CLIMB: &str = "party3_r6pt";
+/// Romeo and Juliet's party quest's rope rooms, by side: the landing's
+/// ways into them, each taken by one member, and their ropes, which the
+/// client actor answers from the run's claims and the field's draw.
+pub const MAGATIA_ROOMS_IN: [[&str; 4]; 2] = [
+    ["rnj4_r1", "rnj4_r2", "rnj4_r3", "rnj4_r4"],
+    ["jnr4_r1", "jnr4_r2", "jnr4_r3", "jnr4_r4"],
+];
+pub const MAGATIA_ROPES: [&str; 2] = ["rnj5_rp", "jnr5_rp"];
 /// The Orbis party quest's way out of the garden, back to the hub.
 pub const OPQ_GARDEN_OUT: &str = "party3_gardenin";
 /// The hub's door to the hidden storage (`in06`), open once the event is
@@ -1303,14 +1311,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         }
         // A Magatia library's way down to its hall, once one of its books
         // held the switch, the hall's way on, once its monsters are all
-        // gone, and the beaker room's, once its three beakers were full
-        // (Cosmic `rnj1_pt00`, `rnj1_out`, `rnj2_out` and their Alcadno
+        // gone, the beaker room's, once its three beakers were full, and
+        // Yulete's office's, once the mobs he left are all gone (Cosmic
+        // `rnj1_pt00`, `rnj1_out`, `rnj2_out`, `rnj6_out` and their Alcadno
         // twins).
-        "rnj1_pt00" | "jnr1_pt00" | "rnj1_out" | "jnr1_out" | "rnj2_out" | "jnr2_out" => {
+        "rnj1_pt00" | "jnr1_pt00" | "rnj1_out" | "jnr1_out" | "rnj2_out" | "jnr2_out"
+        | "rnj6_out" | "jnr6_out" => {
             let side = crate::events::MagatiaSide::of(player.stats.map_id)?;
             let stage = match &script[3..] {
                 "1_pt00" => 1,
                 "1_out" => 2,
+                "6_out" => crate::events::MAGATIA_OFFICE_STAGE,
                 _ => 3,
             };
             ScriptOutcome {
@@ -3209,7 +3220,7 @@ mod tests {
             (MagatiaSide::Alcadno, "jnr"),
         ] {
             let stages = side.stages();
-            for (stage, script) in [(1u8, "1_pt00"), (2, "1_out"), (3, "2_out")] {
+            for (stage, script) in [(1u8, "1_pt00"), (2, "1_out"), (3, "2_out"), (5, "6_out")] {
                 player.stats.map_id = stages[usize::from(stage) - 1];
                 let outcome = portal(&format!("{prefix}{script}"), &player).unwrap();
                 assert_eq!(

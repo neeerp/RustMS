@@ -1291,7 +1291,43 @@ the hub's mobs away (`Effect::ClearMobs`) and open its way on
 `rnj3_out`/`jnr3_out` lead to x00203 only while it is open. After the
 clear they open it again whenever it has shut. A member holding the files
 is told to let the leader hand them in; anyone else is asked whether they
-would rather retreat. The later stages can't be cleared yet.
+would rather retreat.
+
+Yulete (Zenumist 2112000, Alcadno 2112010) comes out at (252, 243) in his
+office (x00203) when the first member arrives there, and the field
+keeps his mood (`net::events::Yulete`, the field's `yulete`). Talked to
+(`FieldMessage::Yulete`, `events::yulete_talk`, Cosmic `2112000`), he
+says he is leaving if he already means to; with anyone within 310 pixels
+of him he says he is being watched and means to leave; if Romeo or Juliet
+never read the letter (`EventTicket::shocked`) he calls the party sneaky
+and means to leave; otherwise he is caught out. Ten seconds after the
+first arrival, not scaled with the event, and only while someone is in the
+office, he leaves (`build_uncontrol_npc`, then REMOVE_NPC 0x102), and
+everyone in the run hears why in pink (`ServerMessage::YuleteLeft`,
+`EventCommand::YuleteLeft`, `magatia.yulete.disgusted` if he was caught,
+`magatia.yulete.fooled` if not); the event keeps which
+(`EventTicket::caught_yulete`) for the boss's room. He leaves five of each
+of his guards (9300143, 9300144) at each of (-455, 135), (0, 135) and
+(360, 135). The last kill clears stage 5 (`cleared_by_killing`) for
+20,000 EXP each and opens the office's door (`rnj6_out`, `jnr6_out`,
+2618005, state 1); until then its way on (the same names) is shut, in
+pink, and then leads to the landing (x00300).
+
+On the landing, its four ways (`rnj4_r1`-`rnj4_r4`, `jnr4_r1`-`jnr4_r4`)
+each lead into one rope room (x00301-x00304) the first time, and only
+then (`EventTicket::take_room`): anyone else is told, in pink, that the
+room is taken (`magatia.room_taken`). In a rope room each of ten rows
+has four ropes, `pt<row><rope>` (`rnj5_rp`, `jnr5_rp`), of which one is
+right; it leads to the row above (portal id + 4), and from the top row to
+the top (`success`); any other leads back to the bottom (`fail`). Each
+room draws its right ropes the first time anyone climbs
+(`events::draw_climb`, `events::climb`; the harness pins them with
+`RUSTMS_MAGATIA_ROPES`). Cosmic's Zenumist script draws them so that each
+row's right rope differs in each of the four rooms; ours draws each room
+on its own, as Cosmic's Alcadno script does. The first to reach the top
+clears stage 6 for 20,000 EXP each, with no clear effect. The rooms' way
+on (`out00`, a plain portal at the top) leads to the boss's room
+(x00400), which has nothing in it yet.
 
 Inside, Romeo or Juliet asks whether a member would rather retreat
 (`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the
@@ -1366,6 +1402,8 @@ nothing yet. Its lines are placeholders (`magatia.*`).
 | Juliet 2112003 | 261000021 | Runtime (`talk_about_event`): a menu of going in and what happened |
 | Juliet 2112003 | 926110000-400 | Asks whether to retreat, to 926110700 |
 | Juliet 2112005 | 926110200 | Runtime (`magatia_hub`): the same on the Alcadno side |
+| Yulete 2112000 | 926100203 | Runtime (`FieldMessage::Yulete`): caught out, watched, sneaky or leaving |
+| Yulete 2112010 | 926110203 | The same on the Alcadno side |
 | Books 2112007 | 926100000 | Runtime (`BookOpened`): mesos, EXP, the letter, the switch or nothing |
 | Books 2112013 | 926110000 | The same; in the hall (926110001) they hold nothing |
 

@@ -1836,6 +1836,13 @@ pub mod keys {
     pub const MAGATIA_JULIET_HURRY: &str = "magatia.juliet.hurry";
     pub const MAGATIA_FILES: &str = "magatia.files";
     pub const MAGATIA_FILES_LEADER: &str = "magatia.files_leader";
+    pub const MAGATIA_YULETE_LEAVING: &str = "magatia.yulete.leaving";
+    pub const MAGATIA_YULETE_WATCHED: &str = "magatia.yulete.watched";
+    pub const MAGATIA_YULETE_SNEAKY: &str = "magatia.yulete.sneaky";
+    pub const MAGATIA_YULETE_CAUGHT: &str = "magatia.yulete.caught";
+    pub const MAGATIA_YULETE_DISGUSTED: &str = "magatia.yulete.disgusted";
+    pub const MAGATIA_YULETE_FOOLED: &str = "magatia.yulete.fooled";
+    pub const MAGATIA_ROOM_TAKEN: &str = "magatia.room_taken";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3063,6 +3070,13 @@ mod tests {
                 keys::MAGATIA_JULIET_HURRY,
                 keys::MAGATIA_FILES,
                 keys::MAGATIA_FILES_LEADER,
+                keys::MAGATIA_YULETE_LEAVING,
+                keys::MAGATIA_YULETE_WATCHED,
+                keys::MAGATIA_YULETE_SNEAKY,
+                keys::MAGATIA_YULETE_CAUGHT,
+                keys::MAGATIA_YULETE_DISGUSTED,
+                keys::MAGATIA_YULETE_FOOLED,
+                keys::MAGATIA_ROOM_TAKEN,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

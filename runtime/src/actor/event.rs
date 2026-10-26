@@ -48,7 +48,7 @@ use net::packet::build::world::field::{build_pyramid_gauge, build_session_value}
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicI32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -107,13 +107,21 @@ pub enum EventMessage {
 
 /// The stages an event's party has cleared, one bit each, how many of the
 /// Pirate Ship's Marks it has handed in (`EventCommand::HandInMarks`), and
-/// how many of its chests it has opened (`EventCommand::ChestOpened`). Only
-/// the event writes it.
+/// how many of its chests it has opened (`EventCommand::ChestOpened`).
+/// Only the event writes it, but for the Magatia rope rooms that members
+/// take.
 #[derive(Debug, Default)]
 pub struct Cleared {
     stages: AtomicU64,
     marks: AtomicU8,
     chests: AtomicU8,
+    /// Romeo or Juliet read the other's letter (`EventCommand::Shocked`).
+    shocked: AtomicBool,
+    /// Yulete left his office caught off guard
+    /// (`EventCommand::YuleteLeft`).
+    caught_yulete: AtomicBool,
+    /// The Magatia rope rooms taken, one bit each from the first.
+    rooms: AtomicU8,
 }
 
 impl Cleared {
@@ -132,6 +140,22 @@ impl Cleared {
 
     pub fn chests(&self) -> u8 {
         self.chests.load(Ordering::Acquire)
+    }
+
+    pub fn shocked(&self) -> bool {
+        self.shocked.load(Ordering::Acquire)
+    }
+
+    pub fn caught_yulete(&self) -> bool {
+        self.caught_yulete.load(Ordering::Acquire)
+    }
+
+    /// Take rope room `room`; returns whether no one had.
+    pub fn take_room(&self, room: u8) -> bool {
+        let Some(bit) = 1u8.checked_shl(room.into()) else {
+            return false;
+        };
+        self.rooms.fetch_or(bit, Ordering::AcqRel) & bit == 0
     }
 }
 
@@ -217,6 +241,22 @@ impl EventTicket {
     /// How many of the Pirate Ship's chests the party has opened.
     pub fn chests(&self) -> u8 {
         self.cleared.chests()
+    }
+
+    /// Whether Romeo or Juliet has read the other's letter.
+    pub fn shocked(&self) -> bool {
+        self.cleared.shocked()
+    }
+
+    /// Whether Yulete left his office caught off guard.
+    pub fn caught_yulete(&self) -> bool {
+        self.cleared.caught_yulete()
+    }
+
+    /// Take the Magatia rope room `room`, from 0, for the member; returns
+    /// whether no one had (Cosmic `rnj4_r1`'s `statusStg5`).
+    pub fn take_room(&self, room: u8) -> bool {
+        self.cleared.take_room(room)
     }
 
     /// Whether the party has cleared the last stage, so has no time limit.
@@ -428,7 +468,6 @@ pub fn spawn(
         moved_to: Vec::new(),
         reached: HashSet::new(),
         lord_pirate_out: false,
-        shocked: false,
         win_exp: None,
         blessing: start.blessing,
         pyramid_stage: 1,
@@ -549,9 +588,6 @@ struct EventActor {
     reached: HashSet<i32>,
     /// The Lord Pirate is out (`EventCommand::PastTheDoors`).
     lord_pirate_out: bool,
-    /// Romeo or Juliet has read the other's letter
-    /// (`EventCommand::Shocked`).
-    shocked: bool,
     blessing: Option<i32>,
     /// The EXP every member gets for the win rather than the last stage's
     /// (`EventCommand::WinWithCoupons`).
@@ -1177,7 +1213,7 @@ impl EventActor {
             // Once a run, everyone hears that Romeo or Juliet read the
             // letter (Cosmic `2112005`/`2112006`'s `mapMessage(6, ..)` to
             // the party's maps).
-            EventCommand::Shocked if !self.shocked && !won => {
+            EventCommand::Shocked if !self.cleared.shocked() && !won => {
                 let key = match self.kind {
                     EventKind::Magatia(net::events::MagatiaSide::Zenumist) => {
                         keys::MAGATIA_ROMEO_SHOCKED
@@ -1187,7 +1223,7 @@ impl EventActor {
                     }
                     _ => return debug!(client_id, "Shock outside Magatia"),
                 };
-                self.shocked = true;
+                self.cleared.shocked.store(true, Ordering::Release);
                 let text = net::content::text().get(key, &[]);
                 if let Ok(line) = build_item_line(&text, 0) {
                     for member in self.team.members() {
@@ -1201,6 +1237,24 @@ impl EventActor {
                 }
             }
             EventCommand::Shocked => debug!(client_id, "Already shocked"),
+            // Everyone hears what Yulete said as he left (Cosmic
+            // `yuleteAction`'s `dropMessage(5, ..)`).
+            EventCommand::YuleteLeft(caught) if matches!(self.kind, EventKind::Magatia(_)) => {
+                self.cleared.caught_yulete.store(caught, Ordering::Release);
+                let key = net::events::yulete_leaves(caught);
+                let text = net::content::text().get(key, &[]);
+                if let Ok(line) = build_broadcast(Broadcast::Pink, &text) {
+                    for member in self.team.members() {
+                        if let Some(handle) = self.members.get(member) {
+                            handle.send(ServerMessage::EventPackets {
+                                id: self.id,
+                                packets: vec![line.clone()],
+                            });
+                        }
+                    }
+                }
+            }
+            EventCommand::YuleteLeft(_) => debug!(client_id, "Yulete outside Magatia"),
             EventCommand::Massacre(hits) if self.kind.pyramid_mode().is_some() => {
                 let seconds = self.stage_seconds();
                 let mut reached = Vec::new();
