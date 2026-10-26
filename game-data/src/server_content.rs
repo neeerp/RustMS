@@ -791,6 +791,20 @@ pub mod keys {
     /// licensed script has the text.
     pub const TRISTAN_ROOM_TAKEN: &str = "tristan.room_taken";
 
+    /// Dollhouse (quest 3230) in Eos Tower: Olson the Toy Soldier (NPC
+    /// 2040002) with the hint and the way into the dollhouse room, or taken
+    /// by another player; a wrong dollhouse (reactor 2200000) throwing the
+    /// player out; and Mark the Toy Soldier (NPC 2040028) taking the
+    /// pendulum, or still waiting for it, before the way back. No licensed
+    /// script has the text.
+    pub const DOLLHOUSE_HINT: &str = "dollhouse.hint";
+    pub const DOLLHOUSE_ENTER: &str = "dollhouse.enter";
+    pub const DOLLHOUSE_BUSY: &str = "dollhouse.busy";
+    pub const DOLLHOUSE_WRONG: &str = "dollhouse.wrong";
+    pub const DOLLHOUSE_FOUND: &str = "dollhouse.found";
+    pub const DOLLHOUSE_NOT_FOUND: &str = "dollhouse.not_found";
+    pub const DOLLHOUSE_BACK: &str = "dollhouse.back";
+
     /// King Pepe's room in the Mushroom Castle: the tower's way in
     /// (`TD_MC_enterboss1`) while another player is in it, and its way out
     /// (`out_pepeking`) giving the Wedding Hall key once the three Yeti
@@ -3047,6 +3061,13 @@ mod tests {
             .chain(&[
                 keys::REEF_THANKS,
                 keys::TRISTAN_ROOM_TAKEN,
+                keys::DOLLHOUSE_HINT,
+                keys::DOLLHOUSE_ENTER,
+                keys::DOLLHOUSE_BUSY,
+                keys::DOLLHOUSE_WRONG,
+                keys::DOLLHOUSE_FOUND,
+                keys::DOLLHOUSE_NOT_FOUND,
+                keys::DOLLHOUSE_BACK,
                 keys::KING_PEPE_BUSY,
                 keys::KING_PEPE_KEY,
                 keys::KING_PEPE_KEY_NO_ROOM,

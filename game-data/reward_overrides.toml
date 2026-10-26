@@ -113,6 +113,13 @@ quest_items = { 4031161 = 1008, 4031162 = 1008 }
 like = 2000
 quest_items = { 4031161 = 1008, 4031162 = 1008 }
 
+[reactors.2202000]
+# Eos Tower's dollhouse room (Map.nx 922000010): the one odd dollhouse
+# ("gives the pendulum", Reactor.nx 2202000 info) drops the pendulum Mark the
+# Toy Soldier takes for Dollhouse (3230). The pack names 4031145; Olson's
+# own pendulum for the next quest (3231 Act/0) is 4031094.
+quest_items = { 4031145 = 3230 }
+
 [reactors.2001002]
 # The Tower of Goddess's Salion stage (Map.nx 920010300): the spot that
 # takes the last Cellion's 4001074 (Reactor.nx 2001002-15, item event)

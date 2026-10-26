@@ -1762,6 +1762,12 @@ impl NpcScript {
         if npc_id == DOJO_BOARD {
             return Some(dojo_board(player));
         }
+        if npc_id == OLSON && player.quests.state(events::DOLLHOUSE_QUEST) == QuestState::Started {
+            return Some(olson());
+        }
+        if npc_id == MARK {
+            return Some(mark(player));
+        }
         if npc_id == DIMENSIONAL_MIRROR {
             return Some(dimensional_mirror(player));
         }
@@ -2929,6 +2935,59 @@ fn violettas_seal(player: &Player) -> NpcScript {
     ];
     script.inventory_full = Some(text(keys::VIOLETTA_SEAL_FULL));
     script
+}
+
+/// Olson the Toy Soldier, on Eos Tower's 100th floor (221024400).
+const OLSON: i32 = 2040002;
+/// Mark the Toy Soldier, in the dollhouse room (922000010).
+const MARK: i32 = 2040028;
+
+/// Olson, to a player on Dollhouse (3230): the pendulum hides in the odd
+/// dollhouse, and he takes them into the dollhouse room alone (Cosmic
+/// `2040002`). Only one may be in it on a channel at a time; another is
+/// told so. To anyone else he speaks as usual.
+fn olson() -> NpcScript {
+    let mut script = NpcScript::new(
+        OLSON,
+        vec![
+            Page::Say(text(keys::DOLLHOUSE_HINT)),
+            Page::Ask {
+                text: text(keys::DOLLHOUSE_ENTER),
+                on_yes: vec![Effect::StartEvent(EventKind::Dollhouse)],
+                on_no: None,
+            },
+        ],
+    );
+    script.refused = Some(text(keys::DOLLHOUSE_BUSY));
+    script
+}
+
+/// Mark, in the dollhouse room: he takes the pendulum from a player on
+/// Dollhouse (3230), which completes it, and sends them back by Olson, which
+/// ends their run (Cosmic `2040028`). The data gives nothing for it.
+fn mark(player: &Player) -> NpcScript {
+    let back = Effect::WarpToPortal(events::EOS_TOWER_100, events::EOS_TOWER_100_RETURN_ID);
+    let found = player.quests.state(events::DOLLHOUSE_QUEST) == QuestState::Started
+        && player.inventory.count(events::DOLLHOUSE_PENDULUM) > 0;
+    let ask = |key| Page::Ask {
+        text: text(key),
+        on_yes: vec![back.clone()],
+        on_no: None,
+    };
+    if !found {
+        return NpcScript::new(MARK, vec![ask(keys::DOLLHOUSE_NOT_FOUND)]);
+    }
+    let thanks = Page::Act {
+        text: text(keys::DOLLHOUSE_FOUND),
+        effects: vec![
+            Effect::TakeItem {
+                item_id: events::DOLLHOUSE_PENDULUM,
+                quantity: 1,
+            },
+            Effect::CompleteQuest(events::DOLLHOUSE_QUEST),
+        ],
+    };
+    NpcScript::new(MARK, vec![thanks, ask(keys::DOLLHOUSE_BACK)])
 }
 
 /// The Spirit of Snow Statue, broken, in the Valley of Snowmen (211040102).
@@ -10314,6 +10373,54 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn olson_takes_a_player_on_dollhouse_into_the_room() {
+        assert_eq!(NpcScript::for_npc(OLSON, &with_quests(&[])), None);
+        assert_eq!(
+            NpcScript::for_npc(OLSON, &with_quests(&[(3230, true)])),
+            None
+        );
+        let mut script = NpcScript::for_npc(OLSON, &with_quests(&[(3230, false)])).unwrap();
+        assert!(script.begin().effects.is_empty(), "the hint first");
+        let ask = script.respond(ScriptInput::Next).unwrap();
+        assert!(ask.effects.is_empty());
+        let go = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(go.effects, [Effect::StartEvent(EventKind::Dollhouse)]);
+        assert!(script.refused().is_some(), "told when it is taken");
+    }
+
+    #[test]
+    fn mark_takes_the_pendulum_and_sends_the_player_back() {
+        let back = Effect::WarpToPortal(events::EOS_TOWER_100, events::EOS_TOWER_100_RETURN_ID);
+        let mut on_it = with_quests(&[(3230, false)]);
+        for player in [on_it.clone(), with_quests(&[])] {
+            let mut script = NpcScript::for_npc(MARK, &player).unwrap();
+            assert!(script.begin().effects.is_empty(), "nothing taken");
+            let yes = script.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(yes.effects, [back.clone()]);
+        }
+        on_it.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(events::DOLLHOUSE_PENDULUM, 1),
+        );
+        let mut script = NpcScript::for_npc(MARK, &on_it).unwrap();
+        assert_eq!(
+            script.begin().effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::DOLLHOUSE_PENDULUM,
+                    quantity: 1
+                },
+                Effect::CompleteQuest(3230)
+            ]
+        );
+        let ask = script.respond(ScriptInput::Next).unwrap();
+        assert!(ask.effects.is_empty());
+        let yes = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(yes.effects, [back]);
     }
 
     #[test]

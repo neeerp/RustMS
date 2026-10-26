@@ -81,6 +81,12 @@ pub const SCRIPTS: &[&str] = &[
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3714,
 ];
+/// Quests no NPC completes through the quest window: `Check/1` is only an
+/// `infoex` entry ("dummy") on an info string nothing sets, which v83's
+/// completion check reads, so neither the client nor the server lets it
+/// pass. An NPC's script completes them instead: Dollhouse (3230), which
+/// Mark the Toy Soldier ends for the pendulum (`net::npc_scripts`).
+pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[3230];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
@@ -400,6 +406,8 @@ pub struct QuestKeys {
     pub skill_keys: Vec<String>,
     /// Its start script completes it ([`FINISHED_BY_START_SCRIPT`]).
     pub finished_by_start_script: bool,
+    /// An NPC's script completes it ([`COMPLETED_BY_NPC_SCRIPT`]).
+    pub completed_by_npc_script: bool,
 }
 
 /// `Ok` if every declared requirement and action is supported, otherwise the
@@ -417,8 +425,9 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
     // handed in to the NPC that gave it (Pio's 1008). Without either, it is
     // a record kept by some event, not something an NPC completes.
     // Unless the start script completes it, or an end script does, at the
-    // start NPC (Captain Al's 2232-2234).
+    // start NPC (Captain Al's 2232-2234), or another NPC's script does.
     if !keys.finished_by_start_script
+        && !keys.completed_by_npc_script
         && !end
             .iter()
             .any(|k| k == "npc" || k == "item" || k == "mob" || k == "endscript")
@@ -526,6 +535,12 @@ impl QuestCatalog {
                 if let Some(keys) = &mut keys.end_check {
                     keys.retain(|key| key != "infoex");
                 }
+            }
+            if COMPLETED_BY_NPC_SCRIPT.contains(&id) {
+                if let Some(keys) = &mut keys.end_check {
+                    keys.retain(|key| key != "infoex");
+                }
+                keys.completed_by_npc_script = true;
             }
             keys.finished_by_start_script = FINISHED_BY_START_SCRIPT.contains(&id)
                 && keys
@@ -684,6 +699,9 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         if nx.int_child(end, "infoNumber")? != Some(i32::from(record)) {
             return Err(invalid("record quest with another record"));
         }
+        (None, info_checks(nx, end)?)
+    } else if COMPLETED_BY_NPC_SCRIPT.contains(&id) {
+        // Kept so the quest window can't complete it either.
         (None, info_checks(nx, end)?)
     } else {
         (None, Vec::new())
@@ -1116,6 +1134,10 @@ mod tests {
         assert!(classify(&informant).is_err());
         informant.finished_by_start_script = true;
         assert_eq!(classify(&informant), Ok(()));
+        let mut scripted = keys(&["npc"], &[], &[], &[]);
+        assert!(classify(&scripted).is_err());
+        scripted.completed_by_npc_script = true;
+        assert_eq!(classify(&scripted), Ok(()));
     }
 
     /// The supported set must match `supported_quests.txt`, which HeavenClient
@@ -1279,6 +1301,10 @@ mod tests {
         assert_eq!(catalog.quest(3600).unwrap().start.weekdays, None);
         assert_eq!(catalog.quest(2029).unwrap().start_money, -1000);
         assert_eq!(catalog.quest(3406).unwrap().start_exp, 1600);
+        // Mark's script completes Dollhouse; the quest window never can.
+        let dollhouse = catalog.quest(3230).unwrap();
+        assert_eq!(dollhouse.end_info[0].value, "dummy");
+        assert_eq!(dollhouse.start_info, None);
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
         // Its first step's offer asks questions (`Act/0/ask`, `stop`).
         assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));

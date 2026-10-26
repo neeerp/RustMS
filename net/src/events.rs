@@ -72,6 +72,9 @@ pub enum EventKind {
     /// Jr. Balrog's room before Tristan's Tomb (2245), taken alone from
     /// Mu Young (1061014) in the Sleepywood dungeon.
     Tristan,
+    /// Eos Tower's dollhouse room, taken alone from Olson the Toy Soldier
+    /// (2040002) to find the pendulum for Dollhouse (3230).
+    Dollhouse,
     /// King Pepe's room in the Mushroom Castle, taken alone through the
     /// East Castle Tower's `TD_MC_enterboss1` while Stop the Wedding (2330)
     /// still wants a Yeti brother.
@@ -2440,6 +2443,43 @@ pub const TRISTAN: Event = Event {
     ..DOJO
 };
 
+/// Eos Tower's 100th floor, 221024400, where Olson the Toy Soldier keeps the
+/// way into the dollhouse room.
+pub const EOS_TOWER_100: i32 = 221024400;
+/// Its portal `q000` (id 4), by Olson, where the room lets out.
+pub const EOS_TOWER_100_RETURN: &str = "q000";
+pub const EOS_TOWER_100_RETURN_ID: u8 = 4;
+/// The dollhouse room, 922000010, where one of the dollhouses is the monster
+/// that took the pendulum (Map.nx: nine reactors 2200000 and one 2202000).
+pub const DOLLHOUSE_ROOM: i32 = 922000010;
+/// Dollhouse (3230), which wants the pendulum back.
+pub const DOLLHOUSE_QUEST: i16 = 3230;
+/// The pendulum the odd dollhouse drops (the pack's reactor drops for
+/// 2202000), which Mark the Toy Soldier takes.
+pub const DOLLHOUSE_PENDULUM: i32 = 4_031_145;
+
+/// The dollhouse room: Olson takes a player on Dollhouse alone into their
+/// own copy for ten minutes, one at a time on a channel (Server.NX
+/// `FieldSet.img/Ludi023`: `timeOut` 600, `shuffle` 1; Cosmic `DollHouse`).
+/// The dollhouses change places in each copy (`reactors::shuffled`). It is
+/// never won; it ends when Mark sends them back, a wrong dollhouse throws
+/// them out, or the time runs out. The pendulum stays behind.
+pub const DOLLHOUSE: Event = Event {
+    lobby: EOS_TOWER_100,
+    entrances: &[],
+    maps: DOLLHOUSE_ROOM..=DOLLHOUSE_ROOM,
+    entry: DOLLHOUSE_ROOM,
+    exit: EOS_TOWER_100,
+    levels: 25..=u8::MAX,
+    team: 1..=1,
+    minutes: 10,
+    exp_per_stage: &[],
+    member_clears: &[],
+    items: &[DOLLHOUSE_PENDULUM],
+    runs: 1,
+    ..DOJO
+};
+
 /// The Mushroom Castle's East Castle Tower, 106021400: the way up to King
 /// Pepe's room and the Wedding Hall (`TD_MC_enterboss1`), and back.
 pub const EAST_CASTLE_TOWER: i32 = 106021400;
@@ -2597,7 +2637,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 40] = [
+    pub const ALL: [EventKind; 41] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2636,6 +2676,7 @@ impl EventKind {
         EventKind::Magatia(MagatiaSide::Zenumist),
         EventKind::Magatia(MagatiaSide::Alcadno),
         EventKind::Tristan,
+        EventKind::Dollhouse,
         EventKind::KingPepe,
         EventKind::WeddingHall,
     ];
@@ -2665,6 +2706,7 @@ impl EventKind {
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
             EventKind::Magatia(side) => &MAGATIA[side as usize],
             EventKind::Tristan => &TRISTAN,
+            EventKind::Dollhouse => &DOLLHOUSE,
             EventKind::KingPepe => &KING_PEPE,
             EventKind::WeddingHall => &WEDDING_HALL_EVENT,
         }
@@ -3733,6 +3775,13 @@ mod tests {
 
     #[test]
     fn king_pepes_room_is_taken_alone_from_the_east_castle_tower() {
+        let dollhouse = EventKind::Dollhouse.event();
+        assert_eq!(
+            (dollhouse.entry, dollhouse.exit, dollhouse.minutes),
+            (DOLLHOUSE_ROOM, EOS_TOWER_100, 10)
+        );
+        assert!(dollhouse.solo() && dollhouse.items == [DOLLHOUSE_PENDULUM]);
+        assert!(event_map(DOLLHOUSE_ROOM) && !event_map(EOS_TOWER_100));
         let pepe = EventKind::KingPepe.event();
         assert_eq!((pepe.entry, pepe.exit), (KING_PEPE_ROOM, EAST_CASTLE_TOWER));
         assert!(pepe.solo() && pepe.lasts_until_empty());

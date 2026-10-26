@@ -270,6 +270,14 @@ Reef (1032108, in 910100001) thanks the player through a start script
 (`Act/1 pop`, through `Effect::GainFame`, since `FinishQuest` gives no
 `Act/1` rewards). Its line is a placeholder (`reef.thanks`).
 
+"Dollhouse" (3230) has no completion NPC either: its `Check/1` is only an
+`infoex` ("dummy") on an info string nothing sets, so neither the client nor
+the server completes it through the quest window. Mark the Toy Soldier's
+script does, for the pendulum (`Effect::CompleteQuest`; see
+[party quests](./party-quests.md), "Eos Tower's dollhouse room").
+`game_data::quests::COMPLETED_BY_NPC_SCRIPT` lets it through and keeps the
+`infoex`.
+
 Mu Young (1061014, in 105100100) has two start scripts, both silent as in
 Cosmic. `q2238s` starts "Who is the Owner of the Mysterious Note?" (2238,
 once 2237 is done). `q2245s` ("To Tristan's Tomb", for a player on 2238)

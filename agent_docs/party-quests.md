@@ -1434,6 +1434,31 @@ player leaves by `left00` or the time runs out, back to the door.
 - Cosmic's refights through the Blocked Entrance (1300013) once 2331 is
   done are not there.
 
+## Eos Tower's dollhouse room
+
+For "Dollhouse" (3230; Server.NX FieldSet `Ludi023`, Cosmic `DollHouse`).
+Olson the Toy Soldier (2040002, on Eos Tower's 100th floor, 221024400)
+gives a player on 3230 a hint and asks whether to go in, then takes them
+alone into their own copy of 922000010 for ten minutes
+(`events::DOLLHOUSE`, `EventKind::Dollhouse`, levels 25 and up). Only one
+may be in it on a channel at a time; another is told so
+(`dollhouse.busy`). Others get his default speech.
+
+- The room holds nine dollhouses (reactor 2200000) and one odd one
+  (2202000), shuffled on each copy (`reactors::shuffled`). Hitting a wrong
+  one throws the player back to the 100th floor's `q000` with a pink line
+  (`dollhouse.wrong`; the reactor's own `go221024400` action), which ends
+  the run.
+- The odd one drops the pendulum (4031145, the pack's drop) while 3230 is
+  started (`reward_overrides.toml`).
+- Mark the Toy Soldier (2040028, in the room) takes the pendulum and
+  completes 3230, whose only completion check is an `infoex` nothing sets
+  (`game_data::quests::COMPLETED_BY_NPC_SCRIPT`), then offers the way back
+  to `q000`. Without it, he only offers the way back.
+- Leaving, by Mark or when the time runs out (the room's `forcedReturn`),
+  ends the run and takes any pendulum left (`items`). The lines are
+  placeholders (`dollhouse.*`).
+
 ## NPCs
 
 | NPC | Where | Script |
