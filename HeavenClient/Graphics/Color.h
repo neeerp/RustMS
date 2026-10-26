@@ -153,6 +153,7 @@ namespace ms
 			FAMILYBLUE,
 			MEDALTEAL,
 			SPOUSEPINK,
+			ITEMLINK,
 			NUM_COLORS
 		};
 
@@ -255,7 +256,8 @@ namespace ms
 						{1.00f, 0.78f, 0.00f}, // Script gold (#FFC600, the floating script lines)
 						{0.64f, 0.94f, 1.00f}, // Family blue (#A4F0FF, v83 font 0x10: an empty junior's box in the Family Tree)
 						{0.20f, 0.43f, 0.50f}, // Medal teal (#346E80, a title's name in v83's title window)
-						{1.00f, 0.44f, 0.75f}  // Spouse pink (#FF71BF, v83 chat font 6: spouse chat)
+						{1.00f, 0.44f, 0.75f}, // Spouse pink (#FF71BF, v83 chat font 6: spouse chat)
+						{0.42f, 0.30f, 0.89f}  // Item link (#6C4CE3, v83 chat font ctx+0xc20: an item megaphone's [item])
 				};
 
 		// Create a color by an array of real numbers [0.0f, 1.0f]

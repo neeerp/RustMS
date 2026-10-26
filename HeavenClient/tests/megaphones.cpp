@@ -1,3 +1,4 @@
+#include "../Util/ChatLinks.h"
 #include "../Util/Megaphones.h"
 #include <iostream>
 #include <stdexcept>
@@ -18,6 +19,15 @@ int main()
 
 		require(with_item("Hero : selling", "Ilbi") == "Hero : [Ilbi]selling", "the item goes before the text");
 		require(with_item("selling", "Ilbi") == "[Ilbi]selling", "even without a name");
+		require(item_at("Hero : selling") == 7 && item_at("selling") == 0, "the item's name goes where with_item puts it");
+
+		require(ms::chat_link::keeps(0, 0) && ms::chat_link::keeps(-20, -20) && ms::chat_link::keeps(19, 19),
+				"a linked item stays in the 40x40 square around the click");
+		require(!ms::chat_link::keeps(20, 0) && !ms::chat_link::keeps(0, 20) && !ms::chat_link::keeps(-21, 0),
+				"but goes once the cursor leaves it, its right and bottom edges left out");
+		require(ms::chat_link::shown(20, 7, 6) == 6, "a first row shows all of the item's name");
+		require(ms::chat_link::shown(10, 7, 6) == 3, "or the part before it wraps");
+		require(ms::chat_link::shown(7, 7, 6) == 0 && ms::chat_link::shown(5, 0, 0) == 0, "or none");
 
 		require(gachapon("Hero : got a(n)", "Chaos Scroll 60%", "Henesys") ==
 					"Hero got a(n)  :  Chaos Scroll 60%  from the Henesys Gachapon! Congrats!",

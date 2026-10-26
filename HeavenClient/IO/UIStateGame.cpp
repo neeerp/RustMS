@@ -24,6 +24,8 @@
 #include "FamilyActions.h"
 #include "Components/TooltipBox.h"
 
+#include "../Util/ChatLinks.h"
+
 #include "UITypes/UIBuffList.h"
 #include "UITypes/UIPartyHP.h"
 #include "UITypes/UIPartySearch.h"
@@ -136,6 +138,8 @@ namespace ms
 					return Tooltip::Parent::ITEMSEARCHRESULT;
 				case UIElement::Type::USERLIST:
 					return Tooltip::Parent::USERLIST;
+				case UIElement::Type::CHATBAR:
+					return Tooltip::Parent::CHATBAR;
 				default:
 					return Tooltip::Parent::NONE;
 			}
@@ -157,6 +161,8 @@ namespace ms
 		// The Owl of Minerva's results put it 20 right of and below the cursor (FUN_008a45b9), as
 		// does the User List (0x91d82f).
 		const Point<int16_t> OWL_TOOLTIP_POS = Point<int16_t>(20, 20) - tooltip::OFFSET;
+		// A chat log line's item goes 20 below the cursor (FUN_008f5b20).
+		const Point<int16_t> CHAT_TOOLTIP_POS = Point<int16_t>(0, chat_link::BELOW) - tooltip::OFFSET;
 
 		Point<int16_t> tooltip_pos(Tooltip::Parent parent)
 		{
@@ -169,6 +175,8 @@ namespace ms
 				case Tooltip::Parent::ITEMSEARCHRESULT:
 				case Tooltip::Parent::USERLIST:
 					return OWL_TOOLTIP_POS;
+				case Tooltip::Parent::CHATBAR:
+					return CHAT_TOOLTIP_POS;
 				default:
 					return TOOLTIP_POS;
 			}

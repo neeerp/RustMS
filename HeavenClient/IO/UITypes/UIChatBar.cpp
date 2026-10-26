@@ -42,6 +42,7 @@
 #include "../../Graphics/GraphicsGL.h"
 #include "../../Net/Packets/MessagingPackets.h"
 #include "../../Util/CharacterName.h"
+#include "../../Util/ChatLinks.h"
 #include "../../Util/ChatWrap.h"
 #include "../../Util/NxFiles.h"
 
@@ -563,6 +564,10 @@ namespace ms
 			}
 
 			shown.text.draw(position + Point<int16_t>(3 + indent, top - TEXT_RAISE));
+
+			// v83 draws the linked item's name over itself in violet.
+			if (shown.link)
+				shown.link->draw(position + Point<int16_t>(3 + indent + shown.link_x, top - TEXT_RAISE));
 		}
 
 		Point<int16_t> bar = position + get_scrollbar_pos();
@@ -681,6 +686,14 @@ namespace ms
 		bool released = !clicking && scrollbar_pressed;
 		scrollbar_pressed = clicking;
 
+		if (link_click)
+		{
+			Point<int16_t> moved = cursorpos - *link_click;
+
+			if (!chat_link::keeps(moved.x(), moved.y()))
+				hide_link();
+		}
+
 		if (thumb_dragging)
 		{
 			if (clicking)
@@ -784,7 +797,22 @@ namespace ms
 		ScrollPart part = scroll_part_at(cursorpos);
 
 		if (part == ScrollPart::NONE)
+		{
+			// The button going down on a row that links an item shows it
+			// (FUN_008d5f5c).
+			if (pressed)
+			{
+				std::optional<size_t> row = row_at(cursorpos);
+
+				if (row && rowtexts[*row].item)
+				{
+					UI::get().show_item(Tooltip::Parent::CHATBAR, *rowtexts[*row].item);
+					link_click = cursorpos;
+				}
+			}
+
 			return UIElement::send_cursor(clicking, cursorpos);
+		}
 
 		if (get_scrollrange() < 2)
 			return Cursor::State::IDLE;
@@ -830,6 +858,7 @@ namespace ms
 		held_part = ScrollPart::NONE;
 		edge_dragging = false;
 		combo_hovered = false;
+		hide_link();
 	}
 
 	UIElement::Type UIChatBar::get_type() const
@@ -858,7 +887,14 @@ namespace ms
 		add_line(line, type, channel, ear);
 	}
 
-	void UIChatBar::add_line(const std::string &line, LineType type, int8_t channel, bool ear)
+	void UIChatBar::send_linked(const std::string &line, LineType type, int8_t channel, bool ear,
+								const storage_contents::Stored &item, size_t from, size_t length)
+	{
+		add_line(line, type, channel, ear, std::make_shared<const storage_contents::Stored>(item), from, length);
+	}
+
+	void UIChatBar::add_line(const std::string &line, LineType type, int8_t channel, bool ear,
+							 std::shared_ptr<const storage_contents::Stored> item, size_t from, size_t length)
 	{
 		Color::Name color;
 		Color strip;
@@ -964,11 +1000,27 @@ namespace ms
 						 type == LineType::SUPER_MEGAPHONE || type == LineType::ITEM_MEGAPHONE ||
 						 type == LineType::MEGAPHONE_PREVIEW || type == LineType::GACHAPON;
 
+		bool first = true;
+
 		for (const auto& row : ChatWrap::wrap(line, indent, fit))
 		{
-			rowtexts.push_back({ Text(Text::Font::A12M, Text::Alignment::LEFT, color, row), strip, channel, ear, row,
-								 claimable });
+			Text text(Text::Font::A12M, Text::Alignment::LEFT, color, row);
+			std::optional<Text> link;
+			int16_t link_x = 0;
+
+			if (first)
+			{
+				if (size_t shown = chat_link::shown(row.size(), from, length))
+				{
+					link = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::ITEMLINK,
+								row.substr(from, shown));
+					link_x = static_cast<int16_t>(text.advance(from));
+				}
+			}
+
+			rowtexts.push_back({ text, strip, channel, ear, row, claimable, item, link, link_x });
 			channel = -1;
+			first = false;
 		}
 
 		while (rowtexts.size() > MAX_ROWS)
@@ -1202,6 +1254,40 @@ namespace ms
 		int16_t left = COMBO.left() + 1;
 
 		return Rectangle<int16_t>(left, left + COMBO_LIST_WIDTH, COMBO.top() - height, COMBO.top());
+	}
+
+	std::optional<size_t> UIChatBar::row_at(Point<int16_t> cursorpos) const
+	{
+		Point<int16_t> cursor = cursorpos - position;
+
+		if (cursor.x() < 0 || cursor.x() >= chat_link::HOT_WIDTH)
+			return {};
+
+		int16_t logbottom = get_logtop() + get_logheight();
+
+		for (int16_t i = 0; i < get_logrows(); i++)
+		{
+			int16_t row = rowpos - i;
+
+			if (row < 0 || row > rowmax)
+				break;
+
+			int16_t top = logbottom - CHATROWHEIGHT * (i + 1);
+
+			if (cursor.y() >= top && cursor.y() < top + CHATROWHEIGHT)
+				return static_cast<size_t>(row);
+		}
+
+		return {};
+	}
+
+	void UIChatBar::hide_link()
+	{
+		if (link_click)
+		{
+			UI::get().clear_tooltip(Tooltip::Parent::CHATBAR);
+			link_click.reset();
+		}
 	}
 
 	std::optional<size_t> UIChatBar::combo_row_at(Point<int16_t> cursorpos) const

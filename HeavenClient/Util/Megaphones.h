@@ -23,16 +23,20 @@ namespace ms
 			return (mapid / 1'000'000) % 100 != 9;
 		}
 
+		// Where with_item puts the item's name: after the first separator, or
+		// first without one.
+		inline size_t item_at(const std::string& line)
+		{
+			size_t split = line.find(SEPARATOR);
+
+			return split == std::string::npos ? 0 : split + SEPARATOR.size();
+		}
+
 		// The line with the shown item's name before the text, as
 		// "Name : [Item]text".
 		inline std::string with_item(const std::string& line, const std::string& item)
 		{
-			size_t split = line.find(SEPARATOR);
-
-			if (split == std::string::npos)
-				return "[" + item + "]" + line;
-
-			split += SEPARATOR.size();
+			size_t split = item_at(line);
 
 			return line.substr(0, split) + "[" + item + "]" + line.substr(split);
 		}

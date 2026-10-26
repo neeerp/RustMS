@@ -342,6 +342,15 @@ megaphone's later lines take the first line's name. Lines are dropped on
 event maps (`Util/Megaphones.h`); v83 shows them there to GMs, but
 HeavenClient doesn't know who is a GM.
 
+A line that carries an item (BROADCAST_MSG types 6, 8 and 11) links it
+(`UIChatBar::send_linked`, `Util/ChatLinks.h`). The item megaphone's
+`[item name]` is drawn again in violet (#6C4CE3, v83's chat font
+ctx+0xc20). When the mouse button goes down on any of the line's rows, the
+item's tooltip opens 20 px below the cursor (FUN_008d5f5c, FUN_008f5b20). It
+closes once the cursor leaves the 40x40 square around the click (0x8d804e).
+HeavenClient also closes it when the cursor leaves the chat bar, since its
+chat bar is a window of its own.
+
 Two other server message types aren't megaphones. Type 6 (a line with an
 item ID) is shown as a blue chat line; v83 also links the item, which
 HeavenClient leaves out. Type 7 (an NPC ID and the text) opens that NPC's
@@ -946,7 +955,8 @@ them (0x9382b0). `Stage::effect_node` finds the path's node, as user effect
 23 does too: the NX file named first (`UI`, `Effect` or `Map`), then the
 node, retried with the image's `.img` put back (`field_effect::with_image`),
 since Item.nx writes reward paths without it. A world message's item link
-(BROADCAST_MSG type 6) isn't drawn; the line shows as plain blue text.
+(BROADCAST_MSG type 6) changes nothing in the line's look; it shows as plain
+blue text, but a click on it shows the item, as above.
 
 ### Gachapon
 
@@ -977,10 +987,9 @@ default, `v83ref/lanes/QUESTIONS.md`) as BROADCAST_MSG type 11
 and the item as in an inventory. The v83 client shows it as a chat line,
 "<name> got a(n)  :  <item>  from the <town> Gachapon! Congrats!" (StringPool
 0x137d), black text on a green bar (chat type 0x12), with the item's tooltip
-on hover; a channel of -1 would name the Cash Shop Surprise. HeavenClient
+on a click; a channel of -1 would name the Cash Shop Surprise. HeavenClient
 reads it in `MessagingHandlers.cpp` (case 11), writes the line with
-`Megaphones::gachapon` and shows it as `UIChatBar::GACHAPON`, without the
-tooltip.
+`Megaphones::gachapon` and shows it as a linked `UIChatBar::GACHAPON` line.
 
 The Remote Gachapon Ticket (5451000, report b196) opens a window of ten town
 buttons in the v83 client; a button sends USE_REMOTE (`0x74`, 0xa14074):
