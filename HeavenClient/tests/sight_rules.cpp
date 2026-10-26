@@ -1,4 +1,5 @@
 #include "../Gameplay/SightRules.h"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
@@ -44,6 +45,34 @@ int main()
 		auto gone = strips(900, 700, 316, 316, 800, 600);
 		require(is(gone[0], 0, 0, 800, 600), "all black");
 		require(gone[1].height == 0 && gone[2].height == 0 && gone[3].height == 0, "and nothing else");
+
+		// Off the left or the top it leaves it all black too.
+		require(is(strips(-400, 100, 316, 316, 800, 600)[3], 0, 100, 800, 316), "off the left");
+		require(is(strips(100, -400, 316, 316, 800, 600)[1], 0, 0, 800, 600), "off the top");
+
+		// Past the right and bottom edges the far strips are empty.
+		auto edge = strips(600, 400, 316, 316, 800, 600);
+		require(is(edge[1], 0, 600, 800, 0), "nothing below");
+		require(is(edge[3], 800, 400, 0, 200), "nothing right");
+
+		// On a screen smaller than the sight, nothing around it is black.
+		for (const Strip& strip : strips(-10, -10, 316, 316, 300, 200))
+			require(strip.width == 0 || strip.height == 0, "a sight over the whole screen");
+
+		// Whatever the sight's place, the strips and the sight together tile
+		// the screen once.
+		for (int16_t left = -400; left <= 900; left += 37)
+			for (int16_t top = -400; top <= 700; top += 41)
+			{
+				int32_t area = 0;
+
+				for (const Strip& strip : strips(left, top, 316, 316, 800, 600))
+					area += strip.width * strip.height;
+
+				int32_t seen_w = std::max(0, std::min(left + 316, 800) - std::max<int32_t>(left, 0));
+				int32_t seen_h = std::max(0, std::min(top + 316, 600) - std::max<int32_t>(top, 0));
+				require(area + seen_w * seen_h == 800 * 600, "tiles the screen");
+			}
 
 		std::cout << "sight_rules: all passed\n";
 		return 0;
