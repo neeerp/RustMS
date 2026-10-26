@@ -2359,6 +2359,12 @@ impl NpcScript {
             "q2334s" => Some(violettas_face()),
             "q2342s" => Some(violettas_seal(player)),
             "q3108s" => Some(snow_statue_clue()),
+            "q3523s" => lost_memory(3523),
+            "q3524s" => lost_memory(3524),
+            "q3525s" => lost_memory(3525),
+            "q3526s" => lost_memory(3526),
+            "q3527s" => lost_memory(3527),
+            "q3529s" => lost_memory(3529),
             "q3714s" => Some(baby_dragon(player)),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
@@ -2935,6 +2941,38 @@ fn snow_statue_clue() -> NpcScript {
     let mut script = NpcScript::new(SNOW_STATUE, vec![Page::Say(text(keys::SNOW_STATUE_CLUE))]);
     script.on_end = vec![Effect::FinishQuest(3108), Effect::GainExp(1000)];
     script
+}
+
+/// In Search for the Lost Memory, for each branch of explorers and the
+/// Cygnus Knights: (quest, its job instructor).
+const LOST_MEMORIES: [(i16, i32); 6] = [
+    (3523, 1022000),
+    (3524, 1032001),
+    (3525, 1012100),
+    (3526, 1052001),
+    (3527, 1090000),
+    (3529, 1101002),
+];
+/// The record the Memory Keeper's quest (3507) reads (`Check/1
+/// infoNumber`), and what it reads once the memory is back (`infoex`).
+const LOST_MEMORY_RECORD: i16 = 7081;
+const LOST_MEMORY_BACK: &str = "1";
+
+/// `q3523s`-`q3527s` and `q3529s`: the job instructor of a player on the
+/// Memory Keeper's quest (3507) gives back the lost memory, which sets
+/// 3507's record so it can end, and the quest completes as it starts
+/// (Cosmic `3523.js`). The data has no rewards.
+fn lost_memory(quest: i16) -> Option<NpcScript> {
+    let &(_, npc) = LOST_MEMORIES.iter().find(|&&(q, _)| q == quest)?;
+    let mut script = NpcScript::new(npc, vec![Page::Say(text(keys::LOST_MEMORY_REGAINED))]);
+    script.on_end = vec![
+        Effect::FinishQuest(quest),
+        Effect::SetRecord {
+            record: LOST_MEMORY_RECORD,
+            value: LOST_MEMORY_BACK,
+        },
+    ];
+    Some(script)
 }
 
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
@@ -10255,6 +10293,26 @@ mod tests {
         for player in [holding, with_quests(&[]), with_quests(&[(2331, true)])] {
             let script = NpcScript::for_quest("q2342s", &player).unwrap();
             assert_eq!(read_through(script), (VIOLETTA, Vec::new()), "only told");
+        }
+    }
+
+    #[test]
+    fn each_job_instructor_gives_back_the_lost_memory() {
+        for (quest, npc) in LOST_MEMORIES {
+            let script = NpcScript::for_quest(&format!("q{quest}s"), &player(50)).unwrap();
+            assert_eq!(
+                read_through(script),
+                (
+                    npc,
+                    vec![
+                        Effect::FinishQuest(quest),
+                        Effect::SetRecord {
+                            record: 7081,
+                            value: "1"
+                        }
+                    ]
+                )
+            );
         }
     }
 

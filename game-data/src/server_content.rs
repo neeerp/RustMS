@@ -819,6 +819,10 @@ pub mod keys {
     /// the broken statue where the clue is found.
     pub const SNOW_STATUE_CLUE: &str = "snow_statue.clue";
 
+    /// In Search for the Lost Memory (3523-3527, 3529): a job instructor
+    /// gives back the memory, and the Memory Keeper has the pass.
+    pub const LOST_MEMORY_REGAINED: &str = "lost_memory.regained";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3057,6 +3061,7 @@ mod tests {
                 keys::VIOLETTA_SEAL_FULL,
                 keys::VIOLETTA_SEAL_KEPT,
                 keys::SNOW_STATUE_CLUE,
+                keys::LOST_MEMORY_REGAINED,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

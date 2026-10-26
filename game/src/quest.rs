@@ -21,8 +21,10 @@ pub const INFO_QUESTS: &[i16] = &[3311, 3900, 3926, 3927, 3929];
 /// 6370), the past Papulatus's (6364, for "A New Revelation", 6363), Lord
 /// Jonathan's (6401, for "Jonathan's Court", 6400), Save Delli!'s way
 /// out's (6411, for "Mission Free the Monsters", 6410) and Nett's
-/// Pyramid's kill count (7760, for "Protector of Pharaoh", 29932).
-pub const RECORDS: &[i16] = &[6331, 6364, 6371, 6401, 6411, 7760];
+/// Pyramid's kill count (7760, for "Protector of Pharaoh", 29932) and the
+/// lost memory a job instructor gives back (7081, for "Memory Keeper",
+/// 3507).
+pub const RECORDS: &[i16] = &[6331, 6364, 6371, 6401, 6411, 7081, 7760];
 
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
