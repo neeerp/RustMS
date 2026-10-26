@@ -735,6 +735,12 @@ pub enum FieldMessage {
     Levers {
         reply: tokio::sync::oneshot::Sender<[bool; 5]>,
     },
+    /// In a jail under the Tower of Goddess's sealed room, what its way on
+    /// makes of its levers against its draw (`net::events::draw_jail`, drawn
+    /// when first asked); `None` on any other map.
+    Jail {
+        reply: tokio::sync::oneshot::Sender<Option<net::events::JailCheck>>,
+    },
     /// Show everyone on the field a packet, as an event's line to a map
     /// of its copy.
     Show(Packet),

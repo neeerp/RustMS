@@ -1842,9 +1842,24 @@ Achilles' and Magic Guard's shares, and shows DAMAGE_PLAYER -3, which has no
 mob. Like Cosmic and Kinoko, it doesn't give the disease. A trap with a
 `targetField` (the Witch Tower's snacks, back to 980040000) sends a
 CHANGE_MAP there on touch, hurting or not, which the server allows a living
-player from that map. Not done: FIELD_OBSTACLE_ONOFF (139), which switches
-named traps such as the Orbis jail spears between states, and the
-`mobdamage` those spears do to mobs (0xBF).
+player from that map.
+
+Named traps can be switched between states by the server with
+FIELD_OBSTACLE_ONOFF (139: name, state; `build_obstacle_state`), which the
+field keeps (`FieldActor::obstacles`, through `move_obstacle`) and sends a
+player who enters with its list (140, `build_obstacle_states`); nothing
+resets them, as the event maps they're on are thrown away. Only the Orbis
+jails' spears use them so far. A trap with `mobdamage` (only those spears)
+also hurts mobs: as v83 does (FUN_006675a8), each client tests every live
+mob once a second, with its body box swept back to where it stood the tick
+before, against the traps with `mobdamage`, rolls it within a tenth, and
+sends FIELD_DAMAGE_MOB (0xBF: `i32 oid, i32 damage`; HeavenClient's
+`MapMobs::hit_traps`); the mob it controls flinches. Every client in the map
+tells of the same hit, so the field (`handle_field_damage_mob`) takes it only
+on a map whose traps have moved, up to the map's highest `mobdamage` plus a
+tenth (`Traps::max_mob_hit`), and once in 900 ms for each mob, then shows
+everyone the damage as a mob's hit would and kills as usual. Cosmic takes up
+to 2000 from anyone, with no wait.
 
 The client's respawn is a CHANGE_MAP with a target while dead. It returns the
 player to the map's return map with 50 HP. When the player chose a Wheel of

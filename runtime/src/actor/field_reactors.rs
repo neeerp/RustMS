@@ -274,6 +274,12 @@ impl ReactorSet {
             .map(|spot| (spot.template.x, spot.template.y))
     }
 
+    /// The map's name for live reactor `object_id`, if it has one.
+    pub fn name(&self, object_id: i32) -> Option<&str> {
+        let reactor = self.live.get(&object_id)?;
+        Some(self.spots[reactor.spot].template.name.as_str())
+    }
+
     /// The live reactor named `name`, if any.
     pub fn named(&self, name: &str) -> Option<&LiveReactor> {
         self.live

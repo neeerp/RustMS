@@ -45,8 +45,8 @@ namespace ms
 
 		void update();
 
-		// The last-loaded trap in the layer that `body` touches.
-		const Obj *find_obstacle(const obstacle::Box &body) const;
+		// The last-loaded trap in the layer that `body` touches; for a mob, only one that hurts mobs.
+		const Obj *find_obstacle(const obstacle::Box &body, bool mob) const;
 
 		// The obj with this name, or null.
 		Obj *find(const std::string &name);
@@ -78,7 +78,8 @@ namespace ms
 		void update();
 
 		// The trap that `body` touches. v83 tests them in reverse load order and takes the first (FUN_00642710).
-		const Obj *find_obstacle(const obstacle::Box &body) const;
+		// A mob's body only meets traps with a `mobdamage`.
+		const Obj *find_obstacle(const obstacle::Box &body, bool mob = false) const;
 
 		// Show the named obj in `state`, or in its current one again for -1 (FUN_00642aca). False if there's no
 		// such obj or state. Names are unique in each map.

@@ -423,6 +423,9 @@ pub mod keys {
     /// Told to a player at the hub's storage door while it is shut (a pink
     /// line).
     pub const OPQ_NOTICE_STORAGE_CLOSED: &str = "opq.notice.storage_closed";
+    /// Told to a player at a jail's way on while `{n}` of its levers stand
+    /// wrong (a pink line).
+    pub const OPQ_NOTICE_JAIL_LEVERS: &str = "opq.notice.jail_levers";
     /// Eak in a room, asking for `{n}` of `{item}`.
     pub const OPQ_EAK_HAND_IN: &str = "opq.eak.hand_in";
     /// Eak giving the leader `{piece}`, a piece of the statue.
@@ -2819,6 +2822,7 @@ mod tests {
             keys::OPQ_EAK_LEADER_ONLY,
             keys::OPQ_EAK_GATHER,
             keys::OPQ_NOTICE_STORAGE_CLOSED,
+            keys::OPQ_NOTICE_JAIL_LEVERS,
             keys::PET_NOTE_ASK,
             keys::PET_NOTE_FULL,
             keys::PET_NOTE_HELD,

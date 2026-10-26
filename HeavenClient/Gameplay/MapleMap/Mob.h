@@ -29,6 +29,7 @@
 #include "MapObject.h"
 #include "MobAttackRules.h"
 #include "MobHurts.h"
+#include "ObstacleRules.h"
 
 #include "../Movement.h"
 #include "../MovePath.h"
@@ -251,6 +252,16 @@ namespace ms
 		// client moves it, it flinches toward them, is pulled in, and
 		// chases them (0x66b6fc, 0x66b562).
 		void catch_by(Point<int16_t> user);
+
+		// The box it meets traps with: its body where it is and where it was an update ago (FUN_00664559 with 1).
+		obstacle::Box trap_box() const;
+
+		// Whether a trap may hurt it: one hasn't in the last second (mob+0x468, 0x667ce6).
+		bool trap_ready() const;
+
+		// A trap hurt it for `damage`, pushing it left or not. A mob this client moves flinches as from a hit
+		// (0x667dd5).
+		void trapped(int32_t damage, bool left);
 
 		// Create a touch damage attack to the player
 		MobAttack create_touch_attack() const;
@@ -722,6 +733,9 @@ namespace ms
 		bool acting = false;
 		// Ms more a hit mob holds still.
 		int16_t hittime = 0;
+		// Where it was an update ago, and the ms since a trap last hurt it.
+		Point<int16_t> lastpos;
+		int32_t since_trapped = 1000;
 
 		// A flinch for the AI to take next update: away from its attacker,
 		// or toward the user Monster Magnet caught it for.

@@ -137,6 +137,15 @@ fn kind_attack(
     p
 }
 
+/// FIELD_DAMAGE_MOB: one of the map's traps hurt mob `object_id`.
+pub fn trap_hit(object_id: i32, damage: i32) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::FieldDamageMob as i16).unwrap();
+    p.write_int(object_id).unwrap();
+    p.write_int(damage).unwrap();
+    p
+}
+
 /// DAMAGE_REACTOR: a swing at a reactor, facing right on a foothold, that
 /// lands after 300 ms.
 pub fn hit_reactor(object_id: i32) -> Packet {
@@ -451,6 +460,8 @@ pub struct Field {
     pub doors: Vec<(i32, (i16, i16), bool)>,
     /// REMOVE_DOOR: owners.
     pub doors_removed: Vec<i32>,
+    /// FIELD_OBSTACLE_ONOFF and its list on entering: (name, state).
+    pub obstacles: Vec<(String, i32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -651,6 +662,14 @@ impl Field {
             match r.read_int().unwrap() {
                 healed if healed <= 0 => self.heals.push((oid, -healed)),
                 damage => self.mobs_hurt.push((oid, damage, r.read_int().unwrap())),
+            }
+        } else if op == SendOpcode::FieldObstacleOnOff as i16 {
+            let name = r.read_str_with_length().unwrap();
+            self.obstacles.push((name, r.read_int().unwrap()));
+        } else if op == SendOpcode::FieldObstacleOnOffList as i16 {
+            for _ in 0..r.read_int().unwrap() {
+                let name = r.read_str_with_length().unwrap();
+                self.obstacles.push((name, r.read_int().unwrap()));
             }
         } else if op == SendOpcode::ShowMonsterHp as i16 {
             self.hp_bars

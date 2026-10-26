@@ -110,6 +110,31 @@ namespace ms
 		}
 	}
 
+	void MapMobs::hit_traps(const MapTilesObjs &objs)
+	{
+		for (auto &mmo : mobs)
+		{
+			Optional<Mob> mob = mmo.second.get();
+
+			if (!mob || !mob->trap_ready())
+				continue;
+
+			const Obj *trap = objs.find_obstacle(mob->trap_box(), true);
+
+			if (!trap)
+				continue;
+
+			int32_t damage = obstacle::roll(trap->get_trap().mobdamage, static_cast<uint32_t>(std::rand()));
+
+			if (damage <= 0)
+				continue;
+
+			FieldDamageMobPacket(mob->get_oid(), damage).dispatch();
+			// It flinches the way the trap pushes (I: 0x668aad takes no direction).
+			mob->trapped(damage, trap->get_push().x < 0);
+		}
+	}
+
 	void MapMobs::update_friendly(int32_t charid, bool reporter)
 	{
 		Optional<Mob> victim = mobs.get(friendlyoid);

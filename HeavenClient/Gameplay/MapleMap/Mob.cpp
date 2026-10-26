@@ -410,6 +410,11 @@ namespace ms
 		if (!active)
 			return phobj.fhlayer;
 
+		lastpos = get_position();
+
+		if (since_trapped < 1000)
+			since_trapped += Constants::TIMESTEP;
+
 		bool aniend = animations.at(stance).update();
 
 		if (aniend && stance == Stance::DIE)
@@ -2634,6 +2639,33 @@ namespace ms
 		casting.reset();
 		acting = true;
 		flinch = Flinch{ false, user };
+	}
+
+	obstacle::Box Mob::trap_box() const
+	{
+		Rectangle<int16_t> body = get_body();
+
+		return obstacle::swept({ body.left(), body.top(), body.right(), body.bottom() },
+							   lastpos.x() - get_position().x(), lastpos.y() - get_position().y());
+	}
+
+	bool Mob::trap_ready() const
+	{
+		return is_alive() && since_trapped >= 1000;
+	}
+
+	void Mob::trapped(int32_t damage, bool left)
+	{
+		since_trapped = 0;
+
+		if (control && !acting && canmove && damage >= knockback)
+		{
+			show_stance(Stance::HIT, left);
+			attacking.reset();
+			casting.reset();
+			acting = true;
+			flinch = Flinch{ left, std::nullopt };
+		}
 	}
 
 	MobAttack Mob::create_touch_attack() const

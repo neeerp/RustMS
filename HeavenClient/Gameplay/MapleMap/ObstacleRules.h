@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 
@@ -75,6 +76,16 @@ namespace ms::obstacle
 		out = flip ? Box{ x - rb.x, y + lt.y, x - lt.x, y + rb.y } : Box{ x + lt.x, y + lt.y, x + rb.x, y + rb.y };
 
 		return true;
+	}
+
+	// A mob's body over its last step: the box covering `body` and `body` moved by (dx, dy), where it was an
+	// update ago (FUN_00664559 with 1, UnionRect).
+	inline Box swept(const Box &body, int32_t dx, int32_t dy)
+	{
+		Box back{ body.left + dx, body.top + dy, body.right + dx, body.bottom + dy };
+
+		return { std::min(body.left, back.left), std::min(body.top, back.top), std::max(body.right, back.right),
+				 std::max(body.bottom, back.bottom) };
 	}
 
 	// A hit's damage from the trap's, with `random` a rand() (0x6427c8): within a tenth either way.

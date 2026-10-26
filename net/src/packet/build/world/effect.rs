@@ -21,6 +21,29 @@ pub fn build_field_object(name: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// FIELD_OBSTACLE_ONOFF: show the map object called `name`, such as an
+/// Orbis jail's spear `trap1`, in `state` (FUN_00642aca).
+pub fn build_obstacle_state(name: &str, state: i32) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldObstacleOnOff as i16)?;
+    p.write_str_with_length(name)?;
+    p.write_int(state)?;
+    Ok(p)
+}
+
+/// FIELD_OBSTACLE_ONOFF_LIST: the named map objects that are in other
+/// states than their first, for a player who enters the field.
+pub fn build_obstacle_states(states: &[(String, i32)]) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::FieldObstacleOnOffList as i16)?;
+    p.write_int(states.len() as i32)?;
+    for (name, state) in states {
+        p.write_str_with_length(name)?;
+        p.write_int(*state)?;
+    }
+    Ok(p)
+}
+
 /// FIELD_EFFECT mode 4: play `Sound.nx/Field.img/<path>`, e.g. a party
 /// quest stage's clear jingle (`Party1/Clear`).
 pub fn build_field_sound(path: &str) -> Result<Packet, NetworkError> {
@@ -295,6 +318,23 @@ mod tests {
         let face = build_item_emotion(5281000).unwrap();
         let mut expect = Expect::new(&face.bytes);
         expect.short(0xE2).int(5281000);
+        expect.end();
+    }
+
+    #[test]
+    fn obstacles_are_set_one_or_all_by_name() {
+        let packet = build_obstacle_state("trap3", 1).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect.short(SendOpcode::FieldObstacleOnOff as i16);
+        expect.string("trap3").int(1);
+        expect.end();
+        let states = [("trap1".to_string(), 1), ("trap7".to_string(), 1)];
+        let packet = build_obstacle_states(&states).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::FieldObstacleOnOffList as i16)
+            .int(2);
+        expect.string("trap1").int(1).string("trap7").int(1);
         expect.end();
     }
 

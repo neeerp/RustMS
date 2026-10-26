@@ -37,6 +37,11 @@ pub enum Action {
     /// Bring out two lots of mobs, each `count` of `mob_id`, on the ground
     /// below it instead: the Pirate Ship's mob boxes (Cosmic `2511000`).
     BringOutLots([(i32, usize); 2]),
+    /// On each hit, drop the trap of its number: a lever `leverN` of the
+    /// Orbis party quest's jails sets off `trapN`, its spears (Cosmic
+    /// `2008007`'s `moveEnvironment`). The tall room's levers, named
+    /// `1`..`5`, set off nothing.
+    Lever,
     /// Send whoever broke it to a map's portal.
     Warp(Warp),
     /// Send whoever broke it to one of these maps, at random: Find the
@@ -200,6 +205,12 @@ pub const OPQ_LIGHT: i32 = 2006000;
 /// Minerva's statue on the Tower of Goddess's hub, which takes the Grass
 /// of Life.
 pub const OPQ_STATUE: i32 = 2006001;
+/// The levers of the tall room and the jails under the sealed room.
+pub const OPQ_LEVER: i32 = 2008007;
+/// The crystal boxes of the jails' box rooms: the plain one of the rooms
+/// no way leads to, and the critical one of those the levers open.
+pub const OPQ_JAIL_BOX: i32 = 2002017;
+pub const OPQ_CRITICAL_BOX: i32 = 2002018;
 /// The first of the Salion stage's spots, `2001002` to `2001015`.
 pub const SALION_SPOTS: i32 = 2001002;
 /// The Cellion that comes out at the Salion stage's spots.
@@ -382,6 +393,13 @@ pub fn action(reactor_id: i32) -> Action {
             at_least: 15,
             mesos: (30, 60),
         },
+        OPQ_LEVER => Action::Lever,
+        // The jails' boxes (`2002017`, `2002018`: `sprayItems(true, 1, 100,
+        // 400, 15)`).
+        OPQ_JAIL_BOX | OPQ_CRITICAL_BOX => Action::Spray {
+            at_least: 15,
+            mesos: (100, 400),
+        },
         // A door's seal: `setAllowSpawnPointInBox(false, ..)` over
         // `Rectangle(x - 160, y - 75, 320, 150)`.
         PIRATE_SEAL..=PIRATE_LAST_SEAL => Action::Seal { half: (160, 75) },
@@ -523,10 +541,14 @@ pub fn breaker_notice(reactor_id: i32) -> Option<&'static str> {
 /// `2006000.img/20`). Minerva's statue
 /// waits at 6, whose event takes the Grass of Life (`2006001.img/6`; its
 /// states 0 to 5 take nothing, and the scars hold the pieces instead).
+/// The jails' critical box starts at 1: its state 0, a blank that fades
+/// it in, has no event, so nothing would ever let it be hit (Cosmic leaves
+/// it so; no script moves it).
 pub fn first_state(reactor_id: i32) -> u8 {
     match reactor_id {
         OPQ_LIGHT => 20,
         OPQ_STATUE => 6,
+        OPQ_CRITICAL_BOX => 1,
         _ => 0,
     }
 }
@@ -632,6 +654,23 @@ mod tests {
         );
         assert_eq!(action(2302003), Action::Drops);
         assert_eq!(action(2000), Action::Drops);
+    }
+
+    #[test]
+    fn the_jails_levers_drop_spears_and_their_boxes_spray() {
+        assert_eq!(action(OPQ_LEVER), Action::Lever);
+        let spray = Action::Spray {
+            at_least: 15,
+            mesos: (100, 400),
+        };
+        assert_eq!(
+            (action(OPQ_JAIL_BOX), action(OPQ_CRITICAL_BOX)),
+            (spray, spray)
+        );
+        assert_eq!(
+            (first_state(OPQ_JAIL_BOX), first_state(OPQ_CRITICAL_BOX)),
+            (0, 1)
+        );
     }
 
     #[test]

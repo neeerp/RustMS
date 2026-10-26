@@ -189,6 +189,12 @@ pub const OPQ_GARDEN_OUT: &str = "party3_gardenin";
 /// The hub's door to the hidden storage (`in06`), open once the event is
 /// won.
 pub const OPQ_STORAGE_IN: &str = "party3_room8";
+/// The doors of the sealed room (920010900) to its three jails, open once
+/// the event is won, as the storage is.
+pub const OPQ_JAILS_IN: [&str; 3] = ["party3_jail1", "party3_jail2", "party3_jail3"];
+/// A jail's way on (`in00`) to its box room, open to the levers that
+/// match the jail's draw (`events::jail_misplaced`).
+pub const OPQ_JAIL_ON: &str = "party3_jailin";
 /// The Dead Mine's way out, on its hub (`ps01`), which the client actor
 /// answers from the player's ticket.
 pub const ZPQ_OUT: &str = "Zakum03";
@@ -1263,6 +1269,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // The hub's storage stays shut until Minerva is free; the event
         // opens it for a team that freed her.
         OPQ_STORAGE_IN => refused(keys::OPQ_NOTICE_STORAGE_CLOSED),
+        _ if OPQ_JAILS_IN.contains(&script) => refused(keys::OPQ_NOTICE_STORAGE_CLOSED),
         "OutPerrion_1" => ScriptOutcome {
             effects: vec![
                 Effect::Pink(content::text().get(keys::TEMPLE_SHORTCUT, &[])),

@@ -49,7 +49,7 @@ namespace ms
 			iter.second.update();
 	}
 
-	const Obj *TilesObjs::find_obstacle(const obstacle::Box &body) const
+	const Obj *TilesObjs::find_obstacle(const obstacle::Box &body, bool mob) const
 	{
 		const Obj *found = nullptr;
 
@@ -58,7 +58,7 @@ namespace ms
 			const Obj &obj = iter.second;
 			obstacle::Box box{};
 
-			if (obj.is_obstacle() && (!found || obj.get_order() > found->get_order()) && obj.obstacle_box(box) &&
+			if (obj.is_obstacle() && (!mob || obj.get_trap().mobdamage != 0) && (!found || obj.get_order() > found->get_order()) && obj.obstacle_box(box) &&
 				box.meets(body))
 				found = &obj;
 		}
@@ -124,10 +124,10 @@ namespace ms
 		layers[layer].draw(viewpos, alpha);
 	}
 
-	const Obj *MapTilesObjs::find_obstacle(const obstacle::Box &body) const
+	const Obj *MapTilesObjs::find_obstacle(const obstacle::Box &body, bool mob) const
 	{
 		for (size_t i = Layer::Id::LENGTH; i-- > 0;)
-			if (const Obj *obj = layers[static_cast<Layer::Id>(i)].find_obstacle(body))
+			if (const Obj *obj = layers[static_cast<Layer::Id>(i)].find_obstacle(body, mob))
 				return obj;
 
 		return nullptr;

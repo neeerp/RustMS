@@ -37,7 +37,8 @@ use net::packet::build::world::drop::{
 };
 use net::packet::build::world::effect::{
     build_blow_weather, build_boss_hp_bar, build_field_effect, build_field_music,
-    build_field_sound, build_item_emotion, build_mist_item_effect,
+    build_field_sound, build_item_emotion, build_mist_item_effect, build_obstacle_state,
+    build_obstacle_states,
 };
 use net::packet::build::world::field::{
     build_player_enter_field, build_player_leave_field, build_show_chair,
@@ -125,6 +126,10 @@ const CATCH_SLACK: i32 = 100;
 /// ahead, onto a foothold within 80 px up or down (FUN_0096b140).
 const SUMMON_REACH_X: i32 = 250;
 const SUMMON_REACH_Y: i32 = 150;
+
+/// How soon a trap may hurt a mob again: a second on the client, less some
+/// lag between the clients that tell of it.
+const TRAPPED_AGAIN: Duration = Duration::from_millis(900);
 
 /// How long a weather item's weather blows (Cosmic's 30 s; the v83 client
 /// waits for the server to stop it).
@@ -244,6 +249,12 @@ pub struct FieldActor {
     trips: Option<i64>,
     /// The weather item blowing here, its message, and when it stops.
     weather: Option<(i32, String, Instant)>,
+    /// The named map objects moved to other states (FIELD_OBSTACLE_ONOFF),
+    /// such as an Orbis jail's dropped spears, in the order they moved.
+    obstacles: Vec<(String, i32)>,
+    /// When a trap last hurt each mob, as a client told: every client in the
+    /// map tells of the same hit.
+    trapped: HashMap<i32, Instant>,
     /// Hits on the Moon Bunny since its guards last heard of them, and the
     /// rice cakes it made.
     bunny_hits: u32,
@@ -267,6 +278,10 @@ pub struct FieldActor {
     /// In the tall room, the two levers Eak wants up, once he has been
     /// asked.
     levers: Option<[bool; 5]>,
+    /// In a jail under the sealed room, the levers that open its way on
+    /// (`net::events::draw_jail`), once anyone has tried it; none once
+    /// they have.
+    jail: Option<u8>,
     /// On a copy of a Mu Lung Dojo floor, its boss until its challenger
     /// first arrives and it comes out (Cosmic `dojang_1st`).
     dojo_boss: Option<i32>,
@@ -335,6 +350,8 @@ impl FieldActor {
             loaded_rx,
             trips: conti::has_trips(key.map_id).then_some(route_time),
             weather: None,
+            obstacles: Vec::new(),
+            trapped: HashMap::new(),
             bunny_hits: 0,
             bunny_cakes: 0,
             lost_at: None,
@@ -344,6 +361,7 @@ impl FieldActor {
             split: None,
             climb: None,
             levers: None,
+            jail: None,
             dojo_boss: net::events::dojo_boss(key.map_id).filter(|_| key.instance_id != 0),
             massacre: net::events::pyramid_stage(key.map_id).is_some() && key.instance_id != 0,
             carnival: net::carnival::battle_room(key.map_id).is_some() && key.instance_id != 0,
@@ -812,6 +830,9 @@ impl FieldActor {
                 });
                 let _ = reply.send(climb.clone());
             }
+            FieldMessage::Jail { reply } => {
+                let _ = reply.send(self.check_jail());
+            }
             FieldMessage::Levers { reply } => {
                 let levers = self
                     .levers
@@ -871,6 +892,9 @@ impl FieldActor {
                     distance,
                 } => self.handle_mob_distance(from, object_id, distance),
                 FieldRequest::MobBomb { object_id } => self.handle_mob_bomb(object_id),
+                FieldRequest::FieldDamageMob { object_id, damage } => {
+                    self.handle_field_damage_mob(from, object_id, damage)
+                }
                 FieldRequest::MobDamageMobFriendly { attacker, victim } => {
                     self.handle_friendly_hit(attacker, victim)
                 }
@@ -2176,6 +2200,92 @@ impl FieldActor {
         if let Some(controller) = self.mob_candidate() {
             let controlled = self.mobs.assign_uncontrolled(controller);
             self.send_control(controller, &controlled);
+        }
+    }
+
+    /// In a jail, what its way on makes of its levers, the draw made now if
+    /// no one has tried it yet; `None` on any other map.
+    fn check_jail(&mut self) -> Option<net::events::JailCheck> {
+        let map_id = self.key.map_id;
+        let levers = net::events::jail_levers(map_id)?;
+        let mask = *self
+            .jail
+            .get_or_insert_with(|| net::events::draw_jail(map_id, &mut rand::thread_rng()));
+        let up: Vec<bool> = (1..=levers)
+            .map(|i| {
+                let lever = self.reactors.named(&format!("lever{i}"));
+                lever.is_some_and(|lever| lever.state > 0)
+            })
+            .collect();
+        let check = net::events::check_jail(mask, &up);
+        // Once open, the way stays open.
+        if check == net::events::JailCheck::Solved {
+            self.jail = Some(0);
+        }
+        Some(check)
+    }
+
+    /// Show the named map object `name` in `state` to everyone here and to
+    /// those who come later (Cosmic `moveEnvironment`).
+    fn move_obstacle(&mut self, name: &str, state: i32) {
+        match self.obstacles.iter_mut().find(|(moved, _)| moved == name) {
+            Some((_, moved)) => *moved = state,
+            None => self.obstacles.push((name.to_string(), state)),
+        }
+        if let Ok(packet) = build_obstacle_state(name, state) {
+            self.broadcast(None, packet);
+        }
+    }
+
+    /// A client saw a trap hurt mob `object_id`. Only a map with traps that
+    /// hurt mobs, some of them moved, takes it, no more than they can roll,
+    /// and once a second for each mob, as each client tells of the same hit
+    /// (0x667ce6).
+    fn handle_field_damage_mob(&mut self, from: ClientId, object_id: i32, damage: i32) {
+        let now = Instant::now();
+        let most = net::get_game_data()
+            .ok()
+            .and_then(|data| data.field(self.key.map_id))
+            .map_or(0, |field| field.traps.max_mob_hit());
+        if self.obstacles.is_empty() || !(1..=most).contains(&damage) {
+            return;
+        }
+        if self
+            .trapped
+            .get(&object_id)
+            .is_some_and(|&at| now.duration_since(at) < TRAPPED_AGAIN)
+        {
+            return;
+        }
+        let Some(max_hp) = self.mobs.get(object_id).map(|mob| mob.info.max_hp) else {
+            return;
+        };
+        if self.mobs.shielded(object_id) {
+            return;
+        }
+        self.trapped.insert(object_id, now);
+        // No client draws a trap's number itself, so all see it here, the
+        // last one too.
+        let show = |field: &Self, hp: i32| {
+            if let Ok(packet) = build_damage_mob(object_id, damage, hp, max_hp) {
+                field.broadcast(None, packet);
+            }
+        };
+        match self.mobs.damage(from, object_id, i64::from(damage), now) {
+            Some(Ok(_)) => {
+                let Some(mob) = self.mobs.get(object_id) else {
+                    return;
+                };
+                show(self, i32::try_from(mob.hp).unwrap_or(i32::MAX));
+                let bar = self.mobs.bar_for(object_id);
+                self.show_boss_bar(bar);
+            }
+            Some(Err(kill)) => {
+                show(self, 0);
+                self.trapped.remove(&object_id);
+                self.killed(&kill);
+            }
+            None => {}
         }
     }
 
@@ -3696,6 +3806,13 @@ impl FieldActor {
                 }
                 match reactors::action(view.reactor_id) {
                     reactors::Action::Bloom => self.bloom(),
+                    reactors::Action::Lever => {
+                        let name = self.reactors.name(view.object_id);
+                        if let Some(n) = name.and_then(|name| name.strip_prefix("lever")) {
+                            let trap = format!("trap{n}");
+                            self.move_obstacle(&trap, 1);
+                        }
+                    }
                     // Cosmic `3008000`'s `hit`: everyone here, as it takes
                     // the item.
                     reactors::Action::ExpToAll(exp) => {
@@ -4020,6 +4137,12 @@ impl FieldActor {
 
         if let Some((item_id, message, _)) = &self.weather {
             if let Ok(packet) = build_blow_weather(Some((*item_id, message))) {
+                handle.send_packet(packet);
+            }
+        }
+
+        if !self.obstacles.is_empty() {
+            if let Ok(packet) = build_obstacle_states(&self.obstacles) {
                 handle.send_packet(packet);
             }
         }

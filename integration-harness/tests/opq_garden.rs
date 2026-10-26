@@ -42,6 +42,9 @@ const TREASURE_BOX: i32 = 2002014;
 /// The hub's door to the storage, and the storage's way back.
 const STORAGE_DOOR: &str = "in06";
 const STORAGE_OUT: &str = "st00";
+/// The room under the hub, and the first of its jails.
+const SEALED_ROOM: i32 = 920_010_900;
+const FIRST_JAIL: i32 = 920_010_910;
 /// The hub's scars and the piece each takes, as the pieces sit in the
 /// holder's Etc slots 1 to 6 (4001044 to 4001049).
 const SCARS: [(i32, i16); 6] = [
@@ -364,6 +367,20 @@ async fn the_gardens_seeds_bring_out_papa_pixie_and_the_grass_brings_back_minerv
         t.warps.contains(&OPQ_HUB)
     })
     .await;
+    // The sealed room's doors to the jails open with the storage's.
+    let sealed = warp(&mut a[1].connection, SEALED_ROOM, "", &mut trace).await;
+    assert_eq!(sealed, SEALED_ROOM);
+    let trace = told(&mut a[1], enter("in01")).await;
+    assert_eq!(trace.portal_sounds, 1, "{trace:?}");
+    assert!(
+        matches!(trace.arrivals[..], [(FIRST_JAIL, 0, _)]),
+        "{trace:?}"
+    );
+    let mut trace = Trace::default();
+    assert_eq!(
+        warp(&mut a[1].connection, OPQ_HUB, "", &mut trace).await,
+        OPQ_HUB
+    );
 
     // Each box sprays at least 15 drops; the first brings Minerva out at
     // her point, and no other brings out another.

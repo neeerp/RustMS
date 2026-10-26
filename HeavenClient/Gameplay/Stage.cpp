@@ -518,6 +518,7 @@ namespace ms
 		mobs.update(physics, { player.get_oid(), playerpos, playerbody, player.get_phobj().onground,
 							   player.is_dead(), player.has_buff(Buffstat::Id::DARKSIGHT), player.is_barrelled(),
 							   player.get_beacon() }, reporter);
+		mobs.hit_traps(tilesobjs);
 		chars.update(physics);
 		drops.update(physics);
 

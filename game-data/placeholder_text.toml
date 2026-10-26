@@ -942,6 +942,7 @@
 "opq.minerva.thanks" = "[placeholder] You put my statue back together and set me free. Take this, with the goddess's blessing."
 "opq.minerva.full" = "[placeholder] Make room in your Equip, Use and Etc tabs first, then come back."
 "opq.notice.storage_closed" = "[placeholder] The storage is sealed while the Pixies' power lingers in the tower."
+"opq.notice.jail_levers" = "[placeholder] Only the right levers open the way on. {n} of them stand wrong."
 "opq.eak.storage" = "[placeholder] This is the tower's hidden storage. Defeat every monster in it, then talk to me, and I will take you on to the treasure room. The way back to the tower stays behind."
 "opq.minerva.bonus_ask" = "[placeholder] Have you taken all you want from the treasure room? Shall we leave?"
 "opq.eak.salion.find" = "[placeholder] A piece of the statue is hidden somewhere in this room. Search it well."

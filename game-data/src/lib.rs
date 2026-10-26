@@ -504,6 +504,18 @@ pub struct Traps {
     /// Where touching one sends a player (`targetField`), such as the Witch
     /// Tower's entrance.
     pub target_fields: Vec<i32>,
+    /// The most any of them hurts a mob (`mobdamage`), before the roll: only
+    /// the spears in Orbis's jails have one.
+    pub mob_damage: i32,
+}
+
+/// The most a trap's `damage` rolls to: over 10, up to a tenth more.
+fn rolled(damage: i32) -> i32 {
+    if damage > 10 {
+        damage + damage / 10
+    } else {
+        damage
+    }
 }
 
 impl Traps {
@@ -511,11 +523,7 @@ impl Traps {
     /// rolls up to a tenth more (0x6427c8), and a `forceHP` trap takes up to
     /// all of `hp`.
     pub fn max_hit(&self, hp: i32) -> i32 {
-        let rolled = if self.damage > 10 {
-            self.damage + self.damage / 10
-        } else {
-            self.damage
-        };
+        let rolled = rolled(self.damage);
         if self.force_hp {
             rolled.max(hp)
         } else {
@@ -523,8 +531,14 @@ impl Traps {
         }
     }
 
+    /// The most a mob's hit a client reports may be.
+    pub fn max_mob_hit(&self) -> i32 {
+        rolled(self.mob_damage)
+    }
+
     fn add(&mut self, trap: &Traps) {
         self.damage = self.damage.max(trap.damage);
+        self.mob_damage = self.mob_damage.max(trap.mob_damage);
         self.force_hp |= trap.force_hp;
         for &map_id in &trap.target_fields {
             if !self.target_fields.contains(&map_id) {
@@ -997,6 +1011,7 @@ fn trap(nx: &NxDataFile, node: u32, traps: &mut Traps) -> Result<bool, GameDataE
             .filter(|&map_id| map_id != 0)
             .into_iter()
             .collect(),
+        mob_damage: nx.int_child(node, "mobdamage")?.unwrap_or(0),
     });
     Ok(true)
 }
@@ -2285,6 +2300,12 @@ mod tests {
             (tower.damage, tower.target_fields.as_slice()),
             (0, &[980_040_000][..])
         );
+
+        // Orbis's jails' spears hurt players and mobs alike.
+        let jail = traps(920_010_910);
+        assert_eq!((jail.damage, jail.mob_damage), (1000, 1000));
+        assert_eq!(jail.max_mob_hit(), 1100);
+        assert_eq!(traps(101_000_100).max_mob_hit(), 0);
 
         assert_eq!(traps(100_000_000), Traps::default());
     }
