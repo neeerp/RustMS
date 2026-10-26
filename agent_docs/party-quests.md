@@ -35,6 +35,9 @@ warriors' 6192, is a party's event with nothing to win
 Haze is played through
 ([the Forest of Poison Haze](#the-forest-of-poison-haze)). Herb Town's
 Pirate Ship is played through ([the Pirate Ship](#the-pirate-ship)).
+Magatia's Romeo and Juliet party quest has its entry, its way out and its
+end rules; its stages come in later slices
+([Romeo and Juliet](#romeo-and-juliet)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
 opt-out is Cosmic's own: in v83 the opt-out is the client's Party Search
@@ -1211,6 +1214,37 @@ not in our Character.nx): `pirate.wu.hat_given` as it is made,
 `pirate.wu.need_feathers` when short, `pirate.wu.room_equip` with no Equip
 room, and `pirate.wu.best` to whoever holds the last one.
 
+## Romeo and Juliet
+
+Magatia's party quest against Yulete
+(`v83ref/reports/b193-rj-pq.md`), from either side, each its own event
+(`EventKind::Magatia(MagatiaSide)`, `events::MAGATIA`; Cosmic
+`MagatiaPQ_Z` and `MagatiaPQ_A`, which differ only in their ids). Romeo
+(2112004) in his room on the Zenumist side (261000011) and Juliet
+(2112003) in hers on the Alcadno side (261000021) answer with a menu of
+going in and what happened. The leader takes exactly four of the party,
+the leader among them, all of levels 71 to 85 and in the room, into the
+side's own copy of its maps (926100000-700 and 926110000-700) for 45
+minutes. With only four, anyone leaving, by the exit, a warp, the party or
+logging out, ends it for all, as Cosmic's `isEventTeamLackingNow` with a
+minimum of four does.
+
+Its seven stages, as Cosmic counts them for their EXP (0, 10,000,
+20,000, 0, 20,000, 20,000, 0), are played on the library (x00000), the
+hall below it (x00001), the beakers (x00100), the hub of files (x00200),
+Yulete's room (x00203), the rope rooms' landing (x00300) and the boss's
+room (x00401), `ZENUMIST_STAGES` and `ALCADNO_STAGES`. None of them can be
+cleared yet.
+
+Inside, Romeo or Juliet asks whether a member would rather retreat
+(`magatia.romeo.retreat`, `magatia.juliet.retreat`) and sends them to the
+side's x00700, where everyone lands when the run ends (its `forcedReturn`
+too). Its portal (`rnj_exit` on both sides' exits; Cosmic has a `jnr_exit`
+our Map.nx never names) leads back to the side's room. The event's items
+(4001130-4001135) are taken from whoever leaves. The maps'
+`onFirstUserEnter` scripts (`StageMsg_romio`, `StageMsg_juliet`) do
+nothing yet. Its lines are placeholders (`magatia.*`).
+
 ## NPCs
 
 | NPC | Where | Script |
@@ -1269,6 +1303,10 @@ room, and `pirate.wu.best` to whoever holds the last one.
 | Wu Yang 2094001 | 925100500 | Out at the Lord Pirate's death; a member is sent to the leader, whose OK wins the ship |
 | Wu Yang 2094001 | 925100600 | A menu: a feather and the way to 251010404, or the next hat for twenty feathers |
 | Guon 2094002 | 925100700 | At once to 251010404 |
+| Romeo 2112004 | 261000011 | Runtime (`talk_about_event`): a menu of going in and what happened |
+| Romeo 2112004 | 926100000-400 | Asks whether to retreat, to 926100700 |
+| Juliet 2112003 | 261000021 | Runtime (`talk_about_event`): a menu of going in and what happened |
+| Juliet 2112003 | 926110000-400 | Asks whether to retreat, to 926110700 |
 
 Their lines are unsourced placeholder keys `kpq.lakelis.*`,
 `kpq.cloto.*`, `kpq.nella.*`, `hpq.tory.*`, `hpq.growlie.*`,

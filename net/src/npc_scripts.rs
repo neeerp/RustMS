@@ -10,7 +10,7 @@ use crate::conti::{self, Route, State};
 use crate::dialogue::{DialoguePage, Prompt};
 use crate::events::{
     self, Aura, Balloon, Cloto, Entry, EventCommand, EventKind, HandIn, HeadCount, LeverCheck,
-    PyramidMode, Standing, Statue,
+    MagatiaSide, PyramidMode, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
 use crate::item_makers::{self, Recipe};
@@ -896,6 +896,10 @@ pub const ELLIN: i32 = 2133000;
 pub const ELLIN_GUIDE: i32 = 2133001;
 pub const ELLIN_MILEPOST: i32 = 2133002;
 pub const ELLIN_SPRITE: i32 = 2133004;
+/// Romeo and Juliet in their rooms in Magatia, who each take a party into
+/// their side's copy of the party quest, and in its maps let a member out.
+pub const ROMEO: i32 = 2112004;
+pub const JULIET: i32 = 2112003;
 /// Guon Over the Pirate Ship, who sends a party aboard against the Lord
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
@@ -1407,6 +1411,12 @@ impl NpcScript {
         ellin(entry, player)
     }
 
+    /// Romeo or Juliet in their room, for a player whose party may or may
+    /// not go into `side`'s party quest.
+    pub fn magatia(side: MagatiaSide, entry: Entry) -> Self {
+        magatia(side, entry)
+    }
+
     /// Guon Over the Pirate Ship, for a player whose party may or may not
     /// board it.
     pub fn guon(entry: Entry) -> Self {
@@ -1829,6 +1839,15 @@ impl NpcScript {
                     keys::ELLIN_MILEPOST_LEAVE,
                     events::ELLIN.exit,
                 ))
+            }
+            // Inside, either asks whether the member would rather leave.
+            ROMEO | JULIET => {
+                let side = magatia_side(npc_id);
+                let event = EventKind::Magatia(side).event();
+                if event.holds(player.stats.map_id) {
+                    let retreat = magatia_keys(side).retreat;
+                    return Some(ask_warp(npc_id, retreat, event.exit));
+                }
             }
             GUON_ABOARD if player.stats.map_id == events::PIRATE_EXIT => {
                 return Some(NpcScript::new(
@@ -7277,6 +7296,75 @@ fn ellin(entry: Entry, player: &Player) -> NpcScript {
     // Someone left or moved since Ellin checked, or another party went in.
     script.refused = Some(event_terms(&events::ELLIN, keys::ELLIN_NOT_ELIGIBLE));
     script.inventory_full = Some(text(keys::ELLIN_PRIZE_NO_ROOM));
+    script
+}
+
+/// What Romeo or Juliet says that differs between them.
+struct MagatiaKeys {
+    menu: &'static str,
+    info: &'static str,
+    retreat: &'static str,
+}
+
+fn magatia_keys(side: MagatiaSide) -> MagatiaKeys {
+    match side {
+        MagatiaSide::Zenumist => MagatiaKeys {
+            menu: keys::MAGATIA_ROMEO_MENU,
+            info: keys::MAGATIA_ROMEO_INFO,
+            retreat: keys::MAGATIA_ROMEO_RETREAT,
+        },
+        MagatiaSide::Alcadno => MagatiaKeys {
+            menu: keys::MAGATIA_JULIET_MENU,
+            info: keys::MAGATIA_JULIET_INFO,
+            retreat: keys::MAGATIA_JULIET_RETREAT,
+        },
+    }
+}
+
+/// Who starts `side`'s party quest: Romeo or Juliet.
+pub fn magatia_host(side: MagatiaSide) -> i32 {
+    match side {
+        MagatiaSide::Zenumist => ROMEO,
+        MagatiaSide::Alcadno => JULIET,
+    }
+}
+
+/// The side whose party quest `npc` (Romeo or Juliet) starts.
+fn magatia_side(npc: i32) -> MagatiaSide {
+    if npc == JULIET {
+        MagatiaSide::Alcadno
+    } else {
+        MagatiaSide::Zenumist
+    }
+}
+
+/// Romeo (Cosmic `2112004`) or Juliet (`2112003`) in their room: the
+/// leader takes the party into their side's party quest, and anyone may
+/// hear about it. Cosmic's Party Search toggle has no counterpart here, as
+/// at Guon.
+fn magatia(side: MagatiaSide, entry: Entry) -> NpcScript {
+    let kind = EventKind::Magatia(side);
+    let event = kind.event();
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::MAGATIA_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::MAGATIA_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(event_terms(event, keys::MAGATIA_NOT_ELIGIBLE)),
+        Entry::Busy => Page::Say(text(keys::MAGATIA_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(kind)]),
+    };
+    let said = magatia_keys(side);
+    let mut script = NpcScript::new(
+        magatia_host(side),
+        vec![Page::Menu {
+            text: text(said.menu),
+            choices: vec![
+                (text(keys::MAGATIA_ENTER), vec![enter]),
+                (text(keys::MAGATIA_ABOUT), vec![Page::Say(text(said.info))]),
+            ],
+        }],
+    );
+    // Someone left or moved since they checked, or another party went in.
+    script.refused = Some(event_terms(event, keys::MAGATIA_NOT_ELIGIBLE));
     script
 }
 
@@ -15220,6 +15308,70 @@ mod tests {
         );
         assert_eq!(input(&prompt, 14, 0, None, None), None);
         assert_eq!(input(&prompt, 4, 1, Some(5), None), None);
+    }
+
+    #[test]
+    fn romeo_and_juliet_take_their_sides_in_and_let_a_member_out() {
+        for (side, host, menu, info, retreat) in [
+            (
+                MagatiaSide::Zenumist,
+                ROMEO,
+                keys::MAGATIA_ROMEO_MENU,
+                keys::MAGATIA_ROMEO_INFO,
+                keys::MAGATIA_ROMEO_RETREAT,
+            ),
+            (
+                MagatiaSide::Alcadno,
+                JULIET,
+                keys::MAGATIA_JULIET_MENU,
+                keys::MAGATIA_JULIET_INFO,
+                keys::MAGATIA_JULIET_RETREAT,
+            ),
+        ] {
+            let started = EventKind::Magatia(side);
+            let event = started.event();
+            assert_eq!(magatia_host(side), host);
+            assert_eq!(magatia_side(host), side);
+            let mut ready = NpcScript::magatia(side, Entry::Ready);
+            assert_eq!(ready.npc_id, host);
+            let menu_page = ready.begin();
+            assert_eq!(kind(&menu_page), Some(4));
+            assert!(format!("{menu_page:?}").contains(&text(menu)));
+            let step = ready.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(step.effects, [Effect::StartEvent(started)]);
+            assert!(ready.refused().is_some());
+            for (entry, key) in [
+                (Entry::NoParty, keys::MAGATIA_NO_PARTY),
+                (Entry::NotLeader, keys::MAGATIA_NOT_LEADER),
+                (Entry::Busy, keys::MAGATIA_BUSY),
+            ] {
+                let mut asked = NpcScript::magatia(side, entry);
+                asked.begin();
+                let step = asked.respond(ScriptInput::Select(0)).unwrap();
+                assert_eq!(page_text(&step), text(key));
+            }
+            let mut asked = NpcScript::magatia(side, Entry::NotEligible);
+            asked.begin();
+            let step = asked.respond(ScriptInput::Select(0)).unwrap();
+            assert!(page_text(&step).contains("85"), "{step:?}");
+            let mut asked = NpcScript::magatia(side, Entry::Ready);
+            asked.begin();
+            let step = asked.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(page_text(&step), text(info));
+
+            // Inside, a member may retreat to the exit; in the lobby or on
+            // the exit there is nothing more to say.
+            let mut member = player(75);
+            member.stats.map_id = event.entry;
+            let mut inside = NpcScript::for_npc(host, &member).unwrap();
+            assert_eq!(question(&inside.begin()), text(retreat));
+            let step = inside.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(step.effects, [Effect::WarpToPortal(event.exit, 0)]);
+            for map in [event.lobby, event.exit] {
+                member.stats.map_id = map;
+                assert!(NpcScript::for_npc(host, &member).is_none(), "{map}");
+            }
+        }
     }
 
     #[test]

@@ -1809,6 +1809,18 @@ pub mod keys {
     pub const ELLIN_PRIZE_NO_ALTAIRE: &str = "ellin.prize.no_altaire";
     pub const ELLIN_PRIZE_NO_GLITTERING: &str = "ellin.prize.no_glittering";
     pub const ELLIN_PRIZE_NO_ROOM: &str = "ellin.prize.no_room";
+    pub const MAGATIA_ENTER: &str = "magatia.enter";
+    pub const MAGATIA_ABOUT: &str = "magatia.about";
+    pub const MAGATIA_NO_PARTY: &str = "magatia.no_party";
+    pub const MAGATIA_NOT_LEADER: &str = "magatia.not_leader";
+    pub const MAGATIA_NOT_ELIGIBLE: &str = "magatia.not_eligible";
+    pub const MAGATIA_BUSY: &str = "magatia.busy";
+    pub const MAGATIA_ROMEO_MENU: &str = "magatia.romeo.menu";
+    pub const MAGATIA_ROMEO_INFO: &str = "magatia.romeo.info";
+    pub const MAGATIA_ROMEO_RETREAT: &str = "magatia.romeo.retreat";
+    pub const MAGATIA_JULIET_MENU: &str = "magatia.juliet.menu";
+    pub const MAGATIA_JULIET_INFO: &str = "magatia.juliet.info";
+    pub const MAGATIA_JULIET_RETREAT: &str = "magatia.juliet.retreat";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3009,6 +3021,18 @@ mod tests {
                 keys::ELLIN_PRIZE_NO_ALTAIRE,
                 keys::ELLIN_PRIZE_NO_GLITTERING,
                 keys::ELLIN_PRIZE_NO_ROOM,
+                keys::MAGATIA_ENTER,
+                keys::MAGATIA_ABOUT,
+                keys::MAGATIA_NO_PARTY,
+                keys::MAGATIA_NOT_LEADER,
+                keys::MAGATIA_NOT_ELIGIBLE,
+                keys::MAGATIA_BUSY,
+                keys::MAGATIA_ROMEO_MENU,
+                keys::MAGATIA_ROMEO_INFO,
+                keys::MAGATIA_ROMEO_RETREAT,
+                keys::MAGATIA_JULIET_MENU,
+                keys::MAGATIA_JULIET_INFO,
+                keys::MAGATIA_JULIET_RETREAT,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

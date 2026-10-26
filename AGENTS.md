@@ -9,7 +9,7 @@ This repository is a Rust workspace for a MapleStory server plus a nested C++ cl
 - `agent_docs/npc-dialogue.md`: asset-backed conversations, runtime ownership, and future quest integration
 - `agent_docs/quests.md`: the v83 client-driven quest flow, supported requirements/actions, persistence, and rewards
 - `agent_docs/map-travel.md`: asset portal links, active beginner route, legacy map variants, and map/portal scripts
-- `agent_docs/party-quests.md`: instanced party events (the party quests of Kerning City, Henesys, Ludibrium, Orbis and Horntail's Trial Grounds, Delli's rescue, the Ludibrium Maze, Protecting Tylus, the Forest of Poison Haze, and the Pirate Ship): entry, tickets, copies of maps, leaving and ending
+- `agent_docs/party-quests.md`: instanced party events (the party quests of Kerning City, Henesys, Ludibrium, Orbis and Horntail's Trial Grounds, Delli's rescue, the Ludibrium Maze, Protecting Tylus, the Forest of Poison Haze, the Pirate Ship, and Romeo and Juliet): entry, tickets, copies of maps, leaving and ending
 - `agent_docs/zakum.md`: the way to Zakum: the chiefs' approval, Adobis's trials, the Breath of Lava, and the gate
 - `agent_docs/papulatus.md`: the fight with Papulatus in Ludibrium's Clocktower: the party's portal, the gates, the way out, the summon, and the win
 - `agent_docs/pianus.md`: Pianus in Aqua Road's Cave of Pianus: the two spawn points, their skills and Bloody Booms, and the drops

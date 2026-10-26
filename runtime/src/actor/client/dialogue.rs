@@ -89,6 +89,14 @@ impl ClientActor {
         if npc_id == net::npc_scripts::ELLIN && player.stats.map_id == net::events::ELLIN.lobby {
             return self.talk_about_event(net::events::EventKind::Ellin).await;
         }
+        for side in net::events::MagatiaSide::ALL {
+            let kind = net::events::EventKind::Magatia(side);
+            if npc_id == net::npc_scripts::magatia_host(side)
+                && player.stats.map_id == kind.event().lobby
+            {
+                return self.talk_about_event(kind).await;
+            }
+        }
         if npc_id == net::npc_scripts::GUON && player.stats.map_id == net::events::PIRATE.lobby {
             return self.talk_about_event(net::events::EventKind::Pirate).await;
         }

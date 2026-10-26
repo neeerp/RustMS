@@ -72,6 +72,22 @@ pub enum EventKind {
     /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
     /// (2042000) on the Carnival Field (`crate::carnival`).
     Carnival(u8),
+    /// Romeo and Juliet's party quest in Magatia, from one of its sides.
+    Magatia(MagatiaSide),
+}
+
+/// Magatia's two sides, each with its own way into Romeo and Juliet's
+/// party quest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum MagatiaSide {
+    /// Zenumist's, started at Romeo (2112004).
+    Zenumist,
+    /// Alcadno's, started at Juliet (2112003).
+    Alcadno,
+}
+
+impl MagatiaSide {
+    pub const ALL: [MagatiaSide; 2] = [MagatiaSide::Zenumist, MagatiaSide::Alcadno];
 }
 
 /// Nett's Pyramid's modes, in Duarte's order (Cosmic `PyramidMode`); each
@@ -1674,6 +1690,86 @@ pub const PIRATE: Event = Event {
     runs: 1,
 };
 
+/// Magatia's lobbies for Romeo and Juliet's party quest: Romeo's room on
+/// the Zenumist side, Juliet's on the Alcadno side.
+pub const ZENUMIST_LOBBY: i32 = 261_000_011;
+pub const ALCADNO_LOBBY: i32 = 261_000_021;
+/// The first of each side's copied maps (Map.nx 926100000 and 926110000);
+/// the others keep the same offsets from it.
+const ZENUMIST_ENTRY: i32 = 926_100_000;
+const ALCADNO_ENTRY: i32 = 926_110_000;
+/// How far each stage's map is from its side's first (Cosmic
+/// `MagatiaPQ_Z`): the library, the hall below it, the beakers, the hub of
+/// files, Yulete's room, the rope rooms' landing, and the boss's room.
+const MAGATIA_STAGE_OFFSETS: [i32; 7] = [0, 1, 100, 200, 203, 300, 401];
+/// The room both sides' maps let out on (its `forcedReturn`), whose portal
+/// leads back to the side's lobby.
+const MAGATIA_EXIT_OFFSET: i32 = 700;
+pub const ZENUMIST_STAGES: [i32; 7] = magatia_stages(ZENUMIST_ENTRY);
+pub const ALCADNO_STAGES: [i32; 7] = magatia_stages(ALCADNO_ENTRY);
+/// The party quest's own items (Cosmic `setEventExclusives`), taken from
+/// whoever leaves it.
+pub const MAGATIA_ITEMS: [i32; 6] = [
+    4_001_130, 4_001_131, 4_001_132, 4_001_133, 4_001_134, 4_001_135,
+];
+
+const fn magatia_stages(entry: i32) -> [i32; 7] {
+    let mut maps = [0; 7];
+    let mut i = 0;
+    while i < maps.len() {
+        maps[i] = entry + MAGATIA_STAGE_OFFSETS[i];
+        i += 1;
+    }
+    maps
+}
+
+/// Romeo and Juliet's party quest from one side (Cosmic `MagatiaPQ_Z` and
+/// `MagatiaPQ_A`, which differ only in their maps and NPCs): exactly four
+/// of a party, all of levels 71 to 85, in the side's lobby with their
+/// leader, go into their own copy of its maps for 45 minutes. With only
+/// four, anyone leaving ends it for all. The stages' EXP is Cosmic's.
+const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
+    Event {
+        lobby,
+        entrances: &[],
+        maps: entry..=entry + MAGATIA_EXIT_OFFSET,
+        entry,
+        entries: 1,
+        exit: entry + MAGATIA_EXIT_OFFSET,
+        levels: 71..=85,
+        spread: None,
+        team: 4..=4,
+        minutes: 45,
+        exp_per_stage: &[0, 10_000, 20_000, 0, 20_000, 20_000, 0],
+        stride: 1,
+        stage_maps: stages,
+        talk_clears: &[],
+        member_clears: &[],
+        clear_portals: &[],
+        gated: &[],
+        puzzles: 1..=0,
+        areas_taken: 0,
+        items: &MAGATIA_ITEMS,
+        passes: 0,
+        hand_ins: &[],
+        gates: false,
+        clear_map: None,
+        bonus: None,
+        blessings: &[],
+        squad: false,
+        gate: &[],
+        until_empty: false,
+        survive: None,
+        runs: 1,
+    }
+}
+
+/// Romeo and Juliet's party quest, by side.
+pub const MAGATIA: [Event; 2] = [
+    magatia(ZENUMIST_LOBBY, ZENUMIST_ENTRY, &ZENUMIST_STAGES),
+    magatia(ALCADNO_LOBBY, ALCADNO_ENTRY, &ALCADNO_STAGES),
+];
+
 /// The Mu Lung Dojo's entrance, where the notice board sends a challenger
 /// and its `dojang_exit` portal leads out (Cosmic's
 /// `MapId.MU_LUNG_DOJO_EXIT`, which is not `DOJO_EXIT`).
@@ -2041,7 +2137,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 35] = [
+    pub const ALL: [EventKind; 37] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2077,6 +2173,8 @@ impl EventKind {
         EventKind::Carnival(4),
         EventKind::Carnival(5),
         EventKind::Carnival(6),
+        EventKind::Magatia(MagatiaSide::Zenumist),
+        EventKind::Magatia(MagatiaSide::Alcadno),
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2102,6 +2200,7 @@ impl EventKind {
             EventKind::PyramidParty(mode) => &PYRAMID_PARTY[mode as usize],
             EventKind::PyramidTomb(mode) => &PYRAMID_TOMB_RUNS[mode as usize],
             EventKind::Carnival(room) => &CARNIVAL[usize::from(room.clamp(1, CARNIVAL_ROOMS) - 1)],
+            EventKind::Magatia(side) => &MAGATIA[side as usize],
         }
     }
 
@@ -3720,6 +3819,39 @@ mod tests {
         assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM_LAST), Some(6));
         assert_eq!(cleared_by_boss(ELLIN_STAGES[5], ELLIN_GOLEM), None);
         assert_eq!(cleared_by_boss(ELLIN_STAGES[4], ELLIN_GOLEM_LAST), None);
+    }
+
+    #[test]
+    fn romeo_and_juliet_take_exactly_four_of_71_to_85_and_end_when_any_one_leaves() {
+        for (side, lobby, stages) in [
+            (MagatiaSide::Zenumist, ZENUMIST_LOBBY, ZENUMIST_STAGES),
+            (MagatiaSide::Alcadno, ALCADNO_LOBBY, ALCADNO_STAGES),
+        ] {
+            let event = EventKind::Magatia(side).event();
+            assert_eq!(event.lobby, lobby);
+            let four: Vec<_> = (1..=4).map(|id| at(id, 75, lobby)).collect();
+            assert_eq!(event.team(1, &four), Some(vec![1, 2, 3, 4]));
+            assert!(event.team(1, &four[..3]).is_none());
+            let five: Vec<_> = (1..=5).map(|id| at(id, 75, lobby)).collect();
+            assert!(event.team(1, &five).is_none());
+            for level in [70, 86] {
+                let off = [&four[..3], &[at(4, level, lobby)]].concat();
+                assert!(event.team(1, &off).is_none(), "{level}");
+            }
+            let mut team = Team::new(event, 1, vec![1, 2, 3, 4]);
+            assert!(team.leave(4));
+            // Its maps are its own; the room it lets out on isn't.
+            assert!(stages.iter().all(|&map| event_map(map)));
+            assert_eq!(stages[0], event.entry);
+            assert!(!event_map(lobby) && !event_map(event.exit));
+            assert_eq!(event.exit, event.entry + 700);
+            assert_eq!(event.last_stage(), 7);
+            assert_eq!(event.stage_on(stages[1]), Some(2));
+            assert_eq!(event.duration(), scaled(Duration::from_secs(45 * 60)));
+            assert_eq!(event.items, MAGATIA_ITEMS);
+        }
+        assert_eq!(ZENUMIST_STAGES[0], 926_100_000);
+        assert_eq!(ALCADNO_STAGES[6], 926_110_401);
     }
 
     #[test]

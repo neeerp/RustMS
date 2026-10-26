@@ -1258,6 +1258,18 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             }
             outcome
         }
+        // Out of Romeo and Juliet's party quest, to the lobby of the side
+        // it was (Alcadno's exit has the same script as Zenumist's).
+        "rnj_exit" => {
+            use crate::events::{EventKind, MagatiaSide};
+            let side = MagatiaSide::ALL
+                .into_iter()
+                .find(|&side| EventKind::Magatia(side).event().exit == player.stats.map_id)?;
+            through(Effect::WarpToPortal(
+                EventKind::Magatia(side).event().lobby,
+                0,
+            ))
+        }
         "party3_roomout" => {
             let map = player.stats.map_id;
             let out = OPQ_ROOMS_OUT.iter().find(|&&(room, _)| room == map);
@@ -3093,6 +3105,22 @@ mod tests {
         };
         assert!(!text.is_empty());
         assert_eq!((*width, *height), (150, 5));
+    }
+
+    #[test]
+    fn romeo_and_juliets_exit_leads_to_its_sides_lobby() {
+        use crate::events::{EventKind, MagatiaSide, ALCADNO_LOBBY, ZENUMIST_LOBBY};
+        let mut player = player_with(&[]);
+        for (side, lobby) in [
+            (MagatiaSide::Zenumist, ZENUMIST_LOBBY),
+            (MagatiaSide::Alcadno, ALCADNO_LOBBY),
+        ] {
+            player.stats.map_id = EventKind::Magatia(side).event().exit;
+            let outcome = portal("rnj_exit", &player).unwrap();
+            assert_eq!(warp_of(&outcome), Some((lobby, 0)), "{side:?}");
+        }
+        player.stats.map_id = ZENUMIST_LOBBY;
+        assert!(portal("rnj_exit", &player).is_none());
     }
 
     #[test]
