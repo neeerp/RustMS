@@ -74,7 +74,7 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |

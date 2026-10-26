@@ -56,6 +56,10 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "pettamenessmin",
     "pettamenessmax",
 ];
+/// Dates under `Check.img/<id>/1`, which nothing reads: v83's completion
+/// check compares no dates (only the start check does), and the two quests
+/// with them (4306, 4309) carry the placeholder 2000-01-01 to 01-02.
+pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 /// Quest scripts (`startscript`/`endscript`) the server implements. A quest
 /// naming any other script is unsupported.
 pub const SCRIPTS: &[&str] = &[
@@ -392,7 +396,11 @@ pub fn classify(keys: &QuestKeys) -> Result<(), String> {
         &[START_REQUIREMENTS, START_TRIGGERS].concat(),
         "Check/0",
     )?;
-    unsupported(end, END_REQUIREMENTS, "Check/1")?;
+    unsupported(
+        end,
+        &[END_REQUIREMENTS, INERT_END_REQUIREMENTS].concat(),
+        "Check/1",
+    )?;
     unsupported(
         &keys.start_act,
         &[START_ACTIONS, INERT_ACTIONS].concat(),
@@ -993,6 +1001,9 @@ mod tests {
         // Or its questions, and the answers that are right.
         let quiz = keys(&["npc"], &["npc"], &["0", "1", "ask", "stop"], &["exp"]);
         assert_eq!(classify(&quiz), Ok(()));
+        // Completion dates are not checked.
+        let dated = keys(&["npc"], &["npc", "start", "end"], &[], &["exp"]);
+        assert_eq!(classify(&dated), Ok(()));
         // Or copies of its requirements, which nothing reads.
         let copied = keys(
             &["npc", "lvmin", "quest"],
