@@ -522,6 +522,8 @@ unsourced = [
     "portal.mini_dungeon.full",
     "time_gate.inactive",
     "time_gate.no_era",
+    "corba.menu",
+    "corba.choice",
     "statue.intro",
     "statue.menu",
     "crumbling.ask",

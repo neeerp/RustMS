@@ -18,7 +18,7 @@ use crate::items;
 use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
-use crate::scripts::{Effect, FRESH_MILK, MILK_BOTTLES};
+use crate::scripts::{Effect, FLIGHT_TO_TEMPLE, FRESH_MILK, MILK_BOTTLES, MINI_DRACO};
 use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
@@ -153,6 +153,9 @@ const ORIHALCON_HAMMER: i32 = 4031450;
 const ICE_VALLEY: (i32, u8) = (921100100, 1);
 /// The Time Gate at the edge of the Tera Forest.
 const TIME_GATE: i32 = 2083006;
+/// Corba at Leafre Station, who turns the player into a dragon for the
+/// flight to the Temple of Time.
+const CORBA: i32 = 2082003;
 /// Andy the Time Traveler, which wakes the Time Gate.
 const TIME_GATE_QUEST: i16 = 3718;
 /// Each era's map (arriving at its `left00`, id 1) and the Guardian Nex
@@ -2101,6 +2104,7 @@ impl NpcScript {
             TORY => tory_after(player, false),
             JEFF => Some(jeff(player)),
             TIME_GATE => Some(time_gate(player)),
+            CORBA => Some(corba()),
             SHANE => Some(shane(player)),
             LOUIS => Some(Self::new(
                 LOUIS,
@@ -4561,6 +4565,24 @@ fn time_gate(player: &Player) -> NpcScript {
         vec![Page::Menu {
             text: String::new(),
             choices,
+        }],
+    )
+}
+
+/// Corba (Cosmic's `2082003`): one choice, for anyone, that makes the
+/// player a dragon and sends them flying (report a014).
+fn corba() -> NpcScript {
+    NpcScript::new(
+        CORBA,
+        vec![Page::Menu {
+            text: text(keys::CORBA_MENU),
+            choices: vec![(
+                text(keys::CORBA_CHOICE),
+                vec![Page::Done(vec![
+                    Effect::ApplyItemBuff(MINI_DRACO),
+                    Effect::WarpToPortal(FLIGHT_TO_TEMPLE, 0),
+                ])],
+            )],
         }],
     )
 }
@@ -10934,6 +10956,22 @@ mod tests {
             player.quests.upsert(game::QuestRecord { quest_id, status });
         }
         player
+    }
+
+    #[test]
+    fn corba_makes_anyone_a_dragon_and_flies_them_off() {
+        let mut corba = NpcScript::for_npc(CORBA, &with_quests(&[])).unwrap();
+        corba.begin();
+        assert_eq!(
+            corba.respond(ScriptInput::Select(0)),
+            Some(Step {
+                prompt: None,
+                effects: vec![
+                    Effect::ApplyItemBuff(MINI_DRACO),
+                    Effect::WarpToPortal(FLIGHT_TO_TEMPLE, 0)
+                ],
+            })
+        );
     }
 
     #[test]

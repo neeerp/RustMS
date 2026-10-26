@@ -15,6 +15,15 @@ use std::time::Duration;
 const FREE_MARKET: i32 = 910000000;
 const HENESYS: i32 = 100000000;
 const LEAFRE_STATION_ENTRANCE: i32 = 240000100;
+/// Corba's dragon flight (report a014): the Mini Draco Transformation
+/// (Morph 16) that Corba casts and the flight's portals take off and put
+/// back on, Leafre Station, the flight's second map and the Temple of
+/// Time's road.
+pub const MINI_DRACO: i32 = 2210016;
+pub const FLIGHT_TO_TEMPLE: i32 = 200090500;
+const LEAFRE_STATION: i32 = 240000110;
+const FLIGHT_TO_MINAR: i32 = 200090510;
+const TEMPLE_ROAD: i32 = 270000100;
 /// The Haunted House's first hall, past the grounds' gate.
 const HAUNTED_HOUSE: i32 = 682000100;
 /// The Mushroom Castle's way in and through (Cosmic's `td_mushcastle`).
@@ -589,6 +598,11 @@ pub enum Effect {
     /// Play the portal sound, which the client leaves to the server for a
     /// scripted portal.
     PortalSound,
+    /// Put an item's effect on the player without taking one (Cosmic's
+    /// `useItem`), before any warp.
+    ApplyItemBuff(i32),
+    /// End an item's buff, if on, before any warp.
+    CancelItemBuff(i32),
     /// A line in pink chat, as a portal that won't let the player through
     /// says why.
     Pink(String),
@@ -732,6 +746,9 @@ const DISCIPLE: i32 = 9300156;
 pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
     let map_id = player.stats.map_id;
     match script {
+        // Leafre Station takes the dragon off whoever lands there, the
+        // flight's timer included (no source; by its name).
+        "undomorphdarco" => Some(vec![Effect::CancelItemBuff(MINI_DRACO)]),
         "TD_NC_title" | "TD_MC_title" => Some(
             THEME_BANNERS
                 .iter()
@@ -909,6 +926,42 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 Effect::WarpToPortal(
                     LEAFRE_STATION_ENTRANCE,
                     portal_id(LEAFRE_STATION_ENTRANCE, |portal| portal.name == "east00"),
+                ),
+            ],
+            block: false,
+            occupied: None,
+        },
+        // Corba's flight: into the Temple of Time on the dragon's last map,
+        // back out into the air, and down to the station on touching the
+        // ground (Cosmic's `templeenter`, `outTemple`, `undodraco`).
+        "templeenter" => ScriptOutcome {
+            effects: vec![
+                Effect::CancelItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    TEMPLE_ROAD,
+                    portal_id(TEMPLE_ROAD, |portal| portal.name == "out00"),
+                ),
+            ],
+            block: false,
+            occupied: None,
+        },
+        "outTemple" => ScriptOutcome {
+            effects: vec![
+                Effect::ApplyItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FLIGHT_TO_MINAR, 0),
+            ],
+            block: false,
+            occupied: None,
+        },
+        "undodraco" => ScriptOutcome {
+            effects: vec![
+                Effect::CancelItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(
+                    LEAFRE_STATION,
+                    portal_id(LEAFRE_STATION, |portal| portal.name == "po00"),
                 ),
             ],
             block: false,
@@ -2415,6 +2468,40 @@ mod tests {
                 Effect::PortalSound,
                 Effect::WarpToPortal(LEAFRE_STATION_ENTRANCE, 2)
             ]
+        );
+    }
+
+    #[test]
+    fn corbas_flight_takes_the_dragon_off_and_puts_it_back_on() {
+        let player = player_with(&[]);
+        let effects = |script| portal(script, &player).unwrap().effects;
+        assert_eq!(
+            effects("templeenter"),
+            [
+                Effect::CancelItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(TEMPLE_ROAD, 2)
+            ]
+        );
+        assert_eq!(
+            effects("outTemple"),
+            [
+                Effect::ApplyItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FLIGHT_TO_MINAR, 0)
+            ]
+        );
+        assert_eq!(
+            effects("undodraco"),
+            [
+                Effect::CancelItemBuff(MINI_DRACO),
+                Effect::PortalSound,
+                Effect::WarpToPortal(LEAFRE_STATION, 2)
+            ]
+        );
+        assert_eq!(
+            map_enter("undomorphdarco", &player),
+            Some(vec![Effect::CancelItemBuff(MINI_DRACO)])
         );
     }
 

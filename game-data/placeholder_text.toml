@@ -360,6 +360,8 @@
 "portal.mini_dungeon.full" = "[placeholder] Every one of these dungeons is taken. Come back a little later."
 "time_gate.inactive" = "[placeholder] The Time Gate is silent. It doesn't seem to work yet."
 "time_gate.no_era" = "[placeholder] The Time Gate won't open until Guardian Nex is beaten."
+"corba.menu" = "[placeholder] I can turn you into a dragon, and you can fly to the Temple of Time. Mind the ground, though: touch it and you're back here."
+"corba.choice" = "[placeholder] I want to become a dragon."
 "statue.intro" = "[placeholder] An old statue stands among the flowers. Something seems to call you into the forest behind it."
 "statue.menu" = "[placeholder] Where will you go?"
 "crumbling.ask" = "[placeholder] Do you want to leave the forest?"
