@@ -1863,6 +1863,7 @@ pub mod keys {
     pub const MAGATIA_THANKS_REHAB: &str = "magatia.thanks.rehab";
     pub const MAGATIA_THANKS_JAIL: &str = "magatia.thanks.jail";
     pub const MAGATIA_THANKS_FULL: &str = "magatia.thanks.full";
+    pub const MAGATIA_PIPE_DARK: &str = "magatia.pipe_dark";
     pub const PIRATE_MENU: &str = "pirate.menu";
     pub const PIRATE_ENTER: &str = "pirate.enter";
     pub const PIRATE_ABOUT: &str = "pirate.about";
@@ -3117,6 +3118,7 @@ mod tests {
                 keys::MAGATIA_THANKS_REHAB,
                 keys::MAGATIA_THANKS_JAIL,
                 keys::MAGATIA_THANKS_FULL,
+                keys::MAGATIA_PIPE_DARK,
                 keys::PIRATE_MENU,
                 keys::PIRATE_ENTER,
                 keys::PIRATE_ABOUT,

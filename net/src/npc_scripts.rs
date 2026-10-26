@@ -862,6 +862,10 @@ pub(crate) const ZAKUM_APPROVED: i16 = 32400;
 /// Adobis forged the player's Eyes of Fire: the trials are done (upstream
 /// quest 100201).
 pub(crate) const ZAKUM_TRIALS_DONE: i16 = 32401;
+/// Yulete's traces have shown the player the way into his lab: the pipe
+/// beyond Magatia's Alcadno side leads there (upstream quest 7770, which
+/// Quest.nx lacks).
+pub(crate) const YULETE_LAB_OPENED: i16 = 32600;
 const DOOR_OF_DIMENSION: i32 = 1061009;
 const LORD_JONATHAN: i32 = 1092019;
 /// How long a Corsair has to find the real Bart (Cosmic's `4jaerial`).
@@ -7538,11 +7542,15 @@ fn magatia_saved(side: MagatiaSide, escort_failed: bool, caught: bool) -> NpcScr
 }
 
 /// Yulete's traces (Cosmic `2112001`, `2112011`): beaten, he is cheered
-/// up, says he is sorry, and sends the member on to the last room.
+/// up, says he is sorry, and sends the member on to the last room, the
+/// way into his lab open to them from now on (`YULETE_LAB_OPENED`).
 fn yulete_traces(side: MagatiaSide) -> NpcScript {
     let on = vec![
         Page::Say(text(keys::MAGATIA_TRACES_SORRY)),
-        Page::Done(vec![Effect::WarpToPortal(side.thanks_room(), 0)]),
+        Page::Done(vec![
+            Effect::Mark(YULETE_LAB_OPENED),
+            Effect::WarpToPortal(side.thanks_room(), 0),
+        ]),
     ];
     NpcScript::new(
         traces(side),
@@ -15910,7 +15918,13 @@ mod tests {
             let sorry = traced.respond(ScriptInput::Select(0)).unwrap();
             assert_eq!(page_text(&sorry), text(keys::MAGATIA_TRACES_SORRY));
             let on = traced.respond(ScriptInput::Next).unwrap();
-            assert_eq!(on.effects, [Effect::WarpToPortal(thanks_room, 0)]);
+            assert_eq!(
+                on.effects,
+                [
+                    Effect::Mark(YULETE_LAB_OPENED),
+                    Effect::WarpToPortal(thanks_room, 0)
+                ]
+            );
 
             // The thanks, then one of the rewards and the way home.
             let lobby = EventKind::Magatia(side).event().lobby;
