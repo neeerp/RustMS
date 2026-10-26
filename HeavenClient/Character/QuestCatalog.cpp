@@ -65,6 +65,18 @@ namespace ms
 			info.repeat_interval = static_cast<int32_t>(start["interval"].get_integer(-1));
 			info.day_by_day = start["dayByDay"].get_integer() != 0;
 
+			// FUN_0071e1d6: a day left out counts as 0, so a key with no day
+			// set opens on none.
+			if (nl::node days = start["dayOfWeek"])
+			{
+				info.weekdays = 0;
+				const char* names[] = { "sun", "mon", "tue", "wed", "thu", "fri", "sat" };
+
+				for (int day = 0; day < 7; day++)
+					if (days[names[day]].get_integer() != 0)
+						info.weekdays |= 1 << day;
+			}
+
 			if (start["start"].data_type() != nl::node::type::none)
 				info.start_time = quest_date(start["start"].get_integer());
 

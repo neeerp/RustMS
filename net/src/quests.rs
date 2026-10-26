@@ -102,6 +102,17 @@ fn repeat_due(start: &StartRequirements, at: SystemTime, now: SystemTime) -> boo
     }
 }
 
+/// The day of the week of `now`, 0 (Sunday) to 6, in UTC. v83 tests
+/// `dayOfWeek` against the PC's own weekday (GetLocalTime), which the server
+/// can't know; it keeps to UTC, as for the quest dates.
+fn weekday(now: SystemTime) -> u32 {
+    let days = now
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() / (24 * 60 * 60));
+    // 1 January 1970 was a Thursday.
+    ((days + 4) % 7) as u32
+}
+
 /// Whether `player` may start `quest` with `npc_id`.
 pub fn check_start(
     quest: &QuestTemplate,
@@ -169,6 +180,12 @@ pub fn check_start(
     }
     let now = SystemTime::now();
     if start.not_before.is_some_and(|at| now < at) || start.not_after.is_some_and(|at| now > at) {
+        return Err(QuestRejection::Date);
+    }
+    if start
+        .weekdays
+        .is_some_and(|days| days & 1 << weekday(now) == 0)
+    {
         return Err(QuestRejection::Date);
     }
     if !pet_met(&start.pets, start.pet_closeness, player) {
@@ -882,6 +899,26 @@ mod tests {
         assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
         q.start.not_after = Some(SystemTime::now() + Duration::from_secs(3600));
         assert_eq!(check_start(&q, 2001, &p), Ok(()));
+    }
+
+    #[test]
+    fn start_keeps_to_its_weekdays() {
+        // 2026-10-25 was a Sunday, and 2000-01-01 a Saturday.
+        let day = |days: u64| SystemTime::UNIX_EPOCH + Duration::from_secs(days * 86_400 + 3_600);
+        assert_eq!(weekday(day(20_751)), 0);
+        assert_eq!(weekday(day(20_752)), 1);
+        assert_eq!(weekday(day(10_957)), 6);
+
+        let mut q = quest();
+        q.start.quests.clear();
+        let p = player(1, 0);
+        let today = 1 << weekday(SystemTime::now());
+        q.start.weekdays = Some(0x7f & !today);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
+        q.start.weekdays = Some(today);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        q.start.weekdays = Some(0);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Date));
     }
 
     #[test]

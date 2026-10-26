@@ -153,6 +153,15 @@ int main()
 		return 1;
 	}
 
+	// 8254 opens Monday to Friday; Pio's on every day.
+	const ms::QuestInfo* weekdays = catalog.find(8254);
+
+	if (!weekdays || weekdays->weekdays != 0x3E || pio->weekdays != 0xFF)
+	{
+		std::cerr << "Quest 8254's dayOfWeek did not parse as expected\n";
+		return 1;
+	}
+
 	// One Who's Touched the Sky is a title; Borrowing Sera's Mirror is not.
 	if (!catalog.is_title(29004) || catalog.is_title(1000))
 	{

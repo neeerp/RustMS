@@ -73,7 +73,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `dayOfWeek`, and the alert trigger `normalAutoStart` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `skill`, `npcAct`, `buffItemID` |
@@ -116,7 +116,13 @@ last hour it can be (v83 offers it from `start` to `end` inclusive). Nearly
 every quest with an `end` is an event that ended in 2005–2010, so, as in the
 client, neither side offers it (9625's one hour is on 31 December 2030). v83
 lets a server move a quest's window with SET_QUEST_TIME (151), which RustMS
-doesn't send.
+doesn't send. `dayOfWeek` lists the days (`sun` to `sat`, each "1") on which
+the quest can be started: 8248 on Saturdays, 8249 and 8251 on Sundays, 8254
+Monday to Friday. A day left out counts as 0, so a `dayOfWeek` with no day
+set opens on none. v83 tests it against the PC's own weekday (GetLocalTime,
+not the server's clock), so the client's guide follows the player's time
+zone, while the server, which can't know it, keeps to UTC's weekday; near
+midnight the two can differ, and the server's refusal wins.
 
 `pet`, on either side, lists pet items (`pet/<n>/id`), and the pet in the
 first summon slot must be one of them; another pet out doesn't count, as in
