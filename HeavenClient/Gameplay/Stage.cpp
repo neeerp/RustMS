@@ -151,6 +151,7 @@ namespace ms
 
 		jump_effect = nl::nx::effect["BasicEff.img"]["VerticalJump"];
 		fear_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["3"];
+		limited_sight = nl::nx::effect["MapEff.img"]["Viewrange"]["1"];
 		quest_alert.init();
 	}
 
@@ -414,7 +415,13 @@ namespace ms
 		clouds.draw(viewx, viewy, alpha);
 		// A weather's particles are on the clouds' layer.
 		weather.draw(viewx, viewy, alpha);
-		draw_fear(viewx, viewy, alpha);
+		// A LimitedView field's darkness and Fear's are at the same z
+		// (0xc006153a); with both, only where the two sights meet is seen.
+		if (sight::limits_view(mapinfo.get_fieldtype()))
+			draw_sight(limited_sight, sight::LIMITED, viewx, viewy, alpha);
+
+		if (player.has_buff(Buffstat::Id::FEAR))
+			draw_sight(fear_sight, sight::FEAR, viewx, viewy, alpha);
 		// The tips of the zones the player stands in are at z 0, above the
 		// field's own layers (FUN_008f3141).
 		tooltips.draw(viewpos);
@@ -434,28 +441,23 @@ namespace ms
 		overlay_effects.drawabove(Point<int16_t>(0, 0), alpha);
 	}
 
-	void Stage::draw_fear(double viewx, double viewy, float alpha) const
+	void Stage::draw_sight(const Texture &sight_texture, sight::Offset offset, double viewx, double viewy,
+						   float alpha) const
 	{
-		if (!player.has_buff(Buffstat::Id::FEAR))
-			return;
-
 		// v83 copies the sight onto a black layer with its top left this
 		// far from the player's feet, ignoring its origin.
-		Point<int16_t> sight = player.get_phobj().get_absolute(viewx, viewy, alpha) + Point<int16_t>(-80, -120);
-		Point<int16_t> size = fear_sight.get_dimensions();
+		Point<int16_t> sight = player.get_phobj().get_absolute(viewx, viewy, alpha) + Point<int16_t>(offset.x, offset.y);
+		Point<int16_t> size = sight_texture.get_dimensions();
 		int16_t width = Constants::Constants::get().get_viewwidth();
 		int16_t height = Constants::Constants::get().get_viewheight();
-		int16_t left = sight.x();
-		int16_t top = sight.y();
-		int16_t right = left + size.x();
-		int16_t bottom = top + size.y();
 
 		GraphicsGL &gl = GraphicsGL::get();
-		gl.drawrectangle(0, 0, width, top, 0.0f, 0.0f, 0.0f, 1.0f);
-		gl.drawrectangle(0, bottom, width, height - bottom, 0.0f, 0.0f, 0.0f, 1.0f);
-		gl.drawrectangle(0, top, left, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
-		gl.drawrectangle(right, top, width - right, size.y(), 0.0f, 0.0f, 0.0f, 1.0f);
-		fear_sight.draw(DrawArgument(sight + fear_sight.get_origin(), Color::cutout(1.0f)));
+
+		for (const sight::Strip &strip : sight::strips(sight.x(), sight.y(), size.x(), size.y(), width, height))
+			if (strip.width > 0 && strip.height > 0)
+				gl.drawrectangle(strip.left, strip.top, strip.width, strip.height, 0.0f, 0.0f, 0.0f, 1.0f);
+
+		sight_texture.draw(DrawArgument(sight + sight_texture.get_origin(), Color::cutout(1.0f)));
 	}
 
 	void Stage::update()
