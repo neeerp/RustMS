@@ -198,6 +198,14 @@ void rewards_are_listed_under_the_last_page()
 		"fame is listed after EXP");
 	fame.fame = -2;
 	require(fame.summary(0, false, false).empty(), "a loss of fame is not");
+
+	// Quest 2104: 500 EXP and 15 closeness for the pet out, listed last.
+	ms::QuestRewards tameness;
+	tameness.exp = 500;
+	tameness.pet_closeness = 15;
+	require(tameness.summary(0, false, false) ==
+			HEADER + "\r\n#fUI/UIWindow.img/QuestIcon/8/0# 500 exp\r\n#fUI/UIWindow.img/QuestIcon/9/0# 15\r\n\r\n#w",
+		"pet closeness follows EXP and fame under QuestIcon 9");
 }
 
 void pages_are_read_to_the_end()

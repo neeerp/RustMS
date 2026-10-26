@@ -118,6 +118,8 @@ pub struct Trace {
     pub cleared: usize,
     /// "Card get" effects (SHOW_ITEM_GAIN_INCHAT 0x0D).
     pub card_effects: usize,
+    /// This player's pets levelling up, by index (SHOW_ITEM_GAIN_INCHAT 4).
+    pub pet_levels: Vec<u8>,
     /// Portal sounds of scripted portals (SHOW_ITEM_GAIN_INCHAT 7).
     pub portal_sounds: usize,
     /// MONSTER_BOOK_SET_CARD: (went into the book, card, copies).
@@ -417,6 +419,10 @@ impl Trace {
                         self.items
                             .push((r.read_int().unwrap(), r.read_int().unwrap()));
                     }
+                }
+                4 => {
+                    r.read_byte().unwrap();
+                    self.pet_levels.push(r.read_byte().unwrap());
                 }
                 7 => self.portal_sounds += 1,
                 9 => self.cleared += 1,

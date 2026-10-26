@@ -117,6 +117,7 @@ pub const END_ACTIONS: &[&str] = &[
     "exp",
     "money",
     "pop",
+    "pettameness",
     "nextQuest",
     "item",
     "skill",
@@ -231,6 +232,9 @@ pub struct QuestTemplate {
     pub money: i32,
     /// Fame given on completion (`pop`); negative takes it.
     pub fame: i16,
+    /// Closeness given on completion to the first pet out (`pettameness`),
+    /// as Cosmic does; v83 lists it last in the rewards (QuestIcon 9).
+    pub pet_closeness: i16,
     pub next_quest: Option<i16>,
     /// `QuestInfo` `autoStart` and `autoComplete`: the client's quest alert
     /// offers the quest wherever the player is.
@@ -676,6 +680,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         exp,
         money: action_int("money")?.unwrap_or(0),
         fame: small(action_int("pop")?.unwrap_or(0), "fame")?,
+        pet_closeness: small(action_int("pettameness")?.unwrap_or(0), "pet closeness")?,
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
