@@ -2493,6 +2493,8 @@ impl NpcScript {
             "q2150s" => truth_of_the_rumor(2150),
             "q2151s" => truth_of_the_rumor(2151),
             "q2152s" => truth_of_the_rumor(2152),
+            "q2197e" => Some(tienks_greeting()),
+            "q2293s" => Some(the_last_song()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3573,6 +3575,32 @@ fn truth_of_the_rumor(quest: i16) -> Option<NpcScript> {
     let mut script = NpcScript::new(npc, vec![Page::Say(text(words))]);
     script.on_end = vec![Effect::FinishQuest(quest), Effect::GainExp(exp)];
     Some(script)
+}
+
+/// Tienk, the Monster Book Salesman (2197): Tienk (2006) in Lith Harbor
+/// greets a new Beginner, whose end script completes the quest with nothing
+/// given (Cosmic `2197.js`). The text is unsourced.
+const TIENK: i32 = 2006;
+const TIENKS_GREETING: i16 = 2197;
+
+fn tienks_greeting() -> NpcScript {
+    let mut script = NpcScript::new(TIENK, vec![Page::Say(text(keys::TIENK_GREETING))]);
+    script.on_end = vec![Effect::CompleteQuest(TIENKS_GREETING)];
+    script
+}
+
+/// The Last Song (2293), after Say "NO" to Plagiarism (2288): Maestro Rho
+/// (1052120) in the Kerning City subway asks about the last song the Spirit
+/// of Rock played, and the start script starts the quest. The data's end
+/// asks for nothing and gives nothing; Cosmic's guessing game at the end
+/// has no end script in the data to run from. The text is unsourced.
+const MAESTRO_RHO: i32 = 1052120;
+const THE_LAST_SONG: i16 = 2293;
+
+fn the_last_song() -> NpcScript {
+    let mut script = NpcScript::new(MAESTRO_RHO, vec![Page::Say(text(keys::RHO_LAST_SONG))]);
+    script.on_end = vec![Effect::StartQuest(THE_LAST_SONG)];
+    script
 }
 
 /// Help Me Find My Glasses (2186): Abel (1094001) in Nautilus Harbor lost
@@ -12032,6 +12060,20 @@ mod tests {
                 (npc, vec![Effect::FinishQuest(quest), Effect::GainExp(exp)])
             );
         }
+    }
+
+    #[test]
+    fn tienk_completes_and_rho_starts_the_last_song() {
+        let script = NpcScript::for_quest("q2197e", &player(5)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (TIENK, vec![Effect::CompleteQuest(TIENKS_GREETING)])
+        );
+        let script = NpcScript::for_quest("q2293s", &player(40)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (MAESTRO_RHO, vec![Effect::StartQuest(THE_LAST_SONG)])
+        );
     }
 
     #[test]

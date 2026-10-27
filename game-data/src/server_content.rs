@@ -602,6 +602,8 @@ pub mod keys {
     pub const RUMOR_AYAN: &str = "perion_rumor.ayan";
     pub const RUMOR_DANCES_WITH_BALROG: &str = "perion_rumor.dances_with_balrog";
     pub const RUMOR_BETTY: &str = "perion_rumor.betty";
+    pub const TIENK_GREETING: &str = "lith_tienk.greeting";
+    pub const RHO_LAST_SONG: &str = "kerning_rho.last_song";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3057,6 +3059,8 @@ mod tests {
             keys::RUMOR_AYAN,
             keys::RUMOR_DANCES_WITH_BALROG,
             keys::RUMOR_BETTY,
+            keys::TIENK_GREETING,
+            keys::RHO_LAST_SONG,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

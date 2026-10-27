@@ -387,6 +387,8 @@
 "perion_rumor.ayan" = "[placeholder] Ayan describes something hanging from the branches of the old tree."
 "perion_rumor.dances_with_balrog" = "[placeholder] Dances with Balrog describes a strange mark on the bark of the old tree."
 "perion_rumor.betty" = "[placeholder] Betty has studied such trees and explains how a stump comes alive on poisoned soil."
+"lith_tienk.greeting" = "[placeholder] Tienk sees the player already carries a Monster Book and wishes them luck on the journey."
+"kerning_rho.last_song" = "[placeholder] Maestro Rho asks whether the player remembers the last song the Spirit of Rock played, and warns there is only one chance to name it."
 "mc_letter.ask" = "[placeholder] The instructor has something to ask of a player who has made the job advancement."
 "mc_letter.later" = "[placeholder] The instructor says it's urgent; come back when there's time."
 "mc_letter.full" = "[placeholder] Make room in the Etc inventory first."
