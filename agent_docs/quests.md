@@ -272,6 +272,17 @@ for a second job, which neither the data nor `QuestInfo` says. It only tells
 the way; the Empty House's `TD_MC_first` checks level 30, not this quest (see
 `map-travel.md`). No source has `q2254s`, and the text of all of them is
 unsourced.
+Magatia's societies are joined through Han the Broker (2111007). After his
+"A Deal with the Broker" (3300), his end scripts `q3301e` and `q3303e` offer a
+choice of the jewel ores (4020000–4020008) the player holds two of, take two of
+the one picked and complete "Test from the Head of Zenumist/Alcadno Society"
+(Cosmic `3301.js`, `3303.js`); without any he refuses. The data's Korean start
+pages ask 30,000 and 50,000 mesos, which no end script takes. The capes that
+follow (3302, 3304) are the data's. Carson (2111000) and Maed (2111001) make a
+lost cape again: their start scripts `q3305s` and `q3306s` ask before starting
+"Re-acquiring Zenumist/Alcadno Cape", whose start and end checks and rewards
+(5 Emeralds or Topazes, 10 Leather, 10,000 mesos, every 4,320 minutes) are the
+data's. Their text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -722,5 +733,7 @@ copied into the source.
   `mushroom_james` (James found, disguised and escaping; Scarrs's spare),
   `mushroom_karcasa` (2251's charms, Karcasa, the Camel Cab's Meerkats and
   clock, Sahel 1, level 30),
+  `magatia_societies` (Han's ore choice for both tests, Carson's cape again,
+  Maed's ask and its no),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

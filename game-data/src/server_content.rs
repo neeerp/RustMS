@@ -534,6 +534,19 @@ pub mod keys {
     pub const CAMEL_CAB_PRIVATE: &str = "mc_camel_cab.private";
     pub const CAMEL_CAB_LEVEL_30: &str = "mc_camel_cab.level_30";
     pub const CAMEL_CAB_CASTLE_WAY: &str = "mc_camel_cab.castle_way";
+    /// Joining Zenumist and Alcadno (`q3301e`, `q3303e`) and re-acquiring
+    /// their capes (`q3305s`, `q3306s`).
+    pub const HAN_ZENUMIST_ORES: &str = "magatia_han.zenumist_ores";
+    pub const HAN_ALCADNO_ORES: &str = "magatia_han.alcadno_ores";
+    pub const HAN_NO_ORES: &str = "magatia_han.no_ores";
+    pub const HAN_ZENUMIST_WAIT: &str = "magatia_han.zenumist_wait";
+    pub const HAN_ALCADNO_WAIT: &str = "magatia_han.alcadno_wait";
+    pub const CARSON_CAPE_LOST: &str = "magatia_cape.carson_lost";
+    pub const CARSON_CAPE_ASK: &str = "magatia_cape.carson_ask";
+    pub const CARSON_CAPE_GO: &str = "magatia_cape.carson_go";
+    pub const MAED_CAPE_LOST: &str = "magatia_cape.maed_lost";
+    pub const MAED_CAPE_ASK: &str = "magatia_cape.maed_ask";
+    pub const MAED_CAPE_GO: &str = "magatia_cape.maed_go";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -2929,6 +2942,17 @@ mod tests {
             keys::CAMEL_CAB_PRIVATE,
             keys::CAMEL_CAB_LEVEL_30,
             keys::CAMEL_CAB_CASTLE_WAY,
+            keys::HAN_ZENUMIST_ORES,
+            keys::HAN_ALCADNO_ORES,
+            keys::HAN_NO_ORES,
+            keys::HAN_ZENUMIST_WAIT,
+            keys::HAN_ALCADNO_WAIT,
+            keys::CARSON_CAPE_LOST,
+            keys::CARSON_CAPE_ASK,
+            keys::CARSON_CAPE_GO,
+            keys::MAED_CAPE_LOST,
+            keys::MAED_CAPE_ASK,
+            keys::MAED_CAPE_GO,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,
