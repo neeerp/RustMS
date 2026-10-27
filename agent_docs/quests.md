@@ -344,6 +344,13 @@ for 1,700 EXP and ten Nautilus Return Scrolls (2030019). If the player
 clicks Abel holding another pair instead, Abel takes it for 1,000 EXP and
 five scrolls and completes the quest anyway (Cosmic `2186.js` and the
 bushes' scripts). The text is unsourced.
+In "Truth of the Rumor" (2144), Winston (1022006) wants to hear what five
+people know about the old tree: Blackbull (1020000), Manji (1022002),
+Ayan (1022007) and Dances with Balrog (1022000) in Perion, and Betty
+(1032104) in Ellinia. Each has a quest of their own (2148 to 2152) whose start
+script tells the player one thing and completes the quest as it starts,
+with the data's EXP (10, or 15 for Betty). Winston's end asks for all five.
+The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -821,5 +828,6 @@ copied into the source.
   taking 2124's box),
   `abels_glasses` (2186: a bush gives one pair at a time, then Abel's end
   script or his click, depending on the pair),
+  `truth_of_the_rumor` (2144 through its five tellers' start scripts),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

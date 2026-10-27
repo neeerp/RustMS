@@ -2488,6 +2488,11 @@ impl NpcScript {
             "q2126e" => Some(moppies_box(SAND_CREW_SUPPLY_AGAIN, MOPPIES_BOX_AGAIN)),
             "q2127e" => Some(to_the_desert()),
             "q2186e" => Some(abels_glasses_found()),
+            "q2148s" => truth_of_the_rumor(2148),
+            "q2149s" => truth_of_the_rumor(2149),
+            "q2150s" => truth_of_the_rumor(2150),
+            "q2151s" => truth_of_the_rumor(2151),
+            "q2152s" => truth_of_the_rumor(2152),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3547,6 +3552,27 @@ fn to_the_desert() -> NpcScript {
     let mut script = NpcScript::new(MANJI, vec![Page::Say(text(keys::MANJI_DESERT_MISSION))]);
     script.on_end = vec![Effect::CompleteQuest(TO_THE_DESERT)];
     script
+}
+
+/// Truth of the Rumor (2148 to 2152): while Winston's Truth of the Rumor
+/// (2144) is under way, each of five people in Perion and Ellinia tells
+/// the player one thing about the old tree; the start script completes its
+/// quest as it starts, with the data's EXP, and 2144 asks for all five
+/// (Cosmic `2148.js` to `2152.js`). The text is unsourced.
+const RUMORS: [(i16, i32, &str, i32); 5] = [
+    (2148, 1020000, keys::RUMOR_BLACKBULL, 10),
+    (2149, MANJI, keys::RUMOR_MANJI, 10),
+    (2150, 1022007, keys::RUMOR_AYAN, 10),
+    (2151, 1022000, keys::RUMOR_DANCES_WITH_BALROG, 10),
+    (2152, 1032104, keys::RUMOR_BETTY, 15),
+];
+
+/// One teller of the rumor: what they know, and the quest done.
+fn truth_of_the_rumor(quest: i16) -> Option<NpcScript> {
+    let &(_, npc, words, exp) = RUMORS.iter().find(|r| r.0 == quest)?;
+    let mut script = NpcScript::new(npc, vec![Page::Say(text(words))]);
+    script.on_end = vec![Effect::FinishQuest(quest), Effect::GainExp(exp)];
+    Some(script)
 }
 
 /// Help Me Find My Glasses (2186): Abel (1094001) in Nautilus Harbor lost
@@ -11989,6 +12015,23 @@ mod tests {
             read_through(script),
             (MANJI, vec![Effect::CompleteQuest(TO_THE_DESERT)])
         );
+    }
+
+    #[test]
+    fn each_teller_of_the_rumor_completes_its_quest() {
+        for (quest, npc, exp) in [
+            (2148, 1020000, 10),
+            (2149, MANJI, 10),
+            (2150, 1022007, 10),
+            (2151, 1022000, 10),
+            (2152, 1032104, 15),
+        ] {
+            let script = NpcScript::for_quest(&format!("q{quest}s"), &player(35)).unwrap();
+            assert_eq!(
+                read_through(script),
+                (npc, vec![Effect::FinishQuest(quest), Effect::GainExp(exp)])
+            );
+        }
     }
 
     #[test]

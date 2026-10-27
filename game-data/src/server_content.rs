@@ -597,6 +597,11 @@ pub mod keys {
     pub const NAUTILUS_ABEL_FOUND: &str = "nautilus_abel.found";
     pub const NAUTILUS_ABEL_OTHER: &str = "nautilus_abel.other";
     pub const NAUTILUS_ABEL_FULL: &str = "nautilus_abel.full";
+    pub const RUMOR_BLACKBULL: &str = "perion_rumor.blackbull";
+    pub const RUMOR_MANJI: &str = "perion_rumor.manji";
+    pub const RUMOR_AYAN: &str = "perion_rumor.ayan";
+    pub const RUMOR_DANCES_WITH_BALROG: &str = "perion_rumor.dances_with_balrog";
+    pub const RUMOR_BETTY: &str = "perion_rumor.betty";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3047,6 +3052,11 @@ mod tests {
             keys::NAUTILUS_ABEL_FOUND,
             keys::NAUTILUS_ABEL_OTHER,
             keys::NAUTILUS_ABEL_FULL,
+            keys::RUMOR_BLACKBULL,
+            keys::RUMOR_MANJI,
+            keys::RUMOR_AYAN,
+            keys::RUMOR_DANCES_WITH_BALROG,
+            keys::RUMOR_BETTY,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,
