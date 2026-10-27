@@ -512,6 +512,19 @@ pub mod keys {
     /// the way to the castle.
     pub const MC_SPORE_USED: &str = "item.mc_spore.used";
     pub const MC_THORNS_REMOVED: &str = "item.mc_thorns.removed";
+    /// A job instructor's recommendation letter to the Mushking Empire
+    /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
+    /// (`q2300e`-`q2304e`), the player answering him.
+    pub const MC_LETTER_ASK: &str = "mc_letter.ask";
+    pub const MC_LETTER_LATER: &str = "mc_letter.later";
+    pub const MC_LETTER_FULL: &str = "mc_letter.full";
+    pub const MC_LETTER_KINGDOM: &str = "mc_letter.kingdom";
+    pub const MC_LETTER_WRITTEN: &str = "mc_letter.written";
+    pub const MC_LETTER_TAKE_YOU: &str = "mc_letter.take_you";
+    pub const MC_LETTER_ROUTE: &str = "mc_letter.route";
+    pub const MC_OFFICER_LETTER: &str = "mc_officer.letter";
+    pub const MC_OFFICER_LETTER_REPLY: &str = "mc_officer.letter.reply";
+    pub const MC_OFFICER_WELCOME: &str = "mc_officer.welcome";
     /// The Secretary of Domestic Affairs (1300003) sends the player to
     /// look at the forest's barrier (`q2314s`) and at the castle's walls
     /// (`q2322s`), which the `investigate1` and `investigate2` portals let
@@ -2876,6 +2889,16 @@ mod tests {
             keys::MC_CASTLE_BLOCKED,
             keys::MC_SPORE_USED,
             keys::MC_THORNS_REMOVED,
+            keys::MC_LETTER_ASK,
+            keys::MC_LETTER_LATER,
+            keys::MC_LETTER_FULL,
+            keys::MC_LETTER_KINGDOM,
+            keys::MC_LETTER_WRITTEN,
+            keys::MC_LETTER_TAKE_YOU,
+            keys::MC_LETTER_ROUTE,
+            keys::MC_OFFICER_LETTER,
+            keys::MC_OFFICER_LETTER_REPLY,
+            keys::MC_OFFICER_WELCOME,
             keys::MC_FOREST_ASK,
             keys::MC_FOREST_DECLINE,
             keys::MC_FOREST_GO,

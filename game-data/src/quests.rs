@@ -68,7 +68,8 @@ pub const SCRIPTS: &[&str] = &[
     "q2234e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e",
     "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e", "q2314s", "q2322s", "q2332s",
     "q2332e", "q2333s", "q2333e", "q2334s", "q2335s", "q2342s", "q3108s", "q3523s", "q3524s",
-    "q3525s", "q3526s", "q3527s", "q3529s",
+    "q3525s", "q3526s", "q3527s", "q3529s", "q2300s", "q2300e", "q2301s", "q2301e", "q2302s",
+    "q2302e", "q2303s", "q2303e", "q2304s", "q2304e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's

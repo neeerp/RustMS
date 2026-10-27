@@ -1083,6 +1083,9 @@ impl OnNumber {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Page {
     Say(String),
+    /// Said by the player in the NPC's conversation (speaker bit 0x2), as
+    /// a quest's `Target.Speech` page.
+    Reply(String),
     /// Yes applies `on_yes` and moves on; no ends the conversation, saying
     /// `on_no` first if there is one.
     Ask {
@@ -2393,6 +2396,10 @@ impl NpcScript {
                 vec![Page::Done(vec![Effect::StartQuest(2238)])],
             )),
             "q2245s" => Some(tristan_tomb()),
+            "q2300s" | "q2301s" | "q2302s" | "q2303s" | "q2304s" => {
+                letter_for_the_kingdom(script, player)
+            }
+            "q2300e" | "q2301e" | "q2302e" | "q2303e" | "q2304e" => letter_read(script),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -2479,10 +2486,11 @@ impl NpcScript {
     /// the prompt (the runtime ends the conversation).
     pub fn respond(&mut self, input: ScriptInput) -> Option<Step> {
         match (&self.pages[self.page], input) {
-            (Page::Say(_) | Page::Act { .. } | Page::End(_), ScriptInput::Next) => {
-                Some(self.advance(Vec::new()))
-            }
-            (Page::Say(_), ScriptInput::Previous) if self.has_previous() => {
+            (
+                Page::Say(_) | Page::Reply(_) | Page::Act { .. } | Page::End(_),
+                ScriptInput::Next,
+            ) => Some(self.advance(Vec::new())),
+            (Page::Say(_) | Page::Reply(_), ScriptInput::Previous) if self.has_previous() => {
                 self.page -= 1;
                 Some(self.begin())
             }
@@ -2581,7 +2589,7 @@ impl NpcScript {
     }
 
     fn has_previous(&self) -> bool {
-        self.page > 0 && matches!(self.pages[self.page - 1], Page::Say(_))
+        self.page > 0 && matches!(self.pages[self.page - 1], Page::Say(_) | Page::Reply(_))
     }
 
     fn step(&self, mut effects: Vec<Effect>) -> Step {
@@ -2595,12 +2603,13 @@ impl NpcScript {
                     effects,
                 };
             }
-            Page::Say(text) => Prompt::Text(DialoguePage {
+            Page::Say(text) | Page::Reply(text) => Prompt::Text(DialoguePage {
                 npc_id,
                 text: text.clone(),
                 has_previous: self.has_previous(),
                 has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
-                player_speaks: self.player_speaks,
+                player_speaks: self.player_speaks
+                    || matches!(self.pages[self.page], Page::Reply(_)),
             }),
             Page::Act { text, effects: own } => {
                 effects.extend(own.iter().cloned());
@@ -2902,6 +2911,103 @@ fn tristan_tomb() -> NpcScript {
     script.refused = Some(text(keys::TRISTAN_ROOM_TAKEN));
     script
 }
+
+/// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
+/// writes a recommendation letter (4032375) to the Head Security Officer
+/// (1300005) in the Mushroom Forest Field. (quest, instructor), one per
+/// branch; 2305-2310, the same for the Cygnus Knights, are left out with
+/// them.
+const KINGDOM_LETTERS: [(i16, i32); 5] = [
+    (2300, 1022000),
+    (2301, 1032001),
+    (2302, 1052001),
+    (2303, 1012100),
+    (2304, KYRIN),
+];
+const KINGDOM_LETTER: i32 = 4032375;
+const HEAD_SECURITY_OFFICER: i32 = 1300005;
+/// The kingdom's opening scene (`TD_MC_Openning`), where an instructor
+/// can send the player straight away.
+const MUSHROOM_OPENING: i32 = 106020001;
+
+/// The quest a `q23xxs`/`q23xxe` script belongs to, and its instructor.
+fn kingdom_letter(script: &str) -> Option<(i16, i32)> {
+    let quest: i16 = script.get(1..5)?.parse().ok()?;
+    KINGDOM_LETTERS.iter().copied().find(|&(q, _)| q == quest)
+}
+
+/// `q2300s`-`q2304s` (all Edelstein's `q2300s`): once the player accepts,
+/// the instructor tells of the kingdom's trouble and hands over the
+/// letter, which starts the quest, then offers to send the player to the
+/// kingdom at once. Without a free ETC slot the instructor says so and
+/// nothing is given.
+fn letter_for_the_kingdom(script: &str, player: &Player) -> Option<NpcScript> {
+    let (quest, instructor) = kingdom_letter(script)?;
+    let accept = Page::Ask {
+        text: text(keys::MC_LETTER_ASK),
+        on_yes: Vec::new(),
+        on_no: Some(text(keys::MC_LETTER_LATER)),
+    };
+    if player.inventory.free(InventoryType::Etc) == 0 {
+        return Some(NpcScript::new(
+            instructor,
+            vec![accept, Page::Say(text(keys::MC_LETTER_FULL))],
+        ));
+    }
+    // One still holding a letter, from a quest given up, keeps it.
+    let mut letter = Vec::new();
+    if player.inventory.count(KINGDOM_LETTER) == 0 {
+        letter.push(Effect::GiveItem {
+            item_id: KINGDOM_LETTER,
+            quantity: 1,
+        });
+    }
+    letter.push(Effect::StartQuest(quest));
+    let mut script = NpcScript::new(
+        instructor,
+        vec![
+            accept,
+            Page::Say(text(keys::MC_LETTER_KINGDOM)),
+            Page::Act {
+                text: text(keys::MC_LETTER_WRITTEN),
+                effects: letter,
+            },
+            Page::Decide {
+                text: text(keys::MC_LETTER_TAKE_YOU),
+                on_yes: vec![Page::Done(vec![Effect::Warp(MUSHROOM_OPENING)])],
+                on_no: vec![Page::Say(text(keys::MC_LETTER_ROUTE))],
+            },
+        ],
+    );
+    script.inventory_full = Some(text(keys::MC_LETTER_FULL));
+    Some(script)
+}
+
+/// `q2300e`-`q2304e` (Edelstein's `q2300e`): the Head Security Officer
+/// reads the letter, the player answers, and he welcomes them, taking the
+/// letter for the quest and 1,200 EXP (the data has no rewards). Without
+/// the letter nothing is applied.
+fn letter_read(script: &str) -> Option<NpcScript> {
+    let (quest, _) = kingdom_letter(script)?;
+    let mut script = NpcScript::new(
+        HEAD_SECURITY_OFFICER,
+        vec![
+            Page::Say(text(keys::MC_OFFICER_LETTER)),
+            Page::Reply(text(keys::MC_OFFICER_LETTER_REPLY)),
+            Page::Say(text(keys::MC_OFFICER_WELCOME)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: KINGDOM_LETTER,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(quest),
+        Effect::GainExp(1200),
+    ];
+    Some(script)
+}
+
 /// The Mushking Empire's Secretary of Domestic Affairs (1300003), and the
 /// two quests he sends the player to look into: Exploring Mushroom Forest
 /// (1) and Over the Castle Walls (2). Their `investigate1` and
@@ -3001,11 +3107,6 @@ fn violettas_face() -> NpcScript {
     script
 }
 
-/// `q2342s`, The Recovered Royal Seal: for one still taking the seal to
-/// the Mushking (2331) without it (the quest asks that none be held),
-/// Violetta hands over the one the Prime Minister dropped, and the quest
-/// completes as it starts (Cosmic `2342.js`). Anyone else is only told
-/// that she keeps it.
 /// `q2335s`, Eliminating the Rest: Violetta gives the key the Prime
 /// Minister dropped (4032405), which opens the Security Room near
 /// Skyscraper 3 (`go_secretroom`, whose door completes the quest), and the
@@ -3034,6 +3135,11 @@ fn violettas_key() -> NpcScript {
     script
 }
 
+/// `q2342s`, The Recovered Royal Seal: for one still taking the seal to
+/// the Mushking (2331) without it (the quest asks that none be held),
+/// Violetta hands over the one the Prime Minister dropped, and the quest
+/// completes as it starts (Cosmic `2342.js`). Anyone else is only told
+/// that she keeps it.
 fn violettas_seal(player: &Player) -> NpcScript {
     if player.quests.state(SEAL_OF_THE_EMPIRE) != QuestState::Started
         || player.inventory.count(ROYAL_SEAL) > 0
@@ -10677,6 +10783,117 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn each_job_instructor_writes_a_letter_to_the_mushking_empire() {
+        let said = |step: Step| match step.prompt {
+            Some(Prompt::Text(page)) => (page.text, page.player_speaks),
+            other => panic!("{other:?}"),
+        };
+        let letter = Effect::GiveItem {
+            item_id: KINGDOM_LETTER,
+            quantity: 1,
+        };
+        for (quest, instructor) in KINGDOM_LETTERS {
+            let name = format!("q{quest}s");
+            let script = || NpcScript::for_quest(&name, &player(50)).unwrap();
+            let mut yes = script();
+            assert!(
+                matches!(yes.begin().prompt, Some(Prompt::YesNo { npc_id, .. }) if npc_id == instructor)
+            );
+            let kingdom = yes.respond(ScriptInput::Yes).unwrap();
+            assert!(kingdom.effects.is_empty());
+            let written = yes.respond(ScriptInput::Next).unwrap();
+            assert_eq!(written.effects, [letter.clone(), Effect::StartQuest(quest)]);
+            let ask = yes.respond(ScriptInput::Next).unwrap();
+            assert!(matches!(ask.prompt, Some(Prompt::YesNo { .. })) && ask.effects.is_empty());
+            let go = yes.respond(ScriptInput::Yes).unwrap();
+            assert_eq!(
+                (go.prompt, go.effects),
+                (None, vec![Effect::Warp(MUSHROOM_OPENING)])
+            );
+            let full = script().inventory_full().unwrap();
+            assert_eq!(said(full).0, text(keys::MC_LETTER_FULL));
+
+            let mut route = script();
+            route.begin();
+            route.respond(ScriptInput::Yes);
+            route.respond(ScriptInput::Next);
+            route.respond(ScriptInput::Next);
+            let told = route.respond(ScriptInput::No).unwrap();
+            assert!(told.effects.is_empty());
+            assert_eq!(said(told).0, text(keys::MC_LETTER_ROUTE));
+
+            let mut later = script();
+            later.begin();
+            let no = later.respond(ScriptInput::No).unwrap();
+            assert!(no.effects.is_empty());
+            assert_eq!(said(no).0, text(keys::MC_LETTER_LATER));
+        }
+
+        // One still holding a letter from a quest given up keeps it.
+        let mut holding = player(50);
+        holding
+            .inventory
+            .insert(InventoryType::Etc, 1, game::Item::stack(KINGDOM_LETTER, 1));
+        let mut script = NpcScript::for_quest("q2300s", &holding).unwrap();
+        script.begin();
+        script.respond(ScriptInput::Yes);
+        let written = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(written.effects, [Effect::StartQuest(2300)]);
+
+        // Without room the instructor only says so.
+        let mut full = player(50);
+        for slot in 1..=full.inventory.slot_limit(InventoryType::Etc) as i16 {
+            full.inventory
+                .insert(InventoryType::Etc, slot, game::Item::stack(4_000_000, 1));
+        }
+        let mut script = NpcScript::for_quest("q2300s", &full).unwrap();
+        script.begin();
+        let told = script.respond(ScriptInput::Yes).unwrap();
+        assert!(told.effects.is_empty());
+        assert_eq!(said(told).0, text(keys::MC_LETTER_FULL));
+        assert_eq!(script.respond(ScriptInput::Next), Some(Step::default()));
+    }
+
+    #[test]
+    fn the_head_patrol_officer_reads_the_letter_and_the_player_answers() {
+        for (quest, _) in KINGDOM_LETTERS {
+            let mut script = NpcScript::for_quest(&format!("q{quest}e"), &player(50)).unwrap();
+            let speakers: Vec<bool> = [
+                script.begin(),
+                script.respond(ScriptInput::Next).unwrap(),
+                script.respond(ScriptInput::Next).unwrap(),
+            ]
+            .into_iter()
+            .map(|step| match step.prompt {
+                Some(Prompt::Text(page)) => {
+                    assert_eq!(page.npc_id, HEAD_SECURITY_OFFICER);
+                    assert!(step.effects.is_empty());
+                    page.player_speaks
+                }
+                other => panic!("{other:?}"),
+            })
+            .collect();
+            assert_eq!(speakers, [false, true, false]);
+            let end = script.respond(ScriptInput::Next).unwrap();
+            assert_eq!(
+                (end.prompt, end.effects),
+                (
+                    None,
+                    vec![
+                        Effect::TakeItem {
+                            item_id: KINGDOM_LETTER,
+                            quantity: 1
+                        },
+                        Effect::CompleteQuest(quest),
+                        Effect::GainExp(1200),
+                    ]
+                )
+            );
+        }
+        assert_eq!(NpcScript::for_quest("q2305e", &player(50)), None, "Cygnus");
     }
 
     #[test]
