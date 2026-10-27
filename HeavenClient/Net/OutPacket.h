@@ -212,6 +212,10 @@ namespace ms
 			CHECK_CASH = 228,
 			CASHSHOP_OPERATION = 229,
 			COUPON_CODE = 230,
+			// The raise window (report b233).
+			RAISE_RECORD = 236,
+			RAISE_WINDOW = 237,
+			RAISE_FEED = 238,
 			USE_HAMMER = 260
 		};
 

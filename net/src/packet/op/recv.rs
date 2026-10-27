@@ -212,6 +212,11 @@ pub enum RecvOpcode {
     CheckCash = 0xE4,
     CashShopOperation = 0xE5,
     CouponCode = 0xE6,
+    /// The raise window asks for its record's value: the record (b233).
+    RaiseRecord = 0xEC,
+    /// An item dragged onto the raise window: its bag, its slot, and the
+    /// raise item (b233).
+    RaiseFeed = 0xEE,
     UseHammer = 0x104,
 
     UnusedOpcode = 0xFF,

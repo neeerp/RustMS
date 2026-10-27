@@ -299,3 +299,25 @@ add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
 [mobs.2230131]
 # Annoyed Zombie Mushroom (Studying the Mushroom Signals 2's): the same.
 add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
+
+[mobs.3210207]
+# Tick drops the Bird Feed 4031992 that grows the Timer's Egg for A Cute
+# Baby Bird (3250, Quest.nx QuestInfo.img/3250/1: from the Clocktower's
+# monsters). The pack has no drop for it; Cosmic's rate.
+add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+
+[mobs.3230306]
+# Chronos, likewise.
+add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+
+[mobs.4230113]
+# Tick-Tock, likewise.
+add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+
+[mobs.4230114]
+# Platoon Chronos, likewise.
+add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+
+[mobs.4230115]
+# Master Chronos, likewise.
+add = [{ item = 4031992, prob = 0.1, quest = 3250 }]

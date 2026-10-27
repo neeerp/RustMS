@@ -38,6 +38,7 @@
 #include "UIItemSearch.h"
 #include "UITradingRoom.h"
 #include "UIMiniGameCreate.h"
+#include "UIRaise.h"
 #include "UITransform.h"
 #include "UIVegaSpell.h"
 #include "UIViciousHammer.h"
@@ -1549,6 +1550,9 @@ namespace ms
 						// A game set opens a room of its game (0xa1d4d8).
 						else if (mini_game::is_game_set(item_id))
 							UIMiniGameCreate::open(item_id);
+						// An item that grows opens its window (0x4f0047).
+						else if (raise::opens(item_id))
+							UIRaise::open(item_id);
 
 						break;
 					default:

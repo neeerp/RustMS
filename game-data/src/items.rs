@@ -99,6 +99,26 @@ pub struct ItemInfo {
     /// What a box (2022xxx, 553xxxx) gives when opened (`reward`, beside
     /// `info`): one entry, picked by weight.
     pub reward: Vec<Reward>,
+    /// What a raise item (an Etc item with `info/questId`) grows.
+    pub raise: Option<RaiseInfo>,
+}
+
+/// A raise item's growth: the record it keeps in (`info/questId`), its
+/// stages (`grade`) of `exp` each, and the items it takes, each with what
+/// it adds (`consumeItem/N`: item, amount).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RaiseInfo {
+    pub record: i16,
+    pub exp: i32,
+    pub grade: i32,
+    pub feed: Vec<(i32, i32)>,
+}
+
+impl RaiseInfo {
+    /// The most it grows to: every stage full.
+    pub fn max(&self) -> i32 {
+        self.exp.saturating_mul(self.grade)
+    }
 }
 
 /// One of a box's prizes (`reward/N`): `count` of `item_id`, weighted by
@@ -637,6 +657,26 @@ impl ItemData {
                 }
             }
         }
+        if let Some(meta) = nx.child_by_name(node, "info")? {
+            if let Some(record) = nx.int_child(meta, "questId")? {
+                let mut feed = Vec::new();
+                if let Some(items) = nx.child_by_name(meta, "consumeItem")? {
+                    for entry in nx.child_indices(items)? {
+                        if let (Some(item), Some(amount)) =
+                            (nx.int_child(entry, "0")?, nx.int_child(entry, "1")?)
+                        {
+                            feed.push((item, amount));
+                        }
+                    }
+                }
+                info.raise = Some(RaiseInfo {
+                    record: i16::try_from(record).unwrap_or(0),
+                    exp: nx.int_child(meta, "exp")?.unwrap_or(0),
+                    grade: nx.int_child(meta, "grade")?.unwrap_or(0),
+                    feed,
+                });
+            }
+        }
         if let Some(rewards) = nx.child_by_name(node, "reward")? {
             // Nine cash bags store `item` as a string.
             while let Some(entry) = nx.child_by_name(rewards, &info.reward.len().to_string())? {
@@ -792,6 +832,7 @@ impl ItemData {
             sandglass: None,
             protect_time: 0,
             reward: Vec::new(),
+            raise: None,
         }))
     }
 }
@@ -1112,6 +1153,31 @@ mod tests {
             (16, (100100, 100), (1210102, 50))
         );
         assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
+    }
+
+    #[test]
+    fn raise_items_keep_their_growth_in_a_record() {
+        let Some(data) = data() else {
+            return;
+        };
+        // Timer's Egg: record 7067, three stages of 1,000, Bird Feed adds 100.
+        let egg = data.info(4220046).unwrap().unwrap().raise.unwrap();
+        assert_eq!(
+            egg,
+            RaiseInfo {
+                record: 7067,
+                exp: 1000,
+                grade: 3,
+                feed: vec![(4031992, 100)],
+            }
+        );
+        assert_eq!(egg.max(), 3000);
+        // The ring fragments write their record as a string.
+        assert_eq!(
+            data.info(4220089).unwrap().unwrap().raise.unwrap().record,
+            8252
+        );
+        assert!(data.info(4031992).unwrap().unwrap().raise.is_none());
     }
 
     #[test]

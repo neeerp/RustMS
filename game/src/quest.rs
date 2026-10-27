@@ -30,11 +30,13 @@ pub const INFO_QUESTS: &[i16] = &[
 /// the one in the Magic Library (20732, for "Maybe it's Grendel!", 20718),
 /// and an Aran's search of the Puppeteer's door (21761, for "The
 /// Puppeteer's Cave", 21728) and the Puppeteer's fall in Lith Harbor's
-/// Info Shop (21762, for "Gathering Some Strange Information", 21733).
+/// Info Shop (21762, for "Gathering Some Strange Information", 21733),
+/// and the growth of the Timer's Egg a player raises (7067, for "A Cute
+/// Baby Bird", 3250), which feeding it in its raise window adds to.
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
 pub const RECORDS: &[i16] = &[
-    2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732, 21761, 21762,
+    2311, 6331, 6364, 6371, 6401, 6411, 7067, 7081, 7760, 20731, 20732, 21761, 21762,
 ];
 
 /// A quest's state as the client and the quest data number it.
