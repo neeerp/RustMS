@@ -66,9 +66,9 @@ pub const INERT_END_REQUIREMENTS: &[&str] = &["start", "end"];
 pub const SCRIPTS: &[&str] = &[
     "q1021s", "q1021e", "q2214e", "q2215e", "q2228s", "q2238s", "q2245s", "q2232e", "q2233e",
     "q2234e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e",
-    "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e", "q2332s", "q2332e", "q2333s",
-    "q2333e", "q2334s", "q2335s", "q2342s", "q3108s", "q3523s", "q3524s", "q3525s", "q3526s",
-    "q3527s", "q3529s",
+    "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e", "q2314s", "q2322s", "q2332s",
+    "q2332e", "q2333s", "q2333e", "q2334s", "q2335s", "q2342s", "q3108s", "q3523s", "q3524s",
+    "q3525s", "q3526s", "q3527s", "q3529s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -113,11 +113,13 @@ pub const EXPLORER_QUESTS: &[i16] = &[
 ];
 /// Quests that complete once their own record reaches a count
 /// (`Check/1/infoNumber` is the quest itself, one `infoex` entry, cond 1):
-/// "Over the Castle Walls (4)" (2324), whose Thorn Remover sets it, and
-/// Where's Violetta? (2332), which the Wedding Hall's `findvioleta` sets.
+/// Exploring Mushroom Forest (1) (2314) and Over the Castle Walls (2)
+/// (2322), whose `investigate1` and `investigate2` portals set it, "Over
+/// the Castle Walls (4)" (2324), whose Thorn Remover sets it, and Where's
+/// Violetta? (2332), which the Wedding Hall's `findvioleta` sets.
 /// The server keeps the count as the record's only "kill"; see
 /// [`QuestTemplate::end_record`].
-pub const OWN_RECORD_QUESTS: &[i16] = &[2324, 2332];
+pub const OWN_RECORD_QUESTS: &[i16] = &[2314, 2322, 2324, 2332];
 /// Quests that complete once a record that is no quest reads a value
 /// (`Check/1 infoNumber` names it, `infoex` the value), which a script sets
 /// (`game::quest::RECORDS`): `(quest, record)`. See
@@ -1377,6 +1379,18 @@ mod tests {
             (walls.end_npc, walls.end_record, walls.exp),
             (1300004, Some(1), 3300)
         );
+        for (id, script, exp) in [(2314, "q2314s", 8300), (2322, "q2322s", 11000)] {
+            let investigation = catalog.quest(id).unwrap();
+            assert_eq!(
+                (
+                    investigation.start_script.as_deref(),
+                    investigation.end_npc,
+                    investigation.end_record,
+                    investigation.exp
+                ),
+                (Some(script), 1300003, Some(1), exp)
+            );
+        }
         let sen = catalog.quest(1033).unwrap();
         assert_eq!(
             sen.start.quests,

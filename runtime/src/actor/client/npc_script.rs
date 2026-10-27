@@ -112,6 +112,7 @@ impl ClientActor {
         let mut afterwards = Vec::new();
         let mut offer_skip = false;
         let mut open_npc = None;
+        let mut thought = None;
         let mut to_field = Vec::new();
         let mut warp = None;
         let mut name_guild = false;
@@ -173,6 +174,7 @@ impl ClientActor {
                 } => afterwards.push(effect::build_hint(text, *width, *height)?),
                 Effect::OfferTutorialSkip => offer_skip = true,
                 Effect::OpenNpc(npc_id) => open_npc = Some(*npc_id),
+                Effect::Think(text) => thought = Some(text.clone()),
                 Effect::BringOutMob { mob_id, at } => to_field.push(FieldRequest::BringOutMob {
                     mob_id: *mob_id,
                     at: *at,
@@ -731,6 +733,11 @@ impl ClientActor {
         }
         if let Some(npc_id) = open_npc {
             Box::pin(self.open_npc(npc_id)).await?;
+        }
+        if let Some(text) = thought {
+            if self.script.is_none() && self.conversation.is_none() {
+                Box::pin(self.start_script(NpcScript::thought(text))).await?;
+            }
         }
         for request in to_field {
             self.send_to_field(FieldMessage::FromClient {

@@ -136,6 +136,8 @@ pub struct Trace {
     pub prompts: Vec<(i32, u8)>,
     /// Their text, in the same order; a slide menu's is its menu.
     pub prompt_texts: Vec<String>,
+    /// Their speaker bytes, in the same order (0x2: the player speaks).
+    pub prompt_speakers: Vec<u8>,
     /// Each slide menu's art set.
     pub slide_sets: Vec<i32>,
     /// Maps warped to.
@@ -611,7 +613,7 @@ impl Trace {
             let npc = r.read_int().unwrap();
             let kind = r.read_byte().unwrap();
             self.prompts.push((npc, kind));
-            r.read_byte().unwrap();
+            self.prompt_speakers.push(r.read_byte().unwrap());
             if kind == 14 {
                 self.slide_sets.push(r.read_int().unwrap());
             }

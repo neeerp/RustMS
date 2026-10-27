@@ -1161,6 +1161,8 @@ pub struct NpcScript {
     inventory_full: Option<String>,
     /// Said when the player no longer may have what an answer applies.
     refused: Option<String>,
+    /// Its pages are the player's own thoughts, not the NPC's words.
+    player_speaks: bool,
 }
 
 impl NpcScript {
@@ -1172,7 +1174,17 @@ impl NpcScript {
             on_end: Vec::new(),
             inventory_full: None,
             refused: None,
+            player_speaks: false,
         }
+    }
+
+    /// One page the player thinks to themselves (speaker bit 0x2), as a
+    /// portal's script has them do. The NPC goes on the wire, but the
+    /// client shows the player.
+    pub fn thought(text: String) -> Self {
+        let mut script = Self::new(MAPLE_ADMINISTRATOR, vec![Page::Say(text)]);
+        script.player_speaks = true;
+        script
     }
 
     /// Heracle's script as it plays for `player`, who is in `guild`, if it
@@ -2370,6 +2382,18 @@ impl NpcScript {
                 vec![Page::Done(vec![Effect::StartQuest(2238)])],
             )),
             "q2245s" => Some(tristan_tomb()),
+            "q2314s" => Some(secretary_sends(
+                EXPLORING_MUSHROOM_FOREST,
+                keys::MC_FOREST_ASK,
+                Some(keys::MC_FOREST_DECLINE),
+                keys::MC_FOREST_GO,
+            )),
+            "q2322s" => Some(secretary_sends(
+                OVER_THE_CASTLE_WALLS,
+                keys::MC_WALLS_ASK,
+                None,
+                keys::MC_WALLS_GO,
+            )),
             "q2332s" => Some(NpcScript::new(
                 VIOLETTA,
                 vec![Page::Done(vec![Effect::StartQuest(
@@ -2565,6 +2589,7 @@ impl NpcScript {
                 text: text.clone(),
                 has_previous: self.has_previous(),
                 has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
+                player_speaks: self.player_speaks,
             }),
             Page::Act { text, effects: own } => {
                 effects.extend(own.iter().cloned());
@@ -2573,6 +2598,7 @@ impl NpcScript {
                     text: text.clone(),
                     has_previous: false,
                     has_next: self.page + 1 < self.pages.len() || !self.on_end.is_empty(),
+                    player_speaks: self.player_speaks,
                 })
             }
             Page::End(text) => Prompt::Text(DialoguePage {
@@ -2580,6 +2606,7 @@ impl NpcScript {
                 text: text.clone(),
                 has_previous: false,
                 has_next: false,
+                player_speaks: self.player_speaks,
             }),
             Page::Ask { text, .. } | Page::Decide { text, .. } => Prompt::YesNo {
                 npc_id,
@@ -2864,6 +2891,34 @@ fn tristan_tomb() -> NpcScript {
     script.refused = Some(text(keys::TRISTAN_ROOM_TAKEN));
     script
 }
+/// The Mushking Empire's Secretary of Domestic Affairs (1300003), and the
+/// two quests he sends the player to look into: Exploring Mushroom Forest
+/// (1) and Over the Castle Walls (2). Their `investigate1` and
+/// `investigate2` portals set the record each completes on
+/// (`net::scripts`).
+const DOMESTIC_SECRETARY: i32 = 1300003;
+const EXPLORING_MUSHROOM_FOREST: i16 = 2314;
+const OVER_THE_CASTLE_WALLS: i16 = 2322;
+
+/// `q2314s`, `q2322s`: the Secretary asks the player to look into
+/// something; a yes says where to go and starts `quest`, a no ends it
+/// (with `decline` said first, if there is one).
+fn secretary_sends(quest: i16, ask: &str, decline: Option<&str>, go: &str) -> NpcScript {
+    let mut script = NpcScript::new(
+        DOMESTIC_SECRETARY,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: Vec::new(),
+                on_no: decline.map(text),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(quest)];
+    script
+}
+
 /// Princess Violetta, in the Wedding Hall (106021600).
 const VIOLETTA: i32 = 1300002;
 /// The Royal Seal (4001318), which The Seal of the Empire (2331) takes to
@@ -10529,6 +10584,52 @@ mod tests {
     }
 
     #[test]
+    fn the_domestic_secretary_sends_the_player_to_look_into_the_barrier_and_the_walls() {
+        for (name, quest, decline) in [
+            (
+                "q2314s",
+                EXPLORING_MUSHROOM_FOREST,
+                Some(keys::MC_FOREST_DECLINE),
+            ),
+            ("q2322s", OVER_THE_CASTLE_WALLS, None),
+        ] {
+            let script = || NpcScript::for_quest(name, &with_quests(&[])).unwrap();
+            let mut yes = script();
+            assert!(
+                matches!(yes.begin().prompt, Some(Prompt::YesNo { npc_id, .. }) if npc_id == DOMESTIC_SECRETARY)
+            );
+            let go = yes.respond(ScriptInput::Yes).unwrap();
+            assert!(go.prompt.is_some() && go.effects.is_empty());
+            let end = yes.respond(ScriptInput::Next).unwrap();
+            assert_eq!(
+                (end.prompt, end.effects),
+                (None, vec![Effect::StartQuest(quest)])
+            );
+
+            let mut no = script();
+            no.begin();
+            let said = no.respond(ScriptInput::No).unwrap();
+            assert!(said.effects.is_empty());
+            let said = said.prompt.map(|prompt| match prompt {
+                Prompt::Text(page) => page.text,
+                other => panic!("{other:?}"),
+            });
+            assert_eq!(said, decline.map(text), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_thought_is_the_players_own() {
+        let mut thought = NpcScript::thought("Hmm.".into());
+        let Some(Prompt::Text(page)) = thought.begin().prompt else {
+            panic!("a page");
+        };
+        assert!(page.player_speaks && !page.has_next && page.text == "Hmm.");
+        let done = thought.respond(ScriptInput::Next).unwrap();
+        assert_eq!(done, Step::default());
+    }
+
+    #[test]
     fn each_job_instructor_gives_back_the_lost_memory() {
         for (quest, npc) in LOST_MEMORIES {
             let script = NpcScript::for_quest(&format!("q{quest}s"), &player(50)).unwrap();
@@ -13214,6 +13315,7 @@ mod tests {
             text: String::new(),
             has_previous: false,
             has_next: true,
+            player_speaks: false,
         });
         assert_eq!(input(&page, 0, 1, None, None), Some(ScriptInput::Next));
         assert_eq!(input(&page, 0, 0, None, None), None, "no previous page");

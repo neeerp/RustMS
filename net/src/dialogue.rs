@@ -78,6 +78,9 @@ pub struct DialoguePage {
     pub text: String,
     pub has_previous: bool,
     pub has_next: bool,
+    /// Said by the player rather than the NPC (speaker bit 0x2), as a
+    /// thought.
+    pub player_speaks: bool,
 }
 
 #[derive(Debug)]
@@ -109,6 +112,7 @@ impl Conversation {
             text: self.definition.pages[self.page].clone(),
             has_previous: self.page > 0,
             has_next: self.page + 1 < self.definition.pages.len(),
+            player_speaks: false,
         }
     }
 

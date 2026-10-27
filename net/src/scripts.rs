@@ -35,6 +35,14 @@ const HAUNTED_HOUSE: i32 = 682000100;
 const MUSHROOM_FOREST_FIELD: i32 = 106020000;
 const SPLIT_ROAD: i32 = 106020400;
 const CASTLE_WALL_EDGE: i32 = 106020501;
+/// The castle wall's edge before its thorns are cleared, where Over the
+/// Castle Walls (2) has the player look at the wall (`investigate2`).
+const THORNY_WALL_EDGE: i32 = 106020500;
+/// Exploring Mushroom Forest (1) and Over the Castle Walls (2): looking at
+/// the forest's barrier (`investigate1`, beside `obstacle`) and at the
+/// castle wall sets the record each completes on (`OWN_RECORD_QUESTS`).
+const EXPLORING_MUSHROOM_FOREST: i16 = 2314;
+const OVER_THE_CASTLE_WALLS: i16 = 2322;
 const CASTLE_EAST_GATE: i32 = 106021300;
 const POISON_SPORE: i32 = 4000507;
 /// Where the `obstacle` portal is, and the scripted items that open the
@@ -437,6 +445,9 @@ pub enum Effect {
     /// Open an NPC's conversation without a click, as a portal does; the
     /// NPC needn't be on the map. Not over a conversation already open.
     OpenNpc(i32),
+    /// A page the player thinks to themselves (`NpcScript::thought`), as a
+    /// portal shows one. Not over a conversation already open.
+    Think(String),
     SetHp(i16),
     GiveItem {
         item_id: i32,
@@ -1095,10 +1106,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             occupied: None,
         },
         "obstacle" => refused(keys::MC_OBSTACLE_BLOCKED),
-        // Over the castle wall, once the Thorn Remover quest is done.
+        // Over the castle wall, once the Thorn Remover quest is done; up to
+        // its thorns while Over the Castle Walls (2) has the player look at
+        // it.
         "gotocastle" if quest(2324) == QuestState::Completed => {
             through(Effect::Warp(CASTLE_WALL_EDGE))
         }
+        "gotocastle" if quest(OVER_THE_CASTLE_WALLS) == QuestState::Started => {
+            through(Effect::Warp(THORNY_WALL_EDGE))
+        }
+        // The barrier and the wall, looked at: the quest's record turns to
+        // 1, and the player thinks it over under a balloon
+        // (`OnUserEff.img/normalEffect/mushroomcastle/chatBalloon<n>`).
+        "investigate1" => investigate(player, EXPLORING_MUSHROOM_FOREST, 1),
+        "investigate2" => investigate(player, OVER_THE_CASTLE_WALLS, 2),
         "gotocastle" => refused(keys::MC_CASTLE_BLOCKED),
         "TD_MC_jump" => through(Effect::Warp(CASTLE_WALL_EDGE)),
         "TD_MC_Egate" => through(Effect::WarpToPortal(
@@ -2012,6 +2033,35 @@ fn through(warp: Effect) -> ScriptOutcome {
     }
 }
 
+/// `investigate1`, `investigate2`: on `quest` and not yet having looked,
+/// the player looks, which sets its record to 1; otherwise nothing.
+fn investigate(player: &Player, quest: i16, balloon: u8) -> ScriptOutcome {
+    let looked = player.quests.kills(quest).first() == Some(&1);
+    let effects = if player.quests.state(quest) == QuestState::Started && !looked {
+        let key = match quest {
+            EXPLORING_MUSHROOM_FOREST => keys::MC_BARRIER_INVESTIGATED,
+            _ => keys::MC_WALLS_INVESTIGATED,
+        };
+        vec![
+            Effect::QuestRecord {
+                quest_id: quest,
+                count: 1,
+            },
+            Effect::Think(content::text().get(key, &[])),
+            Effect::AvatarEffect(format!(
+                "Effect/OnUserEff.img/normalEffect/mushroomcastle/chatBalloon{balloon}"
+            )),
+        ]
+    } else {
+        Vec::new()
+    };
+    ScriptOutcome {
+        effects,
+        block: false,
+        occupied: None,
+    }
+}
+
 /// A portal that opens `npc`'s conversation.
 fn opens(npc: i32) -> ScriptOutcome {
     ScriptOutcome {
@@ -2564,9 +2614,45 @@ mod tests {
             through(Effect::Warp(106020501))
         );
         assert_eq!(
+            castle(&[(2322, QuestState::Started)]).effects,
+            through(Effect::Warp(106020500))
+        );
+        assert!(pink(&castle(&[(2322, QuestState::Completed)])));
+        assert_eq!(
             portal("TD_MC_jump", &player_with(&[])).unwrap().effects,
             through(Effect::Warp(106020501))
         );
+    }
+
+    #[test]
+    fn looking_at_the_barrier_and_the_wall_sets_their_quests_records() {
+        for (script, quest, key, balloon) in [
+            ("investigate1", 2314, keys::MC_BARRIER_INVESTIGATED, 1),
+            ("investigate2", 2322, keys::MC_WALLS_INVESTIGATED, 2),
+        ] {
+            let mut player = player_with(&[(quest, QuestState::Started)]);
+            let outcome = portal(script, &player).unwrap();
+            assert_eq!(
+                outcome.effects,
+                [
+                    Effect::QuestRecord {
+                        quest_id: quest,
+                        count: 1
+                    },
+                    Effect::Think(content::text().get(key, &[])),
+                    Effect::AvatarEffect(format!(
+                        "Effect/OnUserEff.img/normalEffect/mushroomcastle/chatBalloon{balloon}"
+                    )),
+                ]
+            );
+            assert!(!outcome.block);
+            // Once looked at, or off the quest, nothing more.
+            *player.quests.kills_mut(quest).unwrap() = vec![1];
+            assert_eq!(portal(script, &player).unwrap().effects, []);
+            for quests in [&[][..], &[(quest, QuestState::Completed)]] {
+                assert_eq!(portal(script, &player_with(quests)).unwrap().effects, []);
+            }
+        }
     }
 
     /// A player on Stop the Wedding with `kills` of each Yeti brother.

@@ -245,7 +245,8 @@ nothing. A script returns effects that the client actor sends:
 | `photoOut`, `StudioZone_Out`, `outBabyBird` | An event map's exit: portal sound, back to where its invitation was used (else Henesys), forget it |
 | `TD_MC_first` | The Empty House's (`100000002`) way to the Mushroom Kingdom: portal sound, warp to `106020000`, once 2260 is completed or any of 2300-2310 is taken; else a pink line |
 | `obstacle` | The poisonous mushrooms on `106020300`: once a Killer Mushroom Spore opened them (marker 32500, see `inventory.md`, "Scripted items"), portal sound, warp to `106020400` portal `left00`; with a Poison Spore (`4000507`), a pink line, portal sound, take one, the same warp; else a pink line |
-| `gotocastle` | Split Road of Destiny's way over the castle wall: portal sound, warp to `106020501`, once 2324 is completed (with the Secretary of Magic, after the Thorn Remover); else a pink line |
+| `gotocastle` | Split Road of Destiny's way over the castle wall: portal sound, warp to `106020501`, once 2324 is completed (with the Secretary of Magic, after the Thorn Remover); while 2322 is under way, to the Thorny Wall's Edge (`106020500`), where the wall is looked at (no source names that map's way in; assumed); else a pink line |
+| `investigate1`, `investigate2` | The barrier on `106020300` and the castle wall on `106020500`: while 2314 or 2322 is under way and its record is not yet 1, set it to 1 (`Effect::QuestRecord`), show the player's thought (`Effect::Think`, the speaker's 0x2 bit) and the `mushroomcastle/chatBalloon1` or `2` effect; else nothing |
 | `TD_MC_jump` | Portal sound, warp to `106020501` |
 | `TD_MC_Egate` | Portal sound, warp to `106021300` portal `right00` |
 | `subway_in2` | Kerning City's ticketing booth (`103000100` `in00`) into the tunnels: portal sound, warp to `103000101` portal `out00` |

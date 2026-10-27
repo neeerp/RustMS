@@ -230,6 +230,11 @@ record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
 so it is saved and sent as its progress string ("001"). The Thorn Remover the
 quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
 items"), and the Secretary of Magic (1300004) then completes the quest.
+"Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
+work the same way. The Domestic Secretary's (1300003) start scripts `q2314s`
+and `q2322s` send the player off; looking at the barrier (`investigate1`) or
+the wall (`investigate2`, reached by `gotocastle` while 2322 is under way)
+sets the record, and she then completes the quest (see `map-travel.md`).
 "Where's Violetta?" (2332) works the same way: entering the Wedding Hall
 (`findvioleta`) sets it, and Violetta's end script `q2332e` then completes
 it (see [party quests](./party-quests.md#the-wedding-hall), with her other
@@ -662,5 +667,6 @@ copied into the source.
   and `quest_info` (Sejan's Test through Ariant's four houses, kept across
   a relogin, and a string one delivery short refused), `shaman_rocks`
   (2236's six rocks, the swamp's two told apart, each charmed once),
+  `mushroom_forest` (2314's barrier and 2322's wall, each looked at once),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

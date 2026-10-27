@@ -512,6 +512,17 @@ pub mod keys {
     /// the way to the castle.
     pub const MC_SPORE_USED: &str = "item.mc_spore.used";
     pub const MC_THORNS_REMOVED: &str = "item.mc_thorns.removed";
+    /// The Secretary of Domestic Affairs (1300003) sends the player to
+    /// look at the forest's barrier (`q2314s`) and at the castle's walls
+    /// (`q2322s`), which the `investigate1` and `investigate2` portals let
+    /// the player think over.
+    pub const MC_FOREST_ASK: &str = "mc_secretary.forest.ask";
+    pub const MC_FOREST_DECLINE: &str = "mc_secretary.forest.decline";
+    pub const MC_FOREST_GO: &str = "mc_secretary.forest.go";
+    pub const MC_WALLS_ASK: &str = "mc_secretary.walls.ask";
+    pub const MC_WALLS_GO: &str = "mc_secretary.walls.go";
+    pub const MC_BARRIER_INVESTIGATED: &str = "portal.investigate1";
+    pub const MC_WALLS_INVESTIGATED: &str = "portal.investigate2";
     /// Gated portals of a004's section 3: the Temple of Time's lanes
     /// (`timeQuest`), Ereve's Training Forest (`enterDisguise0`), Magatia's
     /// secret doors (`secretDoor`), Ariant's palace (`ariant_castle`)
@@ -2864,6 +2875,13 @@ mod tests {
             keys::MC_CASTLE_BLOCKED,
             keys::MC_SPORE_USED,
             keys::MC_THORNS_REMOVED,
+            keys::MC_FOREST_ASK,
+            keys::MC_FOREST_DECLINE,
+            keys::MC_FOREST_GO,
+            keys::MC_WALLS_ASK,
+            keys::MC_WALLS_GO,
+            keys::MC_BARRIER_INVESTIGATED,
+            keys::MC_WALLS_INVESTIGATED,
             keys::TIME_LANE_LOST,
             keys::DISGUISE_NO_PERMIT,
             keys::SECRET_DOOR_LOCKED,
