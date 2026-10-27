@@ -53,6 +53,42 @@ pub const RECORDS: &[i16] = &[
     7081, 7760, 20731, 20732, 21619, 21620, 21760, 21761, 21762, 21763, 21764, 21765,
 ];
 
+/// The timed titles (`QuestInfo` `timeLimit2`): Celebrity, Diligent
+/// Explorer, Veteran Hunter and Donation King. Their started record is the
+/// date they end, "yyyyMMddHHmmss" (`end_date`), which the client's Quest Log
+/// counts down to (#Qdaylimit#..., 0x4e6a03).
+pub const DATED_QUESTS: &[i16] = &[29002, 29003, 29400, 29503];
+
+/// A timed title's end as its started record: "yyyyMMddHHmmss" in UTC, the
+/// clock the server's FILETIMEs give the client.
+pub fn end_date(at: SystemTime) -> String {
+    let seconds = at
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() as i64);
+    let (days, time) = (seconds.div_euclid(86_400), seconds.rem_euclid(86_400));
+    // Howard Hinnant's civil_from_days.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let day_of_era = z.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}{month:02}{day:02}{:02}{:02}{:02}",
+        time / 3600,
+        time / 60 % 60,
+        time % 60
+    )
+}
+
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuestState {
@@ -310,6 +346,16 @@ pub fn decode_kills(progress: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_timed_titles_end_is_its_utc_date_and_time() {
+        use std::time::{Duration, UNIX_EPOCH};
+        let at = |seconds| UNIX_EPOCH + Duration::from_secs(seconds);
+        assert_eq!(end_date(at(1_234_567_890)), "20090213233130");
+        assert_eq!(end_date(UNIX_EPOCH), "19700101000000");
+        assert_eq!(end_date(at(951_782_400)), "20000229000000");
+        assert_eq!(end_date(at(1_798_761_599)), "20261231235959");
+    }
 
     #[test]
     fn state_tracks_start_completion_and_removal() {

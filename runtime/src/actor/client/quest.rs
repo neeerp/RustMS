@@ -17,7 +17,7 @@ use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest
 use net::skills;
 use net::FieldRequest;
 use packet::Packet;
-use std::time::{Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 use tracing::{debug, warn};
 
 /// A quest change to commit together with the player.
@@ -401,7 +401,8 @@ impl ClientActor {
         if let Some(QuestChange::Start(template)) = change {
             // Hunting quests start with every kill count at 0 ("000"), info
             // quests with their first info string, unless a script set the
-            // string along with the start (`Effect::SetQuestInfo`).
+            // string along with the start (`Effect::SetQuestInfo`), and timed
+            // titles with the date they end.
             let preset = next.quests.state(template.id) == QuestState::Started
                 && self.in_game()?.player.quests.state(template.id) != QuestState::Started;
             if !preset {
@@ -409,7 +410,13 @@ impl ClientActor {
                     quest_id: template.id,
                     status: QuestStatus::Started {
                         kills: vec![0; template.end_mobs.len()],
-                        info: template.start_info.clone(),
+                        info: template.start_info.clone().or_else(|| {
+                            template.time_limit2.map(|seconds| {
+                                game::quest::end_date(
+                                    SystemTime::now() + Duration::from_secs(u64::from(seconds)),
+                                )
+                            })
+                        }),
                     },
                 });
             }

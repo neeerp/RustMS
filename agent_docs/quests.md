@@ -698,6 +698,15 @@ time. The clocks stay up across map and channel changes, and a new login
 clears them. The gauge measures against `timeLimit`, so with
 `RUSTMS_EVENT_SCALE` the harness's clocks start nearly empty.
 
+The timed titles have a `timeLimit2` instead, in seconds: Celebrity (29002),
+Diligent Explorer (29003) and Veteran Hunter (29400) 30 days, Donation King
+(29503) an hour (`QuestTemplate::time_limit2`). These have no clock. Their
+started record is the date they end, "yyyyMMddHHmmss" in UTC
+(`game::quest::end_date`, kept as it stands for `DATED_QUESTS`), which the
+server writes when the quest starts. The Quest Log counts down to it
+(`#Q` below). Nothing ends the quest when that date passes yet: the reference
+client's own handling of it is unknown.
+
 ## Info strings
 
 Some quests keep a string of their own instead of kill counts: `Act/0/info`
@@ -1000,6 +1009,20 @@ formatter (0x99dd54) shows them (HeavenClient `QuestRecordEx::token`):
 | `perDays`, `gaugeDays` | the record's `CNT` (0 unless `LT`, `DONE`, `PT` and `CNT` are all there, 0x4e6b2f) against `QuestInfo` `timeLimit2`'s whole days times 0.9, truncated: 27 for 30 days (0x9a0fe3, 0x99fd26) |
 | anything else (`date`) | the value as it stands |
 
+Two other tags read the timed titles' time (0x9a1189, 0x9a13cc), each
+`%d`; any other key prints 0:
+
+| Token | Value |
+|---|---|
+| `#Qdaylimit#`, `#Qhourlimit#`, `#Qminlimit#`, `#Qseclimit#` | the time left until the end date in the quest's started record, never below 0, in whole days, then the hours, minutes and seconds past them. A record that isn't 14 characters counts as ending on 2079-01-01, the client's "never" |
+| `#Dday#`, `#Dhour#`, `#Dmin#`, `#Dsec#` | the record's `PT`, the seconds played today, split the same way; once the record's `DONE` is set, all of `QuestInfo` `dailyPlayTime` |
+| `#Dminhour#` | `dailyPlayTime`'s hours: a key starting with "min" drops it and reads `dailyPlayTime` |
+| `#Dcount#`, `#Ddaylimit#` | the record's `CNT` and its need, as `perDays` |
+
+`PT`, `DONE` and `CNT`, like `perDays`' `CNT`, are 0 unless `LT`, `DONE`,
+`PT` and `CNT` are all there. HeavenClient counts down against its own
+clock in UTC, where the client uses the server's time.
+
 `scnt`, `perPqS` and `gaugePqS` read every party quest's record, not the
 quest's own: PQ Mania (29000) shows them. Quest Specialist (29001) shows
 the three quest counts, 29300-29304 and 10395-10398 show `level`, and
@@ -1016,8 +1039,8 @@ window draw as the frame and its slices (`QuestTextImages`,
 `QuestRecordEx::gauge_slices`). PQ Mania's and Quest Specialist's tokens read the need from
 `Check.img` itself, as the client does, not from the supported list. The client would
 divide by zero on a `popG` of 0 in `perPop` and on a `timeLimit2` under a
-day; HeavenClient shows 0 there. Nothing writes these titles' records
-yet: the original server's timing is unknown (Cosmic has none), and
+day; HeavenClient shows 0 there. Apart from the end date, nothing writes
+these titles' records yet: the original server's timing is unknown (Cosmic has none), and
 29002, 29400 and 29500-29503 wait on their start scripts.
 
 So far only the party quests keep records, on their info quests 1200-1206

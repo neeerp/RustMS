@@ -779,6 +779,37 @@ pub async fn backdate_quest(
     .await
 }
 
+/// The saved record of character `character_id`'s quest `quest_id` (kill
+/// counts, info string or end date); None if it has none.
+pub async fn quest_progress(
+    character_id: i32,
+    quest_id: i16,
+) -> Result<Option<String>, HarnessError> {
+    #[derive(QueryableByName)]
+    struct Row {
+        #[diesel(sql_type = Text)]
+        progress: String,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read a quest",
+        message,
+    };
+    let rows = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "SELECT progress FROM character_quests WHERE character_id = $1 AND quest_id = $2",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(quest_id)
+        .load::<Row>(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(rows.into_iter().next().map(|row| row.progress))
+}
+
 /// Teach the logged-out character `character_id` skill `skill_id` at
 /// `level`.
 pub async fn grant_skill(character_id: i32, skill_id: i32, level: i32) -> Result<(), HarnessError> {

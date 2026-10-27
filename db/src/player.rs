@@ -17,7 +17,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::upsert::excluded;
 use game::inventory::DEFAULT_SLOT_LIMIT;
-use game::quest::{decode_kills, INFO_QUESTS, RECORDS, SCRIPT_MARKERS};
+use game::quest::{decode_kills, DATED_QUESTS, INFO_QUESTS, RECORDS, SCRIPT_MARKERS};
 use game::{
     AutoPotions, AvatarLook, CharacterStats, DojoRecord, EquipStats, Inventory, InventoryType,
     Item, KeyBinding, Keymap, MonsterBook, Mount, Player, QuestLog, QuestRecord, QuestStatus,
@@ -794,7 +794,8 @@ pub fn quest_record(progress: &QuestProgress) -> QuestRecord {
         status: match (progress.status, progress.completed_at) {
             (2, Some(at)) => QuestStatus::Completed { at },
             _ if INFO_QUESTS.contains(&progress.quest_id)
-                || RECORDS.contains(&progress.quest_id) =>
+                || RECORDS.contains(&progress.quest_id)
+                || DATED_QUESTS.contains(&progress.quest_id) =>
             {
                 QuestStatus::Started {
                     kills: Vec::new(),

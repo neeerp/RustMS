@@ -638,6 +638,7 @@ mod tests {
             end_info: Vec::new(),
             end_info_record: None,
             time_limit: None,
+            time_limit2: None,
         }
     }
 
