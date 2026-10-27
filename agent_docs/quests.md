@@ -926,6 +926,23 @@ gives the Veteran Hunter Medal (1142004) and completes the quest once `mon`
 reaches `mg`, and after the end date says the time is over. Cosmic has no
 scripts for it, and the text is unsourced.
 
+Title Challenge - Diligent Explorer (29003) starts and ends at Dalair from
+level 20, with no scripts: `Act/1` gives the Diligent Explorer Medal
+(1142000). The start writes `LT=<now>;DONE=0;PT=0;CNT=0` into the record
+beside the quest log (`quests::start_play_record`). While it is started and
+before its end date, time online adds to `PT`, the seconds played that UTC
+day; when `PT` reaches `QuestInfo` `dailyPlayTime` (three hours) `DONE` is
+set and `CNT`, the days, goes up by one, and a new day starts `PT` and
+`DONE` again from 0 (`quests::count_play_time`). `LT` is when play was last
+counted. The client actor counts every minute, on entering the game and on
+leaving it, sending the record when it changes (not in the Cash Shop); time
+logged out doesn't count, and a midnight passed online counts toward the
+new day. The quest's text says "3 consecutive hours", but the client keeps
+only the day's total, so the server counts that. The client won't complete
+the quest before `CNT` reaches 27, `timeLimit2`'s whole days times 0.9
+(0x721d2c calls 0x4e6df2), and neither will the server
+(`QuestRejection::PlayDays`); completing after the end date is not checked.
+
 The other title challenges count kills or rankings that the server does
 not keep: Maple Idol Star (29500), which needs the Celebrity Medal, goes to
 the most popular player of the month, and nothing picks one.
@@ -1078,8 +1095,9 @@ window draw as the frame and its slices (`QuestTextImages`,
 `Check.img` itself, as the client does, not from the supported list. The client would
 divide by zero on a `popG` of 0 in `perPop` and on a `timeLimit2` under a
 day; HeavenClient shows 0 there. Apart from the end date, Celebrity's
-`popS` and `popG`, and Veteran Hunter's `mon` and `mg` (below), nothing
-writes these titles' records yet: the original server's timing is unknown
+`popS` and `popG`, Veteran Hunter's `mon` and `mg`, and Diligent
+Explorer's `LT`, `DONE`, `PT` and `CNT` (above), nothing writes these
+titles' records yet: the original server's timing is unknown
 (Cosmic has none), and 29500-29503 wait on their start scripts.
 
 So far only the party quests keep records, on their info quests 1200-1206
@@ -1178,6 +1196,8 @@ copied into the source.
   too late after the end date, then the medal),
   `veteran_hunter` (29400's record at the start, a Slime below the
   player's level not counted, an Octopus above it counted, then the medal),
+  `timed_titles` (29003's end date and record at the start, the medal
+  refused with no days, a 27th day made online, then the medal),
   `knight_titles` (29906 started in Henesys, 29907 refused before the 2nd
   job, and the medal from Cygnus),
   and `timed_quests` (Medin's clock: shown on start, taken down on

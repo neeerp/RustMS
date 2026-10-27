@@ -91,6 +91,8 @@ use tracing::{debug, error, info, warn};
 
 /// How often a dirty player is written back while online.
 const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
+/// How often play is counted toward Diligent Explorer.
+const PLAY_TICK: Duration = Duration::from_secs(60);
 /// Fallback stand position when a map has no usable spawn portal.
 const FALLBACK_SPAWN: SpawnPosition = SpawnPosition {
     x: 0,
@@ -208,6 +210,9 @@ pub struct ClientActor {
     naming_guild: bool,
     /// NX Credit earned and not yet on the account (`earned_nx`).
     nx_earned: i32,
+    /// Play up to here is counted toward Diligent Explorer
+    /// (`count_play_time`).
+    play_counted_at: Instant,
     /// The player's ticket into the party event they are in.
     event: Option<crate::actor::event::EventTicket>,
     /// The player's ticket into their own wedding.
@@ -285,6 +290,7 @@ impl ClientActor {
             merchant_field: None,
             naming_guild: false,
             nx_earned: 0,
+            play_counted_at: Instant::now(),
             event: None,
             wedding: None,
         })
@@ -300,6 +306,9 @@ impl ClientActor {
         let mut nx_hour = interval(earned_nx::HOUR);
         nx_hour.set_missed_tick_behavior(MissedTickBehavior::Delay);
         nx_hour.reset();
+        let mut play = interval(PLAY_TICK);
+        play.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        play.reset();
         let kill = self.kill.clone();
 
         let outcome = loop {
@@ -324,6 +333,7 @@ impl ClientActor {
                 _ = autosave.tick() => self.save_if_dirty().await,
                 _ = hunger.tick() => self.pets_grow_hungry().await,
                 _ = nx_hour.tick() => self.earn_nx_for_hour().await,
+                _ = play.tick() => self.count_play_time(true).await,
                 _ = sleep_until(pets_due.unwrap_or_else(Instant::now)), if pets_due.is_some() => {
                     self.pets_dry_up().await
                 }
@@ -938,6 +948,9 @@ impl ClientActor {
         self.load_notes().await?;
         self.announce_parcels().await?;
         self.open_claims().await?;
+        // Time logged out doesn't count, and a new day starts from none.
+        self.play_counted_at = Instant::now();
+        self.count_play_time(true).await?;
         info!(
             character_id,
             channel_id = self.channel_id,
@@ -2231,6 +2244,8 @@ impl ClientActor {
                 .await;
             self.remember_spawn_point();
             self.leave_timed_quests().await;
+            // The client is gone; the record is saved below.
+            let _ = self.count_play_time(false).await;
             // A channel change keeps them: they go only when the player
             // leaves the game.
             if let (Some(game), false) = (self.game.as_mut(), self.changing_channel) {

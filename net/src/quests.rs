@@ -91,6 +91,8 @@ pub enum QuestRejection {
     MountLevel,
     /// Too few party quests at rank S (`partyQuest_S`).
     PartyQuestRank,
+    /// Too few days of play counted for a title with `dailyPlayTime`.
+    PlayDays,
     /// Too few quests completed (`questComplete`).
     CompletedQuests,
     /// The item rewards don't fit.
@@ -393,6 +395,12 @@ pub fn check_complete(
             return Err(QuestRejection::Record);
         }
     }
+    // The client's own completion check has this too (0x721d2c, 0x4e6df2).
+    if let Some(needed) = play_days_needed(quest) {
+        if PlayRecord::of(player, quest.id).days < needed {
+            return Err(QuestRejection::PlayDays);
+        }
+    }
     Ok(())
 }
 
@@ -456,6 +464,104 @@ pub fn count_hunt(player: &mut Player, mob_level: i16, now: SystemTime) -> Optio
     let hunted = player.quest_ex.number(VETERAN_HUNTER, "mon");
     player.quest_ex.set(VETERAN_HUNTER, "mon", hunted + 1);
     player.quest_ex.raw(VETERAN_HUNTER).map(str::to_owned)
+}
+
+/// The days of play a title with `dailyPlayTime` needs to be completed, as
+/// the client counts them (0x4e6df2, `#Ddaylimit#`): nine tenths of its
+/// whole days, rounded down. Diligent Explorer's 30 days need 27.
+pub fn play_days_needed(quest: &QuestTemplate) -> Option<u32> {
+    quest.daily_play_time?;
+    let days = quest.time_limit2.unwrap_or(0) / 86_400;
+    Some((f64::from(days) * 0.9) as u32)
+}
+
+/// A title with `dailyPlayTime` keeps its play in its record beside the
+/// quest log, which the client reads whole or not at all (0x4e6b2f): `LT`,
+/// the last count ("yyyyMMddHHmmss", UTC), `DONE`, 1 once the day's play is
+/// enough, `PT`, the seconds played that day, and `CNT`, the days done.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct PlayRecord {
+    last: String,
+    done: bool,
+    played: u32,
+    days: u32,
+}
+
+impl PlayRecord {
+    fn of(player: &Player, quest_id: i16) -> Self {
+        let record = &player.quest_ex;
+        let present = ["LT", "DONE", "PT", "CNT"]
+            .iter()
+            .all(|&key| record.get(quest_id, key).is_some_and(|v| !v.is_empty()));
+        if !present {
+            return Self::default();
+        }
+        Self {
+            last: record.get(quest_id, "LT").unwrap_or_default().to_string(),
+            done: record.number(quest_id, "DONE") != 0,
+            played: record.number(quest_id, "PT"),
+            days: record.number(quest_id, "CNT"),
+        }
+    }
+
+    fn write(&self, player: &mut Player, quest_id: i16) -> String {
+        let record = &mut player.quest_ex;
+        record.set(quest_id, "LT", &self.last);
+        record.set(quest_id, "DONE", u32::from(self.done));
+        record.set(quest_id, "PT", self.played);
+        record.set(quest_id, "CNT", self.days);
+        record.raw(quest_id).unwrap_or_default().to_string()
+    }
+}
+
+/// Start a title with `dailyPlayTime` from no play. Returns its new record.
+pub fn start_play_record(
+    quest: &QuestTemplate,
+    player: &mut Player,
+    now: SystemTime,
+) -> Option<String> {
+    quest.daily_play_time?;
+    let record = PlayRecord {
+        last: game::quest::end_date(now),
+        ..PlayRecord::default()
+    };
+    Some(record.write(player, quest.id))
+}
+
+/// Count `seconds` more play toward a started title with `dailyPlayTime`
+/// before its end date: a new day (UTC) starts from no play, and the day is
+/// done, with one more day counted, once its play reaches `dailyPlayTime`.
+/// Returns the record if it changed.
+pub fn count_play_time(
+    quest: &QuestTemplate,
+    player: &mut Player,
+    seconds: u32,
+    now: SystemTime,
+) -> Option<String> {
+    let daily = quest.daily_play_time?;
+    if player.quests.state(quest.id) != QuestState::Started || title_ended(player, quest.id, now) {
+        return None;
+    }
+    let today = game::quest::end_date(now);
+    let before = PlayRecord::of(player, quest.id);
+    let mut after = before.clone();
+    if before.last.get(..8) != today.get(..8) {
+        after.done = false;
+        after.played = 0;
+    }
+    if !after.done {
+        after.played = (after.played + seconds).min(daily);
+        if after.played >= daily {
+            after.done = true;
+            after.days += 1;
+        }
+    }
+    after.last = before.last.clone();
+    if after == before && !before.last.is_empty() {
+        return None;
+    }
+    after.last = today;
+    Some(after.write(player, quest.id))
 }
 
 /// Count a kill of `mob_id` toward every started quest that needs it.
@@ -680,6 +786,7 @@ mod tests {
             end_info_record: None,
             time_limit: None,
             time_limit2: None,
+            daily_play_time: None,
         }
     }
 
@@ -1507,5 +1614,67 @@ mod tests {
         assert!(title_ended(&hunter, VETERAN_HUNTER, later));
         assert_eq!(count_hunt(&mut hunter, 31, later), None);
         assert_eq!(hunter.quest_ex.number(VETERAN_HUNTER, "mon"), 2);
+    }
+
+    #[test]
+    fn diligent_explorer_counts_days_of_three_hours_and_needs_27() {
+        let mut q = quest();
+        q.time_limit2 = Some(2_592_000);
+        q.daily_play_time = Some(10_800);
+        assert_eq!(play_days_needed(&q), Some(27));
+        assert_eq!(play_days_needed(&quest()), None);
+
+        // 2027-01-15 08:00:00 UTC.
+        let morning = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let mut explorer = player(30, 100);
+        assert_eq!(count_play_time(&q, &mut explorer, 60, morning), None);
+        explorer.quests.upsert(QuestRecord {
+            quest_id: 1033,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(game::quest::end_date(
+                    morning + Duration::from_secs(2_592_000),
+                )),
+            },
+        });
+        let today = game::quest::end_date(morning);
+        assert_eq!(
+            start_play_record(&q, &mut explorer, morning).as_deref(),
+            Some(format!("LT={today};DONE=0;PT=0;CNT=0").as_str())
+        );
+        assert_eq!(count_play_time(&q, &mut explorer, 0, morning), None);
+        let later = morning + Duration::from_secs(3600);
+        let at_later = game::quest::end_date(later);
+        assert_eq!(
+            count_play_time(&q, &mut explorer, 3600, later).as_deref(),
+            Some(format!("LT={at_later};DONE=0;PT=3600;CNT=0").as_str())
+        );
+        let evening = morning + Duration::from_secs(36_000);
+        let at_evening = game::quest::end_date(evening);
+        assert_eq!(
+            count_play_time(&q, &mut explorer, 9000, evening).as_deref(),
+            Some(format!("LT={at_evening};DONE=1;PT=10800;CNT=1").as_str())
+        );
+        // The day is done: more play changes nothing.
+        assert_eq!(count_play_time(&q, &mut explorer, 60, evening), None);
+        // The next day starts again from none, keeping the days done.
+        let tomorrow = morning + Duration::from_secs(86_400);
+        let at_tomorrow = game::quest::end_date(tomorrow);
+        assert_eq!(
+            count_play_time(&q, &mut explorer, 0, tomorrow).as_deref(),
+            Some(format!("LT={at_tomorrow};DONE=0;PT=0;CNT=1").as_str())
+        );
+
+        explorer.quest_ex.set(1033, "CNT", 26);
+        assert_eq!(
+            check_complete(&q, 2102, &explorer),
+            Err(QuestRejection::PlayDays)
+        );
+        explorer.quest_ex.set(1033, "CNT", 27);
+        assert_eq!(check_complete(&q, 2102, &explorer), Ok(()));
+
+        // Nothing counts after the end date.
+        let over = morning + Duration::from_secs(2_592_001);
+        assert_eq!(count_play_time(&q, &mut explorer, 60, over), None);
     }
 }
