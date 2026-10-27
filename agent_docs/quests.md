@@ -721,6 +721,16 @@ it says so and does nothing. This follows Cosmic's `29900.js` to `29903.js`.
 The `adventurer_medal.*` text is unsourced. The Knight and Aran titles
 (29904 to 29909 and 29924 to 29928) wait for the Cygnus and Aran jobs.
 
+Title Challenge - Outstanding Citizen (29508) starts at Dalair from the
+data, from level 10. Dalair's end script gives the Outstanding Citizen Medal
+(1142081, the quest's `viewMedalItem`) and completes the quest once the
+player is married, is in a guild, and has a Junior, as the quest's
+`demandSummary` asks. Until then Dalair says what is missing and does
+nothing. The runtime loads the Family window's numbers for this script, as
+it does for Captain Al's (`FAMILY_QUEST_SCRIPTS`). Cosmic has no script for
+it, and the text is unsourced. The other title challenges count fame,
+kills or rankings that the server does not keep.
+
 ## Conversations in the client
 
 `Character/QuestDialogue.h` is a pure state machine over one side of
@@ -880,5 +890,7 @@ copied into the source.
   refused below its level, and both medals given in Perion),
   `to_lith_harbor` (1028: Shanks turned down, then sailing for free, and
   Olaf's reward),
+  `outstanding_citizen` (29508: refused with no marriage, guild or Junior,
+  then the medal once all three are set),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

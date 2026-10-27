@@ -141,7 +141,8 @@ impl ClientActor {
         let Some(script) = script else {
             return Ok(());
         };
-        // Captain Al's read the Family window's numbers.
+        // Captain Al's and Dalair's Outstanding Citizen read the Family
+        // window's numbers.
         let cid = self.client_id;
         let family = if FAMILY_QUEST_SCRIPTS.contains(&script) {
             Some(spawn_db(move || db::family::info(cid)).await?)
@@ -150,7 +151,7 @@ impl ClientActor {
         };
         let player = &self.in_game()?.player;
         let script = match family {
-            Some(family) => NpcScript::for_family_quest(script, &family),
+            Some(family) => NpcScript::for_family_quest(script, player, &family),
             None => NpcScript::for_quest(script, player),
         };
         match script {

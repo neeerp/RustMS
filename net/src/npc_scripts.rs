@@ -2556,8 +2556,12 @@ impl NpcScript {
     /// numbers (`family`): a junior taken (2232), 1,000 Rep earned in all
     /// (2233), then 2,000 earned with the Rep to spend used below 500
     /// (2234). The data gives no rewards; 2232 gives Cosmic's 3,000 EXP,
-    /// and Cosmic has no script for the other two.
-    pub fn for_family_quest(script: &str, family: &FamilyInfo) -> Option<Self> {
+    /// and Cosmic has no script for the other two. Dalair's end script for
+    /// Outstanding Citizen (`q29508e`) also reads them.
+    pub fn for_family_quest(script: &str, player: &Player, family: &FamilyInfo) -> Option<Self> {
+        if script == "q29508e" {
+            return Some(outstanding_citizen(player, family));
+        }
         let (quest, done, [done_key, not_yet_key]) = match script {
             "q2232e" => (2232, family.juniors > 0, keys::CAPTAIN_AL_JUNIOR),
             "q2233e" => (2233, family.total_reputation >= 1000, keys::CAPTAIN_AL_REP),
@@ -3897,6 +3901,36 @@ fn adventurer_medal(script: &str) -> Option<NpcScript> {
     Some(script)
 }
 
+/// Title Challenge - Outstanding Citizen (29508): the data starts it at
+/// Dalair from level 10, and Dalair's end script gives the Outstanding
+/// Citizen Medal (the quest's `viewMedalItem`) to a player who is married,
+/// in a guild, and has a Junior, as its `demandSummary` asks. Cosmic has no
+/// script; the text is unsourced.
+const OUTSTANDING_CITIZEN: i16 = 29508;
+const OUTSTANDING_CITIZEN_MEDAL: i32 = 1142081;
+
+fn outstanding_citizen(player: &Player, family: &FamilyInfo) -> NpcScript {
+    let married = player.marriage.as_ref().is_some_and(|m| m.married());
+    if !married || player.guild.is_none() || family.juniors == 0 {
+        return NpcScript::new(
+            DALAIR,
+            vec![Page::Say(text(keys::OUTSTANDING_CITIZEN_NOT_YET))],
+        );
+    }
+    let medal_id = OUTSTANDING_CITIZEN_MEDAL.to_string();
+    let says = content::text().get(
+        keys::ADVENTURER_MEDAL,
+        &[("title", "Outstanding Citizen"), ("medal", &medal_id)],
+    );
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    script.on_end = vec![
+        give_one(OUTSTANDING_CITIZEN_MEDAL),
+        Effect::CompleteQuest(OUTSTANDING_CITIZEN),
+    ];
+    script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
+    script
+}
+
 /// Tienk, the Monster Book Salesman (2197): Tienk (2006) in Lith Harbor
 /// greets a new Beginner, whose end script completes the quest with nothing
 /// given (Cosmic `2197.js`). The text is unsourced.
@@ -4457,8 +4491,9 @@ fn lost_memory(quest: i16) -> Option<NpcScript> {
 
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
 const CAPTAIN_AL: i32 = 1002103;
-/// Captain Al's end scripts ([`NpcScript::for_family_quest`]).
-pub const FAMILY_QUEST_SCRIPTS: [&str; 3] = ["q2232e", "q2233e", "q2234e"];
+/// The end scripts that read the Family window's numbers: Captain Al's
+/// and Dalair's Outstanding Citizen ([`NpcScript::for_family_quest`]).
+pub const FAMILY_QUEST_SCRIPTS: [&str; 4] = ["q2232e", "q2233e", "q2234e", "q29508e"];
 /// Nine Spirit's Baby Dragon, in its nest (240040612).
 const BABY_DRAGON: i32 = 2081011;
 const NINE_SPIRIT_EGG: i32 = 4001094;
@@ -11653,7 +11688,9 @@ mod tests {
         for script in game_data::quests::SCRIPTS {
             assert!(
                 NpcScript::for_quest(script, &player(50))
-                    .or_else(|| NpcScript::for_family_quest(script, &FamilyInfo::default()))
+                    .or_else(|| {
+                        NpcScript::for_family_quest(script, &player(50), &FamilyInfo::default())
+                    })
                     .is_some(),
                 "{script} has no script"
             );
@@ -12570,6 +12607,51 @@ mod tests {
     }
 
     #[test]
+    fn dalair_gives_the_outstanding_citizen_medal_to_the_married_guilded_senior() {
+        let family = |juniors| FamilyInfo {
+            juniors,
+            ..FamilyInfo::default()
+        };
+        let citizen = |married, guilded| {
+            let mut player = guilder(50, 0, guilded);
+            player.marriage = Some(game::marriage::MarriageRecord {
+                id: 1,
+                groom_id: player.stats.id,
+                bride_id: player.stats.id + 1,
+                status: if married {
+                    game::marriage::MARRIED
+                } else {
+                    game::marriage::ENGAGED
+                },
+                item_id: 2240000,
+                groom_name: player.stats.name.clone(),
+                bride_name: "Bride".into(),
+            });
+            player
+        };
+        let ends = |player: &Player, juniors| {
+            read_through(NpcScript::for_family_quest("q29508e", player, &family(juniors)).unwrap())
+        };
+        let not_yet = (DALAIR, vec![]);
+        assert_eq!(ends(&citizen(true, true), 0), not_yet);
+        assert_eq!(ends(&citizen(false, true), 1), not_yet);
+        assert_eq!(ends(&citizen(true, false), 1), not_yet);
+        assert_eq!(ends(&guilder(50, 0, true), 1), not_yet);
+        let end = NpcScript::for_family_quest("q29508e", &citizen(true, true), &family(1)).unwrap();
+        assert!(end.inventory_full.is_some());
+        assert_eq!(
+            read_through(end),
+            (
+                DALAIR,
+                vec![
+                    give_one(OUTSTANDING_CITIZEN_MEDAL),
+                    Effect::CompleteQuest(OUTSTANDING_CITIZEN)
+                ]
+            ),
+        );
+    }
+
+    #[test]
     fn shanks_sails_for_lucas_and_starts_to_lith_harbor() {
         let mut script = NpcScript::for_quest("q1028s", &player(5)).unwrap();
         assert!(script.begin().prompt.is_some());
@@ -13019,7 +13101,7 @@ mod tests {
             ..FamilyInfo::default()
         };
         let ends = |script, family: &FamilyInfo| {
-            read_through(NpcScript::for_family_quest(script, family).unwrap())
+            read_through(NpcScript::for_family_quest(script, &player(50), family).unwrap())
         };
         let done = |quest| (CAPTAIN_AL, vec![Effect::CompleteQuest(quest)]);
         let not_yet = (CAPTAIN_AL, vec![]);
@@ -13042,7 +13124,7 @@ mod tests {
         for script in FAMILY_QUEST_SCRIPTS {
             assert!(NpcScript::for_quest(script, &player(50)).is_none());
         }
-        assert!(NpcScript::for_family_quest("q2214e", &family(1, 0, 0)).is_none());
+        assert!(NpcScript::for_family_quest("q2214e", &player(50), &family(1, 0, 0)).is_none());
     }
 
     #[test]

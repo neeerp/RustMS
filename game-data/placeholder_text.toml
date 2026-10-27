@@ -434,6 +434,7 @@
 "adventurer_medal.medal" = "[placeholder] Dalair congratulates the player on the <{title}> title and hands over its medal.\r\n\r\n#fUI/UIWindow.img/QuestIcon/4/0#\r\n#v{medal}# #t{medal}#"
 "adventurer_medal.full" = "[placeholder] Dalair asks the player to make room for the medal."
 "shanks.for_lucas" = "[placeholder] Shanks has heard from Lucas and will sail the player to Victoria Island for free. You can never come back. Go?"
+"outstanding_citizen.not_yet" = "[placeholder] Dalair says the Outstanding Citizen title needs a marriage, a guild, and at least one Junior."
 "mc_letter.ask" = "[placeholder] The instructor has something to ask of a player who has made the job advancement."
 "mc_letter.later" = "[placeholder] The instructor says it's urgent; come back when there's time."
 "mc_letter.full" = "[placeholder] Make room in the Etc inventory first."
