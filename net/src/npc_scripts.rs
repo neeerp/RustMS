@@ -2400,6 +2400,9 @@ impl NpcScript {
                 letter_for_the_kingdom(script, player)
             }
             "q2300e" | "q2301e" | "q2302e" | "q2303e" | "q2304e" => letter_read(script),
+            "q2325e" => Some(james_found()),
+            "q2327s" => Some(james_escapes()),
+            "q2338s" => Some(scarrs_spare_spore()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -2909,6 +2912,64 @@ fn tristan_tomb() -> NpcScript {
     ];
     let mut script = NpcScript::new(MU_YOUNG, vec![Page::Done(go)]);
     script.refused = Some(text(keys::TRISTAN_ROOM_TAKEN));
+    script
+}
+
+const JAMES: i32 = 1300008;
+const SCARRS: i32 = 1300007;
+const KILLER_MUSHROOM_SPORE: i32 = 2430014;
+const JAMES_FOUND: i16 = 2325;
+const JAMES_ESCAPES: i16 = 2327;
+const SPORES_AGAIN: i16 = 2338;
+
+/// `q2325e`, James's Whereabouts (1): James, hiding in the castle, is
+/// afraid until the player answers that his brother, the Head Security
+/// Officer, sent them; then the quest completes for 6,000 EXP (its `Act`,
+/// which a script's completion doesn't apply; Cosmic `2325.js`). The text
+/// is unsourced.
+fn james_found() -> NpcScript {
+    let mut script = NpcScript::new(
+        JAMES,
+        vec![
+            Page::Say(text(keys::JAMES_SCARED)),
+            Page::Reply(text(keys::JAMES_SENT_BY_BROTHER)),
+            Page::Say(text(keys::JAMES_SAFE)),
+        ],
+    );
+    script.on_end = vec![Effect::CompleteQuest(JAMES_FOUND), Effect::GainExp(6000)];
+    script
+}
+
+/// `q2327s`, James's Whereabouts (3): James thanks the player for the
+/// Mushroom Disguise of 2326 and starts the quest to put it on (Cosmic
+/// `2327.js`); he completes it himself, from the data. The text is
+/// unsourced.
+fn james_escapes() -> NpcScript {
+    let mut script = NpcScript::new(
+        JAMES,
+        vec![
+            Page::Say(text(keys::JAMES_THANKS)),
+            Page::Say(text(keys::JAMES_DISGUISE)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(JAMES_ESCAPES)];
+    script
+}
+
+/// `q2338s`, Killer Mushroom Spores, Again: for one who used up the spore
+/// of 2318 before 2322 (the start asks that none be held), Scarrs gives a
+/// spare (2430014) and the quest completes as it starts (Cosmic
+/// `2338.js`). Without a USE slot he says so. The text is unsourced.
+fn scarrs_spare_spore() -> NpcScript {
+    let mut script = NpcScript::new(SCARRS, vec![Page::Say(text(keys::SCARRS_SPARE_SPORE))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: KILLER_MUSHROOM_SPORE,
+            quantity: 1,
+        },
+        Effect::FinishQuest(SPORES_AGAIN),
+    ];
+    script.inventory_full = Some(text(keys::SCARRS_SPORE_FULL));
     script
 }
 
@@ -10894,6 +10955,64 @@ mod tests {
             );
         }
         assert_eq!(NpcScript::for_quest("q2305e", &player(50)), None, "Cygnus");
+    }
+
+    #[test]
+    fn james_is_found_and_then_escapes_in_the_disguise() {
+        let speakers = |script: &mut NpcScript, pages: usize| -> Vec<bool> {
+            (0..pages)
+                .map(|page| {
+                    let step = if page == 0 {
+                        script.begin()
+                    } else {
+                        script.respond(ScriptInput::Next).unwrap()
+                    };
+                    assert!(step.effects.is_empty());
+                    match step.prompt {
+                        Some(Prompt::Text(page)) => {
+                            assert_eq!(page.npc_id, JAMES);
+                            page.player_speaks
+                        }
+                        other => panic!("{other:?}"),
+                    }
+                })
+                .collect()
+        };
+        let mut found = NpcScript::for_quest("q2325e", &player(50)).unwrap();
+        assert_eq!(speakers(&mut found, 3), [false, true, false]);
+        assert_eq!(
+            found.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::CompleteQuest(JAMES_FOUND), Effect::GainExp(6000)]
+        );
+
+        let mut escapes = NpcScript::for_quest("q2327s", &player(50)).unwrap();
+        assert_eq!(speakers(&mut escapes, 2), [false, false]);
+        assert_eq!(
+            escapes.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::StartQuest(JAMES_ESCAPES)]
+        );
+    }
+
+    #[test]
+    fn scarrs_gives_a_spare_killer_mushroom_spore() {
+        let script = || NpcScript::for_quest("q2338s", &player(50)).unwrap();
+        assert_eq!(
+            read_through(script()),
+            (
+                SCARRS,
+                vec![
+                    Effect::GiveItem {
+                        item_id: KILLER_MUSHROOM_SPORE,
+                        quantity: 1
+                    },
+                    Effect::FinishQuest(SPORES_AGAIN),
+                ]
+            )
+        );
+        let Some(Prompt::Text(full)) = script().inventory_full().unwrap().prompt else {
+            panic!("told");
+        };
+        assert_eq!(full.text, text(keys::SCARRS_SPORE_FULL));
     }
 
     #[test]

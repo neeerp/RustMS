@@ -249,6 +249,14 @@ Officer's (1300005) end scripts `q2300e`-`q2304e` take the letter, complete
 the quest and give 1,200 EXP; the data has no rewards. The player answers
 him on one page (`Page::Reply`, speaker bit 0x2). The Cygnus Knights'
 2305-2310 are left out with their other quests.
+"James's Whereabouts" (2325-2327) follows the officer's brother James
+(1300008, in 106021201): his end script `q2325e` has the player answer him
+too and gives the 6,000 EXP of its `Act` (a script's completion applies no
+`Act`), and his start script `q2327s` starts 2327 after the Mushroom
+Disguise of 2326. Scarrs's (1300007) `q2338s`, "Killer Mushroom Spores,
+Again", gives a spare spore (2430014) to one holding none before 2322
+starts, completing the quest as it starts. Their text is unsourced; the
+`find_james` portal in James's room has no source either and does nothing.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -696,5 +704,6 @@ copied into the source.
   `mushroom_forest` (2314's barrier and 2322's wall, each looked at once),
   `mushroom_opening` (the opening scene, its way out, then The Test),
   `mushroom_letter` (2300's letter, the way to the scene, the officer),
+  `mushroom_james` (James found, disguised and escaping; Scarrs's spare),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

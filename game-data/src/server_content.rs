@@ -512,6 +512,17 @@ pub mod keys {
     /// the way to the castle.
     pub const MC_SPORE_USED: &str = "item.mc_spore.used";
     pub const MC_THORNS_REMOVED: &str = "item.mc_thorns.removed";
+    /// James (1300008), found in the castle (2325), and his escape in a
+    /// Mushroom Disguise (2327); the player answers him. Unsourced.
+    pub const JAMES_SCARED: &str = "mc_james.scared";
+    pub const JAMES_SENT_BY_BROTHER: &str = "mc_james.sent_by_brother";
+    pub const JAMES_SAFE: &str = "mc_james.safe";
+    pub const JAMES_THANKS: &str = "mc_james.thanks";
+    pub const JAMES_DISGUISE: &str = "mc_james.disguise";
+    /// Scarrs (1300007) gives a spare Killer Mushroom Spore (2338).
+    /// Unsourced.
+    pub const SCARRS_SPARE_SPORE: &str = "mc_scarrs.spare_spore";
+    pub const SCARRS_SPORE_FULL: &str = "mc_scarrs.spore_full";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -2889,6 +2900,13 @@ mod tests {
             keys::MC_CASTLE_BLOCKED,
             keys::MC_SPORE_USED,
             keys::MC_THORNS_REMOVED,
+            keys::JAMES_SCARED,
+            keys::JAMES_SENT_BY_BROTHER,
+            keys::JAMES_SAFE,
+            keys::JAMES_THANKS,
+            keys::JAMES_DISGUISE,
+            keys::SCARRS_SPARE_SPORE,
+            keys::SCARRS_SPORE_FULL,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,
