@@ -620,6 +620,31 @@ pub mod keys {
     pub const LITA_HORSEMAN_ASK: &str = "nlc_lita.horseman_ask";
     pub const LITA_BIGFOOT_ASK: &str = "nlc_lita.bigfoot_ask";
     pub const LITA_BOUNTY_GO: &str = "nlc_lita.bounty_go";
+    pub const NEW_LEAF_CITY_NEEDS_YOU: &str = "nlc_quest.needs_you";
+    pub const NEW_LEAF_CITY_ETC_FULL: &str = "nlc_quest.etc_full";
+    pub const BARRICADE_JACK_ASK: &str = "nlc_barricade.jack_ask";
+    pub const BARRICADE_JACK_GO: &str = "nlc_barricade.jack_go";
+    pub const JACK_BROTHER: &str = "nlc_jack.brother";
+    pub const JACK_MAP: &str = "nlc_jack.map";
+    pub const JACK_SETUP_FULL: &str = "nlc_jack.setup_full";
+    pub const LUKAN_BADGES_ASK: &str = "nlc_lukan.badges_ask";
+    pub const LUKAN_BADGES_GO: &str = "nlc_lukan.badges_go";
+    pub const LUKAN_BADGES_THANKS: &str = "nlc_lukan.badges_thanks";
+    pub const LUKAN_BADGES_MISSING: &str = "nlc_lukan.badges_missing";
+    pub const JACK_LETTER_ASK: &str = "nlc_jack.letter_ask";
+    pub const JACK_LETTER_GO: &str = "nlc_jack.letter_go";
+    pub const BARRICADE_GLYPHS_ASK: &str = "nlc_barricade.glyphs_ask";
+    pub const BARRICADE_GLYPHS_GO: &str = "nlc_barricade.glyphs_go";
+    pub const ELPAM_TRANSLATE: &str = "nlc_elpam.translate";
+    pub const ELPAM_NO_LETTER: &str = "nlc_elpam.no_letter";
+    pub const BARRICADE_TRANSLATED_ASK: &str = "nlc_barricade.translated_ask";
+    pub const JACK_TRANSLATION: &str = "nlc_jack.translation";
+    pub const JACK_NO_TRANSLATION: &str = "nlc_jack.no_translation";
+    pub const JACK_TIDE_ASK: &str = "nlc_jack.tide_ask";
+    pub const JACK_TIDE_GO: &str = "nlc_jack.tide_go";
+    pub const JACK_KEYSTONE: &str = "nlc_jack.keystone";
+    pub const JACK_KEYSTONE_LOST: &str = "nlc_jack.keystone_lost";
+    pub const JACK_HURRY: &str = "nlc_jack.hurry";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3093,6 +3118,31 @@ mod tests {
             keys::LITA_HORSEMAN_ASK,
             keys::LITA_BIGFOOT_ASK,
             keys::LITA_BOUNTY_GO,
+            keys::NEW_LEAF_CITY_NEEDS_YOU,
+            keys::NEW_LEAF_CITY_ETC_FULL,
+            keys::BARRICADE_JACK_ASK,
+            keys::BARRICADE_JACK_GO,
+            keys::JACK_BROTHER,
+            keys::JACK_MAP,
+            keys::JACK_SETUP_FULL,
+            keys::LUKAN_BADGES_ASK,
+            keys::LUKAN_BADGES_GO,
+            keys::LUKAN_BADGES_THANKS,
+            keys::LUKAN_BADGES_MISSING,
+            keys::JACK_LETTER_ASK,
+            keys::JACK_LETTER_GO,
+            keys::BARRICADE_GLYPHS_ASK,
+            keys::BARRICADE_GLYPHS_GO,
+            keys::ELPAM_TRANSLATE,
+            keys::ELPAM_NO_LETTER,
+            keys::BARRICADE_TRANSLATED_ASK,
+            keys::JACK_TRANSLATION,
+            keys::JACK_NO_TRANSLATION,
+            keys::JACK_TIDE_ASK,
+            keys::JACK_TIDE_GO,
+            keys::JACK_KEYSTONE,
+            keys::JACK_KEYSTONE_LOST,
+            keys::JACK_HURRY,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

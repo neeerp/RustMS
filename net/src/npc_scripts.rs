@@ -2495,6 +2495,14 @@ impl NpcScript {
             "q2152s" => truth_of_the_rumor(2152),
             "q2197e" => Some(tienks_greeting()),
             "q2293s" => Some(the_last_song()),
+            "q8219e" => Some(jack_meets_the_player()),
+            "q8222e" => Some(lukans_badges(player)),
+            "q8227s" => Some(lost_in_translation_start(player, 8227)),
+            "q8228s" => Some(lost_in_translation_start(player, 8228)),
+            "q8229s" => Some(lost_in_translation_start(player, 8229)),
+            "q8228e" => Some(elpam_translates(player)),
+            "q8229e" => Some(jack_reads_the_translation(player)),
+            "q8230e" => Some(jack_sees_the_keystone(player)),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3584,15 +3592,24 @@ fn truth_of_the_rumor(quest: i16) -> Option<NpcScript> {
 /// City (8231 to 8238, every second one repeatable). Each asks whether the
 /// player is in; a yes says what to bring or hunt and starts the quest, and
 /// the data's end checks and rewards it (Cosmic `8221.js` to `8238.js`).
-/// The text is unsourced.
-const NEW_LEAF_CITY_STARTS: [(i16, i32, &str, &str); 13] = [
+/// John's Finding Jack (8219), Lukan's The Brewing Storm (8222) and Jack's
+/// Stemming the Tide (8230) start the same way but end in scripts. The text
+/// is unsourced.
+const NEW_LEAF_CITY_STARTS: [(i16, i32, &str, &str); 16] = [
+    (
+        8219,
+        JOHN_BARRICADE,
+        keys::BARRICADE_JACK_ASK,
+        keys::BARRICADE_JACK_GO,
+    ),
     (
         8221,
-        9201051,
+        JOHN_BARRICADE,
         keys::BARRICADE_MARK_ASK,
         keys::BARRICADE_MARK_GO,
     ),
-    (8223, 9201098, keys::LUKAN_STORM_ASK, keys::LUKAN_STORM_GO),
+    (8222, LUKAN, keys::LUKAN_BADGES_ASK, keys::LUKAN_BADGES_GO),
+    (8223, LUKAN, keys::LUKAN_STORM_ASK, keys::LUKAN_STORM_GO),
     (
         8224,
         TAGGRIN,
@@ -3606,6 +3623,7 @@ const NEW_LEAF_CITY_STARTS: [(i16, i32, &str, &str); 13] = [
         keys::TAGGRIN_WARRIORS_ASK,
         keys::TAGGRIN_WARRIORS_GO,
     ),
+    (8230, JACK, keys::JACK_TIDE_ASK, keys::JACK_TIDE_GO),
     (
         8231,
         LITA_LAWLESS,
@@ -3655,8 +3673,17 @@ const NEW_LEAF_CITY_STARTS: [(i16, i32, &str, &str); 13] = [
         keys::LITA_BOUNTY_GO,
     ),
 ];
+const JOHN_BARRICADE: i32 = 9201051;
+const LUKAN: i32 = 9201098;
 const TAGGRIN: i32 = 9201100;
 const LITA_LAWLESS: i32 = 9201054;
+const JACK: i32 = 9201096;
+const ELPAM_GORLAB: i32 = 9201055;
+const STORMBREAKER_BADGE: i32 = 4032006;
+const PHANTOM_FOREST_MAP: i32 = 3992040;
+const CRIMSONWOOD_KEYSTONE: i32 = 3992041;
+const CODED_COMMUNIQUE: i32 = 4032032;
+const TRANSLATED_COMMUNIQUE: i32 = 4032018;
 
 /// `script`, if it is one of New Leaf City's start scripts.
 fn new_leaf_city_start(script: &str) -> Option<NpcScript> {
@@ -3676,6 +3703,146 @@ fn new_leaf_city_start(script: &str) -> Option<NpcScript> {
     );
     script.on_end = vec![Effect::StartQuest(quest)];
     Some(script)
+}
+
+/// One of `item_id`.
+fn give_one(item_id: i32) -> Effect {
+    Effect::GiveItem {
+        item_id,
+        quantity: 1,
+    }
+}
+
+/// `q8219e`, Finding Jack: Jack, past the Phantom Forest, greets the
+/// player John sent and gives the Map of the Phantom Forest (3992040) and
+/// 175,000 EXP (Cosmic `8219.js`).
+fn jack_meets_the_player() -> NpcScript {
+    let mut script = NpcScript::new(
+        JACK,
+        vec![
+            Page::Say(text(keys::JACK_BROTHER)),
+            Page::Say(text(keys::JACK_MAP)),
+        ],
+    );
+    script.on_end = vec![
+        give_one(PHANTOM_FOREST_MAP),
+        Effect::GainExp(175_000),
+        Effect::CompleteQuest(8219),
+    ];
+    script.inventory_full = Some(text(keys::JACK_SETUP_FULL));
+    script
+}
+
+/// `q8222e`, The Brewing Storm: Lukan takes the ten Stormbreaker Badges
+/// (4032006) the data's end asks for. There is no Cosmic script and the
+/// data gives nothing; 8221 and 8223 ask for this quest done.
+fn lukans_badges(player: &Player) -> NpcScript {
+    if player.inventory.count(STORMBREAKER_BADGE) < 10 {
+        return NpcScript::new(LUKAN, vec![Page::Say(text(keys::LUKAN_BADGES_MISSING))]);
+    }
+    let mut script = NpcScript::new(LUKAN, vec![Page::Say(text(keys::LUKAN_BADGES_THANKS))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: STORMBREAKER_BADGE,
+            quantity: 10,
+        },
+        Effect::CompleteQuest(8222),
+    ];
+    script
+}
+
+/// Lost in Translation (8227 to 8229): Jack swipes a Coded Communique
+/// (4032032) from the Keep for John (8227, whose end is the data's); John
+/// can't read it and sends it to Elpam Gorlab, the outsider (8228, given
+/// again if it was lost), who takes it; John then hands the Translated
+/// Communique (4032018) over for Jack, who takes it for 50,000 EXP (8229).
+/// A no ends each start (Cosmic `8227.js` to `8229.js`). The text is
+/// unsourced.
+fn lost_in_translation_start(player: &Player, quest: i16) -> NpcScript {
+    let (npc, ask, go, letter) = match quest {
+        8227 => (
+            JACK,
+            keys::JACK_LETTER_ASK,
+            Some(keys::JACK_LETTER_GO),
+            CODED_COMMUNIQUE,
+        ),
+        8228 => (
+            JOHN_BARRICADE,
+            keys::BARRICADE_GLYPHS_ASK,
+            Some(keys::BARRICADE_GLYPHS_GO),
+            CODED_COMMUNIQUE,
+        ),
+        _ => (
+            JOHN_BARRICADE,
+            keys::BARRICADE_TRANSLATED_ASK,
+            None,
+            TRANSLATED_COMMUNIQUE,
+        ),
+    };
+    let mut pages = vec![Page::Ask {
+        text: text(ask),
+        on_yes: Vec::new(),
+        on_no: Some(text(keys::NEW_LEAF_CITY_NEEDS_YOU)),
+    }];
+    pages.extend(go.map(|go| Page::Say(text(go))));
+    let mut script = NpcScript::new(npc, pages);
+    if player.inventory.count(letter) == 0 {
+        script.on_end.push(give_one(letter));
+    }
+    script.on_end.push(Effect::StartQuest(quest));
+    script.inventory_full = Some(text(keys::NEW_LEAF_CITY_ETC_FULL));
+    script
+}
+
+/// `q8228e`: Elpam Gorlab takes the Coded Communique to translate.
+fn elpam_translates(player: &Player) -> NpcScript {
+    if player.inventory.count(CODED_COMMUNIQUE) == 0 {
+        return NpcScript::new(ELPAM_GORLAB, vec![Page::Say(text(keys::ELPAM_NO_LETTER))]);
+    }
+    let mut script = NpcScript::new(ELPAM_GORLAB, vec![Page::Say(text(keys::ELPAM_TRANSLATE))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: CODED_COMMUNIQUE,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(8228),
+    ];
+    script
+}
+
+/// `q8229e`: Jack takes the Translated Communique for 50,000 EXP.
+fn jack_reads_the_translation(player: &Player) -> NpcScript {
+    if player.inventory.count(TRANSLATED_COMMUNIQUE) == 0 {
+        return NpcScript::new(JACK, vec![Page::Say(text(keys::JACK_NO_TRANSLATION))]);
+    }
+    let mut script = NpcScript::new(JACK, vec![Page::Say(text(keys::JACK_TRANSLATION))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: TRANSLATED_COMMUNIQUE,
+            quantity: 1,
+        },
+        Effect::GainExp(50_000),
+        Effect::CompleteQuest(8229),
+    ];
+    script
+}
+
+/// `q8230e`, Stemming the Tide: with the Crimsonwood Keystone (3992041)
+/// that Storming the Castle (8223) gives, Jack says it opens the Inner
+/// Sanctum and completes the quest, leaving the key with the player;
+/// without it, Jack says where to turn (Cosmic `8230.js`).
+fn jack_sees_the_keystone(player: &Player) -> NpcScript {
+    if player.inventory.count(CRIMSONWOOD_KEYSTONE) > 0 {
+        let mut script = NpcScript::new(JACK, vec![Page::Say(text(keys::JACK_KEYSTONE))]);
+        script.on_end = vec![Effect::CompleteQuest(8230)];
+        return script;
+    }
+    let words = if player.quests.state(8223) == QuestState::Completed {
+        keys::JACK_KEYSTONE_LOST
+    } else {
+        keys::JACK_HURRY
+    };
+    NpcScript::new(JACK, vec![Page::Say(text(words))])
 }
 
 /// Tienk, the Monster Book Salesman (2197): Tienk (2006) in Lith Harbor
@@ -12201,7 +12368,112 @@ mod tests {
             let end = script.respond(ScriptInput::Next).unwrap();
             assert!(end.effects.is_empty(), "{quest}");
         }
-        assert!(NpcScript::for_quest("q8222s", &player(80)).is_none());
+        assert!(NpcScript::for_quest("q8220s", &player(80)).is_none());
+    }
+
+    #[test]
+    fn jack_john_lukan_and_elpam_end_their_quests() {
+        let holding = |held: &[(game::InventoryType, i32, i16)]| {
+            let mut player = player(80);
+            for (slot, &(kind, item, count)) in held.iter().enumerate() {
+                player
+                    .inventory
+                    .insert(kind, slot as i16 + 1, game::Item::stack(item, count));
+            }
+            player
+        };
+        let etc = game::InventoryType::Etc;
+        let take = |item_id, quantity| Effect::TakeItem { item_id, quantity };
+
+        let script = NpcScript::for_quest("q8219e", &player(80)).unwrap();
+        let mut script = script;
+        script.begin();
+        let end = {
+            script.respond(ScriptInput::Next).unwrap();
+            script.respond(ScriptInput::Next).unwrap()
+        };
+        assert_eq!(
+            end.effects,
+            [
+                give_one(PHANTOM_FOREST_MAP),
+                Effect::GainExp(175_000),
+                Effect::CompleteQuest(8219)
+            ]
+        );
+
+        // Lukan wants all ten badges.
+        let few = holding(&[(etc, STORMBREAKER_BADGE, 9)]);
+        let (_, effects) = read_through(NpcScript::for_quest("q8222e", &few).unwrap());
+        assert!(effects.is_empty());
+        let ten = holding(&[(etc, STORMBREAKER_BADGE, 10)]);
+        assert_eq!(
+            read_through(NpcScript::for_quest("q8222e", &ten).unwrap()),
+            (
+                LUKAN,
+                vec![take(STORMBREAKER_BADGE, 10), Effect::CompleteQuest(8222)]
+            )
+        );
+
+        // The letter is given only when it isn't held.
+        for (quest, npc, letter) in [
+            (8227, JACK, CODED_COMMUNIQUE),
+            (8228, JOHN_BARRICADE, CODED_COMMUNIQUE),
+            (8229, JOHN_BARRICADE, TRANSLATED_COMMUNIQUE),
+        ] {
+            let name = format!("q{quest}s");
+            for held in [false, true] {
+                let player = if held {
+                    holding(&[(etc, letter, 1)])
+                } else {
+                    player(80)
+                };
+                let mut script = NpcScript::for_quest(&name, &player).unwrap();
+                assert_eq!(script.npc_id(), npc);
+                script.begin();
+                let mut step = script.respond(ScriptInput::Yes).unwrap();
+                if step.prompt.is_some() {
+                    step = script.respond(ScriptInput::Next).unwrap();
+                }
+                let mut want = Vec::new();
+                if !held {
+                    want.push(give_one(letter));
+                }
+                want.push(Effect::StartQuest(quest));
+                assert_eq!(step.effects, want, "{quest} {held}");
+            }
+        }
+
+        let (_, effects) = read_through(NpcScript::for_quest("q8228e", &player(80)).unwrap());
+        assert!(effects.is_empty());
+        let coded = holding(&[(etc, CODED_COMMUNIQUE, 1)]);
+        assert_eq!(
+            read_through(NpcScript::for_quest("q8228e", &coded).unwrap()),
+            (
+                ELPAM_GORLAB,
+                vec![take(CODED_COMMUNIQUE, 1), Effect::CompleteQuest(8228)]
+            )
+        );
+        let translated = holding(&[(etc, TRANSLATED_COMMUNIQUE, 1)]);
+        assert_eq!(
+            read_through(NpcScript::for_quest("q8229e", &translated).unwrap()),
+            (
+                JACK,
+                vec![
+                    take(TRANSLATED_COMMUNIQUE, 1),
+                    Effect::GainExp(50_000),
+                    Effect::CompleteQuest(8229)
+                ]
+            )
+        );
+
+        // Jack keeps the keystone with the player.
+        let keystone = holding(&[(game::InventoryType::Setup, CRIMSONWOOD_KEYSTONE, 1)]);
+        assert_eq!(
+            read_through(NpcScript::for_quest("q8230e", &keystone).unwrap()),
+            (JACK, vec![Effect::CompleteQuest(8230)])
+        );
+        let (_, effects) = read_through(NpcScript::for_quest("q8230e", &player(80)).unwrap());
+        assert!(effects.is_empty());
     }
 
     #[test]

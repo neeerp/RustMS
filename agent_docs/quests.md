@@ -365,6 +365,20 @@ Barricade's "The Mark of Heroism" (8221), Lukan's "Storming the Castle"
 (8223), Taggrin's Raven Ninja Clan tasks (8224 to 8226), and Lita Lawless's
 bounties (8231 to 8238), where every second one is a repeatable follow-up
 (Cosmic `8221.js` to `8238.js`). The text is unsourced.
+John Barricade's brother Jack takes the story further. "Finding Jack"
+(8219) starts the same way at John, and Jack's end script `q8219e` gives
+the Map of the Phantom Forest (3992040) and 175,000 EXP. In "Lost in
+Translation" (8227 to 8229), Jack's start gives a Coded Communique
+(4032032), and the data's end at John completes 8227. John then sends the
+letter to Elpam Gorlab (8228, given again if lost), whose end script takes
+it. Next John hands over the Translated Communique (4032018, 8229), and
+Jack's end script takes it for 50,000 EXP. In "The Brewing Storm" (8222),
+Lukan's end script takes the ten Stormbreaker Badges and gives nothing, as
+the data does. In "Stemming the Tide" (8230), Jack completes the quest when
+the player has the Crimsonwood Keystone and leaves the key with them.
+Without it, Jack says where to turn (Cosmic `8219.js` and `8227.js` to
+`8230.js`). Each end script that takes an item first checks it is there,
+and a missing item gets its own line. The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -846,5 +860,7 @@ copied into the source.
   `tienk_and_the_last_song` (2197's end script, 2293's start and data end),
   `new_leaf_city_starts` (Lita's bounty turned down, taken and completed, its
   follow-up started, and Taggrin's first task),
+  `finding_jack` (8219 from John to Jack, the three letters, the badges, and
+  the keystone kept),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
