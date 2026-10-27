@@ -357,6 +357,24 @@ Password" (an info quest) with it as the info (Cosmic `3360.js`): a script's
 quest starts with. The Secret Passage (2111024) asks for it at the secret
 door, and the right one sets the info to `1`, which the data's end checks (see
 `map-travel.md`). Their text is unsourced.
+"Life Alchemy, and the Missing Alchemist" (3314) starts from the data, with
+Alcadno's cape (1102136) worn. The desk in Alcadno's upper lab (2111015,
+261020200) gives one of Russellon's Pills (2022198) to a player on 3314 who
+holds none and isn't under one, in the player's own words (Cosmic
+`2111015.js`). The pill brings on its `specEx` disease, Poison (see
+`combat.md`). Russellon's `q3314e` checks for that poison: without it he sends
+the player back to the desk; with it he completes the quest (the data's 12,500
+EXP and one weighted stack of potions) and cures them with an All Cure
+Potion's effect (2050004; `QuestInfo` says he gives an antidote). Cosmic gives
+10 All Cure and 10 random potions after a buff of its own instead.
+A won Romeo and Juliet run sets record 7072 to `1` (see `party-quests.md`),
+which "Yulete's Request" (3365) and "Romeo's Present" (3369) start on
+(`START_RECORD_QUESTS`). Nothing in the data or Cosmic sets it. Their ends are
+the data's. "Yulete's Reward" (3382), after 3365, can be taken again at once
+(`interval` 0). Yulete's (2112014, 926130000) `q3382e` takes 25 of each marble
+(4001159, 4001160) for Horus' Eye (1122010) from a player who owns none, worn
+or carried, or else 10 of each for a Rock of Wisdom (2041212), and with fewer
+asks for more (Cosmic `3382.js`). Their text is unsourced.
 Three end scripts take what their quest asks for and give rewards the data
 leaves out. Dr. Kim's (2050001) `q3452e` takes the Bloctopus Key Chain and
 gives 50 Mana Elixir Pills and 8,000 EXP (Cosmic `3452.js`). Mr. Ku's

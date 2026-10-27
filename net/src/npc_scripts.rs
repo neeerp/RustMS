@@ -2187,6 +2187,7 @@ impl NpcScript {
             PACK_WOLF if retakes_the_wolves_test(player) => {
                 return Some(the_wolves_test_again());
             }
+            PILL_DESK if takes_a_pill(player) => return Some(pill_desk()),
             PASSAGE_END_STATUE => return Some(passage_end_statue()),
             PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
             SHRINE_PILLAR => return Some(shrine_pillar(player)),
@@ -2638,6 +2639,8 @@ impl NpcScript {
             "q21613s" => Some(the_wolves_test()),
             "q21618s" => Some(the_wolfs_evolution()),
             "q21618e" => Some(the_wolf_evolved(player)),
+            "q3314e" => Some(life_alchemy_done(player, &mut rand::thread_rng())),
+            "q3382e" => Some(yuletes_reward(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5609,6 +5612,131 @@ fn the_wolf_evolved(player: &Player) -> NpcScript {
         Effect::CompleteQuest(THE_WOLFS_EVOLUTION),
     ];
     script.inventory_full = Some(text(keys::MAHA_WOLF_EVOLUTION_FULL));
+    script
+}
+
+// Russellon (2111009) in Alcadno's lab and the desk in its upper lab
+// (2111015, `alcadno_potion`) where the pills were left, and Yulete
+// (2112014) in the lab behind the dark pipe (926130000), in Magatia.
+const RUSSELLON: i32 = 2111009;
+const PILL_DESK: i32 = 2111015;
+const LIFE_ALCHEMY: i16 = 3314;
+const RUSSELLONS_PILLS: i32 = 2022198;
+/// The disease the pills give (`specEx`: mob skill 125, Poison, level 7),
+/// as a buff's skill id.
+const PILL_POISON: i32 = 125 | 7 << 16;
+const ALL_CURE_POTION: i32 = 2050004;
+const LIFE_ALCHEMY_EXP: i32 = 12500;
+/// 3314's `Act/1` items: 20 of one, weighted by its `prop`.
+const LIFE_ALCHEMY_POTIONS: [(i32, u32); 6] = [
+    (2022199, 1),
+    (2022224, 5),
+    (2022225, 5),
+    (2022226, 5),
+    (2022227, 5),
+    (2022228, 5),
+];
+const LAB_YULETE: i32 = 2112014;
+const YULETES_REWARD: i16 = 3382;
+const ZENUMIST_MARBLE: i32 = 4001159;
+const ALCADNO_MARBLE: i32 = 4001160;
+const HORUS_EYE: i32 = 1122010;
+const ROCK_OF_WISDOM: i32 = 2041212;
+
+/// Whether the player is under the poison of Russellon's pills.
+fn took_the_pill(player: &Player) -> bool {
+    (player.buffs.active().iter())
+        .any(|buff| buff.stat == game::BuffStat::Poison && buff.skill_id == PILL_POISON)
+}
+
+/// Whether the desk has a pill for the player: on "Life Alchemy, and the
+/// Missing Alchemist" (3314), holding none and not under one.
+fn takes_a_pill(player: &Player) -> bool {
+    player.quests.state(LIFE_ALCHEMY) == QuestState::Started
+        && player.inventory.count(RUSSELLONS_PILLS) == 0
+        && !took_the_pill(player)
+}
+
+/// The desk in Alcadno's upper lab: the player takes one of Russellon's
+/// pills, thinking so (Cosmic `2111015.js`).
+fn pill_desk() -> NpcScript {
+    let mut script = NpcScript::new(
+        PILL_DESK,
+        vec![Page::Act {
+            text: text(keys::RUSSELLON_PILL_TAKEN),
+            effects: vec![Effect::GiveItem {
+                item_id: RUSSELLONS_PILLS,
+                quantity: 1,
+            }],
+        }],
+    );
+    script.player_speaks = true;
+    script.inventory_full = Some(text(keys::RUSSELLON_PILL_FULL));
+    script
+}
+
+/// `q3314e`: Russellon sees the pill's work on the player, completes the
+/// quest with its `Act/1` rewards, which a script's completion doesn't
+/// give, and cures them (an All Cure Potion's effect); without it, sends
+/// them back to take one (Cosmic `3314.js`).
+fn life_alchemy_done(player: &Player, rng: &mut impl Rng) -> NpcScript {
+    if !took_the_pill(player) {
+        return NpcScript::new(
+            RUSSELLON,
+            vec![Page::Say(text(keys::RUSSELLON_PILL_NOT_TAKEN))],
+        );
+    }
+    let &(item_id, _) = LIFE_ALCHEMY_POTIONS
+        .choose_weighted(rng, |&(_, weight)| weight)
+        .expect("weights");
+    let mut script = NpcScript::new(RUSSELLON, vec![Page::Say(text(keys::RUSSELLON_PILL_DONE))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id,
+            quantity: 20,
+        },
+        Effect::GainExp(LIFE_ALCHEMY_EXP),
+        Effect::CompleteQuest(LIFE_ALCHEMY),
+        Effect::ApplyItemBuff(ALL_CURE_POTION),
+    ];
+    script.inventory_full = Some(text(keys::RUSSELLON_REWARD_FULL));
+    script
+}
+
+/// `q3382e`: Yulete makes Horus' Eye from 25 of each marble, for one who
+/// has none, or else a Rock of Wisdom from 10 of each (Cosmic `3382.js`).
+fn yuletes_reward(player: &Player) -> NpcScript {
+    let held = |count: i16| {
+        player.inventory.count(ZENUMIST_MARBLE) >= i32::from(count)
+            && player.inventory.count(ALCADNO_MARBLE) >= i32::from(count)
+    };
+    let has_eye = player.inventory.count(HORUS_EYE) > 0
+        || (player.inventory.items(InventoryType::Equipped))
+            .any(|(_, item)| item.item_id == HORUS_EYE);
+    let (key, count, item_id) = if held(25) && !has_eye {
+        (keys::YULETE_MARBLES_EYE, 25, HORUS_EYE)
+    } else if held(10) {
+        (keys::YULETE_MARBLES_ROCK, 10, ROCK_OF_WISDOM)
+    } else {
+        return NpcScript::new(LAB_YULETE, vec![Page::Say(text(keys::YULETE_MARBLES_MORE))]);
+    };
+    let mut script = NpcScript::new(LAB_YULETE, vec![Page::Say(text(key))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: ZENUMIST_MARBLE,
+            quantity: count,
+        },
+        Effect::TakeItem {
+            item_id: ALCADNO_MARBLE,
+            quantity: count,
+        },
+        Effect::GiveItem {
+            item_id,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(YULETES_REWARD),
+    ];
+    script.inventory_full = Some(text(keys::YULETE_MARBLES_FULL));
     script
 }
 
@@ -10877,9 +11005,14 @@ fn yulete_traces(side: MagatiaSide) -> NpcScript {
     )
 }
 
+/// Set to "1" once the player has seen a Romeo and Juliet run through:
+/// "Yulete's Request" (3365) and "Romeo's Present" (3369) wait for it.
+pub const MAGATIA_WON: i16 = 7072;
+
 /// The one who thanks the party in the last room (Cosmic `2112018`,
 /// `giveEventReward`): their thanks, by whether the escort fainted, then
-/// one of `MAGATIA_REWARDS` and the way home to the side's lobby. A
+/// one of `MAGATIA_REWARDS`, the run marked won (`MAGATIA_WON`) and the
+/// way home to the side's lobby. A
 /// member without a free slot in each kind of inventory the rewards come
 /// in gets nothing yet, and stays.
 fn magatia_thanks(
@@ -10900,6 +11033,10 @@ fn magatia_thanks(
     });
     let last = match events::MAGATIA_REWARDS.choose(rng).filter(|_| room) {
         Some(&(item_id, quantity)) => Page::Done(vec![
+            Effect::SetRecord {
+                record: MAGATIA_WON,
+                value: "1",
+            },
             Effect::GiveItem { item_id, quantity },
             Effect::Warp(lobby),
         ]),
@@ -13895,6 +14032,121 @@ mod tests {
             assert_eq!(time_limit(room), Some(3 * 60));
             assert!(resets_when_empty(room));
         }
+    }
+
+    #[test]
+    fn russellons_pill_poisons_its_taker_and_yulete_trades_marbles() {
+        // The desk has a pill only for one on 3314, holding none and not
+        // under one.
+        let mut alchemist = traveller(70, 0, false);
+        assert!(NpcScript::for_npc(PILL_DESK, &alchemist).is_none());
+        alchemist.quests.upsert(game::QuestRecord {
+            quest_id: LIFE_ALCHEMY,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let desk = NpcScript::for_npc(PILL_DESK, &alchemist).unwrap();
+        assert!(desk.player_speaks && desk.inventory_full.is_some());
+        let pill = Effect::GiveItem {
+            item_id: RUSSELLONS_PILLS,
+            quantity: 1,
+        };
+        assert_eq!(yes_through(desk), (PILL_DESK, vec![pill]));
+        let mut holding = alchemist.clone();
+        holding.inventory.insert(
+            game::InventoryType::Use,
+            1,
+            game::Item::stack(RUSSELLONS_PILLS, 1),
+        );
+        assert!(NpcScript::for_npc(PILL_DESK, &holding).is_none());
+
+        // Russellon wants to see the pill's work before ending the quest.
+        let unwell = NpcScript::for_quest("q3314e", &alchemist).unwrap();
+        assert_eq!(
+            page_text(&unwell.clone().begin()),
+            text(keys::RUSSELLON_PILL_NOT_TAKEN)
+        );
+        assert_eq!(read_through(unwell), (RUSSELLON, Vec::new()));
+        let mut poisoned = alchemist.clone();
+        poisoned.buffs.give(game::Buff::new(
+            PILL_POISON,
+            game::BuffStat::Poison,
+            50,
+            std::time::Instant::now(),
+            std::time::Duration::from_secs(300),
+        ));
+        assert!(NpcScript::for_npc(PILL_DESK, &poisoned).is_none());
+        let done = NpcScript::for_quest("q3314e", &poisoned).unwrap();
+        assert!(done.inventory_full.is_some());
+        let (RUSSELLON, effects) = read_through(done) else {
+            panic!();
+        };
+        let [Effect::GiveItem {
+            item_id,
+            quantity: 20,
+        }, Effect::GainExp(LIFE_ALCHEMY_EXP), Effect::CompleteQuest(LIFE_ALCHEMY), Effect::ApplyItemBuff(ALL_CURE_POTION)] =
+            effects[..]
+        else {
+            panic!("{effects:?}");
+        };
+        assert!(LIFE_ALCHEMY_POTIONS.iter().any(|&(id, _)| id == item_id));
+
+        // Yulete: Horus' Eye for 25 of each marble, a Rock of Wisdom for
+        // 10, or a word to bring more.
+        let with_marbles = |count: i16| {
+            let mut player = traveller(70, 0, false);
+            for (slot, marble) in [(1, ZENUMIST_MARBLE), (2, ALCADNO_MARBLE)] {
+                player.inventory.insert(
+                    game::InventoryType::Etc,
+                    slot,
+                    game::Item::stack(marble, count),
+                );
+            }
+            player
+        };
+        let trade = |count: i16, item_id: i32| {
+            vec![
+                Effect::TakeItem {
+                    item_id: ZENUMIST_MARBLE,
+                    quantity: count,
+                },
+                Effect::TakeItem {
+                    item_id: ALCADNO_MARBLE,
+                    quantity: count,
+                },
+                Effect::GiveItem {
+                    item_id,
+                    quantity: 1,
+                },
+                Effect::CompleteQuest(YULETES_REWARD),
+            ]
+        };
+        let few = NpcScript::for_quest("q3382e", &with_marbles(9)).unwrap();
+        assert_eq!(
+            page_text(&few.clone().begin()),
+            text(keys::YULETE_MARBLES_MORE)
+        );
+        assert_eq!(read_through(few), (LAB_YULETE, Vec::new()));
+        let rock = NpcScript::for_quest("q3382e", &with_marbles(24)).unwrap();
+        assert!(rock.inventory_full.is_some());
+        assert_eq!(read_through(rock), (LAB_YULETE, trade(10, ROCK_OF_WISDOM)));
+        assert_eq!(
+            read_through(NpcScript::for_quest("q3382e", &with_marbles(25)).unwrap()),
+            (LAB_YULETE, trade(25, HORUS_EYE))
+        );
+        // Wearing the eye already, the player gets the rock.
+        let mut wearing = with_marbles(25);
+        wearing.inventory.insert(
+            game::InventoryType::Equipped,
+            -17,
+            game::Item::stack(HORUS_EYE, 1),
+        );
+        assert_eq!(
+            read_through(NpcScript::for_quest("q3382e", &wearing).unwrap()),
+            (LAB_YULETE, trade(10, ROCK_OF_WISDOM))
+        );
     }
 
     /// Every effect of `script` read to its end, answering yes to each ask.
@@ -21843,7 +22095,8 @@ mod tests {
                 ]
             );
 
-            // The thanks, then one of the rewards and the way home.
+            // The thanks, then the run marked won, one of the rewards and
+            // the way home.
             let lobby = EventKind::Magatia(side).event().lobby;
             let mut rng = rand::thread_rng();
             for (escort_failed, key) in [
@@ -21856,7 +22109,10 @@ mod tests {
                 assert_eq!(thanks.npc_id(), MAGATIA_THANKS);
                 assert_eq!(page_text(&thanks.begin()), text(key));
                 let given = thanks.respond(ScriptInput::Next).unwrap();
-                let [Effect::GiveItem { item_id, quantity }, Effect::Warp(to)] = given.effects[..]
+                let [Effect::SetRecord {
+                    record: MAGATIA_WON,
+                    value: "1",
+                }, Effect::GiveItem { item_id, quantity }, Effect::Warp(to)] = given.effects[..]
                 else {
                     panic!("{given:?}");
                 };

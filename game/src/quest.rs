@@ -41,12 +41,13 @@ pub const INFO_QUESTS: &[i16] = &[
 /// warning heard in its cave (21760, for "The Puppeteer's Warning", 21720);
 /// also an Aran's runs with the wolves: through the Field of Wolves (21619,
 /// for "Scadur's Advice", 21610) and out of the wolves' test room (21620,
-/// for "The Wolves' Test", 21613).
+/// for "The Wolves' Test", 21613); and a Romeo and Juliet run won (7072,
+/// for "Yulete's Request", 3365, and "Romeo's Present", 3369).
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
 pub const RECORDS: &[i16] = &[
-    2311, 6331, 6364, 6371, 6401, 6411, 7067, 7081, 7760, 20731, 20732, 21619, 21620, 21760, 21761,
-    21762, 21763, 21764, 21765,
+    2311, 6331, 6364, 6371, 6401, 6411, 7067, 7072, 7081, 7760, 20731, 20732, 21619, 21620, 21760,
+    21761, 21762, 21763, 21764, 21765,
 ];
 
 /// A quest's state as the client and the quest data number it.

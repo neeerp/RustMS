@@ -870,19 +870,10 @@ pub fn catch_disease(
     disease: Disease,
     now: std::time::Instant,
 ) -> WorldResult {
-    let stat = disease.stat;
-    let shielded = player.buffs.has(BuffStat::HolyShield)
-        && !matches!(stat, BuffStat::Stun | BuffStat::Seduce);
-    if player.stats.hp <= 0 || player.buffs.has(stat) || shielded {
+    if !take_disease(player, disease, now) {
         return Ok(HandlerResult::empty());
     }
-    player.buffs.give(Buff::new(
-        disease.skill_id,
-        stat,
-        disease.value,
-        now,
-        disease.lasts,
-    ));
+    let stat = disease.stat;
     let lasts = i32::try_from(disease.lasts.as_millis()).unwrap_or(i32::MAX);
     let mut result = HandlerResult::reply(buff::build_give_buff(
         disease.skill_id,
@@ -902,6 +893,25 @@ pub fn catch_disease(
         )?));
     }
     Ok(result)
+}
+
+/// Put `disease` on the player, unless they're dead, already have it, or
+/// Holy Shield keeps it off (all but Stun and Seduce); whether it took.
+pub fn take_disease(player: &mut Player, disease: Disease, now: std::time::Instant) -> bool {
+    let stat = disease.stat;
+    let shielded = player.buffs.has(BuffStat::HolyShield)
+        && !matches!(stat, BuffStat::Stun | BuffStat::Seduce);
+    if player.stats.hp <= 0 || player.buffs.has(stat) || shielded {
+        return false;
+    }
+    player.buffs.give(Buff::new(
+        disease.skill_id,
+        stat,
+        disease.value,
+        now,
+        disease.lasts,
+    ));
+    true
 }
 
 const SAFETY_CHARM: i32 = 5130000;

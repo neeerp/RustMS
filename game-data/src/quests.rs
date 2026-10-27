@@ -96,9 +96,9 @@ pub const SCRIPTS: &[&str] = &[
     "q29921s", "q29933s", "q21733s", "q21733e", "q21734s", "q21734e", "q21735s", "q21735e",
     "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s", "q21742s", "q21742e",
     "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e", "q21753s", "q21754s",
-    "q21757e", "q21700s", "q21703s", "q21703e", "q21704s", "q21712s", "q21716s", "q21719s",
-    "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q21600s", "q21604s", "q21613s",
-    "q21618s", "q21618e", "q3250s", "q3250e",
+    "q21757e", "q3314e", "q3382e", "q21700s", "q21703s", "q21703e", "q21704s", "q21712s",
+    "q21716s", "q21719s", "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q21600s",
+    "q21604s", "q21613s", "q21618s", "q21618e", "q3250s", "q3250e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -181,10 +181,17 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
 /// set on entering Ellin's warehouse, and "Info on Another Seal Stone"
 /// (21754) for 21765, set on entering the Bowman Instructional School, and
 /// "The Puppeteer's Warning" (21720) for 21760, set by Francis's warning in
-/// the Puppeteer's Cave.
+/// the Puppeteer's Cave. "Yulete's Request" (3365) and "Romeo's Present"
+/// (3369) wait for 7072, set on winning a Romeo and Juliet run.
 /// See [`StartRequirements::record`].
-pub const START_RECORD_QUESTS: &[(i16, i16)] =
-    &[(2312, 2311), (21720, 21760), (21753, 21764), (21754, 21765)];
+pub const START_RECORD_QUESTS: &[(i16, i16)] = &[
+    (2312, 2311),
+    (3365, 7072),
+    (3369, 7072),
+    (21720, 21760),
+    (21753, 21764),
+    (21754, 21765),
+];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
