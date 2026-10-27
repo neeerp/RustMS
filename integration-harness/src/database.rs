@@ -669,7 +669,8 @@ pub async fn start_quest(character_id: i32, quest_id: i16) -> Result<(), Harness
 }
 
 /// Give the logged-out character `character_id` quest `quest_id` in
-/// `status` (1 started, 2 completed) with kill `progress`.
+/// `status` (1 started, 2 completed) with kill `progress`, replacing any
+/// record of it already there.
 pub async fn set_quest(
     character_id: i32,
     quest_id: i16,
@@ -680,7 +681,9 @@ pub async fn set_quest(
     change_one_row("set quest", move |conn| {
         diesel::sql_query(
             "INSERT INTO character_quests (character_id, quest_id, status, completed_at, progress) \
-             VALUES ($1, $2, $3, CASE WHEN $3 = 2 THEN now() END, $4)",
+             VALUES ($1, $2, $3, CASE WHEN $3 = 2 THEN now() END, $4) \
+             ON CONFLICT (character_id, quest_id) DO UPDATE SET status = EXCLUDED.status, \
+             completed_at = EXCLUDED.completed_at, progress = EXCLUDED.progress",
         )
         .bind::<Integer, _>(character_id)
         .bind::<SmallInt, _>(quest_id)

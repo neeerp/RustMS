@@ -2183,6 +2183,7 @@ impl NpcScript {
             }
             PUPPETEER_DOOR => return Some(puppeteer_door(player)),
             FRANCIS => return Some(francis()),
+            CAVE_FRANCIS => return Some(cave_francis(player)),
             PASSAGE_END_STATUE => return Some(passage_end_statue()),
             PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
             SHRINE_PILLAR => return Some(shrine_pillar(player)),
@@ -2609,6 +2610,26 @@ impl NpcScript {
             "q21753s" => Some(athena_keeps_the_letter()),
             "q21754s" => Some(athena_hands_over_the_letter(player)),
             "q21757e" => Some(neinheart_takes_the_letter()),
+            "q21700s" => Some(new_beginnings()),
+            "q21703s" => Some(target_pigs()),
+            "q21703e" => Some(combo_ability()),
+            "q21704s" => Some(baby_steps()),
+            "q21712s" => Some(assignment_done(
+                BRUCE,
+                FIRST_ASSIGNMENT_DONE,
+                keys::BRUCE_FIRST_ASSIGNMENT,
+            )),
+            "q21716s" => Some(assignment_done(
+                ROWEN,
+                SECOND_ASSIGNMENT_DONE,
+                keys::ROWEN_SECOND_ASSIGNMENT,
+            )),
+            "q21719s" => Some(puppeteers_invitation()),
+            "q21720e" => Some(polearm_booster()),
+            "q21729s" => Some(fourth_assignment_done()),
+            "q21766s" => Some(suspicious_john()),
+            "q21766e" => Some(john_cleared()),
+            "q21767s" => Some(wooden_box(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5159,6 +5180,291 @@ fn neinheart_takes_the_letter() -> NpcScript {
         Effect::GainExp(1000),
         Effect::CompleteQuest(NEINHEART_THE_STRATEGIST),
     ];
+    script
+}
+
+const NEW_BEGINNINGS: i16 = 21700;
+const TRAIN_OR_DIE_3: i16 = 21703;
+const BABY_STEPS: i16 = 21704;
+const FIRST_ASSIGNMENT_DONE: i16 = 21712;
+const SECOND_ASSIGNMENT_DONE: i16 = 21716;
+const PUPPETEERS_INVITATION: i16 = 21719;
+const PUPPETEERS_WARNING: i16 = 21720;
+const FOURTH_ASSIGNMENT_DONE: i16 = 21729;
+const SUSPICIOUS_JOHN: i16 = 21766;
+const WOODEN_BOX: i16 = 21767;
+const PUO: i32 = 1202006;
+const BRUCE: i32 = 1012111;
+const ROWEN: i32 = 1032101;
+/// The shadow that hands an Aran the Puppeteer's invitation (21719), from
+/// the quest alert: it stands on no map.
+const INVITATION_SHADOW: i32 = 1204000;
+/// Francis in the Puppeteer's Cave (910510200), the cave's only way out.
+const CAVE_FRANCIS: i32 = 1204001;
+const PUPPETEERS_CAVE_MAP: i32 = 910510200;
+/// Where Francis sends an Aran out: the Hunting Ground in the Deep Forest
+/// II (105040200), by its `in00` (portal 10) to the Puppeteer's Hiding
+/// Place.
+const DEEP_FOREST_II: i32 = 105040200;
+const DEEP_FOREST_II_IN00: u8 = 10;
+/// The record "The Puppeteer's Warning" (21720) needs at "0" to start
+/// (`Check.img/21720/0`), which Francis's warning sets.
+pub const PUPPETEERS_WARNING_RECORD: i16 = 21760;
+const ILJI: i32 = 1061019;
+const TEO: i32 = 1002001;
+const JOHNS_BOX: i32 = 1204033;
+const PRACTICE_POLEARM: i32 = 1442077;
+const SPECIAL_RIEN_RED_POTION: i32 = 2000022;
+const SPECIAL_RIEN_BLUE_POTION: i32 = 2000023;
+const COMBO_ABILITY: i32 = 21000000;
+const POLEARM_BOOSTER: i32 = 21001003;
+const ARTHRITIS_MEDICINE: i32 = 4032423;
+
+/// `q21700s`: Lilin hands an Aran a Practice Polearm (`Act.img/21700/0`)
+/// and sends them west of Rien to Puo, who ends it from the data (Cosmic
+/// `21700.js` gives a plain Pole Arm instead).
+fn new_beginnings() -> NpcScript {
+    let [remember, how, ask, go] = keys::LILIN_NEW_BEGINNINGS;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(remember)),
+            Page::Reply(text(how)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::GiveItem {
+                        item_id: PRACTICE_POLEARM,
+                        quantity: 1,
+                    },
+                    Effect::StartQuest(NEW_BEGINNINGS),
+                ],
+                on_no: Some(text(keys::LILIN_NEW_BEGINNINGS_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::LILIN_NEW_BEGINNINGS_FULL));
+    script
+}
+
+/// `q21703s`: Puo sends an Aran into the third training ground after 30
+/// Target Pigs (Cosmic `21703.js`).
+fn target_pigs() -> NpcScript {
+    let [lesson, ask, go] = keys::PUO_TARGET_PIGS;
+    NpcScript::new(
+        PUO,
+        vec![
+            Page::Say(text(lesson)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(TRAIN_OR_DIE_3)],
+                on_no: Some(text(keys::PUO_TARGET_PIGS_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    )
+}
+
+/// `q21703e`: the pigs beaten, Puo gives the data's 30 of each Special
+/// Rien potion (`Act.img/21703/1`), and Cosmic's 2,800 EXP and Combo
+/// Ability, up to 10, then sends the Aran back to Lilin.
+fn combo_ability() -> NpcScript {
+    let [proud, ask, remembered, lilin] = keys::PUO_COMBO_ABILITY;
+    let mut script = NpcScript::new(
+        PUO,
+        vec![
+            Page::Say(text(proud)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::GiveItem {
+                        item_id: SPECIAL_RIEN_RED_POTION,
+                        quantity: 30,
+                    },
+                    Effect::GiveItem {
+                        item_id: SPECIAL_RIEN_BLUE_POTION,
+                        quantity: 30,
+                    },
+                    Effect::GainExp(2800),
+                    Effect::TeachSkill {
+                        skill_id: COMBO_ABILITY,
+                        level: 0,
+                        master_level: 10,
+                    },
+                    Effect::CompleteQuest(TRAIN_OR_DIE_3),
+                ],
+                on_no: None,
+            },
+            Page::Reply(text(remembered)),
+            Page::Say(text(lilin)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::PUO_COMBO_ABILITY_FULL));
+    script
+}
+
+/// `q21704s`: Lilin hears of Combo Ability and gives Cosmic's 500 EXP; the
+/// quest completes as it starts (`FINISHED_BY_START_SCRIPT`).
+fn baby_steps() -> NpcScript {
+    let [training, combo, body] = keys::LILIN_BABY_STEPS;
+    let mut script = NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(training)),
+            Page::Reply(text(combo)),
+            Page::Say(text(body)),
+        ],
+    );
+    script.on_end = vec![Effect::FinishQuest(BABY_STEPS), Effect::GainExp(500)];
+    script
+}
+
+/// An assignment's report to Tru, offered by `npc` (Cosmic `21712.js`,
+/// `21716.js`): pages, a yes/no that starts `quest`, then a last word
+/// and the Aran's thought.
+fn assignment_done(npc: i32, quest: i16, [said, ask, after, report]: [&str; 4]) -> NpcScript {
+    NpcScript::new(
+        npc,
+        vec![
+            Page::Say(text(said)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(quest)],
+                on_no: Some(text(keys::ASSIGNMENT_DONE_DECLINED)),
+            },
+            Page::Say(text(after)),
+            Page::Reply(text(report)),
+        ],
+    )
+}
+
+/// `q21719s`: a shadow brings an Aran the Puppeteer's invitation, and on
+/// accepting, sends them into the Puppeteer's Cave, where Francis waits
+/// (Cosmic `21719.js` completes it at once; here Francis does). The record
+/// 21720 starts on is set here too, so an Aran who reaches Tru with the
+/// invitation unfinished and ends it there can still go on.
+fn puppeteers_invitation() -> NpcScript {
+    let [found, who, ask] = keys::SHADOW_INVITATION;
+    NpcScript::new(
+        INVITATION_SHADOW,
+        vec![
+            Page::Say(text(found)),
+            Page::Reply(text(who)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::SetRecord {
+                        record: PUPPETEERS_WARNING_RECORD,
+                        value: "0",
+                    },
+                    Effect::StartQuest(PUPPETEERS_INVITATION),
+                    Effect::WarpToPortal(PUPPETEERS_CAVE_MAP, 0),
+                ],
+                on_no: Some(text(keys::SHADOW_INVITATION_DECLINED)),
+            },
+        ],
+    )
+}
+
+/// Francis in the Puppeteer's Cave warns an Aran off the Black Wings'
+/// business, which ends the invitation and sets the record "The
+/// Puppeteer's Warning" (21720) starts on (again: the invitation set it
+/// first), then sends them out to the Deep Forest (Cosmic `1204001.js`).
+/// No source sets the record; this is where the warning is heard. Anyone
+/// else is just sent out.
+fn cave_francis(player: &Player) -> NpcScript {
+    let out = Effect::WarpToPortal(DEEP_FOREST_II, DEEP_FOREST_II_IN00);
+    if player.quests.state(PUPPETEERS_INVITATION) != QuestState::Started {
+        let mut script =
+            NpcScript::new(CAVE_FRANCIS, vec![Page::Say(text(keys::CAVE_FRANCIS_OUT))]);
+        script.on_end = vec![out];
+        return script;
+    }
+    let [warning, thought] = keys::CAVE_FRANCIS_WARNING;
+    let mut script = NpcScript::new(
+        CAVE_FRANCIS,
+        vec![Page::Say(text(warning)), Page::Reply(text(thought))],
+    );
+    script.on_end = vec![
+        Effect::SetRecord {
+            record: PUPPETEERS_WARNING_RECORD,
+            value: "0",
+        },
+        Effect::CompleteQuest(PUPPETEERS_INVITATION),
+        out,
+    ];
+    script
+}
+
+/// `q21720e`: Lilin hears Tru's message of the Puppeteer and gives back
+/// Polearm Booster, up to 20, with Cosmic's 3,900 EXP (`21720.js`).
+fn polearm_booster() -> NpcScript {
+    let [message, black_wings, prophecy, ask, remembered, train] = keys::LILIN_POLEARM_BOOSTER;
+    NpcScript::new(
+        LILIN,
+        vec![
+            Page::Say(text(message)),
+            Page::Reply(text(black_wings)),
+            Page::Say(text(prophecy)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::GainExp(3900),
+                    Effect::TeachSkill {
+                        skill_id: POLEARM_BOOSTER,
+                        level: 0,
+                        master_level: 20,
+                    },
+                    Effect::CompleteQuest(PUPPETEERS_WARNING),
+                ],
+                on_no: None,
+            },
+            Page::Reply(text(remembered)),
+            Page::Say(text(train)),
+        ],
+    )
+}
+
+/// `q21729s`: Ilji sends an Aran to read what the Puppeteer scribbled on
+/// the Mysterious Statue (21730), then to Tru (Cosmic `21729.js`).
+fn fourth_assignment_done() -> NpcScript {
+    let mut script = NpcScript::new(ILJI, vec![Page::Say(text(keys::ILJI_STATUE))]);
+    script.on_end = vec![Effect::StartQuest(FOURTH_ASSIGNMENT_DONE)];
+    script
+}
+
+/// `q21766s`: Teo asks an Aran to find out what John (20000) keeps in a
+/// wooden box (Cosmic `21766.js`).
+fn suspicious_john() -> NpcScript {
+    let [favour, where_] = keys::TEO_SUSPICIOUS_JOHN;
+    let mut script = NpcScript::new(TEO, vec![Page::Say(text(favour)), Page::Say(text(where_))]);
+    script.on_end = vec![Effect::StartQuest(SUSPICIOUS_JOHN)];
+    script
+}
+
+/// `q21766e`: the box's secret kept, the Aran tells Teo something else,
+/// for Cosmic's 200 EXP.
+fn john_cleared() -> NpcScript {
+    let [ask, made_up] = keys::TEO_JOHN_CLEARED;
+    let mut script = NpcScript::new(TEO, vec![Page::Say(text(ask)), Page::Reply(text(made_up))]);
+    script.on_end = vec![Effect::GainExp(200), Effect::CompleteQuest(SUSPICIOUS_JOHN)];
+    script
+}
+
+/// `q21767s`: John's box holds Arthritis Medicine, which the Aran takes to
+/// John (who ends it from the data), unless one is held (Cosmic
+/// `21767.js`).
+fn wooden_box(player: &Player) -> NpcScript {
+    let mut script = NpcScript::new(JOHNS_BOX, vec![Page::Reply(text(keys::JOHNS_BOX_MEDICINE))]);
+    if player.inventory.count(ARTHRITIS_MEDICINE) == 0 {
+        script.on_end.push(Effect::GiveItem {
+            item_id: ARTHRITIS_MEDICINE,
+            quantity: 1,
+        });
+    }
+    script.on_end.push(Effect::StartQuest(WOODEN_BOX));
+    script.inventory_full = Some(text(keys::JOHNS_BOX_FULL));
     script
 }
 
@@ -13160,6 +13466,190 @@ mod tests {
                     },
                     Effect::GainExp(1000),
                     Effect::CompleteQuest(NEINHEART_THE_STRATEGIST),
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn an_aran_fills_the_gaps_from_lilins_polearm_to_johns_box() {
+        let aran = traveller(10, 0, false);
+        let lilin = NpcScript::for_quest("q21700s", &aran).unwrap();
+        assert_eq!(
+            lilin.inventory_full,
+            Some(text(keys::LILIN_NEW_BEGINNINGS_FULL))
+        );
+        assert_eq!(
+            yes_through(lilin),
+            (
+                LILIN,
+                vec![
+                    Effect::GiveItem {
+                        item_id: PRACTICE_POLEARM,
+                        quantity: 1,
+                    },
+                    Effect::StartQuest(NEW_BEGINNINGS),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21703s", &aran).unwrap()),
+            (PUO, vec![Effect::StartQuest(TRAIN_OR_DIE_3)])
+        );
+        let mut puo = NpcScript::for_quest("q21703s", &aran).unwrap();
+        puo.begin();
+        puo.respond(ScriptInput::Next).unwrap();
+        let declined = puo.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&declined), text(keys::PUO_TARGET_PIGS_DECLINED));
+        assert!(declined.effects.is_empty());
+
+        let puo = NpcScript::for_quest("q21703e", &aran).unwrap();
+        assert_eq!(puo.inventory_full, Some(text(keys::PUO_COMBO_ABILITY_FULL)));
+        assert_eq!(
+            yes_through(puo),
+            (
+                PUO,
+                vec![
+                    Effect::GiveItem {
+                        item_id: SPECIAL_RIEN_RED_POTION,
+                        quantity: 30,
+                    },
+                    Effect::GiveItem {
+                        item_id: SPECIAL_RIEN_BLUE_POTION,
+                        quantity: 30,
+                    },
+                    Effect::GainExp(2800),
+                    Effect::TeachSkill {
+                        skill_id: COMBO_ABILITY,
+                        level: 0,
+                        master_level: 10,
+                    },
+                    Effect::CompleteQuest(TRAIN_OR_DIE_3),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21704s", &aran).unwrap()),
+            (
+                LILIN,
+                vec![Effect::FinishQuest(BABY_STEPS), Effect::GainExp(500)]
+            )
+        );
+
+        for (name, npc, quest) in [
+            ("q21712s", BRUCE, FIRST_ASSIGNMENT_DONE),
+            ("q21716s", ROWEN, SECOND_ASSIGNMENT_DONE),
+        ] {
+            assert_eq!(
+                yes_through(NpcScript::for_quest(name, &aran).unwrap()),
+                (npc, vec![Effect::StartQuest(quest)]),
+                "{name}"
+            );
+        }
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21729s", &aran).unwrap()),
+            (ILJI, vec![Effect::StartQuest(FOURTH_ASSIGNMENT_DONE)])
+        );
+
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21720e", &aran).unwrap()),
+            (
+                LILIN,
+                vec![
+                    Effect::GainExp(3900),
+                    Effect::TeachSkill {
+                        skill_id: POLEARM_BOOSTER,
+                        level: 0,
+                        master_level: 20,
+                    },
+                    Effect::CompleteQuest(PUPPETEERS_WARNING),
+                ]
+            )
+        );
+
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21766s", &aran).unwrap()),
+            (TEO, vec![Effect::StartQuest(SUSPICIOUS_JOHN)])
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21766e", &aran).unwrap()),
+            (
+                TEO,
+                vec![Effect::GainExp(200), Effect::CompleteQuest(SUSPICIOUS_JOHN)]
+            )
+        );
+        let bx = NpcScript::for_quest("q21767s", &aran).unwrap();
+        assert_eq!(bx.inventory_full, Some(text(keys::JOHNS_BOX_FULL)));
+        assert_eq!(
+            read_through(bx),
+            (
+                JOHNS_BOX,
+                vec![
+                    Effect::GiveItem {
+                        item_id: ARTHRITIS_MEDICINE,
+                        quantity: 1,
+                    },
+                    Effect::StartQuest(WOODEN_BOX),
+                ]
+            )
+        );
+        let mut holding = aran.clone();
+        holding.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(ARTHRITIS_MEDICINE, 1),
+        );
+        assert_eq!(
+            read_through(NpcScript::for_quest("q21767s", &holding).unwrap()).1,
+            [Effect::StartQuest(WOODEN_BOX)]
+        );
+    }
+
+    #[test]
+    fn the_shadow_brings_an_aran_to_francis_who_warns_it_and_sends_it_back() {
+        let aran = traveller(30, 0, false);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21719s", &aran).unwrap()),
+            (
+                INVITATION_SHADOW,
+                vec![
+                    Effect::SetRecord {
+                        record: PUPPETEERS_WARNING_RECORD,
+                        value: "0",
+                    },
+                    Effect::StartQuest(PUPPETEERS_INVITATION),
+                    Effect::WarpToPortal(PUPPETEERS_CAVE_MAP, 0),
+                ]
+            )
+        );
+
+        let out = Effect::WarpToPortal(DEEP_FOREST_II, DEEP_FOREST_II_IN00);
+        let stray = NpcScript::for_npc(CAVE_FRANCIS, &aran).unwrap();
+        assert_eq!(
+            page_text(&stray.clone().begin()),
+            text(keys::CAVE_FRANCIS_OUT)
+        );
+        assert_eq!(read_through(stray), (CAVE_FRANCIS, vec![out.clone()]));
+
+        let mut invited = aran.clone();
+        invited.quests.upsert(game::QuestRecord {
+            quest_id: PUPPETEERS_INVITATION,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        assert_eq!(
+            yes_through(NpcScript::for_npc(CAVE_FRANCIS, &invited).unwrap()),
+            (
+                CAVE_FRANCIS,
+                vec![
+                    Effect::SetRecord {
+                        record: PUPPETEERS_WARNING_RECORD,
+                        value: "0",
+                    },
+                    Effect::CompleteQuest(PUPPETEERS_INVITATION),
+                    out,
                 ]
             )
         );

@@ -282,6 +282,12 @@ record 21764 to be "1", set on entering Ellin's warehouse after 21751, and
 "Info on Another Seal Stone" (21754) for 21765 to be "2", set on entering the
 Bowman Instructional School after 21753 (see `map-travel.md`). Nothing in the
 sources sets either record, so the server's setters are a guess.
+"The Puppeteer's Warning" (21720) waits for record 21760 to be "0". The
+shadow's invitation (21719, `q21719s`) sets it as it sends the Aran to the
+Puppeteer's cave (910510200), where Francis (1204001) sets it again,
+completes 21719 and sends the Aran back to Deep Forest II, so Tru offers
+21720 afterwards. Nothing in the sources sets 21760 either; Cosmic
+completes 21719 on accepting.
 HeavenClient checks the same record before offering the quest, unless the
 record is itself a quest in `QuestInfo.img` (Meren's 6030-6032 read 6029's
 string, which the server doesn't keep, so the client leaves those to it).
@@ -471,6 +477,9 @@ Reef (1032108, in 910100001) thanks the player through a start script
 (`q2228s`) that completes the quest at once and gives the data's 8 fame
 (`Act/1 pop`, through `Effect::GainFame`, since `FinishQuest` gives no
 `Act/1` rewards). Its line is a placeholder (`reef.thanks`).
+
+"Baby Steps" (21704) is another: Lilin's start script (`q21704s`) completes
+it at once with Cosmic's 500 EXP, as the data has no end rewards.
 
 "Dollhouse" (3230) has no completion NPC either: its `Check/1` is only an
 `infoex` ("dummy") on an info string nothing sets, so neither the client nor

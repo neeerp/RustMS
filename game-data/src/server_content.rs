@@ -1115,6 +1115,74 @@ pub mod keys {
     pub const ATHENA_LETTER_FULL: &str = "athena.letter.full";
     pub const NEINHEART_LETTER: &str = "neinheart.letter";
 
+    /// The Aran's first steps and errands that run on scripts: Lilin
+    /// (`q21700s`, `q21704s`, `q21720e`), Puo (1202006, `q21703s`/`e`),
+    /// Bruce and Rowen reporting to Tru (`q21712s`, `q21716s`), the
+    /// Puppeteer's invitation (1204000, `q21719s`) and Francis in the
+    /// Puppeteer's Cave (1204001), Ilji (`q21729s`), and Teo, John and
+    /// John's box (`q21766s`/`e`, `q21767s`).
+    pub const LILIN_NEW_BEGINNINGS: [&str; 4] = [
+        "lilin.new_beginnings.remember",
+        "lilin.new_beginnings.how",
+        "lilin.new_beginnings.ask",
+        "lilin.new_beginnings.go",
+    ];
+    pub const LILIN_NEW_BEGINNINGS_DECLINED: &str = "lilin.new_beginnings.declined";
+    pub const LILIN_NEW_BEGINNINGS_FULL: &str = "lilin.new_beginnings.full";
+    pub const PUO_TARGET_PIGS: [&str; 3] = [
+        "puo.target_pigs.lesson",
+        "puo.target_pigs.ask",
+        "puo.target_pigs.go",
+    ];
+    pub const PUO_TARGET_PIGS_DECLINED: &str = "puo.target_pigs.declined";
+    pub const PUO_COMBO_ABILITY: [&str; 4] = [
+        "puo.combo_ability.proud",
+        "puo.combo_ability.ask",
+        "puo.combo_ability.remembered",
+        "puo.combo_ability.lilin",
+    ];
+    pub const PUO_COMBO_ABILITY_FULL: &str = "puo.combo_ability.full";
+    pub const LILIN_BABY_STEPS: [&str; 3] = [
+        "lilin.baby_steps.training",
+        "lilin.baby_steps.combo",
+        "lilin.baby_steps.body",
+    ];
+    pub const BRUCE_FIRST_ASSIGNMENT: [&str; 4] = [
+        "bruce.first_assignment.puppet",
+        "bruce.first_assignment.ask",
+        "bruce.first_assignment.planned",
+        "bruce.first_assignment.report",
+    ];
+    pub const ROWEN_SECOND_ASSIGNMENT: [&str; 4] = [
+        "rowen.second_assignment.tree",
+        "rowen.second_assignment.ask",
+        "rowen.second_assignment.suspicious",
+        "rowen.second_assignment.report",
+    ];
+    pub const ASSIGNMENT_DONE_DECLINED: &str = "aran.assignment_done.declined";
+    pub const SHADOW_INVITATION: [&str; 3] = [
+        "shadow.invitation.found",
+        "shadow.invitation.who",
+        "shadow.invitation.ask",
+    ];
+    pub const SHADOW_INVITATION_DECLINED: &str = "shadow.invitation.declined";
+    pub const CAVE_FRANCIS_WARNING: [&str; 2] = ["francis.cave.warning", "francis.cave.thought"];
+    pub const CAVE_FRANCIS_OUT: &str = "francis.cave.out";
+    pub const LILIN_POLEARM_BOOSTER: [&str; 6] = [
+        "lilin.polearm_booster.message",
+        "lilin.polearm_booster.black_wings",
+        "lilin.polearm_booster.prophecy",
+        "lilin.polearm_booster.ask",
+        "lilin.polearm_booster.remembered",
+        "lilin.polearm_booster.train",
+    ];
+    pub const ILJI_STATUE: &str = "ilji.statue";
+    pub const TEO_SUSPICIOUS_JOHN: [&str; 2] =
+        ["teo.suspicious_john.favour", "teo.suspicious_john.where"];
+    pub const TEO_JOHN_CLEARED: [&str; 2] = ["teo.john_cleared.ask", "teo.john_cleared.made_up"];
+    pub const JOHNS_BOX_MEDICINE: &str = "johns_box.medicine";
+    pub const JOHNS_BOX_FULL: &str = "johns_box.full";
+
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
     /// (`q3250e`), takes it back.
@@ -3599,6 +3667,53 @@ mod tests {
                 keys::ATHENA_LETTER,
                 keys::ATHENA_LETTER_FULL,
                 keys::NEINHEART_LETTER,
+                keys::LILIN_NEW_BEGINNINGS[0],
+                keys::LILIN_NEW_BEGINNINGS[1],
+                keys::LILIN_NEW_BEGINNINGS[2],
+                keys::LILIN_NEW_BEGINNINGS[3],
+                keys::LILIN_NEW_BEGINNINGS_DECLINED,
+                keys::LILIN_NEW_BEGINNINGS_FULL,
+                keys::PUO_TARGET_PIGS[0],
+                keys::PUO_TARGET_PIGS[1],
+                keys::PUO_TARGET_PIGS[2],
+                keys::PUO_TARGET_PIGS_DECLINED,
+                keys::PUO_COMBO_ABILITY[0],
+                keys::PUO_COMBO_ABILITY[1],
+                keys::PUO_COMBO_ABILITY[2],
+                keys::PUO_COMBO_ABILITY[3],
+                keys::PUO_COMBO_ABILITY_FULL,
+                keys::LILIN_BABY_STEPS[0],
+                keys::LILIN_BABY_STEPS[1],
+                keys::LILIN_BABY_STEPS[2],
+                keys::BRUCE_FIRST_ASSIGNMENT[0],
+                keys::BRUCE_FIRST_ASSIGNMENT[1],
+                keys::BRUCE_FIRST_ASSIGNMENT[2],
+                keys::BRUCE_FIRST_ASSIGNMENT[3],
+                keys::ROWEN_SECOND_ASSIGNMENT[0],
+                keys::ROWEN_SECOND_ASSIGNMENT[1],
+                keys::ROWEN_SECOND_ASSIGNMENT[2],
+                keys::ROWEN_SECOND_ASSIGNMENT[3],
+                keys::ASSIGNMENT_DONE_DECLINED,
+                keys::SHADOW_INVITATION[0],
+                keys::SHADOW_INVITATION[1],
+                keys::SHADOW_INVITATION[2],
+                keys::SHADOW_INVITATION_DECLINED,
+                keys::CAVE_FRANCIS_WARNING[0],
+                keys::CAVE_FRANCIS_WARNING[1],
+                keys::CAVE_FRANCIS_OUT,
+                keys::LILIN_POLEARM_BOOSTER[0],
+                keys::LILIN_POLEARM_BOOSTER[1],
+                keys::LILIN_POLEARM_BOOSTER[2],
+                keys::LILIN_POLEARM_BOOSTER[3],
+                keys::LILIN_POLEARM_BOOSTER[4],
+                keys::LILIN_POLEARM_BOOSTER[5],
+                keys::ILJI_STATUE,
+                keys::TEO_SUSPICIOUS_JOHN[0],
+                keys::TEO_SUSPICIOUS_JOHN[1],
+                keys::TEO_JOHN_CLEARED[0],
+                keys::TEO_JOHN_CLEARED[1],
+                keys::JOHNS_BOX_MEDICINE,
+                keys::JOHNS_BOX_FULL,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],
