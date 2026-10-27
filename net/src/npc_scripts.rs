@@ -13,6 +13,7 @@ use crate::events::{
     LeverCheck, MagatiaSide, PyramidMode, Standing, Statue,
 };
 use crate::gachapon::{self, Prize};
+use crate::guild_quest;
 use crate::item_makers::{self, Recipe};
 use crate::items;
 use crate::packet::handle::world;
@@ -1482,6 +1483,55 @@ impl NpcScript {
         squad(kind, view, player)
     }
 
+    /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
+    /// `rank` in their guild (none without one) who finds the channel's
+    /// Guild Quest line as `view` (Cosmic `9040000`): the master or a Jr.
+    /// Master puts the guild in line, any member goes into its waiting room
+    /// while it gathers, and anyone may hear what the quest is.
+    pub fn shuang(rank: Option<u8>, view: guild_quest::View) -> Self {
+        let register = match rank {
+            None => Page::Say(text(keys::GUILD_QUEST_NO_GUILD)),
+            Some(rank) if !guild_quest::REGISTRANT_RANKS.contains(&rank) => {
+                Page::Say(text(keys::GUILD_QUEST_NOT_MASTER))
+            }
+            Some(_) if view.listed => Page::Say(text(keys::GUILD_QUEST_LISTED)),
+            Some(_) if view.full => Page::Say(text(keys::GUILD_QUEST_FULL)),
+            Some(_) => Page::Decide {
+                text: content::text().get(
+                    keys::GUILD_QUEST_ASK,
+                    &[("waiting", &view.waiting.to_string())],
+                ),
+                on_yes: vec![Page::Act {
+                    text: text(keys::GUILD_QUEST_REGISTERED),
+                    effects: vec![Effect::GuildQuest(guild_quest::Command::Register)],
+                }],
+                on_no: vec![],
+            },
+        };
+        let join = match rank {
+            None => Page::Say(text(keys::GUILD_QUEST_NO_GUILD)),
+            Some(_) if !view.gathering => Page::Say(text(keys::GUILD_QUEST_NOT_CALLED)),
+            Some(_) => Page::Done(vec![Effect::GuildQuest(guild_quest::Command::Join)]),
+        };
+        let mut script = Self::new(
+            guild_quest::SHUANG,
+            vec![Page::Menu {
+                text: text(keys::GUILD_QUEST_MENU),
+                choices: vec![
+                    (text(keys::GUILD_QUEST_REGISTER_CHOICE), vec![register]),
+                    (text(keys::GUILD_QUEST_JOIN_CHOICE), vec![join]),
+                    (
+                        text(keys::GUILD_QUEST_DETAILS_CHOICE),
+                        vec![Page::Say(text(keys::GUILD_QUEST_DETAILS))],
+                    ),
+                ],
+            }],
+        );
+        // Another guild took the last place, or the guild's turn passed.
+        script.refused = Some(text(keys::GUILD_QUEST_REFUSED));
+        script
+    }
+
     /// The gatekeeper (2083001) at the Cave Entrance, for a player whose
     /// party may or may not go into the Trial Grounds.
     pub fn htpq_gatekeeper(entry: Entry) -> Self {
@@ -1854,6 +1904,14 @@ impl NpcScript {
         }
         if npc_id == SPIEGELMANN && player.stats.map_id != carnival::CARNIVAL_LOBBY {
             return Some(spiegelmann_away(player));
+        }
+        if npc_id == guild_quest::NURIS && player.stats.map_id == guild_quest::RETURNING_PATH {
+            let camp = guild_quest::CAMP;
+            return Some(ask_warp(
+                guild_quest::NURIS,
+                keys::GUILD_QUEST_NURIS_ASK,
+                camp,
+            ));
         }
         if npc_id == CARNIVAL_GUIDE && player.stats.map_id == carnival::CARNIVAL_EXIT {
             let back = carnival::CARNIVAL_LOBBY;

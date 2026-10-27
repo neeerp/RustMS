@@ -1796,6 +1796,20 @@ unsourced = [
     "family.captain_al.rep.not_yet",
     "family.captain_al.entitlement.done",
     "family.captain_al.entitlement.not_yet",
+    "guild_quest.menu",
+    "guild_quest.register_choice",
+    "guild_quest.join_choice",
+    "guild_quest.details_choice",
+    "guild_quest.details",
+    "guild_quest.no_guild",
+    "guild_quest.not_master",
+    "guild_quest.full",
+    "guild_quest.listed",
+    "guild_quest.ask",
+    "guild_quest.registered",
+    "guild_quest.not_called",
+    "guild_quest.refused",
+    "guild_quest.nuris.ask",
 ]
 
 [text."glTutoMsg0.message"]

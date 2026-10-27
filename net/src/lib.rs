@@ -26,6 +26,7 @@ pub mod gachapon;
 mod game_data;
 pub mod gm_commands;
 pub mod gm_event;
+pub mod guild_quest;
 pub mod handler;
 mod helpers;
 pub mod hired_merchant;

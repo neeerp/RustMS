@@ -1,5 +1,6 @@
 mod carnival;
 mod family;
+mod guild_quest;
 mod marriage;
 mod squad;
 
@@ -166,6 +167,14 @@ pub struct WorldDirectory {
     /// The event a GM opened on each channel: its map, the places left,
     /// and how many it had.
     gm_events: HashMap<u8, (i32, u16, u16)>,
+    /// Each channel's Guild Quest line.
+    guild_quests: HashMap<u8, guild_quest::GuildQuestLine>,
+    /// What the directory starts events with when no client asks, as a
+    /// Guild Quest's next guild's turn (`WorldDirectory::with_events`).
+    event_spawner: Option<(
+        std::sync::Arc<crate::actor::registry::FieldRegistry>,
+        mpsc::WeakSender<DirectoryMessage>,
+    )>,
 }
 
 impl WorldDirectory {
@@ -195,7 +204,20 @@ impl WorldDirectory {
             dungeons: HashMap::new(),
             owl_searches: Searches::default(),
             gm_events: HashMap::new(),
+            guild_quests: HashMap::new(),
+            event_spawner: None,
         }
+    }
+
+    /// Let the directory start events itself, on `fields`, with `directory`
+    /// (its own sender) for them to report back to.
+    pub fn with_events(
+        mut self,
+        fields: std::sync::Arc<crate::actor::registry::FieldRegistry>,
+        directory: &mpsc::Sender<DirectoryMessage>,
+    ) -> Self {
+        self.event_spawner = Some((fields, directory.downgrade()));
+        self
     }
 
     pub async fn run(mut self) {
@@ -338,6 +360,7 @@ impl WorldDirectory {
                 self.event_gone(channel_id, kind, id);
                 self.squad_closed(channel_id, kind, id);
                 self.carnival_closed(channel_id, kind, id);
+                self.guild_quest_closed(channel_id, kind, id);
             }
             DirectoryMessage::OpenGmEvent {
                 channel_id,
@@ -390,6 +413,14 @@ impl WorldDirectory {
                 command,
                 reply,
             } => self.squad_command(from, kind, command, reply),
+            DirectoryMessage::GuildQuestTalk { from, reply } => {
+                let _ = reply.send(self.guild_quest_view(from));
+            }
+            DirectoryMessage::GuildQuest {
+                from,
+                command,
+                reply,
+            } => self.guild_quest_command(from, command, reply),
             DirectoryMessage::Deliver { to, packet } => {
                 for client in to {
                     if let Some(entry) = self.clients.get(&client) {

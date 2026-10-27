@@ -152,6 +152,12 @@ namespace ms
 		static bool may_raise(int32_t self, int32_t picked);
 		bool may_lower(int32_t self, int32_t picked) const;
 
+		// The chat line for the Guild Quest's waitlist (GUILD_OPERATION
+		// 0x4C): 1 calls the guild in, 2 says it is next, and n above 2
+		// that it is number n-1 in line. `channel` is the channel's name.
+		// Empty for 0, which only clears the status.
+		static std::string quest_waitlist_line(int32_t n, const std::string& channel);
+
 		void update(GuildData data);
 		void clear();
 		// Someone joined, or left or was expelled.

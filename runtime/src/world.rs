@@ -73,14 +73,17 @@ pub async fn run_world_server(bind_host: &str) -> Result<(), RuntimeError> {
     }
 
     let (directory_tx, directory_rx) = mpsc::channel(DIRECTORY_QUEUE_CAPACITY);
+    let fields = FieldRegistry::new(FIELD_TICK);
     spawn_supervised(
         "world directory".to_string(),
-        WorldDirectory::new(directory_rx).run(),
+        WorldDirectory::new(directory_rx)
+            .with_events(fields.clone(), &directory_tx)
+            .run(),
         || error!("World directory stopped; whispers are unavailable"),
     );
     let services = WorldServices {
         directory: directory_tx,
-        fields: FieldRegistry::new(FIELD_TICK),
+        fields,
         quest_clocks: Default::default(),
     };
 

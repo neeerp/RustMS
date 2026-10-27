@@ -93,7 +93,9 @@ namespace ms
 			// 0xdd9: the Guild Quest ends, too few members left
 			QUEST_TOO_FEW = 0x4A,
 			// 0xdda: the Guild Quest ends, its registrant gone
-			QUEST_REGISTRANT_LEFT = 0x4B
+			QUEST_REGISTRANT_LEFT = 0x4B,
+			// 0xddb, 0xddc, 0xddd: the Guild Quest's waitlist
+			QUEST_WAITLIST = 0x4C
 		};
 
 		// Heracle, at the guild headquarters, says the client's own guild
@@ -553,6 +555,21 @@ namespace ms
 		case Operation::QUEST_REGISTRANT_LEFT:
 			chat_line("The user that registered has disconnected, so the quest cannot continue. Your Guild Quest will end in 5 seconds.");
 			break;
+		case Operation::QUEST_WAITLIST:
+		{
+			// v83 also keeps the line in a status slot until 0 clears it;
+			// this client has no such slot.
+			auto channel = static_cast<uint8_t>(recv.read_byte());
+			int32_t n = recv.read_int();
+			Configuration& config = Configuration::get();
+			std::string line = Guild::quest_waitlist_line(n,
+				config.get_channel_name(config.get_worldid(), channel));
+
+			if (!line.empty())
+				chat_line(line);
+
+			break;
+		}
 		case Operation::RANKING:
 		{
 			// The NPC's id, which the window doesn't use.

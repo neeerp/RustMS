@@ -98,6 +98,10 @@ pub enum EventKind {
     Carnival(u8),
     /// Romeo and Juliet's party quest in Magatia, from one of its sides.
     Magatia(MagatiaSide),
+    /// The Guild Quest to Sharenian, a registered guild's turn on its
+    /// channel (`crate::guild_quest`), its members let in by Shuang
+    /// (9040000) at the Excavation Site's camp.
+    GuildQuest,
 }
 
 /// Magatia's two sides, each with its own way into Romeo and Juliet's
@@ -1100,6 +1104,46 @@ pub const ZAKUM: Event = Event {
     squad: true,
     gate: &[ZAKUM_GATE],
     until_empty: false,
+    survive: None,
+    runs: 1,
+};
+
+/// The Guild Quest to Sharenian (Cosmic `GuildQuest`): the guild whose
+/// turn it is on the channel gathers in the waiting room, stage 1, whose
+/// `join00` opens once its three minutes are up; Sharenian's stages follow
+/// a hundred map ids apart, up to the boss's 990000900. Its members come in
+/// one by one through Shuang while it gathers, and once it is under way it
+/// ends when fewer than six remain or its registrant leaves.
+pub const GUILD_QUEST: Event = Event {
+    lobby: crate::guild_quest::CAMP,
+    entrances: &[],
+    maps: crate::guild_quest::WAITING_ROOM..=990_001_101,
+    entry: crate::guild_quest::WAITING_ROOM,
+    entries: 1,
+    exit: crate::guild_quest::RETURNING_PATH,
+    levels: 1..=u8::MAX,
+    spread: None,
+    team: 6..=30,
+    minutes: 90,
+    exp_per_stage: &[0; 10],
+    stride: 100,
+    stage_maps: &[],
+    talk_clears: &[],
+    member_clears: &[],
+    clear_portals: &[],
+    gated: &[crate::guild_quest::WAITING_ROOM],
+    puzzles: 1..=0,
+    areas_taken: 0,
+    items: &[],
+    passes: 0,
+    hand_ins: &[],
+    gates: false,
+    clear_map: None,
+    bonus: None,
+    blessings: &[],
+    squad: false,
+    gate: &[],
+    until_empty: true,
     survive: None,
     runs: 1,
 };
@@ -2734,7 +2778,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 44] = [
+    pub const ALL: [EventKind; 45] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2779,6 +2823,7 @@ impl EventKind {
         EventKind::WeddingHall,
         EventKind::RockSpirit,
         EventKind::RockSpiritVip,
+        EventKind::GuildQuest,
     ];
 
     /// The info quest whose record (`game::quest_ex`) keeps the player's
@@ -2830,6 +2875,7 @@ impl EventKind {
             EventKind::WeddingHall => &WEDDING_HALL_EVENT,
             EventKind::RockSpirit => &ROCK_SPIRIT,
             EventKind::RockSpiritVip => &ROCK_SPIRIT_VIP,
+            EventKind::GuildQuest => &GUILD_QUEST,
         }
     }
 
@@ -2877,8 +2923,9 @@ impl Event {
     }
 
     /// How many must go for the event to start: the start of `team`, or
-    /// for a squad `RUSTMS_EXPEDITION_MIN` if set, and for a Monster
-    /// Carnival room one with `RUSTMS_CARNIVAL_SOLO=1`, for testing.
+    /// for a squad or the Guild Quest `RUSTMS_EXPEDITION_MIN` if set, and
+    /// for a Monster Carnival room one with `RUSTMS_CARNIVAL_SOLO=1`, for
+    /// testing.
     pub fn least(&self) -> usize {
         let fewer = || {
             std::env::var("RUSTMS_EXPEDITION_MIN")
@@ -2891,7 +2938,7 @@ impl Event {
         if self.lobby == CARNIVAL_LOBBY && solo() {
             return 1;
         }
-        self.squad
+        (self.squad || self.lobby == crate::guild_quest::CAMP)
             .then(fewer)
             .flatten()
             .unwrap_or(*self.team.start())
@@ -2973,7 +3020,10 @@ impl Event {
     /// The stage that must be cleared before `portal` on `map_id` lets
     /// anyone through.
     pub fn gate_stage(&self, map_id: i32, portal: &str) -> Option<u8> {
-        if portal != "next00" || !self.gated.contains(&map_id) {
+        let gate = portal == "next00"
+            || (portal == crate::guild_quest::GATE_PORTAL
+                && map_id == crate::guild_quest::WAITING_ROOM);
+        if !gate || !self.gated.contains(&map_id) {
             return None;
         }
         self.stage_on(map_id)
@@ -4157,6 +4207,16 @@ mod tests {
         let watch_hog = friendly_drop_period(9300102, 6);
         assert_eq!(watch_hog, Some(Duration::from_secs(60) / scale()));
         assert_eq!(friendly_drop_period(100100, 0), None);
+    }
+
+    #[test]
+    fn the_guild_quest_waiting_room_opens_once_gathered() {
+        use crate::guild_quest::{GATE_PORTAL, WAITING_ROOM};
+        assert_eq!(GUILD_QUEST.gate_stage(WAITING_ROOM, GATE_PORTAL), Some(1));
+        assert_eq!(GUILD_QUEST.gate_stage(WAITING_ROOM, "st00"), None);
+        assert_eq!(GUILD_QUEST.gate_stage(990_000_100, GATE_PORTAL), None);
+        // Other events' gated maps don't take the waiting room's portal.
+        assert_eq!(KPQ.gate_stage(103_000_800, GATE_PORTAL), None);
     }
 
     #[test]

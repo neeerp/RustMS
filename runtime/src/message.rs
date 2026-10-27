@@ -1123,6 +1123,19 @@ pub enum DirectoryMessage {
         command: net::squads::SquadCommand,
         reply: tokio::sync::oneshot::Sender<SquadAnswer>,
     },
+    /// What `from` finds of the Guild Quest's line on their channel, at
+    /// Shuang (`net::guild_quest`).
+    GuildQuestTalk {
+        from: ClientId,
+        reply: tokio::sync::oneshot::Sender<net::guild_quest::View>,
+    },
+    /// `from` asks Shuang to put their guild in line, or to let them into
+    /// its run; the latter is answered with a ticket.
+    GuildQuest {
+        from: ClientId,
+        command: net::guild_quest::Command,
+        reply: tokio::sync::oneshot::Sender<SquadAnswer>,
+    },
     /// Event `id` of `kind` on `channel_id` is over or won; the next party
     /// may go.
     EventClosed {

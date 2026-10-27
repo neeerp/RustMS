@@ -138,6 +138,9 @@ impl ClientActor {
                 .talk_about_event(net::events::EventKind::LudiMaze)
                 .await;
         }
+        if npc_id == net::guild_quest::SHUANG && player.stats.map_id == net::guild_quest::CAMP {
+            return self.talk_to_shuang().await;
+        }
         // The NPCs who gather squads, each on its event's lobby.
         for kind in net::events::EventKind::ALL {
             let recruiter = net::npc_scripts::recruiter(kind).map(|recruiter| recruiter.npc);

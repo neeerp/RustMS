@@ -912,6 +912,11 @@ pub enum Effect {
         kind: crate::events::EventKind,
         command: crate::squads::SquadCommand,
     },
+    /// Register the player's guild for the Guild Quest on their channel, or
+    /// let them into its waiting room (`crate::guild_quest`). Nothing after
+    /// it is applied if the directory refuses; the script says its
+    /// `refused` text instead.
+    GuildQuest(crate::guild_quest::Command),
     /// Nothing is applied while the reactor named `name` on the player's
     /// map is in `state` (a missing reactor shuts nothing); the script says
     /// its `refused` text, or the portal its `occupied` one, instead.
