@@ -539,14 +539,24 @@ player on "Snowman's Rage" (3107), the broken Spirit of Snow Statue
 (`Act/1 exp`, given by the script). 3107, which asks for 3108 done, then
 ends at Scadur. Its line is a placeholder (`snow_statue.clue`).
 
-"In Search for the Lost Memory" (3523–3527, 3529) works the same way, one
-quest per first-job instructor: Dances with Balrog (3523), Grendel the
-Really Old (3524), Athena Pierce (3525), the Dark Lord (3526), Kyrin (3527)
-and, for the Cygnus Knights, Neinheart (3529). For a player of that class on "Memory Keeper" (3507), the
+"In Search for the Lost Memory" (3523–3527, 3529, 3539) works the same way,
+one quest per first-job instructor: Dances with Balrog (3523), Grendel the
+Really Old (3524), Athena Pierce (3525), the Dark Lord (3526), Kyrin (3527),
+for the Cygnus Knights Neinheart (3529), and for the Arans Lilin (3539, in
+Rien). For a player of that class on "Memory Keeper" (3507), the
 instructor's start script (`q3523s` etc.) completes the quest at once and
 sets record 7081 to `1`. 3507 then ends at the Memory Keeper (2140001, on
 270010111), whose completion checks that record (`RECORD_QUESTS`). The line
 is a placeholder (`lost_memory.regained`).
+
+"Stealing Queen's Order of Silk" (3941), on the way to Jano's "Mission
+Complete!" (3940), repeats (`interval` 0) while the player holds no Queen's
+silk (4031571). Karcasa (2101013, on 260010600) only deals with a player
+disguised by Tigun's potion (2210005, the Morph buff that the palace's
+`ariant_queens` portal also checks, `scripts::disguised_as_tigun`). In the
+disguise, `q3941s` starts the quest and `q3941e` gives the silk (the data's
+`Act/1`, given by the script) and completes it. Anyone else is sent off at
+either end. The lines are placeholders (`karcasa.silk.*`).
 
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
