@@ -1909,6 +1909,9 @@ pub mod keys {
     pub const QUEST_INFO_OASIS: &str = "quest_info.oasis";
     pub const QUEST_INFO_SHAMAN_ROCK: &str = "quest_info.shaman_rock";
     pub const QUEST_INFO_SHINY_STONE: &str = "quest_info.shiny_stone";
+    pub const QUEST_INFO_HARP_MISSED: &str = "quest_info.harp_missed";
+    pub const QUEST_INFO_HARP_PLAYED: &str = "quest_info.harp_played";
+    pub const QUEST_INFO_PENTAGRAM: &str = "quest_info.pentagram";
     pub const QUEST_INFO_SECRET_WALL: &str = "quest_info.secret_wall";
     pub const QUEST_INFO_WALL_ASK: &str = "quest_info.wall_ask";
     pub const QUEST_INFO_WALL_READ: &str = "quest_info.wall_read";
@@ -3834,6 +3837,9 @@ mod tests {
                 keys::QUEST_INFO_WALL_READ,
                 keys::QUEST_INFO_SHAMAN_ROCK,
                 keys::QUEST_INFO_SHINY_STONE,
+                keys::QUEST_INFO_HARP_MISSED,
+                keys::QUEST_INFO_HARP_PLAYED,
+                keys::QUEST_INFO_PENTAGRAM,
                 keys::REFINER_WHAT,
                 keys::REFINER_HOW_MANY,
                 keys::REFINER_ASK,

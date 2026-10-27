@@ -437,6 +437,28 @@ const CALVES: [i32; 2] = [1092094, 1092095];
 const SHINY_STONE: i32 = 1092016;
 const SHINING_STONE: i16 = 2166;
 const SHINING_STONE_TOUCHED: &str = "5";
+/// Eliza's Eternal Sleep (3114): the seven strings of the goddess's harp in
+/// Eliza's Garden (920020000), 2012027 to 2012033, each sound their note
+/// (`Sound.nx/Field.img/orbis/<note>`) to the map. While the quest is under
+/// way, its string counts the notes of Twinkle Twinkle Little Star (the
+/// book its start gives) played right so far; a wrong one starts it over,
+/// and the whole tune is what Eliza's completion reads (`Check/1/infoex`
+/// "42").
+const HARP_STRINGS: std::ops::RangeInclusive<i32> = 2012027..=2012033;
+const HARP_SOUNDS: [&str; 7] = ["do", "re", "mi", "pa", "sol", "la", "si"];
+/// The tune, as the notes of the strings from 2012027 up.
+const HARP_NOTES: &[u8; 7] = b"CDEFGAB";
+const TWINKLE_TWINKLE: &[u8; 42] = b"CCGGAAGFFEEDDCGGFFEEDGGFFEEDCCGGAAGFFEEDDC";
+const ELIZAS_ETERNAL_SLEEP: i16 = 3114;
+/// The Black Magician's Magic Pentagram (3345): the four circles of the
+/// pentagram in the Black Magician's lab (261040000), 2111020 to 2111023,
+/// touched in order while the quest is under way, count up its string, the
+/// last taking the three Magic Stones; "4" is what Alcaster's completion
+/// reads. One touched out of turn, or the last without the stones, starts
+/// it over.
+const PENTAGRAM_CIRCLES: std::ops::RangeInclusive<i32> = 2111020..=2111023;
+const MAGIC_PENTAGRAM: i16 = 3345;
+const MAGIC_STONES: [i32; 3] = [4031739, 4031740, 4031741];
 const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
 const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
 const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
@@ -2169,6 +2191,14 @@ impl NpcScript {
         }
         if METEORITES.contains(&npc_id) {
             if let Some(script) = meteorite(npc_id, player) {
+                return Some(script);
+            }
+        }
+        if HARP_STRINGS.contains(&npc_id) {
+            return harp_string(npc_id, player);
+        }
+        if PENTAGRAM_CIRCLES.contains(&npc_id) {
+            if let Some(script) = pentagram_circle(npc_id, player) {
                 return Some(script);
             }
         }
@@ -5384,6 +5414,86 @@ fn meteorite(npc: i32, player: &Player) -> Option<NpcScript> {
     let mut script = NpcScript::new(npc, vec![Page::Done(effects)]);
     script.inventory_full = Some(text(keys::METEORITE_FULL));
     Some(script)
+}
+
+/// A string of Eliza's harp sounds its note, and while Eliza's Eternal
+/// Sleep is under way counts it toward the tune or, if it is the wrong
+/// one, starts the tune over.
+fn harp_string(npc: i32, player: &Player) -> Option<NpcScript> {
+    let string = usize::try_from(npc - HARP_STRINGS.start()).ok()?;
+    let mut effects = vec![Effect::SoundToMap(format!("orbis/{}", HARP_SOUNDS[string]))];
+    let played = Some(player)
+        .filter(|player| player.quests.state(ELIZAS_ETERNAL_SLEEP) == QuestState::Started)
+        .and_then(|player| {
+            player
+                .quests
+                .info(ELIZAS_ETERNAL_SLEEP)?
+                .parse::<usize>()
+                .ok()
+        })
+        .filter(|&played| played < TWINKLE_TWINKLE.len());
+    if let Some(played) = played {
+        let set = |played: usize| Effect::SetQuestInfo {
+            quest: ELIZAS_ETERNAL_SLEEP,
+            value: played.to_string(),
+        };
+        if TWINKLE_TWINKLE[played] != HARP_NOTES[string] {
+            effects.extend([
+                set(0),
+                Effect::Pink(text(keys::QUEST_INFO_HARP_MISSED)),
+                Effect::FieldEffect("quest/party/wrong_kor".into()),
+                Effect::Sound("Party1/Failed".into()),
+            ]);
+        } else {
+            effects.push(set(played + 1));
+            if played + 1 == TWINKLE_TWINKLE.len() {
+                effects.extend([
+                    Effect::Pink(text(keys::QUEST_INFO_HARP_PLAYED)),
+                    Effect::FieldEffect("quest/party/clear".into()),
+                    Effect::Sound("Party1/Clear".into()),
+                ]);
+            }
+        }
+    }
+    Some(NpcScript::new(npc, vec![Page::Done(effects)]))
+}
+
+/// A circle of the Magic Pentagram, while its quest is under way and not
+/// yet done: the next in turn counts, the last taking the stones and
+/// saying so; any other starts the count over without a word.
+fn pentagram_circle(npc: i32, player: &Player) -> Option<NpcScript> {
+    if player.quests.state(MAGIC_PENTAGRAM) != QuestState::Started {
+        return None;
+    }
+    let touched = player.quests.info(MAGIC_PENTAGRAM)?;
+    let circle = npc - PENTAGRAM_CIRCLES.start();
+    let last = *PENTAGRAM_CIRCLES.end() - PENTAGRAM_CIRCLES.start();
+    if touched == (last + 1).to_string() {
+        return None;
+    }
+    let set = |touched: i32| Effect::SetQuestInfo {
+        quest: MAGIC_PENTAGRAM,
+        value: touched.to_string(),
+    };
+    let stones = MAGIC_STONES
+        .iter()
+        .all(|&stone| player.inventory.count(stone) > 0);
+    let page = if touched != circle.to_string() || circle == last && !stones {
+        Page::Done(vec![set(0)])
+    } else if circle == last {
+        let mut effects = vec![set(circle + 1)];
+        effects.extend(MAGIC_STONES.map(|item_id| Effect::TakeItem {
+            item_id,
+            quantity: 1,
+        }));
+        Page::Act {
+            text: text(keys::QUEST_INFO_PENTAGRAM),
+            effects,
+        }
+    } else {
+        Page::Done(vec![set(circle + 1)])
+    };
+    Some(NpcScript::new(npc, vec![page]))
 }
 
 /// A house in Ariant takes its delivery without a word, if it is still
@@ -17862,6 +17972,93 @@ mod tests {
         let again = NpcScript::for_npc(2050019, &field("111111", 5)).unwrap();
         assert_eq!(again.begin().effects, [give]);
         assert!(NpcScript::for_npc(2050019, &field("111111", 6)).is_none());
+    }
+
+    /// A player with info quest `quest` under way, its string `info`.
+    fn on_info_quest(quest: i16, info: &str) -> Player {
+        let mut player = traveller(85, 0, false);
+        player.quests.upsert(game::QuestRecord {
+            quest_id: quest,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(info.into()),
+            },
+        });
+        player
+    }
+
+    #[test]
+    fn elizas_harp_counts_the_tune_and_starts_over_on_a_wrong_note() {
+        let play = |npc: i32, info: &str| {
+            let player = on_info_quest(ELIZAS_ETERNAL_SLEEP, info);
+            NpcScript::for_npc(npc, &player).unwrap().begin().effects
+        };
+        let set = |value: &str| Effect::SetQuestInfo {
+            quest: ELIZAS_ETERNAL_SLEEP,
+            value: value.into(),
+        };
+        // The third note is a G, the fifth string.
+        assert_eq!(
+            play(2012031, "2"),
+            [Effect::SoundToMap("orbis/sol".into()), set("3")]
+        );
+        assert_eq!(
+            play(2012027, "2"),
+            [
+                Effect::SoundToMap("orbis/do".into()),
+                set("0"),
+                Effect::Pink(text(keys::QUEST_INFO_HARP_MISSED)),
+                Effect::FieldEffect("quest/party/wrong_kor".into()),
+                Effect::Sound("Party1/Failed".into()),
+            ]
+        );
+        // The last note, a C, ends it.
+        let last = play(2012027, "41");
+        assert_eq!(last[1], set("42"));
+        assert_eq!(last[4], Effect::Sound("Party1/Clear".into()));
+        // Played through, or off the quest, a string only sounds.
+        for player in [
+            on_info_quest(ELIZAS_ETERNAL_SLEEP, "42"),
+            traveller(85, 0, false),
+        ] {
+            let step = NpcScript::for_npc(2012033, &player).unwrap().begin();
+            assert_eq!(step.effects, [Effect::SoundToMap("orbis/si".into())]);
+        }
+        // The tune's 42 notes, all on the harp.
+        assert!(TWINKLE_TWINKLE.iter().all(|note| HARP_NOTES.contains(note)));
+    }
+
+    #[test]
+    fn the_pentagram_circles_count_in_turn_and_the_last_takes_the_stones() {
+        let set = |value: &str| Effect::SetQuestInfo {
+            quest: MAGIC_PENTAGRAM,
+            value: value.into(),
+        };
+        let touch = |npc: i32, player: &Player| NpcScript::for_npc(npc, player).unwrap().begin();
+        assert_eq!(
+            touch(2111021, &on_info_quest(MAGIC_PENTAGRAM, "1")).effects,
+            [set("2")]
+        );
+        // Out of turn: over again.
+        assert_eq!(
+            touch(2111020, &on_info_quest(MAGIC_PENTAGRAM, "2")).effects,
+            [set("0")]
+        );
+        // The last without the stones starts over; with them it takes them.
+        let mut player = on_info_quest(MAGIC_PENTAGRAM, "3");
+        assert_eq!(touch(2111023, &player).effects, [set("0")]);
+        for (slot, stone) in (1..).zip(MAGIC_STONES) {
+            player
+                .inventory
+                .insert(game::InventoryType::Etc, slot, game::Item::stack(stone, 1));
+        }
+        let step = touch(2111023, &player);
+        assert_eq!(page_text(&step), text(keys::QUEST_INFO_PENTAGRAM));
+        assert_eq!(step.effects.len(), 4);
+        assert_eq!(step.effects[0], set("4"));
+        // Done, or off the quest, they say nothing of their own.
+        assert!(NpcScript::for_npc(2111020, &on_info_quest(MAGIC_PENTAGRAM, "4")).is_none());
+        assert!(NpcScript::for_npc(2111020, &traveller(85, 0, false)).is_none());
     }
 
     #[test]

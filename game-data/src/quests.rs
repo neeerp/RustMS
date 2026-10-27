@@ -1406,7 +1406,7 @@ mod tests {
             assert!(quest.end_mobs.is_empty(), "{id}");
         }
         // Quests outside the list keep infoex unsupported.
-        assert!(catalog.quest(3114).is_none());
+        assert!(catalog.quest(10052).is_none());
         // "Jonathan's Court" reads Lord Jonathan's test's record.
         let court = catalog.quest(6400).unwrap();
         assert_eq!(court.end_info_record, Some(6401));

@@ -67,6 +67,17 @@ add = [{ item = 4001156, prob = 1.0 }]
 [mobs.9300170]
 add = [{ item = 4001156, prob = 1.0 }]
 
+[mobs.8110300]
+# Homunscullo drops the Magic Stone of Honesty 4031740 that the Magic
+# Pentagram's last circle takes for The Black Magician's Magic Pentagram
+# (3345, Quest.nx QuestInfo.img/3345/1: from the monsters of Magatia). The
+# pack has no drop for it; Cosmic's rate.
+add = [{ item = 4031740, prob = 0.04, quest = 3345 }]
+
+[mobs.7110300]
+# D. Roy drops its Magic Stone of Trust 4031741, likewise.
+add = [{ item = 4031741, prob = 0.04, quest = 3345 }]
+
 [mobs.9300171]
 add = [{ item = 4001156, prob = 1.0 }]
 
