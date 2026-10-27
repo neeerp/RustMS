@@ -180,6 +180,9 @@ namespace ms
 
 		// Return whether the buff is active.
 		bool has_buff(Buffstat::Id stat) const;
+		// Whether the effect of using item `itemid` is on, which runs under
+		// the item's negated id.
+		bool has_item_buff(int32_t itemid) const;
 		// How many milliseconds ago Dark Sight was last given, -1 if never
 		// this session; cancelling it keeps the time (0x78698f).
 		int64_t since_dark_sight() const;

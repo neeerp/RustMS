@@ -40,6 +40,12 @@ namespace ms
 		// list.
 		std::pair<int32_t, int32_t> pet_closeness{ 0, 30000 };
 		std::pair<int32_t, int32_t> end_pet_closeness{ 0, 30000 };
+		// An item whose effect, as if used, must be on the player (buff) or
+		// must not be (exceptbuff), to start and to complete; 0 for none.
+		int32_t buff = 0;
+		int32_t except_buff = 0;
+		int32_t end_buff = 0;
+		int32_t end_except_buff = 0;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
 		// Not offered before this FILETIME (Check/0/start, quest_date); 0

@@ -132,6 +132,11 @@ namespace ms
 			info.end_pet_closeness = { static_cast<int32_t>(end["pettamenessmin"].get_integer(0)),
 				static_cast<int32_t>(end["pettamenessmax"].get_integer(30000)) };
 
+			info.buff = static_cast<int32_t>(start["buff"].get_integer());
+			info.except_buff = static_cast<int32_t>(start["exceptbuff"].get_integer());
+			info.end_buff = static_cast<int32_t>(end["buff"].get_integer());
+			info.end_except_buff = static_cast<int32_t>(end["exceptbuff"].get_integer());
+
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));
 

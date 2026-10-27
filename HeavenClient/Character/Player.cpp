@@ -1463,6 +1463,15 @@ namespace ms
 		return buffs[stat].value > 0;
 	}
 
+	bool Player::has_item_buff(int32_t itemid) const
+	{
+		for (const Buff &buff : buffs.values())
+			if (buff.stat != Buffstat::Id::NONE && buff.skillid == -itemid)
+				return true;
+
+		return false;
+	}
+
 	int16_t Player::get_buff_value(Buffstat::Id stat) const
 	{
 		return buffs[stat].value;
@@ -2342,6 +2351,9 @@ namespace ms
 			return false;
 
 		auto worn = [&](int32_t id) { return inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0; };
+
+		if (!buffs_met(quest.buff, quest.except_buff, [&](int32_t id) { return has_item_buff(id); }))
+			return false;
 
 		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
 			[&](int32_t id) { return inventory.get_total_item_count(id) + (worn(id) ? 1 : 0); },

@@ -38,6 +38,8 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "pettamenessmin",
     "pettamenessmax",
     "dayOfWeek",
+    "buff",
+    "exceptbuff",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -56,6 +58,8 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "pet",
     "pettamenessmin",
     "pettamenessmax",
+    "buff",
+    "exceptbuff",
 ];
 /// Dates under `Check.img/<id>/1`, which nothing reads: v83's completion
 /// check compares no dates (only the start check does), and the two quests
@@ -239,6 +243,10 @@ pub struct StartRequirements {
     /// The closeness the first pet out must have, from `pettamenessmin` to
     /// `pettamenessmax` (30000 when only the least is given).
     pub pet_closeness: Option<(i32, i32)>,
+    /// An item whose effect, as if used, must be on the player (`buff`), or
+    /// must not be (`exceptbuff`): Kerning's scents (2282 to 2284).
+    pub buff: Option<i32>,
+    pub except_buff: Option<i32>,
     /// A record that is no quest, and what its info string must read
     /// (`Check/0 infoNumber`, `infoex`); see [`START_RECORD_QUESTS`].
     pub record: Option<(i16, Vec<InfoCheck>)>,
@@ -265,6 +273,9 @@ pub struct QuestTemplate {
     pub end_pets: Vec<i32>,
     /// The closeness the first pet out must have to complete.
     pub end_pet_closeness: Option<(i32, i32)>,
+    /// An item whose effect must be on the player to complete, or must not.
+    pub end_buff: Option<i32>,
+    pub end_except_buff: Option<i32>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -668,6 +679,8 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
+    requirements.buff = nx.int_child(start, "buff")?;
+    requirements.except_buff = nx.int_child(start, "exceptbuff")?;
     if let Some(&(_, record)) = START_RECORD_QUESTS.iter().find(|&&(quest, _)| quest == id) {
         if nx.int_child(start, "infoNumber")? != Some(i32::from(record)) {
             return Err(invalid("start record quest with another record"));
@@ -777,6 +790,8 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .transpose()?,
         end_pets: pet_ids(nx, end)?,
         end_pet_closeness: pet_closeness(nx, end)?,
+        end_buff: nx.int_child(end, "buff")?,
+        end_except_buff: nx.int_child(end, "exceptbuff")?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,

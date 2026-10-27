@@ -254,6 +254,14 @@ int main()
 		test.pet_closeness = {1400, 30000};
 		require(!pet_holds({5000000, 1399}), "a listed pet not close enough hides it");
 		require(pet_holds({5000000, 1400}), "a listed pet close enough allows the start");
+		// Kerning's scents: Freesia (2283) waits out Rose's effect and needs its own.
+		std::set<int32_t> scents { 2022631 };
+		auto on = [&](int32_t id) { return scents.count(id) > 0; };
+		require(!ms::buffs_met(0, 2022631, on), "the last scent's effect hides the next");
+		require(!ms::buffs_met(2022632, 0, on), "another scent's effect doesn't complete it");
+		scents = { 2022632 };
+		require(ms::buffs_met(0, 2022631, on) && ms::buffs_met(2022632, 0, on), "its own effect does");
+		require(ms::buffs_met(0, 0, on), "no buff requirement is met");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };
