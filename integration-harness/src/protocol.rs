@@ -79,6 +79,9 @@ pub struct WorldSession {
     pub linked_name: Option<String>,
     /// The crush and friendship ring records, from the world-entry SET_FIELD.
     pub couple_rings: Vec<crate::packets::CoupleRingRecord>,
+    /// The records kept beside the quest log, by quest, from the
+    /// world-entry SET_FIELD.
+    pub quest_records: std::collections::BTreeMap<i16, String>,
     /// The family packets of entering the game the login read past (INFO,
     /// the entitlements, and a working entitlement's icon), as (opcode,
     /// body). Any that came after another packet are still to be read.
@@ -311,6 +314,7 @@ pub async fn login_to_world_session(config: &HarnessConfig) -> Result<WorldSessi
         monster_book: world_entry.monster_book,
         linked_name: world_entry.linked_name,
         couple_rings: world_entry.couple_rings,
+        quest_records: world_entry.quest_records,
         keymap,
         skill_macros,
         auto_potions: (auto_hp, auto_mp),

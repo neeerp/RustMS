@@ -66,6 +66,12 @@ namespace ms
 			const std::function<int32_t(int32_t)>& count,
 			const std::function<bool(const QuestInfo&)>& holds) const;
 		uint64_t revision() const;
+		// The records kept beside the quest log ("quest record ex"), each
+		// "k=v;k=v" as the server sends it whole, which the Quest Log's #j
+		// tokens read (the party quests' tries, clears and ranks).
+		void set_record_ex(int16_t id, const std::string& raw);
+		// The value under `key` in quest `id`'s record, or "".
+		std::string record_ex(int16_t id, const std::string& key) const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level,
 			const std::function<bool(const QuestInfo&)>& holds, bool all_levels = false) const;
@@ -74,6 +80,7 @@ namespace ms
 		std::map<int16_t, std::string> started;
 		std::map<int16_t, std::pair<int16_t, std::string>> in_progress;
 		std::map<int16_t, int64_t> completed;
+		std::map<int16_t, std::string> records_ex;
 		std::vector<int16_t> tracking;
 		bool auto_track = true;
 		// Quests the player took out of the helper; not re-added automatically.

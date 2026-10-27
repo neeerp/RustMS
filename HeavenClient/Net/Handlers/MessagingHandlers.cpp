@@ -315,6 +315,12 @@ namespace ms
 				chat_line(mode == 8 ? "The item [" + name + "] has been expired, and therefore, deleted from your inventory." : name + "'s seal has expired.", UIChatBar::LineType::SKILL);
 			}
 		}
+		else if (mode == 10)
+		{
+			// A quest's record beside the quest log, whole (0xa2160b).
+			int16_t id = recv.read_short();
+			Stage::get().get_player().get_quests().set_record_ex(id, recv.read_string());
+		}
 		else if (mode == 9 || mode == 12)
 		{
 			auto count = static_cast<uint8_t>(mode == 9 ? 1 : recv.read_byte());

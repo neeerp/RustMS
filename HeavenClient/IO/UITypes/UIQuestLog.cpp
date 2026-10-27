@@ -28,6 +28,7 @@
 #include "../../Constants.h"
 #include "../../Character/QuestRequirements.h"
 #include "../../Character/QuestCatalog.h"
+#include "../../Character/QuestRecordEx.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Net/Packets/QuestPackets.h"
@@ -35,10 +36,12 @@
 #include "../../Util/Misc.h"
 #include "../../Util/NpcTextMarkup.h"
 #include "../../Util/NxFiles.h"
+#include "../../Util/PathImage.h"
 
 #include <nlnx/nx.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <limits>
 #include <map>
 
@@ -144,11 +147,20 @@ namespace ms
 			return cut + tail;
 		}
 
+		// A #j token (#jtry#, #jrank#...) from the quest's record beside the
+		// quest log.
+		std::string record_token(const std::string& key, int16_t quest_id)
+		{
+			const auto& quests = Stage::get().get_player().get_quests();
+			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); });
+		}
+
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
 		// #c how many of an item the player holds, #a a kill count
-		// (#a<index># for this quest's mobs, or #a<quest><index>#), and #R
+		// (#a<index># for this quest's mobs, or #a<quest><index>#), #R
 		// a quest's record as it stands (#R27010# an explorer title's count of
-		// places). Line breaks become the renderer's escapes.
+		// places), and #j a value from the quest's record beside the quest
+		// log (`record_token`). Line breaks become the renderer's escapes.
 		std::string quest_counts(const std::string& text, int16_t quest_id)
 		{
 			auto& player = Stage::get().get_player();
@@ -169,6 +181,32 @@ namespace ms
 
 				size_t close = c == '#' && i + 2 < text.size() ? text.find('#', i + 2) : std::string::npos;
 				char tag = i + 1 < text.size() ? text[i + 1] : 0;
+
+				// The tags NpcTextMarkup expands pass whole, so their closing
+				// '#' doesn't start a tag of its own (#t4000000#jewel#).
+				std::string arg = close == std::string::npos ? std::string() : text.substr(i + 2, close - i - 2);
+				std::string number = !arg.empty() && arg.back() == ':' ? arg.substr(0, arg.size() - 1) : arg;
+
+				if (close != std::string::npos && tag != 0
+					&& ((std::string("ptzomvis").find(tag) != std::string::npos && NpcTextMarkup::is_digits(number))
+						|| ((tag == 'f' || tag == 'F') && arg.find('/') != std::string::npos)))
+				{
+					out.append(text, i, close - i + 1);
+					i = close;
+					continue;
+				}
+
+				if (close != std::string::npos && tag == 'j' && close - i - 2 <= 8)
+				{
+					std::string key = text.substr(i + 2, close - i - 2);
+
+					if (!key.empty() && std::all_of(key.begin(), key.end(), [](char k) { return std::isalnum(static_cast<unsigned char>(k)); }))
+					{
+						out += record_token(key, quest_id);
+						i = close;
+						continue;
+					}
+				}
 
 				if (close == std::string::npos || (tag != 'c' && tag != 'a' && tag != 'R')
 					|| !NpcTextMarkup::is_digits(text.substr(i + 2, close - i - 2)) || close - i - 2 > (tag == 'R' ? 5 : 9))
@@ -465,19 +503,32 @@ namespace ms
 		std::vector<NpcTextMarkup::InlineImage> tags;
 		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags);
 
-		// Item icons take a box in the text; anything else is left out.
+		// Item icons and images by path (a party quest's rank) take a box in
+		// the text; anything else is left out.
 		icons.clear();
 		std::vector<Point<int16_t>> boxes;
 
 		for (const auto& tag : tags)
 		{
 			Texture icon;
+			Point<int16_t> size;
+			Point<int16_t> anchor;
 
 			if ((tag.tag == 'i' || tag.tag == 'v') && tag.arg.size() <= 9 && ItemData::get(std::stoi(tag.arg)).is_valid())
+			{
 				icon = ItemData::get(std::stoi(tag.arg)).get_icon(false);
+				size = Point<int16_t>(ICON_SIZE, ICON_SIZE);
+				anchor = Point<int16_t>(0, ICON_SIZE);
+			}
+			else if (tag.tag == 'f' || tag.tag == 'F')
+			{
+				icon = path_image(tag.arg);
+				size = icon.get_dimensions();
+				anchor = icon.get_origin();
+			}
 
-			boxes.push_back(icon.is_valid() ? Point<int16_t>(ICON_SIZE, ICON_SIZE) : Point<int16_t>());
-			icons.push_back({ icon, icons.size() });
+			boxes.push_back(icon.is_valid() ? size : Point<int16_t>());
+			icons.push_back({ icon, icons.size(), size, anchor });
 		}
 
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, TEXT_WIDTH);
@@ -591,8 +642,8 @@ namespace ms
 			{
 				Point<int16_t> box = text + description.box_position(icon.box);
 
-				if (icon.texture.is_valid() && box.y() >= clip.first() && box.y() + ICON_SIZE <= clip.second())
-					icon.texture.draw(box + Point<int16_t>(0, ICON_SIZE));
+				if (icon.texture.is_valid() && box.y() >= clip.first() && box.y() + icon.size.y() <= clip.second())
+					icon.texture.draw(box + icon.anchor);
 			}
 
 			description.draw(text, clip);

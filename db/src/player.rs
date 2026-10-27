@@ -10,7 +10,8 @@ use crate::quest::QuestProgress;
 use crate::schema::{
     accounts, auto_potions, character_mounts, character_quests, characters, dojo_records,
     equipment_stats, explored_maps, extra_pendant_slots, gacha_exp, inventory_items, keybindings,
-    monster_book_cards, quick_slots, saved_locations, skill_macros, skills, teleport_rocks,
+    monster_book_cards, quest_ex_records, quick_slots, saved_locations, skill_macros, skills,
+    teleport_rocks,
 };
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -232,6 +233,12 @@ pub fn load_player(character_id: i32) -> crate::Result<Player> {
         .load::<(i16, i32)>(&mut conn)?
         .into_iter()
         .collect();
+    player.quest_ex = game::quest_ex::QuestExRecords::from_raw(
+        quest_ex_records::table
+            .filter(quest_ex_records::character_id.eq(character_id))
+            .select((quest_ex_records::quest_id, quest_ex_records::data))
+            .load::<(i16, String)>(&mut conn)?,
+    );
     if let Some((hp, mp)) = auto_potions::table
         .find(character_id)
         .select((auto_potions::hp_item, auto_potions::mp_item))
@@ -456,6 +463,26 @@ pub(crate) fn write_player(conn: &mut PgConnection, player: &Player) -> QueryRes
         diesel::insert_into(saved_locations::table)
             .values(&locations)
             .execute(conn)?;
+        // Records are only ever added or changed.
+        let records: Vec<_> = player
+            .quest_ex
+            .iter()
+            .map(|(quest_id, data)| {
+                (
+                    quest_ex_records::character_id.eq(id),
+                    quest_ex_records::quest_id.eq(quest_id),
+                    quest_ex_records::data.eq(data),
+                )
+            })
+            .collect();
+        if !records.is_empty() {
+            diesel::insert_into(quest_ex_records::table)
+                .values(&records)
+                .on_conflict((quest_ex_records::character_id, quest_ex_records::quest_id))
+                .do_update()
+                .set(quest_ex_records::data.eq(excluded(quest_ex_records::data)))
+                .execute(conn)?;
+        }
         if stats.gacha_exp > 0 {
             diesel::insert_into(gacha_exp::table)
                 .values((

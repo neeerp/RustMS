@@ -431,6 +431,12 @@ pub enum ServerMessage {
         won: bool,
         points: i32,
     },
+    /// Event `id` tells the player `outcome` for their party quest record
+    /// (`game::quest_ex`): a Monster Carnival battle started or ended.
+    RecordPartyQuest {
+        id: u32,
+        outcome: game::quest_ex::PartyQuestOutcome,
+    },
     /// The player's field summoned its boss, as Zakum on its altar: an
     /// event held there tells when it closes.
     BossSummoned,

@@ -96,7 +96,12 @@ pub fn encode_character_data(packet: &mut Packet, player: &Player) -> Result<(),
         packet.write_byte(level)?;
     }
     packet.write_short(0)?; // new year cards
-    packet.write_short(0)?; // area info
+                            // The records kept beside the quest log (Cosmic's "area info").
+    packet.write_short(player.quest_ex.len() as i16)?;
+    for (quest_id, data) in player.quest_ex.iter() {
+        packet.write_short(quest_id)?;
+        packet.write_str_with_length(data)?;
+    }
     packet.write_short(0)?;
     Ok(())
 }

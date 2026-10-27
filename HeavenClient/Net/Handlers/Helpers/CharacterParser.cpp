@@ -217,15 +217,15 @@ namespace ms
 		}
 	}
 
-	void CharacterParser::parse_areainfo(InPacket& recv)
+	void CharacterParser::parse_areainfo(InPacket& recv, QuestLog& quests)
 	{
-		std::map<int16_t, std::string> areainfo;
+		// The records kept beside the quest log (flag 0x80000, 0x4e67ef).
 		int16_t arsize = recv.read_short();
 
 		for (int16_t i = 0; i < arsize; i++)
 		{
-			int16_t area = recv.read_short();
-			areainfo[area] = recv.read_string();
+			int16_t quest = recv.read_short();
+			quests.set_record_ex(quest, recv.read_string());
 		}
 	}
 }

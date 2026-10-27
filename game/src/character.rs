@@ -315,6 +315,9 @@ pub struct Player {
     /// Beach left from (`WORLD_TOUR_RETURN`, `FLORINA_RETURN`), or the map
     /// they used an event invitation in, under its `returnMapQR`.
     pub saved_locations: BTreeMap<i16, i32>,
+    /// The records kept beside the quest log, as the party quests'
+    /// (`crate::quest_ex`).
+    pub quest_ex: crate::quest_ex::QuestExRecords,
     /// The potions the first pet gives from the HP and MP pouches' slots,
     /// or 0.
     pub auto_potions: AutoPotions,
@@ -385,6 +388,7 @@ impl Player {
             pyramid_gem: None,
             carnival_result: None,
             saved_locations: BTreeMap::new(),
+            quest_ex: Default::default(),
             auto_potions: AutoPotions::default(),
             quick_slots: None,
             extra_pendant: None,

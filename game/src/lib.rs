@@ -25,6 +25,7 @@ pub mod monster_book;
 pub mod mount;
 pub mod pet;
 pub mod quest;
+pub mod quest_ex;
 pub mod quick_slots;
 pub mod ring;
 pub mod scroll;

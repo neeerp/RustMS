@@ -43,6 +43,17 @@ pub fn build_quest_record(quest_id: i16, data: &str) -> Result<Packet, NetworkEr
     Ok(p)
 }
 
+/// SHOW_STATUS_INFO 0x0A: `quest_id`'s record beside the quest log
+/// (`game::quest_ex`), whole, which the Quest Log's `#j` tokens read.
+pub fn build_quest_ex_record(quest_id: i16, data: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    p.write_byte(0x0A)?;
+    p.write_short(quest_id)?;
+    p.write_str_with_length(data)?;
+    Ok(p)
+}
+
 /// `QUEST_CLEAR`: the quest's title is earned.
 pub fn build_quest_clear(quest_id: i16) -> Result<Packet, NetworkError> {
     let mut p = Packet::new_empty();
@@ -208,6 +219,17 @@ mod tests {
             .short(SendOpcode::ShowStatusInfo as i16)
             .byte(9)
             .string("Go right")
+            .end();
+    }
+
+    #[test]
+    fn a_quest_ex_record_is_mode_10_and_its_string() {
+        let packet = build_quest_ex_record(1200, "try=1;rank=F").unwrap();
+        Expect::new(&packet.bytes)
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(0x0A)
+            .short(1200)
+            .string("try=1;rank=F")
             .end();
     }
 

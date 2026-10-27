@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "QuestLog.h"
 #include "QuestCatalog.h"
+#include "QuestRecordEx.h"
 #include <algorithm>
 
 namespace ms
@@ -101,7 +102,7 @@ namespace ms
 
 	void QuestLog::clear()
 	{
-		started.clear(); in_progress.clear(); completed.clear();
+		started.clear(); in_progress.clear(); completed.clear(); records_ex.clear();
 		tracking.clear(); dismissed.clear();
 		++marker_revision;
 	}
@@ -109,6 +110,18 @@ namespace ms
 	const std::map<int16_t, std::string>& QuestLog::started_quests() const { return started; }
 	const std::map<int16_t, int64_t>& QuestLog::completed_quests() const { return completed; }
 	uint64_t QuestLog::revision() const { return marker_revision; }
+
+	void QuestLog::set_record_ex(int16_t id, const std::string& raw)
+	{
+		records_ex[id] = raw;
+		++marker_revision;
+	}
+
+	std::string QuestLog::record_ex(int16_t id, const std::string& key) const
+	{
+		auto record = records_ex.find(id);
+		return record == records_ex.end() ? "" : QuestRecordEx::value(record->second, key);
+	}
 
 	// A repeatable quest started again keeps its completion, as in v83, but
 	// counts as started.

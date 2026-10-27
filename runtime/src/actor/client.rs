@@ -1793,6 +1793,11 @@ impl ClientActor {
             ServerMessage::CarnivalResult { id, won, points } => {
                 self.carnival_result(id, won, points).await?
             }
+            ServerMessage::RecordPartyQuest { id, outcome } => {
+                if let Some(kind) = self.event.as_ref().filter(|t| t.id == id).map(|t| t.kind) {
+                    self.record_party_quest(kind, outcome).await?
+                }
+            }
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
             ServerMessage::MobBuff(item_id) => {
                 let alive = self

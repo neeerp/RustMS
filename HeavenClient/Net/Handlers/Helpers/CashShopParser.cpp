@@ -53,7 +53,7 @@ namespace ms
 			CharacterParser::parse_teleportrock(recv, player.get_teleport_rock());
 			CharacterParser::parse_monsterbook(recv, player.get_monsterbook());
 			CharacterParser::parse_nyinfo(recv);
-			CharacterParser::parse_areainfo(recv);
+			CharacterParser::parse_areainfo(recv, player.get_quests());
 
 			player.recalc_stats();
 
