@@ -320,6 +320,14 @@ The end needs the potion gone. The Sorcerer's (2140002) `q3514e` says it
 worked, then gives the end's 891,500 EXP and completes the quest. Cosmic
 `3514.js` instead checks for its own potion buff, which v83's potion has no
 `time` for, so there is no buff to check. The text is unsourced.
+Dr. Kim's "Wave Translator" (3454, repeatable) gives a working translator
+(4031928) or a faulty one (4031927) at even odds (`prop` 1 each). Cosmic
+`3454.js` always gives the working one. The working one starts 3456 at the
+Alien Gray (2050002). The faulty one starts "The Endangered Lives of Grays"
+(3455), also repeatable, whose start script `q3455s` says the translator gave
+only noise, takes it, and starts the quest. The quest then ends at the Gray
+with nothing, and Dr. Kim can make another translator. No script for 3455
+survives, so its text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -791,5 +799,7 @@ copied into the source.
   to 1 HP, then completed),
   `meteorite_samples` (3421's six meteorites, each giving once and
   marking its character, then the completion),
+  `grays_translator` (3455's faulty translator used up at the Gray and the
+  quest ended, then 3456 started with the working one),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

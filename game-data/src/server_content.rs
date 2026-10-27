@@ -588,6 +588,7 @@ pub mod keys {
     pub const ARDIN_TEST_BUSY: &str = "ariant_ardin.test_busy";
     pub const SORCERER_POTION_WORKED: &str = "temple_sorcerer.potion_worked";
     pub const METEORITE_FULL: &str = "omega_meteorite.full";
+    pub const GRAY_GARBLED: &str = "omega_gray.garbled";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3029,6 +3030,7 @@ mod tests {
             keys::ARDIN_TEST_BUSY,
             keys::SORCERER_POTION_WORKED,
             keys::METEORITE_FULL,
+            keys::GRAY_GARBLED,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,
