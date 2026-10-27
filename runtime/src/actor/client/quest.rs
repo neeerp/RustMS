@@ -352,14 +352,16 @@ impl ClientActor {
         Ok(true)
     }
 
-    /// Count a kill toward started quests and show the new progress.
+    /// Count a kill toward started quests, and set the records it sets,
+    /// and show the new progress.
     pub(super) async fn count_quest_kill(&mut self, mob_id: i32) -> Result<(), RuntimeError> {
         let Ok(catalog) = quests::catalog() else {
             return Ok(());
         };
         let player = &mut self.in_game_mut()?.player;
         let changed = quests::count_kill(|id| catalog.quest(id), player, mob_id);
-        if changed.is_empty() {
+        let records = quests::kill_records(player, mob_id);
+        if changed.is_empty() && records.is_empty() {
             return Ok(());
         }
         player.mark_dirty();
@@ -367,6 +369,9 @@ impl ClientActor {
         for quest_id in changed {
             let status = player.quests.status(quest_id);
             packets.push(quest::build_quest_progress(quest_id, status)?);
+        }
+        for (record, value) in records {
+            packets.push(quest::build_quest_record(record, value)?);
         }
         self.send_all(&mut packets).await
     }

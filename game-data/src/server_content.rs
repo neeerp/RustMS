@@ -1034,6 +1034,13 @@ pub mod keys {
     pub const FRANCIS_INTRUDER: &str = "francis.intruder";
     pub const FRANCIS_HIDEOUT_BUSY: &str = "francis.hideout_busy";
 
+    /// "Gathering Some Strange Information" (21733): the Puppeteer's call
+    /// in Tru's name (1204007, `q21733s`), and Tru (1002104, `q21733e`) on
+    /// the trap once the Puppeteer is beaten, then teaching Polearm Mastery.
+    pub const FAKE_TRU_CALL: &str = "fake_tru.call";
+    pub const TRU_PUPPETEER_BEATEN: &str = "tru.puppeteer_beaten";
+    pub const TRU_POLEARM_MASTERY: &str = "tru.polearm_mastery";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3448,6 +3455,9 @@ mod tests {
                 keys::PUPPETEER_DOOR_SEARCHED,
                 keys::FRANCIS_INTRUDER,
                 keys::FRANCIS_HIDEOUT_BUSY,
+                keys::FAKE_TRU_CALL,
+                keys::TRU_PUPPETEER_BEATEN,
+                keys::TRU_POLEARM_MASTERY,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

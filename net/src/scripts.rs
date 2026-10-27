@@ -196,8 +196,8 @@ const PLAIN_WARPS: [(&str, i32, Portal); 17] = [
     ("hontale_out1", 240050400, Portal::Id(0)),
     ("eliza_Garden", 920020000, Portal::Id(2)),
     ("catPriest_map", 925000000, Portal::Id(2)),
-    // Lith Harbor's Info Shop. Cosmic also brings out an Aran quest's
-    // monster (21733) here; that isn't in.
+    // Lith Harbor's Info Shop; entering it brings out 21733's Puppeteer
+    // (`unscripted_map_enter`), however the Aran comes in.
     ("enterInfo", 104000004, Portal::Id(1)),
     // Ludibrium's Time Control Room into Ellin Forest, saying so.
     ("move_elin", 300000100, Portal::Named("out00")),
@@ -868,8 +868,21 @@ const DISCIPLES_HIDEOUT: i32 = 100000006;
 const DISCIPLES_QUEST: i16 = 2175;
 const DISCIPLE: i32 = 9300156;
 
+/// Lith Harbor's Info Shop, where the Puppeteer lies in wait for an Aran
+/// on "Gathering Some Strange Information" (21733).
+pub const LITH_INFO_SHOP: i32 = 104000004;
+const PUPPETEER_IN_LITH: i32 = 9300345;
+/// On the shop's floor, between the door and Tru (Cosmic: the ground below
+/// (0, 0)).
+const PUPPETEER_IN_LITH_AT: (i16, i16) = (0, 120);
+const STRANGE_INFORMATION: i16 = 21733;
+const STRANGE_INFORMATION_RECORD: i16 = 21762;
+
 /// What the map `player` just entered does when it has no `onUserEnter`
-/// script: the Puppeteer's hideout brings out the Puppeteer being hunted.
+/// script: the Puppeteer's hideout brings out the Puppeteer being hunted,
+/// and Lith Harbor's Info Shop the Puppeteer an Aran on 21733 hasn't
+/// beaten yet (Cosmic `enterInfo`). His fall sets 21733's record
+/// (`crate::quests::kill_records`).
 pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
     match player.stats.map_id {
         PUPPETEERS_HIDEOUT => hunted_puppeteer(player)
@@ -879,6 +892,15 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
             })
             .into_iter()
             .collect(),
+        LITH_INFO_SHOP
+            if player.quests.state(STRANGE_INFORMATION) == QuestState::Started
+                && player.quests.info(STRANGE_INFORMATION_RECORD) != Some("2") =>
+        {
+            vec![Effect::BringOutMob {
+                mob_id: PUPPETEER_IN_LITH,
+                at: PUPPETEER_IN_LITH_AT,
+            }]
+        }
         _ => Vec::new(),
     }
 }
@@ -4325,6 +4347,35 @@ mod tests {
         // Elsewhere, nothing.
         let elsewhere = player_with(&[(20730, QuestState::Started)]);
         assert!(unscripted_map_enter(&elsewhere).is_empty());
+    }
+
+    #[test]
+    fn the_puppeteer_waits_in_lith_harbors_info_shop_until_he_falls() {
+        let in_shop = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = LITH_INFO_SHOP;
+            player
+        };
+        let data = crate::get_game_data().unwrap();
+        assert_eq!(data.field(LITH_INFO_SHOP).unwrap().on_user_enter, None);
+        assert!(unscripted_map_enter(&in_shop(&[])).is_empty());
+        let mut aran = in_shop(&[(STRANGE_INFORMATION, QuestState::Started)]);
+        let waiting = [Effect::BringOutMob {
+            mob_id: PUPPETEER_IN_LITH,
+            at: PUPPETEER_IN_LITH_AT,
+        }];
+        assert_eq!(unscripted_map_enter(&aran), waiting);
+        assert_eq!(
+            crate::quests::kill_records(&mut aran, PUPPETEER_IN_LITH),
+            [(STRANGE_INFORMATION_RECORD, "2")]
+        );
+        assert!(unscripted_map_enter(&aran).is_empty(), "beaten");
+        assert!(crate::quests::kill_records(&mut aran, PUPPETEER_IN_LITH).is_empty());
+        let done = in_shop(&[(STRANGE_INFORMATION, QuestState::Completed)]);
+        assert!(unscripted_map_enter(&done).is_empty());
+        // Without the quest, his fall sets nothing.
+        let mut passing = in_shop(&[]);
+        assert!(crate::quests::kill_records(&mut passing, PUPPETEER_IN_LITH).is_empty());
     }
 
     #[test]

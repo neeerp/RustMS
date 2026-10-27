@@ -2580,6 +2580,8 @@ impl NpcScript {
             "q3527s" => lost_memory(3527),
             "q3529s" => lost_memory(3529),
             "q3714s" => Some(baby_dragon(player)),
+            "q21733s" => Some(fake_tru_calls()),
+            "q21733e" => Some(tru_on_the_trap()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
             "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
@@ -4706,6 +4708,40 @@ fn francis() -> NpcScript {
         Effect::WarpToPortal(scripts::PUPPETEERS_HIDEOUT, 1),
     ];
     script.refused = Some(text(keys::FRANCIS_HIDEOUT_BUSY));
+    script
+}
+
+const FAKE_TRU: i32 = 1204007;
+const TRU: i32 = 1002104;
+const STRANGE_INFORMATION: i16 = 21733;
+const POLEARM_MASTERY: i32 = 21100000;
+
+/// `q21733s`: the Puppeteer calls an Aran to Lith Harbor's Info Shop in
+/// Tru's name, and Gathering Some Strange Information (21733) starts.
+fn fake_tru_calls() -> NpcScript {
+    let mut script = NpcScript::new(FAKE_TRU, vec![Page::Say(text(keys::FAKE_TRU_CALL))]);
+    script.on_end = vec![Effect::StartQuest(STRANGE_INFORMATION)];
+    script
+}
+
+/// `q21733e`: the Puppeteer beaten (`scripts::unscripted_map_enter`), Tru
+/// gives 8,000 EXP and Polearm Mastery, up to 20 (Cosmic `21733.js`).
+fn tru_on_the_trap() -> NpcScript {
+    let mut script = NpcScript::new(
+        TRU,
+        [keys::TRU_PUPPETEER_BEATEN, keys::TRU_POLEARM_MASTERY]
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![
+        Effect::CompleteQuest(STRANGE_INFORMATION),
+        Effect::GainExp(8000),
+        Effect::TeachSkill {
+            skill_id: POLEARM_MASTERY,
+            level: 0,
+            master_level: 20,
+        },
+    ];
     script
 }
 
@@ -12377,6 +12413,31 @@ mod tests {
         found.quests.set_record(20732, "1");
         nothing(LIBRARY_SHADOW, &found);
         nothing(LIBRARY_SHADOW, &on(&[]));
+    }
+
+    #[test]
+    fn the_puppeteer_calls_an_aran_in_trus_name_and_tru_rewards_his_fall() {
+        let aran = traveller(31, 0, false);
+        assert_eq!(
+            read_through(NpcScript::for_quest("q21733s", &aran).unwrap()),
+            (FAKE_TRU, vec![Effect::StartQuest(STRANGE_INFORMATION)])
+        );
+        let mut tru = NpcScript::for_quest("q21733e", &aran).unwrap();
+        assert_eq!(tru.npc_id(), TRU);
+        assert!(tru.begin().prompt.is_some());
+        assert!(tru.respond(ScriptInput::Next).unwrap().prompt.is_some());
+        assert_eq!(
+            tru.respond(ScriptInput::Next).unwrap().effects,
+            [
+                Effect::CompleteQuest(STRANGE_INFORMATION),
+                Effect::GainExp(8000),
+                Effect::TeachSkill {
+                    skill_id: POLEARM_MASTERY,
+                    level: 0,
+                    master_level: 20,
+                },
+            ]
+        );
     }
 
     #[test]
