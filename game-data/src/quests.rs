@@ -12,7 +12,7 @@
 use crate::{GameDataError, NxDataFile};
 use game::quest::INFO_QUESTS;
 use game::QuestState;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
@@ -350,8 +350,9 @@ pub struct QuestTemplate {
     /// complete (`mbcard`), as `(card id, min, max)`.
     pub end_cards: Vec<BookCard>,
     /// The fewest quests completed before completing this one
-    /// (`questComplete`), as Cosmic counts them. The client reads it too
-    /// (0x7225ab). Only Quest Specialist (29001) has one, 800.
+    /// (`questComplete`), counted as the client counts them (0x7225ab):
+    /// see [`QuestCatalog::counts_as_completed`]. Only Quest Specialist
+    /// (29001) has one, 800.
     pub end_completed_quests: Option<i32>,
     /// The fewest party quests whose record is at rank S
     /// (`partyQuest_S`, 0x722525). Only PQ Mania (29000) has one, 5.
@@ -613,7 +614,12 @@ fn is_speech(key: &str) -> bool {
 pub struct QuestCatalog {
     supported: BTreeMap<i16, QuestTemplate>,
     unsupported: BTreeMap<i16, String>,
+    /// The titles (medals): `QuestInfo` area 51.
+    titles: BTreeSet<i16>,
 }
+
+/// `QuestInfo`'s area for the titles (medals).
+pub const TITLE_AREA: i32 = 51;
 
 impl QuestCatalog {
     pub fn load_from_nx(path: impl AsRef<Path>) -> Result<Self, GameDataError> {
@@ -709,7 +715,22 @@ impl QuestCatalog {
                 }
             }
         }
+        let infos = node(&nx, "QuestInfo.img")?;
+        for info in nx.child_indices(infos)? {
+            let Ok(id) = nx.node_name(info)?.parse::<i16>() else {
+                continue;
+            };
+            if nx.int_child(info, "area")? == Some(TITLE_AREA) {
+                catalog.titles.insert(id);
+            }
+        }
         Ok(catalog)
+    }
+
+    /// Whether a completed `id` counts toward `questComplete`. The client
+    /// (0x7210c2) leaves out ids 9000 to 10999 and the titles.
+    pub fn counts_as_completed(&self, id: i16) -> bool {
+        !(9000..=10999).contains(&id) && !self.titles.contains(&id)
     }
 
     pub fn quest(&self, id: i16) -> Option<&QuestTemplate> {
@@ -1379,6 +1400,20 @@ mod tests {
             .map(|l| l.trim().parse().unwrap())
             .collect();
         assert_eq!(actual, golden, "update game-data/supported_quests.txt");
+    }
+
+    #[test]
+    fn titles_and_ids_from_9000_to_10999_are_not_counted_as_completed() {
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let catalog = QuestCatalog::load_from_nx(path).unwrap();
+        for id in [29000, 29001, 9000, 10999] {
+            assert!(!catalog.counts_as_completed(id), "{id}");
+        }
+        for id in [1000, 8999, 11000] {
+            assert!(catalog.counts_as_completed(id), "{id}");
+        }
     }
 
     #[test]

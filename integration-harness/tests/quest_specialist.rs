@@ -1,5 +1,6 @@
 //! Title Challenge - Quest Specialist (29001): Dalair gives the medal only
-//! once 800 quests are completed (`Check/1/questComplete`).
+//! once 800 quests are completed (`Check/1/questComplete`), counted as the
+//! client counts them: not ids 9000 to 10999, nor the titles.
 
 use integration_harness::database::{complete_quests, set_job};
 use integration_harness::events::maps;
@@ -43,6 +44,17 @@ async fn dalair_wants_eight_hundred_quests_completed() {
     let t = step(c, &m, build_quest_action(START, QUEST_SPECIALIST, DALAIR)).await;
     assert_eq!(t.progress, [(QUEST_SPECIALIST, 1)]);
     // 799 aren't enough.
+    let t = step(c, &m, build_quest_completion(QUEST_SPECIALIST, DALAIR, -1)).await;
+    assert!(t.progress.is_empty() && t.items.is_empty(), "{t:?}");
+    drop(session);
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Nor are ids 9000 to 10999, or a title (PQ Mania).
+    complete_quests(id, 9000, 9000).await.unwrap();
+    complete_quests(id, 10999, 10999).await.unwrap();
+    complete_quests(id, 29000, 29000).await.unwrap();
+    let mut session = visit(&config).await;
+    let c = &mut session.connection;
     let t = step(c, &m, build_quest_completion(QUEST_SPECIALIST, DALAIR, -1)).await;
     assert!(t.progress.is_empty() && t.items.is_empty(), "{t:?}");
     drop(session);

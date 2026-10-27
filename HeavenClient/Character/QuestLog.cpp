@@ -17,6 +17,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 #include "QuestLog.h"
 #include "QuestCatalog.h"
+#include "QuestMarker.h"
 #include "QuestRecordEx.h"
 #include <algorithm>
 
@@ -132,6 +133,14 @@ namespace ms
 				count++;
 
 		return count;
+	}
+
+	int32_t QuestLog::completed_count() const
+	{
+		const QuestCatalog& catalog = QuestCatalog::get();
+
+		return static_cast<int32_t>(std::count_if(completed.begin(), completed.end(),
+			[&](const auto& quest) { return counts_as_completed(quest.first, catalog.is_title(quest.first)); }));
 	}
 
 	// A repeatable quest started again keeps its completion, as in v83, but

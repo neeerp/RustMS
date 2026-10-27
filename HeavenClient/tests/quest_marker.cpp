@@ -297,6 +297,17 @@ int main()
 		mania.end_party_quest_s = 5;
 		require(!ms::party_rank_met(mania, 4) && ms::party_rank_met(mania, 5), "PQ Mania needs five at S");
 		require(std::string(ms::stop_reason(ms::QuestStop::PARTY_RANK)) == "default", "its stop page is the default");
+		// Quest Specialist (29001) needs 800 quests completed, not counting
+		// ids 9000 to 10999 or the titles.
+		ms::QuestInfo specialist = quest(29001, 9000040, 9000040);
+		require(ms::completed_met(specialist, 0), "most quests need no count");
+		specialist.end_completed_quests = 800;
+		require(!ms::completed_met(specialist, 799) && ms::completed_met(specialist, 800), "Quest Specialist needs 800");
+		require(std::string(ms::stop_reason(ms::QuestStop::COMPLETED)) == "default", "its stop page is the default too");
+		require(ms::counts_as_completed(1000, false) && ms::counts_as_completed(8999, false)
+			&& ms::counts_as_completed(11000, false), "other quests count");
+		require(!ms::counts_as_completed(9000, false) && !ms::counts_as_completed(10999, false), "9000 to 10999 don't");
+		require(!ms::counts_as_completed(29000, true), "nor do titles");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };

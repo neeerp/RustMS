@@ -37,14 +37,31 @@ int main()
 		require(token("gvup", [&](const std::string& key) { return value(carnival, key); }) == "1",
 				"give-ups are the tries less the rest");
 
-		using ms::QuestRecordEx::RankS;
-		require(token("scnt", none, RankS { 9, 5 }) == "9", "the S count, unclamped");
-		require(token("perPqS", none, RankS { 0, 5 }) == "0", "no S ranks is 0%");
-		require(token("perPqS", none, RankS { 3, 5 }) == "60", "three of five is 60%");
-		require(token("perPqS", none, RankS { 9, 5 }) == "100", "more than the need is 100%");
-		require(token("perPqS", none, RankS { 3, 0 }) == "0", "no need is 0%");
-		require(token("gaugePqS", none, RankS { 3, 5 }) == "#fUI/UIWindow.img/Quest/Gauge2/frame/45#", "the gauge's slices");
-		require(token("gaugePqS", none, RankS { 9, 5 }) == "#fUI/UIWindow.img/Quest/Gauge2/frame/75#", "a full gauge");
+		using ms::QuestRecordEx::Counts;
+		using ms::QuestRecordEx::Tally;
+		auto rank_s = [](int32_t count, int32_t need) { Counts counts; counts.rank_s = { count, need }; return counts; };
+		require(token("scnt", none, rank_s(9, 5)) == "9", "the S count, unclamped");
+		require(token("perPqS", none, rank_s(0, 5)) == "0", "no S ranks is 0%");
+		require(token("perPqS", none, rank_s(3, 5)) == "60", "three of five is 60%");
+		require(token("perPqS", none, rank_s(9, 5)) == "100", "more than the need is 100%");
+		require(token("perPqS", none, rank_s(3, 0)) == "0", "no need is 0%");
+		require(token("gaugePqS", none, rank_s(3, 5)) == "#fUI/UIWindow.img/Quest/Gauge2/frame/45#", "the gauge's slices");
+		require(token("gaugePqS", none, rank_s(9, 5)) == "#fUI/UIWindow.img/Quest/Gauge2/frame/75#", "a full gauge");
+
+		Counts specialist;
+		specialist.completed = { 200, 800 };
+		require(token("cmpcnt", none, specialist) == "200", "the quests completed");
+		require(token("perQCnt", none, specialist) == "25", "200 of 800 is 25%");
+		require(token("gaugeQCnt", none, specialist) == "#fUI/UIWindow.img/Quest/Gauge2/frame/18#", "75 slices' quarter, rounded down");
+		require(token("scnt", none, specialist) == "0", "each title reads its own count");
+		specialist.completed = { 900, 800 };
+		require(token("perQCnt", none, specialist) == "100", "past the need is 100%");
+		require(Tally { 5, -1 }.share(100) == 0, "no need is 0%");
+
+		Counts stats;
+		stats.level = 120;
+		stats.fame = -3;
+		require(token("level", none, stats) == "120" && token("pop", none, stats) == "-3", "level and fame as %d");
 
 		using ms::QuestRecordEx::gauge_slices;
 		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/45") == 45, "a gauge's path");

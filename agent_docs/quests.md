@@ -174,10 +174,14 @@ of card, and the Spirit titles from The Rememberer (1061011; 29016-29019) want o
 of five cards on top of their kills.
 
 `questComplete` is the fewest quests the player must have completed to
-complete this one. The server checks it, counting the completed quests as
-Cosmic does; a refusal sends nothing. v83's client reads it too
-(FUN_00721d2c 0x7225ab), but HeavenClient doesn't yet. Dalair's Quest
-Specialist (29001) wants 800.
+complete this one. The client tests it right after `partyQuest_S`
+(FUN_00721d2c 0x7225ab) and fails on `stop/default` the same way. It
+counts the completed quests less ids 9000 to 10999 and the titles
+(`QuestInfo` area 51), through 0x7210c2 with its flag set, and the server
+(`QuestCatalog::counts_as_completed`) and HeavenClient
+(`QuestLog::completed_count`, `completed_met`, also for the Quest Log's
+ready icon) count them alike; the server's refusal sends nothing. Dalair's
+Quest Specialist (29001) wants 800.
 
 `partyQuest_S` is the fewest party quests whose record beside the quest
 log ranks S (see "Records beside the quest log"): the client counts the
@@ -985,16 +989,23 @@ formatter (0x99dd54) shows them (HeavenClient `QuestRecordEx::token`):
 | `scnt` | the party quests at rank S, `%d` |
 | `perPqS` | that count against the quest's `partyQuest_S`, as a percentage from 0 to 100 |
 | `gaugePqS` | a 79x8 image: `UI/UIWindow.img/Quest/Gauge2/frame` with `count * 75 / need` (at most 75) one-pixel `gauge` slices from (2, 3) |
+| `cmpcnt` | the quests completed as `questComplete` counts them, `%d` (0x9a0a61) |
+| `perQCnt` | that count against the quest's `questComplete`, as a percentage from 0 to 100 (0x9a0bae) |
+| `gaugeQCnt` | the same gauge for that count (0x99f33c) |
+| `level` | the character's level, `%d` (0x9a0925) |
+| `pop` | the character's fame, `%d` (0x9a076e) |
 | anything else (`date`) | the value as it stands |
 
-The last three read every party quest's record, not the quest's own: PQ
-Mania (29000) shows them. HeavenClient passes the gauge as the path
+`scnt`, `perPqS` and `gaugePqS` read every party quest's record, not the
+quest's own: PQ Mania (29000) shows them. Quest Specialist (29001) shows
+the three quest counts, 29300-29304 and 10395-10398 show `level`, and
+29500 `pop`. HeavenClient passes the gauge as the path
 `…/Gauge2/frame/<slices>`, which the Quest Log and the title (medal)
 window draw as the frame and its slices (`QuestTextImages`,
 `QuestRecordEx::gauge_slices`). The tokens read the need from
 `Check.img` itself, as the client does, not from the supported list. The other medals' tokens
-(`cmpcnt`, `gaugeQCnt`, `perQCnt`, the Pop, Days and Hunt gauges, `level`)
-aren't filled yet.
+(the Pop, Days and Hunt gauges and their percentages, `popG`, `popgap`, `mg`, `mon`,
+`m`, `money`) aren't filled yet: their arithmetic isn't decoded.
 
 So far only the party quests keep records, on their info quests 1200-1206
 and 1301. The client lists these under "Party Quest" and never offers them

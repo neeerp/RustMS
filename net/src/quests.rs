@@ -358,7 +358,10 @@ pub fn check_complete(
         return Err(QuestRejection::PartyQuestRank);
     }
     if quest.end_completed_quests.is_some_and(|least| {
-        player.quests.completed().count() < usize::try_from(least).unwrap_or(0)
+        let counted = (player.quests.completed())
+            .filter(|&(id, _)| catalog().map_or(true, |c| c.counts_as_completed(id)))
+            .count();
+        counted < usize::try_from(least).unwrap_or(0)
     }) {
         return Err(QuestRejection::CompletedQuests);
     }
@@ -883,6 +886,9 @@ mod tests {
         let mut p = player(30, 0);
         set(&mut p, 1033, QuestState::Started);
         set(&mut p, 1000, QuestState::Completed);
+        // As in the client, ids 9000 to 10999 don't count.
+        set(&mut p, 9000, QuestState::Completed);
+        set(&mut p, 10999, QuestState::Completed);
         assert_eq!(
             check_complete(&q, 2102, &p),
             Err(QuestRejection::CompletedQuests)

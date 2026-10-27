@@ -75,6 +75,9 @@ namespace ms
 		// How many party quests' records (1200-1399) are at `rank`, one per
 		// quest (0x724722).
 		int32_t rank_count(const std::string& rank) const;
+		// How many quests are completed as v83 counts them for questComplete
+		// (counts_as_completed).
+		int32_t completed_count() const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level,
 			const std::function<bool(const QuestInfo&)>& holds, bool all_levels = false) const;
