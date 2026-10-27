@@ -243,8 +243,8 @@ the beginner job, not "any"). The level and master level become the entry's
 where the player's are lower, as Cosmic does, and the changed skills follow
 the completion in one UPDATE_SKILLS. `onlyMasterLevel` marks entries
 without a `skillLevel`, which already raise only the master level (Bahamut,
-6121–6124); `acquire` stays unsupported there. `npcAct` (always "quest") names an NPC animation that neither
-side plays; it is ignored. A quest with
+6121–6124); `acquire` stays unsupported there. `npcAct` names a special action the
+completing NPC plays (see "Persistence and rewards"). A quest with
 any other key (`infoex`,
 `petRecallLimit`, ...) is **unsupported**: it is
 never offered, and actions for it are refused. A prerequisite without a
@@ -952,6 +952,12 @@ and the whole player snapshot (EXP, items, HP) in one transaction that locks
 the character row first: rewards are applied to a copy of the player, and the
 actor adopts it only after the commit, so a replay cannot pay twice.
 Prerequisites are rechecked inside the transaction.
+
+After a data completion commits, a quest with `Act/1/npcAct` (2165, 2166,
+2168, 2186, 2207, 2278, 3110, 3340, 9803-9805) has the completing NPC play
+that special action: the field sends `0x106` to its NPC controller (see
+`npc-dialogue.md`). The client ignores the key itself, and Cosmic doesn't
+send it. A script's completion plays nothing unless the script asks.
 
 EXP uses `game::exp` (HeavenClient's table) through `Player::gain_exp`
 (+5 AP per level). HP/MP growth and SP belong with combat. If the level

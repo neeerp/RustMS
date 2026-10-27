@@ -4143,7 +4143,8 @@ fn nautilus_bush(npc: i32, player: &Player, rng: &mut impl Rng) -> NpcScript {
     script
 }
 
-/// Abel's thanks for `glasses`: `exp` and `scrolls` Nautilus Return Scrolls.
+/// Abel's thanks for `glasses`: `exp` and `scrolls` Nautilus Return Scrolls,
+/// and Abel plays the data's `npcAct` ("quest").
 fn abels_thanks(words: &str, glasses: i32, exp: i32, scrolls: i16) -> NpcScript {
     let mut script = NpcScript::new(ABEL, vec![Page::Say(text(words))]);
     script.on_end = vec![
@@ -4157,6 +4158,10 @@ fn abels_thanks(words: &str, glasses: i32, exp: i32, scrolls: i16) -> NpcScript 
             quantity: scrolls,
         },
         Effect::CompleteQuest(FIND_MY_GLASSES),
+        Effect::NpcSpecialAction {
+            npc_id: ABEL,
+            action: "quest",
+        },
     ];
     script.inventory_full = Some(text(keys::NAUTILUS_ABEL_FULL));
     script
@@ -15082,6 +15087,10 @@ mod tests {
                     quantity: scrolls,
                 },
                 Effect::CompleteQuest(FIND_MY_GLASSES),
+                Effect::NpcSpecialAction {
+                    npc_id: ABEL,
+                    action: "quest",
+                },
             ]
         };
         let own = NpcScript::for_quest("q2186e", &looking(Some(ABELS_GLASSES))).unwrap();

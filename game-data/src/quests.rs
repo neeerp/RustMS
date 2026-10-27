@@ -207,8 +207,8 @@ pub const PET_AUTO_SPEAKING: u16 = 0x100;
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item", "exp", "money", "buffItemID"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
-/// `npcAct` (always "quest") names an NPC animation; neither the client nor
-/// the server does anything with it.
+/// `npcAct` names a special action of the completing NPC, which the server
+/// has it play (11 quests: "quest", "action" or an `act<quest>`).
 pub const END_ACTIONS: &[&str] = &[
     "exp",
     "money",
@@ -363,6 +363,9 @@ pub struct QuestTemplate {
     /// completing (`buffItemID`).
     pub start_buff_item: Option<i32>,
     pub end_buff_item: Option<i32>,
+    /// The completing NPC's special action to play (`Act/1/npcAct`); the
+    /// client ignores the key, so the server sends it (0x106).
+    pub end_npc_act: Option<String>,
     /// Skills taught on completion.
     pub end_skills: Vec<QuestSkill>,
     /// Scripts that run the start or completion instead of the quest data.
@@ -887,6 +890,10 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         start_money: start_action_int("money")?.unwrap_or(0),
         start_buff_item: start_action_int("buffItemID")?,
         end_buff_item: action_int("buffItemID")?,
+        end_npc_act: match actions {
+            Some(index) => nx.string_child(index, "npcAct")?,
+            None => None,
+        },
         end_skills: quest_skills(nx, &format!("Act.img/{id}/1"))?,
         start_script: script(nx, start, "startscript")?,
         end_script: script(nx, end, "endscript")?,
@@ -1560,6 +1567,14 @@ mod tests {
         assert_eq!(rest.end_info_record, None);
         assert_eq!(rest.start_script.as_deref(), Some("q2335s"));
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
+        // The completing NPC's special action.
+        let snow_sculpture = catalog.quest(3110).unwrap();
+        assert_eq!(snow_sculpture.end_npc_act.as_deref(), Some("act3110"));
+        assert_eq!(
+            catalog.quest(2278).unwrap().end_npc_act.as_deref(),
+            Some("action")
+        );
+        assert_eq!(catalog.quest(7301).unwrap().end_npc_act, None);
         // Its first step's offer asks questions (`Act/0/ask`, `stop`).
         assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));
         // The token taken, then scrolls to pick from, listed "1" to "16" in
