@@ -28,12 +28,13 @@ use net::packet::build::world::effect::{
 use net::packet::build::world::field::{
     build_dojo_energy, build_dojo_warp_up, build_pyramid_score,
 };
-use net::packet::build::world::inventory::build_inventory_operation;
+use net::packet::build::world::inventory::{build_char_look, build_inventory_operation};
 use net::packet::build::world::messaging::build_item_line;
 use net::packet::build::world::quest::{build_quest_ex_record, build_quest_record};
+use net::packet::build::world::stat::build_hp_mp;
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
-use net::ClientId;
+use net::{ClientId, WorldAction};
 use packet::Packet;
 use rand::Rng;
 use std::time::SystemTime;
@@ -1021,6 +1022,27 @@ impl ClientActor {
         Ok(Some(judge(&field.areas, &positions)))
     }
 
+    /// The statue keeper's script for a member of the Guild Quest in the
+    /// hall of statues, a wrong guess shown to the hall; None elsewhere.
+    pub(super) async fn statue_keeper(&mut self) -> Result<Option<NpcScript>, RuntimeError> {
+        let map_id = self.in_game()?.player.stats.map_id;
+        if map_id != net::guild_quest::STATUE_HALL {
+            return Ok(None);
+        }
+        let in_gq =
+            |ticket: &&EventTicket| ticket.kind == EventKind::GuildQuest && ticket.holds(map_id);
+        let Some(ticket) = self.event.as_ref().filter(in_gq) else {
+            return Ok(None);
+        };
+        let Some(talk) = ticket.statues().await else {
+            return Ok(None);
+        };
+        if talk == net::guild_quest::StatueTalk::Failed {
+            self.show_wrong_answer().await?;
+        }
+        Ok(Some(NpcScript::statue_keeper(talk)))
+    }
+
     /// A wrong answer to a puzzle: everyone on the map sees and hears it.
     async fn show_wrong_answer(&mut self) -> Result<(), RuntimeError> {
         self.show_to_field(&["quest/party/wrong_kor"], &["Party1/Failed"])
@@ -1398,7 +1420,8 @@ impl ClientActor {
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
-        let changes = ticket.kind.event().take_items(&mut game.player);
+        let (changes, worn) = ticket.kind.event().take_items(&mut game.player);
+        let refit = worn && game.player.fit_hp_mp();
         game.player.pyramid_rage = 0;
         // The blessing stays in the event (Cosmic `playerUnregistered`).
         // Only the player hears of it: they are leaving the map, and arrive
@@ -1417,6 +1440,16 @@ impl ClientActor {
         }
         if !unblessed.is_empty() {
             self.send_cancelled(&unblessed).await?;
+        }
+        if worn {
+            // A worn one shows off on the map (Sharenian's earring).
+            let player = &self.in_game()?.player;
+            let hp_mp = refit.then(|| build_hp_mp(&player.stats)).transpose()?;
+            let look = build_char_look(player)?;
+            if let Some(mut hp_mp) = hp_mp {
+                self.send(&mut hp_mp).await?;
+            }
+            Box::pin(self.apply(WorldAction::LookChanged(look))).await?;
         }
         Ok(())
     }
@@ -1769,7 +1802,7 @@ impl ClientActor {
             game::wedding::take_keys(&mut game.player);
         }
         if let (Some(ticket), Some(game)) = (self.event.take(), self.game.as_mut()) {
-            ticket.kind.event().take_items(&mut game.player);
+            let _ = ticket.kind.event().take_items(&mut game.player);
         }
     }
 }

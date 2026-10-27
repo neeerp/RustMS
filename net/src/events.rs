@@ -1134,7 +1134,7 @@ pub const GUILD_QUEST: Event = Event {
     gated: &[crate::guild_quest::WAITING_ROOM],
     puzzles: 1..=0,
     areas_taken: 0,
-    items: &[],
+    items: crate::guild_quest::ITEMS,
     passes: 0,
     hand_ins: &[],
     gates: false,
@@ -3029,10 +3029,12 @@ impl Event {
         self.stage_on(map_id)
     }
 
-    /// Take the event's own items from `player`, who is leaving it (Cosmic
-    /// `setExclusiveItems`).
-    pub fn take_items(&self, player: &mut Player) -> Vec<InventoryChange> {
+    /// Take the event's own items from `player`, who is leaving it, worn
+    /// ones too (Cosmic `setExclusiveItems`, `removeAll`). Returns the
+    /// changes and whether any was worn.
+    pub fn take_items(&self, player: &mut Player) -> (Vec<InventoryChange>, bool) {
         let mut changes = Vec::new();
+        let mut worn = false;
         for &item_id in self.items {
             let held = i16::try_from(player.inventory.count(item_id)).unwrap_or(i16::MAX);
             if held > 0 {
@@ -3043,8 +3045,22 @@ impl Event {
                         .unwrap_or_default(),
                 );
             }
+            let slots: Vec<i16> = (player.inventory.items(game::InventoryType::Equipped))
+                .filter(|(_, item)| item.item_id == item_id)
+                .map(|(slot, _)| slot)
+                .collect();
+            for slot in slots {
+                if let Ok(taken) =
+                    player
+                        .inventory_mut()
+                        .take(game::InventoryType::Equipped, slot, 1)
+                {
+                    changes.extend(taken);
+                    worn = true;
+                }
+            }
         }
-        changes
+        (changes, worn)
     }
 
     /// The stage whose clear wins the event.
@@ -3342,6 +3358,11 @@ pub enum EventCommand {
     CarnivalCast(i32),
     /// A member died on the Monster Carnival battle field.
     CarnivalDied,
+    /// The Guild Quest's registrant is ready for the statue keeper's test:
+    /// the statues show the part's combo (`guild_quest::Statues::show`).
+    ShowStatues,
+    /// A member struck the statue numbered this, from 1.
+    StatueStruck(u8),
 }
 
 /// The coupons Kerning City's party quest's first stage has its members
@@ -4351,6 +4372,29 @@ mod tests {
     }
 
     #[test]
+    fn leaving_the_guild_quest_takes_the_earring_worn() {
+        let mut player = crate::codec::stats::sample_player();
+        let earring = crate::guild_quest::EARRING;
+        let worn = game::Item::stack(earring, 1);
+        let slot = game::inventory::equip_slot::EARRINGS;
+        player
+            .inventory
+            .insert(game::InventoryType::Equipped, slot, worn);
+        let kept = game::Item::stack(1_002_067, 1);
+        player.inventory.insert(
+            game::InventoryType::Equipped,
+            game::inventory::equip_slot::CAP,
+            kept,
+        );
+        let (changes, worn) = GUILD_QUEST.take_items(&mut player);
+        assert!(worn);
+        assert_eq!(changes.len(), 1);
+        let left = player.inventory.items(game::InventoryType::Equipped);
+        assert!(left.map(|(_, item)| item.item_id).eq([1_002_067]));
+        assert_eq!(GUILD_QUEST.take_items(&mut player), (Vec::new(), false));
+    }
+
+    #[test]
     fn leaving_kpq_takes_its_coupons_and_passes() {
         let mut player = crate::codec::stats::sample_player();
         for (slot, (item_id, quantity)) in [(COUPON, 30), (PASS, 2), (COUPON, 5), (4000000, 3)]
@@ -4362,14 +4406,14 @@ mod tests {
                 .inventory
                 .insert(game::InventoryType::Etc, slot as i16 + 1, item);
         }
-        assert_eq!(KPQ.take_items(&mut player).len(), 3);
+        assert_eq!(KPQ.take_items(&mut player).0.len(), 3);
         assert!(player.is_dirty());
         assert_eq!(
             player.inventory.count(COUPON) + player.inventory.count(PASS),
             0
         );
         assert_eq!(player.inventory.count(4000000), 3);
-        assert!(KPQ.take_items(&mut player).is_empty());
+        assert!(KPQ.take_items(&mut player).0.is_empty());
     }
 
     #[test]

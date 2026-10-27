@@ -375,6 +375,9 @@ pub enum ServerMessage {
     /// The player's field saw what clears `stage` of the event they are
     /// in, as Zakum's last body dying on its altar: tell the event.
     ClearEventStage(u8),
+    /// The player struck the Guild Quest's statue numbered this, from 1:
+    /// tell the event.
+    StatueStruck(u8),
     /// The player's field opened a reactor that opens `name` on the
     /// event's copy of `map_id` too (`net::events::EventCommand::OpenReactor`).
     OpenEventReactor {
@@ -746,6 +749,11 @@ pub enum FieldMessage {
     ReactorStates {
         names: Vec<&'static str>,
         reply: tokio::sync::oneshot::Sender<Vec<Option<u8>>>,
+    },
+    /// Play a hit of the live reactors named `name` here, no one swinging
+    /// and their state kept, as the Guild Quest's statues show their combo.
+    PlayReactor {
+        name: &'static str,
     },
     /// Set the live reactors named `name` here to `state`, as an event's
     /// gate shut while it runs (`net::events::Event::gate`).

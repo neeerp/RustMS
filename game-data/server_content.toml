@@ -1810,6 +1810,21 @@ unsourced = [
     "guild_quest.not_called",
     "guild_quest.refused",
     "guild_quest.nuris.ask",
+    "guild_quest.brief",
+    "guild_quest.exit.ask",
+    "guild_quest.statues.not_leader",
+    "guild_quest.statues.cleared",
+    "guild_quest.statues.intro",
+    "guild_quest.statues.harder",
+    "guild_quest.statues.working",
+    "guild_quest.statues.right",
+    "guild_quest.statues.wrong",
+    "guild_quest.statues.won",
+    "guild_quest.statues.showing",
+    "guild_quest.statues.shown",
+    "guild_quest.statues.part_passed",
+    "guild_quest.statues.failed",
+    "guild_quest.gate.closed",
 ]
 
 [text."glTutoMsg0.message"]

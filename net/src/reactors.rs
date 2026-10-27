@@ -71,6 +71,10 @@ pub enum Action {
     /// and once every moonflower there blooms the Moon Bunny comes out below
     /// the moon (Cosmic's 9108000-5).
     Bloom,
+    /// A statue in the Guild Quest's hall of statues: a strike counts
+    /// toward the guild's guess of the statue keeper's combo
+    /// (`guild_quest::Statues`).
+    Statue,
     /// One of the scars on the Tower of Goddess's hub (`2008000`-`2008005`),
     /// where a piece of Minerva's statue goes: it keeps the piece set in it.
     Hold,
@@ -338,6 +342,7 @@ pub fn action(reactor_id: i32) -> Action {
         2401001 => Action::BringOut(9300089, 1),
         2401002 => Action::BringOut(9300090, 1),
         9108000..=9108005 => Action::Bloom,
+        9208000..=9208002 => Action::Statue,
         // Ludibrium's stage 3 boxes (`ludiMob1`): three Bloctopuses come out.
         2201001 => Action::BringOut(LPQ_BLOCTOPUS, 3),
         // Stage 7's (`ludiMob2`), which take the other pass, and the
@@ -733,6 +738,9 @@ mod tests {
     #[test]
     fn the_jails_levers_drop_spears_and_their_boxes_spray() {
         assert_eq!(action(OPQ_LEVER), Action::Lever);
+        for statue in crate::guild_quest::STATUES {
+            assert_eq!(action(statue), Action::Statue);
+        }
         let spray = Action::Spray {
             at_least: 15,
             mesos: (100, 400),
