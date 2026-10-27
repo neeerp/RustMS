@@ -2412,6 +2412,36 @@ impl NpcScript {
             "q2259e" => Some(scorpions_cant_listen(player)),
             "q2260s" => Some(camel_cab_starts(keys::CAMEL_CAB_LEVEL_30, TO_THE_CASTLE)),
             "q2260e" => Some(camel_cab_says(keys::CAMEL_CAB_CASTLE_WAY, TO_THE_CASTLE)),
+            "q3301e" => Some(han_the_broker(
+                player,
+                ZENUMIST_TEST,
+                keys::HAN_ZENUMIST_ORES,
+                keys::HAN_ZENUMIST_WAIT,
+            )),
+            "q3303e" => Some(han_the_broker(
+                player,
+                ALCADNO_TEST,
+                keys::HAN_ALCADNO_ORES,
+                keys::HAN_ALCADNO_WAIT,
+            )),
+            "q3305s" => Some(cape_again(
+                CARSON,
+                ZENUMIST_CAPE_AGAIN,
+                [
+                    keys::CARSON_CAPE_LOST,
+                    keys::CARSON_CAPE_ASK,
+                    keys::CARSON_CAPE_GO,
+                ],
+            )),
+            "q3306s" => Some(cape_again(
+                MAED,
+                ALCADNO_CAPE_AGAIN,
+                [
+                    keys::MAED_CAPE_LOST,
+                    keys::MAED_CAPE_ASK,
+                    keys::MAED_CAPE_GO,
+                ],
+            )),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3062,6 +3092,77 @@ fn scorpions_cant_listen(player: &Player) -> NpcScript {
         return NpcScript::new(CAMEL_CAB, vec![Page::Say(text(keys::CAMEL_CAB_NOT_HERE))]);
     }
     camel_cab_says(keys::CAMEL_CAB_PRIVATE, SCORPIONS)
+}
+
+/// Joining Zenumist and Joining Alcadno (3301, 3303): Han the Broker
+/// (2111007) gets a society's test ready for two of any one jewel ore.
+const HAN_THE_BROKER: i32 = 2111007;
+const MAED: i32 = 2111001;
+const ZENUMIST_TEST: i16 = 3301;
+const ALCADNO_TEST: i16 = 3303;
+/// The jewel ores, Garnet Ore to Black Crystal Ore.
+const JEWEL_ORES: std::ops::RangeInclusive<i32> = 4020000..=4020008;
+/// Re-acquiring a society's cape (3305, 3306).
+const ZENUMIST_CAPE_AGAIN: i16 = 3305;
+const ALCADNO_CAPE_AGAIN: i16 = 3306;
+
+/// `q3301e` and `q3303e`, Test from the Head of a society: Han the Broker
+/// takes two of whichever jewel ore the player picks from those they hold
+/// two of, and the quest completes (Cosmic `3301.js`, `3303.js`); without
+/// any, there is no deal. The data's Korean start pages ask 30000 and 50000
+/// mesos instead, which no end script takes. The text is unsourced.
+fn han_the_broker(player: &Player, quest: i16, ores: &str, wait: &str) -> NpcScript {
+    let choices: Vec<_> = JEWEL_ORES
+        .filter(|&ore| player.inventory.count(ore) >= 2)
+        .map(|ore| {
+            let effects = vec![
+                Effect::TakeItem {
+                    item_id: ore,
+                    quantity: 2,
+                },
+                Effect::CompleteQuest(quest),
+            ];
+            let pages = vec![Page::Act {
+                text: text(wait),
+                effects,
+            }];
+            (format!("#t{ore}#"), pages)
+        })
+        .collect();
+    if choices.is_empty() {
+        return NpcScript::new(HAN_THE_BROKER, vec![Page::Say(text(keys::HAN_NO_ORES))]);
+    }
+    let mut script = NpcScript::new(
+        HAN_THE_BROKER,
+        vec![Page::Menu {
+            text: text(ores),
+            choices,
+        }],
+    );
+    script.refused = Some(text(keys::HAN_NO_ORES));
+    script
+}
+
+/// `q3305s` and `q3306s`, Re-acquiring a society's cape: its head (Carson,
+/// Maed) will make another for 5 of a jewel, 10 Leather and 10000 mesos,
+/// which the data's end takes; on yes the quest starts (Cosmic `3305.js`,
+/// `3306.js`). The text is unsourced.
+fn cape_again(npc: i32, quest: i16, keys: [&str; 3]) -> NpcScript {
+    let [lost, ask, go] = keys;
+    let mut script = NpcScript::new(
+        npc,
+        vec![
+            Page::Say(text(lost)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(quest)];
+    script
 }
 
 /// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
@@ -11174,6 +11275,70 @@ mod tests {
             read_through(script("q2259e", 260020700)),
             (CAMEL_CAB, vec![Effect::CompleteQuest(SCORPIONS)])
         );
+    }
+
+    #[test]
+    fn han_the_broker_takes_two_of_a_jewel_ore_for_a_societys_test() {
+        let none = NpcScript::for_quest("q3301e", &player(50)).unwrap();
+        assert_eq!(read_through(none), (HAN_THE_BROKER, vec![]));
+
+        let mut holding = player(50);
+        holding
+            .inventory
+            .insert(game::InventoryType::Etc, 1, game::Item::stack(4020000, 1));
+        holding
+            .inventory
+            .insert(game::InventoryType::Etc, 2, game::Item::stack(4020002, 2));
+        holding
+            .inventory
+            .insert(game::InventoryType::Etc, 3, game::Item::stack(4020008, 5));
+        for (name, quest) in [("q3301e", ZENUMIST_TEST), ("q3303e", ALCADNO_TEST)] {
+            let mut script = NpcScript::for_quest(name, &holding).unwrap();
+            let Some(Prompt::Selection { text, .. }) = script.begin().prompt else {
+                panic!("a choice of ores");
+            };
+            // Only those held two of.
+            assert!(!text.contains("#t4020000#") && text.contains("#t4020002#"));
+            let taken = script.respond(ScriptInput::Select(1)).unwrap();
+            assert_eq!(
+                taken.effects,
+                [
+                    Effect::TakeItem {
+                        item_id: 4020008,
+                        quantity: 2
+                    },
+                    Effect::CompleteQuest(quest)
+                ],
+                "{name}"
+            );
+            assert!(script.refused().is_some(), "no ores, no deal");
+        }
+    }
+
+    #[test]
+    fn carson_and_maed_make_a_lost_cape_again() {
+        for (name, npc, quest) in [
+            ("q3305s", CARSON, ZENUMIST_CAPE_AGAIN),
+            ("q3306s", MAED, ALCADNO_CAPE_AGAIN),
+        ] {
+            let script = || NpcScript::for_quest(name, &player(50)).unwrap();
+            let mut no = script();
+            no.begin();
+            assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(1));
+            let declined = no.respond(ScriptInput::No).unwrap();
+            assert_eq!((declined.prompt, declined.effects), (None, vec![]));
+            let mut yes = script();
+            assert_eq!(yes.npc_id(), npc);
+            yes.begin();
+            yes.respond(ScriptInput::Next).unwrap();
+            let go = yes.respond(ScriptInput::Yes).unwrap();
+            assert!(go.prompt.is_some() && go.effects.is_empty());
+            assert_eq!(
+                yes.respond(ScriptInput::Next).unwrap().effects,
+                [Effect::StartQuest(quest)],
+                "{name}"
+            );
+        }
     }
 
     #[test]
