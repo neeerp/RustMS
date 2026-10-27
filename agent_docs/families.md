@@ -39,7 +39,9 @@ change made while they were entering the game reached no one), and copied
 into the directory's `Presence`.
 
 Captain Al's three family quests (2232-2234) end by these numbers: a
-junior, then the Rep earned and left (see [Quests](./quests.md)).
+junior, then the Rep earned and left (see [Quests](./quests.md)). Dalair's
+Outstanding Citizen title (29508) also needs a junior, with a marriage and a
+guild.
 
 ### Requests
 
