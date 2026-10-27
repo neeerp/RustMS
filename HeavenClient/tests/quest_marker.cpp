@@ -177,6 +177,17 @@ int main()
 		walls.end_info_record = 0;
 		walls.end_info = {{0, "111"}};
 		require(info_stop(nullptr) == ms::QuestStop::NONE, "infoex without infoNumber is the server's");
+		// Check/0/infoex (FUN_00721163): The Test (2312) waits for the
+		// opening scene to set 2311 to "1".
+		ms::QuestInfo the_test = quest(2312, 1300005, 1300005);
+		the_test.start_info_record = 2311;
+		the_test.start_info = {{1, "1"}};
+		std::string seen;
+		require(!ms::start_info_met(the_test, nullptr), "no record, no start");
+		require(!ms::start_info_met(the_test, &seen), "nor with an empty one");
+		seen = "1";
+		require(ms::start_info_met(the_test, &seen), "the scene seen lets it start");
+		require(ms::start_info_met(walls, nullptr), "a quest without one starts");
 		// Start requirements on what the player holds (FUN_00721163): worn
 		// copies count once, 0 means none, and a negative count is a maximum.
 		ms::QuestInfo mirror = quest(1000, 2101, 2101);

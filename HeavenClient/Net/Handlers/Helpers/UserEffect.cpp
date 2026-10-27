@@ -78,13 +78,24 @@ namespace ms
 				return true;
 			}
 			case 12: // an image where the user stands; v83 delays it by a state of the user's not known
-			case 18: // an animation where the user stands, as the intro cutscenes
 			{
 				std::string path = recv.read_string();
 
 				if (user)
 					if (nl::node effect = Stage::effect_node(path))
 						stage.show_ground_effect(effect, user->get_position());
+
+				return true;
+			}
+			// A scene's part (0x9386d7), from where the user stands. v83 plays another user's too, and its field
+			// event then warps the player, so the server sends it only as the player's own.
+			case 18:
+			{
+				std::string path = recv.read_string();
+
+				if (user)
+					if (nl::node part = Stage::effect_node(path))
+						stage.play_scene(part, user->get_position());
 
 				return true;
 			}

@@ -230,6 +230,15 @@ record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
 so it is saved and sent as its progress string ("001"). The Thorn Remover the
 quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
 items"), and the Secretary of Magic (1300004) then completes the quest.
+"The Test" (2312) has a start check of the same kind: its `Check.img/0`
+`infoNumber` names record 2311, which must be "1" (cond 0 is string equality,
+1 at least, 2 at most, as in the end check; v83 FUN_00721163). Such pairs are
+in `START_RECORD_QUESTS` (`StartRequirements::record`). The Mushroom Kingdom's
+opening scene sets that record (`TD_MC_Openning`, see `map-travel.md`), so the
+officer (1300005) in the Mushroom Forest Field offers 2312 only after it.
+HeavenClient checks the same record before offering the quest, unless the
+record is itself a quest in `QuestInfo.img` (Meren's 6030-6032 read 6029's
+string, which the server doesn't keep, so the client leaves those to it).
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -675,5 +684,6 @@ copied into the source.
   (2236's six rocks, the swamp's two told apart, each charmed once),
   `shining_stone` (2166's stone, once, then Sharyl),
   `mushroom_forest` (2314's barrier and 2322's wall, each looked at once),
+  `mushroom_opening` (the opening scene, its way out, then The Test),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

@@ -98,6 +98,20 @@ namespace ms
 				info.end_info.emplace_back(static_cast<int32_t>(entry["cond"].get_integer()),
 					entry["value"].get_string());
 
+			// v83 checks Check/0/infoex too (FUN_00721163). Meren's classes
+			// read 6029's string, which the server keeps not; those are left
+			// to it, as their completion is.
+			auto start_record = static_cast<int16_t>(start["infoNumber"].get_integer());
+
+			if (start_record != 0 && !root["QuestInfo.img"][std::to_string(start_record)])
+			{
+				info.start_info_record = start_record;
+
+				for (auto entry : start["infoex"])
+					info.start_info.emplace_back(static_cast<int32_t>(entry["cond"].get_integer()),
+						entry["value"].get_string());
+			}
+
 			for (auto map : start["fieldEnter"])
 				info.field_enter.push_back(static_cast<int32_t>(map.get_integer()));
 

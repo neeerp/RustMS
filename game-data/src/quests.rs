@@ -133,6 +133,12 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
     (3507, 7081),
     (29932, 7760),
 ];
+/// Quests that start only once a record that is no quest reads a value
+/// (`Check/0 infoNumber` names it, `infoex` the value), which a script sets
+/// (`game::quest::RECORDS`): `(quest, record)`. The Test (2312) waits for
+/// the Mushroom Kingdom's opening scene (`TD_MC_Openning`) to set 2311.
+/// See [`StartRequirements::record`].
+pub const START_RECORD_QUESTS: &[(i16, i16)] = &[(2312, 2311)];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
@@ -222,6 +228,9 @@ pub struct StartRequirements {
     /// The closeness the first pet out must have, from `pettamenessmin` to
     /// `pettamenessmax` (30000 when only the least is given).
     pub pet_closeness: Option<(i32, i32)>,
+    /// A record that is no quest, and what its info string must read
+    /// (`Check/0 infoNumber`, `infoex`); see [`START_RECORD_QUESTS`].
+    pub record: Option<(i16, Vec<InfoCheck>)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -532,6 +541,11 @@ impl QuestCatalog {
                     keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
                 }
             }
+            if START_RECORD_QUESTS.iter().any(|&(quest, _)| quest == id) {
+                if let Some(keys) = &mut keys.start_check {
+                    keys.retain(|key| !INFO_KEYS.contains(&key.as_str()));
+                }
+            }
             if MEREN_INFO_QUESTS.contains(&id) {
                 for keys in [&mut keys.start_check, &mut keys.end_check]
                     .into_iter()
@@ -643,6 +657,12 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
+    if let Some(&(_, record)) = START_RECORD_QUESTS.iter().find(|&&(quest, _)| quest == id) {
+        if nx.int_child(start, "infoNumber")? != Some(i32::from(record)) {
+            return Err(invalid("start record quest with another record"));
+        }
+        requirements.record = Some((record, info_checks(nx, start)?));
+    }
     if let Some(skills) = nx.child_by_name(start, "skill")? {
         for skill in nx.child_indices(skills)? {
             let skill_id = nx
@@ -789,7 +809,7 @@ fn text_child(nx: &NxDataFile, parent: u32, key: &str) -> Result<Option<String>,
     })
 }
 
-/// Every `Check/1/infoex` entry.
+/// Every `infoex` entry of a `Check/0` or `Check/1` node.
 fn info_checks(nx: &NxDataFile, end: u32) -> Result<Vec<InfoCheck>, GameDataError> {
     let Some(infoex) = nx.child_by_name(end, "infoex")? else {
         return Ok(Vec::new());
@@ -1233,6 +1253,19 @@ mod tests {
                 value: "5".into()
             }]
         );
+        // The Test starts once the opening scene has set record 2311 to 1.
+        let test = catalog.quest(2312).unwrap();
+        assert_eq!(
+            test.start.record,
+            Some((
+                2311,
+                vec![InfoCheck {
+                    cond: 1,
+                    value: "1".into()
+                }]
+            ))
+        );
+        assert_eq!((test.start.npc, test.exp), (1300005, 11500));
         // Every info quest starts with a string and counts no mobs, whose
         // counts would share the record with it.
         for &id in INFO_QUESTS {

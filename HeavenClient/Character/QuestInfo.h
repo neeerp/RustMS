@@ -68,6 +68,10 @@ namespace ms
 		// of which one must hold.
 		int16_t end_info_record = 0;
 		std::vector<std::pair<int32_t, std::string>> end_info;
+		// The same for starting it (Check/0), kept only for a record that is
+		// no quest, such as the Mushroom Kingdom's opening scene's 2311.
+		int16_t start_info_record = 0;
+		std::vector<std::pair<int32_t, std::string>> start_info;
 		// Items given when the quest starts: (item id, count).
 		std::vector<std::pair<int32_t, int32_t>> start_items;
 		// Mobs to kill before completing: (mob id, count).

@@ -33,6 +33,18 @@ const TEMPLE_ROAD: i32 = 270000100;
 const HAUNTED_HOUSE: i32 = 682000100;
 /// The Mushroom Castle's way in and through (Cosmic's `td_mushcastle`).
 const MUSHROOM_FOREST_FIELD: i32 = 106020000;
+/// The Mushroom Kingdom's opening scene (`TD_MC_Openning`), and the record
+/// it sets, which The Test (2312) needs to start.
+const MUSHROOM_OPENING: i32 = 106020001;
+const MUSHROOM_OPENING_RECORD: i16 = 2311;
+const MUSHROOM_OPENING_SEEN: &str = "1";
+/// The least level the Empty House lets through to the kingdom.
+const MUSHROOM_KINGDOM_LEVEL: u8 = 30;
+/// The opening scene's parts (`Effect.nx/Direction2.img/open`), in the order
+/// `TD_MC_Openning` reserves them; its `out` part leads to the forest.
+const MUSHROOM_OPENING_SCENE: [&str; 10] = [
+    "back0", "back1", "light", "pepeKing", "line", "violeta0", "violeta1", "frame", "chat", "out",
+];
 const SPLIT_ROAD: i32 = 106020400;
 const CASTLE_WALL_EDGE: i32 = 106020501;
 /// The castle wall's edge before its thorns are cleared, where Over the
@@ -433,6 +445,13 @@ pub enum Effect {
     FieldEffect(String),
     /// A UI image anchored to the player (`UI/tutorial.img/<n>` hints).
     AvatarEffect(String),
+    /// A scene the client plays from `Effect.nx` (`Direction2.img/open`),
+    /// one path per part, with the UI locked; it ends by asking for `exit`
+    /// (`Player::scene_exit`), which the scene's own data names.
+    Scene {
+        parts: Vec<String>,
+        exit: i32,
+    },
     /// An instruction balloon above the player.
     Hint {
         text: String,
@@ -805,6 +824,20 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
         // Leafre Station takes the dragon off whoever lands there, the
         // flight's timer included (no source; by its name).
         "undomorphdarco" => Some(vec![Effect::CancelItemBuff(MINI_DRACO)]),
+        // The Mushroom Kingdom's opening (Edelstein `TD_MC_Openning`): it
+        // marks the scene seen (The Test, 2312, waits for that) and plays it.
+        "TD_MC_Openning" => Some(vec![
+            Effect::SetRecord {
+                record: MUSHROOM_OPENING_RECORD,
+                value: MUSHROOM_OPENING_SEEN,
+            },
+            Effect::Scene {
+                parts: (MUSHROOM_OPENING_SCENE.iter())
+                    .map(|part| format!("Effect/Direction2.img/open/{part}"))
+                    .collect(),
+                exit: MUSHROOM_FOREST_FIELD,
+            },
+        ]),
         "TD_NC_title" | "TD_MC_title" => Some(
             THEME_BANNERS
                 .iter()
@@ -1084,15 +1117,18 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             block: false,
             occupied: None,
         },
-        // An Empty House's way to the Mushroom Kingdom, open once the
-        // quest that leads there is done or its first quests are taken.
+        // An Empty House's way to the Mushroom Kingdom, from level 30: the
+        // first time through the kingdom's opening scene, which leads on to
+        // its forest (Edelstein's `TD_MC_first`).
+        "TD_MC_first" if player.stats.level < MUSHROOM_KINGDOM_LEVEL => {
+            refused(keys::MC_FIRST_BLOCKED)
+        }
         "TD_MC_first"
-            if quest(2260) == QuestState::Completed
-                || (2300..=2310).any(|id| quest(id) != QuestState::NotStarted) =>
+            if player.quests.info(MUSHROOM_OPENING_RECORD) == Some(MUSHROOM_OPENING_SEEN) =>
         {
             through(Effect::Warp(MUSHROOM_FOREST_FIELD))
         }
-        "TD_MC_first" => refused(keys::MC_FIRST_BLOCKED),
+        "TD_MC_first" => through(Effect::Warp(MUSHROOM_OPENING)),
         // Opened for good by a Killer Mushroom Spore (`item`).
         "obstacle" if quest(OBSTACLE_OPENED) != QuestState::NotStarted => through(
             Effect::WarpToPortal(SPLIT_ROAD, named(SPLIT_ROAD, "left00")),
@@ -2602,16 +2638,32 @@ mod tests {
     #[test]
     fn the_mushroom_castle_lets_players_in_once_their_quests_allow() {
         let through = |warp| vec![Effect::PortalSound, warp];
-        let first = |quests| portal("TD_MC_first", &player_with(quests)).unwrap();
-        assert!(pink(&first(&[])));
-        assert!(pink(&first(&[(2299, QuestState::Started)])));
-        for quests in [
-            &[(2260, QuestState::Completed)][..],
-            &[(2300, QuestState::Started)],
-            &[(2310, QuestState::Completed)],
-        ] {
-            assert_eq!(first(quests).effects, through(Effect::Warp(106020000)));
-        }
+        let first = |player: &Player| portal("TD_MC_first", player).unwrap();
+        let mut player = player_with(&[(2300, QuestState::Started)]);
+        player.stats.level = 29;
+        assert!(pink(&first(&player)));
+        // The first time through the opening scene, then to the forest.
+        player.stats.level = 30;
+        assert_eq!(first(&player).effects, through(Effect::Warp(106020001)));
+        player.quests.set_record(2311, "1");
+        assert_eq!(first(&player).effects, through(Effect::Warp(106020000)));
+
+        // The scene marks itself seen, then plays and leads to the forest.
+        let opening = map_enter("TD_MC_Openning", &player_with(&[])).unwrap();
+        assert_eq!(
+            opening[0],
+            Effect::SetRecord {
+                record: 2311,
+                value: "1"
+            }
+        );
+        let Effect::Scene { parts, exit } = &opening[1] else {
+            panic!("{opening:?}");
+        };
+        assert_eq!(parts.len(), 10);
+        assert_eq!(parts[0], "Effect/Direction2.img/open/back0");
+        assert_eq!(parts[9], "Effect/Direction2.img/open/out");
+        assert_eq!(*exit, 106020000);
 
         let castle = |quests| portal("gotocastle", &player_with(quests)).unwrap();
         assert!(pink(&castle(&[(2324, QuestState::Started)])));

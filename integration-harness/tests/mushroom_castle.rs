@@ -1,9 +1,9 @@
 //! The way into the Mushroom Kingdom: the Empty House's portal, the
 //! poisonous mushrooms that a Poison Spore clears, and the castle wall's
-//! thorns keep players back with a pink line until their quests (or the
-//! spore) let them through.
+//! thorns keep players back with a pink line until their level, quests (or
+//! the spore) let them through.
 
-use integration_harness::database::{grant_stack, set_quest};
+use integration_harness::database::{grant_stack, set_job, set_quest};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::trace::{step, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
@@ -61,7 +61,10 @@ async fn the_mushroom_kingdom_lets_players_through_once_they_may_go() {
     drop(player);
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
-    set_quest(id, 2260, 2, "").await.unwrap();
+    // Level 30, and the kingdom's opening scene already seen (record 2311;
+    // `mushroom_opening` covers the first time).
+    set_job(id, 0, 30, 50).await.unwrap();
+    set_quest(id, 2311, 1, "1").await.unwrap();
     set_quest(id, 2324, 2, "").await.unwrap();
     grant_stack(id, 4, 1, POISON_SPORE, 1).await.unwrap();
     let mut player = relogin(&config).await;

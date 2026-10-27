@@ -165,6 +165,14 @@ impl ClientActor {
                     changed = true;
                 }
                 Effect::AvatarEffect(path) => afterwards.push(effect::build_avatar_effect(path)?),
+                Effect::Scene { parts, exit } => {
+                    afterwards.push(effect::build_lock_ui(true)?);
+                    for part in parts {
+                        afterwards.push(effect::build_scene_part(part)?);
+                    }
+                    next.scene_exit = Some(*exit);
+                    changed = true;
+                }
                 Effect::Pink(text) => afterwards.push(build_broadcast(Broadcast::Pink, text)?),
                 Effect::InfoText(text) => afterwards.push(quest::build_info_text(text)?),
                 Effect::Hint {

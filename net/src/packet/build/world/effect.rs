@@ -122,6 +122,25 @@ pub fn build_avatar_effect(path: &str) -> Result<Packet, NetworkError> {
     Ok(p)
 }
 
+/// SHOW_ITEM_GAIN_INCHAT mode 0x12: a scene's part from `Effect.nx`
+/// (`Effect/Direction2.img/open/back0`), which the client plays on its own
+/// clock.
+pub fn build_scene_part(path: &str) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::ShowItemGainInChat as i16)?;
+    p.write_byte(0x12)?;
+    p.write_str_with_length(path)?;
+    Ok(p)
+}
+
+/// LOCK_UI: hides and locks the UI while a scene plays, or gives it back.
+pub fn build_lock_ui(locked: bool) -> Result<Packet, NetworkError> {
+    let mut p = Packet::new_empty();
+    p.write_short(SendOpcode::LockUi as i16)?;
+    p.write_byte(u8::from(locked))?;
+    Ok(p)
+}
+
 /// The charm that kept a dead player's EXP.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CharmUsed {

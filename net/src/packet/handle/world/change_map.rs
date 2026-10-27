@@ -248,7 +248,8 @@ pub enum DoorExit {
 /// died on, at the spawn point nearest where they fell (Cosmic); otherwise
 /// they go to its return map. A trap may send a live player to one of
 /// `traps_send_to`, as the Witch Tower's snacks send them back to its
-/// entrance (v83 0x94b767). GMs (and debug builds, which the integration
+/// entrance (v83 0x94b767), and a scene shown on the map (`Effect::Scene`)
+/// ends by sending them to the field it leads to. GMs (and debug builds, which the integration
 /// harness uses as a teleport command) may warp anywhere.
 fn direct_destination(
     player: &mut Player,
@@ -278,6 +279,12 @@ fn direct_destination(
         };
         replies.extend(revive(player)?);
         return Ok((destination.0, destination.1, replies));
+    }
+    // A scene's end asks for the field it leads to (`Effect::Scene`), and
+    // gets its UI back there, which also starts that field's music.
+    if player.scene_exit == Some(target) {
+        let unlock = build::world::effect::build_lock_ui(false)?;
+        return Ok((target, 0, vec![unlock]));
     }
     if policy::may_warp_anywhere(player) || traps_send_to.contains(&target) {
         return Ok((target, 0, Vec::new()));
@@ -366,6 +373,20 @@ mod tests {
         if !policy::debug_warps_enabled() {
             assert!(to(&mut p, 180000000).is_err());
         }
+    }
+
+    #[test]
+    fn a_scene_ends_in_the_field_it_leads_to_with_the_ui_back() {
+        let mut p = player(50, 0);
+        assert!(direct_destination(&mut p, 106020000, false, &[], |_| None).is_err());
+        p.scene_exit = Some(106020000);
+        let (map, _, replies) =
+            direct_destination(&mut p, 106020000, false, &[], |_| None).unwrap();
+        assert_eq!(map, 106020000);
+        let unlock = build::world::effect::build_lock_ui(false).unwrap();
+        assert_eq!(replies.len(), 1);
+        assert_eq!(replies[0].bytes, unlock.bytes);
+        assert!(direct_destination(&mut p, 100000000, false, &[], |_| None).is_err());
     }
 
     #[test]
