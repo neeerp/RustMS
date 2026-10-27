@@ -34,11 +34,15 @@ pub const INFO_QUESTS: &[i16] = &[
 /// and the growth of the Timer's Egg a player raises (7067, for "A Cute
 /// Baby Bird", 3250) and the writing coming back on Mr. Do's Hanging
 /// Scroll (21763, for "The Black Scroll", 21742), which feeding them in
-/// their raise windows adds to.
+/// their raise windows adds to, and an Aran's seeing the Ellin Forest seal
+/// stone taken from its Warehouse (21764, for "The Lost Seal Stone of
+/// Ellin Forest", 21753) and finding Athena Pierce in their own time
+/// (21765, for "Info on Another Seal Stone", 21754).
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
 pub const RECORDS: &[i16] = &[
-    2311, 6331, 6364, 6371, 6401, 6411, 7067, 7081, 7760, 20731, 20732, 21761, 21762, 21763,
+    2311, 6331, 6364, 6371, 6401, 6411, 7067, 7081, 7760, 20731, 20732, 21761, 21762, 21763, 21764,
+    21765,
 ];
 
 /// A quest's state as the client and the quest data number it.

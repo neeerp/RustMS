@@ -361,7 +361,40 @@ pub const PUPPETEERS_ARENA: i32 = 910510202;
 const TRACES_OF_THE_PUPPETEER: i16 = 21734;
 const ARENA_PUPPETEER: i32 = 9300346;
 const ARENA_PUPPETEER_AT: (i16, i16) = (95, 200);
-pub const SOLO_MAPS: [i32; 17] = [
+/// Mu Gong's back alley behind the Mu Lung Dojo (925040000), which the
+/// Dojo's `enterBackStreet` lets an Aran into while Mu Gong has business
+/// with them (Cosmic `enterBackStreet`), and Mu Gong's arena for the Test
+/// (21746), one challenger at a time, which `outSpecialSchool` leaves.
+pub const BACK_STREET: i32 = 925040000;
+pub const MU_GONGS_ARENA: i32 = 925040001;
+const SHADOW_KNIGHTS_LETTER: i16 = 21744;
+const HOW_TO_MEET_MU_GONG: i16 = 21745;
+/// The Sealed Shrine, which the Entrance pillar (2091009) lets an Aran on
+/// Catch the Shadow Knight! (21747) into, one at a time; its Shadow Knight
+/// comes out on entry until it falls (Cosmic map script `925040100`).
+pub const SEALED_SHRINE: i32 = 925040100;
+pub const CATCH_THE_SHADOW_KNIGHT: i16 = 21747;
+const SHADOW_KNIGHT: i32 = 9300351;
+const SHADOW_KNIGHT_AT: (i16, i16) = (897, 51);
+/// Ellin Forest's Warehouse (300000011): an Aran who has opened it for
+/// Athena Pierce (21751) sees the Gentleman of the Black Wings make off
+/// with its seal stone, which sets the record The Lost Seal Stone of Ellin
+/// Forest (21753) asks for. Neither Cosmic nor the data says what sets it;
+/// the scene's Gentleman (9300353) leaves by itself.
+const ELLIN_WAREHOUSE: i32 = 300000011;
+const SEAL_STONE_OF_ELLIN: i16 = 21751;
+const WAREHOUSE_RECORD: i16 = 21764;
+const WAREHOUSE_SEEN: &str = "1";
+const WAREHOUSE_GENTLEMAN: i32 = 9300353;
+const WAREHOUSE_GENTLEMAN_AT: (i16, i16) = (200, 100);
+/// Back in their own time, an Aran who has heard from Tru of Athena Pierce
+/// (21753) finds Athena at the Bowman Instructional School, which sets the
+/// record Info on Another Seal Stone (21754) asks for (its `QuestInfo/0`;
+/// the setter is unsourced too).
+const LOST_SEAL_STONE: i16 = 21753;
+const ATHENA_FOUND_RECORD: i16 = 21765;
+const ATHENA_FOUND: &str = "2";
+pub const SOLO_MAPS: [i32; 19] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -379,6 +412,8 @@ pub const SOLO_MAPS: [i32; 17] = [
     PUPPETEERS_ARENA,
     SEALED_GARDEN_WAY,
     SEALED_GARDEN,
+    MU_GONGS_ARENA,
+    SEALED_SHRINE,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -921,6 +956,40 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
                 at: PUPPETEER_IN_LITH_AT,
             }]
         }
+        SEALED_SHRINE
+            if player.quests.state(CATCH_THE_SHADOW_KNIGHT) == QuestState::Started
+                && (player.quests.kills(CATCH_THE_SHADOW_KNIGHT).iter())
+                    .all(|&count| count == 0) =>
+        {
+            vec![Effect::BringOutMob {
+                mob_id: SHADOW_KNIGHT,
+                at: SHADOW_KNIGHT_AT,
+            }]
+        }
+        ELLIN_WAREHOUSE
+            if player.quests.state(SEAL_STONE_OF_ELLIN) == QuestState::Completed
+                && player.quests.info(WAREHOUSE_RECORD) != Some(WAREHOUSE_SEEN) =>
+        {
+            vec![
+                Effect::SetRecord {
+                    record: WAREHOUSE_RECORD,
+                    value: WAREHOUSE_SEEN,
+                },
+                Effect::BringOutMob {
+                    mob_id: WAREHOUSE_GENTLEMAN,
+                    at: WAREHOUSE_GENTLEMAN_AT,
+                },
+            ]
+        }
+        BOWMAN_SCHOOL
+            if player.quests.state(LOST_SEAL_STONE) == QuestState::Completed
+                && player.quests.info(ATHENA_FOUND_RECORD).is_none() =>
+        {
+            vec![Effect::SetRecord {
+                record: ATHENA_FOUND_RECORD,
+                value: ATHENA_FOUND,
+            }]
+        }
         _ => Vec::new(),
     }
 }
@@ -1410,6 +1479,24 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             NEGLECTED_STROLLING_PATH,
             named(NEGLECTED_STROLLING_PATH, "out00"),
         )),
+        // Cosmic opens it only for 21747 or for the letter, which shuts
+        // an Aran out between them (Mu Gong's Test included).
+        "enterBackStreet"
+            if (quest(SHADOW_KNIGHTS_LETTER) == QuestState::Started
+                && quest(HOW_TO_MEET_MU_GONG) == QuestState::Completed)
+                || (quest(SHADOW_KNIGHTS_LETTER) == QuestState::Completed
+                    && quest(CATCH_THE_SHADOW_KNIGHT) != QuestState::Completed) =>
+        {
+            through(Effect::WarpToPortal(BACK_STREET, 0))
+        }
+        "enterBackStreet" => refused(keys::BACK_STREET_NO_ENTRY),
+        "outSpecialSchool" => through(Effect::WarpToPortal(
+            BACK_STREET,
+            named(BACK_STREET, "st00"),
+        )),
+        // The Conference Hall's door to its Warehouse (Cosmic
+        // `enterWarehouse`).
+        "enterWarehouse" => through(Effect::WarpToPortal(ELLIN_WAREHOUSE, 0)),
         "ariant_castle" if player.inventory.count(PALACE_ENTRY_PASS) > 0 => through(
             Effect::WarpToPortal(CASTLE_GARDEN, named(CASTLE_GARDEN, "out00")),
         ),
@@ -4466,6 +4553,112 @@ mod tests {
         );
         *aran.quests.kills_mut(TO_THE_SEALED_GARDEN).unwrap() = vec![1];
         assert!(enter(&aran).is_empty(), "beaten");
+    }
+
+    #[test]
+    fn mu_gongs_back_street_and_shrine_open_for_an_aran_on_its_errands() {
+        let on = |quests: &[(i16, QuestState)]| portal("enterBackStreet", &player_with(quests));
+        let letter = [
+            (SHADOW_KNIGHTS_LETTER, QuestState::Started),
+            (HOW_TO_MEET_MU_GONG, QuestState::Completed),
+        ];
+        assert_eq!(warp_of(&on(&letter).unwrap()), Some((BACK_STREET, 0)));
+        let refused = on(&letter[..1]).unwrap();
+        assert_eq!(warp_of(&refused), None);
+        assert!(matches!(refused.effects[..], [Effect::Pink(_)]));
+        // From the letter's end until the Shadow Knight is caught, Mu Gong
+        // still has business with them, the Test included.
+        let letter_done = (SHADOW_KNIGHTS_LETTER, QuestState::Completed);
+        for errand in [
+            vec![letter_done],
+            vec![letter_done, (21746, QuestState::Started)],
+            vec![letter_done, (21746, QuestState::Completed)],
+            vec![letter_done, (CATCH_THE_SHADOW_KNIGHT, QuestState::Started)],
+        ] {
+            assert_eq!(
+                warp_of(&on(&errand).unwrap()),
+                Some((BACK_STREET, 0)),
+                "{errand:?}"
+            );
+        }
+        let done = on(&[
+            letter_done,
+            (CATCH_THE_SHADOW_KNIGHT, QuestState::Completed),
+        ])
+        .unwrap();
+        assert_eq!(warp_of(&done), None);
+        assert_eq!(
+            warp_of(&portal("outSpecialSchool", &player_with(&[])).unwrap()),
+            Some((BACK_STREET, 1))
+        );
+        assert!(SOLO_MAPS.contains(&MU_GONGS_ARENA) && SOLO_MAPS.contains(&SEALED_SHRINE));
+
+        let in_shrine = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = SEALED_SHRINE;
+            player
+        };
+        let data = crate::get_game_data().unwrap();
+        assert_eq!(data.field(SEALED_SHRINE).unwrap().on_user_enter, None);
+        assert!(unscripted_map_enter(&in_shrine(&[])).is_empty());
+        let mut aran = in_shrine(&[(CATCH_THE_SHADOW_KNIGHT, QuestState::Started)]);
+        assert_eq!(
+            unscripted_map_enter(&aran),
+            [Effect::BringOutMob {
+                mob_id: SHADOW_KNIGHT,
+                at: SHADOW_KNIGHT_AT
+            }]
+        );
+        *aran.quests.kills_mut(CATCH_THE_SHADOW_KNIGHT).unwrap() = vec![1];
+        assert!(unscripted_map_enter(&aran).is_empty(), "beaten");
+    }
+
+    #[test]
+    fn an_aran_sees_the_ellin_stone_taken_then_finds_athena_in_their_own_time() {
+        let at = |map_id, quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = map_id;
+            player
+        };
+        let data = crate::get_game_data().unwrap();
+        assert_eq!(
+            warp_of(&portal("enterWarehouse", &player_with(&[])).unwrap()),
+            Some((ELLIN_WAREHOUSE, 0))
+        );
+        assert_eq!(data.field(ELLIN_WAREHOUSE).unwrap().on_user_enter, None);
+        assert!(unscripted_map_enter(&at(ELLIN_WAREHOUSE, &[])).is_empty());
+        let mut aran = at(
+            ELLIN_WAREHOUSE,
+            &[(SEAL_STONE_OF_ELLIN, QuestState::Completed)],
+        );
+        assert_eq!(
+            unscripted_map_enter(&aran),
+            [
+                Effect::SetRecord {
+                    record: WAREHOUSE_RECORD,
+                    value: WAREHOUSE_SEEN,
+                },
+                Effect::BringOutMob {
+                    mob_id: WAREHOUSE_GENTLEMAN,
+                    at: WAREHOUSE_GENTLEMAN_AT,
+                },
+            ]
+        );
+        aran.quests.set_record(WAREHOUSE_RECORD, WAREHOUSE_SEEN);
+        assert!(unscripted_map_enter(&aran).is_empty(), "seen");
+
+        assert_eq!(data.field(BOWMAN_SCHOOL).unwrap().on_user_enter, None);
+        assert!(unscripted_map_enter(&at(BOWMAN_SCHOOL, &[])).is_empty());
+        let mut aran = at(BOWMAN_SCHOOL, &[(LOST_SEAL_STONE, QuestState::Completed)]);
+        assert_eq!(
+            unscripted_map_enter(&aran),
+            [Effect::SetRecord {
+                record: ATHENA_FOUND_RECORD,
+                value: ATHENA_FOUND,
+            }]
+        );
+        aran.quests.set_record(ATHENA_FOUND_RECORD, ATHENA_FOUND);
+        assert!(unscripted_map_enter(&aran).is_empty(), "found");
     }
 
     #[test]

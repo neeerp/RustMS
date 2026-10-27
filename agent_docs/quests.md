@@ -277,6 +277,11 @@ items"), and the Secretary of Magic (1300004) then completes the quest.
 in `START_RECORD_QUESTS` (`StartRequirements::record`). The Mushroom Kingdom's
 opening scene sets that record (`TD_MC_Openning`, see `map-travel.md`), so the
 officer (1300005) in the Mushroom Forest Field offers 2312 only after it.
+An Aran's "The Lost Seal Stone of Ellin Forest" (21753) likewise waits for
+record 21764 to be "1", set on entering Ellin's warehouse after 21751, and
+"Info on Another Seal Stone" (21754) for 21765 to be "2", set on entering the
+Bowman Instructional School after 21753 (see `map-travel.md`). Nothing in the
+sources sets either record, so the server's setters are a guess.
 HeavenClient checks the same record before offering the quest, unless the
 record is itself a quest in `QuestInfo.img` (Meren's 6030-6032 read 6029's
 string, which the server doesn't keep, so the client leaves those to it).

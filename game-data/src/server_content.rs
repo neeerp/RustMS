@@ -1083,6 +1083,38 @@ pub mod keys {
     pub const MR_DO_SCROLL_FULL: &str = "mr_do.black_scroll.full";
     pub const MR_DO_SCROLL_READ: &str = "mr_do.black_scroll.read";
 
+    /// The Aran's trail from Mu Lung to Ereve (21744-21757): the Dojo's
+    /// back alley (`enterBackStreet`), Mu Gong (2091007) and the Test
+    /// (`q21746s`) and the Shadow Knight (`q21747s`, `q21747e`), the Sealed
+    /// Shrine's pillar (2091009), Lilin teaching Final Charge (`q21748e`),
+    /// Tru on the way into the past (`q21749s`), Athena Pierce then
+    /// (2131000, `q21750e`, `q21753s`) and now (1012100, `q21754s`), and
+    /// Neinheart (1101002) taking Lilin's letter (`q21757e`).
+    pub const BACK_STREET_NO_ENTRY: &str = "portal.enterBackStreet.no_entry";
+    pub const MU_GONG_TEST: &str = "mu_gong.test";
+    pub const MU_GONG_ARENA_BUSY: &str = "mu_gong.arena_busy";
+    pub const MU_GONG_SHADOW_KNIGHT: [&str; 2] = [
+        "mu_gong.shadow_knight.ask",
+        "mu_gong.shadow_knight.password",
+    ];
+    pub const MU_GONG_STONE_TAKEN: [&str; 2] =
+        ["mu_gong.stone_taken.news", "mu_gong.stone_taken.tru"];
+    pub const SHRINE_PILLAR_ASK: &str = "shrine_pillar.ask";
+    pub const SHRINE_PILLAR_WRONG: &str = "shrine_pillar.wrong";
+    pub const SHRINE_PILLAR_SHUT: &str = "shrine_pillar.shut";
+    pub const SHRINE_PILLAR_BUSY: &str = "shrine_pillar.busy";
+    pub const LILIN_FINAL_CHARGE: [&str; 2] = ["lilin.mu_lung_stone", "lilin.final_charge"];
+    pub const TRU_BACK_TO_THE_PAST: [&str; 2] =
+        ["tru.back_to_the_past.news", "tru.back_to_the_past.gate"];
+    pub const ATHENA_REMEMBERS: [&str; 2] = ["athena.remembers.aran", "athena.remembers.sorry"];
+    pub const ATHENA_LETTER_PROMISE: [&str; 2] = [
+        "athena.letter_promise.letter",
+        "athena.letter_promise.your_time",
+    ];
+    pub const ATHENA_LETTER: &str = "athena.letter";
+    pub const ATHENA_LETTER_FULL: &str = "athena.letter.full";
+    pub const NEINHEART_LETTER: &str = "neinheart.letter";
+
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
     /// (`q3250e`), takes it back.
@@ -3545,6 +3577,28 @@ mod tests {
                 keys::MR_DO_SCROLL_FULL,
                 keys::MR_DO_SCROLL_READ,
                 keys::SEALED_GARDEN_OCCUPIED,
+                keys::BACK_STREET_NO_ENTRY,
+                keys::MU_GONG_TEST,
+                keys::MU_GONG_ARENA_BUSY,
+                keys::MU_GONG_SHADOW_KNIGHT[0],
+                keys::MU_GONG_SHADOW_KNIGHT[1],
+                keys::MU_GONG_STONE_TAKEN[0],
+                keys::MU_GONG_STONE_TAKEN[1],
+                keys::SHRINE_PILLAR_ASK,
+                keys::SHRINE_PILLAR_WRONG,
+                keys::SHRINE_PILLAR_SHUT,
+                keys::SHRINE_PILLAR_BUSY,
+                keys::LILIN_FINAL_CHARGE[0],
+                keys::LILIN_FINAL_CHARGE[1],
+                keys::TRU_BACK_TO_THE_PAST[0],
+                keys::TRU_BACK_TO_THE_PAST[1],
+                keys::ATHENA_REMEMBERS[0],
+                keys::ATHENA_REMEMBERS[1],
+                keys::ATHENA_LETTER_PROMISE[0],
+                keys::ATHENA_LETTER_PROMISE[1],
+                keys::ATHENA_LETTER,
+                keys::ATHENA_LETTER_FULL,
+                keys::NEINHEART_LETTER,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],
