@@ -306,6 +306,13 @@ to a Red Potion and 10 EXP). Muhamad (2100001) is convinced in `q3953e` after fo
 only choice of a menu (Cosmic `3953.js`); then a Lidium is taken for 20,000
 EXP. If the rewards don't fit, the script says so and nothing is taken. Their
 text is unsourced.
+Ardin's (2101003) start script `q3933s` for "Ardin's Sand Bandits" asks,
+then, if nobody is in Ardin's room (926000000), starts the quest and sends
+the player to its `st00`, beside the other self (9100013) that the data's
+end asks to be killed (Cosmic `3933.js`); with someone there, it says so. The
+room's spawn has a negative `mobTime`, so the other self appears once. The
+room is one of `scripts::SOLO_MAPS`, so it fills again when empty. Its way
+out is a lost link (see `map-travel.md`). The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -765,5 +772,7 @@ copied into the source.
   password at the secret door, wrong and right),
   `quest_end_rewards` (Dr. Kim's pills, Mr. Ku's tier for 99 Bellflowers,
   Muhamad's four answers),
+  `ardins_sand_bandits` (one player at a time in Ardin's room, the other
+  self's kill, the way out, the room fresh for the next),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

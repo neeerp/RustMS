@@ -323,7 +323,9 @@ const HITMAN_HIDEOUT: i32 = 910200000;
 const BERSERK_ROOM: i32 = 910500200;
 /// The Junior Balrog's other world, for the Bowmen's 4th-job quest 6108.
 pub const BALROG_WORLD: i32 = 910500000;
-pub const SOLO_MAPS: [i32; 11] = [
+/// Where Ardin's other self waits for a challenger on quest 3933.
+pub const ARDINS_ROOM: i32 = 926000000;
+pub const SOLO_MAPS: [i32; 12] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -335,6 +337,7 @@ pub const SOLO_MAPS: [i32; 11] = [
     KYRIN_TESTS[0].room,
     KYRIN_TESTS[1].room,
     BALROG_WORLD,
+    ARDINS_ROOM,
 ];
 
 /// One of Kyrin's 4th-job tests: a Pirate on `quest` holds out in `room`

@@ -582,6 +582,10 @@ pub mod keys {
     pub const MUHAMAD_EXPEDITION: &str = "ariant_muhamad.expedition";
     pub const MUHAMAD_DEO_MONSTER: &str = "ariant_muhamad.deo_monster";
     pub const MUHAMAD_CONVINCED: &str = "ariant_muhamad.convinced";
+    pub const ARDIN_TEST_AGAIN: &str = "ariant_ardin.test_again";
+    pub const ARDIN_TEST_ASK: &str = "ariant_ardin.test_ask";
+    pub const ARDIN_TEST_GO: &str = "ariant_ardin.test_go";
+    pub const ARDIN_TEST_BUSY: &str = "ariant_ardin.test_busy";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3017,6 +3021,10 @@ mod tests {
             keys::MUHAMAD_EXPEDITION,
             keys::MUHAMAD_DEO_MONSTER,
             keys::MUHAMAD_CONVINCED,
+            keys::ARDIN_TEST_AGAIN,
+            keys::ARDIN_TEST_ASK,
+            keys::ARDIN_TEST_GO,
+            keys::ARDIN_TEST_BUSY,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

@@ -4,7 +4,9 @@ Ordinary exits use `Map.nx/Map/Map*/<id>.img/portal`: `pn` identifies
 the source portal, `tm` the destination map, and `tn` the arrival portal.
 The server resolves these links; no handwritten map connection table exists.
 A nonempty `tn` must match an actual destination portal. Only an empty `tn`
-may use the map's default spawn point. The client skips portals without a
+may use the map's default spawn point. The exceptions are `reactors::lost_link`'s exits,
+whose `tn` the target lacks: the Bart room's way out and Ardin's room's
+(926000000, `st00`) go to the target's default spawn instead of closing. The client skips portals without a
 travel destination when selecting an exit, including overlapping spawn points.
 
 The ships between continents run on a timetable instead; see `ships.md`.

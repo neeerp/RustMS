@@ -2459,6 +2459,7 @@ impl NpcScript {
             "q3452e" => Some(dr_kims_thanks()),
             "q3833e" => Some(mr_kus_bellflowers(player)),
             "q3953e" => Some(convince_muhamad()),
+            "q3933s" => Some(ardins_sand_bandits()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3465,6 +3466,35 @@ fn convince_muhamad() -> NpcScript {
         }];
     }
     NpcScript::new(MUHAMAD, pages)
+}
+
+const ARDIN: i32 = 2101003;
+const ARDINS_SAND_BANDITS: i16 = 3933;
+
+/// `q3933s`, Ardin's Sand Bandits: Ardin asks for one more test, and on
+/// yes, with nobody in the room, starts the quest and sends the player to
+/// face the other self Ardin summons there (Cosmic `3933.js`); the room
+/// fills again once empty. The text is unsourced.
+fn ardins_sand_bandits() -> NpcScript {
+    let mut script = NpcScript::new(
+        ARDIN,
+        vec![
+            Page::Say(text(keys::ARDIN_TEST_AGAIN)),
+            Page::Ask {
+                text: text(keys::ARDIN_TEST_ASK),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(keys::ARDIN_TEST_GO)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::RequireEmptyMap(crate::scripts::ARDINS_ROOM),
+        Effect::StartQuest(ARDINS_SAND_BANDITS),
+        Effect::WarpToPortal(crate::scripts::ARDINS_ROOM, 1),
+    ];
+    script.refused = Some(text(keys::ARDIN_TEST_BUSY));
+    script
 }
 
 /// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
@@ -11653,6 +11683,45 @@ mod tests {
                 Effect::GainExp(20000),
             ]
         );
+    }
+
+    #[test]
+    fn ardin_sends_the_player_to_face_the_other_self() {
+        let room = crate::scripts::ARDINS_ROOM;
+        assert!(resets_when_empty(room));
+        let mut no = NpcScript::for_quest("q3933s", &player(50)).unwrap();
+        assert_eq!(no.npc_id(), ARDIN);
+        no.begin();
+        assert_eq!(kind(&no.respond(ScriptInput::Next).unwrap()), Some(1));
+        let declined = no.respond(ScriptInput::No).unwrap();
+        assert_eq!((declined.prompt, declined.effects), (None, vec![]));
+        let mut yes = NpcScript::for_quest("q3933s", &player(50)).unwrap();
+        yes.begin();
+        yes.respond(ScriptInput::Next).unwrap();
+        let go = yes.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(page_text(&go), text(keys::ARDIN_TEST_GO));
+        assert_eq!(
+            yes.respond(ScriptInput::Next).unwrap().effects,
+            [
+                Effect::RequireEmptyMap(room),
+                Effect::StartQuest(ARDINS_SAND_BANDITS),
+                Effect::WarpToPortal(room, 1),
+            ]
+        );
+        assert_eq!(yes.refused, Some(text(keys::ARDIN_TEST_BUSY)));
+        // Portal 1 is the room's st00, beside Ardin's other self.
+        let Ok(maps) = crate::game_data::get() else {
+            return;
+        };
+        let field = maps.field(room).unwrap();
+        assert_eq!(field.portal_by_id(1).unwrap().name, "st00");
+        assert_eq!(field.mob_spawns[0].mob_id, 9100013);
+        assert_eq!(field.mob_spawns[0].mob_time, -1);
+        // Its way out names a portal Ardin's house lacks: the default spawn.
+        assert!(crate::reactors::lost_link(room, "st00"));
+        let out = field.portal_by_name("st00").unwrap();
+        let house = maps.field(out.to_map.unwrap()).unwrap();
+        assert!(house.resolve_spawn_portal(&out.to_name).is_none());
     }
 
     #[test]
