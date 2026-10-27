@@ -1237,6 +1237,21 @@ pub mod keys {
     pub const SWALLOW_NEW_SEED_FULL: &str = "swallow.new_seed_full";
     pub const PIA_SHELL_WISH: &str = "pia.shell.wish";
     pub const PIA_SHELL_MISSING: &str = "pia.shell.missing";
+    /// Kerning Square's 7th floor: June (1052125, `Depart_topFloorIn`) keeps
+    /// the way up to the Spirit of Rock's floors and the VIP Zone.
+    pub const JUNE_MENU: &str = "june.menu";
+    pub const JUNE_HELPING_BLAKE: &str = "june.helping_blake";
+    pub const JUNE_VIP: &str = "june.vip";
+    pub const JUNE_NOT_HELPING: &str = "june.not_helping";
+    pub const JUNE_BUSY: &str = "june.busy";
+    pub const JUNE_VIP_OVER_LEVEL: &str = "june.vip.over_level";
+    pub const JUNE_VIP_INVITATIONS: &str = "june.vip.invitations";
+    pub const JUNE_NOT_VIP: &str = "june.not_vip";
+    /// Admission to the VIP Zone (2291, `q2291e`).
+    pub const JUNE_VIP_MISSING: &str = "june.vip.missing";
+    pub const JUNE_VIP_WELCOME: &str = "june.vip.welcome";
+    /// The Spirit of Rock's floors: a way on that stays shut.
+    pub const DEPART_NO_ACCESS: &str = "depart.no_access";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3808,6 +3823,17 @@ mod tests {
                 keys::SWALLOW_NEW_SEED_FULL,
                 keys::PIA_SHELL_WISH,
                 keys::PIA_SHELL_MISSING,
+                keys::JUNE_MENU,
+                keys::JUNE_HELPING_BLAKE,
+                keys::JUNE_VIP,
+                keys::JUNE_NOT_HELPING,
+                keys::JUNE_BUSY,
+                keys::JUNE_VIP_OVER_LEVEL,
+                keys::JUNE_VIP_INVITATIONS,
+                keys::JUNE_NOT_VIP,
+                keys::JUNE_VIP_MISSING,
+                keys::JUNE_VIP_WELCOME,
+                keys::DEPART_NO_ACCESS,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

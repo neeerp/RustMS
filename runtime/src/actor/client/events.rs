@@ -94,8 +94,9 @@ impl ClientActor {
             EventKind::Pyramid(_) | EventKind::PyramidParty(_) => return Ok(()),
             // Duarte takes the gem, or sends the player in from the Shades.
             EventKind::PyramidTomb(_) => return Ok(()),
-            // Mu Young's start script for 2245 takes the player in.
-            EventKind::Tristan => return Ok(()),
+            // Mu Young's start script for 2245 takes the player in, and
+            // June's own talk and 2291's end script the Spirit of Rock's.
+            EventKind::Tristan | EventKind::RockSpirit | EventKind::RockSpiritVip => return Ok(()),
             // The East Castle Tower's portal takes the player in, and the
             // Wedding Hall's door likewise; Olson's own talk the dollhouse
             // room's, and Cheng's the Toy Factory's Sector 4.

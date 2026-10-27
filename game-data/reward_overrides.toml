@@ -52,6 +52,94 @@ replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 # as on the community servers.
 add = [{ item = 2210006, prob = 1.0 }]
 
+[mobs.4300011]
+# Kerning Square's Spirit of Rock floors (Map.nx 103040410-103040460): the
+# pack has no drops for the Square's mobs at all. Request for a New Song
+# (2286) checks for a Latest Model MP3 4032509 (Quest.nx Check.img/2286/1),
+# Composition Fee (2287) for 50 Fancy Amplifier Cables 4000537, and Say "NO"
+# to Plagiarism (2288) for the Spirit of Rock's Music Score 4000538. The
+# Cheap Amplifiers (4300011, 4300015) carry the MP3, the Fancy Amplifiers
+# (4300012, 4300016) the cables, and the Spirit of Rock (4300013) the score;
+# the rates are the community servers'.
+add = [{ item = 4032509, prob = 0.07, quest = 2286 }]
+
+[mobs.4300015]
+add = [{ item = 4032509, prob = 0.07, quest = 2286 }]
+
+[mobs.4300012]
+add = [{ item = 4000537, prob = 0.2 }]
+
+[mobs.4300016]
+add = [{ item = 4000537, prob = 0.4 }]
+
+[mobs.4300013]
+add = [{ item = 4000538, prob = 0.4, quest = 2288 }]
+
+[mobs.3400000]
+# Admission to the VIP Zone (2291) checks for 10 VIP Invitations 4032521
+# (Quest.nx Check.img/2291/1). Kerning Square's shop mobs from the bubble
+# teas (3400000) to the Greatest Oldies (4300010) carry them while it is
+# under way; the pack has no drops for them, and the rate is the community
+# servers'.
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400001]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400002]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400003]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400004]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400005]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400006]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400007]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.3400008]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300000]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300001]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300002]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300003]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300004]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300005]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300006]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300007]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300008]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300009]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
+[mobs.4300010]
+add = [{ item = 4032521, prob = 0.12, quest = 2291 }]
+
 [mobs.8180000]
 # Manon (Leafre): the pack has the Explorer lines' Pentagon-style items
 # (4031343, 4031511, 4031514, 4031517; Hero's Quality 6904 and its siblings
