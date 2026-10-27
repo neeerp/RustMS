@@ -604,6 +604,7 @@ mod tests {
             start_money: 0,
             start_buff_item: None,
             end_buff_item: None,
+            end_npc_act: None,
             end_skills: vec![],
             start_script: None,
             end_script: None,

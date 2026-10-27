@@ -285,7 +285,17 @@ impl ClientActor {
             from: self.client_id,
             request: FieldRequest::Broadcast(shown),
         })
-        .await
+        .await?;
+        match template.end_npc_act.as_deref() {
+            Some(action) => {
+                self.send_to_field(FieldMessage::FromClient {
+                    from: self.client_id,
+                    request: FieldRequest::NpcSpecialAction { npc_id, action },
+                })
+                .await
+            }
+            None => Ok(()),
+        }
     }
 
     /// Queue what a quest's `buffItemID` did for the player; return what the

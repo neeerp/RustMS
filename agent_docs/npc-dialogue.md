@@ -60,7 +60,8 @@ any RustMS content so far:
   Nothing happens while the NPC plays a `special` action, or if it has no
   such action. A script asks for one with `Effect::NpcSpecialAction`, which
   the field sends to its NPC controller for the first NPC of that id on the
-  map (Pia's `act2156`).
+  map (Pia's `act2156`). A quest with `Act/1/npcAct` gets the same on its
+  data completion, for the completing NPC.
 - `0x107` (`build_set_npc_scriptable`): NPC ids with a script name and
   YYYYMMDD start and end days. The client adds them after the NPC's
   `info/script` windows for the rest of the session, and the newest window

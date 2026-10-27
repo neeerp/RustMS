@@ -76,4 +76,12 @@ async fn a_bush_gives_glasses_and_abel_takes_them() {
     assert_eq!(items, [(NAUTILUS_RETURN, scrolls), (glasses, -1)]);
     assert_eq!(t.gains, [exp]);
     assert_eq!(t.states.get(&FIND_MY_GLASSES), Some(&2));
+    // Abel plays the quest's `npcAct`.
+    let &(abel, _) = trace
+        .field
+        .npcs
+        .iter()
+        .find(|&&(_, npc)| npc == ABEL)
+        .unwrap_or_else(|| panic!("{:?}", trace.field.npcs));
+    assert_eq!(t.field.npc_special_actions, [(abel, "quest".to_string())]);
 }
