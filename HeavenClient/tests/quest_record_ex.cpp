@@ -63,6 +63,45 @@ int main()
 		stats.fame = -3;
 		require(token("level", none, stats) == "120" && token("pop", none, stats) == "-3", "level and fame as %d");
 
+		// Outstanding Citizen: the fame gained since popS against popG.
+		std::string citizen = "popS=10;popG=20";
+		auto citizen_get = [&](const std::string& key) { return value(citizen, key); };
+		Counts famous;
+		famous.fame = 15;
+		require(token("popgap", citizen_get, famous) == "5", "fame less popS");
+		require(token("perPop", citizen_get, famous) == "25", "5 of 20 is 25%");
+		require(token("gaugePop", citizen_get, famous) == "#fUI/UIWindow.img/Quest/Gauge2/frame/18#", "a quarter gauge");
+		require(token("popG", citizen_get, famous) == "20", "popG as it stands");
+		famous.fame = 5;
+		require(token("popgap", citizen_get, famous) == "-5" && token("perPop", citizen_get, famous) == "0", "fame lost");
+		famous.fame = 1;
+		require(token("perPop", none, famous) == "100", "no popG divides by 1");
+		require(token("popgap", none, famous) == "1", "no popS is plain fame");
+		std::string zero = "popG=0;mg=0;mon=3";
+		auto zero_get = [&](const std::string& key) { return value(zero, key); };
+		require(token("perPop", zero_get, famous) == "0", "popG 0, where the client divides by zero");
+		require(token("gaugePop", zero_get, famous) == "#fUI/UIWindow.img/Quest/Gauge2/frame/75#", "the gauge takes popG 0 as 1");
+
+		// Veteran Hunter: mon against mg.
+		std::string hunter = "mon=150;mg=600";
+		auto hunter_get = [&](const std::string& key) { return value(hunter, key); };
+		require(token("perHunt", hunter_get) == "25" && token("mon", hunter_get) == "150", "150 of 600");
+		require(token("gaugeHunt", hunter_get) == "#fUI/UIWindow.img/Quest/Gauge2/frame/18#", "a quarter gauge");
+		require(token("perHunt", zero_get) == "100", "mg 0 counts as 1");
+
+		// Diligent Explorer: CNT days of 27 (30 days' nine tenths).
+		Counts month;
+		month.time_limit = 2592000;
+		std::string diligent = "LT=2009/02/13;DONE=1;PT=10800;CNT=9";
+		auto diligent_get = [&](const std::string& key) { return value(diligent, key); };
+		require(token("perDays", diligent_get, month) == "33", "9 of 27 days");
+		require(token("gaugeDays", diligent_get, month) == "#fUI/UIWindow.img/Quest/Gauge2/frame/25#", "a third of the gauge");
+		std::string partial = "DONE=1;PT=10800;CNT=9";
+		require(token("perDays", [&](const std::string& key) { return value(partial, key); }, month) == "0",
+				"CNT needs the whole record");
+		month.time_limit = 3600;
+		require(token("perDays", diligent_get, month) == "0", "under a day, where the client divides by zero");
+
 		using ms::QuestRecordEx::gauge_slices;
 		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/45") == 45, "a gauge's path");
 		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/0") == 0, "an empty gauge");

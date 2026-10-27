@@ -168,6 +168,8 @@ namespace ms
 			counts.level = player.get_stats().get_stat(MapleStat::Id::LEVEL);
 			// Fame is signed, kept as its 16 bits.
 			counts.fame = static_cast<int16_t>(player.get_stats().get_stat(MapleStat::Id::FAME));
+			counts.time_limit = static_cast<int32_t>(
+				nl::nx::quest["QuestInfo.img"][std::to_string(quest_id)]["timeLimit2"].get_integer());
 
 			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); }, counts);
 		}

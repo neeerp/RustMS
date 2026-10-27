@@ -994,18 +994,31 @@ formatter (0x99dd54) shows them (HeavenClient `QuestRecordEx::token`):
 | `gaugeQCnt` | the same gauge for that count (0x99f33c) |
 | `level` | the character's level, `%d` (0x9a0925) |
 | `pop` | the character's fame, `%d` (0x9a076e) |
+| `popgap` | the fame less the record's `popS` (0 if missing), `%d`, unclamped (0x9a07f8) |
+| `perPop`, `gaugePop` | that gain against the record's `popG` (missing: 1; `gaugePop` also takes 0 as 1) (0x9a0c42, 0x99f646) |
+| `perHunt`, `gaugeHunt` | the record's `mon` against its `mg` (missing or 0: 1) (0x9a0e2b, 0x99f9fc) |
+| `perDays`, `gaugeDays` | the record's `CNT` (0 unless `LT`, `DONE`, `PT` and `CNT` are all there, 0x4e6b2f) against `QuestInfo` `timeLimit2`'s whole days times 0.9, truncated: 27 for 30 days (0x9a0fe3, 0x99fd26) |
 | anything else (`date`) | the value as it stands |
 
 `scnt`, `perPqS` and `gaugePqS` read every party quest's record, not the
 quest's own: PQ Mania (29000) shows them. Quest Specialist (29001) shows
 the three quest counts, 29300-29304 and 10395-10398 show `level`, and
-29500 `pop`. HeavenClient passes the gauge as the path
+29500 `pop`. Outstanding Citizen (29002) shows the fame tokens, Diligent
+Explorer (29003) the days and Veteran Hunter (29400) the hunt. Every
+`per…` token is a percentage clamped to 0..100 and every `gauge…` the same
+Gauge2 gauge (0x9a0bae's and 0x99f33c's pattern). `popG`, `mg`, `mon`, `m`,
+`money` and `date` have no branch of their own: the formatter's default
+(0x9a10ca) prints the record's value as it stands (reports/b248).
+
+HeavenClient passes the gauge as the path
 `…/Gauge2/frame/<slices>`, which the Quest Log and the title (medal)
 window draw as the frame and its slices (`QuestTextImages`,
-`QuestRecordEx::gauge_slices`). The tokens read the need from
-`Check.img` itself, as the client does, not from the supported list. The other medals' tokens
-(the Pop, Days and Hunt gauges and their percentages, `popG`, `popgap`, `mg`, `mon`,
-`m`, `money`) aren't filled yet: their arithmetic isn't decoded.
+`QuestRecordEx::gauge_slices`). PQ Mania's and Quest Specialist's tokens read the need from
+`Check.img` itself, as the client does, not from the supported list. The client would
+divide by zero on a `popG` of 0 in `perPop` and on a `timeLimit2` under a
+day; HeavenClient shows 0 there. Nothing writes these titles' records
+yet: the original server's timing is unknown (Cosmic has none), and
+29002, 29400 and 29500-29503 wait on their start scripts.
 
 So far only the party quests keep records, on their info quests 1200-1206
 and 1301. The client lists these under "Party Quest" and never offers them

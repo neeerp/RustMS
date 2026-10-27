@@ -53,15 +53,27 @@ namespace ms
 
 		// What the titles' tokens read beside the record: the party quests at
 		// rank S against partyQuest_S (PQ Mania), the quests completed as the
-		// client counts them against questComplete (Quest Specialist), and
-		// the character's level and fame.
+		// client counts them against questComplete (Quest Specialist), the
+		// character's level and fame, and the quest's QuestInfo timeLimit2 in
+		// seconds (Diligent Explorer's days).
 		struct Counts
 		{
 			Tally rank_s;
 			Tally completed;
 			int32_t level = 0;
 			int32_t fame = 0;
+			int32_t time_limit = 0;
 		};
+
+		// The days a title's record counts toward its need: its `CNT`, read
+		// only when `LT`, `DONE`, `PT` and `CNT` are all there (0x4e6b2f), and
+		// the need, nine tenths of timeLimit2's whole days.
+		inline Tally days(const std::function<std::string(const std::string&)>& get, int32_t time_limit)
+		{
+			bool whole = !get("LT").empty() && !get("DONE").empty() && !get("PT").empty() && !get("CNT").empty();
+
+			return { whole ? std::atoi(get("CNT").c_str()) : 0, static_cast<int32_t>((time_limit / 86400) * 0.9) };
+		}
 
 		// The gauge #jgaugePqS# draws: the 79x8 frame and up to 75 one-pixel
 		// slices from (2, 3), passed as a path ending in the slices.
@@ -89,11 +101,40 @@ namespace ms
 		// reward "Acquire" or "Fail", the rank as its image (F if none), PQ
 		// Mania's S ranks and Quest Specialist's quests as a count, a
 		// percentage and a gauge of the need, the level and fame "%d", and
-		// anything else as it stands.
+		// anything else as it stands. The other titles read their own
+		// record: Outstanding Citizen the fame gained since `popS` against
+		// `popG`, Veteran Hunter `mon` against `mg`, and Diligent Explorer
+		// its days. A missing or zero need counts as 1, but where the client
+		// would divide by zero (perPop's popG "0", a timeLimit2 under a
+		// day) this shows 0.
 		inline std::string token(const std::string& key, const std::function<std::string(const std::string&)>& get,
 			Counts counts = {})
 		{
 			auto gauge = [](Tally tally) { return "#f" + GAUGE + std::to_string(tally.share(GAUGE_SLICES)) + "#"; };
+			auto number = [&](const std::string& k) { return std::atoi(get(k).c_str()); };
+			auto at_least_one = [](int32_t n) { return n == 0 ? 1 : n; };
+			int32_t gained = counts.fame - number("popS");
+
+			if (key == "popgap")
+				return std::to_string(gained);
+
+			if (key == "perPop")
+				return std::to_string(Tally { gained, get("popG").empty() ? 1 : number("popG") }.share(100));
+
+			if (key == "gaugePop")
+				return gauge({ gained, at_least_one(number("popG")) });
+
+			if (key == "perHunt")
+				return std::to_string(Tally { number("mon"), at_least_one(number("mg")) }.share(100));
+
+			if (key == "gaugeHunt")
+				return gauge({ number("mon"), at_least_one(number("mg")) });
+
+			if (key == "perDays")
+				return std::to_string(days(get, counts.time_limit).share(100));
+
+			if (key == "gaugeDays")
+				return gauge(days(get, counts.time_limit));
 
 			if (key == "scnt")
 				return std::to_string(counts.rank_s.count);
@@ -119,7 +160,6 @@ namespace ms
 			if (key == "pop")
 				return std::to_string(counts.fame);
 
-			auto number = [&](const std::string& k) { return std::atoi(get(k).c_str()); };
 			auto padded = [](int32_t n, size_t width)
 			{
 				std::string digits = std::to_string(n);
