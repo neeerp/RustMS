@@ -16,7 +16,9 @@ beside it.
 - **Item.** `game::Item.pet` holds `PetData` (name, level, closeness,
   fullness, skill bits, attribute). `net::codec::item` writes it as item type
   3: the 13-byte name, level, closeness, fullness, expiry, attribute, skill
-  and remaining life.
+  and remaining life. Quests teach the first pet out skill bits (`petskill`)
+  and the owner's speed (attribute bit 1, `petspeed`), through
+  `train_first_pet`, which re-sends the item (see [Quests](./quests.md)).
 - **Storage.** The `pets` table (`db/src/pet.rs`) is keyed by the item's cash
   serial, so a pet keeps its name and closeness in and out of the Cash
   Inventory. Saving the character upserts the rows of its carried pets, with

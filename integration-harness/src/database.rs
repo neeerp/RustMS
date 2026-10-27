@@ -402,6 +402,32 @@ pub async fn set_pet_closeness(serial: i64, closeness: i16) -> Result<(), Harnes
     .await
 }
 
+/// The skill bits and attribute saved for the pet `serial`.
+pub async fn pet_skills(serial: i64) -> Result<(i32, i16), HarnessError> {
+    #[derive(QueryableByName)]
+    struct Skills {
+        #[diesel(sql_type = Integer)]
+        skill: i32,
+        #[diesel(sql_type = SmallInt)]
+        attribute: i16,
+    }
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "read pet skills",
+        message,
+    };
+    let skills = tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query("SELECT skill, attribute FROM pets WHERE serial = $1")
+            .bind::<BigInt, _>(serial)
+            .get_result::<Skills>(&mut conn)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok((skills.skill, skills.attribute))
+}
+
 /// Date the pet `serial`, whose owner is logged out, to dry up `seconds`
 /// from now; in the past if negative.
 pub async fn date_pet(serial: i64, seconds: i32) -> Result<(), HarnessError> {

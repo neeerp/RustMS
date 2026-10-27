@@ -40,6 +40,8 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "dayOfWeek",
     "buff",
     "exceptbuff",
+    "petRecallLimit",
+    "petAutoSpeakingLimit",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -63,6 +65,8 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "mbmin",
     "mbmax",
     "mbcard",
+    "petRecallLimit",
+    "petAutoSpeakingLimit",
 ];
 /// Dates under `Check.img/<id>/1`, which nothing reads: v83's completion
 /// check compares no dates (only the start check does), and the two quests
@@ -161,6 +165,11 @@ pub const START_RECORD_QUESTS: &[(i16, i16)] = &[(2312, 2311)];
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
 const REQUIREMENTS_IN_START_ACTIONS: i16 = 6034;
+/// The `petSkill` bit of a pet that comes to its owner on a map change.
+pub const PET_RECALL: u16 = 0x80;
+/// The `petSkill` bit of a pet that speaks by itself.
+pub const PET_AUTO_SPEAKING: u16 = 0x100;
+
 /// Actions on starting a quest (`Act.img/<id>/0`) that the server applies.
 pub const START_ACTIONS: &[&str] = &["item", "exp", "money", "buffItemID"];
 /// Actions on completing a quest (`Act.img/<id>/1`) that the server applies.
@@ -176,6 +185,8 @@ pub const END_ACTIONS: &[&str] = &[
     "skill",
     "npcAct",
     "buffItemID",
+    "petskill",
+    "petspeed",
 ];
 /// `Act` keys that copy a requirement from `Check` (`npc`, `lvmin`, `job`,
 /// `quest`, a date or an `interval`). v83's client reads only `item`,
@@ -255,6 +266,9 @@ pub struct StartRequirements {
     /// The closeness the first pet out must have, from `pettamenessmin` to
     /// `pettamenessmax` (30000 when only the least is given).
     pub pet_closeness: Option<(i32, i32)>,
+    /// `petSkill` bits the first pet out must not have yet
+    /// (`petRecallLimit`, `petAutoSpeakingLimit`); 0 means no pet is needed.
+    pub pet_skill_limit: u16,
     /// An item whose effect, as if used, must be on the player (`buff`), or
     /// must not be (`exceptbuff`): Kerning's scents (2282 to 2284).
     pub buff: Option<i32>,
@@ -285,6 +299,7 @@ pub struct QuestTemplate {
     pub end_pets: Vec<i32>,
     /// The closeness the first pet out must have to complete.
     pub end_pet_closeness: Option<(i32, i32)>,
+    pub end_pet_skill_limit: u16,
     /// An item whose effect must be on the player to complete, or must not.
     pub end_buff: Option<i32>,
     pub end_except_buff: Option<i32>,
@@ -319,6 +334,12 @@ pub struct QuestTemplate {
     /// Closeness given on completion to the first pet out (`pettameness`),
     /// as Cosmic does; v83 lists it last in the rewards (QuestIcon 9).
     pub pet_closeness: i16,
+    /// `petSkill` bits given on completion to the first pet out
+    /// (`petskill`): 0x80 recall (4660), 0x100 auto speaking (4661).
+    pub pet_skill: u16,
+    /// Whether completion lets the first pet out keep the owner's speed
+    /// (`petspeed`, attribute bit 1: 3083, 3096).
+    pub pet_speed: bool,
     pub next_quest: Option<i16>,
     /// `QuestInfo` `autoStart` and `autoComplete`: the client's quest alert
     /// offers the quest wherever the player is.
@@ -698,6 +719,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.items = item_counts(nx, start)?;
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
+    requirements.pet_skill_limit = pet_skill_limit(nx, start)?;
     requirements.buff = nx.int_child(start, "buff")?;
     requirements.except_buff = nx.int_child(start, "exceptbuff")?;
     if let Some(&(_, record)) = START_RECORD_QUESTS.iter().find(|&&(quest, _)| quest == id) {
@@ -809,6 +831,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
             .transpose()?,
         end_pets: pet_ids(nx, end)?,
         end_pet_closeness: pet_closeness(nx, end)?,
+        end_pet_skill_limit: pet_skill_limit(nx, end)?,
         end_buff: nx.int_child(end, "buff")?,
         end_except_buff: nx.int_child(end, "exceptbuff")?,
         end_book_min: nx.int_child(end, "mbmin")?,
@@ -827,6 +850,9 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         money: action_int("money")?.unwrap_or(0),
         fame: small(action_int("pop")?.unwrap_or(0), "fame")?,
         pet_closeness: small(action_int("pettameness")?.unwrap_or(0), "pet closeness")?,
+        pet_skill: u16::try_from(action_int("petskill")?.unwrap_or(0))
+            .map_err(|_| invalid("pet skill out of range"))?,
+        pet_speed: action_int("petspeed")?.is_some_and(|speed| speed != 0),
         next_quest: action_int("nextQuest")?
             .map(|id| small(id, "quest id"))
             .transpose()?,
@@ -961,6 +987,21 @@ fn pet_closeness(nx: &NxDataFile, check: u32) -> Result<Option<(i32, i32)>, Game
         return Ok(None);
     }
     Ok(Some((min.unwrap_or(0), max.unwrap_or(30_000))))
+}
+
+/// The `petSkill` bits a `Check` node's first pet out must lack:
+/// `petRecallLimit` rules out recall (0x80) and `petAutoSpeakingLimit` auto
+/// speaking (0x100), as v83 tests them (FUN_00721163, FUN_00721d2c).
+fn pet_skill_limit(nx: &NxDataFile, check: u32) -> Result<u16, GameDataError> {
+    let on = |key: &str| Ok::<_, GameDataError>(nx.int_child(check, key)?.is_some_and(|v| v != 0));
+    let mut bits = 0;
+    if on("petRecallLimit")? {
+        bits |= PET_RECALL;
+    }
+    if on("petAutoSpeakingLimit")? {
+        bits |= PET_AUTO_SPEAKING;
+    }
+    Ok(bits)
 }
 
 /// The `quest` requirements of a `Check` node: other quests' states.

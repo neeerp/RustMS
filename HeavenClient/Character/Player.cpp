@@ -2363,7 +2363,9 @@ namespace ms
 
 	FirstPet Player::first_pet() const
 	{
-		return { pets[0].get_itemid(), get_pet_closeness()[0] };
+		Optional<const Pet> pet = pets[0].get_itemid() ? inventory.get_pet(pets[0].get_serial()) : nullptr;
+
+		return { pets[0].get_itemid(), pet ? pet->get_closeness() : -1, pet ? pet->get_skill() : uint16_t(0) };
 	}
 
 	TeleportRock &Player::get_teleport_rock()
