@@ -46,6 +46,7 @@ use net::packet::build::world::carnival::{
 };
 use net::packet::build::world::effect::{build_field_effect, build_field_sound};
 use net::packet::build::world::field::{build_pyramid_gauge, build_session_value};
+use net::packet::build::world::guild::{build_quest_registrant_left, build_quest_too_few};
 use net::packet::build::world::messaging::{build_broadcast, build_item_line, Broadcast};
 use net::ClientId;
 use std::collections::{HashMap, HashSet};
@@ -439,6 +440,10 @@ pub fn spawn(
             EventKind::Carnival(_) => {
                 Some(Instant::now() + net::events::scaled(net::carnival::WAITING))
             }
+            // A guild gathers before its quest's clock starts.
+            EventKind::GuildQuest => {
+                Some(Instant::now() + net::events::scaled(net::guild_quest::GATHERING))
+            }
             _ => (kind.event().minutes > 0).then(|| Instant::now() + kind.event().duration()),
         },
         joiner: tx.downgrade(),
@@ -492,6 +497,8 @@ pub fn spawn(
         gauge: None,
         gauge_out: None,
         pyramid_end: None,
+        gathering: None,
+        closing: false,
     };
     // However it ends, even by a panic, its members are sent out, the copy
     // closes and the next party may go.
@@ -633,6 +640,12 @@ struct EventActor {
     carnival_outcome: Option<net::carnival::Outcome>,
     /// Whether a tie already gave the battle its overtime.
     carnival_overtime: bool,
+    /// While a guild gathers for its Guild Quest, which keeps it open with
+    /// nobody in yet, and lets its members in.
+    gathering: Option<EventHandle>,
+    /// The Guild Quest can't go on: it ends when the clock runs out, a few
+    /// seconds after its notice.
+    closing: bool,
 }
 
 impl EventActor {
@@ -640,6 +653,9 @@ impl EventActor {
         let (id, kind) = (self.id, self.kind);
         info!(?kind, id, members = ?self.team.members(), blessing = ?self.blessing, "Event started");
         if let Some(event) = self.event.take() {
+            if kind == EventKind::GuildQuest {
+                self.gathering = Some(event.clone());
+            }
             for member in self.members.values() {
                 // A ticket that doesn't arrive hands itself back.
                 let ticket = self.ticket(member.client_id, event.clone());
@@ -656,7 +672,10 @@ impl EventActor {
                 message = self.rx.recv() => match message {
                     Some(EventMessage::Left { client_id }) => {
                         let left = self.team.leave(client_id);
-                        over = self.carnival_left(client_id).unwrap_or(left);
+                        over = self
+                            .carnival_left(client_id)
+                            .or_else(|| self.guild_quest_left(client_id, left))
+                            .unwrap_or(left);
                     }
                     Some(EventMessage::Challengers { members }) => self.challengers(members),
                     Some(EventMessage::Summoned { client_id, tab, index, cost, summoned }) => {
@@ -974,7 +993,20 @@ impl EventActor {
         let Some(tx) = self.joiner.upgrade() else {
             return SquadAnswer::Refused;
         };
-        if !self.team.rejoin(member.client_id) {
+        let admitted = if self.kind == EventKind::GuildQuest {
+            // Any of the guild, the directory saw to that, while it gathers
+            // and has room (Cosmic GuildQuest's `maxPlayers`).
+            self.gathering.is_some()
+                && !self.team.has(member.client_id)
+                && self.team.members().len() < *self.kind.event().team.end()
+                && {
+                    self.team.admit(member.client_id);
+                    true
+                }
+        } else {
+            self.team.rejoin(member.client_id)
+        };
+        if !admitted {
             return SquadAnswer::Refused;
         }
         info!(kind = ?self.kind, id = self.id, member = member.client_id, "Member came back");
@@ -1106,8 +1138,12 @@ impl EventActor {
             // A squad's lead stays its own, whatever the parties, and so
             // does one taken alone; an event that lasts until it is empty
             // doesn't end with a lead outside.
+            // A Guild Quest's registrant is no party's leader.
             EventCommand::HandOver(to)
-                if !event.squad && !event.solo() && (leader || client_id == to) =>
+                if !event.squad
+                    && !event.solo()
+                    && self.kind != EventKind::GuildQuest
+                    && (leader || client_id == to) =>
             {
                 self.leader.store(to, Ordering::Relaxed);
                 if self.team.hand_over(to) {
@@ -1731,6 +1767,63 @@ impl EventActor {
         }
     }
 
+    /// The guild's time to gather is up (Cosmic GuildQuest's
+    /// `scheduledTimeout` while `canJoin`): no one else comes in, and with
+    /// too few in or its registrant missing, the quest ends a few seconds
+    /// after the client's notice; otherwise the way into Sharenian opens and
+    /// the quest's own clock starts.
+    fn guild_quest_gathered(&mut self) -> bool {
+        self.gathering = None;
+        let members = self.team.members().len();
+        if members < self.kind.event().least() {
+            self.close_guild_quest(build_quest_too_few());
+        } else if !self.team.has(self.team.leader()) {
+            self.close_guild_quest(build_quest_registrant_left());
+        } else {
+            self.cleared.set(1);
+            info!(kind = ?self.kind, id = self.id, members, "Guild Quest under way");
+            self.restart_clock(u64::from(self.kind.event().minutes));
+        }
+        false
+    }
+
+    /// `member` left a Guild Quest, which the team's `leave` found `ended`
+    /// it or not. While the guild gathers, anyone may come and go; once
+    /// under way, its registrant's leaving or too few staying ends it a few
+    /// seconds after the client's notice (Cosmic `isEventTeamLackingNow`).
+    fn guild_quest_left(&mut self, member: ClientId, ended: bool) -> Option<bool> {
+        if self.kind != EventKind::GuildQuest || self.gathering.is_some() {
+            return (self.kind == EventKind::GuildQuest).then_some(false);
+        }
+        if ended || self.closing || self.cleared.has(self.kind.event().last_stage()) {
+            return Some(ended);
+        }
+        if member == self.team.leader() {
+            self.close_guild_quest(build_quest_registrant_left());
+        } else if self.team.members().len() < self.kind.event().least() {
+            self.close_guild_quest(build_quest_too_few());
+        }
+        Some(false)
+    }
+
+    /// The Guild Quest can't go on: those in it hear why, and it ends in a
+    /// few seconds.
+    fn close_guild_quest(&mut self, notice: Result<packet::Packet, net::error::NetworkError>) {
+        self.closing = true;
+        self.ends = Some(Instant::now() + net::guild_quest::CLOSING);
+        info!(kind = ?self.kind, id = self.id, "Guild Quest closing");
+        match notice {
+            Ok(notice) => {
+                for member in self.team.members() {
+                    if let Some(handle) = self.members.get(member) {
+                        handle.send_packet(notice.clone());
+                    }
+                }
+            }
+            Err(error) => tracing::warn!(id = self.id, %error, "Failed to build packet"),
+        }
+    }
+
     /// The time ran out. A bonus's ends, taking whoever is still on its map
     /// to its exit (Cosmic `scheduledTimeout`); a team that protects a
     /// friendly mob, which would have lost already without it, wins, and
@@ -1740,6 +1833,9 @@ impl EventActor {
     fn time_up(&mut self) -> bool {
         if let EventKind::Carnival(room) = self.kind {
             return self.carnival_time_up(room);
+        }
+        if self.kind == EventKind::GuildQuest && self.gathering.is_some() {
+            return self.guild_quest_gathered();
         }
         let event = self.kind.event();
         match &event.bonus {

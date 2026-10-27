@@ -172,6 +172,22 @@ namespace ms
 		}
 	}
 
+	std::string Guild::quest_waitlist_line(int32_t n, const std::string& channel)
+	{
+		switch (n)
+		{
+		case 0:
+			return "";
+		case 1:
+			return "Please go see the Guild Quest NPC at Channel " + channel + " immediately to enter.";
+		case 2:
+			return "Your guild is up next. Please head to the Guild Quest map at Channel " + channel + " and wait.";
+		default:
+			return "There's currently 1 guild participating in the Guild Quest, and your guild is number "
+				+ std::to_string(n - 1) + " on the waitlist.";
+		}
+	}
+
 	bool Guild::may_raise(int32_t self, int32_t picked)
 	{
 		switch (self)

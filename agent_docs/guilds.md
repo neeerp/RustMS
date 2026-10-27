@@ -167,7 +167,8 @@ case (a unique index on `lower(name)`).
 ### Guild points
 
 - A guild's points (GP) are `guilds.points`, sent in the guild's record.
-  They rank the guild (above) and will come from the Guild Quest; for now
+  They rank the guild (above) and will come from the Guild Quest
+  ([guild-quest](./guild-quest.md)); for now
   a GM's `!gp <amount>` and a script's `Effect::GainGuildPoints` add them
   (`GuildRequest::GainPoints`, `gain_guild_points` in
   `runtime/src/actor/client/guilds.rs`). Nothing happens without a guild.
@@ -373,7 +374,9 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     (N)" for none or less (`guild_points_line`).
   - 0x4A and 0x4B end a Guild Quest with v83's lines 0xdd9 ("There are
     less than 6 members remaining, ...") and 0xdda ("The user that
-    registered has disconnected, ..."); the server sends neither yet.
+    registered has disconnected, ..."). 0x4C prints the guild's place in
+    the Guild Quest's line (`quest_waitlist_line`); see
+    [guild-quest](./guild-quest.md).
   - 0x32 clears the guild; Heracle tells the master "The guild has been
     disbanded..", and the others get the chat line "The guild has been
     disbanded.". 0x3A sets the capacity, and Heracle tells the master the
@@ -555,7 +558,8 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- The Guild Quest, so guild points have no source in play yet.
+- The Guild Quest's stages, so guild points have no source in play yet
+  ([guild-quest](./guild-quest.md)).
 - The alliance's rank panel slides no more than the guild's.
 - The Alliance tab's tooltips: the whole notice over its box, the online
   and total counts, "Sort thru" over the column heads, and "Unknown" over a

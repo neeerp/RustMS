@@ -26,6 +26,9 @@ const OP_EMBLEM_CHANGED: u8 = 0x42;
 const OP_NOTICE_CHANGED: u8 = 0x44;
 const OP_POINTS_CHANGED: u8 = 0x48;
 const OP_RANKING: u8 = 0x49;
+const OP_QUEST_TOO_FEW: u8 = 0x4A;
+const OP_QUEST_REGISTRANT_LEFT: u8 = 0x4B;
+const OP_QUEST_WAITLIST: u8 = 0x4C;
 
 /// `SHOW_STATUS_INFO`'s mode for guild points gained or lost.
 const STATUS_GUILD_POINTS: u8 = 6;
@@ -286,6 +289,29 @@ pub fn build_points_changed(guild_id: i32, points: i32) -> Result<Packet, Networ
     let mut packet = guild_operation(OP_POINTS_CHANGED)?;
     packet.write_int(guild_id)?;
     packet.write_int(points)?;
+    Ok(packet)
+}
+
+/// The Guild Quest can't go on with fewer than six members left: the
+/// client says it ends in 5 seconds (0xdd9). Bodiless.
+pub fn build_quest_too_few() -> Result<Packet, NetworkError> {
+    guild_operation(OP_QUEST_TOO_FEW)
+}
+
+/// The Guild Quest can't go on without the member who registered it: the
+/// client says it ends in 5 seconds (0xdda). Bodiless.
+pub fn build_quest_registrant_left() -> Result<Packet, NetworkError> {
+    guild_operation(OP_QUEST_REGISTRANT_LEFT)
+}
+
+/// Where the guild stands in the Guild Quest's line on `channel_id` (from
+/// 0; the client names it): `number` 1 calls it to Shuang, 2 says it is
+/// next, more says it is `number - 1`th, and 0 clears the line from the
+/// client's status bar (`crate::guild_quest::waitlist_number`).
+pub fn build_quest_waitlist(channel_id: u8, number: i32) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_QUEST_WAITLIST)?;
+    packet.write_byte(channel_id)?;
+    packet.write_int(number)?;
     Ok(packet)
 }
 
@@ -749,5 +775,27 @@ mod tests {
             .byte(6)
             .int(-30)
             .end();
+    }
+
+    #[test]
+    fn guild_quest_notices() {
+        let packet = build_quest_waitlist(1, 3).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x4C)
+            .byte(1)
+            .int(3)
+            .end();
+        for (packet, op) in [
+            (build_quest_too_few().unwrap(), 0x4A),
+            (build_quest_registrant_left().unwrap(), 0x4B),
+        ] {
+            let mut expect = Expect::new(&packet.bytes);
+            expect
+                .short(SendOpcode::GuildOperation as i16)
+                .byte(op)
+                .end();
+        }
     }
 }

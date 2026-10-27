@@ -109,6 +109,8 @@ impl ClientActor {
             | EventKind::MechanicalParts => return Ok(()),
             // Spiegelmann offers every room at once (`talk_to_spiegelmann`).
             EventKind::Carnival(_) => return Ok(()),
+            // Shuang registers guilds, not parties (`talk_to_shuang`).
+            EventKind::GuildQuest => return Ok(()),
         };
         self.start_script(script).await
     }
@@ -1066,7 +1068,9 @@ impl ClientActor {
     /// taken alone, needs none) or the lobby, or are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
         let event = ticket.kind.event();
-        let waiting = (self.party_id.is_some() || event.squad || event.solo())
+        // A guild's registrant goes into its Guild Quest party or not.
+        let partyless = event.squad || event.solo() || ticket.kind == EventKind::GuildQuest;
+        let waiting = (self.party_id.is_some() || partyless)
             && !self.in_cash_shop
             && self.event.is_none()
             && self

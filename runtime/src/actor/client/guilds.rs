@@ -460,6 +460,26 @@ impl ClientActor {
         self.start_script(script).await
     }
 
+    /// Shuang at the Excavation Site's camp needs the player's rank in
+    /// their guild as it is now, and the channel's Guild Quest line.
+    pub(super) async fn talk_to_shuang(&mut self) -> Result<(), RuntimeError> {
+        let character_id = self.in_game()?.player.id();
+        let rank = match self.in_game()?.player.guild.as_ref().map(|tag| tag.id) {
+            Some(guild_id) => spawn_db(move || db::guild::load(guild_id))
+                .await?
+                .and_then(|guild| guild.member(character_id).map(|member| member.rank)),
+            None => None,
+        };
+        let (reply, view) = tokio::sync::oneshot::channel();
+        self.send_to_directory(DirectoryMessage::GuildQuestTalk {
+            from: self.client_id,
+            reply,
+        })
+        .await?;
+        let view = view.await.unwrap_or_default();
+        self.start_script(NpcScript::shuang(rank, view)).await
+    }
+
     /// Give the guild the emblem the master made in Lea's emblem maker, and
     /// charge them. The client checks nothing before sending it, so the
     /// headquarters, the emblem, the mastery, and the price are checked

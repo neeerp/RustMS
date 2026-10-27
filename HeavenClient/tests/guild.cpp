@@ -210,6 +210,10 @@ int main()
 		require(guild.get_data().notice == "Hello", "a new notice");
 		guild.set_points(120);
 		require(guild.get_data().points == 120, "new guild points");
+		require(Guild::quest_waitlist_line(0, "Scania-2").empty(), "0 only clears the waitlist");
+		require(Guild::quest_waitlist_line(1, "Scania-2") == "Please go see the Guild Quest NPC at Channel Scania-2 immediately to enter.", "the guild's turn");
+		require(Guild::quest_waitlist_line(2, "Scania-2") == "Your guild is up next. Please head to the Guild Quest map at Channel Scania-2 and wait.", "next in line");
+		require(Guild::quest_waitlist_line(4, "Scania-2") == "There's currently 1 guild participating in the Guild Quest, and your guild is number 3 on the waitlist.", "third in line");
 		require(guild.set_online(3, false) && guild.online_count() == 1 && guild.online_ids(9) == std::vector<int32_t>{ 1 }, "a member logs out");
 		require(guild.set_online(3, true) && guild.online_count() == 2 && !guild.set_online(9, true), "a member logs in");
 		require(guild.set_level_job(3, 31, 110) && guild.find(3)->level == 31 && guild.find(3)->job == 110, "a member's level and job");

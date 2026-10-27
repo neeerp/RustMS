@@ -8,6 +8,8 @@ use game::quest::{QuestRecord, QuestStatus};
 use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
+use net::events::EventKind;
+use net::guild_quest;
 use net::handler::BroadcastScope;
 use net::npc_scripts::{self, NpcScript, Step};
 use net::packet::build::world::effect::CharEffect;
@@ -711,6 +713,30 @@ impl ClientActor {
                         ),
                         SquadAnswer::Rejoin(ticket) => {
                             warp = Some((kind.event().entry, None));
+                            self.event = Some(ticket);
+                        }
+                    }
+                }
+                Effect::GuildQuest(command) => {
+                    // Not into the guild's run while in another event.
+                    if *command == guild_quest::Command::Join && self.event.is_some() {
+                        return Ok(Applied::Refused);
+                    }
+                    let (reply, answer) = oneshot::channel();
+                    self.send_to_directory(DirectoryMessage::GuildQuest {
+                        from: self.client_id,
+                        command: *command,
+                        reply,
+                    })
+                    .await?;
+                    match answer.await.unwrap_or(SquadAnswer::Refused) {
+                        SquadAnswer::Refused | SquadAnswer::Start(_) => {
+                            debug!(?command, "Guild Quest refused; nothing applied");
+                            return Ok(Applied::Refused);
+                        }
+                        SquadAnswer::Done => {}
+                        SquadAnswer::Rejoin(ticket) => {
+                            warp = Some((EventKind::GuildQuest.event().entry, None));
                             self.event = Some(ticket);
                         }
                     }
