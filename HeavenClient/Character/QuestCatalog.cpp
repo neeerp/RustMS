@@ -138,6 +138,8 @@ namespace ms
 			};
 			info.pet_skill_limit = skill_limit(start);
 			info.end_pet_skill_limit = skill_limit(end);
+			info.mount_level = { static_cast<int32_t>(start["tamingmoblevelmin"].get_integer(0)),
+				static_cast<int32_t>(start["tamingmoblevelmax"].get_integer(30)) };
 
 			info.buff = static_cast<int32_t>(start["buff"].get_integer());
 			info.except_buff = static_cast<int32_t>(start["exceptbuff"].get_integer());

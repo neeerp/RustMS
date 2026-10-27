@@ -2358,7 +2358,7 @@ namespace ms
 		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),
 			[&](int32_t id) { return inventory.get_total_item_count(id) + (worn(id) ? 1 : 0); },
 			[&](int32_t id) { return skillbook.has_skill(id) || !SkillData::get(id).is_invisible(); }, worn,
-			Stage::get().get_mapid(), first_pet());
+			Stage::get().get_mapid(), first_pet(), mount_level);
 	}
 
 	FirstPet Player::first_pet() const

@@ -821,7 +821,9 @@ field while riding a tamed monster (0x4f1c2d, 0x4f0e97, 0x4f11b4,
 off 1902040 to 1902042 (`mount::stays_on`). Not done: Cosmic's explorer and
 Cygnus restrictions on who may equip which mount, and event mounts. The
 skill comes with quest 6002 (its `skill` act, `agent_docs/quests.md`),
-and the Hog from catching a Tamable Hog (`agent_docs/inventory.md`). HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
+and the Hog from catching a Tamable Hog (`agent_docs/inventory.md`). Kenta
+(2060005) trades a Hog for the Silver Mane (1902001) in quest 6006, which
+starts only for a mount of level 3 or more (`tamingmoblevelmin`). HeavenClient draws the rider on the mount (`CharLook::set_vehicle`,
 report 201).
 
 Battleship (5221006, report 228) is a ride too, on the vehicle 1932000

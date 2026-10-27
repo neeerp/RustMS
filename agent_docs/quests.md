@@ -73,7 +73,7 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `tamingmoblevelmin`, `tamingmoblevelmax`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
 | `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `petskill`, `petspeed`, `skill`, `npcAct`, `buffItemID` |
@@ -147,6 +147,12 @@ that pet's skill and `petspeed` 1 sets bit 1 of its attribute (the owner's
 speed); v83 never reads either, so the server re-sends the pet's item.
 Trainer Bartos's 4660 and 4661 (Robo pets, in Henesys's pet park) use the
 limits and `petskill`; Kenta's 3083 and 3096 (Aquarium) use `petspeed`.
+
+`tamingmoblevelmin` and `tamingmoblevelmax` (0 and 30 when unset) bound the
+level of the player's mount for a start; v83 (FUN_00721163) compares them
+with the level the last SET_TAMING_MOB_INFO gave, which the server sends on
+entering a field with a mount worn. HeavenClient checks them too. Only
+Kenta's Silver Mane (6006) has one, a least of 3.
 
 `buff` and `exceptbuff`, on either side, name an item whose effect, as if
 used, must be on the player or must not be. An item's effect runs under its

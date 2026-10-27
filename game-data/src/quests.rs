@@ -42,6 +42,8 @@ pub const START_REQUIREMENTS: &[&str] = &[
     "exceptbuff",
     "petRecallLimit",
     "petAutoSpeakingLimit",
+    "tamingmoblevelmin",
+    "tamingmoblevelmax",
 ];
 /// Keys in `Check.img/<id>/0` that only tell the client when to offer an
 /// autoStart quest through its quest alert: `normalAutoStart` on stat
@@ -269,6 +271,10 @@ pub struct StartRequirements {
     /// `petSkill` bits the first pet out must not have yet
     /// (`petRecallLimit`, `petAutoSpeakingLimit`); 0 means no pet is needed.
     pub pet_skill_limit: u16,
+    /// The mount's level, from `tamingmoblevelmin` to `tamingmoblevelmax`
+    /// (0 and 30 when unset); v83 (FUN_00721163) tests it on start only.
+    /// Only Silver Mane (6006) has one.
+    pub mount_level: Option<(i32, i32)>,
     /// An item whose effect, as if used, must be on the player (`buff`), or
     /// must not be (`exceptbuff`): Kerning's scents (2282 to 2284).
     pub buff: Option<i32>,
@@ -720,6 +726,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
     requirements.pets = pet_ids(nx, start)?;
     requirements.pet_closeness = pet_closeness(nx, start)?;
     requirements.pet_skill_limit = pet_skill_limit(nx, start)?;
+    requirements.mount_level = mount_level(nx, start)?;
     requirements.buff = nx.int_child(start, "buff")?;
     requirements.except_buff = nx.int_child(start, "exceptbuff")?;
     if let Some(&(_, record)) = START_RECORD_QUESTS.iter().find(|&&(quest, _)| quest == id) {
@@ -987,6 +994,17 @@ fn pet_closeness(nx: &NxDataFile, check: u32) -> Result<Option<(i32, i32)>, Game
         return Ok(None);
     }
     Ok(Some((min.unwrap_or(0), max.unwrap_or(30_000))))
+}
+
+/// The mount level range of a start `Check` node (`tamingmoblevelmin`,
+/// `tamingmoblevelmax`), if it has one.
+fn mount_level(nx: &NxDataFile, check: u32) -> Result<Option<(i32, i32)>, GameDataError> {
+    let min = nx.int_child(check, "tamingmoblevelmin")?;
+    let max = nx.int_child(check, "tamingmoblevelmax")?;
+    if min.is_none() && max.is_none() {
+        return Ok(None);
+    }
+    Ok(Some((min.unwrap_or(0), max.unwrap_or(30))))
 }
 
 /// The `petSkill` bits a `Check` node's first pet out must lack:

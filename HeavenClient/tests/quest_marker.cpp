@@ -256,6 +256,15 @@ int main()
 				mapid, first_pet);
 		};
 		require(!pet_holds(5000066), "a pet not listed hides it");
+		ms::QuestInfo mane = quest(6006, 2060005, 2060005);
+		mane.mount_level = { 3, 30 };
+		auto mount_holds = [&](int32_t level) {
+			return ms::start_holdings_met(mane, fame, [&](int32_t id) { return held[id]; },
+				[&](int32_t id) { return skills.count(id) > 0; }, [&](int32_t id) { return worn.count(id) > 0; },
+				mapid, {}, level);
+		};
+		require(!mount_holds(0) && !mount_holds(2), "a mount below the level hides it");
+		require(mount_holds(3) && mount_holds(30), "a mount within the levels allows it");
 		require(pet_holds(5000000), "a listed pet out allows the start");
 		test.pet_closeness = {1400, 30000};
 		require(!pet_holds({5000000, 1399}), "a listed pet not close enough hides it");
