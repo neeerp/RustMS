@@ -707,6 +707,19 @@ the kept places and "at least the count" have no source either way (v83ref
 Maple Explorer (29013), which need other medals and an info record 27020 that
 nothing sets, are not supported.
 
+## Adventurer titles
+
+The Explorer titles are Beginner, Junior, Veteran and Master Adventurer
+(29900 to 29903). Each has `normalAutoStart`, so the client offers the
+quest once the player reaches its job advancement and level and does not
+hold its medal. Starting it runs the start script anywhere: there is no
+dialogue, the quest starts, and a line in the chat log (SHOW_STATUS_INFO 9)
+names the title. Dalair's (9000040) end script gives the title's medal
+(1142107 to 1142110) and completes the quest. If the Equip tab is full,
+it says so and does nothing. This follows Cosmic's `29900.js` to `29903.js`.
+The `adventurer_medal.*` text is unsourced. The Knight and Aran titles
+(29904 to 29909 and 29924 to 29928) wait for the Cygnus and Aran jobs.
+
 ## Conversations in the client
 
 `Character/QuestDialogue.h` is a pure state machine over one side of
@@ -862,5 +875,7 @@ copied into the source.
   follow-up started, and Taggrin's first task),
   `finding_jack` (8219 from John to Jack, the three letters, the badges, and
   the keystone kept),
+  `adventurer_medals` (two titles started away from Dalair, a third
+  refused below its level, and both medals given in Perion),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

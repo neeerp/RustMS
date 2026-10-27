@@ -645,6 +645,9 @@ pub mod keys {
     pub const JACK_KEYSTONE: &str = "nlc_jack.keystone";
     pub const JACK_KEYSTONE_LOST: &str = "nlc_jack.keystone_lost";
     pub const JACK_HURRY: &str = "nlc_jack.hurry";
+    pub const ADVENTURER_TITLE: &str = "adventurer_medal.title";
+    pub const ADVENTURER_MEDAL: &str = "adventurer_medal.medal";
+    pub const ADVENTURER_MEDAL_FULL: &str = "adventurer_medal.full";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3143,6 +3146,9 @@ mod tests {
             keys::JACK_KEYSTONE,
             keys::JACK_KEYSTONE_LOST,
             keys::JACK_HURRY,
+            keys::ADVENTURER_TITLE,
+            keys::ADVENTURER_MEDAL,
+            keys::ADVENTURER_MEDAL_FULL,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

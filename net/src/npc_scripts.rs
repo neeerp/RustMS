@@ -2503,6 +2503,8 @@ impl NpcScript {
             "q8228e" => Some(elpam_translates(player)),
             "q8229e" => Some(jack_reads_the_translation(player)),
             "q8230e" => Some(jack_sees_the_keystone(player)),
+            "q29900s" | "q29901s" | "q29902s" | "q29903s" => adventurer_title(script),
+            "q29900e" | "q29901e" | "q29902e" | "q29903e" => adventurer_medal(script),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3843,6 +3845,55 @@ fn jack_sees_the_keystone(player: &Player) -> NpcScript {
         keys::JACK_HURRY
     };
     NpcScript::new(JACK, vec![Page::Say(text(words))])
+}
+
+/// The Adventurer titles (29900 to 29903): quest, title and medal. Each
+/// starts by itself (`normalAutoStart`) once an Explorer reaches its job
+/// and level without the medal, and Dalair (9000040) gives the medal.
+const ADVENTURER_TITLES: [(i16, &str, i32); 4] = [
+    (29900, "Beginner Adventurer", 1142107),
+    (29901, "Junior Adventurer", 1142108),
+    (29902, "Veteran Adventurer", 1142109),
+    (29903, "Master Adventurer", 1142110),
+];
+const DALAIR: i32 = 9000040;
+
+/// The Adventurer title whose start or end script is `script`.
+fn adventurer(script: &str) -> Option<(i16, &'static str, i32)> {
+    ADVENTURER_TITLES
+        .iter()
+        .find(|title| script[1..].starts_with(&title.0.to_string()))
+        .copied()
+}
+
+/// `q29900s` to `q29903s`: the title is earned. The quest starts with no
+/// dialogue and a chat-log line names it (Cosmic `29900.js` to
+/// `29903.js`). The text is unsourced.
+fn adventurer_title(script: &str) -> Option<NpcScript> {
+    let (quest, title, _) = adventurer(script)?;
+    let line = content::text().get(keys::ADVENTURER_TITLE, &[("title", title)]);
+    Some(NpcScript::new(
+        DALAIR,
+        vec![Page::Done(vec![
+            Effect::StartQuest(quest),
+            Effect::InfoText(line),
+        ])],
+    ))
+}
+
+/// `q29900e` to `q29903e`: Dalair gives the title's medal and completes
+/// the quest. The text is unsourced.
+fn adventurer_medal(script: &str) -> Option<NpcScript> {
+    let (quest, title, medal) = adventurer(script)?;
+    let medal_id = medal.to_string();
+    let says = content::text().get(
+        keys::ADVENTURER_MEDAL,
+        &[("title", title), ("medal", &medal_id)],
+    );
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    script.on_end = vec![give_one(medal), Effect::CompleteQuest(quest)];
+    script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
+    Some(script)
 }
 
 /// Tienk, the Monster Book Salesman (2197): Tienk (2006) in Lith Harbor
@@ -12474,6 +12525,28 @@ mod tests {
         );
         let (_, effects) = read_through(NpcScript::for_quest("q8230e", &player(80)).unwrap());
         assert!(effects.is_empty());
+    }
+
+    #[test]
+    fn adventurer_titles_start_silently_and_dalair_gives_the_medals() {
+        for (quest, title, medal) in ADVENTURER_TITLES {
+            let mut start = NpcScript::for_quest(&format!("q{quest}s"), &player(30)).unwrap();
+            let step = start.begin();
+            assert_eq!(step.prompt, None, "{quest}");
+            assert_eq!(step.effects[0], Effect::StartQuest(quest));
+            assert!(
+                matches!(&step.effects[1], Effect::InfoText(line) if line.contains(title)),
+                "{quest}"
+            );
+
+            let end = NpcScript::for_quest(&format!("q{quest}e"), &player(30)).unwrap();
+            assert!(end.inventory_full.is_some());
+            assert_eq!(
+                read_through(end),
+                (DALAIR, vec![give_one(medal), Effect::CompleteQuest(quest)]),
+            );
+        }
+        assert!(NpcScript::for_quest("q29904s", &player(30)).is_none());
     }
 
     #[test]
