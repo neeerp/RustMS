@@ -1588,6 +1588,9 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // the way down leads to the 6th floor's `fromUp` (Cosmic
         // `Depart_TopFloor`, `Depart_topOut`).
         "Depart_topFloor" => opens(JUNE),
+        // Kerning Square Station's train back to Kerning City's subway
+        // (Cosmic `Depart_ToKerning`).
+        "Depart_ToKerning" => through(Effect::WarpToPortal(crate::rides::SQUARE_TO_KERNING.map, 0)),
         "Depart_topOut" => through(Effect::WarpToPortal(KERNING_SQUARE_6F, 1)),
         "Depart_goFoward0" => depart_on(player, "right00"),
         "Depart_goFoward1" => depart_on(player, "right01"),
@@ -4681,6 +4684,10 @@ mod tests {
         assert_eq!(
             portal("Depart_topOut", &on(103040400, &[])),
             Some(through(Effect::WarpToPortal(KERNING_SQUARE_6F, 1)))
+        );
+        assert_eq!(
+            portal("Depart_ToKerning", &on(103000310, &[])),
+            Some(through(Effect::WarpToPortal(103000302, 0)))
         );
 
         // Past the Cheap Amplifiers from Composition Fee on, past the Fancy

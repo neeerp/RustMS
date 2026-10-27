@@ -2128,6 +2128,7 @@ pub mod keys {
     pub const LINE3_JAKE_SHORT: &str = "line3.jake.short";
     pub const LINE3_JAKE_FULL: &str = "line3.jake.full";
     pub const LINE3_GATE_MENU: &str = "line3.gate.menu";
+    pub const LINE3_GATE_SQUARE: &str = "line3.gate.square";
     pub const LINE3_GATE_SITE: &str = "line3.gate.site";
     pub const LINE3_GATE_SUBWAY: &str = "line3.gate.subway";
     pub const LINE3_GATE_TICKETS: &str = "line3.gate.tickets";

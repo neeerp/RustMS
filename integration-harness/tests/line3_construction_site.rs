@@ -73,10 +73,10 @@ async fn jake_sells_a_site_ticket_and_the_gate_takes_it_to_the_site() {
     assert_eq!(t.items, [(B1_TICKET, 1)]);
     assert_eq!(t.stat(stat::MESO), Some(0));
 
-    // The gate's first choice, then the ticket, goes straight in.
+    // The gate's second choice, then the ticket, goes straight in.
     let t = step(c, &m, talk(TICKETING, GATE)).await;
     assert_eq!(t.prompts, [(GATE, 4)]);
-    let t = step(c, &m, answer(4, 1, Some(0))).await;
+    let t = step(c, &m, answer(4, 1, Some(1))).await;
     assert_eq!(t.prompts, [(GATE, 4)]);
     let t = step(c, &m, answer(4, 1, Some(0))).await;
     assert_eq!(t.items, [(B1_TICKET, -1)]);

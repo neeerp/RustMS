@@ -1,13 +1,16 @@
 //! Rides with no timetable: the ferries' pilots and the crane sell a ride,
-//! the ride map counts down, and the player arrives at the other end. The
+//! Kerning City's subway gate and Kerning Square Station's way out board
+//! the free train, the ride map counts down, and the player arrives at the
+//! other end. The
 //! stack runs the route clock 60 times as fast (`RUSTMS_CONTI_SCALE`), so
 //! a minute's ride takes a second.
 
 use game_data::GameData;
 use integration_harness::database::{set_job, set_meso};
+use integration_harness::hunting::walk_to;
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
-use integration_harness::trace::{stat, step, until, warp, Trace};
+use integration_harness::trace::{send, stat, step, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, HarnessConfig, WorldSession};
 use net::packet::op::RecvOpcode;
 use packet::io::write::PktWrite;
@@ -30,6 +33,13 @@ const PURO_IN_LITH: i32 = 1200004;
 const PURO_IN_RIEN: i32 = 1200003;
 const KIRU_IN_ORBIS: i32 = 1100008;
 const CRANE: i32 = 2090005;
+const KERNING_TICKETING: i32 = 103_000_100;
+const KERNING_CITY_GATE: i32 = 1052007;
+const TO_KERNING_SQUARE: i32 = 103_000_301;
+const TO_KERNING_CITY: i32 = 103_000_302;
+const KERNING_SQUARE_STATION: i32 = 103_000_310;
+/// Kerning Square Station's way back, `out00`.
+const STATION_OUT: (i16, i16) = (465, 26);
 
 fn maps() -> &'static GameData {
     static MAPS: OnceLock<GameData> = OnceLock::new();
@@ -52,6 +62,16 @@ fn talk(map: i32, npc: i32) -> Packet {
     let mut p = Packet::new_empty();
     p.write_short(RecvOpcode::TalkToNpc as i16).unwrap();
     p.write_int(1_000_000_000 + index as i32).unwrap();
+    p
+}
+
+/// CHANGE_MAP_SPECIAL: press Up on the scripted portal `portal`.
+fn enter(portal: &str) -> Packet {
+    let mut p = Packet::new_empty();
+    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
+    p.write_byte(0).unwrap();
+    p.write_str_with_length(portal).unwrap();
+    p.write_short(0).unwrap();
     p
 }
 
@@ -93,6 +113,31 @@ async fn puro_ferries_a_player_to_rien_and_back_on_a_countdown() {
         assert_eq!(t.warps, [ride, to]);
         assert_eq!(t.countdowns, [1]);
     }
+}
+
+#[tokio::test]
+async fn the_free_train_runs_between_kerning_city_and_kerning_square() {
+    let config = load_harness_config_or_fail().await;
+    let mut session = traveller(&config, 0, KERNING_TICKETING).await;
+    let m = session.character_name.clone();
+    let c = &mut session.connection;
+
+    // The gate's first choice boards at once, with no ticket.
+    let t = step(c, &m, talk(KERNING_TICKETING, KERNING_CITY_GATE)).await;
+    assert_eq!(t.prompts, [(KERNING_CITY_GATE, 4)]);
+    let mut t = step(c, &m, answer(4, 1, Some(0))).await;
+    until(c, &mut t, |t| t.warps.contains(&KERNING_SQUARE_STATION)).await;
+    assert_eq!(t.warps, [TO_KERNING_SQUARE, KERNING_SQUARE_STATION]);
+    assert_eq!(t.countdowns, [1]);
+    assert!(t.items.is_empty());
+
+    // The station's way out rides back.
+    step(c, &m, walk_to(STATION_OUT.0, STATION_OUT.1)).await;
+    send(c, enter("out00")).await;
+    let mut t = Trace::default();
+    until(c, &mut t, |t| t.warps.contains(&KERNING_TICKETING)).await;
+    assert_eq!(t.warps, [TO_KERNING_CITY, KERNING_TICKETING]);
+    assert_eq!(t.countdowns, [1]);
 }
 
 #[tokio::test]

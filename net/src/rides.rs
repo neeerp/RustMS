@@ -1,5 +1,6 @@
-//! Rides with no timetable: the Ereve and Rien ferries and the crane
-//! between Orbis and Mu Lung. A player boards when they like and rides
+//! Rides with no timetable: the Ereve and Rien ferries, the crane
+//! between Orbis and Mu Lung, and the train between Kerning City's subway
+//! and Kerning Square. A player boards when they like and rides
 //! alone: the ride map shows a countdown, and when it runs out the player
 //! arrives (Cosmic's `MapleMap` rides and `Hak` event). Falling off lands
 //! on the dock the ride began at. Logging out lands on the map's
@@ -45,8 +46,12 @@ pub const RIEN_TO_LITH: Ride = ride(200090070, 60, (104000000, 3));
 /// The crane from Orbis Station to Mu Lung Temple, and back.
 pub const ORBIS_TO_MU_LUNG: Ride = ride(200090300, 60, (250000100, 0));
 pub const MU_LUNG_TO_ORBIS: Ride = ride(200090310, 60, (200000141, 0));
+/// The train from Kerning City's subway ticketing booth to Kerning Square
+/// Station, and back (Cosmic `KerningTrain`).
+pub const KERNING_TO_SQUARE: Ride = ride(103000301, 10, (103000310, 0));
+pub const SQUARE_TO_KERNING: Ride = ride(103000302, 10, (103000100, 0));
 
-const RIDES: [Ride; 8] = [
+const RIDES: [Ride; 10] = [
     ORBIS_TO_EREVE,
     EREVE_TO_ORBIS,
     ELLINIA_TO_EREVE,
@@ -55,6 +60,8 @@ const RIDES: [Ride; 8] = [
     RIEN_TO_LITH,
     ORBIS_TO_MU_LUNG,
     MU_LUNG_TO_ORBIS,
+    KERNING_TO_SQUARE,
+    SQUARE_TO_KERNING,
 ];
 
 /// The ride `map_id` is, if any.
