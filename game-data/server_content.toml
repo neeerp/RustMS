@@ -541,6 +541,8 @@ unsourced = [
     "temple_sorcerer.potion_worked",
     "omega_meteorite.full",
     "omega_gray.garbled",
+    "ariant_eleska.box_thanks",
+    "perion_manji.desert_mission",
     "portal.investigate2",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",
