@@ -97,7 +97,7 @@ namespace ms
 	// pages they show.
 	// MESO has no stop key of its own, so it shows stop/default. NO_PET and
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET };
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF };
 
 	// The first pet out: its item (0 for none) and its closeness.
 	struct FirstPet
@@ -127,6 +127,15 @@ namespace ms
 		bool close = first_pet.closeness >= closeness.first && first_pet.closeness <= closeness.second;
 
 		return close ? QuestStop::NONE : QuestStop::WRONG_PET;
+	}
+
+	// Whether the effect of item `buff` (0 for none) is on the player and
+	// that of `except` isn't, with `on` telling whether an item's is: v83's
+	// last checks, to start and to complete (FUN_00721163, FUN_00721d2c).
+	template<class ItemBuff>
+	bool buffs_met(int32_t buff, int32_t except, ItemBuff on)
+	{
+		return (buff == 0 || on(buff)) && (except == 0 || !on(except));
 	}
 
 	inline const char* stop_reason(QuestStop stop)

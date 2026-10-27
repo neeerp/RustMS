@@ -79,10 +79,16 @@ namespace ms
 				auto progress = started.find(quest.id);
 				auto record = started.find(quest.end_info_record);
 
-				return ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
+				QuestStop stop = ms::completion_stop(quest, npc_id, [](int16_t id) { return state(id); },
 					[&](int32_t id) { return inventory.get_total_item_count(id); },
 					progress == started.end() ? std::string() : progress->second, inventory.get_meso(),
 					player().first_pet(), record == started.end() ? nullptr : &record->second);
+
+				if (stop == QuestStop::NONE &&
+					!buffs_met(quest.end_buff, quest.end_except_buff, [](int32_t id) { return player().has_item_buff(id); }))
+					return QuestStop::BUFF;
+
+				return stop;
 			}
 
 			// Whether a quest item given at the start is no longer held, worn

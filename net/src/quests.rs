@@ -9,7 +9,7 @@ pub use game_data::quests::{
 };
 use rand::Rng;
 use std::sync::OnceLock;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 pub fn catalog() -> Result<&'static QuestCatalog, &'static str> {
     static CATALOG: OnceLock<Result<QuestCatalog, String>> = OnceLock::new();
@@ -80,6 +80,9 @@ pub enum QuestRejection {
     Info,
     /// No pet out, or the first pet out isn't one the quest lists.
     Pet,
+    /// Without an item's effect the quest needs (`buff`), or with one it
+    /// rules out (`exceptbuff`).
+    Buff,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -197,6 +200,9 @@ pub fn check_start(
     if !pet_met(&start.pets, start.pet_closeness, player) {
         return Err(QuestRejection::Pet);
     }
+    if !buffs_met(start.buff, start.except_buff, player) {
+        return Err(QuestRejection::Buff);
+    }
     // v83's client doesn't check; it has the server's refusal text.
     if quest.start_money < 0 && player.meso < quest.start_money.saturating_neg() {
         return Err(QuestRejection::Mesos);
@@ -221,6 +227,21 @@ fn pet_met(pets: &[i32], closeness: Option<(i32, i32)>, player: &Player) -> bool
         .as_ref()
         .is_some_and(|pet| (min..=max).contains(&i32::from(pet.closeness)));
     pets.contains(&first.item_id) && close
+}
+
+/// Whether `player` has the effect of item `buff`, if set, and not that of
+/// `except`: a buff from using the item, or from a quest's `buffItemID`,
+/// which runs under the item's negated id. v83's checks test the same.
+fn buffs_met(buff: Option<i32>, except: Option<i32>, player: &Player) -> bool {
+    let now = Instant::now();
+    let on = |item_id: i32| {
+        player
+            .buffs
+            .active()
+            .iter()
+            .any(|b| b.skill_id == -item_id && b.expires > now)
+    };
+    buff.is_none_or(on) && !except.is_some_and(on)
 }
 
 /// How many of `item_id` v83's start check sees `player` hold: those in the
@@ -294,6 +315,9 @@ pub fn check_complete(
     }
     if !pet_met(&quest.end_pets, quest.end_pet_closeness, player) {
         return Err(QuestRejection::Pet);
+    }
+    if !buffs_met(quest.end_buff, quest.end_except_buff, player) {
+        return Err(QuestRejection::Buff);
     }
     // At least the count, as v83's own check (cond 1) has it.
     if let Some(explored) = quest.explored {
@@ -495,6 +519,8 @@ mod tests {
             end_min_level: None,
             end_pets: vec![],
             end_pet_closeness: None,
+            end_buff: None,
+            end_except_buff: None,
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -689,6 +715,36 @@ mod tests {
         // Without a pet list, v83 doesn't read the range.
         q.end_pets.clear();
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn a_scent_needs_its_own_buff_and_not_the_last_one() {
+        let mut q = quest();
+        q.start.max_level = None;
+        q.start.quests.clear();
+        q.start.except_buff = Some(2022631);
+        q.end_buff = Some(2022632);
+        let mut p = player(30, 0);
+        let scent = |item_id: i32| {
+            game::Buff::new(
+                -item_id,
+                game::BuffStat::Speed,
+                -5,
+                Instant::now(),
+                Duration::from_secs(40),
+            )
+        };
+        p.buffs.give(scent(2022631));
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Buff));
+        p.buffs.cancel(-2022631);
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Buff));
+        p.buffs.give(scent(2022632));
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        // Another item's effect on the same stat isn't this one.
+        p.buffs.give(scent(2022633));
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Buff));
     }
 
     #[test]
