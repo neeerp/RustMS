@@ -313,6 +313,13 @@ end asks to be killed (Cosmic `3933.js`); with someone there, it says so. The
 room's spawn has a negative `mobTime`, so the other self appears once. The
 room is one of `scripts::SOLO_MAPS`, so it fills again when empty. Its way
 out is a lost link (see `map-travel.md`). The text is unsourced.
+"The Sorcerer Who Sells Emotions" (3514) starts from the data: it gives the
+Sorcerer's Potion (2022337) for 1,000,000 mesos. The potion's `hpR` and
+`mpR` are -100, so drinking it leaves 1 HP and no MP (see `inventory.md`).
+The end needs the potion gone. The Sorcerer's (2140002) `q3514e` says it
+worked, then gives the end's 891,500 EXP and completes the quest. Cosmic
+`3514.js` instead checks for its own potion buff, which v83's potion has no
+`time` for, so there is no buff to check. The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -774,5 +781,7 @@ copied into the source.
   Muhamad's four answers),
   `ardins_sand_bandits` (one player at a time in Ardin's room, the other
   self's kill, the way out, the room fresh for the next),
+  `sorcerers_potion` (3514 sold, refused while the potion is held, drunk
+  to 1 HP, then completed),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

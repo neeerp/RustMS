@@ -538,6 +538,7 @@ unsourced = [
     "ariant_ardin.test_ask",
     "ariant_ardin.test_go",
     "ariant_ardin.test_busy",
+    "temple_sorcerer.potion_worked",
     "portal.investigate2",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",

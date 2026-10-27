@@ -171,7 +171,8 @@ The player is marked dirty and saved with the usual autosave/logout path.
 
 USE_ITEM (`0x48`: tick, slot, item id) checks the slot holds that item,
 applies its `spec` (`hp`, `mp`, and percent `hpR`/`mpR`, capped at the
-maximums), consumes one, and answers with the inventory change and an HP/MP
+maximums; the two potions that take HP, 2022228 and the Sorcerer's Potion
+2022337, leave at least 1, which no source settles), consumes one, and answers with the inventory change and an HP/MP
 stat update. Dead players can't use items.
 
 v83 sends USE_ITEM only for potions, food, cures, transformations and the
