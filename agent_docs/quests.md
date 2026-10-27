@@ -508,6 +508,7 @@ with the current rules, including the beginner ones:
 | 1038 Maria's Letter | Maria (2103) → Lucas (12000) | 40; the letter for 5 Red and 5 Blue Potions |
 | 1040 Chief's Introduction | Lucas (12000) | 500 and Lucas's letter, after 1041–1044; opens those four |
 | 1021 Roger's Apple (scripted) | Roger (2000) | 10, 3 Apples, 3 Green Apples |
+| 1028 To Lith Harbor! (scripted start) | Shanks (22000) → Olaf (1002101) | 130, 10 Meat and 10 Lemons; after Mai's Request (1027), Shanks's `q1028s` sails to Lith Harbor for free and starts it, and a no stays in Southperry (no Cosmic script, so the ask is unsourced). The start also asks for the Wizet Plain Suit (1042003), a GM item, which is how the data shelves the quest for players |
 | 1008 Pio's Collecting Recycled Goods | Pio (10000) | 100 and 200 mesos for the two materials from Amherst's boxes |
 
 ## Kill counts
@@ -877,5 +878,7 @@ copied into the source.
   the keystone kept),
   `adventurer_medals` (two titles started away from Dalair, a third
   refused below its level, and both medals given in Perion),
+  `to_lith_harbor` (1028: Shanks turned down, then sailing for free, and
+  Olaf's reward),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
