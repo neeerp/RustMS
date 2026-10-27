@@ -66,7 +66,8 @@ pub fn build_npc_dialogue(page: &crate::dialogue::DialoguePage) -> Result<Packet
     packet.write_byte(4)?; // NPC speaker category
     packet.write_int(page.npc_id)?;
     packet.write_byte(0)?; // text dialogue
-    packet.write_byte(0)?; // NPC portrait
+                           // The NPC's portrait, or the player's (bit 0x2).
+    packet.write_byte(if page.player_speaks { 2 } else { 0 })?;
     packet.write_str_with_length(&page.text)?;
     packet.write_byte(u8::from(page.has_previous))?;
     packet.write_byte(u8::from(page.has_next))?;
@@ -340,6 +341,7 @@ mod tests {
             text: "Welcome!".to_string(),
             has_previous,
             has_next,
+            player_speaks: false,
         }
     }
 

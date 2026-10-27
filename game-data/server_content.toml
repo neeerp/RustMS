@@ -476,6 +476,7 @@ unsourced = [
     "portal.mc_castle.blocked",
     "item.mc_spore.used",
     "item.mc_thorns.removed",
+    "portal.investigate2",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",
     "portal.secret_door.locked",
@@ -2246,6 +2247,36 @@ source = "Server.NX/src/NpcShop.img"
 source = "Edelstein.lua/src/td_mushcastle/TD_MC_first.lua"
 template = "{s0}"
 sha256 = "6a0b4a048c118e1c2fb6afb5fc4f0d52349ba38a2bd5e007586cec02df40cbab"
+
+[text."mc_secretary.forest.ask"]
+source = "Edelstein.lua/src/td_mushcastle/q2314s.lua"
+template = "{s0}"
+sha256 = "1babd32e7240b25c8ac72a7b62cbf5bce0fce4630684ddbefe4dd021d062ce03"
+
+[text."mc_secretary.forest.decline"]
+source = "Edelstein.lua/src/td_mushcastle/q2314s.lua"
+template = "{s1}"
+sha256 = "c9f1310a31c7ec84307e5748054bc439ea46bc0ad59448f184379d599ae4f671"
+
+[text."mc_secretary.forest.go"]
+source = "Edelstein.lua/src/td_mushcastle/q2314s.lua"
+template = "{s2}"
+sha256 = "39de275257b42dfe4025ac0fb7c445c42cebef67777d06bf7866399c5e5e5999"
+
+[text."mc_secretary.walls.ask"]
+source = "Edelstein.lua/src/td_mushcastle/q2322s.lua"
+template = "{s0}"
+sha256 = "66416801bdb46f441a30845b3f07c3c4cc8b15d5561e9811400acb8421254223"
+
+[text."mc_secretary.walls.go"]
+source = "Edelstein.lua/src/td_mushcastle/q2322s.lua"
+template = "{s1}"
+sha256 = "f939b0d8dae339a09fc285fff202f993e732bb7c5887dee620c0a094d95c5589"
+
+[text."portal.investigate1"]
+source = "Edelstein.lua/src/td_mushcastle/investigate1.lua"
+template = "{s1}"
+sha256 = "96ec519c4be4f415768b6440a16c622f784e04278129a9b1867bc3f7a12f4961"
 
 [text."portal.elevator.away"]
 source = "Server.Scripts/src/elevator.lua"
