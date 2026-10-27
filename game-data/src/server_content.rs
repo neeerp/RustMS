@@ -1015,6 +1015,14 @@ pub mod keys {
     /// gives back the memory, and the Memory Keeper has the pass.
     pub const LOST_MEMORY_REGAINED: &str = "lost_memory.regained";
 
+    /// The Cygnus Knights' black shadows (20706, 20718): a place with
+    /// nothing, the Pig Farm's shadow, and the hidden Magic Library's,
+    /// whose way out waits for its Blue Mushrooms to fall.
+    pub const BLACK_SHADOW_NOTHING: &str = "black_shadow.nothing";
+    pub const BLACK_SHADOW_SPOTTED: &str = "black_shadow.spotted";
+    pub const BLACK_SHADOW_AMBUSH: &str = "black_shadow.ambush";
+    pub const MAGIC_LIBRARY_MUSHROOMS_LEFT: &str = "portal.outMagiclib.mushrooms_left";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3419,6 +3427,10 @@ mod tests {
                 keys::VIOLETTA_KEY_FULL,
                 keys::SNOW_STATUE_CLUE,
                 keys::LOST_MEMORY_REGAINED,
+                keys::BLACK_SHADOW_NOTHING,
+                keys::BLACK_SHADOW_SPOTTED,
+                keys::BLACK_SHADOW_AMBUSH,
+                keys::MAGIC_LIBRARY_MUSHROOMS_LEFT,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

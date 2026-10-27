@@ -194,6 +194,15 @@ impl ClientActor {
                     mob_id: *mob_id,
                     at: *at,
                 }),
+                Effect::BringOutMobs { mob_id, at, each } => {
+                    to_field.push(FieldRequest::BringOutMobs {
+                        mob_id: *mob_id,
+                        at: at
+                            .iter()
+                            .flat_map(|&point| std::iter::repeat_n(point, usize::from(*each)))
+                            .collect(),
+                    })
+                }
                 Effect::SetReactorState { name, state } => {
                     to_field.push(FieldRequest::SetReactorState {
                         name,

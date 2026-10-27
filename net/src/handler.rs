@@ -978,6 +978,8 @@ pub enum FieldRequest {
     /// A script brings out `mob_id` on the ground below `at`, unless one
     /// is out already.
     BringOutMob { mob_id: i32, at: (i16, i16) },
+    /// A script brings out a `mob_id` on the ground below each of `at`.
+    BringOutMobs { mob_id: i32, at: Vec<(i16, i16)> },
     /// A script puts the reactors named `name` here in `state`
     /// (`scripts::Effect::SetReactorState`).
     SetReactorState { name: &'static str, state: u8 },

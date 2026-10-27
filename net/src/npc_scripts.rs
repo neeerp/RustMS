@@ -2172,6 +2172,9 @@ impl NpcScript {
                     &mut rand::thread_rng(),
                 ))
             }
+            PIG_FARM_SHADOW | PIG_FARM_DECOY | LIBRARY_SHADOW | LIBRARY_CORNER => {
+                return Some(black_shadow(npc_id, player));
+            }
             _ => {}
         }
         // These fall through when silent, so the same NPCs can say more.
@@ -4557,6 +4560,67 @@ fn lost_memory(quest: i16) -> Option<NpcScript> {
         },
     ];
     Some(script)
+}
+
+/// The black shadow hidden in the Pig Farm (100020000) for "A Black Shadow
+/// in the Pig Farm" (20706), and the four spots around it that hide
+/// nothing; the black shadow in the hidden Magic Library
+/// (`scripts::HIDDEN_MAGIC_LIBRARY`) and the library's four corners.
+const PIG_FARM_SHADOW: i32 = 1012115;
+const PIG_FARM_DECOY: i32 = 1012116;
+const LIBRARY_SHADOW: i32 = 1032109;
+const LIBRARY_CORNER: i32 = 1032110;
+/// "A Black Shadow in the Pig Farm" and the record its completion reads
+/// (`Check/1 infoNumber`).
+const BLACK_SHADOW_IN_THE_PIG_FARM: i16 = 20706;
+const PIG_FARM_SHADOW_RECORD: i16 = 20731;
+/// The Blue Mushrooms the library's black shadow sets on the player, ten
+/// on the ground below each point (Cosmic `1032109.js`).
+const BLUE_MUSHROOM: i32 = 2220100;
+const LIBRARY_AMBUSH: [(i16, i16); 3] = [(117, 183), (4, 183), (-109, 183)];
+const LIBRARY_AMBUSH_EACH: u8 = 10;
+
+/// A black shadow the Cygnus Knights hunt, or a spot that hides none.
+/// While "A Black Shadow in the Pig Farm" is under way, the Pig Farm's
+/// shadow is spotted, which sets the record its completion at 1103001
+/// reads (Cosmic completes the quest there instead). While "Maybe it's
+/// Grendel!" is under way and it isn't yet found, the library's shadow
+/// sets its Blue Mushrooms on the player once read, and the record that
+/// quest's completion reads. Otherwise there is nothing to see. The text
+/// is unsourced.
+fn black_shadow(npc: i32, player: &Player) -> NpcScript {
+    let started = |quest| player.quests.state(quest) == QuestState::Started;
+    let pages = match npc {
+        PIG_FARM_SHADOW if started(BLACK_SHADOW_IN_THE_PIG_FARM) => vec![Page::Act {
+            text: text(keys::BLACK_SHADOW_SPOTTED),
+            effects: vec![Effect::SetRecord {
+                record: PIG_FARM_SHADOW_RECORD,
+                value: scripts::SHADOW_SPOTTED,
+            }],
+        }],
+        LIBRARY_SHADOW
+            if started(scripts::MAYBE_ITS_GRENDEL)
+                && player.quests.info(scripts::LIBRARY_SHADOW_RECORD)
+                    != Some(scripts::SHADOW_SPOTTED) =>
+        {
+            vec![
+                Page::Say(text(keys::BLACK_SHADOW_AMBUSH)),
+                Page::Done(vec![
+                    Effect::SetRecord {
+                        record: scripts::LIBRARY_SHADOW_RECORD,
+                        value: scripts::SHADOW_SPOTTED,
+                    },
+                    Effect::BringOutMobs {
+                        mob_id: BLUE_MUSHROOM,
+                        at: &LIBRARY_AMBUSH,
+                        each: LIBRARY_AMBUSH_EACH,
+                    },
+                ]),
+            ]
+        }
+        _ => vec![Page::Say(text(keys::BLACK_SHADOW_NOTHING))],
+    };
+    NpcScript::new(npc, pages)
 }
 
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
@@ -12157,6 +12221,75 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn the_black_shadows_are_found_only_on_their_quests() {
+        let on = |quests: &[(i16, QuestState)]| {
+            let mut player = traveller(30, 0, false);
+            for &(quest_id, state) in quests {
+                let status = match state {
+                    QuestState::Started => QuestStatus::Started {
+                        kills: Vec::new(),
+                        info: None,
+                    },
+                    _ => QuestStatus::Completed {
+                        at: std::time::SystemTime::UNIX_EPOCH,
+                    },
+                };
+                player.quests.upsert(game::QuestRecord { quest_id, status });
+            }
+            player
+        };
+        let spotted = |record| Effect::SetRecord { record, value: "1" };
+        let said = |step: Step| match step.prompt {
+            Some(Prompt::Text(page)) => page.text,
+            other => panic!("{other:?}"),
+        };
+        let nothing = |npc, player: &Player| {
+            let script = NpcScript::for_npc(npc, player).unwrap();
+            assert_eq!(said(script.begin()), text(keys::BLACK_SHADOW_NOTHING));
+            assert_eq!(read_through(script), (npc, vec![]));
+        };
+
+        // The Pig Farm's shadow, spotted at once.
+        let hunting = on(&[(BLACK_SHADOW_IN_THE_PIG_FARM, QuestState::Started)]);
+        let step = NpcScript::for_npc(PIG_FARM_SHADOW, &hunting)
+            .unwrap()
+            .begin();
+        assert_eq!(step.effects, [spotted(20731)]);
+        assert_eq!(said(step), text(keys::BLACK_SHADOW_SPOTTED));
+        nothing(PIG_FARM_DECOY, &hunting);
+        for state in [QuestState::NotStarted, QuestState::Completed] {
+            nothing(
+                PIG_FARM_SHADOW,
+                &on(&[(BLACK_SHADOW_IN_THE_PIG_FARM, state)]),
+            );
+        }
+
+        // The library's, which sets its Blue Mushrooms on the player once read.
+        let searching = on(&[(scripts::MAYBE_ITS_GRENDEL, QuestState::Started)]);
+        let script = NpcScript::for_npc(LIBRARY_SHADOW, &searching).unwrap();
+        assert_eq!(said(script.begin()), text(keys::BLACK_SHADOW_AMBUSH));
+        assert_eq!(
+            read_through(script),
+            (
+                LIBRARY_SHADOW,
+                vec![
+                    spotted(20732),
+                    Effect::BringOutMobs {
+                        mob_id: 2220100,
+                        at: &[(117, 183), (4, 183), (-109, 183)],
+                        each: 10,
+                    }
+                ]
+            )
+        );
+        nothing(LIBRARY_CORNER, &searching);
+        let mut found = searching.clone();
+        found.quests.set_record(20732, "1");
+        nothing(LIBRARY_SHADOW, &found);
+        nothing(LIBRARY_SHADOW, &on(&[]));
     }
 
     #[test]
