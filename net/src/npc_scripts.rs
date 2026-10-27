@@ -2561,6 +2561,8 @@ impl NpcScript {
             "q8230e" => Some(jack_sees_the_keystone(player)),
             "q29900s" | "q29901s" | "q29902s" | "q29903s" => adventurer_title(script),
             "q29900e" | "q29901e" | "q29902e" | "q29903e" => adventurer_medal(script),
+            "q29002s" => Some(celebrity_start(player)),
+            "q29002e" => Some(celebrity_end(player, SystemTime::now())),
             "q29910s" | "q29911s" | "q29912s" | "q29913s" | "q29914s" | "q29915s" | "q29916s"
             | "q29917s" | "q29918s" | "q29919s" | "q29920s" | "q29921s" | "q29933s" | "q29922s"
             | "q29923s" | "q29924s" | "q29925s" | "q29926s" | "q29927s" | "q29928s" => {
@@ -4118,6 +4120,69 @@ fn outstanding_citizen(player: &Player, family: &FamilyInfo) -> NpcScript {
         give_one(OUTSTANDING_CITIZEN_MEDAL),
         Effect::CompleteQuest(OUTSTANDING_CITIZEN),
     ];
+    script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
+    script
+}
+
+/// Title Challenge - Celebrity (29002): Dalair (9000040) sets the player
+/// to raise their fame by 1,000 in the quest's 30 days (`timeLimit2`). The
+/// start keeps the fame it began from and the goal in the quest's record
+/// (`popS`, `popG`), which the Quest Log's `#jpopgap#`, `#jpopG#` and gauge
+/// read, and Dalair's end script gives the Celebrity Medal (1142003, the
+/// quest's `viewMedalItem`) once the fame gained reaches the goal before
+/// the end date. Cosmic has no scripts for it, and the text is unsourced.
+const CELEBRITY: i16 = 29002;
+const CELEBRITY_MEDAL: i32 = 1142003;
+const CELEBRITY_FAME_GOAL: i16 = 1000;
+
+fn celebrity_start(player: &Player) -> NpcScript {
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(text(keys::CELEBRITY_START))]);
+    script.on_end = vec![
+        Effect::StartQuest(CELEBRITY),
+        Effect::SetQuestEx {
+            quest: CELEBRITY,
+            key: "popS",
+            value: player.stats.fame.to_string(),
+        },
+        Effect::SetQuestEx {
+            quest: CELEBRITY,
+            key: "popG",
+            value: CELEBRITY_FAME_GOAL.to_string(),
+        },
+    ];
+    script
+}
+
+fn celebrity_end(player: &Player, now: SystemTime) -> NpcScript {
+    // The started record is the end date, "yyyyMMddHHmmss", which sorts as
+    // it reads.
+    let ended = player
+        .quests
+        .info(CELEBRITY)
+        .is_some_and(|end| end < game::quest::end_date(now).as_str());
+    if ended {
+        return NpcScript::new(DALAIR, vec![Page::Say(text(keys::CELEBRITY_TOO_LATE))]);
+    }
+    let started_at = player
+        .quest_ex
+        .get(CELEBRITY, "popS")
+        .and_then(|v| v.parse().ok());
+    let gained = player.stats.fame as i32 - started_at.unwrap_or(0i32);
+    let goal = i32::from(CELEBRITY_FAME_GOAL);
+    if gained < goal {
+        let says = content::text().get(
+            keys::CELEBRITY_NOT_YET,
+            &[("gained", &gained.to_string()), ("goal", &goal.to_string())],
+        );
+        return NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    }
+    let medal_id = CELEBRITY_MEDAL.to_string();
+    let says = content::text().get(
+        keys::ADVENTURER_MEDAL,
+        &[("title", "Celebrity"), ("medal", &medal_id)],
+    );
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    script.on_end = vec![give_one(CELEBRITY_MEDAL), Effect::CompleteQuest(CELEBRITY)];
     script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
     script
 }
@@ -15441,6 +15506,76 @@ mod tests {
             );
         }
         assert!(NpcScript::for_quest("q29904s", &player(30)).is_none());
+    }
+
+    #[test]
+    fn celebrity_keeps_the_starting_fame_and_ends_at_a_thousand_more() {
+        let mut fan = player(50);
+        fan.stats.fame = 25;
+        let (npc, effects) = read_through(NpcScript::for_quest("q29002s", &fan).unwrap());
+        assert_eq!(npc, DALAIR);
+        assert_eq!(
+            effects,
+            [
+                Effect::StartQuest(CELEBRITY),
+                Effect::SetQuestEx {
+                    quest: CELEBRITY,
+                    key: "popS",
+                    value: "25".into(),
+                },
+                Effect::SetQuestEx {
+                    quest: CELEBRITY,
+                    key: "popG",
+                    value: "1000".into(),
+                },
+            ]
+        );
+
+        let now = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_800_000_000);
+        let ends_at = |date: SystemTime| {
+            let mut started = fan.clone();
+            started.quest_ex.set(CELEBRITY, "popS", 25);
+            started.quest_ex.set(CELEBRITY, "popG", 1000);
+            started.quests.upsert(game::QuestRecord {
+                quest_id: CELEBRITY,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(game::quest::end_date(date)),
+                },
+            });
+            started
+        };
+        let in_time = ends_at(now + std::time::Duration::from_secs(60));
+        let short = celebrity_end(&in_time, now);
+        assert_eq!(
+            page_text(&short.clone().begin()),
+            content::text().get(
+                keys::CELEBRITY_NOT_YET,
+                &[("gained", "0"), ("goal", "1000")]
+            )
+        );
+        assert_eq!(read_through(short), (DALAIR, vec![]));
+
+        let mut famous = in_time.clone();
+        famous.stats.fame = 1025;
+        let done = celebrity_end(&famous, now);
+        assert!(done.inventory_full.is_some());
+        assert_eq!(
+            read_through(done),
+            (
+                DALAIR,
+                vec![give_one(CELEBRITY_MEDAL), Effect::CompleteQuest(CELEBRITY)]
+            )
+        );
+
+        let mut late = ends_at(now - std::time::Duration::from_secs(1));
+        late.stats.fame = 1025;
+        let too_late = celebrity_end(&late, now);
+        assert_eq!(
+            page_text(&too_late.clone().begin()),
+            text(keys::CELEBRITY_TOO_LATE)
+        );
+        assert_eq!(read_through(too_late), (DALAIR, vec![]));
     }
 
     #[test]

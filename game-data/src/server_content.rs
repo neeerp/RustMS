@@ -652,6 +652,11 @@ pub mod keys {
     pub const OUTSTANDING_CITIZEN_NOT_YET: &str = "outstanding_citizen.not_yet";
     pub const MEDAL_TITLE: &str = "medal_title";
     pub const KNIGHT_TITLE: &str = "knight_title";
+    /// Dalair sets Title Challenge - Celebrity (`q29002s`), and at its end
+    /// (`q29002e`) finds the fame short or the time run out.
+    pub const CELEBRITY_START: &str = "celebrity.start";
+    pub const CELEBRITY_NOT_YET: &str = "celebrity.not_yet";
+    pub const CELEBRITY_TOO_LATE: &str = "celebrity.too_late";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3411,6 +3416,9 @@ mod tests {
             keys::OUTSTANDING_CITIZEN_NOT_YET,
             keys::MEDAL_TITLE,
             keys::KNIGHT_TITLE,
+            keys::CELEBRITY_START,
+            keys::CELEBRITY_NOT_YET,
+            keys::CELEBRITY_TOO_LATE,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

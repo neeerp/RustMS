@@ -577,6 +577,17 @@ pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> 
     .await
 }
 
+/// Set the logged-out character `character_id`'s fame.
+pub async fn set_fame(character_id: i32, fame: i16) -> Result<(), HarnessError> {
+    change_one_row("set fame", move |conn| {
+        diesel::sql_query("UPDATE characters SET fame = $2 WHERE id = $1")
+            .bind::<Integer, _>(character_id)
+            .bind::<SmallInt, _>(fame)
+            .execute(conn)
+    })
+    .await
+}
+
 /// Put `level` copies of card `card_id` in the logged-out character
 /// `character_id`'s Monster Book.
 pub async fn add_book_card(

@@ -901,8 +901,21 @@ player is married, is in a guild, and has a Junior, as the quest's
 `demandSummary` asks. Until then Dalair says what is missing and does
 nothing. The runtime loads the Family window's numbers for this script, as
 it does for Captain Al's (`FAMILY_QUEST_SCRIPTS`). Cosmic has no script for
-it, and the text is unsourced. The other title challenges count fame,
-kills or rankings that the server does not keep.
+it, and the text is unsourced.
+
+Title Challenge - Celebrity (29002) starts at Dalair from level 20 for a
+player without the Celebrity Medal (`Check/0`'s item has no count). The
+start script writes the fame the player has (`popS`) and the goal, 1,000
+(`popG`), into the quest's record beside the quest log
+(`Effect::SetQuestEx`, SHOW_STATUS_INFO mode 10), and the Quest Log's
+`#jpopgap#`, `#jperPop#` and gauge count from them. Dalair's end script
+gives the Celebrity Medal (1142003) and completes the quest once fame less
+`popS` reaches `popG`. After the end date (the started record) Dalair says
+the time is over, and the player can give the quest up and start again.
+Cosmic has no scripts for it, and the text is unsourced. The other title
+challenges count kills or rankings that the server does not keep: Maple
+Idol Star (29500), which needs the Celebrity Medal, goes to the most
+popular player of the month, and nothing picks one.
 
 ## Conversations in the client
 
@@ -1038,7 +1051,7 @@ clock in UTC, where the client uses the server's time.
 `scnt`, `perPqS` and `gaugePqS` read every party quest's record, not the
 quest's own: PQ Mania (29000) shows them. Quest Specialist (29001) shows
 the three quest counts, 29300-29304 and 10395-10398 show `level`, and
-29500 `pop`. Outstanding Citizen (29002) shows the fame tokens, Diligent
+29500 `pop`. Celebrity (29002) shows the fame tokens, Diligent
 Explorer (29003) the days and Veteran Hunter (29400) the hunt. Every
 `per…` token is a percentage clamped to 0..100 and every `gauge…` the same
 Gauge2 gauge (0x9a0bae's and 0x99f33c's pattern). `popG`, `mg`, `mon`, `m`,
@@ -1051,9 +1064,10 @@ window draw as the frame and its slices (`QuestTextImages`,
 `QuestRecordEx::gauge_slices`). PQ Mania's and Quest Specialist's tokens read the need from
 `Check.img` itself, as the client does, not from the supported list. The client would
 divide by zero on a `popG` of 0 in `perPop` and on a `timeLimit2` under a
-day; HeavenClient shows 0 there. Apart from the end date, nothing writes
-these titles' records yet: the original server's timing is unknown (Cosmic has none), and
-29002, 29400 and 29500-29503 wait on their start scripts.
+day; HeavenClient shows 0 there. Apart from the end date and Celebrity's
+`popS` and `popG` (below), nothing writes these titles' records yet: the
+original server's timing is unknown (Cosmic has none), and 29400 and
+29500-29503 wait on their start scripts.
 
 So far only the party quests keep records, on their info quests 1200-1206
 and 1301. The client lists these under "Party Quest" and never offers them
@@ -1147,6 +1161,8 @@ copied into the source.
   then the medal once all three are set),
   `medal_titles` (three titles finished away from their NPCs with the medals
   held, not twice, and a fourth refused without its medal),
+  `celebrity` (29002's record at the start, 960 fame not enough, 1,000
+  too late after the end date, then the medal),
   `knight_titles` (29906 started in Henesys, 29907 refused before the 2nd
   job, and the medal from Cygnus),
   and `timed_quests` (Medin's clock: shown on start, taken down on

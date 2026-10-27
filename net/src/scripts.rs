@@ -860,6 +860,14 @@ pub enum Effect {
         record: i16,
         value: &'static str,
     },
+    /// Set `key` in a quest's record beside the quest log
+    /// (`game::quest_ex`), which its `#j` tokens show, as a title challenge
+    /// keeps the fame it started from; nothing if it already reads so.
+    SetQuestEx {
+        quest: i16,
+        key: &'static str,
+        value: String,
+    },
     /// Count `map_id` toward an explorer medal (`crate::medals`), starting
     /// it on the first.
     Explore {
