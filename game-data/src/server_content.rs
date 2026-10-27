@@ -1023,6 +1023,17 @@ pub mod keys {
     pub const BLACK_SHADOW_AMBUSH: &str = "black_shadow.ambush";
     pub const MAGIC_LIBRARY_MUSHROOMS_LEFT: &str = "portal.outMagiclib.mushrooms_left";
 
+    /// The Puppeteer's door (1063011): its password prompt, a wrong one, a
+    /// right one from someone not hunting him (pink), and an Aran's search
+    /// on The Puppeteer's Cave (21728); Francis (1104000) catching the
+    /// intruder, and his hideout taken.
+    pub const PUPPETEER_DOOR_ASK: &str = "puppeteer_door.ask";
+    pub const PUPPETEER_DOOR_WRONG: &str = "puppeteer_door.wrong";
+    pub const PUPPETEER_DOOR_SHUT: &str = "puppeteer_door.shut";
+    pub const PUPPETEER_DOOR_SEARCHED: &str = "puppeteer_door.searched";
+    pub const FRANCIS_INTRUDER: &str = "francis.intruder";
+    pub const FRANCIS_HIDEOUT_BUSY: &str = "francis.hideout_busy";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3431,6 +3442,12 @@ mod tests {
                 keys::BLACK_SHADOW_SPOTTED,
                 keys::BLACK_SHADOW_AMBUSH,
                 keys::MAGIC_LIBRARY_MUSHROOMS_LEFT,
+                keys::PUPPETEER_DOOR_ASK,
+                keys::PUPPETEER_DOOR_WRONG,
+                keys::PUPPETEER_DOOR_SHUT,
+                keys::PUPPETEER_DOOR_SEARCHED,
+                keys::FRANCIS_INTRUDER,
+                keys::FRANCIS_HIDEOUT_BUSY,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

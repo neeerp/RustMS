@@ -337,7 +337,14 @@ const BERSERK_ROOM: i32 = 910500200;
 pub const BALROG_WORLD: i32 = 910500000;
 /// Where Ardin's other self waits for a challenger on quest 3933.
 pub const ARDINS_ROOM: i32 = 926000000;
-pub const SOLO_MAPS: [i32; 13] = [
+/// The Puppeteer's hideout, where Francis (1104000) sends an intruder from
+/// his room, and the Puppeteer each hunt brings out there on entry (Cosmic
+/// map script `910510000`): (quest, mob), Find the Puppeteer! for the
+/// Cygnus Knights and Eliminate the Puppeteer! for an Aran.
+pub const PUPPETEERS_HIDEOUT: i32 = 910510000;
+const PUPPETEER_HUNTS: [(i16, i32); 2] = [(20730, 9300285), (21731, 9300344)];
+const PUPPETEER_AT: (i16, i16) = (680, 258);
+pub const SOLO_MAPS: [i32; 14] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -351,7 +358,20 @@ pub const SOLO_MAPS: [i32; 13] = [
     BALROG_WORLD,
     ARDINS_ROOM,
     HIDDEN_MAGIC_LIBRARY,
+    PUPPETEERS_HIDEOUT,
 ];
+
+/// The Puppeteer `player` is out to beat, while a hunt for him is under
+/// way and he isn't yet beaten.
+pub fn hunted_puppeteer(player: &Player) -> Option<i32> {
+    PUPPETEER_HUNTS
+        .iter()
+        .find(|&&(quest, _)| {
+            player.quests.state(quest) == QuestState::Started
+                && player.quests.kills(quest).iter().all(|&count| count == 0)
+        })
+        .map(|&(_, mob)| mob)
+}
 
 /// One of Kyrin's 4th-job tests: a Pirate on `quest` holds out in `room`
 /// against its boss for two minutes, then tells Kyrin in
@@ -847,6 +867,21 @@ const LITH_HARBOR: i32 = 104000000;
 const DISCIPLES_HIDEOUT: i32 = 100000006;
 const DISCIPLES_QUEST: i16 = 2175;
 const DISCIPLE: i32 = 9300156;
+
+/// What the map `player` just entered does when it has no `onUserEnter`
+/// script: the Puppeteer's hideout brings out the Puppeteer being hunted.
+pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
+    match player.stats.map_id {
+        PUPPETEERS_HIDEOUT => hunted_puppeteer(player)
+            .map(|mob_id| Effect::BringOutMob {
+                mob_id,
+                at: PUPPETEER_AT,
+            })
+            .into_iter()
+            .collect(),
+        _ => Vec::new(),
+    }
+}
 
 /// The map `player` just entered runs its `onUserEnter` script. `None` if
 /// the script is unknown.
@@ -1719,8 +1754,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             let (map, portal) = DOLL_CAVE_WAY_BACK;
             through(Effect::WarpToPortal(map, portal))
         }
-        // Cosmic asks for a password here; not yet.
-        "enterDollcave" => ScriptOutcome::default(),
+        "enterDollcave" => opens(crate::npc_scripts::PUPPETEER_DOOR),
         "tutorialNPC" => {
             let stats = &player.stats;
             match TUTORIAL_INSTRUCTORS
@@ -4255,11 +4289,42 @@ mod tests {
                 Some(DOLL_CAVE_WAY_BACK)
             );
         }
+        // Before, the cave wall asks for the password.
         let started = player_with(&[(20730, QuestState::Started)]);
         assert_eq!(
             portal("enterDollcave", &started),
-            Some(ScriptOutcome::default())
+            Some(opens(crate::npc_scripts::PUPPETEER_DOOR))
         );
+    }
+
+    #[test]
+    fn the_puppeteer_waits_in_his_hideout_for_whoever_hunts_him() {
+        let at_hideout = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = PUPPETEERS_HIDEOUT;
+            player
+        };
+        assert!(SOLO_MAPS.contains(&PUPPETEERS_HIDEOUT));
+        let data = crate::get_game_data().unwrap();
+        assert_eq!(data.field(PUPPETEERS_HIDEOUT).unwrap().on_user_enter, None);
+        assert!(unscripted_map_enter(&at_hideout(&[])).is_empty());
+        for (quest, mob_id) in PUPPETEER_HUNTS {
+            let mut hunting = at_hideout(&[(quest, QuestState::Started)]);
+            assert_eq!(
+                unscripted_map_enter(&hunting),
+                [Effect::BringOutMob {
+                    mob_id,
+                    at: PUPPETEER_AT
+                }]
+            );
+            *hunting.quests.kills_mut(quest).unwrap() = vec![1];
+            assert!(unscripted_map_enter(&hunting).is_empty(), "beaten");
+            let done = at_hideout(&[(quest, QuestState::Completed)]);
+            assert!(unscripted_map_enter(&done).is_empty());
+        }
+        // Elsewhere, nothing.
+        let elsewhere = player_with(&[(20730, QuestState::Started)]);
+        assert!(unscripted_map_enter(&elsewhere).is_empty());
     }
 
     #[test]
