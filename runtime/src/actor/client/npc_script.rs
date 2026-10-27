@@ -538,6 +538,12 @@ impl ClientActor {
                     changed = true;
                     packets.push(quest::build_quest_progress(*id, next.quests.status(*id))?);
                 }
+                Effect::SetQuestInfo { quest: id, value } => {
+                    if next.quests.set_info(*id, value) {
+                        changed = true;
+                        packets.push(quest::build_quest_progress(*id, next.quests.status(*id))?);
+                    }
+                }
                 Effect::SetRecord { record, value } => {
                     if next.quests.set_record(*record, value) {
                         changed = true;

@@ -424,6 +424,12 @@ const STABLE: i32 = 912000100;
 /// The mother cows, each with the number the quest's record keeps for it.
 const MOTHER_COWS: [(i32, u16); 2] = [(1092090, 1), (1092091, 2)];
 const CALVES: [i32; 2] = [1092094, 1092095];
+/// Shining Stone (2166): the Shiny Stone (1092016, `nautil_stone`) in the
+/// Nautilus's Generator Room sets the quest's string to what Sharyl's
+/// completion reads (`Check/1/infoex`).
+const SHINY_STONE: i32 = 1092016;
+const SHINING_STONE: i16 = 2166;
+const SHINING_STONE_TOUCHED: &str = "5";
 const SITE_QUESTS: [i16; 3] = [2055, 2056, 2057];
 const SITE_TICKETS: [i32; 3] = [4031036, 4031037, 4031038];
 const SITE_ENTRANCES: [i32; 3] = [103000900, 103000903, 103000906];
@@ -2150,6 +2156,11 @@ impl NpcScript {
         }
         if CALVES.contains(&npc_id) {
             return Some(calf(npc_id, player));
+        }
+        if npc_id == SHINY_STONE {
+            if let Some(script) = shiny_stone(player) {
+                return Some(script);
+            }
         }
         if let Some(rock) = TOWER_ROCKS.iter().find(|rock| rock.npc == npc_id) {
             return Some(tower_rock(rock, player));
@@ -3954,6 +3965,25 @@ fn calf(npc: i32, player: &Player) -> NpcScript {
         Page::Say(text(keys::MILK_CALF_NO_BOTTLE))
     };
     NpcScript::new(npc, vec![page])
+}
+
+/// The Shiny Stone marks Shining Stone once while it is under way;
+/// otherwise it says nothing of its own.
+fn shiny_stone(player: &Player) -> Option<NpcScript> {
+    let started = player.quests.state(SHINING_STONE) == QuestState::Started;
+    if !started || player.quests.info(SHINING_STONE) == Some(SHINING_STONE_TOUCHED) {
+        return None;
+    }
+    Some(NpcScript::new(
+        SHINY_STONE,
+        vec![Page::Act {
+            text: text(keys::QUEST_INFO_SHINY_STONE),
+            effects: vec![Effect::SetQuestInfo {
+                quest: SHINING_STONE,
+                value: SHINING_STONE_TOUCHED,
+            }],
+        }],
+    ))
 }
 
 /// A Shaman Rock takes a charm while its character of How to Shoo Away the
@@ -15553,6 +15583,33 @@ mod tests {
             &shaman_rock(1063012, 0, &elsewhere).unwrap().begin().effects[0],
             Effect::SetQuestChar { slot: 0, .. }
         ));
+    }
+
+    #[test]
+    fn the_shiny_stone_marks_shining_stone_once() {
+        let on = |info: &str| {
+            let mut player = traveller(30, 0, false);
+            player.quests.upsert(game::QuestRecord {
+                quest_id: SHINING_STONE,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(info.into()),
+                },
+            });
+            player
+        };
+        let step = NpcScript::for_npc(SHINY_STONE, &on("")).unwrap().begin();
+        assert_eq!(page_text(&step), text(keys::QUEST_INFO_SHINY_STONE));
+        assert_eq!(
+            step.effects,
+            [Effect::SetQuestInfo {
+                quest: SHINING_STONE,
+                value: "5"
+            }]
+        );
+        // Once marked, or off the quest, it says nothing of its own.
+        assert!(NpcScript::for_npc(SHINY_STONE, &on("5")).is_none());
+        assert!(NpcScript::for_npc(SHINY_STONE, &traveller(30, 0, false)).is_none());
     }
 
     #[test]
