@@ -83,6 +83,9 @@ pub enum QuestRejection {
     /// Without an item's effect the quest needs (`buff`), or with one it
     /// rules out (`exceptbuff`).
     Buff,
+    /// The Monster Book holds too few or too many cards (`mbmin`, `mbmax`),
+    /// or the wrong count of one it lists (`mbcard`).
+    MonsterBook,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -244,6 +247,23 @@ fn buffs_met(buff: Option<i32>, except: Option<i32>, player: &Player) -> bool {
     buff.is_none_or(on) && !except.is_some_and(on)
 }
 
+/// Whether `player`'s Monster Book meets `quest`'s completion bounds: the
+/// distinct cards it holds against `mbmin`/`mbmax`, and each listed card's
+/// count against its own. v83's completion check (FUN_00721d2c) tests the
+/// same, after the mesos.
+fn book_met(quest: &QuestTemplate, player: &Player) -> bool {
+    let within = |n: i32, min: Option<i32>, max: Option<i32>| {
+        min.is_none_or(|min| n >= min) && max.is_none_or(|max| n <= max)
+    };
+    let book = &player.monster_book;
+    let total = i32::try_from(book.cards().count()).unwrap_or(i32::MAX);
+    within(total, quest.end_book_min, quest.end_book_max)
+        && quest
+            .end_cards
+            .iter()
+            .all(|c| within(i32::from(book.level(c.card)), c.min, c.max))
+}
+
 /// How many of `item_id` v83's start check sees `player` hold: those in the
 /// bag, plus one if a copy is worn.
 fn held_for_start(player: &Player, item_id: i32) -> i32 {
@@ -306,6 +326,9 @@ pub fn check_complete(
         || (quest.money < 0 && player.meso < quest.money.saturating_neg())
     {
         return Err(QuestRejection::Mesos);
+    }
+    if !book_met(quest, player) {
+        return Err(QuestRejection::MonsterBook);
     }
     if quest
         .end_min_level
@@ -521,6 +544,9 @@ mod tests {
             end_pet_closeness: None,
             end_buff: None,
             end_except_buff: None,
+            end_book_min: None,
+            end_book_max: None,
+            end_cards: vec![],
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -745,6 +771,37 @@ mod tests {
         // Another item's effect on the same stat isn't this one.
         p.buffs.give(scent(2022633));
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Buff));
+    }
+
+    #[test]
+    fn complete_needs_the_monster_book_within_its_bounds() {
+        let mut q = quest();
+        q.end_book_min = Some(2);
+        q.end_cards = vec![game_data::quests::BookCard {
+            card: 2380000,
+            min: Some(2),
+            max: None,
+        }];
+        let mut p = player(30, 0);
+        set(&mut p, 1033, QuestState::Started);
+        p.monster_book.add(2380000);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::MonsterBook)
+        );
+        // Two distinct cards, but only one of the listed card.
+        p.monster_book.add(2380001);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::MonsterBook)
+        );
+        p.monster_book.add(2380000);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        q.end_book_max = Some(1);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::MonsterBook)
+        );
     }
 
     #[test]

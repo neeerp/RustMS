@@ -138,6 +138,27 @@ namespace ms
 		return (buff == 0 || on(buff)) && (except == 0 || !on(except));
 	}
 
+	// Whether the Monster Book meets a quest's completion bounds: `total`,
+	// its different cards, against mbmin and mbmax, and each listed card's
+	// count, from `level`, against its own. v83's completion check tests
+	// the same after the mesos and stops on it as on items (FUN_00721d2c).
+	template<class CardLevel>
+	bool book_met(const QuestInfo& quest, int32_t total, CardLevel level)
+	{
+		auto within = [](int32_t n, int32_t min, int32_t max) {
+			return (min < 0 || n >= min) && (max < 0 || n <= max);
+		};
+
+		if (!within(total, quest.end_book_min, quest.end_book_max))
+			return false;
+
+		for (auto& [card, min, max] : quest.end_cards)
+			if (!within(level(card), min, max))
+				return false;
+
+		return true;
+	}
+
 	inline const char* stop_reason(QuestStop stop)
 	{
 		switch (stop)

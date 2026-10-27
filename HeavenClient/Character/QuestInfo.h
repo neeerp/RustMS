@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -46,6 +47,13 @@ namespace ms
 		int32_t except_buff = 0;
 		int32_t end_buff = 0;
 		int32_t end_except_buff = 0;
+		// The fewest and most different cards the Monster Book may hold to
+		// complete (Check/1/mbmin, mbmax); -1 for no bound.
+		int32_t end_book_min = -1;
+		int32_t end_book_max = -1;
+		// Cards whose count in the book must lie within bounds to complete
+		// (Check/1/mbcard), as (card, min, max) with -1 for no bound.
+		std::vector<std::tuple<int32_t, int32_t, int32_t>> end_cards;
 		// Least fame to start (Check/0/pop); 0 means any.
 		int16_t min_fame = 0;
 		// Not offered before this FILETIME (Check/0/start, quest_date); 0

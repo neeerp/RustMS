@@ -88,6 +88,12 @@ namespace ms
 					!buffs_met(quest.end_buff, quest.end_except_buff, [](int32_t id) { return player().has_item_buff(id); }))
 					return QuestStop::BUFF;
 
+				const MonsterBook& book = player().get_monsterbook();
+
+				if (stop == QuestStop::NONE &&
+					!book_met(quest, book.count_cards(false) + book.count_cards(true), [&](int32_t card) { return book.get_level(card); }))
+					return QuestStop::ITEM;
+
 				return stop;
 			}
 

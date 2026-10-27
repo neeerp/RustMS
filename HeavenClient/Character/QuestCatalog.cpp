@@ -136,6 +136,13 @@ namespace ms
 			info.except_buff = static_cast<int32_t>(start["exceptbuff"].get_integer());
 			info.end_buff = static_cast<int32_t>(end["buff"].get_integer());
 			info.end_except_buff = static_cast<int32_t>(end["exceptbuff"].get_integer());
+			info.end_book_min = static_cast<int32_t>(end["mbmin"].get_integer(-1));
+			info.end_book_max = static_cast<int32_t>(end["mbmax"].get_integer(-1));
+
+			for (auto card : end["mbcard"])
+				info.end_cards.emplace_back(static_cast<int32_t>(card["id"].get_integer()),
+					static_cast<int32_t>(card["min"].get_integer(-1)),
+					static_cast<int32_t>(card["max"].get_integer(-1)));
 
 			for (auto job : start["job"])
 				info.jobs.push_back(static_cast<int16_t>(job.get_integer()));

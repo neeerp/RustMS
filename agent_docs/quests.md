@@ -74,7 +74,7 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `buff`, `exceptbuff`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
@@ -147,6 +147,14 @@ them (2282-2284, from Lala, 1052119, to Lana, 1052121, both in Kerning Square's 
 Each start gives its scent's slowing effect for 40 seconds, which
 completion needs. The next scent can't start while the last scent's effect
 is on.
+
+`mbmin` and `mbmax` bound the different cards the Monster Book holds, and
+each `mbcard` entry bounds how many of one card it holds (`min`, `max`;
+either may be missing). v83 checks them on completion right after the
+mesos (FUN_00721d2c), and a quest that fails them stops on the items page,
+as HeavenClient does too. Dalair's Monster Expert (29512) wants 30 kinds
+of card, and the Spirit titles from The Rememberer (1061011; 29016-29019) want one of each
+of five cards on top of their kills.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
