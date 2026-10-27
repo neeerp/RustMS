@@ -585,6 +585,25 @@ The Use tab's own path for classes 545 and 239 (FUN_00a10075, op 0x6F)
 checks the same bit and sends the slot and item. No Use item of either
 class exists in our data, so 0x6F is not routed.
 
+### Weather items
+
+A weather item (512xxxx) is used from the Cash tab with a message of up
+to 35 characters (v83 FUN_00a0a63f, type 0x10). The client says "The
+effect is taking place right now. Please try it later." while a weather,
+its bursts or fireworks, or a jukebox song is still going, where the map's
+`fieldLimit` has 0x4000, and in the wedding halls (`fieldType` 60); the
+server refuses the same maps (`FieldTemplate::may_blow_weather`) with only
+the unlock. Otherwise it takes one (`world/weather.rs`) and the field blows
+BLOW_WEATHER with the item and its String `Cash.img` `msg`, filled with the
+player's name and message, to everyone there and to those who arrive,
+until it stops after 30 seconds or a new one replaces it.
+
+A buff weather (5121xxx) also gives everyone on the map, as it starts, the
+effect of the consumable its `info/stateChangeItem` names (Fighting Spirit
+5121000 gives 2022071's +20 attack and magic attack for 10 minutes), as
+Cosmic does: the field sends each player's client actor `FieldBuff`, the
+message a mob's `buff` uses, and those alive take it.
+
 ### Cash mists
 
 Passed Gas (5281000) and Floral Scent (5281001) leave a cloud around their
@@ -2010,3 +2029,7 @@ the rows, and the most searched list; the build tests cover the packets;
 when nothing turns up, finds a shop in another room and uses up one Owl,
 does the same with a Cash Owl, sees the item in the most searched list, goes into the shop with GO, and
 gets "closed" once the owner logs out.
+`weather_items` (integration) is refused a weather in a training room and a
+wedding hall, blows one over Perion for a second player and a latecomer
+until it stops, and has Fighting Spirit give both players in Kerning City
+its buff.

@@ -32,6 +32,9 @@ pub const FIELD_TYPE_DOJO: i32 = 14;
 pub const FIELD_TYPE_DOJO_2: i32 = 18;
 /// `info/fieldType` of Nett's Pyramid, where Rage of Pharaoh works.
 pub const FIELD_TYPE_PYRAMID: i32 = 23;
+/// `info/fieldType` of the wedding halls, where weather items can't be
+/// used.
+pub const FIELD_TYPE_WEDDING: i32 = 60;
 /// `info/fieldLimit` bit forbidding movement skills; teleport rocks can't
 /// be used there either (v83 FUN_00a0a4aa).
 pub const FIELD_LIMIT_MOVEMENT_SKILLS: i32 = 0x2;
@@ -563,10 +566,10 @@ impl FieldTemplate {
         self.field_limit & FIELD_LIMIT_SUMMON_SACKS == 0 || self.allowed_items.contains(&item_id)
     }
 
-    /// Whether a player may use a weather item here. The client also keeps
-    /// them out of the wedding halls (fieldType 60).
+    /// Whether a player may use a weather item here: not where the map
+    /// forbids them, nor in the wedding halls (v83 0xa0b803).
     pub fn may_blow_weather(&self) -> bool {
-        self.field_limit & FIELD_LIMIT_WEATHER_ITEMS == 0
+        self.field_limit & FIELD_LIMIT_WEATHER_ITEMS == 0 && self.field_type != FIELD_TYPE_WEDDING
     }
 
     /// Whether a player may open an Omok or match cards room here.
@@ -1857,6 +1860,8 @@ mod tests {
         assert!(!field(910000001).may_drop(), "the Free Market rooms");
         let henesys = field(100000000);
         assert!(henesys.may_use(2000000) && henesys.may_drop());
+        assert!(henesys.may_blow_weather());
+        assert!(!field(680000110).may_blow_weather(), "a wedding hall");
     }
 
     #[test]

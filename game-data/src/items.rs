@@ -96,6 +96,9 @@ pub struct ItemInfo {
     pub sandglass: Option<Sandglass>,
     /// The days a timed Item Guard (5061xxx) seals for (`info/protectTime`).
     pub protect_time: i32,
+    /// What a buff weather (5121xxx) gives everyone on the map: the
+    /// consumable whose effect they take (`info/stateChangeItem`).
+    pub state_change_item: i32,
     /// What a box (2022xxx, 553xxxx) gives when opened (`reward`, beside
     /// `info`): one entry, picked by weight.
     pub reward: Vec<Reward>,
@@ -511,6 +514,7 @@ impl ItemData {
             info.expire_on_logout = nx.int_child(meta, "expireOnLogout")? == Some(1);
             info.not_extend = nx.int_child(meta, "notExtend")? == Some(1);
             info.protect_time = nx.int_child(meta, "protectTime")?.unwrap_or(0);
+            info.state_change_item = nx.int_child(meta, "stateChangeItem")?.unwrap_or(0);
             info.meso = nx.int_child(meta, "meso")?.unwrap_or(0);
             info.price = nx.int_child(meta, "price")?.unwrap_or(0);
             info.unit_price = nx.real_child(meta, "unitPrice")?.unwrap_or(0.0);
@@ -852,6 +856,7 @@ impl ItemData {
             mist: None,
             sandglass: None,
             protect_time: 0,
+            state_change_item: 0,
             reward: Vec::new(),
             raise: None,
         }))
@@ -1463,6 +1468,16 @@ mod tests {
             [7, 30, 90, 365]
         );
         assert_eq!(days(5060001), 0);
+    }
+
+    #[test]
+    fn reads_what_a_buff_weather_gives() {
+        let Some(data) = data() else {
+            return;
+        };
+        let gives = |id| data.info(id).unwrap().unwrap().state_change_item;
+        assert_eq!([5121000, 5121001].map(gives), [2022071, 2022072]);
+        assert_eq!(gives(5120000), 0);
     }
 
     #[test]
