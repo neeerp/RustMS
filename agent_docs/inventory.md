@@ -905,12 +905,16 @@ gain line and opens a `UINpcTalk` with what was found.
 
 An Etc item 4220xxx whose info names a record (`questId`), art (`uiData`,
 as `UI/UIWindow/raise/3`), `exp` per stage and `grade` stages grows in a
-window of its own (v83 `CUIRaise`, report b233). The only one in use is
-the Timer's Egg (4220046) of "A Cute Baby Bird" (3250): Ghosthunter Bob
+window of its own (v83 `CUIRaise`, report b233). Two are in use. The
+Timer's Egg (4220046) of "A Cute Baby Bird" (3250): Ghosthunter Bob
 (2041026, in Lost Time 220070000) gives it on the start, Bird Feed
 (4031992) drops from the clocktower's mobs, and the egg grows by 100 for
 each one dropped on its window, to 3000 in record 7067, which the quest's
-completion reads; Bob takes the egg back on the end. Its data is
+completion reads; Bob takes the egg back on the end. And the Hanging
+Scroll (4220151) of the Aran's "The Black Scroll" (21742): Mr. Do
+(2090004, in Mu Lung) gives it on the start, and each Special Ink
+(4032342) dropped on it brings back 100 of its writing, to 800 in record
+21763; Mr. Do takes the scroll back on the end. Their data is
 `game_data::items::RaiseInfo`.
 
 The client sends three packets. 0xED (item id, then 1 on opening and 0 on

@@ -131,6 +131,15 @@ pub const SHADOW_SPOTTED: &str = "1";
 const UNDERGROUND_TEMPLE_STAIRS: i32 = 105100000;
 /// Orbis's Neglected Strolling Path (`enterNepenthes`).
 const NEGLECTED_STROLLING_PATH: i32 = 200060001;
+/// The way into the Sealed Garden and the garden itself, which
+/// `enterNepenthes` lets one Aran on To the Sealed Garden (21739) into
+/// instead of the path. The garden's `sealGarden` brings out its guardian
+/// for one who hasn't beaten it; Cosmic brings it out from the portal.
+pub const SEALED_GARDEN_WAY: i32 = 920030000;
+pub const SEALED_GARDEN: i32 = 920030001;
+const TO_THE_SEALED_GARDEN: i16 = 21739;
+const GARDEN_GUARDIAN: i32 = 9300348;
+const GARDEN_GUARDIAN_AT: (i16, i16) = (591, -34);
 /// Ariant's Castle Garden and the pass it takes (`ariant_castle`).
 const CASTLE_GARDEN: i32 = 260000301;
 const PALACE_ENTRY_PASS: i32 = 4031582;
@@ -344,7 +353,15 @@ pub const ARDINS_ROOM: i32 = 926000000;
 pub const PUPPETEERS_HIDEOUT: i32 = 910510000;
 const PUPPETEER_HUNTS: [(i16, i32); 2] = [(20730, 9300285), (21731, 9300344)];
 const PUPPETEER_AT: (i16, i16) = (680, 258);
-pub const SOLO_MAPS: [i32; 14] = [
+/// The Puppeteer's arena at the end of the Secret Passage, which its end
+/// statue (1063017) lets one challenger into. Its `dollCave02` brings out
+/// the Puppeteer for an Aran on Traces of the Puppeteer (21734) who hasn't
+/// beaten it yet; Cosmic brings it out from the statue instead.
+pub const PUPPETEERS_ARENA: i32 = 910510202;
+const TRACES_OF_THE_PUPPETEER: i16 = 21734;
+const ARENA_PUPPETEER: i32 = 9300346;
+const ARENA_PUPPETEER_AT: (i16, i16) = (95, 200);
+pub const SOLO_MAPS: [i32; 17] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -359,6 +376,9 @@ pub const SOLO_MAPS: [i32; 14] = [
     ARDINS_ROOM,
     HIDDEN_MAGIC_LIBRARY,
     PUPPETEERS_HIDEOUT,
+    PUPPETEERS_ARENA,
+    SEALED_GARDEN_WAY,
+    SEALED_GARDEN,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -927,6 +947,26 @@ pub fn map_enter(script: &str, player: &Player) -> Option<Vec<Effect>> {
                 exit: MUSHROOM_FOREST_FIELD,
             },
         ]),
+        "dollCave02" => Some(
+            (player.quests.state(TRACES_OF_THE_PUPPETEER) == QuestState::Started
+                && (player.quests.kills(TRACES_OF_THE_PUPPETEER).iter()).all(|&count| count == 0))
+            .then_some(Effect::BringOutMob {
+                mob_id: ARENA_PUPPETEER,
+                at: ARENA_PUPPETEER_AT,
+            })
+            .into_iter()
+            .collect(),
+        ),
+        "sealGarden" => Some(
+            (player.quests.state(TO_THE_SEALED_GARDEN) == QuestState::Started
+                && (player.quests.kills(TO_THE_SEALED_GARDEN).iter()).all(|&count| count == 0))
+            .then_some(Effect::BringOutMob {
+                mob_id: GARDEN_GUARDIAN,
+                at: GARDEN_GUARDIAN_AT,
+            })
+            .into_iter()
+            .collect(),
+        ),
         "TD_NC_title" | "TD_MC_title" => Some(
             THEME_BANNERS
                 .iter()
@@ -1355,8 +1395,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             UNDERGROUND_TEMPLE_STAIRS,
             named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
         )),
-        // Cosmic sends an Aran on To the Sealed Garden (21739) to its fight
-        // instead; that isn't in.
+        // An Aran on To the Sealed Garden (21739) goes to its fight, alone.
+        "enterNepenthes" if quest(TO_THE_SEALED_GARDEN) == QuestState::Started => ScriptOutcome {
+            effects: vec![
+                Effect::RequireEmptyMap(SEALED_GARDEN_WAY),
+                Effect::RequireEmptyMap(SEALED_GARDEN),
+                Effect::PortalSound,
+                Effect::WarpToPortal(SEALED_GARDEN_WAY, named(SEALED_GARDEN_WAY, "out00")),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::SEALED_GARDEN_OCCUPIED, &[])),
+        },
         "enterNepenthes" => through(Effect::WarpToPortal(
             NEGLECTED_STROLLING_PATH,
             named(NEGLECTED_STROLLING_PATH, "out00"),
@@ -4347,6 +4396,76 @@ mod tests {
         // Elsewhere, nothing.
         let elsewhere = player_with(&[(20730, QuestState::Started)]);
         assert!(unscripted_map_enter(&elsewhere).is_empty());
+    }
+
+    #[test]
+    fn the_puppeteers_arena_brings_the_puppeteer_out_until_it_falls() {
+        let in_arena = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = PUPPETEERS_ARENA;
+            player
+        };
+        assert!(SOLO_MAPS.contains(&PUPPETEERS_ARENA));
+        let data = crate::get_game_data().unwrap();
+        let script = data.field(PUPPETEERS_ARENA).unwrap().on_user_enter.clone();
+        assert_eq!(script.as_deref(), Some("dollCave02"));
+        let enter = |player: &Player| map_enter("dollCave02", player).unwrap();
+        assert!(enter(&in_arena(&[])).is_empty());
+        let mut aran = in_arena(&[(TRACES_OF_THE_PUPPETEER, QuestState::Started)]);
+        assert_eq!(
+            enter(&aran),
+            [Effect::BringOutMob {
+                mob_id: ARENA_PUPPETEER,
+                at: ARENA_PUPPETEER_AT
+            }]
+        );
+        *aran.quests.kills_mut(TRACES_OF_THE_PUPPETEER).unwrap() = vec![1];
+        assert!(enter(&aran).is_empty(), "beaten");
+        let done = in_arena(&[(TRACES_OF_THE_PUPPETEER, QuestState::Completed)]);
+        assert!(enter(&done).is_empty());
+    }
+
+    #[test]
+    fn an_aran_on_to_the_sealed_garden_fights_its_guardian_alone() {
+        let aran = player_with(&[(TO_THE_SEALED_GARDEN, QuestState::Started)]);
+        let outcome = portal("enterNepenthes", &aran).unwrap();
+        assert_eq!(
+            outcome.effects,
+            [
+                Effect::RequireEmptyMap(SEALED_GARDEN_WAY),
+                Effect::RequireEmptyMap(SEALED_GARDEN),
+                Effect::PortalSound,
+                Effect::WarpToPortal(SEALED_GARDEN_WAY, 2),
+            ]
+        );
+        assert!(outcome.occupied.is_some());
+        let done = player_with(&[(TO_THE_SEALED_GARDEN, QuestState::Completed)]);
+        assert_eq!(
+            warp_of(&portal("enterNepenthes", &done).unwrap()),
+            Some((NEGLECTED_STROLLING_PATH, 2))
+        );
+        assert!(SOLO_MAPS.contains(&SEALED_GARDEN_WAY) && SOLO_MAPS.contains(&SEALED_GARDEN));
+
+        let in_garden = |quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = SEALED_GARDEN;
+            player
+        };
+        let data = crate::get_game_data().unwrap();
+        let script = data.field(SEALED_GARDEN).unwrap().on_user_enter.clone();
+        assert_eq!(script.as_deref(), Some("sealGarden"));
+        let enter = |player: &Player| map_enter("sealGarden", player).unwrap();
+        assert!(enter(&in_garden(&[])).is_empty());
+        let mut aran = in_garden(&[(TO_THE_SEALED_GARDEN, QuestState::Started)]);
+        assert_eq!(
+            enter(&aran),
+            [Effect::BringOutMob {
+                mob_id: GARDEN_GUARDIAN,
+                at: GARDEN_GUARDIAN_AT
+            }]
+        );
+        *aran.quests.kills_mut(TO_THE_SEALED_GARDEN).unwrap() = vec![1];
+        assert!(enter(&aran).is_empty(), "beaten");
     }
 
     #[test]
