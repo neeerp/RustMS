@@ -45,9 +45,10 @@ namespace ms
 	// needs at least the value and 2 at most, as numbers. Entries without
 	// an infoNumber (Meren's 6029) are left to the server, which keeps no
 	// such string.
-	inline bool end_info_met(const QuestInfo& quest, const std::string* record)
+	inline bool info_met(int16_t record_id, const std::vector<std::pair<int32_t, std::string>>& entries,
+		const std::string* record)
 	{
-		if (quest.end_info_record == 0 || quest.end_info.empty())
+		if (record_id == 0 || entries.empty())
 			return true;
 
 		if (record == nullptr)
@@ -55,7 +56,7 @@ namespace ms
 
 		int32_t number = std::atoi(record->c_str());
 
-		return std::any_of(quest.end_info.begin(), quest.end_info.end(), [&](const auto& entry)
+		return std::any_of(entries.begin(), entries.end(), [&](const auto& entry)
 		{
 			int32_t value = std::atoi(entry.second.c_str());
 
@@ -66,6 +67,17 @@ namespace ms
 				default: return *record == entry.second;
 			}
 		});
+	}
+
+	inline bool end_info_met(const QuestInfo& quest, const std::string* record)
+	{
+		return info_met(quest.end_info_record, quest.end_info, record);
+	}
+
+	// The same for starting a quest, Check/0/infoex (FUN_00721163).
+	inline bool start_info_met(const QuestInfo& quest, const std::string* record)
+	{
+		return info_met(quest.start_info_record, quest.start_info, record);
 	}
 
 	// Whether the player's items satisfy a quest's completion requirements.

@@ -178,6 +178,8 @@ pub enum SendOpcode {
     HpTaken = 0xD4,
     /// What the Item Maker made (FUN_0095dad3).
     MakerResult = 0xD9,
+    /// Locks the UI for a scene (byte 1), or unlocks it (byte 0).
+    LockUi = 0xDD,
     /// A cash mist's face for its user (FUN_00938b3e).
     ItemEmotion = 0xE2,
     Cooldown = 0xEA,

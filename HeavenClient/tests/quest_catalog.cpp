@@ -51,6 +51,18 @@ int main()
 		return 1;
 	}
 
+	// The Test waits for the opening scene's record; Meren's classes read
+	// 6029, a quest, and are left to the server.
+	const ms::QuestInfo* test = catalog.find(2312);
+	const ms::QuestInfo* meren = catalog.find(6030);
+
+	if (!test || test->start_info_record != 2311 || test->start_info.size() != 1 ||
+		test->start_info[0] != std::make_pair(1, std::string("1")) || !meren || meren->start_info_record != 0)
+	{
+		std::cerr << "Quest 2312's or 6030's start record did not parse as expected\n";
+		return 1;
+	}
+
 	// Bartos's test needs one of the 45 pets out to start and to finish.
 	const ms::QuestInfo* bartos = catalog.find(4646);
 

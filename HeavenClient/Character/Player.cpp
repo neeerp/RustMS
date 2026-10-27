@@ -2335,6 +2335,12 @@ namespace ms
 		if (done != questlog.completed_quests().end() && !repeat_due(quest, done->second, now))
 			return false;
 
+		const auto &started = questlog.started_quests();
+		auto record = started.find(quest.start_info_record);
+
+		if (!start_info_met(quest, record == started.end() ? nullptr : &record->second))
+			return false;
+
 		auto worn = [&](int32_t id) { return inventory.count_slots(InventoryType::Id::EQUIPPED, id) > 0; };
 
 		return start_holdings_met(quest, stats.get_stat(MapleStat::Id::FAME),

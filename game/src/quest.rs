@@ -15,16 +15,17 @@ pub const SCRIPT_MARKERS: i16 = 32000;
 pub const INFO_QUESTS: &[i16] = &[2166, 2236, 3311, 3900, 3926, 3927, 3929];
 
 /// Records that are no quest (Quest.nx has no such id) but that another
-/// quest's completion reads (`Check/1 infoNumber`): an info string a
-/// script sets whole, kept as a started record. Only records the server's
-/// scripts set are listed: Kyrin's tests' (6331 and 6371, for 6330 and
+/// quest's completion (`Check/1 infoNumber`) or start (`Check/0`) reads:
+/// an info string a script sets whole, kept as a started record. Only
+/// records the server's scripts set are listed: Kyrin's tests' (6331 and 6371, for 6330 and
 /// 6370), the past Papulatus's (6364, for "A New Revelation", 6363), Lord
 /// Jonathan's (6401, for "Jonathan's Court", 6400), Save Delli!'s way
 /// out's (6411, for "Mission Free the Monsters", 6410) and Nett's
 /// Pyramid's kill count (7760, for "Protector of Pharaoh", 29932) and the
 /// lost memory a job instructor gives back (7081, for "Memory Keeper",
-/// 3507).
-pub const RECORDS: &[i16] = &[6331, 6364, 6371, 6401, 6411, 7081, 7760];
+/// 3507). The Mushroom Kingdom's opening scene's (2311) is read by The
+/// Test's start (2312) instead.
+pub const RECORDS: &[i16] = &[2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760];
 
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -344,6 +344,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME sight_rules COMMAND sight_rules_tests)
     add_executable(field_effect_rules_tests tests/field_effect_rules.cpp)
     add_test(NAME field_effect_rules COMMAND field_effect_rules_tests)
+    add_executable(direction_scene_rules_tests tests/direction_scene_rules.cpp)
+    add_test(NAME direction_scene_rules COMMAND direction_scene_rules_tests)
     add_executable(kite_rules_tests tests/kite_rules.cpp)
     add_test(NAME kite_rules COMMAND kite_rules_tests)
     add_executable(friendly_rules_tests tests/friendly_rules.cpp)
@@ -779,6 +781,9 @@ add_executable(HeavenClient
     Gameplay/QuestAlert.cpp
     Gameplay/QuestAlert.h
     Gameplay/QuestAlertRules.h
+    Gameplay/DirectionScene.cpp
+    Gameplay/DirectionScene.h
+    Gameplay/DirectionSceneRules.h
     Gameplay/QuestConversation.cpp
     Gameplay/QuestConversation.h
     Gameplay/Stage.cpp

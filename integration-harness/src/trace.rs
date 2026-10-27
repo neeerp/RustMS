@@ -128,6 +128,10 @@ pub struct Trace {
     pub covers: Vec<i32>,
     /// UI images shown on the player (SHOW_ITEM_GAIN_INCHAT 0x17).
     pub images: Vec<String>,
+    /// A scene's parts the client is to play (SHOW_ITEM_GAIN_INCHAT 0x12).
+    pub scene_parts: Vec<String>,
+    /// LOCK_UI: whether each locked the UI or gave it back.
+    pub ui_locks: Vec<bool>,
     /// "You can't get anymore items." (SHOW_STATUS_INFO 0/-1).
     pub inventory_full: usize,
     /// "This item is unavailable for the pick-up." (SHOW_STATUS_INFO 0, -2).
@@ -431,8 +435,11 @@ impl Trace {
                 0x0D => self.card_effects += 1,
                 0x14 => self.mist_puffs.push(r.read_int().unwrap()),
                 0x17 => self.images.push(r.read_str_with_length().unwrap()),
+                0x12 => self.scene_parts.push(r.read_str_with_length().unwrap()),
                 _ => {}
             }
+        } else if op == SendOpcode::LockUi as i16 {
+            self.ui_locks.push(r.read_byte().unwrap() != 0);
         } else if op == SendOpcode::MesoBagUsed as i16 {
             self.meso_bags.push(Some(r.read_int().unwrap()));
         } else if op == SendOpcode::MesoBagFailed as i16 {

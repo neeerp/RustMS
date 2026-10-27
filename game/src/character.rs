@@ -282,6 +282,10 @@ pub struct Player {
     /// The cash mist (528xxxx) last used, whose face the player may pull
     /// once; not saved.
     pub mist_face: Option<i32>,
+    /// The field the scene shown on the player's map leads to, which the
+    /// client asks for by id when the scene ends; not saved, and gone once
+    /// the player leaves the map.
+    pub scene_exit: Option<i32>,
     /// The maps kept for the teleport rocks.
     pub teleport_rocks: TeleportRocks,
     /// The skill macros, by place in the list.
@@ -371,6 +375,7 @@ impl Player {
             hidden: false,
             last_catch: None,
             mist_face: None,
+            scene_exit: None,
             teleport_rocks: TeleportRocks::default(),
             skill_macros: SkillMacros::default(),
             mount: Mount::default(),
@@ -629,6 +634,7 @@ impl Player {
     pub fn move_to(&mut self, map_id: i32, spawn_point: u8) {
         self.stats.map_id = map_id;
         self.stats.spawn_point = spawn_point;
+        self.scene_exit = None;
         self.dirty = true;
     }
 

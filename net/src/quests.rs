@@ -75,7 +75,8 @@ pub enum QuestRejection {
     Explored,
     /// The quest's own record short of its count (`end_record`).
     Record,
-    /// The quest's info string doesn't read what completion needs.
+    /// The quest's info string doesn't read what completion needs, or a
+    /// record doesn't read what the start needs (`StartRequirements::record`).
     Info,
     /// No pet out, or the first pet out isn't one the quest lists.
     Pet,
@@ -145,6 +146,11 @@ pub fn check_start(
         .find(|p| player.quests.state(p.quest_id) != p.state)
     {
         return Err(QuestRejection::Prerequisite(unmet.quest_id));
+    }
+    if let Some((record, checks)) = &start.record {
+        if !game_data::quests::info_met(player.quests.info(*record), checks) {
+            return Err(QuestRejection::Info);
+        }
     }
     // v83 compares fame unsigned, so negative fame passes.
     if start.min_fame != 0 && (player.stats.fame as u16) < (start.min_fame as u16) {
@@ -722,6 +728,26 @@ mod tests {
         assert!(p.quests.set_record(6401, "q3"));
         assert!(!p.quests.set_record(6401, "q3"));
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn start_reads_a_record_when_the_data_names_one() {
+        let mut q = quest();
+        q.start.record = Some((
+            2311,
+            vec![game_data::quests::InfoCheck {
+                cond: 1,
+                value: "1".into(),
+            }],
+        ));
+        let npc = q.start.npc;
+        let mut p = player(10, 0);
+        set(&mut p, 1032, QuestState::Completed);
+        assert_eq!(check_start(&q, npc, &p), Err(QuestRejection::Info));
+        p.quests.set_record(2311, "0");
+        assert_eq!(check_start(&q, npc, &p), Err(QuestRejection::Info));
+        p.quests.set_record(2311, "1");
+        assert_eq!(check_start(&q, npc, &p), Ok(()));
     }
 
     #[test]

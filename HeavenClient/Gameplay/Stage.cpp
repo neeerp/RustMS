@@ -261,6 +261,8 @@ namespace ms
 		merchants.clear();
 		doors.clear();
 		summons.clear();
+		// A new field drops what is left of a scene (0x4374fd).
+		scene.clear();
 		guide.hush();
 		// The server brings the player's pets out again on the new field.
 		player.clear_pets();
@@ -414,6 +416,8 @@ namespace ms
 		// dark of a LimitedView or Fear, the weather's bar and OX_QUIZ's
 		// notice (FUN_005330f7).
 		screen_effects.drawabove(Point<int16_t>(0, 0), alpha);
+		// A scene's pictures are at that z plus their own.
+		scene.draw(viewpos, alpha);
 		// v83's clouds are above the front backgrounds and below the fear
 		// overlay (z 0xc0061508).
 		clouds.draw(viewx, viewy, alpha);
@@ -485,6 +489,10 @@ namespace ms
 		field_effects.update();
 		screen_effects.update();
 		overlay_effects.update();
+
+		// A scene ends by asking for the field it leads to (0x53035d), as any other transfer.
+		if (std::optional<int32_t> field = scene.update())
+			player.request(ChangeMapPacket(field_key, *field, "", false), ExclRequest::WAIT, true);
 
 		// Coconut Season's nuts take their states as they come due (FUN_005496c7).
 		if (coconut::on_field())
@@ -1079,6 +1087,11 @@ namespace ms
 	void Stage::show_ground_effect(nl::node effect, Point<int16_t> position)
 	{
 		ground_effects.add(effect, DrawArgument(position));
+	}
+
+	void Stage::play_scene(nl::node part, Point<int16_t> position)
+	{
+		scene.play(part, position);
 	}
 
 	void Stage::show_reward_effect(Point<int16_t> position, int32_t item_id, const std::string &path)

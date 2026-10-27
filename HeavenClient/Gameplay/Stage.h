@@ -27,6 +27,7 @@
 #include "Combat/Dash.h"
 #include "EmoteCooldown.h"
 #include "QuestAlert.h"
+#include "DirectionScene.h"
 #include "FameCooldown.h"
 #include "SkillMacroRules.h"
 #include "BlackoutRules.h"
@@ -270,6 +271,9 @@ namespace ms
 
 		// Play `effect` once at `position` in the field, following no one.
 		void show_ground_effect(nl::node effect, Point<int16_t> position);
+
+		// User effect 18, a scene's part (FUN_00439e00): its events from now, at `position` unless they say.
+		void play_scene(nl::node part, Point<int16_t> position);
 
 		// User effect 14, a reward box's prize (0x9382b0): the prize's use sound, and the box's `path` played once
 		// where the opener stands, not following them.
@@ -522,6 +526,7 @@ namespace ms
 		EffectLayer field_effects;
 		EffectLayer screen_effects;
 		EffectLayer overlay_effects;
+		DirectionScene scene;
 		Animation jump_effect;
 		// What Fear leaves the player to see (Effect/MapEff.img/Viewrange/3).
 		Texture fear_sight;
