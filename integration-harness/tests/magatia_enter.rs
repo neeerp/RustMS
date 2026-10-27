@@ -97,14 +97,24 @@ async fn romeo_takes_four_in_and_a_retreat_ends_the_run_for_all() {
 
     // Only the leader may take the party in, and only with all four there.
     told(&mut team[1], talk(ZENUMIST_LOBBY, ROMEO)).await;
-    let trace = told(&mut team[1], answer(4, 1, Some(0))).await;
+    let mut trace = told(&mut team[1], answer(4, 1, Some(0))).await;
+    // The party check asks other actors, so the line can come after the barrier.
+    until(&mut team[1].connection, &mut trace, |t| {
+        !t.prompt_texts.is_empty()
+    })
+    .await;
     let not_leader = net::content::text().get(keys::MAGATIA_NOT_LEADER, &[]);
     assert!(trace.prompt_texts[0].contains(&not_leader), "{trace:?}");
     let mut trace = Trace::default();
     let away = &mut team[3].connection;
     assert_eq!(warp(away, ELSEWHERE, "", &mut trace).await, ELSEWHERE);
     told(&mut team[0], talk(ZENUMIST_LOBBY, ROMEO)).await;
-    let trace = told(&mut team[0], answer(4, 1, Some(0))).await;
+    let mut trace = told(&mut team[0], answer(4, 1, Some(0))).await;
+    // The party check asks other actors, so the line can come after the barrier.
+    until(&mut team[0].connection, &mut trace, |t| {
+        !t.prompt_texts.is_empty()
+    })
+    .await;
     let not_eligible = terms(keys::MAGATIA_NOT_ELIGIBLE, side);
     assert!(trace.prompt_texts[0].contains(&not_eligible), "{trace:?}");
     let mut trace = Trace::default();

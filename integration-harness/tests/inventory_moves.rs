@@ -58,8 +58,9 @@ async fn request(c: &mut MapleTestConnection, kind: i8, from: i16, to: i16) -> R
     }
 }
 
-/// The next UPDATE_CHAR_LOOK an observer sees: whose, and their weapon.
-async fn look_update(c: &mut MapleTestConnection) -> i32 {
+/// Wait for the observer to see `of`'s look updated, skipping the other
+/// tests' players that share the map in a full suite.
+async fn look_update(c: &mut MapleTestConnection, of: i32) {
     loop {
         let p = timeout(Duration::from_secs(5), c.read_packet("look update"))
             .await
@@ -69,7 +70,9 @@ async fn look_update(c: &mut MapleTestConnection) -> i32 {
         if p.opcode() == SendOpcode::UpdateCharLook as i16 {
             let mut r = Cursor::new(&p.bytes);
             r.read_short().unwrap();
-            return r.read_int().unwrap();
+            if r.read_int().unwrap() == of {
+                return;
+            }
         }
     }
 }
@@ -89,20 +92,14 @@ async fn equipment_moves_persist_and_update_the_look_for_others() {
         request(c, -1, WEAPON, 1).await,
         Reply::Moves(vec![(1, WEAPON, 1)])
     );
-    assert_eq!(
-        look_update(&mut observer.connection).await,
-        session.character_id
-    );
+    look_update(&mut observer.connection, session.character_id).await;
     // Move it within the equip bag, then wear it again.
     assert_eq!(request(c, 1, 1, 4).await, Reply::Moves(vec![(1, 1, 4)]));
     assert_eq!(
         request(c, 1, 4, WEAPON).await,
         Reply::Moves(vec![(1, 4, WEAPON)])
     );
-    assert_eq!(
-        look_update(&mut observer.connection).await,
-        session.character_id
-    );
+    look_update(&mut observer.connection, session.character_id).await;
 
     // A weapon is not a hat, and empty slots hold nothing.
     assert_eq!(
