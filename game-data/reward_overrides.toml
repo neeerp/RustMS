@@ -321,3 +321,9 @@ add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
 [mobs.4230115]
 # Master Chronos, likewise.
 add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
+
+[mobs.9300378]
+# The Giant Nependeaths of Orbis's Neglected Strolling Path, for
+# Rapid Growth Stimulators (21737). Cosmic gives the drop to 9300347,
+# which nothing spawns; the path holds 9300378.
+add = [{ item = 4032324, prob = 0.04, quest = 21737 }]

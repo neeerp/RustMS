@@ -2180,6 +2180,8 @@ impl NpcScript {
             }
             PUPPETEER_DOOR => return Some(puppeteer_door(player)),
             FRANCIS => return Some(francis()),
+            PASSAGE_END_STATUE => return Some(passage_end_statue()),
+            PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
             _ => {}
         }
         // These fall through when silent, so the same NPCs can say more.
@@ -2582,6 +2584,18 @@ impl NpcScript {
             "q3714s" => Some(baby_dragon(player)),
             "q21733s" => Some(fake_tru_calls()),
             "q21733e" => Some(tru_on_the_trap()),
+            "q21734s" => Some(puppeteer_traces()),
+            "q21734e" => Some(puppeteer_trail_beaten()),
+            "q21735s" => Some(seal_stone_for_lilin(player)),
+            "q21735e" => Some(seal_stone_kept()),
+            "q21736s" => Some(off_to_orbis()),
+            "q21738s" => Some(sealed_garden()),
+            "q21739e" => Some(sealed_garden_cleared()),
+            "q21740s" => Some(orbis_stone_stolen()),
+            "q21740e" => Some(lilin_teaches_combo_smash()),
+            "q21741s" => Some(off_to_mu_lung()),
+            "q21742s" => Some(black_scroll(player)),
+            "q21742e" => Some(black_scroll_read()),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -4745,6 +4759,268 @@ fn tru_on_the_trap() -> NpcScript {
         },
     ];
     script
+}
+
+const TRACES_OF_THE_PUPPETEER: i16 = 21734;
+const SEAL_STONE_OF_VICTORIA: i16 = 21735;
+const OFF_TO_ORBIS: i16 = 21736;
+const COMBO_DRAIN: i32 = 21100005;
+/// The Seal Stone of Victoria Island, for Lilin (1201000) to see.
+const VICTORIA_SEAL_STONE: i32 = 4032323;
+
+/// `q21734s`: Tru sends an Aran after the Puppeteer, down the passage
+/// behind Sleepywood's cave (`enterDollWay`).
+fn puppeteer_traces() -> NpcScript {
+    let mut script = NpcScript::new(TRU, vec![Page::Say(text(keys::TRU_PUPPETEER_TRACES))]);
+    script.on_end = vec![Effect::StartQuest(TRACES_OF_THE_PUPPETEER)];
+    script
+}
+
+/// `q21734e`: the Puppeteer beaten in his arena
+/// (`scripts::PUPPETEERS_ARENA`), Tru gives 12,500 EXP and Combo Drain, up
+/// to 20 (Cosmic `21734.js`).
+fn puppeteer_trail_beaten() -> NpcScript {
+    let mut script = NpcScript::new(
+        TRU,
+        keys::TRU_COMBO_DRAIN
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![
+        Effect::CompleteQuest(TRACES_OF_THE_PUPPETEER),
+        Effect::GainExp(12500),
+        Effect::TeachSkill {
+            skill_id: COMBO_DRAIN,
+            level: 0,
+            master_level: 20,
+        },
+    ];
+    script
+}
+
+/// `q21735e`: Lilin takes the seal stone into safekeeping for 6,037 EXP
+/// (Cosmic `21735.js`).
+fn seal_stone_kept() -> NpcScript {
+    let mut script = NpcScript::new(LILIN, vec![Page::Say(text(keys::LILIN_SEAL_STONE))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: VICTORIA_SEAL_STONE,
+            quantity: 1,
+        },
+        Effect::GainExp(6037),
+        Effect::CompleteQuest(SEAL_STONE_OF_VICTORIA),
+    ];
+    script
+}
+
+/// `q21735s`: Tru hands over the Seal Stone of Victoria Island to show
+/// Lilin, unless one is held (Cosmic `21735.js`).
+fn seal_stone_for_lilin(player: &Player) -> NpcScript {
+    let mut script = NpcScript::new(
+        TRU,
+        keys::TRU_SEAL_STONE
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    if player.inventory.count(VICTORIA_SEAL_STONE) == 0 {
+        script.on_end.push(Effect::GiveItem {
+            item_id: VICTORIA_SEAL_STONE,
+            quantity: 1,
+        });
+    }
+    script
+        .on_end
+        .push(Effect::StartQuest(SEAL_STONE_OF_VICTORIA));
+    script.inventory_full = Some(text(keys::TRU_SEAL_STONE_FULL));
+    script
+}
+
+/// `q21736s`: Tru sends an Aran to Lisa (2012012) in Orbis, who ends it
+/// with the data's 500 EXP (Cosmic `21736.js`).
+fn off_to_orbis() -> NpcScript {
+    let [news, ask, go] = keys::TRU_ORBIS;
+    NpcScript::new(
+        TRU,
+        vec![
+            Page::Say(text(news)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(OFF_TO_ORBIS)],
+                on_no: Some(text(keys::TRU_ORBIS_DECLINED)),
+            },
+            Page::Say(text(go)),
+        ],
+    )
+}
+
+const SEALED_GARDEN: i16 = 21738;
+const TO_THE_SEALED_GARDEN: i16 = 21739;
+const ORBIS_STONE_STOLEN: i16 = 21740;
+const INVESTIGATING_MU_LUNG: i16 = 21741;
+const THE_BLACK_SCROLL: i16 = 21742;
+const LILIN: i32 = 1201000;
+const MR_DO: i32 = 2090004;
+const COMBO_SMASH: i32 = 21100004;
+/// The Hanging Scroll, a raise item: Special Ink (4032342, from "The
+/// Special Ink", 21743) brings its writing back in record 21763.
+const HANGING_SCROLL: i32 = 4220151;
+
+/// `q21738s`: Spiruna (2032001) tells an Aran of the garden the Black
+/// Wings are after, and Sealed Garden starts; Spiruna ends it with the
+/// data's 1,000 EXP (Cosmic `21738.js`).
+fn sealed_garden() -> NpcScript {
+    let [news, ask] = keys::SPIRUNA_SEALED_GARDEN;
+    NpcScript::new(
+        SPIRUNA,
+        vec![
+            Page::Say(text(news)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(SEALED_GARDEN)],
+                on_no: Some(text(keys::SPIRUNA_SEALED_GARDEN_DECLINED)),
+            },
+        ],
+    )
+}
+
+/// `q21739e`: the garden's guardian beaten (`enterNepenthes`,
+/// `sealGarden`), Spiruna gives 29,500 EXP (Cosmic `21739.js`).
+fn sealed_garden_cleared() -> NpcScript {
+    let mut script = NpcScript::new(SPIRUNA, vec![Page::Say(text(keys::SPIRUNA_GARDEN_CLEARED))]);
+    script.on_end = vec![
+        Effect::CompleteQuest(TO_THE_SEALED_GARDEN),
+        Effect::GainExp(29500),
+    ];
+    script
+}
+
+/// `q21740s`: the Orbis seal stone stolen, Tru sends an Aran to Lilin
+/// (Cosmic `21740.js`).
+fn orbis_stone_stolen() -> NpcScript {
+    let mut script = NpcScript::new(TRU, vec![Page::Say(text(keys::TRU_ORBIS_STONE_STOLEN))]);
+    script.on_end = vec![Effect::StartQuest(ORBIS_STONE_STOLEN)];
+    script
+}
+
+/// `q21740e`: Lilin teaches Combo Smash, up to 20, and nothing else
+/// (Cosmic `21740.js`).
+fn lilin_teaches_combo_smash() -> NpcScript {
+    let mut script = NpcScript::new(
+        LILIN,
+        keys::LILIN_COMBO_SMASH
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![
+        Effect::CompleteQuest(ORBIS_STONE_STOLEN),
+        Effect::TeachSkill {
+            skill_id: COMBO_SMASH,
+            level: 0,
+            master_level: 20,
+        },
+    ];
+    script
+}
+
+/// `q21741s`: Tru sends an Aran to Mr. Do in Mu Lung, who ends it with the
+/// data's 500 EXP (Cosmic `21741.js`).
+fn off_to_mu_lung() -> NpcScript {
+    let [news, ask, keyword] = keys::TRU_MU_LUNG;
+    NpcScript::new(
+        TRU,
+        vec![
+            Page::Say(text(news)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(INVESTIGATING_MU_LUNG)],
+                on_no: Some(text(keys::TRU_MU_LUNG_DECLINED)),
+            },
+            Page::Say(text(keyword)),
+        ],
+    )
+}
+
+/// `q21742s`: Mr. Do owns up to soaking the Black Wings' Hanging Scroll and
+/// hands it over to have its writing restored, unless one is held (Cosmic
+/// `21742.js`). Its record grows by feeding it Special Ink in its raise
+/// window (`world/raise.rs`).
+fn black_scroll(player: &Player) -> NpcScript {
+    let mut on_yes = Vec::new();
+    if player.inventory.count(HANGING_SCROLL) == 0 {
+        on_yes.push(Effect::GiveItem {
+            item_id: HANGING_SCROLL,
+            quantity: 1,
+        });
+    }
+    on_yes.push(Effect::StartQuest(THE_BLACK_SCROLL));
+    let [met, ask] = keys::MR_DO_BLACK_SCROLL;
+    let [soaked, jin_jin] = keys::MR_DO_SCROLL_SOAKED;
+    let mut script = NpcScript::new(
+        MR_DO,
+        vec![
+            Page::Say(text(met)),
+            Page::Ask {
+                text: text(ask),
+                on_yes,
+                on_no: None,
+            },
+            Page::Say(text(soaked)),
+            Page::Say(text(jin_jin)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::MR_DO_SCROLL_FULL));
+    script
+}
+
+/// `q21742e`: the writing back (record 21763 at 800, `Check.img/21742/1`),
+/// Mr. Do takes the scroll and gives 10,000 EXP. Cosmic also takes eight
+/// Special Ink, which feeding the scroll has already used up.
+fn black_scroll_read() -> NpcScript {
+    let mut script = NpcScript::new(MR_DO, vec![Page::Say(text(keys::MR_DO_SCROLL_READ))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: HANGING_SCROLL,
+            quantity: 1,
+        },
+        Effect::GainExp(10000),
+        Effect::CompleteQuest(THE_BLACK_SCROLL),
+    ];
+    script
+}
+
+/// The statues of the Puppeteer's Secret Passage (910510100): the one at
+/// its end leads into his arena, one challenger at a time (Cosmic
+/// `1063017.js`), and the one at its start back out to the cave
+/// (`1063016.js`).
+const PASSAGE_END_STATUE: i32 = 1063017;
+const PASSAGE_EXIT_STATUE: i32 = 1063016;
+const PASSAGE_WAY_OUT: i32 = 105040201;
+
+fn passage_end_statue() -> NpcScript {
+    let mut script = NpcScript::new(
+        PASSAGE_END_STATUE,
+        vec![Page::Ask {
+            text: text(keys::PASSAGE_STATUE_ASK),
+            on_yes: vec![
+                Effect::RequireEmptyMap(scripts::PUPPETEERS_ARENA),
+                Effect::WarpToPortal(scripts::PUPPETEERS_ARENA, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::PASSAGE_STATUE_BUSY));
+    script
+}
+
+fn passage_exit_statue() -> NpcScript {
+    NpcScript::new(
+        PASSAGE_EXIT_STATUE,
+        vec![Page::Ask {
+            text: text(keys::PASSAGE_EXIT_ASK),
+            on_yes: vec![Effect::WarpToPortal(PASSAGE_WAY_OUT, 2)],
+            on_no: None,
+        }],
+    )
 }
 
 /// Ghosthunter Bob, in the Clocktower's lobby.
@@ -12493,6 +12769,205 @@ mod tests {
                     master_level: 20,
                 },
             ]
+        );
+    }
+
+    /// Every effect of `script` read to its end, answering yes to each ask.
+    fn yes_through(mut script: NpcScript) -> (i32, Vec<Effect>) {
+        let npc = script.npc_id();
+        let mut step = script.begin();
+        let mut effects = Vec::new();
+        loop {
+            effects.append(&mut step.effects);
+            let input = match kind(&step) {
+                Some(1) => ScriptInput::Yes,
+                Some(_) => ScriptInput::Next,
+                None => return (npc, effects),
+            };
+            step = script.respond(input).unwrap();
+        }
+    }
+
+    #[test]
+    fn tru_sends_an_aran_after_the_puppeteer_then_to_lilin_and_orbis() {
+        let aran = traveller(37, 0, false);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21734s", &aran).unwrap()),
+            (TRU, vec![Effect::StartQuest(TRACES_OF_THE_PUPPETEER)])
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21734e", &aran).unwrap()),
+            (
+                TRU,
+                vec![
+                    Effect::CompleteQuest(TRACES_OF_THE_PUPPETEER),
+                    Effect::GainExp(12500),
+                    Effect::TeachSkill {
+                        skill_id: COMBO_DRAIN,
+                        level: 0,
+                        master_level: 20,
+                    },
+                ]
+            )
+        );
+
+        let stone = NpcScript::for_quest("q21735s", &aran).unwrap();
+        assert!(stone.inventory_full.is_some());
+        assert_eq!(
+            yes_through(stone),
+            (
+                TRU,
+                vec![
+                    Effect::GiveItem {
+                        item_id: VICTORIA_SEAL_STONE,
+                        quantity: 1
+                    },
+                    Effect::StartQuest(SEAL_STONE_OF_VICTORIA),
+                ]
+            )
+        );
+        let mut holder = aran.clone();
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(VICTORIA_SEAL_STONE, 1),
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21735s", &holder).unwrap()).1,
+            [Effect::StartQuest(SEAL_STONE_OF_VICTORIA)]
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21735e", &holder).unwrap()),
+            (
+                LILIN,
+                vec![
+                    Effect::TakeItem {
+                        item_id: VICTORIA_SEAL_STONE,
+                        quantity: 1
+                    },
+                    Effect::GainExp(6037),
+                    Effect::CompleteQuest(SEAL_STONE_OF_VICTORIA),
+                ]
+            )
+        );
+
+        let orbis = || {
+            let mut tru = NpcScript::for_quest("q21736s", &aran).unwrap();
+            tru.begin();
+            assert_eq!(kind(&tru.respond(ScriptInput::Next).unwrap()), Some(1));
+            tru
+        };
+        assert_eq!(
+            orbis().respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::StartQuest(OFF_TO_ORBIS)]
+        );
+        assert!(orbis().respond(ScriptInput::No).unwrap().effects.is_empty());
+    }
+
+    #[test]
+    fn an_aran_goes_from_the_sealed_garden_to_mr_dos_black_scroll() {
+        let aran = traveller(45, 0, false);
+        let quest = |name| yes_through(NpcScript::for_quest(name, &aran).unwrap());
+        assert_eq!(
+            quest("q21738s"),
+            (SPIRUNA, vec![Effect::StartQuest(SEALED_GARDEN)])
+        );
+        let mut spiruna = NpcScript::for_quest("q21738s", &aran).unwrap();
+        spiruna.begin();
+        assert_eq!(kind(&spiruna.respond(ScriptInput::Next).unwrap()), Some(1));
+        assert!(spiruna.respond(ScriptInput::No).unwrap().effects.is_empty());
+        assert_eq!(
+            quest("q21739e"),
+            (
+                SPIRUNA,
+                vec![
+                    Effect::CompleteQuest(TO_THE_SEALED_GARDEN),
+                    Effect::GainExp(29500)
+                ]
+            )
+        );
+        assert_eq!(
+            quest("q21740s"),
+            (TRU, vec![Effect::StartQuest(ORBIS_STONE_STOLEN)])
+        );
+        assert_eq!(
+            quest("q21740e"),
+            (
+                LILIN,
+                vec![
+                    Effect::CompleteQuest(ORBIS_STONE_STOLEN),
+                    Effect::TeachSkill {
+                        skill_id: COMBO_SMASH,
+                        level: 0,
+                        master_level: 20,
+                    },
+                ]
+            )
+        );
+        assert_eq!(
+            quest("q21741s"),
+            (TRU, vec![Effect::StartQuest(INVESTIGATING_MU_LUNG)])
+        );
+
+        let scroll = NpcScript::for_quest("q21742s", &aran).unwrap();
+        assert!(scroll.inventory_full.is_some());
+        assert_eq!(
+            yes_through(scroll),
+            (
+                MR_DO,
+                vec![
+                    Effect::GiveItem {
+                        item_id: HANGING_SCROLL,
+                        quantity: 1
+                    },
+                    Effect::StartQuest(THE_BLACK_SCROLL),
+                ]
+            )
+        );
+        let mut holder = aran.clone();
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(HANGING_SCROLL, 1),
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21742s", &holder).unwrap()).1,
+            [Effect::StartQuest(THE_BLACK_SCROLL)]
+        );
+        assert_eq!(
+            quest("q21742e"),
+            (
+                MR_DO,
+                vec![
+                    Effect::TakeItem {
+                        item_id: HANGING_SCROLL,
+                        quantity: 1
+                    },
+                    Effect::GainExp(10000),
+                    Effect::CompleteQuest(THE_BLACK_SCROLL),
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn the_passages_statues_lead_into_the_puppeteers_arena_and_out() {
+        let aran = traveller(37, 0, false);
+        let mut end = NpcScript::for_npc(PASSAGE_END_STATUE, &aran).unwrap();
+        assert!(end.refused.is_some());
+        assert_eq!(kind(&end.begin()), Some(1));
+        assert_eq!(
+            end.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::RequireEmptyMap(scripts::PUPPETEERS_ARENA),
+                Effect::WarpToPortal(scripts::PUPPETEERS_ARENA, 0),
+            ]
+        );
+        let mut exit = NpcScript::for_npc(PASSAGE_EXIT_STATUE, &aran).unwrap();
+        assert_eq!(kind(&exit.begin()), Some(1));
+        assert_eq!(
+            exit.respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::WarpToPortal(PASSAGE_WAY_OUT, 2)]
         );
     }
 

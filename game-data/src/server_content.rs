@@ -716,6 +716,9 @@ pub mod keys {
     /// The Treasure Room of Queen (`skyrom`) while someone is in it.
     pub const TREASURE_ROOM_OCCUPIED: &str = "portal.treasure_room.occupied";
     pub const SOLO_MAP_OCCUPIED: &str = "portal.solo_map.occupied";
+    /// The Neglected Strolling Path's `in00` (`enterNepenthes`) when an
+    /// Aran on To the Sealed Garden (21739) finds the garden taken.
+    pub const SEALED_GARDEN_OCCUPIED: &str = "portal.enterNepenthes.occupied";
     /// The Berserk room's way up to the statues (`s4berserk_move`) while a
     /// monster is left.
     pub const MONSTERS_LEFT: &str = "portal.s4berserk_move.monsters_left";
@@ -1040,6 +1043,45 @@ pub mod keys {
     pub const FAKE_TRU_CALL: &str = "fake_tru.call";
     pub const TRU_PUPPETEER_BEATEN: &str = "tru.puppeteer_beaten";
     pub const TRU_POLEARM_MASTERY: &str = "tru.polearm_mastery";
+
+    /// The Aran's trail from the Puppeteer to Orbis (21734-21736): Tru
+    /// (1002104) sends them down the Secret Passage (`q21734s`) and, the
+    /// Puppeteer beaten, teaches Combo Drain (`q21734e`), hands over the
+    /// Seal Stone of Victoria Island for Lilin (`q21735s`), and sends them
+    /// to Orbis (`q21736s`). The passage's statues (1063017, 1063016) lead
+    /// into the Puppeteer's arena and back out.
+    pub const TRU_PUPPETEER_TRACES: &str = "tru.puppeteer_traces";
+    pub const TRU_COMBO_DRAIN: [&str; 2] = ["tru.puppeteer_trail_beaten", "tru.combo_drain"];
+    pub const TRU_SEAL_STONE: [&str; 2] = ["tru.seal_stone.news", "tru.seal_stone.given"];
+    pub const TRU_SEAL_STONE_FULL: &str = "tru.seal_stone.full";
+    /// Lilin (1201000) taking the stone (`q21735e`).
+    pub const LILIN_SEAL_STONE: &str = "lilin.seal_stone";
+    pub const TRU_ORBIS: [&str; 3] = ["tru.orbis.news", "tru.orbis.ask", "tru.orbis.go"];
+    pub const TRU_ORBIS_DECLINED: &str = "tru.orbis.declined";
+    pub const PASSAGE_STATUE_ASK: &str = "passage_statue.ask";
+    pub const PASSAGE_STATUE_BUSY: &str = "passage_statue.busy";
+    pub const PASSAGE_EXIT_ASK: &str = "passage_exit.ask";
+
+    /// The Aran's trail from Orbis to Mu Lung (21738-21742): Spiruna
+    /// (2032001) on the Sealed Garden (`q21738s`) and its guardian beaten
+    /// (`q21739e`), Tru on the Orbis seal stone (`q21740s`), Lilin
+    /// (1201000) teaching Combo Smash (`q21740e`), Tru sending the Aran to
+    /// Mu Lung (`q21741s`), and Mr. Do (2090004) on the soaked Hanging
+    /// Scroll (`q21742s`) and its writing restored (`q21742e`).
+    pub const SPIRUNA_SEALED_GARDEN: [&str; 2] =
+        ["spiruna.sealed_garden.news", "spiruna.sealed_garden.ask"];
+    pub const SPIRUNA_SEALED_GARDEN_DECLINED: &str = "spiruna.sealed_garden.declined";
+    pub const SPIRUNA_GARDEN_CLEARED: &str = "spiruna.garden_cleared";
+    pub const TRU_ORBIS_STONE_STOLEN: &str = "tru.orbis_stone_stolen";
+    pub const LILIN_COMBO_SMASH: [&str; 2] = ["lilin.orbis_stone", "lilin.combo_smash"];
+    pub const TRU_MU_LUNG: [&str; 3] =
+        ["tru.mu_lung.news", "tru.mu_lung.ask", "tru.mu_lung.keyword"];
+    pub const TRU_MU_LUNG_DECLINED: &str = "tru.mu_lung.declined";
+    pub const MR_DO_BLACK_SCROLL: [&str; 2] = ["mr_do.black_scroll.met", "mr_do.black_scroll.ask"];
+    pub const MR_DO_SCROLL_SOAKED: [&str; 2] =
+        ["mr_do.black_scroll.soaked", "mr_do.black_scroll.jin_jin"];
+    pub const MR_DO_SCROLL_FULL: &str = "mr_do.black_scroll.full";
+    pub const MR_DO_SCROLL_READ: &str = "mr_do.black_scroll.read";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3471,6 +3513,38 @@ mod tests {
                 keys::FAKE_TRU_CALL,
                 keys::TRU_PUPPETEER_BEATEN,
                 keys::TRU_POLEARM_MASTERY,
+                keys::TRU_PUPPETEER_TRACES,
+                keys::TRU_COMBO_DRAIN[0],
+                keys::TRU_COMBO_DRAIN[1],
+                keys::TRU_SEAL_STONE[0],
+                keys::TRU_SEAL_STONE[1],
+                keys::TRU_SEAL_STONE_FULL,
+                keys::LILIN_SEAL_STONE,
+                keys::TRU_ORBIS[0],
+                keys::TRU_ORBIS[1],
+                keys::TRU_ORBIS[2],
+                keys::TRU_ORBIS_DECLINED,
+                keys::PASSAGE_STATUE_ASK,
+                keys::PASSAGE_STATUE_BUSY,
+                keys::PASSAGE_EXIT_ASK,
+                keys::SPIRUNA_SEALED_GARDEN[0],
+                keys::SPIRUNA_SEALED_GARDEN[1],
+                keys::SPIRUNA_SEALED_GARDEN_DECLINED,
+                keys::SPIRUNA_GARDEN_CLEARED,
+                keys::TRU_ORBIS_STONE_STOLEN,
+                keys::LILIN_COMBO_SMASH[0],
+                keys::LILIN_COMBO_SMASH[1],
+                keys::TRU_MU_LUNG[0],
+                keys::TRU_MU_LUNG[1],
+                keys::TRU_MU_LUNG[2],
+                keys::TRU_MU_LUNG_DECLINED,
+                keys::MR_DO_BLACK_SCROLL[0],
+                keys::MR_DO_BLACK_SCROLL[1],
+                keys::MR_DO_SCROLL_SOAKED[0],
+                keys::MR_DO_SCROLL_SOAKED[1],
+                keys::MR_DO_SCROLL_FULL,
+                keys::MR_DO_SCROLL_READ,
+                keys::SEALED_GARDEN_OCCUPIED,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],
