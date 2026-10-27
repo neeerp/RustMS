@@ -1183,6 +1183,32 @@ pub mod keys {
     pub const JOHNS_BOX_MEDICINE: &str = "johns_box.medicine";
     pub const JOHNS_BOX_FULL: &str = "johns_box.full";
 
+    /// An Aran's wolf: Pucci's request (`q21600s`), Scadur's saddle
+    /// (`q21604s`), the end of the Field of Wolves (`clearRider`), the
+    /// pack's test (`q21613s`, and its retake) and Maha's evolution
+    /// (`q21618s`, `q21618e`).
+    pub const PUCCI_WOLF_REQUEST: [&str; 3] = [
+        "pucci.wolf_request.strong",
+        "pucci.wolf_request.ask",
+        "pucci.wolf_request.nanuke",
+    ];
+    pub const PUCCI_WOLF_REQUEST_DECLINED: &str = "pucci.wolf_request.declined";
+    pub const SCADUR_WOLF_MOUNT: [&str; 2] =
+        ["scadur.wolf_mount.saddle", "scadur.wolf_mount.hides"];
+    pub const FIELD_OF_WOLVES_CLEARED: &str = "field_of_wolves.cleared";
+    pub const WOLF_TEST: [&str; 3] = ["wolf.test.pup", "wolf.test.friend", "wolf.test.ask"];
+    pub const WOLF_TEST_DECLINED: &str = "wolf.test.declined";
+    pub const WOLF_TEST_BUSY: &str = "wolf.test.busy";
+    pub const WOLF_TEST_AGAIN: &str = "wolf.test.again";
+    pub const MAHA_WOLF_EVOLUTION: [&str; 3] = [
+        "maha.wolf_evolution.power",
+        "maha.wolf_evolution.can_you",
+        "maha.wolf_evolution.ask",
+    ];
+    pub const MAHA_WOLF_EVOLUTION_UNEQUIP: &str = "maha.wolf_evolution.unequip";
+    pub const MAHA_WOLF_EVOLUTION_DONE: &str = "maha.wolf_evolution.done";
+    pub const MAHA_WOLF_EVOLUTION_FULL: &str = "maha.wolf_evolution.full";
+
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
     /// (`q3250e`), takes it back.
@@ -3714,6 +3740,25 @@ mod tests {
                 keys::TEO_JOHN_CLEARED[1],
                 keys::JOHNS_BOX_MEDICINE,
                 keys::JOHNS_BOX_FULL,
+                keys::PUCCI_WOLF_REQUEST[0],
+                keys::PUCCI_WOLF_REQUEST[1],
+                keys::PUCCI_WOLF_REQUEST[2],
+                keys::PUCCI_WOLF_REQUEST_DECLINED,
+                keys::SCADUR_WOLF_MOUNT[0],
+                keys::SCADUR_WOLF_MOUNT[1],
+                keys::FIELD_OF_WOLVES_CLEARED,
+                keys::WOLF_TEST[0],
+                keys::WOLF_TEST[1],
+                keys::WOLF_TEST[2],
+                keys::WOLF_TEST_DECLINED,
+                keys::WOLF_TEST_BUSY,
+                keys::WOLF_TEST_AGAIN,
+                keys::MAHA_WOLF_EVOLUTION[0],
+                keys::MAHA_WOLF_EVOLUTION[1],
+                keys::MAHA_WOLF_EVOLUTION[2],
+                keys::MAHA_WOLF_EVOLUTION_UNEQUIP,
+                keys::MAHA_WOLF_EVOLUTION_DONE,
+                keys::MAHA_WOLF_EVOLUTION_FULL,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

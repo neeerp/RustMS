@@ -394,7 +394,25 @@ const WAREHOUSE_GENTLEMAN_AT: (i16, i16) = (200, 100);
 const LOST_SEAL_STONE: i16 = 21753;
 const ATHENA_FOUND_RECORD: i16 = 21765;
 const ATHENA_FOUND: &str = "2";
-pub const SOLO_MAPS: [i32; 19] = [
+/// The Field of Wolves past El Nath's Wolf-Shaped Rock, which its
+/// `enterRider` lets an Aran on Scadur's Advice (21610) run, one at a time
+/// (Cosmic `enterRider`), until its end (`clearRider`) sets the record the
+/// quest ends on. Neither Cosmic nor the data says what sets it; Cosmic's
+/// own data asks for a token instead.
+pub const FIELD_OF_WOLVES: i32 = 921110000;
+const SCADURS_ADVICE: i16 = 21610;
+const SCADURS_ADVICE_RECORD: i16 = 21619;
+/// The wolves' test room (914030000), which the wolf (1202008) sends an
+/// Aran on The Wolves' Test (21613) into, one at a time; once every wolf
+/// in it is down, its `out00` sets the record the quest ends on and leads
+/// back to the wolf (Cosmic `outtestWolf` gives a token instead).
+pub const WOLVES_TEST_ROOM: i32 = 914030000;
+pub const THE_WOLVES_TEST: i16 = 21613;
+pub const WOLVES_TEST_RECORD: i16 = 21620;
+pub const WOLVES_DEN: i32 = 140010210;
+/// What both records read once their run is done (`Check/1 infoex`).
+pub const WOLF_RUN_DONE: &str = "0";
+pub const SOLO_MAPS: [i32; 21] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -414,6 +432,8 @@ pub const SOLO_MAPS: [i32; 19] = [
     SEALED_GARDEN,
     MU_GONGS_ARENA,
     SEALED_SHRINE,
+    FIELD_OF_WOLVES,
+    WOLVES_TEST_ROOM,
 ];
 
 /// The Puppeteer `player` is out to beat, while a hunt for him is under
@@ -1494,6 +1514,45 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             BACK_STREET,
             named(BACK_STREET, "st00"),
         )),
+        "enterRider" => solo_map_at(
+            quest(SCADURS_ADVICE) == QuestState::Started
+                && player.quests.info(SCADURS_ADVICE_RECORD) != Some(WOLF_RUN_DONE),
+            FIELD_OF_WOLVES,
+            named(FIELD_OF_WOLVES, "st00"),
+        ),
+        // Touching the Field of Wolves' end, where `clear01` leads out.
+        "clearRider"
+            if quest(SCADURS_ADVICE) == QuestState::Started
+                && player.quests.info(SCADURS_ADVICE_RECORD) != Some(WOLF_RUN_DONE) =>
+        {
+            ScriptOutcome {
+                effects: vec![
+                    Effect::SetRecord {
+                        record: SCADURS_ADVICE_RECORD,
+                        value: WOLF_RUN_DONE,
+                    },
+                    Effect::Pink(content::text().get(keys::FIELD_OF_WOLVES_CLEARED, &[])),
+                ],
+                block: false,
+                occupied: None,
+            }
+        }
+        "clearRider" => ScriptOutcome::default(),
+        // Out of the wolves' test room once every wolf is down.
+        "outtestWolf" => ScriptOutcome {
+            effects: [Effect::RequireNoMobs]
+                .into_iter()
+                .chain((quest(THE_WOLVES_TEST) == QuestState::Started).then_some(
+                    Effect::SetRecord {
+                        record: WOLVES_TEST_RECORD,
+                        value: WOLF_RUN_DONE,
+                    },
+                ))
+                .chain([Effect::PortalSound, Effect::WarpToPortal(WOLVES_DEN, 0)])
+                .collect(),
+            block: false,
+            occupied: Some(content::text().get(keys::MONSTERS_LEFT, &[])),
+        },
         // The Conference Hall's door to its Warehouse (Cosmic
         // `enterWarehouse`).
         "enterWarehouse" => through(Effect::WarpToPortal(ELLIN_WAREHOUSE, 0)),
@@ -4553,6 +4612,73 @@ mod tests {
         );
         *aran.quests.kills_mut(TO_THE_SEALED_GARDEN).unwrap() = vec![1];
         assert!(enter(&aran).is_empty(), "beaten");
+    }
+
+    #[test]
+    fn an_aran_runs_the_field_of_wolves_and_leaves_the_test_room_once_the_wolves_are_down() {
+        let advised = [(SCADURS_ADVICE, QuestState::Started)];
+        let rider = portal("enterRider", &player_with(&advised)).unwrap();
+        assert_eq!(
+            rider.effects,
+            [
+                Effect::RequireEmptyMap(FIELD_OF_WOLVES),
+                Effect::PortalSound,
+                Effect::WarpToPortal(FIELD_OF_WOLVES, 1),
+            ]
+        );
+        assert!(rider.occupied.is_some());
+        let shut = portal("enterRider", &player_with(&[])).unwrap();
+        assert!(matches!(shut.effects[..], [Effect::Pink(_)]));
+
+        let clear = portal("clearRider", &player_with(&advised)).unwrap();
+        assert!(matches!(
+            clear.effects[..],
+            [
+                Effect::SetRecord {
+                    record: SCADURS_ADVICE_RECORD,
+                    value: WOLF_RUN_DONE,
+                },
+                Effect::Pink(_),
+            ]
+        ));
+        let mut cleared = player_with(&advised);
+        cleared
+            .quests
+            .set_record(SCADURS_ADVICE_RECORD, WOLF_RUN_DONE);
+        assert!(portal("clearRider", &cleared).unwrap().effects.is_empty());
+        assert!(matches!(
+            portal("enterRider", &cleared).unwrap().effects[..],
+            [Effect::Pink(_)]
+        ));
+        assert!(portal("clearRider", &player_with(&[]))
+            .unwrap()
+            .effects
+            .is_empty());
+
+        let out = |quests: &[(i16, QuestState)]| portal("outtestWolf", &player_with(quests));
+        let tested = out(&[(THE_WOLVES_TEST, QuestState::Started)]).unwrap();
+        assert_eq!(
+            tested.effects,
+            [
+                Effect::RequireNoMobs,
+                Effect::SetRecord {
+                    record: WOLVES_TEST_RECORD,
+                    value: WOLF_RUN_DONE,
+                },
+                Effect::PortalSound,
+                Effect::WarpToPortal(WOLVES_DEN, 0),
+            ]
+        );
+        assert!(tested.occupied.is_some());
+        assert_eq!(
+            out(&[]).unwrap().effects,
+            [
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(WOLVES_DEN, 0),
+            ]
+        );
+        assert!(SOLO_MAPS.contains(&FIELD_OF_WOLVES) && SOLO_MAPS.contains(&WOLVES_TEST_ROOM));
     }
 
     #[test]
