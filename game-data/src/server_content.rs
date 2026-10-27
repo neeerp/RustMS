@@ -1220,6 +1220,13 @@ pub mod keys {
     pub const YULETE_MARBLES_ROCK: &str = "yulete.marbles.rock";
     pub const YULETE_MARBLES_MORE: &str = "yulete.marbles.more";
     pub const YULETE_MARBLES_FULL: &str = "yulete.marbles.full";
+    /// "Stealing Queen's Order of Silk" (3941): Karcasa (2101013, `q3941s`,
+    /// `q3941e`), who gives the queen's silk only to Tigun.
+    pub const KARCASA_SILK_STRANGER: &str = "karcasa.silk.stranger";
+    pub const KARCASA_SILK_TIGUN: &str = "karcasa.silk.tigun";
+    pub const KARCASA_SILK_HANDED: &str = "karcasa.silk.handed";
+    pub const KARCASA_SILK_GIVEN: &str = "karcasa.silk.given";
+    pub const KARCASA_SILK_FULL: &str = "karcasa.silk.full";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3780,6 +3787,11 @@ mod tests {
                 keys::YULETE_MARBLES_ROCK,
                 keys::YULETE_MARBLES_MORE,
                 keys::YULETE_MARBLES_FULL,
+                keys::KARCASA_SILK_STRANGER,
+                keys::KARCASA_SILK_TIGUN,
+                keys::KARCASA_SILK_HANDED,
+                keys::KARCASA_SILK_GIVEN,
+                keys::KARCASA_SILK_FULL,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

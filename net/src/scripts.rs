@@ -527,6 +527,12 @@ const WARP_CARD: i32 = 4031890;
 /// id.
 const ARIANT_CASTLE: i32 = 260000300;
 const TIGUNS_DISGUISE: i32 = 2210005;
+
+/// Whether the player is disguised as Tigun by Tigun's potion.
+pub fn disguised_as_tigun(player: &Player) -> bool {
+    (player.buffs.active().iter())
+        .any(|buff| buff.stat == BuffStat::Morph && buff.skill_id == -TIGUNS_DISGUISE)
+}
 /// Nett's Pyramid's lobby (`nets_in` from Sahel 3's `piramid00`, `nets_out`
 /// back to where the player came from). The party quest itself isn't in.
 const PYRAMID_DUNES: i32 = 926010000;
@@ -2035,15 +2041,7 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             })
         }
         "enter_earth00" | "enter_earth01" => refused(keys::WARP_CARD_NEEDED),
-        "ariant_queens"
-            if player
-                .buffs
-                .active()
-                .iter()
-                .any(|buff| buff.stat == BuffStat::Morph && buff.skill_id == -TIGUNS_DISGUISE) =>
-        {
-            ScriptOutcome::default()
-        }
+        "ariant_queens" if disguised_as_tigun(player) => ScriptOutcome::default(),
         "ariant_queens" => ScriptOutcome {
             effects: vec![
                 Effect::PortalSound,

@@ -2590,6 +2590,7 @@ impl NpcScript {
             "q3526s" => lost_memory(3526),
             "q3527s" => lost_memory(3527),
             "q3529s" => lost_memory(3529),
+            "q3539s" => lost_memory(3539),
             "q3714s" => Some(baby_dragon(player)),
             "q21733s" => Some(fake_tru_calls()),
             "q21733e" => Some(tru_on_the_trap()),
@@ -2641,6 +2642,8 @@ impl NpcScript {
             "q21618e" => Some(the_wolf_evolved(player)),
             "q3314e" => Some(life_alchemy_done(player, &mut rand::thread_rng())),
             "q3382e" => Some(yuletes_reward(player)),
+            "q3941s" => Some(karcasa_silk(player, false)),
+            "q3941e" => Some(karcasa_silk(player, true)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -4598,22 +4601,24 @@ fn snow_statue_clue() -> NpcScript {
     script
 }
 
-/// In Search for the Lost Memory, for each branch of explorers and the
-/// Cygnus Knights: (quest, its job instructor).
-const LOST_MEMORIES: [(i16, i32); 6] = [
+/// In Search for the Lost Memory, for each branch of explorers, the
+/// Cygnus Knights and the Arans (Searching for Lost Memories, at Lilin):
+/// (quest, its job instructor).
+const LOST_MEMORIES: [(i16, i32); 7] = [
     (3523, 1022000),
     (3524, 1032001),
     (3525, 1012100),
     (3526, 1052001),
     (3527, 1090000),
     (3529, 1101002),
+    (3539, LILIN),
 ];
 /// The record the Memory Keeper's quest (3507) reads (`Check/1
 /// infoNumber`), and what it reads once the memory is back (`infoex`).
 const LOST_MEMORY_RECORD: i16 = 7081;
 const LOST_MEMORY_BACK: &str = "1";
 
-/// `q3523s`-`q3527s` and `q3529s`: the job instructor of a player on the
+/// `q3523s`-`q3527s`, `q3529s` and `q3539s`: the job instructor of a player on the
 /// Memory Keeper's quest (3507) gives back the lost memory, which sets
 /// 3507's record so it can end, and the quest completes as it starts
 /// (Cosmic `3523.js`). The data has no rewards.
@@ -5737,6 +5742,42 @@ fn yuletes_reward(player: &Player) -> NpcScript {
         Effect::CompleteQuest(YULETES_REWARD),
     ];
     script.inventory_full = Some(text(keys::YULETE_MARBLES_FULL));
+    script
+}
+
+// Karcasa (2101013) in Ariant, who keeps the queen's silk for "Stealing
+// Queen's Order of Silk" (3941), on the way to Jano's "Mission Complete!"
+// (3940).
+const KARCASA: i32 = 2101013;
+const QUEENS_SILK_QUEST: i16 = 3941;
+const QUEENS_SILK: i32 = 4031571;
+
+/// `q3941s` and `q3941e`: Karcasa takes a player disguised by Tigun's
+/// potion for Tigun, starts the quest and, at its end, hands over the
+/// queen's silk (the data's `Act/1`, which a script's completion doesn't
+/// give); anyone else is sent off (Cosmic `3941.js`).
+fn karcasa_silk(player: &Player, end: bool) -> NpcScript {
+    if !scripts::disguised_as_tigun(player) {
+        return NpcScript::new(KARCASA, vec![Page::Say(text(keys::KARCASA_SILK_STRANGER))]);
+    }
+    if !end {
+        let pages = vec![
+            Page::Say(text(keys::KARCASA_SILK_TIGUN)),
+            Page::Say(text(keys::KARCASA_SILK_HANDED)),
+        ];
+        let mut script = NpcScript::new(KARCASA, pages);
+        script.on_end = vec![Effect::StartQuest(QUEENS_SILK_QUEST)];
+        return script;
+    }
+    let mut script = NpcScript::new(KARCASA, vec![Page::Say(text(keys::KARCASA_SILK_GIVEN))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: QUEENS_SILK,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(QUEENS_SILK_QUEST),
+    ];
+    script.inventory_full = Some(text(keys::KARCASA_SILK_FULL));
     script
 }
 
@@ -14146,6 +14187,41 @@ mod tests {
         assert_eq!(
             read_through(NpcScript::for_quest("q3382e", &wearing).unwrap()),
             (LAB_YULETE, trade(10, ROCK_OF_WISDOM))
+        );
+    }
+
+    #[test]
+    fn karcasa_hands_the_queens_silk_only_to_tigun() {
+        // Undisguised, Karcasa sends the player off at either end.
+        let stranger = traveller(29, 0, false);
+        for name in ["q3941s", "q3941e"] {
+            let script = NpcScript::for_quest(name, &stranger).unwrap();
+            assert_eq!(read_through(script), (KARCASA, vec![]));
+        }
+        // Disguised as Tigun, the player is let in on it, then given the silk.
+        let mut tigun = stranger.clone();
+        let now = std::time::Instant::now();
+        let lasts = std::time::Duration::from_secs(60);
+        let morph = game::buff::Buff::new(-2210005, game::buff::BuffStat::Morph, 1, now, lasts);
+        tigun.buffs.give(morph);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q3941s", &tigun).unwrap()),
+            (KARCASA, vec![Effect::StartQuest(QUEENS_SILK_QUEST)])
+        );
+        let end = NpcScript::for_quest("q3941e", &tigun).unwrap();
+        assert!(end.inventory_full.is_some());
+        assert_eq!(
+            read_through(end),
+            (
+                KARCASA,
+                vec![
+                    Effect::GiveItem {
+                        item_id: QUEENS_SILK,
+                        quantity: 1
+                    },
+                    Effect::CompleteQuest(QUEENS_SILK_QUEST)
+                ]
+            )
         );
     }
 
