@@ -86,6 +86,9 @@ pub enum QuestRejection {
     /// The Monster Book holds too few or too many cards (`mbmin`, `mbmax`),
     /// or the wrong count of one it lists (`mbcard`).
     MonsterBook,
+    /// The mount's level is out of the quest's range
+    /// (`tamingmoblevelmin`).
+    MountLevel,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -207,6 +210,12 @@ pub fn check_start(
         player,
     ) {
         return Err(QuestRejection::Pet);
+    }
+    if start
+        .mount_level
+        .is_some_and(|(min, max)| !(min..=max).contains(&player.mount.level))
+    {
+        return Err(QuestRejection::MountLevel);
     }
     if !buffs_met(start.buff, start.except_buff, player) {
         return Err(QuestRejection::Buff);
@@ -781,6 +790,19 @@ mod tests {
         robo.pet.as_mut().unwrap().skill |= game_data::quests::PET_AUTO_SPEAKING;
         p.inventory.insert(game::InventoryType::Cash, 1, robo);
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
+    }
+
+    #[test]
+    fn a_mount_level_requirement_bounds_the_mount() {
+        let mut q = quest();
+        q.start.max_level = None;
+        q.start.quests.clear();
+        q.start.mount_level = Some((3, 30));
+        let mut p = player(30, 0);
+        p.mount.level = 2;
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::MountLevel));
+        p.mount.level = 3;
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
     }
 
     #[test]

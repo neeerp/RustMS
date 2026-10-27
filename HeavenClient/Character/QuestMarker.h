@@ -216,12 +216,16 @@ namespace ms
 	// gives how many of an item the player holds, plus one if a copy is worn,
 	// and `worn` whether a copy is worn. `has_skill` is v83's loose test: any
 	// skill not hidden from the skill book counts, and a hidden one once it
-	// has a record (FUN_007619b0).
+	// has a record (FUN_007619b0). `mount_level` is the level of the
+	// player's mount as last sent (SET_TAMING_MOB_INFO), 0 before any.
 	template<class Held, class HasSkill, class Worn>
 	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,
-		int32_t mapid, FirstPet first_pet = {})
+		int32_t mapid, FirstPet first_pet = {}, int32_t mount_level = 0)
 	{
 		if (pet_stop(quest.pets, quest.pet_closeness, quest.pet_skill_limit, first_pet) != QuestStop::NONE)
+			return false;
+
+		if (mount_level < quest.mount_level.first || mount_level > quest.mount_level.second)
 			return false;
 
 		if (!std::all_of(quest.worn_all.begin(), quest.worn_all.end(), worn))
