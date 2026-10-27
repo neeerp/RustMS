@@ -1489,6 +1489,53 @@ up). Only one may be in it on a channel at a time; another is told so
   left (`items`). The passage's way out (`ludi021`) takes any still held
   and leads to 220020600. The lines are placeholders (`mechanical_parts.*`).
 
+## Kerning Square's Spirit of Rock
+
+For Blake's requests (2286-2288) and "Admission to the VIP Zone" (2291;
+Cosmic `RockSpirit`, `RockSpiritVIP`, `1052125` and the `Depart_*` portal
+scripts). June (1052125, `Depart_topFloorIn`, on Kerning Square's 7th
+floor, 103040400) offers a menu, and the 7th floor's `topFloor` portal
+(`Depart_topFloor`, Cosmic `Depart_TopFloor`) opens it too:
+
+- "Helping Blake", for a player on 2286, 2287 or 2288, takes them alone
+  into their own copy of the Spirit of Rock's floors for an hour
+  (`events::ROCK_SPIRIT`, `EventKind::RockSpirit`, 103040410 to 103040430).
+  Anyone else is told Blake never mentioned them (`june.not_helping`). Eight may go at once on a channel (`runs: 8`,
+  Cosmic's lobbies); a ninth is told the floors are full (`june.busy`) and
+  nothing is applied.
+- "VIP" only says what it takes: 2290 done, level 50 or below, and 2291's
+  10 VIP Invitations. `q2291e` takes the invitations and the player into
+  their own copy of the VIP Zone (103040440 to 103040460) for half an hour
+  (`events::ROCK_SPIRIT_VIP`, `EventKind::RockSpiritVip`), completing 2291
+  (see [quests](./quests.md)).
+
+Both start on the first floor's `sp`, where Cosmic uses its portal 1
+(`right01`), a few steps to the right.
+
+On the floors (`net::scripts::depart_on`):
+
+- `Depart_goFoward0` and `Depart_goFoward1` lead on to the next floor's
+  `right00` or `right01`: past the Cheap Amplifiers (410) from Composition
+  Fee (2287) on, past the Fancy Amplifiers (420) to the Spirit of Rock's
+  stage (430) from Say "NO" to Plagiarism (2288) on, and freely through the
+  VIP Zone's floors. Otherwise a pink line keeps the player back
+  (`depart.no_access`).
+- `Depart_goBack00` and `Depart_goBack01` lead back to the floor before's
+  `left00` or `left01`, and the first floor's `right01` out to the 7th
+  floor, which ends the run, as does the time running out or dying (the
+  floors' `forcedReturn`). The 7th floor's `goDown` (`Depart_topOut`) leads
+  to the 6th floor's `fromUp`.
+- The mobs are the maps' own `life`, respawning as on any map; the Spirit
+  of Rock (4300013, `mobTime -1`) comes out once per copy. The pack has no
+  drops for the Square's mobs, so the quest items come from
+  `reward_overrides.toml`: the Latest Model MP3 (4032509, 2286) from the
+  Cheap Amplifiers, the Fancy Amplifier Cables (4000537) from the Fancy
+  Amplifiers, and the Music Score (4000538, 2288) from the Spirit of Rock.
+- The floors' `onUserEnter` and `onFirstUserEnter` scripts
+  (`Depart_topFloorEnter`, `Depart_BossEnter`, `Depart_Boss_F_Enter`) do
+  nothing; Cosmic has none. The lines are placeholders (`june.*`,
+  `depart.*`).
+
 ## NPCs
 
 | NPC | Where | Script |

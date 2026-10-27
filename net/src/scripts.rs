@@ -6,9 +6,9 @@
 use crate::content;
 use crate::conti::Portal;
 use crate::events::{
-    EventKind, APPARATUS_ROOM, EAST_CASTLE_TOWER, MACHINE_PART, PRIME_MINISTER, PRIME_MINISTER_AT,
-    STOP_THE_WEDDING, STORY_OF_BETRAYAL, WEDDING_HALL, WEDDING_HALL_KEY, WHERES_VIOLETTA,
-    YETI_BROTHERS,
+    EventKind, APPARATUS_ROOM, EAST_CASTLE_TOWER, JUNE, KERNING_SQUARE_6F, MACHINE_PART,
+    PRIME_MINISTER, PRIME_MINISTER_AT, ROCK_SPIRIT_FLOOR, ROCK_SPIRIT_VIP_FLOOR, STOP_THE_WEDDING,
+    STORY_OF_BETRAYAL, WEDDING_HALL, WEDDING_HALL_KEY, WHERES_VIOLETTA, YETI_BROTHERS,
 };
 use crate::npc_scripts;
 use game::character::{CARNIVAL_RETURN, DOJO_RETURN, FREE_MARKET_RETURN, PYRAMID_RETURN};
@@ -382,6 +382,13 @@ const SHADOW_KNIGHT_AT: (i16, i16) = (897, 51);
 /// Forest (21753) asks for. Neither Cosmic nor the data says what sets it;
 /// the scene's Gentleman (9300353) leaves by itself.
 const ELLIN_WAREHOUSE: i32 = 300000011;
+/// The Spirit of Rock's floors past their first (`crate::events`): the
+/// Fancy Amplifiers' (420, 450), reached on Composition Fee (2287) and
+/// left for the Spirit of Rock's stage on Say "NO" to Plagiarism (2288).
+const FANCY_AMPLIFIER_FLOOR: i32 = 103040420;
+const VIP_FANCY_AMPLIFIER_FLOOR: i32 = 103040450;
+const COMPOSITION_FEE: i16 = 2287;
+const SAY_NO_TO_PLAGIARISM: i16 = 2288;
 const SEAL_STONE_OF_ELLIN: i16 = 21751;
 const WAREHOUSE_RECORD: i16 = 21764;
 const WAREHOUSE_SEEN: &str = "1";
@@ -1569,6 +1576,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
         // The Conference Hall's door to its Warehouse (Cosmic
         // `enterWarehouse`).
         "enterWarehouse" => through(Effect::WarpToPortal(ELLIN_WAREHOUSE, 0)),
+        // Kerning Square's 7th floor: the way up is June's to give, and
+        // the way down leads to the 6th floor's `fromUp` (Cosmic
+        // `Depart_TopFloor`, `Depart_topOut`).
+        "Depart_topFloor" => opens(JUNE),
+        "Depart_topOut" => through(Effect::WarpToPortal(KERNING_SQUARE_6F, 1)),
+        "Depart_goFoward0" => depart_on(player, "right00"),
+        "Depart_goFoward1" => depart_on(player, "right01"),
+        // Back down the Spirit of Rock's floors, to the floor before's
+        // `left00` or `left01`.
+        "Depart_goBack00" => through(to(player.stats.map_id - 10, Portal::Named("left00"))),
+        "Depart_goBack01" => through(to(player.stats.map_id - 10, Portal::Named("left01"))),
         "ariant_castle" if player.inventory.count(PALACE_ENTRY_PASS) > 0 => through(
             Effect::WarpToPortal(CASTLE_GARDEN, named(CASTLE_GARDEN, "out00")),
         ),
@@ -2421,6 +2439,26 @@ pub fn through_secret_door(player: &Player) -> Effect {
         "sp_alca"
     };
     Effect::WarpToPortal(SECRET_BASEMENT_PATH, named(SECRET_BASEMENT_PATH, side))
+}
+
+/// `Depart_goFoward0`, `Depart_goFoward1`: on up the Spirit of Rock's
+/// floors to the next one's `side`: past the Cheap Amplifiers' floor from
+/// Composition Fee (2287) on, past the Fancy Amplifiers' from Say "NO" to
+/// Plagiarism (2288) on, and freely through the VIP Zone's; otherwise the
+/// way stays shut, in pink (Cosmic `Depart_goFoward0`).
+fn depart_on(player: &Player, side: &'static str) -> ScriptOutcome {
+    let map = player.stats.map_id;
+    let begun = |quest: i16| player.quests.state(quest) != QuestState::NotStarted;
+    let open = match map {
+        ROCK_SPIRIT_FLOOR => begun(COMPOSITION_FEE),
+        FANCY_AMPLIFIER_FLOOR => begun(SAY_NO_TO_PLAGIARISM),
+        ROCK_SPIRIT_VIP_FLOOR | VIP_FANCY_AMPLIFIER_FLOOR => true,
+        _ => false,
+    };
+    if !open {
+        return refused(keys::DEPART_NO_ACCESS);
+    }
+    through(to(map + 10, Portal::Named(side)))
 }
 
 /// A portal that opens `npc`'s conversation.
@@ -4617,6 +4655,59 @@ mod tests {
         );
         *aran.quests.kills_mut(TO_THE_SEALED_GARDEN).unwrap() = vec![1];
         assert!(enter(&aran).is_empty(), "beaten");
+    }
+
+    #[test]
+    fn the_spirit_of_rocks_floors_open_with_blakes_requests() {
+        let on = |map: i32, quests: &[(i16, QuestState)]| {
+            let mut player = player_with(quests);
+            player.stats.map_id = map;
+            player
+        };
+        let up = |map: i32, side: &'static str| through(to(map + 10, Portal::Named(side)));
+        let shut = || Some(refused(keys::DEPART_NO_ACCESS));
+        assert_eq!(
+            portal("Depart_topFloor", &on(103040400, &[])),
+            Some(opens(JUNE))
+        );
+        assert_eq!(
+            portal("Depart_topOut", &on(103040400, &[])),
+            Some(through(Effect::WarpToPortal(KERNING_SQUARE_6F, 1)))
+        );
+
+        // Past the Cheap Amplifiers from Composition Fee on, past the Fancy
+        // Amplifiers from Say "NO" to Plagiarism on.
+        let fee = [(COMPOSITION_FEE, QuestState::Started)];
+        let song = [(2286, QuestState::Started)];
+        assert_eq!(portal("Depart_goFoward0", &on(103040410, &song)), shut());
+        assert_eq!(
+            portal("Depart_goFoward0", &on(103040410, &fee)),
+            Some(up(103040410, "right00"))
+        );
+        assert_eq!(portal("Depart_goFoward1", &on(103040420, &fee)), shut());
+        let done = [
+            (COMPOSITION_FEE, QuestState::Completed),
+            (SAY_NO_TO_PLAGIARISM, QuestState::Completed),
+        ];
+        assert_eq!(
+            portal("Depart_goFoward1", &on(103040420, &done)),
+            Some(up(103040420, "right01"))
+        );
+        // The VIP Zone's floors are open.
+        for map in [103040440, 103040450] {
+            assert_eq!(
+                portal("Depart_goFoward1", &on(map, &[])),
+                Some(up(map, "right01"))
+            );
+        }
+        assert_eq!(
+            portal("Depart_goBack00", &on(103040420, &[])),
+            Some(through(to(103040410, Portal::Named("left00"))))
+        );
+        assert_eq!(
+            portal("Depart_goBack01", &on(103040460, &[])),
+            Some(through(to(103040450, Portal::Named("left01"))))
+        );
     }
 
     #[test]

@@ -1843,6 +1843,9 @@ impl NpcScript {
         if npc_id == MARK {
             return Some(mark(player));
         }
+        if npc_id == JUNE {
+            return Some(june(player));
+        }
         if npc_id == CHENG {
             return cheng(player, &mut rand::thread_rng());
         }
@@ -2649,6 +2652,7 @@ impl NpcScript {
             "q3941e" => Some(karcasa_silk(player, true)),
             "q8255s" => Some(adonis_lost_spirits()),
             "q2156e" => Some(pia_rainbow_shell(player)),
+            "q2291e" => Some(vip_admission(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5862,6 +5866,72 @@ fn pia_rainbow_shell(player: &Player) -> NpcScript {
             action: "act2156",
         },
     ];
+    script
+}
+
+/// June (1052125) on Kerning Square's 7th floor (`Depart_topFloorIn`,
+/// also opened by the `topFloor` portal beside her): one helping Blake (on
+/// 2286, 2287 or 2288) goes up to the Spirit of Rock's floors alone, and
+/// is told so when all eight are taken. The VIP Zone opens only through
+/// Admission to the VIP Zone (2291), so asking after it just says how
+/// (Cosmic `1052125`).
+const JUNE: i32 = events::JUNE;
+const BLAKES_REQUESTS: [i16; 3] = [2286, 2287, 2288];
+/// Admission to the VIP Zone (2291) needs the VIP pass quest before it
+/// (2290) and 10 VIP Invitations, at levels 35 to 50.
+const VIP_PASS: i16 = 2290;
+const VIP_ADMISSION: i16 = 2291;
+const VIP_INVITATION: i32 = 4032521;
+const VIP_INVITATIONS: i16 = 10;
+const VIP_MAX_LEVEL: u8 = 50;
+
+fn june(player: &Player) -> NpcScript {
+    let helping = BLAKES_REQUESTS
+        .iter()
+        .any(|&quest| player.quests.state(quest) == QuestState::Started);
+    let blake = match helping {
+        true => Page::Done(vec![Effect::StartEvent(EventKind::RockSpirit)]),
+        false => Page::Say(text(keys::JUNE_NOT_HELPING)),
+    };
+    let vip = if player.quests.state(VIP_PASS) != QuestState::Completed {
+        keys::JUNE_NOT_VIP
+    } else if player.stats.level > VIP_MAX_LEVEL {
+        keys::JUNE_VIP_OVER_LEVEL
+    } else {
+        keys::JUNE_VIP_INVITATIONS
+    };
+    let mut script = NpcScript::new(
+        JUNE,
+        vec![Page::Menu {
+            text: text(keys::JUNE_MENU),
+            choices: vec![
+                (text(keys::JUNE_HELPING_BLAKE), vec![blake]),
+                (text(keys::JUNE_VIP), vec![Page::Say(text(vip))]),
+            ],
+        }],
+    );
+    script.refused = Some(text(keys::JUNE_BUSY));
+    script
+}
+
+/// `q2291e`, Admission to the VIP Zone: June takes the 10 VIP Invitations
+/// and takes the player up to the VIP Zone alone, which completes the
+/// quest (its `Act/1` is empty); when all eight runs are taken, nothing is
+/// taken and June says so (Cosmic `2291.js`).
+fn vip_admission(player: &Player) -> NpcScript {
+    if player.inventory.count(VIP_INVITATION) < i32::from(VIP_INVITATIONS) {
+        return NpcScript::new(JUNE, vec![Page::Say(text(keys::JUNE_VIP_MISSING))]);
+    }
+    let mut script = NpcScript::new(JUNE, vec![Page::Say(text(keys::JUNE_VIP_WELCOME))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: VIP_INVITATION,
+            quantity: VIP_INVITATIONS,
+        },
+        Effect::CompleteQuest(VIP_ADMISSION),
+        Effect::StartEvent(EventKind::RockSpiritVip),
+    ];
+    script.refused = Some(text(keys::JUNE_BUSY));
     script
 }
 
@@ -15653,6 +15723,72 @@ mod tests {
         let go = script.respond(ScriptInput::Yes).unwrap();
         assert_eq!(go.effects, [Effect::StartEvent(EventKind::Dollhouse)]);
         assert!(script.refused().is_some(), "told when it is taken");
+    }
+
+    #[test]
+    fn june_takes_one_helping_blake_up_to_the_spirit_of_rock() {
+        let pick = |player: &Player, choice: i32| {
+            let mut script = NpcScript::for_npc(JUNE, player).unwrap();
+            assert!(script.begin().effects.is_empty(), "the menu first");
+            let step = script.respond(ScriptInput::Select(choice)).unwrap();
+            (script, step)
+        };
+        for quest in BLAKES_REQUESTS {
+            let (mut script, go) = pick(&with_quests(&[(quest, false)]), 0);
+            assert_eq!(go.effects, [Effect::StartEvent(EventKind::RockSpirit)]);
+            assert!(script.refused().is_some(), "told when all are taken");
+        }
+        let (_, no) = pick(&with_quests(&[(2286, true)]), 0);
+        assert!(no.effects.is_empty());
+        assert_eq!(page_text(&no), text(keys::JUNE_NOT_HELPING));
+
+        // The VIP Zone is 2291's to open; June only says how.
+        let vip = |player: &Player| page_text(&pick(player, 1).1);
+        assert_eq!(vip(&with_quests(&[])), text(keys::JUNE_NOT_VIP));
+        assert_eq!(
+            vip(&with_quests(&[(VIP_PASS, true)])),
+            text(keys::JUNE_VIP_OVER_LEVEL)
+        );
+        let mut young = with_quests(&[(VIP_PASS, true)]);
+        young.stats.level = 50;
+        assert_eq!(vip(&young), text(keys::JUNE_VIP_INVITATIONS));
+    }
+
+    #[test]
+    fn june_takes_ten_vip_invitations_into_the_vip_zone() {
+        let mut player = with_quests(&[(VIP_ADMISSION, false)]);
+        player.stats.level = 40;
+        let give = |player: &mut Player, count: i16| {
+            player.inventory.insert(
+                game::InventoryType::Etc,
+                1,
+                game::Item::stack(VIP_INVITATION, count),
+            );
+        };
+        give(&mut player, 9);
+        let short = NpcScript::for_quest("q2291e", &player).unwrap();
+        assert_eq!(
+            page_text(&short.clone().begin()),
+            text(keys::JUNE_VIP_MISSING)
+        );
+        assert_eq!(read_through(short), (JUNE, Vec::new()));
+
+        give(&mut player, 10);
+        let mut script = NpcScript::for_quest("q2291e", &player).unwrap();
+        assert_eq!(page_text(&script.begin()), text(keys::JUNE_VIP_WELCOME));
+        let go = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(
+            go.effects,
+            [
+                Effect::TakeItem {
+                    item_id: VIP_INVITATION,
+                    quantity: 10
+                },
+                Effect::CompleteQuest(VIP_ADMISSION),
+                Effect::StartEvent(EventKind::RockSpiritVip),
+            ]
+        );
+        assert!(script.refused().is_some(), "told when all are taken");
     }
 
     #[test]

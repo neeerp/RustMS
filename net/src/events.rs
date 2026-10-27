@@ -87,6 +87,12 @@ pub enum EventKind {
     /// entrance's `TD_MC_enterboss2` to find Violetta and face the Prime
     /// Minister (Where's Violetta? and The Story of Betrayal, 2332-2333).
     WeddingHall,
+    /// The Spirit of Rock's floors above Kerning Square's 7th floor, taken
+    /// alone from June (1052125) by one helping Blake (2286-2288).
+    RockSpirit,
+    /// The VIP Zone's floors above Kerning Square's 7th floor, taken alone
+    /// on handing June 10 VIP Invitations (Admission to the VIP Zone, 2291).
+    RockSpiritVip,
     /// A Monster Carnival room (1 to 6), taken by a party from Spiegelmann
     /// (2042000) on the Carnival Field (`crate::carnival`).
     Carnival(u8),
@@ -2596,6 +2602,52 @@ pub const WEDDING_HALL_EVENT: Event = Event {
     ..DOJO
 };
 
+/// Kerning Square's 7th floor, 103040400, where June (1052125) keeps the
+/// way up to the Spirit of Rock's floors, and where they let out (their
+/// `forcedReturn`).
+pub const KERNING_SQUARE_7F: i32 = 103040400;
+/// June, by the way up.
+pub const JUNE: i32 = 1_052_125;
+/// Kerning Square's 6th floor below it, where its `goDown` leads (to
+/// `fromUp`, portal 1).
+pub const KERNING_SQUARE_6F: i32 = 103040300;
+/// The Spirit of Rock's floors: the Cheap Amplifiers' (410), the Fancy
+/// Amplifiers' (420) and the Spirit of Rock's own stage (430).
+pub const ROCK_SPIRIT_FLOOR: i32 = 103040410;
+pub const ROCK_SPIRIT_STAGE: i32 = 103040430;
+/// The VIP Zone's floors (440 to 460), the same floors with other mobs.
+pub const ROCK_SPIRIT_VIP_FLOOR: i32 = 103040440;
+pub const ROCK_SPIRIT_VIP_STAGE: i32 = 103040460;
+
+/// The Spirit of Rock's floors: June takes one helping Blake (2286-2288)
+/// up alone for an hour, eight at once on a channel (Cosmic `RockSpirit`).
+/// It is never won; it ends when they leave the floors or the time runs
+/// out.
+pub const ROCK_SPIRIT: Event = Event {
+    lobby: KERNING_SQUARE_7F,
+    entrances: &[],
+    maps: ROCK_SPIRIT_FLOOR..=ROCK_SPIRIT_STAGE,
+    entry: ROCK_SPIRIT_FLOOR,
+    exit: KERNING_SQUARE_7F,
+    levels: 1..=u8::MAX,
+    team: 1..=1,
+    minutes: 60,
+    exp_per_stage: &[],
+    member_clears: &[],
+    runs: 8,
+    ..DOJO
+};
+
+/// The VIP Zone's floors: June takes one who hands in 10 VIP Invitations
+/// (2291) up alone for half an hour, eight at once on a channel (Cosmic
+/// `RockSpiritVIP`); the quest itself asks for levels 35 to 50.
+pub const ROCK_SPIRIT_VIP: Event = Event {
+    maps: ROCK_SPIRIT_VIP_FLOOR..=ROCK_SPIRIT_VIP_STAGE,
+    entry: ROCK_SPIRIT_VIP_FLOOR,
+    minutes: 30,
+    ..ROCK_SPIRIT
+};
+
 /// Every run of Nett's Pyramid Duarte offers, alone first, then with a
 /// party, each by mode.
 pub fn pyramid_kinds() -> impl Iterator<Item = EventKind> {
@@ -2682,7 +2734,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 42] = [
+    pub const ALL: [EventKind; 44] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -2725,6 +2777,8 @@ impl EventKind {
         EventKind::MechanicalParts,
         EventKind::KingPepe,
         EventKind::WeddingHall,
+        EventKind::RockSpirit,
+        EventKind::RockSpiritVip,
     ];
 
     pub fn event(self) -> &'static Event {
@@ -2756,6 +2810,8 @@ impl EventKind {
             EventKind::MechanicalParts => &MECHANICAL_PARTS,
             EventKind::KingPepe => &KING_PEPE,
             EventKind::WeddingHall => &WEDDING_HALL_EVENT,
+            EventKind::RockSpirit => &ROCK_SPIRIT,
+            EventKind::RockSpiritVip => &ROCK_SPIRIT_VIP,
         }
     }
 
@@ -3818,6 +3874,31 @@ mod tests {
         assert!(tristan.team(1, &[at(1, 50, MU_YOUNG_MAP)]).is_some());
         assert_eq!(tristan.team(1, &[at(1, 49, MU_YOUNG_MAP)]), None);
         assert!(event_map(TRISTAN_ROOM) && !event_map(MU_YOUNG_MAP));
+    }
+
+    #[test]
+    fn the_spirit_of_rocks_floors_are_taken_alone_from_kerning_square() {
+        let rock = EventKind::RockSpirit.event();
+        assert_eq!(
+            (rock.entry, rock.exit, rock.minutes, rock.runs),
+            (ROCK_SPIRIT_FLOOR, KERNING_SQUARE_7F, 60, 8)
+        );
+        assert!(rock.solo() && rock.lasts_until_empty());
+        assert!(rock.starts_on(KERNING_SQUARE_7F));
+        assert!(rock.team(1, &[at(1, 35, KERNING_SQUARE_7F)]).is_some());
+        let vip = EventKind::RockSpiritVip.event();
+        assert_eq!(
+            (vip.entry, vip.exit, vip.minutes, vip.runs),
+            (ROCK_SPIRIT_VIP_FLOOR, KERNING_SQUARE_7F, 30, 8)
+        );
+        assert!(vip.solo() && vip.starts_on(KERNING_SQUARE_7F));
+        for map in [103040410, 103040420, 103040430] {
+            assert!(rock.holds(map) && !vip.holds(map));
+        }
+        for map in [103040440, 103040450, 103040460] {
+            assert!(vip.holds(map) && !rock.holds(map));
+        }
+        assert!(!event_map(KERNING_SQUARE_7F) && !event_map(103040300));
     }
 
     #[test]

@@ -581,6 +581,16 @@ it and gives the GMS v83 data's 7,500 EXP, 30,000 mesos and 3 fame. Then
 Pia plays the shell's effect, the special action `act2156`
 (`Effect::NpcSpecialAction`). The lines are placeholders (`pia.shell.*`).
 
+"Admission to the VIP Zone" (2291) starts from the data at June (1052125,
+Kerning Square's 7th floor) once 2290 is done, at levels 35 to 50, and ends
+on June's `q2291e`. Its `Act` is empty. The script asks for 10 VIP
+Invitations (4032521), takes them and lets the player into the VIP Zone
+alone (`EventKind::RockSpiritVip`, see
+[party quests](./party-quests.md#kerning-squares-spirit-of-rock)), which
+completes the quest. When every copy is taken, nothing is taken and June
+says so. The Square's shop mobs drop the invitations while 2291 is under
+way (`reward_overrides.toml`). The lines are placeholders (`june.vip.*`).
+
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
 open once 3706 is done), has a start script (`q3714s`) and no end. It
