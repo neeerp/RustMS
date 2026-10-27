@@ -572,6 +572,15 @@ again while it is started gives a new seed (the data's `Act/1`) and
 completes it. The lines are placeholders (`adonis.spirits.*`,
 `swallow.new_seed*`).
 
+"A rainbow snail shell that makes wishes come true!?" (2156) starts from
+the data at Pia (1012102, Henesys Park) after Snail Hunt (2155). Our data
+ends it on Pia's `q2156e` and has no `Check/1` items and no `Act/1`. The
+script asks for the Rainbow-colored Snail Shell (2210006). Mano drops it
+every time (`reward_overrides.toml`, from Mano's monster book). Pia takes
+it and gives the GMS v83 data's 7,500 EXP, 30,000 mesos and 3 fame. Then
+Pia plays the shell's effect, the special action `act2156`
+(`Effect::NpcSpecialAction`). The lines are placeholders (`pia.shell.*`).
+
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
 open once 3706 is done), has a start script (`q3714s`) and no end. It

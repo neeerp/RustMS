@@ -439,6 +439,9 @@ pub struct Field {
     pub npc_positions: BTreeMap<i32, (i16, i16)>,
     /// Object ids of NPCs taken off the map.
     pub npcs_removed: Vec<i32>,
+    /// Special actions this client, as the NPCs' controller, is asked to
+    /// request (0x106): (object id, action).
+    pub npc_special_actions: Vec<(i32, String)>,
     /// Where each mob spawned.
     pub mob_positions: BTreeMap<i32, (i16, i16)>,
     /// Statuses put on mobs: (object id, stats, first one's value, first
@@ -741,6 +744,9 @@ impl Field {
             self.npc_positions.insert(object_id, at);
         } else if op == SendOpcode::RemoveNpc as i16 {
             self.npcs_removed.push(r.read_int().unwrap());
+        } else if op == SendOpcode::NpcSpecialAction as i16 {
+            self.npc_special_actions
+                .push((r.read_int().unwrap(), r.read_str_with_length().unwrap()));
         } else if op == SendOpcode::ShowForeignEffect as i16 {
             self.effects
                 .push((r.read_int().unwrap(), r.read_byte().unwrap()));

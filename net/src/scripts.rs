@@ -820,6 +820,13 @@ pub enum Effect {
     /// everyone there, until their open state times out, as Cosmic's
     /// `hitReactor` on a reactor whose first state has no events.
     OpenReactor(&'static str),
+    /// NPC `npc_id` on the player's map plays its special action `action`
+    /// (`Npc.nx/<npc>.img/<action>`, flagged `special`), seen by everyone
+    /// there, as Pia uses the rainbow snail shell.
+    NpcSpecialAction {
+        npc_id: i32,
+        action: &'static str,
+    },
     /// Every mob on the player's map that isn't friendly goes, and no more
     /// come, as Cosmic's `killAllMonsters`.
     ClearMobs,

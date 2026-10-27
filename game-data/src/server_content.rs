@@ -1235,6 +1235,8 @@ pub mod keys {
     /// Magic Seed.
     pub const SWALLOW_NEW_SEED: &str = "swallow.new_seed";
     pub const SWALLOW_NEW_SEED_FULL: &str = "swallow.new_seed_full";
+    pub const PIA_SHELL_WISH: &str = "pia.shell.wish";
+    pub const PIA_SHELL_MISSING: &str = "pia.shell.missing";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3804,6 +3806,8 @@ mod tests {
                 keys::ADONIS_SPIRITS_RITUAL,
                 keys::SWALLOW_NEW_SEED,
                 keys::SWALLOW_NEW_SEED_FULL,
+                keys::PIA_SHELL_WISH,
+                keys::PIA_SHELL_MISSING,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

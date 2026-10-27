@@ -1761,6 +1761,8 @@ unsourced = [
     "adonis.spirits.ritual",
     "swallow.new_seed",
     "swallow.new_seed_full",
+    "pia.shell.wish",
+    "pia.shell.missing",
     "bob.baby_bird.feeding",
     "bob.baby_bird.tamed",
     "bob.baby_bird.ask",

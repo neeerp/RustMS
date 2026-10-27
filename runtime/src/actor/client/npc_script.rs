@@ -210,6 +210,12 @@ impl ClientActor {
                     })
                 }
                 Effect::OpenReactor(name) => to_field.push(FieldRequest::OpenReactor { name }),
+                Effect::NpcSpecialAction { npc_id, action } => {
+                    to_field.push(FieldRequest::NpcSpecialAction {
+                        npc_id: *npc_id,
+                        action,
+                    })
+                }
                 Effect::ClearMobs => to_field.push(FieldRequest::ClearMobs),
                 Effect::OpenGuildNamePrompt => {
                     name_guild = true;

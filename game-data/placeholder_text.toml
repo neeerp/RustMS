@@ -1099,6 +1099,8 @@
 "adonis.spirits.ritual" = "[placeholder] Bring a relic of the old town of El Nath together with a diamond, and a Liberation Ritual can free the soul into the relic. Only Zakum holds the diamonds, though."
 "swallow.new_seed" = "[placeholder] I found another seed. Please take better care of this one; there won't be a third."
 "swallow.new_seed_full" = "[placeholder] You have no room for the seed. Make some space in your Etc inventory first."
+"pia.shell.wish" = "[placeholder] The rainbow snail shell! Now for my wish... wait, what is it doing to me?"
+"pia.shell.missing" = "[placeholder] No rainbow snail shell yet? Mano at the thicket around the beach has it."
 "bob.baby_bird.feeding" = "[placeholder] Ghosthunter Bob is busy feeding a nest of baby birds."
 "bob.baby_bird.tamed" = "[placeholder] With the Clocktower's monsters wiped out, Bob has taken to raising tamed #o5220003#s."
 "bob.baby_bird.ask" = "[placeholder] Ten birds are a lot of work. Will you raise one?"

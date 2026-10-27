@@ -55,8 +55,8 @@ use net::packet::build::world::mob::{
     CatchFail, MobMoveView, MobView,
 };
 use net::packet::build::world::npc::{
-    build_control_npc, build_npc_action, build_remove_npc, build_spawn_npc, build_uncontrol_npc,
-    ForeignNpc,
+    build_control_npc, build_npc_action, build_npc_special_action, build_remove_npc,
+    build_spawn_npc, build_uncontrol_npc, ForeignNpc,
 };
 use net::packet::build::world::ox_quiz::{build_gm_event_instructions, build_ox_quiz};
 use net::packet::build::world::pet::build_move_pet;
@@ -651,6 +651,21 @@ impl FieldActor {
         }
     }
 
+    /// Ask the NPCs' controller to have NPC `npc_id` play its special
+    /// action `action` (0x106). Its client answers with an NPC_ACTION, which
+    /// `handle_npc_action` shows everyone.
+    fn npc_special_action(&self, npc_id: i32, action: &str) {
+        let Some(map_npc) = self.map_npcs.iter().find(|npc| npc.npc_id == npc_id) else {
+            return;
+        };
+        let Some(controller) = self.npc_controller.and_then(|id| self.occupants.get(&id)) else {
+            return;
+        };
+        if let Ok(packet) = build_npc_special_action(map_npc.object_id, action) {
+            controller.handle.send_packet(packet);
+        }
+    }
+
     /// Show everyone the action the NPCs' controller chose.
     fn handle_npc_action(&self, from: ClientId, object_id: i32, action: &[u8]) {
         if self.npc_controller != Some(from)
@@ -1034,6 +1049,9 @@ impl FieldActor {
                 }
                 FieldRequest::BringOutMobs { mob_id, at } => self.bring_out_mobs(from, mob_id, &at),
                 FieldRequest::OpenReactor { name } => self.open_reactor(name),
+                FieldRequest::NpcSpecialAction { npc_id, action } => {
+                    self.npc_special_action(npc_id, action)
+                }
                 FieldRequest::ClearMobs => self.clear_mobs(),
                 FieldRequest::SetReactorState { name, state } => {
                     for view in self.reactors.force_forward(name, state) {

@@ -986,6 +986,9 @@ pub enum FieldRequest {
     /// A script opens the reactors named `name` here for as long as their
     /// open state lasts (`scripts::Effect::OpenReactor`).
     OpenReactor { name: &'static str },
+    /// A script has NPC `npc_id` here play its special action `action`
+    /// (`scripts::Effect::NpcSpecialAction`).
+    NpcSpecialAction { npc_id: i32, action: &'static str },
     /// A script sends away every mob here that isn't friendly
     /// (`scripts::Effect::ClearMobs`).
     ClearMobs,
