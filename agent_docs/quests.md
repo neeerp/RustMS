@@ -538,6 +538,7 @@ keeps it). A quest whose start sets no string
 | 2166 Shining Stone | "" to "5" | the Shiny Stone (1092016, `nautil_stone`) in the Nautilus's Generator Room (120000301); Sharyl (1092003) completes it |
 | 2236 How to Shoo Away the Evil | "000000" to "111111" | the six Shaman Rocks (1063012 on 105050200, 105060000, 105070000; 1063013 twice on 105090000 and once on 105090100), each taking one charm (4032263) |
 | 3360 Verifying the Password | Parwen's password, set with the start, to "1" | Parwen's start script (`q3360s`); the Secret Passage (2111024) at the secret door |
+| 3421 Collecting Meteorite Samples | "000000" to "111111" | the six meteorites in Kulan Field (2050014 on 221040000, 2050015 on 221040200, 2050016 on 221040300, 2050017 on 221040100, 2050018 on 221040201, 2050019 on 221040400), each giving one Meteorite Sample (4031117) |
 
 Cosmic's scripts gave the slots and digits. The houses are silent, as
 there; the walls', the oasis's, the stone's and the rocks' words are
@@ -548,7 +549,12 @@ read as info quests. 2236's two rocks in the same swamp are the same NPC;
 the field tells them apart by `nth`, which of the map's NPCs with that id
 was clicked, in Map.nx order (`ServerMessage::NpcConversation`,
 `net::npc_scripts::shaman_rock`). A rock already charmed, or clicked
-without a charm, gives its usual speech.
+without a charm, gives its usual speech. The meteorites are silent, as
+in Cosmic, whose bitmask record is the info string here; once all six
+have given theirs, any meteorite gives another sample while fewer than
+six are held, so a lost one can be replaced. 3421's completion only
+counts the six samples (it has no `infoex`). With no Etc slot free, a
+meteorite says so (`omega_meteorite.full`) and keeps its sample.
 Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
 and the quests reading another record that no script sets.
 
@@ -783,5 +789,7 @@ copied into the source.
   self's kill, the way out, the room fresh for the next),
   `sorcerers_potion` (3514 sold, refused while the potion is held, drunk
   to 1 HP, then completed),
+  `meteorite_samples` (3421's six meteorites, each giving once and
+  marking its character, then the completion),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
