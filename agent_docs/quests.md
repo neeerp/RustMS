@@ -334,6 +334,16 @@ end at Moppie (2012019) leads to "A Supply from the Sand Crew" (2124).
 Eleska's (2101002) `q2124e` and `q2126e` take Moppie's box (4031619 or
 4031624, as each quest's data checks) and complete the quest. Cosmic's
 `2126.js` takes 2124's box instead. The text is unsourced.
+In "Help Me Find My Glasses" (2186), Abel (1094001) in Nautilus Harbor
+(120000000) has lost his glasses in the five bushes there (1094002 to
+1094006). While the quest is under way, searching a bush with no glasses
+held gives one of three pairs at even odds: Abel's own (4031853) or one of
+two others (4031854, 4031855). With any pair held, the bushes give nothing
+more. The data's end checks for Abel's own pair, and his `q2186e` takes it
+for 1,700 EXP and ten Nautilus Return Scrolls (2030019). If the player
+clicks Abel holding another pair instead, Abel takes it for 1,000 EXP and
+five scrolls and completes the quest anyway (Cosmic `2186.js` and the
+bushes' scripts). The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -809,5 +819,7 @@ copied into the source.
   quest ended, then 3456 started with the working one),
   `sand_crew` (Manji's 2127 end script, 2123 through Moppie, and Eleska
   taking 2124's box),
+  `abels_glasses` (2186: a bush gives one pair at a time, then Abel's end
+  script or his click, depending on the pair),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
