@@ -97,7 +97,8 @@ pub const SCRIPTS: &[&str] = &[
     "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s", "q21742s", "q21742e",
     "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e", "q21753s", "q21754s",
     "q21757e", "q21700s", "q21703s", "q21703e", "q21704s", "q21712s", "q21716s", "q21719s",
-    "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q3250s", "q3250e",
+    "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q21600s", "q21604s", "q21613s",
+    "q21618s", "q21618e", "q3250s", "q3250e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -169,6 +170,8 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
     (21733, 21762),
     (3250, 7067),
     (21742, 21763),
+    (21610, 21619),
+    (21613, 21620),
 ];
 /// Quests that start only once a record that is no quest reads a value
 /// (`Check/0 infoNumber` names it, `infoex` the value), which a script sets

@@ -2184,6 +2184,9 @@ impl NpcScript {
             PUPPETEER_DOOR => return Some(puppeteer_door(player)),
             FRANCIS => return Some(francis()),
             CAVE_FRANCIS => return Some(cave_francis(player)),
+            PACK_WOLF if retakes_the_wolves_test(player) => {
+                return Some(the_wolves_test_again());
+            }
             PASSAGE_END_STATUE => return Some(passage_end_statue()),
             PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
             SHRINE_PILLAR => return Some(shrine_pillar(player)),
@@ -2630,6 +2633,11 @@ impl NpcScript {
             "q21766s" => Some(suspicious_john()),
             "q21766e" => Some(john_cleared()),
             "q21767s" => Some(wooden_box(player)),
+            "q21600s" => Some(puccis_request()),
+            "q21604s" => Some(wolf_mount()),
+            "q21613s" => Some(the_wolves_test()),
+            "q21618s" => Some(the_wolfs_evolution()),
+            "q21618e" => Some(the_wolf_evolved(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5465,6 +5473,142 @@ fn wooden_box(player: &Player) -> NpcScript {
     }
     script.on_end.push(Effect::StartQuest(WOODEN_BOX));
     script.inventory_full = Some(text(keys::JOHNS_BOX_FULL));
+    script
+}
+
+// Pucci (1202007, in 140020110), Scadur in El Nath (2020007), the
+// pack's wolf (1202008, in 140010210) and Maha in Rien (1201002), on an
+// Aran's way to riding and raising a wolf.
+const PUCCI: i32 = 1202007;
+const SCADUR: i32 = 2020007;
+const PACK_WOLF: i32 = 1202008;
+const MAHA: i32 = 1201002;
+const PUCCIS_REQUEST: i16 = 21600;
+const WOLF_MOUNT: i16 = 21604;
+const THE_WOLFS_EVOLUTION: i16 = 21618;
+const WOLF_MOUNT_ITEM: i32 = 1902017;
+const EVOLVED_WOLF_MOUNT: i32 = 1902018;
+
+/// `q21600s`: Pucci sends an Aran to Nanuke for food for a wolf cub
+/// (Cosmic `21600.js`); Nanuke ends it from the data.
+fn puccis_request() -> NpcScript {
+    let [strong, ask, nanuke] = keys::PUCCI_WOLF_REQUEST;
+    NpcScript::new(
+        PUCCI,
+        vec![
+            Page::Say(text(strong)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(PUCCIS_REQUEST)],
+                on_no: Some(text(keys::PUCCI_WOLF_REQUEST_DECLINED)),
+            },
+            Page::Say(text(nanuke)),
+        ],
+    )
+}
+
+/// `q21604s`: Scadur offers a saddle for the Aran's wolf for 50 hides
+/// (Cosmic `21604.js`); the data's end gives it and the riding skill.
+fn wolf_mount() -> NpcScript {
+    let mut script = NpcScript::new(
+        SCADUR,
+        keys::SCADUR_WOLF_MOUNT
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![Effect::StartQuest(WOLF_MOUNT)];
+    script
+}
+
+/// `q21613s`: the pack's wolf wants its pup back and puts the Aran to the
+/// test in the wolves' room, alone, against the wolves it summons (Cosmic
+/// `21613.js`).
+fn the_wolves_test() -> NpcScript {
+    let [pup, friend, ask] = keys::WOLF_TEST;
+    let mut script = NpcScript::new(
+        PACK_WOLF,
+        vec![
+            Page::Say(text(pup)),
+            Page::Reply(text(friend)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![
+                    Effect::RequireEmptyMap(scripts::WOLVES_TEST_ROOM),
+                    Effect::StartQuest(scripts::THE_WOLVES_TEST),
+                    Effect::WarpToPortal(scripts::WOLVES_TEST_ROOM, 0),
+                ],
+                on_no: Some(text(keys::WOLF_TEST_DECLINED)),
+            },
+        ],
+    );
+    script.refused = Some(text(keys::WOLF_TEST_BUSY));
+    script
+}
+
+/// Whether the pack's wolf lets `player` take its test again: on it and
+/// yet to come out of the room with every wolf down. Cosmic has no way
+/// back in once time runs out.
+fn retakes_the_wolves_test(player: &Player) -> bool {
+    player.quests.state(scripts::THE_WOLVES_TEST) == QuestState::Started
+        && player.quests.info(scripts::WOLVES_TEST_RECORD) != Some(scripts::WOLF_RUN_DONE)
+}
+
+fn the_wolves_test_again() -> NpcScript {
+    let mut script = NpcScript::new(
+        PACK_WOLF,
+        vec![Page::Ask {
+            text: text(keys::WOLF_TEST_AGAIN),
+            on_yes: vec![
+                Effect::RequireEmptyMap(scripts::WOLVES_TEST_ROOM),
+                Effect::WarpToPortal(scripts::WOLVES_TEST_ROOM, 0),
+            ],
+            on_no: None,
+        }],
+    );
+    script.refused = Some(text(keys::WOLF_TEST_BUSY));
+    script
+}
+
+/// `q21618s`: Maha offers to wake the power in the Aran's wolf (Cosmic
+/// `21618.js`).
+fn the_wolfs_evolution() -> NpcScript {
+    let [power, can_you, ask] = keys::MAHA_WOLF_EVOLUTION;
+    NpcScript::new(
+        MAHA,
+        vec![
+            Page::Say(text(power)),
+            Page::Reply(text(can_you)),
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(THE_WOLFS_EVOLUTION)],
+                on_no: None,
+            },
+        ],
+    )
+}
+
+/// `q21618e`: Maha turns the wolf into its grown form, once it is out of
+/// its equipment slot (Cosmic `21618.js`).
+fn the_wolf_evolved(player: &Player) -> NpcScript {
+    if player.inventory.count(WOLF_MOUNT_ITEM) == 0 {
+        return NpcScript::new(
+            MAHA,
+            vec![Page::Say(text(keys::MAHA_WOLF_EVOLUTION_UNEQUIP))],
+        );
+    }
+    let mut script = NpcScript::new(MAHA, vec![Page::Say(text(keys::MAHA_WOLF_EVOLUTION_DONE))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: WOLF_MOUNT_ITEM,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: EVOLVED_WOLF_MOUNT,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(THE_WOLFS_EVOLUTION),
+    ];
+    script.inventory_full = Some(text(keys::MAHA_WOLF_EVOLUTION_FULL));
     script
 }
 
@@ -11975,9 +12119,9 @@ fn kyrin_fourth_job_test(player: &Player) -> Option<NpcScript> {
     Some(script)
 }
 
-/// The clone's room, Lord Jonathan's test, Kyrin's and the Junior
-/// Balrog's other world: the time a challenger has in it, which the map
-/// itself doesn't set.
+/// The clone's room, Lord Jonathan's test, Kyrin's, the Junior Balrog's
+/// other world, the Field of Wolves and the wolves' test room: the time a
+/// challenger has in it, which the map itself doesn't set.
 pub fn time_limit(map_id: i32) -> Option<u32> {
     if map_id == crate::scripts::BALROG_WORLD {
         return Some(BALROG_WORLD_TIME_LIMIT);
@@ -11991,8 +12135,15 @@ pub fn time_limit(map_id: i32) -> Option<u32> {
     {
         return Some(crate::scripts::kyrin_time_limit());
     }
+    if [scripts::FIELD_OF_WOLVES, scripts::WOLVES_TEST_ROOM].contains(&map_id) {
+        return Some(WOLF_RUN_TIME_LIMIT);
+    }
     is_clone_room(map_id).then_some(CLONE_TIME_LIMIT)
 }
+
+/// An Aran's time in the Field of Wolves or the wolves' test room
+/// (Cosmic's `Aran_2ndmount` and `Aran_3rdmount` events).
+const WOLF_RUN_TIME_LIMIT: u32 = 3 * 60;
 
 fn is_clone_room(map_id: i32) -> bool {
     THIRD_JOBS.iter().any(|line| line.boss_map == map_id)
@@ -13653,6 +13804,97 @@ mod tests {
                 ]
             )
         );
+    }
+
+    #[test]
+    fn an_aran_earns_a_wolf_from_pucci_scadur_the_pack_and_maha() {
+        let aran = traveller(200, 0, false);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21600s", &aran).unwrap()),
+            (PUCCI, vec![Effect::StartQuest(PUCCIS_REQUEST)])
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21604s", &aran).unwrap()),
+            (SCADUR, vec![Effect::StartQuest(WOLF_MOUNT)])
+        );
+
+        let into_the_room = [
+            Effect::RequireEmptyMap(scripts::WOLVES_TEST_ROOM),
+            Effect::WarpToPortal(scripts::WOLVES_TEST_ROOM, 0),
+        ];
+        let test = NpcScript::for_quest("q21613s", &aran).unwrap();
+        assert_eq!(test.refused, Some(text(keys::WOLF_TEST_BUSY)));
+        assert_eq!(
+            yes_through(test),
+            (
+                PACK_WOLF,
+                vec![
+                    into_the_room[0].clone(),
+                    Effect::StartQuest(scripts::THE_WOLVES_TEST),
+                    into_the_room[1].clone(),
+                ]
+            )
+        );
+        // On the test and yet to pass it, the wolf lets the Aran back in;
+        // otherwise it has nothing to say.
+        assert!(NpcScript::for_npc(PACK_WOLF, &aran).is_none());
+        let mut testing = aran.clone();
+        testing.quests.upsert(game::QuestRecord {
+            quest_id: scripts::THE_WOLVES_TEST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let again = NpcScript::for_npc(PACK_WOLF, &testing).unwrap();
+        assert_eq!(again.refused, Some(text(keys::WOLF_TEST_BUSY)));
+        assert_eq!(yes_through(again), (PACK_WOLF, into_the_room.to_vec()));
+        testing
+            .quests
+            .set_record(scripts::WOLVES_TEST_RECORD, scripts::WOLF_RUN_DONE);
+        assert!(NpcScript::for_npc(PACK_WOLF, &testing).is_none());
+
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21618s", &aran).unwrap()),
+            (MAHA, vec![Effect::StartQuest(THE_WOLFS_EVOLUTION)])
+        );
+        // The wolf has to be out of its slot, in the Equip inventory.
+        let riding = NpcScript::for_quest("q21618e", &aran).unwrap();
+        assert_eq!(
+            page_text(&riding.clone().begin()),
+            text(keys::MAHA_WOLF_EVOLUTION_UNEQUIP)
+        );
+        assert_eq!(read_through(riding), (MAHA, Vec::new()));
+        let mut holding = aran.clone();
+        holding.inventory.insert(
+            game::InventoryType::Equip,
+            1,
+            game::Item::stack(WOLF_MOUNT_ITEM, 1),
+        );
+        let evolution = NpcScript::for_quest("q21618e", &holding).unwrap();
+        assert!(evolution.inventory_full.is_some());
+        assert_eq!(
+            read_through(evolution),
+            (
+                MAHA,
+                vec![
+                    Effect::TakeItem {
+                        item_id: WOLF_MOUNT_ITEM,
+                        quantity: 1,
+                    },
+                    Effect::GiveItem {
+                        item_id: EVOLVED_WOLF_MOUNT,
+                        quantity: 1,
+                    },
+                    Effect::CompleteQuest(THE_WOLFS_EVOLUTION),
+                ]
+            )
+        );
+
+        for room in [scripts::FIELD_OF_WOLVES, scripts::WOLVES_TEST_ROOM] {
+            assert_eq!(time_limit(room), Some(3 * 60));
+            assert!(resets_when_empty(room));
+        }
     }
 
     /// Every effect of `script` read to its end, answering yes to each ask.

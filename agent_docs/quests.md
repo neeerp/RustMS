@@ -271,6 +271,15 @@ record's one "kill" (`QuestTemplate::end_record`, `QuestRejection::Record`),
 so it is saved and sent as its progress string ("001"). The Thorn Remover the
 quest gives sets it (`Effect::QuestRecord`, see `inventory.md`, "Scripted
 items"), and the Secretary of Magic (1300004) then completes the quest.
+An Aran's "Scadur's Advice" (21610) and "The Wolves' Test" (21613) end on
+records 21619 and 21620 reading "0" (`RECORD_QUESTS`), which reaching the
+end of the Field of Wolves and leaving the wolves' test room with every wolf
+down set (`map-travel.md`). Nothing in the sources sets either; Cosmic's
+data asks for a token (4001193) instead. Cosmic has no way back into the
+test room once its clock runs out; here the pack's wolf (1202008) offers
+the test again while 21613 is started and unpassed. Maha's end script
+(`q21618e`) swaps the wolf (1902017) for its grown form (1902018) only when
+it is in the Equip inventory, not ridden.
 "The Test" (2312) has a start check of the same kind: its `Check.img/0`
 `infoNumber` names record 2311, which must be "1" (cond 0 is string equality,
 1 at least, 2 at most, as in the end check; v83 FUN_00721163). Such pairs are
