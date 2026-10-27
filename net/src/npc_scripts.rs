@@ -1058,6 +1058,8 @@ pub enum OnText {
     NameAlliance,
     /// The Secret Passage opens, `through` it, for Parwen's `password`.
     SecretPassage { password: String, through: Effect },
+    /// The Puppeteer's door lets one who is `hunting` him through.
+    PuppeteerDoor { hunting: bool },
 }
 
 impl OnText {
@@ -1068,6 +1070,7 @@ impl OnText {
             OnText::SecretPassage { password, through } => {
                 secret_passage_opens(text == password, through)
             }
+            OnText::PuppeteerDoor { hunting } => puppeteer_door_opens(text, *hunting),
         }
     }
 }
@@ -2175,6 +2178,8 @@ impl NpcScript {
             PIG_FARM_SHADOW | PIG_FARM_DECOY | LIBRARY_SHADOW | LIBRARY_CORNER => {
                 return Some(black_shadow(npc_id, player));
             }
+            PUPPETEER_DOOR => return Some(puppeteer_door(player)),
+            FRANCIS => return Some(francis()),
             _ => {}
         }
         // These fall through when silent, so the same NPCs can say more.
@@ -4621,6 +4626,87 @@ fn black_shadow(npc: i32, player: &Player) -> NpcScript {
         _ => vec![Page::Say(text(keys::BLACK_SHADOW_NOTHING))],
     };
     NpcScript::new(npc, pages)
+}
+
+/// The Cave Wall of Evil Eye, the Puppeteer's door at the end of the Cave
+/// of Evil Eye (105070300), which its `enterDollcave` portal opens until
+/// the Puppeteer is beaten (Cosmic `PupeteerPassword`).
+pub const PUPPETEER_DOOR: i32 = 1063011;
+/// The door's password, as Find the Puppeteer! (20730) spells it out:
+/// `#p1104000# is a genius #o9300285#!`, Francis's name and the
+/// Puppeteer's.
+const PUPPETEER_PASSWORD: &str = "Francis is a genius Puppeteer";
+const PUPPETEER_PASSWORD_MAX: i16 = 40;
+/// Behind the door, Francis's room, where Francis (1104000) catches the
+/// intruder.
+const FRANCIS_ROOM: i32 = 910510001;
+const FRANCIS: i32 = 1104000;
+/// The Puppeteer's Cave (21728), an Aran's search of the door, and the
+/// record its completion reads ("0").
+const PUPPETEERS_CAVE: i16 = 21728;
+const PUPPETEERS_CAVE_RECORD: i16 = 21761;
+const PUPPETEERS_CAVE_SEARCHED: &str = "0";
+
+/// The Puppeteer's door. An Aran on The Puppeteer's Cave finds the way
+/// blocked, which sets the record that quest's completion at 1061019
+/// reads. Anyone else is asked for the password. The text is unsourced.
+fn puppeteer_door(player: &Player) -> NpcScript {
+    if player.quests.state(PUPPETEERS_CAVE) == QuestState::Started {
+        return NpcScript::new(
+            PUPPETEER_DOOR,
+            vec![Page::Act {
+                text: text(keys::PUPPETEER_DOOR_SEARCHED),
+                effects: vec![Effect::SetRecord {
+                    record: PUPPETEERS_CAVE_RECORD,
+                    value: PUPPETEERS_CAVE_SEARCHED,
+                }],
+            }],
+        );
+    }
+    NpcScript::new(
+        PUPPETEER_DOOR,
+        vec![Page::AskText {
+            text: text(keys::PUPPETEER_DOOR_ASK),
+            min: 1,
+            max: PUPPETEER_PASSWORD_MAX,
+            on_text: OnText::PuppeteerDoor {
+                hunting: scripts::hunted_puppeteer(player).is_some(),
+            },
+        }],
+    )
+}
+
+/// The right password, in any case and with or without its "!", lets one
+/// hunting the Puppeteer into Francis's room; anyone else hears it's right
+/// but the way stays shut, in pink.
+fn puppeteer_door_opens(text_given: &str, hunting: bool) -> Vec<Page> {
+    let given = text_given.trim();
+    let given = given.strip_suffix('!').unwrap_or(given).trim_end();
+    if !given.eq_ignore_ascii_case(PUPPETEER_PASSWORD) {
+        return vec![Page::Say(text(keys::PUPPETEER_DOOR_WRONG))];
+    }
+    if !hunting {
+        return vec![Page::Done(vec![Effect::Pink(text(
+            keys::PUPPETEER_DOOR_SHUT,
+        ))])];
+    }
+    vec![Page::Done(vec![
+        Effect::PortalSound,
+        Effect::WarpToPortal(FRANCIS_ROOM, 1),
+    ])]
+}
+
+/// Francis catches the intruder and sends them on into the Puppeteer's
+/// hideout, one player at a time (Cosmic `1104000.js` and its `Puppeteer`
+/// event). The text is unsourced.
+fn francis() -> NpcScript {
+    let mut script = NpcScript::new(FRANCIS, vec![Page::Say(text(keys::FRANCIS_INTRUDER))]);
+    script.on_end = vec![
+        Effect::RequireEmptyMap(scripts::PUPPETEERS_HIDEOUT),
+        Effect::WarpToPortal(scripts::PUPPETEERS_HIDEOUT, 1),
+    ];
+    script.refused = Some(text(keys::FRANCIS_HIDEOUT_BUSY));
+    script
 }
 
 /// Captain Al, in Lith Harbor (104000000) and Orbis Park (200000200).
@@ -12229,11 +12315,12 @@ mod tests {
             let mut player = traveller(30, 0, false);
             for &(quest_id, state) in quests {
                 let status = match state {
+                    QuestState::NotStarted => continue,
                     QuestState::Started => QuestStatus::Started {
                         kills: Vec::new(),
                         info: None,
                     },
-                    _ => QuestStatus::Completed {
+                    QuestState::Completed => QuestStatus::Completed {
                         at: std::time::SystemTime::UNIX_EPOCH,
                     },
                 };
@@ -12290,6 +12377,85 @@ mod tests {
         found.quests.set_record(20732, "1");
         nothing(LIBRARY_SHADOW, &found);
         nothing(LIBRARY_SHADOW, &on(&[]));
+    }
+
+    #[test]
+    fn the_puppeteers_door_lets_his_hunters_through_on_the_password() {
+        let on = |quests: &[(i16, QuestState)]| {
+            let mut player = traveller(30, 0, false);
+            for &(quest_id, state) in quests {
+                let status = match state {
+                    QuestState::Started => QuestStatus::Started {
+                        kills: Vec::new(),
+                        info: None,
+                    },
+                    _ => QuestStatus::Completed {
+                        at: std::time::SystemTime::UNIX_EPOCH,
+                    },
+                };
+                player.quests.upsert(game::QuestRecord { quest_id, status });
+            }
+            player
+        };
+        let answer = |player: &Player, given: &str| {
+            let mut door = NpcScript::for_npc(PUPPETEER_DOOR, player).unwrap();
+            assert!(matches!(door.begin().prompt, Some(Prompt::AskText { .. })));
+            door.respond(ScriptInput::Text(given.into())).unwrap()
+        };
+        let through = [Effect::PortalSound, Effect::WarpToPortal(FRANCIS_ROOM, 1)];
+
+        for quest in [20730, 21731] {
+            let hunting = on(&[(quest, QuestState::Started)]);
+            for given in [
+                "Francis is a genius Puppeteer!",
+                "francis is a genius puppeteer",
+                " Francis is a genius Puppeteer ! ",
+            ] {
+                assert_eq!(answer(&hunting, given).effects, through, "{given}");
+            }
+            let wrong = answer(&hunting, "Puppeteer is a genius Francis!");
+            assert_eq!(page_text(&wrong), text(keys::PUPPETEER_DOOR_WRONG));
+            assert!(wrong.effects.is_empty());
+            // Beaten, the way stays shut.
+            let mut beaten = hunting.clone();
+            *beaten.quests.kills_mut(quest).unwrap() = vec![1];
+            assert_eq!(
+                answer(&beaten, "Francis is a genius Puppeteer!").effects,
+                [Effect::Pink(text(keys::PUPPETEER_DOOR_SHUT))]
+            );
+        }
+        assert_eq!(
+            answer(&on(&[]), "Francis is a genius Puppeteer!").effects,
+            [Effect::Pink(text(keys::PUPPETEER_DOOR_SHUT))]
+        );
+
+        // An Aran on The Puppeteer's Cave finds the way barred.
+        let searching = on(&[(PUPPETEERS_CAVE, QuestState::Started)]);
+        let step = NpcScript::for_npc(PUPPETEER_DOOR, &searching)
+            .unwrap()
+            .begin();
+        assert_eq!(page_text(&step), text(keys::PUPPETEER_DOOR_SEARCHED));
+        assert_eq!(
+            step.effects,
+            [Effect::SetRecord {
+                record: 21761,
+                value: "0"
+            }]
+        );
+
+        // Francis sends the intruder on into the hideout, if no one is in.
+        let francis = NpcScript::for_npc(FRANCIS, &on(&[])).unwrap();
+        assert_eq!(page_text(&francis.begin()), text(keys::FRANCIS_INTRUDER));
+        assert_eq!(
+            read_through(francis),
+            (
+                FRANCIS,
+                vec![
+                    Effect::RequireEmptyMap(scripts::PUPPETEERS_HIDEOUT),
+                    Effect::WarpToPortal(scripts::PUPPETEERS_HIDEOUT, 1),
+                ]
+            )
+        );
     }
 
     #[test]

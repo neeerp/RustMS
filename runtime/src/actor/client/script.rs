@@ -7,7 +7,8 @@ use net::scripts;
 use tracing::debug;
 
 impl ClientActor {
-    /// Run the current map's `onUserEnter` script after joining it.
+    /// Run the current map's `onUserEnter` script after joining it, or
+    /// what a map without one does on entry.
     pub(super) async fn run_map_enter_script(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let Some(script) = net::get_game_data()
@@ -15,6 +16,10 @@ impl ClientActor {
             .and_then(|data| data.field(map_id))
             .and_then(|field| field.on_user_enter.clone())
         else {
+            let effects = scripts::unscripted_map_enter(&self.in_game()?.player);
+            if !effects.is_empty() {
+                self.apply_effects(&effects).await?;
+            }
             return Ok(());
         };
         match scripts::map_enter(&script, &self.in_game()?.player) {

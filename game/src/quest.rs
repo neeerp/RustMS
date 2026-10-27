@@ -27,10 +27,14 @@ pub const INFO_QUESTS: &[i16] = &[
 /// lost memory a job instructor gives back (7081, for "Memory Keeper",
 /// 3507), and the black shadows the Cygnus Knights hunt: the one spotted in
 /// the Pig Farm (20731, for "A Black Shadow in the Pig Farm", 20706) and
-/// the one in the Magic Library (20732, for "Maybe it's Grendel!", 20718).
+/// the one in the Magic Library (20732, for "Maybe it's Grendel!", 20718),
+/// and an Aran's search of the Puppeteer's door (21761, for "The
+/// Puppeteer's Cave", 21728).
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
-pub const RECORDS: &[i16] = &[2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732];
+pub const RECORDS: &[i16] = &[
+    2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732, 21761,
+];
 
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
