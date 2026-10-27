@@ -251,8 +251,8 @@ const TIGER_RIDGE: i32 = 222010200;
 const GLOOMY_FOREST: i32 = 922220000;
 const OLD_FOX_TAIL: i32 = 4031793;
 /// The Mushroom Castle's Security Room (`go_secretroom`): its key opens it
-/// while quest 2335 is taken, which the door completes. (The quest isn't
-/// supported yet, so only players who finished it some other way get in.)
+/// while quest 2335, which Violetta gives it for, is taken, and the door
+/// completes the quest.
 const SECURITY_ROOM: i32 = 106021001;
 const SECURITY_ROOM_KEY: i32 = 4032405;
 const SECURITY_ROOM_QUEST: i16 = 2335;
@@ -3881,7 +3881,8 @@ mod tests {
             .quest(SECURITY_ROOM_QUEST)
             .is_none()
         {
-            // Not supported yet: the door stays shut rather than fail.
+            // Without the quest in the catalog, the door stays shut rather
+            // than fail.
             assert!(pink(&opened));
             return;
         }

@@ -2380,6 +2380,7 @@ impl NpcScript {
             "q2333s" => Some(violetta_betrayed()),
             "q2333e" => Some(prime_minister_beaten()),
             "q2334s" => Some(violettas_face()),
+            "q2335s" => Some(violettas_key()),
             "q2342s" => Some(violettas_seal(player)),
             "q3108s" => Some(snow_statue_clue()),
             "q3523s" => lost_memory(3523),
@@ -2869,6 +2870,9 @@ const VIOLETTA: i32 = 1300002;
 /// the Mushking.
 const ROYAL_SEAL: i32 = 4001318;
 const SEAL_OF_THE_EMPIRE: i16 = 2331;
+/// Eliminating the Rest, and the key to the Security Room it is for.
+const ELIMINATING_THE_REST: i16 = 2335;
+const SECURITY_ROOM_KEY: i32 = 4032405;
 
 /// `q2332e`, Where's Violetta?: found in the Wedding Hall (`findvioleta`
 /// set the record its end asks for), Violetta thanks the player, with the
@@ -2936,6 +2940,34 @@ fn violettas_face() -> NpcScript {
 /// Violetta hands over the one the Prime Minister dropped, and the quest
 /// completes as it starts (Cosmic `2342.js`). Anyone else is only told
 /// that she keeps it.
+/// `q2335s`, Eliminating the Rest: Violetta gives the key the Prime
+/// Minister dropped (4032405), which opens the Security Room near
+/// Skyscraper 3 (`go_secretroom`, whose door completes the quest), and the
+/// quest with it; without a free ETC slot, neither.
+fn violettas_key() -> NpcScript {
+    let mut script = NpcScript::new(
+        VIOLETTA,
+        vec![
+            Page::Say(text(keys::VIOLETTA_MINIONS)),
+            Page::Ask {
+                text: text(keys::VIOLETTA_KEY),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(keys::VIOLETTA_KEY_LUCK)),
+        ],
+    );
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: SECURITY_ROOM_KEY,
+            quantity: 1,
+        },
+        Effect::StartQuest(ELIMINATING_THE_REST),
+    ];
+    script.inventory_full = Some(text(keys::VIOLETTA_KEY_FULL));
+    script
+}
+
 fn violettas_seal(player: &Player) -> NpcScript {
     if player.quests.state(SEAL_OF_THE_EMPIRE) != QuestState::Started
         || player.inventory.count(ROYAL_SEAL) > 0
@@ -10465,6 +10497,35 @@ mod tests {
             let script = NpcScript::for_quest("q2342s", &player).unwrap();
             assert_eq!(read_through(script), (VIOLETTA, Vec::new()), "only told");
         }
+    }
+
+    #[test]
+    fn violetta_gives_the_security_room_key_with_eliminating_the_rest() {
+        let quest = || NpcScript::for_quest("q2335s", &with_quests(&[])).unwrap();
+        let mut script = quest();
+        assert!(script.begin().prompt.is_some());
+        let asked = script.respond(ScriptInput::Next).unwrap();
+        assert!(asked.prompt.is_some() && asked.effects.is_empty());
+        let luck = script.respond(ScriptInput::Yes).unwrap();
+        assert!(luck.prompt.is_some() && luck.effects.is_empty());
+        let end = script.respond(ScriptInput::Next).unwrap();
+        assert_eq!(end.prompt, None);
+        assert_eq!(
+            end.effects,
+            [
+                Effect::GiveItem {
+                    item_id: SECURITY_ROOM_KEY,
+                    quantity: 1
+                },
+                Effect::StartQuest(ELIMINATING_THE_REST),
+            ]
+        );
+        assert!(quest().inventory_full().is_some(), "said with no room");
+        let mut declined = quest();
+        declined.begin();
+        declined.respond(ScriptInput::Next);
+        let no = declined.respond(ScriptInput::No);
+        assert!(no.is_none_or(|step| step.effects.is_empty()));
     }
 
     #[test]
