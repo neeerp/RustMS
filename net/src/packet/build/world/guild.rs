@@ -24,7 +24,11 @@ const OP_TITLES_CHANGED: u8 = 0x3E;
 const OP_RANK_CHANGED: u8 = 0x40;
 const OP_EMBLEM_CHANGED: u8 = 0x42;
 const OP_NOTICE_CHANGED: u8 = 0x44;
+const OP_POINTS_CHANGED: u8 = 0x48;
 const OP_RANKING: u8 = 0x49;
+
+/// `SHOW_STATUS_INFO`'s mode for guild points gained or lost.
+const STATUS_GUILD_POINTS: u8 = 6;
 
 /// `MULTICHAT` mode for guild chat.
 pub const MULTICHAT_GUILD: u8 = 2;
@@ -274,6 +278,24 @@ pub fn build_notice_changed(guild_id: i32, notice: &str) -> Result<Packet, Netwo
     let mut packet = guild_operation(OP_NOTICE_CHANGED)?;
     packet.write_int(guild_id)?;
     packet.write_str_with_length(notice)?;
+    Ok(packet)
+}
+
+/// The guild's points, now `points`, which the client keeps quietly.
+pub fn build_points_changed(guild_id: i32, points: i32) -> Result<Packet, NetworkError> {
+    let mut packet = guild_operation(OP_POINTS_CHANGED)?;
+    packet.write_int(guild_id)?;
+    packet.write_int(points)?;
+    Ok(packet)
+}
+
+/// The chat line for guild points gained, or lost if `amount` is
+/// negative (`SHOW_STATUS_INFO` mode 6).
+pub fn build_points_gain_in_chat(amount: i32) -> Result<Packet, NetworkError> {
+    let mut packet = Packet::new_empty();
+    packet.write_short(SendOpcode::ShowStatusInfo as i16)?;
+    packet.write_byte(STATUS_GUILD_POINTS)?;
+    packet.write_int(amount)?;
     Ok(packet)
 }
 
@@ -706,6 +728,26 @@ mod tests {
             .byte(2)
             .short(2003)
             .byte(4)
+            .end();
+    }
+
+    #[test]
+    fn points_changed_and_gained() {
+        let packet = build_points_changed(9, 120).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::GuildOperation as i16)
+            .byte(0x48)
+            .int(9)
+            .int(120)
+            .end();
+
+        let packet = build_points_gain_in_chat(-30).unwrap();
+        let mut expect = Expect::new(&packet.bytes);
+        expect
+            .short(SendOpcode::ShowStatusInfo as i16)
+            .byte(6)
+            .int(-30)
             .end();
     }
 }

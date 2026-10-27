@@ -86,8 +86,14 @@ namespace ms
 			EMBLEM_CHANGED = 0x42,
 			// 0xd15
 			NOTICE_CHANGED = 0x44,
+			// Silent
+			POINTS_CHANGED = 0x48,
 			// The Honorable Rock's ranking window
-			RANKING = 0x49
+			RANKING = 0x49,
+			// 0xdd9: the Guild Quest ends, too few members left
+			QUEST_TOO_FEW = 0x4A,
+			// 0xdda: the Guild Quest ends, its registrant gone
+			QUEST_REGISTRANT_LEFT = 0x4B
 		};
 
 		// Heracle, at the guild headquarters, says the client's own guild
@@ -529,6 +535,24 @@ namespace ms
 			refresh();
 			break;
 		}
+		case Operation::POINTS_CHANGED:
+		{
+			int32_t guild_id = recv.read_int();
+			int32_t points = recv.read_int();
+
+			if (!guild.exists() || guild_id != guild.get_data().id)
+				break;
+
+			guild.set_points(points);
+			refresh();
+			break;
+		}
+		case Operation::QUEST_TOO_FEW:
+			chat_line("There are less than 6 members remaining, so the quest cannot continue. Your Guild Quest will end in 5 seconds.");
+			break;
+		case Operation::QUEST_REGISTRANT_LEFT:
+			chat_line("The user that registered has disconnected, so the quest cannot continue. Your Guild Quest will end in 5 seconds.");
+			break;
 		case Operation::RANKING:
 		{
 			// The NPC's id, which the window doesn't use.

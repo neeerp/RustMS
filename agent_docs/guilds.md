@@ -164,6 +164,20 @@ case (a unique index on `lower(name)`).
   NPC's id, the count, then for each guild its name, points and emblem as
   four ints: mark, mark colour, background, background colour.
 
+### Guild points
+
+- A guild's points (GP) are `guilds.points`, sent in the guild's record.
+  They rank the guild (above) and will come from the Guild Quest; for now
+  a GM's `!gp <amount>` and a script's `Effect::GainGuildPoints` add them
+  (`GuildRequest::GainPoints`, `gain_guild_points` in
+  `runtime/src/actor/client/guilds.rs`). Nothing happens without a guild.
+- `db::guild::add_points` adds the amount under the guild's lock and never
+  goes below 0. Every member online then gets GUILD_OPERATION 0x48
+  (`build_points_changed`: the guild id and the new total) and the chat
+  line `SHOW_STATUS_INFO` mode 6 (`build_points_gain_in_chat`: the amount,
+  which may be negative). Cosmic sends the line only for the Guild
+  Quest's own gains; RustMS sends it for every change.
+
 ### Bulletin board
 
 The guild board (`GUILD_BBS`, recv 0x9B, send 0x3B; the RE notes are
@@ -353,6 +367,13 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
     the notice, an empty one clearing it, and prints "* Guild Notice :
     <notice>" unless it is empty. v83 prints every guild line in its type
     0xc colour, which is `LineType::SKILL`.
+  - 0x48 stores the guild's points silently, for the player's guild only,
+    and the rank panel's GP follows. Mode 6 of `SHOW_STATUS_INFO` prints
+    "You have earned Guild Points (+N)", or "You have lost Guild Points
+    (N)" for none or less (`guild_points_line`).
+  - 0x4A and 0x4B end a Guild Quest with v83's lines 0xdd9 ("There are
+    less than 6 members remaining, ...") and 0xdda ("The user that
+    registered has disconnected, ..."); the server sends neither yet.
   - 0x32 clears the guild; Heracle tells the master "The guild has been
     disbanded..", and the others get the chat line "The guild has been
     disbanded.". 0x3A sets the capacity, and Heracle tells the master the
@@ -534,7 +555,7 @@ the server rules borrowed from Cosmic in `b024-alliance-server-facts.md`
   opened again while sliding back; this one always starts over. A title
   too short closes the prompt, says so and asks again, where v83's prompt
   stays open.
-- Earning guild points, and the guild quest.
+- The Guild Quest, so guild points have no source in play yet.
 - The alliance's rank panel slides no more than the guild's.
 - The Alliance tab's tooltips: the whole notice over its box, the online
   and total counts, "Sort thru" over the column heads, and "Unknown" over a

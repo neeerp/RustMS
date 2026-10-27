@@ -119,6 +119,7 @@ impl ClientActor {
         let mut name_guild = false;
         let mut grow_guild = None;
         let mut disband_guild = false;
+        let mut guild_points = 0;
         let mut alliance = None;
         let mut carnival = None;
         let mut gm_event = None;
@@ -225,6 +226,7 @@ impl ClientActor {
                 Effect::OpenWishlist => afterwards.push(marriage::build_wishlist_input()?),
                 Effect::GrowGuild { from } => grow_guild = Some(*from),
                 Effect::DisbandGuild => disband_guild = true,
+                Effect::GainGuildPoints(amount) => guild_points += amount,
                 Effect::CreateAlliance { .. }
                 | Effect::GrowAlliance { .. }
                 | Effect::DisbandAlliance => alliance = Some(effect.clone()),
@@ -812,6 +814,9 @@ impl ClientActor {
         // These change the player themselves, so they wait for the commit.
         if let Some(from) = grow_guild {
             self.grow_guild(from).await?;
+        }
+        if guild_points != 0 {
+            self.gain_guild_points(guild_points).await?;
         }
         if disband_guild {
             self.disband_guild().await?;

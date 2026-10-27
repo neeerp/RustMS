@@ -208,6 +208,8 @@ int main()
 		require(guild.title(5) == "Recruit" && guild.lowest_rank() == 5, "new titles");
 		guild.set_notice("Hello");
 		require(guild.get_data().notice == "Hello", "a new notice");
+		guild.set_points(120);
+		require(guild.get_data().points == 120, "new guild points");
 		require(guild.set_online(3, false) && guild.online_count() == 1 && guild.online_ids(9) == std::vector<int32_t>{ 1 }, "a member logs out");
 		require(guild.set_online(3, true) && guild.online_count() == 2 && !guild.set_online(9, true), "a member logs in");
 		require(guild.set_level_job(3, 31, 110) && guild.find(3)->level == 31 && guild.find(3)->job == 110, "a member's level and job");
