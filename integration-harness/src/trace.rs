@@ -240,6 +240,9 @@ pub struct Trace {
     pub partner_maps: Vec<(i32, i32)>,
     /// SHOW_STATUS_INFO mode 9: the info lines, in order.
     pub info_texts: Vec<String>,
+    /// SHOW_STATUS_INFO mode 10: (quest, record beside the quest log), in
+    /// order.
+    pub quest_records: Vec<(i16, String)>,
     /// SCRIPT_PROGRESS_MESSAGE lines, in order.
     pub script_messages: Vec<String>,
     /// QUEST_CLEAR: the quests whose titles were earned, in order.
@@ -406,6 +409,11 @@ impl Trace {
                 4 => self.fame_gains.push(r.read_int().unwrap()),
                 5 => self.meso_gains.push(r.read_int().unwrap()),
                 9 => self.info_texts.push(r.read_str_with_length().unwrap()),
+                10 => {
+                    let quest = r.read_short().unwrap();
+                    self.quest_records
+                        .push((quest, r.read_str_with_length().unwrap()));
+                }
                 8 => {
                     for _ in 0..r.read_byte().unwrap() {
                         self.expired.push(r.read_int().unwrap());

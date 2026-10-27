@@ -105,6 +105,9 @@ namespace ms
 		{
 			Texture texture;
 			size_t box;
+			// The box's size, and where in it the texture's origin goes.
+			Point<int16_t> size;
+			Point<int16_t> anchor;
 		};
 
 		void change_tab(uint16_t tabid);

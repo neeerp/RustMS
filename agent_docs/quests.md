@@ -953,6 +953,34 @@ once a button is pressed or 30 s after it appeared, whichever comes first.
 above the last, over it, and when one goes, those above it move down 5 px.
 Handing in or forfeiting the quest also takes its notice away.
 
+## Records beside the quest log
+
+The client keeps a second store by quest, beside the quest log ("quest
+record ex"; Cosmic calls it area info): a `k=v;k=v` string per quest,
+`game::quest_ex::QuestExRecords` on the server and `quest_ex_records` in
+the database. The character data carries them all after the new year
+cards (u16 count, then u16 quest and string each), and SHOW_STATUS_INFO
+mode 10 (u16 quest, string) replaces one (`build_quest_ex_record`).
+
+A quest's texts read them through `#j<key>#` tokens, as the client's
+formatter (0x99dd54) shows them (HeavenClient `QuestRecordEx::token`):
+
+| Key | Shown as |
+|---|---|
+| `try`, `cmp`, `vic`, `lose`, `draw`, `min` | the number, `%4d` |
+| `sec` | the number, `%2d` |
+| `gvup` | `try - vic - lose - draw` |
+| `have`, `have0`... | `Acquire` if above 0, else `Fail` |
+| `rank` | the image `UI/Basic.img/PQuestRank/<rank>`, F if none |
+| anything else (`date`) | the value as it stands |
+
+So far only the party quests keep records, on their info quests 1200-1206
+and 1301. The client lists these under "Party Quest" and never offers them
+(`quest-window.md`), and nothing completes them, so they stay out of the
+supported list: the server starts each, with no string, as a record of its
+own (`game::quest::RECORDS`) along with the first record beside it, and it
+stays started. `party-quests.md` says when the records change.
+
 ## Persistence and rewards
 
 `character_quests` is keyed by `(character_id, quest_id)`: no row (not

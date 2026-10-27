@@ -7,6 +7,8 @@ use super::ClientActor;
 use crate::actor::event::EventTicket;
 use crate::error::RuntimeError;
 use crate::message::{CarnivalPick, DirectoryMessage, FieldKey, FieldMessage};
+use game::quest_ex::{self, PartyQuestOutcome};
+use game::QuestState;
 use game_data::server_content::keys;
 use game_data::{Area, PortalTemplate};
 use net::carnival::SpendRefusal;
@@ -28,12 +30,13 @@ use net::packet::build::world::field::{
 };
 use net::packet::build::world::inventory::build_inventory_operation;
 use net::packet::build::world::messaging::build_item_line;
-use net::packet::build::world::quest::build_quest_record;
+use net::packet::build::world::quest::{build_quest_ex_record, build_quest_record};
 use net::packet::handle::world::{portal_name, warp_to_spawn_point};
 use net::scripts::{self, Effect};
 use net::ClientId;
 use packet::Packet;
 use rand::Rng;
+use std::time::SystemTime;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
 
@@ -1093,6 +1096,11 @@ impl ClientActor {
             self.send(&mut build_dojo_energy(0)?).await?;
         }
         self.warp_within_event(entry).await?;
+        // A Monster Carnival's try is its battle, not its waiting room.
+        if !matches!(kind, EventKind::Carnival(_)) {
+            self.record_party_quest(kind, PartyQuestOutcome::Entered)
+                .await?;
+        }
         if kind == EventKind::Opq {
             self.start_script(NpcScript::opq_arrival()).await?;
         }
@@ -1211,6 +1219,46 @@ impl ClientActor {
         }
         self.in_game_mut()?.player.carnival_result = Some((won, points));
         self.cure_diseases().await
+    }
+
+    /// Record `outcome` in the party quest record of event `kind`, if it
+    /// keeps one, with the rewards the player has: its info quest starts if
+    /// it has not, and the client is sent the record whole.
+    pub(super) async fn record_party_quest(
+        &mut self,
+        kind: EventKind,
+        outcome: PartyQuestOutcome,
+    ) -> Result<(), RuntimeError> {
+        let Some((quest_id, rewards)) = kind.record_quest() else {
+            return Ok(());
+        };
+        if self.in_cash_shop || self.game.is_none() {
+            return Ok(());
+        }
+        let mut next = self.in_game()?.player.clone();
+        let held: Vec<bool> = rewards
+            .iter()
+            .map(|&item_id| {
+                next.inventory.count(item_id) > 0
+                    || next.inventory.equipped_ids().any(|(_, id)| id == item_id)
+            })
+            .collect();
+        quest_ex::record_party_quest(&mut next.quest_ex, quest_id, outcome, &held);
+        let data = next.quest_ex.raw(quest_id).unwrap_or_default();
+        if self.in_game()?.player.quest_ex.raw(quest_id) == Some(data) {
+            return Ok(());
+        }
+        let mut packets = vec![build_quest_ex_record(quest_id, data)?];
+        // The info quest starts with the first record, as a record of its
+        // own (`game::quest::RECORDS`): the client never offers it.
+        if next.quests.state(quest_id) == QuestState::NotStarted {
+            next.quests.set_record(quest_id, "");
+            packets.push(build_quest_record(quest_id, "")?);
+        }
+        if self.commit_player(next, None, &mut packets).await? {
+            self.send_all(&mut packets).await?;
+        }
+        Ok(())
     }
 
     /// Event `id` ended: out of its maps, if the player still holds its
@@ -1338,6 +1386,11 @@ impl ClientActor {
         let Some(ticket) = self.event.take() else {
             return Ok(());
         };
+        // A won party quest's reward is usually had by now.
+        if ticket.won() {
+            self.record_party_quest(ticket.kind, PartyQuestOutcome::Left)
+                .await?;
+        }
         let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
@@ -1414,6 +1467,7 @@ impl ClientActor {
         if self.in_cash_shop || self.game.is_none() {
             return Ok(());
         }
+        let (ticket_kind, entered) = (ticket.kind, ticket.entered);
         let event = ticket.kind.event();
         let dojo = matches!(
             ticket.kind,
@@ -1477,7 +1531,15 @@ impl ClientActor {
                 }
             }
         }
-        self.send_all(&mut packets).await
+        self.send_all(&mut packets).await?;
+        if won {
+            let cleared = PartyQuestOutcome::Cleared {
+                took: entered.elapsed(),
+                at: SystemTime::now(),
+            };
+            self.record_party_quest(ticket_kind, cleared).await?;
+        }
+        Ok(())
     }
 
     /// Event `id` takes the player, if on `from` (or anywhere in it), to

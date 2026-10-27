@@ -104,6 +104,8 @@ pub struct SetFieldPacket {
     pub linked_name: Option<String>,
     /// The crush rings, then the friendship rings, the character carries.
     pub couple_rings: Vec<CoupleRingRecord>,
+    /// The records kept beside the quest log, by quest.
+    pub quest_records: BTreeMap<i16, String>,
 }
 
 /// A crush or friendship ring record of the character data.
@@ -1052,6 +1054,17 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         let card = 2_380_000 + i32::from(cursor.read_short().map_err(|e| e.to_string())?);
         monster_book.insert(card, cursor.read_byte().map_err(|e| e.to_string())?);
     }
+    if cursor.read_short().map_err(|e| e.to_string())? != 0 {
+        return Err("unexpected new year cards".into());
+    }
+    let mut quest_records = BTreeMap::new();
+    for _ in 0..cursor.read_short().map_err(|e| e.to_string())? {
+        let id = cursor.read_short().map_err(|e| e.to_string())?;
+        quest_records.insert(
+            id,
+            cursor.read_str_with_length().map_err(|e| e.to_string())?,
+        );
+    }
 
     Ok(SetFieldPacket {
         character_id: meta.id,
@@ -1079,6 +1092,7 @@ pub fn decode_set_field(packet: &Packet) -> Result<SetFieldPacket, String> {
         monster_book,
         linked_name,
         couple_rings,
+        quest_records,
     })
 }
 

@@ -106,6 +106,8 @@ mod tests {
         player.buddy_capacity = 30;
         player.linked_name = Some("Sib".into());
         player.monster_book = MonsterBook::new(2380001, [(2380000, 5), (2380001, 2)]);
+        player.quest_ex =
+            game::quest_ex::QuestExRecords::from_raw([(1201, "try=2;rank=D".to_string())]);
         player
     }
 
@@ -203,7 +205,7 @@ mod tests {
         expect.int(2380001).byte(0).short(2);
         expect.short(0).byte(5).short(1).byte(2);
         expect.short(0); // new year cards
-        expect.short(0); // area info
+        expect.short(1).short(1201).string("try=2;rank=D"); // quest records
         expect.short(0);
 
         expect.skip(8); // FILETIME now

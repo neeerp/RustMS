@@ -279,6 +279,29 @@ is ready to go (`kpq.nella.bonus`) and sends them to 103000890 like on the
 other stages, which takes the coupons and passes they still hold. The won
 event ends when the last member has left its maps.
 
+## Records
+
+Each party quest with an info quest keeps the member's record on it
+(`EventKind::record_quest`; see "Records beside the quest log" in
+`quests.md`): Henesys's 1200, Kerning City's 1201, Ludibrium's 1202,
+Orbis's 1203, the Pirate Ship's 1204, Romeo and Juliet's 1205, the Forest
+of Poison Haze's 1206 and the Monster Carnival's 1301
+(`game::quest_ex::record_party_quest`):
+
+- Entering counts a try and starts the info quest if it isn't
+  (`event_started`); the Carnival counts it when the battle starts. The
+  started quest shows in the Quest Log's In Progress tab, with the record.
+- The last stage's clear counts `cmp` and, if faster than the best,
+  keeps `min`, `sec` (from the ticket's `entered`) and `date` (UTC,
+  `yyyy/mm/dd`). A Carnival battle counts `vic`, `lose` or `draw`
+  (`ServerMessage::RecordPartyQuest`).
+- `have` (or `have0`, `have1`... for several) says whether the member holds
+  the quest's reward (Henesys's hat, Kerning City's shoes and so on), carried
+  or worn, and stays 1 once had. It is checked at each change above and on
+  leaving a won quest, by when the reward is usually had.
+- `rank` follows the wins (`cmp + vic`): S from 100, A 50, B 30, C 10, D 1,
+  else F. The client has no rule of its own (`v83ref` QUESTIONS b244).
+
 ## Clearing a stage
 
 Stage n is played on `entry + (n - 1) * stride` (`Event::stage_map`):

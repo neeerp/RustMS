@@ -2781,6 +2781,24 @@ impl EventKind {
         EventKind::RockSpiritVip,
     ];
 
+    /// The info quest whose record (`game::quest_ex`) keeps the player's
+    /// runs of this party quest, and the rewards that record shows as had
+    /// (`have`, or `have0`... for several), as QuestInfo's texts for it
+    /// name them.
+    pub fn record_quest(self) -> Option<(i16, &'static [i32])> {
+        match self {
+            EventKind::Hpq => Some((1200, &[1_002_798])),
+            EventKind::Kpq => Some((1201, &[1_072_369])),
+            EventKind::Lpq => Some((1202, &[1_022_073])),
+            EventKind::Opq => Some((1203, &[1_082_232])),
+            EventKind::Pirate => Some((1204, &[1_002_571, 1_002_572, 1_002_573, 1_002_574])),
+            EventKind::Magatia(_) => Some((1205, &[1_122_010])),
+            EventKind::Ellin => Some((1206, &[1_032_060, 1_032_061])),
+            EventKind::Carnival(_) => Some((1301, &[1_122_007])),
+            _ => None,
+        }
+    }
+
     pub fn event(self) -> &'static Event {
         match self {
             EventKind::Kpq => &KPQ,

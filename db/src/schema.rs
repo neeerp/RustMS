@@ -275,6 +275,14 @@ diesel::table! {
 }
 diesel::joinable!(saved_locations -> characters (character_id));
 diesel::table! {
+    quest_ex_records (character_id, quest_id) {
+        character_id -> Int4,
+        quest_id -> Int2,
+        data -> Text,
+    }
+}
+diesel::joinable!(quest_ex_records -> characters (character_id));
+diesel::table! {
     gacha_exp (character_id) {
         character_id -> Int4,
         exp -> Int4,
@@ -822,6 +830,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     explored_maps,
     teleport_rocks,
     skill_macros,
+    quest_ex_records,
     saved_locations,
     gacha_exp,
     auto_potions,

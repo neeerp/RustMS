@@ -31,6 +31,7 @@ use crate::message::{
     ClientHandle, DirectoryMessage, FieldHandle, FieldKey, FieldMessage, ServerMessage, SquadAnswer,
 };
 use crate::supervisor::spawn_supervised;
+use game::quest_ex::{CarnivalOutcome, PartyQuestOutcome};
 use game_data::server_content::keys;
 use game_data::skills::CarnivalSkill;
 use net::events::{
@@ -204,6 +205,9 @@ pub struct EventTicket {
     /// The member's side in a Monster Carnival, 0 Maple Red or 1 Maple
     /// Blue, which their look shows others.
     pub side: u8,
+    /// When the member was let in, which a party quest's record times its
+    /// clear from.
+    pub entered: Instant,
 }
 
 impl Drop for EventTicket {
@@ -720,6 +724,7 @@ impl EventActor {
             prize_taken: false,
             hint_heard: false,
             side: self.carnival.side(member).unwrap_or(0),
+            entered: Instant::now(),
         }
     }
 
@@ -782,6 +787,12 @@ impl EventActor {
                 self.move_team(None, net::carnival::battle_map(room), Some(ends));
                 let text = net::content::text();
                 for member in self.team.members() {
+                    if let Some(handle) = self.members.get(member) {
+                        handle.send(ServerMessage::RecordPartyQuest {
+                            id: self.id,
+                            outcome: PartyQuestOutcome::Entered,
+                        });
+                    }
                     let key = match self.carnival.side(*member) {
                         Some(1) => keys::CARNIVAL_TEAM_BLUE,
                         _ => keys::CARNIVAL_TEAM_RED,
@@ -887,10 +898,19 @@ impl EventActor {
             else {
                 continue;
             };
+            let result = match outcome {
+                net::carnival::Outcome::Draw => CarnivalOutcome::Drew,
+                net::carnival::Outcome::Won(winner) if winner == side => CarnivalOutcome::Won,
+                net::carnival::Outcome::Won(_) => CarnivalOutcome::Lost,
+            };
             handle.send(ServerMessage::CarnivalResult {
                 id: self.id,
-                won: outcome == net::carnival::Outcome::Won(side),
+                won: result == CarnivalOutcome::Won,
                 points: self.carnival.total(side),
+            });
+            handle.send(ServerMessage::RecordPartyQuest {
+                id: self.id,
+                outcome: PartyQuestOutcome::Carnival(result),
             });
             handle.send(ServerMessage::EventMoved {
                 id: self.id,

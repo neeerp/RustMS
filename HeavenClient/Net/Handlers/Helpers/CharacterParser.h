@@ -38,6 +38,6 @@ namespace ms
 		void parse_monsterbook(InPacket& recv, MonsterBook& monsterbook);
 		void parse_teleportrock(InPacket& recv, TeleportRock& teleportrock);
 		void parse_nyinfo(InPacket& recv);
-		void parse_areainfo(InPacket& recv);
+		void parse_areainfo(InPacket& recv, QuestLog& quests);
 	}
 }
