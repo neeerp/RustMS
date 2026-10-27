@@ -233,7 +233,7 @@ items"), and the Secretary of Magic (1300004) then completes the quest.
 "Where's Violetta?" (2332) works the same way: entering the Wedding Hall
 (`findvioleta`) sets it, and Violetta's end script `q2332e` then completes
 it (see [party quests](./party-quests.md#the-wedding-hall), with her other
-scripts `q2333s`, `q2333e`, `q2334s` and `q2342s`).
+scripts `q2333s`, `q2333e`, `q2334s`, `q2335s` and `q2342s`).
 "Find Fresh Milk" (2180) uses the same one-"kill" record only to remember
 the last cow milked; its completion needs just the full bottle. While it is started, Tangyoon (1092000) gives an empty bottle
 (4031847) and sends the player to the stable (912000100). Each mother cow
@@ -279,6 +279,11 @@ script does, for the pendulum (`Effect::CompleteQuest`; see
 [party quests](./party-quests.md), "Eos Tower's dollhouse room").
 "The Missing Mechanical Parts" (3239) is the same, completed by Cheng the
 Assistant for ten parts ("The Toy Factory's Sector 4").
+"Eliminating the Rest" (2335) reads its own record (`infoNumber` 2335,
+at least 1), which nothing sets either. Violetta's start script `q2335s`
+gives the Security Room's key (4032405) with it, and the room's door near
+Skyscraper 3 (`go_secretroom`, see [map travel](./map-travel.md)) completes
+it for 5000 EXP and takes the key.
 `game_data::quests::COMPLETED_BY_NPC_SCRIPT` lets them through and keeps
 the `infoex`.
 

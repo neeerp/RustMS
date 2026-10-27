@@ -1430,7 +1430,9 @@ player leaves by `left00` or the time runs out, back to the door.
   `q2334s` (Violetta's face, Cosmic's 1,000 EXP) and `q2342s` (the seal, for
   one still on 2331 who left it behind) complete their quests as they start
   them (`FINISHED_BY_START_SCRIPT`). Anyone else asking for the seal is
-  only told that she keeps it.
+  only told that she keeps it. Her `q2335s` gives the Security Room's key
+  (4032405) with "Eliminating the Rest" (2335), which the room's door near
+  Skyscraper 3 (`go_secretroom`) completes; see `quests.md`.
 - Cosmic's refights through the Blocked Entrance (1300013) once 2331 is
   done are not there.
 

@@ -67,8 +67,8 @@ pub const SCRIPTS: &[&str] = &[
     "q1021s", "q1021e", "q2214e", "q2215e", "q2228s", "q2238s", "q2245s", "q2232e", "q2233e",
     "q2234e", "q2216s", "q2217s", "q2218s", "q2219s", "q3714s", "q4647e", "q4659e", "q6030e",
     "q6031e", "q6032e", "q6033e", "q6036e", "q8185e", "q8189e", "q2332s", "q2332e", "q2333s",
-    "q2333e", "q2334s", "q2342s", "q3108s", "q3523s", "q3524s", "q3525s", "q3526s", "q3527s",
-    "q3529s",
+    "q2333e", "q2334s", "q2335s", "q2342s", "q3108s", "q3523s", "q3524s", "q3525s", "q3526s",
+    "q3527s", "q3529s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -87,8 +87,10 @@ pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
 /// pass. An NPC's script completes them instead: Dollhouse (3230), which
 /// Mark the Toy Soldier ends for the pendulum, and The Missing Mechanical
 /// Parts (3239), which Cheng the Assistant ends for ten Machine Parts
-/// (`net::npc_scripts`).
-pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[3230, 3239];
+/// (`net::npc_scripts`). Eliminating the Rest (2335) reads its own record
+/// (`infoNumber` 2335), which nothing sets either; the Security Room's door
+/// (`go_secretroom`, `net::scripts`) completes it for Violetta's key.
+pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[2335, 3230, 3239];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
@@ -551,7 +553,7 @@ impl QuestCatalog {
             }
             if COMPLETED_BY_NPC_SCRIPT.contains(&id) {
                 if let Some(keys) = &mut keys.end_check {
-                    keys.retain(|key| key != "infoex");
+                    keys.retain(|key| key != "infoex" && key != "infoNumber");
                 }
                 keys.completed_by_npc_script = true;
             }
@@ -1334,6 +1336,15 @@ mod tests {
         assert_eq!(dollhouse.end_info[0].value, "dummy");
         assert_eq!(dollhouse.start_info, None);
         assert_eq!(catalog.quest(3239).unwrap().end_info[0].value, "dummy");
+        // The Security Room's door completes Eliminating the Rest; the
+        // quest window wants its own record at least 1, which nothing sets.
+        let rest = catalog.quest(2335).unwrap();
+        assert_eq!(
+            (rest.end_info[0].cond, rest.end_info[0].value.as_str()),
+            (1, "1")
+        );
+        assert_eq!(rest.end_info_record, None);
+        assert_eq!(rest.start_script.as_deref(), Some("q2335s"));
         assert_eq!(catalog.quest(7301).unwrap().end_buff_item, Some(2210003));
         // Its first step's offer asks questions (`Act/0/ask`, `stop`).
         assert_eq!(catalog.quest(7300).unwrap().start.min_level, Some(80));

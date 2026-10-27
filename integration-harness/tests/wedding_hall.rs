@@ -5,7 +5,8 @@
 //! there (`findvioleta`) lets 2332 end with her; The Story of Betrayal
 //! (2333) brings out the Prime Minister. Once he is beaten, the door leads
 //! straight into the hall, where Violetta shows her face (2334) and keeps
-//! the Royal Seal for one who left it (2342). The harness world runs events
+//! the Royal Seal for one who left it (2342), and gives the key whose door
+//! completes Eliminating the Rest (2335). The harness world runs events
 //! 60 times as fast (`RUSTMS_EVENT_SCALE`), so the ten minutes are ten
 //! seconds.
 
@@ -35,6 +36,14 @@ const DOOR_AT: (i16, i16) = (255, 140);
 const SEAL_OF_THE_EMPIRE: i16 = 2331;
 const ROYAL_SEAL: i32 = 4_001_318;
 const ETC: u8 = 4;
+const ELIMINATING_THE_REST: i16 = 2335;
+const SECURITY_ROOM_KEY: i32 = 4_032_405;
+/// Skyscraper 3's door into the Security Room: `in00`, whose script is
+/// `go_secretroom`.
+const SKYSCRAPER_3: i32 = 106_021_000;
+const SECURITY_DOOR: &str = "in00";
+const SECURITY_DOOR_AT: (i16, i16) = (927, -97);
+const SECURITY_ROOM: i32 = 106_021_001;
 
 /// A level 35 fighter, armed for the Prime Minister, on The Seal of the
 /// Empire, with quests `quests` (id, status) and the key, at the hall's
@@ -202,4 +211,21 @@ async fn violetta_is_found_and_the_prime_minister_beaten() {
     assert_eq!(t.added.len(), 1);
     let (inventory, _, item) = t.added[0];
     assert_eq!((inventory, item), (ETC, ROYAL_SEAL));
+
+    // Violetta gives the Security Room's key with Eliminating the Rest
+    // (2335), and its door near Skyscraper 3 completes the quest.
+    let t = with_violetta(c, &m, SCRIPT_START, ELIMINATING_THE_REST).await;
+    assert_eq!(t.progress, [(ELIMINATING_THE_REST, 1)]);
+    let (inventory, _, item) = t.added[0];
+    assert_eq!((inventory, item), (ETC, SECURITY_ROOM_KEY));
+    let mut trace = Trace::default();
+    assert_eq!(warp(c, SKYSCRAPER_3, "", &mut trace).await, SKYSCRAPER_3);
+    step(c, &m, walk_to(SECURITY_DOOR_AT.0, SECURITY_DOOR_AT.1)).await;
+    send(c, touch(SECURITY_DOOR)).await;
+    let mut trace = Trace::default();
+    until(c, &mut trace, |t| t.warps == [SECURITY_ROOM]).await;
+    read_for(c, &mut trace, 300).await;
+    assert_eq!(trace.progress, [(ELIMINATING_THE_REST, 2)]);
+    assert_eq!(trace.gains, [5_000]);
+    assert_eq!(trace.items, [(SECURITY_ROOM_KEY, -1)]);
 }

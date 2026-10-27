@@ -839,6 +839,10 @@ pub mod keys {
     pub const VIOLETTA_SEAL: &str = "violetta.seal";
     pub const VIOLETTA_SEAL_FULL: &str = "violetta.seal_full";
     pub const VIOLETTA_SEAL_KEPT: &str = "violetta.seal_kept";
+    pub const VIOLETTA_MINIONS: &str = "violetta.minions";
+    pub const VIOLETTA_KEY: &str = "violetta.key";
+    pub const VIOLETTA_KEY_LUCK: &str = "violetta.key_luck";
+    pub const VIOLETTA_KEY_FULL: &str = "violetta.key_full";
 
     /// Snowman's Rage: the Spirit of Snow Statue (NPC 2020012, `q3108s`),
     /// the broken statue where the clue is found.
@@ -3098,6 +3102,10 @@ mod tests {
                 keys::VIOLETTA_SEAL,
                 keys::VIOLETTA_SEAL_FULL,
                 keys::VIOLETTA_SEAL_KEPT,
+                keys::VIOLETTA_MINIONS,
+                keys::VIOLETTA_KEY,
+                keys::VIOLETTA_KEY_LUCK,
+                keys::VIOLETTA_KEY_FULL,
                 keys::SNOW_STATUE_CLUE,
                 keys::LOST_MEMORY_REGAINED,
                 keys::NINE_SPIRIT_HATCHED,
