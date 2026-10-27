@@ -36,9 +36,13 @@ async fn a_box_broken_brings_out_its_rooms_mobs_with_a_pink_line() {
     }
     let mut trace = seen.expect("Rolly never let the party in");
     let c = &mut team[0].connection;
-    until(c, &mut trace, |t| t.warps.iter().any(in_room)).await;
+    // Under load the room's spawns can already be in the answer's trace;
+    // otherwise start the field record over before the warp comes.
+    if !trace.warps.iter().any(in_room) {
+        trace.field = Default::default();
+        until(c, &mut trace, |t| t.warps.iter().any(in_room)).await;
+    }
     let room = *trace.warps.iter().find(|map| in_room(map)).unwrap();
-    trace.field = Default::default();
     until(c, &mut trace, |t| t.field.reactors.len() == 3).await;
 
     // Four hits break a box: out come its two lots of mobs, and a pink line.
