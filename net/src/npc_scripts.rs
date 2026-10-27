@@ -2473,6 +2473,7 @@ impl NpcScript {
             "q3953e" => Some(convince_muhamad()),
             "q3933s" => Some(ardins_sand_bandits()),
             "q3514e" => Some(the_sorcerers_potion()),
+            "q3455s" => Some(the_faulty_translator()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3496,6 +3497,28 @@ fn the_sorcerers_potion() -> NpcScript {
     script.on_end = vec![
         Effect::GainExp(891_500),
         Effect::CompleteQuest(SELLS_EMOTIONS),
+    ];
+    script
+}
+
+/// The Endangered Lives of Grays (3455): Dr. Kim's Wave Translator
+/// (3454, repeatable) comes out working (4031928, for 3456) or faulty
+/// (4031927, for this one) at even odds. Held up to the Alien Gray
+/// (2050002), the faulty one gives only noise and is used up; the quest
+/// starts, ends at the Gray with nothing, and can be taken again. No
+/// script survives; the text is unsourced.
+const ALIEN_GRAY: i32 = 2050002;
+const GRAYS_GARBLED: i16 = 3455;
+const FAULTY_TRANSLATOR: i32 = 4031927;
+
+fn the_faulty_translator() -> NpcScript {
+    let mut script = NpcScript::new(ALIEN_GRAY, vec![Page::Say(text(keys::GRAY_GARBLED))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: FAULTY_TRANSLATOR,
+            quantity: 1,
+        },
+        Effect::StartQuest(GRAYS_GARBLED),
     ];
     script
 }
@@ -11745,6 +11768,24 @@ mod tests {
                 },
                 Effect::GainExp(20000),
             ]
+        );
+    }
+
+    #[test]
+    fn the_faulty_translator_gives_only_noise() {
+        let script = NpcScript::for_quest("q3455s", &player(50)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (
+                ALIEN_GRAY,
+                vec![
+                    Effect::TakeItem {
+                        item_id: FAULTY_TRANSLATOR,
+                        quantity: 1
+                    },
+                    Effect::StartQuest(GRAYS_GARBLED)
+                ]
+            )
         );
     }
 

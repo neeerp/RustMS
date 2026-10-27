@@ -540,6 +540,7 @@ unsourced = [
     "ariant_ardin.test_busy",
     "temple_sorcerer.potion_worked",
     "omega_meteorite.full",
+    "omega_gray.garbled",
     "portal.investigate2",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",
