@@ -262,6 +262,20 @@ int main()
 		scents = { 2022632 };
 		require(ms::buffs_met(0, 2022631, on) && ms::buffs_met(2022632, 0, on), "its own effect does");
 		require(ms::buffs_met(0, 0, on), "no buff requirement is met");
+		// Monster Expert (29512) wants 30 different cards; the Spirit titles
+		// one of each listed card.
+		ms::QuestInfo expert = quest(29512, 9000040, 9000040);
+		expert.end_book_min = 30;
+		std::map<int32_t, int32_t> cards { {2380000, 2} };
+		auto level = [&](int32_t card) { return cards.count(card) ? cards[card] : 0; };
+		require(!ms::book_met(expert, 29, level) && ms::book_met(expert, 30, level), "the book needs 30 different cards");
+		ms::QuestInfo diviner = quest(29016, 1061011, 1061011);
+		diviner.end_cards = { {2380000, 1, -1}, {2382040, 1, -1} };
+		require(!ms::book_met(diviner, 1, level), "every listed card is needed");
+		cards[2382040] = 1;
+		require(ms::book_met(diviner, 2, level), "one of each will do");
+		diviner.end_cards.emplace_back(2380000, -1, 1);
+		require(!ms::book_met(diviner, 2, level), "but not more than a card's max");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };

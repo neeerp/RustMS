@@ -60,6 +60,9 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "pettamenessmax",
     "buff",
     "exceptbuff",
+    "mbmin",
+    "mbmax",
+    "mbcard",
 ];
 /// Dates under `Check.img/<id>/1`, which nothing reads: v83's completion
 /// check compares no dates (only the start check does), and the two quests
@@ -200,6 +203,15 @@ pub struct QuestPrerequisite {
     pub state: QuestState,
 }
 
+/// A card the Monster Book must hold between `min` and `max` of (either
+/// unset means no bound) to complete a quest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BookCard {
+    pub card: i32,
+    pub min: Option<i32>,
+    pub max: Option<i32>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StartRequirements {
     pub npc: i32,
@@ -276,6 +288,13 @@ pub struct QuestTemplate {
     /// An item whose effect must be on the player to complete, or must not.
     pub end_buff: Option<i32>,
     pub end_except_buff: Option<i32>,
+    /// The fewest and most distinct cards the Monster Book may hold to
+    /// complete (`mbmin`, `mbmax`).
+    pub end_book_min: Option<i32>,
+    pub end_book_max: Option<i32>,
+    /// Cards whose count in the Monster Book must lie within bounds to
+    /// complete (`mbcard`), as `(card id, min, max)`.
+    pub end_cards: Vec<BookCard>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -792,6 +811,9 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_pet_closeness: pet_closeness(nx, end)?,
         end_buff: nx.int_child(end, "buff")?,
         end_except_buff: nx.int_child(end, "exceptbuff")?,
+        end_book_min: nx.int_child(end, "mbmin")?,
+        end_book_max: nx.int_child(end, "mbmax")?,
+        end_cards: book_cards(nx, end)?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,
@@ -890,6 +912,25 @@ fn int_list(nx: &NxDataFile, check: u32, key: &str) -> Result<Vec<i32>, GameData
             nx.int_child(list, &name)?
                 .ok_or_else(|| invalid("non-integer list entry"))?,
         );
+    }
+    Ok(result)
+}
+
+/// The cards listed under `mbcard` of a `Check` node, each with the least
+/// and most of it the Monster Book may hold.
+fn book_cards(nx: &NxDataFile, check: u32) -> Result<Vec<BookCard>, GameDataError> {
+    let Some(cards) = nx.child_by_name(check, "mbcard")? else {
+        return Ok(Vec::new());
+    };
+    let mut result = Vec::new();
+    for card in nx.child_indices(cards)? {
+        result.push(BookCard {
+            card: nx
+                .int_child(card, "id")?
+                .ok_or_else(|| invalid("mbcard entry without id"))?,
+            min: nx.int_child(card, "min")?,
+            max: nx.int_child(card, "max")?,
+        });
     }
     Ok(result)
 }

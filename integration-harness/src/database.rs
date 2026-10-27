@@ -551,6 +551,25 @@ pub async fn set_meso(character_id: i32, meso: i32) -> Result<(), HarnessError> 
     .await
 }
 
+/// Put `level` copies of card `card_id` in the logged-out character
+/// `character_id`'s Monster Book.
+pub async fn add_book_card(
+    character_id: i32,
+    card_id: i32,
+    level: i16,
+) -> Result<(), HarnessError> {
+    change_one_row("add book card", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO monster_book_cards (character_id, card_id, level) VALUES ($1, $2, $3)",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<Integer, _>(card_id)
+        .bind::<SmallInt, _>(level)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Give the logged-out character `character_id` `exp` EXP into their level.
 pub async fn set_exp(character_id: i32, exp: i32) -> Result<(), HarnessError> {
     change_one_row("set exp", move |conn| {
