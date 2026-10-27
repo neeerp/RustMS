@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <climits>
 #include <functional>
 #include <string>
 
@@ -65,14 +66,121 @@ namespace ms
 			int32_t time_limit = 0;
 		};
 
-		// The days a title's record counts toward its need: its `CNT`, read
-		// only when `LT`, `DONE`, `PT` and `CNT` are all there (0x4e6b2f), and
+		// Diligent Explorer's day in its record: whether the day's play is
+		// done, the seconds played (`PT`) and the days done (`CNT`), read
+		// only when `LT`, `DONE`, `PT` and `CNT` are all there, as a byte and
+		// two words (0x4e6b2f).
+		struct Daily
+		{
+			uint8_t done = 0;
+			uint16_t played = 0;
+			uint16_t count = 0;
+		};
+
+		inline Daily daily(const std::function<std::string(const std::string&)>& get)
+		{
+			if (get("LT").empty() || get("DONE").empty() || get("PT").empty() || get("CNT").empty())
+				return {};
+
+			return {
+				static_cast<uint8_t>(std::atoi(get("DONE").c_str())),
+				static_cast<uint16_t>(std::atoi(get("PT").c_str())),
+				static_cast<uint16_t>(std::atoi(get("CNT").c_str()))
+			};
+		}
+
+		// The days a title's record counts toward its need: its `CNT`, and
 		// the need, nine tenths of timeLimit2's whole days.
 		inline Tally days(const std::function<std::string(const std::string&)>& get, int32_t time_limit)
 		{
-			bool whole = !get("LT").empty() && !get("DONE").empty() && !get("PT").empty() && !get("CNT").empty();
+			return { daily(get).count, static_cast<int32_t>((time_limit / 86400) * 0.9) };
+		}
 
-			return { whole ? std::atoi(get("CNT").c_str()) : 0, static_cast<int32_t>((time_limit / 86400) * 0.9) };
+		// The Unix time a timed title's started record names as its end, the
+		// 14 digits "yyyyMMddHHmmss" in UTC (0x4e6a03), or 2079-01-01 for any
+		// other record.
+		inline int64_t expiry(const std::string& progress)
+		{
+			const int64_t NEVER = 3439756800;
+
+			if (progress.size() != 14 || !std::all_of(progress.begin(), progress.end(), [](char c) { return c >= '0' && c <= '9'; }))
+				return NEVER;
+
+			auto part = [&](size_t at, size_t length) { return std::atoi(progress.substr(at, length).c_str()); };
+			int64_t year = part(0, 4) - (part(4, 2) <= 2 ? 1 : 0);
+			int64_t month = part(4, 2);
+			// Howard Hinnant's days_from_civil.
+			int64_t era = (year >= 0 ? year : year - 399) / 400;
+			int64_t year_of_era = year - era * 400;
+			int64_t day_of_year = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + part(6, 2) - 1;
+			int64_t day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+			int64_t days = era * 146097 + day_of_era - 719468;
+
+			return days * 86400 + part(8, 2) * 3600 + part(10, 2) * 60 + part(12, 2);
+		}
+
+		// A #Q token: the time left until `expiry`, never below 0, as whole
+		// days (`daylimit`) or the hours, minutes or seconds past them, "%d";
+		// any other key prints 0 (0x9a1189).
+		inline std::string time_left(const std::string& key, int64_t expiry, int64_t now)
+		{
+			auto left = static_cast<int32_t>(std::clamp<int64_t>(expiry - now, 0, INT32_MAX));
+
+			if (key == "daylimit")
+				return std::to_string(left / 86400);
+
+			if (key == "hourlimit")
+				return std::to_string(left / 3600 % 24);
+
+			if (key == "minlimit")
+				return std::to_string(left / 60 % 60);
+
+			if (key == "seclimit")
+				return std::to_string(left % 60);
+
+			return "0";
+		}
+
+		// A #D token (0x9a13cc): the day's play, `PT`, as `day`, `hour`,
+		// `min` or `sec`, or all of QuestInfo dailyPlayTime once the day is
+		// done or when the key starts with "min" (`minhour`, the hours to
+		// play); `count` the days done and `daylimit` their need. Any other
+		// key prints 0.
+		inline std::string play_time(std::string key, const std::function<std::string(const std::string&)>& get,
+			int32_t daily_play_time, int32_t time_limit)
+		{
+			Daily day = daily(get);
+			int32_t seconds = day.played;
+
+			if (key.size() > 3 && key.compare(0, 3, "min") == 0)
+			{
+				key = key.substr(3);
+				seconds = daily_play_time;
+			}
+			else if (day.done != 0)
+			{
+				seconds = daily_play_time;
+			}
+
+			if (key == "day")
+				return std::to_string(seconds / 86400);
+
+			if (key == "hour")
+				return std::to_string(seconds / 3600 % 24);
+
+			if (key == "min")
+				return std::to_string(seconds / 60 % 60);
+
+			if (key == "sec")
+				return std::to_string(seconds % 60);
+
+			if (key == "daylimit")
+				return std::to_string(days(get, time_limit).need);
+
+			if (key == "count")
+				return std::to_string(day.count);
+
+			return "0";
 		}
 
 		// The gauge #jgaugePqS# draws: the 79x8 frame and up to 75 one-pixel

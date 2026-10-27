@@ -102,6 +102,44 @@ int main()
 		month.time_limit = 3600;
 		require(token("perDays", diligent_get, month) == "0", "under a day, where the client divides by zero");
 
+		// The timed titles' #Q: the time left until the end their started
+		// record names.
+		using ms::QuestRecordEx::expiry;
+		using ms::QuestRecordEx::time_left;
+		require(expiry("20090213233130") == 1234567890, "the end, in UTC");
+		require(expiry("") == 3439756800, "no end is 2079");
+		require(expiry("2009021323313") == 3439756800, "an end needs 14 digits");
+		int64_t now = 1234567890;
+		int64_t end = now + 29 * 86400 + 5 * 3600 + 7 * 60 + 9;
+		require(time_left("daylimit", end, now) == "29", "the days left");
+		require(time_left("hourlimit", end, now) == "5", "the hours past them");
+		require(time_left("minlimit", end, now) == "7", "the minutes past those");
+		require(time_left("seclimit", end, now) == "9", "the seconds past those");
+		require(time_left("daylimit", now - 60, now) == "0", "time up is 0");
+		require(time_left("4490", end, now) == "0", "another key is 0");
+
+		// Diligent Explorer's #D: PT today, or dailyPlayTime once done.
+		using ms::QuestRecordEx::play_time;
+		std::string today = "LT=2009/02/13;DONE=0;PT=5025;CNT=9";
+		auto today_get = [&](const std::string& key) { return value(today, key); };
+		require(play_time("hour", today_get, 10800, 2592000) == "1", "the hours played");
+		require(play_time("min", today_get, 10800, 2592000) == "23", "the minutes past them");
+		require(play_time("sec", today_get, 10800, 2592000) == "45", "the seconds past those");
+		require(play_time("day", today_get, 10800, 2592000) == "0", "no whole day");
+		require(play_time("minhour", today_get, 10800, 2592000) == "3", "the hours to play");
+		require(play_time("count", today_get, 10800, 2592000) == "9", "the days done");
+		require(play_time("daylimit", today_get, 10800, 2592000) == "27", "the days needed");
+		require(play_time("lose", today_get, 10800, 2592000) == "0", "another key is 0");
+		std::string done = "LT=2009/02/13;DONE=1;PT=5025;CNT=9";
+		auto done_get = [&](const std::string& key) { return value(done, key); };
+		require(play_time("hour", done_get, 10800, 2592000) == "3", "a day done shows the whole play");
+		require(play_time("min", done_get, 10800, 2592000) == "0", "and its minutes");
+		std::string part = "DONE=0;PT=5025;CNT=9";
+		auto part_get = [&](const std::string& key) { return value(part, key); };
+		require(play_time("hour", part_get, 10800, 2592000) == "0", "PT needs the whole record");
+		require(play_time("count", part_get, 10800, 2592000) == "0", "so does CNT");
+		require(play_time("minhour", part_get, 10800, 2592000) == "3", "the hours to play need none");
+
 		using ms::QuestRecordEx::gauge_slices;
 		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/45") == 45, "a gauge's path");
 		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/0") == 0, "an empty gauge");

@@ -43,6 +43,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <limits>
 #include <map>
 
@@ -174,12 +175,32 @@ namespace ms
 			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); }, counts);
 		}
 
+		// A #Q token, the time left on a timed title (its started record
+		// names the end), or a #D token, Diligent Explorer's play today.
+		std::string time_token(char tag, const std::string& key, int16_t quest_id)
+		{
+			const auto& quests = Stage::get().get_player().get_quests();
+			nl::node info = nl::nx::quest["QuestInfo.img"][std::to_string(quest_id)];
+
+			if (tag == 'Q')
+			{
+				auto started = quests.started_quests().find(quest_id);
+				std::string progress = started == quests.started_quests().end() ? std::string() : started->second;
+
+				return QuestRecordEx::time_left(key, QuestRecordEx::expiry(progress), static_cast<int64_t>(std::time(nullptr)));
+			}
+
+			return QuestRecordEx::play_time(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); },
+				static_cast<int32_t>(info["dailyPlayTime"].get_integer()), static_cast<int32_t>(info["timeLimit2"].get_integer()));
+		}
+
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
 		// #c how many of an item the player holds, #a a kill count
 		// (#a<index># for this quest's mobs, or #a<quest><index>#), #R
 		// a quest's record as it stands (#R27010# an explorer title's count of
-		// places), and #j a value from the quest's record beside the quest
-		// log (`record_token`). Line breaks become the renderer's escapes.
+		// places), #j a value from the quest's record beside the quest
+		// log (`record_token`), and #Q and #D a timed title's time left and
+		// play today (`time_token`). Line breaks become the renderer's escapes.
 		std::string quest_counts(const std::string& text, int16_t quest_id)
 		{
 			auto& player = Stage::get().get_player();
@@ -215,13 +236,13 @@ namespace ms
 					continue;
 				}
 
-				if (close != std::string::npos && tag == 'j' && close - i - 2 <= 10)
+				if (close != std::string::npos && (tag == 'j' || tag == 'Q' || tag == 'D') && close - i - 2 <= 10)
 				{
 					std::string key = text.substr(i + 2, close - i - 2);
 
 					if (!key.empty() && std::all_of(key.begin(), key.end(), [](char k) { return std::isalnum(static_cast<unsigned char>(k)); }))
 					{
-						out += record_token(key, quest_id);
+						out += tag == 'j' ? record_token(key, quest_id) : time_token(tag, key, quest_id);
 						i = close;
 						continue;
 					}

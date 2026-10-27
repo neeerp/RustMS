@@ -14,8 +14,9 @@ pub struct QuestProgress {
     pub quest_id: i16,
     pub status: i16,
     pub completed_at: Option<SystemTime>,
-    /// Mob kill counts, three digits per required mob (v83 format), or the
-    /// info string of a quest in `game::quest::INFO_QUESTS`.
+    /// Mob kill counts, three digits per required mob (v83 format), the
+    /// info string of a quest in `game::quest::INFO_QUESTS`, or a timed
+    /// title's end date (`game::quest::DATED_QUESTS`).
     pub progress: String,
 }
 

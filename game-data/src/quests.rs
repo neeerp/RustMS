@@ -412,6 +412,10 @@ pub struct QuestTemplate {
     /// `QuestInfo` `timeLimit`: the seconds the player has once started,
     /// shown as the client's timed-quest clock; then the quest is forfeited.
     pub time_limit: Option<u32>,
+    /// `QuestInfo` `timeLimit2`: a timed title's seconds once started. Its
+    /// started record is the end date, which the Quest Log counts down to
+    /// (`game::quest::DATED_QUESTS`).
+    pub time_limit2: Option<u32>,
 }
 
 /// One `Check/1/infoex` entry on the quest's own info string.
@@ -941,15 +945,20 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         start_info,
         end_info,
         end_info_record,
-        time_limit: match info {
-            Some(info) => nx
-                .int_child(info, "timeLimit")?
-                .filter(|&seconds| seconds > 0)
-                .map(|seconds| u32::try_from(seconds).map_err(|_| invalid("timeLimit")))
-                .transpose()?,
-            None => None,
-        },
+        time_limit: seconds(nx, info, "timeLimit")?,
+        time_limit2: seconds(nx, info, "timeLimit2")?,
     })
+}
+
+/// A positive count of seconds under the quest's `QuestInfo` node, if any.
+fn seconds(nx: &NxDataFile, info: Option<u32>, key: &str) -> Result<Option<u32>, GameDataError> {
+    let Some(info) = info else {
+        return Ok(None);
+    };
+    nx.int_child(info, key)?
+        .filter(|&seconds| seconds > 0)
+        .map(|seconds| u32::try_from(seconds).map_err(|_| invalid(key)))
+        .transpose()
 }
 
 /// A string child, or an integer one written out ("0" may be stored as 0).
@@ -1557,6 +1566,15 @@ mod tests {
         // Jr. Officer Medin's plan gives half an hour; Sera's Mirror has no clock.
         assert_eq!(catalog.quest(3458).unwrap().time_limit, Some(1800));
         assert_eq!(mirror.time_limit, None);
+        // Diligent Explorer has 30 days; every timed title keeps its end date.
+        assert_eq!(catalog.quest(29003).unwrap().time_limit2, Some(2_592_000));
+        for quest in catalog.supported().filter(|q| q.time_limit2.is_some()) {
+            assert!(
+                game::quest::DATED_QUESTS.contains(&quest.id),
+                "{}",
+                quest.id
+            );
+        }
         assert_eq!(catalog.quest(29300).unwrap().end_min_level, Some(200));
         // Bartos's test: any of the 45 pets out, to start and to finish.
         let test = catalog.quest(4646).unwrap();
