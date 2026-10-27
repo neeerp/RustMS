@@ -1740,6 +1740,7 @@ pub mod keys {
     pub const MAKER_MOS_DAGGER: &str = "maker.mos.dagger";
     pub const MAKER_MOS_LOST: &str = "maker.mos.lost";
     pub const QUEST_INFO_OASIS: &str = "quest_info.oasis";
+    pub const QUEST_INFO_SHAMAN_ROCK: &str = "quest_info.shaman_rock";
     pub const QUEST_INFO_SECRET_WALL: &str = "quest_info.secret_wall";
     pub const QUEST_INFO_WALL_ASK: &str = "quest_info.wall_ask";
     pub const QUEST_INFO_WALL_READ: &str = "quest_info.wall_read";
@@ -3515,6 +3516,7 @@ mod tests {
                 keys::QUEST_INFO_SECRET_WALL,
                 keys::QUEST_INFO_WALL_ASK,
                 keys::QUEST_INFO_WALL_READ,
+                keys::QUEST_INFO_SHAMAN_ROCK,
                 keys::REFINER_WHAT,
                 keys::REFINER_HOW_MANY,
                 keys::REFINER_ASK,

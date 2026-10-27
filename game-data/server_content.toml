@@ -995,6 +995,7 @@ unsourced = [
     "quest_info.secret_wall",
     "quest_info.wall_ask",
     "quest_info.wall_read",
+    "quest_info.shaman_rock",
     "refiner.what",
     "refiner.how_many",
     "refiner.ask",

@@ -5144,8 +5144,13 @@ impl FieldActor {
         }
         // The field validates map object identity; the client actor owns the
         // conversation and serializes quest persistence with character state.
+        let nth = self.map_npcs[..index]
+            .iter()
+            .filter(|other| other.npc_id == npc.npc_id)
+            .count();
         occupant.handle.send(ServerMessage::NpcConversation {
             npc_id: npc.npc_id,
+            nth: u8::try_from(nth).unwrap_or(u8::MAX),
             field: self.key,
             request_id,
         });

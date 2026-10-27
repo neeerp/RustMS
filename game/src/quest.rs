@@ -12,7 +12,7 @@ pub const SCRIPT_MARKERS: i16 = 32000;
 /// completion needs it to read a given value (`Check/1/infoex`). Only quests
 /// whose characters the server's scripts can set are listed, as others could
 /// never be completed.
-pub const INFO_QUESTS: &[i16] = &[3311, 3900, 3926, 3927, 3929];
+pub const INFO_QUESTS: &[i16] = &[2236, 3311, 3900, 3926, 3927, 3929];
 
 /// Records that are no quest (Quest.nx has no such id) but that another
 /// quest's completion reads (`Check/1 infoNumber`): an info string a
