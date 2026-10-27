@@ -358,6 +358,13 @@ Maestro Rho's (1052120) start script `q2293s` asks about the last song the
 Spirit of Rock played and starts the quest. The data's end has no end script
 and asks for and gives nothing, so Cosmic's guessing game and its 32,500 EXP
 are left out. The text is unsourced.
+New Leaf City's Masteria quests start from scripts that ask whether the
+player is in; a yes says what to bring or hunt and starts the quest, and a
+no ends it. The data's end checks and rewards each one. They are John
+Barricade's "The Mark of Heroism" (8221), Lukan's "Storming the Castle"
+(8223), Taggrin's Raven Ninja Clan tasks (8224 to 8226), and Lita Lawless's
+bounties (8231 to 8238), where every second one is a repeatable follow-up
+(Cosmic `8221.js` to `8238.js`). The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -837,5 +844,7 @@ copied into the source.
   script or his click, depending on the pair),
   `truth_of_the_rumor` (2144 through its five tellers' start scripts),
   `tienk_and_the_last_song` (2197's end script, 2293's start and data end),
+  `new_leaf_city_starts` (Lita's bounty turned down, taken and completed, its
+  follow-up started, and Taggrin's first task),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

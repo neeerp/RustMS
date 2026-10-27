@@ -2536,7 +2536,7 @@ impl NpcScript {
             "q8185e" => Some(pet_evolution(player, 8185)),
             "q4659e" => Some(pet_evolution(player, ROBO_UPGRADE_QUEST)),
             "q8189e" => Some(pet_evolution(player, 8189)),
-            _ => None,
+            _ => new_leaf_city_start(script),
         }
     }
 
@@ -3574,6 +3574,107 @@ fn truth_of_the_rumor(quest: i16) -> Option<NpcScript> {
     let &(_, npc, words, exp) = RUMORS.iter().find(|r| r.0 == quest)?;
     let mut script = NpcScript::new(npc, vec![Page::Say(text(words))]);
     script.on_end = vec![Effect::FinishQuest(quest), Effect::GainExp(exp)];
+    Some(script)
+}
+
+/// The start scripts of New Leaf City's Masteria quests: John Barricade's
+/// The Mark of Heroism (8221) at the Mushroom Marketplace, Lukan's Storming
+/// the Castle (8223) and Taggrin's three Raven Ninja Clan tasks (8224 to
+/// 8226) in the Phantom Forest, and Lita Lawless's bounties in New Leaf
+/// City (8231 to 8238, every second one repeatable). Each asks whether the
+/// player is in; a yes says what to bring or hunt and starts the quest, and
+/// the data's end checks and rewards it (Cosmic `8221.js` to `8238.js`).
+/// The text is unsourced.
+const NEW_LEAF_CITY_STARTS: [(i16, i32, &str, &str); 13] = [
+    (
+        8221,
+        9201051,
+        keys::BARRICADE_MARK_ASK,
+        keys::BARRICADE_MARK_GO,
+    ),
+    (8223, 9201098, keys::LUKAN_STORM_ASK, keys::LUKAN_STORM_GO),
+    (
+        8224,
+        TAGGRIN,
+        keys::TAGGRIN_WOODS_ASK,
+        keys::TAGGRIN_WOODS_GO,
+    ),
+    (8225, TAGGRIN, keys::TAGGRIN_PATH_ASK, keys::TAGGRIN_PATH_GO),
+    (
+        8226,
+        TAGGRIN,
+        keys::TAGGRIN_WARRIORS_ASK,
+        keys::TAGGRIN_WARRIORS_GO,
+    ),
+    (
+        8231,
+        LITA_LAWLESS,
+        keys::LITA_LEPRECHAUNS_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8232,
+        LITA_LAWLESS,
+        keys::LITA_LEPRECHAUNS_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8233,
+        LITA_LAWLESS,
+        keys::LITA_ELDERWRAITHS_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8234,
+        LITA_LAWLESS,
+        keys::LITA_ELDERWRAITHS_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8235,
+        LITA_LAWLESS,
+        keys::LITA_HORSEMAN_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8236,
+        LITA_LAWLESS,
+        keys::LITA_HORSEMAN_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8237,
+        LITA_LAWLESS,
+        keys::LITA_BIGFOOT_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+    (
+        8238,
+        LITA_LAWLESS,
+        keys::LITA_BIGFOOT_ASK,
+        keys::LITA_BOUNTY_GO,
+    ),
+];
+const TAGGRIN: i32 = 9201100;
+const LITA_LAWLESS: i32 = 9201054;
+
+/// `script`, if it is one of New Leaf City's start scripts.
+fn new_leaf_city_start(script: &str) -> Option<NpcScript> {
+    let &(quest, npc, ask, go) = NEW_LEAF_CITY_STARTS
+        .iter()
+        .find(|start| script == format!("q{}s", start.0))?;
+    let mut script = NpcScript::new(
+        npc,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: Vec::new(),
+                on_no: Some(text(keys::NEW_LEAF_CITY_DECLINE)),
+            },
+            Page::Say(text(go)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(quest)];
     Some(script)
 }
 
@@ -12074,6 +12175,33 @@ mod tests {
             read_through(script),
             (MAESTRO_RHO, vec![Effect::StartQuest(THE_LAST_SONG)])
         );
+    }
+
+    #[test]
+    fn new_leaf_city_starts_ask_then_start_their_quest() {
+        for (quest, npc) in [
+            (8221, 9201051),
+            (8223, 9201098),
+            (8224, TAGGRIN),
+            (8226, TAGGRIN),
+            (8232, LITA_LAWLESS),
+            (8238, LITA_LAWLESS),
+        ] {
+            let name = format!("q{quest}s");
+            let mut script = NpcScript::for_quest(&name, &player(80)).unwrap();
+            assert_eq!(script.npc_id(), npc);
+            script.begin();
+            assert!(script.respond(ScriptInput::Yes).unwrap().prompt.is_some());
+            let end = script.respond(ScriptInput::Next).unwrap();
+            assert_eq!(end.effects, [Effect::StartQuest(quest)], "{quest}");
+
+            let mut script = NpcScript::for_quest(&name, &player(80)).unwrap();
+            script.begin();
+            assert!(script.respond(ScriptInput::No).unwrap().prompt.is_some());
+            let end = script.respond(ScriptInput::Next).unwrap();
+            assert!(end.effects.is_empty(), "{quest}");
+        }
+        assert!(NpcScript::for_quest("q8222s", &player(80)).is_none());
     }
 
     #[test]
