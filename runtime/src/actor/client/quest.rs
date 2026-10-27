@@ -371,7 +371,12 @@ impl ClientActor {
         let player = &mut self.in_game_mut()?.player;
         let changed = quests::count_kill(|id| catalog.quest(id), player, mob_id);
         let records = quests::kill_records(player, mob_id);
-        if changed.is_empty() && records.is_empty() {
+        // Only Veteran Hunter needs the mob's level, read from the NX.
+        let hunt = (player.quests.state(quests::VETERAN_HUNTER) == QuestState::Started)
+            .then(|| net::mobs::info(mob_id))
+            .flatten()
+            .and_then(|mob| quests::count_hunt(player, mob.level, SystemTime::now()));
+        if changed.is_empty() && records.is_empty() && hunt.is_none() {
             return Ok(());
         }
         player.mark_dirty();
@@ -382,6 +387,9 @@ impl ClientActor {
         }
         for (record, value) in records {
             packets.push(quest::build_quest_record(record, value)?);
+        }
+        if let Some(raw) = hunt {
+            packets.push(quest::build_quest_ex_record(quests::VETERAN_HUNTER, &raw)?);
         }
         self.send_all(&mut packets).await
     }

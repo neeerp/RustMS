@@ -2563,6 +2563,8 @@ impl NpcScript {
             "q29900e" | "q29901e" | "q29902e" | "q29903e" => adventurer_medal(script),
             "q29002s" => Some(celebrity_start(player)),
             "q29002e" => Some(celebrity_end(player, SystemTime::now())),
+            "q29400s" => Some(veteran_hunter_start()),
+            "q29400e" => Some(veteran_hunter_end(player, SystemTime::now())),
             "q29910s" | "q29911s" | "q29912s" | "q29913s" | "q29914s" | "q29915s" | "q29916s"
             | "q29917s" | "q29918s" | "q29919s" | "q29920s" | "q29921s" | "q29933s" | "q29922s"
             | "q29923s" | "q29924s" | "q29925s" | "q29926s" | "q29927s" | "q29928s" => {
@@ -4154,13 +4156,7 @@ fn celebrity_start(player: &Player) -> NpcScript {
 }
 
 fn celebrity_end(player: &Player, now: SystemTime) -> NpcScript {
-    // The started record is the end date, "yyyyMMddHHmmss", which sorts as
-    // it reads.
-    let ended = player
-        .quests
-        .info(CELEBRITY)
-        .is_some_and(|end| end < game::quest::end_date(now).as_str());
-    if ended {
+    if crate::quests::title_ended(player, CELEBRITY, now) {
         return NpcScript::new(DALAIR, vec![Page::Say(text(keys::CELEBRITY_TOO_LATE))]);
     }
     let started_at = player
@@ -4183,6 +4179,64 @@ fn celebrity_end(player: &Player, now: SystemTime) -> NpcScript {
     );
     let mut script = NpcScript::new(DALAIR, vec![Page::Say(says)]);
     script.on_end = vec![give_one(CELEBRITY_MEDAL), Effect::CompleteQuest(CELEBRITY)];
+    script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
+    script
+}
+
+/// Title Challenge - Veteran Hunter (29400): Dalair (9000040) sets a hunt
+/// of a million mobs above the player's level in 30 days. The start script
+/// writes the count (`mon`) and the goal (`mg`) into the quest's record
+/// beside the quest log, each kill that counts adds one
+/// (`quests::count_hunt`), and the end script gives the Veteran Hunter Medal
+/// (1142004) once the count reaches the goal before the end date.
+const VETERAN_HUNTER_MEDAL: i32 = 1142004;
+const VETERAN_HUNTER_GOAL: u32 = 1_000_000;
+
+fn veteran_hunter_start() -> NpcScript {
+    use crate::quests::VETERAN_HUNTER;
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(text(keys::VETERAN_HUNTER_START))]);
+    script.on_end = vec![
+        Effect::StartQuest(VETERAN_HUNTER),
+        Effect::SetQuestEx {
+            quest: VETERAN_HUNTER,
+            key: "mon",
+            value: "0".to_string(),
+        },
+        Effect::SetQuestEx {
+            quest: VETERAN_HUNTER,
+            key: "mg",
+            value: VETERAN_HUNTER_GOAL.to_string(),
+        },
+    ];
+    script
+}
+
+fn veteran_hunter_end(player: &Player, now: SystemTime) -> NpcScript {
+    use crate::quests::VETERAN_HUNTER;
+    if crate::quests::title_ended(player, VETERAN_HUNTER, now) {
+        return NpcScript::new(DALAIR, vec![Page::Say(text(keys::VETERAN_HUNTER_TOO_LATE))]);
+    }
+    let hunted = player.quest_ex.number(VETERAN_HUNTER, "mon");
+    if hunted < VETERAN_HUNTER_GOAL {
+        let says = content::text().get(
+            keys::VETERAN_HUNTER_NOT_YET,
+            &[
+                ("hunted", &hunted.to_string()),
+                ("goal", &VETERAN_HUNTER_GOAL.to_string()),
+            ],
+        );
+        return NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    }
+    let medal_id = VETERAN_HUNTER_MEDAL.to_string();
+    let says = content::text().get(
+        keys::ADVENTURER_MEDAL,
+        &[("title", "Veteran Hunter"), ("medal", &medal_id)],
+    );
+    let mut script = NpcScript::new(DALAIR, vec![Page::Say(says)]);
+    script.on_end = vec![
+        give_one(VETERAN_HUNTER_MEDAL),
+        Effect::CompleteQuest(VETERAN_HUNTER),
+    ];
     script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
     script
 }
@@ -15574,6 +15628,78 @@ mod tests {
         assert_eq!(
             page_text(&too_late.clone().begin()),
             text(keys::CELEBRITY_TOO_LATE)
+        );
+        assert_eq!(read_through(too_late), (DALAIR, vec![]));
+    }
+
+    #[test]
+    fn veteran_hunter_ends_with_its_medal_at_a_million_hunted() {
+        use crate::quests::VETERAN_HUNTER;
+        let hunter = player(50);
+        let (npc, effects) = read_through(NpcScript::for_quest("q29400s", &hunter).unwrap());
+        assert_eq!(npc, DALAIR);
+        assert_eq!(
+            effects,
+            [
+                Effect::StartQuest(VETERAN_HUNTER),
+                Effect::SetQuestEx {
+                    quest: VETERAN_HUNTER,
+                    key: "mon",
+                    value: "0".into(),
+                },
+                Effect::SetQuestEx {
+                    quest: VETERAN_HUNTER,
+                    key: "mg",
+                    value: "1000000".into(),
+                },
+            ]
+        );
+
+        let now = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_800_000_000);
+        let hunted = |count: u32, date: SystemTime| {
+            let mut started = hunter.clone();
+            started.quest_ex.set(VETERAN_HUNTER, "mon", count);
+            started
+                .quest_ex
+                .set(VETERAN_HUNTER, "mg", VETERAN_HUNTER_GOAL);
+            started.quests.upsert(game::QuestRecord {
+                quest_id: VETERAN_HUNTER,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(game::quest::end_date(date)),
+                },
+            });
+            started
+        };
+        let in_time = now + std::time::Duration::from_secs(60);
+        let short = veteran_hunter_end(&hunted(999_999, in_time), now);
+        assert_eq!(
+            page_text(&short.clone().begin()),
+            content::text().get(
+                keys::VETERAN_HUNTER_NOT_YET,
+                &[("hunted", "999999"), ("goal", "1000000")]
+            )
+        );
+        assert_eq!(read_through(short), (DALAIR, vec![]));
+
+        let done = veteran_hunter_end(&hunted(1_000_000, in_time), now);
+        assert!(done.inventory_full.is_some());
+        assert_eq!(
+            read_through(done),
+            (
+                DALAIR,
+                vec![
+                    give_one(VETERAN_HUNTER_MEDAL),
+                    Effect::CompleteQuest(VETERAN_HUNTER)
+                ]
+            )
+        );
+
+        let late = now - std::time::Duration::from_secs(1);
+        let too_late = veteran_hunter_end(&hunted(1_000_000, late), now);
+        assert_eq!(
+            page_text(&too_late.clone().begin()),
+            text(keys::VETERAN_HUNTER_TOO_LATE)
         );
         assert_eq!(read_through(too_late), (DALAIR, vec![]));
     }
