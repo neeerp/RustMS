@@ -553,8 +553,9 @@ pub const PIRATE_SEAL_NAMES: [&str; 4] = ["sMob1", "sMob2", "sMob3", "sMob4"];
 
 /// Portals whose target spawn portal the target map lacks, so the target's
 /// default spawn stands in: the Bart room's way out names "ao00", which
-/// Nautilus' Navigation Room (120000102) has no portal by.
-const LOST_LINKS: [(i32, &str); 1] = [(BART_ROOM, "ntq00")];
+/// Nautilus' Navigation Room (120000102) has no portal by, and the way out
+/// of Ardin's room names "st00", which Ardin's house (260000200) lacks.
+const LOST_LINKS: [(i32, &str); 2] = [(BART_ROOM, "ntq00"), (crate::scripts::ARDINS_ROOM, "st00")];
 
 /// Whether `map_id`'s `portal` leads to the target map's default spawn.
 pub fn lost_link(map_id: i32, portal: &str) -> bool {
