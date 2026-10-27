@@ -2474,6 +2474,9 @@ impl NpcScript {
             "q3933s" => Some(ardins_sand_bandits()),
             "q3514e" => Some(the_sorcerers_potion()),
             "q3455s" => Some(the_faulty_translator()),
+            "q2124e" => Some(moppies_box(SAND_CREW_SUPPLY, MOPPIES_BOX)),
+            "q2126e" => Some(moppies_box(SAND_CREW_SUPPLY_AGAIN, MOPPIES_BOX_AGAIN)),
+            "q2127e" => Some(to_the_desert()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3498,6 +3501,40 @@ fn the_sorcerers_potion() -> NpcScript {
         Effect::GainExp(891_500),
         Effect::CompleteQuest(SELLS_EMOTIONS),
     ];
+    script
+}
+
+/// A Supply from the Sand Crew (2124, and 2126 for the other way in):
+/// Eleska (2101002) in Ariant takes the box Moppie (2012019) gave, which
+/// the data's end only checks for (Cosmic `2124.js`, whose `2126.js`
+/// takes 2124's box instead of the data's). The text is unsourced.
+const ELESKA: i32 = 2101002;
+const SAND_CREW_SUPPLY: i16 = 2124;
+const SAND_CREW_SUPPLY_AGAIN: i16 = 2126;
+const MOPPIES_BOX: i32 = 4031619;
+const MOPPIES_BOX_AGAIN: i32 = 4031624;
+
+fn moppies_box(quest: i16, box_id: i32) -> NpcScript {
+    let mut script = NpcScript::new(ELESKA, vec![Page::Say(text(keys::ELESKA_BOX_THANKS))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: box_id,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(quest),
+    ];
+    script
+}
+
+/// To the Desert... (2127): Manji (1022002) in Perion tells the player the
+/// mission is on and completes the quest, which opens A Special Assignment
+/// (2123) (Cosmic `2127.js`). The text is unsourced.
+const MANJI: i32 = 1022002;
+const TO_THE_DESERT: i16 = 2127;
+
+fn to_the_desert() -> NpcScript {
+    let mut script = NpcScript::new(MANJI, vec![Page::Say(text(keys::MANJI_DESERT_MISSION))]);
+    script.on_end = vec![Effect::CompleteQuest(TO_THE_DESERT)];
     script
 }
 
@@ -11768,6 +11805,34 @@ mod tests {
                 },
                 Effect::GainExp(20000),
             ]
+        );
+    }
+
+    #[test]
+    fn eleska_takes_moppies_box_and_manji_sends_the_player_off() {
+        for (name, quest, box_id) in [
+            ("q2124e", SAND_CREW_SUPPLY, MOPPIES_BOX),
+            ("q2126e", SAND_CREW_SUPPLY_AGAIN, MOPPIES_BOX_AGAIN),
+        ] {
+            let script = NpcScript::for_quest(name, &player(20)).unwrap();
+            assert_eq!(
+                read_through(script),
+                (
+                    ELESKA,
+                    vec![
+                        Effect::TakeItem {
+                            item_id: box_id,
+                            quantity: 1
+                        },
+                        Effect::CompleteQuest(quest)
+                    ]
+                )
+            );
+        }
+        let script = NpcScript::for_quest("q2127e", &player(20)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (MANJI, vec![Effect::CompleteQuest(TO_THE_DESERT)])
         );
     }
 
