@@ -104,6 +104,7 @@ async fn page(connection: &mut MapleTestConnection) -> DialoguePage {
             text,
             has_previous,
             has_next,
+            player_speaks: false,
         };
     }
     panic!("too many packets before dialogue");

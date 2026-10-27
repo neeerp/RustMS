@@ -257,6 +257,21 @@ Disguise of 2326. Scarrs's (1300007) `q2338s`, "Killer Mushroom Spores,
 Again", gives a spare spore (2430014) to one holding none before 2322
 starts, completing the quest as it starts. Their text is unsourced; the
 `find_james` portal in James's room has no source either and does nothing.
+"About the Mushroom Castle..." leads there from Sleepywood and the desert. The
+Rememberer's (1061011) end script `q2251e` takes the 20 Recording Charms of
+"Zombie Mushroom Signal 3" (4032399, a quest drop of the Zombie and Annoyed
+Zombie Mushrooms in `reward_overrides.toml`) and gives its 8,000 EXP; his
+start script `q2254s` sends the player to Karcasa (2101013), who ends 2254
+and, after his own 2255 and 2256, starts 2257 from the data. The Camel Cab
+(2110005) ends 2257 (`q2257e`), starts 2258 after asking (`q2258s`; its
+five-minute `timeLimit` clock starts with it) and ends it once the 40 Meerkats
+are down (`q2258e`), then starts and ends 2259 and 2260. He ends 2259
+(`q2259e`) only at Sahel 1 (260020700), not outside Ariant (260020000) where
+the Meerkats listen. 2260 ends at level 30, the data's check; Cosmic also asks
+for a second job, which neither the data nor `QuestInfo` says. It only tells
+the way; the Empty House's `TD_MC_first` checks level 30, not this quest (see
+`map-travel.md`). No source has `q2254s`, and the text of all of them is
+unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -705,5 +720,7 @@ copied into the source.
   `mushroom_opening` (the opening scene, its way out, then The Test),
   `mushroom_letter` (2300's letter, the way to the scene, the officer),
   `mushroom_james` (James found, disguised and escaping; Scarrs's spare),
+  `mushroom_karcasa` (2251's charms, Karcasa, the Camel Cab's Meerkats and
+  clock, Sahel 1, level 30),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
