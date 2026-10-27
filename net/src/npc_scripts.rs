@@ -2413,6 +2413,7 @@ impl NpcScript {
         match script {
             "q1021s" => Some(roger_start(player)),
             "q1021e" => Some(roger_end(player)),
+            "q1028s" => Some(shanks_sails_for_lucas()),
             "q2214e" | "q2215e" => {
                 let hour = conti::time_of_day(conti::now()).0;
                 Some(trash_can(player, script == "q2215e", hour))
@@ -4603,6 +4604,25 @@ fn shanks(player: &Player) -> NpcScript {
     }
     let mut script = NpcScript::new(SHANKS, pages);
     script.on_end = on_end;
+    script
+}
+
+/// `q1028s`, To Lith Harbor!: Lucas has asked Shanks to take the player,
+/// who carries Lucas's message for Olaf, so Shanks sails to Lith Harbor for
+/// free and the quest starts. A no stays (`QuestInfo` 1028; no Cosmic
+/// script). The data's start also asks for the Wizet Plain Suit
+/// (1042003), a GM item, which shelves the quest for players. The ask is
+/// unsourced.
+fn shanks_sails_for_lucas() -> NpcScript {
+    let mut script = NpcScript::new(
+        SHANKS,
+        vec![Page::Ask {
+            text: text(keys::SHANKS_FOR_LUCAS),
+            on_yes: Vec::new(),
+            on_no: Some(text(keys::SHANKS_DECLINE)),
+        }],
+    );
+    script.on_end = vec![Effect::StartQuest(1028), Effect::Warp(LITH_HARBOR)];
     script
 }
 
@@ -12547,6 +12567,24 @@ mod tests {
             );
         }
         assert!(NpcScript::for_quest("q29904s", &player(30)).is_none());
+    }
+
+    #[test]
+    fn shanks_sails_for_lucas_and_starts_to_lith_harbor() {
+        let mut script = NpcScript::for_quest("q1028s", &player(5)).unwrap();
+        assert!(script.begin().prompt.is_some());
+        let end = script.respond(ScriptInput::Yes).unwrap();
+        assert_eq!(end.prompt, None);
+        assert_eq!(
+            end.effects,
+            [Effect::StartQuest(1028), Effect::Warp(LITH_HARBOR)]
+        );
+
+        let mut script = NpcScript::for_quest("q1028s", &player(5)).unwrap();
+        script.begin();
+        let no = script.respond(ScriptInput::No).unwrap();
+        assert!(no.prompt.is_some() && no.effects.is_empty());
+        assert_eq!(script.respond(ScriptInput::Next).unwrap().effects, []);
     }
 
     #[test]
