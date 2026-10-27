@@ -384,6 +384,27 @@ pub fn check_complete(
     Ok(())
 }
 
+/// Kills that set a record (`game::quest::RECORDS`) for a started quest
+/// that has no mob to hunt: `(quest, mob, record, value)`. The Puppeteer's
+/// fall in Lith Harbor's Info Shop (9300345) for "Gathering Some Strange
+/// Information" (21733), whose completion reads 21762 at "2".
+const KILL_RECORDS: [(i16, i32, i16, &str); 1] = [(21733, 9300345, 21762, "2")];
+
+/// Set the records a kill of `mob_id` sets for `player`'s started quests.
+/// Returns the records changed, with their new values.
+pub fn kill_records(player: &mut Player, mob_id: i32) -> Vec<(i16, &'static str)> {
+    let mut changed = Vec::new();
+    for (quest_id, mob, record, value) in KILL_RECORDS {
+        if mob == mob_id
+            && player.quests.state(quest_id) == QuestState::Started
+            && player.quests.set_record(record, value)
+        {
+            changed.push((record, value));
+        }
+    }
+    changed
+}
+
 /// Count a kill of `mob_id` toward every started quest that needs it.
 /// Returns the quests whose progress changed.
 pub fn count_kill<'a>(

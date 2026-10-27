@@ -29,11 +29,12 @@ pub const INFO_QUESTS: &[i16] = &[
 /// the Pig Farm (20731, for "A Black Shadow in the Pig Farm", 20706) and
 /// the one in the Magic Library (20732, for "Maybe it's Grendel!", 20718),
 /// and an Aran's search of the Puppeteer's door (21761, for "The
-/// Puppeteer's Cave", 21728).
+/// Puppeteer's Cave", 21728) and the Puppeteer's fall in Lith Harbor's
+/// Info Shop (21762, for "Gathering Some Strange Information", 21733).
 /// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
 pub const RECORDS: &[i16] = &[
-    2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732, 21761,
+    2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732, 21761, 21762,
 ];
 
 /// A quest's state as the client and the quest data number it.
