@@ -8,11 +8,11 @@ use std::time::SystemTime;
 pub const SCRIPT_MARKERS: i16 = 32000;
 
 /// Quests whose record is an info string rather than kill counts: their
-/// start sets it (`Act/0/info`), NPCs change one character at a time, and
-/// completion needs it to read a given value (`Check/1/infoex`). Only quests
-/// whose characters the server's scripts can set are listed, as others could
-/// never be completed.
-pub const INFO_QUESTS: &[i16] = &[2236, 3311, 3900, 3926, 3927, 3929];
+/// start sets it (`Act/0/info`, else it starts empty), NPCs change one
+/// character at a time or set it whole, and completion needs it to read a
+/// given value (`Check/1/infoex`). Only quests whose strings the server's
+/// scripts can set are listed, as others could never be completed.
+pub const INFO_QUESTS: &[i16] = &[2166, 2236, 3311, 3900, 3926, 3927, 3929];
 
 /// Records that are no quest (Quest.nx has no such id) but that another
 /// quest's completion reads (`Check/1 infoNumber`): an info string a
@@ -193,6 +193,25 @@ impl QuestLog {
         true
     }
 
+    /// Set a started info quest's whole string to `value`; `false`,
+    /// changing nothing, if it isn't started or already reads so.
+    pub fn set_info(&mut self, quest_id: i16, value: &str) -> bool {
+        let Some(QuestRecord {
+            status: QuestStatus::Started {
+                info: Some(info), ..
+            },
+            ..
+        }) = self.records.get_mut(&quest_id)
+        else {
+            return false;
+        };
+        if info == value {
+            return false;
+        }
+        value.clone_into(info);
+        true
+    }
+
     /// Set character `slot` of a started quest's info string to `to` if it
     /// is `from`; `false`, changing nothing, otherwise.
     pub fn set_info_char(&mut self, quest_id: i16, slot: usize, from: u8, to: u8) -> bool {
@@ -327,6 +346,12 @@ mod tests {
         assert!(!log.set_info_char(3926, 4, b'2', b'3'));
         assert!(!log.set_info_char(3927, 0, b'2', b'3'));
         assert_eq!(log.info(3926), Some("2322"));
+        // Or whole, once.
+        assert!(log.set_info(3926, "5"));
+        assert!(!log.set_info(3926, "5"));
+        assert!(!log.set_info(3927, "5"));
+        assert_eq!(log.info(3926), Some("5"));
+        assert!(log.set_info(3926, "2322"));
         let status = log.status(3926).unwrap();
         assert_eq!(status.record_string().as_deref(), Some("2322"));
         let kills = QuestStatus::Started {

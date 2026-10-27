@@ -711,11 +711,13 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         .find(|&&(quest, _)| quest == id)
         .map(|&(_, record)| record);
     let (start_info, end_info) = if INFO_QUESTS.contains(&id) {
+        // One whose start sets no string (Shining Stone, 2166) starts with
+        // an empty one, which a script sets whole.
         let start_info = match start_actions {
             Some(index) => text_child(nx, index, "info")?,
             None => None,
         };
-        (start_info, info_checks(nx, end)?)
+        (Some(start_info.unwrap_or_default()), info_checks(nx, end)?)
     } else if let Some(record) = end_info_record {
         if nx.int_child(end, "infoNumber")? != Some(i32::from(record)) {
             return Err(invalid("record quest with another record"));
@@ -1217,6 +1219,20 @@ mod tests {
         );
         let oasis = catalog.quest(3900).unwrap();
         assert_eq!(oasis.start_info.as_deref(), Some("4"));
+        // Shining Stone starts empty; the Shiny Stone sets the "5" Sharyl
+        // reads.
+        let stone = catalog.quest(2166).unwrap();
+        assert_eq!(
+            (stone.start_info.as_deref(), stone.end_npc, stone.exp),
+            (Some(""), 1092003, 400)
+        );
+        assert_eq!(
+            stone.end_info,
+            [InfoCheck {
+                cond: 0,
+                value: "5".into()
+            }]
+        );
         // Every info quest starts with a string and counts no mobs, whose
         // counts would share the record with it.
         for &id in INFO_QUESTS {

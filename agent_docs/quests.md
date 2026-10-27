@@ -431,7 +431,10 @@ the quest deletes them with it (`db::quest::forfeit`). They are `QuestStatus::St
 `character_quests.progress` as is and sent wherever kill counts would be
 (`QuestStatus::record_string`). `Effect::SetQuestChar` changes one
 character if it reads what it should, sending the quest record again;
-otherwise nothing in its script applies.
+otherwise nothing in its script applies. `Effect::SetQuestInfo`
+(`QuestLog::set_info`) sets a started quest's whole string, and does
+nothing if it already reads so. A quest whose start sets no string
+(`Act/0/info`) starts with an empty one.
 
 | Quest | String | Set by |
 | --- | --- | --- |
@@ -440,12 +443,15 @@ otherwise nothing in its script applies.
 | 3900 Learning the Culture of Ariant | "4" to "5" | the Palace Oasis (2103000) |
 | 3927 Existence of the Secret Organization | "0" to "1" | the secret wall (2103001) |
 | 3311 Clue | "4" to "5" | the wall in the missing alchemist's home (2111011), after a yes |
+| 2166 Shining Stone | "" to "5" | the Shiny Stone (1092016, `nautil_stone`) in the Nautilus's Generator Room (120000301); Sharyl (1092003) completes it |
 | 2236 How to Shoo Away the Evil | "000000" to "111111" | the six Shaman Rocks (1063012 on 105050200, 105060000, 105070000; 1063013 twice on 105090000 and once on 105090100), each taking one charm (4032263) |
 
 Cosmic's scripts gave the slots and digits. The houses are silent, as
-there; the walls', the oasis's and the rocks' words are placeholders
-(`quest_info.*`). 2236 names its own record (`infoNumber` 2236), so it is
-read as an info quest. Its two rocks in the same swamp are the same NPC;
+there; the walls', the oasis's, the stone's and the rocks' words are
+placeholders (`quest_info.*`). Cosmic's stone completes 2166 itself;
+here it only sets the string, since Quest.nx has Sharyl complete it.
+2166 and 2236 name their own records (`infoNumber`), so they are
+read as info quests. 2236's two rocks in the same swamp are the same NPC;
 the field tells them apart by `nth`, which of the map's NPCs with that id
 was clicked, in Map.nx order (`ServerMessage::NpcConversation`,
 `net::npc_scripts::shaman_rock`). A rock already charmed, or clicked
@@ -667,6 +673,7 @@ copied into the source.
   and `quest_info` (Sejan's Test through Ariant's four houses, kept across
   a relogin, and a string one delivery short refused), `shaman_rocks`
   (2236's six rocks, the swamp's two told apart, each charmed once),
+  `shining_stone` (2166's stone, once, then Sharyl),
   `mushroom_forest` (2314's barrier and 2322's wall, each looked at once),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

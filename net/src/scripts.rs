@@ -682,6 +682,12 @@ pub enum Effect {
         from: u8,
         to: u8,
     },
+    /// Set a started info quest's whole string to `value`, as the Shiny
+    /// Stone marks Shining Stone; nothing if it already reads so.
+    SetQuestInfo {
+        quest: i16,
+        value: &'static str,
+    },
     /// Set a record that is no quest (`game::quest::RECORDS`) to `value`,
     /// as Kyrin marks a test passed; nothing if it already reads so.
     SetRecord {
