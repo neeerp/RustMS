@@ -96,7 +96,8 @@ pub const SCRIPTS: &[&str] = &[
     "q29921s", "q29933s", "q21733s", "q21733e", "q21734s", "q21734e", "q21735s", "q21735e",
     "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s", "q21742s", "q21742e",
     "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e", "q21753s", "q21754s",
-    "q21757e", "q3250s", "q3250e",
+    "q21757e", "q21700s", "q21703s", "q21703e", "q21704s", "q21712s", "q21716s", "q21719s",
+    "q21720e", "q21729s", "q21766s", "q21766e", "q21767s", "q3250s", "q3250e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -105,9 +106,11 @@ pub const SCRIPTS: &[&str] = &[
 /// the Remnants of Horned Tail (3714), once for each Nine Spirit's Egg, and
 /// Violetta's face (2334) and the Royal Seal she keeps (2342), and the
 /// clue in the broken Spirit of Snow Statue (3108), and the lost memory
-/// each job instructor gives back (3523-3527, 3529).
+/// each job instructor gives back (3523-3527, 3529), and an Aran's Baby
+/// Steps (21704), told to Lilin.
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3714,
+    21704,
 ];
 /// Quests no NPC completes through the quest window: `Check/1` is only an
 /// `infoex` entry ("dummy") on an info string nothing sets, which v83's
@@ -173,9 +176,12 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
 /// the Mushroom Kingdom's opening scene (`TD_MC_Openning`) to set 2311.
 /// An Aran's "The Lost Seal Stone of Ellin Forest" (21753) waits for 21764,
 /// set on entering Ellin's warehouse, and "Info on Another Seal Stone"
-/// (21754) for 21765, set on entering the Bowman Instructional School.
+/// (21754) for 21765, set on entering the Bowman Instructional School, and
+/// "The Puppeteer's Warning" (21720) for 21760, set by Francis's warning in
+/// the Puppeteer's Cave.
 /// See [`StartRequirements::record`].
-pub const START_RECORD_QUESTS: &[(i16, i16)] = &[(2312, 2311), (21753, 21764), (21754, 21765)];
+pub const START_RECORD_QUESTS: &[(i16, i16)] =
+    &[(2312, 2311), (21720, 21760), (21753, 21764), (21754, 21765)];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.
