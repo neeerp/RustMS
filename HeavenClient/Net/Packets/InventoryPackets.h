@@ -743,4 +743,40 @@ namespace ms
 			write_time();
 		}
 	};
+
+	// The raise window asks for the record `record` its item grows by (v83 0x89124e).
+	// Opcode: RAISE_RECORD(236)
+	class RaiseRecordPacket : public OutPacket
+	{
+	public:
+		RaiseRecordPacket(int16_t record) : OutPacket(OutPacket::Opcode::RAISE_RECORD)
+		{
+			write_short(record);
+		}
+	};
+
+	// The raise window of `item_id` opened, or closed (v83 0x890eaa, 0x890f79).
+	// Opcode: RAISE_WINDOW(237)
+	class RaiseWindowPacket : public OutPacket
+	{
+	public:
+		RaiseWindowPacket(int32_t item_id, bool open) : OutPacket(OutPacket::Opcode::RAISE_WINDOW)
+		{
+			write_int(item_id);
+			write_byte(open);
+		}
+	};
+
+	// Feeds the raise item `item_id` the item in `tab` and `slot` (v83 0x8913cf).
+	// Opcode: RAISE_FEED(238)
+	class RaiseFeedPacket : public OutPacket
+	{
+	public:
+		RaiseFeedPacket(InventoryType::Id tab, int16_t slot, int32_t item_id) : OutPacket(OutPacket::Opcode::RAISE_FEED)
+		{
+			write_byte(tab);
+			write_short(slot);
+			write_int(item_id);
+		}
+	};
 }

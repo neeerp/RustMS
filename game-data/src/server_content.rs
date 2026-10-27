@@ -1041,6 +1041,19 @@ pub mod keys {
     pub const TRU_PUPPETEER_BEATEN: &str = "tru.puppeteer_beaten";
     pub const TRU_POLEARM_MASTERY: &str = "tru.polearm_mastery";
 
+    /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
+    /// offers a Timer's Egg to raise, then, once it has grown
+    /// (`q3250e`), takes it back.
+    pub const BOB_BABY_BIRD_OFFER: [&str; 3] = [
+        "bob.baby_bird.feeding",
+        "bob.baby_bird.tamed",
+        "bob.baby_bird.ask",
+    ];
+    pub const BOB_BABY_BIRD_DECLINED: &str = "bob.baby_bird.declined";
+    pub const BOB_BABY_BIRD_GIVEN: [&str; 2] = ["bob.baby_bird.given", "bob.baby_bird.return"];
+    pub const BOB_BABY_BIRD_FULL: &str = "bob.baby_bird.full";
+    pub const BOB_BABY_BIRD_GROWN: &str = "bob.baby_bird.grown";
+
     /// Captain Al's lessons in leading a family (quests 2232-2234), each
     /// ended by his script (NPC 1002103, `q2232e`-`q2234e`): done, then not
     /// yet, for a junior taken, 1,000 Rep earned, and 2,000 earned with the
@@ -3458,6 +3471,14 @@ mod tests {
                 keys::FAKE_TRU_CALL,
                 keys::TRU_PUPPETEER_BEATEN,
                 keys::TRU_POLEARM_MASTERY,
+                keys::BOB_BABY_BIRD_OFFER[0],
+                keys::BOB_BABY_BIRD_OFFER[1],
+                keys::BOB_BABY_BIRD_OFFER[2],
+                keys::BOB_BABY_BIRD_DECLINED,
+                keys::BOB_BABY_BIRD_GIVEN[0],
+                keys::BOB_BABY_BIRD_GIVEN[1],
+                keys::BOB_BABY_BIRD_FULL,
+                keys::BOB_BABY_BIRD_GROWN,
                 keys::NINE_SPIRIT_HATCHED,
                 keys::NINE_SPIRIT_STONE_HELD,
                 keys::NINE_SPIRIT_FULL,

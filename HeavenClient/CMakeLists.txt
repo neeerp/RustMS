@@ -167,6 +167,8 @@ if(HEAVENCLIENT_BUILD_TESTS)
     add_test(NAME remote_gachapon COMMAND remote_gachapon_tests)
     add_executable(incubator_tests tests/incubator.cpp)
     add_test(NAME incubator COMMAND incubator_tests)
+    add_executable(raise_tests tests/raise.cpp)
+    add_test(NAME raise COMMAND raise_tests)
     add_executable(karma_scissors_tests tests/karma_scissors.cpp)
     add_test(NAME karma_scissors COMMAND karma_scissors_tests)
     add_executable(cash_upgrades_tests tests/cash_upgrades.cpp)
@@ -1038,6 +1040,8 @@ add_executable(HeavenClient
     IO/UITypes/UIItemProtector.h
     IO/UITypes/UIIncubator.cpp
     IO/UITypes/UIIncubator.h
+    IO/UITypes/UIRaise.cpp
+    IO/UITypes/UIRaise.h
     IO/UITypes/UIKarmaScissors.cpp
     IO/UITypes/UIKarmaScissors.h
     IO/UITypes/UIRemoteGachapon.cpp

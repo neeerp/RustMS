@@ -39,6 +39,7 @@
 #include "../../IO/UITypes/UIAvatarMegaphone.h"
 #include "../../IO/UITypes/UIEnchantSkill.h"
 #include "../../IO/UITypes/UIQuestComplete.h"
+#include "../../IO/UITypes/UIRaise.h"
 #include "../../IO/UITypes/UIScriptMessage.h"
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIInviteCard.h"
@@ -247,14 +248,16 @@ namespace ms
 			int16_t id = recv.read_short();
 			int8_t status = recv.read_byte();
 			auto& quests = Stage::get().get_player().get_quests();
+			std::string record;
 			if (status == 0)
 				quests.remove(id);
 			else if (status == 1)
-				quests.add_started(id, recv.read_string());
+				quests.add_started(id, record = recv.read_string());
 			else if (status == 2)
 				quests.add_completed(id, recv.read_long());
 
 			Stage::get().get_quest_alert().record_changed(id, status);
+			UIRaise::record_changed(id, status, record);
 		}
 		else if (mode == 3)
 		{

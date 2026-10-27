@@ -901,6 +901,47 @@ there. OK asks the Yes/No from `Character/Inventory/Incubator.h`, then sends
 `UseOnItemPacket` and closes. `IncubatorResultHandler` (opcode 69) prints the
 gain line and opens a `UINpcTalk` with what was found.
 
+### Raise items
+
+An Etc item 4220xxx whose info names a record (`questId`), art (`uiData`,
+as `UI/UIWindow/raise/3`), `exp` per stage and `grade` stages grows in a
+window of its own (v83 `CUIRaise`, report b233). The only one in use is
+the Timer's Egg (4220046) of "A Cute Baby Bird" (3250): Ghosthunter Bob
+(2041026, in Lost Time 220070000) gives it on the start, Bird Feed
+(4031992) drops from the clocktower's mobs, and the egg grows by 100 for
+each one dropped on its window, to 3000 in record 7067, which the quest's
+completion reads; Bob takes the egg back on the end. Its data is
+`game_data::items::RaiseInfo`.
+
+The client sends three packets. 0xED (item id, then 1 on opening and 0 on
+closing) needs nothing and isn't handled. 0xEC (the record, a short) asks
+for the record; the server (`world/raise.rs`) answers with its quest
+record message while a quest reading it (`RECORD_QUESTS`) is under way,
+"0" before anything is fed. 0xEE (the bag as a byte, the slot as a short,
+then the raise item's id) feeds it: if the raise item is held, its quest
+is under way, the slot holds an item in its `consumeItem` list and the
+record is short of `grade` × `exp`, the server takes one and adds the
+list's amount, up to the last stage, then sends the inventory change and
+the record. Anything else only unlocks the client. The client never reads
+the amount; the fed item's own `info/exp` is the same 100 for the egg.
+
+In HeavenClient, `UIRaise` opens on a double-click of any 4220 item whose
+info has a record, art and grade (`Character/Inventory/Raise.h`). It draws
+`UIWindow.img/raise/backgrnd`'s nine cells as a frame, 150 by 150 at
+(0, 150) until the record comes, then the stage's art (`uiData/<stage>`,
+stage = value / exp, at most the grade) at (10, 30) in a window 20 by 40
+larger than it, with `Basic.img/BtClose` 16 px from its right edge. The
+art's place is read from the size v83 gives the window; the canvases'
+origins are not taken off. A new stage writes its `message/<stage>` in the
+chat log (type 0xc). An item dropped on it that it doesn't take gets "This
+item is not available."; one it takes writes its `message/1` in the chat
+log and is sent, once the client is free and 200 ms have passed, or once
+the item is grown shows its `message/0` as a notice. A quest record
+message for the record with state 1 gives the window its value; states 0
+and 2 close it. The window remembers where each item's was. Not done:
+v83's 480 ms effect and its call with 0x29 on a new stage, and more than
+one raise window at a time.
+
 ### Reward boxes
 
 Use items with a `reward` node beside `info` (2022309-2022618: the Golden

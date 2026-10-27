@@ -2582,6 +2582,8 @@ impl NpcScript {
             "q3714s" => Some(baby_dragon(player)),
             "q21733s" => Some(fake_tru_calls()),
             "q21733e" => Some(tru_on_the_trap()),
+            "q3250s" => Some(baby_bird_offer(player)),
+            "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
             "q6031e" => Some(maker_class(HUGHES, keys::MAKER_SCIENCE, 6031)),
             "q6032e" => Some(maker_class(MEREN, keys::MAKER_PRACTICE, 6032)),
@@ -4741,6 +4743,60 @@ fn tru_on_the_trap() -> NpcScript {
             level: 0,
             master_level: 20,
         },
+    ];
+    script
+}
+
+/// Ghosthunter Bob, in the Clocktower's lobby.
+const GHOSTHUNTER_BOB: i32 = 2041026;
+const A_CUTE_BABY_BIRD: i16 = 3250;
+/// The Timer's Egg, a raise item: Bird Feed grows it in record 7067.
+const TIMERS_EGG: i32 = 4220046;
+
+/// `q3250s`: Bob offers a Timer's Egg to raise (`Say.img/3250/0` has the
+/// pages), unless one is already held.
+fn baby_bird_offer(player: &Player) -> NpcScript {
+    let mut on_yes = Vec::new();
+    if player.inventory.count(TIMERS_EGG) == 0 {
+        on_yes.push(Effect::GiveItem {
+            item_id: TIMERS_EGG,
+            quantity: 1,
+        });
+    }
+    on_yes.push(Effect::StartQuest(A_CUTE_BABY_BIRD));
+    let [feeding, tamed, ask] = keys::BOB_BABY_BIRD_OFFER;
+    let [given, back] = keys::BOB_BABY_BIRD_GIVEN;
+    let mut script = NpcScript::new(
+        GHOSTHUNTER_BOB,
+        vec![
+            Page::Say(text(feeding)),
+            Page::Say(text(tamed)),
+            Page::Ask {
+                text: text(ask),
+                on_yes,
+                on_no: Some(text(keys::BOB_BABY_BIRD_DECLINED)),
+            },
+            Page::Say(text(given)),
+            Page::Say(text(back)),
+        ],
+    );
+    script.inventory_full = Some(text(keys::BOB_BABY_BIRD_FULL));
+    script
+}
+
+/// `q3250e`: the bird grown (record 7067 at 3,000, `Check.img/3250/1`),
+/// Bob takes it back. The quest gives nothing (`Act.img/3250/1`).
+fn baby_bird_grown() -> NpcScript {
+    let mut script = NpcScript::new(
+        GHOSTHUNTER_BOB,
+        vec![Page::Say(text(keys::BOB_BABY_BIRD_GROWN))],
+    );
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: TIMERS_EGG,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(A_CUTE_BABY_BIRD),
     ];
     script
 }
@@ -12437,6 +12493,59 @@ mod tests {
                     master_level: 20,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn bob_hands_out_a_timers_egg_and_takes_it_back_grown() {
+        let offer = |player: &Player| {
+            let mut bob = NpcScript::for_quest("q3250s", player).unwrap();
+            assert_eq!(bob.npc_id(), GHOSTHUNTER_BOB);
+            bob.begin();
+            bob.respond(ScriptInput::Next).unwrap();
+            assert_eq!(kind(&bob.respond(ScriptInput::Next).unwrap()), Some(1));
+            bob
+        };
+        let mut bob = offer(&player(70));
+        assert_eq!(
+            bob.respond(ScriptInput::Yes).unwrap().effects,
+            [
+                Effect::GiveItem {
+                    item_id: TIMERS_EGG,
+                    quantity: 1
+                },
+                Effect::StartQuest(A_CUTE_BABY_BIRD),
+            ]
+        );
+        // One already held is not given again.
+        let mut holder = player(70);
+        holder.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(TIMERS_EGG, 1),
+        );
+        assert_eq!(
+            offer(&holder).respond(ScriptInput::Yes).unwrap().effects,
+            [Effect::StartQuest(A_CUTE_BABY_BIRD)]
+        );
+        assert!(offer(&player(70))
+            .respond(ScriptInput::No)
+            .unwrap()
+            .effects
+            .is_empty());
+
+        assert_eq!(
+            read_through(NpcScript::for_quest("q3250e", &holder).unwrap()),
+            (
+                GHOSTHUNTER_BOB,
+                vec![
+                    Effect::TakeItem {
+                        item_id: TIMERS_EGG,
+                        quantity: 1
+                    },
+                    Effect::CompleteQuest(A_CUTE_BABY_BIRD),
+                ]
+            )
         );
     }
 
