@@ -2506,6 +2506,10 @@ impl NpcScript {
             "q8230e" => Some(jack_sees_the_keystone(player)),
             "q29900s" | "q29901s" | "q29902s" | "q29903s" => adventurer_title(script),
             "q29900e" | "q29901e" | "q29902e" | "q29903e" => adventurer_medal(script),
+            "q29910s" | "q29911s" | "q29912s" | "q29913s" | "q29914s" | "q29915s" | "q29916s"
+            | "q29917s" | "q29918s" | "q29919s" | "q29920s" | "q29921s" | "q29933s" => {
+                medal_title(script)
+            }
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3899,6 +3903,42 @@ fn adventurer_medal(script: &str) -> Option<NpcScript> {
     script.on_end = vec![give_one(medal), Effect::CompleteQuest(quest)];
     script.inventory_full = Some(text(keys::ADVENTURER_MEDAL_FULL));
     Some(script)
+}
+
+/// The titles of medals won elsewhere (29910 to 29921 and 29933): each
+/// quest's data starts it by itself (`autoStart`, `autoAccept`) once the
+/// player holds the medal, and its start script starts and completes it at
+/// once with a line in the chat log naming the title, as Cosmic's
+/// `29924.js` does for the Aran titles. Quest, title, and the NPC the data
+/// names.
+const MEDAL_TITLES: [(i16, &str, i32); 13] = [
+    (29910, "Gallant Warrior", 9000066),
+    (29911, "Wiseman", 9000066),
+    (29912, "Lord Sniper", 9000066),
+    (29913, "Legendary Thief", 9000066),
+    (29914, "King Pirate", 9000066),
+    (29915, "Mu Lung Dojo Vanquisher", 2091005),
+    (29916, "Henesys Donor", 9000066),
+    (29917, "Ellinia Donor", 9000066),
+    (29918, "Perion Donor", 9000066),
+    (29919, "Kerning City Donor", 9000066),
+    (29920, "Sleepywood Donor", 9000066),
+    (29921, "Nautilus Donor", 9000066),
+    (29933, "Lith Harbor Donor", 9000066),
+];
+
+fn medal_title(script: &str) -> Option<NpcScript> {
+    let &(quest, title, npc) = MEDAL_TITLES
+        .iter()
+        .find(|(quest, ..)| script[1..].starts_with(&quest.to_string()))?;
+    let line = content::text().get(keys::MEDAL_TITLE, &[("title", title)]);
+    Some(NpcScript::new(
+        npc,
+        vec![Page::Done(vec![
+            Effect::FinishQuest(quest),
+            Effect::InfoText(line),
+        ])],
+    ))
 }
 
 /// Title Challenge - Outstanding Citizen (29508): the data starts it at
@@ -12604,6 +12644,22 @@ mod tests {
             );
         }
         assert!(NpcScript::for_quest("q29904s", &player(30)).is_none());
+    }
+
+    #[test]
+    fn a_medal_held_finishes_its_title_quest_silently() {
+        for (quest, title, npc) in MEDAL_TITLES {
+            let mut start = NpcScript::for_quest(&format!("q{quest}s"), &player(30)).unwrap();
+            assert_eq!(start.npc_id(), npc);
+            let step = start.begin();
+            assert_eq!(step.prompt, None, "{quest}");
+            assert_eq!(step.effects[0], Effect::FinishQuest(quest));
+            assert!(
+                matches!(&step.effects[1], Effect::InfoText(line) if line.contains(title)),
+                "{quest}"
+            );
+        }
+        assert!(NpcScript::for_quest("q29924s", &player(30)).is_none());
     }
 
     #[test]

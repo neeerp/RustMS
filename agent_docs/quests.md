@@ -721,6 +721,16 @@ it says so and does nothing. This follows Cosmic's `29900.js` to `29903.js`.
 The `adventurer_medal.*` text is unsourced. The Knight and Aran titles
 (29904 to 29909 and 29924 to 29928) wait for the Cygnus and Aran jobs.
 
+Some titles go with medals won elsewhere: the job medals at level 180
+(29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
+medals (29916 to 29921 and 29933). Each quest's start needs the medal held,
+and the data starts it by itself (`autoStart`, `autoAccept`). The start
+script runs anywhere and starts and completes the quest at once, with a line
+in the chat log naming the title, as Cosmic's `29924.js` does for the Aran
+titles. The medal stays with the player. The `medal_title` text is
+unsourced. Veteran Hunter and Legendary Hunter (29922 and 29923) have no
+completion NPC in the data, so the catalog leaves them out.
+
 Title Challenge - Outstanding Citizen (29508) starts at Dalair from the
 data, from level 10. Dalair's end script gives the Outstanding Citizen Medal
 (1142081, the quest's `viewMedalItem`) and completes the quest once the
@@ -892,5 +902,7 @@ copied into the source.
   Olaf's reward),
   `outstanding_citizen` (29508: refused with no marriage, guild or Junior,
   then the medal once all three are set),
+  `medal_titles` (two titles finished away from their NPCs with the medals
+  held, not twice, and a third refused without its medal),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
