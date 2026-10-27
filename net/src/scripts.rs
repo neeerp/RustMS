@@ -446,6 +446,12 @@ const ADVICE: [(&str, &str, i16, i16); 11] = [
 pub enum Effect {
     /// A screen effect from `Map.nx/Effect.img` (map name banners).
     FieldEffect(String),
+    /// Play `Sound.nx/Field.img/<path>` for the player, as a missed or
+    /// finished tune's jingle (`Party1/Failed`, `Party1/Clear`).
+    Sound(String),
+    /// Play `Sound.nx/Field.img/<path>` for everyone on the player's map,
+    /// as a string of Eliza's harp sounds its note.
+    SoundToMap(String),
     /// A UI image anchored to the player (`UI/tutorial.img/<n>` hints).
     AvatarEffect(String),
     /// A scene the client plays from `Effect.nx` (`Direction2.img/open`),

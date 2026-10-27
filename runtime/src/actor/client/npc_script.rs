@@ -132,6 +132,12 @@ impl ClientActor {
         for effect in effects {
             match effect {
                 Effect::FieldEffect(path) => afterwards.push(effect::build_field_effect(path)?),
+                Effect::Sound(path) => afterwards.push(effect::build_field_sound(path)?),
+                Effect::SoundToMap(path) => {
+                    let sound = effect::build_field_sound(path)?;
+                    to_field.push(FieldRequest::BroadcastAll(sound.clone()));
+                    afterwards.push(sound);
+                }
                 Effect::PortalSound => {
                     afterwards.push(effect::build_own_effect(CharEffect::PortalSound)?)
                 }
