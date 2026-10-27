@@ -1555,10 +1555,10 @@ swinging at a reactor, so a request the server leaves unanswered can't stop
 a player attacking.
 
 Not yet: skill hits (event type 5 and `0xCD` kind 1) and touching a
-reactor (`0xCE`), which only the Guild Quest's reactors (`6109xxx`) and
-`9222000` use, and events of types 100 and up (an item dropped on a
-reactor, a timeout). v83 also skips a swing at a reactor whose
-`info/quest` isn't in progress, but no v83 reactor has one.
+reactor (`0xCE`), which only the Crimsonwood Keep party quest's reactors
+(`6109xxx`, actions `glpq*`) and `9222000` use.
+v83 also skips a swing at a reactor whose `info/quest` isn't in progress,
+but no v83 reactor has one.
 
 ## Mob attacks
 
