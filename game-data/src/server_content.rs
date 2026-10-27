@@ -604,6 +604,22 @@ pub mod keys {
     pub const RUMOR_BETTY: &str = "perion_rumor.betty";
     pub const TIENK_GREETING: &str = "lith_tienk.greeting";
     pub const RHO_LAST_SONG: &str = "kerning_rho.last_song";
+    pub const NEW_LEAF_CITY_DECLINE: &str = "nlc_quest.decline";
+    pub const BARRICADE_MARK_ASK: &str = "nlc_barricade.mark_ask";
+    pub const BARRICADE_MARK_GO: &str = "nlc_barricade.mark_go";
+    pub const LUKAN_STORM_ASK: &str = "nlc_lukan.storm_ask";
+    pub const LUKAN_STORM_GO: &str = "nlc_lukan.storm_go";
+    pub const TAGGRIN_WOODS_ASK: &str = "nlc_taggrin.woods_ask";
+    pub const TAGGRIN_WOODS_GO: &str = "nlc_taggrin.woods_go";
+    pub const TAGGRIN_PATH_ASK: &str = "nlc_taggrin.path_ask";
+    pub const TAGGRIN_PATH_GO: &str = "nlc_taggrin.path_go";
+    pub const TAGGRIN_WARRIORS_ASK: &str = "nlc_taggrin.warriors_ask";
+    pub const TAGGRIN_WARRIORS_GO: &str = "nlc_taggrin.warriors_go";
+    pub const LITA_LEPRECHAUNS_ASK: &str = "nlc_lita.leprechauns_ask";
+    pub const LITA_ELDERWRAITHS_ASK: &str = "nlc_lita.elderwraiths_ask";
+    pub const LITA_HORSEMAN_ASK: &str = "nlc_lita.horseman_ask";
+    pub const LITA_BIGFOOT_ASK: &str = "nlc_lita.bigfoot_ask";
+    pub const LITA_BOUNTY_GO: &str = "nlc_lita.bounty_go";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3061,6 +3077,22 @@ mod tests {
             keys::RUMOR_BETTY,
             keys::TIENK_GREETING,
             keys::RHO_LAST_SONG,
+            keys::NEW_LEAF_CITY_DECLINE,
+            keys::BARRICADE_MARK_ASK,
+            keys::BARRICADE_MARK_GO,
+            keys::LUKAN_STORM_ASK,
+            keys::LUKAN_STORM_GO,
+            keys::TAGGRIN_WOODS_ASK,
+            keys::TAGGRIN_WOODS_GO,
+            keys::TAGGRIN_PATH_ASK,
+            keys::TAGGRIN_PATH_GO,
+            keys::TAGGRIN_WARRIORS_ASK,
+            keys::TAGGRIN_WARRIORS_GO,
+            keys::LITA_LEPRECHAUNS_ASK,
+            keys::LITA_ELDERWRAITHS_ASK,
+            keys::LITA_HORSEMAN_ASK,
+            keys::LITA_BIGFOOT_ASK,
+            keys::LITA_BOUNTY_GO,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,
