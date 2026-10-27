@@ -602,6 +602,7 @@ unsourced = [
     "adventurer_medal.full",
     "shanks.for_lucas",
     "outstanding_citizen.not_yet",
+    "medal_title",
     "portal.investigate2",
     "portal.time_lane.lost",
     "portal.disguise.no_permit",
