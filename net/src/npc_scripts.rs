@@ -415,6 +415,13 @@ const ARIANT_DELIVERIES: [(i32, i16, i32, u8); 8] = [
     (2103010, 3926, 4031579, 2),
     (2103012, 3926, 4031579, 3),
 ];
+/// Collecting Meteorite Samples (3421): the six meteorites in Kulan Field
+/// (2050014 to 2050019) each give a Meteorite Sample (4031117) once, the
+/// info string's slot for each turning from '0' to '1'; with all six had
+/// and fewer than six held, any gives another.
+const METEORITE_SAMPLES: i16 = 3421;
+const METEORITE_SAMPLE: i32 = 4031117;
+const METEORITES: std::ops::RangeInclusive<i32> = 2050014..=2050019;
 /// Find Fresh Milk (2180): Tangyoon (1092000) hands over an empty bottle
 /// and sends the player to his stable, where each mother cow fills a third
 /// of it, but not twice running (the quest's record holds the last one),
@@ -2159,6 +2166,11 @@ impl NpcScript {
             .and_then(|&delivery| ariant_delivery(delivery, player))
         {
             return Some(script);
+        }
+        if METEORITES.contains(&npc_id) {
+            if let Some(script) = meteorite(npc_id, player) {
+                return Some(script);
+            }
         }
         if npc_id == TANGYOON && player.quests.state(FRESH_MILK) == QuestState::Started {
             return Some(tangyoon());
@@ -4727,6 +4739,37 @@ pub fn shaman_rock(npc_id: i32, nth: u8, player: &Player) -> Option<NpcScript> {
             ],
         }],
     ))
+}
+
+/// A meteorite gives its sample without a word while the quest is under
+/// way, if its slot still reads '0', or again once every slot reads '1'
+/// and the player holds fewer than six.
+fn meteorite(npc: i32, player: &Player) -> Option<NpcScript> {
+    let slot = u8::try_from(npc - METEORITES.start()).ok()?;
+    let give = Effect::GiveItem {
+        item_id: METEORITE_SAMPLE,
+        quantity: 1,
+    };
+    let effects = if info_reads(player, METEORITE_SAMPLES, slot, b'0') {
+        vec![
+            Effect::SetQuestChar {
+                quest: METEORITE_SAMPLES,
+                slot,
+                from: b'0',
+                to: b'1',
+            },
+            give,
+        ]
+    } else if player.quests.info(METEORITE_SAMPLES) == Some("111111")
+        && player.inventory.count(METEORITE_SAMPLE) < 6
+    {
+        vec![give]
+    } else {
+        return None;
+    };
+    let mut script = NpcScript::new(npc, vec![Page::Done(effects)]);
+    script.inventory_full = Some(text(keys::METEORITE_FULL));
+    Some(script)
 }
 
 /// A house in Ariant takes its delivery without a word, if it is still
@@ -16774,6 +16817,56 @@ mod tests {
         let read = wall.respond(ScriptInput::Yes).unwrap();
         assert_eq!(read.effects.len(), 1);
         assert!(NpcScript::for_npc(SECRET_WALL, &traveller(30, 0, false)).is_none());
+    }
+
+    #[test]
+    fn each_meteorite_gives_one_sample_for_its_own_character() {
+        let field = |info: &str, samples: i16| {
+            let mut player = traveller(44, 0, false);
+            player.quests.upsert(game::QuestRecord {
+                quest_id: METEORITE_SAMPLES,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(info.into()),
+                },
+            });
+            if samples > 0 {
+                player.inventory.insert(
+                    game::InventoryType::Etc,
+                    1,
+                    game::Item::stack(METEORITE_SAMPLE, samples),
+                );
+            }
+            player
+        };
+        let give = Effect::GiveItem {
+            item_id: METEORITE_SAMPLE,
+            quantity: 1,
+        };
+        // The fourth meteorite is the fourth character.
+        let script = NpcScript::for_npc(2050017, &field("110000", 2)).unwrap();
+        assert_eq!(script.inventory_full, Some(text(keys::METEORITE_FULL)));
+        let step = script.begin();
+        assert_eq!(step.prompt, None);
+        assert_eq!(
+            step.effects,
+            [
+                Effect::SetQuestChar {
+                    quest: METEORITE_SAMPLES,
+                    slot: 3,
+                    from: b'0',
+                    to: b'1'
+                },
+                give.clone()
+            ]
+        );
+        // One already had says nothing, nor any without the quest.
+        assert!(NpcScript::for_npc(2050015, &field("110000", 2)).is_none());
+        assert!(NpcScript::for_npc(2050014, &traveller(44, 0, false)).is_none());
+        // With all six had, a lost sample is given again, up to six.
+        let again = NpcScript::for_npc(2050019, &field("111111", 5)).unwrap();
+        assert_eq!(again.begin().effects, [give]);
+        assert!(NpcScript::for_npc(2050019, &field("111111", 6)).is_none());
     }
 
     #[test]
