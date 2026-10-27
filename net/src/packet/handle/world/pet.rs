@@ -696,6 +696,31 @@ pub fn tame_first_pet(player: &mut Player, amount: i16) -> Option<(Vec<Inventory
     Some((changes, levelled))
 }
 
+/// A quest's `petSkill` bits (`petskill`) and owner's speed (`petspeed`,
+/// attribute bit 1) for the first pet out: its item re-sent if it changed,
+/// so the client's own quest checks see it; nothing with no pet out.
+pub fn train_first_pet(player: &mut Player, skill: u16, owner_speed: bool) -> Vec<InventoryChange> {
+    let Some((slot, mut item)) = player
+        .pets
+        .first()
+        .and_then(|&serial| pet_item(player, serial))
+    else {
+        return Vec::new();
+    };
+    let Some(pet) = item.pet.as_mut() else {
+        return Vec::new();
+    };
+    let before = (pet.skill, pet.attribute);
+    pet.skill |= skill;
+    if owner_speed {
+        pet.attribute |= 1;
+    }
+    if (pet.skill, pet.attribute) == before {
+        return Vec::new();
+    }
+    put_back(player, slot, item).into()
+}
+
 /// When the next of the player's living pets dries up, if one ever does.
 pub fn next_dry_up(player: &Player) -> Option<SystemTime> {
     player
@@ -822,6 +847,18 @@ mod tests {
         assert_eq!(tame_first_pet(&mut player, 15), Some((vec![], false)));
         player.pets.clear();
         assert_eq!(tame_first_pet(&mut player, 15), None);
+    }
+
+    #[test]
+    fn a_quest_teaches_the_first_pet_out_its_skills_and_speed() {
+        let mut player = owner();
+        assert_eq!(train_first_pet(&mut player, 0x100, false).len(), 2);
+        assert_eq!(train_first_pet(&mut player, 0x80, true).len(), 2);
+        assert_eq!((tiger(&player).skill, tiger(&player).attribute), (0x180, 1));
+        // Nothing new: nothing re-sent.
+        assert!(train_first_pet(&mut player, 0x100, true).is_empty());
+        player.pets.clear();
+        assert!(train_first_pet(&mut player, 0x8, false).is_empty());
     }
 
     #[test]

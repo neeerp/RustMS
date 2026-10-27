@@ -132,6 +132,13 @@ namespace ms
 			info.end_pet_closeness = { static_cast<int32_t>(end["pettamenessmin"].get_integer(0)),
 				static_cast<int32_t>(end["pettamenessmax"].get_integer(30000)) };
 
+			auto skill_limit = [](nl::node check) {
+				return static_cast<uint16_t>((check["petRecallLimit"].get_integer() != 0 ? 0x80 : 0) |
+					(check["petAutoSpeakingLimit"].get_integer() != 0 ? 0x100 : 0));
+			};
+			info.pet_skill_limit = skill_limit(start);
+			info.end_pet_skill_limit = skill_limit(end);
+
 			info.buff = static_cast<int32_t>(start["buff"].get_integer());
 			info.except_buff = static_cast<int32_t>(start["exceptbuff"].get_integer());
 			info.end_buff = static_cast<int32_t>(end["buff"].get_integer());

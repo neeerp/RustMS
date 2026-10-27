@@ -99,34 +99,42 @@ namespace ms
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
 	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF };
 
-	// The first pet out: its item (0 for none) and its closeness.
+	// The first pet out: its item (0 for none), its closeness and its
+	// petSkill bits.
 	struct FirstPet
 	{
 		int32_t item;
 		int32_t closeness;
+		uint16_t skill;
 
-		FirstPet(int32_t item = 0, int32_t closeness = 0) : item(item), closeness(closeness) {}
+		FirstPet(int32_t item = 0, int32_t closeness = 0, uint16_t skill = 0) :
+			item(item), closeness(closeness), skill(skill) {}
 	};
 
 	// Whether the first pet out meets a quest's pet requirement, the pet
-	// items `pets` and the `closeness` range: v83 looks at no other pet, and
-	// at the closeness only with a pet list, where a pet outside the range
-	// is the wrong pet (FUN_00721163, FUN_00721d2c).
+	// items `pets` and the `closeness` range, and lacks the petSkill bits
+	// `skill_limit`: v83 looks at no other pet, and at the closeness only
+	// with a pet list, where a pet outside the range is the wrong pet, as is
+	// one that already has a limited skill (FUN_00721163, FUN_00721d2c).
 	inline QuestStop pet_stop(const std::vector<int32_t>& pets, std::pair<int32_t, int32_t> closeness,
-		FirstPet first_pet)
+		uint16_t skill_limit, FirstPet first_pet)
 	{
-		if (pets.empty())
+		if (pets.empty() && skill_limit == 0)
 			return QuestStop::NONE;
 
 		if (first_pet.item == 0)
 			return QuestStop::NO_PET;
 
-		if (std::find(pets.begin(), pets.end(), first_pet.item) == pets.end())
-			return QuestStop::WRONG_PET;
+		if (!pets.empty())
+		{
+			if (std::find(pets.begin(), pets.end(), first_pet.item) == pets.end())
+				return QuestStop::WRONG_PET;
 
-		bool close = first_pet.closeness >= closeness.first && first_pet.closeness <= closeness.second;
+			if (first_pet.closeness < closeness.first || first_pet.closeness > closeness.second)
+				return QuestStop::WRONG_PET;
+		}
 
-		return close ? QuestStop::NONE : QuestStop::WRONG_PET;
+		return (first_pet.skill & skill_limit) != 0 ? QuestStop::WRONG_PET : QuestStop::NONE;
 	}
 
 	// Whether the effect of item `buff` (0 for none) is on the player and
@@ -199,7 +207,7 @@ namespace ms
 		if (meso < quest.end_meso)
 			return QuestStop::MESO;
 
-		return pet_stop(quest.end_pets, quest.end_pet_closeness, first_pet);
+		return pet_stop(quest.end_pets, quest.end_pet_closeness, quest.end_pet_skill_limit, first_pet);
 	}
 
 	// Whether the player's fame, items, skills, worn items and map meet a
@@ -213,7 +221,7 @@ namespace ms
 	bool start_holdings_met(const QuestInfo& quest, int16_t fame, Held held, HasSkill has_skill, Worn worn,
 		int32_t mapid, FirstPet first_pet = {})
 	{
-		if (pet_stop(quest.pets, quest.pet_closeness, first_pet) != QuestStop::NONE)
+		if (pet_stop(quest.pets, quest.pet_closeness, quest.pet_skill_limit, first_pet) != QuestStop::NONE)
 			return false;
 
 		if (!std::all_of(quest.worn_all.begin(), quest.worn_all.end(), worn))

@@ -11,7 +11,7 @@ use net::packet::build::world::effect::{self, CharEffect};
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::{drop, inventory, pet, quest, skill, stat};
 use net::packet::handle::world::{
-    apply_item_effect, item_effect_packets, tame_first_pet, ItemEffect,
+    apply_item_effect, item_effect_packets, tame_first_pet, train_first_pet, ItemEffect,
 };
 use net::quests::{self, QuestActionKind, QuestItem, QuestRejection, QuestRequest, QuestTemplate};
 use net::skills;
@@ -241,6 +241,10 @@ impl ClientActor {
                     tamed = true;
                 }
             }
+        }
+        let trained = train_first_pet(&mut next, template.pet_skill, template.pet_speed);
+        if !trained.is_empty() {
+            packets.push(inventory::build_inventory_operation(true, &trained)?);
         }
         let taught = quests::apply_skills(&template.end_skills, &mut next);
         let buff = buff_item(&mut next, template.end_buff_item);

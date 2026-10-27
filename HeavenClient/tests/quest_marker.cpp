@@ -147,6 +147,12 @@ int main()
 		hunt.end_pets.clear();
 		require(pet_stop({5000001, 0}) == ms::QuestStop::NONE, "without a pet list closeness is not read");
 		hunt.end_pet_closeness = {0, 30000};
+		// petAutoSpeakingLimit (4661): any pet, but not one that speaks yet.
+		hunt.end_pet_skill_limit = 0x100;
+		require(pet_stop(0) == ms::QuestStop::NO_PET, "a skill limit needs a pet out");
+		require(pet_stop({5000048, 0, 0x80}) == ms::QuestStop::NONE, "another skill doesn't stop it");
+		require(pet_stop({5000048, 0, 0x180}) == ms::QuestStop::WRONG_PET, "the skill already learned does");
+		hunt.end_pet_skill_limit = 0;
 		// Check/1/infoex on a quest's record (FUN_00721d2c): the Thorn
 		// Remover makes 2324's own "001", which is at least "1".
 		ms::QuestInfo walls = quest(2324, 1300004, 1300004);

@@ -200,7 +200,12 @@ pub fn check_start(
     {
         return Err(QuestRejection::Date);
     }
-    if !pet_met(&start.pets, start.pet_closeness, player) {
+    if !pet_met(
+        &start.pets,
+        start.pet_closeness,
+        start.pet_skill_limit,
+        player,
+    ) {
         return Err(QuestRejection::Pet);
     }
     if !buffs_met(start.buff, start.except_buff, player) {
@@ -214,22 +219,24 @@ pub fn check_start(
 }
 
 /// Whether `player` meets a `pet` requirement listing `pets`, with its
-/// `closeness` range (0 to 30000 when unset): v83's checks (FUN_00721163,
+/// `closeness` range (0 to 30000 when unset), and the `petSkill` bits
+/// `skill_limit` the pet must lack: v83's checks (FUN_00721163,
 /// FUN_00721d2c) look only at the first pet out, and at its closeness only
 /// when the quest lists pets.
-fn pet_met(pets: &[i32], closeness: Option<(i32, i32)>, player: &Player) -> bool {
-    if pets.is_empty() {
+fn pet_met(pets: &[i32], closeness: Option<(i32, i32)>, skill_limit: u16, player: &Player) -> bool {
+    if pets.is_empty() && skill_limit == 0 {
         return true;
     }
-    let Some(first) = player.summoned_pet(0) else {
+    let Some((item_id, pet)) = player
+        .summoned_pet(0)
+        .and_then(|item| Some((item.item_id, item.pet.as_ref()?)))
+    else {
         return false;
     };
     let (min, max) = closeness.unwrap_or((0, 30_000));
-    let close = first
-        .pet
-        .as_ref()
-        .is_some_and(|pet| (min..=max).contains(&i32::from(pet.closeness)));
-    pets.contains(&first.item_id) && close
+    let listed = pets.is_empty()
+        || (pets.contains(&item_id) && (min..=max).contains(&i32::from(pet.closeness)));
+    listed && pet.skill & skill_limit == 0
 }
 
 /// Whether `player` has the effect of item `buff`, if set, and not that of
@@ -336,7 +343,12 @@ pub fn check_complete(
     {
         return Err(QuestRejection::Level);
     }
-    if !pet_met(&quest.end_pets, quest.end_pet_closeness, player) {
+    if !pet_met(
+        &quest.end_pets,
+        quest.end_pet_closeness,
+        quest.end_pet_skill_limit,
+        player,
+    ) {
         return Err(QuestRejection::Pet);
     }
     if !buffs_met(quest.end_buff, quest.end_except_buff, player) {
@@ -542,6 +554,7 @@ mod tests {
             end_min_level: None,
             end_pets: vec![],
             end_pet_closeness: None,
+            end_pet_skill_limit: 0,
             end_buff: None,
             end_except_buff: None,
             end_book_min: None,
@@ -560,6 +573,8 @@ mod tests {
             money: 0,
             fame: 0,
             pet_closeness: 0,
+            pet_skill: 0,
+            pet_speed: false,
             next_quest: None,
             auto_start: false,
             auto_complete: false,
@@ -741,6 +756,31 @@ mod tests {
         // Without a pet list, v83 doesn't read the range.
         q.end_pets.clear();
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn a_pet_skill_quest_needs_a_pet_without_the_skill() {
+        let mut q = quest();
+        q.start.max_level = None;
+        q.start.quests.clear();
+        q.start.pet_skill_limit = game_data::quests::PET_AUTO_SPEAKING;
+        q.end_pet_skill_limit = game_data::quests::PET_AUTO_SPEAKING;
+        let mut p = player(30, 0);
+        assert_eq!(check_start(&q, 2001, &p), Err(QuestRejection::Pet));
+        let mut robo = game::Item::stack(5000048, 1);
+        robo.cash_serial = Some(7);
+        robo.pet = Some(game::PetData::new("Robo"));
+        robo.pet.as_mut().unwrap().skill = game_data::quests::PET_RECALL;
+        p.inventory
+            .insert(game::InventoryType::Cash, 1, robo.clone());
+        p.pets = vec![7];
+        // Recall is another skill; any pet will do without a pet list.
+        assert_eq!(check_start(&q, 2001, &p), Ok(()));
+        set(&mut p, 1033, QuestState::Started);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+        robo.pet.as_mut().unwrap().skill |= game_data::quests::PET_AUTO_SPEAKING;
+        p.inventory.insert(game::InventoryType::Cash, 1, robo);
+        assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Pet));
     }
 
     #[test]

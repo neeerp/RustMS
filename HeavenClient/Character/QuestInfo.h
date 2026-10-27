@@ -41,6 +41,10 @@ namespace ms
 		// list.
 		std::pair<int32_t, int32_t> pet_closeness{ 0, 30000 };
 		std::pair<int32_t, int32_t> end_pet_closeness{ 0, 30000 };
+		// petSkill bits that pet must not have yet (petRecallLimit 0x80,
+		// petAutoSpeakingLimit 0x100); with any, a pet must be out.
+		uint16_t pet_skill_limit = 0;
+		uint16_t end_pet_skill_limit = 0;
 		// An item whose effect, as if used, must be on the player (buff) or
 		// must not be (exceptbuff), to start and to complete; 0 for none.
 		int32_t buff = 0;

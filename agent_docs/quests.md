@@ -73,10 +73,10 @@ Only requirements and actions the server implements are allowed
 
 | Node | Allowed keys |
 | --- | --- |
-| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
+| `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
-| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `skill`, `npcAct`, `buffItemID` |
+| `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `petskill`, `petspeed`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
 | `Act/<id>/1/skill/<k>` | `id`, `skillLevel`, `masterLevel`, `job`, `onlyMasterLevel` |
 
@@ -136,6 +136,17 @@ inside the `pet` check, and a pet outside the range counts as the wrong pet.
 HeavenClient checks them too. Garnox's 8184 (a Baby Dragon
 at 1642) and the pet medal quest 29507 (any pet at 1400) qualify through
 them.
+
+`petRecallLimit` and `petAutoSpeakingLimit`, on either side, need the first
+pet out to lack a pet skill: recall (bit 0x80 of the pet's skill) or auto
+speaking (0x100). v83 tests them after the `pet` list and closeness, so
+without a pet out the quest isn't offered and completion shows "lack of
+pet", and a pet that already has the skill counts as the wrong pet.
+HeavenClient checks them too. On completion `petskill` ORs its bits into
+that pet's skill and `petspeed` 1 sets bit 1 of its attribute (the owner's
+speed); v83 never reads either, so the server re-sends the pet's item.
+Trainer Bartos's 4660 and 4661 (Robo pets, in Henesys's pet park) use the
+limits and `petskill`; Kenta's 3083 and 3096 (Aquarium) use `petspeed`.
 
 `buff` and `exceptbuff`, on either side, name an item whose effect, as if
 used, must be on the player or must not be. An item's effect runs under its
