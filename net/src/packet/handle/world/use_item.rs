@@ -400,12 +400,20 @@ fn random_morph(pool: &[(i16, i32)], roll: i32) -> Option<i16> {
 
 /// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it
 /// cures, then the stats it raises, and the morph it rolls from a random
-/// pool, for its time as a buff of id `-item_id`.
+/// pool, for its time as a buff of id `-item_id`. A potion that takes HP
+/// (the Sorcerer's Potion 2022337, `hpR` -100, and 2022228) leaves at least
+/// 1.
 fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instant) -> ItemEffect {
     let max_hp = player.effective_max_hp();
     let max_mp = player.effective_max_mp();
     let (more, longer) = alchemist(player);
-    player.recover_hp(spec.hp * more / 100 + max_hp * spec.hp_r / 100);
+    let hp = spec.hp * more / 100 + max_hp * spec.hp_r / 100;
+    let hp = if hp < 0 {
+        hp.max((1 - i32::from(player.stats.hp)).min(0))
+    } else {
+        hp
+    };
+    player.recover_hp(hp);
     player.add_mp(spec.mp * more / 100 + max_mp * spec.mp_r / 100);
     let cured = player.buffs.cure(&spec.cures);
     let time = spec.time * longer / 100;
@@ -994,6 +1002,24 @@ mod tests {
         let time = items::info(2002004).unwrap().spec.unwrap().time;
         let used = use_item(&mut player, 4, 2002004, now).unwrap();
         assert_eq!(used.effect.time, time * 130 / 100);
+    }
+
+    #[test]
+    fn the_sorcerers_potion_leaves_one_hp() {
+        if items::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player.stats.max_hp = 500;
+        player.stats.hp = 300;
+        player.stats.max_mp = 200;
+        player.stats.mp = 150;
+        player
+            .inventory
+            .insert(InventoryType::Use, 3, Item::stack(2022337, 1));
+        let now = std::time::Instant::now();
+        assert!(use_item(&mut player, 3, 2022337, now).is_some());
+        assert_eq!((player.stats.hp, player.stats.mp), (1, 0));
     }
 
     #[test]

@@ -2460,6 +2460,7 @@ impl NpcScript {
             "q3833e" => Some(mr_kus_bellflowers(player)),
             "q3953e" => Some(convince_muhamad()),
             "q3933s" => Some(ardins_sand_bandits()),
+            "q3514e" => Some(the_sorcerers_potion()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3466,6 +3467,25 @@ fn convince_muhamad() -> NpcScript {
         }];
     }
     NpcScript::new(MUHAMAD, pages)
+}
+
+const SORCERER: i32 = 2140002;
+const SELLS_EMOTIONS: i16 = 3514;
+
+/// `q3514e`, The Sorcerer Who Sells Emotions: once the potion is gone,
+/// which the data's end checks, the Sorcerer sees it worked and gives the
+/// end's 891,500 EXP, which a script's completion doesn't apply (Cosmic
+/// `3514.js`). The text is unsourced.
+fn the_sorcerers_potion() -> NpcScript {
+    let mut script = NpcScript::new(
+        SORCERER,
+        vec![Page::Say(text(keys::SORCERER_POTION_WORKED))],
+    );
+    script.on_end = vec![
+        Effect::GainExp(891_500),
+        Effect::CompleteQuest(SELLS_EMOTIONS),
+    ];
+    script
 }
 
 const ARDIN: i32 = 2101003;
@@ -11682,6 +11702,21 @@ mod tests {
                 },
                 Effect::GainExp(20000),
             ]
+        );
+    }
+
+    #[test]
+    fn the_sorcerer_sees_the_potion_worked() {
+        let script = NpcScript::for_quest("q3514e", &player(50)).unwrap();
+        assert_eq!(
+            read_through(script),
+            (
+                SORCERER,
+                vec![
+                    Effect::GainExp(891_500),
+                    Effect::CompleteQuest(SELLS_EMOTIONS)
+                ]
+            )
         );
     }
 

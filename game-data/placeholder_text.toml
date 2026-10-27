@@ -371,6 +371,7 @@
 "ariant_ardin.test_ask" = "[placeholder] Ardin will summon another self to fight the player. Ready?"
 "ariant_ardin.test_go" = "[placeholder] Ardin likes the confidence."
 "ariant_ardin.test_busy" = "[placeholder] Someone is already in the room. Ardin asks the player to come back later."
+"temple_sorcerer.potion_worked" = "[placeholder] The potion worked and the frozen emotions are back, though the player looks unwell."
 "mc_letter.ask" = "[placeholder] The instructor has something to ask of a player who has made the job advancement."
 "mc_letter.later" = "[placeholder] The instructor says it's urgent; come back when there's time."
 "mc_letter.full" = "[placeholder] Make room in the Etc inventory first."
