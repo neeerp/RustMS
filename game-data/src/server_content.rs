@@ -566,6 +566,22 @@ pub mod keys {
     pub const PARWEN_PASSWORD_CODE: &str = "magatia_de_lang.password_code";
     pub const SECRET_PASSAGE_PASSWORD: &str = "magatia_de_lang.passage_password";
     pub const SECRET_PASSAGE_WRONG: &str = "magatia_de_lang.passage_wrong";
+    /// End scripts that take what the quest asks for and give rewards:
+    /// Dr. Kim (`q3452e`), Mr. Ku (`q3833e`) and Muhamad's answers
+    /// (`q3953e`).
+    pub const DR_KIM_THANKS: &str = "omega_dr_kim.thanks";
+    pub const DR_KIM_FULL: &str = "omega_dr_kim.full";
+    pub const MR_KU_THANKS: &str = "herb_town_mr_ku.thanks";
+    pub const MR_KU_FULL: &str = "herb_town_mr_ku.full";
+    pub const MUHAMAD_DEO_PEACEFUL: &str = "ariant_muhamad.deo_peaceful";
+    pub const MUHAMAD_MERCHANTS: &str = "ariant_muhamad.merchants";
+    pub const MUHAMAD_TRESPASSED: &str = "ariant_muhamad.trespassed";
+    pub const MUHAMAD_QUEEN: &str = "ariant_muhamad.queen";
+    pub const MUHAMAD_GUARDIANS: &str = "ariant_muhamad.guardians";
+    pub const MUHAMAD_GUARDIANS_WHERE: &str = "ariant_muhamad.guardians_where";
+    pub const MUHAMAD_EXPEDITION: &str = "ariant_muhamad.expedition";
+    pub const MUHAMAD_DEO_MONSTER: &str = "ariant_muhamad.deo_monster";
+    pub const MUHAMAD_CONVINCED: &str = "ariant_muhamad.convinced";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -2988,6 +3004,19 @@ mod tests {
             keys::PARWEN_PASSWORD_CODE,
             keys::SECRET_PASSAGE_PASSWORD,
             keys::SECRET_PASSAGE_WRONG,
+            keys::DR_KIM_THANKS,
+            keys::DR_KIM_FULL,
+            keys::MR_KU_THANKS,
+            keys::MR_KU_FULL,
+            keys::MUHAMAD_DEO_PEACEFUL,
+            keys::MUHAMAD_MERCHANTS,
+            keys::MUHAMAD_TRESPASSED,
+            keys::MUHAMAD_QUEEN,
+            keys::MUHAMAD_GUARDIANS,
+            keys::MUHAMAD_GUARDIANS_WHERE,
+            keys::MUHAMAD_EXPEDITION,
+            keys::MUHAMAD_DEO_MONSTER,
+            keys::MUHAMAD_CONVINCED,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

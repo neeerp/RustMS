@@ -296,6 +296,16 @@ Password" (an info quest) with it as the info (Cosmic `3360.js`): a script's
 quest starts with. The Secret Passage (2111024) asks for it at the secret
 door, and the right one sets the info to `1`, which the data's end checks (see
 `map-travel.md`). Their text is unsourced.
+Three end scripts take what their quest asks for and give rewards the data
+leaves out. Dr. Kim's (2050001) `q3452e` takes the Bloctopus Key Chain and
+gives 50 Mana Elixir Pills and 8,000 EXP (Cosmic `3452.js`). Mr. Ku's
+(2092000) `q3833e` gives by the Bellflowers held: the largest of 1,000, 600,
+500, 100, 50 or 1 that the player holds is taken, for that tier's items and
+EXP in Cosmic `3833.js` (from a scroll, 50 Power Elixirs and 54,000 EXP down
+to a Red Potion and 10 EXP). Muhamad (2100001) is convinced in `q3953e` after four answers, each the
+only choice of a menu (Cosmic `3953.js`); then a Lidium is taken for 20,000
+EXP. If the rewards don't fit, the script says so and nothing is taken. Their
+text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -753,5 +763,7 @@ copied into the source.
   Maed's ask and its no),
   `magatia_de_lang` (Parwen's and De Lang's starts and the lab, Parwen's
   password at the secret door, wrong and right),
+  `quest_end_rewards` (Dr. Kim's pills, Mr. Ku's tier for 99 Bellflowers,
+  Muhamad's four answers),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

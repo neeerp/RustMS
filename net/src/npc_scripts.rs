@@ -2456,6 +2456,9 @@ impl NpcScript {
             "q3353s" => Some(what_de_lang_wants()),
             "q3354s" => Some(de_langs_potion()),
             "q3360s" => Some(verifying_the_password(&mut rand::thread_rng())),
+            "q3452e" => Some(dr_kims_thanks()),
+            "q3833e" => Some(mr_kus_bellflowers(player)),
+            "q3953e" => Some(convince_muhamad()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3350,6 +3353,118 @@ fn secret_passage_opens(right: bool, through: &Effect) -> Vec<Page> {
         Effect::PortalSound,
         through.clone(),
     ])]
+}
+
+/// Blocktopus is an Alien? (3452): Dr. Kim (2050001) in Omega Sector.
+const DR_KIM: i32 = 2050001;
+const BLOCKTOPUS_ALIEN: i16 = 3452;
+const BLOCTOPUS_KEY_CHAIN: i32 = 4000099;
+const MANA_ELIXIR_PILL: i32 = 2000011;
+
+/// `q3452e`, Blocktopus is an Alien?: Dr. Kim takes the Bloctopus Key
+/// Chain the end asks for and gives 50 Mana Elixir Pills and 8,000 EXP,
+/// which a script's completion doesn't apply (Cosmic `3452.js`). Without a
+/// USE slot Dr. Kim says so. The text is unsourced.
+fn dr_kims_thanks() -> NpcScript {
+    let mut script = NpcScript::new(DR_KIM, vec![Page::Say(text(keys::DR_KIM_THANKS))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: BLOCTOPUS_KEY_CHAIN,
+            quantity: 1,
+        },
+        Effect::GiveItem {
+            item_id: MANA_ELIXIR_PILL,
+            quantity: 50,
+        },
+        Effect::GainExp(8000),
+        Effect::CompleteQuest(BLOCKTOPUS_ALIEN),
+    ];
+    script.inventory_full = Some(text(keys::DR_KIM_FULL));
+    script
+}
+
+/// Gathering Up the Lacking Ingredients (3833): Mr. Ku (2092000) in the
+/// Herb Town takes 100-Year-Old Bellflowers (4000294).
+const MR_KU: i32 = 2092000;
+const LACKING_INGREDIENTS: i16 = 3833;
+const BELLFLOWER: i32 = 4000294;
+/// What Mr. Ku gives for the most of these Bellflowers the player holds:
+/// (Bellflowers taken, items given, EXP), the most first (Cosmic
+/// `3833.js`).
+const BELLFLOWER_REWARDS: [(i16, &[(i32, i16)], i32); 6] = [
+    (1000, &[(2040501, 1), (2000005, 50)], 54000),
+    (600, &[(2020013, 50)], 54000),
+    (500, &[], 54000),
+    (100, &[], 45000),
+    (50, &[(2020007, 50)], 10000),
+    (1, &[(2000000, 1)], 10),
+];
+
+/// `q3833e`, Gathering Up the Lacking Ingredients: Mr. Ku takes the most
+/// Bellflowers of a tier the player holds (1,000, 600, 500, 100, 50 or 1)
+/// and gives that tier's items and EXP (`BELLFLOWER_REWARDS`). Without the
+/// USE slots Mr. Ku says so. The text is unsourced.
+fn mr_kus_bellflowers(player: &Player) -> NpcScript {
+    let held = player.inventory.count(BELLFLOWER);
+    let mut script = NpcScript::new(MR_KU, vec![Page::Say(text(keys::MR_KU_THANKS))]);
+    let Some(&(taken, items, exp)) = BELLFLOWER_REWARDS
+        .iter()
+        .find(|(taken, ..)| held >= i32::from(*taken))
+    else {
+        return script;
+    };
+    script.on_end = vec![Effect::TakeItem {
+        item_id: BELLFLOWER,
+        quantity: taken,
+    }];
+    script.on_end.extend(
+        items
+            .iter()
+            .map(|&(item_id, quantity)| Effect::GiveItem { item_id, quantity }),
+    );
+    script.on_end.extend([
+        Effect::GainExp(exp),
+        Effect::CompleteQuest(LACKING_INGREDIENTS),
+    ]);
+    script.inventory_full = Some(text(keys::MR_KU_FULL));
+    script
+}
+
+/// Convince Muhamad (3953): Muhamad (2100001) in Ariant.
+const CONVINCE_MUHAMAD: i16 = 3953;
+const LIDIUM: i32 = 4011008;
+
+/// `q3953e`, Convince Muhamad: four times Muhamad speaks and the player
+/// has one thing to answer; then Muhamad is convinced, the Lidium the end
+/// asks for is taken and 20,000 EXP given, which a script's completion
+/// doesn't apply (Cosmic `3953.js`). The text is unsourced.
+fn convince_muhamad() -> NpcScript {
+    let mut pages = vec![Page::Act {
+        text: text(keys::MUHAMAD_CONVINCED),
+        effects: vec![
+            Effect::CompleteQuest(CONVINCE_MUHAMAD),
+            Effect::TakeItem {
+                item_id: LIDIUM,
+                quantity: 1,
+            },
+            Effect::GainExp(20000),
+        ],
+    }];
+    for (says, answer) in [
+        (keys::MUHAMAD_DEO_PEACEFUL, keys::MUHAMAD_MERCHANTS),
+        (keys::MUHAMAD_TRESPASSED, keys::MUHAMAD_QUEEN),
+        (keys::MUHAMAD_GUARDIANS, keys::MUHAMAD_GUARDIANS_WHERE),
+        (keys::MUHAMAD_EXPEDITION, keys::MUHAMAD_DEO_MONSTER),
+    ]
+    .into_iter()
+    .rev()
+    {
+        pages = vec![Page::Menu {
+            text: text(says),
+            choices: vec![(text(answer), pages)],
+        }];
+    }
+    NpcScript::new(MUHAMAD, pages)
 }
 
 /// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
@@ -11461,6 +11576,82 @@ mod tests {
         assert_eq!(
             read_through(script("q2259e", 260020700)),
             (CAMEL_CAB, vec![Effect::CompleteQuest(SCORPIONS)])
+        );
+    }
+
+    #[test]
+    fn dr_kim_mr_ku_and_muhamad_reward_their_quests() {
+        assert_eq!(
+            read_through(NpcScript::for_quest("q3452e", &player(50)).unwrap()),
+            (
+                DR_KIM,
+                vec![
+                    Effect::TakeItem {
+                        item_id: BLOCTOPUS_KEY_CHAIN,
+                        quantity: 1
+                    },
+                    Effect::GiveItem {
+                        item_id: MANA_ELIXIR_PILL,
+                        quantity: 50
+                    },
+                    Effect::GainExp(8000),
+                    Effect::CompleteQuest(BLOCKTOPUS_ALIEN),
+                ]
+            )
+        );
+
+        // The most of a tier held is taken.
+        for (held, taken, given, exp) in [
+            (1, 1, vec![(2000000, 1)], 10),
+            (99, 50, vec![(2020007, 50)], 10000),
+            (499, 100, vec![], 45000),
+            (999, 600, vec![(2020013, 50)], 54000),
+            (1200, 1000, vec![(2040501, 1), (2000005, 50)], 54000),
+        ] {
+            let mut holding = player(50);
+            holding.inventory.insert(
+                game::InventoryType::Etc,
+                1,
+                game::Item::stack(BELLFLOWER, held),
+            );
+            let mut expected = vec![Effect::TakeItem {
+                item_id: BELLFLOWER,
+                quantity: taken,
+            }];
+            expected.extend(
+                given
+                    .into_iter()
+                    .map(|(item_id, quantity)| Effect::GiveItem { item_id, quantity }),
+            );
+            expected.extend([
+                Effect::GainExp(exp),
+                Effect::CompleteQuest(LACKING_INGREDIENTS),
+            ]);
+            let script = NpcScript::for_quest("q3833e", &holding).unwrap();
+            assert_eq!(read_through(script), (MR_KU, expected), "{held}");
+        }
+
+        let mut muhamad = NpcScript::for_quest("q3953e", &player(50)).unwrap();
+        assert_eq!(muhamad.npc_id(), MUHAMAD);
+        assert_eq!(kind(&muhamad.begin()), Some(4));
+        for _ in 0..3 {
+            assert_eq!(
+                kind(&muhamad.respond(ScriptInput::Select(0)).unwrap()),
+                Some(4)
+            );
+        }
+        let convinced = muhamad.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(page_text(&convinced), text(keys::MUHAMAD_CONVINCED));
+        assert_eq!(
+            convinced.effects,
+            [
+                Effect::CompleteQuest(CONVINCE_MUHAMAD),
+                Effect::TakeItem {
+                    item_id: LIDIUM,
+                    quantity: 1
+                },
+                Effect::GainExp(20000),
+            ]
         );
     }
 
