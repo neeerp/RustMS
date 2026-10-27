@@ -538,11 +538,15 @@ impl QuestCatalog {
                 }
             }
             // The server keeps these quests' own info string (not one named
-            // by `infoNumber`, which stays unsupported).
+            // by another quest's `infoNumber`, which stays unsupported).
             if INFO_QUESTS.contains(&id) {
                 keys.start_act.retain(|key| key != "info");
+                let own = match path_index(&nx, &format!("Check.img/{id}/1"))? {
+                    Some(end) => nx.int_child(end, "infoNumber")? == Some(i32::from(id)),
+                    None => false,
+                };
                 if let Some(keys) = &mut keys.end_check {
-                    keys.retain(|key| key != "infoex");
+                    keys.retain(|key| key != "infoex" && !(own && key == "infoNumber"));
                 }
             }
             if COMPLETED_BY_NPC_SCRIPT.contains(&id) {

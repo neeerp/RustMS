@@ -430,11 +430,18 @@ otherwise nothing in its script applies.
 | 3900 Learning the Culture of Ariant | "4" to "5" | the Palace Oasis (2103000) |
 | 3927 Existence of the Secret Organization | "0" to "1" | the secret wall (2103001) |
 | 3311 Clue | "4" to "5" | the wall in the missing alchemist's home (2111011), after a yes |
+| 2236 How to Shoo Away the Evil | "000000" to "111111" | the six Shaman Rocks (1063012 on 105050200, 105060000, 105070000; 1063013 twice on 105090000 and once on 105090100), each taking one charm (4032263) |
 
 Cosmic's scripts gave the slots and digits. The houses are silent, as
-there; the walls' and the oasis's words are placeholders (`quest_info.*`).
+there; the walls', the oasis's and the rocks' words are placeholders
+(`quest_info.*`). 2236 names its own record (`infoNumber` 2236), so it is
+read as an info quest. Its two rocks in the same swamp are the same NPC;
+the field tells them apart by `nth`, which of the map's NPCs with that id
+was clicked, in Map.nx order (`ServerMessage::NpcConversation`,
+`net::npc_scripts::shaman_rock`). A rock already charmed, or clicked
+without a charm, gives its usual speech.
 Not supported: 3114 (a seven-NPC puzzle), 3345 (a chain of four NPCs),
-2236 and the other quests reading another record that no script sets.
+and the quests reading another record that no script sets.
 
 | Quest | Record | Set by |
 | --- | --- | --- |
@@ -648,6 +655,7 @@ copied into the source.
   letter to Lucas, refusals before requirements are met), and
   `quest_reward_choice` (Hongbu's shoes, refusing a choice not offered),
   and `quest_info` (Sejan's Test through Ariant's four houses, kept across
-  a relogin, and a string one delivery short refused),
+  a relogin, and a string one delivery short refused), `shaman_rocks`
+  (2236's six rocks, the swamp's two told apart, each charmed once),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).

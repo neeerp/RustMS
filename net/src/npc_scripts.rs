@@ -386,6 +386,20 @@ const INFO_SETTERS: [(i32, i16, u8, u8, u8); 3] = [
     (MAGATIA_WALL, 3311, 0, b'4', b'5'),
 ];
 const PALACE_OASIS: i32 = 2103000;
+/// How to Shoo Away the Evil (2236): the Shaman Rocks of Victoria's central
+/// dungeon each take one of Chrishrama's six charms, marking their
+/// character of the quest's string: `(map, rock, which of that rock's NPCs
+/// on the map in Map.nx order, slot)`. Sleepywood's Swamp has two.
+const SHAMAN_ROCKS: [(i32, i32, u8, u8); 6] = [
+    (105050200, 1063012, 0, 0),
+    (105060000, 1063012, 0, 1),
+    (105070000, 1063012, 0, 2),
+    (105090000, 1063013, 0, 3),
+    (105090000, 1063013, 1, 4),
+    (105090100, 1063013, 0, 5),
+];
+const SHOO_AWAY_THE_EVIL: i16 = 2236;
+const SHAMAN_CHARM: i32 = 4032263;
 const SECRET_WALL: i32 = 2103001;
 const MAGATIA_WALL: i32 = 2111011;
 /// Ariant's houses and cupboards, each taking one of a quest's four
@@ -3853,6 +3867,38 @@ fn calf(npc: i32, player: &Player) -> NpcScript {
         Page::Say(text(keys::MILK_CALF_NO_BOTTLE))
     };
     NpcScript::new(npc, vec![page])
+}
+
+/// A Shaman Rock takes a charm while its character of How to Shoo Away the
+/// Evil's string is still '0'; otherwise it says nothing of its own.
+/// `nth` tells apart the same rock twice on a map.
+pub fn shaman_rock(npc_id: i32, nth: u8, player: &Player) -> Option<NpcScript> {
+    let &(.., slot) = SHAMAN_ROCKS
+        .iter()
+        .find(|&&(map, rock, which, _)| (map, rock, which) == (player.stats.map_id, npc_id, nth))?;
+    if !info_reads(player, SHOO_AWAY_THE_EVIL, slot, b'0')
+        || player.inventory.count(SHAMAN_CHARM) == 0
+    {
+        return None;
+    }
+    Some(NpcScript::new(
+        npc_id,
+        vec![Page::Act {
+            text: text(keys::QUEST_INFO_SHAMAN_ROCK),
+            effects: vec![
+                Effect::SetQuestChar {
+                    quest: SHOO_AWAY_THE_EVIL,
+                    slot,
+                    from: b'0',
+                    to: b'1',
+                },
+                Effect::TakeItem {
+                    item_id: SHAMAN_CHARM,
+                    quantity: 1,
+                },
+            ],
+        }],
+    ))
 }
 
 /// A house in Ariant takes its delivery without a word, if it is still
@@ -15286,6 +15332,64 @@ mod tests {
         let read = wall.respond(ScriptInput::Yes).unwrap();
         assert_eq!(read.effects.len(), 1);
         assert!(NpcScript::for_npc(SECRET_WALL, &traveller(30, 0, false)).is_none());
+    }
+
+    #[test]
+    fn each_shaman_rock_takes_one_charm_for_its_own_character() {
+        let swamp = |info: &str, charms: i16| {
+            let mut player = traveller(50, 0, false);
+            player.stats.map_id = 105090000;
+            player.quests.upsert(game::QuestRecord {
+                quest_id: SHOO_AWAY_THE_EVIL,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: Some(info.into()),
+                },
+            });
+            if charms > 0 {
+                player.inventory.insert(
+                    game::InventoryType::Etc,
+                    1,
+                    game::Item::stack(SHAMAN_CHARM, charms),
+                );
+            }
+            player
+        };
+        let player = swamp("111000", 3);
+        // The Swamp's second rock is the fifth character.
+        let rock = shaman_rock(1063013, 1, &player).unwrap();
+        let step = rock.begin();
+        assert_eq!(page_text(&step), text(keys::QUEST_INFO_SHAMAN_ROCK));
+        assert_eq!(
+            step.effects,
+            [
+                Effect::SetQuestChar {
+                    quest: SHOO_AWAY_THE_EVIL,
+                    slot: 4,
+                    from: b'0',
+                    to: b'1'
+                },
+                Effect::TakeItem {
+                    item_id: SHAMAN_CHARM,
+                    quantity: 1
+                }
+            ]
+        );
+        assert!(matches!(
+            &shaman_rock(1063013, 0, &player).unwrap().begin().effects[0],
+            Effect::SetQuestChar { slot: 3, .. }
+        ));
+        // A rock already charmed, one without a charm held, or the other
+        // rock's id here say nothing of their own.
+        assert!(shaman_rock(1063013, 0, &swamp("111100", 2)).is_none());
+        assert!(shaman_rock(1063013, 1, &swamp("111000", 0)).is_none());
+        assert!(shaman_rock(1063012, 0, &player).is_none());
+        let mut elsewhere = swamp("000000", 6);
+        elsewhere.stats.map_id = 105050200;
+        assert!(matches!(
+            &shaman_rock(1063012, 0, &elsewhere).unwrap().begin().effects[0],
+            Effect::SetQuestChar { slot: 0, .. }
+        ));
     }
 
     #[test]

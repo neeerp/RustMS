@@ -1683,11 +1683,12 @@ impl ClientActor {
         match message {
             ServerMessage::NpcConversation {
                 npc_id,
+                nth,
                 field,
                 request_id,
             } => {
                 if request_id == self.npc_request_id {
-                    self.start_npc_conversation(npc_id, field).await?;
+                    self.start_npc_conversation(npc_id, nth, field).await?;
                 }
             }
             ServerMessage::BookOpened {

@@ -61,6 +61,8 @@ pub enum ServerMessage {
     /// NPC identity validated by the player's field. Discard if stale.
     NpcConversation {
         npc_id: i32,
+        /// Which of the map's NPCs with this id it is, in Map.nx order.
+        nth: u8,
         field: FieldKey,
         request_id: u64,
     },

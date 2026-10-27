@@ -10,6 +10,7 @@ impl ClientActor {
     pub(super) async fn start_npc_conversation(
         &mut self,
         npc_id: i32,
+        nth: u8,
         field: FieldKey,
     ) -> Result<(), RuntimeError> {
         let Some(game) = self.game.as_ref() else {
@@ -17,6 +18,9 @@ impl ClientActor {
         };
         if field != game.field.key {
             return Ok(());
+        }
+        if let Some(script) = net::npc_scripts::shaman_rock(npc_id, nth, &game.player) {
+            return self.start_script(script).await;
         }
         self.talk_to(npc_id).await
     }
