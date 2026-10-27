@@ -853,6 +853,13 @@ impl FieldActor {
                     }
                 }
             }
+            FieldMessage::ForwardReactor { name, state } => {
+                for view in self.reactors.force_forward(name, state) {
+                    if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
             FieldMessage::OpenReactor { name } => self.open_reactor(name),
             FieldMessage::PlayReactor { name } => {
                 let views: Vec<_> = (self.reactors.live())
@@ -4097,6 +4104,7 @@ impl FieldActor {
                 }
                 match reactors::action(view.reactor_id) {
                     reactors::Action::Bloom => self.bloom(),
+                    reactors::Action::Spear => self.spears_set(by),
                     reactors::Action::Lever => {
                         let name = self.reactors.name(view.object_id);
                         if let Some(n) = name.and_then(|name| name.strip_prefix("lever")) {
@@ -4586,6 +4594,19 @@ impl FieldActor {
             Err(error) => warn!(item_id, %error, "Failed to build weather"),
         }
         self.weather = Some((item_id, message, Instant::now() + time));
+    }
+
+    /// A spear was set here: the event of whoever set it, or of someone
+    /// still here, hears how many are, and moves the knights' hall's gate.
+    fn spears_set(&mut self, by: ClientId) {
+        let set = (self.reactors.live())
+            .filter(|spear| spear.reactor_id == net::guild_quest::SPEAR && spear.state > 0)
+            .count();
+        let set = u8::try_from(set).unwrap_or(u8::MAX);
+        let occupant = (self.occupants.get(&by)).or_else(|| self.occupants.values().next());
+        if let Some(occupant) = occupant {
+            occupant.handle.send(ServerMessage::SpearsSet(set));
+        }
     }
 
     /// A moonflower bloomed: the full moon waxes to as many phases as there

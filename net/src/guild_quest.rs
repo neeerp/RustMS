@@ -64,6 +64,37 @@ pub const STATUE_POINTS: i32 = 15;
 pub const FIRST_SHOWN: Duration = Duration::from_millis(5_000);
 pub const SHOWN_EVERY: Duration = Duration::from_millis(3_500);
 
+/// The knights' hall, past the hall of statues: its gates open on the
+/// spears (`SPEAR_GATE`), a stone and a piece of metal, and the maps off it
+/// (`KNIGHT_MAPS`) share its stage.
+pub const KNIGHT_HALL: i32 = 990_000_400;
+/// The knights' hall's stage (`crate::events::GUILD_QUEST`'s, by map).
+pub const KNIGHT_STAGE: u8 = 5;
+/// The knights' hall and the maps off it, where the stage's clear shows
+/// (Cosmic `9208007`'s `showEffect` on each), but not the way on past it.
+pub const KNIGHT_MAPS: [i32; 6] = [
+    KNIGHT_HALL,
+    990_000_410,
+    990_000_420,
+    990_000_430,
+    990_000_431,
+    990_000_440,
+];
+/// The spears on the room of the spears (990000440), each set by throwing
+/// a spear (4001025) on it.
+pub const SPEAR: i32 = 9_208_007;
+/// The knights' hall's gate, which moves a state for each spear set, and
+/// the way on past it once all are.
+pub const SPEAR_GATE: &str = "speargate";
+pub const SPEARS: u8 = 4;
+/// Guild points for setting the last spear (Cosmic `9208007`'s `gainGP`).
+pub const SPEAR_POINTS: i32 = 20;
+/// The hall's gate to the metal room (990000430), opened by a stone
+/// (4001026), and the metal room's gate to the room past it (990000431),
+/// opened by a piece of metal (4001037).
+pub const STONE_GATE: &str = "stonegate";
+pub const METAL_GATE: &str = "metalgate";
+
 /// How many guilds may wait on a channel, besides the one playing.
 pub const QUEUE_MAX: usize = 10;
 /// How long the guild whose turn it is has to gather (Cosmic
@@ -425,6 +456,18 @@ mod tests {
         assert_eq!(statue_number("21"), None);
         assert_eq!(statue_number("0"), None);
         assert_eq!(statue_number("statuegate"), None);
+    }
+
+    #[test]
+    fn the_knights_hall_plays_its_stage_and_the_maps_off_it_are_rooms() {
+        let event = &crate::events::GUILD_QUEST;
+        assert_eq!(event.stage_on(KNIGHT_HALL), Some(KNIGHT_STAGE));
+        assert_eq!(event.stage_map(KNIGHT_STAGE), KNIGHT_HALL);
+        for map_id in &KNIGHT_MAPS[1..] {
+            assert_eq!(event.stage_on(*map_id), None, "{map_id}");
+            assert!(event.holds(*map_id), "{map_id}");
+        }
+        assert_eq!(event.stage_on(STATUE_HALL), Some(KNIGHT_STAGE - 1));
     }
 
     #[test]

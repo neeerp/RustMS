@@ -1991,3 +1991,4 @@
 "guild_quest.statues.part_passed" = "[placeholder] Part {part} of the statue test is passed."
 "guild_quest.statues.failed" = "[placeholder] The statue test was failed."
 "guild_quest.gate.closed" = "[placeholder] The gate is shut."
+"guild_quest.gate.blocked" = "[placeholder] The door is blocked."

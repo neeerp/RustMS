@@ -21,31 +21,21 @@
 //! opens the gate and earns the guild 15 points.
 
 use game_data::server_content::keys;
-use integration_harness::database::{found_guild, join_guild, wear_equip};
-use integration_harness::events::{cleared, go_to, maps, said, talk, told, wrong};
+use integration_harness::events::{cleared, go_to, said, talk, told, wrong};
+use integration_harness::guild_quest::{
+    arrived, guild_on, into_the_outskirts, take_the_way_on, touch_script_portal, CAMP, EARRING,
+    EARRINGS_SLOT, OUTSKIRTS as FIRST_STAGE, ROCK, SHUANG, WAITING_ROOM,
+};
 use integration_harness::hunting::{hit_reactor, pickup, walk_to};
-use integration_harness::packets::build_change_map;
-use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
-use integration_harness::{login_to_world_session, relogin, WorldSession};
-use net::packet::op::RecvOpcode;
+use integration_harness::WorldSession;
 use packet::io::read::PktRead;
-use packet::io::write::PktWrite;
-use packet::Packet;
 use std::io::Cursor;
-use tokio::time::Duration;
 
-const CAMP: i32 = 101_030_104;
-const WAITING_ROOM: i32 = 990_000_000;
-const FIRST_STAGE: i32 = 990_000_100;
 const RETURNING_PATH: i32 = 990_001_100;
-const SHUANG: i32 = 9_040_000;
 const NURIS: i32 = 9_040_001;
 const EXIT_GUIDE: i32 = 9_040_005;
-const ROCK: i32 = 9_202_000;
-const EARRING: i32 = 1_032_033;
-const EARRINGS_SLOT: i16 = -4;
 const STATUE_HALL: i32 = 990_000_300;
 const STATUE_KEEPER: i32 = 9_040_009;
 const STATUES: std::ops::RangeInclusive<i32> = 9_208_000..=9_208_002;
@@ -58,42 +48,7 @@ const WAITLIST: u8 = 0x4C;
 /// New characters, logged in at the camp: the first founds a guild named
 /// after them, the rest join it.
 async fn guild(size: usize) -> Vec<WorldSession> {
-    guild_on(0, size, None).await
-}
-
-/// As `guild`, on channel `channel` (a line of its own, so the tests don't
-/// wait on each other's runs), the last wearing `earrings` if any.
-async fn guild_on(channel: u8, size: usize, earrings: Option<i32>) -> Vec<WorldSession> {
-    let mut configs = vec![];
-    let mut ids = vec![];
-    for _ in 0..size {
-        let config = load_harness_config_or_fail().await.with_channel(0, channel);
-        ids.push(login_to_world_session(&config).await.unwrap().character_id);
-        drop(relogin(&config).await);
-        configs.push(config);
-    }
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let name = &configs[0].character_name;
-    found_guild(ids[0], name).await.unwrap();
-    for &id in &ids[1..] {
-        join_guild(id, name).await.unwrap();
-    }
-    if let Some(item_id) = earrings {
-        wear_equip(ids[size - 1], EARRINGS_SLOT, item_id)
-            .await
-            .unwrap();
-    }
-    let mut sessions = vec![];
-    for config in &configs {
-        let mut session = relogin(config).await;
-        let mut seen = Trace::default();
-        assert_eq!(
-            warp(&mut session.connection, CAMP, "", &mut seen).await,
-            CAMP
-        );
-        sessions.push(session);
-    }
-    sessions
+    guild_on(0, size, 0).await
 }
 
 /// The waitlist numbers `t` heard (0x4C: channel, number).
@@ -106,32 +61,6 @@ fn waitlist(t: &Trace) -> Vec<(u8, i32)> {
             (r.read_byte().unwrap(), r.read_int().unwrap())
         })
         .collect()
-}
-
-fn arrived(t: &Trace, map: i32) -> bool {
-    t.arrivals.iter().any(|a| a.0 == map)
-}
-
-/// Walk to the waiting room's way on and take it.
-async fn take_the_way_on(player: &mut WorldSession) {
-    let room = maps().field(WAITING_ROOM).unwrap();
-    let portal = room.portal_by_name("join00").unwrap();
-    let c = &mut player.connection;
-    send(c, walk_to(portal.x as i16, portal.y as i16)).await;
-    send(c, build_change_map(-1, "join00").unwrap()).await;
-}
-
-/// Walks `player` to `map`'s script portal `name` and enters it.
-async fn touch_script_portal(player: &mut WorldSession, map: i32, name: &str) {
-    let portal = maps().field(map).unwrap().portal_by_name(name).unwrap();
-    let c = &mut player.connection;
-    send(c, walk_to(portal.x as i16, portal.y as i16)).await;
-    let mut p = Packet::new_empty();
-    p.write_short(RecvOpcode::ChangeMapSpecial as i16).unwrap();
-    p.write_byte(0).unwrap();
-    p.write_str_with_length(name).unwrap();
-    p.write_short(0).unwrap();
-    send(c, p).await;
 }
 
 #[tokio::test]
@@ -238,48 +167,10 @@ async fn guilds_take_their_turns_at_the_guild_quest() {
 /// The master registers the guild and the rest of it joins; once the
 /// gathering is over everyone goes on to the outskirts. Returns what each
 /// saw there.
-async fn into_the_outskirts(team: &mut [WorldSession]) -> Vec<Trace> {
-    let shuang = || talk(CAMP, SHUANG);
-    told(&mut team[0], shuang()).await;
-    told(&mut team[0], answer(4, 1, Some(0))).await;
-    let mut master = told(&mut team[0], answer(1, 1, None)).await;
-    until(&mut team[0].connection, &mut master, |t| {
-        arrived(t, WAITING_ROOM)
-    })
-    .await;
-    let mut seen = vec![master];
-    for player in &mut team[1..] {
-        told(player, shuang()).await;
-        let mut t = told(player, answer(4, 1, Some(1))).await;
-        until(&mut player.connection, &mut t, |t| arrived(t, WAITING_ROOM)).await;
-        seen.push(t);
-    }
-    for (player, t) in team.iter_mut().zip(&mut seen) {
-        until(&mut player.connection, t, |t| {
-            t.countdowns.iter().any(|&seconds| seconds > 60)
-        })
-        .await;
-    }
-    let mut there = vec![];
-    for player in team.iter_mut() {
-        let mut t = Trace::default();
-        take_the_way_on(player).await;
-        // The field's spawns may come after Shuang's brief.
-        until(&mut player.connection, &mut t, |t| {
-            arrived(t, FIRST_STAGE)
-                && !t.prompts.is_empty()
-                && t.field.reactors.iter().any(|r| r.reactor_id == ROCK)
-        })
-        .await;
-        there.push(t);
-    }
-    there
-}
-
 #[tokio::test]
 async fn the_outskirts_rocks_give_earrings_and_the_guide_takes_them_back() {
     // The third already wears an earring, one of a kind.
-    let mut team = guild_on(1, 3, Some(EARRING)).await;
+    let mut team = guild_on(1, 3, 1).await;
     let there = into_the_outskirts(&mut team).await;
     // Shuang briefs each on arrival.
     for (player, t) in team.iter_mut().zip(&there) {
@@ -408,7 +299,7 @@ async fn strike(master: &mut WorldSession, hall: &Trace, combo: &[i32]) -> Trace
 
 #[tokio::test]
 async fn the_statue_keepers_test_opens_the_gate() {
-    let mut team = guild_on(2, 2, None).await;
+    let mut team = guild_on(2, 2, 0).await;
     let there = into_the_outskirts(&mut team).await;
     for player in team.iter_mut() {
         told(player, answer(0, 1, None)).await;

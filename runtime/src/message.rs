@@ -378,6 +378,12 @@ pub enum ServerMessage {
     /// The player struck the Guild Quest's statue numbered this, from 1:
     /// tell the event.
     StatueStruck(u8),
+    /// The player's field, the Guild Quest's room of the spears, has this
+    /// many spears set now: tell the event.
+    SpearsSet(u8),
+    /// The player's guild gains this many points, for something the guild
+    /// did in the Guild Quest.
+    GainGuildPoints(i32),
     /// The player's field opened a reactor that opens `name` on the
     /// event's copy of `map_id` too (`net::events::EventCommand::OpenReactor`).
     OpenEventReactor {
@@ -758,6 +764,13 @@ pub enum FieldMessage {
     /// Set the live reactors named `name` here to `state`, as an event's
     /// gate shut while it runs (`net::events::Event::gate`).
     SetReactor {
+        name: &'static str,
+        state: u8,
+    },
+    /// Move the live reactors named `name` here that are short of `state`
+    /// to it (`ReactorSet::force_forward`), so word of fewer arriving late
+    /// leaves them be: the Guild Quest's spear gate.
+    ForwardReactor {
         name: &'static str,
         state: u8,
     },

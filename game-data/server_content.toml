@@ -1825,6 +1825,7 @@ unsourced = [
     "guild_quest.statues.part_passed",
     "guild_quest.statues.failed",
     "guild_quest.gate.closed",
+    "guild_quest.gate.blocked",
 ]
 
 [text."glTutoMsg0.message"]
