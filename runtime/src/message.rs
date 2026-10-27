@@ -444,8 +444,9 @@ pub enum ServerMessage {
     /// over, as Horntail on its cave: tell the event.
     RestartEventClock,
     /// A mob that leaves a buff (Mob.nx `buff`) was killed on the player's
-    /// field: if alive, the player takes this item's effect.
-    MobBuff(i32),
+    /// field, or a buff weather blew over it: if alive, the player takes
+    /// this item's effect.
+    FieldBuff(i32),
     /// A party challenges the one the player leads in a Monster Carnival
     /// waiting room: ask them.
     CarnivalChallenge {

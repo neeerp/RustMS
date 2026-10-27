@@ -2061,7 +2061,7 @@ impl FieldActor {
         let buff = net::mobs::info(kill.mob_id).map_or(0, |info| info.buff);
         if buff > 0 {
             for occupant in self.occupants.values() {
-                occupant.handle.send(ServerMessage::MobBuff(buff));
+                occupant.handle.send(ServerMessage::FieldBuff(buff));
             }
         }
         // A kill that lets out the map's time mob tells everyone here, as So
@@ -4548,9 +4548,16 @@ impl FieldActor {
     }
 
     /// A player used a weather item: everyone here sees it, in place of any
-    /// that was blowing, until it stops.
+    /// that was blowing, until it stops. A buff weather (5121xxx) also
+    /// gives everyone here its item's effect (Cosmic `stateChangeItem`).
     fn blow_weather(&mut self, item_id: i32, message: String) {
         self.blow_weather_for(item_id, message, WEATHER_TIME);
+        let buff = net::items::info(item_id).map_or(0, |info| info.state_change_item);
+        if buff > 0 {
+            for occupant in self.occupants.values() {
+                occupant.handle.send(ServerMessage::FieldBuff(buff));
+            }
+        }
     }
 
     fn blow_weather_for(&mut self, item_id: i32, message: String, time: Duration) {
@@ -5885,6 +5892,55 @@ mod tests {
             hits(&game, 2),
             [vec![0xFF, 0xFF, 0, 0, 0], vec![2, 0, 0, 0, 3]]
         );
+    }
+
+    #[tokio::test]
+    async fn a_buff_weather_gives_everyone_here_its_items_effect() {
+        if net::items::info(5121000).is_none() {
+            return;
+        }
+        let (_tx, rx) = mpsc::channel(16);
+        let mut actor = FieldActor::new(
+            FieldKey::new(0, 100000000),
+            rx,
+            Vec::new(),
+            MobSet::default(),
+            DropSet::default(),
+            ReactorSet::default(),
+            Duration::from_millis(50),
+        );
+        let (first, mut first_rx) = client(1);
+        let (second, mut second_rx) = client(2);
+        for (handle, id) in [(first, 1), (second, 2)] {
+            actor.handle_message(FieldMessage::Join {
+                handle,
+                avatar: avatar(id, 10, 20),
+                party: None,
+            });
+        }
+        let buffs = |rx: &mut mpsc::Receiver<ServerMessage>| -> Vec<i32> {
+            std::iter::from_fn(|| rx.try_recv().ok())
+                .filter_map(|message| match message {
+                    ServerMessage::FieldBuff(item_id) => Some(item_id),
+                    _ => None,
+                })
+                .collect()
+        };
+        buffs(&mut first_rx);
+        buffs(&mut second_rx);
+
+        // Fighting Spirit gives what a 2022071 does; a snow, nothing.
+        for item_id in [5121000, 5120000] {
+            actor.handle_message(FieldMessage::FromClient {
+                from: 1,
+                request: FieldRequest::Weather {
+                    item_id,
+                    message: "hi".into(),
+                },
+            });
+        }
+        assert_eq!(buffs(&mut first_rx), [2022071]);
+        assert_eq!(buffs(&mut second_rx), [2022071]);
     }
 
     #[tokio::test]

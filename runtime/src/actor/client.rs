@@ -1812,7 +1812,7 @@ impl ClientActor {
                 }
             }
             ServerMessage::BossSummoned => self.tell_closing_time(Some(true)).await?,
-            ServerMessage::MobBuff(item_id) => {
+            ServerMessage::FieldBuff(item_id) => {
                 let alive = self
                     .game
                     .as_ref()
