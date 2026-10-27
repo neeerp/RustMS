@@ -424,6 +424,9 @@ pub struct QuestTemplate {
     /// started record is the end date, which the Quest Log counts down to
     /// (`game::quest::DATED_QUESTS`).
     pub time_limit2: Option<u32>,
+    /// `QuestInfo` `dailyPlayTime`: the seconds of play a day needs to count
+    /// toward the title (Diligent Explorer's three hours).
+    pub daily_play_time: Option<u32>,
 }
 
 /// One `Check/1/infoex` entry on the quest's own info string.
@@ -973,6 +976,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_info_record,
         time_limit: seconds(nx, info, "timeLimit")?,
         time_limit2: seconds(nx, info, "timeLimit2")?,
+        daily_play_time: seconds(nx, info, "dailyPlayTime")?,
     })
 }
 
@@ -1621,6 +1625,15 @@ mod tests {
         assert_eq!(mirror.time_limit, None);
         // Diligent Explorer has 30 days; every timed title keeps its end date.
         assert_eq!(catalog.quest(29003).unwrap().time_limit2, Some(2_592_000));
+        assert_eq!(catalog.quest(29003).unwrap().daily_play_time, Some(10_800));
+        assert_eq!(
+            catalog
+                .supported()
+                .filter(|q| q.daily_play_time.is_some())
+                .map(|q| q.id)
+                .collect::<Vec<_>>(),
+            [29003]
+        );
         for quest in catalog.supported().filter(|q| q.time_limit2.is_some()) {
             assert!(
                 game::quest::DATED_QUESTS.contains(&quest.id),

@@ -394,6 +394,39 @@ impl ClientActor {
         self.send_all(&mut packets).await
     }
 
+    /// Count the play since the last count toward started titles with
+    /// `dailyPlayTime`, and with `show`, send the records that changed (not
+    /// in the Cash Shop, whose stage has no quest log; leaving it sends the
+    /// whole character).
+    pub(super) async fn count_play_time(&mut self, show: bool) -> Result<(), RuntimeError> {
+        let elapsed = self.play_counted_at.elapsed().as_secs();
+        self.play_counted_at += Duration::from_secs(elapsed);
+        let Ok(catalog) = quests::catalog() else {
+            return Ok(());
+        };
+        let Some(game) = self.game.as_mut() else {
+            return Ok(());
+        };
+        let player = &mut game.player;
+        let started: Vec<i16> = player.quests.started().map(|r| r.quest_id).collect();
+        let seconds = u32::try_from(elapsed).unwrap_or(u32::MAX);
+        let mut packets = Vec::new();
+        for quest_id in started {
+            let Some(template) = catalog.quest(quest_id) else {
+                continue;
+            };
+            if let Some(raw) = quests::count_play_time(template, player, seconds, SystemTime::now())
+            {
+                player.mark_dirty();
+                packets.push(quest::build_quest_ex_record(quest_id, &raw)?);
+            }
+        }
+        if !show || self.in_cash_shop || packets.is_empty() {
+            return Ok(());
+        }
+        self.send_all(&mut packets).await
+    }
+
     /// Adopt `next` as the player. With a quest change, the change and the
     /// whole player commit together first; if the database refuses (e.g. a
     /// replayed completion), nothing is adopted and `false` is returned. The
@@ -427,6 +460,10 @@ impl ClientActor {
                         }),
                     },
                 });
+                if let Some(raw) = quests::start_play_record(template, &mut next, SystemTime::now())
+                {
+                    packets.push(quest::build_quest_ex_record(template.id, &raw)?);
+                }
             }
         }
         if let Some(change) = change {
