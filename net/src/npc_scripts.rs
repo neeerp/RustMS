@@ -2188,6 +2188,9 @@ impl NpcScript {
                 return Some(the_wolves_test_again());
             }
             PILL_DESK if takes_a_pill(player) => return Some(pill_desk()),
+            SWALLOW if player.quests.state(THE_SEED_SWALLOW_LOST) == QuestState::Started => {
+                return Some(swallow_new_seed());
+            }
             PASSAGE_END_STATUE => return Some(passage_end_statue()),
             PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
             SHRINE_PILLAR => return Some(shrine_pillar(player)),
@@ -2644,6 +2647,7 @@ impl NpcScript {
             "q3382e" => Some(yuletes_reward(player)),
             "q3941s" => Some(karcasa_silk(player, false)),
             "q3941e" => Some(karcasa_silk(player, true)),
+            "q8255s" => Some(adonis_lost_spirits()),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5778,6 +5782,48 @@ fn karcasa_silk(player: &Player, end: bool) -> NpcScript {
         Effect::CompleteQuest(QUEENS_SILK_QUEST),
     ];
     script.inventory_full = Some(text(keys::KARCASA_SILK_FULL));
+    script
+}
+
+/// Adonis (9201106) in El Nath, who tells of the Zakum Diamonds for "Lost
+/// Spirits" (8255). Its sequel (8256, `q8256s`), the Liberation Ritual that
+/// powers up an iTCG relic with a diamond, isn't in: nothing in v83 gives the
+/// relics, and its recipe has no source.
+const ADONIS: i32 = 9201106;
+const LOST_SPIRITS: i16 = 8255;
+
+/// `q8255s`: Adonis's tale, and the quest completes as it starts (Cosmic
+/// `8255.js`), with the data's 500 EXP (`Act/1`).
+fn adonis_lost_spirits() -> NpcScript {
+    let pages = vec![
+        Page::Say(text(keys::ADONIS_SPIRITS_TALE)),
+        Page::Say(text(keys::ADONIS_SPIRITS_RITUAL)),
+    ];
+    let mut script = NpcScript::new(ADONIS, pages);
+    script.on_end = vec![Effect::FinishQuest(LOST_SPIRITS), Effect::GainExp(500)];
+    script
+}
+
+/// Swallow (2071006) in Korean Folk Town, and "The Seed That Swallow Lost"
+/// (3609), which a player who lost Swallow's Magic Seed (4031225) before
+/// giving it to Nolbu or Hongbu starts from the data. It has no completion
+/// NPC (`COMPLETED_BY_NPC_SCRIPT`): talking to Swallow again while it is
+/// started gives a new seed (the data's `Act/1`) and completes it. Cosmic
+/// has no script for it.
+const SWALLOW: i32 = 2071006;
+const THE_SEED_SWALLOW_LOST: i16 = 3609;
+const SWALLOWS_SEED: i32 = 4031225;
+
+fn swallow_new_seed() -> NpcScript {
+    let mut script = NpcScript::new(SWALLOW, vec![Page::Say(text(keys::SWALLOW_NEW_SEED))]);
+    script.on_end = vec![
+        Effect::GiveItem {
+            item_id: SWALLOWS_SEED,
+            quantity: 1,
+        },
+        Effect::CompleteQuest(THE_SEED_SWALLOW_LOST),
+    ];
+    script.inventory_full = Some(text(keys::SWALLOW_NEW_SEED_FULL));
     script
 }
 
@@ -14220,6 +14266,44 @@ mod tests {
                         quantity: 1
                     },
                     Effect::CompleteQuest(QUEENS_SILK_QUEST)
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn adonis_tells_of_the_lost_spirits_and_swallow_finds_a_new_seed() {
+        let traveller = traveller(40, 0, false);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q8255s", &traveller).unwrap()),
+            (
+                ADONIS,
+                vec![Effect::FinishQuest(LOST_SPIRITS), Effect::GainExp(500)]
+            )
+        );
+
+        // Swallow has a new seed only for one on 3609.
+        assert!(NpcScript::for_npc(SWALLOW, &traveller).is_none());
+        let mut seedless = traveller.clone();
+        seedless.quests.upsert(game::QuestRecord {
+            quest_id: THE_SEED_SWALLOW_LOST,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: None,
+            },
+        });
+        let swallow = NpcScript::for_npc(SWALLOW, &seedless).unwrap();
+        assert!(swallow.inventory_full.is_some());
+        assert_eq!(
+            read_through(swallow),
+            (
+                SWALLOW,
+                vec![
+                    Effect::GiveItem {
+                        item_id: SWALLOWS_SEED,
+                        quantity: 1
+                    },
+                    Effect::CompleteQuest(THE_SEED_SWALLOW_LOST)
                 ]
             )
         );

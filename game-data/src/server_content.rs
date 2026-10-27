@@ -1227,6 +1227,14 @@ pub mod keys {
     pub const KARCASA_SILK_HANDED: &str = "karcasa.silk.handed";
     pub const KARCASA_SILK_GIVEN: &str = "karcasa.silk.given";
     pub const KARCASA_SILK_FULL: &str = "karcasa.silk.full";
+    /// "Lost Spirits" (8255): Adonis (9201106, `q8255s`) on the Zakum
+    /// Diamonds.
+    pub const ADONIS_SPIRITS_TALE: &str = "adonis.spirits.tale";
+    pub const ADONIS_SPIRITS_RITUAL: &str = "adonis.spirits.ritual";
+    /// "The Seed That Swallow Lost" (3609): Swallow (2071006) gives a new
+    /// Magic Seed.
+    pub const SWALLOW_NEW_SEED: &str = "swallow.new_seed";
+    pub const SWALLOW_NEW_SEED_FULL: &str = "swallow.new_seed_full";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3792,6 +3800,10 @@ mod tests {
                 keys::KARCASA_SILK_HANDED,
                 keys::KARCASA_SILK_GIVEN,
                 keys::KARCASA_SILK_FULL,
+                keys::ADONIS_SPIRITS_TALE,
+                keys::ADONIS_SPIRITS_RITUAL,
+                keys::SWALLOW_NEW_SEED,
+                keys::SWALLOW_NEW_SEED_FULL,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

@@ -558,6 +558,20 @@ disguise, `q3941s` starts the quest and `q3941e` gives the silk (the data's
 `Act/1`, given by the script) and completes it. Anyone else is sent off at
 either end. The lines are placeholders (`karcasa.silk.*`).
 
+Adonis (9201106, El Nath) tells "Lost Spirits" (8255): `q8255s` completes
+it as it starts, with the data's 500 EXP. Its sequel (8256, `q8256s`) is
+the Liberation Ritual, which powers up a relic of El Nath (iTCG items such
+as the Crystal Blade) with a Zakum Diamond. It isn't in: nothing in v83
+gives the relics, and the recipe has no source.
+
+"The Seed That Swallow Lost" (3609) starts from the data at Swallow
+(2071006, Korean Folk Town). That needs 3606 done, neither of the gourd
+quests (3607, 3608) started, and no Magic Seed (4031225) held. Its
+`Check/1` is empty (`COMPLETED_BY_NPC_SCRIPT`), so talking to Swallow
+again while it is started gives a new seed (the data's `Act/1`) and
+completes it. The lines are placeholders (`adonis.spirits.*`,
+`swallow.new_seed*`).
+
 "The Remnants of Horned Tail" (3714) works the same way. Nine Spirit's Baby
 Dragon (2081011), in the nest past Leafre's `dragonNest` portal (240040612,
 open once 3706 is done), has a start script (`q3714s`) and no end. It

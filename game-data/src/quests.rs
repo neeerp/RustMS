@@ -96,9 +96,10 @@ pub const SCRIPTS: &[&str] = &[
     "q29920s", "q29921s", "q29933s", "q21733s", "q21733e", "q21734s", "q21734e", "q21735s",
     "q21735e", "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s", "q21742s",
     "q21742e", "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e", "q21753s",
-    "q21754s", "q21757e", "q3314e", "q3382e", "q3941s", "q3941e", "q21700s", "q21703s", "q21703e",
-    "q21704s", "q21712s", "q21716s", "q21719s", "q21720e", "q21729s", "q21766s", "q21766e",
-    "q21767s", "q21600s", "q21604s", "q21613s", "q21618s", "q21618e", "q3250s", "q3250e",
+    "q21754s", "q21757e", "q3314e", "q3382e", "q3941s", "q3941e", "q8255s", "q21700s", "q21703s",
+    "q21703e", "q21704s", "q21712s", "q21716s", "q21719s", "q21720e", "q21729s", "q21766s",
+    "q21766e", "q21767s", "q21600s", "q21604s", "q21613s", "q21618s", "q21618e", "q3250s",
+    "q3250e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -121,8 +122,10 @@ pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
 /// Parts (3239), which Cheng the Assistant ends for ten Machine Parts
 /// (`net::npc_scripts`). Eliminating the Rest (2335) reads its own record
 /// (`infoNumber` 2335), which nothing sets either; the Security Room's door
-/// (`go_secretroom`, `net::scripts`) completes it for Violetta's key.
-pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[2335, 3230, 3239];
+/// (`go_secretroom`, `net::scripts`) completes it for Violetta's key. The
+/// Seed That Swallow Lost (3609) has an empty `Check/1`; Swallow's talk
+/// completes it with a new seed.
+pub const COMPLETED_BY_NPC_SCRIPT: &[i16] = &[2335, 3230, 3239, 3609];
 /// Meren's Maker classes (quests 6030-6032) and the quest they make up
 /// (6029) share 6029's quest-info string, one digit per class: `Act/0 info`
 /// starts it at "000", a class starts only while its own digit is 0
