@@ -167,6 +167,7 @@ namespace ms
 		void leave_alliance();
 		void set_titles(std::array<std::string, 5> titles);
 		void set_notice(std::string notice);
+		void set_points(int32_t points);
 		void set_capacity(int32_t capacity);
 		void set_emblem(const GuildEmblem& emblem);
 

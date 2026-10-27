@@ -85,6 +85,8 @@ pub struct Trace {
     pub gains: Vec<i32>,
     /// Fame gains (or losses) from SHOW_STATUS_INFO mode 4.
     pub fame_gains: Vec<i32>,
+    /// Guild points gained (or lost) from SHOW_STATUS_INFO mode 6.
+    pub guild_point_gains: Vec<i32>,
     /// Mesos gained without a pickup, shown in chat (SHOW_STATUS_INFO 5).
     pub meso_gains: Vec<i32>,
     /// Meso bag answers: the mesos it gave (0xD1), or None when it stayed
@@ -408,6 +410,7 @@ impl Trace {
                 }
                 4 => self.fame_gains.push(r.read_int().unwrap()),
                 5 => self.meso_gains.push(r.read_int().unwrap()),
+                6 => self.guild_point_gains.push(r.read_int().unwrap()),
                 9 => self.info_texts.push(r.read_str_with_length().unwrap()),
                 10 => {
                     let quest = r.read_short().unwrap();

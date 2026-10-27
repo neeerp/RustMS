@@ -437,6 +437,10 @@ pub enum GuildRequest {
     SetEmblem {
         emblem: game::guild::Emblem,
     },
+    /// Add to the guild's points (`!gp`, the Guild Quest).
+    GainPoints {
+        amount: i32,
+    },
     Bbs(BbsRequest),
 }
 

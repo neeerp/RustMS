@@ -14,7 +14,8 @@ use net::packet::build::world::guild::{
     build_capacity_changed, build_emblem_changed, build_guild_chat, build_guild_created,
     build_guild_disbanded, build_guild_error, build_guild_info, build_guild_mark_changed,
     build_guild_name_changed, build_guild_ranking, build_member_expelled, build_member_joined,
-    build_member_left, build_notice_changed, build_rank_changed, build_titles_changed, GuildError,
+    build_member_left, build_notice_changed, build_points_changed, build_points_gain_in_chat,
+    build_rank_changed, build_titles_changed, GuildError,
 };
 use net::packet::build::world::messaging::{build_broadcast, Broadcast};
 use net::packet::build::world::stat::StatUpdate;
@@ -130,8 +131,31 @@ impl ClientActor {
                 let to = spawn_db(move || db::guild::set_notice(guild_id, cid, &notice)).await?;
                 self.tell_guild(to, packet, "Guild notice").await
             }
+            GuildRequest::GainPoints { amount } => self.gain_guild_points(amount).await,
             GuildRequest::Bbs(request) => self.bbs_request(request).await,
         }
+    }
+
+    /// Add to the player's guild's points: every member online hears the
+    /// new total, with a line in the chat log. Nothing without a guild.
+    pub(super) async fn gain_guild_points(&mut self, amount: i32) -> Result<(), RuntimeError> {
+        let Some(guild_id) = self.in_game()?.player.guild.as_ref().map(|tag| tag.id) else {
+            return Ok(());
+        };
+        let Some((points, to)) = spawn_db(move || db::guild::add_points(guild_id, amount)).await?
+        else {
+            return Ok(());
+        };
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to: to.clone(),
+            packet: build_points_changed(guild_id, points)?,
+        })
+        .await?;
+        self.send_to_directory(DirectoryMessage::Deliver {
+            to,
+            packet: build_points_gain_in_chat(amount)?,
+        })
+        .await
     }
 
     /// A change the player made to the guild went through when `to` lists

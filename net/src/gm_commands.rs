@@ -133,6 +133,13 @@ const COMMANDS: &[Command] = &[
     },
     Command {
         prefix: '!',
+        name: "gp",
+        tier: GM,
+        usage: "<amount>",
+        run: guild_points,
+    },
+    Command {
+        prefix: '!',
         name: "level",
         tier: GM,
         usage: "<level>",
@@ -446,6 +453,19 @@ fn exp(_: &mut WorldContext, args: &[&str]) -> Outcome {
     match number::<i32>(args) {
         Some(amount @ 1..) => Ok(Ok(vec![WorldAction::GainExp(amount)])),
         _ => Ok(Err(usage("exp"))),
+    }
+}
+
+/// Points for the GM's guild, or taken from it if negative.
+fn guild_points(ctx: &mut WorldContext, args: &[&str]) -> Outcome {
+    if ctx.player.guild.is_none() {
+        return Ok(Err("You are not in a guild.".to_string()));
+    }
+    match number::<i32>(args) {
+        Some(amount) if amount != 0 => Ok(Ok(vec![WorldAction::Guild(
+            crate::GuildRequest::GainPoints { amount },
+        )])),
+        _ => Ok(Err(usage("gp"))),
     }
 }
 
@@ -1082,6 +1102,28 @@ mod tests {
             lines(&run_as(&mut gm, "!job 140").unwrap()),
             ["Usage: !job <job id>"]
         );
+    }
+
+    #[test]
+    fn guild_points_need_a_guild_and_an_amount() {
+        let mut gm = player(GM);
+        let actions = run_as(&mut gm, "!gp 50").unwrap();
+        assert_eq!(lines(&actions), ["You are not in a guild."]);
+        gm.guild = Some(game::guild::GuildTag {
+            id: 4,
+            name: "Testers".into(),
+            emblem: Default::default(),
+            alliance_id: 0,
+        });
+        let actions = run_as(&mut gm, "!gp -20").unwrap();
+        assert!(matches!(
+            actions[..],
+            [WorldAction::Guild(crate::GuildRequest::GainPoints {
+                amount: -20
+            })]
+        ));
+        let actions = run_as(&mut gm, "!gp 0").unwrap();
+        assert_eq!(lines(&actions), ["Usage: !gp <amount>"]);
     }
 
     #[test]

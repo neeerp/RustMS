@@ -675,6 +675,8 @@ pub enum Effect {
     /// Disband the player's guild, if they are its master. As with
     /// `GrowGuild`, nothing may follow it.
     DisbandGuild,
+    /// Add to the player's guild's points; nothing without a guild.
+    GainGuildPoints(i32),
     /// Found an alliance of the player's guild and their party's other
     /// guild master's, and charge for it (Lenario). Lenario then says how
     /// it went, so nothing may follow it.

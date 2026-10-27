@@ -198,6 +198,25 @@ pub fn set_notice(guild_id: i32, by: i32, notice: &str) -> crate::Result<Option<
     )
 }
 
+/// Add `amount` to the guild's points, never below none. Returns the new
+/// total and every member's id, or `None` if the guild was disbanded.
+pub fn add_points(guild_id: i32, amount: i32) -> crate::Result<Option<(i32, Vec<i32>)>> {
+    let mut conn = crate::connection()?;
+    Ok(conn.transaction(|conn| -> QueryResult<_> {
+        let Some(guild) = locked(conn, guild_id)? else {
+            return Ok(None);
+        };
+        let points = guild.points.saturating_add(amount).max(0);
+        diesel::update(guilds::table.find(guild_id))
+            .set(guilds::points.eq(points))
+            .execute(conn)?;
+        Ok(Some((
+            points,
+            guild.members.iter().map(|member| member.id).collect(),
+        )))
+    })?)
+}
+
 /// Give the guild this emblem, if member `by` may. Returns every member's
 /// id, or `None` if `by` may not.
 pub fn set_emblem(guild_id: i32, by: i32, emblem: Emblem) -> crate::Result<Option<Vec<i32>>> {
