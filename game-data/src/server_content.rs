@@ -657,6 +657,9 @@ pub mod keys {
     pub const CELEBRITY_START: &str = "celebrity.start";
     pub const CELEBRITY_NOT_YET: &str = "celebrity.not_yet";
     pub const CELEBRITY_TOO_LATE: &str = "celebrity.too_late";
+    pub const VETERAN_HUNTER_START: &str = "veteran_hunter.start";
+    pub const VETERAN_HUNTER_NOT_YET: &str = "veteran_hunter.not_yet";
+    pub const VETERAN_HUNTER_TOO_LATE: &str = "veteran_hunter.too_late";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3419,6 +3422,9 @@ mod tests {
             keys::CELEBRITY_START,
             keys::CELEBRITY_NOT_YET,
             keys::CELEBRITY_TOO_LATE,
+            keys::VETERAN_HUNTER_START,
+            keys::VETERAN_HUNTER_NOT_YET,
+            keys::VETERAN_HUNTER_TOO_LATE,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

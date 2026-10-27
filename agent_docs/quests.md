@@ -912,10 +912,23 @@ start script writes the fame the player has (`popS`) and the goal, 1,000
 gives the Celebrity Medal (1142003) and completes the quest once fame less
 `popS` reaches `popG`. After the end date (the started record) Dalair says
 the time is over, and the player can give the quest up and start again.
-Cosmic has no scripts for it, and the text is unsourced. The other title
-challenges count kills or rankings that the server does not keep: Maple
-Idol Star (29500), which needs the Celebrity Medal, goes to the most
-popular player of the month, and nothing picks one.
+Cosmic has no scripts for it, and the text is unsourced.
+
+Title Challenge - Veteran Hunter (29400) starts at Dalair from level 10. The
+start script writes the count, 0 (`mon`), and the goal, 1,000,000 (`mg`),
+into the quest's record beside the quest log. Each kill of a mob above the
+player's level, or from level 120 one of level 120 or above, adds one to
+`mon` while the quest is started and before its end date
+(`quests::count_hunt`, called from `count_quest_kill`), with the record
+sent on every kill. The quest's text has both "higher than your level" and
+"your level or higher"; the server takes the first. Dalair's end script
+gives the Veteran Hunter Medal (1142004) and completes the quest once `mon`
+reaches `mg`, and after the end date says the time is over. Cosmic has no
+scripts for it, and the text is unsourced.
+
+The other title challenges count kills or rankings that the server does
+not keep: Maple Idol Star (29500), which needs the Celebrity Medal, goes to
+the most popular player of the month, and nothing picks one.
 
 ## Conversations in the client
 
@@ -1064,10 +1077,10 @@ window draw as the frame and its slices (`QuestTextImages`,
 `QuestRecordEx::gauge_slices`). PQ Mania's and Quest Specialist's tokens read the need from
 `Check.img` itself, as the client does, not from the supported list. The client would
 divide by zero on a `popG` of 0 in `perPop` and on a `timeLimit2` under a
-day; HeavenClient shows 0 there. Apart from the end date and Celebrity's
-`popS` and `popG` (below), nothing writes these titles' records yet: the
-original server's timing is unknown (Cosmic has none), and 29400 and
-29500-29503 wait on their start scripts.
+day; HeavenClient shows 0 there. Apart from the end date, Celebrity's
+`popS` and `popG`, and Veteran Hunter's `mon` and `mg` (below), nothing
+writes these titles' records yet: the original server's timing is unknown
+(Cosmic has none), and 29500-29503 wait on their start scripts.
 
 So far only the party quests keep records, on their info quests 1200-1206
 and 1301. The client lists these under "Party Quest" and never offers them
@@ -1163,6 +1176,8 @@ copied into the source.
   held, not twice, and a fourth refused without its medal),
   `celebrity` (29002's record at the start, 960 fame not enough, 1,000
   too late after the end date, then the medal),
+  `veteran_hunter` (29400's record at the start, a Slime below the
+  player's level not counted, an Octopus above it counted, then the medal),
   `knight_titles` (29906 started in Henesys, 29907 refused before the 2nd
   job, and the medal from Cygnus),
   and `timed_quests` (Medin's clock: shown on start, taken down on

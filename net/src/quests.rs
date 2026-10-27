@@ -417,6 +417,47 @@ pub fn kill_records(player: &mut Player, mob_id: i32) -> Vec<(i16, &'static str)
     changed
 }
 
+/// Whether a timed title (`game::quest::DATED_QUESTS`) started by `player`
+/// has passed its end date, its started record, "yyyyMMddHHmmss", which
+/// sorts as it reads.
+pub fn title_ended(player: &Player, quest_id: i16, now: SystemTime) -> bool {
+    player
+        .quests
+        .info(quest_id)
+        .is_some_and(|end| end < game::quest::end_date(now).as_str())
+}
+
+/// Veteran Hunter (29400): hunt a million mobs above the player's level
+/// within the title's 30 days. The count is `mon` in the quest's record
+/// beside the quest log, and the goal is `mg`.
+pub const VETERAN_HUNTER: i16 = 29400;
+
+/// Whether a kill of a mob at `mob_level` counts for Veteran Hunter at
+/// `player_level`: a mob above the player's level, or from level 120 one of
+/// 120 or above, as the quest's text has it.
+pub fn counts_for_hunt(player_level: u8, mob_level: i16) -> bool {
+    let player_level = i16::from(player_level);
+    if player_level >= 120 {
+        mob_level >= 120
+    } else {
+        mob_level > player_level
+    }
+}
+
+/// Count a kill of a mob at `mob_level` toward Veteran Hunter, while it is
+/// started and before its end date. Returns the quest's new record.
+pub fn count_hunt(player: &mut Player, mob_level: i16, now: SystemTime) -> Option<String> {
+    if player.quests.state(VETERAN_HUNTER) != QuestState::Started
+        || title_ended(player, VETERAN_HUNTER, now)
+        || !counts_for_hunt(player.stats.level, mob_level)
+    {
+        return None;
+    }
+    let hunted = player.quest_ex.number(VETERAN_HUNTER, "mon");
+    player.quest_ex.set(VETERAN_HUNTER, "mon", hunted + 1);
+    player.quest_ex.raw(VETERAN_HUNTER).map(str::to_owned)
+}
+
 /// Count a kill of `mob_id` toward every started quest that needs it.
 /// Returns the quests whose progress changed.
 pub fn count_kill<'a>(
@@ -1429,5 +1470,42 @@ mod tests {
         assert_eq!(p.skills.level(4121004), 12);
         // Job 410 is not 412, though both are thieves.
         assert!(apply_skills(&skills, &mut player(70, 410)).is_empty());
+    }
+
+    #[test]
+    fn veteran_hunter_counts_mobs_above_the_players_level_until_its_end() {
+        assert!(counts_for_hunt(30, 31));
+        assert!(!counts_for_hunt(30, 30));
+        assert!(!counts_for_hunt(30, 12));
+        assert!(counts_for_hunt(150, 120));
+        assert!(!counts_for_hunt(150, 119));
+
+        let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        let mut hunter = player(30, 100);
+        assert_eq!(count_hunt(&mut hunter, 40, now), None);
+
+        hunter.quests.upsert(QuestRecord {
+            quest_id: VETERAN_HUNTER,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(game::quest::end_date(now + Duration::from_secs(60))),
+            },
+        });
+        hunter.quest_ex.set(VETERAN_HUNTER, "mon", 0);
+        hunter.quest_ex.set(VETERAN_HUNTER, "mg", 1_000_000);
+        assert_eq!(count_hunt(&mut hunter, 30, now), None);
+        assert_eq!(
+            count_hunt(&mut hunter, 31, now).as_deref(),
+            Some("mon=1;mg=1000000")
+        );
+        assert_eq!(
+            count_hunt(&mut hunter, 31, now).as_deref(),
+            Some("mon=2;mg=1000000")
+        );
+
+        let later = now + Duration::from_secs(61);
+        assert!(title_ended(&hunter, VETERAN_HUNTER, later));
+        assert_eq!(count_hunt(&mut hunter, 31, later), None);
+        assert_eq!(hunter.quest_ex.number(VETERAN_HUNTER, "mon"), 2);
     }
 }
