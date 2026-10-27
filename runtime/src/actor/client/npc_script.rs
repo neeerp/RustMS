@@ -4,6 +4,7 @@ use crate::db::spawn_db;
 use crate::error::RuntimeError;
 use crate::message::{DirectoryMessage, FieldMessage, SquadAnswer};
 use game::pet::PetChange;
+use game::quest::{QuestRecord, QuestStatus};
 use game::QuestState;
 use net::conti::{self, State};
 use net::dialogue::Prompt;
@@ -550,6 +551,21 @@ impl ClientActor {
                     if next.quests.set_info(*id, value) {
                         changed = true;
                         packets.push(quest::build_quest_progress(*id, next.quests.status(*id))?);
+                    } else if let Some(QuestChange::Start(t)) =
+                        change.filter(|_| next.quests.state(*id) != QuestState::Started)
+                    {
+                        if t.id != *id {
+                            continue;
+                        }
+                        // Started in this batch: the quest starts with it,
+                        // and its start sends the progress.
+                        next.quests.upsert(QuestRecord {
+                            quest_id: t.id,
+                            status: QuestStatus::Started {
+                                kills: vec![0; t.end_mobs.len()],
+                                info: Some(value.clone()),
+                            },
+                        });
                     }
                 }
                 Effect::SetRecord { record, value } => {

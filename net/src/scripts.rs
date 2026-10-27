@@ -137,7 +137,7 @@ const WEDDING_HALL_ENTRANCE: i32 = 106021401;
 /// Alcadno's lab, once Verifying the Password (3360) is taken.
 const SECRET_BASEMENT_PATH: i32 = 261030000;
 const ZENUMIST_HALLWAY: i32 = 261010000;
-const VERIFYING_THE_PASSWORD: i16 = 3360;
+pub const VERIFYING_THE_PASSWORD: i16 = 3360;
 /// Rien's way out to the Dangerous Forest (`rienTutor8`). While an Aran
 /// beginner is on Basic Fitness Training 1-3 (21015-21017), it keeps them in
 /// town, saying which way their training lies.
@@ -702,10 +702,12 @@ pub enum Effect {
         to: u8,
     },
     /// Set a started info quest's whole string to `value`, as the Shiny
-    /// Stone marks Shining Stone; nothing if it already reads so.
+    /// Stone marks Shining Stone; nothing if it already reads so. After a
+    /// `StartQuest` of the same quest, it is the string the quest starts
+    /// with, as Parwen's password.
     SetQuestInfo {
         quest: i16,
-        value: &'static str,
+        value: String,
     },
     /// Set a record that is no quest (`game::quest::RECORDS`) to `value`,
     /// as Kyrin marks a test passed; nothing if it already reads so.
@@ -1427,18 +1429,20 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
                 occupied: None,
             }
         }
-        // Cosmic asks for the password while the quest is taken; its start
-        // script, which sets one, isn't run, so the door just opens.
+        // While Verifying the Password is under way, the door asks for the
+        // password its start script set (the Secret Passage, Cosmic
+        // `MagatiaPassword`), which once given is "1" (Cosmic `secretDoor`).
+        "secretDoor"
+            if quest(VERIFYING_THE_PASSWORD) == QuestState::Started
+                && player
+                    .quests
+                    .info(VERIFYING_THE_PASSWORD)
+                    .is_some_and(|password| password.len() > 1) =>
+        {
+            opens(crate::npc_scripts::SECRET_PASSAGE)
+        }
         "secretDoor" if quest(VERIFYING_THE_PASSWORD) != QuestState::NotStarted => {
-            let side = if player.stats.map_id == ZENUMIST_HALLWAY {
-                "sp_jenu"
-            } else {
-                "sp_alca"
-            };
-            through(Effect::WarpToPortal(
-                SECRET_BASEMENT_PATH,
-                named(SECRET_BASEMENT_PATH, side),
-            ))
+            through(through_secret_door(player))
         }
         "secretDoor" => refused(keys::SECRET_DOOR_LOCKED),
         "rienTutor8" => {
@@ -2102,6 +2106,17 @@ fn investigate(player: &Player, quest: i16, balloon: u8) -> ScriptOutcome {
         block: false,
         occupied: None,
     }
+}
+
+/// Into Magatia's secret basement, on the side of the lab the player is
+/// leaving (`secretDoor`).
+pub fn through_secret_door(player: &Player) -> Effect {
+    let side = if player.stats.map_id == ZENUMIST_HALLWAY {
+        "sp_jenu"
+    } else {
+        "sp_alca"
+    };
+    Effect::WarpToPortal(SECRET_BASEMENT_PATH, named(SECRET_BASEMENT_PATH, side))
 }
 
 /// A portal that opens `npc`'s conversation.
@@ -3518,6 +3533,20 @@ mod tests {
         player.stats.map_id = ZENUMIST_HALLWAY;
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 2)));
         player.stats.map_id = 261020200;
+        assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
+        // With a password to give, the Secret Passage asks for it.
+        player.quests.upsert(game::quest::QuestRecord {
+            quest_id: VERIFYING_THE_PASSWORD,
+            status: game::quest::QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some("A1B2C3D4E5".into()),
+            },
+        });
+        assert_eq!(
+            portal("secretDoor", &player).unwrap().effects,
+            [Effect::OpenNpc(crate::npc_scripts::SECRET_PASSAGE)]
+        );
+        player.quests.set_info(VERIFYING_THE_PASSWORD, "1");
         assert_eq!(go("secretDoor", &player), Some((SECRET_BASEMENT_PATH, 1)));
     }
 
