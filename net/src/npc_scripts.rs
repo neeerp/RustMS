@@ -2648,6 +2648,7 @@ impl NpcScript {
             "q3941s" => Some(karcasa_silk(player, false)),
             "q3941e" => Some(karcasa_silk(player, true)),
             "q8255s" => Some(adonis_lost_spirits()),
+            "q2156e" => Some(pia_rainbow_shell(player)),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -5824,6 +5825,38 @@ fn swallow_new_seed() -> NpcScript {
         Effect::CompleteQuest(THE_SEED_SWALLOW_LOST),
     ];
     script.inventory_full = Some(text(keys::SWALLOW_NEW_SEED_FULL));
+    script
+}
+
+/// Pia (1012102) in Henesys, and "A rainbow snail shell that makes wishes
+/// come true!?" (2156), which ends on Pia's `q2156e`: the data's `Check/1`
+/// asks for nothing and its `Act/1` gives nothing. The script asks for the
+/// Rainbow-colored Snail Shell Mano drops, takes it and gives the GMS v83
+/// data's 7,500 EXP, 30,000 mesos and 3 fame, and Pia plays the shell's
+/// effect (`act2156`). Cosmic has no script for it.
+const PIA: i32 = 1012102;
+const RAINBOW_SHELL_QUEST: i16 = 2156;
+const RAINBOW_SNAIL_SHELL: i32 = 2210006;
+
+fn pia_rainbow_shell(player: &Player) -> NpcScript {
+    if player.inventory.count(RAINBOW_SNAIL_SHELL) == 0 {
+        return NpcScript::new(PIA, vec![Page::Say(text(keys::PIA_SHELL_MISSING))]);
+    }
+    let mut script = NpcScript::new(PIA, vec![Page::Say(text(keys::PIA_SHELL_WISH))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: RAINBOW_SNAIL_SHELL,
+            quantity: 1,
+        },
+        Effect::GainExp(7500),
+        Effect::GainMeso(30000),
+        Effect::GainFame(3),
+        Effect::CompleteQuest(RAINBOW_SHELL_QUEST),
+        Effect::NpcSpecialAction {
+            npc_id: PIA,
+            action: "act2156",
+        },
+    ];
     script
 }
 
@@ -14304,6 +14337,46 @@ mod tests {
                         quantity: 1
                     },
                     Effect::CompleteQuest(THE_SEED_SWALLOW_LOST)
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn pia_takes_the_rainbow_snail_shell_and_plays_its_effect() {
+        let traveller = traveller(30, 0, false);
+        let without = NpcScript::for_quest("q2156e", &traveller).unwrap();
+        assert_eq!(
+            page_text(&without.clone().begin()),
+            text(keys::PIA_SHELL_MISSING)
+        );
+        assert_eq!(read_through(without), (PIA, Vec::new()));
+
+        let mut holding = traveller.clone();
+        holding.inventory.insert(
+            game::InventoryType::Use,
+            1,
+            game::Item::stack(RAINBOW_SNAIL_SHELL, 1),
+        );
+        let with = NpcScript::for_quest("q2156e", &holding).unwrap();
+        assert_eq!(page_text(&with.clone().begin()), text(keys::PIA_SHELL_WISH));
+        assert_eq!(
+            read_through(with),
+            (
+                PIA,
+                vec![
+                    Effect::TakeItem {
+                        item_id: RAINBOW_SNAIL_SHELL,
+                        quantity: 1
+                    },
+                    Effect::GainExp(7500),
+                    Effect::GainMeso(30000),
+                    Effect::GainFame(3),
+                    Effect::CompleteQuest(RAINBOW_SHELL_QUEST),
+                    Effect::NpcSpecialAction {
+                        npc_id: PIA,
+                        action: "act2156"
+                    },
                 ]
             )
         );

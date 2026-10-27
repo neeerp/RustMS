@@ -44,8 +44,9 @@ have it. The field gives one client control of its NPCs (SPAWN_NPC_C,
 echoes it to the map (`0x104`), so everyone sees the same action. Requests
 from other clients are dropped.
 
-Three more packets change NPCs, though no RustMS content sends them yet
-(builders in `net/src/packet/build/world/npc.rs`, report b095):
+Three more packets change NPCs (builders in
+`net/src/packet/build/world/npc.rs`, report b095). Only `0x106` is sent by
+any RustMS content so far:
 
 - `0x105` (`build_npc_enabled`): `oid`, then 1 to show the NPC with
   `Effect/MapEff.img/NpcSummon` or 0 to hide it with `NpcReturn`. A hidden
@@ -57,7 +58,9 @@ Three more packets change NPCs, though no RustMS content sends them yet
   that has the action asks for it as an NPC_ACTION request, which the field
   echoes as usual if it comes from the controller; send it to the controller.
   Nothing happens while the NPC plays a `special` action, or if it has no
-  such action.
+  such action. A script asks for one with `Effect::NpcSpecialAction`, which
+  the field sends to its NPC controller for the first NPC of that id on the
+  map (Pia's `act2156`).
 - `0x107` (`build_set_npc_scriptable`): NPC ids with a script name and
   YYYYMMDD start and end days. The client adds them after the NPC's
   `info/script` windows for the rest of the session, and the newest window

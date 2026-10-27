@@ -45,6 +45,13 @@ replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 [mobs.9001004]
 replace = [{ item = 4031059, prob = 1.0, quest = 32101 }]
 
+[mobs.2220000]
+# Mano: its monster book (String.nx MonsterBook.img/2220000/reward) lists the
+# Rainbow-colored Snail Shell 2210006 that Pia's rainbow snail shell quest
+# (2156, q2156e) asks for, but the pack's drops lack it. It drops every time,
+# as on the community servers.
+add = [{ item = 2210006, prob = 1.0 }]
+
 [mobs.8180000]
 # Manon (Leafre): the pack has the Explorer lines' Pentagon-style items
 # (4031343, 4031511, 4031514, 4031517; Hero's Quality 6904 and its siblings
