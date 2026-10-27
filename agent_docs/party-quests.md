@@ -1357,7 +1357,9 @@ on to the last room (x00600); otherwise they give the side's gift
 (Zenumist 4001159, Alcadno 4001160, which needs room) and send the member
 on: to the last room, or, if the Frankenroid was the mighty one, first to
 Yulete's traces (2112001, 2112011) in x00500, who send them on in turn.
-In the last room Romeo & Juliet (2112018) thank each member and give
+In the last room Romeo & Juliet (2112018) thank each member, set their
+record 7072 to `1` (`npc_scripts::MAGATIA_WON`, which opens Yulete's
+Request and Romeo's or Juliet's quests after it; see `quests.md`) and give
 one of 23 rewards (`events::MAGATIA_REWARDS`, Cosmic's
 `setEventRewards`), which needs a free slot in each of the Equip and Use
 inventories, on the way back to the side's room. The traces also open

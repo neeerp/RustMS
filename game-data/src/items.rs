@@ -309,13 +309,19 @@ pub struct ConsumeSpec {
     /// (`script`): `killarmush` for the Killer Mushroom Spore 2430014,
     /// `removethorns` for the Thorn Remover 2430015.
     pub script: Option<String>,
+    /// The mob skill and level that using it puts on the player itself
+    /// (`specEx/0`, `mobSkill` and `level`, without a `target`): Russellon's
+    /// Pills (2022198) and Potions (2022225-27), which poison, curse or
+    /// weaken.
+    pub mob_skill: Option<(i32, i32)>,
 }
 
 impl ConsumeSpec {
-    /// Whether USE_ITEM can apply any of it: HP or MP, a cure, or stats or
-    /// a random morph for a time.
+    /// Whether USE_ITEM can apply any of it: HP or MP, a cure, stats or a
+    /// random morph for a time, or a mob skill's disease.
     pub fn has_effect(&self) -> bool {
-        self.hp != 0
+        self.mob_skill.is_some()
+            || self.hp != 0
             || self.mp != 0
             || self.hp_r != 0
             || self.mp_r != 0
@@ -611,6 +617,20 @@ impl ItemData {
                     morph_random.push((i16::try_from(morph).unwrap_or(0), prop));
                 }
             }
+            let mut mob_skill = None;
+            if let Some(entry) = nx
+                .child_by_name(node, "specEx")?
+                .map(|ex| nx.child_by_name(ex, "0"))
+                .transpose()?
+                .flatten()
+            {
+                if let (Some(skill), None) = (
+                    nx.int_child(entry, "mobSkill")?,
+                    nx.int_child(entry, "target")?,
+                ) {
+                    mob_skill = Some((skill, nx.int_child(entry, "level")?.unwrap_or(1)));
+                }
+            }
             info.spec = Some(ConsumeSpec {
                 hp: nx.int_child(spec, "hp")?.unwrap_or(0),
                 mp: nx.int_child(spec, "mp")?.unwrap_or(0),
@@ -646,6 +666,7 @@ impl ItemData {
                 cp: nx.int_child(spec, "cp")?.unwrap_or(0),
                 nuff_skill: nx.int_child(spec, "nuffSkill")?,
                 script: nx.string_child(spec, "script")?,
+                mob_skill,
             });
         }
         if item_id / 10_000 == 210 {
@@ -1153,6 +1174,21 @@ mod tests {
             (16, (100100, 100), (1210102, 50))
         );
         assert!(data.info(2000000).unwrap().unwrap().sack.is_empty());
+    }
+
+    #[test]
+    fn reads_the_mob_skill_russellons_pills_put_on_the_player() {
+        let Some(data) = data() else {
+            return;
+        };
+        let spec = |id| data.info(id).unwrap().unwrap().spec.unwrap();
+        assert_eq!(spec(2022198).mob_skill, Some((125, 7)));
+        assert!(spec(2022198).has_effect());
+        assert_eq!(spec(2022226).mob_skill, Some((124, 8)));
+        // The Carnival's confusing item targets the other side.
+        let carnival = data.info(2022268).unwrap().unwrap().spec;
+        assert_eq!(carnival.and_then(|spec| spec.mob_skill), None);
+        assert_eq!(spec(2000000).mob_skill, None);
     }
 
     #[test]

@@ -1208,6 +1208,18 @@ pub mod keys {
     pub const MAHA_WOLF_EVOLUTION_UNEQUIP: &str = "maha.wolf_evolution.unequip";
     pub const MAHA_WOLF_EVOLUTION_DONE: &str = "maha.wolf_evolution.done";
     pub const MAHA_WOLF_EVOLUTION_FULL: &str = "maha.wolf_evolution.full";
+    /// "Life Alchemy, and the Missing Alchemist" (3314): the desk with
+    /// Russellon's pills (2111015) and Russellon (2111009, `q3314e`).
+    pub const RUSSELLON_PILL_TAKEN: &str = "russellon.pill.taken";
+    pub const RUSSELLON_PILL_FULL: &str = "russellon.pill.full";
+    pub const RUSSELLON_PILL_NOT_TAKEN: &str = "russellon.pill.not_taken";
+    pub const RUSSELLON_PILL_DONE: &str = "russellon.pill.done";
+    pub const RUSSELLON_REWARD_FULL: &str = "russellon.reward.full";
+    /// "Yulete's Reward" (3382): Yulete (2112014, `q3382e`) and the marbles.
+    pub const YULETE_MARBLES_EYE: &str = "yulete.marbles.eye";
+    pub const YULETE_MARBLES_ROCK: &str = "yulete.marbles.rock";
+    pub const YULETE_MARBLES_MORE: &str = "yulete.marbles.more";
+    pub const YULETE_MARBLES_FULL: &str = "yulete.marbles.full";
 
     /// "A Cute Baby Bird" (3250): Ghosthunter Bob (2041026, `q3250s`)
     /// offers a Timer's Egg to raise, then, once it has grown
@@ -3759,6 +3771,15 @@ mod tests {
                 keys::MAHA_WOLF_EVOLUTION_UNEQUIP,
                 keys::MAHA_WOLF_EVOLUTION_DONE,
                 keys::MAHA_WOLF_EVOLUTION_FULL,
+                keys::RUSSELLON_PILL_TAKEN,
+                keys::RUSSELLON_PILL_FULL,
+                keys::RUSSELLON_PILL_NOT_TAKEN,
+                keys::RUSSELLON_PILL_DONE,
+                keys::RUSSELLON_REWARD_FULL,
+                keys::YULETE_MARBLES_EYE,
+                keys::YULETE_MARBLES_ROCK,
+                keys::YULETE_MARBLES_MORE,
+                keys::YULETE_MARBLES_FULL,
                 keys::BOB_BABY_BIRD_OFFER[0],
                 keys::BOB_BABY_BIRD_OFFER[1],
                 keys::BOB_BABY_BIRD_OFFER[2],

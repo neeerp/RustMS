@@ -1,4 +1,5 @@
 use super::change_map::warp;
+use super::combat::take_disease;
 use super::use_skill::show_given;
 use crate::consume_effect;
 use crate::error::NetworkError;
@@ -12,7 +13,7 @@ use crate::packet::build::world::{buff, inventory, stat};
 use crate::skills;
 use game::buff::BuffStat;
 use game::inventory::equip_slot;
-use game::{Buff, InventoryChange, InventoryType, Player, SkillRecord};
+use game::{Buff, Disease, InventoryChange, InventoryType, Player, SkillRecord};
 use game_data::items::ConsumeSpec;
 use game_data::{
     is_use_item, FIELD_LIMIT_MAP_SCROLLS, FIELD_LIMIT_RETURN_SCROLLS, NO_DESTINATION_MAP,
@@ -147,6 +148,8 @@ pub struct ItemEffect {
     /// The stats it raised, for `time` ms.
     given: Vec<(BuffStat, i16)>,
     time: i32,
+    /// The disease its mob skill put on the player.
+    disease: Option<Disease>,
 }
 
 /// Give `player` the effect of using `item_id` (its `spec`), without using
@@ -182,6 +185,20 @@ pub fn item_effect_packets(
     if !effect.given.is_empty() {
         own.push(buff::build_give_buff(-item_id, effect.time, &effect.given)?);
         seen.extend(show_given(player, &effect.given)?);
+    }
+    if let Some(disease) = effect.disease {
+        let lasts = i32::try_from(disease.lasts.as_millis()).unwrap_or(i32::MAX);
+        own.push(buff::build_give_buff(
+            disease.skill_id,
+            lasts,
+            &[(disease.stat, disease.value)],
+        )?);
+        let shown: Vec<_> = (player.buffs.shown().into_iter())
+            .filter(|shown| shown.stat == disease.stat)
+            .collect();
+        if !shown.is_empty() {
+            seen.push(buff::build_give_foreign_buff(player.id(), &shown)?);
+        }
     }
     if let Some(aura) = consume_effect::refresh(player)? {
         own.push(aura.clone());
@@ -400,9 +417,9 @@ fn random_morph(pool: &[(i16, i32)], roll: i32) -> Option<i16> {
 
 /// Apply an item's `spec`: HP/MP (flat and percent), then the diseases it
 /// cures, then the stats it raises, and the morph it rolls from a random
-/// pool, for its time as a buff of id `-item_id`. A potion that takes HP
-/// (the Sorcerer's Potion 2022337, `hpR` -100, and 2022228) leaves at least
-/// 1.
+/// pool, for its time as a buff of id `-item_id`, and last the disease of
+/// its mob skill, as a mob would give it. A potion that takes HP (the
+/// Sorcerer's Potion 2022337, `hpR` -100, and 2022228) leaves at least 1.
 fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instant) -> ItemEffect {
     let max_hp = player.effective_max_hp();
     let max_mp = player.effective_max_mp();
@@ -433,7 +450,19 @@ fn apply_spec(player: &mut Player, item_id: i32, spec: &ConsumeSpec, now: Instan
             .buffs
             .give(Buff::new(-item_id, stat, value, now, lasts));
     }
-    ItemEffect { cured, given, time }
+    let disease = spec
+        .mob_skill
+        .and_then(|(skill, level)| {
+            let data = crate::mobs::skill_level(skill, level)?;
+            game::mob_skill::inflicted(skill, level, data.x, data.duration)
+        })
+        .filter(|&disease| take_disease(player, disease, now));
+    ItemEffect {
+        cured,
+        given,
+        time,
+        disease,
+    }
 }
 
 /// Alchemist (4110000): the percent of an item's flat HP and MP, `x`, and of
@@ -1366,6 +1395,54 @@ mod tests {
         );
         assert!(player.buffs.has(BuffStat::Stun));
         assert!(!player.buffs.has(BuffStat::Poison) && !player.buffs.has(BuffStat::Seal));
+    }
+
+    #[test]
+    fn russellons_pill_poisons_its_taker_as_mob_skill_125_would() {
+        if items::data().is_err() || crate::skills::data().is_err() {
+            return;
+        }
+        let mut player = crate::codec::stats::sample_player();
+        player
+            .inventory
+            .insert(InventoryType::Use, 1, Item::stack(2022198, 2));
+        let mut packet = request(1, 2022198);
+        let mut ctx = WorldContext {
+            client_id: 1,
+            channel_id: 0,
+            player: &mut player,
+        };
+        let actions = UseItemHandler
+            .handle(&mut packet, &mut ctx)
+            .unwrap()
+            .actions;
+        let opcodes: Vec<_> = actions
+            .iter()
+            .map(|action| match action {
+                WorldAction::Reply(p) | WorldAction::BuffsChanged(p) => p.opcode(),
+                _ => 0,
+            })
+            .collect();
+        assert_eq!(
+            opcodes,
+            [
+                SendOpcode::InventoryOperation as i16,
+                SendOpcode::StatChange as i16,
+                SendOpcode::GiveBuff as i16,
+                SendOpcode::GiveForeignBuff as i16,
+            ]
+        );
+        let poison = player.buffs.active()[0].clone();
+        assert_eq!(
+            (poison.skill_id, poison.stat, poison.value),
+            (125 | 7 << 16, BuffStat::Poison, 50)
+        );
+        assert_eq!(player.inventory.count(2022198), 1);
+
+        // Still poisoned, a second pill is used up for nothing more.
+        let used = use_item(&mut player, 1, 2022198, Instant::now()).unwrap();
+        assert_eq!(used.effect.disease, None);
+        assert_eq!(player.inventory.count(2022198), 0);
     }
 
     #[test]

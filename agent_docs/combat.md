@@ -1110,9 +1110,13 @@ member's actor then applies the spec as for the picker, unless they have
 died, left the map or are in the Cash Shop, and sends the update without
 the unlock. The harness test `party_potions` covers this.
 
-Not done yet: `specEx` (2022198 Russellon's Pills, 2022268 Crazy Skull) isn't
-read. Its `0` node names a mob skill and level (125/7, and 132/1 with
-`target`), so these items would bring on a disease, which needs RE first.
+An item's `specEx/0` names a mob skill and level (`ConsumeSpec::mob_skill`).
+Without `target`, using the item puts that skill's disease on the player
+(`combat::take_disease`, as a mob's skill would, for its `x` and `time`):
+Russellon's Pills (2022198, Poison 125/7) and Russellon's Potions
+(2022225-27, among 3314's rewards).
+The give-buff names the mob skill | level << 16, and the map sees it as a
+mob's disease. Crazy Skull (2022268, 132/1) has `target` and isn't read.
 
 ## Monster Book cards
 

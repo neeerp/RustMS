@@ -220,7 +220,8 @@ async fn beat_the_frankenroid(
 }
 
 /// In the last room, where `seen` began, the one who thanks the party says
-/// `key` and gives one of the rewards on the way back to `side`'s lobby.
+/// `key`, marks the run won and gives one of the rewards on the way back to
+/// `side`'s lobby.
 async fn thanked(player: &mut WorldSession, side: MagatiaSide, mut seen: Trace, key: &str) {
     until(&mut player.connection, &mut seen, |t| {
         t.field.npcs.iter().any(|&(_, id)| id == MAGATIA_THANKS)
@@ -233,6 +234,9 @@ async fn thanked(player: &mut WorldSession, side: MagatiaSide, mut seen: Trace, 
     let c = &mut player.connection;
     send(c, answer(0, 1, None)).await;
     until(c, &mut home, |t| t.warps.contains(&lobby)).await;
+    // The run is marked won (7072), which opens Yulete's Request and
+    // Romeo's or Juliet's quests after it.
+    assert_eq!(home.kills.get(&7072).map(String::as_str), Some("1"));
     let rewards: Vec<i32> = MAGATIA_REWARDS.iter().map(|&(id, _)| id).collect();
     assert!(
         home.added
