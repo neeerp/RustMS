@@ -116,6 +116,18 @@ const BEYOND_THE_RUINS: i16 = 3522;
 /// and the Sleepywood dungeon (`balogTemple`).
 const BOWMAN_SCHOOL: i32 = 100000201;
 const MAGIC_LIBRARY: i32 = 101000003;
+/// Ellinia, where the hidden Magic Library lets out by `enterMagiclibrar`'s
+/// own portal, `jobin00`.
+const ELLINIA: i32 = 101000000;
+/// The hidden Magic Library, 910110000, where a Cygnus Knight on "Maybe
+/// it's Grendel!" (20718) searching Grendel's house finds a black shadow
+/// instead (Cosmic `Cygnus_Magic_Library`), one at a time. Its black shadow
+/// sets `LIBRARY_SHADOW_RECORD` to `SHADOW_SPOTTED`, which the quest's
+/// completion reads.
+pub const HIDDEN_MAGIC_LIBRARY: i32 = 910110000;
+pub const MAYBE_ITS_GRENDEL: i16 = 20718;
+pub const LIBRARY_SHADOW_RECORD: i16 = 20732;
+pub const SHADOW_SPOTTED: &str = "1";
 const UNDERGROUND_TEMPLE_STAIRS: i32 = 105100000;
 /// Orbis's Neglected Strolling Path (`enterNepenthes`).
 const NEGLECTED_STROLLING_PATH: i32 = 200060001;
@@ -325,7 +337,7 @@ const BERSERK_ROOM: i32 = 910500200;
 pub const BALROG_WORLD: i32 = 910500000;
 /// Where Ardin's other self waits for a challenger on quest 3933.
 pub const ARDINS_ROOM: i32 = 926000000;
-pub const SOLO_MAPS: [i32; 12] = [
+pub const SOLO_MAPS: [i32; 13] = [
     FIREHAWK_NEST,
     ICE_EAGLE_NEST,
     TORNADO_ROOM,
@@ -338,6 +350,7 @@ pub const SOLO_MAPS: [i32; 12] = [
     KYRIN_TESTS[1].room,
     BALROG_WORLD,
     ARDINS_ROOM,
+    HIDDEN_MAGIC_LIBRARY,
 ];
 
 /// One of Kyrin's 4th-job tests: a Pirate on `quest` holds out in `room`
@@ -685,6 +698,14 @@ pub enum Effect {
     BringOutMob {
         mob_id: i32,
         at: (i16, i16),
+    },
+    /// Bring out `each` of `mob_id` on the ground below each point of `at`
+    /// in the player's map, as the Magic Library's black shadow sets Blue
+    /// Mushrooms on the player. They never respawn.
+    BringOutMobs {
+        mob_id: i32,
+        at: &'static [(i16, i16)],
+        each: u8,
     },
     /// Put the reactors named `name` on the player's map in `state`, shown
     /// to everyone there but without the events that lead to it, as
@@ -1249,12 +1270,30 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             BOWMAN_SCHOOL,
             named(BOWMAN_SCHOOL, "out02"),
         )),
-        // Cosmic starts a Cygnus quest's instance here while Maybe it's
-        // Grendel! (20718) is taken; that isn't in.
+        // Into the hidden Magic Library while Maybe it's Grendel! (20718)
+        // is under way and its black shadow not yet found, by the portal
+        // Cosmic's instance enters by; else into Grendel's house.
+        "enterMagiclibrar"
+            if quest(MAYBE_ITS_GRENDEL) == QuestState::Started
+                && player.quests.info(LIBRARY_SHADOW_RECORD) != Some(SHADOW_SPOTTED) =>
+        {
+            solo_map_at(true, HIDDEN_MAGIC_LIBRARY, 1)
+        }
         "enterMagiclibrar" => through(Effect::WarpToPortal(
             MAGIC_LIBRARY,
             named(MAGIC_LIBRARY, "jobout00"),
         )),
+        // Out of the hidden Magic Library to Ellinia, once the black
+        // shadow's Blue Mushrooms are all gone (Cosmic `outMagiclib`).
+        "outMagiclib" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(ELLINIA, named(ELLINIA, "jobin00")),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::MAGIC_LIBRARY_MUSHROOMS_LEFT, &[])),
+        },
         "balogTemple" => through(Effect::WarpToPortal(
             UNDERGROUND_TEMPLE_STAIRS,
             named(UNDERGROUND_TEMPLE_STAIRS, "top00"),
@@ -3471,6 +3510,47 @@ mod tests {
         // Off the lanes, the script does nothing.
         player.stats.map_id = HENESYS;
         assert_eq!(portal("timeQuest", &player), None);
+    }
+
+    #[test]
+    fn the_hidden_magic_library_holds_a_cygnus_knight_until_its_shadow_is_dealt_with() {
+        let mut searching = player_with(&[(MAYBE_ITS_GRENDEL, QuestState::Started)]);
+        let way_in = portal("enterMagiclibrar", &searching).unwrap();
+        assert_eq!(
+            way_in.effects,
+            [
+                Effect::RequireEmptyMap(HIDDEN_MAGIC_LIBRARY),
+                Effect::PortalSound,
+                Effect::WarpToPortal(HIDDEN_MAGIC_LIBRARY, 1),
+            ]
+        );
+        assert!(way_in.occupied.is_some());
+        assert!(SOLO_MAPS.contains(&HIDDEN_MAGIC_LIBRARY));
+        // Once the shadow is found, or with the quest done, Grendel's house.
+        searching
+            .quests
+            .set_record(LIBRARY_SHADOW_RECORD, SHADOW_SPOTTED);
+        let done = player_with(&[(MAYBE_ITS_GRENDEL, QuestState::Completed)]);
+        for player in [&searching, &done] {
+            assert_eq!(
+                warp_of(&portal("enterMagiclibrar", player).unwrap()),
+                Some((MAGIC_LIBRARY, 8))
+            );
+        }
+
+        let way_out = portal("outMagiclib", &searching).unwrap();
+        assert_eq!(
+            way_out.effects,
+            [
+                Effect::RequireNoMobs,
+                Effect::PortalSound,
+                Effect::WarpToPortal(ELLINIA, 26),
+            ]
+        );
+        assert_eq!(
+            way_out.occupied,
+            Some(content::text().get(keys::MAGIC_LIBRARY_MUSHROOMS_LEFT, &[]))
+        );
     }
 
     #[test]

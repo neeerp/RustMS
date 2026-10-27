@@ -25,9 +25,12 @@ pub const INFO_QUESTS: &[i16] = &[
 /// out's (6411, for "Mission Free the Monsters", 6410) and Nett's
 /// Pyramid's kill count (7760, for "Protector of Pharaoh", 29932) and the
 /// lost memory a job instructor gives back (7081, for "Memory Keeper",
-/// 3507). The Mushroom Kingdom's opening scene's (2311) is read by The
+/// 3507), and the black shadows the Cygnus Knights hunt: the one spotted in
+/// the Pig Farm (20731, for "A Black Shadow in the Pig Farm", 20706) and
+/// the one in the Magic Library (20732, for "Maybe it's Grendel!", 20718).
+/// The Mushroom Kingdom's opening scene's (2311) is read by The
 /// Test's start (2312) instead.
-pub const RECORDS: &[i16] = &[2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760];
+pub const RECORDS: &[i16] = &[2311, 6331, 6364, 6371, 6401, 6411, 7081, 7760, 20731, 20732];
 
 /// A quest's state as the client and the quest data number it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

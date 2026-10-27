@@ -1032,6 +1032,7 @@ impl FieldActor {
                 FieldRequest::BringOutMob { mob_id, at } => {
                     self.handle_bring_out_mob(from, mob_id, at)
                 }
+                FieldRequest::BringOutMobs { mob_id, at } => self.bring_out_mobs(from, mob_id, &at),
                 FieldRequest::OpenReactor { name } => self.open_reactor(name),
                 FieldRequest::ClearMobs => self.clear_mobs(),
                 FieldRequest::SetReactorState { name, state } => {
@@ -2790,25 +2791,36 @@ impl FieldActor {
     /// Bring out the mob a script calls for on the ground below `(x, y)`
     /// (as a summoning sack places one), under `from`'s control, unless one
     /// is out already.
-    fn handle_bring_out_mob(&mut self, from: ClientId, mob_id: i32, (x, y): (i16, i16)) {
+    fn handle_bring_out_mob(&mut self, from: ClientId, mob_id: i32, at: (i16, i16)) {
         if self.mobs.live().any(|mob| mob.info.mob_id == mob_id) {
             return;
         }
+        self.bring_out_mobs(from, mob_id, &[at]);
+    }
+
+    /// Bring out a `mob_id` on the ground below each of `points`, for
+    /// `from`'s client to control if nobody else does.
+    fn bring_out_mobs(&mut self, from: ClientId, mob_id: i32, points: &[(i16, i16)]) {
         let Some(info) = net::mobs::info(mob_id) else {
             return;
         };
-        let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
-        let at = (x, ground.saturating_sub(1));
         let mover = self.mover_for(from);
-        let object_id = self.mobs.place(info, at, 4, mover, Instant::now());
-        let Some(mob) = self.mobs.get(object_id) else {
-            return;
-        };
-        if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
-            self.broadcast(None, packet);
+        let now = Instant::now();
+        let mut placed = Vec::new();
+        for &(x, y) in points {
+            let ground = self.drops.ground_below(x, y.saturating_sub(1)).unwrap_or(y);
+            let at = (x, ground.saturating_sub(1));
+            let object_id = self.mobs.place(info.clone(), at, 4, mover, now);
+            let Some(mob) = self.mobs.get(object_id) else {
+                continue;
+            };
+            if let Ok(packet) = build_spawn_mob(&mob.view(true)) {
+                self.broadcast(None, packet);
+            }
+            placed.push(object_id);
         }
         if let Some(mover) = mover {
-            self.send_control(mover, &[object_id]);
+            self.send_control(mover, &placed);
         }
     }
 
