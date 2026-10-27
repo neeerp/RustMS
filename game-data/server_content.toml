@@ -2249,6 +2249,56 @@ source = "Edelstein.lua/src/td_mushcastle/TD_MC_first.lua"
 template = "{s0}"
 sha256 = "6a0b4a048c118e1c2fb6afb5fc4f0d52349ba38a2bd5e007586cec02df40cbab"
 
+[text."mc_letter.ask"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s0}"
+sha256 = "8dc31fcb6976b2f7afc9ae8f7984be753a97222600aadd93845b52c6e239f8ce"
+
+[text."mc_letter.later"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s1}"
+sha256 = "448c15a9a39d593335e242295abb5e1d9c3b535c2bf1c3e1e8eb74b4397240ef"
+
+[text."mc_letter.full"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s2}"
+sha256 = "cc2ea2cc57b27cd8a7cbafcfca2ab40f370177ae0d4a80a185c67dbc53fc05dd"
+
+[text."mc_letter.kingdom"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s3}"
+sha256 = "47c113ba7879beefc1bb6eee6a04be2815aae57d3fee77261cfcb7f272a6113d"
+
+[text."mc_letter.written"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s4}"
+sha256 = "51df9848dce5fcc5e0c6109b16803e5c72ebf34bfe182d657afa4854b45a7f4e"
+
+[text."mc_letter.take_you"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s5}"
+sha256 = "a305a7753d680f0d53ada7c781c4cb71d8f088eefc1fe6ff003b59ad969f8dc7"
+
+[text."mc_letter.route"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300s.lua"
+template = "{s6}"
+sha256 = "e65d086581d1bc91a4bf0a81d74e05ca1cacd7d903af82e24f2098a60072ee93"
+
+[text."mc_officer.letter"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300e.lua"
+template = "{s0}"
+sha256 = "f8b76eedf30130e54d70841ca636b2efbd2dc2e96857141e122e67cc8b4be0cb"
+
+[text."mc_officer.letter.reply"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300e.lua"
+template = "{s1}"
+sha256 = "7443d1cf6cd2968132cfc6b5fcc39876a6cfa70bec7d37ed53350ea3609cd9a0"
+
+[text."mc_officer.welcome"]
+source = "Edelstein.lua/src/td_mushcastle/start/q2300e.lua"
+template = "{s2}"
+sha256 = "b0cf12a45855d2acda819fc44ee5f0809f2ef2fbceea0fd7375a1d7d84367a53"
+
 [text."mc_secretary.forest.ask"]
 source = "Edelstein.lua/src/td_mushcastle/q2314s.lua"
 template = "{s0}"

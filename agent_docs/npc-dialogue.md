@@ -268,7 +268,8 @@ speaker byte's bits, as v83 reads them: 0x1 leaves out END CHAT, 0x2 shows
 the player instead of the NPC, 0x6 (either bit) puts the speaker on the
 right with the `UtilDlgEx/it`, `ic` and `is` frame and the text on the left,
 and 0x8 mirrors the NPC. The server sends 0, or 2 for a portal's thought
-(`NpcScript::thought`, `Effect::Think`). HeavenClient's quest
+(`NpcScript::thought`, `Effect::Think`) and for a script's `Page::Reply`,
+the player's own line in an NPC's conversation. HeavenClient's quest
 dialogs use 2 when the player answers a flipped question
 (`Say.img/<id>/<n>/stop/<page>/flip`).
 
