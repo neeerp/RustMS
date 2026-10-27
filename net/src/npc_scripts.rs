@@ -18,7 +18,7 @@ use crate::items;
 use crate::packet::handle::world;
 use crate::refiners::{self, Refine};
 use crate::rides;
-use crate::scripts::{Effect, FLIGHT_TO_TEMPLE, FRESH_MILK, MILK_BOTTLES, MINI_DRACO};
+use crate::scripts::{self, Effect, FLIGHT_TO_TEMPLE, FRESH_MILK, MILK_BOTTLES, MINI_DRACO};
 use crate::squads::{self, SquadCommand, SquadView};
 use crate::stylists::{self, Look, Pick, Service};
 use game::alliance::{self, Alliance};
@@ -1023,17 +1023,22 @@ pub enum ScriptInput {
 }
 
 /// What a script does with a line of text the player typed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OnText {
     /// Lenario confirms the name for the new alliance.
     NameAlliance,
+    /// The Secret Passage opens, `through` it, for Parwen's `password`.
+    SecretPassage { password: String, through: Effect },
 }
 
 impl OnText {
     /// The pages that follow the text.
-    fn pages(self, text: &str) -> Vec<Page> {
+    fn pages(&self, text: &str) -> Vec<Page> {
         match self {
             OnText::NameAlliance => confirm_alliance_name(text),
+            OnText::SecretPassage { password, through } => {
+                secret_passage_opens(text == password, through)
+            }
         }
     }
 }
@@ -1890,6 +1895,10 @@ impl NpcScript {
                 ))
             }
             MACHINE_APPARATUS => return Some(machine_apparatus()),
+            PARWEN if player.quests.state(WHAT_PARWEN_KNOWS) != QuestState::NotStarted => {
+                return Some(parwen())
+            }
+            SECRET_PASSAGE => return secret_passage(player),
             KEROBEN => return Some(keroben(player)),
             SQUAD_SLATE => return Some(squad_slate(player)),
             CRYSTAL_OF_ROOTS => return Some(crystal_of_roots(player)),
@@ -2442,6 +2451,11 @@ impl NpcScript {
                     keys::MAED_CAPE_GO,
                 ],
             )),
+            "q3320s" => Some(what_parwen_knows()),
+            "q3321s" => Some(the_missing_alchemist()),
+            "q3353s" => Some(what_de_lang_wants()),
+            "q3354s" => Some(de_langs_potion()),
+            "q3360s" => Some(verifying_the_password(&mut rand::thread_rng())),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3163,6 +3177,179 @@ fn cape_again(npc: i32, quest: i16, keys: [&str; 3]) -> NpcScript {
     );
     script.on_end = vec![Effect::StartQuest(quest)];
     script
+}
+
+/// Dr. De Lang, Magatia's missing alchemist, hides in Dran's Lab
+/// (926120200), which has no portal: Parwen (2111006) sends the player
+/// there, and its forced return is Parwen's map.
+const PARWEN: i32 = 2111006;
+const DE_LANG: i32 = 2111002;
+const DRANS_LAB: i32 = 926120200;
+const WHAT_PARWEN_KNOWS: i16 = 3320;
+const THE_MISSING_ALCHEMIST: i16 = 3321;
+const WHAT_DE_LANG_WANTS: i16 = 3353;
+const DE_LANGS_POTION: i16 = 3354;
+/// The Secret Passage, the door's password prompt (Cosmic
+/// `MagatiaPassword`).
+pub const SECRET_PASSAGE: i32 = 2111024;
+/// Parwen's password: this many of `PASSWORD_CHARS`.
+const PASSWORD_LEN: usize = 10;
+const PASSWORD_CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/// Parwen once What Parwen Knows is taken: straight to Dran's Lab (Cosmic
+/// `2111006.js`).
+fn parwen() -> NpcScript {
+    NpcScript::new(PARWEN, vec![Page::Done(vec![Effect::Warp(DRANS_LAB)])])
+}
+
+/// `q3320s`, What Parwen Knows: Parwen asks, then the quest starts and the
+/// player is in Dran's Lab, where De Lang ends it (Cosmic `3320.js`). The
+/// text is unsourced.
+fn what_parwen_knows() -> NpcScript {
+    let mut script = NpcScript::new(
+        PARWEN,
+        vec![Page::Ask {
+            text: text(keys::PARWEN_KNOWS_ASK),
+            on_yes: Vec::new(),
+            on_no: None,
+        }],
+    );
+    script.on_end = vec![
+        Effect::StartQuest(WHAT_PARWEN_KNOWS),
+        Effect::Warp(DRANS_LAB),
+    ];
+    script
+}
+
+/// `q3321s`, Dr. De Lang, the Missing Alchemist: De Lang tells of the
+/// pendant for Phyllia and the pipes' password, asks, and the quest starts
+/// (Cosmic `3321.js`). The text is unsourced.
+fn the_missing_alchemist() -> NpcScript {
+    let mut script = NpcScript::new(
+        DE_LANG,
+        vec![
+            Page::Say(text(keys::DE_LANG_MISSING_STORY)),
+            Page::Say(text(keys::DE_LANG_MISSING_HELP)),
+            Page::Ask {
+                text: text(keys::DE_LANG_MISSING_ASK),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(keys::DE_LANG_MISSING_PENDANT)),
+            Page::Say(text(keys::DE_LANG_MISSING_PIPES)),
+            Page::Say(text(keys::DE_LANG_MISSING_GO)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(THE_MISSING_ALCHEMIST)];
+    script
+}
+
+/// `q3353s`, What De Lang Wants: Parwen tells, asks, and on yes starts the
+/// quest and sends the player to Dran's Lab (Cosmic `3353.js`). The text is
+/// unsourced.
+fn what_de_lang_wants() -> NpcScript {
+    let mut script = NpcScript::new(
+        PARWEN,
+        vec![
+            Page::Say(text(keys::PARWEN_DE_LANG_WANTS)),
+            Page::Ask {
+                text: text(keys::PARWEN_DE_LANG_WANTS_ASK),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+        ],
+    );
+    script.on_end = vec![
+        Effect::StartQuest(WHAT_DE_LANG_WANTS),
+        Effect::Warp(DRANS_LAB),
+    ];
+    script
+}
+
+/// `q3354s`, De Lang's Potion: De Lang asks, and on yes the quest starts
+/// (Cosmic `3354.js`). The text is unsourced.
+fn de_langs_potion() -> NpcScript {
+    let mut script = NpcScript::new(
+        DE_LANG,
+        vec![Page::Ask {
+            text: text(keys::DE_LANG_POTION_ASK),
+            on_yes: Vec::new(),
+            on_no: None,
+        }],
+    );
+    script.on_end = vec![Effect::StartQuest(DE_LANGS_POTION)];
+    script
+}
+
+/// `q3360s`, Verifying the Password: Parwen makes up a password of ten
+/// digits and capitals, tells it once, and the quest starts with it as its
+/// info; the Secret Passage asks for it (Cosmic `3360.js`). No is a word
+/// to hurry. The text is unsourced.
+fn verifying_the_password(rng: &mut impl Rng) -> NpcScript {
+    let password: String = (0..PASSWORD_LEN)
+        .map(|_| char::from(*PASSWORD_CHARS.choose(rng).unwrap()))
+        .collect();
+    let code = content::text().get(
+        keys::PARWEN_PASSWORD_CODE,
+        &[("password", password.as_str())],
+    );
+    let mut script = NpcScript::new(
+        PARWEN,
+        vec![
+            Page::Say(text(keys::PARWEN_PASSWORD_KEY)),
+            Page::Ask {
+                text: text(keys::PARWEN_PASSWORD_ASK),
+                on_yes: Vec::new(),
+                on_no: Some(text(keys::PARWEN_PASSWORD_HURRY)),
+            },
+            Page::Say(code),
+        ],
+    );
+    script.on_end = vec![
+        Effect::StartQuest(scripts::VERIFYING_THE_PASSWORD),
+        Effect::SetQuestInfo {
+            quest: scripts::VERIFYING_THE_PASSWORD,
+            value: password,
+        },
+    ];
+    script
+}
+
+/// The Secret Passage while Parwen's password is still to be given (the
+/// `secretDoor` portal opens it): it asks for the password.
+fn secret_passage(player: &Player) -> Option<NpcScript> {
+    let password = player
+        .quests
+        .info(scripts::VERIFYING_THE_PASSWORD)
+        .filter(|password| password.len() > 1)?;
+    Some(NpcScript::new(
+        SECRET_PASSAGE,
+        vec![Page::AskText {
+            text: text(keys::SECRET_PASSAGE_PASSWORD),
+            min: 1,
+            max: PASSWORD_LEN as i16,
+            on_text: OnText::SecretPassage {
+                password: password.to_owned(),
+                through: scripts::through_secret_door(player),
+            },
+        }],
+    ))
+}
+
+/// The right password marks Verifying the Password done ("1") and opens
+/// the passage; any other is wrong (Cosmic `MagatiaPassword.js`).
+fn secret_passage_opens(right: bool, through: &Effect) -> Vec<Page> {
+    if !right {
+        return vec![Page::Say(text(keys::SECRET_PASSAGE_WRONG))];
+    }
+    vec![Page::Done(vec![
+        Effect::SetQuestInfo {
+            quest: scripts::VERIFYING_THE_PASSWORD,
+            value: "1".into(),
+        },
+        Effect::PortalSound,
+        through.clone(),
+    ])]
 }
 
 /// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
@@ -4339,7 +4526,7 @@ fn shiny_stone(player: &Player) -> Option<NpcScript> {
             text: text(keys::QUEST_INFO_SHINY_STONE),
             effects: vec![Effect::SetQuestInfo {
                 quest: SHINING_STONE,
-                value: SHINING_STONE_TOUCHED,
+                value: SHINING_STONE_TOUCHED.to_owned(),
             }],
         }],
     ))
@@ -11342,6 +11529,111 @@ mod tests {
     }
 
     #[test]
+    fn parwen_and_de_lang_start_their_quests_in_dran_s_lab() {
+        let yes_to_all = |name: &str| {
+            let mut script = NpcScript::for_quest(name, &player(50)).unwrap();
+            let mut step = script.begin();
+            loop {
+                let input = match kind(&step) {
+                    Some(1) => ScriptInput::Yes,
+                    _ => ScriptInput::Next,
+                };
+                if !step.effects.is_empty() {
+                    return (script.npc_id(), step.effects);
+                }
+                step = script.respond(input).unwrap();
+            }
+        };
+        let to_the_lab = |quest| vec![Effect::StartQuest(quest), Effect::Warp(DRANS_LAB)];
+        assert_eq!(
+            yes_to_all("q3320s"),
+            (PARWEN, to_the_lab(WHAT_PARWEN_KNOWS))
+        );
+        assert_eq!(
+            yes_to_all("q3321s"),
+            (DE_LANG, vec![Effect::StartQuest(THE_MISSING_ALCHEMIST)])
+        );
+        assert_eq!(
+            yes_to_all("q3353s"),
+            (PARWEN, to_the_lab(WHAT_DE_LANG_WANTS))
+        );
+        assert_eq!(
+            yes_to_all("q3354s"),
+            (DE_LANG, vec![Effect::StartQuest(DE_LANGS_POTION)])
+        );
+        // Once What Parwen Knows is taken, Parwen sends the player back.
+        assert_eq!(NpcScript::for_npc(PARWEN, &with_quests(&[])), None);
+        for completed in [false, true] {
+            let parwen =
+                NpcScript::for_npc(PARWEN, &with_quests(&[(WHAT_PARWEN_KNOWS, completed)]))
+                    .unwrap();
+            assert_eq!(parwen.begin().effects, [Effect::Warp(DRANS_LAB)]);
+        }
+    }
+
+    #[test]
+    fn parwen_s_password_opens_the_secret_passage() {
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(3);
+        let mut parwen = verifying_the_password(rng);
+        parwen.begin();
+        let ask = parwen.respond(ScriptInput::Next).unwrap();
+        assert_eq!(kind(&ask), Some(1));
+        let code = parwen.respond(ScriptInput::Yes).unwrap();
+        let [_, Effect::SetQuestInfo { quest, value }] =
+            &parwen.respond(ScriptInput::Next).unwrap().effects[..]
+        else {
+            panic!("no password");
+        };
+        assert_eq!(*quest, scripts::VERIFYING_THE_PASSWORD);
+        assert_eq!(value.len(), PASSWORD_LEN);
+        assert!(value.bytes().all(|b| PASSWORD_CHARS.contains(&b)));
+        assert!(page_text(&code).contains(value.as_str()), "told once");
+        let mut no = verifying_the_password(rng);
+        no.begin();
+        no.respond(ScriptInput::Next).unwrap();
+        let hurry = no.respond(ScriptInput::No).unwrap();
+        assert_eq!(page_text(&hurry), text(keys::PARWEN_PASSWORD_HURRY));
+        assert!(hurry.effects.is_empty());
+
+        let mut player = with_quests(&[]);
+        assert_eq!(NpcScript::for_npc(SECRET_PASSAGE, &player), None);
+        player.stats.map_id = 261010000;
+        player.quests.upsert(game::quest::QuestRecord {
+            quest_id: scripts::VERIFYING_THE_PASSWORD,
+            status: QuestStatus::Started {
+                kills: Vec::new(),
+                info: Some(value.clone()),
+            },
+        });
+        let door = || NpcScript::for_npc(SECRET_PASSAGE, &player).unwrap();
+        let mut wrong = door();
+        wrong.begin();
+        let said = wrong
+            .respond(ScriptInput::Text("0000000000".into()))
+            .unwrap();
+        assert_eq!(page_text(&said), text(keys::SECRET_PASSAGE_WRONG));
+        assert!(said.effects.is_empty());
+        let mut right = door();
+        right.begin();
+        let opened = right.respond(ScriptInput::Text(value.clone())).unwrap();
+        assert_eq!(
+            opened.effects,
+            [
+                Effect::SetQuestInfo {
+                    quest: scripts::VERIFYING_THE_PASSWORD,
+                    value: "1".into(),
+                },
+                Effect::PortalSound,
+                scripts::through_secret_door(&player),
+            ]
+        );
+        // Given, the door no longer asks.
+        player.quests.set_info(scripts::VERIFYING_THE_PASSWORD, "1");
+        assert_eq!(NpcScript::for_npc(SECRET_PASSAGE, &player), None);
+    }
+
+    #[test]
     fn olson_takes_a_player_on_dollhouse_into_the_room() {
         assert_eq!(NpcScript::for_npc(OLSON, &with_quests(&[])), None);
         assert_eq!(
@@ -16266,7 +16558,7 @@ mod tests {
             step.effects,
             [Effect::SetQuestInfo {
                 quest: SHINING_STONE,
-                value: "5"
+                value: "5".into()
             }]
         );
         // Once marked, or off the quest, it says nothing of its own.

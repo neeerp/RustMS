@@ -547,6 +547,25 @@ pub mod keys {
     pub const MAED_CAPE_LOST: &str = "magatia_cape.maed_lost";
     pub const MAED_CAPE_ASK: &str = "magatia_cape.maed_ask";
     pub const MAED_CAPE_GO: &str = "magatia_cape.maed_go";
+    /// Dr. De Lang in Dran's Lab (`q3320s`, `q3321s`, `q3353s`, `q3354s`),
+    /// Parwen's password (`q3360s`, `{password}`) and the Secret Passage
+    /// asking for it.
+    pub const PARWEN_KNOWS_ASK: &str = "magatia_de_lang.parwen_knows_ask";
+    pub const DE_LANG_MISSING_STORY: &str = "magatia_de_lang.missing_story";
+    pub const DE_LANG_MISSING_HELP: &str = "magatia_de_lang.missing_help";
+    pub const DE_LANG_MISSING_ASK: &str = "magatia_de_lang.missing_ask";
+    pub const DE_LANG_MISSING_PENDANT: &str = "magatia_de_lang.missing_pendant";
+    pub const DE_LANG_MISSING_PIPES: &str = "magatia_de_lang.missing_pipes";
+    pub const DE_LANG_MISSING_GO: &str = "magatia_de_lang.missing_go";
+    pub const PARWEN_DE_LANG_WANTS: &str = "magatia_de_lang.parwen_wants";
+    pub const PARWEN_DE_LANG_WANTS_ASK: &str = "magatia_de_lang.parwen_wants_ask";
+    pub const DE_LANG_POTION_ASK: &str = "magatia_de_lang.potion_ask";
+    pub const PARWEN_PASSWORD_KEY: &str = "magatia_de_lang.password_key";
+    pub const PARWEN_PASSWORD_ASK: &str = "magatia_de_lang.password_ask";
+    pub const PARWEN_PASSWORD_HURRY: &str = "magatia_de_lang.password_hurry";
+    pub const PARWEN_PASSWORD_CODE: &str = "magatia_de_lang.password_code";
+    pub const SECRET_PASSAGE_PASSWORD: &str = "magatia_de_lang.passage_password";
+    pub const SECRET_PASSAGE_WRONG: &str = "magatia_de_lang.passage_wrong";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -2953,6 +2972,22 @@ mod tests {
             keys::MAED_CAPE_LOST,
             keys::MAED_CAPE_ASK,
             keys::MAED_CAPE_GO,
+            keys::PARWEN_KNOWS_ASK,
+            keys::DE_LANG_MISSING_STORY,
+            keys::DE_LANG_MISSING_HELP,
+            keys::DE_LANG_MISSING_ASK,
+            keys::DE_LANG_MISSING_PENDANT,
+            keys::DE_LANG_MISSING_PIPES,
+            keys::DE_LANG_MISSING_GO,
+            keys::PARWEN_DE_LANG_WANTS,
+            keys::PARWEN_DE_LANG_WANTS_ASK,
+            keys::DE_LANG_POTION_ASK,
+            keys::PARWEN_PASSWORD_KEY,
+            keys::PARWEN_PASSWORD_ASK,
+            keys::PARWEN_PASSWORD_HURRY,
+            keys::PARWEN_PASSWORD_CODE,
+            keys::SECRET_PASSAGE_PASSWORD,
+            keys::SECRET_PASSAGE_WRONG,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

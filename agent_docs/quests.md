@@ -283,6 +283,19 @@ lost cape again: their start scripts `q3305s` and `q3306s` ask before starting
 "Re-acquiring Zenumist/Alcadno Cape", whose start and end checks and rewards
 (5 Emeralds or Topazes, 10 Leather, 10,000 mesos, every 4,320 minutes) are the
 data's. Their text is unsourced.
+Dr. De Lang (2111002) hides in Dran's Lab (926120200), which has no portal;
+its forced return is Parwen's map (261020401). Parwen's (2111006) start scripts
+`q3320s` and `q3353s` ask, then start "What Parwen Knows" or "What De Lang
+Wants" and send the player there (Cosmic `3320.js`, `3353.js`), and once 3320
+is taken a click on Parwen does the same (Cosmic `2111006.js`). De Lang's
+`q3321s` and `q3354s` ask and start "Dr. De Lang, the Missing Alchemist" and
+"De Lang's Potion"; the ends are the data's. Parwen's `q3360s` makes up a
+password of ten digits and capitals, says it once, and starts "Verifying the
+Password" (an info quest) with it as the info (Cosmic `3360.js`): a script's
+`SetQuestInfo` after its `StartQuest` of the same quest sets the string the
+quest starts with. The Secret Passage (2111024) asks for it at the secret
+door, and the right one sets the info to `1`, which the data's end checks (see
+`map-travel.md`). Their text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -486,7 +499,9 @@ the quest deletes them with it (`db::quest::forfeit`). They are `QuestStatus::St
 character if it reads what it should, sending the quest record again;
 otherwise nothing in its script applies. `Effect::SetQuestInfo`
 (`QuestLog::set_info`) sets a started quest's whole string, and does
-nothing if it already reads so. A quest whose start sets no string
+nothing if it already reads so; after a `StartQuest` of the same quest in
+the same script, it is the string the quest starts with (`commit_player`
+keeps it). A quest whose start sets no string
 (`Act/0/info`) starts with an empty one.
 
 | Quest | String | Set by |
@@ -498,6 +513,7 @@ nothing if it already reads so. A quest whose start sets no string
 | 3311 Clue | "4" to "5" | the wall in the missing alchemist's home (2111011), after a yes |
 | 2166 Shining Stone | "" to "5" | the Shiny Stone (1092016, `nautil_stone`) in the Nautilus's Generator Room (120000301); Sharyl (1092003) completes it |
 | 2236 How to Shoo Away the Evil | "000000" to "111111" | the six Shaman Rocks (1063012 on 105050200, 105060000, 105070000; 1063013 twice on 105090000 and once on 105090100), each taking one charm (4032263) |
+| 3360 Verifying the Password | Parwen's password, set with the start, to "1" | Parwen's start script (`q3360s`); the Secret Passage (2111024) at the secret door |
 
 Cosmic's scripts gave the slots and digits. The houses are silent, as
 there; the walls', the oasis's, the stone's and the rocks' words are
@@ -735,5 +751,7 @@ copied into the source.
   clock, Sahel 1, level 30),
   `magatia_societies` (Han's ore choice for both tests, Carson's cape again,
   Maed's ask and its no),
+  `magatia_de_lang` (Parwen's and De Lang's starts and the lab, Parwen's
+  password at the secret door, wrong and right),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
