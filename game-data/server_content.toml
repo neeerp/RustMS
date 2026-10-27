@@ -1088,6 +1088,7 @@ unsourced = [
     "line3.jake.short",
     "line3.jake.full",
     "line3.gate.menu",
+    "line3.gate.square",
     "line3.gate.site",
     "line3.gate.subway",
     "line3.gate.tickets",

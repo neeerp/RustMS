@@ -187,9 +187,9 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 - The subway's ticket gates (`SUBWAY_GATES`: 1052007 in Kerning City,
   9201068 in New Leaf City) ask first, as `NLC_Move` does, and only then
   look for the ticket; a late yes is refused as at the ushers. Kerning
-  City's gate first asks where to: Line 3's construction sites (see
-  `agent_docs/map-travel.md`) or the subway. Its original menu also offered
-  Kerning Square.
+  City's gate first asks where to: the free train to Kerning Square (see
+  "Rides on a countdown"), Line 3's construction sites (see
+  `agent_docs/map-travel.md`) or the subway.
 - Bell (9201057, `NLC_ticketing`) sells the ticket for the line leaving her
   platform from a one-choice menu, and in a waiting room lets the rider back
   out to its platform. The text is under the `subway.*` keys, from
@@ -197,7 +197,8 @@ The NPCs are in `net/src/npc_scripts.rs`, with placeholder lines under the
 
 ## Rides on a countdown
 
-The ferries to Ereve and Rien and the crane between Orbis and Mu Lung keep
+The ferries to Ereve and Rien, the crane between Orbis and Mu Lung, and
+the train between Kerning City's subway and Kerning Square keep
 no timetable: a player boards when they like and rides alone
 (`net/src/rides.rs`). The pilot or the crane sells the ride from a
 one-choice menu and a Yes or No on the fare, and the yes warps the player
@@ -216,15 +217,21 @@ CLOCK kind 2, scaled like the route clock (`RUSTMS_CONTI_SCALE`).
 | `200090070` | Puro `1200003`, Rien | 800 | 1 min | Lith Harbor, id 3 |
 | `200090300` | The crane `2090005`, Orbis Station `200000141` | 1500 | 1 min | Mu Lung Temple `250000100`, id 0 |
 | `200090310` | The crane, Mu Lung Temple | 1500 | 1 min | `200000141`, id 0 |
+| `103000301` | Kerning City's gate `1052007`, ticketing booth `103000100` | free | 10 s | Kerning Square Station `103000310`, id 0 |
+| `103000302` | Kerning Square Station's `out00` (`Depart_ToKerning`) | free | 10 s | `103000100`, id 0 |
 
 The crane also goes straight between Mu Lung Temple and Herb Town
 (`251000000`) for 500; from Herb Town it is a bare Yes or No. Falling off a
 ride map (its `hd*` portals) lands back on the dock it left. Logging out
 lands on its `forcedReturn`, which is that dock too, except on the two Rien
-ferries, whose `forcedReturn` (Map.nx) is where they arrive. The fares and lengths are Cosmic's. The
-text is under the unsourced `ferry.*` keys. Ellinia's `inERShip` and Rien's
-`enterPort` lead down to the docks (`map-travel.md`). `ferries.rs` checks
-Rien both ways, the crane and Herb Town, and a logout mid-ride.
+ferries and the train back from Kerning Square, whose `forcedReturn`
+(Map.nx) is where they arrive. The fares and lengths are Cosmic's. Cosmic
+also floats a line about the next stop over the train; RustMS doesn't. The
+text is under the unsourced `ferry.*` keys and `line3.gate.square`.
+Ellinia's `inERShip` and Rien's `enterPort` lead down to the docks
+(`map-travel.md`), and Kerning Square Station's `enter00` up into Kerning
+Square (`103040000`). `ferries.rs` checks Rien both ways, the crane and
+Herb Town, the Kerning Square train both ways, and a logout mid-ride.
 
 ## Packets
 
@@ -275,7 +282,4 @@ again before it has finished docking.
 
 ## Not yet
 
-- Kerning City gate's Kerning Square choice.
-- Corba's dragon flight to Leafre.
 - Ariant arrivals use the town's first `sp` portal; Cosmic uses the second.
-- CLOCK countdown kinds 0 and 3.

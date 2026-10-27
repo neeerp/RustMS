@@ -350,8 +350,8 @@ const OUTSIDE_ARIANT: i32 = 260020000;
 const MAGATIA: i32 = 261000000;
 const ARIANT: i32 = 260000000;
 /// The subway's ticket gates: Kerning City's (`subway_in`, whose menu also
-/// offers Line 3's construction sites, and Kerning Square, left out until
-/// it runs) and New Leaf City's (`NLC_Move`).
+/// offers the free train to Kerning Square and Line 3's construction
+/// sites) and New Leaf City's (`NLC_Move`).
 const SUBWAY_GATES: [(i32, &Route); 2] = [
     (KERNING_CITY_GATE, &conti::TO_NLC),
     (9201068, &conti::TO_KERNING_CITY),
@@ -6789,6 +6789,13 @@ fn subway_gate(npc_id: i32, route: &Route, player: &Player, t: i64) -> NpcScript
         pages = vec![Page::Menu {
             text: text(keys::LINE3_GATE_MENU),
             choices: vec![
+                (
+                    text(keys::LINE3_GATE_SQUARE),
+                    vec![Page::Done(vec![Effect::WarpToPortal(
+                        rides::KERNING_TO_SQUARE.map,
+                        0,
+                    )])],
+                ),
                 (text(keys::LINE3_GATE_SITE), construction_site(player)),
                 (text(keys::LINE3_GATE_SUBWAY), pages),
             ],
@@ -16854,11 +16861,18 @@ mod tests {
             1,
             game::Item::stack(conti::TO_NLC.ticket, 1),
         );
-        // Kerning City's gate asks where to first; the subway is second.
+        // Kerning City's gate asks where to first: the train to Kerning
+        // Square boards at once, and the subway is third.
+        let mut gate = subway_gate(KERNING_CITY_GATE, &conti::TO_NLC, &holder, minute(2));
+        gate.begin();
+        assert_eq!(
+            gate.respond(ScriptInput::Select(0)).unwrap().effects,
+            [Effect::WarpToPortal(rides::KERNING_TO_SQUARE.map, 0)]
+        );
         let mut gate = subway_gate(KERNING_CITY_GATE, &conti::TO_NLC, &holder, minute(2));
         assert_eq!(kind(&gate.begin()), Some(4));
         assert_eq!(
-            kind(&gate.respond(ScriptInput::Select(1)).unwrap()),
+            kind(&gate.respond(ScriptInput::Select(2)).unwrap()),
             Some(1)
         );
         assert_eq!(
@@ -16887,7 +16901,7 @@ mod tests {
             let mut gate = subway_gate(npc, route, &both, minute(2));
             gate.begin();
             if npc == KERNING_CITY_GATE {
-                gate.respond(ScriptInput::Select(1));
+                gate.respond(ScriptInput::Select(2));
             }
             assert!(gate
                 .respond(ScriptInput::Yes)
@@ -16913,7 +16927,7 @@ mod tests {
         for t in [minute(4), minute(5)] {
             let mut gate = subway_gate(KERNING_CITY_GATE, &conti::TO_NLC, &holder, t);
             gate.begin();
-            let closed = gate.respond(ScriptInput::Select(1)).unwrap();
+            let closed = gate.respond(ScriptInput::Select(2)).unwrap();
             assert_eq!(buttons(&closed), (false, false));
         }
 
@@ -19295,7 +19309,7 @@ mod tests {
             .respond(ScriptInput::Next)
             .is_none_or(|step| step.prompt.is_none()));
 
-        // The gate's first choice offers the site tickets held.
+        // The gate's second choice offers the site tickets held.
         let mut holder = traveller(30, 0, false);
         for (slot, ticket) in [(1, 4031036), (2, 4031038)] {
             holder
@@ -19304,7 +19318,7 @@ mod tests {
         }
         let mut gate = NpcScript::for_npc(KERNING_CITY_GATE, &holder).unwrap();
         gate.begin();
-        let held = menu(gate.respond(ScriptInput::Select(0)).unwrap());
+        let held = menu(gate.respond(ScriptInput::Select(1)).unwrap());
         assert!(held.contains("#t4031036#") && !held.contains("#t4031037#"));
         let b3 = 103000906;
         assert_eq!(
@@ -19320,7 +19334,7 @@ mod tests {
         // Without one, a word.
         let mut gate = NpcScript::for_npc(KERNING_CITY_GATE, &traveller(30, 0, false)).unwrap();
         gate.begin();
-        let none = gate.respond(ScriptInput::Select(0)).unwrap();
+        let none = gate.respond(ScriptInput::Select(1)).unwrap();
         assert!(none.effects.is_empty());
         assert_eq!(kind(&none), Some(0));
 

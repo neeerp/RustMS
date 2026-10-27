@@ -1477,6 +1477,7 @@
 "line3.jake.short" = "[placeholder] A ticket costs {price} mesos. You don't have enough."
 "line3.jake.full" = "[placeholder] Make room in your Etc. inventory for the ticket first."
 "line3.gate.menu" = "[placeholder] The ticket reader. Where are you going?"
+"line3.gate.square" = "[placeholder] The train to Kerning Square"
 "line3.gate.site" = "[placeholder] The construction site"
 "line3.gate.subway" = "[placeholder] The subway to New Leaf City"
 "line3.gate.tickets" = "[placeholder] Which ticket will you use? You'll go in at once."
