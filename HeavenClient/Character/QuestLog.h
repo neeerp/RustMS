@@ -72,6 +72,9 @@ namespace ms
 		void set_record_ex(int16_t id, const std::string& raw);
 		// The value under `key` in quest `id`'s record, or "".
 		std::string record_ex(int16_t id, const std::string& key) const;
+		// How many party quests' records (1200-1399) are at `rank`, one per
+		// quest (0x724722).
+		int32_t rank_count(const std::string& rank) const;
 		int16_t state(int16_t id) const;
 		std::vector<int16_t> available_quests(int16_t job, int16_t level,
 			const std::function<bool(const QuestInfo&)>& holds, bool all_levels = false) const;

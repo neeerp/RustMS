@@ -37,6 +37,21 @@ int main()
 		require(token("gvup", [&](const std::string& key) { return value(carnival, key); }) == "1",
 				"give-ups are the tries less the rest");
 
+		using ms::QuestRecordEx::RankS;
+		require(token("scnt", none, RankS { 9, 5 }) == "9", "the S count, unclamped");
+		require(token("perPqS", none, RankS { 0, 5 }) == "0", "no S ranks is 0%");
+		require(token("perPqS", none, RankS { 3, 5 }) == "60", "three of five is 60%");
+		require(token("perPqS", none, RankS { 9, 5 }) == "100", "more than the need is 100%");
+		require(token("perPqS", none, RankS { 3, 0 }) == "0", "no need is 0%");
+		require(token("gaugePqS", none, RankS { 3, 5 }) == "#fUI/UIWindow.img/Quest/Gauge2/frame/45#", "the gauge's slices");
+		require(token("gaugePqS", none, RankS { 9, 5 }) == "#fUI/UIWindow.img/Quest/Gauge2/frame/75#", "a full gauge");
+
+		using ms::QuestRecordEx::gauge_slices;
+		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/45") == 45, "a gauge's path");
+		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/0") == 0, "an empty gauge");
+		require(gauge_slices("UI/UIWindow.img/Quest/Gauge2/frame/") == -1, "no slices");
+		require(gauge_slices("UI/Basic.img/PQuestRank/S") == -1, "another image");
+
 		std::cout << "Quest record ex passed\n";
 		return 0;
 	}

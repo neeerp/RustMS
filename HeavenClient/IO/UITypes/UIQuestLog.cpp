@@ -28,6 +28,7 @@
 #include "../../Constants.h"
 #include "../../Character/QuestRequirements.h"
 #include "../../Character/QuestCatalog.h"
+#include "../../Character/QuestMarker.h"
 #include "../../Character/QuestRecordEx.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
@@ -148,11 +149,14 @@ namespace ms
 		}
 
 		// A #j token (#jtry#, #jrank#...) from the quest's record beside the
-		// quest log.
+		// quest log, or the party quests at rank S against its partyQuest_S.
 		std::string record_token(const std::string& key, int16_t quest_id)
 		{
 			const auto& quests = Stage::get().get_player().get_quests();
-			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); });
+			int32_t need = nl::nx::quest["Check.img"][std::to_string(quest_id)]["1"]["partyQuest_S"].get_integer();
+			QuestRecordEx::RankS rank_s { quests.rank_count("S"), need };
+
+			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); }, rank_s);
 		}
 
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
@@ -247,6 +251,58 @@ namespace ms
 	std::string quest_text(const std::string& text, int16_t quest_id)
 	{
 		return quest_counts(text, quest_id);
+	}
+
+	void QuestTextImages::set(const std::vector<NpcTextMarkup::InlineImage>& tags, Text& description)
+	{
+		images.clear();
+		std::vector<Point<int16_t>> boxes;
+
+		if (!gauge_slice.is_valid())
+			gauge_slice = path_image(QuestRecordEx::GAUGE_SLICE);
+
+		for (const auto& tag : tags)
+		{
+			Image image;
+
+			if ((tag.tag == 'i' || tag.tag == 'v') && tag.arg.size() <= 9 && ItemData::get(std::stoi(tag.arg)).is_valid())
+			{
+				image.texture = ItemData::get(std::stoi(tag.arg)).get_icon(false);
+				image.size = Point<int16_t>(ICON_SIZE, ICON_SIZE);
+				image.anchor = Point<int16_t>(0, ICON_SIZE);
+			}
+			else if (tag.tag == 'f' || tag.tag == 'F')
+			{
+				image.slices = QuestRecordEx::gauge_slices(tag.arg);
+				image.texture = path_image(image.slices < 0 ? tag.arg : tag.arg.substr(0, tag.arg.rfind('/')));
+				image.size = image.texture.get_dimensions();
+				image.anchor = image.texture.get_origin();
+			}
+
+			// Anything else is left out.
+			boxes.push_back(image.texture.is_valid() ? image.size : Point<int16_t>());
+			images.push_back(image);
+		}
+
+		description.set_boxes(boxes);
+	}
+
+	void QuestTextImages::draw(const Text& description, Point<int16_t> text, Range<int16_t> clip) const
+	{
+		for (size_t i = 0; i < images.size(); i++)
+		{
+			const Image& image = images[i];
+			Point<int16_t> box = text + description.box_position(i);
+
+			if (!image.texture.is_valid() || box.y() < clip.first() || box.y() + image.size.y() > clip.second())
+				continue;
+
+			image.texture.draw(box + image.anchor);
+
+			// A gauge's slices go one pixel apart from (2, 3) in its frame.
+			for (int32_t slice = 0; slice < image.slices; slice++)
+				gauge_slice.draw(box + Point<int16_t>(static_cast<int16_t>(slice + 2), 3) + gauge_slice.get_origin());
+		}
 	}
 
 	UIQuestLog::UIQuestLog(const QuestLog& ql) : UIDragElement<PosQUEST>(), questlog(ql)
@@ -367,6 +423,7 @@ namespace ms
 		auto goals = objectives(id);
 
 		return std::all_of(goals.begin(), goals.end(), [](const QuestObjective& goal) { return goal.met(); })
+			&& party_rank_met(*QuestCatalog::get().find(id), questlog.rank_count("S"))
 			? Icon::READY : Icon::IN_PROGRESS;
 	}
 
@@ -503,36 +560,8 @@ namespace ms
 		std::vector<NpcTextMarkup::InlineImage> tags;
 		text = NpcTextMarkup::expand(quest_counts(text, selected), lookups, &tags);
 
-		// Item icons and images by path (a party quest's rank) take a box in
-		// the text; anything else is left out.
-		icons.clear();
-		std::vector<Point<int16_t>> boxes;
-
-		for (const auto& tag : tags)
-		{
-			Texture icon;
-			Point<int16_t> size;
-			Point<int16_t> anchor;
-
-			if ((tag.tag == 'i' || tag.tag == 'v') && tag.arg.size() <= 9 && ItemData::get(std::stoi(tag.arg)).is_valid())
-			{
-				icon = ItemData::get(std::stoi(tag.arg)).get_icon(false);
-				size = Point<int16_t>(ICON_SIZE, ICON_SIZE);
-				anchor = Point<int16_t>(0, ICON_SIZE);
-			}
-			else if (tag.tag == 'f' || tag.tag == 'F')
-			{
-				icon = path_image(tag.arg);
-				size = icon.get_dimensions();
-				anchor = icon.get_origin();
-			}
-
-			boxes.push_back(icon.is_valid() ? size : Point<int16_t>());
-			icons.push_back({ icon, icons.size(), size, anchor });
-		}
-
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK, text, TEXT_WIDTH);
-		description.set_boxes(boxes);
+		images.set(tags, description);
 
 		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
 		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
@@ -638,14 +667,7 @@ namespace ms
 			Range<int16_t> clip = Range<int16_t>(detail.y() + TEXT_VIEW.first(), detail.y() + TEXT_VIEW.second());
 			Point<int16_t> text = detail + TEXT_POS - Point<int16_t>(0, detail_offset * TEXT_STEP);
 
-			for (const auto& icon : icons)
-			{
-				Point<int16_t> box = text + description.box_position(icon.box);
-
-				if (icon.texture.is_valid() && box.y() >= clip.first() && box.y() + icon.size.y() <= clip.second())
-					icon.texture.draw(box + icon.anchor);
-			}
-
+			images.draw(description, text, clip);
 			description.draw(text, clip);
 			detail_slider.draw(position);
 		}

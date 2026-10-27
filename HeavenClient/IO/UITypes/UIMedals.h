@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../UIDragElement.h"
+#include "UIQuestLog.h"
 
 #include "../Components/Slider.h"
 
@@ -96,6 +97,7 @@ namespace ms
 		int16_t selected = -1, detail_offset = 0;
 		medal_list::State selected_state = medal_list::OBTAINABLE;
 		Text title, requirement, description;
+		QuestTextImages images;
 		Point<int16_t> cursor_relative;
 		bool tooltip = false;
 

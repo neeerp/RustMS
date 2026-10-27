@@ -89,6 +89,8 @@ pub enum QuestRejection {
     /// The mount's level is out of the quest's range
     /// (`tamingmoblevelmin`).
     MountLevel,
+    /// Too few party quests at rank S (`partyQuest_S`).
+    PartyQuestRank,
     /// Too few quests completed (`questComplete`).
     CompletedQuests,
     /// The item rewards don't fit.
@@ -348,6 +350,13 @@ pub fn check_complete(
     if !book_met(quest, player) {
         return Err(QuestRejection::MonsterBook);
     }
+    // The client counts records at rank S before the quests completed.
+    if quest
+        .end_party_quest_s
+        .is_some_and(|least| player.quest_ex.rank_count("S") < usize::try_from(least).unwrap_or(0))
+    {
+        return Err(QuestRejection::PartyQuestRank);
+    }
     if quest.end_completed_quests.is_some_and(|least| {
         player.quests.completed().count() < usize::try_from(least).unwrap_or(0)
     }) {
@@ -566,6 +575,7 @@ pub fn apply_skills(skills: &[QuestSkill], player: &mut Player) -> Vec<SkillReco
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game::quest_ex::QuestExRecords;
     use game::QuestRecord;
 
     fn quest() -> QuestTemplate {
@@ -598,6 +608,7 @@ mod tests {
             end_book_max: None,
             end_cards: vec![],
             end_completed_quests: None,
+            end_party_quest_s: None,
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -877,6 +888,22 @@ mod tests {
             Err(QuestRejection::CompletedQuests)
         );
         set(&mut p, 1001, QuestState::Completed);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
+    }
+
+    #[test]
+    fn complete_needs_party_quests_at_rank_s() {
+        let mut q = quest();
+        q.end_party_quest_s = Some(2);
+        let mut p = player(30, 0);
+        set(&mut p, 1033, QuestState::Started);
+        p.quest_ex =
+            QuestExRecords::from_raw([(1200, "rank=S".to_string()), (1201, "rank=A".to_string())]);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::PartyQuestRank)
+        );
+        p.quest_ex.set(1201, "rank", "S");
         assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 

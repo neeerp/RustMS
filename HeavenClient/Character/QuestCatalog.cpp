@@ -147,6 +147,7 @@ namespace ms
 			info.end_except_buff = static_cast<int32_t>(end["exceptbuff"].get_integer());
 			info.end_book_min = static_cast<int32_t>(end["mbmin"].get_integer(-1));
 			info.end_book_max = static_cast<int32_t>(end["mbmax"].get_integer(-1));
+			info.end_party_quest_s = static_cast<int32_t>(end["partyQuest_S"].get_integer(-1));
 
 			for (auto card : end["mbcard"])
 				info.end_cards.emplace_back(static_cast<int32_t>(card["id"].get_integer()),

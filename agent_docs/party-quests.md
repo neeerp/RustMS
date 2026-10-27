@@ -301,6 +301,8 @@ of Poison Haze's 1206 and the Monster Carnival's 1301
   leaving a won quest, by when the reward is usually had.
 - `rank` follows the wins (`cmp + vic`): S from 100, A 50, B 30, C 10, D 1,
   else F. The client has no rule of its own (`v83ref` QUESTIONS b244).
+  Dalair's PQ Mania (29000) wants five party quests at S (`partyQuest_S`
+  in `quests.md`).
 
 ## Clearing a stage
 

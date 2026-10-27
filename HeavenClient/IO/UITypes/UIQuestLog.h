@@ -28,6 +28,7 @@
 #include "../../Character/QuestLog.h"
 #include "../../Character/QuestObjectives.h"
 #include "../../Graphics/Animation.h"
+#include "../../Util/NpcTextMarkup.h"
 
 namespace ms
 {
@@ -36,6 +37,31 @@ namespace ms
 	// kill count and #R a quest's record. Line breaks become the renderer's
 	// escapes.
 	std::string quest_text(const std::string& text, int16_t quest_id);
+
+	// The images in a quest's text, each in a box of the text: item icons
+	// (#i, #v) and images by path (a party quest's rank, PQ Mania's gauge).
+	class QuestTextImages
+	{
+	public:
+		// Take the images of `tags` and give `description` their boxes.
+		void set(const std::vector<NpcTextMarkup::InlineImage>& tags, Text& description);
+		// Draw those wholly inside `clip`, the text drawn at `text`.
+		void draw(const Text& description, Point<int16_t> text, Range<int16_t> clip) const;
+
+	private:
+		struct Image
+		{
+			Texture texture;
+			// The box's size, and where in it the texture's origin goes.
+			Point<int16_t> size;
+			Point<int16_t> anchor;
+			// A gauge's slices (#jgaugePqS#), or -1 for a plain image.
+			int32_t slices = -1;
+		};
+
+		std::vector<Image> images;
+		Texture gauge_slice;
+	};
 
 	// The v83 quest log (UIClassic.nx, UIWindow.img/Quest): the list of
 	// quests by area, and beside it the selected quest's details.
@@ -100,16 +126,6 @@ namespace ms
 			Icon icon;
 		};
 
-		// An item icon in the description, in the text's n-th box.
-		struct InlineIcon
-		{
-			Texture texture;
-			size_t box;
-			// The box's size, and where in it the texture's origin goes.
-			Point<int16_t> size;
-			Point<int16_t> anchor;
-		};
-
 		void change_tab(uint16_t tabid);
 		void refresh_list();
 		void select_quest(int16_t id);
@@ -136,7 +152,7 @@ namespace ms
 		std::set<int16_t> folded[3];
 		Animation portrait;
 		Text title, jobs, levels, description;
-		std::vector<InlineIcon> icons;
+		QuestTextImages images;
 		std::vector<QuestObjective> shown_goals;
 		bool details_open = false;
 		int16_t selected = -1, list_offset = 0, detail_offset = 0;
