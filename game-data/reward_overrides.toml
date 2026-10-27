@@ -327,3 +327,8 @@ add = [{ item = 4031992, prob = 0.1, quest = 3250 }]
 # Rapid Growth Stimulators (21737). Cosmic gives the drop to 9300347,
 # which nothing spawns; the path holds 9300378.
 add = [{ item = 4032324, prob = 0.04, quest = 21737 }]
+
+[mobs.5250002]
+# The Ellin Forest Rocky Mountain's monsters, for the keys Kanderun
+# (2132000) asks for in Find the Key (21752), as Cosmic gives them.
+add = [{ item = 4032326, prob = 0.1, quest = 21752 }]

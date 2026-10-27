@@ -95,7 +95,8 @@ pub const SCRIPTS: &[&str] = &[
     "q29913s", "q29914s", "q29915s", "q29916s", "q29917s", "q29918s", "q29919s", "q29920s",
     "q29921s", "q29933s", "q21733s", "q21733e", "q21734s", "q21734e", "q21735s", "q21735e",
     "q21736s", "q21738s", "q21739e", "q21740s", "q21740e", "q21741s", "q21742s", "q21742e",
-    "q3250s", "q3250e",
+    "q21746s", "q21747s", "q21747e", "q21748e", "q21749s", "q21750e", "q21753s", "q21754s",
+    "q21757e", "q3250s", "q3250e",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -170,8 +171,11 @@ pub const RECORD_QUESTS: &[(i16, i16)] = &[
 /// (`Check/0 infoNumber` names it, `infoex` the value), which a script sets
 /// (`game::quest::RECORDS`): `(quest, record)`. The Test (2312) waits for
 /// the Mushroom Kingdom's opening scene (`TD_MC_Openning`) to set 2311.
+/// An Aran's "The Lost Seal Stone of Ellin Forest" (21753) waits for 21764,
+/// set on entering Ellin's warehouse, and "Info on Another Seal Stone"
+/// (21754) for 21765, set on entering the Bowman Instructional School.
 /// See [`StartRequirements::record`].
-pub const START_RECORD_QUESTS: &[(i16, i16)] = &[(2312, 2311)];
+pub const START_RECORD_QUESTS: &[(i16, i16)] = &[(2312, 2311), (21753, 21764), (21754, 21765)];
 /// "What Meren Dropped" (6034) repeats its start requirements in `Act/0`,
 /// with a `skill` 1007 entry (`acquire` 65535) that teaches nothing (Cosmic
 /// has the same data); none of it is an action.

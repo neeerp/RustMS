@@ -1060,6 +1060,8 @@ pub enum OnText {
     SecretPassage { password: String, through: Effect },
     /// The Puppeteer's door lets one who is `hunting` him through.
     PuppeteerDoor { hunting: bool },
+    /// The Sealed Shrine's pillar lets one `hunting` its Shadow Knight in.
+    ShrinePillar { hunting: bool },
 }
 
 impl OnText {
@@ -1071,6 +1073,7 @@ impl OnText {
                 secret_passage_opens(text == password, through)
             }
             OnText::PuppeteerDoor { hunting } => puppeteer_door_opens(text, *hunting),
+            OnText::ShrinePillar { hunting } => shrine_pillar_opens(text, *hunting),
         }
     }
 }
@@ -2182,6 +2185,7 @@ impl NpcScript {
             FRANCIS => return Some(francis()),
             PASSAGE_END_STATUE => return Some(passage_end_statue()),
             PASSAGE_EXIT_STATUE => return Some(passage_exit_statue()),
+            SHRINE_PILLAR => return Some(shrine_pillar(player)),
             _ => {}
         }
         // These fall through when silent, so the same NPCs can say more.
@@ -2596,6 +2600,15 @@ impl NpcScript {
             "q21741s" => Some(off_to_mu_lung()),
             "q21742s" => Some(black_scroll(player)),
             "q21742e" => Some(black_scroll_read()),
+            "q21746s" => Some(mu_gongs_test()),
+            "q21747s" => Some(catch_the_shadow_knight()),
+            "q21747e" => Some(shadow_knight_caught()),
+            "q21748e" => Some(lilin_teaches_final_charge()),
+            "q21749s" => Some(back_to_the_past()),
+            "q21750e" => Some(athena_remembers()),
+            "q21753s" => Some(athena_keeps_the_letter()),
+            "q21754s" => Some(athena_hands_over_the_letter(player)),
+            "q21757e" => Some(neinheart_takes_the_letter()),
             "q3250s" => Some(baby_bird_offer(player)),
             "q3250e" => Some(baby_bird_grown()),
             "q6030e" => Some(maker_class(CARSON, keys::MAKER_ALCHEMY, 6030)),
@@ -4986,6 +4999,212 @@ fn black_scroll_read() -> NpcScript {
         Effect::CompleteQuest(THE_BLACK_SCROLL),
     ];
     script
+}
+
+const MU_GONG: i32 = 2091007;
+const MU_GONGS_TEST: i16 = 21746;
+const SHADOW_KNIGHT_CAUGHT_EXP: i32 = 16000;
+const STOLEN_SEAL_STONE_OF_MU_LUNG: i16 = 21748;
+const FINAL_CHARGE: i32 = 21100002;
+const BACK_TO_THE_PAST: i16 = 21749;
+const ATHENA_PIERCE_OF_ELLIN: i32 = 2131000;
+const SHE_REMEMBERS_ME: i16 = 21750;
+const LOST_SEAL_STONE: i16 = 21753;
+const ATHENA_PIERCE: i32 = 1012100;
+const INFO_ON_ANOTHER_SEAL_STONE: i16 = 21754;
+const ATHENAS_LETTER: i32 = 4032328;
+const NEINHEART: i32 = 1101002;
+const NEINHEART_THE_STRATEGIST: i16 = 21757;
+const LETTER_TO_THE_EMPRESS: i32 = 4032330;
+
+/// `q21746s`: Mu Gong tests an Aran against a clone in the arena, one
+/// challenger at a time (Cosmic `21746.js`). The data ends it with 5,000
+/// EXP; one who leaves before winning forfeits and starts again (its
+/// `Say.img/21746/1` stop line).
+fn mu_gongs_test() -> NpcScript {
+    let mut script = NpcScript::new(MU_GONG, vec![Page::Say(text(keys::MU_GONG_TEST))]);
+    script.on_end = vec![
+        Effect::RequireEmptyMap(scripts::MU_GONGS_ARENA),
+        Effect::StartQuest(MU_GONGS_TEST),
+        Effect::WarpToPortal(scripts::MU_GONGS_ARENA, 0),
+    ];
+    script.refused = Some(text(keys::MU_GONG_ARENA_BUSY));
+    script
+}
+
+/// `q21747s`: Mu Gong sends an Aran after the Shadow Knight in the Sealed
+/// Shrine, with the pillar's password (Cosmic `21747.js`; the password is
+/// `QuestInfo/21747/1`'s).
+fn catch_the_shadow_knight() -> NpcScript {
+    let [ask, password] = keys::MU_GONG_SHADOW_KNIGHT;
+    NpcScript::new(
+        MU_GONG,
+        vec![
+            Page::Ask {
+                text: text(ask),
+                on_yes: vec![Effect::StartQuest(scripts::CATCH_THE_SHADOW_KNIGHT)],
+                on_no: None,
+            },
+            Page::Say(text(password)),
+        ],
+    )
+}
+
+/// `q21747e`: the Shadow Knight beaten but the stone taken, Mu Gong gives
+/// 16,000 EXP (Cosmic `21747.js`).
+fn shadow_knight_caught() -> NpcScript {
+    let mut script = NpcScript::new(
+        MU_GONG,
+        keys::MU_GONG_STONE_TAKEN
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![
+        Effect::GainExp(SHADOW_KNIGHT_CAUGHT_EXP),
+        Effect::CompleteQuest(scripts::CATCH_THE_SHADOW_KNIGHT),
+    ];
+    script
+}
+
+/// `q21748e`: Lilin hears of the Mu Lung seal stone and teaches Final
+/// Charge, up to 30, its levels in Skill.img, with 20,000 EXP (Cosmic
+/// `21748.js`).
+fn lilin_teaches_final_charge() -> NpcScript {
+    let mut script = NpcScript::new(
+        LILIN,
+        keys::LILIN_FINAL_CHARGE
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![
+        Effect::CompleteQuest(STOLEN_SEAL_STONE_OF_MU_LUNG),
+        Effect::GainExp(20000),
+        Effect::TeachSkill {
+            skill_id: FINAL_CHARGE,
+            level: 0,
+            master_level: 30,
+        },
+    ];
+    script
+}
+
+/// `q21749s`: Tru tells an Aran of Ludibrium's broken clocktower, a way
+/// into the past. Cosmic completes it here; the data ends it at Tru with
+/// 500 EXP (`Check.img/21749/1`).
+fn back_to_the_past() -> NpcScript {
+    let mut script = NpcScript::new(
+        TRU,
+        keys::TRU_BACK_TO_THE_PAST
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![Effect::StartQuest(BACK_TO_THE_PAST)];
+    script
+}
+
+/// `q21750e`: Athena Pierce of the past knows the Aran (Cosmic
+/// `21750.js`). The quest gives nothing.
+fn athena_remembers() -> NpcScript {
+    let mut script = NpcScript::new(
+        ATHENA_PIERCE_OF_ELLIN,
+        keys::ATHENA_REMEMBERS
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![Effect::CompleteQuest(SHE_REMEMBERS_ME)];
+    script
+}
+
+/// `q21753s`: the stone gone with the Gentleman, Athena Pierce promises to
+/// carry a letter to the Aran's own time (Cosmic `21753.js`). Tru ends it
+/// with the data's 20,000 EXP.
+fn athena_keeps_the_letter() -> NpcScript {
+    let mut script = NpcScript::new(
+        ATHENA_PIERCE_OF_ELLIN,
+        keys::ATHENA_LETTER_PROMISE
+            .map(|key| Page::Say(text(key)))
+            .to_vec(),
+    );
+    script.on_end = vec![Effect::StartQuest(LOST_SEAL_STONE)];
+    script
+}
+
+/// `q21754s`: Athena Pierce, in the Aran's own time, hands over the letter
+/// kept all along, unless one is held (Cosmic `21754.js`). Tru ends it with the
+/// data's 56,800 EXP and takes it.
+fn athena_hands_over_the_letter(player: &Player) -> NpcScript {
+    let mut script = NpcScript::new(ATHENA_PIERCE, vec![Page::Say(text(keys::ATHENA_LETTER))]);
+    if player.inventory.count(ATHENAS_LETTER) == 0 {
+        script.on_end.push(Effect::GiveItem {
+            item_id: ATHENAS_LETTER,
+            quantity: 1,
+        });
+    }
+    script
+        .on_end
+        .push(Effect::StartQuest(INFO_ON_ANOTHER_SEAL_STONE));
+    script.inventory_full = Some(text(keys::ATHENA_LETTER_FULL));
+    script
+}
+
+/// `q21757e`: Neinheart takes Lilin's letter and gives 1,000 EXP (Cosmic
+/// `21757.js`, `Act.img/21757/1`).
+fn neinheart_takes_the_letter() -> NpcScript {
+    let mut script = NpcScript::new(NEINHEART, vec![Page::Say(text(keys::NEINHEART_LETTER))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: LETTER_TO_THE_EMPRESS,
+            quantity: 1,
+        },
+        Effect::GainExp(1000),
+        Effect::CompleteQuest(NEINHEART_THE_STRATEGIST),
+    ];
+    script
+}
+
+/// The Sealed Shrine's Entrance pillar (2091009) between Mu Lung's
+/// temple pillars: the password lets one who has yet to beat the Shadow
+/// Knight in, one at a time (Cosmic `2091009.js`).
+const SHRINE_PILLAR: i32 = 2091009;
+const SHRINE_PASSWORD: &str = "Actions speak louder than words";
+const SHRINE_PASSWORD_MAX: i16 = 40;
+
+fn shrine_pillar(player: &Player) -> NpcScript {
+    let quest = scripts::CATCH_THE_SHADOW_KNIGHT;
+    let hunting = player.quests.state(quest) == QuestState::Started
+        && player.quests.kills(quest).iter().all(|&count| count == 0);
+    let mut script = NpcScript::new(
+        SHRINE_PILLAR,
+        vec![Page::AskText {
+            text: text(keys::SHRINE_PILLAR_ASK),
+            min: 1,
+            max: SHRINE_PASSWORD_MAX,
+            on_text: OnText::ShrinePillar { hunting },
+        }],
+    );
+    script.refused = Some(text(keys::SHRINE_PILLAR_BUSY));
+    script
+}
+
+/// The password, in any case and with or without a final ".", lets one
+/// hunting the Shadow Knight into the shrine; anyone else hears it's right
+/// but the way stays shut, in pink.
+fn shrine_pillar_opens(text_given: &str, hunting: bool) -> Vec<Page> {
+    let given = text_given.trim();
+    let given = given.strip_suffix('.').unwrap_or(given).trim_end();
+    if !given.eq_ignore_ascii_case(SHRINE_PASSWORD) {
+        return vec![Page::Say(text(keys::SHRINE_PILLAR_WRONG))];
+    }
+    if !hunting {
+        return vec![Page::Done(vec![Effect::Pink(text(
+            keys::SHRINE_PILLAR_SHUT,
+        ))])];
+    }
+    vec![Page::Done(vec![
+        Effect::RequireEmptyMap(scripts::SEALED_SHRINE),
+        Effect::PortalSound,
+        Effect::WarpToPortal(scripts::SEALED_SHRINE, 0),
+    ])]
 }
 
 /// The statues of the Puppeteer's Secret Passage (910510100): the one at
@@ -12769,6 +12988,180 @@ mod tests {
                     master_level: 20,
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn mu_gong_tests_an_aran_and_sends_it_after_the_shadow_knight() {
+        let aran = traveller(57, 0, false);
+        let test = NpcScript::for_quest("q21746s", &aran).unwrap();
+        assert_eq!(test.refused, Some(text(keys::MU_GONG_ARENA_BUSY)));
+        assert_eq!(
+            yes_through(test),
+            (
+                MU_GONG,
+                vec![
+                    Effect::RequireEmptyMap(scripts::MU_GONGS_ARENA),
+                    Effect::StartQuest(MU_GONGS_TEST),
+                    Effect::WarpToPortal(scripts::MU_GONGS_ARENA, 0),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21747s", &aran).unwrap()),
+            (
+                MU_GONG,
+                vec![Effect::StartQuest(scripts::CATCH_THE_SHADOW_KNIGHT)]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21747e", &aran).unwrap()),
+            (
+                MU_GONG,
+                vec![
+                    Effect::GainExp(16000),
+                    Effect::CompleteQuest(scripts::CATCH_THE_SHADOW_KNIGHT),
+                ]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21748e", &aran).unwrap()),
+            (
+                LILIN,
+                vec![
+                    Effect::CompleteQuest(STOLEN_SEAL_STONE_OF_MU_LUNG),
+                    Effect::GainExp(20000),
+                    Effect::TeachSkill {
+                        skill_id: FINAL_CHARGE,
+                        level: 0,
+                        master_level: 30,
+                    },
+                ]
+            )
+        );
+    }
+
+    #[test]
+    fn the_shrine_pillar_lets_one_hunting_the_shadow_knight_in() {
+        let on = |quests: &[(i16, QuestState)]| {
+            let mut player = traveller(57, 0, false);
+            for &(quest_id, state) in quests {
+                let status = match state {
+                    QuestState::Started => QuestStatus::Started {
+                        kills: Vec::new(),
+                        info: None,
+                    },
+                    _ => QuestStatus::Completed {
+                        at: std::time::SystemTime::UNIX_EPOCH,
+                    },
+                };
+                player.quests.upsert(game::QuestRecord { quest_id, status });
+            }
+            player
+        };
+        let answer = |player: &Player, given: &str| {
+            let mut pillar = NpcScript::for_npc(SHRINE_PILLAR, player).unwrap();
+            assert_eq!(pillar.refused, Some(text(keys::SHRINE_PILLAR_BUSY)));
+            assert!(matches!(
+                pillar.begin().prompt,
+                Some(Prompt::AskText { .. })
+            ));
+            pillar.respond(ScriptInput::Text(given.into())).unwrap()
+        };
+        let through = [
+            Effect::RequireEmptyMap(scripts::SEALED_SHRINE),
+            Effect::PortalSound,
+            Effect::WarpToPortal(scripts::SEALED_SHRINE, 0),
+        ];
+        let shut = [Effect::Pink(text(keys::SHRINE_PILLAR_SHUT))];
+
+        let hunting = on(&[(scripts::CATCH_THE_SHADOW_KNIGHT, QuestState::Started)]);
+        for given in [
+            "Actions speak louder than words",
+            "actions speak louder than words.",
+            " Actions speak louder than words . ",
+        ] {
+            assert_eq!(answer(&hunting, given).effects, through, "{given}");
+        }
+        let wrong = answer(&hunting, "Words speak louder than actions");
+        assert_eq!(page_text(&wrong), text(keys::SHRINE_PILLAR_WRONG));
+        assert!(wrong.effects.is_empty());
+        let mut beaten = hunting.clone();
+        *beaten
+            .quests
+            .kills_mut(scripts::CATCH_THE_SHADOW_KNIGHT)
+            .unwrap() = vec![1];
+        assert_eq!(
+            answer(&beaten, "Actions speak louder than words").effects,
+            shut
+        );
+        assert_eq!(
+            answer(&on(&[]), "Actions speak louder than words").effects,
+            shut
+        );
+    }
+
+    #[test]
+    fn an_aran_goes_back_to_ellin_and_athena_keeps_a_letter_for_it() {
+        let aran = traveller(63, 0, false);
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21749s", &aran).unwrap()),
+            (TRU, vec![Effect::StartQuest(BACK_TO_THE_PAST)])
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21750e", &aran).unwrap()),
+            (
+                ATHENA_PIERCE_OF_ELLIN,
+                vec![Effect::CompleteQuest(SHE_REMEMBERS_ME)]
+            )
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21753s", &aran).unwrap()),
+            (
+                ATHENA_PIERCE_OF_ELLIN,
+                vec![Effect::StartQuest(LOST_SEAL_STONE)]
+            )
+        );
+
+        let athena = NpcScript::for_quest("q21754s", &aran).unwrap();
+        assert_eq!(athena.inventory_full, Some(text(keys::ATHENA_LETTER_FULL)));
+        assert_eq!(
+            yes_through(athena),
+            (
+                ATHENA_PIERCE,
+                vec![
+                    Effect::GiveItem {
+                        item_id: ATHENAS_LETTER,
+                        quantity: 1,
+                    },
+                    Effect::StartQuest(INFO_ON_ANOTHER_SEAL_STONE),
+                ]
+            )
+        );
+        let mut holding = aran.clone();
+        holding.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(ATHENAS_LETTER, 1),
+        );
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21754s", &holding).unwrap()).1,
+            [Effect::StartQuest(INFO_ON_ANOTHER_SEAL_STONE)]
+        );
+
+        assert_eq!(
+            yes_through(NpcScript::for_quest("q21757e", &aran).unwrap()),
+            (
+                NEINHEART,
+                vec![
+                    Effect::TakeItem {
+                        item_id: LETTER_TO_THE_EMPRESS,
+                        quantity: 1,
+                    },
+                    Effect::GainExp(1000),
+                    Effect::CompleteQuest(NEINHEART_THE_STRATEGIST),
+                ]
+            )
         );
     }
 
