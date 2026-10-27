@@ -595,6 +595,18 @@ impl ClientActor {
                         packets.push(quest::build_quest_record(*record, value)?);
                     }
                 }
+                Effect::SetQuestEx {
+                    quest: id,
+                    key,
+                    value,
+                } => {
+                    if next.quest_ex.get(*id, key) != Some(value.as_str()) {
+                        next.quest_ex.set(*id, key, value);
+                        changed = true;
+                        let data = next.quest_ex.raw(*id).unwrap_or_default();
+                        packets.push(quest::build_quest_ex_record(*id, data)?);
+                    }
+                }
                 Effect::Explore { medal, map_id } => {
                     let title = template(*medal)?;
                     let Some(explored) = title.explored else {
