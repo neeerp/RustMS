@@ -351,6 +351,13 @@ Ayan (1022007) and Dances with Balrog (1022000) in Perion, and Betty
 script tells the player one thing and completes the quest as it starts,
 with the data's EXP (10, or 15 for Betty). Winston's end asks for all five.
 The text is unsourced.
+Tienk (2006) in Lith Harbor greets a new Beginner with "Tienk, the Monster
+Book Salesman" (2197); the end script `q2197e` completes it with nothing
+given. "The Last Song" (2293) follows "Say NO to Plagiarism" (2288):
+Maestro Rho's (1052120) start script `q2293s` asks about the last song the
+Spirit of Rock played and starts the quest. The data's end has no end script
+and asks for and gives nothing, so Cosmic's guessing game and its 32,500 EXP
+are left out. The text is unsourced.
 "Exploring Mushroom Forest (1)" (2314) and "Over the Castle Walls (2)" (2322)
 work the same way as 2312. The Domestic Secretary's (1300003) start scripts `q2314s`
 and `q2322s` send the player off; looking at the barrier (`investigate1`) or
@@ -829,5 +836,6 @@ copied into the source.
   `abels_glasses` (2186: a bush gives one pair at a time, then Abel's end
   script or his click, depending on the pair),
   `truth_of_the_rumor` (2144 through its five tellers' start scripts),
+  `tienk_and_the_last_song` (2197's end script, 2293's start and data end),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
