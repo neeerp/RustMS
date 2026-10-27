@@ -1,4 +1,4 @@
-//! The titles of medals won elsewhere (29910 to 29921 and 29933): with the
+//! The titles of medals won elsewhere (29910 to 29928 and 29933): with the
 //! medal held, each start script starts and completes its quest wherever
 //! the player is, with a line in the chat log; without it, nothing starts.
 
@@ -17,6 +17,8 @@ const HENESYS_DONOR_MEDAL: i32 = 1142014;
 const DOJO_VANQUISHER: i16 = 29915;
 const DOJO_VANQUISHER_MEDAL: i32 = 1142064;
 const PERION_DONOR: i16 = 29918;
+const VETERAN_HUNTER: i16 = 29922;
+const VETERAN_HUNTER_MEDAL: i32 = 1142004;
 
 #[tokio::test]
 async fn a_medal_held_finishes_its_title_quest_anywhere() {
@@ -27,6 +29,7 @@ async fn a_medal_held_finishes_its_title_quest_anywhere() {
     set_job(id, 100, 30, 50).await.unwrap();
     grant_item(id, 1, 1, HENESYS_DONOR_MEDAL).await.unwrap();
     grant_item(id, 1, 2, DOJO_VANQUISHER_MEDAL).await.unwrap();
+    grant_item(id, 1, 3, VETERAN_HUNTER_MEDAL).await.unwrap();
     let mut session = relogin(&config).await;
     let c = &mut session.connection;
     let mut trace = Trace::default();
@@ -34,7 +37,11 @@ async fn a_medal_held_finishes_its_title_quest_anywhere() {
     // Far from either NPC.
     assert_eq!(warp(c, KERNING_CITY, "", &mut trace).await, KERNING_CITY);
     barrier(c, &m, &mut trace).await;
-    for (quest, npc) in [(HENESYS_DONOR, DALAIR), (DOJO_VANQUISHER, SO_GONG)] {
+    for (quest, npc) in [
+        (HENESYS_DONOR, DALAIR),
+        (DOJO_VANQUISHER, SO_GONG),
+        (VETERAN_HUNTER, DALAIR),
+    ] {
         let t = step(c, &m, build_quest_action(SCRIPT_START, quest, npc)).await;
         assert!(t.prompts.is_empty(), "{t:?}");
         assert_eq!(t.states.get(&quest), Some(&2), "{quest}");

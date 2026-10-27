@@ -100,7 +100,8 @@ pub const SCRIPTS: &[&str] = &[
     "q21754s", "q21757e", "q3314e", "q3382e", "q3941s", "q3941e", "q8255s", "q2156e", "q2291e",
     "q21700s", "q21703s", "q21703e", "q21704s", "q21712s", "q21716s", "q21719s", "q21720e",
     "q21729s", "q21766s", "q21766e", "q21767s", "q21600s", "q21604s", "q21613s", "q21618s",
-    "q21618e", "q3250s", "q3250e",
+    "q21618e", "q3250s", "q3250e", "q29906s", "q29907s", "q29908s", "q29909s", "q29922s",
+    "q29923s", "q29924s", "q29925s", "q29926s", "q29927s", "q29928s",
 ];
 /// Quests with nothing to complete them by (an empty `Check/1`) whose start
 /// script completes them as it starts them (`Effect::FinishQuest`): JM's
@@ -110,11 +111,17 @@ pub const SCRIPTS: &[&str] = &[
 /// Violetta's face (2334) and the Royal Seal she keeps (2342), and the
 /// clue in the broken Spirit of Snow Statue (3108), and the lost memory
 /// each job instructor gives back (3523-3527, 3529, 3539), and an Aran's Baby
-/// Steps (21704), told to Lilin.
+/// Steps (21704), told to Lilin, and the titles of medals held (29922 to
+/// 29928: Veteran Hunter, Legendary Hunter and the Aran titles).
 pub const FINISHED_BY_START_SCRIPT: &[i16] = &[
     2216, 2217, 2218, 2219, 2228, 2245, 2334, 2342, 3108, 3523, 3524, 3525, 3526, 3527, 3529, 3539,
-    3714, 21704,
+    3714, 21704, 29922, 29923, 29924, 29925, 29926, 29927, 29928,
 ];
+/// The Knight titles (29906 to 29909): Cygnus (1101000) completes them, and
+/// their medal (`QuestInfo` `viewMedalItem`) is the reward. The client's
+/// data names no end script and an empty `Act/1`, so the medal is ours to
+/// give; Cosmic's end scripts give it too.
+pub const KNIGHT_TITLES: &[i16] = &[29906, 29907, 29908, 29909];
 /// Quests no NPC completes through the quest window: `Check/1` is only an
 /// `infoex` entry ("dummy") on an info string nothing sets, which v83's
 /// completion check reads, so neither the client nor the server lets it
@@ -915,7 +922,25 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_completed_quests: nx.int_child(end, "questComplete")?,
         end_party_quest_s: nx.int_child(end, "partyQuest_S")?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
-        end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
+        end_rewards: {
+            let mut rewards = quest_items(nx, &format!("Act.img/{id}/1"))?;
+            if KNIGHT_TITLES.contains(&id) {
+                let medal = info
+                    .map(|info| nx.int_child(info, "viewMedalItem"))
+                    .transpose()?
+                    .flatten()
+                    .ok_or_else(|| invalid("Knight title without a medal"))?;
+                rewards.push(QuestItem {
+                    item_id: medal,
+                    count: 1,
+                    job: 0,
+                    gender: 2,
+                    prop: None,
+                    period: None,
+                });
+            }
+            rewards
+        },
         start_exp,
         start_money: start_action_int("money")?.unwrap_or(0),
         start_buff_item: start_action_int("buffItemID")?,
@@ -1409,6 +1434,33 @@ mod tests {
             .map(|l| l.trim().parse().unwrap())
             .collect();
         assert_eq!(actual, golden, "update game-data/supported_quests.txt");
+    }
+
+    #[test]
+    fn knight_titles_end_with_their_medal_and_held_medal_titles_are_offered() {
+        let Some(path) = crate::test_assets::path("Quest.nx") else {
+            return;
+        };
+        let catalog = QuestCatalog::load_from_nx(path).unwrap();
+        let supported: Vec<i16> = catalog.supported().map(|q| q.id).collect();
+        for (quest, medal) in [
+            (29906, 1142066),
+            (29907, 1142067),
+            (29908, 1142068),
+            (29909, 1142069),
+        ] {
+            assert!(supported.contains(&quest), "{quest}");
+            let rewards = &catalog.quest(quest).unwrap().end_rewards;
+            assert_eq!(rewards.len(), 1, "{quest}");
+            assert_eq!(
+                (rewards[0].item_id, rewards[0].count),
+                (medal, 1),
+                "{quest}"
+            );
+        }
+        for quest in 29922..=29928 {
+            assert!(supported.contains(&quest), "{quest}");
+        }
     }
 
     #[test]

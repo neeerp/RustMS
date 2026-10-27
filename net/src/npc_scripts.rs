@@ -2562,9 +2562,11 @@ impl NpcScript {
             "q29900s" | "q29901s" | "q29902s" | "q29903s" => adventurer_title(script),
             "q29900e" | "q29901e" | "q29902e" | "q29903e" => adventurer_medal(script),
             "q29910s" | "q29911s" | "q29912s" | "q29913s" | "q29914s" | "q29915s" | "q29916s"
-            | "q29917s" | "q29918s" | "q29919s" | "q29920s" | "q29921s" | "q29933s" => {
+            | "q29917s" | "q29918s" | "q29919s" | "q29920s" | "q29921s" | "q29933s" | "q29922s"
+            | "q29923s" | "q29924s" | "q29925s" | "q29926s" | "q29927s" | "q29928s" => {
                 medal_title(script)
             }
+            "q29906s" | "q29907s" | "q29908s" | "q29909s" => knight_title(script),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -4018,13 +4020,42 @@ fn adventurer_medal(script: &str) -> Option<NpcScript> {
     Some(script)
 }
 
-/// The titles of medals won elsewhere (29910 to 29921 and 29933): each
+/// The Knight titles (29906 to 29909): quest and title. Each starts by
+/// itself (`normalAutoStart`) once a Cygnus Knight reaches its job and
+/// level, and Cygnus (1101000) completes it with the medal
+/// (`game_data::quests::KNIGHT_TITLES`).
+const KNIGHT_TITLES: [(i16, &str); 4] = [
+    (29906, "Knight-in-Training"),
+    (29907, "Official Knight"),
+    (29908, "Advanced Knight"),
+    (29909, "Chief Knight"),
+];
+const CYGNUS: i32 = 1101000;
+
+/// `q29906s` to `q29909s`: the title is earned. The quest starts with no
+/// dialogue and a chat-log line names it, as for the Adventurer titles
+/// (Cosmic `29906.js` to `29909.js`). The text is unsourced.
+fn knight_title(script: &str) -> Option<NpcScript> {
+    let &(quest, title) = KNIGHT_TITLES
+        .iter()
+        .find(|(quest, _)| script[1..].starts_with(&quest.to_string()))?;
+    let line = content::text().get(keys::KNIGHT_TITLE, &[("title", title)]);
+    Some(NpcScript::new(
+        CYGNUS,
+        vec![Page::Done(vec![
+            Effect::StartQuest(quest),
+            Effect::InfoText(line),
+        ])],
+    ))
+}
+
+/// The titles of medals won elsewhere (29910 to 29928 and 29933): each
 /// quest's data starts it by itself (`autoStart`, `autoAccept`) once the
 /// player holds the medal, and its start script starts and completes it at
 /// once with a line in the chat log naming the title, as Cosmic's
 /// `29924.js` does for the Aran titles. Quest, title, and the NPC the data
 /// names.
-const MEDAL_TITLES: [(i16, &str, i32); 13] = [
+const MEDAL_TITLES: [(i16, &str, i32); 20] = [
     (29910, "Gallant Warrior", 9000066),
     (29911, "Wiseman", 9000066),
     (29912, "Lord Sniper", 9000066),
@@ -4038,6 +4069,13 @@ const MEDAL_TITLES: [(i16, &str, i32); 13] = [
     (29920, "Sleepywood Donor", 9000066),
     (29921, "Nautilus Donor", 9000066),
     (29933, "Lith Harbor Donor", 9000066),
+    (29922, "Veteran Hunter", 9000066),
+    (29923, "Legendary Hunter", 9000066),
+    (29924, "The Revived Aran", 9000066),
+    (29925, "Aran and Memory", 9000066),
+    (29926, "Aran in Agony", 9000066),
+    (29927, "Aran of Hope", 9000066),
+    (29928, "Aran the Hero", 9000066),
 ];
 
 fn medal_title(script: &str) -> Option<NpcScript> {
@@ -15402,7 +15440,22 @@ mod tests {
                 "{quest}"
             );
         }
-        assert!(NpcScript::for_quest("q29924s", &player(30)).is_none());
+        assert!(NpcScript::for_quest("q29904s", &player(30)).is_none());
+    }
+
+    #[test]
+    fn knight_titles_start_silently_at_cygnus() {
+        for (quest, title) in KNIGHT_TITLES {
+            let mut start = NpcScript::for_quest(&format!("q{quest}s"), &player(30)).unwrap();
+            assert_eq!(start.npc_id(), CYGNUS);
+            let step = start.begin();
+            assert_eq!(step.prompt, None, "{quest}");
+            assert_eq!(step.effects[0], Effect::StartQuest(quest));
+            assert!(
+                matches!(&step.effects[1], Effect::InfoText(line) if line.contains(title)),
+                "{quest}"
+            );
+        }
     }
 
     #[test]

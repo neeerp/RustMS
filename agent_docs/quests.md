@@ -869,8 +869,17 @@ dialogue, the quest starts, and a line in the chat log (SHOW_STATUS_INFO 9)
 names the title. Dalair's (9000040) end script gives the title's medal
 (1142107 to 1142110) and completes the quest. If the Equip tab is full,
 it says so and does nothing. This follows Cosmic's `29900.js` to `29903.js`.
-The `adventurer_medal.*` text is unsourced. The Knight and Aran titles
-(29904 to 29909 and 29924 to 29928) wait for the Cygnus and Aran jobs.
+The `adventurer_medal.*` text is unsourced.
+
+The Knight titles Knight-in-Training, Official Knight, Advanced Knight and
+Chief Knight (29906 to 29909) start the same way for Cygnus Knights from
+their 1st to their 4th job, with the `knight_title` line in the chat log.
+Their data names Cygnus (1101000) as the completion NPC, with no end script
+and no reward, so the player completes them in the quest window at Cygnus
+in Ereve. The server adds the title's medal (`viewMedalItem`, 1142066 to
+1142069) to the completion's rewards (`game_data::quests::KNIGHT_TITLES`),
+as Cosmic's end scripts do. The Noblesse titles (29904 and 29905) need the
+Cygnus tutorial (20000 and 20015), which is not supported.
 
 Some titles go with medals won elsewhere: the job medals at level 180
 (29910 to 29914), the Mu Lung Dojo Vanquisher (29915), and the town donor
@@ -878,9 +887,12 @@ medals (29916 to 29921 and 29933). Each quest's start needs the medal held,
 and the data starts it by itself (`autoStart`, `autoAccept`). The start
 script runs anywhere and starts and completes the quest at once, with a line
 in the chat log naming the title, as Cosmic's `29924.js` does for the Aran
-titles. The medal stays with the player. The `medal_title` text is
-unsourced. Veteran Hunter and Legendary Hunter (29922 and 29923) have no
-completion NPC in the data, so the catalog leaves them out.
+titles. The same holds for Veteran Hunter and Legendary Hunter (29922 and
+29923) and the five Aran titles (29924 to 29928), which have no completion
+NPC in the data and so finish only by their start scripts
+(`FINISHED_BY_START_SCRIPT`). Of their medals, only Aran the Hero's
+(1142133) has a giver: the Aran's 4th job (21500). The medal stays with the
+player. The `medal_title` text is unsourced.
 
 Title Challenge - Outstanding Citizen (29508) starts at Dalair from the
 data, from level 10. Dalair's end script gives the Outstanding Citizen Medal
@@ -1133,7 +1145,9 @@ copied into the source.
   Olaf's reward),
   `outstanding_citizen` (29508: refused with no marriage, guild or Junior,
   then the medal once all three are set),
-  `medal_titles` (two titles finished away from their NPCs with the medals
-  held, not twice, and a third refused without its medal),
+  `medal_titles` (three titles finished away from their NPCs with the medals
+  held, not twice, and a fourth refused without its medal),
+  `knight_titles` (29906 started in Henesys, 29907 refused before the 2nd
+  job, and the medal from Cygnus),
   and `timed_quests` (Medin's clock: shown on start, taken down on
   forfeit, running out, kept through a channel change, given up on logout).
