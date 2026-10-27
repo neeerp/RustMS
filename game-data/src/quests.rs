@@ -67,6 +67,7 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "mbmin",
     "mbmax",
     "mbcard",
+    "questComplete",
     "petRecallLimit",
     "petAutoSpeakingLimit",
 ];
@@ -316,6 +317,10 @@ pub struct QuestTemplate {
     /// Cards whose count in the Monster Book must lie within bounds to
     /// complete (`mbcard`), as `(card id, min, max)`.
     pub end_cards: Vec<BookCard>,
+    /// The fewest quests completed before completing this one
+    /// (`questComplete`), as Cosmic counts them; v83's client doesn't read
+    /// it. Only Quest Specialist (29001) has one, 800.
+    pub end_completed_quests: Option<i32>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -844,6 +849,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_book_min: nx.int_child(end, "mbmin")?,
         end_book_max: nx.int_child(end, "mbmax")?,
         end_cards: book_cards(nx, end)?,
+        end_completed_quests: nx.int_child(end, "questComplete")?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,

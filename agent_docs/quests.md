@@ -74,7 +74,7 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `tamingmoblevelmin`, `tamingmoblevelmax`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, `questComplete`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `petskill`, `petspeed`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
@@ -172,6 +172,11 @@ mesos (FUN_00721d2c), and a quest that fails them stops on the items page,
 as HeavenClient does too. Dalair's Monster Expert (29512) wants 30 kinds
 of card, and the Spirit titles from The Rememberer (1061011; 29016-29019) want one of each
 of five cards on top of their kills.
+
+`questComplete` is the fewest quests the player must have completed to
+complete this one. v83's client doesn't read it, so only the server checks
+it, counting the completed quests as Cosmic does; a refusal sends nothing.
+Dalair's Quest Specialist (29001) wants 800.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's

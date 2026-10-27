@@ -89,6 +89,8 @@ pub enum QuestRejection {
     /// The mount's level is out of the quest's range
     /// (`tamingmoblevelmin`).
     MountLevel,
+    /// Too few quests completed (`questComplete`).
+    CompletedQuests,
     /// The item rewards don't fit.
     InventoryFull,
     /// A one-of-a-kind reward the player already has.
@@ -346,6 +348,11 @@ pub fn check_complete(
     if !book_met(quest, player) {
         return Err(QuestRejection::MonsterBook);
     }
+    if quest.end_completed_quests.is_some_and(|least| {
+        player.quests.completed().count() < usize::try_from(least).unwrap_or(0)
+    }) {
+        return Err(QuestRejection::CompletedQuests);
+    }
     if quest
         .end_min_level
         .is_some_and(|min| i16::from(player.stats.level) < min)
@@ -569,6 +576,7 @@ mod tests {
             end_book_min: None,
             end_book_max: None,
             end_cards: vec![],
+            end_completed_quests: None,
             start_items: vec![],
             end_rewards: vec![],
             start_exp: 0,
@@ -833,6 +841,21 @@ mod tests {
         // Another item's effect on the same stat isn't this one.
         p.buffs.give(scent(2022633));
         assert_eq!(check_complete(&q, 2102, &p), Err(QuestRejection::Buff));
+    }
+
+    #[test]
+    fn complete_needs_enough_quests_completed() {
+        let mut q = quest();
+        q.end_completed_quests = Some(2);
+        let mut p = player(30, 0);
+        set(&mut p, 1033, QuestState::Started);
+        set(&mut p, 1000, QuestState::Completed);
+        assert_eq!(
+            check_complete(&q, 2102, &p),
+            Err(QuestRejection::CompletedQuests)
+        );
+        set(&mut p, 1001, QuestState::Completed);
+        assert_eq!(check_complete(&q, 2102, &p), Ok(()));
     }
 
     #[test]

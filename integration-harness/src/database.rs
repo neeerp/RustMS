@@ -691,6 +691,31 @@ pub async fn set_quest(
     .await
 }
 
+/// Mark quests `first` to `last` completed for the logged-out character
+/// `character_id`.
+pub async fn complete_quests(character_id: i32, first: i16, last: i16) -> Result<(), HarnessError> {
+    let fixture = |message: String| HarnessError::Fixture {
+        phase: "complete quests",
+        message,
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut conn = PgConnection::establish(&database_url()).map_err(|e| e.to_string())?;
+        diesel::sql_query(
+            "INSERT INTO character_quests (character_id, quest_id, status, completed_at, progress) \
+             SELECT $1, q::smallint, 2, now(), '' FROM generate_series($2::int, $3::int) AS q",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(first)
+        .bind::<SmallInt, _>(last)
+        .execute(&mut conn)
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| fixture(e.to_string()))?
+    .map_err(fixture)?;
+    Ok(())
+}
+
 /// Record that the logged-out character `character_id` has explored
 /// `map_id` toward the medal counted in quest record `record_id`.
 pub async fn explore_map(
