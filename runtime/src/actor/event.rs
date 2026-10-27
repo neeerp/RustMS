@@ -79,6 +79,12 @@ pub enum EventMessage {
         stage: u8,
         reply: oneshot::Sender<Option<Balloon>>,
     },
+    /// `client_id` talks to the Guild Quest's statue keeper; None for
+    /// anyone not in the event.
+    Statues {
+        client_id: ClientId,
+        reply: oneshot::Sender<Option<net::guild_quest::StatueTalk>>,
+    },
     /// `client_id`'s script did something the event keeps track of.
     Command {
         client_id: ClientId,
@@ -313,6 +319,21 @@ impl EventTicket {
         view.await.ok().flatten()
     }
 
+    /// What the Guild Quest's statue keeper tells the member, or `None` if
+    /// the event is over.
+    pub async fn statues(&self) -> Option<net::guild_quest::StatueTalk> {
+        let (reply, talk) = oneshot::channel();
+        self.event
+            .tx
+            .send(EventMessage::Statues {
+                client_id: self.member,
+                reply,
+            })
+            .await
+            .ok()?;
+        talk.await.ok().flatten()
+    }
+
     /// How many are in the team now, or `None` if the event is over.
     pub async fn team_size(&self) -> Option<usize> {
         let (reply, size) = oneshot::channel();
@@ -478,6 +499,7 @@ pub fn spawn(
             .collect(),
         stage1: Stage1::default(),
         puzzles: Puzzles::default(),
+        statues: Default::default(),
         heard: HashSet::new(),
         cleared,
         leader: Arc::new(AtomicI32::new(start.leader)),
@@ -589,6 +611,8 @@ struct EventActor {
     members: HashMap<ClientId, ClientHandle>,
     stage1: Stage1,
     puzzles: Puzzles,
+    /// The Guild Quest's statue keeper's test.
+    statues: net::guild_quest::Statues,
     /// The hand-in stages whose NPC the leader has heard out.
     heard: HashSet<u8>,
     cleared: Arc<Cleared>,
@@ -686,6 +710,9 @@ impl EventActor {
                     }
                     Some(EventMessage::Balloon { client_id, stage, reply }) => {
                         let _ = reply.send(self.balloon(client_id, stage));
+                    }
+                    Some(EventMessage::Statues { client_id, reply }) => {
+                        let _ = reply.send(self.statues(client_id));
                     }
                     Some(EventMessage::Command { client_id, command }) => {
                         self.command(client_id, command);
@@ -1215,6 +1242,12 @@ impl EventActor {
                 }
             }
             EventCommand::Reached(_) => {}
+            EventCommand::ShowStatues if self.statues_open(client_id) => self.show_statues(),
+            EventCommand::ShowStatues => debug!(client_id, "Statues not shown"),
+            EventCommand::StatueStruck(statue) if self.kind == EventKind::GuildQuest => {
+                self.statues.struck(statue, std::time::Instant::now());
+            }
+            EventCommand::StatueStruck(_) => {}
             // Kept by the member's own ticket.
             EventCommand::PrizeTaken => {}
             // Each in turn, by the leader (Cosmic `2094002`).
@@ -1765,6 +1798,110 @@ impl EventActor {
             }
             _ => Duration::ZERO,
         }
+    }
+
+    /// Whether `client_id` may take the statue keeper's test: the Guild
+    /// Quest's registrant, the gate still shut.
+    fn statues_open(&self, client_id: ClientId) -> bool {
+        self.kind == EventKind::GuildQuest
+            && client_id == self.team.leader()
+            && !self.cleared.has(self.statue_stage())
+    }
+
+    /// The Guild Quest's stage played in the hall of statues.
+    fn statue_stage(&self) -> u8 {
+        (self.kind.event().stage_on(net::guild_quest::STATUE_HALL)).unwrap_or(u8::MAX)
+    }
+
+    /// What the statue keeper tells `client_id` (Cosmic `9040009`): a
+    /// judged guess is told to everyone in the hall, and the last part
+    /// passed opens the gate and clears the stage.
+    fn statues(&mut self, client_id: ClientId) -> Option<net::guild_quest::StatueTalk> {
+        use net::guild_quest::StatueTalk;
+        if self.kind != EventKind::GuildQuest || !self.team.has(client_id) {
+            return None;
+        }
+        if self.cleared.has(self.statue_stage()) {
+            return Some(StatueTalk::Cleared);
+        }
+        if client_id != self.team.leader() {
+            return Some(StatueTalk::NotLeader);
+        }
+        let talk = self.statues.talk(std::time::Instant::now());
+        let notice = match talk {
+            StatueTalk::Passed(part) => {
+                let part = part.to_string();
+                net::content::text().get(keys::GUILD_QUEST_STATUES_PART_PASSED, &[("part", &part)])
+            }
+            StatueTalk::Failed => net::content::text().get(keys::GUILD_QUEST_STATUES_FAILED, &[]),
+            StatueTalk::Won => {
+                self.clear(self.statue_stage());
+                let hall = self.hall();
+                tokio::spawn(async move {
+                    let open = FieldMessage::SetReactor {
+                        name: net::guild_quest::STATUE_GATE,
+                        state: 1,
+                    };
+                    let _ = hall.tx.send(open).await;
+                });
+                return Some(talk);
+            }
+            _ => return Some(talk),
+        };
+        self.tell_hall(vec![notice], Duration::ZERO);
+        Some(talk)
+    }
+
+    /// The event's copy of the hall of statues.
+    fn hall(&self) -> FieldHandle {
+        self.fields.field(FieldKey {
+            channel_id: self.channel_id,
+            map_id: net::guild_quest::STATUE_HALL,
+            instance_id: self.id,
+        })
+    }
+
+    /// Pink `notices` to everyone in the hall of statues, the first after
+    /// `after`.
+    fn tell_hall(&self, notices: Vec<String>, after: Duration) {
+        let hall = self.hall();
+        tokio::spawn(async move {
+            sleep(after).await;
+            for notice in notices {
+                if let Ok(packet) = build_broadcast(Broadcast::Pink, &notice) {
+                    let _ = hall.tx.send(FieldMessage::Show(packet)).await;
+                }
+            }
+        });
+    }
+
+    /// The part's statues move in turn for everyone in the hall (Cosmic
+    /// `delayedHitReactor`), and the hall hears when to strike them.
+    fn show_statues(&mut self) {
+        use net::guild_quest::{shown_after, STATUE_NAMES};
+        // The statues move on the clock their judging goes by.
+        let start = Instant::now();
+        let Some(combo) = (self.statues).show(start.into_std(), &mut rand::thread_rng()) else {
+            return;
+        };
+        info!(id = self.id, ?combo, "Statues shown");
+        let text = net::content::text();
+        let wait = text.get(keys::GUILD_QUEST_STATUES_SHOWING, &[]);
+        self.tell_hall(vec![wait], Duration::ZERO);
+        let names: Vec<_> = (combo.iter())
+            .filter_map(|&statue| STATUE_NAMES.get(usize::from(statue) - 1).copied())
+            .collect();
+        let shown = text.get(keys::GUILD_QUEST_STATUES_SHOWN, &[]);
+        let hall = self.hall();
+        tokio::spawn(async move {
+            for (n, name) in names.into_iter().enumerate() {
+                sleep_until(start + shown_after(n)).await;
+                let _ = hall.tx.send(FieldMessage::PlayReactor { name }).await;
+            }
+            if let Ok(packet) = build_broadcast(Broadcast::Pink, &shown) {
+                let _ = hall.tx.send(FieldMessage::Show(packet)).await;
+            }
+        });
     }
 
     /// The guild's time to gather is up (Cosmic GuildQuest's

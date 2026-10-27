@@ -1483,6 +1483,34 @@ impl NpcScript {
         squad(kind, view, player)
     }
 
+    /// The statue keeper (9040009) in the Guild Quest's hall of statues, to
+    /// a member who hears `talk` (Cosmic `9040009`): the registrant is told
+    /// the test, sets the statues moving on going on, and is judged on
+    /// coming back; the last part passed earns the guild its points.
+    pub fn statue_keeper(talk: guild_quest::StatueTalk) -> Self {
+        use guild_quest::StatueTalk;
+        let pages = match talk {
+            StatueTalk::NotLeader => vec![Page::Say(text(keys::GUILD_QUEST_STATUES_NOT_LEADER))],
+            StatueTalk::Cleared => vec![Page::Say(text(keys::GUILD_QUEST_STATUES_CLEARED))],
+            StatueTalk::Intro(part) => vec![
+                Page::Say(text(if part <= 1 {
+                    keys::GUILD_QUEST_STATUES_INTRO
+                } else {
+                    keys::GUILD_QUEST_STATUES_HARDER
+                })),
+                Page::Done(vec![Effect::EventCommand(EventCommand::ShowStatues)]),
+            ],
+            StatueTalk::Showing => vec![Page::Say(text(keys::GUILD_QUEST_STATUES_WORKING))],
+            StatueTalk::Passed(_) => vec![Page::Say(text(keys::GUILD_QUEST_STATUES_RIGHT))],
+            StatueTalk::Failed => vec![Page::Say(text(keys::GUILD_QUEST_STATUES_WRONG))],
+            StatueTalk::Won => vec![Page::Act {
+                text: text(keys::GUILD_QUEST_STATUES_WON),
+                effects: vec![Effect::GainGuildPoints(guild_quest::STATUE_POINTS)],
+            }],
+        };
+        Self::new(guild_quest::STATUE_KEEPER, pages)
+    }
+
     /// Shuang (9040000) at the Excavation Site's camp, to a member of rank
     /// `rank` in their guild (none without one) who finds the channel's
     /// Guild Quest line as `view` (Cosmic `9040000`): the master or a Jr.
@@ -1912,6 +1940,17 @@ impl NpcScript {
                 keys::GUILD_QUEST_NURIS_ASK,
                 camp,
             ));
+        }
+        if npc_id == guild_quest::EXIT_GUIDE {
+            let camp = guild_quest::CAMP;
+            let key = keys::GUILD_QUEST_EXIT_ASK;
+            return Some(ask_warp(guild_quest::EXIT_GUIDE, key, camp));
+        }
+        // Away from the camp, Shuang only gives the brief at the outskirts
+        // (Cosmic `GuildQuest.js`'s `afterChangedMap`).
+        if npc_id == guild_quest::SHUANG && player.stats.map_id == guild_quest::OUTSKIRTS {
+            let brief = Page::Say(text(keys::GUILD_QUEST_BRIEF));
+            return Some(NpcScript::new(guild_quest::SHUANG, vec![brief]));
         }
         if npc_id == CARNIVAL_GUIDE && player.stats.map_id == carnival::CARNIVAL_EXIT {
             let back = carnival::CARNIVAL_LOBBY;

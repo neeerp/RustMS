@@ -854,6 +854,17 @@ impl FieldActor {
                 }
             }
             FieldMessage::OpenReactor { name } => self.open_reactor(name),
+            FieldMessage::PlayReactor { name } => {
+                let views: Vec<_> = (self.reactors.live())
+                    .filter(|reactor| self.reactors.name(reactor.object_id) == Some(name))
+                    .map(|reactor| reactor.view())
+                    .collect();
+                for view in views {
+                    if let Ok(packet) = build_hit_reactor(&view, 0, 0) {
+                        self.broadcast(None, packet);
+                    }
+                }
+            }
             FieldMessage::Split { reply } => {
                 let split = self
                     .split
@@ -4072,6 +4083,15 @@ impl FieldActor {
     fn show_reactor_hit(&mut self, by: ClientId, hit: Hit, delay: u16) {
         let view = match hit {
             Hit::Moved { view, event } => {
+                // The striker's event hears of a statue before anyone sees
+                // it struck, so a guess is in when the keeper is asked.
+                if matches!(reactors::action(view.reactor_id), reactors::Action::Statue) {
+                    let name = self.reactors.name(view.object_id);
+                    let statue = name.and_then(net::guild_quest::statue_number);
+                    if let (Some(statue), Some(occupant)) = (statue, self.occupants.get(&by)) {
+                        occupant.handle.send(ServerMessage::StatueStruck(statue));
+                    }
+                }
                 if let Ok(packet) = build_hit_reactor(&view, delay, event) {
                     self.broadcast(None, packet);
                 }

@@ -1036,6 +1036,8 @@ pub fn unscripted_map_enter(player: &Player) -> Vec<Effect> {
                 },
             ]
         }
+        // Shuang tells whoever reaches Sharenian's outskirts what to do there.
+        crate::guild_quest::OUTSKIRTS => vec![Effect::OpenNpc(crate::guild_quest::SHUANG)],
         BOWMAN_SCHOOL
             if player.quests.state(LOST_SEAL_STONE) == QuestState::Completed
                 && player.quests.info(ATHENA_FOUND_RECORD).is_none() =>
@@ -2239,6 +2241,17 @@ pub fn portal(script: &str, player: &Player) -> Option<ScriptOutcome> {
             ],
             block: false,
             occupied: Some(content::text().get(keys::PIRATE_MARKS_SHUT, &[])),
+        },
+        // The Guild Quest's way on from the hall of statues, open once the
+        // statue keeper's test is passed (Cosmic `statuegate_open`).
+        "statuegate_open" => ScriptOutcome {
+            effects: vec![
+                Effect::RequireReactorsSet(&[crate::guild_quest::STATUE_GATE]),
+                Effect::PortalSound,
+                Effect::WarpToPortal(crate::guild_quest::STATUE_HALL + 1, 0),
+            ],
+            block: false,
+            occupied: Some(content::text().get(keys::GUILD_QUEST_GATE_CLOSED, &[])),
         },
         // The decks' ways on, once their crews are all gone, as the first
         // stage's (Cosmic `davy_next2`, `davy_next3`).
@@ -4540,6 +4553,18 @@ mod tests {
             assert_eq!(in_room(map, 10, 100), ScriptOutcome::default());
         }
         assert_eq!(in_room(100000000, 1, 0), ScriptOutcome::default());
+    }
+
+    #[test]
+    fn shuang_briefs_whoever_reaches_sharenians_outskirts() {
+        use crate::guild_quest::{OUTSKIRTS, SHUANG, WAITING_ROOM};
+        let data = crate::get_game_data().unwrap();
+        assert_eq!(data.field(OUTSKIRTS).unwrap().on_user_enter, None);
+        let mut player = player_with(&[]);
+        player.stats.map_id = OUTSKIRTS;
+        assert_eq!(unscripted_map_enter(&player), [Effect::OpenNpc(SHUANG)]);
+        player.stats.map_id = WAITING_ROOM;
+        assert!(unscripted_map_enter(&player).is_empty());
     }
 
     #[test]

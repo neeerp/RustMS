@@ -148,6 +148,11 @@ impl ClientActor {
                 return self.talk_about_event(kind).await;
             }
         }
+        if npc_id == net::guild_quest::STATUE_KEEPER {
+            if let Some(script) = self.statue_keeper().await? {
+                return self.start_script(script).await;
+            }
+        }
         if npc_id == net::npc_scripts::AURA {
             if let Some(script) = self.zpq_aura()? {
                 return self.start_script(script).await;

@@ -5,10 +5,13 @@ script (9040000) and `EventManager`'s guild queue. Built so far: the
 registration with Shuang, each channel's line of guilds, the waiting room
 and its gathering, the quest's clock, the ends for too few members or a
 missing registrant, the Returning Path and Nuris, and the client's
-waitlist line. Not yet: the stages beyond the waiting room, their rewards
-and the guild points the quest earns. The plan is in v83ref's
+waitlist line, the outskirts' brief and earrings, the guide out on every
+stage, the quest's items taken on leaving, and the statue keeper's test.
+Not yet: the stages beyond the hall of statues, their rewards and the rest
+of the guild points the quest earns. The plan is in v83ref's
 `reports/b252-guild-quest.md`, with the event machinery's anchors in
-`reports/b253-gq-event-infra.md`.
+`reports/b253-gq-event-infra.md` and the first stages in
+`reports/b254-gq-stages-1-3.md`.
 
 All dialogue is placeholder text (`guild_quest.*` keys in
 `game-data/placeholder_text.toml`): no licensed script has any.
@@ -88,6 +91,61 @@ expedition's: no party, and it lasts until its last member leaves
   Everyone left goes to the Returning Path, where Nuris offers the way back
   to the camp (`ask_warp`).
 
+## The outskirts
+
+The waiting room's way on leads to Sharenian's outskirts (990000100,
+`guild_quest::OUTSKIRTS`), stage 2 by RustMS's map-based numbers.
+
+- **The brief.** Whoever arrives there hears Shuang's brief
+  (`scripts::unscripted_map_enter` opens Shuang, and away from the camp
+  Shuang's script there is the brief), as Cosmic's `afterChangedMap` has
+  Shuang say it.
+- **The rocks.** The glowing rocks (reactors 9202000 and 9202009) break
+  after their hits and drop the protector earring 1032033
+  (`guild_quest::EARRING`), from the content pack's reactor drops. Its
+  120-minute `period` there is ignored: the earring is taken on leaving
+  instead. The outskirts and 990000200 have no mobs, and no gate: their
+  `next00` portals are plain.
+- **The guide.** The guide (9040005, `guild_quest::EXIT_GUIDE`) on each
+  stage asks whether to give up and, on yes, takes the player back to the
+  camp.
+
+## The hall of statues
+
+In the hall of statues (990000300, `guild_quest::STATUE_HALL`), stage 4,
+the statue keeper (9040009, `STATUE_KEEPER`) tests the registrant alone
+(Cosmic `9040009` and the statues' reactor scripts). `guild_quest::Statues`
+keeps the test; the event holds it (`EventMessage::Statues`,
+`EventTicket::statues`).
+
+- **Showing.** Told the test (`NpcScript::statue_keeper`), the registrant
+  goes on and `EventCommand::ShowStatues` picks part `n`'s `n + 3`
+  different statues of the 20 (reactors 9208000-9208002, named "1" to
+  "20"). The hall sees each move in turn (`FieldMessage::PlayReactor`, a
+  hit at its own state), the first after 5 seconds and the rest 3.5 apart
+  (`shown_after`), with pink lines before and after.
+- **Striking.** A statue struck (`reactors::Action::Statue`) tells the
+  striker's event its number (`ServerMessage::StatueStruck`) before the
+  hall sees it hit. Strikes count once the statues are all shown, up to the
+  combo's length, whoever in the guild strikes.
+- **Judging.** The registrant talks to the keeper again. While the statues
+  still move the keeper says to watch. Otherwise the guess is judged:
+  - Wrong: the hall sees and hears the wrong answer, and the test starts
+    over from part 1.
+  - Right on part 1 or 2: a pink line, and the next part shows one statue
+    more.
+  - Right on part 3: the stage is cleared, the gate (reactor "statuegate")
+    goes to state 1, and the guild gains 15 points (`STATUE_POINTS`).
+- **The gate.** `next00` is the `statuegate_open` script: shut until the
+  gate is set, then on to 990000301.
+
+## The quest's items
+
+`events::GUILD_QUEST.items` (`guild_quest::ITEMS`) are Cosmic's exclusive
+items: the earring, 4001024 to 4001035 and 4001037. Leaving the quest, by
+any way, takes them all (`Event::take_items`), a worn earring too, which
+also refreshes the player's look for the map.
+
 The harness's `RUSTMS_EXPEDITION_MIN` lowers the 6, and
 `RUSTMS_EVENT_SCALE` shortens the gathering and the clock (not the 5
 seconds).
@@ -119,6 +177,7 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
   job; not yet.
 - Cosmic turns away a non-member in the waiting room. Here only members of
   the guild come in through Shuang, and the copy is the guild's own.
+- The earring doesn't expire after 120 minutes; it can't leave the quest.
 
 ## Tests
 
@@ -128,5 +187,11 @@ and has no slot. 0x4A and 0x4B print 0xdd9 and 0xdda.
 - `integration-harness/tests/guild_quest.rs`: registration, the turn and
   the waiting room, the shut way on, a second guild's place, the start,
   too few, the Returning Path and Nuris, the next guild's turn, and a
-  gathering too small.
+  gathering too small; then the brief, a rock's earring and the guide out,
+  the earrings taken; then the statue keeper's refusal of a member, the
+  shut gate, a wrong guess, three parts passed, the guild's points and the
+  gate.
+- `net/src/guild_quest.rs` (`statues_*`): the test's parts and judging.
+- `net/src/events.rs` (`leaving_the_guild_quest_takes_the_earring_worn`)
+  and `net/src/scripts.rs` (`shuang_briefs_whoever_reaches_sharenians_outskirts`).
 - `HeavenClient/tests/guild.cpp`: the waitlist lines.

@@ -1767,6 +1767,10 @@ impl ClientActor {
                 self.tell_event(net::events::EventCommand::ClearStage(stage))
                     .await
             }
+            ServerMessage::StatueStruck(statue) => {
+                self.tell_event(net::events::EventCommand::StatueStruck(statue))
+                    .await
+            }
             ServerMessage::YuleteLeft(caught) => {
                 self.tell_event(net::events::EventCommand::YuleteLeft(caught))
                     .await
