@@ -48,6 +48,17 @@ impl QuestExRecords {
             .unwrap_or(0)
     }
 
+    /// How many party quests' records (1200-1399) are at `rank`, as the
+    /// client counts them for `partyQuest_S` and `#jscnt#` (0x724722): one
+    /// for each quest, however often it was run.
+    pub fn rank_count(&self, rank: &str) -> usize {
+        self.0
+            .keys()
+            .filter(|&&quest_id| (1200..=1399).contains(&quest_id))
+            .filter(|&&quest_id| self.get(quest_id, "rank") == Some(rank))
+            .count()
+    }
+
     /// Set `key` in `quest_id`'s record, in its place if it is there.
     pub fn set(&mut self, quest_id: i16, key: &str, value: impl ToString) {
         let value = value.to_string();
@@ -230,6 +241,22 @@ mod tests {
             records.raw(1301),
             Some("vic=1;have0=0;have1=1;rank=D;lose=1;draw=1")
         );
+    }
+
+    #[test]
+    fn rank_count_counts_party_quests_at_the_rank() {
+        let records = QuestExRecords::from_raw([
+            (1200, "try=1;rank=S".to_string()),
+            (1201, "rank=S;cmp=100".to_string()),
+            (1202, "rank=s".to_string()),
+            (1203, "rank=A".to_string()),
+            (1301, "vic=100;rank=S".to_string()),
+            (1400, "rank=S".to_string()),
+            (8252, "rank=S".to_string()),
+        ]);
+        assert_eq!(records.rank_count("S"), 3);
+        assert_eq!(records.rank_count("A"), 1);
+        assert_eq!(QuestExRecords::default().rank_count("S"), 0);
     }
 
     #[test]

@@ -74,7 +74,7 @@ Only requirements and actions the server implements are allowed
 | Node | Allowed keys |
 | --- | --- |
 | `Check/<id>/0` (start) | `npc`, `job`, `lvmin`, `lvmax`, `quest`, `item`, `skill`, `pop`, `interval`, `dayByDay`, `startscript`, `equipAllNeed`, `equipSelectNeed`, `fieldEnter`, `start`, `end`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `tamingmoblevelmin`, `tamingmoblevelmax`, `dayOfWeek`, `buff`, `exceptbuff`, and the alert trigger `normalAutoStart` |
-| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, `questComplete`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
+| `Check/<id>/1` (complete) | `npc`, `item`, `mob`, `quest`, `endscript`, `endmeso`, `level`, `pet`, `pettamenessmin`, `pettamenessmax`, `petRecallLimit`, `petAutoSpeakingLimit`, `buff`, `exceptbuff`, `mbmin`, `mbmax`, `mbcard`, `questComplete`, `partyQuest_S`, and `start`/`end`, which v83 doesn't check on completion (only 4306 and 4309 have them, set to 1 to 2 January 2000) |
 | `Act/<id>/0` | `item`, `exp`, `money`, `buffItemID` |
 | `Act/<id>/1` | `exp`, `nextQuest`, `item`, `money`, `pop`, `pettameness`, `petskill`, `petspeed`, `skill`, `npcAct`, `buffItemID` |
 | `Act/<id>/<n>/item/<k>` | `id`, `count`, `job`, `gender`, `prop`, `period`, `var` |
@@ -174,9 +174,19 @@ of card, and the Spirit titles from The Rememberer (1061011; 29016-29019) want o
 of five cards on top of their kills.
 
 `questComplete` is the fewest quests the player must have completed to
-complete this one. v83's client doesn't read it, so only the server checks
-it, counting the completed quests as Cosmic does; a refusal sends nothing.
-Dalair's Quest Specialist (29001) wants 800.
+complete this one. The server checks it, counting the completed quests as
+Cosmic does; a refusal sends nothing. v83's client reads it too
+(FUN_00721d2c 0x7225ab), but HeavenClient doesn't yet. Dalair's Quest
+Specialist (29001) wants 800.
+
+`partyQuest_S` is the fewest party quests whose record beside the quest
+log ranks S (see "Records beside the quest log"): the client counts the
+records of quests 1200-1399 whose `rank` is exactly `S`, one per quest
+(0x724722), and tests it just before `questComplete` (0x722525), stopping
+on `stop/default`. Only Dalair's PQ Mania (29000) has it, 5; its stop page
+is missing, so the NPC's line shows. The server
+(`QuestExRecords::rank_count`) and HeavenClient (`party_rank_met`, also
+for the Quest Log's ready icon) check it alike.
 
 To complete, `endmeso` is the mesos to hold (it always matches the `money`
 taken). v83 checks it after kills and shows `stop/default` (or the NPC's
@@ -972,7 +982,19 @@ formatter (0x99dd54) shows them (HeavenClient `QuestRecordEx::token`):
 | `gvup` | `try - vic - lose - draw` |
 | `have`, `have0`... | `Acquire` if above 0, else `Fail` |
 | `rank` | the image `UI/Basic.img/PQuestRank/<rank>`, F if none |
+| `scnt` | the party quests at rank S, `%d` |
+| `perPqS` | that count against the quest's `partyQuest_S`, as a percentage from 0 to 100 |
+| `gaugePqS` | a 79x8 image: `UI/UIWindow.img/Quest/Gauge2/frame` with `count * 75 / need` (at most 75) one-pixel `gauge` slices from (2, 3) |
 | anything else (`date`) | the value as it stands |
+
+The last three read every party quest's record, not the quest's own: PQ
+Mania (29000) shows them. HeavenClient passes the gauge as the path
+`…/Gauge2/frame/<slices>`, which the Quest Log and the title (medal)
+window draw as the frame and its slices (`QuestTextImages`,
+`QuestRecordEx::gauge_slices`). The tokens read the need from
+`Check.img` itself, as the client does, not from the supported list. The other medals' tokens
+(`cmpcnt`, `gaugeQCnt`, `perQCnt`, the Pop, Days and Hunt gauges, `level`)
+aren't filled yet.
 
 So far only the party quests keep records, on their info quests 1200-1206
 and 1301. The client lists these under "Party Quest" and never offers them

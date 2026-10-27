@@ -68,6 +68,7 @@ pub const END_REQUIREMENTS: &[&str] = &[
     "mbmax",
     "mbcard",
     "questComplete",
+    "partyQuest_S",
     "petRecallLimit",
     "petAutoSpeakingLimit",
 ];
@@ -349,9 +350,12 @@ pub struct QuestTemplate {
     /// complete (`mbcard`), as `(card id, min, max)`.
     pub end_cards: Vec<BookCard>,
     /// The fewest quests completed before completing this one
-    /// (`questComplete`), as Cosmic counts them; v83's client doesn't read
-    /// it. Only Quest Specialist (29001) has one, 800.
+    /// (`questComplete`), as Cosmic counts them. The client reads it too
+    /// (0x7225ab). Only Quest Specialist (29001) has one, 800.
     pub end_completed_quests: Option<i32>,
+    /// The fewest party quests whose record is at rank S
+    /// (`partyQuest_S`, 0x722525). Only PQ Mania (29000) has one, 5.
+    pub end_party_quest_s: Option<i32>,
     /// Items given or taken on start and on completion.
     pub start_items: Vec<QuestItem>,
     pub end_rewards: Vec<QuestItem>,
@@ -884,6 +888,7 @@ fn template(nx: &NxDataFile, id: i16) -> Result<QuestTemplate, GameDataError> {
         end_book_max: nx.int_child(end, "mbmax")?,
         end_cards: book_cards(nx, end)?,
         end_completed_quests: nx.int_child(end, "questComplete")?,
+        end_party_quest_s: nx.int_child(end, "partyQuest_S")?,
         start_items: quest_items(nx, &format!("Act.img/{id}/0"))?,
         end_rewards: quest_items(nx, &format!("Act.img/{id}/1"))?,
         start_exp,

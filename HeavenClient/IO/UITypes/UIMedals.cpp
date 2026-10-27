@@ -441,8 +441,10 @@ namespace ms
 			[](int32_t id) { return NxHelper::Map::get_map_info_by_id(id).name; }
 		};
 
+		std::vector<NpcTextMarkup::InlineImage> tags;
 		description = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::BLACK,
-			NpcTextMarkup::expand(quest_text(text, selected), lookups), TEXT_WIDTH);
+			NpcTextMarkup::expand(quest_text(text, selected), lookups, &tags), TEXT_WIDTH);
+		images.set(tags, description);
 
 		int16_t view = TEXT_VIEW.length() - (TEXT_POS.y() - TEXT_VIEW.first());
 		int16_t steps = std::max<int16_t>(0, (description.height() - view + TEXT_STEP - 1) / TEXT_STEP);
@@ -479,7 +481,9 @@ namespace ms
 			requirement.draw(detail + REQUIREMENT_POS + raise);
 
 			Range<int16_t> clip = Range<int16_t>(detail.y() + TEXT_VIEW.first(), detail.y() + TEXT_VIEW.second());
-			description.draw(detail + TEXT_POS + raise - Point<int16_t>(0, detail_offset * TEXT_STEP), clip);
+			Point<int16_t> text = detail + TEXT_POS + raise - Point<int16_t>(0, detail_offset * TEXT_STEP);
+			images.draw(description, text, clip);
+			description.draw(text, clip);
 		}
 
 		background.draw(position);

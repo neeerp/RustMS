@@ -94,6 +94,9 @@ namespace ms
 					!book_met(quest, book.count_cards(false) + book.count_cards(true), [&](int32_t card) { return book.get_level(card); }))
 					return QuestStop::ITEM;
 
+				if (stop == QuestStop::NONE && !party_rank_met(quest, player().get_quests().rank_count("S")))
+					return QuestStop::PARTY_RANK;
+
 				return stop;
 			}
 

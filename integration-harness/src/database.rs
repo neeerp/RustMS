@@ -719,6 +719,27 @@ pub async fn complete_quests(character_id: i32, first: i16, last: i16) -> Result
     Ok(())
 }
 
+/// Set the logged-out character `character_id`'s record beside the quest
+/// log for `quest_id` to `data` (`k=v;k=v`).
+pub async fn set_quest_ex(
+    character_id: i32,
+    quest_id: i16,
+    data: &str,
+) -> Result<(), HarnessError> {
+    let data = data.to_string();
+    change_one_row("set quest record ex", move |conn| {
+        diesel::sql_query(
+            "INSERT INTO quest_ex_records (character_id, quest_id, data) VALUES ($1, $2, $3) \
+             ON CONFLICT (character_id, quest_id) DO UPDATE SET data = EXCLUDED.data",
+        )
+        .bind::<Integer, _>(character_id)
+        .bind::<SmallInt, _>(quest_id)
+        .bind::<Text, _>(data)
+        .execute(conn)
+    })
+    .await
+}
+
 /// Record that the logged-out character `character_id` has explored
 /// `map_id` toward the medal counted in quest record `record_id`.
 pub async fn explore_map(

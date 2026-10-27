@@ -291,6 +291,12 @@ int main()
 		require(ms::book_met(diviner, 2, level), "one of each will do");
 		diviner.end_cards.emplace_back(2380000, -1, 1);
 		require(!ms::book_met(diviner, 2, level), "but not more than a card's max");
+		// PQ Mania (29000) needs five party quests at rank S.
+		ms::QuestInfo mania = quest(29000, 9000040, 9000040);
+		require(ms::party_rank_met(mania, 0), "most quests need no ranks");
+		mania.end_party_quest_s = 5;
+		require(!ms::party_rank_met(mania, 4) && ms::party_rank_met(mania, 5), "PQ Mania needs five at S");
+		require(std::string(ms::stop_reason(ms::QuestStop::PARTY_RANK)) == "default", "its stop page is the default");
 		// Pio (10000) lists a hand-in he can't take yet as in progress.
 		std::vector<ms::QuestInfo> pio { quest(1008, 10000, 10000), quest(1020, 10000, 10000),
 			quest(1021, 999, 10000), quest(1022, 10000, 999), quest(1023, 10000, 10000), quest(1250, 10000, 10000) };

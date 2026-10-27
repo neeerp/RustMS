@@ -97,7 +97,8 @@ namespace ms
 	// pages they show.
 	// MESO has no stop key of its own, so it shows stop/default. NO_PET and
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF };
+	// PARTY_RANK (code 12) shows stop/default too.
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF, PARTY_RANK };
 
 	// The first pet out: its item (0 for none), its closeness and its
 	// petSkill bits.
@@ -165,6 +166,14 @@ namespace ms
 				return false;
 
 		return true;
+	}
+
+	// Whether `count`, the party quests whose record ranks S, meets a
+	// quest's partyQuest_S, which v83 tests after the quests it needs
+	// (FUN_00721d2c 0x722525).
+	inline bool party_rank_met(const QuestInfo& quest, int32_t count)
+	{
+		return quest.end_party_quest_s < 0 || count >= quest.end_party_quest_s;
 	}
 
 	inline const char* stop_reason(QuestStop stop)

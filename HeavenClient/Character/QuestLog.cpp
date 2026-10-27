@@ -123,6 +123,17 @@ namespace ms
 		return record == records_ex.end() ? "" : QuestRecordEx::value(record->second, key);
 	}
 
+	int32_t QuestLog::rank_count(const std::string& rank) const
+	{
+		int32_t count = 0;
+
+		for (auto record = records_ex.lower_bound(1200); record != records_ex.end() && record->first <= 1399; ++record)
+			if (QuestRecordEx::value(record->second, "rank") == rank)
+				count++;
+
+		return count;
+	}
+
 	// A repeatable quest started again keeps its completion, as in v83, but
 	// counts as started.
 	int16_t QuestLog::state(int16_t id) const { return started.count(id) ? 1 : completed.count(id) ? 2 : 0; }

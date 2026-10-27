@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
@@ -36,13 +37,57 @@ namespace ms
 			return "";
 		}
 
+		// The party quests at rank S against a quest's partyQuest_S, which the
+		// PQ Mania tokens show.
+		struct RankS
+		{
+			int32_t count = 0;
+			int32_t need = 0;
+		};
+
+		// The gauge #jgaugePqS# draws: the 79x8 frame and up to 75 one-pixel
+		// slices from (2, 3), passed as a path ending in the slices.
+		const std::string GAUGE = "UI/UIWindow.img/Quest/Gauge2/frame/";
+		const std::string GAUGE_SLICE = "UI/UIWindow.img/Quest/Gauge2/gauge";
+		constexpr int32_t GAUGE_SLICES = 75;
+
+		// The slices a gauge's path asks for, or -1 for another path.
+		inline int32_t gauge_slices(const std::string& path)
+		{
+			if (path.rfind(GAUGE, 0) != 0 || path.size() == GAUGE.size())
+				return -1;
+
+			std::string digits = path.substr(GAUGE.size());
+
+			if (!std::all_of(digits.begin(), digits.end(), [](char c) { return c >= '0' && c <= '9'; }) || digits.size() > 2)
+				return -1;
+
+			return std::min(std::atoi(digits.c_str()), GAUGE_SLICES);
+		}
+
 		// What the #j token for `key` shows, `get` reading the quest's record,
 		// as the client's quest text formatter (0x99dd54) writes it: counts
 		// "%4d" (the seconds "%2d"), the give-ups the tries less the rest, a
-		// reward "Acquire" or "Fail", the rank as its image (F if none), and
-		// anything else as it stands.
-		inline std::string token(const std::string& key, const std::function<std::string(const std::string&)>& get)
+		// reward "Acquire" or "Fail", the rank as its image (F if none), PQ
+		// Mania's S ranks as a count, a percentage and a gauge of the need,
+		// and anything else as it stands.
+		inline std::string token(const std::string& key, const std::function<std::string(const std::string&)>& get,
+			RankS rank_s = {})
 		{
+			auto share = [&](int32_t whole)
+			{
+				return rank_s.need <= 0 ? 0 : std::clamp(rank_s.count * whole / rank_s.need, 0, whole);
+			};
+
+			if (key == "scnt")
+				return std::to_string(rank_s.count);
+
+			if (key == "perPqS")
+				return std::to_string(share(100));
+
+			if (key == "gaugePqS")
+				return "#f" + GAUGE + std::to_string(share(GAUGE_SLICES)) + "#";
+
 			auto number = [&](const std::string& k) { return std::atoi(get(k).c_str()); };
 			auto padded = [](int32_t n, size_t width)
 			{

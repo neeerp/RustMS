@@ -58,6 +58,9 @@ namespace ms
 		// complete (Check/1/mbmin, mbmax); -1 for no bound.
 		int32_t end_book_min = -1;
 		int32_t end_book_max = -1;
+		// The fewest party quests whose record ranks S to complete
+		// (Check/1/partyQuest_S, only PQ Mania's); -1 for none.
+		int32_t end_party_quest_s = -1;
 		// Cards whose count in the book must lie within bounds to complete
 		// (Check/1/mbcard), as (card, min, max) with -1 for no bound.
 		std::vector<std::tuple<int32_t, int32_t, int32_t>> end_cards;
