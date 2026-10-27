@@ -97,8 +97,9 @@ namespace ms
 	// pages they show.
 	// MESO has no stop key of its own, so it shows stop/default. NO_PET and
 	// WRONG_PET (codes 8 and 9) show a notice instead of a page.
-	// PARTY_RANK (code 12) shows stop/default too.
-	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF, PARTY_RANK };
+	// PARTY_RANK (code 12) shows stop/default too, as does COMPLETED, too
+	// few quests completed, which leaves by the same path (0x7225c6).
+	enum class QuestStop { NONE, NPC, ITEM, QUEST, INFO, MOB, MESO, NO_PET, WRONG_PET, BUFF, PARTY_RANK, COMPLETED };
 
 	// The first pet out: its item (0 for none), its closeness and its
 	// petSkill bits.
@@ -174,6 +175,21 @@ namespace ms
 	inline bool party_rank_met(const QuestInfo& quest, int32_t count)
 	{
 		return quest.end_party_quest_s < 0 || count >= quest.end_party_quest_s;
+	}
+
+	// Whether a completed quest counts toward questComplete and #jcmpcnt#:
+	// v83 leaves out ids 9000 to 10999 and the titles (0x7210c2).
+	inline bool counts_as_completed(int16_t id, bool title)
+	{
+		return (id < 9000 || id > 10999) && !title;
+	}
+
+	// Whether `count`, the quests completed as QuestLog::completed_count
+	// counts them, meets a quest's questComplete, which v83 tests right
+	// after partyQuest_S (0x7225ab).
+	inline bool completed_met(const QuestInfo& quest, int32_t count)
+	{
+		return quest.end_completed_quests < 0 || count >= quest.end_completed_quests;
 	}
 
 	inline const char* stop_reason(QuestStop stop)

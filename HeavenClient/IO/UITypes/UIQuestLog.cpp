@@ -149,14 +149,27 @@ namespace ms
 		}
 
 		// A #j token (#jtry#, #jrank#...) from the quest's record beside the
-		// quest log, or the party quests at rank S against its partyQuest_S.
+		// quest log, or a title's count against its need (the party quests
+		// at rank S against partyQuest_S, the quests completed against
+		// questComplete), level or fame.
 		std::string record_token(const std::string& key, int16_t quest_id)
 		{
-			const auto& quests = Stage::get().get_player().get_quests();
-			int32_t need = nl::nx::quest["Check.img"][std::to_string(quest_id)]["1"]["partyQuest_S"].get_integer();
-			QuestRecordEx::RankS rank_s { quests.rank_count("S"), need };
+			Player& player = Stage::get().get_player();
+			const auto& quests = player.get_quests();
+			nl::node end = nl::nx::quest["Check.img"][std::to_string(quest_id)]["1"];
+			QuestRecordEx::Counts counts;
 
-			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); }, rank_s);
+			if (key == "scnt" || key == "perPqS" || key == "gaugePqS")
+				counts.rank_s = { quests.rank_count("S"), static_cast<int32_t>(end["partyQuest_S"].get_integer()) };
+
+			if (key == "cmpcnt" || key == "perQCnt" || key == "gaugeQCnt")
+				counts.completed = { quests.completed_count(), static_cast<int32_t>(end["questComplete"].get_integer()) };
+
+			counts.level = player.get_stats().get_stat(MapleStat::Id::LEVEL);
+			// Fame is signed, kept as its 16 bits.
+			counts.fame = static_cast<int16_t>(player.get_stats().get_stat(MapleStat::Id::FAME));
+
+			return QuestRecordEx::token(key, [&](const std::string& k) { return quests.record_ex(quest_id, k); }, counts);
 		}
 
 		// Fill in the quest-only placeholders, which NpcTextMarkup leaves:
@@ -200,7 +213,7 @@ namespace ms
 					continue;
 				}
 
-				if (close != std::string::npos && tag == 'j' && close - i - 2 <= 8)
+				if (close != std::string::npos && tag == 'j' && close - i - 2 <= 10)
 				{
 					std::string key = text.substr(i + 2, close - i - 2);
 
@@ -424,6 +437,7 @@ namespace ms
 
 		return std::all_of(goals.begin(), goals.end(), [](const QuestObjective& goal) { return goal.met(); })
 			&& party_rank_met(*QuestCatalog::get().find(id), questlog.rank_count("S"))
+			&& completed_met(*QuestCatalog::get().find(id), questlog.completed_count())
 			? Icon::READY : Icon::IN_PROGRESS;
 	}
 

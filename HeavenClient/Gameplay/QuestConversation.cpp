@@ -97,6 +97,9 @@ namespace ms
 				if (stop == QuestStop::NONE && !party_rank_met(quest, player().get_quests().rank_count("S")))
 					return QuestStop::PARTY_RANK;
 
+				if (stop == QuestStop::NONE && !completed_met(quest, player().get_quests().completed_count()))
+					return QuestStop::COMPLETED;
+
 				return stop;
 			}
 

@@ -37,12 +37,30 @@ namespace ms
 			return "";
 		}
 
-		// The party quests at rank S against a quest's partyQuest_S, which the
-		// PQ Mania tokens show.
-		struct RankS
+		// A count against a quest's need for it, which the titles' tokens show
+		// as the count, a percentage and a gauge: `share` is the count's part
+		// of `whole`, clamped to 0..whole, and 0 with no need.
+		struct Tally
 		{
 			int32_t count = 0;
 			int32_t need = 0;
+
+			int32_t share(int32_t whole) const
+			{
+				return need <= 0 ? 0 : std::clamp(count * whole / need, 0, whole);
+			}
+		};
+
+		// What the titles' tokens read beside the record: the party quests at
+		// rank S against partyQuest_S (PQ Mania), the quests completed as the
+		// client counts them against questComplete (Quest Specialist), and
+		// the character's level and fame.
+		struct Counts
+		{
+			Tally rank_s;
+			Tally completed;
+			int32_t level = 0;
+			int32_t fame = 0;
 		};
 
 		// The gauge #jgaugePqS# draws: the 79x8 frame and up to 75 one-pixel
@@ -69,24 +87,37 @@ namespace ms
 		// as the client's quest text formatter (0x99dd54) writes it: counts
 		// "%4d" (the seconds "%2d"), the give-ups the tries less the rest, a
 		// reward "Acquire" or "Fail", the rank as its image (F if none), PQ
-		// Mania's S ranks as a count, a percentage and a gauge of the need,
-		// and anything else as it stands.
+		// Mania's S ranks and Quest Specialist's quests as a count, a
+		// percentage and a gauge of the need, the level and fame "%d", and
+		// anything else as it stands.
 		inline std::string token(const std::string& key, const std::function<std::string(const std::string&)>& get,
-			RankS rank_s = {})
+			Counts counts = {})
 		{
-			auto share = [&](int32_t whole)
-			{
-				return rank_s.need <= 0 ? 0 : std::clamp(rank_s.count * whole / rank_s.need, 0, whole);
-			};
+			auto gauge = [](Tally tally) { return "#f" + GAUGE + std::to_string(tally.share(GAUGE_SLICES)) + "#"; };
 
 			if (key == "scnt")
-				return std::to_string(rank_s.count);
+				return std::to_string(counts.rank_s.count);
 
 			if (key == "perPqS")
-				return std::to_string(share(100));
+				return std::to_string(counts.rank_s.share(100));
 
 			if (key == "gaugePqS")
-				return "#f" + GAUGE + std::to_string(share(GAUGE_SLICES)) + "#";
+				return gauge(counts.rank_s);
+
+			if (key == "cmpcnt")
+				return std::to_string(counts.completed.count);
+
+			if (key == "perQCnt")
+				return std::to_string(counts.completed.share(100));
+
+			if (key == "gaugeQCnt")
+				return gauge(counts.completed);
+
+			if (key == "level")
+				return std::to_string(counts.level);
+
+			if (key == "pop")
+				return std::to_string(counts.fame);
 
 			auto number = [&](const std::string& k) { return std::atoi(get(k).c_str()); };
 			auto padded = [](int32_t n, size_t width)
