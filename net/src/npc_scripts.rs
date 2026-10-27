@@ -2403,6 +2403,15 @@ impl NpcScript {
             "q2325e" => Some(james_found()),
             "q2327s" => Some(james_escapes()),
             "q2338s" => Some(scarrs_spare_spore()),
+            "q2251e" => Some(recording_charms()),
+            "q2254s" => Some(rememberer_points_to_karcasa()),
+            "q2257e" => Some(camel_cab_says(keys::CAMEL_CAB_KARCASA, KARCASA_RELENTS)),
+            "q2258s" => Some(meerkats_ask()),
+            "q2258e" => Some(camel_cab_says(keys::CAMEL_CAB_MEERKATS_DONE, MEERKATS)),
+            "q2259s" => Some(camel_cab_starts(keys::CAMEL_CAB_SAHEL, SCORPIONS)),
+            "q2259e" => Some(scorpions_cant_listen(player)),
+            "q2260s" => Some(camel_cab_starts(keys::CAMEL_CAB_LEVEL_30, TO_THE_CASTLE)),
+            "q2260e" => Some(camel_cab_says(keys::CAMEL_CAB_CASTLE_WAY, TO_THE_CASTLE)),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -2971,6 +2980,88 @@ fn scarrs_spare_spore() -> NpcScript {
     ];
     script.inventory_full = Some(text(keys::SCARRS_SPORE_FULL));
     script
+}
+
+const REMEMBERER: i32 = 1061011;
+const RECORDING_CHARM: i32 = 4032399;
+const ZOMBIE_SIGNAL_3: i16 = 2251;
+const KARCASA_OF_THE_DESERT: i16 = 2254;
+const KARCASA_RELENTS: i16 = 2257;
+const MEERKATS: i16 = 2258;
+const SCORPIONS: i16 = 2259;
+const TO_THE_CASTLE: i16 = 2260;
+
+/// `q2251e`, Zombie Mushroom Signal 3: The Rememberer takes the 20
+/// Recording Charms the end asks for (4032399, a Zombie Mushroom's quest
+/// drop) and completes the quest for its 8,000 EXP, which a script's
+/// completion doesn't apply (Cosmic `2251.js`). The text is unsourced.
+fn recording_charms() -> NpcScript {
+    let mut script = NpcScript::new(REMEMBERER, vec![Page::Say(text(keys::REMEMBERER_CHARMS))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: RECORDING_CHARM,
+            quantity: 20,
+        },
+        Effect::CompleteQuest(ZOMBIE_SIGNAL_3),
+        Effect::GainExp(8000),
+    ];
+    script
+}
+
+/// `q2254s`, Karcasa of the Desert: The Rememberer's research says the
+/// Mushroom Castle is in trouble, and Karcasa (2101013) may know more;
+/// he ends the quest from the data. No source has the script, so its one
+/// page follows `QuestInfo` and is unsourced.
+fn rememberer_points_to_karcasa() -> NpcScript {
+    let mut script = NpcScript::new(REMEMBERER, vec![Page::Say(text(keys::REMEMBERER_KARCASA))]);
+    script.on_end = vec![Effect::StartQuest(KARCASA_OF_THE_DESERT)];
+    script
+}
+
+/// The Camel Cab's page for an About the Mushroom Castle... quest it
+/// ends (`q2257e`, `q2258e`, `q2260e`; Cosmic `2257.js` to `2260.js`),
+/// whose checks are the data's: 2258's 40 Meerkats, 2260's level 30. The
+/// text is unsourced.
+fn camel_cab_says(key: &str, quest: i16) -> NpcScript {
+    let mut script = NpcScript::new(CAMEL_CAB, vec![Page::Say(text(key))]);
+    script.on_end = vec![Effect::CompleteQuest(quest)];
+    script
+}
+
+/// The Camel Cab's page for a quest it starts (`q2259s`, `q2260s`).
+fn camel_cab_starts(key: &str, quest: i16) -> NpcScript {
+    let mut script = NpcScript::new(CAMEL_CAB, vec![Page::Say(text(key))]);
+    script.on_end = vec![Effect::StartQuest(quest)];
+    script
+}
+
+/// `q2258s`, Meerkats Listen During the Day: the Camel Cab asks the
+/// player to clear Meerkats from his way; on yes he says how many and the
+/// quest starts, with its five-minute clock (`QuestInfo` `timeLimit`).
+fn meerkats_ask() -> NpcScript {
+    let mut script = NpcScript::new(
+        CAMEL_CAB,
+        vec![
+            Page::Ask {
+                text: text(keys::CAMEL_CAB_MEERKATS_ASK),
+                on_yes: Vec::new(),
+                on_no: None,
+            },
+            Page::Say(text(keys::CAMEL_CAB_MEERKATS_GO)),
+        ],
+    );
+    script.on_end = vec![Effect::StartQuest(MEERKATS)];
+    script
+}
+
+/// `q2259e`, Scorpions Can't Listen at Night: the Camel Cab tells what he
+/// knows only at Sahel 1, where no Meerkat listens; outside Ariant he
+/// sends the player on and the quest stays open (Cosmic `2259.js`).
+fn scorpions_cant_listen(player: &Player) -> NpcScript {
+    if player.stats.map_id == OUTSIDE_ARIANT {
+        return NpcScript::new(CAMEL_CAB, vec![Page::Say(text(keys::CAMEL_CAB_NOT_HERE))]);
+    }
+    camel_cab_says(keys::CAMEL_CAB_PRIVATE, SCORPIONS)
 }
 
 /// Endangered Mushking Empire (2300-2304): an Explorer's job instructor
@@ -11013,6 +11104,76 @@ mod tests {
             panic!("told");
         };
         assert_eq!(full.text, text(keys::SCARRS_SPORE_FULL));
+    }
+
+    #[test]
+    fn the_rememberer_takes_the_recording_charms_and_points_to_karcasa() {
+        let script = |name| NpcScript::for_quest(name, &player(50)).unwrap();
+        assert_eq!(
+            read_through(script("q2251e")),
+            (
+                REMEMBERER,
+                vec![
+                    Effect::TakeItem {
+                        item_id: RECORDING_CHARM,
+                        quantity: 20
+                    },
+                    Effect::CompleteQuest(ZOMBIE_SIGNAL_3),
+                    Effect::GainExp(8000),
+                ]
+            )
+        );
+        assert_eq!(
+            read_through(script("q2254s")),
+            (REMEMBERER, vec![Effect::StartQuest(KARCASA_OF_THE_DESERT)])
+        );
+    }
+
+    #[test]
+    fn the_camel_cab_talks_about_the_mushroom_castle_out_of_the_meerkats_hearing() {
+        let at = |map| {
+            let mut player = player(50);
+            player.stats.map_id = map;
+            player
+        };
+        let script = |name, map| NpcScript::for_quest(name, &at(map)).unwrap();
+        for (name, effect) in [
+            ("q2257e", Effect::CompleteQuest(KARCASA_RELENTS)),
+            ("q2258e", Effect::CompleteQuest(MEERKATS)),
+            ("q2259s", Effect::StartQuest(SCORPIONS)),
+            ("q2260s", Effect::StartQuest(TO_THE_CASTLE)),
+            ("q2260e", Effect::CompleteQuest(TO_THE_CASTLE)),
+        ] {
+            assert_eq!(
+                read_through(script(name, OUTSIDE_ARIANT)),
+                (CAMEL_CAB, vec![effect]),
+                "{name}"
+            );
+        }
+
+        // 2258 asks first; no is the end of it.
+        let mut meerkats = script("q2258s", OUTSIDE_ARIANT);
+        assert_eq!(kind(&meerkats.begin()), Some(1));
+        let no = meerkats.respond(ScriptInput::No).unwrap();
+        assert_eq!((no.prompt, no.effects), (None, vec![]));
+        let mut meerkats = script("q2258s", OUTSIDE_ARIANT);
+        meerkats.begin();
+        let go = meerkats.respond(ScriptInput::Yes).unwrap();
+        assert!(go.prompt.is_some() && go.effects.is_empty());
+        assert_eq!(
+            meerkats.respond(ScriptInput::Next).unwrap().effects,
+            [Effect::StartQuest(MEERKATS)]
+        );
+
+        // 2259 ends only at Sahel 1.
+        assert_eq!(
+            read_through(script("q2259e", OUTSIDE_ARIANT)),
+            (CAMEL_CAB, vec![])
+        );
+        assert_eq!(
+            read_through(script("q2259e", 260020700)),
+            (CAMEL_CAB, vec![Effect::CompleteQuest(SCORPIONS)])
+        );
     }
 
     #[test]

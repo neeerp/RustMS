@@ -523,6 +523,17 @@ pub mod keys {
     /// Unsourced.
     pub const SCARRS_SPARE_SPORE: &str = "mc_scarrs.spare_spore";
     pub const SCARRS_SPORE_FULL: &str = "mc_scarrs.spore_full";
+    pub const REMEMBERER_CHARMS: &str = "mc_rememberer.charms";
+    pub const REMEMBERER_KARCASA: &str = "mc_rememberer.karcasa";
+    pub const CAMEL_CAB_KARCASA: &str = "mc_camel_cab.karcasa";
+    pub const CAMEL_CAB_MEERKATS_ASK: &str = "mc_camel_cab.meerkats_ask";
+    pub const CAMEL_CAB_MEERKATS_GO: &str = "mc_camel_cab.meerkats_go";
+    pub const CAMEL_CAB_MEERKATS_DONE: &str = "mc_camel_cab.meerkats_done";
+    pub const CAMEL_CAB_SAHEL: &str = "mc_camel_cab.sahel";
+    pub const CAMEL_CAB_NOT_HERE: &str = "mc_camel_cab.not_here";
+    pub const CAMEL_CAB_PRIVATE: &str = "mc_camel_cab.private";
+    pub const CAMEL_CAB_LEVEL_30: &str = "mc_camel_cab.level_30";
+    pub const CAMEL_CAB_CASTLE_WAY: &str = "mc_camel_cab.castle_way";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -2907,6 +2918,17 @@ mod tests {
             keys::JAMES_DISGUISE,
             keys::SCARRS_SPARE_SPORE,
             keys::SCARRS_SPORE_FULL,
+            keys::REMEMBERER_CHARMS,
+            keys::REMEMBERER_KARCASA,
+            keys::CAMEL_CAB_KARCASA,
+            keys::CAMEL_CAB_MEERKATS_ASK,
+            keys::CAMEL_CAB_MEERKATS_GO,
+            keys::CAMEL_CAB_MEERKATS_DONE,
+            keys::CAMEL_CAB_SAHEL,
+            keys::CAMEL_CAB_NOT_HERE,
+            keys::CAMEL_CAB_PRIVATE,
+            keys::CAMEL_CAB_LEVEL_30,
+            keys::CAMEL_CAB_CASTLE_WAY,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

@@ -278,3 +278,13 @@ replace = [{ item = 2022618, prob = 1.0 }]
 # and The Recovered Royal Seal (2342) has Violetta keep the one he dropped
 # for whoever left it behind. The pack has no drops for him.
 add = [{ item = 4001318, prob = 1.0, quest = 2331 }]
+
+[mobs.2230101]
+# Zombie Mushroom: Zombie Mushroom Signal 3 (2251) asks for 20 Recording
+# Charms 4032399 (Quest.nx Check.img/2251/1/item). The pack lacks it; one
+# in five, the community servers' rate.
+add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
+
+[mobs.2230131]
+# Annoyed Zombie Mushroom (Studying the Mushroom Signals 2's): the same.
+add = [{ item = 4032399, prob = 0.2, quest = 2251 }]
