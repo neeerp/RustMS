@@ -591,6 +591,12 @@ pub mod keys {
     pub const GRAY_GARBLED: &str = "omega_gray.garbled";
     pub const ELESKA_BOX_THANKS: &str = "ariant_eleska.box_thanks";
     pub const MANJI_DESERT_MISSION: &str = "perion_manji.desert_mission";
+    pub const NAUTILUS_BUSH_SEARCH: &str = "nautilus_bush.search";
+    pub const NAUTILUS_BUSH_SEARCHED: &str = "nautilus_bush.searched";
+    pub const NAUTILUS_BUSH_FULL: &str = "nautilus_bush.full";
+    pub const NAUTILUS_ABEL_FOUND: &str = "nautilus_abel.found";
+    pub const NAUTILUS_ABEL_OTHER: &str = "nautilus_abel.other";
+    pub const NAUTILUS_ABEL_FULL: &str = "nautilus_abel.full";
     /// A job instructor's recommendation letter to the Mushking Empire
     /// (`q2300s`-`q2304s`), and the Head Security Officer reading it
     /// (`q2300e`-`q2304e`), the player answering him.
@@ -3035,6 +3041,12 @@ mod tests {
             keys::GRAY_GARBLED,
             keys::ELESKA_BOX_THANKS,
             keys::MANJI_DESERT_MISSION,
+            keys::NAUTILUS_BUSH_SEARCH,
+            keys::NAUTILUS_BUSH_SEARCHED,
+            keys::NAUTILUS_BUSH_FULL,
+            keys::NAUTILUS_ABEL_FOUND,
+            keys::NAUTILUS_ABEL_OTHER,
+            keys::NAUTILUS_ABEL_FULL,
             keys::MC_LETTER_ASK,
             keys::MC_LETTER_LATER,
             keys::MC_LETTER_FULL,

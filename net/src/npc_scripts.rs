@@ -2172,6 +2172,16 @@ impl NpcScript {
                 return Some(script);
             }
         }
+        if NAUTILUS_BUSHES.contains(&npc_id)
+            && player.quests.state(FIND_MY_GLASSES) == QuestState::Started
+        {
+            return Some(nautilus_bush(npc_id, player, &mut rand::thread_rng()));
+        }
+        if npc_id == ABEL {
+            if let Some(script) = abel_takes_other_glasses(player) {
+                return Some(script);
+            }
+        }
         if npc_id == TANGYOON && player.quests.state(FRESH_MILK) == QuestState::Started {
             return Some(tangyoon());
         }
@@ -2477,6 +2487,7 @@ impl NpcScript {
             "q2124e" => Some(moppies_box(SAND_CREW_SUPPLY, MOPPIES_BOX)),
             "q2126e" => Some(moppies_box(SAND_CREW_SUPPLY_AGAIN, MOPPIES_BOX_AGAIN)),
             "q2127e" => Some(to_the_desert()),
+            "q2186e" => Some(abels_glasses_found()),
             "q2314s" => Some(secretary_sends(
                 EXPLORING_MUSHROOM_FOREST,
                 keys::MC_FOREST_ASK,
@@ -3536,6 +3547,81 @@ fn to_the_desert() -> NpcScript {
     let mut script = NpcScript::new(MANJI, vec![Page::Say(text(keys::MANJI_DESERT_MISSION))]);
     script.on_end = vec![Effect::CompleteQuest(TO_THE_DESERT)];
     script
+}
+
+/// Help Me Find My Glasses (2186): Abel (1094001) in Nautilus Harbor lost
+/// his glasses in the bushes there (1094002 to 1094006). While the quest is
+/// under way, a bush searched with no glasses held gives one of three
+/// pairs at even odds: Abel's own (4031853), which the data's end checks
+/// for, or one of two others (4031854, 4031855). Abel's end script takes
+/// his own for 1,700 EXP and ten Nautilus Return Scrolls (2030019); shown
+/// another pair, he takes it instead for 1,000 EXP and five scrolls and
+/// completes the quest all the same (Cosmic `2186.js` and the bushes'
+/// scripts). The text is unsourced.
+const ABEL: i32 = 1094001;
+const FIND_MY_GLASSES: i16 = 2186;
+const NAUTILUS_BUSHES: std::ops::RangeInclusive<i32> = 1094002..=1094006;
+const ABELS_GLASSES: i32 = 4031853;
+const OTHER_GLASSES: [i32; 2] = [4031854, 4031855];
+const NAUTILUS_RETURN: i32 = 2030019;
+
+/// A bush: a pair of glasses, unless one is already held.
+fn nautilus_bush(npc: i32, player: &Player, rng: &mut impl Rng) -> NpcScript {
+    let held = std::iter::once(ABELS_GLASSES)
+        .chain(OTHER_GLASSES)
+        .any(|glasses| player.inventory.count(glasses) > 0);
+    if held {
+        return NpcScript::new(npc, vec![Page::Say(text(keys::NAUTILUS_BUSH_SEARCHED))]);
+    }
+    let found = match rng.gen_range(0, 3) {
+        0 => ABELS_GLASSES,
+        n => OTHER_GLASSES[n - 1],
+    };
+    let mut script = NpcScript::new(npc, vec![Page::Say(text(keys::NAUTILUS_BUSH_SEARCH))]);
+    script.on_end = vec![Effect::GiveItem {
+        item_id: found,
+        quantity: 1,
+    }];
+    script.inventory_full = Some(text(keys::NAUTILUS_BUSH_FULL));
+    script
+}
+
+/// Abel's thanks for `glasses`: `exp` and `scrolls` Nautilus Return Scrolls.
+fn abels_thanks(words: &str, glasses: i32, exp: i32, scrolls: i16) -> NpcScript {
+    let mut script = NpcScript::new(ABEL, vec![Page::Say(text(words))]);
+    script.on_end = vec![
+        Effect::TakeItem {
+            item_id: glasses,
+            quantity: 1,
+        },
+        Effect::GainExp(exp),
+        Effect::GiveItem {
+            item_id: NAUTILUS_RETURN,
+            quantity: scrolls,
+        },
+        Effect::CompleteQuest(FIND_MY_GLASSES),
+    ];
+    script.inventory_full = Some(text(keys::NAUTILUS_ABEL_FULL));
+    script
+}
+
+/// `q2186e`: Abel's own glasses back.
+fn abels_glasses_found() -> NpcScript {
+    abels_thanks(keys::NAUTILUS_ABEL_FOUND, ABELS_GLASSES, 1700, 10)
+}
+
+/// Abel, clicked with another pair and not his own while the quest is
+/// under way.
+fn abel_takes_other_glasses(player: &Player) -> Option<NpcScript> {
+    if player.quests.state(FIND_MY_GLASSES) != QuestState::Started
+        || player.inventory.count(ABELS_GLASSES) > 0
+    {
+        return None;
+    }
+    let other = OTHER_GLASSES
+        .into_iter()
+        .find(|&glasses| player.inventory.count(glasses) > 0)?;
+    Some(abels_thanks(keys::NAUTILUS_ABEL_OTHER, other, 1000, 5))
 }
 
 /// The Endangered Lives of Grays (3455): Dr. Kim's Wave Translator
@@ -11806,6 +11892,75 @@ mod tests {
                 Effect::GainExp(20000),
             ]
         );
+    }
+
+    #[test]
+    fn a_bush_gives_glasses_and_abel_takes_any_pair() {
+        let looking = |held: Option<i32>| {
+            let mut player = traveller(20, 0, false);
+            player.quests.upsert(game::QuestRecord {
+                quest_id: FIND_MY_GLASSES,
+                status: QuestStatus::Started {
+                    kills: Vec::new(),
+                    info: None,
+                },
+            });
+            if let Some(glasses) = held {
+                player
+                    .inventory
+                    .insert(game::InventoryType::Etc, 1, game::Item::stack(glasses, 1));
+            }
+            player
+        };
+        use rand::SeedableRng;
+        let rng = &mut rand::rngs::StdRng::seed_from_u64(7);
+        let mut found = std::collections::BTreeSet::new();
+        for _ in 0..30 {
+            let (npc, effects) = read_through(nautilus_bush(1094004, &looking(None), rng));
+            assert_eq!(npc, 1094004);
+            let [Effect::GiveItem {
+                item_id,
+                quantity: 1,
+            }] = effects[..]
+            else {
+                panic!("{effects:?}");
+            };
+            found.insert(item_id);
+        }
+        assert_eq!(
+            found.into_iter().collect::<Vec<_>>(),
+            [ABELS_GLASSES, OTHER_GLASSES[0], OTHER_GLASSES[1]]
+        );
+        // One pair at a time; and without the quest the bush is a bush.
+        let searched = nautilus_bush(1094004, &looking(Some(OTHER_GLASSES[1])), rng);
+        assert_eq!(read_through(searched).1, []);
+        assert!(NpcScript::for_npc(1094004, &traveller(20, 0, false)).is_none());
+
+        let thanks = |glasses, exp, scrolls| {
+            vec![
+                Effect::TakeItem {
+                    item_id: glasses,
+                    quantity: 1,
+                },
+                Effect::GainExp(exp),
+                Effect::GiveItem {
+                    item_id: NAUTILUS_RETURN,
+                    quantity: scrolls,
+                },
+                Effect::CompleteQuest(FIND_MY_GLASSES),
+            ]
+        };
+        let own = NpcScript::for_quest("q2186e", &looking(Some(ABELS_GLASSES))).unwrap();
+        assert_eq!(read_through(own), (ABEL, thanks(ABELS_GLASSES, 1700, 10)));
+        let other = NpcScript::for_npc(ABEL, &looking(Some(OTHER_GLASSES[0]))).unwrap();
+        assert!(other.inventory_full.is_some());
+        assert_eq!(
+            read_through(other),
+            (ABEL, thanks(OTHER_GLASSES[0], 1000, 5))
+        );
+        // His own pair goes through the quest's end instead.
+        assert!(NpcScript::for_npc(ABEL, &looking(Some(ABELS_GLASSES))).is_none());
+        assert!(NpcScript::for_npc(ABEL, &looking(None)).is_none());
     }
 
     #[test]
