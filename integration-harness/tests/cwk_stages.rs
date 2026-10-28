@@ -1,12 +1,14 @@
-//! Crimsonwood Keep's first two stages and their ways on. The first's way
+//! Crimsonwood Keep's first four stages and their ways on. The first's way
 //! on stays shut until a member finds the stage's hidden way, behind the
 //! pillar by the Lion Shield; that takes the finder back to the stage's
 //! start and clears it for all, with its EXP and mesos. The way on then
 //! leads to the second stage, on its own clock, whose way on stays shut
-//! until a skill of each job has lit that job's sigil. The harness lets
-//! two set out (`RUSTMS_EXPEDITION_MIN`) and runs events 60 times as fast
-//! (`RUSTMS_EVENT_SCALE`), so the first stage's clock lasts 2 seconds and
-//! the second's 10.
+//! until a skill of each job has lit that job's sigil. The third's way on
+//! waits on its sigils, which set its menhirs going, and on five trips up
+//! its way up; the fourth wakes a sigil of each job, which clear it once
+//! lit. The harness lets two set out (`RUSTMS_EXPEDITION_MIN`) and runs
+//! events 60 times as fast (`RUSTMS_EVENT_SCALE`), so the first stage's
+//! clock lasts 2 seconds and the later ones' 10.
 
 use game_data::server_content::keys;
 use integration_harness::database::{grant_item, grant_skill, set_job};
@@ -17,7 +19,10 @@ use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
-use net::events::{CWK, CWK_ENTRY, CWK_HIDDEN_WAY, CWK_LOBBY, CWK_SIGILS, CWK_SIGIL_LINES};
+use net::events::{
+    cwk_menhirs, CWK, CWK_ENTRY, CWK_HIDDEN_WAY, CWK_LATER_SIGILS, CWK_LOBBY, CWK_MENHIR_LINES,
+    CWK_SIGILS, CWK_SIGIL_LINES,
+};
 use net::npc_scripts::CWK_RECRUITER;
 use tokio::time::Duration;
 
@@ -28,6 +33,12 @@ const PINK: u8 = 5;
 const WAY_ON: &str = "next00";
 const STAGE2: i32 = CWK_ENTRY + 100;
 const STAGE3: i32 = CWK_ENTRY + 200;
+const STAGE4: i32 = CWK_ENTRY + 300;
+/// The third stage's way up, and its way on.
+const WAY_UP: &str = "next00";
+const STAGE3_WAY_ON: &str = "next01";
+/// The fourth stage's fakes.
+const FAKES: [i32; 3] = [6_108_000, 6_108_001, 6_108_005];
 /// A skill of each job that lights its sigil: a White Knight's, a
 /// Ranger's, a Fire/Poison Wizard's, a Hermit's and a Marauder's.
 const SIGIL_SKILLS: [i32; 5] = [1_211_002, 3_211_006, 2_111_002, 4_111_005, 5_111_005];
@@ -68,6 +79,15 @@ fn line(key: &str) -> (String, i32) {
 fn sigil(t: &Trace, job: i32) -> Option<MapReactor> {
     let mut reactors = t.field.reactors.iter();
     reactors.find(|r| r.reactor_id == CWK_SIGILS + job).copied()
+}
+
+/// The line "`n` more to go" up the third stage's way up.
+fn to_go(n: u8) -> (String, i32) {
+    let n = n.to_string();
+    (
+        net::content::text().get(keys::CWK_STEPS_TO_GO, &[("n", &n)]),
+        0,
+    )
 }
 
 /// Whether `t` has seen all five sigils.
@@ -214,7 +234,148 @@ async fn the_keep_s_first_stages_clear_by_the_hidden_way_and_the_sigils() {
     let mut lt = Trace::default();
     touch_script_portal(&mut leader, STAGE2, WAY_ON).await;
     until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&STAGE3) && all_sigils(t)
+    })
+    .await;
+    let sigils: Vec<_> = (0..5).filter_map(|job| sigil(&lt, job)).collect();
+    let mut mt = Trace::default();
+    touch_script_portal(&mut member, STAGE2, WAY_ON).await;
+    until(&mut member.connection, &mut mt, |t| {
         t.warps.contains(&STAGE3)
     })
     .await;
+
+    // Whose way on is shut.
+    touch_script_portal(&mut leader, STAGE3, STAGE3_WAY_ON).await;
+    hears(&mut leader, &mut lt, keys::CWK_WAY_SHUT).await;
+    assert_eq!(lt.warps, [STAGE3], "{lt:?}");
+
+    // Each trip up the way up takes the leader back down, and everyone
+    // hears how many more are to go; past five, that not all the sigils
+    // are lit.
+    for n in (0..5).rev() {
+        touch_script_portal(&mut leader, STAGE3, WAY_UP).await;
+        until(&mut leader.connection, &mut lt, |t| {
+            t.item_lines.contains(&to_go(n))
+        })
+        .await;
+    }
+    touch_script_portal(&mut leader, STAGE3, WAY_UP).await;
+    let not_all = line(keys::CWK_STEPS_NOT_ALL);
+    until(&mut leader.connection, &mut lt, |t| {
+        t.item_lines.contains(&not_all)
+    })
+    .await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.iter().filter(|&&map| map == STAGE3).count() == 7
+    })
+    .await;
+    until(&mut member.connection, &mut mt, |t| {
+        (0..5).all(|n| t.item_lines.contains(&to_go(n))) && t.item_lines.contains(&not_all)
+    })
+    .await;
+
+    // Each sigil lit sets its menhirs going; with the fifth, the stage
+    // clears with its EXP and mesos.
+    let c = &mut leader.connection;
+    for (job, sigil) in sigils.iter().enumerate() {
+        send(c, walk_to(sigil.x, sigil.y)).await;
+        send(c, skill_at_reactor(sigil.object_id, SIGIL_SKILLS[job])).await;
+    }
+    let (exp, meso) = (CWK.stage_exp(3), CWK.stage_meso(3));
+    let menhirs: Vec<_> = (0..5)
+        .flat_map(cwk_menhirs)
+        .map(|&name| (name.to_string(), 1))
+        .collect();
+    for (player, t) in [(&mut leader, &mut lt), (&mut member, &mut mt)] {
+        until(&mut player.connection, t, |t| {
+            CWK_MENHIR_LINES
+                .iter()
+                .all(|&key| t.item_lines.contains(&line(key)))
+                && menhirs
+                    .iter()
+                    .all(|menhir| t.field.obstacles.contains(menhir))
+                && t.item_lines.contains(&line(keys::CWK_SIGILS_DONE))
+                && cleared(t)
+                && t.gains.contains(&exp)
+                && t.meso_gains.contains(&meso)
+        })
+        .await;
+    }
+
+    // Now a trip up tells just the one who took it the way on is open:
+    // the member hears it once, for their own trip after the leader's.
+    touch_script_portal(&mut leader, STAGE3, WAY_UP).await;
+    hears_item(&mut leader, &mut lt, keys::CWK_STEPS_OPEN).await;
+    touch_script_portal(&mut member, STAGE3, WAY_UP).await;
+    hears_item(&mut member, &mut mt, keys::CWK_STEPS_OPEN).await;
+    let open = line(keys::CWK_STEPS_OPEN);
+    let heard = mt.item_lines.iter().filter(|&l| *l == open).count();
+    assert_eq!(heard, 1, "{mt:?}");
+
+    // The way on leads to the fourth stage.
+    let mut lt = Trace::default();
+    touch_script_portal(&mut leader, STAGE3, STAGE3_WAY_ON).await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.warps.contains(&STAGE4) && woken(t).len() == 8
+    })
+    .await;
+
+    // Where a sigil of each job and a fake have woken, at eight places.
+    let woken = woken(&lt);
+    let mut jobs: Vec<_> = (woken.iter())
+        .map(|r| (r.reactor_id - CWK_LATER_SIGILS).clamp(-1, 5))
+        .collect();
+    jobs.sort();
+    jobs.dedup();
+    assert_eq!(jobs, [-1, 0, 1, 2, 3, 4], "{woken:?}");
+    for (n, r) in woken.iter().enumerate() {
+        let near = |o: &&MapReactor| (o.x - r.x).abs() < 10 && (o.y - r.y).abs() < 10;
+        assert_eq!(woken[n + 1..].iter().filter(near).count(), 0, "{woken:?}");
+    }
+
+    // The woken sigils light as the second stage's do, and clear the
+    // stage.
+    let c = &mut leader.connection;
+    for job in 0..5 {
+        let mut sigils = woken.iter();
+        let sigil = sigils
+            .find(|r| r.reactor_id == CWK_LATER_SIGILS + job)
+            .unwrap();
+        send(c, walk_to(sigil.x, sigil.y)).await;
+        send(
+            c,
+            skill_at_reactor(sigil.object_id, SIGIL_SKILLS[job as usize]),
+        )
+        .await;
+    }
+    let (exp, meso) = (CWK.stage_exp(4), CWK.stage_meso(4));
+    until(c, &mut lt, |t| {
+        CWK_SIGIL_LINES
+            .iter()
+            .all(|&key| t.item_lines.contains(&line(key)))
+            && t.item_lines.contains(&line(keys::CWK_SIGILS_DONE))
+            && cleared(t)
+            && t.gains.contains(&exp)
+            && t.meso_gains.contains(&meso)
+    })
+    .await;
+}
+
+/// `player` hears `key` in the chat log, as of an item.
+async fn hears_item(player: &mut WorldSession, t: &mut Trace, key: &str) {
+    until(&mut player.connection, t, |t| {
+        t.item_lines.contains(&line(key))
+    })
+    .await;
+}
+
+/// The fourth stage's sigils and fakes that `t` saw woken.
+fn woken(t: &Trace) -> Vec<MapReactor> {
+    let later = CWK_LATER_SIGILS..CWK_LATER_SIGILS + 5;
+    let reactors = t.field.reactors.iter();
+    let woken = reactors.filter(|r| {
+        r.state == 1 && (later.contains(&r.reactor_id) || FAKES.contains(&r.reactor_id))
+    });
+    woken.copied().collect()
 }

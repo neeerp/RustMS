@@ -78,6 +78,7 @@ impl ClientActor {
                 let open = state == Some(net::events::AMORIA_GATE_OPEN);
                 Some(scripts::amoria_door(map_id, portal, open))
             }
+            (Some(script), Some(_)) if script == scripts::CWK_STEP => self.cwk_step().await?,
             (Some(script), Some(_)) if script == scripts::PAPULATUS_IN => {
                 match scripts::time_leap(&self.in_game()?.player) {
                     Some(effects) => Some(effects),

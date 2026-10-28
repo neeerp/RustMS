@@ -1579,8 +1579,8 @@ The stages' ways on are script portals, `glpqPortal0` to `glpqPortal7`
 (`scripts::cwk_way_on`, reached through `cwk_portal` in the client's
 portal chain). Each stays shut with a pink line until its stage clears,
 then leads to the next stage's map; `glpqPortal7`, to the treasure room,
-is always open. `glpqPortal2`, stage 3's climb that sends members back
-down, comes with the sigils. Stages 2 to 5 show their portal objects,
+is always open. `glpqPortal2`, at the top of stage 3's climb, is not a
+way on (below). Stages 2 to 5 show their portal objects,
 `2pt` to `5pt`, when they clear (`EventTicket::gate_object`).
 
 The first stage hides its way on behind the pillar by the Lion Shield.
@@ -1603,10 +1603,34 @@ skill of its job by it (a skill-used reactor event; see
 (`Cleared::light_sigil`). Everyone hears in the chat log that it lit
 (`CWK_SIGIL_LINES`, `cwk.sigil.*`), and with the fifth that the way on is
 open (`cwk.sigils.done`), and the stage clears (Cosmic `6109000`'s `act`).
-The fourth stage's sigils (6109016 to 6109020) count the same way, once
-the stage wakes them. The picks are in QUESTIONS b265. The third stage's
-sigils and menhirs, the fourth's waking, the job rooms of stage 5, its
-boss and the treasure room come in later slices.
+The picks are in QUESTIONS b265.
+
+The third stage (610030300) has the same five sigils. Each also sets the
+stage's menhirs going, traps that the field shows moved to everyone there
+and to later arrivals (`events::cwk_menhirs`, `FieldActor::move_obstacle`;
+Cosmic `moveEnvironment`): the warriors' `menhir0`, the bowmen's `menhir1`
+and `menhir2`, then `menhir3` to `menhir5`. Its lines say so
+(`CWK_MENHIR_LINES`, `cwk.menhirs.*`). Its way on also waits on its climb:
+its top portal, `next00` (`scripts::CWK_STEP`, `glpqPortal2`), takes
+whoever reaches it back to the start and tells the event
+(`EventCommand::CwkStep`, `Cleared::step`). Until five have, everyone
+hears how many more are to go (`cwk.steps.to_go`); after that, that not
+all the sigils are lit (`cwk.steps.not_all`). With all five sigils lit and
+five up, whichever came last, everyone hears the way on is open and the
+stage clears. After that, the climber alone hears the way on below is
+open (`cwk.steps.open`). The picks are in QUESTIONS b266.
+
+The fourth stage (610030400) has 35 reactors over eight places: sigils of
+each job (6109016 to 6109020, named `4skillN…` for job N) and fakes
+(6108000, 6108001 and 6108005, `4fake…`), all asleep in state 0. When
+the stage's field starts, it wakes one at each place (`events::cwk_wake`,
+`CWK_WAKING`; Cosmic CWKPQ's `generateMapReactors`), drawn again until a
+sigil of each job is among them (the last place has only fakes), and
+deals the eight places out among them afresh
+(`ReactorSet::shuffle_named`). Its woken sigils count as the second
+stage's do. Its fakes break on a swing. The job rooms of stage 5, the
+boss and the treasure room come in later slices, as does the fourth
+stage's flames.
 
 ## Jr. Balrog's room
 

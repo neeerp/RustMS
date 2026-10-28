@@ -333,6 +333,16 @@ impl FieldActor {
         if reactors::shuffled(key.map_id) {
             reactors.shuffle(&mut rand::thread_rng());
         }
+        // Crimsonwood Keep's fourth stage wakes a sigil of each job and
+        // fakes, which then change places (Cosmic CWKPQ's
+        // `generateMapReactors`).
+        if key.map_id == net::events::CWK_ENTRY + 300 {
+            let woken = net::events::cwk_wake(&mut rand::thread_rng());
+            for name in woken {
+                reactors.set_state(name, 1);
+            }
+            reactors.shuffle_named(&woken, &mut rand::thread_rng());
+        }
         // The trips are read from the same moment the elevator's car is
         // placed, so that no change is missed or shown twice.
         let route_time = conti::now();
@@ -4137,6 +4147,12 @@ impl FieldActor {
                         let job = net::events::cwk_sigil(view.reactor_id);
                         if let (Some(job), Some(occupant)) = (job, self.occupants.get(&by)) {
                             occupant.handle.send(ServerMessage::SigilLit(job));
+                        }
+                        // The third stage's set its menhirs going.
+                        if self.key.map_id == net::events::CWK_ENTRY + 200 {
+                            for name in job.map_or(&[][..], net::events::cwk_menhirs) {
+                                self.move_obstacle(name, 1);
+                            }
                         }
                     }
                     reactors::Action::Spear => self.spears_set(by),

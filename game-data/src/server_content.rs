@@ -2248,6 +2248,14 @@ pub mod keys {
     pub const CWK_SIGIL_THIEF: &str = "cwk.sigil.thief";
     pub const CWK_SIGIL_PIRATE: &str = "cwk.sigil.pirate";
     pub const CWK_SIGILS_DONE: &str = "cwk.sigils.done";
+    pub const CWK_MENHIRS_WARRIOR: &str = "cwk.menhirs.warrior";
+    pub const CWK_MENHIRS_ARCHER: &str = "cwk.menhirs.archer";
+    pub const CWK_MENHIRS_MAGE: &str = "cwk.menhirs.mage";
+    pub const CWK_MENHIRS_THIEF: &str = "cwk.menhirs.thief";
+    pub const CWK_MENHIRS_PIRATE: &str = "cwk.menhirs.pirate";
+    pub const CWK_STEPS_TO_GO: &str = "cwk.steps.to_go";
+    pub const CWK_STEPS_NOT_ALL: &str = "cwk.steps.not_all";
+    pub const CWK_STEPS_OPEN: &str = "cwk.steps.open";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

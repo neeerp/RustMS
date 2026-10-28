@@ -36,8 +36,8 @@ use game_data::server_content::keys;
 use game_data::skills::CarnivalSkill;
 use net::events::{
     draw_combo, draw_question, htpq_room_key, Balloon, ClockOn, Cloto, Event, EventCommand,
-    EventKind, GatherTalk, Puzzles, Ropes, RopesTalk, Stage1, Team, HTPQ_ENTRY, HTPQ_KEY_AT,
-    MAZE_COUPONS_WANTED, MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
+    EventKind, GatherTalk, Puzzles, Ropes, RopesTalk, Stage1, Team, CWK_STEPS, HTPQ_ENTRY,
+    HTPQ_KEY_AT, MAZE_COUPONS_WANTED, MAZE_COUPON_EXP, ZPQ_DOCUMENTS,
 };
 use net::loot::Loot;
 use net::packet::build::world::carnival::{
@@ -153,6 +153,19 @@ pub enum EventMessage {
     },
 }
 
+/// What a trip up the Keep's third stage's way up comes to.
+#[derive(Debug, PartialEq, Eq)]
+enum Climb {
+    /// The stage clears.
+    Done,
+    /// So many more trips are to go.
+    ToGo(u8),
+    /// The stage is already clear.
+    Open,
+    /// Enough have climbed, but not every sigil is lit.
+    NotAll,
+}
+
 /// The stages an event's party has cleared, one bit each, how many of the
 /// Pirate Ship's Marks it has handed in (`EventCommand::HandInMarks`), and
 /// how many of its chests it has opened (`EventCommand::ChestOpened`).
@@ -187,6 +200,9 @@ pub struct Cleared {
     /// Crimsonwood Keep's sigils lit, five bits a stage from the second
     /// (`EventCommand::SigilLit`).
     sigils: AtomicU16,
+    /// How many have taken the Keep's third stage's way up, up to
+    /// `CWK_STEPS` (`EventCommand::CwkStep`).
+    steps: AtomicU8,
 }
 
 impl Cleared {
@@ -243,6 +259,40 @@ impl Cleared {
         let bit = 1u16.checked_shl(shift.into()).filter(|_| job < 5)?;
         let before = self.sigils.fetch_or(bit, Ordering::AcqRel);
         (before & bit == 0).then(|| (before >> (shift - job)) & 0b1_1111)
+    }
+
+    /// Whether all five of the Keep's sigils on `stage` are lit.
+    fn sigils_lit(&self, stage: u8) -> bool {
+        let shift = stage.checked_sub(2).and_then(|n| n.checked_mul(5));
+        shift.filter(|&shift| shift < 15).is_some_and(|shift| {
+            (self.sigils.load(Ordering::Acquire) >> shift) & 0b1_1111 == 0b1_1111
+        })
+    }
+
+    fn steps(&self) -> u8 {
+        self.steps.load(Ordering::Acquire)
+    }
+
+    /// Count one more up the Keep's third stage's way; returns how many
+    /// now have, or `None` if `CWK_STEPS` already had.
+    fn step(&self) -> Option<u8> {
+        let more = |n: u8| (n < CWK_STEPS).then_some(n + 1);
+        let before = self
+            .steps
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, more);
+        before.ok().map(|n| n + 1)
+    }
+
+    /// One more up the Keep's third stage's way (Cosmic `glpqPortal2`):
+    /// the last of `CWK_STEPS`, with all the stage's sigils lit, clears it.
+    fn climb(&self) -> Climb {
+        let lit = self.sigils_lit(3);
+        match self.step() {
+            Some(CWK_STEPS) if lit => Climb::Done,
+            Some(n) => Climb::ToGo(CWK_STEPS - n),
+            None if lit => Climb::Open,
+            None => Climb::NotAll,
+        }
     }
 
     /// Take rope room `room`; returns whether no one had.
@@ -1593,6 +1643,10 @@ impl EventActor {
                 self.sigil_lit(map_id, job)
             }
             EventCommand::SigilLit { .. } => {}
+            EventCommand::CwkStep if self.kind == EventKind::Cwk && !won => {
+                self.cwk_step(client_id)
+            }
+            EventCommand::CwkStep => {}
             EventCommand::SpearsSet(set) if self.kind == EventKind::GuildQuest => {
                 self.spears_set(client_id, set)
             }
@@ -2826,7 +2880,7 @@ impl EventActor {
     /// A member lit the Keep's sigil of `job` on `map_id`: everyone hears
     /// of it, and when all five of the second or fourth stage's are lit,
     /// that its way on is open, and the stage clears (Cosmic `6109000`'s
-    /// and `6109016`'s `act`). The third stage's also wait on its menhirs.
+    /// and `6109016`'s `act`). The third stage's also wait on its way up.
     fn sigil_lit(&self, map_id: i32, job: u8) {
         let Some(stage) = self.kind.event().stage_on(map_id) else {
             return;
@@ -2834,25 +2888,68 @@ impl EventActor {
         let Some(before) = self.cleared.light_sigil(stage, job) else {
             return debug!(stage, job, "Sigil already lit");
         };
-        let mut lines = vec![net::events::CWK_SIGIL_LINES[usize::from(job)]];
-        let done = before | 1 << job == 0b1_1111 && matches!(stage, 2 | 4);
+        // The third stage's sigils also set its menhirs going.
+        let lines = match stage {
+            3 => net::events::CWK_MENHIR_LINES,
+            _ => net::events::CWK_SIGIL_LINES,
+        };
+        let mut lines = vec![lines[usize::from(job)]];
+        // The third stage's also waits on its way up.
+        let done = before | 1 << job == 0b1_1111
+            && match stage {
+                2 | 4 => true,
+                3 => self.cleared.steps() == CWK_STEPS,
+                _ => false,
+            };
         if done {
             lines.push(keys::CWK_SIGILS_DONE);
         }
-        let packets: Vec<_> = lines
-            .into_iter()
-            .filter_map(|key| build_item_line(&net::content::text().get(key, &[]), 0).ok())
+        let text = net::content::text();
+        let lines: Vec<_> = lines.into_iter().map(|key| text.get(key, &[])).collect();
+        self.tell_items(None, &lines);
+        if done {
+            self.clear(stage);
+        }
+    }
+
+    /// A member took the Keep's third stage's way up (Cosmic
+    /// `glpqPortal2`). Until `CWK_STEPS` have, each counts, and everyone
+    /// hears how many are to go; the last, with all the stage's sigils lit,
+    /// clears it. After that, everyone hears the sigils aren't all lit, or
+    /// once the stage is clear, the member hears its way on is open.
+    fn cwk_step(&self, client_id: ClientId) {
+        let text = net::content::text();
+        match self.cleared.climb() {
+            Climb::Done => {
+                self.tell_items(None, &[text.get(keys::CWK_SIGILS_DONE, &[])]);
+                self.clear(3);
+            }
+            Climb::ToGo(n) => {
+                let to_go = n.to_string();
+                let line = text.get(keys::CWK_STEPS_TO_GO, &[("n", &to_go)]);
+                self.tell_items(None, &[line]);
+            }
+            Climb::Open => self.tell_items(Some(client_id), &[text.get(keys::CWK_STEPS_OPEN, &[])]),
+            Climb::NotAll => self.tell_items(None, &[text.get(keys::CWK_STEPS_NOT_ALL, &[])]),
+        }
+    }
+
+    /// `only`, or every member, sees `lines` in the chat log, as of an
+    /// item.
+    fn tell_items(&self, only: Option<ClientId>, lines: &[String]) {
+        let packets: Vec<_> = (lines.iter())
+            .filter_map(|line| build_item_line(line, 0).ok())
             .collect();
         for member in self.team.members() {
+            if only.is_some_and(|only| only != *member) {
+                continue;
+            }
             if let Some(handle) = self.members.get(member) {
                 handle.send(ServerMessage::EventPackets {
                     id: self.id,
                     packets: packets.clone(),
                 });
             }
-        }
-        if done {
-            self.clear(stage);
         }
     }
 
@@ -2931,6 +3028,47 @@ mod tests {
         // No sigils on the first stage, nor past the fifth job's.
         assert_eq!(cleared.light_sigil(1, 0), None);
         assert_eq!(cleared.light_sigil(2, 5), None);
+        // All of a stage's lit.
+        assert!(!cleared.sigils_lit(3));
+        for job in 0..4 {
+            cleared.light_sigil(3, job);
+        }
+        assert!(cleared.sigils_lit(2) && cleared.sigils_lit(3) && !cleared.sigils_lit(4));
+        assert!(!cleared.sigils_lit(1) && !cleared.sigils_lit(5));
+    }
+
+    #[test]
+    fn the_keep_s_way_up_counts_five() {
+        let cleared = Cleared::default();
+        let steps: Vec<_> = (0..7).map(|_| cleared.step()).collect();
+        assert_eq!(
+            steps,
+            [Some(1), Some(2), Some(3), Some(4), Some(5), None, None]
+        );
+        assert_eq!(cleared.steps(), CWK_STEPS);
+    }
+
+    #[test]
+    fn the_keep_s_way_up_clears_with_the_last_of_climbs_and_sigils() {
+        // The sigils lit first: the fifth trip up clears the stage.
+        let cleared = Cleared::default();
+        for job in 0..5 {
+            cleared.light_sigil(3, job);
+        }
+        let climbs: Vec<_> = (0..6).map(|_| cleared.climb()).collect();
+        use Climb::*;
+        assert_eq!(climbs, [ToGo(4), ToGo(3), ToGo(2), ToGo(1), Done, Open]);
+        // The climbs first: then not all are lit, until they are.
+        let cleared = Cleared::default();
+        let climbs: Vec<_> = (0..6).map(|_| cleared.climb()).collect();
+        assert_eq!(
+            climbs,
+            [ToGo(4), ToGo(3), ToGo(2), ToGo(1), ToGo(0), NotAll]
+        );
+        for job in 0..5 {
+            cleared.light_sigil(3, job);
+        }
+        assert_eq!(cleared.climb(), Open);
     }
 
     #[test]
