@@ -87,6 +87,11 @@ pub enum EventKind {
     /// entrance's `TD_MC_enterboss2` to find Violetta and face the Prime
     /// Minister (Where's Violetta? and The Story of Betrayal, 2332-2333).
     WeddingHall,
+    /// The Wedding Hall again, in a copy of its own (106021601), taken by a
+    /// party (or one alone) through the hidden Blocked Entrance (1300013)
+    /// once The Seal of the Empire (2331) is done, to fight the Prime
+    /// Minister again.
+    PrimeMinister,
     /// The Spirit of Rock's floors above Kerning Square's 7th floor, taken
     /// alone from June (1052125) by one helping Blake (2286-2288).
     RockSpirit,
@@ -386,6 +391,9 @@ pub struct Event {
     /// of the maps: 1 for most, 15 for the Mu Lung Dojo's solo runs
     /// (Cosmic `Channel.ingressDojo`'s solo slots).
     pub runs: usize,
+    /// Whether one with no party may go in alone, as a team of one (Cosmic
+    /// `MK_PrimeMinister2`, started for the player when there is no party).
+    pub alone: bool,
 }
 
 /// A stage that `npc` clears once the leader hands it `count` of `item`
@@ -495,6 +503,7 @@ pub const KPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Kerning City's bonus stage, 103000805, where the members of a team that
@@ -599,6 +608,7 @@ pub const HPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Ludibrium's party quest in the Dimensional Crack (Cosmic `LudiPQ`: 5
@@ -668,6 +678,7 @@ pub const LPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// What Arturo may give each member of a team that won Ludibrium's party
@@ -866,6 +877,7 @@ pub const OPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Tower of Goddess's hub, where Minerva's statue stands and its six
@@ -1094,6 +1106,7 @@ pub const ZPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Dead Mine's hub, where Aura stands and its way out is.
@@ -1162,6 +1175,7 @@ pub const ZAKUM: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Guild Quest to Sharenian (Cosmic `GuildQuest`): the guild whose
@@ -1213,6 +1227,7 @@ pub const GUILD_QUEST: Event = Event {
     until_empty: true,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Deep Inside the Clocktower, the way to Papulatus, and the Origin of
@@ -1265,6 +1280,7 @@ pub const PAPULATUS: Event = Event {
     until_empty: true,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The expedition to Horntail (Cosmic `HorntailBattle`): like Zakum's, the
@@ -1312,6 +1328,7 @@ pub const HORNTAIL: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The time Horntail's expedition has left once Horntail comes out.
@@ -1415,6 +1432,7 @@ pub const HTPQ: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Trial Grounds' first map, where the team comes in and the leader
@@ -1495,6 +1513,7 @@ pub const DELLI: Event = Event {
     until_empty: false,
     survive: Some(WILLI),
     runs: 1,
+    alone: false,
 };
 
 /// Ludibrium, where the Ludibrium Maze's party gathers.
@@ -1608,6 +1627,7 @@ pub const LUDIMAZE: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Chief's Residence in El Nath, where the party gathers; the room
@@ -1668,6 +1688,7 @@ pub const TYLUS: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Deep Fairy Forest, where the party gathers; the Forest of Poison
@@ -1757,6 +1778,7 @@ pub const ELLIN: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The stage cleared once the last mob on `map_id`, in an event's copy of
@@ -1951,6 +1973,11 @@ pub fn opening_mobs(map_id: i32) -> &'static [(i32, (i16, i16), usize)] {
     if map_id == PINK_BEAN_ARENA {
         return &PINK_BEAN_STATUE;
     }
+    const PRIME_MINISTER_ONLY: [(i32, (i16, i16), usize); 1] =
+        [(PRIME_MINISTER, PRIME_MINISTER_AT, 1)];
+    if map_id == WEDDING_HALL_COPY {
+        return &PRIME_MINISTER_ONLY;
+    }
     match PIRATE_STAGES[2..4]
         .iter()
         .find(|&&deck| deck == map_id || deck + 1 == map_id)
@@ -2002,6 +2029,7 @@ pub const PIRATE: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Amos' Training Ground (670010000), off Purplewood Forest 2, where Amos
@@ -2308,6 +2336,7 @@ pub const AMORIA: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Crimsonwood Keep's party quest (Cosmic `CWKPQ`): an expedition of 6 to
@@ -2353,6 +2382,7 @@ pub const CWK: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The battle with The Boss in Showa (Cosmic `ShowaBattle`): an
@@ -2399,6 +2429,7 @@ pub const SHOWA: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// Showa Town, and the hideout's first map, Near the Hideout, which
@@ -2504,6 +2535,7 @@ pub const BALROG: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Balrog's tomb, and the clear map past it.
@@ -2563,6 +2595,7 @@ pub const LATANICA: Event = Event {
     until_empty: true,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The ghost ship's last deck ("Ghost ship 7"), whose `in00` leads to the
@@ -2622,6 +2655,7 @@ pub const PINK_BEAN: Event = Event {
     until_empty: false,
     survive: None,
     runs: 1,
+    alone: false,
 };
 
 /// The Temple of Time's last gate ("Forgotten Twilight", 270050000), where
@@ -3151,6 +3185,7 @@ const fn magatia(lobby: i32, entry: i32, stages: &'static [i32; 7]) -> Event {
         until_empty: false,
         survive: None,
         runs: 1,
+        alone: false,
     }
 }
 
@@ -3460,6 +3495,7 @@ pub const DOJO: Event = Event {
     until_empty: true,
     survive: None,
     runs: 15,
+    alone: false,
 };
 
 /// The Monster Carnival's rooms, 1 to 6 (Cosmic `2042000`,
@@ -3539,6 +3575,7 @@ pub const DOJO_TRIAL: Event = Event {
     until_empty: true,
     survive: None,
     runs: 5,
+    alone: false,
 };
 
 /// The party Dojo's first floor; floor n is `DOJO_PARTY_FIRST + (n - 1) *
@@ -3557,6 +3594,7 @@ pub const DOJO_PARTY: Event = Event {
     team: 1..=6,
     spread: Some(30),
     runs: 5,
+    alone: false,
     ..DOJO
 };
 
@@ -3696,6 +3734,7 @@ pub const TRISTAN: Event = Event {
     meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
+    alone: false,
     ..DOJO
 };
 
@@ -3734,6 +3773,7 @@ pub const DOLLHOUSE: Event = Event {
     member_clears: &[],
     items: &[DOLLHOUSE_PENDULUM],
     runs: 1,
+    alone: false,
     ..DOJO
 };
 
@@ -3776,6 +3816,7 @@ pub const MECHANICAL_PARTS: Event = Event {
     member_clears: &[],
     items: &[MACHINE_PART],
     runs: 1,
+    alone: false,
     ..DOJO
 };
 
@@ -3813,6 +3854,7 @@ pub const KING_PEPE: Event = Event {
     meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
+    alone: false,
     ..DOJO
 };
 
@@ -3849,7 +3891,36 @@ pub const WEDDING_HALL_EVENT: Event = Event {
     meso_per_stage: &[],
     member_clears: &[],
     runs: 1,
+    alone: false,
     ..DOJO
+};
+
+/// The Wedding Hall's own copy for the Prime Minister's refights (Map.nx
+/// links it to 106021600, Violetta and all), and the hidden Blocked
+/// Entrance (1300013) on its door's map, which offers them.
+pub const WEDDING_HALL_COPY: i32 = 106021601;
+pub const BLOCKED_ENTRANCE: i32 = 1_300_013;
+/// The Seal of the Empire (2331), the Mushroom Castle's last quest: once
+/// it is done, the hall's door opens the Blocked Entrance.
+pub const SEAL_OF_THE_EMPIRE: i16 = 2331;
+
+/// The Prime Minister's refight (Cosmic `MK_PrimeMinister2`): one to three
+/// of a party, all at the hall's door with their leader and of level 30 or
+/// more, or one with no party alone, go into their own copy of the hall
+/// for ten minutes, one team a channel. The Prime Minister comes out at
+/// once, and its death wins it; it lasts until its last member leaves, out by `left00`
+/// or the time running out. The defaults are in `v83ref/lanes/QUESTIONS.md`
+/// b290.
+pub const PRIME_MINISTER_EVENT: Event = Event {
+    lobby: WEDDING_HALL_DOOR,
+    maps: WEDDING_HALL_COPY..=WEDDING_HALL_COPY,
+    entry: WEDDING_HALL_COPY,
+    exit: WEDDING_HALL_DOOR,
+    levels: 30..=u8::MAX,
+    team: 1..=3,
+    minutes: 10,
+    alone: true,
+    ..LATANICA
 };
 
 /// Kerning Square's 7th floor, 103040400, where June (1052125) keeps the
@@ -3886,6 +3957,7 @@ pub const ROCK_SPIRIT: Event = Event {
     meso_per_stage: &[],
     member_clears: &[],
     runs: 8,
+    alone: false,
     ..DOJO
 };
 
@@ -3990,7 +4062,7 @@ pub fn protected(mob_id: i32) -> bool {
 }
 
 impl EventKind {
-    pub const ALL: [EventKind; 51] = [
+    pub const ALL: [EventKind; 52] = [
         EventKind::Kpq,
         EventKind::Hpq,
         EventKind::Lpq,
@@ -4033,6 +4105,7 @@ impl EventKind {
         EventKind::MechanicalParts,
         EventKind::KingPepe,
         EventKind::WeddingHall,
+        EventKind::PrimeMinister,
         EventKind::RockSpirit,
         EventKind::RockSpiritVip,
         EventKind::GuildQuest,
@@ -4091,6 +4164,7 @@ impl EventKind {
             EventKind::MechanicalParts => &MECHANICAL_PARTS,
             EventKind::KingPepe => &KING_PEPE,
             EventKind::WeddingHall => &WEDDING_HALL_EVENT,
+            EventKind::PrimeMinister => &PRIME_MINISTER_EVENT,
             EventKind::RockSpirit => &ROCK_SPIRIT,
             EventKind::RockSpiritVip => &ROCK_SPIRIT_VIP,
             EventKind::GuildQuest => &GUILD_QUEST,
@@ -5693,6 +5767,35 @@ mod tests {
         assert!(hall.team(1, &[at(1, 30, WEDDING_HALL_DOOR)]).is_some());
         assert_eq!(hall.team(1, &[at(1, 29, WEDDING_HALL_DOOR)]), None);
         assert!(event_map(WEDDING_HALL) && !event_map(WEDDING_HALL_DOOR));
+    }
+
+    #[test]
+    fn the_prime_ministers_refight_takes_up_to_three_or_one_alone() {
+        let fight = EventKind::PrimeMinister.event();
+        assert_eq!(
+            (fight.entry, fight.exit),
+            (WEDDING_HALL_COPY, WEDDING_HALL_DOOR)
+        );
+        assert!(fight.alone && !fight.solo() && fight.lasts_until_empty());
+        assert_eq!((fight.minutes, fight.last_stage(), fight.runs), (10, 1, 1));
+        assert!(fight.starts_on(WEDDING_HALL_DOOR));
+        let door = |id, level| at(id, level, WEDDING_HALL_DOOR);
+        let three = [door(1, 30), door(2, 200), door(3, 255)];
+        assert_eq!(fight.team(1, &three), Some(vec![1, 2, 3]));
+        assert_eq!(
+            fight.team(1, &[three[0], three[1], three[2], door(4, 40)]),
+            None
+        );
+        // Those below level 30 or away from the door stay behind.
+        let some = [door(1, 30), door(2, 29), at(3, 50, WEDDING_HALL)];
+        assert_eq!(fight.team(1, &some), Some(vec![1]));
+        assert_eq!(fight.team(1, &[door(1, 29), door(2, 50)]), None);
+        assert!(event_map(WEDDING_HALL_COPY));
+        assert_eq!(
+            opening_mobs(WEDDING_HALL_COPY),
+            [(PRIME_MINISTER, PRIME_MINISTER_AT, 1)]
+        );
+        assert!(opening_mobs(WEDDING_HALL).is_empty());
     }
 
     #[test]

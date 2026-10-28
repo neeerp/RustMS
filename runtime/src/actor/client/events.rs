@@ -82,6 +82,7 @@ impl ClientActor {
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
+            EventKind::PrimeMinister => NpcScript::blocked_entrance(entry),
             EventKind::Amoria => NpcScript::amos_lobby(entry),
             EventKind::Magatia(side) => NpcScript::magatia(side, entry),
             EventKind::Dojo => {
@@ -1508,8 +1509,10 @@ impl ClientActor {
     /// taken alone, needs none) or the lobby, or are in the Cash Shop or another event.
     pub(super) async fn event_started(&mut self, ticket: EventTicket) -> Result<(), RuntimeError> {
         let event = ticket.kind.event();
-        // A guild's registrant goes into its Guild Quest party or not.
-        let partyless = event.squad || event.solo() || ticket.kind == EventKind::GuildQuest;
+        // A guild's registrant goes into its Guild Quest party or not, and
+        // one taken alone (`Event::alone`) has none.
+        let partyless =
+            event.squad || event.solo() || event.alone || ticket.kind == EventKind::GuildQuest;
         let waiting = (self.party_id.is_some() || partyless)
             && !self.in_cash_shop
             && self.event.is_none()

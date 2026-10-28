@@ -1745,6 +1745,13 @@ impl NpcScript {
         NpcScript::new(npc_id, vec![Page::Say(text(key))])
     }
 
+    /// The Blocked Entrance by the Wedding Hall's door, for a player who
+    /// has done The Seal of the Empire and whose party (or who alone) may
+    /// or may not face the Prime Minister again.
+    pub fn blocked_entrance(entry: Entry) -> Self {
+        blocked_entrance(entry)
+    }
+
     /// Guon Over the Pirate Ship, for a player whose party may or may not
     /// board it.
     pub fn guon(entry: Entry) -> Self {
@@ -4862,12 +4869,38 @@ fn secretary_sends(quest: i16, ask: &str, decline: Option<&str>, go: &str) -> Np
     script
 }
 
+/// The Blocked Entrance (Cosmic `1300013`), which the hall's door opens
+/// once The Seal of the Empire is done: its menu takes the party, or one
+/// with none, into the Prime Minister's refight. Cosmic's menu offers King
+/// Pepe's room too; not here (`v83ref/lanes/QUESTIONS.md` b290).
+fn blocked_entrance(entry: Entry) -> NpcScript {
+    let event = &events::PRIME_MINISTER_EVENT;
+    let enter = match entry {
+        Entry::NotLeader => Page::Say(text(keys::PRIME_MINISTER_NOT_LEADER)),
+        Entry::NoParty | Entry::NotEligible => {
+            Page::Say(event_terms(event, keys::PRIME_MINISTER_NOT_ELIGIBLE))
+        }
+        Entry::Busy => Page::Say(text(keys::PRIME_MINISTER_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::PrimeMinister)]),
+    };
+    let mut script = NpcScript::new(
+        events::BLOCKED_ENTRANCE,
+        vec![Page::Menu {
+            text: text(keys::PRIME_MINISTER_MENU),
+            choices: vec![(text(keys::PRIME_MINISTER_ENTER), vec![enter])],
+        }],
+    );
+    // Someone left or moved since it was opened, or another team went in.
+    script.refused = Some(event_terms(event, keys::PRIME_MINISTER_NOT_ELIGIBLE));
+    script
+}
+
 /// Princess Violetta, in the Wedding Hall (106021600).
 const VIOLETTA: i32 = 1300002;
 /// The Royal Seal (4001318), which The Seal of the Empire (2331) takes to
 /// the Mushking.
 const ROYAL_SEAL: i32 = 4001318;
-const SEAL_OF_THE_EMPIRE: i16 = 2331;
+const SEAL_OF_THE_EMPIRE: i16 = events::SEAL_OF_THE_EMPIRE;
 /// Eliminating the Rest, and the key to the Security Room it is for.
 const ELIMINATING_THE_REST: i16 = 2335;
 const SECURITY_ROOM_KEY: i32 = 4032405;
@@ -23739,6 +23772,28 @@ mod tests {
             assert_eq!(page_text(&full), text(keys::MAGATIA_THANKS_FULL));
             assert!(full.effects.is_empty());
         }
+    }
+
+    #[test]
+    fn the_blocked_entrance_takes_the_party_or_one_alone_to_the_prime_minister() {
+        let mut ready = NpcScript::blocked_entrance(Entry::Ready);
+        assert_eq!(kind(&ready.begin()), Some(4));
+        let step = ready.respond(ScriptInput::Select(0)).unwrap();
+        assert_eq!(step.effects, [Effect::StartEvent(EventKind::PrimeMinister)]);
+        assert!(ready.refused().is_some());
+        for (entry, key) in [
+            (Entry::NotLeader, keys::PRIME_MINISTER_NOT_LEADER),
+            (Entry::Busy, keys::PRIME_MINISTER_BUSY),
+        ] {
+            let mut entrance = NpcScript::blocked_entrance(entry);
+            entrance.begin();
+            let step = entrance.respond(ScriptInput::Select(0)).unwrap();
+            assert_eq!(page_text(&step), text(key));
+        }
+        let mut entrance = NpcScript::blocked_entrance(Entry::NotEligible);
+        entrance.begin();
+        let step = entrance.respond(ScriptInput::Select(0)).unwrap();
+        assert!(page_text(&step).contains("1 to 3"), "{step:?}");
     }
 
     #[test]

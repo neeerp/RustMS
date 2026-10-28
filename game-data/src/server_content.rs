@@ -1006,6 +1006,13 @@ pub mod keys {
     /// `q2342s`). No licensed script has the text.
     pub const WEDDING_HALL_LOCKED: &str = "wedding_hall.locked";
     pub const WEDDING_HALL_BUSY: &str = "wedding_hall.busy";
+    /// The Blocked Entrance (1300013), which offers the Prime Minister's
+    /// refight once The Seal of the Empire (2331) is done.
+    pub const PRIME_MINISTER_MENU: &str = "prime_minister.menu";
+    pub const PRIME_MINISTER_ENTER: &str = "prime_minister.enter";
+    pub const PRIME_MINISTER_NOT_LEADER: &str = "prime_minister.not_leader";
+    pub const PRIME_MINISTER_NOT_ELIGIBLE: &str = "prime_minister.not_eligible";
+    pub const PRIME_MINISTER_BUSY: &str = "prime_minister.busy";
     pub const VIOLETTA_FOUND: &str = "violetta.found";
     pub const VIOLETTA_HELP: &str = "violetta.help";
     pub const VIOLETTA_PRIME_MINISTER: &str = "violetta.prime_minister";
@@ -3918,6 +3925,11 @@ mod tests {
                 keys::KING_PEPE_KEY_NO_ROOM,
                 keys::WEDDING_HALL_LOCKED,
                 keys::WEDDING_HALL_BUSY,
+                keys::PRIME_MINISTER_MENU,
+                keys::PRIME_MINISTER_ENTER,
+                keys::PRIME_MINISTER_NOT_LEADER,
+                keys::PRIME_MINISTER_NOT_ELIGIBLE,
+                keys::PRIME_MINISTER_BUSY,
                 keys::VIOLETTA_FOUND,
                 keys::VIOLETTA_HELP,
                 keys::VIOLETTA_PRIME_MINISTER,
