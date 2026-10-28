@@ -2368,6 +2368,10 @@ pub mod keys {
     pub const PINK_BEAN_WAVE_FIRST: &str = "pink_bean.wave.first";
     pub const PINK_BEAN_WAVE_NEXT: &str = "pink_bean.wave.next";
     pub const PINK_BEAN_WAVE_LAST: &str = "pink_bean.wave.last";
+    pub const PINK_BEAN_VICTORY: &str = "pink_bean.victory";
+    pub const PINK_BEAN_FALLEN_CAREFUL: &str = "pink_bean.fallen.careful";
+    pub const PINK_BEAN_FALLEN_LAST_STAND: &str = "pink_bean.fallen.last_stand";
+    pub const PINK_BEAN_FALLEN_OVER: &str = "pink_bean.fallen.over";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";

@@ -38,6 +38,13 @@ Map.nx gives 270050300 instead, which would leave the dead no way back.
 The Forgotten Twilight's `in00` (portal script `Pinkin`) leads back to the
 fight, in the same copy.
 
+The expedition counts its dead (Cosmic `PinkBeanBattle.playerDead`): each
+death in either of the copy's maps before the win tells the event
+(`EventCommand::Fell`, from `died` in `runtime/src/actor/client/combat.rs`).
+The third and fourth deaths warn every member in pink, and the fifth ends
+the expedition, which sends everyone to Between Twilight and Daybreak
+(`events::pink_bean_fallen`, `pink_bean.fallen.*`).
+
 The Forgotten Temple Keeper (2141002, `npc_scripts::TEMPLE_KEEPER`) stands
 in both of the copy's maps. Before the win and after it, the keeper asks
 whether to leave and takes those who say yes to the gate. As in Cosmic,
@@ -74,6 +81,15 @@ However the statue dies, Pink Bean (8820001, `mobs::PINK_BEAN`) comes out
 on the ground where it stood. The wave lines reach only those in the
 fight, not the dead waiting in the Forgotten Twilight.
 
+## The win
+
+When Pink Bean dies in the copy, the map shows the party clear effect and
+plays its sound, which wins the expedition (`boss_falls`), and every other
+mob there goes, the guardians' statues too (`clear_mobs`). The world reads
+an item line naming the channel whose expedition won (`pink_bean.victory`,
+Cosmic `broadcastPinkBeanVictory`). The keeper then offers the way out
+(`pink_bean.keeper.won`).
+
 ## Their skills
 
 The skills are Mob.nx's, cast through the usual mob skill path (see
@@ -106,4 +122,8 @@ only once Pink Bean is hurt.
   the NX data (`mobs.rs`).
 - Harness `pink_bean_waves`: the five waves wake in order out of their
   statues, the warded statue takes no hit, and after the fifth the item
-  falls on the reactor, the statue dies and Pink Bean comes out.
+  falls on the reactor, the statue dies and Pink Bean comes out. Its fall
+  shows the clear, takes every mob, and tells the world the channel.
+- Harness `pink_bean_entry` also counts the dead: deaths in the revival
+  room count, the third and fourth warn, and the fifth sends everyone out.
+- `net`: which deaths warn and which ends it (`events.rs`).

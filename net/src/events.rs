@@ -2666,6 +2666,20 @@ pub fn pink_bean_guardian(mob_id: i32) -> bool {
         .any(|&(_, guardian)| guardian == mob_id)
 }
 
+/// What Pink Bean's expedition hears in pink when the `fallen`th of its
+/// fighters dies, and whether that ends it, everyone out (Cosmic
+/// `PinkBeanBattle.playerDead`): the third and fourth warn, the fifth ends
+/// it.
+pub fn pink_bean_fallen(fallen: u32) -> Option<(&'static str, bool)> {
+    use game_data::server_content::keys;
+    match fallen {
+        3 => Some((keys::PINK_BEAN_FALLEN_CAREFUL, false)),
+        4 => Some((keys::PINK_BEAN_FALLEN_LAST_STAND, false)),
+        5 => Some((keys::PINK_BEAN_FALLEN_OVER, true)),
+        _ => None,
+    }
+}
+
 /// Crimsonwood Keep's Inner Sanctum's entrance, where its expeditions
 /// gather and come back to, and the Keep's first stage.
 pub const CWK_LOBBY: i32 = 610_030_020;
@@ -4616,9 +4630,10 @@ pub enum EventCommand {
     KingRoomFell { here: usize, mobs: usize },
     /// A member who died has revived.
     Revived,
-    /// A member died on one of Showa's maps: no Slot Machine comes out
-    /// with the win (Cosmic `ShowaBattle.playerDead`).
-    ShowaFell,
+    /// A member died on one of the event's maps: Showa's battle brings no
+    /// Slot Machine out with its win (Cosmic `ShowaBattle.playerDead`), and
+    /// Pink Bean's counts the fallen (`pink_bean_fallen`).
+    Fell,
     /// The Glimmer Man brought out the Amorian Challenge's fierry, once a
     /// run, stage 1 being bare.
     FierryOut,
@@ -5259,6 +5274,11 @@ mod tests {
             [(crate::mobs::PINK_BEAN_STATUE, PINK_BEAN_STATUE_AT, 1)]
         );
         assert_eq!(PINK_BEAN_WAVES, 5);
+        let ends = |fallen| pink_bean_fallen(fallen).map(|(_, ends)| ends);
+        assert_eq!(
+            (1..=6).map(ends).collect::<Vec<_>>(),
+            [None, None, Some(false), Some(false), Some(true), None]
+        );
         for (i, &(statues, guardian)) in PINK_BEAN_GUARDIANS.iter().enumerate() {
             // `startWave`'s `8820019 + i % 5`, from 1, and `id - 17`.
             let statue = 8_820_019 + (i as i32 + 1) % 5;

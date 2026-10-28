@@ -54,7 +54,8 @@ impl ClientActor {
     /// HP reached 0: buffs end and the death penalty applies. The spawn
     /// point nearest is kept for a Wheel of Destiny revival. On a Monster
     /// Carnival battle field the player loses CP instead, and keeps their
-    /// buffs and EXP (Cosmic `playerDead`).
+    /// buffs and EXP (Cosmic `playerDead`). In Showa's battle or Pink
+    /// Bean's, the event hears of it.
     pub(super) async fn died(&mut self) -> Result<(), RuntimeError> {
         let map_id = self.in_game()?.player.stats.map_id;
         let carnival = net::carnival::battle_room(map_id).is_some()
@@ -67,11 +68,14 @@ impl ClientActor {
                 .await;
             return Ok(());
         }
-        let in_showa = self.event.as_ref().is_some_and(|ticket| {
-            ticket.kind == net::events::EventKind::Showa && ticket.holds(map_id)
+        let counted = self.event.as_ref().is_some_and(|ticket| {
+            matches!(
+                ticket.kind,
+                net::events::EventKind::Showa | net::events::EventKind::PinkBean
+            ) && ticket.holds(map_id)
         });
-        if in_showa {
-            self.tell_event(net::events::EventCommand::ShowaFell).await;
+        if counted {
+            self.tell_event(net::events::EventCommand::Fell).await;
         }
         self.cancel_buffs().await?;
         self.remember_spawn_point();
