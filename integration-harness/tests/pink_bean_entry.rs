@@ -4,7 +4,8 @@
 //! Forgotten Twilight, whose portal leads back to the fight; the Temple
 //! Keeper (2141002) takes anyone out to the gate, and the expedition lasts
 //! until its last member leaves. Between Twilight and Daybreak's portal
-//! leads to the gate too.
+//! leads to the gate too. The third and fourth of the expedition to die
+//! hear a warning, and the fifth ends it.
 //! The harness lets two set out (`RUSTMS_EXPEDITION_MIN`).
 
 use game_data::server_content::keys;
@@ -26,6 +27,10 @@ const KEEPER: i32 = 2141002;
 /// A mob whose touch the server takes from anyone.
 const JR_GARGOYLE: i32 = 9_300_033;
 const HP: i32 = 0x400;
+const PINK: u8 = 5;
+
+/// A channel holds one expedition at a time: the tests take turns.
+static EXPEDITION: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// A new character of level 120 with little HP, logged in at the temple's
 /// last gate.
@@ -61,9 +66,8 @@ fn touched(damage: i32, mob_id: i32) -> Packet {
     p
 }
 
-/// `player` is touched till they die, and answers the death dialog: where
-/// they revive.
-async fn die(player: &mut WorldSession) -> i32 {
+/// `player` is touched till they die.
+async fn fall(player: &mut WorldSession) -> Trace {
     let mut seen = Trace::default();
     for _ in 0..40 {
         send(&mut player.connection, touched(20, JR_GARGOYLE)).await;
@@ -73,6 +77,13 @@ async fn die(player: &mut WorldSession) -> i32 {
         }
     }
     assert_eq!(seen.stat(HP), Some(0), "{seen:?}");
+    seen
+}
+
+/// `player` is touched till they die, and answers the death dialog: where
+/// they revive.
+async fn die(player: &mut WorldSession) -> i32 {
+    let mut seen = fall(player).await;
     warp(&mut player.connection, PINK_BEAN_ARENA, "", &mut seen).await
 }
 
@@ -111,6 +122,7 @@ async fn set_out(leader: &mut WorldSession, member: &mut WorldSession) -> Trace 
 
 #[tokio::test]
 async fn the_dead_come_back_to_pink_bean_and_the_keeper_takes_them_out() {
+    let _turn = EXPEDITION.lock().await;
     let mut leader = adventurer().await;
     let mut member = adventurer().await;
     let mut lt = set_out(&mut leader, &mut member).await;
@@ -163,4 +175,40 @@ async fn the_dead_come_back_to_pink_bean_and_the_keeper_takes_them_out() {
     assert_eq!(warp(c, PINK_BEAN_OUT, "", &mut seen).await, PINK_BEAN_OUT);
     touch_script_portal(&mut leader, PINK_BEAN_OUT, "in00").await;
     arrives(&mut leader, Trace::default(), PINK_BEAN_GATE).await;
+}
+
+#[tokio::test]
+async fn the_third_and_fourth_to_fall_are_warned_and_the_fifth_ends_the_expedition() {
+    let _turn = EXPEDITION.lock().await;
+    let mut leader = adventurer().await;
+    let mut member = adventurer().await;
+    let mut lt = set_out(&mut leader, &mut member).await;
+    let line = |key| (PINK, net::content::text().get(key, &[]));
+    let (careful, last_stand, over) = (
+        line(keys::PINK_BEAN_FALLEN_CAREFUL),
+        line(keys::PINK_BEAN_FALLEN_LAST_STAND),
+        line(keys::PINK_BEAN_FALLEN_OVER),
+    );
+
+    // Deaths in the Forgotten Twilight count too.
+    for fallen in 1..=4 {
+        assert_eq!(die(&mut member).await, PINK_BEAN_REVIVE);
+        read_for(&mut leader.connection, &mut lt, 300).await;
+        let heard = |b| lt.broadcasts.contains(b);
+        assert_eq!(
+            (heard(&careful), heard(&last_stand)),
+            (fallen >= 3, fallen >= 4),
+            "{fallen}: {lt:?}"
+        );
+    }
+    assert!(!lt.broadcasts.contains(&over), "{lt:?}");
+
+    // The fifth: everyone hears it is over and goes out.
+    fall(&mut member).await;
+    until(&mut leader.connection, &mut lt, |t| {
+        t.broadcasts.contains(&over) && t.arrivals.iter().any(|a| a.0 == PINK_BEAN_OUT)
+    })
+    .await;
+    // The gate takes a new expedition once the copy closes, 2 s on.
+    tokio::time::sleep(Duration::from_secs(3)).await;
 }

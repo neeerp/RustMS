@@ -2211,7 +2211,7 @@ impl FieldActor {
             // the kill Balrog and the Seal (2239) asks for.
             (net::mobs::BALROG_BODY, net::events::BALROG_TOMB) if self.key.instance_id != 0 => {
                 self.boss_falls();
-                self.announce(keys::BALROG_VICTORY);
+                self.announce(keys::BALROG_VICTORY, &[]);
                 let sealed = FieldMessage::BringOut {
                     mob_id: net::mobs::SEALED_BALROG,
                     at: net::events::BALROG_AT,
@@ -2235,6 +2235,15 @@ impl FieldActor {
             (net::events::THE_BOSS, net::events::SHOWA_ARENA) if self.key.instance_id != 0 => {
                 self.boss_falls();
                 self.clear_mobs();
+            }
+            // Every mob in the arena goes with Pink Bean, and the world reads
+            // which channel's expedition won (Cosmic
+            // `PinkBeanBattle.monsterKilled`, `broadcastPinkBeanVictory`).
+            (net::mobs::PINK_BEAN, net::events::PINK_BEAN_ARENA) if self.key.instance_id != 0 => {
+                self.boss_falls();
+                self.clear_mobs();
+                let channel = (u16::from(self.key.channel_id) + 1).to_string();
+                self.announce(keys::PINK_BEAN_VICTORY, &[("channel", &channel)]);
             }
             // Pink Bean comes out where its statue fell (Royals's statue
             // has no `revive`, unlike Cosmic's).
@@ -2477,7 +2486,7 @@ impl FieldActor {
     /// `broadcastZakumVictory`).
     fn zakum_falls(&mut self) {
         self.boss_falls();
-        self.announce(keys::ZAKUM_VICTORY);
+        self.announce(keys::ZAKUM_VICTORY, &[]);
     }
 
     /// Handle `message` `after` (scaled, `net::events::scaled`) from now.
@@ -2486,10 +2495,10 @@ impl FieldActor {
         self.later.push((at, message));
     }
 
-    /// The world reads the line `key` (an item line), through the first
-    /// client here that takes it.
-    fn announce(&self, key: &str) {
-        let line = net::content::text().get(key, &[]);
+    /// The world reads the line `key` with `vars` (an item line), through
+    /// the first client here that takes it.
+    fn announce(&self, key: &str, vars: &[(&str, &str)]) {
+        let line = net::content::text().get(key, vars);
         let Ok(packet) = build_item_line(&line, 0) else {
             return;
         };
@@ -2511,7 +2520,7 @@ impl FieldActor {
                 occupant.handle.send(ServerMessage::ClearEventStage(stage));
             }
         }
-        self.announce(keys::HORNTAIL_VICTORY);
+        self.announce(keys::HORNTAIL_VICTORY, &[]);
     }
 
     /// The object ids of the live `mob_id`s here.

@@ -62,7 +62,7 @@ or Etc is told to make some first. Konpei (9120203) there takes them back
 to town.
 
 A member's death in the arena or the clear map before the win tells the
-event (`EventCommand::ShowaFell`, from `died` in
+event (`EventCommand::Fell`, from `died` in
 `runtime/src/actor/client/combat.rs`). If no member died, the win brings
 out the Slot Machine (9400114, `SLOT_MACHINE`) on the clear map at
 (500, -50) (`EventActor::slot_machine`, `FieldMessage::BringOut`), and the

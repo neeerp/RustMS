@@ -829,6 +829,7 @@ pub fn spawn(
         began: Instant::now(),
         fallen: HashSet::new(),
         showa_fell: false,
+        pink_bean_fallen: 0,
         gauge: None,
         gauge_out: None,
         pyramid_end: None,
@@ -976,8 +977,10 @@ struct EventActor {
     /// revived (`EventCommand::KingRoomFell`).
     fallen: HashSet<ClientId>,
     /// A member died in Showa's battle before it was won
-    /// (`EventCommand::ShowaFell`).
+    /// (`EventCommand::Fell`).
     showa_fell: bool,
+    /// How many times Pink Bean's fighters died before it fell.
+    pink_bean_fallen: u32,
     /// The stage's gauge rules (`mobMassacre/gauge`).
     gauge: Option<game_data::Massacre>,
     /// When the stage's gauge runs out, as the tally stands.
@@ -1715,10 +1718,20 @@ impl EventActor {
             EventCommand::Revived => {
                 self.fallen.remove(&client_id);
             }
-            EventCommand::ShowaFell if self.kind == EventKind::Showa && !won => {
+            EventCommand::Fell if self.kind == EventKind::Showa && !won => {
                 self.showa_fell = true;
             }
-            EventCommand::ShowaFell => {}
+            EventCommand::Fell if self.kind == EventKind::PinkBean && !won => {
+                self.pink_bean_fallen += 1;
+                if let Some((key, ends)) = net::events::pink_bean_fallen(self.pink_bean_fallen) {
+                    self.tell_team(key);
+                    if ends {
+                        info!(kind = ?self.kind, id = self.id, "Too many fell");
+                        self.failed = true;
+                    }
+                }
+            }
+            EventCommand::Fell => {}
             EventCommand::KingGateOpened if self.kind == EventKind::GuildQuest => {
                 if !self.cleared.king_gate.swap(true, Ordering::AcqRel) {
                     info!(id = self.id, client_id, "King's Corridor opened");

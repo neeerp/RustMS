@@ -4,7 +4,9 @@
 //! wakes all five. Pink Bean's statue takes no harm while they stand. Once
 //! the fifth wave is down, the item that calls the lightning falls on the
 //! statue's reactor, which takes it a few seconds later: the statue dies,
-//! and Pink Bean comes out where it stood. The harness world runs events
+//! and Pink Bean comes out where it stood. Its fall wins the fight: every
+//! mob there goes, and the world hears which channel's expedition won.
+//! The harness world runs events
 //! 60 times as fast, and lets two set out (`RUSTMS_EXPEDITION_MIN`).
 
 use game_data::server_content::keys;
@@ -21,6 +23,7 @@ use net::mobs::{PINK_BEAN, PINK_BEAN_STATUE};
 use tokio::time::Duration;
 
 const RECRUITER: i32 = 2141001;
+const KEEPER: i32 = 2141002;
 const PINK: u8 = 5;
 /// Under the most a level-120 character with 32000 STR and a 1999-attack
 /// sword may hit for.
@@ -72,8 +75,8 @@ async fn set_out(leader: &mut WorldSession, member: &mut WorldSession) -> (Trace
 
 /// Hit `object_id` until `seen` sees it die, five hits at a time.
 async fn beat(c: &mut MapleTestConnection, name: &str, seen: &mut Trace, object_id: i32) {
-    // Ariel, the toughest, takes 120.
-    for _ in 0..40 {
+    // Pink Bean, the toughest, takes 420.
+    for _ in 0..100 {
         if seen.field.killed.contains(&object_id) {
             return;
         }
@@ -174,4 +177,29 @@ async fn the_guardians_wake_in_waves_and_their_fall_lets_the_lightning_strike_th
     let pink_bean = lt.field.alive(PINK_BEAN)[0];
     let at = |object_id| lt.field.mob_positions.get(&object_id);
     assert_eq!(at(pink_bean), at(statue), "{lt:?}");
+
+    // Pink Bean's fall wins: both see the clear, every mob goes, the world
+    // hears the first channel's expedition won, and the keeper knows it.
+    beat(c, &name, &mut lt, pink_bean).await;
+    let cleared = |t: &Trace| {
+        t.field_effects
+            .iter()
+            .any(|(_, path)| path == "quest/party/clear")
+    };
+    let victory = net::content::text().get(keys::PINK_BEAN_VICTORY, &[("channel", "1")]);
+    until(c, &mut lt, cleared).await;
+    until(&mut member.connection, &mut mt, |t| {
+        cleared(t) && t.item_lines.contains(&(victory.clone(), 0))
+    })
+    .await;
+    barrier(&mut leader.connection, &name, &mut lt).await;
+    let left: Vec<_> = lt
+        .field
+        .mobs
+        .iter()
+        .filter(|(oid, _)| !lt.field.killed.contains(oid))
+        .collect();
+    assert!(left.is_empty(), "{left:?}");
+    let t = told(&mut leader, talk(PINK_BEAN_ARENA, KEEPER)).await;
+    assert!(said(&t, keys::PINK_BEAN_KEEPER_WON), "{t:?}");
 }
