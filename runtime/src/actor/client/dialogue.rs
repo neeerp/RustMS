@@ -223,6 +223,9 @@ impl ClientActor {
             if let Some(script) = self.amoria_gather().await? {
                 return self.start_script(script).await;
             }
+            if let Some(script) = self.amoria_geist()? {
+                return self.start_script(script).await;
+            }
         }
         if npc_id == net::npc_scripts::GUON_ABOARD {
             if let Some(script) = self.guon_aboard().await? {

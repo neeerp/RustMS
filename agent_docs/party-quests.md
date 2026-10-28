@@ -42,8 +42,8 @@ is taken alone ([Jr. Balrog's room](#jr-balrogs-room)), and so are King
 Pepe's room in the Mushroom Castle, for quest 2330 ([King Pepe's
 room](#king-pepes-room)), and its Wedding Hall, for quests 2332 and 2333
 ([the Wedding Hall](#the-wedding-hall)). Amoria's Amorian Challenge, for
-married couples, has its entry, its way out, its end rules and its first
-five stages; its later stages come in later slices ([the Amorian
+married couples, has its entry, its way out, its end rules and its six
+stages; its bonus comes in a later slice ([the Amorian
 Challenge](#the-amorian-challenge)).
 
 No event NPC offers Cosmic's "enable/disable Party Search" line. That
@@ -1508,6 +1508,19 @@ each, the clock cut on stage 4 is given back, and the team hears in pink
 that only the boss is left (`amoria_pq.stage5.notice`). Once it is
 cleared, any member's talk takes the whole team to stage 6 (670010700),
 once. Unlike Cosmic, a dead member still on the map counts as apart.
+
+Stage 6 (670010700, `AMORIA_STAGE6`) is the Geist Balrog (9400536), which
+the copy brings out at (942, 478) when it opens (`events::opening_mobs`).
+It comes back twice as it dies (`revive` in its Mob.nx data), as 9400537
+and then 9400514, and only that last form drops the Geist Fang (4031594,
+in `rewards.json`). Amos (`AMOS_TRIALS`, `npc_scripts::amos_geist`) stands
+above the map's first area: a living player who talks to him from inside
+that area (Map.nx `area` 0) is taken up to `st01` without a word, and a
+dead one is told so. Otherwise he sends the others to the leader, and asks
+the leader for the Fang; the leader's Fang wins the challenge for 11000
+EXP each, and the clock stops. After that the leader hears it is won and
+the others are told to wait for the leader; Cosmic's bonus maps
+(670010750 and 670010800) come in a later slice.
 
 ## Jr. Balrog's room
 
