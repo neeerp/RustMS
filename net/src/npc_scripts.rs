@@ -2342,6 +2342,7 @@ impl NpcScript {
             SITE_EXIT => return Some(site_exit()),
             CWK_GATE => return Some(cwk_gate(player)),
             KONPEI_TOWN => return Some(konpei_town()),
+            BALROG_SCROLLS => return Some(balrog_scrolls(player)),
             KONPEI_HIDEOUT => return Some(konpei_hideout()),
             KONPEI_CLEAR => return Some(konpei_clear()),
             SERRYL => {
@@ -13270,6 +13271,54 @@ fn balrog_keeper(won: bool) -> NpcScript {
     NpcScript::new(BALROG_KEEPER, pages)
 }
 
+/// The Suspicious Man in the Balrog's hall (105100000, Npc.nx script
+/// `balog_scroll`, Cosmic `1061016`): one Piece of Balrog Leather for one
+/// of the Balrog's scrolls, the player's pick.
+const BALROG_SCROLLS: i32 = 1061016;
+/// Balrog's STR, INT, LUK, DEX, HP, MP, Speed, Jump, Accuracy,
+/// Avoidability and Defense Scrolls 30% and its Twilight Scroll 5%.
+pub const BALROG_SCROLL_IDS: std::ops::RangeInclusive<i32> = 2040728..=2040739;
+
+fn balrog_scrolls(player: &Player) -> NpcScript {
+    let has_leather = player.inventory.count(events::BALROG_LEATHER) > 0;
+    let choices = BALROG_SCROLL_IDS
+        .map(|scroll| {
+            let page = if has_leather {
+                Page::Act {
+                    text: text(keys::BALROG_SCROLLS_GIVEN),
+                    effects: vec![
+                        Effect::TakeItem {
+                            item_id: events::BALROG_LEATHER,
+                            quantity: 1,
+                        },
+                        Effect::GiveItem {
+                            item_id: scroll,
+                            quantity: 1,
+                        },
+                    ],
+                }
+            } else {
+                Page::Say(text(keys::BALROG_SCROLLS_NO_LEATHER))
+            };
+            (format!("#i{scroll}# #t{scroll}#"), vec![page])
+        })
+        .collect();
+    let pick = Page::Menu {
+        text: text(keys::BALROG_SCROLLS_PICK),
+        choices,
+    };
+    let mut script = NpcScript::new(
+        BALROG_SCROLLS,
+        vec![Page::Menu {
+            text: text(keys::BALROG_SCROLLS_HELLO),
+            choices: vec![(text(keys::BALROG_SCROLLS_REDEEM_CHOICE), vec![pick])],
+        }],
+    );
+    script.inventory_full = Some(text(keys::BALROG_SCROLLS_FULL));
+    script.refused = Some(text(keys::BALROG_SCROLLS_NO_LEATHER));
+    script
+}
+
 /// Konpei on the clear map past the arena (Cosmic `9120203`): back to
 /// Showa Town.
 const KONPEI_CLEAR: i32 = 9120203;
@@ -24191,6 +24240,47 @@ mod tests {
         );
         let clear = rider(50, 0, events::BALROG_CLEAR);
         assert!(NpcScript::in_event(BALROG_KEEPER, &clear, false, true).is_none());
+    }
+
+    #[test]
+    fn the_suspicious_man_trades_a_piece_of_balrog_leather_for_a_scroll() {
+        let mut player = rider(50, 0, 105100000);
+        let mut man = NpcScript::for_npc(BALROG_SCROLLS, &player).unwrap();
+        man.begin();
+        let Some(Prompt::Selection { text: pick, .. }) =
+            man.respond(ScriptInput::Select(0)).unwrap().prompt
+        else {
+            panic!("a choice of scrolls");
+        };
+        assert!(pick.contains("#t2040728#") && pick.contains("#t2040739#"));
+        let none = man.respond(ScriptInput::Select(3)).unwrap();
+        assert!(none.effects.is_empty());
+        assert_eq!(page_text(&none), text(keys::BALROG_SCROLLS_NO_LEATHER));
+
+        player.inventory.insert(
+            game::InventoryType::Etc,
+            1,
+            game::Item::stack(events::BALROG_LEATHER, 2),
+        );
+        let mut man = NpcScript::for_npc(BALROG_SCROLLS, &player).unwrap();
+        man.begin();
+        man.respond(ScriptInput::Select(0)).unwrap();
+        let traded = man.respond(ScriptInput::Select(11)).unwrap();
+        assert_eq!(
+            traded.effects,
+            [
+                Effect::TakeItem {
+                    item_id: events::BALROG_LEATHER,
+                    quantity: 1
+                },
+                Effect::GiveItem {
+                    item_id: 2040739,
+                    quantity: 1
+                }
+            ]
+        );
+        assert_eq!(page_text(&traded), text(keys::BALROG_SCROLLS_GIVEN));
+        assert_eq!(man.inventory_full, Some(text(keys::BALROG_SCROLLS_FULL)));
     }
 
     #[test]

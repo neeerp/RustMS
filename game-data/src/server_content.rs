@@ -2341,6 +2341,12 @@ pub mod keys {
     pub const BALROG_KEEPER_WON: &str = "balrog.keeper.won";
     pub const BALROG_VICTORY: &str = "balrog.victory";
     pub const BALROG_END_FULL: &str = "balrog.end.full";
+    pub const BALROG_SCROLLS_HELLO: &str = "balrog.scrolls.hello";
+    pub const BALROG_SCROLLS_REDEEM_CHOICE: &str = "balrog.scrolls.redeem_choice";
+    pub const BALROG_SCROLLS_PICK: &str = "balrog.scrolls.pick";
+    pub const BALROG_SCROLLS_NO_LEATHER: &str = "balrog.scrolls.no_leather";
+    pub const BALROG_SCROLLS_FULL: &str = "balrog.scrolls.full";
+    pub const BALROG_SCROLLS_GIVEN: &str = "balrog.scrolls.given";
     pub const AMORIA_PQ_STAGE6_WAIT: &str = "amoria_pq.stage6.wait";
     pub const AMORIA_PQ_STAGE6_DEAD: &str = "amoria_pq.stage6.dead";
     pub const AMORIA_PQ_GLIMMER_TASK: &str = "amoria_pq.glimmer.task";
@@ -4725,6 +4731,19 @@ mod tests {
             assert_eq!(drops.len(), 1, "{reactor_id}");
             assert_eq!((drops[0].item, drops[0].prob), (Some(item), 1.0));
         }
+    }
+
+    #[test]
+    fn the_balrog_and_its_clear_maps_box_drop_without_the_pack() {
+        let table = RewardTable::load(None).unwrap();
+        let body = table.drops(8830000);
+        assert_eq!(body.len(), 75);
+        assert_eq!((body[0].money, body[0].prob), (Some(7000), 0.4));
+        let leather = body.iter().find(|d| d.item == Some(4001261)).unwrap();
+        assert_eq!(leather.prob, 0.6);
+        let scrolls = table.reactor_drops(1052001);
+        assert_eq!(scrolls.len(), 44);
+        assert!((2040728..=2040739).all(|s| scrolls.iter().any(|d| d.item == Some(s))));
     }
 
     fn quest_item(item: i32, quest: i16) -> RewardEntry {

@@ -4,39 +4,53 @@
 //! left claw wait. The claw soon gives way to the left arm; the body takes
 //! no harm until both arms are dead, and its death wins the battle and
 //! brings out the sealed Balrog. Mu Young in the tomb takes the winners on
-//! to the clear map, whose way out gives each a Piece of Balrog Leather.
+//! to the clear map, whose box sprays loot and whose way out gives each a
+//! Piece of Balrog Leather, which the Suspicious Man in the Balrog's hall
+//! trades for a scroll. Everyone in the tomb counts the kill Balrog and the
+//! Seal (2239) asks for.
 //! The harness lets two set out (`RUSTMS_EXPEDITION_MIN`) and runs the
 //! claw's minute in a second (`RUSTMS_EVENT_SCALE`).
 
 use game_data::server_content::keys;
 use integration_harness::connection::MapleTestConnection;
-use integration_harness::database::{replace_item, set_job, set_str, set_weapon_attack};
+use integration_harness::database::{
+    replace_item, set_job, set_str, set_weapon_attack, start_quest,
+};
 use integration_harness::events::{cleared, said, talk, told};
 use integration_harness::guild_quest::touch_script_portal;
-use integration_harness::hunting::attack;
+use integration_harness::hunting::{attack, hit_reactor, walk_to};
 use integration_harness::preconditions::load_harness_config_or_fail;
 use integration_harness::quests::answer;
 use integration_harness::trace::{barrier, send, until, warp, Trace};
 use integration_harness::{login_to_world_session, relogin, WorldSession};
 use net::events::{BALROG_CLEAR, BALROG_LEATHER, BALROG_TOMB, MU_YOUNG_MAP};
 use net::mobs::{BALROG_BODY, BALROG_CLAW, BALROG_LEFT_ARM, BALROG_RIGHT_ARM, SEALED_BALROG};
+use net::reactors::BALROG_BOX;
 use packet::Packet;
 use tokio::time::Duration;
 
 const MU_YOUNG: i32 = 1061014;
 const KEEPER: i32 = 1061018;
+const SUSPICIOUS_MAN: i32 = 1061016;
+/// The Balrog's hall, where the Suspicious Man stands.
+const HALL: i32 = 105100000;
+/// Balrog and the Seal.
+const SEAL_QUEST: i16 = 2239;
+/// The Balrog's Twilight Scroll 5%, the last of the man's scrolls.
+const TWILIGHT_SCROLL: i32 = 2040739;
 /// Under the most a level-100 character with 32000 STR and a 1999-attack
 /// sword may hit for.
 const HIT: i32 = 5_000_000;
 
-/// A new character of level 100, logged in at the temple's entrance. A
-/// `strong` one hits very hard.
+/// A new character of level 100 on Balrog and the Seal, logged in at the
+/// temple's entrance. A `strong` one hits very hard.
 async fn adventurer(strong: bool) -> WorldSession {
     let config = load_harness_config_or_fail().await;
     let id = login_to_world_session(&config).await.unwrap().character_id;
     drop(relogin(&config).await);
     tokio::time::sleep(Duration::from_millis(500)).await;
     set_job(id, 0, 100, 50).await.unwrap();
+    start_quest(id, SEAL_QUEST).await.unwrap();
     if strong {
         replace_item(id, -1, -11, 1302000).await.unwrap();
         set_weapon_attack(id, 1_999).await.unwrap();
@@ -123,27 +137,57 @@ async fn the_balrog_s_arms_shield_its_body_whose_death_wins_the_leather() {
     }
     beat(c, &name, &mut lt, body).await;
 
-    // Won: the clear, the world's line, and the sealed Balrog.
+    // Won: the clear, the world's line, and the sealed Balrog; both count
+    // the seal's kill.
     let victory = net::content::text().get(keys::BALROG_VICTORY, &[]);
     until(c, &mut lt, |t| {
-        cleared(t) && !t.field.alive(SEALED_BALROG).is_empty()
+        cleared(t)
+            && !t.field.alive(SEALED_BALROG).is_empty()
+            && t.progress.contains(&(SEAL_QUEST, 1))
     })
     .await;
     until(&mut member.connection, &mut mt, |t| {
-        cleared(t) && t.item_lines.contains(&(victory.clone(), 0))
+        cleared(t)
+            && t.item_lines.contains(&(victory.clone(), 0))
+            && t.progress.contains(&(SEAL_QUEST, 1))
     })
     .await;
 
-    // Mu Young takes each on to the clear map, whose way out gives the
-    // leather and leads back to the temple's entrance.
-    for player in [&mut member, &mut leader] {
+    // Mu Young takes each on to the clear map, whose box sprays its loot
+    // and whose way out gives the leather and leads back to the temple's
+    // entrance.
+    for (player, hits) in [(&mut member, false), (&mut leader, true)] {
         let t = told(player, talk(BALROG_TOMB, KEEPER)).await;
         assert!(said(&t, keys::BALROG_KEEPER_WON), "{t:?}");
         let mut t = told(player, answer(0, 1, None)).await;
-        until(&mut player.connection, &mut t, |t| {
+        let c = &mut player.connection;
+        until(c, &mut t, |t| {
             t.arrivals.iter().any(|a| a.0 == BALROG_CLEAR)
+                && t.field.reactors.iter().any(|r| r.reactor_id == BALROG_BOX)
         })
         .await;
+        if hits {
+            let name = player.character_name.clone();
+            let c = &mut player.connection;
+            let reactors = t.field.reactors.iter();
+            let reactor = *reactors
+                .clone()
+                .find(|r| r.reactor_id == BALROG_BOX)
+                .unwrap();
+            send(c, walk_to(reactor.x, reactor.y)).await;
+            for _ in 0..8 {
+                if t.field
+                    .reactors_removed
+                    .iter()
+                    .any(|r| r.0 == reactor.object_id)
+                {
+                    break;
+                }
+                send(c, hit_reactor(reactor.object_id)).await;
+                barrier(c, &name, &mut t).await;
+            }
+            until(c, &mut t, |t| t.field.drops.len() >= 15).await;
+        }
         touch_script_portal(player, BALROG_CLEAR, "out99").await;
         until(&mut player.connection, &mut t, |t| {
             t.arrivals.iter().any(|a| a.0 == MU_YOUNG_MAP)
@@ -151,4 +195,22 @@ async fn the_balrog_s_arms_shield_its_body_whose_death_wins_the_leather() {
         .await;
         assert!(t.added.iter().any(|a| a.2 == BALROG_LEATHER), "{t:?}");
     }
+
+    // The Suspicious Man in the hall takes the member's leather for the
+    // scroll they pick.
+    let mut seen = Trace::default();
+    assert_eq!(
+        warp(&mut member.connection, HALL, "", &mut seen).await,
+        HALL
+    );
+    let t = told(&mut member, talk(HALL, SUSPICIOUS_MAN)).await;
+    assert!(said(&t, keys::BALROG_SCROLLS_HELLO), "{t:?}");
+    let t = told(&mut member, answer(4, 1, Some(0))).await;
+    assert!(said(&t, keys::BALROG_SCROLLS_PICK), "{t:?}");
+    let mut t = told(&mut member, answer(4, 1, Some(11))).await;
+    until(&mut member.connection, &mut t, |t| {
+        t.added.iter().any(|a| a.2 == TWILIGHT_SCROLL)
+    })
+    .await;
+    assert!(said(&t, keys::BALROG_SCROLLS_GIVEN), "{t:?}");
 }

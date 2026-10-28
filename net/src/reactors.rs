@@ -348,6 +348,9 @@ pub fn takes(reactor_id: i32, name: &str, item_id: i32, day: u8) -> bool {
     }
 }
 
+/// The reward box on the Balrog's clear map (Map.nx 105100301).
+pub const BALROG_BOX: i32 = 1052001;
+
 pub fn action(reactor_id: i32) -> Action {
     match reactor_id {
         // Find the Jewel's boxes, by their `action` in Reactor.nx; its
@@ -488,6 +491,12 @@ pub fn action(reactor_id: i32) -> Action {
         6102002..=6102005 => Action::Spray {
             at_least: 15,
             mesos: (90, 360),
+        },
+        // The box on the Balrog's clear map, 105100301 (Cosmic `1052001`:
+        // `sprayItems(true, 1, 500, 1000, 15)`).
+        BALROG_BOX => Action::Spray {
+            at_least: 15,
+            mesos: (500, 1000),
         },
         OPQ_LEVER => Action::Lever,
         // The jails' boxes (`2002017`, `2002018`: `sprayItems(true, 1, 100,
@@ -825,6 +834,14 @@ mod tests {
             );
         }
         assert_ne!(action(6102001), action(6102002));
+        // The Balrog's clear map's box.
+        assert_eq!(
+            action(BALROG_BOX),
+            Action::Spray {
+                at_least: 15,
+                mesos: (500, 1000)
+            }
+        );
         let Action::SpawnAt { mob_id, at, .. } = action(2201003) else {
             panic!("{:?}", action(2201003));
         };
