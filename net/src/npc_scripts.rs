@@ -974,6 +974,13 @@ pub const MAGATIA_THANKS: i32 = 2112018;
 /// Pirate, and Guon on each of the ship's maps and its way out.
 pub const GUON: i32 = 2094000;
 pub const GUON_ABOARD: i32 = 2094002;
+/// Amos the Strong on his training ground, who lets a ticket holder into
+/// the Amorian Challenge's Entrance and trades keys for tickets; Amos on
+/// the Entrance, who sends a party of married couples in; and the Glimmer
+/// Man on its way out.
+pub const AMOS_HALL: i32 = 9201043;
+pub const AMOS_LOBBY: i32 = 9201048;
+pub const GLIMMER_MAN: i32 = 9201047;
 /// So Gong, who takes a challenger into the Mu Lung Dojo from its hall and
 /// stands on each of its floors, and the notice board in Mu Lung that
 /// leads to the Dojo.
@@ -1677,6 +1684,12 @@ impl NpcScript {
         guon(entry)
     }
 
+    /// Amos on the Amorian Challenge's Entrance, for a player whose party
+    /// may or may not take it on.
+    pub fn amos_lobby(entry: Entry) -> Self {
+        amos_lobby(entry)
+    }
+
     /// So Gong in the Dojo's hall, for `player`, who may or may not go in.
     pub fn so_gong(entry: Entry, party: Entry, player: &Player) -> Self {
         so_gong(entry, party, player)
@@ -2173,6 +2186,19 @@ impl NpcScript {
                     let retreat = magatia_keys(side).retreat;
                     return Some(ask_warp(npc_id, retreat, event.exit));
                 }
+            }
+            AMOS_HALL if player.stats.map_id == events::AMORIA_HALL => {
+                return Some(amos_hall(player));
+            }
+            GLIMMER_MAN if player.stats.map_id == events::AMORIA_EXIT => {
+                return Some(NpcScript::new(
+                    GLIMMER_MAN,
+                    vec![Page::Ask {
+                        text: text(keys::AMORIA_PQ_EXIT_ASK),
+                        on_yes: vec![Effect::WarpToPortal(events::AMORIA_HALL, 1)],
+                        on_no: None,
+                    }],
+                ));
             }
             GUON_ABOARD if player.stats.map_id == events::PIRATE_EXIT => {
                 return Some(NpcScript::new(
@@ -11710,6 +11736,98 @@ fn guon(entry: Entry) -> NpcScript {
     );
     // Someone left or moved since Guon checked, or another party went in.
     script.refused = Some(event_terms(&events::PIRATE, keys::PIRATE_NOT_ELIGIBLE));
+    script
+}
+
+/// Amos the Strong (Cosmic `9201043`) on his training ground: a player
+/// holding an Entrance Ticket gives it up to go into the Amorian
+/// Challenge's Entrance, and one without may trade 10 Lip Lock Keys for
+/// one.
+fn amos_hall(player: &Player) -> NpcScript {
+    let later = Some(text(keys::AMORIA_PQ_HALL_LATER));
+    let tickets = player.inventory.count(events::AMORIA_TICKET);
+    let enter = match tickets {
+        0 => Page::Say(text(keys::AMORIA_PQ_HALL_NO_TICKET)),
+        _ => Page::Ask {
+            text: text(keys::AMORIA_PQ_HALL_ENTER_ASK),
+            on_yes: vec![
+                Effect::TakeItem {
+                    item_id: events::AMORIA_TICKET,
+                    quantity: 1,
+                },
+                Effect::WarpToPortal(events::AMORIA_LOBBY, 0),
+            ],
+            on_no: later.clone(),
+        },
+    };
+    let keys_held = player.inventory.count(events::LIP_LOCK_KEY);
+    let trade = match tickets {
+        0 if keys_held >= events::AMORIA_KEYS_PER_TICKET as i32 => Page::Ask {
+            text: text(keys::AMORIA_PQ_HALL_TRADE_ASK),
+            on_yes: vec![
+                Effect::TakeItem {
+                    item_id: events::LIP_LOCK_KEY,
+                    quantity: events::AMORIA_KEYS_PER_TICKET,
+                },
+                Effect::GiveItem {
+                    item_id: events::AMORIA_TICKET,
+                    quantity: 1,
+                },
+            ],
+            on_no: later,
+        },
+        0 => Page::Say(text(keys::AMORIA_PQ_HALL_NO_KEYS)),
+        _ => Page::Say(text(keys::AMORIA_PQ_HALL_HAS_TICKET)),
+    };
+    let mut script = NpcScript::new(
+        AMOS_HALL,
+        vec![Page::Menu {
+            text: text(keys::AMORIA_PQ_HALL_MENU),
+            choices: vec![
+                (text(keys::AMORIA_PQ_HALL_ENTER), vec![enter]),
+                (text(keys::AMORIA_PQ_HALL_TRADE), vec![trade]),
+            ],
+        }],
+    );
+    script.inventory_full = Some(text(keys::AMORIA_PQ_HALL_NO_ROOM));
+    script
+}
+
+/// Amos (Cosmic `9201048`) on the Amorian Challenge's Entrance: the leader
+/// of a party of six married men and women takes it in, and anyone may hear
+/// about it. The map has no way out, so Amos also sends a player back to
+/// the training ground.
+fn amos_lobby(entry: Entry) -> NpcScript {
+    let not_eligible = || event_terms(&events::AMORIA, keys::AMORIA_PQ_LOBBY_NOT_ELIGIBLE);
+    let enter = match entry {
+        Entry::NoParty => Page::Say(text(keys::AMORIA_PQ_LOBBY_NO_PARTY)),
+        Entry::NotLeader => Page::Say(text(keys::AMORIA_PQ_LOBBY_NOT_LEADER)),
+        Entry::NotEligible => Page::Say(not_eligible()),
+        Entry::Busy => Page::Say(text(keys::AMORIA_PQ_LOBBY_BUSY)),
+        Entry::Ready => Page::Done(vec![Effect::StartEvent(EventKind::Amoria)]),
+    };
+    let mut script = NpcScript::new(
+        AMOS_LOBBY,
+        vec![Page::Menu {
+            text: text(keys::AMORIA_PQ_LOBBY_MENU),
+            choices: vec![
+                (text(keys::AMORIA_PQ_LOBBY_ENTER), vec![enter]),
+                (
+                    text(keys::AMORIA_PQ_LOBBY_LEAVE),
+                    vec![Page::Done(vec![Effect::WarpToPortal(
+                        events::AMORIA_HALL,
+                        1,
+                    )])],
+                ),
+                (
+                    text(keys::AMORIA_PQ_LOBBY_ABOUT),
+                    vec![Page::Say(text(keys::AMORIA_PQ_LOBBY_INFO))],
+                ),
+            ],
+        }],
+    );
+    // Someone left or moved since Amos checked, or another party went in.
+    script.refused = Some(not_eligible());
     script
 }
 

@@ -662,6 +662,8 @@ impl WorldDirectory {
             id: entry.handle.client_id,
             level: entry.presence.level,
             map_id: entry.presence.map_id,
+            married: entry.presence.married,
+            gender: entry.presence.gender,
         };
         let candidates: Vec<_> = if kind.event().solo() {
             // Party or not (Cosmic `2091005`'s solo run).
@@ -2144,6 +2146,8 @@ mod tests {
             alliance_id: None,
             family: Default::default(),
             partner: None,
+            married: false,
+            gender: 0,
             gm: false,
             hidden: false,
         }

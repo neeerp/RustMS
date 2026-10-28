@@ -909,6 +909,11 @@ pub struct Presence {
     pub family: Relatives,
     /// The other one of the couple, who is told the player's map.
     pub partner: Option<ClientId>,
+    /// Whether the couple is married, not just engaged (Amoria's party
+    /// quest takes only the married).
+    pub married: bool,
+    /// 0 for a man, 1 for a woman.
+    pub gender: u8,
     /// Whether the account is a GM's.
     pub gm: bool,
     /// A GM hidden by Hide, whom only GMs can find or whisper.
@@ -936,6 +941,11 @@ impl Presence {
                 .marriage
                 .as_ref()
                 .map(|record| record.partner_of(player.id())),
+            married: player
+                .marriage
+                .as_ref()
+                .is_some_and(|record| record.married()),
+            gender: stats.gender,
             gm: player.gm_level > 0,
             hidden: player.hidden,
         }

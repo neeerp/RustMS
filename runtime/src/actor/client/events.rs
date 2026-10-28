@@ -81,6 +81,7 @@ impl ClientActor {
             EventKind::Tylus => NpcScript::tylus(entry),
             EventKind::Ellin => NpcScript::ellin(entry, &self.in_game()?.player),
             EventKind::Pirate => NpcScript::guon(entry),
+            EventKind::Amoria => NpcScript::amos_lobby(entry),
             EventKind::Magatia(side) => NpcScript::magatia(side, entry),
             EventKind::Dojo => {
                 // He offers the run with a party too.
