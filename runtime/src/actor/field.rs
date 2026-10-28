@@ -2171,7 +2171,8 @@ impl FieldActor {
             (net::mobs::HORNTAIL, net::events::HORNTAILS_CAVE) => self.horntail_falls(),
             (net::mobs::PAPULATUS_LAST, net::events::ORIGIN_OF_CLOCKTOWER) => self.boss_falls(),
             // The sealed Balrog comes out a little later (Cosmic
-            // `BalrogBattle.spawnSealedBalrog`).
+            // `BalrogBattle.spawnSealedBalrog`), and everyone here counts
+            // the kill Balrog and the Seal (2239) asks for.
             (net::mobs::BALROG_BODY, net::events::BALROG_TOMB) if self.key.instance_id != 0 => {
                 self.boss_falls();
                 self.announce(keys::BALROG_VICTORY);
@@ -2180,6 +2181,18 @@ impl FieldActor {
                     at: net::events::BALROG_AT,
                 };
                 self.after(net::events::SEALED_BALROG_AFTER, sealed);
+                for occupant in self.occupants.values() {
+                    occupant.handle.send(ServerMessage::MobKilled {
+                        mob_id: net::mobs::BALROG_SEALED_CREDIT,
+                        object_id: kill.object_id,
+                        exp: 0,
+                        party_bonus: 0,
+                        looter: false,
+                        x: kill.x,
+                        y: kill.y,
+                        showdown: kill.showdown,
+                    });
+                }
             }
             // Every mob in the arena goes with The Boss (Cosmic
             // `ShowaBattle.clearPQ`).

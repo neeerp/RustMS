@@ -128,7 +128,9 @@ async fn prize(player: &mut WorldSession) -> Trace {
         t.arrivals.iter().any(|a| a.0 == SHOWA_CLEAR)
     })
     .await;
-    let got = (t.added.iter()).any(|&(_, _, item_id)| SHOWA_REWARDS.iter().any(|r| r.0 == item_id));
+    // A prize may stack onto one won before, so look at the gain's line.
+    let got =
+        (t.items.iter()).any(|&(item_id, n)| n > 0 && SHOWA_REWARDS.iter().any(|r| r.0 == item_id));
     assert!(got, "{t:?}");
     read_for(&mut player.connection, &mut t, 1500).await;
     t

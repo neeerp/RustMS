@@ -42,7 +42,15 @@ of a death. The second arm's death makes it real (`make_real`).
 The body's death in the copy is `boss_falls` (the clear effect and jingle,
 and the event's one stage cleared, which wins it), with a world item line
 (`balrog.victory`), as Zakum's. Ten seconds later the sealed Balrog
-(8830003) comes out at the same spot.
+(8830003) comes out at the same spot. Everyone in the tomb then counts a
+kill of 9101003 (`mobs::BALROG_SEALED_CREDIT`, a `MobKilled` with no EXP
+and no loot), the mob Mu Young's Balrog and the Seal (2239) asks for
+(Quest.nx `Check.img/2239/1/mob`); no mob of that id ever comes out.
+
+The content pack has no drops for the Balrog, so its body's come from
+`game-data/reward_overrides.toml` (`[mobs.8830000]`): Cosmic's table, the
+Balrog's weapons and shoes, potions, scrolls and its leather (60%), less its
+Monster Book card, with one pile of about 7,000 mesos.
 
 ## The win
 
@@ -53,20 +61,36 @@ on to the clear map (105100301, `BALROG_CLEAR`). The clear map's way out
 (4001261, `BALROG_LEATHER`) and leads back to Mu Young; one with no room in
 Etc is told to make some.
 
+The clear map's box (reactor 1052001, `reactors::BALROG_BOX`) breaks after
+its hits and sprays its loot with piles of 500 to 999 mesos, at least 15
+drops (Cosmic's `sprayItems`). Its loot is Cosmic's too
+(`[reactors.1052001]`): each of 44 Balrog weapons, shoes and scrolls one
+time in three.
+
+The Suspicious Man (1061016, `npc_scripts::BALROG_SCROLLS`) in the
+Balrog's hall (105100000) trades one leather for one of the Balrog's twelve
+scrolls (2040728 to 2040739, 30% stat scrolls and the 5% Twilight Scroll),
+the player's pick. One with no leather is told so; one with no room in Use
+is told to make some.
+
 ## NPCs
 
 | NPC | Where | Script |
 | --- | --- | --- |
 | Mu Young 1061014 | 105100100 | The squad |
 | Mu Young 1061018 | 105100300 | Leave, or after the win on to 105100301 |
+| Suspicious Man 1061016 | 105100000 | A scroll for a leather |
 
 ## Tests
 
 `net` has unit tests for the event (`events.rs`), the shields (`mobs.rs`),
-the squad and the tomb's Mu Young (`npc_scripts.rs`) and `balog_end`
-(`scripts.rs`); `runtime`'s `field_mobs.rs` checks the body stays shielded
+the squad, the tomb's Mu Young and the Suspicious Man (`npc_scripts.rs`),
+the box (`reactors.rs`) and `balog_end` (`scripts.rs`); `game-data` checks
+the drops load without the pack; `runtime`'s `field_mobs.rs` checks the body stays shielded
 between the claw's death and the left arm's coming out. The harness's
 `tests/balrog_tomb.rs` gathers two, has Mu Young in the tomb offer only the
 way out, waits for the left arm, finds the body unhurt, beats both arms and
-the body, sees the clear, the world line and the sealed Balrog, and takes
-both through the clear map's way out for the leather.
+the body, sees the clear, the world line, the sealed Balrog and both
+counting 2239's kill, breaks the clear map's box for its spray, takes both
+through the clear map's way out for the leather, and trades one for the
+Twilight Scroll.

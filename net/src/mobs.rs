@@ -73,6 +73,10 @@ pub const BALROG_LEFT_ARM: i32 = 8830001;
 pub const BALROG_RIGHT_ARM: i32 = 8830002;
 pub const SEALED_BALROG: i32 = 8830003;
 pub const BALROG_CLAW: i32 = 8830006;
+/// The mob Balrog and the Seal (2239) counts (Quest.nx Check.img/2239/1/mob,
+/// String.nx's Korean-only 9101003): no mob of its own, but each one in the
+/// tomb when the body falls (Cosmic `dispatchRaiseQuestMobCount`).
+pub const BALROG_SEALED_CREDIT: i32 = 9101003;
 
 /// Whether a `guard` out keeps a `mob_id` from harm: Zakum's arms its body
 /// (Cosmic `MapleMap.damageMonster`), and the Balrog's arms and claw its
